@@ -77,6 +77,7 @@ machine (their datum identifiers need not be).
 #include "network_distributed.h"
 #include "network_voice.h"
 #include "mcc_network.h"
+#include "mcc_script_effects.h"
 #include "mcc_object_names_network.h"
 #include "map_share.h"
 #include "profile_sections.h"
@@ -2066,6 +2067,10 @@ static void distributed_take_prediction(
 	real_point3d position = state->position;
 	real dx, dy, dz;
 
+	/* MCC movement effects stay host-simulated, rather than widening the
+	 * security bounds on client-supplied positions and velocities. */
+	if (mcc_script_effects_host_movement())
+		return;
 	if (distributed_riding_moving_elevator(unit_index))
 		position.z = object->object.position.z;
 	dx = position.x - object->object.position.x;
@@ -2249,7 +2254,7 @@ static void distributed_handle_unit_state(
 		network_player_attach_unit(player_index, state->unit_index);
 		/* (a unit of a life this machine missed the end of, no player's
 		now: unit_kill_no_statistics is for players' units only) */
-		if (unit_index != NONE && unit_index != state->unit_index)
+		if (unit_index != NONE && unit_index != state->unit_index && !mcc_script_effects_preserve_body())
 			unit_kill(unit_index);
 	}
 	unit_index = state->unit_index;

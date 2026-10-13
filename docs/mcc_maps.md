@@ -1330,7 +1330,7 @@ parameter-only handling was insufficient when Warthog Rally compiled its timer
 expression. The guarded hook is necessary because native expression compilation
 and evaluation use the shared interpreter. Xbox and Custom Edition retain the
 original cast table, and the tests cover the inactive-MCC case.
-Cursed Halo loads after graph repair, but 15 scripts remain disabled because
+At this stage Cursed Halo loaded after graph repair, but 15 scripts remained disabled because
 of restricted engine cheats (vehicle spawning, jetpack, super-jump, possession,
 Medusa, bottomless ammunition and omnipotence). The new diagnostics identify
 individual scripts. No cheat permission or client-authority restriction is
@@ -1494,3 +1494,70 @@ Validation on Windows (portable release, based on main `dccbc62b`):
 All implementation changes are in MCC modules. No shared engine source,
 Xbox/Custom Edition loader or network message layout was changed.
 For authored biped seats and their network isolation, see [MCC seats](mcc_seats.md).
+
+### Cursed Halo authored effects (October 13)
+
+`mcc_script_effects.c` supports the map-authored jetpack, super-jump,
+bottomless-clip, possession, Medusa, omnipotence and deathless flags. The
+MCC campaign adapter also exposes vehicle spawning through the existing
+engine service. This enables the 15 previously restricted Cursed Halo scripts;
+it does not add Twitch/Crowd Control connectivity. Evidence comes from the
+supplied CursedHalo A10's compiled scripts: its dispatcher calls timed `fx_*`
+scripts, whose continuous updates clear the flags when their timers expire.
+No proprietary MCC source was used.
+
+The host runs these scripts and owns damage, spawning and possession. Clients
+receive bounded effect flags in the existing MCC campaign snapshot and use
+them for movement and ammunition prediction, while native client cheat globals
+remain disabled. Jetpack and super-jump keep movement host-simulated from
+validated inputs rather than widening acceptable client position/velocity
+bounds. This can require corrections under latency; it does not authorize a
+client's position, possession target or cheat request. State version 3 retains
+the snapshot size and accepts older checkpoint versions with the new effects
+off. Network version 40 is required because peers must agree on these effects
+and on live-body player transfers.
+
+The shared hooks are necessary because the native movement and weapon code
+reads cheat globals directly, the bump handler uses a local-only possession
+helper, and client player attachment previously killed the former body.
+Guarded calls in `bipeds.c`, `units.c` and `weapons.c` consult MCC-owned state;
+`network_distributed.c` leaves MCC former-body death to host replication and
+declines client movement corrections during movement effects. Their inactive
+MCC paths retain Xbox/Custom Edition behavior. Effect state is restored at
+checkpoints and the pre-MCC settings are restored on unload.
+
+The same A10 intro passes an actor-variant tag to `object_type_predict`.
+The MCC adapter precaches that variant's referenced unit after group checks,
+instead of interpreting actor-variant data as an object. Other non-object
+references produce a diagnostic; the native function is unchanged.
+
+Validation: Windows x86 portable release build; 1,045 MCC tests passed (two
+optional skips), plus 157 targeted native/cache tests (four optional skips).
+The movement-bound regression includes a mutation check that fails if client
+positions are accepted during MCC movement effects. Hidden A10 tests exercised
+the authored dispatcher, timed expiration and checkpoint restoration in
+singleplayer and two-player loopback co-op. Read-only process observations
+confirmed matching host/client effect state with all native client cheat flags
+remaining clear. Singleplayer also exercised Medusa, omnipotence, deathless and
+vehicle spawning, then Xbox Blood Gulch and Custom Edition Death Island in the
+same process; MCC flags cleared on transition. Possession ownership, invalid
+targets and preserving multiplayer teams are covered by the real-module
+harness. A further two-instance A10 collision test transferred the remote
+player into the captain biped and back into the original living body; both
+machines observed the same unit identifiers with no assertions. These checks
+are not a full campaign playthrough or a latency test.
+Two-player Cursed Halo Blood Gulch also synchronized enable/disable while the
+network test exercised firing. The remote console's attempts to enable
+super-jump and spawn vehicles were rejected with the existing host-authority
+message, and its native cheat flags remained clear.
+
+Direct console calls to parameterized map scripts reported the existing
+runtime's corrupt-syntax diagnostic during testing; the map's compiled
+dispatcher calls executed successfully. Android/Web build targets are absent
+from this Windows configuration. Web graph/socket tests cannot complete here
+(Windows-only graph and missing pthread headers); browser/native transport
+tests also require unavailable Playwright. These platform checks remain for CI
+or an appropriately provisioned host.
+
+Final Windows executable SHA-256:
+`f2c16365d22ab7c5d84f7ffcbd400f3ec0b62e6ff9638cc2979b859e20809f8c`.

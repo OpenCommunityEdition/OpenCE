@@ -12,11 +12,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run, structure  # noqa: E402
 
 SOURCE = "port/linux/game/network_distributed.c"
-CASES = ["riding-up", "elevator-at-rest", "on-foot"]
+CASES = ["riding-up", "elevator-at-rest", "on-foot", "mcc-host-movement"]
 FUNCTIONS = ("distributed_riding_moving_elevator", "distributed_take_prediction")
 
 # a fault in network_distributed.c, the function it is in, and the case that must catch it
 NEGATIVE_CONTROLS = {
+    "mcc-client-position-taken": (("if (mcc_script_effects_host_movement())", "if (0)"),
+                                  "distributed_take_prediction", "mcc-host-movement"),
     "height-taken-riding": (("if (distributed_riding_moving_elevator(unit_index))\n\t\tposition.z",
                              "if (0)\n\t\tposition.z"), "distributed_take_prediction", "riding-up"),
     "elevator-at-rest-rides": (("return elevator && elevator->device.position_velocity != 0.0f;",

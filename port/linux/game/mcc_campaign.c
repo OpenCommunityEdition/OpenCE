@@ -2,6 +2,8 @@
  * replaced. State belongs to MCC snapshots, never the Xbox/CE tag data. */
 #include "mcc_campaign.h"
 #include "mcc_cache.h"
+#include "mcc_script_effects.h"
+#include "ai/actor_definitions.h"
 #include "mcc_ui_network.h"
 #include "main/main.h"
 #include "errors.h"
@@ -61,7 +63,7 @@ boolean mcc_campaign_global_settable(short index)
     char const *name;
     if (!mcc_cache_tags_loaded() || index<0 || index>=hs_external_global_count) return FALSE;
     name=hs_global_external_get(index)->name;
-    return !csstrcasecmp(name,"sound_gain_under_dialog") || !csstrcasecmp(name,"cheat_infinite_ammo") ||
+    return mcc_script_effect_global(name) || !csstrcasecmp(name,"sound_gain_under_dialog") || !csstrcasecmp(name,"cheat_infinite_ammo") ||
         !csstrcasecmp(name,"object_light_ambient_base") || !csstrcasecmp(name,"object_light_ambient_scale") ||
         !csstrcasecmp(name,"loud_dialog_hack") || !csstrcasecmp(name,"ai_debug_ignore_player");
 }
@@ -75,6 +77,7 @@ static real mcc_campaign_argument(long value)
 
 void mcc_campaign_begin(void)
 {
+    mcc_script_effects_begin();
     if (!mcc_campaign_owned) {
         short index=hs_find_global_by_name("ai_debug_ignore_player");
         struct hs_external_global_definition *global=index!=NONE && ((unsigned short)index&0x8000) &&
@@ -88,7 +91,7 @@ void mcc_campaign_begin(void)
         mcc_original_ignore_player=mcc_ignore_player ? *mcc_ignore_player : FALSE;
     }
     memset(&mcc_campaign,0,sizeof(mcc_campaign));
-    mcc_campaign.version=2; mcc_campaign.gravity=1.0f;
+    mcc_campaign.version=3; mcc_campaign.gravity=1.0f;
     mcc_campaign.effects_gain=1.0f;
     mcc_campaign.dialog_gain=mcc_original_dialog_gain;
     global_gravity=mcc_original_gravity;
@@ -102,6 +105,7 @@ void mcc_campaign_begin(void)
 
 void mcc_campaign_dispose(void)
 {
+    mcc_script_effects_dispose();
     if (mcc_campaign_owned) {
         global_gravity=mcc_original_gravity;sound_gain_under_dialog=mcc_original_dialog_gain;
         cheat.infinite_ammo=mcc_original_infinite_ammo;
@@ -117,8 +121,10 @@ void mcc_campaign_dispose(void)
 void mcc_campaign_snapshot(void *out)
 {
     mcc_campaign.dialog_gain=sound_gain_under_dialog;
-    mcc_campaign.flags=(mcc_campaign.flags&8u) | (cheat.infinite_ammo ? 1u : 0u) | (loud_dialog_hack ? 2u : 0u) |
-        (mcc_ignore_player && *mcc_ignore_player ? 4u : 0u);
+    if (game_connection()!=_game_connection_network_client)
+        mcc_campaign.flags=(mcc_campaign.flags&8u) | (cheat.infinite_ammo ? 1u : 0u) | (loud_dialog_hack ? 2u : 0u) |
+            (mcc_ignore_player && *mcc_ignore_player ? 4u : 0u) |
+            (mcc_script_effects_snapshot()<<4);
     mcc_campaign.ambient_base=object_light_ambient_base;mcc_campaign.ambient_scale=object_light_ambient_scale;
     memcpy(out,&mcc_campaign,sizeof(mcc_campaign));
 }
@@ -131,9 +137,9 @@ int mcc_campaign_validate(void const *in, unsigned long bytes)
     memset(&state,0,sizeof(state));state.effects_gain=1.0f;
     state.ambient_base=mcc_original_ambient_base;state.ambient_scale=mcc_original_ambient_scale;
     memcpy(&state,in,bytes);
-    if (state.version!=(bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES ? 1u : 2u) ||
+    if ((bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES ? state.version!=1u : (state.version!=2u && state.version!=3u)) ||
         !(state.effects_gain>=0.0f && state.effects_gain<=4.0f) ||
-        (state.flags & ~(bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES ? 1u : 15u)) ||
+        (state.flags & ~(state.version==1u ? 1u : state.version==2u ? 15u : 15u|(MCC_EFFECT_MASK<<4))) ||
         !mcc_campaign_real(state.ambient_base) || !mcc_campaign_real(state.ambient_scale) ||
         !mcc_campaign_real(state.dialog_gain) ||
         !(state.gravity>=-1000.0f && state.gravity<=1000.0f)) return 0;
@@ -166,7 +172,8 @@ int mcc_campaign_restore(void const *in, unsigned long bytes)
     memcpy(&mcc_campaign,in,bytes);
     if (bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES)
         mcc_campaign.flags|=(mcc_original_loud_dialog ? 2u : 0u) | (mcc_original_ignore_player ? 4u : 0u);
-    mcc_campaign.version=2;
+    mcc_campaign.version=3;
+    mcc_script_effects_restore(mcc_campaign.flags>>4);
     global_gravity=mcc_original_gravity*mcc_campaign.gravity;
     sound_gain_under_dialog=mcc_campaign.dialog_gain;
     object_light_ambient_base=mcc_campaign.ambient_base;object_light_ambient_scale=mcc_campaign.ambient_scale;
@@ -181,6 +188,12 @@ int mcc_campaign_restore(void const *in, unsigned long bytes)
 real mcc_campaign_effects_gain(void)
 {
     return mcc_cache_tags_loaded() && mcc_campaign_owned ? mcc_campaign.effects_gain : 1.0f;
+}
+
+boolean mcc_campaign_unlimited_ammo(void)
+{
+    return mcc_cache_tags_loaded() && mcc_campaign_owned &&
+        (game_connection()==_game_connection_network_client ? (mcc_campaign.flags&1u)!=0 : cheat.infinite_ammo);
 }
 
 /* Script muting is additional to the player's audio settings, and belongs
@@ -430,6 +443,34 @@ static void mcc_cinematic_abort_evaluate(short function, long thread, boolean in
     hs_return(thread,0);
 }
 
+static void mcc_spawn_vehicles_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;(void)initialize;
+    /* The existing engine service places the loaded globals' vehicle list.
+     * Object creation is already replicated by the host's object channel. */
+    if (mcc_cache_tags_loaded() && mcc_campaign_owned &&
+        game_connection()!=_game_connection_network_client) cheat_all_vehicles();
+    hs_return(thread,0);
+}
+
+static void mcc_object_type_predict_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    long tag;
+    boolean tag_index_is_group(long index,long group);
+    if (!args) return;
+    tag=args[0];
+    /* Cursed Halo A10's intro names an actor variant in object_type_predict.
+     * Precache its referenced unit instead of reading actv data as an object. */
+    if (mcc_cache_tags_loaded() && tag!=NONE) {
+        if (tag_index_is_group(tag,ACTOR_VARIANT_DEFINITION_TAG))
+            tag=actor_variant_definition_get(tag)->unit_reference.index;
+        if (tag!=NONE && tag_index_is_group(tag,OBJECT_DEFINITION_TAG)) object_definition_predict(tag);
+        else if (tag!=NONE) error(_error_silent,"mcc: object_type_predict cannot preload non-object tag %08lx",tag);
+    }
+    hs_return(thread,0);
+}
+
 static void mcc_print_if_evaluate(short function, long thread, boolean initialize)
 {
     long *args=hs_macro_function_evaluate(function,thread,initialize);
@@ -504,7 +545,9 @@ static struct mcc_campaign_definition mcc_campaign_functions[]={
     {{_hs_type_void,0,"sound_enable",hs_macro_function_parse,mcc_sound_enable_evaluate,NULL,NULL,1,{_hs_type_boolean}},{0}},
     {{_hs_type_void,0,"map_reset",hs_macro_function_parse,mcc_map_reset_evaluate,NULL,NULL,0,{0}},{0}},
     {{_hs_type_real,0,"abs_real",hs_macro_function_parse,mcc_abs_real_evaluate,NULL,NULL,1,{_hs_type_real}},{0}},
-    {{_hs_type_void,0,"cinematic_abort",hs_macro_function_parse,mcc_cinematic_abort_evaluate,NULL,NULL,0,{0}},{0}}
+    {{_hs_type_void,0,"cinematic_abort",hs_macro_function_parse,mcc_cinematic_abort_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_void,0,"cheat_all_vehicles",hs_macro_function_parse,mcc_spawn_vehicles_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_void,0,"object_type_predict",hs_macro_function_parse,mcc_object_type_predict_evaluate,NULL,NULL,1,{_hs_type_object_definition}},{0}}
 };
 
 struct hs_function_definition *mcc_campaign_function(short index)

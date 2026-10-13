@@ -265,6 +265,15 @@ seat state. The host checks the action, proximity, occupancy and animation befor
 boarding; clients apply the host's object identity and seat. Biped parents do not
 become client-owned predicted vehicles. No packet layout changes, but older peers
 would reject these parents and disagree about attachments and camera/aiming.
+
+GulchCE version 40 adds host-authored MCC campaign effect flags to the existing
+campaign snapshot (state version 3, unchanged packet size). Clients predict
+jetpack, super-jump and ammunition behavior from those flags without enabling
+their native cheat globals. While movement effects are active the host simulates
+movement from validated inputs and does not accept client position/velocity
+corrections. MCC possession uses host-owned player attachment; clients leave the
+former body's fate to host object/damage replication. Xbox and Custom Edition
+retain their original simulation paths, but all peers require version 40.
 Xbox and Custom Edition keep their existing vehicle-seat behavior; all peers
 still need the matching network version.
 

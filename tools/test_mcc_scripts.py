@@ -27,6 +27,8 @@ def native_mcc_harness(tmp_path_factory):
     def build(name):
         binary = directory / (name + ".exe")
         extra = [str(ROOT / "port/linux/game/mcc_syntax.c")] if name == "mcc_scripts" else []
+        if name == "mcc_campaign":
+            extra.append(str(ROOT / "port/linux/game/mcc_script_effects.c"))
         result = subprocess.run(command + [str(ROOT / "tools/harness/tests" / (name + ".c")),
                                 str(ROOT / "port/linux/game" / (name + ".c"))] + extra + ["-o", str(binary)],
                                 capture_output=True, text=True)

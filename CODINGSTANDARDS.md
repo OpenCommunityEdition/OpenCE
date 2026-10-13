@@ -23,7 +23,7 @@ inventory when an authorized change makes it inaccurate.
 | --- | --- |
 | Map selection, loading, packages and resources | `mcc_main`, `mcc_maps`, `mcc_cache`, `mcc_cache_format`, `mcc_package`, `mcc_resources`, `mcc_tags`, `mcc_tag_validate` |
 | Script interpretation, parameters and object names | `mcc_scripts`, `mcc_syntax`, `mcc_script_parameters`, `mcc_object_names` |
-| Checkpoints and campaign state | `mcc_checkpoint`, `mcc_campaign` |
+| Checkpoints and campaign state | `mcc_checkpoint`, `mcc_campaign`, `mcc_script_effects` |
 | Weapon-authored camera selection | `mcc_camera` |
 | Networking and named-object synchronization | `mcc_network`, `mcc_object_names_network` |
 | Player inventory, objects, seats and recordings | `mcc_player`, `mcc_grenades`, `mcc_objects`, `mcc_seats`, `mcc_recordings` |
