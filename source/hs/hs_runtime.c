@@ -2953,6 +2953,9 @@ static void hs_global_reconcile_read(
 	struct hs_global_datum *global;
 	struct hs_external_global_definition *external;
 
+	/* port: MCC's scenario-local speed global reflects its authoritative clock. */
+	mcc_hs_speed_reconcile(global_designator, FALSE);
+
 	if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL(global_designator))
 	{
 		long global_index;
@@ -3180,6 +3183,9 @@ static void hs_global_reconcile_write(
 	struct hs_global_datum *global;
 	struct hs_external_global_definition *external;
 	real value;
+
+	/* port: MCC speed writes cannot change a client's local clock. */
+	mcc_hs_speed_reconcile(global_designator, TRUE);
 
 	if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL(global_designator))
 	{

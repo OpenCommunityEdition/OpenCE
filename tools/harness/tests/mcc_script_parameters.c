@@ -4,6 +4,7 @@
 #include "hs/hs.h"
 #include "hs/hs_scenario_definitions.h"
 #include "memory/data.h"
+#include "game/game.h"
 #include "scenario/scenario_definitions.h"
 #include "mcc_runtime.h"
 #include "mcc_script_parameters.h"
@@ -25,6 +26,8 @@ struct hs_thread_datum {short identifier;byte type,flags;long script_index,sleep
 static struct hs_thread_datum thread,other_thread;
 static struct scenario *scenario;
 struct data_array *hs_syntax_data;
+struct hs_global_datum {short identifier;short unused;long value;};
+static struct data_array *hs_global_data;
 static int loaded=1,errors,refs,returned,disabled;
 short const hs_external_global_count=443;
 static long last_result;

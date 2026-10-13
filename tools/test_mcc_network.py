@@ -50,6 +50,53 @@ def test_legacy_inventory_wire_unchanged():
     assert "mcc" not in inventory
 
 
+def test_speed_packet_transport_boundary(tmp_path):
+    """Compile the dispatcher's actual new case, not a second copy of its checks."""
+    from harness import structure
+    clang = shutil.which("clang")
+    if not clang:
+        pytest.skip("clang required")
+    source = (ROOT / "port/linux/game/network_distributed.c").read_text()
+    header = (ROOT / "port/linux/game/network_distributed.h").read_text()
+    start = source.index("case _distributed_message_mcc_game_speed:")
+    case = source[start:source.index("case _distributed_message_mcc_object_names:", start)]
+    code = r'''
+#include <stdio.h>
+typedef float real;
+typedef unsigned char byte;
+typedef unsigned short message_header;
+''' + structure(header, "distributed_message_header") + r'''
+static int unreliable,accepted;
+static int network_connection_last_read_was_unreliable(void) {return unreliable;}
+enum {NONE=-1,_distributed_message_mcc_game_speed=90};
+static void dispatch(int machine_index,unsigned int size,unsigned int count) {
+ struct distributed_message_header header={0};
+ unsigned int entry_size=0;header.type=90;header.count=count;
+ switch(header.type) {
+''' + case + r'''
+ }
+ if(entry_size==sizeof(real))accepted++;
+}
+#define CHECK(x) do {if(!(x))return __LINE__;} while(0)
+int main(void) {
+ unsigned int size,count,valid=sizeof(struct distributed_message_header)+sizeof(real);int sender;
+ dispatch(NONE,valid,1);CHECK(accepted==1);
+ for(sender=0;sender<16;sender++)dispatch(sender,valid,1);
+ CHECK(accepted==1);unreliable=1;dispatch(NONE,valid,1);CHECK(accepted==1);unreliable=0;
+ for(size=0;size<100;size++)if(size!=valid)dispatch(NONE,size,1);
+ for(count=0;count<256;count++)if(count!=1)dispatch(NONE,valid,count);
+ CHECK(accepted==1);return 0;
+}
+'''
+    path = tmp_path / "speed_packet.c"
+    path.write_text(code)
+    binary = tmp_path / ("speed_packet.exe" if os.name == "nt" else "speed_packet")
+    target = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if os.name == "nt" else []
+    result = subprocess.run([clang, *target, "-std=gnu89", str(path), "-o", str(binary)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert subprocess.run([str(binary)], timeout=10).returncode == 0
+
+
 def test_map_sharing_keeps_mcc_packets_and_names_separate(tmp_path):
     from harness import enum_with, function, structure
     clang = shutil.which("clang")

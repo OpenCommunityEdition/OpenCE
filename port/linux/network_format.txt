@@ -1,4 +1,4 @@
-version 40
+version 41
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
 bound DISTRIBUTED_INPUT_HISTORY 4
@@ -63,6 +63,7 @@ enum _distributed_message_map_share_progress 86
 enum _distributed_message_map_share_request 83
 enum _distributed_message_map_share_sources 85
 enum _distributed_message_mcc_campaign 88
+enum _distributed_message_mcc_game_speed 90
 enum _distributed_message_mcc_grenades 87
 enum _distributed_message_mcc_object_names 89
 enum _distributed_message_notice 17

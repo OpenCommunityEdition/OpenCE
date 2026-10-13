@@ -15,6 +15,7 @@
 #include "interface/hud_definitions.h"
 #include "scenario/scenario_definitions.h"
 #include "mcc_campaign.h"
+#include "mcc_game_speed.h"
 #include "sound/sound_definitions.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +24,7 @@
 #undef memcpy
 #undef strcmp
 #undef strlen
+void mcc_game_speed_reset(void) {}
 
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
 static int printed,requests,blocks,restarts,network_restarts,cinematic_skips,vehicle_spawns,possessions;

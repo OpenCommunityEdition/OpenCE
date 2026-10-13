@@ -1561,3 +1561,96 @@ or an appropriately provisioned host.
 
 Final Windows executable SHA-256:
 `f2c16365d22ab7c5d84f7ffcbd400f3ec0b62e6ff9638cc2979b859e20809f8c`.
+
+### MCC clock global and alternate environment attenuation (issue 49)
+
+`game_speed_value` is linked to an MCC scenario-local real global, initialized
+to one. Its read/write adapter uses the native host's game-time speed, which
+already belongs to saved game state. Finite values from zero through 100 are
+accepted, matching the native speed setter; this is a safety bound, not a
+recommendation to run maps at high speed. The public
+[H1 scripting reference](https://c20.reclaimers.net/h1/scripting/) documents
+the MCC global and warns against speeds above 20. No reporter could identify
+the original failing map, so runtime validation uses private copies of
+Bigass and Mercury Falling with this global added; originals remain unchanged.
+
+`mcc_game_speed.c` owns synchronization and client state. Only the host may
+change speed. Clients retain the native cheat enforcement and receive a
+separate multiplier from the host on its reliable, ordered connection.
+Message 90 requires exactly one float, an exact packet size and the host
+connection; unreliable packets and client senders are rejected. Invalid float
+values are ignored. Updates continue in wall-clock time at speed zero, and
+repeat for joining clients. They are deliberately outside the tick-only batch
+and stale-tick filter, so pause/resume and checkpoint rewinds remain possible.
+Network version **41** is required for this new message and timing agreement.
+The existing engine admits new players on simulation ticks: joining a host
+already at speed zero can time out before admission. Resume before admitting
+a new player. Existing players can pause/resume together; a late join at half
+speed also receives the correct multiplier. This change does not alter the
+shared player-admission implementation.
+
+The host's existing client speed-hack detector still runs. Its elapsed time
+uses an MCC-owned clock integrating only host-approved speed changes. At zero
+speed it retains a small positive budget rather than exempting clients. Client
+movement acceptance and other host-authority checks are unchanged. MCC unload
+and new-map initialization clear remote speed and send/clock bookkeeping.
+
+The interpreter's global reconciliation and the frame/tick clock read native
+state directly, so MCC modules alone cannot implement these semantics.
+Small hooks in `hs_runtime.c` and `game_time.c` invoke the MCC adapter;
+`network_distributed.c` adds dispatch and a clock query. Xbox/CE lookups and
+clock behavior retain their original values when the MCC guards are inactive.
+
+Bigass's day, night and snow maps each contain 21 environment shaders with
+flag `0x8`, including `altis\\levels\\bigass\\shaders\\bigassgrass` in the day map.
+The [environment shader format reference](https://c20.reclaimers.net/h1/tags/shader/shader_environment/)
+identifies this as alternate bump attenuation, correcting repeated diffuse
+attenuation that can darken terrain and expose triangle boundaries. The flag
+layout is corroborated by Invader's public shader_environment schema. No
+proprietary shader implementation or SDK material was used.
+
+`mcc_environment_shader.c` scopes this behavior to a flagged MCC lightmap
+draw, excluding specular-mask-only bump maps. The platform companion emits
+an independently reconstructed response: `max(0, 1 + dot(normal, light) -
+light.z)`, followed by the existing combiner clamp. A flat normal therefore
+preserves the baked lightmap response instead of attenuating it again, while
+normal variations still affect it. **This is an approximation of the documented
+intent, not a verified copy of MCC's exact shader equation.** The supplied
+native MCC/GulchCE screenshots establish the visual symptom; controlled
+same-camera comparisons show the reduction in dark terrain triangles. Exact
+brightness in every MCC material remains a playtest limitation.
+
+This cannot be implemented purely by changing converted texture bytes: it
+depends on the incident-light vector of each fragment. The necessary shared
+additions scope the environment draw, carry one bit in the compiled shader
+cache key, and select the MCC emitter only for the matching bump-dot combiner.
+All other combiners retain the original generator. The draw clears its state
+immediately afterward, so subsequent materials and map families cannot inherit
+it. No texture, global brightness, Xbox shader flag or CE loader is rewritten.
+
+Validation on Windows x86 portable release: 1,050 MCC tests passed, with two
+optional skips. This includes actual script relocation, module behavior,
+packet size/sender/transport checks and the real combiner generator's legacy
+and MCC branches. Two hidden loopback instances tested Bigass multiplayer and
+Mercury Falling co-op at 0.5, 2, 0 and 1 speed. Read-only process sampling
+measured approximately 15, 60, 0 and 30 ticks/second on both machines, while
+native client speed stayed at one. Client console attempts to write the new
+global or invoke native `game_speed` were rejected. Joining at half speed,
+then pausing and resuming, passed; joining an already paused host timed out
+as described above.
+
+A singleplayer test suspended the fixture's authored auto-saving scripts,
+saved at half speed, changed to double speed, and reverted: the global and
+native clock returned to half speed. An initial test did not isolate the map's
+own checkpoint requests and was inconclusive. Xbox Blood Gulch
+and CE Death Island subsequently ran at normal speed. A separate rendered
+sequence exercised Bigass day/night/snow, Xbox Blood Gulch, CE Death Island
+and Bigass again at 1280x720, with screenshots inspected and no assertion or
+shader compilation errors. These are focused tests, not complete playthroughs.
+
+The broader general harness completed 306 tests but 82 cases could not build
+in this Windows environment (POSIX header/type assumptions and MSVC warnings
+treated as errors). Android/Web targets are absent from this Windows build
+configuration; both were attempted. Browser/native WebRTC and internet tests
+were attempted but lack Playwright here. Linux, Android, Web and internet
+latency/loss validation remain outstanding for CI or a provisioned host.

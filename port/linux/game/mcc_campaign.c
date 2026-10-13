@@ -3,6 +3,7 @@
 #include "mcc_campaign.h"
 #include "mcc_cache.h"
 #include "mcc_script_effects.h"
+#include "mcc_game_speed.h"
 #include "ai/actor_definitions.h"
 #include "mcc_ui_network.h"
 #include "main/main.h"
@@ -78,6 +79,7 @@ static real mcc_campaign_argument(long value)
 void mcc_campaign_begin(void)
 {
     mcc_script_effects_begin();
+    mcc_game_speed_reset();
     if (!mcc_campaign_owned) {
         short index=hs_find_global_by_name("ai_debug_ignore_player");
         struct hs_external_global_definition *global=index!=NONE && ((unsigned short)index&0x8000) &&
@@ -106,6 +108,7 @@ void mcc_campaign_begin(void)
 void mcc_campaign_dispose(void)
 {
     mcc_script_effects_dispose();
+    mcc_game_speed_reset();
     if (mcc_campaign_owned) {
         global_gravity=mcc_original_gravity;sound_gain_under_dialog=mcc_original_dialog_gain;
         cheat.infinite_ammo=mcc_original_infinite_ammo;

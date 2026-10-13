@@ -206,6 +206,7 @@ static short mcc_local_global(struct mcc_runtime *runtime, struct scenario *scen
     memset(initializer,0,sizeof(*initializer));
     initializer->datum_header=1;initializer->flags=9;
     initializer->type=initializer->constant_type=type;
+    if (!csstrcasecmp(name,"game_speed_value")) initializer->data=0x3f800000;
     initializer->next_node_index=NONE;initializer->source_offset=NONE;
     if (slot>=syntax->count) syntax->count=(short)(slot+1);
     syntax->actual_count++;
@@ -248,7 +249,7 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
     struct hs_syntax_node *nodes;
     char const *strings;
     long i, missing = 0;
-    short developer=NONE, scratch[6]={NONE,NONE,NONE,NONE,NONE,NONE};
+    short developer=NONE, speed=NONE, scratch[6]={NONE,NONE,NONE,NONE,NONE,NONE};
     long scratch_strings=NONE;
     static char const scratch_names[6][17]={"__mcc_scratch_f0","__mcc_scratch_f1",
         "__mcc_scratch_f2","__mcc_scratch_f3","__mcc_scratch_f4","__mcc_scratch_f5"};
@@ -335,6 +336,15 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
                 node->flags &= ~4;
                 node->constant_type = _hs_type_boolean;
                 node->data = FALSE;
+                continue;
+            }
+            if (!csstrcasecmp(name,"game_speed_value")) {
+                if (speed==NONE) speed=mcc_local_global(runtime,scenario,syntax,name,_hs_type_real);
+                if (speed==NONE) {
+                    error(_error_silent,"mcc: no scenario storage for game_speed_value");
+                    return FALSE;
+                }
+                node->data=speed;
                 continue;
             }
             if (!csstrcasecmp(name,"developer_mode")) {
