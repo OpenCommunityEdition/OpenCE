@@ -21,7 +21,7 @@ inventory when an authorized change makes it inaccurate.
 
 | Boundary | Existing MCC-owned modules in `port/linux/game/` |
 | --- | --- |
-| Map selection, loading, packages and resources | `mcc_main`, `mcc_maps`, `mcc_cache`, `mcc_precache`, `mcc_cache_format`, `mcc_package`, `mcc_resources`, `mcc_tags`, `mcc_tag_validate` |
+| Map selection, loading, packages and resources | `mcc_main`, `mcc_maps`, `mcc_cache`, `mcc_precache`, `mcc_identity`, `mcc_sha256`, `mcc_cache_format`, `mcc_package`, `mcc_resources`, `mcc_tags`, `mcc_tag_validate` |
 | Script interpretation, parameters and object names | `mcc_scripts`, `mcc_syntax`, `mcc_script_parameters`, `mcc_object_names`, `mcc_game_speed` |
 | Checkpoints and campaign state | `mcc_checkpoint`, `mcc_campaign`, `mcc_script_effects` |
 | Weapon-authored camera selection | `mcc_camera` |

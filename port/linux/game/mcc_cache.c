@@ -6,6 +6,7 @@
 #include "scenario/scenario_definitions.h"
 #include "interface/ui_widget.h"
 #include "mcc_cache.h"
+#include "mcc_identity.h"
 #include "mcc_maps.h"
 #include "mcc_runtime.h"
 #include "mcc_resources.h"
@@ -116,7 +117,7 @@ boolean mcc_cache_available(char const *name)
 {
     struct mcc_cache_identity identity;
     struct mcc_cache_source source;
-    FILE *stream = mcc_open(name, &source, &identity);
+    FILE *stream = mcc_open(mcc_identity_local_name(name), &source, &identity);
     if (!stream) return FALSE;
     fclose(stream);
     return TRUE;
@@ -126,20 +127,40 @@ unsigned long mcc_cache_checksum(char const *name)
 {
     struct mcc_cache_identity identity;
     struct mcc_cache_source source;
-    FILE *stream=mcc_open(name,&source,&identity);
+    FILE *stream;
     uint32_t checksum=0;
+    name=mcc_identity_local_name(name);
+    stream=mcc_open(name,&source,&identity);
     if (!stream) return 0;
     if (!mcc_resources_probe(name,&source,&checksum)) checksum=0;
     fclose(stream);
     return checksum;
 }
 
+int mcc_content_probe(char const *name,unsigned char digest[32])
+{
+    struct mcc_cache_identity identity;
+    struct mcc_cache_source source;
+    FILE *stream=mcc_open(name,&source,&identity);
+    int ok;
+    if (!stream) return 0;
+    ok=mcc_resources_fingerprint_probe(name,&source,digest);
+    fclose(stream);
+    return ok;
+}
+
 boolean mcc_cache_present(char const *name, unsigned long checksum, char *message, long size)
 {
     struct mcc_cache_identity identity;
     struct mcc_cache_source source;
-    FILE *stream = mcc_open(name, &source, &identity);
+    FILE *stream;
     uint32_t actual;
+    if (!mcc_identity_check(name)) {
+        snprintf(message,(size_t)size,"The resolved MCC map or resources changed since admission. Rejoin with the host's matching package.");
+        return FALSE;
+    }
+    name=mcc_identity_local_name(name);
+    stream=mcc_open(name,&source,&identity);
     if (!stream) {
         snprintf(message, (size_t)size, "The MCC map %.63s is missing or is not a valid version-13 cache. Copy its .map file into mcc_maps.", name ? name : "");
         return FALSE;
@@ -242,9 +263,9 @@ struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header
     uint32_t package_checksum;
     char const *problem = "the map could not be opened";
     mcc_cache_tags_unload();
-    mcc_stream = mcc_open(name, &runtime->source, &identity);
+    mcc_stream = mcc_open(mcc_identity_local_name(name), &runtime->source, &identity);
     if (!mcc_stream) goto failed;
-    if (!mcc_package_name(name, runtime->level_name)) goto failed;
+    if (!mcc_package_name(mcc_identity_local_name(name), runtime->level_name)) goto failed;
     /* The virtual streams are disjoint from the on-disk file. */
     problem = "the file overlaps the MCC virtual resource range";
     if (identity.file_length >= 0x50000000u) goto failed;
@@ -258,6 +279,8 @@ struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header
     if (!mcc_resources_select(runtime,raw) || !mcc_resources_checksum(runtime,
         (runtime->report.external_bitmap_count ? 1u : 0u)|(runtime->report.external_sound_count ? 2u : 0u),
         &package_checksum)) goto failed;
+    problem = "the loaded MCC content does not match the admitted SHA-256 fingerprint";
+    if (!mcc_identity_loaded(name,runtime)) goto failed;
     runtime->capacity = MCC_CACHE_TAG_CAPACITY;
     runtime->tags = mcc_memory_reserve(runtime->report.tag_base, runtime->capacity);
     problem = "the MCC tag address window is unavailable";

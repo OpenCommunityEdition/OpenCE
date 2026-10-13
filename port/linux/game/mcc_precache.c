@@ -4,15 +4,12 @@
 #include "cseries.h"
 #include "mcc_cache.h"
 #include "mcc_package.h"
+#include "mcc_precache.h"
+#include "mcc_identity.h"
 #include <xtl.h>
 #include <stdio.h>
 #include <string.h>
 
-#define MCC_PRECACHE_FILES 9
-struct mcc_precache_stamp {
-    DWORD present, attributes, size_low, size_high;
-    FILETIME created, written;
-};
 static struct {
     char name[64];
     struct mcc_precache_stamp files[MCC_PRECACHE_FILES];
@@ -36,8 +33,10 @@ static boolean mcc_precache_file(char const *path, struct mcc_precache_stamp *st
     stamp->attributes = data.dwFileAttributes;
     stamp->size_low = data.nFileSizeLow;
     stamp->size_high = data.nFileSizeHigh;
-    stamp->created = data.ftCreationTime;
-    stamp->written = data.ftLastWriteTime;
+    stamp->created_low = data.ftCreationTime.dwLowDateTime;
+    stamp->created_high = data.ftCreationTime.dwHighDateTime;
+    stamp->written_low = data.ftLastWriteTime.dwLowDateTime;
+    stamp->written_high = data.ftLastWriteTime.dwHighDateTime;
     return TRUE;
 }
 
@@ -62,12 +61,17 @@ static boolean mcc_precache_files(char const *name, struct mcc_precache_stamp *f
     return TRUE;
 }
 
+int mcc_precache_snapshot(char const *name, struct mcc_precache_snapshot *snapshot)
+{
+    return mcc_precache_files(name, snapshot->files);
+}
+
 boolean mcc_cache_precache_ready(char const *name)
 {
     char canonical[64];
     struct mcc_precache_stamp before[MCC_PRECACHE_FILES], after[MCC_PRECACHE_FILES];
     boolean stamped;
-    if (!mcc_package_name(name, canonical)) {
+    if (!mcc_package_name(mcc_identity_local_name(name), canonical)) {
         mcc_cache_precache_clear();
         return FALSE;
     }

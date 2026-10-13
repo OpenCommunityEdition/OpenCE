@@ -12,6 +12,7 @@ list, loader, resource directory or display index is used here.
 #include "mcc_cache_format.h"
 #include "mcc_maps.h"
 #include "mcc_cache.h"
+#include "mcc_identity.h"
 #include "mcc_package.h"
 
 #include <stdio.h>
@@ -275,7 +276,7 @@ short mcc_maps_find(char const *level_name)
 	short index;
     char canonical[64];
 
-	if (!mcc_package_name(level_name, canonical))
+	if (!mcc_package_name(mcc_identity_local_name(level_name), canonical))
 		return NONE;
 	mcc_maps_scan();
 	for (index = 0; index < mcc_menu_catalog.count; index++)

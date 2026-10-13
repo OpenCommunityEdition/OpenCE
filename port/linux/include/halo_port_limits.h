@@ -49,7 +49,7 @@ machines, 16 players) are 0x226 and 0x434. */
 /* (then the gametype's PC options, struct game_variant_options: 0x1C bytes) */
 #define HALO_PORT_NETWORK_GAME_VARIANT_OPTIONS_OFFSET (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0xA)
 #define HALO_PORT_NETWORK_GAME_LOCAL_DATA_OFFSET (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x26)
-#define HALO_PORT_NETWORK_GAME_SIZE (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x2A)
+#define HALO_PORT_NETWORK_GAME_SIZE (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x2A + 32) /* MCC SHA-256 */
 
 /* ---------- system link protocol
 
@@ -76,7 +76,7 @@ Raise it with any change to what the machines send each other. */
 /* Version 40: MCC campaign snapshots carry host-approved movement/ammo flags.
  * MCC possession preserves the former body until host death replication. */
 /* Version 41: MCC hosts send reliable clock multipliers, including while paused. */
-#define HALO_PORT_NETWORK_VERSION 41
+#define HALO_PORT_NETWORK_VERSION 42
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags */
 #define HALO_PORT_ADVERTISED_VERSION_OFFSET 0

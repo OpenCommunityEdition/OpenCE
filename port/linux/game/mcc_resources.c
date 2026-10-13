@@ -2,6 +2,8 @@
  * decoded explicitly; no CE resource state or readers are shared. */
 #include "mcc_runtime.h"
 #include "mcc_resources.h"
+#include "mcc_identity.h"
+#include "mcc_sha256.h"
 #include "mcc_package.h"
 #include "cseries.h"
 #include "errors.h"
@@ -257,7 +259,53 @@ int mcc_resources_checksum(struct mcc_runtime *runtime,unsigned resources,uint32
     return 1;
 }
 
-int mcc_resources_probe(char const *name,struct mcc_cache_source const *source,uint32_t *checksum)
+/* Length/type framing keeps file boundaries distinct without including paths. */
+static void mcc_fingerprint_file_header(struct mcc_sha256 *hash, unsigned type, uint64_t size)
+{
+    unsigned char header[9];
+    unsigned i;
+    header[0]=(unsigned char)type;
+    for (i=0;i<8;i++) header[i+1]=(unsigned char)(size>>(i*8));
+    mcc_sha256_add(hash,header,sizeof(header));
+}
+
+int mcc_resources_fingerprint(struct mcc_runtime *runtime,unsigned char digest[32])
+{
+    struct mcc_sha256 hash;
+    unsigned char buffer[32768];
+    uint32_t offset,bytes;
+    unsigned type;
+    struct mcc_resource_file *resource;
+    long size;
+    if (!runtime || !runtime->source.read || runtime->source.size>0x7fffffffu) return 0;
+    mcc_sha256_begin(&hash);
+    mcc_sha256_add(&hash,"GulchCE MCC content v1",sizeof("GulchCE MCC content v1")-1);
+    mcc_fingerprint_file_header(&hash,0,runtime->source.size);
+    for (offset=0;offset<runtime->source.size;offset+=bytes) {
+        bytes=(uint32_t)(runtime->source.size-offset);
+        if (bytes>sizeof(buffer)) bytes=sizeof(buffer);
+        if (!runtime->source.read(runtime->source.context,offset,bytes,buffer)) return 0;
+        mcc_sha256_add(&hash,buffer,(int)bytes);
+    }
+    for (type=1;type<=2;type++) {
+        if (!(type==1 ? runtime->report.external_bitmap_count : runtime->report.external_sound_count)) continue;
+        resource=mcc_resource_get(runtime,type);
+        if (!resource || fseek(resource->stream,0,SEEK_END) ||
+            (size=ftell(resource->stream))<0 || fseek(resource->stream,0,SEEK_SET)) return 0;
+        mcc_fingerprint_file_header(&hash,type,(uint32_t)size);
+        for (offset=0;offset<(uint32_t)size;offset+=bytes) {
+            bytes=(uint32_t)size-offset;
+            if (bytes>sizeof(buffer)) bytes=sizeof(buffer);
+            if (fread(buffer,1,bytes,resource->stream)!=bytes) return 0;
+            mcc_sha256_add(&hash,buffer,(int)bytes);
+        }
+    }
+    mcc_sha256_end(&hash,digest);
+    return 1;
+}
+
+static int mcc_resources_inspect(char const *name,struct mcc_cache_source const *source,
+    uint32_t *checksum,unsigned char *digest)
 {
     struct mcc_runtime runtime;
     unsigned char header[MCC_CACHE_HEADER_BYTES];
@@ -270,9 +318,22 @@ int mcc_resources_probe(char const *name,struct mcc_cache_source const *source,u
         mcc_cache_identify(header,sizeof(header),source->size,&identity)!=MCC_CACHE_OK) return 0;
     raw=malloc(identity.tag_data_size);
     if (!raw) return 0;
+    runtime.source=*source;
     ok=mcc_cache_load(source,raw,identity.tag_data_size,&runtime.report)==MCC_CACHE_OK &&
-        mcc_resources_select(&runtime,raw) && mcc_resources_checksum(&runtime,
-            (runtime.report.external_bitmap_count ? 1u : 0u)|(runtime.report.external_sound_count ? 2u : 0u),checksum);
+        mcc_resources_select(&runtime,raw);
+    if (ok && digest) ok=mcc_resources_fingerprint(&runtime,digest);
+    if (ok && checksum) ok=mcc_resources_checksum(&runtime,
+        (runtime.report.external_bitmap_count ? 1u : 0u)|(runtime.report.external_sound_count ? 2u : 0u),checksum);
     mcc_resources_dispose(&runtime);free(raw);
     return ok;
+}
+
+int mcc_resources_probe(char const *name,struct mcc_cache_source const *source,uint32_t *checksum)
+{
+    return mcc_resources_inspect(name,source,checksum,NULL);
+}
+
+int mcc_resources_fingerprint_probe(char const *name,struct mcc_cache_source const *source,unsigned char digest[32])
+{
+    return mcc_resources_inspect(name,source,NULL,digest);
 }

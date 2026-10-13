@@ -40,6 +40,9 @@ static char paths[9][128];
 static WIN32_FILE_ATTRIBUTE_DATA files[9];
 static int count,probes,valid=1,mutate,denied=-1,present[9];
 static DWORD last_error;
+char const *mcc_identity_local_name(char const *name) {
+ return name && !strcmp(name,"mcc_maps/host/a10") ? "mcc_maps/package/a10" : name;
+}
 DWORD GetLastError(void) {return last_error;}
 int GetFileAttributesExA(char const *path,int level,void *out) {
  int i;(void)level;
@@ -63,6 +66,7 @@ int main(void) {
  for(i=0;i<1000;i++)CHECK(mcc_cache_precache_ready(name));
  CHECK(probes==1);
  CHECK(mcc_cache_precache_ready("mcc_maps\\package\\a10"));CHECK(probes==1);
+ CHECK(mcc_cache_precache_ready("mcc_maps/host/a10"));CHECK(probes==1);
  /* Each map/resource candidate, including a previously absent override,
   * invalidates on add, removal, same-size write, replacement or resize. */
  for(i=0;i<9;i++) {

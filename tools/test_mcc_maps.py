@@ -87,6 +87,8 @@ static unsigned inventories;
 static int admission_reads;
 static unsigned reads, largest, scans, closed;
 void mcc_cache_precache_clear(void) {}
+char const *mcc_identity_local_name(char const *name) {return name;}
+int mcc_identity_check(char const *name) {(void)name;return 1;}
 #include "mcc_runtime.h"
 #include "mcc_resources.h"
 static char saved_identity[64];
@@ -250,7 +252,7 @@ int main(int argc,char **argv) {
                "-I", str(work), "-I", str(ROOT / "port/linux/game"), str(source),
                str(ROOT / "port/linux/game/mcc_maps.c"),
                str(ROOT / "port/linux/game/mcc_package.c"),
-               str(ROOT / "port/linux/game/mcc_cache_format.c"), str(ROOT / "port/linux/game/mcc_resources.c"), "-o", str(output)]
+               str(ROOT / "port/linux/game/mcc_cache_format.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), "-o", str(output)]
     if sys.platform == "win32":
         command[1:1] = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"]
     result = subprocess.run(command, capture_output=True, text=True)

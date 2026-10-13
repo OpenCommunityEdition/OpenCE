@@ -57,8 +57,9 @@ beside the level. Byte-identical matches are interchangeable.
 Self-contained levels do not open or fingerprint resources. Only required types
 are considered. Chosen paths and failures are logged in `debug.txt`. `loc.map`
 is unsupported. Nothing searches other packages, `maps` or `custom_maps`.
-A package level's identity is `mcc_maps\solar_flare\m0`;
-the folder name must be the same on every player's installation. Optional
+A package level's identity is `mcc_maps\solar_flare\m0`.
+Network peers may use different package folder names; the level filename and
+complete map/required resource contents must match the host. Optional
 `.txt` descriptions remain beside the corresponding level. No manifest is
 required.
 
@@ -112,18 +113,40 @@ downloads and MCC package manifests are not implemented. There is no
 dependency on the Custom Edition setting or its resource directories.
 
 The loader opens source maps read-only. A rejected map reports the failing
-stage in `debug.txt` and returns a menu error. Matching the header checksum
-can detect that a network host selected a different map version. The MCC tag
-reader determines which external resource types are referenced. For both loose
-and packaged levels, the fingerprint streams every byte of the selected files
-for those types, using the same validated selection and open files as conversion.
-Unused files have no effect. Selected contents, not their shared/root/package location,
-determine identity. This adds disk I/O at load/admission, not per frame.
-Checkpoints use this fingerprint too: the new policy may invalidate earlier MCC
-saves; Xbox/Custom Edition save identities are unchanged. All network peers need
-GulchCE protocol 36, including for legacy maps. CRC32 detects accidental mismatches,
-not malicious forgery; the level header checksum still does not authenticate the
-map. Network support uses OpenCE's host-authoritative protocol, not MCC clients.
+stage in `debug.txt` and returns a menu error. Network admission compares all
+32 bytes of a SHA-256 fingerprint covering the complete map and each required
+external resource file. The MCC tag reader determines those dependencies; the
+same validated resource selection is used for conversion and fingerprinting.
+File types and lengths frame the hash input, while paths and unused resources
+are excluded. Identical bytes in package, root or shared locations match.
+
+The host sends this fingerprint in its existing settings record. Clients first
+verify the exact installation path, then look for a unique matching same-filename
+map in their MCC catalog. Ambiguous fallback matches, missing/mismatched resources,
+or more than 16 same-filename candidates are refused with an explanatory error.
+The selected local path stays local; readiness replies and game options retain
+the host's session name. A fresh fingerprint is checked at actual loading too.
+The host's advertised name still follows the existing network path validation.
+Map changes and disconnects discard the binding. No client gains host authority,
+and content matching does not prove that an untrusted client executes honest code.
+
+The issue #51 metadata cache still avoids full resource reads on each lobby
+readiness poll. Host fingerprints are also cached while map/resource metadata
+stays unchanged. Initial admission and actual loading do read the full content,
+so large packages can take longer at these points. The previous 32-bit checksum
+remains for checkpoint identity and engine bookkeeping; it is no longer the
+MCC network content proof. Existing save identities are unchanged by SHA-256.
+All peers need GulchCE protocol 42, including for legacy maps. Xbox and Custom
+Edition retain their original matching/loading behavior. Network support uses
+OpenCE's host-authoritative protocol, not MCC clients.
+
+The shared integration is limited to the settings record's appended digest,
+the two host settings senders, client settings admission, and client teardown.
+These hooks are necessary because MCC modules alone cannot attach data to the
+existing host record or resolve a local path before its generic presence check.
+All hashing, package selection and binding lifetime policy lives in MCC modules;
+legacy settings carry zero digest bytes and keep their original checks. The
+protocol recorder includes the full settings record and its size/offset bounds.
 
 MCC's `halo1/maps/bitmaps.map` stores individual texture entries. Its
 `halo1/maps/custom_edition` resources store grouped `__pixels` and
@@ -210,6 +233,7 @@ are not an MCC implementation dependency. The independent components are:
 | `port/linux/game/mcc_maps.c` | Catalog, display identities, names and descriptions. |
 | `port/linux/game/mcc_cache_format.c` | Portable little-endian version-13 reader and file-range audit. |
 | `port/linux/game/mcc_cache.c` | MCC path admission, read-only file lifetime, conversion and streaming dispatch. |
+| `port/linux/game/mcc_identity.c`, `mcc_sha256.c` and `mcc_precache.c` | SHA-256 session content checks, local package resolution and metadata-based readiness caching. |
 | `port/linux/game/mcc_main.c` | MCC load-failure recovery through the native main-menu lifecycle. |
 | `port/linux/game/mcc_ui.c` and `mcc_ui_network.inl` | MCC in-map widget actions, settings routing, checkpoint/quit behavior and synchronized network restarts. |
 | `port/linux/game/mcc_pause.c` and `mcc_pause_runtime.c` | Generated stock-style pause layouts, objective display, independent UI art and atomic publication/lifetime of the appended tags. |

@@ -387,6 +387,7 @@ symbols in this file:
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
+#include "mcc_identity.h" /* port: MCC content admission and local package resolution */
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
@@ -902,6 +903,7 @@ void network_game_client_dispose(
 {
 	if (client)
 	{
+		mcc_identity_disconnect(); /* port: discard the MCC session's local binding */
 		if (client->connection)
 			network_connection_delete(client->connection);
 
@@ -1285,9 +1287,14 @@ boolean network_game_client_game_settings_updated(
 			return FALSE;
 		}
 		if (csstrcmp(message_packet->map.name, client->game.map.name) ||
-			message_packet->map.version != client->game.map.version)
+			message_packet->map.version != client->game.map.version ||
+			/* port: the host's MCC content may change without changing its stored checksum */
+			memcmp(message_packet->mcc_content_sha256, client->game.mcc_content_sha256, 32))
 		{
 			char build[0x20];
+
+			/* port: resolve MCC locally before native presence checks, retaining the host's wire name */
+			if (!mcc_identity_accept(message_packet)) return FALSE;
 
 			/* port: a map this machine has not (a Custom Edition map not in
 			its custom_maps folder, or another version of it than the host's,

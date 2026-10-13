@@ -257,6 +257,7 @@ symbols in this file:
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
+#include "mcc_identity.h" /* port: attach MCC content identity to host settings */
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager_internal.h"
@@ -783,7 +784,11 @@ boolean network_game_server_send_game_settings_to_client_machine(
 	long game_size)
 {
 	struct message_server_game_settings_update message;
+	struct network_game mcc_settings; /* port: fingerprint extension, no host record mutation */
 	long offset;
+
+	game = mcc_identity_host_settings(game, game_size, &mcc_settings); /* port: MCC admission */
+	if (!game) return FALSE;
 
 	for (offset = 0; offset < game_size; offset += sizeof(message.data))
 	{
@@ -1060,8 +1065,12 @@ boolean network_game_server_send_game_settings_to_all_machines(
 	long game_size)
 {
 	struct message_server_game_settings_update message;
+	struct network_game mcc_settings; /* port: fingerprint extension, no host record mutation */
 	long offset;
 	boolean result = TRUE;
+
+	game = mcc_identity_host_settings(game, game_size, &mcc_settings); /* port: MCC admission */
+	if (!game) return FALSE;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_server_message_handler.c",
