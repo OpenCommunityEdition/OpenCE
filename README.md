@@ -1,3 +1,34 @@
+# OpenCE Gun Game
+
+This is [OpenCE](https://github.com/OpenCommunityEdition/OpenCE) with a Gun Game mode called **Gun Race**. The code is [CC0 1.0](LICENSE.md), the same public-domain dedication as OpenCE. This project does not include Halo's maps or disc. You use your own Xbox disc image of Halo: Combat Evolved.
+
+## Download Gun Game
+
+| Platform | Release |
+| --- | --- |
+| Windows | [halo-windows-release.zip](https://github.com/Restartt97/OpenCE/releases/latest/download/halo-windows-release.zip) |
+| Linux | [halo-linux-release.zip](https://github.com/Restartt97/OpenCE/releases/latest/download/halo-linux-release.zip) |
+| Android | [halo-android-release.zip](https://github.com/Restartt97/OpenCE/releases/latest/download/halo-android-release.zip) |
+
+The first build appears on the [releases page](https://github.com/Restartt97/OpenCE/releases) after GitHub finishes compiling `main`. Use the release build to play. [halocombatevolved.com](https://halocombatevolved.com/) is official OpenCE and does not include Gun Race.
+
+## How to play
+
+1. Unzip the Windows build and start `halo.exe`.
+2. The first time, choose your Halo disc image (`.xiso` or `.iso`). The game extracts the maps next to the executable.
+3. Open multiplayer, create a game, and choose the saved game type **Gun Race**.
+4. Start the match. The host needs this build.
+
+Five kills with the current weapon move you to the next weapon. On Xbox maps the ladder starts at the rocket. The last stage is the skull: one melee hit kills, and ten of those kills win the match. Grenades are off. The map has no weapons lying around, and a weapon disappears when its owner dies. A kill with the wrong weapon, a melee kill before the skull, a vehicle kill, or a suicide does not advance you and does not score.
+
+A player can join from official OpenCE. Scoring still works, because the host decides it. That player does not see the short weapon names, the message at spawn, the warning when someone reaches the skull, or the blue mark on the motion tracker. Hosting Gun Race needs this build.
+
+At startup the game looks for a newer build of **this** repository, so an update keeps Gun Game. This repository also merges OpenCE's `main` branch when that merge is clean. A merge that conflicts waits for a person to resolve it.
+
+## OpenCE
+
+The rest of this page is OpenCE's own guide.
+
 # Halo: Combat Evolved for Linux, Windows, Android and the web
 
 [![Join our Discord](https://invidget.switchblade.xyz/9gqcHyr5km)](https://discord.gg/9gqcHyr5km)
@@ -19,10 +50,10 @@ builds of the latest release:
 
 | Platform | Release | Debug |
 | --- | --- | --- |
-| Linux | [halo-linux-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-release.zip) | [halo-linux-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-debug.zip) |
-| Windows | [halo-windows-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-windows-release.zip) | [halo-windows-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-windows-debug.zip) |
-| Android | [halo-android-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-android-release.zip) | [halo-android-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-android-debug.zip) |
-| Web | [halocombatevolved.com](https://halocombatevolved.com/) (or [halo-web-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-web-release.zip) for your own server) | [halo-web-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-web-debug.zip) |
+| Linux | [halo-linux-release.zip](https://github.com/Restartt97/OpenCE/releases/latest/download/halo-linux-release.zip) | [halo-linux-debug.zip](https://github.com/Restartt97/OpenCE/releases/latest/download/halo-linux-debug.zip) |
+| Windows | [halo-windows-release.zip](https://github.com/Restartt97/OpenCE/releases/latest/download/halo-windows-release.zip) | [halo-windows-debug.zip](https://github.com/Restartt97/OpenCE/releases/latest/download/halo-windows-debug.zip) |
+| Android | [halo-android-release.zip](https://github.com/Restartt97/OpenCE/releases/latest/download/halo-android-release.zip) | [halo-android-debug.zip](https://github.com/Restartt97/OpenCE/releases/latest/download/halo-android-debug.zip) |
+| Web | [halocombatevolved.com](https://halocombatevolved.com/) (or [halo-web-release.zip](https://github.com/Restartt97/OpenCE/releases/latest/download/halo-web-release.zip) for your own server) | [halo-web-debug.zip](https://github.com/Restartt97/OpenCE/releases/latest/download/halo-web-debug.zip) |
 
 Use the release build to play. The debug build stops at the first failed
 assertion and writes it to the log. Use the debug build to find and report
@@ -34,7 +65,7 @@ if you want to install it. Refer to "Updates" in
 each new build when it is out.
 
 Each build of the `main` branch that passes on all four platforms is a new
-release, and the web site then plays it. The [Releases](https://github.com/OpenCommunityEdition/OpenCE/releases)
+release, and the web site then plays it. The [Releases](https://github.com/Restartt97/OpenCE/releases)
 page keeps the last five releases. If the latest build has a problem, get
 an older build from that page.
 
