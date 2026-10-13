@@ -212,6 +212,7 @@ boolean mcc_cache_contains(void const *address, long bytes)
 
 void mcc_cache_tags_unload(void)
 {
+    mcc_cache_precache_clear();
     mcc_hud_glyphs_dispose();
     mcc_campaign_dispose();
     mcc_ui_teams_reset();

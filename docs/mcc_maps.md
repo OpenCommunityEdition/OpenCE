@@ -1654,3 +1654,47 @@ treated as errors). Android/Web targets are absent from this Windows build
 configuration; both were attempted. Browser/native WebRTC and internet tests
 were attempted but lack Playwright here. Linux, Android, Web and internet
 latency/loss validation remain outstanding for CI or a provisioned host.
+
+## MCC lobby readiness (issue #51)
+
+The native pregame client polls map readiness once per second. The MCC hook
+previously reread tag data and fingerprinted every required resource on each
+poll, blocking menu frames. Mercury Falling's supplied bitmap and sound
+resources total roughly 687 MB; repeated reads reproduced the reported stalls.
+
+`mcc_precache.c` retains one successful readiness result while the map and all
+eight possible bitmap/sound resource candidates have unchanged file metadata.
+Missing candidates are recorded too: adding a package override or another
+shared resource set invalidates the result. Size, creation/write time and
+attribute changes trigger full validation; access time does not. Failed
+validation is never cached, unreadable metadata prevents reuse, and a change
+during validation cannot establish a cached ready result. Rescanning the MCC
+catalog and unloading MCC tags clear the result.
+
+This is a polling optimization, not a trusted content fingerprint. Network
+admission, map-version calculation and actual loading still perform their
+existing independent resource validation. Protocol 41 and host-authority
+rules are unchanged. Initial validation can still pause the menu; this change
+removes the recurring validation after an unchanged map has been checked.
+
+The existing MCC branch in `cache_files_give_time_to_precache` must select the
+new polling function because its old callee also serves admission callers,
+which must stay fresh. This is the only shared-engine change. Xbox and Custom
+Edition readiness branches retain their existing code and behavior.
+
+Windows x86 portable-release testing against base `d1669f19` reproduced the
+stalls with the old executable. During a 35-second Mercury lobby run it made
+21 resource probes; the fixed build made three initial probes, then advanced
+60 menu frames per approximately one second without further resource scans.
+The MCC regression suite and protocol-record check passed (1,053 tests, two
+optional skips). The readiness tests exercise all resource candidates, failed
+validation, metadata errors, changes during validation and lifecycle reset.
+Two hidden loopback instances entered Mercury co-op and Bigass multiplayer
+and exchanged matching player state without assertions; the bounded runner
+stopped them afterward. Initial Bigass fixtures omitted its package resources
+and were correctly refused; the successful run included those resources.
+A separate rendered instance transitioned from Mercury to Xbox Blood Gulch,
+CE Death Island and back to Mercury, then exited normally without assertions.
+These are focused runtime checks, not full campaign or multiplayer playthroughs.
+Android and Web builds were attempted but those targets are absent from this
+Windows configuration. Native Linux validation remains for CI.

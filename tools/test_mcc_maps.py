@@ -42,6 +42,7 @@ def catalog_tool(tmp_path_factory):
 #include <string.h>
 #include <stddef.h>
 typedef unsigned char boolean;
+typedef unsigned char byte;
 #define TRUE 1
 #define FALSE 0
 #define NONE (-1)
@@ -85,6 +86,7 @@ static char const *listing="list.txt";
 static unsigned inventories;
 static int admission_reads;
 static unsigned reads, largest, scans, closed;
+void mcc_cache_precache_clear(void) {}
 #include "mcc_runtime.h"
 #include "mcc_resources.h"
 static char saved_identity[64];
