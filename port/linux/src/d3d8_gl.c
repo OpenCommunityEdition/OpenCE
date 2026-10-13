@@ -397,6 +397,9 @@ struct program_entry
 	/* nv2a_pixel_shader_key's source_blend's color, and what it last had */
 	GLint blend_constant;
 	float blend_constant_value[4];
+	/* d3d8_gl_set_recolor's, and what it last had */
+	GLint recolor;
+	float recolor_value[4];
 	/* the lights of a draw lit for each pixel (XGPU_MODEL_LIGHT_COUNT), and
 	constants_serial at their last upload */
 	GLint model_lights;
@@ -2899,6 +2902,8 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	entry->texture_lod_bias = glGetUniformLocation(entry->program, "texture_lod_bias");
 	entry->screen_offset = glGetUniformLocation(entry->program, "screen_offset");
 	entry->blend_constant = glGetUniformLocation(entry->program, "blend_constant");
+	entry->recolor = glGetUniformLocation(entry->program, "recolor");
+	entry->recolor_value[3] = -1.0f;
 	entry->model_lights = glGetUniformLocation(entry->program, "model_lights");
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 	{
@@ -3672,6 +3677,18 @@ static void gl_check_errors(const char *where)
 counts the conversions */
 #define DRAW_UNIFORM_INPUT_COUNT (4 + 4 + 16 + 1 + 16 + 2 + 4 + 1 + 1 + 7 * D3DTSS_MAXSTAGES)
 
+/* the recolor of the draws that follow (d3d8_gl_set_recolor): off while its
+curve is zero */
+static float recolor_value[4];
+
+void d3d8_gl_set_recolor(float red, float green, float blue, float curve)
+{
+	recolor_value[0] = red;
+	recolor_value[1] = green;
+	recolor_value[2] = blue;
+	recolor_value[3] = curve;
+}
+
 static DWORD draw_uniform_inputs[DRAW_UNIFORM_INPUT_COUNT];
 static struct draw_uniforms draw_uniforms;
 static unsigned long draw_uniforms_serial;
@@ -3797,6 +3814,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 #endif
 	key.fog_enable = D3D__RenderState[D3DRS_FOGENABLE] != 0;
 	key.source_blend = source_blend_in_shader();
+	key.recolor = recolor_value[3] > 0.0f;
 	key.fog_table_mode = (unsigned char)D3D__RenderState[D3DRS_FOGTABLEMODE];
 #ifdef HALO_GLES
 	key.count_samples = device.visibility_test_active && xgpu_capabilities.atomic_counters;
@@ -3845,6 +3863,11 @@ static struct program_entry *prepare_draw(BOOL immediate)
 			memcpy(entry->blend_constant_value, blend_constant, sizeof(blend_constant));
 			glUniform4fv(entry->blend_constant, 1, blend_constant);
 		}
+	}
+	if (key.recolor && entry->recolor >= 0 && memcmp(entry->recolor_value, recolor_value, sizeof(recolor_value)))
+	{
+		memcpy(entry->recolor_value, recolor_value, sizeof(recolor_value));
+		glUniform4fv(entry->recolor, 1, recolor_value);
 	}
 #ifdef HALO_GLES
 	if (key.count_samples)

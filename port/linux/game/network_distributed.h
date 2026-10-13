@@ -125,6 +125,11 @@ enum
 	_distributed_message_map_share_offer = 84,
 	_distributed_message_map_share_sources = 85,
 	_distributed_message_map_share_progress = 86,
+	/* a machine's visor color, to the host, reliably, which takes it only
+	from that machine's own stream; and every machine's, from the host to
+	each, reliably (visor_color.c), in the lobby too */
+	_distributed_message_visor_color = 91,
+	_distributed_message_visor_colors = 92,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
