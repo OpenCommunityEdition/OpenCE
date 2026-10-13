@@ -118,26 +118,40 @@ requirements still apply.
 ## Verification and reporting
 
 Run the required checks in `AGENTS.md` for affected platforms and code.
-For relevant MCC changes, cover representative Xbox and Custom Edition
-behavior alongside MCC. Select checks according to the affected path:
+For general features, verify established behavior with the feature disabled
+and the intended behavior with it enabled. For relevant MCC changes, cover
+representative Xbox and Custom Edition behavior alongside MCC. Shared-engine
+changes require checks of the affected map-family paths, even when the
+assignment is not primarily about MCC.
 
+Select checks according to the affected path:
+
+- Feature activation and state: default settings, enabled and disabled
+  behavior, supported activation changes, initialization, cleanup and
+  relevant map or session transitions.
 - Loading/resource work: supported and malformed inputs, failure recovery,
   package isolation, unload/reload and transitions between map families.
 - Script/state work: representative execution, supported limits,
-  checkpoints, restart and cleanup of MCC state on leaving the map.
+  checkpoints, restart and cleanup of feature or MCC state at the relevant
+  lifecycle boundaries.
 - Network work: host/client agreement, joining, synchronization and relevant
   co-op/multiplayer paths, plus the required transport checks and protocol
   version review.
 - Renderer/UI work: real visual output at relevant resolutions and layouts,
   alongside automated checks where they provide meaningful coverage.
+- Existing behavior fixes: evidence of the defect, verification of the
+  intended correction and checks of related behavior that must remain
+  unchanged. Prefer a regression test exercising the real implementation.
+- Upstream conflict resolution: identify the behavior affected by each
+  resolution and verify the resulting upstream and fork integration.
 
 These are risk-based examples, not a demand to replay every map for every
-edit. Record the tested revision, build configuration, maps, modes and
-outcomes. Clearly distinguish conversion success, entry into gameplay,
-tested transitions and full campaign completion. Report skipped checks,
-failures, unavailable tools and CI results accurately. Compilation alone
-does not establish runtime compatibility, and passing tests do not prove
-the absence of regressions.
+edit. Record the tested revision, build configuration, relevant feature
+settings, maps, modes and outcomes. Clearly distinguish conversion success,
+entry into gameplay, tested transitions and full campaign completion.
+Report skipped checks, failures, unavailable tools and CI results
+accurately. Compilation alone does not establish runtime compatibility,
+and passing tests do not prove the absence of regressions.
 
 ## Git, upstream contributions and code reduction
 
