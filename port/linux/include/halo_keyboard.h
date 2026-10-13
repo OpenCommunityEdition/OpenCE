@@ -38,6 +38,11 @@ enum halo_keyboard_action
 	/* (voice chat's, which the game itself does not read:
 	halo_push_to_talk_held) */
 	HALO_KEYBOARD_PUSH_TO_TALK,
+	/* (the third-person camera turned on and off, which the game itself does
+	not read: platform_third_person_key) */
+	HALO_KEYBOARD_THIRD_PERSON,
+	/* (the third-person camera's free look, held: platform_free_look_held) */
+	HALO_KEYBOARD_FREE_LOOK,
 	NUMBER_OF_HALO_KEYBOARD_ACTIONS
 };
 

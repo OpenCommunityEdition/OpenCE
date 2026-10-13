@@ -84,6 +84,10 @@ static pthread_mutex_t mouse_lock = PTHREAD_MUTEX_INITIALIZER;
 static float mouse_pending_x, mouse_pending_y;
 static unsigned long mouse_polls_unconsumed = 0;
 static float mouse_wheel_accumulated = 0.0f;
+/* the third-person camera on (platform_third_person_active: third_person.c):
+the wheel zooms it, and switches no weapon; what it turned, for the camera */
+static int third_person_active;
+static float third_person_wheel;
 /* the wheel's switch (wheel_update): when the wheel last moved, until when
 Y is held, and whether a scroll is under way */
 static Uint64 wheel_moved_ms = 0;
@@ -273,9 +277,16 @@ static void mouse_poll(const struct platform_input_state *input)
 		mouse_pending_y += input->mouse_dy;
 		if (input->mouse_dx != 0.0f || input->mouse_dy != 0.0f)
 			mouse_aimed_ms = SDL_GetTicks();
-		mouse_wheel_accumulated += input->mouse_wheel;
-		if (input->mouse_wheel != 0.0f)
-			wheel_moved_ms = SDL_GetTicks();
+		if (third_person_active)
+		{
+			third_person_wheel += input->mouse_wheel;
+		}
+		else
+		{
+			mouse_wheel_accumulated += input->mouse_wheel;
+			if (input->mouse_wheel != 0.0f)
+				wheel_moved_ms = SDL_GetTicks();
+		}
 	}
 	pthread_mutex_unlock(&mouse_lock);
 }
@@ -421,7 +432,7 @@ static const char *const binding_settings[NUMBER_OF_HALO_KEYBOARD_ACTIONS] =
 	"controls.jump", "controls.crouch", "controls.fire", "controls.throw_grenade", "controls.melee",
 	"controls.reload", "controls.zoom", "controls.switch_weapon", "controls.switch_grenade", "controls.action",
 	"controls.flashlight", "controls.scoreboard", "controls.pause", "controls.screenshot",
-	"controls.push_to_talk",
+	"controls.push_to_talk", "controls.third_person", "controls.free_look",
 };
 
 static const struct
@@ -592,6 +603,65 @@ static void keyboard_controls(unsigned long held, XINPUT_GAMEPAD *pad)
 unsigned long halo_keyboard_actions(short controller_index)
 {
 	return controller_index == 0 ? keyboard_actions_held : 0;
+}
+
+/* ---------- the third-person camera's keys (third_person.c) */
+
+static BOOL third_person_key_down;
+static int third_person_key_pressed;
+static int free_look_held;
+
+void platform_third_person_active(int active)
+{
+	pthread_mutex_lock(&mouse_lock);
+	third_person_active = active != 0;
+	if (!third_person_active)
+		third_person_wheel = 0.0f;
+	pthread_mutex_unlock(&mouse_lock);
+}
+
+float platform_third_person_wheel(void)
+{
+	float turned;
+
+	pthread_mutex_lock(&mouse_lock);
+	turned = third_person_wheel;
+	third_person_wheel = 0.0f;
+	pthread_mutex_unlock(&mouse_lock);
+	return turned;
+}
+
+int platform_third_person_key(void)
+{
+	int pressed = third_person_key_pressed;
+
+	third_person_key_pressed = 0;
+	return pressed;
+}
+
+int platform_free_look_held(void)
+{
+	return free_look_held;
+}
+
+/* controls.third_person pressed (in play), and controls.free_look held */
+static void third_person_keys_update(const struct platform_input_state *input, BOOL playing)
+{
+	BOOL down = FALSE;
+	int slot;
+
+	bindings_read();
+	free_look_held = FALSE;
+	for (slot = 0; playing && slot < MAXIMUM_BINDINGS; slot++)
+	{
+		if (input_held(input, bindings[HALO_KEYBOARD_THIRD_PERSON][slot]))
+			down = TRUE;
+		if (input_held(input, bindings[HALO_KEYBOARD_FREE_LOOK][slot]))
+			free_look_held = TRUE;
+	}
+	if (down && !third_person_key_down)
+		third_person_key_pressed = 1;
+	third_person_key_down = down;
 }
 
 int halo_push_to_talk_held(void)
@@ -989,6 +1059,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		keyboard_actions_held = 0;
 		keys_held_over_switch(&input);
 		console_active = console_is_active();
+		third_person_keys_update(&input, !console_active && !input.menus);
 		held = console_active ? 0 : keyboard_bound_actions(&input);
 		keyboard_screenshot(held);
 		if (!console_active)
