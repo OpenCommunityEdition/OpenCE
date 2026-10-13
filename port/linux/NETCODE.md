@@ -285,6 +285,17 @@ the host does not accept client speed changes. Xbox and Custom Edition retain
 their existing clock behavior. All peers need version 41 because older clients
 would ignore the message and simulate MCC maps at the wrong rate.
 
+GulchCE version 42 appends a 32-byte MCC SHA-256 content fingerprint to the
+host's fragmented game settings. Xbox/CE use zero in this extension and retain
+their existing map checks. MCC clients bind the host's session name to a verified
+local package, allowing different folder names. The fingerprint covers complete
+map bytes and each required resource file with type/length framing; paths are
+excluded. All 32 digest bytes must match before readiness and loading. The
+32-bit map version remains for existing save/version bookkeeping, not as the
+MCC content admission proof. All peers require version 42; host authority and
+gameplay messages are unchanged. This checks installed content, not client
+integrity or anti-cheat attestation.
+
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console

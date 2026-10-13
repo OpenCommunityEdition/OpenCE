@@ -75,6 +75,7 @@ struct network_game
 	/* port: the gametype's PC options (game_engine.h) */
 	struct game_variant_options variant_options;
 	struct network_game_local_data local_data;
+	byte mcc_content_sha256[32]; /* port: MCC-only content identity; zero for Xbox/CE */
 };
 
 /* ---------- prototypes/EXAMPLE.C */

@@ -4,9 +4,53 @@ import shutil
 import struct
 import subprocess
 import sys
+import hashlib
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize("kind", [0, 1, 2])
+def test_sha256_covers_complete_map_and_required_resources(resource_tool, tmp_path, kind):
+    from test_mcc_cache_format import resource_dependency_map, TAG_OFFSET
+    data = resource_dependency_map("bitm" if kind == 1 else "snd!", int(kind != 0), 4)
+    name = b"res_0\0" if kind == 1 else b"res__0__0\0"
+    offset = 0x818 if kind == 1 else 0x898
+    struct.pack_into("<I", data, TAG_OFFSET+offset, 16)
+    resource = bytearray(struct.pack("<4I", kind, 20, 20+len(name), 1)+b"abcd"+name+
+                         struct.pack("<3I", 0, 4, 16))
+    filename = "bitmaps.map" if kind == 1 else "sounds.map"
+    def digest(package):
+        folder = tmp_path / "mcc_maps" / package
+        result = subprocess.run([str(resource_tool), "fingerprint", str(folder / "a10.map"),
+                                 "mcc_maps/"+package+"/a10"], cwd=tmp_path, capture_output=True)
+        assert result.returncode == 0, result.stderr
+        return result.stdout.decode()
+    for package in ("host", "client"):
+        folder = tmp_path / "mcc_maps" / package
+        folder.mkdir(parents=True)
+        (folder / "a10.map").write_bytes(data)
+        (folder / filename).write_bytes(resource if kind else b"unused, invalid resource")
+    framed = b"GulchCE MCC content v1" + struct.pack("<BQ", 0, len(data)) + data
+    if kind:
+        framed += struct.pack("<BQ", kind, len(resource)) + resource
+    original = digest("host")
+    assert original == hashlib.sha256(framed).hexdigest() == digest("client")
+    # File changes outside the stored checksum must invalidate identity too.
+    data[-1] ^= 1
+    (tmp_path / "mcc_maps/client/a10.map").write_bytes(data)
+    assert digest("client") != original
+    data[-1] ^= 1
+    (tmp_path / "mcc_maps/client/a10.map").write_bytes(data)
+    resource[16] ^= 1
+    (tmp_path / "mcc_maps/client" / filename).write_bytes(resource)
+    assert (digest("client") != original) == bool(kind)
+    if kind:
+        # The same selected bytes at the root produce the same identity.
+        (tmp_path / "mcc_maps/client" / filename).unlink()
+        resource[16] ^= 1
+        (tmp_path / "mcc_maps" / filename).write_bytes(resource)
+        assert digest("client") == original
 
 
 @pytest.fixture(scope="module")
@@ -22,6 +66,7 @@ def resource_tool(tmp_path_factory):
     source.write_text(r'''
 #include "mcc_runtime.h"
 #include "mcc_resources.h"
+#include "mcc_identity.h"
 #include "mcc_package.h"
 #include <stdio.h>
 #include <string.h>
@@ -32,6 +77,14 @@ static int read_map(void *context,uint32_t offset,uint32_t size,void *out) {
 }
 int main(int argc,char **argv) {
     struct mcc_runtime runtime={0};unsigned char bytes[32]={0};int ok;
+    if(argc==4 && !strcmp(argv[1],"fingerprint")) {
+        struct mcc_cache_source source;unsigned i;
+        FILE *f=fopen(argv[2],"rb");if(!f)return 8;
+        fseek(f,0,SEEK_END);source.size=(uint64_t)ftell(f);source.context=f;source.read=read_map;
+        ok=mcc_resources_fingerprint_probe(argv[3],&source,bytes);fclose(f);
+        if(!ok)return 9;
+        for(i=0;i<32;i++)printf("%02x",bytes[i]);return 0;
+    }
     if(argc==5 && !strcmp(argv[1],"probe")) {
         struct mcc_cache_source source;uint32_t sum=0;
         FILE *f=fopen(argv[2],"rb");if(!f)return 8;
@@ -72,7 +125,7 @@ int main(int argc,char **argv) {
     target = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if sys.platform == "win32" else []
     # Match the game's GNU89 mode, including libc's snprintf declaration on Linux.
     result = subprocess.run([clang] + target + ["-std=gnu89", "-Wall", "-Wextra", "-Werror", "-D_CRT_SECURE_NO_WARNINGS", "-I"+str(ROOT / "port/linux/game"),
-                    "-I"+str(work), str(source), str(ROOT / "port/linux/game/mcc_package.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_cache_format.c"), "-o", str(exe)], capture_output=True, text=True)
+                    "-I"+str(work), str(source), str(ROOT / "port/linux/game/mcc_package.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), str(ROOT / "port/linux/game/mcc_cache_format.c"), "-o", str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return exe
 

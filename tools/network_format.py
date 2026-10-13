@@ -54,6 +54,12 @@ def items():
         assert name not in result, f"{name} is declared twice"
         result[name] = str(value)
 
+    # Settings travel as the complete network_game record, in fragments.
+    game_header = re.sub(r"/\*.*?\*/|//[^\n]*", " ",
+                         (ROOT / "source/networking/network_game_manager.h").read_text(), flags=re.S)
+    for block in _blocks(game_header, r"^struct network_game\s*\{"):
+        add("struct network_game", _hash(block))
+
     for text in texts:
         for block in _blocks(text, r"^struct distributed_\w+\s*\{"):
             structs[re.match(r"struct (\w+)", block).group(1)] = block
@@ -80,7 +86,7 @@ def items():
     # the constants the structs' arrays are sized by, and the netcode's
     # DISTRIBUTED_ sizes in enums of no name, as their definitions' text, with
     # the names those use in turn
-    bounds = set()
+    bounds = {"HALO_PORT_NETWORK_GAME_SIZE", "HALO_PORT_NETWORK_GAME_LOCAL_DATA_OFFSET"}
     for name in sent:
         for size in re.findall(r"\[([^\]]+)\]", structs[name].split("{", 1)[1]):
             bounds |= set(re.findall(r"\b[A-Z_][A-Z0-9_]*\b", size))
