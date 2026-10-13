@@ -1227,6 +1227,91 @@ static void config_report_unknown_keys(toml_datum_t table)
 	}
 }
 
+/* the most lines of a file that cannot be read that are skipped to read
+the rest */
+#define CONFIG_MAXIMUM_SKIPPED_LINES 16
+
+/* the line a parse error is on ("(line 12) ..."), or 0 */
+static int config_error_line(const char *message)
+{
+	const char *at = strstr(message, "(line ");
+	int line = 0;
+
+	if (!at || sscanf(at, "(line %d)", &line) != 1)
+		return 0;
+	return line;
+}
+
+/* whether length bytes of text are word, in any case (ASCII) */
+static int config_word_is(const char *text, size_t length, const char *word)
+{
+	size_t index;
+
+	if (strlen(word) != length)
+		return 0;
+	for (index = 0; index < length; index++)
+	{
+		if (tolower((unsigned char)text[index]) != word[index])
+			return 0;
+	}
+	return 1;
+}
+
+/* the line of text that cannot be read, said in the log with what likely
+makes it so, and emptied (its number kept for the lines after it): returns
+whether it was there */
+static int config_skip_line(char *text, int line_number, const char *message)
+{
+	char *line = text, *end, *value, *value_end;
+	const char *reason = strchr(message, ')');
+	char key[64] = "";
+	char hint[160] = "";
+	int number;
+
+	for (number = 1; number < line_number && *line; number++)
+		line += strcspn(line, "\n") + (line[strcspn(line, "\n")] ? 1 : 0);
+	if (line_number < 1 || number != line_number || !*line)
+		return 0;
+	end = line + strcspn(line, "\n");
+	reason = reason ? reason + 1 : message;
+	while (*reason == ' ')
+		reason++;
+	/* "key = value": the value as written, to the end of the line or a
+	comment */
+	value = memchr(line, '=', (size_t)(end - line));
+	if (value)
+	{
+		char *key_start = line, *key_end = value;
+
+		while (key_start < key_end && (*key_start == ' ' || *key_start == '\t'))
+			key_start++;
+		while (key_end > key_start && (key_end[-1] == ' ' || key_end[-1] == '\t'))
+			key_end--;
+		snprintf(key, sizeof(key), "%.*s", (int)(key_end - key_start), key_start);
+		value++;
+		while (value < end && (*value == ' ' || *value == '\t'))
+			value++;
+		value_end = value + strcspn(value, "#\n");
+		if (value_end > end)
+			value_end = end;
+		while (value_end > value && (value_end[-1] == ' ' || value_end[-1] == '\t' || value_end[-1] == '\r'))
+			value_end--;
+		if (config_word_is(value, (size_t)(value_end - value), "true") ||
+			config_word_is(value, (size_t)(value_end - value), "false"))
+		{
+			snprintf(hint, sizeof(hint), ": true and false are lowercase, %s = %.*s", key, (int)(value_end - value),
+				value_end - value == 4 ? "true" : "false");
+		}
+		else if (value < value_end && isalpha((unsigned char)*value))
+		{
+			snprintf(hint, sizeof(hint), ": text needs quotes, %s = \"%.*s\"", key, (int)(value_end - value), value);
+		}
+	}
+	platform_log("config.toml line %d cannot be read (%s), so it is skipped%s", line_number, reason, hint);
+	memset(line, ' ', (size_t)(end - line));
+	return 1;
+}
+
 static void config_load(void)
 {
 	char path[1024];
@@ -1257,6 +1342,7 @@ static void config_load(void)
 	{
 		char *joined = config_join_sections(text);
 		toml_result_t result;
+		int skipped = 0;
 
 		if (joined)
 		{
@@ -1265,11 +1351,20 @@ static void config_load(void)
 			size = strlen(text);
 		}
 		result = toml_parse(text, (int)size);
+		/* (a line that cannot be read is skipped, in memory, so that the
+		rest is) */
+		while (!result.ok && skipped < CONFIG_MAXIMUM_SKIPPED_LINES &&
+			config_skip_line(text, config_error_line(result.errmsg), result.errmsg))
+		{
+			toml_free(result);
+			result = toml_parse(text, (int)strlen(text));
+			skipped++;
+		}
 		if (result.ok)
 		{
 			char *completed;
 
-			if (joined)
+			if (joined && !skipped)
 			{
 				if (config_write_file(path, text))
 					platform_log("settings: joined the sections %s had twice", path);
@@ -1280,10 +1375,20 @@ static void config_load(void)
 				config_set_from_file(&config_values[index], &config_settings[index], result.toptab);
 			config_report_unknown_keys(result.toptab);
 			platform_log("settings: %s", path);
-			completed = config_add_missing(text, result.toptab);
-			if (completed && !config_write_file(path, completed))
-				platform_log("settings: cannot write %s", path);
-			free(completed);
+			/* (a file with lines skipped is left as the player wrote it, to
+			be fixed) */
+			if (skipped)
+			{
+				platform_log("settings: %d line%s of config.toml skipped; every other setting in it is used", skipped,
+					skipped == 1 ? "" : "s");
+			}
+			else
+			{
+				completed = config_add_missing(text, result.toptab);
+				if (completed && !config_write_file(path, completed))
+					platform_log("settings: cannot write %s", path);
+				free(completed);
+			}
 		}
 		else
 		{
