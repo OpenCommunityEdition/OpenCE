@@ -6836,8 +6836,10 @@ static void ui_widgets_process_mouse(
 				ui_mouse_list_directions(widget, &back, &forward);
 			/* a sideways PC widget (typically a screen's button bar) steps
 			sideways only, and the d-pad's up and down pass over it to a widget
-			above it on the focus's way, so a touch drag leaves it the same way */
-			if (touch && widget && back == _widget_event_dpad_left && pc_menu_tag(widget->definition_tag_index) &&
+			above it on the focus's way, so a touch drag or the wheel leaves it
+			the same way (the wheel, past a list's last row onto the bar, went
+			back and forth between its buttons) */
+			if (widget && back == _widget_event_dpad_left && pc_menu_tag(widget->definition_tag_index) &&
 				ui_mouse_wheel_room(ui_mouse_menu(), _widget_event_dpad_up, FALSE) != NONE)
 			{
 				back = _widget_event_dpad_up;
