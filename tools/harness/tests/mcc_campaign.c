@@ -8,6 +8,9 @@
 #include "game/players.h"
 #include "objects/objects.h"
 #include "units/units.h"
+#include "units/bipeds.h"
+#include "mcc_script_effects.h"
+#include "ai/actor_definitions.h"
 #include "interface/hud.h"
 #include "interface/hud_definitions.h"
 #include "scenario/scenario_definitions.h"
@@ -22,15 +25,25 @@
 #undef strlen
 
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
-static int printed,requests,blocks,restarts,network_restarts,cinematic_skips;
+static int printed,requests,blocks,restarts,network_restarts,cinematic_skips,vehicle_spawns,possessions;
+void cheat_all_vehicles(void) {vehicle_spawns++;}
 void main_skip_cinematic(void) {cinematic_skips++;}
 void main_reset_map(void) {restarts++;}
 boolean mcc_ui_restart_network_game(void) {network_restarts++;return TRUE;}
 static struct sound_definition sound;
+static struct actor_variant_definition actor_variant;
+static long predicted_tag=NONE;
+boolean tag_index_is_group(long index,long group) {
+    return (index==19 && group==ACTOR_VARIANT_DEFINITION_TAG) || (index==20 && group==OBJECT_DEFINITION_TAG);
+}
+void object_definition_predict(long index) {predicted_tag=index;}
 static struct sound_pitch_range ranges[2];
 static struct sound_permutation permutations[3];
 void hs_print(char const *message) {if(strcmp(message,"100% literal"))abort();printed++;}
-void *tag_get(long group,long index) {if(group!='snd!'||index!=17)abort();return &sound;}
+void *tag_get(long group,long index) {
+    if(group==ACTOR_VARIANT_DEFINITION_TAG && index==19)return &actor_variant;
+    if(group!='snd!'||index!=17)abort();return &sound;
+}
 boolean _sound_cache_sound_request(struct sound_permutation *p,boolean block,boolean load,boolean ref) {
     if(p<permutations||p>=permutations+3||!load||ref)abort();requests++;blocks+=block;return TRUE;
 }
@@ -40,7 +53,7 @@ static long args[7],result,added[4];
 static int count,draws;
 static real_point3d drawn;
 static struct player_datum players[3];
-static struct unit_datum units[3];
+static struct biped_datum units[3];
 static struct scenario scenario;
 static struct scenario_cutscene_flag flags[2];
 static struct hud_globals_definition hud;
@@ -80,6 +93,9 @@ void *datum_try_and_get(struct data_array *data,long index) {
 }
 void *object_try_and_get_and_verify_type(long index,unsigned long mask) {(void)mask;return index>=0&&index<3 ? units+index : NULL;}
 void *object_get_and_verify_type(long index,unsigned long mask) {return object_try_and_get_and_verify_type(index,mask);}
+void network_player_detach_unit(long index) {units[players[index].unit_index].unit.player_index=NONE;players[index].unit_index=NONE;}
+void network_player_attach_unit(long index,long unit) {players[index].unit_index=unit;units[unit].unit.player_index=index;possessions++;}
+void players_set_local_player_unit(short local,long unit) {network_player_detach_unit(local);network_player_attach_unit(local,unit);}
 real_point3d *object_get_origin(long index,real_point3d *p) {p->x=(real)index*4;p->y=p->z=0;return p;}
 void unit_get_head_position(long index,real_point3d *p) {object_get_origin(index,p);}
 short hud_get_nav_point_render_type(short local,real_point3d const *h,real_point3d const *p,long ref) {
@@ -121,7 +137,71 @@ int main(int argc,char **argv) {
     scenario.cutscene_flags.address=flags;scenario.cutscene_flags.count=2;
     flags[1].position.x=10;
     mcc_campaign_begin();
-    if(!strcmp(argv[1],"cinematic_abort")) {
+    if(!strcmp(argv[1],"object_predict")) {
+        actor_variant.unit_reference.index=20;
+        args[0]=19;call("object_type_predict");CHECK(predicted_tag==20);
+        predicted_tag=NONE;actor_variant.unit_reference.index=19;
+        call("object_type_predict");CHECK(predicted_tag==NONE);
+        args[0]=123;call("object_type_predict");CHECK(predicted_tag==NONE);
+        args[0]=NONE;call("object_type_predict");CHECK(predicted_tag==NONE);
+        args[0]=20;call("object_type_predict");CHECK(predicted_tag==20);
+        predicted_tag=NONE;loaded=FALSE;call("object_type_predict");CHECK(predicted_tag==NONE);
+    } else if(!strcmp(argv[1],"script_effects")) {
+        CHECK(mcc_script_effect_global("cheat_jetpack"));
+        CHECK(!mcc_script_effect_global("cheat_controller"));
+        cheat.jetpack=TRUE;cheat.super_jump=TRUE;cheat.bottomless_clip=TRUE;
+        cheat.bump_possession=TRUE;cheat.medusa=TRUE;cheat.omnipotent=TRUE;
+        cheat.deathless_player=TRUE;cheat.infinite_ammo=TRUE;
+        CHECK(mcc_script_effects_snapshot()==MCC_EFFECT_MASK);
+        CHECK(mcc_script_effects_host_movement());
+        mcc_campaign_snapshot(saved);
+        CHECK(mcc_campaign_validate(saved,sizeof(saved)));
+        mcc_campaign_begin();CHECK(!mcc_script_effects_snapshot());
+        CHECK(mcc_campaign_restore(saved,sizeof(saved)));
+        CHECK(cheat.jetpack && cheat.omnipotent);
+        connection=_game_connection_network_client;
+        memset(&cheat,0,sizeof(cheat));
+        CHECK(mcc_campaign_restore(saved,sizeof(saved)));
+        CHECK(!cheat.jetpack && !cheat.bottomless_clip && !cheat.medusa);
+        CHECK(mcc_campaign_unlimited_ammo() && !cheat.infinite_ammo);
+        CHECK(mcc_script_effect_enabled(MCC_EFFECT_JETPACK));
+        CHECK(mcc_script_effect_enabled(MCC_EFFECT_BOTTOMLESS_CLIP));
+        call("cheat_all_vehicles");CHECK(!vehicle_spawns);
+        CHECK(mcc_script_effects_bump(0,1));CHECK(!possessions);
+        memcpy(bad,saved,sizeof(saved));bad[0]=2;
+        CHECK(!mcc_campaign_validate(bad,sizeof(bad)));
+        memcpy(bad,saved,sizeof(saved));bad[13]|=8;
+        CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
+        CHECK(mcc_script_effects_snapshot()==MCC_EFFECT_MASK);
+        loaded=FALSE;CHECK(!mcc_script_effect_enabled(MCC_EFFECT_JETPACK));
+        CHECK(!mcc_script_effect_global("cheat_jetpack"));
+        CHECK(!mcc_script_effects_bump(0,1));
+        call("cheat_all_vehicles");CHECK(!vehicle_spawns);
+        loaded=TRUE;connection=_game_connection_network_server;
+        call("cheat_all_vehicles");CHECK(vehicle_spawns==1);
+        mcc_campaign_dispose();CHECK(!mcc_script_effects_snapshot() && !cheat.jetpack);
+        call("cheat_all_vehicles");CHECK(vehicle_spawns==1);
+    } else if(!strcmp(argv[1],"possession")) {
+        cheat.bump_possession=TRUE;
+        units[0].unit.player_index=0;units[1].unit.player_index=NONE;
+        units[0].object.parent_object_index=units[1].object.parent_object_index=NONE;
+        players[0].local_player_index=NONE;
+        connection=_game_connection_network_server;
+        CHECK(mcc_script_effects_bump(0,123));CHECK(!possessions);
+        units[1].unit.player_index=1;
+        CHECK(mcc_script_effects_bump(0,1));CHECK(!possessions);
+        units[1].unit.player_index=NONE;units[1].object.damage_flags=1u<<_object_dead_bit;
+        CHECK(mcc_script_effects_bump(0,1));CHECK(!possessions);
+        units[1].object.damage_flags=0;units[1].object.parent_object_index=2;
+        CHECK(mcc_script_effects_bump(0,1));CHECK(!possessions);
+        units[1].object.parent_object_index=NONE;
+        CHECK(mcc_script_effects_bump(0,1));CHECK(possessions==1);
+        CHECK(players[0].unit_index==1 && units[0].unit.player_index==NONE);
+        CHECK(units[1].unit.player_index==0 && units[1].biped.bump_ticks==-15);
+        CHECK(!units[0].object.damage_flags);
+        CHECK(mcc_script_effects_preserve_body());
+        loaded=FALSE;CHECK(!mcc_script_effects_preserve_body());
+    } else if(!strcmp(argv[1],"cinematic_abort")) {
         short id=mcc_campaign_find("cinematic_abort");
         struct hs_function_definition *definition=mcc_campaign_function(id);
         CHECK(definition && definition->return_type==_hs_type_void && !definition->parameter_count);
@@ -253,8 +333,8 @@ int main(int argc,char **argv) {
     } else if(!strcmp(argv[1],"validation")) {
         mcc_campaign_snapshot(saved);CHECK(mcc_campaign_validate(saved,sizeof(saved)));
         CHECK(!mcc_campaign_validate(saved,sizeof(saved)-1));
-        memcpy(bad,saved,sizeof(saved));bad[0]=3;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
-        memcpy(bad,saved,sizeof(saved));bad[12]=16;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
+        memcpy(bad,saved,sizeof(saved));bad[0]=4;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
+        memcpy(bad,saved,sizeof(saved));bad[13]=8;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         memcpy(bad,saved,sizeof(saved));{long nan=0x7fc00000;memcpy(bad+4,&nan,4);}CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         memcpy(bad,saved,sizeof(saved));bad[16]=4;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         CHECK(global_gravity==original);

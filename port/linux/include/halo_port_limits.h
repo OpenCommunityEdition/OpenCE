@@ -73,7 +73,9 @@ Raise it with any change to what the machines send each other. */
 /* Version 37 belongs to the optional camera branch. MCC weapon-authored
  * cameras change deterministic aiming; all peers must implement that choice. */
 /* Version 39 admits MCC biped parents in host-authoritative seat state. */
-#define HALO_PORT_NETWORK_VERSION 39
+/* MCC campaign effect snapshots now carry host-approved movement/ammo flags.
+ * MCC possession preserves the former body until host death replication. */
+#define HALO_PORT_NETWORK_VERSION 40
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags */
 #define HALO_PORT_ADVERTISED_VERSION_OFFSET 0

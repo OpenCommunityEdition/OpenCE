@@ -662,6 +662,7 @@ symbols in this file:
 #include "effects/effects.h"
 #include "effects/material_effect_definitions.h"
 #include "game/cheats.h"
+#include "mcc_script_effects.h" /* port: MCC host-approved jetpack prediction */
 #include "game/game_allegiance.h"
 #include "game/game_globals.h"
 #include "game/game_engine.h"
@@ -5626,7 +5627,8 @@ boolean unit_update(
 		* Grenade throw button
 		* Primary weapon fire button
 		*/
-		if (cheat.jetpack &&
+		/* port: the MCC jetpack combination must suppress firing on clients too. */
+		if ((cheat.jetpack || mcc_script_effect_enabled(MCC_EFFECT_JETPACK)) &&
 			TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit) &&
 			TEST_FLAG(unit->unit.control_flags, _unit_control_throw_grenade_bit))
 		{
