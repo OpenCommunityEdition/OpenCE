@@ -1,0 +1,657 @@
+diff --git a/port/android/app/src/main/java/com/halo/decomp/Updater.java b/port/android/app/src/main/java/com/halo/decomp/Updater.java
+index 266a98e..676ec62 100644
+--- a/port/android/app/src/main/java/com/halo/decomp/Updater.java
++++ b/port/android/app/src/main/java/com/halo/decomp/Updater.java
+@@ -47,7 +47,8 @@ import java.util.zip.ZipInputStream;
+  * app must keep for Android to install a new version over it.
+  */
+ final class Updater {
+-    private static final String REPOSITORY = "OpenCommunityEdition/OpenCE";
++    /* Gun Game builds update from this fork, not official OpenCE. */
++    private static final String REPOSITORY = "Restartt97/OpenCE";
+     private static final String USER_AGENT = "halo-ce-universal-updater";
+     private static final int TIMEOUT_MILLISECONDS = 20000;
+     /** the most a download (a release's zip, about 35 MB) or the app in it may be */
+diff --git a/port/linux/game/network_damage.c b/port/linux/game/network_damage.c
+index 3ed444a..978faa7 100644
+--- a/port/linux/game/network_damage.c
++++ b/port/linux/game/network_damage.c
+@@ -56,6 +56,7 @@ being hit looks and feels like on the clients).
+ #include "scenario/scenario.h"
+ #include "units/units.h"
+ #include "network_distributed.h"
++#include "gun_race.h"
+ 
+ #include <math.h>
+ 
+@@ -1746,7 +1747,8 @@ target. */
+ static boolean distributed_report_valid(
+ 	long machine_index,
+ 	struct distributed_hit_report const *report,
+-	struct damage_data *damage)
++	struct damage_data *damage,
++	boolean *is_melee)
+ {
+ 	short player_index = report->damage.owner_player_index;
+ 	long now = game_time_get();
+@@ -1766,6 +1768,9 @@ static boolean distributed_report_valid(
+ 	short grenade_type;
+ 	short throw_index = NONE;
+ 
++	if (is_melee)
++		*is_melee = FALSE;
++
+ 	/* that machine's player */
+ 	if (player_index == NO_PLAYER || player_index >= MAXIMUM_TRACKED_PLAYERS ||
+ 		!(player = distributed_player(player_index)) || !distributed_machine_has_player(machine_index, player_index))
+@@ -1948,6 +1953,8 @@ static boolean distributed_report_valid(
+ 	unit_index = distributed_living_unit(player);
+ 	if (!distributed_object_is_players(player_index, unit_index, damage->owner_object_index))
+ 		damage->owner_object_index = unit_index;
++	if (is_melee)
++		*is_melee = melee;
+ 	return TRUE;
+ }
+ 
+@@ -1963,16 +1970,31 @@ void network_damage_handle_reports(
+ 	{
+ 		struct distributed_hit_report const *report = &reports[index];
+ 		struct damage_data damage;
++		boolean melee;
++		int gun_race_hit;
+ 
+-		if (!distributed_report_valid(machine_index, report, &damage))
++		melee = FALSE;
++		gun_race_hit = 0;
++		if (!distributed_report_valid(machine_index, report, &damage, &melee))
+ 		{
+ 			damage_rejected_reports++;
+ 			continue;
+ 		}
+ 		damage_dealt_reports++;
++		/* port: Gun Race Pro. A client's hit is not this machine's projectile,
++		   so the weapon is taken from the damage it dealt. Skull melee kills. */
++		if (melee && gun_race_reported_melee_should_kill(damage.owner_player_index))
++		{
++			damage.scale = 1.0f;
++			damage.multiplier = 100.0f;
++		}
++		gun_race_hit = gun_race_begin_reported_hit(
++			damage.owner_player_index, damage.definition_index, melee);
+ 		damage_dealing_report = TRUE;
+ 		object_cause_damage(&damage, report->object_index, report->node_index, report->region_index,
+ 			report->material_index, report->has_normal ? &report->object_normal : NULL);
++		if (gun_race_hit)
++			gun_race_end_damage();
+ 		damage_dealing_report = FALSE;
+ 	}
+ }
+diff --git a/source/effects/effects.c b/source/effects/effects.c
+index 18691f4..2204690 100644
+--- a/source/effects/effects.c
++++ b/source/effects/effects.c
+@@ -172,8 +172,12 @@ symbols in this file:
+ #include "tag_files/tag_groups.h"
+ #include "units/bipeds.h"
+ #include "units/units.h"
++#include "gun_race.h" /* port: port/linux/game/gun_race.c */
+ #undef real_local_random
+ 
++/* port: the effect whose parts are being built, for Gun Race Pro */
++static long gun_race_generating_effect = NONE;
++
+ /* ---------- constants */
+ 
+ enum effect_flags
+@@ -1550,6 +1554,8 @@ static long effect_allocate(
+ 		}
+ 	}
+ 
++	/* port: Gun Race Pro remembers which projectile created this effect */
++	gun_race_bind_effect(effect_index);
+ 	return effect_index;
+ }
+ 
+@@ -1756,7 +1762,10 @@ static void effect_generate_part(
+ 			damage.epicenter = *world_point;
+ 			damage.direction = *world_forward;
+ 
++			/* port: Gun Race Pro attributes this explosion to the projectile */
++			gun_race_begin_projectile(gun_race_effect_projectile(gun_race_generating_effect));
+ 			area_of_effect_cause_damage(&damage, NONE);
++			gun_race_end_damage();
+ 			break;
+ 		}
+ 
+@@ -2460,7 +2469,15 @@ static void effect_update(
+ 			}
+ 
+ 			if (!TEST_FLAG(effect->header.flags, _effect_invisible_bit))
++			{
++				long saved_effect;
++
++				/* port: Gun Race Pro reads the effect index while a part deals damage */
++				saved_effect = gun_race_generating_effect;
++				gun_race_generating_effect = effect_index;
+ 				effect_generate_parts(effect);
++				gun_race_generating_effect = saved_effect;
++			}
+ 		}
+ 	}
+ 
+diff --git a/source/game/game_engine.c b/source/game/game_engine.c
+index 93f9739..d7b0f16 100644
+--- a/source/game/game_engine.c
++++ b/source/game/game_engine.c
+@@ -593,6 +593,7 @@ struct network_game *network_game_server_get_game(struct network_game_server *se
+ #include "units/bipeds.h"
+ #include "units/units.h"
+ #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
++#include "gun_race.h" /* port: port/linux/game/gun_race.c */
+ 
+ /* network_game_globals.c's */
+ boolean network_game_distributed_client(void);
+@@ -7050,6 +7051,13 @@ struct game_variant *game_engine_get_variant(
+ 	return &global_variant;
+ }
+ 
++/* port: Gun Race Pro. _game_engine_weapons_no_grenades only remaps grenades. */
++void game_engine_suppress_grenade_set(
++	void)
++{
++	global_variant.universal_variant.weapon_set = _game_engine_weapons_no_grenades;
++}
++
+ struct game_variant *game_engine_get_variant_by_name(
+ 	struct game_variant *variant,
+ 	char const *name)
+@@ -9181,6 +9189,9 @@ void game_engine_postspawn_player_update(
+ 		}
+ 	}
+ 
++	/* port: Gun Race Pro replaces the spawn loadout and clears grenades */
++	gun_race_on_player_spawn(player_index);
++
+ 	return;
+ }
+ 
+diff --git a/source/game/game_engine.h b/source/game/game_engine.h
+index 01e8e49..b2a34e2 100644
+--- a/source/game/game_engine.h
++++ b/source/game/game_engine.h
+@@ -637,6 +637,10 @@ void game_engine_load_stage(
+ void game_engine_end_game(
+ 	void);
+ 
++/* port: Gun Race Pro (port/linux/game/gun_race.c). Map grenades are not placed. */
++void game_engine_suppress_grenade_set(
++	void);
++
+ void ticks_to_unicode_time_string(
+ 	long ticks,
+ 	unsigned long character_count,
+diff --git a/source/game/game_engine_slayer.c b/source/game/game_engine_slayer.c
+index 5677d4d..ad79620 100644
+--- a/source/game/game_engine_slayer.c
++++ b/source/game/game_engine_slayer.c
+@@ -85,6 +85,7 @@ symbols in this file:
+ #include "text/text_group.h"
+ #include "text/unicode.h"
+ #include "units/units.h"
++#include "gun_race.h" /* port: port/linux/game/gun_race.c */
+ 
+ /* ---------- constants */
+ 
+@@ -158,6 +159,9 @@ static void slayer_engine_dispose(
+ static boolean slayer_engine_initialize_for_new_map(
+ 	void)
+ {
++	/* port: Gun Race Pro builds its ladder before Slayer clears the scores */
++	gun_race_on_new_map();
++
+ 	csmemset(slayer_globals.team_score, 0, sizeof(slayer_globals.team_score));
+ 	csmemset(slayer_globals.individual_score, 0, sizeof(slayer_globals.individual_score));
+ 
+@@ -233,6 +237,8 @@ static void slayer_engine_player_added(
+ 	long slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+ 
+ 	player->multiplayer_special = NONE;
++	/* port: Gun Race Pro starts this player at the first stage */
++	gun_race_on_player_added(player_index);
+ 	/* port: a player joining the game in progress can take the slot of one
+ 	who quit (network_game_spawn_player): not that player's score, nor in
+ 	free for all, where the slot is the team, the team's */
+@@ -258,6 +264,10 @@ static boolean slayer_engine_allow_pick_up(
+ 	long unit_index,
+ 	long weapon_index)
+ {
++	/* port: Gun Race Pro removes the map's weapons, so this stays open.
++	   Closing it also stopped a carried weapon from being put in the hands. */
++	(void)unit_index;
++	(void)weapon_index;
+ 	return TRUE;
+ }
+ 
+@@ -293,6 +303,17 @@ static wchar_t *slayer_get_score_string(
+ 	long player_index,
+ 	wchar_t *buffer)
+ {
++	/* port: Gun Race Pro shows the weapon and the kills still needed */
++	if (gun_race_show_scoreboard())
++	{
++		gun_race_format_progress(
++			player_index,
++			slayer_globals.individual_score[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)],
++			buffer,
++			48);
++		return buffer;
++	}
++
+ 	usprintf(
+ 		buffer,
+ 		L"%d",
+@@ -307,6 +328,12 @@ static wchar_t *slayer_get_score_header_string(
+ {
+ 	long string_list_index;
+ 
++	/* port: Gun Race Pro. The map's score name is "Score" or "Flag". */
++	if (gun_race_show_scoreboard())
++	{
++		ustrncpy_terminated(buffer, L"Stage", 256);
++		return buffer;
++	}
+ 	/* port: bounded (a map's text, into its callers' score_string[256]) */
+ 	ustrncpy_terminated(buffer, GET_MULTIPLAYER_GAME_TEXT(_string_score), 256);
+ 
+@@ -473,6 +500,28 @@ static void slayer_engine_player_killed_player(
+ {
+ 	struct player_datum *dead_player = player_get(dead_player_index);
+ 
++	/* port: Gun Race Pro counts only a kill with the current stage's weapon */
++	if (gun_race_active())
++	{
++		int result;
++
++		if (dead_player->quit_out_of_game || killing_player_index == NONE ||
++			network_game_distributed_client() || friendly_fire ||
++			killing_player_index == dead_player_index)
++		{
++			return;
++		}
++		result = gun_race_handle_kill(killing_player_index, dead_player_index);
++		if (result == GR_KILL_COUNTED || result == GR_STAGE_ADVANCED ||
++			result == GR_MATCH_WON)
++		{
++			slayer_engine_adjust_score(killing_player_index, 1);
++			if (result == GR_MATCH_WON)
++				game_engine_end_game();
++		}
++		return;
++	}
++
+ 	/* (a client of the distributed netcode has the host's scores,
+ 	game_engine_slayer_read_network_state: its copy of a kill may come before
+ 	or after the state with it, and would count twice) */
+@@ -518,6 +567,18 @@ static boolean slayer_engine_display_score(
+ 	player_get(player_index);
+ 	target_player = NULL;
+ 
++	/* port: Gun Race Pro replaces the score line with the stage */
++	if (gun_race_show_scoreboard() &&
++		(message == _slayer_message_new_target || message == _game_engine_message_show_score))
++	{
++		gun_race_format_progress(
++			player_index,
++			slayer_get_score(player_index, _get_score_individual),
++			buffer,
++			buffer_character_count);
++		return TRUE;
++	}
++
+ 	if (message == _slayer_message_new_target)
+ 	{
+ 		if (game_engine_get_variant()->universal_variant.teams)
+@@ -596,6 +657,10 @@ static void slayer_player_update(
+ {
+ 	struct player_datum *player = player_get(index);
+ 
++	/* port: Gun Race Pro keeps the stage weapon in hand and grenades empty */
++	gun_race_observe_score(index, slayer_get_score(index, _get_score_individual));
++	gun_race_enforce_player(index);
++
+ 	if (game_engine_get_variant()->game_engine_variant.slayer.no_kill_penalty &&
+ 		player->speed_multiplier > 1.0f)
+ 	{
+diff --git a/source/game/players.c b/source/game/players.c
+index 04dcec5..3ac9535 100644
+--- a/source/game/players.c
++++ b/source/game/players.c
+@@ -237,6 +237,7 @@ symbols in this file:
+ #include "data.h"
+ #include "devices/devices.h"
+ #include "network_coop.h" /* port: port/linux/game/network_coop.c */
++#include "gun_race.h" /* port: port/linux/game/gun_race.c */
+ #include "cutscene/cinematics.h" /* port: network co-op's first spawns */
+ #include "editor/editor_stubs.h"
+ #include "effects/effects.h"
+@@ -4231,7 +4232,8 @@ static void player_examine_nearby_item(
+ 		equipment_definition = equipment_definition_get(equipment->definition_index);
+ 		if (equipment_definition->equipment.powerup_type == _equipment_powerup_grenade)
+ 		{
+-			if (players_decide_pickups() && unit_add_grenade_to_inventory(player->unit_index, item_index))
++			/* port: Gun Race Pro never picks up grenades */
++			if (!gun_race_forbids_grenades() && players_decide_pickups() && unit_add_grenade_to_inventory(player->unit_index, item_index))
+ 			{
+ 				hud_picked_up_grenade(
+ 					player->local_player_index,
+@@ -4889,7 +4891,9 @@ void players_update_before_game(
+ 					weapon_index = unit_inventory_get_weapon(
+ 						player->unit_index,
+ 						unit_get(player->unit_index)->unit.current_weapon_index);
+-					if (weapon_index != NONE && weapon_must_be_readied(weapon_index))
++					/* port: Gun Race Pro holds the skull. Firing must not drop it. */
++					if (weapon_index != NONE && weapon_must_be_readied(weapon_index) &&
++						!gun_race_active())
+ 					{
+ 						if (TEST_FLAG(action->control_flags, _unit_control_weapon_primary_trigger_bit) ||
+ 							TEST_FLAG(action->control_flags, _unit_control_weapon_secondary_trigger_bit))
+diff --git a/source/interface/motion_sensor.c b/source/interface/motion_sensor.c
+index be07f7f..e050247 100644
+--- a/source/interface/motion_sensor.c
++++ b/source/interface/motion_sensor.c
+@@ -108,6 +108,7 @@ symbols in this file:
+ #include "units/unit_definitions.h"
+ #include "units/units.h"
+ #include "units/vehicles.h"
++#include "gun_race.h"
+ 
+ /* ---------- constants */
+ 
+@@ -848,6 +849,10 @@ static char blip_type_get(
+ 	if (controlling_local_player_index == local_player_index)
+ 		return _blip_type_self;
+ 
++	/* port: Gun Race Pro. The last weapon pulses on the radar. */
++	if (gun_race_mark_on_radar(object_index))
++		return _blip_type_custom;
++
+ 	if (!unit_try_and_get(object_index))
+ 		return _blip_type_enemy;
+ 
+@@ -1018,6 +1023,10 @@ static boolean should_draw_object(
+ 	{
+ 		struct unit_datum *unit = unit_get(object_index);
+ 
++		/* port: Gun Race Pro. A player on the last weapon stays marked. */
++		if (gun_race_mark_on_radar(object_index))
++			return TRUE;
++
+ 		if (TEST_FLAG(
+ 			unit->unit.control_flags,
+ 			_unit_control_weapon_primary_trigger_bit) ||
+diff --git a/source/items/projectiles.c b/source/items/projectiles.c
+index 7778307..20cc45a 100644
+--- a/source/items/projectiles.c
++++ b/source/items/projectiles.c
+@@ -141,6 +141,7 @@ symbols in this file:
+ #include "sound/sound_definitions.h"
+ #include "units/bipeds.h"
+ #include "units/units.h"
++#include "gun_race.h" /* port: port/linux/game/gun_race.c */
+ 
+ /* ---------- constants */
+ 
+@@ -1235,6 +1236,11 @@ static void projectile_effect_new(
+ 	real scale,
+ 	real material_effect_scale)
+ {
++	struct projectile_datum *projectile;
++
++	/* port: Gun Race Pro credits effects spawned by this impact */
++	projectile = projectile_get(projectile_index);
++	gun_race_push_pending_projectile(projectile->definition_index);
+ 	if (collision->type == _collision_result_object)
+ 	{
+ 		effect_new_attached_from_markers(
+@@ -1268,6 +1274,7 @@ static void projectile_effect_new(
+ 			TRUE);
+ 	}
+ 
++	gun_race_pop_pending_projectile();
+ 	return;
+ }
+ 
+@@ -1349,6 +1356,8 @@ static void projectile_detonate(
+ 
+ 	projectile = projectile_get(projectile_index);
+ 	definition = projectile_definition_get(projectile->definition_index);
++	/* port: Gun Race Pro credits damage from this projectile's explosion */
++	gun_race_push_pending_projectile(projectile->definition_index);
+ 
+ 	marker_names[0] = "";
+ 	marker_names[1] = "gravity";
+@@ -1459,7 +1468,10 @@ static void projectile_detonate(
+ 		damage.owner_object_index = projectile->object.owner_object_index;
+ 		damage.owner_player_index = projectile->object.owner_player_index;
+ 		damage.owner_team_index = projectile->object.owner_team_index;
++		/* port: Gun Race Pro attributes this hit to the projectile */
++		gun_race_begin_projectile(projectile->definition_index);
+ 		object_cause_damage(&damage, projectile->object.parent_object_index, NONE, NONE, NONE, NULL);
++		gun_race_end_damage();
+ 	}
+ 
+ 	if (projectile->projectile.hit_material_type != NONE)
+@@ -1495,6 +1507,7 @@ static void projectile_detonate(
+ 		definition->projectile.detonation_noise,
+ 		1);
+ 
++	gun_race_pop_pending_projectile();
+ 	return;
+ }
+ 
+@@ -1562,6 +1575,8 @@ static void projectile_collision(
+ 		damage.origin = collision->point;
+ 		damage.direction = *new_velocity;
+ 		normalize3d(&damage.direction);
++		/* port: Gun Race Pro attributes this hit to the projectile */
++		gun_race_begin_projectile(projectile->definition_index);
+ 		object_cause_damage(
+ 			&damage,
+ 			collision->object_index,
+@@ -1569,6 +1584,7 @@ static void projectile_collision(
+ 			collision->region_index,
+ 			collision->material_index,
+ 			&collision->plane.n);
++		gun_race_end_damage();
+ 
+ 		if (damage.material_type != NONE)
+ 			material_type = damage.material_type;
+diff --git a/source/saved games/playlist_profile.c b/source/saved games/playlist_profile.c
+index 44f8daa..84093ef 100644
+--- a/source/saved games/playlist_profile.c	
++++ b/source/saved games/playlist_profile.c	
+@@ -285,6 +285,111 @@ word playlist_profile_number_of_default_profiles_on_disk(
+ 	return playlist_profile_globals.number_of_default_profiles;
+ }
+ 
++/* port: Gun Race Pro is a saved gametype, like one made in the menu */
++static int playlist_profile_name_is_gun_race(wchar_t const *name)
++{
++	static wchar_t const expected[] = { 'G', 'u', 'n', ' ', 'R', 'a', 'c', 'e', 0 };
++	int index;
++
++	if (!name)
++		return 0;
++	for (index = 0; expected[index] != 0; index++)
++	{
++		if (name[index] != expected[index])
++			return 0;
++	}
++	return name[index] == 0;
++}
++
++static long playlist_profile_create_gun_race(short local_player_index)
++{
++	struct game_variant temporary;
++	struct file_reference file;
++	wchar_t name[MAXIMUM_GAME_VARIANT_NAME_LENGTH];
++	long playlist_profile_index;
++
++	csmemset(name, 0, sizeof(name));
++	name[0] = 'G';
++	name[1] = 'u';
++	name[2] = 'n';
++	name[3] = ' ';
++	name[4] = 'R';
++	name[5] = 'a';
++	name[6] = 'c';
++	name[7] = 'e';
++	playlist_profile_index = create_enumerated_saved_game_file(
++		_saved_game_file_type_game_variant,
++		local_player_index,
++		name);
++
++	if (playlist_profile_index == NONE)
++		return NONE;
++	if (saved_game_file_open(&file, playlist_profile_index))
++	{
++		byte block[SAVED_GAME_FILE_BLOCK_SIZE] = {0};
++		struct game_variant variant = *build_game_variant_slayer_pro(&temporary);
++
++		csmemcpy(block, &variant, sizeof(struct game_variant));
++		SET_FLAG(
++			((struct game_variant *)block)->flags,
++			_game_variant_is_system_default_bit,
++			FALSE);
++		game_engine_variant_cleanup((struct game_variant *)block);
++		ustrncpy(
++			(wchar_t *)block,
++			name,
++			MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1);
++		((struct game_variant *)block)->human_readable_game_description[
++			MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1] = 0;
++		saved_game_file_generate_checksum(
++			block,
++			PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE,
++			(XCALCSIG_SIGNATURE *)(block + PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE));
++
++		if (!file_set_position(&file, 0) ||
++			!file_write(&file, sizeof(block), block))
++		{
++			error(_error_silent, "failed to initialize the Gun Race gametype");
++			delete_enumerated_saved_game_file(playlist_profile_index);
++			playlist_profile_index = NONE;
++		}
++
++		saved_game_file_close(&file, playlist_profile_index);
++	}
++	else
++	{
++		error(_error_silent, "failed to open the Gun Race gametype");
++		delete_enumerated_saved_game_file(playlist_profile_index);
++		playlist_profile_index = NONE;
++	}
++
++	return playlist_profile_index;
++}
++
++static void playlist_profile_ensure_gun_race(short local_player_index)
++{
++	long indices[100];
++	word count;
++	word index;
++
++	if (local_player_index < 0)
++		return;
++	count = 100;
++	saved_game_files_enumerate_available_to_local_player_index(
++		local_player_index,
++		_saved_game_file_type_game_variant,
++		&count,
++		indices,
++		TRUE);
++	for (index = 0; index < count; index++)
++	{
++		if (playlist_profile_name_is_gun_race(
++			saved_game_file_get_display_name(indices[index])))
++			return;
++	}
++	playlist_profile_create_gun_race(local_player_index);
++}
++
+ void playlist_profiles_enumerate_available_to_local_player_index(
+ 	short local_player_index,
+ 	word *number_of_profiles,
+@@ -296,6 +401,7 @@ void playlist_profiles_enumerate_available_to_local_player_index(
+ 		playlist_profile_default_data.first_time = FALSE;
+ 	}
+ 
++	playlist_profile_ensure_gun_race(local_player_index);
+ 	saved_game_files_enumerate_available_to_local_player_index(
+ 		local_player_index,
+ 		_saved_game_file_type_game_variant,
+diff --git a/source/units/units.c b/source/units/units.c
+index 2500a40..61e77dd 100644
+--- a/source/units/units.c
++++ b/source/units/units.c
+@@ -665,6 +665,7 @@ symbols in this file:
+ #include "game/game_allegiance.h"
+ #include "game/game_globals.h"
+ #include "game/game_engine.h"
++#include "gun_race.h" /* port: port/linux/game/gun_race.c */
+ #include "game/players.h"
+ #include "hs/object_lists.h"
+ #include "interface/first_person_weapons.h"
+@@ -2828,6 +2829,29 @@ void unit_died(
+ 	}
+ 
+ 	unit->unit.speech.queued.priority = 0;
++	/* port: Gun Race Pro. A dead player's weapon is deleted, not dropped. */
++	if (gun_race_active())
++	{
++		int weapon_slot;
++
++		for (weapon_slot = 0; weapon_slot < MAXIMUM_WEAPONS_PER_UNIT; weapon_slot++)
++		{
++			long carried = unit->unit.weapon_object_indices[weapon_slot];
++
++			unit->unit.weapon_object_indices[weapon_slot] = NONE;
++			if (carried != NONE &&
++				!(object_get(carried)->object.type == _object_type_weapon &&
++					weapon_is_flag(carried)))
++			{
++				if (object_get(carried)->object.parent_object_index != NONE)
++					object_detach(carried);
++				object_delete(carried);
++			}
++		}
++		unit->unit.current_weapon_index = NONE;
++		unit->unit.desired_weapon_index = NONE;
++		unit->unit.weapon_drop_delay_ticks = 0;
++	}
+ 	unit_drop_inventory_weapons(unit_index);
+ 	fresh_unit = unit_get(unit_index);
+ 	if (fresh_unit->unit.equipment_object_index != NONE)
+@@ -9259,6 +9283,14 @@ void unit_cause_player_melee_damage(
+ 
+ 				if (object_get(best_object_index)->object.type==_object_type_biped)
+ 				{
++					/* port: Gun Race Pro. An unarmed punch kills a player
++					   in one hit, and the blow is the kill's weapon. */
++					if (gun_race_melee_should_kill(unit_index))
++					{
++						damage_data.scale = 1.f;
++						damage_data.multiplier = 100.f;
++					}
++					gun_race_begin_melee();
+ 					object_cause_damage(
+ 						&damage_data,
+ 						best_object_index,
+@@ -9266,6 +9298,7 @@ void unit_cause_player_melee_damage(
+ 						NONE,
+ 						NONE,
+ 						NULL);
++					gun_race_end_damage();
+ 				}
+ 			}
+ 		}
