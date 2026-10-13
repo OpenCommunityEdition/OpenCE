@@ -187,6 +187,18 @@ async function checkedFiles(candidates) {
   return kept;
 }
 
+// The maps folder among the root's folders: "maps", or on a multi-language
+// European disc, which has a "maps_xx" for each language instead, the one
+// for the browser's language, else English's, else the first.
+function mapsFolder(directories, language) {
+  const plain = directories.find((entry) => sameName(entry.name, 'maps'));
+  if (plain) return plain;
+  const languages = directories.filter((entry) => entry.name.length === 7 && sameName(entry.name.slice(0, 5), 'maps_'));
+  const wanted = 'maps_' + asciiLower(language).slice(0, 2);
+  return languages.find((entry) => sameName(entry.name, wanted)) ||
+    languages.find((entry) => sameName(entry.name, 'maps_en')) || languages[0];
+}
+
 // The maps folder's files in a disc image, as { name, size, read(offset,
 // size) }; throws why it cannot be used.
 async function imageFiles(file) {
@@ -195,7 +207,8 @@ async function imageFiles(file) {
   const { partition } = volume;
   const root = await readTable(file, partition, volume.rootSector, volume.rootSize,
     'The disc image\'s file system is damaged.');
-  const maps = walkDirectory(root).find((entry) => entry.directory && sameName(entry.name, 'maps'));
+  const maps = mapsFolder(walkDirectory(root).filter((entry) => entry.directory),
+    (typeof navigator !== 'undefined' && navigator.language) || '');
   if (!maps) throw new Error('The disc image has no maps folder: it is not a Halo disc.');
   const table = await readTable(file, partition, maps.sector, maps.size, 'The disc image\'s maps folder is damaged.');
   const candidates = [];
@@ -304,5 +317,5 @@ if (typeof onmessage !== 'undefined' || typeof WorkerGlobalScope !== 'undefined'
 
 // (for the tests: port/web/tests)
 if (typeof module !== 'undefined') {
-  module.exports = { findVolume, walkDirectory, mapProblem, imageFiles, folderFiles, plainName };
+  module.exports = { findVolume, walkDirectory, mapProblem, imageFiles, folderFiles, plainName, mapsFolder };
 }

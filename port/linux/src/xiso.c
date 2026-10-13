@@ -420,6 +420,52 @@ static int xiso_copy_file(struct xiso_image *image, const struct xiso_entry *ent
 	return 1;
 }
 
+/* the maps folder among the root's folders, count if none: "maps", or on a
+multi-language European disc, which has a "maps_xx" for each language
+instead, the one for the system's language (LC_ALL, LC_MESSAGES or LANG),
+else English's, else the first */
+static int xiso_maps_folder(const struct xiso_entry *entries, int count)
+{
+	static const char *const variables[] = { "LC_ALL", "LC_MESSAGES", "LANG" };
+	char language[8] = "maps_en";
+	int english = count, first = count;
+	int index;
+
+	for (index = 0; index < count; index++)
+	{
+		if (xiso_name_is(entries[index].name, (int)strlen(entries[index].name), "maps"))
+			return index;
+	}
+	for (index = 0; index < (int)(sizeof(variables) / sizeof(variables[0])); index++)
+	{
+		const char *value = getenv(variables[index]);
+
+		if (value && value[0])
+		{
+			if (value[0] >= 'a' && value[0] <= 'z' && value[1] >= 'a' && value[1] <= 'z')
+			{
+				language[5] = value[0];
+				language[6] = value[1];
+			}
+			break;
+		}
+	}
+	for (index = 0; index < count; index++)
+	{
+		const char *name = entries[index].name;
+
+		if (strlen(name) != 7 || !xiso_name_is(name, 5, "maps_"))
+			continue;
+		if (xiso_name_is(name, 7, language))
+			return index;
+		if (english == count && xiso_name_is(name, 7, "maps_en"))
+			english = index;
+		if (first == count)
+			first = index;
+	}
+	return english < count ? english : first;
+}
+
 /* ---------- public code */
 
 int xiso_extract_maps(const char *image_path, const char *destination, xiso_progress_proc progress, void *context,
@@ -478,16 +524,16 @@ int xiso_extract_maps(const char *image_path, const char *destination, xiso_prog
 		xiso_error(error, error_size, "Out of memory.");
 		goto done;
 	}
-	for (found = 0, index = 0; index < count && !found; index++)
+	index = xiso_maps_folder(entries, count);
+	found = index < count;
+	if (found)
 	{
-		if (xiso_name_is(entries[index].name, (int)strlen(entries[index].name), "maps"))
-		{
-			maps_sector = entries[index].sector;
-			maps_size = entries[index].size;
-			found = 1;
-		}
+		maps_sector = entries[index].sector;
+		maps_size = entries[index].size;
+		if (!xiso_name_is(entries[index].name, (int)strlen(entries[index].name), "maps"))
+			platform_log("the disc image has no maps folder but one per language: extracting %s", entries[index].name);
 	}
-	if (!found)
+	else
 	{
 		xiso_error(error, error_size, "The disc image has no maps folder: it is not a Halo disc.");
 		goto done;

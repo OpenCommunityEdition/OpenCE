@@ -168,3 +168,12 @@ test('a maps folder chosen as files is checked as an image is', async () => {
   assert.deepStrictEqual(result.map((file) => file.name).sort(), ['a10.map', 'bloodgulch.map', 'loading.tga', 'ui.map']);
   await assert.rejects(xiso.folderFiles(files.filter((file) => file.name !== 'ui.map')), /no ui\.map/);
 });
+
+test("a multi-language disc's maps folder is the browser language's, else English's", () => {
+  const folders = (...names) => names.map((name) => ({ name, directory: true }));
+  assert.strictEqual(xiso.mapsFolder(folders('$SystemUpdate', 'maps'), 'es-ES').name, 'maps');
+  assert.strictEqual(xiso.mapsFolder(folders('maps_it', 'MAPS_ES', 'maps_en'), 'es-ES').name, 'MAPS_ES');
+  assert.strictEqual(xiso.mapsFolder(folders('maps_it', 'maps_en'), 'fr').name, 'maps_en');
+  assert.strictEqual(xiso.mapsFolder(folders('maps_it', 'maps_es'), '').name, 'maps_it');
+  assert.strictEqual(xiso.mapsFolder(folders('media', 'mapsx'), 'en'), undefined);
+});
