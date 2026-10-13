@@ -1626,6 +1626,7 @@ BITMAP_FRAMES): Gamepad Setup's row's, as the list numbers its rows
 the PC version's nine the Xbox's five of the button settings */
 #define PROFILE_GAMEPAD_FRAME 2
 #define PROFILE_FIRST_LAYOUT_FRAME 9
+#define PROFILE_LAYOUT_PICTURES 5
 
 /* "port gamepad layout preview" (the picture's own): on Gamepad Setup's
 row, the edited profile's button settings */
@@ -1635,11 +1636,14 @@ static void profile_gamepad_layout(struct widget_instance *picture)
 	short frame = picture->animation.current_frame_index;
 
 	if (frame == PROFILE_GAMEPAD_FRAME ||
-		(frame >= PROFILE_FIRST_LAYOUT_FRAME && frame < PROFILE_FIRST_LAYOUT_FRAME + NUMBER_OF_BUTTON_PRESETS))
+		(frame >= PROFILE_FIRST_LAYOUT_FRAME && frame < PROFILE_FIRST_LAYOUT_FRAME + PROFILE_LAYOUT_PICTURES))
 	{
-		picture->animation.current_frame_index = (short)(PROFILE_FIRST_LAYOUT_FRAME +
-			(profile && profile->controller_settings.button_preset < NUMBER_OF_BUTTON_PRESETS ?
-				profile->controller_settings.button_preset : _button_preset_standard));
+		/* The Xbox bitmap has only the original five layouts. New layouts
+		   use the PC gamepad picture rather than an absent bitmap frame. */
+		picture->animation.current_frame_index = profile &&
+			profile->controller_settings.button_preset >= PROFILE_LAYOUT_PICTURES ?
+			PROFILE_GAMEPAD_FRAME : (short)(PROFILE_FIRST_LAYOUT_FRAME +
+			(profile ? profile->controller_settings.button_preset : _button_preset_standard));
 	}
 }
 

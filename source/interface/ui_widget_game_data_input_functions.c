@@ -3908,7 +3908,17 @@ static void player_profile_1wide_list_update(
 							profile->controller_settings.joystick_preset);
 						wchar_t const *button_description = unicode_string_list_get_string(
 							button_descriptions_tag_index,
-							profile->controller_settings.button_preset);
+							profile->controller_settings.button_preset >= _button_preset_bumper_jumper ?
+								_button_preset_standard : profile->controller_settings.button_preset);
+						/* port: the Xbox string list has only the original presets. */
+						switch (profile->controller_settings.button_preset)
+						{
+						case _button_preset_bumper_jumper: button_description = L"Bumper Jumper"; break;
+						case _button_preset_recon: button_description = L"Recon"; break;
+						case _button_preset_walkie_talkie: button_description = L"Walkie Talkie"; break;
+						case _button_preset_fishstick: button_description = L"Fishstick"; break;
+						case _button_preset_helljumper: button_description = L"Helljumper"; break;
+						}
 
 						usnprintf(
 							profile_description->parameters.text_box.text,
@@ -3939,7 +3949,17 @@ static void player_profile_1wide_list_update(
 							profile->controller_settings.joystick_preset);
 						wchar_t const *button_description = unicode_string_list_get_string(
 							button_descriptions_tag_index,
-							profile->controller_settings.button_preset);
+							profile->controller_settings.button_preset >= _button_preset_bumper_jumper ?
+								_button_preset_standard : profile->controller_settings.button_preset);
+						/* port: the Xbox string list has only the original presets. */
+						switch (profile->controller_settings.button_preset)
+						{
+						case _button_preset_bumper_jumper: button_description = L"Bumper Jumper"; break;
+						case _button_preset_recon: button_description = L"Recon"; break;
+						case _button_preset_walkie_talkie: button_description = L"Walkie Talkie"; break;
+						case _button_preset_fishstick: button_description = L"Fishstick"; break;
+						case _button_preset_helljumper: button_description = L"Helljumper"; break;
+						}
 
 						usnprintf(
 							profile_description->parameters.text_box.text,

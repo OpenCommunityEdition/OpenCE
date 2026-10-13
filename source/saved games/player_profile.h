@@ -37,6 +37,12 @@ enum
 	_button_preset_swap_a_and_left_trigger,
 	_button_preset_swap_b_and_left_trigger,
 	_button_preset_swap_b_and_right_thumb,
+	_button_preset_bumper_jumper, /* port: appended to preserve saved preset values */
+	/* port: later-game layouts adapted to CE's actions */
+	_button_preset_recon,
+	_button_preset_walkie_talkie,
+	_button_preset_fishstick,
+	_button_preset_helljumper,
 	NUMBER_OF_BUTTON_PRESETS
 };
 

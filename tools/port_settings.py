@@ -179,9 +179,10 @@ SCREENS = {
             ("AUTO-CENTER LOOK:", "profile.autocenter", YES_NO,
              "Level the view while walking.", None),
             ("BUTTON LAYOUT:", "profile.button_preset",
-             [("DEFAULT", "0"), ("SWAP TRIGGERS", "1"), ("SWAP A, L TRIGGER", "2"), ("SWAP B, L TRIGGER", "3"),
-              ("SWAP B, R STICK", "4")],
-             "Which of the controller's buttons does what (not\nthe keyboard's: Controls Setup sets those).", None),
+             [("DEFAULT", "0"), ("SWAP TRIGGERS", "1"), ("SWAP A, L TRIGGER", "2"), ("BOXER", "3"),
+              ("GREEN THUMB", "4"), ("BUMPER JUMPER", "5"), ("RECON", "6"), ("WALKIE TALKIE", "7"),
+              ("FISHSTICK", "8"), ("HELLJUMPER", "9")],
+             "Controller layouts adapted to Halo CE. Fishstick\nand Helljumper use LT toggle zoom. Menus keep A/B.", None),
             ("STICK LAYOUT:", "profile.joystick_preset",
              [("DEFAULT", "0"), ("SOUTHPAW", "1"), ("LEGACY", "2"), ("LEGACY SOUTHPAW", "3")],
              "Which stick moves and which looks.", None),
@@ -1460,3 +1461,16 @@ def multiplayer_files() -> dict:
 
 
 REPLACED_FOLDERS = [f"{MT}/server_settings"]
+
+
+if __name__ == "__main__":
+    import argparse
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(description="Regenerate one port settings screen without external tag assets.")
+    parser.add_argument("screen", choices=SCREENS)
+    args = parser.parse_args()
+    filename = f"{PE}/{args.screen}".replace("/", ".") + ".xml"
+    destination = Path(__file__).resolve().parents[1] / "port/assets/menus/ce" / filename
+    destination.write_text("\n".join(settings_files()[filename]), encoding="utf-8")
+    print(destination)
