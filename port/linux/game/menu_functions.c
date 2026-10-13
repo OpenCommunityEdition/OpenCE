@@ -1948,6 +1948,7 @@ static struct
 	{ "controls.pause", L"PAUSE MENU", 2 },
 	{ "controls.screenshot", L"SCREENSHOT", 2 },
 	{ "controls.push_to_talk", L"PUSH TO TALK", 2 },
+	{ "controls.text_chat", L"TEXT CHAT", 2 },
 };
 
 static struct

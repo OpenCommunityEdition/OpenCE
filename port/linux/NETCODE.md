@@ -296,6 +296,20 @@ never sends a machine its own. A listener sets the gain and pan of a voice
 heard for being near by its own view of the speaker's unit. Mutes are each
 machine's own. Builds without voice chat never say they hear voices, so the
 host sends them none, and drop the kinds as unknown.
+
+Text chat (`network_chat.c`) travels the same way, in the lobby and in a
+game: `network_chat_handles_message` takes its messages before the checks
+that a game is running. A client sends its line to the host reliably
+(`_distributed_message_chat_up`); the host takes it only from that machine's
+own stream, whatever machine the message names, no longer than 80
+characters, of printable characters only, and no faster than a burst of 4
+then one every 0.75 seconds. It sends the line on reliably
+(`_distributed_message_chat`, with the speaker's machine) to every machine,
+or to the machines with a player on the speaker's team for a team's line,
+and shows it itself. Each machine names the speaker by its first player in
+the network game's players, so a line has the same name in the lobby and the
+game. Builds without text chat drop both kinds as unknown, so the network
+version is unchanged.
 A speed hack of less than a tenth is let be: the host's bounds on how far
 and how fast a client's player moves and fires hold it to the host's time
 anyway.

@@ -1,4 +1,5 @@
 version 28
+bound CHAT_TEXT_LENGTH 80
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
 bound DISTRIBUTED_INPUT_HISTORY 4
@@ -41,6 +42,8 @@ enum _distributed_actor_super_camouflaged_bit 5
 enum _distributed_message_actor_damage 73
 enum _distributed_message_actor_states 64
 enum _distributed_message_batch 16
+enum _distributed_message_chat 90
+enum _distributed_message_chat_up 89
 enum _distributed_message_client_identity 18
 enum _distributed_message_client_ready 9
 enum _distributed_message_coop_device_groups 68
@@ -218,6 +221,8 @@ struct distributed_actor_damage 96a57e13e2b8
 struct distributed_actor_damage_message f985e899a708
 struct distributed_actor_state 8bd5e771659d
 struct distributed_actor_state_message 51a56e04a536
+struct distributed_chat fbd247202c86
+struct distributed_chat_message 8b4ce2d3c363
 struct distributed_client_identity 4d9e62025616
 struct distributed_coop_device_group 4aa3499be2cc
 struct distributed_coop_device_groups_message b96ad0030ccc
