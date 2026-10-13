@@ -1,6 +1,6 @@
 name: Apply Gun Race
 
-# Apply the Gun Race rules patch, remove this helper, and start the release build.
+# Assemble the rules, apply the engine hooks, remove this helper, and start the release build.
 on:
   push:
     paths:
@@ -19,8 +19,22 @@ jobs:
 
       - name: Apply Gun Race
         run: |
+          mkdir -p port/linux/game
+          python3 - <<'PY'
+          import base64, pathlib
+          parts = []
+          for index in range(1, 5):
+              text = pathlib.Path("gun_race.c.part%d.b64" % index).read_text(encoding="utf-8")
+              parts.append(base64.b64decode("".join(text.split())))
+          data = b"".join(parts)
+          data = data.replace(b"GR_UNARMED,@NONE", b"GR_UNARMED, NONE")
+          pathlib.Path("port/linux/game/gun_race.c").write_bytes(data)
+          PY
+          git add port/linux/game/gun_race.c
           git apply --index gun-race-rules.patch
-          git rm -f gun-race-rules.patch .github/workflows/apply-gun-race.yml
+          git rm -f gun-race-rules.patch \
+            gun_race.c.part1.b64 gun_race.c.part2.b64 gun_race.c.part3.b64 gun_race.c.part4.b64 \
+            .github/workflows/apply-gun-race.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Wire Gun Race into the game."
