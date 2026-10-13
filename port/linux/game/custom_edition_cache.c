@@ -211,8 +211,8 @@ static boolean maps_folder_has(
 
 /* The custom_maps folder's one map named <name>_<hash>.map, for a name
 without the hash its file has: its file name (without the extension) in
-`hashed` (MAP_PATH_SIZE characters). Maps there are named for their hash as
-the map lists find them (map_share_name_map), so a level name of before (a
+`hashed` (MAP_PATH_SIZE characters). Downloaded maps are named so, and
+earlier builds renamed every map so, so a level name without the hash (a
 saved last map, a test's) still finds its map; FALSE if there are more. */
 static boolean maps_folder_hashed_name(
 	char const *name,
@@ -258,9 +258,63 @@ static boolean maps_folder_hashed_name(
 	return count == 1;
 }
 
+/* a map file of the folder whose name starts with base (a name cut short
+to fit a level name with its hash: map_share_level_name_hash) and whose
+hash's digits are digits, into path */
+static boolean maps_folder_digits_find(
+	char const *folder,
+	char const *base,
+	char const *digits,
+	char *path)
+{
+	char pattern[MAP_PATH_SIZE];
+	char found_digits[MAP_SHARE_NAME_DIGITS + 1];
+	WIN32_FIND_DATAA data;
+	HANDLE find;
+	boolean found = FALSE;
+
+	/* (no install: its folder not looked in, which would be made) */
+	if ((folder == maps_folder(1) && !custom_edition_install_present()) || strchr(base, '*') || strchr(base, '?') ||
+		strlen(folder) + strlen(base) + 2 + 4 >= MAP_PATH_SIZE)
+	{
+		return FALSE;
+	}
+	sprintf(pattern, "%s%s*%s", folder, base, MAP_FILE_EXTENSION);
+	find = FindFirstFileA(pattern, &data);
+	if (find == INVALID_HANDLE_VALUE)
+		return FALSE;
+	do
+	{
+		char file[sizeof(data.cFileName) + 1];
+		size_t length;
+
+		memcpy(file, data.cFileName, sizeof(data.cFileName));
+		file[sizeof(data.cFileName)] = 0;
+		length = strlen(file);
+		if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || length <= strlen(MAP_FILE_EXTENSION) ||
+			length - strlen(MAP_FILE_EXTENSION) <= strlen(base))
+		{
+			continue;
+		}
+		file[length - strlen(MAP_FILE_EXTENSION)] = 0;
+		if (!map_share_name_hashed(file) && map_share_name_digits(folder, file, found_digits) &&
+			!_stricmp(found_digits, digits) && maps_folder_has(folder, file, MAP_FILE_EXTENSION, path))
+		{
+			found = TRUE;
+			break;
+		}
+	} while (FindNextFileA(find, &data));
+	CloseHandle(find);
+
+	return found;
+}
+
 /* the file that holds the map `map_name` names (a level name or a file
 name): <custom maps folder>\<name>.map (custom_maps' <name>_<hash>.map for
-a name without the hash, if it has one map of that name) */
+a name without the hash, if it has one map of that name; for a name with
+the hash, <name>.map without it whose hash it is, as no map is renamed for
+its hash: map_share_name_digits, or for a name cut short to fit the hash,
+<name...>.map that starts with it) */
 static boolean custom_edition_map_path(
 	char const *map_name,
 	char *path)
@@ -275,6 +329,36 @@ static boolean custom_edition_map_path(
 		{
 			return TRUE;
 		}
+	}
+	if (map_share_name_hashed(name))
+	{
+		short base_length = map_share_name_base_length(name);
+		char digits[MAP_SHARE_NAME_DIGITS + 1];
+
+		if (base_length <= 0 || base_length >= MAP_PATH_SIZE)
+			return FALSE;
+		memcpy(hashed, name, (size_t)base_length);
+		hashed[base_length] = 0;
+		for (folder = 0; folder < NUMBER_OF_MAPS_FOLDERS; folder++)
+		{
+			if (maps_folder_has(maps_folder(folder), hashed, MAP_FILE_EXTENSION, path) &&
+				map_share_name_digits(maps_folder(folder), hashed, digits) &&
+				!_stricmp(digits, name + base_length + 1))
+			{
+				return TRUE;
+			}
+		}
+		/* (a name cut short to fit the level name: map_share_level_name_hash) */
+		if (base_length == CUSTOM_EDITION_MAXIMUM_LEVEL_NAME_LENGTH - (short)(sizeof(CUSTOM_EDITION_LEVEL_NAME_PREFIX) - 1) -
+			MAP_SHARE_NAME_DIGITS - 1)
+		{
+			for (folder = 0; folder < NUMBER_OF_MAPS_FOLDERS; folder++)
+			{
+				if (maps_folder_digits_find(maps_folder(folder), hashed, name + base_length + 1, path))
+					return TRUE;
+			}
+		}
+		return FALSE;
 	}
 
 	return maps_folder_hashed_name(name, hashed) &&

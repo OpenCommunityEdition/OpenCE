@@ -15,10 +15,11 @@ A map's level name is custom_maps\<name> (CUSTOM_EDITION_LEVEL_NAME_PREFIX),
 which the cache loader reads from the custom maps folders alone: a map named
 as one of the game's own levels (a30.map, bloodgulch.map) is listed and
 played as itself. The game engine keeps 63 characters of a level name, so a
-map whose name is longer than 51 is skipped. A map in the custom_maps folder
-is named for its hash (<name>_<hash>.map) once it has been found: a network
-game's level name then says which version of the map it is on, and a player
-without it can download it (map_share.h). The menus show the name without
+map whose name is longer than 51 is skipped. A network game's level name
+has the first digits of its map's hash after the name (custom_maps\<name>_<hash>,
+map_share.h), worked out from the file, which keeps its name: it then says
+which version of the map the game is on, and a player without it can
+download it (written as <name>_<hash>.map). The menus show the name without
 the hash, unless two versions of a map are listed.
 
 Each map can have, beside it in its folder:
@@ -389,7 +390,7 @@ static void custom_edition_map_add(
 	csprintf(map->level_name, "%s%s", CUSTOM_EDITION_LEVEL_NAME_PREFIX, name);
 	display_name_make(name, FALSE, map->display_name);
 	custom_edition_map_description_read(map);
-	/* (named for its hash, renamed: map_share_files.c) */
+	/* (its hash worked out, once, for a game's level name: map_share_files.c) */
 	if (!map_share_name_hashed(name))
 		map_share_name_map(folder, name);
 
@@ -400,13 +401,25 @@ static int custom_edition_map_compare(
 	void const *first,
 	void const *second)
 {
-	return (int)csstrcasecmp(
-		((struct custom_edition_map const *)first)->name,
-		((struct custom_edition_map const *)second)->name);
+	char const *first_name = ((struct custom_edition_map const *)first)->name;
+	char const *second_name = ((struct custom_edition_map const *)second)->name;
+	short first_length = map_share_name_base_length(first_name);
+	short second_length = map_share_name_base_length(second_name);
+	int result;
+
+	/* (by the name without its hash first, so that the versions of a map are
+	side by side: custom_edition_maps_tell_versions_apart) */
+	result = _strnicmp(first_name, second_name, (size_t)MIN(first_length, second_length));
+	if (result)
+		return result;
+	if (first_length != second_length)
+		return first_length < second_length ? -1 : 1;
+	return (int)csstrcasecmp(first_name, second_name);
 }
 
 /* Two versions of a map (its name the same but for its hash) listed: each
-shown with its hash, to tell them apart. The maps are sorted by name. */
+shown with its hash, to tell them apart. The maps are sorted by their names
+without the hash (custom_edition_map_compare), so versions are side by side. */
 static void custom_edition_maps_tell_versions_apart(
 	struct custom_edition_map *maps,
 	short count)

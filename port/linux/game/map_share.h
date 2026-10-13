@@ -61,19 +61,25 @@ short map_share_name_base_length(
 
 /* The map lists found the map file <folder><name>.map, a Custom Edition
 map, whose name is not its hash's: in the custom_maps folder it is hashed,
-on a thread of its own, and renamed <name>_<hash>.map, with its picture and
-description beside it (<name>.bmp, <name>.txt); the map lists are scanned
-again once it has been (custom_edition_maps_look_again). Not while the map
-is loaded (a file in use is not renamed on Windows): it is asked for again. */
+on a thread of its own, and the digits it is named by remembered while the
+file stays the same. No file is renamed (map_share_name_digits). */
 void map_share_name_map(
 	char const *folder,
 	char const *name);
+/* The digits of the hash the map file <folder><name>.map is named by (a
+level of it is custom_maps\<name>_<digits>), into digits
+(MAP_SHARE_NAME_DIGITS + 1 characters): remembered, or hashed now (a
+fraction of a second); FALSE if it cannot be read. */
+boolean map_share_name_digits(
+	char const *folder,
+	char const *name,
+	char *digits);
 
 /* A host's game is on the level `level_name` (a buffer of `size`): a
 Custom Edition map's named without its hash (custom_maps\hugeass, a saved
-last map's or a test's) is named with it (custom_maps\hugeass_1a2b3c4d), the
-map's file renamed for its hash first if it has not been yet, so that the
-players can download it (network_server_manager.c). */
+last map's or a test's) is named with it (custom_maps\hugeass_1a2b3c4d), its
+file hashed where it is and never renamed, so that the players can download
+it (network_server_manager.c). */
 void map_share_level_name_hash(
 	char *level_name,
 	long size);

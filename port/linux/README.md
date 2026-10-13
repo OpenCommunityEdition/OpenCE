@@ -792,12 +792,15 @@ UPLOAD LIMIT in Settings > Network Setup > Map Sharing). Set these lower on
 a slow connection. DOWNLOAD MAPS there (`network.map_download`) turns
 downloading off: you then leave a game whose map you do not have.
 
-The name of each map in `custom_maps` ends with the start of its hash: when
-the map lists find `hugeass.map`, the game renames it `hugeass_0e2b3ee4.map`
-(and its picture and description). Thus two versions of a map have different
-names, and a game always loads the version of the host. The menus show the
+A game names each map in `custom_maps` with the start of its hash: when it
+hosts `hugeass.map`, the game is on `hugeass_0e2b3ee4`. The game works the
+hash out from the file, which keeps its name (no map is renamed), once:
+it keeps the hash in `map_hashes.txt` in the save root until the file
+changes. Thus two versions of a map have different names, and a game always
+loads the version of the host. A downloaded map is written as `hugeass_0e2b3ee4.map`,
+beside any other version you have, which stays as it is. The menus show the
 map without the hash, and with it only when you have two versions of the
-map. The downloaded map has the same name. A download that stops leaves a
+map. A download that stops leaves a
 `.part` file in `custom_maps`; the next download of that map continues from
 it. Maps in the folder of a Halo Custom Edition install
 (`paths.custom_edition`) keep their names, and the host does not share them.

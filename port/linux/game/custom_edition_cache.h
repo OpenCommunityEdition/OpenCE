@@ -86,9 +86,11 @@ cache. */
 unsigned long custom_edition_map_checksum(
 	char const *level_name);
 /* The file of the map `map_name` (a level name or a file name) in the
-Custom Edition maps folders, into `path` (256 characters): the custom_maps
-folder's map named for its hash (<name>_<hash>.map, map_share.h) for a name
-without it, if there is one map of that name. FALSE if none. */
+Custom Edition maps folders, into `path` (256 characters). A name with its
+map's hash (<name>_<hash>, map_share.h) finds <name>_<hash>.map, or the
+<name>.map whose hash it is (maps are not renamed for their hash); a name
+without it, the custom_maps folder's <name>_<hash>.map if there is one map
+of that name. FALSE if none. */
 boolean custom_edition_map_file_path(
 	char const *map_name,
 	char *path);
