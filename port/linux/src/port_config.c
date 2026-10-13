@@ -281,6 +281,8 @@ static const struct config_setting config_settings[] =
 		"Save a PNG screenshot beside maps/ (press once per capture)." },
 	{ "controls.push_to_talk", _config_string, "\"V\"", "HALO_KEY_PUSH_TO_TALK", _environment_value, _platform_all,
 		"Voice chat: talk while it is held (audio.voice_chat \"push_to_talk\")." },
+	{ "controls.text_chat", _config_string, "\"T\"", "HALO_KEY_TEXT_CHAT", _environment_value, _platform_all,
+		"Text chat: open a line to type (game.text_chat)." },
 
 	{ "game.console_log", _config_string, "\"important\"", "HALO_CONSOLE_LOG", _environment_value, _platform_all,
 		"What the game's console shows on screen of what it logs: \"important\"\n"
@@ -305,6 +307,16 @@ static const struct config_setting config_settings[] =
 		"as CUSTOM SINGLEPLAYER and CUSTOM MULTIPLAYER. Their tags are checked\n"
 		"as the game's own maps' are before they run; false refuses them\n"
 		"(docs/custom_edition_caches.md)." },
+	{ "game.text_chat", _config_boolean, "true", "HALO_TEXT_CHAT", _environment_value, _platform_all,
+		"Text chat in network games, in the lobby too: controls.text_chat (T)\n"
+		"opens a line to type (Enter sends it, Tab: to your team or to all,\n"
+		"Escape cancels), and the players' lines show at the left of the\n"
+		"screen. Off: none shown, none typed." },
+	{ "game.text_chat_opacity", _config_integer, "100", "HALO_TEXT_CHAT_OPACITY", _environment_value, _platform_all,
+		"How opaque text chat is drawn, in percent (25 to 100)." },
+	{ "game.text_chat_size", _config_string, "\"large\"", "HALO_TEXT_CHAT_SIZE", _environment_value, _platform_all,
+		"How large text chat is drawn: \"small\", \"medium\" or \"large\" (the HUD's\n"
+		"own size)." },
 	{ "display.viewmodel_shield", _config_boolean, "false", "HALO_VIEWMODEL_SHIELD", _environment_value, _platform_all,
 		"The energy shield's flare on the first-person arms too, as on the body\n"
 		"(the stock game draws it on the body only)." },

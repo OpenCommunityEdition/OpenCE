@@ -125,6 +125,11 @@ enum
 	_distributed_message_map_share_offer = 84,
 	_distributed_message_map_share_sources = 85,
 	_distributed_message_map_share_progress = 86,
+	/* a machine's line of text chat, in the lobby too: to the host,
+	reliably, which takes it only from that machine's own stream; and sent on
+	by the host, reliably, to the machines that may read it (network_chat.c) */
+	_distributed_message_chat_up = 89,
+	_distributed_message_chat = 90,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };

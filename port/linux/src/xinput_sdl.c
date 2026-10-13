@@ -323,6 +323,32 @@ void platform_text_field(int typing, int password)
 #endif
 }
 
+/* the game's own line of text, text chat's (platform_game_typing:
+network_chat.c), in play and in the lobby: as with the console, the keys
+type into it (escape too, which cancels it) and move nothing */
+static BOOL game_typing;
+
+void platform_game_typing(int typing)
+{
+	game_typing = typing != 0;
+}
+
+/* text chat's key (controls.text_chat), in play or in the lobby but not
+while a menu's text is typed, which opens its line (platform_chat_key:
+network_chat.c): pressed since last asked */
+static BOOL chat_key_down;
+static int chat_key_pressed;
+
+int platform_chat_key(void)
+{
+	int pressed = chat_key_pressed;
+
+	chat_key_pressed = 0;
+	return pressed;
+}
+
+static void chat_key_update(const struct platform_input_state *input, BOOL playing);
+
 static void typing_gamepad(const struct platform_input_state *input, XINPUT_GAMEPAD *pad)
 {
 	const unsigned char *k = input->keys;
@@ -394,7 +420,8 @@ static void keys_held_over_switch(struct platform_input_state *input)
 {
 	static unsigned char held[SDL_SCANCODE_COUNT];
 	static int context = -1;
-	int next_context = (input->menus != FALSE) | (text_typing ? 2 : 0) | (console_is_active() ? 4 : 0);
+	int next_context = (input->menus != FALSE) | (text_typing ? 2 : 0) | (console_is_active() ? 4 : 0) |
+		(game_typing ? 8 : 0);
 	int scancode;
 
 	if (context != next_context)
@@ -421,7 +448,7 @@ static const char *const binding_settings[NUMBER_OF_HALO_KEYBOARD_ACTIONS] =
 	"controls.jump", "controls.crouch", "controls.fire", "controls.throw_grenade", "controls.melee",
 	"controls.reload", "controls.zoom", "controls.switch_weapon", "controls.switch_grenade", "controls.action",
 	"controls.flashlight", "controls.scoreboard", "controls.pause", "controls.screenshot",
-	"controls.push_to_talk",
+	"controls.push_to_talk", "controls.text_chat",
 };
 
 static const struct
@@ -592,6 +619,22 @@ static void keyboard_controls(unsigned long held, XINPUT_GAMEPAD *pad)
 unsigned long halo_keyboard_actions(short controller_index)
 {
 	return controller_index == 0 ? keyboard_actions_held : 0;
+}
+
+static void chat_key_update(const struct platform_input_state *input, BOOL playing)
+{
+	BOOL down = FALSE;
+	int slot;
+
+	bindings_read();
+	for (slot = 0; playing && slot < MAXIMUM_BINDINGS; slot++)
+	{
+		if (input_held(input, bindings[HALO_KEYBOARD_TEXT_CHAT][slot]))
+			down = TRUE;
+	}
+	if (down && !chat_key_down)
+		chat_key_pressed = 1;
+	chat_key_down = down;
 }
 
 int halo_push_to_talk_held(void)
@@ -988,7 +1031,8 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		wheel_update();
 		keyboard_actions_held = 0;
 		keys_held_over_switch(&input);
-		console_active = console_is_active();
+		console_active = console_is_active() || game_typing;
+		chat_key_update(&input, !console_active && !text_typing);
 		held = console_active ? 0 : keyboard_bound_actions(&input);
 		keyboard_screenshot(held);
 		if (!console_active)
@@ -1073,7 +1117,7 @@ DWORD WINAPI XInputDebugGetKeystroke(PXINPUT_DEBUG_KEYSTROKE keystroke)
 		/* key ups always pass, so no key is left latched down; while typing,
 		escape does not (it cancels, as B: the game's own escape leaves the
 		menus, main.c) */
-		if (key_up || next.virtual_key == VK_OEM_3_BACKQUOTE || console_is_active() ||
+		if (key_up || next.virtual_key == VK_OEM_3_BACKQUOTE || console_is_active() || game_typing ||
 			(text_typing && next.virtual_key != 0x1B /* escape */))
 		{
 			keystroke->VirtualKey = next.virtual_key;
