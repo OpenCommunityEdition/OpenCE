@@ -5201,6 +5201,12 @@ void game_engine_player_killed(
 			message = _game_engine_message_double_kill;
 		else if (killing_player->statistics.kills_in_a_row == 5)
 			message = _game_engine_message_five_kills_in_row;
+		/* port: none in a row is no spree. A network client's copy of the
+		killer's statistics can have this kill credited to no one, or to
+		someone else, before the host's statistics come (the Xbox's credited
+		the killer here, so never had none): Running Riot was announced */
+		else if (killing_player->statistics.kills_in_a_row <= 0)
+			message = _game_engine_message_killed_enemy;
 		else
 		{
 			message = (killing_player->statistics.kills_in_a_row % 5)
