@@ -234,7 +234,22 @@ _network["categories"] = [
     ("MAP SHARING:", "network_setup/map_sharing",
      "Downloading Custom Edition maps you do not have,\nand helping send them to other players.",
      "desktop android"),
+    # (port/linux/game/network_chat.c: typed with the keyboard)
+    ("TEXT CHAT:", "network_setup/text_chat",
+     "Showing the players' typed chat, how opaque and\nhow large it is drawn.", "desktop web"),
 ]
+SCREENS["network_setup/text_chat"] = {
+    "screen": "text_chat_settings_screen", "header": _network["header"], "spacing": 30,
+    "rows": [
+        ("TEXT CHAT:", "game.text_chat", ON_OFF,
+         "Show text chat, in the lobby and in the game; its\nkey (Controls, T) opens a line to type.", None),
+        ("CHAT OPACITY:", "game.text_chat_opacity",
+         [(f"{percent}%", str(percent)) for percent in (25, 50, 75, 100)],
+         "How opaque the chat's lines and its box are.", None),
+        ("CHAT SIZE:", "game.text_chat_size", [("SMALL", "small"), ("MEDIUM", "medium"), ("LARGE", "large")],
+         "How large the chat is drawn. Large: as the HUD's\nmessages.", None),
+    ],
+}
 SCREENS["network_setup/map_sharing"] = {
     "screen": "map_sharing_settings_screen", "header": _network["header"], "spacing": 30,
     "rows": [
