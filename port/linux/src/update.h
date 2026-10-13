@@ -3,7 +3,8 @@ UPDATE.H
 
 What the desktop self-updater (updater.c) needs of the system: a download
 over HTTPS, and putting files in place of the running game's and starting
-it again. posix_update.c does it on Linux (Mbed TLS, the system's
+it again. The map archives (map_archives.c) download over HTTPS with it
+too. posix_update.c does it on Linux (Mbed TLS, the system's
 certificate authorities), win32_update.c on Windows (WinHTTP). The Android
 app updates itself in Java (port/android).
 
@@ -22,6 +23,20 @@ with the certificate and host name checked; 1 on success, else 0 and why in
 error */
 int update_download(const char *url, const char *path, update_progress_proc progress, void *context,
 	char *error, int error_size);
+
+/* update_download's request with more of it given: form, when not NULL, is
+POSTed (application/x-www-form-urlencoded, a redirect after it followed with
+a GET); agent, when not NULL, is the User-Agent; and the download stops,
+failing, once *stop (when stop is not NULL) is not 0 */
+int update_request(const char *url, const char *form, const char *agent, const volatile int *stop,
+	const char *path, update_progress_proc progress, void *context, char *error, int error_size);
+
+/* update_request's GET of length bytes of the file at url from offset (a
+Range request) into the file at path: 1 when the server sent those bytes
+(206), else 0 and why in error (a server that sends the whole file instead
+is refused, unread) */
+int update_request_range(const char *url, const char *agent, const volatile int *stop, unsigned long long offset,
+	unsigned long long length, const char *path, char *error, int error_size);
 
 /* the full path of this executable; 1 on success */
 int update_executable_path(char *path, int size);

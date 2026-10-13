@@ -25,6 +25,11 @@ Each map is checked as the game checks it when it loads it (cache_files.c):
 "head" and "foot" signatures, the Xbox's cache version, and the build of a
 retail disc (01.10.12.2276) or of this decompilation's (01.01.14.2342).
 
+The loading screen's picture, which the retail disc has no file of, is
+taken out of the image's default.xbe and written beside the maps as the
+loading.tga the game reads (loadingPicture; xiso.c's write_loading_picture
+does the same). Without it the loading screen makes clouds of its own.
+
 Messages from the page: { type: 'image', file } or { type: 'folder', files }
 (a maps folder's File objects). To the page: { type: 'progress', file, done,
 total }, then { type: 'done', files, bytes } or { type: 'error', message }.
@@ -45,6 +50,11 @@ const COPY_CHUNK = 4 * 1024 * 1024;
 const MAP_HEADER_SIZE = 0x800;
 const CACHE_VERSION = 5;
 const BUILDS = ['01.10.12.2276', '01.01.14.2342'];
+// the loading screen's picture (source/interface/progress_bar.c)
+const LOADING_WIDTH = 320;
+const LOADING_HEIGHT = 240;
+const TGA_HEADER_SIZE = 18;
+const MAXIMUM_XBE_SIZE = 64 * 1024 * 1024;
 // written last: the page starts the game only when it is there
 const COMPLETE_MARKER = '.complete';
 
@@ -156,22 +166,77 @@ async function checkedFiles(candidates) {
   return files;
 }
 
+// The loading screen's picture out of a default.xbe, as the TGA the game
+// reads (uncompressed, 24 bits, rows from the bottom), or null. The
+// executable holds it, 320 by 240, as runs of 4-bit greys (a byte each: the
+// grey's high four bits in its low nibble, the run's length in its high one)
+// after the width and height as 32-bit numbers: found by those two numbers
+// followed by runs that fill the picture exactly.
+function loadingPicture(xbe) {
+  const pixels = LOADING_WIDTH * LOADING_HEIGHT;
+  const greys = new Uint8Array(pixels);
+  let found = false;
+  for (let at = 0; at + 8 <= xbe.length && !found; at++) {
+    if (u32(xbe, at) !== LOADING_WIDTH || u32(xbe, at + 4) !== LOADING_HEIGHT) continue;
+    let pixel = 0;
+    for (let next = at + 8; next < xbe.length && pixel < pixels; next++) {
+      const run = xbe[next] >> 4;
+      if (!run || pixel + run > pixels) break;
+      greys.fill((xbe[next] & 0x0F) << 4, pixel, pixel + run);
+      pixel += run;
+    }
+    found = pixel === pixels;
+  }
+  if (!found) return null;
+  const tga = new Uint8Array(TGA_HEADER_SIZE + pixels * 3);
+  tga[2] = 2;
+  tga[12] = LOADING_WIDTH & 0xFF;
+  tga[13] = LOADING_WIDTH >> 8;
+  tga[14] = LOADING_HEIGHT & 0xFF;
+  tga[15] = LOADING_HEIGHT >> 8;
+  tga[16] = 24;
+  for (let y = 0; y < LOADING_HEIGHT; y++) {
+    const row = greys.subarray((LOADING_HEIGHT - 1 - y) * LOADING_WIDTH, (LOADING_HEIGHT - y) * LOADING_WIDTH);
+    for (let x = 0; x < LOADING_WIDTH; x++) {
+      const out = TGA_HEADER_SIZE + (y * LOADING_WIDTH + x) * 3;
+      tga[out] = tga[out + 1] = tga[out + 2] = row[x];
+    }
+  }
+  return tga;
+}
+
+// the root's default.xbe's loading picture, as a file to copy, or null
+async function loadingPictureFile(file, volume, rootEntries) {
+  const xbe = rootEntries.find((entry) => !entry.directory && entry.name.toLowerCase() === 'default.xbe');
+  if (!xbe || !xbe.size || xbe.size > MAXIMUM_XBE_SIZE) return null;
+  const offset = volume.partition + xbe.sector * SECTOR_SIZE;
+  if (offset + xbe.size > file.size) return null;
+  const tga = loadingPicture(await readAt(file, offset, xbe.size));
+  return tga && { name: 'loading.tga', size: tga.length, read: async (at, size) => tga.subarray(at, at + size) };
+}
+
 async function imageFiles(file) {
   const volume = await findVolume(file);
   if (!volume) throw new Error('This file is not an Xbox disc image (no XDVDFS volume was found).');
   const root = await readDirectory(file, volume, volume.rootSector, volume.rootSize);
   if (!root) throw new Error("The disc image's file system is damaged.");
-  const maps = walkDirectory(root).find((entry) => entry.directory && entry.name.toLowerCase() === 'maps');
+  const rootEntries = walkDirectory(root);
+  const maps = rootEntries.find((entry) => entry.directory && entry.name.toLowerCase() === 'maps');
   if (!maps) throw new Error('The disc image has no maps folder: it is not a Halo disc.');
   const table = await readDirectory(file, volume, maps.sector, maps.size);
   if (!table) throw new Error("The disc image's maps folder is damaged.");
-  return checkedFiles(walkDirectory(table).filter((entry) => !entry.directory).map((entry) => {
+  const files = await checkedFiles(walkDirectory(table).filter((entry) => !entry.directory).map((entry) => {
     const offset = volume.partition + entry.sector * SECTOR_SIZE;
     if (offset + entry.size > file.size) {
       throw new Error(`The disc image ends before ${entry.name} does: is it complete?`);
     }
     return { name: entry.name, size: entry.size, read: (at, size) => readAt(file, offset + at, Math.min(size, entry.size - at)) };
   }));
+  if (!files.some((entry) => entry.name.toLowerCase() === 'loading.tga')) {
+    const picture = await loadingPictureFile(file, volume, rootEntries);
+    if (picture) files.push(picture);
+  }
+  return files;
 }
 
 async function folderFiles(list) {
@@ -250,5 +315,5 @@ if (typeof onmessage !== 'undefined' || typeof WorkerGlobalScope !== 'undefined'
 
 // (for the tests: port/web/tests)
 if (typeof module !== 'undefined') {
-  module.exports = { findVolume, walkDirectory, mapProblem, imageFiles, folderFiles, plainName };
+  module.exports = { findVolume, walkDirectory, mapProblem, imageFiles, folderFiles, plainName, loadingPicture };
 }

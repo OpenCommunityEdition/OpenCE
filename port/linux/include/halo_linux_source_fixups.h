@@ -68,4 +68,12 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
 
+/* Custom Edition maps downloaded from the community's archives before a
+join (port/linux/src/map_downloads.c: cache_files.c, main.c's loop), and the
+host's version of a map forgotten as a client leaves
+(port/linux/game/custom_edition_cache.c) */
+int map_downloads_fetch(const char *level_name, unsigned long version, const char *files);
+void map_downloads_poll(void);
+void custom_edition_map_version_forget(void);
+
 #endif

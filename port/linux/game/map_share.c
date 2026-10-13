@@ -64,6 +64,7 @@ done. The host does not drop a machine that says it is downloading.
 #include "custom_edition_maps.h"
 #include "map_share.h"
 #include "../src/p2p.h"
+#include "../src/map_downloads.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -132,6 +133,17 @@ enum
 	LISTEN_RETRY_INTERVAL = 10000,
 	RATE_WINDOW = 2000,
 	LOG_INTERVAL = 10000,
+
+	/* the pieces asked of a web seed at once (4 MiB), and the failed asks
+	after which none is asked again this download */
+	WEB_SEED_PIECES = 16,
+	WEB_SEED_FAILURES = 3,
+	/* milliseconds before asking again after a failed ask, or one that
+	could not start (another fetch under way) */
+	WEB_SEED_RETRY_INTERVAL = 5000,
+	WEB_SEED_START_RETRY_INTERVAL = 1000,
+	/* a web seed's URL (maps.web_seeds' folder and the file's name) */
+	WEB_SEED_URL_BYTES = 1024,
 
 	/* the largest file of each kind the cache loader takes
 	(custom_edition_cache.c's combined offset space), so that a host cannot
@@ -327,6 +339,11 @@ struct download_file
 	char part_path[MAP_SHARE_PATH_SIZE];
 	char final_path[MAP_SHARE_PATH_SIZE];
 	FILE *stream;
+	/* the file on a web seed (the index's file of its name, version and
+	size: port/linux/src/map_downloads.c), "" for none; and whether it sent
+	a piece that is not this file's */
+	char web_url[WEB_SEED_URL_BYTES];
+	boolean web_off;
 };
 
 /* a machine the host named */
@@ -374,6 +391,16 @@ struct download
 	unsigned long last_window_bytes;
 	unsigned long last_window_time;
 	unsigned long logged_at;
+	/* the pieces asked of the web seed: whether any are, the file's, the
+	first and how many (a run of them); the asks failed, and the bytes it
+	brought */
+	boolean web_active;
+	short web_file;
+	long web_first;
+	long web_count;
+	short web_failures;
+	unsigned long web_bytes;
+	unsigned long web_retry_at;
 };
 
 /* a piece asked of a connection */
@@ -1106,6 +1133,8 @@ static void listener_update(
 
 static void download_report(
 	byte state);
+static void download_web_seeds_find(
+	char const *name);
 static void request_remove(
 	struct connection *connection,
 	short index);
@@ -1140,6 +1169,8 @@ static void download_end(
 		for (file = 0; file < MAXIMUM_FILES; file++)
 			connection->download_file[file] = NONE;
 	}
+	if (download->web_active)
+		map_downloads_range_stop();
 	for (index = 0; index < download->file_count; index++)
 	{
 		struct download_file *file = &download->files[index];
@@ -1365,14 +1396,22 @@ static void download_offered(
 
 	if (download->state != _download_asking || csstrcmp(offer->level_name, download->level_name))
 		return;
-	if (offer->result == _offer_off)
-	{
-		download_fail("The host does not share its maps.");
-		return;
-	}
 	if (offer->result != _offer_ok || !offer->file_count || offer->file_count > MAXIMUM_FILES)
 	{
-		download_fail("The host cannot share this map.");
+		char files[256];
+
+		/* (from the community's archives instead, when the index of the maps
+		has it: port/linux/src/map_downloads.c; the player joins again once
+		it is there) */
+		if (custom_edition_cache_files_missing(download->level_name, download->version, files, sizeof(files)) > 0 &&
+			map_downloads_fetch(download->level_name, download->version, files))
+		{
+			download_fail("The host does not send this map, so it is being downloaded from the map archives "
+				"(Join Game shows how it goes). Join again when it is there.");
+			return;
+		}
+		download_fail(offer->result == _offer_off ? "The host does not share its maps." :
+			"The host cannot share this map.");
 		return;
 	}
 	download->in_progress = TEST_FLAG(offer->flags, _offer_in_progress_bit);
@@ -1425,6 +1464,7 @@ static void download_offered(
 	/* (the hashes come first: no piece can be checked without them) */
 	for (index = 0; index < download->file_count; index++)
 		download->files[index].state = _file_awaiting_hashes;
+	download_web_seeds_find(name);
 	download->state = _download_transferring;
 	download->progress_at = system_milliseconds();
 	error(_error_silent, "map sharing: downloading %s, %d files, %lu bytes", download->level_name,
@@ -2520,6 +2560,168 @@ static void connections_update(
 
 /* ---------- the client's download, each frame */
 
+/* ---------- the web seeds
+
+A web seed (maps.web_seeds: a folder of the maps by file name, on a web
+server) is one more source of the pieces, beside the players: a file of
+the download that the index of the maps has (its name and version, and
+the offer's size: port/linux/src/map_downloads.c) is asked of it a run of
+pieces at a time (an HTTP range, on a thread of its own), pieces no player
+has been asked for, and each piece is checked against its hash as a
+player's is. One that is not the file's is the end of the web seed for
+that file. None on Android and the web (no HTTPS there), or with
+maps.downloads off. */
+
+/* each file's web seed, once the offer is known (name: the level's map
+file, without .map) */
+static void download_web_seeds_find(
+	char const *name)
+{
+	struct download *download = &map_share_globals.download;
+	short index;
+
+	for (index = 0; index < download->file_count; index++)
+	{
+		struct download_file *file = &download->files[index];
+		char file_name[MAP_SHARE_PATH_SIZE];
+
+		file->web_url[0] = 0;
+		if (file->kind == _map_share_file_map)
+			csprintf(file_name, "%s.map", name);
+		else
+			csprintf(file_name, "%s.map", resource_map_type_describe((enum resource_map_type)file->kind));
+		if (map_downloads_web_seed(file_name, file->kind == _map_share_file_map ? download->version : 0, file->size,
+			0, file->web_url, sizeof(file->web_url)))
+		{
+			error(_error_silent, "map sharing: %s comes from the web seed too (%s)", file_name, file->web_url);
+		}
+	}
+}
+
+/* the web seed's pieces, as they come (each checked), and the next run of
+them asked for */
+static void download_web_seed_update(
+	void)
+{
+	struct download *download = &map_share_globals.download;
+	char reason[192];
+	short index;
+
+	if (download->web_active)
+	{
+		struct download_file *file = &download->files[download->web_file];
+		int state = map_downloads_range_poll(reason, sizeof(reason));
+		long piece;
+
+		if (state == 1)
+			return;
+		download->web_active = FALSE;
+		if (state == 2)
+		{
+			byte *buffer = malloc(MAP_SHARE_PIECE_BYTES);
+
+			for (piece = download->web_first; buffer && piece < download->web_first + download->web_count; piece++)
+			{
+				unsigned long offset = (unsigned long)(piece - download->web_first) * MAP_SHARE_PIECE_BYTES;
+				unsigned long bytes = MIN(MAP_SHARE_PIECE_BYTES, file->size - (unsigned long)piece * MAP_SHARE_PIECE_BYTES);
+				byte hash[MAP_SHARE_HASH_BYTES];
+
+				if (file->have[piece >> 3] & (1 << (piece & 7)))
+					continue;
+				if (!map_downloads_range_read(offset, buffer, bytes))
+				{
+					download->web_failures++;
+					download->web_retry_at = system_milliseconds() + WEB_SEED_RETRY_INTERVAL;
+					break;
+				}
+				p2p_blake2b_256(buffer, bytes, hash);
+				if (csmemcmp(hash, file->piece_hashes + piece * MAP_SHARE_HASH_BYTES, MAP_SHARE_HASH_BYTES))
+				{
+					error(_error_silent, "map sharing: the web seed's piece %ld of %s is not the map's: not asked again",
+						piece, file->final_path);
+					file->web_off = TRUE;
+					break;
+				}
+				download->web_bytes += bytes;
+				download_piece_had(download->web_file, piece, buffer);
+				/* (the download may have ended: a file that could not be
+				written) */
+				if (download->state != _download_transferring)
+				{
+					free(buffer);
+					map_downloads_range_stop();
+					return;
+				}
+			}
+			free(buffer);
+		}
+		else
+		{
+			download->web_failures++;
+			download->web_retry_at = system_milliseconds() + WEB_SEED_RETRY_INTERVAL;
+			error(_error_silent, "map sharing: the web seed did not send pieces %ld to %ld of %s: %s",
+				download->web_first, download->web_first + download->web_count - 1, file->final_path, reason);
+		}
+		for (piece = download->web_first; piece < download->web_first + download->web_count; piece++)
+		{
+			if (file->asked[piece])
+				file->asked[piece]--;
+		}
+		map_downloads_range_stop();
+	}
+	if (download->web_failures >= WEB_SEED_FAILURES ||
+		(download->web_retry_at && (long)(system_milliseconds() - download->web_retry_at) < 0))
+	{
+		return;
+	}
+	/* the next run: the first pieces no one has been asked for, of a file
+	whose pieces' hashes are known */
+	for (index = 0; index < download->file_count; index++)
+	{
+		struct download_file *file = &download->files[index];
+		long first;
+		long count;
+
+		if (file->state != _file_transferring || !file->piece_hashes || !file->web_url[0] || file->web_off)
+			continue;
+		for (first = 0; first < file->piece_count; first++)
+		{
+			if (!(file->have[first >> 3] & (1 << (first & 7))) && !file->asked[first])
+				break;
+		}
+		if (first == file->piece_count)
+			continue;
+		for (count = 1; count < WEB_SEED_PIECES && first + count < file->piece_count; count++)
+		{
+			long piece = first + count;
+
+			if ((file->have[piece >> 3] & (1 << (piece & 7))) || file->asked[piece])
+				break;
+		}
+		/* (a fetch stopped may still be ending, or the archives' under way:
+		asked again in a moment) */
+		if (!map_downloads_range_start(file->web_url, (unsigned long long)first * MAP_SHARE_PIECE_BYTES,
+			MIN((unsigned long)count * MAP_SHARE_PIECE_BYTES, file->size - (unsigned long)first * MAP_SHARE_PIECE_BYTES)))
+		{
+			download->web_retry_at = system_milliseconds() + WEB_SEED_START_RETRY_INTERVAL;
+			return;
+		}
+		for (count = 0; count < WEB_SEED_PIECES && first + count < file->piece_count; count++)
+		{
+			long piece = first + count;
+
+			if ((file->have[piece >> 3] & (1 << (piece & 7))) || (count && file->asked[piece]))
+				break;
+			file->asked[piece]++;
+		}
+		download->web_active = TRUE;
+		download->web_file = index;
+		download->web_first = first;
+		download->web_count = count;
+		return;
+	}
+}
+
 static void download_update(
 	void)
 {
@@ -2605,6 +2807,9 @@ static void download_update(
 		return;
 	}
 	download_reach_sources();
+	download_web_seed_update();
+	if (download->state != _download_transferring)
+		return;
 	if (elapsed(download->reported_at, now, PROGRESS_INTERVAL))
 		download_report(_progress_downloading);
 	if (elapsed(download->logged_at, now, LOG_INTERVAL))
@@ -2617,9 +2822,10 @@ static void download_update(
 				map_share_globals.connections[index].state == _connection_open;
 		}
 		download->logged_at = now;
-		error(_error_silent, "map sharing: %lu of %lu bytes, %d connections, %lu bytes a second",
+		error(_error_silent, "map sharing: %lu of %lu bytes, %d connections, %lu bytes a second (%lu from the web seed)",
 			download->done_bytes, download->total_bytes, (int)connections,
-			download->last_window_time ? download->last_window_bytes * 1000 / download->last_window_time : 0);
+			download->last_window_time ? download->last_window_bytes * 1000 / download->last_window_time : 0,
+			download->web_bytes);
 	}
 	if (elapsed(download->window_at, now, RATE_WINDOW))
 	{

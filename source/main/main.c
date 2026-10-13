@@ -3522,6 +3522,9 @@ static boolean main_loop_iteration(
 			network_voice_update();
 			/* port: map sharing, in the lobby and in game (port/linux/game/map_share.c) */
 			map_share_update();
+			/* port: Custom Edition maps downloaded from the community's archives,
+			in the menus too (port/linux/src/map_downloads.c) */
+			map_downloads_poll();
 			profile_scope_enter(main_network_start_frame_section)
 			connection = main_globals.connection;
 			if (connection==_game_connection_network_client)

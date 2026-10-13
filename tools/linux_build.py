@@ -48,6 +48,12 @@ def game_defines_and_includes(config: Dict[str, Any]) -> str:
     )
 
 
+# the platform layer's units the map downloads' file handling is built with
+# alone (tools/map_download_check.c): the map archives' zips and the hash
+# check, and the files they use
+MAP_DOWNLOAD_CHECK_PLATFORM_SOURCES = ("map_archives_zip.c", "map_sha1.c", "posix_files.c")
+
+
 def compile_launcher(sln: Any) -> str:
     """what the native ports' compile commands start with: the
     --compiler-launcher (ccache, say) and a space, or nothing"""
@@ -511,9 +517,11 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     libs = " ".join(f"-l{lib}" for lib in config.get("libraries", []))
 
     def emit(obj_dir: Path, output: Path, extra_cflags: List[str], extra_ldflags: List[str],
-             implicit_inputs: List[Path], validator: Optional[Path] = None) -> None:
+             implicit_inputs: List[Path], validator: Optional[Path] = None,
+             map_download_check: Optional[Path] = None) -> None:
         """the objects and the executable, with the given extra flags (and
-        the tag validator alone, tools/map_validate.c, as validator)"""
+        the tag validator alone, tools/map_validate.c, as validator; the map
+        downloads' file handling alone, tools/map_download_check.c, as map_download_check)"""
         extra = " ".join(extra_cflags)
         # the posix_* units have glibc's 32-bit wchar_t, and LLVM will not
         # optimise them together with code that has a 16-bit one: they stay
@@ -673,6 +681,43 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                                                 *extra_ldflags])},
             )
 
+        # the map downloads' zips and hash check (port/linux/src/map_archives_zip.c)
+        # alone, outside the game: the game's objects of them and of the
+        # platform layer's files, and a program that runs them
+        # (tools/map_download_check.c; tools/test_map_download_check.py)
+        if map_download_check is not None:
+            tool = Path("tools/map_download_check.c")
+            tool_object = obj_dir / tool.with_suffix(".o")
+            n.build(
+                outputs=tool_object,
+                rule="linux_cc",
+                inputs=tool,
+                implicit=[*xdk_headers(), prefix_header, platform_semantics_header, *sysroot_inputs],
+                variables={"cflags": f"{platform_cflags} {extra}"},
+            )
+            # (and stand-ins for the renderer, which the Xbox headers' inline
+            # functions in every platform unit refer to: tools/map_download_check_xbox.c)
+            stand_ins = Path("tools/map_download_check_xbox.c")
+            stand_ins_object = obj_dir / stand_ins.with_suffix(".o")
+            n.build(
+                outputs=stand_ins_object,
+                rule="linux_cc",
+                inputs=stand_ins,
+                implicit=sysroot_inputs,
+                variables={"cflags": f"{posix_cflags} {posix_extra}"},
+            )
+            tool_objects = [tool_object, stand_ins_object,
+                            *(obj_dir / (platform_dir / name).with_suffix(".o")
+                              for name in MAP_DOWNLOAD_CHECK_PLATFORM_SOURCES),
+                            *(obj_dir / (ZLIB_DIR / name).with_suffix(".o") for name in ZLIB_SOURCES)]
+            n.build(
+                outputs=map_download_check,
+                rule="linux_tool_link",
+                inputs=tool_objects,
+                variables={"ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *sysroot_ldflags,
+                                                *extra_ldflags, "-lpthread"])},
+            )
+
     # Profile-guided optimisation: with the committed profile, or with
     # --pgo=train one that an instrumented build records while playing
     # (tools/pgo_train.py). A profile is trained once: code changed since
@@ -694,10 +739,14 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     cflags, ldflags = lto_flags(sln, build_dir / "thinlto-cache")
     cflags += profile_use_flags(profile)
     validator = build_dir / "map_validate"
-    emit(obj_dir, output, cflags, ldflags, [profile] if profile else [], validator)
+    map_download_check = build_dir / "map_download_check"
+    emit(obj_dir, output, cflags, ldflags, [profile] if profile else [], validator, map_download_check)
     # internet play's MQTT brokers, a file beside the game (network.brokers_file)
     brokers = build_dir / "brokers.txt"
     n.build(outputs=brokers, rule="linux_copy", inputs=Path("port/assets/network/brokers.txt"))
+    # the index of the Custom Edition maps, a file beside the game (maps.index)
+    map_index = build_dir / "map_index.txt"
+    n.build(outputs=map_index, rule="linux_copy", inputs=Path("port/assets/network/map_index.txt"))
     n.build(outputs="linux", rule="phony",
-            inputs=[output, brokers, validator, *sdl_outputs])
+            inputs=[output, brokers, map_index, validator, map_download_check, *sdl_outputs])
     n.newline()

@@ -341,10 +341,13 @@ a pregame keep-alive every five seconds from the host
 A client may join a game on a Custom Edition map it does not have
 (`port/linux/game/map_share.c`, `map_share_files.c`). Every map in the
 custom_maps folder is named for its contents: once the map lists (or a host
-picking it) find it, `hugeass.map` is renamed `hugeass_<8 hex digits>.map`,
-the first digits of its hash, with its picture and description, so a game's
-level name (`custom_maps\hugeass_0e2b3ee4`) says which version of the map it
-is, and two versions never meet. A file's hash is BLAKE2b's (32 bytes) of a
+picking it) find `hugeass.map`, it is hashed, and a game on it is on the
+level `custom_maps\hugeass_<8 hex digits>`, the first digits of its hash, so
+the level name says which version of the map it is, and two versions never
+meet. The file keeps its name (no map is renamed: other programs and
+installs use the folder too); the level finds it by the hash
+(`custom_edition_cache.c`), and a map downloaded is written under the level's
+name, beside any other version. A file's hash is BLAKE2b's (32 bytes) of a
 label, its size and the BLAKE2b hashes of its pieces (256 KiB each). The
 menus show a map without its hash, unless two versions are listed.
 
@@ -383,6 +386,14 @@ menus show a map without its hash, unless two versions are listed.
   its connections a 16 KiB block at a time, so that the game's own traffic
   keeps the rest of the upload; `network.map_seed = false` sends none. A
   player that has downloaded the map sends it on at once.
+- **Web seeds.** A file of the download that the index of the maps has (by
+  its name and version, at the offer's size: `port/linux/src/map_downloads.c`)
+  is also asked of a web seed (`maps.web_seeds`, a folder of the maps on a
+  web server) over HTTPS, 16 pieces at a time (an HTTP range, on a thread of
+  its own), pieces no player has been asked for. Each is checked against
+  its hash as a player's is; one that is not the file's ends the web seed
+  for that file, and three failed asks for the download. Nothing of it goes
+  over the game's connections. Linux and Windows (`maps.downloads`).
 - **Internet play.** The players of an internet game reach its host alone.
   A player that shares answers the holders of the invite it joined with as
   its host does (`p2p_set_answering_players`), and a downloading client asks

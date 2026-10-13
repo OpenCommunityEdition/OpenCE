@@ -29,6 +29,11 @@ import java.util.List;
  * The files are written to maps.partial first and moved into maps once they
  * all are, so an interrupted extraction never leaves maps/ui.map behind.
  *
+ * The loading screen's picture, which the retail disc has no file of, is
+ * taken out of the image's default.xbe and written beside the maps as the
+ * loading.tga the game reads (loadingPicture, as xiso.c's
+ * write_loading_picture); without it the loading screen makes clouds.
+ *
  * Some parts of this code are copyright in@fishtank.com. This product
  * includes software developed by in &lt;in@fishtank.com&gt;.
  *
@@ -76,6 +81,12 @@ final class XisoExtractor {
     private static final int MAXIMUM_FILES = 256;
     private static final int COPY_BUFFER_SIZE = 1 << 20;
     private static final byte[] VOLUME_MAGIC = "MICROSOFT*XBOX*MEDIA".getBytes(StandardCharsets.US_ASCII);
+    /* the loading screen's picture (source/interface/progress_bar.c) */
+    private static final int LOADING_WIDTH = 320;
+    private static final int LOADING_HEIGHT = 240;
+    private static final int TGA_HEADER_SIZE = 18;
+    private static final long MAXIMUM_XBE_SIZE = 64 << 20;
+    private static final String LOADING_PICTURE = "loading.tga";
 
     /* where the game partition starts: a plain image, and whole-disc images
     (extract-xiso's GLOBAL, XGD3 and XGD1 offsets) */
@@ -213,11 +224,88 @@ final class XisoExtractor {
             walk(table, right, depth + 1, directories, out, visited);
     }
 
+    /**
+     * The loading screen's picture out of a default.xbe, as the TGA the game
+     * reads (uncompressed, 24 bits, rows from the bottom), or null. The
+     * executable holds it, 320 by 240, as runs of 4-bit greys (a byte each:
+     * the grey's high four bits in its low nibble, the run's length in its high
+     * one) after the width and height as 32-bit numbers: found by those two
+     * numbers followed by runs that fill the picture exactly.
+     */
+    static byte[] loadingPicture(byte[] xbe) {
+        int pixels = LOADING_WIDTH * LOADING_HEIGHT;
+        byte[] greys = new byte[pixels];
+        ByteBuffer words = ByteBuffer.wrap(xbe).order(ByteOrder.LITTLE_ENDIAN);
+        boolean found = false;
+
+        for (int at = 0; at + 8 <= xbe.length && !found; at++) {
+            if (words.getInt(at) != LOADING_WIDTH || words.getInt(at + 4) != LOADING_HEIGHT)
+                continue;
+            int pixel = 0;
+            for (int next = at + 8; next < xbe.length && pixel < pixels; next++) {
+                int run = (xbe[next] & 0xFF) >> 4;
+
+                if (run == 0 || pixel + run > pixels)
+                    break;
+                java.util.Arrays.fill(greys, pixel, pixel + run, (byte) ((xbe[next] & 0x0F) << 4));
+                pixel += run;
+            }
+            found = pixel == pixels;
+        }
+        if (!found)
+            return null;
+        byte[] tga = new byte[TGA_HEADER_SIZE + pixels * 3];
+        tga[2] = 2;
+        tga[12] = (byte) (LOADING_WIDTH & 0xFF);
+        tga[13] = (byte) (LOADING_WIDTH >> 8);
+        tga[14] = (byte) (LOADING_HEIGHT & 0xFF);
+        tga[15] = (byte) (LOADING_HEIGHT >> 8);
+        tga[16] = 24;
+        for (int y = 0; y < LOADING_HEIGHT; y++) {
+            for (int x = 0; x < LOADING_WIDTH; x++) {
+                int out = TGA_HEADER_SIZE + (y * LOADING_WIDTH + x) * 3;
+                byte grey = greys[(LOADING_HEIGHT - 1 - y) * LOADING_WIDTH + x];
+
+                tga[out] = tga[out + 1] = tga[out + 2] = grey;
+            }
+        }
+        return tga;
+    }
+
+    /** writes the root's default.xbe's loading picture into folder; whether it did */
+    private boolean writeLoadingPicture(ByteBuffer rootTable, File folder) {
+        List<Entry> rootFiles = new ArrayList<>();
+        walk(rootTable, 0, 0, false, rootFiles, new int[1]);
+        for (Entry file : rootFiles) {
+            if (!file.name.equalsIgnoreCase("default.xbe") || file.size <= 0 || file.size > MAXIMUM_XBE_SIZE)
+                continue;
+            File picture = new File(folder, LOADING_PICTURE);
+            try {
+                ByteBuffer xbe = ByteBuffer.allocate((int) file.size);
+                readAt(partition + file.sector * SECTOR_SIZE, xbe);
+                byte[] tga = loadingPicture(xbe.array());
+                if (tga == null)
+                    return false;
+                try (FileOutputStream out = new FileOutputStream(picture)) {
+                    out.write(tga);
+                }
+                return true;
+            } catch (IOException | OutOfMemoryError e) {
+                /* (no picture, rather than one cut short, which the loading
+                screen would read past: it makes clouds) */
+                picture.delete();
+                return false;
+            }
+        }
+        return false;
+    }
+
     private void extract(File destination, Progress progress) throws IOException {
         long[] root = findVolume();
 
         /* the root's maps folder */
         ByteBuffer table = readDirectory(root[0], root[1], "The disc image's file system is damaged.");
+        ByteBuffer rootTable = table;
         List<Entry> directories = new ArrayList<>();
         walk(table, 0, 0, true, directories, new int[1]);
         Entry maps = null;
@@ -234,9 +322,11 @@ final class XisoExtractor {
         walk(table, 0, 0, false, files, new int[1]);
         long total = 0;
         boolean hasUi = false;
+        boolean hasLoading = false;
         for (Entry file : files) {
             total += file.size;
             hasUi |= file.name.equalsIgnoreCase("ui.map");
+            hasLoading |= file.name.equalsIgnoreCase(LOADING_PICTURE);
         }
         if (!hasUi)
             throw new ExtractException("The disc image's maps folder has no ui.map: it is not a Halo disc.");
@@ -273,6 +363,9 @@ final class XisoExtractor {
                 throw new ExtractException("Could not write " + path + " (is the storage full?).");
             }
         }
+
+        if (!hasLoading && writeLoadingPicture(rootTable, partial))
+            files.add(new Entry(LOADING_PICTURE, 0, 0));
 
         /* (the maps folder may be there, empty: the app makes it for adb) */
         if (!finished.isDirectory() && !finished.mkdirs())

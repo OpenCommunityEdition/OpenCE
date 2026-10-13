@@ -679,6 +679,10 @@ struct widget_instance;
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "ui_widget.h"
+/* port: a map's download screen over the menus (port/linux/game/download_screen.c) */
+boolean download_screen_active(void);
+void download_screen_process(void);
+void download_screen_render(void);
 
 /* ---------- constants */
 
@@ -6798,7 +6802,9 @@ static void ui_widgets_process_mouse(
 		if (ui_debug_targets_enabled())
 			ui_debug_log_keyboard_tap(pointer.click_x, pointer.click_y, hit);
 	}
-	if (!pointer_active || keyboard_active)
+	if (!pointer_active || keyboard_active
+		/* port: (nor under a map's download screen, which hides the menus) */
+		|| download_screen_active())
 	{
 		ui_mouse_press_count = 0;
 		ui_mouse_hover_pending = FALSE;
@@ -7418,6 +7424,9 @@ void render_ui_widgets(
 	{
 		virtual_keyboard_render();
 	}
+	/* port: a map's download screen, over the menus */
+	if (first_players_render)
+		download_screen_render();
 	ui_debug_draw_targets(first_players_render);
 
 	return;
@@ -8486,7 +8495,13 @@ void process_ui_widgets(
 
 		return;
 	}
-	if (attract_mode_should_start())
+	/* port: a map's download screen over the menus
+	(port/linux/game/download_screen.c): the menus go on behind it, so that
+	the join waiting for the map follows, but its presses are its own, and
+	the attract mode does not start while it is up */
+	if (download_screen_active())
+		download_screen_process();
+	else if (attract_mode_should_start())
 	{
 		attract_mode_start();
 

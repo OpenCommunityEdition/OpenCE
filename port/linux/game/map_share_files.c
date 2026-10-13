@@ -44,10 +44,12 @@ enum
 	/* the files hashed for sharing at once: a game's map and its three
 	resource maps, a download's, and the last few games' */
 	MAXIMUM_SHARE_FILES = 16,
-	/* the maps waiting to be named, and those named or given up on this
-	run (not looked at again) */
+	/* the maps waiting to be hashed for their names, and those hashed or
+	given up on (not hashed again while their files stay the same; those
+	hashed kept in NAMED_FILE for the next runs) */
 	MAXIMUM_NAMING_QUEUE = 64,
-	MAXIMUM_NAMED = 1024,
+	/* (every map the map lists hold) */
+	MAXIMUM_NAMED = CUSTOM_EDITION_MAPS_MAXIMUM,
 	/* the longest map file name the map lists take (custom_edition_maps.c:
 	the level name, custom_maps\ and it, kept whole by the game engine) */
 	MAXIMUM_MAP_NAME_LENGTH = CUSTOM_EDITION_MAXIMUM_LEVEL_NAME_LENGTH - (sizeof(CUSTOM_EDITION_LEVEL_NAME_PREFIX) - 1),
@@ -55,6 +57,13 @@ enum
 	are smaller: custom_edition_cache.c) */
 	MAXIMUM_FILE_BYTES = 0x7FFFFFFF,
 };
+
+/* the maps hashed for their names, kept from one run to the next (in the
+save root: a line a file, its naming_key, size, time and digits, in hexadecimal
+and decimal), so that a map is hashed once as long as its file stays the
+same, as when the maps were renamed for their hash */
+#define NAMED_FILE "z:\\map_hashes.txt"
+#define NAMED_FILE_FORMAT "# OpenCE map hashes 1"
 
 /* what a hash is of: these bytes, the file's size (4 bytes, little-endian)
 and its pieces' hashes */
@@ -90,6 +99,22 @@ struct naming
 {
 	char folder[MAP_SHARE_PATH_SIZE];
 	char name[MAP_SHARE_PATH_SIZE];
+	/* the file's size and time before it was hashed: its digits are kept
+	only if they are the same after (a file being copied over is hashed
+	again once it is whole) */
+	unsigned long size;
+	unsigned long modified;
+};
+
+/* a map file hashed for its name: by its folder and name (naming_key), its
+size and when it was written then, and the digits it is named by (none:
+it could not be read) */
+struct named
+{
+	unsigned long key;
+	unsigned long size;
+	unsigned long modified;
+	char digits[MAP_SHARE_NAME_DIGITS + 1];
 };
 
 struct map_share_files_globals
@@ -110,7 +135,13 @@ struct map_share_files_globals
 	short naming_count;
 	struct naming naming_queue[MAXIMUM_NAMING_QUEUE];
 	long named_count;
-	unsigned long named_hashes[MAXIMUM_NAMED];
+	struct named named[MAXIMUM_NAMED];
+	boolean named_loaded;
+	/* digits worked out since NAMED_FILE was written */
+	boolean named_dirty;
+	/* a map the queue had no room for: the map lists offer theirs again
+	once it is empty */
+	boolean naming_overflowed;
 
 	/* the pieces asked for, and what was found for their owner */
 	boolean pieces_wanted;
@@ -457,27 +488,149 @@ static unsigned long naming_key(
 	return key;
 }
 
-static boolean naming_known(
-	unsigned long key)
+/* the maps hashed in earlier runs (NAMED_FILE), once */
+static void named_load(
+	void)
 {
 	struct map_share_files_globals *globals = &map_share_files_globals;
-	long index;
+	char line[128];
+	FILE *stream;
 
-	for (index = 0; index < globals->named_count; index++)
+	if (globals->named_loaded)
+		return;
+	globals->named_loaded = TRUE;
+	stream = fopen(NAMED_FILE, "rb");
+	if (!stream)
+		return;
+	if (fgets(line, sizeof(line), stream) && !csstrncmp(line, NAMED_FILE_FORMAT, csstrlen(NAMED_FILE_FORMAT)))
 	{
-		if (globals->named_hashes[index] == key)
-			return TRUE;
+		while (globals->named_count < MAXIMUM_NAMED && fgets(line, sizeof(line), stream))
+		{
+			struct named *named = &globals->named[globals->named_count];
+			char digits[16];
+			short index;
+
+			csmemset(named, 0, sizeof(*named));
+			if (sscanf(line, "%lx %lu %lu %15s", &named->key, &named->size, &named->modified, digits) != 4 ||
+				csstrlen(digits) != MAP_SHARE_NAME_DIGITS)
+			{
+				continue;
+			}
+			for (index = 0; index < MAP_SHARE_NAME_DIGITS; index++)
+			{
+				if (!((digits[index] >= '0' && digits[index] <= '9') || (digits[index] >= 'a' && digits[index] <= 'f')))
+					break;
+			}
+			if (index < MAP_SHARE_NAME_DIGITS)
+				continue;
+			csstrcpy(named->digits, digits);
+			globals->named_count++;
+		}
 	}
-	return FALSE;
+	fclose(stream);
 }
 
-static void naming_remember(
-	unsigned long key)
+/* the maps hashed kept for the next runs (NAMED_FILE): those given up on
+are tried again then */
+static void named_save(
+	void)
 {
 	struct map_share_files_globals *globals = &map_share_files_globals;
+	FILE *stream = fopen(NAMED_FILE, "wb");
+	long index;
 
-	if (globals->named_count < MAXIMUM_NAMED)
-		globals->named_hashes[globals->named_count++] = key;
+	if (!stream)
+		return;
+	fprintf(stream, "%s\n", NAMED_FILE_FORMAT);
+	for (index = 0; index < globals->named_count; index++)
+	{
+		struct named const *named = &globals->named[index];
+
+		if (named->digits[0])
+			fprintf(stream, "%08lx %lu %lu %s\n", named->key, named->size, named->modified, named->digits);
+	}
+	fclose(stream);
+}
+
+/* the map file's entry, if it was hashed (or given up on) as it is now
+(its size and time the same) */
+static struct named *naming_find(
+	char const *folder,
+	char const *name)
+{
+	struct map_share_files_globals *globals = &map_share_files_globals;
+	unsigned long key = naming_key(folder, name);
+	char path[MAP_SHARE_PATH_SIZE];
+	unsigned long size, modified;
+	long index;
+
+	named_load();
+	if (csstrlen(folder) + csstrlen(name) + 4 >= MAP_SHARE_PATH_SIZE)
+		return NULL;
+	csprintf(path, "%s%s.map", folder, name);
+	if (!file_stamp(path, &size, &modified))
+		return NULL;
+	for (index = 0; index < globals->named_count; index++)
+	{
+		struct named *named = &globals->named[index];
+
+		if (named->key == key && named->size == size && named->modified == modified)
+			return named;
+	}
+	return NULL;
+}
+
+/* the hash's digits of the map file <folder><name>.map remembered (none:
+it could not be read), as the file was when hashed (size, modified): its
+entry of before (another version) replaced */
+static void naming_remember(
+	char const *folder,
+	char const *name,
+	unsigned long size,
+	unsigned long modified,
+	char const *digits)
+{
+	struct map_share_files_globals *globals = &map_share_files_globals;
+	unsigned long key = naming_key(folder, name);
+	struct named *named = NULL;
+	long index;
+
+	named_load();
+	for (index = 0; index < globals->named_count && !named; index++)
+	{
+		if (globals->named[index].key == key)
+			named = &globals->named[index];
+	}
+	if (!named)
+	{
+		/* (when full, the oldest goes) */
+		if (globals->named_count == MAXIMUM_NAMED)
+		{
+			csmemmove(&globals->named[0], &globals->named[1], (MAXIMUM_NAMED - 1) * sizeof(globals->named[0]));
+			globals->named_count--;
+		}
+		named = &globals->named[globals->named_count++];
+		csmemset(named, 0, sizeof(*named));
+		named->key = key;
+	}
+	named->size = size;
+	named->modified = modified;
+	csstrncpy(named->digits, digits, MAP_SHARE_NAME_DIGITS);
+	named->digits[MAP_SHARE_NAME_DIGITS] = 0;
+	if (named->digits[0])
+		globals->named_dirty = TRUE;
+}
+
+/* the naming's file's size and time now, into it; FALSE if it is not there */
+static boolean naming_stamp(
+	struct naming *naming)
+{
+	char path[MAP_SHARE_PATH_SIZE];
+
+	if (csstrlen(naming->folder) + csstrlen(naming->name) + 4 >= MAP_SHARE_PATH_SIZE)
+		return FALSE;
+	csprintf(path, "%s%s.map", naming->folder, naming->name);
+	return file_stamp(path, &naming->size, &naming->modified);
 }
 
 void map_share_name_map(
@@ -485,13 +638,15 @@ void map_share_name_map(
 	char const *name)
 {
 	struct map_share_files_globals *globals = &map_share_files_globals;
-	unsigned long key = naming_key(folder, name);
 	short index;
 
-	/* (the custom_maps folder's alone: an install of Custom Edition is
-	left as it is, for Custom Edition) */
-	if (csstrcasecmp(folder, CUSTOM_EDITION_MAP_DIRECTORY) || map_share_name_hashed(name) || naming_known(key))
+	/* (the maps folders': a game's level name finds an install of Custom
+	Edition's maps by their hash too, though they are not shared) */
+	if ((csstrcasecmp(folder, CUSTOM_EDITION_MAP_DIRECTORY) && csstrcasecmp(folder, CUSTOM_EDITION_INSTALL_MAP_DIRECTORY)) ||
+		map_share_name_hashed(name) || naming_find(folder, name))
+	{
 		return;
+	}
 	for (index = 0; index < globals->naming_count; index++)
 	{
 		if (!csstrcasecmp(globals->naming_queue[index].name, name) &&
@@ -506,116 +661,123 @@ void map_share_name_map(
 		return;
 	}
 	if (globals->naming_count == MAXIMUM_NAMING_QUEUE)
+	{
+		globals->naming_overflowed = TRUE;
 		return;
+	}
+	csmemset(&globals->naming_queue[globals->naming_count], 0, sizeof(globals->naming_queue[0]));
 	csstrncpy(globals->naming_queue[globals->naming_count].folder, folder, MAP_SHARE_PATH_SIZE - 1);
 	csstrncpy(globals->naming_queue[globals->naming_count].name, name, MAP_SHARE_PATH_SIZE - 1);
-	globals->naming_count++;
+	if (naming_stamp(&globals->naming_queue[globals->naming_count]))
+		globals->naming_count++;
 }
 
-/* <folder><from><extension> renamed <folder><to><extension>, if it is there
-and that is not */
-static boolean rename_beside(
-	char const *folder,
-	char const *from,
-	char const *to,
-	char const *extension)
-{
-	char from_path[MAP_SHARE_PATH_SIZE];
-	char to_path[MAP_SHARE_PATH_SIZE];
-
-	if (csstrlen(folder) + csstrlen(from) + csstrlen(extension) >= MAP_SHARE_PATH_SIZE ||
-		csstrlen(folder) + csstrlen(to) + csstrlen(extension) >= MAP_SHARE_PATH_SIZE)
-	{
-		return FALSE;
-	}
-	csprintf(from_path, "%s%s%s", folder, from, extension);
-	csprintf(to_path, "%s%s%s", folder, to, extension);
-	return MoveFileA(from_path, to_path) != 0;
-}
-
-/* a map hashed: renamed <name>_<hash>.map (the name cut short to fit the
-map lists), with its picture and description */
+/* a map hashed: the digits it is named by remembered (its file is not
+renamed: a player's maps are theirs, and other programs use them) */
 static void naming_finish(
 	struct naming const *naming,
 	struct hash_job const *job)
 {
 	char digits[MAP_SHARE_NAME_DIGITS + 1];
-	char hashed[MAP_SHARE_PATH_SIZE];
-	char path[MAP_SHARE_PATH_SIZE];
-	short base_length = (short)csstrlen(naming->name);
-	char const *loaded = custom_edition_cache_loaded_path();
+	struct naming now = *naming;
 
-	csprintf(path, "%s%s.map", naming->folder, naming->name);
-	/* (in use: named another time) */
-	if (loaded && !csstrcasecmp(loaded, path))
-		return;
-	naming_remember(naming_key(naming->folder, naming->name));
 	if (job->failed)
 	{
-		error(_error_silent, "map sharing: '%s' could not be read to name it for its hash", path);
+		error(_error_silent, "map sharing: '%s%s.map' could not be read to name it for its hash", naming->folder,
+			naming->name);
+		naming_remember(naming->folder, naming->name, naming->size, naming->modified, "");
+		return;
+	}
+	/* (changed while it was hashed: hashed again when it is next asked for) */
+	if (!naming_stamp(&now) || now.size != naming->size || now.modified != naming->modified)
+	{
+		error(_error_silent, "map sharing: '%s%s.map' changed while it was hashed", naming->folder, naming->name);
 		return;
 	}
 	map_share_hash_digits(job->hash, digits);
-	base_length = (short)MIN(base_length, MAXIMUM_MAP_NAME_LENGTH - MAP_SHARE_NAME_DIGITS - 1);
-	csmemcpy(hashed, naming->name, base_length);
-	csprintf(hashed + base_length, "_%s", digits);
-	if (!rename_beside(naming->folder, naming->name, hashed, ".map"))
+	naming_remember(naming->folder, naming->name, naming->size, naming->modified, digits);
+}
+
+boolean map_share_name_digits(
+	char const *folder,
+	char const *name,
+	char *digits)
+{
+	struct named *named = naming_find(folder, name);
+	struct naming naming;
+	struct hash_job job;
+
+	if (!named)
 	{
-		error(_error_silent, "map sharing: '%s' was not renamed %s.map (that file exists, or this one is in use)",
-			path, hashed);
-		return;
+		/* (hashed here: a map's hash takes a fraction of a second) */
+		if (csstrlen(folder) + csstrlen(name) + 4 >= MAP_SHARE_PATH_SIZE)
+			return FALSE;
+		csmemset(&naming, 0, sizeof(naming));
+		csmemset(&job, 0, sizeof(job));
+		csstrncpy(naming.folder, folder, sizeof(naming.folder) - 1);
+		csstrncpy(naming.name, name, sizeof(naming.name) - 1);
+		if (!naming_stamp(&naming))
+			return FALSE;
+		csprintf(job.path, "%s%s.map", folder, name);
+		hash_job_run(&job);
+		naming_finish(&naming, &job);
+		free(job.piece_hashes);
+		named = naming_find(folder, name);
 	}
-	rename_beside(naming->folder, naming->name, hashed, ".bmp");
-	rename_beside(naming->folder, naming->name, hashed, ".txt");
-	error(_error_silent, "map sharing: %s.map is now %s.map, named for its hash", naming->name, hashed);
-	custom_edition_maps_look_again();
+	if (!named || !named->digits[0])
+		return FALSE;
+	csstrcpy(digits, named->digits);
+	return TRUE;
 }
 
 void map_share_level_name_hash(
 	char *level_name,
 	long size)
 {
-	struct naming naming;
-	struct hash_job job;
 	char path[MAP_SHARE_PATH_SIZE];
+	char file[MAP_SHARE_PATH_SIZE];
+	char digits[MAP_SHARE_NAME_DIGITS + 1];
 	char const *name;
-	char const *hashed;
+	size_t length;
 
 	if (!level_name || !custom_edition_level_name(level_name))
 		return;
 	name = tag_name_strip_path(level_name);
 	if (map_share_name_hashed(name) || !custom_edition_map_file_path(level_name, path))
 		return;
-	/* (the file's own name, which may have its hash already) */
-	hashed = tag_name_strip_path(path);
+	/* (the custom_maps folder's alone: an install of Custom Edition's maps
+	are not shared) */
 	if (_strnicmp(path, CUSTOM_EDITION_MAP_DIRECTORY, csstrlen(CUSTOM_EDITION_MAP_DIRECTORY)) ||
 		strchr(path + csstrlen(CUSTOM_EDITION_MAP_DIRECTORY), '\\'))
 	{
 		return;
 	}
-	if (!map_share_name_hashed(name) && csstrlen(hashed) > 4 && csstrlen(hashed) - 4 == csstrlen(name) &&
-		!_strnicmp(hashed, name, csstrlen(name)))
+	/* the file's own name, which may have its hash already (a map downloaded,
+	or renamed by an earlier build) */
+	length = csstrlen(path + csstrlen(CUSTOM_EDITION_MAP_DIRECTORY));
+	if (length <= 4 || length - 4 >= sizeof(file))
+		return;
+	csprintf(file, "%.*s", (int)(length - 4), path + csstrlen(CUSTOM_EDITION_MAP_DIRECTORY));
+	if (map_share_name_hashed(file))
 	{
-		/* named now: hashed here (a map's hash takes a fraction of a second
-		to work out) and renamed, unless it is loaded */
-		csmemset(&naming, 0, sizeof(naming));
-		csmemset(&job, 0, sizeof(job));
-		csstrncpy(naming.folder, CUSTOM_EDITION_MAP_DIRECTORY, sizeof(naming.folder) - 1);
-		csstrncpy(naming.name, name, sizeof(naming.name) - 1);
-		csstrncpy(job.path, path, sizeof(job.path) - 1);
-		hash_job_run(&job);
-		naming_finish(&naming, &job);
-		free(job.piece_hashes);
-		if (!custom_edition_map_file_path(level_name, path))
-			return;
-		hashed = tag_name_strip_path(path);
+		if (csstrlen(CUSTOM_EDITION_LEVEL_NAME_PREFIX) + csstrlen(file) < (unsigned long)size)
+			csprintf(level_name, "%s%s", CUSTOM_EDITION_LEVEL_NAME_PREFIX, file);
 	}
-	/* the level name of the file found: custom_maps\<name>_<hash> */
-	if (csstrlen(hashed) <= 4 || csstrlen(CUSTOM_EDITION_LEVEL_NAME_PREFIX) + csstrlen(hashed) - 4 >= (unsigned long)size)
-		return;
-	csprintf(level_name, "%s%.*s", CUSTOM_EDITION_LEVEL_NAME_PREFIX, (int)(csstrlen(hashed) - 4), hashed);
-	if (!map_share_name_hashed(tag_name_strip_path(level_name)))
-		return;
+	else
+	{
+		/* named for its hash, the file as it is (custom_edition_cache.c finds
+		<name>.map for <name>_<hash> by the hash); a name too long to be kept
+		whole with the hash cut short to fit, as the maps were renamed before
+		(custom_edition_cache.c finds the file whose name starts so) */
+		short base_length = (short)MIN(csstrlen(file), MAXIMUM_MAP_NAME_LENGTH - MAP_SHARE_NAME_DIGITS - 1);
+
+		if (csstrlen(CUSTOM_EDITION_LEVEL_NAME_PREFIX) + base_length + 1 + MAP_SHARE_NAME_DIGITS >= (unsigned long)size ||
+			!map_share_name_digits(CUSTOM_EDITION_MAP_DIRECTORY, file, digits))
+		{
+			return;
+		}
+		csprintf(level_name, "%s%.*s_%s", CUSTOM_EDITION_LEVEL_NAME_PREFIX, (int)base_length, file, digits);
+	}
 	error(_error_silent, "map sharing: the game's map is %s", level_name);
 }
 
@@ -626,6 +788,22 @@ void map_share_files_update(
 {
 	struct map_share_files_globals *globals = &map_share_files_globals;
 	short index;
+
+	/* (the maps hashed kept once no more are waiting, not after each; and
+	the map lists asked for the maps there was no room for) */
+	if (!globals->naming_count && globals->job_type != _hash_job_name)
+	{
+		if (globals->named_dirty)
+		{
+			named_save();
+			globals->named_dirty = FALSE;
+		}
+		if (globals->naming_overflowed)
+		{
+			globals->naming_overflowed = FALSE;
+			custom_edition_maps_look_again();
+		}
+	}
 
 	if (globals->thread)
 	{

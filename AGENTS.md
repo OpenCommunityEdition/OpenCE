@@ -26,7 +26,7 @@ end.
 | `port/third_party/` | Vendored libraries, each with a README naming its upstream, version and checksum |
 | `port/tools/` | Stand-alone tools (`cache_file_report.c`) |
 | `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py`, `web_build.py`, `ci_build.py`, `web_serve.py`), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `xdk_headers.py`) and tests |
-| `docs/` | Longer design notes (`custom_edition_caches.md`) |
+| `docs/` | Longer design notes (`custom_edition_caches.md`, `map_downloads.md`) |
 | `pgo/` | Profile-guided optimisation profiles |
 | `assets/` | Game data for local runs (gitignored: `maps/`, `custom_maps/`) |
 | `.github/workflows/` | CI: builds every platform on each push, publishes releases from `main` |
@@ -85,6 +85,7 @@ setting (`game.custom_edition`), checked at run time with
 python -m pytest -q tools/harness tools/test_touch_menu.py   # the engine's functions in a fake world
 python -m pytest -q tools/test_linux_port.py                # the build, the maps' checks (needs assets/maps)
 python -m pytest -q tools/test_cache_file_formats.py tools/test_bmp_files.py tools/test_profile.py
+python -m pytest -q tools/test_map_index.py tools/test_map_download_check.py  # the map downloads' index and checks
 python tools/test_touch_layout.py                           # the Android touch layout (JDK 17+)
 python tools/test_light_storage.py
 python tools/test_death_timing.py
@@ -176,7 +177,10 @@ Custom Edition maps live in the data root's `custom_maps` folder with
 added: a map that needs them is refused, and one that only carries
 OpenSauce's header runs as stock Custom Edition runs it. Map files are
 untrusted input: read them through bounds-checked readers. See
-`docs/custom_edition_caches.md`.
+`docs/custom_edition_caches.md`. A map that a host does not send is
+downloaded from the community's archives and checked against
+`port/assets/network/map_index.txt` (`docs/map_downloads.md`); no player's
+map file is ever replaced or renamed.
 
 ### Settings
 
@@ -216,6 +220,7 @@ as documentation of file formats, never copied.
 | [port/web/README.md](port/web/README.md) | The web build, the page, the game data in the browser, limits, how it operates, hosting on GitHub Pages |
 | [port/include/xdk/README.md](port/include/xdk/README.md) | How the SDK declarations were written and are checked |
 | [docs/custom_edition_caches.md](docs/custom_edition_caches.md) | Loading and converting Custom Edition maps, and the evidence for each layout |
+| [docs/map_downloads.md](docs/map_downloads.md) | Custom Edition maps downloaded from the community's archives, the index of the maps, `tools/map_index.py` |
 | [port/assets/menus/README.md](port/assets/menus/README.md) | The menu files' format and how to write them again |
 | [port/assets/menus/NON_HANDDRAWN.md](port/assets/menus/NON_HANDDRAWN.md) | Menu pictures that are not redraws |
 | [port/assets/menus/UNWIRED.md](port/assets/menus/UNWIRED.md) | Menu functions that do nothing yet |

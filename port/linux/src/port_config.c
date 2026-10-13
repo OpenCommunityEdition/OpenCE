@@ -419,6 +419,34 @@ static const struct config_setting config_settings[] =
 		"download it (and the resource maps it needs) from the game's players\n"
 		"into custom_maps, if its host shares it (network.map_share); false\n"
 		"leaves the game, saying which map is missing." },
+	{ "maps.downloads", _config_boolean, "true", "HALO_MAP_DOWNLOADS", _environment_value, _platform_all,
+		"Download a Custom Edition map this machine lacks when joining a game\n"
+		"whose host does not send it (a host of another build, or one that\n"
+		"does not share: network.map_share), from the community's map\n"
+		"archives (archives, web_seeds), when the index of the maps (index)\n"
+		"has it; false never downloads from them." },
+	{ "maps.download_screen", _config_boolean, "true", "HALO_MAP_DOWNLOAD_SCREEN", _environment_value,
+		_platform_all,
+		"While a map downloads before its game is joined, show Halo's loading\n"
+		"screen over the menus, its light sweeping across as the map comes (B\n"
+		"stops the download); false leaves the menus up, their status line\n"
+		"saying how the download goes." },
+	{ "maps.archives", _config_string, "\"halonet,halomaps\"", "HALO_MAP_ARCHIVES", _environment_value,
+		_platform_desktop,
+		"The community's map archives a missing map is taken from, out of the\n"
+		"zip that holds it, in this order (comma-separated): halonet\n"
+		"(maps.halonet.net), halomaps (halomaps.org); then the web seeds.\n"
+		"Each map is checked against the index's hash before it is used." },
+	{ "maps.web_seeds", _config_string, "\"https://halomaps.fractumseraph.net/maps/\"", "HALO_MAP_WEB_SEEDS",
+		_environment_value, _platform_desktop,
+		"Comma-separated https:// folders holding every map of the index under\n"
+		"its file name (the maps' seed boxes), tried after the archives, and\n"
+		"asked for pieces beside the players when map sharing downloads a map;\n"
+		"empty for none (docs/map_downloads.md)." },
+	{ "maps.index", _config_string, "\"map_index.txt\"", "HALO_MAP_INDEX", _environment_value, _platform_all,
+		"The index of the maps (tools/map_index.py), beside this file unless\n"
+		"a full path: port/assets/network/map_index.txt, which the builds put\n"
+		"there." },
 	{ "network.coop_public", _config_boolean, "false", "HALO_NET_COOP_PUBLIC", _environment_value, _platform_all,
 		"Whether an online co-op game (Create Game > Internet, a SINGLEPLAYER\n"
 		"map) starts as PUBLIC or, false, PRIVATE: Server Setup's LISTING in\n"

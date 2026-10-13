@@ -144,6 +144,10 @@ def main() -> int:
     # Android's APK has its own copy)
     if args.platform != "android":
         shutil.copy2(ROOT / "port/assets/network/brokers.txt", dist / "brokers.txt")
+        # the index of the Custom Edition maps, likewise (maps.index; the web's
+        # page fetches what it plays itself)
+        if args.platform != "web":
+            shutil.copy2(ROOT / "port/assets/network/map_index.txt", dist / "map_index.txt")
     return 0
 
 

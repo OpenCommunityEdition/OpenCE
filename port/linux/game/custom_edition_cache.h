@@ -86,9 +86,11 @@ cache. */
 unsigned long custom_edition_map_checksum(
 	char const *level_name);
 /* The file of the map `map_name` (a level name or a file name) in the
-Custom Edition maps folders, into `path` (256 characters): the custom_maps
-folder's map named for its hash (<name>_<hash>.map, map_share.h) for a name
-without it, if there is one map of that name. FALSE if none. */
+Custom Edition maps folders, into `path` (256 characters). A name with its
+map's hash (<name>_<hash>, map_share.h) finds <name>_<hash>.map, or the
+<name>.map whose hash it is (maps are not renamed for their hash); a name
+without it, the custom_maps folder's <name>_<hash>.map if there is one map
+of that name. FALSE if none. */
 boolean custom_edition_map_file_path(
 	char const *map_name,
 	char *path);
@@ -117,6 +119,25 @@ boolean custom_edition_cache_present(
 	unsigned long checksum,
 	char *message,
 	long message_size);
+
+/* The files this machine lacks to play the level as a network game's
+client (custom_edition_cache_present's conditions): its map, when absent,
+not a Custom Edition cache or not the host's version (`checksum`; 0 for
+any) with none of that version beside it, and each resource map absent, as
+file names, tab-separated ("<name>.map\tbitmaps.map") in `names`
+(`names_size` characters). Returns how many, 0 when nothing is missing, or
+-1 when Custom Edition maps cannot run at all. The map downloads
+(port/linux/src/map_downloads.c) fetch what is named. */
+short custom_edition_cache_files_missing(
+	char const *level_name,
+	unsigned long checksum,
+	char *names,
+	long names_size);
+/* The map a network game's client plays is again the one of its name, not
+the host's version beside it that custom_edition_cache_present chose (the
+client gone: network_game_client_dispose). */
+void custom_edition_map_version_forget(
+	void);
 
 /* Whether the file `file_name` (custom_maps\<file_name>.map) is a Custom
 Edition cache of a campaign map (a solo scenario, played alone or as

@@ -2868,6 +2868,21 @@ void rasterizer_set_vertex_shader(
 	return;
 }
 
+/* port: the loading screen (progress_bar.c) sets the device's vertex shader
+(the fixed-function pipeline), render states and texture stage states
+itself, not through these caches: after it, the next draw sets its vertex
+shader again, and the smart states' shadows are the device's (on the Xbox
+only a map's load followed it; the screen of a map's download is drawn
+over the menus, every frame) */
+void rasterizer_forget_hardware_state(
+	void)
+{
+	rasterizer_state_cache.vertex_shader_index = INVALID_RASTERIZER_HARDWARE_STATE;
+	rasterizer_vertex_shader_runtime_forget();
+	SetupSmartStates();
+	return;
+}
+
 
 
 typedef char verify_rasterizer_xbox_push_buffer_size_offset[

@@ -128,6 +128,14 @@ WEB_EXCLUDE = {
     "posix_trace_marker.c", # a Linux GPU driver's trace markers
     "posix_dtls.c",         # internet play's WebRTC: the browser's own
     "p2p_webrtc.c",         # (port/web/src/web_p2p.c)
+    # The Custom Edition maps' downloads from the community's archives
+    # (docs/map_downloads.md): the page fetches what it plays itself, with no
+    # HTTPS download of the platform layer's (port/web/src/web_map_downloads.c
+    # stands in for map_downloads.h)
+    "map_archives.c",
+    "map_archives_zip.c",
+    "map_downloads.c",
+    "map_sha1.c",
 }
 
 # the web runtime's units that, like posix_*.c, are the C library's side of

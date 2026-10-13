@@ -902,6 +902,9 @@ void network_game_client_dispose(
 {
 	if (client)
 	{
+		/* port: the map played again the one of its name, not the host's
+		version beside it (port/linux/game/custom_edition_cache.c) */
+		custom_edition_map_version_forget();
 		if (client->connection)
 			network_connection_delete(client->connection);
 

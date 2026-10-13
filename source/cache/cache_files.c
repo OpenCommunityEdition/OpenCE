@@ -1081,10 +1081,23 @@ boolean cache_files_map_present(
 		return TRUE;
 	if (custom_edition_level_name(map_name))
 	{
+		char files[256];
+
 		if (custom_edition_cache_present(map_name, version, message, sizeof(message)) ||
 			map_share_download_begin(map_name, version, message))
 		{
 			return TRUE;
+		}
+		/* port: a map the host does not send (it is not named for its hash:
+		a host of another build) downloaded from the community's archives,
+		if the index of the maps has it (port/linux/src/map_downloads.c): the
+		player told to join again once it is there */
+		if (custom_edition_cache_files_missing(map_name, version, files, sizeof(files)) > 0 &&
+			map_downloads_fetch(map_name, version, files))
+		{
+			snprintf(message, sizeof(message),
+				"The host's map %.64s is being downloaded from the map archives (Join Game shows how it goes). Join "
+				"again when it is there.", name);
 		}
 	}
 	else

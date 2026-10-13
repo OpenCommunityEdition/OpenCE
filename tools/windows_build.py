@@ -545,5 +545,8 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
     # internet play's MQTT brokers, a file beside the game (network.brokers_file)
     brokers = BUILD / "brokers.txt"
     n.build(outputs=brokers, rule="windows_copy", inputs=Path("port/assets/network/brokers.txt"))
-    n.build(outputs="windows", rule="phony", inputs=[output, sdl_dll, brokers])
+    # the index of the Custom Edition maps, a file beside the game (maps.index)
+    map_index = BUILD / "map_index.txt"
+    n.build(outputs=map_index, rule="windows_copy", inputs=Path("port/assets/network/map_index.txt"))
+    n.build(outputs="windows", rule="phony", inputs=[output, sdl_dll, brokers, map_index])
     n.newline()

@@ -34,11 +34,13 @@ games, progress, the next level). The game engine keeps 63 characters of a
 level name, so a map whose file name is longer than 51 is not listed.
 
 A map in `custom_maps` is named for its contents once the map lists (or a
-host picking it) find it: `hugeass.map` becomes `hugeass_0e2b3ee4.map`, the
-first 8 hexadecimal digits of its hash after `_`, its `.bmp` and `.txt`
-renamed with it (`port/linux/game/map_share_files.c`; the name is cut short
-to keep the level name within 63 characters). A network game's level name
-then says which version of the map it is on, a player without it downloads
+host picking it) find it: a game on `hugeass.map` is on the level
+`custom_maps\hugeass_0e2b3ee4`, the first 8 hexadecimal digits of its hash
+after `_` (`port/linux/game/map_share_files.c`; a name too long to keep the
+level name within 63 characters with them is left without). The file keeps
+its name: no map is renamed, and the level finds `hugeass.map` by its hash
+(`custom_edition_cache.c`). A network game's level name then says which
+version of the map it is on, a player without it downloads
 it under that name (`port/linux/NETCODE.md`, "Map sharing"), and two
 versions of a map keep apart. A level name without the hash (a saved last
 map, a test's) finds the one map of that name in `custom_maps`. The menus

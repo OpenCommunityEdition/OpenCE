@@ -174,7 +174,8 @@ These files are in the data root:
 
 The settings are in `config.toml` next to the executable. Refer to
 "Settings". Internet play's MQTT brokers are in `brokers.txt` next to it
-(`network.brokers_file`).
+(`network.brokers_file`). The index of the Custom Edition maps is in
+`map_index.txt` next to it (`maps.index`; refer to "Map downloads").
 
 If the game stops because of a fatal signal, it writes the address and a
 backtrace to the standard error. To find the function at the address, enter
@@ -398,6 +399,11 @@ the setting for one start of the game. It has priority over the file.
 | `network.map_seed` | `true` | `HALO_NET_MAP_SEED` | When you play in the game of another machine: help send its map to players who join without it. HELP SEND MAPS in Settings > Network Setup > Map Sharing. |
 | `network.map_seed_upload` | `256` | `HALO_NET_MAP_SEED_UPLOAD` | When you play in the game of another machine: the most kilobytes per second that the game sends of maps to other players (`16` to `65536`). UPLOAD LIMIT in Settings > Network Setup > Map Sharing. |
 | `network.map_download` | `true` | `HALO_NET_MAP_DOWNLOAD` | When you join a game on a Custom Edition map that you do not have: download it from the players of the game. `false`: leave the game and show which map is missing. DOWNLOAD MAPS in Settings > Network Setup > Map Sharing. |
+| `maps.downloads` | `true` | `HALO_MAP_DOWNLOADS` | When the host does not send a Custom Edition map that you do not have: download it from the community's archives. `false`: never. Refer to "Map downloads". |
+| `maps.download_screen` | `true` | `HALO_MAP_DOWNLOAD_SCREEN` | `true`: Halo's loading screen covers the menus while a map downloads (B stops the download). `false`: the menus stay up, and the status line of the games list shows the download. |
+| `maps.archives` | `"halonet,halomaps"` | `HALO_MAP_ARCHIVES` | Linux and Windows. The archives that a missing map is taken from first, out of the zip that holds it, in this order: `halonet` (maps.halonet.net), `halomaps` (halomaps.org). Empty: none. |
+| `maps.web_seeds` | `"https://halomaps.fractumseraph.net/maps/"` | `HALO_MAP_WEB_SEEDS` | Linux and Windows. The `https://` folders (with commas between them) that hold the maps under their file names: tried after the archives, and asked for pieces beside the players when map sharing downloads a map. Empty: none. |
+| `maps.index` | `"map_index.txt"` | `HALO_MAP_INDEX` | The index of the Custom Edition maps that downloads are checked against: next to `config.toml`, unless a full path. |
 | `network.coop_public` | `false` | `HALO_NET_COOP_PUBLIC` | `true`: an online co-op game (Create Game > Internet, a SINGLEPLAYER map) starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in co-op's Server Setup writes its choice here. Refer to "Server browser". |
 | `network.brokers_file` | `"brokers.txt"` | `HALO_NET_BROKERS_FILE` | The file of the public MQTT brokers that let the machines of an invite find each other, and that carry the listings of the server browser: next to `config.toml`, unless a full path. One `host:port` on each line, up to 4; `#` starts a comment. |
 | `network.stun_servers` | Google and Cloudflare | `HALO_NET_STUN` | The public STUN servers (`host:port`, with commas between them) that give the internet address of a machine. |
@@ -792,14 +798,20 @@ UPLOAD LIMIT in Settings > Network Setup > Map Sharing). Set these lower on
 a slow connection. DOWNLOAD MAPS there (`network.map_download`) turns
 downloading off: you then leave a game whose map you do not have.
 
-The name of each map in `custom_maps` ends with the start of its hash: when
-the map lists find `hugeass.map`, the game renames it `hugeass_0e2b3ee4.map`
-(and its picture and description). Thus two versions of a map have different
-names, and a game always loads the version of the host. The menus show the
+A game names each map in `custom_maps` with the start of its hash: when it
+hosts `hugeass.map`, the game is on `hugeass_0e2b3ee4`. The game works the
+hash out from the file, which keeps its name (no map is renamed), once:
+it keeps the hash in `map_hashes.txt` in the save root until the file
+changes. Thus two versions of a map have different names, and a game always
+loads the version of the host. A downloaded map is written as `hugeass_0e2b3ee4.map`,
+beside any other version you have, which stays as it is. The menus show the
 map without the hash, and with it only when you have two versions of the
-map. The downloaded map has the same name. A download that stops leaves a
+map. A download that stops leaves a
 `.part` file in `custom_maps`; the next download of that map continues from
-it. Maps in the folder of a Halo Custom Edition install
+it. When the index of the maps has the host's map (see "Map downloads"), a
+web seed (`maps.web_seeds`) sends pieces of it too, beside the players: a
+host with a slow upload does not hold the download up. Each piece is checked
+against its hash, as a player's is. Maps in the folder of a Halo Custom Edition install
 (`paths.custom_edition`) keep their names, and the host does not share them.
 Copy a map to `custom_maps` to share it.
 
@@ -808,6 +820,24 @@ each other a map, a player answers the other players of the game (who have
 its invite) as the host does, and a player who downloads connects to them in
 the same way that it connected to the host. Map sharing uses port 5153 for
 its connections. Refer to `NETCODE.md`, "Map sharing".
+
+### Map downloads
+
+When a host does not send its map (SHARE MAPS off, or a build that names
+its maps without their hash), the game downloads the map from the
+community's archives: the zips of HaloNet's map repository and of HaloMaps
+(`maps.archives`), else a web seed (`maps.web_seeds`). Halo's loading
+screen shows the download, and B stops it. Each map is checked against the
+index of the maps (`map_index.txt` next to the executable, `maps.index`)
+before it is used, and is written as `<name>_<hash>.map`, the name that map
+sharing gives it, beside any other version: no map is replaced or renamed.
+
+When you join a game from the games list whose map is named without its
+hash and you do not have it, the map is downloaded first, and the join goes
+ahead once it is there. When a host declines to send its map after you join, you
+leave the game, and you join again once the map is there. The Linux and
+Windows builds download from the archives. Refer to
+[docs/map_downloads.md](../../docs/map_downloads.md).
 
 ### Security
 
