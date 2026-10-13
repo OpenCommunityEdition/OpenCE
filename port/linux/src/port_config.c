@@ -20,6 +20,9 @@ it exists, so that the player's edits and comments stay.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 /* ---------- the settings */
 
@@ -1312,6 +1315,47 @@ static int config_skip_line(char *text, int line_number, const char *message)
 	return 1;
 }
 
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+/* a config.toml the game never reads, likely edited in its place: said in
+the log, with the one it reads (path) */
+static void config_report_unread(const char *path)
+{
+	char other[1100];
+#ifndef _WIN32
+	/* in the folder the game was started from, when that is not the
+	executable's (the game's is beside the executable) */
+	char folder[1024];
+
+	if (getcwd(folder, sizeof(folder)))
+	{
+		snprintf(other, sizeof(other), "%s/config.toml", folder);
+		if (strcmp(other, path) && SDL_GetPathInfo(other, NULL))
+		{
+			SDL_PathInfo mine, theirs;
+
+			/* (the same file by another name is the one read) */
+			if (!SDL_GetPathInfo(path, &mine) || !SDL_GetPathInfo(other, &theirs) ||
+				mine.size != theirs.size || mine.modify_time != theirs.modify_time)
+			{
+				platform_log("settings: %s is not read; the game's settings are %s", other, path);
+			}
+		}
+	}
+#endif
+	/* the file saved with .txt after it, by an editor that adds it (and
+	Windows Explorer hides it) */
+	snprintf(other, sizeof(other), "%s.txt", path);
+	if (SDL_GetPathInfo(other, NULL))
+	{
+#ifdef _WIN32
+		platform_log("settings: %s is not read: Windows saved it as config.toml.txt; rename it to config.toml", other);
+#else
+		platform_log("settings: %s is not read; rename it to config.toml", other);
+#endif
+	}
+}
+#endif
+
 /* ---------- words */
 
 /* the settings that take one of a few words: one in any case is taken (as
@@ -1427,6 +1471,9 @@ static void config_load(void)
 	}
 
 	config_path(path, sizeof(path));
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+	config_report_unread(path);
+#endif
 	text = config_read_file(path, &size);
 	if (text)
 	{
