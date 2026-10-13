@@ -230,7 +230,21 @@ int main(int argc, char **argv) {
         nodes[2].string_offset=nodes[3].string_offset=4;
         nodes[2].type=nodes[3].type=_hs_type_real;
     }
+    if (!strcmp(argv[1],"speed")) {
+        strcpy(strings,"game_speed_value");
+        nodes[0].flags=nodes[2].flags=13;nodes[0].data=nodes[2].data=0x8001;
+        nodes[0].string_offset=nodes[2].string_offset=0;
+        nodes[0].type=nodes[2].type=_hs_type_real;
+    }
     CHECK(mcc_scripts_prepare(&runtime) == expected);
+    if (!strcmp(argv[1],"speed")) {
+        struct hs_global *global=scenario->hs_globals.address;
+        struct hs_syntax_node *initial=datum_try_and_get(syntax,global->initialization_expression_index);
+        CHECK(scenario->hs_globals.count==1 && nodes[0].data==0 && nodes[2].data==0);
+        CHECK(global->type==_hs_type_real && initial && initial->data==0x3f800000);
+        CHECK(!strcmp(global->name,"game_speed_value"));
+        free(runtime.tags);return 0;
+    }
     if (!strcmp(argv[1],"scratch")) {
         struct hs_global *global=scenario->hs_globals.address;
         struct hs_syntax_node *initial=datum_try_and_get(syntax,global->initialization_expression_index);

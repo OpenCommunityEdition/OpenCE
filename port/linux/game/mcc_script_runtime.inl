@@ -3,6 +3,19 @@
  * and checkpoint state remain inside each native 512-byte thread stack. */
 #include "mcc_script_parameters.h"
 #include "mcc_campaign.h"
+#include "mcc_game_speed.h"
+
+static void mcc_hs_speed_reconcile(word designator, boolean write)
+{
+    struct hs_global_datum *global;
+    union { long bits; real number; } value;
+    if (!mcc_game_speed_global(designator)) return;
+    global=datum_get(hs_global_data,designator+hs_external_global_count);
+    value.bits=global->value;
+    if (write) mcc_game_speed_set(value.number);
+    value.number=game_time_get_speed();
+    global->value=value.bits;
+}
 long hs_cast(long thread_index, short actual_type, short desired_type, long value);
 
 void mcc_script_finished_evaluate(short function, long thread_index, boolean initialize)

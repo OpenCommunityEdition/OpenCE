@@ -76,6 +76,7 @@ symbols in this file:
 #include "networking/network_server_manager.h"
 #include "saved games/game_state.h"
 #include "profile_sections.h" /* port: port/linux/include/profile_sections.h */
+#include "mcc_game_speed.h" /* port: port/linux/game/mcc_game_speed.c */
 /* port/linux/game/network_distributed.c's */
 void network_distributed_tick(void);
 
@@ -282,6 +283,9 @@ real game_time_get_tick_fraction(
 	if (!game_time_globals || !game_time_globals->active || game_time_globals->paused)
 		return 1.0f;
 	fraction = game_time_globals->leftover_dt * game_time_globals->speed * TICKS_PER_SECOND;
+	/* port: MCC clients interpolate using only the host's approved speed. */
+	if (network_game_distributed_client())
+		fraction = game_time_globals->leftover_dt * mcc_game_speed_client(game_time_globals->speed) * TICKS_PER_SECOND;
 	return PIN(fraction, 0.0f, 1.0f);
 }
 
@@ -293,7 +297,7 @@ real game_time_get_speed(
 	/* port: a client of another's game runs at the host's speed (its own
 	set before it joined too: cheats_network_client_enforce) */
 	if (network_game_distributed_client())
-		return 1.0f;
+		return mcc_game_speed_client(1.0f); /* port: legacy clients remain at one */
 	return game_time_globals->speed;
 }
 
@@ -380,12 +384,17 @@ void game_time_update(
 	real time_delta_sec)
 {
 	match_assert("c:\\halo\\SOURCE\\game\\game_time.c", 205, game_time_globals);
+	/* port: MCC speed updates must continue when simulation is stopped. */
+	mcc_game_speed_frame();
 
 	if (game_time_globals->active)
 	{
 		long connection;
 		long ticks_elapsed;
 		real ticks_per_second = game_time_globals->speed*TICKS_PER_SECOND;
+		/* port: preserve native client cheat enforcement; use MCC host state separately. */
+		if (network_game_distributed_client())
+			ticks_per_second = mcc_game_speed_client(game_time_globals->speed)*TICKS_PER_SECOND;
 
 		/* The native builds draw several frames per tick
 		(port/linux/game/render_interpolation.c). A frame that runs no tick has
