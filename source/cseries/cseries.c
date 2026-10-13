@@ -535,66 +535,33 @@ not_equal:
 	return c1 > c2 ? 1 : -1;
 }
 
-__declspec(naked) char *stristr(
-	const char *haystack,
-	const char *needle)
+char *stristr(
+	char const *haystack,
+	char const *needle)
 {
-	__asm
+	char c;
+	char sc;
+	unsigned long length;
+
+	if ((c = *needle++) != 0)
 	{
-		push ebp
-		mov ebp, esp
-		push ebx
-		push esi
-		push edi
-		mov edi, needle
-		mov bl, byte ptr [edi]
-		inc edi
-		test bl, bl
-		je empty_needle
-		push edi
-		call csstrlen
-		mov esi, haystack
-		add esp, 4
-		mov needle, eax
-		nop
-	search:
-		mov al, byte ptr [esi]
-		inc esi
-		test al, al
-		je no_match
-		cmp al, bl
-		jne search
-		mov eax, needle
-		push eax
-		push edi
-		push esi
-		call _strnicmp
-		add esp, 12
-		test eax, eax
-		jne search
-		dec esi
-		pop edi
-		mov eax, esi
-		pop esi
-		pop ebx
-		pop ebp
-		ret
-	no_match:
-		pop edi
-		pop esi
-		xor eax, eax
-		pop ebx
-		pop ebp
-		ret
-	empty_needle:
-		mov esi, haystack
-		pop edi
-		mov eax, esi
-		pop esi
-		pop ebx
-		pop ebp
-		ret
+		length = csstrlen(needle);
+		do
+		{
+			do
+			{
+				if ((sc = *haystack++) == 0)
+				{
+					return NULL;
+				}
+			}
+			while (sc != c);
+		}
+		while (_strnicmp(haystack, needle, length) != 0);
+		haystack--;
 	}
+
+	return (char *)haystack;
 }
 
 unsigned long string_hash(
