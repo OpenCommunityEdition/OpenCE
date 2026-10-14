@@ -13,7 +13,8 @@ app's library:
   port/linux/arm64/host_main.c as its entry point), with the guest image
   inside it;
 - build/<name>/libSDL3.so.0: SDL3, next to the executable, which finds
-  it there (an rpath of $ORIGIN), as few distributions have SDL3 yet.
+  it there (an rpath of $ORIGIN), as few distributions have SDL3 yet, and
+  its license, SDL3-LICENSE.txt.
 
 Each build is a LinuxGuest in LINUX_GUESTS, generated on a computer of its
 architecture. Refer to "64-bit ARM" in port/linux/README.md.
@@ -30,8 +31,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .android_build import (GUEST_ARCH_SCRIPT, SDL_TAG, TOML_DIR, fetch_third_party, generate_guest_image)
 from .guest_arch import ARM64_32, GuestArch
-from .linux_build import (MBEDTLS_DIR, MINIUPNPC_DEFINES, MINIUPNPC_DIR, compile_launcher, miniupnpc_sources,
-                          updater_defines)
+from .linux_build import (MBEDTLS_DIR, MINIUPNPC_DEFINES, MINIUPNPC_DIR, SDL_RPATH_LDFLAGS, compile_launcher,
+                          miniupnpc_sources, sdl3_rule, updater_defines)
 from .ninja_syntax import Writer, escape
 
 # the desktop host's own files (its entry point, SDL's desktop functions)
@@ -149,15 +150,8 @@ def generate_linux_guest_build(n: Writer, sln: Any, target: LinuxGuest) -> None:
 
     sdl_build = build / "sdl3-build"
     libsdl = sdl_build / "libSDL3.so.0"
-    n.rule(
-        name=f"{prefix}_sdl3",
-        command=(f"cmake -S {sdl_dir} -B {sdl_build} -G Ninja -DCMAKE_C_COMPILER=${prefix}_cc "
-                 f"-DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF "
-                 f"-DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF > {build}/sdl3-configure.log && "
-                 f"ninja -C {sdl_build} > {build}/sdl3-build.log"),
-        description=f"{label} SDL3 {SDL_TAG}",
-        pool="console",
-    )
+    sdl3_rule(n, sln, name=f"{prefix}_sdl3", description=f"{label} SDL3 {SDL_TAG}", source=sdl_dir,
+              sdl_build=sdl_build, log_dir=build, cc=f"${prefix}_cc")
     n.build(outputs=libsdl, rule=f"{prefix}_sdl3", implicit=[sdl_dir / "CMakeLists.txt"])
 
     # ---------- the host
@@ -226,7 +220,8 @@ def generate_linux_guest_build(n: Writer, sln: Any, target: LinuxGuest) -> None:
         name=f"{prefix}_host_link",
         command=(f"${prefix}_cc -o $out $in -L{sdl_build} "
                  + " ".join(f"-l{lib}" for lib in HOST_LIBRARIES)
-                 + " '-Wl,-rpath,$$ORIGIN' -Wl,--no-undefined"
+                 # (the SDL beside the executable, as the portable x86 build's)
+                 + " " + " ".join(SDL_RPATH_LDFLAGS) + " -Wl,--no-undefined"
                  # (posix_trace_marker.c's, which the GPU driver's calls must reach)
                  + "".join(f" -Wl,--export-dynamic-symbol={name}" for name in ("open", "open64", "openat", "openat64"))),
         description=f"{label} LINK $out",
@@ -234,8 +229,11 @@ def generate_linux_guest_build(n: Writer, sln: Any, target: LinuxGuest) -> None:
     n.build(outputs=output, rule=f"{prefix}_host_link", inputs=host_objects, implicit=[libsdl])
     n.rule(name=f"{prefix}_copy", command="cp -L $in $out", description=f"{label} STAGE $out")
     n.build(outputs=staged_sdl, rule=f"{prefix}_copy", inputs=libsdl)
+    # (SDL's license, which the release carries beside it)
+    sdl_license = build / "SDL3-LICENSE.txt"
+    n.build(outputs=sdl_license, rule=f"{prefix}_copy", inputs=sdl_dir / "LICENSE.txt")
     # internet play's MQTT brokers, a file beside the game (network.brokers_file)
     brokers = build / "brokers.txt"
     n.build(outputs=brokers, rule=f"{prefix}_copy", inputs=Path("port/assets/network/brokers.txt"))
-    n.build(outputs=target.name, rule="phony", inputs=[output, staged_sdl, brokers])
+    n.build(outputs=target.name, rule="phony", inputs=[output, staged_sdl, sdl_license, brokers])
     n.newline()

@@ -1051,6 +1051,7 @@ computer: on such a computer, `ninja` without a target builds it.
 | --- | --- |
 | `build/linux_arm64/halo` | The game, an AArch64 executable |
 | `build/linux_arm64/libSDL3.so.0` | SDL 3.4.16. The game finds it next to the executable. |
+| `build/linux_arm64/SDL3-LICENSE.txt` | The license of SDL |
 
 The game data, the settings, the saved games, the controls and system link
 are the same as on x86. Linux arm64, x86 Linux, Windows and Android
@@ -1071,7 +1072,8 @@ machines can play in the same game.
   `.github/workflows/build.yml`.
 - A network connection for the first build. `configure.py` downloads musl
   1.2.5 (checked against its SHA-256) and SDL 3.4.16 to
-  `build/linux_arm64/third_party`.
+  `build/linux_arm64/third_party`. SDL is built with the options of the
+  portable x86 build (`SDL_OPTIONS` in `tools/linux_build.py`).
 
 To start the game: OpenGL ES 3 (`libGLESv2.so.2`, `libEGL.so.1`, from Mesa
 for example). The release builds of GitHub Actions use glibc 2.35 or later.
