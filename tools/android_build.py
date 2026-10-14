@@ -7,7 +7,8 @@ ordinary 64-bit Android app. This graph builds
 - the guest image, build/android/halo_guest.elf: the game sources, the
   platform layer shared with the Linux port (port/linux/src) and the guest
   runtime (port/android/guest) with a subset of musl as its C library, all
-  compiled by clang for arm64_32-apple-watchos, converted to ELF assembly
+  compiled by clang for arm64_32-apple-watchos (ARM64_32 in
+  tools/guest_arch.py), converted to ELF assembly
   (tools/android_asm_convert.py), assembled for AArch64 and linked at a fixed
   address below 4 GB;
 - the host library, build/android/jniLibs/arm64-v8a/libmain.so, with the
@@ -25,6 +26,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .guest_arch import ARM64_32, GuestArch
 from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, STB_VORBIS_SOURCE, XDK_INCLUDE,
                           compile_launcher, configuration_defines, game_defines_and_includes, game_sources,
                           miniupnpc_sources, musl_math_sources, opus_cflags, opus_sources, pgo_mode, pgo_profile,
@@ -34,6 +36,7 @@ from .linux_sysroot import download
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/android")
+GUEST_ARCH_SCRIPT = Path("tools/guest_arch.py")
 LINUX_DIR = Path("port/linux")
 BUILD = Path("build/android")
 THIRD_PARTY = BUILD / "third_party"
@@ -65,39 +68,25 @@ SDL_ANDROID_MOUSE_PATCH = Path("port/android/patches/sdl-relative-mouse.patch")
 SDL_ANDROID_MOUSE_LISTENER = "android-project/app/src/main/java/org/libsdl/app/SDLControllerManager.java"
 ANDROID_API = 28
 
-# The guest ABI: AArch64 code with 32-bit pointers (clang's only such target
-# is Apple's arm64_32, whose Mach-O output is converted afterwards). The
-# Darwin environment is hidden from the sources; the C library is musl.
-GUEST_ABI_FLAGS = [
-    "--target=arm64_32-apple-watchos",
-    "-U__APPLE__",
-    "-U__MACH__",
-    "-fno-define-target-os-macros",
-    "-D__linux__=1",
-    "-D__unix__=1",
-    # the ILP32 guest's code paths, and the OpenGL ES renderer's, which the
-    # Linux arm64 build shares (tools/linux_arm64_build.py)
-    "-DHALO_ARM64_GUEST=1",
-    "-DHALO_GLES=1",
-    "-DHALO_ANDROID=1",
-    # ARMv8.0: nothing the emulator's binary translation or an older
-    # device could lack (Darwin targets otherwise assume pointer
-    # authentication and FP16)
-    "-mcpu=cortex-a53",
+# The guest's code generation on every architecture (tools/guest_arch.py has
+# each one's target): no C library but the guest's (musl), no unwinding
+# tables, and thread-local variables through the guest runtime
+GUEST_FLAGS = [
     "-nostdinc",
     "-fshort-wchar",
     "-fno-stack-protector",
     "-fno-unwind-tables",
     "-fno-asynchronous-unwind-tables",
     "-femulated-tls",
-    "-mllvm",
-    "-aarch64-neon-syntax=generic",
     # no fused multiply-add: the game was written for x87/SSE arithmetic,
     # and its debug assertions (colours within 0..1, unit vectors) trip on
     # the different rounding of fused operations
     "-ffp-contract=off",
     "-O2",
 ]
+# the Android app's code paths, and the OpenGL ES renderer's, which the
+# desktop guest builds share (tools/linux_guest_build.py)
+ANDROID_DEFINES = ["-DHALO_GLES=1", "-DHALO_ANDROID=1"]
 
 # as the Linux build (tools/linux_build.py), minus what only x86 needs
 GUEST_CODE_FLAGS = [
@@ -182,6 +171,12 @@ def _find_ndk() -> Optional[Path]:
     return None
 
 
+def guest_abi_flags(arch: GuestArch, platform_defines: List[str]) -> List[str]:
+    """the guest's code generation and defines: the architecture's, every
+    guest's, and the platform's (ANDROID_DEFINES, or a desktop's)"""
+    return [*arch.target_flags, *GUEST_FLAGS, *arch.defines, *platform_defines]
+
+
 def fetch_third_party(third_party: Path = THIRD_PARTY) -> None:
     """Download musl and SDL3 (configure time, once). musl's archive is
     checked against MUSL_SHA256 before it is unpacked; a failed download
@@ -240,27 +235,34 @@ def _musl_sources(musl_dir: Path = MUSL_DIR) -> List[Path]:
 
 
 def android_configure_inputs() -> List[Path]:
-    return [Path(__file__), SDL_ANDROID_MOUSE_PATCH, PORT_DIR / "guest" / "runtime", PORT_DIR / "host",
+    return [Path(__file__), GUEST_ARCH_SCRIPT, SDL_ANDROID_MOUSE_PATCH, PORT_DIR / "guest" / "runtime", PORT_DIR / "host",
             LINUX_DIR / "src", *hud_configure_inputs()]
 
 
-def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix: str, label: str, build: Path,
-                         third_party: Path, guest_cc: str, gl_headers: Path, ar: str, ld: str, builtins: str,
-                         asm_target: str, abi_flags: List[str] = GUEST_ABI_FLAGS,
-                         extra_runtime: List[Path] = [], extra_imports: List[Path] = [],
+def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: GuestArch, prefix: str, label: str,
+                         build: Path, third_party: Path, guest_cc: str, gl_headers: Path, ar: str, ld: str,
+                         builtins_cc: str, environment: str, platform_defines: List[str],
+                         extra_runtime: Optional[List[Path]] = None, extra_imports: Optional[List[Path]] = None,
                          updater_cflags: str = "", desktop_gl: bool = False) -> Dict[str, Path]:
     """The guest image (build/halo_guest.elf) and the host's import table, for
-    the builds that run the game as ILP32 AArch64 code: Android, and Linux
-    arm64 (tools/linux_arm64_build.py). The caller sets ${prefix}_guest_cc to
+    the builds that run the game as ILP32 code of the architecture arch
+    (tools/guest_arch.py): Android, and the desktop guest builds
+    (tools/linux_guest_build.py). The caller sets ${prefix}_guest_cc to
     guest_cc; gl_headers holds the OpenGL ES headers (GLES2, GLES3, KHR), and
-    ar, ld and builtins are the archiver, the AArch64 linker and the
-    compiler's runtime library; abi_flags are the guest's code generation and platform defines.
-    extra_runtime are more guest runtime sources, and extra_imports more
-    lists of the host functions they import; updater_cflags are the desktop
-    self-updater's defines (port/linux/src/updater.c), for a guest that has
-    it. desktop_gl gives the guest desktop OpenGL's entry points (from
-    gl_headers' GL/glcorearb.h) in place of OpenGL ES's, for a guest without
-    HALO_GLES (the Linux arm64 build's desktop renderer)."""
+    ar and ld are the archiver and the linker. builtins_cc is the compiler
+    that names the runtime library the image links with, and environment the
+    toolchain's (android, gnu), which the assembler's target ends with;
+    platform_defines are the platform's code paths (ANDROID_DEFINES, or a
+    desktop's). extra_runtime are more guest runtime sources, and
+    extra_imports more lists of the host functions they import;
+    updater_cflags are the desktop self-updater's defines
+    (port/linux/src/updater.c), for a guest that has it. desktop_gl gives the
+    guest desktop OpenGL's entry points (from gl_headers' GL/glcorearb.h) in
+    place of OpenGL ES's, for a guest without HALO_GLES (the desktop guest
+    builds' desktop renderer)."""
+    extra_runtime = extra_runtime or []
+    extra_imports = extra_imports or []
+    asm_target = arch.assembler_target(environment)
     musl_dir = third_party / f"musl-{MUSL_VERSION}"
     sdl_dir = third_party / "SDL3"
     guest_dir = build / "guest"
@@ -269,7 +271,7 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
     libc_include = guest_dir / "libc_include"
     libc_internal = guest_dir / "libc_internal"
     gl_include = guest_dir / "gl_include"
-    arch = PORT_DIR / "guest" / "libc" / "arch" / "arm64_32"
+    libc_arch = PORT_DIR / "guest" / "libc" / "arch" / arch.name
     semantics_header = Path("build/linux/halo_msvc_semantics.h")
     platform_semantics_header = Path("build/linux/platform_msvc_semantics.h")
     prefix_header = LINUX_DIR / "include" / "halo_linux_prefix.h"
@@ -287,13 +289,13 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
         description=f"{label} MUSL $out",
     )
     n.build(outputs=alltypes, rule=f"{prefix}_alltypes",
-            inputs=[arch / "bits" / "alltypes.h.in", musl_dir / "include" / "alltypes.h.in"])
+            inputs=[libc_arch / "bits" / "alltypes.h.in", musl_dir / "include" / "alltypes.h.in"])
     n.rule(
         name=f"{prefix}_syscall_h",
         command="cp $in $out && sed -n -e s/__NR_/SYS_/p < $in >> $out",
         description=f"{label} MUSL $out",
     )
-    n.build(outputs=syscall_h, rule=f"{prefix}_syscall_h", inputs=arch / "bits" / "syscall.h.in")
+    n.build(outputs=syscall_h, rule=f"{prefix}_syscall_h", inputs=libc_arch / "bits" / "syscall.h.in")
     n.rule(
         name=f"{prefix}_version_h",
         command=f"echo '#define VERSION \"{MUSL_VERSION}\"' > $out",
@@ -316,18 +318,18 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
     guest_gl_c = gen_dir / "guest_gl.c"
     gl_imports = gen_dir / "gl_imports.list"
     if desktop_gl:
-        gl_stubs_command = (f"{python} tools/android_gl_stubs.py --desktop {LINUX_DIR}/src/gl.h "
+        gl_stubs_command = (f"{python} tools/android_gl_stubs.py --arch {arch.name} --desktop {LINUX_DIR}/src/gl.h "
                             f"{gl_headers}/GL/glcorearb.h {guest_gl_c} {gl_imports}")
     else:
-        gl_stubs_command = (f"{python} tools/android_gl_stubs.py {LINUX_DIR}/src/gl.h {gl_headers}/GLES3/gl32.h "
-                            f"{gl_headers}/GLES2/gl2ext.h {guest_gl_c} {gl_imports}")
+        gl_stubs_command = (f"{python} tools/android_gl_stubs.py --arch {arch.name} {LINUX_DIR}/src/gl.h "
+                            f"{gl_headers}/GLES3/gl32.h {gl_headers}/GLES2/gl2ext.h {guest_gl_c} {gl_imports}")
     n.rule(
         name=f"{prefix}_gl_stubs",
         command=gl_stubs_command,
         description=f"{label} GL STUBS",
     )
     n.build(outputs=[guest_gl_c, gl_imports], rule=f"{prefix}_gl_stubs",
-            implicit=[Path("tools/android_gl_stubs.py"), LINUX_DIR / "src" / "gl.h"])
+            implicit=[Path("tools/android_gl_stubs.py"), GUEST_ARCH_SCRIPT, LINUX_DIR / "src" / "gl.h"])
 
     guest_posix_c = gen_dir / "guest_posix.c"
     posix_imports = gen_dir / "posix_imports.list"
@@ -344,23 +346,28 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
     host_imports_list = PORT_DIR / "host_imports.list"
     n.rule(
         name=f"{prefix}_imports",
-        command=f"{python} tools/android_imports.py --host-table {host_table_c} {imports_s} $in",
+        command=f"{python} tools/android_imports.py --arch {arch.name} --host-table {host_table_c} {imports_s} $in",
         description=f"{label} IMPORTS",
     )
     n.build(outputs=[imports_s, host_table_c], rule=f"{prefix}_imports",
             inputs=[host_imports_list, *extra_imports, posix_imports, gl_imports],
-            implicit=[Path("tools/android_imports.py")])
+            implicit=[Path("tools/android_imports.py"), GUEST_ARCH_SCRIPT])
 
     generated_headers = [*xdk_headers(), alltypes, syscall_h, version_h, gl_stamp,
                          semantics_header, platform_semantics_header]
 
-    # ---------- guest compilation: C -> Darwin assembly -> ELF assembly -> object
+    # ---------- guest compilation: C -> object, or for a Darwin target
+    # C -> Darwin assembly -> ELF assembly -> object
 
+    if arch.darwin_assembly:
+        guest_cc_command = (f"{compile_launcher(sln)}${prefix}_guest_cc -MMD -MF $out.d $cflags -S $in "
+                            f"-o $out.darwin.s && {python} tools/android_asm_convert.py $out.darwin.s $out.s && "
+                            f"${prefix}_guest_cc --target={asm_target} -c $out.s -o $out")
+    else:
+        guest_cc_command = f"{compile_launcher(sln)}${prefix}_guest_cc -MMD -MF $out.d $cflags -c $in -o $out"
     n.rule(
         name=f"{prefix}_guest_cc",
-        command=(f"{compile_launcher(sln)}${prefix}_guest_cc -MMD -MF $out.d $cflags -S $in -o $out.darwin.s && "
-                 f"{python} tools/android_asm_convert.py $out.darwin.s $out.s && "
-                 f"${prefix}_guest_cc --target={asm_target} -c $out.s -o $out"),
+        command=guest_cc_command,
         description=f"{label} CC $out",
         depfile="$out.d",
         deps="gcc",
@@ -372,12 +379,12 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
     )
 
     libc_includes = [
-        f"-isystem {libc_include}", f"-isystem {arch}", f"-isystem {musl_dir}/arch/generic",
+        f"-isystem {libc_include}", f"-isystem {libc_arch}", f"-isystem {musl_dir}/arch/generic",
         f"-isystem {musl_dir}/include",
     ]
-    guest_abi = " ".join(abi_flags + configuration_defines(sln))
+    guest_abi = " ".join(guest_abi_flags(arch, platform_defines) + configuration_defines(sln))
     guest_code = " ".join(GUEST_CODE_FLAGS)
-    tool_implicit = [Path("tools/android_asm_convert.py"), *generated_headers]
+    tool_implicit = [*([Path("tools/android_asm_convert.py")] if arch.darwin_assembly else []), *generated_headers]
     # profile-guided optimisation with the Linux build's profile (committed,
     # or trained by the Linux build with --pgo=train): the game and platform
     # code are the same, and functions that differ simply go without
@@ -397,7 +404,7 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
     # musl
     musl_cflags = " ".join([
         guest_abi, "-std=c99", "-ffreestanding", "-fno-common", "-D_XOPEN_SOURCE=700", "-w",
-        f"-I{arch}", f"-I{musl_dir}/arch/generic", f"-I{libc_internal}",
+        f"-I{libc_arch}", f"-I{musl_dir}/arch/generic", f"-I{libc_internal}",
         f"-I{PORT_DIR}/guest/libc/src_include", f"-I{musl_dir}/src/include",
         f"-I{musl_dir}/src/internal", f"-I{libc_include}", f"-I{musl_dir}/include",
     ])
@@ -480,10 +487,9 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
         objects.append(guest_object(MONOCYPHER_DIR / name, platform_cflags))
     # the port's zlib
     for name in ZLIB_SOURCES:
-        # (not the CPU's CRC32 instructions, which the guest's assembly step
-        # is not told it may use)
-        objects.append(guest_object(ZLIB_DIR / name, " ".join([platform_cflags, *ZLIB_DEFINES,
-                                                               "-U__ARM_FEATURE_CRC32"])))
+        # (not the processor's features that the guest's assembly step is
+        # not told it may use: AArch64's CRC32 instructions)
+        objects.append(guest_object(ZLIB_DIR / name, " ".join([platform_cflags, *ZLIB_DEFINES, *arch.zlib_flags])))
     # the game's sin, pow and the rest, the same on every port
     # (port/include/halo_math.h)
     musl_math_cflags = " ".join([
@@ -495,7 +501,7 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
     runtime_internal_cflags = " ".join([
         guest_abi, "-std=c99", "-ffreestanding", "-fno-common", "-D_XOPEN_SOURCE=700", "-D_GNU_SOURCE",
         f"-I{PORT_DIR}/guest/runtime", f"-I{PORT_DIR}/include",
-        f"-I{arch}", f"-I{musl_dir}/arch/generic", f"-I{libc_internal}",
+        f"-I{libc_arch}", f"-I{musl_dir}/arch/generic", f"-I{libc_internal}",
         f"-I{PORT_DIR}/guest/libc/src_include", f"-I{musl_dir}/src/include",
         f"-I{musl_dir}/src/internal", f"-I{libc_include}", f"-I{musl_dir}/include",
     ])
@@ -525,9 +531,9 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
     linker_script = PORT_DIR / "guest" / "guest.ld"
     n.rule(
         name=f"{prefix}_guest_link",
-        command=(f"{ld} -m aarch64linux -static -nostdlib -T {linker_script} "
+        command=(f"{ld} -m {arch.ld_emulation} -static -nostdlib -T {linker_script} "
                  f"-Map $out.map -o $out @$out.rsp {libguestc} "
-                 f"{builtins}"),
+                 f"{arch.builtins(builtins_cc)}"),
         description=f"{label} LINK $out",
         rspfile="$out.rsp",
         rspfile_content="$in_newline",
@@ -581,9 +587,9 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     n.variable("android_ndk_bin", str(ndk_bin))
 
     guest = generate_guest_image(
-        n, sln, config, prefix="android", label="ANDROID", build=BUILD, third_party=THIRD_PARTY,
+        n, sln, config, arch=ARM64_32, prefix="android", label="ANDROID", build=BUILD, third_party=THIRD_PARTY,
         guest_cc=guest_cc, gl_headers=sysroot_include, ar="$android_ndk_bin/llvm-ar", ld="$android_ndk_bin/ld.lld",
-        builtins="$$($android_host_cc -print-libgcc-file-name)", asm_target="aarch64-linux-android")
+        builtins_cc="$android_host_cc", environment="android", platform_defines=ANDROID_DEFINES)
     image = guest["image"]
     host_table_c = guest["host_table_c"]
     sdl_build = BUILD / "sdl3-build"

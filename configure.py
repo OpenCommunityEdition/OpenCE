@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 from tools import ninja_syntax
 from tools.android_build import android_configure_inputs, generate_android_build
-from tools.linux_arm64_build import generate_linux_arm64_build, is_linux_arm64, linux_arm64_configure_inputs
+from tools.linux_guest_build import generate_linux_guest_builds, linux_guest_configure_inputs, native_linux_guest
 from tools.linux_build import check_profile_options, generate_linux_build, linux_configure_inputs
 from tools.web_build import generate_web_build, web_configure_inputs
 from tools.windows_build import generate_windows_build, windows_configure_inputs
@@ -147,7 +147,7 @@ n.newline()
 
 generate_linux_build(n, sln)
 generate_android_build(n, sln)
-generate_linux_arm64_build(n, sln)
+generate_linux_guest_builds(n, sln)
 generate_windows_build(n, sln)
 generate_web_build(n, sln)
 
@@ -166,7 +166,7 @@ n.build(
         Path("tools/ninja_syntax.py"),
         *linux_configure_inputs(),
         *android_configure_inputs(),
-        *linux_arm64_configure_inputs(),
+        *linux_guest_configure_inputs(),
         *windows_configure_inputs(),
         *web_configure_inputs(),
     ],
@@ -175,7 +175,8 @@ n.newline()
 
 # the build for this computer, where it could be generated (the Windows
 # build is left out when SDL cannot be fetched, for instance)
-default = "windows" if is_windows() else "linux_arm64" if is_linux_arm64() else "linux"
+native_guest = native_linux_guest()
+default = "windows" if is_windows() else native_guest.name if native_guest else "linux"
 if f"\nbuild {default}: " in out.getvalue():
     n.comment("Default rule: the build for this computer")
     n.default(default)

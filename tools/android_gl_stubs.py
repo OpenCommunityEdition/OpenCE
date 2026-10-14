@@ -7,8 +7,10 @@ pointer arguments zero-extended, and 32-bit integers and floats go in the
 same registers under both ABIs. What differs is
 
 - GLsizeiptr and GLintptr, 32-bit in the guest and 64-bit in the host;
-- arguments passed on the stack (beyond the eighth integer argument), which
-  the guest packs by size while the host expects 8-byte slots;
+- for the arm64_32 guest, arguments passed on the stack (beyond the eighth
+  integer argument), which the guest packs by size while the host expects
+  8-byte slots (integer_registers and packed_stack_arguments in
+  tools/guest_arch.py);
 - returned pointers, which point at host memory.
 
 For each function in the Android list in port/linux/src/gl.h this writes a
@@ -17,21 +19,22 @@ hostgl_<function>, which the host resolves to the real entry point. Functions
 returning a string go through host_gl_get_string instead.
 
 With --desktop, the list is gl.h's desktop OpenGL one and the prototypes come
-from the Khronos glcorearb.h: the Linux arm64 build's desktop renderer
-(tools/linux_arm64_build.py). Its two functions that hand the host a pointer
+from the Khronos glcorearb.h: the desktop guest builds' desktop renderer
+(tools/linux_guest_build.py). Its two functions that hand the host a pointer
 it cannot use, or give the guest one it cannot, have guest replacements:
 glMapBufferRange maps nothing (d3d8_gl.c reads the visibility results through
 host_gl_read_buffer instead), and glDebugMessageCallback installs the host's
 logger, the guest's callback being guest code.
 
-Usage: android_gl_stubs.py gl.h gl32.h gl2ext.h output.c imports.list
-       android_gl_stubs.py --desktop gl.h glcorearb.h output.c imports.list
+Usage: android_gl_stubs.py --arch NAME gl.h gl32.h gl2ext.h output.c imports.list
+       android_gl_stubs.py --arch NAME --desktop gl.h glcorearb.h output.c imports.list
 """
 
 import re
 import sys
 
-INTEGER_REGISTER_COUNT = 8
+from guest_arch import GUEST_ARCHES
+
 WIDE_TYPES = {"GLsizeiptr", "GLintptr", "GLint64", "GLuint64", "GLint64EXT", "GLuint64EXT"}
 FLOAT_TYPES = {"GLfloat", "GLclampf", "GLdouble", "GLclampd", "float", "double"}
 
@@ -67,14 +70,19 @@ def split_parameter(param: str):
 
 
 def main():
-    desktop = sys.argv[1] == "--desktop"
+    arguments = sys.argv[1:]
+    if arguments[:1] != ["--arch"] or len(arguments) < 3 or arguments[1] not in GUEST_ARCHES:
+        sys.exit(__doc__)
+    arch = GUEST_ARCHES[arguments[1]]
+    arguments = arguments[2:]
+    desktop = arguments[0] == "--desktop"
     if desktop:
-        gl_header, glcorearb, output, imports = sys.argv[2:6]
+        gl_header, glcorearb, output, imports = arguments[1:5]
         functions = android_functions(gl_header, "DESKTOP_GL_FUNCTIONS")
         protos = prototypes(glcorearb, desktop=True)
         headers = ["#include <GL/glcorearb.h>", "#define GL_APIENTRY APIENTRY"]
     else:
-        gl_header, gl32, gl2ext, output, imports = sys.argv[1:6]
+        gl_header, gl32, gl2ext, output, imports = arguments[0:5]
         functions = android_functions(gl_header)
         protos = prototypes(gl32, gl2ext)
         headers = ["#include <GLES3/gl32.h>", "#include <GLES2/gl2ext.h>"]
@@ -174,7 +182,9 @@ def main():
                 call_args.append(arg)
                 continue
             wide = base in WIDE_TYPES and not is_pointer
-            on_stack = integer_index >= INTEGER_REGISTER_COUNT
+            # (an argument the host reads from an 8-byte slot where the guest
+            # packed it by size: passed as a 64-bit value)
+            on_stack = arch.packed_stack_arguments and integer_index >= arch.integer_registers
             integer_index += 1
             if is_pointer:
                 if on_stack:

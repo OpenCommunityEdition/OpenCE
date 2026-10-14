@@ -1063,7 +1063,9 @@ machines can play in the same game.
   `llvm-ar`. The option `--linux-arm64-cc` of `configure.py` selects a
   different clang.
 - The OpenGL ES and EGL headers (`libgles-dev` and `libegl-dev` on Debian
-  and Ubuntu).
+  and Ubuntu), and for the desktop OpenGL renderer
+  (`--linux-arm64-gl=desktop`) the OpenGL headers (`libgl-dev`). Without
+  them, `ninja linux_arm64` stops and names the missing headers.
 - CMake, and the development files that SDL3 uses for X11, Wayland and
   sound. Refer to the SDL documentation, or to the `linux-arm64` job in
   `.github/workflows/build.yml`.
@@ -1083,8 +1085,10 @@ ILP32 AArch64 code, a guest image in a 64-bit process. Refer to "How the
 port operates" in [port/android/README.md](../android/README.md#how-the-port-operates).
 
 - The guest image is the image of the Android build
-  (`generate_guest_image` in `tools/android_build.py`), with the desktop
-  code paths of the platform layer. The guest code has `HALO_ARM64_GUEST`
+  (`generate_guest_image` in `tools/android_build.py`, for the architecture
+  `ARM64_32` of `tools/guest_arch.py`), with the desktop code paths of the
+  platform layer. `tools/linux_guest_build.py` builds it and the host; each
+  of its builds (`LINUX_GUESTS`) is for one architecture. The guest code has `HALO_ARM64_GUEST`
   and `HALO_GLES`, not `HALO_ANDROID`.
 - The host is the Android host (`port/android/host`) as a Linux executable.
   `arm64/host_main.c` replaces its `host_main.c`. The executable contains

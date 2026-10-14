@@ -145,7 +145,7 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 /* ANDROID_GL_FUNCTIONS_END */
 #else
 /* OpenGL 4.5 core; tools/android_gl_stubs.py --desktop reads this list for
-the Linux arm64 build's desktop renderer (tools/linux_arm64_build.py) */
+the desktop guest builds' desktop renderer (tools/linux_guest_build.py) */
 /* DESKTOP_GL_FUNCTIONS_BEGIN */
 #define GL_FUNCTIONS(X) \
 	X(glGetString) \
