@@ -40,8 +40,8 @@ worker) */
 /* the 64-bit ARM build (port/linux/host) */
 #define UPDATE_PLATFORM "linux-arm64"
 #elif defined(__x86_64__)
-/* (none yet: the 64-bit x86 build, a guest as the 64-bit ARM build is, will
-update from "linux-x86_64" once the releases have it) */
+/* the 64-bit x86 build (port/linux/host, as the 64-bit ARM one) */
+#define UPDATE_PLATFORM "linux-x86_64"
 #else
 #define UPDATE_PLATFORM "linux"
 #endif

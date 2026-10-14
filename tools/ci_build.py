@@ -5,6 +5,7 @@
     python tools/ci_build.py linux debug
     python tools/ci_build.py android release
     python tools/ci_build.py linux_arm64 release   (on a 64-bit ARM computer)
+    python tools/ci_build.py linux_x86_64 release  (on a 64-bit x86 computer)
     python tools/ci_build.py linux profile
     python tools/ci_build.py web release
 
@@ -41,6 +42,8 @@ OUTPUTS = {
     "linux": ["build/linux/halo", "build/linux/libSDL3.so.0", "build/linux/SDL3-LICENSE.txt"],
     "linux_arm64": ["build/linux_arm64/halo", "build/linux_arm64/libSDL3.so.0",
                     "build/linux_arm64/SDL3-LICENSE.txt"],
+    "linux_x86_64": ["build/linux_x86_64/halo", "build/linux_x86_64/libSDL3.so.0",
+                     "build/linux_x86_64/SDL3-LICENSE.txt"],
     "windows": ["build/windows/halo.exe", "build/windows/SDL3.dll"],
     "android": [],  # the APK, below
     "web": [],  # the site, below
@@ -101,8 +104,9 @@ def main() -> int:
         run(["ninja", args.platform])
         outputs = OUTPUTS[args.platform]
 
-    # (halo-linux-arm64-release, the name the self-updater asks for)
-    dist = ROOT / "dist" / f"halo-{args.platform.replace('_', '-')}-{args.config}"
+    # (halo-linux-arm64-release and halo-linux-x86_64-release, the names the
+    # self-updater asks for: the target's first underscore only)
+    dist = ROOT / "dist" / f"halo-{args.platform.replace('_', '-', 1)}-{args.config}"
     if dist.exists():
         shutil.rmtree(dist)
     dist.mkdir(parents=True)
