@@ -91,7 +91,7 @@ jobs:
 
       - name: Test
         run: |
-          python -m pytest -q tools/test_linux_port.py tools/test_host_watch_hash.py tools/test_host_units.py tools/test_check_host_imports.py tools/test_touch_menu.py tools/harness tools/test_profile.py
+          python -m pytest -q tools/test_linux_port.py tools/test_host_watch_hash.py tools/test_host_units.py tools/test_check_host_imports.py tools/test_host_syscall.py tools/test_touch_menu.py tools/harness tools/test_profile.py
           python tools/test_light_storage.py
 
       - name: Compile cache
@@ -218,7 +218,7 @@ jobs:
         run: python3 tools/ci_build.py linux_x86_64 release
 
       - name: Test
-        run: python3 -m pytest -q tools/test_host_units.py tools/test_guest_image_check.py tools/test_check_host_imports.py
+        run: python3 -m pytest -q tools/test_host_units.py tools/test_guest_image_check.py tools/test_check_host_imports.py tools/test_host_syscall.py tools/test_guest_layout.py tools/test_linux_guest_build.py
 
       - name: Compile cache
         run: ccache --show-stats
