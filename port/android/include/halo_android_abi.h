@@ -37,7 +37,8 @@ keeps its heaps low in the address space and fills it upwards */
 #define HALO_GUEST_WINDOW_SIZE 0x08000000u
 
 #define HALO_GUEST_MAGIC 0x4f4c4148u /* 'HALO' */
-#define HALO_GUEST_ABI_VERSION 2
+/* 3: the system call interface of halo_guest_syscall.h (_llseek) */
+#define HALO_GUEST_ABI_VERSION 3
 
 /* at HALO_GUEST_IMAGE_BASE */
 struct halo_guest_header

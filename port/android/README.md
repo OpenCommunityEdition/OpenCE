@@ -328,6 +328,15 @@ architecture (`guest/libc/arch/arm64_32`). It has ILP32 types and a 32-bit
 host (`syscall_arch.h`). `guest/runtime/guest_thread.c` makes the threads
 and supplies the thread pointer and TLS.
 
+The system calls have an interface of their own, the same for every guest
+architecture (`include/halo_guest_syscall.h`, and for musl
+`guest/libc/arch/generic`): AArch64's numbers, kernel `stat` and open
+flags, with `_llseek` in place of `lseek` so that a 64-bit file offset
+fits the guest's 32-bit result. The host translates each call to its own
+kernel's (`host/host_syscall.c`), so the same guest runs on an AArch64 or
+an x86-64 host. `tools/test_host_syscall.py` tests the translation on the
+build machine.
+
 ### The host library
 
 `libmain.so` is an arm64 NDK library. The activity of SDL3 starts it
