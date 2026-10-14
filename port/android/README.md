@@ -363,6 +363,11 @@ build machine.
 The guest calls the host through stubs (`tools/android_imports.py`, with the
 instructions of `import_stub` in `tools/guest_arch.py`). The two ABIs use
 the same registers for 32-bit integers, floats and pointers.
+`host_imports.list` lists every guest's imports, `android_imports.list` the
+app's own (its folders, gesture edges and touch controls).
+`tools/check_host_imports.py` checks the lists against their declarations,
+and that every argument has a register on each host (on x86-64, six for
+integers and pointers: a later one may be an integer, never a pointer).
 `tools/android_gl_stubs.py` makes the OpenGL ES stubs from
 `port/linux/src/gl.h`. `tools/android_posix_stubs.py` makes the stubs of the
 `posix_*` functions, which copy the `errno` of the host.

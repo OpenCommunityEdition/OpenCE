@@ -64,8 +64,8 @@ int host_sdl_render_clear(unsigned int renderer);
 int host_sdl_render_fill_rect(unsigned int renderer, const void *rectangle);
 int host_sdl_render_debug_text(unsigned int renderer, float x, float y, const char *text);
 int host_sdl_render_present(unsigned int renderer);
-int host_sdl_show_message_box(unsigned int flags, const char *title, const char *message, int button_count,
-	const int *button_flags, const int *button_ids, const char *button_texts, int *chosen);
+/* (struct message_box, below) */
+int host_sdl_show_message_box(void *box);
 int host_sdl_open_file_dialog(int filter_count, const char *filter_names, const char *filter_patterns,
 	char *path, unsigned int size);
 int host_update_download(const char *url, const char *path, unsigned int progress, unsigned int context,
@@ -736,15 +736,35 @@ bool SDL_RenderPresent(SDL_Renderer *renderer)
 
 #define MESSAGE_BOX_BUTTONS 8
 
+/* host_desktop.c's struct host_message_box: 32-bit members only, and one
+pointer to it, so that every argument of the call has a register (on
+x86-64, six) */
+struct message_box
+{
+	unsigned int flags;
+	unsigned int title;
+	unsigned int message;
+	int button_count;
+	int button_flags[MESSAGE_BOX_BUTTONS];
+	int button_ids[MESSAGE_BOX_BUTTONS];
+	/* the buttons' texts one after another, each NUL terminated */
+	unsigned int button_texts;
+	unsigned int button_texts_size;
+	/* the host's answer */
+	int chosen;
+};
+
+typedef char message_box_size_check[sizeof(struct message_box) == 92 ? 1 : -1];
+
 bool SDL_ShowMessageBox(const SDL_MessageBoxData *data, int *button)
 {
-	int flags[MESSAGE_BOX_BUTTONS], ids[MESSAGE_BOX_BUTTONS];
+	struct message_box box;
 	char texts[1024];
 	size_t used = 0;
 	int count = data->numbuttons < MESSAGE_BOX_BUTTONS ? data->numbuttons : MESSAGE_BOX_BUTTONS;
 	int index;
-	int chosen = -1;
 
+	memset(&box, 0, sizeof(box));
 	for (index = 0; index < count; index++)
 	{
 		const char *text = data->buttons[index].text ? data->buttons[index].text : "";
@@ -755,18 +775,22 @@ bool SDL_ShowMessageBox(const SDL_MessageBoxData *data, int *button)
 			count = index;
 			break;
 		}
-		flags[index] = (int)data->buttons[index].flags;
-		ids[index] = data->buttons[index].buttonID;
+		box.button_flags[index] = (int)data->buttons[index].flags;
+		box.button_ids[index] = data->buttons[index].buttonID;
 		memcpy(texts + used, text, length);
 		used += length;
 	}
-	if (!host_sdl_show_message_box((unsigned int)data->flags, data->title ? data->title : "",
-		data->message ? data->message : "", count, flags, ids, texts, &chosen))
-	{
+	box.flags = (unsigned int)data->flags;
+	box.title = (unsigned int)(uintptr_t)(data->title ? data->title : "");
+	box.message = (unsigned int)(uintptr_t)(data->message ? data->message : "");
+	box.button_count = count;
+	box.button_texts = (unsigned int)(uintptr_t)texts;
+	box.button_texts_size = (unsigned int)used;
+	box.chosen = -1;
+	if (!host_sdl_show_message_box(&box))
 		return false;
-	}
 	if (button)
-		*button = chosen;
+		*button = box.chosen;
 	return true;
 }
 

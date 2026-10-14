@@ -31,6 +31,7 @@ from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_
                           compile_launcher, configuration_defines, game_defines_and_includes, game_sources,
                           miniupnpc_sources, musl_math_sources, opus_cflags, opus_sources, pgo_mode, pgo_profile,
                           profile_use_flags, updater_defines, xdk_headers)
+from . import check_host_imports
 from .embed_assets import hud_assets_build, hud_configure_inputs
 from .linux_sysroot import download
 from .ninja_syntax import Writer
@@ -355,9 +356,19 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: G
         command=f"{python} tools/android_imports.py --arch {arch.name} --host-table {host_table_c} {imports_s} $in",
         description=f"{label} IMPORTS",
     )
+    # every import's arguments must cross to the host as the guest left them
+    # (tools/check_host_imports.py)
+    imports_checked = gen_dir / "host_imports.checked"
+    n.rule(
+        name=f"{prefix}_import_check",
+        command=f"{python} tools/check_host_imports.py --stamp $out",
+        description=f"{label} CHECK IMPORTS",
+    )
+    n.build(outputs=imports_checked, rule=f"{prefix}_import_check",
+            implicit=[Path("tools/check_host_imports.py"), *check_host_imports.inputs()])
     n.build(outputs=[imports_s, host_table_c], rule=f"{prefix}_imports",
             inputs=[host_imports_list, *extra_imports, posix_imports, gl_imports],
-            implicit=[Path("tools/android_imports.py"), GUEST_ARCH_SCRIPT])
+            implicit=[Path("tools/android_imports.py"), GUEST_ARCH_SCRIPT, imports_checked])
 
     generated_headers = [*xdk_headers(), alltypes, syscall_h, version_h, gl_stamp,
                          semantics_header, platform_semantics_header]
@@ -596,7 +607,8 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     guest = generate_guest_image(
         n, sln, config, arch=ARM64_32, prefix="android", label="ANDROID", build=BUILD, third_party=THIRD_PARTY,
         guest_cc=guest_cc, gl_headers=sysroot_include, ar="$android_ndk_bin/llvm-ar", ld="$android_ndk_bin/ld.lld",
-        builtins_cc="$android_host_cc", environment="android", platform_defines=ANDROID_DEFINES)
+        builtins_cc="$android_host_cc", environment="android", platform_defines=ANDROID_DEFINES,
+        extra_imports=[PORT_DIR / "android_imports.list"])
     image = guest["image"]
     host_table_c = guest["host_table_c"]
     sdl_build = BUILD / "sdl3-build"

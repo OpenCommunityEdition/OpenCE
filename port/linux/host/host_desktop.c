@@ -345,34 +345,57 @@ int host_sdl_render_present(uint32_t renderer)
 
 #define MESSAGE_BOX_BUTTONS 8
 
-/* button_texts: the buttons' texts one after another, each NUL terminated;
-returns 1 and the button chosen in *chosen, else 0 */
-int host_sdl_show_message_box(uint32_t flags, const char *title, const char *message, int button_count,
-	const int32_t *button_flags, const int32_t *button_ids, const char *button_texts, int32_t *chosen)
+/* guest_desktop.c's struct message_box: the dialog and the guest's
+answer; title, message and button_texts are guest addresses */
+struct host_message_box
+{
+	uint32_t flags;
+	uint32_t title;
+	uint32_t message;
+	int32_t button_count;
+	int32_t button_flags[MESSAGE_BOX_BUTTONS];
+	int32_t button_ids[MESSAGE_BOX_BUTTONS];
+	/* the buttons' texts one after another, each NUL terminated, in
+	button_texts_size bytes */
+	uint32_t button_texts;
+	uint32_t button_texts_size;
+	int32_t chosen;
+};
+
+typedef char host_message_box_size_check[sizeof(struct host_message_box) == 92 ? 1 : -1];
+
+/* 1 and the button chosen in box->chosen, else 0 */
+int host_sdl_show_message_box(struct host_message_box *box)
 {
 	SDL_MessageBoxButtonData buttons[MESSAGE_BOX_BUTTONS];
 	SDL_MessageBoxData data;
+	const char *texts = (const char *)(uintptr_t)box->button_texts;
+	uint32_t used = 0;
 	int index;
 	int result = -1;
 
-	if (button_count < 0 || button_count > MESSAGE_BOX_BUTTONS)
+	if (box->button_count < 0 || box->button_count > MESSAGE_BOX_BUTTONS)
 		return 0;
-	for (index = 0; index < button_count; index++)
+	for (index = 0; index < box->button_count; index++)
 	{
-		buttons[index].flags = (SDL_MessageBoxButtonFlags)button_flags[index];
-		buttons[index].buttonID = button_ids[index];
-		buttons[index].text = button_texts;
-		button_texts += strlen(button_texts) + 1;
+		const char *end = used < box->button_texts_size ? memchr(texts + used, 0, box->button_texts_size - used) : NULL;
+
+		if (!end)
+			return 0;
+		buttons[index].flags = (SDL_MessageBoxButtonFlags)box->button_flags[index];
+		buttons[index].buttonID = box->button_ids[index];
+		buttons[index].text = texts + used;
+		used = (uint32_t)(end - texts) + 1;
 	}
 	memset(&data, 0, sizeof(data));
-	data.flags = (SDL_MessageBoxFlags)flags;
-	data.title = title;
-	data.message = message;
-	data.numbuttons = button_count;
+	data.flags = (SDL_MessageBoxFlags)box->flags;
+	data.title = (const char *)(uintptr_t)box->title;
+	data.message = (const char *)(uintptr_t)box->message;
+	data.numbuttons = box->button_count;
 	data.buttons = buttons;
 	if (!SDL_ShowMessageBox(&data, &result))
 		return 0;
-	*chosen = result;
+	box->chosen = result;
 	return 1;
 }
 

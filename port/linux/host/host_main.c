@@ -55,50 +55,6 @@ static void log_to_stderr(int priority, const char *line)
 		return;
 }
 
-/* ---------- Android's imports */
-
-/* the app's folders (host_imports.list); the desktop guest finds its own */
-void host_android_path(int which, char *buffer, uint32_t size)
-{
-	(void)which;
-	if (size)
-		buffer[0] = 0;
-}
-
-/* Android's gesture edges and on-screen touch controls (host_imports.list,
-port/android/host/host_touch.c): none on the desktop, whose guest does not
-show the touch controls */
-void host_gesture_insets(int *insets)
-{
-	insets[0] = insets[1] = insets[2] = insets[3] = 0;
-}
-
-void host_touch_read(int *state)
-{
-	memset(state, 0, 7 * sizeof(*state));
-}
-
-void host_touch_look_read(float *delta)
-{
-	memset(delta, 0, 4 * sizeof(*delta));
-}
-
-void host_touch_rumble(uint32_t low, uint32_t high)
-{
-	(void)low;
-	(void)high;
-}
-
-void host_touch_scene(int scene)
-{
-	(void)scene;
-}
-
-void host_touch_bindings(const int *controls)
-{
-	(void)controls;
-}
-
 /* ---------- the guest's environment */
 
 /* what the game reads: its settings (HALO_...), where the saves go
