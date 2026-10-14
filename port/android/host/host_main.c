@@ -271,6 +271,7 @@ int main(int argc, char *argv[])
 	host_log_set_sink(log_to_logcat);
 	host_logf(HOST_LOG_INFO, "Halo for Android starting");
 	host_install_signal_handlers();
+	host_signal_stack_install();
 	if (host_native_thread_create(game_main, NULL, MAIN_STACK_SIZE) != 0)
 		host_fatal("cannot start the game thread");
 	/* the game ends the process itself (host_exit) */

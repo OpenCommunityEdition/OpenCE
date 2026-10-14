@@ -70,6 +70,9 @@ struct pool
 	uint8_t used[POOL_PAGES]; /* 1 for each page handed out */
 };
 
+/* A pool is never freed, and its base never changes: pool_count is
+published after its entry (with release ordering), so host_low_owns reads
+both without the lock, from signal handlers too. */
 static struct pool *pools[MAXIMUM_POOLS];
 static int pool_count;
 static pthread_mutex_t memory_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -539,7 +542,8 @@ static struct pool *pool_new(void)
 			pool = calloc(1, sizeof(*pool));
 			pool->base = address;
 			pool->free_pages = POOL_PAGES;
-			pools[pool_count++] = pool;
+			pools[pool_count] = pool;
+			__atomic_store_n(&pool_count, pool_count + 1, __ATOMIC_RELEASE);
 			host_logf(HOST_LOG_INFO, "guest memory pool %d at %08llx", pool_count - 1, (unsigned long long)address);
 			return pool;
 		}
@@ -726,9 +730,10 @@ void *host_low_map(size_t size, int protection)
 
 static struct pool *pool_of(uint64_t address, uint64_t size)
 {
+	int count = __atomic_load_n(&pool_count, __ATOMIC_ACQUIRE);
 	int index;
 
-	for (index = 0; index < pool_count; index++)
+	for (index = 0; index < count; index++)
 	{
 		if (in_range(address, size, pools[index]->base, pools[index]->base + POOL_SIZE))
 			return pools[index];
@@ -764,14 +769,9 @@ void host_low_unmap(void *address, size_t size)
 
 int host_low_owns(uintptr_t address, size_t size)
 {
-	int result;
-
 	if (in_range(address, size, window_base, window_end) || in_range(address, size, image_base, image_end))
 		return 1;
-	pthread_mutex_lock(&memory_lock);
-	result = pool_of(address, size) != NULL;
-	pthread_mutex_unlock(&memory_lock);
-	return result;
+	return pool_of(address, size) != NULL;
 }
 
 /* ---------- the guest's memory system calls */
@@ -886,40 +886,39 @@ static void mark_written(uint64_t page)
 
 static struct sigaction previous_segv, previous_bus, previous_ill;
 
+/* the guest's code, the stack and the frame records at a crash, through the
+log's sink (which neither locks nor uses stdio); the walk reads only memory
+the host gave the guest */
+static int frame_readable(uintptr_t address, size_t size)
+{
+	return host_low_owns(address, size);
+}
+
 static void report_crash(int signal_number, siginfo_t *information, void *context)
 {
-	ucontext_t *ucontext = context;
-	const struct sigcontext *registers = (const struct sigcontext *)&ucontext->uc_mcontext;
-	uint64_t pc = registers->pc, lr = registers->regs[30];
-	int index;
+	char line[256];
+	uint64_t pc, sp, fp, lr;
+	uint64_t returns[24];
+	int count, index;
 
-	host_logf(HOST_LOG_ERROR, "signal %d at address %p: pc %016llx lr %016llx sp %016llx",
+	host_arch_context(context, &pc, &sp, &fp, &lr);
+	snprintf(line, sizeof(line), "signal %d at address %p: pc %016llx lr %016llx sp %016llx fp %016llx",
 		signal_number, information->si_addr, (unsigned long long)pc, (unsigned long long)lr,
-		(unsigned long long)registers->sp);
+		(unsigned long long)sp, (unsigned long long)fp);
+	host_log(HOST_LOG_ERROR, line);
 	if (pc >= host_image.base && pc < host_image.end)
-		host_logf(HOST_LOG_ERROR, "  in the guest image: addr2line -e halo_guest.elf 0x%llx 0x%llx",
+	{
+		snprintf(line, sizeof(line), "  in the guest image: addr2line -e halo_guest.elf 0x%llx 0x%llx",
 			(unsigned long long)pc, (unsigned long long)lr);
-	for (index = 0; index < 31; index += 4)
-	{
-		host_logf(HOST_LOG_ERROR, "  x%-2d %016llx %016llx %016llx %016llx", index,
-			(unsigned long long)registers->regs[index],
-			(unsigned long long)(index + 1 < 31 ? registers->regs[index + 1] : 0),
-			(unsigned long long)(index + 2 < 31 ? registers->regs[index + 2] : 0),
-			(unsigned long long)(index + 3 < 31 ? registers->regs[index + 3] : 0));
+		host_log(HOST_LOG_ERROR, line);
 	}
-	/* the guest's frame records: fp and lr, 8 bytes each */
+	for (index = 0; host_arch_register_line(context, index, line, sizeof(line)); index++)
+		host_log(HOST_LOG_ERROR, line);
+	count = host_arch_walk_frames(fp, frame_readable, returns, (int)(sizeof(returns) / sizeof(returns[0])));
+	for (index = 0; index < count; index++)
 	{
-		uint64_t fp = registers->regs[29];
-
-		for (index = 0; index < 24 && fp && fp < LOW_LIMIT && (fp & 7) == 0; index++)
-		{
-			const uint64_t *frame = (const uint64_t *)fp;
-
-			if (!host_low_owns(fp, 16))
-				break;
-			host_logf(HOST_LOG_ERROR, "  frame %2d: return %016llx", index, (unsigned long long)frame[1]);
-			fp = frame[0];
-		}
+		snprintf(line, sizeof(line), "  frame %2d: return %016llx", index, (unsigned long long)returns[index]);
+		host_log(HOST_LOG_ERROR, line);
 	}
 }
 

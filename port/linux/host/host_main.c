@@ -161,6 +161,7 @@ int main(int argc, char *argv[])
 	setenv("mesa_glthread", "true", 0);
 	host_log_set_sink(log_to_stderr);
 	host_install_signal_handlers();
+	host_signal_stack_install();
 	if (host_native_thread_create(game_main, NULL, MAIN_STACK_SIZE) != 0)
 		host_fatal("cannot start the game thread");
 	/* the game ends the process itself (host_exit) */

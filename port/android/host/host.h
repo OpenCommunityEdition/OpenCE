@@ -100,7 +100,7 @@ void host_memory_watch_use_hashes(void);
 void *host_low_map(size_t size, int protection);
 void host_low_unmap(void *address, size_t size);
 /* 1 if [address, address + size) was handed out by host_low_map or is one of
-the fixed ranges */
+the fixed ranges; takes no lock, so signal handlers may call it */
 int host_low_owns(uintptr_t address, size_t size);
 /* the guest's mmap/munmap/mprotect/madvise/mremap (host_syscall.c) */
 long host_guest_mmap(uint64_t address, uint64_t size, int protection, int flags, int fd, int64_t offset);
@@ -110,6 +110,11 @@ long host_guest_mprotect(uint64_t address, uint64_t size, int protection);
 /* the SIGSEGV, SIGBUS and SIGILL handlers: the write tracking's faults, and
 a report of any other (host_memory.c); the main thread calls it first */
 void host_install_signal_handlers(void);
+/* gives the calling thread a stack of its own for those handlers, so that a
+stack overflow can be reported (host_thread.c does it for its threads); 0
+on success */
+int host_signal_stack_install(void);
+void host_signal_stack_remove(void);
 
 /* ---------- the guest image (host_loader.c) */
 
@@ -123,6 +128,22 @@ extern struct host_guest_image host_image;
 
 /* maps the image from the ELF file in memory; returns 0 on success */
 int host_load_image(const void *elf, size_t size);
+
+/* ---------- the processor's registers (host_arch.c) */
+
+/* the program counter, stack pointer, frame pointer and link register of a
+signal's ucontext_t; *lr is 0 where calls keep the return address on the
+stack (x86-64) */
+void host_arch_context(const void *ucontext, uint64_t *pc, uint64_t *sp, uint64_t *fp, uint64_t *lr);
+/* the line'th line of the register dump of a ucontext_t into buffer; 0 past
+the last line */
+int host_arch_register_line(const void *ucontext, int line, char *buffer, size_t size);
+/* follows the guest's frame records from fp (both guests keep the caller's
+frame pointer then the return address, 8 bytes each), collecting up to
+maximum return addresses; readable says whether 16 bytes at an address may
+be read. Returns how many. */
+int host_arch_walk_frames(uint64_t fp, int (*readable)(uintptr_t address, size_t size),
+	uint64_t *returns, int maximum);
 
 /* ---------- entering guest code (host_thread.c) */
 

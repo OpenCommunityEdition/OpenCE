@@ -4,9 +4,9 @@ HOST_DEBUG.C
 A sampler for finding where the guest spends its time (or hangs) on a
 device without root, where debuggerd cannot attach: with sample_seconds in
 config.toml's [debug], every guest thread is interrupted that often and its program
-counter, link register and frame chain are written to logcat. The addresses
-symbolize against build/android/halo_guest.elf (llvm-symbolizer
---obj=build/android/halo_guest.elf 0x...).
+counter, link register (none on x86-64) and frame chain are written to the
+log (host_arch.c reads them). The addresses symbolize against the build's
+halo_guest.elf (llvm-symbolizer --obj=build/android/halo_guest.elf 0x...).
 */
 
 #include "host.h"
@@ -17,7 +17,6 @@ symbolize against build/android/halo_guest.elf (llvm-symbolizer
 #include <stdlib.h>
 #include <string.h>
 #include <sys/syscall.h>
-#include <ucontext.h>
 #include <unistd.h>
 
 #define MAXIMUM_THREADS 64
@@ -56,28 +55,29 @@ void host_debug_thread_exited(void)
 	pthread_mutex_unlock(&threads_lock);
 }
 
+static int frame_readable(uintptr_t address, size_t size)
+{
+	return host_low_owns(address, size);
+}
+
+/* (a signal handler: it formats into its own buffer, and the log's sink
+neither locks nor uses stdio) */
 static void sample_handler(int signal_number, siginfo_t *information, void *context)
 {
-	const ucontext_t *ucontext = context;
-	const struct sigcontext *registers = (const struct sigcontext *)&ucontext->uc_mcontext;
 	char line[512];
-	int length, depth;
-	uint64_t fp = registers->regs[29];
+	uint64_t pc, sp, fp, lr;
+	uint64_t returns[12];
+	int length, count, index;
 
 	(void)signal_number;
 	(void)information;
-	length = snprintf(line, sizeof(line), "sample tid %d: pc %llx lr %llx", gettid(),
-		(unsigned long long)registers->pc, (unsigned long long)registers->regs[30]);
-	for (depth = 0; depth < 12 && fp && fp < 0x100000000ULL && !(fp & 7) && host_low_owns(fp, 16); depth++)
-	{
-		const uint64_t *frame = (const uint64_t *)fp;
-
-		length += snprintf(line + length, sizeof(line) - length, " %llx", (unsigned long long)frame[1]);
-		if (frame[0] <= fp)
-			break;
-		fp = frame[0];
-	}
-	host_logf(HOST_LOG_INFO, "%s", line);
+	host_arch_context(context, &pc, &sp, &fp, &lr);
+	length = snprintf(line, sizeof(line), "sample tid %d: pc %llx lr %llx", (int)gettid(),
+		(unsigned long long)pc, (unsigned long long)lr);
+	count = host_arch_walk_frames(fp, frame_readable, returns, (int)(sizeof(returns) / sizeof(returns[0])));
+	for (index = 0; index < count && length > 0 && (size_t)length < sizeof(line); index++)
+		length += snprintf(line + length, sizeof(line) - length, " %llx", (unsigned long long)returns[index]);
+	host_log(HOST_LOG_INFO, line);
 }
 
 static void *sampler(void *context)

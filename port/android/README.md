@@ -477,7 +477,9 @@ assembly of the port is necessary:
 
 - Enter `adb logcat -s halo` to see the log of the port and the errors of
   the game. `files/debug.txt` is the log of the game.
-- If the guest code stops, the log shows the registers and the frame chain.
+- If the guest code stops, the log shows the registers and the frame chain
+  (`host/host_arch.c`), from a stack of the signal handler's own, so a
+  stack overflow is reported too.
   To find the functions, enter
   `llvm-symbolizer --obj=build/android/halo_guest.elf <address>`.
 - Set `sample_seconds = <seconds>` in `[debug]` of `config.toml`. The log
