@@ -179,11 +179,13 @@ SDL_SHA256 = "7322236cd12090c3eb40b9728be4d49c76f66ad17d04369584d4ecad5cf77c68"
 # what SDL must have been built with (its SDL_build_config.h): the drivers a
 # desktop needs, each loaded when SDL starts rather than linked to (libdecor
 # too: without its library's name, SDL would link to it, and the Steam Deck
-# has no 32-bit libdecor)
+# has no 32-bit libdecor), and XInput 2.1's scrolling (without it, SDL drops
+# the wheel's button events as emulated, and an X11 mouse wheel sends nothing)
 SDL_REQUIRED = [
     "SDL_VIDEO_DRIVER_X11_DYNAMIC", "SDL_VIDEO_DRIVER_WAYLAND_DYNAMIC", "HAVE_LIBDECOR_H",
     "SDL_VIDEO_DRIVER_WAYLAND_DYNAMIC_LIBDECOR", "SDL_VIDEO_OPENGL_GLX",
-    "SDL_VIDEO_OPENGL_EGL", "SDL_AUDIO_DRIVER_PIPEWIRE_DYNAMIC", "SDL_AUDIO_DRIVER_PULSEAUDIO_DYNAMIC",
+    "SDL_VIDEO_OPENGL_EGL", "SDL_VIDEO_DRIVER_X11_XINPUT2_SUPPORTS_SCROLLINFO",
+    "SDL_AUDIO_DRIVER_PIPEWIRE_DYNAMIC", "SDL_AUDIO_DRIVER_PULSEAUDIO_DYNAMIC",
     "SDL_AUDIO_DRIVER_ALSA_DYNAMIC", "SDL_UDEV_DYNAMIC", "HAVE_DBUS_DBUS_H",
 ]
 

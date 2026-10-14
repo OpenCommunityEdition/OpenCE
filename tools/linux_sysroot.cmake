@@ -14,5 +14,9 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 set(ENV{PKG_CONFIG_SYSROOT_DIR} "${HALO_SYSROOT}")
 set(ENV{PKG_CONFIG_LIBDIR} "${HALO_SYSROOT}/usr/lib/i386-linux-gnu/pkgconfig:${HALO_SYSROOT}/usr/share/pkgconfig")
 set(ENV{PKG_CONFIG_PATH} "")
+# (a program that a check links may use a library whose own libraries the
+# system root has not got, as it has only what SDL's headers and dlopen
+# names need: libX11's libxcb, in the check for XInput 2.1's scrolling)
+set(CMAKE_EXE_LINKER_FLAGS_INIT "-Wl,--allow-shlib-undefined")
 # (and in the projects CMake tries compiling in)
 list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES HALO_SYSROOT)
