@@ -317,15 +317,18 @@ The APK contains the image as an asset.
 
 `ARM64_32` in `tools/guest_arch.py` holds what in these steps is particular
 to the processor: the target and its options, the defines, the conversion
-of the assembly, the linker's emulation, the builtins, the instructions of
-the import stubs and the calling convention of the host for the OpenGL
-stubs. The Android build and the desktop guest builds
-(`tools/linux_guest_build.py`) take it.
+of the assembly, the linker's emulation, the image's address, the
+builtins, the instructions of the import stubs and the calling convention
+of the host for the OpenGL stubs. The Android build and the desktop guest
+builds (`tools/linux_guest_build.py`) take it; the 64-bit x86 Linux build
+takes `X32` instead ("64-bit x86" in [port/linux/README.md](../linux/README.md#64-bit-x86)).
+`tools/guest_image_check.py` checks each linked image: no thread-local
+storage, no use of the thread pointer, nothing outside its range.
 
 The C library of the guest is a part of musl for a new `arm64_32`
-architecture (`guest/libc/arch/arm64_32`). It has ILP32 types and a 32-bit
-`time_t`, as in the MSVC runtime of the game. Its system calls go to the
-host (`syscall_arch.h`). `guest/runtime/guest_thread.c` makes the threads
+architecture (`guest/libc/arch/arm64_32`; `x32` for the x86-64 guest). It
+has ILP32 types and a 32-bit `time_t`, as in the MSVC runtime of the game.
+Its system calls go to the host (`guest/libc/arch/generic/syscall_arch.h`). `guest/runtime/guest_thread.c` makes the threads
 and supplies the thread pointer and TLS.
 
 The system calls have an interface of their own, the same for every guest

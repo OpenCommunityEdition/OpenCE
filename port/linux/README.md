@@ -9,7 +9,8 @@ The game is 32-bit code because its data (tags, cache files, saved games)
 contains 32-bit pointers, as on the Xbox.
 
 `ninja linux_arm64` builds the game for 64-bit ARM Linux. Refer to
-"64-bit ARM".
+"64-bit ARM". `ninja linux_x86_64` builds it as a 64-bit x86 executable,
+which needs no 32-bit libraries. Refer to "64-bit x86".
 
 ## Requirements
 
@@ -454,7 +455,8 @@ Builds that you make yourself have no build number. They do not look for
 updates.
 
 The 64-bit ARM build downloads `halo-linux-arm64-release.zip` (or
-`-debug.zip`), not the x86 build.
+`-debug.zip`), not the x86 build. The 64-bit x86 build downloads
+`halo-linux-x86_64-release.zip` (or `-debug.zip`).
 
 ## Frame rate
 
@@ -1114,6 +1116,84 @@ port operates" in [port/android/README.md](../android/README.md#how-the-port-ope
   x86 build does (`src/posix_trace_marker.c`, under "The platform layer"
   below): on the Steam Frame, its markers took the game from the headset's
   72 Hz to about 50 frames a second.
+
+## 64-bit x86
+
+`ninja linux_x86_64` builds the game as a 64-bit x86 Linux executable. The
+x86 build (`ninja linux`) stays the default build of an x86 computer, and
+does not change: it is 32-bit code, which needs the distribution's 32-bit
+libraries and drivers. This build needs none. It runs the game as the
+64-bit ARM build does, as a guest image of 32-bit-pointer code in a 64-bit
+process: here x32 code, the x86-64 instruction set with 32-bit pointers.
+
+| Result | Item |
+| --- | --- |
+| `build/linux_x86_64/halo` | The game, an x86-64 executable |
+| `build/linux_x86_64/libSDL3.so.0` | SDL 3.4.16. The game finds it next to the executable. |
+| `build/linux_x86_64/SDL3-LICENSE.txt` | The license of SDL |
+
+The game data, the settings (`config.toml` next to the executable), the
+saved games, the controls and system link are the same as in the x86
+build. The renderer is the x86 build's: desktop OpenGL 4.5. The two builds
+compute the game with the same code and options (SSE arithmetic, no fused
+multiply-add, the vendored musl maths), but the x86 build's `long double`
+is x87's 80-bit one where this build's is a `double`, as MSVC's is.
+
+### Requirements
+
+- Python and ninja.
+- clang with the x32 target (`x86_64-linux-gnux32`; clang 22 operates),
+  `ld.lld`, `llvm-ar` and `llvm-objdump`. The option `--linux-x86-64-cc`
+  of `configure.py` selects a different clang. The kernel's own x32
+  support is not needed: the guest never calls the kernel itself.
+- The OpenGL, OpenGL ES and EGL headers (`libgl-dev`, `libgles-dev` and
+  `libegl-dev` on Debian and Ubuntu, `mesa` on Arch Linux). Without them,
+  `ninja linux_x86_64` stops and names the missing headers.
+- CMake, and the development files that SDL3 uses for X11, Wayland and
+  sound, as for the 64-bit ARM build. Refer to the `linux-x86_64` job in
+  `.github/workflows/build.yml`.
+- A network connection for the first build. `configure.py` downloads musl
+  1.2.5 (checked against its SHA-256) and SDL 3.4.16 to
+  `build/linux_x86_64/third_party`.
+
+To start the game: the 64-bit OpenGL libraries of GLVND (`libOpenGL.so.0`,
+`libEGL.so.1`), which Mesa and NVIDIA's driver use. The release builds of
+GitHub Actions are built on Ubuntu 22.04, and use glibc 2.35 or later; a
+build that you make needs the glibc of the computer that built it, or a
+later one.
+
+### How it operates
+
+As "How it operates" under "64-bit ARM", with these differences:
+
+- The guest is compiled by clang for x32 (`X32` in `tools/guest_arch.py`),
+  which writes ELF objects itself: no assembly is converted. Its C library
+  is musl with `guest/libc/arch/x32` of `port/android`: musl's x86 bits,
+  with the guest's own types and system calls, as for `arm64_32`.
+- The guest image is linked at `0x70000000`, below 2 GB, not above the
+  Xbox memory at `0x80000000` as on AArch64: x32's static code addresses
+  its own symbols with 32-bit values that are sign-extended, which cannot
+  reach 2 GB or more. The Xbox memory above it is reached through
+  registers, and its addresses compute with 32-bit wraparound, as on the
+  Xbox.
+- The guest calls the host's functions through import stubs that jump
+  through a table of 64-bit addresses. The host's functions read pointer
+  arguments as 64-bit registers, and x32 code passes them zero-extended,
+  which `tools/test_host_units.py` tests (`x32_boundary_test.c`). The host
+  passes the guest its own arguments zero-extended in turn
+  (`host_call_guest`). An argument after the sixth is on the stack, where
+  the guest may write only 4 bytes of a pointer: such an argument is a
+  32-bit or 64-bit integer, never a pointer (`tools/check_host_imports.py`).
+- The thread pointer (`%fs`) belongs to the host's glibc. The guest's
+  thread-local variables are emulated, and the build stops if the image
+  uses `%fs` or `%gs`, or has thread-local storage
+  (`tools/guest_image_check.py`).
+- The image needs no runtime library (`libgcc` or compiler-rt): x86-64 has
+  every operation that its integers and floats need, and the link stops if
+  that changes.
+- The host is a position-independent executable, which leaves the low 4 GB
+  of the address space to the guest, and calls OpenGL through GLVND's
+  `libOpenGL`.
 
 ## What operates
 
