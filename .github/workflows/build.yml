@@ -1,7 +1,7 @@
 name: Build
 
-# Debug and release builds of the native ports (Linux, Linux arm64, Windows,
-# Android) and the web port for every pushed commit, uploaded as artifacts.
+# Debug and release builds of the native ports (Linux, Linux arm64, Linux
+# x86-64, Windows, Android) and the web port for every pushed commit, uploaded as artifacts.
 # tools/ci_build.py does each build; see it for the options.
 #
 # Kept cheap:
@@ -166,6 +166,73 @@ jobs:
         with:
           name: halo-linux-arm64-release
           path: dist/halo-linux-arm64-release
+          retention-days: 3
+
+  linux-x86_64:
+    # The 64-bit x86 guest build (ninja linux_x86_64: the game as x32 code in
+    # a 64-bit host), made as the 64-bit ARM one is: Ubuntu 22.04 (glibc 2.35,
+    # so the build starts on older distributions too) with clang 22 from
+    # apt.llvm.org (the guest's x32 target) and the development files SDL3
+    # builds with; and the tests of the guest's call boundary and image
+    # checks, which need this processor.
+    runs-on: ubuntu-24.04
+    container: ubuntu:22.04
+    timeout-minutes: 40
+    steps:
+      - name: Install the toolchain
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl gnupg lsb-release \
+            software-properties-common git python3 python3-pytest ninja-build cmake make pkg-config ccache zip \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxfixes-dev \
+            libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols libegl-dev libgles-dev \
+            libgl-dev libdrm-dev libgbm-dev libpulse-dev libpipewire-0.3-dev libasound2-dev \
+            libudev-dev libdbus-1-dev libdecor-0-dev
+          curl -fsSL https://apt.llvm.org/llvm.sh -o llvm.sh
+          bash llvm.sh 22 && rm llvm.sh
+          apt-get install -y --no-install-recommends lld-22 llvm-22
+          for tool in clang ld.lld llvm-ar llvm-objdump llvm-objcopy llvm-nm; do
+            ln -sf "/usr/bin/$tool-22" "/usr/local/bin/$tool"
+          done
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-linux-x86_64-${{ github.sha }}
+          restore-keys: ccache-linux-x86_64-
+
+      # musl and SDL, which configure.py fetches
+      - uses: actions/cache@v4
+        with:
+          path: build/linux_x86_64/third_party
+          key: linux-x86_64-third-party-${{ hashFiles('tools/android_build.py', 'port/android/patches/**') }}
+
+      - name: Debug
+        run: python3 tools/ci_build.py linux_x86_64 debug
+
+      - name: Release
+        run: python3 tools/ci_build.py linux_x86_64 release
+
+      - name: Test
+        run: python3 -m pytest -q tools/test_host_units.py tools/test_guest_image_check.py tools/test_check_host_imports.py
+
+      - name: Compile cache
+        run: ccache --show-stats
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-linux-x86_64-debug
+          path: dist/halo-linux-x86_64-debug
+          retention-days: 3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-linux-x86_64-release
+          path: dist/halo-linux-x86_64-release
           retention-days: 3
 
   android:
@@ -397,12 +464,12 @@ jobs:
           retention-days: 3
 
   release:
-    # The eight builds (and the Windows builds' PDBs) as a release, tagged
+    # The twelve builds (and the Windows builds' PDBs) as a release, tagged
     # build-<run number> and marked latest
     # (every file keeps its name from release to release, for the README's
     # latest/download links); then all but the newest five build-* releases
     # go, tags and all. Only for main, and only when every platform built.
-    needs: [linux, linux-arm64, android, windows, web]
+    needs: [linux, linux-arm64, linux-x86_64, android, windows, web]
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -520,7 +587,7 @@ jobs:
     # without it): green when every platform built, red when one did not,
     # with each platform's result, this run's release (main only), and links
     # to the latest release's builds and the site.
-    needs: [linux, linux-arm64, android, windows, web, release, pages]
+    needs: [linux, linux-arm64, linux-x86_64, android, windows, web, release, pages]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -530,6 +597,7 @@ jobs:
           WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           LINUX: ${{ needs.linux.result }}
           LINUX_ARM64: ${{ needs['linux-arm64'].result }}
+          LINUX_X86_64: ${{ needs['linux-x86_64'].result }}
           ANDROID: ${{ needs.android.result }}
           WINDOWS: ${{ needs.windows.result }}
           WEB: ${{ needs.web.result }}
@@ -557,13 +625,13 @@ jobs:
               *) echo "➖ Skipped" ;;
             esac
           }
-          if [ "$LINUX" = success ] && [ "$LINUX_ARM64" = success ] && [ "$ANDROID" = success ] && [ "$WINDOWS" = success ] && [ "$WEB" = success ]; then
+          if [ "$LINUX" = success ] && [ "$LINUX_ARM64" = success ] && [ "$LINUX_X86_64" = success ] && [ "$ANDROID" = success ] && [ "$WINDOWS" = success ] && [ "$WEB" = success ]; then
             title="Build succeeded"; color=5763719
           else
             title="Build failed"; color=15548997
           fi
           latest="$SERVER/$REPOSITORY/releases/latest"
-          downloads="[Linux]($latest/download/halo-linux-release.zip) · [Linux arm64]($latest/download/halo-linux-arm64-release.zip) · [Windows]($latest/download/halo-windows-release.zip) · [Android]($latest/download/halo-android-release.zip) · [Web]($SITE_URL) ([all builds]($latest))"
+          downloads="[Linux]($latest/download/halo-linux-release.zip) · [Linux arm64]($latest/download/halo-linux-arm64-release.zip) · [Linux x86-64]($latest/download/halo-linux-x86_64-release.zip) · [Windows]($latest/download/halo-windows-release.zip) · [Android]($latest/download/halo-android-release.zip) · [Web]($SITE_URL) ([all builds]($latest))"
           if [ -n "$RELEASE_TAG" ]; then
             release="[$RELEASE_TAG]($SERVER/$REPOSITORY/releases/tag/$RELEASE_TAG)"
             if [ "$PAGES" = success ]; then
@@ -577,7 +645,7 @@ jobs:
             --arg title "$title" --argjson color "$color" --arg url "$RUN_URL" \
             --arg description "[\`${SHA:0:7}\`]($COMMIT_URL) $subject — $ACTOR ($BRANCH)" \
             --arg release "$release" --arg downloads "$downloads" \
-            --arg linux "$(status "$LINUX")" --arg linux_arm64 "$(status "$LINUX_ARM64")" --arg windows "$(status "$WINDOWS")" --arg android "$(status "$ANDROID")" \
+            --arg linux "$(status "$LINUX")" --arg linux_arm64 "$(status "$LINUX_ARM64")" --arg linux_x86_64 "$(status "$LINUX_X86_64")" --arg windows "$(status "$WINDOWS")" --arg android "$(status "$ANDROID")" \
             --arg web "$(status "$WEB")" \
             --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{embeds: [{
@@ -585,6 +653,7 @@ jobs:
               fields: [
                 {name: "Linux", value: $linux, inline: true},
                 {name: "Linux arm64", value: $linux_arm64, inline: true},
+                {name: "Linux x86-64", value: $linux_x86_64, inline: true},
                 {name: "Windows", value: $windows, inline: true},
                 {name: "Android", value: $android, inline: true},
                 {name: "Web", value: $web, inline: true},
