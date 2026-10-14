@@ -412,6 +412,7 @@ int main(int argc, char **argv)
 		CHECK(fake_exists("d:\\custom_maps\\hugeass_0e2b3ee4.map") && fake_exists("d:\\custom_maps\\bitmaps.map"),
 			"a download that can be played was not left in custom_maps");
 		CHECK(!fake_exists("d:\\custom_maps\\bitmaps.map.part"), "a part file was left");
+		CHECK(fake_looked_again == 1, "the map lists looked again %d times", fake_looked_again);
 		return 0;
 	}
 	/* one that cannot is deleted again, and nothing it did not bring */
@@ -424,6 +425,8 @@ int main(int argc, char **argv)
 		CHECK(!fake_exists("d:\\custom_maps\\hugeass_0e2b3ee4.map"), "a map that cannot be played was left");
 		CHECK(!fake_exists("d:\\custom_maps\\bitmaps.map"), "a resource map of a map that cannot be played was left");
 		CHECK(fake_exists("d:\\custom_maps\\sounds.map"), "a file the download did not bring was deleted");
+		CHECK(fake_looked_again == 2, "the map lists did not look again once the files were deleted (%d times)",
+			fake_looked_again);
 		return 0;
 	}
 	/* a file not put in custom_maps (one of its name there): those that were
@@ -438,6 +441,8 @@ int main(int argc, char **argv)
 		CHECK(!fake_exists("d:\\custom_maps\\hugeass_0e2b3ee4.map"), "the files put in custom_maps were left");
 		CHECK(fake_exists("d:\\custom_maps\\bitmaps.map"), "the file that was there was deleted");
 		CHECK(fake_exists("d:\\custom_maps\\bitmaps.map.part"), "the part file not put there was deleted");
+		CHECK(fake_looked_again == 1, "the map lists did not look again once the files were deleted (%d times)",
+			fake_looked_again);
 		return 0;
 	}
 	fprintf(stderr, "unknown case: %s\n", case_name);

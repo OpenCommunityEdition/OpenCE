@@ -51,8 +51,6 @@ static struct map_share_file fake_file;
 static int fake_offers;
 static byte fake_offer_result;
 static int fake_opened;
-static int fake_failed;
-static char const *fake_closed;
 
 static struct map_share_globals map_share_globals;
 
@@ -145,13 +143,12 @@ static boolean download_file_open(struct download_file *file, short index)
 static void download_fail(char const *reason)
 {
 	(void)reason;
-	fake_failed++;
 }
 
 static void connection_close(struct connection *connection, char const *reason)
 {
+	(void)reason;
 	connection->used = FALSE;
-	fake_closed = reason;
 }
 
 #include "under_test.inc"
