@@ -18,6 +18,7 @@ halo_guest.elf (llvm-symbolizer --obj=build/android/halo_guest.elf 0x...).
 #include <stdlib.h>
 #include <string.h>
 #include <sys/syscall.h>
+#include <time.h>
 #include <unistd.h>
 
 #define MAXIMUM_THREADS 64
@@ -80,16 +81,20 @@ static void sample_handler(int signal_number, siginfo_t *information, void *cont
 	errno = saved_errno;
 }
 
+/* the time between samples */
+static struct timespec sample_interval;
+
 static void *sampler(void *context)
 {
-	unsigned int seconds = (unsigned int)(uintptr_t)context;
-
+	(void)context;
 	for (;;)
 	{
 		pid_t threads[MAXIMUM_THREADS];
+		struct timespec remaining = sample_interval;
 		int index;
 
-		sleep(seconds);
+		while (nanosleep(&remaining, &remaining) != 0 && errno == EINTR)
+			;
 		pthread_mutex_lock(&threads_lock);
 		memcpy(threads, guest_threads, sizeof(threads));
 		pthread_mutex_unlock(&threads_lock);
@@ -106,16 +111,24 @@ void host_debug_start_sampler(const char *setting)
 {
 	struct sigaction action;
 	pthread_t thread;
-	unsigned int seconds = setting ? (unsigned int)atoi(setting) : 0;
+	/* (a real number of seconds, as the setting is: 0.5 is twice a second) */
+	double seconds = setting ? strtod(setting, NULL) : 0.0;
 
-	if (!seconds)
+	if (!(seconds > 0.0))
 		return;
+	/* (at most a hundred samples a second, and at least one a day) */
+	if (seconds < 0.01)
+		seconds = 0.01;
+	if (seconds > 86400.0)
+		seconds = 86400.0;
+	sample_interval.tv_sec = (time_t)seconds;
+	sample_interval.tv_nsec = (long)((seconds - (double)sample_interval.tv_sec) * 1e9);
 	memset(&action, 0, sizeof(action));
 	action.sa_sigaction = sample_handler;
 	action.sa_flags = SA_SIGINFO | SA_RESTART;
 	sigemptyset(&action.sa_mask);
 	sigaction(SAMPLE_SIGNAL, &action, NULL);
-	if (pthread_create(&thread, NULL, sampler, (void *)(uintptr_t)seconds) == 0)
+	if (pthread_create(&thread, NULL, sampler, NULL) == 0)
 		pthread_detach(thread);
-	host_logf(HOST_LOG_INFO, "sampling guest threads every %u s", seconds);
+	host_logf(HOST_LOG_INFO, "sampling guest threads every %g s", seconds);
 }
