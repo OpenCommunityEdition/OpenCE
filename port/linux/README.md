@@ -1176,6 +1176,11 @@ As "How it operates" under "64-bit ARM", with these differences:
   reach 2 GB or more. The Xbox memory above it is reached through
   registers, and its addresses compute with 32-bit wraparound, as on the
   Xbox.
+- As the image is not above the Xbox memory, the Xbox memory is the x86
+  build's 512 MB (`0x80000000` to `0xA0000000`), with its 256 MB texture
+  cache and 16 MB sound cache, which Custom Edition maps need
+  (`halo_port_capacity.h`). The 64-bit ARM build and Android have 128 MB,
+  with the Xbox's caches.
 - The guest calls the host's functions through import stubs that jump
   through a table of 64-bit addresses. The host's functions read pointer
   arguments as 64-bit registers, and x32 code passes them zero-extended,

@@ -139,8 +139,9 @@ map_name custom_maps\hugeass
   in `maps`, which is told to go in `custom_maps`.
 - **Xbox caches** take the path they took before.
 
-The desktop builds' Xbox memory window is 512 MB (Android's 128 MB), in
-which the texture cache is 256 MB: Custom Edition maps draw more texture
+The desktop builds' Xbox memory window is 512 MB (the 64-bit x86 build's
+too; Android's and the 64-bit ARM build's 128 MB), in which the texture
+cache is 256 MB: Custom Edition maps draw more texture
 than the Xbox's 22 MB cache holds, and their geometry is made into
 Direct3D buffers in the same memory (`port/linux/include/halo_port_capacity.h`).
 
@@ -344,7 +345,7 @@ changed:
   22 MB of textures the Xbox texture cache holds, and textures that did not
   fit were drawn as the default one. The desktop builds' texture cache is
   256 MB, in a 512 MB memory window (`halo_port_capacity.h`), for every map;
-  Android's is the Xbox's.
+  Android's and the 64-bit ARM build's are the Xbox's.
 - **Scripts.** A compiled script names each function it calls, and each
   engine global it uses, by its index in the engine's tables, and Halo PC's
   tables have entries this build's do not, in among the ones both have: from

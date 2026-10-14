@@ -114,16 +114,19 @@ that window at start-up and hands out page-granular blocks from it, so the
 physical/virtual arithmetic the game and Direct3D rely on keeps working. */
 
 #define PLATFORM_CONTIGUOUS_BASE 0x80000000UL
-#if defined(HALO_GUEST) || defined(HALO_WEB)
-/* 128 MB, a development kit's: Android's guest image is linked just above
-the window (port/android/include/halo_android_abi.h), and the web build's
-WebAssembly memory ends with it (tools/web_build.py) */
+#if defined(HALO_WEB) || (defined(HALO_GUEST) && defined(__aarch64__))
+/* 128 MB, a development kit's: the AArch64 guests' image (Android's, and
+64-bit ARM Linux's) is linked just above the window, and the web build's
+WebAssembly memory ends with it (tools/web_build.py). The guests' host
+reserves HALO_GUEST_WINDOW_SIZE (port/android/include/halo_android_abi.h),
+which must agree; so must halo_port_capacity.h's test of the same builds. */
 #define PLATFORM_CONTIGUOUS_SIZE 0x08000000UL
 #else
 /* 512 MB on the desktop builds, whose caches outgrow the Xbox's (Custom
-Edition maps' textures and geometry: halo_port_capacity.h). Its pages are
-backed as they are used. port/windows/src/win32_memory_watch.c has the
-same size. */
+Edition maps' textures and geometry: halo_port_capacity.h), the x86-64
+guest's too, whose image is linked below the window. Its pages are backed
+as they are used. port/windows/src/win32_memory_watch.c has the same
+size. */
 #define PLATFORM_CONTIGUOUS_SIZE 0x20000000UL
 #endif
 #define PLATFORM_ANY_PHYSICAL_ADDRESS 0xffffffffUL

@@ -42,9 +42,20 @@ can reach it; the window above it is reached through registers. */
 /* the room the host reserves for the image there (port/android/host/host_memory.c) */
 #define HALO_GUEST_IMAGE_RESERVE 0x04000000u
 
-/* the Xbox contiguous memory window (port/linux/src/platform.h) */
+/* the Xbox contiguous memory window (port/linux/src/platform.h's
+PLATFORM_CONTIGUOUS_SIZE, which must agree: tools/test_guest_layout.py).
+AArch64: a development kit's 128 MB, as the image is linked right above it.
+x86-64: the desktop builds' 512 MB, to 0xA0000000, as the image is below it. */
 #define HALO_GUEST_WINDOW_BASE 0x80000000u
+#if defined(__x86_64__)
+#define HALO_GUEST_WINDOW_SIZE 0x20000000u
+#else
 #define HALO_GUEST_WINDOW_SIZE 0x08000000u
+#endif
+#if HALO_GUEST_IMAGE_BASE < HALO_GUEST_WINDOW_BASE + HALO_GUEST_WINDOW_SIZE && \
+	HALO_GUEST_IMAGE_BASE + HALO_GUEST_IMAGE_RESERVE > HALO_GUEST_WINDOW_BASE
+#error the guest image's range overlaps the Xbox window
+#endif
 
 #define HALO_GUEST_MAGIC 0x4f4c4148u /* 'HALO' */
 /* 3: the system call interface of halo_guest_syscall.h (_llseek) */

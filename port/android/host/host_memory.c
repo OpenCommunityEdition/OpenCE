@@ -587,8 +587,10 @@ static struct pool *pool_new(void)
 	return NULL;
 }
 
-/* The fixed ranges: the Xbox window and, right above it, room for the guest
-image (HALO_GUEST_IMAGE_RESERVE), reserved as early as the process allows
+/* The fixed ranges: the Xbox window (HALO_GUEST_WINDOW_SIZE: 128 MB on
+AArch64, 512 MB on x86-64) and room for the guest image
+(HALO_GUEST_IMAGE_RESERVE: right above the window on AArch64, below it on
+x86-64; halo_android_abi.h checks that they do not overlap), reserved as early as the process allows
 (host_memory_reserve_early, from JNI_OnLoad) or else when the image loads. */
 static int fixed_reserved;
 static int fixed_error;
