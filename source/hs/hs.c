@@ -2829,6 +2829,7 @@ symbols in this file:
 #include "interface/hud_weapon.h"
 #include "interface/interface.h"
 #include "interface/player_ui.h"
+#include "saved games/player_profile.h"
 #include "rasterizer/rasterizer_cinematics.h"
 #include "shaders/shaders.h"
 #include "sound/game_sound.h"
@@ -15454,6 +15455,40 @@ static boolean hs_compile_and_evaluate_command(
 				length--;
 			name[length] = 0;
 			return network_votekick_player_named(name);
+		}
+	}
+	/* port: profile_reset_campaign, which clears the first player's
+	profile's campaign progress (player_ui_reset_campaign_progress) once
+	confirmed: "profile_reset_campaign yes" */
+	{
+		char const *text = hs_host_player_command(expression, "profile_reset_campaign");
+
+		if (text)
+		{
+			wchar_t wide_name[MAXIMUM_PLAYER_PROFILE_NAME_LENGTH];
+			char name[MAXIMUM_PLAYER_PROFILE_NAME_LENGTH];
+			boolean confirmed;
+			long length;
+
+			while (*text == ' ' || *text == '\t' || *text == '"')
+				text++;
+			confirmed = csstrncmp(text, "yes", 3) == 0 &&
+				(!text[3] || text[3] == ' ' || text[3] == '\t' || text[3] == '"' || text[3] == ')');
+			if (!player_ui_reset_campaign_progress(confirmed, wide_name, NUMBEROF(wide_name)))
+			{
+				console_warning("there is no profile to reset: make or choose one first");
+				return FALSE;
+			}
+			for (length = 0; wide_name[length]; length++)
+				name[length] = wide_name[length] < 0x80 ? (char)wide_name[length] : '?';
+			name[length] = 0;
+			if (!confirmed)
+				console_printf(FALSE,
+					"This clears every level %s finished and starts the campaign over at The Pillar of Autumn. "
+					"To do it, type: profile_reset_campaign yes", name);
+			else
+				console_printf(FALSE, "%s's campaign progress is reset: The Pillar of Autumn is the only level open", name);
+			return TRUE;
 		}
 	}
 	/* port: playing in another's game, the host decides the game: no

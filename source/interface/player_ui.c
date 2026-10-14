@@ -585,6 +585,52 @@ void player_ui_activate_all_solo_levels(
 	return;
 }
 
+/* port: the first player's profile (the one in use, else the one last
+used, else the first, as the PC menus' campaign has it) and its name; with
+reset, its campaign progress cleared (the levels and difficulties it
+finished, the level it played last) and saved, for a profile this debug
+build had made with every level finished (player_profile_new); FALSE for
+none */
+boolean player_ui_reset_campaign_progress(
+	boolean reset,
+	wchar_t *name,
+	long name_length)
+{
+	struct player_profile profile;
+	long profile_index = player_ui_globals.local_players[0].active_profile_index;
+	boolean active = profile_index != NONE;
+
+	if (active)
+		profile = player_ui_globals.local_players[0].profile;
+	else
+	{
+		profile_index = player_ui_get_player1_last_used_profile_index();
+		if (profile_index == NONE || !player_profile_get(profile_index, &profile))
+		{
+			word count = 1;
+
+			profile_index = NONE;
+			player_profiles_enumerate_available_to_local_player_index(NONE, &count, &profile_index, FALSE);
+			if ((short)count <= 0 || profile_index == NONE || !player_profile_get(profile_index, &profile))
+				return FALSE;
+		}
+	}
+	if (name && name_length > 0)
+	{
+		ustrncpy(name, profile.player_name, name_length - 1);
+		name[name_length - 1] = 0;
+	}
+	if (reset)
+	{
+		csmemset(profile.single_player_map_flags, 0, sizeof(profile.single_player_map_flags));
+		profile.last_single_player_map_played = 0;
+		player_profile_save(profile_index, &profile);
+		if (active)
+			player_ui_globals.local_players[0].profile = profile;
+	}
+	return TRUE;
+}
+
 void player_ui_set_game_variant(
 	struct game_variant *variant)
 {

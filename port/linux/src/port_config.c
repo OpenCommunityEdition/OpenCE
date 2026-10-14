@@ -347,6 +347,30 @@ static const struct config_setting config_settings[] =
 		"gray, yellow, green, pink, purple, cyan, cobalt, orange, teal, sage,\n"
 		"brown, tan, maroon or salmon." },
 
+	{ "game.unlock_all_levels", _config_boolean, "false", "HALO_UNLOCK_ALL_LEVELS", _environment_value, _platform_all,
+		"true: a profile made from now on starts with every campaign level\n"
+		"finished on every difficulty, so any level can be played. false: a new\n"
+		"profile starts at The Pillar of Autumn and opens each level as the one\n"
+		"before it is finished, as on the Xbox. Profiles already made keep their\n"
+		"progress; the console's profile_reset_campaign starts one over." },
+
+	{ "game.downloaded_maps", _config_string, "\"\"", "HALO_DOWNLOADED_MAPS", _environment_value, _platform_all,
+		"Maps played as downloaded ones (until the game downloads maps itself):\n"
+		"their names, as the game names them (bloodgulch, hugeass@ce), separated\n"
+		"by commas, or \"*\" for every map. A downloaded map's scripts may not\n"
+		"change the player's settings or other players' games (debug.txt names\n"
+		"what they were refused)." },
+
+	{ "game.move_old_map_folders", _config_string, "\"ask\"", "HALO_MOVE_OLD_MAP_FOLDERS", _environment_value,
+		_platform_all,
+		"Halo PC maps have folders of their own beside maps: maps_ce (Custom\n"
+		"Edition, with its bitmaps.map, sounds.map and loc.map), maps_md (HaloMD)\n"
+		"and maps_pc (Halo PC). The older maps/ce and md_maps are still played\n"
+		"from. \"ask\": the game offers once to move them into the new folders\n"
+		"(each folder moved whole, never copied; one that cannot be moved stays\n"
+		"where it is); \"yes\": moved without asking; \"no\": left where they are.\n"
+		"Android moves them unless this is \"no\"." },
+
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"
 		"working directory and its assets folder. Windows paths are easiest in\n"
