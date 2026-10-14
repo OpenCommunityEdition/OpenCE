@@ -1,0 +1,10 @@
+# Host functions only the Android app's guest imports (declared in
+# port/android/guest/runtime/guest_host.h, defined in port/android/host's
+# host_main.c and host_touch.c), beyond host_imports.list's.
+host_android_path
+host_gesture_insets
+host_touch_read
+host_touch_look_read
+host_touch_rumble
+host_touch_scene
+host_touch_bindings

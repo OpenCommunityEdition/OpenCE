@@ -29,8 +29,8 @@ ninja) and these items:
   The option `--android-ndk` selects a different NDK.
 - CMake, and a JDK 17 or later for Gradle.
 - A network connection for the first build. `configure.py` downloads musl
-  1.2.5 and SDL 3.4.16 to `build/android/third_party`. Gradle downloads the
-  Android Gradle Plugin.
+  1.2.5 (checked against its SHA-256) and SDL 3.4.16 to
+  `build/android/third_party`. Gradle downloads the Android Gradle Plugin.
 
 On Windows, build in WSL2 (Ubuntu 24.04). The Android build does not run
 on Windows itself. Enter
@@ -315,11 +315,27 @@ The guest is the game, the platform layer and a small runtime:
 
 The APK contains the image as an asset.
 
+`ARM64_32` in `tools/guest_arch.py` holds what in these steps is particular
+to the processor: the target and its options, the defines, the conversion
+of the assembly, the linker's emulation, the builtins, the instructions of
+the import stubs and the calling convention of the host for the OpenGL
+stubs. The Android build and the desktop guest builds
+(`tools/linux_guest_build.py`) take it.
+
 The C library of the guest is a part of musl for a new `arm64_32`
 architecture (`guest/libc/arch/arm64_32`). It has ILP32 types and a 32-bit
 `time_t`, as in the MSVC runtime of the game. Its system calls go to the
 host (`syscall_arch.h`). `guest/runtime/guest_thread.c` makes the threads
 and supplies the thread pointer and TLS.
+
+The system calls have an interface of their own, the same for every guest
+architecture (`include/halo_guest_syscall.h`, and for musl
+`guest/libc/arch/generic`): AArch64's numbers, kernel `stat` and open
+flags, with `_llseek` in place of `lseek` so that a 64-bit file offset
+fits the guest's 32-bit result. The host translates each call to its own
+kernel's (`host/host_syscall.c`), so the same guest runs on an AArch64 or
+an x86-64 host. `tools/test_host_syscall.py` tests the translation on the
+build machine.
 
 ### The host library
 
@@ -329,7 +345,11 @@ and supplies the thread pointer and TLS.
 - Reserves the address space of the guest below 4 GB: the Xbox memory at
   `0x80000000`, the image, and pools for the memory of the guest
   (`host/host_memory.c`). Refer to "The fixed addresses".
-- Loads the image and fills its import table (`host/host_loader.c`).
+- Loads the image and fills its import table (`host/host_loader.c`). The
+  image must be a static executable of the host's guest (a 64-bit AArch64
+  ELF file of `arm64_32` code), whose segments, header and import table lie
+  in the file and in the image's reserved range; the loader checks each
+  before it uses it.
 - Starts the `main` of the game and each guest thread on a stack in guest
   memory, because ILP32 code keeps stack addresses in 32-bit registers
   (`host/host_thread.c`).
@@ -340,8 +360,14 @@ and supplies the thread pointer and TLS.
   UPnP and DTLS functions of `port/linux/src/posix_*.c` (DTLS with Mbed TLS,
   for internet play with browsers: `posix_dtls.c`).
 
-The guest calls the host through stubs (`tools/android_imports.py`). The
-two ABIs use the same registers for 32-bit integers, floats and pointers.
+The guest calls the host through stubs (`tools/android_imports.py`, with the
+instructions of `import_stub` in `tools/guest_arch.py`). The two ABIs use
+the same registers for 32-bit integers, floats and pointers.
+`host_imports.list` lists every guest's imports, `android_imports.list` the
+app's own (its folders, gesture edges and touch controls).
+`tools/check_host_imports.py` checks the lists against their declarations,
+and that every argument has a register on each host (on x86-64, six for
+integers and pointers: a later one may be an integer, never a pointer).
 `tools/android_gl_stubs.py` makes the OpenGL ES stubs from
 `port/linux/src/gl.h`. `tools/android_posix_stubs.py` makes the stubs of the
 `posix_*` functions, which copy the `errno` of the host.
@@ -433,22 +459,29 @@ floating-point contraction, as on x86.
 
 ### Game source changes
 
-The port's code tells three things apart, each its own macro, which the
+The port's code tells these things apart, each its own macro, which the
 Android build defines all of (`tools/android_build.py`):
 
-- `HALO_ARM64_GUEST`: the guest's ABI (ILP32 AArch64 code in a 64-bit
-  process);
+- `HALO_GUEST`: the game is an ILP32 guest in a 64-bit process (its
+  memory, its host imports, the SDL it reaches). The instruction set is the
+  compiler's own macro, `__aarch64__`;
+- `HALO_GUEST_MACHO`: the guest is compiled for clang's Darwin target
+  (`arm64_32`), whose Mach-O objects are converted afterwards;
 - `HALO_GLES`: the OpenGL ES renderer;
 - `HALO_ANDROID`: the app (its display, input, files and lifecycle).
 
+`HALO_ARM64_GUEST`, the name of `HALO_GUEST` before, is still defined:
+`HALO_GUEST` on AArch64.
+
 The x86 inline assembly is replaced by C (refer to
 [port/linux/README.md](../linux/README.md#game-source-changes)).
-These changes are in `#ifdef HALO_ARM64_GUEST`:
+These changes, which the Linux arm64 build shares, are:
 
-- Seven `#pragma bss_seg(".bss")` lines are removed. The Darwin target does
-  not accept them.
-- A stack walker follows the AArch64 frame records. Thus the log of an
-  assertion (`debug.txt`) shows the call sites.
+- Seven `#pragma bss_seg(".bss")` lines are removed (`#ifndef
+  HALO_GUEST_MACHO`). The Darwin target does not accept them.
+- A stack walker follows the 64-bit frame records (`__aarch64__`, and
+  `__x86_64__`'s, which are alike). Thus the log of an assertion
+  (`debug.txt`) shows the call sites.
 
 The musl of the guest uses its C math, not the AArch64 assembly. The only
 assembly of the port is necessary:
@@ -462,7 +495,9 @@ assembly of the port is necessary:
 
 - Enter `adb logcat -s halo` to see the log of the port and the errors of
   the game. `files/debug.txt` is the log of the game.
-- If the guest code stops, the log shows the registers and the frame chain.
+- If the guest code stops, the log shows the registers and the frame chain
+  (`host/host_arch.c`), from a stack of the signal handler's own, so a
+  stack overflow is reported too.
   To find the functions, enter
   `llvm-symbolizer --obj=build/android/halo_guest.elf <address>`.
 - Set `sample_seconds = <seconds>` in `[debug]` of `config.toml`. The log

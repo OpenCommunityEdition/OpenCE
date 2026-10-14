@@ -13,12 +13,18 @@ The guest's thread pointer (its musl struct pthread) is kept per thread in
 host TLS.
 
 Thread stacks are freed by a reaper thread once the thread has fully exited.
+
+Each of these threads, and the main thread, also has a stack for the
+signal handlers (host_memory.c's, which report a crash on it), so that a stack
+overflow into a guard page is reported rather than killing the process
+silently.
 */
 
 #include "host.h"
 
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -61,6 +67,60 @@ static int on_guest_stack(void)
 	return sp < 0x100000000ULL;
 }
 
+/* ---------- the signal handlers' stacks */
+
+/* (SIGSTKSZ is not a constant on every C library) */
+#define SIGNAL_STACK_SIZE 0x10000
+#define SIGNAL_STACK_GUARD 0x1000
+
+static __thread void *signal_stack;
+
+int host_signal_stack_install(void)
+{
+	stack_t stack;
+	char *mapping;
+
+	if (signal_stack)
+		return 0;
+	/* (bionic gives every thread one already) */
+	if (sigaltstack(NULL, &stack) == 0 && !(stack.ss_flags & SS_DISABLE) && stack.ss_size >= SIGNAL_STACK_SIZE / 2)
+		return 0;
+	mapping = mmap(NULL, SIGNAL_STACK_GUARD + SIGNAL_STACK_SIZE, PROT_READ | PROT_WRITE,
+		MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (mapping == MAP_FAILED)
+	{
+		host_logf(HOST_LOG_WARN, "cannot allocate a signal stack: a stack overflow will not be reported");
+		return -1;
+	}
+	/* guard page at the bottom */
+	mprotect(mapping, SIGNAL_STACK_GUARD, PROT_NONE);
+	memset(&stack, 0, sizeof(stack));
+	stack.ss_sp = mapping + SIGNAL_STACK_GUARD;
+	stack.ss_size = SIGNAL_STACK_SIZE;
+	if (sigaltstack(&stack, NULL) != 0)
+	{
+		host_logf(HOST_LOG_WARN, "cannot install a signal stack (%s): a stack overflow will not be reported",
+			strerror(errno));
+		munmap(mapping, SIGNAL_STACK_GUARD + SIGNAL_STACK_SIZE);
+		return -1;
+	}
+	signal_stack = mapping;
+	return 0;
+}
+
+void host_signal_stack_remove(void)
+{
+	stack_t stack;
+
+	if (!signal_stack)
+		return;
+	memset(&stack, 0, sizeof(stack));
+	stack.ss_flags = SS_DISABLE;
+	sigaltstack(&stack, NULL);
+	munmap(signal_stack, SIGNAL_STACK_GUARD + SIGNAL_STACK_SIZE);
+	signal_stack = NULL;
+}
+
 /* ---------- calling into the guest */
 
 typedef uint32_t (*guest_function)(uint32_t, uint32_t, uint32_t, uint32_t);
@@ -82,20 +142,23 @@ void host_run_guest_main(uint32_t boot)
 
 /* ---------- guest threads */
 
-struct thread_start
-{
-	void *(*function)(void *);
-	void *argument;
-	void *mapping;
-	size_t mapping_size;
-};
-
 struct finished_thread
 {
 	struct finished_thread *next;
 	pthread_t thread;
 	void *mapping;
 	size_t mapping_size;
+};
+
+/* (the record the thread gives the reaper is allocated with it, so that
+a thread can always end) */
+struct thread_start
+{
+	void *(*function)(void *);
+	void *argument;
+	void *mapping;
+	size_t mapping_size;
+	struct finished_thread *finished;
 };
 
 static pthread_mutex_t reaper_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -129,6 +192,7 @@ static void *thread_main(void *context)
 	struct finished_thread *finished;
 
 	free(context);
+	host_signal_stack_install();
 	host_debug_thread_started();
 	start.function(start.argument);
 	/* (a thread the guest made has let its struct pthread go by now; one
@@ -136,9 +200,10 @@ static void *thread_main(void *context)
 	if (guest_tp)
 		((guest_function)(uintptr_t)host_image.header->thread_detach)(0, 0, 0, 0);
 	host_debug_thread_exited();
+	host_signal_stack_remove();
 	guest_tp = 0;
 
-	finished = calloc(1, sizeof(*finished));
+	finished = start.finished;
 	finished->thread = pthread_self();
 	finished->mapping = start.mapping;
 	finished->mapping_size = start.mapping_size;
@@ -153,13 +218,19 @@ static void *thread_main(void *context)
 int host_native_thread_create(void *(*function)(void *), void *argument, size_t stack_size)
 {
 	struct thread_start *start = calloc(1, sizeof(*start));
+	struct finished_thread *finished = calloc(1, sizeof(*finished));
 	pthread_attr_t attributes;
 	pthread_t thread;
 	void *stack;
 	int error;
 
-	if (!start)
+	if (!start || !finished)
+	{
+		free(start);
+		free(finished);
 		return ENOMEM;
+	}
+	start->finished = finished;
 	pthread_mutex_lock(&reaper_lock);
 	if (!reaper_started)
 	{
@@ -178,6 +249,7 @@ int host_native_thread_create(void *(*function)(void *), void *argument, size_t 
 	if (!stack)
 	{
 		free(start);
+		free(finished);
 		return EAGAIN;
 	}
 	start->function = function;
@@ -190,6 +262,7 @@ int host_native_thread_create(void *(*function)(void *), void *argument, size_t 
 	{
 		host_low_unmap(start->mapping, start->mapping_size);
 		free(start);
+		free(finished);
 	}
 	return error;
 }

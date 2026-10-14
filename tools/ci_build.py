@@ -4,11 +4,12 @@
 
     python tools/ci_build.py linux debug
     python tools/ci_build.py android release
+    python tools/ci_build.py linux_arm64 release   (on a 64-bit ARM computer)
     python tools/ci_build.py linux profile
     python tools/ci_build.py web release
 
-Builds are portable (any x86-64 processor), so they run on other
-computers. Debug builds skip link-time and profile-guided optimisation,
+Builds are portable (any x86-64 processor; any ARMv8.0 one for
+linux_arm64 and android), so they run on other computers. Debug builds skip link-time and profile-guided optimisation,
 which only make the build slower; release builds use both, as a local
 release build does (profile-guided optimisation needs clang 22 or later,
 and is skipped with an older one). A profile build is a debug build with
@@ -34,9 +35,12 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # what each port's build leaves, and what goes into dist/
 OUTPUTS = {
-    # (and the SDL3 the portable build brings, tools/linux_build.py, with its
-    # zlib license, as the release carries the other libraries')
+    # (and the SDL3 the portable build and the desktop guest builds bring,
+    # tools/linux_build.py and tools/linux_guest_build.py, with its zlib
+    # license, as the release carries the other libraries')
     "linux": ["build/linux/halo", "build/linux/libSDL3.so.0", "build/linux/SDL3-LICENSE.txt"],
+    "linux_arm64": ["build/linux_arm64/halo", "build/linux_arm64/libSDL3.so.0",
+                    "build/linux_arm64/SDL3-LICENSE.txt"],
     "windows": ["build/windows/halo.exe", "build/windows/SDL3.dll"],
     "android": [],  # the APK, below
     "web": [],  # the site, below
@@ -97,7 +101,8 @@ def main() -> int:
         run(["ninja", args.platform])
         outputs = OUTPUTS[args.platform]
 
-    dist = ROOT / "dist" / f"halo-{args.platform}-{args.config}"
+    # (halo-linux-arm64-release, the name the self-updater asks for)
+    dist = ROOT / "dist" / f"halo-{args.platform.replace('_', '-')}-{args.config}"
     if dist.exists():
         shutil.rmtree(dist)
     dist.mkdir(parents=True)

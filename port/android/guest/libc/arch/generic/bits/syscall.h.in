@@ -1,3 +1,8 @@
+/* The guest's system call numbers, on every guest architecture: AArch64's
+(asm-generic, without the old calls such as open, stat and poll), with 62
+as _llseek, which returns a 64-bit offset through a pointer. The host
+translates them to its own (port/android/include/halo_guest_syscall.h,
+port/android/host/host_syscall.c). */
 #define __NR_io_setup 0
 #define __NR_io_destroy 1
 #define __NR_io_submit 2
@@ -60,7 +65,7 @@
 #define __NR_pipe2 59
 #define __NR_quotactl 60
 #define __NR_getdents64 61
-#define __NR_lseek 62
+#define __NR__llseek 62
 #define __NR_read 63
 #define __NR_write 64
 #define __NR_readv 65

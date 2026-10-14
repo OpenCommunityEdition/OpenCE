@@ -10,7 +10,7 @@ byte-for-byte identical to what the matching MSVC build compiles.
 #ifndef __HALO_LINUX_PREFIX_H
 #define __HALO_LINUX_PREFIX_H
 
-#if !defined(__i386__) && !defined(HALO_ARM64_GUEST) && !defined(__wasm32__)
+#if !defined(__i386__) && !defined(HALO_GUEST) && !defined(__wasm32__)
 #error the Linux port targets 32-bit x86: game data structures assume 32-bit pointers
 #endif
 
@@ -81,6 +81,29 @@ always runs and the handler is compiled out. */
 #define __except(filter) else if (0)
 #define __finally
 #define __leave
+
+/* ---------- the guest builds
+
+HALO_GUEST: the game is an ILP32 guest image in a 64-bit host process
+(Android, and Linux arm64: port/android/README.md). The instruction set is
+the compiler's (__aarch64__, __x86_64__). HALO_GUEST_MACHO: the guest is
+compiled for clang's Darwin target (arm64_32, the only ILP32 AArch64 one),
+whose Mach-O objects are converted afterwards (tools/android_build.py).
+HALO_ARM64_GUEST, the guest's name before, is HALO_GUEST on AArch64. */
+#ifdef HALO_GUEST
+#ifndef __ILP32__
+#error a guest build is ILP32: game data structures assume 32-bit pointers
+#endif
+#if defined(__aarch64__) && !defined(HALO_ARM64_GUEST)
+#define HALO_ARM64_GUEST 1
+#endif
+#endif
+#if defined(HALO_ARM64_GUEST) && !(defined(HALO_GUEST) && defined(__aarch64__))
+#error HALO_ARM64_GUEST is HALO_GUEST on AArch64
+#endif
+#if defined(HALO_GUEST_MACHO) && !defined(HALO_GUEST)
+#error HALO_GUEST_MACHO is a guest build's
+#endif
 
 /* ---------- multiplayer session limits of the native builds */
 

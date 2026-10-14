@@ -1,5 +1,7 @@
-/* the AArch64 kernel's struct stat (fstat, newfstatat), spelled with
-fixed-width types so the ILP32 guest reads the kernel's layout */
+/* the guest's kernel stat (fstat, newfstatat): the AArch64 kernel's struct
+stat, which the host converts its own kernel's into, whatever its
+architecture (struct halo_guest_kstat, port/android/include/halo_guest_syscall.h;
+guest_syscall.c checks that the two agree) */
 struct kstat {
 	unsigned long long st_dev;
 	unsigned long long st_ino;

@@ -1,3 +1,6 @@
+/* the guest's open flags and fcntl commands, AArch64's, on every guest
+architecture: the host translates them to its own
+(port/android/include/halo_guest_syscall.h) */
 #define O_CREAT        0100
 #define O_EXCL         0200
 #define O_NOCTTY       0400
