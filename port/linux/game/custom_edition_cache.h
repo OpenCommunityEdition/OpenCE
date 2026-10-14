@@ -80,17 +80,36 @@ boolean custom_edition_cache_playable(
 Custom Edition maps folders, whatever it holds. */
 boolean custom_edition_map_file_present(
 	char const *map_name);
-/* The checksum in the header of the level's map file, which differs between
-versions of a map; 0 if it has no file or the file is not a Custom Edition
-cache. */
-unsigned long custom_edition_map_checksum(
+/* The version of the level's map, a network game record's
+(map_share_hash_version): of the map a host's game was given
+(map_share_level_name_choose), else of the level's file; 0 if it has none. */
+unsigned long custom_edition_map_version(
 	char const *level_name);
 /* The file of the map `map_name` (a level name or a file name) in the
-Custom Edition maps folders, into `path` (256 characters): the custom_maps
-folder's map named for its hash (<name>_<hash>.map, map_share.h) for a name
-without it, if there is one map of that name. FALSE if none. */
+Custom Edition maps folders, into `path` (256 characters): in a network game
+on that level, the file of the game's version
+(custom_edition_map_find_version), else custom_edition_map_file_named's.
+FALSE if none. */
 boolean custom_edition_map_file_path(
 	char const *map_name,
+	char *path);
+/* ... a network game's map's file looked for again at once: the maps
+changed (custom_edition_maps_look_again) */
+void custom_edition_map_paths_forget(
+	void);
+/* ... the file the name names, whatever version a network game is on:
+<name>.map; for a name without a hash, the custom_maps folder's map of that
+name and a hash (<name>_<hash>.map, another version's) if it is the one;
+for a name with one (a build of before's level name), the map of the name
+without it, if the hash is its. */
+boolean custom_edition_map_file_named(
+	char const *map_name,
+	char *path);
+/* ... the file of the level's name and `version` (map_share_hash_version's):
+<name>.map in a maps folder, or the custom_maps folder's <name>_<hash>.map. */
+boolean custom_edition_map_find_version(
+	char const *level_name,
+	unsigned long version,
 	char *path);
 /* The resource map of `type` (enum resource_map_type: bitmaps.map,
 sounds.map, loc.map) in the first maps folder that has it, into `path` (256
@@ -107,14 +126,14 @@ unsigned long custom_edition_map_resource_maps_needed(
 char const *custom_edition_cache_loaded_path(
 	void);
 /* Whether this machine can play the level `level_name` (custom_maps\<name>),
-as a network game's client must: its file present and a Custom Edition
-cache of the host's version (`checksum`, custom_edition_map_checksum's on
-the host; 0 for any), Custom Edition maps able to run, and the resource maps
-it needs present. When not, `message` (`message_size` characters) says why, for the
-player, and what to do. */
+as a network game's client must: a file of it of the host's version
+(`version`, custom_edition_map_version's on the host; 0 for any), a Custom
+Edition cache, Custom Edition maps able to run, and the resource maps it
+needs present. When not, `message` (`message_size` characters) says why, for
+the player, and what to do. */
 boolean custom_edition_cache_present(
 	char const *level_name,
-	unsigned long checksum,
+	unsigned long version,
 	char *message,
 	long message_size);
 

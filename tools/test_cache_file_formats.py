@@ -880,6 +880,19 @@ def test_malformed_structure_bsp_materials_are_rejected(report_tool, tmp_path, c
     assert report["load"] == BAD_BSP_GEOMETRY
 
 
+@pytest.mark.parametrize("vertex_count, loads", [(64000, True), (64001, False)])
+def test_structure_bsp_materials_hold_at_most_the_games_vertices(report_tool, tmp_path, vertex_count, loads):
+    """the game's MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL, to which the
+    validator cuts a material's counts (which would move its lightmap
+    vertices): a material of more, all within the BSP, is refused"""
+    material = {"vertex_count": vertex_count, "lightmap_vertex_count": vertex_count}
+    returncode, report, _ = converted(report_tool, Map(bsp_sizes=(0x500000,), bsp_material=material), tmp_path)
+    if loads:
+        assert returncode == 0 and report["structure_bsp_materials_checked"] == "1"
+    else:
+        assert returncode == 1 and report["load"] == BAD_BSP_GEOMETRY
+
+
 def test_structure_bsp_lightmaps_outside_the_bsp_are_rejected(report_tool, tmp_path):
     cache = Map(bsp_material={})
     path = patched(cache.write(tmp_path), cache.where["bsp"] + 0x18 + 0x108, "<I", BASE)

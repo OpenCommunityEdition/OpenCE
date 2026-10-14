@@ -13485,10 +13485,13 @@ static boolean hs_rebuild_source(
 	struct file_reference source_files[8];
 	short source_file_count;
 	short source_file_index;
+	char *scripts_name;
 
 	tag_block_resize(&global_scenario_get()->hs_source_files, 0);
-	sprintf(scenario_path, "data\\%s", tag_get_name(global_scenario_index));
-	sprintf(strrchr(scenario_path, '\\') + 1, "scripts");
+	/* port: snprintf (a map's tag's name may be any length) */
+	snprintf(scenario_path, sizeof(scenario_path), "data\\%s", tag_get_name(global_scenario_index));
+	scripts_name = strrchr(scenario_path, '\\') + 1;
+	snprintf(scripts_name, sizeof(scenario_path) - (scripts_name - scenario_path), "scripts");
 	file_reference_create_from_path(
 		&global_scripts,
 		"data\\global_scripts.hsc",

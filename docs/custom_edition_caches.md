@@ -33,17 +33,18 @@ network games, and is never taken for one of the campaign's levels (saved
 games, progress, the next level). The game engine keeps 63 characters of a
 level name, so a map whose file name is longer than 51 is not listed.
 
-A map in `custom_maps` is named for its contents once the map lists (or a
-host picking it) find it: `hugeass.map` becomes `hugeass_0e2b3ee4.map`, the
-first 8 hexadecimal digits of its hash after `_`, its `.bmp` and `.txt`
-renamed with it (`port/linux/game/map_share_files.c`; the name is cut short
-to keep the level name within 63 characters). A network game's level name
-then says which version of the map it is on, a player without it downloads
-it under that name (`port/linux/NETCODE.md`, "Map sharing"), and two
-versions of a map keep apart. A level name without the hash (a saved last
-map, a test's) finds the one map of that name in `custom_maps`. The menus
-show a map without its hash, unless two versions of it are listed. Maps in
-a Custom Edition install's folder keep their names.
+Maps keep their names. A network game's level name is the map's own
+(`custom_maps\hugeass`), and its game record's map version is the first 32
+bits of the map's hash (`port/linux/game/map_share_files.c`), so a client
+plays its file of that name and version, whatever else it has of the name
+(`custom_edition_map_find_version`); a player without it downloads it
+(`port/linux/NETCODE.md`, "Map sharing"). A download beside another version
+of its name is named `hugeass_0e2b3ee4.map`, the first 8 hexadecimal digits
+of its hash after `_`, and the menus show it as "Hugeass (2)". A level name
+without the hash (a saved last map, a test's) finds the one map of that
+name in `custom_maps`, and one with it (an earlier build's, which named
+every map so) the map given its name back. Maps in a Custom Edition
+install's folder are found and shared as `custom_maps`' are.
 
 A map needs only the resource maps that hold its tags: its tag index says
 which (`cache_file_resource_maps_needed`, `cache_file_formats.c`: a tag
@@ -96,7 +97,7 @@ than the damaged disc error precaching a missing map gives
 the map cannot run there (Custom Edition maps turned off, the file not a
 Custom Edition cache, or `bitmaps.map`, `sounds.map` and `loc.map` missing),
 when its copy of a Custom Edition map is another version than the host's
-(the host sends its file's header checksum as the game record's map
+(the host sends its map's hash's first 32 bits as the game record's map
 version, which the Xbox left 0: `cache_files_map_version`; a host that sends
 0 is not checked), and when the host names a Custom Edition map as other
 versions of this port do (`levels\test\<name>\<name>`) and the file is in
@@ -191,9 +192,11 @@ Loading, step by step (`custom_edition_cache_load`):
    its lightmaps and their materials: every block within the BSP and aligned,
    every material's uncompressed environment vertices (56 bytes) and
    lightmap vertices (20 bytes) within the BSP and of the size their counts
-   give, lightmap vertices exactly when the lightmap has a bitmap, and every
-   normal, binormal, tangent and incident radiosity within ±1.005 (the game's
-   vertex compressor asserts on anything further out).
+   give, at most 64000 of each (the game's limit, to which the validator
+   cuts a material's counts), lightmap vertices exactly when the lightmap
+   has a bitmap, and every normal, binormal, tangent and incident radiosity
+   within ±1.005 (the game's vertex compressor asserts on anything further
+   out).
 5. The header checksum is computed as OpenSauce computes it, before anything
    changes the tag data; a mismatch is reported, not refused.
 6. The tags held by resource maps are read into the tag cache after the tag
@@ -384,9 +387,11 @@ every tag as it checks an Xbox map's (`tag_validate_custom_edition_tags`,
 called by `custom_edition_cache_tags_load`): every block and data within
 the loaded tags and overlapping no other's, counts cut to the game's
 capacities, indices, enums and tag references corrected, runtime values
-reset, then the graph checks (collision BSPs, node trees, scripts' syntax).
-A map whose pointers cannot be trusted is refused; what can be corrected is,
-and logged. What differs from an Xbox map:
+reset, then the graph checks (collision BSPs, node trees, scripts' syntax),
+and a tag name that lies in any tag's block or data is emptied (what the
+game writes there could take away its end). A map whose pointers cannot be
+trusted is refused; what can be corrected is, and logged. What differs
+from an Xbox map:
 
 - the tag header has no vertex or index buffers, and the tag cache is the
   Custom Edition one (23 MB);
@@ -563,10 +568,10 @@ every layout used was then checked against the sample maps.
 - **What the validator corrects is lost.** A community map's data that the
   validator corrects (an index past its block, an enum past its values) is
   what the game then runs; Halo PC read past such data unchecked.
-- **Ogg Vorbis sounds** are decoded when the map loads (stb_vorbis, public
-  domain) and encoded again as Xbox ADPCM in memory
-  (`port/linux/game/custom_edition_sounds.c`); one that cannot be decoded is
-  silenced, and still logs when played.
+- **Ogg Vorbis sounds** are decoded when the map loads (stb_vorbis, with
+  added bounds checks: `port/third_party/stb_vorbis`) and encoded again as
+  Xbox ADPCM in memory (`port/linux/game/custom_edition_sounds.c`); one that
+  cannot be decoded is silenced, and still logs when played.
 - **Models of 44 nodes or more** are drawn a part's nodes at a time, given
   local nodes when they have none; one whose part's vertices name more
   nodes than a part holds is refused.

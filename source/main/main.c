@@ -2300,8 +2300,11 @@ static void main_frame_rate_debug(
 			FILE *file;
 
 			GetSystemTime(&system_time);
-			sprintf(
+			/* port: snprintf, here and below (a map's tag's name may be any
+			length) */
+			snprintf(
 				core_name,
+				sizeof(core_name),
 				"%s_slow_%d_%d_%d_%d_%d_%d.bin",
 				scenario_name,
 				system_time.wMonth,
@@ -2311,7 +2314,7 @@ static void main_frame_rate_debug(
 				system_time.wMinute,
 				system_time.wSecond);
 			game_state_save_core(core_name);
-			sprintf(init_file_name, "d:\\%s_init.txt", scenario_name);
+			snprintf(init_file_name, sizeof(init_file_name), "d:\\%s_init.txt", scenario_name);
 
 			file = fopen(init_file_name, "r");
 			if (!file)
