@@ -28,6 +28,10 @@ C heap there, do not run.
 #include "platform.h"
 #include "port_config.h"
 #include "../game/cache_file_formats.h"
+#ifdef HALO_GUEST
+/* the window the guests' host reserves (port/android/host/host_memory.c) */
+#include "halo_android_abi.h"
+#endif
 
 #include <errno.h>
 #include <string.h>
@@ -38,6 +42,16 @@ C heap there, do not run.
 /* the memory's size: whether it covers the window */
 #define web_memory_bytes() ((unsigned long long)__builtin_wasm_memory_size(0) << 16)
 #endif
+
+#ifdef HALO_GUEST
+typedef char window_is_the_hosts[PLATFORM_CONTIGUOUS_BASE == HALO_GUEST_WINDOW_BASE &&
+	PLATFORM_CONTIGUOUS_SIZE == HALO_GUEST_WINDOW_SIZE ? 1 : -1];
+#endif
+/* the texture and sound caches, which the window hands out top-down, fit
+above the game state (halo_port_capacity.h) */
+typedef char caches_fit_the_window[HALO_PORT_GAME_STATE_BASE_ADDRESS + HALO_PORT_GAME_STATE_SIZE -
+	PLATFORM_CONTIGUOUS_BASE + HALO_PORT_TEXTURE_CACHE_SIZE + HALO_PORT_SOUND_CACHE_SIZE <=
+	PLATFORM_CONTIGUOUS_SIZE ? 1 : -1];
 
 #define PAGE_SIZE_BYTES 0x1000UL
 #define CONTIGUOUS_PAGE_COUNT (PLATFORM_CONTIGUOUS_SIZE / PAGE_SIZE_BYTES)

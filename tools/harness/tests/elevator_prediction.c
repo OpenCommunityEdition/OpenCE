@@ -10,13 +10,17 @@ copy under its own elevator's floor, where the game's copy falls through and
 the client's player dies after it. Taken across only, the copy rides the
 host's elevator; off an elevator, or on one at rest, the client's word is
 taken whole. test_elevator_prediction.py takes the functions
-(under_test.inc) and the bound's structure and tolerance (config.inc); what
+(under_test.inc) and the bound's structure and tolerance, and the drift
+figures the function notes for the tests (config.inc); what
 they call besides is stubbed: the speed and height limits pass every move
 (the cases move no faster than a player may), and applying a state puts the
 unit there.
 */
 
 #include "harness.h"
+
+#include <limits.h>
+#include <math.h>
 
 /* ---------- the fake world */
 

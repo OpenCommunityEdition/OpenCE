@@ -274,6 +274,34 @@ SDL_OPTIONS = [
     "-DSDL_WAYLAND_LIBDECOR_SHARED=ON", "-DSDL_IBUS=OFF", "-DSDL_HIDAPI_LIBUSB=OFF", "-DSDL_JACK=OFF",
     "-DSDL_SNDIO=OFF", "-DSDL_LIBURING=OFF", "-DSDL_FRIBIDI=OFF", "-DSDL_LIBTHAI=OFF", "-DSDL_X11_XTEST=OFF",
 ]
+# (the linker's options for the executable that loads the SDL beside it:
+# DT_RPATH rather than DT_RUNPATH, as it comes before LD_LIBRARY_PATH, which
+# Steam sets for the games it starts, so that the SDL beside the executable
+# is the one loaded, whatever other SDL that path holds)
+SDL_RPATH_LDFLAGS = ["'-Wl,-rpath,$$ORIGIN'", "-Wl,--disable-new-dtags"]
+
+
+def sdl3_rule(n: Writer, sln: Any, *, name: str, description: str, source: Path, sdl_build: Path, log_dir: Path,
+              cc: str, cmake_args: Sequence[str] = (), check: str = "") -> None:
+    """The rule that builds SDL3 from source into sdl_build, as the builds
+    that bring their own libSDL3.so.0 do (the portable build, and the
+    desktop guest builds of tools/linux_guest_build.py): with SDL_OPTIONS
+    and the --compiler-launcher, CMake's cmake_args (a toolchain file, say),
+    its logs in log_dir, and then check, a command that stops the build if
+    SDL lacks what it needs."""
+    launcher = getattr(sln, "compiler_launcher", None)
+    options = SDL_OPTIONS + ([f"-DCMAKE_C_COMPILER_LAUNCHER={launcher}"] if launcher else [])
+    n.rule(
+        name=name,
+        command=(f"cmake -S {source} -B {sdl_build} -G Ninja --fresh "
+                 + "".join(f"{argument} " for argument in cmake_args)
+                 + f"-DCMAKE_C_COMPILER={cc} {' '.join(options)} > {log_dir}/sdl3-configure.log && "
+                 f"ninja -C {sdl_build} > {log_dir}/sdl3-build.log"
+                 + (f" && {check}" if check else "")),
+        description=description,
+        pool="console",
+        restat=True,
+    )
 
 
 def portable_sdl(n: Writer, sln: Any, build_dir: Path, cc: str) -> Tuple[List[str], List[str], Path, Path, Path]:
@@ -296,27 +324,14 @@ def portable_sdl(n: Writer, sln: Any, build_dir: Path, cc: str) -> Tuple[List[st
     # (and SDL's license, which the release carries)
     sdl_license_source = sdl_source / "LICENSE.txt"
     n.build(outputs=stamp, rule="linux_sysroot", implicit=[SYSROOT_SCRIPT], implicit_outputs=[sdl_license_source])
-    launcher = getattr(sln, "compiler_launcher", None)
-    options = SDL_OPTIONS + ([f"-DCMAKE_C_COMPILER_LAUNCHER={launcher}"] if launcher else [])
-    n.rule(
-        name="linux_sdl3",
-        command=(f"cmake -S {sdl_source} -B {sdl_build} -G Ninja --fresh "
-                 f"-DCMAKE_TOOLCHAIN_FILE=$$PWD/{SYSROOT_TOOLCHAIN} -DHALO_SYSROOT=$$PWD/{sysroot} "
-                 f"-DCMAKE_C_COMPILER={cc} {' '.join(options)} > {build_dir}/sdl3-configure.log && "
-                 f"ninja -C {sdl_build} > {build_dir}/sdl3-build.log && "
-                 f"$python {SYSROOT_SCRIPT} --check-sdl "
-                 f"{sdl_build}/include-config-release/build_config/SDL_build_config.h"),
-        description="LINUX SDL3",
-        pool="console",
-        restat=True,
-    )
+    sdl3_rule(n, sln, name="linux_sdl3", description="LINUX SDL3", source=sdl_source, sdl_build=sdl_build,
+              log_dir=build_dir, cc=cc,
+              cmake_args=[f"-DCMAKE_TOOLCHAIN_FILE=$$PWD/{SYSROOT_TOOLCHAIN}", f"-DHALO_SYSROOT=$$PWD/{sysroot}"],
+              check=(f"$python {SYSROOT_SCRIPT} --check-sdl "
+                     f"{sdl_build}/include-config-release/build_config/SDL_build_config.h"))
     n.build(outputs=libsdl, rule="linux_sdl3", implicit=[stamp, SYSROOT_TOOLCHAIN])
     cflags = [f"--sysroot={_quote(sysroot)}", f"-isystem {_quote(sdl_source / 'include')}"]
-    # (DT_RPATH rather than DT_RUNPATH: it comes before LD_LIBRARY_PATH,
-    # which Steam sets for the games it starts, so that the SDL beside the
-    # executable is the one loaded, whatever other SDL that path holds)
-    ldflags = [f"--sysroot={_quote(sysroot)}", f"-L{_quote(sdl_build)}", "'-Wl,-rpath,$$ORIGIN'",
-               "-Wl,--disable-new-dtags"]
+    ldflags = [f"--sysroot={_quote(sysroot)}", f"-L{_quote(sdl_build)}", *SDL_RPATH_LDFLAGS]
     sdl_license = build_dir / "SDL3-LICENSE.txt"
     n.build(outputs=sdl_license, rule="linux_copy", inputs=sdl_license_source)
     return cflags, ldflags, stamp, libsdl, sdl_license

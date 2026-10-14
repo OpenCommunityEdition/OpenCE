@@ -3,13 +3,16 @@ GUEST_MISC.C
 
 Runtime support functions the guest's code generator (clang's Darwin
 arm64_32 target) or the platform layer expect, which neither the game nor
-musl provides.
+musl provides. Those of Darwin's are only for a guest compiled for it
+(HALO_GUEST_MACHO); clang's GNU targets (x32) call musl's own.
 */
 
 #include "guest_host.h"
 
 #include <math.h>
 #include <string.h>
+
+#ifdef HALO_GUEST_MACHO
 
 /* Darwin's combined sine and cosine, which clang substitutes for
 sin()/cos() pairs of the same argument */
@@ -80,6 +83,8 @@ __attribute__((no_builtin)) void memset_pattern16(void *buffer, const void *patt
 	for (index = 0; index < size; index++)
 		out[index] = ((const unsigned char *)pattern)[index & 15];
 }
+
+#endif
 
 void __stack_chk_fail(void)
 {

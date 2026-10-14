@@ -249,6 +249,11 @@ enum
 	_distributed_unit_part_killer_bit,
 };
 
+/* world units: how far apart the host's run of a client's player and the
+client's may be, a tick from the same place, and agree (distributed_divergence:
+well past the last bits' rounding, well short of a player running 1% faster) */
+#define DIVERGENCE_APART_DISTANCE 0.0001f
+
 /* world units: how far a client's own player's unit may be from the host's
 before the host takes it no longer, and before the client is put where the
 host has it (no further than that: between the two they would disagree for
@@ -683,6 +688,35 @@ static struct
 	long received;
 	long corrections;
 } distributed_statistics;
+/* ... and (the host) how far apart a client's player moved in a tick on the
+client and on the host, where the host took the client's last prediction
+the tick before, that was of the client's tick before, and the host's tick
+ran the player with the client's input of that tick: both machines then
+moved the player one tick with the same input from much the same place, so
+builds that simulate alike move it alike to the last bit (but where the
+player touched something the two have in different places), and a build
+that moves a player otherwise moves it otherwise, every tick the player
+moves (tools/net_compare.py). The move, not where it ends: the host's
+copy is put only halfway to a prediction a little off, and would be as far
+off the next for ticks after. Since network_distributed_divergence last
+read them: how many such ticks, how many of them further apart than
+DIVERGENCE_APART_DISTANCE, and the mean and the largest distance. */
+static struct
+{
+	long samples;
+	long apart;
+	real total;
+	real largest;
+	/* the tick of the client's and of the host's last prediction taken */
+	long taken_time[MAXIMUM_TRACKED_PLAYERS];
+	long taken_host_time[MAXIMUM_TRACKED_PLAYERS];
+	/* where that prediction had the player, and where it left the host's */
+	real_point3d taken_position[MAXIMUM_TRACKED_PLAYERS];
+	real_point3d taken_host_position[MAXIMUM_TRACKED_PLAYERS];
+	/* the client's tick of the latest input the host has of each player
+	(what the host's tick ran it with) */
+	long input_time[MAXIMUM_TRACKED_PLAYERS];
+} distributed_divergence;
 
 /* ---------- shared (network_distributed.h) */
 
@@ -700,6 +734,22 @@ void distributed_count_correction(
 	void)
 {
 	distributed_statistics.corrections++;
+}
+
+void network_distributed_divergence(
+	long *samples,
+	long *apart,
+	real *mean,
+	real *largest)
+{
+	*samples = distributed_divergence.samples;
+	*apart = distributed_divergence.apart;
+	*mean = distributed_divergence.samples ? distributed_divergence.total / (real)distributed_divergence.samples : 0.0f;
+	*largest = distributed_divergence.largest;
+	distributed_divergence.samples = 0;
+	distributed_divergence.apart = 0;
+	distributed_divergence.total = 0.0f;
+	distributed_divergence.largest = 0.0f;
 }
 
 boolean distributed_real_valid(
@@ -2069,6 +2119,30 @@ static void distributed_take_prediction(
 	dx = position.x - object->object.position.x;
 	dy = position.y - object->object.position.y;
 	dz = position.z - object->object.position.z;
+	/* (for the tests' reports: a tick on from the last taken, on both, with
+	the input the client's tick ran: an input's tick is the client's time
+	before it ran, a prediction's after; the prediction's time is the
+	client's word, kept from overflowing) */
+	if (distributed_divergence.taken_host_time[player_index] == now - 1 &&
+		distributed_predictions[player_index].time != LONG_MIN &&
+		distributed_divergence.taken_time[player_index] == distributed_predictions[player_index].time - 1 &&
+		distributed_divergence.input_time[player_index] == distributed_predictions[player_index].time - 1)
+	{
+		real_point3d const *client_from = &distributed_divergence.taken_position[player_index];
+		real_point3d const *host_from = &distributed_divergence.taken_host_position[player_index];
+		real mx = (position.x - client_from->x) - (object->object.position.x - host_from->x);
+		real my = (position.y - client_from->y) - (object->object.position.y - host_from->y);
+		real mz = (position.z - client_from->z) - (object->object.position.z - host_from->z);
+		real distance = (real)sqrt(mx * mx + my * my + mz * mz);
+
+		distributed_divergence.samples++;
+		if (distance > DIVERGENCE_APART_DISTANCE)
+			distributed_divergence.apart++;
+		distributed_divergence.total += distance;
+		if (distance > distributed_divergence.largest)
+			distributed_divergence.largest = distance;
+	}
+	distributed_divergence.taken_host_time[player_index] = NONE;
 	if (!(dx * dx + dy * dy + dz * dz <= HOST_ACCEPT_TOLERANCE * HOST_ACCEPT_TOLERANCE))
 		return;
 	if (distributed_accepted[player_index].valid)
@@ -2107,6 +2181,10 @@ static void distributed_take_prediction(
 	{
 		distributed_predictions[player_index].taken_time = distributed_predictions[player_index].time;
 		distributed_predictions[player_index].taken_host_time = now;
+		distributed_divergence.taken_time[player_index] = distributed_predictions[player_index].time;
+		distributed_divergence.taken_host_time[player_index] = now;
+		distributed_divergence.taken_position[player_index] = position;
+		distributed_divergence.taken_host_position[player_index] = object->object.position;
 		/* (a new anchor: the first, one a second on, or after a jump) */
 		if (!distributed_accepted[player_index].valid ||
 			now - distributed_accepted[player_index].host_time >= PREDICTION_ANCHOR_TICKS)
@@ -2445,6 +2523,18 @@ static void distributed_handle_inputs(
 		network_coop_note_player_structure_bsp(input->player_index, input->structure_bsp_index);
 		update_server_handle_distributed_input(DATUM_INDEX_NEW(input->player_index, player->identifier), input->tick,
 			&action, input->control_flags, DISTRIBUTED_INPUT_HISTORY);
+		/* (for the tests' reports: the newest, as the input taken is, or one
+		a second or more older, the client's clock set back; the subtraction
+		kept from overflowing, as the tick is the client's word) */
+		{
+			long newest = distributed_divergence.input_time[input->player_index];
+
+			if (newest == NONE || input->tick > newest ||
+				(newest >= LONG_MIN + TICKS_PER_SECOND && input->tick < newest - TICKS_PER_SECOND))
+			{
+				distributed_divergence.input_time[input->player_index] = input->tick;
+			}
+		}
 		if (input->host_time != NONE && (host_time == NONE || input->host_time > host_time))
 			host_time = input->host_time;
 	}
@@ -3360,6 +3450,14 @@ void network_distributed_new_game(
 	distributed_host_time = NONE;
 	distributed_statistics_due = FALSE;
 	distributed_pickup_count = 0;
+	/* (the tests' drift figures: none taken, no input had, of this game) */
+	csmemset(&distributed_divergence, 0, sizeof(distributed_divergence));
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+	{
+		distributed_divergence.taken_time[player_index] = NONE;
+		distributed_divergence.taken_host_time[player_index] = NONE;
+		distributed_divergence.input_time[player_index] = NONE;
+	}
 	/* (each player's latest input: player_queues_new.c) */
 	update_queues_distributed_reset();
 	network_objects_new_game();

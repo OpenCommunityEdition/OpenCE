@@ -30,7 +30,13 @@ void __guest_thread_initialize_main(void);
 
 extern char **__environ;
 
+/* (first in the image, guest.ld; a Mach-O section name for a guest whose
+assembly is converted to ELF's, which names it .guest_header) */
+#ifdef HALO_GUEST_MACHO
 __attribute__((section("__TEXT,__guest_header"), used))
+#else
+__attribute__((section(".guest_header"), used))
+#endif
 const struct halo_guest_header __guest_header =
 {
 	HALO_GUEST_MAGIC,
