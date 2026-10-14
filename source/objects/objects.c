@@ -58,6 +58,7 @@ void object_bounds_cache_update(long object_index, real_point3d const *center, r
 /* port: port/linux/game/first_person_legs.c's */
 void first_person_legs_reset(void);
 void visor_color_reset(void); /* port: port/linux/game/visor_color.c */
+void spartan_colors_reset(void); /* port: port/linux/game/spartan_colors.c */
 
 /* ---------- constants */
 
@@ -1076,6 +1077,7 @@ void objects_initialize_for_new_map(
 	(port/linux/game/first_person_legs.c) */
 	first_person_legs_reset();
 	visor_color_reset(); /* port: the visor shaders looked up again (port/linux/game/visor_color.c) */
+	spartan_colors_reset(); /* port: (port/linux/game/spartan_colors.c) */
 	
 	data_make_valid(object_header_data);
 	object_name_list_clear();

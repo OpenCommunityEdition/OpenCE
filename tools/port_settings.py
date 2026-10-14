@@ -221,13 +221,34 @@ SCREENS["video_settings/fov_viewmodels"] = {
          "The energy shield's flare on your first-person\narms too, as on your body.", None),
         ("LEGS:", "display.first_person_legs", ON_OFF,
          "Your legs in first person, seen looking down,\nmoving as you run. Your body as others see it.", None),
-        ("SHIELD COLOR:", "display.shield_color", [("DEFAULT", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
-         "Your shield's flare in an armor color, whatever\nyour armor. Only you see it. Default: its own.", None),
-        ("VISOR COLOR:", "display.visor_color", [("DEFAULT", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
-         "Your visor in an armor color. Black: deep, as\nan ODST's. Default: its gold.", None),
-        ("SHOW CUSTOM VISORS:", "display.others_visor_colors", ON_OFF,
-         "Lets you decide if you want to see others'\ncustom visor colors, or stay classic.", None),
     ],
+}
+# the pause menus' ARMOR (menu_tags.c's pause_list_patch; not opened from the
+# settings): your Spartan's look (port/linux/game/spartan_colors.c,
+# visor_color.c, shield_color.c), and whether the other players' are shown
+# as they chose them (armor_sync.c)
+SCREENS["video_settings/fov_viewmodels/spartan_armor"] = {
+    "screen": "spartan_armor_settings_screen", "header": _video["header"], "spacing": 30,
+    "rows": [
+        ("ARMOR COLOR:", "display.spartan_armor_color",
+         [("CLASSIC", "default")] + [(c.upper(), c) for c in SHIELD_COLORS] + [("BLACKOUT", "blackout")],
+         "Change your look.", None),
+        ("ARMOR LIGHTS:", "display.spartan_lights_color", [("CLASSIC", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
+         "The armor's lights, above the knees and\nwherever it glows.", None),
+        ("VISOR COLOR:", "display.visor_color", [("CLASSIC", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
+         "Your visor in an armor color. Black: deep, as\nan ODST's. Classic: its gold.", None),
+        ("FLASHLIGHT:", "display.flashlight_color", [("CLASSIC", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
+         "The flashlight's light.", None),
+        ("SHIELD COLOR:", "display.shield_color", [("CLASSIC", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
+         "Your energy shield's flare in an armor color.\nClassic: its own.", None),
+        ("SHOW PLAYERS CUSTOM ARMOR:", "display.others_custom_armor", YES_NO,
+         "No: every other player as stock, their armor,\nlights, visor, shield and flashlight.", None),
+        ("SHOW PLAYERS CUSTOM FLASHLIGHTS:", "display.others_custom_flashlights", YES_NO,
+         "Other players' flashlights in the colors they\nchose. No: as stock.", None),
+    ],
+    # (a button under the rows, in the middle: every row back to the game's
+    # own look, as DEFAULTS does)
+    "reset_button": "RESET TO CLASSIC",
 }
 
 # Network Setup's map sharing (port/linux/game/map_share.c): this machine's
@@ -260,6 +281,8 @@ CONTROL_ROWS = 7
 
 # the settings whose rows have the wider spinner (a device's name)
 WIDE_SETTINGS = {"audio.output_device", "audio.input_device"}
+# (the Armor menu's Show rows: long labels, YES or NO)
+SHORT_SETTINGS = {"display.others_custom_armor", "display.others_custom_flashlights"}
 
 # the host's voice chat and vote kicks, on Teamplay Options
 # (_teamplay_options_extras): each row's key, its label, its choices' words
@@ -348,7 +371,9 @@ def _screen(folder: str, spec: dict, rows: list, list_inputs: list, list_handler
     # (each row: its widget, platform, and the place it is in, else the next)
     for index, (row, platform, *place) in enumerate(rows):
         y = 73 + (place[0] if place else index) * spec["spacing"]
-        children.append(f'<child{attributes([("widget", row), ("x", 54), ("y", y), ("platform", platform)])}/>')
+        # (a row's own x, if it gives one: reset_button's)
+        x = place[1] if len(place) > 1 else 54
+        children.append(f'<child{attributes([("widget", row), ("x", x), ("y", y), ("platform", platform)])}/>')
     children.append(f'<child{attributes([("widget", f"{base}/button_bar"), ("y", 414)])}/>')
     lines += _widget(f"{base}/options_menu",
                      [("type", "column_list"), ("width", 640), ("height", 480),
@@ -401,23 +426,26 @@ def _setting_screen(folder: str, spec: dict) -> list:
         # (a device's name wants the wider spinner Server Setup's co-op rows
         # have: WIDE_SETTINGS)
         wide = setting in WIDE_SETTINGS
+        # (a long label and a short value, YES or NO: SHORT_SETTINGS' spinner
+        # further right, narrower, the label wider)
+        short = setting in SHORT_SETTINGS
         extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
                                ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
                          [f'<child{attributes([("widget", f"{base}/{key}_label")])}/>',
-                          f'<child{attributes([("widget", f"{base}/{key}_spinner"), ("x", 286 if wide else 320), ("y", 1)])}/>'])
+                          f'<child{attributes([("widget", f"{base}/{key}_spinner"), ("x", 286 if wide else 384 if short else 320), ("y", 1)])}/>'])
         extra += _widget(f"{base}/{key}_label",
-                         [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
+                         [("type", "text"), ("controller", 1), ("width", 370 if short else 300), ("height", 22),
                           ("string_list", f"{base}/labels"), ("string_index", index), ("font", "ui\\large_ui"),
                           ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
         extra += _widget(f"{base}/{key}_spinner",
-                         [("type", "spinner"), ("left", None if wide else 3), ("top", 2), ("width", 206 if wide else 147),
+                         [("type", "spinner"), ("left", None if wide else 3), ("top", 2), ("width", 206 if wide else 110 if short else 147),
                           ("height", 20), ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
                           ("strings", "|".join(shown for shown, _ in choices)), ("setting", setting),
                           ("values", "|".join(value for _, value in choices)), ("font", "ui\\large_ui"),
                           ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4 if wide else 1),
                           ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
                           ("header_bounds", "7 -13 19 -7" if wide else "7 -6 19 0"),
-                          ("footer_bounds", "7 208 19 214" if wide else "7 150 19 156")],
+                          ("footer_bounds", "7 208 19 214" if wide else "7 113 19 119" if short else "7 150 19 156")],
                          ['<on event="created" run="port setting load"/>'])
     # (each category's row: its label, the screen it opens, its help, and the
     # platforms it is for, as a row's: every one's when it names none)
@@ -446,6 +474,19 @@ def _setting_screen(folder: str, spec: dict) -> list:
                                                     '<on event="start" run="port settings defaults"/>'])
     extra += _button(f"{base}/button_ok", 1, ['<on event="a" run="port settings save" back="true"/>',
                                               '<on event="start" run="port settings save" back="true"/>'])
+    # (reset_button: a button of that text under the last row, centred on
+    # the rows, setting them all to their defaults)
+    if spec.get("reset_button"):
+        width = 224
+        rows.append((f"{base}/button_reset", None, place + 1 + len(spec.get("categories", ())),
+                     54 + (512 - width) // 2))
+        extra += _widget(f"{base}/button_reset",
+                         [("type", "text"), ("width", width), ("height", 24),
+                          ("bitmap", "bitmaps/text_button_background"), ("text", spec["reset_button"]),
+                          ("font", "ui\\small_ui"), ("color", "#FFFFFFFF"), ("align", "center"), ("text_y", 2)],
+                         ['<on event="a" run="port settings defaults"/>',
+                          '<on event="start" run="port settings defaults"/>',
+                          '<on event="left_mouse" run="mouse emit accept event"/>'])
     extra += _strings(f"{base}/labels", [label for label, *_ in spec["rows"]] +
                       [label for label, *_ in spec.get("categories", ())])
     # (the help of the row whose label is string n is n + 1: the buttons' is 0)
@@ -757,8 +798,10 @@ def title_backdrop(width: float) -> str:
 PAUSE_BOX_BUTTONS = [3, 4]
 # the campaign pause box, tall enough for five rows at the PC version's pause
 # menu's pitch (30) with the prompts still under the last row: the stock box
-# is 159, and those rows need 36 more
-PAUSE_BOX_EXTRA_HEIGHTS = [195]
+# is 159, and those rows need 36 more; and for six, with ARMOR, 30 more
+# again; and the multiplayer box of five buttons (ARMOR), as tall as its
+# picture lets (256)
+PAUSE_BOX_EXTRA_HEIGHTS = [195, 225, 255]
 
 
 def pause_box_height(buttons: int) -> int:

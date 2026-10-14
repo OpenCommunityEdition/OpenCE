@@ -308,14 +308,6 @@ static const struct config_setting config_settings[] =
 	{ "display.viewmodel_shield", _config_boolean, "false", "HALO_VIEWMODEL_SHIELD", _environment_value, _platform_all,
 		"The energy shield's flare on the first-person arms too, as on the body\n"
 		"(the stock game draws it on the body only)." },
-	{ "display.visor_color", _config_string, "\"default\"", "HALO_VISOR_COLOR", _environment_value, _platform_all,
-		"Your Spartan's visor in a multiplayer armor color (\"white\", \"black\",\n"
-		"\"red\"... as the profile's colors; black a deep, glossy black), or\n"
-		"\"default\", its gold. Sent to the other players in network games." },
-	{ "display.others_visor_colors", _config_boolean, "false", "HALO_OTHERS_VISOR_COLORS", _environment_value,
-		_platform_all,
-		"Other players' visors in the colors they chose (display.visor_color);\n"
-		"false: their gold, as stock." },
 	{ "display.first_person_legs", _config_boolean, "false", "HALO_FIRST_PERSON_LEGS", _environment_value, _platform_all,
 		"Your own legs in first person, seen looking down: your body as others\n"
 		"see it, drawn from the waist down, moving as it moves." },
@@ -326,10 +318,36 @@ static const struct config_setting config_settings[] =
 		"How far the shield glow reaches: \"default\" or \"light_show\" (three\n"
 		"times as far, and at full strength from a third of the flare)." },
 	{ "display.shield_color", _config_string, "\"default\"", "HALO_SHIELD_COLOR", _environment_value, _platform_all,
-		"Your energy shield's color, as this machine draws it: \"default\" (the\n"
-		"shield's own) or a multiplayer armor color: white, black, red, blue,\n"
-		"gray, yellow, green, pink, purple, cyan, cobalt, orange, teal, sage,\n"
-		"brown, tan, maroon or salmon." },
+		"Your energy shield's color: \"default\" (the shield's own) or a\n"
+		"multiplayer armor color: white, black, red, blue, gray, yellow, green,\n"
+		"pink, purple, cyan, cobalt, orange, teal, sage, brown, tan, maroon or\n"
+		"salmon. In a network game the other players see it if they show\n"
+		"players' custom armor (display.others_custom_armor)." },
+	{ "display.spartan_armor_color", _config_string, "\"default\"", "HALO_SPARTAN_ARMOR_COLOR", _environment_value,
+		_platform_all,
+		"Your Spartan's armor in a multiplayer armor color (\"white\", \"black\",\n"
+		"\"red\"...) or \"blackout\" (deeper than black); \"default\": the game's\n"
+		"own (in multiplayer, the profile's color). A team game keeps the team's." },
+	{ "display.spartan_lights_color", _config_string, "\"default\"", "HALO_SPARTAN_LIGHTS_COLOR", _environment_value,
+		_platform_all,
+		"Your Spartan's armor lights (the glow above the knees) in a multiplayer\n"
+		"armor color; \"default\": the game's own." },
+	{ "display.visor_color", _config_string, "\"default\"", "HALO_VISOR_COLOR", _environment_value, _platform_all,
+		"Your Spartan's visor in a multiplayer armor color (\"white\", \"black\",\n"
+		"\"red\"... as the profile's colors; black a deep, glossy black), or\n"
+		"\"default\", its gold." },
+	{ "display.flashlight_color", _config_string, "\"default\"", "HALO_FLASHLIGHT_COLOR", _environment_value,
+		_platform_all,
+		"Your Spartan's flashlight in a multiplayer armor color; \"default\": the\n"
+		"game's own." },
+	{ "display.others_custom_armor", _config_boolean, "false", "HALO_OTHERS_CUSTOM_ARMOR", _environment_value,
+		_platform_all,
+		"Other players' Spartans as they chose them (Pause > Armor): their armor,\n"
+		"lights, visor and shield (and flashlight, display.others_custom_flashlights);\n"
+		"false: every one as stock." },
+	{ "display.others_custom_flashlights", _config_boolean, "false", "HALO_OTHERS_CUSTOM_FLASHLIGHTS",
+		_environment_value, _platform_all,
+		"Other players' flashlights in the colors they chose; false: as stock." },
 
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"

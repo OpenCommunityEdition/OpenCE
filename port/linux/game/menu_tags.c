@@ -81,8 +81,8 @@ adds to */
 #define MULTIPLAYER_COLLECTION "ui\\shell\\multiplayer"
 /* the campaign's full screen pause screen, which pause_campaign_patch adds to */
 #define CAMPAIGN_PAUSE_SCREEN "ui\\shell\\solo_game\\pause_game\\pause_game"
-/* the tags pause_patch adds: two buttons and their texts */
-#define PAUSE_PATCH_TAGS 4
+/* the tags pause_patch adds: three buttons and their texts */
+#define PAUSE_PATCH_TAGS 6
 /* what a frame of ui.map's is drawn as in a game map, which has not got it */
 #define BLANK_PNG "ce/port/blank__0.png"
 #define UI_WIDGET_DEFINITION_TAG 'DeLa'
@@ -1468,8 +1468,13 @@ tools/port_settings.py), centred where the old one was; on a custom map's,
 what is below the list moves down. */
 
 #define PAUSE_SETTINGS_SCREEN "main_menu/settings_select/player_setup/player_profile_edit/player_profile_edit_screen"
+/* the pause menus' ARMOR (spartan_colors.c, armor_sync.c) */
+#define PAUSE_ARMOR_SCREEN \
+	"main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/spartan_armor/spartan_armor_settings_screen"
 #define PAUSE_BUTTON_SPACING 35
 #define PAUSE_BOX_FIRST_BUTTONS 3
+/* the frame of five buttons' box (tools/port_settings.py) */
+#define PAUSE_BOX_FIVE_FRAME 4
 
 static long ui_function_named(char const *name)
 {
@@ -1525,8 +1530,8 @@ static long pause_quit_button(struct ui_widget_definition const *list, long quit
 }
 
 /* a button like the model (its look), its own text, each of the model's
-events (its A and Start) running the function and opening the widget (if
-not NONE) */
+events (its A and Start) running the function (if not NONE) and opening the
+widget (if not NONE) */
 static void *pause_button(struct cache_file_tag_instance *instances, struct ui_widget_definition const *model,
 	char const *name, char const *text, long function, long widget_tag)
 {
@@ -1548,8 +1553,9 @@ static void *pause_button(struct cache_file_tag_instance *instances, struct ui_w
 		memcpy(handlers, model->event_handlers.address, model->event_handlers.count * sizeof(*handlers));
 	for (handler = 0; handler < model->event_handlers.count; handler++)
 	{
-		handlers[handler].flags = FLAG(_event_handler_run_function_bit);
-		handlers[handler].function = (short)function;
+		/* (NONE: no function, the widget only opened) */
+		handlers[handler].flags = function != NONE ? FLAG(_event_handler_run_function_bit) : 0;
+		handlers[handler].function = (short)(function != NONE ? function : 0);
 		handlers[handler].script[0] = 0;
 		reference_set(&handlers[handler].widget_tag, UI_WIDGET_DEFINITION_TAG, widget_tag);
 		if (widget_tag != NONE)
@@ -1562,37 +1568,53 @@ static void *pause_button(struct cache_file_tag_instance *instances, struct ui_w
 	return button;
 }
 
-/* the list's buttons: SETTINGS (and the host's END GAME) put before LEAVE
-GAME (quit); returns how many were added, and how much taller the list
-grew for them (growth) */
+/* the list's buttons: ARMOR (armor), SETTINGS and the host's END GAME put
+before LEAVE GAME (quit); returns how many were added, and how much taller
+the list grew for them (growth) */
 static long pause_list_patch(struct cache_file_tag_instance *instances, struct ui_widget_definition *list, long quit,
-	boolean host, short *growth)
+	boolean host, boolean armor, short *growth)
 {
 	struct ui_widget_child_reference *children = list->child_widgets.address;
-	long count = list->child_widgets.count, added = host ? 2 : 1, child;
+	long count = list->child_widgets.count, added = 1 + (host ? 1 : 0) + (armor ? 1 : 0), child;
 	struct ui_widget_child_reference *grown = allocate((count + added) * sizeof(struct ui_widget_child_reference));
 	struct ui_widget_definition const *model = tag_get(UI_WIDGET_DEFINITION_TAG, children[quit].widget_tag.index);
 	long settings_widget = widget_named(PAUSE_SETTINGS_SCREEN);
 	short spacing = count >= 2 ? (short)(children[count - 1].vertical_offset - children[count - 2].vertical_offset) :
 		PAUSE_BUTTON_SPACING;
-	void *buttons[2];
-	long tags[2];
+	long armor_widget = armor ? widget_named(PAUSE_ARMOR_SCREEN) : NONE;
+	void *buttons[3];
+	long tags[3];
+	char const *names[3];
 
-	if (!grown || settings_widget == NONE || spacing <= 0)
+	if (!grown || settings_widget == NONE || spacing <= 0 || (armor && armor_widget == NONE))
 		return 0;
-	tags[0] = next_tag();
-	buttons[0] = pause_button(instances, model, "pause/settings_button", "SETTINGS",
+	/* (ARMOR first, then SETTINGS, then the host's END GAME) */
+	child = 0;
+	if (armor)
+	{
+		tags[child] = next_tag();
+		names[child] = "pause/armor_button";
+		buttons[child++] = pause_button(instances, model, "pause/armor_button", "ARMOR",
+			NONE, build.widget_tags[armor_widget]);
+	}
+	tags[child] = next_tag();
+	names[child] = "pause/settings_button";
+	buttons[child++] = pause_button(instances, model, "pause/settings_button", "SETTINGS",
 		function_index("profile set edit begin", "pause", 0), build.widget_tags[settings_widget]);
-	tags[1] = host ? next_tag() : NONE;
-	buttons[1] = host ? pause_button(instances, model, "pause/end_game_button", "END GAME",
-		function_index("port pause end game", "pause", 0), NONE) : NULL;
-	if (!buttons[0] || (host && !buttons[1]))
-		return 0;
+	if (host)
+	{
+		tags[child] = next_tag();
+		names[child] = "pause/end_game_button";
+		buttons[child++] = pause_button(instances, model, "pause/end_game_button", "END GAME",
+			function_index("port pause end game", "pause", 0), NONE);
+	}
 	for (child = 0; child < added; child++)
 	{
-		instance_set(instances, UI_WIDGET_DEFINITION_TAG, tags[child],
-			child ? "pause/end_game_button" : "pause/settings_button", "", buttons[child]);
+		if (!buttons[child])
+			return 0;
 	}
+	for (child = 0; child < added; child++)
+		instance_set(instances, UI_WIDGET_DEFINITION_TAG, tags[child], names[child], "", buttons[child]);
 	if (quit)
 		memcpy(grown, children, quit * sizeof(*grown));
 	for (child = 0; child < added; child++)
@@ -1660,7 +1682,9 @@ static void pause_box_redraw(struct ui_widget_definition const *box, long button
 		group = bitmap_group_get(build.bitmap_tags[bitmap]);
 		sequence = group->sequences.address;
 		/* (one frame: the one for the number of buttons) */
-		sequence->first_bitmap_index = (short)PIN(buttons - PAUSE_BOX_FIRST_BUTTONS, 0, group->bitmaps.count - 1);
+		/* (five, with ARMOR: the frame after the campaign's two) */
+		sequence->first_bitmap_index = (short)PIN(buttons >= PAUSE_BOX_FIRST_BUTTONS + 2 ? PAUSE_BOX_FIVE_FRAME :
+			buttons - PAUSE_BOX_FIRST_BUTTONS, 0, group->bitmaps.count - 1);
 		sequence->bitmap_count = 1;
 		reference_set(&definition->background_bitmap, BITMAP_GROUP_TAG, build.bitmap_tags[bitmap]);
 		definition->bounds.y1 = (short)(definition->bounds.y0 + 256);
@@ -1711,7 +1735,7 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 			quit = pause_quit_button(list, quit_function);
 			if (quit == NONE || patched_list != NONE)
 				continue;
-			added = pause_list_patch(instances, list, quit, host, &grow);
+			added = pause_list_patch(instances, list, quit, host, TRUE, &grow);
 			if (!added)
 				return;
 			buttons = list->child_widgets.count;
@@ -1774,10 +1798,11 @@ static char const *const pause_settings_hidden_items[] =
 
 /* the PC version's pause menu's row pitch (30 apart). The third pause box
 frame is the stock 159 grown by the 36 that five rows at this pitch add
-(tools/port_settings.py) */
+(tools/port_settings.py); the fourth, 30 more, for six rows (ARMOR) */
 #define PAUSE_CAMPAIGN_ROW_PITCH 30
 #define PAUSE_CAMPAIGN_BOX_FRAME 2
 #define PAUSE_CAMPAIGN_BOX_HEIGHT 195
+#define PAUSE_CAMPAIGN_BOX_HEIGHT_SIX 225
 
 /* the port box piece for one of the map's pause box pieces, else NULL */
 static char const *pause_campaign_box_bitmap(long tag_index)
@@ -1863,18 +1888,21 @@ static void pause_campaign_grow_box(struct ui_widget_definition *widget, short s
 			/* (bitmap_name is the lookup, not piece_bitmap: find calls it) */
 			long bitmap = find(piece_bitmap, build.menus->bitmap_count, bitmap_name);
 			short height = (short)(child_widget->bounds.y1 - child_widget->bounds.y0);
+			short grown_height = (short)(height + shift);
+			short frame = grown_height == PAUSE_CAMPAIGN_BOX_HEIGHT ? PAUSE_CAMPAIGN_BOX_FRAME :
+				grown_height == PAUSE_CAMPAIGN_BOX_HEIGHT_SIX ? PAUSE_CAMPAIGN_BOX_FRAME + 1 : NONE;
 
-			if (bitmap != NONE && (short)(height + shift) == PAUSE_CAMPAIGN_BOX_HEIGHT)
+			if (bitmap != NONE && frame != NONE)
 			{
 				struct bitmap_group *group = bitmap_group_get(build.bitmap_tags[bitmap]);
 				struct bitmap_group_sequence *sequence = group ? group->sequences.address : NULL;
 
-				if (sequence && PAUSE_CAMPAIGN_BOX_FRAME < group->bitmaps.count)
+				if (sequence && frame < group->bitmaps.count)
 				{
-					sequence->first_bitmap_index = PAUSE_CAMPAIGN_BOX_FRAME;
+					sequence->first_bitmap_index = frame;
 					sequence->bitmap_count = 1;
 					reference_set(&child_widget->background_bitmap, BITMAP_GROUP_TAG, build.bitmap_tags[bitmap]);
-					child_widget->bounds.y1 = (short)(child_widget->bounds.y0 + PAUSE_CAMPAIGN_BOX_HEIGHT);
+					child_widget->bounds.y1 = (short)(child_widget->bounds.y0 + grown_height);
 				}
 			}
 			else
@@ -1986,12 +2014,13 @@ static void pause_campaign_patch(struct cache_file_tag_instance *instances)
 			if (tag_name_ends(rows[revert].widget_tag.index, "\\restart_at_save_point_button"))
 				break;
 		}
+		/* (none, co-op's: before its last, the quit) */
 		if (revert == list->child_widgets.count)
-			return;
+			revert = list->child_widgets.count - 1;
 		span = (short)(rows[list->child_widgets.count - 1].vertical_offset - rows[0].vertical_offset);
 		top = rows[0].vertical_offset;
 		bottom = list->bounds.y1;
-		if (pause_list_patch(instances, list, revert, FALSE, &grow))
+		if (pause_list_patch(instances, list, revert, FALSE, TRUE, &grow))
 		{
 			struct ui_widget_child_reference *placed = list->child_widgets.address;
 			struct ui_widget_definition const *button =
@@ -2163,8 +2192,9 @@ void menu_tags_loaded(
 	if (game_map)
 	{
 		pause_patch(instances);
-		if (campaign)
-			pause_campaign_patch(instances);
+		/* (co-op's pause menu too, a campaign's: its screens do not pause
+		the game) */
+		pause_campaign_patch(instances);
 		if (build.failed)
 			goto failed;
 		/* (those it made) */

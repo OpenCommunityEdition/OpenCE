@@ -76,7 +76,7 @@ machine (their datum identifiers need not be).
 #include "network_coop.h"
 #include "network_distributed.h"
 #include "network_voice.h"
-#include "visor_color.h"
+#include "armor_sync.h"
 #include "map_share.h"
 #include "profile_sections.h"
 
@@ -3979,11 +3979,11 @@ void network_distributed_handle_message(
 		network_voice_handle_message(machine_index, message, size);
 		return;
 	}
-	/* (the visors' colors, in the lobby too: visor_color.c; the host takes
-	a client's only from its stream) */
-	if (visor_color_handles_message(message, size))
+	/* (the Armor choices, in the lobby too: armor_sync.c; the host takes a
+	client's only from its stream) */
+	if (armor_sync_handles_message(message, size))
 	{
-		visor_color_handle_message(machine_index, message, size,
+		armor_sync_handle_message(machine_index, message, size,
 			machine_index != NONE && distributed_handling_stream_message);
 		return;
 	}

@@ -1,10 +1,8 @@
 /*
 VISOR_COLOR.C
 
-Your Spartan's visor in a multiplayer armor color (Video Setup > FOV and
-Viewmodels > Visor Color, display.visor_color), instead of its gold; and the
-other players' in theirs, with Show Custom Visors (display.others_visor_colors,
-off by default: their gold, as stock).
+Your Spartan's visor in a multiplayer armor color (the pause menus' ARMOR >
+Visor Color, display.visor_color), instead of its gold.
 
 The visor's gold is not a color the game sets: it is painted into the
 Spartan's own texture ("characters\cyborg\bitmaps\cyborg", the armor's),
@@ -19,16 +17,12 @@ as an ODST's.
 Only the drawing is changed. In multiplayer, your own players' visors (each
 local player's unit, as it is drawn: in third person, in a vehicle; and
 their bodies once dead, after they have respawned too), and the other
-players' in the colors they chose (display.others_visor_colors). In a
-campaign, every Spartan's, so the cutscenes' Master Chief has it too.
+players' in the colors they chose (display.others_custom_armor: Show
+Players Custom Armor), in co-op too. In a campaign, every Spartan's, so the
+cutscenes' Master Chief has it too.
 
-In a network game each machine sends its visor color to the host, reliably,
-whenever it is not the one the host has for it; the host keeps every
-machine's and sends the whole table to every machine, reliably, when it
-changes and every ten seconds, in the lobby and in the game. Builds without
-it drop both kinds as unknown, as with voice chat (network_voice.c), so the
-network version is unchanged. The host takes a machine's color only from its
-own stream, and only an armor color's index or none.
+In a network game each machine's visor color goes to the others with its
+other Armor choices (armor_sync.c).
 */
 
 #include "cseries.h"
@@ -38,24 +32,15 @@ own stream, and only an armor color's index or none.
 #include "game/players.h"
 #include "saved games/player_profile.h"
 #include "tag_files/tag_groups.h"
-#include "bungie_net/common/message_header.h"
-#include "networking/network_game_globals.h"
-#include "networking/network_game_manager.h"
-#include "networking/network_client_manager.h"
-#include "network_distributed.h"
-#include "visor_color.h"
 #include "game/game_engine.h"
+#include "armor_sync.h"
 
 #include <string.h>
 
-/* port/linux/src/port_config.c, network_distributed.c, cseries_windows.c */
+/* port/linux/src/port_config.c */
 const char *config_string(const char *name);
 int config_boolean(const char *name);
 unsigned long config_changes(void);
-boolean network_distributed_client_send_reliably(void *message, word size);
-boolean network_distributed_server_send_to_machine_reliably(long machine_index, void *message, word size);
-short network_distributed_server_machines(long *machine_indices, short maximum);
-unsigned long system_milliseconds(void);
 /* cache_files.c */
 long tag_loaded(long group_tag, char const *name);
 /* port/linux/src/d3d8_gl.c: the draws that follow recolored (curve 0: not) */
@@ -81,6 +66,8 @@ static char const *const visor_shader_names[] =
 
 static unsigned long visor_color_changes = (unsigned long)-1;
 static short visor_color_index = NONE;
+/* others' visors shown as they chose (display.others_custom_armor) */
+static boolean visor_color_others_shown = FALSE;
 /* the map's visor shaders (looked up again on a new map: visor_color_reset) */
 static boolean visor_color_looked = FALSE;
 static void const *visor_color_shaders[NUMBEROF(visor_shader_names)];
@@ -95,6 +82,7 @@ static void visor_color_update(
 	if (visor_color_changes == config_changes())
 		return;
 	visor_color_changes = config_changes();
+	visor_color_others_shown = config_boolean("display.others_custom_armor") != 0;
 	visor_color_index = NONE;
 	value = config_string("display.visor_color");
 	for (index = 0; value && index < (short)NUMBEROF(visor_color_names); index++)
@@ -177,236 +165,21 @@ static boolean visor_color_local_unit(
 	return FALSE;
 }
 
-/* ---------- in network games */
-
-enum
-{
-	VISOR_COLOR_MACHINES = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
-	VISOR_COLOR_SENT_NONE = 0xFF,
-	/* how often a machine says its color while the host has another, and
-	the host sends its table unchanged (ms) */
-	VISOR_COLOR_SAY_MS = 3000,
-	VISOR_COLOR_TABLE_MS = 10000,
-	VISOR_COLOR_TABLE_SOONEST_MS = 500,
-};
-
-/* a machine's color, to the host */
-struct distributed_visor_color
-{
-	byte color; /* an armor color's index, VISOR_COLOR_SENT_NONE for the gold */
-	byte pad[3];
-};
-
-/* every machine's color, from the host */
-struct distributed_visor_colors
-{
-	byte colors[VISOR_COLOR_MACHINES];
-};
-
-struct distributed_visor_color_message
-{
-	struct distributed_message_header header;
-	struct distributed_visor_color entry;
-};
-
-struct distributed_visor_colors_message
-{
-	struct distributed_message_header header;
-	struct distributed_visor_colors entry;
-};
-
-/* each machine's color as the host has it (heard: a client has had the
-host's table) */
-static byte visor_color_table[VISOR_COLOR_MACHINES];
-static boolean visor_color_table_heard = FALSE;
-static boolean visor_color_table_changed = FALSE;
-static unsigned long visor_color_table_sent_at = 0;
-static unsigned long visor_color_said_at = 0;
-static boolean visor_color_in_game = FALSE;
-
-static struct network_game *visor_color_network_game(
-	void)
-{
-	struct network_game_client *client = global_network_game_client_get();
-
-	return client ? network_game_client_get_game(client) : NULL;
-}
-
-static boolean visor_color_host(
-	void)
-{
-	return global_network_game_server_get() != NULL;
-}
-
-static byte visor_color_sent(
-	void)
-{
-	return visor_color_index == NONE ? VISOR_COLOR_SENT_NONE : (byte)visor_color_index;
-}
-
-static void visor_color_fill_header(
-	struct distributed_message_header *header,
-	byte type,
-	word size)
-{
-	header->header = 0;
-	build_message_header(&header->header, size, 2, 0);
-	header->type = type;
-	header->count = 1;
-	header->game_time = game_in_progress() ? game_time_get() : 0;
-}
-
-/* another machine's player's visor, as the host's table has it (NONE: the
-gold, or not shown here) */
+/* another machine's player's visor, as the host's table has it
+(armor_sync.c; NONE: the gold, or not shown here) */
 static short visor_color_of_other(
 	long object_index)
 {
 	struct unit_datum *unit = unit_try_and_get(object_index);
 	struct player_datum *player;
-	long machine_index;
-	byte color;
+	short choices[NUMBER_OF_ARMOR_SYNC_CHOICES];
 
-	if (!unit || unit->unit.player_index == NONE || !visor_color_table_heard ||
-		!config_boolean("display.others_visor_colors"))
-	{
+	if (!visor_color_others_shown || !unit || unit->unit.player_index == NONE)
 		return NONE;
-	}
 	player = player_try_and_get(unit->unit.player_index);
-	if (!player)
+	if (!player || !armor_sync_of_machine(player->network_player_data.machine_index, choices))
 		return NONE;
-	machine_index = player->network_player_data.machine_index;
-	if (machine_index < 0 || machine_index >= VISOR_COLOR_MACHINES)
-		return NONE;
-	color = visor_color_table[machine_index];
-	return color < NUMBEROF(visor_color_names) ? color : NONE;
-}
-
-/* once a frame (interface.c): this machine's color said, and the host's
-table sent */
-void visor_color_network_update(
-	void)
-{
-	unsigned long now = system_milliseconds();
-	long local_machine;
-
-	if (!visor_color_network_game())
-	{
-		if (visor_color_in_game)
-		{
-			csmemset(visor_color_table, VISOR_COLOR_SENT_NONE, sizeof(visor_color_table));
-			visor_color_table_heard = FALSE;
-			visor_color_in_game = FALSE;
-		}
-		return;
-	}
-	if (!visor_color_in_game)
-	{
-		csmemset(visor_color_table, VISOR_COLOR_SENT_NONE, sizeof(visor_color_table));
-		visor_color_in_game = TRUE;
-		visor_color_said_at = now - VISOR_COLOR_SAY_MS;
-		visor_color_table_changed = TRUE;
-	}
-	visor_color_update();
-	local_machine = network_game_client_get_local_machine_index();
-	if (visor_color_host())
-	{
-		long machines[VISOR_COLOR_MACHINES];
-		short count;
-		short index;
-		struct distributed_visor_colors_message message;
-
-		visor_color_table_heard = TRUE;
-		if (local_machine >= 0 && local_machine < VISOR_COLOR_MACHINES &&
-			visor_color_table[local_machine] != visor_color_sent())
-		{
-			visor_color_table[local_machine] = visor_color_sent();
-			visor_color_table_changed = TRUE;
-		}
-		if (!(visor_color_table_changed && now - visor_color_table_sent_at >= VISOR_COLOR_TABLE_SOONEST_MS) &&
-			now - visor_color_table_sent_at < VISOR_COLOR_TABLE_MS)
-		{
-			return;
-		}
-		visor_color_table_changed = FALSE;
-		visor_color_table_sent_at = now;
-		csmemset(&message, 0, sizeof(message));
-		visor_color_fill_header(&message.header, _distributed_message_visor_colors, (word)sizeof(message));
-		csmemcpy(message.entry.colors, visor_color_table, sizeof(message.entry.colors));
-		count = network_distributed_server_machines(machines, VISOR_COLOR_MACHINES);
-		for (index = 0; index < count; index++)
-		{
-			if (machines[index] != local_machine)
-				network_distributed_server_send_to_machine_reliably(machines[index], &message, (word)sizeof(message));
-		}
-		return;
-	}
-	/* (a client: its color, while the host has another for it) */
-	if (local_machine < 0 || local_machine >= VISOR_COLOR_MACHINES ||
-		(visor_color_table_heard && visor_color_table[local_machine] == visor_color_sent()) ||
-		now - visor_color_said_at < VISOR_COLOR_SAY_MS)
-	{
-		return;
-	}
-	visor_color_said_at = now;
-	{
-		struct distributed_visor_color_message message;
-
-		csmemset(&message, 0, sizeof(message));
-		visor_color_fill_header(&message.header, _distributed_message_visor_color, (word)sizeof(message));
-		message.entry.color = visor_color_sent();
-		network_distributed_client_send_reliably(&message, (word)sizeof(message));
-	}
-}
-
-boolean visor_color_handles_message(
-	word const *message,
-	word size)
-{
-	struct distributed_message_header header;
-
-	if (size < sizeof(header))
-		return FALSE;
-	csmemcpy(&header, message, sizeof(header));
-	return header.type == _distributed_message_visor_color || header.type == _distributed_message_visor_colors;
-}
-
-void visor_color_handle_message(
-	long machine_index,
-	word const *message,
-	word size,
-	boolean from_stream)
-{
-	struct distributed_message_header header;
-	byte const *entry = (byte const *)message + sizeof(header);
-
-	if (!visor_color_handles_message(message, size))
-		return;
-	csmemcpy(&header, message, sizeof(header));
-	if (header.type == _distributed_message_visor_color)
-	{
-		struct distributed_visor_color color;
-
-		/* (the host, from that machine's own stream: an armor color or none) */
-		if (machine_index == NONE || !from_stream || !visor_color_host() ||
-			machine_index >= VISOR_COLOR_MACHINES || size < sizeof(header) + sizeof(color))
-		{
-			return;
-		}
-		csmemcpy(&color, entry, sizeof(color));
-		if (color.color != VISOR_COLOR_SENT_NONE && color.color >= NUMBEROF(visor_color_names))
-			return;
-		if (visor_color_table[machine_index] != color.color)
-		{
-			visor_color_table[machine_index] = color.color;
-			visor_color_table_changed = TRUE;
-		}
-	}
-	else if (machine_index == NONE && !visor_color_host() &&
-		size >= sizeof(header) + sizeof(struct distributed_visor_colors))
-	{
-		csmemcpy(visor_color_table, entry, sizeof(visor_color_table));
-		visor_color_table_heard = TRUE;
-	}
+	return VALID_INDEX(choices[_armor_sync_visor], (short)NUMBEROF(visor_color_names)) ? choices[_armor_sync_visor] : NONE;
 }
 
 /* from _rasterizer_model_draw: a model's shader about to be drawn, of an
@@ -425,7 +198,7 @@ void visor_color_model_begin(
 	/* (in a campaign, every Spartan's visor: a cutscene's Master Chief is
 	an object of the cutscene's own, not your player's unit; in multiplayer,
 	your own, and the others' as they chose) */
-	if (!game_engine_running() || visor_color_local_unit(object_index))
+	if ((!game_engine_running() && !armor_sync_network_active()) || visor_color_local_unit(object_index))
 		index = visor_color_index;
 	else
 		index = visor_color_of_other(object_index);

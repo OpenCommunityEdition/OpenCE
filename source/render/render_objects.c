@@ -377,6 +377,8 @@ boolean first_person_legs_wanted(long object_index);
 real_matrix4x3 const *first_person_legs_node_matrices(long object_index, real_matrix4x3 const *nodes);
 /* port: port/linux/game/shield_color.c */
 real_rgb_color const *shield_color_colors(long unit_index, real_rgb_color const *colors);
+/* port: port/linux/game/spartan_colors.c */
+real_rgb_color const *spartan_colors_change_colors(long object_index, real_rgb_color const *colors);
 
 void render_object_shadows(
 	void)
@@ -622,7 +624,9 @@ static void render_object_list(
 						level_of_detail_pixels,
 						node_matrices,
 						object->object.region_permutations,
-						object->object.outgoing_change_colors,
+						/* port: a Spartan's armor in the color chosen
+						(port/linux/game/spartan_colors.c) */
+						spartan_colors_change_colors(object_index, object->object.outgoing_change_colors),
 						object->object.outgoing_function_values,
 						data->lighting,
 						&object->object.bounding_sphere_center,
@@ -644,7 +648,9 @@ static void render_object_list(
 						level_of_detail_pixels * 0.3f,
 						node_matrices,
 						object->object.region_permutations,
-						object->object.outgoing_change_colors,
+						/* port: a Spartan's armor in the color chosen
+						(port/linux/game/spartan_colors.c) */
+						spartan_colors_change_colors(object_index, object->object.outgoing_change_colors),
 						object->object.outgoing_function_values,
 						data->lighting,
 						&object->object.bounding_sphere_center,

@@ -105,7 +105,7 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/units.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
-#include "visor_color.h" /* port: port/linux/game/visor_color.c */
+#include "armor_sync.h" /* port: port/linux/game/armor_sync.c */
 
 /* ---------- constants */
 
@@ -385,8 +385,8 @@ void interface_draw_fullscreen_overlays(
 	hud_render_timer();
 	/* port: a map's download (port/linux/game/map_share.c) */
 	map_share_render();
-	/* port: the visors' colors sent (port/linux/game/visor_color.c) */
-	visor_color_network_update();
+	/* port: the Armor choices sent (port/linux/game/armor_sync.c) */
+	armor_sync_network_update();
 	terminal_draw();
 	main_framerate_render();
 	render_debug_profile();
