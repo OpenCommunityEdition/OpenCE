@@ -117,6 +117,9 @@ python tools/test_death_timing.py
 python -m pytest -q tools/test_web_build.py                 # the web build's graph, sockets, menus
 node --test "port/web/tests/*.test.js"                      # the web page's importer and service worker
 node port/web/tests/webrtc_native.mjs chromium firefox      # the native builds' WebRTC with browsers (Playwright)
+python -m pytest -q tools/test_net_compare.py               # net_compare.py's judging of logs
+python tools/net_compare.py --a build/linux/halo --b <other build> --data <game data> --swap
+                                                            # two builds in one network game, in step (retail maps: local only)
 ```
 
 `tools/harness/README.md` explains how to add an asset-free test: the code

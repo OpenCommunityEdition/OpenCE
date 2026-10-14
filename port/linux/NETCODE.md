@@ -756,3 +756,113 @@ The host logs to `debug.txt` when a player on another machine presses the
 action button where the host has nothing for them to pick up, with where it
 has them and the nearest item: a client that sees a pickup the host does
 not.
+
+### Comparing two builds
+
+`tools/net_compare.py` checks that two builds play a network game in step:
+a new port or architecture against the i686 Linux build (x86-64 against
+i686, arm64 against x86), or a build with a change to the simulation
+against one without. It plays them together on the loopback, build A
+hosting and B joining (and, with `--swap`, the other way round), on each
+map given, each copy's player a seeded bot (`debug.test_input`
+`bot:<seed>`, `--events` adds `debug.network_test_shoot` and
+`debug.network_test_kill`), headless (`debug.null_renderer`, or with
+`--window` a hidden window), and compares the two machines' logs:
+
+```sh
+python tools/net_compare.py --a build/linux/halo --b build/linux_x86_64/halo \
+    --data <folder holding maps/> --maps bloodgulch,beavercreek,hangemhigh --swap
+```
+
+It needs the retail maps, so it runs on a developer's machine or a
+self-hosted runner, not in the public CI; run it before merging a change to
+a build's compiler, architecture, maths or the simulation itself. Each copy
+gets its own folder (an executable beside which it writes `config.toml`, a
+data root linking the maps, and saves) in `build/net_compare/`, removed
+when every game passes. It prints PASS, FAIL (with the first divergent
+player, tick and field) or ERROR (a copy that did not start, join or log)
+for each game, a line of figures, and exits 0, 1 or 2; a copy's log and
+the end of its `debug.txt` are kept for each game. `--compare <host log>
+<client log>` judges two logs already written, and
+`--a-wrapper`/`--b-wrapper` run a build under an emulator. Both builds
+must log the drift (below): one built before it is an error.
+
+The host decides and a client predicts its own player, so the comparison
+is not lockstep's bit for bit, but of what the netcode allows:
+
+- **Each second's state.** For every player, what the host logged and what
+  the client logged at the same tick (the machines' clocks agree: the
+  ticks match). Positions within 1 world unit: a remote player's word
+  comes a tick or so late, a client's prediction reaches the host as late,
+  and a player runs about 0.08 world units a tick, so identical builds are
+  0.04 apart on average and 0.24 at most, and a client puts its copy of a
+  remote player where the host has it past `REMOTE_BLEND_DISTANCE` (1
+  world unit); out for 2 seconds in a row fails. Aim within 15 degrees,
+  body and shield within 0.15, and alive or dead, riding, grenades,
+  weapons, score, kills, deaths and team the same: out for 3 seconds in a
+  row fails, as the host's word on damage, a death, a pickup or a score is
+  a round trip, or a death blow's wait, late, and a player thrown by a
+  blast aims as no input says for a second or two. Rounds within 3: out
+  for 6 seconds fails, as a client keeps its own player's ammunition
+  while it fires and takes the host's (a pickup's) only once it stops
+  (`network_objects.c`).
+- **Drift.** Those agree between builds that simulate differently too,
+  as the netcode corrects every copy toward the host's. What does not is
+  how the host moves a client's player: each tick the host moves it on
+  from where it took the client's last prediction, with the client's
+  input, and then hears the client's prediction of the same tick. Where
+  the host took the last a tick ago, it was of the client's tick before,
+  and the host has the input of the client's tick, both machines moved
+  the player one tick with the same input from much the same place, and
+  `distributed_take_prediction` (network_distributed.c) notes how far
+  apart the two moves were, and whether further than
+  `DIVERGENCE_APART_DISTANCE` (0.0001 world units, far above the last
+  bits' rounding). (The moves, not where they end: the host puts its copy
+  only halfway to a prediction a little off, so where it ends would be as
+  far off for ticks after anything that set them apart.) Identical builds
+  move it alike to the last bit but where the player touched something
+  the two machines have in slightly different places (the other player,
+  a grenade's blast, an item knocked about). A build that moves a player
+  otherwise is apart in most of the ticks the player moves. More than 60%
+  of the ticks apart fails.
+
+The per-second line each machine logs (`network_test_log_players`) is:
+
+```
+network test: tick <tick> player <index>: (<x> <y> <z>) h<body>/<shield>[ riding][ camo] g<grenades>/<grenades> w
+  a<aim yaw>/<aim pitch> f<facing yaw> l<look yaw>/<look pitch> as<aiming screen>/<looking screen> st<animation state>
+  thr<throttle>[ <weapon tag>:<rounds>...] s<score> k<kills> d<deaths> f<team kills> t<team> m<machine>
+  [player <index>: dead s<score> k<kills> d<deaths> f<team kills> t<team> m<machine>] ...
+  | items <on the ground> (+<created> -<deleted> !<failed> x<removed>) | <playing|game over> to <score to win>
+  | sent <n> received <n> corrected <n> | hits <n> dealt <n> rejected <n> replayed <n>
+  | local <player> camera (<x> <y> <z>) respawn <ticks> | drift <ticks> <apart> <mean> <largest>
+```
+
+(on one line; a riding player's position is the vehicle's, angles are in
+degrees, a weapon's tag is its tag index's low 16 bits in hexadecimal, and
+its rounds are those loaded and in reserve). `drift` is the host's: how
+many ticks of the second it compared a client's move of its player with
+its own (above), how many of them were apart, and the mean and largest
+distance apart (world units); a client's is 0. net_compare.py reads every
+field but the items, the hits and the camera, and compares the last game a
+log has.
+
+Calibration (on one 24-thread computer, with up to four games played at
+once, 60 seconds each, both ways round, on bloodgulch, beavercreek,
+hangemhigh, chillout, prisoner, ratrace, longest and carousel):
+
+| Builds | Games | Result | Ticks apart |
+| --- | --- | --- | --- |
+| i686 against itself | 64 | 63 pass (one copy crashed, an error) | 0-13%, up to 42% with the frames uneven |
+| i686 against itself, `--events` | 12 | 12 pass | 7-36% |
+| B's players 0.5% faster | 10 | 10 fail, at the first second compared | 77-88% |
+| B's players 2% faster | 6 | 6 fail, at the first second compared | 88-93% |
+| B's gravity 0.5% or 2% stronger | 14 | 14 pass | 25-38% |
+
+(B a build of the same sources with `movement_desired` or `global_gravity`
+scaled in `biped_update_physics`, a change made for the test.) A change to
+how players move on the ground is caught in the first second; one that
+changes only the ticks in the air, as gravity does, is within what
+identical builds show, and not caught. Positions agree to 0.04 world units
+on average, 0.24 at most, in every game, perturbed or not: the netcode
+corrects them.

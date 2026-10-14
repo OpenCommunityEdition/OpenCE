@@ -195,3 +195,24 @@ Enter `adb pull` to copy the recording parts to a computer.
 
 A profiling build plays with normal builds. It does not use
 `--pgo=train`.
+
+## Testing
+
+The tests are listed in [AGENTS.md](AGENTS.md) ("Testing"). Most run
+without the game data, in GitHub Actions too.
+
+One check needs the retail maps, so it runs on your own computer (or on a
+self-hosted runner), not in GitHub Actions: `tools/net_compare.py` plays
+two builds together in a network game on one computer and checks that they
+stay in step. Run it when a change can alter how a build calculates the
+game, as a new platform, compiler or architecture does, before it is
+merged. For example, to check a 64-bit build against the 32-bit build:
+
+```sh
+python tools/net_compare.py --a build/linux/halo --b build/linux_x86_64/halo \
+    --data <folder with maps/> --maps bloodgulch,beavercreek,hangemhigh --swap
+```
+
+Each game prints PASS or FAIL. A FAIL names the first player, tick and
+value that differ. Refer to "Comparing two builds" in
+[port/linux/NETCODE.md](port/linux/NETCODE.md).
