@@ -1187,6 +1187,20 @@ static boolean refresh_sound(
 		sound->playing_channel_index==NONE ||
 			channel_get(sound->playing_channel_index)->sound_index==sound_index);
 
+	/* port: a track of a looping sound that is gone stops, even when it
+	started this millisecond. The test of the start time below skips the
+	tracking, which is what notices the looping sound is gone, and a
+	looping sound not refreshed since the last frame is deleted
+	(process_looping_sounds): with three frames in one millisecond (no
+	frame limit, the null renderer) the track went on to
+	update_channel_for_looping_sound, which read the deleted looping
+	sound. BUG (original): the Xbox's frames were never that close. */
+	if (sound->type != _sound_impulse &&
+		!datum_try_and_get(looping_sound_data, sound->source_identifier))
+	{
+		return FALSE;
+	}
+
 	if (TEST_FLAG(sound->flags, _sound_delayed_bit) ||
 		!sound->track_proc ||
 		sound->start_time >= sound_manager_globals.render_time ||
