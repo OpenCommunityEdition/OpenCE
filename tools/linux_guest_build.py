@@ -1,13 +1,16 @@
 """Ninja rules for the desktop guest builds: Linux on 64-bit ARM
-(``ninja linux_arm64``).
+(``ninja linux_arm64``) and on 64-bit x86 (``ninja linux_x86_64``).
 
-The game's data needs 32-bit pointers, recent 64-bit ARM processors have no
-32-bit mode, and few distributions have 32-bit ARM libraries. So this build
-runs the game as the Android port does (port/android/README.md, "How the port operates"): the
-guest image is ILP32 code of the computer's architecture (tools/guest_arch.py;
-tools/android_build.py, generate_guest_image), with the Linux desktop's code
-paths instead of the app's, and the host is a Linux executable instead of an
-app's library:
+The game's data needs 32-bit pointers. Recent 64-bit ARM processors have no
+32-bit mode, and few distributions have 32-bit ARM libraries; 64-bit x86
+processors do have one, which the x86 build (``ninja linux``, tools/linux_build.py)
+uses, but it needs a distribution's 32-bit libraries, which some no longer
+carry, and 32-bit drivers. So these builds run the game as the Android port
+does (port/android/README.md, "How the port operates"): the
+guest image is ILP32 code of the computer's architecture (tools/guest_arch.py:
+arm64_32, or x32; tools/android_build.py, generate_guest_image), with the
+Linux desktop's code paths instead of the app's, and the host is a 64-bit
+Linux executable instead of an app's library:
 
 - build/<name>/halo: the host (port/android/host, with
   port/linux/host/host_main.c as its entry point), with the guest image
@@ -17,7 +20,7 @@ app's library:
   its license, SDL3-LICENSE.txt.
 
 Each build is a LinuxGuest in LINUX_GUESTS, generated on a computer of its
-architecture. Refer to "64-bit ARM" in port/linux/README.md.
+architecture. Refer to "64-bit ARM" and "64-bit x86" in port/linux/README.md.
 """
 
 import json
@@ -30,7 +33,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from .android_build import (GUEST_ARCH_SCRIPT, SDL_TAG, TOML_DIR, fetch_third_party, generate_guest_image)
-from .guest_arch import ARM64_32, GuestArch
+from .guest_arch import ARM64_32, X32, GuestArch
 from .linux_build import (MBEDTLS_DIR, MINIUPNPC_DEFINES, MINIUPNPC_DIR, SDL_RPATH_LDFLAGS, compile_launcher,
                           miniupnpc_sources, sdl3_rule, updater_defines)
 from .ninja_syntax import Writer, escape
@@ -42,7 +45,11 @@ LINUX_DIR = Path("port/linux")
 # the system's OpenGL ES, EGL and OpenGL headers (libgles-dev, libegl-dev and
 # libgl-dev on Debian and Ubuntu, mesa on Arch Linux)
 GL_HEADERS = Path("/usr/include")
+
+# (with the desktop renderer, GLVND's libOpenGL in place of libGLESv2: the
+# host's own OpenGL calls, port/android/host/host_gl.c)
 HOST_LIBRARIES = ["SDL3", "GLESv2", "EGL", "m", "dl", "pthread"]
+DESKTOP_GL_HOST_LIBRARIES = ["SDL3", "OpenGL", "EGL", "m", "dl", "pthread"]
 
 
 @dataclass(frozen=True)
@@ -59,16 +66,27 @@ class LinuxGuest:
     arch: GuestArch
     # the processors (platform.machine()) of the computers that build it
     machines: Tuple[str, ...]
+    # its renderer unless configure.py says otherwise (<name>_gl): OpenGL ES
+    # 3 ("gles", HALO_GLES, as on Android) or desktop OpenGL 4.5 ("desktop",
+    # as the x86 build's)
+    renderer: str
+    # whether it is the default target of those computers (configure.py):
+    # not the x86-64 build, as a 64-bit x86 computer builds the x86 build
+    # (ninja linux) by default
+    default: bool
 
 
 LINUX_GUESTS = (
     LinuxGuest(name="linux_arm64", label="LINUX ARM64", title="64-bit ARM Linux", arch=ARM64_32,
-               machines=("aarch64", "arm64")),
+               machines=("aarch64", "arm64"), renderer="gles", default=True),
+    LinuxGuest(name="linux_x86_64", label="LINUX X86_64", title="64-bit x86 Linux", arch=X32,
+               machines=("x86_64", "amd64"), renderer="desktop", default=False),
 )
 
 
 def native_linux_guest() -> Optional[LinuxGuest]:
-    """the desktop guest build of this computer, if there is one"""
+    """the desktop guest build of this computer, if there is one (whether it
+    is the computer's default build is its own, LinuxGuest.default)"""
     if not sys.platform.startswith("linux"):
         return None
     machine = platform.machine().lower()
@@ -112,8 +130,8 @@ def generate_linux_guest_build(n: Writer, sln: Any, target: LinuxGuest) -> None:
     sdl_dir = third_party / "SDL3"
     cc = getattr(sln, f"{prefix}_cc", None) or "clang"
     # the renderer: OpenGL ES 3 (HALO_GLES, as on Android), or desktop OpenGL
-    # 4.5 (--linux-arm64-gl=desktop)
-    desktop_gl = getattr(sln, f"{prefix}_gl", "gles") == "desktop"
+    # 4.5 (the x86-64 build's, and --linux-arm64-gl=desktop)
+    desktop_gl = (getattr(sln, f"{prefix}_gl", None) or target.renderer) == "desktop"
     # (the host's OpenGL ES and EGL, and the guest's entry points: OpenGL ES's,
     # or desktop OpenGL's from glcorearb.h)
     headers = ["GLES3/gl32.h", "GLES2/gl2ext.h", "EGL/egl.h", "KHR/khrplatform.h"]
@@ -141,7 +159,7 @@ def generate_linux_guest_build(n: Writer, sln: Any, target: LinuxGuest) -> None:
 
     guest = generate_guest_image(
         n, sln, config, arch=target.arch, prefix=prefix, label=label, build=build, third_party=third_party,
-        guest_cc=cc, gl_headers=GL_HEADERS, ar="llvm-ar", ld="ld.lld", builtins_cc=f"${prefix}_cc",
+        guest_cc=cc, gl_headers=GL_HEADERS, ar="llvm-ar", ld="ld.lld", objdump="llvm-objdump", builtins_cc=f"${prefix}_cc",
         environment="gnu", platform_defines=guest_defines, extra_runtime=[PORT_DIR / "guest_desktop.c"],
         extra_imports=[PORT_DIR / "host_imports.list"],
         updater_cflags=updater_defines(getattr(sln, "port_release", False)), desktop_gl=desktop_gl)
@@ -213,15 +231,18 @@ def generate_linux_guest_build(n: Writer, sln: Any, target: LinuxGuest) -> None:
     # the guest image, inside the executable (host_main.c)
     image_obj = host_obj_dir / "guest_image.S.o"
     n.build(outputs=image_obj, rule=host_cc, inputs=PORT_DIR / "guest_image.S",
-            implicit=[guest["image"]], variables={"cflags": f'-DGUEST_IMAGE=\\"{guest["image"]}\\"'})
+            implicit=[guest["image"], guest["checked"]], variables={"cflags": f'-DGUEST_IMAGE=\\"{guest["image"]}\\"'})
     host_objects.append(image_obj)
 
     output = build / "halo"
     staged_sdl = build / "libSDL3.so.0"
     n.rule(
         name=f"{prefix}_host_link",
-        command=(f"${prefix}_cc -o $out $in -L{sdl_build} "
-                 + " ".join(f"-l{lib}" for lib in HOST_LIBRARIES)
+        # (a position-independent executable, as the guest needs the low 4 GB
+        # of the address space: a fixed one, and the heap after it, would be
+        # loaded there)
+        command=(f"${prefix}_cc -pie -o $out $in -L{sdl_build} "
+                 + " ".join(f"-l{lib}" for lib in (DESKTOP_GL_HOST_LIBRARIES if desktop_gl else HOST_LIBRARIES))
                  # (the SDL beside the executable, as the portable x86 build's)
                  + " " + " ".join(SDL_RPATH_LDFLAGS) + " -Wl,--no-undefined"
                  # (posix_trace_marker.c's, which the GPU driver's calls must reach)

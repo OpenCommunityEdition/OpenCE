@@ -5,11 +5,13 @@ OpenGL ES for the guest. Its generated entry points (guest_gl.c) import
 hostgl_<function>, resolved here to the driver's function; the arguments
 already have host types by then. Only strings need copying back.
 
-The Linux arm64 build can instead give the guest desktop OpenGL 4.5
-(HALO_DESKTOP_GL, tools/linux_arm64_build.py): the entry points are then
-desktop GL's, from GLVND's libOpenGL. This file's own calls go through
-libGLESv2 either way, whose GLVND entry points dispatch to the current
-context whatever its API.
+The Linux builds can instead give the guest desktop OpenGL 4.5
+(HALO_DESKTOP_GL, tools/linux_guest_build.py: the x86-64 build's renderer,
+and the arm64 build's with --linux-arm64-gl=desktop): the entry
+points are then desktop GL's, from GLVND's libOpenGL. This file's own calls
+are the same functions in either API, which the host links from libGLESv2,
+or from libOpenGL for desktop GL: GLVND's entry points, which dispatch to
+the current context whatever its API and window system (EGL or GLX).
 */
 
 #include "host.h"

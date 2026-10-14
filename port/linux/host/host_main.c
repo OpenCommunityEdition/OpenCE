@@ -2,7 +2,7 @@
 HOST_MAIN.C
 
 Entry point of the Linux builds that run the game as an ILP32 guest (the
-64-bit ARM build, tools/linux_arm64_build.py).
+64-bit ARM and x86 builds, tools/linux_guest_build.py).
 
 The host is the Android port's (port/android/host, port/android/README.md),
 with this file in place of its host_main.c and host_touch.c; what both

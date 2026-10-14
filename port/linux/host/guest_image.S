@@ -1,4 +1,4 @@
-/* the guest image (tools/linux_arm64_build.py), inside the host executable;
+/* the guest image (tools/linux_guest_build.py), inside the host executable;
 host_main.c loads it */
 
 	.section .rodata.halo_guest_image, "a"
