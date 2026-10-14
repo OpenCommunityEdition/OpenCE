@@ -8,7 +8,7 @@ This build plays Xbox ADPCM only, mono at 22 kHz or stereo at 22 or 44 kHz
 (sound_manager.c), and refuses any other sound each time it is played.
 Halo PC also has Ogg Vorbis (music, dialogue, the announcer), uncompressed
 samples and mono sounds at 44 kHz. When a map is loaded, each such
-permutation is decoded here (Ogg Vorbis with stb_vorbis.c, public domain),
+permutation is decoded here (Ogg Vorbis with port/third_party/stb_vorbis),
 brought to the sound's channel count at a rate this build plays, and
 encoded again as Xbox ADPCM into one buffer kept for as long as the map is
 loaded. The permutation is then an Xbox ADPCM one whose samples lie in a
@@ -32,7 +32,7 @@ the channels (port/linux/src/dsound_sdl.c decodes it).
 #include "custom_edition_cache.h"
 
 #define STB_VORBIS_HEADER_ONLY
-#include "stb_vorbis.c"
+#include "../../third_party/stb_vorbis/stb_vorbis.c"
 
 #include <stdlib.h>
 #include <string.h>
@@ -60,6 +60,11 @@ stereo samples. Every buffer of frames is sized from a count within it
 size_t of this build: a stream that said it was at 1 Hz once made a count
 whose bytes wrapped to a few KB, which the resampler then wrote 4 GB into */
 #define MAXIMUM_FRAMES 0x1000000L
+/* The most bytes a permutation's samples are read in: as many frames as
+that, stereo, uncompressed. Any longer decode to more frames than that, so
+are not read at all (Xbox ADPCM and Ogg Vorbis are smaller than the
+uncompressed samples they hold, and no stream has more than two channels). */
+#define MAXIMUM_SAMPLES_BYTES (MAXIMUM_FRAMES * 2 * (long)sizeof(short))
 /* the highest rate a stream is taken to be at (its own rate is read from
 it, and the resampler scales by it) */
 #define MAXIMUM_SAMPLE_RATE 192000
@@ -526,7 +531,8 @@ static boolean permutation_convert(
 	long offset = NONE;
 
 	/* (the loader checked the samples lie in the file; none at all is no sound) */
-	if (permutation->samples.size <= 0 || !(data = malloc(permutation->samples.size)))
+	if (permutation->samples.size <= 0 || permutation->samples.size > MAXIMUM_SAMPLES_BYTES ||
+		!(data = malloc(permutation->samples.size)))
 	{
 		return FALSE;
 	}

@@ -184,9 +184,10 @@ int main(int argc,char **argv) {
     exe = work / ("decoder.exe" if os.name == "nt" else "decoder")
     flags = ["-target", "i686-pc-windows-msvc"] if os.name == "nt" else []
     subprocess.run([compiler, *flags, "-O2", "-Wno-deprecated-declarations", "-Wno-tautological-compare",
-                    "-I", str(ROOT / "port/linux/game"), str(source),
+                    "-I", str(ROOT / "port/linux/game"),
+                    "-I", str(ROOT / "port/third_party/stb_vorbis"), str(source),
                     str(ROOT / "port/linux/game/mcc_vorbis.c"),
-                    str(ROOT / "port/linux/game/stb_vorbis.c"),
+                    str(ROOT / "port/third_party/stb_vorbis/stb_vorbis.c"),
                     *([] if os.name == "nt" else ["-lm"]), "-o", str(exe)], check=True, capture_output=True)
     return exe
 

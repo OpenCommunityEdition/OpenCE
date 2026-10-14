@@ -211,9 +211,9 @@ static boolean maps_folder_has(
 
 /* The custom_maps folder's one map named <name>_<hash>.map, for a name
 without the hash its file has: its file name (without the extension) in
-`hashed` (MAP_PATH_SIZE characters). Maps there are named for their hash as
-the map lists find them (map_share_name_map), so a level name of before (a
-saved last map, a test's) still finds its map; FALSE if there are more. */
+`hashed` (MAP_PATH_SIZE characters). A download beside another version of
+its name is named so (map_share.c), and a build of before named every map so
+(map_share_map_found gives the names back); FALSE if there are more. */
 static boolean maps_folder_hashed_name(
 	char const *name,
 	char *hashed)
@@ -258,10 +258,9 @@ static boolean maps_folder_hashed_name(
 	return count == 1;
 }
 
-/* the file that holds the map `map_name` names (a level name or a file
-name): <custom maps folder>\<name>.map (custom_maps' <name>_<hash>.map for
-a name without the hash, if it has one map of that name) */
-static boolean custom_edition_map_path(
+/* the file the map `map_name` names (a level name or a file name),
+whatever version a network game is on (custom_edition_map_file_named) */
+static boolean custom_edition_map_named(
 	char const *map_name,
 	char *path)
 {
@@ -276,9 +275,83 @@ static boolean custom_edition_map_path(
 			return TRUE;
 		}
 	}
+	if (maps_folder_hashed_name(name, hashed) && maps_folder_has(maps_folder(0), hashed, MAP_FILE_EXTENSION, path))
+	{
+		return TRUE;
+	}
+	/* (a level name of a build of before, the map named for its hash: the
+	map given its name back, if the hash is still its) */
+	if (map_share_name_hashed(name) && strlen(name) < MAP_PATH_SIZE)
+	{
+		char base[MAP_PATH_SIZE];
+		char digits[MAP_SHARE_NAME_DIGITS + 1];
+		byte hash[MAP_SHARE_HASH_BYTES];
+		short length = map_share_name_base_length(name);
 
-	return maps_folder_hashed_name(name, hashed) &&
-		maps_folder_has(maps_folder(0), hashed, MAP_FILE_EXTENSION, path);
+		memcpy(base, name, (size_t)length);
+		base[length] = 0;
+		if (maps_folder_has(maps_folder(0), base, MAP_FILE_EXTENSION, path) && map_share_map_hash(path, hash))
+		{
+			map_share_hash_digits(hash, digits);
+			if (!strcmp(name + length + 1, digits))
+				return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+/* the file of a network game's map of its version, as last looked for: the
+game asks for the map's file many times a frame, so it is looked for again
+a second later, or once the maps have changed (custom_edition_map_paths_forget) */
+static struct
+{
+	char name[MAP_PATH_SIZE];
+	unsigned long version;
+	boolean found;
+	char path[MAP_PATH_SIZE];
+	unsigned long looked_at;
+} custom_edition_version_lookup;
+
+void custom_edition_map_paths_forget(
+	void)
+{
+	custom_edition_version_lookup.looked_at = 0;
+}
+
+/* the file that holds the map `map_name` names (a level name or a file
+name): in a network game on that map, the file of its version, and none
+if this machine has none (a download's, or another version's, is not
+loaded in its place); else custom_edition_map_named's */
+static boolean custom_edition_map_path(
+	char const *map_name,
+	char *path)
+{
+	unsigned long version;
+
+	if (map_share_game_map_version(map_name, &version) && version)
+	{
+		char const *name = tag_name_strip_path(map_name);
+		unsigned long now = GetTickCount() | 1;
+
+		if (custom_edition_version_lookup.looked_at && now - custom_edition_version_lookup.looked_at < 1000 &&
+			custom_edition_version_lookup.version == version && !csstrcasecmp(custom_edition_version_lookup.name, name))
+		{
+			if (custom_edition_version_lookup.found)
+				strcpy(path, custom_edition_version_lookup.path);
+			return custom_edition_version_lookup.found;
+		}
+		if (strlen(name) >= MAP_PATH_SIZE)
+			return FALSE;
+		custom_edition_version_lookup.found = custom_edition_map_find_version(map_name, version, path);
+		strcpy(custom_edition_version_lookup.name, name);
+		strcpy(custom_edition_version_lookup.path, custom_edition_version_lookup.found ? path : "");
+		custom_edition_version_lookup.version = version;
+		custom_edition_version_lookup.looked_at = now;
+		return custom_edition_version_lookup.found;
+	}
+
+	return custom_edition_map_named(map_name, path);
 }
 
 /* A cache's resource map of `type`, bitmaps.map and so on, in the first maps
@@ -633,6 +706,69 @@ boolean custom_edition_map_file_path(
 	return custom_edition_map_path(map_name, path);
 }
 
+boolean custom_edition_map_file_named(
+	char const *map_name,
+	char *path)
+{
+	return custom_edition_map_named(map_name, path);
+}
+
+boolean custom_edition_map_find_version(
+	char const *level_name,
+	unsigned long version,
+	char *path)
+{
+	char const *name = tag_name_strip_path(level_name);
+	char pattern[MAP_PATH_SIZE];
+	char digits[MAP_SHARE_NAME_DIGITS + 1];
+	WIN32_FIND_DATAA data;
+	HANDLE find;
+	unsigned long found_version;
+	boolean found = FALSE;
+	short folder;
+
+	for (folder = 0; folder < NUMBER_OF_MAPS_FOLDERS; folder++)
+	{
+		if (maps_folder_has(maps_folder(folder), name, MAP_FILE_EXTENSION, path) &&
+			map_share_map_version(path, &found_version) && found_version == version)
+		{
+			return TRUE;
+		}
+	}
+	/* (custom_maps' other versions of the name: the one whose name ends in
+	the version's digits, if its hash is that) */
+	if (strlen(maps_folder(0)) + strlen(name) + 1 + MAP_SHARE_NAME_DIGITS + strlen(MAP_FILE_EXTENSION) >= MAP_PATH_SIZE)
+		return FALSE;
+	sprintf(digits, "%08lx", version);
+	sprintf(pattern, "%s%s_*%s", maps_folder(0), name, MAP_FILE_EXTENSION);
+	find = FindFirstFileA(pattern, &data);
+	if (find == INVALID_HANDLE_VALUE)
+		return FALSE;
+	do
+	{
+		char file_name[sizeof(data.cFileName) + 1];
+		size_t length;
+
+		memcpy(file_name, data.cFileName, sizeof(data.cFileName));
+		file_name[sizeof(data.cFileName)] = 0;
+		length = strlen(file_name);
+		if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || length <= strlen(MAP_FILE_EXTENSION))
+			continue;
+		file_name[length - strlen(MAP_FILE_EXTENSION)] = 0;
+		/* (version 1 is also a hash's of digits 00000000: map_share_hash_version) */
+		if (!map_share_name_hashed(file_name) || (size_t)map_share_name_base_length(file_name) != strlen(name) ||
+			_strnicmp(file_name, name, strlen(name)) || (version != 1 && strcmp(file_name + strlen(name) + 1, digits)))
+		{
+			continue;
+		}
+		sprintf(path, "%s%s%s", maps_folder(0), file_name, MAP_FILE_EXTENSION);
+		found = map_share_map_version(path, &found_version) && found_version == version;
+	} while (!found && FindNextFileA(find, &data));
+	CloseHandle(find);
+
+	return found;
+}
+
 boolean custom_edition_resource_map_file_path(
 	short type,
 	char *path)
@@ -682,30 +818,23 @@ boolean custom_edition_map_file_present(
 	return custom_edition_map_path(map_name, path);
 }
 
-unsigned long custom_edition_map_checksum(
+unsigned long custom_edition_map_version(
 	char const *level_name)
 {
 	char path[MAP_PATH_SIZE];
-	struct custom_edition_file file;
-	struct cache_file_identity identity;
-	unsigned long checksum = 0;
+	unsigned long version = 0;
 
-	if (custom_edition_map_path(level_name, path) && custom_edition_file_open(&file, path))
-	{
-		if (cache_file_identify(&file.source, &identity) == _cache_file_status_ok &&
-			identity.format == _cache_file_format_custom_edition_cache)
-		{
-			checksum = identity.checksum;
-		}
-		custom_edition_file_close(&file);
-	}
+	if (map_share_level_name_version(level_name, &version))
+		return version;
+	if (!custom_edition_map_path(level_name, path) || !map_share_map_version(path, &version))
+		return 0;
 
-	return checksum;
+	return version;
 }
 
 boolean custom_edition_cache_present(
 	char const *level_name,
-	unsigned long checksum,
+	unsigned long version,
 	char *message,
 	long message_size)
 {
@@ -718,8 +847,19 @@ boolean custom_edition_cache_present(
 	short folder;
 	short type;
 
-	if (!custom_edition_map_path(level_name, path))
+	/* (another version's tags are not the host's: the objects the host sends
+	would be other things here) */
+	if (version ? !custom_edition_map_find_version(level_name, version, path) :
+		!custom_edition_map_path(level_name, path))
 	{
+		if (version && custom_edition_map_named(level_name, path))
+		{
+			error(_error_silent, "custom edition: '%s' is another version of the host's map (the host's %08lx)", path,
+				version);
+			snprintf(message, message_size,
+				"Your %.64s.map is a different version from the host's. Copy the host's into custom_maps.", name);
+			return FALSE;
+		}
 		snprintf(message, message_size, "You don't have the map %.*s.map. If you have it, copy it into custom_maps.",
 			(int)MIN(64, map_share_name_base_length(name)), name);
 		return FALSE;
@@ -750,16 +890,6 @@ boolean custom_edition_cache_present(
 			status != _cache_file_status_ok ? cache_file_status_describe(status) :
 			"it is not a Halo Custom Edition cache");
 		snprintf(message, message_size, "Your %.64s.map can't be played (debug.txt says why).", name);
-		return FALSE;
-	}
-	/* (another version's tags are not the host's: the objects the host sends
-	would be other things here) */
-	if (checksum && identity.checksum != checksum)
-	{
-		error(_error_silent, "custom edition: '%s' is another version of the host's map (checksum %08lX, the host's %08lX)",
-			path, (unsigned long)identity.checksum, checksum);
-		snprintf(message, message_size,
-			"Your %.64s.map is a different version from the host's. Copy the host's into custom_maps.", name);
 		return FALSE;
 	}
 	for (type = _resource_map_bitmaps; type < NUMBER_OF_RESOURCE_MAP_TYPES; type++)

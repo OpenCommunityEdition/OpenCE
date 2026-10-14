@@ -159,6 +159,11 @@ rasterizer_geometry.h */
 #define TRIANGLE_BUFFER_TYPE_PRECOMPILED_STRIP 1
 /* strips index vertices with 16 bits */
 #define MAXIMUM_VERTICES_PER_BUFFER 0xFFFF
+/* the most vertices a structure BSP material has (the game's
+MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL, structures.h): the validator cuts
+a count past it, which would move where the lightmap vertices that follow
+are read from. The most of the maps examined is 9956 */
+#define MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL 64000
 
 /* gbxmodel (OpenSauce model_definitions.hpp: gbxmodel_definition 0xE8, its
 markers 0x40 and their instances 0x20, nodes 0x9C, regions 0x4C,
@@ -1817,7 +1822,7 @@ static enum cache_file_status structure_bsp_geometry_verify(
 			/* the counts bound the size, which bounds the counts */
 			if (read_s16(material + STRUCTURE_BSP_MATERIAL_VERTEX_TYPE_OFFSET) != VERTEX_TYPE_ENVIRONMENT_UNCOMPRESSED ||
 				vertex_count < 0 ||
-				vertex_count > MAXIMUM_VERTICES_PER_BUFFER ||
+				vertex_count > MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL ||
 				lightmap_vertex_count != (has_bitmap ? vertex_count : 0) ||
 				vertices_size != vertex_count * STRUCTURE_BSP_ENVIRONMENT_VERTEX_BYTES +
 					lightmap_vertex_count * STRUCTURE_BSP_LIGHTMAP_VERTEX_BYTES ||

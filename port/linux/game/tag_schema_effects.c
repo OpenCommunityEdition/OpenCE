@@ -2962,8 +2962,14 @@ static boolean game_globals_interface_tag_references_check(
 /* the blocks whose first element is read through its address, or asked
 for and used unchecked: a player's look function (player_control.c,
 evaluate_piecewise_linear_function, from its address with its count),
-the rasterizer's data (rasterizer_common.c) and the interface's tags
-(interface.c, interface_tag_references_get) */
+the rasterizer's data (rasterizer_common.c), the interface's tags
+(interface.c, interface_tag_references_get), the camera (following_camera.c),
+the player's information (bipeds.c, units.c, players.c, player_control.c)
+and the first person interface (first_person_weapons.c, units.c): every map
+examined has each. (An element past a block's end reads as zeros,
+tag_empty_data: the falling damage and the multiplayer information, also
+read unchecked, are left to that, as the game's own maps leave them empty,
+ui.map the one and the campaign's the other) */
 static boolean game_globals_check(
 	struct tag_validation *validation,
 	void *base)
@@ -2979,6 +2985,11 @@ static boolean game_globals_check(
 	if (!globals->rasterizer_data.count || !globals->interface_tag_references.count)
 	{
 		tag_validate_refuse(validation, "has no rasterizer data or interface tags");
+		return FALSE;
+	}
+	if (!globals->camera.count || !globals->player_information.count || !globals->first_person_interface.count)
+	{
+		tag_validate_refuse(validation, "has no camera, player information or first person interface");
 		return FALSE;
 	}
 

@@ -33,7 +33,7 @@
 #define stb_vorbis_get_samples_float mcc_stb_get_samples_float
 #define stb_vorbis_get_samples_short_interleaved mcc_stb_get_samples_short_interleaved
 #define stb_vorbis_get_samples_short mcc_stb_get_samples_short
-#include "stb_vorbis.c"
+#include "../../third_party/stb_vorbis/stb_vorbis.c"
 
 static uint32_t mcc_ogg_u32(unsigned char const *p)
 {
