@@ -28,8 +28,13 @@ int update_executable_path(char *path, int size);
 
 /* puts the file at new_path in place of the one at path, which is renamed
 to old_path first (a running executable can be renamed, not overwritten),
-keeping its permissions; 1 on success */
+keeping its permissions (a new file keeps new_path's); 1 on success */
 int update_replace_file(const char *path, const char *new_path, const char *old_path);
+
+/* lets the file at path be run (on Linux; nothing on Windows): a file the
+release's zip marks executable, which update_replace_file puts where there
+was none; 1 on success */
+int update_make_executable(const char *path);
 
 /* deletes the file (or empty folder) at path, if there is one */
 void update_delete_file(const char *path);

@@ -5,8 +5,11 @@ Win32 file API for the Linux build, over POSIX descriptors.
 
 Xbox paths are translated below two roots. d:\ is the data root, the
 directory holding the game's maps/ folder: paths.data (port_config.c), else the current
-directory when it has maps/, else assets/ in the current directory or two
-levels above the executable (the repository root for build/linux/halo).
+directory when it has maps/, else the game's folder when it has maps/ (on
+Linux the release's root, or ~/.local/share/halo-linux when the game is
+installed: install_layout.c; on Windows the executable's folder), else
+assets/ in the current directory or two levels above the executable (the
+repository root for build/linux/halo).
 h:\ is the Halo Custom Edition install paths.custom_edition names, if any
 (its maps folder holds the resource maps Custom Edition maps need, and more
 maps).
@@ -19,6 +22,7 @@ matched case-insensitively, like the Xbox's FATX volumes.
 #include "platform.h"
 #include "posix.h"
 #include "port_config.h"
+#include "install_layout.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -71,7 +75,7 @@ const char *platform_data_root(void)
 		else
 		{
 			char executable[MAX_PATH];
-			char executable_directory[MAX_PATH] = "";
+			char game_folder[MAX_PATH] = "";
 			ssize_t length = readlink("/proc/self/exe", executable, sizeof(executable) - 1);
 
 			if (length > 0)
@@ -79,17 +83,24 @@ const char *platform_data_root(void)
 				char *slash;
 
 				executable[length] = '\0';
-				snprintf(executable_directory, sizeof(executable_directory), "%s", executable);
-				slash = strrchr(executable_directory, '/');
+				snprintf(game_folder, sizeof(game_folder), "%s", executable);
+				slash = strrchr(game_folder, '/');
 				if (slash)
 					*slash = '\0';
 			}
+#if !defined(_WIN32) && !defined(HALO_ANDROID) && !defined(HALO_WEB)
+			/* on Linux, the game's folder (the release's root, above its
+			bin/), or ~/.local/share/halo-linux when the game is installed
+			(install_layout.c) */
+			snprintf(game_folder, sizeof(game_folder), "%s", install_data_folder());
+#endif
 			snprintf(root, sizeof(root), ".");
-			if (executable_directory[0] && has_maps(executable_directory))
+			if (game_folder[0] && has_maps(game_folder))
 			{
-				/* next to the executable, where the desktop ports' first start
-				extracts it (platform_offer_game_data) */
-				snprintf(root, sizeof(root), "%s", executable_directory);
+				/* in the game's folder (next to the executable on Windows),
+				where the desktop ports' first start extracts it
+				(platform_offer_game_data) */
+				snprintf(root, sizeof(root), "%s", game_folder);
 			}
 			else if (has_maps("assets"))
 			{
@@ -112,10 +123,10 @@ const char *platform_data_root(void)
 				}
 			}
 #if !defined(HALO_ANDROID) && !defined(HALO_WEB)
-			if (!has_maps(root) && executable_directory[0] && platform_offer_game_data(executable_directory) &&
-				has_maps(executable_directory))
+			if (!has_maps(root) && game_folder[0] && platform_offer_game_data(game_folder) &&
+				has_maps(game_folder))
 			{
-				snprintf(root, sizeof(root), "%s", executable_directory);
+				snprintf(root, sizeof(root), "%s", game_folder);
 			}
 #endif
 			if (!has_maps(root))

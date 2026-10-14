@@ -19,7 +19,7 @@ builds of the latest release:
 
 | Platform | Release | Debug |
 | --- | --- | --- |
-| Linux | [halo-linux-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-release.zip) | [halo-linux-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-debug.zip) |
+| Linux | [halo-linux-i686-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-i686-release.zip) | [halo-linux-i686-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-i686-debug.zip) |
 | Windows | [halo-windows-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-windows-release.zip) | [halo-windows-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-windows-debug.zip) |
 | Android | [halo-android-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-android-release.zip) | [halo-android-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-android-debug.zip) |
 | Web | [halocombatevolved.com](https://halocombatevolved.com/) (or [halo-web-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-web-release.zip) for your own server) | [halo-web-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-web-debug.zip) |
@@ -27,6 +27,13 @@ builds of the latest release:
 Use the release build to play. The debug build stops at the first failed
 assertion and writes it to the log. Use the debug build to find and report
 problems.
+
+On Linux, unpack the zip into a folder and start `bin/opence` in it. The
+folders are laid out as a Unix prefix is (`bin/`, `lib/`, `share/`), for
+package managers too: refer to "Packaging" in
+[port/linux/README.md](port/linux/README.md#packaging). The releases also
+have `halo-linux-release.zip`, the same build laid out flat as before, for
+the updaters of older builds.
 
 The game updates itself. At start-up it looks for a newer release, and asks
 if you want to install it. Refer to "Updates" in
@@ -50,7 +57,8 @@ so players of the two versions can play together.
 2. At the first start, the game asks for the disc image. Select it.
 3. The game extracts the `maps/` folder. Then the game starts.
 
-On Linux and Windows, the game puts `maps/` next to the executable. On
+On Linux, the game puts `maps/` in the folder of the release (next to
+`bin/`). On Windows, the game puts `maps/` next to the executable. On
 Android, copy the disc image to the phone first. The app puts `maps/` in its
 data folder. Refer to [port/android/README.md](port/android/README.md). On
 the web, the page copies `maps/` out of the disc image into the browser's
