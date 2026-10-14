@@ -560,9 +560,12 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: G
     # ---------- the guest image
 
     linker_script = PORT_DIR / "guest" / "guest.ld"
+    # (the folder of the script's guest_init_array.ld: which constructors the
+    # image takes, guest.ld)
+    linker_fragments = PORT_DIR / "guest" / "ld" / ("macho" if arch.darwin_assembly else "elf")
     n.rule(
         name=f"{prefix}_guest_link",
-        command=(f"{ld} -m {arch.ld_emulation} -static -nostdlib -T {linker_script} "
+        command=(f"{ld} -m {arch.ld_emulation} -static -nostdlib -T {linker_script} -L {linker_fragments} "
                  f"--defsym=__guest_image_base={arch.image_base:#x} "
                  f"-Map $out.map -o $out @$out.rsp {libguestc}"
                  + (f" {arch.builtins(builtins_cc)}" if arch.builtins(builtins_cc) else "")),
@@ -570,14 +573,15 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: G
         rspfile="$out.rsp",
         rspfile_content="$in_newline",
     )
-    n.build(outputs=image, rule=f"{prefix}_guest_link", inputs=objects, implicit=[libguestc, linker_script])
+    n.build(outputs=image, rule=f"{prefix}_guest_link", inputs=objects,
+            implicit=[libguestc, linker_script, linker_fragments / "guest_init_array.ld"])
     # what the host cannot give the image: thread-local storage, the thread
     # pointer, an address outside its range (tools/guest_image_check.py);
     # what uses the image waits for this
     checked = guest_dir / "halo_guest.checked"
     n.rule(
         name=f"{prefix}_guest_check",
-        command=f"{python} tools/guest_image_check.py --arch {arch.name} --objdump {objdump} $in $out",
+        command=f"{python} tools/guest_image_check.py --arch {arch.name} --objdump {objdump} --map $in.map $in $out",
         description=f"{label} CHECK $in",
     )
     n.build(outputs=checked, rule=f"{prefix}_guest_check", inputs=image,
