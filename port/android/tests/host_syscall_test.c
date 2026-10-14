@@ -305,9 +305,9 @@ static void test_stat(void)
 	CHECK(guest->st_size == 5000);
 	CHECK(guest->st_blksize == (int32_t)host.st_blksize);
 	CHECK(guest->st_blocks == (int64_t)host.st_blocks);
-	CHECK(guest->st_atime_sec == 1000000000 && guest->st_atime_nsec == 123456789);
-	CHECK(guest->st_mtime_sec == 1500000000 && guest->st_mtime_nsec == 987654321);
-	CHECK(guest->st_ctime_sec == (int64_t)host.st_ctim.tv_sec);
+	CHECK(guest->atime_seconds == 1000000000 && guest->atime_nanoseconds == 123456789);
+	CHECK(guest->mtime_seconds == 1500000000 && guest->mtime_nanoseconds == 987654321);
+	CHECK(guest->ctime_seconds == (int64_t)host.st_ctim.tv_sec);
 	/* the layout as musl reads it (arch/generic/kstat.h), byte by byte */
 	CHECK(*(int64_t *)((uint8_t *)guest + 48) == 5000);
 	CHECK(*(uint32_t *)((uint8_t *)guest + 16) == (uint32_t)host.st_mode);

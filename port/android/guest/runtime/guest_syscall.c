@@ -133,6 +133,10 @@ SAME(SYS_clone3);
 	_Static_assert(offsetof(struct guest, field) == offsetof(struct host, field) && \
 		sizeof(((struct guest *)0)->field) == sizeof(((struct host *)0)->field), \
 		"the guest interface's " #guest "." #field " differs from musl's")
+#define SAME_FIELD_AS(guest, guest_field, host, field) \
+	_Static_assert(offsetof(struct guest, guest_field) == offsetof(struct host, field) && \
+		sizeof(((struct guest *)0)->guest_field) == sizeof(((struct host *)0)->field), \
+		"the guest interface's " #guest "." #guest_field " differs from musl's " #field)
 _Static_assert(sizeof(struct kstat) == sizeof(struct halo_guest_kstat), "kstat's size differs");
 SAME_FIELD(halo_guest_kstat, kstat, st_dev);
 SAME_FIELD(halo_guest_kstat, kstat, st_ino);
@@ -144,12 +148,12 @@ SAME_FIELD(halo_guest_kstat, kstat, st_rdev);
 SAME_FIELD(halo_guest_kstat, kstat, st_size);
 SAME_FIELD(halo_guest_kstat, kstat, st_blksize);
 SAME_FIELD(halo_guest_kstat, kstat, st_blocks);
-SAME_FIELD(halo_guest_kstat, kstat, st_atime_sec);
-SAME_FIELD(halo_guest_kstat, kstat, st_atime_nsec);
-SAME_FIELD(halo_guest_kstat, kstat, st_mtime_sec);
-SAME_FIELD(halo_guest_kstat, kstat, st_mtime_nsec);
-SAME_FIELD(halo_guest_kstat, kstat, st_ctime_sec);
-SAME_FIELD(halo_guest_kstat, kstat, st_ctime_nsec);
+SAME_FIELD_AS(halo_guest_kstat, atime_seconds, kstat, st_atime_sec);
+SAME_FIELD_AS(halo_guest_kstat, atime_nanoseconds, kstat, st_atime_nsec);
+SAME_FIELD_AS(halo_guest_kstat, mtime_seconds, kstat, st_mtime_sec);
+SAME_FIELD_AS(halo_guest_kstat, mtime_nanoseconds, kstat, st_mtime_nsec);
+SAME_FIELD_AS(halo_guest_kstat, ctime_seconds, kstat, st_ctime_sec);
+SAME_FIELD_AS(halo_guest_kstat, ctime_nanoseconds, kstat, st_ctime_nsec);
 _Static_assert(sizeof(struct flock) == sizeof(struct halo_guest_flock), "struct flock's size differs");
 SAME_FIELD(halo_guest_flock, flock, l_type);
 SAME_FIELD(halo_guest_flock, flock, l_whence);

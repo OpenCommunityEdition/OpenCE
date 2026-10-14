@@ -161,12 +161,14 @@ struct halo_guest_kstat
 	int32_t st_blksize;
 	int32_t pad2;
 	int64_t st_blocks;
-	int64_t st_atime_sec;
-	int64_t st_atime_nsec;
-	int64_t st_mtime_sec;
-	int64_t st_mtime_nsec;
-	int64_t st_ctime_sec;
-	int64_t st_ctime_nsec;
+	/* (not st_atime_sec and the like: bionic defines those names as macros
+	for its own struct stat, which would rewrite these fields) */
+	int64_t atime_seconds;
+	int64_t atime_nanoseconds;
+	int64_t mtime_seconds;
+	int64_t mtime_nanoseconds;
+	int64_t ctime_seconds;
+	int64_t ctime_nanoseconds;
 	uint32_t unused[2];
 };
 
@@ -191,8 +193,8 @@ HALO_GUEST_CHECK_LAYOUT(kstat_rdev, offsetof(struct halo_guest_kstat, st_rdev) =
 HALO_GUEST_CHECK_LAYOUT(kstat_size_field, offsetof(struct halo_guest_kstat, st_size) == 48);
 HALO_GUEST_CHECK_LAYOUT(kstat_blksize, offsetof(struct halo_guest_kstat, st_blksize) == 56);
 HALO_GUEST_CHECK_LAYOUT(kstat_blocks, offsetof(struct halo_guest_kstat, st_blocks) == 64);
-HALO_GUEST_CHECK_LAYOUT(kstat_atime, offsetof(struct halo_guest_kstat, st_atime_sec) == 72);
-HALO_GUEST_CHECK_LAYOUT(kstat_ctime_nsec, offsetof(struct halo_guest_kstat, st_ctime_nsec) == 112);
+HALO_GUEST_CHECK_LAYOUT(kstat_atime, offsetof(struct halo_guest_kstat, atime_seconds) == 72);
+HALO_GUEST_CHECK_LAYOUT(kstat_ctime_nsec, offsetof(struct halo_guest_kstat, ctime_nanoseconds) == 112);
 HALO_GUEST_CHECK_LAYOUT(flock_size, sizeof(struct halo_guest_flock) == 32);
 HALO_GUEST_CHECK_LAYOUT(flock_start, offsetof(struct halo_guest_flock, l_start) == 8);
 HALO_GUEST_CHECK_LAYOUT(flock_pid, offsetof(struct halo_guest_flock, l_pid) == 24);

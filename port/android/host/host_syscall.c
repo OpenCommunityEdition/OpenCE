@@ -261,12 +261,12 @@ static void kstat_out(const struct stat *value, struct halo_guest_kstat *result)
 	result->st_size = (int64_t)value->st_size;
 	result->st_blksize = (int32_t)value->st_blksize;
 	result->st_blocks = (int64_t)value->st_blocks;
-	result->st_atime_sec = (int64_t)value->st_atim.tv_sec;
-	result->st_atime_nsec = (int64_t)value->st_atim.tv_nsec;
-	result->st_mtime_sec = (int64_t)value->st_mtim.tv_sec;
-	result->st_mtime_nsec = (int64_t)value->st_mtim.tv_nsec;
-	result->st_ctime_sec = (int64_t)value->st_ctim.tv_sec;
-	result->st_ctime_nsec = (int64_t)value->st_ctim.tv_nsec;
+	result->atime_seconds = (int64_t)value->st_atim.tv_sec;
+	result->atime_nanoseconds = (int64_t)value->st_atim.tv_nsec;
+	result->mtime_seconds = (int64_t)value->st_mtim.tv_sec;
+	result->mtime_nanoseconds = (int64_t)value->st_mtim.tv_nsec;
+	result->ctime_seconds = (int64_t)value->st_ctim.tv_sec;
+	result->ctime_nanoseconds = (int64_t)value->st_ctim.tv_nsec;
 }
 
 static long guest_fstatat(int directory, uint64_t path, uint64_t result, int flags, int by_descriptor)
