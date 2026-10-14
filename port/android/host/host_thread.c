@@ -121,9 +121,18 @@ void host_signal_stack_remove(void)
 	signal_stack = NULL;
 }
 
-/* ---------- calling into the guest */
+/* ---------- calling into the guest
 
-typedef uint32_t (*guest_function)(uint32_t, uint32_t, uint32_t, uint32_t);
+The guest's functions are called through C function pointers: the guest's
+calling convention is the host's, with 32-bit pointers. Its arguments are
+passed as 64-bit values, zero-extended: the guest takes its pointer
+arguments as 64-bit registers that the caller has zero-extended (x32 code
+passes them on unchanged, into the host's imports too), where a 32-bit
+argument of the host's leaves the register's upper half undefined. A 32-bit
+integer argument is the same register's lower half either way. The result
+is the guest's 32-bit one (w0, eax). */
+
+typedef uint32_t (*guest_function)(uint64_t, uint64_t, uint64_t, uint64_t);
 
 uint32_t host_call_guest(uint32_t function, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
 {
@@ -136,7 +145,7 @@ uint32_t host_call_guest(uint32_t function, uint32_t a, uint32_t b, uint32_t c, 
 
 void host_run_guest_main(uint32_t boot)
 {
-	((void (*)(uint32_t))(uintptr_t)host_image.header->start)(boot);
+	((void (*)(uint64_t))(uintptr_t)host_image.header->start)(boot);
 	host_fatal("the guest returned from __guest_start");
 }
 
