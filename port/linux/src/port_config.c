@@ -11,6 +11,7 @@ it exists, so that the player's edits and comments stay.
 */
 
 #include "platform.h"
+#include "install_layout.h"
 #include "port_config.h"
 #include "tomlc17.h"
 
@@ -456,6 +457,7 @@ static const struct config_setting config_settings[] =
 		"HALO_NET_BROKERS_FILE", _environment_value, _platform_all,
 		"The file of the public MQTT brokers through which the machines of an\n"
 		"invite find each other (its messages are encrypted), beside this file\n"
+		"(else the game's own, share/opence/brokers.txt in the Linux release)\n"
 		"unless a full path: one host:port on each line, up to 4. Updates\n"
 		"replace brokers.txt: keep a list of your own under another name." },
 	{ "network.stun_servers", _config_string, "\"stun.l.google.com:19302,stun.cloudflare.com:3478\"",
@@ -543,6 +545,10 @@ static const struct config_setting config_settings[] =
 	{ "debug.update_answer", _config_string, "\"\"", "HALO_UPDATE_ANSWER", _environment_value, _platform_desktop,
 		"The answer to the new version question, for automated tests: \"yes\",\n"
 		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },
+	{ "debug.update_from", _config_string, "\"\"", "HALO_UPDATE_FROM", _environment_value, _platform_desktop,
+		"A release's zip file to update to, for testing updates: the game offers\n"
+		"it as a new version without asking GitHub, even when it has no build\n"
+		"number (not in the version it starts); empty asks GitHub." },
 	{ "debug.exit_after", _config_real, "0.0", "HALO_EXIT_AFTER", _environment_value, _platform_all,
 		"Quit this many seconds after the window opens; 0 never." },
 	{ "debug.hidden_window", _config_boolean, "false", "HALO_HIDDEN_WINDOW", _environment_set_is_true, _platform_desktop,
@@ -645,11 +651,15 @@ static void config_path(char *path, size_t size)
 	const char *root = getenv("HALO_DATA_ROOT");
 
 	snprintf(path, size, "%s/config.toml", root && *root ? root : ".");
-#else
+#elif defined(_WIN32)
 	/* the executable's folder, with its separator */
 	const char *base = SDL_GetBasePath();
 
 	snprintf(path, size, "%sconfig.toml", base ? base : "");
+#else
+	/* the game's folder (the release's root, or the executable's folder),
+	or ~/.config/halo-linux when the game is installed (install_layout.c) */
+	snprintf(path, size, "%sconfig.toml", install_config_folder());
 #endif
 }
 

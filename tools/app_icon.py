@@ -10,7 +10,10 @@
 - opence-icon-render.png, the helmet alone on transparency (1024x1024, the same
   framing): the Android app's launcher icon;
 - opence-icon.png again: the web page's icons (port/web/site/icons), its tab's,
-  the installed web app's and the home screen's.
+  the installed web app's and the home screen's; and the Linux release's
+  (port/assets/icon/hicolor/opence-<size>.png, which tools/linux_package.py
+  puts in share/icons/hicolor/<size>x<size>/apps/opence.png for the desktop
+  entry, port/assets/linux/opence.desktop).
 
 The launcher icon is an adaptive one (Android 8 and later): the render as its
 foreground layer, the background's gradient as its background layer, and the
@@ -48,6 +51,9 @@ WINDOWS_SIZES = [16, 20, 24, 32, 40, 48, 64, 128, 256]
 # manifest's (192, 512)
 WEB_ICONS = ROOT / "port/web/site/icons"
 WEB_SIZES = [32, 180, 192, 512]
+# the Linux release's, for the freedesktop icon theme's hicolor sizes
+LINUX_ICONS = ARTWORK / "hicolor"
+LINUX_SIZES = [16, 24, 32, 48, 64, 128, 256, 512]
 
 
 def background_gradient(icon: Image.Image, render: Image.Image) -> tuple:
@@ -99,6 +105,13 @@ def web_icons(icon: Image.Image) -> None:
     print(f"{WEB_ICONS.relative_to(ROOT)}: {', '.join(str(size) for size in WEB_SIZES)}")
 
 
+def linux_icons(icon: Image.Image) -> None:
+    LINUX_ICONS.mkdir(parents=True, exist_ok=True)
+    for size in LINUX_SIZES:
+        icon.resize((size, size), Image.LANCZOS).save(LINUX_ICONS / f"opence-{size}.png", optimize=True)
+    print(f"{LINUX_ICONS.relative_to(ROOT)}: {', '.join(str(size) for size in LINUX_SIZES)}")
+
+
 def main() -> None:
     icon = Image.open(ICON).convert("RGBA")
     render = Image.open(RENDER).convert("RGBA")
@@ -109,6 +122,7 @@ def main() -> None:
     icon.save(WINDOWS_ICON, sizes=[(size, size) for size in WINDOWS_SIZES])
     print(f"{WINDOWS_ICON.relative_to(ROOT)}: {', '.join(str(size) for size in WINDOWS_SIZES)}")
     web_icons(icon)
+    linux_icons(icon)
 
     # the launcher's layers
     themed = monochrome(render)

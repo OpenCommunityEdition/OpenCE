@@ -17,6 +17,11 @@ passed on as --compiler-launcher. A build of the main branch gets the run's
 number (HALO_BUILD_NUMBER), which its release is named after and the
 self-updater compares (and the web site's version.json names).
 
+The Linux build is two folders (tools/linux_package.py): the release's tree,
+dist/halo-linux-i686-<config>/ (bin/opence, lib/opence, share/...), and the
+same build laid out flat, dist/halo-linux-<config>/, for the self-updaters
+of the releases before the tree.
+
 The web build (port/web/README.md) needs Emscripten (emcc on the PATH, as
 emsdk_env.sh puts it); dist/halo-web-<config>/ is the whole site, which a
 static host serves as it is: the workflow publishes the release build's to
@@ -30,12 +35,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+import linux_package
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # what each port's build leaves, and what goes into dist/
 OUTPUTS = {
     # (and the SDL3 the portable build brings, tools/linux_build.py, with its
-    # zlib license, as the release carries the other libraries')
+    # zlib license, as the release carries the other libraries'; laid out by
+    # tools/linux_package.py)
     "linux": ["build/linux/halo", "build/linux/libSDL3.so.0", "build/linux/SDL3-LICENSE.txt"],
     "windows": ["build/windows/halo.exe", "build/windows/SDL3.dll"],
     "android": [],  # the APK, below
@@ -97,6 +105,24 @@ def main() -> int:
         run(["ninja", args.platform])
         outputs = OUTPUTS[args.platform]
 
+    # the licences of what the build carries (tools/linux_package.py)
+    notices = linux_package.notices(args.platform)
+
+    if args.platform == "linux":
+        # the release's tree, and the same build flat for the updaters of the
+        # releases before it (tools/linux_package.py; SDL's license with the
+        # others)
+        executable, library, sdl_license = (ROOT / output for output in outputs)
+        notices.append((sdl_license, sdl_license.name))
+        for name, stage in ((f"halo-linux-i686-{args.config}", linux_package.stage_tree),
+                            (f"halo-linux-{args.config}", linux_package.stage_flat)):
+            dist = ROOT / "dist" / name
+            if dist.exists():
+                shutil.rmtree(dist)
+            stage(dist, executable, library, notices)
+            print(f"{', '.join(outputs)} -> {dist.relative_to(ROOT)}", flush=True)
+        return 0
+
     dist = ROOT / "dist" / f"halo-{args.platform}-{args.config}"
     if dist.exists():
         shutil.rmtree(dist)
@@ -117,29 +143,8 @@ def main() -> int:
         for pdb in [ROOT / "build/windows/halo.pdb", *sorted((ROOT / "build/windows/third_party").glob("SDL3-*/lib/x86/SDL3.pdb"))]:
             shutil.copy2(pdb, symbols)
             print(f"{pdb.relative_to(ROOT)} -> {symbols.relative_to(ROOT)}", flush=True)
-    # the disc image readers (port/linux/src/xiso.c, and the Android app's
-    # XisoExtractor.java) follow extract-xiso, whose license asks binaries
-    # to carry its notice
-    shutil.copy2(ROOT / "port/third_party/extract-xiso/LICENSE.TXT", dist / "extract-xiso-LICENSE.txt")
-    if args.platform != "web":
-        # internet play's DTLS with browsers, and the Linux self-updater's TLS
-        # (port/third_party/mbedtls), whose Apache license asks the same
-        shutil.copy2(ROOT / "port/third_party/mbedtls/LICENSE", dist / "mbedtls-LICENSE.txt")
-    # internet play's UPnP (port/third_party/miniupnpc), in every build,
-    # whose BSD license asks binaries to carry its notice
-    shutil.copy2(ROOT / "port/third_party/miniupnpc/LICENSE", dist / "miniupnpc-LICENSE.txt")
-    # the text's fonts (port/assets/fonts), embedded in every build, whose
-    # SIL Open Font License asks each copy to carry it
-    shutil.copy2(ROOT / "port/assets/fonts/Overpass-OFL.txt", dist / "Overpass-OFL.txt")
-    # the menus' XML parser (port/third_party/expat), in every build, whose
-    # MIT license asks copies to carry its notice
-    shutil.copy2(ROOT / "port/third_party/expat/COPYING", dist / "expat-COPYING.txt")
-    # voice chat's codec (port/third_party/opus), in every build, whose BSD
-    # license asks binaries to carry its notice
-    shutil.copy2(ROOT / "port/third_party/opus/COPYING", dist / "opus-COPYING.txt")
-    # voice chat's speaker icons (port/assets/icons/lucide, drawn into the
-    # menus' bitmaps), whose ISC license asks copies to carry its notice
-    shutil.copy2(ROOT / "port/assets/icons/lucide/LICENSE", dist / "lucide-LICENSE.txt")
+    for source, name in notices:
+        shutil.copy2(source, dist / name)
     # internet play's MQTT brokers, a file beside the game (network.brokers_file;
     # Android's APK has its own copy)
     if args.platform != "android":

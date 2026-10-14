@@ -45,7 +45,7 @@ To start the game:
 
 SteamOS has all of these. Its system is read-only, and the builds from
 GitHub Actions need no package: they bring their own SDL3
-(`libSDL3.so.0`, next to the executable).
+(`lib/opence/libSDL3.so.0`).
 
 ### Portable build
 
@@ -58,12 +58,13 @@ portable build starts on more systems than the build machine's:
   build machine. An executable needs the glibc version that it was built
   against, or a later one.
 - It brings SDL 3 (`libSDL3.so.0`), built from source against the same
-  glibc. The executable looks for it in its own folder first (a `DT_RPATH`
-  of `$ORIGIN`, which comes before `LD_LIBRARY_PATH`), so that it uses this
-  SDL even when Steam sets `LD_LIBRARY_PATH`. Few distributions have a
-  32-bit SDL 3. This SDL loads X11, Wayland, libdecor, PipeWire, PulseAudio
-  and ALSA when it starts, so it starts with whichever of them the system
-  has. It is linked only to glibc. Its license is `SDL3-LICENSE.txt`.
+  glibc. The executable looks for it in its own folder and in
+  `../lib/opence` first (a `DT_RPATH` of `$ORIGIN:$ORIGIN/../lib/opence`,
+  which comes before `LD_LIBRARY_PATH`), so that it uses this SDL even when
+  Steam sets `LD_LIBRARY_PATH`. Few distributions have a 32-bit SDL 3. This
+  SDL loads X11, Wayland, libdecor, PipeWire, PulseAudio and ALSA when it
+  starts, so it starts with whichever of them the system has. It is linked
+  only to glibc. Its license is `SDL3-LICENSE.txt`.
 
 At the first build, `tools/linux_sysroot.py` downloads the Debian packages
 (about 25 MB) and the source of SDL. Each package comes from
@@ -91,10 +92,15 @@ To see the glibc version that a build needs, enter
 
 Enter `build/linux/halo`.
 
-To play on a Steam Deck, unpack `halo-linux-release.zip` into a folder (in
-Desktop Mode), and add `halo` to Steam as a non-Steam game ("Add a Game" in
-the Games menu of Steam). The game then starts in Game Mode as well. Refer
-to "Steam Deck".
+The release (`halo-linux-i686-release.zip`) is a folder laid out as a Unix
+prefix is (refer to "Packaging"). Unpack it into a folder, and enter
+`bin/opence` in that folder. That folder is the game's folder: the game
+keeps `config.toml` and `maps/` there.
+
+To play on a Steam Deck, unpack `halo-linux-i686-release.zip` into a folder
+(in Desktop Mode), and add `bin/opence` to Steam as a non-Steam game ("Add a
+Game" in the Games menu of Steam). The game then starts in Game Mode as
+well. Refer to "Steam Deck".
 
 The game data is the folder that contains `maps/`, from an Xbox disc image
 of any version of the game. The game looks for this folder in this
@@ -102,7 +108,10 @@ sequence:
 
 1. `paths.data` in `config.toml`.
 2. The current folder.
-3. The folder of the executable.
+3. The game's folder: the folder of the release (above `bin/`), or the
+   folder of the executable (`build/linux/halo`). For an installed game
+   (refer to "Packaging"), `~/.local/share/halo-linux`, unless the game's
+   folder is read-only and has `maps/`.
 4. `assets/` in the current folder, and `assets/` in the repository that
    contains the executable.
 
@@ -111,7 +120,7 @@ If the game finds no data, it asks for an Xbox disc image (`.xiso` or
 
 - Select "No" to stop the game.
 - Select "Yes" to open a file picker. Select the disc image. The game copies
-  `maps/` next to the executable and shows the progress.
+  `maps/` into the game's folder and shows the progress.
 
 The game writes the copy to `maps.partial`. When the copy is complete, the
 game changes the name to `maps`. If the copy stops before it is complete,
@@ -119,9 +128,10 @@ the game asks for the disc image again at the next start.
 
 ### Steam Deck
 
-Do the set-up in Desktop Mode: unpack the release, put `maps/` next to
-`halo` (or start the game one time to copy it from a disc image), and add
-`halo` to Steam. Then start the game from the library in Game Mode.
+Do the set-up in Desktop Mode: unpack the release, put `maps/` in its
+folder, next to `bin/` (or start the game one time to copy it from a disc
+image), and add `bin/opence` to Steam. Then start the game from the library
+in Game Mode.
 
 - Screen: the game fills the screen without borders (`display.mode` empty,
   thus borderless). The 3D view and the HUD have the shape of the screen
@@ -172,9 +182,12 @@ These files are in the data root:
 | `init.txt` | Console commands that the game does at start-up. For example, `map_name levels\a10\a10` starts the first campaign level. |
 | `tags/` | Sound tag files that replace the sounds of the maps (`audio.loose_sounds`). |
 
-The settings are in `config.toml` next to the executable. Refer to
-"Settings". Internet play's MQTT brokers are in `brokers.txt` next to it
-(`network.brokers_file`).
+The settings are in `config.toml` in the game's folder (the release's
+folder, or the folder of `build/linux/halo`), or in
+`~/.config/halo-linux` for an installed game. Refer to "Settings" and
+"Packaging". Internet play's MQTT brokers are in `brokers.txt`
+(`network.brokers_file`): the one next to `config.toml`, if there is one,
+else the release's `share/opence/brokers.txt`.
 
 If the game stops because of a fatal signal, it writes the address and a
 backtrace to the standard error. To find the function at the address, enter
@@ -307,8 +320,9 @@ problem.
 
 ## Settings
 
-The settings are in `config.toml` next to the executable
-(`build/linux/config.toml`). At the first start, the game writes the file
+The settings are in `config.toml` in the game's folder (the release's
+folder, or `build/linux/config.toml`; `~/.config/halo-linux/config.toml` for
+an installed game: refer to "Packaging"). At the first start, the game writes the file
 with the default values and a comment for each setting. To get the default
 values again, delete the file.
 
@@ -399,19 +413,20 @@ the setting for one start of the game. It has priority over the file.
 | `network.map_seed_upload` | `256` | `HALO_NET_MAP_SEED_UPLOAD` | When you play in the game of another machine: the most kilobytes per second that the game sends of maps to other players (`16` to `65536`). UPLOAD LIMIT in Settings > Network Setup > Map Sharing. |
 | `network.map_download` | `true` | `HALO_NET_MAP_DOWNLOAD` | When you join a game on a Custom Edition map that you do not have: download it from the players of the game. `false`: leave the game and show which map is missing. DOWNLOAD MAPS in Settings > Network Setup > Map Sharing. |
 | `network.coop_public` | `false` | `HALO_NET_COOP_PUBLIC` | `true`: an online co-op game (Create Game > Internet, a SINGLEPLAYER map) starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in co-op's Server Setup writes its choice here. Refer to "Server browser". |
-| `network.brokers_file` | `"brokers.txt"` | `HALO_NET_BROKERS_FILE` | The file of the public MQTT brokers that let the machines of an invite find each other, and that carry the listings of the server browser: next to `config.toml`, unless a full path. One `host:port` on each line, up to 4; `#` starts a comment. |
+| `network.brokers_file` | `"brokers.txt"` | `HALO_NET_BROKERS_FILE` | The file of the public MQTT brokers that let the machines of an invite find each other, and that carry the listings of the server browser: next to `config.toml` (else the release's, `share/opence/brokers.txt`), unless a full path. One `host:port` on each line, up to 4; `#` starts a comment. |
 | `network.stun_servers` | Google and Cloudflare | `HALO_NET_STUN` | The public STUN servers (`host:port`, with commas between them) that give the internet address of a machine. |
 | `discord.application_id` | the application of the project | `HALO_DISCORD_APPLICATION` | The Discord application for invites. Empty: no Discord. |
 | `update.auto` | `true` | `HALO_UPDATE_AUTO` | `true`: at start-up, the game looks for a new version. Refer to "Updates". `false`: the game does not look. |
 | `crash_reports.upload` | `"ask"` | `HALO_CRASH_REPORTS` | Windows only. `"yes"`: the game sends a report of each crash to the developers. `"no"`: the game sends no reports. `"ask"`: the game asks at the next crash and writes the answer here. Refer to "Crash reports" in [port/windows/README.md](../windows/README.md#crash-reports). |
 | `debug.update_answer` | `""` | `HALO_UPDATE_ANSWER` | The answer to the update question, for automatic tests: `yes`, `no` or `never`. Empty: the game asks. |
+| `debug.update_from` | `""` | `HALO_UPDATE_FROM` | A release's zip file to update to, for tests of updates: the game offers it as a new version without asking GitHub, also when the build has no build number, but not in the version that the update starts. Empty: the game asks GitHub. |
 | `debug.exit_after` | `0.0` | `HALO_EXIT_AFTER` | The game stops after this number of seconds. `0`: never. |
 | `debug.screenshot_directory`, `debug.screenshot_every` | `""`, `0` | `HALO_SCREENSHOT_DIR`, `HALO_SCREENSHOT_EVERY` | The game writes each Nth frame to this folder as a BMP file. |
 | `debug.hidden_window`, `debug.null_renderer` | `false` | `HALO_HIDDEN_WINDOW`, `HALO_NULL_RENDERER` | `true`: no visible window, or no graphics. |
 | `debug.gpu_stats`, `debug.gpu_trace_frame`, `debug.gpu_trace_constants`, `debug.gpu_dump_shaders`, `debug.texture_dump_directory`, `debug.texture_log`, `debug.gl_debug`, `debug.texture_no_cache` | off | `HALO_GPU_STATS`, `HALO_GPU_TRACE`, `HALO_GPU_TRACE_CONSTANTS`, `HALO_GPU_DUMP_SHADERS`, `HALO_TEXTURE_DUMP`, `HALO_TEXTURE_LOG`, `HALO_GL_DEBUG`, `HALO_TEXTURE_NO_CACHE` | Tools to find problems in the graphics: counts for each frame, all the GL state of one frame, the GLSL code, the textures. |
 | `debug.menu_open` | `""` | `HALO_MENU_OPEN` | Start on this screen of the menus (`main_menu/settings_select/...`, as `port/assets/menus` names it), a player profile being edited, to look at it. |
 | `debug.gpu_skip_vertex_shaders`, `debug.gpu_debug_expression`, `debug.gpu_debug_flat`, `debug.gpu_debug_texture0` | off | `HALO_GPU_SKIP_VS`, `HALO_GPU_DEBUG_EXPR`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | Tools to find problems in the graphics: skip the draws of a vertex shader, or replace the output of all pixel shaders with a GLSL expression (for example `t0.rgb`). |
-| `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.network_test_pickup_weapon`, `debug.network_test_public`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_NETWORK_TEST_PICKUP_WEAPON`, `HALO_NETWORK_TEST_PUBLIC`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`). Refer to `NETCODE.md`. |
+| `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.network_test_pickup_weapon`, `debug.network_test_public`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_NETWORK_TEST_PICKUP_WEAPON`, `HALO_NETWORK_TEST_PUBLIC`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`); a test game starts `debug.network_test_start` seconds (`15.0`) after the host opens it. Refer to `NETCODE.md`. |
 | `debug.touch_targets` | `false` | `HALO_TOUCH_TARGETS` | Outlines the tap targets of the menus (item green, value blue, list slot yellow, legend button red, the band beside the slots of a list orange, keys of the on-screen keyboard white), marks where the last finger went down and the last tap landed for 3 seconds, and logs each tap with the target that it hit (for a value, also where it splits into previous and next): to judge the accuracy of touch. |
 | `debug.network_latency`, `debug.network_loss`, `debug.network_corrupt`, `debug.network_corrupt_stream`, `debug.network_corrupt_after` | `0` | `HALO_NETWORK_LATENCY`, `HALO_NETWORK_LOSS`, `HALO_NETWORK_CORRUPT`, `HALO_NETWORK_CORRUPT_STREAM`, `HALO_NETWORK_CORRUPT_AFTER` | The game holds all the data that it receives for this number of milliseconds, ignores this percentage of the datagrams, and damages this percentage of the datagrams it receives, and this percentage of its reads of streams, at random (bytes changed, cut short, stretched or replaced), from this many seconds after the start. Use the first two to test the netcode as on the internet, and the others to test that nothing another machine sends can crash the game (a damaged stream is closed, so a little goes a long way; a host's messages to its own client are damaged too, so start damaging once the game has started). |
 | `debug.voice_test` | `false` | `HALO_VOICE_TEST` | Automatic tests of voice chat: a tone replaces the microphone, and each voice that the game hears is written to the log once each second. |
@@ -431,9 +446,10 @@ newer, the game does nothing.
 
 If the latest release is newer, the game asks: "Do you want to update?"
 
-- Select "Yes" to update. The game downloads the release for this platform,
-  replaces its files and starts the new version. The old files get the
-  extension `.old`. The new version deletes them.
+- Select "Yes" to update. The game downloads the release for this platform
+  (`halo-linux-i686-release.zip`), replaces its files and starts the new
+  version. The old files get the extension `.old`. The new version deletes
+  them.
 - Select "No" to continue. The game asks again at the next start.
 - Select "Do not ask again", then "Yes", to stop the questions. The game
   writes `auto = false` in the `[update]` section of `config.toml`. To get
@@ -442,11 +458,106 @@ If the latest release is newer, the game asks: "Do you want to update?"
 The game downloads through HTTPS. It examines the certificate of the server
 against the certificate authorities of the system: on Linux, the bundle of
 the distribution (`src/posix_update.c`, with Mbed TLS); on Windows, the
-certificate store of Windows (WinHTTP). The folder of the executable must
-let the game write to it.
+certificate store of Windows (WinHTTP). The game's folder must let the
+game write to it.
 
 Builds that you make yourself have no build number. They do not look for
-updates.
+updates. An installed game (refer to "Packaging") does not look for
+updates: its package manager updates it.
+
+### From the flat release
+
+Earlier releases were flat: `halo`, `libSDL3.so.0`, `brokers.txt` and the
+licenses in one folder. Their updaters cannot
+change. They install only the files at the top of a zip, and they download
+`halo-linux-release.zip`. So the releases still have
+`halo-linux-release.zip`: the same build as `halo-linux-i686-release.zip`,
+laid out flat. An update from a flat release thus occurs in two steps:
+
+1. The old game installs the new build, flat, as before.
+2. At the next update, the new game installs the release's folders
+   (`bin/`, `lib/`, `share/`) into its folder. It puts a script in place of
+   `halo` that starts `bin/opence`, so that shortcuts (Steam's) and scripts
+   that start `halo` continue to operate. It deletes the flat files that
+   the folders replace (`libSDL3.so.0`, `brokers.txt` and the licenses).
+   `config.toml` and `maps/` stay where they are.
+
+Delete the script `halo` when no shortcut starts it. A flat release that
+you unpacked yourself can be replaced the same way: unpack
+`halo-linux-i686-release.zip` into its folder, delete the files that the
+list above names, and start `bin/opence`.
+
+## Packaging
+
+The release (`halo-linux-i686-release.zip`) is laid out as a Unix prefix is,
+so a package can copy its folders to `/usr` (or `/opt/opence`) as they are:
+
+| Path | Contents |
+| --- | --- |
+| `bin/opence` | The game: a 32-bit x86 executable. |
+| `lib/opence/libSDL3.so.0` | SDL 3, which the game loads from there (a `DT_RPATH` of `$ORIGIN:$ORIGIN/../lib/opence`; refer to "Portable build"). Leave it out to use the system's 32-bit SDL 3 (`lib32-sdl3`). |
+| `share/opence/brokers.txt` | Internet play's MQTT brokers (`network.brokers_file`). |
+| `share/applications/opence.desktop` | The desktop entry. |
+| `share/icons/hicolor/<size>/apps/opence.png` | Its icon, 16x16 to 512x512. |
+| `share/doc/opence/` | The main README and this one. |
+| `share/licenses/opence/` | The project's license (`LICENSE.md`, CC0) and the licenses of what the build carries, which ask to be carried with it. |
+
+The game finds its files from the place of its executable
+(`src/install_layout.c`): when the executable's folder is `bin/` and
+`share/opence/` is next to that folder, the folder above `bin/` is the
+game's folder. Otherwise the folder of the executable is the game's folder
+(`build/linux/halo`).
+
+An installed game keeps the player's files in the player's folders, not in
+the game's folder, and does not update itself:
+
+- `config.toml`: `$XDG_CONFIG_HOME/halo-linux/` (`~/.config/halo-linux/`).
+- The game data (`maps/`, which the first start copies from a disc image)
+  and `debug.txt`: `$XDG_DATA_HOME/halo-linux/`
+  (`~/.local/share/halo-linux/`), as are the saves (refer to "Files and
+  folders").
+- `brokers.txt`: the package's `share/opence/brokers.txt`, unless the player
+  puts one next to `config.toml`.
+
+The game is installed when the player cannot write to the game's folder
+(`/usr`, `/opt/opence`), or when `share/opence/packaged` exists. A package
+adds that file (it can be empty) so that the game is installed also when its
+folder can be written to: when root starts it, or in a folder that the
+player owns. Otherwise the game is portable: it keeps its files in its
+folder and updates itself, as an unpacked release does.
+
+A read-only folder without `share/opence/packaged` (a portable copy on a
+read-only disk, or `/opt/halo` with maps that an administrator put there)
+keeps the `config.toml` and `maps/` it has: the game reads them there, and
+puts in the player's folders only what the folder does not have. Without a
+home folder (no `XDG_CONFIG_HOME`, `XDG_DATA_HOME` or `HOME`), an installed
+game keeps its files in its folder, as far as it can be written to, and
+still does not update itself.
+
+To make a package from the sources, build as the releases do, and lay out
+the build as the release's tree:
+
+```sh
+python configure.py --portable --release
+ninja linux
+python tools/linux_package.py tree "$pkgdir/usr"
+```
+
+A build that you make has no build number, so it does not look for updates
+in any place. `--portable` links against Debian 11's glibc and builds SDL 3,
+which goes into `lib/opence`; its first build downloads them (refer to
+"Portable build"). Without `--portable`, the build links against the
+system's 32-bit glibc and SDL 3 (`lib32-sdl3`, then a dependency), and the
+tree has no `lib/opence`.
+
+The game needs, as 32-bit libraries: glibc 2.31 or later, OpenGL 4.5
+(`lib32-mesa`, or the driver's own), the X11 client libraries
+(`lib32-libx11`, `lib32-libxext`), and the PipeWire or PulseAudio client
+libraries (`lib32-pipewire` or `lib32-libpulse`) for sound. The 32-bit
+Wayland libraries (`lib32-wayland`, `lib32-libxkbcommon`, `lib32-libdecor`)
+are optional: refer to "Requirements". The disc image picker of the first
+start is the desktop's file dialog, through `xdg-desktop-portal` (or
+`zenity`).
 
 ## Frame rate
 
@@ -756,9 +867,11 @@ with the invite can ask the host to connect, and the host then sends its
 addresses. Thus anyone can learn the address of the host of a public game,
 as for any public server.
 
-The brokers are in `brokers.txt` next to the executable (from
-`port/assets/network/brokers.txt`; on Android, the app writes it next to
-`config.toml` at each start), one `host:port` on each line. The game uses
+The brokers are in `brokers.txt` (from `port/assets/network/brokers.txt`:
+`share/opence/brokers.txt` in the Linux release, next to the executable in
+a build and on Windows; on Android, the app writes it next to `config.toml`
+at each start), one `host:port` on each line. A `brokers.txt` next to
+`config.toml` comes first. The game uses
 all of them at once (up to 4), so one that works is enough. An update
 replaces `brokers.txt`: to use brokers of your own, put them in another
 file and name it in `network.brokers_file`. All the players must use the

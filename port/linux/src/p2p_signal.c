@@ -69,6 +69,7 @@ answered it in a while.
 */
 
 #include "platform.h"
+#include "install_layout.h"
 #include "posix.h"
 #include "port_config.h"
 #include "p2p_internal.h"
@@ -1699,8 +1700,9 @@ static void broker_readable(struct broker *broker)
 
 /* ---------- p2p.c's side */
 
-/* the brokers in network.brokers_file (beside config.toml, unless a full
-path: port/assets/network/brokers.txt, which the builds put there), one on
+/* the brokers in network.brokers_file (beside config.toml, else the one the
+release brings, unless a full path: port/assets/network/brokers.txt, which
+the builds put beside the executable or in share/opence), one on
 each line, "#" starting a comment, into text: host:port entries separated by
 commas; empty if the file cannot be read */
 static void brokers_list(char *text, size_t size)
@@ -1733,6 +1735,14 @@ static void brokers_list(char *text, size_t size)
 		snprintf(path + strlen(path), sizeof(path) - strlen(path), "%s", name);
 	}
 	file = config_file_read(path, &file_size);
+#if !defined(_WIN32) && !defined(HALO_ANDROID) && !defined(HALO_WEB)
+	/* (the release's, share/opence/brokers.txt in its tree: install_layout.c) */
+	if (!file && !(name[0] == '/' || name[0] == '\\' || (name[0] && name[1] == ':')))
+	{
+		install_shared_file(name, path, sizeof(path));
+		file = config_file_read(path, &file_size);
+	}
+#endif
 	if (!file)
 	{
 		platform_log("Internet play: the brokers' file %s cannot be read (network.brokers_file)", path);

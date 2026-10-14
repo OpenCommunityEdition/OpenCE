@@ -252,9 +252,11 @@ def march_flag(sln: Any) -> str:
 # starts on other Linux systems than the one that built it, the Steam Deck's
 # among them: it is compiled and linked against Debian 11's glibc 2.31, not
 # the build machine's (an executable asks for the glibc version it was built
-# with, or older), and it brings its own SDL3, libSDL3.so.0 beside the
-# executable, which finds it there (an rpath of $ORIGIN), as few
-# distributions have a 32-bit SDL3. tools/linux_sysroot.py downloads the
+# with, or older), and it brings its own SDL3, libSDL3.so.0, as few
+# distributions have a 32-bit SDL3: beside the executable in the build and
+# the flat release, in lib/opence in the release's tree (bin/opence;
+# tools/linux_package.py), which the executable finds with an rpath of
+# $ORIGIN:$ORIGIN/../lib/opence. tools/linux_sysroot.py downloads the
 # system root and SDL's source, and tools/linux_sysroot.cmake builds SDL
 # against it.
 SYSROOT_SCRIPT = Path("tools/linux_sysroot.py")
@@ -310,10 +312,11 @@ def portable_sdl(n: Writer, sln: Any, build_dir: Path, cc: str) -> Tuple[List[st
     n.build(outputs=libsdl, rule="linux_sdl3", implicit=[stamp, SYSROOT_TOOLCHAIN])
     cflags = [f"--sysroot={_quote(sysroot)}", f"-isystem {_quote(sdl_source / 'include')}"]
     # (DT_RPATH rather than DT_RUNPATH: it comes before LD_LIBRARY_PATH,
-    # which Steam sets for the games it starts, so that the SDL beside the
-    # executable is the one loaded, whatever other SDL that path holds)
-    ldflags = [f"--sysroot={_quote(sysroot)}", f"-L{_quote(sdl_build)}", "'-Wl,-rpath,$$ORIGIN'",
-               "-Wl,--disable-new-dtags"]
+    # which Steam sets for the games it starts, so that the SDL the release
+    # brings is the one loaded, whatever other SDL that path holds; a
+    # package without lib/opence gets the system's)
+    ldflags = [f"--sysroot={_quote(sysroot)}", f"-L{_quote(sdl_build)}",
+               "'-Wl,-rpath,$$ORIGIN:$$ORIGIN/../lib/opence'", "-Wl,--disable-new-dtags"]
     sdl_license = build_dir / "SDL3-LICENSE.txt"
     n.build(outputs=sdl_license, rule="linux_copy", inputs=sdl_license_source)
     return cflags, ldflags, stamp, libsdl, sdl_license

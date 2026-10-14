@@ -565,6 +565,10 @@ int update_replace_file(const char *path, const char *new_path, const char *old_
 	struct stat information;
 	int existed = stat(path, &information) == 0;
 
+	/* (a new file keeps the mode its extraction gave it) */
+	if (!existed && stat(new_path, &information) != 0)
+		information.st_mode = 0644;
+
 	unlink(old_path);
 	if (existed && rename(path, old_path) != 0)
 		return 0;
@@ -575,8 +579,13 @@ int update_replace_file(const char *path, const char *new_path, const char *old_
 		return 0;
 	}
 	/* (the new file as the old was: an executable stays executable) */
-	chmod(path, existed ? (information.st_mode & 07777) : 0644);
+	chmod(path, information.st_mode & 07777);
 	return 1;
+}
+
+int update_make_executable(const char *path)
+{
+	return chmod(path, 0755) == 0;
 }
 
 void update_delete_file(const char *path)
