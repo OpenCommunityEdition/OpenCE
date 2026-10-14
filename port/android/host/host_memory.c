@@ -775,6 +775,23 @@ static struct pool *pool_of(uint64_t address, uint64_t size)
 	return NULL;
 }
 
+/* gives pages of a pool back, with the memory lock held: the memory goes,
+the address space stays reserved */
+static void pool_release(struct pool *pool, uint64_t start, uint64_t length)
+{
+	uint64_t first = (start - pool->base) / PAGE, count = length / PAGE, page;
+
+	mmap((void *)(uintptr_t)start, length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED, -1, 0);
+	for (page = first; page < first + count; page++)
+	{
+		if (pool->used[page])
+		{
+			pool->used[page] = 0;
+			pool->free_pages++;
+		}
+	}
+}
+
 void host_low_unmap(void *address, size_t size)
 {
 	uint64_t start = (uint64_t)address & ~(PAGE - 1);
@@ -784,20 +801,7 @@ void host_low_unmap(void *address, size_t size)
 	pthread_mutex_lock(&memory_lock);
 	pool = pool_of(start, length);
 	if (pool)
-	{
-		uint64_t first = (start - pool->base) / PAGE, count = length / PAGE, page;
-
-		/* give the memory back but keep the address space */
-		mmap((void *)start, length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED, -1, 0);
-		for (page = first; page < first + count; page++)
-		{
-			if (pool->used[page])
-			{
-				pool->used[page] = 0;
-				pool->free_pages++;
-			}
-		}
-	}
+		pool_release(pool, start, length);
 	pthread_mutex_unlock(&memory_lock);
 }
 
@@ -808,34 +812,237 @@ int host_low_owns(uintptr_t address, size_t size)
 	return pool_of(address, size) != NULL;
 }
 
-/* ---------- the guest's memory system calls */
+/* ---------- the guest's memory system calls
+
+The guest maps, unmaps, reprotects and advises only memory that is its own:
+the pools' pages, the Xbox window, the image's range, and the ranges it
+mapped itself at addresses of its choosing (MAP_FIXED_NOREPLACE in free
+address space). The rest of the low 4 GB is the host's (on Android, ART's
+too). What each page is in use for is kept so that a "no replace" mapping
+fails where something is mapped, as the kernel's does: a pool's used[], and
+guest_pages for the window and the guest's own ranges. All under the memory
+lock. */
+
+/* a bit for each page below 4 GB outside the pools and the image that the
+guest has mapped: in the window, and its own ranges */
+static uint8_t guest_pages[LOW_LIMIT / PAGE / 8];
+
+static int guest_page(uint64_t address)
+{
+	uint64_t page = address / PAGE;
+
+	return (guest_pages[page >> 3] >> (page & 7)) & 1;
+}
+
+static void set_guest_pages(uint64_t address, uint64_t length, int value)
+{
+	uint64_t page;
+
+	for (page = address / PAGE; page < (address + length) / PAGE; page++)
+	{
+		if (value)
+			guest_pages[page >> 3] |= (uint8_t)(1 << (page & 7));
+		else
+			guest_pages[page >> 3] &= (uint8_t)~(1 << (page & 7));
+	}
+}
+
+/* what a page below 4 GB is */
+enum
+{
+	PAGE_HOST, /* the host's, or free address space */
+	PAGE_POOL,
+	PAGE_WINDOW,
+	PAGE_IMAGE,
+	PAGE_GUEST, /* a range the guest mapped itself */
+};
+
+static int page_kind(uint64_t address, struct pool **pool)
+{
+	*pool = NULL;
+	if (in_range(address, PAGE, window_base, window_end))
+		return PAGE_WINDOW;
+	if (in_range(address, PAGE, image_base, image_end))
+		return PAGE_IMAGE;
+	*pool = pool_of(address, PAGE);
+	if (*pool)
+		return PAGE_POOL;
+	return guest_page(address) ? PAGE_GUEST : PAGE_HOST;
+}
+
+/* the end of the run of pages from address (before end) of the same kind,
+and pool, as the first */
+static uint64_t run_end(uint64_t address, uint64_t end, int *kind, struct pool **pool)
+{
+	struct pool *next_pool;
+
+	*kind = page_kind(address, pool);
+	for (address += PAGE; address < end; address += PAGE)
+	{
+		if (page_kind(address, &next_pool) != *kind || next_pool != *pool)
+			break;
+	}
+	return address;
+}
+
+/* whether any page of a run holds a mapping */
+static int run_in_use(uint64_t address, uint64_t end, int kind, const struct pool *pool)
+{
+	for (; address < end; address += PAGE)
+	{
+		if (kind == PAGE_IMAGE || kind == PAGE_GUEST)
+			return 1;
+		if (kind == PAGE_POOL && pool->used[(address - pool->base) / PAGE])
+			return 1;
+		if (kind == PAGE_WINDOW && guest_page(address))
+			return 1;
+	}
+	return 0;
+}
+
+/* whether every page of a range is the guest's (PAGE_IMAGE too, unless
+image is 0), with the memory lock held */
+static int guest_owns(uint64_t address, uint64_t end, int image)
+{
+	while (address < end)
+	{
+		struct pool *pool;
+		int kind;
+
+		address = run_end(address, end, &kind, &pool);
+		if (kind == PAGE_HOST || (kind == PAGE_IMAGE && !image))
+			return 0;
+	}
+	return 1;
+}
+
+/* the write tracking forgets the window's pages that were remapped or
+reprotected */
+static void forget_window_range(uint64_t address, uint64_t length)
+{
+	uint64_t start = address, end = address + length;
+
+	if (start < window_base)
+		start = window_base;
+	if (end > window_end)
+		end = window_end;
+	if (start < end)
+		host_memory_watch_forget((uint32_t)start, (uint32_t)(end - start));
+}
+
+static long guest_mmap_fixed(uint64_t address, uint64_t length, int protection, int flags, int fd, int64_t offset)
+{
+	uint64_t end = address + length, at;
+	int replace = !(flags & MAP_FIXED_NOREPLACE);
+	int host = 0, owned = 0, in_use = 0;
+	void *result;
+	long status;
+
+	if (address & (PAGE - 1))
+		return -EINVAL;
+	if (end > LOW_LIMIT || end < address)
+		return -ENOMEM;
+	pthread_mutex_lock(&memory_lock);
+	for (at = address; at < end;)
+	{
+		struct pool *pool;
+		int kind;
+		uint64_t next = run_end(at, end, &kind, &pool);
+
+		if (kind == PAGE_HOST)
+			host = 1;
+		else
+		{
+			owned = 1;
+			in_use |= run_in_use(at, next, kind, pool);
+		}
+		at = next;
+	}
+	if (!owned)
+	{
+		/* free address space, or the host's: a range of the guest's own
+		where the kernel finds nothing mapped */
+		if (replace)
+		{
+			status = -EINVAL;
+			goto done;
+		}
+		result = mmap((void *)(uintptr_t)address, length, protection, flags, fd, offset);
+		if (result == MAP_FAILED)
+			status = -errno;
+		else if (result != (void *)(uintptr_t)address)
+		{
+			/* (a kernel older than 4.17 takes MAP_FIXED_NOREPLACE as a
+			hint) */
+			munmap(result, length);
+			status = -EEXIST;
+		}
+		else
+		{
+			set_guest_pages(address, length, 1);
+			status = (long)address;
+		}
+		goto done;
+	}
+	if (host)
+	{
+		/* (partly the host's: never replaced, and not free either) */
+		status = replace ? -EINVAL : -EEXIST;
+		goto done;
+	}
+	if (!replace && in_use)
+	{
+		status = -EEXIST;
+		goto done;
+	}
+	/* the guest's own memory: a reservation (or, with MAP_FIXED, a mapping)
+	is replaced */
+	result = mmap((void *)(uintptr_t)address, length, protection, (flags & ~MAP_FIXED_NOREPLACE) | MAP_FIXED,
+		fd, offset);
+	if (result == MAP_FAILED)
+	{
+		status = -errno;
+		goto done;
+	}
+	for (at = address; at < end;)
+	{
+		struct pool *pool;
+		int kind;
+		uint64_t next = run_end(at, end, &kind, &pool);
+		uint64_t page;
+
+		if (kind == PAGE_POOL)
+		{
+			/* (so that host_low_map does not hand them out again) */
+			for (page = (at - pool->base) / PAGE; page < (next - pool->base) / PAGE; page++)
+			{
+				if (!pool->used[page])
+				{
+					pool->used[page] = 1;
+					pool->free_pages--;
+				}
+			}
+		}
+		else if (kind == PAGE_WINDOW)
+			set_guest_pages(at, next - at, 1);
+		at = next;
+	}
+	forget_window_range(address, length);
+	status = (long)address;
+done:
+	pthread_mutex_unlock(&memory_lock);
+	return status;
+}
 
 long host_guest_mmap(uint64_t address, uint64_t size, int protection, int flags, int fd, int64_t offset)
 {
 	uint64_t length = round_up(size);
 	void *result;
 
-	if (!length)
+	if (!length || length < size)
 		return -EINVAL;
 	if (flags & (MAP_FIXED | MAP_FIXED_NOREPLACE))
-	{
-		int fixed_flags = (flags & ~MAP_FIXED_NOREPLACE) | MAP_FIXED;
-
-		if (address + length > LOW_LIMIT)
-			return -ENOMEM;
-		/* inside a range the host reserved for the guest, a "no replace"
-		request replaces the reservation */
-		if (!host_low_owns(address, length))
-		{
-			if (!(flags & MAP_FIXED_NOREPLACE))
-				return -EINVAL;
-			fixed_flags = flags;
-		}
-		result = mmap((void *)address, length, protection, fixed_flags, fd, offset);
-		if (result == MAP_FAILED)
-			return -errno;
-		return (long)(uintptr_t)result;
-	}
+		return guest_mmap_fixed(address, length, protection, flags, fd, offset);
 	result = host_low_map(length, PROT_NONE);
 	if (!result)
 		return -ENOMEM;
@@ -849,54 +1056,66 @@ long host_guest_mmap(uint64_t address, uint64_t size, int protection, int flags,
 	return (long)(uintptr_t)result;
 }
 
+/* pool pages go back to their pool, the window's to its reservation, and
+the guest's own ranges are unmapped; nothing is done unless all of the
+range is one of these (the image is never unmapped) */
 long host_guest_munmap(uint64_t address, uint64_t size)
 {
-	uint64_t length = round_up(size);
+	uint64_t length = round_up(size), end = address + length, at;
+	long status = 0;
 
-	if (address + length > LOW_LIMIT)
+	if ((address & (PAGE - 1)) || !length || length < size)
 		return -EINVAL;
-	if (in_range(address, length, window_base, window_end))
-	{
-		mmap((void *)address, length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED, -1, 0);
-		return 0;
-	}
-	if (in_range(address, length, image_base, image_end))
+	if (end > LOW_LIMIT || end < address)
 		return -EINVAL;
-	if (host_low_owns(address, length))
+	pthread_mutex_lock(&memory_lock);
+	if (!guest_owns(address, end, 0))
 	{
-		host_low_unmap((void *)address, length);
-		return 0;
+		status = -EINVAL;
+		goto done;
 	}
-	return munmap((void *)address, length) ? -errno : 0;
+	for (at = address; at < end;)
+	{
+		struct pool *pool;
+		int kind;
+		uint64_t next = run_end(at, end, &kind, &pool);
+
+		if (kind == PAGE_POOL)
+			pool_release(pool, at, next - at);
+		else if (kind == PAGE_WINDOW)
+			mmap((void *)(uintptr_t)at, next - at, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED,
+				-1, 0);
+		else if (kind == PAGE_GUEST)
+			munmap((void *)(uintptr_t)at, next - at);
+		if (kind == PAGE_WINDOW || kind == PAGE_GUEST)
+			set_guest_pages(at, next - at, 0);
+		at = next;
+	}
+	forget_window_range(address, length);
+done:
+	pthread_mutex_unlock(&memory_lock);
+	return status;
 }
 
-/* mprotect and madvise only on memory the host gave the guest: the rest of
-the low 4 GB is the host's (on Android, ART's too). The write tracking
-forgets what they change in the Xbox window. */
+/* mprotect and madvise only on memory that is the guest's (above). The
+write tracking forgets what they change in the Xbox window. */
 static long guest_range(uint64_t address, uint64_t size, uint64_t *length)
 {
+	int owned;
+
 	if (address & (PAGE - 1))
 		return -EINVAL;
 	*length = round_up(size);
+	if (*length < size)
+		return -ENOMEM;
 	if (!*length)
 		return 0;
 	if (address + *length > LOW_LIMIT || address + *length < address)
 		return -ENOMEM;
-	if (!host_low_owns((uintptr_t)address, (size_t)*length))
-		return -ENOMEM;
-	return 1;
-}
-
-static void forget_window_range(uint64_t address, uint64_t length)
-{
-	uint64_t start = address, end = address + length;
-
-	if (start < window_base)
-		start = window_base;
-	if (end > window_end)
-		end = window_end;
-	if (start < end)
-		host_memory_watch_forget((uint32_t)start, (uint32_t)(end - start));
+	pthread_mutex_lock(&memory_lock);
+	owned = guest_owns(address, address + *length, 1);
+	pthread_mutex_unlock(&memory_lock);
+	return owned ? 1 : -ENOMEM;
 }
 
 long host_guest_mprotect(uint64_t address, uint64_t size, int protection)
