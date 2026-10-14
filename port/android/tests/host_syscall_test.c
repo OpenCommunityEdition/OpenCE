@@ -4,7 +4,8 @@ HOST_SYSCALL_TEST.C
 Tests of the translation of the guest's system calls
 (port/android/host/host_syscall.c) on the build machine, whatever its
 architecture: the numbers, open's flags, the kernel stat layout, fcntl's
-locks, _llseek and vectored I/O. Built and run by
+locks, _llseek, vectored I/O (with preadv's and pwritev's offsets in
+halves), sysinfo, sleeps and futex timeouts. Built and run by
 tools/test_host_syscall.py; exits nonzero on a failure.
 
 The calls are made as the guest makes them, through host_syscall, with the
@@ -16,6 +17,7 @@ are 32-bit).
 
 #include <dirent.h>
 #include <stdarg.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -140,6 +142,20 @@ static long long call(long long number, long long a, long long b, long long c, l
 static long long guest_int(int value)
 {
 	return (long long)(uint32_t)value;
+}
+
+/* a long as musl passes it (__scc: a 32-bit long, sign-extended) */
+static long long guest_long(int32_t value)
+{
+	return (long long)value;
+}
+
+/* preadv and pwritev as musl makes them: the offset as two longs, low
+half first (src/unistd/preadv.c) */
+static long long call_positional(long long number, int fd, void *vector, int count, int64_t offset)
+{
+	return call(number, fd, guest_address(vector), count, guest_long((int32_t)(uint32_t)(uint64_t)offset),
+		guest_long((int32_t)(offset >> 32)));
 }
 
 static char directory[256];
@@ -430,7 +446,7 @@ static void test_iovecs(void)
 	CHECK(call(GUEST_SYS_writev, fd, guest_address(vector), guest_int(-1), 0, 0) == -EINVAL);
 	CHECK(call(GUEST_SYS_writev, fd, guest_address(vector), 0, 0, 0) == 0);
 	/* a short vector (the stack's) */
-	CHECK(call(GUEST_SYS_pwritev, fd, guest_address(vector), 3, 4096, 0) == 6);
+	CHECK(call_positional(GUEST_SYS_pwritev, fd, vector, 3, 4096) == 6);
 	CHECK(pread(fd, check, 6, 4096) == 6 && memcmp(check, bytes, 6) == 0);
 
 	/* reading back, in 300 pieces of different lengths */
@@ -440,13 +456,48 @@ static void test_iovecs(void)
 		vector[index].base = guest_address(bytes + index * 6);
 		vector[index].length = 6;
 	}
-	CHECK(call(GUEST_SYS_preadv, fd, guest_address(vector), 300, 0, 0) == 1800);
+	CHECK(call_positional(GUEST_SYS_preadv, fd, vector, 300, 0) == 1800);
 	CHECK(pread(fd, check, 1800, 0) == 1800 && memcmp(check, bytes, 1800) == 0);
 	CHECK(lseek(fd, 0, SEEK_SET) == 0);
 	memset(bytes, 0, 1800);
 	CHECK(call(GUEST_SYS_readv, fd, guest_address(vector), 300, 0, 0) == 1800);
 	CHECK(memcmp(check, bytes, 1800) == 0);
 	close(fd);
+}
+
+/* offsets past 2 GB (a low half with its top bit set, which musl's __scc
+sign-extends) and past 4 GB (a high half), in a sparse file */
+static void test_positional_offsets(void)
+{
+	static const int64_t offsets[] = { 3LL << 30, (4LL << 30) + 4096, (5LL << 30) + 0x80001000LL, 0x7ffff000LL };
+	char *file = path_in("offsets");
+	struct halo_guest_iovec *vector = low_alloc(sizeof(*vector) * 2);
+	uint8_t *bytes = low_alloc(16);
+	uint8_t check[16], probe;
+	int fd = open(file, O_CREAT | O_RDWR | O_TRUNC, 0644);
+	int index;
+
+	CHECK(fd >= 0);
+	vector[0].base = guest_address(bytes);
+	vector[0].length = 8;
+	vector[1].base = guest_address(bytes + 8);
+	vector[1].length = 8;
+	for (index = 0; index < (int)(sizeof(offsets) / sizeof(offsets[0])); index++)
+	{
+		int64_t offset = offsets[index];
+
+		memset(bytes, 'a' + index, 16);
+		CHECK(call_positional(GUEST_SYS_pwritev, fd, vector, 2, offset) == 16);
+		CHECK(pread(fd, check, 16, (off_t)offset) == 16 && memcmp(check, bytes, 16) == 0);
+		/* nothing at the offset's low half alone */
+		if (offset >= (4LL << 30))
+			CHECK(pread(fd, &probe, 1, (off_t)(uint32_t)offset) <= 0 || probe != 'a' + index);
+		memset(bytes, 0, 16);
+		CHECK(call_positional(GUEST_SYS_preadv, fd, vector, 2, offset) == 16);
+		CHECK(memcmp(check, bytes, 16) == 0 && bytes[0] == 'a' + index && bytes[15] == 'a' + index);
+	}
+	close(fd);
+	unlink(file);
 }
 
 static void test_directories_and_limits(void)
@@ -506,6 +557,188 @@ static void test_time(void)
 	CHECK(call(GUEST_SYS_clock_gettime, 12345, guest_address(value), 0, 0, 0) == -EINVAL);
 }
 
+static void test_sysinfo(void)
+{
+	struct halo_guest_sysinfo *guest = low_alloc(sizeof(*guest) + 16);
+	uint8_t *after = (uint8_t *)(guest + 1);
+	struct sysinfo host, large;
+	struct halo_guest_sysinfo converted;
+	uint64_t guest_total, host_total, pages;
+
+	memset(guest, 0xa5, sizeof(*guest) + 16);
+	CHECK(call(GUEST_SYS_sysinfo, guest_address(guest), 0, 0, 0, 0) == 0);
+	CHECK(sysinfo(&host) == 0);
+	CHECK(after[0] == 0xa5 && after[15] == 0xa5);
+	CHECK(guest->mem_unit >= 1);
+	CHECK(guest->totalram > 0 && guest->freeram <= guest->totalram);
+	CHECK(guest->procs > 0);
+	CHECK(guest->reserved[0] == 0 && guest->reserved[255] == 0);
+	/* the same memory, whatever the unit */
+	guest_total = (uint64_t)guest->totalram * guest->mem_unit;
+	host_total = (uint64_t)host.totalram * host.mem_unit;
+	CHECK(guest_total <= host_total && host_total - guest_total < guest->mem_unit);
+	/* musl's sysconf(_SC_PHYS_PAGES) */
+	pages = (uint64_t)guest->totalram * guest->mem_unit / 4096;
+	CHECK(pages > 0 && pages * 4096 <= host_total);
+	/* the layout as musl reads it, byte by byte */
+	CHECK(*(uint32_t *)((uint8_t *)guest + 16) == guest->totalram);
+	CHECK(*(uint32_t *)((uint8_t *)guest + 52) == guest->mem_unit);
+	CHECK(call(GUEST_SYS_sysinfo, 0, 0, 0, 0, 0) == -EFAULT);
+
+	/* sizes past 32 bits are counted in larger units, as a 64-bit kernel
+	does for 32-bit programs */
+	memset(&large, 0, sizeof(large));
+	large.uptime = 1234;
+	large.loads[0] = 65536;
+	large.totalram = 96ULL << 30; /* 96 GB in bytes */
+	large.freeram = 40ULL << 30;
+	large.totalswap = 8ULL << 30;
+	large.freeswap = 3;
+	large.procs = 321;
+	large.mem_unit = 1;
+	sysinfo_out(&large, &converted);
+	CHECK(converted.mem_unit == 32);
+	CHECK((uint64_t)converted.totalram * converted.mem_unit == 96ULL << 30);
+	CHECK((uint64_t)converted.freeram * converted.mem_unit == 40ULL << 30);
+	CHECK((uint64_t)converted.totalswap * converted.mem_unit == 8ULL << 30);
+	CHECK(converted.freeswap == 0);
+	CHECK(converted.uptime == 1234 && converted.loads[0] == 65536 && converted.procs == 321);
+	/* and small ones are left in theirs */
+	large.totalram = 1ULL << 20;
+	large.freeram = 1ULL << 19;
+	large.totalswap = 0;
+	large.mem_unit = 4096;
+	sysinfo_out(&large, &converted);
+	CHECK(converted.mem_unit == 4096 && converted.totalram == 1u << 20 && converted.freeram == 1u << 19);
+	large.mem_unit = 0;
+	sysinfo_out(&large, &converted);
+	CHECK(converted.mem_unit == 1);
+}
+
+static void interrupted(int number)
+{
+	(void)number;
+}
+
+/* sleeps interrupted by a signal: a relative one writes what remains, an
+absolute one leaves it alone */
+static void test_sleeps(void)
+{
+	struct halo_guest_timespec *request = low_alloc(sizeof(*request));
+	struct halo_guest_timespec *remaining = low_alloc(sizeof(*remaining));
+	struct sigaction action, previous;
+	struct itimerval timer;
+	struct timespec now;
+
+	memset(&action, 0, sizeof(action));
+	action.sa_handler = interrupted;
+	sigemptyset(&action.sa_mask);
+	/* (no SA_RESTART: the sleep returns EINTR) */
+	sigaction(SIGALRM, &action, &previous);
+	memset(&timer, 0, sizeof(timer));
+	timer.it_value.tv_usec = 20000;
+
+	request->seconds = 5;
+	request->nanoseconds = 0;
+	remaining->seconds = 0x5a5a5a5a;
+	remaining->nanoseconds = 0x5a5a5a5a;
+	setitimer(ITIMER_REAL, &timer, NULL);
+	CHECK(call(GUEST_SYS_clock_nanosleep, CLOCK_MONOTONIC, 0, guest_address(request), guest_address(remaining),
+		0) == -EINTR);
+	CHECK(remaining->seconds >= 3 && remaining->seconds <= 5);
+	CHECK(remaining->nanoseconds >= 0 && remaining->nanoseconds < 1000000000);
+
+	CHECK(clock_gettime(CLOCK_MONOTONIC, &now) == 0);
+	request->seconds = (int32_t)now.tv_sec + 5;
+	request->nanoseconds = 0;
+	remaining->seconds = 0x5a5a5a5a;
+	remaining->nanoseconds = 0x5a5a5a5a;
+	setitimer(ITIMER_REAL, &timer, NULL);
+	CHECK(call(GUEST_SYS_clock_nanosleep, CLOCK_MONOTONIC, GUEST_TIMER_ABSTIME, guest_address(request),
+		guest_address(remaining), 0) == -EINTR);
+	CHECK(remaining->seconds == 0x5a5a5a5a && remaining->nanoseconds == 0x5a5a5a5a);
+
+	/* an absolute time already past */
+	request->seconds = (int32_t)now.tv_sec - 1;
+	CHECK(call(GUEST_SYS_clock_nanosleep, CLOCK_MONOTONIC, GUEST_TIMER_ABSTIME, guest_address(request),
+		guest_address(remaining), 0) == 0);
+	CHECK(call(GUEST_SYS_clock_nanosleep, CLOCK_MONOTONIC, 0, 0, 0, 0) == -EFAULT);
+
+	request->seconds = 5;
+	request->nanoseconds = 0;
+	setitimer(ITIMER_REAL, &timer, NULL);
+	CHECK(call(GUEST_SYS_nanosleep, guest_address(request), guest_address(remaining), 0, 0, 0) == -EINTR);
+	CHECK(remaining->seconds >= 3 && remaining->seconds <= 5);
+	sigaction(SIGALRM, &previous, NULL);
+}
+
+/* a thread holding a priority-inheritance futex until told to stop */
+static uint32_t *pi_word;
+static volatile int pi_holding, pi_release;
+
+static void *pi_holder(void *unused)
+{
+	(void)unused;
+	__atomic_store_n(pi_word, (uint32_t)gettid(), __ATOMIC_SEQ_CST);
+	pi_holding = 1;
+	while (!pi_release)
+		usleep(1000);
+	__atomic_store_n(pi_word, 0, __ATOMIC_SEQ_CST);
+	return NULL;
+}
+
+/* FUTEX_LOCK_PI's and FUTEX_LOCK_PI2's timeouts (absolute: CLOCK_REALTIME's
+and CLOCK_MONOTONIC's) are the guest's timespec, converted */
+static void test_futex_timeouts(void)
+{
+	struct halo_guest_timespec *timeout = low_alloc(sizeof(*timeout));
+	struct timespec before, after;
+	pthread_t thread;
+	long long result;
+
+	pi_word = low_alloc(sizeof(*pi_word));
+	if (pthread_create(&thread, NULL, pi_holder, NULL) != 0)
+	{
+		CHECK(!"pthread_create");
+		return;
+	}
+	while (!pi_holding)
+		usleep(1000);
+
+	CHECK(clock_gettime(CLOCK_REALTIME, &before) == 0);
+	timeout->seconds = (int32_t)before.tv_sec;
+	timeout->nanoseconds = (int32_t)before.tv_nsec;
+	timeout->nanoseconds += 50000000;
+	if (timeout->nanoseconds >= 1000000000)
+	{
+		timeout->nanoseconds -= 1000000000;
+		timeout->seconds++;
+	}
+	result = call(GUEST_SYS_futex, guest_address(pi_word), FUTEX_LOCK_PI_PRIVATE, 0, guest_address(timeout), 0);
+	CHECK(clock_gettime(CLOCK_REALTIME, &after) == 0);
+	CHECK(result == -ETIMEDOUT);
+	CHECK(after.tv_sec - before.tv_sec <= 2);
+
+	CHECK(clock_gettime(CLOCK_MONOTONIC, &before) == 0);
+	timeout->seconds = (int32_t)before.tv_sec;
+	timeout->nanoseconds = (int32_t)before.tv_nsec;
+	timeout->nanoseconds += 50000000;
+	if (timeout->nanoseconds >= 1000000000)
+	{
+		timeout->nanoseconds -= 1000000000;
+		timeout->seconds++;
+	}
+	result = call(GUEST_SYS_futex, guest_address(pi_word), FUTEX_LOCK_PI2 | FUTEX_PRIVATE_FLAG, 0,
+		guest_address(timeout), 0);
+	CHECK(clock_gettime(CLOCK_MONOTONIC, &after) == 0);
+	/* (Linux 5.14 and later) */
+	CHECK(result == -ETIMEDOUT || result == -ENOSYS);
+	CHECK(after.tv_sec - before.tv_sec <= 2);
+
+	pi_release = 1;
+	pthread_join(thread, NULL);
+}
+
 /* the files go in a new folder in argv[1], or in /tmp */
 int main(int argc, char **argv)
 {
@@ -534,8 +767,12 @@ int main(int argc, char **argv)
 	test_llseek();
 	test_locks();
 	test_iovecs();
+	test_positional_offsets();
 	test_directories_and_limits();
 	test_time();
+	test_sysinfo();
+	test_sleeps();
+	test_futex_timeouts();
 
 	snprintf(command, sizeof(command), "rm -rf '%s'", directory);
 	if (system(command) != 0)

@@ -17,7 +17,7 @@ differences:
 - number 62 is _llseek, as on 32-bit asm-generic architectures, not lseek:
   the guest's system calls return a 32-bit long, which cannot hold a 64-bit
   file offset, so the offset is returned through a pointer;
-- timespec and iovec have the guest's 32-bit layouts.
+- timespec, iovec and sysinfo have the guest's 32-bit layouts.
 
 The guest's libc headers hold the same values for musl
 (port/android/guest/libc/arch/generic: bits/syscall.h.in, kstat.h,
@@ -185,6 +185,25 @@ struct halo_guest_flock
 };
 
 #define HALO_GUEST_CHECK_LAYOUT(name, condition) typedef char halo_guest_layout_##name[(condition) ? 1 : -1]
+/* sysinfo's result, musl's struct sysinfo with 32-bit longs */
+struct halo_guest_sysinfo
+{
+	uint32_t uptime;
+	uint32_t loads[3];
+	uint32_t totalram;
+	uint32_t freeram;
+	uint32_t sharedram;
+	uint32_t bufferram;
+	uint32_t totalswap;
+	uint32_t freeswap;
+	uint16_t procs;
+	uint16_t pad;
+	uint32_t totalhigh;
+	uint32_t freehigh;
+	uint32_t mem_unit;
+	char reserved[256];
+};
+
 HALO_GUEST_CHECK_LAYOUT(timespec_size, sizeof(struct halo_guest_timespec) == 8);
 HALO_GUEST_CHECK_LAYOUT(iovec_size, sizeof(struct halo_guest_iovec) == 8);
 HALO_GUEST_CHECK_LAYOUT(kstat_size, sizeof(struct halo_guest_kstat) == 128);
@@ -198,6 +217,13 @@ HALO_GUEST_CHECK_LAYOUT(kstat_ctime_nsec, offsetof(struct halo_guest_kstat, ctim
 HALO_GUEST_CHECK_LAYOUT(flock_size, sizeof(struct halo_guest_flock) == 32);
 HALO_GUEST_CHECK_LAYOUT(flock_start, offsetof(struct halo_guest_flock, l_start) == 8);
 HALO_GUEST_CHECK_LAYOUT(flock_pid, offsetof(struct halo_guest_flock, l_pid) == 24);
+HALO_GUEST_CHECK_LAYOUT(sysinfo_size, sizeof(struct halo_guest_sysinfo) == 312);
+HALO_GUEST_CHECK_LAYOUT(sysinfo_totalram, offsetof(struct halo_guest_sysinfo, totalram) == 16);
+HALO_GUEST_CHECK_LAYOUT(sysinfo_freeswap, offsetof(struct halo_guest_sysinfo, freeswap) == 36);
+HALO_GUEST_CHECK_LAYOUT(sysinfo_procs, offsetof(struct halo_guest_sysinfo, procs) == 40);
+HALO_GUEST_CHECK_LAYOUT(sysinfo_totalhigh, offsetof(struct halo_guest_sysinfo, totalhigh) == 44);
+HALO_GUEST_CHECK_LAYOUT(sysinfo_mem_unit, offsetof(struct halo_guest_sysinfo, mem_unit) == 52);
+HALO_GUEST_CHECK_LAYOUT(sysinfo_reserved, offsetof(struct halo_guest_sysinfo, reserved) == 56);
 
 /* ---------- open's flags (openat, fcntl's F_GETFL and F_SETFL, pipe2,
 dup3), which differ between architectures; the host translates them, and
@@ -301,6 +327,8 @@ a host whose headers disagree. */
 #define GUEST_RLIMIT_CORE 4
 #define GUEST_RLIMIT_NOFILE 7
 #define GUEST_RLIMIT_AS 9
+
+#define GUEST_TIMER_ABSTIME 1
 
 #define GUEST_LOCK_SH 1
 #define GUEST_LOCK_EX 2

@@ -25,8 +25,10 @@ Per call:
   them;
 - structures with the guest's ILP32 layouts are converted: timespec and
   timeval (the guest's time_t is 32-bit, as in the MSVC runtime), iovec,
-  and the kernel stat of fstat and newfstatat; fcntl's struct flock is
-  copied field by field;
+  struct sysinfo (its longs are 32-bit), and the kernel stat of fstat and
+  newfstatat; fcntl's struct flock is copied field by field;
+- a 64-bit argument the guest passes in two halves (preadv's and pwritev's
+  offset, as musl passes it on 32-bit architectures) is put together;
 - structures that are the same on every 64-bit Linux pass unchanged: the
   directory entries of getdents64 (struct linux_dirent64), pollfd, utsname,
   rlimit64 (prlimit64, and getrlimit, which becomes prlimit64), the signal
@@ -63,6 +65,7 @@ _llseek's pointer.
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/sysinfo.h>
 #include <sys/uio.h>
 #include <time.h>
 #include <unistd.h>
@@ -112,6 +115,7 @@ SAME(RLIMIT_STACK);
 SAME(RLIMIT_CORE);
 SAME(RLIMIT_NOFILE);
 SAME(RLIMIT_AS);
+SAME(TIMER_ABSTIME);
 SAME(LOCK_SH);
 SAME(LOCK_EX);
 SAME(LOCK_NB);
@@ -286,6 +290,55 @@ static long guest_fstatat(int directory, uint64_t path, uint64_t result, int fla
 	return 0;
 }
 
+/* the host's struct sysinfo in the guest's, whose longs are 32-bit: as a
+64-bit kernel does for its 32-bit programs, a memory size too large for 32
+bits is counted in larger units (mem_unit), and the rest saturate */
+static uint32_t saturate(uint64_t value)
+{
+	return value > UINT32_MAX ? UINT32_MAX : (uint32_t)value;
+}
+
+static void sysinfo_out(const struct sysinfo *value, struct halo_guest_sysinfo *result)
+{
+	uint64_t sizes[8];
+	uint64_t unit = value->mem_unit ? value->mem_unit : 1;
+	int index, large;
+
+	sizes[0] = value->totalram;
+	sizes[1] = value->freeram;
+	sizes[2] = value->sharedram;
+	sizes[3] = value->bufferram;
+	sizes[4] = value->totalswap;
+	sizes[5] = value->freeswap;
+	sizes[6] = value->totalhigh;
+	sizes[7] = value->freehigh;
+	for (;;)
+	{
+		large = 0;
+		for (index = 0; index < 8; index++)
+			large |= sizes[index] > UINT32_MAX;
+		if (!large || unit >= 0x80000000u)
+			break;
+		unit <<= 1;
+		for (index = 0; index < 8; index++)
+			sizes[index] >>= 1;
+	}
+	memset(result, 0, sizeof(*result));
+	result->uptime = value->uptime < 0 ? 0 : saturate((uint64_t)value->uptime);
+	for (index = 0; index < 3; index++)
+		result->loads[index] = saturate(value->loads[index]);
+	result->totalram = saturate(sizes[0]);
+	result->freeram = saturate(sizes[1]);
+	result->sharedram = saturate(sizes[2]);
+	result->bufferram = saturate(sizes[3]);
+	result->totalswap = saturate(sizes[4]);
+	result->freeswap = saturate(sizes[5]);
+	result->procs = value->procs;
+	result->totalhigh = saturate(sizes[6]);
+	result->freehigh = saturate(sizes[7]);
+	result->mem_unit = (uint32_t)unit;
+}
+
 /* ---------- standard output and error */
 
 #ifdef __ANDROID__
@@ -409,6 +462,13 @@ static long guest_readv(int fd, uint64_t vector, int count, int64_t offset, int 
 
 /* ---------- files */
 
+/* a 64-bit offset from the two longs musl passes for it, low half first:
+each arrives sign-extended (__scc), so only its lower 32 bits count */
+static int64_t offset_of_halves(long long low, long long high)
+{
+	return (int64_t)((uint64_t)(uint32_t)low | ((uint64_t)(uint32_t)high << 32));
+}
+
 /* _llseek(fd, offset_high, offset_low, result, whence): the 64-bit offset
 in two halves, and the new position through a pointer, because the guest's
 result is a 32-bit long */
@@ -512,6 +572,11 @@ static long guest_fcntl(int fd, int command, uint64_t argument)
 
 /* ---------- time */
 
+#ifndef FUTEX_LOCK_PI2
+/* (Linux 5.14; older headers lack it) */
+#define FUTEX_LOCK_PI2 13
+#endif
+
 static long guest_futex(uint64_t address, int operation, uint32_t value, uint64_t timeout,
 	uint64_t address2, uint32_t value3)
 {
@@ -522,7 +587,7 @@ static long guest_futex(uint64_t address, int operation, uint32_t value, uint64_
 	/* for these operations the fourth argument is a timeout; for the
 	others it is a count passed as a pointer-sized integer */
 	if (command == FUTEX_WAIT || command == FUTEX_WAIT_BITSET || command == FUTEX_LOCK_PI ||
-		command == FUTEX_WAIT_REQUEUE_PI)
+		command == FUTEX_LOCK_PI2 || command == FUTEX_WAIT_REQUEUE_PI)
 	{
 		if (timespec_in(timeout, &host_timeout))
 			timeout_pointer = &host_timeout;
@@ -599,11 +664,11 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	case GUEST_SYS_writev:
 		return guest_writev((int)a, (uint64_t)b, (int)c, 0, 0);
 	case GUEST_SYS_pwritev:
-		return guest_writev((int)a, (uint64_t)b, (int)c, d, 1);
+		return guest_writev((int)a, (uint64_t)b, (int)c, offset_of_halves(d, e), 1);
 	case GUEST_SYS_readv:
 		return guest_readv((int)a, (uint64_t)b, (int)c, 0, 0);
 	case GUEST_SYS_preadv:
-		return guest_readv((int)a, (uint64_t)b, (int)c, d, 1);
+		return guest_readv((int)a, (uint64_t)b, (int)c, offset_of_halves(d, e), 1);
 
 	case GUEST_SYS_openat:
 	{
@@ -694,7 +759,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		if (!timespec_in((uint64_t)c, &request))
 			return -EFAULT;
 		result = clock_nanosleep((clockid_t)a, (int)b, &request, &remaining);
-		if (result == EINTR)
+		/* (an absolute sleep has nothing remaining, and leaves it alone) */
+		if (result == EINTR && !((int)b & TIMER_ABSTIME))
 			timespec_out((uint64_t)d, &remaining);
 		return -result;
 	}
@@ -737,6 +803,18 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	case GUEST_SYS_exit_group:
 		host_exit((int)a);
 
+	case GUEST_SYS_sysinfo:
+	{
+		struct sysinfo value;
+
+		if (!a)
+			return -EFAULT;
+		if (sysinfo(&value) != 0)
+			return -errno;
+		sysinfo_out(&value, GUEST(struct halo_guest_sysinfo *, a));
+		return 0;
+	}
+
 	case GUEST_SYS_set_tid_address:
 		return gettid();
 	case GUEST_SYS_rt_sigaction:
@@ -754,7 +832,6 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	case GUEST_SYS_rt_sigtimedwait:
 	case GUEST_SYS_pselect6:
 	case GUEST_SYS_epoll_pwait:
-	case GUEST_SYS_sysinfo:
 	case GUEST_SYS_sendmsg:
 	case GUEST_SYS_recvmsg:
 	case GUEST_SYS_timer_create:

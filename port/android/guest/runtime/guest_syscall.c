@@ -30,7 +30,9 @@ numbering has it, as on 32-bit architectures).
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
+#include <sys/sysinfo.h>
 #include <sys/uio.h>
+#include <time.h>
 #include <kstat.h>
 
 #define SAME(name) _Static_assert(name == GUEST_##name, "musl's " #name " differs from the guest interface's")
@@ -161,6 +163,20 @@ SAME_FIELD(halo_guest_flock, flock, l_start);
 SAME_FIELD(halo_guest_flock, flock, l_len);
 SAME_FIELD(halo_guest_flock, flock, l_pid);
 _Static_assert(sizeof(struct iovec) == sizeof(struct halo_guest_iovec), "struct iovec's size differs");
+_Static_assert(sizeof(struct sysinfo) == sizeof(struct halo_guest_sysinfo), "struct sysinfo's size differs");
+SAME_FIELD(halo_guest_sysinfo, sysinfo, uptime);
+SAME_FIELD(halo_guest_sysinfo, sysinfo, loads);
+SAME_FIELD(halo_guest_sysinfo, sysinfo, totalram);
+SAME_FIELD(halo_guest_sysinfo, sysinfo, freeram);
+SAME_FIELD(halo_guest_sysinfo, sysinfo, sharedram);
+SAME_FIELD(halo_guest_sysinfo, sysinfo, bufferram);
+SAME_FIELD(halo_guest_sysinfo, sysinfo, totalswap);
+SAME_FIELD(halo_guest_sysinfo, sysinfo, freeswap);
+SAME_FIELD(halo_guest_sysinfo, sysinfo, procs);
+SAME_FIELD(halo_guest_sysinfo, sysinfo, totalhigh);
+SAME_FIELD(halo_guest_sysinfo, sysinfo, freehigh);
+SAME_FIELD(halo_guest_sysinfo, sysinfo, mem_unit);
+SAME_FIELD_AS(halo_guest_sysinfo, reserved, sysinfo, __reserved);
 _Static_assert(sizeof(struct timespec) == sizeof(struct halo_guest_timespec), "struct timespec's size differs");
 _Static_assert(sizeof(struct rlimit) == 16, "struct rlimit is not prlimit64's");
 _Static_assert(IOV_MAX == GUEST_IOV_MAX, "IOV_MAX differs");
@@ -245,6 +261,7 @@ SAME(RLIMIT_STACK);
 SAME(RLIMIT_CORE);
 SAME(RLIMIT_NOFILE);
 SAME(RLIMIT_AS);
+SAME(TIMER_ABSTIME);
 SAME(LOCK_SH);
 SAME(LOCK_EX);
 SAME(LOCK_NB);
