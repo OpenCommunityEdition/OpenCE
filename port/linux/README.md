@@ -1189,9 +1189,11 @@ As "How it operates" under "64-bit ARM", with these differences:
   arguments as 64-bit registers, and x32 code passes them zero-extended,
   which `tools/test_host_units.py` tests (`x32_boundary_test.c`). The host
   passes the guest its own arguments zero-extended in turn
-  (`host_call_guest`). An argument after the sixth is on the stack, where
-  the guest may write only 4 bytes of a pointer: such an argument is a
-  32-bit or 64-bit integer, never a pointer (`tools/check_host_imports.py`).
+  (`host_call_guest`). An argument after the sixth is on the stack, in an
+  8-byte slot, where clang's x32 code also writes a pointer zero-extended;
+  as only the registers are tested, such an argument is kept a 32-bit or
+  64-bit integer, never a pointer (`tools/check_host_imports.py`), and the
+  OpenGL stubs extend a pointer there themselves.
 - The thread pointer (`%fs`) belongs to the host's glibc. The guest's
   thread-local variables are emulated, and the build stops if the image
   uses `%fs` or `%gs`, or has thread-local storage

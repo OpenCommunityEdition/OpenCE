@@ -17,10 +17,13 @@ the guest compiles:
   hosts);
 - integer and pointer arguments: x86-64 passes six in registers, AArch64
   eight. A seventh or later goes on the stack, where each of the x32 guest
-  and the host gives it 8 bytes, but where the guest writes 4 bytes of a
-  pointer that the host reads 8 of: so an argument after the sixth must be
-  a 32-bit or 64-bit integer, never a pointer (pass a pointer to a structure
-  of 32-bit members instead). The arm64_32 guest packs its stack arguments
+  and the host gives it an 8-byte slot. clang's x32 code writes a pointer
+  there zero-extended, all 8 bytes, as it does in a register, but only the
+  registers are tested (tools/test_host_units.py, x32_boundary_test.c), and
+  the slot's upper half is the code generator's choice: so, to depend on
+  neither, an argument after the sixth must be a 32-bit or 64-bit integer,
+  never a pointer (pass a pointer to a structure of 32-bit members
+  instead). The arm64_32 guest packs its stack arguments
   where AArch64 Linux gives each 8 bytes, which agree only for the first:
   so there are at most 9.
 

@@ -9,9 +9,10 @@ same registers under both ABIs. What differs is
 - GLsizeiptr and GLintptr, 32-bit in the guest and 64-bit in the host;
 - arguments passed on the stack (beyond the eighth integer argument on
   AArch64, the sixth on x86-64), which the host reads from 8-byte slots,
-  where the arm64_32 guest packs them by size and the x32 guest may write
-  only the 4 bytes of a pointer (integer_registers and
-  packed_stack_arguments in tools/guest_arch.py);
+  where the arm64_32 guest packs them by size, and where the x32 guest's
+  pointer is written zero-extended by clang's choice rather than by a
+  rule the stubs rely on (integer_registers and packed_stack_arguments in
+  tools/guest_arch.py; tools/check_host_imports.py);
 - returned pointers, which point at host memory.
 
 For each function in the Android list in port/linux/src/gl.h this writes a
@@ -184,9 +185,10 @@ def main():
                 continue
             wide = base in WIDE_TYPES and not is_pointer
             # (an argument on the stack, which the host reads from an 8-byte
-            # slot: a pointer, of which the guest may write only 4 bytes, is
-            # passed as a 64-bit value, and so is every argument where the
-            # guest packs them by size)
+            # slot: a pointer is passed as a 64-bit value that the stub
+            # zero-extends itself, rather than as the compiler would extend
+            # it, and so is every argument where the guest packs them by
+            # size)
             on_stack = integer_index >= arch.integer_registers
             integer_index += 1
             if is_pointer:

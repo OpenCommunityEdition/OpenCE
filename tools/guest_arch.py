@@ -172,9 +172,10 @@ X32 = GuestArch(
         "\tjmpq *__host_import_table+{offset}(%rip)"
     ),
     integer_registers=6,
-    # (each argument on the stack has an 8-byte slot in either ABI, but the
-    # guest may write only 4 bytes of a 32-bit one: the stubs pass a pointer
-    # there as a 64-bit value, tools/android_gl_stubs.py)
+    # (each argument on the stack has an 8-byte slot in either ABI; clang's
+    # x32 code writes a pointer there zero-extended, all 8 bytes, but the
+    # stubs do not rely on it and pass a pointer there as a 64-bit value
+    # that they extend themselves, tools/android_gl_stubs.py)
     packed_stack_arguments=False,
     zlib_flags=(),
     # (SSE's xmmintrin.h, which Opus uses as on the x86 build)
