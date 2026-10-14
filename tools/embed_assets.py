@@ -22,7 +22,7 @@ no files beside its guest image.
 
 The data are 32-bit words, not bytes: the Android build passes the guest's
 assembly through tools/android_asm_convert.py, which rewrites identifiers in
-operands and would garble a long .ascii string of binary data.
+operands (it keeps .ascii strings as they are, but once garbled them).
 """
 
 import json
