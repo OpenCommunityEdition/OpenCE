@@ -65,12 +65,14 @@ struct collision_bsp_test_sphere_result { int leaf_count; long leaf_indices[CLUS
 	(((result)->leaf_count = clusters_touched(center, radius, (result)->leaf_indices)) > 0)
 #define collision_cluster_index_from_leaf(leaf_index) (leaf_index)
 
-/* each query visits a cluster and an object once */
+/* each query visits a cluster and an object once; marking an object reads it
+(the game's mark is in the object), which object_reads counts */
 static long cluster_marks[CLUSTERS], object_marks[OBJECTS], marker;
+static unsigned long object_reads;
 #define structure_cluster_marker_begin() (++marker)
 #define structure_cluster_mark(cluster) (cluster_marks[cluster] != marker && (cluster_marks[cluster] = marker))
 #define object_mark_function(object_index) \
-	(object_marks[DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index)] != marker && \
+	(object_reads++, object_marks[DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index)] != marker && \
 		(object_marks[DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index)] = marker))
 
 /* the features gathered: each object's, by type and query, hashed in order */
@@ -302,6 +304,22 @@ int main(int argc, char **argv)
 		move_some(FALSE);
 		object_bounds_cache_invalidate();
 		CHECK(same_features(), "the features differ after the cache was invalidated");
+		return 0;
+	}
+	/* the far objects passed over on the cache are not read, to be marked */
+	CASE("far-unread")
+	{
+		unsigned long without;
+
+		object_reads = 0;
+		run_queries_without_cache();
+		without = object_reads;
+		tell_cache();
+		object_reads = 0;
+		run_queries();
+		printf("%lu objects read without the cache, %lu with\n", without, object_reads);
+		CHECK(object_reads * 2 < without, "%lu objects read with the cache, %lu without: the far ones are read",
+			object_reads, without);
 		return 0;
 	}
 	/* not a check: how long the queries take without and with the cache */

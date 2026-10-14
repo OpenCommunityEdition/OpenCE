@@ -952,9 +952,11 @@ boolean collision_get_features_in_sphere(
 						object_index = cluster_get_next_collideable_object(&reference_index))
 					{
 						/* port: (the far ones passed over on a packed copy
-						of their bounding spheres: object_bounds_cache.c) */
-						if (object_mark_function(object_index) &&
-							!object_bounds_cache_out_of_reach(object_index, center, radius))
+						of their bounding spheres: object_bounds_cache.c;
+						before they are marked, which reads them: one met
+						again in another cluster is passed over again) */
+						if (!object_bounds_cache_out_of_reach(object_index, center, radius) &&
+							object_mark_function(object_index))
 						{
 							object_get_features_in_sphere(
 								flags,

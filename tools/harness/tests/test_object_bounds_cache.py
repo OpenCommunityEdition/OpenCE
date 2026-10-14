@@ -11,7 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, enum_with, function, inline, mutated, read, run  # noqa: E402
 
-CASES = ["identical", "moving", "detects-stale", "invalidated"]
+CASES = ["identical", "moving", "detects-stale", "invalidated", "far-unread"]
 
 # a fault in the cache, and the case that must catch it
 NEGATIVE_CONTROLS = {
