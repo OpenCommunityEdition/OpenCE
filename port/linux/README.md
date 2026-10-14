@@ -1094,13 +1094,13 @@ port operates" in [port/android/README.md](../android/README.md#how-the-port-ope
   `HALO_GUEST` (and `HALO_ARM64_GUEST`, `HALO_GUEST_MACHO`) and `HALO_GLES`,
   not `HALO_ANDROID`.
 - The host is the Android host (`port/android/host`) as a Linux executable.
-  `arm64/host_main.c` replaces its `host_main.c`. The executable contains
-  the guest image (`arm64/guest_image.S`). The guest gets the variables of
+  `host/host_main.c` replaces its `host_main.c`. The executable contains
+  the guest image (`host/guest_image.S`). The guest gets the variables of
   the environment that it reads (the `HALO_` settings, `HOME`, the XDG
   folders), so the `HALO_` settings operate.
 - The desktop code paths use more of SDL than the Android app:
-  `arm64/guest_desktop.c` and `arm64/host_desktop.c` supply it, and
-  `arm64/host_imports.list` lists their imports. The guest does SDL's
+  `host/guest_desktop.c` and `host/host_desktop.c` supply it, and
+  `host/host_imports.list` lists their imports. The guest does SDL's
   threads, mutexes, atomic values, files and `SDL_GlobDirectory` itself.
   The host does the windows, the displays, the 2D renderer, the dialogs
   and the downloads of the self-updater (`src/posix_update.c`).

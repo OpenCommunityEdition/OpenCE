@@ -10,7 +10,7 @@ paths instead of the app's, and the host is a Linux executable instead of an
 app's library:
 
 - build/<name>/halo: the host (port/android/host, with
-  port/linux/arm64/host_main.c as its entry point), with the guest image
+  port/linux/host/host_main.c as its entry point), with the guest image
   inside it;
 - build/<name>/libSDL3.so.0: SDL3, next to the executable, which finds
   it there (an rpath of $ORIGIN), as few distributions have SDL3 yet, and
@@ -36,7 +36,7 @@ from .linux_build import (MBEDTLS_DIR, MINIUPNPC_DEFINES, MINIUPNPC_DIR, SDL_RPA
 from .ninja_syntax import Writer, escape
 
 # the desktop host's own files (its entry point, SDL's desktop functions)
-PORT_DIR = Path("port/linux/arm64")
+PORT_DIR = Path("port/linux/host")
 ANDROID_DIR = Path("port/android")
 LINUX_DIR = Path("port/linux")
 # the system's OpenGL ES, EGL and OpenGL headers (libgles-dev, libegl-dev and

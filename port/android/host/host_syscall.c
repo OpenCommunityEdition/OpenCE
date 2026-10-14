@@ -12,7 +12,7 @@ The exceptions are
   timeval (the guest's time_t is 32-bit, as in the MSVC runtime), iovec;
 - memory mappings, which must stay below 4 GB (host_memory.c);
 - the standard output and error streams, which go to logcat (on Android;
-  on Linux arm64, port/linux/arm64, they are the process's);
+  on Linux arm64, port/linux/host, they are the process's);
 - process exit, and calls that have no meaning for the guest (signal
   handlers, which the host owns).
 */

@@ -106,7 +106,7 @@ void *host_resolve_import(const char *name);
 /* ---------- SDL / GL (host_sdl.c, host_gl.c) */
 
 /* SDL objects are 64-bit pointers, which the guest cannot hold: it gets
-small handles into a table instead (host_sdl.c; port/linux/arm64's
+small handles into a table instead (host_sdl.c; port/linux/host's
 host_desktop.c uses it too) */
 enum host_sdl_handle_type
 {

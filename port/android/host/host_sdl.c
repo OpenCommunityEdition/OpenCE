@@ -506,7 +506,7 @@ int host_sdl_show_toast(const char *message, int duration, int gravity, int x, i
 #ifdef __ANDROID__
 	return SDL_ShowAndroidToast(message, duration, gravity, x, y) ? 1 : 0;
 #else
-	/* (the desktop guest shows none: Linux arm64, port/linux/arm64) */
+	/* (the desktop guest shows none: Linux arm64, port/linux/host) */
 	(void)message;
 	(void)duration;
 	(void)gravity;

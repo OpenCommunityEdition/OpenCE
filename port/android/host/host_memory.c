@@ -38,7 +38,7 @@ instead (host_watch_hash.c).
 #ifdef __ANDROID__
 #include <sys/system_properties.h>
 #else
-/* (the Linux arm64 build's host, port/linux/arm64: no Android properties,
+/* (the Linux arm64 build's host, port/linux/host: no Android properties,
 each read as unset) */
 #define PROP_VALUE_MAX 92
 

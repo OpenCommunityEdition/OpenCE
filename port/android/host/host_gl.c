@@ -34,7 +34,7 @@ void *host_gl_resolve(const char *name)
 			library = dlopen("libGL.so.1", RTLD_NOW | RTLD_GLOBAL);
 	}
 #else
-		/* Linux arm64 (port/linux/arm64): ES 3 is in libGLESv2 */
+		/* Linux arm64 (port/linux/host): ES 3 is in libGLESv2 */
 		library = dlopen("libGLESv2.so.2", RTLD_NOW | RTLD_GLOBAL);
 #endif
 	if (library)
