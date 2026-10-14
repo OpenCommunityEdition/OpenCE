@@ -172,6 +172,17 @@ def _find_ndk() -> Optional[Path]:
     return None
 
 
+def compiler_include(cc: str) -> str:
+    """the folder of the compiler's own headers (clang's resource
+    directory's), asked of it at configure time"""
+    try:
+        resource = subprocess.run([cc, "-print-resource-dir"], capture_output=True, text=True,
+                                  check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise RuntimeError(f"{cc} -print-resource-dir failed ({error})") from error
+    return _quote(Path(resource) / "include")
+
+
 def guest_abi_flags(arch: GuestArch, platform_defines: List[str]) -> List[str]:
     """the guest's code generation and defines: the architecture's, every
     guest's (HALO_GUEST, and HALO_GUEST_MACHO where clang writes Mach-O,
@@ -245,7 +256,7 @@ def android_configure_inputs() -> List[Path]:
 
 def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: GuestArch, prefix: str, label: str,
                          build: Path, third_party: Path, guest_cc: str, gl_headers: Path, ar: str, ld: str,
-                         builtins_cc: str, environment: str, platform_defines: List[str],
+                         objdump: str, builtins_cc: str, environment: str, platform_defines: List[str],
                          extra_runtime: Optional[List[Path]] = None, extra_imports: Optional[List[Path]] = None,
                          updater_cflags: str = "", desktop_gl: bool = False) -> Dict[str, Path]:
     """The guest image (build/halo_guest.elf) and the host's import table, for
@@ -253,7 +264,8 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: G
     (tools/guest_arch.py): Android, and the desktop guest builds
     (tools/linux_guest_build.py). The caller sets ${prefix}_guest_cc to
     guest_cc; gl_headers holds the OpenGL ES headers (GLES2, GLES3, KHR), and
-    ar and ld are the archiver and the linker. builtins_cc is the compiler
+    ar, ld and objdump are the archiver, the linker and the disassembler (with
+    which tools/guest_image_check.py checks the image). builtins_cc is the compiler
     that names the runtime library the image links with, and environment the
     toolchain's (android, gnu), which the assembler's target ends with;
     platform_defines are the platform's code paths (ANDROID_DEFINES, or a
@@ -399,6 +411,7 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: G
         f"-isystem {libc_include}", f"-isystem {libc_arch}", f"-isystem {arch_generic}",
         f"-isystem {musl_dir}/arch/generic",
         f"-isystem {musl_dir}/include",
+        *([f"-idirafter {compiler_include(guest_cc)}"] if arch.compiler_headers else []),
     ]
     guest_abi = " ".join(guest_abi_flags(arch, platform_defines) + configuration_defines(sln))
     guest_code = " ".join(GUEST_CODE_FLAGS)
@@ -550,15 +563,27 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: G
     n.rule(
         name=f"{prefix}_guest_link",
         command=(f"{ld} -m {arch.ld_emulation} -static -nostdlib -T {linker_script} "
-                 f"-Map $out.map -o $out @$out.rsp {libguestc} "
-                 f"{arch.builtins(builtins_cc)}"),
+                 f"--defsym=__guest_image_base={arch.image_base:#x} "
+                 f"-Map $out.map -o $out @$out.rsp {libguestc}"
+                 + (f" {arch.builtins(builtins_cc)}" if arch.builtins(builtins_cc) else "")),
         description=f"{label} LINK $out",
         rspfile="$out.rsp",
         rspfile_content="$in_newline",
     )
     n.build(outputs=image, rule=f"{prefix}_guest_link", inputs=objects, implicit=[libguestc, linker_script])
+    # what the host cannot give the image: thread-local storage, the thread
+    # pointer, an address outside its range (tools/guest_image_check.py);
+    # what uses the image waits for this
+    checked = guest_dir / "halo_guest.checked"
+    n.rule(
+        name=f"{prefix}_guest_check",
+        command=f"{python} tools/guest_image_check.py --arch {arch.name} --objdump {objdump} $in $out",
+        description=f"{label} CHECK $in",
+    )
+    n.build(outputs=checked, rule=f"{prefix}_guest_check", inputs=image,
+            implicit=[Path("tools/guest_image_check.py"), GUEST_ARCH_SCRIPT])
 
-    return {"image": image, "host_table_c": host_table_c}
+    return {"image": image, "checked": checked, "host_table_c": host_table_c}
 
 
 def generate_android_build(n: Writer, sln: Any) -> None:
@@ -607,7 +632,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     guest = generate_guest_image(
         n, sln, config, arch=ARM64_32, prefix="android", label="ANDROID", build=BUILD, third_party=THIRD_PARTY,
         guest_cc=guest_cc, gl_headers=sysroot_include, ar="$android_ndk_bin/llvm-ar", ld="$android_ndk_bin/ld.lld",
-        builtins_cc="$android_host_cc", environment="android", platform_defines=ANDROID_DEFINES,
+        objdump="$android_ndk_bin/llvm-objdump", builtins_cc="$android_host_cc", environment="android", platform_defines=ANDROID_DEFINES,
         extra_imports=[PORT_DIR / "android_imports.list"])
     image = guest["image"]
     host_table_c = guest["host_table_c"]
@@ -695,7 +720,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     staged_image = assets_dir / "halo_guest.elf"
     n.rule(name="android_copy", command="cp $in $out", description="ANDROID STAGE $out")
     n.build(outputs=staged_sdl, rule="android_copy", inputs=libsdl)
-    n.build(outputs=staged_image, rule="android_copy", inputs=image)
+    n.build(outputs=staged_image, rule="android_copy", inputs=image, implicit=[guest["checked"]])
     # internet play's MQTT brokers, in the APK: the app writes them beside
     # config.toml (port/android/host/host_main.c)
     staged_brokers = assets_dir / "brokers.txt"

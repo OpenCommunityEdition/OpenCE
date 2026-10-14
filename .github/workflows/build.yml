@@ -131,7 +131,7 @@ jobs:
           curl -fsSL https://apt.llvm.org/llvm.sh -o llvm.sh
           bash llvm.sh 22 && rm llvm.sh
           apt-get install -y --no-install-recommends lld-22 llvm-22
-          for tool in clang ld.lld llvm-ar; do ln -sf "/usr/bin/$tool-22" "/usr/local/bin/$tool"; done
+          for tool in clang ld.lld llvm-ar llvm-objdump; do ln -sf "/usr/bin/$tool-22" "/usr/local/bin/$tool"; done
 
       - uses: actions/checkout@v4
 

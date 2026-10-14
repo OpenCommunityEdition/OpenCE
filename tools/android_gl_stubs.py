@@ -7,10 +7,11 @@ pointer arguments zero-extended, and 32-bit integers and floats go in the
 same registers under both ABIs. What differs is
 
 - GLsizeiptr and GLintptr, 32-bit in the guest and 64-bit in the host;
-- for the arm64_32 guest, arguments passed on the stack (beyond the eighth
-  integer argument), which the guest packs by size while the host expects
-  8-byte slots (integer_registers and packed_stack_arguments in
-  tools/guest_arch.py);
+- arguments passed on the stack (beyond the eighth integer argument on
+  AArch64, the sixth on x86-64), which the host reads from 8-byte slots,
+  where the arm64_32 guest packs them by size and the x32 guest may write
+  only the 4 bytes of a pointer (integer_registers and
+  packed_stack_arguments in tools/guest_arch.py);
 - returned pointers, which point at host memory.
 
 For each function in the Android list in port/linux/src/gl.h this writes a
@@ -182,9 +183,11 @@ def main():
                 call_args.append(arg)
                 continue
             wide = base in WIDE_TYPES and not is_pointer
-            # (an argument the host reads from an 8-byte slot where the guest
-            # packed it by size: passed as a 64-bit value)
-            on_stack = arch.packed_stack_arguments and integer_index >= arch.integer_registers
+            # (an argument on the stack, which the host reads from an 8-byte
+            # slot: a pointer, of which the guest may write only 4 bytes, is
+            # passed as a 64-bit value, and so is every argument where the
+            # guest packs them by size)
+            on_stack = integer_index >= arch.integer_registers
             integer_index += 1
             if is_pointer:
                 if on_stack:
@@ -193,7 +196,7 @@ def main():
                 else:
                     host_params.append(ptype)
                     call_args.append(arg)
-            elif wide or on_stack:
+            elif wide or (on_stack and arch.packed_stack_arguments):
                 host_params.append("long long")
                 call_args.append(f"(long long){arg}")
             else:

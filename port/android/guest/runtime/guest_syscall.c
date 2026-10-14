@@ -1,7 +1,7 @@
 /*
 GUEST_SYSCALL.C
 
-musl's system calls (arch/arm64_32/syscall_arch.h). The guest cannot enter
+musl's system calls (arch/generic/syscall_arch.h). The guest cannot enter
 the kernel itself: the structures it would pass (timespec, stat, iovec) have
 ILP32 layouts, and memory it maps must stay below 4 GB. The host performs
 each call, converting where needed (host_syscall.c).
