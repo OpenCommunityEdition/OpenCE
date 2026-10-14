@@ -336,7 +336,11 @@ and supplies the thread pointer and TLS.
 - Reserves the address space of the guest below 4 GB: the Xbox memory at
   `0x80000000`, the image, and pools for the memory of the guest
   (`host/host_memory.c`). Refer to "The fixed addresses".
-- Loads the image and fills its import table (`host/host_loader.c`).
+- Loads the image and fills its import table (`host/host_loader.c`). The
+  image must be a static executable of the host's guest (a 64-bit AArch64
+  ELF file of `arm64_32` code), whose segments, header and import table lie
+  in the file and in the image's reserved range; the loader checks each
+  before it uses it.
 - Starts the `main` of the game and each guest thread on a stack in guest
   memory, because ILP32 code keeps stack addresses in 32-bit registers
   (`host/host_thread.c`).

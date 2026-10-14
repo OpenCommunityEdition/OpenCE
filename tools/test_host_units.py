@@ -1,6 +1,6 @@
 """Runs the C tests of the guest's host (port/android/host) that need
-neither Android nor the guest: the processor's registers and frame walk
-(host_arch.c), on the build
+neither Android nor the guest: the image loader's checks (host_loader.c)
+and the processor's registers and frame walk (host_arch.c), on the build
 machine's processor (AArch64 or x86-64), with its C compiler."""
 import platform
 import shutil
@@ -37,6 +37,10 @@ def run_test(tmp_path, name, sources):
     )
     result = subprocess.run([str(binary)], capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_host_loader(tmp_path):
+    run_test(tmp_path, "host_loader_test", [TESTS / "host_loader_test.c", HOST / "host_loader.c"])
 
 
 def test_host_arch(tmp_path):

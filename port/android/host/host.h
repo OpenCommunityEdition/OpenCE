@@ -129,6 +129,47 @@ extern struct host_guest_image host_image;
 /* maps the image from the ELF file in memory; returns 0 on success */
 int host_load_image(const void *elf, size_t size);
 
+/* The image's class and machine for this host's guest: a 64-bit AArch64
+ELF file (arm64_32 code) on AArch64, a 32-bit x86-64 one (x32) on x86-64. */
+#if defined(__aarch64__)
+#define HOST_IMAGE_CLASS 2 /* ELFCLASS64 */
+#define HOST_IMAGE_MACHINE 183 /* EM_AARCH64 */
+#elif defined(__x86_64__)
+#define HOST_IMAGE_CLASS 1 /* ELFCLASS32 */
+#define HOST_IMAGE_MACHINE 62 /* EM_X86_64 */
+#else
+#error "no guest image for this architecture"
+#endif
+
+#define HOST_IMAGE_SEGMENTS_MAXIMUM 16
+
+/* a loadable segment, in either ELF class */
+struct host_image_segment
+{
+	uint64_t offset, address, file_size, memory_size;
+	uint32_t flags;
+};
+
+struct host_image_layout
+{
+	uint64_t low, high; /* the page-aligned range the segments take */
+	struct host_image_segment segments[HOST_IMAGE_SEGMENTS_MAXIMUM];
+	uint32_t segment_count;
+};
+
+/* checks an ELF file before anything is mapped: its class and machine, a
+static executable (no PT_DYNAMIC or PT_INTERP), and its loadable segments
+inside the file and inside the image's reserved range
+(HALO_GUEST_IMAGE_BASE, HALO_GUEST_IMAGE_RESERVE); fills layout. 0, or -1
+with the reason logged. */
+int host_image_validate(const void *file, size_t size, int elf_class, int machine, struct host_image_layout *layout);
+/* checks the header's import table, its names and count, and its entry
+points against the image, whose bytes from base to end are at memory (the
+image itself once loaded); 0 with the import count, or -1 with the reason
+logged */
+int host_image_validate_imports(const uint8_t *memory, uint32_t base, uint32_t end,
+	const struct host_image_layout *layout, uint32_t *count);
+
 /* ---------- the processor's registers (host_arch.c) */
 
 /* the program counter, stack pointer, frame pointer and link register of a
