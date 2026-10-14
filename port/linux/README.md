@@ -1259,7 +1259,8 @@ can optimize that code for each processor:
 
 The x87 control and status words (`_control87`, `_statusfp`, `_clearfp` in
 `src/msvc_crt.c`) use `fenv.h`. On AArch64 (Android, Linux arm64), they use
-the FPCR and FPSR. In the web build, the control word is only remembered.
+the FPCR and FPSR; on x86-64, MXCSR and the x87 control word. In the web
+build, the control word is only remembered.
 
 The web build's changes (`HALO_WEB`: the main loop runs one iteration for
 each of the browser's frames, the cache thread starts at a function of
