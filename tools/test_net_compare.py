@@ -1,8 +1,14 @@
 """net_compare.py's reading and judging of the network test's logs, on
 logs written here (playing a game needs the retail maps: NETCODE.md)."""
 import argparse
+import os
+import signal
+import subprocess
 import sys
+import time
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -91,3 +97,181 @@ def test_no_drift_figures_is_a_problem(tmp_path):
     host, client = write_logs(tmp_path)
     host.write_text(host.read_text().replace(" | drift 30 0 0.000000 0.000000", ""))
     assert any("drift" in problem for problem in judge(host, client)["problems"])
+
+
+# ---------- the exit status, the tolerances, the copies' folders and processes
+
+
+def test_a_fail_is_not_masked_by_an_error():
+    assert net_compare.exit_status(["PASS", "ERROR", "FAIL"]) == 1
+    assert net_compare.exit_status(["FAIL", "ERROR"]) == 1
+    assert net_compare.exit_status(["PASS", "ERROR"]) == 2
+    assert net_compare.exit_status(["PASS", "PASS"]) == 0
+    assert net_compare.exit_status([]) == 0
+
+
+@pytest.mark.parametrize("setting, expected", [
+    ("persist=4", ("persist", 4)),
+    ("position=1.5", ("position", 1.5)),
+    ("drift_share=0.7", ("drift_share", 0.7)),
+])
+def test_tolerance_read(setting, expected):
+    assert net_compare.parse_tolerance(setting) == expected
+
+
+@pytest.mark.parametrize("setting, reason", [
+    ("persist=3.5", "whole number"),
+    ("position=far", "a number"),
+    ("position=nan", "finite"),
+    ("aim=-1", "negative"),
+    ("drift_share=1.5", "from 0 to 1"),
+    ("speed=1", "no tolerance"),
+    ("persist", "NAME=VALUE"),
+])
+def test_tolerance_refused(setting, reason):
+    with pytest.raises(ValueError, match=reason):
+        net_compare.parse_tolerance(setting)
+
+
+def test_tolerance_reported_without_a_traceback(tmp_path):
+    result = subprocess.run([sys.executable, str(Path(net_compare.__file__)), "--tolerance", "persist=3.5",
+                             "--compare", "a", "b"], capture_output=True, text=True)
+    assert result.returncode == 2
+    assert "persist takes a whole number" in result.stderr and "Traceback" not in result.stderr
+
+
+def make_data(tmp_path):
+    data = tmp_path / "data"
+    (data / "maps").mkdir(parents=True)
+    return data
+
+
+def test_copy_of_a_flat_folder(tmp_path):
+    build = tmp_path / "build"
+    build.mkdir()
+    (build / "halo").write_text("#!/bin/sh\n")
+    (build / "libSDL3.so.0").write_text("")
+    (build / "config.toml").write_text("")
+    copy = net_compare.prepare_copy(tmp_path / "work", "A", build / "halo", make_data(tmp_path))
+    assert copy["executable"] == tmp_path / "work/A/bin/halo"
+    assert (tmp_path / "work/A/bin/libSDL3.so.0").resolve() == build / "libSDL3.so.0"
+    assert not (tmp_path / "work/A/bin/config.toml").exists()
+    assert (copy["data"] / "maps").is_symlink()
+
+
+def environment_of(window=False, display=None):
+    args = argparse.Namespace(start=8.0, seconds=60, skip=3, events=False, window=window, display=display)
+    copy = {"data": Path("/data"), "saves": Path("/saves")}
+    return net_compare.copy_environment(copy, "127.0.0.210", "127.0.0.211", "join", 1, args, [])
+
+
+def test_headless_copies_have_no_display(monkeypatch):
+    monkeypatch.setenv("DISPLAY", ":0")
+    monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
+    environment = environment_of()
+    assert "DISPLAY" not in environment and "WAYLAND_DISPLAY" not in environment
+    assert environment["HALO_NULL_RENDERER"] == "1" and environment["SDL_VIDEO_DRIVER"] == "dummy"
+
+
+def test_window_display(monkeypatch):
+    monkeypatch.setenv("DISPLAY", ":0")
+    monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
+    assert environment_of(window=True)["DISPLAY"] == ":0"
+    environment = environment_of(window=True, display=":99")
+    assert environment["DISPLAY"] == ":99" and "WAYLAND_DISPLAY" not in environment
+    assert environment["SDL_VIDEO_DRIVER"] == "x11" and environment["HALO_HIDDEN_WINDOW"] == "1"
+
+
+# a copy that ignores SIGTERM and starts a process of its own, as a game
+# under a wrapper might: each writes its PID
+FAKE_GAME = """#!/bin/sh
+trap '' TERM
+sleep 300 &
+echo $$ $! >> "{pids}"
+while :; do sleep 1; done
+"""
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    # (a zombie waiting for its parent is gone)
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().split(") ", 1)[1][0] != "Z"
+    except OSError:
+        return False
+
+
+def wait_for(condition, seconds=10.0):
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if condition():
+            return True
+        time.sleep(0.1)
+    return condition()
+
+
+def fake_game(tmp_path):
+    pids = tmp_path / "pids"
+    game = tmp_path / "game" / "halo"
+    game.parent.mkdir()
+    game.write_text(FAKE_GAME.format(pids=pids))
+    game.chmod(0o755)
+    return game, pids
+
+
+def read_pids(pids):
+    return [int(pid) for pid in pids.read_text().split()] if pids.exists() else []
+
+
+def test_stop_ends_the_copy_and_what_it_started(tmp_path):
+    game, pids = fake_game(tmp_path)
+    process = net_compare.start([str(game)])
+    assert wait_for(lambda: len(read_pids(pids)) == 2)
+    assert os.getpgid(process.pid) == process.pid  # (a session, and a group, of its own)
+    net_compare.stop(process)
+    assert process not in net_compare.RUNNING
+    assert wait_for(lambda: not any(alive(pid) for pid in read_pids(pids)))
+
+
+@pytest.mark.parametrize("number", [signal.SIGTERM, signal.SIGHUP, signal.SIGINT])
+def test_the_tool_stopped_leaves_no_copy(tmp_path, number):
+    game, pids = fake_game(tmp_path)
+    tool = subprocess.Popen([sys.executable, str(Path(net_compare.__file__)), "--a", str(game), "--data",
+                             str(make_data(tmp_path)), "--work", str(tmp_path / "work"), "--maps", "bloodgulch",
+                             "--seconds", "30", "--timeout", "60"],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        # (the host and the client, each with its child)
+        assert wait_for(lambda: len(read_pids(pids)) == 4, 20)
+        tool.send_signal(number)
+        _, errors = tool.communicate(timeout=30)
+    finally:
+        if tool.poll() is None:
+            tool.kill()
+    assert tool.returncode == 128 + number, errors
+    assert f"stopped by signal {int(number)}" in errors and "Traceback" not in errors
+    assert not [pid for pid in read_pids(pids) if alive(pid)]
+
+
+def test_a_copy_dies_with_a_killed_tool(tmp_path):
+    # (SIGKILL cannot be caught: the kernel ends the copies, PR_SET_PDEATHSIG;
+    # what a copy started is its own, and the test's to end)
+    game, pids = fake_game(tmp_path)
+    tool = subprocess.Popen([sys.executable, str(Path(net_compare.__file__)), "--a", str(game), "--data",
+                             str(make_data(tmp_path)), "--work", str(tmp_path / "work"), "--maps", "bloodgulch"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        assert wait_for(lambda: len(read_pids(pids)) == 4, 20)
+        tool.kill()
+        tool.wait(timeout=10)
+        copies = read_pids(pids)[0::2]
+        assert wait_for(lambda: not any(alive(pid) for pid in copies))
+    finally:
+        for pid in read_pids(pids)[0::2]:
+            try:
+                os.killpg(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass

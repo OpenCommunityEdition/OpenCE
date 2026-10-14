@@ -21,11 +21,19 @@ self-hosted) check, not a public CI one.
     python tools/net_compare.py --a build/linux/halo --data /path/to/halo \\
         --b build/linux_x86_64/halo --maps bloodgulch,beavercreek --swap
 
-Exit status: 0 when every run passes, 1 when one diverges, 2 when a run
-could not be played (a copy failed to start, join or log).
+Exit status: 0 when every run passes; 1 when a run diverges (FAIL), even if
+another could not be played, as a divergence is the finding and an error
+only a gap in it; else 2 when a run could not be played (ERROR: a copy
+failed to start, join or log); 128 + N when the tool was stopped by signal
+N (SIGINT, SIGTERM, SIGHUP), after stopping the copies.
+
+Each copy runs in a session of its own (its process group), which the tool
+ends however it ends itself, so that no copy outlives it.
 """
 
 import argparse
+import atexit
+import ctypes
 import json
 import math
 import os
@@ -381,10 +389,15 @@ def judge_drift(summary, tolerances, player):
 # ---------- running the copies
 
 
+def link_once(link, target):
+    if not link.exists() and not link.is_symlink():
+        link.symlink_to(target)
+
+
 def prepare_copy(work, name, executable, data_root, wrapper=""):
     """a folder for one copy: its own executable (config.toml is written
-    beside it), its own data root (debug.txt goes there; maps/ is the
-    data's) and its own saves"""
+    in the game's folder, beside it), its own data root
+    (debug.txt goes there; maps/ is the data's) and its own saves"""
     executable = Path(executable).resolve()
     data_root = Path(data_root).resolve()
     if not executable.is_file():
@@ -402,9 +415,7 @@ def prepare_copy(work, name, executable, data_root, wrapper=""):
     for entry in executable.parent.iterdir():
         if entry.name in (executable.name, "config.toml") or entry.name.endswith(".log"):
             continue
-        link = bin_folder / entry.name
-        if not link.exists() and not link.is_symlink():
-            link.symlink_to(entry.resolve())
+        link_once(bin_folder / entry.name, entry.resolve())
     copied = bin_folder / executable.name
     if not copied.exists():
         try:
@@ -439,7 +450,7 @@ def copy_environment(copy, address, broadcast, test, seed, args, extra):
         "HALO_NETWORK_TEST_START": str(args.start),
         "HALO_TEST_INPUT": f"bot:{seed}",
         # (a safety: the tool stops the copies itself)
-        "HALO_EXIT_AFTER": str(args.start + args.seconds + 120),
+        "HALO_EXIT_AFTER": str(args.start + args.skip + args.seconds + 120),
         "SDL_AUDIO_DRIVER": "dummy",
     })
     if args.events:
@@ -449,12 +460,21 @@ def copy_environment(copy, address, broadcast, test, seed, args, extra):
         environment["HALO_NETWORK_TEST_SHOOT"] = "4"
         environment["HALO_NETWORK_TEST_KILL"] = "17"
     if args.window:
+        # (on the display the tool was started with: DISPLAY or
+        # WAYLAND_DISPLAY as they are, or --display's)
         environment["HALO_HIDDEN_WINDOW"] = "1"
+        if args.display:
+            environment["DISPLAY"] = args.display
+            environment.pop("WAYLAND_DISPLAY", None)
+            environment["SDL_VIDEO_DRIVER"] = "x11"
     else:
         environment["HALO_NULL_RENDERER"] = "1"
         # (SDL's video started without a display: without it, SDL_Init
-        # fails, and is tried again, every frame)
+        # fails, and is tried again, every frame; and none of the caller's,
+        # so that no copy can open a window on it)
         environment["SDL_VIDEO_DRIVER"] = "dummy"
+        for key in ("DISPLAY", "WAYLAND_DISPLAY"):
+            environment.pop(key, None)
     for setting in extra:
         key, _, value = setting.partition("=")
         environment[key] = value
@@ -479,16 +499,105 @@ def latest_tick(path):
     return tick
 
 
-def stop(process):
-    if process.poll() is not None:
+# ---------- the copies' processes
+#
+# Each copy runs in a session of its own (start_new_session), so that the
+# copy and whatever it started (a wrapper's) are one process group, which
+# stop() ends; and so that a terminal's Ctrl-C reaches only the tool, which
+# stops them. The tool stops them on every way out: returning, an exception,
+# Ctrl-C (KeyboardInterrupt), SIGTERM and SIGHUP (Stopped), and atexit; and
+# a copy is killed by the kernel if the tool dies without that (SIGKILL:
+# PR_SET_PDEATHSIG).
+
+# the copies running
+RUNNING = []
+# the signals the tool stops on, and the one that stopped it
+STOP_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+stopping = None
+
+
+class Stopped(Exception):
+    """the tool was sent SIGTERM or SIGHUP"""
+
+    def __init__(self, number):
+        super().__init__(f"stopped by signal {number}")
+        self.number = number
+
+
+def on_stop_signal(number, frame):
+    global stopping
+    # (once: a second signal while the copies are being stopped waits)
+    if stopping is not None:
         return
-    # (the game does not end on SIGTERM; its files are all written by now)
-    process.send_signal(signal.SIGTERM)
+    stopping = number
+    if number == signal.SIGINT:
+        raise KeyboardInterrupt
+    raise Stopped(number)
+
+
+def stop_on_signals():
+    for number in STOP_SIGNALS:
+        signal.signal(number, on_stop_signal)
+    atexit.register(stop_all)
+
+
+def die_with_the_tool(parent=os.getpid()):
+    """(in a copy, before it runs) SIGKILL when the tool ends, however it
+    ends (Linux's PR_SET_PDEATHSIG; elsewhere nothing)"""
     try:
-        process.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        process.kill()
+        ctypes.CDLL(None, use_errno=True).prctl(1, int(signal.SIGKILL), 0, 0, 0)  # PR_SET_PDEATHSIG
+    except (OSError, AttributeError):
+        return
+    # (the tool gone already, before that)
+    if os.getppid() != parent:
+        os.kill(os.getpid(), signal.SIGKILL)
+
+
+def start(command, **options):
+    """a copy started in a session of its own, and noted as running before
+    a signal can come between (it is blocked meanwhile)"""
+    blocked = signal.pthread_sigmask(signal.SIG_BLOCK, STOP_SIGNALS)
+    try:
+        parent = os.getpid()
+        process = subprocess.Popen(command, start_new_session=True,
+                                   preexec_fn=lambda: die_with_the_tool(parent), **options)
+        RUNNING.append(process)
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, blocked)
+    return process
+
+
+def signal_group(process, number):
+    try:
+        os.killpg(process.pid, number)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def stop(process):
+    """ends a copy's process group: SIGTERM (the game quits on it, its files
+    all written by now), then SIGKILL two seconds on (a build from before it
+    quit on SIGTERM)"""
+    if process.poll() is None:
+        signal_group(process, signal.SIGTERM)
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            pass
+        # (the group: the copy, and what it started that is left)
+        signal_group(process, signal.SIGKILL)
         process.wait()
+    if process in RUNNING:
+        RUNNING.remove(process)
+
+
+def stop_all():
+    blocked = signal.pthread_sigmask(signal.SIG_BLOCK, STOP_SIGNALS)
+    try:
+        for process in list(RUNNING):
+            stop(process)
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, blocked)
 
 
 def play(run_folder, host_copy, client_copy, map_name, args, host_extra, client_extra, seeds):
@@ -506,12 +615,12 @@ def play(run_folder, host_copy, client_copy, map_name, args, host_extra, client_
     processes = []
     try:
         with open(host_log, "w") as log:
-            processes.append(subprocess.Popen(
+            processes.append(start(
                 host_copy["command"], cwd=host_copy["folder"], stdout=log, stderr=subprocess.STDOUT,
                 env=copy_environment(host_copy, host_address, client_address, test, seeds[0], args, host_extra)))
         time.sleep(1.0)
         with open(client_log, "w") as log:
-            processes.append(subprocess.Popen(
+            processes.append(start(
                 client_copy["command"], cwd=client_copy["folder"], stdout=log, stderr=subprocess.STDOUT,
                 env=copy_environment(client_copy, client_address, host_address, "join", seeds[1], args,
                                      client_extra)))
@@ -528,8 +637,14 @@ def play(run_folder, host_copy, client_copy, map_name, args, host_extra, client_
             time.sleep(0.5)
         exits = [process.poll() for process in processes]
     finally:
-        for process in processes:
-            stop(process)
+        # (with the signals that stop the tool held off, so that the
+        # stopping is not cut short)
+        blocked = signal.pthread_sigmask(signal.SIG_BLOCK, STOP_SIGNALS)
+        try:
+            for process in processes:
+                stop(process)
+        finally:
+            signal.pthread_sigmask(signal.SIG_SETMASK, blocked)
     # (the end of each copy's debug.txt, beside its log: a crash's story)
     for copy, name in ((host_copy, "host"), (client_copy, "client")):
         try:
@@ -607,6 +722,43 @@ def describe(result):
     return lines
 
 
+def parse_tolerance(setting):
+    """(name, value) of a --tolerance NAME=VALUE; ValueError with the reason"""
+    name, equals, text = setting.partition("=")
+    name = name.strip()
+    if not equals:
+        raise ValueError(f"{setting!r} is not NAME=VALUE")
+    if name not in TOLERANCES:
+        raise ValueError(f"no tolerance {name!r} (the tolerances: {', '.join(TOLERANCES)})")
+    kind = type(TOLERANCES[name])
+    try:
+        value = kind(text.strip())
+    except ValueError:
+        raise ValueError(f"{name} takes {'a whole number' if kind is int else 'a number'}, not {text!r}") from None
+    if kind is float and not math.isfinite(value):
+        raise ValueError(f"{name} takes a finite number, not {text!r}")
+    if value < 0:
+        raise ValueError(f"{name} cannot be negative ({text!r})")
+    if name == "drift_share" and value > 1:
+        raise ValueError(f"drift_share is a share of the ticks, from 0 to 1, not {text!r}")
+    return name, value
+
+
+# a FAIL is the finding, so it decides the exit status over an ERROR
+EXIT_STATUSES = {"PASS": 0, "ERROR": 2, "FAIL": 1}
+
+
+def exit_status(verdicts):
+    """the tool's exit status of the runs' verdicts: 1 if any FAIL, else 2 if
+    any ERROR, else 0"""
+    verdicts = set(verdicts)
+    if "FAIL" in verdicts:
+        return EXIT_STATUSES["FAIL"]
+    if "ERROR" in verdicts:
+        return EXIT_STATUSES["ERROR"]
+    return EXIT_STATUSES["PASS"]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0],
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -638,7 +790,10 @@ def main():
     parser.add_argument("--address-base", default="127.0.0.210",
                         help="the host's loopback address; the client takes the next")
     parser.add_argument("--window", action="store_true",
-                        help="draw in a hidden window instead of the null renderer")
+                        help="draw in a hidden window instead of the null renderer, on the display the tool has "
+                             "(DISPLAY or WAYLAND_DISPLAY; a virtual one, Xvfb, rather than a desktop), or --display's")
+    parser.add_argument("--display", help="with --window: the X display for the copies' windows (\":99\"), "
+                                          "through SDL's X11 driver")
     parser.add_argument("--work", help="the folder for the copies' files and logs (default: a new one in "
                                        "build/net_compare, removed if every game passes)")
     parser.add_argument("--keep", action="store_true", help="keep the default folder when every game passes")
@@ -651,20 +806,41 @@ def main():
 
     tolerances = dict(TOLERANCES)
     for setting in args.tolerance:
-        name, _, value = setting.partition("=")
-        if name not in tolerances:
-            parser.error(f"no tolerance {name}")
-        tolerances[name] = type(tolerances[name])(value)
+        try:
+            name, value = parse_tolerance(setting)
+        except ValueError as error:
+            parser.error(f"--tolerance: {error}")
+        tolerances[name] = value
 
     if args.compare:
+        for log in args.compare:
+            if not Path(log).is_file():
+                parser.error(f"--compare: no log {log}")
         result = judge_run(Path(args.compare[0]), Path(args.compare[1]), args, tolerances)
         verdict = "FAIL" if result["divergences"] else ("ERROR" if result["problems"] else "PASS")
         print(f"{verdict}: {args.compare[0]} against {args.compare[1]}")
         print("\n".join(describe(result)))
-        return 1 if verdict == "FAIL" else 2 if verdict == "ERROR" else 0
+        return exit_status([verdict])
 
     if not args.a or not args.data:
         parser.error("--a and --data are needed to play (or --compare two logs)")
+    if args.display and not args.window:
+        parser.error("--display is for --window's windows")
+    stop_on_signals()
+    try:
+        return play_all(args, tolerances)
+    except (Stopped, KeyboardInterrupt) as stopped:
+        number = stopped.number if isinstance(stopped, Stopped) else signal.SIGINT
+        stop_all()
+        print(f"net_compare: stopped by signal {int(number)} ({signal.Signals(number).name}); the copies were stopped",
+              file=sys.stderr, flush=True)
+        return 128 + int(number)
+    finally:
+        stop_all()
+
+
+def play_all(args, tolerances):
+    """plays every game, prints and returns the exit status"""
     # (on disk: the copies' saves hold map caches of hundreds of megabytes,
     # too many for a /tmp in memory)
     temporary = args.work is None
@@ -678,7 +854,6 @@ def main():
     orders = [("A", "B")] + ([("B", "A")] if args.swap else [])
     results = []
     seed = args.seed
-    worst = 0
     for repeat in range(args.repeat):
         for map_name in [name for name in args.maps.split(",") if name]:
             for host_name, client_name in orders:
@@ -695,7 +870,6 @@ def main():
                 if any(code not in (None, 0) for code in exits):
                     result["problems"].append(f"a copy ended early (exit statuses {exits})")
                 verdict = "FAIL" if result["divergences"] else ("ERROR" if result["problems"] else "PASS")
-                worst = max(worst, {"PASS": 0, "FAIL": 1, "ERROR": 2}[verdict])
                 print(f"{verdict}: {label} ({time.monotonic() - started:.0f} s; logs {run_folder})")
                 print("\n".join(describe(result)), flush=True)
                 result.update({"map": map_name, "host": host_name, "client": client_name, "repeat": repeat + 1,
@@ -708,11 +882,12 @@ def main():
         with open(args.json, "w") as output:
             json.dump({"a": args.a, "b": args.b or args.a, "tolerances": tolerances, "results": results},
                       output, indent=1, default=str)
-    if temporary and not args.keep and worst == 0:
+    status = exit_status(result["verdict"] for result in results)
+    if temporary and not args.keep and status == 0:
         shutil.rmtree(work, ignore_errors=True)
     elif temporary:
         print(f"files kept in {work}")
-    return worst
+    return status
 
 
 if __name__ == "__main__":

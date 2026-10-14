@@ -766,8 +766,10 @@ against one without. It plays them together on the loopback, build A
 hosting and B joining (and, with `--swap`, the other way round), on each
 map given, each copy's player a seeded bot (`debug.test_input`
 `bot:<seed>`, `--events` adds `debug.network_test_shoot` and
-`debug.network_test_kill`), headless (`debug.null_renderer`, or with
-`--window` a hidden window), and compares the two machines' logs:
+`debug.network_test_kill`), headless (`debug.null_renderer`, with no
+display; or with `--window` a hidden window, on the display the tool was
+started with, `DISPLAY` or `WAYLAND_DISPLAY`, or `--display`'s: a virtual
+one, Xvfb, rather than a desktop), and compares the two machines' logs:
 
 ```sh
 python tools/net_compare.py --a build/linux/halo --b build/linux_x86_64/halo \
@@ -776,13 +778,19 @@ python tools/net_compare.py --a build/linux/halo --b build/linux_x86_64/halo \
 
 It needs the retail maps, so it runs on a developer's machine or a
 self-hosted runner, not in the public CI; run it before merging a change to
-a build's compiler, architecture, maths or the simulation itself. Each copy
-gets its own folder (an executable beside which it writes `config.toml`, a
-data root linking the maps, and saves) in `build/net_compare/`, removed
-when every game passes. It prints PASS, FAIL (with the first divergent
-player, tick and field) or ERROR (a copy that did not start, join or log)
-for each game, a line of figures, and exits 0, 1 or 2; a copy's log and
-the end of its `debug.txt` are kept for each game. `--compare <host log>
+a build's compiler, architecture, maths or the simulation itself. A build
+is its executable: a build's (`build/linux/halo`) or a release's. Each copy
+gets its own folder (an executable, `config.toml` written in the copy's
+folder, a data root linking the maps, and saves) in `build/net_compare/`,
+removed when every game passes. It prints PASS, FAIL (with the first
+divergent player, tick and field) or ERROR (a copy that did not start, join or log) for each game and
+a line of figures; a copy's log and the end of its `debug.txt` are kept for
+each game. It exits 0 when every game passes, 1 when any fails, even if
+another was an error (a divergence is the finding; an error only a gap in
+it), else 2 when any was an error. Each copy runs in a process group of its
+own, which the tool ends however it ends: stopped with Ctrl-C, SIGTERM or
+SIGHUP, it stops the copies and exits 128 plus the signal's number, and
+killed outright, the kernel ends the copies (`PR_SET_PDEATHSIG`). `--compare <host log>
 <client log>` judges two logs already written, and
 `--a-wrapper`/`--b-wrapper` run a build under an emulator. Both builds
 must log the drift (below): one built before it is an error.
