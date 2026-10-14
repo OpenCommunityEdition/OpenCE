@@ -93,25 +93,6 @@
       "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Retain the real covariance/axis/endpoint/selector graph. Initialize axis and selector packing, and handle zero-length quantized endpoints for mixed-alpha blocks too, preventing NaN conversion and invalid palette indexing. The held Alpha3 encoder is not imported. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning.  On 2026-09-21 (Lane C) ColorToFcolor's byte-to-real conversion was bound to a named `real` local, which made _Quantize strict exact. This function shares the RGBToColor/ColorToFcolor inlines, so its bytes moved and the base measurement is refreshed here. Its own residual is unchanged in class: it is frame-structural (January sub esp,0x1a8 vs our 0x19c, a missing local). Separately, an EXACT body for it is measured and held at scratch/cand/s3tc_owner_gated.c, but it requires three constructs the reviewer refused and the owner has not admitted: an uninitialised `long best_axis`, deleting `block->bitmap = 0;`, and an `&& cOpaque == 16` conjunct that divides by zero and indexes mapRGB3 out of bounds when cOpaque != 16."
     },
     {
-      "unit": "source/bitmaps/s3tc/s3tc",
-      "function": "_DecodeBlockRGB__single_pixel",
-      "class": "unclassified",
-      "measurements": {
-        "target": {
-          "size": 496,
-          "relocation_count": 10,
-          "normalized_sha256": "430094b19ae6b9e585f8c77b2c063824b45c98e3ceea58ac1dd4e2049730247b"
-        },
-        "base": {
-          "size": 496,
-          "relocation_count": 10,
-          "normalized_sha256": "fa5385c3372ba60d98ab2c82e91481d4182918f84e64cafc528ba1e666a67dfb"
-        },
-        "objdiff_percent": 99.27545
-      },
-      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Repair the null-source clear to four output bytes rather than the original 64-byte overrun. Require coordinates 0..3, not the original inclusive 4 which permits an invalid selector shift. Preserve the actual three/four-color palette implementation. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning.  On 2026-09-21 (Lane C, graphics/UI) RGBToColor's body was restored to January's in-place channel form and its `= { 0 }` initialiser dropped, which made RGBToColor and DecodeBlockRGB strict exact. This function's bytes moved as a consequence and the base measurement is refreshed here: its size and relocation count now EQUAL January's (the tag went from [size 432!=496, relocs 11!=10, sha] to [sha] only), so the remaining residual is ordering or selection rather than structure. Its January assert text (`u>=0 && u<=4` / `v<=4` against our `< 4`) is a separate owner-held January defect and is unchanged."
-    },
-    {
       "unit": "source/saved games/player_profile",
       "function": "_player_profile_write_thread_proc@4",
       "class": "unclassified",
