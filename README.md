@@ -20,6 +20,8 @@ builds of the latest release:
 | Platform | Release | Debug |
 | --- | --- | --- |
 | Linux | [halo-linux-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-release.zip) | [halo-linux-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-debug.zip) |
+| Linux arm64 | [halo-linux-arm64-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-arm64-release.zip) | [halo-linux-arm64-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-arm64-debug.zip) |
+| Linux x86-64 | [halo-linux-x86_64-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-x86_64-release.zip) | [halo-linux-x86_64-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-x86_64-debug.zip) |
 | Windows | [halo-windows-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-windows-release.zip) | [halo-windows-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-windows-debug.zip) |
 | Android | [halo-android-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-android-release.zip) | [halo-android-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-android-debug.zip) |
 | Web | [halocombatevolved.com](https://halocombatevolved.com/) (or [halo-web-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-web-release.zip) for your own server) | [halo-web-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-web-debug.zip) |
@@ -33,7 +35,7 @@ if you want to install it. Refer to "Updates" in
 [port/linux/README.md](port/linux/README.md#updates). The web site offers
 each new build when it is out.
 
-Each build of the `main` branch that passes on all four platforms is a new
+Each build of the `main` branch that passes on all the platforms is a new
 release, and the web site then plays it. The [Releases](https://github.com/OpenCommunityEdition/OpenCE/releases)
 page keeps the last five releases. If the latest build has a problem, get
 an older build from that page.
@@ -64,6 +66,8 @@ Each platform has its own instructions:
 | Platform | Instructions |
 | --- | --- |
 | Linux (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/linux/README.md](port/linux/README.md) |
+| Linux arm64 (arm64 executable, OpenGL ES 3, SDL3) | [port/linux/README.md](port/linux/README.md#64-bit-arm) |
+| Linux x86-64 (x86-64 executable, OpenGL 4.5, SDL3; no 32-bit libraries) | [port/linux/README.md](port/linux/README.md#64-bit-x86) |
 | Windows (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/windows/README.md](port/windows/README.md) |
 | Android (arm64 app, OpenGL ES 3, SDL3) | [port/android/README.md](port/android/README.md) |
 | Web (WebAssembly, WebGL 2, SDL3; desktop Chrome, Edge and Firefox) | [port/web/README.md](port/web/README.md) |
@@ -76,9 +80,9 @@ functions. These are almost the same on all platforms.
 The game can play system link games on a local network and on the internet:
 
 - A system link game can have up to 128 players on up to 128 machines.
-- Linux, Windows and Android machines and browsers can play in the same
-  game. On a local network, the native builds play system link; browsers
-  play each other in rooms, over WebRTC
+- Linux (x86, x86-64 and arm64), Windows and Android machines and browsers can play
+  in the same game. On a local network, the native builds play system link;
+  browsers play each other in rooms, over WebRTC
   ([port/web/README.md](port/web/README.md)).
 - An invite link, or the server browser, lets a machine join a game on the
   internet, browsers too: a native build takes a browser's WebRTC
@@ -104,12 +108,14 @@ To build the game:
 | Target | Result |
 | --- | --- |
 | `ninja linux` | `build/linux/halo` |
+| `ninja linux_arm64` (on 64-bit ARM Linux) | `build/linux_arm64/halo` and `libSDL3.so.0` |
+| `ninja linux_x86_64` (on 64-bit x86 Linux, after `python configure.py --linux-x86-64`) | `build/linux_x86_64/halo` and `libSDL3.so.0` |
 | `ninja windows` (on Windows) | `build/windows/halo.exe` and `SDL3.dll` |
 | `ninja android_apk` | `port/android/app/build/outputs/apk/debug/app-debug.apk` |
 | `ninja web` | `build/web/site/`, the web site (`python tools/web_serve.py` serves it) |
 
 If you enter `ninja` without a target, ninja builds the game for the
-computer that you use.
+computer that you use: on 64-bit x86 Linux, the x86 build (`ninja linux`).
 
 `tools/ci_build.py` makes the same builds as GitHub Actions. For example,
 enter `python tools/ci_build.py linux release`.

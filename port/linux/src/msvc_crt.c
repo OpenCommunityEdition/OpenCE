@@ -295,7 +295,7 @@ static unsigned short msvc_to_control_word(unsigned int value, unsigned short wo
 	return word;
 }
 
-#ifdef HALO_ARM64_GUEST
+#if defined(__aarch64__)
 /* AArch64: the rounding mode lives in FPCR.RMode, the sticky exception
 flags in FPSR. Precision control and exception unmasking have no
 equivalent; the rest of the MSVC control word is only remembered. */
@@ -349,6 +349,61 @@ unsigned int _clearfp(void)
 	unsigned int status = _statusfp();
 
 	__builtin_arm_wsr64("fpsr", __builtin_arm_rsr64("fpsr") & ~0x9fULL);
+	return status;
+}
+#elif defined(__x86_64__)
+/* x86-64: the SSE unit computes floats and doubles, with its rounding mode
+in MXCSR.RC (bits 13 and 14, encoded as the x87 control word's and as
+_RC_*) and its sticky exception flags in MXCSR's bits 0-5 (in the x87
+status word's order). The x87 unit computes only long doubles, which MSVC's
+are not, but is kept in step: _control87 sets both units' rounding on
+32-bit x86 as well. Precision control has no SSE equivalent, and the
+exceptions stay masked, as on AArch64; the rest of the MSVC control word is
+only remembered. */
+static unsigned int msvc_control_word = CW_DEFAULT;
+
+unsigned int _control87(unsigned int new_value, unsigned int mask)
+{
+	unsigned int rounding;
+	unsigned int mxcsr;
+	unsigned short x87;
+
+	if (mask)
+	{
+		msvc_control_word = (msvc_control_word & ~mask) | (new_value & mask);
+		rounding = (msvc_control_word & _MCW_RC) >> 8;
+		mxcsr = __builtin_ia32_stmxcsr();
+		mxcsr = (mxcsr & ~(3U << 13)) | rounding << 13;
+		__builtin_ia32_ldmxcsr(mxcsr);
+		__asm__ __volatile__ ("fnstcw %0" : "=m" (x87));
+		x87 = (unsigned short)((x87 & ~(3U << 10)) | rounding << 10);
+		__asm__ __volatile__ ("fldcw %0" : : "m" (x87));
+	}
+	return msvc_control_word;
+}
+
+unsigned int _controlfp(unsigned int new_value, unsigned int mask)
+{
+	/* _controlfp ignores the denormal mask */
+	return _control87(new_value, mask & ~_EM_DENORMAL);
+}
+
+unsigned int _statusfp(void)
+{
+	unsigned short x87;
+
+	/* as the x87 status word's low bits: invalid, denormal, zero divide,
+	overflow, underflow, precision (either unit's) */
+	__asm__ __volatile__ ("fnstsw %0" : "=m" (x87));
+	return (__builtin_ia32_stmxcsr() | x87) & 0x3f;
+}
+
+unsigned int _clearfp(void)
+{
+	unsigned int status = _statusfp();
+
+	__builtin_ia32_ldmxcsr(__builtin_ia32_stmxcsr() & ~0x3fU);
+	__asm__ __volatile__ ("fnclex");
 	return status;
 }
 #elif defined(HALO_WEB)

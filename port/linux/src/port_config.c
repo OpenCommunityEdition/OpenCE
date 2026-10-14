@@ -53,6 +53,10 @@ enum
 	_platform_windows = 4,
 	/* (the web build, which has the desktop's settings, and these) */
 	_platform_web = 8,
+	/* (the Linux builds whose game runs as a guest of the Android port's
+	host, port/linux/host, which have the desktop's settings, and the
+	host's own) */
+	_platform_guest = 16,
 };
 
 struct config_setting
@@ -586,14 +590,14 @@ static const struct config_setting config_settings[] =
 		"Log texture uploads." },
 	{ "debug.texture_no_cache", _config_boolean, "false", "HALO_TEXTURE_NO_CACHE", _environment_set_is_true, _platform_all,
 		"Upload textures again every time they are used." },
-	{ "debug.sample_seconds", _config_real, "0.0", "HALO_SAMPLE", _environment_value, _platform_android,
+	{ "debug.sample_seconds", _config_real, "0.0", "HALO_SAMPLE", _environment_value, _platform_android | _platform_guest,
 		"Log where every game thread is this often, in seconds (read by the\n"
-		"app, port/android/host/host_debug.c); 0 never." },
-	{ "debug.memory_watch", _config_boolean, "true", NULL, _environment_value, _platform_android,
+		"host, port/android/host/host_debug.c); 0 never." },
+	{ "debug.memory_watch", _config_boolean, "true", "HALO_MEMORY_WATCH", _environment_value, _platform_android | _platform_guest,
 		"Notice the game's writes to cached textures and vertices by page\n"
 		"protection; false compares page contents once a frame instead, which is\n"
 		"slower. Under ARM translation (the x86 emulator) the app always compares\n"
-		"contents. Read by the app from the file (port/android/host/host_main.c)." },
+		"contents. Read by the host from the file (port/android/host/host_common.c)." },
 #ifdef HALO_PROFILE
 	{ "debug.profile_record", _config_boolean, "false", "HALO_PROFILE_RECORD", _environment_value, _platform_all,
 		"Record a profile with no command (configure.py --profile builds): from\n"
@@ -619,6 +623,8 @@ static const struct config_setting config_settings[] =
 #define CONFIG_PLATFORM (_platform_desktop | _platform_web)
 #elif defined(_WIN32)
 #define CONFIG_PLATFORM (_platform_desktop | _platform_windows)
+#elif defined(HALO_GUEST)
+#define CONFIG_PLATFORM (_platform_desktop | _platform_guest)
 #else
 #define CONFIG_PLATFORM _platform_desktop
 #endif
@@ -656,7 +662,7 @@ static void config_path(char *path, size_t size)
 /* the whole file, NUL terminated, or NULL; free() it */
 static char *config_read_file(const char *path, size_t *size)
 {
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 	FILE *file = fopen(path, "rb");
 	char *text = NULL;
 	long length;
@@ -699,7 +705,7 @@ static char *config_read_file(const char *path, size_t *size)
 
 static int config_write_file(const char *path, const char *text)
 {
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 	FILE *file = fopen(path, "wb");
 	int written;
 
@@ -769,7 +775,9 @@ static void config_append_setting(struct config_text *text, const struct config_
 			line++;
 	}
 #ifndef HALO_ANDROID
-	/* (Android apps have no environment to set) */
+	/* (Android apps have no environment to set; a setting without a variable
+	names none) */
+	if (setting->environment)
 	switch (setting->environment_style)
 	{
 	case _environment_value:
