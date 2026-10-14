@@ -90,6 +90,33 @@ static int in_range(uint64_t address, uint64_t size, uint64_t base, uint64_t end
 	return address >= base && address + size <= end && address + size >= address;
 }
 
+/* ---------- reading /proc/self/maps and smaps */
+
+/* the next line of a /proc file into line, without its newline; a line
+longer than the buffer (a long path) is cut short there, and the rest of it
+skipped, so that it is never taken for lines of its own. 0 at the end. */
+static int read_proc_line(FILE *file, char *line, size_t size)
+{
+	size_t length;
+
+	if (!fgets(line, (int)size, file))
+		return 0;
+	length = strlen(line);
+	if (length && line[length - 1] == '\n')
+	{
+		line[length - 1] = '\0';
+		return 1;
+	}
+	for (;;)
+	{
+		int c = fgetc(file);
+
+		if (c == '\n' || c == EOF)
+			break;
+	}
+	return 1;
+}
+
 /* ---------- reserving address space below 4 GB */
 
 /* the lowest free gap of at least size bytes at or above minimum, from
@@ -103,7 +130,7 @@ static uint64_t find_gap(uint64_t size, uint64_t minimum)
 
 	if (!maps)
 		return 0;
-	while (fgets(line, sizeof(line), maps))
+	while (read_proc_line(maps, line, sizeof(line)))
 	{
 		unsigned long long start, end;
 
@@ -244,7 +271,7 @@ static long mapping_swap_kb_ending(uint64_t start, uint64_t end, int *dont_dump)
 		*dont_dump = 0;
 	if (!smaps)
 		return -1;
-	while (fgets(line, sizeof(line), smaps))
+	while (read_proc_line(smaps, line, sizeof(line)))
 	{
 		unsigned long long lo, hi;
 		long kb;
@@ -392,7 +419,7 @@ static int reclaim_art_overlap(uint64_t address, uint64_t size)
 
 	if (!maps)
 		return 0;
-	while (fgets(line, sizeof(line), maps))
+	while (read_proc_line(maps, line, sizeof(line)))
 	{
 		unsigned long long lo, hi;
 		uint64_t from, to;
@@ -405,7 +432,6 @@ static int reclaim_art_overlap(uint64_t address, uint64_t size)
 		if (hi <= address || lo >= address + size)
 			continue;
 		name = line + name_offset;
-		name[strcspn(name, "\n")] = '\0';
 		from = lo > address ? lo : address;
 		to = hi < address + size ? hi : address + size;
 		if (strcmp(name, ART_LARGE_OBJECT_SPACE))
@@ -502,13 +528,12 @@ void host_memory_report_low_mappings(FILE *file)
 	}
 	if (!maps)
 		return;
-	while (fgets(line, sizeof(line), maps))
+	while (read_proc_line(maps, line, sizeof(line)))
 	{
 		unsigned long long lo, hi;
 
 		if (sscanf(line, "%llx-%llx", &lo, &hi) != 2 || lo >= LOW_LIMIT)
 			continue;
-		line[strcspn(line, "\n")] = '\0';
 		host_logf(HOST_LOG_INFO, "low mapping: %s", line);
 		if (file)
 			fprintf(file, "%s\n", line);
@@ -525,7 +550,10 @@ static struct pool *pool_new(void)
 	int attempt;
 
 	if (pool_count == MAXIMUM_POOLS)
+	{
+		host_logf(HOST_LOG_ERROR, "guest memory: all %d pools are in use", MAXIMUM_POOLS);
 		return NULL;
+	}
 	for (attempt = 0; attempt < 64; attempt++)
 	{
 		uint64_t address = find_gap(POOL_SIZE, minimum);
@@ -540,6 +568,12 @@ static struct pool *pool_new(void)
 		if (reserve(address, POOL_SIZE, 0) == 0)
 		{
 			pool = calloc(1, sizeof(*pool));
+			if (!pool)
+			{
+				munmap((void *)(uintptr_t)address, POOL_SIZE);
+				host_logf(HOST_LOG_ERROR, "guest memory: out of memory for a pool's page map");
+				return NULL;
+			}
 			pool->base = address;
 			pool->free_pages = POOL_PAGES;
 			pools[pool_count] = pool;
@@ -836,11 +870,59 @@ long host_guest_munmap(uint64_t address, uint64_t size)
 	return munmap((void *)address, length) ? -errno : 0;
 }
 
+/* mprotect and madvise only on memory the host gave the guest: the rest of
+the low 4 GB is the host's (on Android, ART's too). The write tracking
+forgets what they change in the Xbox window. */
+static long guest_range(uint64_t address, uint64_t size, uint64_t *length)
+{
+	if (address & (PAGE - 1))
+		return -EINVAL;
+	*length = round_up(size);
+	if (!*length)
+		return 0;
+	if (address + *length > LOW_LIMIT || address + *length < address)
+		return -ENOMEM;
+	if (!host_low_owns((uintptr_t)address, (size_t)*length))
+		return -ENOMEM;
+	return 1;
+}
+
+static void forget_window_range(uint64_t address, uint64_t length)
+{
+	uint64_t start = address, end = address + length;
+
+	if (start < window_base)
+		start = window_base;
+	if (end > window_end)
+		end = window_end;
+	if (start < end)
+		host_memory_watch_forget((uint32_t)start, (uint32_t)(end - start));
+}
+
 long host_guest_mprotect(uint64_t address, uint64_t size, int protection)
 {
-	if (address + size > LOW_LIMIT)
-		return -EINVAL;
-	return mprotect((void *)address, size, protection) ? -errno : 0;
+	uint64_t length;
+	long check = guest_range(address, size, &length);
+
+	if (check <= 0)
+		return check;
+	if (mprotect((void *)(uintptr_t)address, length, protection))
+		return -errno;
+	forget_window_range(address, length);
+	return 0;
+}
+
+long host_guest_madvise(uint64_t address, uint64_t size, int advice)
+{
+	uint64_t length;
+	long check = guest_range(address, size, &length);
+
+	if (check <= 0)
+		return check;
+	if (madvise((void *)(uintptr_t)address, length, advice))
+		return -errno;
+	forget_window_range(address, length);
+	return 0;
 }
 
 /* ---------- write tracking (port/linux/src/memory_watch.c) */

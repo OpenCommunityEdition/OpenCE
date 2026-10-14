@@ -29,6 +29,7 @@ static pthread_mutex_t threads_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void host_debug_thread_started(void)
 {
+	static int overflow_logged;
 	int index;
 
 	pthread_mutex_lock(&threads_lock);
@@ -39,6 +40,11 @@ void host_debug_thread_started(void)
 			guest_threads[index] = gettid();
 			break;
 		}
+	}
+	if (index == MAXIMUM_THREADS && !overflow_logged)
+	{
+		overflow_logged = 1;
+		host_logf(HOST_LOG_WARN, "more than %d guest threads: the sampler leaves the others out", MAXIMUM_THREADS);
 	}
 	pthread_mutex_unlock(&threads_lock);
 }

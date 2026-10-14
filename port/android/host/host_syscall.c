@@ -727,9 +727,7 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	case GUEST_SYS_mprotect:
 		return host_guest_mprotect((uint64_t)a, (uint64_t)b, (int)c);
 	case GUEST_SYS_madvise:
-		if ((uint64_t)a + (uint64_t)b > 0x100000000ULL)
-			return -EINVAL;
-		return result_of(syscall(SYS_madvise, a, b, c));
+		return host_guest_madvise((uint64_t)a, (uint64_t)b, (int)c);
 	case GUEST_SYS_mremap:
 	case GUEST_SYS_brk:
 		/* musl then falls back to mmap and copying */

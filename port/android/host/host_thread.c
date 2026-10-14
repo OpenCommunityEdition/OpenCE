@@ -142,20 +142,23 @@ void host_run_guest_main(uint32_t boot)
 
 /* ---------- guest threads */
 
-struct thread_start
-{
-	void *(*function)(void *);
-	void *argument;
-	void *mapping;
-	size_t mapping_size;
-};
-
 struct finished_thread
 {
 	struct finished_thread *next;
 	pthread_t thread;
 	void *mapping;
 	size_t mapping_size;
+};
+
+/* (the record the thread gives the reaper is allocated with it, so that
+a thread can always end) */
+struct thread_start
+{
+	void *(*function)(void *);
+	void *argument;
+	void *mapping;
+	size_t mapping_size;
+	struct finished_thread *finished;
 };
 
 static pthread_mutex_t reaper_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -200,7 +203,7 @@ static void *thread_main(void *context)
 	host_signal_stack_remove();
 	guest_tp = 0;
 
-	finished = calloc(1, sizeof(*finished));
+	finished = start.finished;
 	finished->thread = pthread_self();
 	finished->mapping = start.mapping;
 	finished->mapping_size = start.mapping_size;
@@ -215,13 +218,19 @@ static void *thread_main(void *context)
 int host_native_thread_create(void *(*function)(void *), void *argument, size_t stack_size)
 {
 	struct thread_start *start = calloc(1, sizeof(*start));
+	struct finished_thread *finished = calloc(1, sizeof(*finished));
 	pthread_attr_t attributes;
 	pthread_t thread;
 	void *stack;
 	int error;
 
-	if (!start)
+	if (!start || !finished)
+	{
+		free(start);
+		free(finished);
 		return ENOMEM;
+	}
+	start->finished = finished;
 	pthread_mutex_lock(&reaper_lock);
 	if (!reaper_started)
 	{
@@ -240,6 +249,7 @@ int host_native_thread_create(void *(*function)(void *), void *argument, size_t 
 	if (!stack)
 	{
 		free(start);
+		free(finished);
 		return EAGAIN;
 	}
 	start->function = function;
@@ -252,6 +262,7 @@ int host_native_thread_create(void *(*function)(void *), void *argument, size_t 
 	{
 		host_low_unmap(start->mapping, start->mapping_size);
 		free(start);
+		free(finished);
 	}
 	return error;
 }

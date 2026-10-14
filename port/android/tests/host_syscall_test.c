@@ -64,6 +64,11 @@ long host_guest_mprotect(uint64_t address, uint64_t size, int protection)
 	return mprotect((void *)(uintptr_t)address, size, protection) ? -errno : 0;
 }
 
+long host_guest_madvise(uint64_t address, uint64_t size, int advice)
+{
+	return madvise((void *)(uintptr_t)address, size, advice) ? -errno : 0;
+}
+
 int host_low_owns(uintptr_t address, size_t size)
 {
 	(void)address;
