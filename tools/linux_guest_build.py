@@ -165,8 +165,10 @@ def generate_linux_guest_build(n: Writer, sln: Any, target: LinuxGuest) -> None:
         depfile="$out.d",
         deps="gcc",
     )
+    # (frame pointers: the sampler and the crash report walk the host's
+    # frames too, host_arch.c)
     host_cflags = " ".join([
-        "-O2", "-g", "-fPIC", "-Wall", "-Wno-unused-function", "-D_GNU_SOURCE",
+        "-O2", "-g", "-fno-omit-frame-pointer", "-fPIC", "-Wall", "-Wno-unused-function", "-D_GNU_SOURCE",
         f"-I{ANDROID_DIR}/include", f"-I{ANDROID_DIR}/host", f"-I{sdl_dir}/include", f"-I{LINUX_DIR}/src",
         f"-I{TOML_DIR}", *host_defines,
     ])

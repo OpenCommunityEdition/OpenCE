@@ -11,6 +11,7 @@ halo_guest.elf (llvm-symbolizer --obj=build/android/halo_guest.elf 0x...).
 
 #include "host.h"
 
+#include <errno.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
@@ -55,29 +56,28 @@ void host_debug_thread_exited(void)
 	pthread_mutex_unlock(&threads_lock);
 }
 
-static int frame_readable(uintptr_t address, size_t size)
-{
-	return host_low_owns(address, size);
-}
-
-/* (a signal handler: it formats into its own buffer, and the log's sink
-neither locks nor uses stdio) */
+/* (a signal handler: it formats into its own buffer, the log's sink
+neither locks nor uses stdio, and the frame walk copies each record without
+faulting, whatever the frame pointer register held: host_arch.c) */
 static void sample_handler(int signal_number, siginfo_t *information, void *context)
 {
 	char line[512];
 	uint64_t pc, sp, fp, lr;
 	uint64_t returns[12];
 	int length, count, index;
+	int saved_errno = errno;
 
 	(void)signal_number;
 	(void)information;
 	host_arch_context(context, &pc, &sp, &fp, &lr);
 	length = snprintf(line, sizeof(line), "sample tid %d: pc %llx lr %llx", (int)gettid(),
 		(unsigned long long)pc, (unsigned long long)lr);
-	count = host_arch_walk_frames(fp, frame_readable, returns, (int)(sizeof(returns) / sizeof(returns[0])));
+	count = host_arch_walk_frames(fp, host_arch_read_memory, returns, (int)(sizeof(returns) / sizeof(returns[0])));
 	for (index = 0; index < count && length > 0 && (size_t)length < sizeof(line); index++)
 		length += snprintf(line + length, sizeof(line) - length, " %llx", (unsigned long long)returns[index]);
 	host_log(HOST_LOG_INFO, line);
+	/* (the interrupted code may be between a call and its errno check) */
+	errno = saved_errno;
 }
 
 static void *sampler(void *context)

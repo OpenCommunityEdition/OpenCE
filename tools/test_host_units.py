@@ -1,6 +1,7 @@
 """Runs the C tests of the guest's host (port/android/host) that need
-neither Android nor the guest: the image loader's checks (host_loader.c)
-and the processor's registers and frame walk (host_arch.c), on the build
+neither Android nor the guest: the image loader's checks (host_loader.c),
+the processor's registers and frame walk (host_arch.c), and the guest's
+memory system calls and crash report (host_memory.c), on the build
 machine's processor (AArch64 or x86-64), with its C compiler."""
 import platform
 import shutil
@@ -32,7 +33,7 @@ def run_test(tmp_path, name, sources):
     subprocess.run(
         [cc, "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter", "-O1", "-D_GNU_SOURCE",
          f"-I{ROOT / 'port' / 'android' / 'include'}", f"-I{HOST}",
-         *[str(source) for source in sources], "-o", str(binary)],
+         "-pthread", *[str(source) for source in sources], "-o", str(binary)],
         check=True,
     )
     result = subprocess.run([str(binary)], capture_output=True, text=True)
@@ -45,3 +46,8 @@ def test_host_loader(tmp_path):
 
 def test_host_arch(tmp_path):
     run_test(tmp_path, "host_arch_test", [TESTS / "host_arch_test.c", HOST / "host_arch.c"])
+
+
+def test_host_memory(tmp_path):
+    run_test(tmp_path, "host_memory_test",
+             [TESTS / "host_memory_test.c", HOST / "host_arch.c", HOST / "host_watch_hash.c"])

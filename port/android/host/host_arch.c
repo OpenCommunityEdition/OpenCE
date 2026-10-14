@@ -11,13 +11,26 @@ address on the stack and the frame pointer in rbp. Both guests' frame
 records are 16 bytes: the caller's frame pointer, then the return address,
 8 bytes each (stp x29, x30; or call's return address and push rbp, which in
 64-bit mode are 8 bytes, x32 too).
+
+The walk runs inside signal handlers, from whatever the frame pointer
+register held: in host or driver code built without frame pointers it is an
+ordinary register, and even a real frame record may point into a guard page
+(PROT_NONE), a part of a pool never handed out, or memory another thread has
+just unmapped. So nothing is read through a pointer: each record is copied
+by process_vm_readv on this process, which fails with EFAULT instead of
+faulting. It takes no lock and touches only the caller's buffer, so it is
+async-signal-safe; where a sandbox refuses the call the walk finds nothing.
 */
 
 #include "host.h"
 
+#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
+#include <sys/syscall.h>
+#include <sys/uio.h>
 #include <ucontext.h>
+#include <unistd.h>
 
 #if defined(__aarch64__)
 
@@ -112,15 +125,32 @@ int host_arch_register_line(const void *ucontext, int line, char *buffer, size_t
 #error "the host's registers are not known for this architecture"
 #endif
 
-int host_arch_walk_frames(uint64_t fp, int (*readable)(uintptr_t address, size_t size),
+int host_arch_read_memory(uintptr_t address, void *buffer, size_t size)
+{
+	struct iovec local = { buffer, size };
+	struct iovec remote = { (void *)address, size };
+	long copied;
+
+	if (!size)
+		return 1;
+	if (address + size < address)
+		return 0;
+	/* (the system call itself: no C library wrapper may take a lock) */
+	copied = syscall(SYS_process_vm_readv, (long)getpid(), &local, 1L, &remote, 1L, 0L);
+	return copied == (long)size;
+}
+
+int host_arch_walk_frames(uint64_t fp, int (*read)(uintptr_t address, void *buffer, size_t size),
 	uint64_t *returns, int maximum)
 {
 	int count = 0;
 
-	while (count < maximum && fp && !(fp & 7) && readable((uintptr_t)fp, 16))
+	while (count < maximum && fp && !(fp & 7) && fp <= UINTPTR_MAX - 16)
 	{
-		const uint64_t *frame = (const uint64_t *)(uintptr_t)fp;
+		uint64_t frame[2];
 
+		if (!read((uintptr_t)fp, frame, sizeof(frame)))
+			break;
 		returns[count++] = frame[1];
 		/* (the stack grows down: a caller's record is above its callee's) */
 		if (frame[0] <= fp)

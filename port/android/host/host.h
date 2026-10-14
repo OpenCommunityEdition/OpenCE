@@ -99,8 +99,9 @@ void host_memory_watch_use_hashes(void);
 /* page-granular allocations below 4 GB; NULL on failure */
 void *host_low_map(size_t size, int protection);
 void host_low_unmap(void *address, size_t size);
-/* 1 if [address, address + size) was handed out by host_low_map or is one of
-the fixed ranges; takes no lock, so signal handlers may call it */
+/* 1 if [address, address + size) lies in a pool (host_low_map's) or one of
+the fixed ranges. Not whether it can be read: those hold reserved and
+PROT_NONE pages too (host_arch_read_memory tells that). */
 int host_low_owns(uintptr_t address, size_t size);
 /* the guest's mmap/munmap/mprotect/madvise/mremap (host_syscall.c) */
 long host_guest_mmap(uint64_t address, uint64_t size, int protection, int flags, int fd, int64_t offset);
@@ -179,11 +180,15 @@ void host_arch_context(const void *ucontext, uint64_t *pc, uint64_t *sp, uint64_
 /* the line'th line of the register dump of a ucontext_t into buffer; 0 past
 the last line */
 int host_arch_register_line(const void *ucontext, int line, char *buffer, size_t size);
-/* follows the guest's frame records from fp (both guests keep the caller's
-frame pointer then the return address, 8 bytes each), collecting up to
-maximum return addresses; readable says whether 16 bytes at an address may
-be read. Returns how many. */
-int host_arch_walk_frames(uint64_t fp, int (*readable)(uintptr_t address, size_t size),
+/* copies size bytes at address into buffer, never faulting: 0 if any of
+them cannot be read (unmapped, PROT_NONE). Async-signal-safe (it may change
+errno). */
+int host_arch_read_memory(uintptr_t address, void *buffer, size_t size);
+/* follows the frame records from fp (both guests, and the host, keep the
+caller's frame pointer then the return address, 8 bytes each), collecting
+up to maximum return addresses; read copies a record (host_arch_read_memory,
+or a test's), and the walk stops where it fails. Returns how many. */
+int host_arch_walk_frames(uint64_t fp, int (*read)(uintptr_t address, void *buffer, size_t size),
 	uint64_t *returns, int maximum);
 
 /* ---------- entering guest code (host_thread.c) */

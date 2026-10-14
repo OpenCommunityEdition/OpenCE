@@ -887,13 +887,9 @@ static void mark_written(uint64_t page)
 static struct sigaction previous_segv, previous_bus, previous_ill;
 
 /* the guest's code, the stack and the frame records at a crash, through the
-log's sink (which neither locks nor uses stdio); the walk reads only memory
-the host gave the guest */
-static int frame_readable(uintptr_t address, size_t size)
-{
-	return host_low_owns(address, size);
-}
-
+log's sink (which neither locks nor uses stdio); the walk copies each record
+without faulting (host_arch_read_memory), as the frame pointer may hold
+anything at a crash */
 static void report_crash(int signal_number, siginfo_t *information, void *context)
 {
 	char line[256];
@@ -914,7 +910,7 @@ static void report_crash(int signal_number, siginfo_t *information, void *contex
 	}
 	for (index = 0; host_arch_register_line(context, index, line, sizeof(line)); index++)
 		host_log(HOST_LOG_ERROR, line);
-	count = host_arch_walk_frames(fp, frame_readable, returns, (int)(sizeof(returns) / sizeof(returns[0])));
+	count = host_arch_walk_frames(fp, host_arch_read_memory, returns, (int)(sizeof(returns) / sizeof(returns[0])));
 	for (index = 0; index < count; index++)
 	{
 		snprintf(line, sizeof(line), "  frame %2d: return %016llx", index, (unsigned long long)returns[index]);
@@ -938,9 +934,12 @@ static void chain(struct sigaction *previous, int signal_number, siginfo_t *info
 	(or default) handler */
 }
 
+/* (each handler keeps the interrupted code's errno: a write tracking fault
+can come between any call and its errno check) */
 static void segv_handler(int signal_number, siginfo_t *information, void *context)
 {
 	uint64_t address = (uint64_t)information->si_addr;
+	int saved_errno = errno;
 
 	if (watch_active && in_window(address))
 	{
@@ -949,23 +948,31 @@ static void segv_handler(int signal_number, siginfo_t *information, void *contex
 		if (page_protected[page])
 		{
 			mark_written(page);
+			errno = saved_errno;
 			return;
 		}
 	}
 	report_crash(signal_number, information, context);
 	chain(&previous_segv, signal_number, information, context);
+	errno = saved_errno;
 }
 
 static void bus_handler(int signal_number, siginfo_t *information, void *context)
 {
+	int saved_errno = errno;
+
 	report_crash(signal_number, information, context);
 	chain(&previous_bus, signal_number, information, context);
+	errno = saved_errno;
 }
 
 static void ill_handler(int signal_number, siginfo_t *information, void *context)
 {
+	int saved_errno = errno;
+
 	report_crash(signal_number, information, context);
 	chain(&previous_ill, signal_number, information, context);
+	errno = saved_errno;
 }
 
 void host_install_signal_handlers(void)
