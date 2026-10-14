@@ -1152,9 +1152,12 @@ is x87's 80-bit one where this build's is a `double`, as MSVC's is.
 - CMake, and the development files that SDL3 uses for X11, Wayland and
   sound, as for the 64-bit ARM build. Refer to the `linux-x86_64` job in
   `.github/workflows/build.yml`.
-- A network connection for the first build. `configure.py` downloads musl
-  1.2.5 (checked against its SHA-256) and SDL 3.4.16 to
-  `build/linux_x86_64/third_party`.
+- A network connection for the first build. As this is not the default
+  build of an x86 computer, `configure.py` generates it only when asked:
+  `python3 configure.py --linux-x86-64` (or with `--linux-x86-64-cc`)
+  downloads musl 1.2.5 (checked against its SHA-256) and SDL 3.4.16 to `build/linux_x86_64/third_party`, and later runs of
+  `configure.py` take them from there. Without them, `ninja linux_x86_64`
+  stops and says so; `configure.py` alone downloads nothing for it.
 
 To start the game: the 64-bit OpenGL libraries of GLVND (`libOpenGL.so.0`,
 `libEGL.so.1`), which Mesa and NVIDIA's driver use. The release builds of

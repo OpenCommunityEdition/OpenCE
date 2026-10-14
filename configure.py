@@ -97,6 +97,13 @@ parser.add_argument(
     help="the renderer of `ninja linux_arm64`: OpenGL ES 3 (the default, as on Android) or desktop OpenGL 4.5",
 )
 parser.add_argument(
+    "--linux-x86-64",
+    action="store_true",
+    help="generate `ninja linux_x86_64`, the 64-bit x86 Linux build, on a 64-bit x86 Linux computer, whose default "
+    "build is the x86 one: configure.py then downloads its musl and SDL3 (once, to build/linux_x86_64/third_party). "
+    "--linux-x86-64-cc asks for it too",
+)
+parser.add_argument(
     "--linux-x86-64-cc",
     type=str,
     help="clang (with the x32 target) for `ninja linux_x86_64`, the 64-bit x86 Linux build (default: clang)",
@@ -127,6 +134,7 @@ sln = SimpleNamespace(
     android_guest_cc=args.android_guest_cc,
     linux_arm64_cc=args.linux_arm64_cc,
     linux_arm64_gl=args.linux_arm64_gl,
+    linux_x86_64=args.linux_x86_64,
     linux_x86_64_cc=args.linux_x86_64_cc,
     web_emcc=args.web_emcc,
 )

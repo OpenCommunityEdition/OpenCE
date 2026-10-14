@@ -72,6 +72,10 @@ def main() -> int:
         configure += ["--lto=off", "--pgo=off"]
     if args.config == "profile":
         configure.append("--profile")
+    if args.platform == "linux_x86_64":
+        # (not this computer's default build, which configure.py generates
+        # only when asked)
+        configure.append("--linux-x86-64")
     launcher = os.environ.get("CI_COMPILER_LAUNCHER")
     if launcher:
         configure += ["--compiler-launcher", launcher]

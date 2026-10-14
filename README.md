@@ -109,7 +109,7 @@ To build the game:
 | --- | --- |
 | `ninja linux` | `build/linux/halo` |
 | `ninja linux_arm64` (on 64-bit ARM Linux) | `build/linux_arm64/halo` and `libSDL3.so.0` |
-| `ninja linux_x86_64` (on 64-bit x86 Linux) | `build/linux_x86_64/halo` and `libSDL3.so.0` |
+| `ninja linux_x86_64` (on 64-bit x86 Linux, after `python configure.py --linux-x86-64`) | `build/linux_x86_64/halo` and `libSDL3.so.0` |
 | `ninja windows` (on Windows) | `build/windows/halo.exe` and `SDL3.dll` |
 | `ninja android_apk` | `port/android/app/build/outputs/apk/debug/app-debug.apk` |
 | `ninja web` | `build/web/site/`, the web site (`python tools/web_serve.py` serves it) |

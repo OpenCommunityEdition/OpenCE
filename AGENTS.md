@@ -37,7 +37,8 @@ end.
 ```sh
 python configure.py            # debug build; add --release, --portable, --profile, --pgo=off, --lto=off
 ninja linux                    # build/linux/halo
-ninja linux_x86_64             # build/linux_x86_64/halo: x32 guest in a 64-bit host (x86-64 Linux only)
+ninja linux_x86_64             # build/linux_x86_64/halo: x32 guest in a 64-bit host (x86-64 Linux only;
+                               # configure with --linux-x86-64 first, which downloads musl and SDL3)
 ninja linux_arm64              # build/linux_arm64/halo: arm64_32 guest (64-bit ARM Linux only)
 ninja android                  # the Android guest image and native libraries
 ninja android_apk              # the APK (Gradle)
@@ -74,7 +75,9 @@ python tools/ci_build.py linux release   # what CI builds
   run by the build). The host calls guest code only through
   `host_call_guest`, which passes arguments zero-extended. Each target
   configures only on its own processor; `ninja` alone on x86-64 still
-  builds `linux`.
+  builds `linux`, and `linux_x86_64` is generated (its sources
+  downloaded) only with `--linux-x86-64` or `--linux-x86-64-cc`, or once
+  they are in `build/linux_x86_64/third_party`.
 - Web: the game is `wasm32` (also ILP32), run on a Web Worker; calls must
   match their callee's type exactly (the link fails on a mismatch), and
   WebGL 2 is ES 3.0. Run `ninja web` after changing what it compiles (as

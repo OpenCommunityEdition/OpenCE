@@ -20,9 +20,17 @@ Linux executable instead of an app's library:
   its license, SDL3-LICENSE.txt.
 
 Each build is a LinuxGuest in LINUX_GUESTS, generated on a computer of its
-architecture. Refer to "64-bit ARM" and "64-bit x86" in port/linux/README.md.
+architecture. Its sources (musl and SDL3) are downloaded when
+configure.py generates it, as the Android build's are, and only when it is
+asked for: the 64-bit ARM build, the default build of its computers,
+always; the 64-bit x86 build, which is not, with configure.py
+--linux-x86-64 (or --linux-x86-64-cc), or once its sources are there. A
+build that is not asked for, or cannot be generated, is a target
+that stops with the reason. Refer to "64-bit ARM" and "64-bit x86" in
+port/linux/README.md.
 """
 
+import io
 import json
 import platform
 import shlex
@@ -32,7 +40,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .android_build import (GUEST_ARCH_SCRIPT, SDL_TAG, TOML_DIR, fetch_third_party, generate_guest_image)
+from .android_build import (GUEST_ARCH_SCRIPT, MUSL_VERSION, SDL_TAG, TOML_DIR, fetch_third_party,
+                            generate_guest_image)
 from .guest_arch import ARM64_32, X32, GuestArch
 from .linux_build import (MBEDTLS_DIR, MINIUPNPC_DEFINES, MINIUPNPC_DIR, SDL_RPATH_LDFLAGS, compile_launcher,
                           miniupnpc_sources, sdl3_rule, updater_defines)
@@ -102,11 +111,13 @@ def generate_linux_guest_builds(n: Writer, sln: Any) -> None:
         generate_linux_guest_build(n, sln, target)
 
 
-def _unavailable(n: Writer, target: LinuxGuest, reason: str) -> None:
+def _unavailable(n: Writer, target: LinuxGuest, reason: str, quiet: bool = False) -> None:
     """a target of the build's name that stops with the reason it cannot be
-    built, rather than none (ninja would then say only that it is unknown)"""
+    built, rather than none (ninja would then say only that it is unknown);
+    configure.py says it too unless quiet"""
     message = f"{target.title} build ({target.name}) unavailable: {reason}"
-    print(message, file=sys.stderr)
+    if not quiet:
+        print(message, file=sys.stderr)
     n.comment(message)
     n.rule(
         name=f"{target.name}_unavailable",
@@ -117,6 +128,14 @@ def _unavailable(n: Writer, target: LinuxGuest, reason: str) -> None:
     n.newline()
 
 
+def requested(sln: Any, target: LinuxGuest, third_party: Path) -> bool:
+    """whether configure.py is to generate the build, and so download its
+    sources: the computer's default build, one asked for (--<name>, its
+    compiler), or one whose sources are there already"""
+    return (target.default or bool(getattr(sln, target.name, False)) or bool(getattr(sln, f"{target.name}_cc", None))
+            or ((third_party / f"musl-{MUSL_VERSION}").is_dir() and (third_party / "SDL3").is_dir()))
+
+
 def generate_linux_guest_build(n: Writer, sln: Any, target: LinuxGuest) -> None:
     config_path = LINUX_DIR / "port.json"
     if not config_path.is_file() or not PORT_DIR.is_dir():
@@ -124,9 +143,30 @@ def generate_linux_guest_build(n: Writer, sln: Any, target: LinuxGuest) -> None:
     if native_linux_guest() != target:
         n.comment(f"{target.title} build ({target.name}): only on a {target.title} computer")
         return
+    third_party = Path("build") / target.name / "third_party"
+    if not requested(sln, target, third_party):
+        option = "--" + target.name.replace("_", "-")
+        _unavailable(n, target, f"run python3 configure.py {option} first (it downloads musl and SDL3 for it)",
+                     quiet=True)
+        return
+    # (written aside, so that a build that fails to generate halfway leaves
+    # nothing of itself but its unavailable target)
+    output = io.StringIO()
+    try:
+        _generate(Writer(output, n.width), sln, target, config_path, third_party)
+    except (subprocess.CalledProcessError, OSError, RuntimeError) as error:
+        # (the reasons of _generate's own, and those of what it calls: a
+        # compiler that cannot run, android_build.compiler_include)
+        _unavailable(n, target, str(error))
+        return
+    n.output.write(output.getvalue())
+
+
+def _generate(n: Writer, sln: Any, target: LinuxGuest, config_path: Path, third_party: Path) -> None:
+    """writes the build to n; raises RuntimeError with the reason it cannot
+    be built"""
     prefix, label = target.name, target.label
     build = Path("build") / target.name
-    third_party = build / "third_party"
     sdl_dir = third_party / "SDL3"
     cc = getattr(sln, f"{prefix}_cc", None) or "clang"
     # the renderer: OpenGL ES 3 (HALO_GLES, as on Android), or desktop OpenGL
@@ -139,14 +179,12 @@ def generate_linux_guest_build(n: Writer, sln: Any, target: LinuxGuest) -> None:
         headers.append("GL/glcorearb.h")
     missing = [header for header in headers if not (GL_HEADERS / header).is_file()]
     if missing:
-        _unavailable(n, target, f"no {', '.join(missing)} in {GL_HEADERS} (libgles-dev, libegl-dev"
-                     + (", libgl-dev" if desktop_gl else "") + ")")
-        return
+        raise RuntimeError(f"no {', '.join(missing)} in {GL_HEADERS} (libgles-dev, libegl-dev"
+                           + (", libgl-dev" if desktop_gl else "") + ")")
     try:
         fetch_third_party(third_party)
     except (subprocess.CalledProcessError, OSError, RuntimeError) as error:
-        _unavailable(n, target, f"cannot fetch musl or SDL3 ({error})")
-        return
+        raise RuntimeError(f"cannot fetch musl or SDL3 ({error})") from error
     config: Dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
     # the guest's and the host's code paths: the desktop's (no HALO_ANDROID),
     # and the renderer's
