@@ -3325,6 +3325,16 @@ void players_respawn_at_checkpoint(
 		if (unplaced[DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)])
 			player_place_beside_teammate(iterator.datum_index);
 	}
+	/* (a revert brings back the saved all_dead, FALSE; this brings no state
+	back, so it is cleared here once anyone is back, or the next death would
+	wait for a respawn that never comes: players_update_after_game neither
+	respawns a player nor ends the game while everyone is dead) */
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->unit_index != NONE)
+			players_globals->all_dead = FALSE;
+	}
 
 	return;
 }
