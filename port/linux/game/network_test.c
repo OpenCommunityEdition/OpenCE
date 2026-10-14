@@ -21,7 +21,10 @@ Automated system link sessions for testing the netcode without the menus
   and then as "join". It logs what it lists.
 
 Once the game runs, every second each machine logs where every player's
-unit is, so the machines' views of the game can be compared.
+unit is, so the machines' views of the game can be compared, and the host
+how far its own run of each client's player came from the client's
+(network_distributed_divergence): tools/net_compare.py compares two builds
+so (port/linux/NETCODE.md, "Comparing two builds", has the line's format).
 
 Scripted play for the netcode's parts the bots' wandering does not reach:
 debug.network_test_kill (the host kills the last player every so often),
@@ -77,6 +80,7 @@ void platform_log(char const *format, ...);
 void damage_kill_object_for_player(long object_index, long player_index);
 /* network_distributed.c's */
 void network_distributed_statistics(long *sent, long *received, long *corrections);
+void network_distributed_divergence(long *samples, long *apart, real *mean, real *largest);
 void network_distributed_item_statistics(long *creates, long *deletes, long *failures, long *removed);
 void network_damage_statistics(long *sent_reports, long *dealt_reports, long *rejected_reports, long *replayed_events);
 /* xinput_sdl.c's */
@@ -331,9 +335,14 @@ static void network_test_log_players(
 		spawns leaves it where it began) */
 		long local_player_index = local_player_get_player_index(0);
 		struct observer_result const *camera = observer_get_camera(0);
+		long divergence_samples, divergence_apart;
+		real divergence_mean, divergence_largest;
+
+		network_distributed_divergence(&divergence_samples, &divergence_apart, &divergence_mean, &divergence_largest);
 
 		platform_log("network test: tick %ld%s | items %ld (+%ld -%ld !%ld x%ld) | %s to %ld | sent %ld received %ld corrected %ld"
-			" | hits %ld dealt %ld rejected %ld replayed %ld | local %ld camera (%.1f %.1f %.1f) respawn %ld",
+			" | hits %ld dealt %ld rejected %ld replayed %ld | local %ld camera (%.1f %.1f %.1f) respawn %ld"
+			" | drift %ld %ld %.6f %.6f",
 			game_time_get(), line, ground_items, creates, deletes, failures, removed,
 			game_engine_can_score() ? "playing" : "game over",
 			game_engine_running() ? (long)game_engine_get_variant()->universal_variant.score_to_win : 0L,
@@ -341,7 +350,8 @@ static void network_test_log_players(
 			sent_reports, dealt_reports, rejected_reports, replayed_events,
 			local_player_index == NONE ? -1L : (long)DATUM_INDEX_TO_ABSOLUTE_INDEX(local_player_index),
 			camera ? camera->position.x : 0.0f, camera ? camera->position.y : 0.0f, camera ? camera->position.z : 0.0f,
-			local_player_index == NONE ? 0L : (long)player_get(local_player_index)->respawn_timer);
+			local_player_index == NONE ? 0L : (long)player_get(local_player_index)->respawn_timer,
+			divergence_samples, divergence_apart, divergence_mean, divergence_largest);
 	}
 }
 
