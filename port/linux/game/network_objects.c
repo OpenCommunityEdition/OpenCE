@@ -2956,6 +2956,27 @@ static void distributed_client_apply_inventory(
 				unit->unit.grenade_counts[grenade_type] = count;
 			}
 		}
+		/* an AI unit's grenade type: the host's actor chose it as it gave the
+		unit its grenades (unit_add_grenade_type_to_inventory), and a client
+		has no actors. Without one, the throws the host's control starts
+		never begin here (unit_throw_grenade_begin), and the grenades, whose
+		blasts the host's damage brings, are never seen. The type it carries
+		is it; not changed in the middle of a throw */
+		if (!own && unit->unit.player_index == NONE &&
+			unit->unit.grenade_throw_state == _unit_grenade_throw_idle &&
+			(unit->unit.current_grenade_index == NONE ||
+				unit->unit.grenade_counts[unit->unit.current_grenade_index] == 0))
+		{
+			for (grenade_type = 0; grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES; grenade_type++)
+			{
+				if (unit->unit.grenade_counts[grenade_type] > 0)
+				{
+					unit->unit.current_grenade_index = grenade_type;
+					unit->unit.desired_grenade_index = grenade_type;
+					break;
+				}
+			}
+		}
 	}
 	/* (what the host changed here is not this machine's doing) */
 	if (own)
