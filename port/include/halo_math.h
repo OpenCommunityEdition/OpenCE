@@ -21,7 +21,8 @@ rounds once instead of twice.
 
 The macros are function-like, so they rename calls (and musl's definitions)
 but not variables or fields of the same names. The functions that are
-exact in IEEE arithmetic (sqrt, fabs, floor, ceil, fmod) need nothing.
+exact in IEEE arithmetic (sqrt, fabs, floor, ceil, fmod) need nothing,
+but fmod's fraction of a whole is taken here (halo_fmod), for speed.
 */
 
 #ifndef __HALO_MATH_H
@@ -52,5 +53,24 @@ double halo_pow(double x, double y);
 #define log2(x) halo_log2(x)
 #define log10(x) halo_log10(x)
 #define pow(x, y) halo_pow(x, y)
+
+double fmod(double x, double y);
+
+/* fmod(x, 1.0), the fraction of a whole the periodic functions and the
+objects' functions take many times a frame, without the UCRT's x86 fmod,
+which goes through the x87 and its exception handling: x less its
+truncation, which is exact, and a zero with x's sign, as fmod gives */
+static __inline double halo_fmod(double x, double y)
+{
+	if (y == 1.0 && x > -2147483648.0 && x < 2147483648.0)
+	{
+		double fraction = x - (double)(long)x;
+
+		return fraction != 0.0 ? fraction : x * 0.0;
+	}
+	return (fmod)(x, y);
+}
+
+#define fmod(x, y) halo_fmod(x, y)
 
 #endif
