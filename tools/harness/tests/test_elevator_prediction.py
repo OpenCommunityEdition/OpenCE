@@ -25,12 +25,26 @@ NEGATIVE_CONTROLS = {
 }
 
 
+def divergence(source):
+    """network_distributed.c's distributed_divergence, an unnamed structure's static variable"""
+    end = source.find("} distributed_divergence;")
+    assert end >= 0, f"distributed_divergence not found in {SOURCE}"
+    start = source.rindex("static struct", 0, end)
+    return source[start:end] + "} distributed_divergence;"
+
+
 def generated(fault=None, faulty_function=None):
     source = read(SOURCE)
     tolerance = re.search(r"^#define HOST_ACCEPT_TOLERANCE\s+(\S+)", source, re.M)
     assert tolerance, f"HOST_ACCEPT_TOLERANCE not found in {SOURCE}"
     config = f"#define HOST_ACCEPT_TOLERANCE {tolerance.group(1)}\n"
     config += structure(source, "distributed_on_foot_bound") + "\n"
+    # (the tests' drift figures, which distributed_take_prediction notes:
+    # the source's own definitions)
+    apart = re.search(r"^#define DIVERGENCE_APART_DISTANCE\s+(\S+)", source, re.M)
+    assert apart, f"DIVERGENCE_APART_DISTANCE not found in {SOURCE}"
+    config += f"#define DIVERGENCE_APART_DISTANCE {apart.group(1)}\n"
+    config += divergence(source) + "\n"
     text = ""
     for name in FUNCTIONS:
         code = function(source, name)

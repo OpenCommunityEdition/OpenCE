@@ -2121,8 +2121,10 @@ static void distributed_take_prediction(
 	dz = position.z - object->object.position.z;
 	/* (for the tests' reports: a tick on from the last taken, on both, with
 	the input the client's tick ran: an input's tick is the client's time
-	before it ran, a prediction's after) */
+	before it ran, a prediction's after; the prediction's time is the
+	client's word, kept from overflowing) */
 	if (distributed_divergence.taken_host_time[player_index] == now - 1 &&
+		distributed_predictions[player_index].time != LONG_MIN &&
 		distributed_divergence.taken_time[player_index] == distributed_predictions[player_index].time - 1 &&
 		distributed_divergence.input_time[player_index] == distributed_predictions[player_index].time - 1)
 	{
@@ -2521,11 +2523,17 @@ static void distributed_handle_inputs(
 		network_coop_note_player_structure_bsp(input->player_index, input->structure_bsp_index);
 		update_server_handle_distributed_input(DATUM_INDEX_NEW(input->player_index, player->identifier), input->tick,
 			&action, input->control_flags, DISTRIBUTED_INPUT_HISTORY);
-		/* (for the tests' reports: the newest, as the input taken is) */
-		if (input->tick > distributed_divergence.input_time[input->player_index] ||
-			input->tick < distributed_divergence.input_time[input->player_index] - TICKS_PER_SECOND)
+		/* (for the tests' reports: the newest, as the input taken is, or one
+		a second or more older, the client's clock set back; the subtraction
+		kept from overflowing, as the tick is the client's word) */
 		{
-			distributed_divergence.input_time[input->player_index] = input->tick;
+			long newest = distributed_divergence.input_time[input->player_index];
+
+			if (newest == NONE || input->tick > newest ||
+				(newest >= LONG_MIN + TICKS_PER_SECOND && input->tick < newest - TICKS_PER_SECOND))
+			{
+				distributed_divergence.input_time[input->player_index] = input->tick;
+			}
 		}
 		if (input->host_time != NONE && (host_time == NONE || input->host_time > host_time))
 			host_time = input->host_time;
@@ -3442,6 +3450,14 @@ void network_distributed_new_game(
 	distributed_host_time = NONE;
 	distributed_statistics_due = FALSE;
 	distributed_pickup_count = 0;
+	/* (the tests' drift figures: none taken, no input had, of this game) */
+	csmemset(&distributed_divergence, 0, sizeof(distributed_divergence));
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+	{
+		distributed_divergence.taken_time[player_index] = NONE;
+		distributed_divergence.taken_host_time[player_index] = NONE;
+		distributed_divergence.input_time[player_index] = NONE;
+	}
 	/* (each player's latest input: player_queues_new.c) */
 	update_queues_distributed_reset();
 	network_objects_new_game();
