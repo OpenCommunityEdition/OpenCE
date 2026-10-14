@@ -311,6 +311,12 @@ static const struct config_setting config_settings[] =
 	{ "display.first_person_legs", _config_boolean, "false", "HALO_FIRST_PERSON_LEGS", _environment_value, _platform_all,
 		"Your own legs in first person, seen looking down: your body as others\n"
 		"see it, drawn from the waist down, moving as it moves." },
+	{ "display.overshield_effect", _config_boolean, "false", "HALO_OVERSHIELD_EFFECT", _environment_value, _platform_all,
+		"The overshield as this machine draws it: its flare rising up the body as\n"
+		"it charges (2 seconds, 3 from a shield that was down) and staying lit,\n"
+		"its energy slower, in its own color (the powerup's), on the first-person\n"
+		"arms too with viewmodel_shield; a hit on it plays what the projectile\n"
+		"plays on an Elite's shield. Only what is drawn and heard changes." },
 	{ "display.shield_glow", _config_boolean, "false", "HALO_SHIELD_GLOW", _environment_value, _platform_all,
 		"Energy shields light what is around them as they flare, as plasma\n"
 		"does, in the shield's own color." },

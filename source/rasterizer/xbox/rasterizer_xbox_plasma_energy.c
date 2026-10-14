@@ -142,6 +142,11 @@ void rasterizer_set_pixel_shader(
 /* port: port/linux/game/shield_color.c */
 boolean shield_color_override(real_rgb_color const *colors, real_rgb_color *chosen);
 void shield_color_apply(real_rgb_color const *chosen, real_rgb_color const *original, real_rgb_color *result);
+/* port: port/linux/game/overshield_effect.c */
+boolean overshield_effect_draw(real const *values, real *energy_speed, real *inverse_softness, real *height);
+boolean overshield_effect_color(real const *values, real_rgb_color *color);
+/* port: port/linux/src/d3d8_gl.c */
+void d3d8_gl_set_height_fade(float inverse_softness, float height, float offset, float scale);
 
 /* ---------- globals */
 
@@ -172,6 +177,10 @@ void rasterizer_plasma_energy_draw(
 	real_rgb_color perpendicular_color; /* port: (shield_color.c) */
 	real_rgb_color parallel_color;
 	real_rgb_color chosen;
+	real energy_speed; /* port: (overshield_effect.c) */
+	real fade_inverse_softness;
+	real fade_height;
+	boolean overshield;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_plasma_energy.c",
@@ -220,7 +229,8 @@ void rasterizer_plasma_energy_draw(
 		(port/linux/game/shield_color.c) */
 		perpendicular_color = plasma->perpendicular_color;
 		parallel_color = plasma->parallel_color;
-		if (shield_color_override(runtime ? runtime->colors : NULL, &chosen))
+		if ((runtime && overshield_effect_color(runtime->exponents, &chosen)) ||
+			shield_color_override(runtime ? runtime->colors : NULL, &chosen))
 		{
 			shield_color_apply(&chosen, &plasma->perpendicular_color, &perpendicular_color);
 			shield_color_apply(&chosen, &plasma->parallel_color, &parallel_color);
@@ -274,7 +284,14 @@ void rasterizer_plasma_energy_draw(
 			/* Preserve January's immediate integer zero store without adding a
 			 * third __real@00000000 relocation. */
 			*(long *)&offset = 0;
-		primary_time = global_frame_parameters.game_time_sec / plasma->primary_noise_map_animation_period;
+		/* port: an overshield's energy slower, and its rise
+		(port/linux/game/overshield_effect.c) */
+		energy_speed = 1.0f;
+		fade_inverse_softness = 0.0f;
+		fade_height = 0.0f;
+		overshield = runtime && overshield_effect_draw(runtime->exponents, &energy_speed, &fade_inverse_softness,
+			&fade_height);
+		primary_time = global_frame_parameters.game_time_sec * energy_speed / plasma->primary_noise_map_animation_period;
 		vertex_constants[0][1] = 0.0f;
 		vertex_constants[0][2] = offset;
 		vertex_constants[1][0] = 0.0f;
@@ -292,7 +309,7 @@ void rasterizer_plasma_energy_draw(
 		color_constants[0][2] = 1.0f;
 		color_constants[0][3] = 1.0f;
 
-		secondary_time = global_frame_parameters.game_time_sec / plasma->secondary_noise_map_animation_period;
+		secondary_time = global_frame_parameters.game_time_sec * energy_speed / plasma->secondary_noise_map_animation_period;
 		primary_scale = plasma->primary_noise_map_scale;
 		secondary_scale = plasma->secondary_noise_map_scale;
 		vertex_constants[0][0] = primary_scale;
@@ -341,9 +358,16 @@ void rasterizer_plasma_energy_draw(
 		pixel_shader.final_combiner_inputs_abcd = 0x0C0F0000;
 		pixel_shader.final_combiner_inputs_efg = 0x1C1C1400;
 		rasterizer_set_pixel_shader(&pixel_shader);
+		/* port: the overshield risen this far up its model, its height the
+		noise coordinate's (vertex_constants[2]: scale times the model's z
+		plus the animation's offset) */
+		if (overshield && fade_inverse_softness > 0.0f && primary_scale != 0.0f)
+			d3d8_gl_set_height_fade(fade_inverse_softness, fade_height, vertex_constants[2][3], primary_scale);
 		rasterizer_transparent_geometry_group_draw__internal(
 			(struct transparent_geometry_group const *)group,
 			FALSE);
+		if (overshield)
+			d3d8_gl_set_height_fade(0.0f, 0.0f, 0.0f, 0.0f);
 	}
 	return;
 }

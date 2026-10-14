@@ -377,6 +377,8 @@ boolean first_person_legs_wanted(long object_index);
 real_matrix4x3 const *first_person_legs_node_matrices(long object_index, real_matrix4x3 const *nodes);
 /* port: port/linux/game/shield_color.c */
 real_rgb_color const *shield_color_colors(long unit_index, real_rgb_color const *colors);
+/* port: port/linux/game/overshield_effect.c */
+real const *overshield_effect_values(long unit_index, real const *values, boolean arms);
 
 void render_object_shadows(
 	void)
@@ -540,8 +542,12 @@ static void render_object_list(
 								TEST_FLAG(_object_mask_unit, object->object.type) ?
 									shield_color_colors(object_index, object->object.outgoing_change_colors) :
 									object->object.outgoing_change_colors;
+							/* port: an overshield as it rises and lasts
+							(port/linux/game/overshield_effect.c) */
 							model_effect.modifier_animation.values =
-								object->object.outgoing_function_values;
+								TEST_FLAG(_object_mask_unit, object->object.type) ?
+									overshield_effect_values(object_index, object->object.outgoing_function_values, FALSE) :
+									object->object.outgoing_function_values;
 						}
 						else
 						{
