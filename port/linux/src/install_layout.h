@@ -25,20 +25,24 @@ const char *install_folder(void);
 int install_is_tree(void);
 
 /* 1 when a package manager installed the game, or the player cannot write
-to its folder (/usr, /opt): the player's files go to their XDG folders, and
-the game does not update itself; 0 for a portable game */
+to its folder (/usr, /opt, a read-only disk): the game does not update
+itself, and the player's files go to their XDG folders (those the game's
+folder lacks, when it is read-only and not packaged; none without a home
+folder); 0 for a portable game */
 int install_is_system(void);
 
 /* why install_is_system() is 1, for the log: "" when it is 0 */
 const char *install_system_reason(void);
 
 /* the folder of config.toml, with a separator at its end (made if it is
-missing): the game's folder, or $XDG_CONFIG_HOME/halo-linux */
+missing): the game's folder (an installed game's when it is read-only,
+not packaged and has config.toml), or $XDG_CONFIG_HOME/halo-linux */
 const char *install_config_folder(void);
 
 /* where the game data (maps/) is copied and looked for when no other place
-has it: the game's folder, or $XDG_DATA_HOME/halo-linux; without a
-separator at its end */
+has it: the game's folder (an installed game's when it is read-only, not
+packaged and has maps/), or $XDG_DATA_HOME/halo-linux; without a separator
+at its end */
 const char *install_data_folder(void);
 
 /* the path of a read-only file the release brings (brokers.txt):

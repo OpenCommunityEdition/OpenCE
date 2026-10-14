@@ -20,13 +20,19 @@ tree's root, or the executable's folder.
 A portable game (a release unpacked in the player's folders, or a build)
 keeps the player's files in the game's folder, as the flat releases did:
 config.toml, the maps/ copied from a disc image (and so debug.txt), and the
-self-updater's work. An installed game keeps them in the player's XDG
-folders: config.toml in $XDG_CONFIG_HOME/halo-linux (~/.config/halo-linux)
-and the game data in $XDG_DATA_HOME/halo-linux (~/.local/share/halo-linux,
-the save root's folder, xbox_files.c); and it does not update itself
-(updater.c). A game is installed when its tree has share/opence/packaged,
-which a package adds, or when the player cannot write to the game's folder
-(/usr, /opt).
+self-updater's work. An installed game does not update itself (updater.c)
+and keeps the player's files in their XDG folders: config.toml in
+$XDG_CONFIG_HOME/halo-linux (~/.config/halo-linux) and the game data in
+$XDG_DATA_HOME/halo-linux (~/.local/share/halo-linux, the save root's
+folder, xbox_files.c). A game is installed when its tree has
+share/opence/packaged, which a package adds, or when the player cannot
+write to the game's folder (/usr, /opt, a portable copy on a read-only
+disk). A read-only folder's own config.toml and maps/ are still read where
+they are (a portable copy on a read-only USB stick, /opt/halo with the maps
+an administrator put there): only what the folder lacks goes to the XDG
+folders. Without a home folder (no XDG_CONFIG_HOME, XDG_DATA_HOME or HOME)
+the files stay in the game's folder, whatever it allows, and an installed
+game still does not update itself.
 
 Only the C library is called (no logging: the log's place depends on
 this), so the Linux builds that run the game as a guest can compile it
@@ -37,10 +43,12 @@ into their host too.
 
 #if !defined(_WIN32) && !defined(HALO_ANDROID) && !defined(HALO_WEB)
 
+#include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 
 /* (the C library's: the game's <sys/stat.h> is MSVC's,
@@ -55,6 +63,7 @@ static int install_found;
 static char install_executable_folder[INSTALL_PATH_SIZE];
 static char install_root[INSTALL_PATH_SIZE];
 static int install_tree;
+static int install_packaged;
 static const char *install_reason = "";
 static char install_config[INSTALL_PATH_SIZE];
 static char install_data[INSTALL_PATH_SIZE];
@@ -86,6 +95,22 @@ static void install_make_folders(const char *path)
 	mkdir(partial, 0755);
 }
 
+/* whether folder holds name, matched without case (the data root's maps/
+is: xbox_files.c) */
+static int install_has_entry(const char *folder, const char *name)
+{
+	DIR *directory = opendir(folder[0] ? folder : "/");
+	struct dirent *entry;
+	int found = 0;
+
+	if (!directory)
+		return 0;
+	while (!found && (entry = readdir(directory)) != NULL)
+		found = !strcasecmp(entry->d_name, name);
+	closedir(directory);
+	return found;
+}
+
 /* $<variable>/halo-linux, or $HOME/<fallback>/halo-linux (the XDG base
 directories, which must be absolute); 0 without either */
 static int install_xdg_folder(const char *variable, const char *fallback, char *path, size_t size)
@@ -108,6 +133,9 @@ static void install_find(void)
 {
 	char executable[INSTALL_PATH_SIZE];
 	char marker[INSTALL_PATH_SIZE + 32];
+	char config[INSTALL_PATH_SIZE];
+	char data[INSTALL_PATH_SIZE];
+	char config_toml[INSTALL_PATH_SIZE + 16];
 	ssize_t length = readlink("/proc/self/exe", executable, sizeof(executable) - 1);
 	char *slash;
 
@@ -145,27 +173,39 @@ static void install_find(void)
 		snprintf(marker, sizeof(marker), "%s/share/" INSTALL_NAME "/packaged",
 			strcmp(install_root, "/") ? install_root : "");
 		if (install_exists(marker))
+		{
+			install_packaged = 1;
 			install_reason = "share/" INSTALL_NAME "/packaged";
+		}
 	}
 	if (!install_reason[0] && install_root[0] && access(install_root, W_OK) != 0)
 		install_reason = "its folder is read-only";
 
-	if (install_reason[0] && install_xdg_folder("XDG_CONFIG_HOME", ".config", install_config, sizeof(install_config)) &&
-		install_xdg_folder("XDG_DATA_HOME", ".local/share", install_data, sizeof(install_data)))
-	{
-		install_make_folders(install_config);
-		install_make_folders(install_data);
-		snprintf(install_config + strlen(install_config), sizeof(install_config) - strlen(install_config), "/");
-		return;
-	}
-	if (install_reason[0])
-	{
-		/* (no home folder: the game's folder, whatever it allows) */
-		install_reason = "";
-	}
+	/* the game's folder: everything of a portable game's, and what a
+	read-only one has */
 	snprintf(install_data, sizeof(install_data), "%s", install_root);
 	snprintf(install_config, sizeof(install_config), "%s%s", install_root,
 		install_root[0] && strcmp(install_root, "/") ? "/" : "");
+	if (!install_reason[0] ||
+		!install_xdg_folder("XDG_CONFIG_HOME", ".config", config, sizeof(config)) ||
+		!install_xdg_folder("XDG_DATA_HOME", ".local/share", data, sizeof(data)))
+	{
+		/* (a portable game; or an installed one without a home folder,
+		whose files stay in the game's folder, whatever it allows:
+		install_reason stays, so it does not update itself) */
+		return;
+	}
+	snprintf(config_toml, sizeof(config_toml), "%sconfig.toml", install_config);
+	if (install_packaged || !install_root[0] || !install_exists(config_toml))
+	{
+		install_make_folders(config);
+		snprintf(install_config, sizeof(install_config), "%s/", config);
+	}
+	if (install_packaged || !install_root[0] || !install_has_entry(install_root, "maps"))
+	{
+		install_make_folders(data);
+		snprintf(install_data, sizeof(install_data), "%s", data);
+	}
 }
 
 /* (found on the first question, which config.toml's loading asks on the

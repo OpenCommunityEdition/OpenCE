@@ -110,7 +110,8 @@ sequence:
 2. The current folder.
 3. The game's folder: the folder of the release (above `bin/`), or the
    folder of the executable (`build/linux/halo`). For an installed game
-   (refer to "Packaging"), `~/.local/share/halo-linux`.
+   (refer to "Packaging"), `~/.local/share/halo-linux`, unless the game's
+   folder is read-only and has `maps/`.
 4. `assets/` in the current folder, and `assets/` in the repository that
    contains the executable.
 
@@ -524,6 +525,14 @@ adds that file (it can be empty) so that the game is installed also when its
 folder can be written to: when root starts it, or in a folder that the
 player owns. Otherwise the game is portable: it keeps its files in its
 folder and updates itself, as an unpacked release does.
+
+A read-only folder without `share/opence/packaged` (a portable copy on a
+read-only disk, or `/opt/halo` with maps that an administrator put there)
+keeps the `config.toml` and `maps/` it has: the game reads them there, and
+puts in the player's folders only what the folder does not have. Without a
+home folder (no `XDG_CONFIG_HOME`, `XDG_DATA_HOME` or `HOME`), an installed
+game keeps its files in its folder, as far as it can be written to, and
+still does not update itself.
 
 To make a package from the sources, build as the releases do, and lay out
 the build as the release's tree:
