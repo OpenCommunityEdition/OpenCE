@@ -30,6 +30,7 @@ from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_
                           miniupnpc_sources, musl_math_sources, opus_cflags, opus_sources, pgo_mode, pgo_profile,
                           profile_use_flags, updater_defines, xdk_headers)
 from .embed_assets import hud_assets_build, hud_configure_inputs
+from .linux_sysroot import download
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/android")
@@ -55,6 +56,7 @@ ZLIB_DEFINES = ("-DZ_PREFIX", "-Dz_errmsg=z_port_errmsg")
 MUSL_VERSION = "1.2.5"
 MUSL_DIR = THIRD_PARTY / f"musl-{MUSL_VERSION}"
 MUSL_URL = f"https://musl.libc.org/releases/musl-{MUSL_VERSION}.tar.gz"
+MUSL_SHA256 = "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4"
 # (as tools/windows_build.py's and tools/linux_sysroot.py's SDL_VERSION)
 SDL_TAG = "release-3.4.16"
 SDL_DIR = THIRD_PARTY / "SDL3"
@@ -181,15 +183,24 @@ def _find_ndk() -> Optional[Path]:
 
 
 def fetch_third_party(third_party: Path = THIRD_PARTY) -> None:
-    """Download musl and SDL3 (configure time, once)."""
+    """Download musl and SDL3 (configure time, once). musl's archive is
+    checked against MUSL_SHA256 before it is unpacked; a failed download
+    raises RuntimeError, and a failed clone CalledProcessError."""
     musl_dir = third_party / f"musl-{MUSL_VERSION}"
     sdl_dir = third_party / "SDL3"
     third_party.mkdir(parents=True, exist_ok=True)
     if not musl_dir.is_dir():
         print(f"Downloading {MUSL_URL}")
         archive = third_party / f"musl-{MUSL_VERSION}.tar.gz"
-        subprocess.run(["curl", "-sSfL", "-o", str(archive), MUSL_URL], check=True)
-        subprocess.run(["tar", "xzf", archive.name], cwd=third_party, check=True)
+        archive.write_bytes(download([MUSL_URL], MUSL_SHA256))
+        # (unpacked beside it and then moved, so that an interrupted unpacking
+        # leaves no folder that a later configure would take as complete)
+        unpacked = third_party / f"musl-{MUSL_VERSION}.unpacked"
+        shutil.rmtree(unpacked, ignore_errors=True)
+        unpacked.mkdir()
+        subprocess.run(["tar", "xzf", str(archive.resolve())], cwd=unpacked, check=True)
+        (unpacked / musl_dir.name).rename(musl_dir)
+        unpacked.rmdir()
         archive.unlink()
     if not sdl_dir.is_dir():
         print(f"Cloning SDL3 {SDL_TAG}")
@@ -536,7 +547,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         return
     try:
         fetch_third_party()
-    except (subprocess.CalledProcessError, OSError) as error:
+    except (subprocess.CalledProcessError, OSError, RuntimeError) as error:
         print(f"Android build disabled: cannot fetch musl/SDL3 ({error})", file=sys.stderr)
         return
     import json

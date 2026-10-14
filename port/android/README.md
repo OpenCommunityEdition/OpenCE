@@ -29,8 +29,8 @@ ninja) and these items:
   The option `--android-ndk` selects a different NDK.
 - CMake, and a JDK 17 or later for Gradle.
 - A network connection for the first build. `configure.py` downloads musl
-  1.2.5 and SDL 3.4.16 to `build/android/third_party`. Gradle downloads the
-  Android Gradle Plugin.
+  1.2.5 (checked against its SHA-256) and SDL 3.4.16 to
+  `build/android/third_party`. Gradle downloads the Android Gradle Plugin.
 
 On Windows, build in WSL2 (Ubuntu 24.04). The Android build does not run
 on Windows itself. Enter

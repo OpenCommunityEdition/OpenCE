@@ -1068,7 +1068,8 @@ machines can play in the same game.
   sound. Refer to the SDL documentation, or to the `linux-arm64` job in
   `.github/workflows/build.yml`.
 - A network connection for the first build. `configure.py` downloads musl
-  1.2.5 and SDL 3.4.16 to `build/linux_arm64/third_party`.
+  1.2.5 (checked against its SHA-256) and SDL 3.4.16 to
+  `build/linux_arm64/third_party`.
 
 To start the game: OpenGL ES 3 (`libGLESv2.so.2`, `libEGL.so.1`, from Mesa
 for example). The release builds of GitHub Actions use glibc 2.35 or later.

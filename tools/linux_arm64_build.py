@@ -64,7 +64,7 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
         return
     try:
         fetch_third_party(THIRD_PARTY)
-    except (subprocess.CalledProcessError, OSError) as error:
+    except (subprocess.CalledProcessError, OSError, RuntimeError) as error:
         print(f"Linux arm64 build disabled: cannot fetch musl/SDL3 ({error})", file=sys.stderr)
         return
     config: Dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))

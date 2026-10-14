@@ -145,7 +145,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: build/linux_arm64/third_party
-          key: linux-arm64-third-party-${{ hashFiles('tools/android_build.py') }}
+          key: linux-arm64-third-party-${{ hashFiles('tools/android_build.py', 'port/android/patches/**') }}
 
       - name: Debug
         run: python3 tools/ci_build.py linux_arm64 debug
