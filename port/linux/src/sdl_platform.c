@@ -827,8 +827,8 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 #ifndef HALO_ANDROID
 	/* the game's icon, which the desktop shows for the window (on Windows
 	also halo.exe's own, port/windows/halo.rc; a web page has its own; not
-	the arm64 guest's, which reaches no SDL surfaces) */
-#if !defined(HALO_GLES) && !defined(HALO_ARM64_GUEST)
+	a guest's, which reaches no SDL surfaces) */
+#if !defined(HALO_GLES) && !defined(HALO_GUEST)
 	if (platform_window_icon_size)
 	{
 		SDL_Surface *icon = SDL_LoadPNG_IO(SDL_IOFromConstMem(platform_window_icon, platform_window_icon_size), true);
@@ -1620,7 +1620,7 @@ void platform_pump_events(void)
 			break;
 #endif
 		case SDL_EVENT_GAMEPAD_ADDED:
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 			/* (the guest reaches SDL only through host_imports.list, which
 			has no SDL_GetGamepadName) */
 			SDL_OpenGamepad(event.gdevice.which);

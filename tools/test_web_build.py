@@ -111,7 +111,7 @@ def test_the_link_makes_the_memory_the_window_needs():
 def test_the_memory_layout_agrees_with_the_sources():
     platform = (ROOT / "port/linux/src/platform.h").read_text()
     base = int(re.search(r"#define PLATFORM_CONTIGUOUS_BASE (0x[0-9A-Fa-f]+)", platform).group(1), 16)
-    sizes = re.search(r"#if defined\(HALO_ARM64_GUEST\) \|\| defined\(HALO_WEB\).*?#define PLATFORM_CONTIGUOUS_SIZE "
+    sizes = re.search(r"#if defined\(HALO_GUEST\) \|\| defined\(HALO_WEB\).*?#define PLATFORM_CONTIGUOUS_SIZE "
                       r"(0x[0-9A-Fa-f]+)", platform, re.S)
     assert sizes, "platform.h gives the web build the 128 MB window"
     assert web_build.WEB_MEMORY_BYTES == base + int(sizes.group(1), 16)

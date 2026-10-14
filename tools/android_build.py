@@ -173,8 +173,11 @@ def _find_ndk() -> Optional[Path]:
 
 def guest_abi_flags(arch: GuestArch, platform_defines: List[str]) -> List[str]:
     """the guest's code generation and defines: the architecture's, every
-    guest's, and the platform's (ANDROID_DEFINES, or a desktop's)"""
-    return [*arch.target_flags, *GUEST_FLAGS, *arch.defines, *platform_defines]
+    guest's (HALO_GUEST, and HALO_GUEST_MACHO where clang writes Mach-O,
+    port/linux/include/halo_linux_prefix.h), and the platform's
+    (ANDROID_DEFINES, or a desktop's)"""
+    guest_defines = ["-DHALO_GUEST=1", *(["-DHALO_GUEST_MACHO=1"] if arch.darwin_assembly else [])]
+    return [*arch.target_flags, *GUEST_FLAGS, *guest_defines, *arch.defines, *platform_defines]
 
 
 def fetch_third_party(third_party: Path = THIRD_PARTY) -> None:

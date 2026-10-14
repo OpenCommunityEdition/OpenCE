@@ -441,23 +441,29 @@ floating-point contraction, as on x86.
 
 ### Game source changes
 
-The port's code tells three things apart, each its own macro, which the
+The port's code tells these things apart, each its own macro, which the
 Android build defines all of (`tools/android_build.py`):
 
-- `HALO_ARM64_GUEST`: the guest's ABI (ILP32 AArch64 code in a 64-bit
-  process);
+- `HALO_GUEST`: the game is an ILP32 guest in a 64-bit process (its
+  memory, its host imports, the SDL it reaches). The instruction set is the
+  compiler's own macro, `__aarch64__`;
+- `HALO_GUEST_MACHO`: the guest is compiled for clang's Darwin target
+  (`arm64_32`), whose Mach-O objects are converted afterwards;
 - `HALO_GLES`: the OpenGL ES renderer;
 - `HALO_ANDROID`: the app (its display, input, files and lifecycle).
 
+`HALO_ARM64_GUEST`, the name of `HALO_GUEST` before, is still defined:
+`HALO_GUEST` on AArch64.
+
 The x86 inline assembly is replaced by C (refer to
 [port/linux/README.md](../linux/README.md#game-source-changes)).
-These changes are in `#ifdef HALO_ARM64_GUEST`, which the Linux arm64 build
-shares:
+These changes, which the Linux arm64 build shares, are:
 
-- Seven `#pragma bss_seg(".bss")` lines are removed. The Darwin target does
-  not accept them.
-- A stack walker follows the AArch64 frame records. Thus the log of an
-  assertion (`debug.txt`) shows the call sites.
+- Seven `#pragma bss_seg(".bss")` lines are removed (`#ifndef
+  HALO_GUEST_MACHO`). The Darwin target does not accept them.
+- A stack walker follows the 64-bit frame records (`__aarch64__`, and
+  `__x86_64__`'s, which are alike). Thus the log of an assertion
+  (`debug.txt`) shows the call sites.
 
 The musl of the guest uses its C math, not the AArch64 assembly. The only
 assembly of the port is necessary:

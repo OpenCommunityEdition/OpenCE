@@ -25,7 +25,10 @@ class GuestArch:
     # clang's target and code generation for this guest, and what hides the
     # target's own platform from the sources
     target_flags: Tuple[str, ...]
-    # the defines that select this architecture's code paths in the sources
+    # the defines that select this architecture's code paths in the sources,
+    # beside every guest's HALO_GUEST (tools/android_build.py's
+    # guest_abi_flags; the instruction set is mostly told by the compiler's
+    # own __aarch64__ or __x86_64__)
     defines: Tuple[str, ...]
     # true when clang emits Mach-O assembly for this target, which
     # tools/android_asm_convert.py turns into ELF assembly before it is
@@ -82,6 +85,7 @@ ARM64_32 = GuestArch(
         "-mllvm",
         "-aarch64-neon-syntax=generic",
     ),
+    # (HALO_GUEST on AArch64, by its name before HALO_GUEST)
     defines=("-DHALO_ARM64_GUEST=1",),
     darwin_assembly=True,
     elf_arch="aarch64",

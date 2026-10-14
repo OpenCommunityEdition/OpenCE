@@ -474,15 +474,15 @@ static void render_targets_evict(void);
 
 /* ---------- the device */
 
-#if defined(HALO_GLES) || defined(HALO_ARM64_GUEST)
+#if defined(HALO_GLES) || defined(HALO_GUEST)
 /* Mobile drivers (Mali) keep every orphaned copy of a buffer until the GPU
 is done with it, so a large buffer orphaned each frame costs its size per
 frame in flight and more. Instead each frame streams into the next of a few
 smaller buffers, reusing one only once the GPU has finished the frame that
 last used it (host_gl_wait_frame). A busy frame streams about 5 MB of
-vertices. The Linux arm64 build's desktop renderer streams so too: on Zink
-(Turnip), as on Mali, a glBufferSubData for each draw costs much more than
-the unsynchronized write the ring allows (host_gl_buffer_write). */
+vertices. A Linux guest's desktop renderer streams so too: on Zink (Turnip),
+as on Mali, a glBufferSubData for each draw costs much more than the
+unsynchronized write the ring allows (host_gl_buffer_write). */
 #define XGPU_STREAM_RING
 #define STREAM_BUFFER_SIZE (16 * 1024 * 1024)
 #define INDEX_BUFFER_SIZE (2 * 1024 * 1024)
@@ -615,7 +615,7 @@ struct gl_device
 		unsigned long count;
 	} visibility_batches[2];
 	unsigned long visibility_batch;
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 	GLuint visibility_results_copy[VISIBILITY_TEST_SLOTS];
 #endif
 	/* a pipeline flush every flush_every draws (draw_flush), 0 never */
@@ -1707,7 +1707,7 @@ static void gl_initialize(void)
 	glBindBuffer(GL_QUERY_BUFFER, device.visibility_results_buffer);
 	glBufferStorage(GL_QUERY_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL,
 		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 	/* the mapping would be a host address: the host keeps it and copies the
 	results into guest memory after each frame (D3DDevice_Present) */
 	if (host_gl_map_results(device.visibility_results_buffer, VISIBILITY_TEST_SLOTS * sizeof(GLuint)))
@@ -5671,9 +5671,9 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 
 /* ---------- presentation */
 
-#if !defined(HALO_GLES) && !defined(HALO_ARM64_GUEST)
-/* the screenshot key's PNG (controls.screenshot; the Android guest has none
-of the SDL calls it takes) */
+#if !defined(HALO_GLES) && !defined(HALO_GUEST)
+/* the screenshot key's PNG (controls.screenshot; a guest has none of the
+SDL calls it takes) */
 static void write_key_screenshot(struct render_target_entry *target)
 {
 	char directory[512], path[640], timestamp[32], filename[64];
@@ -5898,7 +5898,7 @@ static void frame_end_buffers(void)
 	device.stream_offset = STREAM_BUFFER_SIZE; /* orphan next frame */
 	device.index_offset = INDEX_BUFFER_SIZE;
 #endif
-#if defined(HALO_ARM64_GUEST) && !defined(HALO_GLES)
+#if defined(HALO_GUEST) && !defined(HALO_GLES)
 	if (device.visibility_results)
 		host_gl_read_results(device.visibility_results_copy, sizeof(device.visibility_results_copy));
 #endif
@@ -5930,7 +5930,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 #endif
 		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
 			write_screenshot(back_buffer);
-#if !defined(HALO_GLES) && !defined(HALO_ARM64_GUEST)
+#if !defined(HALO_GLES) && !defined(HALO_GUEST)
 		if (platform_screenshot_take_request())
 			write_key_screenshot(back_buffer);
 #endif

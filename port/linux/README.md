@@ -1090,8 +1090,9 @@ port operates" in [port/android/README.md](../android/README.md#how-the-port-ope
   (`generate_guest_image` in `tools/android_build.py`, for the architecture
   `ARM64_32` of `tools/guest_arch.py`), with the desktop code paths of the
   platform layer. `tools/linux_guest_build.py` builds it and the host; each
-  of its builds (`LINUX_GUESTS`) is for one architecture. The guest code has `HALO_ARM64_GUEST`
-  and `HALO_GLES`, not `HALO_ANDROID`.
+  of its builds (`LINUX_GUESTS`) is for one architecture. The guest code has
+  `HALO_GUEST` (and `HALO_ARM64_GUEST`, `HALO_GUEST_MACHO`) and `HALO_GLES`,
+  not `HALO_ANDROID`.
 - The host is the Android host (`port/android/host`) as a Linux executable.
   `arm64/host_main.c` replaces its `host_main.c`. The executable contains
   the guest image (`arm64/guest_image.S`). The guest gets the variables of
@@ -1252,8 +1253,8 @@ can optimize that code for each processor:
 | `bink/bink_playback.c` | `int 3` | `__builtin_trap` |
 
 The x87 control and status words (`_control87`, `_statusfp`, `_clearfp` in
-`src/msvc_crt.c`) use `fenv.h`. On Android, they use the FPCR and FPSR. In
-the web build, the control word is only remembered.
+`src/msvc_crt.c`) use `fenv.h`. On AArch64 (Android, Linux arm64), they use
+the FPCR and FPSR. In the web build, the control word is only remembered.
 
 The web build's changes (`HALO_WEB`: the main loop runs one iteration for
 each of the browser's frames, the cache thread starts at a function of
