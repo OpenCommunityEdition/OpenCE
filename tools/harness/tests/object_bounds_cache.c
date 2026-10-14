@@ -90,7 +90,7 @@ static void record(struct collision_feature_list *features, int type, long objec
 	features->count[type]++;
 	feature_total++;
 }
-struct collision_model_instance { long object_index; };
+struct collision_model_instance { long object_index; void const *model; int matrices[1]; };
 struct physics_instance { long object_index; };
 #define collision_features_new(features) memset(features, 0, sizeof(*(features)))
 #define collision_features_from_point(point, height, width, object_index, a, b, c, d, features) \
@@ -103,6 +103,45 @@ struct physics_instance { long object_index; };
 	record(features, _collision_feature_prism, (instance)->object_index, radius, (height) + (width))
 #define biped_get_physics_pill(object_index, base, height, width) \
 	(*(base) = object_get(object_index)->object.bounding_sphere_center, *(height) = 0.4f, *(width) = 0.2f)
+
+/* collision_test_vector's object test (object_test_vector): an object is hit
+wherever its bounding sphere is met, at a t of its own */
+typedef struct { real_vector3d n; real d; } real_plane3d;
+struct collision_result
+{
+	short type;
+	real t;
+	real_plane3d plane;
+	short material_type;
+	long object_index;
+	short region_index, node_index, bsp_index;
+	long surface_index, plane_designator;
+	byte flags, breakable_surface_index;
+	short material_index;
+};
+struct physics_test_vector_result { real t; real_plane3d plane; };
+struct collision_model_test_vector_result
+{
+	struct
+	{
+		real t;
+		real_plane3d const *plane;
+		long surface_index, plane_designator;
+		byte flags, breakable_surface_index;
+		short material_index;
+	} bsp_result;
+	short region_index, node_index, bsp_index;
+};
+static real_plane3d const hit_plane = { { 0.0f, 0.0f, 1.0f }, 0.0f };
+#define object_hit_t(object_index) (0.001f * (real)(DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index) + 1))
+#define physics_test_vector(instance, point, vector, result) \
+	((result)->t = object_hit_t((instance)->object_index), (result)->plane = hit_plane, TRUE)
+#define collision_model_test_vector(instance, bsp_flags, point, vector, result) \
+	(memset(result, 0, sizeof(*(result))), (result)->bsp_result.t = object_hit_t((instance)->object_index), \
+		(result)->bsp_result.plane = &hit_plane, TRUE)
+#define matrix4x3_transform_plane(matrix, plane, result) (*(result) = *(plane))
+#define plane3d_negate(plane, result) (*(result) = *(plane))
+#define collision_model_get_material_type(model, material_index) 0
 
 /* not under test: the structure's own features, collision's statistics */
 #define collision_bsp_get_features_in_sphere(...) ((void)0)
@@ -320,6 +359,37 @@ int main(int argc, char **argv)
 		printf("%lu objects read without the cache, %lu with\n", without, object_reads);
 		CHECK(object_reads * 2 < without, "%lu objects read with the cache, %lu without: the far ones are read",
 			object_reads, without);
+		return 0;
+	}
+	/* collision_test_vector passes over the objects the cache says a vector
+	misses: object_test_vector must find nothing in them, children and all */
+	CASE("vector-misses")
+	{
+		long query, index, missed = 0;
+
+		tell_cache();
+		for (query = 0; query < QUERIES; query++)
+		{
+			real_vector3d vector;
+
+			vector.i = random_real(-8.0f, 8.0f);
+			vector.j = random_real(-8.0f, 8.0f);
+			vector.k = random_real(-1.0f, 1.0f);
+			for (index = 0; index < OBJECTS; index++)
+			{
+				struct collision_result collision;
+
+				if (objects[index].object.parent_object_index != NONE ||
+					!object_bounds_cache_missed_by_vector(OBJECT_INDEX(index), &queries[query].point, &vector))
+					continue;
+				missed++;
+				collision.t = 1.0f;
+				CHECK(!object_test_vector(OBJECT_INDEX(index), queries[query].flags | _collision_test_objects_all_types_flags,
+					0, &queries[query].point, &vector, NONE, &collision),
+					"query %ld hits object %ld, which the cache says the vector misses", query, index);
+			}
+		}
+		CHECK(missed > (long)QUERIES * OBJECTS / 2, "the cache says only %ld vectors miss: too few to compare", missed);
 		return 0;
 	}
 	/* not a check: how long the queries take without and with the cache */
