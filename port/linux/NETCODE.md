@@ -197,7 +197,11 @@ a map it lacks, and the game's players reach each other to send it; version
 28 holds the players of a machine still downloading the map out of the game
 until it has the map, keeps a multiplayer map's first scripted BSP, leaves
 dynamic lights and the flashlight on past the Xbox game's player and vehicle
-limits, and readies a second weapon picked up while firing.
+limits, and readies a second weapon picked up while firing; version 29 names
+a Custom Edition map by its own name (`custom_maps\hugeass`, which every
+screen shows) and says which version it is by the map version of the game
+record, its hash's first 32 bits (the header checksum before), which a
+client finds its file by (below, "Map sharing").
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -339,21 +343,25 @@ a pregame keep-alive every five seconds from the host
 ## Map sharing
 
 A client may join a game on a Custom Edition map it does not have
-(`port/linux/game/map_share.c`, `map_share_files.c`). Every map in the
-custom_maps folder is named for its contents: once the map lists (or a host
-picking it) find it, `hugeass.map` is renamed `hugeass_<8 hex digits>.map`,
-the first digits of its hash, with its picture and description, so a game's
-level name (`custom_maps\hugeass_0e2b3ee4`) says which version of the map it
-is, and two versions never meet. A file's hash is BLAKE2b's (32 bytes) of a
-label, its size and the BLAKE2b hashes of its pieces (256 KiB each). The
-menus show a map without its hash, unless two versions are listed.
+(`port/linux/game/map_share.c`, `map_share_files.c`). A game's level name is
+the map's own (`custom_maps\hugeass`), which every screen and the server
+browser show, and the game record's map version is the first 32 bits of the
+map's hash (`map_share_hash_version`), which says which version of the map it
+is: a client plays its file of that name and version, so two versions never
+meet. A file's hash is BLAKE2b's (32 bytes) of a label, its size and the
+BLAKE2b hashes of its pieces (256 KiB each); a map is hashed when it is
+needed (a host's game is put on it, a client's settings name its name) and
+kept for the run. No map is renamed. A map downloaded beside another version
+of its name is named for its hash (`hugeass_0e2b3ee4.map`), and the menus
+show it as `Hugeass (2)`; a map an earlier build named so, with no map of
+its name alone beside it, has its name given back as the map lists find it.
 
-- **Asking.** A client whose settings name a map it lacks
-  (`cache_files_map_present`), or one whose resource maps it lacks, asks the
-  host over its connection (`_distributed_message_map_share_request`: the
-  level, and which of the map, bitmaps.map, sounds.map and loc.map it
-  lacks) instead of leaving, if `network.map_download` lets it; the map must
-  be named for its hash. Its players wait to join until the host's settings
+- **Asking.** A client whose settings name a map it lacks, or lacks of
+  their version (`cache_files_map_present`), or one whose resource maps it
+  lacks, asks the host over its connection
+  (`_distributed_message_map_share_request`: the level, and which of the
+  map, bitmaps.map, sounds.map and loc.map it lacks) instead of leaving, if
+  `network.map_download` lets it. Its players wait to join until the host's settings
   have named the map, and for a game in progress until it is downloaded; in
   the lobby they join at once, and the host's start waits for the machine to
   precache the map, as it waits for any machine.
@@ -365,8 +373,8 @@ menus show a map without its hash, unless two versions are listed.
   answers with each file's size and hash (`_offer`, or why it does not:
   sharing off, or not the game's map), and which of its other machines may
   have them (`_sources`: an address on a LAN, internet play's key hash on the
-  internet), again every ten seconds. A map whose hash is not its name's is
-  not offered. The client checks that the map's hash is its name's, and
+  internet), again every ten seconds. A map that is not of the game's version is
+  not offered. The client checks that the map is of the game's version, and
   that no file is larger than the cache loader takes, and refuses a map
   name Windows takes for a device (`CON`, `NUL`, `COM1` and the like,
   before the first dot). It connects to a LAN machine the host names only

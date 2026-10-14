@@ -3538,9 +3538,9 @@ void network_game_server_change_map_name(
 		map_name,
 		NETWORK_GAME_MAP_NAME_LENGTH - 1);
 	server->game.map.name[NETWORK_GAME_MAP_NAME_LENGTH - 1] = 0;
-	/* port: a Custom Edition map by the name its hash makes, which the
-	players download it by (port/linux/game/map_share.c) */
-	map_share_level_name_hash(server->game.map.name, NETWORK_GAME_MAP_NAME_LENGTH);
+	/* port: a Custom Edition map by its own name, its version (its hash's)
+	telling which one it is (port/linux/game/map_share.c) */
+	map_share_level_name_choose(server->game.map.name, NETWORK_GAME_MAP_NAME_LENGTH);
 	server->game.map.version = (long)cache_files_map_version(server->game.map.name);
 
 	if (!network_game_server_send_game_data_pregame(server))
@@ -4290,8 +4290,8 @@ static void network_game_server_cooperative_round(
 	server->game.variant_options.friendly_fire = friendly_fire;
 	csstrncpy(server->game.map.name, network_game_server_cooperative_next_map, sizeof(server->game.map.name) - 1);
 	server->game.map.name[sizeof(server->game.map.name) - 1] = 0;
-	/* port: by the name its hash makes (port/linux/game/map_share.c) */
-	map_share_level_name_hash(server->game.map.name, sizeof(server->game.map.name));
+	/* port: by its own name, and its version (port/linux/game/map_share.c) */
+	map_share_level_name_choose(server->game.map.name, sizeof(server->game.map.name));
 	server->game.map.version = (long)cache_files_map_version(server->game.map.name);
 	main_set_multiplayer_map_name(server->game.map.name);
 	server->game.maximum_teams = 1;
@@ -4367,8 +4367,8 @@ static boolean network_game_server_setup_game_from_playlist(
 		network_game_generate_local_machine_name(machine_name);
 		ustrncpy(server->game.name, machine_name, NETWORK_GAME_NAME_LENGTH - 1);
 		server->game.name[NETWORK_GAME_NAME_LENGTH - 1] = L'\0';
-		/* port: by the name its hash makes (port/linux/game/map_share.c) */
-		map_share_level_name_hash(server->game.map.name, sizeof(server->game.map.name));
+		/* port: by its own name, and its version (port/linux/game/map_share.c) */
+		map_share_level_name_choose(server->game.map.name, sizeof(server->game.map.name));
 		server->game.map.version = (long)cache_files_map_version(server->game.map.name);
 		server->game.minimum_players = 2;
 		server->game.maximum_players = MAXIMUM_NETWORK_PLAYER_COUNT;

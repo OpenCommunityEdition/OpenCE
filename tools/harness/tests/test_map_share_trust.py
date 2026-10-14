@@ -11,10 +11,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, enum_with, function, mutated, read, run, structure  # noqa: E402
 
 CASES = ["source-addresses", "hashes-sources", "hashes-frames", "progress-advances", "progress-asked-again",
-         "progress-other-level-between", "requests-apart", "requests-apart-after-another-level"]
+         "progress-other-level-between", "offer-of-the-version", "requests-apart", "requests-apart-after-another-level"]
 
 # a fault in map_share.c, the function it is in, and the case that must catch it
 NEGATIVE_CONTROLS = {
+    "any-version-offered": (("(!game || map_share_hash_version(file->hash) != (unsigned long)game->map.version)", "0"),
+                            "host_update", "offer-of-the-version"),
     "lan-host-sends-anywhere": (("return !address_private(host_address) || address_private(address);", "return TRUE;"),
                                 "source_address_allowed", "source-addresses"),
     "loopback-from-a-lan": ((" ||\n\t\t((address >> 24) == 127) != ((host_address >> 24) == 127)", ""),

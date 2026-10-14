@@ -1046,13 +1046,14 @@ void cache_files_show_multiplayer_unavailable(
 
 /* port: the version of the map a network game is on, which the host sends
 in its game record (network_game_map's version, which the Xbox's left 0):
-a Custom Edition map's header checksum, which differs between versions of
-it. 0, which a client checks nothing for, for the game's own maps, whose
-builds of other regions play together. */
+a Custom Edition map's hash's first 32 bits (port/linux/game/map_share.h),
+which differ between versions of it, a client playing its file of that
+version whatever its name. 0, which a client checks nothing for, for the
+game's own maps, whose builds of other regions play together. */
 unsigned long cache_files_map_version(
 	char const *map_name)
 {
-	return custom_edition_level_name(map_name) ? custom_edition_map_checksum(map_name) : 0;
+	return custom_edition_level_name(map_name) ? custom_edition_map_version(map_name) : 0;
 }
 
 /* port: whether this machine has the map a network game is on (a client

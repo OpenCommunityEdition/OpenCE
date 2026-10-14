@@ -41,6 +41,7 @@ struct network_game
 	struct
 	{
 		char name[128];
+		long version;
 	} map;
 };
 
@@ -116,12 +117,12 @@ static char const *tag_name_strip_path(char const *name)
 
 #define config_boolean(name) 1
 #define custom_edition_level_name(level_name) (!strncmp(level_name, "custom_maps\\", 12))
-#define custom_edition_map_file_path(level_name, path) (strcpy(path, "d:\\custom_maps\\hugeass_0e2b3ee4.map"), 1)
+#define custom_edition_map_file_path(level_name, path) (strcpy(path, "d:\\custom_maps\\hugeass.map"), 1)
 #define custom_edition_resource_map_file_path(kind, path) 0
 #define custom_edition_map_resource_maps_needed(level_name) 0UL
-#define map_share_name_hashed(name) ((name)[0] != 0)
-#define map_share_hash_digits(hash, digits) strcpy(digits, "0e2b3ee4")
-#define map_share_name_base_length(name) ((short)(strrchr(name, '_') ? strrchr(name, '_') - (name) : strlen(name)))
+/* (map_share_files.c's: the hash's first 32 bits) */
+#define map_share_hash_version(hash) \
+	((unsigned long)(hash)[0] << 24 | (unsigned long)(hash)[1] << 16 | (unsigned long)(hash)[2] << 8 | (hash)[3])
 
 /* the pieces' hashes: a file's hash the first piece's here, which is enough to
 tell a whole list from none */
@@ -179,9 +180,14 @@ static void hashes_frame(struct connection *connection, long first, long count)
 /* the host's game on a map whose file is 3 MB, machine 3 in it */
 static void host_setup(void)
 {
-	strcpy(fake_game.map.name, "custom_maps\\hugeass_0e2b3ee4");
+	strcpy(fake_game.map.name, "custom_maps\\hugeass");
+	fake_game.map.version = 0x0e2b3ee4;
 	fake_machine_addresses[3] = ADDRESS(10, 0, 0, 3);
 	memset(&fake_file, 0, sizeof(fake_file));
+	fake_file.hash[0] = 0x0e;
+	fake_file.hash[1] = 0x2b;
+	fake_file.hash[2] = 0x3e;
+	fake_file.hash[3] = 0xe4;
 	fake_file.used = TRUE;
 	fake_file.ready = TRUE;
 	fake_file.size = 3 * 1024 * 1024;
@@ -380,7 +386,7 @@ int main(int argc, char **argv)
 		host_wait(DOWNLOADING_STALL_TIMEOUT + 2000, 0);
 		CHECK(!map_share_machine_downloading(3), "a machine that has had nothing for long is still downloading");
 		memset(&request, 0, sizeof(request));
-		strcpy(request.level_name, "custom_maps\\bloodgulch_00000000");
+		strcpy(request.level_name, "custom_maps\\bloodgulch");
 		request.wanted = FLAG(_map_share_file_map);
 		host_request(3, &request);
 		CHECK(fake_offers == 2 && fake_offer_result == _offer_unavailable, "another level was offered");
@@ -390,7 +396,7 @@ int main(int argc, char **argv)
 		host_ask();
 		CHECK(!map_share_machine_downloading(3), "asking for another level between, again, made it downloading");
 		/* (the host's game on another map) */
-		strcpy(fake_game.map.name, "custom_maps\\hugeass2_0e2b3ee4");
+		strcpy(fake_game.map.name, "custom_maps\\hugeass2");
 		host_ask();
 		CHECK(map_share_machine_downloading(3), "a game on another map kept the last map's count");
 		return 0;
@@ -398,6 +404,22 @@ int main(int argc, char **argv)
 	/* a machine's requests are taken MAP_REQUEST_INTERVAL apart at most: one
 	sooner waits, the last of them taken in its turn (a millisecond more: the
 	time a request was taken is kept odd, never 0) */
+	CASE("offer-of-the-version")
+	{
+		host_setup();
+		host_asked_for(fake_game.map.name);
+		host_update();
+		CHECK(fake_offers == 1 && fake_offer_result == _offer_ok, "the game's version was not offered");
+		/* (the host's file another version than the game is on) */
+		host_setup();
+		fake_file.hash[3] = 0xe5;
+		fake_now += MAP_REQUEST_INTERVAL + 1;
+		host_asked_for(fake_game.map.name);
+		host_update();
+		CHECK(fake_offers == 2 && fake_offer_result == _offer_unavailable,
+			"a map of another version than the game's was offered");
+		return 0;
+	}
 	CASE("requests-apart")
 	{
 		int asked;
@@ -409,7 +431,7 @@ int main(int argc, char **argv)
 		for (asked = 0; asked < 50; asked++)
 		{
 			fake_now += 10;
-			host_asked_for(asked & 1 ? fake_game.map.name : "custom_maps\\bloodgulch_00000000");
+			host_asked_for(asked & 1 ? fake_game.map.name : "custom_maps\\bloodgulch");
 			host_update();
 		}
 		CHECK(fake_offers == 1, "requests one after another were all answered: %d", fake_offers);
@@ -432,7 +454,7 @@ int main(int argc, char **argv)
 	CASE("requests-apart-after-another-level")
 	{
 		host_setup();
-		host_asked_for("custom_maps\\bloodgulch_00000000");
+		host_asked_for("custom_maps\\bloodgulch");
 		CHECK(fake_offers == 1 && fake_offer_result == _offer_unavailable, "another level was offered");
 		host_asked_for(fake_game.map.name);
 		host_update();

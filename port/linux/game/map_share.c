@@ -31,7 +31,9 @@ session as it asked the host (p2p.c: a player answers holders of the invite
 it joined with while it may share). Each downloaded file is written beside
 the others as <name>.part and renamed when whole (a .part found again is
 checked piece by piece and taken up where it was), into custom_maps under
-the map's own name, which is its hash's.
+the map's own name, or, beside another version of that name, the name and
+its hash's first digits (the game's map version is checked against the
+offered map's hash).
 
 A machine still downloading does not hold the lobby: the machines that
 have the map start, and it joins the game in progress once the download is
@@ -212,7 +214,7 @@ enum
 	_offer_ok,
 	/* it does not share maps (network.map_share) */
 	_offer_off,
-	/* not the game's map, not named for its hash, or not readable */
+	/* not the game's map, not of the game's version, or not readable */
 	_offer_unavailable,
 };
 
@@ -613,6 +615,22 @@ static struct network_game *map_share_network_game(
 	struct network_game_client *client = global_network_game_client_get();
 
 	return client ? network_game_client_get_game(client) : NULL;
+}
+
+boolean map_share_game_map_version(
+	char const *level_name,
+	unsigned long *version)
+{
+	struct network_game *game = map_share_network_game();
+
+	/* (by the map's name: the loader asks by its file's, hugeass) */
+	if (!game || !level_name || !custom_edition_level_name(game->map.name) ||
+		csstrcasecmp(tag_name_strip_path(game->map.name), tag_name_strip_path(level_name)))
+	{
+		return FALSE;
+	}
+	*version = (unsigned long)game->map.version;
+	return TRUE;
 }
 
 static boolean map_share_host(
@@ -1394,14 +1412,18 @@ static void download_ask(
 
 /* the files this machine lacks for the level: a bit each */
 static byte files_wanted(
-	char const *level_name)
+	char const *level_name,
+	unsigned long version)
 {
 	char path[MAP_SHARE_PATH_SIZE];
 	byte wanted = 0;
 	short kind;
 
-	if (!custom_edition_map_file_path(level_name, path))
+	if (version ? !custom_edition_map_find_version(level_name, version, path) :
+		!custom_edition_map_file_named(level_name, path))
+	{
 		wanted |= FLAG(_map_share_file_map);
+	}
 	for (kind = _map_share_file_bitmaps; kind < MAXIMUM_FILES; kind++)
 	{
 		if (!custom_edition_resource_map_file_path(kind, path))
@@ -1432,17 +1454,12 @@ boolean map_share_download_begin(
 		download_end(FALSE);
 	}
 	name = tag_name_strip_path(level_name);
-	wanted = files_wanted(level_name);
-	/* (the map named for its hash, so that the download is the host's
-	version under its own name, a file of custom_maps alone, whatever the
-	host's level name holds; a map this machine has of another version is
-	not replaced) */
-	if (!wanted || !map_share_name_safe(name) ||
-		(TEST_FLAG(wanted, _map_share_file_map) && !map_share_name_hashed(name)) ||
-		(!TEST_FLAG(wanted, _map_share_file_map) && custom_edition_map_checksum(level_name) != version && version))
-	{
+	wanted = files_wanted(level_name, version);
+	/* (the map of the host's version, which the offer's hash is checked
+	against, a file of custom_maps alone, whatever the host's level name
+	holds; a map this machine has of another version is not replaced) */
+	if (!wanted || !map_share_name_safe(name) || (TEST_FLAG(wanted, _map_share_file_map) && !version))
 		return FALSE;
-	}
 	{
 		static long serial;
 
@@ -1566,21 +1583,28 @@ static void download_offered(
 		file->piece_count = map_share_piece_count(file->size);
 		map_share_hash_digits(file->hash, digits);
 		/* (a file this machine did not ask for, or offered twice, or a map
-		whose hash is not its name's) */
+		not of the game's version) */
 		if (file->kind >= MAXIMUM_FILES || !TEST_FLAG(download->wanted, file->kind) ||
 			TEST_FLAG(offered, file->kind) || !file->size ||
 			file->size > (unsigned long)(file->kind == _map_share_file_map ? MAXIMUM_MAP_BYTES :
 			MAXIMUM_RESOURCE_MAP_BYTES) ||
-			(file->kind == _map_share_file_map && csstrcmp(name + map_share_name_base_length(name) + 1, digits)))
+			(file->kind == _map_share_file_map && map_share_hash_version(file->hash) != download->version))
 		{
 			download->file_count = index;
 			download_fail("The host's offer was not of this map.");
 			return;
 		}
 		offered |= (byte)FLAG(file->kind);
+		/* (the map by its own name, or beside another version of it, by the
+		name and its hash's first digits) */
 		if (file->kind == _map_share_file_map)
 		{
 			snprintf(file->final_path, sizeof(file->final_path), "%s%s.map", CUSTOM_EDITION_MAP_DIRECTORY, name);
+			if (GetFileAttributesA(file->final_path) != (unsigned long)-1)
+			{
+				snprintf(file->final_path, sizeof(file->final_path), "%s%s_%s.map", CUSTOM_EDITION_MAP_DIRECTORY, name,
+					digits);
+			}
 		}
 		else
 		{
@@ -1830,6 +1854,8 @@ static void download_finish(
 		}
 		if (!csstrcasecmp(map_share_globals.kept_part, file->part_path))
 			map_share_globals.kept_part[0] = 0;
+		/* (its hash known: its version is not read again) */
+		map_share_map_hash_remember(file->final_path, file->hash);
 	}
 	custom_edition_maps_look_again();
 	if (!custom_edition_cache_present(download->level_name, download->version, message, sizeof(message)))
@@ -3010,7 +3036,6 @@ static void host_request(
 {
 	struct host_machine *machine = &map_share_globals.machines[machine_index];
 	struct network_game *game = map_share_network_game();
-	char const *name;
 	char path[MAP_SHARE_PATH_SIZE];
 	unsigned long needed;
 	short kind;
@@ -3042,12 +3067,11 @@ static void host_request(
 		host_offer(machine_index, _offer_off);
 		return;
 	}
-	/* (the game's map alone, a Custom Edition map's, named for its hash if
-	it is asked for) */
-	name = tag_name_strip_path(request->level_name);
+	/* (the game's map alone, a Custom Edition map's, of the game's version
+	if it is asked for) */
 	if (!game || csstrcmp(game->map.name, request->level_name) || !custom_edition_level_name(request->level_name) ||
 		!custom_edition_map_file_path(request->level_name, path) ||
-		(TEST_FLAG(request->wanted, _map_share_file_map) && !map_share_name_hashed(name)))
+		(TEST_FLAG(request->wanted, _map_share_file_map) && !game->map.version))
 	{
 		host_offer(machine_index, _offer_unavailable);
 		return;
@@ -3104,6 +3128,7 @@ static void host_update(
 	void)
 {
 	struct map_share_globals *globals = &map_share_globals;
+	struct network_game *game = map_share_network_game();
 	unsigned long now = system_milliseconds();
 	long index;
 
@@ -3152,19 +3177,16 @@ static void host_update(
 			}
 			if (!ready)
 				continue;
-			/* (the map's hash its name's, as the client checks) */
+			/* (the map of the game's version, as the client checks) */
 			for (file_index = 0; file_index < machine->file_count; file_index++)
 			{
 				struct map_share_file *file = map_share_file_get(machine->catalog_files[file_index]);
-				char const *name = tag_name_strip_path(machine->request.level_name);
-				char digits[MAP_SHARE_NAME_DIGITS + 1];
 
-				map_share_hash_digits(file->hash, digits);
 				if (machine->file_kinds[file_index] == _map_share_file_map &&
-					csstrcmp(name + map_share_name_base_length(name) + 1, digits))
+					(!game || map_share_hash_version(file->hash) != (unsigned long)game->map.version))
 				{
-					error(_error_silent, "map sharing: %s is not named for its hash (%s): not shared", file->path,
-						digits);
+					error(_error_silent, "map sharing: %s is not the game's version of its map (%08lx): not shared",
+						file->path, game ? (unsigned long)game->map.version : 0UL);
 					failed = TRUE;
 				}
 			}

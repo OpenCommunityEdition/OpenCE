@@ -155,6 +155,13 @@ static boolean DeleteFileA(char const *path)
 	return TRUE;
 }
 
+/* (map_share_files.c's: a finished download's hash kept) */
+static void map_share_map_hash_remember(char const *path, byte const *hash)
+{
+	(void)path;
+	(void)hash;
+}
+
 static void custom_edition_maps_look_again(void)
 {
 	fake_looked_again++;
