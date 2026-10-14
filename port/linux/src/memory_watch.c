@@ -141,6 +141,16 @@ void memory_watch_initialize(void)
 		watch_active = TRUE;
 }
 
+/* the handler from the start, for its crash report: the renderer's device
+(d3d8_gl.c) installs it too, but a game with debug.null_renderer (the
+network tests, net_compare) creates none, and a crash before the device
+went unreported */
+__attribute__((constructor))
+static void memory_watch_install(void)
+{
+	memory_watch_initialize();
+}
+
 void memory_watch_protect(unsigned long address, unsigned long size)
 {
 	unsigned long first, last, page;
