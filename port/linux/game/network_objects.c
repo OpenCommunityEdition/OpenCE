@@ -201,6 +201,10 @@ fourth (as it sends players, network_distributed.c) */
 #define MIDDLE_OBJECT_DISTANCE 60.0f
 #define FAR_OBJECT_DISTANCE 120.0f
 
+/* a step of an unsteered vehicle's path (world units a tick). Further than
+this in one tick, the host moved it some other way (a teleport), which is
+not carried on as the path */
+#define UNSTEERED_PATH_STEP 4.0f
 /* world units */
 #define REMOTE_OBJECT_TOLERANCE 0.05f
 /* ... and the cosine of the angle (an object at rest turned) */
@@ -418,6 +422,14 @@ static struct
 	long object_index;
 	long time;
 } objects_client_dead[MAXIMUM_TRACKED_OBJECTS];
+/* ... where the host last had each unsteered vehicle, and when, so the
+path between those positions can be carried (distributed_client_note_unsteered_path) */
+static struct
+{
+	long object_index;
+	long time;
+	real_point3d position;
+} objects_client_unsteered_path[MAXIMUM_TRACKED_OBJECTS];
 /* ... its own objects made since the last tick (of any kind: those of the
 kinds the host has go), and whether to look through all the objects
 instead (the host's all told, too many made, or made where it cannot say) */
@@ -2549,6 +2561,43 @@ static void distributed_client_dead_vehicle(
 	object_damage_update(object_index);
 }
 
+/* Client: the velocity that stays on the path of the host's positions for
+this unsteered vehicle. The velocity in the host's state is its physics
+velocity. A recording (a lifepod, which has no pilot) swings that about
+the path, and the next position pulls the vehicle back. The step from the
+host's previous position does not. */
+static void distributed_client_note_unsteered_path(
+	long object_index,
+	real_point3d const *host_position)
+{
+	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
+	struct object_datum *object;
+	long now;
+	long since;
+	real_vector3d step;
+
+	if (absolute_index < 0 || absolute_index >= MAXIMUM_TRACKED_OBJECTS || !host_position)
+		return;
+	object = object_get(object_index);
+	now = game_time_get();
+	since = objects_client_unsteered_path[absolute_index].object_index == object_index ?
+		now - objects_client_unsteered_path[absolute_index].time : 0;
+	if (since > 0)
+	{
+		step.i = (host_position->x - objects_client_unsteered_path[absolute_index].position.x) / (real)since;
+		step.j = (host_position->y - objects_client_unsteered_path[absolute_index].position.y) / (real)since;
+		step.k = (host_position->z - objects_client_unsteered_path[absolute_index].position.z) / (real)since;
+		/* (a teleport is not a step of the path: leave it where the host put it) */
+		if (step.i * step.i + step.j * step.j + step.k * step.k <= UNSTEERED_PATH_STEP * UNSTEERED_PATH_STEP)
+			object->object.translational_velocity = step;
+		else
+			object->object.translational_velocity = *global_zero_vector3d;
+	}
+	objects_client_unsteered_path[absolute_index].object_index = object_index;
+	objects_client_unsteered_path[absolute_index].time = now;
+	objects_client_unsteered_path[absolute_index].position = *host_position;
+}
+
 void network_objects_handle_states(
 	void const *entries,
 	short count)
@@ -2655,6 +2704,8 @@ void network_objects_handle_states(
 				forward.k * object->object.forward.k >= angle_tolerance &&
 			up.i * object->object.up.i + up.j * object->object.up.j + up.k * object->object.up.k >= angle_tolerance)
 		{
+			if (distributed_vehicle_unsteered(state->object_index))
+				distributed_client_note_unsteered_path(state->object_index, &state->position);
 			continue;
 		}
 		if (network_objects_reconcile(state->object_index, &state->position, &forward, &up, &velocity,
@@ -2662,6 +2713,8 @@ void network_objects_handle_states(
 		{
 			distributed_count_correction();
 		}
+		if (distributed_vehicle_unsteered(state->object_index))
+			distributed_client_note_unsteered_path(state->object_index, &state->position);
 		/* (one it drives, put where the host has it, is as the host has it) */
 		if (own_vehicle)
 			SET_FLAG(object->object.flags, _object_at_rest_bit, at_rest);
@@ -3121,10 +3174,11 @@ static void distributed_client_remove_own_objects(
 	objects_client_new_object_count = 0;
 }
 
-/* Client: keeps each AI-driven vehicle (such as a Pelican on its flight
-path) moving at the velocity the host last sent. These vehicles are held at
-rest here, and a distant one is only updated every few ticks, so otherwise
-it would stop between updates and jump on each one. */
+/* Client: keeps each unsteered vehicle moving along the path of the host's
+positions (distributed_client_note_unsteered_path): a Pelican its pilot
+flies, and a recording's lifepod, which has no pilot. These vehicles are
+held at rest here, and a distant one is only updated every few ticks, so
+otherwise it would stop between updates and jump on each one. */
 static void distributed_client_carry_unsteered_vehicles(
 	void)
 {
@@ -3141,8 +3195,7 @@ static void distributed_client_carry_unsteered_vehicles(
 		real_point3d position;
 		real angle;
 
-		if (object->object.parent_object_index != NONE || unit_get(iterator.index)->unit.driver_object_index == NONE ||
-			!distributed_vehicle_unsteered(iterator.index))
+		if (object->object.parent_object_index != NONE || !distributed_vehicle_unsteered(iterator.index))
 		{
 			continue;
 		}
@@ -3222,6 +3275,8 @@ void network_objects_new_game(
 		objects_host_inventories[absolute_index].ammunition_time = NONE;
 		objects_client_has[absolute_index] = NONE;
 		objects_client_dead[absolute_index].object_index = NONE;
+		objects_client_unsteered_path[absolute_index].object_index = NONE;
+		objects_client_unsteered_path[absolute_index].time = NONE;
 	}
 	objects_host_told_count = 0;
 	objects_host_resting_cursor = 0;
