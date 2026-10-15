@@ -422,12 +422,13 @@ static struct
 	long object_index;
 	long time;
 } objects_client_dead[MAXIMUM_TRACKED_OBJECTS];
-/* ... where the host last had each unsteered vehicle, and when, so the
-path between those positions can be carried (distributed_client_note_unsteered_path) */
+/* ... where the host last had each unsteered vehicle, and when, and for
+how many ticks that step may be carried (distributed_client_note_unsteered_path) */
 static struct
 {
 	long object_index;
 	long time;
+	long coast_ticks;
 	real_point3d position;
 } objects_client_unsteered_path[MAXIMUM_TRACKED_OBJECTS];
 /* ... its own objects made since the last tick (of any kind: those of the
@@ -2565,15 +2566,19 @@ static void distributed_client_dead_vehicle(
 this unsteered vehicle. The velocity in the host's state is its physics
 velocity. A recording (a lifepod, which has no pilot) swings that about
 the path, and the next position pulls the vehicle back. The step from the
-host's previous position does not. */
+host's previous position does not. Kept only for that gap: a late next
+position must not drive the vehicle on, and the host's word that it is at
+rest stops it. */
 static void distributed_client_note_unsteered_path(
 	long object_index,
-	real_point3d const *host_position)
+	real_point3d const *host_position,
+	boolean host_at_rest)
 {
 	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
 	struct object_datum *object;
 	long now;
 	long since;
+	long coast_ticks;
 	real_vector3d step;
 
 	if (absolute_index < 0 || absolute_index >= MAXIMUM_TRACKED_OBJECTS || !host_position)
@@ -2582,19 +2587,31 @@ static void distributed_client_note_unsteered_path(
 	now = game_time_get();
 	since = objects_client_unsteered_path[absolute_index].object_index == object_index ?
 		now - objects_client_unsteered_path[absolute_index].time : 0;
-	if (since > 0)
+	coast_ticks = 0;
+	/* (stopped as the host has it: the last step would sink a warthog, or
+	carry a Pelican past the pad, until the next word) */
+	if (host_at_rest)
+	{
+		object->object.translational_velocity = *global_zero_vector3d;
+		object->object.angular_velocity = *global_zero_vector3d;
+	}
+	else if (since > 0)
 	{
 		step.i = (host_position->x - objects_client_unsteered_path[absolute_index].position.x) / (real)since;
 		step.j = (host_position->y - objects_client_unsteered_path[absolute_index].position.y) / (real)since;
 		step.k = (host_position->z - objects_client_unsteered_path[absolute_index].position.z) / (real)since;
 		/* (a teleport is not a step of the path: leave it where the host put it) */
 		if (step.i * step.i + step.j * step.j + step.k * step.k <= UNSTEERED_PATH_STEP * UNSTEERED_PATH_STEP)
+		{
 			object->object.translational_velocity = step;
+			coast_ticks = since;
+		}
 		else
 			object->object.translational_velocity = *global_zero_vector3d;
 	}
 	objects_client_unsteered_path[absolute_index].object_index = object_index;
 	objects_client_unsteered_path[absolute_index].time = now;
+	objects_client_unsteered_path[absolute_index].coast_ticks = coast_ticks;
 	objects_client_unsteered_path[absolute_index].position = *host_position;
 }
 
@@ -2705,7 +2722,8 @@ void network_objects_handle_states(
 			up.i * object->object.up.i + up.j * object->object.up.j + up.k * object->object.up.k >= angle_tolerance)
 		{
 			if (distributed_vehicle_unsteered(state->object_index))
-				distributed_client_note_unsteered_path(state->object_index, &state->position);
+				distributed_client_note_unsteered_path(state->object_index, &state->position,
+					TEST_FLAG(state->flags, _distributed_object_at_rest_bit));
 			continue;
 		}
 		if (network_objects_reconcile(state->object_index, &state->position, &forward, &up, &velocity,
@@ -2714,7 +2732,8 @@ void network_objects_handle_states(
 			distributed_count_correction();
 		}
 		if (distributed_vehicle_unsteered(state->object_index))
-			distributed_client_note_unsteered_path(state->object_index, &state->position);
+			distributed_client_note_unsteered_path(state->object_index, &state->position,
+				TEST_FLAG(state->flags, _distributed_object_at_rest_bit));
 		/* (one it drives, put where the host has it, is as the host has it) */
 		if (own_vehicle)
 			SET_FLAG(object->object.flags, _object_at_rest_bit, at_rest);
@@ -3199,6 +3218,19 @@ static void distributed_client_carry_unsteered_vehicles(
 		{
 			continue;
 		}
+		/* (the step of the last gap only: past that, hold for the host) */
+		{
+			long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.index);
+
+			if (absolute_index < 0 || absolute_index >= MAXIMUM_TRACKED_OBJECTS ||
+				objects_client_unsteered_path[absolute_index].object_index != iterator.index ||
+				objects_client_unsteered_path[absolute_index].coast_ticks <= 0 ||
+				game_time_get() - objects_client_unsteered_path[absolute_index].time >
+					objects_client_unsteered_path[absolute_index].coast_ticks)
+			{
+				continue;
+			}
+		}
 		angle = normalize3d(&axis);
 		if (velocity->i == 0.0f && velocity->j == 0.0f && velocity->k == 0.0f && angle == 0.0f)
 			continue;
@@ -3277,6 +3309,7 @@ void network_objects_new_game(
 		objects_client_dead[absolute_index].object_index = NONE;
 		objects_client_unsteered_path[absolute_index].object_index = NONE;
 		objects_client_unsteered_path[absolute_index].time = NONE;
+		objects_client_unsteered_path[absolute_index].coast_ticks = 0;
 	}
 	objects_host_told_count = 0;
 	objects_host_resting_cursor = 0;

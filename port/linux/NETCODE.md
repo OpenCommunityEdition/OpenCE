@@ -521,7 +521,9 @@ its name alone beside it, has its name given back as the map lists find it.
    the positions the host sent, a recording's lifepod as well as a Pelican.
    Its physics velocity swings about that path, so the carry steps from
    one of those positions to the next, and a jump further than a step of
-   the path is left where the host put it. A client drives its own player's vehicle and sends where it is,
+   the path is left where the host put it. The host's word that it is at
+   rest stops that step, and the step is kept only for the last gap
+   between positions, so a late word does not drive it on. A client drives its own player's vehicle and sends where it is,
    which the host takes within a tolerance, as it does its own player's
    unit, and no further from an anchor (one it took, a newer once a
    second) than the vehicle moves in the client's ticks since, those no
