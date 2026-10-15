@@ -3,7 +3,7 @@
 </p>
 
 <h2 align="center">
-  A fork of OpenCE focused on bringing experimental features and enhancements to OpenCE.
+  A fork of OpenCE focused on bringing experimental features to OpenCE.
 </h2>
 
 <p align="center">
