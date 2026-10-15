@@ -7662,7 +7662,8 @@ short game_engine_friendly_damage(
 
 	/* port: network co-op's friendly fire is Server Setup's FRIENDLY FIRE,
 	in the host's game settings (only the host deals damage), between its
-	players: their AI allies they always hurt, as in the campaign */
+	players: their AI allies they always hurt, as in the campaign. Each
+	player also has a choice of their own (network_coop_players_friendly_fire) */
 	if (network_coop_active())
 	{
 		struct network_game *game = network_game_get_game();
@@ -7671,6 +7672,8 @@ short game_engine_friendly_damage(
 
 		if (!game || !unit || unit->unit.player_index == NONE)
 			return _friendly_damage_all;
+		if (!network_coop_players_friendly_fire(attacker_player_index, unit->unit.player_index))
+			return _friendly_damage_none;
 		friendly_fire = game->variant_options.friendly_fire;
 	}
 	else if (!game_engine || !global_variant.universal_variant.teams)

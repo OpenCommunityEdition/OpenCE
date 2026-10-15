@@ -48,6 +48,14 @@ boolean network_coop_active(void);
 /* whether the players collide with each other: FALSE in a co-op game whose
 host set Server Setup's PLAYER COLLISIONS off (bipeds.c, collisions.c) */
 boolean network_coop_player_collisions(void);
+/* whether this machine's players play with friendly fire between players
+(network.coop_own_friendly_fire: the pause menu's FRIENDLY FIRE) */
+boolean network_coop_own_friendly_fire(void);
+/* host: the choice a client's player's input says is theirs */
+void network_coop_note_player_friendly_fire(long player_index, boolean friendly_fire);
+/* host: whether one player's hit may hurt another: both chose friendly fire,
+or the one hit has been away from the controls for over 70 seconds */
+boolean network_coop_players_friendly_fire(long attacker_player_index, long victim_player_index);
 /* whether this machine is a co-op client, whose devices only the host moves */
 boolean network_coop_devices_remote(void);
 /* devices.c: a group's devices were set straight to its value */

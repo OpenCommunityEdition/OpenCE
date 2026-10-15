@@ -30,7 +30,8 @@ pictures, sounds and screens) are none, a missing picture drawn blank, and
 no screen pauses the game (a network game's clock runs on).
 
 So does a single-player campaign's map (pause_campaign_patch), whose screens
-pause it as its pause menu does.
+pause it as its pause menu does, and a network co-op game's, whose pause
+menu gets FRIENDLY FIRE instead.
 */
 
 #include "cseries.h"
@@ -363,7 +364,7 @@ static char const *const port_function_names[] =
 	"port setup edit",
 	"port setup options init", "port setup options save",
 	"port map list back",
-	"port pause end game",
+	"port pause end game", "port coop friendly fire",
 	"port coop begin", "port coop player 2 list initialize", "port coop player 2",
 	"port lobby open", "port lobby add player", "port lobby join", "port lobby leave",
 	"port lobby player list initialize", "port lobby player choose",
@@ -408,6 +409,8 @@ static char const *const port_game_data_input_names[] =
 	/* (the profile settings' picture: the Xbox's of the button settings,
 	on Gamepad Setup's row) */
 	"port gamepad layout preview",
+	/* (network co-op's pause menu's FRIENDLY FIRE: its text, ON or OFF) */
+	"port coop friendly fire text",
 };
 
 static struct
@@ -447,6 +450,8 @@ static struct
 	boolean game_map;
 	/* a single-player campaign's map's, whose screens pause the game */
 	boolean campaign;
+	/* a network co-op game's map's: its pause menu gets FRIENDLY FIRE */
+	boolean coop;
 } build;
 
 /* ---------- private code */
@@ -1526,23 +1531,38 @@ static long pause_quit_button(struct ui_widget_definition const *list, long quit
 
 /* a button like the model (its look), its own text, each of the model's
 events (its A and Start) running the function and opening the widget (if
-not NONE) */
+not NONE); with other_text, a second text, which the game data input (input)
+chooses between */
 static void *pause_button(struct cache_file_tag_instance *instances, struct ui_widget_definition const *model,
-	char const *name, char const *text, long function, long widget_tag)
+	char const *name, char const *text, long function, long widget_tag, char const *other_text, long input)
 {
 	struct ui_widget_definition *button = allocate(sizeof(*button));
 	struct ui_widget_event_handler_reference *handlers =
 		allocate(model->event_handlers.count * sizeof(struct ui_widget_event_handler_reference));
 	long text_tag = next_tag(), handler;
+	char const *texts[2];
 
 	if (!button || !handlers)
 		return NULL;
 	memcpy(button, model, sizeof(*button));
-	instance_set(instances, UNICODE_STRING_LIST_TAG, text_tag, name, " text", string_list_build(&text, 1));
+	texts[0] = text;
+	texts[1] = other_text;
+	instance_set(instances, UNICODE_STRING_LIST_TAG, text_tag, name, " text",
+		string_list_build(texts, other_text ? 2 : 1));
 	reference_set(&button->text_label_string_list, UNICODE_STRING_LIST_TAG, text_tag);
 	button->string_list_index = 0;
 	button->game_data_inputs.count = 0;
 	button->game_data_inputs.address = NULL;
+	if (other_text)
+	{
+		struct ui_widget_game_data_input_reference *inputs = allocate(sizeof(*inputs));
+
+		if (!inputs)
+			return NULL;
+		inputs->function = (short)input;
+		button->game_data_inputs.count = 1;
+		button->game_data_inputs.address = inputs;
+	}
 	/* (the game's memcpy asserts on a NULL source, even for nothing) */
 	if (model->event_handlers.count)
 		memcpy(handlers, model->event_handlers.address, model->event_handlers.count * sizeof(*handlers));
@@ -1563,8 +1583,9 @@ static void *pause_button(struct cache_file_tag_instance *instances, struct ui_w
 }
 
 /* the list's buttons: SETTINGS (and the host's END GAME) put before LEAVE
-GAME (quit); returns how many were added, and how much taller the list
-grew for them (growth) */
+GAME (quit), or in network co-op FRIENDLY FIRE, whose text says the machine's
+choice (menu_functions.c); returns how many were added, and how much taller
+the list grew for them (growth) */
 static long pause_list_patch(struct cache_file_tag_instance *instances, struct ui_widget_definition *list, long quit,
 	boolean host, short *growth)
 {
@@ -1581,17 +1602,21 @@ static long pause_list_patch(struct cache_file_tag_instance *instances, struct u
 	if (!grown || settings_widget == NONE || spacing <= 0)
 		return 0;
 	tags[0] = next_tag();
-	buttons[0] = pause_button(instances, model, "pause/settings_button", "SETTINGS",
-		function_index("profile set edit begin", "pause", 0), build.widget_tags[settings_widget]);
+	buttons[0] = build.coop ?
+		pause_button(instances, model, "pause/friendly_fire_button", "FRIENDLY FIRE ON",
+			function_index("port coop friendly fire", "pause", 0), NONE, "FRIENDLY FIRE OFF",
+			game_data_input_index("port coop friendly fire text", "pause", 0)) :
+		pause_button(instances, model, "pause/settings_button", "SETTINGS",
+			function_index("profile set edit begin", "pause", 0), build.widget_tags[settings_widget], NULL, NONE);
 	tags[1] = host ? next_tag() : NONE;
 	buttons[1] = host ? pause_button(instances, model, "pause/end_game_button", "END GAME",
-		function_index("port pause end game", "pause", 0), NONE) : NULL;
+		function_index("port pause end game", "pause", 0), NONE, NULL, NONE) : NULL;
 	if (!buttons[0] || (host && !buttons[1]))
 		return 0;
 	for (child = 0; child < added; child++)
 	{
-		instance_set(instances, UI_WIDGET_DEFINITION_TAG, tags[child],
-			child ? "pause/end_game_button" : "pause/settings_button", "", buttons[child]);
+		instance_set(instances, UI_WIDGET_DEFINITION_TAG, tags[child], child ? "pause/end_game_button" :
+			build.coop ? "pause/friendly_fire_button" : "pause/settings_button", "", buttons[child]);
 	}
 	if (quit)
 		memcpy(grown, children, quit * sizeof(*grown));
@@ -2024,8 +2049,9 @@ static void pause_campaign_patch(struct cache_file_tag_instance *instances)
 				pause_campaign_shift_prompts(definition, need);
 				pause_campaign_grow_box(definition, need);
 			}
-			pause_settings_patch();
-			platform_log("menus: the pause menu has SETTINGS");
+			if (!build.coop)
+				pause_settings_patch();
+			platform_log("menus: the pause menu has %s", build.coop ? "FRIENDLY FIRE" : "SETTINGS");
 		}
 		return;
 	}
@@ -2038,6 +2064,14 @@ static boolean single_player_campaign_map(void)
 	return tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE &&
 		tag_loaded(UI_WIDGET_DEFINITION_TAG, CAMPAIGN_PAUSE_SCREEN) != NONE &&
 		game_connection() == _game_connection_local && !network_game_is_active() && !game_is_cooperative();
+}
+
+/* ... and by the players of a network game: network co-op */
+static boolean network_coop_campaign_map(void)
+{
+	return tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE &&
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, CAMPAIGN_PAUSE_SCREEN) != NONE &&
+		game_connection() != _game_connection_local && network_game_is_active();
 }
 
 /* whether display.menus asks for the PC version's menus: "pc" in any case
@@ -2066,10 +2100,11 @@ void menu_tags_loaded(
 
 	boolean game_map = strcmp(map_name, "ui") != 0;
 	boolean campaign = game_map && single_player_campaign_map();
+	boolean coop = game_map && network_coop_campaign_map();
 
 	/* (ui.map, and a multiplayer map: its pause menu's SETTINGS; a
-	single-player campaign's too) */
-	if ((game_map && tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE && !campaign) ||
+	single-player campaign's too, and network co-op's FRIENDLY FIRE) */
+	if ((game_map && tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE && !campaign && !coop) ||
 		!menus_pc_chosen())
 	{
 		return;
@@ -2081,6 +2116,7 @@ void menu_tags_loaded(
 	build.menus = menus;
 	build.game_map = game_map;
 	build.campaign = campaign;
+	build.coop = coop;
 	widget_count = menus->widget_count;
 	build.widget_tags = malloc((widget_count + 1) * sizeof(long));
 	build.text_tags = malloc((widget_count + 1) * sizeof(long));
@@ -2163,7 +2199,7 @@ void menu_tags_loaded(
 	if (game_map)
 	{
 		pause_patch(instances);
-		if (campaign)
+		if (campaign || coop)
 			pause_campaign_patch(instances);
 		if (build.failed)
 			goto failed;
