@@ -1,22 +1,40 @@
-# GulchCE - an OpenCE fork focusing on bringing experimental features to OpenCE
+<p align="center">
+  <img width="420" height="420" alt="gulchceopencelogo" src="https://github.com/user-attachments/assets/1787aa2f-3305-4353-8dd4-27d08661f6d4" />
+</p>
 
-This project is a fork of [OpenCommunityEdition/OpenCE](https://github.com/OpenCommunityEdition/OpenCE) - the Halo: Combat Evolved decompilation project targeting Linux, 
+<h1 align="center">
+  An OpenCE fork focused on bringing experimental enhancements to OpenCE.
+</h1>
+
+GulchCE is a fork of [OpenCommunityEdition/OpenCE](https://github.com/OpenCommunityEdition/OpenCE) - the Halo: Combat Evolved decompilation project targeting Linux, 
 Windows, Android and web browsers.
 
 The decompilation is of the Xbox build 2342. (`cachebeta.exe`, SHA-256
 `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`).
 
-## Download
+## Will you always stay compatible with OpenCE?
+
+Yes! GulchCE will always match the same network version as OpenCE,
+so GulchCE and OpenCE players can play together. The only time crossplay
+would not be possible is when GulchCE players host matches with MCC maps.
+
+This is due to MCC-specific netcode additions that only function when an
+MCC map is being played online. OpenCE clients wouldn't recognise the
+network messages.
+
+Once MCC map support is fully ironed out on GulchCE, OpenCE will be asked
+if they would like the MCC map support feature on their own, main repo.
+
+## How do I download a build?
 
 Release & debug builds are available in the Releases section of the repository.
 The release builds are for playing; the debug builds stop at the first failed assertion and log it.
 
-## Game data
+## What about game data and assets?
 
 The port does not include the game data. You would need an Xbox disc image
 (`.xiso` or `.iso`) of Halo: Combat Evolved. All versions of the game
-operate. The maps of the European (PAL) version were made for a slower
-console. The port changes them to play as the North American (NTSC) maps do,
+work. The port converts PAL maps to play as the North American (NTSC) maps do,
 so players of the two versions can play together.
 
 On Linux and Windows, the game puts `maps/` next to the executable. On
@@ -40,24 +58,19 @@ installation, you need to take:
 - You then need to take the bitmaps.map AND sounds.map files from `halo1/maps/custom_edition` 
 and put these into `mcc_maps/_shared/multiplayer`.
 
-Use separate package folders such as `mcc_maps/Solar Flare/`
-for levels with their own resources (e.g. bitmaps.map and sounds.map); maps in
-those folders appear as selectable folders in the MCC menus. Open a folder to
-choose a level, or select a loose map directly. Back returns to the folder list.
+You must obtain these files from an legally-owned installed copy of Halo 1 on the Halo: The Master Chief Collection.
 
-You cannot use Custom Edition resource files in these folders. You must obtain these files from an legally-owned installed copy of Halo 1 on the Halo: The Master Chief Collection.
-
-The shared folder names are installation labels: either map type can use either
-set when its resource references match. Package files take priority, followed
-by existing root-level resources. If neither is present, the loader checks both
-shared sets and requires one complete, unambiguous match for each needed file.
-It never combines partial matches or loads resources a map does not need.
-External `loc.map` support is not implemented.
+For maps with their own bitmaps.map and sounds.map resources, you need to put these into a subfolder,
+for example `mcc_maps/Solar Flare/`. maps in those folders then appear as selectable folders in the
+level select menu. Open a folder tochoose a level, or select a loose map directly. Back returns 
+to the folder list.
 
 See [MCC map support](docs/mcc_maps.md) for installation, supported formats,
 validation results and remaining compatibility limits.
 
-## Platforms
+## What platforms can I play GulchCE on?
+
+Right now, we support a few - Windows, Linux, Android and browsers.
 
 Each platform has its own instructions:
 
@@ -71,9 +84,9 @@ Each platform has its own instructions:
 The Linux README also gives the controls, the settings and the multiplayer
 functions. These are almost the same on all platforms.
 
-## Multiplayer
+## Can I play multiplayer?
 
-The game can play system link games on a local network and on the internet:
+Yes! The game can play system link games on a local network and on the internet:
 
 - A system link game can have up to 128 players on up to 128 machines.
 - Linux, Windows and Android machines and browsers can play in the same
@@ -88,7 +101,7 @@ The game can play system link games on a local network and on the internet:
   and the host makes the decisions for the game. Refer to
   [port/linux/NETCODE.md](port/linux/NETCODE.md).
 
-## Build the game
+## How do I build the game?
 
 You do not need the Xbox SDK. The port supplies the SDK declarations that
 the game uses. Refer to [port/include/xdk](port/include/xdk/README.md).
@@ -114,7 +127,7 @@ computer that you use.
 `tools/ci_build.py` makes the same builds as GitHub Actions. For example,
 enter `python tools/ci_build.py linux release`.
 
-### Build options
+### What build options do I have?
 
 Give these options to `configure.py`:
 
@@ -153,7 +166,7 @@ The build then plays the main menu and the first minute of each campaign
 level. This procedure continues for approximately 15 minutes. The game
 data must be in `assets/`.
 
-### Profiling builds
+### What about profiling builds?
 
 A profiling build records where the game spends its time.
 
