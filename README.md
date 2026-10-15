@@ -15,10 +15,12 @@
 </p>
 <hr>
 
+<h3 align="center">
+GulchCE is and always will be compatible with OpenCE, and players on both clients can play together.
+</h3>
+<br>
 <p align="center">
-<strong>GulchCE is and always will be compatible with OpenCE, and players on both clients can play together.</strong>
-<br><br>
-Halo is a trademark of Microsoft. GulchCE is a fan project, not made or endorsed by Microsoft, Bungie, 343 Industries, or Halo Studios, and does not include any game assets or content.
+  Halo is a trademark of Microsoft. GulchCE is a fan project, not made or endorsed by Microsoft, Bungie, 343 Industries, or Halo Studios, and does not include any game assets or content.
 </p>
 <hr>
 
