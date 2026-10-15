@@ -718,7 +718,10 @@ runs.
 
 In the Server Browser, select a game to join it. The game joins the invite
 of the game, as for a link. When it reaches the host, it opens the lobby.
-If it cannot reach the host in 30 seconds, it marks the game FAILED. A game
+If it cannot reach the host in 30 seconds, it marks the game FAILED; when
+this machine's NAT gives each destination its own port and no router forwards
+`network.tunnel_port`, the line below the games says so (turn on UPnP on the
+router, or forward the port: refer to "Connection"). A game
 that is full or starting shows CLOSED. REFRESH asks the hosts for their
 listings again.
 

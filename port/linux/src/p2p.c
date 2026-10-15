@@ -2771,6 +2771,18 @@ int p2p_reach_player(const unsigned char *key_hash)
 	return result;
 }
 
+int p2p_nat_strict(void)
+{
+	int strict;
+
+	if (!p2p.running)
+		return 0;
+	pthread_mutex_lock(&p2p_lock);
+	strict = p2p.reported_symmetric && !p2p.upnp_forwarded;
+	pthread_mutex_unlock(&p2p_lock);
+	return strict;
+}
+
 int p2p_peer_reached(const unsigned char *peer_identifier, unsigned long *address)
 {
 	struct peer *peer;

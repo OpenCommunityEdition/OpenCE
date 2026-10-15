@@ -210,6 +210,9 @@ int p2p_reach_player(const unsigned char *key_hash);
 /* whether the tunnel reaches the machine with this identifier, and the
 virtual address (network byte order) the game reaches it at */
 int p2p_peer_reached(const unsigned char *identifier, unsigned long *address);
+/* this network's NAT gives each destination its own port and no router
+forwards the tunnel's: only games behind more lenient NATs can be reached */
+int p2p_nat_strict(void);
 
 /* BLAKE2b with a 32-byte digest (Monocypher's): a map's pieces
 (map_share.c) */
