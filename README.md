@@ -2,9 +2,25 @@
   <img width="420" height="420" alt="gulchceopencelogo" src="https://github.com/user-attachments/assets/1787aa2f-3305-4353-8dd4-27d08661f6d4" />
 </p>
 
-<h1 align="center">
-  An OpenCE fork focused on bringing experimental enhancements to OpenCE.
-</h1>
+<h2 align="center">
+  A fork of OpenCE focused on bringing experimental features and enhancements to OpenCE.
+</h2>
+
+<p align="center">
+  <a href="https://github.com/chestahh/GulchCE/releases">download the latest release</a> ·
+  <a href="https://www.youtube.com/@pablochestobar">check out the youtube</a>
+  <br>
+  <br>
+  forever <strong>compatible</strong>, for <strong>everyone</strong>
+</p>
+<hr>
+
+<p align="center">
+<strong>GulchCE is and always will be compatible with OpenCE, and players on both clients can play together.</strong>
+<br><br>
+Halo is a trademark of Microsoft. GulchCE is a fan project, not made or endorsed by Microsoft, Bungie, 343 Industries, or Halo Studios, and does not include any game assets or content.
+</p>
+<hr>
 
 GulchCE is a fork of [OpenCommunityEdition/OpenCE](https://github.com/OpenCommunityEdition/OpenCE) - the Halo: Combat Evolved decompilation project targeting Linux, 
 Windows, Android and web browsers.
@@ -14,10 +30,9 @@ The decompilation is of the Xbox build 2342. (`cachebeta.exe`, SHA-256
 
 ## Will you always stay compatible with OpenCE?
 
-GulchCE supports crossplay on Xbox and Custom Edition maps with the latest
-verified OpenCE network protocol, currently version 29. New OpenCE protocol
-versions need to be checked before we adopt them. MCC games require matching
-GulchCE clients and cannot be joined by ordinary OpenCE clients.
+Yes! GulchCE and OpenCE players can play online together on both Xbox and
+Custom Edition maps. The only time they can't do crossplay is when GulchCE
+players are playing MCC maps.
 
 This is due to MCC-specific netcode additions that only function when an
 MCC map is being played online. OpenCE clients wouldn't recognise the
@@ -203,7 +218,3 @@ Enter `adb pull` to copy the recording parts to a computer.
 
 A profiling build plays with normal builds. It does not use
 `--pgo=train`.
-
-Halo is a trademark of Microsoft. GulchCE is a fan project, not made or
-endorsed by Microsoft, Bungie or 343 Industries, and includes none of the
-game's content.
