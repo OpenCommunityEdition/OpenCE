@@ -499,3 +499,28 @@ The Android updater checks `chestahh/GulchCE` releases and compares GulchCE
 Build workflow numbers, just like the desktop updater. Release tags stay
 `build-<number>` and asset filenames stay unchanged. Successive Android
 releases must use the same signing key to install over each other.
+
+### GulchCE release signing
+
+The Build workflow requires both repository Actions secrets on `main`:
+
+- `ANDROID_KEYSTORE_BASE64`: the base64-encoded permanent keystore, with
+  private-key alias `halo`.
+- `ANDROID_KEYSTORE_PASSWORD`: the keystore and private-key password (the
+  same password for both).
+
+Missing either secret fails the Android job before compilation and prevents
+release publication. Other branches may use a debug key when both secrets
+are absent; a partial signing configuration fails on every branch. Malformed
+base64 fails during staging; Gradle rejects an invalid keystore or password.
+
+Keep an offline backup of the permanent keystore and its password outside
+the repository. Reuse this key for every release; do not regenerate it when
+moving machines or updating secrets. GitHub cannot return secret values.
+
+Older GulchCE releases used a new runner debug key for each build. Moving
+from one of those APKs to the permanent key requires backing up saved games,
+uninstalling the old app and installing the new one (see the backup commands
+above). Uninstalling deletes the app's data. Later releases signed with the
+permanent key can update in place. Stable signing does not guarantee that
+Google Play Protect immediately removes an unfamiliar-developer warning.
