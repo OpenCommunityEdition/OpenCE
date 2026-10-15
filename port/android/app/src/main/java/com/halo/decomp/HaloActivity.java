@@ -9,6 +9,7 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Display;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
@@ -28,15 +29,8 @@ import org.libsdl.app.SDLActivity;
  * loads the game image from the APK's assets.
  */
 public class HaloActivity extends SDLActivity {
-    /** lets system link's broadcasts in over Wi-Fi while the game runs */
     private WifiManager.MulticastLock multicastLock;
-    /**
-     * the latest system gesture insets {left, top, right, bottom}, in pixels;
-     * written on the UI thread, read by the game's thread: replaced as a
-     * whole, never changed in place
-     */
     private volatile int[] gestureInsets = new int[] { 0, 0, 0, 0 };
-    /** the on-screen touch controls, over SDL's surface */
     private TouchControls touchControls;
     private static final int EXPORT_LAYOUT = 401, IMPORT_LAYOUT = 402;
     private String pendingLayoutExport;
@@ -60,11 +54,9 @@ public class HaloActivity extends SDLActivity {
         preferHighestRefreshRate();
         trackGestureInsets();
         acquireMulticastLock();
-        // a new version looked for while the game starts
         Updater.start(this);
     }
 
-    /** the system's file picker, for the touch layout; no storage permission */
     public void chooseLayoutFile(boolean export, String configuration) {
         String message = export
             ? "Choose the folder and the name of the touch layout file."
@@ -108,7 +100,6 @@ public class HaloActivity extends SDLActivity {
         if (result != RESULT_OK || data == null || data.getData() == null)
             return;
         Uri document = data.getData();
-        // (the file is read and written away from the UI thread)
         new Thread(() -> {
             try {
                 if (request == EXPORT_LAYOUT)
@@ -146,7 +137,6 @@ public class HaloActivity extends SDLActivity {
             }
         }
         String configuration = new String(contents.toByteArray(), StandardCharsets.UTF_8);
-        // checked here, then applied to the overlay at once
         TouchLayout.importConfiguration(configuration);
         runOnUiThread(() -> {
             if (isFinishing() || isDestroyed() || touchControls == null)
@@ -168,6 +158,16 @@ public class HaloActivity extends SDLActivity {
             .setMessage("The operation did not complete: " + error.getMessage())
             .setPositiveButton("OK", null)
             .show();
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (touchControls != null && touchControls.isEditing() && event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            if (event.getAction() == KeyEvent.ACTION_UP)
+                touchControls.stopEditing();
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     @Override
@@ -205,13 +205,6 @@ public class HaloActivity extends SDLActivity {
         super.onDestroy();
     }
 
-    /**
-     * keeps gestureInsets current; Android sends the insets again when the
-     * activity rotates (after the game's native code has started on a phone
-     * launched from portrait), so a single read at startup would keep the
-     * portrait values; the listener hands the insets on so SDL's own
-     * handling still sees them
-     */
     private void trackGestureInsets() {
         getWindow().getDecorView().setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
             @Override
@@ -222,10 +215,9 @@ public class HaloActivity extends SDLActivity {
         });
     }
 
-    @SuppressWarnings("deprecation") // getSystemGestureInsets is the only call on Android 10
+    @SuppressWarnings("deprecation")
     private static int[] readGestureInsets(WindowInsets insets) {
         Insets gesture;
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
             gesture = insets.getInsets(WindowInsets.Type.systemGestures());
         else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
@@ -235,27 +227,10 @@ public class HaloActivity extends SDLActivity {
         return new int[] { gesture.left, gesture.top, gesture.right, gesture.bottom };
     }
 
-    /**
-     * the edges of the screen where Android keeps its gestures; in sticky
-     * full screen the first swipe from an edge only shows the system bars,
-     * and Android hands that swipe to the game as an ordinary finger, so
-     * the game (port/linux/src/touch_input.c) must ignore touches that
-     * begin there; returns a copy of {left, top, right, bottom} in pixels:
-     * all 0 before Android 10 (which has no insets) and until the first
-     * insets arrive. The game's native code calls this through JNI by name
-     * and signature (host_main.c GetMethodID(...,
-     * "getSystemGestureInsetsPixels", "()[I")), at every finger down, so
-     * it must not be renamed, retyped or removed as unused
-     */
     public int[] getSystemGestureInsetsPixels() {
         return gestureInsets.clone();
     }
 
-    /**
-     * Many phones drop the Wi-Fi's broadcast and multicast datagrams to
-     * save power unless an app holds this: without it they would not see
-     * system link games on the local network, nor be seen hosting one.
-     */
     private void acquireMulticastLock() {
         try {
             WifiManager wifi = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
@@ -265,16 +240,10 @@ public class HaloActivity extends SDLActivity {
             multicastLock.setReferenceCounted(false);
             multicastLock.acquire();
         } catch (RuntimeException e) {
-            // (no Wi-Fi, or not allowed: the local network may miss games)
             multicastLock = null;
         }
     }
 
-    /**
-     * The game draws a frame at every display refresh, between its 30 Hz
-     * ticks (port/linux/game/render_interpolation.c); Android otherwise
-     * often keeps an app at 60 Hz on a faster display.
-     */
     private void preferHighestRefreshRate() {
         Display display = getWindowManager().getDefaultDisplay();
         Display.Mode current = display.getMode();
