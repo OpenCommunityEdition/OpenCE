@@ -4184,6 +4184,10 @@ static boolean player_profile_initialize_controller_settings(
 		case _button_preset_swap_b_and_right_thumb:
 			option_spinner->data3C.selected_index = 4;
 			break;
+		/* port: this port's own preset, the sixth row of the spinner */
+		case _button_preset_swap_b_and_right_bumper:
+			option_spinner->data3C.selected_index = 5;
+			break;
 		default:
 			option_spinner->data3C.selected_index = 0;
 			break;
@@ -4822,6 +4826,8 @@ static boolean player_profile_change_controller_settings(
 		case _button_preset_swap_a_and_left_trigger: profile->controller_settings.button_preset = _button_preset_swap_a_and_left_trigger; return TRUE;
 		case _button_preset_swap_b_and_left_trigger: profile->controller_settings.button_preset = _button_preset_swap_b_and_left_trigger; return TRUE;
 		case _button_preset_swap_b_and_right_thumb: profile->controller_settings.button_preset = _button_preset_swap_b_and_right_thumb; return TRUE;
+		/* port: this port's own preset */
+		case _button_preset_swap_b_and_right_bumper: profile->controller_settings.button_preset = _button_preset_swap_b_and_right_bumper; return TRUE;
 		default: error(2, "unknown button config option selected"); return TRUE;
 		}
 	}

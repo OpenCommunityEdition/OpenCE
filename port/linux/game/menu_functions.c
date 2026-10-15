@@ -1624,6 +1624,10 @@ profile's button settings as the Xbox's Controller Setup shows them */
 BITMAP_FRAMES): Gamepad Setup's row's, as the list numbers its rows
 (player_profile_edit_select_menu_update_extended_description), and after
 the PC version's nine the Xbox's five of the button settings */
+/* port: the Xbox has a picture of each of its five button settings and no
+   more, so a preset this port added (player_profile.h) shows the standard
+   picture until one is drawn */
+#define NUMBER_OF_BUTTON_PICTURES 5
 #define PROFILE_GAMEPAD_FRAME 2
 #define PROFILE_FIRST_LAYOUT_FRAME 9
 
@@ -1635,10 +1639,10 @@ static void profile_gamepad_layout(struct widget_instance *picture)
 	short frame = picture->animation.current_frame_index;
 
 	if (frame == PROFILE_GAMEPAD_FRAME ||
-		(frame >= PROFILE_FIRST_LAYOUT_FRAME && frame < PROFILE_FIRST_LAYOUT_FRAME + NUMBER_OF_BUTTON_PRESETS))
+		(frame >= PROFILE_FIRST_LAYOUT_FRAME && frame < PROFILE_FIRST_LAYOUT_FRAME + NUMBER_OF_BUTTON_PICTURES))
 	{
 		picture->animation.current_frame_index = (short)(PROFILE_FIRST_LAYOUT_FRAME +
-			(profile && profile->controller_settings.button_preset < NUMBER_OF_BUTTON_PRESETS ?
+			(profile && profile->controller_settings.button_preset < NUMBER_OF_BUTTON_PICTURES ?
 				profile->controller_settings.button_preset : _button_preset_standard));
 	}
 }

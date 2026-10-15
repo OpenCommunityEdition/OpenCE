@@ -37,6 +37,9 @@ enum
 	_button_preset_swap_a_and_left_trigger,
 	_button_preset_swap_b_and_left_trigger,
 	_button_preset_swap_b_and_right_thumb,
+	/* port: this port's own preset, melee on the right bumper and switching
+	   grenades on B; the table is player_ui.c's */
+	_button_preset_swap_b_and_right_bumper,
 	NUMBER_OF_BUTTON_PRESETS
 };
 
