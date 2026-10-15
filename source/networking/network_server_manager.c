@@ -468,6 +468,7 @@ symbols in this file:
 #include "networking/network_server_manager.h"
 #include "networking/network_server_manager_internal.h"
 #include "networking/network_server_message_handler.h"
+#include "mcc_protocol.h" /* port: capability lifetime belongs to the connection */
 #include "mcc_ui_network.h"
 #include "saved games/player_profile.h"
 #include "text/unicode.h"
@@ -1288,6 +1289,7 @@ struct network_game_server *network_game_server_create(
 			network_game_invalidate(&server->game);
 
 			server->game.difficulty = main_get_difficulty();
+			mcc_protocol_reset(); /* port: a fresh server has no negotiated MCC peers */
 			server->game.number_of_games_played = -1;
 
 			for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
@@ -1334,6 +1336,7 @@ struct network_game_server *network_game_server_create(
 void network_game_server_dispose(
 	struct network_game_server *server)
 {
+	mcc_protocol_reset(); /* port: no stale MCC peer pointers */
 	mcc_ui_network_server_dispose(server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x120, server);
 
@@ -3583,6 +3586,7 @@ boolean network_game_server_remove_client_machine_from_game(
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x22F, server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x230, client);
+	mcc_protocol_forget(client); /* port: reused slots must renegotiate MCC */
 
 	if (_network_game_server_state_ingame == server->state)
 	{

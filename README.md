@@ -14,9 +14,10 @@ The decompilation is of the Xbox build 2342. (`cachebeta.exe`, SHA-256
 
 ## Will you always stay compatible with OpenCE?
 
-Yes! GulchCE will always match the same network version as OpenCE,
-so GulchCE and OpenCE players can play together. The only time crossplay
-would not be possible is when GulchCE players host matches with MCC maps.
+GulchCE supports crossplay on Xbox and Custom Edition maps with the latest
+verified OpenCE network protocol, currently version 29. New OpenCE protocol
+versions need to be checked before we adopt them. MCC games require matching
+GulchCE clients and cannot be joined by ordinary OpenCE clients.
 
 This is due to MCC-specific netcode additions that only function when an
 MCC map is being played online. OpenCE clients wouldn't recognise the

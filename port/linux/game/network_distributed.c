@@ -53,6 +53,7 @@ machine (their datum identifiers need not be).
 */
 
 #include "cseries.h"
+#include "mcc_cache.h"
 #include "cseries/errors.h"
 #include "cache/cache_files.h"
 #include "devices/devices.h"
@@ -4003,6 +4004,9 @@ void network_distributed_handle_message(
 	if (size < sizeof(header) || !game_in_progress())
 		return;
 	csmemcpy(&header, message, sizeof(header));
+	/* MCC messages never execute in an ordinary OpenCE session, even in a batch. */
+	if (header.type >= _distributed_message_mcc_grenades && !mcc_cache_tags_loaded())
+		return;
 	/* a tick's messages in one: each as if it came alone */
 	if (header.type == _distributed_message_batch)
 	{

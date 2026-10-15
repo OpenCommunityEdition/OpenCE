@@ -1,4 +1,4 @@
-version 44
+version 45
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
 bound DISTRIBUTED_INPUT_HISTORY 4
@@ -40,6 +40,11 @@ bound P2P_PLAYER_KEY_HASH_SIZE 16
 define DISTRIBUTED_ANGULAR_VELOCITY_SCALE 4096.0f
 define DISTRIBUTED_UNIT_SCALE 32767.0f
 define DISTRIBUTED_VELOCITY_SCALE 1024.0f
+define MCC_PROTOCOL_ADVERTISED_FLAG 0x04
+define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 3
+define MCC_PROTOCOL_JOIN_KIND 91
+define MCC_PROTOCOL_JOIN_MAX 256
+define MCC_PROTOCOL_VERSION 45
 enum _distributed_actor_camouflaged_bit 4
 enum _distributed_actor_impulse_aligned_bit 6
 enum _distributed_actor_rides_bit 0
@@ -193,6 +198,7 @@ fields server_pregame_countdown 758215ada4e1
 fields server_pregame_keep_alive 758215ada4e1
 fields server_remove_player_ingame 1718d4189972
 fields server_switch_to_pregame 678699dea271
+protocol OpenCE 29
 size message_client_add_player_request_ingame 0x20
 size message_client_add_player_request_pregame 0x20
 size message_client_broadcast_game_search 0x0C

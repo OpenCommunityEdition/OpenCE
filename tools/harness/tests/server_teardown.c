@@ -38,6 +38,7 @@ static boolean message_fails, send_fails, machines_fail;
 
 /* These legacy teardown cases have no pending MCC restart. Its independent
    snapshot lifetime is exercised by test_mcc_ui_network.py. */
+static void mcc_protocol_reset(void) { } /* Independent peer lifetime: test_mcc_protocol.py. */
 static void mcc_ui_network_server_dispose(struct network_game_server *server) { (void)server; }
 
 static void note(char event)
