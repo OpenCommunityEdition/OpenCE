@@ -475,6 +475,7 @@ symbols in this file:
 #include "interface/player_ui.h"
 #include "tag_files/tag_files.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
+#include "bots.h" /* port: port/linux/game/bots.c */
 
 /* port: internet play's Discord presence (port/linux/src/p2p.c), and the
 server browser's listing of a public game (p2p_lobby.c) */
@@ -1517,6 +1518,104 @@ static void network_game_server_list(
 		in_progress, game->variant.universal_variant.teams);
 }
 
+/* port: the bots (port/linux/game/bots.c, the settings' bots.count and
+bots.teams): in the lobby of a local (split screen) Slayer game, as many bot
+players as the settings ask for, as far as the game has room, each the one
+player of a machine of its own (BOTS_FIRST_MACHINE up, which no real machine
+is). In a team game they even the teams with the players or, for bots.teams
+"against", all take the team the players are not on; the players may change
+teams in the lobby, and the bots follow. They leave when the setting asks
+for fewer, or the game is another gametype. Not once the game has been
+started, nor in a game other machines may join (system link and internet
+games: no bots there, which would need the clients told) */
+static void network_game_server_port_bots(
+	struct network_game_server *server)
+{
+	long slot_of_bot[BOTS_MAXIMUM];
+	long team_counts[NUMBER_OF_MULTIPLAYER_TEAMS] = { 0, 0 };
+	long human_team = NONE;
+	long wanted = 0;
+	long slot;
+	long bot_index;
+	boolean changed = FALSE;
+
+	if (server->state != _network_game_server_state_pregame || server->sent_start_game_message)
+		return;
+	if (network_game_is_splitscreen_local() && server->game.variant.game_engine_index == game_engine_slayer)
+		wanted = PIN(bots_wanted_count(), 0, BOTS_MAXIMUM);
+	for (bot_index = 0; bot_index < BOTS_MAXIMUM; bot_index++)
+		slot_of_bot[bot_index] = NONE;
+	for (slot = 0; slot < MAXIMUM_NETWORK_PLAYER_COUNT; slot++)
+	{
+		struct network_player *player = &server->game.players[slot];
+
+		if (!network_player_is_valid(player))
+			continue;
+		if (bots_machine_is_bot(player->machine_index))
+			slot_of_bot[player->machine_index - BOTS_FIRST_MACHINE] = slot;
+		else if (VALID_INDEX(player->team_index, NUMBER_OF_MULTIPLAYER_TEAMS))
+		{
+			team_counts[player->team_index]++;
+			if (human_team == NONE)
+				human_team = player->team_index;
+		}
+	}
+	/* (no bots before a player is in: the lobby's own first player) */
+	if (human_team == NONE)
+		wanted = 0;
+
+	/* those not wanted leave (the last first) */
+	for (bot_index = BOTS_MAXIMUM - 1; bot_index >= wanted; bot_index--)
+	{
+		if (slot_of_bot[bot_index] != NONE)
+		{
+			struct network_player leaving = server->game.players[slot_of_bot[bot_index]];
+
+			if (network_game_remove_player(&server->game, &leaving))
+			{
+				network_event("bots: bot %ld left the lobby", bot_index + 1);
+				changed = TRUE;
+			}
+			slot_of_bot[bot_index] = NONE;
+		}
+	}
+	/* the teams: each bot in turn on the smaller team (evening them with the
+	players), or the players' other team */
+	for (bot_index = 0; bot_index < wanted; bot_index++)
+	{
+		long team_index;
+
+		if (bots_teams() == _bots_teams_against)
+			team_index = human_team == 0 ? 1 : 0;
+		else
+			team_index = team_counts[1] < team_counts[0] ? 1 : 0;
+		if (slot_of_bot[bot_index] == NONE)
+		{
+			struct network_player joining;
+
+			if (server->game.player_count >= server->game.maximum_players)
+				break;
+			bots_network_player(bot_index, &joining);
+			joining.team_index = (char)team_index;
+			joining.primary_color_index = NONE;
+			get_unique_random_color(server, &joining);
+			joining.player_list_index = NONE;
+			if (!network_game_add_player(&server->game, &joining))
+				break;
+			network_event("bots: bot %ld joined the lobby (team %ld)", bot_index + 1, team_index);
+			changed = TRUE;
+		}
+		else if (server->game.players[slot_of_bot[bot_index]].team_index != team_index)
+		{
+			server->game.players[slot_of_bot[bot_index]].team_index = (char)team_index;
+			changed = TRUE;
+		}
+		team_counts[team_index]++;
+	}
+	if (changed && !network_game_server_send_game_data_pregame(server))
+		network_event("network_game_server_port_bots() failed to send updated game settings to clients");
+}
+
 boolean network_game_server_idle(
 	struct network_game_server *server)
 {
@@ -1533,6 +1632,8 @@ boolean network_game_server_idle(
 		}
 	}
 
+	/* port: the bots of a local game (port/linux/game/bots.c) */
+	network_game_server_port_bots(server);
 	/* (what Discord shows of a game hosted for internet play, and the
 	server browser's listing) */
 	p2p_set_game_player_counts(server->game.player_count, server->game.maximum_players);

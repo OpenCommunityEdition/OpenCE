@@ -237,6 +237,7 @@ symbols in this file:
 #include "data.h"
 #include "devices/devices.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "bots.h" /* port: port/linux/game/bots.c */
 #include "cutscene/cinematics.h" /* port: network co-op's first spawns */
 #include "editor/editor_stubs.h"
 #include "effects/effects.h"
@@ -607,6 +608,8 @@ void players_initialize_for_new_map(
 		machine_to_player_table,
 		NONE,
 		sizeof(machine_to_player_table));
+	/* port: the bots of local games (port/linux/game/bots.c) */
+	bots_initialize_for_new_map();
 
 	return;
 }
@@ -614,6 +617,8 @@ void players_initialize_for_new_map(
 void players_dispose_from_old_map(
 	void)
 {
+	/* port: the bots of local games (port/linux/game/bots.c) */
+	bots_dispose_from_old_map();
 	data_make_invalid(player_data);
 	data_make_invalid(team_data);
 
@@ -4751,6 +4756,9 @@ void players_update_before_game(
 	players_coop_rescue_stranded();
 	if (update_client_dequeue(actions))
 	{
+		/* port: the controls of a local game's bots this tick
+		(port/linux/game/bots.c), in place of what their queues held */
+		bots_update_actions(actions);
 		data_iterator_new(&iterator, player_data);
 		while (player = data_iterator_next(&iterator))
 		{
