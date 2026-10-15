@@ -53,6 +53,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c */
 #include "cseries/errors.h"
 #include "bitmaps/bitmap_group.h"
 #include "cache/texture_cache.h"
@@ -967,6 +968,9 @@ static void crosshairs_draw(
 	long stack_buffer[STACK_BUFFER_LENGTH];
 	boolean firing_active = FALSE;
 
+	/* port: project the passenger's shot once for all pieces of its reticle */
+	if (!passenger_camera_reticle_begin(player->local_player_index, weapon_index))
+		return;
 	csmemset(
 		stack_buffer,
 		0x62,
@@ -1324,6 +1328,8 @@ static void crosshairs_draw(
 		}
 	}
 
+	/* port: other HUD elements keep their ordinary anchors */
+	passenger_camera_reticle_end();
 	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_weapon.c", 0x4E2);
 	return;
 }

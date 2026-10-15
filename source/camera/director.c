@@ -126,6 +126,7 @@ symbols in this file:
 #include "first_person_camera.h"
 #include "flying_camera.h"
 #include "following_camera.h"
+#include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c */
 #include "observer.h"
 #include "orbiting_camera.h"
 
@@ -615,6 +616,9 @@ static void director_choose_game_perspective(
 	short local_player_index,
 	boolean force)
 {
+	/* port: remember only local display choices, never a shared seat flag */
+	static boolean passenger_views[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+	boolean passenger = passenger_camera_enabled(local_player_index);
 	director_perspective perspective;
 	short following;
 	long unit_index;
@@ -622,7 +626,13 @@ static void director_choose_game_perspective(
 
 	unit_index = player_control_get_unit_index(local_player_index);
 	following = director_desired_perspective(unit_index, &perspective);
-	if (force || director->seat_state != perspective)
+	/* port: the local passenger view must not change the deterministic
+	camera used by player_aim_projectile. Reconsider a menu toggle even
+	when the seat's enter/exit state has not changed. */
+	if (passenger)
+		following = TRUE;
+	if (force || director->seat_state != perspective ||
+		passenger != passenger_views[local_player_index])
 	{
 		if (following == TRUE)
 		{
@@ -647,6 +657,8 @@ static void director_choose_game_perspective(
 		director->seat_state = perspective;
 	}
 
+	/* port: a menu toggle can change the view without changing seats */
+	passenger_views[local_player_index] = passenger;
 	return;
 }
 
@@ -880,9 +892,10 @@ static boolean director_update_controls(
 		struct mouse_state const *mouse = input_get_mouse_state();
 
 		switch_camera = input_key_is_down(_key_backspace) == TRUE;
-		if ((director->camera_proc !=
+		/* port: the passenger follows their aim, never the debug mouse orbit */
+		if (!passenger_camera_enabled(local_player_index) && ((director->camera_proc !=
 				(director_camera_update_proc)first_person_camera_update &&
-			mouse->buttons[1]) || input_key_is_down(_key_tab))
+			mouse->buttons[1]) || input_key_is_down(_key_tab)))
 		{
 			SET_FLAG(control_flags, _camera_control_forward_bit,
 				input_key_is_down(_key_w));
