@@ -136,17 +136,19 @@ stays unchanged. Initial admission and actual loading do read the full content,
 so large packages can take longer at these points. The previous 32-bit checksum
 remains for checkpoint identity and engine bookkeeping; it is no longer the
 MCC network content proof. Existing save identities are unchanged by SHA-256.
-All peers need GulchCE protocol 42, including for legacy maps. Xbox and Custom
-Edition retain their original matching/loading behavior. Network support uses
-OpenCE's host-authoritative protocol, not MCC clients.
+MCC peers need matching GulchCE MCC protocol 45. Xbox and Custom Edition use
+the verified OpenCE protocol 29 and retain their original matching/loading
+behavior. See the crossplay boundary in `port/linux/NETCODE.md`. Network
+support uses OpenCE's host-authoritative engine, not official MCC clients.
 
 The shared integration is limited to the settings record's appended digest,
 the two host settings senders, client settings admission, and client teardown.
 These hooks are necessary because MCC modules alone cannot attach data to the
 existing host record or resolve a local path before its generic presence check.
 All hashing, package selection and binding lifetime policy lives in MCC modules;
-legacy settings carry zero digest bytes and keep their original checks. The
-protocol recorder includes the full settings record and its size/offset bounds.
+legacy settings omit the digest trailer and keep their original checks. The
+protocol recorder includes the full MCC settings record and its size/offset
+bounds; the crossplay tests separately pin the unchanged OpenCE prefix.
 
 MCC's `halo1/maps/bitmaps.map` stores individual texture entries. Its
 `halo1/maps/custom_edition` resources store grouped `__pixels` and

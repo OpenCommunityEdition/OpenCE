@@ -387,6 +387,8 @@ symbols in this file:
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
+#include "mcc_protocol.h" /* port: negotiate MCC only with an advertising host */
+void network_game_client_reset_settings_staging(void); /* port: discard partial settings across connections */
 #include "mcc_identity.h" /* port: MCC content admission and local package resolution */
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
@@ -903,6 +905,8 @@ void network_game_client_dispose(
 {
 	if (client)
 	{
+		network_game_client_reset_settings_staging(); /* port: discard partial old-host settings */
+		mcc_protocol_client_clear(); /* port: no capability survives a connection */
 		mcc_identity_disconnect(); /* port: discard the MCC session's local binding */
 		if (client->connection)
 			network_connection_delete(client->connection);
@@ -2045,6 +2049,24 @@ boolean network_game_client_initiate_join_game(
 		0x157,
 		client && (client->state == _network_game_client_state_searching) && game && join_parameters && client->connection && !network_connection_connected(client->connection) && (game->platform == network_game_get_local_platform()));
 
+	/* port: bind the capability to the selected advertisement, not a prior host. */
+	network_game_client_reset_settings_staging(); /* port: a new host starts a new record */
+	{
+		unsigned int mcc_flags = 0;
+		long advertised_index;
+		/* port: the host joins its own loopback server using a temporary
+		 * advertisement, which is not an entry in available_games. */
+		if (global_network_game_server_get() &&
+			address->address.long_words[0] == IPV4_LOOPBACK_ADDRESS)
+			mcc_flags = MCC_PROTOCOL_ADVERTISED_FLAG;
+		else for (advertised_index = 0; advertised_index < MAXIMUM_NETWORK_ADVERTISED_GAMES; advertised_index++)
+			if (game == &client->available_games[advertised_index])
+			{
+				mcc_flags = network_game_client_advertised_versions[advertised_index].flags;
+				break;
+			}
+		mcc_protocol_client_begin(mcc_flags);
+	}
 	client->join_in_progress = TRUE;
 	client->connect_process = 0;
 	client->connection_attempt_time = system_milliseconds();
@@ -2511,6 +2533,10 @@ static boolean add_advertised_game(
 				(advertisement->__unknown5A[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] << 8));
 			network_game_client_advertised_versions[game_index].flags =
 				advertisement->__unknown5A[HALO_PORT_ADVERTISED_FLAGS_OFFSET];
+			/* port: another MCC revision can still use the ordinary OpenCE join. */
+			if (advertisement->__unknown5A[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET] != (MCC_PROTOCOL_VERSION & 255) ||
+				advertisement->__unknown5A[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET + 1] != (MCC_PROTOCOL_VERSION >> 8))
+				network_game_client_advertised_versions[game_index].flags &= ~MCC_PROTOCOL_ADVERTISED_FLAG;
 		}
 
 		if (advertisement->game_name[0] != L'\0')
@@ -2821,6 +2847,7 @@ static boolean network_game_client_idle_joining(
 			{
 				struct message_client_join_game_request join_game_request;
 				message_header *message;
+				word mcc_join[MCC_PROTOCOL_JOIN_MAX / sizeof(word)]; /* port: bounded optional envelope */
 
 				csmemset(&join_game_request, 0, sizeof(join_game_request));
 				network_game_generate_local_machine_name(join_game_request.machine_name);
@@ -2841,6 +2868,8 @@ static boolean network_game_client_idle_joining(
 					_message_client_join_game_request,
 					&join_game_request,
 					sizeof(join_game_request));
+				if (message)
+					message = (message_header *)mcc_protocol_join(message, GET_MESSAGE_SIZE(*message), mcc_join); /* port */
 				if (message)
 				{
 					if (network_game_client_write(
@@ -3108,15 +3137,22 @@ boolean network_game_client_advertised_game_compatible(
 
 	if (game_index < 0 || game_index >= MAXIMUM_NETWORK_ADVERTISED_GAMES)
 		return FALSE;
+	ours = mcc_protocol_version(game->map.name); /* port: distinct MCC protocol */
 	theirs = network_game_client_advertised_versions[game_index].version;
 	distributed = (network_game_client_advertised_versions[game_index].flags &
 		HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG) != 0;
-	if (theirs == ours && distributed)
+	if (theirs == ours && distributed && (ours == HALO_PORT_NETWORK_VERSION ||
+		(network_game_client_advertised_versions[game_index].flags & MCC_PROTOCOL_ADVERTISED_FLAG)))
 	{
 		network_event("joining a host of network version %u", theirs);
 		return TRUE;
 	}
-	if (theirs == ours)
+	if (ours == MCC_PROTOCOL_VERSION)
+	{
+		csprintf(message, "This MCC game requires GulchCE with MCC network version %u.\n\n"
+			"OpenCE clients can join Xbox and Custom Edition games only.", MCC_PROTOCOL_VERSION);
+	}
+	else if (theirs == ours)
 	{
 		csprintf(message,
 			"The host is using the lockstep network code, which this version no longer has.\n\n"

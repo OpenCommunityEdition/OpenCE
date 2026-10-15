@@ -139,6 +139,53 @@ A host's game advertisement says that it plays this netcode. A client does
 not join a host that does not (one of network version 4 built before the
 lockstep netcode was removed, set to play it): it tells the player why.
 
+## GulchCE crossplay boundary
+
+Xbox and Custom Edition sessions use OpenCE network version 29, verified against
+OpenCommunityEdition/OpenCE commit `8102e711c353068d22d62efe6bf67ebc8a90a22e`.
+This is an explicit protocol baseline, not automatic compatibility with future
+OpenCE releases. Do not change the base version without auditing its wire format,
+simulation rules and admission behavior and testing unmodified upstream clients.
+The pinned fixture and settings-prefix check are in `tools/test_mcc_protocol.py`.
+
+MCC sessions use separate MCC protocol version 45 (previous GulchCE builds used
+44). Discovery advertises the selected map family's protocol and, separately,
+the host's MCC capability version. A GulchCE client sends a bounded reliable join
+envelope only to a host advertising the same MCC capability. The envelope wraps
+an unchanged OpenCE join packet. The normal host admission still checks the join
+token, bans, slots and session state; capability does not grant any authority.
+An unmodified OpenCE host receives only the original join packet.
+Capability is an untrusted compatibility claim, not proof of client identity or
+honest execution. A modified client can claim support, but still passes all
+ordinary admission, ownership, message-direction and host-authority checks.
+
+An MCC host refuses ordinary joins before acceptance or settings transfer. When
+a lobby switches to MCC, it disconnects peers without the negotiated capability
+before broadcasting MCC settings. OpenCE's existing UI reports the incompatible
+network version when joining an MCC advertisement; GulchCE gives an MCC-specific
+explanation. Capability belongs to a connection and is cleared on removal or
+server disposal, including reused slots.
+
+Legacy settings transmit exactly OpenCE's prefix through `local_data`. Only MCC
+settings carry the additional SHA-256 digest. Receivers check the complete record's
+map family and negotiated capability, pin fragment lengths, clear the staging
+record on a new connection, and preserve host-source validation. MCC map matching
+and precache admission still use the SHA-256 identity and the local package binding.
+MCC gameplay messages do not execute on Xbox or Custom Edition maps.
+The shared hooks are necessary at discovery, join admission, settings framing
+and connection teardown: MCC modules cannot select these wire boundaries after
+the generic engine has already sent or accepted a message. Capability and
+map-family policy remain in `mcc_protocol.c`; existing gameplay authority and
+transport checks are not bypassed.
+
+The public internet listing uses the common OpenCE version 29 discovery format.
+This lets GulchCE discover both families without modifying the relay, signalling,
+WebRTC or signed listing formats. OpenCE can therefore see an MCC listing, but
+its subsequent game advertisement rejects the join. Direct invitations pass the
+same game discovery and host admission checks. The listing is not permission to
+join or load a map. Every MCC simulation or message change increments
+`MCC_PROTOCOL_VERSION`; the combined wire manifest follows that version.
+
 ## Versions
 
 The native builds' network code has a version, an unsigned 16-bit number

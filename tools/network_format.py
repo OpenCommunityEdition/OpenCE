@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""The wire format of HALO_PORT_NETWORK_VERSION (port/linux/network_format.txt).
+"""The combined OpenCE/MCC wire manifest (port/linux/network_format.txt).
+
+OpenCE protocol 29 is pinned separately by test_mcc_protocol.py. The combined
+manifest is versioned with MCC_PROTOCOL_VERSION; changing legacy wire items
+requires a verified upstream update as well, not merely an MCC version bump.
 
 Taken from the sources: the game's message numbers, sizes and fields
 (network_messages.c, .h) and the distributed netcode's (network_*.c, .h,
@@ -123,12 +127,17 @@ def items():
         add(f"size {name}", " ".join(size.split()))
     for fields, name in re.findall(r"\t\{\n((?:\t\t.*\n)*?)\t\},\n\tNETWORK_GAME_MESSAGE_DEFINITION\((\w+),", messages):
         add(f"fields {name}", _hash(fields))
+    protocol = (ROOT / "port/linux/game/mcc_protocol.h").read_text()
+    for name, value in re.findall(r"^#define (MCC_PROTOCOL_\w+) ([^\n]+)", protocol, re.M):
+        add(f"define {name}", value)
+    add("protocol OpenCE", re.search(r"#define HALO_PORT_NETWORK_VERSION (\d+)",
+        (ROOT / "port/linux/include/halo_port_limits.h").read_text()).group(1))
     return result
 
 
 def version():
-    limits = (ROOT / "port/linux/include/halo_port_limits.h").read_text()
-    return int(re.search(r"#define HALO_PORT_NETWORK_VERSION (\d+)", limits).group(1))
+    limits = (ROOT / "port/linux/game/mcc_protocol.h").read_text()
+    return int(re.search(r"#define MCC_PROTOCOL_VERSION (\d+)", limits).group(1))
 
 
 def recorded():
@@ -164,7 +173,7 @@ def record():
     recorded_version, old = recorded()
     breaking = changes(old, new)[0]
     if breaking and recorded_version == version():
-        sys.exit("changed or removed: " + ", ".join(breaking) + "\nraise HALO_PORT_NETWORK_VERSION first")
+        sys.exit("changed or removed: " + ", ".join(breaking) + "\nraise MCC_PROTOCOL_VERSION first (and verify the pinned OpenCE contract)")
     RECORD.write_text(f"version {version()}\n" + "".join(f"{name} {new[name]}\n" for name in sorted(new)))
 
 

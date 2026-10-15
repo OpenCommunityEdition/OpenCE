@@ -257,6 +257,7 @@ symbols in this file:
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
+#include "mcc_protocol.h" /* port: MCC-only admission and settings envelope */
 #include "mcc_identity.h" /* port: attach MCC content identity to host settings */
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
@@ -522,7 +523,8 @@ static boolean network_game_server_handle_message_client_join_game_request(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *client_machine,
 	word *message,
-	short message_size);
+	short message_size,
+	boolean mcc_capable); /* port: optional MCC admission, ordinary auth retained */
 static boolean network_game_server_handle_message_client_add_player_request_pregame(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *client_machine,
@@ -787,8 +789,11 @@ boolean network_game_server_send_game_settings_to_client_machine(
 	struct network_game mcc_settings; /* port: fingerprint extension, no host record mutation */
 	long offset;
 
+	/* port: no MCC settings reach a peer that has not negotiated them. */
+	if (!mcc_protocol_allows(game, machine)) return FALSE;
 	game = mcc_identity_host_settings(game, game_size, &mcc_settings); /* port: MCC admission */
 	if (!game) return FALSE;
+	game_size = mcc_protocol_settings_size(game); /* port: exact OpenCE prefix for legacy maps */
 
 	for (offset = 0; offset < game_size; offset += sizeof(message.data))
 	{
@@ -1069,8 +1074,11 @@ boolean network_game_server_send_game_settings_to_all_machines(
 	long offset;
 	boolean result = TRUE;
 
+	/* port: a map-family change removes incompatible peers before broadcasting. */
+	mcc_protocol_prune(server, game);
 	game = mcc_identity_host_settings(game, game_size, &mcc_settings); /* port: MCC admission */
 	if (!game) return FALSE;
+	game_size = mcc_protocol_settings_size(game); /* port: exact OpenCE prefix for legacy maps */
 
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_server_message_handler.c",
@@ -1197,7 +1205,7 @@ boolean network_game_server_handle_client_message(
 								server,
 								machine,
 								message,
-								message_buffer_size);
+								message_buffer_size, FALSE); /* port: ordinary OpenCE join */
 							if (!result)
 							{
 								network_event("network_game_server_handle_message_client_join_game_request() failed");
@@ -1378,6 +1386,18 @@ boolean network_game_server_handle_client_message(
 				break;
 
 			case _message_type_data:
+				/* port: an MCC capability envelope carries only an ordinary join.
+				 * The existing handler still checks tokens, bans and host admission. */
+				if (((byte *)message)[2] == MCC_PROTOCOL_JOIN_KIND)
+				{
+					word inner[MCC_PROTOCOL_JOIN_MAX / sizeof(word)];
+					word inner_size;
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) ||
+						!mcc_protocol_unwrap(message, message_buffer_size, inner, &inner_size))
+						return FALSE;
+					return network_game_server_handle_message_client_join_game_request(
+						server, machine, inner, inner_size, TRUE);
+				}
 				/* the distributed netcode's messages (port/linux/NETCODE.md) */
 				/* (port: voice chat's from any machine that joined, in the
 				lobby too: network_voice.c) */
@@ -1765,10 +1785,13 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			/* the native builds' network version and netcode (a client
 			refuses a host of another version, or of the lockstep netcode
 			older builds had: network_client_manager.c) */
-			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(HALO_PORT_NETWORK_VERSION & 0xFF);
-			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(HALO_PORT_NETWORK_VERSION >> 8);
+			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(mcc_protocol_version(game->map.name) & 0xFF);
+			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(mcc_protocol_version(game->map.name) >> 8);
+			/* port: capability version is separate even in an OpenCE lobby. */
+			advertisement.reserved[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET] = MCC_PROTOCOL_VERSION & 255;
+			advertisement.reserved[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET + 1] = MCC_PROTOCOL_VERSION >> 8;
 			advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] =
-				HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG;
+				HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG | MCC_PROTOCOL_ADVERTISED_FLAG; /* port: optional MCC join */
 			if (network_game_server_get_state(server, NULL) != _network_game_server_state_pregame ||
 				network_game_server_game_is_loading(server))
 			{
@@ -1901,7 +1924,8 @@ static boolean network_game_server_handle_message_client_join_game_request(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *server_client_machine,
 	word *message,
-	short message_size)
+	short message_size,
+	boolean mcc_capable /* port: optional MCC admission, ordinary auth retained */)
 {
 	boolean result = TRUE;
 	/* (or a distributed game in progress: network_game_server_accepts_late_joins) */
@@ -1933,6 +1957,12 @@ static boolean network_game_server_handle_message_client_join_game_request(
 			the countdown for ever */
 			boolean full = network_game_server_get_state(server, NULL) == _network_game_server_state_pregame &&
 				!network_game_has_free_player_slot(network_game_server_get_game(server));
+
+			/* port: bind capability to this connection before the normal admission.
+			 * A failed join is removed through the same lifecycle as any other peer. */
+			if (!mcc_protocol_peer(server_client_machine, mcc_capable) ||
+				!mcc_protocol_allows(network_game_server_get_game(server), server_client_machine))
+				return FALSE;
 
 			/* port: its hardware id, as it tells it: hex only (anything else
 			left out), no more than its field; the host logs it, and refuses

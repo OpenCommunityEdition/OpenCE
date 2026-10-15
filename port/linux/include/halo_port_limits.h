@@ -78,7 +78,9 @@ Raise it with any change to what the machines send each other. */
 /* Version 41: MCC hosts send reliable clock multipliers, including while paused. */
 /* Version 44 combines MCC content identity with upstream CE map-name/version rules.
  * Version 43 belongs to the optional camera branch. */
-#define HALO_PORT_NETWORK_VERSION 44
+/* OpenCE 8102e711 (version 29) is authoritative for ordinary sessions.
+ * MCC protocol 45 is negotiated separately (mcc_protocol.h). */
+#define HALO_PORT_NETWORK_VERSION 29
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags */
 #define HALO_PORT_ADVERTISED_VERSION_OFFSET 0
