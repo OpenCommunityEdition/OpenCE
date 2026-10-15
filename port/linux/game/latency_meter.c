@@ -5,7 +5,12 @@ The latency meter of a network game (display.latency_meter, off by
 default): this machine's round trip to the host, "Ping 45 ms" with four
 bars, green below 80 ms, yellow below 150, red from 150, at the screen's top
 right under the shields while a game is played (the frame rate counter is at
-the bottom right, a map's download at the top).
+the bottom right, a map's download at the top). With the meter on, the
+scoreboard's pings are drawn in the same colours, and where this machine
+times a player's round trip itself (the host: every client's; a client: its
+own players'), the scoreboard shows that, so it agrees with the meter; the
+others are the host's measure in ticks, which every machine is sent
+(game_engine.c).
 
 What it shows is the distributed netcode's own round trip (NETCODE.md),
 timed in milliseconds rather than ticks (network_distributed.c): nothing is
@@ -151,6 +156,14 @@ short latency_meter_color(
 		color->blue = 0.3f;
 	}
 	return bars;
+}
+
+long latency_meter_player_ping(
+	short player_index)
+{
+	long ping = latency_meter_shown() ? distributed_player_measured_ping(player_index) : NONE;
+
+	return ping != NONE ? ping : distributed_player_ping(player_index);
 }
 
 void latency_meter_draw(

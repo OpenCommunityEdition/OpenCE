@@ -692,8 +692,10 @@ static boolean distributed_own_ping_valid;
 static real distributed_own_ping_milliseconds;
 static unsigned long distributed_host_silent_since;
 /* ... what is shown (refreshed in the tick every PING_REFRESH_TICKS, so
-the render reads it whole): a client's own round trip, and the host's
-slowest client's; NONE for none */
+the render reads it whole): each player's round trip as this machine times
+it (the host: each client's, its own players' 0; a client: its own
+players'), a client's own, and the host's slowest client's; NONE for none */
+static long distributed_shown_pings[MAXIMUM_TRACKED_PLAYERS];
 static long distributed_shown_own_ping = NONE;
 static long distributed_shown_slowest_ping = NONE;
 /* a client: each player's ping as the host last told it (UNKNOWN_PING: not
@@ -1456,11 +1458,36 @@ static void distributed_refresh_pings(
 	void)
 {
 	short connection = game_connection();
+	short player_index;
 
 	distributed_shown_own_ping = NONE;
 	distributed_shown_slowest_ping = NONE;
 	if (connection == _game_connection_network_client && distributed_own_ping_valid)
 		distributed_shown_own_ping = (long)(distributed_own_ping_milliseconds + 0.5f);
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+	{
+		long ping = NONE;
+
+		if (!distributed_player(player_index))
+			;
+		else if (connection == _game_connection_network_server)
+		{
+			long machine_index = distributed_player_machines[player_index];
+
+			if (machine_index == NONE)
+				ping = 0;
+			else if (machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES &&
+				distributed_round_trips[machine_index].milliseconds_valid)
+			{
+				ping = (long)(distributed_round_trips[machine_index].milliseconds + 0.5f);
+			}
+		}
+		else if (distributed_player_is_local(player_index))
+		{
+			ping = distributed_shown_own_ping;
+		}
+		distributed_shown_pings[player_index] = ping;
+	}
 	if (connection == _game_connection_network_server)
 	{
 		long machine_indices[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
@@ -1532,6 +1559,12 @@ static void distributed_refresh_pings(
 				distributed_own_round_trip, problem ? ", connection problem" : "");
 		}
 	}
+}
+
+long distributed_player_measured_ping(
+	short player_index)
+{
+	return player_index >= 0 && player_index < MAXIMUM_TRACKED_PLAYERS ? distributed_shown_pings[player_index] : NONE;
 }
 
 long distributed_own_ping(
@@ -3583,6 +3616,8 @@ void network_distributed_new_game(
 	distributed_host_silent_since = 0;
 	distributed_shown_own_ping = NONE;
 	distributed_shown_slowest_ping = NONE;
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+		distributed_shown_pings[player_index] = NONE;
 	for (type = 0; type < TICK_SENT_TIMES; type++)
 		distributed_tick_sent_times[type].time = NONE;
 	csmemset(distributed_machine_players, 0xFF, sizeof(distributed_machine_players));
