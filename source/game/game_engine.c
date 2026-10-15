@@ -4145,6 +4145,15 @@ boolean game_engine_showing_postgame(
 	return game_engine != NULL && game_engine_globals.postgame_state == game_engine_mode_postgame_rasterize;
 }
 
+/* port: whether a game is being played: one of no game engine's (the
+campaign, co-op), or its game not over (port/linux/game/latency_meter.c) */
+boolean game_engine_in_play(
+	void)
+{
+	return game_engine == NULL || game_engine_globals.postgame_state == game_engine_mode_active;
+}
+
+
 void game_variant_options_default(
 	struct game_variant const *variant,
 	struct game_variant_options *options)
