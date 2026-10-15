@@ -16,7 +16,7 @@
 <hr>
 
 <h3 align="center">
-GulchCE is and always will be compatible with OpenCE, and players on both clients can play together.
+GulchCE will always be compatible with OpenCE, so players on both clients can play together.
 </h3>
 <br>
 <p align="center">
@@ -24,7 +24,6 @@ GulchCE is and always will be compatible with OpenCE, and players on both client
 </p>
 <hr>
 <br>
-</br>
 
 ## What is GulchCE?
 GulchCE is a fork of [OpenCommunityEdition/OpenCE](https://github.com/OpenCommunityEdition/OpenCE) - the Halo: Combat Evolved decompilation project targeting Linux, 
