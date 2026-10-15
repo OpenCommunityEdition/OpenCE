@@ -80,10 +80,13 @@ and put these into `mcc_maps/_shared/multiplayer`.
 
 You must obtain these files from an legally-owned installed copy of Halo 1 on the Halo: The Master Chief Collection.
 
-For maps with their own bitmaps.map and sounds.map resources, you need to put these into a subfolder,
-for example `mcc_maps/Solar Flare/`. maps in those folders then appear as selectable folders in the
-level select menu. Open a folder tochoose a level, or select a loose map directly. Back returns 
-to the folder list.
+**Some custom maps come with their own bitmaps.map and sounds.map resources. These are separate from the `_shared` folder.**
+
+- These resources can be found inside `workshop/content/976730/[workshop ID]/halo1/maps`.
+- Install these along the custom level .map files in your specific custom map folder, e.g. `mcc_maps\MercuryRising`.
+- If you don't do this, the MCC compatibility layer will recognise this and refuse to load the map until these resources are installed.
+
+Not every custom map will come with their own custom resources, and will instead rely on what's inside the `_shared` folder if necessary.
 
 See [MCC map support](docs/mcc_maps.md) for installation, supported formats,
 validation results and remaining compatibility limits.
