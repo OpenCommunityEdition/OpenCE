@@ -22,6 +22,7 @@ Halo is a trademark of Microsoft. GulchCE is a fan project, not made or endorsed
 </p>
 <hr>
 
+## What is GulchCE?
 GulchCE is a fork of [OpenCommunityEdition/OpenCE](https://github.com/OpenCommunityEdition/OpenCE) - the Halo: Combat Evolved decompilation project targeting Linux, 
 Windows, Android and web browsers.
 
