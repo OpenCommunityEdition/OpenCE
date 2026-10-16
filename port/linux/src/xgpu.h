@@ -296,9 +296,10 @@ cannot be (once FALSE, it stays so) */
 BOOL xgpu_post_prepare_hdr(void);
 
 /* tone maps the corners (as xgpu_post_anti_alias's) of a GL_RGBA16F target:
-reads its pixels from source (its texture's framebuffer), writes the colour
-(not alpha) into destination (the same, or its multisampled renderbuffer's) */
-BOOL xgpu_post_tone_map(GLuint source, GLuint destination, unsigned long width, unsigned long height,
+reads its pixels from source_texture (source is its framebuffer), writes the
+colour (not alpha) into destination (the same, or its multisampled
+renderbuffer's) */
+BOOL xgpu_post_tone_map(GLuint source, GLuint source_texture, GLuint destination, unsigned long width, unsigned long height,
 	const GLint corners[4], const struct xgpu_tone_mapping *tone_mapping);
 
 /* draws a GL_RGBA16F target's texture into the bound draw framebuffer's x,

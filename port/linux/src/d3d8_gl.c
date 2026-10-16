@@ -5820,8 +5820,8 @@ void halo_screen_tone_map(short x0, short y0, short x1, short y1)
 	/* (both found first: making a framebuffer binds it) */
 	source = framebuffer_get(target->target.texture, 0);
 	destination = target->target.samples ? framebuffer_find(target->target.multisample, 0, TRUE) : source;
-	if (xgpu_post_tone_map(source, destination, target->target.gl_width, target->target.gl_height, corners,
-		&hdr.tone_mapping) && target->target.samples)
+	if (xgpu_post_tone_map(source, target->target.texture, destination, target->target.gl_width,
+		target->target.gl_height, corners, &hdr.tone_mapping) && target->target.samples)
 	{
 		target->target.unresolved = TRUE;
 	}

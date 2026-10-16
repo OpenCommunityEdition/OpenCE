@@ -669,7 +669,7 @@ BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, GLenum format, unsigned
 	return TRUE;
 }
 
-BOOL xgpu_post_tone_map(GLuint source, GLuint destination, unsigned long width, unsigned long height,
+BOOL xgpu_post_tone_map(GLuint source, GLuint source_texture, GLuint destination, unsigned long width, unsigned long height,
 	const GLint corners[4], const struct xgpu_tone_mapping *tone_mapping)
 {
 	float tone[4];
@@ -678,13 +678,18 @@ BOOL xgpu_post_tone_map(GLuint source, GLuint destination, unsigned long width, 
 		return FALSE;
 	textures_fit(FALSE, GL_RGBA16F, width, height);
 	pass_state();
-	color_copy(source, corners);
+	if (destination == source)
+	{
+		/* (a pass cannot read the texture it draws into) */
+		color_copy(source, corners);
+		source_texture = post.color;
+	}
 
 	tone[0] = (float)tone_mapping->curve;
 	tone[1] = tone_mapping->exposure;
 	tone[2] = tone_mapping->peak;
 	tone[3] = 0.0f;
-	texture_bind(0, post.color);
+	texture_bind(0, source_texture);
 	glUseProgram(post.programs[_post_program_tone_map]);
 	glUniform4fv(post.tone, 1, tone);
 	pass_draw(_post_program_tone_map, destination, corners, TRUE);
