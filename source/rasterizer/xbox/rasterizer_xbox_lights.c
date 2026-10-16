@@ -171,6 +171,9 @@ void rasterizer_sun_glow_draw(
 	short viewport_height;
 	real center_x;
 	real center_y;
+	real light_depth;
+	real_point3d light_center;
+	real_vector2d light_axes;
 	real r;
 	short blurred_target;
 	boolean success;
@@ -249,6 +252,18 @@ void rasterizer_sun_glow_draw(
 		&center,
 		&axes))
 	{
+		/* port: the glow has to be tested at the light. The point above is
+		pulled toward the camera by the occlusion radius, which puts an
+		engine in front of the hull, and the blurred glow was then drawn
+		over the ship. */
+		light_depth = center.z;
+		if (rasterizer_project_billboard(
+			&flare->position,
+			1.0f,
+			&light_center,
+			&light_axes))
+			light_depth = light_center.z;
+
 		center_x = (real)floor(center.x + 0.5f);
 		center_y = (real)floor(center.y + 0.5f);
 
@@ -398,7 +413,7 @@ void rasterizer_sun_glow_draw(
 				0,
 				bounds.x0,
 				bounds.y0,
-				center.z,
+				light_depth,
 				1.0f);
 			IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 1, 0);
 			IDirect3DDevice8_SetVertexData4f(
@@ -406,7 +421,7 @@ void rasterizer_sun_glow_draw(
 				0,
 				bounds.x1,
 				bounds.y0,
-				center.z,
+				light_depth,
 				1.0f);
 			IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 1, 1);
 			IDirect3DDevice8_SetVertexData4f(
@@ -414,7 +429,7 @@ void rasterizer_sun_glow_draw(
 				0,
 				bounds.x1,
 				bounds.y1,
-				center.z,
+				light_depth,
 				1.0f);
 			IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 0, 1);
 			IDirect3DDevice8_SetVertexData4f(
@@ -422,7 +437,7 @@ void rasterizer_sun_glow_draw(
 				0,
 				bounds.x0,
 				bounds.y1,
-				center.z,
+				light_depth,
 				1.0f);
 			IDirect3DDevice8_End(global_d3d_device);
 
@@ -476,7 +491,9 @@ void rasterizer_sun_glow_draw(
 			SetRenderStateSmart(D3DRS_DESTBLEND, D3DBLEND_ONE);
 			SetRenderStateSmart(D3DRS_BLENDOP, D3DBLENDOP_ADD);
 			SetRenderStateSmart(D3DRS_ALPHATESTENABLE, FALSE);
-			SetRenderStateSmart(D3DRS_ZENABLE, FALSE);
+			SetRenderStateSmart(D3DRS_ZENABLE, TRUE);
+			SetRenderStateSmart(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+			SetRenderStateSmart(D3DRS_ZWRITEENABLE, FALSE);
 			IDirect3DDevice8_SetRenderState(
 				global_d3d_device,
 				D3DRS_ZBIAS,
@@ -547,11 +564,13 @@ void rasterizer_sun_glow_draw(
 						"IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 0, 0)");
 				}
 
-				if (IDirect3DDevice8_SetVertexData2f(
+				if (IDirect3DDevice8_SetVertexData4f(
 					global_d3d_device,
 					0,
 					bounds.x0 - r,
-					bounds.y0 - r) >= 0 && success)
+					bounds.y0 - r,
+					light_depth,
+					1.0f) >= 0 && success)
 				{
 					success = TRUE;
 				}
@@ -579,11 +598,13 @@ void rasterizer_sun_glow_draw(
 						"IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 1, 0)");
 				}
 
-				if (IDirect3DDevice8_SetVertexData2f(
+				if (IDirect3DDevice8_SetVertexData4f(
 					global_d3d_device,
 					0,
 					bounds.x1 + r,
-					bounds.y0 - r) >= 0 && success)
+					bounds.y0 - r,
+					light_depth,
+					1.0f) >= 0 && success)
 				{
 					success = TRUE;
 				}
@@ -611,11 +632,13 @@ void rasterizer_sun_glow_draw(
 						"IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 1, 1)");
 				}
 
-				if (IDirect3DDevice8_SetVertexData2f(
+				if (IDirect3DDevice8_SetVertexData4f(
 					global_d3d_device,
 					0,
 					bounds.x1 + r,
-					bounds.y1 + r) >= 0 && success)
+					bounds.y1 + r,
+					light_depth,
+					1.0f) >= 0 && success)
 				{
 					success = TRUE;
 				}
@@ -643,11 +666,13 @@ void rasterizer_sun_glow_draw(
 						"IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 0, 1)");
 				}
 
-				if (IDirect3DDevice8_SetVertexData2f(
+				if (IDirect3DDevice8_SetVertexData4f(
 					global_d3d_device,
 					0,
 					bounds.x0 - r,
-					bounds.y1 + r) >= 0 && success)
+					bounds.y1 + r,
+					light_depth,
+					1.0f) >= 0 && success)
 				{
 					success = TRUE;
 				}

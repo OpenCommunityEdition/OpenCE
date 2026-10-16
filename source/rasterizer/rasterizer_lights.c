@@ -931,7 +931,12 @@ void rasterizer_lens_flares_draw(
 	{
 		short lens_flare_index;
 
-		rasterizer_widget_begin(_widget_type_internal_sprite, 0);
+		/* port: the sprite is tested against the scene. The occlusion
+		fraction fades the whole glow, and a light behind the hull was
+		still drawn across it. */
+		rasterizer_widget_begin(
+			_widget_type_internal_sprite,
+			FLAG(_rasterizer_widget_z_enable_bit));
 
 		for (lens_flare_index = 0; lens_flare_index < local_lens_flare_count; lens_flare_index++)
 		{
