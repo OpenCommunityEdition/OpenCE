@@ -474,6 +474,28 @@ static void mcc_object_type_predict_evaluate(short function, long thread, boolea
     hs_return(thread,0);
 }
 
+static void mcc_unit_kill(short function, long thread, boolean initialize, void (*kill)(long))
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    if (!args) return;
+    /* Tiny Halo's startup and Mercury2's credits can name absent units.
+     * Validate the handle and unit type before entering the native routines;
+     * those require a live datum. Preserve argument evaluation and yielding. */
+    if (mcc_cache_tags_loaded() && game_connection()!=_game_connection_network_client &&
+        unit_try_and_get(args[0])) kill(args[0]);
+    hs_return(thread,0);
+}
+
+static void mcc_unit_kill_evaluate(short function, long thread, boolean initialize)
+{
+    mcc_unit_kill(function,thread,initialize,unit_kill);
+}
+
+static void mcc_unit_kill_silent_evaluate(short function, long thread, boolean initialize)
+{
+    mcc_unit_kill(function,thread,initialize,unit_kill_silent);
+}
+
 static void mcc_print_if_evaluate(short function, long thread, boolean initialize)
 {
     long *args=hs_macro_function_evaluate(function,thread,initialize);
@@ -550,7 +572,9 @@ static struct mcc_campaign_definition mcc_campaign_functions[]={
     {{_hs_type_real,0,"abs_real",hs_macro_function_parse,mcc_abs_real_evaluate,NULL,NULL,1,{_hs_type_real}},{0}},
     {{_hs_type_void,0,"cinematic_abort",hs_macro_function_parse,mcc_cinematic_abort_evaluate,NULL,NULL,0,{0}},{0}},
     {{_hs_type_void,0,"cheat_all_vehicles",hs_macro_function_parse,mcc_spawn_vehicles_evaluate,NULL,NULL,0,{0}},{0}},
-    {{_hs_type_void,0,"object_type_predict",hs_macro_function_parse,mcc_object_type_predict_evaluate,NULL,NULL,1,{_hs_type_object_definition}},{0}}
+    {{_hs_type_void,0,"object_type_predict",hs_macro_function_parse,mcc_object_type_predict_evaluate,NULL,NULL,1,{_hs_type_object_definition}},{0}},
+    {{_hs_type_void,0,"unit_kill",hs_macro_function_parse,mcc_unit_kill_evaluate,NULL,NULL,1,{_hs_type_unit}},{0}},
+    {{_hs_type_void,0,"unit_kill_silent",hs_macro_function_parse,mcc_unit_kill_silent_evaluate,NULL,NULL,1,{_hs_type_unit}},{0}}
 };
 
 struct hs_function_definition *mcc_campaign_function(short index)

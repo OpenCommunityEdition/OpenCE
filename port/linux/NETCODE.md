@@ -148,8 +148,11 @@ OpenCE releases. Do not change the base version without auditing its wire format
 simulation rules and admission behavior and testing unmodified upstream clients.
 The pinned fixture and settings-prefix check are in `tools/test_mcc_protocol.py`.
 
-MCC sessions use separate MCC protocol version 45 (previous GulchCE builds used
-44). Discovery advertises the selected map family's protocol and, separately,
+MCC sessions use separate MCC protocol version 46 (previous GulchCE builds used
+45). Version 46 requires the weapon-only recording direction policy on every
+MCC peer, including multiplayer clients that run local scripts. Its packet
+layouts are unchanged. Xbox/Custom Edition retain OpenCE protocol 29.
+Discovery advertises the selected map family's protocol and, separately,
 the host's MCC capability version. A GulchCE client sends a bounded reliable join
 envelope only to a host advertising the same MCC capability. The envelope wraps
 an unchanged OpenCE join packet. The normal host admission still checks the join

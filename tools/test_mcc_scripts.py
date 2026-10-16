@@ -29,6 +29,8 @@ def native_mcc_harness(tmp_path_factory):
         extra = [str(ROOT / "port/linux/game/mcc_syntax.c")] if name == "mcc_scripts" else []
         if name == "mcc_campaign":
             extra.append(str(ROOT / "port/linux/game/mcc_script_effects.c"))
+        if name == "mcc_recording_control":
+            extra.append(str(ROOT / "port/linux/game/mcc_recordings.c"))
         result = subprocess.run(command + [str(ROOT / "tools/harness/tests" / (name + ".c")),
                                 str(ROOT / "port/linux/game" / (name + ".c"))] + extra + ["-o", str(binary)],
                                 capture_output=True, text=True)
@@ -52,6 +54,12 @@ def test_mcc_script_linking(scripts_tool, case):
 
 def test_mcc_authoritative_game_speed(native_mcc_harness):
     result = subprocess.run([str(native_mcc_harness("mcc_game_speed"))], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_mcc_weapon_only_recording_directions(native_mcc_harness):
+    result = subprocess.run([str(native_mcc_harness("mcc_recording_control"))],
+                            capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr
 
 

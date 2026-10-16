@@ -56,6 +56,9 @@ static int count,draws;
 static real_point3d drawn;
 static struct player_datum players[3];
 static struct biped_datum units[3];
+static int kills, silent_kills;
+void unit_kill(long index) {if(!unit_try_and_get(index))abort();kills++;}
+void unit_kill_silent(long index) {if(!unit_try_and_get(index))abort();silent_kills++;}
 static struct scenario scenario;
 static struct scenario_cutscene_flag flags[2];
 static struct hud_globals_definition hud;
@@ -93,7 +96,9 @@ void *datum_try_and_get(struct data_array *data,long index) {
     if(data==&list_array)return index==8 ? &list_array : NULL;
     return NULL;
 }
-void *object_try_and_get_and_verify_type(long index,unsigned long mask) {(void)mask;return index>=0&&index<3 ? units+index : NULL;}
+void *object_try_and_get_and_verify_type(long index,unsigned long mask) {
+    return index>=0&&index<3 && (mask&(1u<<units[index].object.type)) ? units+index : NULL;
+}
 void *object_get_and_verify_type(long index,unsigned long mask) {return object_try_and_get_and_verify_type(index,mask);}
 void network_player_detach_unit(long index) {units[players[index].unit_index].unit.player_index=NONE;players[index].unit_index=NONE;}
 void network_player_attach_unit(long index,long unit) {players[index].unit_index=unit;units[unit].unit.player_index=index;possessions++;}
@@ -139,7 +144,28 @@ int main(int argc,char **argv) {
     scenario.cutscene_flags.address=flags;scenario.cutscene_flags.count=2;
     flags[1].position.x=10;
     mcc_campaign_begin();
-    if(!strcmp(argv[1],"object_predict")) {
+    if(!strcmp(argv[1],"unit_kill")) {
+        char const *names[2]={"unit_kill","unit_kill_silent"};
+        for(i=0;i<2;i++) {
+            short id=mcc_campaign_find(names[i]);
+            struct hs_function_definition *definition=mcc_campaign_function(id);
+            CHECK(definition && definition->parameter_count==1 &&
+                definition->parameter_types[0]==_hs_type_unit && definition->return_type==_hs_type_void);
+            args[0]=NONE;call(names[i]);CHECK(!kills && !silent_kills && result==0);
+            args[0]=0x10000;call(names[i]);CHECK(!kills && !silent_kills);
+            units[0].object.type=_object_type_scenery;
+            args[0]=0;call(names[i]);CHECK(!kills && !silent_kills);
+            units[0].object.type=_object_type_biped;
+            result=123;definition->evaluate(id,0,FALSE);CHECK(result==123 && !kills && !silent_kills);
+            loaded=FALSE;call(names[i]);CHECK(!kills && !silent_kills);loaded=TRUE;
+            connection=_game_connection_network_client;call(names[i]);CHECK(!kills && !silent_kills);
+            connection=_game_connection_local;call(names[i]);CHECK(kills+silent_kills==1);
+            connection=_game_connection_network_server;
+            units[0].object.type=_object_type_vehicle;call(names[i]);
+            CHECK(kills==(i==0 ? 2 : 0) && silent_kills==(i==1 ? 2 : 0));
+            kills=silent_kills=0;
+        }
+    } else if(!strcmp(argv[1],"object_predict")) {
         actor_variant.unit_reference.index=20;
         args[0]=19;call("object_type_predict");CHECK(predicted_tag==20);
         predicted_tag=NONE;actor_variant.unit_reference.index=19;

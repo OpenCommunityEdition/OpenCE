@@ -21,14 +21,21 @@ static uint32_t mcc_recording_weapon(unsigned char *p, int write)
 }
 
 static int mcc_recording_walk(unsigned char *stream, uint32_t size,
-    unsigned version, unsigned control_version, int write, uint32_t *corrected)
+    unsigned version, unsigned control_version, int write, uint32_t *corrected,
+    int *weapon_only)
 {
     uint32_t offset = 52, changes;
     unsigned i;
+    int stationary, weapon_event = 0;
     if (!stream || version < 1 || version > 4 || control_version > 4) return 0;
     for (i = 1; i < control_version; ++i) offset += i == 1 ? 4 : 2;
     if (version == 4) offset += 12; /* facing/aiming/looking angle state */
     if (offset > size) return 0;
+    stationary = weapon_only && version == 4 && control_version == 4 && !mcc_recording_word(stream + 2);
+    /* Tiny Halo's weapon-only recordings omit both throttle and directions.
+     * Accept signed zero, but not nonzero, nonfinite or partial directions. */
+    for (i = 8; stationary && i < 52; i += 4)
+        if (stream[i] || stream[i+1] || stream[i+2] || (stream[i+3] & 127)) stationary = 0;
     changes = mcc_recording_weapon(stream + 4, write);
     while (offset < size) {
         uint32_t header_size, payload_size;
@@ -51,9 +58,13 @@ static int mcc_recording_walk(unsigned char *stream, uint32_t size,
         if (payload_size > size - offset) return 0;
         if (type == 1) {
             *corrected = changes;
+            if (weapon_only) *weapon_only = stationary && weapon_event;
             return 1;
         }
-        if (type == 5) changes += mcc_recording_weapon(stream + offset, write);
+        if (type == 5) {
+            changes += mcc_recording_weapon(stream + offset, write);
+            weapon_event = 1;
+        } else if (type != 0) stationary = 0;
         offset += payload_size;
     }
     return 0; /* missing end event */
@@ -64,7 +75,16 @@ int mcc_recording_prepare(unsigned char *stream, uint32_t size,
 {
     uint32_t changes;
     *corrected = 0;
-    if (!mcc_recording_walk(stream, size, version, control_version, 0, &changes)) return 0;
-    if (changes) return mcc_recording_walk(stream, size, version, control_version, 1, corrected);
+    if (!mcc_recording_walk(stream, size, version, control_version, 0, &changes, 0)) return 0;
+    if (changes) return mcc_recording_walk(stream, size, version, control_version, 1, corrected, 0);
     return 1;
+}
+
+int mcc_recording_weapon_only(unsigned char *stream, uint32_t size,
+    unsigned version, unsigned control_version)
+{
+    uint32_t changes;
+    int weapon_only = 0;
+    return mcc_recording_walk(stream, size, version, control_version, 0, &changes,
+        &weapon_only) && weapon_only;
 }

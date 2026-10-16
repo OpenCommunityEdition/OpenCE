@@ -1,4 +1,4 @@
-version 45
+version 46
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
 bound DISTRIBUTED_INPUT_HISTORY 4
@@ -44,7 +44,7 @@ define MCC_PROTOCOL_ADVERTISED_FLAG 0x04
 define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 3
 define MCC_PROTOCOL_JOIN_KIND 91
 define MCC_PROTOCOL_JOIN_MAX 256
-define MCC_PROTOCOL_VERSION 45
+define MCC_PROTOCOL_VERSION 46
 enum _distributed_actor_camouflaged_bit 4
 enum _distributed_actor_impulse_aligned_bit 6
 enum _distributed_actor_rides_bit 0

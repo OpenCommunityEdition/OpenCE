@@ -136,7 +136,7 @@ stays unchanged. Initial admission and actual loading do read the full content,
 so large packages can take longer at these points. The previous 32-bit checksum
 remains for checkpoint identity and engine bookkeeping; it is no longer the
 MCC network content proof. Existing save identities are unchanged by SHA-256.
-MCC peers need matching GulchCE MCC protocol 45. Xbox and Custom Edition use
+MCC peers need matching GulchCE MCC protocol 46. Xbox and Custom Edition use
 the verified OpenCE protocol 29 and retain their original matching/loading
 behavior. See the crossplay boundary in `port/linux/NETCODE.md`. Network
 support uses OpenCE's host-authoritative engine, not official MCC clients.
@@ -1736,3 +1736,132 @@ CE Death Island and back to Mercury, then exited normally without assertions.
 These are focused runtime checks, not full campaign or multiplayer playthroughs.
 Android and Web builds were attempted but those targets are absent from this
 Windows configuration. Native Linux validation remains for CI.
+
+### Missing-unit script calls (issues #50 and #63)
+
+The build-111 executable and its matching published PDB resolve issue #63's
+fault to `object_get_and_verify_type`, called by `unit_kill_silent` from a
+scenario script. The datum is `NONE`. Mercury2's `bsp_switching_credits`
+script kills three named scientist units, which may be absent; this is a
+plausible call site, not confirmation of the reporter's playthrough location.
+Calling `(unit_kill_silent none)` in the original build reproduces the same
+fault and relative instruction address. Tiny Halo's startup independently
+reproduces the corresponding `unit_kill` fault before its player proxy exists.
+The public [c20 script reference](https://c20.reclaimers.net/h1/scripting/)
+also documents the pre-MCC crash when either command targets a missing unit.
+
+The MCC campaign adapters now evaluate the argument normally, preserve a
+yielding evaluation, and validate the full datum and unit type before calling
+the existing kill routines. Missing, stale and non-unit targets return without
+a kill. Valid units retain the existing death behavior. Execution requires an
+active MCC cache and local/host authority. The kill adapters do not change any
+Xbox or Custom Edition function table, evaluator or shared-engine source. The new entries are
+appended to preserve existing MCC function indices. There is no new state or
+message to synchronize: scripts run on the host and deaths use the existing
+replication. These adapters alone do not require a protocol change; the
+recording policy below does require matching MCC peers.
+
+Validation on base `72b6e1b7`, Windows x86 portable release, 2026-10-16:
+
+- The new handler regression failed before the adapters existed and passed
+  afterward. The 112 focused campaign, script, parameter and protocol checks
+  passed, covering absent/stale/wrong-type targets, argument yielding, both
+  kill commands, valid bipeds/vehicles, client denial and inactive-MCC guards.
+- The Windows release build succeeded. Two isolated hidden Mercury2 instances
+  loaded into loopback co-op and exchanged simulation updates. Both missing
+  target calls returned on the host; the client console refused host-only
+  commands. No assertion was detected during the 95-second bounded runs.
+  This initial client joined after loading began and had no active player
+  slot; it checks state reception and command denial, not two-player gameplay.
+  The runner stopped its own processes afterward; this was not a campaign
+  completion or an internet/browser-transport test.
+- Tiny Halo passed its original startup failure, then hit separate unit-vector
+  assertions. Its `switch_weapon` and `switch_weapon0` recordings contain
+  zero facing, aiming and looking vectors and a weapon-selection event. The
+  native playback passes these vectors into unit control. A diagnostic run
+  stopping `player0_stuff` only in that temporary session avoided the later
+  assertions for 100 seconds, isolating the second fault. No script was
+  disabled in the implementation; the recording solution below preserves
+  playback rather than skipping it.
+- Issue #50's second, older build-95 crash mentions a missing player. It has
+  not been reproduced; its matching release symbols were unavailable. It is
+  not claimed fixed by the unit-target adapters.
+- Android and Web build targets were attempted but are absent from the local
+  Windows configuration. Linux remains unverified locally. Xbox/CE source
+  kill implementations are unchanged and isolation checks passed. Recording
+  integration and its additional validation are described below.
+
+Temporary map links and save folders were isolated from player data. Runtime
+logs and the original-build reproduction are retained under the ignored
+`build/mcc-missing-objects` folder. Mercury2 was linked under a simple private
+package name for the co-op run: the legacy lobby name validator rejects the
+ampersand in the installed `Mercury 1 & 2` folder, a separate admission issue.
+
+### Weapon-only MCC recordings (Tiny Halo)
+
+Tiny Halo's two 78-byte version-4/control-version-4 weapon-switch recordings
+have zero throttle and all three initial direction vectors zero. Their only
+effective event changes the weapon slot, followed by a timed end event.
+Preserving the unit's current directions is an explicit compatibility policy
+for this non-directional input, inferred from those inspected streams and
+their weapon-switch script use; it is not a claim to reproduce MCC's private
+playback implementation. The converter logs which recordings use the policy.
+
+The existing bounds-checked MCC recording walker recognizes this case only
+when the entire stream through its end is valid, initial control flags and
+movement/direction vectors are zero, and it contains a weapon event with no
+other effective event type. Signed zero is accepted. Authored directions,
+motion, control/animation-state events, older codecs and malformed streams
+do not select the fallback. Recording bytes, event timings, weapon slots and
+the remaining controller fields are not rewritten by this policy.
+
+`mcc_recording_control.c` initializes only the playback controller's three
+directions from the target unit's valid current orientation. It requires an
+active MCC cache, MCC-owned stream storage and a valid unit. A minimal `port:`
+hook in `recorded_animations.c` supplies its private controller immediately
+after native decoding. Conversion alone cannot supply a live unit orientation:
+the same recording can be played on different units facing different ways.
+The hook returns without changing anything outside MCC or for ordinary
+recordings. It adds no persistent state or allocation to leak across reloads,
+checkpoints or map-family transitions. Existing playback still owns the
+recording's lifetime, possession, events and completion.
+
+In co-op the host continues to initiate scenario/AI recordings; existing unit
+controls and object synchronization carry their results to clients. Multiplayer
+clients can also run local scripts, so MCC protocol 46 requires matching
+recording behavior on both peers. No packet layout or client authority was
+added, and the OpenCE/Xbox/Custom Edition protocol remains 29. The asset-free
+tests exercise the production walker and runtime
+hook, including every stream truncation, nonzero/NaN/infinite directions,
+other event types, distinct current directions, invalid units, foreign data,
+and inactive-MCC behavior. The combined focused suite passed 188 tests.
+
+With the recording fix, the original Tiny Halo map completed a 150-second
+singleplayer startup check, printed a delayed completion marker and took a
+checkpoint without assertions. A separate 190-second process transitioned
+Tiny Halo -> Xbox A10 -> CE Death Island -> Tiny Halo and ran the second
+Tiny Halo startup without assertions. These used hidden windows and a null
+renderer, so they do not verify visual fidelity or a full playthrough.
+
+The supplied Tiny Halo cache is marked multiplayer. An attempted `:coop`
+automation run refused that classification and selected its default map;
+that run was stopped and is not Tiny Halo validation. The corrected
+165-second `:slayer` run loaded Tiny Halo on two machines with both players
+active, advanced through the recording startup and a player death/respawn,
+and produced a delayed host completion marker without assertions. Existing
+map warnings about unsupported multiplayer placements and absent units remain
+visible. This is a bounded multiplayer smoke check, not certification of the
+mod's co-op design. These runtime checks preceded the final MCC-version bump;
+the separate admission tests were then rerun for version 46, and the wire
+manifest check confirmed that only the MCC version changed.
+
+The final MCC-46 Windows release was rebuilt successfully and tested with two
+Mercury2 co-op instances for 145/140 seconds. Both player slots were admitted
+before loading, both players became alive, and host/client logs show their
+replicated positions. The host executed both missing-unit calls and a delayed
+completion marker; the client console refused the same host-only commands.
+No assertion was detected. Map-authored warnings (including a biped outside
+the world) were left visible. The runners stopped their own processes after
+the bounded checks. Generated test cache files were removed, retaining logs,
+symbols and test-save evidence. Android/Web targets remain unavailable and
+Linux/browser transport execution remains unverified locally.

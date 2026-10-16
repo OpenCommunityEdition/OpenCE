@@ -42,7 +42,9 @@ int main(int argc,char **argv) {
     if(argc!=6)return 2;
     memset(data,0,sizeof(data));f=fopen(argv[3],"rb");if(!f)return 3;
     size=(uint32_t)fread(data+0x700,1,sizeof(data)-0x700,f);fclose(f);
-    if(!strcmp(argv[5],"stream"))
+    if(!strcmp(argv[5],"weapon-only"))
+        ok=mcc_recording_weapon_only(data+0x700,size,atoi(argv[1]),atoi(argv[2]));
+    else if(!strcmp(argv[5],"stream"))
         ok=mcc_recording_prepare(data+0x700,size,atoi(argv[1]),atoi(argv[2]),&corrected);
     else {
         r.tags=r.tag_index=data;r.used=0x700+size;r.report.tag_base=0x50000000;r.report.tag_count=1;
@@ -90,6 +92,23 @@ def convert(tool, tmp, data, version=4, control=4, mode="stream"):
     result = subprocess.run([str(tool), str(version), str(control), str(src), str(dst), mode],
                             capture_output=True, text=True, check=True)
     return tuple(map(int, result.stdout.split())), dst.read_bytes()
+
+
+def test_weapon_only_classification(recording_tool, tmp_path):
+    data = stream(weapon=0) + event(4, 5, b"\x01\x00") + event(4, 1, time=2)
+    assert convert(recording_tool, tmp_path, data, mode="weapon-only") == ((1, 0), data)
+    for size in range(len(data)):
+        assert convert(recording_tool, tmp_path, data[:size], mode="weapon-only")[0] == (0, 0)
+    for offset, value in [(2, 1), (8, 0x3f800000), (16, 0x3f800000), (28, 0x7fc00000), (40, 0x7f800000)]:
+        changed = bytearray(data);struct.pack_into("<I", changed, offset, value)
+        assert convert(recording_tool, tmp_path, changed, mode="weapon-only") == ((0, 0), changed)
+    negative_zero = bytearray(data);struct.pack_into("<I", negative_zero, 16, 0x80000000)
+    assert convert(recording_tool, tmp_path, negative_zero, mode="weapon-only")[0] == (1, 0)
+    for kind, payload in [(2, b"\x03"), (4, b"\0\0"), (6, bytes(8)), (7, bytes(2))]:
+        changed = data[:-2] + event(4, kind, payload) + event(4, 1)
+        assert convert(recording_tool, tmp_path, changed, mode="weapon-only")[0] == (0, 0)
+    empty = stream(weapon=0) + event(4, 1)
+    assert convert(recording_tool, tmp_path, empty, mode="weapon-only")[0] == (0, 0)
 
 
 @pytest.mark.parametrize("version", [1, 2, 3, 4])

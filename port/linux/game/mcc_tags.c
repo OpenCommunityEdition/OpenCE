@@ -53,6 +53,9 @@ static int mcc_scenario_recordings(struct mcc_runtime *r, unsigned char *scenari
                 (unsigned long)i);
             return FALSE;
         }
+        if (mcc_recording_weapon_only(stream, size, recording[0x20], recording[0x22]))
+            error(_error_silent, "mcc: recorded animation #%lu: weapon-only controls will inherit the unit's current directions",
+                (unsigned long)i);
         if (corrected) error(_error_silent,
             "mcc: recorded animation #%lu: %lu invalid weapon selections changed to NONE",
             (unsigned long)i, (unsigned long)corrected);
