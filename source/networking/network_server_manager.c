@@ -481,6 +481,8 @@ server browser's listing of a public game (p2p_lobby.c) */
 void p2p_set_game_player_counts(int count, int maximum);
 void p2p_set_game_listing(const char *name, const char *map, const char *gametype, int engine_type, int open,
 	int in_progress, int has_teams);
+/* port: the platform layer's (port/linux/src/port_config.c) */
+int config_boolean(const char *name);
 
 /* ---------- constants */
 
@@ -4308,6 +4310,9 @@ void network_game_server_port_set_cooperative(
 	/* (Server Setup's default for co-op, menu_functions.c's
 	COOPERATIVE_DEFAULT_PLAYERS, until it sets its own) */
 	server->game.maximum_players = MIN(16, MAXIMUM_NETWORK_PLAYER_COUNT);
+	/* (network.coop_cryo_bay) */
+	SET_FLAG(server->game.cooperative_flags, _network_game_cooperative_cryo_bay_bit,
+		config_boolean("network.coop_cryo_bay") != 0);
 	if (!network_game_server_send_game_data_pregame(server))
 		network_event("network_game_server_port_set_cooperative() failed to send updated game settings to clients");
 

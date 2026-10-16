@@ -144,6 +144,7 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicles.h"
 #include "game/game_engine.h" /* port: game_engine_vehicle_placement_begin's type, which WebAssembly calls it by */
+#include "coop_cryo.h" /* port: port/linux/game/coop_cryo.c */
 
 /* ---------- constants */
 
@@ -1161,6 +1162,8 @@ void object_types_place_objects(
 		}
 
 		processed_bsp_flags |= FLAG(global_structure_bsp_index);
+		/* port: network co-op's cryo bay (port/linux/game/coop_cryo.c) */
+		coop_cryo_place_cells();
 	}
 
 	return;
@@ -1233,6 +1236,9 @@ void object_types_place_all(
 					{
 						continue;
 					}
+					/* port: network co-op's cryo bay (port/linux/game/coop_cryo.c) */
+					if (coop_cryo_placement_skipped(object_type, scenario_object, scenario_palette))
+						continue;
 					object_new_from_scenario(scenario_object, scenario_palette);
 					objects_garbage_collection();
 				}

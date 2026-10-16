@@ -607,6 +607,13 @@ void scenario_tags_unload(
 		loose_sounds_tags_unloaded();
 	}
 	texture_cache_close();
+	/* port: network co-op's cryo bay's tags go (port/linux/game/coop_cryo.c),
+	before the menus' bring the map's own table back */
+	{
+		extern void coop_cryo_tags_unloaded(void);
+
+		coop_cryo_tags_unloaded();
+	}
 	/* port: the menus' tags go, and the map's own table comes back
 	(port/linux/game/menu_tags.c): after the texture cache, which writes to
 	the bitmaps it has loaded as it closes, theirs among them */

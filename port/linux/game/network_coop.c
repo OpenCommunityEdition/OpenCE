@@ -110,6 +110,7 @@ index and tag, since the map placed them at the same index everywhere.
 #include "sound/sound_manager.h"
 #include "sound/sound_definitions.h"
 #include "units/units.h"
+#include "coop_cryo.h"
 #include "coop_enemies.h"
 #include "coop_spectate.h"
 #include "network_coop.h"
@@ -203,6 +204,9 @@ enum
 	/* a breakable surface broke: value its index, frame its BSP, reals the
 	damage's epicenter */
 	_coop_event_surface_broken,
+	/* a unit the netcode doesn't seat into target's seat value, or out
+	(target NONE) */
+	_coop_event_unit_seat,
 };
 
 /* distributed_coop_event.type of an effect: at a cutscene flag (value), or on
@@ -1652,6 +1656,27 @@ static void client_apply_unit_animation(
 		unit_port_play_user_animation(event->object_index, event->tag_index, event->value, event->interpolate, event->frame);
 }
 
+static void client_apply_unit_seat(
+	struct distributed_coop_event const *event)
+{
+	struct unit_datum *unit;
+
+	if (!distributed_object_index_valid(event->object_index) || !network_objects_client_has(event->object_index) ||
+		!(unit = (struct unit_datum *)object_try_and_get_and_verify_type(event->object_index, _object_mask_unit)))
+	{
+		return;
+	}
+	if (event->target == NONE)
+	{
+		if (unit->object.parent_object_index != NONE)
+			unit_try_and_exit_seat(event->object_index);
+	}
+	else if (unit->object.parent_object_index != event->target || unit->unit.parent_seat_index != event->value)
+	{
+		network_objects_set_seat(event->object_index, event->target, event->value);
+	}
+}
+
 static void client_apply_scenery_animation(
 	struct distributed_coop_event const *event)
 {
@@ -1844,6 +1869,9 @@ static void client_apply_event(
 			breakable_surface_port_break(event->value, &epicenter);
 		}
 		break;
+	case _coop_event_unit_seat:
+		client_apply_unit_seat(event);
+		break;
 	case _coop_event_unit_open:
 		if (distributed_object_index_valid(event->object_index) && network_objects_client_has(event->object_index) &&
 			object_try_and_get_and_verify_type(event->object_index, _object_mask_unit))
@@ -1960,6 +1988,7 @@ void network_coop_new_game(
 	skip_vote.cooldown_until = 0;
 	skip_vote.skip_save_written = FALSE;
 	coop_enemies_new_game();
+	coop_cryo_new_game();
 }
 
 /* A network game on a campaign scenario with no game engine. Checking the
@@ -2319,6 +2348,20 @@ void network_coop_note_unit_open(
 	event->value = (short)open;
 }
 
+void network_coop_note_unit_seat(
+	long unit_index,
+	long vehicle_index,
+	short seat_index)
+{
+	struct distributed_coop_event *event = event_new(_coop_event_unit_seat);
+
+	if (!event)
+		return;
+	event->object_index = unit_index;
+	event->target = vehicle_index;
+	event->value = seat_index;
+}
+
 /* unit_custom_animation_at_frame starts the animation and then sets the
 frame in the same call, so the start is still queued and unsent: the frame
 goes into it */
@@ -2622,6 +2665,8 @@ void network_coop_host_tick(
 
 	if (!coop_game())
 		return;
+	/* (before the presentation: it sets the camera) */
+	coop_cryo_update();
 	host_resend_update();
 	players_vitality_keep();
 	coop_enemies_update();
@@ -2650,6 +2695,7 @@ void network_coop_client_tick(
 	if (!coop_client())
 		return;
 	client_play_presentation();
+	coop_cryo_update();
 	players_vitality_keep();
 	if (game_time_get() - coop_presentation.heard_time > PRESENTATION_SILENCE_TICKS)
 	{

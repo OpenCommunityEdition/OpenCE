@@ -181,6 +181,7 @@ struct game_options;
 #include "structures/structures.h"
 #include "units/units.h"
 #include "units/vehicles.h"
+#include "coop_cryo.h" /* port: port/linux/game/coop_cryo.c */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #ifdef HALO_PROFILE
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
@@ -602,7 +603,8 @@ boolean game_safe_to_speak(
 boolean game_is_cooperative(
 	void)
 {
-	return player_spawn_count > 1;
+	/* port: or network co-op's cryo bay (port/linux/game/coop_cryo.c) */
+	return player_spawn_count > 1 || coop_cryo_scripts_cooperative();
 }
 
 boolean game_load(

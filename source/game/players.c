@@ -236,6 +236,7 @@ symbols in this file:
 #include "camera/observer.h"
 #include "data.h"
 #include "devices/devices.h"
+#include "coop_cryo.h" /* port: port/linux/game/coop_cryo.c */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "cutscene/cinematics.h" /* port: network co-op's first spawns */
 #include "editor/editor_stubs.h"
@@ -4838,6 +4839,12 @@ void players_update_before_game(
 						{
 							player_spawn(iterator.datum_index);
 							player_place_beside_teammate(iterator.datum_index);
+						}
+						/* port: or into their cryotube (port/linux/game/coop_cryo.c) */
+						else if (coop_cryo_seat_waiting(iterator.datum_index))
+						{
+							player_spawn(iterator.datum_index);
+							coop_cryo_seat_player(iterator.datum_index);
 						}
 						else if (players_coop_use_majority() && !cinematic_in_progress() &&
 							players_checkpoint.valid)

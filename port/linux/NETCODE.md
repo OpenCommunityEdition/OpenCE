@@ -201,7 +201,10 @@ limits, and readies a second weapon picked up while firing; version 29 names
 a Custom Edition map by its own name (`custom_maps\hugeass`, which every
 screen shows) and says which version it is by the map version of the game
 record, its hash's first 32 bits (the header checksum before), which a
-client finds its file by (below, "Map sharing").
+client finds its file by (below, "Map sharing"); version 30 sends with the
+game's settings whether every co-op player wakes in a cryotube on The Pillar
+of Autumn (`port/linux/game/coop_cryo.c`), so that every machine sets the
+cryo bay up alike: its static tubes out and its cradles in.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

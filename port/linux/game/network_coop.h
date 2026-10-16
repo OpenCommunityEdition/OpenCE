@@ -80,6 +80,9 @@ void network_coop_note_unit_animation(long unit_index, long animation_graph_inde
 	boolean interpolate);
 /* units.c: a unit (a dropship) opened or closed (unit_open, unit_close) */
 void network_coop_note_unit_open(long unit_index, boolean open);
+/* coop_cryo.c: a unit neither a player's nor an actor's seated, or (vehicle
+NONE) climbing out */
+void network_coop_note_unit_seat(long unit_index, long vehicle_index, short seat_index);
 /* units.c: unit_custom_animation_at_frame moved it to a frame */
 void network_coop_note_unit_animation_frame(long unit_index, short frame_index);
 /* scenery.c: a scenery animation started */

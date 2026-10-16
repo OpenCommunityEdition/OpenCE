@@ -695,6 +695,7 @@ symbols in this file:
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
+#include "coop_cryo.h" /* port: port/linux/game/coop_cryo.c */
 
 /* port: the control and animation impulses the host's actors give their
 units go to the clients' copies (port/linux/game/network_actors.c) */
@@ -3283,6 +3284,8 @@ void unit_exit_seat_end(
 			&unit->object.original_node_orientations);
 		node_orientations->translation = root_translation;
 
+		/* port: network co-op's cryo bay (port/linux/game/coop_cryo.c) */
+		coop_cryo_exit_seat_end(unit_index, parent_unit_index);
 		if (unit->object.type==_object_type_biped)
 		{
 			biped_exit_seat_end(unit_index, parent_unit_index);

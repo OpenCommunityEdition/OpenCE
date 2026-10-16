@@ -48,6 +48,8 @@ enum
 	/* the players pass through each other (Server Setup's PLAYER COLLISIONS:
 	OFF, co-op's): network_coop_player_collisions */
 	_network_game_cooperative_no_player_collisions_bit = 0,
+	/* a cryotube for every player on a10 (network.coop_cryo_bay) */
+	_network_game_cooperative_cryo_bay_bit,
 };
 
 struct network_game
