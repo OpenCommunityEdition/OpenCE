@@ -38,6 +38,10 @@ release, and the web site then plays it. The [Releases](https://github.com/OpenC
 page keeps the last five releases. If the latest build has a problem, get
 an older build from that page.
 
+### Arch-based Linux Distributions
+
+The above linux binary is available on the [AUR](https://aur.archlinux.org/packages/opence-bin)
+
 ## Game data
 
 The port does not include the game data. Download an Xbox disc image
