@@ -2,8 +2,8 @@
 #ifndef MCC_PROTOCOL_H
 #define MCC_PROTOCOL_H
 
-/* Weapon-only recording controls must use the same MCC policy on each peer. */
-#define MCC_PROTOCOL_VERSION 46
+/* Boat physics must initialize the same powered controls on every MCC peer. */
+#define MCC_PROTOCOL_VERSION 47
 #define MCC_PROTOCOL_ADVERTISED_FLAG 0x04
 #define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 3
 #define MCC_PROTOCOL_JOIN_KIND 91

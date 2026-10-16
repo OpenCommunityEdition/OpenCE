@@ -165,6 +165,7 @@ symbols in this file:
 #include "structures/structure_bsp_definitions.h"
 #include "units/unit_definitions.h"
 #include "units/vehicle_definitions.h"
+#include "mcc_objects.h" /* port: port/linux/game/mcc_objects.c */
 
 /* ---------- constants */
 
@@ -1988,6 +1989,9 @@ static void update_human_boat_physics(
 		real maximum_angle;
 		real *rotation;
 		real const *forward;
+
+		/* port: initialize MCC boat controls before assigning active channels. */
+		mcc_boat_controls_initialize(state);
 
 		speed = (real)fabs(magnitude3d(&vehicle->object.translational_velocity)*2.5f);
 		maximum_angle = vehicle->vehicle.turn*0.5f;
