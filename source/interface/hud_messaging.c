@@ -894,6 +894,9 @@ void hud_render_timer(
 		numbers.placement.offset = timer->position;
 		numbers.placement.scale.i = 1.0f;
 		numbers.placement.scale.j = 1.0f;
+		/* port: this scripted element has no authored scaling flags. The PC
+		 * digit renderer reads them, so stack data must not halve its glyphs. */
+		numbers.placement.multiplayer_scaling_flags = 0;
 
 		hud_number_index = interface_get_tag_index(_interface_hud_digits);
 		if (hud_number_index != NONE)
