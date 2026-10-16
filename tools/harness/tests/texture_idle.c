@@ -8,14 +8,23 @@ struct texture_entry
 {
 	struct texture_entry *next;
 	GLuint texture;
-	unsigned long last_used_frame;
+	struct { unsigned long width, height; } description;
+	unsigned long address, generation, last_used_frame;
+	GLuint hud_upscale;
 };
 #include "config.inc"
 static struct texture_entry *texture_buckets[TEXTURE_BUCKET_COUNT];
+static struct { struct texture_entry *entry; } recent_textures[4];
 static Uint64 clock_ms;
 static Uint64 SDL_GetTicks(void) { return clock_ms; }
 static void glDeleteTextures(int count, const GLuint *texture) { }
 static void xgpu_gl_state_invalidate(void) { }
+/* the high-res HUD's settings never change here */
+static unsigned long hud_hires_settings_changed(void) { return 0; }
+static int hud_hires_bitmap_affected(unsigned long address, long width, long height, unsigned long changed)
+{
+	return 0;
+}
 #include "under_test.inc"
 
 /* the texture drawn every frame, and the one drawn until a time */
