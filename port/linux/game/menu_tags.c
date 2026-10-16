@@ -1789,15 +1789,19 @@ frame is the stock 159 grown by the 36 that five rows at this pitch add
 /* the port box piece for one of the map's pause box pieces, else NULL */
 static char const *pause_campaign_box_bitmap(long tag_index)
 {
-	if (tag_name_ends(tag_index, "\\pausebox2_left_center") || tag_name_ends(tag_index, "\\pausebox_right_center") ||
-		tag_name_ends(tag_index, "\\pausebox_center"))
-	{
+	if (tag_name_ends(tag_index, "\\pausebox2_left_center"))
 		return "pause/pausebox_center";
-	}
-	if (tag_name_ends(tag_index, "\\pausebox2_left") || tag_name_ends(tag_index, "\\pausebox_left"))
+	if (tag_name_ends(tag_index, "\\pausebox2_left"))
 		return "pause/pausebox_left";
-	if (tag_name_ends(tag_index, "\\pausebox2_right") || tag_name_ends(tag_index, "\\pausebox_right"))
+	if (tag_name_ends(tag_index, "\\pausebox2_right"))
 		return "pause/pausebox_right";
+	/* The objectives' pieces carry a header, not the button-key footer. */
+	if (tag_name_ends(tag_index, "\\pausebox_right_center") || tag_name_ends(tag_index, "\\pausebox_center"))
+		return "pause/objectives_center";
+	if (tag_name_ends(tag_index, "\\pausebox_left"))
+		return "pause/objectives_left";
+	if (tag_name_ends(tag_index, "\\pausebox_right"))
+		return "pause/objectives_right";
 	return NULL;
 }
 
@@ -1870,15 +1874,16 @@ static void pause_campaign_grow_box(struct ui_widget_definition *widget, short s
 			/* (bitmap_name is the lookup, not piece_bitmap: find calls it) */
 			long bitmap = find(piece_bitmap, build.menus->bitmap_count, bitmap_name);
 			short height = (short)(child_widget->bounds.y1 - child_widget->bounds.y0);
+			short frame = strstr(piece_bitmap, "objectives_") ? 0 : PAUSE_CAMPAIGN_BOX_FRAME;
 
 			if (bitmap != NONE && (short)(height + shift) == PAUSE_CAMPAIGN_BOX_HEIGHT)
 			{
 				struct bitmap_group *group = bitmap_group_get(build.bitmap_tags[bitmap]);
 				struct bitmap_group_sequence *sequence = group ? group->sequences.address : NULL;
 
-				if (sequence && PAUSE_CAMPAIGN_BOX_FRAME < group->bitmaps.count)
+				if (sequence && frame < group->bitmaps.count)
 				{
-					sequence->first_bitmap_index = PAUSE_CAMPAIGN_BOX_FRAME;
+					sequence->first_bitmap_index = frame;
 					sequence->bitmap_count = 1;
 					reference_set(&child_widget->background_bitmap, BITMAP_GROUP_TAG, build.bitmap_tags[bitmap]);
 					child_widget->bounds.y1 = (short)(child_widget->bounds.y0 + PAUSE_CAMPAIGN_BOX_HEIGHT);

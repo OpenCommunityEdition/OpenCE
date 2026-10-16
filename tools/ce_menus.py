@@ -542,15 +542,55 @@ def engine_names(source: Path, start: str, count: int) -> list:
     return re.findall(r'"([^"\\]*)"', text[:text.index("}")])[:count]
 
 
+def pause_art(art):
+    lines = []
+    for piece in ("left", "center", "right"):
+        heights = [port_settings.pause_box_height(buttons) for buttons in port_settings.PAUSE_BOX_BUTTONS]
+        heights += list(port_settings.PAUSE_BOX_EXTRA_HEIGHTS)
+        lines.append(art.port_picture(f"pause/pausebox_{piece}", [
+            (port_settings.pause_box_svg(piece, height), 4 if piece == "center" else 16, 256) for height in heights]))
+    for piece in ("left", "center", "right"):
+        lines.append(art.port_picture(f"pause/objectives_{piece}", [
+            (port_settings.pause_box_svg(piece, 195, header=True), 4 if piece == "center" else 16, 256)]))
+    return lines
+
+
+def regenerate_pause_art():
+    """Regenerate port-owned pause art without requiring the PC tag archive."""
+    import re
+    art = Art.__new__(Art)
+    art.pngs = []
+    lines = pause_art(art)
+    path = CE / "bitmaps.xml"
+    text = path.read_text()
+    pattern = r'\t<bitmap name="pause/(?:pausebox|objectives)_[^"]+">.*?</bitmap>\n'
+    matches = list(re.finditer(pattern, text, flags=re.S))
+    position = matches[0].start()
+    text = re.sub(pattern, "", text, flags=re.S)
+    text = text[:position] + "\n".join(lines) + "\n" + text[position:]
+    path.write_text(text)
+    manifest = MENUS / "menus.json"
+    data = json.loads(manifest.read_text())
+    files = set(data["files"]) | set(art.pngs)
+    data["files"] = sorted(name for name in files if name.endswith(".xml")) + sorted(
+        name for name in files if not name.endswith(".xml"))
+    manifest.write_text(json.dumps(data, indent=1) + "\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--tags", type=Path, required=True)
-    parser.add_argument("--definitions", type=Path, required=True)
-    parser.add_argument("--redraws", type=Path, required=True)
-    parser.add_argument("--placeholder", type=Path, required=True, help="the picture for frames with no redraw")
+    parser.add_argument("--pause-art-only", action="store_true", help="regenerate only the port-owned pause panels")
+    pause_only = "--pause-art-only" in sys.argv
+    parser.add_argument("--tags", type=Path, required=not pause_only)
+    parser.add_argument("--definitions", type=Path, required=not pause_only)
+    parser.add_argument("--redraws", type=Path, required=not pause_only)
+    parser.add_argument("--placeholder", type=Path, required=not pause_only, help="the picture for frames with no redraw")
     parser.add_argument("--pictures", type=Path,
                         help="the PC version's pictures, as PNGs by tag path: only where each is, to place its placeholder")
     arguments = parser.parse_args()
+    if arguments.pause_art_only:
+        regenerate_pause_art()
+        return
     tags = Tags(arguments.tags, arguments.definitions)
     # (the names of the Xbox's own as the game has them, which the tags' own
     # names give a little differently: "create&edit", "NULL")
@@ -621,12 +661,7 @@ def main() -> None:
              " (NON_HANDDRAWN.md; tools/ce_menus.py) -->", "<menus>"]
     lines += [art.bitmap(tag) for tag in sorted(bitmaps)]
     lines += [art.title(name, text) for name, text in sorted(port_settings.TITLES.items())]
-    # (the in-game pause menu's taller box: menu_tags.c's pause_patch)
-    for piece in ("left", "center", "right"):
-        heights = [port_settings.pause_box_height(buttons) for buttons in port_settings.PAUSE_BOX_BUTTONS]
-        heights += list(port_settings.PAUSE_BOX_EXTRA_HEIGHTS)
-        lines.append(art.port_picture(f"pause/pausebox_{piece}", [
-            (port_settings.pause_box_svg(piece, height), 4 if piece == "center" else 16, 256) for height in heights]))
+    lines += pause_art(art)
     # (voice chat's speaker, of a player who talks and of one muted: Lucide's
     # icons, port/assets/icons/lucide, white for network_voice.c to tint)
     lines.append(art.port_picture("voice/speaker", [

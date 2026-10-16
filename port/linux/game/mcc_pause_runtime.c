@@ -99,9 +99,17 @@ static long mcc_pause_art_add(short width, short height, enum mcc_pause_art_kind
         for(y=0;y<(kind==MCC_PAUSE_ART_DIM?4:height);y++) for(x=0;x<(kind==MCC_PAUSE_ART_DIM?4:width);x++) {
             unsigned long color=0;
             if(kind==MCC_PAUSE_ART_DIM) color=0x80000000UL;
-            else if((kind==MCC_PAUSE_ART_PANEL || i==1) && mcc_pause_inside(x,y,width,height,0))
+            else if((kind==MCC_PAUSE_ART_PANEL || kind==MCC_PAUSE_ART_FOOTER_PANEL ||
+                kind==MCC_PAUSE_ART_OBJECTIVES_PANEL || i==1) && mcc_pause_inside(x,y,width,height,0))
                 color=mcc_pause_inside(x,y,width,height,2)?
-                    (kind==MCC_PAUSE_ART_PANEL?0xC00A2649UL:0x60204A75UL):0xFF2896FFUL;
+                    (kind==MCC_PAUSE_ART_HIGHLIGHT?0x60204A75UL:0xC00A2649UL):0xFF2896FFUL;
+            /* Keep the stock 28-pixel bands inside the rounded outline. */
+            if(mcc_pause_inside(x,y,width,height,2)) {
+                if(kind==MCC_PAUSE_ART_OBJECTIVES_PANEL && y<=28)
+                    color=y==28?0xFF2896FFUL:0xFF000000UL;
+                else if(kind==MCC_PAUSE_ART_FOOTER_PANEL && y>=height-28)
+                    color=y==height-28?0xFF2896FFUL:0xFF000000UL;
+            }
             pixels[y*bitmap->width+x]=color;
         }
         if(!rasterizer_bitmap_new(bitmap)) goto failed;

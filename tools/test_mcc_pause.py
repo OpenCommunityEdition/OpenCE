@@ -94,7 +94,7 @@ static long art(short width,short height,enum mcc_pause_art_kind kind) {
     unsigned i;
     if(++art_calls==fail_art)return NONE;
     assert(width>0&&height>0&&width<=640&&height<=480);
-    assert(kind>=MCC_PAUSE_ART_PANEL&&kind<=MCC_PAUSE_ART_DIM);
+    assert(kind>=MCC_PAUSE_ART_PANEL&&kind<=MCC_PAUSE_ART_OBJECTIVES_PANEL);
     for(i=0;i<art_count;i++)if(art_records[i].width==width&&art_records[i].height==height&&
         art_records[i].kind==kind)return art_records[i].handle;
     assert(art_count<NUMBEROF(art_records));

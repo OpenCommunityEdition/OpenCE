@@ -789,7 +789,7 @@ def pause_box_height(buttons: int) -> int:
     return 159 + (buttons - 2) * 35
 
 
-def pause_box_svg(piece: str, height: int) -> str:
+def pause_box_svg(piece: str, height: int, header: bool = False) -> str:
     """a piece of the pause box (left cap, centre strip, right cap; 9-slice:
     the strip tiles across), height units high in its 256-high texture"""
     width = 4 if piece == "center" else 16
@@ -806,6 +806,19 @@ def pause_box_svg(piece: str, height: int) -> str:
                'stroke="#2896ff" stroke-width="2"/>']
         lines += (['  <g transform="matrix(-1 0 0 1 16 0)">'] + cap + ['  </g>']) if piece == "right" else \
             [line[2:] for line in cap]
+    # The stock objectives have a 28-unit header; the button key has a
+    # 28-unit footer. Clip the black fill to the rounded panel interior.
+    top = 2 if header else height - 28
+    divider = 28 if header else height - 28
+    if piece == "left":
+        lines += [f'  <defs><clipPath id="strip"><rect x="2" y="2" width="{width + 16}" height="{height - 4}" rx="7.5"/></clipPath></defs>']
+    if piece == "right":
+        lines += [f'  <defs><clipPath id="strip"><rect x="-16" y="2" width="{width + 14}" height="{height - 4}" rx="7.5"/></clipPath></defs>']
+    clip = ' clip-path="url(#strip)"' if piece != "center" else ""
+    lines += [f'  <g{clip}>',
+              f'    <rect x="0" y="{top}" width="{width}" height="26" fill="black"/>',
+              f'    <rect x="0" y="{divider}" width="{width}" height="0.75" fill="#2896ff"/>',
+              '  </g>']
     lines += ["</svg>", ""]
     return "\n".join(lines)
 

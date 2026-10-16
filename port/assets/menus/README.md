@@ -58,6 +58,10 @@ It needs `rsvg-convert`, Pillow, NumPy and SciPy. It writes every file, so
 `git status` should show only the screens meant to change; then
 `ninja linux` (or `ninja android`) embeds them in the game.
 
+The port-owned pause panels can be regenerated without the PC tags:
+`python tools/ce_menus.py --pause-art-only`. This updates only their SVGs,
+PNGs, bitmap definitions and the asset manifest.
+
 A settings screen (Controls Setup, Gamepads, Mouse, Audio, Video or Network
 Setup) is changed in `tools/port_settings.py`, not in its XML, and written
 with the command above.

@@ -217,10 +217,10 @@ static long mcc_pause_button(short layout, short width, short height, short labe
     return handle;
 }
 
-static long mcc_pause_panel(short layout, short width, short height)
+static long mcc_pause_panel(short layout, short width, short height, enum mcc_pause_art_kind kind)
 {
     long panel = mcc_pause_widget("panel", 0, width, height, layout, NONE);
-    mcc_pause_background(panel, width, height, MCC_PAUSE_ART_PANEL);
+    mcc_pause_background(panel, width, height, kind);
     return panel;
 }
 
@@ -242,7 +242,7 @@ static long mcc_pause_dialog(short layout, boolean pauses, short kind)
     widget->flags = 1 | (pauses ? 2 : 0);
     mcc_pause_background(root, width, height, MCC_PAUSE_ART_DIM);
     mcc_pause_events(root, 0, NONE, 512, TRUE);
-    children[0] = mcc_pause_panel(layout, panel_width, panel_height);
+    children[0] = mcc_pause_panel(layout, panel_width, panel_height, MCC_PAUSE_ART_PANEL);
     xs[0] = px; ys[0] = py;
     children[1] = mcc_pause_widget("attention", 1, panel_width - 24, 24, layout, LABEL_ATTENTION);
     xs[1] = px + 12; ys[1] = py + 8;
@@ -278,7 +278,7 @@ static long mcc_pause_team_screen(short layout)
     widget->flags = 1;
     mcc_pause_background(root, width, height, MCC_PAUSE_ART_DIM);
     mcc_pause_events(root, 0, NONE, 512, TRUE);
-    children[0] = mcc_pause_panel(layout, 226, 156); x[0] = (width - 226) / 2; y[0] = (height - 156) / 2;
+    children[0] = mcc_pause_panel(layout, 226, 156, MCC_PAUSE_ART_PANEL); x[0] = (width - 226) / 2; y[0] = (height - 156) / 2;
     children[1] = mcc_pause_widget("choose_team_caption", 1, 202, 24, layout, LABEL_TEAM_TITLE);
     x[1] = (width - 202) / 2; y[1] = y[0] + 8;
     list = mcc_pause_widget("teams", 3, 202, 96, layout, NONE);
@@ -340,17 +340,18 @@ static long mcc_pause_screen(short mode, short layout)
         x = layout == MCC_PAUSE_QUARTER ? 28 : 72;
         y = layout == MCC_PAUSE_FULL ? 171 : (layout == MCC_PAUSE_HALF ? 51 : 26);
         children[child_count] = mcc_pause_panel(layout, layout == MCC_PAUSE_QUARTER ? 296 : 218,
-            layout == MCC_PAUSE_QUARTER ? 228 : 159 + campaign_growth);
+            layout == MCC_PAUSE_QUARTER ? 228 : 159 + campaign_growth,
+            layout == MCC_PAUSE_QUARTER ? MCC_PAUSE_ART_PANEL : MCC_PAUSE_ART_FOOTER_PANEL);
         xs[child_count] = layout == MCC_PAUSE_QUARTER ? 12 : 64;
         ys[child_count++] = layout == MCC_PAUSE_FULL ? 162 : (layout == MCC_PAUSE_HALF ? 42 : 10);
         if (layout != MCC_PAUSE_QUARTER) {
-            children[child_count] = mcc_pause_panel(layout, 285, 159 + campaign_growth);
+            children[child_count] = mcc_pause_panel(layout, 285, 159 + campaign_growth, MCC_PAUSE_ART_OBJECTIVES_PANEL);
             xs[child_count] = 287; ys[child_count++] = y - 9;
         }
     } else {
         panel_height = count * row + 48;
         x = (width - 202) / 2; y = (height - panel_height) / 2 + 10;
-        children[child_count] = mcc_pause_panel(layout, 226, panel_height);
+        children[child_count] = mcc_pause_panel(layout, 226, panel_height, MCC_PAUSE_ART_PANEL);
         xs[child_count] = x - 8; ys[child_count++] = y - 10;
     }
     list = mcc_pause_widget("pause_actions", 3, button_width, count * row, layout, NONE);

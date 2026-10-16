@@ -198,12 +198,22 @@ static int pixel_check(void) {
         for(j=0;j<art->group.bitmaps.count;j++) {
             struct bitmap_data const *bitmap=&art->frames[j];
             unsigned long const *pixels=bitmap->base_address;
+            if(art->kind==MCC_PAUSE_ART_OBJECTIVES_PANEL) {
+                CHECK(pixels[10*bitmap->width+art->width/2]==0xFF000000UL);
+                CHECK(pixels[28*bitmap->width+art->width/2]==0xFF2896FFUL);
+                CHECK(pixels[40*bitmap->width+art->width/2]==0xC00A2649UL);
+            }
+            if(art->kind==MCC_PAUSE_ART_FOOTER_PANEL) {
+                CHECK(pixels[(art->height-10)*bitmap->width+art->width/2]==0xFF000000UL);
+                CHECK(pixels[(art->height-28)*bitmap->width+art->width/2]==0xFF2896FFUL);
+                CHECK(pixels[40*bitmap->width+art->width/2]==0xC00A2649UL);
+            }
             for(y=0;y<bitmap->height;y++)for(x=0;x<bitmap->width;x++) {
                 unsigned long color=pixels[y*bitmap->width+x];
                 if(art->kind==MCC_PAUSE_ART_DIM)CHECK(color==0x80000000UL);
                 else if(x>=art->width||y>=art->height)CHECK(!color);
                 else if(art->kind==MCC_PAUSE_ART_HIGHLIGHT&&!j)CHECK(!color);
-                else CHECK(!color||color==0xFF2896FFUL||color==0xC00A2649UL||color==0x60204A75UL);
+                else CHECK(!color||color==0xFF000000UL||color==0xFF2896FFUL||color==0xC00A2649UL||color==0x60204A75UL);
             }
         }
     }
