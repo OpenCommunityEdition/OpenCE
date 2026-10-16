@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
 
-<!-- MCC gameplay: Xbox white button, derived from the OpenCE button redraw. -->
+<!-- Original Xbox white button, derived from the OpenCE button redraw. -->
 <defs>
 
 <linearGradient id="body" gradientUnits="userSpaceOnUse" x1="0" y1="-12.932" x2="0" y2="12.932">
