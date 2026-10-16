@@ -100,15 +100,30 @@ static long mcc_pause_art_add(short width, short height, enum mcc_pause_art_kind
             unsigned long color=0;
             if(kind==MCC_PAUSE_ART_DIM) color=0x80000000UL;
             else if((kind==MCC_PAUSE_ART_PANEL || kind==MCC_PAUSE_ART_FOOTER_PANEL ||
-                kind==MCC_PAUSE_ART_OBJECTIVES_PANEL || i==1) && mcc_pause_inside(x,y,width,height,0))
+                kind==MCC_PAUSE_ART_OBJECTIVES_PANEL || kind==MCC_PAUSE_ART_CAMPAIGN_PANEL || i==1) && mcc_pause_inside(x,y,width,height,0))
                 color=mcc_pause_inside(x,y,width,height,2)?
                     (kind==MCC_PAUSE_ART_HIGHLIGHT?0x60204A75UL:0xC00A2649UL):0xFF2896FFUL;
+            /* The Xbox campaign body fades from (10,38,73) to (5,13,28).
+             * Scale only the body, leaving its header, footer and outline intact. */
+            if(color==0xC00A2649UL && (kind==MCC_PAUSE_ART_FOOTER_PANEL ||
+                kind==MCC_PAUSE_ART_OBJECTIVES_PANEL || kind==MCC_PAUSE_ART_CAMPAIGN_PANEL)) {
+                long top=kind==MCC_PAUSE_ART_OBJECTIVES_PANEL?29:2;
+                long bottom=kind==MCC_PAUSE_ART_FOOTER_PANEL?height-28:height-2;
+                long span=bottom-top, position=y-top;
+                if(span>0) {
+                    if(position<0) position=0;
+                    if(position>span) position=span;
+                    color=0xC0000000UL | ((10-5*position/span)<<16) |
+                        ((38-25*position/span)<<8) | (73-45*position/span);
+                }
+            }
             /* Keep the stock 28-pixel bands inside the rounded outline. */
             if(mcc_pause_inside(x,y,width,height,2)) {
                 if(kind==MCC_PAUSE_ART_OBJECTIVES_PANEL && y<=28)
                     color=y==28?0xFF2896FFUL:0xFF000000UL;
                 else if(kind==MCC_PAUSE_ART_FOOTER_PANEL && y>=height-28)
-                    color=y==height-28?0xFF2896FFUL:0xFF000000UL;
+                    /* The Xbox footer is black with alpha 191, replacing the body. */
+                    color=y==height-28?0xFF2896FFUL:0xBF000000UL;
             }
             pixels[y*bitmap->width+x]=color;
         }

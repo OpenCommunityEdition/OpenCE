@@ -239,6 +239,38 @@
     0,
     0
    ]
+  },
+  {
+   "name": "black_butn__0",
+   "tag": "ui\\shell\\bitmaps\\black_butn",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 0,
+   "svg": "black_butn.svg",
+   "place": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "white_butn__0",
+   "tag": "ui\\shell\\bitmaps\\white_butn",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 0,
+   "svg": "white_butn.svg",
+   "place": [
+    1,
+    0,
+    0
+   ]
   }
  ]
 }

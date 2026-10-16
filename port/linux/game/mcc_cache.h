@@ -17,6 +17,7 @@ void mcc_cache_precache_clear(void);
 unsigned long mcc_cache_checksum(char const *name);
 struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header);
 boolean mcc_cache_tags_loaded(void);
+short mcc_cache_scenario_type(void);
 void mcc_cache_tags_unload(void);
 boolean mcc_cache_contains(void const *address, long bytes);
 boolean mcc_cache_read(long tag, long offset, long bytes, void *out);

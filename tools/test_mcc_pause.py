@@ -94,7 +94,7 @@ static long art(short width,short height,enum mcc_pause_art_kind kind) {
     unsigned i;
     if(++art_calls==fail_art)return NONE;
     assert(width>0&&height>0&&width<=640&&height<=480);
-    assert(kind>=MCC_PAUSE_ART_PANEL&&kind<=MCC_PAUSE_ART_OBJECTIVES_PANEL);
+    assert(kind>=MCC_PAUSE_ART_PANEL&&kind<=MCC_PAUSE_ART_CAMPAIGN_PANEL);
     for(i=0;i<art_count;i++)if(art_records[i].width==width&&art_records[i].height==height&&
         art_records[i].kind==kind)return art_records[i].handle;
     assert(art_count<NUMBEROF(art_records));
@@ -191,6 +191,15 @@ static int context_check(boolean do_bounds) {
                 if(!strcmp(definition->name,"button_key"))footer=child;
             }
             CHECK(list!=NONE&&footer!=NONE);
+            if(!campaign) {
+                struct ui_widget_definition const *panel=widget(children[0].widget_tag.index);
+                unsigned record;
+                for(record=0;record<art_count;record++)
+                    if(art_records[record].handle==panel->background_bitmap.index)break;
+                CHECK(record<art_count);
+                CHECK(art_records[record].kind==MCC_PAUSE_ART_FOOTER_PANEL);
+                CHECK(children[footer].vertical_offset>=children[0].vertical_offset+panel->bounds.y1-28);
+            }
             if(campaign&&layout==0&&assets.settings) {
                 struct ui_widget_definition const *buttons=widget(children[list].widget_tag.index);
                 struct ui_widget_child_reference const *rows=buttons->child_widgets.address;

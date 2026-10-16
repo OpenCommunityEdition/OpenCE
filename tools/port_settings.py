@@ -794,14 +794,30 @@ def pause_box_svg(piece: str, height: int, header: bool = False) -> str:
     the strip tiles across), height units high in its 256-high texture"""
     width = 4 if piece == "center" else 16
     lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="256" viewBox="0 0 {width} 256">']
+    fill = "#0a2649"
+    body_clip = ""
+    if not header:
+        # Keep the translucent footer clear of the body: blending two
+        # 75%-opaque fills would make it nearly opaque and tint it blue.
+        lines += [f'  <defs><clipPath id="body-area"><rect x="-16" y="0" width="48" height="{height - 28}"/></clipPath></defs>']
+        body_clip = ' clip-path="url(#body-area)"'
+    if height in PAUSE_BOX_EXTRA_HEIGHTS or height in map(pause_box_height, PAUSE_BOX_BUTTONS):
+        # The stock campaign body fades from blue to dark navy at 75% opacity.
+        # Scale it within the body, excluding the objective header or key footer.
+        top, bottom = (29, height - 2) if header else (2, height - 28)
+        lines += [f'  <defs><linearGradient id="body" gradientUnits="userSpaceOnUse" x1="0" y1="{top}" x2="0" y2="{bottom}">',
+                  '    <stop offset="0" stop-color="#0a2649"/>',
+                  '    <stop offset="1" stop-color="#050d1c"/>',
+                  '  </linearGradient></defs>']
+        fill = "url(#body)"
     if piece == "center":
-        lines += [f'  <rect x="0" y="2" width="4" height="{height - 4}" fill="#0a2649" fill-opacity="0.75"/>',
+        lines += [f'  <rect x="0" y="2" width="4" height="{height - 4}" fill="{fill}" fill-opacity="0.75"{body_clip}/>',
                   '  <rect x="0" y="0" width="4" height="2" fill="#2896ff"/>',
                   f'  <rect x="0" y="{height - 2}" width="4" height="2" fill="#2896ff"/>']
     else:
         bottom, corner = height - 1, height - 9.5
         cap = [f'    <path d="M9.5,1 H17 V{bottom} H9.5 A8.5,8.5 0 0 1 1,{corner} V9.5 A8.5,8.5 0 0 1 9.5,1 Z" '
-               'fill="#0a2649" fill-opacity="0.75" fill-rule="evenodd"/>',
+               f'fill="{fill}" fill-opacity="0.75" fill-rule="evenodd"{body_clip}/>',
                f'    <path d="M17,1 H9.5 A8.5,8.5 0 0 0 1,9.5 V{corner} A8.5,8.5 0 0 0 9.5,{bottom} H17" fill="none" '
                'stroke="#2896ff" stroke-width="2"/>']
         lines += (['  <g transform="matrix(-1 0 0 1 16 0)">'] + cap + ['  </g>']) if piece == "right" else \
@@ -815,8 +831,9 @@ def pause_box_svg(piece: str, height: int, header: bool = False) -> str:
     if piece == "right":
         lines += [f'  <defs><clipPath id="strip"><rect x="-16" y="2" width="{width + 14}" height="{height - 4}" rx="7.5"/></clipPath></defs>']
     clip = ' clip-path="url(#strip)"' if piece != "center" else ""
+    opacity = ' fill-opacity="0.75"' if not header else ""
     lines += [f'  <g{clip}>',
-              f'    <rect x="0" y="{top}" width="{width}" height="26" fill="black"/>',
+              f'    <rect x="0" y="{top}" width="{width}" height="26" fill="black"{opacity}/>',
               f'    <rect x="0" y="{divider}" width="{width}" height="0.75" fill="#2896ff"/>',
               '  </g>']
     lines += ["</svg>", ""]

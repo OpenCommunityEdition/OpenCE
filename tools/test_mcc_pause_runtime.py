@@ -201,19 +201,32 @@ static int pixel_check(void) {
             if(art->kind==MCC_PAUSE_ART_OBJECTIVES_PANEL) {
                 CHECK(pixels[10*bitmap->width+art->width/2]==0xFF000000UL);
                 CHECK(pixels[28*bitmap->width+art->width/2]==0xFF2896FFUL);
-                CHECK(pixels[40*bitmap->width+art->width/2]==0xC00A2649UL);
+                CHECK((pixels[40*bitmap->width+art->width/2]&0xFF) >
+                    (pixels[(art->height-40)*bitmap->width+art->width/2]&0xFF));
             }
             if(art->kind==MCC_PAUSE_ART_FOOTER_PANEL) {
-                CHECK(pixels[(art->height-10)*bitmap->width+art->width/2]==0xFF000000UL);
+                CHECK(pixels[(art->height-10)*bitmap->width+art->width/2]==0xBF000000UL);
                 CHECK(pixels[(art->height-28)*bitmap->width+art->width/2]==0xFF2896FFUL);
-                CHECK(pixels[40*bitmap->width+art->width/2]==0xC00A2649UL);
+                CHECK((pixels[40*bitmap->width+art->width/2]&0xFF) >
+                    (pixels[(art->height-40)*bitmap->width+art->width/2]&0xFF));
+            }
+            if(art->kind==MCC_PAUSE_ART_CAMPAIGN_PANEL) {
+                CHECK(pixels[2*bitmap->width+art->width/2]==0xC00A2649UL);
+                CHECK(pixels[(art->height-3)*bitmap->width+art->width/2]==0xC0060E1DUL);
             }
             for(y=0;y<bitmap->height;y++)for(x=0;x<bitmap->width;x++) {
                 unsigned long color=pixels[y*bitmap->width+x];
                 if(art->kind==MCC_PAUSE_ART_DIM)CHECK(color==0x80000000UL);
                 else if(x>=art->width||y>=art->height)CHECK(!color);
                 else if(art->kind==MCC_PAUSE_ART_HIGHLIGHT&&!j)CHECK(!color);
-                else CHECK(!color||color==0xFF000000UL||color==0xFF2896FFUL||color==0xC00A2649UL||color==0x60204A75UL);
+                else if((art->kind==MCC_PAUSE_ART_OBJECTIVES_PANEL||art->kind==MCC_PAUSE_ART_FOOTER_PANEL||
+                    art->kind==MCC_PAUSE_ART_CAMPAIGN_PANEL) &&
+                    (color>>24)==0xC0) {
+                    CHECK((color&255)>=28&&(color&255)<=73);
+                    CHECK(((color>>8)&255)>=13&&((color>>8)&255)<=38);
+                    CHECK(((color>>16)&255)>=5&&((color>>16)&255)<=10);
+                }
+                else CHECK(!color||color==0xFF000000UL||color==0xBF000000UL||color==0xFF2896FFUL||color==0xC00A2649UL||color==0x60204A75UL);
             }
         }
     }

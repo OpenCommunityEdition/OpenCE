@@ -225,6 +225,11 @@ void *mcc_runtime_allocate(struct mcc_runtime *runtime, uint32_t bytes)
 
 boolean mcc_cache_tags_loaded(void) { return mcc_loaded; }
 
+short mcc_cache_scenario_type(void)
+{
+    return mcc_loaded ? (short)mcc_loaded_cache.report.identity.scenario_type : NONE;
+}
+
 boolean mcc_cache_contains(void const *address, long bytes)
 {
     uintptr_t offset = (uintptr_t)address - (uintptr_t)mcc_loaded_cache.tags;
