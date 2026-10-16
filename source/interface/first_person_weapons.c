@@ -129,6 +129,8 @@ symbols in this file:
 #include "shaders/shaders.h"
 /* port: port/linux/game/shield_color.c */
 real_rgb_color const *shield_color_colors(long unit_index, real_rgb_color const *colors);
+/* port: port/linux/game/spartan_colors.c */
+real_rgb_color const *spartan_colors_change_colors(long object_index, real_rgb_color const *colors);
 
 /* ---------- constants */
 
@@ -585,7 +587,9 @@ void first_person_weapon_draw(
 							0.0f,
 							model_node_matrices,
 							NULL,
-							unit->object.outgoing_change_colors,
+							/* port: a Spartan's arms in the armor's chosen
+							color (port/linux/game/spartan_colors.c) */
+							spartan_colors_change_colors(unit_index, unit->object.outgoing_change_colors),
 							unit->object.outgoing_function_values,
 							lighting,
 							&render.camera.position,

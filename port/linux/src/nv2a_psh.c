@@ -622,6 +622,10 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		xgpu_text_append(&text, "uniform %s tex%d;\n", sampler_declaration(key->sampler_type[stage]), stage);
 	if (key->source_blend)
 		xgpu_text_append(&text, "uniform vec4 blend_constant;\n");
+	if (key->recolor)
+		xgpu_text_append(&text, "uniform vec4 recolor;\n");
+	if (key->glow)
+		xgpu_text_append(&text, "uniform vec4 glow;\n");
 	if (key->per_pixel_lighting)
 		model_lighting(&text, key->per_pixel_lighting == 2);
 	xgpu_text_append(&text,
@@ -747,6 +751,38 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 	if (key->count_samples)
 		xgpu_text_append(&text, "\tatomicCounterIncrement(visible_samples);\n");
 #endif
+	if (key->recolor)
+	{
+		/* (a curve above 100: the port's blackout armor, spartan_colors.c,
+		its strongly colored pixels - its lights' glow - kept) */
+		xgpu_text_append(&text,
+			"\t{\n"
+			"\t\tfloat recolor_curve = recolor.a > 100.0 ? recolor.a - 100.0 : recolor.a;\n"
+			"\t\tvec3 recolored = recolor.rgb * pow(clamp(dot(clamp(result.rgb, 0.0, 1.0), vec3(0.299, 0.587, 0.114)), 0.0, 1.0), recolor_curve);\n"
+			"\t\tvec3 kept = clamp(result.rgb, 0.0, 1.0);\n"
+			"\t\tfloat chroma = max(kept.r, max(kept.g, kept.b)) - min(kept.r, min(kept.g, kept.b));\n"
+			"\t\tresult.rgb = recolor.a > 100.0 ? mix(recolored, kept, smoothstep(0.25, 0.5, chroma)) : recolored;\n"
+			"\t}\n");
+	}
+	if (key->glow)
+	{
+		/* (the lights as LEDs: their cores, the slits too, the color at
+		full whatever the armor's texture under them, and a soft bloom
+		around them, added; not the faint speckle of the mask. The Spartan
+		armor's own texture (characters\cyborg\bitmaps\cyborg
+		multipurpose): its helmet's light and its lower back's panel left
+		dark) */
+		xgpu_text_append(&text,
+			"\t{\n"
+			"\t\tvec2 glow_uv = fract(xT2.xy * texture_scale[2].xy);\n"
+			"\t\tfloat glow_mask = t2.g;\n"
+			"\t\tif (all(greaterThan(glow_uv, vec2(0.570, 0.250))) && all(lessThan(glow_uv, vec2(0.640, 0.330)))) glow_mask = 0.0;\n"
+			"\t\tif (all(greaterThan(glow_uv, vec2(0.805, 0.415))) && all(lessThan(glow_uv, vec2(0.930, 0.470)))) glow_mask = 0.0;\n"
+			"\t\tfloat glow_core = smoothstep(0.22, 0.42, glow_mask);\n"
+			"\t\tfloat glow_bloom = smoothstep(0.10, 0.40, glow_mask);\n"
+			"\t\tresult.rgb = mix(clamp(result.rgb, 0.0, 1.0), glow.rgb, glow_core) + glow.rgb * glow_bloom * glow_bloom * glow.a * (1.0 - glow_core);\n"
+			"\t}\n");
+	}
 	if (key->source_blend)
 	{
 		static const char *const factors[] =

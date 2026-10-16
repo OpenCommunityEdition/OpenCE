@@ -40,6 +40,8 @@ enum _distributed_actor_shield_over_charging_bit 3
 enum _distributed_actor_super_camouflaged_bit 5
 enum _distributed_message_actor_damage 73
 enum _distributed_message_actor_states 64
+enum _distributed_message_armor 91
+enum _distributed_message_armors 92
 enum _distributed_message_batch 16
 enum _distributed_message_client_identity 18
 enum _distributed_message_client_ready 9

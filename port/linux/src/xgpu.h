@@ -151,6 +151,14 @@ struct nv2a_pixel_shader_key
 	blend of a constant color factor with a constant alpha one, as the
 	meters' (shader_transparent_meter) */
 	unsigned char source_blend;
+	/* the draw recolored (d3d8_gl_set_recolor: a Spartan's visor,
+	port/linux/game/visor_color.c): its color made recolor's at its
+	brightness, curved by recolor's alpha */
+	unsigned char recolor;
+	/* the draw's self-illumination glow in a color (d3d8_gl_set_glow: a
+	Spartan's armor lights, port/linux/game/spartan_colors.c): where t2's
+	green (the glow's mask) is, the light's color, with a halo */
+	unsigned char glow;
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);

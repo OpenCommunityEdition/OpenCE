@@ -300,6 +300,29 @@ never sends a machine its own. A listener sets the gain and pan of a voice
 heard for being near by its own view of the speaker's unit. Mutes are each
 machine's own. Builds without voice chat never say they hear voices, so the
 host sends them none, and drop the kinds as unknown.
+
+The Armor menu's choices (`armor_sync.c`: `display.spartan_armor_color`,
+`display.spartan_lights_color`, `display.flashlight_color`,
+`display.shield_color` and `display.visor_color`, an armor color's index
+each, Blackout after them for the armor, or none) travel the same way, in the
+lobby and in a game, in multiplayer and in co-op: `armor_sync_handles_message`
+takes them before the checks that a game is running. A machine sends its
+choices to the host reliably (`_distributed_message_armor`) while the host's
+table has others for it, every three seconds at most; the host takes them only
+from that machine's own stream, and only indices in range or none, clears the
+row of a machine that leaves, and sends the table to each machine reliably
+(`_distributed_message_armors`, the rows up to the last machine in the game,
+five bytes each) when it changes, half a second apart at the soonest, to a
+machine that has not had it as soon as it is in the game (joined, or done
+loading the map), and every ten seconds. So a choice changed in the pause
+menu mid-game reaches the others within seconds. Each machine draws another
+player's armor, lights, visor and shield as they chose only with
+`display.others_custom_armor`, and the flashlight only with
+`display.others_custom_flashlights` too; a team game keeps the teams' armor
+colors. Only the drawing changes: nothing of the game's state is touched.
+Builds without them drop both kinds as unknown, so the network version is
+unchanged.
+
 A speed hack of less than a tenth is let be: the host's bounds on how far
 and how fast a client's player moves and fires hold it to the host's time
 anyway.
