@@ -302,7 +302,70 @@
       108
      ],
      "kind": "meter",
-     "score": 0.683
+     "score": 0.683,
+     "thresholds": [
+      4,
+      8,
+      12,
+      16,
+      20,
+      24,
+      28,
+      32,
+      36,
+      40,
+      44,
+      48,
+      52,
+      56,
+      60,
+      64,
+      68,
+      72,
+      76,
+      80,
+      84,
+      88,
+      92,
+      96,
+      100,
+      104,
+      108,
+      112,
+      116,
+      120,
+      124,
+      128,
+      132,
+      136,
+      140,
+      144,
+      148,
+      152,
+      156,
+      160,
+      164,
+      168,
+      172,
+      176,
+      180,
+      184,
+      188,
+      192,
+      196,
+      200,
+      204,
+      208,
+      212,
+      216,
+      220,
+      224,
+      228,
+      232,
+      236,
+      240
+     ],
+     "quantize_thresholds": true
     },
     {
      "xbox": [
@@ -324,7 +387,22 @@
       180
      ],
      "kind": "meter",
-     "score": 0.676
+     "score": 0.676,
+     "thresholds": [
+      10,
+      30,
+      50,
+      70,
+      90,
+      110,
+      130,
+      150,
+      170,
+      190,
+      210,
+      230
+     ],
+     "quantize_thresholds": true
     },
     {
      "xbox": [
@@ -346,7 +424,22 @@
       248
      ],
      "kind": "meter",
-     "score": 0.747
+     "score": 0.747,
+     "thresholds": [
+      10,
+      30,
+      50,
+      70,
+      90,
+      110,
+      130,
+      150,
+      170,
+      190,
+      210,
+      230
+     ],
+     "quantize_thresholds": true
     },
     {
      "xbox": [
@@ -434,7 +527,30 @@
       248
      ],
      "kind": "meter",
-     "score": 0.721
+     "score": 0.721,
+     "thresholds": [
+      12,
+      24,
+      36,
+      48,
+      60,
+      72,
+      84,
+      96,
+      108,
+      120,
+      132,
+      144,
+      156,
+      168,
+      180,
+      192,
+      204,
+      216,
+      228,
+      240
+     ],
+     "quantize_thresholds": true
     },
     {
      "xbox": [
@@ -456,7 +572,14 @@
       88
      ],
      "kind": "meter",
-     "score": 0.852
+     "score": 0.852,
+     "thresholds": [
+      60,
+      120,
+      180,
+      240
+     ],
+     "quantize_thresholds": true
     },
     {
      "xbox": [
@@ -478,7 +601,12 @@
       180
      ],
      "kind": "meter",
-     "score": 0.82
+     "score": 0.82,
+     "thresholds": [
+      120,
+      240
+     ],
+     "quantize_thresholds": true
     }
    ]
   },
@@ -3237,7 +3365,7 @@
       50,
       18
      ],
-     "svg": "hud2_left_reticles__reticle_18.svg",
+     "svg": "sniper_diamond.svg",
      "source_scale": 1.365,
      "source": [
       -3.5831,
@@ -3353,6 +3481,72 @@
      ],
      "kind": "a8",
      "score": 0.996
+    }
+   ]
+  },
+  {
+   "name": "vehicle_wrench_outline__0",
+   "tag": "ui\\hud\\redraws\\vehicle_wrench_outline",
+   "bitmap": 0,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 4,
+   "crc": 0,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "vehicle_wrench_outline.svg",
+     "source_scale": 1,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "kind": "alpha"
+    }
+   ]
+  },
+  {
+   "name": "passenger_health_outline__0",
+   "tag": "ui\\hud\\redraws\\passenger_health_outline",
+   "bitmap": 0,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 4,
+   "crc": 0,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "passenger_health_outline.svg",
+     "source_scale": 1,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "kind": "alpha"
     }
    ]
   }
