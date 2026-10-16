@@ -523,6 +523,25 @@ typedef char verify_shader_model_reflection_cube_map_offset[
 /* ---------- globals */
 
 static struct render_animation const *transparent_geometry_cached_animation = NULL;
+
+/* port: the four function values are the caller's, and the meter is drawn
+after that frame is gone. A charge sprite in between was writing over them. */
+static struct render_animation const *rasterizer_model_copy_animation(
+	struct render_animation const *animation)
+{
+	struct render_animation *copy;
+
+	if (!animation)
+		return NULL;
+	copy = rasterizer_memory_alloc(animation, sizeof(*copy));
+	if (copy && animation->values)
+	{
+		copy->values = rasterizer_memory_alloc(
+			animation->values,
+			sizeof(real) * 4);
+	}
+	return copy;
+}
 static struct render_lighting const *transparent_geometry_cached_lighting = NULL;
 static short transparent_geometry_cached_node_matrix_count = 0;
 static real_matrix4x3 const *transparent_geometry_cached_node_matrices = NULL;
@@ -1679,9 +1698,8 @@ void _rasterizer_model_draw(
 
 				if (group)
 				{
-					group->animation = rasterizer_memory_alloc(
-						&local_parameters->effect.modifier_animation,
-						sizeof(struct render_animation));
+					group->animation = rasterizer_model_copy_animation(
+						&local_parameters->effect.modifier_animation);
 				}
 			}
 		}
@@ -2657,9 +2675,8 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 								&local_parameters->lighting,
 								sizeof(struct render_lighting));
 						transparent_geometry_cached_animation =
-							rasterizer_memory_alloc_const(
-								&local_parameters->animation,
-								sizeof(struct render_animation));
+							rasterizer_model_copy_animation(
+								&local_parameters->animation);
 						local_parameters_queued_flag = TRUE;
 					}
 

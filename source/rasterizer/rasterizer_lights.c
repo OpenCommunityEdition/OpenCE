@@ -869,9 +869,14 @@ void rasterizer_lens_flares_submit_occlusion_tests(
 				real occlusion_radius = definition->occlusion_radius;
 				real_point3d occlusion_point;
 
-				/* port: the first-person weapon's projection (view_fov.c) */
+				/* port: the first-person weapon's projection (view_fov.c).
+				The gun covers the marker, so a depth test there counts no
+				pixels and the charge is never drawn. */
 				if (first_person)
+				{
+					rasterizer_widget_set_zbuffer_enable(FALSE);
 					viewmodel_projection_begin();
+				}
 
 				switch (definition->occlusion_offset_direction)
 				{
@@ -908,7 +913,10 @@ void rasterizer_lens_flares_submit_occlusion_tests(
 						lens_flare_index);
 
 				if (first_person)
+				{
 					viewmodel_projection_end();
+					rasterizer_widget_set_zbuffer_enable(TRUE);
+				}
 			}
 		}
 
@@ -947,11 +955,18 @@ void rasterizer_lens_flares_draw(
 					_lens_flare_first_person_weapon_flag) != 0;
 				struct lens_flare_definition *definition = lens_flare_parameters->definition;
 
-				/* port: the first-person weapon's projection (view_fov.c) */
+				/* port: the first-person weapon's projection (view_fov.c).
+				Tested against the scene, the sprite sits behind the gun,
+				so the charge never shows. */
 				if (first_person)
+				{
+					rasterizer_widget_set_zbuffer_enable(FALSE);
 					viewmodel_projection_begin();
+				}
 
-				if (lens_flare_parameters->internal__occlusion_pixels > 0 &&
+				/* port: the test is in the gun's camera and the depth is the
+				world's, so aiming at a wall counted the charge as hidden */
+				if ((first_person || lens_flare_parameters->internal__occlusion_pixels > 0) &&
 					LENS_FLARE_LIGHT_COLOR_ALPHA(lens_flare_parameters->compressed_light_color) > 0 &&
 					definition->reflections.count > 0)
 				{
@@ -979,7 +994,7 @@ void rasterizer_lens_flares_draw(
 					subtract_vectors3d(&corona_axis, &eye_to_corona_vector, &corona_axis);
 					scale_vector3d(&corona_axis, 2.0f, &corona_axis);
 
-					occlusion_fraction = *occlusion_test_result*(1.0f/255.0f);
+					occlusion_fraction = first_person ? 1.0f : *occlusion_test_result*(1.0f/255.0f);
 
 					if (definition->far_fade_distance > 0.0f)
 					{
@@ -1171,8 +1186,11 @@ void rasterizer_lens_flares_draw(
 									}
 
 									rasterizer_widget_set_tint_factor(tint_factor);
-									if (TEST_FLAG(reflection->flags, _lens_flare_reflection_zbuffer_bit) &&
-										(lens_flare_parameters->compressed_window_index & _lens_flare_first_person_weapon_flag))
+									/* port: the gun marked its pixels. A charge light
+									draws around the body, not through it. */
+									if (first_person ||
+										(TEST_FLAG(reflection->flags, _lens_flare_reflection_zbuffer_bit) &&
+											(lens_flare_parameters->compressed_window_index & _lens_flare_first_person_weapon_flag)))
 									{
 										rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_REJECT);
 									}

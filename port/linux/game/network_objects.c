@@ -23,8 +23,12 @@ same datum index (identifier and all), so that any message can name one:
   bodies), each client those near its players every tick and those further
   less often, with each as it comes to rest, and to every client a few of
   those at rest, round the lot; a client moves its copies there, a little
-  off half of the way each tick, further (or come to rest) drawn gliding from
-  where they were rather than jumping (render_interpolation.c).
+  off half of the way each tick, its facing halfway toward the host's
+  (a large turn, or a unit this machine drives, is taken whole), further
+  (or come to rest) drawn gliding from where they were rather than jumping
+  (render_interpolation.c). The glide is drawn on the 30 Hz frame as well,
+  so a flashlight beam and a muzzle flash aimed from that pose do not snap
+  when frames are not drawn between ticks.
   A client's own player's vehicle is its own, as its own player's unit is:
   it sends the host where it drives it at which of its ticks, which the host
   takes within what the vehicle can have moved at its next tick, and tells
@@ -754,6 +758,41 @@ static boolean distributed_object_follows_host(
 	return (network_coop_active() && cinematic_in_progress()) || distributed_vehicle_unsteered(object_index);
 }
 
+/* Halfway toward the host's facing. A beam and a muzzle flash are aimed
+from it, so taking the host's aim in one step swings them. A turn no
+update makes (or a unit this machine drives, whose aim is its own) is
+taken whole. */
+static void distributed_ease_facing(
+	long object_index,
+	real_vector3d *forward,
+	real_vector3d *up)
+{
+	struct object_datum *object = object_get(object_index);
+	real_vector3d eased_forward;
+	real_vector3d eased_up;
+	real dot;
+
+	if (distributed_object_follows_host(object_index))
+		return;
+	if (TEST_FLAG(_object_mask_unit, object->object.type) && distributed_unit_driven_here(object_index))
+		return;
+	dot = object->object.forward.i * forward->i + object->object.forward.j * forward->j +
+		object->object.forward.k * forward->k;
+	if (!(dot >= 0.5f))
+		return;
+	eased_forward.i = object->object.forward.i + (forward->i - object->object.forward.i) * 0.5f;
+	eased_forward.j = object->object.forward.j + (forward->j - object->object.forward.j) * 0.5f;
+	eased_forward.k = object->object.forward.k + (forward->k - object->object.forward.k) * 0.5f;
+	eased_up.i = object->object.up.i + (up->i - object->object.up.i) * 0.5f;
+	eased_up.j = object->object.up.j + (up->j - object->object.up.j) * 0.5f;
+	eased_up.k = object->object.up.k + (up->k - object->object.up.k) * 0.5f;
+	if (distributed_axes_make_valid(&eased_forward, &eased_up))
+	{
+		*forward = eased_forward;
+		*up = eased_up;
+	}
+}
+
 /* (the transform checked) */
 static void distributed_object_move(
 	long object_index,
@@ -764,14 +803,20 @@ static void distributed_object_move(
 	real_vector3d const *angular_velocity)
 {
 	struct object_datum *object = object_get(object_index);
+	real_vector3d eased_forward = *forward;
+	real_vector3d eased_up = *up;
 	real_vector3d offset;
 
 	/* (drawn from where it was, the difference fading over a few ticks) */
 	offset.i = object->object.position.x - position->x;
 	offset.j = object->object.position.y - position->y;
 	offset.k = object->object.position.z - position->z;
+	distributed_ease_facing(object_index, &eased_forward, &eased_up);
 	distributed_body_unfix_pose(object_index);
-	object_set_position(object_index, position, forward, up);
+	object_set_position(object_index, position, &eased_forward, &eased_up);
+	/* the weapon's matrices too: its beam and muzzle flash are placed from
+	them, and set_position poses only this object */
+	object_compute_node_matrices_recursive(object_index);
 	if (velocity)
 		object->object.translational_velocity = *velocity;
 	if (angular_velocity)
@@ -841,8 +886,12 @@ boolean network_objects_reconcile(
 		offset.i = object->object.position.x - blended.x;
 		offset.j = object->object.position.y - blended.y;
 		offset.k = object->object.position.z - blended.z;
+		distributed_ease_facing(object_index, &valid_forward, &valid_up);
 		distributed_body_unfix_pose(object_index);
 		object_set_position(object_index, &blended, &valid_forward, &valid_up);
+		/* the weapon's matrices too: its beam and muzzle flash are placed
+		from them, and set_position poses only this object */
+		object_compute_node_matrices_recursive(object_index);
 		if (!distributed_object_follows_host(object_index))
 			render_interpolation_correct_object(object_index, &offset);
 	}

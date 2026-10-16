@@ -90,6 +90,7 @@ symbols in this file:
 #include "game/game.h"
 #include "memory/data.h"
 #include "objects/objects.h"
+#include "interface/first_person_weapons.h"
 #include "render/render.h"
 #include "render/render_sprite.h"
 #include "saved games/game_state.h"
@@ -549,12 +550,19 @@ void glow_render(
 
 	glow = glow_get(glow_index);
 	definition = glow_definition_get(glow->definition_index);
-	build_sprites_begin(
-		&sprite_data,
-		glow->number_of_particles,
-		definition->texture.index,
-		&global_shader_effect_additive,
-		0);
+	/* port: the local weapon's glow is drawn with the viewmodel. The world's
+	view cuts off a charge held against the camera. */
+	{
+		long local_index = first_person_weapon_get_local_index(object_index);
+
+		build_sprites_begin(
+			&sprite_data,
+			glow->number_of_particles,
+			definition->texture.index,
+			&global_shader_effect_additive,
+			local_index != NONE && local_index == render.local_player_index ?
+				FLAG(_build_sprites_first_person_bit) : 0);
+	}
 
 	for (particle = glow->head_particle; particle; particle = particle->next)
 	{
@@ -1285,11 +1293,21 @@ static void glow_update(
 	if (!definition)
 		return;
 
-	glow->number_of_markers = object_get_marker_by_name(
+	/* port: the local weapon's charge follows the viewmodel. The body's
+	markers are not on screen in first person. */
+	glow->number_of_markers = first_person_weapon_get_marker_by_name_render(
 		object_index,
 		definition->attachment_marker,
 		glow->markers,
 		MAXIMUM_GLOW_MARKERS);
+	if (glow->number_of_markers <= 0)
+	{
+		glow->number_of_markers = object_get_marker_by_name(
+			object_index,
+			definition->attachment_marker,
+			glow->markers,
+			MAXIMUM_GLOW_MARKERS);
+	}
 
 	if (!glow->initialized && glow->number_of_markers > 1)
 	{

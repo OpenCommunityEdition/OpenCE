@@ -28,8 +28,11 @@ An object the distributed netcode moves to where the host has it
 (port/linux/game/network_objects.c) is drawn gliding there over a few ticks
 rather than jumping: its snapshots move with it, and the difference is drawn
 on top of it, whole until the next tick and fading from then on (no more than
-a few world units of it: further is a jump). A local player's view glides so
-with their unit, and with what it rides.
+a few world units of it: further is a jump). That glide is also drawn when
+display.interpolation is off, on the one frame of each tick: a beam and a
+muzzle flash are placed from the pose that is drawn. A local player's view
+glides so with their unit, and with what it rides, when frames are drawn
+between ticks.
 */
 
 #include "cseries.h"
@@ -148,6 +151,9 @@ static struct interpolated_first_person interpolated_first_person[MAXIMUM_LOCAL_
 static long interpolation_tick;
 static long interpolation_frame;
 static boolean interpolation_rendering;
+/* true from frame begin to frame end, including when interpolation is off:
+the correction glide is drawn then */
+static boolean interpolation_drawing;
 static real interpolation_fraction = 1.0f;
 
 /* ---------- blending */
@@ -384,6 +390,41 @@ static real distance_squared(real_point3d const *a, real_point3d const *b)
 
 /* ---------- ticks */
 
+/* the records, so a correction can be kept when frames are not drawn
+between ticks (no snapshots then) */
+static void interpolation_records_ensure(void)
+{
+	long index;
+
+	if (interpolated_objects)
+		return;
+	interpolated_objects = calloc(MAXIMUM_INTERPOLATED_OBJECTS, sizeof(*interpolated_objects));
+	if (!interpolated_objects)
+		return;
+	for (index = 0; index < MAXIMUM_INTERPOLATED_OBJECTS; index++)
+		interpolated_objects[index].object_index = NONE;
+}
+
+/* one tick of the glide, without keeping poses to blend between ticks */
+static void interpolation_corrections_tick(void)
+{
+	long index;
+
+	if (!interpolated_objects)
+		return;
+	for (index = 0; index < MAXIMUM_INTERPOLATED_OBJECTS; index++)
+	{
+		struct interpolated_object *record = &interpolated_objects[index];
+
+		if (record->object_index == NONE || record->has_previous)
+			continue;
+		correction_advance(&record->correction, &record->correction_pending);
+		record->blended_frame = NONE;
+		if (!correction_significant(&record->correction))
+			record->object_index = NONE;
+	}
+}
+
 void render_interpolation_tick(void)
 {
 	struct object_iterator iterator;
@@ -391,7 +432,10 @@ void render_interpolation_tick(void)
 	long previous_tick = interpolation_tick++;
 
 	if (!halo_interpolation_enabled())
+	{
+		interpolation_corrections_tick();
 		return;
+	}
 	/* the cameras' corrections a tick on, as the objects' (below) */
 	{
 		short local_player_index;
@@ -501,6 +545,7 @@ void render_interpolation_reset(void)
 
 void render_interpolation_frame_begin(void)
 {
+	interpolation_drawing = TRUE;
 	interpolation_rendering = halo_interpolation_enabled();
 	interpolation_frame++;
 	interpolation_fraction = game_time_get_tick_fraction();
@@ -509,6 +554,7 @@ void render_interpolation_frame_begin(void)
 void render_interpolation_frame_end(void)
 {
 	interpolation_rendering = FALSE;
+	interpolation_drawing = FALSE;
 }
 
 real render_interpolation_fraction(void)
@@ -516,12 +562,16 @@ real render_interpolation_fraction(void)
 	return interpolation_rendering ? interpolation_fraction : 1.0f;
 }
 
+static real_matrix4x3 *interpolation_correction_matrices(long object_index);
+
 real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 {
 	struct interpolated_object *record;
 	long absolute_index;
 
-	if (!interpolation_rendering || !interpolated_objects || object_index == NONE)
+	if (!interpolation_rendering)
+		return interpolation_correction_matrices(object_index);
+	if (!interpolated_objects || object_index == NONE)
 		return NULL;
 	absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
 	if (absolute_index >= MAXIMUM_INTERPOLATED_OBJECTS)
@@ -598,6 +648,62 @@ real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 	return record->nodes + 2 * record->node_capacity;
 }
 
+/* the glide alone, on the frame of a tick: the pose as simulated, drawn
+back by the correction. Not between ticks, which the blend above is. */
+static real_matrix4x3 *interpolation_correction_matrices(long object_index)
+{
+	struct object_datum *object;
+	struct interpolated_object *record;
+	long absolute_index;
+	short node_count;
+	short node_index;
+	real_matrix4x3 *raw;
+	real_matrix4x3 *drawn;
+	real_vector3d offset;
+
+	if (halo_interpolation_enabled() || !interpolation_drawing || !interpolated_objects || object_index == NONE)
+		return NULL;
+	absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
+	if (absolute_index >= MAXIMUM_INTERPOLATED_OBJECTS)
+		return NULL;
+	record = &interpolated_objects[absolute_index];
+	if (record->object_index != object_index || record->has_previous)
+		return NULL;
+	if (!correction_significant(&record->correction) && !correction_significant(&record->correction_pending))
+		return NULL;
+	object = object_try_and_get(object_index);
+	if (!object)
+		return NULL;
+	node_count = (short)(object->object.node_matrices.size / (short)sizeof(real_matrix4x3));
+	if (node_count <= 0 || node_count > MAXIMUM_INTERPOLATED_NODES)
+		return NULL;
+	if (record->node_capacity < node_count)
+	{
+		real_matrix4x3 *nodes = realloc(record->nodes, 3 * node_count * sizeof(real_matrix4x3));
+
+		if (!nodes)
+			return NULL;
+		record->nodes = nodes;
+		record->node_capacity = node_count;
+		record->blended_frame = NONE;
+	}
+	if (record->blended_frame == interpolation_frame && record->node_count == node_count)
+		return record->nodes;
+	raw = object_header_block_get(object_index, &object->object.node_matrices);
+	drawn = record->nodes;
+	memcpy(drawn, raw, node_count * sizeof(real_matrix4x3));
+	correction_drawn(&record->correction, &record->correction_pending, &offset);
+	for (node_index = 0; node_index < node_count; node_index++)
+	{
+		drawn[node_index].position.x += offset.i;
+		drawn[node_index].position.y += offset.j;
+		drawn[node_index].position.z += offset.k;
+	}
+	record->node_count = node_count;
+	record->blended_frame = interpolation_frame;
+	return drawn;
+}
+
 /* ---------- corrections */
 
 /* the object (and what it carries) moved by the netcode from where it was,
@@ -609,33 +715,57 @@ void render_interpolation_correct_object(long object_index, real_vector3d const 
 	long absolute_index;
 
 	/* (so written that an offset not a number is none) */
-	if (!interpolated_objects || object_index == NONE ||
+	if (object_index == NONE ||
 		!(offset->i * offset->i + offset->j * offset->j + offset->k * offset->k <= OBJECT_SNAP_DISTANCE * OBJECT_SNAP_DISTANCE))
 	{
 		return;
 	}
+	if (!halo_interpolation_enabled())
+		interpolation_records_ensure();
+	if (!interpolated_objects)
+		return;
 	absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
 	if (absolute_index < MAXIMUM_INTERPOLATED_OBJECTS &&
 		interpolated_objects[absolute_index].object_index == object_index)
 	{
 		struct interpolated_object *record = &interpolated_objects[absolute_index];
-		short snapshot;
-		short node_index;
 
-		/* the snapshots where it would have been, the difference drawn */
-		for (snapshot = 0; snapshot < 2; snapshot++)
+		/* the snapshots where it would have been, the difference drawn.
+		With no frames between ticks there are no snapshots: the difference
+		is kept and drawn on the tick's frame. */
+		if (halo_interpolation_enabled() && record->nodes && record->node_count > 0)
 		{
-			real_matrix4x3 *nodes = record->nodes + snapshot * record->node_capacity;
+			short snapshot;
+			short node_index;
 
-			for (node_index = 0; node_index < record->node_count; node_index++)
+			for (snapshot = 0; snapshot < 2; snapshot++)
 			{
-				nodes[node_index].position.x -= offset->i;
-				nodes[node_index].position.y -= offset->j;
-				nodes[node_index].position.z -= offset->k;
+				real_matrix4x3 *nodes = record->nodes + snapshot * record->node_capacity;
+
+				for (node_index = 0; node_index < record->node_count; node_index++)
+				{
+					nodes[node_index].position.x -= offset->i;
+					nodes[node_index].position.y -= offset->j;
+					nodes[node_index].position.z -= offset->k;
+				}
 			}
 		}
-		correction_add(&record->correction, &record->correction_pending, offset);
+		if (halo_interpolation_enabled() || !record->has_previous)
+		{
+			correction_add(&record->correction, &record->correction_pending, offset);
+			record->blended_frame = NONE;
+		}
+	}
+	else if (!halo_interpolation_enabled() && absolute_index < MAXIMUM_INTERPOLATED_OBJECTS)
+	{
+		struct interpolated_object *record = &interpolated_objects[absolute_index];
+
+		record->object_index = object_index;
+		record->correction = *global_zero_vector3d;
+		record->correction_pending = *global_zero_vector3d;
+		record->has_previous = FALSE;
 		record->blended_frame = NONE;
+		correction_add(&record->correction, &record->correction_pending, offset);
 	}
 	/* a local player's unit (by itself, or with what it rides): its
 	first-person view, which the observer poses from it, glides with it */
