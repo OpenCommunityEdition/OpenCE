@@ -15,6 +15,8 @@
 #include <string.h>
 
 long halo_screen_width(void);
+int config_boolean(char const *name);
+char const *config_string(char const *name);
 long hud_hires_asset_count(void);
 char const *hud_hires_asset_tag(long asset);
 void hud_hires_register_placeholder(long asset, unsigned long const *texture);
@@ -25,6 +27,7 @@ static struct {
     long asset;
     boolean attempted;
 } mcc_buttons[6];
+static boolean mcc_buttons_classic;
 
 void mcc_hud_glyphs_dispose(void)
 {
@@ -56,13 +59,23 @@ static struct bitmap_data const *mcc_hud_button_bitmap(short index)
     static char const *names[]={"ui\\shell\\bitmaps\\a_butn","ui\\shell\\bitmaps\\b_butn",
         "ui\\shell\\bitmaps\\x_butn","ui\\shell\\bitmaps\\y_butn",
         "mcc\\buttons\\black","mcc\\buttons\\white"};
+    static char const *classic_names[]={"ui\\hud\\buttons\\classic_a","ui\\hud\\buttons\\classic_b",
+        "ui\\hud\\buttons\\classic_x","ui\\hud\\buttons\\classic_y",
+        "ui\\hud\\buttons\\classic_black","ui\\hud\\buttons\\classic_white"};
     long asset;
     struct bitmap_data *bitmap;
+    boolean classic;
     if (index<0 || index>=6) return NULL;
+    /* Keep the established MCC low-res path; the style belongs to High-Res HUD. */
+    classic=config_boolean("display.high_res_hud") && strcmp(config_string("display.hud_button_style"),"gems");
+    if (classic!=mcc_buttons_classic) {
+        mcc_hud_glyphs_dispose();
+        mcc_buttons_classic=classic;
+    }
     if (mcc_buttons[index].attempted) return mcc_buttons[index].bitmap;
     mcc_buttons[index].attempted=TRUE;
     for (asset=0;asset<hud_hires_asset_count();asset++) {
-        if (strcmp(hud_hires_asset_tag(asset),names[index])) continue;
+        if (strcmp(hud_hires_asset_tag(asset),classic ? classic_names[index] : names[index])) continue;
         /* Reuse OpenCE's embedded hand-drawn buttons. The placeholder has
          * the original 32px layout, independent of the MCC sprite sheet. */
         bitmap=bitmap_2d_new(32,32,0,11);

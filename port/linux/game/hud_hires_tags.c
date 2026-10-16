@@ -36,6 +36,7 @@ When the texture cannot be drawn, the sprites are drawn from their bitmap.
 void platform_log(char const *format, ...);
 unsigned long config_changes(void);
 int config_boolean(char const *name);
+char const *config_string(char const *name);
 long hud_hires_asset_count(void);
 char const *hud_hires_asset_tag(long asset);
 long hud_hires_asset_bitmap(long asset);
@@ -93,6 +94,21 @@ static struct
 	long asset;
 	boolean attempted;
 } hud_buttons[6];
+static boolean hud_buttons_classic;
+
+static void hud_buttons_forget(void)
+{
+	long index;
+	for (index = 0; index < 6; index++)
+	{
+		if (hud_buttons[index].bitmap)
+		{
+			hud_hires_register_placeholder(hud_buttons[index].asset, NULL);
+			bitmap_delete(hud_buttons[index].bitmap);
+		}
+	}
+	csmemset(hud_buttons, 0, sizeof(hud_buttons));
+}
 
 /* ---------- private code */
 
@@ -110,15 +126,7 @@ static void hud_hires_sprite_bitmaps_forget(
 		}
 	}
 	hires_sprite_bitmap_count = 0;
-	for (index = 0; index < 6; index++)
-	{
-		if (hud_buttons[index].bitmap)
-		{
-			hud_hires_register_placeholder(hud_buttons[index].asset, NULL);
-			bitmap_delete(hud_buttons[index].bitmap);
-		}
-	}
-	csmemset(hud_buttons, 0, sizeof(hud_buttons));
+	hud_buttons_forget();
 
 	return;
 }
@@ -328,6 +336,10 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 		"ui\\shell\\bitmaps\\a_butn", "ui\\shell\\bitmaps\\b_butn",
 		"ui\\shell\\bitmaps\\x_butn", "ui\\shell\\bitmaps\\y_butn",
 		"ui\\shell\\bitmaps\\black_butn", "ui\\shell\\bitmaps\\white_butn"};
+	static char const *classic_names[] = {
+		"ui\\hud\\buttons\\classic_a", "ui\\hud\\buttons\\classic_b",
+		"ui\\hud\\buttons\\classic_x", "ui\\hud\\buttons\\classic_y",
+		"ui\\hud\\buttons\\classic_black", "ui\\hud\\buttons\\classic_white"};
 	struct icon_hud_element_definition const *buttons;
 	struct rasterizer_dynamic_screen_geometry_parameters parameters;
 	struct dynamic_screen_vertex vertices[4];
@@ -335,6 +347,7 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	real viewport, scale, x, y;
 	long index, asset;
 	short i;
+	boolean classic;
 
 	if (!config_boolean("display.high_res_hud") || !hud_globals)
 		return FALSE;
@@ -344,12 +357,18 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 		if (icon == buttons + index) break;
 	if (index >= 6 || index >= hud_globals->messaging.button_icons.count)
 		return FALSE;
+	classic = strcmp(config_string("display.hud_button_style"), "gems") != 0;
+	if (classic != hud_buttons_classic)
+	{
+		hud_buttons_forget();
+		hud_buttons_classic = classic;
+	}
 	if (!hud_buttons[index].attempted)
 	{
 		hud_buttons[index].attempted = TRUE;
 		for (asset = 0; asset < hud_hires_asset_count(); asset++)
 		{
-			if (strcmp(hud_hires_asset_tag(asset), names[index])) continue;
+			if (strcmp(hud_hires_asset_tag(asset), classic ? classic_names[index] : names[index])) continue;
 			bitmap = bitmap_2d_new(32, 32, 0, 11);
 			if (!bitmap) break;
 			if (!rasterizer_bitmap_new(bitmap))

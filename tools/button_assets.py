@@ -94,6 +94,15 @@ HUD_BUTTONS = [dict(name=f"{button}_butn__0", tag=BITMAPS + f"{button}_butn",
                    crc=0, svg=f"{button}_butn.svg", place=[1, 0, 0])
                for button in ("black", "white")]
 
+# Plain gameplay faces use the same hand-drawn oval and letter as the
+# message stencils, with solid colour and no rim or shadow.
+CLASSIC_BUTTONS = [dict(name=f"classic_{button}__0", tag=f"ui\\hud\\buttons\\classic_{button}",
+                       bitmap=0, width=32, height=32, format="dxt3", scale=8,
+                       crc=0, svg=f"{button}_butn.svg", place=[1, 0, 0], classic=color)
+                   for button, color in (("a", "#40eb40"), ("b", "#fa5946"),
+                                         ("x", "#3998fa"), ("y", "#f9e928"),
+                                         ("black", "#000000"), ("white", "#ffffff"))]
+
 
 # MCC modern shoulder labels map to the Xbox black/white controls. These
 # redraws are placeholders, not CRC replacements for any native map bitmap.
@@ -148,6 +157,21 @@ def stencil(svg: str, cell: list, place: list, index: int, letter: list = (0, 0)
             f'<g clip-path="url(#cell{index})" mask="url(#letter{index})">'
             f'<ellipse transform="{moved} {parents[oval].get("transform")}" rx="{oval.get("rx")}" '
             f'ry="{oval.get("ry")}" fill="#ffffff"/></g>')
+
+
+def classic(svg: str, color: str, letter_move: list = (0, 0)) -> str:
+    """The existing redraw's plain oval and black letter in the same cell."""
+    root = ElementTree.parse(ASSETS / "svg" / svg).getroot()
+    parents = {child: parent for parent in root.iter() for child in parent}
+    oval, letter = root.find(".//*[@id='oval']"), root.find(".//*[@id='letter']")
+    oval.set("fill", color)
+    oval.set("transform", parents[oval].get("transform", ""))
+    body = ElementTree.tostring(oval, encoding="unicode")
+    if letter is not None:
+        letter.set("fill", "#000000")
+        letter.set("transform", f"translate({letter_move[0]} {letter_move[1]}) {letter.get('transform', '')}")
+        body += ElementTree.tostring(letter, encoding="unicode")
+    return document(32, 32, body)
 
 
 def render(text: str, scale: int) -> np.ndarray:
@@ -310,7 +334,10 @@ def layout(arguments) -> None:
         # (the sprites it stands for, not the whole bitmap)
         "sprites": sprites,
     })
-    LIST.write_text(json.dumps({"assets": entries + MCC_BUTTONS + HUD_BUTTONS}, indent=1) + "\n")
+    classic_buttons = [dict(entry) for entry in CLASSIC_BUTTONS]
+    for entry, sprite in zip(classic_buttons, sprites):
+        entry["letter"] = [round(n / sprite["place"][0], 4) for n in sprite["letter"]]
+    LIST.write_text(json.dumps({"assets": entries + MCC_BUTTONS + HUD_BUTTONS + classic_buttons}, indent=1) + "\n")
 
 
 def build(arguments) -> None:
@@ -320,7 +347,9 @@ def build(arguments) -> None:
         if stale.name not in names:
             stale.unlink()
     for entry in description["assets"]:
-        if "sprites" in entry:
+        if "classic" in entry:
+            image = bleed(render(classic(entry["svg"], entry["classic"], entry.get("letter", (0, 0))), entry["scale"]))
+        elif "sprites" in entry:
             body = "\n".join(stencil(sprite["svg"], sprite["cell"], sprite["place"], index,
                                      sprite.get("letter", (0, 0)))
                              for index, sprite in enumerate(entry["sprites"]))
