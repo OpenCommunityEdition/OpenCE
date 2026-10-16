@@ -2043,13 +2043,13 @@ static void pause_campaign_patch(struct cache_file_tag_instance *instances)
 	}
 }
 
-/* the campaign played here by one player: not network co-op, nor split
-screen */
-static boolean single_player_campaign_map(void)
+/* The full-screen campaign pause menu also serves network co-op. Local
+split-screen keeps its separate layout. */
+static boolean full_screen_campaign_map(void)
 {
 	return tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE &&
 		tag_loaded(UI_WIDGET_DEFINITION_TAG, CAMPAIGN_PAUSE_SCREEN) != NONE &&
-		game_connection() == _game_connection_local && !network_game_is_active() && !game_is_cooperative();
+		(game_connection() != _game_connection_local || network_game_is_active() || !game_is_cooperative());
 }
 
 /* whether display.menus asks for the PC version's menus: "pc" in any case
@@ -2077,7 +2077,7 @@ void menu_tags_loaded(
 	long widget_count, own_lists = 0, total, index;
 
 	boolean game_map = strcmp(map_name, "ui") != 0;
-	boolean campaign = game_map && single_player_campaign_map();
+	boolean campaign = game_map && full_screen_campaign_map();
 
 	/* MCC owns its pause menus and uses these native Settings screens.
 	Do not patch embedded MCC campaign widgets. */
@@ -2104,7 +2104,9 @@ mcc_settings:
 	memset(&build, 0, sizeof(build));
 	build.menus = menus;
 	build.game_map = game_map;
-	build.campaign = campaign;
+	/* Settings must not pause the simulation in a network campaign. */
+	build.campaign = campaign && game_connection() == _game_connection_local &&
+		!network_game_is_active() && !game_is_cooperative();
 	widget_count = menus->widget_count;
 	build.widget_tags = malloc((widget_count + 1) * sizeof(long));
 	build.text_tags = malloc((widget_count + 1) * sizeof(long));
