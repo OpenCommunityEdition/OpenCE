@@ -366,9 +366,10 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	bitmap = hud_buttons[index].bitmap;
 	if (!bitmap) return FALSE;
 	viewport = local_player_count() > 1 ? 0.75f : 1.0f;
-	scale = viewport * (20.0f / 26.0f);
-	x = cursor->x0 + 2.0f * viewport;
-	y = draw_unicode_string_capital_middle(cursor, L"") + 10.0f * viewport;
+	scale = viewport;
+	/* Account for the text renderer's leading inset on the following run. */
+	x = cursor->x0 + 4.0f * viewport;
+	y = draw_unicode_string_capital_middle(cursor, L"") + 13.0f * viewport;
 	csmemset(&parameters, 0, sizeof(parameters));
 	parameters.map[0] = bitmap;
 	parameters.map_texture_scale[0].i = parameters.map_texture_scale[0].j = 1.0f;
@@ -384,6 +385,6 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 		vertices[i].color = (color & 0xFF000000UL) | 0xFFFFFFUL;
 	}
 	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
-	cursor->x0 = (short)(x + 21.0f * scale - 3.0f * viewport);
+	cursor->x0 = (short)(x + 21.0f * scale - 5.0f * viewport);
 	return TRUE;
 }
