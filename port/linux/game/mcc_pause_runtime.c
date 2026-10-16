@@ -122,7 +122,8 @@ static long mcc_pause_art_add(short width, short height, enum mcc_pause_art_kind
                 if(kind==MCC_PAUSE_ART_OBJECTIVES_PANEL && y<=28)
                     color=y==28?0xFF2896FFUL:0xFF000000UL;
                 else if(kind==MCC_PAUSE_ART_FOOTER_PANEL && y>=height-28)
-                    color=y==height-28?0xFF2896FFUL:0xFF000000UL;
+                    /* The Xbox footer is black with alpha 191, replacing the body. */
+                    color=y==height-28?0xFF2896FFUL:0xBF000000UL;
             }
             pixels[y*bitmap->width+x]=color;
         }

@@ -16,7 +16,8 @@ def test_button_strip(piece, frame, height):
     image = Image.open(MENUS / f'ce/port/pause/pausebox_{piece}__{frame}.png').convert('RGBA')
     scale = image.height // 256
     x = image.width // 2
-    assert image.getpixel((x, (height - 15) * scale)) == (0, 0, 0, 255)
+    # Stock Xbox footer alpha is 191/255, with no blue body underneath.
+    assert image.getpixel((x, (height - 15) * scale)) == (0, 0, 0, 191)
     if frame == 2:
         assert_campaign_gradient(image, 2, height - 29, piece)
     else:
