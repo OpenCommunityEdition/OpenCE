@@ -11,7 +11,12 @@
 // messages of every size, split across SCTP's packets and not, which it
 // sends back, and the browser checks them; then again with a tenth of the
 // datagrams each way lost, when the channel must stay open (what was lost is
-// given up, FORWARD-TSN) and carry the rest. No game data is needed.
+// given up, FORWARD-TSN) and carry the rest. Then with the first DATA chunk
+// the browser sends lost, and every tenth after it, and nothing else: the
+// other messages must come back, to the end (Firefox's SCTP gives up the
+// first with a FORWARD-TSN and sends no more of them, so the native end must
+// give up the rest itself, or the gaps fill its SACKs and the browser stops
+// sending). No game data is needed.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
@@ -60,16 +65,18 @@ async function build() {
     while (queue.length) await queue.shift()();
   }));
   const program = path.join(work, 'webrtc_native');
-  const link = spawnSync(compiler, ['-o', program, ...objects, '-lpthread'], { stdio: 'inherit' });
+  // (HARNESS_DROP's records: webrtc_native.c's __wrap_posix_dtls_receive)
+  const link = spawnSync(compiler, ['-o', program, ...objects, '-Wl,--wrap=posix_dtls_receive', '-lpthread'],
+    { stdio: 'inherit' });
   if (link.status) throw new Error('cannot link the harness');
   return program;
 }
 
 // ---------- one browser's run
 
-function start(program, loss) {
+function start(program, loss, drop) {
   const secret = [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('');
-  const harness = spawn(program, [secret], { env: { ...process.env, HARNESS_LOSS: String(loss) } });
+  const harness = spawn(program, [secret], { env: { ...process.env, HARNESS_LOSS: String(loss), HARNESS_DROP: drop } });
   const told = {};
   harness.stderr.on('data', (data) => process.stdout.write('  native: ' + data));
   const ready = new Promise((resolve, reject) => {
@@ -85,8 +92,8 @@ function start(program, loss) {
   return { harness, told, ready };
 }
 
-async function run(program, kind, loss, rounds) {
-  const { harness, told, ready } = start(program, loss);
+async function run(program, kind, loss, rounds, drop = '') {
+  const { harness, told, ready } = start(program, loss, drop);
   const browser = await playwright[kind].launch();
   try {
     await ready;
@@ -170,6 +177,14 @@ try {
     // two thirds for the larger, most for the smaller; and to the end)
     if (lossy.wrong || !lossy.open || lossy.echoed < lossy.sent / 2 || lossy.lastEchoed < lossy.sent - 64) {
       fail(`${kind} with losses: ${JSON.stringify(lossy)}`);
+    }
+    const drops = [1, ...Array.from({ length: 30 }, (_, index) => 10 * (index + 1))];
+    const first = await run(program, kind, 0, 40, drops.join(','));
+    console.log(`${kind}, the first DATA chunk lost and every tenth: ${first.echoed} of ${first.sent} messages back`);
+    // (each lost chunk is a different message's: the rest come back, to the
+    // end; Chromium's SCTP now and then gives up a few more with them)
+    if (first.wrong || !first.open || first.echoed < first.sent - drops.length - 16 || first.lastEchoed < first.sent - 8) {
+      fail(`${kind} with the first DATA chunk lost: ${JSON.stringify(first)}`);
     }
   }
 } catch (error) {

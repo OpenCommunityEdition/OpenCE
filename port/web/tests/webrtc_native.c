@@ -14,6 +14,10 @@ messages received. On its standard input it takes the browser's
 certificate's hash ("browser <hex>"), which opens the connection, and
 "quit".
 HARNESS_LOSS=<percent> loses that share of the datagrams each way.
+HARNESS_DROP=<n>[,<n>...] loses the nth DATA chunks the browser sends (from
+1; the records p2p_webrtc.c reads, by linking it with
+-Wl,--wrap=posix_dtls_receive): only those, whatever else their packets
+carry.
 */
 
 #include "posix.h"
@@ -37,6 +41,8 @@ static in_addr_t local_address;
 static int connection = -1;
 static long received_count, received_bytes;
 static int loss;
+static const char *drops;
+static long data_count;
 
 /* ---------- what p2p_webrtc.c calls (p2p.c's, the platform layer's) */
 
@@ -112,6 +118,81 @@ void p2p_tunnel_send(unsigned long address, unsigned short port, const void *dat
 	sendto(udp, data, (size_t)size, 0, (struct sockaddr *)&to, sizeof(to));
 }
 
+/* the browser's SCTP packets as p2p_webrtc.c reads them, less the DATA
+chunks HARNESS_DROP names */
+int __real_posix_dtls_receive(int handle, posix_ulong now, void *buffer, int size);
+
+static int dropped(long number)
+{
+	const char *list = drops;
+
+	while (list && *list)
+	{
+		if (atol(list) == number)
+			return 1;
+		list = strchr(list, ',');
+		if (list)
+			list++;
+	}
+	return 0;
+}
+
+static unsigned int crc32c(const unsigned char *data, int size)
+{
+	unsigned int crc = 0xFFFFFFFF;
+	int index, bit;
+
+	for (index = 0; index < size; index++)
+	{
+		crc ^= data[index];
+		for (bit = 0; bit < 8; bit++)
+			crc = crc & 1 ? 0x82F63B78 ^ crc >> 1 : crc >> 1;
+	}
+	return ~crc;
+}
+
+int __wrap_posix_dtls_receive(int handle, posix_ulong now, void *buffer, int size)
+{
+	unsigned char *packet = buffer;
+	int result = __real_posix_dtls_receive(handle, now, buffer, size);
+	int offset = 12;
+	int changed = 0;
+	unsigned int crc;
+
+	if (result <= 0 || !drops)
+		return result;
+	while (offset + 4 <= result)
+	{
+		int length = packet[offset + 2] << 8 | packet[offset + 3];
+		int padded = (length + 3) & ~3;
+
+		if (length < 4 || offset + length > result)
+			break;
+		if (offset + padded > result)
+			padded = result - offset;
+		/* (a DATA chunk) */
+		if (packet[offset] == 0 && dropped(++data_count))
+		{
+			fprintf(stderr, "DATA chunk %ld lost\n", data_count);
+			memmove(packet + offset, packet + offset + padded, (size_t)(result - offset - padded));
+			result -= padded;
+			changed = 1;
+			continue;
+		}
+		offset += padded;
+	}
+	if (changed)
+	{
+		memset(packet + 8, 0, 4);
+		crc = crc32c(packet, result);
+		packet[8] = (unsigned char)crc;
+		packet[9] = (unsigned char)(crc >> 8);
+		packet[10] = (unsigned char)(crc >> 16);
+		packet[11] = (unsigned char)(crc >> 24);
+	}
+	return result;
+}
+
 /* a message from the browser: back to it */
 void p2p_tunnel_packet(const unsigned char *packet, int size, unsigned long address, unsigned short port)
 {
@@ -152,6 +233,9 @@ int main(int argc, char **argv)
 		return 2;
 	}
 	loss = getenv("HARNESS_LOSS") ? atoi(getenv("HARNESS_LOSS")) : 0;
+	drops = getenv("HARNESS_DROP");
+	if (drops && !*drops)
+		drops = NULL;
 	unhex(argv[1], secret, sizeof(secret));
 	/* the address this computer sends from (a browser may not take a
 	loopback one): a UDP socket connected anywhere names it, sending nothing */

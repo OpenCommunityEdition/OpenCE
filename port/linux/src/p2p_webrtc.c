@@ -24,7 +24,9 @@ play's, sealed as to any peer; WebRTC is only their way through.
   the tunnel's datagrams, whose streams KCP makes reliable, as on UDP).
   Messages larger than a packet are split and joined again. What this end
   sends and the peer has not acknowledged in ABANDON_TIME is given up
-  (FORWARD-TSN, RFC 3758); what it receives is acknowledged at once.
+  (FORWARD-TSN, RFC 3758); what it receives is acknowledged at once, and
+  what is missing from it for GAP_TIME is given up as if the peer's
+  FORWARD-TSN had said so (nothing is sent twice: it will not come).
 
 Everything runs on the p2p thread, under p2p_lock.
 */
@@ -65,6 +67,9 @@ enum
 	PUNCH_TIME = 30000,
 	ABANDON_TIME = 300,
 	FORWARD_INTERVAL = 200,
+	/* what is missing below a TSN that came this long ago is given up (longer
+	than datagrams are reordered by: the peer will have given it up too) */
+	GAP_TIME = 250,
 	/* a path not checked in this long is not one the browser uses */
 	PATH_TIME = 30000,
 };
@@ -173,11 +178,12 @@ struct connection
 	unsigned int local_tag;
 	unsigned int peer_tag;
 	unsigned char cookie[16];
-	/* receiving: the cumulative TSN, which past it arrived (by TSN modulo
-	TSN_WINDOW), the highest, and whether a SACK is owed */
+	/* receiving: the cumulative TSN, which past it arrived and when (by TSN
+	modulo TSN_WINDOW), the highest, and whether a SACK is owed */
 	unsigned int cumulative;
 	unsigned int highest;
 	unsigned char received[TSN_WINDOW];
+	unsigned long received_times[TSN_WINDOW];
 	int sack_due;
 	struct fragment fragments[MAXIMUM_FRAGMENTS];
 	/* sending: the next TSN, the peer's cumulative acknowledgement, when
@@ -644,6 +650,66 @@ static void join_fragments(struct connection *connection)
 	}
 }
 
+/* the cumulative TSN past what has arrived since */
+static void catch_up(struct connection *connection)
+{
+	while (connection->received[(connection->cumulative + 1) % TSN_WINDOW] &&
+		tsn_after(connection->highest + 1, connection->cumulative + 1))
+	{
+		connection->cumulative++;
+		connection->received[connection->cumulative % TSN_WINDOW] = 0;
+	}
+}
+
+/* the pieces of messages up to a TSN given up: these will never be whole */
+static void drop_fragments(struct connection *connection, unsigned int through)
+{
+	int index;
+
+	for (index = 0; index < MAXIMUM_FRAGMENTS; index++)
+	{
+		if (connection->fragments[index].used &&
+			!tsn_after(connection->fragments[index].tsn, through))
+		{
+			connection->fragments[index].used = 0;
+		}
+	}
+}
+
+/* what is missing below a TSN that came GAP_TIME ago: given up, as the
+peer's FORWARD-TSN would have (the channel sends nothing twice, so it will
+not come). Without this the peer must neither lose a FORWARD-TSN nor fail to
+send one, and Firefox's SCTP sends no more of them once the first DATA it
+sent is lost (and then another): the cumulative TSN stays where it is, the
+SACKs' gaps soon run past MAXIMUM_GAP_BLOCKS, what they leave out stays in
+its flight, and it sends nothing more (port/web/tests/webrtc_native.mjs,
+with losses) */
+static void give_up_gaps(struct connection *connection)
+{
+	unsigned int last = connection->cumulative;
+	unsigned int tsn;
+
+	/* (cumulative + 1 is missing, or it would have been caught up with) */
+	for (tsn = connection->cumulative + 2; !tsn_after(tsn, connection->highest); tsn++)
+	{
+		if (!connection->received[tsn % TSN_WINDOW])
+			continue;
+		if (!elapsed(connection->received_times[tsn % TSN_WINDOW], GAP_TIME))
+			break;
+		last = tsn;
+	}
+	if (last == connection->cumulative)
+		return;
+	while (tsn_after(last, connection->cumulative))
+	{
+		connection->cumulative++;
+		connection->received[connection->cumulative % TSN_WINDOW] = 0;
+	}
+	catch_up(connection);
+	drop_fragments(connection, last);
+	sctp_send_sack(connection);
+}
+
 static void data_received(struct connection *connection, int flags, const unsigned char *value, int length)
 {
 	unsigned int tsn;
@@ -663,14 +729,10 @@ static void data_received(struct connection *connection, int flags, const unsign
 		return;
 	}
 	connection->received[tsn % TSN_WINDOW] = 1;
+	connection->received_times[tsn % TSN_WINDOW] = p2p_now();
 	if (tsn_after(tsn, connection->highest))
 		connection->highest = tsn;
-	while (connection->received[(connection->cumulative + 1) % TSN_WINDOW] &&
-		tsn_after(connection->highest + 1, connection->cumulative + 1))
-	{
-		connection->cumulative++;
-		connection->received[connection->cumulative % TSN_WINDOW] = 0;
-	}
+	catch_up(connection);
 	/* (the channel's messages: binary, or strings, which none of this
 	version's sends; not the channel's control messages) */
 	if (ppid != _ppid_binary && ppid != _ppid_binary_empty && ppid != _ppid_string && ppid != _ppid_string_empty)
@@ -715,7 +777,6 @@ static void data_received(struct connection *connection, int flags, const unsign
 static void forward_tsn_received(struct connection *connection, const unsigned char *value, int length)
 {
 	unsigned int forward;
-	int index;
 
 	if (length < 4)
 		return;
@@ -736,18 +797,9 @@ static void forward_tsn_received(struct connection *connection, const unsigned c
 	connection->cumulative = forward;
 	if (tsn_after(forward, connection->highest))
 		connection->highest = forward;
-	while (connection->received[(connection->cumulative + 1) % TSN_WINDOW] &&
-		tsn_after(connection->highest + 1, connection->cumulative + 1))
-	{
-		connection->cumulative++;
-		connection->received[connection->cumulative % TSN_WINDOW] = 0;
-	}
+	catch_up(connection);
 	/* (what is past it of a message given up will never be whole) */
-	for (index = 0; index < MAXIMUM_FRAGMENTS; index++)
-	{
-		if (connection->fragments[index].used && !tsn_after(connection->fragments[index].tsn, forward))
-			connection->fragments[index].used = 0;
-	}
+	drop_fragments(connection, forward);
 }
 
 static void sack_received(struct connection *connection, const unsigned char *value, int length)
@@ -1138,7 +1190,10 @@ int p2p_webrtc_update(void)
 		/* (the handshake's retransmissions) */
 		connection_receive(connection);
 		if (connection->state == _sctp_established)
+		{
 			sctp_forward(connection);
+			give_up_gaps(connection);
+		}
 		else if (!elapsed(connection->created_time, PUNCH_TIME) && elapsed(connection->punch_time, PUNCH_INTERVAL))
 			punch(connection);
 	}
