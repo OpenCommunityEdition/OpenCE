@@ -165,7 +165,8 @@ boolean mcc_hud_icon_draw(long bitmap_group_index, struct bitmap_data const *bit
             real button_scale=viewport_scale*(20.0f/26.0f);
             point.x=(short)(cursor->x0+2.0f*viewport_scale);
             point.y=(short)(draw_unicode_string_capital_middle(cursor,L"")+10.0f*viewport_scale);
-            mcc_hud_button_draw(button,&point,button_scale,color);
+            /* Preserve the icon opacity override used by the bitmap path. */
+            mcc_hud_button_draw(button,&point,button_scale,icon->flags&2 ? icon->color : color);
             cursor->x0=(short)(point.x+21.0f*button_scale-3.0f*viewport_scale);
             return TRUE;
         }

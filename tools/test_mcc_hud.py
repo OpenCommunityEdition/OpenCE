@@ -193,22 +193,23 @@ int main(int argc,char **argv) {
     struct icon_hud_element_definition icon={0,-6,{-2,15},0xFF123456,0,2,0},saved=icon;
     struct icon_hud_element_definition buttons[18],*active=&icon;
     int menu,handled;
-    if(argc!=6 && argc!=7 && argc!=8)return 2;
+    if(argc!=6 && argc!=7 && argc!=8 && argc!=10)return 2;
     mcc=atoi(argv[1]);players=atoi(argv[2]);menu=atoi(argv[3]);
     group.flags=(unsigned)atoi(argv[4]);icon.flags=(unsigned char)atoi(argv[5]);
     if(argc==7)icon.offset.y=(short)atoi(argv[6]);saved=icon;
-    if(argc==8) {
+    if(argc>=8) {
+        if(argc==10) {icon.color=strtoul(argv[9],NULL,16);saved=icon;}
         int b=atoi(argv[7]);if(b<0||b>=18)return 8;
         memset(buttons,0,sizeof(buttons));buttons[b]=icon;buttons[b].sequence_index=99;
         globals.messaging.button_icons.count=18;globals.messaging.button_icons.address=buttons;
         hud_globals=&globals;active=&buttons[b];
     }
     if(!menu) {clip.x1=clip.y1=93.0f/256;}
-    handled=mcc_hud_icon_draw(17,&bitmap,&clip,&cursor,0xFFABCDEF,active,menu);
+    handled=mcc_hud_icon_draw(17,&bitmap,&clip,&cursor,argc==10 ? strtoul(argv[8],NULL,16) : 0xFFABCDEF,active,menu);
     if(memcmp(&icon,&saved,sizeof(icon)))return 3;
     if(!mcc && (memcmp(&cursor,&before,sizeof(cursor))||draws||lookups||handled))return 4;
     if(mcc_hud_bitmap_scale(NONE)!=1.0f)return 5;
-    if(argc==8 && mcc && !menu && atoi(argv[7])<6) {
+    if(argc>=8 && mcc && !menu && atoi(argv[7])<6) {
         if(allocations!=1||registrations!=1||lookups)return 9;
         if(mcc_hud_button_bitmap((short)atoi(argv[7]))!=&native_bitmap||allocations!=1)return 10;
         mcc_hud_glyphs_dispose();mcc_hud_glyphs_dispose();
@@ -521,3 +522,17 @@ def test_mcc_safe_frame_preserves_split_seams_and_zoom_inset(anchor_tool,layout,
     result=subprocess.run([str(anchor_tool),"1",str(anchor),"1",str(layout)],capture_output=True,text=True)
     assert result.returncode==0,result.stderr
     assert list(map(float,result.stdout.split()))[3:5]==list(expected)
+
+
+@pytest.mark.parametrize("button", range(6))
+@pytest.mark.parametrize("flags,prompt,authored,expected", [
+    (2, 0x7FABCDEF, 0xFF123456, 0xFFFFFFFF),
+    (2, 0x7FABCDEF, 0x40123456, 0x40FFFFFF),
+    (0, 0x7FABCDEF, 0xFF123456, 0x7FFFFFFF),
+    (0, 0, 0xFF123456, 0x00FFFFFF),
+])
+def test_gameplay_button_authored_opacity(hud_tool, button, flags, prompt, authored, expected):
+    result = subprocess.run([str(hud_tool), "1", "1", "0", "0", str(flags), "0", str(button),
+                             f"{prompt:x}", f"{authored:x}"], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert int(result.stdout.split()[6]) == expected

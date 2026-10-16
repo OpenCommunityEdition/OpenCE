@@ -107,13 +107,14 @@ typedef struct {short x0,y0,x1,y1;} rectangle2d;
 #define FALSE 0
 #define csmemset memset
 struct bitmap_data {unsigned long *hardware_format;};
-struct icon_hud_element_definition {int unused;};
+struct icon_hud_element_definition {unsigned flags;pixel32 color;};
 struct {struct {struct {int count;void *address;}button_icons;}messaging;} globals,*hud_globals=&globals;
 struct dynamic_screen_vertex {struct {float x,y;}position,texture_coordinates;pixel32 color;};
 struct rasterizer_dynamic_screen_geometry_parameters {
     struct bitmap_data *map[3];struct {float i,j;}map_texture_scale[3],map_scale[3];int framebuffer_blend_function;
 };
 static int enabled=1,gems,live,last_asset=-1,draws;
+static pixel32 drawn_color;
 static int config_boolean(char const *key) {(void)key;return enabled;}
 static char const *config_string(char const *key) {(void)key;return gems==2?"menu_gems":gems?"gems":"classic";}
 static int local_player_count(void) {return 1;}
@@ -128,13 +129,25 @@ static void hud_hires_register_placeholder(long a,unsigned long const *t) {if(t)
 static void rasterizer_psuedo_dynamic_screen_quad_draw(struct rasterizer_dynamic_screen_geometry_parameters *p,
     struct dynamic_screen_vertex *v) {
     assert(!p->framebuffer_blend_function);assert(v[2].position.x-v[0].position.x==21);
-    assert(v[2].position.y-v[0].position.y==26);draws++;
+    assert(v[2].position.y-v[0].position.y==26);drawn_color=v[0].color;draws++;
 }
 '''
     prelude += 'static char const *tags[]={' + ','.join(json.dumps(t) for t in tags) + '};\n'
     prelude += 'static long hud_hires_asset_count(void) {return sizeof(tags)/sizeof(*tags);}\n'
     prelude += 'static char const *hud_hires_asset_tag(long i) {return tags[i];}\n'
-    call = 'assert(mcc_hud_button_bitmap((short)i));' if mcc else 'assert(hud_hires_button_draw(&buttons[i],&cursor,0xffffffff));'
+    call = 'assert(mcc_hud_button_bitmap((short)i));' if mcc else r'''
+        buttons[i].flags=2;buttons[i].color=0xff123456;
+        assert(hud_hires_button_draw(&buttons[i],&cursor,0x7fabcdef));
+        assert(drawn_color==0xffffffff);
+        buttons[i].color=0x40123456;
+        assert(hud_hires_button_draw(&buttons[i],&cursor,0x7fabcdef));
+        assert(drawn_color==0x40ffffff);
+        buttons[i].flags=0;
+        assert(hud_hires_button_draw(&buttons[i],&cursor,0x7fabcdef));
+        assert(drawn_color==0x7fffffff);
+        assert(hud_hires_button_draw(&buttons[i],&cursor,0));
+        assert(drawn_color==0x00ffffff);
+        '''
     dispose = 'mcc_hud_glyphs_dispose' if mcc else 'hud_buttons_forget'
     check_off = (r'''enabled=0;gems=0;assert(mcc_hud_button_bitmap(0));
         assert(!strstr(tags[last_asset],"classic"));''' if mcc else r'''
