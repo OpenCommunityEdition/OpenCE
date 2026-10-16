@@ -16,7 +16,7 @@
 <hr>
 
 <h3 align="center">
-GulchCE will always be compatible with OpenCE, so players on both clients can play together.
+GulchCE will always be compatible with OpenCE, so everyone can play together.
 </h3>
 <br>
 <p align="center">
