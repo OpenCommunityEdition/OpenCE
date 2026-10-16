@@ -2,8 +2,8 @@
 #ifndef MCC_PROTOCOL_H
 #define MCC_PROTOCOL_H
 
-/* Boat physics must initialize the same powered controls on every MCC peer. */
-#define MCC_PROTOCOL_VERSION 47
+/* Every MCC peer must apply the same signed/vector damage impulses. */
+#define MCC_PROTOCOL_VERSION 48
 #define MCC_PROTOCOL_ADVERTISED_FLAG 0x04
 #define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 3
 #define MCC_PROTOCOL_JOIN_KIND 91

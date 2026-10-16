@@ -30,6 +30,9 @@ void error(int level,char const *format,...) {(void)level;(void)format;}
 int mcc_recording_prepare(unsigned char *p,uint32_t s,unsigned char v,unsigned char c,uint32_t *n) {
     (void)p;(void)s;(void)v;(void)c;(void)n;abort();return 0;
 }
+int mcc_recording_weapon_only(unsigned char const *p,uint32_t s,unsigned char v,unsigned char c) {
+    (void)p;(void)s;(void)v;(void)c;abort();return 0;
+}
 void *mcc_runtime_pointer(struct mcc_runtime *r,uint32_t address,uint32_t size) {
     uint32_t offset=address-r->report.tag_base;
     return address>=r->report.tag_base && offset<=r->used && size<=r->used-offset ? r->tags+offset : NULL;

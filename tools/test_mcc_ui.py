@@ -35,6 +35,7 @@ def ui_tool(tmp_path_factory):
              "mcc_ui_event_function"]
     source = r'''
 #include <assert.h>
+#include <float.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
