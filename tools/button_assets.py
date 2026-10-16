@@ -103,6 +103,12 @@ CLASSIC_BUTTONS = [dict(name=f"classic_{button}__0", tag=f"ui\\hud\\buttons\\cla
                                          ("x", "#3998fa"), ("y", "#f9e928"),
                                          ("black", "#000000"), ("white", "#ffffff"))]
 
+# Supplied Xbox gameplay gems, fitted to the existing 21x26 gameplay cell.
+# Black and White retain the existing gem redraws in both gem styles.
+GEM_BUTTONS = [dict(name=f"gem_{button}__0", tag=f"ui\\hud\\buttons\\gem_{button}",
+                   bitmap=0, width=32, height=32, format="dxt3", scale=8, crc=0,
+                   source_png=f"source/{button}_gem.png") for button in "abxy"]
+
 
 # MCC modern shoulder labels map to the Xbox black/white controls. These
 # redraws are placeholders, not CRC replacements for any native map bitmap.
@@ -172,6 +178,26 @@ def classic(svg: str, color: str, letter_move: list = (0, 0)) -> str:
         letter.set("transform", f"translate({letter_move[0]} {letter_move[1]}) {letter.get('transform', '')}")
         body += ElementTree.tostring(letter, encoding="unicode")
     return document(32, 32, body)
+
+
+def gameplay_gem(entry: dict) -> np.ndarray:
+    """Fit the supplied transparent oval to the shared gameplay icon cell."""
+    source = Image.open(ASSETS / entry["source_png"]).convert("RGBA")
+    bounds = source.getchannel("A").getbbox()
+    if bounds is None:
+        raise ValueError(f"{entry['source_png']}: empty button")
+    scale = entry["scale"]
+    reference = Image.open(ASSETS / "a_butn__0.png").convert("RGBA")
+    # Keep the menu redraw's outer bounds and transparent inset, rather than
+    # filling its whole cropped cell and making the new faces look larger.
+    factor = entry["width"] * scale / reference.width
+    left, top, right, bottom = [round(n * factor) for n in reference.getchannel("A").getbbox()]
+    cell = (right - left, bottom - top)
+    face = source.crop(bounds)
+    face.thumbnail(cell, Image.Resampling.LANCZOS)
+    image = Image.new("RGBA", (entry["width"] * scale, entry["height"] * scale))
+    image.paste(face, (left + (cell[0] - face.width) // 2, top + (cell[1] - face.height) // 2))
+    return bleed(np.asarray(image).copy())
 
 
 def render(text: str, scale: int) -> np.ndarray:
@@ -337,7 +363,7 @@ def layout(arguments) -> None:
     classic_buttons = [dict(entry) for entry in CLASSIC_BUTTONS]
     for entry, sprite in zip(classic_buttons, sprites):
         entry["letter"] = [round(n / sprite["place"][0], 4) for n in sprite["letter"]]
-    LIST.write_text(json.dumps({"assets": entries + MCC_BUTTONS + HUD_BUTTONS + classic_buttons}, indent=1) + "\n")
+    LIST.write_text(json.dumps({"assets": entries + MCC_BUTTONS + HUD_BUTTONS + classic_buttons + GEM_BUTTONS}, indent=1) + "\n")
 
 
 def build(arguments) -> None:
@@ -347,7 +373,9 @@ def build(arguments) -> None:
         if stale.name not in names:
             stale.unlink()
     for entry in description["assets"]:
-        if "classic" in entry:
+        if "source_png" in entry:
+            image = gameplay_gem(entry)
+        elif "classic" in entry:
             image = bleed(render(classic(entry["svg"], entry["classic"], entry.get("letter", (0, 0))), entry["scale"]))
         elif "sprites" in entry:
             body = "\n".join(stencil(sprite["svg"], sprite["cell"], sprite["place"], index,

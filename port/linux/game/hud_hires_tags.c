@@ -94,7 +94,7 @@ static struct
 	long asset;
 	boolean attempted;
 } hud_buttons[6];
-static boolean hud_buttons_classic;
+static short hud_buttons_style;
 
 static void hud_buttons_forget(void)
 {
@@ -340,6 +340,10 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 		"ui\\hud\\buttons\\classic_a", "ui\\hud\\buttons\\classic_b",
 		"ui\\hud\\buttons\\classic_x", "ui\\hud\\buttons\\classic_y",
 		"ui\\hud\\buttons\\classic_black", "ui\\hud\\buttons\\classic_white"};
+	static char const *gem_names[] = {
+		"ui\\hud\\buttons\\gem_a", "ui\\hud\\buttons\\gem_b",
+		"ui\\hud\\buttons\\gem_x", "ui\\hud\\buttons\\gem_y",
+		"ui\\shell\\bitmaps\\black_butn", "ui\\shell\\bitmaps\\white_butn"};
 	struct icon_hud_element_definition const *buttons;
 	struct rasterizer_dynamic_screen_geometry_parameters parameters;
 	struct dynamic_screen_vertex vertices[4];
@@ -347,7 +351,7 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	real viewport, scale, x, y;
 	long index, asset;
 	short i;
-	boolean classic;
+	short style;
 
 	if (!config_boolean("display.high_res_hud") || !hud_globals)
 		return FALSE;
@@ -357,18 +361,20 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 		if (icon == buttons + index) break;
 	if (index >= 6 || index >= hud_globals->messaging.button_icons.count)
 		return FALSE;
-	classic = strcmp(config_string("display.hud_button_style"), "gems") != 0;
-	if (classic != hud_buttons_classic)
+	style = !strcmp(config_string("display.hud_button_style"), "menu_gems") ? 2 :
+		!strcmp(config_string("display.hud_button_style"), "gems");
+	if (style != hud_buttons_style)
 	{
 		hud_buttons_forget();
-		hud_buttons_classic = classic;
+		hud_buttons_style = style;
 	}
 	if (!hud_buttons[index].attempted)
 	{
 		hud_buttons[index].attempted = TRUE;
 		for (asset = 0; asset < hud_hires_asset_count(); asset++)
 		{
-			if (strcmp(hud_hires_asset_tag(asset), classic ? classic_names[index] : names[index])) continue;
+			if (strcmp(hud_hires_asset_tag(asset), style == 0 ? classic_names[index] :
+				style == 1 ? gem_names[index] : names[index])) continue;
 			bitmap = bitmap_2d_new(32, 32, 0, 11);
 			if (!bitmap) break;
 			if (!rasterizer_bitmap_new(bitmap))

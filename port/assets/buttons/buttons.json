@@ -389,6 +389,50 @@
     0
    ],
    "classic": "#ffffff"
+  },
+  {
+   "name": "gem_a__0",
+   "tag": "ui\\hud\\buttons\\gem_a",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 0,
+   "source_png": "source/a_gem.png"
+  },
+  {
+   "name": "gem_b__0",
+   "tag": "ui\\hud\\buttons\\gem_b",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 0,
+   "source_png": "source/b_gem.png"
+  },
+  {
+   "name": "gem_x__0",
+   "tag": "ui\\hud\\buttons\\gem_x",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 0,
+   "source_png": "source/x_gem.png"
+  },
+  {
+   "name": "gem_y__0",
+   "tag": "ui\\hud\\buttons\\gem_y",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 0,
+   "source_png": "source/y_gem.png"
   }
  ]
 }
