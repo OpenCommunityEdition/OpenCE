@@ -27,10 +27,12 @@ When the texture cannot be drawn, the sprites are drawn from their bitmap.
 #include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 #include "tag_files/tag_groups.h"
 #include "game/players.h"
+#include "game/game.h"
 #include "interface/hud.h"
 #include "interface/hud_definitions.h"
 #include "rasterizer/rasterizer.h"
 #include "text/draw_string.h"
+#include "hud_button_layout.h"
 
 /* the platform layer's (port/linux/src) */
 void platform_log(char const *format, ...);
@@ -93,13 +95,13 @@ static struct
 	struct bitmap_data *bitmap;
 	long asset;
 	boolean attempted;
-} hud_buttons[6];
+} hud_buttons[14];
 static short hud_buttons_style;
 
 static void hud_buttons_forget(void)
 {
 	long index;
-	for (index = 0; index < 6; index++)
+	for (index = 0; index < 14; index++)
 	{
 		if (hud_buttons[index].bitmap)
 		{
@@ -348,34 +350,38 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	struct rasterizer_dynamic_screen_geometry_parameters parameters;
 	struct dynamic_screen_vertex vertices[4];
 	struct bitmap_data *bitmap;
-	real viewport, scale, x, y;
+	real viewport, scale, x, y, width, height, u, v;
+	short advance;
 	long index, asset;
 	short i;
-	short style;
+	short style, slot;
 
 	if (!config_boolean("display.high_res_hud") || !hud_globals)
 		return FALSE;
 	buttons = hud_globals->messaging.button_icons.address;
 	if (!buttons) return FALSE;
-	for (index = 0; index < 6 && index < hud_globals->messaging.button_icons.count; index++)
+	for (index = 0; index < 18 && index < hud_globals->messaging.button_icons.count; index++)
 		if (icon == buttons + index) break;
-	if (index >= 6 || index >= hud_globals->messaging.button_icons.count)
+	if (index >= 18 || index >= hud_globals->messaging.button_icons.count)
 		return FALSE;
-	style = !strcmp(config_string("display.hud_button_style"), "menu_gems") ? 2 :
+	slot = index < 6 ? (short)index : hud_button_control_slot((short)index,
+		icon->frame_rate > 0 ? game_time_get() / icon->frame_rate : 0);
+	if (slot < 0) return FALSE;
+	style = (!strcmp(config_string("display.hud_button_style"), "dark_gems") || !strcmp(config_string("display.hud_button_style"), "menu_gems")) ? 2 :
 		!strcmp(config_string("display.hud_button_style"), "gems");
 	if (style != hud_buttons_style)
 	{
 		hud_buttons_forget();
 		hud_buttons_style = style;
 	}
-	if (!hud_buttons[index].attempted)
+	if (!hud_buttons[slot].attempted)
 	{
-		hud_buttons[index].attempted = TRUE;
+		hud_buttons[slot].attempted = TRUE;
 		for (asset = 0; asset < hud_hires_asset_count(); asset++)
 		{
-			if (strcmp(hud_hires_asset_tag(asset), style == 0 ? classic_names[index] :
+			if (strcmp(hud_hires_asset_tag(asset), slot >= 6 ? hud_button_control_name(slot) : style == 0 ? classic_names[index] :
 				style == 1 ? gem_names[index] : names[index])) continue;
-			bitmap = bitmap_2d_new(32, 32, 0, 11);
+			bitmap = bitmap_2d_new(slot >= 6 ? 64 : 32, slot >= 6 ? 64 : 32, 0, 11);
 			if (!bitmap) break;
 			if (!rasterizer_bitmap_new(bitmap))
 			{
@@ -383,36 +389,55 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 				break;
 			}
 			hud_hires_register_placeholder(asset, bitmap->hardware_format);
-			hud_buttons[index].asset = asset;
-			hud_buttons[index].bitmap = bitmap;
+			hud_buttons[slot].asset = asset;
+			hud_buttons[slot].bitmap = bitmap;
 			break;
 		}
 	}
-	bitmap = hud_buttons[index].bitmap;
+	bitmap = hud_buttons[slot].bitmap;
 	if (!bitmap) return FALSE;
 	viewport = local_player_count() > 1 ? 0.75f : 1.0f;
 	scale = viewport;
 	/* Account for the text renderer's leading inset on the following run. */
 	x = cursor->x0 + 4.0f * viewport;
 	y = draw_unicode_string_capital_middle(cursor, L"") + 13.0f * viewport;
+	width = 21.0f * scale;
+	height = 26.0f * scale;
+	advance = (short)(cursor->x0 + (index < 4 ? 22.0f : 20.0f) * viewport);
+	y -= height;
+	hud_button_face_bounds(style, (short)index, &x, &y, &width, &height);
+	u = 21.0f / 32.0f;
+	v = 26.0f / 32.0f;
+	if (slot >= 6)
+	{
+		width = (slot < 8 ? 44.0f : 32.0f) * scale;
+		height = (slot < 8 ? 33.0f : 34.0f) * scale;
+		x = cursor->x0 + 4.0f * viewport;
+		y = draw_unicode_string_capital_middle(cursor, L"") - height * 0.5f;
+		u = (slot < 8 ? 50.0f : 36.0f) / 64.0f;
+		v = (slot < 8 ? 35.0f : 40.0f) / 64.0f;
+		advance = (short)(cursor->x0 + width + viewport);
+		hud_button_control_bounds(slot, &x, &y, &width, &height);
+	}
 	csmemset(&parameters, 0, sizeof(parameters));
 	parameters.map[0] = bitmap;
 	parameters.map_texture_scale[0].i = parameters.map_texture_scale[0].j = 1.0f;
 	parameters.map_scale[0].i = parameters.map_scale[0].j = 1.0f;
-	parameters.framebuffer_blend_function = 0;
+	/* Stick/trigger art uses the original HUD blend, with premultiplied edges. */
+	parameters.framebuffer_blend_function = slot >= 6 ? 7 : 0;
 	/* Keep the icon's authored opacity, as the low-resolution path does.
 	 * The embedded artwork supplies RGB; prompt text may be translucent. */
 	if (icon->flags & 2) color = icon->color;
 	for (i = 0; i < 4; i++)
 	{
 		boolean right = ((i + 1) & 2) != 0, bottom = i > 1;
-		vertices[i].position.x = x + (right ? 21.0f * scale : 0.0f);
-		vertices[i].position.y = y - (bottom ? 0.0f : 26.0f * scale);
-		vertices[i].texture_coordinates.x = right ? 21.0f / 32.0f : 0.0f;
-		vertices[i].texture_coordinates.y = bottom ? 26.0f / 32.0f : 0.0f;
-		vertices[i].color = (color & 0xFF000000UL) | 0xFFFFFFUL;
+		vertices[i].position.x = x + (right ? width : 0.0f);
+		vertices[i].position.y = y + (bottom ? height : 0.0f);
+		vertices[i].texture_coordinates.x = right ? u : 0.0f;
+		vertices[i].texture_coordinates.y = bottom ? v : 0.0f;
+		vertices[i].color = slot >= 6 ? color : (color & 0xFF000000UL) | 0xFFFFFFUL;
 	}
 	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
-	cursor->x0 = (short)(x + 21.0f * scale - 5.0f * viewport);
+	cursor->x0 = advance;
 	return TRUE;
 }

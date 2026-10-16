@@ -401,6 +401,126 @@
    "scale": 8,
    "crc": 0,
    "source_png": "source/y_gem.png"
+  },
+  {
+   "name": "trigger_left__0",
+   "tag": "ui\\hud\\buttons\\trigger_left",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "source_png": "source/trigger_left.png",
+   "control_cell": [
+    50,
+    35
+   ]
+  },
+  {
+   "name": "trigger_right__0",
+   "tag": "ui\\hud\\buttons\\trigger_right",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "source_png": "source/trigger_right.png",
+   "control_cell": [
+    50,
+    35
+   ]
+  },
+  {
+   "name": "thumbstick_left__0",
+   "tag": "ui\\hud\\buttons\\thumbstick_left",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "source_png": "source/thumbstick_left.png",
+   "control_cell": [
+    36,
+    40
+   ]
+  },
+  {
+   "name": "thumbstick_right__0",
+   "tag": "ui\\hud\\buttons\\thumbstick_right",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "source_png": "source/thumbstick_right.png",
+   "control_cell": [
+    36,
+    40
+   ]
+  },
+  {
+   "name": "thumbstick-halfway_left__0",
+   "tag": "ui\\hud\\buttons\\thumbstick-halfway_left",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "source_png": "source/thumbstick-halfway_left.png",
+   "control_cell": [
+    36,
+    40
+   ]
+  },
+  {
+   "name": "thumbstick-halfway_right__0",
+   "tag": "ui\\hud\\buttons\\thumbstick-halfway_right",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "source_png": "source/thumbstick-halfway_right.png",
+   "control_cell": [
+    36,
+    40
+   ]
+  },
+  {
+   "name": "thumbstick-full_left__0",
+   "tag": "ui\\hud\\buttons\\thumbstick-full_left",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "source_png": "source/thumbstick-full_left.png",
+   "control_cell": [
+    36,
+    40
+   ]
+  },
+  {
+   "name": "thumbstick-full_right__0",
+   "tag": "ui\\hud\\buttons\\thumbstick-full_right",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "source_png": "source/thumbstick-full_right.png",
+   "control_cell": [
+    36,
+    40
+   ]
   }
  ]
 }

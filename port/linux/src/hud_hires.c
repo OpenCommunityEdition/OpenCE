@@ -33,7 +33,8 @@ zlib (port/third_party/zlib).
 /* the game's (port/linux/game/hud_hires_tags.c) */
 long hud_hires_asset_at(unsigned long address, long width, long height);
 
-#define MAXIMUM_TEXTURES 128
+/* Include every embedded HUD and button style, including stick frames. */
+#define MAXIMUM_TEXTURES 256
 /* a PNG's inflated rows and its texels, which are held at once: 128 MB for
 a 4096 by 4096 sheet (the largest shipped, 2048 by 2048, takes 32 MB), and
 no more for a small file that names a large size (a menus folder's) */

@@ -110,6 +110,31 @@ GEM_BUTTONS = [dict(name=f"gem_{button}__0", tag=f"ui\\hud\\buttons\\gem_{button
                    source_png=f"source/{button}_gem.png") for button in "abxy"]
 
 
+# Supplied Xbox trigger and three thumbstick press states, shared by every style.
+CONTROL_BUTTONS = [dict(name=f"{name}__0", tag=f"ui\\hud\\buttons\\{name}",
+                        bitmap=0, width=64, height=64, format="a8r8g8b8", scale=8,
+                        crc=0, source_png=f"source/{name}.png", control_cell=cell)
+                   for name, cell in [("trigger_left", [50,35]), ("trigger_right", [50,35])] +
+                   [(f"thumbstick{state}_{side}", [36,40])
+                    for state in ("", "-halfway", "-full") for side in ("left", "right")]]
+
+
+def gameplay_control(entry: dict) -> np.ndarray:
+    """Keep supplied artwork proportional inside a padded legacy-sized cell."""
+    source = Image.open(ASSETS / entry["source_png"]).convert("RGBA")
+    face = source.crop(source.getchannel("A").getbbox())
+    scale = entry["scale"]
+    width, height = [n * scale for n in entry["control_cell"]]
+    face.thumbnail((width - 2 * scale, height - 2 * scale), Image.Resampling.LANCZOS)
+    image = Image.new("RGBA", (entry["width"] * scale, entry["height"] * scale))
+    image.paste(face, ((width - face.width) // 2, (height - face.height) // 2))
+    # The original HUD uses ONE / INVSRCALPHA. Store premultiplied edges
+    # so that blend preserves its brightness without exposing transparent RGB.
+    pixels = np.asarray(image).copy()
+    pixels[..., :3] = (pixels[..., :3].astype(np.uint16) * pixels[..., 3:4] + 127) // 255
+    return pixels
+
+
 def document(width: int, height: int, body: str) -> str:
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
             f'viewBox="0 0 {width} {height}">\n{body}\n</svg>\n')
@@ -355,7 +380,7 @@ def layout(arguments) -> None:
     classic_buttons = [dict(entry) for entry in CLASSIC_BUTTONS]
     for entry, sprite in zip(classic_buttons, sprites):
         entry["letter"] = [round(n / sprite["place"][0], 4) for n in sprite["letter"]]
-    LIST.write_text(json.dumps({"assets": entries + HUD_BUTTONS + classic_buttons + GEM_BUTTONS}, indent=1) + "\n")
+    LIST.write_text(json.dumps({"assets": entries + HUD_BUTTONS + classic_buttons + GEM_BUTTONS + CONTROL_BUTTONS}, indent=1) + "\n")
 
 
 def build(arguments) -> None:
@@ -365,7 +390,9 @@ def build(arguments) -> None:
         if stale.name not in names:
             stale.unlink()
     for entry in description["assets"]:
-        if "source_png" in entry:
+        if "control_cell" in entry:
+            image = gameplay_control(entry)
+        elif "source_png" in entry:
             image = gameplay_gem(entry)
         elif "classic" in entry:
             image = bleed(render(classic(entry["svg"], entry["classic"], entry.get("letter", (0, 0))), entry["scale"]))
