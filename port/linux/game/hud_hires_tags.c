@@ -400,6 +400,9 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	parameters.map_texture_scale[0].i = parameters.map_texture_scale[0].j = 1.0f;
 	parameters.map_scale[0].i = parameters.map_scale[0].j = 1.0f;
 	parameters.framebuffer_blend_function = 0;
+	/* Keep the icon's authored opacity, as the low-resolution path does.
+	 * The embedded artwork supplies RGB; prompt text may be translucent. */
+	if (icon->flags & 2) color = icon->color;
 	for (i = 0; i < 4; i++)
 	{
 		boolean right = ((i + 1) & 2) != 0, bottom = i > 1;
