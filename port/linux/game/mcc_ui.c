@@ -125,6 +125,14 @@ boolean mcc_ui_settings_needed(char const *map_name)
     return map_name && mcc_level_name(map_name) && mcc_cache_tags_loaded();
 }
 
+boolean mcc_ui_settings_pause_game(void)
+{
+    /* Settings tags precede global_scenario and the local players. Read the
+     * loaded MCC cache identity; the action admits one full-screen player. */
+    return mcc_cache_scenario_type() == 0 &&
+        game_connection() == _game_connection_local;
+}
+
 static boolean mcc_ui_scenario_type(short type)
 {
     /* main_get_map_name is the last solo selection; network rounds load

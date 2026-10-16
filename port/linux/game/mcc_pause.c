@@ -351,7 +351,7 @@ static long mcc_pause_screen(short mode, short layout)
     } else {
         panel_height = count * row + 48;
         x = (width - 202) / 2; y = (height - panel_height) / 2 + 10;
-        children[child_count] = mcc_pause_panel(layout, 226, panel_height, MCC_PAUSE_ART_PANEL);
+        children[child_count] = mcc_pause_panel(layout, 226, panel_height, MCC_PAUSE_ART_FOOTER_PANEL);
         xs[child_count] = x - 8; ys[child_count++] = y - 10;
     }
     list = mcc_pause_widget("pause_actions", 3, button_width, count * row, layout, NONE);

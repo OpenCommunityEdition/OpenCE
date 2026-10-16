@@ -29,7 +29,7 @@ def ui_tool(tmp_path_factory):
     profiles = (ROOT / "source/interface/player_ui.c").read_text()
     actions = re.search(r"enum\s*\{.*?\};", ui_header, re.S).group()
     names = ["mcc_ui_settings_profile_released", "mcc_ui_settings_profile_reopen", "mcc_ui_settings_close", "mcc_ui_settings_begin",
-             "mcc_ui_owns_widget", "mcc_ui_trusted_action", "mcc_ui_settings_needed", "mcc_ui_scenario_type", "mcc_ui_controller",
+             "mcc_ui_owns_widget", "mcc_ui_trusted_action", "mcc_ui_settings_needed", "mcc_ui_settings_pause_game", "mcc_ui_scenario_type", "mcc_ui_controller",
              "mcc_ui_failure", "mcc_ui_host_required", "mcc_ui_restart", "mcc_ui_end_round", "mcc_ui_new_game",
              "mcc_ui_request_team", "mcc_ui_choose_team", "mcc_ui_close_for_controller",
              "mcc_ui_event_function"]
@@ -113,6 +113,7 @@ static wchar_t const *message;
 static char const *widget_tag_name="ui\\shell\\multiplayer_game\\pause_game\\blue_team_button";
 static char owned[0x60],unowned[0x60];
 static boolean mcc_cache_tags_loaded(void){return mcc;}
+static short mcc_cache_scenario_type(void){return mcc?scenario.type:NONE;}
 static boolean mcc_level_name(char const *name){return name&&!strncmp(name,"mcc_maps\\",9);}
 static boolean mcc_pause_owns(long tag){return pause_owned&&tag==300;}
 static void *tag_get(long group,long index){(void)group;return index==100?owned:unowned;}
@@ -395,6 +396,13 @@ int main(int argc,char **argv){
     }
     if(!strcmp(argv[1],"settings-namespace")){
         CHECK(mcc_ui_settings_needed("mcc_maps\\a10"),69);
+        CHECK(mcc_ui_settings_pause_game(),140);
+        global_scenario=NULL;CHECK(mcc_ui_settings_pause_game(),146);global_scenario=&scenario;
+        connection=1;CHECK(!mcc_ui_settings_pause_game(),141);
+        connection=2;CHECK(!mcc_ui_settings_pause_game(),142);
+        connection=0;local_players=0;CHECK(mcc_ui_settings_pause_game(),143);
+        local_players=1;scenario.type=1;CHECK(!mcc_ui_settings_pause_game(),144);
+        scenario.type=0;mcc=FALSE;CHECK(!mcc_ui_settings_pause_game(),145);mcc=TRUE;
         CHECK(!mcc_ui_settings_needed("mercury_falling")&&!mcc_ui_settings_needed("a10"),70);
         campaign=FALSE;CHECK(mcc_ui_settings_needed("mcc_maps\\dangercanyon"),71);
         CHECK(!mcc_ui_settings_needed("ui")&&!mcc_ui_settings_needed("custom_maps\\dangercanyon")&&
@@ -616,7 +624,7 @@ static int mcc, wants_settings, pc=1, campaign_tag, multiplayer_tag;
 static int built, built_campaign;
 static int mcc_cache_tags_loaded(void){return mcc;}
 static int mcc_ui_settings_needed(char const *name){(void)name;return wants_settings;}
-static int single_player_campaign_map(void){return campaign_tag;}
+static int full_screen_campaign_map(void){return campaign_tag;}
 static long tag_loaded(long group,char const *name){(void)group;(void)name;return multiplayer_tag?1:NONE;}
 static int menus_pc_chosen(void){return pc;}
 ''' + admission + r'''
