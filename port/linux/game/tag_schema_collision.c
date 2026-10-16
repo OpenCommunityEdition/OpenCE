@@ -1379,9 +1379,12 @@ static void structure_material_check(
 	{
 		long fit_count = PIN(material->vertices.count, 0,
 			MIN(vertex_data_size / vertex_size, MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL));
-		long fit_lightmap_count = PIN(material->lightmap_vertices.count, 0,
-			MIN((vertex_data_size - fit_count * vertex_size) / lightmap_vertex_size,
-				MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL));
+		/* (its lightmap vertices follow its vertices: with fewer of those,
+		they are not where they would be read, and there are none) */
+		long fit_lightmap_count = fit_count != material->vertices.count ? 0 :
+			PIN(material->lightmap_vertices.count, 0,
+				MIN((vertex_data_size - fit_count * vertex_size) / lightmap_vertex_size,
+					MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL));
 
 		tag_validate_correct(validation, "lightmap %d's material %d's %ld vertices and %ld lightmap vertices are not in"
 			" its %ld bytes: %ld and %ld", lightmap_index, material_index, material->vertices.count,

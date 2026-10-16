@@ -31,11 +31,14 @@ session as it asked the host (p2p.c: a player answers holders of the invite
 it joined with while it may share). Each downloaded file is written beside
 the others as <name>.part and renamed when whole (a .part found again is
 checked piece by piece and taken up where it was), into custom_maps under
-the map's own name, which is its hash's.
+the map's own name, or, beside another version of that name, the name and
+its hash's first digits (the game's map version is checked against the
+offered map's hash).
 
 A machine still downloading does not hold the lobby: the machines that
 have the map start, and it joins the game in progress once the download is
-done. The host does not drop a machine that says it is downloading.
+done. The host does not drop a machine that says it is downloading, while
+what it says it has grows.
 */
 
 /* ---------- headers */
@@ -99,9 +102,12 @@ enum
 	MAXIMUM_SOURCES = 32,
 	MAXIMUM_OUTGOING = 8,
 	/* connections at once, those other machines made included, and of
-	those, from one address */
+	those, from one address; those other machines made (the rest kept for
+	the download's own), and of those, ones that have not said hello yet */
 	MAXIMUM_CONNECTIONS = 24,
 	MAXIMUM_CONNECTIONS_PER_ADDRESS = 4,
+	MAXIMUM_INCOMING = MAXIMUM_CONNECTIONS - MAXIMUM_OUTGOING - 1,
+	MAXIMUM_INCOMING_WITHOUT_HELLO = 8,
 	/* a connection's buffers: a whole frame in (the largest a block), and
 	a few blocks out */
 	INPUT_BYTES = 0x6000,
@@ -122,16 +128,31 @@ enum
 	STALL_TIMEOUT = 60000,
 	PROGRESS_INTERVAL = 2000,
 	SOURCES_INTERVAL = 10000,
-	/* the host takes a machine for downloading this long after it said so */
+	/* the host takes a machine for downloading this long after it said so,
+	and while what it says it has grew by a piece (or to the whole) this
+	long ago at most (a download that brings nothing for STALL_TIMEOUT
+	fails) */
 	DOWNLOADING_TIMEOUT = 20000,
+	DOWNLOADING_STALL_TIMEOUT = STALL_TIMEOUT + DOWNLOADING_TIMEOUT,
 	CONNECTION_IDLE_TIMEOUT = 30000,
 	CONNECT_TIMEOUT = 10000,
+	/* a connection open this long without the other end's hello is closed */
+	HELLO_TIMEOUT = 10000,
 	KEEP_ALIVE_INTERVAL = 10000,
 	REQUEST_TIMEOUT = 30000,
+	/* the pieces' hashes are asked of the host first: of the others the host
+	named once this long has passed since its offer without them, and of the
+	connections other machines made after REQUEST_TIMEOUT; one connection
+	sends them all in this long */
+	HASHES_SOURCES_DELAY = 10000,
+	HASHES_TIMEOUT = 60000,
 	SOURCE_RETRY_INTERVAL = 15000,
 	LISTEN_RETRY_INTERVAL = 10000,
 	RATE_WINDOW = 2000,
 	LOG_INTERVAL = 10000,
+	/* (the host) a machine's requests for a map taken this often at most:
+	one that comes sooner waits its turn, the last of them kept */
+	MAP_REQUEST_INTERVAL = 5000,
 
 	/* the largest file of each kind the cache loader takes
 	(custom_edition_cache.c's combined offset space), so that a host cannot
@@ -193,7 +214,7 @@ enum
 	_offer_ok,
 	/* it does not share maps (network.map_share) */
 	_offer_off,
-	/* not the game's map, not named for its hash, or not readable */
+	/* not the game's map, not of the game's version, or not readable */
 	_offer_unavailable,
 };
 
@@ -319,6 +340,8 @@ struct download_file
 	byte *hashes_coming;
 	long hashes_received;
 	short hashes_connection;
+	/* when they were asked for, and when the last of them came */
+	unsigned long hashes_started_at;
 	unsigned long hashes_asked_at;
 	/* the pieces had (a bit each), and asked for (a count each) */
 	byte *have;
@@ -363,6 +386,7 @@ struct download
 	short source_count;
 	struct source sources[MAXIMUM_SOURCES + 1];
 	unsigned long asked_at;
+	unsigned long offered_at;
 	unsigned long progress_at;
 	unsigned long reported_at;
 	/* the bytes of the pieces had, of all of them; and for the rate shown,
@@ -405,6 +429,9 @@ struct connection
 	unsigned long address;
 	struct transport_endpoint *endpoint;
 	unsigned long created_at;
+	/* connected or taken (its hello due by HELLO_TIMEOUT), and when it last
+	sent a whole frame */
+	unsigned long opened_at;
 	unsigned long heard_at;
 	unsigned long sent_at;
 	/* the bytes of pieces it brought and took, for the log */
@@ -413,14 +440,16 @@ struct connection
 	boolean hello_heard;
 	/* the files it is about, and for each: the download's file, the
 	catalog's file this machine sends (map_share_files.c), what the other
-	end has, whether this end said what it has, and the next of the pieces'
-	hashes to send it (NONE: none asked) */
+	end has (by piece: a bit each of the pieces it covers, as many as the
+	download's file had when it was made), whether this end said what it
+	has, and the next of the pieces' hashes to send it (NONE: none asked) */
 	short file_count;
 	byte file_hashes[MAXIMUM_FILES][MAP_SHARE_HASH_BYTES];
 	short download_file[MAXIMUM_FILES];
 	short catalog_file[MAXIMUM_FILES];
 	short remote_has[MAXIMUM_FILES];
 	byte *remote_pieces[MAXIMUM_FILES];
+	long remote_piece_count[MAXIMUM_FILES];
 	boolean state_heard[MAXIMUM_FILES];
 	boolean state_told[MAXIMUM_FILES];
 	long hashes_next[MAXIMUM_FILES];
@@ -454,6 +483,19 @@ struct host_machine
 	unsigned long done;
 	unsigned long total;
 	unsigned long address;
+	/* the bytes offered, and when what it said it has last grew by a piece
+	(or to the whole), and to what */
+	unsigned long offered_total;
+	unsigned long advanced_at;
+	unsigned long advanced_done;
+	/* the game's map that progress is counted for (another request does
+	not start it again, whatever level it names) */
+	char advanced_level[LEVEL_NAME_BYTES];
+	/* when its last request was taken, and one that came sooner after it
+	than MAP_REQUEST_INTERVAL, taken then (host_asked) */
+	unsigned long requested_at;
+	boolean request_waiting;
+	struct distributed_map_share_request waiting_request;
 };
 
 struct map_share_globals
@@ -472,6 +514,9 @@ struct map_share_globals
 	this machine sends (NONE: none), and the level they are of */
 	char current_level[LEVEL_NAME_BYTES];
 	short current_files[MAXIMUM_FILES];
+	/* the part file of a map a download stopped in, kept to be taken up
+	again (one alone: the one before is deleted) */
+	char kept_part[MAP_SHARE_PATH_SIZE];
 };
 
 /* ---------- globals */
@@ -536,6 +581,32 @@ static boolean address_internet(
 	return (address & 0xFFC00000UL) == 0x64400000UL;
 }
 
+/* whether an address (host byte order) is a private network's (RFC 1918,
+link-local) or this machine's (loopback) */
+static boolean address_private(
+	unsigned long address)
+{
+	return (address >> 24) == 10 || (address >> 24) == 127 || (address & 0xFFF00000UL) == 0xAC100000UL ||
+		(address & 0xFFFF0000UL) == 0xC0A80000UL || (address & 0xFFFF0000UL) == 0xA9FE0000UL;
+}
+
+/* whether a client connects to an address the host named (host byte
+order) for a machine of a LAN game: one of the host's own kind, a private
+network's if the host's is, this machine's (loopback) only if the host's is,
+and never 0.0.0.0/8, multicast or reserved; so that a host on a LAN cannot
+have its players connect anywhere on the internet */
+static boolean source_address_allowed(
+	unsigned long address,
+	unsigned long host_address)
+{
+	if ((address >> 24) == 0 || (address >> 28) >= 14 || address_internet(address) ||
+		((address >> 24) == 127) != ((host_address >> 24) == 127))
+	{
+		return FALSE;
+	}
+	return !address_private(host_address) || address_private(address);
+}
+
 /* ---------- this machine's network game */
 
 static struct network_game *map_share_network_game(
@@ -544,6 +615,22 @@ static struct network_game *map_share_network_game(
 	struct network_game_client *client = global_network_game_client_get();
 
 	return client ? network_game_client_get_game(client) : NULL;
+}
+
+boolean map_share_game_map_version(
+	char const *level_name,
+	unsigned long *version)
+{
+	struct network_game *game = map_share_network_game();
+
+	/* (by the map's name: the loader asks by its file's, hugeass) */
+	if (!game || !level_name || !custom_edition_level_name(game->map.name) ||
+		csstrcasecmp(tag_name_strip_path(game->map.name), tag_name_strip_path(level_name)))
+	{
+		return FALSE;
+	}
+	*version = (unsigned long)game->map.version;
+	return TRUE;
 }
 
 static boolean map_share_host(
@@ -834,6 +921,31 @@ static void connection_match_files(
 	}
 }
 
+/* whether the other end of a connection has a piece of its file: all of
+it, or the piece among those it said it has (a piece beyond them is not
+had: they are of the download's file as it was when they were said) */
+static boolean remote_piece_had(
+	struct connection const *connection,
+	short index,
+	long piece)
+{
+	if (connection->remote_has[index] == _have_all)
+		return TRUE;
+	return connection->remote_has[index] == _have_pieces && connection->remote_pieces[index] && piece >= 0 &&
+		piece < connection->remote_piece_count[index] &&
+		(connection->remote_pieces[index][piece >> 3] & (1 << (piece & 7))) != 0;
+}
+
+/* the pieces the other end said it has of a connection's file forgotten */
+static void remote_pieces_forget(
+	struct connection *connection,
+	short index)
+{
+	free(connection->remote_pieces[index]);
+	connection->remote_pieces[index] = NULL;
+	connection->remote_piece_count[index] = 0;
+}
+
 /* ---------- connections */
 
 static struct connection *connection_new(
@@ -1014,37 +1126,80 @@ static boolean connection_connected(
 	return TRUE;
 }
 
+/* (the host) whether an address (host byte order) is one of its game's
+machines', which alone fetch the game's files from it */
+static boolean host_machine_address(
+	unsigned long address)
+{
+	long index;
+
+	for (index = 0; index < MAP_SHARE_MACHINES; index++)
+	{
+		if (address && network_game_server_machine_address(index) == address)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 static void connection_accept(
 	void)
 {
 	struct map_share_globals *globals = &map_share_globals;
 	struct transport_endpoint *endpoint;
 	struct connection *connection;
+	struct connection *oldest;
 	struct transport_address address;
 	short count;
+	short incoming;
+	short without_hello;
 	short index;
 
 	while (globals->listener && endpoint_readable(globals->listener, 0))
 	{
 		count = 0;
+		incoming = 0;
+		without_hello = 0;
+		oldest = NULL;
 		endpoint = accept_endpoint(globals->listener);
 		if (!endpoint)
 			return;
 		csmemset(&address, 0, sizeof(address));
 		if (set_endpoint_blocking(endpoint, FALSE) != _transport_error_none ||
 			get_endpoint_address(endpoint, &address) != _transport_error_none ||
-			(!map_share_sending() && map_share_globals.download.state != _download_transferring))
+			(!map_share_sending() && map_share_globals.download.state != _download_transferring) ||
+			(map_share_host() && !host_machine_address(address.address.long_words[0])))
 		{
 			delete_transport_endpoint(endpoint);
 			continue;
 		}
-		/* (a few from one address: anyone can connect) */
+		/* (a few from one address, and a few at once that have not said
+		hello: anyone can connect. The download's own connections keep slots
+		of their own) */
 		for (index = 0; index < MAXIMUM_CONNECTIONS; index++)
 		{
-			count += globals->connections[index].used &&
-				globals->connections[index].address == address.address.long_words[0];
+			struct connection *other = &globals->connections[index];
+
+			if (!other->used)
+				continue;
+			count += other->address == address.address.long_words[0];
+			if (other->outgoing)
+				continue;
+			incoming++;
+			if (!other->hello_heard)
+			{
+				without_hello++;
+				if (!oldest || (long)(other->opened_at - oldest->opened_at) < 0)
+					oldest = other;
+			}
 		}
-		connection = count < MAXIMUM_CONNECTIONS_PER_ADDRESS ? connection_new() : NULL;
+		/* (the longest waiting for its hello makes way: one that holds its
+		slot without a word holds it HELLO_TIMEOUT at most) */
+		if (without_hello >= MAXIMUM_INCOMING_WITHOUT_HELLO && count < MAXIMUM_CONNECTIONS_PER_ADDRESS)
+		{
+			connection_close(oldest, "no hello while others waited");
+			incoming--;
+		}
+		connection = count < MAXIMUM_CONNECTIONS_PER_ADDRESS && incoming < MAXIMUM_INCOMING ? connection_new() : NULL;
 		if (!connection)
 		{
 			delete_transport_endpoint(endpoint);
@@ -1054,6 +1209,7 @@ static void connection_accept(
 		connection->address = address.address.long_words[0];
 		connection->state = _connection_open;
 		connection->outgoing = FALSE;
+		connection->opened_at = connection->created_at;
 	}
 }
 
@@ -1110,9 +1266,45 @@ static void request_remove(
 	struct connection *connection,
 	short index);
 
-/* the download over: its files closed (a part file is kept, to be taken
-up again), and the connections it made closed, unless they are kept for
-what this machine sends now that it has the files (keep_connections) */
+/* a download's file closed, not had whole: its part file deleted if it
+holds none of the file (made for an offer alone, it would be a host's to
+fill the disk with, a new name each time), else kept to be taken up again, a
+map's alone of them all (the one before deleted: resource maps' part files
+have names of their own) */
+static void download_file_close(
+	struct download_file *file)
+{
+	struct map_share_globals *globals = &map_share_globals;
+
+	if (file->stream)
+	{
+		fclose(file->stream);
+		file->stream = NULL;
+	}
+	/* (one being checked, or not opened yet, is not this download's to
+	delete: it may hold what an earlier one had) */
+	if (file->state != _file_transferring || !file->part_path[0])
+		return;
+	if (!file->have_count)
+	{
+		DeleteFileA(file->part_path);
+		if (!csstrcasecmp(globals->kept_part, file->part_path))
+			globals->kept_part[0] = 0;
+		return;
+	}
+	if (file->kind != _map_share_file_map)
+		return;
+	if (globals->kept_part[0] && csstrcasecmp(globals->kept_part, file->part_path))
+	{
+		error(_error_silent, "map sharing: deleted %s (another download stopped since)", globals->kept_part);
+		DeleteFileA(globals->kept_part);
+	}
+	csstrncpy(globals->kept_part, file->part_path, sizeof(globals->kept_part) - 1);
+}
+
+/* the download over: its files closed (download_file_close), and the
+connections it made closed, unless they are kept for what this machine
+sends now that it has the files (keep_connections) */
 static void download_end(
 	boolean keep_connections)
 {
@@ -1134,18 +1326,23 @@ static void download_end(
 			continue;
 		}
 		/* (another's connection, which may still fetch what this machine
-		sends: what it asked of the download let go) */
+		sends: what it asked of the download let go, and which pieces of the
+		download's files the other end has, a bit each of pieces counted by
+		the offer: another download's file of the same hash may be offered
+		of another size) */
 		while (connection->request_count)
 			request_remove(connection, (short)(connection->request_count - 1));
 		for (file = 0; file < MAXIMUM_FILES; file++)
+		{
 			connection->download_file[file] = NONE;
+			remote_pieces_forget(connection, file);
+		}
 	}
 	for (index = 0; index < download->file_count; index++)
 	{
 		struct download_file *file = &download->files[index];
 
-		if (file->stream)
-			fclose(file->stream);
+		download_file_close(file);
 		free(file->piece_hashes);
 		free(file->hashes_coming);
 		free(file->have);
@@ -1215,14 +1412,18 @@ static void download_ask(
 
 /* the files this machine lacks for the level: a bit each */
 static byte files_wanted(
-	char const *level_name)
+	char const *level_name,
+	unsigned long version)
 {
 	char path[MAP_SHARE_PATH_SIZE];
 	byte wanted = 0;
 	short kind;
 
-	if (!custom_edition_map_file_path(level_name, path))
+	if (version ? !custom_edition_map_find_version(level_name, version, path) :
+		!custom_edition_map_file_named(level_name, path))
+	{
 		wanted |= FLAG(_map_share_file_map);
+	}
 	for (kind = _map_share_file_bitmaps; kind < MAXIMUM_FILES; kind++)
 	{
 		if (!custom_edition_resource_map_file_path(kind, path))
@@ -1253,17 +1454,12 @@ boolean map_share_download_begin(
 		download_end(FALSE);
 	}
 	name = tag_name_strip_path(level_name);
-	wanted = files_wanted(level_name);
-	/* (the map named for its hash, so that the download is the host's
-	version under its own name, a file of custom_maps alone, whatever the
-	host's level name holds; a map this machine has of another version is
-	not replaced) */
-	if (!wanted || !map_share_name_safe(name) ||
-		(TEST_FLAG(wanted, _map_share_file_map) && !map_share_name_hashed(name)) ||
-		(!TEST_FLAG(wanted, _map_share_file_map) && custom_edition_map_checksum(level_name) != version && version))
-	{
+	wanted = files_wanted(level_name, version);
+	/* (the map of the host's version, which the offer's hash is checked
+	against, a file of custom_maps alone, whatever the host's level name
+	holds; a map this machine has of another version is not replaced) */
+	if (!wanted || !map_share_name_safe(name) || (TEST_FLAG(wanted, _map_share_file_map) && !version))
 		return FALSE;
-	}
 	{
 		static long serial;
 
@@ -1307,7 +1503,9 @@ boolean map_share_holds_players(
 		(download->state == _download_transferring && download->in_progress);
 }
 
-/* the download's file made anew for writing: its part file the file's size */
+/* the download's file made anew for writing: its part file empty, each
+piece written at its place as it comes (not the file's size at once: the
+offer alone, the host's word, would take the disk) */
 static boolean download_file_create(
 	struct download_file *file)
 {
@@ -1315,11 +1513,6 @@ static boolean download_file_create(
 
 	if (!stream)
 		return FALSE;
-	if (file->size && (fseek(stream, (long)file->size - 1, SEEK_SET) != 0 || fputc(0, stream) == EOF))
-	{
-		fclose(stream);
-		return FALSE;
-	}
 	fclose(stream);
 	file->stream = fopen(file->part_path, "r+b");
 	if (!file->stream)
@@ -1328,9 +1521,9 @@ static boolean download_file_create(
 	return TRUE;
 }
 
-/* the download's file opened for writing: a part file of its size there
-already checked piece by piece first (on the hashing thread, asked again
-while it is busy: download_update), else one made anew */
+/* the download's file opened for writing: a part file there already (no
+larger than the file) checked piece by piece first (on the hashing thread,
+asked again while it is busy: download_update), else one made anew */
 static boolean download_file_open(
 	struct download_file *file,
 	short index)
@@ -1344,7 +1537,7 @@ static boolean download_file_open(
 			size = ftell(stream);
 		fclose(stream);
 	}
-	if (size == (long)file->size && file->size)
+	if (size > 0 && size <= (long)file->size)
 	{
 		file->state = _file_checking;
 		map_share_pieces_hash(file->part_path, map_share_globals.download.serial << 3 | index);
@@ -1390,21 +1583,28 @@ static void download_offered(
 		file->piece_count = map_share_piece_count(file->size);
 		map_share_hash_digits(file->hash, digits);
 		/* (a file this machine did not ask for, or offered twice, or a map
-		whose hash is not its name's) */
+		not of the game's version) */
 		if (file->kind >= MAXIMUM_FILES || !TEST_FLAG(download->wanted, file->kind) ||
 			TEST_FLAG(offered, file->kind) || !file->size ||
 			file->size > (unsigned long)(file->kind == _map_share_file_map ? MAXIMUM_MAP_BYTES :
 			MAXIMUM_RESOURCE_MAP_BYTES) ||
-			(file->kind == _map_share_file_map && csstrcmp(name + map_share_name_base_length(name) + 1, digits)))
+			(file->kind == _map_share_file_map && map_share_hash_version(file->hash) != download->version))
 		{
 			download->file_count = index;
 			download_fail("The host's offer was not of this map.");
 			return;
 		}
 		offered |= (byte)FLAG(file->kind);
+		/* (the map by its own name, or beside another version of it, by the
+		name and its hash's first digits) */
 		if (file->kind == _map_share_file_map)
 		{
 			snprintf(file->final_path, sizeof(file->final_path), "%s%s.map", CUSTOM_EDITION_MAP_DIRECTORY, name);
+			if (GetFileAttributesA(file->final_path) != (unsigned long)-1)
+			{
+				snprintf(file->final_path, sizeof(file->final_path), "%s%s_%s.map", CUSTOM_EDITION_MAP_DIRECTORY, name,
+					digits);
+			}
 		}
 		else
 		{
@@ -1427,6 +1627,7 @@ static void download_offered(
 		download->files[index].state = _file_awaiting_hashes;
 	download->state = _download_transferring;
 	download->progress_at = system_milliseconds();
+	download->offered_at = download->progress_at;
 	error(_error_silent, "map sharing: downloading %s, %d files, %lu bytes", download->level_name,
 		(int)download->file_count, download->total_bytes);
 }
@@ -1457,8 +1658,12 @@ static void download_sources(
 		struct source *source = NULL;
 		short known;
 
-		if (entry->machine_index == network_game_client_get_local_machine_index())
+		if (entry->machine_index == network_game_client_get_local_machine_index() ||
+			(!TEST_FLAG(entry->flags, _source_internet_bit) &&
+			!source_address_allowed(entry->address, download->sources[0].address)))
+		{
 			continue;
+		}
 		for (known = 1; known < download->source_count; known++)
 		{
 			if (download->sources[known].machine_index == entry->machine_index &&
@@ -1604,7 +1809,27 @@ static void download_piece_had(
 	}
 }
 
-/* the download's files, all had: renamed, the map checked */
+/* the first `count` of the download's files, which download_finish put in
+custom_maps, deleted again: a download that cannot be played leaves none of
+its files there, for the map lists to take for present (none of them was
+there before it: MoveFileA does not replace a file) */
+static void download_unfinish(
+	short count)
+{
+	struct download *download = &map_share_globals.download;
+	short index;
+
+	for (index = 0; index < count; index++)
+	{
+		error(_error_silent, "map sharing: deleted %s (the download cannot be played)",
+			download->files[index].final_path);
+		DeleteFileA(download->files[index].final_path);
+	}
+	custom_edition_maps_look_again();
+}
+
+/* the download's files, all had: renamed, the map checked (each deleted
+again if it cannot be played) */
 static void download_finish(
 	void)
 {
@@ -1623,14 +1848,20 @@ static void download_finish(
 		}
 		if (!MoveFileA(file->part_path, file->final_path))
 		{
+			download_unfinish(index);
 			download_fail("The downloaded map could not be put in custom_maps (a file of its name is there).");
 			return;
 		}
+		if (!csstrcasecmp(map_share_globals.kept_part, file->part_path))
+			map_share_globals.kept_part[0] = 0;
+		/* (its hash known: its version is not read again) */
+		map_share_map_hash_remember(file->final_path, file->hash);
 	}
 	custom_edition_maps_look_again();
 	if (!custom_edition_cache_present(download->level_name, download->version, message, sizeof(message)))
 	{
 		csstrncpy(download->message, message, sizeof(download->message) - 1);
+		download_unfinish(download->file_count);
 		download_fail("The map was downloaded, but cannot be played.");
 		return;
 	}
@@ -1682,12 +1913,8 @@ static long piece_choose(
 		{
 			continue;
 		}
-		if (connection->remote_has[connection_file] != _have_all &&
-			!(connection->remote_has[connection_file] == _have_pieces && connection->remote_pieces[connection_file] &&
-			(connection->remote_pieces[connection_file][piece >> 3] & (1 << (piece & 7)))))
-		{
+		if (!remote_piece_had(connection, connection_file, piece))
 			continue;
-		}
 		for (index = 0; index < connection->request_count; index++)
 		{
 			if (connection->requests[index].file == connection->download_file[connection_file] &&
@@ -1712,13 +1939,8 @@ static long piece_choose(
 				if (other->download_file[other_file] == connection->download_file[connection_file])
 					break;
 			}
-			if (other_file < other->file_count &&
-				(other->remote_has[other_file] == _have_all ||
-				(other->remote_has[other_file] == _have_pieces && other->remote_pieces[other_file] &&
-				(other->remote_pieces[other_file][piece >> 3] & (1 << (piece & 7))))))
-			{
+			if (other_file < other->file_count && remote_piece_had(other, other_file, piece))
 				count++;
-			}
 		}
 		if (count < best_count)
 		{
@@ -1886,8 +2108,7 @@ static void frame_state(
 	if (size < 2 || body[0] >= connection->file_count)
 		return;
 	index = body[0];
-	free(connection->remote_pieces[index]);
-	connection->remote_pieces[index] = NULL;
+	remote_pieces_forget(connection, index);
 	connection->remote_has[index] = _have_none;
 	connection->state_heard[index] = TRUE;
 	if (body[1] == _have_all)
@@ -1901,11 +2122,15 @@ static void frame_state(
 		connection->remote_has[index] = _have_pieces;
 		if (connection->download_file[index] != NONE)
 		{
-			long bytes = (download->files[connection->download_file[index]].piece_count + 7) / 8;
+			long piece_count = download->files[connection->download_file[index]].piece_count;
+			long bytes = (piece_count + 7) / 8;
 
 			connection->remote_pieces[index] = size == 2 + bytes ? malloc(bytes) : NULL;
 			if (connection->remote_pieces[index])
+			{
 				csmemcpy(connection->remote_pieces[index], body + 2, bytes);
+				connection->remote_piece_count[index] = piece_count;
+			}
 		}
 	}
 }
@@ -1927,11 +2152,15 @@ static void frame_have(
 	piece = (long)get_long(body + 1);
 	if (piece < 0 || piece >= file->piece_count || connection->remote_has[index] == _have_all)
 		return;
+	/* (said of another file of this hash, of another size: forgotten) */
+	if (connection->remote_pieces[index] && connection->remote_piece_count[index] != file->piece_count)
+		remote_pieces_forget(connection, index);
 	if (!connection->remote_pieces[index])
 	{
 		connection->remote_pieces[index] = calloc((unsigned long)(file->piece_count + 7) / 8, 1);
 		if (!connection->remote_pieces[index])
 			return;
+		connection->remote_piece_count[index] = file->piece_count;
 	}
 	connection->remote_pieces[index][piece >> 3] |= (byte)(1 << (piece & 7));
 	connection->remote_has[index] = _have_pieces;
@@ -2057,7 +2286,7 @@ static void frame_refuse(
 			says next) */
 			if (connection->remote_has[body[0]] == _have_all)
 				connection->remote_has[body[0]] = _have_none;
-			else if (connection->remote_pieces[body[0]])
+			else if (remote_piece_had(connection, body[0], piece))
 				connection->remote_pieces[body[0]][piece >> 3] &= (byte)~(1 << (piece & 7));
 			return;
 		}
@@ -2091,7 +2320,8 @@ static void frame_hashes(
 	file = &download->files[connection->download_file[body[0]]];
 	first = get_long(body + 1);
 	count = body[5] | body[6] << 8;
-	if (file->piece_hashes || file->hashes_connection != connection_index || !file->hashes_coming ||
+	/* (none: a frame that brings nothing does not keep the request alive) */
+	if (file->piece_hashes || file->hashes_connection != connection_index || !file->hashes_coming || count < 1 ||
 		size != 7 + count * MAP_SHARE_HASH_BYTES || first != (unsigned long)file->hashes_received ||
 		count > file->piece_count - file->hashes_received)
 	{
@@ -2142,8 +2372,6 @@ static void connection_read(
 			connection->input_size += result;
 			if (!result && connection->input_size < 5)
 				return;
-			if (result)
-				connection->heard_at = system_milliseconds();
 		}
 		while (connection->used && connection->input_size - offset >= 5)
 		{
@@ -2163,6 +2391,8 @@ static void connection_read(
 			body = connection->input + offset + 5;
 			size = (long)length - 1;
 			offset += 4 + (long)length;
+			/* (heard from: a whole frame, not a byte at a time) */
+			connection->heard_at = system_milliseconds();
 			if (type != _frame_hello && !connection->hello_heard)
 			{
 				connection_close(connection, "no hello");
@@ -2383,6 +2613,24 @@ static void serve_blocks(
 	}
 }
 
+/* whether a download's file's pieces' hashes may be asked of the
+connection: of the host's, the host's word; of another the host named once
+HASHES_SOURCES_DELAY has passed since the offer, and of one another machine
+made after REQUEST_TIMEOUT (anyone can connect, and hold the request) */
+static boolean hashes_source(
+	struct connection const *connection,
+	unsigned long now)
+{
+	struct download const *download = &map_share_globals.download;
+
+	if (connection->outgoing && connection->source != NONE && connection->source < download->source_count &&
+		download->sources[connection->source].host)
+	{
+		return TRUE;
+	}
+	return elapsed(download->offered_at, now, connection->outgoing ? HASHES_SOURCES_DELAY : REQUEST_TIMEOUT);
+}
+
 /* each connection: connected, read, its states said, its pieces and
 hashes asked for, written */
 static void connections_update(
@@ -2416,6 +2664,7 @@ static void connections_update(
 				continue;
 			}
 			connection->state = _connection_open;
+			connection->opened_at = now;
 			connection->heard_at = now;
 			send_hello(connection);
 		}
@@ -2432,6 +2681,11 @@ static void connections_update(
 		}
 		if (!connection->hello_heard)
 		{
+			if (elapsed(connection->opened_at, now, HELLO_TIMEOUT))
+			{
+				connection_close(connection, "no hello");
+				continue;
+			}
 			connection_flush(connection);
 			continue;
 		}
@@ -2444,7 +2698,8 @@ static void connections_update(
 			/* (the pieces' hashes asked of one that has the file whole) */
 			if (download_file != NONE && download->files[download_file].state == _file_awaiting_hashes &&
 				download->files[download_file].hashes_connection == NONE &&
-				connection->remote_has[file_index] == _have_all && frame_room(connection, 1))
+				connection->remote_has[file_index] == _have_all && hashes_source(connection, now) &&
+				frame_room(connection, 1))
 			{
 				struct download_file *file = &download->files[download_file];
 				byte *body;
@@ -2455,6 +2710,7 @@ static void connections_update(
 					continue;
 				file->hashes_received = 0;
 				file->hashes_connection = index;
+				file->hashes_started_at = now;
 				file->hashes_asked_at = now;
 				body = frame_begin(connection, _frame_hashes_request, 1);
 				body[0] = (byte)file_index;
@@ -2500,7 +2756,8 @@ static void connections_update(
 		for (file_index = 0; file_index < download->file_count; file_index++)
 		{
 			if (download->files[file_index].hashes_connection == index &&
-				elapsed(download->files[file_index].hashes_asked_at, now, REQUEST_TIMEOUT))
+				(elapsed(download->files[file_index].hashes_asked_at, now, REQUEST_TIMEOUT) ||
+				elapsed(download->files[file_index].hashes_started_at, now, HASHES_TIMEOUT)))
 			{
 				break;
 			}
@@ -2557,9 +2814,11 @@ static void download_update(
 		{
 			long piece;
 
-			file->stream = piece_hashes && piece_count == file->piece_count && size == file->size ?
+			/* (a part file as long as the furthest piece written: the pieces
+			it reaches, the last of them perhaps cut short and not taken) */
+			file->stream = piece_hashes && piece_count <= file->piece_count && size <= file->size ?
 				fopen(file->part_path, "r+b") : NULL;
-			for (piece = 0; file->stream && piece < file->piece_count; piece++)
+			for (piece = 0; file->stream && piece < piece_count; piece++)
 			{
 				if (!csmemcmp(piece_hashes + piece * MAP_SHARE_HASH_BYTES, file->piece_hashes + piece * MAP_SHARE_HASH_BYTES,
 					MAP_SHARE_HASH_BYTES))
@@ -2638,13 +2897,26 @@ static boolean host_machine_valid(
 	return machine_index >= 0 && machine_index < MAP_SHARE_MACHINES;
 }
 
+/* whether a machine says it is downloading, lately, and what it says it
+has grew lately (once offered the files): one that only says so, its
+download going nowhere, holds its slot no longer than an honest one's
+download would last before it failed */
+static boolean host_machine_downloading(
+	struct host_machine const *machine)
+{
+	unsigned long now = system_milliseconds();
+
+	return machine->downloading && !elapsed(machine->heard_at, now, DOWNLOADING_TIMEOUT) &&
+		(!machine->offered || !elapsed(machine->advanced_at, now, DOWNLOADING_STALL_TIMEOUT));
+}
+
 boolean map_share_machine_downloading(
 	long machine_index)
 {
 	struct host_machine const *machine = host_machine_valid(machine_index) ?
 		&map_share_globals.machines[machine_index] : NULL;
 
-	return machine && machine->downloading && !elapsed(machine->heard_at, system_milliseconds(), DOWNLOADING_TIMEOUT);
+	return machine && host_machine_downloading(machine);
 }
 
 boolean map_share_machine_needs_map(
@@ -2653,8 +2925,7 @@ boolean map_share_machine_needs_map(
 	struct host_machine const *machine = host_machine_valid(machine_index) ?
 		&map_share_globals.machines[machine_index] : NULL;
 
-	return machine && machine->downloading && !machine->downloaded &&
-		!elapsed(machine->heard_at, system_milliseconds(), DOWNLOADING_TIMEOUT);
+	return machine && !machine->downloaded && host_machine_downloading(machine);
 }
 
 static boolean host_in_game(
@@ -2696,6 +2967,16 @@ static void host_offer(
 		csmemcpy(message.files[index].hash, file->hash, MAP_SHARE_HASH_BYTES);
 	}
 	network_distributed_server_send_to_machine_reliably(machine_index, &message, size);
+	/* (the files' bytes, and the time its progress is counted from: a
+	request asked again does not start it again, host_request) */
+	machine->offered_total = 0;
+	for (index = 0; index < count; index++)
+		machine->offered_total += message.files[index].size;
+	if (!machine->advanced_at && result == _offer_ok)
+	{
+		machine->advanced_at = system_milliseconds() | 1;
+		level_name_copy(machine->advanced_level, machine->request.level_name);
+	}
 	machine->offered = TRUE;
 	machine->asked = FALSE;
 	error(_error_silent, "map sharing: offered machine #%ld %s (%d files)%s", machine_index,
@@ -2755,27 +3036,42 @@ static void host_request(
 {
 	struct host_machine *machine = &map_share_globals.machines[machine_index];
 	struct network_game *game = map_share_network_game();
-	char const *name;
 	char path[MAP_SHARE_PATH_SIZE];
 	unsigned long needed;
 	short kind;
+	/* (the same machine asking again while the game is on the map its
+	progress is counted for, its download failed or not, whatever level it
+	names: its progress counted from the first offer still, so that asking
+	again and again, or for another level between, does not keep it
+	downloading. One that leaves is forgotten, host_update; a game on
+	another map starts it again) */
+	boolean again = machine->advanced_at && machine->address == network_game_server_machine_address(machine_index) &&
+		game && !csstrncmp(machine->advanced_level, game->map.name, LEVEL_NAME_BYTES - 1);
+	unsigned long advanced_at = again ? machine->advanced_at : 0;
+	unsigned long advanced_done = again ? machine->advanced_done : 0;
+	char advanced_level[LEVEL_NAME_BYTES];
 
+	csmemcpy(advanced_level, machine->advanced_level, LEVEL_NAME_BYTES);
 	csmemset(machine, 0, sizeof(*machine));
 	machine->request = *request;
 	machine->asked_at = system_milliseconds();
 	machine->heard_at = machine->asked_at;
+	machine->requested_at = machine->asked_at | 1;
 	machine->address = network_game_server_machine_address(machine_index);
+	machine->advanced_at = advanced_at;
+	machine->advanced_done = advanced_done;
+	if (again)
+		csmemcpy(machine->advanced_level, advanced_level, LEVEL_NAME_BYTES);
 	if (!config_boolean("network.map_share"))
 	{
 		host_offer(machine_index, _offer_off);
 		return;
 	}
-	/* (the game's map alone, a Custom Edition map's, named for its hash if
-	it is asked for) */
-	name = tag_name_strip_path(request->level_name);
+	/* (the game's map alone, a Custom Edition map's, of the game's version
+	if it is asked for) */
 	if (!game || csstrcmp(game->map.name, request->level_name) || !custom_edition_level_name(request->level_name) ||
 		!custom_edition_map_file_path(request->level_name, path) ||
-		(TEST_FLAG(request->wanted, _map_share_file_map) && !map_share_name_hashed(name)))
+		(TEST_FLAG(request->wanted, _map_share_file_map) && !game->map.version))
 	{
 		host_offer(machine_index, _offer_unavailable);
 		return;
@@ -2805,12 +3101,34 @@ static void host_request(
 		(unsigned)request->wanted);
 }
 
+/* a machine's request, as it comes: taken at once if the last it made was
+taken MAP_REQUEST_INTERVAL ago, else kept (the last of them) and taken then
+(host_update), so that one asking again and again has the host answer it,
+and write to its log, that often at most; one asking again honestly (its
+download failed) waits a moment at most */
+static void host_asked(
+	long machine_index,
+	struct distributed_map_share_request const *request)
+{
+	struct host_machine *machine = &map_share_globals.machines[machine_index];
+
+	if (machine->requested_at && machine->address == network_game_server_machine_address(machine_index) &&
+		!elapsed(machine->requested_at, system_milliseconds(), MAP_REQUEST_INTERVAL))
+	{
+		machine->waiting_request = *request;
+		machine->request_waiting = TRUE;
+		return;
+	}
+	host_request(machine_index, request);
+}
+
 /* the host's machines: answered once their files are hashed, told the
 sources again now and then, forgotten once gone */
 static void host_update(
 	void)
 {
 	struct map_share_globals *globals = &map_share_globals;
+	struct network_game *game = map_share_network_game();
 	unsigned long now = system_milliseconds();
 	long index;
 
@@ -2820,13 +3138,20 @@ static void host_update(
 		unsigned long address = network_game_server_machine_address(index);
 		short file_index;
 
-		if (!machine->asked && !machine->downloading)
+		if (!machine->asked && !machine->downloading && !machine->advanced_at && !machine->request_waiting)
 			continue;
 		/* (left: another machine may take its slot) */
 		if (!address || address != machine->address)
 		{
 			csmemset(machine, 0, sizeof(*machine));
 			continue;
+		}
+		/* (a request that came too soon after the last, its turn come) */
+		if (machine->request_waiting && elapsed(machine->requested_at, now, MAP_REQUEST_INTERVAL))
+		{
+			struct distributed_map_share_request request = machine->waiting_request;
+
+			host_request(index, &request);
 		}
 		if (machine->asked)
 		{
@@ -2852,19 +3177,16 @@ static void host_update(
 			}
 			if (!ready)
 				continue;
-			/* (the map's hash its name's, as the client checks) */
+			/* (the map of the game's version, as the client checks) */
 			for (file_index = 0; file_index < machine->file_count; file_index++)
 			{
 				struct map_share_file *file = map_share_file_get(machine->catalog_files[file_index]);
-				char const *name = tag_name_strip_path(machine->request.level_name);
-				char digits[MAP_SHARE_NAME_DIGITS + 1];
 
-				map_share_hash_digits(file->hash, digits);
 				if (machine->file_kinds[file_index] == _map_share_file_map &&
-					csstrcmp(name + map_share_name_base_length(name) + 1, digits))
+					(!game || map_share_hash_version(file->hash) != (unsigned long)game->map.version))
 				{
-					error(_error_silent, "map sharing: %s is not named for its hash (%s): not shared", file->path,
-						digits);
+					error(_error_silent, "map sharing: %s is not the game's version of its map (%08lx): not shared",
+						file->path, game ? (unsigned long)game->map.version : 0UL);
 					failed = TRUE;
 				}
 			}
@@ -2895,8 +3217,17 @@ static void host_progress(
 	if (!machine->offered)
 		return;
 	machine->heard_at = system_milliseconds();
-	machine->done = progress->done;
+	machine->done = MIN(progress->done, machine->offered_total);
 	machine->total = progress->total;
+	/* (grown by a piece, or to the whole: a client's own download fails
+	when no piece comes for STALL_TIMEOUT) */
+	if (machine->done >= machine->advanced_done + MAP_SHARE_PIECE_BYTES ||
+		(machine->done > machine->advanced_done && machine->done == machine->offered_total) ||
+		progress->state == _progress_done)
+	{
+		machine->advanced_done = machine->done;
+		machine->advanced_at = machine->heard_at | 1;
+	}
 	machine->downloading = progress->state != _progress_failed;
 	machine->downloaded = progress->state == _progress_done;
 	if (progress->state != _progress_downloading)
@@ -2950,7 +3281,7 @@ void map_share_handle_message(
 		csmemcpy(&request, entries, sizeof(request));
 		if (!level_name_valid(request.level_name))
 			return;
-		host_request(machine_index, &request);
+		host_asked(machine_index, &request);
 		break;
 	}
 	case _distributed_message_map_share_progress:

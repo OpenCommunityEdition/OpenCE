@@ -132,6 +132,9 @@ ZLIB_DEFINES = ("-DZ_PREFIX", "-Dz_errmsg=z_port_errmsg")
 MBEDTLS_DIR = Path("port/third_party/mbedtls")
 # internet play's UPnP (port/linux/src/posix_upnp.c)
 MINIUPNPC_DIR = Path("port/third_party/miniupnpc")
+# the Custom Edition maps' Ogg Vorbis decoder (custom_edition_sounds.c),
+# compiled as the port's game units are
+STB_VORBIS_SOURCE = Path("port/third_party/stb_vorbis/stb_vorbis.c")
 # miniupnpc's own build's definitions (its Makefile), and a static library
 MINIUPNPC_DEFINES = ["-DMINIUPNP_STATICLIB", "-DMINIUPNPC_SET_SOCKET_TIMEOUT", "-DMINIUPNPC_GET_SRC_ADDR",
                      "-D_BSD_SOURCE", "-D_DEFAULT_SOURCE"]
@@ -557,6 +560,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # sources do (port/linux/game).
         for source in sorted(Path(config["game_sources"]).glob("*.c")):
             add_object(source, game_cflags)
+        add_object(STB_VORBIS_SOURCE, game_cflags)
 
         platform_dir = Path(config["platform_sources"])
         platform_cflags = " ".join([

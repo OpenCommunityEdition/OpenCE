@@ -43,8 +43,8 @@ from typing import Any, Dict, List, Optional
 
 from .android_build import VARIADIC_PROTOTYPE_FILES
 from .embed_assets import hud_assets_build, hud_configure_inputs
-from .linux_build import (EXPAT_DIR, EXPAT_SOURCES, KCP_DIR, MONOCYPHER_DIR, MUSL_MATH_DIR, TOML_DIR, XDK_INCLUDE,
-                          ZLIB_DEFINES, ZLIB_DIR, ZLIB_SOURCES, compile_launcher, configuration_defines,
+from .linux_build import (EXPAT_DIR, EXPAT_SOURCES, KCP_DIR, MONOCYPHER_DIR, MUSL_MATH_DIR, STB_VORBIS_SOURCE, TOML_DIR,
+                          XDK_INCLUDE, ZLIB_DEFINES, ZLIB_DIR, ZLIB_SOURCES, compile_launcher, configuration_defines,
                           game_defines_and_includes, game_sources, musl_math_cflags, musl_math_sources,
                           opus_cflags, opus_sources, updater_defines, xdk_headers)
 from .ninja_syntax import Writer
@@ -245,6 +245,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         add_object(source, cflags)
     for source in sorted(Path(config["game_sources"]).glob("*.c")):
         add_object(source, game_cflags)
+    add_object(STB_VORBIS_SOURCE, game_cflags)
 
     # ---------- the platform layer and the web runtime
 

@@ -20,7 +20,7 @@ NOTICES = [
     ("Monocypher (internet play's signatures)", "port/third_party/monocypher/LICENCE.md"),
     ("tomlc17 (config.toml)", "port/third_party/tomlc17/LICENSE"),
     ("musl (the maths functions)", "port/third_party/musl-math/COPYRIGHT"),
-    ("stb_vorbis (loose sounds)", "port/third_party/stb/LICENSE"),
+    ("stb_vorbis (loose sounds)", "port/third_party/stb_vorbis/LICENSE"),
     ("extract-xiso (how the disc image is read)", "port/third_party/extract-xiso/LICENSE.TXT"),
     ("Overpass (the menus' text and the page's)", "port/assets/fonts/Overpass-OFL.txt"),
     ("OpenCE (the title font, from Newtown)", "port/assets/fonts/OpenCE-OFL.txt"),
