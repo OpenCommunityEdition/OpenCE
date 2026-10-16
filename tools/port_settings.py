@@ -672,7 +672,11 @@ WIDGET_PATCHES = {
         '<on event="b" run="port mcc host folder back"/>',
         '<on event="back" run="port mcc host folder back"/>',
     ]},
-    f"{MT}/connected/connected_map_select_wrapper": {"handlers": [
+    # The host returns here after a round with no menu history. Back must
+    # reopen the main menu when it closes the last screen, as the lobby does.
+    f"{MT}/connected/connected_map_select_wrapper": {"set": {
+        "flags": "pass_unhandled_to_focused_child pause_game main_menu_if_no_history tag_controller_index force_handle_mouse",
+    }, "handlers": [
         '<on event="b" run="port mcc host folder back"/>',
         '<on event="back" run="port mcc host folder back"/>',
     ]},
