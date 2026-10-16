@@ -28,12 +28,12 @@
       <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#000000"/>
     </linearGradient>
     <linearGradient id="ab0" gradientUnits="userSpaceOnUse" x1="0" y1="322.996" x2="0" y2="339.002"><stop offset="0" stop-color="#b9b9b9"/><stop offset="1" stop-color="#b3b3b3"/></linearGradient>
-    <mask id="mbx0" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="512"><path d="M48.13,323 L416.49,323 L423.87,339 L55.51,339 Z" fill="url(#ab0)"/></mask>
+    <mask id="mbx0" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="512"><path d="M53.5,327 L408.5,327 L412.2,335 L57.2,335 Z" fill="url(#ab0)"/></mask>
     <linearGradient id="cb1" gradientUnits="userSpaceOnUse" x1="-88.616" y1="40.907" x2="242.068" y2="-111.744">
       <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#000000"/>
     </linearGradient>
     <linearGradient id="ab1" gradientUnits="userSpaceOnUse" x1="0" y1="363.996" x2="0" y2="392.003"><stop offset="0" stop-color="#b9b9b9"/><stop offset="1" stop-color="#aeaeae"/></linearGradient>
-    <mask id="mbx1" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="512"><path d="M63.33,364 L459.69,364 L472.66,392 L76.29,392 Z" fill="url(#ab1)"/></mask>
+    <mask id="mbx1" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="512"><path d="M68,368 L454,368 L463.3,388 L77.3,388 Z" fill="url(#ab1)"/></mask>
   </defs>
   <g transform="translate(0,0)" mask="url(#m1)"><rect x="564.89" y="6" width="393.11" height="60.03" fill="url(#c1)"/></g>
   <g transform="translate(0,-1)" mask="url(#m4)"><rect x="49.21" y="143" width="435.41" height="112.02" fill="url(#c4)"/></g>
