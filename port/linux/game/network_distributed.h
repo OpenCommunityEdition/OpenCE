@@ -126,6 +126,9 @@ enum
 	_distributed_message_map_share_sources = 85,
 	_distributed_message_map_share_progress = 86,
 
+	/* The host's mouse aim-assist policy, reliably on ready and on change. */
+	_distributed_message_aim_assist_policy = 87,
+
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
 
