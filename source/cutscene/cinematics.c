@@ -425,6 +425,10 @@ void cinematic_render(
 				fade_amount = PIN(fade_amount, 0.0f, 1.0f);
 			}
 
+			/* port: not drawn over a menu, as the letterbox is not (the
+			fullscreen overlays come after the players' windows and their
+			menus); the title's time goes on as before */
+			if (!ui_widgets_active())
 			{
 				real_argb_color text_color;
 				long shadow_alpha;

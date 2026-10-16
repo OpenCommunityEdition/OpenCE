@@ -18,8 +18,8 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .linux_build import (LINUX_PROFILE, MINIUPNPC_DIR, OPTIMISATION, WINDOWS_PROFILE, XDK_INCLUDE, lto_mode,
-                          march_flag, miniupnpc_sources, pgo_mode, compile_launcher, configuration_defines,
+from .linux_build import (LINUX_PROFILE, MINIUPNPC_DIR, OPTIMISATION, STB_VORBIS_SOURCE, WINDOWS_PROFILE, XDK_INCLUDE,
+                          lto_mode, march_flag, miniupnpc_sources, pgo_mode, compile_launcher, configuration_defines,
                           game_defines_and_includes, game_sources, musl_math_cflags, musl_math_sources, opus_cflags,
                           opus_sources, pgo_profile, profile_use_flags, xdk_headers)
 from .embed_assets import hud_assets_build, hud_configure_inputs
@@ -395,6 +395,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             add_object(source, flags)
         for source in sorted(Path(linux_config["game_sources"]).glob("*.c")):
             add_object(source, game_cflags)
+        add_object(STB_VORBIS_SOURCE, game_cflags)
 
         linux_platform = Path(linux_config["platform_sources"])
         platform_cflags = " ".join([

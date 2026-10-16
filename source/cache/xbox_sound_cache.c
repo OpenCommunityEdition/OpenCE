@@ -543,8 +543,10 @@ static const char *cache_block_get_sound_permutation_name(
 	struct xbox_cache_sound_datum *cache_sound;
 
 	cache_sound = datum_get(xbox_sound_cache_globals.cache_sounds, block_index);
-	sprintf(
+	/* port: snprintf (a map's tag's name may be any length) */
+	snprintf(
 		xbox_sound_cache_globals.debug_block_name,
+		sizeof(xbox_sound_cache_globals.debug_block_name),
 		"%s (%s)",
 		tag_get_name(cache_sound->sound->runtime_tag_index),
 		cache_sound->sound);

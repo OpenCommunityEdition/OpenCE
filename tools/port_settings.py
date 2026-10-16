@@ -71,6 +71,9 @@ SCREENS = {
              "In first person, turn the view the moment the\nmouse moves, not up to two ticks later.", "desktop web"),
             ("HIGH-RES HUD:", "display.high_res_hud", ON_OFF,
              "Draw the HUD from the high-res redraws; off\ndraws the game's own pictures.", None),
+            ("BUTTON STYLE:", "display.hud_button_style",
+             [("CLASSIC", "classic"), ("GEMS", "gems"), ("DARK GEMS", "menu_gems")],
+             "Classic: plain Xbox buttons. Gems: shaded Xbox\nbuttons. Dark Gems: the menu's button artwork.", None),
             ("HIGH-RES TEXT:", "display.high_res_text", ON_OFF,
              "Draw text and titles with high-res fonts; off\ndraws the game's own.", None),
             ("ANTI-ALIASING:", "display.anti_aliasing",
@@ -196,7 +199,7 @@ SCREENS = {
 # Video Setup's categories open ordinary settings screens. Each has the same
 # pending edits, Defaults, OK and Cancel as the other settings screens.
 _video = SCREENS["video_settings"]
-_graphics = {"display.high_res_hud", "display.high_res_text", "display.anti_aliasing",
+_graphics = {"display.high_res_hud", "display.hud_button_style", "display.high_res_text", "display.anti_aliasing",
              "display.shadow_resolution", "display.disable_lod", "display.per_pixel_lighting",
              "display.shield_glow", "display.shield_glow_intensity"}
 SCREENS["video_settings/graphics"] = {
@@ -225,6 +228,29 @@ SCREENS["video_settings/fov_viewmodels"] = {
          "Your legs in first person, seen looking down,\nmoving as you run. Your body as others see it.", None),
         ("SHIELD COLOR:", "display.shield_color", [("DEFAULT", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
          "Your shield's flare in an armor color, whatever\nyour armor. Only you see it. Default: its own.", None),
+    ],
+}
+
+# Network Setup's map sharing (port/linux/game/map_share.c): this machine's
+# part in another's game, a screen of its own (a category, as Video Setup's)
+SEED_UPLOADS = (64, 128, 256, 512, 1024, 2048)
+_network = SCREENS["network_setup"]
+_network["categories"] = [
+    ("MAP SHARING:", "network_setup/map_sharing",
+     "Downloading Custom Edition maps you do not have,\nand helping send them to other players.",
+     "desktop android"),
+]
+SCREENS["network_setup/map_sharing"] = {
+    "screen": "map_sharing_settings_screen", "header": _network["header"], "spacing": 30,
+    "rows": [
+        ("DOWNLOAD MAPS:", "network.map_download", ON_OFF,
+         "Joining a game on a Custom Edition map you do not\nhave: download it from the players (if shared).",
+         None),
+        ("HELP SEND MAPS:", "network.map_seed", ON_OFF,
+         "In another's game, send its map to players who\njoin without it, as a torrent's peers do.", None),
+        ("UPLOAD LIMIT:", "network.map_seed_upload",
+         [(f"{kb} KB/S" if kb < 1024 else f"{kb // 1024} MB/S", str(kb)) for kb in SEED_UPLOADS],
+         "The most you send of maps to other players, so\nthat the game keeps the rest of your upload.", None),
     ],
 }
 
@@ -394,18 +420,22 @@ def _setting_screen(folder: str, spec: dict) -> list:
                           ("header_bounds", "7 -13 19 -7" if wide else "7 -6 19 0"),
                           ("footer_bounds", "7 208 19 214" if wide else "7 150 19 156")],
                          ['<on event="created" run="port setting load"/>'])
-    for index, (label, category_folder, _) in enumerate(spec.get("categories", ())):
+    # (each category's row: its label, the screen it opens, its help, and the
+    # platforms it is for, as a row's: every one's when it names none)
+    for index, (label, category_folder, _, *category_platform) in enumerate(spec.get("categories", ())):
         key = category_folder.rsplit("/", 1)[-1]
         row = f"{base}/op_{key}"
         target = f"{PE}/{category_folder}/{SCREENS[category_folder]['screen']}"
+        platform = category_platform[0] if category_platform else None
         if spec.get("platform_places"):
-            for name in places:
+            members = platform.split() if platform else list(places)
+            for name in members:
                 places[name] += 1
-            rows += _placed(row, None, list(places), places)
+            rows += _placed(row, platform, members, places)
         else:
-            rows.append((row, None, place + 1 + index))
+            rows.append((row, platform, place + 1 + index))
         extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
-                               ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                               ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
                          [f'<on event="a" open="{target}"/>', f'<on event="start" open="{target}"/>',
                           '<on event="left_mouse" run="mouse emit accept event"/>',
                           f'<child widget="{base}/{key}_label"/>'])
@@ -422,7 +452,7 @@ def _setting_screen(folder: str, spec: dict) -> list:
     # (the help of the row whose label is string n is n + 1: the buttons' is 0)
     extra += _strings(f"{base}/help_strings",
                       [""] + [help_text.replace("\n", "\\n") for _, _, _, help_text, *_ in spec["rows"]] +
-                      [help_text.replace("\n", "\\n") for _, _, help_text in spec.get("categories", ())])
+                      [help_text.replace("\n", "\\n") for _, _, help_text, *_ in spec.get("categories", ())])
     return _screen(folder, spec, rows, ["port settings help"], [], extra)
 
 
@@ -593,6 +623,11 @@ MAP_KIND_CHOOSER = "main_menu/new_select/list_item_0_map_kind"
 # changes to the PC version's widgets (by our names): attributes set, all
 # their handlers replaced, children added, game data inputs added
 WIDGET_PATCHES = {
+    # The host returns here after a round with no menu history. Back must
+    # reopen the main menu when it closes the last screen, as the lobby does.
+    f"{MT}/connected/connected_map_select_wrapper": {"set": {
+        "flags": "pass_unhandled_to_focused_child pause_game main_menu_if_no_history tag_controller_index force_handle_mouse",
+    }},
     # (the profile settings' picture: on Gamepad Setup's row, the profile's
     # button settings, BITMAP_FRAMES; menu_functions.c's
     # profile_gamepad_layout)
@@ -847,8 +882,8 @@ def _server_settings() -> list:
     whether the server browser lists it (PUBLIC or PRIVATE: an internet
     game's)"""
     base = f"{MT}/server_settings"
-    # (eleven rows: closer together, the help lower)
-    spec = {"screen": "server_settings_screen", "spacing": 26, "help_top": 366,
+    # (twelve rows: closer together, the help lower)
+    spec = {"screen": "server_settings_screen", "spacing": 24, "help_top": 366,
             "header": ("header_server_settings", f"{base}/header_server_settings")}
     rows, extra = [], []
     extra += _value_row(base, "server_name", 0, "ss edit server name")
@@ -895,6 +930,22 @@ def _server_settings() -> list:
     # which players from the server browser must type
     extra += _value_row(base, "password", 10 + len(COOP_SETUP_SCREENS), "ss edit server password")
     rows.append((f"{base}/op_password", None))
+    # MAP SHARING (map_share.c), a screen of its own as co-op's options are,
+    # for any game: SETUP_OPTIONS_PLACE below it
+    key, _, _, _ = MAP_SHARE_SETUP
+    target = f"{base}/{key}/{key}_screen"
+    extra += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
+                                         ("flags", "pass_unhandled_to_focused_child"),
+                                         ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                     [f'<on event="a" open="{target}"/>', f'<on event="start" open="{target}"/>',
+                      '<on event="left_mouse" run="mouse emit accept event"/>',
+                      f'<child widget="{base}/{key}_label"/>'])
+    extra += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
+                                             ("string_list", f"{base}/labels"),
+                                             ("string_index", 11 + len(COOP_SETUP_SCREENS)),
+                                             ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13),
+                                             ("text_y", 4)], [])
+    rows.append((f"{base}/op_{key}", None, SETUP_OPTIONS_PLACE - 1))
     # co-op's options, in the place of the gametype's rows, which co-op hides
     # as multiplayer hides co-op's (menu_functions.c's server_settings_update):
     # rows opening their screens, as the gametype's options' do
@@ -911,7 +962,7 @@ def _server_settings() -> list:
                                                  ("string_list", f"{base}/labels"), ("string_index", 10 + index),
                                                  ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13),
                                                  ("text_y", 4)], [])
-        rows.append((f"{base}/op_{key}", None, 5 + index))
+        rows.append((f"{base}/op_{key}", None, SETUP_OPTIONS_PLACE + index))
     # the gametype's options for this game (the gametype editor's screens,
     # editing a copy of the gametype chosen: "port setup edit")
     for index, (key, screen) in enumerate(SETUP_OPTION_SCREENS):
@@ -930,7 +981,7 @@ def _server_settings() -> list:
         extra += _widget(f"{base}/{key}_value", [("type", "text"), ("controller", 1), ("width", 280), ("height", 22),
                                                  ("font", "ui\\small_ui"), ("color", "#FF2896FF"), ("align", "center"),
                                                  ("text_y", 5), ("text_flags", "no_focus_test")], [])
-        rows.append((f"{base}/op_{key}", None, 5 + index))
+        rows.append((f"{base}/op_{key}", None, SETUP_OPTIONS_PLACE + index))
     extra += _button(f"{base}/button_defaults", 3, [])
     extra += _widget(f"{base}/button_ok", [("type", "text"), ("width", 128), ("height", 24),
                                            ("bitmap", "bitmaps/text_button_background"), ("text", "START GAME"),
@@ -942,7 +993,8 @@ def _server_settings() -> list:
     extra += _strings(f"{base}/labels", ["GAME NAME:", "MAXIMUM PLAYERS:", "INVITE LINK:", "GAME TYPE:",
                                          "PLAYER OPTIONS:", "ITEM OPTIONS:", "VEHICLE OPTIONS:", "INDICATOR OPTIONS:",
                                          "TEAMPLAY OPTIONS:", "LISTING:",
-                                         *(f"{title}:" for _, title, _, _ in COOP_SETUP_SCREENS), "PASSWORD:"])
+                                         *(f"{title}:" for _, title, _, _ in COOP_SETUP_SCREENS), "PASSWORD:",
+                                         f"{MAP_SHARE_SETUP[1]}:"])
     extra += _strings(f"{base}/help_strings", [
         "",
         "The name the game shows in the lists of games.\\nEnter changes it.",
@@ -961,11 +1013,13 @@ def _server_settings() -> list:
         *(help_text for _, _, help_text, _ in COOP_SETUP_SCREENS),
         # (PASSWORD's)
         "Players from the Server Browser must type it to\\njoin (an invite link needs none). Enter sets it.",
+        # (MAP SHARING's)
+        MAP_SHARE_SETUP[2],
     ])
     lines = _screen(base, spec, rows, ["server settings update"],
                     ['<on event="created" run="server settings init"/>'], extra)
-    # (co-op's options' screens)
-    for key, title, _, screen_rows in COOP_SETUP_SCREENS:
+    # (co-op's options' screens, and map sharing's)
+    for key, title, _, screen_rows in [*COOP_SETUP_SCREENS, MAP_SHARE_SETUP]:
         lines += _setup_option_screen(f"{base}/{key}", key, screen_rows)
     # (no Defaults: the bar is START and CANCEL; B cancels the name's edit
     # first)
@@ -1011,8 +1065,26 @@ COOP_SETUP_SCREENS = [
     ]),
     ("voice_options", "VOICE AND VOTING", "Voice chat and votes to kick a player, for this\\ngame.", TEAMPLAY_ROWS),
 ]
+# Server Setup's map sharing (port/linux/game/map_share.c), for any game,
+# laid out as co-op's options are (its key, its title, its row's help and
+# its rows: menu_functions.c's gametype_options give their settings' values)
+MAP_SHARE_UPLOADS = (256, 512, 1024, 2048, 4096, 8192)
+MAP_SHARE_SETUP = ("map_share_options", "MAP SHARING",
+                   "Sending players who join without the game's\\nCustom Edition map the map, and how fast.", [
+    ("map_share", "SHARE MAPS:", ["ON", "OFF"], [
+        "Players who join without the map download it\\nfrom you and the other players.",
+        "Players who join without the map cannot play.",
+    ]),
+    ("map_share_upload", "UPLOAD LIMIT:", [f"{kb} KB/S" if kb < 1024 else f"{kb // 1024} MB/S"
+                                           for kb in MAP_SHARE_UPLOADS],
+     ["The most you send of maps, so that the game\\nkeeps the rest of your upload."] * len(MAP_SHARE_UPLOADS)),
+])
+# (Server Setup's place of its options' rows, co-op's or the gametype's: after
+# MAP SHARING's)
+SETUP_OPTIONS_PLACE = 6
 # (their screens' titles)
-TITLES.update({f"{MT}/server_settings/{key}/header_{key}": title for key, title, _, _ in COOP_SETUP_SCREENS})
+TITLES.update({f"{MT}/server_settings/{key}/header_{key}": title
+               for key, title, _, _ in [*COOP_SETUP_SCREENS, MAP_SHARE_SETUP]})
 # (the rows of a co-op options screen in one place, the one shown: PER
 # PLAYER's and MULTIPLIER's, by EXTRA ENEMIES')
 SETUP_OPTION_SAME_PLACE = {"coop_enemies_multiplier"}

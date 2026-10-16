@@ -1038,9 +1038,18 @@ void hs_object_teleport(
 	long object_index,
 	short cutscene_flag_index)
 {
-	hs_object_orient(object_index, cutscene_flag_index, TRUE, TRUE);
-	/* port: co-op players the scripts can't name go with player0 */
-	coop_scripts_teleport_followers(object_index);
+	/* port: followers go to the flag, not to wherever player0 was left when
+	that teleport did not fit */
+	if (object_index != NONE)
+	{
+		struct scenario_cutscene_flag *flag = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->cutscene_flags,
+			cutscene_flag_index,
+			struct scenario_cutscene_flag);
+
+		hs_object_orient(object_index, cutscene_flag_index, TRUE, TRUE);
+		coop_scripts_teleport_followers(object_index, &flag->position);
+	}
 
 	return;
 }
@@ -1059,9 +1068,20 @@ void hs_teleport_players_not_in_trigger_volume(
 	short cutscene_flag_index)
 {
 	long player_index;
-	/* port: in network co-op the first player moved goes to the flag and
-	the rest around them, instead of all into the same spot */
-	long first_unit_index = NONE;
+	/* port: in network co-op the host spreads players around the flag.
+	A client does not move them; the host's copies arrive with the units. */
+	long arrived[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+	short arrived_count = 0;
+	boolean coop = network_coop_active();
+	struct scenario_cutscene_flag *flag = NULL;
+
+	if (coop && game_connection() == _game_connection_network_server)
+	{
+		flag = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->cutscene_flags,
+			cutscene_flag_index,
+			struct scenario_cutscene_flag);
+	}
 
 	for (player_index = data_next_index(player_data, NONE);
 		player_index != NONE;
@@ -1070,23 +1090,35 @@ void hs_teleport_players_not_in_trigger_volume(
 		struct player_datum *player;
 
 		player = player_get(player_index);
-		if (player->unit_index != NONE &&
-			!scenario_trigger_volume_test_object(
+		if (player->unit_index == NONE ||
+			scenario_trigger_volume_test_object(
 				trigger_volume_index,
 				player->unit_index))
 		{
-			if (first_unit_index != NONE && network_coop_active())
-			{
-				player_teleport(player_index, first_unit_index, &object_get(first_unit_index)->object.position);
-				continue;
-			}
-			hs_object_orient(
-				player->unit_index,
-				cutscene_flag_index,
-				TRUE,
-				TRUE);
-			first_unit_index = player->unit_index;
+			continue;
 		}
+		if (coop && !flag)
+			continue;
+		if (flag)
+		{
+			boolean here = FALSE;
+			real_point3d origin;
+
+			if (arrived_count == 0)
+				hs_object_orient(player->unit_index, cutscene_flag_index, TRUE, TRUE);
+			here = coop_scripts_unit_near(player->unit_index, &flag->position) &&
+				!player_position_switches_bsp(object_get_origin(player->unit_index, &origin));
+			if (!here)
+				here = coop_scripts_arrive_at(player_index, &flag->position, arrived, arrived_count);
+			if (here && arrived_count < NUMBEROF(arrived))
+				arrived[arrived_count++] = player->unit_index;
+			continue;
+		}
+		hs_object_orient(
+			player->unit_index,
+			cutscene_flag_index,
+			TRUE,
+			TRUE);
 	}
 
 	return;

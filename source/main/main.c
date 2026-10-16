@@ -381,6 +381,7 @@ symbols in this file:
 #include "networking/network_server_manager.h" /* port: a co-op game's level won */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "network_voice.h" /* port: port/linux/game/network_voice.c */
+#include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "profile_sections.h" /* port: port/linux/include/profile_sections.h */
 #ifdef HALO_PROFILE
 #include "profile_trace.h" /* port: port/linux/src/profile_trace.c */
@@ -2299,8 +2300,11 @@ static void main_frame_rate_debug(
 			FILE *file;
 
 			GetSystemTime(&system_time);
-			sprintf(
+			/* port: snprintf, here and below (a map's tag's name may be any
+			length) */
+			snprintf(
 				core_name,
+				sizeof(core_name),
 				"%s_slow_%d_%d_%d_%d_%d_%d.bin",
 				scenario_name,
 				system_time.wMonth,
@@ -2310,7 +2314,7 @@ static void main_frame_rate_debug(
 				system_time.wMinute,
 				system_time.wSecond);
 			game_state_save_core(core_name);
-			sprintf(init_file_name, "d:\\%s_init.txt", scenario_name);
+			snprintf(init_file_name, sizeof(init_file_name), "d:\\%s_init.txt", scenario_name);
 
 			file = fopen(init_file_name, "r");
 			if (!file)
@@ -3519,6 +3523,8 @@ static boolean main_loop_iteration(
 			network_test_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
 			/* port: voice chat, in the lobby and in game (port/linux/game/network_voice.c) */
 			network_voice_update();
+			/* port: map sharing, in the lobby and in game (port/linux/game/map_share.c) */
+			map_share_update();
 			profile_scope_enter(main_network_start_frame_section)
 			connection = main_globals.connection;
 			if (connection==_game_connection_network_client)

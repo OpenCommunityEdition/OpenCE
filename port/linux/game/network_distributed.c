@@ -64,6 +64,7 @@ machine (their datum identifiers need not be).
 #include "main/main.h"
 #include "game/player_queues_new.h"
 #include "networking/network_game_globals.h"
+#include "networking/network_connection.h"
 #include "objects/objects.h"
 #include "objects/damage.h"
 #include "scenario/scenario.h"
@@ -75,6 +76,7 @@ machine (their datum identifiers need not be).
 #include "network_coop.h"
 #include "network_distributed.h"
 #include "network_voice.h"
+#include "map_share.h"
 #include "profile_sections.h"
 
 #include <limits.h>
@@ -3974,6 +3976,14 @@ void network_distributed_handle_message(
 	if (network_voice_handles_message(message, size))
 	{
 		network_voice_handle_message(machine_index, message, size);
+		return;
+	}
+	/* (map sharing's, in the lobby too, over the host's connection alone:
+	map_share.c) */
+	if (map_share_handles_message(message, size))
+	{
+		map_share_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
 		return;
 	}
 	/* (none between games: loading, or in the menus) */

@@ -184,10 +184,29 @@ lists a public game with a password with its invite's token sealed with the
 password's key (`p2p_lobby.c`), a listing of another layout; version 21
 sends each killing blow again reliably and an object come to rest three
 times (a client waits for a player's blow before its body dies without one),
-and switches co-op's BSP on the host's crossing alone; version 26 has each
-machine say its WebRTC in internet play's signalling (a native build's
-certificate, a browser's ICE credentials too), so that browsers play
-(port/linux/README.md, "Browsers").
+and switches co-op's BSP on the host's crossing alone; version 22 names a
+Custom Edition map `custom_maps\<name>`, which older clients cannot load or
+explain; version 23 keeps the blocks of a Custom Edition map that 22 cut to
+the Xbox tools' limits, so both place the same objects; version 24 sends the
+gametype's PC vehicle set; version 25 sends a unit's integrated light with
+its object state; version 26 has each machine say its WebRTC in internet
+play's signalling (a native build's certificate, a browser's ICE credentials
+too), so that browsers play (port/linux/README.md, "Browsers"); version 27
+shares Custom Edition maps (below, "Map sharing"): a client asks the host for
+a map it lacks, and the game's players reach each other to send it; version
+28 holds the players of a machine still downloading the map out of the game
+until it has the map, keeps a multiplayer map's first scripted BSP, leaves
+dynamic lights and the flashlight on past the Xbox game's player and vehicle
+limits, and readies a second weapon picked up while firing; version 29 names
+a Custom Edition map by its own name (`custom_maps\hugeass`, which every
+screen shows) and says which version it is by the map version of the game
+record, its hash's first 32 bits (the header checksum before), which a
+client finds its file by (below, "Map sharing").
+
+`port/linux/network_format.txt` records the wire format of the current
+version (`tools/network_format.py`): `test_linux_port.py` fails when the
+sources' messages, kinds, bits, structs sent whole or the sizes of their
+arrays differ from it.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
@@ -321,6 +340,101 @@ machine in the pregame refuses, and which the others no longer need), only
 a pregame keep-alive every five seconds from the host
 (`network_server_manager.c`, `network_server_message_handler.c`).
 
+## Map sharing
+
+A client may join a game on a Custom Edition map it does not have
+(`port/linux/game/map_share.c`, `map_share_files.c`). A game's level name is
+the map's own (`custom_maps\hugeass`), which every screen and the server
+browser show, and the game record's map version is the first 32 bits of the
+map's hash (`map_share_hash_version`), which says which version of the map it
+is: a client plays its file of that name and version, so two versions never
+meet. A file's hash is BLAKE2b's (32 bytes) of a label, its size and the
+BLAKE2b hashes of its pieces (256 KiB each); a map is hashed when it is
+needed (a host's game is put on it, a client's settings name its name) and
+kept for the run. No map is renamed. A map downloaded beside another version
+of its name is named for its hash (`hugeass_0e2b3ee4.map`), and the menus
+show it as `Hugeass (2)`; a map an earlier build named so, with no map of
+its name alone beside it, has its name given back as the map lists find it.
+
+- **Asking.** A client whose settings name a map it lacks, or lacks of
+  their version (`cache_files_map_present`), or one whose resource maps it
+  lacks, asks the host over its connection
+  (`_distributed_message_map_share_request`: the level, and which of the
+  map, bitmaps.map, sounds.map and loc.map it lacks) instead of leaving, if
+  `network.map_download` lets it. Its players wait to join until the host's settings
+  have named the map, and for a game in progress until it is downloaded; in
+  the lobby they join at once, and the host's start waits for the machine to
+  precache the map, as it waits for any machine.
+- **The offer.** A host that shares maps (`network.map_share`) hashes the
+  map, and the resource maps the map needs (its tag index says which: a tag
+  whose entry's word at 0x18 is set is held whole by bitmaps.map for a
+  bitmap, sounds.map for a sound, loc.map for a font, string list or HUD
+  message text) that the client lacks, on a thread of their own, and
+  answers with each file's size and hash (`_offer`, or why it does not:
+  sharing off, or not the game's map), and which of its other machines may
+  have them (`_sources`: an address on a LAN, internet play's key hash on the
+  internet), again every ten seconds. A map that is not of the game's version is
+  not offered. The client checks that the map is of the game's version, and
+  that no file is larger than the cache loader takes, and refuses a map
+  name Windows takes for a device (`CON`, `NUL`, `COM1` and the like,
+  before the first dot). It connects to a LAN machine the host names only
+  at an address of the host's kind (a private network's if the host's is,
+  loopback only if the host's is; never 0.0.0.0, multicast or internet
+  play's), so that a host cannot send its players anywhere.
+- **The swarm.** The client connects to the host and up to eight of the
+  others on port 5153 (of two downloading, the one of the lower machine
+  connects). Each end says which files it has, whole or by piece, and tells
+  the other of each piece it gets; the client asks for the rarest pieces
+  first (from a random place, so that clients ask for different pieces), two
+  at a time from each connection, sixteen in all, and the last few again of
+  whoever is quicker. The pieces' hashes come from the host (from the
+  others it named after ten seconds without them, and from the connections
+  other machines made after thirty), all of them within a minute, checked
+  against the file's hash; a frame of none is refused. Each piece is
+  checked against its own as it arrives, and an end that sends a wrong one
+  is not asked again. A machine
+  sends of the game's files (its map, the resource maps the map needs, a
+  download's pieces) no faster than `network.map_share_upload` (the host,
+  1024 KB/s) or `network.map_seed_upload` (a player, 256 KB/s), round all
+  its connections a 16 KiB block at a time, so that the game's own traffic
+  keeps the rest of the upload; `network.map_seed = false` sends none. A
+  player that has downloaded the map sends it on at once.
+- **Connections.** A machine takes up to 24 connections, of which 15 others
+  made (the rest are kept for its own download's), four from one address,
+  eight at once that have not said hello (the oldest makes way); a
+  connection says hello within ten seconds, and one that sends no whole
+  frame for 30 seconds is closed. The host takes connections only from its
+  game's machines' addresses.
+- **Internet play.** The players of an internet game reach its host alone.
+  A player that shares answers the holders of the invite it joined with as
+  its host does (`p2p_set_answering_players`), and a downloading client asks
+  another player, by the key hash the host told, for a session as it asked
+  the host (`p2p_reach_player`: up to eight at once, alongside the request to
+  the host, in one topic of the invite's token). Its map sharing connection
+  then goes through their tunnel, as the game's connections go.
+- **Writing.** A download is written to `<file>.part` beside its file in
+  custom_maps, each piece at its place as it comes (the file is not made its
+  size at once), and renamed when every piece is had. A part file found
+  again is checked piece by piece on the hashing thread and taken up where
+  it was. A download that stops deletes a part file that holds none of its
+  file, and keeps one map's part file at most (the one kept before is
+  deleted), so that a host cannot fill a disk with offers.
+  The client checks the map again once it has it (`custom_edition_cache_present`),
+  and deletes the files the download put in custom_maps if it cannot be
+  played (or if one of them could not be put there), so that none is taken
+  for present; it tells the host its progress every two seconds
+  (`_progress`). The host does not drop a machine downloading (and for 20
+  seconds after) for adding no players or loading slowly, while what it says
+  it has grew by a piece (or to the whole, and no more than the files
+  offered) in the last 80 seconds, counted from the first offer of the
+  game's map however often, and for whatever level, the machine asks again.
+  It takes a machine's requests five seconds apart at most: one that comes
+  sooner waits its turn (the last of them kept). A connection forgets which
+  pieces the other end has of the download's files when the download ends.
+  A download that brings nothing for a minute, or a host that does not
+  answer in 30 seconds, leaves the game, saying why.
+- The download's progress is drawn at the top of the screen.
+
 ## Stages
 
 1. (Done) Decoupled ticks: clients tick on their own clock with local input
@@ -397,7 +511,11 @@ a pregame keep-alive every five seconds from the host
    would leave a falling body hanging until its turn round all of them),
    and a few of those at rest, round them all. A client takes the host's
    word on whether each is at rest even when its copy is close enough to
-   leave where it is. A client puts its copies there, and the difference is
+   leave where it is. A body's pose goes with it: one lying limp that the
+   host moves stops lying limp (the blast that moved the host's reaches
+   only the machines that see the body's player), and one the host has at
+   rest is on the ground, so it lies limp again where it stops instead of
+   keeping the pose of its fall in the air. A client puts its copies there, and the difference is
    drawn fading over a few ticks (`render_interpolation.c`) instead of a
    jump. A client drives its own player's vehicle and sends where it is,
    which the host takes within a tolerance, as it does its own player's

@@ -465,6 +465,11 @@ static void render_state_text(
 	rectangle2d *cursor_bounds,
 	wchar_t const *text,
 	boolean custom);
+/* port: original Xbox high-resolution glyphs, port/linux/game/hud_hires_tags.c */
+boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
+	rectangle2d *cursor, pixel32 color);
+struct bitmap_data const *hud_hires_sprite_bitmap(struct bitmap_data const *bitmap, short sequence_index);
+
 static void render_state_bitmap(
 	rectangle2d *bounds,
 	rectangle2d *cursor_bounds,
@@ -543,6 +548,10 @@ static void render_state_bitmap(
 	if (bitmap && _texture_cache_bitmap_get_hardware_format(
 		(struct bitmap_data *)bitmap, FALSE, TRUE))
 	{
+		/* port: keep gameplay prompts on the high-resolution HUD path. */
+		if (hud_hires_button_draw(icon, cursor_bounds, color))
+			return;
+		bitmap = hud_hires_sprite_bitmap(bitmap, icon->sequence_index);
 		scale = local_player_count() > 1 ? 0.75f : 1.0f;
 		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0);
 		point.y = (short)(cursor_bounds->y1 - icon->offset.y * scale);
