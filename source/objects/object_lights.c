@@ -960,85 +960,6 @@ long light_new_unattached(
 	return light_index;
 }
 
-/* port: a flashlight whose beam was not moved onto the viewmodel still
-aims from the tick. Ease the spot toward that aim across the frames. */
-struct flashlight_drawn
-{
-	long light_index;
-	boolean valid;
-	real_point3d position;
-	real_vector3d forward;
-};
-
-static struct flashlight_drawn flashlight_drawn_lights[MAXIMUM_LIGHTS_PER_MAP];
-
-static void flashlight_ease(
-	long light_index,
-	real_point3d *position,
-	real_vector3d *forward)
-{
-	static long eased_tick = NONE;
-	static real eased_fraction = 0.0f;
-	static real eased_alpha = 0.5f;
-	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(light_index);
-	struct flashlight_drawn *drawn;
-	real_vector3d step;
-	real length_squared;
-	real alpha;
-	long tick;
-	real fraction;
-	real dt;
-
-	if (absolute_index < 0 || absolute_index >= MAXIMUM_LIGHTS_PER_MAP)
-		return;
-	tick = game_time_get();
-	fraction = game_time_get_tick_fraction();
-	if (tick != eased_tick || fraction != eased_fraction)
-	{
-		if (eased_tick == NONE || tick < eased_tick)
-			dt = 1.0f / 60.0f;
-		else
-			dt = ((real)(tick - eased_tick) + (fraction - eased_fraction)) / (real)TICKS_PER_SECOND;
-		if (!(dt > 0.0f && dt < 0.1f))
-			dt = 1.0f / 60.0f;
-		eased_alpha = 1.0f - (real)exp((double)(-dt / 0.04f));
-		eased_tick = tick;
-		eased_fraction = fraction;
-	}
-	drawn = &flashlight_drawn_lights[absolute_index];
-	step.i = position->x - drawn->position.x;
-	step.j = position->y - drawn->position.y;
-	step.k = position->z - drawn->position.z;
-	length_squared = step.i * step.i + step.j * step.j + step.k * step.k;
-	if (!drawn->valid || drawn->light_index != light_index || !(length_squared <= 4.0f))
-	{
-		drawn->valid = TRUE;
-		drawn->light_index = light_index;
-		drawn->position = *position;
-		drawn->forward = *forward;
-		return;
-	}
-	alpha = eased_alpha;
-	drawn->position.x += step.i * alpha;
-	drawn->position.y += step.j * alpha;
-	drawn->position.z += step.k * alpha;
-	drawn->forward.i += (forward->i - drawn->forward.i) * alpha;
-	drawn->forward.j += (forward->j - drawn->forward.j) * alpha;
-	drawn->forward.k += (forward->k - drawn->forward.k) * alpha;
-	length_squared = drawn->forward.i * drawn->forward.i + drawn->forward.j * drawn->forward.j +
-		drawn->forward.k * drawn->forward.k;
-	if (length_squared > 0.0f)
-	{
-		real inverse = 1.0f / (real)sqrt((double)length_squared);
-
-		drawn->forward.i *= inverse;
-		drawn->forward.j *= inverse;
-		drawn->forward.k *= inverse;
-	}
-	*position = drawn->position;
-	*forward = drawn->forward;
-}
-
 void lights_preprocess_scene(
 	void)
 {
@@ -1271,7 +1192,7 @@ void lights_preprocess_scene(
 								&light_parameters.forward,
 								&light_parameters.up);
 							/* still the tick's aim (another player, or no
-							viewmodel marker): ease it across the frames */
+							viewmodel marker): the marker the picture blends */
 							if (game_connection() != _game_connection_local &&
 								posed_forward.i == light_parameters.forward.i &&
 								posed_forward.j == light_parameters.forward.j &&
@@ -1280,8 +1201,19 @@ void lights_preprocess_scene(
 								posed_position.y == light_parameters.position.y &&
 								posed_position.z == light_parameters.position.z)
 							{
-								flashlight_ease(scene_light_handle, &light_parameters.position,
-									&light_parameters.forward);
+								struct object_marker markers[1];
+
+								if (object_get_marker_by_name(
+									light->object_index,
+									object_get_attachment_marker_name(light->object_index,
+										light->attachment_marker_index),
+									markers,
+									1) > 0)
+								{
+									light_parameters.position = markers[0].matrix.position;
+									light_parameters.forward = markers[0].matrix.forward;
+									light_parameters.up = markers[0].matrix.up;
+								}
 							}
 							adjusted = TRUE;
 						}

@@ -42,9 +42,11 @@ between ticks.
 #include "camera/director.h"
 #include "camera/observer.h"
 #include "cutscene/cinematics.h"
+#include "game/game.h"
 #include "game/players.h"
 #include "render/render_cameras.h"
 #include "units/units.h"
+#include "network_distributed.h"
 
 /* port/linux/src/port_config.c */
 int config_boolean(const char *name);
@@ -155,6 +157,26 @@ static boolean interpolation_rendering;
 the correction glide is drawn then */
 static boolean interpolation_drawing;
 static real interpolation_fraction = 1.0f;
+
+/* a remote pose the picture turns through while display.interpolation is
+off. The simulation takes the sample whole. The beam and the gun share this,
+so the light stays on the weapon. One tick of samples is the usual gap. A
+later sample keeps the turn going across the ticks since the last. */
+struct drawn_pose
+{
+	long object_index;
+	long sample_tick;
+	long interval;
+	real_point3d previous_position;
+	real_point3d latest_position;
+	real_vector3d previous_forward;
+	real_vector3d previous_up;
+	real_vector3d latest_forward;
+	real_vector3d latest_up;
+};
+
+static struct drawn_pose *drawn_poses;
+static long pose_clock;
 
 /* ---------- blending */
 
@@ -533,6 +555,12 @@ void render_interpolation_reset(void)
 		for (index = 0; index < MAXIMUM_INTERPOLATED_OBJECTS; index++)
 			interpolated_objects[index].object_index = NONE;
 	}
+	if (drawn_poses)
+	{
+		for (index = 0; index < MAXIMUM_OBJECTS_PER_MAP; index++)
+			drawn_poses[index].object_index = NONE;
+	}
+	pose_clock = 0;
 	memset(interpolated_cameras, 0, sizeof(interpolated_cameras));
 	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
 	{
@@ -648,8 +676,249 @@ real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 	return record->nodes + 2 * record->node_capacity;
 }
 
+/* the unit this object is, or hangs off, else NONE */
+static long pose_root_unit(
+	long object_index)
+{
+	long index = object_index;
+	long guard;
+
+	for (guard = 0; index != NONE && guard < 8; guard++)
+	{
+		struct object_datum *object = object_try_and_get(index);
+
+		if (!object)
+			return NONE;
+		if (TEST_FLAG(_object_mask_unit, object->object.type))
+			return index;
+		index = object->object.parent_object_index;
+	}
+	return NONE;
+}
+
+/* this machine drives it: its own beam is the viewmodel, and its body is
+its own simulation */
+static boolean pose_driven_here(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_try_and_get(unit_index);
+	long player_index;
+
+	if (!unit)
+		return FALSE;
+	player_index = unit->unit.player_index;
+	if (unit->unit.driver_object_index != NONE)
+	{
+		struct unit_datum *driver = unit_try_and_get(unit->unit.driver_object_index);
+
+		if (driver)
+			player_index = driver->unit.player_index;
+	}
+	return player_index != NONE && distributed_player_is_local(player_index);
+}
+
+static void pose_records_ensure(
+	void)
+{
+	long index;
+
+	if (drawn_poses)
+		return;
+	drawn_poses = calloc(MAXIMUM_OBJECTS_PER_MAP, sizeof(*drawn_poses));
+	if (!drawn_poses)
+		return;
+	for (index = 0; index < MAXIMUM_OBJECTS_PER_MAP; index++)
+		drawn_poses[index].object_index = NONE;
+}
+
+static void pose_store(
+	struct drawn_pose *pose,
+	long object_index,
+	struct object_datum const *object,
+	long interval)
+{
+	pose->object_index = object_index;
+	pose->sample_tick = pose_clock;
+	pose->interval = interval < 1 ? 1 : interval;
+	pose->previous_position = pose->latest_position;
+	pose->previous_forward = pose->latest_forward;
+	pose->previous_up = pose->latest_up;
+	pose->latest_position = object->object.position;
+	pose->latest_forward = object->object.forward;
+	pose->latest_up = object->object.up;
+}
+
+static void pose_snap(
+	struct drawn_pose *pose,
+	long object_index,
+	struct object_datum const *object)
+{
+	pose->object_index = NONE;
+	pose_store(pose, object_index, object, 1);
+	pose->previous_position = pose->latest_position;
+	pose->previous_forward = pose->latest_forward;
+	pose->previous_up = pose->latest_up;
+}
+
+/* how far this frame is from the previous sample to the latest */
+static real pose_blend_t(
+	struct drawn_pose const *pose)
+{
+	long since;
+	real t;
+
+	if (!pose || pose->object_index == NONE || pose->interval < 1)
+		return 1.0f;
+	since = pose_clock - pose->sample_tick;
+	if (since < 0)
+		since = 0;
+	t = ((real)since + interpolation_fraction) / (real)pose->interval;
+	if (!(t > 0.0f))
+		return 0.0f;
+	if (t > 1.0f)
+		return 1.0f;
+	return t;
+}
+
+static boolean pose_changed(
+	struct drawn_pose const *pose,
+	struct object_datum const *object)
+{
+	real dx = object->object.position.x - pose->latest_position.x;
+	real dy = object->object.position.y - pose->latest_position.y;
+	real dz = object->object.position.z - pose->latest_position.z;
+	real dot = pose->latest_forward.i * object->object.forward.i +
+		pose->latest_forward.j * object->object.forward.j +
+		pose->latest_forward.k * object->object.forward.k;
+
+	return !(dx * dx + dy * dy + dz * dz < 1.0e-8f) || !(dot > 0.9999f);
+}
+
+/* after the tick's netcode moves. A campaign frame has no remote pose. */
+void render_interpolation_pose_tick(
+	void)
+{
+	struct object_iterator iterator;
+	struct object_datum *object;
+
+	pose_clock++;
+	if (game_connection() == _game_connection_local || halo_interpolation_enabled())
+		return;
+	pose_records_ensure();
+	if (!drawn_poses)
+		return;
+	object_iterator_new(&iterator, _object_mask_all, 0);
+	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL)
+	{
+		long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.index);
+		long unit_index;
+		struct drawn_pose *pose;
+		real dx, dy, dz;
+		long since;
+
+		if (absolute_index < 0 || absolute_index >= MAXIMUM_OBJECTS_PER_MAP)
+			continue;
+		pose = &drawn_poses[absolute_index];
+		unit_index = pose_root_unit(iterator.index);
+		if (unit_index == NONE || pose_driven_here(unit_index))
+		{
+			pose->object_index = NONE;
+			continue;
+		}
+		if (pose->object_index != iterator.index)
+		{
+			pose_snap(pose, iterator.index, object);
+			continue;
+		}
+		dx = object->object.position.x - pose->latest_position.x;
+		dy = object->object.position.y - pose->latest_position.y;
+		dz = object->object.position.z - pose->latest_position.z;
+		if (!(dx * dx + dy * dy + dz * dz <= OBJECT_SNAP_DISTANCE * OBJECT_SNAP_DISTANCE))
+		{
+			pose_snap(pose, iterator.index, object);
+			continue;
+		}
+		if (!pose_changed(pose, object))
+			continue;
+		since = pose_clock - pose->sample_tick;
+		if (since < 1)
+			since = 1;
+		pose_store(pose, iterator.index, object, since);
+	}
+}
+
+/* turn the simulated nodes from the latest sample toward the pose this
+frame shows. The root moves and turns. A fin or a limb keeps its bend. */
+static void pose_apply_nodes(
+	long object_index,
+	real_matrix4x3 *nodes,
+	short node_count)
+{
+	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
+	struct drawn_pose *pose;
+	real t;
+	real_matrix4x3 from;
+	real_matrix4x3 to;
+	real_matrix4x3 from_rotation;
+	real_matrix4x3 to_rotation;
+	real_quaternion rotation0;
+	real_quaternion rotation1;
+	real_quaternion rotation;
+	real_point3d blended_position;
+	short node_index;
+
+	if (!drawn_poses || absolute_index < 0 || absolute_index >= MAXIMUM_OBJECTS_PER_MAP)
+		return;
+	pose = &drawn_poses[absolute_index];
+	if (pose->object_index != object_index)
+		return;
+	t = pose_blend_t(pose);
+	if (!(t < 1.0f))
+		return;
+	/* a position glide is already drawn for a correction. Turning around
+	the simulated root keeps that glide, and the gun on the body. */
+	blended_position = pose->latest_position;
+	if (!(interpolated_objects && absolute_index < MAXIMUM_INTERPOLATED_OBJECTS &&
+		interpolated_objects[absolute_index].object_index == object_index &&
+		(correction_significant(&interpolated_objects[absolute_index].correction) ||
+			correction_significant(&interpolated_objects[absolute_index].correction_pending))))
+	{
+		blended_position.x = pose->previous_position.x +
+			(pose->latest_position.x - pose->previous_position.x) * t;
+		blended_position.y = pose->previous_position.y +
+			(pose->latest_position.y - pose->previous_position.y) * t;
+		blended_position.z = pose->previous_position.z +
+			(pose->latest_position.z - pose->previous_position.z) * t;
+	}
+	matrix4x3_rotation_from_vectors(&from_rotation, &pose->previous_forward, &pose->previous_up);
+	matrix4x3_rotation_from_vectors(&to_rotation, &pose->latest_forward, &pose->latest_up);
+	matrix4x3_rotation_to_quaternion(&from_rotation, &rotation0);
+	matrix4x3_rotation_to_quaternion(&to_rotation, &rotation1);
+	quaternions_interpolate_and_normalize(&rotation0, &rotation1, t, &rotation);
+	matrix4x3_rotation_from_quaternion(&to, &rotation);
+	to.position = blended_position;
+	matrix4x3_from_point_and_vectors(&from, &pose->latest_position, &pose->latest_forward, &pose->latest_up);
+	for (node_index = 0; node_index < node_count; node_index++)
+	{
+		real_point3d local_point;
+		real_vector3d local_forward;
+		real_vector3d local_left;
+		real_vector3d local_up;
+
+		matrix4x3_inverse_transform_point(&from, &nodes[node_index].position, &local_point);
+		matrix4x3_transform_point(&to, &local_point, &nodes[node_index].position);
+		matrix4x3_inverse_transform_vector(&from, &nodes[node_index].forward, &local_forward);
+		matrix4x3_inverse_transform_vector(&from, &nodes[node_index].left, &local_left);
+		matrix4x3_inverse_transform_vector(&from, &nodes[node_index].up, &local_up);
+		matrix4x3_transform_vector(&to, &local_forward, &nodes[node_index].forward);
+		matrix4x3_transform_vector(&to, &local_left, &nodes[node_index].left);
+		matrix4x3_transform_vector(&to, &local_up, &nodes[node_index].up);
+	}
+}
+
 /* the glide alone, on the frame of a tick: the pose as simulated, drawn
-back by the correction. Not between ticks, which the blend above is. */
+back by the correction. Not between ticks, which the blend above is.
+A remote pose is turned from the previous sample toward the latest too. */
 static real_matrix4x3 *interpolation_correction_matrices(long object_index)
 {
 	struct object_datum *object;
@@ -661,16 +930,37 @@ static real_matrix4x3 *interpolation_correction_matrices(long object_index)
 	real_matrix4x3 *drawn;
 	real_vector3d offset;
 
-	if (halo_interpolation_enabled() || !interpolation_drawing || !interpolated_objects || object_index == NONE)
+	if (halo_interpolation_enabled() || !interpolation_drawing || object_index == NONE)
+		return NULL;
+	interpolation_records_ensure();
+	if (!interpolated_objects)
 		return NULL;
 	absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
 	if (absolute_index >= MAXIMUM_INTERPOLATED_OBJECTS)
 		return NULL;
 	record = &interpolated_objects[absolute_index];
-	if (record->object_index != object_index || record->has_previous)
+	if (record->has_previous)
 		return NULL;
-	if (!correction_significant(&record->correction) && !correction_significant(&record->correction_pending))
+	if (record->object_index != object_index &&
+		!(drawn_poses && absolute_index < MAXIMUM_OBJECTS_PER_MAP &&
+			drawn_poses[absolute_index].object_index == object_index))
+	{
 		return NULL;
+	}
+	if (record->object_index != object_index &&
+		!correction_significant(&record->correction) && !correction_significant(&record->correction_pending) &&
+		!(drawn_poses && drawn_poses[absolute_index].object_index == object_index &&
+			pose_blend_t(&drawn_poses[absolute_index]) < 1.0f))
+	{
+		return NULL;
+	}
+	if (record->object_index == object_index &&
+		!correction_significant(&record->correction) && !correction_significant(&record->correction_pending) &&
+		!(drawn_poses && drawn_poses[absolute_index].object_index == object_index &&
+			pose_blend_t(&drawn_poses[absolute_index]) < 1.0f))
+	{
+		return NULL;
+	}
 	object = object_try_and_get(object_index);
 	if (!object)
 		return NULL;
@@ -692,7 +982,11 @@ static real_matrix4x3 *interpolation_correction_matrices(long object_index)
 	raw = object_header_block_get(object_index, &object->object.node_matrices);
 	drawn = record->nodes;
 	memcpy(drawn, raw, node_count * sizeof(real_matrix4x3));
-	correction_drawn(&record->correction, &record->correction_pending, &offset);
+	pose_apply_nodes(object_index, drawn, node_count);
+	if (record->object_index == object_index)
+		correction_drawn(&record->correction, &record->correction_pending, &offset);
+	else
+		offset = *global_zero_vector3d;
 	for (node_index = 0; node_index < node_count; node_index++)
 	{
 		drawn[node_index].position.x += offset.i;

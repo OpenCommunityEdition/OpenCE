@@ -78,18 +78,6 @@ static void light_volume_ease_marker(
 
 static struct light_volume_globals light_volume_globals = {0};
 
-/* the beam last drawn, so a marker that moves on the tick can be eased
-across the frames in between. one slot per light volume the pool can hold */
-struct light_volume_drawn
-{
-	long object_index;
-	boolean valid;
-	real_point3d position;
-	real_vector3d forward;
-};
-
-static struct light_volume_drawn light_volume_drawn_markers[HALO_PORT_MAXIMUM_LIGHT_VOLUMES];
-
 /* ---------- public code */
 
 void light_volumes_initialize(
@@ -247,37 +235,9 @@ static real pow1(
 	return exponent != 1.f ? pow(value, exponent) : value;
 }
 
-/* port: how far this frame eases a beam toward the pose of the tick. A
-remote player's aim arrives every couple of ticks, and the picture is drawn
-faster than the ticks, so the beam would step. About 40 ms to settle. */
-static real light_volume_ease_alpha(
-	void)
-{
-	static long eased_tick = NONE;
-	static real eased_fraction = 0.0f;
-	static real eased_alpha = 0.5f;
-	long tick = game_time_get();
-	real fraction = game_time_get_tick_fraction();
-
-	if (tick != eased_tick || fraction != eased_fraction)
-	{
-		real dt;
-
-		if (eased_tick == NONE || tick < eased_tick)
-			dt = 1.0f / 60.0f;
-		else
-			dt = ((real)(tick - eased_tick) + (fraction - eased_fraction)) / (real)TICKS_PER_SECOND;
-		if (!(dt > 0.0f && dt < 0.1f))
-			dt = 1.0f / 60.0f;
-		eased_alpha = 1.0f - (real)exp((double)(-dt / 0.04f));
-		eased_tick = tick;
-		eased_fraction = fraction;
-	}
-	return eased_alpha;
-}
-
 /* port: the local player's own beam, in a match, from the viewmodel, which
-follows the view every frame. Anyone else's eases toward the tick's marker. */
+follows the view every frame. Anyone else's is the pose the picture blends
+to (render_interpolation.c), which this marker is already on. */
 static void light_volume_ease_marker(
 	long light_volume_index,
 	long object_index,
@@ -285,12 +245,8 @@ static void light_volume_ease_marker(
 	struct object_marker *marker)
 {
 	struct object_marker viewmodel;
-	long absolute_index;
-	struct light_volume_drawn *drawn;
-	real alpha;
-	real_vector3d step;
-	real length_squared;
 
+	(void)light_volume_index;
 	if (game_connection() == _game_connection_local)
 		return;
 	if (first_person_weapon_get_marker_by_name_render(object_index, marker_name, &viewmodel, 1) > 0)
@@ -298,58 +254,7 @@ static void light_volume_ease_marker(
 		marker->matrix.position = viewmodel.matrix.position;
 		marker->matrix.forward = viewmodel.matrix.forward;
 		marker->matrix.up = viewmodel.matrix.up;
-		return;
 	}
-	/* a muzzle flash is a short volume. Easing it leaves the cone behind the
-	barrel and it ends on a hard edge. Only the flashlight beam is eased. */
-	{
-		char const *expected = "flashlight";
-
-		if (!marker_name)
-			return;
-		while (*expected != 0 && *marker_name == *expected)
-		{
-			marker_name++;
-			expected++;
-		}
-		if (*expected != 0 || *marker_name != 0)
-			return;
-	}
-	absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(light_volume_index);
-	if (absolute_index < 0 || absolute_index >= HALO_PORT_MAXIMUM_LIGHT_VOLUMES)
-		return;
-	drawn = &light_volume_drawn_markers[absolute_index];
-	step.i = marker->matrix.position.x - drawn->position.x;
-	step.j = marker->matrix.position.y - drawn->position.y;
-	step.k = marker->matrix.position.z - drawn->position.z;
-	length_squared = step.i * step.i + step.j * step.j + step.k * step.k;
-	if (!drawn->valid || drawn->object_index != object_index || !(length_squared <= 4.0f))
-	{
-		drawn->valid = TRUE;
-		drawn->object_index = object_index;
-		drawn->position = marker->matrix.position;
-		drawn->forward = marker->matrix.forward;
-		return;
-	}
-	alpha = light_volume_ease_alpha();
-	drawn->position.x += step.i * alpha;
-	drawn->position.y += step.j * alpha;
-	drawn->position.z += step.k * alpha;
-	drawn->forward.i += (marker->matrix.forward.i - drawn->forward.i) * alpha;
-	drawn->forward.j += (marker->matrix.forward.j - drawn->forward.j) * alpha;
-	drawn->forward.k += (marker->matrix.forward.k - drawn->forward.k) * alpha;
-	length_squared = drawn->forward.i * drawn->forward.i + drawn->forward.j * drawn->forward.j +
-		drawn->forward.k * drawn->forward.k;
-	if (length_squared > 0.0f)
-	{
-		real inverse = 1.0f / (real)sqrt((double)length_squared);
-
-		drawn->forward.i *= inverse;
-		drawn->forward.j *= inverse;
-		drawn->forward.k *= inverse;
-	}
-	marker->matrix.position = drawn->position;
-	marker->matrix.forward = drawn->forward;
 }
 
 void light_volume_render(

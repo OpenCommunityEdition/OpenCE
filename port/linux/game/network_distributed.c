@@ -3437,6 +3437,8 @@ void network_distributed_tick(
 	profile_scope(distributed_tick_batches_flush_section, distributed_batches_flush();)
 	distributed_machines.in_tick = FALSE;
 	distributed_machines.valid = FALSE;
+	/* the pose the picture blends, after this tick's moves */
+	render_interpolation_pose_tick();
 }
 
 /* whether an unreliable message of the kind is older than one had already
