@@ -138,7 +138,7 @@ static point2d drawn_point;
 static pixel32 drawn_color;
 static struct bitmap_group group;
 static struct {struct bitmap_data *bitmap;long asset;boolean attempted;} mcc_buttons[6];
-static boolean mcc_buttons_classic;
+static short mcc_buttons_style;
 static int config_boolean(char const *name) {(void)name;return 0;}
 static char const *config_string(char const *name) {(void)name;return "gems";}
 static struct {struct {struct {long count;void *address;} button_icons;} messaging;} globals,*hud_globals;

@@ -69,6 +69,22 @@ int main(void) {
 ''')
 
 
+def test_supplied_gems_preserve_transparency_and_fit_existing_bounds():
+    import numpy as np
+    from PIL import Image
+    import button_assets
+    reference = Image.open(button_assets.ASSETS/'a_butn__0.png').getchannel('A').getbbox()
+    for entry in button_assets.GEM_BUTTONS:
+        generated = button_assets.gameplay_gem(entry)
+        committed = np.asarray(Image.open(button_assets.ASSETS/(entry['name']+'.png')))
+        assert np.array_equal(generated, committed)
+        bounds = Image.fromarray(generated).getchannel('A').getbbox()
+        assert bounds[0] >= reference[0] and bounds[1] >= reference[1]
+        assert bounds[2] <= reference[2] and bounds[3] <= reference[3]
+        assert abs((bounds[0]+bounds[2])-(reference[0]+reference[2])) <= 1
+        assert abs((bounds[1]+bounds[3])-(reference[1]+reference[3])) <= 1
+
+
 @pytest.mark.parametrize('mcc', [False, True])
 def test_six_button_styles_toggle_and_dispose(tmp_path, mcc):
     path = ROOT / 'port/linux/game' / ('mcc_hud_draw.c' if mcc else 'hud_hires_tags.c')
@@ -80,7 +96,7 @@ def test_six_button_styles_toggle_and_dispose(tmp_path, mcc):
     routines = '\n'.join(function(source, name) for name in names)
     tags = [a['tag'] for a in json.loads((ROOT/'port/assets/buttons/buttons.json').read_text())['assets']
             if a['name'] in ['a_butn__0','b_butn__0','x_butn__0','y_butn__0','black_butn__0','white_butn__0',
-                             'mcc_black_butn__0','mcc_white_butn__0'] or 'classic' in a]
+                             'mcc_black_butn__0','mcc_white_butn__0'] or 'classic' in a or 'source_png' in a]
     prelude = r'''
 #include <assert.h>
 #include <stdlib.h>
@@ -99,7 +115,7 @@ struct rasterizer_dynamic_screen_geometry_parameters {
 };
 static int enabled=1,gems,live,last_asset=-1,draws;
 static int config_boolean(char const *key) {(void)key;return enabled;}
-static char const *config_string(char const *key) {(void)key;return gems?"gems":"classic";}
+static char const *config_string(char const *key) {(void)key;return gems==2?"menu_gems":gems?"gems":"classic";}
 static int local_player_count(void) {return 1;}
 static int draw_unicode_string_capital_middle(rectangle2d *r,void const *s) {(void)r;(void)s;return 100;}
 static struct bitmap_data *bitmap_2d_new(int w,int h,int m,int f) {
@@ -128,9 +144,10 @@ static void rasterizer_psuedo_dynamic_screen_quad_draw(struct rasterizer_dynamic
 int main(void) {
     struct icon_hud_element_definition buttons[6],unrelated;rectangle2d cursor={0};int i,j;
     globals.messaging.button_icons.count=6;globals.messaging.button_icons.address=buttons;
-    for(j=0;j<30;j++) {gems=j%2;for(i=0;i<6;i++) {
+    for(j=0;j<30;j++) {gems=j%3;for(i=0;i<6;i++) {
         CALL
         assert((strstr(tags[last_asset],"classic")!=0)==!gems);
+        assert((strstr(tags[last_asset],"gem_")!=0)==(gems==1 && i<4));
         CALL
         assert(live==i+1);
     }}
