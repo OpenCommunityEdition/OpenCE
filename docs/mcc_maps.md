@@ -526,6 +526,11 @@ decoded texture storage to exceed the former single 512 MiB offset range.
   Allocation refusals report the address, size and OS error in `debug.txt`.
   MCC network load failures schedule session teardown and a menu reload before
   the next frame's input update, rather than entering the fatal error screen.
+  A player reported that disabling XFire and restarting GulchCE resolved this
+  allocation refusal. This supports interference from third-party software,
+  but the specific allocation conflict has not been captured. Early reservation
+  is not a guarantee of compatibility with XFire; disabling it and restarting
+  remains the confirmed workaround for that report.
 - There are at most 65,535 tags and 32 BSP references. Runtime conversion
   descriptors must fit below the lowest BSP in the tag window. Geometry
   currently admits at most 64 nodes per model, 22 palette nodes per part,
