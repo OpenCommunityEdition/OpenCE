@@ -138,6 +138,7 @@ symbols in this file:
 #include "units/bipeds.h"
 #include "units/units.h"
 #include "units/vehicles.h"
+#include "blood.h" /* port: port/linux/game/blood.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -1040,6 +1041,17 @@ static void object_damage_aftermath(
 
 	/* port: (a client's replay of the host's nonlethal damage too) */
 	damage_data_validate_owner(damage);
+
+#if BLOOD_EFFECTS
+	/* port: a biped hit bleeds onto what is behind it (port/linux/game/blood.c) */
+	if (object->object.type == _object_type_biped)
+	{
+		blood_biped_damaged(
+			object_index,
+			damage,
+			MAX(shield_damage + body_damage, damage_effect->damage.damage_upper_bound * damage->scale));
+	}
+#endif
 
 	if (object_definition->object.acceleration_scale > _real_epsilon)
 	{

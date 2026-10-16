@@ -30,6 +30,7 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/units.h"
 #include "view_fov.h" /* port: port/linux/game/view_fov.c */
+#include "blood.h" /* port: port/linux/game/blood.c */
 
 /* ---------- constants */
 
@@ -398,6 +399,12 @@ void render_particles(
 			}
 		}
 	}
+
+#if BLOOD_EFFECTS
+	/* port: blood's drops, running and falling (port/linux/game/blood_drops.c) */
+	if (render_particles_enabled)
+		blood_drops_render();
+#endif
 
 	profile_exit(render_particles_section);
 	return;

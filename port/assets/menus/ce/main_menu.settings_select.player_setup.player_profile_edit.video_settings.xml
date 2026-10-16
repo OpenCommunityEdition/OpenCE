@@ -161,7 +161,7 @@
 		<string text="With V-Sync off, the most frames a second. Auto:\ntwice the display's refresh rate."/>
 		<string text="Draw a frame for every display refresh, blending\nbetween the game's 30 ticks a second."/>
 		<string text="In first person, turn the view the moment the\nmouse moves, not up to two ticks later."/>
-		<string text="The HUD, text, anti-aliasing, shadows and\nlighting."/>
+		<string text="The HUD, text, anti-aliasing, shadows,\nlighting and blood."/>
 		<string text="The field of view and the first-person\nweapon. Their defaults keep the stock view."/>
 	</strings>
 </menus>

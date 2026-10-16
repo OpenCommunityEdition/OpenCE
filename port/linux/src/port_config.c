@@ -311,6 +311,10 @@ static const struct config_setting config_settings[] =
 	{ "display.first_person_legs", _config_boolean, "false", "HALO_FIRST_PERSON_LEGS", _environment_value, _platform_all,
 		"Your own legs in first person, seen looking down: your body as others\n"
 		"see it, drawn from the waist down, moving as it moves." },
+	{ "game.dynamic_blood", _config_boolean, "false", "HALO_DYNAMIC_BLOOD", _environment_value, _platform_all,
+		"Blood thrown onto the wall behind a body hit, running down walls in\n"
+		"drops, and landing on trees and fences (port/linux/game/blood.c).\n"
+		"This machine's alone: nothing is sent. false: the game's own blood." },
 	{ "display.shield_glow", _config_boolean, "false", "HALO_SHIELD_GLOW", _environment_value, _platform_all,
 		"Energy shields light what is around them as they flare, as plasma\n"
 		"does, in the shield's own color." },

@@ -92,6 +92,8 @@ SCREENS = {
              "Shields light their surroundings as they flare,\nin the shield's own color.", None),
             ("GLOW INTENSITY:", "display.shield_glow_intensity", [("DEFAULT", "default"), ("LIGHT SHOW", "light_show")],
              "Light Show: the shield glow three times as far,\nat full from a third of the flare.", None),
+            ("DYNAMIC BLOOD:", "game.dynamic_blood", ON_OFF,
+             "Hits throw blood on the walls behind, and it\nruns down them. Off: the game's own blood.", None),
         ],
     },
     "mouse_settings": {
@@ -196,7 +198,7 @@ SCREENS = {
 _video = SCREENS["video_settings"]
 _graphics = {"display.high_res_hud", "display.high_res_text", "display.anti_aliasing",
              "display.shadow_resolution", "display.per_pixel_lighting",
-             "display.shield_glow", "display.shield_glow_intensity"}
+             "display.shield_glow", "display.shield_glow_intensity", "game.dynamic_blood"}
 SCREENS["video_settings/graphics"] = {
     "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 30,
     "same_place": ["anti_aliasing_android"],
@@ -204,7 +206,7 @@ SCREENS["video_settings/graphics"] = {
 }
 _video["rows"] = [row for row in _video["rows"] if row[1] not in _graphics]
 _video["categories"] = [
-    ("GRAPHICS:", "video_settings/graphics", "The HUD, text, anti-aliasing, shadows and\nlighting."),
+    ("GRAPHICS:", "video_settings/graphics", "The HUD, text, anti-aliasing, shadows,\nlighting and blood."),
     ("FOV AND VIEWMODELS:", "video_settings/fov_viewmodels",
      "The field of view and the first-person\nweapon. Their defaults keep the stock view."),
 ]
