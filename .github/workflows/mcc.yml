@@ -34,7 +34,7 @@ jobs:
       - name: Install native test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld gcc-multilib python3-pytest
+          sudo apt-get install -y clang lld gcc-multilib python3-pytest python3-numpy python3-pil
       - name: Check MCC parsing, validation, codecs and existing CE parsing
         run: >-
           python3 -m pytest -q
@@ -73,8 +73,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Install Python test runner
-        run: python -m pip install pytest
+      - name: Install Python test dependencies
+        run: python -m pip install pytest numpy Pillow
       - name: Check native x86 MCC adapters and legacy isolation
         shell: cmd
         run: |
