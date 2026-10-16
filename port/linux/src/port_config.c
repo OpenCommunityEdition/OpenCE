@@ -151,7 +151,7 @@ static const struct config_setting config_settings[] =
 		"on the Xbox, or 256, 512 or 1024 for smoother edges, as soft." },
 	{ "display.disable_lod", _config_boolean, "false", "HALO_DISABLE_LOD", _environment_value, _platform_all,
 		"Keep models and their shadows at full detail and retain small particles.\n"
-		"The cryotube keeps its authored detail to hide its cinematic Chief.\n"
+		"Interior-only detail is used only inside the model's bounding sphere.\n"
 		"False keeps normal detail selection; true can increase rendering cost." },
 	{ "display.menus", _config_string, "\"pc\"", "HALO_MENUS", _environment_value, _platform_all,
 		"The menus: \"pc\" for the PC version's main menu (port/assets/menus,\n"

@@ -1,4 +1,4 @@
-"""Live render-only detail policy and the cinematic cryotube exception."""
+"""Live detail policy, interior LODs and authored permutation availability."""
 import sys
 from pathlib import Path
 import pytest
@@ -9,21 +9,21 @@ import port_settings
 
 def generated(fault=None):
     source = read("port/linux/game/render_lod.c")
-    if fault == "exception":
-        source = mutated(source, '"levels\\\\a10\\\\devices\\\\cryotube\\\\cryotube"', '"wrong model"')
+    if fault == "interior":
+        source = mutated(source, "inside_model || model->detail_cutoff_pixels[level] <= 1000.f", "TRUE")
     if fault == "live":
         source = mutated(source, "read_at != changes", "(read_at != changes && changes == 0)")
     return (("under_test.inc", "\n".join(function(source, name) for name in (
-        "render_lod_disabled", "render_lod_model_disabled", "render_lod_particle_visible", "render_lod_geometry_level", "render_lod_permutation_level"))),)
+        "render_lod_disabled", "render_lod_inside_model", "render_lod_particle_visible", "render_lod_geometry_level", "render_lod_permutation_level"))),)
 
 
-@pytest.mark.parametrize("case", ["default", "live", "cryotube", "projection", "geometry", "permutations"])
+@pytest.mark.parametrize("case", ["default", "live", "interior", "bounds", "projection", "geometry", "permutations"])
 def test_policy(case):
     status, output = run(build("render_lod", generated()), case)
     assert status == 0, output
 
 
-@pytest.mark.parametrize("fault,case", [("exception", "cryotube"), ("live", "live")])
+@pytest.mark.parametrize("fault,case", [("interior", "interior"), ("live", "live")])
 def test_negative(fault, case):
     status, output = run(build("render_lod", generated(fault)), case)
     assert status == CHECK_FAILED, output

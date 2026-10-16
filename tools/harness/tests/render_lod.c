@@ -1,9 +1,7 @@
 #include "harness.h"
-#include <strings.h>
 #include <math.h>
 static unsigned long revision;
-static int configured, reads, tag_reads;
-static char const *model_name = "weapons\\needler\\needler";
+static int configured, reads;
 static unsigned long config_changes(void) { return revision; }
 static int config_boolean(char const *name)
 {
@@ -11,13 +9,7 @@ static int config_boolean(char const *name)
 	reads++;
 	return configured;
 }
-static char const *tag_get_name(long index)
-{
-	CHECK(index == 123, "valid model index passed through");
-	tag_reads++;
-	return model_name;
-}
-#define csstrcasecmp strcasecmp
+#define REAL_MAX 3.4028235e38f
 #define NUMBEROF(a) (sizeof(a) / sizeof((a)[0]))
 #define PIN(v,l,h) ((v)<(l)?(l):((v)>(h)?(h):(v)))
 struct model {real detail_cutoff_pixels[5];};
@@ -29,8 +21,6 @@ int main(int argc, char **argv)
 	char const *case_name = argc > 1 ? argv[1] : "";
 	CASE("default") {
 		CHECK(!render_lod_disabled(), "default unchanged");
-		CHECK(!render_lod_model_disabled(123), "stock model detail");
-		CHECK(!tag_reads, "no tag lookup while off");
 		CHECK(!render_lod_particle_visible(2, 2), "stock strict cutoff");
 		CHECK(render_lod_particle_visible(3, 2), "stock visible particle");
 		CHECK(reads == 1, "config cached across rendering calls");
@@ -38,23 +28,45 @@ int main(int argc, char **argv)
 	CASE("live") {
 		CHECK(!render_lod_disabled(), "starts off");
 		configured = 1; revision++;
-		CHECK(render_lod_model_disabled(123), "model switches live");
+		CHECK(render_lod_disabled(), "model switches live");
 		CHECK(render_lod_particle_visible(.001f, 10), "tiny particle retained");
 		CHECK(reads == 2, "one read per revision");
 		configured = 0; revision++;
-		CHECK(!render_lod_model_disabled(123), "normal detail restored");
+		CHECK(!render_lod_disabled(), "normal detail restored");
 		CHECK(!render_lod_particle_visible(.001f, 10), "cutoff restored");
 	}
-	CASE("cryotube") {
-		configured = 1;
-		model_name = "levels\\a10\\devices\\cryotube\\cryotube";
-		CHECK(!render_lod_model_disabled(123), "keep cryotube cinematic mesh hidden");
-		model_name = "LEVELS\\A10\\DEVICES\\CRYOTUBE\\CRYOTUBE";
-		CHECK(!render_lod_model_disabled(123), "tag names case insensitive");
-		model_name = "levels\\a10\\devices\\doors\\door cryo chamber\\door cryo chamber";
-		CHECK(render_lod_model_disabled(123), "only cryotube is exempt");
-		model_name = "characters\\cyborg\\cyborg";
-		CHECK(render_lod_model_disabled(123), "reused tag index after map switch");
+	CASE("interior") {
+		struct model model = {{0, 0, 0, 0, 3000}};
+		struct model_region_permutation permutation = {{1, 1, 1, 1, 0}};
+		CHECK(render_lod_permutation_level(&model, &permutation, 4, TRUE, FALSE) == 3, "stock cryotube outside");
+		CHECK(render_lod_permutation_level(&model, &permutation, 4, TRUE, TRUE) == 4, "stock cryotube inside");
+		model.detail_cutoff_pixels[3] = 2000;
+		CHECK(render_lod_permutation_level(&model, &permutation, 4, TRUE, FALSE) == 2, "multiple interior levels");
+		model.detail_cutoff_pixels[4] = 500; permutation.geometry_indices[4] = NONE;
+		CHECK(render_lod_permutation_level(&model, &permutation, 4, TRUE, FALSE) == 2, "missing LOD cannot fall back into interior geometry");
+		model.detail_cutoff_pixels[2] = 1000;
+		CHECK(render_lod_permutation_level(&model, &permutation, 4, TRUE, FALSE) == 2, "1000 remains exterior");
+		model.detail_cutoff_pixels[2] = 1000.01f;
+		CHECK(render_lod_permutation_level(&model, &permutation, 4, TRUE, FALSE) == 1, "strictly over 1000 is interior");
+		model.detail_cutoff_pixels[0] = model.detail_cutoff_pixels[1] = 2000;
+		CHECK(render_lod_permutation_level(&model, &permutation, 4, TRUE, FALSE) == NONE, "no exterior geometry stays hidden");
+		CHECK(render_lod_permutation_level(&model, &permutation, 3, FALSE, FALSE) == 3, "authored or debug selection remains explicit");
+	}
+	CASE("bounds") {
+		struct model model = {{0, 0, 0, 0, 3000}};
+		real_point3d center = {10,20,30}, camera = {10,20,30};
+		CHECK(render_lod_inside_model(&model,&camera,&center,2), "translated world-space center");
+		camera.x = 11.999f; CHECK(render_lod_inside_model(&model,&camera,&center,2), "just inside");
+		camera.x = 12; CHECK(!render_lod_inside_model(&model,&camera,&center,2), "boundary is outside");
+		camera.x = 12.001f; CHECK(!render_lod_inside_model(&model,&camera,&center,2), "just outside");
+		CHECK(render_lod_inside_model(&model,&camera,&center,4), "scaled world-space radius");
+		CHECK(!render_lod_inside_model(&model,&camera,&center,0), "zero radius");
+		CHECK(!render_lod_inside_model(&model,&camera,&center,-1), "negative radius");
+		CHECK(!render_lod_inside_model(&model,&camera,&center,INFINITY), "infinite radius");
+		CHECK(!render_lod_inside_model(&model,&camera,&center,NAN), "invalid radius");
+		camera.x = NAN; CHECK(!render_lod_inside_model(&model,&camera,&center,2), "invalid camera");
+		model.detail_cutoff_pixels[4] = 500;
+		CHECK(!render_lod_inside_model(&model,NULL,NULL,2), "ordinary models need no camera or sphere test");
 	}
 	CASE("projection") {
 		configured = 1;
@@ -76,25 +88,20 @@ int main(int argc, char **argv)
 		CHECK(render_lod_geometry_level(&model, 0, 2, TRUE) == 2, "explicit debug override wins");
 		CHECK(render_lod_geometry_level(&model, 0, -5, TRUE) == 0, "negative debug clamped");
 		CHECK(render_lod_geometry_level(&model, 0, 99, FALSE) == 4, "debug clamped");
-		configured = 1;
-		model.detail_cutoff_pixels[4] = 3000;
-		model_name = "levels\\a10\\devices\\cryotube\\cryotube";
-		CHECK(render_lod_geometry_level(&model, 200, NONE, render_lod_model_disabled(123)) == 3, "cryotube keeps normal mesh");
-		model_name = "vehicles\\warthog\\warthog";
-		CHECK(render_lod_geometry_level(&model, 200, NONE, render_lod_model_disabled(123)) == 4, "other models use highest mesh");
 	}
 	CASE("permutations") {
 		struct model_region_permutation permutation;
+		struct model model = {{0, 0, 0, 0, 0}};
 		int mask, requested, level;
 		for (mask = 0; mask < 32; mask++) {
 			for (level = 0; level < 5; level++)
 				permutation.geometry_indices[level] = mask & (1 << level) ? 0 : NONE;
 			for (requested = 0; requested < 5; requested++) {
 				short expected = requested;
-				while (expected > 0 && !(mask & (1 << expected))) expected--;
-				CHECK(render_lod_permutation_level(&permutation, requested, TRUE) == expected,
+				while (expected >= 0 && !(mask & (1 << expected))) expected--;
+				CHECK(render_lod_permutation_level(&model, &permutation, requested, TRUE, FALSE) == expected,
 					"highest available geometry at or below the requested level");
-				CHECK(render_lod_permutation_level(&permutation, requested, FALSE) == requested,
+				CHECK(render_lod_permutation_level(&model, &permutation, requested, FALSE, FALSE) == requested,
 					"authored missing geometry stays hidden with override off");
 			}
 		}

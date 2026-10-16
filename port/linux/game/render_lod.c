@@ -1,5 +1,4 @@
 #include "cseries.h"
-#include "tag_files/tag_groups.h"
 #include "models/model_definitions.h"
 #include "render_lod.h"
 
@@ -21,12 +20,25 @@ boolean render_lod_disabled(void)
 	return disabled;
 }
 
-boolean render_lod_model_disabled(long model_index)
+boolean render_lod_inside_model(struct model const *model, real_point3d const *camera,
+	real_point3d const *center, real radius)
 {
-	/* The cryotube's highest LOD includes a headless cinematic Chief.
-	Keep its authored selection, including across map changes/tag reuse. */
-	return render_lod_disabled() && csstrcasecmp(tag_get_name(model_index),
-		"levels\\a10\\devices\\cryotube\\cryotube") != 0;
+	short level;
+	for (level = 0; level < NUMBEROF(model->detail_cutoff_pixels); level++)
+	{
+		if (model->detail_cutoff_pixels[level] > 1000.f)
+		{
+			double x, y, z, r;
+			if (!camera || !center || !(radius > 0.f && radius <= REAL_MAX))
+				return FALSE;
+			x = (double)camera->x - center->x;
+			y = (double)camera->y - center->y;
+			z = (double)camera->z - center->z;
+			r = radius;
+			return x*x + y*y + z*z < r*r;
+		}
+	}
+	return FALSE;
 }
 
 boolean render_lod_particle_visible(real diameter, real cutoff)
@@ -50,12 +62,20 @@ short render_lod_geometry_level(struct model const *model, real pixels,
 	return level;
 }
 
-short render_lod_permutation_level(struct model_region_permutation const *permutation,
-	short level, boolean full_detail)
+short render_lod_permutation_level(struct model const *model,
+	struct model_region_permutation const *permutation, short level,
+	boolean full_detail, boolean inside_model)
 {
-	/* Only the full-detail override fills missing LODs. Authored selection
-	   and explicit debug levels must still be able to hide a permutation. */
-	while (full_detail && level > 0 && permutation->geometry_indices[level] == NONE)
+	if (!full_detail)
+		return level;
+	/* Very high authored cutoffs mark interior detail (the cryotube uses
+	   3000). Do not expose it from outside, even while filling missing LODs. */
+	while (level >= 0)
+	{
+		if ((inside_model || model->detail_cutoff_pixels[level] <= 1000.f) &&
+			permutation->geometry_indices[level] != NONE)
+			return level;
 		level--;
-	return level;
+	}
+	return NONE;
 }

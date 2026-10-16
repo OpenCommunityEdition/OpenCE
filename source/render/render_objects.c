@@ -922,7 +922,7 @@ static void object_render_state_refresh(
 
 	if (TEST_FLAG(object_get(object_index)->object.flags, _object_static_lighting_recompute_bit))
 	{
-		if (render_lod_disabled() || level_of_detail_pixels > OBJECT_RENDER_STATE_LARGE_PIXELS)
+		if (level_of_detail_pixels > OBJECT_RENDER_STATE_LARGE_PIXELS)
 		{
 			refresh = refresh_age > 0;
 		}
