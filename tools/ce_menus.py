@@ -70,14 +70,14 @@ LEFT_OUT = {
     "ui\\shell\\main_menu\\multiplayer_type_select\\checking_updates_screen_join",
 }
 # children moved: (parent, child) to (x, y); the main menu's Quit up into
-# Credits' place; Multiplayer's Edit Gametypes and its line down a row, for
-# Co-op (port_settings.WIDGET_PATCHES)
+# Credits' place; Multiplayer's Edit Gametypes and divider below Co-op,
+# keeping its 32-unit highlight inside the description panel's bottom curve.
 CHILD_OFFSETS = {
     ("ui\\shell\\main_menu\\main_menu_select_list", "ui\\shell\\main_menu\\main_menu_item_quit_game"): (192, 391),
     ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
-     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_gametypes_item"): (0, 375),
+     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_gametypes_item"): (0, 358),
     ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_screen",
-     "ui\\shell\\main_menu\\blueline"): (64, 358),
+     "ui\\shell\\main_menu\\blueline"): (64, 349),
     # the browser's rows up under the column titles, into the place of the
     # scroll up button (hidden: the list does not scroll)
     **{("ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\join_game_items_list",
@@ -577,17 +577,50 @@ def regenerate_pause_art():
     manifest.write_text(json.dumps(data, indent=1) + "\n")
 
 
+def regenerate_child_offsets():
+    """Apply the same child positions to existing XML without the PC tags."""
+    import re
+    for path in CE.glob("*.xml"):
+        original = path.read_text()
+        parent = None
+        lines = []
+        for line in original.splitlines(keepends=True):
+            widget = re.match(r'\t<widget name="([^"]+)"', line)
+            if widget:
+                parent = "ui\\shell\\" + widget[1].replace("/", "\\")
+            child = re.match(r'\t\t<child widget="([^"]+)"', line)
+            if child:
+                tag = "ui\\shell\\" + child[1].replace("/", "\\")
+                position = CHILD_OFFSETS.get((parent, tag))
+                if position is not None:
+                    for axis, value in zip(("x", "y"), position):
+                        attribute = f' {axis}="{value}"'
+                        pattern = rf' {axis}="[^"]*"'
+                        if re.search(pattern, line):
+                            line = re.sub(pattern, attribute, line)
+                        elif value:
+                            line = line.replace("/>", attribute + "/>")
+            lines.append(line)
+        updated = "".join(lines)
+        if updated != original:
+            path.write_text(updated)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--pause-art-only", action="store_true", help="regenerate only the port-owned pause panels")
-    pause_only = "--pause-art-only" in sys.argv
-    parser.add_argument("--tags", type=Path, required=not pause_only)
-    parser.add_argument("--definitions", type=Path, required=not pause_only)
-    parser.add_argument("--redraws", type=Path, required=not pause_only)
-    parser.add_argument("--placeholder", type=Path, required=not pause_only, help="the picture for frames with no redraw")
+    parser.add_argument("--child-offsets-only", action="store_true", help="apply child positions to existing menu XML")
+    partial_only = "--pause-art-only" in sys.argv or "--child-offsets-only" in sys.argv
+    parser.add_argument("--tags", type=Path, required=not partial_only)
+    parser.add_argument("--definitions", type=Path, required=not partial_only)
+    parser.add_argument("--redraws", type=Path, required=not partial_only)
+    parser.add_argument("--placeholder", type=Path, required=not partial_only, help="the picture for frames with no redraw")
     parser.add_argument("--pictures", type=Path,
                         help="the PC version's pictures, as PNGs by tag path: only where each is, to place its placeholder")
     arguments = parser.parse_args()
+    if arguments.child_offsets_only:
+        regenerate_child_offsets()
+        return
     if arguments.pause_art_only:
         regenerate_pause_art()
         return
