@@ -946,12 +946,18 @@ void web_js_post(int kind, const char *text);
 
 void platform_video_swap(void)
 {
+	Uint64 swap_start = SDL_GetTicks(), swap_time;
 #ifndef HALO_ANDROID
 	static Uint64 next_frame;
 	Uint64 interval, now;
-
 #endif
+
 	SDL_GL_SwapWindow(platform_window);
+	/* (a frame the graphics driver held for seconds: the game froze, and
+	online, a host stops hearing a machine after a few; the log says where) */
+	swap_time = SDL_GetTicks() - swap_start;
+	if (swap_time >= 2000)
+		platform_log("display: showing a frame took %.1f s in the graphics driver", (double)swap_time / 1000.0);
 #ifdef HALO_WEB
 	web_frame_shown();
 #endif
