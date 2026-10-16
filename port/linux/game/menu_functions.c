@@ -73,6 +73,7 @@ their handlers open opens.
 #include "interface/ui_widget_event_handler_functions.h"
 #include "main/main.h"
 #include "networking/network_game_manager.h"
+#include "networking/network_game_globals.h" /* port: typed local-player quit for co-op */
 #include "saved games/player_profile.h"
 #include "tag_files/tag_groups.h"
 #include "text/text_group.h"
@@ -2278,8 +2279,6 @@ boolean ui_widget_port_unjoin_player(struct widget_instance *widget, struct even
 void network_game_server_port_set_settings(wchar_t const *name, long maximum_players);
 void network_game_server_port_set_cooperative_friendly_fire(short friendly_fire);
 void network_game_server_port_set_cooperative_player_collisions(boolean player_collisions);
-void *global_network_game_client_get(void);
-void *global_network_game_server_get(void);
 boolean network_game_is_splitscreen_local(void);
 struct advertised_game *network_game_client_get_available_games(void *client);
 boolean network_game_client_advertised_game_is_valid(struct advertised_game *game);
@@ -2294,6 +2293,7 @@ boolean playlist_profile_get_display_name(long index, wchar_t *name);
 boolean input_get_key(struct key_stroke *key);
 boolean game_engine_running(void);
 void game_engine_end_game(void);
+void network_game_server_port_cooperative_won(char const *next_map);
 /* the platform layer's */
 int p2p_join_invite(char const *text);
 int p2p_invite_link(char *link, int size);
@@ -4069,6 +4069,27 @@ static boolean pause_end_game(void)
 	return TRUE;
 }
 
+/* Co-op's host returns everyone to the lobby, retaining the current map
+and difficulty, through the existing campaign round transition. A client
+leaves only this machine's players; it cannot end the host's game. */
+static boolean coop_leave_game(boolean *widget_deleted)
+{
+	short controller;
+
+	if (!network_coop_active())
+		return campaign_fail();
+	if (global_network_game_server_get())
+		network_game_server_port_cooperative_won(NULL);
+	else
+	{
+		for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
+			network_game_client_local_player_quit(controller);
+		ui_widgets_close_all();
+	}
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+
 /* ---- the lobby: the game's players (up to the port's 128), its map and
 gametype, the countdown */
 
@@ -5547,6 +5568,10 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port pause end game"))
 		{
 			return pause_end_game();
+		}
+		else if (!strcmp(name, "port coop leave game"))
+		{
+			return coop_leave_game(widget_deleted);
 		}
 		else if (!strcmp(name, "player profile save changes"))
 		{

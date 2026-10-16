@@ -387,6 +387,7 @@ static char const *const port_function_names[] =
 	/* (a new profile's screens: Settings' is then being edited, which the
 	Xbox's leaves to its own screens) */
 	"new campaign decision",
+	"port coop leave game",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
@@ -1811,6 +1812,35 @@ static short pause_campaign_prompts(struct ui_widget_definition const *screen)
 	return NONE;
 }
 
+/* The generated co-op menu borrows the campaign's Cancel/Select footer.
+It cannot reference it in XML: ui.map does not contain this widget. The
+footer and its children belong to the same loaded map as the pause menu. */
+static void pause_coop_prompts_patch(void)
+{
+	long screen = tag_loaded(UI_WIDGET_DEFINITION_TAG, CAMPAIGN_PAUSE_SCREEN);
+	long prompts = widget_named("pause/coop/prompts");
+	struct ui_widget_definition const *campaign;
+	struct ui_widget_child_reference const *children;
+	long child;
+
+	if (screen == NONE || prompts == NONE)
+		return;
+	campaign = tag_get(UI_WIDGET_DEFINITION_TAG, screen);
+	children = campaign->child_widgets.address;
+	for (child = 0; child < campaign->child_widgets.count; child++)
+	{
+		long tag = children[child].widget_tag.index;
+
+		if (tag != NONE && (tag_name_ends(tag, "\\button_key_sm") || tag_name_ends(tag, "\\button_key")))
+		{
+			struct ui_widget_definition *destination = tag_get(UI_WIDGET_DEFINITION_TAG, build.widget_tags[prompts]);
+
+			*destination = *(struct ui_widget_definition const *)tag_get(UI_WIDGET_DEFINITION_TAG, tag);
+			return;
+		}
+	}
+}
+
 /* the prompts move down with the last row */
 static void pause_campaign_shift_prompts(struct ui_widget_definition *widget, short shift)
 {
@@ -2066,10 +2096,13 @@ void menu_tags_loaded(
 
 	boolean game_map = strcmp(map_name, "ui") != 0;
 	boolean campaign = game_map && single_player_campaign_map();
+	/* Tags load before the new scenario is initialized. Its campaign pause
+	screen tells us which footer is available, not what session is running. */
+	boolean campaign_pause = game_map && tag_loaded(UI_WIDGET_DEFINITION_TAG, CAMPAIGN_PAUSE_SCREEN) != NONE;
 
 	/* (ui.map, and a multiplayer map: its pause menu's SETTINGS; a
 	single-player campaign's too) */
-	if ((game_map && tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE && !campaign) ||
+	if ((game_map && tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE && !campaign_pause) ||
 		!menus_pc_chosen())
 	{
 		return;
@@ -2165,6 +2198,15 @@ void menu_tags_loaded(
 		pause_patch(instances);
 		if (campaign)
 			pause_campaign_patch(instances);
+		if (campaign_pause)
+		{
+			long box = widget_named("pause/coop/box");
+
+			if (box != NONE)
+				pause_box_redraw(tag_get(UI_WIDGET_DEFINITION_TAG, build.widget_tags[box]), 3);
+			pause_settings_patch();
+			pause_coop_prompts_patch();
+		}
 		if (build.failed)
 			goto failed;
 		/* (those it made) */
@@ -2314,6 +2356,43 @@ char const *pc_menus_screen(
 			return screens[index].menu_name;
 	}
 	return name;
+}
+
+/* Called only for a confirmed network campaign. Xbox menus and failed PC
+menu loads retain the campaign screen: those maps have no multiplayer one. */
+char const *pc_menus_coop_pause_screen(
+	char const *name)
+{
+	static char const *const game_names[] =
+	{
+		"ui\\shell\\multiplayer_game\\pause_game\\1p_pause_game",
+		"ui\\shell\\multiplayer_game\\pause_game\\2p_pause_game",
+		"ui\\shell\\multiplayer_game\\pause_game\\4p_pause_game",
+	};
+	static char const *const menu_names[] =
+	{
+		"pc\\pause\\coop\\1p_pause_game",
+		"pc\\pause\\coop\\2p_pause_game",
+		"pc\\pause\\coop\\4p_pause_game",
+	};
+	short index;
+
+	if (menu_tags.loaded)
+		for (index = 0; index < NUMBEROF(game_names); index++)
+			if (!strcmp(name, game_names[index]) && tag_loaded(UI_WIDGET_DEFINITION_TAG, menu_names[index]) != NONE)
+				return menu_names[index];
+	return CAMPAIGN_PAUSE_SCREEN;
+}
+
+/* The client captures the actual co-op state before loading ui.map. Only
+the PC co-op host goes straight to its lobby; Xbox and other games keep
+their existing postgame map-selection flow. */
+char const *pc_menus_postgame_screen(
+	boolean cooperative)
+{
+	if (menu_tags.loaded && cooperative)
+		return "pc\\main_menu\\multiplayer_type_select\\lobby\\lobby_screen";
+	return pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper");
 }
 
 char const *pc_menu_game_data_input_name(

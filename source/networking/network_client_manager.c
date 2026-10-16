@@ -380,6 +380,7 @@ symbols in this file:
 #include "interface/player_ui.h"
 #include "saved games/player_profile.h"
 #include "interface/ui_widget.h"
+#include "network_coop.h" /* port: the live play mode before loading ui.map */
 #include "main/main.h"
 #include "memory/data.h"
 #include "networking/network_client_manager.h"
@@ -1010,6 +1011,9 @@ boolean network_game_client_switch_to_pregame(
 
 	if (client->state != _network_game_client_state_pregame)
 	{
+		/* port: ui.map has no live campaign, so keep the confirmed play mode. */
+		boolean cooperative = network_coop_active();
+
 		network_game_reset_for_next_round(&client->game, TRUE);
 		network_connection_keep_alive(client->connection);
 		client->next_update_number = 0;
@@ -1019,7 +1023,7 @@ boolean network_game_client_switch_to_pregame(
 		network_game_client_late_join_time = 0;
 		network_game_client_late_join_clock_pending = FALSE;
 		network_event("switching to pregame");
-		network_game_reset_to_pregame_ui();
+		network_game_reset_to_pregame_ui(cooperative);
 		network_connection_keep_alive(client->connection);
 	}
 

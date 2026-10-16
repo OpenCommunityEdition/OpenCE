@@ -29,6 +29,10 @@ float render_interpolation_game_time_sec(long ticks);
 /* the port's menus' screen for one of ui.map's, by name, else the name
 (port/linux/game/menu_tags.c) */
 char const *pc_menus_screen(char const *name);
+/* a confirmed network campaign's pause screen, and the host's postgame
+screen after capturing the play mode before unloading the map (same file) */
+char const *pc_menus_coop_pause_screen(char const *name);
+char const *pc_menus_postgame_screen(unsigned char cooperative);
 /* the Custom Edition tag cache window, or NULL unless the
 game.custom_edition setting reserved it (port/linux/src/xbox_memory.c) */
 void *halo_custom_edition_tag_cache(void);
