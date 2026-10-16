@@ -593,6 +593,7 @@ struct network_game *network_game_server_get_game(struct network_game_server *se
 #include "units/bipeds.h"
 #include "units/units.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
+#include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -2308,6 +2309,8 @@ static void game_engine_rasterize_scoreboard(
 		struct player_datum *player;
 		wchar_t *status_string;
 		real_argb_color *row_color;
+		long ping = NONE;
+		boolean ping_colored;
 
 		if (row >= rows || position >= list_counts[list])
 			continue;
@@ -2330,7 +2333,9 @@ static void game_engine_rasterize_scoreboard(
 		ping_string[0] = 0;
 		if (network)
 		{
-			long ping = distributed_player_ping((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(entry->player_index));
+			/* port: as this machine times it, with the latency meter on
+			(latency_meter.c); else the host's measure, as before */
+			ping = latency_meter_player_ping((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(entry->player_index));
 
 			/* (three digits at most: its column's width) */
 			if (ping == NONE)
@@ -2340,6 +2345,9 @@ static void game_engine_rasterize_scoreboard(
 			else
 				usprintf(ping_string, L"%ld", ping);
 		}
+		/* port: with the latency meter on, a known ping is drawn on its own,
+		in the meter's colour for it (display.latency_meter) */
+		ping_colored = ping != NONE && latency_meter_shown();
 		usnprintf(
 			row_string,
 			NUMBEROF(row_string),
@@ -2347,7 +2355,7 @@ static void game_engine_rasterize_scoreboard(
 			campaign ? L"" : get_place_string(entry),
 			player->name,
 			status_string,
-			ping_string);
+			ping_colored ? L"" : ping_string);
 		row_string[NUMBEROF(row_string) - 1] = 0;
 		row_color = has_teams ? &team_colors[PIN(player->team_index, 0, 1)] : &color;
 		/* port: a player talking (or muted) in voice chat, its speaker just
@@ -2420,6 +2428,23 @@ static void game_engine_rasterize_scoreboard(
 			top,
 			(short)(left + column * (SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP)),
 			TRUE);
+		if (ping_colored)
+		{
+			real_argb_color ping_color;
+
+			latency_meter_color(ping, &ping_color);
+			ping_color.alpha = alpha;
+			usnprintf(row_string, NUMBEROF(row_string), L"\t\t\t\t%s", ping_string);
+			row_string[NUMBEROF(row_string) - 1] = 0;
+			scoreboard_draw_row(
+				row_string,
+				FALSE,
+				&ping_color,
+				2 + row,
+				top,
+				(short)(left + column * (SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP)),
+				TRUE);
+		}
 	}
 	/* (where the scroll is, and how to move it) */
 	if (total > page)
@@ -4143,6 +4168,14 @@ boolean game_engine_showing_postgame(
 	void)
 {
 	return game_engine != NULL && game_engine_globals.postgame_state == game_engine_mode_postgame_rasterize;
+}
+
+/* port: whether a game is being played: one of no game engine's (the
+campaign, co-op), or its game not over (port/linux/game/latency_meter.c) */
+boolean game_engine_in_play(
+	void)
+{
+	return game_engine == NULL || game_engine_globals.postgame_state == game_engine_mode_active;
 }
 
 void game_variant_options_default(

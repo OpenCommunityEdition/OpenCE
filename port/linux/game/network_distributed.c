@@ -77,6 +77,7 @@ machine (their datum identifiers need not be).
 #include "network_distributed.h"
 #include "network_voice.h"
 #include "map_share.h"
+#include "latency_meter.h"
 #include "profile_sections.h"
 
 #include <limits.h>
@@ -109,6 +110,7 @@ void p2p_discord_sanitize(char *destination, int size, const char *source, int n
 void p2p_discord_identity(char *id, int id_size, char *name, int name_size);
 unsigned long p2p_peer_endpoint_address(unsigned long virtual_address);
 unsigned long system_milliseconds(void);
+void platform_log(char const *format, ...);
 void console_warning(const char *format, ...);
 
 /* the host: a client's game run faster than its clock (a speed hack, which
@@ -182,6 +184,15 @@ enum
 	/* ... and beyond it, the ticks a client's own player may ride otherwise
 	than the host has it */
 	SEAT_DISAGREEMENT_SLACK_TICKS = 6,
+	/* the latency meter (latency_meter.c): the same round trips timed in
+	milliseconds, by when each of the last ticks was sent (a power of two,
+	more than the longest round trip); the longest shown; how often what is
+	shown is refreshed; and how long the host (to a client) or a client (to
+	the host) says nothing before it is said to have a connection problem */
+	TICK_SENT_TIMES = 64,
+	MAXIMUM_PING_MILLISECONDS = 9999,
+	PING_REFRESH_TICKS = TICKS_PER_SECOND / 2,
+	CONNECTION_PROBLEM_MILLISECONDS = 2000,
 	/* a client: where its own players' units were, the last ticks (a power
 	of two, more than the longest round trip) */
 	OWN_POSITION_TICKS = 64,
@@ -648,15 +659,45 @@ static struct distributed_client_clock
 /* the host: whether the message being handled came over its machine's
 stream (network_distributed_handle_stream_message) */
 static boolean distributed_handling_stream_message;
-/* a client: the host's latest tick it has had a message of */
+/* a client: the host's latest tick it has had a message of, and when that
+message came (system_milliseconds) */
 static long distributed_host_time = NONE;
-/* the host: each client's round trip, in ticks, and its jitter */
+static unsigned long distributed_host_time_received;
+/* the host: each client's round trip, in ticks, and its jitter; the same
+in milliseconds (the latency meter's); and when the client was last heard
+from (system_milliseconds) */
 static struct
 {
 	boolean valid;
 	real average;
 	real deviation;
+	boolean milliseconds_valid;
+	real milliseconds;
+	unsigned long heard;
+	/* (logged: silent since when it was heard, 0 for not silent) */
+	unsigned long silent_since;
 } distributed_round_trips[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+/* the latency meter: when each of this machine's last ticks was sent
+(system_milliseconds), by tick; a round trip coming back naming one of
+them is timed by it */
+static struct
+{
+	long time;
+	unsigned long milliseconds;
+} distributed_tick_sent_times[TICK_SENT_TIMES];
+/* ... a client: its own round trip in milliseconds, as the host has its
+players and tells it back, and whether it is measured; and since when the
+host has been silent (logged), 0 for not silent */
+static boolean distributed_own_ping_valid;
+static real distributed_own_ping_milliseconds;
+static unsigned long distributed_host_silent_since;
+/* ... what is shown (refreshed in the tick every PING_REFRESH_TICKS, so
+the render reads it whole): each player's round trip as this machine times
+it (the host: each client's, its own players' 0; a client: its own
+players'), a client's own, and the host's slowest client's; NONE for none */
+static long distributed_shown_pings[MAXIMUM_TRACKED_PLAYERS];
+static long distributed_shown_own_ping = NONE;
+static long distributed_shown_slowest_ping = NONE;
 /* a client: each player's ping as the host last told it (UNKNOWN_PING: not
 told) */
 static word distributed_player_pings[MAXIMUM_TRACKED_PLAYERS];
@@ -1347,6 +1388,210 @@ real distributed_machine_round_trip_ticks(
 	return distributed_round_trips[machine_index].average + 2.0f * distributed_round_trips[machine_index].deviation;
 }
 
+/* ---------- the latency meter's round trips */
+
+/* the milliseconds since this machine sent the messages of its tick (at
+most MAXIMUM_PING_MILLISECONDS), NONE if that tick is not one of the last
+TICK_SENT_TIMES */
+static long distributed_milliseconds_since_tick(
+	long time)
+{
+	unsigned long elapsed;
+
+	if (time == NONE || distributed_tick_sent_times[time & (TICK_SENT_TIMES - 1)].time != time)
+		return NONE;
+	elapsed = system_milliseconds() - distributed_tick_sent_times[time & (TICK_SENT_TIMES - 1)].milliseconds;
+	return elapsed > (unsigned long)MAXIMUM_PING_MILLISECONDS ? MAXIMUM_PING_MILLISECONDS : (long)elapsed;
+}
+
+/* a round trip in milliseconds into a smoothed one (as TCP smooths its own,
+an eighth), the first as it is */
+static void distributed_smooth_ping(
+	boolean *valid,
+	real *milliseconds,
+	long sample)
+{
+	if (!*valid)
+	{
+		*valid = TRUE;
+		*milliseconds = (real)sample;
+	}
+	else
+	{
+		*milliseconds += ((real)sample - *milliseconds) / 8.0f;
+	}
+}
+
+/* (a client) the milliseconds since the host's latest message came, NONE
+before the first */
+static long distributed_host_silence(
+	void)
+{
+	return distributed_host_time == NONE ? NONE : (long)(system_milliseconds() - distributed_host_time_received);
+}
+
+/* (the host) whether the client machine has said nothing for a while */
+static boolean distributed_machine_silent(
+	long machine_index)
+{
+	return game_engine_in_play() && machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES &&
+		distributed_round_trips[machine_index].heard &&
+		system_milliseconds() - distributed_round_trips[machine_index].heard > CONNECTION_PROBLEM_MILLISECONDS;
+}
+
+/* (a client) the host has its players (or its vehicle) at that tick of this
+machine's, as told now: its own round trip timed */
+void distributed_note_own_round_trip(
+	long time)
+{
+	long sample = distributed_milliseconds_since_tick(time);
+
+	if (sample != NONE && game_connection() == _game_connection_network_client)
+		distributed_smooth_ping(&distributed_own_ping_valid, &distributed_own_ping_milliseconds, sample);
+}
+
+/* what the latency meter shows, refreshed in the tick (with Latency meter
+On): a client's own round trip, the host's slowest client's (one silent
+for a while as long as it has been); and in the log, each connection
+problem as it starts and ends, and the round trips every ten seconds */
+static void distributed_refresh_pings(
+	void)
+{
+	short connection = game_connection();
+	short player_index;
+
+	distributed_shown_own_ping = NONE;
+	distributed_shown_slowest_ping = NONE;
+	if (connection == _game_connection_network_client && distributed_own_ping_valid)
+		distributed_shown_own_ping = (long)(distributed_own_ping_milliseconds + 0.5f);
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+	{
+		long ping = NONE;
+
+		if (!distributed_player(player_index))
+			;
+		else if (connection == _game_connection_network_server)
+		{
+			long machine_index = distributed_player_machines[player_index];
+
+			if (machine_index == NONE)
+				ping = 0;
+			else if (machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES &&
+				distributed_round_trips[machine_index].milliseconds_valid)
+			{
+				ping = (long)(distributed_round_trips[machine_index].milliseconds + 0.5f);
+			}
+		}
+		else if (distributed_player_is_local(player_index))
+		{
+			ping = distributed_shown_own_ping;
+		}
+		distributed_shown_pings[player_index] = ping;
+	}
+	if (connection == _game_connection_network_server)
+	{
+		long machine_indices[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+		short count = distributed_client_machines(machine_indices, HALO_PORT_MAXIMUM_NETWORK_MACHINES);
+		boolean log_round_trips = game_time_get() % (10 * TICKS_PER_SECOND) == 0;
+		char line[512];
+		int length = 0;
+		short index;
+
+		line[0] = 0;
+		for (index = 0; index < count; index++)
+		{
+			long machine_index = machine_indices[index];
+			boolean silent;
+			long ping;
+
+			if (machine_index < 0 || machine_index >= HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+				continue;
+			silent = distributed_machine_silent(machine_index);
+			if (silent && !distributed_round_trips[machine_index].silent_since)
+			{
+				distributed_round_trips[machine_index].silent_since = distributed_round_trips[machine_index].heard;
+				platform_log("latency: machine %ld silent for %lu ms: connection problem", machine_index,
+					system_milliseconds() - distributed_round_trips[machine_index].heard);
+			}
+			else if (!silent && distributed_round_trips[machine_index].silent_since)
+			{
+				platform_log("latency: machine %ld heard again after %lu ms", machine_index,
+					distributed_round_trips[machine_index].heard - distributed_round_trips[machine_index].silent_since);
+				distributed_round_trips[machine_index].silent_since = 0;
+			}
+			if (!distributed_round_trips[machine_index].milliseconds_valid)
+				continue;
+			ping = (long)(distributed_round_trips[machine_index].milliseconds + 0.5f);
+			if (silent)
+			{
+				ping = MAX(ping, (long)MIN(system_milliseconds() - distributed_round_trips[machine_index].heard,
+					(unsigned long)MAXIMUM_PING_MILLISECONDS));
+			}
+			distributed_shown_slowest_ping = MAX(distributed_shown_slowest_ping, ping);
+			if (log_round_trips && length < (int)sizeof(line) - 64)
+			{
+				length += snprintf(line + length, sizeof(line) - length, "%s machine %ld %ld ms (%.1f ticks)%s",
+					length ? "," : "", machine_index, ping, distributed_round_trips[machine_index].average,
+					silent ? " silent" : "");
+			}
+		}
+		if (length)
+			platform_log("latency: the clients' round trips:%s", line);
+	}
+	else if (connection == _game_connection_network_client)
+	{
+		boolean problem = distributed_connection_problem();
+
+		if (problem && !distributed_host_silent_since)
+		{
+			distributed_host_silent_since = distributed_host_time_received ? distributed_host_time_received : 1;
+			platform_log("latency: the host silent for %ld ms: connection problem", distributed_host_silence());
+		}
+		else if (!problem && distributed_host_silent_since)
+		{
+			platform_log("latency: the host heard again after %lu ms",
+				distributed_host_time_received - distributed_host_silent_since);
+			distributed_host_silent_since = 0;
+		}
+		if (game_time_get() % (10 * TICKS_PER_SECOND) == 0 && distributed_own_ping_valid)
+		{
+			platform_log("latency: round trip to the host %ld ms (%.1f ticks)%s", distributed_shown_own_ping,
+				distributed_own_round_trip, problem ? ", connection problem" : "");
+		}
+	}
+}
+
+long distributed_player_measured_ping(
+	short player_index)
+{
+	return player_index >= 0 && player_index < MAXIMUM_TRACKED_PLAYERS ? distributed_shown_pings[player_index] : NONE;
+}
+
+long distributed_own_ping(
+	void)
+{
+	return game_connection() == _game_connection_network_client ? distributed_shown_own_ping : NONE;
+}
+
+long distributed_slowest_client_ping(
+	void)
+{
+	return game_connection() == _game_connection_network_server ? distributed_shown_slowest_ping : NONE;
+}
+
+boolean distributed_connection_problem(
+	void)
+{
+	/* (a game over: the host sends nothing of it) */
+	if (game_connection() == _game_connection_network_client && game_engine_in_play())
+	{
+		long silence = distributed_host_silence();
+
+		return silence != NONE && silence > CONNECTION_PROBLEM_MILLISECONDS;
+	}
+	return FALSE;
+}
+
 /* ---------- units */
 
 static void distributed_state_from_player(
@@ -1695,6 +1940,7 @@ static void distributed_correct_own_unit(
 				distributed_own_round_trip = (real)(now - time);
 			else
 				distributed_own_round_trip += ((real)(now - time) - distributed_own_round_trip) / 8.0f;
+			distributed_note_own_round_trip(time);
 			error.i = state->position.x - own->position.x;
 			error.j = state->position.y - own->position.y;
 			error.k = state->position.z - own->position.z;
@@ -2470,6 +2716,17 @@ static void distributed_handle_inputs(
 				distributed_round_trips[machine_index].average += difference / 8.0f;
 				distributed_round_trips[machine_index].deviation +=
 					((real)fabs(difference) - distributed_round_trips[machine_index].deviation) / 4.0f;
+			}
+		}
+		/* (the same timed in milliseconds, for the latency meter: by when
+		this machine sent that tick) */
+		{
+			long milliseconds = distributed_milliseconds_since_tick(host_time);
+
+			if (milliseconds != NONE)
+			{
+				distributed_smooth_ping(&distributed_round_trips[machine_index].milliseconds_valid,
+					&distributed_round_trips[machine_index].milliseconds, milliseconds);
 			}
 		}
 	}
@@ -3354,6 +3611,15 @@ void network_distributed_new_game(
 	}
 	distributed_own_round_trip = 0.0f;
 	csmemset(distributed_player_pings, 0xFF, sizeof(distributed_player_pings));
+	distributed_own_ping_valid = FALSE;
+	distributed_own_ping_milliseconds = 0.0f;
+	distributed_host_silent_since = 0;
+	distributed_shown_own_ping = NONE;
+	distributed_shown_slowest_ping = NONE;
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+		distributed_shown_pings[player_index] = NONE;
+	for (type = 0; type < TICK_SENT_TIMES; type++)
+		distributed_tick_sent_times[type].time = NONE;
 	csmemset(distributed_machine_players, 0xFF, sizeof(distributed_machine_players));
 	distributed_machines.in_tick = FALSE;
 	distributed_machines.valid = FALSE;
@@ -3410,6 +3676,8 @@ void network_distributed_tick(
 		distributed_statistics_due = FALSE;
 		if (game_time_get() % PING_INTERVAL_TICKS == 0)
 			profile_scope(distributed_tick_send_pings_section, distributed_send_pings();)
+		if (game_time_get() % PING_REFRESH_TICKS == 0 && latency_meter_enabled())
+			distributed_refresh_pings();
 		/* (before the players, so clients load a new BSP before they hear
 		where the host moved everyone into it) */
 		if (network_coop_active() && (global_structure_bsp_index_get() != distributed_sent_structure_bsp_index ||
@@ -3428,12 +3696,18 @@ void network_distributed_tick(
 	else if (connection == _game_connection_network_client)
 	{
 		profile_scope(distributed_tick_note_own_positions_section, distributed_note_own_positions();)
+		if (game_time_get() % PING_REFRESH_TICKS == 0 && latency_meter_enabled())
+			distributed_refresh_pings();
 		profile_scope(distributed_tick_send_inputs_section, distributed_client_send_inputs();)
 		profile_scope(distributed_tick_send_predictions_section, distributed_client_send_predictions();)
 		profile_scope(distributed_tick_objects_client_tick_section, network_objects_client_tick();)
 		profile_scope(distributed_tick_damage_client_tick_section, network_damage_client_tick();)
 		profile_scope(distributed_tick_coop_client_tick_section, network_coop_client_tick();)
 	}
+	/* (when this tick's messages were sent: the round trips that name it
+	are timed by it) */
+	distributed_tick_sent_times[game_time_get() & (TICK_SENT_TIMES - 1)].time = game_time_get();
+	distributed_tick_sent_times[game_time_get() & (TICK_SENT_TIMES - 1)].milliseconds = system_milliseconds();
 	profile_scope(distributed_tick_batches_flush_section, distributed_batches_flush();)
 	distributed_machines.in_tick = FALSE;
 	distributed_machines.valid = FALSE;
@@ -4090,14 +4364,20 @@ void network_distributed_handle_message(
 	case _distributed_message_votekick:
 		if (machine_index == NONE || game_connection() != _game_connection_network_server)
 			return;
+		/* (heard from: the latency meter's connection problem) */
+		if (machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+			distributed_round_trips[machine_index].heard = system_milliseconds();
 		break;
 	default:
 		if (game_connection() != _game_connection_network_client)
 			return;
 		/* (the host's latest tick, which this client's input messages tell
-		it back) */
+		it back; and when it came, the latency meter's) */
 		if (distributed_host_time == NONE || header.game_time > distributed_host_time)
+		{
 			distributed_host_time = header.game_time;
+			distributed_host_time_received = system_milliseconds();
+		}
 		break;
 	}
 	if ((distributed_handling_batch || header.type != _distributed_message_damage_events) &&

@@ -2474,6 +2474,9 @@ static boolean distributed_client_correct_own_vehicle(
 	{
 		return FALSE;
 	}
+	/* (driving: the round trip as the host has its vehicle, the latency
+	meter's) */
+	distributed_note_own_round_trip(time);
 	{
 		struct distributed_own_vehicle const *own =
 			&objects_client_own_vehicles[local_player_index][time & (OWN_VEHICLE_POSITION_TICKS - 1)];

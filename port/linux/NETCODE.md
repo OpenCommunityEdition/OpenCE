@@ -717,6 +717,18 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
   took to come (the reliable channel's resending holds it up), that is
   when the shooter saw the target (as far back as the host keeps). A
   report made more than three seconds ago is refused.
+- **The latency meter** (`latency_meter.c`, `display.latency_meter`) shows
+  the same round trips, timed in milliseconds by when each machine sent the
+  tick they come back naming (the last 64 ticks' send times kept), with
+  nothing more sent: the host each client's, by the host tick its input
+  names; a client its own, by its tick the host's state of its player (or,
+  driving, its vehicle) says the host has it at. Each is the network both
+  ways plus each machine's wait for its next tick, so a LAN reads 15 to 35
+  ms. A client that has heard nothing from the host for two seconds shows
+  "Connection problem"; the host logs a client silent as long. With the
+  meter on, the scoreboard shows these where the machine has them (the
+  host every client's, a client its own players'), and the host's measure
+  in ticks, which every machine is sent, for the others.
 
 ## Testing
 

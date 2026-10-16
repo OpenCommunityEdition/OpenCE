@@ -105,6 +105,7 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/units.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
+#include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
 
 /* ---------- constants */
 
@@ -384,6 +385,8 @@ void interface_draw_fullscreen_overlays(
 	hud_render_timer();
 	/* port: a map's download (port/linux/game/map_share.c) */
 	map_share_render();
+	/* port: a network game's round trip to the host (display.latency_meter) */
+	latency_meter_draw();
 	terminal_draw();
 	main_framerate_render();
 	render_debug_profile();
