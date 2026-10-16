@@ -30,7 +30,7 @@ Any fork compatible with OpenCE is also compatible with GulchCE. Crossplay galor
 <br>
 
 ## What is GulchCE?
-GulchCE is a fork of [OpenCommunityEdition/OpenCE](https://github.com/OpenCommunityEdition/OpenCE) - the Halo: Combat Evolved decompilation project targeting Linux, 
+GulchCE is a fork of [OpenCommunityEdition/OpenCE](https://github.com/OpenCommunityEdition/OpenCE) - the Halo: Combat Evolved decompilation project targeting Linux,
 Windows, Android and web browsers.
 
 The decompilation is of the Xbox build 2342. (`cachebeta.exe`, SHA-256
@@ -54,6 +54,10 @@ if they would like the MCC map support feature on their own, main repo.
 Release & debug builds are available in the Releases section of the repository.
 The release builds are for playing; the debug builds stop at the first failed assertion and log it.
 
+### Arch-based Linux Distributions
+
+The Linux binary release is available on the [AUR](https://aur.archlinux.org/packages/gulchce-bin).
+
 ## What about game data and assets?
 
 The port does not include the game data. You would need an Xbox disc image
@@ -74,12 +78,12 @@ MCC custom maps use the separate `mcc_maps` directory and the
 **MCC SINGLEPLAYER** and **MCC MULTIPLAYER** menu options. Maps appear in
 the appropriate category automatically.
 
-Inside `mcc_maps`, you need to create a `_shared` folder, and two subfolders inside 
+Inside `mcc_maps`, you need to create a `_shared` folder, and two subfolders inside
 the `_shared` folder: `singleplayer` and `multiplayer`. From your existing Halo 1 MCC
 installation, you need to take:
 
-- The bitmaps.map file from `halo1/maps` and put it into `mcc_maps/_shared/singleplayer`. 
-- You then need to take the bitmaps.map AND sounds.map files from `halo1/maps/custom_edition` 
+- The bitmaps.map file from `halo1/maps` and put it into `mcc_maps/_shared/singleplayer`.
+- You then need to take the bitmaps.map AND sounds.map files from `halo1/maps/custom_edition`
 and put these into `mcc_maps/_shared/multiplayer`.
 
 You must obtain these files from an legally-owned installed copy of Halo 1 on the Halo: The Master Chief Collection.
