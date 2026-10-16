@@ -3308,12 +3308,34 @@ boolean server_has_enough_machines(
 	return has_enough_machines;
 }
 
-/* port: a game's one player, with no one else in it yet, may start it:
-a system link or internet game's host, or split screen's first player */
-static boolean server_alone(
+/* port: TRUE if the game has at least one player and every player is on the
+same machine; FALSE with no player. Such a game may start as a host alone
+does: a system link or internet game's host, alone or with split screen
+players. Machines are not counted, only players' machines: a machine that
+has joined without a player does not stop the host's countdown
+(server_ok_to_countdown) */
+static boolean server_players_on_one_machine(
 	struct network_game_server *server)
 {
-	return server->game.player_count == 1;
+	short first_machine_index = NONE;
+	long player_index;
+
+	for (player_index = 0;
+		player_index < MAXIMUM_NETWORK_PLAYER_COUNT;
+		player_index++)
+	{
+		struct network_player *player = &server->game.players[player_index];
+
+		if (!network_player_is_valid(player))
+			continue;
+
+		if (first_machine_index == NONE)
+			first_machine_index = (short)player->machine_index;
+		else if ((short)player->machine_index != first_machine_index)
+			return FALSE;
+	}
+
+	return first_machine_index != NONE;
 }
 
 /* port: a machine joining or leaving is in the game before its player is.
@@ -3324,8 +3346,8 @@ boolean server_ok_to_countdown(
 	struct network_game_server *server)
 {
 	if (server_has_enough_machines(server) &&
-		(!server_needs_more_teams(server) || server_alone(server)) &&
-		(server->game.player_count >= server->game.minimum_players || server_alone(server)))
+		(!server_needs_more_teams(server) || server_players_on_one_machine(server)) &&
+		(server->game.player_count >= server->game.minimum_players || server_players_on_one_machine(server)))
 	{
 		return TRUE;
 	}
@@ -3486,7 +3508,7 @@ boolean network_game_server_game_can_start(
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x782, server);
 
 	return server->state == 0 &&
-		(server->game.player_count >= server->game.minimum_players || server_alone(server));
+		(server->game.player_count >= server->game.minimum_players || server_players_on_one_machine(server));
 }
 
 void network_game_server_pause_countdown(
@@ -4003,7 +4025,7 @@ void network_game_server_update_countdown(
 				{
 					if (network_game_should_accept_remote_connections() == FALSE ||
 						network_game_server_get_client_machine_count(server) > 1 ||
-						server_alone(server))
+						server_players_on_one_machine(server))
 					{
 						unsigned long countdown;
 
