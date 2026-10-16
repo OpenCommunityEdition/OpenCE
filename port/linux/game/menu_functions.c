@@ -4039,6 +4039,24 @@ static boolean pause_end_game(void)
 	return TRUE;
 }
 
+/* "port coop friendly fire" (network co-op's pause menu's FRIENDLY FIRE,
+menu_tags.c): switches this machine's own friendly fire, from now on */
+static boolean coop_friendly_fire_change(void)
+{
+	char const *choice = config_boolean("network.coop_own_friendly_fire") ? "false" : "true";
+
+	if (!config_write("network.coop_own_friendly_fire", choice))
+		platform_log("menus: could not write network.coop_own_friendly_fire to config.toml");
+	ui_play_audio_feedback_sound(SOUND_FORWARD);
+	return TRUE;
+}
+
+/* "port coop friendly fire text": the button's text, ON or OFF */
+static void coop_friendly_fire_text(struct widget_instance *button)
+{
+	button->parameters.text_box.string_list_index = config_boolean("network.coop_own_friendly_fire") ? 0 : 1;
+}
+
 /* ---- the lobby: the game's players (up to the port's 128), its map and
 gametype, the countdown */
 
@@ -5518,6 +5536,10 @@ boolean pc_menu_event_function_invoke(
 		{
 			return pause_end_game();
 		}
+		else if (!strcmp(name, "port coop friendly fire"))
+		{
+			return coop_friendly_fire_change();
+		}
 		else if (!strcmp(name, "player profile save changes"))
 		{
 			return profile_save_changes(widget, widget_deleted);
@@ -5791,4 +5813,6 @@ void pc_menu_game_data_function_invoke(
 		saved_game_list_update(widget);
 	else if (!strcmp(name, "port gamepad layout preview"))
 		profile_gamepad_layout(widget);
+	else if (!strcmp(name, "port coop friendly fire text"))
+		coop_friendly_fire_text(widget);
 }

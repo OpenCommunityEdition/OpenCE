@@ -332,7 +332,9 @@ struct distributed_player_input
 	byte player_index;
 	/* co-op: the structure BSP the client has loaded */
 	byte structure_bsp_index;
-	byte pad[2];
+	/* co-op: the player chose to play without friendly fire */
+	byte coop_no_friendly_fire;
+	byte pad;
 	/* the client's tick */
 	long tick;
 	/* the latest host tick the client has had a message of (the host
@@ -2369,6 +2371,7 @@ static void distributed_client_send_inputs(
 			continue;
 		input->player_index = distributed_player_to_byte(player_index);
 		input->structure_bsp_index = (byte)global_structure_bsp_index_get();
+		input->coop_no_friendly_fire = network_coop_active() && !network_coop_own_friendly_fire();
 		input->host_time = distributed_host_time;
 		count++;
 	}
@@ -2443,6 +2446,8 @@ static void distributed_handle_inputs(
 		if (network_coop_active() && player->unit_index != NONE)
 			distributed_note_input_actions(input->player_index, &action);
 		network_coop_note_player_structure_bsp(input->player_index, input->structure_bsp_index);
+		network_coop_note_player_friendly_fire(DATUM_INDEX_NEW(input->player_index, player->identifier),
+			!input->coop_no_friendly_fire);
 		update_server_handle_distributed_input(DATUM_INDEX_NEW(input->player_index, player->identifier), input->tick,
 			&action, input->control_flags, DISTRIBUTED_INPUT_HISTORY);
 		if (input->host_time != NONE && (host_time == NONE || input->host_time > host_time))
