@@ -341,7 +341,7 @@ static long mcc_pause_screen(short mode, short layout)
         y = layout == MCC_PAUSE_FULL ? 171 : (layout == MCC_PAUSE_HALF ? 51 : 26);
         children[child_count] = mcc_pause_panel(layout, layout == MCC_PAUSE_QUARTER ? 296 : 218,
             layout == MCC_PAUSE_QUARTER ? 228 : 159 + campaign_growth,
-            layout == MCC_PAUSE_QUARTER ? MCC_PAUSE_ART_PANEL : MCC_PAUSE_ART_FOOTER_PANEL);
+            layout == MCC_PAUSE_QUARTER ? MCC_PAUSE_ART_CAMPAIGN_PANEL : MCC_PAUSE_ART_FOOTER_PANEL);
         xs[child_count] = layout == MCC_PAUSE_QUARTER ? 12 : 64;
         ys[child_count++] = layout == MCC_PAUSE_FULL ? 162 : (layout == MCC_PAUSE_HALF ? 42 : 10);
         if (layout != MCC_PAUSE_QUARTER) {

@@ -13,7 +13,8 @@ enum mcc_pause_art_kind {
     MCC_PAUSE_ART_HIGHLIGHT,
     MCC_PAUSE_ART_DIM,
     MCC_PAUSE_ART_FOOTER_PANEL,
-    MCC_PAUSE_ART_OBJECTIVES_PANEL
+    MCC_PAUSE_ART_OBJECTIVES_PANEL,
+    MCC_PAUSE_ART_CAMPAIGN_PANEL
 };
 
 /* Logical viewport sizes: 640x480, 640x240, 320x240. The art callback owns
