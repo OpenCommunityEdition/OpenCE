@@ -519,6 +519,18 @@ decoded texture storage to exceed the former single 512 MiB offset range.
   MCC virtual resources. Runtime tag windows must be free, 64 KiB-aligned,
   64 MiB allocations based between `0x42000000` and `0x70000000` inclusive.
   The observed MCC base is `0x50000000`.
+  Windows reserves this address range before renderer initialization and
+  retains the reservation between maps. Pages are committed only during an
+  MCC load and decommitted on unload; other accepted linked bases can replace
+  only our inactive reservation. An occupied range is never overwritten.
+  Allocation refusals report the address, size and OS error in `debug.txt`.
+  MCC network load failures schedule session teardown and a menu reload before
+  the next frame's input update, rather than entering the fatal error screen.
+  A player reported that disabling XFire and restarting GulchCE resolved this
+  allocation refusal. This supports interference from third-party software,
+  but the specific allocation conflict has not been captured. Early reservation
+  is not a guarantee of compatibility with XFire; disabling it and restarting
+  remains the confirmed workaround for that report.
 - There are at most 65,535 tags and 32 BSP references. Runtime conversion
   descriptors must fit below the lowest BSP in the tag window. Geometry
   currently admits at most 64 nodes per model, 22 palette nodes per part,

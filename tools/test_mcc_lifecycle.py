@@ -10,6 +10,84 @@ from harness import function
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_network_mcc_load_failure_schedules_abort_without_initializing_players(tmp_path):
+    from test_mcc_identity import compile_tool
+
+    manager = (ROOT / "source/networking/network_game_manager.c").read_text()
+    adapter = (ROOT / "port/linux/game/mcc_main.c").read_text()
+    code = r'''
+#include <string.h>
+#include <wchar.h>
+#include <stdio.h>
+typedef int boolean;
+#define TRUE 1
+#define FALSE 0
+#define _error_silent 2
+#define _game_connection_network_client 1
+#define _game_connection_network_server 2
+#define _game_connection_film_playback 3
+#define NETWORK_GAME_PLAYER_SLOTS 2
+#define match_assert(a,b,c) ((void)0)
+#define csstrncpy strncpy
+struct game_options {char map_name[64];int difficulty,random_seed;};
+struct player {int player_list_index;};
+struct network_game {
+    struct {char name[64];} map;
+    struct {int game_engine_index;} variant;
+    struct {int game_objects_loaded;} local_data;
+    struct player players[2];
+    int difficulty,random_seed,variant_options;
+};
+static int fatal,aborts,popups,clears,menus,initialized,spawned,refuse=1,connection=1;
+static void error(int priority,char const *format,...) {(void)format;if(priority==0)fatal++;}
+static void game_options_new(struct game_options *p) {memset(p,0,sizeof(*p));}
+static int game_connection(void) {return connection;}
+static int network_game_get_random_seed(void) {return 1;}
+static void game_precache_new_map(char *p,int v) {(void)p;(void)v;}
+static void main_menu_unload(void) {}
+static int game_in_progress(void) {return 0;}
+static int game_map_loaded(void) {return 0;}
+static void game_dispose_from_old_map(void) {}
+static void game_unload(void) {}
+static void game_set_game_variant(void *p) {(void)p;}
+static void game_set_game_variant_options(void *p) {(void)p;}
+static int game_load(struct game_options *p) {(void)p;return !refuse;}
+static void game_initialize_for_new_map(void) {initialized++;}
+static int network_player_is_valid(struct player *p) {(void)p;return 1;}
+static int network_game_spawn_player(struct player *p) {(void)p;spawned++;return 1;}
+static int mcc_level_name(char const *p) {return !strncmp(p,"mcc_maps\\",9);}
+static void errors_clear(void) {clears++;}
+static void display_error_text_when_main_menu_loaded(wchar_t const *p) {(void)p;popups++;}
+static void network_game_abort(void) {aborts++;}
+static void main_goto_main_menu(void) {menus++;}
+''' + function(adapter, "mcc_main_network_load_failed") + function(manager, "network_game_create_game_objects") + r'''
+#define CHECK(c) do{if(!(c)){fprintf(stderr,"line%d\n",__LINE__);return 1;}}while(0)
+int main(void) {
+    struct network_game game={0};
+    for(connection=1;connection<=2;connection++) {
+        strcpy(game.map.name,"mcc_maps\\Floodslayer\\c10_flood");
+        game.local_data.game_objects_loaded=1;
+        CHECK(!network_game_create_game_objects(&game));
+        CHECK(!game.local_data.game_objects_loaded && !fatal && !initialized && !spawned);
+        CHECK(aborts==connection && popups==connection && clears==connection && menus==connection);
+    }
+    game.local_data.game_objects_loaded=0;
+    strcpy(game.map.name,"levels\\a10\\a10");
+    CHECK(!network_game_create_game_objects(&game));CHECK(fatal==1 && aborts==2);
+    strcpy(game.map.name,"custom_maps\\test");
+    CHECK(!network_game_create_game_objects(&game));CHECK(fatal==2 && aborts==2);
+    strcpy(game.map.name,"mcc_maps\\good");refuse=0;
+    CHECK(network_game_create_game_objects(&game));
+    CHECK(initialized==1 && spawned==2 && aborts==2 && clears==2);
+    return 0;
+}
+'''
+    source = tmp_path / "network_failure.c"
+    source.write_text(code)
+    binary = compile_tool(tmp_path, [source])
+    subprocess.run([str(binary)], check=True, capture_output=True, text=True)
+
+
 def test_mcc_completion_defers_menu_load_without_starting_xbox_credits(tmp_path):
     compiler = shutil.which("clang") or shutil.which("cc")
     if not compiler:
