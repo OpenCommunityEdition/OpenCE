@@ -24,6 +24,7 @@ static struct model_region region;
 static struct model_region_permutation permutation;
 static int locks, submissions, iterator_position;
 static short previous[32], next[32];
+static int solid_draws, shadow_draws, selected_geometry[8];
 static real shell[5][8] = {{-1,-1,0},{1,-1,0},{1,1,0},{-1,1,0},{0,0,2}};
 static word indices[64] = {0,1,2,0,2,3,0,4,1,1,4,2,2,4,3,3,4,0};
 static real sphere[6][8] = {{-.22f,0,.7f},{.22f,0,.7f},{0,-.22f,.7f},{0,.22f,.7f},{0,0,.48f},{0,0,.92f}};
@@ -37,8 +38,8 @@ static real sphere[6][8] = {{-.22f,0,.7f},{.22f,0,.7f},{0,-.22f,.7f},{0,.22f,.7f
 #define model_data_error(m,e) ((void)0)
 #define render_model_no_geometry FALSE
 #define matrix4x3_transform_point(m,p,o) (*(o)=*(p))
-#define rasterizer_model_draw(...) ((void)0)
-#define rasterizer_environment_shadow_model_draw(...) ((void)0)
+#define rasterizer_model_draw(s,p,t,ti,tc,v,vi) (selected_geometry[solid_draws++] = (v)->count)
+#define rasterizer_environment_shadow_model_draw(s,p,t,v) (selected_geometry[shadow_draws++] = (v)->count)
 #define rasterizer_debug_model_vertices(...) ((void)0)
 #define D3DLOCK_READONLY 128
 
@@ -127,7 +128,7 @@ static void draw_frame(void)
     struct render_skinning skinning = {NULL, 1};
     char permutation_indices[] = {0};
     submissions = 0;
-    render_model_parts(&model, permutation_indices, 1, &skinning, 1, 0, 0, 0);
+    render_model_parts(&model, permutation_indices, 1, &skinning, 1, 0, FALSE, 0, 0);
     CHECK(submissions == 2, "two transparent parts");
     CHECK(next[0] == 1 && previous[1] == 0, "native links must include part zero");
     CHECK(glass_material.flags == FLAG(_shader_transparent_glass_flag_two_sided_bit), "retail two-sided glass retained");
@@ -138,6 +139,46 @@ int main(int argc, char **argv)
     const char *case_name = argc > 1 ? argv[1] : "closed";
     int i;
     initialize();
+    if (!strncmp(case_name, "lod-", 4)) {
+        struct model_region regions[2];
+        struct model_region_permutation permutations[2];
+        struct model_geometry geometries[4];
+        struct model_geometry_part solid_parts[4];
+        struct render_skinning skinning = {NULL, 1};
+        char choices[2] = {0, 0};
+        boolean full_detail = strcmp(case_name, "lod-off") != 0;
+        boolean shadow = !strcmp(case_name, "lod-shadows");
+        memset(regions, 0, sizeof(regions));
+        memset(solid_parts, 0, sizeof(solid_parts));
+        for (i = 0; i < 4; i++) {
+            geometries[i].parts.count = 1; geometries[i].parts.address = &solid_parts[i];
+            solid_parts[i].shader_index = 2;
+            solid_parts[i].previous_part_index = solid_parts[i].next_part_index = NONE;
+            solid_parts[i].vertex_buffer.count = i;
+        }
+        for (i = 0; i < 2; i++) {
+            regions[i].permutations.count = 1; regions[i].permutations.address = &permutations[i];
+            memset(&permutations[i], 0xff, sizeof(permutations[i]));
+            permutations[i].geometry_indices[0] = 0;
+            permutations[i].geometry_indices[1] = 1;
+        }
+        permutations[1].geometry_indices[3] = 3;
+        if (!strcmp(case_name, "lod-empty"))
+            for (i = 0; i < 5; i++) permutations[0].geometry_indices[i] = NONE;
+        if (!strcmp(case_name, "lod-invalid")) permutations[0].geometry_indices[4] = 99;
+        model.regions.count = 2; model.regions.address = regions;
+        model.geometries.count = 4; model.geometries.address = geometries;
+        render_model_parts(&model, choices, 2, &skinning, 1, 4, full_detail, 0,
+            shadow ? FLAG(_render_model_shadow_bit) : 0);
+        if (!full_detail) CHECK(!solid_draws && !shadow_draws, "off preserves absent top-level geometry");
+        else if (!strcmp(case_name, "lod-empty") || !strcmp(case_name, "lod-invalid"))
+            CHECK(solid_draws == 1 && selected_geometry[0] == 3, "absent or corrupt geometry remains rejected");
+        else {
+            CHECK((shadow ? shadow_draws : solid_draws) == 2, "both regions draw with different highest available LODs");
+            CHECK(selected_geometry[0] == 1 && selected_geometry[1] == 3, "per-region fallback preserves geometry choice");
+        }
+        return 0;
+    }
     CASE("closed") { CHECK(recognizes(), "closed shell"); }
     CASE("open") { parts[1].triangle_buffer.count = 5; CHECK(!recognizes(), "missing face"); }
     CASE("outside") { sphere[0][0] = 5; CHECK(!recognizes(), "outside core"); }

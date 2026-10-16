@@ -10,8 +10,9 @@ from harness.render_types import transparent_types
 
 CASES = ["closed", "open", "outside", "reversed", "invalid", "strips", "uncompressed",
          "materials", "authored-links", "part-zero", "glass-zero", "opaque-part", "skinned",
-         "additional-transparent", "frame-cost", "map-reload", "render-links"]
+         "additional-transparent", "frame-cost", "map-reload", "render-links", "lod-regions", "lod-shadows", "lod-off", "lod-empty", "lod-invalid"]
 CONTROLS = {
+    "lost-lod-fallback": (("full_detail && level > 0", "FALSE && level > 0"), "lod-regions"),
     "revived-part-zero-gate": (("part->previous_part_index>=0", "part->previous_part_index>0"), "render-links"),
     "lost-enclosure-link": (("parts[energy].next_part_index = (char)glass;", "parts[energy].next_part_index = NONE;"), "part-zero"),
     "wrong-target-zero": (("if (glass == 0)", "if (FALSE)"), "glass-zero"),
@@ -37,6 +38,7 @@ def generated(control=None):
     types += "\n" + enum_with(read("source/models/model_definitions.h"), "MODELS_GROUP_TAG")
     code = read("source/rasterizer/rasterizer_transparent_enclosure.h")
     code += "\n" + function(raster, "rasterizer_transparent_geometry_is_enclosure")
+    code += "\n" + function(read("port/linux/game/render_lod.c"), "render_lod_permutation_level")
     for name in ["model_geometry_fix_transparent_part_links", "models_fix_transparent_part_links", "render_model_parts"]:
         code += "\n" + function(models, name)
     if control:

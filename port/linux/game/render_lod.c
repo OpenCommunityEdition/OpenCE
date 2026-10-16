@@ -41,11 +41,21 @@ short render_lod_geometry_level(struct model const *model, real pixels,
 {
 	short level = NUMBEROF(model->detail_cutoff_pixels) - 1;
 
+	if (debug_level != NONE)
+		return PIN(debug_level, 0, NUMBEROF(model->detail_cutoff_pixels) - 1);
 	if (full_detail)
 		return level;
 	while (level > 0 && pixels < model->detail_cutoff_pixels[level])
 		level--;
-	if (debug_level != NONE)
-		level = PIN(debug_level, 0, NUMBEROF(model->detail_cutoff_pixels) - 1);
+	return level;
+}
+
+short render_lod_permutation_level(struct model_region_permutation const *permutation,
+	short level, boolean full_detail)
+{
+	/* Only the full-detail override fills missing LODs. Authored selection
+	   and explicit debug levels must still be able to hide a permutation. */
+	while (full_detail && level > 0 && permutation->geometry_indices[level] == NONE)
+		level--;
 	return level;
 }

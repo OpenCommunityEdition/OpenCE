@@ -14,10 +14,10 @@ def generated(fault=None):
     if fault == "live":
         source = mutated(source, "read_at != changes", "(read_at != changes && changes == 0)")
     return (("under_test.inc", "\n".join(function(source, name) for name in (
-        "render_lod_disabled", "render_lod_model_disabled", "render_lod_particle_visible", "render_lod_geometry_level"))),)
+        "render_lod_disabled", "render_lod_model_disabled", "render_lod_particle_visible", "render_lod_geometry_level", "render_lod_permutation_level"))),)
 
 
-@pytest.mark.parametrize("case", ["default", "live", "cryotube", "projection", "geometry"])
+@pytest.mark.parametrize("case", ["default", "live", "cryotube", "projection", "geometry", "permutations"])
 def test_policy(case):
     status, output = run(build("render_lod", generated()), case)
     assert status == 0, output

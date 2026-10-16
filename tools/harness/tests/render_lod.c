@@ -21,6 +21,7 @@ static char const *tag_get_name(long index)
 #define NUMBEROF(a) (sizeof(a) / sizeof((a)[0]))
 #define PIN(v,l,h) ((v)<(l)?(l):((v)>(h)?(h):(v)))
 struct model {real detail_cutoff_pixels[5];};
+struct model_region_permutation {short geometry_indices[5];};
 #include "under_test.inc"
 
 int main(int argc, char **argv)
@@ -72,7 +73,8 @@ int main(int argc, char **argv)
 		}
 		CHECK(render_lod_geometry_level(&model, 79.99f, NONE, FALSE) == 3, "below boundary");
 		CHECK(render_lod_geometry_level(&model, 0, 2, FALSE) == 2, "stock debug override");
-		CHECK(render_lod_geometry_level(&model, 0, 2, TRUE) == 4, "setting forces maximum");
+		CHECK(render_lod_geometry_level(&model, 0, 2, TRUE) == 2, "explicit debug override wins");
+		CHECK(render_lod_geometry_level(&model, 0, -5, TRUE) == 0, "negative debug clamped");
 		CHECK(render_lod_geometry_level(&model, 0, 99, FALSE) == 4, "debug clamped");
 		configured = 1;
 		model.detail_cutoff_pixels[4] = 3000;
@@ -80,6 +82,22 @@ int main(int argc, char **argv)
 		CHECK(render_lod_geometry_level(&model, 200, NONE, render_lod_model_disabled(123)) == 3, "cryotube keeps normal mesh");
 		model_name = "vehicles\\warthog\\warthog";
 		CHECK(render_lod_geometry_level(&model, 200, NONE, render_lod_model_disabled(123)) == 4, "other models use highest mesh");
+	}
+	CASE("permutations") {
+		struct model_region_permutation permutation;
+		int mask, requested, level;
+		for (mask = 0; mask < 32; mask++) {
+			for (level = 0; level < 5; level++)
+				permutation.geometry_indices[level] = mask & (1 << level) ? 0 : NONE;
+			for (requested = 0; requested < 5; requested++) {
+				short expected = requested;
+				while (expected > 0 && !(mask & (1 << expected))) expected--;
+				CHECK(render_lod_permutation_level(&permutation, requested, TRUE) == expected,
+					"highest available geometry at or below the requested level");
+				CHECK(render_lod_permutation_level(&permutation, requested, FALSE) == requested,
+					"authored missing geometry stays hidden with override off");
+			}
+		}
 	}
 	return 0;
 }
