@@ -71,6 +71,9 @@ SCREENS = {
              "In first person, turn the view the moment the\nmouse moves, not up to two ticks later.", "desktop web"),
             ("HIGH-RES HUD:", "display.high_res_hud", ON_OFF,
              "Draw the HUD from the high-res redraws; off\ndraws the game's own pictures.", None),
+            ("BUTTON STYLE:", "display.hud_button_style",
+             [("CLASSIC", "classic"), ("GEMS", "gems"), ("DARK GEMS", "menu_gems")],
+             "Classic: plain Xbox buttons. Gems: shaded Xbox\nbuttons. Dark Gems: the menu's button artwork.", None),
             ("HIGH-RES TEXT:", "display.high_res_text", ON_OFF,
              "Draw text and titles with high-res fonts; off\ndraws the game's own.", None),
             ("ANTI-ALIASING:", "display.anti_aliasing",
@@ -194,7 +197,7 @@ SCREENS = {
 # Video Setup's categories open ordinary settings screens. Each has the same
 # pending edits, Defaults, OK and Cancel as the other settings screens.
 _video = SCREENS["video_settings"]
-_graphics = {"display.high_res_hud", "display.high_res_text", "display.anti_aliasing",
+_graphics = {"display.high_res_hud", "display.hud_button_style", "display.high_res_text", "display.anti_aliasing",
              "display.shadow_resolution", "display.per_pixel_lighting",
              "display.shield_glow", "display.shield_glow_intensity"}
 SCREENS["video_settings/graphics"] = {
@@ -618,6 +621,11 @@ MAP_KIND_CHOOSER = "main_menu/new_select/list_item_0_map_kind"
 # changes to the PC version's widgets (by our names): attributes set, all
 # their handlers replaced, children added, game data inputs added
 WIDGET_PATCHES = {
+    # The host returns here after a round with no menu history. Back must
+    # reopen the main menu when it closes the last screen, as the lobby does.
+    f"{MT}/connected/connected_map_select_wrapper": {"set": {
+        "flags": "pass_unhandled_to_focused_child pause_game main_menu_if_no_history tag_controller_index force_handle_mouse",
+    }},
     # (the profile settings' picture: on Gamepad Setup's row, the profile's
     # button settings, BITMAP_FRAMES; menu_functions.c's
     # profile_gamepad_layout)
@@ -761,23 +769,53 @@ def pause_box_height(buttons: int) -> int:
     return 159 + (buttons - 2) * 35
 
 
-def pause_box_svg(piece: str, height: int) -> str:
+def pause_box_svg(piece: str, height: int, header: bool = False) -> str:
     """a piece of the pause box (left cap, centre strip, right cap; 9-slice:
     the strip tiles across), height units high in its 256-high texture"""
     width = 4 if piece == "center" else 16
     lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="256" viewBox="0 0 {width} 256">']
+    fill = "#0a2649"
+    body_clip = ""
+    if not header:
+        # Keep the translucent footer clear of the body: blending two
+        # 75%-opaque fills would make it nearly opaque and tint it blue.
+        lines += [f'  <defs><clipPath id="body-area"><rect x="-16" y="0" width="48" height="{height - 28}"/></clipPath></defs>']
+        body_clip = ' clip-path="url(#body-area)"'
+    if height in PAUSE_BOX_EXTRA_HEIGHTS or height in map(pause_box_height, PAUSE_BOX_BUTTONS):
+        # The stock campaign body fades from blue to dark navy at 75% opacity.
+        # Scale it within the body, excluding the objective header or key footer.
+        top, bottom = (29, height - 2) if header else (2, height - 28)
+        lines += [f'  <defs><linearGradient id="body" gradientUnits="userSpaceOnUse" x1="0" y1="{top}" x2="0" y2="{bottom}">',
+                  '    <stop offset="0" stop-color="#0a2649"/>',
+                  '    <stop offset="1" stop-color="#050d1c"/>',
+                  '  </linearGradient></defs>']
+        fill = "url(#body)"
     if piece == "center":
-        lines += [f'  <rect x="0" y="2" width="4" height="{height - 4}" fill="#0a2649" fill-opacity="0.75"/>',
+        lines += [f'  <rect x="0" y="2" width="4" height="{height - 4}" fill="{fill}" fill-opacity="0.75"{body_clip}/>',
                   '  <rect x="0" y="0" width="4" height="2" fill="#2896ff"/>',
                   f'  <rect x="0" y="{height - 2}" width="4" height="2" fill="#2896ff"/>']
     else:
         bottom, corner = height - 1, height - 9.5
         cap = [f'    <path d="M9.5,1 H17 V{bottom} H9.5 A8.5,8.5 0 0 1 1,{corner} V9.5 A8.5,8.5 0 0 1 9.5,1 Z" '
-               'fill="#0a2649" fill-opacity="0.75" fill-rule="evenodd"/>',
+               f'fill="{fill}" fill-opacity="0.75" fill-rule="evenodd"{body_clip}/>',
                f'    <path d="M17,1 H9.5 A8.5,8.5 0 0 0 1,9.5 V{corner} A8.5,8.5 0 0 0 9.5,{bottom} H17" fill="none" '
                'stroke="#2896ff" stroke-width="2"/>']
         lines += (['  <g transform="matrix(-1 0 0 1 16 0)">'] + cap + ['  </g>']) if piece == "right" else \
             [line[2:] for line in cap]
+    # The stock objectives have a 28-unit header; the button key has a
+    # 28-unit footer. Clip the black fill to the rounded panel interior.
+    top = 2 if header else height - 28
+    divider = 28 if header else height - 28
+    if piece == "left":
+        lines += [f'  <defs><clipPath id="strip"><rect x="2" y="2" width="{width + 16}" height="{height - 4}" rx="7.5"/></clipPath></defs>']
+    if piece == "right":
+        lines += [f'  <defs><clipPath id="strip"><rect x="-16" y="2" width="{width + 14}" height="{height - 4}" rx="7.5"/></clipPath></defs>']
+    clip = ' clip-path="url(#strip)"' if piece != "center" else ""
+    opacity = ' fill-opacity="0.75"' if not header else ""
+    lines += [f'  <g{clip}>',
+              f'    <rect x="0" y="{top}" width="{width}" height="26" fill="black"{opacity}/>',
+              f'    <rect x="0" y="{divider}" width="{width}" height="0.75" fill="#2896ff"/>',
+              '  </g>']
     lines += ["</svg>", ""]
     return "\n".join(lines)
 

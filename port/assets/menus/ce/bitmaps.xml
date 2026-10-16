@@ -356,6 +356,15 @@
 		<frame png="ce/port/pause/pausebox_right__1.png" width="16" height="256"/>
 		<frame png="ce/port/pause/pausebox_right__2.png" width="16" height="256"/>
 	</bitmap>
+	<bitmap name="pause/objectives_left">
+		<frame png="ce/port/pause/objectives_left__0.png" width="16" height="256"/>
+	</bitmap>
+	<bitmap name="pause/objectives_center">
+		<frame png="ce/port/pause/objectives_center__0.png" width="4" height="256"/>
+	</bitmap>
+	<bitmap name="pause/objectives_right">
+		<frame png="ce/port/pause/objectives_right__0.png" width="16" height="256"/>
+	</bitmap>
 	<bitmap name="voice/speaker">
 		<frame png="ce/port/voice/speaker__0.png" width="24" height="24"/>
 		<frame png="ce/port/voice/speaker__1.png" width="24" height="24"/>

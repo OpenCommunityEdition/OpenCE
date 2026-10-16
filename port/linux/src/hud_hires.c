@@ -33,7 +33,8 @@ zlib (port/third_party/zlib).
 /* the game's (port/linux/game/hud_hires_tags.c) */
 long hud_hires_asset_at(unsigned long address, long width, long height);
 
-#define MAXIMUM_TEXTURES 128
+/* Include every embedded HUD and button style, including stick frames. */
+#define MAXIMUM_TEXTURES 256
 /* a PNG's inflated rows and its texels, which are held at once: 128 MB for
 a 4096 by 4096 sheet (the largest shipped, 2048 by 2048, takes 32 MB), and
 no more for a small file that names a large size (a menus folder's) */
@@ -70,6 +71,31 @@ long hud_hires_asset_fits(long asset, long width, long height)
 
 	return width > 0 && height > 0 && embedded->width % width == 0 && embedded->height % height == 0 &&
 		embedded->width / width == embedded->height / height && embedded->width / width > 1;
+}
+
+/* Changed settings since the previous rendered frame: HUD bit 0, titles bit 1.
+ * Pending menu edits do not change config_changes(). */
+unsigned long hud_hires_settings_changed(void)
+{
+	static unsigned long read_at = (unsigned long)-1;
+	static unsigned long previous;
+	unsigned long current, changed;
+
+	if (read_at == config_changes()) return 0;
+	current = (config_boolean("display.high_res_hud") ? 1UL : 0UL) |
+		(config_boolean("display.high_res_text") ? 2UL : 0UL);
+	changed = read_at == (unsigned long)-1 ? 0 : previous ^ current;
+	read_at = config_changes();
+	previous = current;
+	return changed;
+}
+
+int hud_hires_bitmap_affected(unsigned long address, long width, long height, unsigned long changed)
+{
+	long asset = hud_hires_asset_at(address, width, height);
+
+	return asset >= 0 && asset < hud_hires_asset_count() &&
+		(changed & (hud_hires_embedded[asset].title ? 2UL : 1UL)) != 0;
 }
 
 long hud_hires_override_find(unsigned long address, unsigned long width, unsigned long height,
@@ -115,7 +141,8 @@ int hud_hires_override_coverage(long asset)
 
 /* the placeholders of the textures drawn for some of a bitmap's sprites
 (port/linux/game/hud_hires_tags.c): their D3D textures' Data */
-#define MAXIMUM_PLACEHOLDERS 8
+/* Room for the gameplay button styles and map-owned sprite placeholders. */
+#define MAXIMUM_PLACEHOLDERS 32
 
 static struct
 {
@@ -200,6 +227,146 @@ int hud_hires_override_point_threshold(long asset)
 }
 
 /* ---------- decoding */
+
+/* Catmull-Rom interpolation of the map's original texels. No font, sprite
+ * rectangle, registration point or animation frame is substituted. Keeping
+ * the input centres at (x + .5) also keeps the original HUD alignment. */
+static void upscale_weights(float t, float *weights)
+{
+	float square = t * t, cube = square * t;
+
+	weights[0] = -0.5f * t + square - 0.5f * cube;
+	weights[1] = 1.0f - 2.5f * square + 1.5f * cube;
+	weights[2] = 0.5f * t + 2.0f * square - 1.5f * cube;
+	weights[3] = -0.5f * square + 0.5f * cube;
+}
+
+unsigned char *hud_hires_upscale_pixels(const unsigned char *bgra, unsigned long width, unsigned long height)
+{
+	unsigned char *out;
+	unsigned long x, y, channel;
+
+	if (!bgra || !width || !height || width > 256 || height > 256)
+		return NULL;
+	out = malloc(width * height * 16 * 4);
+	if (!out)
+		return NULL;
+	for (y = 0; y < height * 4; y++)
+	{
+		float sy = (y + 0.5f) * 0.25f - 0.5f, wy[4];
+		long iy = (long)sy;
+
+		if (sy < iy) iy--;
+		upscale_weights(sy - iy, wy);
+		for (x = 0; x < width * 4; x++)
+		{
+			float sx = (x + 0.5f) * 0.25f - 0.5f, wx[4];
+			long ix = (long)sx;
+
+			if (sx < ix) ix--;
+			upscale_weights(sx - ix, wx);
+			for (channel = 0; channel < 4; channel++)
+			{
+				float value = 0.0f;
+				long row, column;
+				unsigned long source_channel = channel == 0 ? 2 : channel == 2 ? 0 : channel;
+
+				for (row = 0; row < 4; row++)
+				{
+					long py = iy + row - 1;
+
+					if (py < 0) py = 0;
+					if (py >= (long)height) py = height - 1;
+					for (column = 0; column < 4; column++)
+					{
+						long px = ix + column - 1;
+
+						if (px < 0) px = 0;
+						if (px >= (long)width) px = width - 1;
+						value += bgra[(py * width + px) * 4 + source_channel] * wy[row] * wx[column];
+					}
+				}
+				out[(y * width * 4 + x) * 4 + channel] =
+					(unsigned char)(value < 0 ? 0 : value > 255 ? 255 : value + 0.5f);
+			}
+		}
+	}
+	return out;
+}
+
+static unsigned char *png_decode(const unsigned char *data, unsigned long size,
+	unsigned long *png_width, unsigned long *png_height);
+
+/* The background's old icon otherwise draws over the existing high-res meter
+ * contour. Only the five known Xbox sheets get this matching contour; their
+ * text, and customized sheets, retain their original pixels and layout. */
+static void upscale_outline(unsigned char *pixels, const unsigned char *bgra,
+	unsigned long width, unsigned long height, long kind)
+{
+	unsigned long crc, png_width, png_height, row;
+	long asset;
+	unsigned char *outline;
+	char const *name;
+	unsigned long left, top, right, bottom;
+
+	if (width != 128 || height != 32 || (kind != 2 && kind != 3))
+		return;
+	crc = crc32(0L, bgra, (uInt)(width * height * 4));
+	if (kind == 2)
+	{
+		if (crc != 0x23894da5UL && crc != 0x38fb467aUL && crc != 0xcd279468UL)
+			return;
+		name = "ui\\hud\\redraws\\vehicle_wrench_outline";
+		left = 73; top = 11; right = 101; bottom = 25;
+	}
+	else
+	{
+		if (crc != 0x17446e88UL && crc != 0xb14f00a1UL)
+			return;
+		name = "ui\\hud\\redraws\\passenger_health_outline";
+		left = 74; top = 10; right = 89; bottom = 24;
+	}
+	for (asset = 0; asset < hud_hires_asset_count(); asset++)
+	{
+		const struct hud_hires_embedded *embedded = &hud_hires_embedded[asset];
+
+		if (strcmp(embedded->tag, name))
+			continue;
+		outline = png_decode((const unsigned char *)embedded->png, embedded->png_size, &png_width, &png_height);
+		if (outline && png_width == width * 4 && png_height == height * 4)
+			for (row = top * 4; row < bottom * 4; row++)
+				memcpy(pixels + (row * width * 4 + left * 4) * 4,
+					outline + (row * width * 4 + left * 4) * 4, (right - left) * 16);
+		free(outline);
+		break;
+	}
+}
+
+unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long width,
+	unsigned long height, long kind, unsigned long *levels)
+{
+	unsigned char *pixels = hud_hires_upscale_pixels(bgra, width, height);
+	unsigned long largest;
+	GLuint texture;
+
+	if (!pixels)
+		return 0;
+	upscale_outline(pixels, bgra, width, height, kind);
+	*levels = 1;
+	for (largest = (width > height ? width : height) * 4; largest > 1; largest >>= 1)
+		(*levels)++;
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, (GLint)*levels - 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)width * 4, (GLsizei)height * 4,
+		0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	xgpu_gl_state_invalidate();
+	free(pixels);
+	return texture;
+}
 
 static unsigned long big_endian_long(const unsigned char *bytes)
 {

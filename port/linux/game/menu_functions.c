@@ -1524,6 +1524,36 @@ static void video_rows_show(struct widget_instance *list)
 	}
 }
 
+/* Graphics' button style follows the pending HUD choice, including Defaults.
+The remaining options close the gap; the help and bottom buttons stay put. */
+static void hud_button_style_row_show(struct widget_instance *list)
+{
+	struct widget_instance *hud = named(list, "high_res_hud_spinner", 0);
+	struct widget_instance *row = named(list, "op_hud_button_style", 0);
+	struct pc_menu_setting *setting = hud ? pc_menu_setting_get(hud->definition_tag_index) : NULL;
+	struct widget_instance *child;
+	short index;
+	boolean visible;
+
+	if (!setting || !row) return;
+	index = hud->parameters.list.selected_index;
+	visible = index >= 0 && index < setting->value_count && !strcmp(setting->values[index], "true");
+	if (row->visible != visible)
+	{
+		for (child = row->next; child; child = child->next)
+			if (!strncmp(child->name, "op_", 3))
+				child->vertical_offset += visible ? 30 : -30;
+		row->visible = visible;
+	}
+	if (!visible && list->focused_child == row)
+	{
+		for (index = 0, child = list->child; child && child != hud->parent; child = child->next)
+			index++;
+		list->focused_child = hud->parent;
+		list->parameters.list.selected_index = index;
+	}
+}
+
 /* ---------- Change Color: the profile's colour, from a list of the
 game's colours (more than its rows: it scrolls), by the Xbox's names for
 its spinner's functions */
@@ -5779,6 +5809,7 @@ void pc_menu_game_data_function_invoke(
 	else if (!strcmp(name, "port settings help"))
 	{
 		video_rows_show(widget);
+		hud_button_style_row_show(widget);
 		settings_help(widget);
 	}
 	else if (!strcmp(name, "controls update menu"))
