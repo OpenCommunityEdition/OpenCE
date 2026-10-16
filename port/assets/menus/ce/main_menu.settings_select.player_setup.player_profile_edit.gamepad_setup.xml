@@ -70,7 +70,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_preset_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_preset_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="DEFAULT|SWAP TRIGGERS|SWAP A, L TRIGGER|SWAP B, L TRIGGER|SWAP B, R STICK" setting="profile.button_preset" values="0|1|2|3|4" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_preset_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="DEFAULT|SWAP TRIGGERS|SWAP A, L TRIGGER|BOXER|GREEN THUMB|BUMPER JUMPER|RECON|WALKIE TALKIE|FISHSTICK|HELLJUMPER" setting="profile.button_preset" values="0|1|2|3|4|5|6|7|8|9" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_joystick_preset" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
@@ -126,7 +126,7 @@
 		<string text="Pushing the right stick up looks down."/>
 		<string text="Flying vehicles pitch as aircraft do: pushing up\nflies down."/>
 		<string text="Level the view while walking."/>
-		<string text="Which of the controller's buttons does what (not\nthe keyboard's: Controls Setup sets those)."/>
+		<string text="Controller layouts adapted to Halo CE. Fishstick\nand Helljumper use LT toggle zoom. Menus keep A/B."/>
 		<string text="Which stick moves and which looks."/>
 		<string text="Rumble the controller."/>
 		<string text="Show the game's hints about its controls."/>

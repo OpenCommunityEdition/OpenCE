@@ -193,6 +193,47 @@ controller 1. The gamepad changes controller only when none of its buttons
 is held. The profile's button layout (Settings > Gamepads) is the
 gamepads' only.
 
+Settings > Gamepads > Button Layout offers BUMPER JUMPER, based on Halo 3.
+It is saved in the player profile. Menus keep A to accept and B to go back.
+
+| Button | Bumper Jumper action |
+| --- | --- |
+| LB | Jump |
+| RB | Melee |
+| LT | Throw grenade |
+| RT | Fire |
+| A | Switch grenades |
+| B | Reload / use (hold to swap weapons) |
+| X | Flashlight (Halo CE has no equipment) |
+| Y | Switch weapons |
+| Left stick click | Crouch |
+| Right stick click | Zoom |
+| Start / Back | Pause / scores |
+
+Other layouts include classic BOXER (LT melee, B grenade) and GREEN THUMB
+(right stick click melee, B zoom), named versions of the existing swaps.
+The later-game layouts below are adapted to CE's actions. They keep RT fire,
+Y switch weapons, Start pause and Back scores. Stick layout is independent.
+
+| Action | Recon | Walkie Talkie | Fishstick | Helljumper |
+| --- | --- | --- | --- | --- |
+| Jump | A | A | A | LB |
+| Melee | B | RB | Right stick click | Right stick click |
+| Reload / use | RB | B | X | B |
+| Throw grenade | LT | LT | RB | RB |
+| Switch grenades | LB | X | LB | A |
+| Flashlight | X | LB | Left stick click | X |
+| Crouch | Left stick click | Left stick click | B | Left stick click |
+| Zoom | Right stick click | Right stick click | LT | LT |
+
+Recon follows Halo 3's default layout, with X flashlight instead of equipment.
+Walkie Talkie's LB operates the flashlight; it does not bind voice chat.
+Fishstick and Helljumper use CE's toggle/cycle zoom, not hold-to-aim. CE has
+no sprint, equipment or Spartan abilities; the remaining buttons serve its
+flashlight and grenade selection. Layout references:
+[Halo 3](https://www.halopedia.org/H3:Control_schemes) and
+[Halo 5](https://www.halopedia.org/H5G:Control_schemes).
+
 | Action | Keys and buttons (default) |
 | --- | --- |
 | move | W, A, S, D |

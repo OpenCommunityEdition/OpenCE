@@ -62,6 +62,12 @@ A settings screen (Controls Setup, Gamepads, Mouse, Audio, Video or Network
 Setup) is changed in `tools/port_settings.py`, not in its XML, and written
 with the command above.
 
+To regenerate only one port settings screen without the external tag assets:
+
+```sh
+python tools/port_settings.py gamepad_setup
+```
+
 ## Elements
 
 A file holds one `<menus>` element (`root` names the main menu's widget, in
