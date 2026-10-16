@@ -801,7 +801,7 @@ def pause_box_svg(piece: str, height: int, header: bool = False) -> str:
         # 75%-opaque fills would make it nearly opaque and tint it blue.
         lines += [f'  <defs><clipPath id="body-area"><rect x="-16" y="0" width="48" height="{height - 28}"/></clipPath></defs>']
         body_clip = ' clip-path="url(#body-area)"'
-    if height in PAUSE_BOX_EXTRA_HEIGHTS:
+    if height in PAUSE_BOX_EXTRA_HEIGHTS or height in map(pause_box_height, PAUSE_BOX_BUTTONS):
         # The stock campaign body fades from blue to dark navy at 75% opacity.
         # Scale it within the body, excluding the objective header or key footer.
         top, bottom = (29, height - 2) if header else (2, height - 28)

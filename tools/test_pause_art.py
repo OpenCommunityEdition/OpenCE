@@ -18,10 +18,7 @@ def test_button_strip(piece, frame, height):
     x = image.width // 2
     # Stock Xbox footer alpha is 191/255, with no blue body underneath.
     assert image.getpixel((x, (height - 15) * scale)) == (0, 0, 0, 191)
-    if frame == 2:
-        assert_campaign_gradient(image, 2, height - 29, piece)
-    else:
-        assert image.getpixel((x, 40 * scale)) == pytest.approx((10, 38, 73, 191), abs=1)
+    assert_campaign_gradient(image, 2, height - 29, piece)
     assert image.getpixel((x, (height + 1) * scale))[3] == 0
     assert image.getpixel((x, (height - 28) * scale))[:3] == (40, 150, 255)
 
