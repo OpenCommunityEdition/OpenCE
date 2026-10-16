@@ -395,6 +395,10 @@ void voice_audio_play(int speaker, unsigned short sequence, const unsigned char 
 
 	if (length <= 0 || length > VOICE_MAXIMUM_PACKET)
 		return;
+	/* (every build sends a frame of 20 ms: anything else, damaged, is
+	dropped before the decoder sees it, and made up for as lost) */
+	if (opus_packet_get_nb_samples(packet, length, VOICE_RATE) != VOICE_FRAME_SAMPLES)
+		return;
 	pthread_mutex_lock(&voice_lock);
 	slot = voice_slot_for(speaker, TRUE);
 	if (!slot)

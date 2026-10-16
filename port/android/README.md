@@ -307,7 +307,9 @@ The guest is the game, the platform layer and a small runtime:
    AArch64 target of clang. The options `-U__APPLE__` and
    `-fno-define-target-os-macros` hide the Darwin environment.
 2. `tools/android_asm_convert.py` changes the Mach-O assembly to ELF
-   assembly.
+   assembly. It renames symbols, but keeps string literals (`.ascii`,
+   `.asciz`) byte for byte: they hold tables as well as text
+   (`tools/test_android_asm_convert.py`).
 3. The AArch64 assembler makes the objects.
 4. `ld.lld` links the objects with `guest/guest.ld` to a static image,
    `build/android/halo_guest.elf`, at a fixed address above the Xbox memory
