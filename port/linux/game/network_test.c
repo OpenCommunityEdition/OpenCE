@@ -13,6 +13,9 @@ Automated system link sessions for testing the netcode without the menus
   with a path is that level (custom_maps\a30, a Custom Edition map's), and
   the variant "coop" makes the game network co-op on it, at normal
   difficulty, as the Map screen does for a campaign level;
+- "local:<map>[:<variant>...]" the same with a local (split screen) game of
+  one player, as Multiplayer > Split Screen of the Xbox's menus sets one up
+  (no other machine joins it: the bots' games, bots.count);
 - "join" searches for games and joins the first it finds, as picking it in
   the system link list does;
 - "browse" joins the game with the most players that the server browser
@@ -96,6 +99,8 @@ static struct
 	short mode;
 	char map_name[64];
 	char variant_name[64];
+	/* "local:": a local (split screen) game, not a system link one */
+	boolean local;
 	/* ... the variant of this game, of variant_name's list; and the seconds
 	the last game's scores have been shown */
 	short variant_index;
@@ -155,12 +160,13 @@ static void network_test_read_settings(
 	char const *setting = config_string("debug.network_test");
 
 	network_test.checked = TRUE;
-	if (!strncmp(setting, "host:", 5) && setting[5])
+	if ((!strncmp(setting, "host:", 5) && setting[5]) || (!strncmp(setting, "local:", 6) && setting[6]))
 	{
 		char *colon;
 
 		network_test.mode = _network_test_host;
-		snprintf(network_test.map_name, sizeof(network_test.map_name), "%s", setting + 5);
+		network_test.local = setting[0] == 'l';
+		snprintf(network_test.map_name, sizeof(network_test.map_name), "%s", strchr(setting, ':') + 1);
 		snprintf(network_test.variant_name, sizeof(network_test.variant_name), "slayer");
 		colon = strchr(network_test.map_name, ':');
 		if (colon)
@@ -985,11 +991,34 @@ void network_test_update(
 		{
 			network_test.set_up = TRUE;
 			main_set_multiplayer_map_name(network_test.map_name);
-			player_ui_fast_setup_network_server();
-			platform_log("network test: hosting %s", network_test.map_name);
-			/* (in the server browser, as Create Game > Internet's PUBLIC) */
-			if (network_test.public_game)
-				p2p_set_hosting_public(TRUE);
+			if (network_test.local)
+			{
+				/* as Multiplayer > Split Screen does (split_screen_game_initialize) */
+				ui_widgets_close_all();
+				dispose_global_network_game_server();
+				dispose_global_network_game_client();
+				network_game_accept_remote_connections(FALSE);
+				game_engine_playlist_initialize();
+				if (create_global_network_game_server())
+				{
+					game_engine_playlist_begin();
+					game_connection_set(_game_connection_network_server);
+				}
+				if (!global_network_game_client_get())
+					create_global_network_game_client();
+				ui_widget_load_by_name_or_tag(
+					"ui\\shell\\main_menu\\multiplayer_type_select\\split_screen\\pregame\\splitscreen_pregame_wrapper_normal",
+					NONE, NULL, NONE, NONE, NONE, NONE);
+				platform_log("network test: a local game on %s", network_test.map_name);
+			}
+			else
+			{
+				player_ui_fast_setup_network_server();
+				platform_log("network test: hosting %s", network_test.map_name);
+				/* (in the server browser, as Create Game > Internet's PUBLIC) */
+				if (network_test.public_game)
+					p2p_set_hosting_public(TRUE);
+			}
 		}
 		else if (!network_test.started)
 		{
