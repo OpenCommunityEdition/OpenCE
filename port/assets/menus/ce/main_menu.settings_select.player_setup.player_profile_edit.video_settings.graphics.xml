@@ -44,7 +44,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/hud_button_style_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/hud_button_style_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="CLASSIC|GEMS|MENU GEMS" setting="display.hud_button_style" values="classic|gems|menu_gems" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/hud_button_style_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="CLASSIC|GEMS|DARK GEMS" setting="display.hud_button_style" values="classic|gems|menu_gems" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/op_high_res_text" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
@@ -134,7 +134,7 @@
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/help_strings">
 		<string text=""/>
 		<string text="Draw the HUD from the high-res redraws; off\ndraws the game's own pictures."/>
-		<string text="Classic: plain Xbox buttons. Gems: shaded Xbox\nbuttons. Menu Gems: the menu's button artwork."/>
+		<string text="Classic: plain Xbox buttons. Gems: shaded Xbox\nbuttons. Dark Gems: the menu's button artwork."/>
 		<string text="Draw text and titles with high-res fonts; off\ndraws the game's own."/>
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA\nand SMAA are cheap; SSAA and MSAA are sharper."/>
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA\nis cheap; MSAA is sharper."/>
