@@ -115,7 +115,8 @@ int hud_hires_override_coverage(long asset)
 
 /* the placeholders of the textures drawn for some of a bitmap's sprites
 (port/linux/game/hud_hires_tags.c): their D3D textures' Data */
-#define MAXIMUM_PLACEHOLDERS 16
+/* Room for the gameplay button styles and map-owned sprite placeholders. */
+#define MAXIMUM_PLACEHOLDERS 32
 
 static struct
 {

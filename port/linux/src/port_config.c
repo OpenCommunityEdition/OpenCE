@@ -139,7 +139,8 @@ static const struct config_setting config_settings[] =
 		"false draws the maps' own bitmaps." },
 	{ "display.hud_button_style", _config_string, "\"classic\"", "HALO_HUD_BUTTON_STYLE", _environment_value, _platform_all,
 		"High-res gameplay controller buttons: classic uses plain Xbox faces;\n"
-		"gems uses the shaded, outlined faces. Requires display.high_res_hud." },
+		"gems uses shaded Xbox faces; menu_gems uses the menu's button art.\n"
+		"Requires display.high_res_hud." },
 	{ "display.high_res_text", _config_boolean, "true", "HALO_HIGH_RES_TEXT", _environment_value, _platform_all,
 		"Draw the menus' and HUD's text with the fonts in port/assets/fonts\n"
 		"(Overpass) at the resolution the game draws at, and the menus' titles\n"
