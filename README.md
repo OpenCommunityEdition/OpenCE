@@ -20,6 +20,10 @@ GulchCE will always be compatible with OpenCE, so players on both clients can pl
 </h3>
 <br>
 <p align="center">
+Any fork compatible with OpenCE is also compatible with GulchCE. Crossplay galore!
+</p>
+<br>
+<p align="center">
   Halo is a trademark of Microsoft. GulchCE is a fan project, not made or endorsed by Microsoft, Bungie, 343 Industries, or Halo Studios, and does not include any game assets or content.
 </p>
 <hr>
