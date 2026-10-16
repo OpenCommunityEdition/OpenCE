@@ -88,6 +88,27 @@ BUTTONS = {
 MESSAGE_ICONS = "ui\\hud\\bitmaps\\hud_msg_icons_sm"
 MESSAGE_BUTTONS = {0: "a_butn.svg", 1: "b_butn.svg", 2: "x_butn.svg", 3: "y_butn.svg"}
 
+# Standalone Xbox faces for gameplay prompts, using the existing redraws.
+HUD_BUTTONS = [dict(name=f"{button}_butn__0", tag=BITMAPS + f"{button}_butn",
+                   bitmap=0, width=32, height=32, format="dxt3", scale=8,
+                   crc=0, svg=f"{button}_butn.svg", place=[1, 0, 0])
+               for button in ("black", "white")]
+
+# Plain gameplay faces use the same hand-drawn oval and letter as the
+# message stencils, with solid colour and no rim or shadow.
+CLASSIC_BUTTONS = [dict(name=f"classic_{button}__0", tag=f"ui\\hud\\buttons\\classic_{button}",
+                       bitmap=0, width=32, height=32, format="dxt3", scale=8,
+                       crc=0, svg=f"{button}_butn.svg", place=[1, 0, 0], classic=color)
+                   for button, color in (("a", "#40eb40"), ("b", "#fa5946"),
+                                         ("x", "#3998fa"), ("y", "#f9e928"),
+                                         ("black", "#000000"), ("white", "#ffffff"))]
+
+# Supplied Xbox gameplay gems, fitted to the existing 21x26 gameplay cell.
+# Black and White retain the existing gem redraws in both gem styles.
+GEM_BUTTONS = [dict(name=f"gem_{button}__0", tag=f"ui\\hud\\buttons\\gem_{button}",
+                   bitmap=0, width=32, height=32, format="dxt3", scale=8, crc=0,
+                   source_png=f"source/{button}_gem.png") for button in "abxy"]
+
 
 def document(width: int, height: int, body: str) -> str:
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
@@ -134,6 +155,41 @@ def stencil(svg: str, cell: list, place: list, index: int, letter: list = (0, 0)
             f'<g clip-path="url(#cell{index})" mask="url(#letter{index})">'
             f'<ellipse transform="{moved} {parents[oval].get("transform")}" rx="{oval.get("rx")}" '
             f'ry="{oval.get("ry")}" fill="#ffffff"/></g>')
+
+
+def classic(svg: str, color: str, letter_move: list = (0, 0)) -> str:
+    """The existing redraw's plain oval and black letter in the same cell."""
+    root = ElementTree.parse(ASSETS / "svg" / svg).getroot()
+    parents = {child: parent for parent in root.iter() for child in parent}
+    oval, letter = root.find(".//*[@id='oval']"), root.find(".//*[@id='letter']")
+    oval.set("fill", color)
+    oval.set("transform", parents[oval].get("transform", ""))
+    body = ElementTree.tostring(oval, encoding="unicode")
+    if letter is not None:
+        letter.set("fill", "#000000")
+        letter.set("transform", f"translate({letter_move[0]} {letter_move[1]}) {letter.get('transform', '')}")
+        body += ElementTree.tostring(letter, encoding="unicode")
+    return document(32, 32, body)
+
+
+def gameplay_gem(entry: dict) -> np.ndarray:
+    """Fit the supplied transparent oval to the shared gameplay icon cell."""
+    source = Image.open(ASSETS / entry["source_png"]).convert("RGBA")
+    bounds = source.getchannel("A").getbbox()
+    if bounds is None:
+        raise ValueError(f"{entry['source_png']}: empty button")
+    scale = entry["scale"]
+    reference = Image.open(ASSETS / "a_butn__0.png").convert("RGBA")
+    # Keep the menu redraw's outer bounds and transparent inset, rather than
+    # filling its whole cropped cell and making the new faces look larger.
+    factor = entry["width"] * scale / reference.width
+    left, top, right, bottom = [round(n * factor) for n in reference.getchannel("A").getbbox()]
+    cell = (right - left, bottom - top)
+    face = source.crop(bounds)
+    face.thumbnail(cell, Image.Resampling.LANCZOS)
+    image = Image.new("RGBA", (entry["width"] * scale, entry["height"] * scale))
+    image.paste(face, (left + (cell[0] - face.width) // 2, top + (cell[1] - face.height) // 2))
+    return bleed(np.asarray(image).copy())
 
 
 def render(text: str, scale: int) -> np.ndarray:
@@ -296,7 +352,10 @@ def layout(arguments) -> None:
         # (the sprites it stands for, not the whole bitmap)
         "sprites": sprites,
     })
-    LIST.write_text(json.dumps({"assets": entries}, indent=1) + "\n")
+    classic_buttons = [dict(entry) for entry in CLASSIC_BUTTONS]
+    for entry, sprite in zip(classic_buttons, sprites):
+        entry["letter"] = [round(n / sprite["place"][0], 4) for n in sprite["letter"]]
+    LIST.write_text(json.dumps({"assets": entries + HUD_BUTTONS + classic_buttons + GEM_BUTTONS}, indent=1) + "\n")
 
 
 def build(arguments) -> None:
@@ -306,7 +365,11 @@ def build(arguments) -> None:
         if stale.name not in names:
             stale.unlink()
     for entry in description["assets"]:
-        if "sprites" in entry:
+        if "source_png" in entry:
+            image = gameplay_gem(entry)
+        elif "classic" in entry:
+            image = bleed(render(classic(entry["svg"], entry["classic"], entry.get("letter", (0, 0))), entry["scale"]))
+        elif "sprites" in entry:
             body = "\n".join(stencil(sprite["svg"], sprite["cell"], sprite["place"], index,
                                      sprite.get("letter", (0, 0)))
                              for index, sprite in enumerate(entry["sprites"]))

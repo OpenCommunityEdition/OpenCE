@@ -831,6 +831,9 @@ struct texture_entry
 	unsigned long last_used_frame;
 	/* the high-res HUD texture drawn in its place (hud_hires.h), or -1 */
 	long override;
+	GLuint hud_upscale;
+	unsigned long hud_upscale_levels;
+	BOOL hud_upscale_checked;
 	/* the newest generation of its pages (memory_watch_generation) as of the
 	memory watch serial read before it was found: the same while no watched
 	page has been written since (0: never found) */
@@ -932,6 +935,38 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 			description->hires_coverage = hud_hires_override_coverage(entry->override);
 			description->hires_point_threshold = hud_hires_override_point_threshold(entry->override);
 			return texture;
+		}
+	}
+	/* These sheets keep the map's art and coordinates. Decode through the
+	 * normal format reader; the HUD module owns only the interpolation. */
+	if (config_boolean("display.high_res_hud"))
+	{
+		if (!entry->hud_upscale_checked)
+		{
+			long kind = hud_hires_upscale_at(entry->address, entry->description.width, entry->description.height);
+
+			entry->hud_upscale_checked = TRUE;
+			if (entry->size && !entry->description.compressed && entry->target == GL_TEXTURE_2D &&
+				format_information(entry->description.format).kind != _texel_p8 &&
+				entry->description.width <= 256 && entry->description.height <= 256 &&
+				kind &&
+				custom_edition_texels_order(entry->address) == _custom_edition_channels_xbox &&
+				platform_is_contiguous((void *)entry->address) &&
+				platform_is_contiguous((void *)(entry->address + entry->size - 1)))
+			{
+				unsigned long *pixels = malloc(entry->description.width * entry->description.height * 4);
+
+				if (pixels && decode_level(&entry->description, 0, (const unsigned char *)entry->address, NULL, pixels))
+					entry->hud_upscale = hud_hires_upscale_texture((const unsigned char *)pixels,
+						entry->description.width, entry->description.height, kind, &entry->hud_upscale_levels);
+				free(pixels);
+			}
+		}
+		if (entry->hud_upscale)
+		{
+			description->hires = TRUE;
+			description->levels = entry->hud_upscale_levels;
+			return entry->hud_upscale;
 		}
 	}
 	return entry->texture;
@@ -1043,6 +1078,13 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		if (!entry->generation)
 			entry->generation = 1;
 		/* (which bitmap is here may have changed with the pixels) */
+		if (entry->hud_upscale)
+		{
+			glDeleteTextures(1, &entry->hud_upscale);
+			entry->hud_upscale = 0;
+			xgpu_gl_state_invalidate();
+		}
+		entry->hud_upscale_checked = FALSE;
 		entry->override = -1;
 		if (entry->size && !palettized && !entry->description.cube_map && entry->description.depth == 1)
 		{
@@ -1109,6 +1151,8 @@ void xgpu_texture_cache_begin_frame(void)
 			{
 				*link = entry->next;
 				glDeleteTextures(1, &entry->texture);
+				if (entry->hud_upscale)
+					glDeleteTextures(1, &entry->hud_upscale);
 				xgpu_gl_state_invalidate();
 				texture_drop_serial++;
 				free(entry);
