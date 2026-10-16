@@ -179,6 +179,23 @@ review guidance. Those standards do not relax the isolation rules.
 - Keep temporary test maps bounded and clean up only your own verified
   fixtures after testing. Preserve the user's original maps, saves and
   useful diagnostic logs.
+- Clean up after each test run and before finishing an assignment, including
+  failed runs once useful diagnostics have been retained. Remove generated
+  game caches (such as `saves/z/cacheNNN.map`), temporary test builds and
+  binaries, duplicate packages, disposable fixtures and any other outputs
+  no longer strictly necessary for ongoing work or delivery. Do not leave
+  repeated test sessions accumulating gigabytes of disposable data.
+- Preserve useful logs and diagnostic evidence, original maps and all saves;
+  `savegame.bin` is a save, not a disposable map cache. Large inactive test
+  saves or captures may be archived losslessly, with original paths recorded
+  and archive contents verified before removing loose copies. Keep active
+  saves usable in place, along with required builds and installed toolchains.
+- Limit routine cleanup to verified outputs of your assignment. Check resolved
+  paths before deletion, do not follow junctions or symlinks into original
+  data, and preserve source, Git worktrees and other ongoing work. A folder
+  being ignored by Git or named `build` does not make all its contents
+  disposable. Check the size of retained test outputs and briefly report
+  cleanup and any large artifacts that still need to remain.
 
 ## Layout
 
