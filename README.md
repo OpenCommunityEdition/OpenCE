@@ -40,7 +40,7 @@ an older build from that page.
 
 ### Arch-based Linux Distributions
 
-The above linux binary is available on the [AUR](https://aur.archlinux.org/packages/opence-bin)
+The above Linux binary release is available on the [AUR](https://aur.archlinux.org/packages/opence-bin).
 
 ## Game data
 
