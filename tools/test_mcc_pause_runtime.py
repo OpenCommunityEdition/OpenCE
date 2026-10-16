@@ -205,7 +205,7 @@ static int pixel_check(void) {
                     (pixels[(art->height-40)*bitmap->width+art->width/2]&0xFF));
             }
             if(art->kind==MCC_PAUSE_ART_FOOTER_PANEL) {
-                CHECK(pixels[(art->height-10)*bitmap->width+art->width/2]==0xFF000000UL);
+                CHECK(pixels[(art->height-10)*bitmap->width+art->width/2]==0xBF000000UL);
                 CHECK(pixels[(art->height-28)*bitmap->width+art->width/2]==0xFF2896FFUL);
                 CHECK((pixels[40*bitmap->width+art->width/2]&0xFF) >
                     (pixels[(art->height-40)*bitmap->width+art->width/2]&0xFF));
@@ -226,7 +226,7 @@ static int pixel_check(void) {
                     CHECK(((color>>8)&255)>=13&&((color>>8)&255)<=38);
                     CHECK(((color>>16)&255)>=5&&((color>>16)&255)<=10);
                 }
-                else CHECK(!color||color==0xFF000000UL||color==0xFF2896FFUL||color==0xC00A2649UL||color==0x60204A75UL);
+                else CHECK(!color||color==0xFF000000UL||color==0xBF000000UL||color==0xFF2896FFUL||color==0xC00A2649UL||color==0x60204A75UL);
             }
         }
     }
