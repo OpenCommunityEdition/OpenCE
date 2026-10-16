@@ -1260,7 +1260,26 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 void xgpu_texture_cache_begin_frame(void)
 {
 	unsigned long index;
+	unsigned long changed = hud_hires_settings_changed();
 
+	/* Refresh only map bitmaps belonging to the setting that changed. Keep
+	 * decoded replacement art and world textures; rebuild native pixels on
+	 * demand too, since an override may have skipped their first upload. */
+	if (changed)
+	{
+		for (index = 0; index < TEXTURE_BUCKET_COUNT; index++)
+		{
+			struct texture_entry *entry;
+
+			for (entry = texture_buckets[index]; entry; entry = entry->next)
+				if (hud_hires_bitmap_affected(entry->address,
+					(long)entry->description.width, (long)entry->description.height, changed))
+					entry->generation = 0;
+		}
+		/* Recent hits bypass the generation check. Forget lookups, not textures. */
+		memset(recent_textures, 0, sizeof(recent_textures));
+		xgpu_gl_state_invalidate();
+	}
 	texture_frame++;
 	if (texture_frame % 600)
 		return;

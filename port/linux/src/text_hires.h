@@ -38,6 +38,9 @@ struct text_hires_glyph
 /* the letters a font is fitted to its tag by: A to Z, then a to z */
 #define TEXT_HIRES_FIT_LETTERS 52
 
+/* The committed setting; checked before looking up cached font choices. */
+int text_hires_enabled(void);
+
 /* the font standing for a font tag, sized so that its capitals are
 cap_height units tall and narrowed where its letters are wider than the
 tag's letter_widths (TEXT_HIRES_FIT_LETTERS of them, 0 for a letter the tag

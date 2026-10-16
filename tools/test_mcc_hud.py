@@ -136,38 +136,47 @@ static int mcc,players,lookups,draws;
 static float drawn_scale;
 static point2d drawn_point;
 static pixel32 drawn_color;
+static real left,top,right,bottom;
 static struct bitmap_group group;
-static struct {struct bitmap_data *bitmap;long asset;boolean attempted;} mcc_buttons[6];
+static struct {struct bitmap_data *bitmap;long asset;boolean attempted;} mcc_buttons[14];
+static short mcc_buttons_style;
+static int high_res,style;
+static int config_boolean(char const *name) {(void)name;return high_res;}
+static char const *config_string(char const *name) {(void)name;return style==2 ? "menu_gems" : style==1 ? "gems" : "classic";}
 static struct {struct {struct {long count;void *address;} button_icons;} messaging;} globals,*hud_globals;
 static int allocations,registrations,deletions;
 static struct bitmap_data native_bitmap;
 static unsigned long hardware[2];
 static char const *assets[]={"ui\\shell\\bitmaps\\a_butn","ui\\shell\\bitmaps\\b_butn",
     "ui\\shell\\bitmaps\\x_butn","ui\\shell\\bitmaps\\y_butn",
-    "mcc\\buttons\\black","mcc\\buttons\\white"};
-static long hud_hires_asset_count(void) {return 6;}
+    "mcc\\buttons\\black","mcc\\buttons\\white",
+    "ui\\hud\\buttons\\classic_a","ui\\hud\\buttons\\classic_b","ui\\hud\\buttons\\classic_x","ui\\hud\\buttons\\classic_y",
+    "ui\\hud\\buttons\\gem_a","ui\\hud\\buttons\\gem_b","ui\\hud\\buttons\\gem_x","ui\\hud\\buttons\\gem_y","ui\\hud\\buttons\\trigger_left","ui\\hud\\buttons\\trigger_right","ui\\hud\\buttons\\thumbstick_left","ui\\hud\\buttons\\thumbstick_right","ui\\hud\\buttons\\thumbstick-halfway_left","ui\\hud\\buttons\\thumbstick-halfway_right","ui\\hud\\buttons\\thumbstick-full_left","ui\\hud\\buttons\\thumbstick-full_right"};
+static long hud_hires_asset_count(void) {return sizeof(assets)/sizeof(*assets);}
 static char const *hud_hires_asset_tag(long i) {return assets[i];}
 static struct bitmap_data *bitmap_2d_new(short w,short h,short m,short f) {
-    if(w!=32||h!=32||m||f!=11)abort();allocations++;
+    if((w!=32&&w!=64)||h!=w||m||f!=11)abort();allocations++;
     native_bitmap.width=w;native_bitmap.height=h;return &native_bitmap;
 }
 static int rasterizer_bitmap_new(struct bitmap_data *b) {b->hardware_format=hardware;return 1;}
 static void hud_hires_register_placeholder(long a,unsigned long const *t) {
-    if(a<0||a>=6||(t&&t!=hardware))abort();registrations+=t?1:-1;
+    if(a<0||a>=hud_hires_asset_count()||(t&&t!=hardware))abort();registrations+=t?1:-1;
 }
 static void xgpu_mcc_texture_unbind(unsigned long const *t) {if(t!=hardware)abort();}
 static void bitmap_delete(struct bitmap_data *b) {if(b!=&native_bitmap)abort();deletions++;}
 static void rasterizer_psuedo_dynamic_screen_quad_draw(
     struct rasterizer_dynamic_screen_geometry_parameters *p,struct dynamic_screen_vertex *v) {
-    if(p->framebuffer_blend_function||p->map[0]!=&native_bitmap||p->map[1]||p->map[2])abort();
+    if(p->framebuffer_blend_function!=(native_bitmap.width==64?7:0)||p->map[0]!=&native_bitmap||p->map[1]||p->map[2])abort();
     if(p->map_scale[0].i!=1||p->map_scale[0].j!=1||
        p->map_texture_scale[0].i!=1||p->map_texture_scale[0].j!=1)abort();
     if(v[0].texture_coordinates.x||v[0].texture_coordinates.y||
-       v[2].texture_coordinates.x!=21.0f/32||v[2].texture_coordinates.y!=26.0f/32)abort();
+       (native_bitmap.width==32 && (v[2].texture_coordinates.x!=21.0f/32||v[2].texture_coordinates.y!=26.0f/32)))abort();
+    left=v[0].position.x;top=v[0].position.y;right=v[2].position.x;bottom=v[2].position.y;
     draws++;drawn_scale=(v[2].position.y-v[0].position.y)/26;
     drawn_point.x=(short)v[0].position.x;drawn_point.y=(short)v[2].position.y;drawn_color=v[0].color;
 }
 static int mcc_cache_tags_loaded(void) {return mcc;}
+static long game_time_get(void) {return 0;}
 static int local_player_count(void) {return players;}
 static struct bitmap_group *bitmap_group_get(long id) {
     if(id!=17)abort();lookups++;return &group;
@@ -182,7 +191,7 @@ static void hud_draw_bitmap_direct(struct bitmap_data const *bitmap,short corner
     if(corner!=2||theta||linear)abort();
     draws++;drawn_scale=scale;drawn_point=*point;drawn_color=color;
 }
-''' + functions + r'''
+''' + (ROOT/'port/linux/game/hud_button_layout.h').read_text() + functions + r'''
 int main(int argc,char **argv) {
     struct bitmap_data bitmap={256,256,NULL};
     real_rectangle2d clip={0.0f,30.0f/256,0.0f,38.0f/256};
@@ -190,29 +199,32 @@ int main(int argc,char **argv) {
     struct icon_hud_element_definition icon={0,-6,{-2,15},0xFF123456,0,2,0},saved=icon;
     struct icon_hud_element_definition buttons[18],*active=&icon;
     int menu,handled;
-    if(argc!=6 && argc!=7 && argc!=8)return 2;
+    if(argc!=6 && argc!=7 && argc!=8 && argc!=10 && argc!=12)return 2;
+    if(argc==12) {high_res=atoi(argv[10]);style=atoi(argv[11]);}
     mcc=atoi(argv[1]);players=atoi(argv[2]);menu=atoi(argv[3]);
     group.flags=(unsigned)atoi(argv[4]);icon.flags=(unsigned char)atoi(argv[5]);
     if(argc==7)icon.offset.y=(short)atoi(argv[6]);saved=icon;
-    if(argc==8) {
+    if(argc>=8) {
+        if(argc>=10) {icon.color=strtoul(argv[9],NULL,16);saved=icon;}
         int b=atoi(argv[7]);if(b<0||b>=18)return 8;
         memset(buttons,0,sizeof(buttons));buttons[b]=icon;buttons[b].sequence_index=99;
         globals.messaging.button_icons.count=18;globals.messaging.button_icons.address=buttons;
         hud_globals=&globals;active=&buttons[b];
     }
     if(!menu) {clip.x1=clip.y1=93.0f/256;}
-    handled=mcc_hud_icon_draw(17,&bitmap,&clip,&cursor,0xFFABCDEF,active,menu);
+    handled=mcc_hud_icon_draw(17,&bitmap,&clip,&cursor,argc>=10 ? strtoul(argv[8],NULL,16) : 0xFFABCDEF,active,menu);
     if(memcmp(&icon,&saved,sizeof(icon)))return 3;
     if(!mcc && (memcmp(&cursor,&before,sizeof(cursor))||draws||lookups||handled))return 4;
     if(mcc_hud_bitmap_scale(NONE)!=1.0f)return 5;
-    if(argc==8 && mcc && !menu && atoi(argv[7])<6) {
+    if(argc>=8 && mcc && !menu && (atoi(argv[7])<6 || (high_res && (atoi(argv[7])==6 || atoi(argv[7])==7 || atoi(argv[7])>=14)))) {
         if(allocations!=1||registrations!=1||lookups)return 9;
-        if(mcc_hud_button_bitmap((short)atoi(argv[7]))!=&native_bitmap||allocations!=1)return 10;
+        if(mcc_hud_button_bitmap(mcc_hud_button_index(active))!=&native_bitmap||allocations!=1)return 10;
         mcc_hud_glyphs_dispose();mcc_hud_glyphs_dispose();
         if(registrations||deletions!=1)return 11;
     } else if(allocations||registrations)return 12;
     printf("%d %d %.3f %d %d %d %lu %.3f\n",handled,draws,drawn_scale,
         drawn_point.x,drawn_point.y,cursor.x0,drawn_color,mcc_hud_canvas_scale());
+    if(argc==12)printf("%.6f %.6f %.6f %.6f\n",left,top,right,bottom);
     return 0;
 }
 '''
@@ -518,3 +530,65 @@ def test_mcc_safe_frame_preserves_split_seams_and_zoom_inset(anchor_tool,layout,
     result=subprocess.run([str(anchor_tool),"1",str(anchor),"1",str(layout)],capture_output=True,text=True)
     assert result.returncode==0,result.stderr
     assert list(map(float,result.stdout.split()))[3:5]==list(expected)
+
+
+@pytest.mark.parametrize("button", range(6))
+@pytest.mark.parametrize("flags,prompt,authored,expected", [
+    (2, 0x7FABCDEF, 0xFF123456, 0xFFFFFFFF),
+    (2, 0x7FABCDEF, 0x40123456, 0x40FFFFFF),
+    (0, 0x7FABCDEF, 0xFF123456, 0x7FFFFFFF),
+    (0, 0, 0xFF123456, 0x00FFFFFF),
+])
+def test_gameplay_button_authored_opacity(hud_tool, button, flags, prompt, authored, expected):
+    result = subprocess.run([str(hud_tool), "1", "1", "0", "0", str(flags), "0", str(button),
+                             f"{prompt:x}", f"{authored:x}"], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert int(result.stdout.split()[6]) == expected
+
+
+@pytest.mark.parametrize("style", range(3))
+@pytest.mark.parametrize("button", range(4))
+@pytest.mark.parametrize("players", [1, 2])
+def test_high_res_mcc_button_visible_size(hud_tool, style, button, players):
+    import numpy as np
+    from PIL import Image
+    result = subprocess.run([str(hud_tool), "1", str(players), "0", "0", "2", "0", str(button),
+                             "7fffffff", "ffffffff", "1", str(style)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    fields = result.stdout.split()
+    left, top, right, bottom = map(float, fields[8:])
+    letter = "abxy"[button]
+    name = ("classic_" + letter if style == 0 else "gem_" + letter if style == 1 else letter + "_butn") + "__0.png"
+    alpha = np.asarray(Image.open(ROOT / "port/assets/buttons" / name))[..., 3]
+    ys, xs = np.where(alpha >= 128)
+    viewport = 1.0 if players == 1 else 0.75
+    scale = viewport * 20 / 26
+    assert (right-left) * (xs.max()+1-xs.min()) / 168 == pytest.approx(21*scale, abs=0.0001)
+    assert (bottom-top) * (ys.max()+1-ys.min()) / 208 == pytest.approx(26*scale, abs=0.0001)
+    assert left + xs.min()*(right-left)/168 == pytest.approx(int(100+2*viewport), abs=0.0001)
+    assert int(fields[5]) == int(int(100+2*viewport)+23*scale-3*viewport)
+
+
+@pytest.mark.parametrize("style", range(3))
+@pytest.mark.parametrize("button", [6,7,14,15,16,17])
+@pytest.mark.parametrize("players", [1,2])
+def test_high_res_mcc_controls_visible_size(hud_tool, style, button, players):
+    import numpy as np
+    from PIL import Image
+    result = subprocess.run([str(hud_tool), "1", str(players), "0", "0", "0", "0", str(button),
+                             "7fabcdef", "ffffffff", "1", str(style)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    fields = result.stdout.split()
+    left, top, right, bottom = map(float, fields[8:])
+    name = ('trigger_' if button<8 else 'thumbstick_') + ('left' if button%2==0 else 'right')
+    alpha = np.asarray(Image.open(ROOT/'port/assets/buttons'/(name+'__0.png')))[...,3]
+    ys,xs=np.where(alpha>=128)
+    viewport=1.0 if players==1 else 0.75
+    scale=viewport*20/26
+    cw,ch=(400,280) if button<8 else (288,320)
+    w,h=(44,33) if button<8 else (32,34)
+    assert (right-left)*(xs.max()+1-xs.min())/cw == pytest.approx(w*scale, abs=0.0001)
+    assert (bottom-top)*(ys.max()+1-ys.min())/ch == pytest.approx(h*scale, abs=0.0001)
+    assert left+xs.min()*(right-left)/cw == pytest.approx(int(100+2*viewport), abs=0.0001)
+    assert int(fields[5]) == int(int(100+2*viewport)+(w+2)*scale-3*viewport)
+    assert int(fields[6]) == 0x7fabcdef

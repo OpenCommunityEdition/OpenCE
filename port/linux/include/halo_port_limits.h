@@ -79,7 +79,7 @@ Raise it with any change to what the machines send each other. */
 /* Version 44 combines MCC content identity with upstream CE map-name/version rules.
  * Version 43 belongs to the optional camera branch. */
 /* OpenCE 8102e711 (version 29) is authoritative for ordinary sessions.
- * MCC protocol 46 is negotiated separately (mcc_protocol.h). */
+ * MCC protocol 48 is negotiated separately (mcc_protocol.h). */
 #define HALO_PORT_NETWORK_VERSION 29
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags */

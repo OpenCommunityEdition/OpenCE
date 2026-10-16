@@ -33,7 +33,8 @@ zlib (port/third_party/zlib).
 /* the game's (port/linux/game/hud_hires_tags.c) */
 long hud_hires_asset_at(unsigned long address, long width, long height);
 
-#define MAXIMUM_TEXTURES 128
+/* Include every embedded HUD and button style, including stick frames. */
+#define MAXIMUM_TEXTURES 256
 /* a PNG's inflated rows and its texels, which are held at once: 128 MB for
 a 4096 by 4096 sheet (the largest shipped, 2048 by 2048, takes 32 MB), and
 no more for a small file that names a large size (a menus folder's) */
@@ -70,6 +71,31 @@ long hud_hires_asset_fits(long asset, long width, long height)
 
 	return width > 0 && height > 0 && embedded->width % width == 0 && embedded->height % height == 0 &&
 		embedded->width / width == embedded->height / height && embedded->width / width > 1;
+}
+
+/* Changed settings since the previous rendered frame: HUD bit 0, titles bit 1.
+ * Pending menu edits do not change config_changes(). */
+unsigned long hud_hires_settings_changed(void)
+{
+	static unsigned long read_at = (unsigned long)-1;
+	static unsigned long previous;
+	unsigned long current, changed;
+
+	if (read_at == config_changes()) return 0;
+	current = (config_boolean("display.high_res_hud") ? 1UL : 0UL) |
+		(config_boolean("display.high_res_text") ? 2UL : 0UL);
+	changed = read_at == (unsigned long)-1 ? 0 : previous ^ current;
+	read_at = config_changes();
+	previous = current;
+	return changed;
+}
+
+int hud_hires_bitmap_affected(unsigned long address, long width, long height, unsigned long changed)
+{
+	long asset = hud_hires_asset_at(address, width, height);
+
+	return asset >= 0 && asset < hud_hires_asset_count() &&
+		(changed & (hud_hires_embedded[asset].title ? 2UL : 1UL)) != 0;
 }
 
 long hud_hires_override_find(unsigned long address, unsigned long width, unsigned long height,
@@ -115,7 +141,8 @@ int hud_hires_override_coverage(long asset)
 
 /* the placeholders of the textures drawn for some of a bitmap's sprites
 (port/linux/game/hud_hires_tags.c): their D3D textures' Data */
-#define MAXIMUM_PLACEHOLDERS 16
+/* Room for the gameplay button styles and map-owned sprite placeholders. */
+#define MAXIMUM_PLACEHOLDERS 32
 
 static struct
 {

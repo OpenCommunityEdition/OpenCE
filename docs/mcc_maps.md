@@ -1865,3 +1865,55 @@ the world) were left visible. The runners stopped their own processes after
 the bounded checks. Generated test cache files were removed, retaining logs,
 symbols and test-save evidence. Android/Web targets remain unavailable and
 Linux/browser transport execution remains unverified locally.
+
+### Mercury2 Doozy boat controls (issue #62)
+
+Mercury2's Doozy uses the three-powered-point boat controller. Its inspected
+`crashsite\levels\splashsite\doozy\doozy` physics tag (index 3733 in the
+supplied map) has finite mass/inertia data and water-friction plus water-lift
+flags (`0x0a`) on all three powered points. The engine's boat controller
+assigns `water_friction_velocity` only on point zero; `physics_compute_new`
+reads it on points one and two as well. Those stack values were uninitialized.
+A non-finite value can contaminate the boat's force, position and orientation;
+the issue reports precisely those invalid vectors. This also explains why a
+client's earlier visible copy cannot be boarded on the authoritative host.
+
+`mcc_boat_controls_initialize` in `mcc_objects.c` zeroes the three temporary
+controls before the existing boat routine assigns its rotations, lift and
+propeller speed. The only shared addition is a port-marked call inside the
+three-point boat branch (and its declaration include). Conversion alone
+cannot initialize this private per-tick stack storage. Non-MCC execution is a
+no-op; other vehicle controllers and boat point counts retain their paths.
+No authored tags, network permissions, packet fields or seat rules change.
+There is no persistent state to clean up across map-family transitions.
+
+MCC protocol 47 requires this initialization on every peer, including a
+client predicting a boat it drives. The separate OpenCE protocol stays 29.
+The regression harness extracts the real boat routine, real scratch structure
+and MCC initializer, starts the scratch storage with NaNs, and checks the
+controls delivered to physics. Removing the hook reproduces the failure.
+It also checks the inactive MCC guard, unchanged alternate point-count path,
+rotations/lift/propeller outputs and the adjacent scratch-array canary. This
+is a control-initialization test, not a simulation of the complete physics.
+
+Validation: the Windows release builds, 78 focused boat/script/protocol/network
+tests pass, and the recorded network-format check passes. A hidden two-instance
+Mercury2 co-op check switched to the plains BSP and created the authored `d1`
+boat at its original position. Host-authorized script calls seated the client
+as driver and host as passenger. Both logs retained finite positions and both
+players riding for 55 seconds without assertions. The boat's health query is
+zero because its collision tag has zero maximum body vitality; this is also
+the engine's initial value for such objects, not evidence of a destroyed boat.
+This verifies seat replication and stable occupied physics, not manual client
+entry, driven movement, visible rendering or a complete campaign playthrough.
+Earlier artificial player-teleport attempts were unsuccessful (one hit a
+cluster assertion) and are not counted as passing validation.
+A separate hidden single-instance smoke check loaded Mercury2, Xbox A10,
+Custom Edition Death Island and Mercury2 again without assertions. This checks
+the map-family lifecycle, not full legacy gameplay or a visual comparison.
+
+Android and Web build targets are unavailable in this local configuration;
+Linux was not executed. Browser/native transport testing could not start
+because Playwright is absent. Those platform checks remain for CI. Temporary
+map copies and generated caches were removed; logs and verified compressed
+private test saves were retained.

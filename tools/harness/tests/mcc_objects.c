@@ -12,6 +12,7 @@ boolean mcc_cache_tags_loaded(void) { return loaded; }
 boolean game_engine_running(void) { return running; }
 struct game_variant *game_engine_get_variant(void) { return &variant; }
 void *csmemcpy(void *to, void const *from, unsigned long size) { return memcpy(to, from, size); }
+void *csmemset(void *to, long value, unsigned long size) { return memset(to, value, size); }
 
 #define CHECK(value) do { if (!(value)) { fprintf(stderr, "failed at %d\n", __LINE__); return 1; } } while (0)
 int main(void) {

@@ -4,6 +4,7 @@
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps.h"
 #include "game/players.h"
+#include "game/game.h"
 #include "interface/hud.h"
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
@@ -12,9 +13,12 @@
 #include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 #include "mcc_cache.h"
 #include "mcc_hud_draw.h"
+#include "hud_button_layout.h"
 #include <string.h>
 
 long halo_screen_width(void);
+int config_boolean(char const *name);
+char const *config_string(char const *name);
 long hud_hires_asset_count(void);
 char const *hud_hires_asset_tag(long asset);
 void hud_hires_register_placeholder(long asset, unsigned long const *texture);
@@ -24,12 +28,13 @@ static struct {
     struct bitmap_data *bitmap;
     long asset;
     boolean attempted;
-} mcc_buttons[6];
+} mcc_buttons[14];
+static short mcc_buttons_style;
 
 void mcc_hud_glyphs_dispose(void)
 {
     long i;
-    for (i=0;i<6;i++) if (mcc_buttons[i].bitmap) {
+    for (i=0;i<14;i++) if (mcc_buttons[i].bitmap) {
         hud_hires_register_placeholder(mcc_buttons[i].asset,NULL);
         xgpu_mcc_texture_unbind(mcc_buttons[i].bitmap->hardware_format);
         bitmap_delete(mcc_buttons[i].bitmap);
@@ -46,8 +51,10 @@ static short mcc_hud_button_index(struct icon_hud_element_definition const *icon
     if (!hud_globals) return NONE;
     buttons=hud_globals->messaging.button_icons.address;
     if (!buttons) return NONE;
-    for (i=0;i<6 && i<hud_globals->messaging.button_icons.count;i++)
-        if (icon==buttons+i) return i;
+    for (i=0;i<18 && i<hud_globals->messaging.button_icons.count;i++)
+        if (icon==buttons+i) return i<6 ? i :
+            config_boolean("display.high_res_hud") ? hud_button_control_slot(i,
+                icon->frame_rate>0 ? game_time_get()/icon->frame_rate : 0) : NONE;
     return NONE;
 }
 
@@ -56,16 +63,31 @@ static struct bitmap_data const *mcc_hud_button_bitmap(short index)
     static char const *names[]={"ui\\shell\\bitmaps\\a_butn","ui\\shell\\bitmaps\\b_butn",
         "ui\\shell\\bitmaps\\x_butn","ui\\shell\\bitmaps\\y_butn",
         "mcc\\buttons\\black","mcc\\buttons\\white"};
+    static char const *classic_names[]={"ui\\hud\\buttons\\classic_a","ui\\hud\\buttons\\classic_b",
+        "ui\\hud\\buttons\\classic_x","ui\\hud\\buttons\\classic_y",
+        "ui\\hud\\buttons\\classic_black","ui\\hud\\buttons\\classic_white"};
+    static char const *gem_names[]={"ui\\hud\\buttons\\gem_a","ui\\hud\\buttons\\gem_b",
+        "ui\\hud\\buttons\\gem_x","ui\\hud\\buttons\\gem_y",
+        "mcc\\buttons\\black","mcc\\buttons\\white"};
     long asset;
     struct bitmap_data *bitmap;
-    if (index<0 || index>=6) return NULL;
+    short style;
+    if (index<0 || index>=14 || (index>=6 && !config_boolean("display.high_res_hud"))) return NULL;
+    /* Keep the established MCC low-res path; the style belongs to High-Res HUD. */
+    style=!config_boolean("display.high_res_hud") || (!strcmp(config_string("display.hud_button_style"), "dark_gems") || !strcmp(config_string("display.hud_button_style"), "menu_gems")) ? 2 :
+        !strcmp(config_string("display.hud_button_style"),"gems");
+    if (style!=mcc_buttons_style) {
+        mcc_hud_glyphs_dispose();
+        mcc_buttons_style=style;
+    }
     if (mcc_buttons[index].attempted) return mcc_buttons[index].bitmap;
     mcc_buttons[index].attempted=TRUE;
     for (asset=0;asset<hud_hires_asset_count();asset++) {
-        if (strcmp(hud_hires_asset_tag(asset),names[index])) continue;
+        if (strcmp(hud_hires_asset_tag(asset),index>=6 ? hud_button_control_name(index) : style==0 ? classic_names[index] :
+            style==1 ? gem_names[index] : names[index])) continue;
         /* Reuse OpenCE's embedded hand-drawn buttons. The placeholder has
-         * the original 32px layout, independent of the MCC sprite sheet. */
-        bitmap=bitmap_2d_new(32,32,0,11);
+         * the embedded layout, independent of the MCC sprite sheet. */
+        bitmap=bitmap_2d_new(index>=6 ? 64 : 32,index>=6 ? 64 : 32,0,11);
         if (!bitmap) return NULL;
         if (!rasterizer_bitmap_new(bitmap)) {bitmap_delete(bitmap);return NULL;}
         hud_hires_register_placeholder(asset,bitmap->hardware_format);
@@ -79,23 +101,35 @@ static struct bitmap_data const *mcc_hud_button_bitmap(short index)
 /* Menu artwork has straight alpha; the gameplay HUD's multiply-add blend
  * would expose RGB stored under transparent pixels around the button. */
 static void mcc_hud_button_draw(struct bitmap_data const *bitmap, point2d const *point,
-    real scale, pixel32 color)
+    real scale, pixel32 color, short index)
 {
     struct rasterizer_dynamic_screen_geometry_parameters parameters;
     struct dynamic_screen_vertex vertices[4];
     short i;
+    real x=point->x, y=point->y-26.0f*scale;
+    real width=21.0f*scale, height=26.0f*scale;
+    real u=21.0f/32.0f,v=26.0f/32.0f;
+    if (index>=6) {
+        width=(index<8 ? 44.0f : 32.0f)*scale;
+        height=(index<8 ? 33.0f : 34.0f)*scale;
+        y=point->y-13.0f*scale-height*0.5f;
+        u=(index<8 ? 50.0f : 36.0f)/64.0f;v=(index<8 ? 35.0f : 40.0f)/64.0f;
+        hud_button_control_bounds(index,&x,&y,&width,&height);
+    }
+    if (config_boolean("display.high_res_hud"))
+        hud_button_face_bounds(mcc_buttons_style,index,&x,&y,&width,&height);
     memset(&parameters,0,sizeof(parameters));
     parameters.map[0]=(struct bitmap_data *)bitmap;
     parameters.map_texture_scale[0].i=parameters.map_texture_scale[0].j=1.0f;
     parameters.map_scale[0].i=parameters.map_scale[0].j=1.0f;
-    parameters.framebuffer_blend_function=0; /* alpha blend */
+    parameters.framebuffer_blend_function=index>=6 ? 7 : 0; /* HUD blend for sticks/triggers */
     for (i=0;i<4;i++) {
         boolean right=((i+1)&2)!=0, bottom=i>1;
-        vertices[i].position.x=point->x+(right ? 21.0f*scale : 0.0f);
-        vertices[i].position.y=point->y-(bottom ? 0.0f : 26.0f*scale);
-        vertices[i].texture_coordinates.x=right ? 21.0f/32.0f : 0.0f;
-        vertices[i].texture_coordinates.y=bottom ? 26.0f/32.0f : 0.0f;
-        vertices[i].color=(color&0xFF000000UL)|0xFFFFFFUL;
+        vertices[i].position.x=x+(right ? width : 0.0f);
+        vertices[i].position.y=y+(bottom ? height : 0.0f);
+        vertices[i].texture_coordinates.x=right ? u : 0.0f;
+        vertices[i].texture_coordinates.y=bottom ? v : 0.0f;
+        vertices[i].color=index>=6 ? color : (color&0xFF000000UL)|0xFFFFFFUL;
     }
     rasterizer_psuedo_dynamic_screen_quad_draw(&parameters,vertices);
 }
@@ -138,7 +172,8 @@ boolean mcc_hud_icon_draw(long bitmap_group_index, struct bitmap_data const *bit
     if (!mcc_cache_tags_loaded()) return FALSE;
     viewport_scale=!menu && local_player_count()>1 ? 0.75f : 1.0f;
     if (!menu) {
-        struct bitmap_data const *button=mcc_hud_button_bitmap(mcc_hud_button_index(icon));
+        short button_index=mcc_hud_button_index(icon);
+        struct bitmap_data const *button=mcc_hud_button_bitmap(button_index);
         if (button) {
             /* Crop transparent padding from the native 32px art. A 16x20
              * icon shares the current font's capital center, and its text
@@ -147,8 +182,10 @@ boolean mcc_hud_icon_draw(long bitmap_group_index, struct bitmap_data const *bit
             real button_scale=viewport_scale*(20.0f/26.0f);
             point.x=(short)(cursor->x0+2.0f*viewport_scale);
             point.y=(short)(draw_unicode_string_capital_middle(cursor,L"")+10.0f*viewport_scale);
-            mcc_hud_button_draw(button,&point,button_scale,color);
-            cursor->x0=(short)(point.x+21.0f*button_scale-3.0f*viewport_scale);
+            /* Preserve the icon opacity override used by the bitmap path. */
+            mcc_hud_button_draw(button,&point,button_scale,icon->flags&2 ? icon->color : color,button_index);
+            cursor->x0=(short)(point.x+(config_boolean("display.high_res_hud") && button_index<4 ?
+                23.0f : button_index>=6 ? (button_index<8 ? 46.0f : 34.0f) : 21.0f)*button_scale-3.0f*viewport_scale);
             return TRUE;
         }
     }
