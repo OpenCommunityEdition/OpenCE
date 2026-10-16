@@ -988,7 +988,11 @@ void render_model(
 		rasterizer_model_cortana_hack = FALSE;
 	}
 
-	if (level_of_detail_pixels>=model->detail_cutoff_pixels[0] || TEST_FLAG(flags, _render_model_shadow_bit))
+	/* port: the model measured as display.model_detail says
+	(halo_model_detail_scale, port/linux/src/d3d8_gl.c): stock, in the lines
+	of the 480-line screen */
+	if (level_of_detail_pixels*halo_model_detail_scale(FALSE)>=model->detail_cutoff_pixels[0] ||
+		TEST_FLAG(flags, _render_model_shadow_bit))
 	{
 		real_matrix4x3 relative_node_matrices[MAXIMUM_NODES_PER_MODEL];
 		struct rasterizer_model_begin_parameters model_parameters;
@@ -1001,6 +1005,8 @@ void render_model(
 			MAXIMUM_REGIONS_PER_MODEL;
 		/* port: no more nodes than relative_node_matrices holds (a map's count) */
 		short node_count = (short)MIN(model->nodes.count, MAXIMUM_NODES_PER_MODEL);
+		/* port: the size the level of detail is chosen by (display.model_detail) */
+		real detail_level_pixels = level_of_detail_pixels*halo_model_detail_scale(TRUE);
 
 		if (!region_permutation_indices)
 		{
@@ -1045,7 +1051,7 @@ void render_model(
 
 		geometry_detail_level_index = NUMBER_OF_DETAIL_LEVELS_PER_MODEL-1;
 		while (geometry_detail_level_index>0 &&
-			level_of_detail_pixels<model->detail_cutoff_pixels[geometry_detail_level_index])
+			detail_level_pixels<model->detail_cutoff_pixels[geometry_detail_level_index])
 		{
 			geometry_detail_level_index--;
 		}

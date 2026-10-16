@@ -57,6 +57,10 @@ long halo_screen_commit(void);
 /* the shadow maps' pixels for each of their 128 texels each way, a power of
 two (display.shadow_resolution) */
 long halo_shadow_map_scale(void);
+/* how many times a model's size in the 480-line screen's pixels to measure
+it at (display.model_detail, source/models/models.c): level nonzero, to
+choose its level of detail, otherwise whether it is drawn */
+float halo_model_detail_scale(int level);
 /* while TRUE, drawing shifts right to center 640-column layouts */
 void halo_screen_ui_offset(unsigned char centered);
 /* names a model lighting vertex program, whose draws can be lit for each

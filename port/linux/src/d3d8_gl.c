@@ -84,6 +84,9 @@ is presented (halo_screen_commit). */
 render target the size of the screen has per unit of it */
 static long screen_width;
 static float screen_scale[2] = { 1.0f, 1.0f };
+/* how many times the display's pixels each way supersampling draws (with
+the scale screen_mode_choose last chose) */
+static float screen_supersampling = 1.0f;
 static long ui_offset;
 #define UI_OFFSET ((GLint)ui_offset)
 
@@ -186,11 +189,13 @@ static void screen_mode_choose(long *width, float scale[2])
 		*width = 1600;
 	*width &= ~1L;
 	scale[0] = scale[1] = 1.0f;
+	screen_supersampling = 1.0f;
 #else
 	long display_width, display_height;
 
 	*width = 640;
 	scale[0] = scale[1] = 1.0f;
+	screen_supersampling = 1.0f;
 	if (platform_screen_mode(&display_width, &display_height) && display_width > 0 && display_height > 0)
 	{
 		long wanted = (SCREEN_HEIGHT * display_width + display_height / 2) / display_height;
@@ -218,6 +223,7 @@ static void screen_mode_choose(long *width, float scale[2])
 			{
 				scale[0] *= factor;
 				scale[1] *= factor;
+				screen_supersampling = factor;
 			}
 		}
 	}
@@ -240,6 +246,58 @@ float halo_screen_pixel_scale(void)
 {
 	halo_screen_width();
 	return screen_scale[1];
+}
+
+/* display.model_detail: the size a model is measured at to choose its
+level of detail (source/models/models.c).
+
+The game measures a model's bounding sphere in the lines of its 480-line
+screen (render_frustum_sphere_diameter_in_pixels), whatever the display has,
+and compares that with the pixel sizes each level is meant for: on a display
+of 1440 lines a model three times the size the levels were chosen for is
+drawn as the Xbox drew it at 480. "stock" keeps that; "native" measures in
+the display's lines (not supersampling's, which the display scales down;
+"original" resolution scaling draws 480); "highest" measures as "native"
+which models are too small to draw, and draws the others at their most
+detailed level. level: the scale for choosing the level, otherwise for
+whether to draw at all. */
+enum
+{
+	_model_detail_stock,
+	_model_detail_native,
+	_model_detail_highest,
+};
+
+static int model_detail = -1;
+static unsigned long model_detail_read_at;
+
+float halo_model_detail_scale(int level)
+{
+	float display_scale;
+
+	if (model_detail < 0 || model_detail_read_at != config_changes())
+	{
+		const char *setting = config_string("display.model_detail");
+		int value = !strcmp(setting, "native") ? _model_detail_native :
+			!strcmp(setting, "highest") ? _model_detail_highest : _model_detail_stock;
+
+		model_detail_read_at = config_changes();
+		if (value != model_detail)
+		{
+			if (value == _model_detail_stock && strcmp(setting, "stock"))
+				platform_log("model detail: \"%s\" is unknown, so stock", setting);
+			else
+				platform_log("model detail: %s", setting);
+		}
+		model_detail = value;
+	}
+	if (model_detail == _model_detail_stock)
+		return 1.0f;
+	if (model_detail == _model_detail_highest && level)
+		return 1.0e6f;
+	halo_screen_width();
+	display_scale = screen_scale[1] / screen_supersampling;
+	return display_scale > 1.0f ? display_scale : 1.0f;
 }
 
 /* how many pixels the screen's targets draw to the Xbox's one, the larger
