@@ -29,7 +29,24 @@ update.h's: posix_update.c on Linux, win32_update.c on Windows.
 #include "port_config.h"
 #include "update.h"
 
-#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+/* the release's build that this one updates to (halo-<platform>-<release|
+debug>.zip); a build without one never looks for updates */
+#if defined(HALO_ANDROID) || defined(HALO_WEB)
+/* (none: the Android app updates itself, the site through its service
+worker) */
+#elif defined(_WIN32)
+#define UPDATE_PLATFORM "windows"
+#elif defined(__aarch64__)
+/* the 64-bit ARM build (port/linux/host) */
+#define UPDATE_PLATFORM "linux-arm64"
+#elif defined(__x86_64__)
+/* (none yet: the 64-bit x86 build, a guest as the 64-bit ARM build is, will
+update from "linux-x86_64" once the releases have it) */
+#else
+#define UPDATE_PLATFORM "linux"
+#endif
+
+#ifdef UPDATE_PLATFORM
 
 #include "zlib_prefixed.h"
 
@@ -48,10 +65,8 @@ update.h's: posix_update.c on Linux, win32_update.c on Windows.
 
 #define UPDATE_REPOSITORY "OpenCommunityEdition/OpenCE"
 #ifdef _WIN32
-#define UPDATE_PLATFORM "windows"
 #define PATH_SEPARATOR "\\"
 #else
-#define UPDATE_PLATFORM "linux"
 #define PATH_SEPARATOR "/"
 #endif
 #define UPDATE_ASSET "halo-" UPDATE_PLATFORM "-" HALO_BUILD_FLAVOR ".zip"
@@ -655,10 +670,11 @@ void updater_start(void)
 {
 }
 
-#ifdef HALO_WEB
+#ifndef HALO_ANDROID
 #include <SDL3/SDL.h>
 
-/* (the site updates itself: port/web/site/sw.js) */
+/* (nothing to ask about: the site updates itself, port/web/site/sw.js, and
+the other builds without UPDATE_PLATFORM are updated otherwise) */
 void updater_poll(SDL_Window *window)
 {
 	(void)window;

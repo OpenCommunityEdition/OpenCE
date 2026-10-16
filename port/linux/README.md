@@ -8,6 +8,9 @@ gamepad input.
 The game is 32-bit code because its data (tags, cache files, saved games)
 contains 32-bit pointers, as on the Xbox.
 
+`ninja linux_arm64` builds the game for 64-bit ARM Linux. Refer to
+"64-bit ARM".
+
 ## Requirements
 
 You do not need the Xbox SDK. The declarations that the game uses are in
@@ -415,6 +418,8 @@ the setting for one start of the game. It has priority over the file.
 | `debug.touch_targets` | `false` | `HALO_TOUCH_TARGETS` | Outlines the tap targets of the menus (item green, value blue, list slot yellow, legend button red, the band beside the slots of a list orange, keys of the on-screen keyboard white), marks where the last finger went down and the last tap landed for 3 seconds, and logs each tap with the target that it hit (for a value, also where it splits into previous and next): to judge the accuracy of touch. |
 | `debug.network_latency`, `debug.network_loss`, `debug.network_corrupt`, `debug.network_corrupt_stream`, `debug.network_corrupt_after` | `0` | `HALO_NETWORK_LATENCY`, `HALO_NETWORK_LOSS`, `HALO_NETWORK_CORRUPT`, `HALO_NETWORK_CORRUPT_STREAM`, `HALO_NETWORK_CORRUPT_AFTER` | The game holds all the data that it receives for this number of milliseconds, ignores this percentage of the datagrams, and damages this percentage of the datagrams it receives, and this percentage of its reads of streams, at random (bytes changed, cut short, stretched or replaced), from this many seconds after the start. Use the first two to test the netcode as on the internet, and the others to test that nothing another machine sends can crash the game (a damaged stream is closed, so a little goes a long way; a host's messages to its own client are damaged too, so start damaging once the game has started). |
 | `debug.voice_test` | `false` | `HALO_VOICE_TEST` | Automatic tests of voice chat: a tone replaces the microphone, and each voice that the game hears is written to the log once each second. |
+| `debug.sample_seconds` | `0.0` | `HALO_SAMPLE` | 64-bit ARM only. The host writes to the log, this often in seconds, where each game thread is: its program counter and frame chain, to find where the game spends its time or stops. `0`: never. |
+| `debug.memory_watch` | `true` | `HALO_MEMORY_WATCH` | 64-bit ARM only. `true`: the host notices the game's writes to cached textures and vertices by page protection. `false`: it compares page contents once a frame instead, which is slower. |
 | `debug.telnet_console`, `debug.telnet_console_port` | `false`, `2323` | `HALO_TELNET_CONSOLE`, `HALO_TELNET_CONSOLE_PORT` | The game listens on 127.0.0.1, on this port, for a script console (connect with telnet). The console has no password, so only this computer can reach it. |
 | `debug.profile_record`, `debug.profile_record_when`, `debug.profile_memory` | `false`, `"start"`, `256` | `HALO_PROFILE_RECORD`, `HALO_PROFILE_RECORD_WHEN`, `HALO_PROFILE_MEMORY` | Profiling builds only (`configure.py --profile`). Record without a command; `"start"` records from the first frame until the first map change, `"game"` records each game outside the main menu. Memory is 4–1024 MB. Numbered `profile_<stamp>_<role>.part<n>.json` files remain in `profiles/` after recording. Refer to "Profiling builds" in the main README. |
 
@@ -447,6 +452,9 @@ let the game write to it.
 
 Builds that you make yourself have no build number. They do not look for
 updates.
+
+The 64-bit ARM build downloads `halo-linux-arm64-release.zip` (or
+`-debug.zip`), not the x86 build.
 
 ## Frame rate
 
@@ -1035,6 +1043,78 @@ against what the game made at startup (`game_state_image_accept` in
 `saved games/game_state.c`): an image that does not match (a damaged or
 crafted file) is refused, and the level starts over.
 
+## 64-bit ARM
+
+`ninja linux_arm64` builds the game for 64-bit ARM Linux. It was tested on
+a Steam Frame (SteamOS, Adreno 750 with Mesa). Enter it on a 64-bit ARM
+computer: on such a computer, `ninja` without a target builds it.
+
+| Result | Item |
+| --- | --- |
+| `build/linux_arm64/halo` | The game, an AArch64 executable |
+| `build/linux_arm64/libSDL3.so.0` | SDL 3.4.16. The game finds it next to the executable. |
+| `build/linux_arm64/SDL3-LICENSE.txt` | The license of SDL |
+
+The game data, the settings, the saved games, the controls and system link
+are the same as on x86. Linux arm64, x86 Linux, Windows and Android
+machines can play in the same game.
+
+### Requirements
+
+- Python and ninja.
+- clang with the `arm64_32` target (clang 22 operates), `ld.lld` and
+  `llvm-ar`. The option `--linux-arm64-cc` of `configure.py` selects a
+  different clang.
+- The OpenGL ES and EGL headers (`libgles-dev` and `libegl-dev` on Debian
+  and Ubuntu), and for the desktop OpenGL renderer
+  (`--linux-arm64-gl=desktop`) the OpenGL headers (`libgl-dev`). Without
+  them, `ninja linux_arm64` stops and names the missing headers.
+- CMake, and the development files that SDL3 uses for X11, Wayland and
+  sound. Refer to the SDL documentation, or to the `linux-arm64` job in
+  `.github/workflows/build.yml`.
+- A network connection for the first build. `configure.py` downloads musl
+  1.2.5 (checked against its SHA-256) and SDL 3.4.16 to
+  `build/linux_arm64/third_party`. SDL is built with the options of the
+  portable x86 build (`SDL_OPTIONS` in `tools/linux_build.py`).
+
+To start the game: OpenGL ES 3 (`libGLESv2.so.2`, `libEGL.so.1`, from Mesa
+for example). The release builds of GitHub Actions use glibc 2.35 or later.
+
+### How it operates
+
+Recent 64-bit ARM processors (the Steam Frame's, for example) cannot
+execute 32-bit ARM code, and few distributions have 32-bit ARM libraries
+(SDL3, Mesa). Thus this build operates as the Android port does: the game is
+ILP32 AArch64 code, a guest image in a 64-bit process. Refer to "How the
+port operates" in [port/android/README.md](../android/README.md#how-the-port-operates).
+
+- The guest image is the image of the Android build
+  (`generate_guest_image` in `tools/android_build.py`, for the architecture
+  `ARM64_32` of `tools/guest_arch.py`), with the desktop code paths of the
+  platform layer. `tools/linux_guest_build.py` builds it and the host; each
+  of its builds (`LINUX_GUESTS`) is for one architecture. The guest code has
+  `HALO_GUEST` (and `HALO_ARM64_GUEST`, `HALO_GUEST_MACHO`) and `HALO_GLES`,
+  not `HALO_ANDROID`.
+- The host is the Android host (`port/android/host`) as a Linux executable.
+  `host/host_main.c` replaces its `host_main.c` and `host_touch.c`; what
+  both entry points do is in its `host_common.c`. The host's log is the
+  standard error stream, as is the report of a crash (the registers and
+  the frame chain). The executable contains
+  the guest image (`host/guest_image.S`). The guest gets the variables of
+  the environment that it reads (the `HALO_` settings, `HOME`, the XDG
+  folders), so the `HALO_` settings operate.
+- The desktop code paths use more of SDL than the Android app:
+  `host/guest_desktop.c` and `host/host_desktop.c` supply it, and
+  `host/host_imports.list` lists their imports. The guest does SDL's
+  threads, mutexes, atomic values, files and `SDL_GlobDirectory` itself.
+  The host does the windows, the displays, the 2D renderer, the dialogs
+  and the downloads of the self-updater (`src/posix_update.c`).
+- The renderer uses OpenGL ES, as on Android.
+- The host keeps the GPU driver from the kernel's `trace_marker`, as the
+  x86 build does (`src/posix_trace_marker.c`, under "The platform layer"
+  below): on the Steam Frame, its markers took the game from the headset's
+  72 Hz to about 50 frames a second.
+
 ## What operates
 
 | Area | Status |
@@ -1178,8 +1258,8 @@ can optimize that code for each processor:
 | `bink/bink_playback.c` | `int 3` | `__builtin_trap` |
 
 The x87 control and status words (`_control87`, `_statusfp`, `_clearfp` in
-`src/msvc_crt.c`) use `fenv.h`. On Android, they use the FPCR and FPSR. In
-the web build, the control word is only remembered.
+`src/msvc_crt.c`) use `fenv.h`. On AArch64 (Android, Linux arm64), they use
+the FPCR and FPSR. In the web build, the control word is only remembered.
 
 The web build's changes (`HALO_WEB`: the main loop runs one iteration for
 each of the browser's frames, the cache thread starts at a function of
