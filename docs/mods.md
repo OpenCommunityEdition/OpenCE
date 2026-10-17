@@ -226,6 +226,12 @@ plays), and `debug.txt` and the console say why.
   Xbox's menus (`display.menus = "xbox"`) and the text shown while playing
   (HUD messages, the multiplayer messages, the pause menu).
 
+  ## Shaders
+    You can use every shader from Halo CE Except `shader_transparent_chicago` because this is a Gearbox made shader so do not use this shader format
+  ## Models
+    use the `.model` Format for scenery, vehicles etc
+    do not use the `.gbxmodel` Format because that is a Gearbox made model tag
+
 ## Making a mod
 
 1. Get the tags you want to change as tag files. `invader-extract` extracts
