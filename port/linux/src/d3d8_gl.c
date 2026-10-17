@@ -599,7 +599,27 @@ struct gl_device
 #else
 	/* Diagnostic: read each query to the CPU only after it completes. */
 	BOOL visibility_sync;
-	unsigned long visibility_sync_reads;
+	BOOL visibility_no_depth;
+	/* State at the query's draw, not at the next frame's readback. Slots
+	are reused by the game and do not identify a particular light. */
+	struct visibility_observation
+	{
+		unsigned long frame, draws;
+		BOOL depth, stencil;
+		DWORD depth_function, cull, color, bias;
+		GLint viewport[4];
+	} visibility_draw, visibility_observations[VISIBILITY_TEST_SLOTS];
+	struct visibility_sample
+	{
+		struct visibility_observation draw;
+		GLuint query, raw, pixels;
+		DWORD slot;
+		float scale;
+	} visibility_examples[2];
+	Uint64 visibility_log_time;
+	unsigned long visibility_reads, visibility_zeros, visibility_rounded_zeros;
+	unsigned long visibility_errors;
+	GLuint visibility_min, visibility_max;
 	/* each test's latest result, which the GPU writes (as a query buffer)
 	a frame after the test (visibility_copy_batch): the game waits for
 	results at the start of the next frame, and a query would stop the CPU
@@ -1701,7 +1721,9 @@ static void gl_initialize(void)
 	glGenQueries(VISIBILITY_TEST_SLOTS, device.queries);
 	glGenQueries(1, &device.scratch_query);
 #ifndef HALO_GLES
-	device.visibility_sync = config_boolean("debug.gpu_sync_visibility") != 0;
+	device.visibility_no_depth = config_boolean("debug.gpu_visibility_no_depth") != 0;
+	device.visibility_sync = config_boolean("debug.gpu_sync_visibility") != 0 || device.visibility_no_depth;
+	device.visibility_log_time = SDL_GetTicks();
 	if (device.visibility_sync)
 		platform_log("GPU: synchronized visibility readback enabled; occlusion remains active, GPU waits may reduce frame rate");
 	else
@@ -1723,6 +1745,9 @@ static void gl_initialize(void)
 	/* (unbound: a query read into a bound query buffer takes its pointer
 	for an offset into it) */
 	glBindBuffer(GL_QUERY_BUFFER, 0);
+	if (device.visibility_sync)
+		platform_log("GPU: visibility diagnostic depth=%s; one-second summaries and latest zero/nonzero examples; slots are not light identities",
+			device.visibility_no_depth ? "disabled for visibility draws only" : "normal");
 	{
 		long every = config_integer("debug.gpu_flush_draws");
 		const char *renderer = (const char *)glGetString(GL_RENDERER);
@@ -2230,12 +2255,68 @@ void WINAPI D3DDevice_InsertCallback(D3DCALLBACKTYPE type, D3DCALLBACK callback,
 
 /* ---------- visibility (occlusion) tests */
 
+#ifndef HALO_GLES
+static void visibility_check_errors(const char *operation)
+{
+	GLenum error;
+
+	if (!device.visibility_sync)
+		return;
+	while ((error = glGetError()) != GL_NO_ERROR)
+	{
+		if (device.visibility_errors++ < 16)
+			platform_log("GPU: visibility GL error 0x%x at %s frame %lu", error, operation, device.frame);
+	}
+}
+
+static void visibility_log_summary(void)
+{
+	Uint64 now;
+	int i;
+
+	if (!device.visibility_sync)
+		return;
+	now = SDL_GetTicks();
+	if (now - device.visibility_log_time < 1000)
+		return;
+	platform_log("GPU: visibility summary ms=%llu frame=%lu depth=%s reads=%lu zero=%lu nonzero=%lu rounded_zero=%lu raw_min=%u raw_max=%u GL_errors_total=%lu",
+		(unsigned long long)now, device.frame, device.visibility_no_depth ? "off" : "normal",
+		device.visibility_reads, device.visibility_zeros, device.visibility_reads - device.visibility_zeros,
+		device.visibility_rounded_zeros, device.visibility_reads ? device.visibility_min : 0,
+		device.visibility_max, device.visibility_errors);
+	for (i = 0; i < 2; i++)
+	{
+		const struct visibility_sample *sample = &device.visibility_examples[i];
+		const struct visibility_observation *draw = &sample->draw;
+
+		if (i ? device.visibility_reads == device.visibility_zeros : !device.visibility_zeros)
+			continue;
+		platform_log("GPU: visibility example slot=%lu query=%u submit_frame=%lu draws=%lu raw=%u scale=%g pixels=%u depth=%d zfunc=0x%lx stencil=%d cull=0x%lx color=0x%lx zbias=%lu viewport=%d,%d,%d,%d",
+			(unsigned long)sample->slot, sample->query, draw->frame, draw->draws, sample->raw, sample->scale, sample->pixels,
+			draw->depth, (unsigned long)draw->depth_function, draw->stencil, (unsigned long)draw->cull,
+			(unsigned long)draw->color, (unsigned long)draw->bias,
+			draw->viewport[0], draw->viewport[1], draw->viewport[2], draw->viewport[3]);
+	}
+	device.visibility_log_time = now;
+	device.visibility_reads = device.visibility_zeros = device.visibility_rounded_zeros = 0;
+	device.visibility_min = device.visibility_max = 0;
+}
+#endif
+
 void WINAPI D3DDevice_BeginVisibilityTest(void)
 {
 	if (!device.gl_ready || device.visibility_test_active)
 		return;
 	/* the query object is chosen when the test ends; use a scratch one */
 	device.visibility_test_active = TRUE;
+#ifndef HALO_GLES
+	if (device.visibility_sync)
+	{
+		memset(&device.visibility_draw, 0, sizeof(device.visibility_draw));
+		device.visibility_draw.frame = device.frame;
+		visibility_check_errors("before begin query");
+	}
+#endif
 #ifdef HALO_GLES
 	if (xgpu_capabilities.atomic_counters)
 	{
@@ -2263,6 +2344,9 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 	}
 #endif
 	glBeginQuery(VISIBILITY_QUERY, device.scratch_query);
+#ifndef HALO_GLES
+	visibility_check_errors("begin query");
+#endif
 }
 
 HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
@@ -2291,6 +2375,13 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	}
 #endif
 	glEndQuery(VISIBILITY_QUERY);
+#ifndef HALO_GLES
+	if (device.visibility_sync)
+	{
+		visibility_check_errors("draw/end query");
+		device.visibility_observations[index] = device.visibility_draw;
+	}
+#endif
 	/* the target's samples to a game pixel (its pixels, by its samples a
 	pixel with multisampling): the result is a count of the game's pixels
 	(visibility_unscaled), which the game divides by its own test's area
@@ -2387,9 +2478,25 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 			if (samples)
 				samples = VISIBILITY_ALL_SAMPLES;
 #else
-			if (device.visibility_sync && device.visibility_sync_reads++ < 16)
-				platform_log("GPU: synchronized visibility slot %lu raw %u scale %g pixels %u",
-					(unsigned long)index, samples, device.query_area[index], visibility_unscaled(samples, index));
+			if (device.visibility_sync)
+			{
+				struct visibility_sample *sample = &device.visibility_examples[samples != 0];
+
+				visibility_check_errors("read query result");
+				sample->draw = device.visibility_observations[index];
+				sample->slot = index;
+				sample->query = device.queries[index];
+				sample->raw = samples;
+				sample->scale = device.query_area[index];
+				sample->pixels = visibility_unscaled(samples, index);
+				if (!device.visibility_reads || samples < device.visibility_min)
+					device.visibility_min = samples;
+				if (samples > device.visibility_max)
+					device.visibility_max = samples;
+				device.visibility_reads++;
+				device.visibility_zeros += samples == 0;
+				device.visibility_rounded_zeros += samples != 0 && sample->pixels == 0;
+			}
 			samples = visibility_unscaled(samples, index);
 #endif
 			device.visibility_known[index] = samples;
@@ -3503,6 +3610,12 @@ static void apply_raster_state(BOOL has_depth)
 	unsigned char color_mask;
 	BOOL depth_test = has_depth && rs[D3DRS_ZENABLE];
 
+#ifndef HALO_GLES
+	/* Only visibility draws bypass depth. The next ordinary draw restores
+	the requested test and write mask through the normal GL state cache. */
+	if (device.visibility_test_active && device.visibility_no_depth)
+		depth_test = FALSE;
+#endif
 	viewport[0] = target_pixel((float)device.viewport.X, 0);
 	viewport[1] = target_pixel((float)device.viewport.Y, 1);
 	viewport[2] = target_pixel((float)(device.viewport.X + device.viewport.Width), 0) - viewport[0];
@@ -3532,6 +3645,21 @@ static void apply_raster_state(BOOL has_depth)
 	}
 
 	state_enable(&gl_state.depth_test, GL_DEPTH_TEST, depth_test);
+#ifndef HALO_GLES
+	if (device.visibility_test_active && device.visibility_sync)
+	{
+		struct visibility_observation *draw = &device.visibility_draw;
+
+		draw->draws++;
+		draw->depth = depth_test;
+		draw->stencil = has_depth && rs[D3DRS_STENCILENABLE];
+		draw->depth_function = rs[D3DRS_ZFUNC];
+		draw->cull = rs[D3DRS_CULLMODE];
+		draw->color = write;
+		draw->bias = rs[D3DRS_ZBIAS];
+		memcpy(draw->viewport, viewport, sizeof(viewport));
+	}
+#endif
 	if (depth_test)
 	{
 		GLenum function = rs[D3DRS_ZFUNC] ? (GLenum)rs[D3DRS_ZFUNC] : GL_NEVER;
@@ -5884,6 +6012,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		render_target_resolve(&back_buffer->target);
 #ifndef HALO_GLES
 		visibility_copy_batch();
+		visibility_log_summary();
 #endif
 		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
 			write_screenshot(back_buffer);
