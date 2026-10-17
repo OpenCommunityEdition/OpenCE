@@ -275,7 +275,9 @@ static BOOL data_extract(const char *image, const char *destination, char *error
 struct data_image_choice
 {
 	SDL_AtomicInt done;
+	BOOL failed;
 	char path[1024];
+	char error[256];
 };
 
 static void SDLCALL data_image_chosen(void *userdata, const char * const *files, int filter)
@@ -283,13 +285,47 @@ static void SDLCALL data_image_chosen(void *userdata, const char * const *files,
 	struct data_image_choice *choice = userdata;
 
 	(void)filter;
-	if (files && files[0])
+	if (!files)
+	{
+		/* no dialog could be shown (SDL needs the desktop portal through
+		libdbus, or zenity) */
+		choice->failed = TRUE;
+		snprintf(choice->error, sizeof(choice->error), "%s",
+			*SDL_GetError() ? SDL_GetError() : "no desktop portal or zenity");
+	}
+	else if (files[0])
+	{
 		snprintf(choice->path, sizeof(choice->path), "%s", files[0]);
+	}
 	SDL_SetAtomicInt(&choice->done, 1);
 }
 
-/* the disc image the player picks; FALSE if they pick none */
-static BOOL data_choose_image(char *path, int size)
+/* a disc image in the folder the maps are extracted to (next to the
+executable), for systems where no file dialog can be shown */
+static BOOL data_find_image(const char *directory, char *path, int size)
+{
+	static const char *const patterns[] = { "*.iso", "*.xiso" };
+	int pattern;
+
+	for (pattern = 0; pattern < (int)(sizeof(patterns) / sizeof(patterns[0])); pattern++)
+	{
+		int count = 0;
+		char **files = SDL_GlobDirectory(directory, patterns[pattern], SDL_GLOB_CASEINSENSITIVE, &count);
+
+		if (files && count > 0)
+		{
+			snprintf(path, (size_t)size, "%s/%s", directory, files[0]);
+			SDL_free(files);
+			return TRUE;
+		}
+		SDL_free(files);
+	}
+	return FALSE;
+}
+
+/* the disc image the player picks; FALSE if they pick none, with *failed
+set (and error written) when no dialog could be shown */
+static BOOL data_choose_image(char *path, int size, BOOL *failed, char *error, int error_size)
 {
 	static const SDL_DialogFileFilter filters[] =
 	{
@@ -307,6 +343,9 @@ static BOOL data_choose_image(char *path, int size)
 		SDL_PumpEvents();
 		SDL_Delay(50);
 	}
+	*failed = choice.failed;
+	if (choice.failed)
+		snprintf(error, (size_t)error_size, "%s", choice.error);
 	if (!choice.path[0])
 		return FALSE;
 	snprintf(path, (size_t)size, "%s", choice.path);
@@ -320,7 +359,9 @@ BOOL platform_offer_game_data(const char *destination)
 		{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Yes" },
 		{ SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "No" },
 	};
-	char message[1400];
+	char message[2600];
+	char found[1024];
+	BOOL image_found;
 
 	/* not for runs nobody is watching */
 	if (config_boolean("debug.hidden_window") || config_real("debug.exit_after") > 0.0 ||
@@ -328,27 +369,59 @@ BOOL platform_offer_game_data(const char *destination)
 	{
 		return FALSE;
 	}
-	snprintf(message, sizeof(message),
-		"Halo's game data (its maps folder) was not found.\n\n"
-		"Extract the maps folder from an Xbox disc image (.iso) of Halo: Combat Evolved? "
-		"It is copied to %s/maps (about 2 GB).\n\n"
-		"(Or put the maps folder there yourself, or set paths.data in config.toml.)",
-		destination);
+	image_found = data_find_image(destination, found, sizeof(found));
+	if (image_found)
+	{
+		snprintf(message, sizeof(message),
+			"Halo's game data (its maps folder) was not found.\n\n"
+			"Extract the maps folder from the Xbox disc image %s? "
+			"It is copied to %s/maps (about 2 GB).\n\n"
+			"(Or put the maps folder there yourself, or set paths.data in config.toml.)",
+			found, destination);
+	}
+	else
+	{
+		snprintf(message, sizeof(message),
+			"Halo's game data (its maps folder) was not found.\n\n"
+			"Extract the maps folder from an Xbox disc image (.iso) of Halo: Combat Evolved? "
+			"It is copied to %s/maps (about 2 GB).\n\n"
+			"(Or put the maps folder there yourself, or set paths.data in config.toml.)",
+			destination);
+	}
 	for (;;)
 	{
 		SDL_MessageBoxData question = { SDL_MESSAGEBOX_INFORMATION, NULL, "Halo", message, 2, buttons, NULL };
 		char image[1024];
 		char error[512];
 		int answer = 0;
+		BOOL failed = FALSE;
 
 		if (!SDL_ShowMessageBox(&question, &answer) || answer != 1)
 		{
 			platform_log("no game data: quitting");
 			exit(EXIT_SUCCESS);
 		}
-		/* no image picked: ask again */
-		if (!data_choose_image(image, sizeof(image)))
-			continue;
+		if (image_found)
+		{
+			snprintf(image, sizeof(image), "%s", found);
+		}
+		else if (!data_choose_image(image, sizeof(image), &failed, error, sizeof(error)))
+		{
+			char explanation[1400];
+
+			/* no image picked: ask again */
+			if (!failed)
+				continue;
+			/* no dialog could be shown */
+			platform_log("no file dialog: %s", error);
+			snprintf(explanation, sizeof(explanation),
+				"No file dialog could be shown (%s).\n\n"
+				"Put the disc image (.iso) in %s and start Halo again, "
+				"or install zenity.",
+				error, destination);
+			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo", explanation, NULL);
+			exit(EXIT_SUCCESS);
+		}
 		platform_log("extracting the maps folder from %s to %s", image, destination);
 		if (data_extract(image, destination, error, sizeof(error)))
 		{
@@ -356,6 +429,7 @@ BOOL platform_offer_game_data(const char *destination)
 			return TRUE;
 		}
 		platform_log("extraction failed: %s", error);
+		image_found = FALSE;
 		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo", error, NULL);
 	}
 }
