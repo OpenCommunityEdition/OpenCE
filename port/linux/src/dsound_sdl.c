@@ -30,8 +30,9 @@ Without an audio device, a clock thread runs the same mixer into a scratch
 buffer, so streams still drain at their real rate.
 
 audio.volume sets the master volume (default 1.0); audio.reverb = false
-turns the reverb off; audio.enabled = false skips opening a device
-(port_config.c).
+turns the reverb off; audio.resampler = "linear" resamples between
+neighbouring frames instead of with the sinc low pass; audio.enabled = false
+skips opening a device (port_config.c).
 */
 
 #include "platform.h"
@@ -483,34 +484,23 @@ next, so the blend is a multiply and an add a tap */
 static float resampler_phases[RESAMPLER_TABLE_STEPS + 1][RESAMPLER_TAPS] RESAMPLER_ALIGNED;
 static float resampler_deltas[RESAMPLER_TABLE_STEPS][RESAMPLER_TAPS] RESAMPLER_ALIGNED;
 
-/* How source samples are converted to the output sample rate */
+/* how a voice's frames are converted to the output's rate: the windowed sinc
+low pass, or between the two frames either side (linear: it lets more of the
+images above the source's rate through, which some hear as brighter) */
 enum resampler_mode
 {
-	/* windowed sinc low pass */
 	RESAMPLER_SINC,
-	/* linear interpolation: it suppresses unwanted spectral images
-	less effectively, but it is a brighter alternative */
-	RESAMPLER_LINEAR,
+	RESAMPLER_LINEAR
 };
 /* audio.resampler */
 static enum resampler_mode resampler_mode = RESAMPLER_SINC;
 
-static enum resampler_mode get_resampler_mode_from_config(void)
+/* audio.resampler's mode: sinc for any value but "linear" */
+static enum resampler_mode resampler_mode_read(void)
 {
 	const char *setting = config_string("audio.resampler");
 
-	if (setting)
-	{
-		if (!strcmp(setting, "sinc"))
-		{
-			return RESAMPLER_SINC;
-		}
-		if (!strcmp(setting, "linear"))
-		{
-			return RESAMPLER_LINEAR;
-		}
-	}
-	return RESAMPLER_SINC;
+	return setting && !strcmp(setting, "linear") ? RESAMPLER_LINEAR : RESAMPLER_SINC;
 }
 
 static double bessel_i0(double x)
@@ -809,14 +799,14 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 		}
 		else if (resampler_mode == RESAMPLER_LINEAR)
 		{
-			unsigned long first = stream->center % RESAMPLER_HISTORY;
-			unsigned long next = (first + 1) % RESAMPLER_HISTORY;
+			/* (the frame the output is at and the next, side by side
+			however the ring wraps) */
+			const float *left_frames = stream->history[0] + stream->center % RESAMPLER_HISTORY;
+			const float *right_frames = stream->history[1] + stream->center % RESAMPLER_HISTORY;
 			float fraction = (float)stream->phase;
-			const float *left_frames = stream->history[0];
-			const float *right_frames = stream->history[1];
 
-			sample_left = left_frames[first] + (left_frames[next] - left_frames[first]) * fraction;
-			sample_right = right_frames[first] + (right_frames[next] - right_frames[first]) * fraction;
+			sample_left = left_frames[0] + (left_frames[1] - left_frames[0]) * fraction;
+			sample_right = right_frames[0] + (right_frames[1] - right_frames[0]) * fraction;
 		}
 		else if (scale == 1.0f)
 		{
@@ -1398,7 +1388,7 @@ static void audio_start(void)
 	audio_started = TRUE;
 	master_volume = (float)config_real("audio.volume");
 	reverb_enabled = config_boolean("audio.reverb");
-	resampler_mode = get_resampler_mode_from_config();
+	resampler_mode = resampler_mode_read();
 	resampler_initialize();
 	resampler_phases_initialize();
 	reverb_initialize();
@@ -1730,19 +1720,15 @@ VOID WINAPI DirectSoundDoWork(void)
 {
 	static unsigned long volume_read_at = (unsigned long)-1;
 
-	/* (audio.volume and audio.reverb read again when the settings change: on
-	the game's thread, not the mixer's, whose lock the config's file I/O
-	would hold) */
+	/* (audio.volume, audio.reverb and audio.resampler read again when the
+	settings change: on the game's thread, not the mixer's, whose lock the
+	config's file I/O would hold) */
 	if (volume_read_at != config_changes())
 	{
 		volume_read_at = config_changes();
 		master_volume = (float)config_real("audio.volume");
 		reverb_enabled = config_boolean("audio.reverb");
-		/* TODO: audio.resampler option is not added to UI yet:
-		it can only be changed from config.toml.
-		So currently, get_resampler_mode_from_config call here does nothing.
-		Remove this comment when audio.resampler can be changed through UI */
-		resampler_mode = get_resampler_mode_from_config();
+		resampler_mode = resampler_mode_read();
 	}
 	streams_complete_finished();
 }
