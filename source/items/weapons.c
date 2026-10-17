@@ -220,6 +220,7 @@ symbols in this file:
 #include "game/cheats.h"
 #include "game/game.h"
 #include "game/game_engine.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
 #include "math/periodic_functions.h"
@@ -646,6 +647,8 @@ void weapon_place(
 	}
 
 	SET_FLAG(weapon->object.flags, _object_at_rest_bit, TEST_FLAG(scenario_weapon->flags, _weapon_created_at_rest_bit));
+	/* port: preserve loaded rounds; configure this original scenario weapon. */
+	game_engine_apply_map_reserves(weapon_index);
 	SET_FLAG(weapon->object.flags, _object_cannot_be_garbage_bit, TRUE);
 	SET_FLAG(weapon->item.flags, _item_does_not_accelerate_bit, !TEST_FLAG(scenario_weapon->flags, _weapon_does_accelerate_bit));
 
@@ -910,7 +913,9 @@ void weapon_delete(
 {
 	if (game_engine_running())
 	{
-		match_assert("c:\\halo\\SOURCE\\items\\weapons.c", 234, !weapon_is_flag(weapon_index));
+		/* port: preserve CTF/Oddball protection, allow Infection skull cleanup. */
+		match_assert("c:\\halo\\SOURCE\\items\\weapons.c", 234,
+			!weapon_is_flag(weapon_index) || infection_can_delete_skull(weapon_index));
 	}
 
 	return;
@@ -1095,9 +1100,12 @@ boolean weapon_handle_potential_inventory_item(
 		struct weapon_magazine *magazine = weapon_magazine_get(weapon, magazine_index);
 		struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
 
-		if (magazine && magazine->rounds_total<magazine_definition->rounds_total_maximum)
+		/* port: variant reserves can exceed the unchanged weapon tag capacity. */
+		short reserve_limit = game_engine_weapon_reserve_limit(weapon->definition_index, magazine_index,
+			magazine_definition->rounds_total_maximum);
+		if (magazine && magazine->rounds_total<reserve_limit)
 		{
-			short rounds_needed = magazine_definition->rounds_total_maximum-magazine->rounds_total;
+			short rounds_needed = reserve_limit-magazine->rounds_total;
 			short rounds_taken = 0;
 
 			if (weapon->definition_index==item_definition_index)
@@ -1289,7 +1297,8 @@ void weapon_build_weapon_interface_state(
 		state->magazines[magazine_index].rounds_loaded = magazine->rounds_loaded;
 		state->magazines[magazine_index].rounds_loaded_maximum = magazine_definition->rounds_loaded_maximum;
 		state->magazines[magazine_index].rounds_remaining = magazine->rounds_total;
-		state->magazines[magazine_index].rounds_remaining_maximum = magazine_definition->rounds_total_maximum;
+		state->magazines[magazine_index].rounds_remaining_maximum = game_engine_weapon_reserve_limit(
+			weapon->definition_index, magazine_index, magazine_definition->rounds_total_maximum);
 	}
 
 	return;

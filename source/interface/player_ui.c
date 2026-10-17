@@ -143,6 +143,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "cseries/errors.h"
 #include "game/game.h"
 #include "game/game_engine.h"
@@ -602,6 +603,8 @@ void player_ui_set_game_variant_options(
 	struct game_variant_options const *options)
 {
 	player_ui_multiplayer_options = *options;
+	/* port: validate profile and network options on selection */
+	infection_options_validate(&player_ui_globals.multiplayer_variant, &player_ui_multiplayer_options);
 }
 
 struct game_variant_options const *player_ui_get_game_variant_options(

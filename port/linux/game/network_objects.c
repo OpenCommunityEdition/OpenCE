@@ -2918,6 +2918,7 @@ static void distributed_client_apply_inventory(
 			short total = inventory->rounds_total[weapon_slot][magazine];
 			short loaded = inventory->rounds_loaded[weapon_slot][magazine];
 
+			total_maximum = game_engine_weapon_reserve_limit(weapon->definition_index, magazine, total_maximum);
 			state->rounds_total = total < 0 ? 0 : MIN(total, total_maximum);
 			state->rounds_loaded = loaded < 0 ? 0 : MIN(loaded, magazine_definition->rounds_loaded_maximum);
 		}

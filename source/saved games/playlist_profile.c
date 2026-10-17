@@ -77,6 +77,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "saved games/playlist_profile.h"
 #include "bungie_net/common/thread.h"
 #include "cseries/errors.h"
@@ -100,7 +101,7 @@ enum
 	which do not pass. */
 	PLAYLIST_PROFILE_OPTIONS_OFFSET = 0x100,
 	PLAYLIST_PROFILE_OPTIONS_MAGIC = 0x4F565047, /* 'GPVO' little-endian */
-	PLAYLIST_PROFILE_OPTIONS_VERSION = 1,
+	PLAYLIST_PROFILE_OPTIONS_VERSION = 4,
 	MAXIMUM_GAME_VARIANT_NAME_LENGTH = 12,
 	NUMBER_OF_DEFAULT_PLAYLIST_PROFILES = 26,
 };
@@ -907,15 +908,24 @@ static boolean playlist_profile_options_from_block(
 	XCALCSIG_SIGNATURE checksum;
 
 	csmemcpy(&header, data, sizeof(header));
-	if (header.magic != PLAYLIST_PROFILE_OPTIONS_MAGIC || header.version != PLAYLIST_PROFILE_OPTIONS_VERSION ||
-		header.size != sizeof(*options))
+	if (header.magic != PLAYLIST_PROFILE_OPTIONS_MAGIC || !((header.version == 1 && header.size == 0x1C) ||
+		(header.version == 2 && header.size == 0x24) ||
+		(header.version == 3 && header.size == 0x28) ||
+		(header.version == PLAYLIST_PROFILE_OPTIONS_VERSION && header.size == sizeof(*options))))
 	{
 		return FALSE;
 	}
+	/* port: legacy checksums cover exactly their original options */
+	size = sizeof(header) + header.size;
 	saved_game_file_generate_checksum((byte *)data, size, &checksum);
 	if (csmemcmp(&checksum, data + size, sizeof(checksum)))
 		return FALSE;
-	csmemcpy(options, data + sizeof(header), sizeof(*options));
+	/* port: migrate v1-v3 without changing existing values. Missing shield
+	   settings use ON; missing ammo settings use NORMAL. Explicit saves use v4. */
+	infection_options_default(options);
+	variant_ammo_options_default(options);
+	csmemcpy(options, data + sizeof(header), header.size);
+	variant_ammo_options_validate(options);
 	options->friendly_fire = (short)PIN(options->friendly_fire, 0, NUMBER_OF_FRIENDLY_FIRE_MODES - 1);
 	options->radar_players = (byte)PIN(options->radar_players, 0, NUMBER_OF_RADAR_PLAYERS - 1);
 	options->loadout = (byte)PIN(options->loadout, 0, NUMBER_OF_LOADOUTS - 1);

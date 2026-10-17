@@ -5,6 +5,7 @@ OBJECTS.C
 /* ---------- headers */
 
 #include "cseries.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "objects.h"
 
 #include "damage.h"
@@ -1796,7 +1797,10 @@ static void object_delete_initial_recursive(
 
 	if (game_engine_running() && object->object.type == _object_type_weapon)
 	{
-		match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 829, !(weapon_is_flag(object_index)));
+		/* port: infection owns disposable per-player skulls; ordinary
+		   Oddball and CTF objectives retain their deletion protection. */
+		match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 829,
+			!weapon_is_flag(object_index) || infection_can_delete_skull(object_index));
 	}
 	
 	if (object->object.first_child_object_index!=NONE)

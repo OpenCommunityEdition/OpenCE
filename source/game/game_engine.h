@@ -236,9 +236,31 @@ struct game_variant_options
 	/* no weapons spawn on the map (its grenades and powerups do): for
 	a loadout of none, melee only */
 	boolean no_map_weapons;
+	/* port: optional Slayer infection rules, GPVO version 2 */
+	byte infection_enabled;
+	byte infection_initial_zombies;
+	byte infection_speed_percent;
+	byte infection_damage_percent;
+	short infection_respawn_seconds;
+	short infection_countdown_seconds;
+	/* port: GPVO v3, zero-filled reserved bytes keep the wire deterministic */
+	byte infection_zombie_shields;
+	byte infection_reserved[3];
+	/* port: GPVO v4 Infection reserves: unloaded rounds, -1 preserves the tag.
+	   Pistol, shotgun, assault rifle, sniper rifle; finite, at most 999. */
+	short ammo_reserves[4];
 };
 
-typedef char verify_game_variant_options_size[sizeof(struct game_variant_options) == 0x1C ? 1 : -1];
+typedef char verify_game_variant_options_size[sizeof(struct game_variant_options) == 0x30 ? 1 : -1];
+
+void variant_ammo_options_default(struct game_variant_options *options);
+void variant_ammo_options_validate(struct game_variant_options *options);
+short game_engine_weapon_reserve_limit(long definition_index, short magazine_index, short native_limit);
+/* port: new scenario weapons only; never on inventory attachment or pickup. */
+void game_engine_apply_map_reserves(long object_index);
+
+/* port: infection humans use the variant's ordinary spawn equipment */
+void game_engine_default_postspawn_player_update(long player_index);
 
 struct game_engine
 {
