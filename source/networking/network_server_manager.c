@@ -475,6 +475,7 @@ symbols in this file:
 #include "interface/player_ui.h"
 #include "tag_files/tag_files.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
+#include "dedicated_server.h" /* port: port/linux/game/dedicated_server.c */
 
 /* port: internet play's Discord presence (port/linux/src/p2p.c), and the
 server browser's listing of a public game (p2p_lobby.c) */
@@ -3323,6 +3324,15 @@ can join the game in progress. */
 boolean server_ok_to_countdown(
 	struct network_game_server *server)
 {
+	/* port: a dedicated server's lobby, whose own machine has no player
+	(port/linux/game/dedicated_server.c): once its game is set up, with
+	sv_minplayers players on any teams, as Halo PC's dedicated server starts
+	(the others join it in progress) */
+	if (dedicated_server_active())
+	{
+		return dedicated_server_lobby_ready() &&
+			server->game.player_count >= dedicated_server_minimum_players();
+	}
 	if (server_has_enough_machines(server) &&
 		(!server_needs_more_teams(server) || server_alone(server)) &&
 		(server->game.player_count >= server->game.minimum_players || server_alone(server)))
@@ -3485,6 +3495,9 @@ boolean network_game_server_game_can_start(
 {
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x782, server);
 
+	/* port: a dedicated server's, as server_ok_to_countdown */
+	if (dedicated_server_active())
+		return server->state == 0 && server_ok_to_countdown(server);
 	return server->state == 0 &&
 		(server->game.player_count >= server->game.minimum_players || server_alone(server));
 }
@@ -4455,6 +4468,14 @@ static boolean network_game_server_add_new_client(
 							"refusing another connection from %s, which has not joined with those it has",
 							transport_address_to_string(&client_address));
 					}
+					/* port: a dedicated server takes so many connections a
+					minute from an address (an internet play peer's real one) */
+					else if (client_address.address.ipv4_address != IPV4_LOOPBACK_ADDRESS &&
+						!dedicated_server_join_allowed(client_address.address.ipv4_address))
+					{
+						network_event("refusing a connection from %s: too many from its address of late",
+							transport_address_to_string(&client_address));
+					}
 					else
 					{
 						server->client_machines[i].connection = new_connection;
@@ -4874,6 +4895,16 @@ static boolean network_game_server_idle_pregame_tasks(
 					network_game_has_free_player_slot(&server->game) ? _rejection_code_game_is_closed :
 						_rejection_code_game_is_full);
 			}
+		}
+
+		/* port: a dedicated server's lobby counts down by itself, with no
+		one to press start, once its players are in (sv_start_delay; more
+		may join until it starts, and after) */
+		if (dedicated_server_active() && !server->countdown_state.active && !server->countdown_state.paused &&
+			server_ok_to_countdown(server))
+		{
+			network_game_server_begin_game_start_countdown(server, dedicated_server_countdown_milliseconds());
+			server->countdown_state.last_countdown_message_time = 0;
 		}
 
 		if (server->countdown_state.active == TRUE)

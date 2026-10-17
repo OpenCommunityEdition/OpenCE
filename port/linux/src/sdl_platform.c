@@ -108,6 +108,8 @@ extern const unsigned long platform_window_icon_size;
 
 BOOL platform_sdl_initialize(void)
 {
+	SDL_InitFlags flags = SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_EVENTS;
+
 	if (platform_sdl_started)
 		return TRUE;
 #if !defined(_WIN32) && !defined(HALO_ANDROID)
@@ -130,7 +132,18 @@ BOOL platform_sdl_initialize(void)
 	controller emulation in xinput_sdl.c) */
 	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
 #endif
-	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_EVENTS))
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+	/* a dedicated server (server.dedicated) runs where there is no display or
+	sound (a service, a machine with no desktop): SDL's drivers that need
+	none, and no controllers */
+	if (config_boolean("server.dedicated"))
+	{
+		SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
+		SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
+		flags &= ~SDL_INIT_GAMEPAD;
+	}
+#endif
+	if (!SDL_Init(flags))
 	{
 		platform_log("SDL_Init failed: %s", SDL_GetError());
 		return FALSE;

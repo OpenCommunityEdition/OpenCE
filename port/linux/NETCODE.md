@@ -340,6 +340,21 @@ machine in the pregame refuses, and which the others no longer need), only
 a pregame keep-alive every five seconds from the host
 (`network_server_manager.c`, `network_server_message_handler.c`).
 
+## Dedicated servers
+
+A dedicated server (`server.dedicated`, `port/linux/game/dedicated_server.c`;
+port/linux/README.md, "Dedicated server") is a host whose own machine has no
+player. It hosts as the pregame screen's fast setup does, and sets its map
+and gametype in its lobby as the menus do. Two things of the host differ, on
+the host alone: its lobby counts down by itself once its game is set up and
+`sv_minplayers` players are in, on any teams (`server_ok_to_countdown`,
+`network_game_server_idle_pregame_tasks`), and its own client does not leave
+the game when no local player remains (`network_client_manager.c`). It
+takes at most 6 connections a minute from one address (an internet play
+peer's real one). Nothing that the machines send each other changes: a
+client cannot tell it from any other host, and the network version is
+unchanged.
+
 ## Map sharing
 
 A client may join a game on a Custom Edition map it does not have

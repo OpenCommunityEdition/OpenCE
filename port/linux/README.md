@@ -169,7 +169,7 @@ These files are in the data root:
 | File | Contents |
 | --- | --- |
 | `debug.txt` | The log of the game. At start-up, the game shows the data root in the terminal. A crash writes its report (the faulting address and the calls that led to it) here as well; the `reference address` line at the top of each session places those addresses in the build. |
-| `init.txt` | Console commands that the game does at start-up. For example, `map_name levels\a10\a10` starts the first campaign level. |
+| `init.txt` | Console commands that the game does at start-up. For example, `map_name levels\a10\a10` starts the first campaign level. A dedicated server reads its own commands here instead. Refer to "Dedicated server". |
 | `tags/` | Sound tag files that replace the sounds of the maps (`audio.loose_sounds`). |
 
 The settings are in `config.toml` next to the executable. Refer to
@@ -401,6 +401,8 @@ the setting for one start of the game. It has priority over the file.
 | `network.coop_public` | `false` | `HALO_NET_COOP_PUBLIC` | `true`: an online co-op game (Create Game > Internet, a SINGLEPLAYER map) starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in co-op's Server Setup writes its choice here. Refer to "Server browser". |
 | `network.brokers_file` | `"brokers.txt"` | `HALO_NET_BROKERS_FILE` | The file of the public MQTT brokers that let the machines of an invite find each other, and that carry the listings of the server browser: next to `config.toml`, unless a full path. One `host:port` on each line, up to 4; `#` starts a comment. |
 | `network.stun_servers` | Google and Cloudflare | `HALO_NET_STUN` | The public STUN servers (`host:port`, with commas between them) that give the internet address of a machine. |
+| `server.dedicated` | `false` | `HALO_DEDICATED_SERVER` | `true`: the game is a dedicated server. It hosts network games with no window, sound or player of its own, and takes its commands from `server.init_file` and the terminal. Refer to "Dedicated server". Not on Android or the web. |
+| `server.init_file` | `"init.txt"` | `HALO_SERVER_INIT_FILE` | The commands that a dedicated server does at start-up, one on each line: in the data root, unless a full path. Empty: none. |
 | `discord.application_id` | the application of the project | `HALO_DISCORD_APPLICATION` | The Discord application for invites. Empty: no Discord. |
 | `update.auto` | `true` | `HALO_UPDATE_AUTO` | `true`: at start-up, the game looks for a new version. Refer to "Updates". `false`: the game does not look. |
 | `crash_reports.upload` | `"ask"` | `HALO_CRASH_REPORTS` | Windows only. `"yes"`: the game sends a report of each crash to the developers. `"no"`: the game sends no reports. `"ask"`: the game asks at the next crash and writes the answer here. Refer to "Crash reports" in [port/windows/README.md](../windows/README.md#crash-reports). |
@@ -972,6 +974,133 @@ the invite with the invite button of Discord. When a person accepts it, that
 person joins the game. If the game does not operate, Discord starts it.
 The game sends the activity only to a Discord client of the same user.
 
+## Dedicated server
+
+With `server.dedicated = true` (`HALO_DEDICATED_SERVER=1`), the game is a
+dedicated server. It hosts a system link game, which is also an internet
+game, with no window, sound or player of its own. The simulation, the AI and
+the scores run on the server, as on any host
+(`game/dedicated_server.c`). Other machines join it as they join any host:
+on the local network, with the invite link, or from the server browser. The
+server sends the same messages as any host of this network version, so any
+build of the same version can join it.
+
+To start a server, put the `maps` folder of the game in a folder of its
+own, write the commands of the server in `init.txt` in that folder, and
+start the game with that folder as the data root:
+
+```sh
+mkdir -p ~/halo-server && cp -r /path/to/maps ~/halo-server/maps
+HALO_DEDICATED_SERVER=1 HALO_DATA_ROOT=~/halo-server HALO_NET_TUNNEL_PORT=2302 build/linux/halo
+```
+
+The server writes to the standard output: its invite link, the players that
+join and leave, and the games. Type `help` for the commands. `quit`, Ctrl+C
+or SIGTERM (`systemctl stop`) stops the server, and its listing in the
+server browser closes. To let players on the internet join, forward the
+UDP port `network.tunnel_port` (2302 above) on the router to the server.
+
+A dedicated server always runs with these settings, whatever `config.toml`
+and the environment say: no window and no graphics (`debug.null_renderer`,
+`debug.hidden_window`), no sound and no microphone (`audio.enabled`,
+`audio.voice_chat`), 30 frames each second (`display.interpolation` and
+`display.vsync` off), no high-res HUD or text, no updates, no crash report
+questions, no Discord, no invite links from the clipboard, no telnet
+console, and no automatic tests (`debug.network_test`, `debug.test_input`).
+It needs no display or sound device: SDL uses its dummy drivers. The game's
+`init.txt` scripts do not run on a server.
+
+`init.txt` has one command on each line, as for the dedicated server of
+Halo PC (`haloceded`). Lines that start with `#`, `;` or `//` are comments.
+The server reports a command that it does not know, and ignores it.
+
+```
+# my server
+sv_name "OpenCE Slayer"
+sv_maxplayers 12
+sv_public 1
+sv_mapcycle_add bloodgulch ctf
+sv_mapcycle_add chillout slayer
+sv_mapcycle_add hangemhigh team_slayer
+sv_timelimit 15
+sv_minplayers 1
+```
+
+| Command | Function |
+| --- | --- |
+| `sv_name <name>` | The name of the game, in the lobby and the server browser (up to 15 characters). Without it: the name of the machine. |
+| `sv_maxplayers <2-128>` | The most players (16 is the default). |
+| `sv_password [password]` | Players who join from the server browser must type this password. Without a password: none. The invite link joins without the password. The server never shows or logs the password. |
+| `sv_public <0\|1>` | `1`: the game is listed in the server browser. `0`: only players with the invite link (or on the local network) can join. The default is `network.host_public`. |
+| `sv_mapcycle_add <map> <gametype>` | Adds a game to the map cycle. The map is a file name in `maps/` without `.map`, or the name of a Custom Edition map in `custom_maps/` (with `game.custom_edition`). The gametypes are `slayer`, `team_slayer`, `ctf`, `ironctf`, `king`, `team_king`, `oddball`, `team_oddball`, `race`, `team_race`, `rally`, `elimination`, `stalker` and `accumulation` (also Halo PC's `ffa` and `koth`). |
+| `sv_mapcycle_del <#>`, `sv_mapcycle_clear`, `sv_mapcycle`, `sv_mapcycle_begin` | Removes a game from the cycle; empties the cycle; lists it; starts it again from its first game. An empty cycle plays Blood Gulch, Slayer. |
+| `sv_map <map> <gametype>` | Plays this game now, and then the cycle continues. |
+| `sv_map_next`, `sv_map_reset`, `sv_end_game` | Ends the game: then the next game of the cycle, the same game again, or the next game. |
+| `sv_timelimit <minutes>` | The longest time of a game. `0` (the default): until the score of the gametype. |
+| `sv_scorelimit <score>` | The score that wins, from the next game. `0` (the default): the score of the gametype. |
+| `sv_minplayers <n>` | The players that a game needs to start (1 is the default). |
+| `sv_start_delay <seconds>` | The countdown in the lobby when the players are in (10 is the default). |
+| `sv_postgame <seconds>` | How long the scores show after a game (10 is the default; 3 when nobody is in the game). |
+| `sv_end_empty <seconds>` | A game that nobody is in ends after this time (30 is the default; `0`: never). |
+| `sv_players`, `sv_status` | The players (number, name, team, address, hardware id); the server (its game, players and invite). |
+| `sv_kick <#\|name>`, `sv_ban <#\|name>` | Removes the player of that number (`sv_players`) or name, as the `kick` and `ban` console commands do. `sv_ban` adds a line to `bans.txt`. |
+| `sv_ban_ip <a.b.c.d>`, `sv_banlist`, `sv_unban <#>` | Bans an address; lists the bans of `bans.txt`, with numbers; removes a ban. |
+| `quit` | Stops the server. |
+
+How the server plays:
+
+- It hosts one game at a time. The lobby counts down by itself when
+  `sv_minplayers` players are in, on any teams, and the game starts. Other
+  players join the game in progress.
+- A game ends at its score, at `sv_timelimit`, or with a command. The
+  scores show for `sv_postgame` seconds. Then the next game of the cycle
+  starts in the lobby, and the players stay in it.
+- When nobody is in a game for `sv_end_empty` seconds, the game ends, and
+  the server waits in its lobby. While no other machine is connected, the
+  server does about 10 frames each second. A server used 0.2% to 0.3% of a
+  core of a Ryzen 9 7950X with nobody connected, and 2% to 2.5% with two
+  players, with about 135 MB of memory.
+- A dedicated server takes at most 6 connections each minute from one
+  address (for internet play, the real address of the player), and refuses
+  more. The other rules of a host (bans, the checks of the netcode, the
+  limits of internet play) are the same.
+
+Commands come only from `init.txt` and from the standard input of the
+server: there is no remote console, and the telnet console is off. No
+command runs a script or a program, and the players cannot send commands.
+Keep `init.txt` readable only by the user of the server if it has a
+password. On Windows, a server reads `init.txt` but has no console. Android
+and the web have no dedicated server.
+
+### Several servers on one machine
+
+Each server needs its own data root (its `init.txt`, `bans.txt` and
+`debug.txt`), save root (`paths.saves`, for the map cache), game address and
+internet play port. The first server can use the defaults. Give each of the
+others an address of its own on the loopback network (`network.address`,
+for example `127.0.0.2`) and a port of its own (`network.tunnel_port`, for
+example 2303). Players then join those servers with their invite links or
+from the server browser, not on the local network.
+
+`halo-server@.service` runs one server for each folder in
+`/opt/halo/servers` (`halo-server@s1` for `/opt/halo/servers/s1`), as the
+user `halo`, with the protections of systemd. The game is in
+`/opt/halo/bin` (`build/linux/halo` of a `--portable` build, with its
+`libSDL3.so.0`). Each folder has `maps/`, `init.txt` and `server.env`, the
+settings of that server:
+
+```sh
+sudo useradd --system --home-dir /opt/halo --shell /usr/sbin/nologin halo
+sudo install -D -m 755 build/linux/halo build/linux/libSDL3.so.0 -t /opt/halo/bin
+sudo install -d -o halo -g halo -m 750 /opt/halo/servers/s1
+sudo ln -s /opt/halo/maps /opt/halo/servers/s1/maps
+sudo install -o halo -g halo -m 600 init.txt /opt/halo/servers/s1/init.txt
+printf 'HALO_NET_TUNNEL_PORT=2302\n' | sudo tee /opt/halo/servers/s1/server.env
+sudo install -m 644 port/linux/halo-server@.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now halo-server@s1
+journalctl -u halo-server@s1 -f
+```
+
 ## Map checks
 
 The game reads a map's tags straight into memory and uses them as its own
@@ -1161,6 +1290,7 @@ Other changes:
 | `cutscene/cinematics.c` | A scenario's titles (some Custom Edition maps show their name for the whole game) are not drawn over a menu, as the letterbox is not: the screen's overlays are drawn after the players' menus. |
 | `tag_files/tag_groups.h` | `TAG_BLOCK_GET_ELEMENT` returns an element in the block without a call, and calls `tag_block_get_element_with_size` for anything else. |
 | `input/input_xbox.c`, `physics/collision_usage.c` | The clock is read only for a button held, and for collision tests only when their times are shown: a read of the clock is slow in a browser. |
+| `main/main.c`, `main/console.c`, `networking/network_server_manager.c`, `networking/network_client_manager.c` | The dedicated server (`game/dedicated_server.c`): its work each frame; no `init.txt` scripts; its lobby counts down by itself once its game is set up and its players are in; it takes so many connections a minute from an address; and its own client stays in the game with no local player. |
 
 The x86 inline assembly of the game is replaced by C. Thus the compiler
 can optimize that code for each processor:

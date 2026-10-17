@@ -1,0 +1,66 @@
+# systemd template unit for dedicated servers (port/linux/README.md,
+# "Dedicated server"): one instance for each server folder,
+# /opt/halo/servers/<name> (maps/, init.txt, and server.env with the settings
+# of that server: its own HALO_NET_TUNNEL_PORT, and for all but one server
+# its own HALO_NET_ADDRESS), all run by the user "halo". Install as that
+# section says, then:
+#   sudo systemctl enable --now halo-server@s1
+#   journalctl -u halo-server@s1 -f      (the invite link, the players, the games)
+# Forward (and open in the firewall) each server's network.tunnel_port, UDP.
+[Unit]
+Description=Halo dedicated server %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=halo
+Group=halo
+WorkingDirectory=/opt/halo/servers/%i
+Environment=HALO_DEDICATED_SERVER=1
+Environment=HALO_DATA_ROOT=/opt/halo/servers/%i
+Environment=HALO_SAVE_ROOT=/opt/halo/servers/%i/saves
+Environment=HOME=/opt/halo/servers/%i
+Environment=HALO_NET_TUNNEL_PORT=2302
+EnvironmentFile=-/opt/halo/servers/%i/server.env
+ExecStart=/opt/halo/bin/halo
+# (no console under systemd: commands from init.txt; SIGTERM stops the
+# server at its next frame and closes its listing in the server browser)
+StandardInput=null
+KillSignal=SIGTERM
+TimeoutStopSec=15
+Restart=on-failure
+RestartSec=10
+# (no privileges, nothing writable but the server's folder)
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/opt/halo/servers/%i
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+# (a 32-bit x86 program)
+SystemCallArchitectures=native x86
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+UMask=0027
+# (a server used about 135 MB with two players)
+MemoryMax=600M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

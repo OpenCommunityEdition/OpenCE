@@ -466,6 +466,15 @@ static const struct config_setting config_settings[] =
 		"HALO_NET_STUN", _environment_value, _platform_all,
 		"Public STUN servers that tell this machine its internet address;\n"
 		"comma-separated host:port." },
+	{ "server.dedicated", _config_boolean, "false", "HALO_DEDICATED_SERVER", _environment_value, _platform_desktop,
+		"Run as a dedicated server: host network games with no window, sound or\n"
+		"player of its own, taking its commands (sv_name, sv_mapcycle_add...) from\n"
+		"init_file and the terminal (port/linux/README.md, \"Dedicated server\");\n"
+		"false plays the game." },
+	{ "server.init_file", _config_string, "\"init.txt\"", "HALO_SERVER_INIT_FILE", _environment_value,
+		_platform_desktop,
+		"A dedicated server's commands at its start, one a line: in the data\n"
+		"folder unless a full path; empty for none." },
 	{ "discord.application_id", _config_string, "\"1553978809840050229\"", "HALO_DISCORD_APPLICATION",
 		_environment_value, _platform_desktop,
 		"The Discord application internet play invites go through while the\n"
@@ -1241,6 +1250,45 @@ static void config_load(void)
 			break;
 		}
 	}
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+	/* a dedicated server (port/linux/game/dedicated_server.c) has no window,
+	sound, microphone or player, never updates itself, talks to Discord or
+	asks anything, and takes commands only from its own console, whatever
+	the file and the environment say */
+	if (config_values[config_setting_index("server.dedicated")].boolean)
+	{
+		static const char *const dedicated_settings[][2] =
+		{
+			{ "debug.null_renderer", "true" },
+			{ "debug.hidden_window", "true" },
+			{ "display.fullscreen", "false" },
+			{ "display.vsync", "false" },
+			/* (the game's frames held to its 30 ticks a second) */
+			{ "display.interpolation", "false" },
+			{ "display.high_res_hud", "false" },
+			{ "display.high_res_text", "false" },
+			{ "audio.enabled", "false" },
+			{ "audio.voice_chat", "off" },
+			{ "update.auto", "false" },
+			{ "crash_reports.upload", "no" },
+			{ "discord.application_id", "" },
+			{ "network.join_from_clipboard", "false" },
+			{ "debug.telnet_console", "false" },
+			{ "debug.network_test", "" },
+			{ "debug.test_input", "" },
+			{ "debug.menu_open", "" },
+		};
+		size_t setting;
+
+		for (setting = 0; setting < sizeof(dedicated_settings) / sizeof(dedicated_settings[0]); setting++)
+		{
+			long found = config_setting_index(dedicated_settings[setting][0]);
+
+			if (found >= 0)
+				config_set_from_text(&config_values[found], config_settings[found].type, dedicated_settings[setting][1]);
+		}
+	}
+#endif
 }
 
 static const struct config_value *config_value(const char *name, enum config_type type)

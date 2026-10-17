@@ -392,6 +392,7 @@ symbols in this file:
 #include "networking/network_server_manager.h"
 #include "text/unicode.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
+#include "dedicated_server.h" /* port: port/linux/game/dedicated_server.c */
 
 /* ---------- constants */
 
@@ -1814,7 +1815,9 @@ boolean network_game_client_remove_player(
 				}
 			}
 
-			if (network_player_index == MAXIMUM_NUMBER_OF_PLAYERS)
+			/* port: a dedicated server's own machine never has a player
+			(port/linux/game/dedicated_server.c): it goes on hosting */
+			if (network_player_index == MAXIMUM_NUMBER_OF_PLAYERS && !dedicated_server_active())
 			{
 				network_game_client_all_local_players_have_quit();
 				network_event("no local players remain in the game, exiting the game now");

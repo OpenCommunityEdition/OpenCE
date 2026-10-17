@@ -60,6 +60,7 @@ symbols in this file:
 #include "hs/hs.h"
 #include "networking/network_server_manager.h"
 #include "network_votekick.h" /* port: port/linux/game/network_votekick.c */
+#include "dedicated_server.h" /* port: port/linux/game/dedicated_server.c */
 #include "input/input.h"
 #include "interface/terminal.h"
 #include "math/real_math.h"
@@ -400,6 +401,11 @@ void console_startup(
 	FILE *file;
 	short newest_previous_command_index;
 
+	/* port: a dedicated server's init.txt is its own commands, which it runs
+	itself (port/linux/game/dedicated_server.c): no script from it, and
+	nothing of it (a password) logged */
+	if (dedicated_server_active())
+		return;
 	if (!game_in_editor())
 	{
 		file = fopen("d:\\init.txt", "r");

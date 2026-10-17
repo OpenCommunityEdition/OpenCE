@@ -680,6 +680,7 @@ typedef char screenshot_and_framerate_globals_size_assert[
 	sizeof(struct _screenshot_and_framerate_globals) == 0x38B ? 1 : -1];
 
 void network_test_update(boolean main_menu_loaded, real seconds);
+#include "dedicated_server.h" /* port: port/linux/game/dedicated_server.c */
 
 /* ---------- prototypes */
 
@@ -3521,6 +3522,8 @@ static boolean main_loop_iteration(
 
 			/* automated system link tests (port/linux/game/network_test.c) */
 			network_test_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
+			/* port: a dedicated server's hosting and commands (port/linux/game/dedicated_server.c) */
+			dedicated_server_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
 			/* port: voice chat, in the lobby and in game (port/linux/game/network_voice.c) */
 			network_voice_update();
 			/* port: map sharing, in the lobby and in game (port/linux/game/map_share.c) */
