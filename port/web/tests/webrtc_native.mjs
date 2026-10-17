@@ -11,7 +11,9 @@
 // messages of every size, split across SCTP's packets and not, which it
 // sends back, and the browser checks them; then again with a tenth of the
 // datagrams each way lost, when the channel must stay open (what was lost is
-// given up, FORWARD-TSN) and carry the rest. No game data is needed.
+// given up, FORWARD-TSN, or by the native end when the browser's does not
+// come in time) and carry the rest to the end: a lost first chunk of the
+// association, a tenth of the runs, once stopped it. No game data is needed.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';

@@ -649,7 +649,15 @@ needs (`src/p2p_webrtc.c`):
 - SCTP, over DTLS: the browser opens the association, and one data channel,
   agreed before (unordered, without retransmissions), carries the packets of
   the tunnel. They are sealed as on UDP, and KCP makes the streams reliable
-  as on UDP.
+  as on UDP. A packet that is lost stays lost. The native build gives up its
+  own lost packets after 300 ms (FORWARD-TSN), and the lost packets of the
+  browser after 200 ms if the browser has not given them up first: the SCTP
+  of Chromium and Firefox (dcsctp) can stop doing so on a path that loses
+  packets, Firefox's before Firefox 158 in particular when the first packet
+  of the connection is lost, and the connection would then stop.
+  When a connection does not flow (the native build gives up a packet of
+  the browser for it, or the browser acknowledges nothing), the log says
+  so once, with the state of SCTP.
 
 Two browsers connect to each other with their own WebRTC. There is no relay:
 as between native builds, two networks that do not let a direct connection

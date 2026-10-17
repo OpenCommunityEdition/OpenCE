@@ -723,6 +723,14 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
   took to come (the reliable channel's resending holds it up), that is
   when the shooter saw the target (as far back as the host keeps). A
   report made more than three seconds ago is refused.
+- **A browser's datagrams are datagrams too.** A browser's tunnel is a
+  WebRTC data channel that never sends a message again (port/linux/README.md,
+  "Browsers"), so a lost datagram is lost as on UDP and KCP sends it again,
+  as on UDP. A native build gives up a lost chunk of the browser's SCTP
+  after 200 ms if the browser has not given it up (`p2p_webrtc.c`), as the
+  browsers' SCTP (dcsctp) can fall behind at it, or stop, on a path that
+  loses datagrams. `port/web/tests/webrtc_native.mjs` checks the channel
+  with a tenth of the datagrams lost each way.
 
 ## Testing
 

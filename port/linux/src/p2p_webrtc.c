@@ -24,7 +24,21 @@ play's, sealed as to any peer; WebRTC is only their way through.
   the tunnel's datagrams, whose streams KCP makes reliable, as on UDP).
   Messages larger than a packet are split and joined again. What this end
   sends and the peer has not acknowledged in ABANDON_TIME is given up
-  (FORWARD-TSN, RFC 3758); what it receives is acknowledged at once.
+  (FORWARD-TSN, RFC 3758); what it receives is acknowledged at once, with
+  every gap that fits in the SACK (the browser counts a lost chunk missing,
+  and gives it up, only from newer chunks acknowledged past it).
+  A gap the browser has not given up in SKIP_TIME is given up here: its
+  TSNs are acknowledged as if a FORWARD-TSN had come. The channel's
+  messages are never retransmitted, so a chunk missing that long is lost
+  either way, and a browser's FORWARD-TSNs can fall behind or stop. dcsctp
+  (Chromium's SCTP, and Firefox's) waits a smoothed round trip, or
+  200 ms if that is shorter, after one before the next, and each passes
+  only the first gap; it measures the round trip only from SACKs without
+  gaps, so when the association's first chunk is lost it keeps its first
+  guess (500 ms) and gives up a gap every 200 ms, fewer than a lossy path
+  opens. Firefox's dcsctp before Firefox 158 has no clock (its callbacks
+  left TimeMillis returning 0: Mozilla's bug 2077997), so there its
+  FORWARD-TSN after a first chunk lost is its last.
 
 Everything runs on the p2p thread, under p2p_lock.
 */
@@ -54,7 +68,10 @@ enum
 	TSN_WINDOW = 1024,
 	/* fragments of messages kept for joining */
 	MAXIMUM_FRAGMENTS = 16,
-	MAXIMUM_GAP_BLOCKS = 16,
+	/* the gaps a SACK reports (as many as a packet carries: those past
+	the last reported would never be acknowledged, and what the browser
+	sent before them never counted missing) */
+	MAXIMUM_GAP_BLOCKS = (MAXIMUM_CHUNK_DATA - 4) / 4,
 	SCTP_PORT = 5000,
 	/* the window this end says it has: messages are passed on at once */
 	RECEIVE_WINDOW = 1 << 20,
@@ -65,6 +82,11 @@ enum
 	PUNCH_TIME = 30000,
 	ABANDON_TIME = 300,
 	FORWARD_INTERVAL = 200,
+	/* a gap in what the browser sends, open this long after a later chunk
+	came, is given up here (RFC 3758 has a FORWARD-TSN delayed at most
+	200 ms; and dcsctp's retransmission timeout, 400 ms at least, which
+	would cut its congestion window to a packet, is not reached) */
+	SKIP_TIME = 200,
 	/* a path not checked in this long is not one the browser uses */
 	PATH_TIME = 30000,
 };
@@ -173,12 +195,15 @@ struct connection
 	unsigned int local_tag;
 	unsigned int peer_tag;
 	unsigned char cookie[16];
-	/* receiving: the cumulative TSN, which past it arrived (by TSN modulo
-	TSN_WINDOW), the highest, and whether a SACK is owed */
+	/* receiving: the cumulative TSN, which past it arrived and when (by TSN
+	modulo TSN_WINDOW), the highest, whether a SACK is owed, and the gaps
+	given up here (SKIP_TIME) */
 	unsigned int cumulative;
 	unsigned int highest;
 	unsigned char received[TSN_WINDOW];
+	unsigned long received_times[TSN_WINDOW];
 	int sack_due;
+	unsigned long skipped;
 	struct fragment fragments[MAXIMUM_FRAGMENTS];
 	/* sending: the next TSN, the peer's cumulative acknowledgement, when
 	each TSN past it was sent (by TSN modulo TSN_WINDOW), and the last
@@ -188,6 +213,8 @@ struct connection
 	unsigned long sent_times[TSN_WINDOW];
 	unsigned int forwarded;
 	unsigned long forward_time;
+	/* whether sending stopped, the peer too far behind (logged once) */
+	int send_blocked;
 };
 
 static struct connection *connections[MAXIMUM_CONNECTIONS];
@@ -463,6 +490,26 @@ static void connection_fail(struct connection *connection, const char *reason)
 	connection->state = _sctp_closed;
 }
 
+/* the association's state, when it is not flowing as it should: what was
+received (to the cumulative TSN, the highest past it, the gaps between),
+and what was sent and not acknowledged */
+static void sctp_log_state(struct connection *connection, const char *what)
+{
+	unsigned int tsn;
+	int gaps = 0;
+
+	for (tsn = connection->cumulative + 1; !tsn_after(tsn, connection->highest); tsn++)
+	{
+		if (!connection->received[tsn % TSN_WINDOW] && connection->received[(tsn + 1) % TSN_WINDOW])
+			gaps++;
+	}
+	platform_log("Internet play: WebRTC with %s %s: %s (SCTP: received to TSN %u and %u past it in %d gaps, "
+		"%lu gaps given up here; sent %u past TSN %u acknowledged, FORWARD-TSN to %u)",
+		connection->is_host ? "host" : "player", connection->name, what, connection->cumulative,
+		connection->highest - connection->cumulative, gaps, connection->skipped,
+		connection->next_tsn - 1 - connection->acknowledged, connection->acknowledged, connection->forwarded);
+}
+
 /* ---------- SCTP: what this end sends */
 
 /* one SCTP packet: the common header, then the chunks (already in packet
@@ -540,7 +587,13 @@ static void sctp_send_message(struct connection *connection, const unsigned char
 		return;
 	/* (the peer far behind: lost, until FORWARD-TSN catches up) */
 	if (connection->next_tsn - connection->acknowledged >= TSN_WINDOW - 4)
+	{
+		if (!connection->send_blocked)
+			sctp_log_state(connection, "its browser acknowledges nothing; this end's packets are lost");
+		connection->send_blocked = 1;
 		return;
+	}
+	connection->send_blocked = 0;
 	while (offset < size)
 	{
 		int length = size - offset > MAXIMUM_CHUNK_DATA ? MAXIMUM_CHUNK_DATA : size - offset;
@@ -663,6 +716,7 @@ static void data_received(struct connection *connection, int flags, const unsign
 		return;
 	}
 	connection->received[tsn % TSN_WINDOW] = 1;
+	connection->received_times[tsn % TSN_WINDOW] = p2p_now();
 	if (tsn_after(tsn, connection->highest))
 		connection->highest = tsn;
 	while (connection->received[(connection->cumulative + 1) % TSN_WINDOW] &&
@@ -712,14 +766,13 @@ static void data_received(struct connection *connection, int flags, const unsign
 	}
 }
 
-static void forward_tsn_received(struct connection *connection, const unsigned char *value, int length)
+/* what the peer sent to TSN forward, and is missing, given up (by its
+FORWARD-TSN, or here: sctp_skip): the cumulative TSN moves past it, and
+past what came after it */
+static void give_up_to(struct connection *connection, unsigned int forward)
 {
-	unsigned int forward;
 	int index;
 
-	if (length < 4)
-		return;
-	forward = get_long(value);
 	connection->sack_due = 1;
 	if (!tsn_after(forward, connection->cumulative))
 		return;
@@ -747,6 +800,32 @@ static void forward_tsn_received(struct connection *connection, const unsigned c
 	{
 		if (connection->fragments[index].used && !tsn_after(connection->fragments[index].tsn, forward))
 			connection->fragments[index].used = 0;
+	}
+}
+
+static void forward_tsn_received(struct connection *connection, const unsigned char *value, int length)
+{
+	if (length >= 4)
+		give_up_to(connection, get_long(value));
+}
+
+/* the gaps in what the peer sent that a later chunk came past SKIP_TIME
+ago, given up as by a FORWARD-TSN (the file's comment says why) */
+static void sctp_skip(struct connection *connection)
+{
+	while (tsn_after(connection->highest, connection->cumulative))
+	{
+		unsigned int tsn;
+
+		/* (the first past the gap; the highest came, so one did) */
+		for (tsn = connection->cumulative + 2; !connection->received[tsn % TSN_WINDOW]; tsn++)
+			;
+		if (!elapsed(connection->received_times[tsn % TSN_WINDOW], SKIP_TIME))
+			return;
+		if (!connection->skipped)
+			sctp_log_state(connection, "its browser did not give up a lost chunk (FORWARD-TSN) in time, so this end does");
+		connection->skipped++;
+		give_up_to(connection, tsn - 1);
 	}
 }
 
@@ -786,6 +865,8 @@ static void init_received(struct connection *connection, const unsigned char *va
 		connection->next_tsn = random_long();
 		connection->acknowledged = connection->next_tsn - 1;
 		connection->forwarded = connection->acknowledged;
+		connection->skipped = 0;
+		connection->send_blocked = 0;
 		connection->state = _sctp_cookie_sent;
 	}
 	outbound = get_short(value + 8);
@@ -1135,7 +1216,9 @@ int p2p_webrtc_update(void)
 		busy = 1;
 		if (connection->failed)
 			continue;
-		/* (the handshake's retransmissions) */
+		/* (the handshake's retransmissions; and the SACK of gaps given up) */
+		if (connection->state == _sctp_established)
+			sctp_skip(connection);
 		connection_receive(connection);
 		if (connection->state == _sctp_established)
 			sctp_forward(connection);
