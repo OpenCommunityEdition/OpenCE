@@ -62,6 +62,7 @@
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/op_kills_to_win" x="54" y="163"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/op_team_play" x="54" y="193"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_time_limit" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/open_infection" x="54" y="253"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">

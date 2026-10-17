@@ -66,6 +66,7 @@ their handlers open opens.
 */
 
 #include "cseries.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "input/input.h"
 #include "interface/event_manager.h"
 #include "interface/player_ui.h"
@@ -5144,6 +5145,14 @@ struct gametype_option
 
 static struct gametype_option const gametype_options[] =
 {
+	{ "infection_enabled_spinner", _option_option_byte, OPTIONS_FIELD(infection_enabled), 0, 2, { 0, 1 } },
+	{ "infection_initial_zombies_spinner", _option_option_byte, OPTIONS_FIELD(infection_initial_zombies), 0, 6, { 1, 2, 3, 4, 8, 16 } },
+	{ "infection_speed_percent_spinner", _option_option_byte, OPTIONS_FIELD(infection_speed_percent), 0, 8, { 100, 110, 115, 125, 150, 180, 190, 200 } },
+	{ "infection_damage_percent_spinner", _option_option_byte, OPTIONS_FIELD(infection_damage_percent), 0, 4, { 100, 150, 200, 250 } },
+	{ "infection_respawn_seconds_spinner", _option_short, OPTIONS_FIELD(infection_respawn_seconds), 0, 5, { 1, 2, 3, 5, 10 } },
+	{ "infection_countdown_seconds_spinner", _option_short, OPTIONS_FIELD(infection_countdown_seconds), 0, 4, { 0, 3, 5, 10 } },
+	{ "infection_zombie_shields_spinner", _option_option_byte, OPTIONS_FIELD(infection_zombie_shields), 0, 2, { 0, 1 } },
+	{ "infection_time_limit_spinner", _option_short, OPTIONS_FIELD(time_limit), 0, 6, { 0, 1, 3, 5, 10, 15 } },
 	/* player options */
 	{ "number_of_lives_spinner", _option_long, VARIANT_FIELD(universal_variant.lives), 0, 4, { 0, 1, 3, 5 } },
 	{ "maximum_health_spinner", _option_health, 0, 0, 6, { 5, 10, 15, 20, 30, 40 } },
@@ -5170,6 +5179,11 @@ static struct gametype_option const gametype_options[] =
 	{ "secondary_weapon_spinner", _option_option_byte, OPTIONS_FIELD(secondary_weapon), 0, NUMBER_OF_LOADOUT_WEAPONS,
 		{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 } },
 	/* indicator options */
+	/* port: unloaded starting reserves; NORMAL keeps native equipment values. */
+	{ "ammo_reserve_0_spinner", _option_short, OPTIONS_FIELD(ammo_reserves[0]), 0, 9, { -1, 0, 50, 100, 120, 200, 300, 500, 999 } },
+	{ "ammo_reserve_1_spinner", _option_short, OPTIONS_FIELD(ammo_reserves[1]), 0, 9, { -1, 0, 50, 100, 120, 200, 300, 500, 999 } },
+	{ "ammo_reserve_2_spinner", _option_short, OPTIONS_FIELD(ammo_reserves[2]), 0, 9, { -1, 0, 50, 100, 120, 200, 300, 500, 999 } },
+	{ "ammo_reserve_3_spinner", _option_short, OPTIONS_FIELD(ammo_reserves[3]), 0, 9, { -1, 0, 50, 100, 120, 200, 300, 500, 999 } },
 	{ "indicator_options_radar display_spinner", _option_long, VARIANT_FIELD(universal_variant.goal_radar), 0, 3,
 		{ 0, 1, 2 } },
 	{ "indicator_options_players_on_radar_spinner", _option_radar, OPTIONS_FIELD(radar_players), 0, 3,
@@ -5406,6 +5420,11 @@ static void gametype_options_each(struct widget_instance *list, boolean save)
 			{
 				short index = (short)PIN(spinner->parameters.list.selected_index, 0, option->count - 1);
 
+				/* Infection owns these values. The Slayer screen underneath
+				   it still has the old spinners when returning from its child. */
+				if (options->infection_enabled &&
+					(!strcmp(option->spinner, "time_limit_spinner") || !strcmp(option->spinner, "team_play_spinner")))
+					continue;
 				gametype_option_value_set(option, option->values[index], variant, options);
 			}
 			else
@@ -5572,6 +5591,11 @@ static boolean gametype_options_init(struct widget_instance *list)
 	if (!edit_variant())
 		return campaign_fail();
 	gametype_options_each(list, FALSE);
+	if (!edit_options()->infection_enabled && !edit_options()->time_limit)
+	{
+		struct widget_instance *spinner = named(list, "infection_time_limit_spinner", 0);
+		if (spinner) spinner->parameters.list.selected_index = 3;
+	}
 	if (named(list, "op_team", 0))
 		vehicles_show(list);
 	return TRUE;
@@ -5587,6 +5611,13 @@ static boolean gametype_options_save(struct widget_instance *widget)
 	if (named(list, "op_team", 0))
 		vehicles_keep(list);
 	gametype_options_each(list, TRUE);
+	if (edit_options()->infection_enabled && edit_variant()->game_engine_index == game_engine_slayer)
+	{
+		edit_variant()->universal_variant.teams = TRUE;
+		edit_variant()->universal_variant.lives = 0;
+		edit_variant()->universal_variant.odd_man_out = FALSE;
+	}
+	infection_options_validate(edit_variant(), edit_options());
 	return TRUE;
 }
 
@@ -5616,6 +5647,52 @@ static boolean gametype_setup_apply(void)
 
 	gametype_edit.setup = FALSE;
 	return applied;
+}
+
+/* Opt-in regression: load the real menu widgets and use their OK callbacks.
+   Reopening Server Setup keeps its selected variant; no replacement gametype. */
+boolean menu_test_infection_toggle(boolean enabled, boolean set_reserves)
+{
+	struct widget_instance *screen, *spinner, *button;
+	struct gametype_option const *option;
+	boolean saved;
+	short slot;
+	char name[32];
+	if (strcmp(config_string("debug.test_input"), "look:inventory-menu-toggle")) return FALSE;
+	gametype_setup_begin();
+	if (!gametype_edit.setup) return FALSE;
+	platform_log("menu toggle: before enabled=%d reserve=%d teams=%d", edit_options()->infection_enabled,
+		edit_options()->ammo_reserves[2], edit_variant()->universal_variant.teams);
+	if (set_reserves)
+	{
+		screen = ui_widget_load_by_name_or_tag("pc\\main_menu\\settings_select\\multiplayer_setup\\ammo_options_edit\\ammo_screen",
+			NONE, NULL, NONE, NONE, NONE, NONE);
+		if (!screen) return FALSE;
+		for (slot = 0; slot < 4; slot++)
+		{
+			snprintf(name, sizeof(name), "ammo_reserve_%d_spinner", slot);
+			spinner = named(screen, name, 0); option = gametype_option_named(name);
+			if (!spinner || !option) { ui_widget_delete(screen); return FALSE; }
+			spinner->parameters.list.selected_index = gametype_option_index(option, 999);
+		}
+		button = named(screen, "ammo_button_ok", 0);
+		saved = button && gametype_options_save(button);
+		ui_widget_delete(screen);
+		if (!saved) return FALSE;
+	}
+	screen = ui_widget_load_by_name_or_tag("pc\\main_menu\\settings_select\\multiplayer_setup\\infection_options_edit\\infection_screen",
+		NONE, NULL, NONE, NONE, NONE, NONE);
+	if (!screen) return FALSE;
+	spinner = named(screen, "infection_enabled_spinner", 0);
+	option = gametype_option_named("infection_enabled_spinner");
+	button = named(screen, "infection_button_ok", 0);
+	if (!spinner || !option || !button) { ui_widget_delete(screen); return FALSE; }
+	spinner->parameters.list.selected_index = gametype_option_index(option, enabled);
+	saved = gametype_options_save(button);
+	platform_log("menu toggle: saved=%d enabled=%d reserve=%d teams=%d", saved,
+		edit_options()->infection_enabled, edit_options()->ammo_reserves[2], edit_variant()->universal_variant.teams);
+	ui_widget_delete(screen);
+	return saved && gametype_setup_apply();
 }
 
 /* the game type row's: the gametype's name and type */

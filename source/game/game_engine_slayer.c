@@ -75,6 +75,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "network_test.h" /* port: port/linux/game/network_test.c */
 
 #include "game/game_engine_place.h"
 #include "game/game_engine_slayer.h"
@@ -668,6 +669,8 @@ static void slayer_player_update(
 		slayer_get_score(index, _get_score_team) >=
 		game_engine_get_variant()->universal_variant.score_to_win)
 	{
+		/* port: opt-in evidence; retain the original score decision. */
+		if (game_engine_can_score()) network_test_verdict_log("slayer-score-limit", index, NONE, FALSE);
 		game_engine_end_game();
 	}
 

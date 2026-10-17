@@ -41,6 +41,7 @@ being hit looks and feels like on the clients).
 */
 
 #include "cseries.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "cseries/errors.h"
 #include "game/game.h"
 #include "game/game_globals.h"
@@ -58,6 +59,9 @@ being hit looks and feels like on the clients).
 #include "network_distributed.h"
 
 #include <math.h>
+
+/* Opt-in diagnostic only, implemented in network_test.c. */
+void network_test_damage_log(char const *stage, struct damage_data const *damage, long target, boolean remote);
 
 /* damage.c's */
 void damage_replay_player_effect(long player_index, struct damage_data *damage, real total_damage);
@@ -691,6 +695,7 @@ boolean network_damage_deals(
 			return FALSE;
 		}
 	}
+	network_test_damage_log("before", damage, object_index, damage_dealing_report);
 	return TRUE;
 }
 
@@ -797,6 +802,7 @@ void network_damage_aftermath(
 	unit = (struct unit_datum *)object_try_and_get_and_verify_type(object_index, _object_mask_unit);
 	if (!unit)
 		return;
+	network_test_damage_log("after", damage, object_index, damage_dealing_report);
 	/* (the last events kept for killing blows: of a player's unit, whose
 	player the blow's aftermath has already taken from it, unit_died; or of
 	a biped no player's that was alive, an actor's: a body gibbed, or a
@@ -1870,6 +1876,12 @@ static boolean distributed_report_valid(
 	{
 		return FALSE;
 	}
+	/* Infection's exposed-rider exception never authorizes a hull, hidden
+	   seat, long-range or obstructed hit, including a forged remote report. */
+	if (melee && infection_unit_is_zombie(distributed_living_unit(player)) &&
+		target->object.parent_object_index != NONE && target->object.type == _object_type_biped &&
+		!infection_melee_rider_visible(distributed_living_unit(player), report->object_index, &report->damage.direction))
+		return FALSE;
 	if (collision && !distributed_player_drove_into(player_index, &report->damage.epicenter, &report->target_position,
 		target->object.bounding_sphere_radius, ticks))
 	{
@@ -1941,7 +1953,7 @@ static boolean distributed_report_valid(
 	{
 		normalize3d(&damage->direction);
 	}
-	damage->multiplier = 1.0f;
+	damage->multiplier = melee ? infection_melee_multiplier(distributed_living_unit(player)) : 1.0f;
 	damage->owner_player_index = DATUM_INDEX_NEW(player_index, player->identifier);
 	damage->owner_team_index = (short)player->team_index;
 	/* (the players' traits' multipliers go by the object) */

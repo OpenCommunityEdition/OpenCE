@@ -636,6 +636,27 @@ still, only turning and looking up and down (where remote players aim and
 whether they stand) */
 static int test_input_holding_action;
 static Uint64 test_input_holding_action_since;
+static int test_input_infection_buttons;
+static int test_input_combat_action;
+static int test_input_show_scoreboard;
+
+/* Only driven by the opt-in network fixture; never by normal game input. */
+void test_input_scoreboard(int show)
+{
+	test_input_show_scoreboard = show;
+}
+
+/* Real gamepad actions for the opt-in two-player combat fixture. */
+void test_input_combat_actions(int action)
+{
+	test_input_combat_action = action;
+}
+
+/* Opt-in network objective regressions. Reset on menus and variant changes. */
+void test_input_objective_actions(int enabled)
+{
+	test_input_infection_buttons = enabled;
+}
 
 /* the automated tests (port/linux/game/network_test.c): the scripted player
 stands still, holding the action button (X: picking up, swapping weapons)
@@ -671,6 +692,39 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 	}
 	if (seed < 0)
 		return;
+	if (test_input_show_scoreboard) pad->wButtons |= XINPUT_GAMEPAD_BACK;
+	if (!strncmp(config_string("debug.test_input"), "look:party", 10) ||
+		!strcmp(config_string("debug.test_input"), "look:classic"))
+	{
+		/* Full-client diagnostic: ordinary movement/buttons, no unit edits. */
+		if (test_input_combat_action & 4) pad->sThumbLY = 28000;
+		if (SDL_GetTicks() % 3000 < 150 && (test_input_combat_action & 8))
+			pad->bAnalogButtons[XINPUT_GAMEPAD_A] = 255;
+		if (SDL_GetTicks() % 600 < 250)
+		{
+			if (test_input_combat_action & 1) pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
+			if (test_input_combat_action & 2) pad->bAnalogButtons[XINPUT_GAMEPAD_B] = 255;
+			if (test_input_combat_action & 16) pad->bAnalogButtons[XINPUT_GAMEPAD_X] = 255;
+		}
+		return;
+	}
+	if (!strcmp(config_string("debug.test_input"), "look:combat") ||
+		!strncmp(config_string("debug.test_input"), "look:inventory", 14) ||
+		!strcmp(config_string("debug.test_input"), "look:vehicle"))
+	{
+		/* Release between presses: semi-automatic guns and melee both need
+		   distinct button edges. Aim is set by the engine-side fixture. */
+		/* The ammo probe holds one switch, rather than toggling twice. */
+		if (test_input_combat_action == 32) pad->bAnalogButtons[XINPUT_GAMEPAD_Y] = 255;
+		if (test_input_combat_action == 64) pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
+		if (SDL_GetTicks() % 600 < 250)
+		{
+			if (test_input_combat_action == 1) pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
+			if (test_input_combat_action == 2) pad->bAnalogButtons[XINPUT_GAMEPAD_B] = 255;
+			if (test_input_combat_action == 16) pad->bAnalogButtons[XINPUT_GAMEPAD_X] = 255;
+		}
+		return;
+	}
 	if (test_input_holding_action)
 	{
 		/* (standing still, the button held from a second on) */
@@ -679,11 +733,34 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 		return;
 	}
 	t = (double)SDL_GetTicks() / 1000.0 + seed * 1.7;
+	if (test_input_infection_buttons)
+	{
+		pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
+		pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
+		if (fmod(t, 2.0) < 1.0)
+		{
+			pad->bAnalogButtons[XINPUT_GAMEPAD_X] = 255;
+			pad->bAnalogButtons[XINPUT_GAMEPAD_Y] = 255;
+		}
+	}
 	if (looking)
 	{
 		pad->sThumbRX = (SHORT)(sin(t * 0.5) * 14000.0);
 		pad->sThumbRY = (SHORT)(sin(t * 0.3) * 32000.0);
 		return;
+	}
+	if (!strcmp(config_string("debug.test_input"), "bot:population"))
+	{
+		/* Opt-in population lifecycle probe: ordinary aim/grenade input,
+		   then walking. Never place units or assign damage/respawn state. */
+		double phase = fmod(t, 40.0);
+		pad->sThumbRY = -32000;
+		if (phase < 12.0)
+		{
+			if ((phase >= 4.0 && phase < 4.3) || (phase >= 7.0 && phase < 7.3))
+				pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
+			return;
+		}
 	}
 	pad->sThumbLY = (SHORT)(sin(t * 0.9) * 32000.0);
 	pad->sThumbLX = (SHORT)(cos(t * 0.6 + seed) * 20000.0);
@@ -692,7 +769,7 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 		pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
 	if (fmod(t, 5.0) < 0.1)
 		pad->bAnalogButtons[XINPUT_GAMEPAD_A] = 255;
-	if (fmod(t, 7.0) < 0.2)
+	if (strcmp(config_string("debug.test_input"), "bot:population") && fmod(t, 7.0) < 0.2)
 		pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
 }
 

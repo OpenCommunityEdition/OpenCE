@@ -141,6 +141,31 @@ lockstep netcode was removed, set to play it): it tells the player why.
 
 ## Versions
 
+Protocol version 34 integrates classic Infection into upstream version 29.
+Infection remains a Slayer submode. The session's `game_variant_options`
+grows from 28 to 48 bytes, moving the local-data offset by 20 bytes and
+making the settings record 13,140 bytes. GPVO v1-v3 disk profiles migrate to
+v4; missing Infection settings stay disabled and missing reserves use NORMAL.
+GPVO v4 stores four signed 16-bit finite ammo reserves (-1 for NORMAL,
+otherwise 0-999), applied only while Infection is enabled.
+
+`distributed_infection_state` uses the existing reliable game-state channel:
+round number, revision, phase, phase-start tick, winning team, and 128 roles,
+scores and participant identities. Clients validate the whole snapshot before
+applying it. The host assigns roles, equips skulls and ends the round.
+Remote skull melee multipliers are recomputed after hit validation. Exposed
+vehicle riders additionally require the host's normal short collision ray.
+Team Options retain friendly fire and betrayal penalties; a human killed by
+a teammate's betrayal respawns human. The base respawn is assigned before
+the native pending penalty is consumed.
+
+Private development builds used versions 29-33 for Infection, shields,
+finite reserves and friendly-fire agreement. They predate upstream version
+29's Custom Edition map-name/hash agreement, so they must not join this
+integrated build even when their Infection options match. Version 34 rejects
+both those builds and upstream 29. This bump is necessary for all modes,
+including ordinary Slayer; the protocol is a whole-session agreement.
+
 The native builds' network code has a version, an unsigned 16-bit number
 (`HALO_PORT_NETWORK_VERSION` in `port/linux/include/halo_port_limits.h`),
 raised with any change to what the machines send each other. A host puts it
@@ -745,6 +770,29 @@ button on the scores does). `debug.network_test_public` lists the host's
 game in the server browser, and `browse` joins the one listed there with the
 most players (not co-op, if it can), as the server browser does
 (port/web/tests/internet.mjs plays the native build and browsers so).
+The session parser owns the complete variant list and tokens, with no
+64-byte list/name limit. Empty tokens and map paths that cannot fit the
+actual `network_game_map.name` field (including the expanded multiplayer
+path) disable the fixture with a diagnostic instead of silently truncating.
+`tools/test_network_test_config.py` compiles this parser without game assets.
+
+`tools/test_dual_combat.py` runs two full Windows processes with separate
+data/config/save directories and crossed loopback addresses `.200`/`.201`.
+Its `look:combat` input drives real trigger and melee button edges. Only
+setup placement, aim and the initial alpha candidate are controlled: damage,
+death, conversion and respawn use the ordinary game paths. Placement checks
+the firing corridor as well as BSP membership. The fixture explicitly ends
+Slayer after both players have killed and respawned; Infection must finish
+through its own victory rule. It never calls the synthetic hit/kill drivers.
+The default sequence is Slayer, Infection with host alpha, Infection with
+client alpha, then Slayer again. JSON samples record unit ownership,
+health, equipment/ammo, stats, assigned armour colors, positions, camera/BSP,
+raw RTT and damage acceptance counters. Verification requires ordered
+death/respawn transitions and agreement on postgame stats; it does not
+validate rendered frames. `--manual` prepares normal-menu launchers with
+isolated folders and cleared inherited `HALO_` overrides, without starting
+processes or activating automatic combat.
+
 `debug.network_latency` and
 `debug.network_loss` hold back what a machine receives and drop some of its
 datagrams, to test as over the internet. `debug.network_corrupt` damages
