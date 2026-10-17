@@ -43,9 +43,13 @@ boolean render_lod_inside_model(struct model const *model, real_point3d const *c
 
 boolean render_lod_particle_visible(real diameter, real cutoff)
 {
-	/* A zero/negative projection must not reach minimum-pixel scaling's
-	division by diameter, even with the size cutoff disabled. */
-	return render_lod_disabled() ? diameter > 0.0f : diameter > cutoff;
+	/* Cull only half-pixel specks on Halo's logical 480p scale, retaining
+	the map's smaller cutoffs. Full detail must never hide a
+	particle normal detail would show. Reject invalid projections before
+	minimum-pixel scaling divides by the diameter. */
+	if (!(diameter > 0.0f && diameter <= REAL_MAX))
+		return FALSE;
+	return diameter > (render_lod_disabled() ? MIN(cutoff, 0.5f) : cutoff);
 }
 
 short render_lod_geometry_level(struct model const *model, real pixels,

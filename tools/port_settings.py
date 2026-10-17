@@ -92,7 +92,7 @@ SCREENS = {
             ("PER-PIXEL LIGHTING:", "display.per_pixel_lighting", ON_OFF,
              "Light models for each pixel, without the facets\nof the Xbox's lighting for each vertex.", None),
             ("DISABLE LOD:", "display.disable_lod", [("OFF", "false"), ("ON", "true")],
-             "Keep full detail at any distance, except cryotubes.\nMay reduce performance.", None),
+             "Keep full detail, culling only tiny particles.\nCryotube interiors stay hidden. May reduce performance.", None),
             ("SHIELD GLOW:", "display.shield_glow", ON_OFF,
              "Shields light their surroundings as they flare,\nin the shield's own color.", None),
             ("GLOW INTENSITY:", "display.shield_glow_intensity", [("DEFAULT", "default"), ("LIGHT SHOW", "light_show")],

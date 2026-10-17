@@ -11,6 +11,7 @@ static int config_boolean(char const *name)
 }
 #define REAL_MAX 3.4028235e38f
 #define NUMBEROF(a) (sizeof(a) / sizeof((a)[0]))
+#define MIN(a,b) ((a)<(b)?(a):(b))
 #define PIN(v,l,h) ((v)<(l)?(l):((v)>(h)?(h):(v)))
 struct model {real detail_cutoff_pixels[5];};
 struct model_region_permutation {short geometry_indices[5];};
@@ -29,7 +30,8 @@ int main(int argc, char **argv)
 		CHECK(!render_lod_disabled(), "starts off");
 		configured = 1; revision++;
 		CHECK(render_lod_disabled(), "model switches live");
-		CHECK(render_lod_particle_visible(.001f, 10), "tiny particle retained");
+		CHECK(!render_lod_particle_visible(.001f, 10), "negligible particle culled");
+		CHECK(render_lod_particle_visible(.501f, 10), "visible small particle retained");
 		CHECK(reads == 2, "one read per revision");
 		configured = 0; revision++;
 		CHECK(!render_lod_disabled(), "normal detail restored");
@@ -73,7 +75,19 @@ int main(int argc, char **argv)
 		CHECK(!render_lod_particle_visible(0, 2), "zero cannot divide by zero");
 		CHECK(!render_lod_particle_visible(-1, 2), "behind camera");
 		CHECK(!render_lod_particle_visible(NAN, 2), "invalid projection");
-		CHECK(render_lod_particle_visible(.001f, 2), "positive projection retained");
+		CHECK(!render_lod_particle_visible(INFINITY, 2), "infinite projection rejected");
+		CHECK(!render_lod_particle_visible(.001f, 2), "negligible projection culled");
+		CHECK(render_lod_particle_visible(.001f, 0), "zero authored cutoff retains positive projection");
+	}
+	CASE("particle-cutoff") {
+		configured = 1;
+		CHECK(!render_lod_particle_visible(.5f, 4), "strict default boundary");
+		CHECK(render_lod_particle_visible(.5001f, 4), "just above default boundary");
+		CHECK(render_lod_particle_visible(.3f, .25f), "preserve a smaller authored cutoff");
+		CHECK(render_lod_particle_visible(.001f, 0), "preserve authored zero cutoff");
+		configured = 0; revision++;
+		CHECK(!render_lod_particle_visible(3, 4), "off keeps authored cutoff");
+		CHECK(render_lod_particle_visible(5, 4), "off keeps authored visibility");
 	}
 	CASE("geometry") {
 		struct model model = {{1, 10, 20, 40, 80}};
