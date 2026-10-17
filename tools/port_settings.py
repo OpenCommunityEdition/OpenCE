@@ -228,6 +228,8 @@ SCREENS["video_settings/fov_viewmodels"] = {
          "The weapon and hands, horizontal at 16:9.\nDefault keeps the weapon's stock view.", None),
         ("VIEWMODELS:", "display.viewmodel_visible", ON_OFF,
          "Draw first-person weapons, hands and attached\nvisuals. Gameplay and sound continue when off.", None),
+        ("PASSENGER THIRD PERSON:", "display.passenger_third_person", ON_OFF,
+         "Third-person Warthog and Scorpion passengers.\nWeapon zoom is disabled.", None),
         ("ARM SHIELDS:", "display.viewmodel_shield", ON_OFF,
          "The energy shield's flare on your first-person\narms too, as on your body.", None),
         ("LEGS:", "display.first_person_legs", ON_OFF,

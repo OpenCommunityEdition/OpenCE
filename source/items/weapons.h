@@ -303,6 +303,9 @@ boolean weapon_aim(
 	real *result_ticks,
 	real *result_distance,
 	boolean *result_linear);
+/* port: a player's centre shot ray, without firing, spread or aim-assist
+bookkeeping (the local passenger reticle). */
+boolean weapon_get_projectile_ray(long weapon_index, short trigger_index, real_point3d *origin, real_vector3d *forward);
 real weapon_estimate_time_to_target(
 	long weapon_index,
 	short trigger_index,
