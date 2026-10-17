@@ -372,6 +372,7 @@ the setting for one start of the game. It has priority over the file.
 | `controls.<action>` | (the table in "Controls") | `HALO_KEY_<ACTION>` | The keys and mouse buttons of an action, up to two, separated by a comma: `move_forward`, `move_backward`, `strafe_left`, `strafe_right`, `jump`, `crouch`, `fire`, `throw_grenade`, `melee`, `reload`, `zoom`, `switch_weapon`, `switch_grenade`, `action`, `flashlight`, `scoreboard`, `pause`, `screenshot`, `push_to_talk`, `chat`, `team_chat`. Keys by their names (`"W"`, `"Space"`, `"Left Ctrl"`, `"F1"`), and `"Mouse Left"`, `"Mouse Right"`, `"Mouse Middle"`, `"Mouse 4"`, `"Mouse 5"`, `"Wheel"` (either way), `"Wheel Up"`, `"Wheel Down"`. |
 | `game.console_log` | `"important"` | `HALO_CONSOLE_LOG` | What the console shows on the screen. `"important"`: bans, players that the host drops for cheating, the reasons that the game refuses a command, and the asserts that stop the game. `"all"`: all the lines. `"none"`: only the asserts that stop the game. The output of a command always shows. `debug.txt` gets all the lines. |
 | `game.language` | `""` | `HALO_LANGUAGE` | The language of the menus: `ja`, `de`, `fr`, `es` or `it`. Empty: English. |
+| `game.streamer_mode` | `false` | `HALO_STREAMER_MODE` | Streamer mode: the text chat shows the slurs and swearing in players' names and lines as harmless words. Only what this machine shows. Refer to "Text chat". |
 | `game.enhanced_animations` | `true` | `HALO_ENHANCED_ANIMATIONS` | `true`: the player bipeds' grenade throws keep their legs moving, blended by speed and direction (crouched throws stay crouched, throws in the air use the jump's legs), Warthog and Scorpion riders stay seated to throw and let go of the grips to throw and reload, and a player turns with the aim while throwing, as while meleeing. `false`: the original animations, which freeze the legs during a throw and stand a rider up. Only in config.toml, not in the menus. |
 | `paths.data` | `""` | `HALO_DATA_ROOT` | The data root. Refer to "Start the game". |
 | `paths.saves` | `""` | `HALO_SAVE_ROOT` | The save root. Refer to "Files and folders". |
@@ -671,6 +672,18 @@ their team (blue in a game without teams), then the text. A line to the
 team says "(team)" after the name. The lines go after ten seconds; while
 you type, the last six show. A line has 63 characters at most, letters,
 numbers and punctuation only (ASCII). `debug.txt` gets every line.
+
+Streamer mode (`game.streamer_mode` in `config.toml`, off by default)
+replaces the slurs, swearing and sexual words in the chat's names and lines
+with harmless ones, so that a stream shows none: "fuck" shows as "fudge",
+"cunt" as "chop stick", "faggot" as "flurry". It finds them in either case,
+with digits and signs for letters ("n1gg3r", "c00n", "f*ck"), letters
+typed more than once ("fuuuck"), spelled out ("n i g g e r", "c.u.n.t") and
+run together ("sonofabitch"), and leaves alone the words that hold one
+("Scunthorpe", "snigger", "spicy", "assassin", "cocktail", "rapper"). It changes only what your game shows: the other
+players see the lines as they were typed, and `debug.txt` keeps them so.
+The line you type shows as you type it. The list is in
+`port/linux/game/chat_filter.c`.
 
 The host sends each line on: a player of an older build does not see the
 lines and cannot send them. The host takes 5 lines at once from a machine,

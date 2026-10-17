@@ -301,6 +301,10 @@ static const struct config_setting config_settings[] =
 	{ "game.language", _config_string, "\"\"", "HALO_LANGUAGE", _environment_value, _platform_all,
 		"The language the game asks the Xbox for: \"ja\", \"de\", \"fr\", \"es\" or \"it\";\n"
 		"empty for English. The game data decides what is translated." },
+	{ "game.streamer_mode", _config_boolean, "false", "HALO_STREAMER_MODE", _environment_value, _platform_all,
+		"Streamer mode: the text chat shows the slurs and swearing in players'\n"
+		"names and lines as harmless words (fuck: fudge). Only what this\n"
+		"machine shows." },
 	{ "game.enhanced_animations", _config_boolean, "true", "HALO_ENHANCED_ANIMATIONS", _environment_value, _platform_all,
 		"The player bipeds' grenade throws keep their legs moving (crouched,\n"
 		"in the air and in a vehicle's seat too), riders' hands leave the grips\n"

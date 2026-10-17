@@ -35,6 +35,7 @@ players neither send nor see lines.
 #include "text/text_group.h"
 #include "network_distributed.h"
 #include "network_chat.h"
+#include "chat_filter.h"
 #include "halo_keyboard.h"
 
 #include <stdio.h>
@@ -62,6 +63,8 @@ enum
 	CHAT_BURST = 5,
 	CHAT_REFILL_MILLISECONDS = 1500,
 	MAXIMUM_CHAT_MACHINES = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
+	/* a line's name and text as drawn (streamer mode's words may be longer) */
+	CHAT_DRAWN_SIZE = 2 * CHAT_TEXT_SIZE,
 	/* the caret's half period while typing */
 	CHAT_CARET_MILLISECONDS = 500,
 	/* a key's Ctrl (struct key_stroke's modifier_flags: menu_functions.c's) */
@@ -640,21 +643,16 @@ static void chat_draw_line(
 	rectangle2d const *bounds,
 	wchar_t const *name,
 	real_argb_color const *name_color,
-	char const *text,
+	wchar_t const *wide,
 	real alpha)
 {
-	wchar_t wide[CHAT_TEXT_SIZE + 2];
 	rectangle2d name_bounds;
 	rectangle2d cursor_bounds;
 	rectangle2d text_bounds = *bounds;
 	real_argb_color color;
-	short index;
 
 	draw_string_set_draw_mode(font_index, NONE, 0 /* left */, 0, name_color);
 	draw_unicode_string_compute_bounds(bounds, name, &name_bounds, &cursor_bounds);
-	for (index = 0; text[index] && index < CHAT_TEXT_SIZE + 1; index++)
-		wide[index] = (wchar_t)(unsigned char)text[index];
-	wide[index] = 0;
 	/* (a space's width after the colon) */
 	text_bounds.x0 = (short)(name_bounds.x1 + (bounds->y1 - bounds->y0) / 4);
 	/* (the text's own shadow drawn clear: a colour of no alpha that is not
@@ -670,18 +668,49 @@ static void chat_draw_line(
 	rasterizer_text_set_shadow_color(0);
 }
 
-/* a line's name as drawn: "Name:", or "Name (team):" */
+/* a line's text as drawn: its characters, and in streamer mode its words
+replaced (chat_filter.c) */
+static void chat_line_text(
+	char const *text,
+	wchar_t *drawn,
+	short size)
+{
+	wchar_t wide[CHAT_TEXT_SIZE];
+	short index;
+
+	for (index = 0; text[index] && index < CHAT_TEXT_SIZE - 1; index++)
+		wide[index] = (wchar_t)(unsigned char)text[index];
+	wide[index] = 0;
+	if (chat_filter_enabled())
+	{
+		chat_filter_text(drawn, size, wide);
+		return;
+	}
+	for (index = 0; wide[index] && index < size - 1; index++)
+		drawn[index] = wide[index];
+	drawn[index] = 0;
+}
+
+/* a line's name as drawn: "Name:", or "Name (team):"; in streamer mode its
+words replaced */
 static void chat_line_name(
 	struct chat_line const *line,
 	wchar_t *name,
 	short size)
 {
 	wchar_t const *suffix = line->team ? L" (team):" : L":";
+	wchar_t filtered[CHAT_DRAWN_SIZE];
+	wchar_t const *player_name = line->name;
 	short length = 0;
 	short index;
 
-	for (index = 0; line->name[index] && length < size - 1; index++)
-		name[length++] = line->name[index];
+	if (chat_filter_enabled())
+	{
+		chat_filter_text(filtered, NUMBEROF(filtered), line->name);
+		player_name = filtered;
+	}
+	for (index = 0; player_name[index] && length < size - 1; index++)
+		name[length++] = player_name[index];
 	for (index = 0; suffix[index] && length < size - 1; index++)
 		name[length++] = suffix[index];
 	name[length] = 0;
@@ -727,15 +756,17 @@ void network_chat_draw(
 	{
 		real_argb_color color;
 		rectangle2d bounds;
-		char text[CHAT_TEXT_SIZE + 2];
+		wchar_t text[CHAT_TEXT_SIZE + 2];
 		short length;
 
 		bounds.x0 = left;
 		bounds.x1 = window.x1;
 		bounds.y1 = bottom;
 		bounds.y0 = (short)(bottom - line_height);
-		csstrcpy(text, chat_input.text);
-		length = (short)csstrlen(text);
+		/* (as typed: streamer mode replaces only what is sent) */
+		for (length = 0; chat_input.text[length]; length++)
+			text[length] = (wchar_t)(unsigned char)chat_input.text[length];
+		text[length] = 0;
 		if ((now / CHAT_CARET_MILLISECONDS) % 2 == 0)
 		{
 			text[length] = '_';
@@ -750,7 +781,8 @@ void network_chat_draw(
 		struct chat_line const *line =
 			&chat_lines[(chat_newest_line - index + CHAT_MAXIMUM_LINES) % CHAT_MAXIMUM_LINES];
 		real alpha = chat_line_alpha(now - line->time, typing);
-		wchar_t name[CHAT_NAME_SIZE + 16];
+		wchar_t name[CHAT_DRAWN_SIZE];
+		wchar_t text[CHAT_DRAWN_SIZE];
 		real_argb_color color;
 		rectangle2d bounds;
 
@@ -758,12 +790,13 @@ void network_chat_draw(
 		if (alpha <= 0.0f)
 			break;
 		chat_line_name(line, name, NUMBEROF(name));
+		chat_line_text(line->text, text, NUMBEROF(text));
 		bounds.x0 = left;
 		bounds.x1 = window.x1;
 		bounds.y1 = bottom;
 		bounds.y0 = (short)(bottom - line_height);
 		chat_color(line->color, alpha, &color);
-		chat_draw_line(font_index, &bounds, name, &color, line->text, alpha);
+		chat_draw_line(font_index, &bounds, name, &color, text, alpha);
 		bottom = bounds.y0;
 		shown++;
 	}
