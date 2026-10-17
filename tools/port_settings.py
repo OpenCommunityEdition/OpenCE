@@ -103,6 +103,8 @@ SCREENS = {
              "Shields light their surroundings as they flare,\nin the shield's own color.", None),
             ("GLOW INTENSITY:", "display.shield_glow_intensity", [("DEFAULT", "default"), ("LIGHT SHOW", "light_show")],
              "Light Show: the shield glow three times as far,\nat full from a third of the flare.", None),
+            ("MATCH TIMER:", "display.match_timer", ON_OFF,
+             "Draw a clock at the bottom right in multiplayer,\ncounting up from the start of the game.", None),
         ],
     },
     "mouse_settings": {
