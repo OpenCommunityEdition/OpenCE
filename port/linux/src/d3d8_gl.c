@@ -5093,10 +5093,20 @@ the mirror does not hold. An index array drawn twice the same is kept
 instead, rebased, in a buffer of its own: a draw of it compares its indices
 with a copy and draws from the buffer. Arrays that change (the structure's
 visible triangles, made each frame) are never the same twice, and are
-uploaded as before. When the buffer is full, everything kept is forgotten. */
+uploaded as before. When the buffer is full, everything kept is forgotten.
+
+WebGL on Metal waits for the GPU before it writes a buffer that a queued
+draw reads (web_chunk_get), and the kept arrays are drawn from every frame:
+written into one buffer as they were kept, every few frames while a level
+was explored, each was a wait of 20 to 40 ms. So there is a buffer for each
+frame of the ring, drawn from only in that frame, and an array kept is
+written into a frame's buffer as the frame begins, when the GPU is done with
+it (STREAM_BUFFER_RING frames on, as for the chunks). Until its frame's
+buffer has it, a draw of it uploads its indices as before. */
 #define INDEX_CACHE_BUFFER_SIZE (8 * 1024 * 1024)
 #define INDEX_CACHE_SLOTS 8192
 #define INDEX_CACHE_PROBES 4
+#define INDEX_CACHE_ALL_FRAMES ((1u << STREAM_BUFFER_RING) - 1)
 
 struct index_cache_entry
 {
@@ -5106,30 +5116,88 @@ struct index_cache_entry
 	WORD *copy;
 	unsigned long capacity;
 	WORD minimum, maximum;
-	/* in the buffer (when kept is the epoch), or not yet: seen once */
+	/* in the buffers (when kept is the epoch), or not yet: seen once */
 	unsigned long offset;
 	unsigned long kept;
+	/* the frames of the ring whose buffers have it, a bit each */
+	unsigned char written;
 };
 
 static struct
 {
-	GLuint buffer;
+	GLuint buffers[STREAM_BUFFER_RING];
 	unsigned long used;
-	/* entries kept in an earlier epoch are not in the buffer */
+	/* entries kept in an earlier epoch are not in the buffers */
 	unsigned long epoch;
+	/* device.frame when its frame's buffer was last brought up to date */
+	unsigned long written_frame;
 	struct index_cache_entry entries[INDEX_CACHE_SLOTS];
-} index_cache = { 0, 0, 1 };
+	/* the entries kept that some frame's buffer has not got yet */
+	struct index_cache_entry *pending[INDEX_CACHE_SLOTS];
+	unsigned long pending_count;
+} index_cache = { { 0 }, 0, 1, (unsigned long)-1 };
 
-/* the buffer offset of the rebased indices kept for the array, with their
-extent; FALSE if it is not kept (yet) */
+/* writes the entry's indices, rebased, into the ring frame's buffer; FALSE
+if there is no memory to rebase them */
+static BOOL index_cache_write(const struct index_cache_entry *entry, unsigned long ring)
+{
+	WORD *rebased;
+	unsigned long index;
+
+	if (!index_cache.buffers[ring])
+	{
+		glGenBuffers(1, &index_cache.buffers[ring]);
+		state_element_array_buffer(index_cache.buffers[ring]);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_CACHE_BUFFER_SIZE, NULL, GL_STATIC_DRAW);
+	}
+	rebased = malloc(entry->count * sizeof(WORD) + 2);
+	if (!rebased)
+		return FALSE;
+	for (index = 0; index < entry->count; index++)
+		rebased[index] = (WORD)(entry->copy[index] - entry->minimum);
+	state_element_array_buffer(index_cache.buffers[ring]);
+	host_gl_buffer_write(GL_ELEMENT_ARRAY_BUFFER, (unsigned int)entry->offset,
+		(unsigned int)(entry->count * sizeof(WORD)), rebased);
+	free(rebased);
+	return TRUE;
+}
+
+/* once a frame, before its first draw from the cache: the arrays kept since
+its buffer was last drawn from are written into it, which no queued draw
+reads now */
+static void index_cache_begin_frame(void)
+{
+	unsigned long ring = device.buffer_ring, index, remaining = 0;
+
+	if (index_cache.written_frame == device.frame)
+		return;
+	index_cache.written_frame = device.frame;
+	for (index = 0; index < index_cache.pending_count; index++)
+	{
+		struct index_cache_entry *entry = index_cache.pending[index];
+
+		/* (forgotten, or remembered anew, since it was kept) */
+		if (entry->kept != index_cache.epoch)
+			continue;
+		if (!(entry->written & (1u << ring)) && index_cache_write(entry, ring))
+			entry->written |= (unsigned char)(1u << ring);
+		if (entry->written != INDEX_CACHE_ALL_FRAMES)
+			index_cache.pending[remaining++] = entry;
+	}
+	index_cache.pending_count = remaining;
+}
+
+/* the offset in this frame's buffer of the rebased indices kept for the
+array, with their extent; FALSE if it is not kept (yet) or not yet in this
+frame's buffer */
 static BOOL index_cache_get(const WORD *indices, unsigned long count, unsigned long *minimum, unsigned long *maximum,
 	unsigned long *offset)
 {
 	unsigned long slot = (((unsigned long)indices >> 1) ^ (count * 2654435761UL)) % INDEX_CACHE_SLOTS;
-	unsigned long probe, size = count * sizeof(WORD), index;
+	unsigned long probe, size = count * sizeof(WORD);
 	struct index_cache_entry *entry = NULL, *oldest = NULL;
-	WORD *rebased;
 
+	index_cache_begin_frame();
 	for (probe = 0; probe < INDEX_CACHE_PROBES; probe++)
 	{
 		struct index_cache_entry *candidate = &index_cache.entries[(slot + probe) % INDEX_CACHE_SLOTS];
@@ -5146,38 +5214,29 @@ static BOOL index_cache_get(const WORD *indices, unsigned long count, unsigned l
 	{
 		if (entry->kept == index_cache.epoch)
 		{
+			if (!(entry->written & (1u << device.buffer_ring)))
+				return FALSE;
 			*minimum = entry->minimum;
 			*maximum = entry->maximum;
 			*offset = entry->offset;
 			return TRUE;
 		}
-		/* the second time the same: kept from now on */
+		/* the second time the same: kept from now on, in the frames'
+		buffers as each of them begins (index_cache_begin_frame) */
 		if (index_cache.used + ((size + 15) & ~15UL) > INDEX_CACHE_BUFFER_SIZE)
 		{
 			index_cache.epoch++;
 			index_cache.used = 0;
+			index_cache.pending_count = 0;
 		}
-		if (!index_cache.buffer)
-		{
-			glGenBuffers(1, &index_cache.buffer);
-			state_element_array_buffer(index_cache.buffer);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_CACHE_BUFFER_SIZE, NULL, GL_STATIC_DRAW);
-		}
-		rebased = malloc(size + 2);
-		if (!rebased)
+		if (index_cache.pending_count == INDEX_CACHE_SLOTS)
 			return FALSE;
-		for (index = 0; index < count; index++)
-			rebased[index] = (WORD)(indices[index] - entry->minimum);
-		state_element_array_buffer(index_cache.buffer);
-		host_gl_buffer_write(GL_ELEMENT_ARRAY_BUFFER, (unsigned int)index_cache.used, (unsigned int)size, rebased);
-		free(rebased);
 		entry->offset = index_cache.used;
 		entry->kept = index_cache.epoch;
+		entry->written = 0;
 		index_cache.used += (size + 15) & ~15UL;
-		*minimum = entry->minimum;
-		*maximum = entry->maximum;
-		*offset = entry->offset;
-		return TRUE;
+		index_cache.pending[index_cache.pending_count++] = entry;
+		return FALSE;
 	}
 	/* seen for the first time, or changed: remembered */
 	if (!entry)
@@ -5227,7 +5286,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 	{
 		trace_draw("indexed", primitive_type, vertex_count, NULL);
 		setup_streams(device.base_vertex_index + minimum, maximum - minimum + 1);
-		state_element_array_buffer(index_cache.buffer);
+		state_element_array_buffer(index_cache.buffers[device.buffer_ring]);
 		glDrawElements(primitive_mode(primitive_type), (GLsizei)vertex_count, GL_UNSIGNED_SHORT, (const void *)index_offset);
 		return;
 	}
