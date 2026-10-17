@@ -99,9 +99,17 @@ Not every custom map will come with their own custom resources, and will instead
 See [MCC map support](docs/mcc_maps.md) for installation, supported formats,
 validation results and remaining compatibility limits.
 
-## What platforms can I play GulchCE on?
+## Mods
 
-Right now, we support a few - Windows, Linux, Android and browsers.
+Mods are folders of Halo PC tag files, as the Halo Editing Kit and Invader
+write them, in `mods/` next to `maps/`: texture, sound, text and model packs
+that play over Xbox and Custom Edition maps on your machine only. Each has a
+`mod.toml`. Every mod in the folder is on; the main menu's Mods turns them
+off and on and sets the order they load in.
+MCC maps always use their authored resources; loose-tag mods are bypassed.
+Refer to [docs/mods.md](docs/mods.md).
+
+## Platforms
 
 Each platform has its own instructions:
 

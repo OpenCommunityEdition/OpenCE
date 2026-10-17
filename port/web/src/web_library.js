@@ -20,13 +20,28 @@ addToLibrary({
   emscripten_get_now: () => (webTimeOrigin ||= performance.timeOrigin) + performance.now(),
 
   // kind: 0 a status, 1 a notice, 2 an invite link of a game hosted for the
-  // internet (to offer), 3 a fatal error (the game stops)
+  // internet (to offer), 3 a fatal error (the game stops), 4 the game quits
+  // as the player asked (the page starts again: port_mods.c)
   web_js_post__proxy: 'sync',
   web_js_post: (kind, text) => {
     var message = UTF8ToString(text);
     if (Module.haloMessage) Module.haloMessage(kind, message);
     else if (kind == 3) console.error(message);
     else console.log(message);
+  },
+
+  // a question for the player (port/linux/src/sdl_platform.c's
+  // platform_ask): the page's dialog, its buttons' labels one to a line; the
+  // button chosen goes in the word the game waits on (web_shared.h's
+  // _web_answer). (async: the game's thread waits on the word, its strings
+  // kept until then)
+  web_js_ask__proxy: 'async',
+  web_js_ask__deps: ['web_state'],
+  web_js_ask: (title, text, labels) => {
+    var answer = (index) => Atomics.store(HEAP32, (_web_state() >> 2) + 49, index);
+    var buttons = UTF8ToString(labels).split('\n');
+    if (Module.haloAsk) Module.haloAsk(UTF8ToString(title), UTF8ToString(text), buttons, answer);
+    else answer(0);
   },
 
   // a frame for another browser of the room (port/web/src/web_net.c; the
