@@ -41,6 +41,7 @@ pause it as its pause menu does.
 #include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 
 #include "halo_menus.h"
+#include "custom_edition_cache.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -452,6 +453,8 @@ static struct
 	boolean game_map;
 	/* a single-player campaign's map's, whose screens pause the game */
 	boolean campaign;
+	/* the strings taken from the Custom Edition's loc.map */
+	long map_strings;
 } build;
 
 /* ---------- private code */
@@ -706,8 +709,11 @@ static void parse_bounds(char const *text, rectangle2d *bounds, char const *file
 	}
 }
 
-/* a 'ustr' of the strings */
-static void *string_list_build(char const *const *strings, long count)
+/* a 'ustr' of the strings; each with an index in the list `map` (the
+Custom Edition's in its language, or NULL) given by maps is its string
+there */
+static void *string_list_build(char const *const *strings, long const *maps, long count,
+	struct custom_edition_string_list const *map)
 {
 	struct string_list *list = allocate(sizeof(struct string_list));
 	struct string_list_entry *entries = allocate(count * sizeof(struct string_list_entry));
@@ -720,9 +726,22 @@ static void *string_list_build(char const *const *strings, long count)
 	for (index = 0; index < count; index++)
 	{
 		long length = (long)strlen(strings[index]);
-		unsigned short *characters = allocate((length * 2 + 2) * sizeof(unsigned short));
+		unsigned short *characters;
 		long written;
 
+		if (map && maps[index] != HALO_MENU_NONE && maps[index] < map->count)
+		{
+			length = map->lengths[maps[index]];
+			characters = allocate(length * sizeof(unsigned short));
+			if (!characters)
+				return list;
+			memcpy(characters, map->strings[maps[index]], length * sizeof(unsigned short));
+			entries[index].string.size = length * (long)sizeof(unsigned short);
+			entries[index].string.address = characters;
+			build.map_strings++;
+			continue;
+		}
+		characters = allocate((length * 2 + 2) * sizeof(unsigned short));
 		if (!characters)
 			return list;
 		written = halo_menus_utf16(strings[index], characters, length * 2 + 2);
@@ -1543,7 +1562,7 @@ static void *pause_button(struct cache_file_tag_instance *instances, struct ui_w
 	if (!button || !handlers)
 		return NULL;
 	memcpy(button, model, sizeof(*button));
-	instance_set(instances, UNICODE_STRING_LIST_TAG, text_tag, name, " text", string_list_build(&text, 1));
+	instance_set(instances, UNICODE_STRING_LIST_TAG, text_tag, name, " text", string_list_build(&text, NULL, 1, NULL));
 	reference_set(&button->text_label_string_list, UNICODE_STRING_LIST_TAG, text_tag);
 	button->string_list_index = 0;
 	button->game_data_inputs.count = 0;
@@ -2067,12 +2086,30 @@ static boolean menus_pc_chosen(void)
 	return FALSE;
 }
 
+/* whether the PC menus' text is the language of the maps' Custom Edition
+(display.menu_language), else English */
+static boolean menus_language_maps(void)
+{
+	static boolean said;
+	char const *value = config_string("display.menu_language");
+
+	if (!csstrcasecmp(value, "maps"))
+		return TRUE;
+	if (csstrcasecmp(value, "english") && !said)
+	{
+		platform_log("menus: display.menu_language \"%s\" is not \"maps\" or \"english\": English", value);
+		said = TRUE;
+	}
+	return FALSE;
+}
+
 void menu_tags_loaded(
 	char const *map_name)
 {
 	struct halo_menus const *menus;
 	struct cache_file_tag_instance *instances;
 	long widget_count, own_lists = 0, total, index;
+	boolean locale;
 
 	boolean game_map = strcmp(map_name, "ui") != 0;
 	boolean campaign = game_map && full_screen_campaign_map();
@@ -2132,12 +2169,24 @@ void menu_tags_loaded(
 		instance_set(instances, BITMAP_GROUP_TAG, build.bitmap_tags[index], menus->bitmaps[index].name, "",
 			bitmap_build(&menus->bitmaps[index], build.bitmap_tags[index]));
 	}
+	/* (the PC version's strings in the language of the Custom Edition the
+	maps come from, its loc.map's, unless English is chosen) */
+	locale = menus_language_maps() && custom_edition_locale_open();
 	for (index = 0; index < menus->string_list_count && !build.failed; index++)
 	{
 		struct halo_menu_strings const *list = &menus->string_lists[index];
+		struct custom_edition_string_list *map = locale && list->map ? custom_edition_locale_strings(list->map) : NULL;
 
 		instance_set(instances, UNICODE_STRING_LIST_TAG, build.strings_tags[index], list->name, "",
-			string_list_build(menus->strings + list->first, list->count));
+			string_list_build(menus->strings + list->first, menus->string_maps + list->first, list->count, map));
+		if (map)
+			free(map);
+	}
+	if (locale)
+	{
+		custom_edition_locale_close();
+		if (!game_map)
+			platform_log("menus: %ld strings from the Custom Edition's loc.map", build.map_strings);
 	}
 	for (index = 0; index < widget_count && !build.failed; index++)
 	{
@@ -2146,7 +2195,7 @@ void menu_tags_loaded(
 		if (widget->text)
 		{
 			instance_set(instances, UNICODE_STRING_LIST_TAG, build.text_tags[index], widget->name, " text",
-				string_list_build(&widget->text, 1));
+				string_list_build(&widget->text, NULL, 1, NULL));
 		}
 		if (widget->strings)
 		{
@@ -2154,7 +2203,7 @@ void menu_tags_loaded(
 			long count = spinner_split(widget, FALSE, pieces);
 
 			instance_set(instances, UNICODE_STRING_LIST_TAG, build.spinner_tags[index], widget->name, " strings",
-				string_list_build(pieces, count));
+				string_list_build(pieces, NULL, count, NULL));
 		}
 		instance_set(instances, UI_WIDGET_DEFINITION_TAG, build.widget_tags[index], widget->name, "", NULL);
 	}
