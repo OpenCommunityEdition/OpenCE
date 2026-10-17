@@ -51,6 +51,14 @@ boolean _sound_cache_sound_request(struct sound_permutation *p,boolean block,boo
 }
 static boolean loaded=TRUE;
 static short connection;
+static boolean local_coop, online_coop, screen_flashes=TRUE, fading_out;
+static short fade_ticks=NONE;
+static long fade_start;
+boolean game_is_cooperative(void) {return local_coop;}
+boolean network_coop_active(void) {return online_coop;}
+void player_effect_port_screen_fade_get(real_rgb_color *color,short *ticks,boolean *out,long *start) {
+    color->red=color->green=color->blue=0;*ticks=fade_ticks;*out=fading_out;*start=fade_start;
+}
 static long args[7],result,added[4];
 static int count,draws;
 static real_point3d drawn;
@@ -70,14 +78,16 @@ real sound_gain_under_dialog=.7f;
 struct cheat_globals cheat;
 real object_light_ambient_base=.03f,object_light_ambient_scale=1.0f;
 boolean loud_dialog_hack,ignore_player;
-short const hs_external_global_count=7;
-static struct hs_external_global_definition globals[7]={{"sound_gain_under_dialog",_hs_type_real,0,&sound_gain_under_dialog},
+short const hs_external_global_count=8;
+static struct hs_external_global_definition globals[8]={{"sound_gain_under_dialog",_hs_type_real,0,&sound_gain_under_dialog},
     {"cheat_infinite_ammo",_hs_type_boolean,0,&cheat.infinite_ammo},{"unsafe",_hs_type_real,0,NULL},
     {"object_light_ambient_base",_hs_type_real,0,&object_light_ambient_base},
     {"object_light_ambient_scale",_hs_type_real,0,&object_light_ambient_scale},
     {"loud_dialog_hack",_hs_type_boolean,0,&loud_dialog_hack},
-    {"ai_debug_ignore_player",_hs_type_boolean,0,&ignore_player}};
-short hs_find_global_by_name(char const *name) {return !strcmp(name,"ai_debug_ignore_player") ? (short)0x8006 : NONE;}
+    {"ai_debug_ignore_player",_hs_type_boolean,0,&ignore_player},
+    {"rasterizer_screen_flashes",_hs_type_boolean,0,&screen_flashes}};
+short hs_find_global_by_name(char const *name) {return !strcmp(name,"ai_debug_ignore_player") ? (short)0x8006 :
+    !strcmp(name,"rasterizer_screen_flashes") ? (short)0x8007 : NONE;}
 struct hs_external_global_definition *hs_global_external_get(short index) {return &globals[index];}
 void *csmemset(void *p,long c,unsigned long n) {return memset(p,c,n);}
 void *csmemcpy(void *p,void const *q,unsigned long n) {return memcpy(p,q,n);}
@@ -144,7 +154,38 @@ int main(int argc,char **argv) {
     scenario.cutscene_flags.address=flags;scenario.cutscene_flags.count=2;
     flags[1].position.x=10;
     mcc_campaign_begin();
-    if(!strcmp(argv[1],"unit_kill")) {
+    if(!strcmp(argv[1],"flashlight")) {
+        units[0].object.type=_object_type_biped;
+        args[0]=0;call("unit_get_current_flashlight_state");CHECK(!result);
+        SET_FLAG(units[0].unit.flags,_unit_integrated_light_on_bit,TRUE);
+        call("unit_get_current_flashlight_state");CHECK(result);
+        args[0]=NONE;call("unit_get_current_flashlight_state");CHECK(!result);
+        args[0]=0x12340000;call("unit_get_current_flashlight_state");CHECK(!result);
+        args[0]=0;units[0].object.type=_object_type_weapon;
+        call("unit_get_current_flashlight_state");CHECK(!result);
+    } else if(!strcmp(argv[1],"cooperative")) {
+        call("game_is_cooperative");CHECK(!result);
+        local_coop=TRUE;call("game_is_cooperative");CHECK(result);
+        local_coop=FALSE;online_coop=TRUE;call("game_is_cooperative");CHECK(result);
+        online_coop=FALSE;connection=_game_connection_network_server;
+        call("game_is_cooperative");CHECK(!result);
+    } else if(!strcmp(argv[1],"fades")) {
+        CHECK(mcc_campaign_global_settable(7));CHECK(!mcc_campaign_fade_active());
+        fade_ticks=0;fading_out=TRUE;CHECK(mcc_campaign_fade_active());
+        screen_flashes=FALSE;CHECK(mcc_campaign_fade_active());
+        mcc_campaign_snapshot(saved);CHECK(mcc_campaign_validate(saved,sizeof(saved)));
+        mcc_campaign_begin();CHECK(screen_flashes);
+        connection=_game_connection_network_client;
+        CHECK(mcc_campaign_restore(saved,sizeof(saved)));CHECK(!screen_flashes);
+        fading_out=FALSE;fade_start=100;fade_ticks=30;CHECK(mcc_campaign_fade_active());
+        fade_ticks=20;CHECK(!mcc_campaign_fade_active());
+        fade_ticks=NONE;CHECK(!mcc_campaign_fade_active());
+        memcpy(bad,saved,sizeof(bad));bad[0]=3;CHECK(!mcc_campaign_validate(bad,sizeof(bad)));
+        bad[13]&=~8;CHECK(mcc_campaign_restore(bad,sizeof(bad)));CHECK(screen_flashes);
+        mcc_campaign_dispose();CHECK(screen_flashes && !mcc_campaign_fade_active());
+        screen_flashes=FALSE;mcc_campaign_begin();screen_flashes=TRUE;mcc_campaign_dispose();CHECK(!screen_flashes);
+        loaded=FALSE;CHECK(!mcc_campaign_global_settable(7));
+    } else if(!strcmp(argv[1],"unit_kill")) {
         char const *names[2]={"unit_kill","unit_kill_silent"};
         for(i=0;i<2;i++) {
             short id=mcc_campaign_find(names[i]);
@@ -198,7 +239,7 @@ int main(int argc,char **argv) {
         CHECK(mcc_script_effects_bump(0,1));CHECK(!possessions);
         memcpy(bad,saved,sizeof(saved));bad[0]=2;
         CHECK(!mcc_campaign_validate(bad,sizeof(bad)));
-        memcpy(bad,saved,sizeof(saved));bad[13]|=8;
+        memcpy(bad,saved,sizeof(saved));bad[13]|=16;
         CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         CHECK(mcc_script_effects_snapshot()==MCC_EFFECT_MASK);
         loaded=FALSE;CHECK(!mcc_script_effect_enabled(MCC_EFFECT_JETPACK));
@@ -361,13 +402,13 @@ int main(int argc,char **argv) {
     } else if(!strcmp(argv[1],"validation")) {
         mcc_campaign_snapshot(saved);CHECK(mcc_campaign_validate(saved,sizeof(saved)));
         CHECK(!mcc_campaign_validate(saved,sizeof(saved)-1));
-        memcpy(bad,saved,sizeof(saved));bad[0]=4;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
-        memcpy(bad,saved,sizeof(saved));bad[13]=8;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
+        memcpy(bad,saved,sizeof(saved));bad[0]=5;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
+        memcpy(bad,saved,sizeof(saved));bad[13]=16;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         memcpy(bad,saved,sizeof(saved));{long nan=0x7fc00000;memcpy(bad+4,&nan,4);}CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         memcpy(bad,saved,sizeof(saved));bad[16]=4;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         CHECK(global_gravity==original);
         CHECK(mcc_campaign_global_settable(0));CHECK(mcc_campaign_global_settable(1));
-        CHECK(!mcc_campaign_global_settable(2));CHECK(!mcc_campaign_global_settable(7));CHECK(!mcc_campaign_global_settable(-1));
+        CHECK(!mcc_campaign_global_settable(2));CHECK(!mcc_campaign_global_settable(8));CHECK(!mcc_campaign_global_settable(-1));
         for(i=3;i<7;i++) CHECK(mcc_campaign_global_settable((short)i));
         loaded=FALSE;CHECK(!mcc_campaign_global_settable(0));
     } else if(!strcmp(argv[1],"lighting_controls")) {

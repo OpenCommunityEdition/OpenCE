@@ -10,6 +10,7 @@ short mcc_campaign_find(char const *name);
 boolean mcc_campaign_global_settable(short index);
 void mcc_campaign_begin(void);
 void mcc_campaign_dispose(void);
+boolean mcc_campaign_fade_active(void);
 void mcc_campaign_render(short local_player);
 void mcc_campaign_snapshot(void *out);
 real mcc_campaign_effects_gain(void);

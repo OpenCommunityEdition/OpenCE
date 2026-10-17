@@ -17,6 +17,7 @@ static void mcc_hs_speed_reconcile(word designator, boolean write)
     global->value=value.bits;
 }
 long hs_cast(long thread_index, short actual_type, short desired_type, long value);
+static void mcc_hs_release_thread(long thread_index);
 
 void mcc_script_finished_evaluate(short function, long thread_index, boolean initialize)
 {
@@ -51,11 +52,20 @@ void mcc_sleep_forever_evaluate(short function, long thread_index, boolean initi
     if ((short)*script!=NONE) target=hs_find_thread_by_script((short)*script);
     if (target!=NONE) {
         struct hs_thread_datum *sleeper=hs_thread_get(target);
-        if (sleeper->sleep_until!=NONE) {
-            if (target!=thread_index && !TEST_FLAG(sleeper->flags,_hs_thread_sleeping_bit)) {
-                sleeper->previous_sleep_until=sleeper->sleep_until;
-                SET_FLAG(sleeper->flags,_hs_thread_sleeping_bit,TRUE);
-            }
+        if (target!=thread_index && !hs_scenario_script_disabled((short)*script)) {
+            /* MCC's named sleep_forever cancels this invocation. A later
+             * wake starts it again, including an already completed dormant
+             * script (Warthog Rally's race/setup reset sequence). Ordinary
+             * wake and the native sleep adapter retain their own semantics. */
+            mcc_hs_release_thread(target);
+            sleeper->stack=(struct hs_stack_frame *)sleeper->stack_data;
+            sleeper->stack->previous=NULL;
+            sleeper->stack->expression_index=NONE;
+            sleeper->stack->size=0;
+            sleeper->flags=0;
+            sleeper->previous_sleep_until=0;
+            sleeper->sleep_until=NONE-1;
+        } else if (target==thread_index && sleeper->sleep_until!=NONE) {
             sleeper->sleep_until=NONE-1;
         }
     }

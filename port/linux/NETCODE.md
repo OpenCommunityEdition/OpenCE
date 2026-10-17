@@ -148,11 +148,13 @@ OpenCE releases. Do not change the base version without auditing its wire format
 simulation rules and admission behavior and testing unmodified upstream clients.
 The pinned fixture and settings-prefix check are in `tools/test_mcc_protocol.py`.
 
-MCC sessions use separate MCC protocol version 48 (previous GulchCE builds used
-47). Version 48 requires signed/vector damage impulses on every MCC peer,
-including clients replaying host damage. It retains initialized three-point
-boat controls from version 47. Its packet
-layouts are unchanged. Xbox/Custom Edition retain OpenCE protocol 29.
+MCC sessions use separate MCC protocol version 49 (previous GulchCE builds used
+48). Version 49 requires weapon-authored movement penalties on every MCC peer
+and campaign snapshot version 4, which carries the map's screen-flash setting.
+It also corrects named sleep_forever resets and online cooperative script queries.
+It retains signed/vector damage impulses from version 48 and initialized
+three-point boat controls from version 47. Packet sizes are unchanged.
+Xbox/Custom Edition retain OpenCE protocol 29.
 Discovery advertises the selected map family's protocol and, separately,
 the host's MCC capability version. A GulchCE client sends a bounded reliable join
 envelope only to a host advertising the same MCC capability. The envelope wraps
