@@ -99,6 +99,9 @@ lights the diffuse color for each pixel (nv2a_pixel_shader_key
 per_pixel_lighting). Returns a malloc'd string. */
 char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
 	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting);
+/* the fixed-function pipeline's vertex shader (the loading screen's draws):
+positions already in clip space. Returns a malloc'd string. */
+char *nv2a_fixed_function_glsl(void);
 
 /* ---------- pixel shaders */
 
