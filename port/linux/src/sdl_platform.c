@@ -974,6 +974,15 @@ void platform_video_swap(void)
 #endif
 }
 
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+/* when SDL_SetWindowRelativeMouseMode has no XInput2 (32-bit libSDL3 on X11
+without 32-bit libXi.so.6), the mouse is held with a hidden cursor, a window
+grab and a warp back to the middle after each move */
+static BOOL mouse_warp_capture;
+static int mouse_warp_x;
+static int mouse_warp_y;
+#endif
+
 void platform_mouse_capture(BOOL capture)
 {
 #ifdef HALO_WEB
@@ -981,8 +990,49 @@ void platform_mouse_capture(BOOL capture)
 	web_shared.h) */
 	__atomic_store_n(&web_shared[_web_mouse_wanted], capture ? 1 : 0, __ATOMIC_RELAXED);
 #endif
-	if (platform_window)
-		SDL_SetWindowRelativeMouseMode(platform_window, capture ? true : false);
+	if (!platform_window)
+		return;
+#if defined(HALO_ANDROID) || defined(HALO_WEB)
+	SDL_SetWindowRelativeMouseMode(platform_window, capture ? true : false);
+#else
+	if (!capture)
+	{
+		mouse_warp_capture = FALSE;
+		SDL_SetWindowRelativeMouseMode(platform_window, false);
+		SDL_SetWindowMouseGrab(platform_window, false);
+		SDL_ShowCursor();
+		return;
+	}
+	if (SDL_GetKeyboardFocus() == platform_window &&
+		SDL_SetWindowRelativeMouseMode(platform_window, true))
+	{
+		if (mouse_warp_capture)
+		{
+			mouse_warp_capture = FALSE;
+			SDL_SetWindowMouseGrab(platform_window, false);
+			SDL_ShowCursor();
+		}
+		return;
+	}
+	/* (before the window has focus, SDL_SetWindowRelativeMouseMode sets
+	SDL_WINDOW_MOUSE_RELATIVE_MODE without testing XInput2; if XInput2 is
+	missing when focus arrives, non-relative motion is dropped until cleared) */
+	SDL_SetWindowRelativeMouseMode(platform_window, false);
+	mouse_warp_capture = TRUE;
+	SDL_HideCursor();
+	SDL_SetWindowMouseGrab(platform_window, true);
+	{
+		int width = 0, height = 0;
+
+		SDL_GetWindowSize(platform_window, &width, &height);
+		if (width > 0 && height > 0)
+		{
+			mouse_warp_x = width / 2;
+			mouse_warp_y = height / 2;
+			SDL_WarpMouseInWindow(platform_window, (float)mouse_warp_x, (float)mouse_warp_y);
+		}
+	}
+#endif
 }
 
 /* ---------- keyboard translation */
@@ -1440,6 +1490,9 @@ void platform_pump_events(void)
 	SDL_Event event;
 	static BOOL looked_at_clipboard;
 	BOOL look_at_clipboard = !looked_at_clipboard;
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+	BOOL mouse_needs_warp = FALSE;
+#endif
 
 	if (!platform_window || SDL_GetCurrentThreadID() != platform_event_thread)
 		return;
@@ -1535,6 +1588,14 @@ void platform_pump_events(void)
 				ui_pointer.moved = TRUE;
 				break;
 			}
+#ifndef HALO_WEB
+			if (mouse_warp_capture)
+			{
+				if ((int)event.motion.x == mouse_warp_x && (int)event.motion.y == mouse_warp_y)
+					break;
+				mouse_needs_warp = TRUE;
+			}
+#endif
 #endif
 			input_state.mouse_dx += event.motion.xrel;
 			input_state.mouse_dy += event.motion.yrel;
@@ -1600,7 +1661,22 @@ void platform_pump_events(void)
 			{
 				input_state.mouse_buttons[event.button.button] = event.button.down;
 				if (event.button.down)
+				{
 					mouse_buttons_pressed[event.button.button] = 1;
+#ifndef HALO_ANDROID
+					if (!input_state.ui_pointer && !scoreboard_pointer_active &&
+						(input_state.mouse_released ||
+						(!SDL_GetWindowRelativeMouseMode(platform_window)
+#ifndef HALO_WEB
+						&& !mouse_warp_capture
+#endif
+						)))
+					{
+						input_state.mouse_released = FALSE;
+						platform_mouse_capture(TRUE);
+					}
+#endif
+				}
 			}
 			break;
 		case SDL_EVENT_MOUSE_WHEEL:
@@ -1656,6 +1732,14 @@ void platform_pump_events(void)
 			/* (the scoreboard's pointer goes; the mouse is taken back for
 			the aim as the window has the focus again) */
 			scoreboard_pointer_active = FALSE;
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+			if (mouse_warp_capture)
+			{
+				mouse_warp_capture = FALSE;
+				SDL_SetWindowMouseGrab(platform_window, false);
+				SDL_ShowCursor();
+			}
+#endif
 #ifdef HALO_ANDROID
 			touch_input_cancel();
 #endif
@@ -1710,6 +1794,21 @@ void platform_pump_events(void)
 			break;
 		}
 	}
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+	if (mouse_warp_capture && mouse_needs_warp && !input_state.ui_pointer &&
+		!scoreboard_pointer_active && !input_state.mouse_released)
+	{
+		int width = 0, height = 0;
+
+		SDL_GetWindowSize(platform_window, &width, &height);
+		if (width > 0 && height > 0)
+		{
+			mouse_warp_x = width / 2;
+			mouse_warp_y = height / 2;
+			SDL_WarpMouseInWindow(platform_window, (float)mouse_warp_x, (float)mouse_warp_y);
+		}
+	}
+#endif
 	pthread_mutex_unlock(&input_lock);
 	looked_at_clipboard = TRUE;
 	platform_invite_clipboard(look_at_clipboard);
