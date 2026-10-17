@@ -22,6 +22,10 @@ and the debug keyboard that the game's console reads.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef HALO_WINDOWS
+/* port/windows/src/win32_window.c, compiled with the Windows SDK */
+void win32_window_borderless_apply(SDL_Window *window);
+#endif
 #if !defined(_WIN32) && !defined(HALO_ANDROID)
 #include <signal.h>
 #endif
@@ -844,6 +848,9 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	platform_fullscreen_requested = platform_fullscreen_setting();
 	platform_fullscreen_kind_apply();
 #endif
+#ifdef HALO_WINDOWS
+	win32_window_borderless_apply(platform_window);
+#endif
 	platform_gl_context = SDL_GL_CreateContext(platform_window);
 #ifdef HALO_GLES
 	/* ES 3.2 where the driver has it, otherwise the renderer makes do with
@@ -954,6 +961,11 @@ void platform_video_swap(void)
 	static Uint64 next_frame;
 	Uint64 interval, now;
 
+#endif
+#ifdef HALO_WINDOWS
+	/* SDL can restore its fullscreen styles on a mode or focus change.
+	Keep borderless on the desktop before the driver presents a frame. */
+	win32_window_borderless_apply(platform_window);
 #endif
 	SDL_GL_SwapWindow(platform_window);
 #ifdef HALO_WEB
