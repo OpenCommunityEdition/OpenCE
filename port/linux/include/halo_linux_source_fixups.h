@@ -29,6 +29,9 @@ float render_interpolation_game_time_sec(long ticks);
 /* the port's menus' screen for one of ui.map's, by name, else the name
 (port/linux/game/menu_tags.c) */
 char const *pc_menus_screen(char const *name);
+/* debug.fixed_step: a game of this machine alone runs a tick a frame
+(port/linux/src/port_config.c; game_time.c, main.c) */
+int halo_fixed_step(void);
 /* the Custom Edition tag cache window, or NULL unless the
 game.custom_edition setting reserved it (port/linux/src/xbox_memory.c) */
 void *halo_custom_edition_tag_cache(void);

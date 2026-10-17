@@ -25,7 +25,7 @@ end.
 | `port/assets/` | What the builds embed or ship: high-res HUD (`hud/`), fonts, titles, menus (`menus/`), icons, network brokers |
 | `port/third_party/` | Vendored libraries, each with a README naming its upstream, version and checksum |
 | `port/tools/` | Stand-alone tools (`cache_file_report.c`) |
-| `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py`, `web_build.py`, `ci_build.py`, `web_serve.py`), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `xdk_headers.py`) and tests |
+| `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py`, `web_build.py`, `ci_build.py`, `web_serve.py`), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `xdk_headers.py`), tests, and `stagekit/` (scenarios staged and instrumented on the real engine, no retail assets) |
 | `docs/` | Longer design notes (`custom_edition_caches.md`) |
 | `pgo/` | Profile-guided optimisation profiles |
 | `assets/` | Game data for local runs (gitignored: `maps/`, `custom_maps/`) |
@@ -83,6 +83,7 @@ setting (`game.custom_edition`), checked at run time with
 
 ```sh
 python -m pytest -q tools/harness tools/test_touch_menu.py   # the engine's functions in a fake world
+python -m pytest -q tools/stagekit/tests                    # scenarios on the real engine, no retail assets (Linux)
 python -m pytest -q tools/test_linux_port.py                # the build, the maps' checks (needs assets/maps)
 python -m pytest -q tools/test_cache_file_formats.py tools/test_bmp_files.py tools/test_profile.py
 python tools/test_touch_layout.py                           # the Android touch layout (JDK 17+)
@@ -94,7 +95,8 @@ node port/web/tests/webrtc_native.mjs chromium firefox      # the native builds'
 ```
 
 `tools/harness/README.md` explains how to add an asset-free test: the code
-under test is taken from the sources, not copied.
+under test is taken from the sources, not copied. `tools/stagekit/README.md`
+explains how to add a scenario: the real engine, with no retail assets.
 
 Running the game without a person at it:
 
@@ -221,5 +223,6 @@ as documentation of file formats, never copied.
 | [port/assets/menus/UNWIRED.md](port/assets/menus/UNWIRED.md) | Menu functions that do nothing yet |
 | [port/assets/fonts/README.md](port/assets/fonts/README.md) | The fonts and their licences |
 | [tools/harness/README.md](tools/harness/README.md) | Asset-free regression tests |
+| [tools/stagekit/README.md](tools/stagekit/README.md) | Scenarios staged and instrumented on the real engine, no retail assets |
 | `port/third_party/*/README.md` | Each vendored library |
 | [AUTHORS.md](AUTHORS.md) | Art credits |

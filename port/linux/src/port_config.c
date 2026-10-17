@@ -483,7 +483,8 @@ static const struct config_setting config_settings[] =
 		"Automated system link sessions for testing (port/linux/game/network_test.c):\n"
 		"\"host:<map>\" hosts a game on that map, \"join\" joins the first game found,\n"
 		"\"browse\" the one with the most players the server browser lists (not\n"
-		"co-op, if it can); empty for none." },
+		"co-op, if it can), \"log\" logs the game that runs (and runs its cues);\n"
+		"empty for none." },
 	{ "debug.network_test_start", _config_real, "15.0", "HALO_NETWORK_TEST_START", _environment_value, _platform_all,
 		"Seconds after hosting that an automated test game starts." },
 	{ "debug.network_test_kill", _config_real, "0.0", "HALO_NETWORK_TEST_KILL", _environment_value, _platform_all,
@@ -505,6 +506,14 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"The weapon network_test_pickup stands the player on: the first whose tag\n"
 		"name has this in it (\"sniper\", say); empty any." },
+	{ "debug.network_test_cues", _config_string, "\"\"", "HALO_NETWORK_TEST_CUES", _environment_value, _platform_all,
+		"Console lines an automated test runs at a game second, from the first tick\n"
+		"every player of debug.network_test_cue_players has a unit:\n"
+		"\"<second> <line>|<second> <line>...\" (the host's, or a game of one machine;\n"
+		"not on the web)." },
+	{ "debug.network_test_cue_players", _config_integer, "1", "HALO_NETWORK_TEST_CUE_PLAYERS", _environment_value,
+		_platform_all,
+		"The players debug.network_test_cues waits for." },
 	{ "debug.network_test_public", _config_boolean, "false", "HALO_NETWORK_TEST_PUBLIC", _environment_value,
 		_platform_all,
 		"The network test's host lists its game in the server browser, as Create\n"
@@ -547,6 +556,10 @@ static const struct config_setting config_settings[] =
 	{ "debug.update_answer", _config_string, "\"\"", "HALO_UPDATE_ANSWER", _environment_value, _platform_desktop,
 		"The answer to the new version question, for automated tests: \"yes\",\n"
 		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },
+	{ "debug.fixed_step", _config_boolean, "false", "HALO_FIXED_STEP", _environment_set_is_true, _platform_all,
+		"A game of this machine alone runs one tick a frame, whatever time has\n"
+		"passed, so that it plays the same every time (tests); game_speed has no\n"
+		"effect." },
 	{ "debug.exit_after", _config_real, "0.0", "HALO_EXIT_AFTER", _environment_value, _platform_all,
 		"Quit this many seconds after the window opens; 0 never." },
 	{ "debug.hidden_window", _config_boolean, "false", "HALO_HIDDEN_WINDOW", _environment_set_is_true, _platform_desktop,
@@ -1495,6 +1508,15 @@ int config_default(const char *name, char *text, size_t size)
 int config_boolean(const char *name)
 {
 	return config_value(name, _config_boolean)->boolean;
+}
+
+int halo_fixed_step(void)
+{
+	static int fixed_step = -1;
+
+	if (fixed_step < 0)
+		fixed_step = config_boolean("debug.fixed_step") != 0;
+	return fixed_step;
 }
 
 long config_integer(const char *name)

@@ -19,6 +19,8 @@ Automated system link sessions for testing the netcode without the menus
   lists after five seconds (internet play's public games: a host's with
   debug.network_test_public), co-op ones last, as picking it there does,
   and then as "join". It logs what it lists.
+- "log" hosts and joins nothing: the game that runs (map_name, in init.txt,
+  plays one without the menus) is logged, as below.
 
 Once the game runs, every second each machine logs where every player's
 unit is, so the machines' views of the game can be compared.
@@ -34,6 +36,10 @@ machine's player holds the action button, as getting in does)
 and debug.network_test_pickup (the last player stands on a weapon lying
 about that many seconds in, and a joining machine's player holds the action
 button a second later, to pick it up).
+
+debug.network_test_cues: console lines the host (or a game of one machine)
+runs at their ticks, counted from the first tick every player of
+debug.network_test_cue_players has a unit (tools/stagekit's scenarios).
 
 Called from the main loop every frame (main.c).
 */
@@ -59,12 +65,14 @@ Called from the main loop every frame (main.c).
 #include "scenario/scenario.h"
 #include "tag_files/tag_files.h"
 #include "camera/observer.h"
+#include "hs/hs.h"
 
 #include "../src/p2p.h" /* port: port/linux/src/p2p.c, p2p_lobby.c */
 
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* the platform layer's (port/linux/src/port_config.c) */
@@ -88,6 +96,7 @@ enum
 	_network_test_host,
 	_network_test_join,
 	_network_test_browse,
+	_network_test_log,
 };
 
 static struct
@@ -122,6 +131,17 @@ static struct
 	boolean browsing;
 	boolean browse_listed;
 	float browse_seconds;
+	/* debug.network_test_cues: each line and its tick from the cues' start,
+	the first tick every player of cue_players has a unit (NONE until then) */
+	struct
+	{
+		long tick;
+		char line[256];
+	} cues[32];
+	short cue_count;
+	short next_cue;
+	long cue_players;
+	long cues_start;
 } network_test;
 
 /* the variant at the index of the list (copied to name), FALSE past its end */
@@ -177,6 +197,10 @@ static void network_test_read_settings(
 	{
 		network_test.mode = _network_test_browse;
 	}
+	else if (!strcmp(setting, "log"))
+	{
+		network_test.mode = _network_test_log;
+	}
 	network_test.public_game = config_boolean("debug.network_test_public") != 0;
 	network_test.start_delay = (real)config_real("debug.network_test_start");
 	network_test.kill_interval = (real)config_real("debug.network_test_kill");
@@ -186,6 +210,47 @@ static void network_test_read_settings(
 	snprintf(network_test.pickup_weapon, sizeof(network_test.pickup_weapon), "%s",
 		config_string("debug.network_test_pickup_weapon"));
 	network_test.score_to_win = (long)config_integer("debug.network_test_score");
+	network_test.cue_players = MAX(1, config_integer("debug.network_test_cue_players"));
+	network_test.cues_start = NONE;
+#ifndef HALO_WEB
+	/* (not on the web, where a link's ?set= would have it run what it says) */
+	{
+		char const *cue = config_string("debug.network_test_cues");
+
+		while (*cue)
+		{
+			char const *end = strchr(cue, '|');
+			int length = end ? (int)(end - cue) : (int)strlen(cue);
+			char *line;
+			double second = strtod(cue, &line);
+			short index;
+
+			if (!(second >= 0.0 && second < 86400.0) || line == cue || line >= cue + length ||
+				cue + length - line >= (int)sizeof(network_test.cues[0].line))
+			{
+				platform_log("network test: cue \"%.*s\" is not \"<second> <line>\" of %d characters at most: left out",
+					length, cue, (int)sizeof(network_test.cues[0].line) - 1);
+			}
+			else if (network_test.cue_count >= (short)NUMBEROF(network_test.cues))
+			{
+				platform_log("network test: cues past %d left out", (int)NUMBEROF(network_test.cues));
+			}
+			else
+			{
+				/* (in the order they run) */
+				long tick = (long)(second * TICKS_PER_SECOND + 0.5);
+
+				for (index = network_test.cue_count; index > 0 && network_test.cues[index - 1].tick > tick; index--)
+					network_test.cues[index] = network_test.cues[index - 1];
+				network_test.cues[index].tick = tick;
+				snprintf(network_test.cues[index].line, sizeof(network_test.cues[index].line), "%.*s",
+					(int)(cue + length - line), line);
+				network_test.cue_count++;
+			}
+			cue += length + (end != NULL);
+		}
+	}
+#endif
 	if (network_test.mode != _network_test_off)
 		platform_log("network test: %s", setting);
 }
@@ -681,6 +746,37 @@ static void network_test_second_weapon(
 	}
 }
 
+/* debug.network_test_cues: from the first tick every player waited for has a
+unit (logged, cues or not: where a test's seconds start), each line at its
+tick (the host's, or a game of one machine: a client runs none) */
+static void network_test_run_cues(
+	void)
+{
+	if (network_test.mode != _network_test_host && network_test.mode != _network_test_log)
+		return;
+	if (network_test.cues_start == NONE)
+	{
+		struct data_iterator iterator;
+		struct player_datum *player;
+		long players = 0;
+
+		data_iterator_new(&iterator, player_data);
+		while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+			players += player->unit_index != NONE;
+		if (players < network_test.cue_players)
+			return;
+		network_test.cues_start = game_time_get();
+		platform_log("network test: cues from tick %ld", network_test.cues_start);
+	}
+	while (network_test.next_cue < network_test.cue_count &&
+		game_time_get() >= network_test.cues_start + network_test.cues[network_test.next_cue].tick)
+	{
+		platform_log("network test: cue at tick %ld: %s", game_time_get(), network_test.cues[network_test.next_cue].line);
+		hs_compile_and_evaluate(network_test.cues[network_test.next_cue].line);
+		network_test.next_cue++;
+	}
+}
+
 /* both machines stand the last player on the first weapon lying about that
 it does not carry (the same object on both: a client's own player is where
 it has it, within a tolerance) */
@@ -749,10 +845,16 @@ void network_test_update(
 	if (network_test.mode == _network_test_off)
 		return;
 
-	/* the game running: report (from the start of each game: the next
-	game's time starts over) */
+	/* the game running: report (from the start of each game, or a revert to
+	a checkpoint: the time starts over, and the cues with it) */
 	if (game_in_progress() && game_time_get() < network_test.logged_time)
+	{
 		network_test.logged_time = 0;
+		network_test.cues_start = NONE;
+		network_test.next_cue = 0;
+	}
+	if (game_in_progress() && !main_menu_loaded)
+		network_test_run_cues();
 	if (game_in_progress() && !main_menu_loaded && game_time_get() - network_test.logged_time >= TICKS_PER_SECOND)
 	{
 		network_test.logged_time = game_time_get();
@@ -1081,4 +1183,12 @@ void network_test_update(
 		}
 		break;
 	}
+}
+
+/* the game's time in seconds while a game runs, -1 otherwise: the scripted
+player's clock (xinput_sdl.c, debug.test_input) */
+double network_test_game_seconds(
+	void)
+{
+	return game_time_initialized() && game_in_progress() ? (double)game_time_get() / TICKS_PER_SECOND : -1.0;
 }
