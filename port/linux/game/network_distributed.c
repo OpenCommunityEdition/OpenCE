@@ -74,6 +74,7 @@ machine (their datum identifiers need not be).
 #include "units/biped_definitions.h"
 #include "units/bipeds.h"
 #include "network_coop.h"
+#include "network_killfeed.h"
 #include "network_distributed.h"
 #include "network_voice.h"
 #include "map_share.h"
@@ -3366,6 +3367,7 @@ void network_distributed_new_game(
 	network_damage_new_game();
 	network_actors_new_game();
 	network_coop_new_game();
+	network_killfeed_reset();
 	network_votekick_new_game();
 }
 
@@ -4031,6 +4033,7 @@ void network_distributed_handle_message(
 	case _distributed_message_actor_states: entry_size = network_actors_entry_size(); break;
 	case _distributed_message_structure_bsp: entry_size = sizeof(struct distributed_structure_bsp); break;
 	case _distributed_message_coop_presentation: entry_size = network_coop_presentation_entry_size(); break;
+	case _distributed_message_coop_death: entry_size = network_killfeed_entry_size(); break;
 	case _distributed_message_coop_events: entry_size = network_coop_event_entry_size(); break;
 	case _distributed_message_coop_skip_vote: entry_size = network_coop_skip_vote_entry_size(); break;
 	case _distributed_message_coop_device_groups: entry_size = network_coop_device_group_entry_size(); break;
@@ -4135,6 +4138,10 @@ void network_distributed_handle_message(
 		break;
 	case _distributed_message_coop_presentation:
 		network_coop_handle_presentation(entries, header.game_time);
+		break;
+	case _distributed_message_coop_death:
+		network_killfeed_handle_message(entries, (word)(size - sizeof(header)),
+			header.count, !network_connection_last_read_was_unreliable());
 		break;
 	case _distributed_message_coop_events:
 		network_coop_handle_events(entries, header.count);

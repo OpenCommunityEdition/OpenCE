@@ -126,6 +126,9 @@ enum
 	_distributed_message_map_share_sources = 85,
 	_distributed_message_map_share_progress = 86,
 
+	/* co-op death text in the normal multiplayer HUD (reliable, host only) */
+	_distributed_message_coop_death = 89,
+
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
 

@@ -43,6 +43,7 @@ enum _distributed_message_actor_states 64
 enum _distributed_message_batch 16
 enum _distributed_message_client_identity 18
 enum _distributed_message_client_ready 9
+enum _distributed_message_coop_death 89
 enum _distributed_message_coop_device_groups 68
 enum _distributed_message_coop_device_states 77
 enum _distributed_message_coop_events 71
