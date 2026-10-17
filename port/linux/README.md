@@ -350,6 +350,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.menus` | `"pc"` | `HALO_MENUS` | `"pc"`: the PC version's menus, from the files in `port/assets/menus` and a `menus` folder next to `config.toml`. Refer to "Menus". `"xbox"`: the Xbox's menus. |
 | `display.player_names` | `"all"` | `HALO_PLAYER_NAMES` | In multiplayer, whose names are drawn above their heads: `"all"`, `"allies"`, `"enemies"` or `"none"`. An ally's name is drawn above the triangle the game shows over teammates. An enemy's name shows only within the motion sensor's reach, while the enemy is in sight and not camouflaged, so it never shows where an enemy hides. The gametype's motion tracker setting also applies: no names if it shows no players, only allies' if it shows only friends. |
 | `display.player_name_scale` | `1.0` | `HALO_PLAYER_NAME_SCALE` | How large the players' names are drawn: `1.0` is three quarters of the size of the HUD's text, from `0.25` to `4`. With high-res text, larger names are rasterized at their size, so they stay sharp. |
+| `display.chat_style` | `"default"` | `HALO_CHAT_STYLE` | The text chat's colours (Settings > Audio > Voice and Text Chat > CHAT TEXT): `"default"`, the player's name in their team's colour and the text a pale blue, as the PC version drew them; `"white"`, all of it white, as Custom Edition. |
 | `display.scoreboard_team_layout` | `"teams"` | `HALO_SCOREBOARD_TEAM_LAYOUT` | How the multiplayer scoreboard (hold BACK, or tab) lists a team game's players. `"teams"`: a column for each team, red on the left and blue on the right. `"score"`: all the players in order of score. With more players than fit, the mouse wheel and Page Up / Page Down scroll the scoreboard. |
 | `display.scoreboard_background` | `true` | `HALO_SCOREBOARD_BACKGROUND` | `true`: the multiplayer scoreboard (hold BACK, or tab) has a panel behind its text, for clearer text. |
 | `display.scoreboard_background_color` | `"16, 16, 16, 150"` | `HALO_SCOREBOARD_BACKGROUND_COLOR` | The colour of the scoreboard's panel: `"red, green, blue, alpha"`, each from `0` to `255`. Alpha `0` is see-through, `255` is solid. |
@@ -668,7 +669,9 @@ to all the players). Enter sends the line, Escape cancels it. While you
 type, your player does not move.
 
 The lines show above the motion sensor: the player's name in the colour of
-their team (blue in a game without teams), then the text. A line to the
+their team (blue in a game without teams), then the text in a pale blue;
+CHAT TEXT in Settings > Audio > Voice and Text Chat (`display.chat_style`)
+draws them all white instead, as Custom Edition does. A line to the
 team says "(team)" after the name. The lines go after ten seconds; while
 you type, the last six show. A line has 63 characters at most, letters,
 numbers and punctuation only (ASCII). `debug.txt` gets every line.

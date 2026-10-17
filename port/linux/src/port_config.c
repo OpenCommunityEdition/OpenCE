@@ -301,6 +301,10 @@ static const struct config_setting config_settings[] =
 	{ "game.language", _config_string, "\"\"", "HALO_LANGUAGE", _environment_value, _platform_all,
 		"The language the game asks the Xbox for: \"ja\", \"de\", \"fr\", \"es\" or \"it\";\n"
 		"empty for English. The game data decides what is translated." },
+	{ "display.chat_style", _config_string, "\"default\"", "HALO_CHAT_STYLE", _environment_value, _platform_all,
+		"The text chat's colours: \"default\" (names in their team's colour,\n"
+		"the text a pale blue, as the PC version) or \"white\" (all white, as\n"
+		"Custom Edition)." },
 	{ "game.streamer_mode", _config_boolean, "false", "HALO_STREAMER_MODE", _environment_value, _platform_all,
 		"Streamer mode: the text chat shows the slurs and swearing in players'\n"
 		"names and lines as harmless words (fuck: fudge). Only what this\n"

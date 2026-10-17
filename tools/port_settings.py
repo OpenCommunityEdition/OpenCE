@@ -230,7 +230,8 @@ SCREENS["video_settings/fov_viewmodels"] = {
 }
 
 # Audio Setup's voice chat (port/linux/game/network_voice.c) with the text
-# chat's streamer mode (chat_filter.c), a screen of their own (a category, as
+# chat's colours and streamer mode (network_chat.c, chat_filter.c), a screen
+# of their own (a category, as
 # Video Setup's): Audio Setup has no room for another row, and Network Setup,
 # which has none either, is not offered in a game (menu_tags.c)
 _audio = SCREENS["audio_settings"]
@@ -238,6 +239,8 @@ _chat = {"audio.voice_chat", "audio.voice_volume"}
 SCREENS["audio_settings/chat"] = {
     "screen": "chat_settings_screen", "header": _audio["header"], "spacing": 30,
     "rows": [row for row in _audio["rows"] if row[1] in _chat] + [
+        ("CHAT TEXT:", "display.chat_style", [("DEFAULT", "default"), ("WHITE", "white")],
+         "The text chat's colors: DEFAULT, names in their\nteam's color; WHITE, all white, as Custom Edition.", None),
         ("STREAMER MODE:", "game.streamer_mode", ON_OFF,
          "Show slurs and swearing in the text chat as\nharmless words, for streaming.", None),
     ],

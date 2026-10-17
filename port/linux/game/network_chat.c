@@ -43,6 +43,9 @@ players neither send nor see lines.
 /* the platform layer's */
 unsigned long system_milliseconds(void);
 int platform_clipboard_get(char *text, int size);
+/* port_config.c's */
+const char *config_string(const char *name);
+unsigned long config_changes(void);
 
 /* ---------- constants */
 
@@ -566,13 +569,37 @@ void network_chat_note_motion_sensor(
 	chat_motion_sensors[local_player_index].top = top;
 }
 
+/* whether the lines are all white, as Custom Edition draws them
+(display.chat_style "white"), not the PC version's colours ("default") */
+static boolean chat_style_white(
+	void)
+{
+	static boolean white;
+	static unsigned long read_at = (unsigned long)-1;
+
+	/* (read again when Settings changes it) */
+	if (read_at != config_changes())
+	{
+		const char *style = config_string("display.chat_style");
+
+		read_at = config_changes();
+		white = style && !csstrcmp(style, "white");
+	}
+	return white;
+}
+
+/* a name's colour: its team's, or white */
 static void chat_color(
 	short color,
 	real alpha,
 	real_argb_color *result)
 {
 	result->alpha = alpha;
-	if (color == _chat_color_red)
+	if (chat_style_white())
+	{
+		result->red = result->green = result->blue = 1.0f;
+	}
+	else if (color == _chat_color_red)
 	{
 		result->red = 0.86f;
 		result->green = 0.32f;
@@ -586,12 +613,17 @@ static void chat_color(
 	}
 }
 
-/* the message's colour: a pale blue */
+/* the message's colour: a pale blue, or white */
 static void chat_text_color(
 	real alpha,
 	real_argb_color *result)
 {
 	result->alpha = alpha;
+	if (chat_style_white())
+	{
+		result->red = result->green = result->blue = 1.0f;
+		return;
+	}
 	result->red = 0.64f;
 	result->green = 0.75f;
 	result->blue = 0.87f;
