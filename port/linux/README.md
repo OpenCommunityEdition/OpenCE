@@ -212,6 +212,8 @@ gamepads' only.
 | pause menu | escape |
 | screenshot | F10 |
 | talk in voice chat (hold) | V |
+| third-person camera, on and off (campaign and co-op) | keypad enter |
+| free look in the third-person camera (hold) | left alt, right alt |
 
 Always: \` opens the developer console, F12 releases or captures the mouse,
 F11 changes between fullscreen and window. Screenshot (default F10,
@@ -222,6 +224,30 @@ second get a numeric suffix so previous screenshots are preserved.
 
 One movement of the mouse wheel changes the weapon one time. A second
 movement after a short pause changes it again.
+
+### Third-person camera
+
+In a campaign, and in co-op, keypad enter (`controls.third_person`) turns a
+third-person camera on and off for the first player on this computer; never
+in multiplayer. The camera sits behind the player's head, a little to the
+right and up, and looks where the player looks: the mouse turns the player
+as in first person. The mouse wheel brings it nearer or further (from about
+0.75 m to 3.7 m) and changes no weapon meanwhile: change it with 1. The
+level and objects push the camera in, as the game's vehicle cameras are.
+
+- Free look: hold alt (`controls.free_look`). The player keeps the facing
+  and aim it had, and moves on that way; the mouse turns the camera alone,
+  all the way round, and the player's head turns to where it looks, over
+  the shoulder when it looks back. Let go, and the player turns to the
+  camera's way.
+- Zoomed in with a scope, the view is first person at once, and third
+  person again as it zooms out.
+- On foot only: in a vehicle its own cameras, dead the game's dead camera,
+  in a cutscene the cutscene's.
+
+Only the view and the first player's facing while free look is held
+change. Nothing new is sent between machines: in co-op, the player's facing
+is sent as it always is.
 
 In the menus, the mouse moves a pointer:
 
@@ -367,7 +393,7 @@ the setting for one start of the game. It has priority over the file.
 | `input.mouse_vertical_sensitivity` | `0.0` | `HALO_MOUSE_VERTICAL_SENSITIVITY` | The multiplier for the vertical mouse aim. `0`: the same as `input.mouse_sensitivity`. |
 | `input.invert_mouse` | `false` | `HALO_MOUSE_INVERT=1` sets `true` | `true`: the vertical mouse aim is inverted. |
 | `input.mouse_aim_assist` | `false` | `HALO_MOUSE_AIM_ASSIST` | `true`: the magnetism of the controller also operates for the mouse. `false`: when the mouse moved after the right stick, the view is not slowed or dragged by a target. The autoaim of the bullets operates in both cases. |
-| `controls.<action>` | (the table in "Controls") | `HALO_KEY_<ACTION>` | The keys and mouse buttons of an action, up to two, separated by a comma: `move_forward`, `move_backward`, `strafe_left`, `strafe_right`, `jump`, `crouch`, `fire`, `throw_grenade`, `melee`, `reload`, `zoom`, `switch_weapon`, `switch_grenade`, `action`, `flashlight`, `scoreboard`, `pause`, `screenshot`, `push_to_talk`. Keys by their names (`"W"`, `"Space"`, `"Left Ctrl"`, `"F1"`), and `"Mouse Left"`, `"Mouse Right"`, `"Mouse Middle"`, `"Mouse 4"`, `"Mouse 5"`, `"Wheel"` (either way), `"Wheel Up"`, `"Wheel Down"`. |
+| `controls.<action>` | (the table in "Controls") | `HALO_KEY_<ACTION>` | The keys and mouse buttons of an action, up to two, separated by a comma: `move_forward`, `move_backward`, `strafe_left`, `strafe_right`, `jump`, `crouch`, `fire`, `throw_grenade`, `melee`, `reload`, `zoom`, `switch_weapon`, `switch_grenade`, `action`, `flashlight`, `scoreboard`, `pause`, `screenshot`, `push_to_talk`, `third_person`, `free_look`. Keys by their names (`"W"`, `"Space"`, `"Left Ctrl"`, `"F1"`), and `"Mouse Left"`, `"Mouse Right"`, `"Mouse Middle"`, `"Mouse 4"`, `"Mouse 5"`, `"Wheel"` (either way), `"Wheel Up"`, `"Wheel Down"`. |
 | `game.console_log` | `"important"` | `HALO_CONSOLE_LOG` | What the console shows on the screen. `"important"`: bans, players that the host drops for cheating, the reasons that the game refuses a command, and the asserts that stop the game. `"all"`: all the lines. `"none"`: only the asserts that stop the game. The output of a command always shows. `debug.txt` gets all the lines. |
 | `game.language` | `""` | `HALO_LANGUAGE` | The language of the menus: `ja`, `de`, `fr`, `es` or `it`. Empty: English. |
 | `game.enhanced_animations` | `true` | `HALO_ENHANCED_ANIMATIONS` | `true`: the player bipeds' grenade throws keep their legs moving, blended by speed and direction (crouched throws stay crouched, throws in the air use the jump's legs), Warthog and Scorpion riders stay seated to throw and let go of the grips to throw and reload, and a player turns with the aim while throwing, as while meleeing. `false`: the original animations, which freeze the legs during a throw and stand a rider up. Only in config.toml, not in the menus. |
@@ -1138,6 +1164,7 @@ Other changes:
 | `cseries/errors.c` | `debug.txt` stays open between lines. |
 | `networking/`, `game/`, `interface/`, `bungie_net/network/` and the pools of objects, effects and sounds | The system link limits and the memory for them. |
 | `game/`, `objects/`, `units/`, `networking/` | The distributed netcode. Refer to `NETCODE.md`. |
+| `camera/director.c`, `game/players.c` | The third-person camera on foot in a campaign and co-op (`game/third_person.c`): the director chooses it over the first-person camera while it is on, and free look holds the first player's facing and aim. |
 | `cache/cache_files.c` | When a map's tags load and unload, the port finds the bitmaps that the high-res HUD replaces (`game/hud_hires_tags.c`), and adds the tags of the menus to the menus' map (`game/menu_tags.c`). |
 | `interface/ui_widget.c`, `interface/ui_widget_event_handler_functions.c`, `interface/ui_widget_game_data_input_functions.c` | The main menu is the PC version's from `port/assets/menus` (`display.menus`); the menus' widgets can call the port's functions (`game/menu_functions.c`) and send the PC version's custom activation event; the widgets' memory is 256 KB, not 16 KB; the main menu and Multiplayer clear co-op's controllers, so that a gamepad going back to controller 1 is not a controller unplugged; the lobby's split screen players leave alone, and one who quits in game is not joined to the next game (`interface/player_ui.c`). |
 | `interface/player_ui.c` | Fast setup opens the pregame screen through the port's menus (the lobby), as `interface/ui_widget.c` does. |

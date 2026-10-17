@@ -1949,7 +1949,7 @@ static boolean coop_player2_choose(short controller)
 bindings each */
 
 #define CONTROL_BINDINGS 2
-#define CONTROL_ROWS 7
+#define CONTROL_ROWS 8
 #define CONTROL_NAME_LENGTH 32
 
 static struct
@@ -1978,6 +1978,8 @@ static struct
 	{ "controls.pause", L"PAUSE MENU", 2 },
 	{ "controls.screenshot", L"SCREENSHOT", 2 },
 	{ "controls.push_to_talk", L"PUSH TO TALK", 2 },
+	{ "controls.third_person", L"THIRD PERSON", 2 },
+	{ "controls.free_look", L"FREE LOOK", 2 },
 };
 
 static struct

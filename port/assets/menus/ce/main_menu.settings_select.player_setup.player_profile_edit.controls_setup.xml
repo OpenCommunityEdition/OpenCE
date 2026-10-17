@@ -22,6 +22,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_5" x="54" y="223"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_6" x="54" y="253"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_7" x="54" y="283"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_8" x="54" y="313"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -86,6 +87,14 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_binding" x="356"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_7" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="controls begin binding"/>
+		<on event="start" run="controls begin binding"/>
+		<on event="left right" run="controls binding slot"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_binding" x="200"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_binding" x="356"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_8" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<on event="a" run="controls begin binding"/>
 		<on event="start" run="controls begin binding"/>
 		<on event="left right" run="controls binding slot"/>

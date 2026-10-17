@@ -140,6 +140,9 @@ symbols in this file:
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
+/* port: port/linux/game/third_person.c */
+boolean third_person_camera_wanted(short local_player_index);
+void third_person_camera_update(void *camera, void *controls, void *result);
 
 /* ---------- constants */
 
@@ -309,7 +312,9 @@ director_perspective director_get_perspective(
 		if (camera->camera_change_pause == 0.f)
 			camera->perspective = 0;
 	}
-	else if (camera->camera_proc == following_camera_update)
+	else if (camera->camera_proc == following_camera_update ||
+		/* port: the third-person camera on foot (third_person.c) */
+		camera->camera_proc == third_person_camera_update)
 	{
 		camera->perspective = 1;
 	}
@@ -619,9 +624,30 @@ static void director_choose_game_perspective(
 	short following;
 	long unit_index;
 	struct director *director = director_get(local_player_index);
+	boolean third_person; /* port: (third_person.c) */
 
 	unit_index = player_control_get_unit_index(local_player_index);
 	following = director_desired_perspective(unit_index, &perspective);
+	/* port: on foot, the third-person camera when it is on
+	(port/linux/game/third_person.c) */
+	third_person = !following && third_person_camera_wanted(local_player_index);
+	if (third_person &&
+		(force || director->camera_proc == (director_camera_update_proc)first_person_camera_update))
+	{
+		director_set_camera(local_player_index, (director_camera_update_proc)third_person_camera_update, FALSE);
+		director->seat_state = perspective;
+		return;
+	}
+	if (!third_person && director->camera_proc == (director_camera_update_proc)third_person_camera_update)
+	{
+		first_person_camera_new((struct first_person_camera *)director->camera_data);
+		director_set_camera(local_player_index, (director_camera_update_proc)first_person_camera_update, FALSE);
+		if (!following)
+		{
+			director->seat_state = perspective;
+			return;
+		}
+	}
 	if (force || director->seat_state != perspective)
 	{
 		if (following == TRUE)
