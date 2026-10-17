@@ -588,6 +588,15 @@ boolean network_objects_may_delete(
 		objects_client_has[absolute_index] != object_index;
 }
 
+/* whether a client is in distributed_client_delete: deleting an object on
+the host's word, or one of its own the host never told it of; a flag or
+ball among them, which the game itself never deletes (objects.c, weapons.c) */
+boolean network_objects_client_deleting(
+	void)
+{
+	return objects_client_deleting;
+}
+
 /* the map's objects placed (game.c): a client's own come from the upper
 half from now on */
 void network_objects_placed(
@@ -2113,6 +2122,11 @@ static void distributed_client_delete(
 		return;
 	if (TEST_FLAG(_object_mask_item, object->object.type))
 		distributed_client_release_item(object_index, TRUE);
+	/* (a flag or ball, which the game never deletes but a host may: a
+	release build's assertions do not stop it. Out of its carrier's hands
+	above, as any weapon; and the goal its game type shows at it goes too) */
+	if (object->object.type == _object_type_weapon && game_engine_running() && weapon_is_flag(object_index))
+		game_engine_objective_weapon_deleted(object_index);
 	if (TEST_FLAG(_object_mask_unit, object->object.type))
 	{
 		struct unit_datum *unit = unit_get(object_index);

@@ -482,7 +482,11 @@ its name alone beside it, has its name given back as the map lists find it.
      and delete theirs to match. A client that has loaded asks for all the
      host's objects and is told when it has them; from then on it deletes
      any such object the host has not told it of, and nothing but the
-     host's word deletes the host's.
+     host's word deletes the host's. That word deletes a CTF flag or an
+     oddball too, which the game itself never deletes (an assertion
+     stops a build that is not `--release` there, where a release host
+     goes on and tells its clients): the client takes it out of its
+     carrier's hands, and the goal its game type shows at it goes with it.
    - The objects placed when the map loads are placed alike everywhere:
      the host's word finds a client's already there. Past loading, a
      client's own objects (projectiles, effects: what only it sees) take
