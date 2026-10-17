@@ -105,6 +105,11 @@ const char *platform_custom_edition_root(void);
 out of an Xbox disc image into destination (sdl_platform.c), and quits if
 the player declines; nonzero once destination has one */
 BOOL platform_offer_game_data(const char *destination);
+/* asks the player, in a box of its own that waits for the answer (before
+the window opens, or between frames), with `count` buttons (3 at most: Android's),
+`default_index` Enter's and Escape's: the index of the one chosen, or -1
+when it cannot ask */
+int platform_ask(const char *title, const char *text, const char *const *labels, int count, int default_index);
 const char *platform_save_root(void);
 
 /* ---------- contiguous ("physical") memory

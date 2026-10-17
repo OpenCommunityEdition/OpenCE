@@ -23,6 +23,10 @@ would mean decompressing them, which the texture cache has no room for, so
 the renderer is told where Halo PC keeps the channels of each bitmap's
 pixels as they arrive, and samples them in this build's order
 (port/linux/src/xbox_textures.c).
+
+The bitmaps of mods (port/linux/game/mod_bitmaps.c) are Halo PC's too,
+whatever map they are played on: their channels are found in the same way
+in the loaded map's tags, once the mods' bitmaps are in them.
 */
 
 /* ---------- headers */
@@ -35,6 +39,7 @@ pixels as they arrive, and samples them in this build's order
 #include "rasterizer/rasterizer_swizzle.h"
 #include "shaders/shader_definitions.h"
 #include "interface/unit_hud_interface_definition.h"
+#include "cache/cache_files.h"
 #include "cache_file_formats.h"
 #include "custom_edition_cache.h"
 
@@ -88,6 +93,29 @@ enum
 };
 
 /* ---------- structures */
+
+/* a tag in the loaded map's table (cache_files.c's) */
+struct cache_file_tag_instance
+{
+	long group_tag;
+	long parent_group_tags[2];
+	long tag_index;
+	char *name;
+	void *base_address;
+	unsigned long unused[2];
+};
+
+typedef char verify_cache_file_tag_instance_size[
+	sizeof(struct cache_file_tag_instance) == 0x20 ? 1 : -1];
+
+/* the tags the bitmaps' users are found in: a tag cache
+custom_edition_cache_load filled (`loaded_bytes` of it in use), or with no
+tag cache the loaded map's, which the validator has checked */
+struct tag_view
+{
+	byte *tag_cache;
+	unsigned long loaded_bytes;
+};
 
 /* A model shader, to its reflection cube map: the bitmaps it draws with.
 rasterizer_xbox_models.c defines this build's shader_model for itself (no
@@ -177,7 +205,101 @@ struct custom_edition_bitmaps_globals
 
 static struct custom_edition_bitmaps_globals custom_edition_bitmaps_globals;
 
+/* ---------- prototypes */
+
+/* the game's (port: cache_files.c) */
+void *cache_files_tag_instances(long *count);
+boolean tag_index_is_group(long tag_index, long group_tag);
+
 /* ---------- private code */
+
+/* the definition of the next tag of group `group_tag` after the absolute
+index `*tag_index` (NONE: from the first), which becomes its index; NULL
+when there is none */
+static void *view_tag_next(
+	struct tag_view const *view,
+	unsigned long group_tag,
+	unsigned long definition_bytes,
+	int32_t *tag_index)
+{
+	struct cache_file_tag_instance *instances;
+	long count;
+	long index;
+
+	if (view->tag_cache)
+	{
+		return custom_edition_cache_tag_next(view->tag_cache, view->loaded_bytes, group_tag, definition_bytes, tag_index);
+	}
+	instances = cache_files_tag_instances(&count);
+	for (index = *tag_index < 0 ? 0 : *tag_index + 1; instances && index < count; index++)
+	{
+		struct cache_file_tag_instance const *instance = &instances[index];
+
+		if (instance->base_address &&
+			((unsigned long)instance->group_tag == group_tag ||
+				(unsigned long)instance->parent_group_tags[0] == group_tag ||
+				(unsigned long)instance->parent_group_tags[1] == group_tag))
+		{
+			*tag_index = (int32_t)index;
+			return instance->base_address;
+		}
+	}
+	*tag_index = (int32_t)count;
+
+	return NULL;
+}
+
+/* the definition of the tag `handle` names, or NULL unless it is one of
+group `group_tag` */
+static void *view_tag_get(
+	struct tag_view const *view,
+	long handle,
+	unsigned long group_tag,
+	unsigned long definition_bytes)
+{
+	if (view->tag_cache)
+	{
+		return custom_edition_cache_tag_get(view->tag_cache, view->loaded_bytes, (unsigned long)handle, group_tag,
+			definition_bytes);
+	}
+
+	return tag_index_is_group(handle, (long)group_tag) ? tag_get(group_tag, handle) : NULL;
+}
+
+/* element `element_index` of a block, or NULL */
+static void *view_block_element(
+	struct tag_view const *view,
+	struct tag_block const *block,
+	long element_index,
+	unsigned long element_bytes)
+{
+	if (view->tag_cache)
+	{
+		return custom_edition_cache_block_element(view->tag_cache, view->loaded_bytes, block, element_index,
+			element_bytes);
+	}
+
+	return element_index >= 0 && element_index < block->count && block->address ?
+		(byte *)block->address + element_index * element_bytes : NULL;
+}
+
+/* the name of the tag of absolute index `tag_index`, for messages */
+static char const *view_tag_name(
+	struct tag_view const *view,
+	long tag_index)
+{
+	struct cache_file_tag_instance *instances;
+	long count;
+
+	if (view->tag_cache)
+	{
+		return custom_edition_cache_tag_name(view->tag_cache, view->loaded_bytes, tag_index);
+	}
+	instances = cache_files_tag_instances(&count);
+
+	return instances && tag_index >= 0 && tag_index < count && instances[tag_index].name ?
+		instances[tag_index].name : "";
+}
 
 static boolean power_of_two(
 	long value)
@@ -220,7 +342,7 @@ the texture cache assume without checking: the game's own bitmap_verify, a
 format with a hardware texture, a compressed flag that says whether the
 format is compressed, power-of-two dimensions for the swizzle (or else a
 linear 2D bitmap), square cube maps, and every pixel its levels need. */
-static boolean custom_edition_bitmap_drawable(
+boolean custom_edition_bitmap_drawable(
 	struct bitmap_data *bitmap)
 {
 	boolean linear = TEST_FLAG(bitmap->flags, _bitmap_linear_bit);
@@ -309,16 +431,14 @@ names draws (its bitmaps, or its sprites'; all the tag's for NONE or a
 sequence it has not got) as drawn in `channel_order`, or as they are
 (NONE). FALSE when there is no memory for them. */
 static boolean reordered_bitmaps_mark(
-	byte *tag_cache,
-	unsigned long loaded_bytes,
+	struct tag_view const *view,
 	long handle,
 	short sequence_index,
 	short channel_order)
 {
-	struct bitmap_group *group = custom_edition_cache_tag_get(
-		tag_cache, loaded_bytes, (unsigned long)handle, BITMAP_GROUP_TAG, sizeof(struct bitmap_group));
+	struct bitmap_group *group = view_tag_get(view, handle, BITMAP_GROUP_TAG, sizeof(struct bitmap_group));
 	struct bitmap_group_sequence *sequence = group && sequence_index != NONE ?
-		custom_edition_cache_block_element(tag_cache, loaded_bytes, &group->sequences, sequence_index, sizeof(*sequence)) :
+		view_block_element(view, &group->sequences, sequence_index, sizeof(*sequence)) :
 		NULL;
 	boolean marked = TRUE;
 	long index;
@@ -336,8 +456,7 @@ static boolean reordered_bitmaps_mark(
 	{
 		for (index = 0; marked && index < sequence->sprites.count; index++)
 		{
-			struct bitmap_group_sprite *sprite = custom_edition_cache_block_element(
-				tag_cache, loaded_bytes, &sequence->sprites, index, sizeof(*sprite));
+			struct bitmap_group_sprite *sprite = view_block_element(view, &sequence->sprites, index, sizeof(*sprite));
 
 			if (!sprite)
 				break;
@@ -355,41 +474,37 @@ static boolean reordered_bitmaps_mark(
 
 /* the bitmaps a HUD meter draws, in Halo PC's meter order */
 static boolean meter_bitmaps_mark(
-	byte *tag_cache,
-	unsigned long loaded_bytes,
+	struct tag_view const *view,
 	struct meter_hud_element_definition const *meter)
 {
-	return reordered_bitmaps_mark(tag_cache, loaded_bytes, meter->meter_bitmap.index, meter->sequence_index,
+	return reordered_bitmaps_mark(view, meter->meter_bitmap.index, meter->sequence_index,
 		_custom_edition_channels_hud_meter);
 }
 
 /* the bitmaps a HUD static element draws as they are */
 static void static_bitmaps_mark(
-	byte *tag_cache,
-	unsigned long loaded_bytes,
+	struct tag_view const *view,
 	struct static_hud_element_definition const *element)
 {
-	reordered_bitmaps_mark(tag_cache, loaded_bytes, element->interface_bitmap.index, element->sequence_index, NONE);
+	reordered_bitmaps_mark(view, element->interface_bitmap.index, element->sequence_index, NONE);
 
 	return;
 }
 
 /* the bitmaps of the HUD meters of a unit HUD interface */
 static boolean unit_hud_meters_add(
-	byte *tag_cache,
-	unsigned long loaded_bytes,
+	struct tag_view const *view,
 	struct unit_hud_interface_definition *hud)
 {
 	boolean added =
-		meter_bitmaps_mark(tag_cache, loaded_bytes, &hud->shield_meter.meter) &&
-		meter_bitmaps_mark(tag_cache, loaded_bytes, &hud->health_meter.meter);
+		meter_bitmaps_mark(view, &hud->shield_meter.meter) &&
+		meter_bitmaps_mark(view, &hud->health_meter.meter);
 	long meter_index;
 
 	for (meter_index = 0; added && meter_index < hud->auxilary_meters.count; meter_index++)
 	{
-		struct auxilary_meter_definition *meter = custom_edition_cache_block_element(
-			tag_cache,
-			loaded_bytes,
+		struct auxilary_meter_definition *meter = view_block_element(
+			view,
 			&hud->auxilary_meters,
 			meter_index,
 			sizeof(*meter));
@@ -399,7 +514,7 @@ static boolean unit_hud_meters_add(
 		{
 			break;
 		}
-		added = meter_bitmaps_mark(tag_cache, loaded_bytes, &meter->panel.meter);
+		added = meter_bitmaps_mark(view, &meter->panel.meter);
 	}
 
 	return added;
@@ -407,22 +522,20 @@ static boolean unit_hud_meters_add(
 
 /* the bitmaps a unit HUD interface draws as they are */
 static void unit_hud_statics_note(
-	byte *tag_cache,
-	unsigned long loaded_bytes,
+	struct tag_view const *view,
 	struct unit_hud_interface_definition *hud)
 {
 	long element_index;
 
-	static_bitmaps_mark(tag_cache, loaded_bytes, &hud->background);
-	static_bitmaps_mark(tag_cache, loaded_bytes, &hud->shield_meter.background);
-	static_bitmaps_mark(tag_cache, loaded_bytes, &hud->health_meter.background);
-	static_bitmaps_mark(tag_cache, loaded_bytes, &hud->motion_sensor.background);
-	static_bitmaps_mark(tag_cache, loaded_bytes, &hud->motion_sensor.foreground);
+	static_bitmaps_mark(view, &hud->background);
+	static_bitmaps_mark(view, &hud->shield_meter.background);
+	static_bitmaps_mark(view, &hud->health_meter.background);
+	static_bitmaps_mark(view, &hud->motion_sensor.background);
+	static_bitmaps_mark(view, &hud->motion_sensor.foreground);
 	for (element_index = 0; element_index < hud->auxilary_panel.auxilary_overlays.count; element_index++)
 	{
-		struct auxilary_overlay_definition *overlay = custom_edition_cache_block_element(
-			tag_cache,
-			loaded_bytes,
+		struct auxilary_overlay_definition *overlay = view_block_element(
+			view,
 			&hud->auxilary_panel.auxilary_overlays,
 			element_index,
 			sizeof(*overlay));
@@ -431,13 +544,12 @@ static void unit_hud_statics_note(
 		{
 			break;
 		}
-		static_bitmaps_mark(tag_cache, loaded_bytes, &overlay->static_element);
+		static_bitmaps_mark(view, &overlay->static_element);
 	}
 	for (element_index = 0; element_index < hud->auxilary_meters.count; element_index++)
 	{
-		struct auxilary_meter_definition *meter = custom_edition_cache_block_element(
-			tag_cache,
-			loaded_bytes,
+		struct auxilary_meter_definition *meter = view_block_element(
+			view,
 			&hud->auxilary_meters,
 			element_index,
 			sizeof(*meter));
@@ -446,7 +558,7 @@ static void unit_hud_statics_note(
 		{
 			break;
 		}
-		static_bitmaps_mark(tag_cache, loaded_bytes, &meter->panel.background);
+		static_bitmaps_mark(view, &meter->panel.background);
 	}
 
 	return;
@@ -454,8 +566,7 @@ static void unit_hud_statics_note(
 
 /* the bitmaps of the HUD meters of a weapon HUD interface */
 static boolean weapon_hud_meters_add(
-	byte *tag_cache,
-	unsigned long loaded_bytes,
+	struct tag_view const *view,
 	struct weapon_hud_interface_elements *hud)
 {
 	boolean added = TRUE;
@@ -463,9 +574,8 @@ static boolean weapon_hud_meters_add(
 
 	for (meter_index = 0; added && meter_index < hud->meters.count; meter_index++)
 	{
-		struct weapon_hud_meter_element *meter = custom_edition_cache_block_element(
-			tag_cache,
-			loaded_bytes,
+		struct weapon_hud_meter_element *meter = view_block_element(
+			view,
 			&hud->meters,
 			meter_index,
 			sizeof(*meter));
@@ -474,7 +584,7 @@ static boolean weapon_hud_meters_add(
 		{
 			break;
 		}
-		added = meter_bitmaps_mark(tag_cache, loaded_bytes, &meter->meter_element);
+		added = meter_bitmaps_mark(view, &meter->meter_element);
 	}
 
 	return added;
@@ -482,17 +592,15 @@ static boolean weapon_hud_meters_add(
 
 /* the bitmaps a weapon HUD interface draws as they are */
 static void weapon_hud_statics_note(
-	byte *tag_cache,
-	unsigned long loaded_bytes,
+	struct tag_view const *view,
 	struct weapon_hud_interface_elements *hud)
 {
 	long static_index;
 
 	for (static_index = 0; static_index < hud->statics.count; static_index++)
 	{
-		struct weapon_hud_static_element *element = custom_edition_cache_block_element(
-			tag_cache,
-			loaded_bytes,
+		struct weapon_hud_static_element *element = view_block_element(
+			view,
 			&hud->statics,
 			static_index,
 			sizeof(*element));
@@ -501,10 +609,125 @@ static void weapon_hud_statics_note(
 		{
 			break;
 		}
-		static_bitmaps_mark(tag_cache, loaded_bytes, &element->static_element);
+		static_bitmaps_mark(view, &element->static_element);
 	}
 
 	return;
+}
+
+/* the bitmaps of the tags `view` reads whose channels Halo PC keeps
+elsewhere (custom_edition_reordered_bitmaps_find) */
+static boolean reordered_bitmaps_find(
+	struct tag_view const *view)
+{
+	struct custom_edition_bitmaps_globals *globals = &custom_edition_bitmaps_globals;
+	struct shader_model_maps *shader;
+	struct unit_hud_interface_definition *unit_hud;
+	struct weapon_hud_interface_elements *weapon_hud;
+	int32_t tag_index;
+	long multipurpose_count = 0;
+	long meter_count = 0;
+	long kept_count = 0;
+	long bitmap_index;
+
+	/* the bitmaps drawn in Halo PC's orders: model shaders' multipurpose
+	maps and HUD meters */
+	tag_index = NONE;
+	while ((shader = view_tag_next(view, SHADER_MODEL_GROUP_TAG, sizeof(*shader), &tag_index)) != NULL)
+	{
+		if (!reordered_bitmaps_mark(view, shader->multipurpose_map.index, NONE, _custom_edition_channels_multipurpose))
+		{
+			return FALSE;
+		}
+	}
+	tag_index = NONE;
+	while ((unit_hud = view_tag_next(view, UNIT_HUD_INTERFACE_DEFINITION_TAG, sizeof(*unit_hud), &tag_index)) != NULL)
+	{
+		if (!unit_hud_meters_add(view, unit_hud))
+		{
+			return FALSE;
+		}
+	}
+	tag_index = NONE;
+	while ((weapon_hud = view_tag_next(view, WEAPON_HUD_INTERFACE_GROUP_TAG, sizeof(*weapon_hud), &tag_index)) != NULL)
+	{
+		if (!weapon_hud_meters_add(view, weapon_hud))
+		{
+			return FALSE;
+		}
+	}
+
+	/* and those drawn as they are too: a model shader's other maps and a
+	HUD's static elements */
+	tag_index = NONE;
+	while ((shader = view_tag_next(view, SHADER_MODEL_GROUP_TAG, sizeof(*shader), &tag_index)) != NULL)
+	{
+		reordered_bitmaps_mark(view, shader->base_map.index, NONE, NONE);
+		reordered_bitmaps_mark(view, shader->detail_map.index, NONE, NONE);
+		reordered_bitmaps_mark(view, shader->reflection_cube_map.index, NONE, NONE);
+	}
+	tag_index = NONE;
+	while ((unit_hud = view_tag_next(view, UNIT_HUD_INTERFACE_DEFINITION_TAG, sizeof(*unit_hud), &tag_index)) != NULL)
+	{
+		unit_hud_statics_note(view, unit_hud);
+	}
+	tag_index = NONE;
+	while ((weapon_hud = view_tag_next(view, WEAPON_HUD_INTERFACE_GROUP_TAG, sizeof(*weapon_hud), &tag_index)) != NULL)
+	{
+		weapon_hud_statics_note(view, weapon_hud);
+	}
+
+	/* which keep their channels as they are */
+	bitmap_index = 0;
+	while (bitmap_index < globals->reordered_bitmap_count)
+	{
+		struct reordered_bitmap *bitmap = &globals->reordered_bitmaps[bitmap_index];
+
+		if (bitmap->drawn_otherwise)
+		{
+			error(
+				_error_silent,
+				"%s: bitmap %d of '%s' is drawn with Halo PC's %s channels and otherwise too, and keeps its channels as they are",
+				view->tag_cache ? "custom edition" : "mods",
+				bitmap->bitmap_index,
+				view_tag_name(view, DATUM_INDEX_TO_ABSOLUTE_INDEX(bitmap->handle)),
+				bitmap->channel_order == _custom_edition_channels_multipurpose ? "multipurpose map" : "HUD meter");
+			*bitmap = globals->reordered_bitmaps[--globals->reordered_bitmap_count];
+			kept_count++;
+		}
+		else
+		{
+			if (bitmap->channel_order == _custom_edition_channels_multipurpose)
+			{
+				multipurpose_count++;
+			}
+			else
+			{
+				meter_count++;
+			}
+			bitmap_index++;
+		}
+	}
+	if (view->tag_cache)
+	{
+		error(
+			_error_silent,
+			"custom edition: %ld multipurpose maps and %ld HUD meters are drawn with their channels in this build's order (%ld drawn otherwise too are not)",
+			multipurpose_count,
+			meter_count,
+			kept_count);
+	}
+	else
+	{
+		error(
+			_error_silent,
+			"mods: of the map's bitmaps, %ld are multipurpose maps and %ld HUD meters, a mod's drawn with its channels in this build's order (%ld drawn otherwise too are not)",
+			multipurpose_count,
+			meter_count,
+			kept_count);
+	}
+
+	return TRUE;
 }
 
 /* ---------- public code */
@@ -555,101 +778,36 @@ boolean custom_edition_reordered_bitmaps_find(
 	byte *tag_cache,
 	unsigned long loaded_bytes)
 {
+	struct tag_view view;
+
+	view.tag_cache = tag_cache;
+	view.loaded_bytes = loaded_bytes;
+
+	return reordered_bitmaps_find(&view);
+}
+
+boolean custom_edition_loaded_reordered_bitmaps_find(
+	void)
+{
 	struct custom_edition_bitmaps_globals *globals = &custom_edition_bitmaps_globals;
-	struct shader_model_maps *shader;
-	struct unit_hud_interface_definition *unit_hud;
-	struct weapon_hud_interface_elements *weapon_hud;
-	int32_t tag_index;
-	long multipurpose_count = 0;
-	long meter_count = 0;
-	long kept_count = 0;
-	long bitmap_index;
+	struct tag_view view;
 
-	/* the bitmaps drawn in Halo PC's orders: model shaders' multipurpose
-	maps and HUD meters */
-	tag_index = NONE;
-	while ((shader = custom_edition_cache_tag_next(tag_cache, loaded_bytes, SHADER_MODEL_GROUP_TAG, sizeof(*shader), &tag_index)) != NULL)
-	{
-		if (!reordered_bitmaps_mark(tag_cache, loaded_bytes, shader->multipurpose_map.index, NONE, _custom_edition_channels_multipurpose))
-		{
-			return FALSE;
-		}
-	}
-	tag_index = NONE;
-	while ((unit_hud = custom_edition_cache_tag_next(tag_cache, loaded_bytes, UNIT_HUD_INTERFACE_DEFINITION_TAG, sizeof(*unit_hud), &tag_index)) != NULL)
-	{
-		if (!unit_hud_meters_add(tag_cache, loaded_bytes, unit_hud))
-		{
-			return FALSE;
-		}
-	}
-	tag_index = NONE;
-	while ((weapon_hud = custom_edition_cache_tag_next(tag_cache, loaded_bytes, WEAPON_HUD_INTERFACE_GROUP_TAG, sizeof(*weapon_hud), &tag_index)) != NULL)
-	{
-		if (!weapon_hud_meters_add(tag_cache, loaded_bytes, weapon_hud))
-		{
-			return FALSE;
-		}
-	}
+	/* (found again: the tags may have changed) */
+	globals->reordered_bitmap_count = 0;
+	view.tag_cache = NULL;
+	view.loaded_bytes = 0;
 
-	/* and those drawn as they are too: a model shader's other maps and a
-	HUD's static elements */
-	tag_index = NONE;
-	while ((shader = custom_edition_cache_tag_next(tag_cache, loaded_bytes, SHADER_MODEL_GROUP_TAG, sizeof(*shader), &tag_index)) != NULL)
-	{
-		reordered_bitmaps_mark(tag_cache, loaded_bytes, shader->base_map.index, NONE, NONE);
-		reordered_bitmaps_mark(tag_cache, loaded_bytes, shader->detail_map.index, NONE, NONE);
-		reordered_bitmaps_mark(tag_cache, loaded_bytes, shader->reflection_cube_map.index, NONE, NONE);
-	}
-	tag_index = NONE;
-	while ((unit_hud = custom_edition_cache_tag_next(tag_cache, loaded_bytes, UNIT_HUD_INTERFACE_DEFINITION_TAG, sizeof(*unit_hud), &tag_index)) != NULL)
-	{
-		unit_hud_statics_note(tag_cache, loaded_bytes, unit_hud);
-	}
-	tag_index = NONE;
-	while ((weapon_hud = custom_edition_cache_tag_next(tag_cache, loaded_bytes, WEAPON_HUD_INTERFACE_GROUP_TAG, sizeof(*weapon_hud), &tag_index)) != NULL)
-	{
-		weapon_hud_statics_note(tag_cache, loaded_bytes, weapon_hud);
-	}
+	return reordered_bitmaps_find(&view);
+}
 
-	/* which keep their channels as they are */
-	bitmap_index = 0;
-	while (bitmap_index < globals->reordered_bitmap_count)
-	{
-		struct reordered_bitmap *bitmap = &globals->reordered_bitmaps[bitmap_index];
+short custom_edition_bitmap_channel_order(
+	long handle,
+	long bitmap_index)
+{
+	long index = reordered_bitmap_index(handle, bitmap_index);
 
-		if (bitmap->drawn_otherwise)
-		{
-			error(
-				_error_silent,
-				"custom edition: bitmap %d of '%s' is drawn with Halo PC's %s channels and otherwise too, and keeps its channels as they are",
-				bitmap->bitmap_index,
-				custom_edition_cache_tag_name(tag_cache, loaded_bytes, DATUM_INDEX_TO_ABSOLUTE_INDEX(bitmap->handle)),
-				bitmap->channel_order == _custom_edition_channels_multipurpose ? "multipurpose map" : "HUD meter");
-			*bitmap = globals->reordered_bitmaps[--globals->reordered_bitmap_count];
-			kept_count++;
-		}
-		else
-		{
-			if (bitmap->channel_order == _custom_edition_channels_multipurpose)
-			{
-				multipurpose_count++;
-			}
-			else
-			{
-				meter_count++;
-			}
-			bitmap_index++;
-		}
-	}
-	error(
-		_error_silent,
-		"custom edition: %ld multipurpose maps and %ld HUD meters are drawn with their channels in this build's order (%ld drawn otherwise too are not)",
-		multipurpose_count,
-		meter_count,
-		kept_count);
-
-	return TRUE;
+	return index != NONE ? custom_edition_bitmaps_globals.reordered_bitmaps[index].channel_order :
+		_custom_edition_channels_xbox;
 }
 
 void custom_edition_bitmaps_dispose(

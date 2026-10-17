@@ -603,15 +603,15 @@ void scenario_tags_unload(
 		hud_hires_tags_unloaded();
 	}
 	sound_cache_close();
-	/* port: the sounds of tag files go, after the sound cache that held them
-	(port/linux/game/loose_sounds.c) */
-	{
-		extern void loose_sounds_tags_unloaded(void);
-
-		loose_sounds_tags_unloaded();
-	}
 	texture_cache_close();
-	/* MCC's appended pause table unwinds before the native menu table. */
+	/* port: the mods' tags go, after the sound and texture caches that held
+	their sounds and bitmaps (port/linux/game/mods.c) */
+	{
+		extern void mods_tags_unloaded(void);
+
+		mods_tags_unloaded();
+	}
+	/* port: MCC's appended pause table unwinds before the native menu table. */
 	{
 		extern void mcc_pause_runtime_unload(void);
 		mcc_pause_runtime_unload();
@@ -1218,7 +1218,7 @@ long scenario_tags_load(
 		if (cache_file_globals.tag_header)
 		{
 			extern void menu_tags_loaded(char const *map_name);
-			extern void loose_sounds_tags_loaded(void);
+			extern void mods_tags_loaded(char const *map_name);
 			global_tag_instances = cache_file_globals.tag_header->tag_instances;
 			global_tag_count = cache_file_globals.tag_header->tag_count;
 			cache_file_globals.tags_loaded = TRUE;
@@ -1231,7 +1231,8 @@ long scenario_tags_load(
 					return NONE;
 				}
 			}
-			loose_sounds_tags_loaded();
+			/* port: clear prior mods; MCC resources remain authored. */
+			mods_tags_loaded(scenario_name);
 			result = cache_file_globals.tag_header->scenario_tag_index;
 		}
 		else
@@ -1262,11 +1263,11 @@ long scenario_tags_load(
 
 				menu_tags_loaded(cache_file_globals.header.name);
 			}
-			/* (and the sounds of tag files, as below) */
+			/* (and the mods' tags, as below) */
 			{
-				extern void loose_sounds_tags_loaded(void);
+				extern void mods_tags_loaded(char const *map_name);
 
-				loose_sounds_tags_loaded();
+				mods_tags_loaded(stripped_scenario_name);
 			}
 			result = cache_file_globals.tag_header->scenario_tag_index;
 		}
@@ -1370,12 +1371,14 @@ long scenario_tags_load(
 
 				hud_hires_tags_loaded();
 			}
-			/* port: the sounds of tag files played over the map's
-			(audio.loose_sounds: port/linux/game/loose_sounds.c) */
+			/* port: the mods' sounds, bitmaps, text and models played over
+			the map's, last, over the menus' tags too, and with the high-res
+			HUD standing for the map's bitmaps, not a mod's (the main menu's
+			Mods: port/linux/game/mods.c) */
 			{
-				extern void loose_sounds_tags_loaded(void);
+				extern void mods_tags_loaded(char const *map_name);
 
-				loose_sounds_tags_loaded();
+				mods_tags_loaded(stripped_scenario_name);
 			}
 			result = cache_file_globals.tag_header->scenario_tag_index;
 		}

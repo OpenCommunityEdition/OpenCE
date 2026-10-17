@@ -138,6 +138,7 @@ symbols in this file:
 #include "rasterizer/rasterizer_model_types.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "render/render.h"
+#include "view_fov.h" /* port: port/linux/game/view_fov.c */
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
 #include <stddef.h>
@@ -1325,7 +1326,14 @@ void _rasterizer_environment_fog_screen_begin(
 		{
 			boolean success;
 			boolean clear_z_buffer;
+			boolean stick_to_drawn_surface;
 			real vsh_constants__texscale[VSH_CONSTANTS__TEXSCALE_COUNT][4];
+
+			/* port: at the stock field of view the redrawn canopy lands on the
+			canopy. At any other angle, less or equal still accepts that
+			redraw where it has slid onto the sky */
+			stick_to_drawn_surface =
+				render_fov_reticle_scale(render.local_player_index) != 1.0f;
 
 			if (pass == 0)
 			{
@@ -1349,6 +1357,8 @@ void _rasterizer_environment_fog_screen_begin(
 			{
 				clear_z_buffer = FALSE;
 			}
+			if (stick_to_drawn_surface)
+				clear_z_buffer = FALSE;
 
 			success = IDirect3DDevice8_Clear(
 				global_d3d_device,
@@ -1365,7 +1375,7 @@ void _rasterizer_environment_fog_screen_begin(
 			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHATESTENABLE, FALSE);
 			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZENABLE, TRUE);
 			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZFUNC,
-				pass != 0 ? D3DCMP_EQUAL : D3DCMP_LESSEQUAL);
+				pass != 0 || stick_to_drawn_surface ? D3DCMP_EQUAL : D3DCMP_LESSEQUAL);
 			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZWRITEENABLE, pass == 0);
 			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZBIAS, 0);
 
