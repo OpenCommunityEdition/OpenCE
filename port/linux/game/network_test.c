@@ -61,6 +61,7 @@ Called from the main loop every frame (main.c).
 #include "camera/observer.h"
 
 #include "../src/p2p.h" /* port: port/linux/src/p2p.c, p2p_lobby.c */
+#include "network_chat.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -116,6 +117,9 @@ static struct
 	real vehicle_time;
 	real pickup_time;
 	char pickup_weapon[64];
+	/* debug.network_test_chat's, and the lines said this game */
+	real chat_time;
+	short chat_lines_said;
 	long score_to_win;
 	long logged_time;
 	boolean public_game;
@@ -183,6 +187,7 @@ static void network_test_read_settings(
 	network_test.shoot_interval = (real)config_real("debug.network_test_shoot");
 	network_test.vehicle_time = (real)config_real("debug.network_test_vehicle");
 	network_test.pickup_time = (real)config_real("debug.network_test_pickup");
+	network_test.chat_time = (real)config_real("debug.network_test_chat");
 	snprintf(network_test.pickup_weapon, sizeof(network_test.pickup_weapon), "%s",
 		config_string("debug.network_test_pickup_weapon"));
 	network_test.score_to_win = (long)config_integer("debug.network_test_score");
@@ -795,6 +800,29 @@ void network_test_update(
 					game_time_get() < pickup_time + 4 * TICKS_PER_SECOND;
 
 				test_input_hold_action(hold);
+			}
+		}
+		/* debug.network_test_chat: each machine's player says a line to
+		everyone that many seconds in, and one to the team two seconds on */
+		if (network_test.chat_time > 0.0f)
+		{
+			long chat_time = (long)(network_test.chat_time * TICKS_PER_SECOND);
+			char const *machine = network_test.mode == _network_test_host ? "the host" : "a client";
+			char text[64];
+
+			if (game_time_get() < chat_time)
+				network_test.chat_lines_said = 0;
+			if (network_test.chat_lines_said == 0 && game_time_get() >= chat_time)
+			{
+				snprintf(text, sizeof(text), "hello everyone from %s", machine);
+				network_chat_say(FALSE, text);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 1 && game_time_get() >= chat_time + 2 * TICKS_PER_SECOND)
+			{
+				snprintf(text, sizeof(text), "hello team from %s", machine);
+				network_chat_say(TRUE, text);
+				network_test.chat_lines_said++;
 			}
 		}
 		if (network_test.mode == _network_test_host && network_test.vehicle_time > 0.0f)

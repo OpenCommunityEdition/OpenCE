@@ -280,6 +280,19 @@ as it changes), for the scoreboard, whose right click frees the mouse to
 pick a player; the host's own scoreboard adds Kick and Ban. Builds without
 votes drop both kinds as unknown, so the network version is unchanged.
 
+The text chat (`network_chat.c`): a client sends its player's line to the
+host (`_distributed_message_chat_up`, reliably), which takes it only from
+the client's own stream and from one of that machine's players, at most 5
+lines at once and one each 1.5 seconds after (more are dropped), its text
+cut to 63 characters of printable ASCII. The host alone sends the line on
+(`_distributed_message_chat_down`, reliably, with the sender's absolute
+index): to every client, or a team's line only to the machines with a
+player of the sender's team (to every one in a game without teams), and
+shows it itself if one of its own players hears it. A client shows only
+the host's lines, its own too, so every machine shows them in one order.
+Builds without the chat drop both kinds as unknown, so the network version
+is unchanged.
+
 Voice chat (`network_voice.c`, the sound in `port/linux/src/voice_audio.c`)
 travels as distributed messages too, but in the lobby as well as in a game:
 `network_voice_handles_message` takes them before the netcode's checks that
@@ -732,7 +745,10 @@ two machines' views of one game can be compared. `debug.network_test_kill`,
 `debug.network_test_shoot`, `debug.network_test_vehicle` and
 `debug.network_test_pickup` script kills, hits, a vehicle ride and a weapon
 swap the bots' wandering does not reach (`debug.network_test_pickup_weapon`
-picks the weapon: the first whose tag name has it in it, as "sniper"), and `debug.network_test_score`
+picks the weapon: the first whose tag name has it in it, as "sniper"),
+`debug.network_test_chat` has each machine's player say a chat line to
+everyone and one to the team, which every machine's `debug.txt` records as
+it shows them, and `debug.network_test_score`
 shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's
 button on the scores does). `debug.network_test_public` lists the host's
