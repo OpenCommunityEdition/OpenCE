@@ -86,6 +86,8 @@ symbols in this file:
 /* port: model tags and static enclosure recognition at map initialization. */
 #include "cache/cache_files.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
+/* port: optional full detail, preserving authored interior-only geometry. */
+#include "render_lod.h" /* port: port/linux/game/render_lod.c */
 
 /* ---------- constants */
 
@@ -239,6 +241,8 @@ static void render_model_parts(
 	struct render_skinning const *skinning,
 	long object_index,
 	short geometry_detail_level_index,
+	boolean full_detail,
+	boolean inside_model,
 	short forced_shader_permutation_index,
 	long flags);
 static void model_geometry_part_build_tangent_matrices(
@@ -273,6 +277,8 @@ static void render_model_parts(
 	struct render_skinning const *skinning,
 	long object_index,
 	short geometry_detail_level_index,
+	boolean full_detail,
+	boolean inside_model,
 	short forced_shader_permutation_index,
 	long flags)
 {
@@ -302,6 +308,7 @@ static void render_model_parts(
 			{
 				struct model_region_permutation *permutation;
 				short geometry_index;
+				short permutation_detail_level;
 
 				/* port: a permutation the region has, and a geometry the model
 				has (a map's indices); a bad one draws nothing */
@@ -314,7 +321,12 @@ static void render_model_parts(
 					&region->permutations,
 					permutation_index,
 					struct model_region_permutation);
-				geometry_index = permutation->geometry_indices[geometry_detail_level_index];
+				/* port: full detail uses each permutation's highest present LOD. */
+				permutation_detail_level = render_lod_permutation_level(model, permutation,
+					geometry_detail_level_index, full_detail, inside_model);
+				if (permutation_detail_level == NONE)
+					continue;
+				geometry_index = permutation->geometry_indices[permutation_detail_level];
 				if (geometry_index!=NONE && !VALID_INDEX(geometry_index, model->geometries.count))
 				{
 					model_data_error(model, "geometry");
@@ -973,6 +985,9 @@ void render_model(
 	unsigned long flags)
 {
 	struct model *model = model_definition_get(model_index);
+	/* port: retain real projected size for effects and debug bounds. */
+	boolean full_detail = render_lod_disabled() &&
+		rasterizer_debug_options.debug_model_lod == NONE;
 
 	profile_enter(render_model_section);
 
@@ -988,7 +1003,7 @@ void render_model(
 		rasterizer_model_cortana_hack = FALSE;
 	}
 
-	if (level_of_detail_pixels>=model->detail_cutoff_pixels[0] || TEST_FLAG(flags, _render_model_shadow_bit))
+	if (full_detail || level_of_detail_pixels>=model->detail_cutoff_pixels[0] || TEST_FLAG(flags, _render_model_shadow_bit))
 	{
 		real_matrix4x3 relative_node_matrices[MAXIMUM_NODES_PER_MODEL];
 		struct rasterizer_model_begin_parameters model_parameters;
@@ -1001,6 +1016,8 @@ void render_model(
 			MAXIMUM_REGIONS_PER_MODEL;
 		/* port: no more nodes than relative_node_matrices holds (a map's count) */
 		short node_count = (short)MIN(model->nodes.count, MAXIMUM_NODES_PER_MODEL);
+		/* port: the viewer and the object's world-space bounds, also for shadows. */
+		boolean inside_model;
 
 		if (!region_permutation_indices)
 		{
@@ -1022,6 +1039,8 @@ void render_model(
 		{
 			centroid = &node_matrices->position;
 		}
+		inside_model = full_detail && render_lod_inside_model(model,
+			&render.camera.position, centroid, radius);
 
 		if (node_matrices)
 		{
@@ -1043,16 +1062,9 @@ void render_model(
 			}
 		}
 
-		geometry_detail_level_index = NUMBER_OF_DETAIL_LEVELS_PER_MODEL-1;
-		while (geometry_detail_level_index>0 &&
-			level_of_detail_pixels<model->detail_cutoff_pixels[geometry_detail_level_index])
-		{
-			geometry_detail_level_index--;
-		}
-		if (rasterizer_debug_options.debug_model_lod!=NONE)
-		{
-			geometry_detail_level_index = PIN(rasterizer_debug_options.debug_model_lod, 0, NUMBER_OF_DETAIL_LEVELS_PER_MODEL-1);
-		}
+		/* port: preserve authored selection unless full detail is requested. */
+		geometry_detail_level_index = render_lod_geometry_level(model,
+			level_of_detail_pixels, rasterizer_debug_options.debug_model_lod, full_detail);
 		match_assert(
 			"c:\\halo\\SOURCE\\models\\models.c",
 			169,
@@ -1114,7 +1126,7 @@ void render_model(
 
 			if (render_model_vertex_counts || render_model_index_counts)
 			{
-				short maximum_actual_detail_level_index = geometry_detail_level_index;
+				short maximum_actual_detail_level_index = full_detail ? 0 : geometry_detail_level_index;
 				boolean has_unstripped_parts = FALSE;
 				short vertex_count = 0;
 				short index_count = 0;
@@ -1136,13 +1148,18 @@ void render_model(
 							struct model_region_permutation);
 						short actual_detail_level_index;
 						short geometry_index;
+						/* port: count the same geometry that the draw path selects. */
+						short permutation_detail_level = render_lod_permutation_level(model, permutation,
+							geometry_detail_level_index, full_detail, inside_model);
+						if (permutation_detail_level == NONE)
+							continue;
 
-						for (actual_detail_level_index = geometry_detail_level_index+1;
+						for (actual_detail_level_index = permutation_detail_level+1;
 							actual_detail_level_index<NUMBER_OF_DETAIL_LEVELS_PER_MODEL;
 							actual_detail_level_index++)
 						{
 							if (permutation->geometry_indices[actual_detail_level_index]!=
-								permutation->geometry_indices[geometry_detail_level_index])
+								permutation->geometry_indices[permutation_detail_level])
 							{
 								break;
 							}
@@ -1155,7 +1172,7 @@ void render_model(
 							(actual_detail_level_index >= 0) && (actual_detail_level_index < NUMBER_OF_DETAIL_LEVELS_PER_MODEL));
 						maximum_actual_detail_level_index = MAX(maximum_actual_detail_level_index, actual_detail_level_index);
 
-						geometry_index = permutation->geometry_indices[geometry_detail_level_index];
+						geometry_index = permutation->geometry_indices[permutation_detail_level];
 						if (VALID_INDEX(geometry_index, model->geometries.count))
 						{
 							struct model_geometry *geometry = TAG_BLOCK_GET_ELEMENT(&model->geometries, geometry_index, struct model_geometry);
@@ -1265,6 +1282,8 @@ void render_model(
 			&model_parameters.skinning,
 			unique_identifier,
 			geometry_detail_level_index,
+			full_detail,
+			inside_model,
 			forced_shader_permutation_index,
 			flags);
 		if (TEST_FLAG(flags, _render_model_shadow_bit))
