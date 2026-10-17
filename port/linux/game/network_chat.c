@@ -594,8 +594,47 @@ static void chat_text_color(
 	result->blue = 0.87f;
 }
 
+/* a string's soft shadow, down and right of it: copies in a translucent
+black about its offset, which add up to a dark middle with a soft edge (the
+text's own shadow, a hard copy a unit down and right, is not drawn) */
+static void chat_draw_shadow(
+	long font_index,
+	rectangle2d const *bounds,
+	wchar_t const *string,
+	real alpha)
+{
+	static struct
+	{
+		short x;
+		short y;
+		real alpha;
+	} const copies[] =
+	{
+		{ 1, 1, 0.45f },
+		{ 2, 2, 0.35f },
+		{ 2, 1, 0.25f },
+		{ 1, 2, 0.25f },
+		{ 3, 2, 0.12f },
+		{ 2, 3, 0.12f },
+		{ 3, 3, 0.10f },
+	};
+	short index;
+
+	for (index = 0; index < (short)NUMBEROF(copies); index++)
+	{
+		real_argb_color color;
+		rectangle2d shadow_bounds = *bounds;
+
+		color.alpha = copies[index].alpha * alpha;
+		color.red = color.green = color.blue = 0.0f;
+		offset_rectangle2d(&shadow_bounds, copies[index].x, copies[index].y);
+		draw_string_set_draw_mode(font_index, NONE, 0 /* left */, 0, &color);
+		rasterizer_draw_unicode_string(&shadow_bounds, NULL, NULL, 0, string);
+	}
+}
+
 /* a line: the name (or prompt) in its colour, then the text in the pale
-blue; bounds' top and bottom the line's */
+blue, over their shadows; bounds' top and bottom the line's */
 static void chat_draw_line(
 	long font_index,
 	rectangle2d const *bounds,
@@ -612,16 +651,23 @@ static void chat_draw_line(
 	short index;
 
 	draw_string_set_draw_mode(font_index, NONE, 0 /* left */, 0, name_color);
-	rasterizer_draw_unicode_string(bounds, NULL, NULL, 0, name);
 	draw_unicode_string_compute_bounds(bounds, name, &name_bounds, &cursor_bounds);
 	for (index = 0; text[index] && index < CHAT_TEXT_SIZE + 1; index++)
 		wide[index] = (wchar_t)(unsigned char)text[index];
 	wide[index] = 0;
 	/* (a space's width after the colon) */
 	text_bounds.x0 = (short)(name_bounds.x1 + (bounds->y1 - bounds->y0) / 4);
+	/* (the text's own shadow drawn clear: a colour of no alpha that is not
+	0, which would be the text's black) */
+	rasterizer_text_set_shadow_color(0x00000001);
+	chat_draw_shadow(font_index, bounds, name, alpha);
+	chat_draw_shadow(font_index, &text_bounds, wide, alpha);
+	draw_string_set_draw_mode(font_index, NONE, 0 /* left */, 0, name_color);
+	rasterizer_draw_unicode_string(bounds, NULL, NULL, 0, name);
 	chat_text_color(alpha, &color);
 	draw_string_set_draw_mode(font_index, NONE, 0 /* left */, 0, &color);
 	rasterizer_draw_unicode_string(&text_bounds, NULL, NULL, 0, wide);
+	rasterizer_text_set_shadow_color(0);
 }
 
 /* a line's name as drawn: "Name:", or "Name (team):" */
