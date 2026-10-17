@@ -128,6 +128,16 @@ int main(int argc,char **argv) {
         memset(&thread,0,sizeof(thread));memset(&other_thread,0,sizeof(other_thread));
         frame=(void *)(thread.stack_data+32);thread.stack=frame;frame->expression_index=0x10002;
         other_thread.sleep_until=123;nodes[4].data=1;
+        if(!strcmp(argv[1],"sleep_lists")) {
+            struct hs_stack_frame *pending=(void *)(other_thread.stack_data+32);
+            struct mcc_hs_arguments *arguments=(void *)pending->data;
+            CHECK(mcc_parameters_prepare(&runtime,scenario,hs_syntax_data));
+            pending->previous=(void *)other_thread.stack_data;
+            pending->expression_index=0x10002;pending->size=(short)mcc_hs_arguments_size(1);
+            other_thread.stack=pending;arguments->magic=MCC_HS_ARGUMENT_MAGIC;
+            arguments->script=0;arguments->count=1;arguments->references=1;arguments->values[0]=42;refs=1;
+        }
+        if(!strcmp(argv[1],"sleep_disabled"))disabled=1;
         if(!named)nodes[3].next_node_index=NONE;
         if(!strcmp(argv[1],"sleep_missing"))nodes[4].data=9;
         if(!strcmp(argv[1],"sleep_finished"))other_thread.sleep_until=NONE;
@@ -137,13 +147,15 @@ int main(int argc,char **argv) {
             saved=thread;memset(&thread,0,sizeof(thread));thread=saved;
             frame->size=0;mcc_sleep_forever_evaluate(0,0,FALSE);
             if(!strcmp(argv[1],"sleep_missing"))CHECK(other_thread.sleep_until==123);
-            else if(!strcmp(argv[1],"sleep_finished"))CHECK(other_thread.sleep_until==NONE);
+            else if(disabled)CHECK(other_thread.sleep_until==123);
             else {
-                CHECK(other_thread.sleep_until==NONE-1 && other_thread.previous_sleep_until==123);
-                CHECK(TEST_FLAG(other_thread.flags,_hs_thread_sleeping_bit));
+                CHECK(other_thread.sleep_until==NONE-1 && other_thread.previous_sleep_until==0);
+                CHECK(!other_thread.flags && other_thread.stack==(void *)other_thread.stack_data);
+                CHECK(!other_thread.stack->previous && !other_thread.stack->size && other_thread.stack->expression_index==NONE);
                 frame->size=0;mcc_sleep_forever_evaluate(0,0,TRUE);
                 frame->size=0;mcc_sleep_forever_evaluate(0,0,FALSE);
-                CHECK(other_thread.previous_sleep_until==123);
+                CHECK(other_thread.previous_sleep_until==0 && other_thread.sleep_until==NONE-1);
+                CHECK(!refs);
             }
             CHECK(thread.sleep_until==0);
         } else CHECK(thread.sleep_until==NONE-1 && !thread.flags);

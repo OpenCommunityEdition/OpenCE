@@ -25,6 +25,8 @@
 #include "scenario/scenario_definitions.h"
 #include "units/units.h"
 #include "network_distributed.h"
+#include "network_coop.h"
+#include "effects/player_effects.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -54,6 +56,9 @@ static real mcc_original_ambient_base,mcc_original_ambient_scale;
 static boolean mcc_original_loud_dialog,mcc_original_ignore_player;
 static boolean *mcc_ignore_player;
 static boolean mcc_campaign_owned;
+static boolean *mcc_screen_flashes;
+static boolean mcc_original_screen_flashes;
+enum { MCC_CAMPAIGN_FLASHES_DISABLED = 1u << 11 };
 extern real sound_gain_under_dialog;
 extern real object_light_ambient_base,object_light_ambient_scale;
 extern boolean loud_dialog_hack;
@@ -66,7 +71,8 @@ boolean mcc_campaign_global_settable(short index)
     name=hs_global_external_get(index)->name;
     return mcc_script_effect_global(name) || !csstrcasecmp(name,"sound_gain_under_dialog") || !csstrcasecmp(name,"cheat_infinite_ammo") ||
         !csstrcasecmp(name,"object_light_ambient_base") || !csstrcasecmp(name,"object_light_ambient_scale") ||
-        !csstrcasecmp(name,"loud_dialog_hack") || !csstrcasecmp(name,"ai_debug_ignore_player");
+        !csstrcasecmp(name,"loud_dialog_hack") || !csstrcasecmp(name,"ai_debug_ignore_player") ||
+        !csstrcasecmp(name,"rasterizer_screen_flashes");
 }
 
 static int mcc_campaign_real(real value) { return value>=-1000000.0f && value<=1000000.0f; }
@@ -86,6 +92,11 @@ void mcc_campaign_begin(void)
             (index&0x7fff)<hs_external_global_count ?
             hs_global_external_get(index&0x7fff) : NULL;
         mcc_ignore_player=global && global->type==_hs_type_boolean ? global->address : NULL;
+        index=hs_find_global_by_name("rasterizer_screen_flashes");
+        global=index!=NONE && ((unsigned short)index&0x8000) && (index&0x7fff)<hs_external_global_count ?
+            hs_global_external_get(index&0x7fff) : NULL;
+        mcc_screen_flashes=global && global->type==_hs_type_boolean ? global->address : NULL;
+        mcc_original_screen_flashes=mcc_screen_flashes ? *mcc_screen_flashes : TRUE;
         mcc_original_gravity=global_gravity;mcc_original_dialog_gain=sound_gain_under_dialog;mcc_campaign_owned=TRUE;
         mcc_original_infinite_ammo=cheat.infinite_ammo;
         mcc_original_ambient_base=object_light_ambient_base;mcc_original_ambient_scale=object_light_ambient_scale;
@@ -93,7 +104,7 @@ void mcc_campaign_begin(void)
         mcc_original_ignore_player=mcc_ignore_player ? *mcc_ignore_player : FALSE;
     }
     memset(&mcc_campaign,0,sizeof(mcc_campaign));
-    mcc_campaign.version=3; mcc_campaign.gravity=1.0f;
+    mcc_campaign.version=4; mcc_campaign.gravity=1.0f;
     mcc_campaign.effects_gain=1.0f;
     mcc_campaign.dialog_gain=mcc_original_dialog_gain;
     global_gravity=mcc_original_gravity;
@@ -103,6 +114,7 @@ void mcc_campaign_begin(void)
     object_light_ambient_scale=mcc_campaign.ambient_scale=mcc_original_ambient_scale;
     loud_dialog_hack=mcc_original_loud_dialog;
     if (mcc_ignore_player) *mcc_ignore_player=mcc_original_ignore_player;
+    if (mcc_screen_flashes) *mcc_screen_flashes=mcc_original_screen_flashes;
 }
 
 void mcc_campaign_dispose(void)
@@ -115,9 +127,11 @@ void mcc_campaign_dispose(void)
         object_light_ambient_base=mcc_original_ambient_base;object_light_ambient_scale=mcc_original_ambient_scale;
         loud_dialog_hack=mcc_original_loud_dialog;
         if (mcc_ignore_player) *mcc_ignore_player=mcc_original_ignore_player;
+        if (mcc_screen_flashes) *mcc_screen_flashes=mcc_original_screen_flashes;
     }
     mcc_campaign_owned=FALSE;
     mcc_ignore_player=NULL;
+    mcc_screen_flashes=NULL;
     memset(&mcc_campaign,0,sizeof(mcc_campaign));
 }
 
@@ -127,7 +141,8 @@ void mcc_campaign_snapshot(void *out)
     if (game_connection()!=_game_connection_network_client)
         mcc_campaign.flags=(mcc_campaign.flags&8u) | (cheat.infinite_ammo ? 1u : 0u) | (loud_dialog_hack ? 2u : 0u) |
             (mcc_ignore_player && *mcc_ignore_player ? 4u : 0u) |
-            (mcc_script_effects_snapshot()<<4);
+            (mcc_script_effects_snapshot()<<4) |
+            (mcc_screen_flashes && !*mcc_screen_flashes ? MCC_CAMPAIGN_FLASHES_DISABLED : 0u);
     mcc_campaign.ambient_base=object_light_ambient_base;mcc_campaign.ambient_scale=object_light_ambient_scale;
     memcpy(out,&mcc_campaign,sizeof(mcc_campaign));
 }
@@ -140,9 +155,10 @@ int mcc_campaign_validate(void const *in, unsigned long bytes)
     memset(&state,0,sizeof(state));state.effects_gain=1.0f;
     state.ambient_base=mcc_original_ambient_base;state.ambient_scale=mcc_original_ambient_scale;
     memcpy(&state,in,bytes);
-    if ((bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES ? state.version!=1u : (state.version!=2u && state.version!=3u)) ||
+    if ((bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES ? state.version!=1u : (state.version<2u || state.version>4u)) ||
         !(state.effects_gain>=0.0f && state.effects_gain<=4.0f) ||
-        (state.flags & ~(state.version==1u ? 1u : state.version==2u ? 15u : 15u|(MCC_EFFECT_MASK<<4))) ||
+        (state.flags & ~(state.version==1u ? 1u : state.version==2u ? 15u :
+            15u|(MCC_EFFECT_MASK<<4)|(state.version==4u ? MCC_CAMPAIGN_FLASHES_DISABLED : 0u))) ||
         !mcc_campaign_real(state.ambient_base) || !mcc_campaign_real(state.ambient_scale) ||
         !mcc_campaign_real(state.dialog_gain) ||
         !(state.gravity>=-1000.0f && state.gravity<=1000.0f)) return 0;
@@ -175,17 +191,50 @@ int mcc_campaign_restore(void const *in, unsigned long bytes)
     memcpy(&mcc_campaign,in,bytes);
     if (bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES)
         mcc_campaign.flags|=(mcc_original_loud_dialog ? 2u : 0u) | (mcc_original_ignore_player ? 4u : 0u);
-    mcc_campaign.version=3;
-    mcc_script_effects_restore(mcc_campaign.flags>>4);
+    if (mcc_campaign.version<4u && !mcc_original_screen_flashes)
+        mcc_campaign.flags|=MCC_CAMPAIGN_FLASHES_DISABLED;
+    mcc_campaign.version=4;
+    mcc_script_effects_restore((mcc_campaign.flags>>4)&MCC_EFFECT_MASK);
     global_gravity=mcc_original_gravity*mcc_campaign.gravity;
     sound_gain_under_dialog=mcc_campaign.dialog_gain;
     object_light_ambient_base=mcc_campaign.ambient_base;object_light_ambient_scale=mcc_campaign.ambient_scale;
     loud_dialog_hack=(mcc_campaign.flags&2u)!=0;
+    if (mcc_screen_flashes) *mcc_screen_flashes=!(mcc_campaign.flags&MCC_CAMPAIGN_FLASHES_DISABLED);
     /* The native client cheat policy remains authoritative. Only the host
      * runs campaign scripts and decides ammunition consumption. */
     if (game_connection()!=_game_connection_network_client) cheat.infinite_ammo=(mcc_campaign.flags&1u)!=0;
     if (mcc_ignore_player && game_connection()!=_game_connection_network_client) *mcc_ignore_player=(mcc_campaign.flags&4u)!=0;
     return 1;
+}
+
+/* D20 disables damage flashes while fading over a BSP switch. The native
+ * renderer gates both with one switch; only an active MCC fade bypasses it. */
+boolean mcc_campaign_fade_active(void)
+{
+    real_rgb_color color;
+    short ticks;
+    boolean fading_out;
+    long start;
+    if (!mcc_cache_tags_loaded() || !mcc_campaign_owned) return FALSE;
+    player_effect_port_screen_fade_get(&color,&ticks,&fading_out,&start);
+    return ticks>=0 && (fading_out || game_time_get()-start<=ticks);
+}
+
+static void mcc_cooperative_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;(void)initialize;
+    hs_return(thread,game_is_cooperative() || network_coop_active());
+}
+
+static void mcc_flashlight_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    struct unit_datum *unit;
+    if (!args) return;
+    /* A race can destroy its vehicles while another script still holds
+     * their handles. Validate the salt and unit type before querying. */
+    unit=unit_try_and_get(args[0]);
+    hs_return(thread,unit && TEST_FLAG(unit->unit.flags,_unit_integrated_light_on_bit));
 }
 
 real mcc_campaign_effects_gain(void)
@@ -574,7 +623,9 @@ static struct mcc_campaign_definition mcc_campaign_functions[]={
     {{_hs_type_void,0,"cheat_all_vehicles",hs_macro_function_parse,mcc_spawn_vehicles_evaluate,NULL,NULL,0,{0}},{0}},
     {{_hs_type_void,0,"object_type_predict",hs_macro_function_parse,mcc_object_type_predict_evaluate,NULL,NULL,1,{_hs_type_object_definition}},{0}},
     {{_hs_type_void,0,"unit_kill",hs_macro_function_parse,mcc_unit_kill_evaluate,NULL,NULL,1,{_hs_type_unit}},{0}},
-    {{_hs_type_void,0,"unit_kill_silent",hs_macro_function_parse,mcc_unit_kill_silent_evaluate,NULL,NULL,1,{_hs_type_unit}},{0}}
+    {{_hs_type_void,0,"unit_kill_silent",hs_macro_function_parse,mcc_unit_kill_silent_evaluate,NULL,NULL,1,{_hs_type_unit}},{0}},
+    {{_hs_type_boolean,0,"game_is_cooperative",hs_macro_function_parse,mcc_cooperative_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_boolean,0,"unit_get_current_flashlight_state",hs_macro_function_parse,mcc_flashlight_evaluate,NULL,NULL,1,{_hs_type_unit}},{0}}
 };
 
 struct hs_function_definition *mcc_campaign_function(short index)

@@ -278,6 +278,7 @@ symbols in this file:
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "mcc_seats.h" /* port: port/linux/game/mcc_seats.c */
 #include "mcc_script_effects.h" /* port: MCC campaign effects and host-owned possession */
+#include "mcc_movement.h" /* port: MCC weapon-authored movement penalties */
 
 /* port: port/linux/game/network_objects.c's (a client deletes the host's
 objects on the host's word alone) */
@@ -3852,6 +3853,8 @@ static void biped_update_moving(
 					biped->unit.throttle.j * stun_scale * sideways_speed /
 					TICKS_PER_SECOND;
 				physics.movement_desired.k = 0.f;
+				/* port: MCC-only input scaling; legacy player physics is unchanged. */
+				mcc_movement_apply(biped_index, &physics.movement_desired);
 				physics.airborne_acceleration_maximum =
 					player_information->airborne_acceleration / TICKS_PER_SECOND;
 				if (!TEST_FLAG(
