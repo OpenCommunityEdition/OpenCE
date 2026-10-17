@@ -928,6 +928,53 @@ void rasterizer_lens_flares_submit_occlusion_tests(
 	return;
 }
 
+/* port: the plasma pistol's two front lights are one fixed sprite, 0.0188
+across, on each prong. The player looks at those from behind the gun, so
+they stay on the view other players have. The needler's smoke light is
+0.003 and the flashlight is 0.05, so this band is those two prongs. */
+static boolean lens_flare_first_person_front_light(
+	struct lens_flare_definition *definition)
+{
+	real largest = 0.0f;
+	short index;
+
+	for (index = 0; index < definition->reflections.count; index++)
+	{
+		struct lens_flare_reflection *reflection = TAG_BLOCK_GET_ELEMENT(
+			&definition->reflections,
+			index,
+			struct lens_flare_reflection);
+
+		if (reflection->radius_upper_bounds > reflection->radius_lower_bounds)
+			return FALSE;
+		if (reflection->radius_upper_bounds > largest)
+			largest = reflection->radius_upper_bounds;
+	}
+
+	return largest >= 0.01f && largest < 0.02f;
+}
+
+/* port: a charge grows with the light (the pistol's reaches 0.175). The
+first-person one is drawn with no occlusion fade, so it is pulled down. */
+static boolean lens_flare_charge_grows(
+	struct lens_flare_definition *definition)
+{
+	short index;
+
+	for (index = 0; index < definition->reflections.count; index++)
+	{
+		struct lens_flare_reflection *reflection = TAG_BLOCK_GET_ELEMENT(
+			&definition->reflections,
+			index,
+			struct lens_flare_reflection);
+
+		if (reflection->radius_upper_bounds > reflection->radius_lower_bounds)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
 void rasterizer_lens_flares_draw(
 	void)
 {
@@ -954,6 +1001,8 @@ void rasterizer_lens_flares_draw(
 				boolean first_person = (lens_flare_parameters->compressed_window_index &
 					_lens_flare_first_person_weapon_flag) != 0;
 				struct lens_flare_definition *definition = lens_flare_parameters->definition;
+				boolean front_light = first_person &&
+					lens_flare_first_person_front_light(definition);
 
 				/* port: the first-person weapon's projection (view_fov.c).
 				Tested against the scene, the sprite sits behind the gun,
@@ -967,6 +1016,7 @@ void rasterizer_lens_flares_draw(
 				/* port: the test is in the gun's camera and the depth is the
 				world's, so aiming at a wall counted the charge as hidden */
 				if ((first_person || lens_flare_parameters->internal__occlusion_pixels > 0) &&
+					!front_light &&
 					LENS_FLARE_LIGHT_COLOR_ALPHA(lens_flare_parameters->compressed_light_color) > 0 &&
 					definition->reflections.count > 0)
 				{
@@ -1010,6 +1060,8 @@ void rasterizer_lens_flares_draw(
 					}
 
 					light_brightness *= occlusion_fraction;
+					if (first_person && lens_flare_charge_grows(definition))
+						light_brightness *= 0.7f;
 					light_brightness *= uncompress_int8_to_real(
 						(byte)LENS_FLARE_LIGHT_COLOR_ALPHA(lens_flare_parameters->compressed_light_color));
 					corona_rotation = lens_flare_evaluate_corona_rotation_function(
