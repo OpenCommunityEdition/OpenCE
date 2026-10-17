@@ -68,7 +68,9 @@ python tools/ci_build.py linux release   # what CI builds
 | --- | --- | --- |
 | `HALO_ANDROID` | Android | The app: its display, input, files and lifecycle |
 | `HALO_GLES` | Android, web | The OpenGL ES renderer |
-| `HALO_ARM64_GUEST` | Android | The guest's ABI (ILP32 AArch64) |
+| `HALO_GUEST` | Android, Linux arm64 | The game is an ILP32 guest image in a 64-bit host process: its memory, its host imports, the SDL it reaches. The instruction set is the compiler's: test `__aarch64__` or `__x86_64__` |
+| `HALO_GUEST_MACHO` | Android, Linux arm64 | The guest is compiled for clang's Darwin target (`arm64_32`), whose Mach-O objects are converted afterwards |
+| `HALO_ARM64_GUEST` | Android, Linux arm64 | `HALO_GUEST` on AArch64 (its name before); new code tests `HALO_GUEST` or `__aarch64__` |
 | `HALO_WEB` | Web | The browser: its frames, storage, sockets and WebGL 2's limits (with `HALO_GLES`, not `HALO_ANDROID`) |
 | `HALO_WINDOWS` | Windows (`halo_windows_prefix.h`) | The Windows build |
 | `HALO_RELEASE` | `--release` | No assertions checked |

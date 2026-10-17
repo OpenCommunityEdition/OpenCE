@@ -35,7 +35,20 @@ instead (host_watch_hash.c).
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
+#ifdef __ANDROID__
 #include <sys/system_properties.h>
+#else
+/* (the Linux arm64 build's host, port/linux/arm64: no Android properties,
+each read as unset) */
+#define PROP_VALUE_MAX 92
+
+static int __system_property_get(const char *name, char *value)
+{
+	(void)name;
+	value[0] = '\0';
+	return 0;
+}
+#endif
 #include <ucontext.h>
 #include <unistd.h>
 

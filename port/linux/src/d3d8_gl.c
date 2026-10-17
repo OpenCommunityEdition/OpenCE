@@ -474,13 +474,16 @@ static void render_targets_evict(void);
 
 /* ---------- the device */
 
-#ifdef HALO_GLES
+#if defined(HALO_GLES) || defined(HALO_GUEST)
 /* Mobile drivers (Mali) keep every orphaned copy of a buffer until the GPU
 is done with it, so a large buffer orphaned each frame costs its size per
 frame in flight and more. Instead each frame streams into the next of a few
 smaller buffers, reusing one only once the GPU has finished the frame that
 last used it (host_gl_wait_frame). A busy frame streams about 5 MB of
-vertices. */
+vertices. A Linux guest's desktop renderer streams so too: on Zink (Turnip),
+as on Mali, a glBufferSubData for each draw costs much more than the
+unsynchronized write the ring allows (host_gl_buffer_write). */
+#define XGPU_STREAM_RING
 #define STREAM_BUFFER_SIZE (16 * 1024 * 1024)
 #define INDEX_BUFFER_SIZE (2 * 1024 * 1024)
 #define STREAM_BUFFER_RING 3
@@ -538,7 +541,7 @@ struct gl_device
 
 	GLuint vertex_array;
 	GLuint stream_buffer;
-#ifdef HALO_GLES
+#ifdef XGPU_STREAM_RING
 	GLuint stream_buffers[STREAM_BUFFER_RING];
 	GLuint index_buffers[STREAM_BUFFER_RING];
 	unsigned long buffer_ring;
@@ -612,6 +615,9 @@ struct gl_device
 		unsigned long count;
 	} visibility_batches[2];
 	unsigned long visibility_batch;
+#ifdef HALO_GUEST
+	GLuint visibility_results_copy[VISIBILITY_TEST_SLOTS];
+#endif
 	/* a pipeline flush every flush_every draws (draw_flush), 0 never */
 	unsigned long flush_every;
 	unsigned long flush_draws;
@@ -1668,7 +1674,7 @@ static void gl_initialize(void)
 #endif
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
-#ifdef HALO_GLES
+#ifdef XGPU_STREAM_RING
 	{
 		int ring;
 
@@ -1685,7 +1691,7 @@ static void gl_initialize(void)
 		device.index_buffer = device.index_buffers[0];
 	}
 #endif
-#ifndef HALO_GLES
+#ifndef XGPU_STREAM_RING
 	glGenBuffers(1, &device.stream_buffer);
 	glBindBuffer(GL_ARRAY_BUFFER, device.stream_buffer);
 	glBufferData(GL_ARRAY_BUFFER, STREAM_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
@@ -1701,8 +1707,15 @@ static void gl_initialize(void)
 	glBindBuffer(GL_QUERY_BUFFER, device.visibility_results_buffer);
 	glBufferStorage(GL_QUERY_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL,
 		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+#ifdef HALO_GUEST
+	/* the mapping would be a host address: the host keeps it and copies the
+	results into guest memory after each frame (D3DDevice_Present) */
+	if (host_gl_map_results(device.visibility_results_buffer, VISIBILITY_TEST_SLOTS * sizeof(GLuint)))
+		device.visibility_results = device.visibility_results_copy;
+#else
 	device.visibility_results = glMapBufferRange(GL_QUERY_BUFFER, 0, VISIBILITY_TEST_SLOTS * sizeof(GLuint),
 		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+#endif
 	if (device.visibility_results)
 	{
 		glGenQueries(VISIBILITY_TEST_SLOTS, device.visibility_batches[0].queries);
@@ -4188,7 +4201,7 @@ static struct
 	/* the page's memory_watch generation when it was uploaded */
 	unsigned long generation[MIRROR_PAGE_COUNT];
 	unsigned long rewritten_frame[MIRROR_PAGE_COUNT];
-#ifdef HALO_GLES
+#ifdef XGPU_STREAM_RING
 	/* device.frame at the segment's latest glBufferSubData */
 	unsigned long subdata_frame[MIRROR_SEGMENT_COUNT];
 #endif
@@ -4275,13 +4288,13 @@ static BOOL mirror_refresh(unsigned long first, unsigned long last)
 			glGenBuffers(1, &mirror.buffers[segment]);
 			glBindBuffer(GL_COPY_WRITE_BUFFER, mirror.buffers[segment]);
 			glBufferData(GL_COPY_WRITE_BUFFER, MIRROR_SEGMENT_SIZE, NULL, GL_DYNAMIC_DRAW);
-#ifdef HALO_GLES
+#ifdef XGPU_STREAM_RING
 			/* (no glBufferSubData yet: as if long enough ago) */
 			mirror.subdata_frame[segment] = device.frame - STREAM_BUFFER_RING;
 #endif
 		}
 		glBindBuffer(GL_COPY_WRITE_BUFFER, mirror.buffers[segment]);
-#ifdef HALO_GLES
+#ifdef XGPU_STREAM_RING
 		/* Mali copies the whole buffer for a glBufferSubData that queued
 		draws might read (see STREAM_BUFFER_RING); unused pages can be
 		written without waiting for them. Not while such a copy may be
@@ -4531,7 +4544,7 @@ static unsigned long stream_upload(const void *data, unsigned long size)
 	stream_reserve(size);
 	offset = device.stream_offset;
 	state_array_buffer(device.stream_buffer);
-#ifdef HALO_GLES
+#ifdef XGPU_STREAM_RING
 	host_gl_buffer_write(GL_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
 #else
 	buffer_upload(GL_ARRAY_BUFFER, offset, length, data);
@@ -4612,7 +4625,7 @@ static unsigned long index_upload(const void *data, unsigned long size)
 	}
 #endif
 	offset = device.index_offset;
-#ifdef HALO_GLES
+#ifdef XGPU_STREAM_RING
 	host_gl_buffer_write(GL_ELEMENT_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
 #else
 	buffer_upload(GL_ELEMENT_ARRAY_BUFFER, offset, length, data);
@@ -5658,9 +5671,9 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 
 /* ---------- presentation */
 
-#ifndef HALO_GLES
-/* the screenshot key's PNG (controls.screenshot; the Android guest has none
-of the SDL calls it takes) */
+#if !defined(HALO_GLES) && !defined(HALO_GUEST)
+/* the screenshot key's PNG (controls.screenshot; a guest has none of the
+SDL calls it takes) */
 static void write_key_screenshot(struct render_target_entry *target)
 {
 	char directory[512], path[640], timestamp[32], filename[64];
@@ -5830,6 +5843,67 @@ static void visibility_copy_batch(void)
 }
 
 #endif
+
+/* the end of a frame's GL work: the streamed data and visibility results of
+the frames the GPU may still be drawing stay as they are */
+static void frame_end_buffers(void)
+{
+#ifdef HALO_GLES
+	if (xgpu_capabilities.atomic_counters)
+	{
+		/* this frame's counts, for when the GPU is done with it (the
+		barrier makes the shaders' counter writes visible to the copy,
+		which ES 3.1 does not promise without one) */
+		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+		glBindBuffer(GL_COPY_READ_BUFFER, device.visibility_counters);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, device.counter_snapshots[device.buffer_ring]);
+		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0,
+			VISIBILITY_TEST_SLOTS * sizeof(GLuint));
+		glBindBuffer(GL_COPY_READ_BUFFER, 0);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+	}
+#endif
+#ifdef XGPU_STREAM_RING
+	host_gl_fence_frame((unsigned int)device.buffer_ring);
+	device.buffer_ring = (device.buffer_ring + 1) % STREAM_BUFFER_RING;
+	host_gl_wait_frame((unsigned int)device.buffer_ring);
+#endif
+#ifdef HALO_GLES
+	if (xgpu_capabilities.atomic_counters && device.ring_test_count[device.buffer_ring])
+	{
+		unsigned long ring = device.buffer_ring;
+		unsigned long test;
+
+		/* the GPU has passed that frame's fence: its copy is complete,
+		and the slot is free for this frame's tests */
+		host_gl_read_buffer(device.counter_snapshots[ring], 0, VISIBILITY_TEST_SLOTS * sizeof(GLuint),
+			device.counter_values);
+		for (test = 0; test < device.ring_test_count[ring]; test++)
+		{
+			device.visibility_latest[device.ring_tests[ring][test][0]] =
+				device.counter_values[device.ring_tests[ring][test][1]];
+		}
+		device.ring_test_count[ring] = 0;
+	}
+#endif
+#ifdef XGPU_STREAM_RING
+	device.stream_buffer = device.stream_buffers[device.buffer_ring];
+	device.index_buffer = device.index_buffers[device.buffer_ring];
+	device.stream_offset = 0;
+	device.index_offset = 0;
+#ifdef HALO_WEB
+	web_chunks_begin_frame();
+#endif
+#else
+	device.stream_offset = STREAM_BUFFER_SIZE; /* orphan next frame */
+	device.index_offset = INDEX_BUFFER_SIZE;
+#endif
+#if defined(HALO_GUEST) && !defined(HALO_GLES)
+	if (device.visibility_results)
+		host_gl_read_results(device.visibility_results_copy, sizeof(device.visibility_results_copy));
+#endif
+}
+
 void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destination_rectangle,
 	void *unused, void *unused2)
 {
@@ -5856,7 +5930,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 #endif
 		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
 			write_screenshot(back_buffer);
-#ifndef HALO_GLES
+#if !defined(HALO_GLES) && !defined(HALO_GUEST)
 		if (platform_screenshot_take_request())
 			write_key_screenshot(back_buffer);
 #endif
@@ -5885,50 +5959,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		xgpu_gl_state_invalidate();
 		memory_watch_begin_frame();
 		xgpu_texture_cache_begin_frame();
-#ifdef HALO_GLES
-		if (xgpu_capabilities.atomic_counters)
-		{
-			/* this frame's counts, for when the GPU is done with it (the
-			barrier makes the shaders' counter writes visible to the copy,
-			which ES 3.1 does not promise without one) */
-			glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
-			glBindBuffer(GL_COPY_READ_BUFFER, device.visibility_counters);
-			glBindBuffer(GL_COPY_WRITE_BUFFER, device.counter_snapshots[device.buffer_ring]);
-			glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0,
-				VISIBILITY_TEST_SLOTS * sizeof(GLuint));
-			glBindBuffer(GL_COPY_READ_BUFFER, 0);
-			glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
-		}
-		host_gl_fence_frame((unsigned int)device.buffer_ring);
-		device.buffer_ring = (device.buffer_ring + 1) % STREAM_BUFFER_RING;
-		host_gl_wait_frame((unsigned int)device.buffer_ring);
-		if (xgpu_capabilities.atomic_counters && device.ring_test_count[device.buffer_ring])
-		{
-			unsigned long ring = device.buffer_ring;
-			unsigned long test;
-
-			/* the GPU has passed that frame's fence: its copy is complete,
-			and the slot is free for this frame's tests */
-			host_gl_read_buffer(device.counter_snapshots[ring], 0, VISIBILITY_TEST_SLOTS * sizeof(GLuint),
-				device.counter_values);
-			for (test = 0; test < device.ring_test_count[ring]; test++)
-			{
-				device.visibility_latest[device.ring_tests[ring][test][0]] =
-					device.counter_values[device.ring_tests[ring][test][1]];
-			}
-			device.ring_test_count[ring] = 0;
-		}
-		device.stream_buffer = device.stream_buffers[device.buffer_ring];
-		device.index_buffer = device.index_buffers[device.buffer_ring];
-		device.stream_offset = 0;
-		device.index_offset = 0;
-#ifdef HALO_WEB
-		web_chunks_begin_frame();
-#endif
-#else
-		device.stream_offset = STREAM_BUFFER_SIZE; /* orphan next frame */
-		device.index_offset = INDEX_BUFFER_SIZE;
-#endif
+		frame_end_buffers();
 	}
 	device.frame++;
 	stats.presents++;
