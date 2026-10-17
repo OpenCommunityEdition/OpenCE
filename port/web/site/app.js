@@ -2,8 +2,8 @@
 APP.JS
 
 The launcher page (index.html): it checks that the browser can run the game,
-copies the game data in from the player's disc image (xiso-worker.js), and
-starts the game (halo.js and halo.wasm: tools/web_build.py), whose canvas
+copies the game data in from the player's disc image (xiso-worker.js) and
+the player's mods (mods-worker.js), and starts the game (halo.js and halo.wasm: tools/web_build.py), whose canvas
 then fills the page.
 
 - The game's threads need SharedArrayBuffer, so a cross-origin isolated
@@ -299,6 +299,92 @@ $('folder-input').addEventListener('change', (event) => {
   const files = [...event.target.files];
   event.target.value = '';
   if (files.length) importData({ type: 'folder', files });
+});
+
+// ---------- mods (mods-worker.js): /data/mods, all of them played unless
+// the game's main menu's Mods turns them off (port/linux/src/port_mods.c)
+
+// the name a mod's mod.toml gives it, else its folder's
+async function modName(directory, folder) {
+  try {
+    const text = await (await (await directory.getFileHandle('mod.toml')).getFile()).text();
+    const match = /^\s*name\s*=\s*"([^"\n]*)"/m.exec(text);
+    if (match && match[1].trim()) return match[1].trim();
+  } catch {
+    // (none: not a mod the game plays)
+  }
+  return folder;
+}
+
+async function refreshMods() {
+  const list = $('mods-list');
+  const found = [];
+  try {
+    const root = await navigator.storage.getDirectory();
+    const mods = await root.getDirectoryHandle('mods');
+    for await (const [folder, handle] of mods.entries()) {
+      if (handle.kind === 'directory') found.push({ folder, name: await modName(handle, folder) });
+    }
+  } catch {
+    // no mods folder yet
+  }
+  // (as the game orders them by default: their folders' names, whatever the
+  // case of their A to Z, port_mods.c's names_compare)
+  const key = (folder) => folder.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+  found.sort((first, second) => (key(first.folder) < key(second.folder) ? -1 : 1));
+  list.replaceChildren(...found.map(({ folder, name }) => {
+    const item = document.createElement('li');
+    const label = document.createElement('span');
+    const detail = document.createElement('span');
+    const remove = document.createElement('button');
+    label.textContent = name;
+    detail.className = 'detail';
+    detail.textContent = ` ${folder}`;
+    label.append(detail);
+    remove.textContent = 'Remove';
+    remove.className = 'danger';
+    remove.addEventListener('click', () => {
+      if (confirm(`Remove the mod ${name} from this browser?`)) modTask({ type: 'remove', name: folder });
+    });
+    item.append(label, remove);
+    return item;
+  }));
+  $('mods-status').textContent = found.length ? `${found.length} mod${found.length === 1 ? '' : 's'} in this browser.` :
+    'No mods yet.';
+  await refreshStorage();
+}
+
+function modTask(message) {
+  const worker = new Worker('mods-worker.js');
+  $('mod-label').classList.add('disabled');
+  $('mod-input').disabled = true;
+  worker.onmessage = async (event) => {
+    const data = event.data;
+    if (data.type === 'progress') {
+      $('mods-status').textContent = `Copying ${data.file}: ${formatBytes(data.done)} of ${formatBytes(data.total)}`;
+      return;
+    }
+    worker.terminate();
+    $('mod-label').classList.remove('disabled');
+    $('mod-input').disabled = false;
+    await refreshMods();
+    if (data.type === 'error') $('mods-status').textContent = data.message;
+    else if (message.type === 'add') logLine(`mods: ${data.name}, ${data.files} files, ${data.bytes} bytes`);
+  };
+  worker.onerror = async (event) => {
+    worker.terminate();
+    $('mod-label').classList.remove('disabled');
+    $('mod-input').disabled = false;
+    await refreshMods();
+    $('mods-status').textContent = 'The copy failed: ' + event.message;
+  };
+  worker.postMessage(message);
+}
+
+$('mod-input').addEventListener('change', (event) => {
+  const files = [...event.target.files];
+  event.target.value = '';
+  if (files.length) modTask({ type: 'add', files });
 });
 
 $('delete-data').addEventListener('click', async () => {
@@ -602,6 +688,28 @@ async function play() {
         logLine(text);
         if (kind === 2) showInvite(text);
         if (kind === 3) showFatal(text);
+        // (the game quits, as the player asked: the page starts again)
+        if (kind === 4) location.reload();
+      },
+      // a question the game waits on (sdl_platform.c's platform_ask: the
+      // mods that cannot be played together), answered with a button's index
+      haloAsk: (title, text, labels, answer) => {
+        logLine(`${title}: ${text}`);
+        $('ask-title').textContent = title;
+        $('ask-text').textContent = text;
+        $('ask-buttons').replaceChildren(...labels.map((label, index) => {
+          const button = document.createElement('button');
+          button.textContent = label;
+          if (index === 0) button.className = 'primary';
+          button.addEventListener('click', () => {
+            $('ask').hidden = true;
+            answer(index);
+          });
+          return button;
+        }));
+        // (the dialog is the page's: out of the game's full screen)
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        $('ask').hidden = false;
       },
       onAbort: (what) => showFatal('The game stopped: ' + what),
       onExit: (status) => {
@@ -713,8 +821,12 @@ document.addEventListener('visibilitychange', async () => {
     $('checks-note').textContent = 'Desktop Chrome, Edge and Firefox run the game; Safari 17 or later may.';
     $('checks-note').hidden = false;
   }
-  if (results.opfs === 'good') await refreshData();
-  else updatePlay();
+  if (results.opfs === 'good') {
+    await refreshData();
+    await refreshMods();
+  } else {
+    updatePlay();
+  }
   checkForUpdate();
   if (/^[0-9a-f]{32}$/.test(params.get('room') || '')) await joinRoom(params.get('room'));
   if (params.has('play')) play();

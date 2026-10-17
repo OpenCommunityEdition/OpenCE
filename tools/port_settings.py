@@ -13,9 +13,17 @@ settings defaults" shows the defaults. Controls Setup binds the keyboard and
 mouse's controls, by the functions the PC version names for it.
 """
 
+from pathlib import Path
 from xml.sax.saxutils import quoteattr
 
 PE = "main_menu/settings_select/player_setup/player_profile_edit"
+# the mods' screen, and its rows (_mods); the main menu's items
+# (ce/main_menu.xml): MODS in Credits' place (Credits is left out:
+# tools/ce_menus.py's LEFT_OUT), Quit a row below it (its CHILD_OFFSETS)
+MODS = "main_menu/mods"
+MOD_ROWS = 11
+MODS_ITEM_PLACE = (192, 391)
+QUIT_ITEM_PLACE = (192, 427)
 YES_NO = [("YES", "true"), ("NO", "false")]
 ON_OFF = [("ON", "true"), ("OFF", "false")]
 # the multiplayer armor colors, in the profile's order (player_profile.c)
@@ -626,6 +634,9 @@ WIDGET_PATCHES = {
     f"{MT}/connected/connected_map_select_wrapper": {"set": {
         "flags": "pass_unhandled_to_focused_child pause_game main_menu_if_no_history tag_controller_index force_handle_mouse",
     }},
+    # (the main menu's MODS, before Quit: _mods)
+    "main_menu/main_menu_select_list": {"insert_before": {"main_menu/main_menu_item_quit_game": [
+        f'<child widget="main_menu/main_menu_item_mods" x="{MODS_ITEM_PLACE[0]}" y="{MODS_ITEM_PLACE[1]}"/>']}},
     # (the profile settings' picture: on Gamepad Setup's row, the profile's
     # button settings, BITMAP_FRAMES; menu_functions.c's
     # profile_gamepad_layout)
@@ -728,6 +739,7 @@ BITMAP_FRAMES = {
 # the titles this port has that the PC version has not, set as its headers
 # are (port/assets/menus/port_svg): bitmap name, text
 TITLES = {
+    "main_menu/mods/header_mods": "MODS",
     f"{MT}/join_game/header_server_browser": "SERVER BROWSER",
     f"{MT}/join_game/header_direct_link": "DIRECT LINK",
     f"{MT}/join_game/header_password": "PASSWORD",
@@ -1494,7 +1506,168 @@ def multiplayer_files() -> dict:
         "main_menu/new_select".replace("/", ".") + ".port.xml": head + _map_kind() + ["</menus>", ""],
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
         TEAMPLAY_EDIT.replace("/", ".") + ".port.xml": head + _teamplay_options_extras() + ["</menus>", ""],
+        MODS.replace("/", ".") + ".xml": [head[0], "<!-- The port's Mods screen, in the PC version's style "
+                                          "(tools/port_settings.py) -->", head[2]] + _mods() + ["</menus>", ""],
     }
 
 
 REPLACED_FOLDERS = [f"{MT}/server_settings"]
+
+
+# ---------- the mods (port/linux/game/mods.c, docs/mods.md): the main menu's
+# MODS, which opens the list of the mods folder's mods, in their load order,
+# each turned on or off and moved up or down (menu_functions.c's "port mods"
+# functions)
+
+# the redraws' main menu items (svg/shell/main_menu/menu_*.svg): their text's
+# capitals' top and height, its colour dim (not chosen) and its glow chosen,
+# and where its middle is
+MENU_ITEM_TOP, MENU_ITEM_CAP, MENU_ITEM_MIDDLE = 6.57, 21.5 * 0.9037, 130.0
+TITLE_FONT_PATH = Path(__file__).resolve().parent.parent / "port/assets/fonts/OpenCE-Regular.ttf"
+# the mods' status icons (port/assets/icons/lucide): a mod out of the order it
+# asks for, and one that cannot be played (another mod says it cannot be
+# played with it, or this build cannot play it): menu_functions.c's
+# mods_update shows frame 1 or 2
+MOD_STATUS_ICONS = [("triangle-alert", "#FFB020"), ("circle-x", "#FF4040")]
+
+
+def menu_item_frames(text: str) -> list:
+    """the frames (svg, width, height) of a main menu item of the port's:
+    its text set in OpenCE (Newtown respaced: port/assets/fonts) as the
+    redraws' items are, dim, then white with their blue glow"""
+    from fontTools.pens.boundsPen import BoundsPen
+    from fontTools.pens.svgPathPen import SVGPathPen
+    from fontTools.pens.transformPen import TransformPen
+    from fontTools.ttLib import TTFont
+
+    font = TTFont(str(TITLE_FONT_PATH))
+    glyphs = font.getGlyphSet()
+    cmap = font.getBestCmap()
+    kerning = font["kern"].kernTables[0].kernTable if "kern" in font else {}
+    cap = glyphs["H"]
+    pen = BoundsPen(glyphs)
+    cap.draw(pen)
+    scale = MENU_ITEM_CAP / (pen.bounds[3] - pen.bounds[1])
+    names = [cmap[ord(character)] for character in text]
+    widths = [font["hmtx"][name][0] for name in names]
+    advance = sum(widths) + sum(kerning.get((first, second), 0) for first, second in zip(names, names[1:]))
+    x = MENU_ITEM_MIDDLE / scale - advance / 2
+    baseline = MENU_ITEM_TOP + MENU_ITEM_CAP
+    defs, uses = {}, []
+    for index, name in enumerate(names):
+        if name not in defs and name != "space":
+            path = SVGPathPen(glyphs, lambda value: f"{value:.2f}".rstrip("0").rstrip("."))
+            glyphs[name].draw(TransformPen(path, (1, 0, 0, -1, 0, 0)))
+            defs[name] = path.getCommands()
+        if name != "space":
+            uses.append(f'<use href="#g{name}" transform="translate({x * scale:.2f},{baseline:.2f}) scale({scale:.5f})"/>')
+        x += widths[index] + (kerning.get((name, names[index + 1]), 0) if index + 1 < len(names) else 0)
+    paths = [f'    <path id="g{name}" d="{commands}"/>' for name, commands in sorted(defs.items())]
+    head = ['<svg xmlns="http://www.w3.org/2000/svg" width="256" height="64" viewBox="0 0 256 64">', "  <defs>", *paths]
+    # (as heavy as the redraws' letters: a thin edge of their colour)
+    edge = f'stroke-width="{0.9 / scale:.2f}" stroke-linejoin="round"'
+    dim = [*head, "  </defs>", f'  <!-- "{text}" (normal state: dim blue) -->',
+           f'  <g id="text" fill="#2895ff" stroke="#2895ff" opacity="0.467" {edge}>',
+           *[f"    {use}" for use in uses], "  </g>", "</svg>", ""]
+    glow = [*head, '    <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="256" height="64">',
+            '      <feGaussianBlur stdDeviation="2.19"/>', "    </filter>", "  </defs>",
+            f'  <!-- "{text}" (highlighted: white with blue glow) -->',
+            f'  <g fill="#2895ff" stroke="#2895ff" stroke-width="{6.3 / scale:.2f}" stroke-linejoin="round" '
+            'opacity="0.650" filter="url(#glow)">', *[f"    {use}" for use in uses], "  </g>",
+            f'  <g id="text" fill="#fff" stroke="#fff" {edge}>', *[f"    {use}" for use in uses], "  </g>", "</svg>", ""]
+    return [("\n".join(dim), 256, 64), ("\n".join(glow), 256, 64)]
+
+
+def mod_status_frames(icons: Path, size: int = 24) -> list:
+    """the frames of the mods' status icon, `size` pixels square (the menus
+    draw a bitmap at its size): none, out of order, incompatible"""
+    blank = f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24"/>\n'
+    return [(blank, size, size)] + [
+        ((icons / f"{icon}.svg").read_text().replace('stroke="currentColor"', f'stroke="{color}"')
+         .replace('width="24"', f'width="{size}"').replace('height="24"', f'height="{size}"'), size, size)
+        for icon, color in MOD_STATUS_ICONS]
+
+
+def _text_button(name: str, text: str, handlers: list) -> list:
+    """a button of the button bar with its own words"""
+    pairs = [("type", "text"), ("width", 128), ("height", 24), ("bitmap", "bitmaps/text_button_background"),
+             ("text", text), ("font", "ui\\small_ui"), ("color", "#FFFFFFFF"), ("align", "center"), ("text_y", 2)]
+    return _widget(name, pairs, handlers + ['<on event="left_mouse" run="mouse emit accept event"/>'])
+
+
+def _mods() -> list:
+    """the main menu's MODS and its screen, laid out as the lobby is: on the
+    left two thirds the mods as a resource pack list has them (the one at the
+    top playing over those below it: the load order upside down), a row each
+    with its status icon, name and ON or OFF; on the right third, in the
+    lobby's frame, the mod chosen: its name, what is wrong with it, whether it
+    is on and its priority, and what its mod.toml says. A turns the mod chosen
+    on or off, left and right (and MOVE UP and MOVE DOWN, for the mouse) move
+    it; OK keeps it all (load_order.toml) and plays them, Cancel forgets it
+    (menu_functions.c)"""
+    base = MODS
+    lines = _widget("main_menu/main_menu_item_mods",
+                    [("type", "text"), ("width", 256), ("height", 33), ("bitmap", "main_menu/menu_mods")],
+                    [f'<on event="a" open="{base}/mods_screen"/>', f'<on event="start" open="{base}/mods_screen"/>',
+                     '<on event="left_mouse" run="mouse emit accept event"/>'])
+    lines += _widget(f"{base}/mods_screen", [("width", 640), ("height", 480),
+                                             ("flags", "pass_unhandled_to_focused_child pause_game"),
+                                             ("bitmap", "bitmaps/gradient")],
+                     ['<on event="b" back="true"/>', '<on event="back" back="true"/>',
+                      '<child widget="main_menu/new_select/sel_list_desc_bkd"/>',
+                      f'<child widget="{base}/mods_list"/>',
+                      f'<child widget="{base}/header_mods"/>'])
+    lines += _header(f"{base}/header_mods", f"{base}/header_mods")
+    # (the lobby's rows, MOD_ROWS of them, scrolling over more mods)
+    rows = [f'<child widget="{base}/op_mod_{index + 1}" x="20" y="{73 + 30 * index}"/>' for index in range(MOD_ROWS)]
+    lines += _widget(f"{base}/mods_list", [("type", "column_list"), ("width", 640), ("height", 480),
+                                           ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
+                                           ("description", f"{base}/mod_details")],
+                     ['<data input="port mods update"/>', '<on event="created" run="port mods init"/>',
+                      '<on event="deleted" run="port mods close"/>', *rows,
+                      f'<child widget="{base}/button_bar" y="414"/>'])
+    for index in range(MOD_ROWS):
+        lines += _widget(f"{base}/op_mod_{index + 1}",
+                         [("width", 390), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
+                          ("bitmap", "bitmaps/sel_list_item_bkd_top" if index == 0 else "bitmaps/sel_list_item_bkd"),
+                          ("color", "#FF2896FF")],
+                         ['<on event="a" run="port mods toggle"/>', '<on event="start" run="port mods toggle"/>',
+                          '<on event="left" run="port mods move up"/>', '<on event="right" run="port mods move down"/>',
+                          '<on event="left_mouse" run="mouse emit accept event"/>',
+                          f'<child widget="{base}/mod_status" x="8" y="2"/>',
+                          f'<child widget="{base}/mod_name" x="34"/>',
+                          f'<child widget="{base}/mod_state" x="318"/>'])
+    lines += _widget(f"{base}/mod_status", [("controller", 1), ("width", 24), ("height", 24),
+                                            ("bitmap", "mods/status")], [])
+    lines += _widget(f"{base}/mod_name",
+                     [("type", "text"), ("controller", 1), ("width", 284), ("height", 22), ("font", "ui\\large_ui"),
+                      ("color", "#FF2896FF"), ("text_y", 4)], [])
+    lines += _widget(f"{base}/mod_state",
+                     [("type", "text"), ("controller", 1), ("width", 66), ("height", 22), ("font", "ui\\large_ui"),
+                      ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4), ("text_flags", "no_focus_test")], [])
+    # (in the lobby's frame, sel_list_desc_bkd's: the mod chosen's name, the
+    # icon of what is wrong with it, and the rest)
+    lines += _widget(f"{base}/mod_details", [("width", 640), ("height", 480)],
+                     [f'<child widget="{base}/mod_details_name"/>', f'<child widget="{base}/mod_details_status"/>',
+                      f'<child widget="{base}/mod_details_text"/>'])
+    lines += _widget(f"{base}/mod_details_name",
+                     [("type", "text"), ("controller", 1), ("left", 412), ("top", 84), ("width", 200), ("height", 44),
+                      ("font", "ui\\large_ui"), ("color", "#FFFFFFFF")], [])
+    lines += _widget(f"{base}/mod_details_status", [("controller", 1), ("left", 411), ("top", 132), ("width", 16),
+                                                    ("height", 16), ("bitmap", "mods/status_small")], [])
+    lines += _widget(f"{base}/mod_details_text",
+                     [("type", "text"), ("controller", 1), ("left", 412), ("top", 130), ("width", 200),
+                      ("height", 272), ("font", "ui\\small_ui"), ("color", "#FF2896FF")], [])
+    lines += _widget(f"{base}/button_bar",
+                     [("type", "column_list"), ("width", 640), ("height", 28),
+                      ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
+                     [f'<child widget="{base}/button_up" y="1"/>', f'<child widget="{base}/button_down" x="130" y="1"/>',
+                      f'<child widget="{base}/button_ok" x="380" y="1"/>',
+                      '<child widget="common_button_cancel" x="510" y="1"/>'])
+    lines += _text_button(f"{base}/button_up", "MOVE UP", ['<on event="a" run="port mods move up"/>',
+                                                          '<on event="start" run="port mods move up"/>'])
+    lines += _text_button(f"{base}/button_down", "MOVE DOWN", ['<on event="a" run="port mods move down"/>',
+                                                              '<on event="start" run="port mods move down"/>'])
+    lines += _button(f"{base}/button_ok", 1, ['<on event="a" run="port mods save" back="true"/>',
+                                              '<on event="start" run="port mods save" back="true"/>'])
+    return lines

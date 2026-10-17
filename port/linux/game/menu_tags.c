@@ -387,6 +387,9 @@ static char const *const port_function_names[] =
 	/* (a new profile's screens: Settings' is then being edited, which the
 	Xbox's leaves to its own screens) */
 	"new campaign decision",
+	/* (the main menu's Mods: menu_functions.c) */
+	"port mods init", "port mods close", "port mods toggle", "port mods move up", "port mods move down",
+	"port mods save",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
@@ -408,6 +411,8 @@ static char const *const port_game_data_input_names[] =
 	/* (the profile settings' picture: the Xbox's of the button settings,
 	on Gamepad Setup's row) */
 	"port gamepad layout preview",
+	/* (the main menu's Mods) */
+	"port mods update",
 };
 
 static struct

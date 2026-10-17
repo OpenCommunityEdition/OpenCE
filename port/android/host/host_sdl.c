@@ -510,3 +510,35 @@ int host_sdl_show_simple_message_box(uint32_t flags, const char *title, const ch
 {
 	return SDL_ShowSimpleMessageBox((SDL_MessageBoxFlags)flags, title, message, NULL) ? 1 : 0;
 }
+
+/* ---------- a question for the player (the mods at startup: port_mods.c) */
+
+int host_sdl_show_message_box(uint32_t flags, const char *title, const char *message, int default_index,
+	const char *button0, const char *button1, const char *button2)
+{
+	const char *labels[3] = { button0, button1, button2 };
+	SDL_MessageBoxButtonData buttons[3];
+	SDL_MessageBoxData question;
+	int count = 0;
+	int answer = -1;
+	int index;
+
+	for (index = 0; index < 3; index++)
+	{
+		if (!labels[index])
+			continue;
+		buttons[count].flags = index == default_index ?
+			SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT | SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT : 0;
+		buttons[count].buttonID = index;
+		buttons[count].text = labels[index];
+		count++;
+	}
+	question.flags = (SDL_MessageBoxFlags)flags;
+	question.window = NULL;
+	question.title = title;
+	question.message = message;
+	question.numbuttons = count;
+	question.buttons = buttons;
+	question.colorScheme = NULL;
+	return SDL_ShowMessageBox(&question, &answer) ? answer : -1;
+}

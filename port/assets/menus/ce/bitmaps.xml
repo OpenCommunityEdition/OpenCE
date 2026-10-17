@@ -314,6 +314,9 @@
 	<bitmap name="main_menu/solo_level_select/header_load_level">
 		<frame png="ce/shell/main_menu/solo_level_select/header_load_level__0.png" width="512" height="64"/>
 	</bitmap>
+	<bitmap name="main_menu/mods/header_mods">
+		<frame png="ce/port/main_menu/mods/header_mods.png" width="512" height="64"/>
+	</bitmap>
 	<bitmap name="main_menu/multiplayer_type_select/coop/header_player_2">
 		<frame png="ce/port/main_menu/multiplayer_type_select/coop/header_player_2.png" width="512" height="64"/>
 	</bitmap>
@@ -368,6 +371,20 @@
 	<bitmap name="voice/speaker">
 		<frame png="ce/port/voice/speaker__0.png" width="24" height="24"/>
 		<frame png="ce/port/voice/speaker__1.png" width="24" height="24"/>
+	</bitmap>
+	<bitmap name="main_menu/menu_mods">
+		<frame png="ce/port/main_menu/menu_mods__0.png" width="256" height="64"/>
+		<frame png="ce/port/main_menu/menu_mods__1.png" width="256" height="64"/>
+	</bitmap>
+	<bitmap name="mods/status">
+		<frame png="ce/port/mods/status__0.png" width="24" height="24"/>
+		<frame png="ce/port/mods/status__1.png" width="24" height="24"/>
+		<frame png="ce/port/mods/status__2.png" width="24" height="24"/>
+	</bitmap>
+	<bitmap name="mods/status_small">
+		<frame png="ce/port/mods/status_small__0.png" width="16" height="16"/>
+		<frame png="ce/port/mods/status_small__1.png" width="16" height="16"/>
+		<frame png="ce/port/mods/status_small__2.png" width="16" height="16"/>
 	</bitmap>
 	<bitmap name="blank">
 		<frame png="ce/port/blank__0.png" width="4" height="4"/>

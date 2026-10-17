@@ -38,7 +38,10 @@ enum
 	click (app.js), as a request from the game's thread, which reaches the
 	page outside the click, is refused once the player has let it go */
 	_web_mouse_wanted = 48,
-	WEB_SHARED_WORDS = 49,
+	/* the page's: the button the player chose in the dialog the game asked
+	for (platform_ask: web_library.js's web_js_ask), -1 while it waits */
+	_web_answer = 49,
+	WEB_SHARED_WORDS = 50,
 };
 
 #define WEB_TOUCH_INPUTS 17

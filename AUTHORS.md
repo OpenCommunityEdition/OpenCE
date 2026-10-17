@@ -18,3 +18,6 @@
   [Lucide](https://lucide.dev) 1.53.0, copyright (c) 2026 Lucide Icons and
   Contributors, under the ISC licence
   (`port/assets/icons/lucide/LICENSE`).
+- **The Mods menu's warning icons** (a mod out of its requested order, and
+  a mod that cannot be played): `triangle-alert` and `circle-x` from
+  [Lucide](https://lucide.dev) 1.53.0, under the same licence.

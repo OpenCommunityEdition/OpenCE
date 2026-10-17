@@ -2191,6 +2191,462 @@ static void controls_update(struct widget_instance *list)
 	}
 }
 
+/* ---------- Mods (the main menu's: tools/port_settings.py's _mods), laid
+out as the lobby is: the mods folder's mods, a row each (op_mod_<n>), as a
+resource pack list is, the one that plays over the others at the top (the
+load order upside down: the mod loaded last first), turned on or off and
+moved up or down there, and in the frame beside them the mod chosen's
+details; OK keeps it (port/linux/src/port_mods.c's load_order.toml) and
+plays them on the map now (mods.c), Cancel forgets it */
+
+#define MOD_ROWS 11
+#define MOD_DETAILS_LENGTH 1024
+/* the details' lines: as many as fit down the frame */
+#define MOD_DETAILS_LINES 13
+/* (from the shadow of each box's last character) */
+#define MOD_TEXT_MARGIN 8
+
+/* the text boxes whose lines are measured: the details' mod name and the
+rest, and the rows' names */
+enum
+{
+	_mod_details_name,
+	_mod_details_text,
+	_mod_row_name,
+	NUMBER_OF_MOD_TEXT_BOXES
+};
+
+/* the text boxes' names, and as many characters as fit across each until
+it has been drawn, and its font is known */
+static char const *const mod_text_box_names[NUMBER_OF_MOD_TEXT_BOXES] = { "mod_details_name", "mod_details_text",
+	"mod_name" };
+static short const mod_text_box_characters[NUMBER_OF_MOD_TEXT_BOXES] = { 17, 30, 24 };
+
+/* (port/linux/src/port_mods.c, port_mods.h's) */
+enum
+{
+	_port_mod_fine,
+	_port_mod_out_of_order,
+	_port_mod_incompatible,
+	_port_mod_unplayable,
+};
+
+long port_mods_count(void);
+long port_mods_at(long position);
+char const *port_mods_name(long index);
+int port_mods_on(long index);
+int port_mods_status(long index, char *text, unsigned long size);
+int port_mods_details(long index, char *text, unsigned long size);
+long port_mods_move(long position, long places);
+void port_mods_turn(long index, int on);
+int port_mods_save(void);
+void port_mods_revert(void);
+/* (mods.c) */
+void mods_apply(void);
+
+static struct
+{
+	/* the place on the list (0 the top: the mod loaded last) of the first
+	row, and of the mod chosen last (MOVE UP and MOVE DOWN's, which take the
+	focus from the rows) */
+	short first;
+	short chosen;
+	/* the text boxes' fonts and widths as they were last drawn
+	(menu_functions_text_box_drawn), which their lines are measured in;
+	NONE before then */
+	long fonts[NUMBER_OF_MOD_TEXT_BOXES];
+	short widths[NUMBER_OF_MOD_TEXT_BOXES];
+	/* what the details show (they are wrapped again when it changes), and
+	the mod each row's name is of, in which font (NONE: none yet) */
+	char shown[128];
+	long row_mods[MOD_ROWS];
+	long row_fonts[MOD_ROWS];
+} mods_screen;
+
+/* the row (op_mod_<n>) a widget is or is in, else NULL */
+static struct widget_instance *mod_row(struct widget_instance *widget)
+{
+	for (; widget; widget = widget->parent)
+	{
+		if (!strncmp(widget->name, "op_mod_", 7))
+			return widget;
+	}
+	return NULL;
+}
+
+/* the place on the list of the mod on a row, else NONE */
+static short mod_row_place(struct widget_instance *row)
+{
+	short place = row ? (short)(mods_screen.first + atoi(row->name + 7) - 1) : NONE;
+
+	return place >= 0 && place < port_mods_count() ? place : NONE;
+}
+
+/* the mod at a place on the list (its place in the load order counted from
+the end), else NONE */
+static long mod_at_place(short place)
+{
+	long count = port_mods_count();
+
+	return place >= 0 && place < count ? port_mods_at(count - 1 - place) : NONE;
+}
+
+/* UTF-8 text (mod.toml's) as the menus' (a line break the game's \r\n; a
+character the menus' UTF-16 cannot hold, or a broken one, a ?) */
+static void mods_wide_text(char const *text, wchar_t *wide, short length)
+{
+	short index = 0;
+
+	while (*text && index < length - 2)
+	{
+		unsigned char first = (unsigned char)*text++;
+		unsigned long character = first;
+		short following = first >= 0xF0 ? 3 : first >= 0xE0 ? 2 : first >= 0xC0 ? 1 : 0;
+
+		if (first >= 0x80)
+		{
+			character = first & (0x3F >> following);
+			for (; following > 0 && ((unsigned char)*text & 0xC0) == 0x80; following--)
+				character = (character << 6) | ((unsigned char)*text++ & 0x3F);
+			if (following || first < 0xC0 || character > 0xFFFF)
+				character = '?';
+		}
+		if (character == '\n')
+			wide[index++] = '\r';
+		wide[index++] = (wchar_t)character;
+	}
+	wide[index] = 0;
+}
+
+/* the start of the UTF-8 character before `at` in text */
+static size_t mods_character_before(char const *text, size_t at)
+{
+	if (at > 0)
+		at--;
+	while (at > 0 && ((unsigned char)text[at] & 0xC0) == 0x80)
+		at--;
+	return at;
+}
+
+/* whether `count` bytes of text fit across a text box (box): measured in
+its font, from its left as it is drawn (leading spaces and all), else
+counted */
+static boolean mods_text_fits(short box, char const *text, size_t count)
+{
+	static real_argb_color const white = { 1.0f, 1.0f, 1.0f, 1.0f };
+	char part[MOD_DETAILS_LENGTH];
+	wchar_t wide[MOD_DETAILS_LENGTH];
+	rectangle2d bounds;
+	rectangle2d text_bounds;
+	rectangle2d cursor;
+
+	if (!count)
+		return TRUE;
+	if (mods_screen.fonts[box] == NONE)
+		return count <= (size_t)mod_text_box_characters[box];
+	if (count >= sizeof(part))
+		return FALSE;
+	memcpy(part, text, count);
+	part[count] = 0;
+	mods_wide_text(part, wide, NUMBEROF(wide));
+	bounds.x0 = 0;
+	bounds.y0 = 0;
+	bounds.x1 = 0x3FFF;
+	bounds.y1 = 480;
+	draw_string_set_draw_mode(mods_screen.fonts[box], NONE, 0, 0, &white);
+	draw_unicode_string_compute_bounds(&bounds, wide, &text_bounds, &cursor);
+	return MAX(text_bounds.x1, cursor.x0) - bounds.x0 <= mods_screen.widths[box] - MOD_TEXT_MARGIN;
+}
+
+/* `count` bytes of text, as much of them as fits across a text box (box)
+with "..." after it, into `shortened` */
+static void mods_text_shorten(short box, char const *text, size_t count, char *shortened, size_t size)
+{
+	size_t kept = count;
+
+	for (;;)
+	{
+		snprintf(shortened, size, "%.*s...", (int)kept, text);
+		if (!kept || mods_text_fits(box, shortened, strlen(shortened)))
+			return;
+		kept = mods_character_before(text, kept);
+	}
+}
+
+/* text, after what `wrapped` holds, in lines that fit across a text box
+(box), broken at spaces and at its own line breaks (word by word: a word
+too long for a line broken where it fits); `lines` lines in all at most,
+the last cut short with "..." when there is more: how many it holds now */
+static short mods_wrap(char const *text, char *wrapped, size_t size, short box, short lines, short line)
+{
+	size_t length = strlen(wrapped);
+
+	while (line < lines && *text)
+	{
+		char const *end = strchr(text, '\n');
+		size_t count = end ? (size_t)(end - text) : strlen(text);
+		size_t cut = 0;
+		boolean more;
+
+		for (;;)
+		{
+			size_t next = cut;
+
+			while (next < count && text[next] == ' ')
+				next++;
+			while (next < count && text[next] != ' ')
+				next++;
+			if (next == cut || !mods_text_fits(box, text, next))
+				break;
+			cut = next;
+		}
+		if (!cut && count)
+		{
+			for (cut = 0; cut < count && text[cut] == ' '; cut++)
+			{
+			}
+			while (cut < count && text[cut] != ' ')
+				cut++;
+			while (cut > 1 && !mods_text_fits(box, text, cut))
+				cut = mods_character_before(text, cut);
+			if (!cut)
+				cut = 1;
+		}
+		more = cut < count || (text[count] == '\n' && text[count + 1]);
+		if (line == lines - 1 && more)
+		{
+			char shortened[MOD_DETAILS_LENGTH];
+
+			mods_text_shorten(box, text, cut, shortened, sizeof(shortened));
+			snprintf(wrapped + length, size - length, "%s%s", length ? "\n" : "", shortened);
+			return lines;
+		}
+		snprintf(wrapped + length, size - length, "%s%.*s", length ? "\n" : "", (int)cut, text);
+		length = strlen(wrapped);
+		line++;
+		text += cut;
+		while (*text == ' ')
+			text++;
+		if (*text == '\n')
+			text++;
+	}
+	return line;
+}
+
+/* "port mods init" (the list's created), and "port mods close" (its
+deleted: what OK has not kept is forgotten) */
+static boolean mods_screen_reset(void)
+{
+	short index;
+
+	port_mods_revert();
+	mods_screen.first = 0;
+	mods_screen.chosen = 0;
+	mods_screen.shown[0] = 0;
+	for (index = 0; index < NUMBER_OF_MOD_TEXT_BOXES; index++)
+	{
+		mods_screen.fonts[index] = NONE;
+		mods_screen.widths[index] = 0;
+	}
+	for (index = 0; index < MOD_ROWS; index++)
+		mods_screen.row_mods[index] = NONE;
+	return TRUE;
+}
+
+/* "port mods toggle" (A on a row; a mod that cannot be played stays as it
+is, so that it is still off when it can be) */
+static boolean mods_toggle(struct widget_instance *widget)
+{
+	short place = mod_row_place(mod_row(widget));
+	long mod = mod_at_place(place);
+
+	if (place == NONE)
+		return FALSE;
+	if (port_mods_status(mod, NULL, 0) != _port_mod_unplayable)
+		port_mods_turn(mod, !port_mods_on(mod));
+	return TRUE;
+}
+
+/* "port mods move up" and "port mods move down" (left and right on a row,
+and the buttons): the mod of the row, else the one chosen last, moved one
+place on the list (up: later in the load order, over one more mod); the
+focus follows it on its row */
+static boolean mods_move(struct widget_instance *widget, short places)
+{
+	struct widget_instance *row = mod_row(widget);
+	short count = (short)port_mods_count();
+	short place = row ? mod_row_place(row) : mods_screen.chosen;
+	short moved;
+
+	/* (no mods: nothing to move) */
+	if (!count)
+		return TRUE;
+	if (place == NONE || place >= count)
+		return FALSE;
+	moved = (short)(count - 1 - port_mods_move(count - 1 - place, -places));
+	mods_screen.chosen = moved;
+	if (moved < mods_screen.first)
+		mods_screen.first = moved;
+	else if (moved >= mods_screen.first + MOD_ROWS)
+		mods_screen.first = (short)(moved - MOD_ROWS + 1);
+	if (row && row->parent)
+		focus_row(row->parent, (short)(moved - mods_screen.first));
+	return TRUE;
+}
+
+/* the details of the mod at `place` on the list, in the frame (the list's
+description): its name; what is wrong with it, beside its icon; whether it
+is on and its priority (1 the top, the mod that wins); and what its
+mod.toml says */
+static void mods_details_show(struct widget_instance *details, short place, short count)
+{
+	long mod = mod_at_place(place);
+	struct widget_instance *icon = named(details, "mod_details_status", 0);
+	char problem[MOD_DETAILS_LENGTH];
+	char about[MOD_DETAILS_LENGTH];
+	char text[MOD_DETAILS_LENGTH];
+	wchar_t wide[MOD_DETAILS_LENGTH];
+	int status;
+	short line;
+	char shown[sizeof(mods_screen.shown)];
+
+	/* (wrapped again only when what they show, or its fonts, change) */
+	snprintf(shown, sizeof(shown), "%ld %d %d %d %d %ld %d %ld %d", mod, port_mods_status(mod, NULL, 0),
+		port_mods_on(mod), place, count, mods_screen.fonts[_mod_details_name],
+		mods_screen.widths[_mod_details_name], mods_screen.fonts[_mod_details_text],
+		mods_screen.widths[_mod_details_text]);
+	if (!strcmp(shown, mods_screen.shown))
+		return;
+	strcpy(mods_screen.shown, shown);
+	if (mod < 0)
+	{
+		/* (no mods: where they go) */
+		mods_wide_text(count ? "" : "No mods", wide, NUMBEROF(wide));
+		text_set_length(named(details, "mod_details_name", 0), wide, NUMBEROF(wide));
+		text[0] = 0;
+		if (!count)
+		{
+			mods_wrap("Each mod is a folder of its own in the mods folder, beside the maps folder.", text,
+				sizeof(text), _mod_details_text, MOD_DETAILS_LINES, 0);
+		}
+		mods_wide_text(text, wide, NUMBEROF(wide));
+		text_set_length(named(details, "mod_details_text", 0), wide, NUMBEROF(wide));
+		visible_set(icon, FALSE);
+		return;
+	}
+	status = port_mods_status(mod, problem, sizeof(problem));
+	text[0] = 0;
+	mods_wrap(port_mods_name(mod), text, sizeof(text), _mod_details_name, 2, 0);
+	mods_wide_text(text, wide, NUMBEROF(wide));
+	text_set_length(named(details, "mod_details_name", 0), wide, NUMBEROF(wide));
+	visible_set(icon, status != _port_mod_fine);
+	if (icon)
+		icon->animation.current_frame_index = status == _port_mod_out_of_order ? 1 : 2;
+	text[0] = 0;
+	line = 0;
+	if (status != _port_mod_fine)
+	{
+		/* (its first line indented, for the icon) */
+		snprintf(text, sizeof(text), "     %s", problem);
+		strcpy(problem, text);
+		text[0] = 0;
+		line = mods_wrap(problem, text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
+		line = mods_wrap(" ", text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
+	}
+	snprintf(about, sizeof(about), "%s\nPriority: %d of %d", status == _port_mod_unplayable ? "Cannot be played" :
+		port_mods_on(mod) ? "On" : "Off", place + 1, count);
+	line = mods_wrap(about, text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
+	line = mods_wrap(" ", text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
+	port_mods_details(mod, about, sizeof(about));
+	mods_wrap(about, text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
+	mods_wide_text(text, wide, NUMBEROF(wide));
+	text_set_length(named(details, "mod_details_text", 0), wide, NUMBEROF(wide));
+}
+
+/* "port mods update": the rows (the list moving on at its ends while there
+are more mods past them), each mod's name (cut short where it is too long),
+ON or OFF and its icon (out of the order it asks for; another says it cannot
+be played with it, or it cannot be played), and the details of the mod
+chosen */
+static void mods_update(struct widget_instance *list)
+{
+	struct widget_instance *row;
+	struct widget_instance *focused = mod_row(list->focused_child);
+	short count = (short)port_mods_count();
+	short focused_index = focused ? (short)(atoi(focused->name + 7) - 1) : NONE;
+
+	if (focused_index == MOD_ROWS - 1 && mods_screen.first + MOD_ROWS < count && list_scrolls_at_end())
+	{
+		mods_screen.first++;
+		focus_row(list, --focused_index);
+	}
+	else if (focused_index == 0 && mods_screen.first > 0 && list_scrolls_at_end())
+	{
+		mods_screen.first--;
+		focus_row(list, ++focused_index);
+	}
+	if (mods_screen.first > 0 && mods_screen.first + MOD_ROWS > count)
+		mods_screen.first = (short)MAX(0, count - MOD_ROWS);
+	if (focused_index != NONE && mods_screen.first + focused_index < count)
+		mods_screen.chosen = (short)(mods_screen.first + focused_index);
+	for (row = list->child; row; row = row->next)
+	{
+		short place;
+		short row_index;
+		long mod;
+		struct widget_instance *icon;
+		int status;
+
+		if (strncmp(row->name, "op_mod_", 7))
+			continue;
+		/* (its background: the focused one's outlined frame, which the
+		engine shows only on a bitmap of two frames, as the browser's) */
+		row->animation.current_frame_index = row == focused ? 1 : 0;
+		place = mod_row_place(row);
+		row->visible = place != NONE;
+		if (place == NONE)
+		{
+			if (row == focused)
+				focus_row(list, count ? (short)(count - 1 - mods_screen.first) : NONE);
+			continue;
+		}
+		mod = mod_at_place(place);
+		status = port_mods_status(mod, NULL, 0);
+		row_index = (short)PIN(atoi(row->name + 7) - 1, 0, MOD_ROWS - 1);
+		if (mods_screen.row_mods[row_index] != mod ||
+			mods_screen.row_fonts[row_index] != mods_screen.fonts[_mod_row_name])
+		{
+			char const *name = port_mods_name(mod);
+			char shortened[MOD_DETAILS_LENGTH];
+			wchar_t wide[ROW_TEXT_LENGTH];
+
+			if (mods_text_fits(_mod_row_name, name, strlen(name)))
+				snprintf(shortened, sizeof(shortened), "%s", name);
+			else
+				mods_text_shorten(_mod_row_name, name, strlen(name), shortened, sizeof(shortened));
+			mods_wide_text(shortened, wide, ROW_TEXT_LENGTH);
+			text_set(named(row, "mod_name", 0), wide);
+			mods_screen.row_mods[row_index] = mod;
+			mods_screen.row_fonts[row_index] = mods_screen.fonts[_mod_row_name];
+		}
+		text_set(named(row, "mod_state", 0), port_mods_on(mod) ? L"ON" : L"OFF");
+		icon = named(row, "mod_status", 0);
+		visible_set(icon, status != _port_mod_fine);
+		if (icon)
+			icon->animation.current_frame_index = status == _port_mod_out_of_order ? 1 : 2;
+	}
+	mods_details_show(list->parameters.list.extended_description, count ? mods_screen.chosen : NONE, count);
+}
+
+/* "port mods save" (OK): kept, and played at once (port_mods_save keeps
+what it cannot write until the game quits) */
+static boolean mods_save(void)
+{
+	port_mods_save();
+	mods_apply();
+	return TRUE;
+}
+
 /* ---------- Multiplayer (port/assets/menus' PLAN: Create Game > Internet
 or LAN; Join Game > Server Browser (blank, for now), LAN, Direct Link): the
 Xbox's networking, run by the engine's port entry points
@@ -4349,6 +4805,18 @@ void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d c
 {
 	short row;
 
+	/* (the Mods screen's texts: the fonts and widths their lines are
+	measured in, mods_text_fits) */
+	for (row = 0; widget->name && row < NUMBER_OF_MOD_TEXT_BOXES; row++)
+	{
+		if (!strcmp(widget->name, mod_text_box_names[row]))
+		{
+			mods_screen.fonts[row] = draw_string_get_font();
+			mods_screen.widths[row] = (short)(bounds->x1 - bounds->x0);
+			return;
+		}
+	}
+
 	/* (as the lobby last updated them: the rows' widgets go with it) */
 	if (!lobby_icons.count || system_milliseconds() - lobby_icons.updated_at > 250)
 		return;
@@ -5635,6 +6103,22 @@ boolean pc_menu_event_function_invoke(
 		{
 			settings_each(screen_of(widget), setting_default_show);
 		}
+		else if (!strcmp(name, "port mods init") || !strcmp(name, "port mods close"))
+		{
+			return mods_screen_reset();
+		}
+		else if (!strcmp(name, "port mods toggle"))
+		{
+			return mods_toggle(widget);
+		}
+		else if (!strcmp(name, "port mods move up") || !strcmp(name, "port mods move down"))
+		{
+			return mods_move(widget, (short)(!strcmp(name, "port mods move up") ? -1 : 1));
+		}
+		else if (!strcmp(name, "port mods save"))
+		{
+			return mods_save();
+		}
 		else if (!strcmp(name, "controls screen init") || !strcmp(name, "controls screen defaults"))
 		{
 			return controls_load(!strcmp(name, "controls screen defaults"));
@@ -5814,6 +6298,8 @@ void pc_menu_game_data_function_invoke(
 	}
 	else if (!strcmp(name, "controls update menu"))
 		controls_update(widget);
+	else if (!strcmp(name, "port mods update"))
+		mods_update(widget);
 	else if (!strcmp(name, "color picker update"))
 		color_list_update(widget);
 	else if (!strcmp(name, "3wide player profile list update"))
