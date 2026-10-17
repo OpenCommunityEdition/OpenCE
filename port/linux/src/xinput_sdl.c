@@ -647,6 +647,49 @@ void test_input_hold_action(int hold)
 	test_input_holding_action = hold;
 }
 
+/* "zoom:<switches>:<start>": until <start> seconds after the program
+starts, A is tapped every two seconds (skipping the level's cinematic); then
+Y is tapped <switches> times, a second apart (switching weapons), and from
+then on the zoom button (the right stick's click) is clicked every
+TEST_INPUT_ZOOM_SECONDS, standing still: the view steps through the
+weapon's zoom levels and back, the same view at each */
+#define TEST_INPUT_ZOOM_SECONDS 6.0
+static int zoom_start = -1;
+static int zoom_switches;
+
+static void test_input_zoom(XINPUT_GAMEPAD *pad)
+{
+	static long clicks_logged = -1;
+	double t = (double)SDL_GetTicks() / 1000.0;
+	double since;
+	long click;
+
+	if (t < zoom_start)
+	{
+		if (fmod(t, 2.0) < 0.1)
+			pad->bAnalogButtons[XINPUT_GAMEPAD_A] = 255;
+		return;
+	}
+	since = t - zoom_start;
+	if (since < zoom_switches + 1.0)
+	{
+		if (fmod(since, 1.0) < 0.15 && since < zoom_switches)
+			pad->bAnalogButtons[XINPUT_GAMEPAD_Y] = 255;
+		return;
+	}
+	since -= zoom_switches + 1.0;
+	click = (long)(since / TEST_INPUT_ZOOM_SECONDS);
+	if (click > 0 && since - click * TEST_INPUT_ZOOM_SECONDS < 0.15)
+	{
+		pad->wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB;
+		if (clicks_logged != click)
+		{
+			clicks_logged = click;
+			platform_log("test input: zoom click %ld", click);
+		}
+	}
+}
+
 static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 {
 	static int checked;
@@ -668,6 +711,18 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 			seed = atoi(setting + 5);
 			looking = 1;
 		}
+		else if (!strncmp(setting, "zoom:", 5))
+		{
+			const char *start = strchr(setting + 5, ':');
+
+			zoom_switches = atoi(setting + 5);
+			zoom_start = start ? atoi(start + 1) : 30;
+		}
+	}
+	if (zoom_start >= 0)
+	{
+		test_input_zoom(pad);
+		return;
 	}
 	if (seed < 0)
 		return;
