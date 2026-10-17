@@ -978,11 +978,13 @@ A mod is a folder in `mods/` in the data root with a `mod.toml` and a
 them: sounds, bitmaps and string lists that play over the maps' tags of the
 same names, on this machine only (a high-res audio or texture pack, a
 translation). Every mod in the folder is on, in alphabetical order moved
-as the mods ask (`load_after`, `load_before`); the main menu's Mods turns
-them off and moves them, and keeps that in `mods/load_order.toml`. Mods that
-say they cannot be played together (`incompatible`) are asked about at
-startup. The console's `mods_list` lists them, `mods_reload` reads their files again and `mods_enable false`
-plays the maps' own tags. The game checks every file before it plays it, and
+as the mods ask (`load_after`, `load_before`); the main menu's Mods lists
+them as a resource pack list does, the mod at the top playing over those
+below it, turns them off and moves them, and keeps that in
+`mods/load_order.toml`. Mods that say they cannot be played together
+(`incompatible`) are asked about at startup. The console's `mods_list` lists
+them, `mods_reload` reads their files again and `mods_enable false` plays
+the maps' own tags. The game checks every file before it plays it, and
 leaves out (with a line in `debug.txt`) one it cannot trust or that does not
 fit the map's tag it replaces. A mod changes nothing that the machines of a
 network game agree on. Refer to [docs/mods.md](../../docs/mods.md).

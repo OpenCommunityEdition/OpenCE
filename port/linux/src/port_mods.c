@@ -1148,9 +1148,10 @@ int port_mods_status(long index, char *text, unsigned long size)
 	}
 	if ((other = mod_out_of_order_with(index, &before)) >= 0)
 	{
+		/* (as the Mods menu shows them: the mod loaded last at the top) */
 		if (text)
-			snprintf(text, size, "It asks to load %s %s, but loads %s it.", before ? "before" : "after",
-				port_mods.mods[other].name, before ? "after" : "before");
+			snprintf(text, size, "It asks to be %s %s, but is %s it.", before ? "below" : "above",
+				port_mods.mods[other].name, before ? "above" : "below");
 		return _port_mod_out_of_order;
 	}
 	return _port_mod_fine;
@@ -1241,8 +1242,9 @@ int port_mods_save(void)
 
 	if (!text)
 		return 0;
-	snprintf(text, size, "# The mods' load order (the first loads first, and each plays over those before it),\n"
-		"# and the mods turned off: the Mods menu writes this.\norder = [");
+	snprintf(text, size, "# The mods' load order (the first loads first, and each plays over those\n"
+		"# before it: the Mods menu shows it the other way up), and the mods turned\n"
+		"# off. The Mods menu writes this.\norder = [");
 	for (index = 0; index < port_mods.mod_count; index++)
 	{
 		strcat(text, index ? ", \"" : "\"");

@@ -1567,13 +1567,14 @@ def _text_button(name: str, text: str, handlers: list) -> list:
 
 def _mods() -> list:
     """the main menu's MODS and its screen, laid out as the lobby is: on the
-    left two thirds the mods in their load order (the first loads first, each
-    playing over those above it), a row each with its status icon, name and ON
-    or OFF; on the right third, in the lobby's frame, the mod chosen: its
-    name, whether it is on and where it loads, what is wrong with it, and
-    what its mod.toml says. A turns the mod chosen on or off, left and right
-    (and MOVE UP and MOVE DOWN, for the mouse) move it; OK keeps it all
-    (load_order.toml) and plays them, Cancel forgets it (menu_functions.c)"""
+    left two thirds the mods as a resource pack list has them (the one at the
+    top playing over those below it: the load order upside down), a row each
+    with its status icon, name and ON or OFF; on the right third, in the
+    lobby's frame, the mod chosen: its name, what is wrong with it, whether it
+    is on and its priority, and what its mod.toml says. A turns the mod chosen
+    on or off, left and right (and MOVE UP and MOVE DOWN, for the mouse) move
+    it; OK keeps it all (load_order.toml) and plays them, Cancel forgets it
+    (menu_functions.c)"""
     base = MODS
     lines = _widget("main_menu/main_menu_item_mods",
                     [("type", "text"), ("width", 256), ("height", 33), ("bitmap", "main_menu/menu_mods")],

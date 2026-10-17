@@ -2192,10 +2192,12 @@ static void controls_update(struct widget_instance *list)
 }
 
 /* ---------- Mods (the main menu's: tools/port_settings.py's _mods), laid
-out as the lobby is: the mods folder's mods in their load order, a row each
-(op_mod_<n>), turned on or off and moved up or down there, and in the frame
-beside them the mod chosen's details; OK keeps it (port/linux/src/port_mods.c's
-load_order.toml) and plays them on the map now (mods.c), Cancel forgets it */
+out as the lobby is: the mods folder's mods, a row each (op_mod_<n>), as a
+resource pack list is, the one that plays over the others at the top (the
+load order upside down: the mod loaded last first), turned on or off and
+moved up or down there, and in the frame beside them the mod chosen's
+details; OK keeps it (port/linux/src/port_mods.c's load_order.toml) and
+plays them on the map now (mods.c), Cancel forgets it */
 
 #define MOD_ROWS 11
 #define MOD_DETAILS_LENGTH 1024
@@ -2244,8 +2246,9 @@ void mods_apply(void);
 
 static struct
 {
-	/* the place in the load order of the first row, and of the mod chosen
-	last (MOVE UP and MOVE DOWN's, which take the focus from the rows) */
+	/* the place on the list (0 the top: the mod loaded last) of the first
+	row, and of the mod chosen last (MOVE UP and MOVE DOWN's, which take the
+	focus from the rows) */
 	short first;
 	short chosen;
 	/* the text boxes' fonts and widths as they were last drawn
@@ -2271,12 +2274,21 @@ static struct widget_instance *mod_row(struct widget_instance *widget)
 	return NULL;
 }
 
-/* the place in the load order of the mod on a row, else NONE */
-static short mod_row_position(struct widget_instance *row)
+/* the place on the list of the mod on a row, else NONE */
+static short mod_row_place(struct widget_instance *row)
 {
-	short position = row ? (short)(mods_screen.first + atoi(row->name + 7) - 1) : NONE;
+	short place = row ? (short)(mods_screen.first + atoi(row->name + 7) - 1) : NONE;
 
-	return position >= 0 && position < port_mods_count() ? position : NONE;
+	return place >= 0 && place < port_mods_count() ? place : NONE;
+}
+
+/* the mod at a place on the list (its place in the load order counted from
+the end), else NONE */
+static long mod_at_place(short place)
+{
+	long count = port_mods_count();
+
+	return place >= 0 && place < count ? port_mods_at(count - 1 - place) : NONE;
 }
 
 /* UTF-8 text (mod.toml's) as the menus' (a line break the game's \r\n; a
@@ -2445,10 +2457,10 @@ static boolean mods_screen_reset(void)
 is, so that it is still off when it can be) */
 static boolean mods_toggle(struct widget_instance *widget)
 {
-	short position = mod_row_position(mod_row(widget));
-	long mod = port_mods_at(position);
+	short place = mod_row_place(mod_row(widget));
+	long mod = mod_at_place(place);
 
-	if (position == NONE)
+	if (place == NONE)
 		return FALSE;
 	if (port_mods_status(mod, NULL, 0) != _port_mod_unplayable)
 		port_mods_turn(mod, !port_mods_on(mod));
@@ -2457,19 +2469,21 @@ static boolean mods_toggle(struct widget_instance *widget)
 
 /* "port mods move up" and "port mods move down" (left and right on a row,
 and the buttons): the mod of the row, else the one chosen last, moved one
-place; the focus follows it on its row */
+place on the list (up: later in the load order, over one more mod); the
+focus follows it on its row */
 static boolean mods_move(struct widget_instance *widget, short places)
 {
 	struct widget_instance *row = mod_row(widget);
-	short position = row ? mod_row_position(row) : mods_screen.chosen;
+	short count = (short)port_mods_count();
+	short place = row ? mod_row_place(row) : mods_screen.chosen;
 	short moved;
 
 	/* (no mods: nothing to move) */
-	if (!port_mods_count())
+	if (!count)
 		return TRUE;
-	if (position == NONE || position >= port_mods_count())
+	if (place == NONE || place >= count)
 		return FALSE;
-	moved = (short)port_mods_move(position, places);
+	moved = (short)(count - 1 - port_mods_move(count - 1 - place, -places));
 	mods_screen.chosen = moved;
 	if (moved < mods_screen.first)
 		mods_screen.first = moved;
@@ -2480,12 +2494,13 @@ static boolean mods_move(struct widget_instance *widget, short places)
 	return TRUE;
 }
 
-/* the details of the mod at `position` in the load order, in the frame
-(the list's description): its name; what is wrong with it, beside its
-icon; whether it is on and where it loads; and what its mod.toml says */
-static void mods_details_show(struct widget_instance *details, short position, short count)
+/* the details of the mod at `place` on the list, in the frame (the list's
+description): its name; what is wrong with it, beside its icon; whether it
+is on and its priority (1 the top, the mod that wins); and what its
+mod.toml says */
+static void mods_details_show(struct widget_instance *details, short place, short count)
 {
-	long mod = port_mods_at(position);
+	long mod = mod_at_place(place);
 	struct widget_instance *icon = named(details, "mod_details_status", 0);
 	char problem[MOD_DETAILS_LENGTH];
 	char about[MOD_DETAILS_LENGTH];
@@ -2497,7 +2512,7 @@ static void mods_details_show(struct widget_instance *details, short position, s
 
 	/* (wrapped again only when what they show, or its fonts, change) */
 	snprintf(shown, sizeof(shown), "%ld %d %d %d %d %ld %d %ld %d", mod, port_mods_status(mod, NULL, 0),
-		port_mods_on(mod), position, count, mods_screen.fonts[_mod_details_name],
+		port_mods_on(mod), place, count, mods_screen.fonts[_mod_details_name],
 		mods_screen.widths[_mod_details_name], mods_screen.fonts[_mod_details_text],
 		mods_screen.widths[_mod_details_text]);
 	if (!strcmp(shown, mods_screen.shown))
@@ -2538,8 +2553,8 @@ static void mods_details_show(struct widget_instance *details, short position, s
 		line = mods_wrap(problem, text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
 		line = mods_wrap(" ", text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
 	}
-	snprintf(about, sizeof(about), "%s\nLoad order: %d of %d", status == _port_mod_unplayable ? "Cannot be played" :
-		port_mods_on(mod) ? "On" : "Off", position + 1, count);
+	snprintf(about, sizeof(about), "%s\nPriority: %d of %d", status == _port_mod_unplayable ? "Cannot be played" :
+		port_mods_on(mod) ? "On" : "Off", place + 1, count);
 	line = mods_wrap(about, text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
 	line = mods_wrap(" ", text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
 	port_mods_details(mod, about, sizeof(about));
@@ -2576,7 +2591,7 @@ static void mods_update(struct widget_instance *list)
 		mods_screen.chosen = (short)(mods_screen.first + focused_index);
 	for (row = list->child; row; row = row->next)
 	{
-		short position;
+		short place;
 		short row_index;
 		long mod;
 		struct widget_instance *icon;
@@ -2587,15 +2602,15 @@ static void mods_update(struct widget_instance *list)
 		/* (its background: the focused one's outlined frame, which the
 		engine shows only on a bitmap of two frames, as the browser's) */
 		row->animation.current_frame_index = row == focused ? 1 : 0;
-		position = mod_row_position(row);
-		row->visible = position != NONE;
-		if (position == NONE)
+		place = mod_row_place(row);
+		row->visible = place != NONE;
+		if (place == NONE)
 		{
 			if (row == focused)
 				focus_row(list, count ? (short)(count - 1 - mods_screen.first) : NONE);
 			continue;
 		}
-		mod = port_mods_at(position);
+		mod = mod_at_place(place);
 		status = port_mods_status(mod, NULL, 0);
 		row_index = (short)PIN(atoi(row->name + 7) - 1, 0, MOD_ROWS - 1);
 		if (mods_screen.row_mods[row_index] != mod ||

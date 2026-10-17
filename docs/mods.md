@@ -81,25 +81,25 @@ later plays.
 
 - The default order is the folders' names in alphabetical order (not
   case-sensitive), except that the mods a mod must load after (those it
-  asks to load after, and those that ask to load before it) move up to just
-  before it. Mods that ask in a ring (a after b, b after a) load
+  asks to load after, and those that ask to load before it) are taken to
+  just before it. Mods that ask in a ring (a after b, b after a) load
   alphabetically, and the game's log says so.
 - The main menu's **Mods** (in the PC version's menus, `display.menus =
-  "pc"`, the default) is laid out as the game lobby is: the mods in
-  their order on the left, the first loading first and each playing over
-  those above it, and the chosen mod's details in the frame on the right
-  (its name, what is wrong with it, whether it is on, its place in the load
-  order, and its version, authors, folder, maps and description). Choosing
-  a mod (A, or a click on the chosen one: the first click chooses it)
-  turns it on or off (ON, OFF); left and right, or **Move up** and **Move
-  down**, move the chosen mod. **OK** keeps the order
-  and plays it at once (on a map that is loaded, too); **Cancel** leaves it
-  as it was.
-- A warning sign beside a mod means it loads on the wrong side of a mod it
-  asks to load before or after (both on). A red cross means a mod that is
-  on says it cannot be played with this one, or that it cannot be played at
-  all (made for a later build, or its `maps` names none): it stays off. The
-  details say which.
+  "pc"`, the default) is laid out as the game lobby is: the mods on the
+  left as a resource pack list has them, the one at the top playing over
+  all those below it (the load order upside down: the mod loaded last is at
+  the top), and the chosen mod's details in the frame on the right (its
+  name, what is wrong with it, whether it is on, its priority, 1 the top,
+  and its version, authors, folder, maps and description). Choosing a mod
+  (A, or a click on the chosen one: the first click chooses it) turns it on
+  or off (ON, OFF); left and right, or **Move up** and **Move down**, move
+  the chosen mod (up: over one more mod). **OK** keeps the order and plays
+  it at once (on a map that is loaded, too); **Cancel** leaves it as it was.
+- A warning sign beside a mod means it is on the wrong side of a mod it
+  asks to load before or after (both on): a mod that loads after another is
+  above it in the menu. A red cross means a mod that is on says it cannot be
+  played with this one, or that it cannot be played at all (made for a later
+  build, or its `maps` names none): it stays off. The details say which.
 
 The menu keeps the order, and the mods turned off, in `mods/load_order.toml`,
 by the mods' folders' names:
