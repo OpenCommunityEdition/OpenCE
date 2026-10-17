@@ -3102,36 +3102,121 @@ static long players_coop_host_unit(
 	return NONE;
 }
 
-/* port: the co-op host's bringto command (hs.c). Every other player comes
-to the host's first player in the level, or, with no room there, beside one
-who already came. Returns whether anyone came. */
-boolean players_coop_bring_to_host(
-	void)
+/* port: check if a players name matches the argument */
+static boolean player_name_matches(
+	wchar_t const *player_name,
+	char const *text,
+	boolean exact_only)
+{
+	char a;
+	char b;
+
+	for (; *text; player_name++, text++)
+	{
+		a = player_name_character_ascii(*player_name);
+		b = *text;
+
+		if (a >= 'A' && a <= 'Z')
+			a = (char)(a - 'A' + 'a');
+		if (b >= 'A' && b <= 'Z')
+			b = (char)(b - 'A' + 'a');
+
+		if (!*player_name || a != b)
+			return FALSE;
+	}
+	return !exact_only || !*player_name;
+}
+
+/* port: find a player's unit index by name for bringto */
+static long players_find_target_unit(
+	char const *target_name)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	long exact_unit = NONE;
+	long partial_unit = NONE;
+	short exact_count = 0;
+	short partial_count = 0;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->quit_out_of_game || player->unit_index == NONE)
+			continue;
+
+		if (player_name_matches(player->name, target_name, TRUE))
+		{
+			exact_unit = player->unit_index;
+			exact_count++;
+		}
+		if (player_name_matches(player->name, target_name, FALSE))
+		{
+			partial_unit = player->unit_index;
+			partial_count++;
+		}
+	}
+
+	if (exact_count == 1)
+		return exact_unit;
+	if (exact_count > 1 || partial_count > 1)
+	{
+		// shouldnt happen due to player.c handling this but just in case?
+		console_warning("bringto: multiple players match \"%s\", please be more specific", target_name);
+		return NONE;
+	}
+	if (partial_count == 1)
+		return partial_unit;
+
+	console_warning("bringto: no active player named \"%s\"", target_name);
+	return NONE;
+}
+
+/* port: the host's bringto command (hs.c). Every other player comes
+to the specified player, or the host's first player in the level if no name
+is provided, or, with no room there, beside one who already came.
+Returns whether anyone came. */
+boolean players_bring_to_player(
+	char const *target_name)
 {
 	struct data_iterator iterator;
 	struct player_datum *player;
 	long arrived_unit_indices[NETWORK_GAME_MAXIMUM_PLAYER_COUNT + 1];
 	short arrived_count = 0;
 	short missed_count = 0;
+	long target_unit = NONE;
 
 	if (!network_coop_active() || game_connection() != _game_connection_network_server)
 	{
-		console_warning("bringto: only the host of a co-op game brings the players");
+		console_warning("bringto: only the host can teleport players");
 		return FALSE;
 	}
-	arrived_unit_indices[arrived_count++] = players_coop_host_unit();
-	if (arrived_unit_indices[0] == NONE)
+
+	if (target_name && target_name[0])
 	{
-		console_warning("bringto: the host has no player in the level");
+		target_unit = players_find_target_unit(target_name);
+	}
+	else
+	{
+		target_unit = players_coop_host_unit();
+	}
+
+	if (target_unit == NONE)
+	{
+		if (!target_name || !target_name[0])
+			console_warning("bringto: the host has no player in the level");
 		return FALSE;
 	}
+
+	arrived_unit_indices[arrived_count++] = target_unit;
+
 	data_iterator_new(&iterator, player_data);
 	while ((player = data_iterator_next(&iterator)) != NULL)
 	{
 		short arrived_index;
 
-		if (player->unit_index == NONE || player->unit_index == arrived_unit_indices[0])
+		if (player->unit_index == NONE || player->unit_index == target_unit)
 			continue;
+
 		for (arrived_index = 0; arrived_index < arrived_count; arrived_index++)
 		{
 			long beside_index = arrived_unit_indices[arrived_index];
@@ -3139,11 +3224,13 @@ boolean players_coop_bring_to_host(
 			if (player_teleport(iterator.datum_index, beside_index, &object_get(beside_index)->object.bounding_sphere_center))
 				break;
 		}
+
 		if (arrived_index < arrived_count)
 			arrived_unit_indices[arrived_count++] = player->unit_index;
 		else
 			missed_count++;
 	}
+
 	console_printf(FALSE, "bringto: %d brought, %d with no room", arrived_count - 1, missed_count);
 
 	return arrived_count > 1;

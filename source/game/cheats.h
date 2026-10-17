@@ -56,6 +56,9 @@ void cheats_load(
 	void);
 void cheat_active_camouflage_local_player(
 	short player_index);
+/* port: spawns an object matching the given tag near the host if valid space exists */
+boolean cheat_spawn_object(
+	char const *tag_identifier);
 
 /* ---------- globals */
 

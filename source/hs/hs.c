@@ -15432,9 +15432,56 @@ static boolean hs_compile_and_evaluate_command(
 		return TRUE;
 #endif
 	/* port: the co-op host's bringto, which brings every player to the host
-	(players.c; a client is told it is the host's) */
-	if (hs_host_player_command(expression, "bringto"))
-		return players_coop_bring_to_host();
+	(players.c; a client is told it is the host's) or a player typed after the
+
+	 */
+	{
+		char const *text = hs_host_player_command(expression, "bringto");
+
+		if (text)
+		{
+			char name[64];
+			long length = 0;
+
+			while (*text == ' ' || *text == '\t' || *text == '"')
+				text++;
+			while (*text && *text != '"' && *text != ')' && length < (long)sizeof(name) - 1)
+				name[length++] = *text++;
+			while (length > 0 && (name[length - 1] == ' ' || name[length - 1] == '\t'))
+				length--;
+			name[length] = 0;
+
+			return players_bring_to_player(name[0] ? name : NULL);
+		}
+	}
+
+	/* port: the host's spawn command, which spawns an object (such as a vehicle) near the host */
+	{
+		char const *text = hs_host_player_command(expression, "spawn");
+
+		if (text)
+		{
+			char name[128];
+			long length = 0;
+
+			if (hs_playing_in_anothers_game())
+			{
+				console_warning("spawn: only the host of the game can spawn objects");
+				return FALSE;
+			}
+
+			while (*text == ' ' || *text == '\t' || *text == '"')
+				text++;
+			while (*text && *text != '"' && *text != ')' && length < (long)sizeof(name) - 1)
+				name[length++] = *text++;
+			while (length > 0 && (name[length - 1] == ' ' || name[length - 1] == '\t'))
+				length--;
+			name[length] = 0;
+
+			return cheat_spawn_object(name);
+		}
+	}
+
 	/* port: the players' vote to kick a player ("votekick <player name>",
 	or the name's start: Tab completes it), on any machine of a network
 	game: the host counts (network_votekick.c) */

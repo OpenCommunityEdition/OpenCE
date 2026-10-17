@@ -63,8 +63,12 @@ symbols in this file:
 #include "main/console.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
+#include "objects/object_types.h"
+#include "physics/bsp3d.h"
+#include "physics/collisions.h"
 #include "rasterizer/rasterizer_console_vars.h"
 #include "scenario/scenario.h"
+#include "tag_files/tag_files.h"
 #include "tag_files/tag_groups.h"
 #include "units/units.h"
 
@@ -480,4 +484,278 @@ void cheat_all_vehicles(
 	}
 
 	return;
+}
+
+/* port: finds an object definition tag matching the given tag identifier (name or index) */
+static long cheat_find_object_tag(
+	char const *tag_identifier)
+{
+	struct tag_iterator iterator;
+	long tag_index;
+	long exact_match_tag = NONE;
+	long stripped_match_tag = NONE;
+	long full_substring_match_tag = NONE;
+	char search_lower[128];
+	char *endptr;
+	unsigned long parsed_id;
+
+	if (!tag_identifier || !tag_identifier[0])
+		return NONE;
+
+	/* 1. Check if the identifier is a numerical or hexadecimal tag ID */
+	parsed_id = strtoul(tag_identifier, &endptr, 0);
+	if (endptr != tag_identifier && *endptr == 0)
+	{
+		if (tag_index_is_group(parsed_id, OBJECT_DEFINITION_TAG) ||
+			object_definition_index_to_object_type(parsed_id) != NONE)
+		{
+			return (long)parsed_id;
+		}
+	}
+
+	/* Prepare lowercase search string for case-insensitive matching */
+	csstrncpy(search_lower, tag_identifier, sizeof(search_lower) - 1);
+	search_lower[sizeof(search_lower) - 1] = 0;
+	strlwr(search_lower);
+
+	/* Iterate all tags in the loaded cache */
+	tag_iterator_new(&iterator, NONE);
+	for (tag_index = tag_iterator_next(&iterator);
+		tag_index != NONE;
+		tag_index = tag_iterator_next(&iterator))
+	{
+		short obj_type = object_definition_index_to_object_type(tag_index);
+		char const *full_name;
+		char const *stripped_name;
+		char full_lower[256];
+		char stripped_lower[128];
+
+		if (obj_type == NONE)
+			continue;
+
+		full_name = tag_get_name(tag_index);
+		if (!full_name || !full_name[0])
+			continue;
+
+		stripped_name = tag_name_strip_path(full_name);
+
+		csstrncpy(full_lower, full_name, sizeof(full_lower) - 1);
+		full_lower[sizeof(full_lower) - 1] = 0;
+		strlwr(full_lower);
+
+		csstrncpy(stripped_lower, stripped_name, sizeof(stripped_lower) - 1);
+		stripped_lower[sizeof(stripped_lower) - 1] = 0;
+		strlwr(stripped_lower);
+
+		/* Exact match on stripped name (e.g. "warthog" or "mp_warthog") */
+		if (!csstrcmp(stripped_lower, search_lower))
+		{
+			exact_match_tag = tag_index;
+			break;
+		}
+
+		/* Exact match on full tag path */
+		if (!csstrcmp(full_lower, search_lower))
+		{
+			exact_match_tag = tag_index;
+			break;
+		}
+
+		/* Substring match on stripped name */
+		if (strstr(stripped_lower, search_lower))
+		{
+			if (stripped_match_tag == NONE || obj_type == _object_type_vehicle)
+				stripped_match_tag = tag_index;
+		}
+		/* Substring match on full name */
+		else if (strstr(full_lower, search_lower))
+		{
+			if (full_substring_match_tag == NONE || obj_type == _object_type_vehicle)
+				full_substring_match_tag = tag_index;
+		}
+	}
+
+	if (exact_match_tag != NONE)
+		return exact_match_tag;
+	if (stripped_match_tag != NONE)
+		return stripped_match_tag;
+	return full_substring_match_tag;
+}
+
+/* port: spawns an object near the host if in a valid position or reports FAIL if no space */
+boolean cheat_spawn_object(
+	char const *tag_identifier)
+{
+	long definition_index;
+	short object_type;
+	struct object_definition *object_definition;
+	real bounding_radius;
+	long player_index;
+	struct player_datum *player;
+	long host_unit_index;
+	real_point3d host_origin;
+	real_vector3d host_forward, host_up;
+	real_vector3d horizontal_forward;
+	real spawn_distance;
+	real_point3d spawn_pos;
+	struct collision_result ground_collision;
+	struct collision_result line_collision;
+	struct location spawn_loc;
+	real_vector3d down_vector;
+	real_vector3d host_to_spawn;
+	long nearby_objects[32];
+	short nearby_count;
+	short i;
+	struct object_placement_data placement_data;
+	long new_object_index;
+
+	if (!tag_identifier || !tag_identifier[0])
+	{
+		console_warning("spawn: give a tag identifier or name");
+		return FALSE;
+	}
+
+	definition_index = cheat_find_object_tag(tag_identifier);
+	if (definition_index == NONE)
+	{
+		console_warning("spawn: FAIL - object tag \"%s\" not found", tag_identifier);
+		return FALSE;
+	}
+
+	object_type = object_definition_index_to_object_type(definition_index);
+	if (object_type == NONE)
+	{
+		console_warning("spawn: FAIL - tag \"%s\" is not a valid object", tag_identifier);
+		return FALSE;
+	}
+
+	object_definition = object_definition_get(definition_index);
+	bounding_radius = object_definition->object.bounding_radius;
+	if (bounding_radius <= 0.1f)
+		bounding_radius = 1.0f;
+
+	player_index = cheat_player_index();
+	if (player_index == NONE)
+	{
+		console_warning("spawn: FAIL - no player in game");
+		return FALSE;
+	}
+
+	player = player_get(player_index);
+	if (player->unit_index == NONE)
+	{
+		console_warning("spawn: FAIL - host player is not alive");
+		return FALSE;
+	}
+
+	host_unit_index = player->unit_index;
+	object_get_origin(host_unit_index, &host_origin);
+	object_get_orientation(host_unit_index, &host_forward, &host_up);
+
+	horizontal_forward = host_forward;
+	horizontal_forward.k = 0.0f;
+	if (magnitude_squared3d(&horizontal_forward) > 0.0001f)
+		normalize3d(&horizontal_forward);
+	else
+		horizontal_forward = host_forward;
+
+	spawn_distance = bounding_radius + 2.0f;
+	if (spawn_distance < 2.5f)
+		spawn_distance = 2.5f;
+
+	spawn_pos.x = host_origin.x + horizontal_forward.i * spawn_distance;
+	spawn_pos.y = host_origin.y + horizontal_forward.j * spawn_distance;
+	spawn_pos.z = host_origin.z + 0.5f;
+
+	/* Ground detection via downward collision trace */
+	down_vector.i = 0.0f;
+	down_vector.j = 0.0f;
+	down_vector.k = -4.0f;
+	if (collision_test_vector(
+		FLAG(_collision_test_front_facing_surfaces_bit) | FLAG(_collision_test_structure_bit),
+		&spawn_pos,
+		&down_vector,
+		host_unit_index,
+		&ground_collision))
+	{
+		// add bounding radius to solve, plus a padding for collision errors
+		spawn_pos.z = ground_collision.point.z + bounding_radius + 0.1f;
+	}
+
+	// fix for crashes prob
+	/* 1. Location and cluster validation */
+	scenario_location_from_point(&spawn_loc, &spawn_pos);
+	if (spawn_loc.cluster_index == NONE)
+	{
+		console_warning("spawn: FAIL - no space (position outside cluster/BSP)");
+		return FALSE;
+	}
+
+	if (global_bsp3d_get() && bsp3d_test_point(global_bsp3d_get(), 0, &spawn_pos) == NONE)
+	{
+		console_warning("spawn: FAIL - no space (position outside BSP leaf)");
+		return FALSE;
+	}
+
+	/* 2. Line of sight / obstacle check between host and spawn position */
+	vector_from_points3d(&host_origin, &spawn_pos, &host_to_spawn);
+	if (collision_test_vector(
+		FLAG(_collision_test_front_facing_surfaces_bit) | FLAG(_collision_test_structure_bit),
+		&host_origin,
+		&host_to_spawn,
+		host_unit_index,
+		&line_collision))
+	{
+		console_warning("spawn: FAIL - no space (line of sight blocked by structure)");
+		return FALSE;
+	}
+
+	// MAIN CHECK
+	/* 3. Collision sphere check against structure BSP */
+	if (collision_test_sphere(&spawn_pos, bounding_radius * 0.75f, host_unit_index))
+	{
+		console_warning("spawn: FAIL - no space (intersects structure)");
+		return FALSE;
+	}
+
+	/* 4. Overlap check with nearby objects */
+	/*
+	  TODO: fix nearby objects
+
+	nearby_count = objects_in_sphere(
+		0,
+		_object_mask_vehicle | _object_mask_biped | _object_mask_scenery | _object_mask_machine,
+		&spawn_loc,
+		&spawn_pos,
+		bounding_radius,
+		nearby_objects,
+		NUMBEROF(nearby_objects));
+
+
+	for (i = 0; i < nearby_count; i++)
+	{
+		if (nearby_objects[i] != host_unit_index)
+		{
+			short nearby_type = object_get_type(nearby_objects[i]);
+			console_warning("spawn: FAIL - no space (blocked by nearby %s)",
+				object_type_get_name(nearby_type));
+			return FALSE;
+		}
+	}
+*/
+	/* Instantiate object */
+	object_placement_data_new(&placement_data, definition_index, NONE);
+	placement_data.position = spawn_pos;
+	placement_data.forward = horizontal_forward;
+	placement_data.up = *global_up3d;
+
+	new_object_index = object_new(&placement_data);
+	if (new_object_index == NONE)
+	{
+		console_warning("spawn: FAIL - object creation failed");
+		return FALSE;
+	}
+
+	console_printf("spawn: created %s", tag_get_name(definition_index));
+	return TRUE;
 }
