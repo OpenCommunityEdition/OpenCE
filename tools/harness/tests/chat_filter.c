@@ -15,7 +15,22 @@ test_chat_filter.py takes the list, its constants and the code
 #define SHORT_MAX 32767
 #define NUMBEROF(array) ((long)(sizeof(array) / sizeof((array)[0])))
 
+/* streamer mode, as the setting says */
+static boolean enabled = TRUE;
+#define chat_filter_enabled() enabled
+static short chat_filter_cache_next;
+
 #include "under_test.inc"
+
+/* a text in ASCII as the game would draw it */
+static char const *shown(
+	char const *text)
+{
+	return chat_filter_shown_ascii(text);
+}
+
+#define EXPECT_SHOWN(text, expected) \
+	CHECK(!strcmp(shown(text), expected), "\"%s\" drawn as \"%s\", not \"%s\"", text, shown(text), expected)
 
 /* the text filtered, in ASCII */
 static char const *filtered(
@@ -147,6 +162,64 @@ int main(int argc, char **argv)
 		EXPECT("asses", "donkeys");
 		EXPECT("spics", "sporks");
 		EXPECT("fag!", "flapjack!");
+	}
+
+	/* a text drawn: its format codes (| and the character after) kept, and
+	never joined to the words beside them */
+	CASE("formatted")
+	{
+		EXPECT_SHOWN("Player 2|tits a trap", "Player 2|tits a trap");
+		EXPECT_SHOWN("|nfuck you|tcunt", "|nfudge you|tchop stick");
+		EXPECT_SHOWN("fu|nck", "fu|nck");
+		EXPECT_SHOWN("ends with a bar|", "ends with a bar|");
+	}
+
+	/* every text drawn: the same text again from the cache, another text
+	not mistaken for it; as it is with streamer mode off, or too long */
+	CASE("shown")
+	{
+		char long_text[400];
+		wchar_t wide[8] = L"fuck";
+		wchar_t long_wide[400];
+		short index;
+
+		EXPECT_SHOWN("fuck", "fudge");
+		EXPECT_SHOWN("abcd", "abcd");
+		EXPECT_SHOWN("fuck", "fudge");
+		CHECK(chat_filter_shown(wide)[1] == 'u' && chat_filter_shown(wide)[3] == 'g', "the wide text not replaced");
+		memset(long_text, 'x', sizeof(long_text) - 6);
+		memcpy(long_text + sizeof(long_text) - 6, "fuck", 5);
+		CHECK(shown(long_text) == long_text, "a text too long for the cache not drawn as it is");
+		for (index = 0; index < 399; index++)
+			long_wide[index] = (wchar_t)long_text[index];
+		long_wide[399] = 0;
+		CHECK(chat_filter_shown(long_wide) == long_wide, "a wide text too long for the cache not drawn as it is");
+		enabled = FALSE;
+		CHECK(shown("fuck") != NULL && !strcmp(shown("fuck"), "fuck"), "replaced with streamer mode off");
+		CHECK(chat_filter_shown(wide) == wide, "not the string itself with streamer mode off");
+	}
+
+	/* what replaces a word holds none (the chat's text and the drawn text are
+	both filtered) */
+	CASE("idempotent")
+	{
+		long index;
+
+		for (index = 0; index < NUMBEROF(chat_filter_words); index++)
+		{
+			wchar_t source[64];
+			wchar_t destination[256];
+			short length;
+
+			if (!chat_filter_words[index].replacement)
+				continue;
+			for (length = 0; chat_filter_words[index].replacement[length]; length++)
+				source[length] = (wchar_t)chat_filter_words[index].replacement[length];
+			source[length] = 0;
+			chat_filter_text(destination, (short)NUMBEROF(destination), source);
+			CHECK(!wcscmp(destination, source), "\"%s\" (for \"%s\") is itself replaced",
+				chat_filter_words[index].replacement, chat_filter_words[index].word);
+		}
 	}
 
 	/* never past the buffer, and always ended */

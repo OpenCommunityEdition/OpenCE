@@ -40,7 +40,6 @@ players neither send nor see lines.
 #include "text/text_group.h"
 #include "network_distributed.h"
 #include "network_chat.h"
-#include "chat_filter.h"
 #include "halo_keyboard.h"
 
 #include <stdio.h>
@@ -768,32 +767,21 @@ static void chat_draw_line(
 	rasterizer_text_set_shadow_color(0);
 }
 
-/* a line's text as drawn: its characters, and in streamer mode its words
-replaced (chat_filter.c) */
+/* a line's text as drawn (streamer mode's words are replaced as in every text
+the game draws: draw_string.c, chat_filter.c) */
 static void chat_line_text(
 	char const *text,
 	wchar_t *drawn,
 	short size)
 {
-	wchar_t wide[CHAT_TEXT_SIZE];
 	short index;
 
-	for (index = 0; text[index] && index < CHAT_TEXT_SIZE - 1; index++)
-		wide[index] = (wchar_t)(unsigned char)text[index];
-	wide[index] = 0;
-	if (chat_filter_enabled())
-	{
-		chat_filter_text(drawn, size, wide);
-		return;
-	}
-	for (index = 0; wide[index] && index < size - 1; index++)
-		drawn[index] = wide[index];
+	for (index = 0; text[index] && index < size - 1; index++)
+		drawn[index] = (wchar_t)(unsigned char)text[index];
 	drawn[index] = 0;
 }
 
-/* a line's name as drawn: "Name:", "Name (team):" or "Name (vehicle):"; in
-streamer mode its
-words replaced */
+/* a line's name as drawn: "Name:", "Name (team):" or "Name (vehicle):" */
 static void chat_line_name(
 	struct chat_line const *line,
 	wchar_t *name,
@@ -801,16 +789,10 @@ static void chat_line_name(
 {
 	wchar_t const *suffix = line->channel == _chat_channel_team ? L" (team):" :
 		line->channel == _chat_channel_vehicle ? L" (vehicle):" : L":";
-	wchar_t filtered[CHAT_DRAWN_SIZE];
 	wchar_t const *player_name = line->name;
 	short length = 0;
 	short index;
 
-	if (chat_filter_enabled())
-	{
-		chat_filter_text(filtered, NUMBEROF(filtered), line->name);
-		player_name = filtered;
-	}
 	for (index = 0; player_name[index] && length < size - 1; index++)
 		name[length++] = player_name[index];
 	for (index = 0; suffix[index] && length < size - 1; index++)
@@ -865,7 +847,7 @@ void network_chat_draw(
 		bounds.x1 = window.x1;
 		bounds.y1 = bottom;
 		bounds.y0 = (short)(bottom - line_height);
-		/* (as typed: streamer mode replaces only what is sent) */
+		/* (streamer mode replaces its words as in every text drawn) */
 		for (length = 0; chat_input.text[length]; length++)
 			text[length] = (wchar_t)(unsigned char)chat_input.text[length];
 		text[length] = 0;

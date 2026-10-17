@@ -1,10 +1,11 @@
 /*
 CHAT_FILTER.C
 
-Streamer mode (game.streamer_mode, off by default): the text chat shows
-the slurs and swearing in players' names and lines as harmless words
-instead, so that what a stream shows stays clean. It changes only what
-this machine draws (network_chat.c): every machine is sent the lines as
+Streamer mode (game.streamer_mode, off by default): the text the game
+draws shows the slurs and swearing in it as harmless words instead, the
+chat's lines and players' names wherever they show, so that what a stream
+shows stays clean. It changes only what this machine draws (draw_string.c,
+through chat_filter_shown): every machine is sent the lines and names as
 they were typed, and debug.txt keeps them so.
 
 Each word of the list matches in either case, and in the spellings that
@@ -56,6 +57,13 @@ enum
 {
 	/* the endings of _chat_filter_word (the first of chat_filter_endings) */
 	CHAT_FILTER_PLURAL_ENDINGS = 4,
+	/* the texts drawn (chat_filter_shown): those remembered, filtered, and how
+	long one may be (a longer one is drawn as it is); how much longer a text
+	may grow (kys: keep yourself safe); a run between format codes at most */
+	CHAT_FILTER_CACHED = 48,
+	CHAT_FILTER_CACHED_SIZE = 256,
+	CHAT_FILTER_GROWTH = 4,
+	CHAT_FILTER_RUN_SIZE = 256,
 };
 
 /* ---------- structures */
@@ -275,7 +283,7 @@ static struct chat_filter_word const chat_filter_words[] =
 	{ "pussy willow", NULL, _chat_filter_word },
 	{ "pussy", "kitty cat", _chat_filter_anywhere },
 	{ "whore", "hoarder", _chat_filter_anywhere },
-	{ "hoe", "garden hoe", _chat_filter_word },
+	{ "hoe", "rake", _chat_filter_word },
 	{ "thot", "thought", _chat_filter_word },
 	{ "slut", "sloth", _chat_filter_anywhere },
 	{ "skank", "skunk", _chat_filter_word_start },
@@ -353,6 +361,17 @@ static struct chat_filter_word const chat_filter_words[] =
 	{ "stfu", "shush", _chat_filter_word },
 	{ "gtfo", "go touch grass", _chat_filter_word },
 };
+
+/* the texts drawn, as streamer mode shows them (chat_filter_shown) */
+static struct
+{
+	boolean valid;
+	short length;
+	unsigned long hash;
+	wchar_t source[CHAT_FILTER_CACHED_SIZE];
+	wchar_t shown[CHAT_FILTER_CACHED_SIZE * CHAT_FILTER_GROWTH];
+} chat_filter_cache[CHAT_FILTER_CACHED];
+static short chat_filter_cache_next;
 
 /* the endings a word may have (_chat_filter_word: the first
 CHAT_FILTER_PLURAL_ENDINGS) */
@@ -691,6 +710,112 @@ short chat_filter_text(
 	}
 	destination[length] = 0;
 	return length;
+}
+
+/* a text as the game draws it: the runs between its format codes (a | and the
+character after it: "|n", "|t", draw_string.c's) each filtered on its own, the
+codes kept as they are, so that none joins the words beside it */
+static short chat_filter_formatted(
+	wchar_t *destination,
+	short size,
+	wchar_t const *source)
+{
+	wchar_t run[CHAT_FILTER_RUN_SIZE];
+	short length = 0;
+	long index = 0;
+
+	if (size <= 0)
+		return 0;
+	while (source[index] && length < size - 1)
+	{
+		short run_length = 0;
+
+		while (source[index] && source[index] != '|' && run_length < CHAT_FILTER_RUN_SIZE - 1)
+			run[run_length++] = source[index++];
+		run[run_length] = 0;
+		if (run_length)
+			length = (short)(length + chat_filter_text(destination + length, (short)(size - length), run));
+		if (source[index] == '|')
+		{
+			chat_filter_put(destination, size, &length, source[index++]);
+			if (source[index])
+				chat_filter_put(destination, size, &length, source[index++]);
+		}
+	}
+	destination[length] = 0;
+	return length;
+}
+
+/* the text as streamer mode shows it (the string itself when it is off), the
+same strings drawn each frame found again in a cache; a text too long for the
+cache's entries is shown as it is rather than cut short */
+static wchar_t const *chat_filter_cached(
+	wchar_t const *string)
+{
+	unsigned long hash = 2166136261UL;
+	long length;
+	short slot;
+	short index;
+
+	for (length = 0; string[length]; length++)
+	{
+		if (length >= CHAT_FILTER_CACHED_SIZE - 1)
+			return string;
+		hash = (hash ^ (unsigned long)string[length]) * 16777619UL;
+	}
+	for (slot = 0; slot < CHAT_FILTER_CACHED; slot++)
+	{
+		if (!chat_filter_cache[slot].valid || chat_filter_cache[slot].hash != hash ||
+			chat_filter_cache[slot].length != length)
+		{
+			continue;
+		}
+		for (index = 0; index < length && chat_filter_cache[slot].source[index] == string[index]; index++)
+			;
+		if (index == length)
+			return chat_filter_cache[slot].shown;
+	}
+	slot = chat_filter_cache_next;
+	chat_filter_cache_next = (short)((chat_filter_cache_next + 1) % CHAT_FILTER_CACHED);
+	for (index = 0; index <= length; index++)
+		chat_filter_cache[slot].source[index] = string[index];
+	chat_filter_cache[slot].hash = hash;
+	chat_filter_cache[slot].length = (short)length;
+	chat_filter_cache[slot].valid = TRUE;
+	chat_filter_formatted(chat_filter_cache[slot].shown, (short)NUMBEROF(chat_filter_cache[slot].shown), string);
+	return chat_filter_cache[slot].shown;
+}
+
+wchar_t const *chat_filter_shown(
+	wchar_t const *string)
+{
+	if (!string || !chat_filter_enabled())
+		return string;
+	return chat_filter_cached(string);
+}
+
+char const *chat_filter_shown_ascii(
+	char const *string)
+{
+	static char shown[CHAT_FILTER_CACHED_SIZE * CHAT_FILTER_GROWTH];
+	wchar_t wide[CHAT_FILTER_CACHED_SIZE];
+	wchar_t const *filtered;
+	short index;
+
+	if (!string || !chat_filter_enabled())
+		return string;
+	for (index = 0; string[index]; index++)
+	{
+		if (index >= CHAT_FILTER_CACHED_SIZE - 1)
+			return string;
+		wide[index] = (wchar_t)(unsigned char)string[index];
+	}
+	wide[index] = 0;
+	filtered = chat_filter_cached(wide);
+	for (index = 0; filtered[index] && index < (short)sizeof(shown) - 1; index++)
+		shown[index] = (char)filtered[index];
+	shown[index] = 0;
+	return shown;
 }
 
 /* ---------- the setting */

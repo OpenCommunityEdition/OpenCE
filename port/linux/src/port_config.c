@@ -518,6 +518,9 @@ static const struct config_setting config_settings[] =
 		"This many seconds into an automated test game each machine's player\n"
 		"says a chat line to everyone, then to the team and to the vehicle (the\n"
 		"host seats the last two players in one first); 0 never." },
+	{ "debug.network_test_name", _config_string, "\"\"", "HALO_NETWORK_TEST_NAME", _environment_value, _platform_all,
+		"The name this machine's player takes in an automated test game (ASCII);\n"
+		"empty keeps its profile's." },
 	{ "debug.network_test_pickup_weapon", _config_string, "\"\"", "HALO_NETWORK_TEST_PICKUP_WEAPON", _environment_value,
 		_platform_all,
 		"The weapon network_test_pickup stands the player on: the first whose tag\n"

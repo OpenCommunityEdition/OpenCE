@@ -41,6 +41,7 @@ Called from the main loop every frame (main.c).
 #include "cseries.h"
 #include "main/main.h"
 #include "interface/player_ui.h"
+#include "saved games/player_profile.h"
 #include "interface/ui_widget.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_client_manager.h"
@@ -596,6 +597,25 @@ static void network_test_vehicle(
 	}
 }
 
+/* debug.network_test_name: the name the machine's first player takes (its
+profile's, which it joins with), in ASCII */
+static void network_test_set_name(
+	void)
+{
+	char const *name = config_string("debug.network_test_name");
+	struct player_profile profile;
+	short index;
+
+	if (!name || !name[0])
+		return;
+	player_ui_get_active_player_profile(0, &profile);
+	for (index = 0; name[index] && index < MAXIMUM_PLAYER_PROFILE_NAME_LENGTH - 1; index++)
+		profile.player_name[index] = (wchar_t)(unsigned char)name[index];
+	profile.player_name[index] = 0;
+	player_ui_set_active_player_profile(0, player_ui_get_active_player_profile_index(0), &profile);
+	platform_log("network test: this machine's player is named %s", name);
+}
+
 /* debug.network_test_chat: the host seats the last two players in one
 vehicle, the nearest to the first of them with seats for both (any, a map's
 own), for the vehicle chat (two joining machines' players, of one team: they
@@ -1136,7 +1156,10 @@ void network_test_update(
 				network_test.map_set = TRUE;
 			}
 			if (!network_test.player_added && network_test.setup_seconds >= 2.0f && global_network_game_client_get())
+			{
+				network_test_set_name();
 				network_test.player_added = network_game_client_add_player(global_network_game_client_get(), 0);
+			}
 			if (network_test.setup_seconds >= network_test.start_delay)
 			{
 				network_test.started = TRUE;
@@ -1151,6 +1174,7 @@ void network_test_update(
 			network_test.set_up = TRUE;
 			dispose_global_network_game_client();
 			dispose_global_network_game_server();
+			network_test_set_name();
 			if (create_global_network_game_client())
 			{
 				game_connection_set(_game_connection_network_client);
