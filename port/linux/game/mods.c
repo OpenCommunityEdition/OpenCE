@@ -2,14 +2,16 @@
 MODS.C
 
 Mods: tag files played over a map's tags on this machine, as a resource
-pack is: a map's sounds (mod_sounds.c), bitmaps (mod_bitmaps.c) and text
-(mod_strings.c) from Halo PC tag files, as the Halo Editing Kit and Invader
-write them, in the mods of the mods folder that are on, in their load order
-(port/linux/src/port_mods.c; the main menu's Mods chooses: menu_functions.c;
-the mod.toml files: docs/mods.md). Nothing a mod plays is anything the
-machines of a network game must agree on: no tag that the game simulates is
-played from a file, and no mod is sent to another machine, so a mod is this
-machine's alone, in any game.
+pack is: a map's sounds (mod_sounds.c), bitmaps (mod_bitmaps.c), text
+(mod_strings.c) and models (mod_models.c) from Halo PC tag files, as the
+Halo Editing Kit and Invader write them, in the mods of the mods folder that
+are on, in their load order (port/linux/src/port_mods.c; the main menu's
+Mods chooses: menu_functions.c; the mod.toml files: docs/mods.md). Nothing a
+mod plays is anything the machines of a network game must agree on: no tag
+that the game simulates is played from a file (a model's nodes, markers and
+regions must be the map's: only what is drawn of it is the file's), and no
+mod is sent to another machine, so a mod is this machine's alone, in any
+game.
 
 When a map's tags load (scenario_tags_load), when the console asks
 (mods_reload) and when the Mods menu's OK keeps a new order (mods_apply),
@@ -40,8 +42,8 @@ char *tag_get_name(long tag_index);
 /* ---------- constants */
 
 /* the most the mods' tags keep in memory (their files, their sounds'
-samples and their bitmaps' tags; bitmaps' pixels are read as they are
-drawn) */
+samples, their bitmaps' tags and their models' geometry; bitmaps' pixels
+are read as they are drawn) */
 #if defined(HALO_ANDROID) || defined(HALO_WEB)
 #define MAXIMUM_KEPT_BYTES (192UL * 1024 * 1024)
 #else
@@ -62,13 +64,16 @@ static struct
 	/* the groups' updates say what they did at the console (not as the
 	Mods menu applies them) */
 	boolean say;
-	/* how many of the map's strings, bitmaps and sounds the mods play */
+	/* how many of the map's strings, bitmaps, sounds and models the mods play */
 	long string_count;
 	long bitmap_count;
 	long sound_count;
+	long model_count;
 } mods_globals;
 
 /* ---------- private code */
+
+static void mods_let_go(boolean give_back);
 
 /* every group's tags played from the mods' files, or (remove_all) none */
 static void mods_update(
@@ -78,6 +83,7 @@ static void mods_update(
 	mods_globals.string_count = mod_strings_update(remove_all, at_load);
 	mods_globals.bitmap_count = mod_bitmaps_update(remove_all, at_load);
 	mods_globals.sound_count = mod_sounds_update(remove_all, at_load);
+	mods_globals.model_count = mod_models_update(remove_all, at_load);
 
 	return;
 }
@@ -232,6 +238,11 @@ boolean mods_map_loaded(
 void mods_tags_loaded(
 	char const *map_name)
 {
+	/* (a map whose tags loaded, but not the rest of it, is not unloaded
+	before the next map's tags load over its own: what the mods made for it
+	goes, and nothing of it is written over the new map's tags) */
+	if (mods_globals.map_loaded)
+		mods_let_go(FALSE);
 	mods_globals.map_loaded = TRUE;
 	mods_globals.enabled = TRUE;
 	csstrncpy(mods_globals.map_name, map_name ? map_name : "", sizeof(mods_globals.map_name) - 1);
@@ -249,13 +260,14 @@ void mods_tags_loaded(
 	return;
 }
 
-/* (scenario_tags_unload, once the sound and texture caches are closed: no
-cache block holds a mod's permutation or bitmap) */
-void mods_tags_unloaded(
-	void)
+/* Every group lets go of what it made for the map; the map's models get
+their own definitions back if `give_back` (their tags are still there). */
+static void mods_let_go(
+	boolean give_back)
 {
 	mod_sounds_tags_unloaded();
 	mod_bitmaps_tags_unloaded();
+	mod_models_tags_unloaded(give_back);
 	mod_strings_tags_unloaded();
 	mods_globals.map_loaded = FALSE;
 	mods_globals.enabled = FALSE;
@@ -264,6 +276,17 @@ void mods_tags_unloaded(
 	mods_globals.string_count = 0;
 	mods_globals.bitmap_count = 0;
 	mods_globals.sound_count = 0;
+	mods_globals.model_count = 0;
+
+	return;
+}
+
+/* (scenario_tags_unload, once the sound and texture caches are closed: no
+cache block holds a mod's permutation or bitmap; nothing draws a model) */
+void mods_tags_unloaded(
+	void)
+{
+	mods_let_go(TRUE);
 
 	return;
 }
@@ -363,9 +386,9 @@ void mods_list(
 	{
 		if (mods_globals.enabled)
 		{
-			console_printf(FALSE, "mods: on %s, %ld string lists, %ld bitmaps and %ld sounds are theirs (%lu KB kept)",
+			console_printf(FALSE, "mods: on %s, %ld string lists, %ld bitmaps, %ld sounds and %ld models are theirs (%lu KB kept)",
 				mods_globals.map_name, mods_globals.string_count, mods_globals.bitmap_count, mods_globals.sound_count,
-				mods_globals.kept_bytes / 1024);
+				mods_globals.model_count, mods_globals.kept_bytes / 1024);
 		}
 		else
 		{

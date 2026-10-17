@@ -5,8 +5,9 @@ The mods (port_mods.h): folders in the data root's mods folder, each with a
 mod.toml saying what it is and a tags folder of Halo PC tag files, as the
 Halo Editing Kit and Invader write them (tags/sound/.../name.sound). The
 game plays a map's tags from the files of the mods that are on
-(port/linux/game/mods.c): only those of this machine's sounds, bitmaps and
-text, so that a mod changes nothing another machine of a network game sees.
+(port/linux/game/mods.c): only those of this machine's sounds, bitmaps,
+text and models (what is drawn of them), so that a mod changes nothing
+another machine of a network game sees.
 
 Every mod in the folder is on, in a load order: the folders' names'
 alphabetical order, except that the mods a mod must load after (those it
@@ -1060,6 +1061,11 @@ int port_mods_file_read(long file, unsigned long offset, void *buffer, unsigned 
 	}
 	free(staging);
 	return read;
+}
+
+long port_mods_file_order(long file)
+{
+	return file >= 0 && file < port_mods.file_count ? port_mods.mods[port_mods.files[file].mod].order : -1;
 }
 
 const char *port_mods_file_mod(long file)
