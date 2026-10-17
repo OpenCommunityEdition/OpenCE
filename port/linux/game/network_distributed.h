@@ -126,6 +126,9 @@ enum
 	_distributed_message_map_share_sources = 85,
 	_distributed_message_map_share_progress = 86,
 
+	/* A client asks the host to kill only its current unit (reliable). */
+	_distributed_message_suicide_request = 88,
+
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
 
