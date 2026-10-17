@@ -570,6 +570,10 @@ static const struct config_setting config_settings[] =
 	{ "debug.gpu_visibility_no_depth", _config_boolean, "false", "HALO_GPU_VISIBILITY_NO_DEPTH", _environment_value, _platform_desktop,
 		"Diagnostic: disable depth testing only while drawing visibility queries. Implies\n"
 		"gpu_sync_visibility. Glows may show through walls; not a gameplay fix. Restart required." },
+	{ "debug.gpu_visibility_explicit_depth", _config_boolean, "false", "HALO_GPU_VISIBILITY_EXPLICIT_DEPTH", _environment_value, _platform_desktop,
+		"Diagnostic: replace visibility-draw polygon bias with shader depth offset\n"
+		"-zbias/16777215, clamped to [0,1]. Keeps depth tests, implies synchronous\n"
+		"readback and overrides gpu_visibility_no_depth. Restart required." },
 	{ "debug.gpu_trace_frame", _config_integer, "-1", "HALO_GPU_TRACE", _environment_value, _platform_all,
 		"Log every draw of this frame; -1 none." },
 	{ "debug.gpu_trace_constants", _config_boolean, "false", "HALO_GPU_TRACE_CONSTANTS", _environment_set_is_true, _platform_all,

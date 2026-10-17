@@ -2,6 +2,7 @@
 setlocal
 set "HALO_GPU_SYNC_VISIBILITY=true"
 set "HALO_GPU_VISIBILITY_NO_DEPTH=false"
+set "HALO_GPU_VISIBILITY_EXPLICIT_DEPTH=false"
 if /I "%~1"=="--baseline" set "HALO_GPU_SYNC_VISIBILITY=false"
 if /I "%~1"=="--no-depth" set "HALO_GPU_VISIBILITY_NO_DEPTH=true"
 set "HALO_GL_DEBUG=1"

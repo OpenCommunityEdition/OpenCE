@@ -395,6 +395,9 @@ struct program_entry
 	GLint bump_matrix, bump_luminance, texture_scale;
 	GLint texture_lod_bias;
 	GLint screen_offset;
+#ifndef HALO_GLES
+	GLint visibility_depth_offset;
+#endif
 	/* nv2a_pixel_shader_key's source_blend's color, and what it last had */
 	GLint blend_constant;
 	float blend_constant_value[4];
@@ -600,6 +603,7 @@ struct gl_device
 	/* Diagnostic: read each query to the CPU only after it completes. */
 	BOOL visibility_sync;
 	BOOL visibility_no_depth;
+	BOOL visibility_explicit_depth;
 	/* State at the query's draw, not at the next frame's readback. Slots
 	are reused by the game and do not identify a particular light. */
 	struct visibility_observation
@@ -607,6 +611,7 @@ struct gl_device
 		unsigned long frame, draws;
 		BOOL depth, stencil;
 		DWORD depth_function, cull, color, bias;
+		float explicit_offset;
 		GLint viewport[4];
 	} visibility_draw, visibility_observations[VISIBILITY_TEST_SLOTS];
 	struct visibility_sample
@@ -1722,7 +1727,10 @@ static void gl_initialize(void)
 	glGenQueries(1, &device.scratch_query);
 #ifndef HALO_GLES
 	device.visibility_no_depth = config_boolean("debug.gpu_visibility_no_depth") != 0;
-	device.visibility_sync = config_boolean("debug.gpu_sync_visibility") != 0 || device.visibility_no_depth;
+	device.visibility_explicit_depth = config_boolean("debug.gpu_visibility_explicit_depth") != 0;
+	if (device.visibility_explicit_depth)
+		device.visibility_no_depth = FALSE;
+	device.visibility_sync = config_boolean("debug.gpu_sync_visibility") != 0 || device.visibility_no_depth || device.visibility_explicit_depth;
 	device.visibility_log_time = SDL_GetTicks();
 	if (device.visibility_sync)
 		platform_log("GPU: synchronized visibility readback enabled; occlusion remains active, GPU waits may reduce frame rate");
@@ -1748,6 +1756,8 @@ static void gl_initialize(void)
 	if (device.visibility_sync)
 		platform_log("GPU: visibility diagnostic depth=%s; one-second summaries and latest zero/nonzero examples; slots are not light identities",
 			device.visibility_no_depth ? "disabled for visibility draws only" : "normal");
+	if (device.visibility_explicit_depth)
+		platform_log("GPU: explicit visibility depth offset enabled: -zbias/16777215, clamped to [0,1]; native polygon offset replaced for visibility draws; depth testing retained");
 	{
 		long every = config_integer("debug.gpu_flush_draws");
 		const char *renderer = (const char *)glGetString(GL_RENDERER);
@@ -2256,6 +2266,20 @@ void WINAPI D3DDevice_InsertCallback(D3DCALLBACKTYPE type, D3DCALLBACK callback,
 /* ---------- visibility (occlusion) tests */
 
 #ifndef HALO_GLES
+static BOOL visibility_explicit_depth_active(void)
+{
+	return device.visibility_test_active && device.visibility_explicit_depth;
+}
+
+static float visibility_depth_offset(void)
+{
+	/* The renderer allocates D24S8 targets. This is an explicit D24-step
+	experiment, not an assertion about the NV2A's bias unit. Visibility
+	quads have constant depth, so their slope term is zero. */
+	return visibility_explicit_depth_active() && D3D__RenderState[D3DRS_SOLIDOFFSETENABLE] ?
+		-(float)D3D__RenderState[D3DRS_ZBIAS] / 16777215.0f : 0.0f;
+}
+
 static void visibility_check_errors(const char *operation)
 {
 	GLenum error;
@@ -2291,10 +2315,10 @@ static void visibility_log_summary(void)
 
 		if (i ? device.visibility_reads == device.visibility_zeros : !device.visibility_zeros)
 			continue;
-		platform_log("GPU: visibility example slot=%lu query=%u submit_frame=%lu draws=%lu raw=%u scale=%g pixels=%u depth=%d zfunc=0x%lx stencil=%d cull=0x%lx color=0x%lx zbias=%lu viewport=%d,%d,%d,%d",
+		platform_log("GPU: visibility example slot=%lu query=%u submit_frame=%lu draws=%lu raw=%u scale=%g pixels=%u depth=%d zfunc=0x%lx stencil=%d cull=0x%lx color=0x%lx zbias=%lu explicit_offset=%g viewport=%d,%d,%d,%d",
 			(unsigned long)sample->slot, sample->query, draw->frame, draw->draws, sample->raw, sample->scale, sample->pixels,
 			draw->depth, (unsigned long)draw->depth_function, draw->stencil, (unsigned long)draw->cull,
-			(unsigned long)draw->color, (unsigned long)draw->bias,
+			(unsigned long)draw->color, (unsigned long)draw->bias, draw->explicit_offset,
 			draw->viewport[0], draw->viewport[1], draw->viewport[2], draw->viewport[3]);
 	}
 	device.visibility_log_time = now;
@@ -3022,6 +3046,9 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	}
 	entry->viewport_scale = glGetUniformLocation(entry->program, "viewport_scale");
 	entry->viewport_offset = glGetUniformLocation(entry->program, "viewport_offset");
+#ifndef HALO_GLES
+	entry->visibility_depth_offset = glGetUniformLocation(entry->program, "visibility_depth_offset");
+#endif
 	entry->point_size = glGetUniformLocation(entry->program, "point_size");
 	entry->ps_c0 = glGetUniformLocation(entry->program, "ps_c0");
 	entry->ps_c1 = glGetUniformLocation(entry->program, "ps_c1");
@@ -3609,12 +3636,15 @@ static void apply_raster_state(BOOL has_depth)
 	float depth_range[2];
 	unsigned char color_mask;
 	BOOL depth_test = has_depth && rs[D3DRS_ZENABLE];
+	BOOL polygon_offset = rs[D3DRS_SOLIDOFFSETENABLE] != 0;
 
 #ifndef HALO_GLES
 	/* Only visibility draws bypass depth. The next ordinary draw restores
 	the requested test and write mask through the normal GL state cache. */
 	if (device.visibility_test_active && device.visibility_no_depth)
 		depth_test = FALSE;
+	if (visibility_explicit_depth_active())
+		polygon_offset = FALSE;
 #endif
 	viewport[0] = target_pixel((float)device.viewport.X, 0);
 	viewport[1] = target_pixel((float)device.viewport.Y, 1);
@@ -3657,6 +3687,7 @@ static void apply_raster_state(BOOL has_depth)
 		draw->cull = rs[D3DRS_CULLMODE];
 		draw->color = write;
 		draw->bias = rs[D3DRS_ZBIAS];
+		draw->explicit_offset = visibility_depth_offset();
 		memcpy(draw->viewport, viewport, sizeof(viewport));
 	}
 #endif
@@ -3785,11 +3816,11 @@ static void apply_raster_state(BOOL has_depth)
 #endif
 
 	/* D3DRS_ZBIAS is expressed in these states (D3DDevice_SetRenderState_ZBias) */
-	state_enable(&gl_state.offset_fill, GL_POLYGON_OFFSET_FILL, rs[D3DRS_SOLIDOFFSETENABLE] != 0);
+	state_enable(&gl_state.offset_fill, GL_POLYGON_OFFSET_FILL, polygon_offset);
 #ifndef HALO_GLES
-	state_enable(&gl_state.offset_line, GL_POLYGON_OFFSET_LINE, rs[D3DRS_SOLIDOFFSETENABLE] != 0);
+	state_enable(&gl_state.offset_line, GL_POLYGON_OFFSET_LINE, polygon_offset);
 #endif
-	if (rs[D3DRS_SOLIDOFFSETENABLE])
+	if (polygon_offset)
 	{
 		float offset[2];
 
@@ -3927,6 +3958,9 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	key.combiner_state[D3DRS_PSFINALCOMBINERCONSTANT1] = 0;
 	key.texture_modes = D3D__RenderState[D3DRS_PSTEXTUREMODES];
 	key.mcc_bump_attenuation = mcc_environment_shader_active();
+#ifndef HALO_GLES
+	key.visibility_explicit_depth = visibility_explicit_depth_active();
+#endif
 	/* the textures before the targets: a render target the draw samples
 	has its multisampled pixels resolved by a blit (render_target_resolve),
 	which binds framebuffers of its own, and the back buffer can be both
@@ -3994,6 +4028,12 @@ static struct program_entry *prepare_draw(BOOL immediate)
 #endif
 	draw_flush();
 	state_program(entry->program);
+#ifndef HALO_GLES
+	/* Upload outside the shared uniform-serial shortcut: the same program
+	can be reused with a different bias on the next visibility draw. */
+	if (key.visibility_explicit_depth && entry->visibility_depth_offset >= 0)
+		glUniform1f(entry->visibility_depth_offset, visibility_depth_offset());
+#endif
 	if (key.source_blend && entry->blend_constant >= 0)
 	{
 		float blend_constant[4];
