@@ -151,7 +151,7 @@
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA\nis cheap; MSAA is sharper."/>
 		<string text="The size objects' shadows are drawn at: 128 as on\nthe Xbox; larger for smoother, as soft, edges."/>
 		<string text="Light models for each pixel, without the facets\nof the Xbox's lighting for each vertex."/>
-		<string text="Keep full detail, culling only tiny particles.\nCryotube interiors stay hidden. May reduce performance."/>
+		<string text="Keep full detail, culling small particles.\nCryotube interiors stay hidden. May reduce performance."/>
 		<string text="Shields light their surroundings as they flare,\nin the shield's own color."/>
 		<string text="Light Show: the shield glow three times as far,\nat full from a third of the flare."/>
 	</strings>

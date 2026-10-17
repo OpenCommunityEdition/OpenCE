@@ -14,7 +14,7 @@ def generated(fault=None):
     if fault == "live":
         source = mutated(source, "read_at != changes", "(read_at != changes && changes == 0)")
     if fault == "particle":
-        source = mutated(source, "MIN(cutoff, 0.5f)", "0.0f")
+        source = mutated(source, "MIN(cutoff, 4.0f)", "0.0f")
     return (("under_test.inc", "\n".join(function(source, name) for name in (
         "render_lod_disabled", "render_lod_inside_model", "render_lod_particle_visible", "render_lod_geometry_level", "render_lod_permutation_level"))),)
 

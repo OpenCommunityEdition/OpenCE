@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 		configured = 1; revision++;
 		CHECK(render_lod_disabled(), "model switches live");
 		CHECK(!render_lod_particle_visible(.001f, 10), "negligible particle culled");
-		CHECK(render_lod_particle_visible(.501f, 10), "visible small particle retained");
+		CHECK(render_lod_particle_visible(4.001f, 10), "visible small particle retained");
 		CHECK(reads == 2, "one read per revision");
 		configured = 0; revision++;
 		CHECK(!render_lod_disabled(), "normal detail restored");
@@ -81,8 +81,8 @@ int main(int argc, char **argv)
 	}
 	CASE("particle-cutoff") {
 		configured = 1;
-		CHECK(!render_lod_particle_visible(.5f, 4), "strict default boundary");
-		CHECK(render_lod_particle_visible(.5001f, 4), "just above default boundary");
+		CHECK(!render_lod_particle_visible(4.0f, 10), "strict default boundary");
+		CHECK(render_lod_particle_visible(4.0001f, 10), "just above default boundary");
 		CHECK(render_lod_particle_visible(.3f, .25f), "preserve a smaller authored cutoff");
 		CHECK(render_lod_particle_visible(.001f, 0), "preserve authored zero cutoff");
 		configured = 0; revision++;
