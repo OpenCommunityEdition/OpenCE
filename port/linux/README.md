@@ -214,6 +214,7 @@ gamepads' only.
 | talk in voice chat (hold) | V |
 | type a chat line to everyone | T |
 | type a chat line to your team | Y |
+| while typing a chat line: to everyone, the team or the vehicle, in turn | Tab |
 
 Always: \` opens the developer console, F12 releases or captures the mouse,
 F11 changes between fullscreen and window. Screenshot (default F10,
@@ -665,14 +666,17 @@ together.
 Network games have a text chat, as the PC version had. Press T
 (`controls.chat`) to type a line to all the players, or Y
 (`controls.team_chat`) to type one to your team (in a game without teams,
-to all the players). Enter sends the line, Escape cancels it. While you
-type, your player does not move.
+to all the players). While you type, Tab changes who the line is to, in
+turn: all the players, your team, or your vehicle (the players riding in
+the vehicle you ride in, whatever the map's vehicles are, Custom Edition
+maps' too; on foot, only you see it). Enter sends the line, Escape cancels
+it. While you type, your player does not move.
 
 The lines show above the motion sensor: the player's name in the colour of
 their team (blue in a game without teams), then the text in a pale blue;
 CHAT TEXT in Settings > Audio > Voice and Text Chat (`display.chat_style`)
 draws them all white instead, as Custom Edition does. A line to the
-team says "(team)" after the name. The lines go after ten seconds; while
+team says "(team)" after the name, one to the vehicle "(vehicle)". The lines go after ten seconds; while
 you type, the last six show. A line has 63 characters at most, letters,
 numbers and punctuation only (ASCII). `debug.txt` gets every line.
 

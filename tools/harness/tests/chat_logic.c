@@ -128,10 +128,31 @@ int main(int argc, char **argv)
 	/* a team's line by that team alone, or by everyone without teams */
 	CASE("hears")
 	{
-		CHECK(chat_hears(FALSE, TRUE, 0, 1), "a line to everyone not heard by the other team");
-		CHECK(chat_hears(TRUE, TRUE, 1, 1), "a team's line not heard by the team");
-		CHECK(!chat_hears(TRUE, TRUE, 0, 1), "a team's line heard by the other team");
-		CHECK(chat_hears(TRUE, FALSE, 0, 1), "a team's line not heard without teams");
+		CHECK(chat_hears(_chat_channel_everyone, TRUE, 0, 1, NONE, 7), "a line to everyone not heard by the other team");
+		CHECK(chat_hears(_chat_channel_team, TRUE, 1, 1, NONE, NONE), "a team's line not heard by the team");
+		CHECK(!chat_hears(_chat_channel_team, TRUE, 0, 1, 7, 7), "a team's line heard by the other team");
+		CHECK(chat_hears(_chat_channel_team, FALSE, 0, 1, NONE, NONE), "a team's line not heard without teams");
+	}
+
+	/* a vehicle's line by those riding in the sender's vehicle alone, of any
+	team; by no one when the sender rides in none */
+	CASE("hears-vehicle")
+	{
+		CHECK(chat_hears(_chat_channel_vehicle, TRUE, 0, 1, 7, 7), "not heard in the same vehicle (another team)");
+		CHECK(!chat_hears(_chat_channel_vehicle, TRUE, 0, 0, 7, 8), "heard in another vehicle");
+		CHECK(!chat_hears(_chat_channel_vehicle, TRUE, 0, 0, 7, NONE), "heard on foot");
+		CHECK(!chat_hears(_chat_channel_vehicle, FALSE, 0, 0, NONE, NONE), "heard on foot from a sender on foot");
+	}
+
+	/* a line's channel through its flags, as sent */
+	CASE("flags")
+	{
+		short channel;
+
+		for (channel = 0; channel < NUMBER_OF_CHAT_CHANNELS; channel++)
+			CHECK(chat_channel_from_flags(chat_channel_flags(channel)) == channel, "channel %d came back as %d",
+				channel, chat_channel_from_flags(chat_channel_flags(channel)));
+		CHECK(chat_channel_from_flags(0) == _chat_channel_everyone, "no flags is not everyone");
 	}
 
 	/* shown whole, then fading, then gone; whole while a line is typed */

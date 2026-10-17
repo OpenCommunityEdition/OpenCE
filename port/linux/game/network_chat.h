@@ -10,13 +10,25 @@ it.
 #define __NETWORK_CHAT_H
 #pragma once
 
+/* ---------- constants */
+
+/* who a line is to */
+enum
+{
+	_chat_channel_everyone,
+	_chat_channel_team,
+	/* those riding in the sender's vehicle */
+	_chat_channel_vehicle,
+	NUMBER_OF_CHAT_CHANNELS
+};
+
 /* ---------- prototypes/NETWORK_CHAT.C */
 
 /* every frame (main.c): the keys that start typing a line, and those typed */
 void network_chat_update(void);
-/* the first local player says a line, as if typed and sent (to the team:
-team); the automated tests' (network_test.c) */
-void network_chat_say(boolean team, char const *text);
+/* the first local player says a line to a channel, as if typed and sent;
+the automated tests' (network_test.c) */
+void network_chat_say(short channel, char const *text);
 /* whether a line is being typed: the keyboard types into it, and drives no
 player (xinput_sdl.c), as with the console */
 boolean network_chat_typing(void);

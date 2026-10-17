@@ -3,7 +3,8 @@ NETWORK_CHAT.C
 
 The text chat of network games (port/linux/NETCODE.md), as the PC version
 had it: T (controls.chat) starts a line to everyone, Y (controls.team_chat)
-one to the player's team; Enter sends it, Escape lets it go. The lines are
+one to the player's team; Tab, while typing, turns it to everyone, the team
+or the vehicle in turn; Enter sends it, Escape lets it go. The lines are
 drawn above the motion sensor, each with its player's name in their team's
 colour, and fade after a while.
 
@@ -12,8 +13,11 @@ reliably), which takes it only from the client's own stream, from one of
 that machine's players, at most CHAT_BURST lines at once and one each
 CHAT_REFILL_MILLISECONDS after, its text cut to printable ASCII. The host
 sends it on to every machine that hears it (_distributed_message_chat_down,
-reliably): all of them, or a team's line only those with a player of the
-team (every machine in a game without teams). A client shows only what the
+reliably): all of them, a team's line only those with a player of the
+team (every machine in a game without teams), and a vehicle's line only
+those with a player riding in the vehicle the sender rides in (the
+outermost: a vehicle on another's back is its), whatever the map's vehicles
+are, and the sender's own. A client shows only what the
 host sends, its own lines too, so every machine shows the same lines in the
 same order. A build without the chat drops both kinds as unknown: its
 players neither send nor see lines.
@@ -28,6 +32,7 @@ players neither send nor see lines.
 #include "input/input.h"
 #include "interface/hud_messaging.h"
 #include "main/console.h"
+#include "objects/objects.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "text/draw_string.h"
@@ -79,7 +84,11 @@ enum
 {
 	/* to the sender's team alone */
 	_chat_line_team_bit,
+	/* to those in the sender's vehicle alone */
+	_chat_line_vehicle_bit,
 };
+
+/* who a line is to (network_chat.h's _chat_channel_*) */
 
 /* a line's colour: its sender's team's */
 enum
@@ -118,7 +127,7 @@ struct chat_line
 	wchar_t name[CHAT_NAME_SIZE];
 	char text[CHAT_TEXT_SIZE];
 	short color;
-	boolean team;
+	short channel;
 	/* (system_milliseconds) */
 	unsigned long time;
 };
@@ -134,7 +143,7 @@ static short chat_newest_line;
 static struct
 {
 	boolean active;
-	boolean team;
+	short channel;
 	char text[CHAT_TEXT_SIZE];
 } chat_input;
 
@@ -229,15 +238,44 @@ static boolean chat_rate_take(
 	return TRUE;
 }
 
-/* whether a listener of a team hears a line: one to everyone, a team's in a
-game without teams, else a team's by the same team alone */
+/* whether a listener hears a line of a channel: one to everyone; a team's
+by the same team, or by everyone in a game without teams; a vehicle's by
+those riding in the vehicle the sender rides in (NONE: none), none when the
+sender rides in none (the sender sees their own lines whatever this says) */
 static boolean chat_hears(
-	boolean team_line,
+	short channel,
 	boolean has_teams,
 	long sender_team,
-	long listener_team)
+	long listener_team,
+	long sender_vehicle,
+	long listener_vehicle)
 {
-	return !team_line || !has_teams || sender_team == listener_team;
+	switch (channel)
+	{
+	case _chat_channel_team:
+		return !has_teams || sender_team == listener_team;
+	case _chat_channel_vehicle:
+		return sender_vehicle != NONE && sender_vehicle == listener_vehicle;
+	default:
+		return TRUE;
+	}
+}
+
+/* a line's channel from its flags, and back */
+static short chat_channel_from_flags(
+	byte flags)
+{
+	if (TEST_FLAG(flags, _chat_line_vehicle_bit))
+		return _chat_channel_vehicle;
+	return TEST_FLAG(flags, _chat_line_team_bit) ? _chat_channel_team : _chat_channel_everyone;
+}
+
+static byte chat_channel_flags(
+	short channel)
+{
+	if (channel == _chat_channel_vehicle)
+		return (byte)FLAG(_chat_line_vehicle_bit);
+	return channel == _chat_channel_team ? (byte)FLAG(_chat_line_team_bit) : 0;
 }
 
 /* how much of a line shows at its age (milliseconds): all of it for a while,
@@ -266,7 +304,7 @@ static boolean chat_network_game(
 /* a line shown, from a player (absolute index) */
 static void chat_add_line(
 	short player_index,
-	boolean team,
+	short channel,
 	char const *text)
 {
 	struct player_datum *player = distributed_player(player_index);
@@ -287,7 +325,7 @@ static void chat_add_line(
 	}
 	csstrncpy(line->text, text, CHAT_TEXT_SIZE - 1);
 	line->color = game_engine_has_teams() && player->team_index == 0 ? _chat_color_red : _chat_color_blue;
-	line->team = team;
+	line->channel = channel;
 	line->time = system_milliseconds();
 	/* (debug.txt has the lines, in ASCII) */
 	{
@@ -296,7 +334,8 @@ static void chat_add_line(
 		for (index = 0; line->name[index]; index++)
 			name[index] = player_name_character_ascii(line->name[index]);
 		name[index] = 0;
-		error(_error_log, "chat%s: %s: %s", team ? " (team)" : "", name, line->text);
+		error(_error_log, "chat%s: %s: %s", channel == _chat_channel_team ? " (team)" :
+			channel == _chat_channel_vehicle ? " (vehicle)" : "", name, line->text);
 	}
 }
 
@@ -308,15 +347,38 @@ static boolean chat_host(
 	return game_connection() == _game_connection_network_server;
 }
 
-/* (the host) a player's line, sent on to every machine that hears it and
-shown here if a player of this machine's does */
+/* the vehicle a player rides in, the outermost (a vehicle carried by another
+is in that one); NONE for none, or no unit */
+static long chat_player_vehicle(
+	struct player_datum const *player)
+{
+	long object_index = player->unit_index;
+	long vehicle_index = NONE;
+
+	/* (each object riding in its parent: a unit in a seat is its vehicle's child) */
+	while (object_index != NONE)
+	{
+		struct object_datum *object = object_try_and_get(object_index);
+
+		if (!object || object->object.parent_object_index == NONE)
+			break;
+		vehicle_index = object->object.parent_object_index;
+		object_index = vehicle_index;
+	}
+	return vehicle_index;
+}
+
+/* (the host) a player's line, sent on to every machine that hears it (and
+the sender's) and shown here if a player of this machine's hears it or said
+it */
 static void chat_host_send(
 	short player_index,
-	boolean team,
+	short channel,
 	char const *text)
 {
 	struct player_datum *sender = distributed_player(player_index);
 	boolean has_teams = game_engine_has_teams();
+	long sender_vehicle;
 	long machine_indices[MAXIMUM_CHAT_MACHINES];
 	short count = distributed_client_machines(machine_indices, MAXIMUM_CHAT_MACHINES);
 	struct
@@ -329,16 +391,16 @@ static void chat_host_send(
 
 	if (!sender || sender->quit_out_of_game)
 		return;
+	sender_vehicle = chat_player_vehicle(sender);
 	csmemset(&message, 0, sizeof(message));
 	message.line.player_index = distributed_player_to_byte(player_index);
-	if (team)
-		message.line.flags |= FLAG(_chat_line_team_bit);
+	message.line.flags = chat_channel_flags(channel);
 	csstrncpy(message.line.text, text, CHAT_TEXT_SIZE - 1);
 	for (index = 0; index < count; index++)
 	{
 		struct data_iterator iterator;
 		struct player_datum *player;
-		boolean hears = FALSE;
+		boolean hears = distributed_machine_has_player(machine_indices[index], player_index);
 
 		data_iterator_new(&iterator, player_data);
 		while (!hears && (player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
@@ -346,7 +408,8 @@ static void chat_host_send(
 			hears = !player->quit_out_of_game &&
 				distributed_machine_has_player(machine_indices[index],
 					(short)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)) &&
-				chat_hears(team, has_teams, sender->team_index, player->team_index);
+				chat_hears(channel, has_teams, sender->team_index, player->team_index, sender_vehicle,
+					chat_player_vehicle(player));
 		}
 		if (hears)
 		{
@@ -360,9 +423,11 @@ static void chat_host_send(
 		long local_index = local_player_get_player_index(local_player_index);
 
 		if (local_index != NONE &&
-			chat_hears(team, has_teams, sender->team_index, player_get(local_index)->team_index))
+			((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(local_index) == player_index ||
+				chat_hears(channel, has_teams, sender->team_index, player_get(local_index)->team_index,
+					sender_vehicle, chat_player_vehicle(player_get(local_index)))))
 		{
-			chat_add_line(player_index, team, text);
+			chat_add_line(player_index, channel, text);
 			break;
 		}
 	}
@@ -387,7 +452,7 @@ void network_chat_handle_up(
 	{
 		return;
 	}
-	chat_host_send(line.player_index, TEST_FLAG(line.flags, _chat_line_team_bit), text);
+	chat_host_send(line.player_index, chat_channel_from_flags(line.flags), text);
 }
 
 word network_chat_line_entry_size(
@@ -409,7 +474,7 @@ void network_chat_handle_down(
 	csmemcpy(&line, entries, sizeof(line));
 	if (distributed_player_from_byte(line.player_index) == NONE || !chat_text_clean(text, line.text, CHAT_TEXT_SIZE))
 		return;
-	chat_add_line(line.player_index, TEST_FLAG(line.flags, _chat_line_team_bit), text);
+	chat_add_line(line.player_index, chat_channel_from_flags(line.flags), text);
 }
 
 /* ---------- typing */
@@ -425,7 +490,7 @@ static short chat_speaker(
 }
 
 static void chat_send(
-	boolean team,
+	short channel,
 	char const *typed)
 {
 	char text[CHAT_TEXT_SIZE];
@@ -435,7 +500,7 @@ static void chat_send(
 		return;
 	if (chat_host())
 	{
-		chat_host_send(player_index, team, text);
+		chat_host_send(player_index, channel, text);
 	}
 	else
 	{
@@ -447,8 +512,7 @@ static void chat_send(
 
 		csmemset(&message, 0, sizeof(message));
 		message.line.player_index = distributed_player_to_byte(player_index);
-		if (team)
-			message.line.flags |= FLAG(_chat_line_team_bit);
+		message.line.flags = chat_channel_flags(channel);
 		csstrncpy(message.line.text, text, CHAT_TEXT_SIZE - 1);
 		distributed_send(&message, _distributed_message_chat_up, 1, (word)sizeof(message),
 			_distributed_to_host_reliably);
@@ -456,21 +520,21 @@ static void chat_send(
 }
 
 void network_chat_say(
-	boolean team,
+	short channel,
 	char const *text)
 {
-	if (chat_network_game() && game_in_progress())
-		chat_send(team, text);
+	if (chat_network_game() && game_in_progress() && channel >= 0 && channel < NUMBER_OF_CHAT_CHANNELS)
+		chat_send(channel, text);
 }
 
 static void chat_input_begin(
-	boolean team)
+	short channel)
 {
 	struct key_stroke key;
 
 	csmemset(&chat_input, 0, sizeof(chat_input));
 	chat_input.active = TRUE;
-	chat_input.team = team;
+	chat_input.channel = channel;
 	/* (the keys pressed before) */
 	while (input_get_key(&key))
 		;
@@ -502,7 +566,7 @@ void network_chat_update(
 		pressed = held & ~chat_actions_held;
 		chat_actions_held = held;
 		if (pressed && !console_is_active())
-			chat_input_begin(!TEST_FLAG(pressed, HALO_KEYBOARD_CHAT));
+			chat_input_begin(TEST_FLAG(pressed, HALO_KEYBOARD_CHAT) ? _chat_channel_everyone : _chat_channel_team);
 		return;
 	}
 	chat_actions_held = 0;
@@ -520,8 +584,12 @@ void network_chat_update(
 			break;
 		case _key_return:
 		case _keypad_enter:
-			chat_send(chat_input.team, chat_input.text);
+			chat_send(chat_input.channel, chat_input.text);
 			chat_input_end();
+			break;
+		/* (to everyone, the team, the vehicle, in turn) */
+		case _key_tab:
+			chat_input.channel = (short)((chat_input.channel + 1) % NUMBER_OF_CHAT_CHANNELS);
 			break;
 		case _key_backspace:
 			if (length)
@@ -723,14 +791,16 @@ static void chat_line_text(
 	drawn[index] = 0;
 }
 
-/* a line's name as drawn: "Name:", or "Name (team):"; in streamer mode its
+/* a line's name as drawn: "Name:", "Name (team):" or "Name (vehicle):"; in
+streamer mode its
 words replaced */
 static void chat_line_name(
 	struct chat_line const *line,
 	wchar_t *name,
 	short size)
 {
-	wchar_t const *suffix = line->team ? L" (team):" : L":";
+	wchar_t const *suffix = line->channel == _chat_channel_team ? L" (team):" :
+		line->channel == _chat_channel_vehicle ? L" (vehicle):" : L":";
 	wchar_t filtered[CHAT_DRAWN_SIZE];
 	wchar_t const *player_name = line->name;
 	short length = 0;
@@ -805,7 +875,8 @@ void network_chat_draw(
 			text[length + 1] = 0;
 		}
 		chat_color(_chat_color_blue, 1.0f, &color);
-		chat_draw_line(font_index, &bounds, chat_input.team ? L"Say to team:" : L"Say:", &color, text, 1.0f);
+		chat_draw_line(font_index, &bounds, chat_input.channel == _chat_channel_team ? L"Say to team:" :
+			chat_input.channel == _chat_channel_vehicle ? L"Say to vehicle:" : L"Say:", &color, text, 1.0f);
 		bottom = bounds.y0;
 	}
 	for (shown = 0, index = 0; index < chat_line_count && shown < CHAT_LINES_SHOWN; index++)

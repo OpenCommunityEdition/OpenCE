@@ -596,6 +596,68 @@ static void network_test_vehicle(
 	}
 }
 
+/* debug.network_test_chat: the host seats the last two players in one
+vehicle, the nearest to the first of them with seats for both (any, a map's
+own), for the vehicle chat (two joining machines' players, of one team: they
+start near each other) */
+static void network_test_seat_together(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct object_iterator vehicles;
+	long units[2];
+	long best_index = NONE;
+	real best_distance = 0.0f;
+	short count = 0;
+	short index;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->unit_index == NONE)
+			continue;
+		units[0] = count ? units[1] : NONE;
+		units[1] = player->unit_index;
+		count++;
+	}
+	if (count < 2)
+		return;
+	object_iterator_new(&vehicles, _object_mask_vehicle, 0);
+	while (object_iterator_next(&vehicles))
+	{
+		real distance;
+
+		if (unit_definition_get(object_get(vehicles.index)->definition_index)->unit.seats.count < 2)
+			continue;
+		distance = distance_squared3d(&object_get(units[0])->object.position, &object_get(vehicles.index)->object.position);
+		if (best_index == NONE || distance < best_distance)
+		{
+			best_index = vehicles.index;
+			best_distance = distance;
+		}
+	}
+	if (best_index == NONE)
+	{
+		platform_log("network test: no vehicle with two seats");
+		return;
+	}
+	for (index = 0; index < (short)NUMBEROF(units); index++)
+	{
+		short seat_index;
+
+		for (seat_index = 0;
+			seat_index < unit_definition_get(object_get(best_index)->definition_index)->unit.seats.count; seat_index++)
+		{
+			if (!unit_seat_filled(best_index, seat_index) && unit_enter_seat(units[index], best_index, seat_index))
+				break;
+		}
+	}
+	platform_log("network test: the last two players ride vehicle %lx: %s, %s", best_index,
+		object_get(units[0])->object.parent_object_index == best_index ? "in" : "out",
+		object_get(units[1])->object.parent_object_index == best_index ? "in" : "out");
+}
+
 /* both machines stand the last player at the driver's entrance of the
 nearest vehicle no one rides (a joining machine's player then holds the
 action button, as a player getting in does) */
@@ -803,25 +865,39 @@ void network_test_update(
 			}
 		}
 		/* debug.network_test_chat: each machine's player says a line to
-		everyone that many seconds in, and one to the team two seconds on */
+		everyone that many seconds in, one to the team two seconds on, and
+		one to the vehicle two more on, the host having seated the last two
+		players in one vehicle (the others in none) three seconds before */
 		if (network_test.chat_time > 0.0f)
 		{
 			long chat_time = (long)(network_test.chat_time * TICKS_PER_SECOND);
 			char const *machine = network_test.mode == _network_test_host ? "the host" : "a client";
 			char text[64];
 
-			if (game_time_get() < chat_time)
+			if (game_time_get() < chat_time - 3 * TICKS_PER_SECOND)
 				network_test.chat_lines_said = 0;
-			if (network_test.chat_lines_said == 0 && game_time_get() >= chat_time)
+			if (network_test.mode == _network_test_host && network_test.chat_lines_said == 0 &&
+				game_time_get() >= chat_time - 3 * TICKS_PER_SECOND)
+			{
+				network_test_seat_together();
+				network_test.chat_lines_said = -1;
+			}
+			if (network_test.chat_lines_said <= 0 && game_time_get() >= chat_time)
 			{
 				snprintf(text, sizeof(text), "hello everyone from %s", machine);
-				network_chat_say(FALSE, text);
-				network_test.chat_lines_said++;
+				network_chat_say(_chat_channel_everyone, text);
+				network_test.chat_lines_said = 1;
 			}
 			if (network_test.chat_lines_said == 1 && game_time_get() >= chat_time + 2 * TICKS_PER_SECOND)
 			{
 				snprintf(text, sizeof(text), "hello team from %s", machine);
-				network_chat_say(TRUE, text);
+				network_chat_say(_chat_channel_team, text);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 2 && game_time_get() >= chat_time + 4 * TICKS_PER_SECOND)
+			{
+				snprintf(text, sizeof(text), "hello vehicle from %s", machine);
+				network_chat_say(_chat_channel_vehicle, text);
 				network_test.chat_lines_said++;
 			}
 		}

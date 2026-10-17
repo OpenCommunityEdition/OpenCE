@@ -286,9 +286,13 @@ the client's own stream and from one of that machine's players, at most 5
 lines at once and one each 1.5 seconds after (more are dropped), its text
 cut to 63 characters of printable ASCII. The host alone sends the line on
 (`_distributed_message_chat_down`, reliably, with the sender's absolute
-index): to every client, or a team's line only to the machines with a
-player of the sender's team (to every one in a game without teams), and
-shows it itself if one of its own players hears it. A client shows only
+index and its channel, the line's flags): to every client, a team's line
+only to the machines with a player of the sender's team (to every one in a
+game without teams), and a vehicle's line only to those with a player
+riding in the sender's vehicle (the outermost object each unit is a child
+of, so any map's vehicles), as the host has them; the sender's machine gets
+its own line whatever it is. The host shows it itself if one of its own
+players hears it or said it. A client shows only
 the host's lines, its own too, so every machine shows them in one order.
 Builds without the chat drop both kinds as unknown, so the network version
 is unchanged.
@@ -747,7 +751,8 @@ two machines' views of one game can be compared. `debug.network_test_kill`,
 swap the bots' wandering does not reach (`debug.network_test_pickup_weapon`
 picks the weapon: the first whose tag name has it in it, as "sniper"),
 `debug.network_test_chat` has each machine's player say a chat line to
-everyone and one to the team, which every machine's `debug.txt` records as
+everyone, one to the team and one to the vehicle (the host seats the last
+two players in one first), which every machine's `debug.txt` records as
 it shows them, and `debug.network_test_score`
 shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's

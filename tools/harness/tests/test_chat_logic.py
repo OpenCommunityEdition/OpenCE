@@ -1,5 +1,5 @@
 """The rules of network_chat.c's text chat: a line's text (another machine's is untrusted), the lines the host takes
-from a machine, who hears a team's line, and how long a line shows."""
+from a machine, who hears a team's line and a vehicle's, and how long a line shows."""
 
 import sys
 from pathlib import Path
@@ -7,11 +7,12 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from harness import CHECK_FAILED, build, constant, function, mutated, read, run, structure  # noqa: E402
+from harness import CHECK_FAILED, build, constant, enum_with, function, mutated, read, run, structure  # noqa: E402
 
 CASES = ["text-printable", "text-control-characters", "text-bounds", "text-empty", "append", "rate-burst",
-         "rate-refill", "rate-wrap", "hears", "alpha"]
-FUNCTIONS = ("chat_text_clean", "chat_text_append", "chat_rate_take", "chat_hears", "chat_line_alpha")
+         "rate-refill", "rate-wrap", "hears", "hears-vehicle", "flags", "alpha"]
+FUNCTIONS = ("chat_text_clean", "chat_text_append", "chat_rate_take", "chat_hears", "chat_channel_from_flags",
+             "chat_channel_flags", "chat_line_alpha")
 
 # a fault in network_chat.c, the function it is in, and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -26,6 +27,11 @@ NEGATIVE_CONTROLS = {
     "refill-unbounded": (("MIN((unsigned long)CHAT_BURST, rate->tokens + gained)", "(rate->tokens + gained)"),
                          "chat_rate_take", "rate-refill"),
     "team-line-to-all": (("|| sender_team == listener_team", "|| TRUE"), "chat_hears", "hears"),
+    "vehicle-line-to-all": (("return sender_vehicle != NONE && sender_vehicle == listener_vehicle;", "return TRUE;"),
+                            "chat_hears", "hears-vehicle"),
+    "vehicle-line-on-foot": (("return sender_vehicle != NONE && sender_vehicle", "return sender_vehicle"),
+                             "chat_hears", "hears-vehicle"),
+    "vehicle-flag-dropped": (("if (channel == _chat_channel_vehicle)", "if (0)"), "chat_channel_flags", "flags"),
     "never-fades": (("if (typing || age < CHAT_LINE_MILLISECONDS)", "if (TRUE)"), "chat_line_alpha", "alpha"),
 }
 
@@ -37,6 +43,8 @@ def generated(fault=None, faulty_function=None):
                  "CHAT_FADE_MILLISECONDS"):
         config += f"#define {name} {constant(source, name)}\n"
     config += structure(source, "chat_rate") + "\n"
+    config += enum_with(source, "_chat_line_team_bit,") + "\n"
+    config += enum_with(read("port/linux/game/network_chat.h"), "_chat_channel_everyone,") + "\n"
     text = ""
     for name in FUNCTIONS:
         code = function(source, name)
