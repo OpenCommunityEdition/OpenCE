@@ -26,6 +26,9 @@ int port_mods_file_stamp(long file, unsigned long *size, unsigned long stamp[2])
 /* reads size bytes of a file at offset into buffer (the Xbox's memory too);
 0 unless all of them were read */
 int port_mods_file_read(long file, unsigned long offset, void *buffer, unsigned long size);
+/* the place in the order the mods' files were listed in of a file's mod
+(later plays over earlier), or -1 */
+long port_mods_file_order(long file);
 /* the folder name of a file's mod, and the file's path (for messages) */
 const char *port_mods_file_mod(long file);
 const char *port_mods_file_path(long file);

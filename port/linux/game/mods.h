@@ -32,6 +32,7 @@ MB; a bitmap's pixels are read as they are drawn) */
 
 struct sound_permutation;
 struct bitmap_data;
+struct vertex_buffer;
 
 /* ---------- prototypes/PORT_MODS.C (the platform layer's: port_mods.h) */
 
@@ -41,6 +42,7 @@ long port_mods_played(void);
 long port_mods_file_find(char const *tag_file, char const *map_name);
 int port_mods_file_stamp(long file, unsigned long *size, unsigned long stamp[2]);
 int port_mods_file_read(long file, unsigned long offset, void *buffer, unsigned long size);
+long port_mods_file_order(long file);
 char const *port_mods_file_mod(long file);
 char const *port_mods_file_path(long file);
 long port_mods_count(void);
@@ -113,5 +115,15 @@ boolean mod_bitmaps_contain(struct bitmap_data const *bitmap);
 
 long mod_strings_update(boolean remove_all, boolean at_load);
 void mod_strings_tags_unloaded(void);
+
+/* ---------- prototypes/MOD_MODELS.C */
+
+long mod_models_update(boolean remove_all, boolean at_load);
+/* (before the tags go: the map's models are given back, unless give_back
+is FALSE (the tags are gone already), and the mods' buffers let go) */
+void mod_models_tags_unloaded(boolean give_back);
+/* (custom_edition_part_palette) the nodes a mod's part of a model of many
+nodes is drawn with, by its vertex buffer: their count, 0 for any other */
+short mod_models_part_palette(struct vertex_buffer const *vertex_buffer, byte const **nodes);
 
 #endif

@@ -237,6 +237,25 @@ SCREENS["video_settings/fov_viewmodels"] = {
     ],
 }
 
+# Audio Setup's sound processing (port/linux/src/dsound_sdl.c): the reverb
+# and the resampler, a screen of their own (a category, as Video Setup's);
+# the devices and the volumes stay on Audio Setup
+_audio = SCREENS["audio_settings"]
+_processing = {"audio.reverb"}
+SCREENS["audio_settings/sound_processing"] = {
+    "screen": "sound_processing_settings_screen", "header": _audio["header"], "spacing": 30,
+    "rows": [row for row in _audio["rows"] if row[1] in _processing] + [
+        ("RESAMPLER:", "audio.resampler", [("SINC", "sinc"), ("LINEAR", "linear")],
+         "How sounds are converted to the output's rate:\nsinc is clean; linear is brighter, with aliasing.",
+         None),
+    ],
+}
+_audio["rows"] = [row for row in _audio["rows"] if row[1] not in _processing]
+_audio["categories"] = [
+    ("SOUND PROCESSING:", "audio_settings/sound_processing",
+     "The reverb, and how sounds are converted to the\noutput's rate."),
+]
+
 # Network Setup's map sharing (port/linux/game/map_share.c): this machine's
 # part in another's game, a screen of its own (a category, as Video Setup's)
 SEED_UPLOADS = (64, 128, 256, 512, 1024, 2048)

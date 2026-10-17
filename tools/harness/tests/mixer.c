@@ -12,7 +12,8 @@ signals:
 	  the band, and what else comes out (images and aliases) under the tone;
 	- a voice out of earshot, which is not resampled, moves on as one heard
 	  does, and is heard the same once it comes into earshot;
-	- mono voices heard as stereo ones with both channels the same are.
+	- mono voices heard as stereo ones with both channels the same are;
+	- audio.resampler = "linear": each frame between the two around it.
 "render" writes voices at each rate and a scene's whole mix as raw floats
 (test_mixer.py compares the resampler adding four taps at a time with it
 adding tap by tap), "metrics" prints the figures and "bench" times a game's
@@ -45,6 +46,14 @@ typedef struct
 #define DS3DMODE_NORMAL 0x00000000
 #define DS3DMODE_HEADRELATIVE 0x00000001
 #define DS3DMODE_DISABLE 0x00000002
+
+/* the settings (port_config.c): audio.resampler, which a case sets */
+static const char *resampler_setting;
+
+static const char *config_string(const char *name)
+{
+	return !strcmp(name, "audio.resampler") ? resampler_setting : NULL;
+}
 
 /* the players' voices (voice_audio.c): none */
 static void voice_audio_mix(float *output, unsigned long frames)
@@ -609,6 +618,51 @@ int main(int argc, char **argv)
 		free(stereo);
 		free(exact);
 		free(pairs);
+		free(samples);
+		free(signal);
+		return 0;
+	}
+	/* audio.resampler = "linear": each frame the two source frames around
+	it, weighted by how near it is to each */
+	CASE("linear")
+	{
+		double *signal = noise(30000);
+		short *samples = malloc(30000 * sizeof(short));
+		double *exact = malloc(30000 * sizeof(double));
+		float *output = calloc(50000, sizeof(float));
+		unsigned long n;
+
+		resampler_setting = "linear";
+		resampler_mode = resampler_mode_read();
+		CHECK(resampler_mode == RESAMPLER_LINEAR, "audio.resampler = \"linear\" is not read as linear");
+		quantize(signal, samples, exact, 30000);
+		for (index = 0; index < sizeof(rates) / sizeof(rates[0]); index++)
+		{
+			double step = (double)(rates[index][1] ? rates[index][1] : rates[index][0]) / OUTPUT_RATE;
+			unsigned long outputs = (unsigned long)((30000 - 1) / step);
+			struct sdl_stream *stream = voice_new(samples, 30000, 1, rates[index][0], rates[index][1]);
+
+			if (outputs > 50000)
+				outputs = 50000;
+			render(stream, output, outputs, FALSE);
+			for (n = 0; n < outputs; n++)
+			{
+				double time = (double)n * step, fraction = time - floor(time);
+				long first = (long)floor(time);
+				double expected = exact[first] + (first + 1 < 30000 ? exact[first + 1] - exact[first] : -exact[first]) *
+					fraction;
+
+				CHECK(fabs(output[n] - expected) < 1.0e-5, "%lu Hz played at %lu: frame %lu is %f, not %f",
+					rates[index][0], rates[index][1], n, output[n], expected);
+			}
+			voice_delete(stream);
+		}
+		resampler_setting = "sinc";
+		CHECK(resampler_mode_read() == RESAMPLER_SINC, "audio.resampler = \"sinc\" is not read as sinc");
+		resampler_setting = NULL;
+		CHECK(resampler_mode_read() == RESAMPLER_SINC, "audio.resampler unset is not read as sinc");
+		free(output);
+		free(exact);
 		free(samples);
 		free(signal);
 		return 0;

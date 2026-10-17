@@ -11732,7 +11732,7 @@ static struct hs_function_definition_with_1_parameter const mods_enable_definiti
 		"mods_enable",
 		hs_macro_function_parse,
 		hs_mods_enable_evaluate,
-		"plays the mods' sounds, bitmaps and text, or (false) the map's own, until the map changes.",
+		"plays the mods' sounds, bitmaps, text and models, or (false) the map's own, until the map changes.",
 		NULL,
 		1,
 		{ _hs_type_boolean },
