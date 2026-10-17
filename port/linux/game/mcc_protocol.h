@@ -2,8 +2,8 @@
 #ifndef MCC_PROTOCOL_H
 #define MCC_PROTOCOL_H
 
-/* Peers agree on weapon movement penalties and campaign flash state. */
-#define MCC_PROTOCOL_VERSION 49
+/* Peers agree on bounded conditional execution for MCC equipment scripts. */
+#define MCC_PROTOCOL_VERSION 50
 #define MCC_PROTOCOL_ADVERTISED_FLAG 0x04
 #define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 3
 #define MCC_PROTOCOL_JOIN_KIND 91

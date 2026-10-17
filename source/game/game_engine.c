@@ -8088,8 +8088,10 @@ static void game_engine_update_weapons(
 			match_assert(
 				"c:\\halo\\SOURCE\\game\\game_engine.c",
 				0x83E,
-				(item->object.scale >= 0.5f) &&
-					(item->object.scale <= 3.f));
+				((item->object.scale >= 0.5f) &&
+					(item->object.scale <= 3.f)) ||
+				/* port: MCC-authored miniature items retain their tag scale. */
+				mcc_item_small_scale(item->object.scale));
 		}
 
 		/*

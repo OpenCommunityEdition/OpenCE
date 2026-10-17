@@ -108,6 +108,33 @@ int main(int argc,char **argv) {
     nodes[2].flags=10;nodes[2].script_index=0;nodes[2].data=0x10003;
     nodes[3].type=_hs_function_name;nodes[3].next_node_index=0x10004;
     nodes[4].data=42;
+    if(!strncmp(argv[1],"tail_",5)) {
+        struct hs_stack_frame *parent=(void *)thread.stack_data;
+        struct hs_stack_frame *child=(void *)(thread.stack_data+64);
+        long output=99;
+        long *state=(long *)child->data;
+        nodes[0].flags=8;nodes[0].type=_hs_type_long_integer;nodes[0].data=0x10001;
+        nodes[1].datum_header=1;nodes[1].next_node_index=0x10002;
+        nodes[2].next_node_index=0x10003;
+        nodes[3].flags=9;nodes[3].type=_hs_type_long_integer;nodes[3].data=12;nodes[3].next_node_index=0x10004;
+        nodes[4].flags=9;nodes[4].type=_hs_type_long_integer;nodes[4].data=34;
+        parent->result=&output;child->previous=parent;child->expression_index=0x10000;thread.stack=child;
+        state[0]=!strcmp(argv[1],"tail_true");state[1]=NONE;
+        if(!strcmp(argv[1],"tail_legacy"))loaded=0;
+        if(!strcmp(argv[1],"tail_cast"))nodes[4].type=_hs_type_short_integer;
+        if(!strcmp(argv[1],"tail_absent"))nodes[3].next_node_index=NONE;
+        if(!strcmp(argv[1],"tail_complete"))state[1]=0x10004;
+        CHECK(!mcc_hs_if_tail(_hs_function_if,0,TRUE));
+        CHECK(!mcc_hs_if_tail(_hs_function_begin,0,FALSE));
+        if(!strcmp(argv[1],"tail_true") || !strcmp(argv[1],"tail_false")) {
+            CHECK(mcc_hs_if_tail(_hs_function_if,0,FALSE));
+            CHECK(thread.stack==parent && output==(!strcmp(argv[1],"tail_true") ? 12 : 34));
+        } else {
+            CHECK(!mcc_hs_if_tail(_hs_function_if,0,FALSE));
+            CHECK(thread.stack==child && output==99);
+        }
+        CHECK(!errors);free(runtime.tags);return 0;
+    }
     if(!strcmp(argv[1],"finished")) {
         finished_argument=(long)"target";
         other_thread.sleep_until=NONE;

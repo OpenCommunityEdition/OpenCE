@@ -385,6 +385,31 @@ Each draw resolves a temporary placement without changing the parent tag.
 This places A50_Revisited's visor at the screen edges; invalid child anchors
 retain the parent placement. Xbox/CE returns the original parent untouched.
 
+MCC Chicago shaders that explicitly request Custom Edition blending (extra
+flag `0x4`) use black-neutral modulation for double multiply. Frogfoot's
+`waterb` layer sets this flag; ordinary double multiply turns its dark pixels
+into black water. The MCC adapter uses `destination * (1 + source)` and fades
+the source toward black, preserving the background at zero contribution.
+This is an independently implemented interpretation of the black-transparent
+behaviour documented in [the Chicago format reference](https://c20.reclaimers.net/h1/tags/shader/shader_transparent_chicago/),
+validated against Frogfoot's authored layer and local visual comparisons;
+exact pixel parity with native MCC has not been established. Other blend
+modes and unflagged shaders retain their original behaviour. The adapter
+runs after native Chicago state setup because tag conversion alone cannot
+express this blend and its matching fade. Each subsequent shader installs
+its normal blend state; the adapter retains no per-map state.
+
+MCC equipment scripts may delete the currently displayed weapon before
+creating its replacement. A deletion notification clears matching local
+first-person references while the old object still exists; unrelated weapons
+and Xbox/CE maps keep the original path. This notification must run at the
+engine's weapon-deletion boundary, which the script adapter alone cannot
+cover (including replicated deletions). MCC also admits positive authored
+item scales from `0.001` up to the native `0.5` lower bound, as used by
+MeinCrap's block weapons. The item update already applies these scales;
+only its validation gains the guarded MCC allowance. The native upper limit,
+zero/invalid rejection and all Xbox/CE limits remain unchanged.
+
 MCC textures bind their immutable converted allocations directly through an
 MCC-owned hardware-header registry. Exact registered header identity grants
 access to the pixels; a copied descriptor or arbitrary physical-address word
@@ -447,8 +472,13 @@ Signatures, scoped local references and call arguments are checked before
 loading. The MCC interpreter extension keeps arguments, mutable local
 values and the evaluation cursor in the existing thread stack; object-list
 references survive sleeps and release on return or thread termination.
-Nested and recursive calls retain separate scopes. The existing 512-byte
-stack remains the recursion/depth bound. Dynamic console calls with
+Nested and recursive calls retain separate scopes. After an MCC `if` selects
+a branch of the same result type, its forwarding frame can be released before
+evaluating that branch. This prevents MeinCrap 2's nested equipment selectors
+from exhausting the stack, while retaining script parameter scopes and all
+live state in the checkpointed buffer. Branches requiring a cast use the native
+evaluation path. The existing 512-byte stack remains the recursion/depth bound.
+Dynamic console calls with
 parameters are not supported by this extension; the cached map's calls
 are the supported path. MCC syntax now retains its full 32,767-slot arena,
 including unused slots for dynamic console expressions. This is the Halo 1

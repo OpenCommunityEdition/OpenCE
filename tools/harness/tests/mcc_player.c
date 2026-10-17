@@ -8,6 +8,16 @@
 #undef memset
 static boolean active;
 static short types = 4, counts[4];
+static struct { long weapon_index; } cached_weapons[4];
+static unsigned forgotten;
+boolean mcc_cache_tags_loaded(void) { return active; }
+static void first_person_weapon_forget_weapon(short local)
+{
+    forgotten |= 1U << local;
+    cached_weapons[local].weapon_index = NONE;
+}
+#define first_person_weapon_get(local) (&cached_weapons[local])
+#include "mcc_first_person.inl"
 boolean mcc_grenades_active(void) { return active; }
 short mcc_grenades_type_count(void) { return types; }
 void mcc_grenades_clear(long unit) { (void)unit; counts[2] = counts[3] = 0; }
@@ -19,6 +29,21 @@ int main(void) {
     struct scenario_starting_profile profile = {0};
     union { unsigned long bits; float value; } invalid;
     short choice;
+    cached_weapons[0].weapon_index = cached_weapons[2].weapon_index = 123;
+    cached_weapons[1].weapon_index = 456;
+    cached_weapons[3].weapon_index = NONE;
+    mcc_first_person_weapon_deleted(123);
+    CHECK(!forgotten && cached_weapons[0].weapon_index == 123);
+    active = TRUE;
+    mcc_first_person_weapon_deleted(NONE);
+    mcc_first_person_weapon_deleted(789);
+    CHECK(!forgotten);
+    mcc_first_person_weapon_deleted(123);
+    CHECK(forgotten == 5 && cached_weapons[0].weapon_index == NONE &&
+          cached_weapons[2].weapon_index == NONE && cached_weapons[1].weapon_index == 456);
+    mcc_first_person_weapon_deleted(123);
+    CHECK(forgotten == 5);
+    active = FALSE;
     CHECK(!mcc_player_choice_supported(0));
     mcc_player_profile_grenades(1, &profile, TRUE);
     active = TRUE;

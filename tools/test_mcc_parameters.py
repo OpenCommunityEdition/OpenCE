@@ -14,7 +14,8 @@ def parameters_tool(native_mcc_harness):
                                   "call_arity", "call_type", "global_scope", "legacy", "return", "snapshot",
                                   "nested_scope", "recursive_arguments", "lists", "set", "overflow", "ai_cast", "widen",
                                   "global_capacity", "global_overflow", "maximum", "disabled", "predicate", "script_kind",
-                                  "high_node", "negative_count", "sleep_self", "sleep_named", "sleep_missing", "sleep_finished", "sleep_lists", "sleep_disabled", "finished"])
+                                  "high_node", "negative_count", "sleep_self", "sleep_named", "sleep_missing", "sleep_finished", "sleep_lists", "sleep_disabled", "finished",
+                                  "tail_true", "tail_false", "tail_cast", "tail_absent", "tail_complete", "tail_legacy"])
 def test_mcc_parameter_metadata_and_runtime(parameters_tool, case):
     result = subprocess.run([str(parameters_tool), case], capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr

@@ -2752,10 +2752,13 @@ static void hs_thread_main(
 
 			match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2d8, function->evaluate);
 
-			function->evaluate(
-				expression->index,
-				thread_index,
-				initialize);
+			/* port: MCC may release a completed conditional frame before
+			entering its selected branch; legacy evaluation is unchanged. */
+			if (!mcc_hs_if_tail(expression->index, thread_index, initialize))
+				function->evaluate(
+					expression->index,
+					thread_index,
+					initialize);
 		}
 		else
 		{
