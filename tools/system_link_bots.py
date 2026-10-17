@@ -82,13 +82,31 @@ MESSAGE_NAMES = {
 }
 
 
-def network_game_layout(machines, players):
+def network_game_layout(machines, players, options_size=0x30):
     """Offsets of struct network_game (port/linux/include/halo_port_limits.h)."""
     player_count = 0x114 + machines * 0x44
     players_offset = player_count + 2
-    size = players_offset + players * 0x20 + 0xE
+    size = players_offset + players * 0x20 + 0xE + options_size
     return {"map_name": 0x24, "machine_count": 0x112, "player_count": player_count,
             "players": players_offset, "size": size}
+
+
+def network_game_counts(settings):
+    """Read diagnostics from known settings layouts, including GPVO v1/v2.
+
+    This does not negotiate protocol compatibility or interpret gameplay.
+    Unknown/truncated layouts stay unknown instead of reading arbitrary offsets.
+    """
+    for machine_slots, player_slots in ((128, 128), (4, 16)):
+        for options_size in (0x30, 0x28, 0x24, 0x1C, 0):
+            layout = network_game_layout(machine_slots, player_slots, options_size)
+            if len(settings) != layout['size']:
+                continue
+            machines = struct.unpack_from('<h', settings, layout['machine_count'])[0]
+            players = struct.unpack_from('<h', settings, layout['player_count'])[0]
+            if 0 <= machines <= machine_slots and 0 <= players <= player_slots:
+                return machines, players
+    return None, None
 
 
 def wide(text, count):
@@ -400,11 +418,7 @@ def main():
                 sample = next((m for m in machines if m.settings_complete), None)
                 players = machines_in_game = None
                 if sample:
-                    for machine_slots in (128, 4):
-                        layout = network_game_layout(machine_slots, 128 if machine_slots == 128 else 16)
-                        if len(sample.settings_complete) == layout["size"]:
-                            machines_in_game = struct.unpack_from("<h", sample.settings_complete, layout["machine_count"])[0]
-                            players = struct.unpack_from("<h", sample.settings_complete, layout["player_count"])[0]
+                    machines_in_game, players = network_game_counts(sample.settings_complete)
                 updates = [m.last_update_number for m in machines if m.last_update_number is not None]
                 log("states %s; host game: %s machines, %s players; latest update %s; received %.1f MB" % (
                     states, machines_in_game, players, max(updates) if updates else None,

@@ -40,7 +40,8 @@ def graph(release=False, emcc="/opt/emsdk/upstream/emscripten/emcc"):
     sln = SimpleNamespace(build_dir=Path("build"), web_emcc=emcc, port_release=release, port_profile=False,
                           compiler_launcher=None)
     web_build.generate_web_build(ninja_syntax.Writer(out), sln)
-    return re.sub(r" \$\n +", " ", out.getvalue())
+    # Ninja accepts the host's separators; assertions compare portable paths.
+    return re.sub(r" \$\n +", " ", out.getvalue()).replace('\\', '/')
 
 
 def compile_flags(text, source):
