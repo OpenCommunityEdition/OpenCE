@@ -179,6 +179,27 @@ static const struct config_setting config_settings[] =
 		"pixel by the lights the game gives them, without the facets the light\n"
 		"of each vertex shows across curved surfaces; false lights each vertex,\n"
 		"as the Xbox does." },
+	{ "display.hdr", _config_boolean, "false", "HALO_HDR", _environment_value, _platform_all,
+		"Draw the 3D view into a floating-point back buffer, which keeps what\n"
+		"the game's additive effects (explosions, plasma, lights, the sun's\n"
+		"glare) add past white, and tone map it before the HUD is drawn:\n"
+		"display.hdr_tone_mapping brings it back to the display's range\n"
+		"instead of clipping it. false draws into 8 bits a channel, as the\n"
+		"Xbox does." },
+	{ "display.hdr_exposure", _config_real, "1.0", "HALO_HDR_EXPOSURE", _environment_value, _platform_all,
+		"With display.hdr, the 3D view's brightness in linear light before it\n"
+		"is tone mapped, 0.25 to 4.0." },
+	{ "display.hdr_tone_mapping", _config_string, "\"neutral\"", "HALO_HDR_TONE_MAPPING", _environment_value,
+		_platform_all,
+		"With display.hdr, the curve that brings what is past white into the\n"
+		"display's range: \"neutral\" (the picture as drawn, with only its\n"
+		"brightest parts rolled off), \"aces\" (filmic, more contrast) or\n"
+		"\"reinhard\" (softer, and darker throughout)." },
+	{ "display.hdr_output", _config_boolean, "false", "HALO_HDR_OUTPUT", _environment_value, _platform_desktop,
+		"With display.hdr, ask for a floating-point window (scRGB), so that an\n"
+		"HDR display shows what is past white brighter than the desktop's\n"
+		"white rather than tone mapped down to it; the operating system's HDR\n"
+		"must be on. Taken up when the game starts." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },

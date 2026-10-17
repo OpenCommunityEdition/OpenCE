@@ -762,6 +762,52 @@ SDL_AudioDeviceID platform_audio_device(int recording, const char *name)
 /* the window's size (platform_window_size_setting), as the window was made
 or last resized: platform_display_apply */
 static long platform_window_width = -1, platform_window_height = -1;
+
+/* display.hdr_output: the window's pixels are half floats (scRGB), -1 until
+the window is first made; FALSE once the driver has none */
+static int platform_float_window = -1;
+
+/* the attributes of a window with (or without) floating-point pixels */
+static void platform_float_window_attributes(BOOL floating)
+{
+	int size = floating ? 16 : 8;
+
+	SDL_GL_SetAttribute(SDL_GL_FLOATBUFFERS, floating ? 1 : 0);
+	SDL_GL_SetAttribute(SDL_GL_RED_SIZE, size);
+	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, size);
+	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, size);
+	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, size);
+}
+
+/* a window with floating-point pixels that cannot be made, or have a
+context made for it: one without them (on Windows a window's pixel format
+is set once, so a new window) */
+static BOOL platform_float_window_refused(void)
+{
+	if (platform_float_window != TRUE)
+		return FALSE;
+	platform_log("HDR output: no floating-point window (%s); the window is SDR", SDL_GetError());
+	platform_float_window = FALSE;
+	platform_float_window_attributes(FALSE);
+	if (platform_window)
+		SDL_DestroyWindow(platform_window);
+	platform_window = NULL;
+	return TRUE;
+}
+
+BOOL platform_video_hdr(float *sdr_white, float *headroom)
+{
+	SDL_PropertiesID properties = platform_window ? SDL_GetWindowProperties(platform_window) : 0;
+	BOOL enabled = properties && SDL_GetBooleanProperty(properties, SDL_PROP_WINDOW_HDR_ENABLED_BOOLEAN, false);
+
+	*sdr_white = properties ? SDL_GetFloatProperty(properties, SDL_PROP_WINDOW_SDR_WHITE_LEVEL_FLOAT, 1.0f) : 1.0f;
+	*headroom = properties ? SDL_GetFloatProperty(properties, SDL_PROP_WINDOW_HDR_HEADROOM_FLOAT, 1.0f) : 1.0f;
+	if (!(*sdr_white > 0.0f))
+		*sdr_white = 1.0f;
+	if (!(*headroom >= 1.0f))
+		*headroom = 1.0f;
+	return enabled;
+}
 #endif
 
 BOOL platform_video_initialize(unsigned long width, unsigned long height)
@@ -772,6 +818,17 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		return TRUE;
 	if (!platform_sdl_initialize())
 		return FALSE;
+#ifndef HALO_ANDROID
+#ifdef HALO_WEB
+	/* (a browser's canvas has 8 bits a channel) */
+	platform_float_window = FALSE;
+#else
+	if (platform_float_window < 0)
+		platform_float_window = config_boolean("display.hdr") && config_boolean("display.hdr_output");
+#endif
+	if (platform_float_window)
+		platform_float_window_attributes(TRUE);
+#endif
 
 #ifdef HALO_GLES
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
@@ -825,6 +882,10 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 #endif
 	if (!platform_window)
 	{
+#ifndef HALO_ANDROID
+		if (platform_float_window_refused())
+			return platform_video_initialize(width, height);
+#endif
 		platform_log("SDL_CreateWindow failed: %s", SDL_GetError());
 		return FALSE;
 	}
@@ -854,6 +915,10 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		platform_gl_context = SDL_GL_CreateContext(platform_window);
 	}
 #endif
+#ifndef HALO_ANDROID
+	if (!platform_gl_context && platform_float_window_refused())
+		return platform_video_initialize(width, height);
+#endif
 	if (!platform_gl_context)
 	{
 		platform_log("cannot create an OpenGL context: %s", SDL_GetError());
@@ -867,6 +932,13 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	platform_event_thread = SDL_GetCurrentThreadID();
 	platform_log("OpenGL %s on %s", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER));
 #ifndef HALO_ANDROID
+	{
+		float sdr_white, headroom;
+		BOOL hdr = platform_video_hdr(&sdr_white, &headroom);
+
+		platform_log("display: HDR %s (SDR white %.2f, headroom %.2f), %s window", hdr ? "on" : "off", sdr_white,
+			headroom, platform_float_window ? "floating-point" : "8-bit");
+	}
 	platform_mouse_capture(TRUE);
 #endif
 	return TRUE;

@@ -291,6 +291,31 @@ long halo_shadow_map_scale(void)
 	return shadow_scale;
 }
 
+/* display.hdr (xgpu_post.c): the back buffer in GL_RGBA16F, which keeps
+what the game's additive blending adds past white, tone mapped over each
+window's 3D view before the HUD is drawn (halo_screen_tone_map) and put in
+the window by a shader (D3DDevice_Present). Taken up between frames
+(halo_screen_commit) and as the GL context is made (hdr_read). */
+static struct
+{
+	/* config_changes() when the settings were read, if they have been;
+	display.hdr as it was then */
+	unsigned long read_at;
+	BOOL read, wanted;
+	/* display.hdr, where the GPU draws into half floats and the programs
+	build: the back buffer is GL_RGBA16F */
+	BOOL active;
+	struct xgpu_tone_mapping tone_mapping;
+	/* the window's pixels are floating point (display.hdr_output): its
+	pixels are linear, in scRGB's units, the desktop's white sdr_white */
+	BOOL float_window;
+	float sdr_white;
+#ifdef HALO_GLES
+	/* the most samples a pixel of a GL_RGBA16F renderbuffer */
+	GLint maximum_samples;
+#endif
+} hdr;
+
 void halo_screen_ui_offset(unsigned char centered)
 {
 	ui_offset = centered ? (halo_screen_width() - 640) / 2 : 0;
@@ -1286,6 +1311,20 @@ static struct render_target_entry *render_target_remember(const D3DSurface *surf
 	return entry;
 }
 
+/* the bound texture's storage, of the target's size and format */
+static void render_target_storage(const struct xgpu_render_target *target)
+{
+	if (target->format == GL_DEPTH24_STENCIL8)
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, (GLsizei)target->gl_width, (GLsizei)target->gl_height, 0,
+			GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+	else if (target->format == GL_RGBA16F)
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, (GLsizei)target->gl_width, (GLsizei)target->gl_height, 0,
+			GL_RGBA, GL_HALF_FLOAT, NULL);
+	else
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)target->gl_width, (GLsizei)target->gl_height, 0,
+			GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+}
+
 static struct render_target_entry *render_target_get(const D3DSurface *surface)
 {
 	struct render_target_entry *entry;
@@ -1348,16 +1387,13 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->kind = kind;
 	entry->target.gl_width = (unsigned long)(width * scale[0] + 0.5f);
 	entry->target.gl_height = (unsigned long)(height * scale[1] + 0.5f);
+	entry->screen_buffer = surface->Data == (depth ? device.depth_buffer.Data : device.back_buffer.Data);
+	entry->target.format = depth ? GL_DEPTH24_STENCIL8 :
+		entry->screen_buffer && hdr.active ? GL_RGBA16F : GL_RGBA8;
 	glGenTextures(1, &entry->target.texture);
 	glBindTexture(GL_TEXTURE_2D, entry->target.texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-	if (depth)
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, (GLsizei)entry->target.gl_width,
-			(GLsizei)entry->target.gl_height, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
-	else
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)entry->target.gl_width, (GLsizei)entry->target.gl_height,
-			0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-	entry->screen_buffer = surface->Data == (depth ? device.depth_buffer.Data : device.back_buffer.Data);
+	render_target_storage(&entry->target);
 	xgpu_gl_state_invalidate();
 	entry->next = render_targets;
 	render_targets = entry;
@@ -1484,7 +1520,7 @@ static void render_target_multisample(struct xgpu_render_target *target, int sam
 	if (!target->multisample)
 		glGenRenderbuffers(1, &target->multisample);
 	glBindRenderbuffer(GL_RENDERBUFFER, target->multisample);
-	glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, target->depth ? GL_DEPTH24_STENCIL8 : GL_RGBA8,
+	glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, target->format,
 		samples ? (GLsizei)target->gl_width : 1, samples ? (GLsizei)target->gl_height : 1);
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
 	target->samples = samples;
@@ -1598,6 +1634,89 @@ static BOOL bind_targets(BOOL *has_depth)
 	return TRUE;
 }
 
+/* ---------- display.hdr */
+
+static const char *const tone_mapping_names[NUMBER_OF_XGPU_TONE_MAPPINGS] = { "neutral", "aces", "reinhard" };
+
+/* display.hdr's settings, if they have changed: the back buffer's entries
+are made again in the format it takes (what they held is lost, and a frame
+clears them before it draws) */
+static void hdr_read(void)
+{
+	const char *curve;
+	double exposure;
+	BOOL wanted, supported = TRUE, active;
+	struct render_target_entry *entry;
+	int value;
+
+	if (!device.gl_ready || (hdr.read && hdr.read_at == config_changes()))
+		return;
+	if (!hdr.read)
+	{
+#ifdef HALO_GLES
+		glGetInternalformativ(GL_RENDERBUFFER, GL_RGBA16F, GL_SAMPLES, 1, &hdr.maximum_samples);
+#else
+		GLint component_type = GL_NONE;
+
+		/* (the window's own framebuffer, as display.hdr_output made it) */
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_BACK_LEFT,
+			GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE, &component_type);
+		hdr.float_window = component_type == GL_FLOAT;
+		xgpu_gl_state_invalidate();
+#endif
+		hdr.sdr_white = 1.0f;
+		hdr.tone_mapping.peak = 1.0f;
+	}
+	hdr.read = TRUE;
+	hdr.read_at = config_changes();
+	curve = config_string("display.hdr_tone_mapping");
+	exposure = config_real("display.hdr_exposure");
+	wanted = config_boolean("display.hdr");
+	for (value = NUMBER_OF_XGPU_TONE_MAPPINGS - 1; value > 0 && strcmp(curve, tone_mapping_names[value]); value--)
+	{
+	}
+	exposure = !(exposure >= 0.25) ? 0.25 : exposure > 4.0 ? 4.0 : exposure;
+#ifdef HALO_GLES
+	supported = xgpu_capabilities.color_buffer_half_float;
+#endif
+	active = wanted && supported && xgpu_post_prepare_hdr();
+	/* (logged as it changes) */
+	if (active != hdr.active || wanted != hdr.wanted ||
+		(active && (value != hdr.tone_mapping.curve || (float)exposure != hdr.tone_mapping.exposure)))
+	{
+		if (active)
+			platform_log("HDR: on, %s tone mapping%s, exposure %.2f", tone_mapping_names[value],
+				strcmp(curve, tone_mapping_names[value]) ? " (the setting's is unknown)" : "", exposure);
+		else if (wanted && !supported)
+			platform_log("HDR: the GPU cannot draw into half floats, so off");
+		else if (wanted)
+			platform_log("HDR: its programs do not build, so off");
+		else
+			platform_log("HDR: off");
+	}
+	hdr.wanted = wanted;
+	hdr.tone_mapping.curve = value;
+	hdr.tone_mapping.exposure = (float)exposure;
+	if (active == hdr.active)
+		return;
+	hdr.active = active;
+	for (entry = render_targets; entry; entry = entry->next)
+	{
+		if (!entry->screen_buffer || entry->target.depth)
+			continue;
+		/* (the multisampled renderbuffer takes the format when it is next
+		made: render_target_multisample) */
+		render_target_multisample(&entry->target, 0);
+		entry->target.format = active ? GL_RGBA16F : GL_RGBA8;
+		glBindTexture(GL_TEXTURE_2D, entry->target.texture);
+		render_target_storage(&entry->target);
+	}
+	xgpu_gl_state_invalidate();
+	/* (multisampling's samples, which may be fewer for half floats) */
+	anti_aliasing_prepare();
+}
+
 /* ---------- device creation */
 
 static void gl_initialize(void)
@@ -1638,6 +1757,9 @@ static void gl_initialize(void)
 				base_vertex_source = "GL_OES_draw_elements_base_vertex";
 			}
 		}
+		xgpu_capabilities.color_buffer_half_float = es32 ||
+			host_gl_has_extension("GL_EXT_color_buffer_half_float") ||
+			host_gl_has_extension("GL_EXT_color_buffer_float");
 		xgpu_capabilities.shading_language = major > 3 || (major == 3 && minor >= 1) ? "310 es" : "300 es";
 		if (major > 3 || (major == 3 && minor >= 1))
 		{
@@ -1651,10 +1773,10 @@ static void gl_initialize(void)
 			host_gl_has_extension("GL_ANGLE_texture_compression_dxt3") &&
 			host_gl_has_extension("GL_ANGLE_texture_compression_dxt5"));
 		platform_log("OpenGL ES %d.%d: copy image %d, border clamp %d, anisotropy %d, S3TC %d, sample counting %d, "
-			"base vertex %d (%s)",
+			"base vertex %d (%s), half float targets %d",
 			(int)major, (int)minor, xgpu_capabilities.copy_image, xgpu_capabilities.border_clamp,
 			xgpu_capabilities.anisotropy, xgpu_capabilities.s3tc, xgpu_capabilities.atomic_counters,
-			xgpu_capabilities.base_vertex, base_vertex_source);
+			xgpu_capabilities.base_vertex, base_vertex_source, xgpu_capabilities.color_buffer_half_float);
 	}
 #else
 	if (config_boolean("debug.gl_debug"))
@@ -1769,6 +1891,7 @@ static void gl_initialize(void)
 		anti_aliasing_read();
 	else
 		anti_aliasing_prepare();
+	hdr_read();
 }
 
 /* what display.anti_aliasing's value needs of the GL context, once there is
@@ -1788,6 +1911,13 @@ static void anti_aliasing_prepare(void)
 		platform_log("anti-aliasing: the GPU has at most %d samples a pixel", (int)anti_aliasing_maximum_samples);
 		anti_aliasing_samples = anti_aliasing_maximum_samples < 2 ? 0 : anti_aliasing_maximum_samples;
 	}
+#ifdef HALO_GLES
+	if (hdr.active && anti_aliasing_samples > hdr.maximum_samples)
+	{
+		platform_log("anti-aliasing: the GPU has at most %d samples a pixel of half floats", (int)hdr.maximum_samples);
+		anti_aliasing_samples = hdr.maximum_samples < 2 ? 0 : hdr.maximum_samples;
+	}
+#endif
 	if ((mode == _anti_aliasing_fxaa || mode == _anti_aliasing_smaa) && !xgpu_post_prepare(mode == _anti_aliasing_smaa))
 		platform_log("anti-aliasing: its programs do not build, so the 3D view is not antialiased");
 	xgpu_gl_state_invalidate();
@@ -2056,6 +2186,17 @@ long halo_screen_commit(void)
 	/* (display.anti_aliasing, as Settings or config.toml has it now:
 	supersampling changes the scale below) */
 	anti_aliasing_read();
+	/* display.hdr, and how bright the display goes (an HDR display's
+	headroom, with display.hdr_output's floating-point window) */
+	hdr_read();
+#ifndef HALO_ANDROID
+	if (hdr.float_window)
+	{
+		float headroom;
+
+		hdr.tone_mapping.peak = platform_video_hdr(&hdr.sdr_white, &headroom) ? headroom : 1.0f;
+	}
+#endif
 	/* display.shadow_resolution, if it has changed: the maps' entries at
 	the old scale are freed (render_targets_evict), new ones made at the new */
 	if (shadow_scale && shadow_scale_read_at != config_changes())
@@ -5651,7 +5792,39 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 	corners[2] = scaled_pixel(x1, target->target.scale[0]);
 	corners[3] = scaled_pixel(y1, target->target.scale[1]);
 	xgpu_post_anti_alias(mode == _anti_aliasing_smaa, framebuffer_get(target->target.texture, 0),
-		target->target.gl_width, target->target.gl_height, corners);
+		target->target.format, target->target.gl_width, target->target.gl_height, corners);
+	glBindVertexArray(device.vertex_array);
+	xgpu_gl_state_invalidate();
+}
+
+/* display.hdr's tone mapping of a window's 3D view, before the HUD and
+menus are drawn over it, and before display.anti_aliasing's pass (which
+then finds the edges the display shows); in place, into the multisampled
+renderbuffer with multisampling */
+void halo_screen_tone_map(short x0, short y0, short x1, short y1)
+{
+	struct render_target_entry *target;
+	GLuint source, destination;
+	GLint corners[4];
+
+	if (!device.gl_ready || !hdr.active)
+		return;
+	target = render_target_get(&device.back_buffer);
+	if (!target || target->target.format != GL_RGBA16F)
+		return;
+	corners[0] = scaled_pixel(x0, target->target.scale[0]);
+	corners[1] = scaled_pixel(y0, target->target.scale[1]);
+	corners[2] = scaled_pixel(x1, target->target.scale[0]);
+	corners[3] = scaled_pixel(y1, target->target.scale[1]);
+	render_target_resolve(&target->target);
+	/* (both found first: making a framebuffer binds it) */
+	source = framebuffer_get(target->target.texture, 0);
+	destination = target->target.samples ? framebuffer_find(target->target.multisample, 0, TRUE) : source;
+	if (xgpu_post_tone_map(source, target->target.texture, destination, target->target.gl_width,
+		target->target.gl_height, corners, &hdr.tone_mapping) && target->target.samples)
+	{
+		target->target.unresolved = TRUE;
+	}
 	glBindVertexArray(device.vertex_array);
 	xgpu_gl_state_invalidate();
 }
@@ -5772,6 +5945,23 @@ static void write_screenshot(struct render_target_entry *target)
 		return;
 	pixels = malloc(image_size);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(target->target.texture, 0));
+#ifdef HALO_GLES
+	/* (OpenGL ES reads a half float target only as floats) */
+	if (target->target.format == GL_RGBA16F)
+	{
+		float *texels = malloc(image_size * sizeof(float));
+
+		glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_RGBA, GL_FLOAT, texels);
+		for (row = 0; row < image_size; row++)
+		{
+			float texel = texels[row] < 0.0f ? 0.0f : texels[row] > 1.0f ? 1.0f : texels[row];
+
+			pixels[row] = (unsigned char)(texel * 255.0f + 0.5f);
+		}
+		free(texels);
+	}
+	else
+#endif
 	glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
 	/* the display ignores destination alpha, which the game uses as scratch;
 	image viewers would show it as transparency */
@@ -5877,10 +6067,19 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(back_buffer->target.texture, 0));
-		/* row 0 of the render target is the top of the picture */
-		glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
-			x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+		/* (display.hdr's back buffer, or display.hdr_output's window, by a
+		shader: a blit neither makes the pixels linear nor, on OpenGL ES,
+		converts half floats) */
+		if (!((back_buffer->target.format == GL_RGBA16F || hdr.float_window) &&
+			xgpu_post_present(back_buffer->target.texture, x, y, width, height,
+				hdr.float_window ? hdr.sdr_white : 0.0f)))
+		{
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(back_buffer->target.texture, 0));
+			/* row 0 of the render target is the top of the picture */
+			glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
+				x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+		}
+		glBindVertexArray(device.vertex_array);
 		platform_video_swap();
 		xgpu_gl_state_invalidate();
 		memory_watch_begin_frame();

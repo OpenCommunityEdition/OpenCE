@@ -135,7 +135,8 @@ this list to generate the guest's entry points */
 	X(glGenQueries) \
 	X(glBeginQuery) \
 	X(glEndQuery) \
-	X(glGetQueryObjectuiv)
+	X(glGetQueryObjectuiv) \
+	X(glGetInternalformativ)
 /* entry points of extensions, which a driver may lack: loaded where the
 context has the extension, never required (gl_functions.c). On ES 3.0 and
 3.1 these stand in for glDrawElementsBaseVertex */
@@ -202,6 +203,7 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 	X(glBindFramebuffer) \
 	X(glFramebufferTexture2D) \
 	X(glCheckFramebufferStatus) \
+	X(glGetFramebufferAttachmentParameteriv) \
 	X(glBlitFramebuffer) \
 	X(glDrawBuffers) \
 	X(glGenRenderbuffers) \
@@ -379,6 +381,7 @@ pointers, sees the declarations without these aliases */
 #define glBeginQuery halo_glBeginQuery
 #define glEndQuery halo_glEndQuery
 #define glGetQueryObjectuiv halo_glGetQueryObjectuiv
+#define glGetInternalformativ halo_glGetInternalformativ
 #else
 #define glGetString halo_glGetString
 #define glGetIntegerv halo_glGetIntegerv
@@ -437,6 +440,7 @@ pointers, sees the declarations without these aliases */
 #define glBindFramebuffer halo_glBindFramebuffer
 #define glFramebufferTexture2D halo_glFramebufferTexture2D
 #define glCheckFramebufferStatus halo_glCheckFramebufferStatus
+#define glGetFramebufferAttachmentParameteriv halo_glGetFramebufferAttachmentParameteriv
 #define glBlitFramebuffer halo_glBlitFramebuffer
 #define glDrawBuffers halo_glDrawBuffers
 #define glGenRenderbuffers halo_glGenRenderbuffers
