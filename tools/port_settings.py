@@ -13,6 +13,8 @@ settings defaults" shows the defaults. Controls Setup binds the keyboard and
 mouse's controls, by the functions the PC version names for it.
 """
 
+import re
+import sys
 from pathlib import Path
 from xml.sax.saxutils import quoteattr
 
@@ -1538,11 +1540,15 @@ REPLACED_FOLDERS = [f"{MT}/server_settings"]
 # each turned on or off and moved up or down (menu_functions.c's "port mods"
 # functions)
 
-# the redraws' main menu items (svg/shell/main_menu/menu_*.svg): their text's
-# capitals' top and height, its colour dim (not chosen) and its glow chosen,
-# and where its middle is
-MENU_ITEM_TOP, MENU_ITEM_CAP, MENU_ITEM_MIDDLE = 6.57, 21.5 * 0.9037, 130.0
-TITLE_FONT_PATH = Path(__file__).resolve().parent.parent / "port/assets/fonts/OpenCE-Regular.ttf"
+# the redraws' main menu items (svg/shell/main_menu/menu_*.svg): their
+# letters' top and scale, and where their middle is
+MENU_ITEM_TOP, MENU_ITEM_SCALE, MENU_ITEM_MIDDLE = 6.57, 0.9037, 130.0
+# the space between two of the redraws' letters, in their units (their
+# capitals are 21.5 high), for the pairs the port's items have: no redraw has
+# these pairs, so each is the sum of a space after the first letter and one
+# before the second, fitted (least squares) to the 53 pairs the redraws' items
+# and headers have (D-I, of the main menu's Credits, gives D's right side)
+MENU_ITEM_SPACES = {"MO": 3.17, "OD": 2.8, "DS": 2.3}
 # the mods' status icons (port/assets/icons/lucide): a mod out of the order it
 # asks for, and one that cannot be played (another mod says it cannot be
 # played with it, or this build cannot play it): menu_functions.c's
@@ -1550,50 +1556,49 @@ TITLE_FONT_PATH = Path(__file__).resolve().parent.parent / "port/assets/fonts/Op
 MOD_STATUS_ICONS = [("triangle-alert", "#FFB020"), ("circle-x", "#FF4040")]
 
 
-def menu_item_frames(text: str) -> list:
-    """the frames (svg, width, height) of a main menu item of the port's:
-    its text set in OpenCE (Newtown respaced: port/assets/fonts) as the
-    redraws' items are, dim, then white with their blue glow"""
-    from fontTools.pens.boundsPen import BoundsPen
-    from fontTools.pens.svgPathPen import SVGPathPen
-    from fontTools.pens.transformPen import TransformPen
-    from fontTools.ttLib import TTFont
+def redraw_letters(redraws: Path) -> dict:
+    """the redraws' letters (their <path id="gA">s, one drawing of each
+    letter in every item and header), by letter"""
+    letters = {}
+    for svg in sorted(redraws.rglob("*.svg")):
+        if any(part.startswith("_") for part in svg.relative_to(redraws).parts):
+            continue
+        for letter, path in re.findall(r'<path id="g([A-Z])" d="([^"]+)"', svg.read_text()):
+            if letters.setdefault(letter, path) != path:
+                sys.exit(f"{svg}: the redraws draw {letter} two ways")
+    return letters
 
-    font = TTFont(str(TITLE_FONT_PATH))
-    glyphs = font.getGlyphSet()
-    cmap = font.getBestCmap()
-    kerning = font["kern"].kernTables[0].kernTable if "kern" in font else {}
-    cap = glyphs["H"]
-    pen = BoundsPen(glyphs)
-    cap.draw(pen)
-    scale = MENU_ITEM_CAP / (pen.bounds[3] - pen.bounds[1])
-    names = [cmap[ord(character)] for character in text]
-    widths = [font["hmtx"][name][0] for name in names]
-    advance = sum(widths) + sum(kerning.get((first, second), 0) for first, second in zip(names, names[1:]))
-    x = MENU_ITEM_MIDDLE / scale - advance / 2
-    baseline = MENU_ITEM_TOP + MENU_ITEM_CAP
-    defs, uses = {}, []
-    for index, name in enumerate(names):
-        if name not in defs and name != "space":
-            path = SVGPathPen(glyphs, lambda value: f"{value:.2f}".rstrip("0").rstrip("."))
-            glyphs[name].draw(TransformPen(path, (1, 0, 0, -1, 0, 0)))
-            defs[name] = path.getCommands()
-        if name != "space":
-            uses.append(f'<use href="#g{name}" transform="translate({x * scale:.2f},{baseline:.2f}) scale({scale:.5f})"/>')
-        x += widths[index] + (kerning.get((name, names[index + 1]), 0) if index + 1 < len(names) else 0)
-    paths = [f'    <path id="g{name}" d="{commands}"/>' for name, commands in sorted(defs.items())]
-    head = ['<svg xmlns="http://www.w3.org/2000/svg" width="256" height="64" viewBox="0 0 256 64">', "  <defs>", *paths]
-    # (as heavy as the redraws' letters: a thin edge of their colour)
-    edge = f'stroke-width="{0.9 / scale:.2f}" stroke-linejoin="round"'
+
+def menu_item_frames(text: str, redraws: Path) -> list:
+    """the frames (svg, width, height) of a main menu item of the port's: its
+    text in the redraws' own letters (redraw_letters), spaced, placed and
+    coloured as their items are, dim, then white with their blue glow"""
+    from fontTools.pens.boundsPen import BoundsPen
+    from fontTools.svgLib.path import parse_path
+
+    letters = redraw_letters(redraws)
+    widths = []
+    for letter in text:
+        pen = BoundsPen(None)
+        parse_path(letters[letter], pen)
+        widths.append(pen.bounds[2])
+    spaces = [MENU_ITEM_SPACES[first + second] for first, second in zip(text, text[1:])]
+    x = MENU_ITEM_MIDDLE - (sum(widths) + sum(spaces)) * MENU_ITEM_SCALE / 2
+    uses = []
+    for index, letter in enumerate(text):
+        uses.append(f'<use href="#g{letter}" transform="translate({x:.2f},{MENU_ITEM_TOP}) scale({MENU_ITEM_SCALE})"/>')
+        x += (widths[index] + (spaces[index] if index < len(spaces) else 0)) * MENU_ITEM_SCALE
+    paths = [f'    <path id="g{letter}" d="{letters[letter]}"/>' for letter in sorted(set(text))]
+    head = ['<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256" '
+            'height="64" viewBox="0 0 256 64">', "  <defs>", *paths]
     dim = [*head, "  </defs>", f'  <!-- "{text}" (normal state: dim blue) -->',
-           f'  <g id="text" fill="#2895ff" stroke="#2895ff" opacity="0.467" {edge}>',
-           *[f"    {use}" for use in uses], "  </g>", "</svg>", ""]
+           '  <g id="text" fill="#2895ff" fill-opacity="0.467">', *[f"    {use}" for use in uses], "  </g>", "</svg>", ""]
     glow = [*head, '    <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="256" height="64">',
             '      <feGaussianBlur stdDeviation="2.19"/>', "    </filter>", "  </defs>",
             f'  <!-- "{text}" (highlighted: white with blue glow) -->',
-            f'  <g fill="#2895ff" stroke="#2895ff" stroke-width="{6.3 / scale:.2f}" stroke-linejoin="round" '
-            'opacity="0.650" filter="url(#glow)">', *[f"    {use}" for use in uses], "  </g>",
-            f'  <g id="text" fill="#fff" stroke="#fff" {edge}>', *[f"    {use}" for use in uses], "  </g>", "</svg>", ""]
+            '  <g fill="#2895ff" stroke="#2895ff" stroke-width="6.3" stroke-linejoin="round" opacity="0.650" '
+            'filter="url(#glow)">', *[f"    {use}" for use in uses], "  </g>",
+            '  <g id="text" fill="#fff">', *[f"    {use}" for use in uses], "  </g>", "</svg>", ""]
     return [("\n".join(dim), 256, 64), ("\n".join(glow), 256, 64)]
 
 
