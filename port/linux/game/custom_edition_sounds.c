@@ -304,7 +304,7 @@ static boolean vorbis_decode(
 }
 
 /* uncompressed samples, 16-bit little-endian as Halo PC's maps keep them
-(big-endian as its tag files do: loose_sounds.c) */
+(big-endian as its tag files do: mod_sounds.c) */
 static boolean pcm_decode(
 	byte const *data,
 	long data_bytes,

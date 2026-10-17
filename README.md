@@ -61,6 +61,15 @@ the web, the page copies `maps/` out of the disc image into the browser's
 storage for the site; nothing is uploaded. Refer to
 [port/web/README.md](port/web/README.md).
 
+## Mods
+
+Mods are folders of Halo PC tag files, as the Halo Editing Kit and Invader
+write them, in `mods/` next to `maps/`: texture, sound and text packs that
+play over the maps' on your machine only, in any game. Each has a
+`mod.toml`. Every mod in the folder is on; the main menu's Mods turns them
+off and on and sets the order they load in.
+Refer to [docs/mods.md](docs/mods.md).
+
 ## Platforms
 
 Each platform has its own instructions:

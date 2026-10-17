@@ -710,9 +710,12 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 	decode_compressed = description->compressed && !xgpu_capabilities.s3tc;
 #endif
 #ifdef HALO_WEB
-	/* WebGL's S3TC takes 2D textures whose sides are multiples of 4 */
+	/* WebGL's S3TC takes 2D textures whose sides are multiples of 4; and a
+	texture whose channels are where Halo PC keeps them is decoded, to put
+	them in order (WebGL 2 has no texture swizzle) */
 	decode_compressed |= description->compressed &&
-		(target == GL_TEXTURE_3D || (description->width & 3) || (description->height & 3));
+		(target == GL_TEXTURE_3D || (description->width & 3) || (description->height & 3) ||
+			channel_order != _custom_edition_channels_xbox);
 #endif
 	converted = description->compressed && !decode_compressed ? NULL : malloc(largest * sizeof(unsigned long));
 	if (!converted && !(description->compressed && !decode_compressed))
@@ -726,7 +729,8 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 	/* the channel of the texels each channel is sampled from, set on every
 	upload: a texture object can be reused for other texels (WebGL 2 has no
 	texture swizzle: the converted texels' channels are put in order before
-	they are uploaded instead, and Custom Edition maps do not run there) */
+	they are uploaded instead, below; there it is only mods' textures, as
+	Custom Edition maps do not run there) */
 #ifndef HALO_WEB
 	{
 		GLint channels[4] = { GL_RED, GL_GREEN, GL_BLUE, GL_ALPHA };
@@ -794,14 +798,32 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 				}
 #ifdef HALO_WEB
 				{
-					/* BGRA (32-bit ARGB words) to the RGBA WebGL takes */
+					/* BGRA (32-bit ARGB words) to the RGBA WebGL takes, each
+					channel from where the texels keep it */
 					unsigned long texel, count = (unsigned long)width * (unsigned long)height * (unsigned long)depth;
 
 					for (texel = 0; texel < count; texel++)
 					{
 						unsigned long value = converted[texel];
 
-						converted[texel] = (value & 0xff00ff00UL) | ((value >> 16) & 0xffUL) | ((value & 0xffUL) << 16);
+						if (channel_order == _custom_edition_channels_xbox)
+						{
+							converted[texel] = (value & 0xff00ff00UL) | ((value >> 16) & 0xffUL) | ((value & 0xffUL) << 16);
+						}
+						else
+						{
+							/* (red, green, blue and alpha, as stored) */
+							unsigned long stored[4];
+							unsigned long channel;
+
+							stored[0] = (value >> 16) & 0xffUL;
+							stored[1] = (value >> 8) & 0xffUL;
+							stored[2] = value & 0xffUL;
+							stored[3] = (value >> 24) & 0xffUL;
+							converted[texel] = 0;
+							for (channel = 0; channel < 4; channel++)
+								converted[texel] |= stored[custom_edition_channel_sources[channel_order][channel]] << (8 * channel);
+						}
 					}
 				}
 #endif

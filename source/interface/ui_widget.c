@@ -6661,12 +6661,14 @@ static boolean ui_mouse_menus_active(
 }
 
 /* port: a row of a list to choose from (the PC version's menus' lists of
-gametypes, maps, profiles, levels and games: port/assets/menus) */
+gametypes, maps, profiles, levels and games, and the port's of mods:
+port/assets/menus) */
 static boolean ui_mouse_selection_row(
 	struct widget_instance *widget)
 {
 	return widget && widget->parent && pc_menu_tag(widget->parent->definition_tag_index) &&
-		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12));
+		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12) ||
+			!strncmp(widget->name, "op_mod_", 7));
 }
 
 /* logs a tap the menus resolved: where it was and the target the click acts

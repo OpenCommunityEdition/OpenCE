@@ -58,7 +58,7 @@ Android's window is 128 MB, as the web build's, and its cache the Xbox's. */
 The sound cache holds the sounds being played in 4 KB pages, 4 MB of them on
 the Xbox. Halo Custom Edition maps' sounds, converted when they load
 (port/linux/game/custom_edition_sounds.c), and those of sound tags loaded
-over a map's (loose_sounds.c), are longer than the Xbox maps' and fill it (a
+over a map's by mods (mod_sounds.c), are longer than the Xbox maps' and fill it (a
 campaign map's dialogue and music did, "SOUND CACHE BLOWN" in debug.txt).
 The desktop builds' cache is 16 MB; Android's and the web build's windows keep
 the Xbox's. */

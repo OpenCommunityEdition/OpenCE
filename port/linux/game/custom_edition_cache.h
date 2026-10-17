@@ -43,6 +43,7 @@ characters of a level name (game_engine.c, struct game_engine_stage). */
 
 /* ---------- structures */
 
+struct bitmap_data;
 struct cache_file_tag_header;
 struct custom_edition_load_report;
 struct scenario_object_datum;
@@ -200,6 +201,22 @@ them either way. */
 boolean custom_edition_reordered_bitmaps_find(
 	byte *tag_cache,
 	unsigned long loaded_bytes);
+/* As custom_edition_reordered_bitmaps_find, in the loaded map's tags, which
+the validator has checked: for the bitmaps of mods (mod_bitmaps.c), Halo
+PC's on any map. FALSE after logging why it cannot. */
+boolean custom_edition_loaded_reordered_bitmaps_find(
+	void);
+/* The order (enum custom_edition_channel_order) Halo PC keeps the channels
+of bitmap `bitmap_index` of the tag `handle` names in, of those found. */
+short custom_edition_bitmap_channel_order(
+	long handle,
+	long bitmap_index);
+/* Whether the texture cache can draw `bitmap` from pixels laid out as a
+Halo PC tag lays them out (rasterizer_xbox_bitmap_rebuild_hardware_format
+makes them the hardware's): the game's bitmap_verify, a format with a
+hardware texture, sizes it can swizzle, and every pixel its levels need. */
+boolean custom_edition_bitmap_drawable(
+	struct bitmap_data *bitmap);
 /* Decodes every sound permutation of a tag cache custom_edition_cache_load
 filled (its resource offsets combined) that this build would not play: Ogg
 Vorbis, uncompressed, or mono at 44 kHz. Each is encoded again in memory as
@@ -217,7 +234,7 @@ boolean custom_edition_sounds_decode(
 `compression` (16-bit PCM, little-endian or `big_endian`; Xbox ADPCM; Ogg
 Vorbis), `channels` channels at `rate`, encoded as Xbox ADPCM at
 `encoded_rate`: a buffer of the game's allocator of *encoded_bytes; NULL
-when they cannot be (loose_sounds.c) */
+when they cannot be (mod_sounds.c) */
 byte *custom_edition_sounds_encode(
 	byte const *data,
 	long data_bytes,

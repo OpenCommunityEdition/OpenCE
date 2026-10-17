@@ -18,14 +18,14 @@ NOTICES = [
     ("zlib", "port/third_party/zlib/LICENSE"),
     ("KCP (internet play's streams)", "port/third_party/kcp/LICENSE"),
     ("Monocypher (internet play's signatures)", "port/third_party/monocypher/LICENCE.md"),
-    ("tomlc17 (config.toml)", "port/third_party/tomlc17/LICENSE"),
+    ("tomlc17 (config.toml, mod.toml, load_order.toml)", "port/third_party/tomlc17/LICENSE"),
     ("musl (the maths functions)", "port/third_party/musl-math/COPYRIGHT"),
-    ("stb_vorbis (loose sounds)", "port/third_party/stb_vorbis/LICENSE"),
+    ("stb_vorbis (Custom Edition maps' and mods' sounds)", "port/third_party/stb_vorbis/LICENSE"),
     ("extract-xiso (how the disc image is read)", "port/third_party/extract-xiso/LICENSE.TXT"),
     ("Overpass (the menus' text and the page's)", "port/assets/fonts/Overpass-OFL.txt"),
     ("OpenCE (the title font, from Newtown)", "port/assets/fonts/OpenCE-OFL.txt"),
     ("Newtown", "port/assets/fonts/Newtown-LICENSE.txt"),
-    ("Lucide (voice chat's speaker icons)", "port/assets/icons/lucide/LICENSE"),
+    ("Lucide (voice chat's speaker icons, the Mods menu's warning icons)", "port/assets/icons/lucide/LICENSE"),
 ]
 
 
