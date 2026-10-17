@@ -494,4 +494,7 @@ assembly of the port is necessary:
   page contents once a frame instead ("write tracking: page hashes" in the
   log). This is slower, and a write shows one frame later, so moving
   geometry can glitch briefly. `debug.memory_watch = false` does the same
-  on a device.
+  on a device. The translation also has no scalar conversion from floating
+  point to an integer in a SIMD register (`fcvtzs s0, s1`, an illegal
+  instruction there), so `tools/android_asm_convert.py` writes each as the
+  vector form, which leaves the register and the exception flags the same.
