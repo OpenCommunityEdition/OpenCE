@@ -40,12 +40,18 @@ symbols in this file:
 #include "bitmaps/bitmap_color_conversion.h"
 #include "cseries/cseries.h"
 #include "math/real_math.h"
+#include "game/game.h"
+#include "interface/first_person_weapons.h"
 #include "objects/objects.h"
 #include "rasterizer/rasterizer_widgets.h"
 #include "rasterizer/rasterizer.h"
+
+void rasterizer_set_stencil_mode(long stencil_mode);
 #include "render/render.h"
 #include "saved games/game_state.h"
 #include "shaders/shaders.h"
+
+#include <math.h>
 
 /* ---------- constants */
 
@@ -62,6 +68,11 @@ static struct light_volume_frame *light_volume_interpolate_frames(
 static real pow1(
 	real value,
 	real exponent);
+static void light_volume_ease_marker(
+	long light_volume_index,
+	long object_index,
+	char const *marker_name,
+	struct object_marker *marker);
 
 /* ---------- globals */
 
@@ -224,6 +235,28 @@ static real pow1(
 	return exponent != 1.f ? pow(value, exponent) : value;
 }
 
+/* port: the local player's own beam, in a match, from the viewmodel, which
+follows the view every frame. Anyone else's is the pose the picture blends
+to (render_interpolation.c), which this marker is already on. */
+static void light_volume_ease_marker(
+	long light_volume_index,
+	long object_index,
+	char const *marker_name,
+	struct object_marker *marker)
+{
+	struct object_marker viewmodel;
+
+	(void)light_volume_index;
+	if (game_connection() == _game_connection_local)
+		return;
+	if (first_person_weapon_get_marker_by_name_render(object_index, marker_name, &viewmodel, 1) > 0)
+	{
+		marker->matrix.position = viewmodel.matrix.position;
+		marker->matrix.forward = viewmodel.matrix.forward;
+		marker->matrix.up = viewmodel.matrix.up;
+	}
+}
+
 void light_volume_render(
 	long object_index,
 	long light_volume_index)
@@ -242,6 +275,7 @@ void light_volume_render(
 			real parallel_factor;
 
 			object_get_marker_by_name(object_index, definition->attachment_marker, &marker, 1);
+			light_volume_ease_marker(light_volume_index, object_index, definition->attachment_marker, &marker);
 			brightness = 1.f;
 			vector_from_points3d(&render.camera.position, &marker.matrix.position, &eye_to_marker_vector);
 			parallel_factor = ABS(dot_product3d(&render.camera.forward, &marker.matrix.forward));
@@ -272,10 +306,36 @@ void light_volume_render(
 			{
 				short count;
 				short sprite_index;
+				short pass;
+				short pass_count;
+				long local_index = first_person_weapon_get_local_index(object_index);
+				char const *marker_name = definition->attachment_marker;
+				char const *flashlight = "flashlight";
+				boolean on_the_gun = local_index != NONE &&
+					local_index == render.local_player_index;
 
+				/* the flashlight beam still stops on a wall */
+				if (on_the_gun && marker_name)
+				{
+					while (*flashlight != 0 && *marker_name == *flashlight)
+					{
+						marker_name++;
+						flashlight++;
+					}
+					if (*flashlight == 0 && *marker_name == 0)
+						on_the_gun = FALSE;
+				}
+				/* port: one pass on the gun, where its depth hides the charge,
+				and one around the body so the world does not */
+				pass_count = on_the_gun ? 2 : 1;
+				for (pass = 0; pass < pass_count; pass++)
+				{
+				if (on_the_gun)
+					rasterizer_set_stencil_mode(pass == 0 ? 3 : 2);
 				rasterizer_widget_begin(
 					_widget_type_internal_sprite,
-					FLAG(_rasterizer_widget_z_enable_bit));
+					!on_the_gun || pass == 0 ?
+						FLAG(_rasterizer_widget_z_enable_bit) : 0);
 				rasterizer_widget_set_texture(
 					0,
 					definition->map.index,
@@ -318,6 +378,9 @@ void light_volume_render(
 				}
 				rasterizer_widget_batch_sprites(FALSE); /* port: (drawn) */
 				rasterizer_widget_end();
+				}
+				if (on_the_gun)
+					rasterizer_set_stencil_mode(0);
 			}
 		}
 	}
@@ -354,7 +417,15 @@ void light_volume_submit(
 				real_point3d delta;
 				real distance;
 
-				object_get_marker_by_name(object_index, definition->attachment_marker, &marker, 1);
+				/* port: the local weapon's volume is on the viewmodel */
+				if (first_person_weapon_get_marker_by_name_render(
+					object_index,
+					definition->attachment_marker,
+					&marker,
+					1) <= 0)
+				{
+					object_get_marker_by_name(object_index, definition->attachment_marker, &marker, 1);
+				}
 				delta.x = marker.matrix.position.x - render.camera.position.x;
 				delta.y = marker.matrix.position.y - render.camera.position.y;
 				delta.z = marker.matrix.position.z - render.camera.position.z;

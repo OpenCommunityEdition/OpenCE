@@ -174,6 +174,8 @@ symbols in this file:
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "shaders/shader_definitions.h"
+
+#include <math.h>
 #include "structures/cluster_partitions.h"
 #include "structures/structure_bsp_definitions.h"
 #include "structures/structure_render.h"
@@ -1181,11 +1183,38 @@ void lights_preprocess_scene(
 							definition->flags,
 							_light_definition_is_first_person_flashlight_bit))
 						{
+							real_point3d posed_position = light_parameters.position;
+							real_vector3d posed_forward = light_parameters.forward;
+
 							first_person_weapon_center_flashlight(
 								light->object_index,
 								&light_parameters.position,
 								&light_parameters.forward,
 								&light_parameters.up);
+							/* still the tick's aim (another player, or no
+							viewmodel marker): the marker the picture blends */
+							if (game_connection() != _game_connection_local &&
+								posed_forward.i == light_parameters.forward.i &&
+								posed_forward.j == light_parameters.forward.j &&
+								posed_forward.k == light_parameters.forward.k &&
+								posed_position.x == light_parameters.position.x &&
+								posed_position.y == light_parameters.position.y &&
+								posed_position.z == light_parameters.position.z)
+							{
+								struct object_marker markers[1];
+
+								if (object_get_marker_by_name(
+									light->object_index,
+									object_get_attachment_marker_name(light->object_index,
+										light->attachment_marker_index),
+									markers,
+									1) > 0)
+								{
+									light_parameters.position = markers[0].matrix.position;
+									light_parameters.forward = markers[0].matrix.forward;
+									light_parameters.up = markers[0].matrix.up;
+								}
+							}
 							adjusted = TRUE;
 						}
 						else if (object->object.type == _object_type_weapon

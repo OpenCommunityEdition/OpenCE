@@ -117,6 +117,7 @@ symbols in this file:
 #include "models/models.h"
 #include "networking/network_connection.h"
 #include "objects/objects.h"
+#include "objects/widgets/widgets.h"
 #include "rasterizer/rasterizer_model_types.h"
 #include "render/render.h"
 #include "saved games/game_state.h"
@@ -507,7 +508,13 @@ void first_person_weapon_draw(
 					struct animation_graph *animation_graph= animation_graph_definition_get(
 						weapon_definition->weapon.interface_definition.first_person_animations.index);
 					struct render_lighting *lighting= object_get_cached_render_lighting(unit_index, FLT_MAX);
+					real weapon_functions[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS];
+					real unit_functions[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS];
 
+					/* port: the tick's functions, moved into this frame, so the
+					charge clicks with the picture instead of once a tick */
+					object_function_values_for_render(first_person_weapon->weapon_index, weapon_functions);
+					object_function_values_for_render(unit_index, unit_functions);
 					model_effect.modifier_shader= NULL;
 					if (TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit) ||
 						unit->unit.active_camouflage>0.0f)
@@ -538,7 +545,7 @@ void first_person_weapon_draw(
 							model_node_matrices,
 							NULL,
 							weapon->object.outgoing_change_colors,
-							weapon->object.outgoing_function_values,
+							weapon_functions,
 							lighting,
 							&render.camera.position,
 							0.0f,
@@ -546,6 +553,17 @@ void first_person_weapon_draw(
 							first_person_weapon->weapon_index,
 							0,
 							FLAG(_render_model_first_person_bit));
+					}
+
+					/* port: the charge is a widget on the weapon. The body is
+					not drawn in first person, so neither was the charge, while
+					another player still saw it. */
+					{
+						struct render_animation animation;
+
+						animation.colors= weapon->object.outgoing_change_colors;
+						animation.values= weapon_functions;
+						widgets_render(first_person_weapon->weapon_index, lighting, &animation);
 					}
 
 					/* port: the shield's flare on the arms as on the body, the
@@ -566,7 +584,7 @@ void first_person_weapon_draw(
 								model_effect.modifier_shader= modifier_shader;
 								model_effect.modifier_animation.colors= shield_color_colors(unit_index,
 									unit->object.outgoing_change_colors);
-								model_effect.modifier_animation.values= unit->object.outgoing_function_values;
+								model_effect.modifier_animation.values= unit_functions;
 							}
 						}
 					}
@@ -586,7 +604,7 @@ void first_person_weapon_draw(
 							model_node_matrices,
 							NULL,
 							unit->object.outgoing_change_colors,
-							unit->object.outgoing_function_values,
+							unit_functions,
 							lighting,
 							&render.camera.position,
 							0.0f,

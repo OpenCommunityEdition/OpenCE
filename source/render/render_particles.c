@@ -181,11 +181,17 @@ void render_particles(
 					(short)particle->definition_index;
 				rendered_particle->cluster_index =
 					particle->location.cluster_index;
+				/* port: a charge stuck to the viewmodel is drawn with it.
+				One that also shows on the body was left on the world's
+				view, and the near plane cut it down. */
 				rendered_particle->attached_to_first_person_weapon =
 					owned_by_local_player &&
+					(TEST_FLAG(
+						particle->flags,
+						_particle_datum_dont_draw_third_person_bit) ||
 					TEST_FLAG(
 						particle->flags,
-						_particle_datum_dont_draw_third_person_bit);
+						_particle_datum_attached_to_local_player_bit));
 			}
 		}
 
@@ -254,7 +260,7 @@ void render_particles(
 
 					build_sprites_begin(
 						&sprite_data,
-						particle_count,
+						particle_count > 16383 ? (short)32767 : (short)(particle_count * 2),
 						definition->bitmap.index,
 						&definition->shader,
 						rendered_particle->attached_to_first_person_weapon
@@ -369,18 +375,59 @@ void render_particles(
 										particle_flags,
 										_particle_datum_v_mirror_bit));
 
-								build_sprite(
-									&sprite_data,
-									definition->sprite_orientation,
-									particle->sequence_index,
-									particle->frame_index,
-									&position,
-									&direction,
-									particle->rotation,
-									scale,
-									&particle->color,
-									fade,
-									flags);
+								{
+									short next_frame;
+									real blend;
+
+									/* the next cel across this tick, so the
+									flash does not cut from one sprite to the
+									next */
+									if (particle_sprite_blend(
+										rendered_particle->particle_index,
+										&next_frame,
+										&blend))
+									{
+										build_sprite(
+											&sprite_data,
+											definition->sprite_orientation,
+											particle->sequence_index,
+											particle->frame_index,
+											&position,
+											&direction,
+											particle->rotation,
+											scale,
+											&particle->color,
+											fade * (1.0f - blend),
+											flags);
+										build_sprite(
+											&sprite_data,
+											definition->sprite_orientation,
+											particle->sequence_index,
+											next_frame,
+											&position,
+											&direction,
+											particle->rotation,
+											scale,
+											&particle->color,
+											fade * blend,
+											flags);
+									}
+									else
+									{
+										build_sprite(
+											&sprite_data,
+											definition->sprite_orientation,
+											particle->sequence_index,
+											particle->frame_index,
+											&position,
+											&direction,
+											particle->rotation,
+											scale,
+											&particle->color,
+											fade,
+											flags);
+									}
+								}
 
 								particle->last_rendered_frame_index =
 									render.frame_index;
