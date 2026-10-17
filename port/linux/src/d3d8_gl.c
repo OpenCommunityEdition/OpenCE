@@ -597,6 +597,9 @@ struct gl_device
 	GLuint counter_values[VISIBILITY_TEST_SLOTS];
 	GLuint visibility_latest[VISIBILITY_TEST_SLOTS];
 #else
+	/* Diagnostic: read each query to the CPU only after it completes. */
+	BOOL visibility_sync;
+	unsigned long visibility_sync_reads;
 	/* each test's latest result, which the GPU writes (as a query buffer)
 	a frame after the test (visibility_copy_batch): the game waits for
 	results at the start of the next frame, and a query would stop the CPU
@@ -1698,19 +1701,25 @@ static void gl_initialize(void)
 	glGenQueries(VISIBILITY_TEST_SLOTS, device.queries);
 	glGenQueries(1, &device.scratch_query);
 #ifndef HALO_GLES
-	glGenBuffers(1, &device.visibility_results_buffer);
-	glBindBuffer(GL_QUERY_BUFFER, device.visibility_results_buffer);
-	glBufferStorage(GL_QUERY_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL,
-		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-	device.visibility_results = glMapBufferRange(GL_QUERY_BUFFER, 0, VISIBILITY_TEST_SLOTS * sizeof(GLuint),
-		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-	if (device.visibility_results)
-	{
-		glGenQueries(VISIBILITY_TEST_SLOTS, device.visibility_batches[0].queries);
-		glGenQueries(VISIBILITY_TEST_SLOTS, device.visibility_batches[1].queries);
-	}
+	device.visibility_sync = config_boolean("debug.gpu_sync_visibility") != 0;
+	if (device.visibility_sync)
+		platform_log("GPU: synchronized visibility readback enabled; occlusion remains active, GPU waits may reduce frame rate");
 	else
-		platform_log("cannot map the visibility test results; tests wait for the GPU");
+	{
+		glGenBuffers(1, &device.visibility_results_buffer);
+		glBindBuffer(GL_QUERY_BUFFER, device.visibility_results_buffer);
+		glBufferStorage(GL_QUERY_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL,
+			GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+		device.visibility_results = glMapBufferRange(GL_QUERY_BUFFER, 0, VISIBILITY_TEST_SLOTS * sizeof(GLuint),
+			GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+		if (device.visibility_results)
+		{
+			glGenQueries(VISIBILITY_TEST_SLOTS, device.visibility_batches[0].queries);
+			glGenQueries(VISIBILITY_TEST_SLOTS, device.visibility_batches[1].queries);
+		}
+		else
+			platform_log("cannot map the visibility test results; tests wait for the GPU");
+	}
 	/* (unbound: a query read into a bound query buffer takes its pointer
 	for an offset into it) */
 	glBindBuffer(GL_QUERY_BUFFER, 0);
@@ -2358,6 +2367,14 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 	behind, from the slot's earlier ones */
 	if (device.visibility_unread[index])
 	{
+#ifndef HALO_GLES
+		/* GL_QUERY_RESULT blocks until this query completes. With the
+		diagnostic enabled no query buffer is allocated, so the destination
+		is CPU memory, not an offset into a persistently mapped buffer. */
+		if (device.visibility_sync)
+			available = 1;
+		else
+#endif
 		glGetQueryObjectuiv(device.queries[index], GL_QUERY_RESULT_AVAILABLE, &available);
 		if (available)
 		{
@@ -2370,6 +2387,9 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 			if (samples)
 				samples = VISIBILITY_ALL_SAMPLES;
 #else
+			if (device.visibility_sync && device.visibility_sync_reads++ < 16)
+				platform_log("GPU: synchronized visibility slot %lu raw %u scale %g pixels %u",
+					(unsigned long)index, samples, device.query_area[index], visibility_unscaled(samples, index));
 			samples = visibility_unscaled(samples, index);
 #endif
 			device.visibility_known[index] = samples;

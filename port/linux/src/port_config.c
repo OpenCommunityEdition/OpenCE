@@ -564,6 +564,9 @@ static const struct config_setting config_settings[] =
 		"graphics with Mesa's driver (which can hang without), 0 never." },
 	{ "debug.gpu_stats", _config_boolean, "false", "HALO_GPU_STATS", _environment_set_is_true, _platform_all,
 		"Log the renderer's draw counts once a second." },
+	{ "debug.gpu_sync_visibility", _config_boolean, "false", "HALO_GPU_SYNC_VISIBILITY", _environment_value, _platform_desktop,
+		"Diagnostic: wait for completed OpenGL visibility queries instead of asynchronous\n"
+		"readback. Keeps lens-flare occlusion enabled; may reduce frame rate. Restart required." },
 	{ "debug.gpu_trace_frame", _config_integer, "-1", "HALO_GPU_TRACE", _environment_value, _platform_all,
 		"Log every draw of this frame; -1 none." },
 	{ "debug.gpu_trace_constants", _config_boolean, "false", "HALO_GPU_TRACE_CONSTANTS", _environment_set_is_true, _platform_all,
