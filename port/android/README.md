@@ -29,8 +29,8 @@ ninja) and these items:
   The option `--android-ndk` selects a different NDK.
 - CMake, and a JDK 17 or later for Gradle.
 - A network connection for the first build. `configure.py` downloads musl
-  1.2.5 and SDL 3.4.16 to `build/android/third_party`. Gradle downloads the
-  Android Gradle Plugin.
+  1.2.5 (checked against its SHA-256) and SDL 3.4.16 to
+  `build/android/third_party`. Gradle downloads the Android Gradle Plugin.
 
 On Windows, build in WSL2 (Ubuntu 24.04). The Android build does not run
 on Windows itself. Enter
@@ -317,6 +317,13 @@ The guest is the game, the platform layer and a small runtime:
 
 The APK contains the image as an asset.
 
+`ARM64_32` in `tools/guest_arch.py` holds what in these steps is particular
+to the processor: the target and its options, the defines, the conversion
+of the assembly, the linker's emulation, the builtins, the instructions of
+the import stubs and the calling convention of the host for the OpenGL
+stubs. The Android build and the desktop guest builds
+(`tools/linux_guest_build.py`) take it.
+
 The C library of the guest is a part of musl for a new `arm64_32`
 architecture (`guest/libc/arch/arm64_32`). It has ILP32 types and a 32-bit
 `time_t`, as in the MSVC runtime of the game. Its system calls go to the
@@ -342,8 +349,9 @@ and supplies the thread pointer and TLS.
   UPnP and DTLS functions of `port/linux/src/posix_*.c` (DTLS with Mbed TLS,
   for internet play with browsers: `posix_dtls.c`).
 
-The guest calls the host through stubs (`tools/android_imports.py`). The
-two ABIs use the same registers for 32-bit integers, floats and pointers.
+The guest calls the host through stubs (`tools/android_imports.py`, with the
+instructions of `import_stub` in `tools/guest_arch.py`). The two ABIs use
+the same registers for 32-bit integers, floats and pointers.
 `tools/android_gl_stubs.py` makes the OpenGL ES stubs from
 `port/linux/src/gl.h`. `tools/android_posix_stubs.py` makes the stubs of the
 `posix_*` functions, which copy the `errno` of the host.
@@ -445,7 +453,8 @@ Android build defines all of (`tools/android_build.py`):
 
 The x86 inline assembly is replaced by C (refer to
 [port/linux/README.md](../linux/README.md#game-source-changes)).
-These changes are in `#ifdef HALO_ARM64_GUEST`:
+These changes are in `#ifdef HALO_ARM64_GUEST`, which the Linux arm64 build
+shares:
 
 - Seven `#pragma bss_seg(".bss")` lines are removed. The Darwin target does
   not accept them.

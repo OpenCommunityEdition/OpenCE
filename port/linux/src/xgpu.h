@@ -37,6 +37,13 @@ void host_gl_read_buffer(unsigned int buffer, unsigned int offset, unsigned int 
 void host_gl_buffer_write(unsigned int target, unsigned int offset, unsigned int size, const void *data);
 void host_gl_fence_frame(unsigned int slot);
 void host_gl_wait_frame(unsigned int slot);
+#elif defined(HALO_ARM64_GUEST)
+/* the Linux arm64 build's desktop renderer (port/android/host/host_gl.c) */
+void host_gl_buffer_write(unsigned int target, unsigned int offset, unsigned int size, const void *data);
+void host_gl_fence_frame(unsigned int slot);
+void host_gl_wait_frame(unsigned int slot);
+int host_gl_map_results(unsigned int buffer, unsigned int size);
+void host_gl_read_results(void *data, unsigned int size);
 #endif
 
 /* ---------- GL state
