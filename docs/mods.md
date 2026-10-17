@@ -279,6 +279,17 @@ made for.
 - Every model made from a file is kept until the map changes, a file edited
   and read again by `mods_reload` too, and counts against the mods' memory.
 
+### Shaders
+
+A model's parts can be drawn with a shader of every group Halo PC has but
+one: `shader_transparent_chicago_extended`, which Gearbox added for Halo PC.
+The Xbox game does not have it, so do not use it: use a
+`shader_transparent_chicago` shader instead. (A Custom Edition map's
+chicago extended shaders become chicago shaders as the map loads, keeping
+only their four-stage maps: see
+[custom_edition_caches.md](custom_edition_caches.md).) As for every
+shader, it must be one the map has.
+
 ## Making a mod
 
 1. Get the tags you want to change as tag files. `invader-extract` extracts
