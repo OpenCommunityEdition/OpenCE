@@ -51,6 +51,11 @@ struct hud_hires_embedded
 extern const struct hud_hires_embedded hud_hires_embedded[];
 extern const unsigned int hud_hires_embedded_count;
 
+/* At the frame boundary, identify cached bitmaps affected by committed HUD
+ * or title setting changes. Pixel/CRC validation still occurs on upload. */
+unsigned long hud_hires_settings_changed(void);
+int hud_hires_bitmap_affected(unsigned long address, long width, long height, unsigned long changed);
+
 /* the texture standing for the bitmap whose pixels are uploaded from address
 (guest virtual) with this size, its first mip level being level0_size bytes,
 or -1: none, its setting (display.high_res_hud, or display.high_res_text for

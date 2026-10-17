@@ -89,6 +89,7 @@ struct text_hires_glyph
 };
 
 #define TEXT_HIRES_FIT_LETTERS 52
+int text_hires_enabled(void); /* port: port/linux/src/text_hires.c */
 long text_hires_font(char const *tag_name, float cap_height, short const *letter_widths, float oversample);
 int text_hires_covers(long font, unsigned long code);
 int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *glyph);
@@ -822,7 +823,9 @@ static long hires_text_font_get(
 	short row;
 	long hires_font;
 
-	if (font_index == NONE)
+	/* port: consult the committed setting before the font cache. In particular,
+	 * never cache NONE merely because high-res text was disabled. */
+	if (font_index == NONE || !text_hires_enabled())
 		return NONE;
 	font = font_definition_get(font_index);
 	for (font_slot = 0; font_slot < MAXIMUM_HIRES_TEXT_FONTS; font_slot++)

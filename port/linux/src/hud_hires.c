@@ -73,6 +73,31 @@ long hud_hires_asset_fits(long asset, long width, long height)
 		embedded->width / width == embedded->height / height && embedded->width / width > 1;
 }
 
+/* Changed settings since the previous rendered frame: HUD bit 0, titles bit 1.
+ * Pending menu edits do not change config_changes(). */
+unsigned long hud_hires_settings_changed(void)
+{
+	static unsigned long read_at = (unsigned long)-1;
+	static unsigned long previous;
+	unsigned long current, changed;
+
+	if (read_at == config_changes()) return 0;
+	current = (config_boolean("display.high_res_hud") ? 1UL : 0UL) |
+		(config_boolean("display.high_res_text") ? 2UL : 0UL);
+	changed = read_at == (unsigned long)-1 ? 0 : previous ^ current;
+	read_at = config_changes();
+	previous = current;
+	return changed;
+}
+
+int hud_hires_bitmap_affected(unsigned long address, long width, long height, unsigned long changed)
+{
+	long asset = hud_hires_asset_at(address, width, height);
+
+	return asset >= 0 && asset < hud_hires_asset_count() &&
+		(changed & (hud_hires_embedded[asset].title ? 2UL : 1UL)) != 0;
+}
+
 long hud_hires_override_find(unsigned long address, unsigned long width, unsigned long height,
 	unsigned long level0_size)
 {
