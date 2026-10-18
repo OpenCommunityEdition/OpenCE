@@ -89,6 +89,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+/* port: the most an overshield's drain lowers the shield between two looks
+at it (about 0.00074 a tick on the host; a client's arrives in the host's
+updates): a smaller step from past full is the drain, a larger one a hit */
+#define OVERSHIELD_DRAIN_STEP 0.02f
+
 enum
 {
 	_hud_panel_health_dont_show_bit = 0,
@@ -445,11 +450,20 @@ void hud_play_unit_sounds(
 							sound_flags = TEST_FLAG(
 								unit->object.damage_flags,
 								_object_shield_charging_bit);
+							/* port: not an overshield's drain. This runs every frame,
+							and a client applies the host's shield as it arrives,
+							between ticks: the meter's memory is a drain step behind
+							until the tick closes it (hud_update_unit_local_player),
+							and the shield damage sound played at every update of the
+							host for the whole overshield. */
 							SET_FLAG(
 								sound_flags,
 								_unit_hud_shield_damage,
 								hud_state->last_shield_vitality >
-									unit->object.shield_vitality);
+									unit->object.shield_vitality &&
+								!(hud_state->last_shield_vitality > 1.0f &&
+									hud_state->last_shield_vitality - unit->object.shield_vitality <=
+										OVERSHIELD_DRAIN_STEP));
 							SET_FLAG(
 								sound_flags,
 								_unit_hud_shield_low,
@@ -542,7 +556,7 @@ static void hud_update_unit_local_player(
 				one late packet cannot leave the meter a little behind and keep
 				the flash going, and a hit's flash already fading goes on
 				fading, as when the shield holds still. */
-				if (hud_state->last_shield_vitality > 1.0f && shield_drop <= 0.02f)
+				if (hud_state->last_shield_vitality > 1.0f && shield_drop <= OVERSHIELD_DRAIN_STEP)
 				{
 					hud_state->last_shield_vitality = unit->object.shield_vitality;
 					if (hud_state->fade_time > 0.0f)
