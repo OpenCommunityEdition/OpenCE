@@ -39,6 +39,12 @@ void progress_bar_display(
 	real progress);
 boolean progress_bar_is_stuff_ready(
 	void);
+/* port: the screen of a map's download over the menus
+(port/linux/game/download_screen.c) */
+void progress_bar_download_display(
+	real progress);
+void progress_bar_download_end(
+	void);
 
 /* ---------- globals */
 

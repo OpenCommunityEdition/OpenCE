@@ -316,11 +316,102 @@ static int copy_file(struct xiso_image *image, const struct xiso_file *file, con
 	return 1;
 }
 
+/* The loading screen's picture (source/interface/progress_bar.c reads it as
+maps/loading.tga). The retail game has no such file: its default.xbe holds
+the picture, 320 by 240, as runs of 4-bit greys (a byte each: the grey's
+high four bits in its low nibble, the run's length in its high one) after
+the width and height as 32-bit numbers, and its loading screen decodes them
+into the texture. Found by those two numbers followed by runs that fill the
+picture exactly, and written into the maps folder as the uncompressed 24-bit
+TGA progress_bar.c reads (port/web/site/xiso-worker.js does the same). Nothing is
+written when it is not found: the loading screen then makes its own. */
+static void write_loading_picture(struct xiso_image *image, const struct xiso_file *xbe, const char *folder)
+{
+	enum
+	{
+		WIDTH = 320,
+		HEIGHT = 240,
+		PIXELS = WIDTH * HEIGHT,
+		TGA_HEADER_SIZE = 18,
+		MAXIMUM_XBE_SIZE = 64 << 20,
+	};
+	unsigned char *data = NULL, *greys = NULL, *tga = NULL;
+	unsigned long at, next, pixel = 0;
+	char path[1300];
+	int output, y, x;
+
+	if (!xbe->size || xbe->size > MAXIMUM_XBE_SIZE)
+		return;
+	data = malloc(xbe->size);
+	greys = malloc(PIXELS);
+	tga = malloc(TGA_HEADER_SIZE + PIXELS * 3);
+	if (!data || !greys || !tga ||
+		!read_at(image, image->partition + (unsigned long long)xbe->sector * SECTOR_SIZE, data, xbe->size))
+	{
+		goto done;
+	}
+	for (at = 0; at + 8 <= xbe->size && pixel != PIXELS; at++)
+	{
+		if (read_u32(data + at) != WIDTH || read_u32(data + at + 4) != HEIGHT)
+			continue;
+		for (pixel = 0, next = at + 8; next < xbe->size && pixel < PIXELS; next++)
+		{
+			unsigned long run = data[next] >> 4;
+
+			if (!run || pixel + run > PIXELS)
+				break;
+			memset(greys + pixel, (data[next] & 0x0F) << 4, run);
+			pixel += run;
+		}
+	}
+	if (pixel != PIXELS)
+		goto done;
+	memset(tga, 0, TGA_HEADER_SIZE);
+	tga[2] = 2;
+	tga[12] = WIDTH & 0xFF;
+	tga[13] = WIDTH >> 8;
+	tga[14] = HEIGHT & 0xFF;
+	tga[15] = HEIGHT >> 8;
+	tga[16] = 24;
+	/* (rows from the bottom; blue, green and red each the grey) */
+	for (y = 0; y < HEIGHT; y++)
+	{
+		for (x = 0; x < WIDTH; x++)
+		{
+			unsigned char *out = tga + TGA_HEADER_SIZE + ((unsigned long)y * WIDTH + x) * 3;
+
+			out[0] = out[1] = out[2] = greys[(unsigned long)(HEIGHT - 1 - y) * WIDTH + x];
+		}
+	}
+	snprintf(path, sizeof(path), "%s/loading.tga", folder);
+	output = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
+	if (output >= 0)
+	{
+		int whole = write(output, tga, TGA_HEADER_SIZE + PIXELS * 3) == TGA_HEADER_SIZE + PIXELS * 3;
+
+		if (close(output) != 0)
+			whole = 0;
+		/* (none rather than one cut short, which the loading screen would
+		read past) */
+		if (whole)
+			platform_log("extracting maps/loading.tga (the loading screen's picture, from default.xbe)");
+		else
+			unlink(path);
+	}
+
+done:
+	free(data);
+	free(greys);
+	free(tga);
+}
+
 int xiso_extract_maps(const char *image_path, const char *destination, xiso_progress_proc progress, void *context,
 	char *error, int error_size)
 {
 	struct xiso_image image;
 	struct xiso_file *entries = NULL;
+	/* the root's default.xbe (the loading screen's picture) */
+	struct xiso_file xbe;
 	unsigned char *table = NULL;
 	unsigned char *buffer = NULL;
 	unsigned long root_sector, root_size;
@@ -351,6 +442,17 @@ int xiso_extract_maps(const char *image_path, const char *destination, xiso_prog
 		fail(&image, "The disc image's file system is damaged.%s", NULL);
 		goto done;
 	}
+	memset(&xbe, 0, sizeof(xbe));
+	{
+		struct directory_walk walk = { table, root_size, entries, 0, MAXIMUM_FILES, 0, 0 };
+
+		walk_directory(&walk, 0, 0);
+		for (index = 0; index < walk.entry_count; index++)
+		{
+			if (names_match(entries[index].name, "default.xbe"))
+				xbe = entries[index];
+		}
+	}
 	{
 		struct directory_walk walk = { table, root_size, entries, 0, MAXIMUM_FILES, 0, 1 };
 
@@ -375,13 +477,14 @@ int xiso_extract_maps(const char *image_path, const char *destination, xiso_prog
 	/* its files */
 	{
 		struct directory_walk walk = { table, root_size, entries, 0, MAXIMUM_FILES, 0, 0 };
-		int has_ui = 0;
+		int has_ui = 0, has_loading = 0;
 
 		walk_directory(&walk, 0, 0);
 		for (index = 0; index < walk.entry_count; index++)
 		{
 			total += entries[index].size;
 			has_ui |= names_match(entries[index].name, "ui.map");
+			has_loading |= names_match(entries[index].name, "loading.tga");
 		}
 		if (!has_ui)
 		{
@@ -398,6 +501,8 @@ int xiso_extract_maps(const char *image_path, const char *destination, xiso_prog
 			if (!copy_file(&image, &entries[index], path, buffer, &done, total, progress, context))
 				goto done;
 		}
+		if (!has_loading)
+			write_loading_picture(&image, &xbe, partial);
 		if (rename(partial, final) != 0)
 		{
 			fail(&image, "Could not create %s.", final);
