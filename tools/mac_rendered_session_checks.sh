@@ -272,6 +272,11 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     units="$units port/linux/game/menu_cursor.c"
     # port: the optional achievements (achievements.c; game.achievements)
     units="$units port/linux/game/achievements.c"
+    # port: upstream's mods, in-game chat and text filter (mods.c, mod_*.c, network_chat.c, text_filter*.c)
+    units="$units port/linux/game/mods.c port/linux/game/mod_bitmaps.c port/linux/game/mod_models.c port/linux/game/mod_sounds.c port/linux/game/mod_strings.c"
+    units="$units port/linux/game/network_chat.c port/linux/game/text_filter.c port/linux/game/text_filter_match.c"
+    # port: what the platform layer gives them on other platforms, as none on the Mac
+    units="$units port/mac/engine_upstream_stubs.c"
     source_units=
     recognized_units=" mac_engine_session_probe engine_text_gl "
     index=0
