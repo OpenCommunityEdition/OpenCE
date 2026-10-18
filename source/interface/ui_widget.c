@@ -664,6 +664,7 @@ struct widget_instance;
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "menu_cursor.h" /* port: port/linux/game/menu_cursor.c */
 #include "rasterizer/rasterizer.h"
 #include "saved games/player_profile.h"
 #include "saved games/playlist_profile.h"
@@ -6263,6 +6264,38 @@ static void ui_mouse_widen_values(
 	return;
 }
 
+/* port: the mouse's values reach their arrows. A setting's value box is the
+box of its text, and the arrows are drawn just outside it (5 to 13 units),
+so a click on an arrow fell on the row behind it and pressed A, which a
+setting row ignores; the box grows by the arrows' room on each side, the
+split between previous and next staying at its centre. Unlike
+ui_mouse_widen_values (a finger's), the label and the rest of the row keep
+their meaning. Runs once a frame with the others */
+#define UI_MOUSE_VALUE_ARROW_ROOM 16
+
+static void ui_mouse_pad_values(
+	void)
+{
+	long index;
+	short screen_width = (short)halo_screen_width();
+
+	for (index = 0; index < ui_mouse_target_count; index++)
+	{
+		struct ui_mouse_target *value = &ui_mouse_targets[index];
+
+		if (value->kind != _ui_mouse_target_value)
+			continue;
+		value->split_x = (value->bounds.x0 + value->bounds.x1) / 2;
+		value->split_y = (value->bounds.y0 + value->bounds.y1) / 2;
+		value->bounds.x0 = MAX((short)(value->bounds.x0 - UI_MOUSE_VALUE_ARROW_ROOM),
+			(short)(-(screen_width - 640) / 2));
+		value->bounds.x1 = MIN((short)(value->bounds.x1 + UI_MOUSE_VALUE_ARROW_ROOM),
+			(short)(640 + (screen_width - 640) / 2));
+	}
+
+	return;
+}
+
 /* the right edge of a legend label's text as the game draws it, or NONE
 when it cannot be measured (no text, no font, or icons in the string, which
 the measuring does not account for) */
@@ -6775,6 +6808,8 @@ static void ui_widgets_process_mouse(
 
 	ui_debug_frame++;
 	pointer_active = halo_ui_pointer_update(ui_mouse_menus_active(), &pointer) != 0;
+	/* port: the menus' pointer, drawn (input.menu_cursor) */
+	menu_cursor_note(pointer_active, &pointer);
 	if (pointer_active)
 		ui_mouse_pointer_is_touch = pointer.touch != 0;
 	if (pointer_active && ui_debug_targets_enabled())
@@ -7396,6 +7431,12 @@ void render_ui_widgets(
 				ui_mouse_merge_setting_rows();
 				ui_mouse_widen_values();
 			}
+			else
+			{
+				/* port: the mouse's value boxes reach their arrows
+				(ui_mouse_pad_values) */
+				ui_mouse_pad_values();
+			}
 			ui_mouse_targets_settled = TRUE;
 		}
 		if (widget_globals.fade_to_black >= 0.0f &&
@@ -7419,6 +7460,9 @@ void render_ui_widgets(
 		virtual_keyboard_render();
 	}
 	ui_debug_draw_targets(first_players_render);
+	/* port: the menus' pointer, over everything (input.menu_cursor) */
+	if (first_players_render)
+		menu_cursor_draw();
 
 	return;
 }

@@ -970,6 +970,9 @@ void platform_video_swap(void)
 #endif
 }
 
+/* port/linux/game/menu_cursor.c */
+int menu_cursor_replaces_system(void);
+
 void platform_mouse_capture(BOOL capture)
 {
 #ifdef HALO_WEB
@@ -1402,6 +1405,20 @@ void platform_pump_events(void)
 	/* (Settings > Audio's output device, as it changes: dsound_sdl.c) */
 	dsound_sdl_output_device_check();
 	screen_keyboard_update();
+	/* (the menus draw their own pointer: menu_cursor.c, input.menu_cursor) */
+	{
+		static int cursor_hidden;
+		int hide = menu_cursor_replaces_system();
+
+		if (hide != cursor_hidden)
+		{
+			cursor_hidden = hide;
+			if (hide)
+				SDL_HideCursor();
+			else
+				SDL_ShowCursor();
+		}
+	}
 #endif
 	pthread_mutex_lock(&input_lock);
 #ifndef HALO_ANDROID
