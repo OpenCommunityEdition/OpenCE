@@ -110,3 +110,53 @@ map changes and restart. Include frame-rate observations: this validation does
 not establish performance parity across all drivers or GPUs. Earlier diagnostic
 launchers and test instructions have been retired; historical commits and
 delivered packages retain the investigation steps.
+
+## NVIDIA performance validation
+
+On 18 October 2026, the RTX 5070 Ti / NVIDIA 617.42 / Core i7-14700K comparison
+used Windows portable release builds with PGO and LTO. All other objects were
+shared; only the renderer and its GL loader differed between original c8cf7d83,
+CPU fix 92eaa0cd and NVIDIA optimization 95748a74. Nine 75-second hidden real-GL
+runs alternated the three variants, each with fresh saves, the Xbox A10 opening,
+1920x1080 output, AA off, occlusion on, interpolation on, VSync off and uncapped
+FPS. Each sample window covered 10-60 seconds after the first visibility query.
+An identical in-memory timer recorded Present-entry intervals; detailed profiling
+hooks were absent. All slow frames inside the window were retained.
+
+| Renderer | Median average FPS | FPS range | Mean frame time | p99 frame time | 1% low FPS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Original | 1211.27 | 1208.84-1252.71 | 0.8256 ms | 1.5456 ms | 448.31 |
+| CPU fix | 645.84 | 639.28-1000.26 | 1.5484 ms | 3.0935 ms | 253.96 |
+| NVIDIA optimization | 1178.51 | 788.32-1188.02 | 0.8485 ms | 1.6259 ms | 335.01 |
+
+Each metric is the median of three per-run measurements. The 1% low is the
+reciprocal of the mean of the slowest 1% of intervals. Median throughput improved
+82.5% over the CPU fix and was 2.7% below the original. The wide run-to-run ranges
+are material, and slow-frame performance has not fully recovered. This is one
+uncapped scene, not a deterministic replay, a GPU-only timer or evidence of the
+same gain at a capped frame rate. Background applications and driver scheduling
+were not controlled; no driver or power settings were changed.
+
+Detailed profiling put the CPU readback routine near 0.025 ms/frame, much less
+than the earlier roughly 0.69 ms/frame regression. Additional time appeared in
+draw submission and presentation. Removing flushes, error checks or pool audits,
+shrinking the pool, reducing availability polls, changing CPU read timing and
+using non-waiting CPU result requests did not recover throughput. The measured
+improvement comes from the NVIDIA buffered path; the exact internal driver
+mechanism is not established. Its error checks remain enabled. Profiling hooks
+and experimental variants are not part of the production renderer.
+
+For renderer commit 95748a74, Windows, Linux, Android and web debug/release CI
+passed, along with MCC map validation. Linux CI reported 439 passed and 6 skipped;
+26 focused local visibility, MCC shader and protocol tests passed. Local web
+tests encountered five Windows-only Unix-path/pthread limitations; the web CI
+tests passed on their supported host. Android build success is not Android GPU
+runtime validation, and no new AMD hardware run was available.
+
+The normal local Windows release also completed Xbox A10 -> MCC Tiny Halo ->
+Xbox A10 transitions with 4x MSAA and occlusion enabled. A delayed console marker
+confirmed simulation continued after each load. Thirty visibility summaries
+reported no unavailable polls, dropped measurements or readback failures; the
+process exited normally. Captures and logs were retained. This is a bounded
+smoke test, not full map compatibility or visual occlusion coverage. No Custom
+Edition maps were available for a local runtime test.
