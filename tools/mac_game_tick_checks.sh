@@ -57,7 +57,7 @@ for arch in ${MAC_ARCHS:-ppc}; do
     done
     # Compile the same real-runtime units as the current object harness, but
     # keep the checked provider batch and its link result separate.
-    for unit in "$out/mac_material_effects_native.c" port/mac/engine_services.c port/mac/engine_host_misc.c port/mac/engine_debug_globals.c port/mac/engine_device_state.c port/mac/mac_gpu_textures.c port/mac/mac_shader_source_cache.c port/mac/mac_bone_gather.c port/mac/mac_gl_visibility.c port/mac/mac_gl_program_cache.c port/mac/mac_render_timing.c port/mac/mac_vertex_upload.c port/mac/mac_index_decode_cache.c port/mac/bsp_decode_cache.c port/mac/engine_screen.c port/mac/mac_glsl120.c port/mac/mac_nv2a_vertex.c port/mac/mac_nv2a_pixel.c port/mac/mac_xgpu_text.c port/mac/engine_cache_resources.c port/mac/engine_arena.c port/mac/engine_handles.c port/mac/engine_sockets.c port/mac/engine_clock.c port/mac/engine_common.c port/mac/engine_legacy_shader_globals.c port/mac/engine_custom_edition.c port/mac/engine_cache_files.c port/mac/native_world_vertex_buffers.c port/mac/engine_session.c port/mac/engine_tags.c port/mac/engine_texture_cache.c port/mac/engine_texture_lifecycle.c port/mac/engine_synchronous_precache.c port/mac/engine_tag_compat.c port/mac/native_interface_assets.c port/mac/native_font_tags.c tools/mac_tag_compat_probe.c port/mac/engine_p2p_offline.c port/mac/engine_hud_hires_assets.c port/mac/native_antenna_tags.c port/mac/engine_config.c port/third_party/monocypher/monocypher.c tools/mac_texture_lifecycle_probe.c port/mac/engine_scenario_transition.c port/mac/engine_files.c port/mac/engine_xapi.c port/mac/engine_xnet_status.c port/mac/engine_xnet_compat.c port/mac/engine_winsock_init.c port/mac/mac_xnet_address.c "$out/mac_memory_diagnostics.c" port/mac/engine_shell.c port/mac/engine_console.c port/mac/engine_clipboard.c port/mac/engine_audio_devices.c port/mac/engine_display.c port/mac/engine_messages.c port/mac/engine_format.c "$out/mac_startup_globals.c" "$out/mac_menu_parser.c" "$out/mac_menu_xml.c" "$out/mac_cache_vertex_native.c" port/third_party/expat/xmlparse.c port/third_party/expat/xmlrole.c port/third_party/expat/xmltok.c source/sound/sound_environment_definitions.c "$out/mac_dsound_native.c" "$out/mac_sound_dsound_xbox.c" "$out/mac_lruv_cache.c" "$out/mac_voice_audio_native.c" port/mac/mac_audio_output.c port/mac/mac_audio_pcm.c port/mac/engine_crt.c port/mac/engine_wide.c "$out/mac_shared_wide.c" "$out/mac_bink_null.c" port/mac/engine_physical_memory.c port/mac/engine_heap.c port/third_party/mbedtls/library/sha1.c port/third_party/mbedtls/library/platform_util.c port/mac/engine_memory_status.c port/mac/mac_host_memory.c port/mac/engine_game_runtime.c port/mac/engine_input.c port/mac/mac_window.c source/interface/hud_unit.c source/structures/structure_runtime_decals.c source/interface/hud.c "$probe" source/game/player_queues_new.c port/mac/engine_world.c port/mac/engine_bitmaps.c port/mac/native_actor_assets.c port/mac/native_physics_tags.c port/mac/native_environment_assets.c port/mac/native_effect_assets.c port/mac/native_decal_assets.c port/mac/native_object_tags.c port/mac/native_bitmap_tags.c port/mac/native_light_tags.c port/mac/native_collision_tags.c port/mac/native_animation_tags.c port/mac/native_model_tags.c port/mac/native_model_buffers.c port/mac/native_scenario_objects.c port/mac/native_scenario_blocks.c port/mac/native_scenario_gameplay.c port/mac/native_scenario_scripts.c port/mac/native_scenario_skies.c port/mac/engine_script_cache.c port/linux/game/first_person_legs.c port/linux/game/object_mesh.c source/render/render_objects.c source/objects/object_deleted_procs.c port/mac/mac_ctype.c $providers "source/saved games/saved_game_files.c" "source/saved games/playlist_profile.c" "$out/mac_game_state_xbox.c"; do
+    for unit in "$out/mac_material_effects_native.c" port/mac/engine_services.c port/mac/engine_host_misc.c port/mac/engine_debug_globals.c port/mac/engine_device_state.c port/mac/mac_gpu_textures.c port/mac/mac_shader_source_cache.c port/mac/mac_bone_gather.c port/mac/mac_gl_visibility.c port/mac/mac_gl_program_cache.c port/mac/mac_render_timing.c port/mac/mac_vertex_upload.c port/mac/mac_index_decode_cache.c port/mac/bsp_decode_cache.c port/mac/engine_screen.c port/mac/mac_glsl120.c port/mac/mac_nv2a_vertex.c port/mac/mac_nv2a_pixel.c port/mac/mac_xgpu_text.c port/mac/engine_cache_resources.c port/mac/engine_arena.c port/mac/engine_handles.c port/mac/engine_sockets.c port/mac/engine_clock.c port/mac/engine_common.c port/mac/engine_legacy_shader_globals.c port/mac/engine_custom_edition.c port/mac/engine_cache_files.c port/mac/native_world_vertex_buffers.c port/mac/engine_session.c port/mac/engine_tags.c port/mac/engine_texture_cache.c port/mac/engine_texture_lifecycle.c port/mac/engine_synchronous_precache.c port/mac/engine_tag_compat.c port/mac/native_interface_assets.c port/mac/native_font_tags.c tools/mac_tag_compat_probe.c port/mac/engine_p2p_offline.c port/mac/engine_hud_hires_assets.c port/mac/native_antenna_tags.c port/mac/engine_config.c port/third_party/monocypher/monocypher.c tools/mac_texture_lifecycle_probe.c port/mac/engine_scenario_transition.c port/mac/engine_files.c port/mac/engine_xapi.c port/mac/engine_xnet_status.c port/mac/engine_xnet_compat.c port/mac/engine_winsock_init.c port/mac/mac_xnet_address.c "$out/mac_memory_diagnostics.c" port/mac/engine_shell.c port/mac/engine_console.c port/mac/engine_clipboard.c port/mac/engine_audio_devices.c port/mac/engine_display.c port/mac/engine_messages.c port/mac/engine_format.c "$out/mac_startup_globals.c" "$out/mac_menu_parser.c" "$out/mac_menu_xml.c" "$out/mac_cache_vertex_native.c" port/third_party/expat/xmlparse.c port/third_party/expat/xmlrole.c port/third_party/expat/xmltok.c source/sound/sound_environment_definitions.c "$out/mac_dsound_native.c" "$out/mac_sound_dsound_xbox.c" "$out/mac_lruv_cache.c" "$out/mac_voice_audio_native.c" port/mac/mac_audio_output.c port/mac/mac_audio_pcm.c port/mac/engine_crt.c port/mac/engine_wide.c "$out/mac_shared_wide.c" "$out/mac_bink_null.c" port/mac/engine_physical_memory.c port/mac/engine_heap.c port/mac/mac_mbedtls_time.c port/mac/engine_memory_status.c port/mac/mac_host_memory.c port/mac/engine_game_runtime.c port/mac/engine_input.c port/mac/mac_window.c source/interface/hud_unit.c source/structures/structure_runtime_decals.c source/interface/hud.c "$probe" source/game/player_queues_new.c port/mac/engine_world.c port/mac/engine_bitmaps.c port/mac/native_actor_assets.c port/mac/native_physics_tags.c port/mac/native_environment_assets.c port/mac/native_effect_assets.c port/mac/native_decal_assets.c port/mac/native_object_tags.c port/mac/native_bitmap_tags.c port/mac/native_light_tags.c port/mac/native_collision_tags.c port/mac/native_animation_tags.c port/mac/native_model_tags.c port/mac/native_model_buffers.c port/mac/native_scenario_objects.c port/mac/native_scenario_blocks.c port/mac/native_scenario_gameplay.c port/mac/native_scenario_scripts.c port/mac/native_scenario_skies.c port/mac/engine_script_cache.c port/linux/game/first_person_legs.c port/linux/game/object_mesh.c source/render/render_objects.c source/objects/object_deleted_procs.c port/mac/mac_ctype.c $providers "source/saved games/saved_game_files.c" "source/saved games/playlist_profile.c" "$out/mac_game_state_xbox.c"; do
         name=$(basename "$unit" .c)
         if [ "$unit" = port/mac/mac_render_timing.c ] || [ "$unit" = port/mac/mac_vertex_upload.c ] || [ "$unit" = port/mac/mac_index_decode_cache.c ] || [ "$unit" = port/mac/bsp_decode_cache.c ] || [ "$unit" = port/mac/mac_bone_gather.c ]; then
             "$mac_cc" -arch "$arch" -isysroot "$mac_sdk" -mmacosx-version-min=10.4 \
@@ -167,11 +167,58 @@ for arch in ${MAC_ARCHS:-ppc}; do
             continue
         fi
         if [ "$unit" = port/mac/engine_xapi.c ]; then
-            if "$mac_cc" -arch "$arch" -isysroot "$mac_sdk" -mmacosx-version-min=10.4 -std=gnu89 -O2 $fp -ffunction-sections -fdata-sections -I. -Isource -Isource/cseries -Isource/math -Iport/mac -Iport/include/xdk -Iport/third_party/mbedtls/include -idirafter port/linux/include -c "$unit" -o "$out/${name}_$arch.o" > "$out/${name}_$arch.txt" 2>&1; then objects="$objects $out/${name}_$arch.o"; else echo "$unit" >> "$out/compile_failures_$arch.txt"; failed=$((failed+1)); fi
+            if "$mac_cc" -arch "$arch" -isysroot "$mac_sdk" -mmacosx-version-min=10.4 -std=gnu89 -O2 $fp -ffunction-sections -fdata-sections -DMBEDTLS_CONFIG_FILE='"mac_mbedtls_config.h"' -I. -Isource -Isource/cseries -Isource/math -Iport/mac -Iport/include/xdk -Iport/third_party/mbedtls/include -idirafter port/linux/include -c "$unit" -o "$out/${name}_$arch.o" > "$out/${name}_$arch.txt" 2>&1; then objects="$objects $out/${name}_$arch.o"; else echo "$unit" >> "$out/compile_failures_$arch.txt"; failed=$((failed+1)); fi
             continue
         fi
-        if [ "$unit" = port/third_party/mbedtls/library/sha1.c ] || [ "$unit" = port/third_party/mbedtls/library/platform_util.c ]; then
-            if "$mac_cc" -arch "$arch" -isysroot "$mac_sdk" -mmacosx-version-min=10.4 -std=gnu89 -O2 $fp -DMBEDTLS_PLATFORM_MS_TIME_ALT -ffunction-sections -fdata-sections -Iport/third_party/mbedtls/include -Iport/third_party/mbedtls/library -c "$unit" -o "$out/${name}_$arch.o" > "$out/${name}_$arch.txt" 2>&1; then objects="$objects $out/${name}_$arch.o"; else echo "$unit" >> "$out/compile_failures_$arch.txt"; failed=$((failed+1)); fi
+        if [ "$unit" = port/mac/mac_mbedtls_time.c ]; then
+            # The whole of mbedtls and the whole of miniupnpc, for internet
+            # play's DTLS and its port mapping. They hang off this unit
+            # because this unit is the clock mbedtls asks for once
+            # mac_mbedtls_config.h sets MBEDTLS_PLATFORM_MS_TIME_ALT: the
+            # two belong together, and the library does not link without it.
+            #
+            # Every mbedtls file is built with the same MBEDTLS_CONFIG_FILE.
+            # Its options decide structure layouts, so a library built half
+            # one way and half the other does not fail at the link; it
+            # misbehaves later, somewhere else. port/mac/engine_xapi.c,
+            # which reads mbedtls headers, takes the same define above.
+            #
+            # Both are globbed rather than listed, as tools/linux_build.py
+            # globs them, so that a vendored update brings its new files
+            # with it. AGENTS.md keeps the vendored copies unchanged; all
+            # the Mac needs is in mac_mbedtls_config.h.
+            if "$mac_cc" -arch "$arch" -isysroot "$mac_sdk" -mmacosx-version-min=10.4 -std=gnu99 -O2 $fp \
+                -DMBEDTLS_CONFIG_FILE='"mac_mbedtls_config.h"' -ffunction-sections -fdata-sections \
+                -Iport/mac -Iport/third_party/mbedtls/include \
+                -c "$unit" -o "$out/${name}_$arch.o" > "$out/${name}_$arch.txt" 2>&1; then
+                objects="$objects $out/${name}_$arch.o"
+            else
+                echo "$unit" >> "$out/compile_failures_$arch.txt"; failed=$((failed+1))
+            fi
+            for mbedtls_source in port/third_party/mbedtls/library/*.c; do
+                mbedtls_name=$(basename "$mbedtls_source" .c)
+                if "$mac_cc" -arch "$arch" -isysroot "$mac_sdk" -mmacosx-version-min=10.4 -std=gnu99 -O2 $fp \
+                    -DMBEDTLS_CONFIG_FILE='"mac_mbedtls_config.h"' -ffunction-sections -fdata-sections \
+                    -Iport/mac -Iport/third_party/mbedtls/include -Iport/third_party/mbedtls/library \
+                    -c "$mbedtls_source" -o "$out/mbedtls_${mbedtls_name}_$arch.o" \
+                    > "$out/mbedtls_${mbedtls_name}_$arch.txt" 2>&1; then
+                    objects="$objects $out/mbedtls_${mbedtls_name}_$arch.o"
+                else
+                    echo "$mbedtls_source" >> "$out/compile_failures_$arch.txt"; failed=$((failed+1))
+                fi
+            done
+            for upnp_source in port/third_party/miniupnpc/src/*.c; do
+                upnp_name=$(basename "$upnp_source" .c)
+                if "$mac_cc" -arch "$arch" -isysroot "$mac_sdk" -mmacosx-version-min=10.4 -std=gnu99 -O2 $fp \
+                    -DMINIUPNP_STATICLIB -DMINIUPNPC_SET_SOCKET_TIMEOUT -DMINIUPNPC_GET_SRC_ADDR \
+                    -ffunction-sections -fdata-sections -Iport/third_party/miniupnpc/include \
+                    -c "$upnp_source" -o "$out/upnp_${upnp_name}_$arch.o" \
+                    > "$out/upnp_${upnp_name}_$arch.txt" 2>&1; then
+                    objects="$objects $out/upnp_${upnp_name}_$arch.o"
+                else
+                    echo "$upnp_source" >> "$out/compile_failures_$arch.txt"; failed=$((failed+1))
+                fi
+            done
             continue
         fi
         if [ "$unit" = port/mac/native_scenario_objects.c ] || [ "$unit" = port/mac/native_scenario_blocks.c ] || [ "$unit" = port/mac/native_scenario_gameplay.c ] || [ "$unit" = port/mac/native_scenario_scripts.c ] || [ "$unit" = port/mac/engine_script_cache.c ]; then
