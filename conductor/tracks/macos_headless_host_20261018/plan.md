@@ -8,7 +8,7 @@ Prerequisite (the user does this): `sudo xcodebuild -license accept`. Apple's cl
 
 Small stand-alone C programs in `port/macos/spikes/`, each one printing PASS or FAIL. Each has a pytest in `tools/test_macos_spikes.py` that builds it, runs it and checks its output. The tests are written first and fail until the programs exist.
 
-- [ ] Task: Write `tools/test_macos_spikes.py`, which builds and runs each spike and expects PASS (red)
+- [x] Task: Write `tools/test_macos_spikes.py`, which builds and runs each spike and expects PASS (red) 83a1f3d
 - [ ] Task: Spike `low_memory`: try a host linked with `-pagezero_size 0x1000`, then mapping `0x80000000`–`0x8c000000` with fixed `mmap` / `mach_vm_allocate`; if the link or the load is refused, try freeing the page-zero range at start-up. Record which way works
 - [ ] Task: Spike `exec_image`: map a small arm64_32 code page at `0x88000000` as executable, call into it through a trampoline that switches between ILP32 and 64-bit, return a value. Note the entitlements a hardened runtime would need
 - [ ] Task: Spike `thread_pointer`: set `TPIDR_EL0` on two threads, sleep and yield, and check that each keeps its own value
