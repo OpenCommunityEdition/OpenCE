@@ -31,7 +31,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 
 `port/macos/runtime/`: the pure-logic pieces of the VM host, behind a C ABI (cbindgen header), with tests that need no game data.
 
-- [ ] Task: Write tests for `GuestPtr(u32)` and the guest memory: guest addresses map to offsets in one host reservation of 4 GB, with bounds-checked conversion to host slices, and rejection of unmapped addresses and ranges that wrap (red)
+- [x] Task: Write tests for `GuestPtr(u32)` and the guest memory: guest addresses map to offsets in one host reservation of 4 GB, with bounds-checked conversion to host slices, and rejection of unmapped addresses and ranges that wrap (red) 7955264
 - [ ] Task: Implement `GuestPtr` and the guest memory, with the Darwin reservation behind a `platform` module
 - [ ] Task: Write tests for the guest's address-space plan, from `port/android/host/host_memory.c`'s layout: the fixed ranges (`0x80000000`–`0x88000000`, image to `0x8c000000`), the pools and stacks, overlap checks, and the error for a range already taken (red)
 - [ ] Task: Implement the address-space plan
