@@ -1,0 +1,21 @@
+[package]
+name = "opence_runtime"
+version = "0.1.0"
+edition = "2021"
+description = "The pure-logic pieces of the macOS host that runs the guest in a VM (docs/macos_host.md)"
+license = "CC0-1.0"
+publish = false
+
+[lib]
+# rlib for the tests, staticlib for the C host (port/macos/host)
+crate-type = ["rlib", "staticlib"]
+
+[dependencies]
+thiserror = "2"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[profile.release]
+# a panic must not unwind into the C host
+panic = "abort"
