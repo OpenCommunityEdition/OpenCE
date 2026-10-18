@@ -146,8 +146,12 @@ static void mac_render_gamma_install(void)
    engine_device_state.c): the setting's words, and the card's video memory
    and CPU, which "auto" and the limits go by (mac_gpu_info.c, when linked) */
 const char *(*mac_device_render_setting_hook)(int *vram_mb, int *is_ppc);
-extern int mac_gpu_info_vram_mb(void) __attribute__((weak));
-extern int mac_gpu_info_is_ppc(void) __attribute__((weak));
+/* weak definitions, replaced by mac_gpu_info.c's when it is linked: the
+   render graph's own link (mac_main_game_render_checks.sh) does not have it */
+int mac_gpu_info_vram_mb(void) __attribute__((weak));
+int mac_gpu_info_is_ppc(void) __attribute__((weak));
+int mac_gpu_info_vram_mb(void) { return 32; }
+int mac_gpu_info_is_ppc(void) { return 0; }
 
 static const char *mac_render_setting(int *vram_mb, int *is_ppc)
 {
@@ -159,8 +163,8 @@ static const char *mac_render_setting(int *vram_mb, int *is_ppc)
 		read_at = config_changes();
 		setting = config_string("mac.render_resolution");
 	}
-	*vram_mb = mac_gpu_info_vram_mb ? mac_gpu_info_vram_mb() : 32;
-	*is_ppc = mac_gpu_info_is_ppc ? mac_gpu_info_is_ppc() : 0;
+	*vram_mb = mac_gpu_info_vram_mb();
+	*is_ppc = mac_gpu_info_is_ppc();
 	return setting;
 }
 
