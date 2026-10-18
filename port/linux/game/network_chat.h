@@ -29,6 +29,9 @@ void network_chat_update(void);
 /* the first local player says a line to a channel, as if typed and sent;
 the automated tests' (network_test.c) */
 void network_chat_say(short channel, char const *text);
+/* ... sent past this machine's own checks of the host's settings, as a
+changed build could send it, for the host to refuse (network_test.c) */
+void network_chat_say_unchecked(short channel, char const *text);
 /* whether a line is being typed: the keyboard types into it, and drives no
 player (xinput_sdl.c), as with the console */
 boolean network_chat_typing(void);

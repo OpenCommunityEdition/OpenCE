@@ -5247,6 +5247,8 @@ static struct gametype_option const gametype_options[] =
 		{ "5", "10", "15", "20", "30", "50" } },
 	/* (and the players' votes to kick: port/linux/game/network_votekick.c) */
 	{ "votekick_spinner", _option_setting, 0, 0, 2, { 0 }, "network.votekick", { "true", "false" } },
+	/* (and the text chat: port/linux/game/network_chat.c) */
+	{ "text_chat_spinner", _option_setting, 0, 0, 3, { 0 }, "network.text_chat", { "on", "links", "off" } },
 	/* co-op's options (Server Setup's CO-OP OPTIONS: tools/port_settings.py's
 	COOP_SETUP_SCREENS; coop_enemies.c) */
 	{ "coop_friendly_fire_spinner", _option_setting, 0, 0, 4, { 0 }, "network.coop_friendly_fire",

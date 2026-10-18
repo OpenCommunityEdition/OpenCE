@@ -299,6 +299,9 @@ static const struct config_setting config_settings[] =
 	{ "game.language", _config_string, "\"\"", "HALO_LANGUAGE", _environment_value, _platform_all,
 		"The language the game asks the Xbox for: \"ja\", \"de\", \"fr\", \"es\" or \"it\";\n"
 		"empty for English. The game data decides what is translated." },
+	{ "display.text_chat", _config_boolean, "true", "HALO_TEXT_CHAT", _environment_value, _platform_all,
+		"Show the text chat of network games: false hides its lines and keeps\n"
+		"its keys from opening it, as for purists and streamers." },
 	{ "display.chat_style", _config_string, "\"default\"", "HALO_CHAT_STYLE", _environment_value, _platform_all,
 		"The text chat's colours: \"default\" (names in their team's colour,\n"
 		"the text a pale blue, as the PC version) or \"white\" (all white, as\n"
@@ -396,6 +399,10 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"Hosting: how near (world units: 1 is about 3 metres) a player must be\n"
 		"to be heard by proximity voice chat (5 to 100)." },
+	{ "network.text_chat", _config_string, "\"on\"", "HALO_NET_TEXT_CHAT", _environment_value, _platform_all,
+		"Hosting: the text chat: \"on\" (links in lines are refused), \"links\"\n"
+		"(links allowed) or \"off\". Always off in a game listed in the server\n"
+		"browser (a public internet game)." },
 	{ "network.votekick", _config_boolean, "true", "HALO_NET_VOTEKICK", _environment_value, _platform_all,
 		"Hosting: let the players vote to kick a player (the scoreboard's\n"
 		"right-click, or the console's votekick). More than half of the players\n"

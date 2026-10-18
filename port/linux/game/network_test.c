@@ -74,6 +74,7 @@ const char *config_string(char const *name);
 int config_boolean(char const *name);
 double config_real(char const *name);
 long config_integer(char const *name);
+int config_write(char const *name, char const *value);
 void platform_log(char const *format, ...);
 /* damage.c's */
 void damage_kill_object_for_player(long object_index, long player_index);
@@ -910,7 +911,9 @@ void network_test_update(
 		then the host mutes the last player for a minute (a client's /mute
 		of the host refused), each says a line to everyone (the last
 		player's going no further than the host), the host unmutes it, and
-		each says another */
+		each says another; then each says a line with a link (refused, as
+		network.text_chat "on" refuses links), the host turns the text chat
+		off (network.text_chat "off"), and each says a line (refused) */
 		if (network_test.chat_time > 0.0f)
 		{
 			long chat_time = (long)(network_test.chat_time * TICKS_PER_SECOND);
@@ -977,6 +980,39 @@ void network_test_update(
 			{
 				snprintf(text, sizeof(text), "after unmute from %s", machine);
 				network_chat_say(_chat_channel_everyone, text);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 7 && game_time_get() >= chat_time + 14 * TICKS_PER_SECOND)
+			{
+				/* (a client's sent past its own check, for the host to refuse) */
+				snprintf(text, sizeof(text), "join us at discord(dot)gg/halo from %s", machine);
+				if (network_test.mode == _network_test_host)
+					network_chat_say(_chat_channel_everyone, text);
+				else
+					network_chat_say_unchecked(_chat_channel_everyone, text);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 8 && game_time_get() >= chat_time + 16 * TICKS_PER_SECOND)
+			{
+				if (network_test.mode == _network_test_host && !config_write("network.text_chat", "off"))
+					platform_log("network test: could not turn the text chat off");
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 9 && game_time_get() >= chat_time + 18 * TICKS_PER_SECOND)
+			{
+				snprintf(text, sizeof(text), "with the chat off from %s", machine);
+				if (network_test.mode == _network_test_host)
+					network_chat_say(_chat_channel_everyone, text);
+				else
+					network_chat_say_unchecked(_chat_channel_everyone, text);
+				network_test.chat_lines_said++;
+			}
+			/* (and on again: config.toml is the executable's folder's, which
+			every test of it shares) */
+			if (network_test.chat_lines_said == 10 && game_time_get() >= chat_time + 20 * TICKS_PER_SECOND)
+			{
+				if (network_test.mode == _network_test_host && !config_write("network.text_chat", "on"))
+					platform_log("network test: could not turn the text chat on");
 				network_test.chat_lines_said++;
 			}
 		}

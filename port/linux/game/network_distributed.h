@@ -130,6 +130,9 @@ enum
 	the line the host sends on to each machine that hears it, reliably */
 	_distributed_message_chat_up = 87,
 	_distributed_message_chat_down = 88,
+	/* the host's text chat settings (network_chat.c): whether its players
+	may chat and send links, to every client, reliably */
+	_distributed_message_chat_config = 89,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -307,6 +310,9 @@ void network_chat_handle_up(long machine_index, void const *entries, boolean fro
 /* (a client) a line the host sent on */
 void network_chat_handle_down(void const *entries);
 word network_chat_line_entry_size(void);
+/* (a client) the host's chat settings */
+void network_chat_handle_config(void const *entries);
+word network_chat_config_entry_size(void);
 
 /* ---------- prototypes/NETWORK_ACTORS.C */
 

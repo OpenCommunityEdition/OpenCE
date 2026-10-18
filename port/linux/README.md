@@ -351,6 +351,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.menus` | `"pc"` | `HALO_MENUS` | `"pc"`: the PC version's menus, from the files in `port/assets/menus` and a `menus` folder next to `config.toml`. Refer to "Menus". `"xbox"`: the Xbox's menus. |
 | `display.player_names` | `"all"` | `HALO_PLAYER_NAMES` | In multiplayer, whose names are drawn above their heads: `"all"`, `"allies"`, `"enemies"` or `"none"`. An ally's name is drawn above the triangle the game shows over teammates. An enemy's name shows only within the motion sensor's reach, while the enemy is in sight and not camouflaged, so it never shows where an enemy hides. The gametype's motion tracker setting also applies: no names if it shows no players, only allies' if it shows only friends. |
 | `display.player_name_scale` | `1.0` | `HALO_PLAYER_NAME_SCALE` | How large the players' names are drawn: `1.0` is three quarters of the size of the HUD's text, from `0.25` to `4`. With high-res text, larger names are rasterized at their size, so they stay sharp. |
+| `display.text_chat` | `true` | `HALO_TEXT_CHAT` | Show the text chat of network games (Settings > Audio > Voice and Text Chat > TEXT CHAT). `false` hides its lines, and its keys open nothing. Refer to "Text chat". |
 | `display.chat_style` | `"default"` | `HALO_CHAT_STYLE` | The text chat's colours (Settings > Audio > Voice and Text Chat > CHAT TEXT): `"default"`, the player's name in their team's colour and the text a pale blue, as the PC version drew them; `"white"`, all of it white, as Custom Edition. |
 | `display.scoreboard_team_layout` | `"teams"` | `HALO_SCOREBOARD_TEAM_LAYOUT` | How the multiplayer scoreboard (hold BACK, or tab) lists a team game's players. `"teams"`: a column for each team, red on the left and blue on the right. `"score"`: all the players in order of score. With more players than fit, the mouse wheel and Page Up / Page Down scroll the scoreboard. |
 | `display.scoreboard_background` | `true` | `HALO_SCOREBOARD_BACKGROUND` | `true`: the multiplayer scoreboard (hold BACK, or tab) has a panel behind its text, for clearer text. |
@@ -394,6 +395,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.voice_mode` | `"team_global_enemy_proximity"` | `HALO_NET_VOICE_MODE` | When you host: who hears whom during a game. `"off"`; `"team_proximity"` (teammates who are near); `"team_enemy_proximity"` (all players who are near); `"team_global"` (all teammates); `"team_global_enemy_proximity"` (all teammates, and enemies who are near). Refer to "Voice chat". |
 | `network.voice_kbps` | `24` | `HALO_NET_VOICE_KBPS` | When you host: the voice quality in the lobby and in a game, in kilobits per second, `8` to `64`. |
 | `network.voice_proximity` | `15.0` | `HALO_NET_VOICE_PROXIMITY` | When you host: the distance in world units (1 unit is approximately 3 metres) at which players are near, for voice chat. `5` to `100`. |
+| `network.text_chat` | `"on"` | `HALO_NET_TEXT_CHAT` | When you host: the text chat. `"on"`, lines with links refused; `"links"`, links allowed; `"off"`, no chat. Always off in a game listed in the server browser. TEXT CHAT in Server Setup > Teamplay Options (in co-op, Voice and Voting) writes its choice here. Refer to "Text chat". |
 | `network.votekick` | `true` | `HALO_NET_VOTEKICK` | When you host: `true`, the players can vote to kick a player. Refer to "Security". `false`: no votes. VOTE KICK in Server Setup > Teamplay Options (in co-op, Voice and Voting) writes its choice here. |
 | `network.votekick_minutes` | `5` | `HALO_NET_VOTEKICK_MINUTES` | When you host: the minutes that a player must play on the server before the player can start a vote to kick (`0` to `60`). To vote, a player must play for 2 minutes, or for this time if it is less. |
 | `network.votekick_ban_minutes` | `30` | `HALO_NET_VOTEKICK_BAN_MINUTES` | When you host: the minutes that a player who is kicked by a vote cannot join again (`1` to `1440`). |
@@ -691,8 +693,21 @@ The host sends each line on: a player of an older build does not see the
 lines and cannot send them. The host takes 5 lines at once from a machine,
 then one each 1.5 seconds.
 
+TEXT CHAT in Settings > Audio > Voice and Text Chat (`display.text_chat`)
+can HIDE the chat entirely, for purists and streamers: no lines show, and
+its keys open nothing.
+
+The host chooses the text chat for its games with TEXT CHAT in Server
+Setup > Teamplay Options (in co-op, Voice and Voting; `network.text_chat`):
+ON (the default: a line with a link, such as `discord.gg/...`,
+`example.com` or `www.`, is refused), WITH LINKS, or OFF. A game listed in
+the server browser (a public internet game) never has the text chat,
+whatever it says; a private game, joined by its invite, and a LAN game have
+it as chosen. Pressing T where the chat is off says so, and a refused line
+tells its sender why.
+
 The host can mute a player's text chat: type `/mute <player> <minutes>` in
-the chat, as `/mute Milenko 5` (5 minutes when you give none, 1440 at
+the chat, as `/mute Milenko 5` (20 minutes when you give none, 1440 at
 most). The player is found as the console's `kick` finds one: the whole
 name in either case, else the one player whose name begins with what you
 typed. All the players see "Milenko muted for 5 minutes". The muted

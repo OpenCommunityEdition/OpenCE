@@ -5,12 +5,16 @@ The rules of port/linux/game/network_chat.c's text chat: what a line's text
 may hold (another machine's is untrusted), how many lines the host takes
 from a machine, who hears a team's line, how long a line shows, and the
 host's /mute (what it reads from a line, the player a name means, how long a
-mute lasts). test_chat_logic.py takes the constants and structures
-(config.inc) and the code (under_test.inc).
+mute lasts), the links it can refuse and which lines its settings refuse.
+test_chat_logic.py takes the constants and structures (config.inc) and the
+code (under_test.inc).
 */
 
 #include "harness.h"
 
+#ifndef NUMBEROF
+#define NUMBEROF(array) (sizeof(array) / sizeof((array)[0]))
+#endif
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define csstrlen strlen
 #define csstrcmp strcmp
@@ -335,6 +339,63 @@ int main(int argc, char **argv)
 		CHECK(chat_mute_set(mutes, 2, "c", 5, now + CHAT_MILLISECONDS_PER_MINUTE), "the run out mute not taken");
 		CHECK(chat_mute_find(mutes, 2, "a", now + CHAT_MILLISECONDS_PER_MINUTE) &&
 			chat_mute_find(mutes, 2, "c", now + CHAT_MILLISECONDS_PER_MINUTE), "the wrong mute taken");
+	}
+
+	/* links: a scheme, www., a name and a domain (with a path, at the end,
+	before punctuation), an address of four numbers, in either case */
+	CASE("link-found")
+	{
+		static char const *const links[] =
+		{
+			"join https://example.org/x", "ftp://files", "go to WWW.SITE.NET now", "www.halo",
+			"discord.gg/abc", "my clan is at Example.COM", "check yt.tv, it's good", "halo.lol!",
+			"ip 192.168.1.20 port 2302", "10.0.0.1",
+		};
+		int index;
+
+		for (index = 0; index < (int)NUMBEROF(links); index++)
+			CHECK(chat_text_has_link(links[index]), "not a link: '%s'", links[index]);
+	}
+
+	/* the dots written out, as a link is dressed to get past a filter */
+	CASE("link-written-out")
+	{
+		static char const *const links[] = { "discord(dot)gg/abc", "example[dot]com", "site(.)net", "evil[.]io",
+			"EXAMPLE(DOT)COM" };
+		int index;
+
+		for (index = 0; index < (int)NUMBEROF(links); index++)
+			CHECK(chat_text_has_link(links[index]), "not a link: '%s'", links[index]);
+	}
+
+	/* what is not one: sentences, numbers, abbreviations, a dot and a word
+	that is not a domain, a domain's letters running into more */
+	CASE("link-not")
+	{
+		static char const *const lines[] =
+		{
+			"gg ez", "nice shot. com on", "the score is 1.5 to 2", "e.g. the sniper", "i.e. no", "U.S.A",
+			"version 1.2.3", "lol...ok", "use the www to read", "wait.comrades", "Mr.Chief", "a.b", "dot com",
+			"hello world", "3.14159", "", "it's .com", "1.2.3.4567", "player.com2",
+		};
+		int index;
+
+		for (index = 0; index < (int)NUMBEROF(lines); index++)
+			CHECK(!chat_text_has_link(lines[index]), "a link: '%s'", lines[index]);
+	}
+
+	/* the host's settings: no chat refuses every line; links refused unless
+	allowed */
+	CASE("refused")
+	{
+		byte on = (byte)FLAG(_chat_config_allowed_bit);
+		byte links = (byte)(FLAG(_chat_config_allowed_bit) | FLAG(_chat_config_links_bit));
+
+		CHECK(chat_refused(0, "hello") != NULL, "a line taken with the chat off");
+		CHECK(chat_refused((byte)FLAG(_chat_config_links_bit), "hello") != NULL, "links alone let the chat on");
+		CHECK(chat_refused(on, "hello") == NULL, "a line refused with the chat on");
+		CHECK(chat_refused(on, "see discord.gg/x") != NULL, "a link taken where links are refused");
+		CHECK(chat_refused(links, "see discord.gg/x") == NULL, "a link refused where links are allowed");
 	}
 
 	return 0;

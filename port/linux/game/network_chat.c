@@ -24,7 +24,14 @@ host sends, its own lines too, so every machine shows the same lines in the
 same order. A build without the chat drops both kinds as unknown: its
 players neither send nor see lines.
 
-The host may type "/mute <player> [minutes]" (5 when it gives none, a day
+The host's settings (network.text_chat: on, links allowed, or off; off in a
+game listed in the server browser) go to every client
+(_distributed_message_chat_config). A line they refuse is refused by its
+sender's machine and again by the host, which tells the sender why; a
+client without them (from a host without the chat) has the chat off.
+display.text_chat hides the chat on this machine.
+
+The host may type "/mute <player> [minutes]" (20 when it gives none, a day
 at most) or "/unmute <player>", the player as the console's kick finds one
 (the whole name in either case, else the one it begins). It keeps the mute
 by the player's name, which then sends no line further than the host till
@@ -60,8 +67,11 @@ mutes.
 unsigned long system_milliseconds(void);
 int platform_clipboard_get(char *text, int size);
 /* port_config.c's */
+int config_boolean(const char *name);
 const char *config_string(const char *name);
 unsigned long config_changes(void);
+/* p2p_lobby.c's */
+int p2p_hosting_listed(void);
 
 /* ---------- constants */
 
@@ -92,8 +102,11 @@ enum
 	CHAT_LINES_SHOWN_ANDROID = 4,
 	/* a key's Ctrl (struct key_stroke's modifier_flags: menu_functions.c's) */
 	CHAT_KEY_MODIFIER_CONTROL_BIT = 1,
+	/* the host: its chat settings sent again this often (to a machine that
+	joined since) */
+	CHAT_CONFIG_MILLISECONDS = 3000,
 	/* the host's /mute: the minutes when it gives none, and the most (a day) */
-	CHAT_MUTE_DEFAULT_MINUTES = 5,
+	CHAT_MUTE_DEFAULT_MINUTES = 20,
 	CHAT_MUTE_MAXIMUM_MINUTES = 1440,
 	CHAT_MILLISECONDS_PER_MINUTE = 60000,
 	/* the players muted at once */
@@ -111,6 +124,15 @@ enum
 	_chat_line_vehicle_bit,
 	/* the host's notice (a mute's): its text alone, from no player */
 	_chat_line_notice_bit,
+};
+
+/* the host's chat settings' flags (_distributed_message_chat_config) */
+enum
+{
+	/* its players may chat */
+	_chat_config_allowed_bit,
+	/* their lines may have links */
+	_chat_config_links_bit,
 };
 
 /* who a line is to (network_chat.h's _chat_channel_*) */
@@ -155,6 +177,15 @@ struct chat_message
 	struct distributed_message_header header;
 	struct distributed_chat_line line;
 };
+
+/* the host's chat settings */
+struct distributed_chat_config
+{
+	byte flags;
+	byte pad[3];
+};
+
+typedef char distributed_chat_config_size_assert[sizeof(struct distributed_chat_config) == 4 ? 1 : -1];
 
 /* the host: a machine's lines allowed (chat_rate_take) */
 struct chat_rate
@@ -208,6 +239,17 @@ static unsigned long chat_actions_held;
 /* the host's */
 static struct chat_rate chat_rates[MAXIMUM_CHAT_MACHINES];
 static struct chat_mute chat_mutes[CHAT_MAXIMUM_MUTES];
+
+/* the host's chat settings: a client's as the host last sent them (none
+till it does, as from a host without the chat); the host's own as it last
+sent them */
+static struct
+{
+	boolean known;
+	byte flags;
+	/* (the host, system_milliseconds) */
+	unsigned long sent;
+} chat_config;
 
 /* each local player's motion sensor as last drawn (the window's units),
 and whether it has been */
@@ -534,6 +576,99 @@ static char const *chat_minutes_plural(
 	return minutes == 1 ? "" : "s";
 }
 
+static boolean chat_alphanumeric(
+	char character)
+{
+	return (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9');
+}
+
+/* whether a line (chat_text_clean's) has a link, in either case: a scheme
+("http://", any "://"), "www.", an address of four numbers, or a name and a
+common top-level domain ("discord.gg", "example.com/x"), its dots also
+written "(dot)", "[dot]", "(.)" or "[.]" */
+static boolean chat_text_has_link(
+	char const *text)
+{
+	static char const *const dots[] = { "(dot)", "[dot]", "(.)", "[.]" };
+	static char const *const domains[] =
+	{
+		"com", "net", "org", "gg", "io", "tv", "me", "co", "uk", "us", "ru", "de", "fr", "nl", "eu", "info", "biz",
+		"xyz", "ly", "be", "app", "dev", "link", "to", "cc", "ca", "au", "live", "stream", "shop", "site", "online",
+		"club", "pro", "gl", "ws", "cn", "jp", "kr", "br", "in", "es", "it", "pl", "se", "tk", "top", "icu", "fun",
+		"win", "vip", "lol", "edu", "gov", "mil", "int", "ai", "sh", "is", "fm", "gd", "im", "st", "su",
+	};
+	char line[CHAT_TEXT_SIZE];
+	short length = 0;
+	short index;
+
+	/* (in lower case, each dot written out a dot) */
+	for (index = 0; text[index] && length < CHAT_TEXT_SIZE - 1;)
+	{
+		short dot;
+
+		for (dot = 0; dot < (short)NUMBEROF(dots); dot++)
+		{
+			short at;
+
+			for (at = 0; dots[dot][at] && chat_lower(text[index + at]) == dots[dot][at]; at++)
+				;
+			if (!dots[dot][at])
+			{
+				index = (short)(index + at);
+				break;
+			}
+		}
+		line[length++] = dot < (short)NUMBEROF(dots) ? '.' : chat_lower(text[index++]);
+	}
+	line[length] = 0;
+	for (index = 0; index < length; index++)
+	{
+		if (!strncmp(line + index, "://", 3) || (!strncmp(line + index, "www.", 4) &&
+			(index == 0 || !chat_alphanumeric(line[index - 1]))))
+		{
+			return TRUE;
+		}
+		/* (a name, a dot and a domain, all of its letters, which ends there) */
+		if (line[index] == '.' && index > 0 && chat_alphanumeric(line[index - 1]))
+		{
+			short end;
+			short domain;
+
+			for (end = (short)(index + 1); line[end] >= 'a' && line[end] <= 'z'; end++)
+				;
+			if (end - index - 1 < 2 || chat_alphanumeric(line[end]))
+				continue;
+			for (domain = 0; domain < (short)NUMBEROF(domains); domain++)
+			{
+				if ((short)csstrlen(domains[domain]) == end - index - 1 &&
+					!strncmp(line + index + 1, domains[domain], end - index - 1))
+				{
+					return TRUE;
+				}
+			}
+		}
+		/* (four numbers and three dots) */
+		if (line[index] >= '0' && line[index] <= '9' && (index == 0 || !chat_alphanumeric(line[index - 1])))
+		{
+			short at = index;
+			short part;
+
+			for (part = 0; part < 4; part++)
+			{
+				short digits;
+
+				for (digits = 0; line[at] >= '0' && line[at] <= '9'; at++)
+					digits++;
+				if (!digits || digits > 3 || (part < 3 && line[at++] != '.'))
+					break;
+			}
+			if (part == 4)
+				return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 /* ---------- the lines */
 
 static boolean chat_network_game(
@@ -542,6 +677,114 @@ static boolean chat_network_game(
 	short connection = game_connection();
 
 	return connection == _game_connection_network_client || connection == _game_connection_network_server;
+}
+
+/* whether this player shows the text chat (display.text_chat): hidden, no
+line shows and its keys open nothing */
+static boolean chat_shown(
+	void)
+{
+	static boolean shown = TRUE;
+	static unsigned long read_at = (unsigned long)-1;
+
+	/* (read again when Settings changes it) */
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		shown = config_boolean("display.text_chat");
+	}
+	return shown;
+}
+
+/* ---------- the host's chat settings */
+
+static boolean chat_host(
+	void)
+{
+	return game_connection() == _game_connection_network_server;
+}
+
+/* (the host) its chat settings: network.text_chat's, the chat off in a game
+listed in the server browser */
+static byte chat_host_config_flags(
+	void)
+{
+	char const *setting = config_string("network.text_chat");
+	byte flags = 0;
+
+	if (setting && csstrcmp(setting, "off") && !p2p_hosting_listed())
+	{
+		flags |= (byte)FLAG(_chat_config_allowed_bit);
+		if (!csstrcmp(setting, "links"))
+			flags |= (byte)FLAG(_chat_config_links_bit);
+	}
+	return flags;
+}
+
+/* the host's chat settings: the host's own, or as it sent them (none, and
+no chat, till it does) */
+static byte chat_config_flags(
+	void)
+{
+	if (chat_host())
+		return chat_host_config_flags();
+	return chat_config.known ? chat_config.flags : 0;
+}
+
+static void chat_send_to_clients(void *message, byte type, word size);
+
+/* (the host, in a game) its chat settings sent to every client as they
+change, and each CHAT_CONFIG_MILLISECONDS */
+static void chat_host_update_config(
+	void)
+{
+	byte flags = chat_host_config_flags();
+	unsigned long now = system_milliseconds();
+	struct
+	{
+		struct distributed_message_header header;
+		struct distributed_chat_config config;
+	} message;
+
+	if (chat_config.known && flags == chat_config.flags && now - chat_config.sent < CHAT_CONFIG_MILLISECONDS)
+		return;
+	chat_config.known = TRUE;
+	chat_config.flags = flags;
+	chat_config.sent = now;
+	csmemset(&message, 0, sizeof(message));
+	message.config.flags = flags;
+	chat_send_to_clients(&message, _distributed_message_chat_config, (word)sizeof(message));
+}
+
+void network_chat_handle_config(
+	void const *entries)
+{
+	struct distributed_chat_config config;
+
+	if (game_connection() != _game_connection_network_client)
+		return;
+	csmemcpy(&config, entries, sizeof(config));
+	chat_config.known = TRUE;
+	chat_config.flags = config.flags;
+}
+
+word network_chat_config_entry_size(
+	void)
+{
+	return sizeof(struct distributed_chat_config);
+}
+
+/* what is wrong with a line the host's settings refuse: the chat off, or a
+link where links are not allowed; NULL for none */
+static char const *chat_refused(
+	byte flags,
+	char const *text)
+{
+	if (!TEST_FLAG(flags, _chat_config_allowed_bit))
+		return "Text chat is off in this game";
+	if (!TEST_FLAG(flags, _chat_config_links_bit) && chat_text_has_link(text))
+		return "Links aren't allowed in this game";
+	return NULL;
 }
 
 /* the characters of a player's name a line keeps (at most CHAT_NAME_SIZE - 1) */
@@ -620,12 +863,6 @@ static void chat_add_notice(
 }
 
 /* ---------- the host */
-
-static boolean chat_host(
-	void)
-{
-	return game_connection() == _game_connection_network_server;
-}
 
 /* the vehicle a player rides in, the outermost (a vehicle carried by another
 is in that one); NONE for none, or no unit */
@@ -829,6 +1066,7 @@ void network_chat_handle_up(
 	char name[CHAT_NAME_SIZE];
 	struct player_datum *sender;
 	struct chat_mute *mute;
+	char const *refused;
 	unsigned long now = system_milliseconds();
 
 	if (!chat_host() || machine_index < 0 || machine_index >= MAXIMUM_CHAT_MACHINES || !from_stream)
@@ -852,6 +1090,13 @@ void network_chat_handle_up(
 
 		snprintf(notice, sizeof(notice), "You are muted for %d more minute%s", minutes, chat_minutes_plural(minutes));
 		chat_host_notice(machine_index, notice);
+		return;
+	}
+	/* (nor one the host's settings refuse, whatever the client knew of them:
+	the sender is told why) */
+	if ((refused = chat_refused(chat_host_config_flags(), text)) != NULL)
+	{
+		chat_host_notice(machine_index, refused);
 		return;
 	}
 	chat_host_send(line.player_index, chat_channel_from_flags(line.flags), text);
@@ -898,26 +1143,38 @@ static short chat_speaker(
 	return player_index != NONE ? (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index) : NONE;
 }
 
+/* a line said; checked: refused here as the host would refuse it (a test's
+client sends one unchecked, as a changed build could, for the host to refuse) */
 static void chat_send(
 	short channel,
-	char const *typed)
+	char const *typed,
+	boolean checked)
 {
 	char text[CHAT_TEXT_SIZE];
 	char name[CHAT_TEXT_SIZE];
 	short minutes;
 	short player_index = chat_speaker();
+	char const *refused;
 
 	if (player_index == NONE || !chat_text_clean(text, typed, CHAT_TEXT_SIZE))
 		return;
-	if (chat_host())
-	{
-		if (!chat_host_command(player_index, text))
-			chat_host_send(player_index, channel, text);
-	}
-	/* (the host's alone: a client's is not sent) */
-	else if (chat_command_parse(text, name, sizeof(name), &minutes) != _chat_command_none)
+	/* (the host's commands, whatever its settings; a client's is not sent) */
+	if (chat_host() && chat_host_command(player_index, text))
+		return;
+	if (!chat_host() && chat_command_parse(text, name, sizeof(name), &minutes) != _chat_command_none)
 	{
 		chat_add_notice("Only the host can mute players");
+		return;
+	}
+	/* (a line the host's settings refuse, refused here: the host would) */
+	if ((checked || chat_host()) && (refused = chat_refused(chat_config_flags(), text)) != NULL)
+	{
+		chat_add_notice(refused);
+		return;
+	}
+	if (chat_host())
+	{
+		chat_host_send(player_index, channel, text);
 	}
 	else
 	{
@@ -934,7 +1191,15 @@ void network_chat_say(
 	char const *text)
 {
 	if (chat_network_game() && game_in_progress() && channel >= 0 && channel < NUMBER_OF_CHAT_CHANNELS)
-		chat_send(channel, text);
+		chat_send(channel, text, TRUE);
+}
+
+void network_chat_say_unchecked(
+	short channel,
+	char const *text)
+{
+	if (chat_network_game() && game_in_progress() && channel >= 0 && channel < NUMBER_OF_CHAT_CHANNELS)
+		chat_send(channel, text, FALSE);
 }
 
 static void chat_input_begin(
@@ -963,7 +1228,12 @@ void network_chat_update(
 	unsigned long pressed;
 	struct key_stroke key;
 
-	if (!chat_network_game() || !game_in_progress() || chat_speaker() == NONE)
+	/* (the host's settings: a client's as the host sends them in each game) */
+	if (!chat_network_game() || !game_in_progress())
+		chat_config.known = FALSE;
+	else if (chat_host())
+		chat_host_update_config();
+	if (!chat_network_game() || !game_in_progress() || chat_speaker() == NONE || !chat_shown())
 	{
 		chat_input_end();
 		chat_actions_held = 0;
@@ -976,7 +1246,13 @@ void network_chat_update(
 		pressed = held & ~chat_actions_held;
 		chat_actions_held = held;
 		if (pressed && !console_is_active())
-			chat_input_begin(TEST_FLAG(pressed, HALO_KEYBOARD_CHAT) ? _chat_channel_everyone : _chat_channel_team);
+		{
+			/* (no typing where the host has the chat off: it says so) */
+			if (!TEST_FLAG(chat_config_flags(), _chat_config_allowed_bit))
+				chat_add_notice("Text chat is off in this game");
+			else
+				chat_input_begin(TEST_FLAG(pressed, HALO_KEYBOARD_CHAT) ? _chat_channel_everyone : _chat_channel_team);
+		}
 		return;
 	}
 	chat_actions_held = 0;
@@ -994,7 +1270,7 @@ void network_chat_update(
 			break;
 		case _key_return:
 		case _keypad_enter:
-			chat_send(chat_input.channel, chat_input.text);
+			chat_send(chat_input.channel, chat_input.text, TRUE);
 			chat_input_end();
 			break;
 		/* (to everyone, the team, the vehicle, in turn) */
@@ -1236,7 +1512,7 @@ void network_chat_draw(
 	short maximum_shown = CHAT_LINES_SHOWN;
 	short index;
 
-	if (!chat_network_game() || font_index == NONE || local_player_index < 0 ||
+	if (!chat_network_game() || !chat_shown() || font_index == NONE || local_player_index < 0 ||
 		local_player_index >= MAXIMUM_LOCAL_PLAYERS || (!chat_line_count && !typing))
 	{
 		return;

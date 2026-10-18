@@ -14,10 +14,11 @@ from harness import CHECK_FAILED, build, constant, enum_with, function, mutated,
 CASES = ["text-printable", "text-control-characters", "text-bounds", "text-empty", "append", "rate-burst",
          "rate-refill", "rate-wrap", "hears", "hears-vehicle", "flags", "alpha", "command-mute", "command-unmute",
          "command-not", "command-usage", "name-match", "name-bounds", "mute-time", "mute-wrap", "mute-again",
-         "mute-full"]
+         "mute-full", "link-found", "link-written-out", "link-not", "refused"]
 FUNCTIONS = ("chat_text_clean", "chat_text_append", "chat_rate_take", "chat_hears", "chat_channel_from_flags",
              "chat_channel_flags", "chat_line_alpha", "chat_lower", "chat_command_word", "chat_command_parse",
-             "chat_name_match", "chat_mute_minutes_left", "chat_mute_find", "chat_mute_set", "chat_minutes_plural")
+             "chat_name_match", "chat_mute_minutes_left", "chat_mute_find", "chat_mute_set", "chat_minutes_plural",
+             "chat_alphanumeric", "chat_text_has_link", "chat_refused")
 
 # a fault in network_chat.c, the function it is in, and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -60,6 +61,16 @@ NEGATIVE_CONTROLS = {
                       "struct chat_mute *mute = NULL;"), "chat_mute_set", "mute-again"),
     "mute-overwrites": (("if (!chat_mute_minutes_left(&mutes[index], now))", "if (TRUE)"), "chat_mute_set",
                         "mute-full"),
+    "scheme-missed": (('if (!strncmp(line + index, "://", 3) ||', "if ("), "chat_text_has_link", "link-found"),
+    "address-missed": (("if (part == 4)\n\t\t\t\treturn TRUE;", ""), "chat_text_has_link", "link-found"),
+    "dots-not-read": (('line[length++] = dot < (short)NUMBEROF(dots) ? \'.\' : chat_lower(text[index++]);',
+                       "line[length++] = chat_lower(text[index++]);"), "chat_text_has_link", "link-written-out"),
+    "domain-not-ended": (("if (end - index - 1 < 2 || chat_alphanumeric(line[end]))",
+                          "if (end - index - 1 < 2)"), "chat_text_has_link", "link-not"),
+    "links-always-allowed": (("if (!TEST_FLAG(flags, _chat_config_links_bit) && chat_text_has_link(text))", "if (0)"),
+                             "chat_refused", "refused"),
+    "chat-always-allowed": (("if (!TEST_FLAG(flags, _chat_config_allowed_bit))", "if (0)"), "chat_refused",
+                            "refused"),
 }
 
 
@@ -75,6 +86,7 @@ def generated(fault=None, faulty_function=None):
     config += structure(source, "chat_mute") + "\n"
     config += enum_with(source, "_chat_line_team_bit,") + "\n"
     config += enum_with(source, "_chat_command_none,") + "\n"
+    config += enum_with(source, "_chat_config_allowed_bit,") + "\n"
     config += enum_with(read("port/linux/game/network_chat.h"), "_chat_channel_everyone,") + "\n"
     text = ""
     for name in FUNCTIONS:

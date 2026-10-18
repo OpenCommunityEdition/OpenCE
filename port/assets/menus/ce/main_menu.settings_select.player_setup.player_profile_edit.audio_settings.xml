@@ -133,6 +133,6 @@
 		<string text="The volume of every other sound: effects and\nspeech."/>
 		<string text="Play sound at all; from the next time the game\nstarts."/>
 		<string text="The reverb, and how sounds are converted to the\noutput's rate."/>
-		<string text="Voice chat, and the text chat's colors."/>
+		<string text="Voice chat, and showing the text chat and its\ncolors."/>
 	</strings>
 </menus>

@@ -302,8 +302,19 @@ left; it tells every machine of each mute and unmute. A notice is a down
 line with `_chat_line_notice_bit` set, its text alone (no sender). A
 client's `/mute` is never sent, and the host takes the text of a line that
 came up as a line, never a command.
-Builds without the chat drop both kinds as unknown, so the network version
-is unchanged.
+The host's chat settings (`network.text_chat`: on, links allowed, or off;
+always off while its game is listed in the server browser,
+`p2p_hosting_listed`) go to every client in
+`_distributed_message_chat_config` (one byte of flags), reliably, as they
+change and every 3 seconds. A client without them (from a host without the
+chat, or before they come) has the chat off. A client refuses a line the
+settings refuse before sending it, and the host refuses it again whatever
+the client knew, telling its machine why: a changed build gets no further.
+Links are found in the line's text (`chat_text_has_link`): a scheme, `www.`,
+an address of four numbers, or a name and a common top-level domain, its
+dots also written `(dot)`, `[dot]`, `(.)` or `[.]`.
+Builds without the chat drop the three kinds as unknown, so the network
+version is unchanged.
 
 Voice chat (`network_voice.c`, the sound in `port/linux/src/voice_audio.c`)
 travels as distributed messages too, but in the lobby as well as in a game:
@@ -768,7 +779,9 @@ picks the weapon: the first whose tag name has it in it, as "sniper"),
 everyone, one to the team and one to the vehicle (the host seats the last
 two players in one first), then the host mutes the last player for a
 minute, each says a line, the host unmutes them and each says another,
-which every machine's `debug.txt` records as
+each says a line with a link (a client's sent past its own check, for the
+host to refuse), and the host turns the text chat off (and on again) as each
+says one more, which every machine's `debug.txt` records as
 it shows them (the notices as `chat notice:`), and `debug.network_test_score`
 shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's
