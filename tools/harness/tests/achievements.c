@@ -14,7 +14,6 @@ test_achievements.py takes the file itself (under_test.inc).
 
 static struct ach_profile saved_profile;
 static int unlock_count[ACH_PLAYERS][NUMBER_OF_ACHIEVEMENTS];
-static int saves;
 
 void ach_platform_unlocked(int local_player, int achievement)
 {
@@ -24,7 +23,6 @@ void ach_platform_unlocked(int local_player, int achievement)
 void ach_platform_save(int local_player)
 {
 	(void)local_player;
-	saves++;
 }
 
 void ach_platform_log(char const *format, ...)
