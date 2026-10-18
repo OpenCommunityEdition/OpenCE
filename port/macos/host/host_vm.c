@@ -24,6 +24,7 @@ memory for it.
 
 #include <Hypervisor/Hypervisor.h>
 #include <errno.h>
+#include <stdatomic.h>
 #include <libkern/OSCacheControl.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -74,6 +75,14 @@ extern const unsigned int host_import_name_count;
 #define COUNTED_IMPORTS 1024
 static int counting = -1;
 static _Atomic unsigned long long import_counts[COUNTED_IMPORTS];
+
+/* the vCPUs, for the sampler (HALO_HOST_SAMPLE) */
+#define MAXIMUM_VCPUS 64
+static hv_vcpu_t vcpu_ids[MAXIMUM_VCPUS];
+static int vcpu_count;
+static pthread_mutex_t vcpu_lock = PTHREAD_MUTEX_INITIALIZER;
+/* set while the sampler asks every vCPU for its state */
+static atomic_int sampling;
 
 static __thread struct vcpu *current_vcpu;
 /* the guest stack size the next vCPU made on this thread gets */
@@ -175,6 +184,26 @@ static void restore_state(struct vcpu *vcpu, const struct saved_state *state)
 
 /* ---------- crashes */
 
+/* the guest's calls, from its frame records (x29: the previous x29, then the
+return address; the guest keeps frame pointers) */
+static void print_calls(struct vcpu *vcpu)
+{
+	uint64_t frame = get_reg(vcpu, HV_REG_FP);
+	int depth;
+
+	fputs("halo_host:   called from", stderr);
+	for (depth = 0; depth < 24 && frame && frame < 0xfffffff0u && !(frame & 7); depth++)
+	{
+		const uint64_t *record = (const uint64_t *)opence_guest_host_pointer(host_guest, (uint32_t)frame, 16);
+
+		if (!record || !record[1])
+			break;
+		fprintf(stderr, " 0x%08llx", (unsigned long long)record[1]);
+		frame = record[0];
+	}
+	fputc('\n', stderr);
+}
+
 static void report_crash(struct vcpu *vcpu, const char *what, uint64_t syndrome)
 {
 	uint64_t esr = get_sys(vcpu, HV_SYS_REG_ESR_EL1);
@@ -195,24 +224,7 @@ static void report_crash(struct vcpu *vcpu, const char *what, uint64_t syndrome)
 	guest's) */
 	fprintf(stderr, "halo_host:   sp 0x%08llx elr 0x%08llx\n", (unsigned long long)get_sys(vcpu, HV_SYS_REG_SP_EL0),
 		(unsigned long long)get_sys(vcpu, HV_SYS_REG_ELR_EL1));
-	/* the guest's calls, from its frame records (x29: the previous x29,
-	then the return address; the guest keeps frame pointers) */
-	{
-		uint64_t frame = get_reg(vcpu, HV_REG_FP);
-		int depth;
-
-		fputs("halo_host:   called from", stderr);
-		for (depth = 0; depth < 24 && frame && frame < 0xfffffff0u && !(frame & 7); depth++)
-		{
-			const uint64_t *record = (const uint64_t *)opence_guest_host_pointer(host_guest, (uint32_t)frame, 16);
-
-			if (!record || !record[1])
-				break;
-			fprintf(stderr, " 0x%08llx", (unsigned long long)record[1]);
-			frame = record[0];
-		}
-		fputc('\n', stderr);
-	}
+	print_calls(vcpu);
 	fflush(stderr);
 	_exit(70);
 }
@@ -238,6 +250,10 @@ static struct vcpu *vcpu_current(void)
 	set_sys(vcpu, HV_SYS_REG_TPIDR_EL0, 0);
 	/* (no timer interrupts are wanted) */
 	hv_vcpu_set_vtimer_mask(vcpu->id, true);
+	pthread_mutex_lock(&vcpu_lock);
+	if (vcpu_count < MAXIMUM_VCPUS)
+		vcpu_ids[vcpu_count++] = vcpu->id;
+	pthread_mutex_unlock(&vcpu_lock);
 	vcpu->stack_size = next_stack_size ? next_stack_size : DEFAULT_STACK_SIZE;
 	vcpu->stack = host_guest_allocate(vcpu->stack_size);
 	if (!vcpu->stack)
@@ -250,8 +266,20 @@ static void vcpu_release(void)
 {
 	struct vcpu *vcpu = current_vcpu;
 
+	int index;
+
 	if (!vcpu)
 		return;
+	pthread_mutex_lock(&vcpu_lock);
+	for (index = 0; index < vcpu_count; index++)
+	{
+		if (vcpu_ids[index] == vcpu->id)
+		{
+			vcpu_ids[index] = vcpu_ids[--vcpu_count];
+			break;
+		}
+	}
+	pthread_mutex_unlock(&vcpu_lock);
 	hv_vcpu_destroy(vcpu->id);
 	host_guest_free(vcpu->stack, vcpu->stack_size);
 	free(vcpu);
@@ -293,7 +321,23 @@ static void vcpu_run(struct vcpu *vcpu)
 
 		if (result != HV_SUCCESS)
 			host_fatal("hv_vcpu_run failed (%#x)", (unsigned int)result);
-		if (vcpu->exit->reason == HV_EXIT_REASON_VTIMER_ACTIVATED || vcpu->exit->reason == HV_EXIT_REASON_CANCELED)
+		if (vcpu->exit->reason == HV_EXIT_REASON_CANCELED)
+		{
+			/* the sampler's request: where this thread's guest code is */
+			if (atomic_load(&sampling))
+			{
+				uint64_t pc = get_reg(vcpu, HV_REG_PC), cpsr = get_reg(vcpu, HV_REG_CPSR);
+
+				flockfile(stderr);
+				fprintf(stderr, "halo_host: sample: vCPU %llu at %#llx%s\n", (unsigned long long)vcpu->id,
+					(unsigned long long)((cpsr & 0xf) ? get_sys(vcpu, HV_SYS_REG_ELR_EL1) : pc),
+					(cpsr & 0xf) ? " (in an import)" : "");
+				print_calls(vcpu);
+				funlockfile(stderr);
+			}
+			continue;
+		}
+		if (vcpu->exit->reason == HV_EXIT_REASON_VTIMER_ACTIVATED)
 			continue;
 		if (vcpu->exit->reason != HV_EXIT_REASON_EXCEPTION)
 			host_fatal("unexpected vCPU exit %u", (unsigned int)vcpu->exit->reason);
@@ -361,6 +405,43 @@ static uint64_t vcpu_call(uint32_t function, const uint32_t *arguments, int coun
 		free(saved);
 	}
 	return result;
+}
+
+/* HALO_HOST_SAMPLE=<seconds>: every so often, each vCPU's guest code's
+address and calls, to standard error (where a guest that hangs is) */
+static void *sampler(void *context)
+{
+	unsigned int seconds = (unsigned int)(uintptr_t)context;
+
+	for (;;)
+	{
+		hv_vcpu_t ids[MAXIMUM_VCPUS];
+		int count;
+
+		sleep(seconds);
+		pthread_mutex_lock(&vcpu_lock);
+		count = vcpu_count;
+		memcpy(ids, vcpu_ids, sizeof(ids[0]) * (size_t)count);
+		pthread_mutex_unlock(&vcpu_lock);
+		fprintf(stderr, "halo_host: sample: %d vCPUs\n", count);
+		atomic_store(&sampling, 1);
+		if (count)
+			hv_vcpus_exit(ids, (uint32_t)count);
+		/* (a vCPU that is in an import is sampled when it next runs) */
+		usleep(100000);
+		atomic_store(&sampling, 0);
+	}
+	return NULL;
+}
+
+void host_vm_start_sampler(void)
+{
+	const char *setting = getenv("HALO_HOST_SAMPLE");
+	pthread_t thread;
+	int seconds = setting ? atoi(setting) : 0;
+
+	if (seconds > 0 && pthread_create(&thread, NULL, sampler, (void *)(uintptr_t)seconds) == 0)
+		pthread_detach(thread);
 }
 
 void host_vm_report_import_counts(void)

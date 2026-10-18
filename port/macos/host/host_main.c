@@ -250,6 +250,7 @@ int main(int argc, char **argv)
 
 	if (host_vm_initialize() != 0)
 		return 1;
+	host_vm_start_sampler();
 	/* (the guest's arguments: from the image's path on, if one was given,
 	which so is its argv[0]) */
 	host_vm_run_main(boot_block(argc > 1 ? argc - 1 : argc, argc > 1 ? argv + 1 : argv));

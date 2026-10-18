@@ -932,6 +932,7 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		return result_of(flock((int)a, (int)b));
 
 	case __NR_statx:
+	case __NR_sysinfo:
 	case __NR_statfs:
 	case __NR_fstatfs:
 	case __NR_membarrier:
