@@ -82,8 +82,6 @@ enum
 	CHAT_BURST = 5,
 	CHAT_REFILL_MILLISECONDS = 1500,
 	MAXIMUM_CHAT_MACHINES = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
-	/* a line's name and text as drawn (streamer mode's words may be longer) */
-	CHAT_DRAWN_SIZE = 2 * CHAT_TEXT_SIZE,
 	/* the caret's half period while typing */
 	CHAT_CARET_MILLISECONDS = 500,
 	/* Android: the top of the lines, in the HUD's units (480 high, before
@@ -150,6 +148,13 @@ struct distributed_chat_line
 };
 
 typedef char distributed_chat_line_size_assert[sizeof(struct distributed_chat_line) == 68 ? 1 : -1];
+
+/* a message of one line */
+struct chat_message
+{
+	struct distributed_message_header header;
+	struct distributed_chat_line line;
+};
 
 /* the host: a machine's lines allowed (chat_rate_take) */
 struct chat_rate
@@ -539,20 +544,30 @@ static boolean chat_network_game(
 	return connection == _game_connection_network_client || connection == _game_connection_network_server;
 }
 
+/* the characters of a player's name a line keeps (at most CHAT_NAME_SIZE - 1) */
+static short chat_player_name_length(
+	struct player_datum const *player)
+{
+	short length;
+
+	for (length = 0; length < CHAT_NAME_SIZE - 1 && length < (short)NUMBEROF(player->name) && player->name[length];
+		length++)
+		;
+	return length;
+}
+
 /* a player's name in ASCII ("?" for what is not), as debug.txt and /mute
 have it */
 static void chat_player_name_ascii(
 	struct player_datum const *player,
 	char *name)
 {
+	short length = chat_player_name_length(player);
 	short index;
 
-	for (index = 0; index < CHAT_NAME_SIZE - 1 && index < (short)NUMBEROF(player->name) && player->name[index];
-		index++)
-	{
+	for (index = 0; index < length; index++)
 		name[index] = player_name_character_ascii(player->name[index]);
-	}
-	name[index] = 0;
+	name[length] = 0;
 }
 
 /* the newest line, cleared (the oldest gives way) */
@@ -580,16 +595,11 @@ static void chat_add_line(
 	struct player_datum *player = distributed_player(player_index);
 	struct chat_line *line;
 	char name[CHAT_NAME_SIZE];
-	short index;
 
 	if (!player)
 		return;
 	line = chat_new_line(text);
-	for (index = 0; index < CHAT_NAME_SIZE - 1 && index < (short)NUMBEROF(player->name) && player->name[index];
-		index++)
-	{
-		line->name[index] = player->name[index];
-	}
+	csmemcpy(line->name, player->name, chat_player_name_length(player) * sizeof(line->name[0]));
 	line->color = game_engine_has_teams() && player->team_index == 0 ? _chat_color_red : _chat_color_blue;
 	line->channel = channel;
 	/* (debug.txt has the lines, in ASCII) */
@@ -638,6 +648,35 @@ static long chat_player_vehicle(
 	return vehicle_index;
 }
 
+/* a line's message: from a player (absolute index; NONE for the host's
+notice), its flags and its text */
+static void chat_message_new(
+	struct chat_message *message,
+	short player_index,
+	byte flags,
+	char const *text)
+{
+	csmemset(message, 0, sizeof(*message));
+	if (player_index != NONE)
+		message->line.player_index = distributed_player_to_byte(player_index);
+	message->line.flags = flags;
+	csstrncpy(message->line.text, text, CHAT_TEXT_SIZE - 1);
+}
+
+/* (the host) a message of one entry sent to every client machine, reliably */
+static void chat_send_to_clients(
+	void *message,
+	byte type,
+	word size)
+{
+	long machine_indices[MAXIMUM_CHAT_MACHINES];
+	short count = distributed_client_machines(machine_indices, MAXIMUM_CHAT_MACHINES);
+	short index;
+
+	for (index = 0; index < count; index++)
+		distributed_send_to_machine_reliably(machine_indices[index], message, type, 1, size);
+}
+
 /* (the host) a player's line, sent on to every machine that hears it (and
 the sender's) and shown here if a player of this machine's hears it or said
 it */
@@ -651,21 +690,14 @@ static void chat_host_send(
 	long sender_vehicle;
 	long machine_indices[MAXIMUM_CHAT_MACHINES];
 	short count = distributed_client_machines(machine_indices, MAXIMUM_CHAT_MACHINES);
-	struct
-	{
-		struct distributed_message_header header;
-		struct distributed_chat_line line;
-	} message;
+	struct chat_message message;
 	short index;
 	short local_player_index;
 
 	if (!sender || sender->quit_out_of_game)
 		return;
 	sender_vehicle = chat_player_vehicle(sender);
-	csmemset(&message, 0, sizeof(message));
-	message.line.player_index = distributed_player_to_byte(player_index);
-	message.line.flags = chat_channel_flags(channel);
-	csstrncpy(message.line.text, text, CHAT_TEXT_SIZE - 1);
+	chat_message_new(&message, player_index, chat_channel_flags(channel), text);
 	for (index = 0; index < count; index++)
 	{
 		struct data_iterator iterator;
@@ -709,30 +741,16 @@ static void chat_host_notice(
 	long machine_index,
 	char const *text)
 {
-	long machine_indices[MAXIMUM_CHAT_MACHINES];
-	short count;
-	struct
-	{
-		struct distributed_message_header header;
-		struct distributed_chat_line line;
-	} message;
-	short index;
+	struct chat_message message;
 
-	csmemset(&message, 0, sizeof(message));
-	message.line.flags = (byte)FLAG(_chat_line_notice_bit);
-	csstrncpy(message.line.text, text, CHAT_TEXT_SIZE - 1);
+	chat_message_new(&message, NONE, (byte)FLAG(_chat_line_notice_bit), text);
 	if (machine_index != NONE)
 	{
 		distributed_send_to_machine_reliably(machine_index, &message, _distributed_message_chat_down, 1,
 			(word)sizeof(message));
 		return;
 	}
-	count = distributed_client_machines(machine_indices, MAXIMUM_CHAT_MACHINES);
-	for (index = 0; index < count; index++)
-	{
-		distributed_send_to_machine_reliably(machine_indices[index], &message, _distributed_message_chat_down, 1,
-			(word)sizeof(message));
-	}
+	chat_send_to_clients(&message, _distributed_message_chat_down, (word)sizeof(message));
 	chat_add_notice(text);
 }
 
@@ -903,16 +921,9 @@ static void chat_send(
 	}
 	else
 	{
-		struct
-		{
-			struct distributed_message_header header;
-			struct distributed_chat_line line;
-		} message;
+		struct chat_message message;
 
-		csmemset(&message, 0, sizeof(message));
-		message.line.player_index = distributed_player_to_byte(player_index);
-		message.line.flags = chat_channel_flags(channel);
-		csstrncpy(message.line.text, text, CHAT_TEXT_SIZE - 1);
+		chat_message_new(&message, player_index, chat_channel_flags(channel), text);
 		distributed_send(&message, _distributed_message_chat_up, 1, (word)sizeof(message),
 			_distributed_to_host_reliably);
 	}
@@ -1173,9 +1184,10 @@ static void chat_draw_line(
 	rasterizer_text_set_shadow_color(0);
 }
 
-/* a line's text as drawn (streamer mode hides its words as in every text the
-game draws: draw_string.c, text_filter.c) */
-static void chat_line_text(
+/* a line's text (ASCII) as drawn, at most size with its end; its length
+(streamer mode hides its words as in every text the game draws:
+draw_string.c, text_filter.c) */
+static short chat_line_text(
 	char const *text,
 	wchar_t *drawn,
 	short size)
@@ -1185,6 +1197,7 @@ static void chat_line_text(
 	for (index = 0; text[index] && index < size - 1; index++)
 		drawn[index] = (wchar_t)(unsigned char)text[index];
 	drawn[index] = 0;
+	return index;
 }
 
 /* a line's name as drawn: "Name:", "Name (team):" or "Name (vehicle):" */
@@ -1265,10 +1278,7 @@ void network_chat_draw(
 		bounds.x1 = window.x1;
 		bounds.y0 = step < 0 ? (short)(edge - line_height) : edge;
 		bounds.y1 = (short)(bounds.y0 + line_height);
-		/* (streamer mode replaces its words as in every text drawn) */
-		for (length = 0; chat_input.text[length]; length++)
-			text[length] = (wchar_t)(unsigned char)chat_input.text[length];
-		text[length] = 0;
+		length = chat_line_text(chat_input.text, text, CHAT_TEXT_SIZE);
 		if ((now / CHAT_CARET_MILLISECONDS) % 2 == 0)
 		{
 			text[length] = '_';
@@ -1284,8 +1294,9 @@ void network_chat_draw(
 		struct chat_line const *line =
 			&chat_lines[(chat_newest_line - index + CHAT_MAXIMUM_LINES) % CHAT_MAXIMUM_LINES];
 		real alpha = chat_line_alpha(now - line->time, typing);
-		wchar_t name[CHAT_DRAWN_SIZE];
-		wchar_t text[CHAT_DRAWN_SIZE];
+		/* (a name and its " (vehicle):" fit as a notice's text does) */
+		wchar_t name[CHAT_TEXT_SIZE];
+		wchar_t text[CHAT_TEXT_SIZE];
 		real_argb_color color;
 		rectangle2d bounds;
 
