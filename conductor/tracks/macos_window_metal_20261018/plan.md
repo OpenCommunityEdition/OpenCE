@@ -7,9 +7,9 @@
 - [x] Task: Build OpenCE.app with Nix (`nix build .#app`) 71b7cb62
     - [x] Write tests: pytest checks the bundle layout, Info.plist, the embedded guest image and the hypervisor entitlement in the signature
     - [x] A Swift app target (SwiftPM or xcodebuild under Nix, settled here; tech-stack.md updated first if it differs), signed ad hoc with sigtool
-- [ ] Task: UniFFI bindings from the Rust runtime to Swift
-    - [ ] Write tests: cargo test for the exported API; a Swift test that maps a guest range through the bindings
-    - [ ] Export what Swift needs (the guest memory view and its range checks)
+- [x] Task: UniFFI bindings from the Rust runtime to Swift ee85ebca
+    - [x] Write tests: cargo test for the exported API; a Swift test that maps a guest range through the bindings
+    - [x] Export what Swift needs (the guest memory view and its range checks)
 - [ ] Task: Run main-thread imports on the main thread
     - [ ] Write tests: a guest program (port/macos/tests) whose thread asks for a main-thread import and gets its result; a request during shutdown fails cleanly
     - [ ] A request queue: the vCPU posts and waits, the AppKit run loop carries it out
