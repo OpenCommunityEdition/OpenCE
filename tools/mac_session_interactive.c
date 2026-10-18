@@ -25,6 +25,9 @@
 #include "physics/collision_usage.h"
 #include "game/game_engine.h"
 #include "main/main.h"
+#include "main/console.h" /* port: the developer console, serviced as main.c's loop does */
+#include "interface/terminal.h"
+#include "networking/telnet_console.h"
 #include "saved games/game_state.h"
 #include "saved games/player_profile.h"
 #include "interface/player_ui.h"
@@ -1188,6 +1191,9 @@ static void mac_interactive_network_end_frame(struct mac_interactive_context *co
     (void)context;
 }
 
+/* port: whether the developer console was open at the last tick (to say so when it changes) */
+static int mac_console_was_open;
+
 static int mac_interactive_frame(void *opaque,
     const struct mac_input_frame *native_input, unsigned width, unsigned height)
 {
@@ -1199,6 +1205,7 @@ static int mac_interactive_frame(void *opaque,
     unsigned tick_count = 0;
     int shot = 0, screenshot = 0;
     unsigned long tick_started;
+    int console_open = 0;
 
     if (!context || !native_input || !width || !height) {
         if (context)
@@ -1355,7 +1362,8 @@ static int mac_interactive_frame(void *opaque,
                     (int)weapon->weapon.triggers[0].state, (int)weapon->weapon.triggers[0].state_timer);
         }
     }
-    if (mac_engine_menu_enabled()) {
+    /* port: HALO_MAC_MENU_KEYS also drives a game with no menus (to type at the developer console) */
+    if (mac_engine_menu_enabled() || getenv("HALO_MAC_MENU_KEYS")) {
         int token = mac_script_step(&tick_input);
         if (token == SCRIPT_SHOT)
             shot = 1;
@@ -1915,6 +1923,8 @@ radar_free_done:
         platform_request_quit();
         return 0;
     }
+    /* port: the script console (debug.telnet_console), once a frame as main.c's loop does */
+    telnet_console_process();
     tick_started = system_milliseconds();
     while (context->accumulator + 0.0000001 >= MAC_INTERACTIVE_TICK &&
         tick_count < 3) {
@@ -1930,11 +1940,25 @@ radar_free_done:
         input_frame_begin();
         input_update();
         input_abstraction_update();
+        console_open = 0;
         /* the menus (HALO_MAC_MENU=1) take the input; no player is controlled */
         if (mac_engine_menu_active())
             mac_engine_menu_tick();
         else {
-            (void)player_control_update((real)MAC_INTERACTIVE_TICK);
+            /* port: the developer console (the backquote key) and the cheats, in main.c's order. While the console is
+               open on a local game the player's controls and the game's time stand still, as main.c's loop leaves them. */
+            console_open = 0;
+            if (game_in_progress()) {
+                terminal_update();
+                console_open = console_update() && game_connection() == _game_connection_local;
+                if (console_open != mac_console_was_open)
+                    fprintf(stderr, "console: %s at tick %u\n", console_open ? "open" : "closed", context->ticks);
+                mac_console_was_open = console_open;
+                if (!console_open)
+                    cheats_update();
+            }
+            if (!console_open)
+                (void)player_control_update((real)MAC_INTERACTIVE_TICK);
             /* (in a game, Escape opens the pause menu) */
             if (mac_engine_menu_enabled())
                 mac_engine_menu_tick();
@@ -1945,7 +1969,8 @@ radar_free_done:
                 context->request = (unsigned)request;
         }
         mac_interactive_network_end_frame(context);
-        game_time_update((real)MAC_INTERACTIVE_TICK);
+        if (!console_open)
+            game_time_update((real)MAC_INTERACTIVE_TICK);
         /* (HALO_MAC_KILL_PLAYER=<tick>[,<tick>...] (diagnostic): the player is killed then) */
         mac_interactive_kill_player(context);
         if (!mac_engine_menu_active() && mac_interactive_checkpoints_enabled())
@@ -2031,6 +2056,14 @@ int mac_session_interactive_run(unsigned max_frames, int visible,
         return 0;
     }
     context.max_frames = max_frames;
+    /* port: the developer console's state, as main.c sets it before the game starts (the game is already initialized) */
+    {
+        static int console_ready;
+        if (!console_ready) {
+            console_initialize();
+            console_ready = 1;
+        }
+    }
     /* A bounded hidden image-comparison probe advances the real engine once
        per captured frame, independently of driver speed. Visible play always
        retains wall-clock scheduling. */

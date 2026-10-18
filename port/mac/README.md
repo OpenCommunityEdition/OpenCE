@@ -330,6 +330,9 @@ machine" in the game's addressing; give each copy on one machine its own
 - Audio is OpenAL (`HALO_MAC_AUDIO_OPENAL=0` selects the software mixer). Music
   and loops that are Ogg Vorbis in MacSoft's data are converted in the
   background.
+- The developer console opens with the backquote key in a game (Escape or the backquote closes it; the
+  game stands still while it is open), and `debug.telnet_console` listens on `127.0.0.1` for the script
+  console, as on the other builds.
 - The app is not signed or notarized (10.4 to 10.6 do not need it).
 - `HALO_MAC_*` variables beyond those above are diagnostics for the port's
   tests and may change.
