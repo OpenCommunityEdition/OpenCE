@@ -4,7 +4,7 @@ Track: `macos_headless_host_20261018`. Spec: [spec.md](./spec.md). Workflow: [..
 
 Prerequisite (the user does this): `sudo xcodebuild -license accept`. Apple's clang and SDK do not run until the licence is accepted.
 
-## Phase 1: Feasibility spike on macOS
+## Phase 1: Feasibility spike on macOS [checkpoint: cfe80db]
 
 Small stand-alone C programs in `port/macos/spikes/`, each one printing PASS or FAIL. Each has a pytest in `tools/test_macos_spikes.py` that builds it, runs it and checks its output. The tests are written first and fail until the programs exist.
 
@@ -13,7 +13,7 @@ Small stand-alone C programs in `port/macos/spikes/`, each one printing PASS or 
 - [x] Task: Spike `exec_image`: map a small arm64_32 code page at `0x88000000` as executable, call into it through a trampoline that switches between ILP32 and 64-bit, return a value. Note the entitlements a hardened runtime would need 867f88c (replaced by the `hypervisor` spike: a VM runs code at `0x80000000`, about 1 µs per exit)
 - [x] Task: Spike `thread_pointer`: set `TPIDR_EL0` on two threads, sleep and yield, and check that each keeps its own value 6849eaf (result: overwritten at the first context switch)
 - [x] Task: Write `docs/macos_host.md` with each risk's result, the commands and their output, and the chosen approach; update `tech-stack.md` (remove "Unverified") or stop the track if no approach works 94ba2cf (approach pending the user's decision)
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Feasibility spike on macOS' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Feasibility spike on macOS' (Protocol in workflow.md)
 
 ## Phase 2: Nix flake and the macOS build
 
