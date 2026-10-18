@@ -91,7 +91,10 @@ def build(test, generated):
                "-Wno-unused-variable", "-I", str(HARNESS / "include"), "-I", str(work),
                str(HARNESS / "tests" / f"{test}.c"), "-o", str(executable)]
     # The Windows CRT already supplies maths; MSVC has no separate m.lib.
-    if os.name != 'nt':
+    if os.name == 'nt':
+        # Exercise standard C string functions, without MSVC's *_s advice.
+        command.append('-D_CRT_SECURE_NO_WARNINGS')
+    else:
         # Match the portable engine's SSE2 arithmetic instead of x87 excess precision.
         command.extend(['-march=x86-64', '-ffp-contract=off', '-lm'])
     result = subprocess.run(command, capture_output=True, text=True)

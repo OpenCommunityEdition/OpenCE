@@ -80,18 +80,90 @@ Integrated artifact SHA-256 identifiers (artifacts are not committed):
 - Web WASM: `99040c49315be1a585835f3fc4e536cbfcca806aeffc80f8a1d5f4519cd20153`.
 - Android Debug APK: `108b45770b32aa0c552b8a0048cdfa994b7d336dc16813fd425ea0c37854341b`.
 
+## Upstream conflict resolution (2026-10-18)
+
+Merged `main` at `38ccb5f9` (build 232) into the existing contribution branch,
+without rewriting its history. The two conflicts were:
+
+- `network_test.c`: keep the dynamically sized variant/pickup strings and
+  Infection input helpers alongside upstream's chat timer, keyboard input
+  helper and chat diagnostics. Do not restore the old 64-byte truncation.
+- `network_format.txt`: regenerate the combined record, keeping protocol 34
+  and adding the six upstream chat entries. No prior entry changed or was
+  removed. Upstream explicitly documents that older readers ignore these
+  optional message kinds, so this merge needs no further protocol bump.
+
+A production-parser regression combines the original 64-character Infection
+variant suffix, a 299-character pickup filter and an enabled chat timer. The
+Infection menu fixtures now extract upstream's chat-lock constants/helper;
+the Windows harness uses `_CRT_SECURE_NO_WARNINGS` to test standard C string
+functions without MSVC's alternative-function deprecation advice. These are
+test compatibility changes, not changes to Infection's gameplay rules.
+
+| Check on the merged source | Result |
+| --- | --- |
+| Windows portable Debug build | PASS, `ninja -j8 windows`. |
+| Windows targeted tests | Initially 58 PASS / 79 fixture compilation FAIL. The failures were six missing chat-menu dependencies and 73 CRT deprecation errors in upstream's chat harness. Targeted recheck after fixture fixes: 80 PASS (including all failed cases; overlaps one previous pass). No full-suite rerun. |
+| Linux targeted tests | 112 PASS: parser, Infection rules/options/persistence, chat logic and recorded protocol. |
+| Linux / Web / Android builds | PASS, `ninja -j8 linux web android android_apk` with the previously documented toolchains. Device runtime validation for the same APK is recorded below. |
+| Windows full engines | PASS: two real processes, zero bots, Slayer → Infection host zombie → Infection remote zombie → Slayer. Real combat, deaths/new-unit respawns, conversions and matching victories/postgame. 79 paired live snapshots, zero team disagreements, max position difference 0.036 and health difference 0; local camera distance at most 0.62. |
+| Web JavaScript / startup | 22 unit tests PASS; Chromium worker/WebGL2/OPFS/engine-startup smoke PASS. |
+| Browser/native transport | PASS: Chromium and Firefox WebRTC/DTLS, including 10% datagram loss; browser/browser and both Linux/browser host directions completed the local-broker connection/tick scenarios. This does not replace the historical Infection combat campaign. |
+
+Android device follow-up used the same APK on a Motorola Edge 50 Fusion
+(Android 16), with two full Windows processes and **zero protocol bots**. A
+private, temporary MQTT broker and the existing native peer tunnel made all
+three participants reachable without changing gameplay or network code.
+
+| Android runtime scope | Result |
+| --- | --- |
+| Windows host, Android client | PASS, four rounds / 12 peer-round checks: FF ON with host and remote initial zombies, FF OFF, then Team Slayer. |
+| Android host, two Windows clients | PASS, two Infection rounds / six peer-round checks: FF ON and OFF. Both completed with matching victories and postgame statistics. |
+| Combat and inventory | PASS: actual shots/melee, betrayal victim remains human, 5+10-second betrayal penalty, zombie respawn, legitimate conversions, exclusive skull inventory and 180% speed; human owner/host inventory and 100% speed preserved. No injected death commands. |
+| Android-host return to Team Slayer | SKIP at the user's request before that round, to conserve quota. The Windows-host return above completed. The runner was deliberately stopped; its generic early-exit marker is not a gameplay crash. |
+| Strict instantaneous inventory on every observer | FAIL for one sampled remote respawn: Windows observer game 1/tick 1320 saw the new Android unit before its skull; host and owner already had it, and the observer had the same skull at tick 1350. This observation is retained, not counted as a universal inventory pass. |
+
+The remote spawn observation is consistent with `network_objects.c` applying
+inventory separately and waiting for referenced weapon objects; the host and
+owner checks passed. No engine change was made. All local sampled camera
+clusters were valid; the second Windows observer briefly reported a camera
+separation of 3.23 at the fixture's 35-second reposition. Postgame scores,
+deaths, teams and winners matched across the three engines. Windows reported
+RTT up to 31 ms; Android's diagnostic RTT counters reported zero, not proof of
+zero network latency.
+
+Retained local evidence: `pr-update-20261018/android-ff-three` contains the
+original strict failure, the rules verifier's 12 passes and qualified inventory
+results; `android-host-ff-three/completed-verdict-result.json` records the six
+completed checks and explicit SKIP. The settings used `look:party-verdict`,
+score limit 1, a 60-second lobby and the named `infection-verdict[-ff-on]`
+fixtures; clients used `browse` against the isolated broker. Raw logs, private
+addresses and device configuration are not published. This is native tunnel
+transport on a LAN, not a new remote-NAT traversal test.
+
+SHA-256 identifiers for this refresh:
+
+- Windows: `5cb7572e183622a8e54f3c628849923c01ece841ac274b70b084396c01921877`.
+- Linux: `42d3c286129ffd7b16911102797e24c91b25bd0ea3ba909fbee5c228b5261e93`.
+- Web WASM: `b16be62b4882fa9c1cba240cf8c1f064ae453f4bec98ddd7b971ae4d70cde87b`.
+- Android APK: `91389104b2bf6cdb87260a057b83a2898f746f571a272030c75384913051a184`.
+
+GitHub Actions still reported zero registered fork workflows/runs during this
+refresh. Local results are not labelled as CI passes. The completed conflict
+resolution is ready for maintainer review with the coverage limits below.
+
 ## Remaining limits
 
-- Complete Android FF ON/OFF with a reachable third participant remains pending.
+- Android FF ON/OFF now has full three-engine coverage in both hosting directions; the Android-host Team Slayer follow-up was explicitly skipped. The bounded remote spawn inventory observation above remains disclosed.
 - The pre-integration base has an independent null-renderer/high-resolution-HUD
   crash: postgame icons call `hud_hires_png_texture` and `glGenTextures` without
   a GL context. The fixture disables HUD/text rendering; no engine workaround
   is included here. Its reproduction on current upstream remains separate.
-- Android menu-driven persistence, Android Internet traversal, original-mode
+- Android menu-driven persistence, remote Internet traversal, broader original-mode
   Android scenarios and broader device/GPU coverage were not executed.
 - Web FF and human survival, Linux full-engine 10/16-player soaks and
   physical-GPU multiplayer were not repeated during this contribution phase.
 - The historical Ammo999 report is closed by the project owner. It is not
   reopened or presented as a newly fixed issue in this contribution.
-- Maintainer review and canonical CI remain necessary. A Draft PR is not a
-  release-readiness claim.
+- Maintainer review and canonical CI remain necessary. Review readiness is
+  not a release-readiness claim.

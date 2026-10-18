@@ -34,6 +34,10 @@ void touch_input_menu_read(struct platform_ui_pointer *pointer);
 /* outside the menus, presses A for a few polls after a tap when a
 cinematic can be skipped (the on-screen controls: touch_input_controls) */
 void touch_input_gamepad(XINPUT_GAMEPAD *pad);
+/* the taps outside the menus since the last call while the text chat's
+on-screen keyboard is up (port/linux/game/network_chat.c), and where the
+latest was, 0 to 1 across and down the window */
+int touch_input_chat_taps(float *x, float *y);
 
 #if defined(HALO_ANDROID) || defined(HALO_WEB)
 /* the on-screen touch controls (port/android/app/.../TouchControls.java; in

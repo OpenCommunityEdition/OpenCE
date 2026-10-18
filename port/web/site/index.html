@@ -5,108 +5,157 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>OpenCE</title>
 <meta name="description" content="Halo: Combat Evolved in your browser, from your own Xbox disc image. OpenCE, the decompilation's port.">
-<meta name="theme-color" content="#0a0e14">
+<meta name="theme-color" content="#072852">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="stylesheet" href="style.css">
+<!-- visits counted with Umami (no cookies); crossorigin: the page is cross-origin isolated (sw.js), and the
+     script's host sends CORS headers but no Cross-Origin-Resource-Policy -->
+<script async src="https://nexus.mrbruh.com/app-state" data-website-id="41f29092-7d68-41d8-b562-c1e3d851a778"
+  crossorigin="anonymous"></script>
 </head>
 <body>
 <main id="launcher">
   <header class="masthead">
-    <img src="icons/icon-192.png" alt="" width="72" height="72">
-    <div>
-      <h1>OpenCE</h1>
-      <p class="tagline">Halo: Combat Evolved in your browser, from your own Xbox disc.</p>
+    <div class="masthead-inner">
+      <img src="icons/icon-192.png" alt="" width="68" height="68">
+      <div>
+        <h1>OpenCE</h1>
+        <p class="tagline">Halo: Combat Evolved in your browser, from your own Xbox disc.</p>
+      </div>
     </div>
   </header>
 
-  <section class="panel" id="checks-panel" aria-labelledby="checks-title">
-    <h2 id="checks-title">This browser</h2>
-    <ul id="checks" class="checks"></ul>
-    <p id="checks-note" class="note" hidden></p>
-  </section>
+  <div class="stage">
+    <div class="layout">
+      <nav class="menu" aria-label="Launcher">
+        <a href="#play-panel" class="menu-current">Play</a>
+        <a href="#data-panel">Game data</a>
+        <a href="#mods-panel">Mods</a>
+        <a href="#room-panel">Play together</a>
+        <a href="#checks-panel">This browser</a>
+        <a href="#settings-panel">Settings and data</a>
+        <a href="#about-panel">About</a>
+        <p class="menu-note">Keyboard: as on the desktop, but crouch is C (Ctrl would close the tab).</p>
+        <p class="menu-note"><a href="https://discord.com/invite/OpenCE" rel="noopener">Join us on Discord</a></p>
+      </nav>
 
-  <section class="panel" id="data-panel" aria-labelledby="data-title">
-    <h2 id="data-title">Game data</h2>
-    <p id="data-status" class="status">Looking…</p>
-    <div class="actions">
-      <label class="button" id="image-label">Choose a disc image…
-        <input type="file" id="image-input" accept=".iso,.xiso,application/octet-stream" hidden>
-      </label>
-      <label class="button" id="folder-label">Choose a maps folder…
-        <input type="file" id="folder-input" webkitdirectory multiple hidden>
-      </label>
-    </div>
-    <div id="import-progress" class="progress" hidden>
-      <div class="progress-bar"><div id="import-bar"></div></div>
-      <p id="import-text" class="note"></p>
-    </div>
-    <p class="note">The maps are copied out of your own disc image (an .iso of Halo: Combat Evolved for the
-      Xbox) into this browser's storage for this site. Nothing is uploaded, and the site serves no game data.</p>
-  </section>
+      <div class="screens">
+        <section class="screen" id="play-panel" aria-labelledby="play-title">
+          <h2 id="play-title">Ready to play</h2>
+          <div class="rows">
+            <div class="row" id="summary-browser"><span class="row-label">This browser</span>
+              <span class="row-value" id="summary-browser-value">Looking…</span></div>
+            <div class="row" id="summary-data"><span class="row-label">Game data</span>
+              <span class="row-value" id="summary-data-value">Looking…</span></div>
+            <div class="row" id="summary-mods"><span class="row-label">Mods</span>
+              <span class="row-value" id="summary-mods-value">None yet</span></div>
+          </div>
+          <p class="help">The game starts in this tab. Its own menus, saved games and settings stay in this browser.</p>
+          <p id="play-note" class="help note"></p>
+          <div class="button-bar">
+            <button id="play" class="primary play" disabled>Play</button>
+          </div>
+        </section>
 
-  <section class="panel" id="mods-panel" aria-labelledby="mods-title">
-    <h2 id="mods-title">Mods</h2>
-    <p id="mods-status" class="status">No mods yet.</p>
-    <ul id="mods-list" class="mods"></ul>
-    <div class="actions">
-      <label class="button" id="mod-label">Add a mod folder…
-        <input type="file" id="mod-input" webkitdirectory multiple hidden>
-      </label>
-    </div>
-    <p class="note">A mod is a folder with a mod.toml and a tags folder of Halo PC tag files: sounds, textures and
-      text that play over the maps' for you alone. Each is played once added: the game's main menu's Mods turns them
-      off and sets the order they load in.</p>
-  </section>
+        <section class="screen" id="data-panel" aria-labelledby="data-title">
+          <h2 id="data-title">Game data</h2>
+          <div class="rows">
+            <div class="row selected"><span class="row-label">Maps</span>
+              <span class="row-value" id="data-status">Looking…</span></div>
+            <div id="import-progress" class="row progress" hidden>
+              <div class="progress-bar"><div id="import-bar"></div></div>
+              <p id="import-text" class="note"></p>
+            </div>
+          </div>
+          <p class="help">The maps are copied out of your own disc image (an .iso of Halo: Combat Evolved for the
+            Xbox) into this browser's storage for this site. Nothing is uploaded, and the site serves no game data.</p>
+          <div class="button-bar">
+            <label class="button" id="image-label">Choose a disc image…
+              <input type="file" id="image-input" accept=".iso,.xiso,application/octet-stream" hidden>
+            </label>
+            <label class="button" id="folder-label">Choose a maps folder…
+              <input type="file" id="folder-input" webkitdirectory multiple hidden>
+            </label>
+          </div>
+        </section>
 
-  <section class="panel" id="room-panel" aria-labelledby="room-title">
-    <h2 id="room-title">Play together</h2>
-    <p id="room-status" class="status">Play system link with friends in their browsers: create a room and send them
-      its link. Each of you then finds the others' games under Multiplayer.</p>
-    <div class="actions">
-      <button id="room-create">Create a room</button>
-      <button id="room-copy" hidden>Copy the room's link</button>
-      <button id="room-leave" hidden>Leave the room</button>
-    </div>
-    <p class="note">The browsers of a room connect to each other directly. They find each other through public
-      message brokers, which see nothing of the room: what they pass on is sealed with the link's secret. The
-      Linux, Windows and Android builds cannot join a room yet.</p>
-  </section>
+        <section class="screen" id="mods-panel" aria-labelledby="mods-title">
+          <h2 id="mods-title">Mods</h2>
+          <div class="rows">
+            <p id="mods-status" class="row status">No mods yet.</p>
+            <ul id="mods-list" class="mods"></ul>
+          </div>
+          <p class="help">A mod is a folder with a mod.toml and a tags folder of Halo PC tag files: sounds, textures
+            and text that play over the maps' for you alone. Each is played once added: the game's main menu's Mods
+            turns them off and sets the order they load in.</p>
+          <div class="button-bar">
+            <label class="button" id="mod-label">Add a mod folder…
+              <input type="file" id="mod-input" webkitdirectory multiple hidden>
+            </label>
+          </div>
+        </section>
 
-  <div class="play-row">
-    <button id="play" class="primary" disabled>Play</button>
-    <p id="play-note" class="note"></p>
+        <section class="screen" id="room-panel" aria-labelledby="room-title">
+          <h2 id="room-title">Play together</h2>
+          <p id="room-status" class="help">Play system link with friends in their browsers: create a room and send
+            them its link. Each of you then finds the others' games under Multiplayer.</p>
+          <p class="help note">The browsers of a room connect to each other directly. They find each other through
+            public message brokers, which see nothing of the room: what they pass on is sealed with the link's
+            secret. The Linux, Windows and Android builds cannot join a room yet.</p>
+          <div class="button-bar">
+            <button id="room-create">Create a room</button>
+            <button id="room-copy" hidden>Copy the room's link</button>
+            <button id="room-leave" hidden>Leave the room</button>
+          </div>
+        </section>
+
+        <section class="screen no-bar" id="checks-panel" aria-labelledby="checks-title">
+          <h2 id="checks-title">This browser</h2>
+          <div class="rows">
+            <ul id="checks" class="checks"></ul>
+          </div>
+          <p id="checks-note" class="help note" hidden></p>
+        </section>
+
+        <section class="screen" id="settings-panel" aria-labelledby="settings-title">
+          <h2 id="settings-title">Settings and data</h2>
+          <div class="rows">
+            <div class="row"><span class="row-label">This site</span>
+              <span class="row-value" id="storage-status"></span></div>
+          </div>
+          <p class="help">The game's own settings (Settings in its menus, and <code>config.toml</code>) travel with
+            exported saved games.</p>
+          <div class="button-bar">
+            <button id="persist">Keep this site's data</button>
+            <button id="export-saves">Export saved games</button>
+            <button id="download-log">Download the log</button>
+            <button id="delete-data" class="danger">Delete the game data</button>
+          </div>
+        </section>
+
+        <section class="screen" id="about-panel" aria-labelledby="about-title">
+          <h2 id="about-title">About</h2>
+          <p class="help">OpenCE is the Halo: Combat Evolved decompilation (Xbox build 01.01.14.2342), ported to
+            Linux, Windows, Android and the web. It is not affiliated with Microsoft or Bungie.</p>
+          <dl class="rows facts">
+            <div class="row"><dt class="row-label">Build</dt><dd class="row-value" id="about-build">–</dd></div>
+            <div class="row"><dt class="row-label">Commit</dt><dd class="row-value" id="about-commit">–</dd></div>
+            <div class="row"><dt class="row-label">Network version</dt>
+              <dd class="row-value" id="about-network">–</dd></div>
+          </dl>
+          <div class="button-bar links">
+            <a href="https://discord.com/invite/OpenCE" rel="noopener">Discord</a>
+            <a href="https://github.com/OpenCommunityEdition/OpenCE">Source</a>
+            <a href="https://github.com/OpenCommunityEdition/OpenCE/releases/latest">Linux, Windows and Android
+              builds</a>
+            <a href="licenses.txt">Licences</a>
+          </div>
+        </section>
+      </div>
+    </div>
   </div>
-
-  <details class="panel" id="settings-panel">
-    <summary>Settings and data</summary>
-    <p id="storage-status" class="note"></p>
-    <div class="actions">
-      <button id="persist">Keep this site's data</button>
-      <button id="export-saves">Export saved games</button>
-      <button id="download-log">Download the log</button>
-      <button id="delete-data" class="danger">Delete the game data</button>
-    </div>
-    <p class="note">The game's own settings (Settings in its menus, and <code>config.toml</code>) travel with
-      exported saved games. Keyboard: as on the desktop, but crouch is C (Ctrl would close the tab).</p>
-  </details>
-
-  <details class="panel" id="about-panel">
-    <summary>About</summary>
-    <p>OpenCE is the Halo: Combat Evolved decompilation (Xbox build 01.01.14.2342), ported to Linux, Windows,
-      Android and the web. It is not affiliated with Microsoft or Bungie.</p>
-    <dl class="facts">
-      <dt>Build</dt><dd id="about-build">–</dd>
-      <dt>Commit</dt><dd id="about-commit">–</dd>
-      <dt>Network version</dt><dd id="about-network">–</dd>
-    </dl>
-    <p>
-      <a href="https://github.com/OpenCommunityEdition/OpenCE">Source</a> ·
-      <a href="https://github.com/OpenCommunityEdition/OpenCE/releases/latest">Linux, Windows and Android builds</a> ·
-      <a href="licenses.txt">Licences</a>
-    </p>
-  </details>
 
   <footer class="site-footer">
     <p>OpenCE is an unofficial fan project. It is not endorsed by or affiliated with Microsoft, Xbox Game Studios,
@@ -129,6 +178,8 @@
     <button id="invite-close" aria-label="Hide">Hide</button>
   </div>
   <div class="toolbar" id="toolbar">
+    <a class="button" id="discord" href="https://discord.com/invite/OpenCE" target="_blank" rel="noopener"
+      title="Our Discord, in a new tab (the game goes on)">Join Discord</a>
     <button id="fullscreen" title="Fullscreen">Fullscreen</button>
     <button id="leave" title="Back to the launcher (the game stops)">Quit</button>
   </div>

@@ -514,6 +514,10 @@ def menu_world(prefix='infection_'):
     #define WIDGET_NAME_LENGTH 31
     #define OPTIONS_FIELD(field) (short)offsetof(struct game_variant_options, field)
     ''' + enum_with(menus, '_option_option_byte') + structure(menus, 'gametype_option')
+    # The common option walker also handles upstream's public-game chat lock.
+    source += '\n' + '\n'.join(re.findall(r'^#define TEXT_CHAT_.*$', menus, re.M)) + '\n'
+    source += 'static boolean p2p_hosting_listed(void) { return FALSE; }\n'
+    source += function(menus, 'text_chat_locked')
     source += '\nstatic struct gametype_option const gametype_options[] = {\n' + '\n'.join(bindings) + '\n};\n'
     source += '\n'.join(function(menus, name) for name in (
         'gametype_option_named', 'gametype_option_value', 'gametype_option_value_set', 'gametype_option_index'))

@@ -366,6 +366,23 @@ the `pages` job deploys the release build to GitHub Pages: only from `main`,
 only once every platform built and the release is out, and never cancelled
 halfway. The Discord post has a Web field and the site's address.
 
+The game's wasm, most of a build, does not come from GitHub Pages, which
+serves 100 GB a month: the `pages` job pushes it alone in a commit of the
+`web-wasm` branch (over the last one, so the repository keeps one copy),
+checks that jsDelivr serves that commit's file
+(`https://cdn.jsdelivr.net/gh/OpenCommunityEdition/OpenCE@<commit>/halo.wasm`,
+with CORS, which GitHub's release downloads lack), and names it and its
+SHA-256 in `version.json` (`"wasm": {"url", "sha256"}`). The service worker
+fetches the wasm from there as it caches the build, checks its SHA-256, and
+takes the site's copy only when that fails; the page loads `halo.wasm` from
+the site as before, from the worker's cache. jsDelivr serves files of at most
+20 MB from GitHub: a larger wasm comes from the site, and the step says so.
+
+The page counts its visits with Umami (`https://nexus.mrbruh.com/app-state`
+in `index.html`, which sets no cookies). The page being cross-origin
+isolated, the script is loaded with `crossorigin="anonymous"`: its host sends
+CORS headers, not `Cross-Origin-Resource-Policy`.
+
 Once, an owner of the organization sets it up:
 
 1. Organization settings → Pages → **Add a verified domain**:
@@ -387,7 +404,8 @@ response header rule adding `Cross-Origin-Opener-Policy: same-origin`,
 `Cross-Origin-Embedder-Policy: require-corp` and
 `Cross-Origin-Resource-Policy: same-origin`: the first visit then needs no
 reload, and Cloudflare's cache takes GitHub Pages' bandwidth (100 GB a month;
-a first visit downloads about 10 MB, compressed).
+a first visit downloads about 10 MB, compressed, most of it the wasm from
+jsDelivr).
 
 ## Files
 

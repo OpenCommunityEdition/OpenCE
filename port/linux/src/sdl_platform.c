@@ -17,6 +17,7 @@ and the debug keyboard that the game's console reads.
 #include "port_mods.h"
 #include "xiso.h"
 #include "touch_input.h"
+#include "../game/text_filter.h"
 
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -1237,6 +1238,9 @@ void platform_show_message(const char *title, const char *message)
 	pthread_mutex_lock(&platform_message_lock);
 	snprintf(platform_message_title, sizeof(platform_message_title), "%s", title);
 	snprintf(platform_message_text, sizeof(platform_message_text), "%s", message);
+	/* (streamer mode's words hidden here too: a map's or a mod's name) */
+	text_filter_utf8(platform_message_title);
+	text_filter_utf8(platform_message_text);
 	platform_message_pending = TRUE;
 	pthread_mutex_unlock(&platform_message_lock);
 }
@@ -1249,10 +1253,36 @@ void web_js_ask(const char *title, const char *text, const char *labels);
 
 int platform_ask(const char *title, const char *text, const char *const *labels, int count, int default_index)
 {
+	/* (streamer mode's words hidden here too: mods' names) */
+	static char shown_title[128];
+	static char shown_text[4096];
+	static char shown_labels[3][128];
+	const char *shown[3];
+	int index;
 #ifdef HALO_WEB
 	char joined[512] = "";
-	int index;
+#else
+	SDL_MessageBoxButtonData buttons[3];
+	SDL_MessageBoxData question;
+	int answer = -1;
+#endif
 
+	if (count > 3)
+		count = 3;
+	snprintf(shown_title, sizeof(shown_title), "%s", title);
+	snprintf(shown_text, sizeof(shown_text), "%s", text);
+	text_filter_utf8(shown_title);
+	text_filter_utf8(shown_text);
+	for (index = 0; index < count; index++)
+	{
+		snprintf(shown_labels[index], sizeof(shown_labels[index]), "%s", labels[index]);
+		text_filter_utf8(shown_labels[index]);
+		shown[index] = shown_labels[index];
+	}
+	title = shown_title;
+	text = shown_text;
+	labels = shown;
+#ifdef HALO_WEB
 	/* (the page's dialog: the game's thread waits for the player there, as
 	SDL's box would, which a page's worker cannot show) */
 	for (index = 0; index < count; index++)
@@ -1268,13 +1298,6 @@ int platform_ask(const char *title, const char *text, const char *const *labels,
 	(void)default_index;
 	return __atomic_load_n(&web_shared[_web_answer], __ATOMIC_SEQ_CST);
 #else
-	SDL_MessageBoxButtonData buttons[3];
-	SDL_MessageBoxData question;
-	int answer = -1;
-	int index;
-
-	if (count > 3)
-		count = 3;
 	for (index = 0; index < count; index++)
 	{
 		buttons[index].flags = index == default_index ?

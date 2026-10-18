@@ -4044,6 +4044,9 @@ void network_distributed_handle_message(
 	case _distributed_message_pickups: entry_size = sizeof(struct distributed_pickup); break;
 	case _distributed_message_votekick: entry_size = network_votekick_request_entry_size(); break;
 	case _distributed_message_votekick_status: entry_size = network_votekick_status_entry_size(); break;
+	case _distributed_message_chat_up:
+	case _distributed_message_chat_down: entry_size = network_chat_line_entry_size(); break;
+	case _distributed_message_chat_config: entry_size = network_chat_config_entry_size(); break;
 	case _distributed_message_player_inputs: entry_size = sizeof(struct distributed_player_input); break;
 	case _distributed_message_relayed_actions: entry_size = DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE; break;
 	case _distributed_message_game_state:
@@ -4069,6 +4072,9 @@ void network_distributed_handle_message(
 	case _distributed_message_coop_skip_vote:
 	case _distributed_message_votekick:
 	case _distributed_message_votekick_status:
+	case _distributed_message_chat_up:
+	case _distributed_message_chat_down:
+	case _distributed_message_chat_config:
 		if (header.count < 1)
 			return;
 		break;
@@ -4088,6 +4094,7 @@ void network_distributed_handle_message(
 	case _distributed_message_player_inputs:
 	case _distributed_message_coop_skip_vote:
 	case _distributed_message_votekick:
+	case _distributed_message_chat_up:
 		if (machine_index == NONE || game_connection() != _game_connection_network_server)
 			return;
 		break;
@@ -4147,6 +4154,17 @@ void network_distributed_handle_message(
 		break;
 	case _distributed_message_votekick_status:
 		network_votekick_handle_status(entries);
+		break;
+	case _distributed_message_chat_up:
+		network_chat_handle_up(machine_index, entries, distributed_handling_stream_message);
+		break;
+	/* (the host's, over its connection's stream alone: a datagram from its
+	address could be anyone's) */
+	case _distributed_message_chat_down:
+		network_chat_handle_down(entries, !network_connection_last_read_was_unreliable());
+		break;
+	case _distributed_message_chat_config:
+		network_chat_handle_config(entries, !network_connection_last_read_was_unreliable());
 		break;
 	case _distributed_message_coop_device_groups:
 		network_coop_handle_device_groups(entries, header.count);

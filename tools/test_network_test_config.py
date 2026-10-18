@@ -30,11 +30,14 @@ def parser_world():
     #define FALSE 0
     static const char *setting, *pickup = "";
     static int diagnostics;
+    static double chat_time;
     static const char *config_string(const char *key) {
         return !strcmp(key, "debug.network_test") ? setting : pickup;
     }
     static int config_boolean(const char *key) { return 0; }
-    static double config_real(const char *key) { return 0; }
+    static double config_real(const char *key) {
+        return !strcmp(key, "debug.network_test_chat") ? chat_time : 0;
+    }
     static long config_integer(const char *key) { return 0; }
     static void platform_log(const char *fmt, ...) { diagnostics++; }
     ''' + structure(read('source/networking/network_game_manager.h'), 'network_game_map') + \
@@ -73,6 +76,17 @@ CASES = {
         char filter[300]; memset(filter, 'p', 299); filter[299] = 0;
         setting = "join"; pickup = filter; network_test_read_settings();
         assert(!strcmp(network_test.pickup_weapon, filter));
+    ''',
+    'chat_with_untruncated_infection_settings': r'''
+        char filter[300]; memset(filter, 'p', 299); filter[299] = 0;
+        setting = "host:beavercreek:slayer,infection-combat-host,infection-combat-client";
+        pickup = filter; chat_time = 2.5; network_test_read_settings();
+        assert(network_test.mode == _network_test_host);
+        assert(network_test.chat_time == 2.5f);
+        assert(!strcmp(variant(2), "infection-combat-client"));
+        assert(!strcmp(network_test.pickup_weapon, filter));
+        filter[0] = 'x'; /* the fixture owns both string snapshots */
+        assert(network_test.pickup_weapon[0] == 'p');
     ''',
     'map_path_boundary': r'''
         char text[140]; strcpy(text, "host:custom_maps\\");
