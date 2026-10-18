@@ -280,6 +280,31 @@ as it changes), for the scoreboard, whose right click frees the mouse to
 pick a player; the host's own scoreboard adds Kick and Ban. Builds without
 votes drop both kinds as unknown, so the network version is unchanged.
 
+The text chat (`network_chat.c`): a client sends its player's line to the
+host (`_distributed_message_chat_up`, reliably), which takes it only from
+the client's own stream and from one of that machine's players, at most 5
+lines at once and one each 1.5 seconds after (more are dropped), its text
+cut to 63 characters of printable ASCII. The host alone sends the line on
+(`_distributed_message_chat_down`, reliably, with the sender's absolute
+index and its channel, the line's flags): to every client, a team's line
+only to the machines with a player of the sender's team (to every one in a
+game without teams), and a vehicle's line only to those with a player
+riding in the sender's vehicle (the outermost object each unit is a child
+of, so any map's vehicles), as the host has them; the sender's machine gets
+its own line whatever it is. The host shows it itself if one of its own
+players hears it or said it. A client shows only
+the host's lines, its own too, so every machine shows them in one order.
+The host's own `/mute <player> [minutes]` and `/unmute <player>` are
+commands, not lines: it keeps a mute by the player's name (in ASCII) and
+its minutes by its own clock, drops the lines of a muted player's machine
+when they come up, and sends that machine alone a notice of the minutes
+left; it tells every machine of each mute and unmute. A notice is a down
+line with `_chat_line_notice_bit` set, its text alone (no sender). A
+client's `/mute` is never sent, and the host takes the text of a line that
+came up as a line, never a command.
+Builds without the chat drop both kinds as unknown, so the network version
+is unchanged.
+
 Voice chat (`network_voice.c`, the sound in `port/linux/src/voice_audio.c`)
 travels as distributed messages too, but in the lobby as well as in a game:
 `network_voice_handles_message` takes them before the netcode's checks that
@@ -738,7 +763,13 @@ two machines' views of one game can be compared. `debug.network_test_kill`,
 `debug.network_test_shoot`, `debug.network_test_vehicle` and
 `debug.network_test_pickup` script kills, hits, a vehicle ride and a weapon
 swap the bots' wandering does not reach (`debug.network_test_pickup_weapon`
-picks the weapon: the first whose tag name has it in it, as "sniper"), and `debug.network_test_score`
+picks the weapon: the first whose tag name has it in it, as "sniper"),
+`debug.network_test_chat` has each machine's player say a chat line to
+everyone, one to the team and one to the vehicle (the host seats the last
+two players in one first), then the host mutes the last player for a
+minute, each says a line, the host unmutes them and each says another,
+which every machine's `debug.txt` records as
+it shows them (the notices as `chat notice:`), and `debug.network_test_score`
 shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's
 button on the scores does). `debug.network_test_public` lists the host's
