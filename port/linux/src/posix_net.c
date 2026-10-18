@@ -15,12 +15,18 @@ with the host ABI.
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <poll.h>
+#if defined(__APPLE__)
+#include <pthread.h> /* port: the thread state below, in place of __thread */
+#else
 #include <spawn.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <sys/random.h>
+#if !defined(__APPLE__)
+#include <sys/random.h> /* port: Darwin has no getrandom; see below */
+#endif
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -29,6 +35,115 @@ with the host ABI.
 #include <unistd.h>
 
 #include "posix.h"
+
+/*
+port: Darwin, for the Mac port's internet play (port/mac). Apple's GCC
+4.0.1 and the 10.4 SDK have none of the conveniences this file was written
+with. What it does is the same on both; only the asking differs.
+
+	__thread                 no thread-local storage: a pthread key, as
+	                         port/mac/engine_sockets.c already does
+	SOCK_CLOEXEC, O_CLOEXEC  no flag in socket(), accept() or open():
+	SOCK_NONBLOCK, accept4   fcntl once the descriptor is open
+	MSG_NOSIGNAL             no flag in send(): SO_NOSIGPIPE on the socket
+	getrandom                none at all: the /dev/urandom path below, which
+	                         is already here for a kernel that refuses it
+	posix_spawnp             no <spawn.h>: fork and execvp
+	SO_PEERCRED              getpeereid, which answers the same question
+
+Nothing here changes what Linux, Android or the web compile.
+*/
+#if defined(__APPLE__)
+
+#ifndef SOCK_CLOEXEC
+#define SOCK_CLOEXEC 0
+#endif
+#ifndef SOCK_NONBLOCK
+#define SOCK_NONBLOCK 0
+#endif
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+
+/* a file that is open: close-on-exec, which the flags above are nothing */
+static int close_on_exec(int descriptor)
+{
+	if (descriptor >= 0)
+		fcntl(descriptor, F_SETFD, FD_CLOEXEC);
+	return descriptor;
+}
+
+/* a socket that is open: that, and SIGPIPE off. A send on a connection the
+other end closed must fail with EPIPE, as MSG_NOSIGNAL makes it, and not
+kill the game; the socket says so here instead of each send. */
+static int socket_made(int descriptor)
+{
+	int on = 1;
+
+	if (descriptor >= 0)
+	{
+		fcntl(descriptor, F_SETFD, FD_CLOEXEC);
+		setsockopt(descriptor, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
+	}
+	return descriptor;
+}
+
+/* what __thread held */
+struct posix_thread_state
+{
+	int last_error;
+	struct pollfd *poll_buffer;
+	int poll_buffer_size;
+};
+
+static pthread_key_t posix_thread_key;
+static pthread_once_t posix_thread_once = PTHREAD_ONCE_INIT;
+
+static void posix_thread_state_free(void *state)
+{
+	if (state)
+	{
+		free(((struct posix_thread_state *)state)->poll_buffer);
+		free(state);
+	}
+}
+
+static void posix_thread_key_create(void)
+{
+	pthread_key_create(&posix_thread_key, posix_thread_state_free);
+}
+
+static struct posix_thread_state *posix_thread_state(void)
+{
+	/* (one shared when there is no memory for a thread's own, so that a
+	caller never writes through nothing: the error it reads may then be
+	another thread's, which is better than the game going down) */
+	static struct posix_thread_state shared;
+	struct posix_thread_state *state;
+
+	pthread_once(&posix_thread_once, posix_thread_key_create);
+	state = pthread_getspecific(posix_thread_key);
+	if (!state)
+	{
+		state = calloc(1, sizeof(*state));
+		if (!state)
+			return &shared;
+		pthread_setspecific(posix_thread_key, state);
+	}
+	return state;
+}
+
+#define last_error (posix_thread_state()->last_error)
+
+#else
+
+#define close_on_exec(descriptor) (descriptor)
+#define socket_made(descriptor) (descriptor)
+
+#endif
 
 /* Winsock error codes (winsockx.h) */
 #define WSAEINTR 10004
@@ -75,7 +190,9 @@ with the host ABI.
 #define WINSOCK_SO_ERROR 0x1007
 #define WINSOCK_SO_TYPE 0x1008
 
+#if !defined(__APPLE__)
 static __thread int last_error;
+#endif
 
 static int fail(void)
 {
@@ -134,7 +251,7 @@ int posix_socket_last_error(void)
 
 int posix_socket(int family, int type, int protocol)
 {
-	return succeed(socket(family, type | SOCK_CLOEXEC, protocol));
+	return succeed(socket_made(socket(family, type | SOCK_CLOEXEC, protocol)));
 }
 
 int posix_socket_close(int socket)
@@ -173,7 +290,11 @@ int posix_socket_listen(int socket, int backlog)
 int posix_socket_accept(int socket, void *address, int *address_length)
 {
 	socklen_t length = address_length ? (socklen_t)*address_length : 0;
+#if defined(__APPLE__)
+	int result = socket_made(accept(socket, address, address_length ? &length : NULL));
+#else
 	int result = accept4(socket, address, address_length ? &length : NULL, SOCK_CLOEXEC);
+#endif
 
 	if (address_length)
 		*address_length = (int)length;
@@ -338,8 +459,16 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 	static const short ready[3] = { POLLIN | POLLHUP | POLLERR, POLLOUT | POLLERR, POLLPRI | POLLERR };
 	/* (larger sets, as internet play's thread waits on, in a buffer each
 	thread keeps: not one allocation each time) */
+#if defined(__APPLE__)
+	struct posix_thread_state *state = posix_thread_state();
+	struct pollfd **buffer_at = &state->poll_buffer;
+	int *buffer_size_at = &state->poll_buffer_size;
+#else
 	static __thread struct pollfd *buffer;
 	static __thread int buffer_size;
+	struct pollfd **buffer_at = &buffer;
+	int *buffer_size_at = &buffer_size;
+#endif
 	int *lists[3] = { read, write, error };
 	int *counts[3] = { read_count, write_count, error_count };
 	struct pollfd stack[256];
@@ -358,19 +487,19 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 	}
 	if (total > (int)(sizeof(stack) / sizeof(*stack)))
 	{
-		if (total > buffer_size)
+		if (total > *buffer_size_at)
 		{
-			struct pollfd *larger = realloc(buffer, sizeof(*buffer) * (size_t)total);
+			struct pollfd *larger = realloc(*buffer_at, sizeof(**buffer_at) * (size_t)total);
 
 			if (!larger)
 			{
 				errno = ENOMEM;
 				return fail();
 			}
-			buffer = larger;
-			buffer_size = total;
+			*buffer_at = larger;
+			*buffer_size_at = total;
 		}
-		descriptors = buffer;
+		descriptors = *buffer_at;
 	}
 	total = 0;
 	for (list = 0; list < 3; list++)
@@ -480,7 +609,7 @@ posix_ulong posix_local_ipv4_address(void)
 #endif
 	/* the address the default route leaves from: a UDP socket "connected"
 	to an internet address (a documentation one; nothing is sent) has it */
-	probe = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+	probe = socket_made(socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0));
 	if (probe >= 0)
 	{
 		memset(&route, 0, sizeof(route));
@@ -504,6 +633,7 @@ void posix_random_bytes(void *buffer, posix_ulong size)
 {
 	unsigned char *cursor = buffer;
 
+#if !defined(__APPLE__)
 	while (size)
 	{
 		ssize_t count = getrandom(cursor, size, 0);
@@ -515,10 +645,12 @@ void posix_random_bytes(void *buffer, posix_ulong size)
 		cursor += count;
 		size -= (posix_ulong)count;
 	}
+#endif
 	if (size)
 	{
-		/* a kernel without getrandom, or a sandbox that refuses it */
-		int descriptor = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+		/* a kernel without getrandom, a sandbox that refuses it, or Darwin,
+		which has none */
+		int descriptor = close_on_exec(open("/dev/urandom", O_RDONLY | O_CLOEXEC));
 
 		while (descriptor >= 0 && size)
 		{
@@ -619,7 +751,7 @@ int posix_user_secret(unsigned char *secret, int size)
 	for (attempt = 0; attempt < 3; attempt++)
 	{
 		struct stat status;
-		int descriptor = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+		int descriptor = close_on_exec(open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC));
 		int ok;
 
 		if (descriptor >= 0)
@@ -643,7 +775,7 @@ int posix_user_secret(unsigned char *secret, int size)
 		}
 		if (errno != ENOENT)
 			return 0;
-		descriptor = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+		descriptor = close_on_exec(open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600));
 		/* (another copy of the game made it first: read that one) */
 		if (descriptor < 0)
 			continue;
@@ -662,12 +794,28 @@ int posix_user_secret(unsigned char *secret, int size)
 /* runs a program with its arguments and waits for it; its exit status, or -1 */
 static int run_program(char *const arguments[])
 {
-	extern char **environ;
 	pid_t process;
 	int status;
 
-	if (posix_spawnp(&process, arguments[0], NULL, NULL, arguments, environ) != 0)
+#if defined(__APPLE__)
+	/* (no <spawn.h> in the 10.4 SDK; nothing here calls this on the Mac,
+	as the desktop entry it writes is the X desktops', but it must build) */
+	process = fork();
+	if (process < 0)
 		return -1;
+	if (process == 0)
+	{
+		execvp(arguments[0], arguments);
+		_exit(127);
+	}
+#else
+	{
+		extern char **environ;
+
+		if (posix_spawnp(&process, arguments[0], NULL, NULL, arguments, environ) != 0)
+			return -1;
+	}
+#endif
 	if (waitpid(process, &status, 0) < 0)
 		return -1;
 	return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
@@ -780,9 +928,12 @@ int posix_discord_connect(void)
 					continue;
 				/* (not blocking: a client that does not take connections is
 				passed over) */
-				socket_descriptor = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+				socket_descriptor = socket_made(socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0));
 				if (socket_descriptor < 0)
 					return -1;
+#if defined(__APPLE__)
+				fcntl(socket_descriptor, F_SETFL, fcntl(socket_descriptor, F_GETFL, 0) | O_NONBLOCK);
+#endif
 				if (connect(socket_descriptor, (struct sockaddr *)&address, sizeof(address)) == 0)
 				{
 #ifdef SO_PEERCRED
@@ -796,6 +947,14 @@ int posix_discord_connect(void)
 					{
 						return socket_descriptor;
 					}
+#elif defined(__APPLE__)
+					/* port: the same question, which Darwin answers with
+					getpeereid rather than a socket option */
+					uid_t user;
+					gid_t group;
+
+					if (getpeereid(socket_descriptor, &user, &group) == 0 && user == getuid())
+						return socket_descriptor;
 #else
 					return socket_descriptor;
 #endif
