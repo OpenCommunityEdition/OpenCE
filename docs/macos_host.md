@@ -135,6 +135,127 @@ runtime's exceptions).
 
 ### Recommendation
 
-Option A: the guest's code stays as it is, the host carries over most of
+Option A, which the host now carries out (below): the guest's code stays as it is, the host carries over most of
 the Android host, and the cost (an exit per host call) is limited by
 batching the renderer, which the Metal renderer needs in any case.
+
+## Building
+
+The macOS build is for Apple Silicon Macs with macOS 26 or later. Its tools
+come from Nix (`flake.nix`): clang 22 and lld for the guest, the macOS 26
+SDK and SDL3 for the host, and Rust (`rust-toolchain.toml`) for the
+runtime crate, `port/macos/runtime`.
+
+```sh
+nix develop                    # the shell: every tool the build needs
+python configure.py            # on a Mac, the default target is macos
+ninja macos                    # build/macos/halo_host and build/macos/halo_guest.elf
+nix build .#host               # the final build: result/bin/halo_host, result/share/opence/halo_guest.elf
+```
+
+`ninja macos` builds:
+
+- the guest image, `build/macos/halo_guest.elf`: the Android guest's
+  sources with `HALO_GUEST_VM` defined (its imports are `svc` stubs, and
+  it keeps its thread pointer in `TPIDR_EL0`);
+- the runtime crate, a static library with a C header made by cbindgen
+  (`build/macos/runtime/opence_runtime.h`): the guest's memory plan, its
+  page tables and the image's checks;
+- the host, `build/macos/halo_host`: `port/macos/host`, the Android host's
+  SDL bridge (`host_sdl.c`), the platform layer's files and sockets
+  (`posix_files.c`, `posix_net.c`), UPnP and DTLS, and the import
+  dispatcher that `tools/macos_dispatch.py` writes from
+  `port/android/host_imports.list`.
+
+### Signing
+
+The host needs the `com.apple.security.hypervisor` entitlement
+(`port/macos/host/halo_host.entitlements`). The build signs it ad hoc
+with the entitlement, which is enough to run it on the Mac that built it.
+A copy for other Macs must be signed with a Developer ID that has it.
+The Nix package skips the fixup phase, whose signing would drop the
+entitlement.
+
+## Running
+
+```sh
+build/macos/halo_host [build/macos/halo_guest.elf] [arguments for the game]
+```
+
+The image defaults to `halo_guest.elf` beside the host, or
+`../share/opence/halo_guest.elf` (the Nix package's layout). The game's data
+folder is `HALO_DATA_ROOT`, else the current folder: its `maps` folder holds
+the maps, and `config.toml` and `debug.txt` are written there. Saves and
+profiles go to `XDG_DATA_HOME`, by default `~/Library/Application
+Support/OpenCE`.
+
+Without a person at it, as on Linux (`AGENTS.md`):
+
+```sh
+HALO_DATA_ROOT=assets HALO_NULL_RENDERER=1 HALO_HIDDEN_WINDOW=1 \
+SDL_VIDEO_DRIVER=dummy SDL_AUDIO_DRIVER=dummy \
+HALO_NETWORK_TEST=host:bloodgulch HALO_NET_ADDRESS=127.0.0.1 HALO_EXIT_AFTER=30 \
+build/macos/halo_host
+```
+
+hosts a game on bloodgulch and logs its player's state each second
+(`network test: tick ...`), then exits with status 0.
+
+Two copies on one Mac need loopback addresses of their own, and macOS has
+only 127.0.0.1 on `lo0`. Add others with
+`sudo ifconfig lo0 alias 127.0.0.2 up` (and `127.0.0.3`). They last until
+the Mac restarts.
+
+The host's own settings:
+
+| Variable | Meaning |
+| --- | --- |
+| `HALO_HOST_QUIET` | Logs only the host's warnings and errors |
+| `HALO_HOST_IMPORT_COUNTS` | At exit, reports the VM's exits per second, in all and by import (busiest first) |
+| `HALO_HOST_SAMPLE=<seconds>` | Every that many seconds, prints each vCPU's guest address and its frames |
+
+A guest crash is reported with its registers, the exception's syndrome and
+the guest's frames, by address in the image (`llvm-symbolizer` on
+`halo_guest.elf` names them).
+
+### Exits
+
+Each call the guest makes to the host is an exit from the VM, at about
+1 µs. A hosted bloodgulch game, headless (null renderer) for 30 seconds,
+made 503 000 exits a second, half of the time of one core:
+
+| Import | Calls a second |
+| --- | --- |
+| `host_syscall` | 248 000 |
+| `host_sdl_ticks` | 164 000 |
+| `host_errno` | 32 000 |
+| `hostposix_socket_last_error` | 12 000 |
+| `hostposix_socket_recv` | 9 000 |
+
+This is the baseline for the next steps: the renderer's commands go in
+batches, and the time and error calls that run most can be answered in
+the guest.
+
+## Tests
+
+In `nix develop`, after `ninja macos`:
+
+```sh
+python -m pytest -q tools/test_macos_spikes.py tools/test_macos_build.py tools/test_macos_vm.py tools/test_macos_host.py
+cargo test --manifest-path port/macos/runtime/Cargo.toml
+python -m pytest -q tools/harness         # the asset-free harness, in the VM
+```
+
+`tools/test_macos_vm.py` runs guest programs (`port/macos/tests`) in the
+host: threads, futexes, time, files, memory, sockets and SDL, headless.
+`tools/test_macos_host.py` runs the game: without maps, with them, a
+hosted network game, and a second copy that joins it (when `lo0` has the
+aliases).
+
+## Not supported yet
+
+- Drawing: OpenGL ES is refused while headless, and there is no Metal
+  renderer yet. The game runs only with `debug.null_renderer`.
+- A window, and input from it.
+- Intel Macs, and macOS before 26.
+- An app bundle.
