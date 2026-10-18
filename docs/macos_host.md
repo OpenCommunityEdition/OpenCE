@@ -229,6 +229,12 @@ build/macos/halo_host
 hosts a game on bloodgulch and logs its player's state each second
 (`network test: tick ...`), then exits with status 0.
 
+The app's data folder is `HALO_DATA_ROOT` too, else
+`~/Library/Application Support/OpenCE` (`DataRoot` in
+`port/macos/app/Sources/OpenCEShell`). The app makes its `maps` folder.
+If `ui.map` is not in it, the app does not start the game: a dialog says
+where to copy the maps, offers to show the folder in the Finder, and quits.
+
 Two copies on one Mac need loopback addresses of their own, and macOS has
 only 127.0.0.1 on `lo0`. Add others with
 `sudo ifconfig lo0 alias 127.0.0.2 up` (and `127.0.0.3`). They last until

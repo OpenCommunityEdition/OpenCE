@@ -243,6 +243,7 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     n.build(outputs=bindings, rule="macos_swift_bindings", inputs=[runtime_library],
             implicit=[runtime_dir / "src" / "bin" / "uniffi-bindgen.rs"])
     swift_sources = [APP_DIR / "Package.swift", *sorted((APP_DIR / "Sources" / "OpenCE").glob("*.swift")),
+                     *sorted((APP_DIR / "Sources" / "OpenCEShell").glob("*.swift")),
                      APP_DIR / "Sources" / "CHaloHost" / "module.modulemap", PORT_DIR / "host" / "halo_host.h",
                      *bindings]
     n.build(outputs=app_executable, rule="macos_app",

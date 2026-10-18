@@ -17,7 +17,9 @@ let package = Package(
         .target(name: "OpenCERuntime", dependencies: ["opence_runtimeFFI"],
                 // (as uniffi-bindgen writes it, for Swift 5's checks)
                 swiftSettings: [.swiftLanguageMode(.v5)]),
-        .executableTarget(name: "OpenCE", dependencies: ["CHaloHost", "OpenCERuntime"]),
-        .testTarget(name: "OpenCETests", dependencies: ["OpenCERuntime"]),
+        // the app's own logic, kept apart from AppKit so that it is tested
+        .target(name: "OpenCEShell"),
+        .executableTarget(name: "OpenCE", dependencies: ["CHaloHost", "OpenCERuntime", "OpenCEShell"]),
+        .testTarget(name: "OpenCETests", dependencies: ["OpenCERuntime", "OpenCEShell"]),
     ]
 )
