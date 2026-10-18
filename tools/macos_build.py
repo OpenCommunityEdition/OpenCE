@@ -57,7 +57,7 @@ def is_macos_host() -> bool:
 
 
 def macos_configure_inputs() -> List[Path]:
-    return [Path(__file__), PORT_DIR / "host", PORT_DIR / "cli", APP_DIR / "Sources" / "OpenCE",
+    return [Path(__file__), PORT_DIR / "host", PORT_DIR / "cli", APP_DIR / "Sources" / "OpenCE", APP_DIR / "Tests",
             PORT_DIR / "runtime" / "src", Path("tools/macos_dispatch.py")]
 
 
@@ -210,22 +210,55 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     if sdl_lib:
         linker_flags += f" -Xlinker -L{sdl_lib} -Xlinker -rpath -Xlinker {sdl_lib}"
     linker_flags += " -Xlinker -lSDL3"
+    swift_package = (f"env -u SDKROOT -u DEVELOPER_DIR -u MACOSX_DEPLOYMENT_TARGET -u CC -u CXX -u LD "
+                     f"{swift} %s --quiet --disable-sandbox --package-path {APP_DIR} "
+                     f"--scratch-path {swift_build} --cache-path {swift_build}/cache "
+                     f"--config-path {swift_build}/config --security-path {swift_build}/security {linker_flags}")
     n.rule(
         name="macos_app",
-        command=(f"env -u SDKROOT -u DEVELOPER_DIR -u MACOSX_DEPLOYMENT_TARGET -u CC -u CXX -u LD "
-                 f"{swift} build --quiet -c release --disable-sandbox --package-path {APP_DIR} "
-                 f"--scratch-path {swift_build} --cache-path {swift_build}/cache "
-                 f"--config-path {swift_build}/config --security-path {swift_build}/security {linker_flags} && "
+        command=(f"{swift_package % 'build -c release'} && "
                  f"$python tools/macos_app.py {swift_build}/release/OpenCE {image} {ENTITLEMENTS} {app_codesign} "
                  f"{APP_VERSION} {app}"),
         description="MACOS APP $out",
     )
-    swift_sources = [APP_DIR / "Package.swift", *sorted((APP_DIR / "Sources").rglob("*.swift")),
-                     APP_DIR / "Sources" / "CHaloHost" / "module.modulemap", PORT_DIR / "host" / "halo_host.h"]
+    # The runtime's Swift bindings, generated from its library (whose
+    # metadata they must match) into the package's ignored folders.
+    # uniffi-bindgen is built in a target folder of its own: its features
+    # would otherwise rebuild the library the hosts link.
+    bindings_dir = BUILD / "swift_bindings"
+    bindings = [APP_DIR / "Sources" / "OpenCERuntime" / "opence_runtime.swift",
+                APP_DIR / "Sources" / "opence_runtimeFFI" / "opence_runtimeFFI.h",
+                APP_DIR / "Sources" / "opence_runtimeFFI" / "module.modulemap"]
+    n.rule(
+        name="macos_swift_bindings",
+        command=(f"cargo run --quiet --release --features bindgen --bin uniffi-bindgen "
+                 f"--manifest-path {runtime_dir}/Cargo.toml --target-dir {BUILD / 'cargo_bindgen'} -- "
+                 f"generate --library {runtime_library} --language swift --out-dir {bindings_dir} && "
+                 f"mkdir -p {bindings[0].parent} {bindings[1].parent} && "
+                 f"cp {bindings_dir}/opence_runtime.swift {bindings[0]} && "
+                 f"cp {bindings_dir}/opence_runtimeFFI.h {bindings[1]} && "
+                 f"cp {bindings_dir}/opence_runtimeFFI.modulemap {bindings[2]}"),
+        description="MACOS UNIFFI $out",
+    )
+    n.build(outputs=bindings, rule="macos_swift_bindings", inputs=[runtime_library],
+            implicit=[runtime_dir / "src" / "bin" / "uniffi-bindgen.rs"])
+    swift_sources = [APP_DIR / "Package.swift", *sorted((APP_DIR / "Sources" / "OpenCE").glob("*.swift")),
+                     APP_DIR / "Sources" / "CHaloHost" / "module.modulemap", PORT_DIR / "host" / "halo_host.h",
+                     *bindings]
     n.build(outputs=app_executable, rule="macos_app",
             inputs=[*swift_sources, host_library, runtime_library, image, ENTITLEMENTS],
             implicit=[Path("tools/macos_app.py")])
     n.build(outputs="macos_app", rule="phony", inputs=[app_executable])
+    # the package's tests (port/macos/app/Tests), run each time they are asked for
+    swift_tests = sorted((APP_DIR / "Tests").rglob("*.swift"))
+    n.rule(
+        name="macos_app_test",
+        command=swift_package % "test",
+        description="MACOS SWIFT TEST",
+        pool="console",
+    )
+    n.build(outputs="macos_app_test", rule="macos_app_test",
+            inputs=[*swift_sources, *swift_tests, host_library, runtime_library])
 
     # ---------- the runtime crate
 

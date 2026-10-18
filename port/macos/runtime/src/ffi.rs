@@ -15,6 +15,8 @@ use std::ffi::{c_char, CStr, CString};
 use std::ptr;
 
 use crate::image::{check_imports, GuestHeader, GuestImage};
+use std::sync::Arc;
+
 use crate::memory::{GuestMemory, GuestPtr, GuestRange};
 use crate::page_tables::{PageTables, SystemRegisters};
 use crate::plan::{AddressSpacePlan, PoolAllocator, RegionKind, IMAGE_BASE, RUNTIME_BASE};
@@ -26,7 +28,8 @@ pub const OPENCE_TABLES: u32 = 0x0020_1000;
 
 /// The guest: opaque to C.
 pub struct OpenceGuest {
-    memory: GuestMemory,
+    // (shared with the Swift app's view of it, src/swift.rs)
+    memory: Arc<GuestMemory>,
     plan: AddressSpacePlan,
     pools: PoolAllocator,
     image: Option<GuestImage>,
@@ -155,6 +158,8 @@ impl OpenceGuest {
                 .map(region.range)
                 .map_err(|error| format!("{}: {error}", region.kind))?;
         }
+        let memory = Arc::new(memory);
+        crate::swift::set_running(&memory);
         let pools = PoolAllocator::new(&plan);
         Ok(OpenceGuest {
             memory,
@@ -498,6 +503,9 @@ mod tests {
     }
 
     fn guest() -> Guest {
+        let _running = crate::swift::RUNNING_TESTS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let guest = opence_guest_create();
         assert!(!guest.is_null());
         Guest(guest)

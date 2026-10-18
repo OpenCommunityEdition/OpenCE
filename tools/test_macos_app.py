@@ -64,6 +64,13 @@ def test_app_graph(monkeypatch):
     inputs = rule.group(1)
     assert "build/macos/libhalo_host.a" in inputs and "build/macos/halo_guest.elf" in inputs
     assert "port/macos/app/Sources/OpenCE/" in inputs
+    # and with the runtime's Swift bindings, generated from its library
+    assert "port/macos/app/Sources/OpenCERuntime/opence_runtime.swift" in inputs
+    bindings = re.search(r"^build (port/macos/app/Sources/OpenCERuntime/opence_runtime\.swift .*): "
+                         r"macos_swift_bindings (.*)$", flat, re.MULTILINE)
+    assert bindings and "port/macos/app/Sources/opence_runtimeFFI/module.modulemap" in bindings.group(1)
+    assert bindings.group(2).startswith("build/macos/cargo/release/libopence_runtime.a")
+    assert re.search(r"^build macos_app_test: macos_app_test .*port/macos/app/Tests/", flat, re.MULTILINE)
 
 
 @on_macos
@@ -109,3 +116,14 @@ def test_app_runs_the_guest_beside_appkit(tmp_path):
     assert run.returncode == 0, run.stderr[-2000:]
     assert "exiting after debug.exit_after" in run.stderr + run.stdout
     assert "starting main menu music" in (tmp_path / "debug.txt").read_text(errors="replace")
+
+
+@on_macos
+@pytest.mark.skipif(shutil.which("ninja") is None or not (ROOT / "build.ninja").is_file(),
+                    reason="needs ninja and a configured build (nix develop)")
+def test_swift_tests_pass():
+    # the package's tests, incl. the runtime's guest memory view through
+    # its bindings (port/macos/app/Tests)
+    run = subprocess.run(["ninja", "macos_app_test"], cwd=ROOT, capture_output=True, text=True, timeout=600)
+    assert run.returncode == 0, run.stdout[-3000:] + run.stderr[-2000:]
+    assert re.search(r"Test run with \d+ tests .*passed", run.stdout)

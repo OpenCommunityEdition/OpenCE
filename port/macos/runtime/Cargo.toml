@@ -10,8 +10,19 @@ publish = false
 # rlib for the tests, staticlib for the C host (port/macos/host)
 crate-type = ["rlib", "staticlib"]
 
+[[bin]]
+# writes the Swift bindings (src/swift.rs); only with --features bindgen, so
+# that the libraries the hosts link are built without its dependencies
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+bindgen = ["uniffi/cli"]
+
 [dependencies]
 thiserror = "2"
+uniffi = { version = "0.32", default-features = false }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

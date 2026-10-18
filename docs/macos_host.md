@@ -153,6 +153,7 @@ ninja macos                    # build/macos/halo_host and build/macos/halo_gues
 nix build .#host               # the final build: result/bin/halo_host, result/share/opence/halo_guest.elf
 ninja macos_app                # build/macos/OpenCE.app (needs Xcode)
 nix build .#app                # result/Applications/OpenCE.app
+ninja macos_app_test           # the Swift package's tests (port/macos/app/Tests)
 ```
 
 The app, `OpenCE.app`, is the Swift package `port/macos/app` built with
@@ -165,6 +166,17 @@ hypervisor entitlement, using Apple's `codesign`. AppKit keeps the main
 thread; the guest's main runs on a thread of its own. Being outside the
 store, Xcode makes `nix build .#app` impure: it needs a Nix without the
 sandbox.
+
+Swift calls the runtime crate through UniFFI (`port/macos/runtime/src/swift.rs`).
+For now that is a view of the guest's memory, `GuestMemoryView`. Its
+`hostAddress`, `read` and `write` accept only ranges that are wholly mapped,
+and throw `GuestMemoryError` for any other. `runningGuestMemory()` returns the
+memory of the guest the C host is running. The memory is mapped when the
+guest is made and never again, so the view needs no lock; it keeps the memory
+alive while the view exists. The build makes the crate's `uniffi-bindgen`
+(`--features bindgen`, in a target folder of its own) and runs it on
+`libopence_runtime.a`. It writes the bindings into the package's ignored
+folders `Sources/OpenCERuntime` and `Sources/opence_runtimeFFI`.
 
 `ninja macos` builds:
 
