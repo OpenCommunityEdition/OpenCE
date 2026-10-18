@@ -339,11 +339,43 @@ def test_insertion_preserves_legacy_menu_and_is_idempotent():
     assert [int(row.get("y")) for row in rows] == [247, 283, 319, 355, 391, 427]
     root = ET.fromstring(main).find("widget[@name='main_menu/main_menu']")
     assert root.find(f"child[@widget='{changelog_menu.CORNER}']").attrib == {
-        "widget": changelog_menu.CORNER, "x": "456", "y": "444"}
-    assert root.find(f"child[@widget='{changelog_menu.BUILD_LABEL}']").get("y") == "420"
+        "widget": changelog_menu.CORNER, "x": "447", "y": "438"}
+    label = root.find(f"child[@widget='{changelog_menu.BUILD_LABEL}']")
+    assert label.get("x") == "424" and label.get("y") == "420"
+    label_widget = feature().find(f"widget[@name='{changelog_menu.BUILD_LABEL}']")
+    assert label_widget.get("align") == "center" and label_widget.get("width") == "150"
+    assert int(label.get("x")) + 150 / 2 == 499
+    assert 447 + changelog_menu.CORNER_WIDTH / 2 == 499
     corner = feature().find(f"widget[@name='{changelog_menu.CORNER}']")
     assert corner.get("type") == "column_list"
     assert corner.find("child").get("widget") == changelog_menu.ITEM
+    assert corner.get("width") == "104" and corner.get("height") == "21"
+    item = feature().find(f"widget[@name='{changelog_menu.ITEM}']")
+    assert item.get("width") == "104" and item.get("height") == "21"
+
+
+def test_corner_art_scales_the_whole_design_without_changing_its_groups():
+    frames = changelog_menu.corner_frames(MENUS / "svg")
+    assert len(frames) == 2
+    for index, (svg, width, height) in enumerate(frames):
+        root = ET.fromstring(svg)
+        assert (width, height) == (104, 21)
+        assert root.get("viewBox") == "0 0 160 32"
+        assert root.get("preserveAspectRatio") == "xMinYMin meet"
+        # Keeping both design groups unchanged scales the caption, outline
+        # and glow together; fitting the outline separately would restyle it.
+        groups = list(root)
+        assert [group.get("transform") for group in groups] == [
+            "translate(0,3) scale(1.25,1)", "translate(2,4) scale(0.6)"]
+        expected_border = ET.parse(MENUS / f"svg/shell/bitmaps/text_button_background__{index}.svg").getroot()
+        expected_caption = ET.fromstring(changelog_menu.port_settings.menu_item_frames(
+            "CHANGELOG", MENUS / "svg", changelog_menu.SPACING)[index][0])
+        for actual, expected in zip(groups, (expected_border, expected_caption)):
+            for node in (*actual.iter(), *expected.iter()):
+                node.tail = None
+                if node.text and not node.text.strip():
+                    node.text = None
+            assert [ET.tostring(child) for child in actual] == [ET.tostring(child) for child in expected]
 
 
 def c_function(source, name):

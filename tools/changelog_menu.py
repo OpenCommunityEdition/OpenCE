@@ -23,7 +23,11 @@ FILE = "main_menu.changelog.port.xml"
 ITEM = "main_menu/main_menu_item_changelog"
 CORNER = "main_menu/changelog_corner"
 BASE = "main_menu/changelog"
-CHILD = f'<child widget="{CORNER}" x="456" y="444"/>'
+# Center beneath the original version's visible text (x454..544), rather
+# than its wider text widget, whose center is farther to the right.
+CHILD = f'<child widget="{CORNER}" x="447" y="438"/>'
+CORNER_WIDTH = 104
+CORNER_HEIGHT = 21
 BUILD_LABEL = "main_menu/gulch_build_number"
 BITMAP = "main_menu/menu_changelog"
 TITLE = f"{BASE}/header_changelog"
@@ -140,17 +144,18 @@ def _text(name, text, x, y, width, height=24, font="small", color="#FFCCCCCC", a
 
 
 def corner_frames(redraws):
-    """Reuse the handmade caption/glow and the standard button outline."""
+    """Uniformly fit the existing design beneath the visible version text."""
     frames = []
     for index, (caption, _, _) in enumerate(port_settings.menu_item_frames("CHANGELOG", redraws, SPACING)):
         border = (redraws / f"shell/bitmaps/text_button_background__{index}.svg").read_text(encoding="utf-8")
         inner = lambda svg: svg[svg.index(">") + 1:svg.rindex("</svg>")]
         svg = '\n'.join([
             '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
-            'width="160" height="32" viewBox="0 0 160 32">',
+            f'width="{CORNER_WIDTH}" height="{CORNER_HEIGHT}" viewBox="0 0 160 32" '
+            'preserveAspectRatio="xMinYMin meet">',
             '  <g transform="translate(0,3) scale(1.25,1)">', inner(border), '  </g>',
             '  <g transform="translate(2,4) scale(0.6)">', inner(caption), '  </g>', '</svg>', ''])
-        frames.append((svg, 160, 32))
+        frames.append((svg, CORNER_WIDTH, CORNER_HEIGHT))
     return frames
 
 
@@ -164,17 +169,17 @@ def widget_lines(data=None):
     data = load_notes() if data is None else validate_notes(data)
     entries = data["entries"] or [None]
     lines = port_settings._widget(ITEM, [
-        ("type", "text"), ("width", 160), ("height", 28), ("bitmap", BITMAP),
+        ("type", "text"), ("width", CORNER_WIDTH), ("height", CORNER_HEIGHT), ("bitmap", BITMAP),
     ], [f'<on event="a start" open="{BASE}/build_1"/>',
         '<on event="left_mouse" run="mouse emit accept event"/>'])
     lines += port_settings._widget(CORNER, [
-        ("type", "column_list"), ("width", 160), ("height", 28),
+        ("type", "column_list"), ("width", CORNER_WIDTH), ("height", CORNER_HEIGHT),
         ("flags", "pass_unhandled_to_focused_child"),
     ], [f'<child widget="{ITEM}"/>'])
     lines += port_settings._header(TITLE, TITLE)
     lines += port_settings._widget(BUILD_LABEL, [
         ("type", "text"), ("controller", 1), ("width", 150), ("height", 20),
-        ("font", "ui\\small_ui"), ("color", "#FFFF8000"),
+        ("font", "ui\\small_ui"), ("color", "#FFFF8000"), ("align", "center"),
     ], ['<on event="created" run="port gulch build label"/>'])
     for index, entry in enumerate(entries, 1):
         page = f"{BASE}/build_{index}"
@@ -298,7 +303,7 @@ def insert_item(text):
     if count != 1:
         raise ValueError("expected one main menu root")
     pattern = r'(\t\t<child widget="main_menu/build_number"[^\n]+)'
-    updated, count = re.subn(pattern, r'\1' + f'\n\t\t<child widget="{BUILD_LABEL}" x="450" y="420"/>'
+    updated, count = re.subn(pattern, r'\1' + f'\n\t\t<child widget="{BUILD_LABEL}" x="424" y="420"/>'
                            + '\n\t\t' + CHILD, updated)
     if count != 1:
         raise ValueError("expected one main menu build-number child")
