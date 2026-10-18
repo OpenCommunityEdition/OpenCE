@@ -1,0 +1,8 @@
+# The Rust toolchain of the macOS host's runtime (port/macos/runtime). The
+# Nix flake reads this file (rust-overlay), so `nix develop` and rustup agree.
+# wasm32 is here for the portable crates' check (conductor/tech-stack.md).
+[toolchain]
+channel = "1.98.1"
+components = ["rustfmt", "clippy", "llvm-tools-preview"]
+targets = ["aarch64-apple-darwin", "wasm32-unknown-unknown"]
+profile = "minimal"
