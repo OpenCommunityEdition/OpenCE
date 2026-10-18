@@ -10,9 +10,9 @@
 - [x] Task: UniFFI bindings from the Rust runtime to Swift ee85ebca
     - [x] Write tests: cargo test for the exported API; a Swift test that maps a guest range through the bindings
     - [x] Export what Swift needs (the guest memory view and its range checks)
-- [ ] Task: Run main-thread imports on the main thread
-    - [ ] Write tests: a guest program (port/macos/tests) whose thread asks for a main-thread import and gets its result; a request during shutdown fails cleanly
-    - [ ] A request queue: the vCPU posts and waits, the AppKit run loop carries it out
+- [x] Task: Run main-thread imports on the main thread 988639b1
+    - [x] Write tests: a guest program (port/macos/tests) whose thread asks for a main-thread import and gets its result; a request during shutdown fails cleanly
+    - [x] A request queue: the vCPU posts and waits, the AppKit run loop carries it out
 - [ ] Task: The data root, and a dialog for missing maps
     - [ ] Write tests: the root is HALO_DATA_ROOT, else Application Support/OpenCE; missing maps give the dialog's message
     - [ ] Implement it in the Swift shell
