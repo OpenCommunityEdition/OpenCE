@@ -2,14 +2,13 @@
 cases spell nothing offensive: how a word is found however it is dressed (case, accents, look-alikes, leet, repeats,
 spaces and punctuation, the game's "|" codes), the rules of where it may be, the allowed words and the levels."""
 
-import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from harness import build, mutated, read  # noqa: E402
+from harness import build, mutated, process, read  # noqa: E402
 
 # the made-up list: (group, severity, rule, word)
 WORDS = [
@@ -109,9 +108,9 @@ def generated(real=False, fault=None):
 
 
 def censor(executable, texts, levels, narrow=False, extra=()):
-    command = [str(executable), "--censor", *(["--narrow"] if narrow else []), *extra, *levels]
+    arguments = ["--censor", *(["--narrow"] if narrow else []), *extra, *levels]
     data = ("\n".join(texts) + "\n").encode("latin-1" if narrow else "utf-8")
-    result = subprocess.run(command, input=data, capture_output=True, check=True, timeout=60)
+    result = process(executable, arguments, input=data, capture_output=True, check=True, timeout=60)
     return result.stdout.decode("latin-1" if narrow else "utf-8").split("\n")[:len(texts)]
 
 

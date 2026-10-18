@@ -79,6 +79,15 @@ _directory = tempfile.TemporaryDirectory(prefix="halo-harness-")
 CHECK_FAILED = 1  # a case's exit status when a CHECK fails (harness.h)
 
 
+def _in_macos_vm():
+    """On arm64 macOS, which runs no 32-bit code, each test is built as the macOS
+    host's guest code and run in its VM (tools/macos_guest_image.py; needs `ninja
+    macos` in `nix develop`): the ILP32 AArch64 code the game runs as there."""
+    import platform
+    import sys
+    return sys.platform == "darwin" and platform.machine() == "arm64"
+
+
 @functools.lru_cache(maxsize=None)
 def build(test, generated):
     """tests/<test>.c compiled with the generated includes ((name, text), ...) for the game's 32-bit ABI."""
@@ -86,6 +95,8 @@ def build(test, generated):
     work.mkdir(parents=True, exist_ok=True)
     for name, text in generated:
         (work / name).write_text(text)
+    if _in_macos_vm():
+        return _build_for_macos_vm(test, work)
     executable = work / test
     command = [os.environ.get("CC", "clang"), "-m32", "-std=gnu99", "-O2", "-Wall", "-Werror", "-Wno-unused-function",
                "-Wno-unused-variable", "-I", str(HARNESS / "include"), "-I", str(work),
@@ -96,7 +107,40 @@ def build(test, generated):
     return executable
 
 
+def _build_for_macos_vm(test, work):
+    import pytest
+    import sys
+    sys.path.insert(0, str(ROOT))
+    from tools import macos_guest_image
+    if not macos_guest_image.available():
+        pytest.skip("on macOS the harness runs in the host's VM: needs `ninja macos` in `nix develop`")
+    # (the Linux harness's flags, and its configuration: without the guest
+    # build's MSVC extensions or port platform macros, which a test sets
+    # itself where it needs them)
+    flags = ["-std=gnu99", "-O2", "-Wall", "-Werror", "-Wno-unused-function", "-Wno-unused-variable",
+             "-Wno-incompatible-sysroot", "-fno-ms-extensions", "-UHALO_ANDROID", "-UHALO_GLES",
+             "-UHALO_ARM64_GUEST", "-UHALO_GUEST_VM", "-I", str(HARNESS / "include"), "-I", str(work)]
+    try:
+        return macos_guest_image.build_guest_image([HARNESS / "tests" / f"{test}.c"], work, test, flags)
+    except RuntimeError as error:
+        raise RuntimeError(f"{test}.c does not compile:\n{error}") from None
+
+
+def process(executable, arguments, **options):
+    """subprocess.run of a built test with these arguments (and subprocess.run's options: input, timeout...); on
+    macOS, where the test is a guest image, in the host's VM"""
+    if Path(executable).suffix == ".elf":
+        import sys
+        sys.path.insert(0, str(ROOT))
+        from tools import macos_guest_image
+        folder = Path(executable).parent / "run"
+        options.setdefault("env", macos_guest_image.guest_environment(folder))
+        options.setdefault("cwd", folder)
+        return subprocess.run([str(macos_guest_image.HOST), str(executable), *arguments], **options)
+    return subprocess.run([str(executable), *arguments], **options)
+
+
 def run(executable, case):
     """Run one case: (exit status, output)."""
-    result = subprocess.run([str(executable), case], capture_output=True, text=True, timeout=60)
+    result = process(executable, [case], capture_output=True, text=True, timeout=60)
     return result.returncode, (result.stdout + result.stderr).strip()

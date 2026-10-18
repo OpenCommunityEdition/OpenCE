@@ -8,6 +8,11 @@ graphics, so a fix can carry a test that CI runs.
 They need `clang` (or `CC`) and a 32-bit C runtime (`lib32-glibc`, `gcc-multilib`), as the Linux build does. pytest
 finds every `tests/test_*.py`, so a new test needs no change to CI.
 
+On an arm64 Mac, which runs no 32-bit code, each test is built as the macOS host's guest code (ILP32 AArch64, as the
+game runs there) and run in its VM (`tools/macos_guest_image.py`, docs/macos_host.md), with the same flags and
+configuration as here; it needs `ninja macos` in `nix develop`. A test that runs its executable itself goes through
+`process` (as `run` does).
+
 ## A test
 
 - `tests/<name>.c`: the fake world, only what the code reads, with what it calls stubbed as macros that name only the

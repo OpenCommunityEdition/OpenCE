@@ -82,15 +82,21 @@ def build_guest_image(sources: Iterable[Path], work: Path, name: str, extra_flag
     return image
 
 
-def run_guest(image: Path, arguments: Iterable[str], folder: Path, environment: Optional[dict] = None,
-              timeout: int = 60) -> subprocess.CompletedProcess:
-    """runs the image in the host, in `folder`, which is also its HOME and
-    data folder; the host's own messages are left out of the output unless
-    it fails (HALO_HOST_QUIET)"""
+def guest_environment(folder: Path, environment: Optional[dict] = None) -> dict:
+    """the environment a guest image runs in: `folder` (made if missing) is its
+    HOME and data folder, and the host's own messages are left out of the
+    output unless it fails (HALO_HOST_QUIET)"""
     folder.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
     env.update({"HOME": str(folder), "XDG_DATA_HOME": str(folder), "HALO_DATA_ROOT": str(folder),
                 "HALO_HOST_QUIET": "1"})
     env.update(environment or {})
+    return env
+
+
+def run_guest(image: Path, arguments: Iterable[str], folder: Path, environment: Optional[dict] = None,
+              timeout: int = 60) -> subprocess.CompletedProcess:
+    """runs the image in the host, in `folder` (guest_environment)"""
+    env = guest_environment(folder, environment)
     return subprocess.run([str(HOST), str(image), *arguments], cwd=folder, env=env, capture_output=True, text=True,
                           timeout=timeout)
