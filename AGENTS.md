@@ -19,6 +19,7 @@ end.
 | `port/linux/game/` | The port's game-side code, compiled as the game's sources are: the distributed netcode (`network_*.c`), co-op, map sharing (`map_share*.c`), the menus (`menu_tags.c`, `menu_functions.c`), Custom Edition maps (`custom_edition_*.c`, `cache_file_formats.c`), the tag validator (`tag_validate.c`, `tag_schema_*.c`), touch, FOV and more |
 | `port/linux/include/` | The port's headers: the limits (`halo_port_limits.h`, with `HALO_PORT_NETWORK_VERSION`), capacities (`halo_port_capacity.h`), the prefix header, `halo_linux_source_fixups.h` (port functions the game's sources call) |
 | `port/include/xdk/` | Stand-ins for the Xbox SDK's headers (declarations only) |
+| `port/mac/` | The Mac build (PowerPC and Intel, Mac OS X 10.4 and later): its window, input, audio, files and sockets, the engine's integration, the Xbox maps' loaders, the app bundle. Built by `tools/mac_*` scripts, not by ninja (`port/mac/README.md`) |
 | `port/windows/` | The Windows build's own files (`win32_*.c`, headers) |
 | `port/android/` | The Android app: the guest runtime, the host library (`host/`), the Java app (`app/`), host imports (`host_imports.list`) |
 | `port/web/` | The web build: its runtime (`src/`: entry, sockets inside the page, memory watch), the page and its service worker (`site/`), the SDL port, tests |
@@ -71,6 +72,7 @@ python tools/ci_build.py linux release   # what CI builds
 | `HALO_ARM64_GUEST` | Android | The guest's ABI (ILP32 AArch64) |
 | `HALO_WEB` | Web | The browser: its frames, storage, sockets and WebGL 2's limits (with `HALO_GLES`, not `HALO_ANDROID`) |
 | `HALO_WINDOWS` | Windows (`halo_windows_prefix.h`) | The Windows build |
+| `HALO_MAC` | The Mac scripts (`tools/mac_*`), not ninja | The Mac build: its platform layer and the game's hooks for it; compiles to nothing in the four ninja builds |
 | `HALO_RELEASE` | `--release` | No assertions checked |
 | `HALO_PROFILE` | `--profile` | The profiling build; a normal build must be unchanged by it |
 

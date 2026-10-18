@@ -34,7 +34,10 @@ scale (a window made fullscreen) or a full atlas starts it over.
 /* (the Xbox maps' tags and a Custom Edition loc.map's, which share names,
 each at its oversamples) */
 #define MAXIMUM_FONTS 16
+/* (a port may choose a smaller atlas: the Mac's 1024, for GPUs with 32 MB) */
+#ifndef ATLAS_SIZE
 #define ATLAS_SIZE 2048
+#endif
 /* clear texels around each glyph, so that filtering never reaches the next */
 #define ATLAS_PADDING 2
 #define GLYPH_CACHE_SIZE 4096

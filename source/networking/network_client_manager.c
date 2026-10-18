@@ -1651,6 +1651,10 @@ boolean network_game_client_handle_game_update(
 	return TRUE;
 }
 
+#ifdef HALO_MAC
+int mac_engine_network_begin_deferred(const char *map_name); /* port: port/mac/engine_network_test.c */
+#endif
+
 boolean network_game_client_game_has_started(
 	struct network_game_client *client)
 {
@@ -1661,6 +1665,15 @@ boolean network_game_client_game_has_started(
 		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
 		0x3B0,
 		client && (client->state == _network_game_client_state_pregame));
+
+#ifdef HALO_MAC
+	/* port: the Mac's session holds one map. If the game's is not this
+	session's (the menus' is the title's), the session is changed and this
+	is asked again in the game's (port/mac/engine_network_test.c): the
+	client stays in the pregame, as the host's loaded count has it. */
+	if (mac_engine_network_begin_deferred(client->game.map.name))
+		return TRUE;
+#endif
 
 	client->seconds_to_game_start = NONE;
 	network_connection_keep_alive(client->connection);

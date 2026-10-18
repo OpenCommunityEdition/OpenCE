@@ -4790,6 +4790,17 @@ static boolean network_game_server_have_all_machines_have_precached(
 		}
 	}
 
+#ifdef HALO_MAC
+	/* port: the Mac's menus' session holds the title's map, not the game's
+	(cache_files_give_time_to_precache): the game's is loaded by the session
+	it begins in */
+	{
+		int mac_engine_network_map_precached(char const *map_name);
+
+		if (all_machines_have_precached && mac_engine_network_map_precached(main_get_multiplayer_map_name()))
+			return all_machines_have_precached;
+	}
+#endif
 	match_assert(
 		NETWORK_SERVER_MANAGER_FILE,
 		0x8C8,
