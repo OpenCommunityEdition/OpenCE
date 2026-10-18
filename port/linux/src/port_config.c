@@ -106,8 +106,9 @@ static const struct config_setting config_settings[] =
 		"What fullscreen and borderless draw at: \"native\", the display's own, or\n"
 		"\"<width>x<height>\" (\"1920x1080\"), 640x480 or more. Fullscreen sets the\n"
 		"display to it; borderless draws it scaled to the display. Mac: the\n"
-		"display's mode when fullscreen takes it, at the next start; the 640x480\n"
-		"picture is scaled to it." },
+		"display's mode when fullscreen takes it, at the next start (Video Setup\n"
+		"lists the display's own modes: the wide ones with Widescreen On, the 4:3\n"
+		"ones with it Off); the picture is drawn with its pixels (mac.render_resolution)." },
 	{ "display.resolution_scaling", _config_string, "\"native\"", "HALO_RESOLUTION_SCALING", _environment_value,
 		_platform_desktop,
 		"\"native\" draws at the window's resolution (fullscreen, the display's or\n"
@@ -494,6 +495,17 @@ static const struct config_setting config_settings[] =
 		"than 6 pixels, 12 in the campaign, no lens flares, and particles no\n"
 		"wider than 160 pixels) or \"lowest\" (low, and no particles). A\n"
 		"display.* detail setting that is not at its default wins over this." },
+	{ "mac.render_resolution", _config_string, "\"auto\"", "HALO_MAC_RENDER_RESOLUTION", _environment_value,
+		_platform_mac,
+		"How many pixels the game draws a frame with: \"native\" (the window's, or\n"
+		"the display's, own), \"original\" (the Xbox's 480 lines, scaled up to the\n"
+		"window), \"auto\" (native on an Intel Mac with more than 64 MB of video\n"
+		"memory, else 480 lines) or a number of lines, 480 to 4320 (\"720\"). A\n"
+		"picture drawn with fewer pixels than the window has is scaled up with\n"
+		"linear filtering (a whole number of pixels each way: doubled). Every\n"
+		"choice is offered on every Mac; one the window, the card's largest\n"
+		"texture or its video memory cannot hold is cut to what they can, and the\n"
+		"log says so. The log line \"render resolution\" gives the size drawn." },
 	{ "mac.texture_cache_mb", _config_integer, "0", "HALO_MAC_RETAIL_TEXTURE_CACHE_MB", _environment_value,
 		_platform_mac,
 		"The megabytes of the graphics card's memory that the game's textures may\n"

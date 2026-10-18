@@ -142,6 +142,34 @@ static void mac_render_gamma_install(void)
 	mac_device_gamma_hook = mac_render_gamma;
 }
 
+/* port: mac.render_resolution for the device's frame (mac_render_scale_update,
+   engine_device_state.c): the setting's words, and the card's video memory
+   and CPU, which "auto" and the limits go by (mac_gpu_info.c, when linked) */
+const char *(*mac_device_render_setting_hook)(int *vram_mb, int *is_ppc);
+extern int mac_gpu_info_vram_mb(void) __attribute__((weak));
+extern int mac_gpu_info_is_ppc(void) __attribute__((weak));
+
+static const char *mac_render_setting(int *vram_mb, int *is_ppc)
+{
+	static unsigned long read_at = (unsigned long)-1;
+	static const char *setting = "auto";
+
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		setting = config_string("mac.render_resolution");
+	}
+	*vram_mb = mac_gpu_info_vram_mb ? mac_gpu_info_vram_mb() : 32;
+	*is_ppc = mac_gpu_info_is_ppc ? mac_gpu_info_is_ppc() : 0;
+	return setting;
+}
+
+static void mac_render_setting_install(void) __attribute__((constructor));
+static void mac_render_setting_install(void)
+{
+	mac_device_render_setting_hook = mac_render_setting;
+}
+
 void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 {
 	const struct mac_device_state *device = mac_device_state_get();

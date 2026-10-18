@@ -1,5 +1,7 @@
 #include <stdio.h>
+#include <ApplicationServices/ApplicationServices.h>
 #include <string.h>
+#include "mac_display_modes.h"
 
 int platform_display_resolutions(long *,long *,int);
 int platform_window_sizes(long *,long *,int);
@@ -34,6 +36,29 @@ int main(void)
 		if(index)checks++;
 		if(index&&(widths[index-1]<widths[index]||
 			(widths[index-1]==widths[index]&&heights[index-1]<heights[index])))failures++;
+	}
+	/* the modes Video Setup offers: no smaller than 640x480, no interlaced or unsafe mode, no 16-bit ones */
+	checks++;if(!mac_display_mode_usable(1280,800,32,1,0))failures++;
+	checks++;if(!mac_display_mode_usable(640,480,32,1,0))failures++;
+	checks++;if(!mac_display_mode_usable(1024,768,0,1,0))failures++;
+	checks++;if(mac_display_mode_usable(640,400,32,1,0))failures++;
+	checks++;if(mac_display_mode_usable(512,384,32,1,0))failures++;
+	checks++;if(mac_display_mode_usable(1920,1080,32,1,1))failures++;
+	checks++;if(mac_display_mode_usable(1920,1080,32,0,0))failures++;
+	checks++;if(mac_display_mode_usable(1024,768,16,1,0))failures++;
+	/* widescreen is wider than 3:2 */
+	checks++;if(mac_display_mode_is_wide(1024,768)||mac_display_mode_is_wide(1280,1024)||mac_display_mode_is_wide(1440,960))failures++;
+	checks++;if(!mac_display_mode_is_wide(1280,800)||!mac_display_mode_is_wide(1920,1080)||!mac_display_mode_is_wide(2560,1080))failures++;
+	/* the main display's own list: each size once, the desktop's among them, all usable */
+	{
+		long w[64],h[64];int found=0,n=platform_display_resolutions(w,h,64),a,b;
+		long desktop_w=(long)CGDisplayPixelsWide(CGMainDisplayID()),desktop_h=(long)CGDisplayPixelsHigh(CGMainDisplayID());
+		for(a=0;a<n;a++) {
+			if(w[a]==desktop_w&&h[a]==desktop_h)found=1;
+			for(b=a+1;b<n;b++){checks++;if(w[a]==w[b]&&h[a]==h[b])failures++;}
+		}
+		checks++;if(!found)failures++;
+		printf("display modes offered (%d):",n);for(a=0;a<n;a++)printf(" %ldx%ld%s",w[a],h[a],mac_display_mode_is_wide(w[a],h[a])?"w":"");printf("\n");
 	}
 	count=platform_window_sizes(widths,heights,64);
 	checks++;if(count<1||count>64)failures++;

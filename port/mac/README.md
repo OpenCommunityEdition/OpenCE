@@ -24,7 +24,9 @@ the build in the working tree.
   that shape; a wider window or display gets a wider picture (480 lines and
   as many columns as its shape gives, to 1280: Settings > Video > Widescreen,
   `display.resolution_scaling`), with the 3D view wider, the HUD at the
-  corners and the menus centred. The picture is scaled to the window.
+  corners and the menus centred. The picture is drawn with as many pixels as
+  the window has (`mac.render_resolution`, "Render resolution"), not scaled
+  up from 640x480.
 
 ## Install
 
@@ -139,6 +141,7 @@ file with its defaults when it is missing. Of the settings, the Mac reads
 | --- | --- | --- | --- |
 | `mac.map` | `"bloodgulch"` | `HALO_MAC_MAP` | The map the game starts on when opened with no arguments (not by PowerSpark.app, which starts the menus) |
 | `mac.detail` | `"auto"` | `HALO_MAC_DETAIL` | The performance preset: `"auto"`, `"high"`, `"low"` or `"lowest"` |
+| `mac.render_resolution` | `"auto"` | `HALO_MAC_RENDER_RESOLUTION` | Pixels a frame is drawn with: `"native"` (the window's), `"original"` (480 lines), a number of lines (`"720"`) or `"auto"` (native on an Intel Mac with more than 64 MB, else 480 lines). Every choice is offered on every Mac; one that does not fit the window or the card is cut to what does |
 | `mac.texture_cache_mb` | `0` | `HALO_MAC_RETAIL_TEXTURE_CACHE_MB` | Video memory for textures, 4 to 48; 0 by the card |
 | `mac.texture_skip_levels` | `-1` | `HALO_MAC_TEXTURE_SKIP_LEVELS` | Largest texture levels left out, 0 to 4; -1 by the card |
 
@@ -165,6 +168,43 @@ on. If the Xbox data has none (a kit made before the launcher copied them:
 make it again from the disc image, or copy `default.xbe` and `bink/` from the
 disc into `XboxData`), or `game.movies = false`, MacSoft's `mgs.mov`,
 `bungie.mov` and `ending.mov` play instead, with QuickTime, as before.
+
+### Render resolution and display modes
+
+`mac.render_resolution` (Settings > Video > Graphics > Render Resolution) is
+how many pixels the game draws a frame with. The picture keeps its shape (480
+lines of the game, and the columns of the window's shape with Widescreen On;
+4:3 with bars with it Off); the renderer scales the GL viewport, scissor and
+clears so that it is drawn into the lower left of the window's framebuffer
+with more pixels, and the present step scales it to the window. The choices
+are `native` (the window's, or the display's, own pixels), `original` (480
+lines, the Xbox's, which the window scales up) and a number of lines
+(`600`, `720`, `1080`...), and `auto` picks by the Mac: native on an Intel Mac
+with a card of more than 64 MB, 480 lines on a PowerPC Mac and on the
+smaller Intel cards (the iBook's limit is fill rate). Every choice is offered
+on every Mac. One that cannot be held is cut at run time, and the log has a
+`render resolution:` line with the size drawn and what held it back: more
+lines than the window has pixels for; more than the card's largest texture or
+viewport; more pixels than its memory allows (twelve bytes a pixel in half
+the video memory: 1.4 million on 32 MB, about 1440x1000). A picture drawn with
+fewer pixels than the window has is scaled with linear filtering, or doubled
+without blur where the window is a whole number of its pixels each way.
+
+What is drawn with more pixels is the 3D view, the HUD's high-res redraws
+and everything drawn as geometry. Text and the HUD pictures the game has
+from the map are scaled up as before. Screen effects that read the frame
+(the sun's glow, camouflage, cinematic effects) read it from a copy of the
+size drawn.
+
+Fullscreen (Settings > Video > Display Mode) offers the display's own modes
+(`CGDisplayAvailableModes`: not smaller than 640x480, not interlaced, safe
+for the hardware, at 24 or more bits, each size once, the largest first, as
+Resolution's list). The desktop's own mode, the default, is a borderless
+window at the desktop's mode; another mode captures the display and switches
+to it, when the game next starts. With Widescreen On the Resolution and Window
+Size lists show the modes wider than 3:2 (16:10, 16:9, wider); with it Off,
+the 4:3 and 5:4 ones. Halo Custom Edition's own list (all the modes the card
+reports, with no Widescreen switch) is from memory and was not checked.
 
 ### Performance presets
 

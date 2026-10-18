@@ -18,6 +18,17 @@ static __inline__ int mac_gpu_pick_preset(int vram_mb, int is_ppc)
     return vram_mb <= 64 ? MAC_DETAIL_MEDIUM : MAC_DETAIL_HIGH;
 }
 
+/* The picture's height in lines for mac.render_resolution "auto" (0: the
+   window's own, "native"). An Intel Mac with a card of more than 64 MB draws
+   at the window's pixels; a PowerPC Mac (fill rate is the iBook's limit, and
+   the PowerBook's) and the small Intel cards (GMA 950) draw the Xbox's 480
+   lines and the window scales them up. Only the default: every choice of the
+   setting is offered on every Mac. */
+static __inline__ int mac_gpu_pick_render_lines(int vram_mb, int is_ppc)
+{
+    return is_ppc || vram_mb <= 64 ? 480 : 0;
+}
+
 /* The levels of the campaign (their map names), which hold far more texture
    than a multiplayer map */
 static __inline__ int mac_gpu_map_is_campaign(const char *name)

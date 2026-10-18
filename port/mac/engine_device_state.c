@@ -34,6 +34,7 @@
 #include <OpenGL/OpenGL.h>
 #include <mach/mach_time.h>
 #include "engine_screen.h"
+#include "mac_render_scale.h" /* port: the render resolution */
 #include <stdlib.h>
 void mac_gpu_textures_meter_draw(int meter); /* mac_gpu_textures.c */
 const unsigned char *mac_native_bitmap_cache_rgba(const void *,uint32_t,uint32_t *,uint32_t *,size_t *);
@@ -252,20 +253,24 @@ static void mac_gl_shadow_attribute_value(GLuint index,const float value[4])
     glVertexAttrib4fv(index,value);memcpy(a->value,value,sizeof(a->value));a->value_valid=1;
 }
 #undef SHADOW_SAME
-/* (HALO_MAC_RENDER_SCALE=0.4..1, experimental) The frame is drawn into the
-   back buffer's lower left at this scale, and stretched to its whole size
-   when presented: fewer pixels for a slower GPU. The game still sees 640x480;
-   only the GL viewport, scissor and clears of the back buffer are scaled. */
-static float gpu_render_scale=-1.0f;
+/* port: the render resolution. The game still sees its 640x480 (or wider,
+   mac_window.c: 480 lines and as many columns as the window's shape gives);
+   the GL viewport, scissor and clears of the back buffer are scaled, so that
+   the frame is drawn with more pixels (mac.render_resolution: the window's
+   own, or a number of lines) into the lower left of the window's framebuffer,
+   and scaled to the window when it is presented. HALO_MAC_RENDER_SCALE=0.4..4
+   (diagnostic) takes the place of the setting; below 1 the frame is drawn
+   smaller and stretched back to the game's size at the present. */
+static float gpu_render_scale=1.0f;
+static unsigned gpu_region_width,gpu_region_height;
 static GLuint gpu_scale_texture;static unsigned gpu_scale_texture_width,gpu_scale_texture_height;
+/* installed by engine_render_services.c, which reads config.toml: the
+   setting's words ("auto", "native", "original", lines), and the card's video
+   memory and whether the machine is a PowerPC */
+const char *(*mac_device_render_setting_hook)(int *vram_mb,int *is_ppc);
 static int mac_render_scaled(void)
 {
-    if(gpu_render_scale<0.0f) {
-        const char *value=getenv("HALO_MAC_RENDER_SCALE");
-        float scale=value?(float)atof(value):1.0f;
-        gpu_render_scale=scale>=0.4f&&scale<1.0f?scale:1.0f;
-    }
-    return gpu_render_scale<1.0f&&device.render_target==&device.back_buffer;
+    return gpu_render_scale!=1.0f&&device.render_target==&device.back_buffer;
 }
 static void mac_render_scale_rect(GLint *x,GLint *y,GLsizei *w,GLsizei *h)
 {
@@ -969,6 +974,7 @@ int mac_device_headless_start(unsigned long width,unsigned long height)
     D3DDevice_SetRenderTarget(&device.back_buffer,&device.depth_buffer);
     return 1;
 }
+static void mac_render_scale_update(void);
 struct gpu_frame_call { mac_device_gpu_frame_proc callback;void *context; };
 static int mac_device_gpu_frame_call(void *context,const struct mac_input_frame *input,
     unsigned width,unsigned height)
@@ -998,6 +1004,7 @@ static int mac_device_gpu_frame_call(void *context,const struct mac_input_frame 
     glDisable(GL_SCISSOR_TEST);glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
     glDepthMask(GL_TRUE);glStencilMask((GLuint)-1);
     mac_gl_shadow_forget();mac_gpu_textures_shadow_reset();
+    mac_render_scale_update(); /* port: the render resolution, for this frame */
     if(device.render_target&&device.render_target!=&device.back_buffer&&
        !mac_engine_device_resources_bind_target(device.render_target,device.depth_stencil))
         result=0;
@@ -1015,6 +1022,66 @@ static void mac_device_surface_size(D3DSurface *surface,unsigned long width,unsi
     unsigned long pitch=(width*4+D3DTEXTURE_PITCH_ALIGNMENT-1)&~(unsigned long)(D3DTEXTURE_PITCH_ALIGNMENT-1);
     surface->Size=((pitch/D3DTEXTURE_PITCH_ALIGNMENT-1)<<D3DSIZE_PITCH_SHIFT)|((height-1)<<D3DSIZE_HEIGHT_SHIFT)|(width-1);
 }
+/* The frame's scale, for the setting and the window as they are now: read
+   between frames (and when the picture's width changes), so that a frame is
+   drawn with one. Logged when it changes, with what held it back. */
+static void mac_render_scale_update(void)
+{
+    static int env_read;static float env_scale;
+    static GLint max_dimension;
+    static long logged_lines=-2;static int logged_clamp=-1;
+    int window_width=0,window_height=0,vram_mb=32,is_ppc=0,clamp=0;
+    const char *setting="original";
+    float scale;long lines;unsigned region_width,region_height;
+    if(!device.gpu)return;
+    if(!env_read) {
+        const char *value=getenv("HALO_MAC_RENDER_SCALE");
+        env_read=1;env_scale=value?(float)atof(value):0.0f;
+        if(env_scale<0.4f||env_scale>4.0f)env_scale=0.0f;
+    }
+    if(env_scale>0.0f)scale=env_scale;
+    else {
+        if(mac_device_render_setting_hook)setting=mac_device_render_setting_hook(&vram_mb,&is_ppc);
+        lines=mac_render_parse(setting);
+        if(lines==MAC_RENDER_LINES_AUTO)lines=mac_gpu_pick_render_lines(vram_mb,is_ppc);
+        if(!max_dimension) {
+            GLint texture=0,viewport[2]={0,0};
+            glGetIntegerv(GL_MAX_TEXTURE_SIZE,&texture);glGetIntegerv(GL_MAX_VIEWPORT_DIMS,viewport);
+            while(glGetError()!=GL_NO_ERROR){}
+            max_dimension=texture>0?texture:2048;
+            if(viewport[0]>0&&viewport[0]<max_dimension)max_dimension=viewport[0];
+        }
+        platform_video_window_size(&window_width,&window_height);
+        if(window_width<=0||window_height<=0){window_width=(int)device.gpu_width;window_height=(int)device.gpu_height;}
+        scale=mac_render_scale_choose(lines,(unsigned)device.gpu_width,(unsigned)window_width,(unsigned)window_height,
+            (unsigned)max_dimension,mac_render_pixel_budget(vram_mb),&clamp);
+        if(lines!=logged_lines||clamp!=logged_clamp) {
+            logged_lines=lines;logged_clamp=clamp;
+            if(clamp)fprintf(stderr,"render resolution: %s asked for %s lines, held to scale %.3f (%s%s%s)\n",
+                setting,lines?"more":"the window's",(double)scale,
+                (clamp&MAC_RENDER_CLAMP_WINDOW)?"the window's pixels ":"",
+                (clamp&MAC_RENDER_CLAMP_SIZE)?"the card's largest texture ":"",
+                (clamp&MAC_RENDER_CLAMP_MEMORY)?"the card's memory":"");
+        }
+    }
+    region_width=mac_render_pixels((unsigned)device.gpu_width,scale);region_height=mac_render_pixels((unsigned)device.gpu_height,scale);
+    if(scale!=gpu_render_scale||region_width!=gpu_region_width||region_height!=gpu_region_height) {
+        gpu_render_scale=scale;gpu_region_width=region_width;gpu_region_height=region_height;
+        fprintf(stderr,"render resolution: %ux%u pixels for the %lux%lu picture (scale %.3f, setting \"%s\", window %dx%d, %d MB, %s)\n",
+            region_width,region_height,(unsigned long)device.gpu_width,(unsigned long)device.gpu_height,(double)scale,
+            env_scale>0.0f?"HALO_MAC_RENDER_SCALE":setting,window_width,window_height,vram_mb,is_ppc?"PowerPC":"Intel");
+    }
+}
+/* the pixels the frame is drawn with: the picture's own, or scaled (also
+   for the textures made of the back buffer, mac_gpu_textures.c) */
+void mac_device_render_region(unsigned *width,unsigned *height)
+{
+    if(gpu_render_scale>1.0f&&gpu_region_width&&gpu_region_height) {
+        *width=gpu_region_width;*height=gpu_region_height;
+    } else {
+        *width=(unsigned)device.gpu_width;*height=(unsigned)device.gpu_height;
+    }
+}
 static void mac_device_screen_width_changed(unsigned width)
 {
     if(!device.gpu||width<640||width>GPU_WIDE_MAXIMUM_WIDTH)return;
@@ -1025,6 +1092,7 @@ static void mac_device_screen_width_changed(unsigned width)
         device.viewport.X=device.viewport.Y=0;device.viewport.Width=width;device.viewport.Height=device.gpu_height;
         viewport_update_constants();
     }
+    mac_render_scale_update(); /* (the picture's shape is the scale's) */
 }
 int mac_device_gpu_start(unsigned long width,unsigned long height,int visible,const char *title)
 {
@@ -3318,7 +3386,9 @@ static int mac_post_fxaa_program(void)
    (x,y), w by h, into its lower left) */
 static void mac_post_begin(GLint x,GLint y,GLsizei w,GLsizei h)
 {
-    GLsizei width=(GLsizei)device.gpu_width,height=(GLsizei)device.gpu_height;
+    unsigned region_width,region_height;GLsizei width,height;
+    mac_device_render_region(&region_width,&region_height);
+    width=(GLsizei)region_width;height=(GLsizei)region_height;
     glUseProgram(0);gpu_current_program=0;
     glDisable(GL_VERTEX_PROGRAM_ARB);glDisable(GL_FRAGMENT_PROGRAM_ARB);glDisable(GL_VERTEX_PROGRAM_POINT_SIZE_ARB);
     glDisable(GL_BLEND);glDisable(GL_DEPTH_TEST);glDisable(GL_STENCIL_TEST);glDisable(GL_SCISSOR_TEST);
@@ -3372,13 +3442,18 @@ static void install_post_fxaa(void) { mac_device_post_fxaa_hook=mac_device_post_
 int mac_device_post_fxaa(int x0,int y0,int x1,int y1)
 {
     GLsizei width=(GLsizei)device.gpu_width,height=(GLsizei)device.gpu_height,w,h;
-    if(!device.gpu||!device.gpu_frame_active||device.render_target!=&device.back_buffer||mac_render_scaled())return 0;
+    GLint px,py;
+    if(!device.gpu||!device.gpu_frame_active||device.render_target!=&device.back_buffer||
+       (mac_render_scaled()&&gpu_render_scale<1.0f))return 0;
     if(x0<0)x0=0;if(y0<0)y0=0;if(x1>width)x1=width;if(y1>height)y1=height;
     if(x1<=x0||y1<=y0||!mac_post_fxaa_program())return 0;
     w=(GLsizei)(x1-x0);h=(GLsizei)(y1-y0);
-    mac_post_begin(x0,height-y1,w,h);
+    px=x0;py=height-y1;
+    /* (the 3D view's pixels where the frame is drawn at more than the Xbox's) */
+    if(mac_render_scaled())mac_render_scale_rect(&px,&py,&w,&h);
+    mac_post_begin(px,py,w,h);
     glEnable(GL_FRAGMENT_PROGRAM_ARB);glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB,gpu_post_fxaa);
-    mac_post_quad(x0,height-y1,w,h,w,h);
+    mac_post_quad(px,py,w,h,w,h);
     mac_post_end();
     return 1;
 }
@@ -3427,8 +3502,10 @@ static int mac_post_gamma_program(void)
 }
 static void mac_post_gamma(void)
 {
-    GLsizei width=(GLsizei)device.gpu_width,height=(GLsizei)device.gpu_height;
+    unsigned region_width,region_height;GLsizei width,height;
     double gamma;float exponent;
+    mac_device_render_region(&region_width,&region_height);
+    width=(GLsizei)region_width;height=(GLsizei)region_height;
     if(!mac_device_gamma_hook||!device.gpu||!device.gpu_frame_active||device.render_target!=&device.back_buffer)return;
     gamma=mac_device_gamma_hook();
     if(gamma==1.0||gpu_post_gamma_state<0||!mac_post_gamma_program())return;
@@ -3460,24 +3537,47 @@ static void mac_post_capture(GLsizei width,GLsizei height)
     }
     free(pixels);
 }
-/* the window larger than the game's picture: scaled to it as far as its shape
-   allows (the menus' pointer takes the same square, engine_input.c) */
+/* the window larger than the frame's pixels: the frame scaled to it as far as
+   its shape allows (the menus' pointer takes the same square, engine_input.c),
+   with linear filtering, or without where the window is a whole number of the
+   frame's pixels each way (no blur). A window of the frame's own size has
+   nothing to draw. */
 static void mac_post_present_scaled(void)
 {
     int window_width=0,window_height=0;
-    GLsizei width=(GLsizei)device.gpu_width,height=(GLsizei)device.gpu_height,w,h;
+    unsigned region_width,region_height;
+    GLsizei width,height,w,h;
     float scale,scale_y;
-    if(!device.gpu||!device.gpu_frame_active||device.render_target!=&device.back_buffer||mac_render_scaled())return;
+    GLint filter=GL_LINEAR;
+    if(!device.gpu||!device.gpu_frame_active||device.render_target!=&device.back_buffer||
+       (mac_render_scaled()&&gpu_render_scale<1.0f))return;
     platform_video_window_size(&window_width,&window_height);
-    if(window_width<width||window_height<height||(window_width==width&&window_height==height))return;
+    mac_device_render_region(&region_width,&region_height);
+    width=(GLsizei)region_width;height=(GLsizei)region_height;
+    if(window_width<width||window_height<height)return;
+    if(window_width==width&&window_height==height){mac_post_capture((GLsizei)window_width,(GLsizei)window_height);return;}
     if(!mac_post_available())return;
     scale=(float)window_width/(float)width;scale_y=(float)window_height/(float)height;
     if(scale_y<scale)scale=scale_y;
+    if(scale>=2.0f) {
+        /* (a whole number of pixels each way: doubled, not blurred) */
+        float whole=(float)(int)(scale+0.5f),gap=scale-whole;
+        if(gap<0.0f)gap=-gap;
+        if(gap<0.005f*whole)filter=GL_NEAREST;
+    }
     w=(GLsizei)((float)width*scale+0.5f);h=(GLsizei)((float)height*scale+0.5f);
     mac_post_begin(0,0,width,height);
+    if(filter!=GL_LINEAR) {
+        glTexParameteri(GL_TEXTURE_RECTANGLE_ARB,GL_TEXTURE_MIN_FILTER,filter);
+        glTexParameteri(GL_TEXTURE_RECTANGLE_ARB,GL_TEXTURE_MAG_FILTER,filter);
+    }
     glViewport(0,0,(GLsizei)window_width,(GLsizei)window_height);
     glClearColor(0.0f,0.0f,0.0f,1.0f);glClear(GL_COLOR_BUFFER_BIT);
     mac_post_quad((window_width-w)/2,(window_height-h)/2,w,h,width,height);
+    if(filter!=GL_LINEAR) {
+        glTexParameteri(GL_TEXTURE_RECTANGLE_ARB,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_RECTANGLE_ARB,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    }
     mac_post_capture((GLsizei)window_width,(GLsizei)window_height);
     mac_post_end();
 }
@@ -3486,13 +3586,14 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle,CONST RECT *destinati
 {
     unsigned int *pixels,*destination;unsigned long y,pitch;
     GLint old_pack_alignment,old_pack_swap_bytes;GLenum readback_error;
+    unsigned region_width,region_height;
     mac_render_timing_stamp phase_stamp;
     (void)source_rectangle;(void)destination_rectangle;(void)unused;(void)unused2;
     if(!device.gpu||!device.gpu_frame_active||device.render_target!=&device.back_buffer) {
         fprintf(stderr,"D3D present requires the active native GPU back buffer frame\n");abort();
     }
     phase_stamp=mac_render_timing_begin(mac_render_timing_present_readback);
-    if(mac_render_scaled())mac_render_scale_resolve();
+    if(mac_render_scaled()&&gpu_render_scale<1.0f)mac_render_scale_resolve();
     mac_post_gamma(); /* port: display.gamma, over the finished picture */
     if(gpu_lazy_present&&!gpu_readback_requested) {
         mac_post_present_scaled(); /* port: a window larger than the game's picture */
@@ -3502,14 +3603,15 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle,CONST RECT *destinati
         return;
     }
     gpu_readback_requested=0;
-    pixels=(unsigned int *)malloc((size_t)device.gpu_width*(size_t)device.gpu_height*4);
+    mac_device_render_region(&region_width,&region_height);
+    pixels=(unsigned int *)malloc((size_t)region_width*(size_t)region_height*4);
     if(!pixels){fprintf(stderr,"D3D present readback allocation failed\n");abort();}
     glGetIntegerv(GL_PACK_ALIGNMENT,&old_pack_alignment);
     glGetIntegerv(GL_PACK_SWAP_BYTES,&old_pack_swap_bytes);
     glPixelStorei(GL_PACK_ALIGNMENT,4);glPixelStorei(GL_PACK_SWAP_BYTES,GL_FALSE);
     /* Packed BGRA produces native numeric ARGB words on either endian.
        ReadPixels completes the transfer without an additional glFinish. */
-    glReadPixels(0,0,(GLsizei)device.gpu_width,(GLsizei)device.gpu_height,
+    glReadPixels(0,0,(GLsizei)region_width,(GLsizei)region_height,
         GL_BGRA,GL_UNSIGNED_INT_8_8_8_8_REV,pixels);
     readback_error=glGetError();
     glPixelStorei(GL_PACK_ALIGNMENT,old_pack_alignment);
@@ -3517,9 +3619,21 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle,CONST RECT *destinati
     if(readback_error!=GL_NO_ERROR){free(pixels);fprintf(stderr,"D3D present framebuffer readback failed\n");abort();}
     pitch=(device.gpu_width*4+D3DTEXTURE_PITCH_ALIGNMENT-1)&~(unsigned long)(D3DTEXTURE_PITCH_ALIGNMENT-1);
     destination=(unsigned int *)PLATFORM_PHYSICAL_TO_VIRTUAL(device.back_buffer.Data);
-    for(y=0;y<device.gpu_height;y++)
-        memcpy(destination+(pitch/4)*y,pixels+(device.gpu_height-1-y)*device.gpu_width,
-            (size_t)device.gpu_width*4);
+    if(region_width==device.gpu_width&&region_height==device.gpu_height) {
+        for(y=0;y<device.gpu_height;y++)
+            memcpy(destination+(pitch/4)*y,pixels+(device.gpu_height-1-y)*device.gpu_width,
+                (size_t)device.gpu_width*4);
+    } else {
+        /* port: the game's memory holds its own size: the frame, drawn with
+           more pixels, sampled at the centre of each of the game's */
+        unsigned long x;
+        for(y=0;y<device.gpu_height;y++) {
+            unsigned long source_row=(2*(device.gpu_height-1-y)+1)*region_height/(2*device.gpu_height);
+            const unsigned int *row=pixels+source_row*region_width;
+            unsigned int *out=destination+(pitch/4)*y;
+            for(x=0;x<device.gpu_width;x++)out[x]=row[(2*x+1)*region_width/(2*device.gpu_width)];
+        }
+    }
     free(pixels);
     mac_post_present_scaled(); /* port: a window larger than the game's picture */
     mac_render_timing_end(mac_render_timing_present_readback,phase_stamp);

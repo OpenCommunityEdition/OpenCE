@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "mac_display_modes.h"
 
 extern void platform_video_window_size(int *width,int *height);
 extern int mac_window_resize_active(unsigned width,unsigned height);
@@ -40,24 +41,38 @@ static void display_sort(long *widths,long *heights,int count)
 	}
 }
 
+/* a number in a display mode's dictionary, or the fallback */
+static long display_mode_number(CFDictionaryRef mode,CFStringRef key,long fallback)
+{
+	CFNumberRef number=(CFNumberRef)CFDictionaryGetValue(mode,key);
+	int value=0;
+	if(!number||!CFNumberGetValue(number,kCFNumberIntType,&value))return fallback;
+	return value;
+}
+
+/* port: the display's own modes (CGDisplayAvailableModes, 10.4 to 10.6): at
+   least 640x480, not interlaced, safe for the hardware, with 24 or more bits a
+   pixel, each size once, the largest first. Those larger than the desktop's
+   mode are offered too: fullscreen switches to the mode (display.resolution).
+   The desktop's own mode is always there. */
 int platform_display_resolutions(long *widths,long *heights,int maximum)
 {
-	CGDirectDisplayID display=CGMainDisplayID();CFArrayRef modes;CGRect bounds;int count=0,index;
+	CGDirectDisplayID display=CGMainDisplayID();CFArrayRef modes;int count=0,index;
 	if(!widths||!heights||maximum<=0)return 0;
-	bounds=CGDisplayBounds(display);modes=CGDisplayAvailableModes(display);
+	modes=CGDisplayAvailableModes(display);
 	for(index=0;modes&&index<CFArrayGetCount(modes);index++) {
 		CFDictionaryRef mode=(CFDictionaryRef)CFArrayGetValueAtIndex(modes,index);
-		CFNumberRef width_number=(CFNumberRef)CFDictionaryGetValue(mode,kCGDisplayWidth);
-		CFNumberRef height_number=(CFNumberRef)CFDictionaryGetValue(mode,kCGDisplayHeight);
-		int width=0,height=0;
-		if(!width_number||!height_number||
-			!CFNumberGetValue(width_number,kCFNumberIntType,&width)||
-			!CFNumberGetValue(height_number,kCFNumberIntType,&height))continue;
-		if(width<640||height<480||width>bounds.size.width||height>bounds.size.height)continue;
+		long width=display_mode_number(mode,kCGDisplayWidth,0),height=display_mode_number(mode,kCGDisplayHeight,0);
+		/* (a mode that does not say is taken as safe and progressive) */
+		CFTypeRef safe=CFDictionaryGetValue(mode,kCGDisplayModeIsSafeForHardware);
+		CFTypeRef interlaced=CFDictionaryGetValue(mode,kCGDisplayModeIsInterlaced);
+		if(!mac_display_mode_usable(width,height,display_mode_number(mode,kCGDisplayBitsPerPixel,0),
+			safe!=kCFBooleanFalse,interlaced==kCFBooleanTrue))continue;
 		count=display_add(widths,heights,count,maximum,width,height);
 	}
 	/* (the system's array: CGDisplayAvailableModes follows the Get rule, and a
 	   release here left the second call with a freed one) */
+	count=display_add(widths,heights,count,maximum,(long)CGDisplayPixelsWide(display),(long)CGDisplayPixelsHigh(display));
 	display_sort(widths,heights,count);
 	return count;
 }

@@ -1532,43 +1532,86 @@ static void settings_help(struct widget_instance *list)
 	help->parameters.text_box.string_list_index = index;
 }
 
+/* a row's spinner (its label is the other child) */
+static struct widget_instance *row_spinner(struct widget_instance *row)
+{
+	struct widget_instance *child;
+
+	for (child = row ? row->child : NULL; child; child = child->next)
+	{
+		if (child->type == 2 && !spinner_item(child))
+			return child;
+	}
+	return NULL;
+}
+
 /* Video Setup's Resolution and Window Size, in the one row's place
 (tools/port_settings.py): the one the display mode shown uses (Window Size
 the window's, Resolution fullscreen's and borderless's) is shown, and the
-list passes over the other, which takes no focus while it is hidden */
+list passes over the other, which takes no focus while it is hidden. The
+Mac has each twice, the display's wide modes (16:10, 16:9 and wider) for
+Widescreen On and its 4:3 modes for Off (menu_tags.c, spinner_split): the
+pair the Widescreen row shows is the one used. A row that is hidden shows
+the value it was loaded with, so that a choice made before the other pair
+was shown does not reach the file with the one chosen */
 static void video_rows_show(struct widget_instance *list)
 {
 	struct widget_instance *mode = named(list, "mode_spinner", 0);
-	struct widget_instance *resolution = named(list, "op_resolution", 0);
-	struct widget_instance *window_size = named(list, "op_window_size", 0);
-	struct pc_menu_setting *setting;
+	struct widget_instance *screen = named(list, "widescreen_mac_spinner", 0);
+	struct widget_instance *rows[4];
+	struct pc_menu_setting *setting, *screen_setting;
 	struct widget_instance *shown, *child;
+	boolean windowed, wide;
 	short index;
 
 	/* (the Mac's own rows, tools/port_settings.py) */
 	if (!mode)
 		mode = named(list, "mode_mac_spinner", 0);
-	if (!resolution)
-		resolution = named(list, "op_resolution_mac", 0);
-	if (!window_size)
-		window_size = named(list, "op_window_size_mac", 0);
+	rows[0] = named(list, "op_resolution", 0);
+	if (!rows[0])
+		rows[0] = named(list, "op_resolution_mac", 0);
+	rows[1] = named(list, "op_resolution_mac_wide", 0);
+	rows[2] = named(list, "op_window_size", 0);
+	if (!rows[2])
+		rows[2] = named(list, "op_window_size_mac", 0);
+	rows[3] = named(list, "op_window_size_mac_wide", 0);
 	setting = mode ? pc_menu_setting_get(mode->definition_tag_index) : NULL;
 
-	if (!setting || !resolution || !window_size)
+	if (!setting || !rows[0] || !rows[2])
 		return;
 	index = mode->parameters.list.selected_index;
-	shown = index >= 0 && index < setting->value_count && !strcmp(setting->values[index], "windowed") ?
-		window_size : resolution;
-	resolution->visible = shown == resolution;
-	window_size->visible = shown == window_size;
-	/* (the focus on the one hidden goes to the one shown: Defaults can
-	change the mode while it has it) */
-	if (list->focused_child == (shown == resolution ? window_size : resolution))
+	windowed = index >= 0 && index < setting->value_count && !strcmp(setting->values[index], "windowed");
+	screen_setting = screen ? pc_menu_setting_get(screen->definition_tag_index) : NULL;
+	index = screen ? screen->parameters.list.selected_index : NONE;
+	wide = screen_setting && index >= 0 && index < screen_setting->value_count &&
+		!strcmp(screen_setting->values[index], "native");
+	shown = windowed ? (wide && rows[3] ? rows[3] : rows[2]) : (wide && rows[1] ? rows[1] : rows[0]);
+	for (index = 0; index < 4; index++)
 	{
-		for (index = 0, child = list->child; child && child != shown; child = child->next)
-			index++;
+		struct widget_instance *spinner;
+		struct pc_menu_setting *row_setting;
+
+		if (!rows[index])
+			continue;
+		rows[index]->visible = rows[index] == shown;
+		spinner = row_spinner(rows[index]);
+		row_setting = spinner ? pc_menu_setting_get(spinner->definition_tag_index) : NULL;
+		if (!rows[index]->visible && row_setting && row_setting->loaded_index >= 0 &&
+			row_setting->loaded_index < (short)spinner->parameters.list.number_of_items)
+			spinner->parameters.list.selected_index = row_setting->loaded_index;
+	}
+	/* (the focus on one hidden goes to the one shown: Defaults can change
+	the mode, and Widescreen the pair, while it has it) */
+	for (index = 0; index < 4; index++)
+	{
+		short place;
+
+		if (!rows[index] || rows[index] == shown || list->focused_child != rows[index])
+			continue;
+		for (place = 0, child = list->child; child && child != shown; child = child->next)
+			place++;
 		list->focused_child = shown;
-		list->parameters.list.selected_index = index;
+		list->parameters.list.selected_index = place;
 	}
 }
 

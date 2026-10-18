@@ -67,6 +67,9 @@ const struct mac_device_state *mac_device_state_get(void);
 /* With HALO_MAC_LAZY_PRESENT=1, the next present copies its frame into the
    back buffer's memory (others do not); without it every present does. */
 void mac_device_gpu_request_readback(void);
+/* port: the pixels the back buffer's frame is drawn with (the picture's own at the Xbox's scale,
+   more where mac.render_resolution asks), for the textures made of it */
+void mac_device_render_region(unsigned *width,unsigned *height);
 /* display.anti_aliasing "fxaa": the 3D view's bounds (the game's coordinates) smoothed in place; 0 if not done */
 int mac_device_post_fxaa(int x0,int y0,int x1,int y1);
 unsigned long long mac_device_state_constant_serial(void);

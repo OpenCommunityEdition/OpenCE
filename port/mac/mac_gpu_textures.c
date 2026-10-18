@@ -677,7 +677,10 @@ static unsigned back_buffer_copy_width, back_buffer_copy_height;
 static unsigned back_buffer_copied(const struct mac_device_state *device)
 {
     GLint old_framebuffer = 0, old_texture = 0;
-    unsigned width = device->gpu_width, height = device->gpu_height;
+    unsigned width, height;
+    /* port: the pixels the frame is drawn with (more than the game's where mac.render_resolution
+       asks); the game addresses the texture by fractions of it, so any size serves */
+    mac_device_render_region(&width, &height);
     if (!width || !height) return 0;
     glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &old_framebuffer);
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &old_texture);
@@ -727,8 +730,9 @@ static void back_buffer_blit_find(void)
 static unsigned back_buffer_flipped(const struct mac_device_state *device)
 {
     GLint old_framebuffer = 0, old_texture = 0;
-    unsigned width = device->gpu_width, height = device->gpu_height;
+    unsigned width, height;
     GLuint source = (GLuint)device->gpu_default_framebuffer;
+    mac_device_render_region(&width, &height); /* port: as back_buffer_copied */
     if (!width || !height) return 0;
     if (back_buffer_flip_texture && back_buffer_flip_valid &&
         back_buffer_flip_writes == device->gpu_back_buffer_writes &&

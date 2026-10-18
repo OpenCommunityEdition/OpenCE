@@ -811,13 +811,30 @@ static long spinner_split(struct halo_menu_widget const *widget, boolean values,
 	if (widget->setting && !strcmp(widget->setting, "display.resolution"))
 		added = platform_display_resolutions(widths, heights, (int)(MAXIMUM_STRINGS - count));
 	else if (widget->setting && !strcmp(widget->setting, "display.window_size"))
-	{
 		added = platform_window_sizes(widths, heights, MAXIMUM_STRINGS);
-		if (added > 0)
-			count = 0;
-	}
 	else
 		return count;
+	/* the Mac's pairs of rows, for Widescreen On and Off: the wide modes (wider than 3:2) or
+	the 4:3 ones (tools/port_settings.py; menu_functions.c shows the pair that is used) */
+	if (added > 0 && widget->name && (strstr(widget->name, "_mac_wide_") || strstr(widget->name, "_mac_spinner")))
+	{
+		boolean wide = strstr(widget->name, "_mac_wide_") != NULL;
+		long kept = 0;
+
+		for (index = 0; index < added; index++)
+		{
+			if ((widths[index] * 2 > heights[index] * 3) == wide)
+			{
+				widths[kept] = widths[index];
+				heights[kept] = heights[index];
+				kept++;
+			}
+		}
+		added = kept;
+	}
+	/* (the window sizes are all of the list's own: a list with none keeps the one it was given) */
+	if (added > 0 && !strcmp(widget->setting, "display.window_size"))
+		count = 0;
 	for (index = 0; index < added; index++)
 	{
 		char text[32];

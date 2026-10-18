@@ -53,7 +53,7 @@ SCREENS = {
         # (rows in the place of the row before them: Window Size in
         # Resolution's, port/linux/game/menu_functions.c showing the one the
         # display mode chosen uses; Android's anti-aliasing in the desktop's)
-        "same_place": ["display.window_size", "anti_aliasing_android"],
+        "same_place": ["display.window_size", "resolution_mac_wide", "anti_aliasing_android"],
         "rows": [
             ("DISPLAY MODE:", "display.mode",
              [("FULLSCREEN", "fullscreen"), ("BORDERLESS", "borderless"), ("WINDOWED", "windowed")],
@@ -76,12 +76,20 @@ SCREENS = {
             # (no more of either than the picture's own shape: black bars);
             # menu_functions.c shows the one the display mode chosen uses, as
             # for the desktop's two)
+            # (a pair of each, for Widescreen On and Off: the 4:3 modes and the wide ones, which
+            # menu_tags.c fills from the display and menu_functions.c shows by the Widescreen row)
             ("RESOLUTION:", "display.resolution", [("NATIVE", "native")],
              "The display's mode when fullscreen takes it (from\nthe next start); Native keeps the desktop's.", "mac",
              "resolution_mac"),
+            ("RESOLUTION:", "display.resolution", [("NATIVE", "native")],
+             "The display's mode when fullscreen takes it (from\nthe next start); Native keeps the desktop's.", "mac",
+             "resolution_mac_wide"),
             ("WINDOW SIZE:", "display.window_size", [("640 x 480", "640x480")],
              "The window's size: the game's picture is scaled to\nit (its edges can also be dragged).", "mac",
              "window_size_mac"),
+            ("WINDOW SIZE:", "display.window_size", [("1280 x 720", "1280x720")],
+             "The window's size: the game's picture is scaled to\nit (its edges can also be dragged).", "mac",
+             "window_size_mac_wide"),
             ("RESOLUTION SCALING:", "display.resolution_scaling", [("NATIVE", "native"), ("ORIGINAL", "original")],
              "Native draws at the resolution; Original draws\nthe Xbox's 640x480 and scales it up.", "desktop web"),
             # (the Mac's: a wider picture for a wider window or display, 480
@@ -89,7 +97,7 @@ SCREENS = {
             # Xbox's 640x480 with bars; the setting the desktop's Resolution
             # Scaling is, port/mac/mac_window.c)
             ("WIDESCREEN:", "display.resolution_scaling", [("ON", "native"), ("OFF", "original")],
-             "On: a window or display wider than 4:3 shows a wider\nview. Off: the Xbox's 4:3 picture, with bars.", "mac",
+             "On: a wider view for a wider window, with the wide\nmodes listed. Off: the 4:3 picture, and 4:3 modes.", "mac",
              "widescreen_mac"),
             ("V-SYNC:", "display.vsync", ON_OFF,
              "Wait for the display between frames, so that the\npicture never tears.", None),
@@ -132,6 +140,14 @@ SCREENS = {
             ("DETAIL:", "mac.detail",
              [("AUTO", "auto"), ("HIGH", "high"), ("LOW", "low"), ("LOWEST", "lowest")],
              "High draws as the Xbox did; Low leaves out specular,\nshadows, decals and small things. Auto picks by Mac.",
+             "mac"),
+            # (the Mac's: the pixels a frame is drawn with, port/mac/engine_device_state.c; every
+            # choice on every Mac, the default by the card)
+            ("RENDER RESOLUTION:", "mac.render_resolution",
+             [("AUTO", "auto"), ("NATIVE", "native"), ("480 LINES", "original"), ("600 LINES", "600"),
+              ("720 LINES", "720"), ("768 LINES", "768"), ("900 LINES", "900"), ("1080 LINES", "1080"),
+              ("1440 LINES", "1440")],
+             "Native draws the window's pixels, 480 the Xbox's,\nscaled up. More than the card holds is cut down.",
              "mac"),
             ("TEXTURE QUALITY:", "mac.texture_skip_levels",
              [("AUTO", "-1"), ("HIGH", "0"), ("MEDIUM", "1"), ("LOW", "2"), ("LOWEST", "3")],
@@ -249,7 +265,7 @@ SCREENS = {
 # Video Setup's categories open ordinary settings screens. Each has the same
 # pending edits, Defaults, OK and Cancel as the other settings screens.
 _video = SCREENS["video_settings"]
-_graphics = {"mac.detail", "mac.texture_skip_levels", "display.high_res_hud", "display.hud_button_style", "display.high_res_text", "display.anti_aliasing",
+_graphics = {"mac.detail", "mac.render_resolution", "mac.texture_skip_levels", "display.high_res_hud", "display.hud_button_style", "display.high_res_text", "display.anti_aliasing",
              "display.shadow_resolution", "display.per_pixel_lighting",
              "display.shield_glow", "display.shield_glow_intensity"}
 SCREENS["video_settings/graphics"] = {
