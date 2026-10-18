@@ -8,7 +8,8 @@
    for the startup dialog (launcher_dialog.c) and the Option key. Plain gnu89.
 
    Usage: PowerSpark [--dry-run] [--setup | --controller-setup] [--data-source
-   auto|xbox|retail] [--dialog | --no-dialog | --dialog-dump] [game arguments]
+   auto|xbox|retail] [--dialog | --no-dialog | --dialog-dump |
+   --dialog-layout] [game arguments]
      --dry-run          print what would be run (folders, data, settings set,
                         the game's command) and do nothing else
      --setup            open PowerSpark Setup (the Xbox disc image) and quit
@@ -17,6 +18,8 @@
      --no-dialog        do not show it (so does HALO_MAC_LAUNCHER_DIALOG=0, and
                         game arguments: they mean a scripted run)
      --dialog-dump      print what the dialog would show, and quit; no window
+     --dialog-layout    print each control's rectangle and its text's width, and
+                        quit with 1 if some text does not fit its control
    The startup dialog (settings, Play, Quit, Setup, Controller Setup) opens
    before the game unless "Don't show this at startup" was checked (the file
    startup-dialog holds "off"); holding Option while the app opens shows it
@@ -389,7 +392,7 @@ int main(int argc, char **argv)
 	uint32_t size = sizeof(exe);
 	int i, nargs = 0, want_setup = 0, want_controller = 0, have_retail = 0, have_xbox = 0, use_xbox = 0;
 	int config_dir_support;
-	int force_dialog = 0, no_dialog = 0, dialog_dump = 0;
+	int force_dialog = 0, no_dialog = 0, dialog_dump = 0, dialog_layout = 0;
 	struct lc_model dialog_model;
 	const char *dialog_env;
 	time_t now;
@@ -410,6 +413,8 @@ int main(int argc, char **argv)
 			force_dialog = 1;
 		else if (strcmp(argv[i], "--no-dialog") == 0)
 			no_dialog = 1;
+		else if (strcmp(argv[i], "--dialog-layout") == 0)
+			dialog_layout = dry_run = 1;
 		else if (strcmp(argv[i], "--dialog-dump") == 0)
 			dialog_dump = dry_run = 1;	/* (it writes and runs nothing) */
 		else if (strcmp(argv[i], "--data-source") == 0 && i + 1 < argc)
@@ -565,6 +570,11 @@ int main(int argc, char **argv)
 	snprintf(dialog_model.data_source, sizeof(dialog_model.data_source), "%s", source_name);
 	snprintf(dialog_model.data_source_original, sizeof(dialog_model.data_source_original), "%s", source_name);
 	dialog_model.hide = dialog_model.hide_original = read_dialog_hidden();
+	if (dialog_layout)
+	{
+		/* (no window: each control's rectangle and its text's width in the system font; 1 if some text does not fit) */
+		return ld_layout_report(&dialog_model, stdout) != 0;
+	}
 	if (dialog_dump)
 	{
 		int modes[64][2], n = ld_modes(modes, 64);

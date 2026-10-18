@@ -49,8 +49,8 @@ turned off, hold Option while the app opens.
 ## Startup dialog
 
 PowerSpark opens a window before the game, as MacSoft's Halo and Halo PC do: Display (Full
-Screen or Windowed, Resolution from the display's modes, Widescreen, V-Sync, Smooth
-motion, Frame rate limit), Graphics (Detail, Texture quality, Anti-aliasing, Shadow
+Screen or Windowed, Resolution from the display's modes, Render resolution
+(`mac.render_resolution`), Widescreen, V-Sync, Smooth motion, Frame rate limit), Graphics (Detail, Texture quality, Anti-aliasing, Shadow
 quality, Gamma, High-resolution HUD and text, Per-pixel lighting), Sound (on, Reverb,
 Volume), Options (Play intro movies, Achievements, the Game data source, Set Up from
 Disc Image, Controller Setup), and Play (Return), Quit (Escape, Command-Q) and "Don't
@@ -58,7 +58,7 @@ show this at startup". Every option is shown on every Mac, PowerPC or Intel; onl
 defaults differ with the card (`mac.detail` auto), and the game limits at run time what
 a card cannot do. Play writes the settings that were changed to `config.toml` with the
 keys the game's Settings menus use (`display.mode`, `display.resolution`,
-`display.window_size`, `display.resolution_scaling`, `display.vsync`, `display.max_fps`,
+`display.window_size`, `display.resolution_scaling`, `mac.render_resolution`, `display.vsync`, `display.max_fps`,
 `display.interpolation`, `display.gamma`, `display.high_res_hud`, `display.high_res_text`,
 `display.anti_aliasing`, `display.shadow_resolution`, `display.per_pixel_lighting`,
 `mac.detail`, `mac.texture_skip_levels`, `audio.enabled`, `audio.volume`, `audio.reverb`,
@@ -67,7 +67,10 @@ keeps the rest of the file as it is. The data source goes to the `data-source` f
 "Don't show this at startup" writes `off` to the file `startup-dialog` in the support
 folder. The dialog is not shown for scripted runs: with game arguments, `--no-dialog`
 or `HALO_MAC_LAUNCHER_DIALOG=0`. `--dialog` shows it anyway; `--dialog-dump` prints
-what it would show, without a window.
+what it would show, without a window; `--dialog-layout` prints each control's rectangle
+and its text's width in the system font and exits 1 if a text does not fit its control
+(the labels beside the popups are as wide as their longest text, so a longer translation
+makes the popups narrower, not the text cut). Hovering a control shows a help tag.
 
 ## Game data
 

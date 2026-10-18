@@ -29,6 +29,7 @@ settings[LC_COUNT] =
 	{ "display.per_pixel_lighting", T_BOOL, "false" },
 	{ "mac.detail", T_STRING, "auto" },
 	{ "mac.texture_skip_levels", T_INT, "-1" },
+	{ "mac.render_resolution", T_STRING, "auto" },
 	{ "audio.enabled", T_BOOL, "true" },
 	{ "audio.volume", T_REAL, "1.0" },
 	{ "audio.reverb", T_BOOL, "true" },

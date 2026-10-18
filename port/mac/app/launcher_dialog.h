@@ -19,4 +19,7 @@ int ld_run(struct lc_model *model, const struct ld_env *env);
 /* the display's modes of 640x480 or more, widest first (one of each size); the count */
 int ld_modes(int modes[][2], int max);
 
+/* prints every control's rectangle and its text's width (no window); the number of items that do not fit */
+int ld_layout_report(struct lc_model *model, FILE *out);
+
 #endif
