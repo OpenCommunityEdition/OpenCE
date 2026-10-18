@@ -686,6 +686,19 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
 
     objects="$objects $out/mac_engine_session_probe_gpu_$arch.o"
     printf '%s\n' $objects > "$out/engine_objects_$arch.txt"
+
+    # port: a name defined by two of these objects is a link that fails some
+    # minutes from here, saying what collided but not why. The same list read
+    # with nm says it now, and names both objects, in seconds. Every one of
+    # the three builds internet play cost was this: a unit that stopped being
+    # compiled whose manifest object was still linked beside the new one.
+    if ! sh tools/mac_duplicate_symbols.sh "$out/engine_objects_$arch.txt" "$arch" \
+        > "$out/duplicate_symbols_$arch.txt" 2>&1; then
+        cat "$out/duplicate_symbols_$arch.txt" >&2
+        echo "$arch: see $out/duplicate_symbols_$arch.txt" >&2
+        exit 1
+    fi
+    cat "$out/duplicate_symbols_$arch.txt"
     {
         echo "base-manifest: $base/engine_objects_$arch.txt"
         echo "incremental: ${MAC_RENDERED_SESSION_INCREMENTAL:-0}"
