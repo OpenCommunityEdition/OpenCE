@@ -233,6 +233,9 @@ struct gamepad_device {
        (an adapter may answer a poll with a canned frame, and a pad's
        elements are only as fresh as the driver's last report). */
     int raw_kind, raw_seen, raw_bad;
+    /* when a report last came (or the pad was opened): a streaming pad that falls silent is asleep */
+    CFAbsoluteTime raw_last;
+    int asleep;
     /* rumble (mac_gamepad_rumble): the pad is on USB (the Bluetooth output
        reports carry a checksum, not made), what it was last told and when */
     int usb, rumble_failed;
@@ -448,6 +451,7 @@ static void raw_report(void *target, IOReturn result, void *refcon, void *sender
     if (mac_gamepad_decode_report(pad->raw_kind, pad->raw_buffer, size, &frame, NULL)) {
         pad->raw_frame = frame;
         pad->raw_seen = 1;
+        pad->raw_last = CFAbsoluteTimeGetCurrent();
     } else if (pad->raw_bad < RAW_BAD_LIMIT && !pad->raw_seen)
         ++pad->raw_bad;
 }
@@ -466,6 +470,7 @@ static void device_raw_start(struct gamepad_device *pad)
         pad->raw_kind = MAC_PAD_REPORT_NONE;
         return;
     }
+    pad->raw_last = CFAbsoluteTimeGetCurrent();
     CFRunLoopAddSource(CFRunLoopGetCurrent(), pad->raw_source, RAW_MODE);
 }
 
@@ -609,6 +614,18 @@ static int device_poll(struct gamepad_device *pad, struct mac_gamepad_frame *out
             pad_lost((int)(pad - pads));
             return 0;
         }
+        if (mac_gamepad_stream_silent(pad->raw_kind, CFAbsoluteTimeGetCurrent() - pad->raw_last)) {
+            /* (the pad is asleep or out of range, the adapter still there: not connected, nothing held,
+               and the slot kept for when its reports resume) */
+            if (!pad->asleep && reported < 16) { ++reported; fprintf(stderr, "game pad: %s is silent (asleep or out of range)\n", pad->name); }
+            pad->asleep = 1;
+            memset(out, 0, sizeof(*out));
+            return 1;
+        }
+        if (pad->asleep) {
+            pad->asleep = 0;
+            if (reported < 16) { ++reported; fprintf(stderr, "game pad: %s is back\n", pad->name); }
+        }
         if (pad->raw_seen)
             *out = pad->raw_frame;
         else {
@@ -736,6 +753,11 @@ void mac_gamepad_stop(void)
 const char *mac_gamepad_name_at(int slot)
 {
     return slot >= 0 && slot < MAC_GAMEPAD_MAXIMUM_DEVICES && pads[slot].interface ? pads[slot].name : "";
+}
+
+int mac_gamepad_asleep_at(int slot)
+{
+    return slot >= 0 && slot < MAC_GAMEPAD_MAXIMUM_DEVICES && pads[slot].interface && pads[slot].asleep;
 }
 
 int mac_gamepad_is_playstation_at(int slot)

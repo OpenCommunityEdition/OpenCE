@@ -313,6 +313,14 @@ int main(void)
         }
     }
 
+    /* the silence timeout: only the streaming kind, only past a second */
+    CHECK(!mac_gamepad_stream_silent(MAC_PAD_REPORT_8BITDO_DINPUT, 0.0));
+    CHECK(!mac_gamepad_stream_silent(MAC_PAD_REPORT_8BITDO_DINPUT, 1.0));
+    CHECK(mac_gamepad_stream_silent(MAC_PAD_REPORT_8BITDO_DINPUT, 1.01));
+    CHECK(mac_gamepad_stream_silent(MAC_PAD_REPORT_8BITDO_DINPUT, 600.0));
+    CHECK(!mac_gamepad_stream_silent(MAC_PAD_REPORT_DUALSHOCK4, 600.0));
+    CHECK(!mac_gamepad_stream_silent(MAC_PAD_REPORT_DUALSENSE, 600.0));
+    CHECK(!mac_gamepad_stream_silent(MAC_PAD_REPORT_NONE, 600.0));
     printf("%d checks, %d failures\n", checks, failures);
     return failures != 0;
 }

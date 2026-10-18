@@ -63,6 +63,10 @@ void mac_gamepad_map(const struct mac_gamepad_element *elements,
    ids, as it pairs, and keeps its player). */
 int mac_gamepad_poll_all(struct mac_gamepad_frame frames[MAC_GAMEPAD_MAXIMUM_DEVICES]);
 const char *mac_gamepad_name_at(int slot);
+/* whether the slot's pad is open but silent: an adapter that streams all the time (Dinput mode) has sent
+   no report for a second, its pad asleep or out of range. The slot is not connected (neutral input, as an
+   unplugged pad) and keeps its pad: the reports resuming (PS pressed) connect it again. */
+int mac_gamepad_asleep_at(int slot);
 /* whether the slot's pad is a Sony pad (a DualShock 4 or DualSense, or an
    adapter presenting itself as one): for the PlayStation button names */
 int mac_gamepad_is_playstation_at(int slot);

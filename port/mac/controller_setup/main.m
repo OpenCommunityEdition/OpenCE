@@ -35,6 +35,7 @@ static NSString *const kStatusWaiting = @"No input received yet: press a button 
 static NSString *const kStatusReceiving = @"Receiving input";
 static NSString *const kStatusSilent = @"Controller found but sending nothing: make sure it's paired (LED solid) and press a button.";
 static NSString *const kStatusQuiet = @"Receiving input earlier, quiet now: press a button.";
+static NSString *const kStatusAsleep = @"Controller asleep or out of range: press the PS button to reconnect.";
 static NSString *const kStatusAdapterIdle = @"Adapter found, waiting for a controller: pair it now (adapter button, then Create + PS).";
 #define SILENCE_SECONDS 4.0
 
@@ -185,6 +186,7 @@ static int DeviceNumber(IOHIDDeviceRef device, CFStringRef key)
 	NSMutableDictionary *reportBuffers; /* NSValue of IOHIDDeviceRef -> NSMutableData */
 	IOHIDDeviceRef chosen;
 	int reportKind;       /* MAC_PAD_REPORT_*: the chosen pad's reports are decoded */
+	BOOL asleep;          /* the chosen pad's reports stopped (see refresh) */
 	BOOL reportSeen;      /* a report of the chosen pad decoded: its elements are then ignored */
 	unsigned long inputCount;
 	CFAbsoluteTime chosenAt, lastInput;
@@ -379,11 +381,11 @@ static CFMutableDictionaryRef MatchPage(int page, int usage)
    wrapping, which is a little wider than the theme's. */
 - (float)statusHeight
 {
-	NSString *all[6];
+	NSString *all[7];
 	float h = 0;
 	int i;
-	all[0] = kStatusNoPad; all[1] = kStatusWaiting; all[2] = kStatusReceiving; all[3] = kStatusSilent; all[4] = kStatusQuiet; all[5] = kStatusAdapterIdle;
-	for (i = 0; i < 6; i++) {
+	all[0] = kStatusNoPad; all[1] = kStatusWaiting; all[2] = kStatusReceiving; all[3] = kStatusSilent; all[4] = kStatusQuiet; all[5] = kStatusAdapterIdle; all[6] = kStatusAsleep;
+	for (i = 0; i < 7; i++) {
 		float t = ThemeSize(all[i], kThemeSmallSystemFont, 490, YES).height;
 		if (t > h)
 			h = t;
@@ -501,13 +503,13 @@ static int DumpView(NSView *view, int depth, NSString *indent)
 
 - (void)dumpText
 {
-	NSString *all[6];
+	NSString *all[7];
 	int i, bad;
 	NSRect f = [[window contentView] frame];
-	all[0] = kStatusNoPad; all[1] = kStatusWaiting; all[2] = kStatusReceiving; all[3] = kStatusSilent; all[4] = kStatusQuiet; all[5] = kStatusAdapterIdle;
+	all[0] = kStatusNoPad; all[1] = kStatusWaiting; all[2] = kStatusReceiving; all[3] = kStatusSilent; all[4] = kStatusQuiet; all[5] = kStatusAdapterIdle; all[6] = kStatusAsleep;
 	printf("window %dx%d\n", (int)f.size.width, (int)f.size.height);
 	bad = DumpView([window contentView], 0, @"  ");
-	for (i = 0; i < 6; i++) {
+	for (i = 0; i < 7; i++) {
 		NSSize n = ThemeSize(all[i], kThemeSmallSystemFont, 496, YES);
 		NSRect sf = [status frame];
 		printf("status %d needs %dx%d in %dx%d%s: %s\n", i, (int)n.width, (int)n.height, (int)sf.size.width, (int)sf.size.height,
@@ -620,6 +622,7 @@ static int DumpView(NSView *view, int depth, NSString *indent)
 	if (best != chosen) {
 		chosen = best;
 		reportSeen = NO;
+		asleep = NO;
 		reportKind = best ? mac_gamepad_report_kind((unsigned)DeviceNumber(best, CFSTR(kIOHIDVendorIDKey)),
 			(unsigned)DeviceNumber(best, CFSTR(kIOHIDProductIDKey))) : MAC_PAD_REPORT_NONE;
 		inputCount = 0;
@@ -738,6 +741,7 @@ static int DumpView(NSView *view, int depth, NSString *indent)
 
 	if (!chosen || device != chosen || length <= 0 || length > 256)
 		return;
+	asleep = NO;
 	[self noteInput];
 	if (reportKind == MAC_PAD_REPORT_NONE)
 		return;
@@ -764,6 +768,16 @@ static int DumpView(NSView *view, int depth, NSString *indent)
 
 	if (!chosen)
 		text = [self adapterWaiting] ? kStatusAdapterIdle : kStatusNoPad;
+	else if (mac_gamepad_stream_silent(reportKind, now - (inputCount > 0 ? lastInput : chosenAt))) {
+		/* the adapter streams all the time: none for a second is a pad asleep or out of range, not a pad at rest */
+		text = kStatusAsleep;
+		if (!asleep) {
+			asleep = YES;
+			reportSeen = NO;
+			cs_pad_clear(&padView->pad, [self layoutOf:chosen]);
+			[padView setNeedsDisplay:YES];
+		}
+	}
 	else if (inputCount > 0 && now - lastInput < SILENCE_SECONDS)
 		text = kStatusReceiving;
 	else if (inputCount > 0)

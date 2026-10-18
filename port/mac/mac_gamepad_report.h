@@ -82,6 +82,18 @@ enum {
 unsigned mac_gamepad_dinput_button(unsigned number);
 unsigned mac_gamepad_psclassic_button(unsigned number);
 
+/* A pad that streams reports all the time (the adapter in Dinput mode sends
+   about 235 a second, still or not) and has sent none for this long is
+   asleep or out of range: the adapter stays enumerated. The pad is then
+   not connected (neutral, nothing held) until its reports resume. */
+#define MAC_PAD_STREAM_TIMEOUT_SECONDS 1.0
+
+/* Whether the pad of this report kind is silent: seconds is the time since
+   its last report, or since it was opened when none has come. Only a
+   streaming kind can be silent; a DualShock 4 on the adapter's automatic
+   mode sends only when something changes, so its silence is a pad at rest. */
+int mac_gamepad_stream_silent(int kind, double seconds);
+
 /* the report layout of a Sony id, or MAC_PAD_REPORT_NONE */
 int mac_gamepad_report_kind(unsigned vendor, unsigned product);
 /* the pad's name for lists, or "" */

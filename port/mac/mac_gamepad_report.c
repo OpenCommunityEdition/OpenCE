@@ -13,6 +13,11 @@ int mac_gamepad_report_kind(unsigned vendor, unsigned product)
     return MAC_PAD_REPORT_NONE;
 }
 
+int mac_gamepad_stream_silent(int kind, double seconds)
+{
+    return kind == MAC_PAD_REPORT_8BITDO_DINPUT && seconds > MAC_PAD_STREAM_TIMEOUT_SECONDS;
+}
+
 const char *mac_gamepad_report_name(int kind)
 {
     return kind == MAC_PAD_REPORT_DUALSHOCK4 ? "DualShock 4" :
