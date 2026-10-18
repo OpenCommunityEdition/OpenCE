@@ -3,6 +3,12 @@
 Each spike is a stand-alone C program for arm64 macOS that settles one
 question the macOS host depends on, and prints PASS or FAIL: <reason> as its
 last line. No game data needed. Skipped on anything but arm64 macOS.
+docs/macos_host.md records the results.
+
+Two spikes fail on macOS 26, and are expected to: a process cannot map the
+guest's range below 4 GB, and the kernel overwrites TPIDR_EL0. They are
+strict expected failures, so a macOS that allows either makes them pass and
+this test fail, which is the signal to look again at the in-process host.
 """
 
 import platform
@@ -21,16 +27,24 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def build_and_run(tmp_path, source, flags=()):
-    exe = tmp_path / Path(source).stem
+def build_and_run(directory, source, flags=(), entitlements=None):
+    directory.mkdir(parents=True, exist_ok=True)
+    exe = directory / Path(source).stem
     build = subprocess.run(
         ["clang", "-O1", "-Wall", "-Werror", str(SPIKES / source), "-o", str(exe), *flags],
         capture_output=True, text=True,
     )
     if build.returncode != 0:
         return False, "build failed:\n" + build.stderr
+    if entitlements:
+        sign = subprocess.run(
+            ["codesign", "-s", "-", "-f", "--entitlements", str(SPIKES / entitlements), str(exe)],
+            capture_output=True, text=True,
+        )
+        if sign.returncode != 0:
+            return False, "codesign failed:\n" + sign.stderr
     try:
-        result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=30)
+        result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60)
     except subprocess.TimeoutExpired:
         return False, "timed out"
     output = (result.stdout + result.stderr).strip()
@@ -38,22 +52,25 @@ def build_and_run(tmp_path, source, flags=()):
     return result.returncode == 0 and last == "PASS", output
 
 
+@pytest.mark.xfail(strict=True, reason="arm64 macOS refuses memory below 4 GB to a process")
 def test_low_memory(tmp_path):
-    # Either a host linked with a small page-zero, or one that frees the
-    # range below 4 GB at start-up, must be able to map the guest's range.
-    (tmp_path / "small").mkdir()
-    (tmp_path / "default").mkdir()
+    # A host linked with a small page-zero is killed at exec; one with the
+    # default page-zero cannot allocate below 4 GB even after freeing it.
     small = build_and_run(tmp_path / "small", "low_memory.c", ["-Wl,-pagezero_size,0x4000"])
     default = build_and_run(tmp_path / "default", "low_memory.c")
     assert small[0] or default[0], (
         "small page-zero:\n" + small[1] + "\n\ndefault page-zero:\n" + default[1])
 
 
-def test_exec_image(tmp_path):
-    ok, output = build_and_run(tmp_path, "exec_image.c", ["-Wl,-pagezero_size,0x4000"])
+@pytest.mark.xfail(strict=True, reason="the macOS kernel overwrites TPIDR_EL0 on a context switch")
+def test_thread_pointer(tmp_path):
+    ok, output = build_and_run(tmp_path, "thread_pointer.c", ["-lpthread"])
     assert ok, output
 
 
-def test_thread_pointer(tmp_path):
-    ok, output = build_and_run(tmp_path, "thread_pointer.c", ["-lpthread"])
+def test_hypervisor(tmp_path):
+    # The guest's address space inside a VM: code runs at 0x80000000 and
+    # each hvc returns to the host.
+    ok, output = build_and_run(tmp_path, "hypervisor.c", ["-framework", "Hypervisor"],
+                               entitlements="hypervisor.entitlements")
     assert ok, output
