@@ -394,6 +394,7 @@ static char const *const port_function_names[] =
 	/* (the main menu's Mods: menu_functions.c) */
 	"port mods init", "port mods close", "port mods toggle", "port mods move up", "port mods move down",
 	"port mods save",
+	"port changelog init", "port changelog up", "port changelog down",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from

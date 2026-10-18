@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Player notes (tools/changelog_menu.py) -->
+<menus>
+	<bitmap name="main_menu/menu_changelog">
+		<frame png="ce/port/main_menu/menu_changelog__0.png" width="256" height="64"/>
+		<frame png="ce/port/main_menu/menu_changelog__1.png" width="256" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/changelog/header_changelog">
+		<frame png="ce/port/main_menu/changelog/header_changelog.png" width="512" height="64"/>
+	</bitmap>
+	<widget name="main_menu/main_menu_item_changelog" type="text" width="256" height="33" bitmap="main_menu/menu_changelog">
+		<on event="a start" open="main_menu/changelog/build_1"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/changelog/header_changelog" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/changelog/header_changelog">
+	</widget>
+	<strings name="main_menu/changelog/build_1/lines">
+		<string text=""/>
+		<string text="- Fixed screen fades in MCC campaign"/>
+		<string text="  maps."/>
+		<string text="- Fixed a dark layer over Frogfoot's"/>
+		<string text="  water."/>
+		<string text="- Fixed missing light glows on AMD"/>
+		<string text="  graphics cards."/>
+		<string text="- Improved rendering performance on"/>
+		<string text="  NVIDIA graphics cards."/>
+		<string text=""/>
+		<string text=""/>
+		<string text="- Fixed repeat races in Rally and weapon"/>
+		<string text="  movement speeds in Bigass."/>
+		<string text="- Fixed repeated equipment selection in"/>
+		<string text="  MeinCrap."/>
+		<string text=""/>
+		<string text=""/>
+		<string text="- Added streamer mode to hide offensive"/>
+		<string text="  words in names and other text."/>
+		<string text="- Mute a player's voice and text chat from"/>
+		<string text="  the scoreboard."/>
+		<string text=""/>
+		<string text=""/>
+		<string text="- Added text chat for private multiplayer"/>
+		<string text="  games."/>
+		<string text="- Raised the maximum map sharing"/>
+		<string text="  speeds."/>
+		<string text=""/>
+		<string text=""/>
+		<string text="- Access multiplayer chat settings from"/>
+		<string text="  the pause menu, including co-op."/>
+		<string text="- Refreshed the browser launcher with a"/>
+		<string text="  clearer Ready to Play screen."/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+	</strings>
+	<strings name="main_menu/changelog/build_1/headings">
+		<string text="GRAPHICS"/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text="GAMEPLAY"/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text="QUALITY OF LIFE"/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text="MULTIPLAYER"/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text="INTERFACE"/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+		<string text=""/>
+	</strings>
+	<widget name="main_menu/changelog/build_1" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game no_history" bitmap="bitmaps/gradient">
+		<on event="b back start" back="true"/>
+		<on event="created" run="port changelog init"/>
+		<on event="up stick_up" run="port changelog up"/>
+		<on event="down stick_down" run="port changelog down"/>
+		<child widget="main_menu/changelog/header_changelog"/>
+		<child widget="main_menu/changelog/build_1/build_number"/>
+		<child widget="main_menu/changelog/build_1/label"/>
+		<child widget="main_menu/changelog/build_1/heading"/>
+		<child widget="main_menu/changelog/build_1/date"/>
+		<child widget="main_menu/changelog/build_1/row_0"/>
+		<child widget="main_menu/changelog/build_1/row_1"/>
+		<child widget="main_menu/changelog/build_1/row_2"/>
+		<child widget="main_menu/changelog/build_1/row_3"/>
+		<child widget="main_menu/changelog/build_1/row_4"/>
+		<child widget="main_menu/changelog/build_1/row_5"/>
+		<child widget="main_menu/changelog/build_1/row_6"/>
+		<child widget="main_menu/changelog/build_1/row_7"/>
+		<child widget="main_menu/changelog/build_1/heading_row_0"/>
+		<child widget="main_menu/changelog/build_1/heading_row_1"/>
+		<child widget="main_menu/changelog/build_1/heading_row_2"/>
+		<child widget="main_menu/changelog/build_1/heading_row_3"/>
+		<child widget="main_menu/changelog/build_1/heading_row_4"/>
+		<child widget="main_menu/changelog/build_1/heading_row_5"/>
+		<child widget="main_menu/changelog/build_1/heading_row_6"/>
+		<child widget="main_menu/changelog/build_1/heading_row_7"/>
+		<child widget="main_menu/changelog/build_1/scroll_position"/>
+		<child widget="main_menu/changelog/build_1/instructions"/>
+		<child widget="main_menu/changelog/build_1/buttons" y="414"/>
+		<child widget="main_menu/changelog/build_1/scroll_up" x="480" y="314"/>
+		<child widget="main_menu/changelog/build_1/scroll_down" x="480" y="342"/>
+	</widget>
+	<widget name="main_menu/changelog/build_1/build_number" type="text" left="430" top="44" width="170" height="24" text="1 / 1" font="ui\small_ui" color="#FF2896FF" align="right">
+	</widget>
+	<widget name="main_menu/changelog/build_1/label" type="text" left="55" top="90" width="530" height="24" text="PLAYER NOTES" font="ui\small_ui" color="#FFFFB020" align="left">
+	</widget>
+	<widget name="main_menu/changelog/build_1/heading" type="text" left="55" top="118" width="530" height="34" text="UNRELEASED" font="ui\large_ui" color="#FFFFFFFF" align="left">
+	</widget>
+	<widget name="main_menu/changelog/build_1/date" type="text" left="55" top="158" width="530" height="24" text="2026-10-18" font="ui\small_ui" color="#FFCCCCCC" align="left">
+	</widget>
+	<widget name="main_menu/changelog/build_1/row_0" type="text" left="55" top="188" width="420" height="22" string_list="main_menu/changelog/build_1/lines" string_index="0" font="ui\small_ui" color="#FFCCCCCC">
+	</widget>
+	<widget name="main_menu/changelog/build_1/heading_row_0" type="text" left="55" top="188" width="420" height="22" string_list="main_menu/changelog/build_1/headings" string_index="0" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/changelog/build_1/row_1" type="text" left="55" top="210" width="420" height="22" string_list="main_menu/changelog/build_1/lines" string_index="1" font="ui\small_ui" color="#FFCCCCCC">
+	</widget>
+	<widget name="main_menu/changelog/build_1/heading_row_1" type="text" left="55" top="210" width="420" height="22" string_list="main_menu/changelog/build_1/headings" string_index="1" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/changelog/build_1/row_2" type="text" left="55" top="232" width="420" height="22" string_list="main_menu/changelog/build_1/lines" string_index="2" font="ui\small_ui" color="#FFCCCCCC">
+	</widget>
+	<widget name="main_menu/changelog/build_1/heading_row_2" type="text" left="55" top="232" width="420" height="22" string_list="main_menu/changelog/build_1/headings" string_index="2" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/changelog/build_1/row_3" type="text" left="55" top="254" width="420" height="22" string_list="main_menu/changelog/build_1/lines" string_index="3" font="ui\small_ui" color="#FFCCCCCC">
+	</widget>
+	<widget name="main_menu/changelog/build_1/heading_row_3" type="text" left="55" top="254" width="420" height="22" string_list="main_menu/changelog/build_1/headings" string_index="3" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/changelog/build_1/row_4" type="text" left="55" top="276" width="420" height="22" string_list="main_menu/changelog/build_1/lines" string_index="4" font="ui\small_ui" color="#FFCCCCCC">
+	</widget>
+	<widget name="main_menu/changelog/build_1/heading_row_4" type="text" left="55" top="276" width="420" height="22" string_list="main_menu/changelog/build_1/headings" string_index="4" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/changelog/build_1/row_5" type="text" left="55" top="298" width="420" height="22" string_list="main_menu/changelog/build_1/lines" string_index="5" font="ui\small_ui" color="#FFCCCCCC">
+	</widget>
+	<widget name="main_menu/changelog/build_1/heading_row_5" type="text" left="55" top="298" width="420" height="22" string_list="main_menu/changelog/build_1/headings" string_index="5" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/changelog/build_1/row_6" type="text" left="55" top="320" width="420" height="22" string_list="main_menu/changelog/build_1/lines" string_index="6" font="ui\small_ui" color="#FFCCCCCC">
+	</widget>
+	<widget name="main_menu/changelog/build_1/heading_row_6" type="text" left="55" top="320" width="420" height="22" string_list="main_menu/changelog/build_1/headings" string_index="6" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/changelog/build_1/row_7" type="text" left="55" top="342" width="420" height="22" string_list="main_menu/changelog/build_1/lines" string_index="7" font="ui\small_ui" color="#FFCCCCCC">
+	</widget>
+	<widget name="main_menu/changelog/build_1/heading_row_7" type="text" left="55" top="342" width="420" height="22" string_list="main_menu/changelog/build_1/headings" string_index="7" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/changelog/build_1/scroll_position" type="text" left="55" top="382" width="250" height="24" font="ui\small_ui" color="#FF999999">
+	</widget>
+	<widget name="main_menu/changelog/build_1/instructions" type="text" left="300" top="382" width="310" height="24" text="Scroll: Up/Down or mouse wheel" font="ui\small_ui" color="#FF999999" align="right">
+	</widget>
+	<widget name="main_menu/changelog/build_1/scroll_up" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="UP" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port changelog up"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/changelog/build_1/scroll_down" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="DOWN" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port changelog down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/changelog/build_1/button_back" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="BACK" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/changelog/build_1/buttons" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child">
+		<child widget="main_menu/changelog/build_1/button_back" x="510" y="1"/>
+	</widget>
+</menus>

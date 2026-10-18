@@ -50,6 +50,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hud_assets import bleed, render_svg  # noqa: E402
 import port_settings  # noqa: E402
+import changelog_menu  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 MENUS = ROOT / "port/assets/menus"
@@ -612,7 +613,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--pause-art-only", action="store_true", help="regenerate only the port-owned pause panels")
     parser.add_argument("--child-offsets-only", action="store_true", help="apply child positions to existing menu XML")
-    partial_only = "--pause-art-only" in sys.argv or "--child-offsets-only" in sys.argv
+    parser.add_argument("--changelog-only", action="store_true", help="regenerate only the sample changelog menus")
+    partial_only = any(option in sys.argv for option in ("--pause-art-only", "--child-offsets-only", "--changelog-only"))
     parser.add_argument("--tags", type=Path, required=not partial_only)
     parser.add_argument("--definitions", type=Path, required=not partial_only)
     parser.add_argument("--redraws", type=Path, required=not partial_only)
@@ -620,6 +622,9 @@ def main() -> None:
     parser.add_argument("--pictures", type=Path,
                         help="the PC version's pictures, as PNGs by tag path: only where each is, to place its placeholder")
     arguments = parser.parse_args()
+    if arguments.changelog_only:
+        changelog_menu.regenerate()
+        return
     if arguments.child_offsets_only:
         regenerate_child_offsets()
         return
@@ -677,6 +682,9 @@ def main() -> None:
         (CE / f"{folder.replace('/', '.')}.xml").write_text("\n".join(lines) + "\n")
     for name, lines in [*port_settings.settings_files().items(), *port_settings.multiplayer_files().items()]:
         (CE / name).write_text("\n".join(lines))
+    main_menu = CE / "main_menu.xml"
+    main_menu.write_text(changelog_menu.insert_item(main_menu.read_text()))
+    changelog_menu.generate(art)
     # their strings
     lines = ['<?xml version="1.0" encoding="UTF-8"?>',
              "<!-- The PC version's menus' text (tools/ce_menus.py) -->", "<menus>"]

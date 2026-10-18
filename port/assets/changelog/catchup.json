@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "baseline": "ecb6ba92271c1718397fc1b09b567c17c0b4fbf5",
+  "notes": [
+    {"commit": "26324d4a3f12965ce4ea98951a4fabd6ebd79ba3", "text": "Fixed screen fades in MCC campaign maps.", "category": "GRAPHICS"},
+    {"commit": "26324d4a3f12965ce4ea98951a4fabd6ebd79ba3", "text": "Fixed repeat races in Rally and weapon movement speeds in Bigass.", "category": "GAMEPLAY"},
+    {"commit": "c8cf7d83a0a029becf69797aa62da0748ca9e96a", "text": "Fixed repeated equipment selection in MeinCrap.", "category": "GAMEPLAY"},
+    {"commit": "c8cf7d83a0a029becf69797aa62da0748ca9e96a", "text": "Fixed a dark layer over Frogfoot's water.", "category": "GRAPHICS"},
+    {"commit": "b0c5d017d4230ef0ff978c57da0839eea558c469", "text": "Fixed missing light glows on AMD graphics cards.", "category": "GRAPHICS"},
+    {"commit": "95748a74ce13a77444a7bb3bfe236bf97cfbb21d", "text": "Improved rendering performance on NVIDIA graphics cards.", "category": "GRAPHICS"},
+    {"commit": "da38822634ea294323b1db3ecc3a3d5c8a224a3a", "text": "Added text chat for private multiplayer games.", "category": "MULTIPLAYER"},
+    {"commit": "7abd376b85a6c9e2713f00364ddec06d2600c31f", "text": "Mute a player's voice and text chat from the scoreboard.", "category": "QUALITY OF LIFE"},
+    {"commit": "90dd65cab46d2760750506f4b05821e6ecc8794d", "text": "Added streamer mode to hide offensive words in names and other text.", "category": "QUALITY OF LIFE"},
+    {"commit": "90ab2ff094e7e453500315aa2009f84d4865d694", "text": "Access multiplayer chat settings from the pause menu, including co-op.", "category": "INTERFACE"},
+    {"commit": "eb16cf4bdc7d2d7d6325d365a39e7beddb494546", "text": "Raised the maximum map sharing speeds.", "category": "MULTIPLAYER"},
+    {"commit": "bc37efd5da325afc5f157eaa4f85a7fd16271a7a", "text": "Refreshed the browser launcher with a clearer Ready to Play screen.", "category": "INTERFACE"},
+    {"commit": "1b61b529294dee3bd3c90a816781400d24dcc709", "text": "Improved browser multiplayer on unreliable connections.", "category": "MULTIPLAYER"},
+    {"commit": "81a768bc81fadfdaa8a1a78141e7fc2efe69a07f", "text": "Fixed the browser loading notice and joining games from browser rooms.", "category": "INTERFACE"}
+  ]
+}

@@ -427,6 +427,13 @@ as documentation of file formats, never copied.
 
 - Commit subjects are plain sentences saying what changed; the body says
   why and what was checked.
+- For player-visible changes, add a `Player-Note: Short plain-language sentence.`
+  line in the commit body (at most 100 printable ASCII characters after the
+  prefix). An optional `[CATEGORY]` after the prefix assigns a menu section;
+  it is excluded from the note's 100-character limit. See `docs/changelog.md`
+  for category syntax. Multiple lines are allowed; keep them focused on what
+  players notice. Internal-only changes need no note. These lines supply the menu
+  and release changelogs when testing reaches main; see `docs/changelog.md`.
 - A pull request is merged with a merge commit (`Merge pull request #N from
   <owner>/<branch>`), and follow-up changes go in separate commits whose
   subject ends with `(#N)`.

@@ -1,0 +1,39 @@
+{
+  "schema_version": 2,
+  "head": "ca3bfbaa4c1275c5ef2c94e236942a67b9c33fd2",
+  "entries": [
+    {
+      "build": null,
+      "date": "2026-10-18",
+      "commit": "ca3bfbaa4c1275c5ef2c94e236942a67b9c33fd2",
+      "notes": [
+        "Fixed screen fades in MCC campaign maps.",
+        "Fixed repeat races in Rally and weapon movement speeds in Bigass.",
+        "Fixed repeated equipment selection in MeinCrap.",
+        "Fixed a dark layer over Frogfoot's water.",
+        "Fixed missing light glows on AMD graphics cards.",
+        "Improved rendering performance on NVIDIA graphics cards.",
+        "Added streamer mode to hide offensive words in names and other text.",
+        "Added text chat for private multiplayer games.",
+        "Mute a player's voice and text chat from the scoreboard.",
+        "Access multiplayer chat settings from the pause menu, including co-op.",
+        "Refreshed the browser launcher with a clearer Ready to Play screen.",
+        "Raised the maximum map sharing speeds."
+      ],
+      "categories": [
+        "GRAPHICS",
+        "GAMEPLAY",
+        "GAMEPLAY",
+        "GRAPHICS",
+        "GRAPHICS",
+        "GRAPHICS",
+        "QUALITY OF LIFE",
+        "MULTIPLAYER",
+        "QUALITY OF LIFE",
+        "INTERFACE",
+        "INTERFACE",
+        "MULTIPLAYER"
+      ]
+    }
+  ]
+}

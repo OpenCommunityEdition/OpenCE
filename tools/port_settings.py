@@ -1658,10 +1658,11 @@ def redraw_letters(redraws: Path) -> dict:
     return letters
 
 
-def menu_item_frames(text: str, redraws: Path) -> list:
+def menu_item_frames(text: str, redraws: Path, spacing: dict = None) -> list:
     """the frames (svg, width, height) of a main menu item of the port's: its
     text in the redraws' own letters (redraw_letters), spaced, placed and
-    coloured as their items are, dim, then white with their blue glow"""
+    coloured as their items are, dim, then white with their blue glow;
+    feature-owned captions can supply their own letter-pair spacing"""
     from fontTools.pens.boundsPen import BoundsPen
     from fontTools.svgLib.path import parse_path
 
@@ -1671,7 +1672,8 @@ def menu_item_frames(text: str, redraws: Path) -> list:
         pen = BoundsPen(None)
         parse_path(letters[letter], pen)
         widths.append(pen.bounds[2])
-    spaces = [MENU_ITEM_SPACES[first + second] for first, second in zip(text, text[1:])]
+    spacing = MENU_ITEM_SPACES if spacing is None else spacing
+    spaces = [spacing[first + second] for first, second in zip(text, text[1:])]
     x = MENU_ITEM_MIDDLE - (sum(widths) + sum(spaces)) * MENU_ITEM_SCALE / 2
     uses = []
     for index, letter in enumerate(text):
