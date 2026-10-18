@@ -501,6 +501,7 @@ struct visibility_batch
 	unsigned long count, read, frame;
 	ULONGLONG serial;
 	BOOL sealed, failed;
+	GLsync fence;
 };
 #endif
 #ifdef HALO_GLES
@@ -611,6 +612,8 @@ struct gl_device
 	unsigned long visibility_batch;
 	ULONGLONG visibility_serial;
 	BOOL visibility_logging;
+	GLuint visibility_buffer;
+	volatile GLuint *visibility_mapped;
 	struct
 	{
 		unsigned long submitted, completed, samples, nonzero, maximum;
@@ -1607,6 +1610,7 @@ static BOOL bind_targets(BOOL *has_depth)
 #ifndef HALO_GLES
 static BOOL visibility_queries_initialize(void);
 static void visibility_results_initialize(void);
+static BOOL visibility_readback_gl_ok(const char *phase);
 #endif
 
 static void gl_initialize(void)
@@ -2266,9 +2270,33 @@ static BOOL visibility_queries_initialize(void)
 
 static void visibility_results_initialize(void)
 {
+	const char *vendor = (const char *)glGetString(GL_VENDOR);
+	GLsizeiptr size = VISIBILITY_BATCH_COUNT * VISIBILITY_TEST_SLOTS * sizeof(GLuint);
+	GLbitfield flags = GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+	BOOL success;
+
 	device.visibility_logging = config_boolean("debug.gl_debug");
-	platform_log("GPU: asynchronous direct CPU visibility readback enabled; %d query batches, availability polling, no query-buffer copies or forced synchronization",
-		VISIBILITY_BATCH_COUNT);
+	/* AMD needs direct CPU delivery. Only NVIDIA uses the buffered path;
+	each batch has disjoint storage and a fence after all its copies. */
+	if (vendor && !strcmp(vendor, "NVIDIA Corporation"))
+	{
+		visibility_readback_gl_ok("before buffer creation");
+		glGenBuffers(1, &device.visibility_buffer);
+		glBindBuffer(GL_QUERY_BUFFER, device.visibility_buffer);
+		glBufferStorage(GL_QUERY_BUFFER, size, NULL, flags);
+		device.visibility_mapped = glMapBufferRange(GL_QUERY_BUFFER, 0, size, flags);
+		glBindBuffer(GL_QUERY_BUFFER, 0);
+		success = visibility_readback_gl_ok("buffer creation");
+		if (!success || !device.visibility_buffer || !device.visibility_mapped)
+		{
+			glDeleteBuffers(1, &device.visibility_buffer);
+			device.visibility_buffer = 0;
+			device.visibility_mapped = NULL;
+			platform_log("GPU: visibility buffer unavailable; using direct CPU readback");
+		}
+	}
+	platform_log("GPU: asynchronous %s visibility readback enabled; %d query batches, no forced synchronization",
+		device.visibility_mapped ? "NVIDIA fenced buffer" : "direct CPU", VISIBILITY_BATCH_COUNT);
 }
 
 static BOOL visibility_readback_gl_ok(const char *phase)
@@ -5879,15 +5907,18 @@ static void visibility_read_batch(void)
 	struct visibility_batch *batch;
 	unsigned long i, oldest, pending = 0, oldest_age = 0;
 	GLint binding = 0;
-	BOOL bound;
+	BOOL bound = TRUE;
 
 	/* CPU pointers become byte offsets when a query buffer is bound. */
-	visibility_readback_gl_ok("before readback");
-	glGetIntegerv(GL_QUERY_BUFFER_BINDING, &binding);
-	if (!visibility_readback_gl_ok("read binding"))
-		return;
-	glBindBuffer(GL_QUERY_BUFFER, 0);
-	bound = visibility_readback_gl_ok("unbind query buffer");
+	if (!device.visibility_mapped)
+	{
+		visibility_readback_gl_ok("before readback");
+		glGetIntegerv(GL_QUERY_BUFFER_BINDING, &binding);
+		if (!visibility_readback_gl_ok("read binding"))
+			return;
+		glBindBuffer(GL_QUERY_BUFFER, 0);
+		bound = visibility_readback_gl_ok("unbind query buffer");
+	}
 	while (bound)
 	{
 		oldest = VISIBILITY_BATCH_COUNT;
@@ -5901,28 +5932,54 @@ static void visibility_read_batch(void)
 		if (oldest == VISIBILITY_BATCH_COUNT)
 			break;
 		batch = &device.visibility_batches[oldest];
+		if (device.visibility_mapped)
+		{
+			GLenum status = glClientWaitSync(batch->fence, 0, 0);
+			BOOL success = visibility_readback_gl_ok("copy completion");
+
+			if (success && status == GL_TIMEOUT_EXPIRED)
+			{
+				device.visibility_stats.unavailable++;
+				break;
+			}
+			if (!success || (status != GL_ALREADY_SIGNALED && status != GL_CONDITION_SATISFIED))
+			{
+				batch->failed = TRUE;
+				device.visibility_stats.failures++;
+				platform_log("GPU: visibility batch %lu quarantined after fence error", oldest);
+			}
+			glDeleteSync(batch->fence);
+			batch->fence = NULL;
+			if (batch->failed)
+				continue;
+		}
 		while (batch->read < batch->count)
 		{
 			unsigned long test = batch->read;
 			GLuint available = 0, samples = 0;
 			float area = batch->areas[test];
 
-			glGetQueryObjectuiv(batch->queries[test], GL_QUERY_RESULT_AVAILABLE, &available);
-			if (!visibility_readback_gl_ok("availability"))
+			if (device.visibility_mapped)
+				samples = device.visibility_mapped[oldest * VISIBILITY_TEST_SLOTS + test];
+			else
 			{
-				batch->failed = TRUE;
-				break;
-			}
-			if (!available)
-			{
-				device.visibility_stats.unavailable++;
-				break;
-			}
-			glGetQueryObjectuiv(batch->queries[test], GL_QUERY_RESULT, &samples);
-			if (!visibility_readback_gl_ok("result"))
-			{
-				batch->failed = TRUE;
-				break;
+				glGetQueryObjectuiv(batch->queries[test], GL_QUERY_RESULT_AVAILABLE, &available);
+				if (!visibility_readback_gl_ok("availability"))
+				{
+					batch->failed = TRUE;
+					break;
+				}
+				if (!available)
+				{
+					device.visibility_stats.unavailable++;
+					break;
+				}
+				glGetQueryObjectuiv(batch->queries[test], GL_QUERY_RESULT, &samples);
+				if (!visibility_readback_gl_ok("result"))
+				{
+					batch->failed = TRUE;
+					break;
+				}
 			}
 			device.visibility_known[batch->slots[test]] = area > 1.0f ?
 				(GLuint)(samples / area + 0.5f) : samples;
@@ -5945,13 +6002,36 @@ static void visibility_read_batch(void)
 		batch->count = batch->read = 0;
 		batch->sealed = FALSE;
 	}
-	glBindBuffer(GL_QUERY_BUFFER, (GLuint)binding);
-	visibility_readback_gl_ok("restore query buffer");
+	if (!device.visibility_mapped)
+	{
+		glBindBuffer(GL_QUERY_BUFFER, (GLuint)binding);
+		visibility_readback_gl_ok("restore query buffer");
+	}
 	if (device.visibility_batch < VISIBILITY_BATCH_COUNT)
 	{
 		batch = &device.visibility_batches[device.visibility_batch];
 		if (batch->count)
 		{
+			if (device.visibility_mapped)
+			{
+				BOOL success;
+
+				visibility_readback_gl_ok("before query copies");
+				for (i = 0; i < batch->count; i++)
+					glGetQueryBufferObjectuiv(batch->queries[i], device.visibility_buffer, GL_QUERY_RESULT,
+						(GLintptr)((device.visibility_batch * VISIBILITY_TEST_SLOTS + i) * sizeof(GLuint)));
+				batch->fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+				success = visibility_readback_gl_ok("query copies");
+				if (!success || !batch->fence)
+				{
+					batch->failed = TRUE;
+					device.visibility_stats.failures++;
+					if (batch->fence)
+						glDeleteSync(batch->fence);
+					batch->fence = NULL;
+					platform_log("GPU: visibility batch %lu quarantined after copy error", device.visibility_batch);
+				}
+			}
 			batch->sealed = TRUE;
 			batch->serial = ++device.visibility_serial;
 			batch->frame = device.frame;
@@ -5976,8 +6056,8 @@ static void visibility_read_batch(void)
 	}
 	if (device.visibility_logging && device.frame % 120 == 0)
 	{
-		platform_log("GPU: visibility CPU frame=%lu submitted=%lu completed=%lu pending=%lu oldest_age=%lu samples=%lu nonzero=%lu raw_max=%lu unavailable=%lu dropped=%lu failures=%lu",
-			device.frame, device.visibility_stats.submitted, device.visibility_stats.completed, pending, oldest_age,
+		platform_log("GPU: visibility %s frame=%lu submitted=%lu completed=%lu pending=%lu oldest_age=%lu samples=%lu nonzero=%lu raw_max=%lu unavailable=%lu dropped=%lu failures=%lu",
+			device.visibility_mapped ? "buffer" : "CPU", device.frame, device.visibility_stats.submitted, device.visibility_stats.completed, pending, oldest_age,
 			device.visibility_stats.samples, device.visibility_stats.nonzero, device.visibility_stats.maximum,
 			device.visibility_stats.unavailable, device.visibility_stats.dropped, device.visibility_stats.failures);
 		memset(&device.visibility_stats, 0, sizeof(device.visibility_stats));

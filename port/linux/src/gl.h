@@ -260,6 +260,10 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 	X(glMemoryBarrier) \
 	X(glCreateQueries) \
 	X(glIsQuery) \
+	X(glGetQueryBufferObjectuiv) \
+	X(glFenceSync) \
+	X(glClientWaitSync) \
+	X(glDeleteSync) \
 	X(glDebugMessageCallback)
 #endif
 
@@ -496,6 +500,10 @@ pointers, sees the declarations without these aliases */
 #define glMemoryBarrier halo_glMemoryBarrier
 #define glCreateQueries halo_glCreateQueries
 #define glIsQuery halo_glIsQuery
+#define glGetQueryBufferObjectuiv halo_glGetQueryBufferObjectuiv
+#define glFenceSync halo_glFenceSync
+#define glClientWaitSync halo_glClientWaitSync
+#define glDeleteSync halo_glDeleteSync
 #define glDebugMessageCallback halo_glDebugMessageCallback
 
 #endif

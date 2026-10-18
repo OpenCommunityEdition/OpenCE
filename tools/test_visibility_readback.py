@@ -1,4 +1,4 @@
-"""Exercise the desktop renderer's actual asynchronous CPU query readback."""
+"""Exercise actual CPU and NVIDIA buffered visibility readback with a delayed GPU."""
 import os
 from pathlib import Path
 import shutil
@@ -14,7 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.mark.parametrize("negative_control", [None, "untyped_pool", "invalid_pool",
                                              "early_read", "wrong_scale", "wrong_query",
                                              "reuse_pending", "no_flush", "no_unbind",
-                                             "ignore_error", "wrong_order"])
+                                             "ignore_error", "wrong_order", "buffered",
+                                             "early_buffer", "wrong_offset", "blocking_wait",
+                                             "early_fence", "unchecked_copy", "unchecked_wait"])
 def test_visibility_readback(tmp_path, negative_control):
     compiler = shutil.which("clang")
     if not compiler:
@@ -24,9 +26,27 @@ def test_visibility_readback(tmp_path, negative_control):
     code = code.split("/* ---------- render and texture stage state */", 1)[0]
     read_code = function(source, "visibility_read_batch")
     batch_type = structure(source, "visibility_batch")
-    for forbidden in ("glGetQueryBuffer", "glMapBuffer", "glBufferStorage", "glFinish",
-                      "glFenceSync", "glClientWaitSync", "visibility_results["):
+    for forbidden in ("glFinish", "glWaitSync"):
         assert forbidden not in code + read_code
+    buffered = negative_control in ("buffered", "early_buffer", "wrong_offset", "blocking_wait",
+                                    "early_fence", "unchecked_copy", "unchecked_wait")
+    if negative_control == "early_buffer":
+        read_code = mutated(read_code, "GLenum status = glClientWaitSync(batch->fence, 0, 0);",
+                            "GLenum status = GL_ALREADY_SIGNALED;")
+    if negative_control == "wrong_offset":
+        read_code = mutated(read_code, "device.visibility_batch * VISIBILITY_TEST_SLOTS + i", "i")
+    if negative_control == "blocking_wait":
+        read_code = mutated(read_code, "glClientWaitSync(batch->fence, 0, 0)", "glClientWaitSync(batch->fence, 0, 1)")
+    if negative_control == "early_fence":
+        statement = "batch->fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);"
+        read_code = mutated(read_code, statement, "((void)0);")
+        read_code = mutated(read_code, "for (i = 0; i < batch->count; i++)",
+                            statement + "\nfor (i = 0; i < batch->count; i++)")
+    if negative_control == "unchecked_copy":
+        read_code = mutated(read_code, "if (!success || !batch->fence)", "if (!batch->fence)")
+    if negative_control == "unchecked_wait":
+        read_code = mutated(read_code, "if (!success || (status != GL_ALREADY_SIGNALED && status != GL_CONDITION_SATISFIED))",
+                            "if (FALSE)")
     if negative_control == "untyped_pool":
         code = mutated(code, "glCreateQueries(VISIBILITY_QUERY, (GLsizei)count, queries)",
                        "glGenQueries((GLsizei)count, queries)")
@@ -58,7 +78,11 @@ def test_visibility_readback(tmp_path, negative_control):
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 typedef unsigned int GLuint, DWORD, UINT, GLenum;
+typedef unsigned int GLbitfield;
+typedef intptr_t GLintptr, GLsizeiptr;
+typedef struct fake_fence { int complete; unsigned copies; } *GLsync;
 typedef unsigned long long ULONGLONG;
 typedef int BOOL, HRESULT, GLsizei, GLint;
 #define WINAPI
@@ -73,6 +97,15 @@ typedef int BOOL, HRESULT, GLsizei, GLint;
 #define GL_NO_ERROR 0
 #define GL_QUERY_BUFFER 4
 #define GL_QUERY_BUFFER_BINDING 5
+#define GL_VENDOR 6
+#define GL_MAP_READ_BIT 1
+#define GL_MAP_PERSISTENT_BIT 2
+#define GL_MAP_COHERENT_BIT 4
+#define GL_SYNC_GPU_COMMANDS_COMPLETE 7
+#define GL_TIMEOUT_EXPIRED 8
+#define GL_ALREADY_SIGNALED 9
+#define GL_CONDITION_SATISFIED 10
+#define GL_WAIT_FAILED 11
 #define platform_log(...) ((void)0)
 static BOOL config_boolean(const char *key) { return FALSE; }
 /* BATCH_TYPE */
@@ -85,6 +118,8 @@ static struct {
     unsigned long visibility_batch, frame;
     ULONGLONG visibility_serial;
     BOOL visibility_logging;
+    GLuint visibility_buffer;
+    volatile GLuint *visibility_mapped;
     struct { unsigned long submitted, completed, samples, nonzero, maximum,
                            unavailable, dropped, failures; } visibility_stats;
 } device;
@@ -100,6 +135,7 @@ static BOOL direct_error, availability_error, binding_error, unbind_error;
 static int zero_at = -1, duplicate_at = -1;
 static BOOL fail_object, fail_create, fail_all;
 static GLenum gpu_error;
+static BOOL visibility_readback_gl_ok(const char *phase);
 static GLenum glGetError(void) { GLenum error = gpu_error; gpu_error = 0; return error; }
 static void glGenQueries(GLsizei count, GLuint *queries) {
     int i;
@@ -174,6 +210,59 @@ static void glGetIntegerv(GLenum pname, GLint *value) {
     assert(pname == GL_QUERY_BUFFER_BINDING);
     if (binding_error) { gpu_error = 0x502; return; }
     *value = query_buffer;
+}
+static const char *vendor = "AMD";
+static GLuint mapped[VISIBILITY_BATCH_COUNT * VISIBILITY_TEST_SLOTS];
+static GLintptr offsets[1024];
+static unsigned copy_serial[1024];
+static unsigned buffer_calls, fence_count, deletes, copies;
+static struct fake_fence fences[128];
+static BOOL map_null, map_error, copy_error, fence_null, wait_error;
+static const char *glGetString(GLenum name) { assert(name == GL_VENDOR); return vendor; }
+static void glGenBuffers(GLsizei n, GLuint *buffer) {
+    assert(n == 1 && !strcmp(vendor, "NVIDIA Corporation"));
+    buffer_calls++; *buffer = 123;
+}
+static void glBufferStorage(GLenum target, GLsizeiptr size, void *data, GLbitfield flags) {
+    assert(target == GL_QUERY_BUFFER && query_buffer == 123 && size == sizeof(mapped));
+    assert(!data && flags == 7); buffer_calls++;
+}
+static void *glMapBufferRange(GLenum target, GLintptr offset, GLsizeiptr size, GLbitfield flags) {
+    assert(target == GL_QUERY_BUFFER && !offset && size == sizeof(mapped) && flags == 7);
+    buffer_calls++; if (map_error) gpu_error = 0x502;
+    return map_null ? NULL : mapped;
+}
+static void glDeleteBuffers(GLsizei n, GLuint *buffer) { assert(n == 1); buffer_calls++; }
+static void glGetQueryBufferObjectuiv(GLuint query, GLuint buffer, GLenum pname, GLintptr offset) {
+    assert(buffer == 123 && pname == GL_QUERY_RESULT && gpu[query].pending);
+    assert(offset >= 0 && offset < sizeof(mapped) && !(offset % sizeof(GLuint)));
+    offsets[query] = offset; copy_serial[query] = ++copies;
+    if (copy_error) gpu_error = 0x502;
+}
+static GLsync glFenceSync(GLenum condition, GLbitfield flags) {
+    assert(condition == GL_SYNC_GPU_COMMANDS_COMPLETE && !flags && fence_count < 128);
+    if (fence_null) return NULL;
+    fences[fence_count].copies = copies;
+    return &fences[fence_count++];
+}
+static GLenum glClientWaitSync(GLsync fence, GLbitfield flags, ULONGLONG timeout) {
+    assert(fence && !flags && !timeout); /* Never flush or wait in the CPU poll. */
+    return wait_error ? GL_WAIT_FAILED : !fence->complete ? GL_TIMEOUT_EXPIRED :
+        (fence_count & 1) ? GL_ALREADY_SIGNALED : GL_CONDITION_SATISFIED;
+}
+static void glDeleteSync(GLsync fence) { assert(fence); deletes++; }
+static void complete_buffer(unsigned b) {
+    struct visibility_batch *batch = &device.visibility_batches[b];
+    unsigned i;
+    assert(batch->sealed && !batch->failed && batch->fence);
+    for (i = 0; i < batch->count; i++) {
+        GLuint q = batch->queries[i];
+        assert(gpu[q].pending && gpu[q].flushed);
+        assert(copy_serial[q] && copy_serial[q] <= batch->fence->copies);
+        mapped[offsets[q] / sizeof(GLuint)] = gpu[q].samples;
+        gpu[q].pending = FALSE;
+    }
+    batch->fence->complete = TRUE;
 }
 """
     main = r"""
@@ -283,6 +372,74 @@ int main(void) {
     fail_object = FALSE; fail_create = TRUE; CHECK(!visibility_queries_initialize());
     fail_create = FALSE; fail_all = TRUE; CHECK(!visibility_queries_initialize());
     for (i = 0; i < VISIBILITY_BATCH_COUNT; i++) CHECK(!device.visibility_batches[i].queries[0]);
+    CHECK(!buffer_calls && !copies && !fence_count); /* AMD never uses mapped delivery. */
+    return 0;
+}
+"""
+    if buffered:
+        main = main[:main.index("int main(void)")] + r"""
+int main(void) {
+    unsigned i, b, before;
+    /* Other vendors, including NVIDIA-like strings, retain direct CPU delivery. */
+    visibility_results_initialize(); CHECK(!buffer_calls && !device.visibility_mapped);
+    vendor = "NVIDIA other";
+    visibility_results_initialize(); CHECK(!buffer_calls && !device.visibility_mapped);
+    vendor = "NVIDIA Corporation";
+    map_null = TRUE; visibility_results_initialize();
+    CHECK(!device.visibility_mapped && !device.visibility_buffer);
+    CHECK(visibility_queries_initialize()); device.gl_ready = TRUE;
+    submit(0, 240); present(); ready(0, 0); present();
+    CHECK(result(0) == 10 && reads == 1 && !copies && !fence_count);
+    memset(&device, 0, sizeof(device)); reads = polls = flushes = 0;
+    map_null = FALSE; map_error = TRUE; visibility_results_initialize();
+    CHECK(!device.visibility_mapped && !device.visibility_buffer);
+    map_error = FALSE;
+    CHECK(visibility_queries_initialize()); visibility_results_initialize();
+    CHECK(device.visibility_mapped == mapped && !query_buffer);
+    device.gl_ready = TRUE;
+    query_buffer = 91;
+    submit(0, 240); submit(1, 0); present();
+    CHECK(copies == 2 && !reads && !polls && result(0) == 0 && query_buffer == 91);
+    target_samples = 1;
+    submit(0, 120); present(); submit(0, 180); present();
+    for (i = 0; i < 12; i++) { submit(0, 999); present(); CHECK(result(0) == 0); }
+    CHECK(device.visibility_stats.dropped == 12 && flushes == 3);
+    complete_buffer(2); present(); CHECK(result(0) == 0);
+    complete_buffer(0); present(); CHECK(result(0) == 10 && result(1) == 0);
+    CHECK(device.visibility_stats.completed == 1);
+    submit(0, 240); present(); complete_buffer(1); present();
+    CHECK(result(0) == 30 && device.visibility_stats.completed == 3);
+    complete_buffer(0); present(); CHECK(result(0) == 40);
+    b = device.visibility_batch; submit(0, 0); present();
+    for (i = 0; i < 6; i++) { present(); CHECK(result(0) == 40); }
+    complete_buffer(b); present(); CHECK(result(0) == 0);
+    for (i = 0; i < 20; i++) {
+        b = device.visibility_batch;
+        target_samples = 4; submit(0, 240);
+        target_samples = 1; submit(0, 120); submit(7, 60); present();
+        /* Query completion alone is insufficient: wait for buffer copies too. */
+        ready(b, 0); present(); CHECK(device.visibility_batches[b].sealed);
+        complete_buffer(b); present(); CHECK(result(0) == 20 && result(7) == 10);
+    }
+    b = device.visibility_batch; before = copies;
+    for (i = 0; i < VISIBILITY_TEST_SLOTS + 2; i++) submit(i, 6 * (i + 1));
+    present(); complete_buffer(b); present();
+    CHECK(copies == before + VISIBILITY_TEST_SLOTS && result(0) == 1 && result(7) == 8);
+    b = device.visibility_batch; submit(0, 600);
+    copy_error = TRUE; present(); copy_error = FALSE;
+    CHECK(device.visibility_batches[b].failed && result(0) == 1);
+    b = device.visibility_batch; submit(0, 1200); present();
+    wait_error = TRUE; present(); wait_error = FALSE;
+    CHECK(device.visibility_batches[b].failed && result(0) == 1);
+    b = device.visibility_batch; submit(0, 240); present(); complete_buffer(b); present();
+    CHECK(result(0) == 40);
+    b = device.visibility_batch; submit(0, 600);
+    fence_null = TRUE; present(); fence_null = FALSE;
+    CHECK(device.visibility_batches[b].failed && result(0) == 40);
+    before = copies;
+    for (i = 0; i < 10; i++) { submit(0, 900); present(); }
+    CHECK(copies == before && result(0) == 40);
+    CHECK(!reads && !polls && deletes == fence_count && query_buffer == 91);
     return 0;
 }
 """
@@ -294,7 +451,7 @@ int main(void) {
                            capture_output=True, text=True)
     assert build.returncode == 0, build.stderr
     run = subprocess.run([str(binary)], capture_output=True, text=True)
-    if negative_control:
+    if negative_control and negative_control != "buffered":
         assert run.returncode != 0, "negative control unexpectedly passed"
     else:
         assert run.returncode == 0, run.stderr
