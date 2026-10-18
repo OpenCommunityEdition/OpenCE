@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.parametrize("negative_control", [None, "readback", "depth_restore", "offset_restore",
-                                             "invalid_query", "failed_read"])
+                                             "invalid_query", "failed_read", "untyped_pool", "wrong_batch"])
 def test_visibility_readback(tmp_path, negative_control):
     compiler = shutil.which("clang")
     if not compiler:
@@ -18,6 +18,8 @@ def test_visibility_readback(tmp_path, negative_control):
     source = (ROOT / "port/linux/src/d3d8_gl.c").read_text()
     code = source.split("/* ---------- visibility (occlusion) tests */", 1)[1]
     code = code.split("/* ---------- render and texture stage state */", 1)[0]
+    from harness import function
+    copy_code = function(source, "visibility_copy_batch")
     depth_code = source.split("static void apply_raster_state(BOOL has_depth)", 1)[1]
     depth_code = depth_code.split("\tstate_enable(&gl_state.stencil_test", 1)[0]
     offset_code = source.split("\t/* D3DRS_ZBIAS is expressed in these states", 1)[1]
@@ -41,10 +43,17 @@ def test_visibility_readback(tmp_path, negative_control):
     if negative_control == "failed_read":
         code = code.replace("if (!visibility_query_read(index, &samples))",
                             "if ((visibility_query_read(index, &samples), FALSE))")
+    if negative_control == "untyped_pool":
+        code = code.replace("glCreateQueries(VISIBILITY_QUERY, (GLsizei)count, queries)",
+                            "glGenQueries((GLsizei)count, queries)")
+    if negative_control == "wrong_batch":
+        copy_code = copy_code.replace("device.visibility_batch ^= 1;", "/* no swap */")
     prefix = r'''
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+typedef long GLintptr;
 typedef unsigned int GLuint, DWORD, UINT;
 typedef unsigned long long ULONGLONG;
 typedef unsigned long long Uint64;
@@ -92,30 +101,47 @@ static struct {
     GLuint visibility_known[8];
     BOOL query_pending[8], visibility_unread[8];
     float query_area[8];
+    GLuint visibility_results_buffer;
     volatile GLuint *visibility_results;
     struct { GLuint queries[8]; unsigned short slots[8]; unsigned long count; } visibility_batches[2];
     unsigned long visibility_batch;
 } device;
 static float target_scale[2] = {2, 3};
 static int target_samples = 4;
-static struct { GLuint samples; BOOL available, reserved, object; } gpu[64];
+static struct { GLuint samples; BOOL available, reserved, object; } gpu[256];
 static GLuint active, next_samples;
 static unsigned reads, polls;
 static unsigned next_query = 1, invalid_begins, invalid_ends, end_calls;
 static int zero_at = -1, duplicate_at = -1;
-static BOOL fail_generation, fail_begin, fail_end, fail_read;
+static BOOL fail_generation, fail_begin, fail_end, fail_read, fail_object, fail_create;
+static unsigned copies;
 static void glGenQueries(GLsizei count, GLuint *queries) {
     int i;
     for (i = 0; i < count; i++) {
         if (fail_generation || i == zero_at) { queries[i] = 0; continue; }
         if (i == duplicate_at && i) { queries[i] = queries[i - 1]; continue; }
-        assert(next_query < 64);
+        assert(next_query < 256);
         queries[i] = next_query++;
         gpu[queries[i]].reserved = TRUE;
     }
     zero_at = duplicate_at = -1;
 }
-static BOOL glIsQuery(GLuint query) { return query < 64 && gpu[query].object; }
+static void glCreateQueries(GLenum target, GLsizei count, GLuint *queries) {
+    int i;
+    assert(target == VISIBILITY_QUERY);
+    glGenQueries(count, queries);
+    for (i = 0; i < count; i++)
+        if (queries[i]) gpu[queries[i]].object = !fail_object;
+    if (fail_create) gpu_error = 0x505;
+}
+static void glGetQueryBufferObjectuiv(GLuint query, GLuint buffer, GLenum pname, GLintptr offset) {
+    assert(query && gpu[query].object && pname == GL_QUERY_RESULT);
+    assert(offset >= 0 && offset < sizeof(GLuint) * VISIBILITY_TEST_SLOTS);
+    assert(device.visibility_results && buffer == device.visibility_results_buffer);
+    ((GLuint *)device.visibility_results)[offset / sizeof(GLuint)] = gpu[query].samples;
+    copies++;
+}
+static BOOL glIsQuery(GLuint query) { return query < 256 && gpu[query].object; }
 static DWORD D3D__RenderState[10];
 static struct {
     GLint viewport[4], scissor[4]; float depth_range[2];
@@ -146,7 +172,7 @@ static void state_enable(unsigned char *cached, GLenum state, BOOL enabled) {
 }
 static void glBeginQuery(int target, GLuint query) {
     assert(target == VISIBILITY_QUERY && !active);
-    if (!query || query >= 64 || !gpu[query].reserved) {
+    if (!query || query >= 256 || !gpu[query].reserved) {
         invalid_begins++; gpu_error = 0x502; return;
     }
     if (fail_begin) { gpu_error = 0x502; return; }
@@ -190,7 +216,7 @@ int main(void) {
     unsigned old_ends, old_reads;
     GLuint mapped[8] = {0};
     device.gl_ready = TRUE;
-    visibility_queries_initialize();
+    CHECK(visibility_queries_initialize());
     D3DDevice_GetVisibilityTestResult(0, &value, &stamp);
     CHECK(value == 0 && stamp == 0 && reads == 0);
     submit(0, 240);
@@ -280,15 +306,13 @@ int main(void) {
     apply_raster_state(TRUE);
     CHECK(actual_offset_fill && actual_offset_line && actual_depth);
     CHECK(visibility_depth_offset() == 0.0f);
-    /* The pool audit catches creation failures. A generated name is not
-       an object until BeginQuery; this must not reject healthy fresh names. */
+    /* Inject corruption after a valid startup to exercise the optional
+       synchronized diagnostic's last-valid-result recovery. */
     memset(&device, 0, sizeof(device));
     device.gl_ready = device.visibility_sync = TRUE;
-    zero_at = 0;
-    duplicate_at = 3;
-    visibility_queries_initialize();
-    CHECK(device.visibility_query_faults == 2 && device.queries[0] == 0);
-    CHECK(!glIsQuery(device.scratch_query));
+    CHECK(visibility_queries_initialize());
+    CHECK(glIsQuery(device.scratch_query));
+    device.queries[0] = 0;
     submit(0, 7);
     D3DDevice_GetVisibilityTestResult(0, &value, NULL);
     CHECK(value == 7 && device.scratch_query == 0);
@@ -350,11 +374,63 @@ int main(void) {
     submit(0, 0);
     D3DDevice_GetVisibilityTestResult(0, &value, NULL);
     CHECK(value == 0 && invalid_begins == 0 && invalid_ends == 0);
+    /* The normal asynchronous path must use separate objects in the two
+       frame batches, copy the previous frame, and never read/poll on CPU. */
+    memset(&device, 0, sizeof(device));
+    memset(gpu, 0, sizeof(gpu));
+    next_query = 1;
+    device.gl_ready = TRUE;
+    CHECK(visibility_queries_initialize());
+    device.visibility_results = mapped;
+    memset(mapped, 0, sizeof(mapped));
+    old_reads = reads;
+    old_ends = polls;
+    submit(0, 120);
+    submit(1, 0);
+    visibility_copy_batch();
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 0 && copies == 0);
+    submit(0, 240);
+    visibility_copy_batch();
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 120 && copies == 2);
+    visibility_copy_batch();
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 240 && copies == 3);
+    submit(0, 0);
+    visibility_copy_batch();
+    visibility_copy_batch();
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 0 && copies == 4);
+    /* Overflow uses scratch only; no out-of-bounds batch access or copy. */
+    {
+        unsigned i;
+        for (i = 0; i < VISIBILITY_TEST_SLOTS + 2; i++) submit(i % VISIBILITY_TEST_SLOTS, i + 1);
+    }
+    visibility_copy_batch();
+    visibility_copy_batch();
+    CHECK(copies == VISIBILITY_TEST_SLOTS + 4);
+    CHECK(reads == old_reads && polls == old_ends && !invalid_begins && !invalid_ends);
+    /* Refuse zero, duplicate (including across batches), uninstantiated
+       objects and GL errors before publishing any IDs to the renderer. */
+    memset(&device, 0, sizeof(device));
+    zero_at = 0;
+    CHECK(!visibility_queries_initialize() && !device.scratch_query && !device.queries[0]);
+    duplicate_at = VISIBILITY_TEST_SLOTS + 1;
+    CHECK(!visibility_queries_initialize() && !device.visibility_batches[0].queries[0]);
+    duplicate_at = VISIBILITY_TEST_SLOTS * 2 + 1;
+    CHECK(!visibility_queries_initialize() && !device.visibility_batches[1].queries[0]);
+    fail_object = TRUE;
+    CHECK(!visibility_queries_initialize() && !device.scratch_query);
+    fail_object = FALSE;
+    fail_create = TRUE;
+    CHECK(!visibility_queries_initialize() && !device.scratch_query);
+    fail_create = FALSE;
     return 0;
 }
 '''
     path = tmp_path / "visibility.c"
-    path.write_text(prefix.replace("DIAGNOSTIC_FIELDS", diagnostic_fields) + code + depth_code + main)
+    path.write_text(prefix.replace("DIAGNOSTIC_FIELDS", diagnostic_fields) + code + copy_code + depth_code + main)
     binary = tmp_path / ("visibility.exe" if os.name == "nt" else "visibility")
     target = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if os.name == "nt" else []
     build = subprocess.run([compiler, *target, "-std=gnu89", str(path), "-o", str(binary)],
@@ -366,7 +442,9 @@ int main(void) {
         expected = {"readback": "value == 20", "depth_restore": "actual_depth && actual_depth_mask",
                     "offset_restore": "actual_offset_fill && actual_offset_line",
                     "invalid_query": "value == 11 && device.visibility_replacements",
-                    "failed_read": "value == 17 && device.visibility_failed_reads"}[negative_control]
+                    "failed_read": "value == 17 && device.visibility_failed_reads",
+                    "untyped_pool": "visibility_queries_initialize()",
+                    "wrong_batch": "value == 0 && copies == 0"}[negative_control]
         assert expected in run.stderr
     else:
         assert run.returncode == 0, run.stderr

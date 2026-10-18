@@ -1,5 +1,9 @@
 # Visibility query validation test
 
+This describes the historical `1f281595` synchronized package. The current
+branch uses typed query creation in both modes; see
+[the asynchronous test](amd_async_query_test.md).
+
 Extract this package separately and supply your own maps. Double-click the
 single `Run-AMD-Query-Test.cmd` launcher. In the game console enter:
 

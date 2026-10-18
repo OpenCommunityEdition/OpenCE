@@ -602,6 +602,8 @@ struct gl_device
 #else
 	/* Diagnostic: read each query to the CPU only after it completes. */
 	BOOL visibility_sync;
+	BOOL visibility_debug;
+	unsigned long visibility_copies;
 	BOOL visibility_no_depth;
 	BOOL visibility_explicit_depth;
 	BOOL visibility_query_started;
@@ -1633,7 +1635,7 @@ static BOOL bind_targets(BOOL *has_depth)
 /* ---------- device creation */
 
 #ifndef HALO_GLES
-static void visibility_queries_initialize(void);
+static BOOL visibility_queries_initialize(void);
 #endif
 
 static void gl_initialize(void)
@@ -1741,24 +1743,26 @@ static void gl_initialize(void)
 		device.visibility_no_depth = FALSE;
 	device.visibility_sync = config_boolean("debug.gpu_sync_visibility") != 0 || device.visibility_no_depth || device.visibility_explicit_depth;
 	device.visibility_log_time = SDL_GetTicks();
-	visibility_queries_initialize();
+	device.visibility_debug = config_boolean("debug.gl_debug") != 0;
+	if (!visibility_queries_initialize())
+	{
+		platform_log("GPU: cannot create a valid visibility query pool; stopping before rendering");
+		exit(EXIT_FAILURE);
+	}
 	if (device.visibility_sync)
 		platform_log("GPU: synchronized visibility readback enabled; occlusion remains active, GPU waits may reduce frame rate");
 	else
 	{
 		glGenBuffers(1, &device.visibility_results_buffer);
 		glBindBuffer(GL_QUERY_BUFFER, device.visibility_results_buffer);
-		glBufferStorage(GL_QUERY_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL,
+		glBufferStorage(GL_QUERY_BUFFER, sizeof(device.visibility_known), device.visibility_known,
 			GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
 		device.visibility_results = glMapBufferRange(GL_QUERY_BUFFER, 0, VISIBILITY_TEST_SLOTS * sizeof(GLuint),
 			GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
 		if (device.visibility_results)
-		{
-			glGenQueries(VISIBILITY_TEST_SLOTS, device.visibility_batches[0].queries);
-			glGenQueries(VISIBILITY_TEST_SLOTS, device.visibility_batches[1].queries);
-		}
+			platform_log("GPU: asynchronous visibility readback enabled; mapped results, deferred query batches, no forced CPU query waits");
 		else
-			platform_log("cannot map the visibility test results; tests wait for the GPU");
+			platform_log("GPU: cannot map visibility results; using availability-polled query readback");
 	}
 	/* (unbound: a query read into a bound query buffer takes its pointer
 	for an offset into it) */
@@ -2323,33 +2327,51 @@ static BOOL visibility_query_alias(GLuint query, unsigned long count)
 	return FALSE;
 }
 
-static void visibility_queries_initialize(void)
+static int visibility_query_compare(const void *left, const void *right)
 {
-	unsigned long i, zeros = 0, duplicates = 0;
+	GLuint a = *(const GLuint *)left, b = *(const GLuint *)right;
 
-	visibility_check_errors("before query creation");
-	glGenQueries(VISIBILITY_TEST_SLOTS, device.queries);
-	visibility_check_errors("slot query creation");
-	glGenQueries(1, &device.scratch_query);
-	visibility_check_errors("scratch query creation");
-	if (!device.visibility_sync)
-		return;
-	/* GenQueries reserves names; IsQuery may legitimately be false until
-	the first BeginQuery. Check the names here, and the GL operation at use. */
-	for (i = 0; i <= VISIBILITY_TEST_SLOTS; i++)
+	return (a > b) - (a < b);
+}
+
+static BOOL visibility_queries_initialize(void)
+{
+	GLuint queries[VISIBILITY_TEST_SLOTS * 3 + 1] = {0};
+	unsigned long count = device.visibility_sync ? VISIBILITY_TEST_SLOTS + 1 : VISIBILITY_TEST_SLOTS * 3 + 1;
+	unsigned long i, zeros = 0, duplicates = 0, invalid = 0;
+	GLenum error;
+	BOOL success = TRUE;
+
+	/* CreateQueries (core 4.5) instantiates typed objects immediately. The
+	AMD diagnostic returned zero and overlapping names from GenQueries.
+	Create the entire pool together and audit it before publishing any IDs. */
+	while ((error = glGetError()) != GL_NO_ERROR)
+		platform_log("GPU: GL error 0x%x before visibility query creation", error);
+	glCreateQueries(VISIBILITY_QUERY, (GLsizei)count, queries);
+	qsort(queries, count, sizeof(queries[0]), visibility_query_compare);
+	for (i = 0; i < count; i++)
 	{
-		GLuint query = i < VISIBILITY_TEST_SLOTS ? device.queries[i] : device.scratch_query;
-		BOOL duplicate = query && visibility_query_alias(query, i);
-
-		zeros += query == 0;
-		duplicates += duplicate;
-		if (!query || duplicate)
-			visibility_query_fault(!query ? "creation zero" : "creation duplicate", query,
-				i < VISIBILITY_TEST_SLOTS ? (long)i : -1);
+		zeros += queries[i] == 0;
+		duplicates += i && queries[i] && queries[i] == queries[i - 1];
+		invalid += queries[i] && !glIsQuery(queries[i]);
 	}
-	platform_log("GPU: visibility query pool slots=%d first=%u last=%u scratch=%u zeros=%lu duplicates=%lu; validation enabled",
-		VISIBILITY_TEST_SLOTS, device.queries[0], device.queries[VISIBILITY_TEST_SLOTS - 1],
-		device.scratch_query, zeros, duplicates);
+	while ((error = glGetError()) != GL_NO_ERROR)
+	{
+		success = FALSE;
+		platform_log("GPU: GL error 0x%x creating visibility queries", error);
+	}
+	platform_log("GPU: visibility query pool created=%lu zeros=%lu duplicates=%lu invalid=%lu GL_ok=%d; glCreateQueries",
+		count, zeros, duplicates, invalid, success);
+	if (!success || zeros || duplicates || invalid)
+		return FALSE;
+	memcpy(device.queries, queries, sizeof(device.queries));
+	device.scratch_query = queries[VISIBILITY_TEST_SLOTS];
+	if (!device.visibility_sync)
+	{
+		memcpy(device.visibility_batches[0].queries, queries + VISIBILITY_TEST_SLOTS + 1, sizeof(device.queries));
+		memcpy(device.visibility_batches[1].queries, queries + VISIBILITY_TEST_SLOTS * 2 + 1, sizeof(device.queries));
+	}
+	return TRUE;
 }
 
 static BOOL visibility_query_prepare(void)
@@ -2361,8 +2383,8 @@ static BOOL visibility_query_prepare(void)
 	visibility_query_fault(!device.scratch_query ? "before begin zero" : "before begin duplicate", device.scratch_query, -1);
 	/* A bad recycled name must not circulate through the slots. Generate
 	a replacement without deleting a possibly aliased object's valid result. */
-	glGenQueries(1, &replacement);
-	if (!visibility_check_errors("replacement query creation") || !replacement ||
+	glCreateQueries(VISIBILITY_QUERY, 1, &replacement);
+	if (!visibility_check_errors("replacement query creation") || !replacement || !glIsQuery(replacement) ||
 		visibility_query_alias(replacement, VISIBILITY_TEST_SLOTS))
 	{
 		visibility_query_fault("replacement rejected", replacement, -1);
@@ -2401,11 +2423,19 @@ static void visibility_log_summary(void)
 	Uint64 now;
 	int i;
 
-	if (!device.visibility_sync)
+	if (!device.visibility_sync && !device.visibility_debug)
 		return;
 	now = SDL_GetTicks();
 	if (now - device.visibility_log_time < 1000)
 		return;
+	if (!device.visibility_sync)
+	{
+		platform_log("GPU: asynchronous visibility frame=%lu queued_results=%lu mapped=%d; no forced CPU query waits",
+			device.frame, device.visibility_copies, device.visibility_results != NULL);
+		device.visibility_copies = 0;
+		device.visibility_log_time = now;
+		return;
+	}
 	platform_log("GPU: visibility summary ms=%llu frame=%lu depth=%s reads=%lu zero=%lu nonzero=%lu rounded_zero=%lu raw_min=%u raw_max=%u GL_errors_total=%lu query_faults_total=%lu replacements_total=%lu failed_tests_total=%lu failed_reads_total=%lu",
 		(unsigned long long)now, device.frame, device.visibility_no_depth ? "off" : "normal",
 		device.visibility_reads, device.visibility_zeros, device.visibility_reads - device.visibility_zeros,
@@ -6167,6 +6197,7 @@ static void visibility_copy_batch(void)
 			device.visibility_results_buffer, GL_QUERY_RESULT,
 			(GLintptr)(device.visibility_batches[device.visibility_batch].slots[i] * sizeof(GLuint)));
 	}
+	device.visibility_copies += device.visibility_batches[device.visibility_batch].count;
 	device.visibility_batches[device.visibility_batch].count = 0;
 }
 

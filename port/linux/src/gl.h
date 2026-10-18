@@ -259,6 +259,7 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 	X(glEndQuery) \
 	X(glGetQueryObjectuiv) \
 	X(glMemoryBarrier) \
+	X(glCreateQueries) \
 	X(glIsQuery) \
 	X(glDebugMessageCallback)
 #endif
@@ -495,6 +496,7 @@ pointers, sees the declarations without these aliases */
 #define glEndQuery halo_glEndQuery
 #define glGetQueryObjectuiv halo_glGetQueryObjectuiv
 #define glMemoryBarrier halo_glMemoryBarrier
+#define glCreateQueries halo_glCreateQueries
 #define glIsQuery halo_glIsQuery
 #define glDebugMessageCallback halo_glDebugMessageCallback
 
