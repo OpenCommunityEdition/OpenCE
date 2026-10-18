@@ -69,7 +69,7 @@ pub struct Region {
 impl Region {
     /// Whether the guest's code (EL0) may use the range.
     pub fn guest_accessible(&self) -> bool {
-        todo!()
+        self.kind != RegionKind::Runtime
     }
 }
 
@@ -77,7 +77,10 @@ impl Region {
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum PlanError {
     #[error("{first} and {second} overlap")]
-    Overlap { first: RegionKind, second: RegionKind },
+    Overlap {
+        first: RegionKind,
+        second: RegionKind,
+    },
     #[error("{0} appears twice")]
     Duplicate(RegionKind),
     #[error("{0} is not aligned to 2 MB")]
@@ -100,34 +103,79 @@ pub struct AddressSpacePlan {
 
 impl AddressSpacePlan {
     /// A plan of these regions, checked.
+    /// Each region is checked in turn; one that overlaps a region before it
+    /// names itself first and the region it overlaps second.
     pub fn new(regions: impl IntoIterator<Item = Region>) -> Result<AddressSpacePlan, PlanError> {
-        todo!("{}", regions.into_iter().count())
+        let mut sorted: Vec<Region> = Vec::new();
+        for region in regions {
+            let start = u64::from(region.range.start().0);
+            if start % REGION_ALIGNMENT != 0 || region.range.size() % REGION_ALIGNMENT != 0 {
+                return Err(PlanError::Misaligned(region.kind));
+            }
+            if region.range.start().0 < NULL_GUARD {
+                return Err(PlanError::NullPage(region.kind));
+            }
+            if sorted.iter().any(|other| other.kind == region.kind) {
+                return Err(PlanError::Duplicate(region.kind));
+            }
+            if let Some(other) = sorted.iter().find(|other| {
+                start < other.range.end() && u64::from(other.range.start().0) < region.range.end()
+            }) {
+                return Err(PlanError::Overlap {
+                    first: region.kind,
+                    second: other.kind,
+                });
+            }
+            let at = sorted.partition_point(|other| other.range.start() < region.range.start());
+            sorted.insert(at, region);
+        }
+        Ok(AddressSpacePlan { regions: sorted })
     }
 
     /// The plan the macOS host uses: the table in this module's description.
     pub fn standard() -> AddressSpacePlan {
-        todo!()
+        let fixed = |kind, start, size| Region {
+            kind,
+            range: GuestRange::new(GuestPtr(start), size).expect("a fixed range lies below 4 GB"),
+        };
+        let mut regions = vec![
+            fixed(RegionKind::Runtime, RUNTIME_BASE, RUNTIME_SIZE),
+            fixed(RegionKind::Window, WINDOW_BASE, WINDOW_SIZE),
+            fixed(RegionKind::Image, IMAGE_BASE, IMAGE_SIZE),
+        ];
+        // seven pools below the window and five above the image
+        for index in 0..POOL_COUNT {
+            let start = if index < 7 {
+                0x1000_0000 * (u32::from(index) + 1)
+            } else {
+                0x9000_0000 + 0x1000_0000 * (u32::from(index) - 7)
+            };
+            regions.push(fixed(RegionKind::Pool(index), start, POOL_SIZE));
+        }
+        AddressSpacePlan::new(regions).expect("the standard plan is valid (its tests check it)")
     }
 
     /// The regions, in address order.
     pub fn regions(&self) -> &[Region] {
-        todo!()
+        &self.regions
     }
 
     pub fn region(&self, kind: RegionKind) -> Option<&Region> {
-        todo!("{kind}")
+        self.regions.iter().find(|region| region.kind == kind)
     }
 
     /// The region that holds all of `range`, if one does.
     pub fn region_containing(&self, range: GuestRange) -> Option<&Region> {
-        todo!("{range:?}")
+        self.regions.iter().find(|region| {
+            region.range.start() <= range.start() && range.end() <= region.range.end()
+        })
     }
 
     /// The pools, in address order.
     pub fn pools(&self) -> impl Iterator<Item = &Region> {
-        todo!();
-        #[allow(unreachable_code)]
-        self.regions.iter()
+        self.regions
+            .iter()
+            .filter(|region| matches!(region.kind, RegionKind::Pool(_)))
     }
 }
 
@@ -146,23 +194,105 @@ struct Pool {
 
 impl PoolAllocator {
     pub fn new(plan: &AddressSpacePlan) -> PoolAllocator {
-        todo!("{}", plan.regions.len())
+        let pools = plan
+            .pools()
+            .map(|pool| {
+                let pages = pool.range.size() / GUEST_PAGE;
+                Pool {
+                    range: pool.range,
+                    used: vec![0; pages.div_ceil(64) as usize],
+                }
+            })
+            .collect();
+        PoolAllocator { pools }
     }
 
     /// `size` bytes (rounded up to whole pages) of free pool memory.
     pub fn allocate(&mut self, size: u64) -> Result<GuestRange, PlanError> {
-        todo!("{size}")
+        if size == 0 {
+            return Err(PlanError::Empty);
+        }
+        let pages = size.div_ceil(GUEST_PAGE);
+        for pool in &mut self.pools {
+            if let Some(first) = pool.free_run(pages) {
+                pool.set(first, pages, true);
+                let start = u64::from(pool.range.start().0) + first * GUEST_PAGE;
+                // (inside the pool, so below 4 GB)
+                return GuestRange::new(GuestPtr(start as u32), pages * GUEST_PAGE)
+                    .map_err(|_| PlanError::NoRoom(size));
+            }
+        }
+        Err(PlanError::NoRoom(size))
     }
 
     /// Gives back the pages of `range` (rounded out to whole pages); the
     /// range must lie in one pool. Pages already free stay free.
     pub fn free(&mut self, range: GuestRange) -> Result<(), PlanError> {
-        todo!("{range:?}")
+        let not_allocated = PlanError::NotAllocated {
+            address: range.start().0,
+            size: range.size(),
+        };
+        let (pool, first, pages) = self.pages_of(range).ok_or(not_allocated)?;
+        self.pools[pool].set(first, pages, false);
+        Ok(())
     }
 
     /// Whether all of `range` was handed out and not given back.
     pub fn owns(&self, range: GuestRange) -> bool {
-        todo!("{range:?}")
+        self.pages_of(range).is_some_and(|(pool, first, pages)| {
+            (first..first + pages).all(|page| self.pools[pool].is_used(page))
+        })
+    }
+
+    /// The pool and its pages (first, count) that hold `range`, rounded out
+    /// to whole pages.
+    fn pages_of(&self, range: GuestRange) -> Option<(usize, u64, u64)> {
+        let start = u64::from(range.start().0) / GUEST_PAGE * GUEST_PAGE;
+        let end = range.end().div_ceil(GUEST_PAGE) * GUEST_PAGE;
+        self.pools
+            .iter()
+            .position(|pool| u64::from(pool.range.start().0) <= start && end <= pool.range.end())
+            .map(|index| {
+                let first = (start - u64::from(self.pools[index].range.start().0)) / GUEST_PAGE;
+                (index, first, (end - start) / GUEST_PAGE)
+            })
+    }
+}
+
+impl Pool {
+    fn pages(&self) -> u64 {
+        self.range.size() / GUEST_PAGE
+    }
+
+    fn is_used(&self, page: u64) -> bool {
+        self.used[(page / 64) as usize] & (1 << (page % 64)) != 0
+    }
+
+    fn set(&mut self, first: u64, count: u64, used: bool) {
+        for page in first..first + count {
+            let (word, bit) = ((page / 64) as usize, 1u64 << (page % 64));
+            if used {
+                self.used[word] |= bit;
+            } else {
+                self.used[word] &= !bit;
+            }
+        }
+    }
+
+    /// The first page of the first run of `count` free pages.
+    fn free_run(&self, count: u64) -> Option<u64> {
+        let mut run = 0;
+        for page in 0..self.pages() {
+            if self.is_used(page) {
+                run = 0;
+                continue;
+            }
+            run += 1;
+            if run == count {
+                return Some(page + 1 - count);
+            }
+        }
+        None
     }
 }
 
@@ -186,9 +316,15 @@ mod tests {
     fn the_standard_plan_puts_the_game_where_it_was_linked() {
         let plan = AddressSpacePlan::standard();
         let window = plan.region(RegionKind::Window).expect("a window");
-        assert_eq!((window.range.start(), window.range.size()), (GuestPtr(0x8000_0000), 0x0800_0000));
+        assert_eq!(
+            (window.range.start(), window.range.size()),
+            (GuestPtr(0x8000_0000), 0x0800_0000)
+        );
         let image = plan.region(RegionKind::Image).expect("an image range");
-        assert_eq!((image.range.start(), image.range.end()), (GuestPtr(0x8800_0000), 0x8c00_0000));
+        assert_eq!(
+            (image.range.start(), image.range.end()),
+            (GuestPtr(0x8800_0000), 0x8c00_0000)
+        );
         let runtime = plan.region(RegionKind::Runtime).expect("a runtime range");
         assert!(!runtime.guest_accessible());
         assert!(window.guest_accessible() && image.guest_accessible());
@@ -213,7 +349,10 @@ mod tests {
         let regions = plan.regions();
         assert_eq!(regions.len(), 15);
         for pair in regions.windows(2) {
-            assert!(pair[0].range.end() <= u64::from(pair[1].range.start().0), "{pair:?}");
+            assert!(
+                pair[0].range.end() <= u64::from(pair[1].range.start().0),
+                "{pair:?}"
+            );
         }
         for region in regions {
             assert_eq!(u64::from(region.range.start().0) % REGION_ALIGNMENT, 0);
@@ -253,11 +392,13 @@ mod tests {
             PlanError::Duplicate(RegionKind::Window)
         );
         assert_eq!(
-            AddressSpacePlan::new([region(RegionKind::Image, 0x8800_1000, 0x0020_0000)]).expect_err("misaligned"),
+            AddressSpacePlan::new([region(RegionKind::Image, 0x8800_1000, 0x0020_0000)])
+                .expect_err("misaligned"),
             PlanError::Misaligned(RegionKind::Image)
         );
         assert_eq!(
-            AddressSpacePlan::new([region(RegionKind::Pool(0), 0x1000_0000, 0x1000)]).expect_err("misaligned size"),
+            AddressSpacePlan::new([region(RegionKind::Pool(0), 0x1000_0000, 0x1000)])
+                .expect_err("misaligned size"),
             PlanError::Misaligned(RegionKind::Pool(0))
         );
         assert_eq!(
@@ -271,8 +412,15 @@ mod tests {
         let plan = AddressSpacePlan::standard();
         let pool = plan.pools().nth(3).expect("a fourth pool");
         let inside = range(pool.range.start().0 + 0x1000, 0x2000);
-        assert_eq!(plan.region_containing(inside).map(|r| r.kind), Some(RegionKind::Pool(3)));
-        assert_eq!(plan.region_containing(range(0x8800_0000, 0x10)).map(|r| r.kind), Some(RegionKind::Image));
+        assert_eq!(
+            plan.region_containing(inside).map(|r| r.kind),
+            Some(RegionKind::Pool(3))
+        );
+        assert_eq!(
+            plan.region_containing(range(0x8800_0000, 0x10))
+                .map(|r| r.kind),
+            Some(RegionKind::Image)
+        );
         // in no region, or across two
         assert!(plan.region_containing(range(0x0000_1000, 0x10)).is_none());
         assert!(plan.region_containing(range(0x87ff_fff0, 0x20)).is_none());
@@ -286,12 +434,18 @@ mod tests {
         let a = pools.allocate(1).expect("room");
         assert_eq!((a.start(), a.size()), (GuestPtr(first_pool), GUEST_PAGE));
         let b = pools.allocate(GUEST_PAGE + 1).expect("room");
-        assert_eq!((b.start(), b.size()), (GuestPtr(first_pool + 0x1000), 2 * GUEST_PAGE));
+        assert_eq!(
+            (b.start(), b.size()),
+            (GuestPtr(first_pool + 0x1000), 2 * GUEST_PAGE)
+        );
         assert!(pools.owns(a) && pools.owns(b));
         pools.free(a).expect("handed out");
         assert!(!pools.owns(a));
         // the freed page is the first that is free again
-        assert_eq!(pools.allocate(GUEST_PAGE).expect("room").start(), GuestPtr(first_pool));
+        assert_eq!(
+            pools.allocate(GUEST_PAGE).expect("room").start(),
+            GuestPtr(first_pool)
+        );
         assert_eq!(pools.allocate(0), Err(PlanError::Empty));
     }
 
@@ -302,8 +456,14 @@ mod tests {
         let mut pools = PoolAllocator::new(&plan);
         let whole = pools.allocate(POOL_SIZE).expect("a whole pool");
         assert_eq!(whole.start(), GuestPtr(starts[0]));
-        assert_eq!(pools.allocate(GUEST_PAGE).expect("room").start(), GuestPtr(starts[1]));
-        assert_eq!(pools.allocate(POOL_SIZE + GUEST_PAGE), Err(PlanError::NoRoom(POOL_SIZE + GUEST_PAGE)));
+        assert_eq!(
+            pools.allocate(GUEST_PAGE).expect("room").start(),
+            GuestPtr(starts[1])
+        );
+        assert_eq!(
+            pools.allocate(POOL_SIZE + GUEST_PAGE),
+            Err(PlanError::NoRoom(POOL_SIZE + GUEST_PAGE))
+        );
     }
 
     #[test]
