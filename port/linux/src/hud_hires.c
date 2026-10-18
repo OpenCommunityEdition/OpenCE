@@ -592,7 +592,7 @@ unsigned int hud_hires_shown_texture(long asset, unsigned long *levels)
 		else
 		{
 			unsigned long width = 0, height = 0;
-			unsigned char *pixels = png_decode(hud_hires_embedded[face].png, hud_hires_embedded[face].png_size,
+			unsigned char *pixels = png_decode((const unsigned char *)hud_hires_embedded[face].png,hud_hires_embedded[face].png_size,
 				&width, &height);
 			unsigned char *placed = pixels ? hud_button_variant_place(pixels, width, height,
 				32,

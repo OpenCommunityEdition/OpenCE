@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from harness import CHECK_FAILED, build, constant, enum_with, function, inline, mutated, read, run  # noqa: E402
+from harness import CHECK_FAILED, build, constant, enum_with, function, inline, mutated, read, run, structure  # noqa: E402
 
 CASES = ["identical", "moving", "detects-stale", "invalidated"]
 
@@ -30,6 +30,7 @@ ENUMS = [("source/objects/object_types.h", "_object_type_biped"), ("source/objec
 def under_test(fault=None):
     enums = "\n".join(enum_with(read(header), member) for header, member in ENUMS)
     enums += f"\n#define MAXIMUM_OBJECTS_PER_MAP {constant(read('source/objects/objects.h'), 'MAXIMUM_OBJECTS_PER_MAP')}\n"
+    enums += "\n" + structure(read("source/objects/objects.h"), "object_node_stamp_key") + "\n"
     real_math = read("source/math/real_math.h")
     text = "".join(inline(real_math, helper) + "\n"
                    for helper in ("vector_from_points3d", "magnitude_squared3d", "distance_squared3d", "point_in_sphere"))
