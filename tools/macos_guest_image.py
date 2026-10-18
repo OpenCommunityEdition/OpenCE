@@ -20,9 +20,9 @@ GUEST = ROOT / "build/macos/guest"
 OBJECTS = GUEST / "obj"
 HOST = ROOT / "build/macos/halo_host"
 LINKER_SCRIPT = ROOT / "port/android/guest/guest.ld"
-# the guest runtime's parts a program needs (not its SDL, POSIX or memory
-# watch bridges, which the game's platform layer uses)
-RUNTIME = ["guest_start", "guest_thread", "guest_syscall", "guest_string", "guest_misc"]
+# the guest runtime's parts a program needs, with its SDL bridge (not its
+# memory watch, which the game's platform layer uses)
+RUNTIME = ["guest_start", "guest_thread", "guest_syscall", "guest_string", "guest_misc", "guest_sdl"]
 # a runtime object whose compile command is the one a test's C file gets
 REFERENCE_OBJECT = OBJECTS / "port/android/guest/runtime/guest_misc.o"
 
@@ -60,8 +60,9 @@ def compile_guest(source: Path, obj: Path, extra_flags: Iterable[str] = ()) -> N
 def link_guest(objects: Iterable[Path], image: Path) -> None:
     lld = os.environ.get("HALO_MACOS_LLD", "ld.lld")
     runtime = [OBJECTS / f"port/android/guest/runtime/{name}.o" for name in RUNTIME]
-    # the platform layer's POSIX helpers' guest side (port/linux/src/posix.h)
-    runtime.append(OBJECTS / "guest/gen/guest_posix.o")
+    # the guest sides of the platform layer's POSIX helpers (port/linux/src/posix.h)
+    # and of OpenGL ES (which the SDL bridge refers to)
+    runtime += [OBJECTS / "guest/gen/guest_posix.o", OBJECTS / "guest/gen/guest_gl.o"]
     command = [lld, "-m", "aarch64linux", "-static", "-nostdlib", "-T", str(LINKER_SCRIPT), "-o", str(image),
                *map(str, objects), *map(str, runtime), str(OBJECTS / "gen/imports.o"), str(GUEST / "libguestc.a")]
     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)

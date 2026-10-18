@@ -184,10 +184,35 @@ static void report_crash(struct vcpu *vcpu, const char *what, uint64_t syndrome)
 		what, (unsigned long long)syndrome, (unsigned long long)esr, (unsigned long long)(esr >> 26),
 		(unsigned long long)get_sys(vcpu, HV_SYS_REG_ELR_EL1), (unsigned long long)get_sys(vcpu, HV_SYS_REG_FAR_EL1));
 	for (index = 0; index < 31; index++)
-		fprintf(stderr, "halo_host:   x%-2d %#010llx%s", index, (unsigned long long)get_reg(vcpu, (hv_reg_t)(HV_REG_X0 + index)),
-			index % 4 == 3 ? "\n" : "");
-	fprintf(stderr, "\nhalo_host:   sp %#010llx pc %#010llx\n", (unsigned long long)get_sys(vcpu, HV_SYS_REG_SP_EL0),
-		(unsigned long long)get_reg(vcpu, HV_REG_PC));
+	{
+		if (index % 4 == 0)
+			fputs("halo_host:  ", stderr);
+		fprintf(stderr, " x%-2d 0x%08llx", index, (unsigned long long)get_reg(vcpu, (hv_reg_t)(HV_REG_X0 + index)));
+		if (index % 4 == 3 || index == 30)
+			fputc('\n', stderr);
+	}
+	/* (pc is the vectors', where the exception was taken: elr is the
+	guest's) */
+	fprintf(stderr, "halo_host:   sp 0x%08llx elr 0x%08llx\n", (unsigned long long)get_sys(vcpu, HV_SYS_REG_SP_EL0),
+		(unsigned long long)get_sys(vcpu, HV_SYS_REG_ELR_EL1));
+	/* the guest's calls, from its frame records (x29: the previous x29,
+	then the return address; the guest keeps frame pointers) */
+	{
+		uint64_t frame = get_reg(vcpu, HV_REG_FP);
+		int depth;
+
+		fputs("halo_host:   called from", stderr);
+		for (depth = 0; depth < 24 && frame && frame < 0xfffffff0u && !(frame & 7); depth++)
+		{
+			const uint64_t *record = (const uint64_t *)opence_guest_host_pointer(host_guest, (uint32_t)frame, 16);
+
+			if (!record || !record[1])
+				break;
+			fprintf(stderr, " 0x%08llx", (unsigned long long)record[1]);
+			frame = record[0];
+		}
+		fputc('\n', stderr);
+	}
 	fflush(stderr);
 	_exit(70);
 }

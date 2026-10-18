@@ -97,3 +97,34 @@ def test_the_hosts_system_calls_natively(tmp_path):
     result = subprocess.run([str(exe), str(folder)], capture_output=True, text=True, timeout=30)
     assert (result.returncode, result.stdout.strip()) == (0, "ok"), result.stdout + result.stderr
     assert list(folder.iterdir()) == []
+
+
+# ---------- SDL, headless
+
+SDL_DRIVERS = {"SDL_AUDIO_DRIVER": "dummy", "SDL_VIDEO_DRIVER": "dummy"}
+
+
+@pytest.fixture(scope="module")
+def sdl_image(tmp_path_factory):
+    work = tmp_path_factory.mktemp("vm_sdl")
+    return macos_guest_image.build_guest_image([ROOT / "port/macos/tests/vm_sdl.c"], work, "vm_sdl")
+
+
+@pytest.mark.parametrize("case", ["audio", "audio_then_wait", "events"])
+def test_sdl(sdl_image, tmp_path, case):
+    status, stdout, stderr = run_case(sdl_image, tmp_path, case, environment=SDL_DRIVERS)
+    assert (status, stdout.strip()) == (0, "ok"), stdout + stderr
+
+
+def test_the_audio_callback_is_guest_code_on_a_vcpu_of_its_own(sdl_image, tmp_path):
+    # (the callback's calls into the host: its SDL_PutAudioStreamData)
+    status, stdout, stderr = run_case(sdl_image, tmp_path, "audio",
+                                      environment={**SDL_DRIVERS, "HALO_HOST_IMPORT_COUNTS": "1"})
+    assert (status, stdout.strip()) == (0, "ok"), stdout + stderr
+    assert import_counts(stderr).get("host_sdl_put_audio_stream_data", 0) >= 3, stderr
+
+
+def test_opengl_es_is_refused_while_headless(sdl_image, tmp_path):
+    status, stdout, stderr = run_case(sdl_image, tmp_path, "gl", environment=SDL_DRIVERS)
+    assert (status, stdout.strip()) == (0, "ok"), stdout + stderr
+    assert stderr.count("the guest called hostgl_glClear, which this host does not carry out") == 1, stderr

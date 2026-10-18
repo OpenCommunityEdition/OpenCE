@@ -48,6 +48,10 @@ enum
 #define DEFAULT_STACK_SIZE (1024 * 1024)
 
 static struct guest_thread main_thread;
+/* the thread pointer of a host thread whose own struct pthread is being
+freed (__guest_thread_detach): free() itself uses errno, which is in the
+struct pthread, and may unmap the very memory it frees */
+static struct guest_thread detaching_thread;
 
 #ifdef HALO_GUEST_VM
 uintptr_t __guest_get_tp(void)
@@ -87,6 +91,7 @@ static void thread_initialize(struct guest_thread *thread)
 void __guest_thread_initialize_main(void)
 {
 	thread_initialize(&main_thread);
+	thread_initialize(&detaching_thread);
 	guest_set_tp((unsigned int)&main_thread);
 	main_thread.pthread.tid = __syscall(SYS_gettid);
 	libc.can_do_threads = 1;
@@ -139,6 +144,10 @@ unsigned int __guest_thread_attach(void)
 		host_abort("cannot allocate a guest thread");
 	thread_initialize(thread);
 	thread->state = _thread_detached;
+	/* the guest's code now runs on two threads at once, even if it never
+	made one (a program whose only other thread is SDL's audio callback's):
+	musl's malloc and stdio must take their locks */
+	libc.need_locks = 1;
 	guest_set_tp((unsigned int)thread);
 	thread->pthread.tid = __syscall(SYS_gettid);
 	return (unsigned int)thread;
@@ -152,8 +161,9 @@ void __guest_thread_detach(void)
 
 	if (!thread || thread == &main_thread)
 		return;
-	guest_set_tp(0);
+	guest_set_tp((unsigned int)&detaching_thread);
 	thread_free(thread);
+	guest_set_tp(0);
 }
 
 int pthread_create(pthread_t *restrict result, const pthread_attr_t *restrict attributes,
