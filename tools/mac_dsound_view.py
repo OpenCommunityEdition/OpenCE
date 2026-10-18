@@ -404,10 +404,10 @@ def generate():
 	free(stream);
 	return 0;''', 'OpenAL release')
     text = replace_once(text,
-        '''		reverb_enabled = audio_reverb_setting();
+        '''		resampler_mode = resampler_mode_read();
 	}
 	streams_complete_finished();''',
-        '''		reverb_enabled = audio_reverb_setting();
+        '''		resampler_mode = resampler_mode_read();
 	}
 	openal_update();
 	streams_complete_finished();''', 'OpenAL update')
