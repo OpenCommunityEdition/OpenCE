@@ -45,7 +45,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 
 `port/macos/host/`: the VM, and the imports adapted from `port/android/host/`. Shared code is moved or included rather than copied where the Android host stays as it is.
 
-- [ ] Task: Write `tools/test_macos_host.py` with a smoke test: the host creates the VM, loads the guest image, runs to the guest's `main` (a log line through `host_log`) and exits with status 0 under `debug.exit_after` (red)
+- [x] Task: Write `tools/test_macos_host.py` with a smoke test: the host creates the VM, loads the guest image, runs to the guest's `main` (a log line through `host_log`) and exits with status 0 under `debug.exit_after` (red) 61722a9
 - [ ] Task: The VM: reserve the guest memory (Rust), map it into the VM, build the page tables, load and check the image (Rust), and start a vCPU at EL0 at the guest's entry
 - [ ] Task: The guest's EL1 vectors (assembly, mapped by the host): an `svc` from EL0 becomes an `hvc` and then an `eret`; any other exception exits with `ESR_EL1`, `FAR_EL1` and `ELR_EL1`, and the host reports it as a crash with the guest address
 - [ ] Task: The import dispatcher: generated from `guest_host.h`'s prototypes, it reads each import's integer and floating-point arguments from the vCPU's registers, turns guest addresses into host addresses, calls the host function and writes the result back; tests for the generator
