@@ -27,7 +27,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: Check that `python configure.py` and the existing `linux` and `android` targets are unchanged (`ninja -t commands` before and after) (checked: identical commands, no code change)
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Nix flake and the macOS build' (Protocol in workflow.md)
 
-## Phase 3: The Rust runtime crate
+## Phase 3: The Rust runtime crate [checkpoint: e522066]
 
 `port/macos/runtime/`: the pure-logic pieces of the VM host, behind a C ABI (cbindgen header), with tests that need no game data.
 
@@ -39,7 +39,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: Implement the page-table builder and the system-register values the vCPUs start with (`TTBR0_EL1`, `TCR_EL1`, `MAIR_EL1`, `SCTLR_EL1`, `CPACR_EL1`, `VBAR_EL1`) 7df6d14
 - [x] Task: Write tests for the ELF image checks: the header, program headers inside the file, segments inside the image range, the import table's bounds, with malformed images (red) f634cca
 - [x] Task: Implement the image checks from `host_loader.c`, and export the C ABI with a cbindgen header; `cargo fmt`, `cargo clippy -D warnings`, and coverage >80% b6bd54a 8f580af
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: The Rust runtime crate' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: The Rust runtime crate' (Protocol in workflow.md)
 
 ## Phase 4: The VM host
 
