@@ -153,7 +153,7 @@ static const struct config_setting config_settings[] =
 		"The menus: \"pc\" for the PC version's main menu (port/assets/menus,\n"
 		"and a menus folder here for your own), \"xbox\" for the Xbox's." },
 	{ "display.changelog", _config_boolean, "true", "HALO_CHANGELOG", _environment_value, _platform_all,
-		"Show CHANGELOG between MODS and QUIT in the PC main menu.\n"
+		"Show CHANGELOG at the bottom-right of the PC main menu.\n"
 		"Restart the game after changing this setting." },
 	{ "display.player_names", _config_string, "\"all\"", "HALO_PLAYER_NAMES", _environment_value, _platform_all,
 		"In multiplayer, whose names are drawn above their heads: \"all\",\n"

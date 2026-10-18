@@ -7,6 +7,91 @@
 
 #define CHANGELOG_VISIBLE_LINES 8
 
+static boolean changelog_menu_main_focus(struct widget_instance *widget, boolean corner)
+{
+	struct widget_instance *main_list, *corner_list, *button, *child;
+	char const *name;
+	short index;
+
+	while (widget && widget->parent)
+		widget = widget->parent;
+	name = widget ? tag_get_name(widget->definition_tag_index) : NULL;
+	if (!name || strcmp(name, "pc\\main_menu\\main_menu"))
+		return FALSE;
+	main_list = named(widget, "main_menu_select_list", 0);
+	corner_list = named(widget, "changelog_corner", 0);
+	button = named(corner_list, "main_menu_item_changelog", 0);
+	if (!main_list || main_list->type != 3 || !corner_list || corner_list->type != 3 || !button)
+		return FALSE;
+	if (corner)
+	{
+		main_list->focused_child = NULL;
+		corner_list->focused_child = button;
+		widget->focused_child = corner_list;
+	}
+	else
+	{
+		/* Mouse focus clears the old chain, but retains the list's selected
+		index. Restore that child without changing the six-row tab behavior. */
+		if (!main_list->focused_child)
+		{
+			child = main_list->child;
+			for (index = 0; child && child->next && index < main_list->parameters.list.selected_index; index++)
+				child = child->next;
+			main_list->focused_child = child;
+		}
+		if (main_list->focused_child && main_list->focused_child->animation.number_of_sprite_frames == 2)
+			main_list->focused_child->animation.current_frame_index = 1;
+		widget->focused_child = main_list;
+	}
+	return TRUE;
+}
+
+static void changelog_menu_focus_update(struct widget_instance *widget)
+{
+	static char const prefix[] = "pc\\main_menu\\changelog\\build_";
+	struct widget_instance *corner, *button, *main_list, *child;
+	char const *name = widget ? tag_get_name(widget->definition_tag_index) : NULL;
+	short index;
+
+	if (!name)
+		return;
+	if (widget->type == 0 && !widget->parent && !strncmp(name, prefix, sizeof(prefix) - 1) &&
+		name[sizeof(prefix) - 1] && strspn(name + sizeof(prefix) - 1, "0123456789") == strlen(name + sizeof(prefix) - 1))
+	{
+		short list_index;
+
+		/* The engine updates only the focused list. Synchronize our two
+		button groups so the inactive group cannot retain a white outline. */
+		for (list_index = 0; list_index < 2; list_index++)
+		{
+			main_list = named(widget, list_index ? "buttons" : "scroll_controls", 0);
+			if (!main_list || main_list->type != 3)
+				continue;
+			for (child = main_list->child, index = 0; child && index < 3; child = child->next, index++)
+				if (child->animation.number_of_sprite_frames == 2)
+					child->animation.current_frame_index = !child->disabled &&
+						widget->focused_child == main_list && main_list->focused_child == child;
+		}
+		return;
+	}
+	if (strcmp(name, "pc\\main_menu\\main_menu"))
+		return;
+	corner = named(widget, "changelog_corner", 0);
+	button = named(corner, "main_menu_item_changelog", 0);
+	if (corner && button)
+	{
+		button->animation.current_frame_index = widget->focused_child == corner && corner->focused_child == button;
+		main_list = named(widget, "main_menu_select_list", 0);
+		/* Mouse focus bypasses the Right handler. The inactive list is not
+		updated by the engine, so clear its old glow before it is rendered. */
+		if (widget->focused_child == corner && main_list)
+			for (child = main_list->child, index = 0; child && index < 6; child = child->next, index++)
+				if (child->animation.number_of_sprite_frames == 2)
+					child->animation.current_frame_index = 0;
+	}
+}
+
 static boolean changelog_menu_event(struct widget_instance *widget, char const *event)
 {
 	static char const prefix[] = "pc\\main_menu\\changelog\\build_";
@@ -19,6 +104,8 @@ static boolean changelog_menu_event(struct widget_instance *widget, char const *
 	boolean initialize = !strcmp(event, "port changelog init");
 	long direction = !strcmp(event, "port changelog down") ? 1 : -1;
 
+	if (!strcmp(event, "port changelog corner focus") || !strcmp(event, "port changelog main focus"))
+		return changelog_menu_main_focus(widget, !strcmp(event, "port changelog corner focus"));
 	if (!initialize && strcmp(event, "port changelog up") && strcmp(event, "port changelog down"))
 		return FALSE;
 	while (root && root->parent)

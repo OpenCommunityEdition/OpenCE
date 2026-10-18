@@ -11,12 +11,17 @@
 	<widget name="main_menu/halo_logo" controller="1" width="640" height="256" bitmap="ui\shell\main_menu\halo_logo">
 	</widget>
 	<widget name="main_menu/main_menu" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<on event="right stick_right" run="port changelog corner focus"/>
+		<on event="left stick_left" run="port changelog main focus"/>
+		<data input="port changelog focus update"/>
 		<on event="created" run="main menu intialize" label="ring_loop"/>
 		<on event="back" open="main_menu/quit_select/quit_screen"/>
 		<on event="b" open="main_menu/quit_select/quit_screen"/>
 		<child widget="main_menu/halo_logo" y="28"/>
 		<child widget="main_menu/main_menu_select_list"/>
 		<child widget="main_menu/build_number" x="450" y="400"/>
+		<child widget="main_menu/gulch_build_number" x="450" y="420"/>
+		<child widget="main_menu/changelog_corner" x="456" y="444"/>
 	</widget>
 	<widget name="main_menu/main_menu_item_load_camp" type="text" width="256" height="33" bitmap="main_menu/menu_load_campaign" string_list="main_menu/main_menu_options" string_index="1" font="ui\small_ui" color="#000080FF">
 		<on event="a" run="new game if no plyr profiles" label="load_campaign" open="main_menu/campaign_select/campaign_menu" branch="true"/>
@@ -57,7 +62,6 @@
 		<child widget="main_menu/main_menu_item_profile" x="192" y="319"/>
 		<child widget="main_menu/main_menu_item_settings" x="192" y="355"/>
 		<child widget="main_menu/main_menu_item_mods" x="192" y="391"/>
-		<child widget="main_menu/main_menu_item_changelog" x="192" y="427"/>
 		<child widget="main_menu/main_menu_item_quit_game" x="192" y="427"/>
 	</widget>
 	<widget name="main_menu/new_campaign_creating_profile" width="640" height="480" flags="pass_unhandled_to_focused_child no_history" auto_close="1">

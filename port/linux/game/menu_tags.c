@@ -395,6 +395,8 @@ static char const *const port_function_names[] =
 	"port mods init", "port mods close", "port mods toggle", "port mods move up", "port mods move down",
 	"port mods save",
 	"port changelog init", "port changelog up", "port changelog down",
+	"port gulch build label",
+	"port changelog corner focus", "port changelog main focus",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
@@ -418,6 +420,7 @@ static char const *const port_game_data_input_names[] =
 	"port gamepad layout preview",
 	/* (the main menu's Mods) */
 	"port mods update",
+	"port changelog focus update",
 };
 
 static struct

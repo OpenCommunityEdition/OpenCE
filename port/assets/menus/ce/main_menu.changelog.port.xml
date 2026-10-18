@@ -2,17 +2,23 @@
 <!-- Player notes (tools/changelog_menu.py) -->
 <menus>
 	<bitmap name="main_menu/menu_changelog">
-		<frame png="ce/port/main_menu/menu_changelog__0.png" width="256" height="64"/>
-		<frame png="ce/port/main_menu/menu_changelog__1.png" width="256" height="64"/>
+		<frame png="ce/port/main_menu/menu_changelog__0.png" width="160" height="32"/>
+		<frame png="ce/port/main_menu/menu_changelog__1.png" width="160" height="32"/>
 	</bitmap>
 	<bitmap name="main_menu/changelog/header_changelog">
 		<frame png="ce/port/main_menu/changelog/header_changelog.png" width="512" height="64"/>
 	</bitmap>
-	<widget name="main_menu/main_menu_item_changelog" type="text" width="256" height="33" bitmap="main_menu/menu_changelog">
+	<widget name="main_menu/main_menu_item_changelog" type="text" width="160" height="28" bitmap="main_menu/menu_changelog">
 		<on event="a start" open="main_menu/changelog/build_1"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
+	<widget name="main_menu/changelog_corner" type="column_list" width="160" height="28" flags="pass_unhandled_to_focused_child">
+		<child widget="main_menu/main_menu_item_changelog"/>
+	</widget>
 	<widget name="main_menu/changelog/header_changelog" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/changelog/header_changelog">
+	</widget>
+	<widget name="main_menu/gulch_build_number" type="text" controller="1" width="150" height="20" font="ui\small_ui" color="#FFFF8000">
+		<on event="created" run="port gulch build label"/>
 	</widget>
 	<strings name="main_menu/changelog/build_1/lines">
 		<string text=""/>
@@ -105,6 +111,7 @@
 		<on event="created" run="port changelog init"/>
 		<on event="up stick_up" run="port changelog up"/>
 		<on event="down stick_down" run="port changelog down"/>
+		<data input="port changelog focus update"/>
 		<child widget="main_menu/changelog/header_changelog"/>
 		<child widget="main_menu/changelog/build_1/build_number"/>
 		<child widget="main_menu/changelog/build_1/label"/>
@@ -129,8 +136,7 @@
 		<child widget="main_menu/changelog/build_1/scroll_position"/>
 		<child widget="main_menu/changelog/build_1/instructions"/>
 		<child widget="main_menu/changelog/build_1/buttons" y="414"/>
-		<child widget="main_menu/changelog/build_1/scroll_up" x="480" y="314"/>
-		<child widget="main_menu/changelog/build_1/scroll_down" x="480" y="342"/>
+		<child widget="main_menu/changelog/build_1/scroll_controls" x="480" y="314"/>
 	</widget>
 	<widget name="main_menu/changelog/build_1/build_number" type="text" left="430" top="44" width="170" height="24" text="1 / 1" font="ui\small_ui" color="#FF2896FF" align="right">
 	</widget>
@@ -183,6 +189,10 @@
 	<widget name="main_menu/changelog/build_1/scroll_down" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="DOWN" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="port changelog down"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/changelog/build_1/scroll_controls" type="column_list" width="128" height="52" flags="pass_unhandled_to_focused_child">
+		<child widget="main_menu/changelog/build_1/scroll_up"/>
+		<child widget="main_menu/changelog/build_1/scroll_down" y="28"/>
 	</widget>
 	<widget name="main_menu/changelog/build_1/button_back" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="BACK" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" back="true"/>

@@ -17,11 +17,11 @@ def layout_tool(tmp_path_factory):
     if not cc:
         pytest.skip("a C compiler is needed for the changelog layout test")
     tree = ET.parse(ROOT / "port/assets/menus/ce/main_menu.xml")
-    rows = tree.find("widget[@name='main_menu/main_menu_select_list']").findall("child")
-    assert len(rows) == 7
+    rows = tree.find("widget[@name='main_menu/main_menu']").findall("child")
+    assert any(row.get("widget") == "main_menu/changelog_corner" for row in rows)
     setup = "\n".join(
         f"children[{i}].widget = {json.dumps(row.get('widget'))}; "
-        f"children[{i}].x = {row.get('x')}; children[{i}].y = {row.get('y')};"
+        f"children[{i}].x = {row.get('x', 0)}; children[{i}].y = {row.get('y', 0)};"
         for i, row in enumerate(rows)
     )
     folder = tmp_path_factory.mktemp("changelog-layout")
@@ -36,26 +36,24 @@ int main(int argc, char **argv)
 {
     struct halo_menus menus = {0};
     struct halo_menu_widget widget = {0};
-    struct halo_menu_child children[7] = {0}, before[7];
+    struct halo_menu_child children[32] = {0}, before[32];
     long i;
     int enabled;
     if (argc != 2) return 2;
-    enabled = strcmp(argv[1], "off") != 0;
+    enabled = !strcmp(argv[1], "on") || !strcmp(argv[1], "repeat");
     menus.widgets = &widget; menus.widget_count = 1;
-    menus.children = children; menus.child_count = 7;
-    widget.name = "main_menu/main_menu_select_list"; widget.first_child = 0;
-    for (i = 0; i < 7; i++) {
+    menus.children = children; menus.child_count = ROWCOUNT;
+    widget.name = "main_menu/main_menu"; widget.first_child = 0;
+    for (i = 0; i < ROWCOUNT; i++) {
         children[i].nested = HALO_MENU_NONE;
-        children[i].next = i == 6 ? HALO_MENU_NONE : i + 1;
+        children[i].next = i == ROWCOUNT - 1 ? HALO_MENU_NONE : i + 1;
     }
-''' + setup + r'''
-    if (!strcmp(argv[1], "custom")) children[0].y = 100;
-    if (!strcmp(argv[1], "absent")) children[4].next = 6;
+'''.replace('ROWCOUNT', str(len(rows))) + setup + r'''
     if (!strcmp(argv[1], "other")) widget.name = "main_menu/mods/mods_list";
     memcpy(before, children, sizeof(children));
     changelog_menu_configure(&menus, enabled);
-    if (!strcmp(argv[1], "repeat")) changelog_menu_configure(&menus, enabled);
-    if (!strcmp(argv[1], "custom") || !strcmp(argv[1], "absent") || !strcmp(argv[1], "other")) {
+    changelog_menu_configure(&menus, enabled);
+    if (enabled || !strcmp(argv[1], "other")) {
         if (memcmp(before, children, sizeof(children))) return 3;
     }
     for (i = widget.first_child; i != HALO_MENU_NONE; i = children[i].next)
@@ -79,22 +77,21 @@ def run_layout(tool, mode):
     return [line.rsplit(" ", 2) for line in output.splitlines()]
 
 
-@pytest.mark.parametrize("mode", ["on", "repeat"])
-def test_enabled_entry_fits_and_is_between_mods_and_quit(layout_tool, mode):
-    rows = run_layout(layout_tool, mode)
-    assert [int(row[2]) for row in rows] == [211, 247, 283, 319, 355, 391, 427]
-    assert [row[0].rsplit("_", 1)[-1] for row in rows[4:6]] == ["mods", "changelog"]
-    assert rows[-1][0].endswith("quit_game")
-    assert all(int(row[2]) + 33 <= 480 for row in rows)
+def test_corner_is_separate_from_original_six_rows(layout_tool):
+    rows = run_layout(layout_tool, "on")
+    assert [row for row in rows if row[0].endswith("changelog_corner")] == [
+        ["main_menu/changelog_corner", "456", "444"]]
+    tree = ET.parse(ROOT / "port/assets/menus/ce/main_menu.xml")
+    central = tree.find("widget[@name='main_menu/main_menu_select_list']").findall("child")
+    assert len(central) == 6
+    assert [int(row.get("y")) for row in central] == [247, 283, 319, 355, 391, 427]
 
 
-def test_disabled_restores_original_six_rows(layout_tool):
-    rows = run_layout(layout_tool, "off")
-    assert len(rows) == 6
-    assert all("changelog" not in row[0] for row in rows)
-    assert [int(row[2]) for row in rows] == [247, 283, 319, 355, 391, 427]
+def test_disabled_removes_only_corner_and_preserves_build_label(layout_tool):
+    on, off = run_layout(layout_tool, "on"), run_layout(layout_tool, "off")
+    assert off == [row for row in on if row[0] != "main_menu/changelog_corner"]
+    assert any(row[0] == "main_menu/gulch_build_number" for row in off)
 
 
-@pytest.mark.parametrize("mode", ["custom", "absent", "other"])
-def test_overrides_and_unrelated_menus_are_unchanged(layout_tool, mode):
-    run_layout(layout_tool, mode)
+def test_unrelated_menu_is_unchanged(layout_tool):
+    assert run_layout(layout_tool, "other") == run_layout(layout_tool, "on")
