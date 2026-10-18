@@ -19,7 +19,7 @@ Small stand-alone C programs in `port/macos/spikes/`, each one printing PASS or 
 
 Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM under Hypervisor.framework.
 
-- [ ] Task: Write `tools/test_macos_build.py`: the configured build graph has a `macos` target with the guest image and the host, and `ninja -n macos` succeeds; the VM build's import stubs are `mov w16, #index; svc #0; ret` (red)
+- [x] Task: Write `tools/test_macos_build.py`: the configured build graph has a `macos` target with the guest image and the host, and `ninja -n macos` succeeds; the VM build's import stubs are `mov w16, #index; svc #0; ret` (red) 6e19415
 - [ ] Task: Add `flake.nix` and `flake.lock`: `devShells.default` with clang (arm64_32 target), `ld.lld`, ninja, Python 3 with pytest, Rust stable (`rust-toolchain.toml`), `cargo-llvm-cov` and SDL3, using the impure Apple SDK from Xcode
 - [ ] Task: Add the VM import stubs: a mode of `tools/android_imports.py` (shared with Android, not copied) that writes each stub as `mov w16, #index; svc #0; ret`, and the host's table of import names by index
 - [ ] Task: Add `tools/macos_build.py` and the `macos` target to `configure.py`: the guest image with the Android guest's rules and the VM stubs, and an empty host signed ad hoc with `com.apple.security.hypervisor`
