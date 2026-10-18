@@ -532,7 +532,8 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     for unit in port/linux/src/p2p.c port/linux/src/p2p_crypto.c port/linux/src/p2p_discord.c \
         port/linux/src/p2p_lobby.c port/linux/src/p2p_signal.c port/linux/src/p2p_webrtc.c \
         port/linux/src/posix_net.c port/linux/src/posix_dtls.c port/linux/src/posix_upnp.c \
-        port/mac/mac_mbedtls_time.c port/mac/mac_p2p_hardware_id.c; do
+        port/mac/mac_mbedtls_time.c port/mac/mac_p2p_hardware_id.c \
+        port/third_party/monocypher/monocypher-ed25519.c; do
         name=$(basename "$unit" .c)
         recognized_units="$recognized_units $name "
         obj="$out/${name}_$arch.o"
