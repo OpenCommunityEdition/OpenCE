@@ -1,0 +1,1584 @@
+group obje ____ ____ object_definition
+def object_definition 380
+field object_definition 9 380 1 0 0 object object
+def object 380
+field object 6 2 1 0 12 - type
+field object 3 16 1 40 0 - model
+field object 3 16 1 56 0 - animation_graph
+field object 3 16 1 112 0 - collision_model
+field object 3 16 1 128 0 - physics
+field object 3 16 1 144 0 - modifier_shader
+field object 3 16 1 160 0 - creation_effect
+field object 6 2 4 264 20 - function_modes
+field object 0 12 1 320 8 object_attachment attachments
+field object 0 12 1 332 4 object_widget widgets
+field object 0 12 1 344 4 object_function functions
+field object 0 12 1 356 4 object_change_color change_colors
+field object 0 12 1 368 1024 predicted_resource predicted_resources
+def object_attachment 72
+field object_attachment 3 16 1 0 0 - type
+field object_attachment 7 32 1 16 0 - marker_name
+field object_attachment 6 2 1 48 5 - primary_scale_function_reference
+field object_attachment 6 2 1 50 5 - secondary_scale_function_reference
+field object_attachment 6 2 1 52 5 - change_color_reference
+def object_widget 32
+field object_widget 3 16 1 0 0 - type
+def object_function 360
+field object_function 6 2 1 8 9 - scale_period_by_function_index
+field object_function 6 2 1 10 12 - function_type
+field object_function 6 2 1 12 9 - scale_function_by_function_index
+field object_function 6 2 1 14 12 - wobble_function_type
+field object_function 6 2 1 30 6 - map_result_to_transition_function
+field object_function 6 2 1 34 9 - add_function_index
+field object_function 6 2 1 36 9 - scale_result_by_function_index
+field object_function 6 2 1 38 3 - bounds_mode
+field object_function 5 2 1 54 0 - turn_off_with_function_index
+field object_function 7 32 1 328 0 - usage
+def object_change_color 44
+field object_change_color 6 2 1 0 9 - darken_by
+field object_change_color 6 2 1 2 9 - scaled_by
+field object_change_color 0 12 1 32 32 object_change_color_permutation permutations
+def object_change_color_permutation 28
+def predicted_resource 8
+field predicted_resource 6 2 1 0 2 - type
+field predicted_resource 4 4 1 4 0 - tag_index
+group unit obje ____ unit_definition
+def unit_definition 752
+field unit_definition 9 380 1 0 0 object object
+field unit_definition 9 372 1 380 0 unit unit
+def unit 372
+field unit 6 2 1 4 10 - default_team
+field unit 6 2 1 6 5 - constant_sound
+field unit 3 16 1 12 0 - integrated_light_toggle_effect
+field unit 6 2 4 28 8 - function_modes
+field unit 9 88 1 44 0 unit_camera camera
+field unit 3 16 1 208 0 - spawned_actor_variant
+field unit 3 16 1 268 0 - melee_damage
+field unit 0 12 1 300 2 unit_hud huds
+field unit 0 12 1 312 16 unit_dialogue_variant dialogue_variants
+field unit 6 2 1 328 2 - grenade_type
+field unit 0 12 1 336 2 unit_powered_seat powered_seats
+field unit 0 12 1 348 4 unit_initial_weapon initial_weapons
+field unit 0 12 1 360 16 unit_seat seats
+def unit_camera 88
+field unit_camera 7 32 1 0 0 - marker_name
+field unit_camera 7 32 1 32 0 - submerged_marker_name
+field unit_camera 0 12 1 76 2 unit_camera_track unit_camera_tracks
+def unit_camera_track 28
+field unit_camera_track 3 16 1 0 0 - track
+def unit_hud 48
+field unit_hud 3 16 1 0 0 - hud
+def unit_dialogue_variant 24
+field unit_dialogue_variant 3 16 1 8 0 - dialogue
+def unit_powered_seat 68
+def unit_initial_weapon 36
+field unit_initial_weapon 3 16 1 0 0 - weapon
+def unit_seat 284
+field unit_seat 7 32 1 4 0 - label
+field unit_seat 7 32 1 36 0 - marker_name
+field unit_seat 9 88 1 132 0 unit_camera camera
+field unit_seat 0 12 1 220 2 unit_hud seat_huds
+field unit_seat 3 16 1 248 0 - built_in_actor_reference
+group bipd unit obje biped_definition
+def biped_definition 1268
+field biped_definition 9 380 1 0 0 object object
+field biped_definition 9 372 1 380 0 unit unit
+field biped_definition 9 516 1 752 0 biped biped
+field biped_definition 10 0 1 0 0 - biped_type_check
+field biped_definition 10 0 1 0 0 - biped_nodes_check
+def biped 516
+field biped 6 2 4 28 2 - function_modes
+field biped 3 16 1 36 0 - melee_damage
+field biped 3 16 1 156 0 - material_effects
+field biped 0 12 1 504 2 biped_contact_point contact_points
+def biped_contact_point 64
+field biped_contact_point 7 32 1 32 0 - marker_name
+group vehi unit obje vehicle_definition
+def vehicle_definition 1008
+field vehicle_definition 9 380 1 0 0 object unit.object
+field vehicle_definition 9 372 1 380 0 unit unit.unit
+field vehicle_definition 6 2 1 756 7 - vehicle_type
+field vehicle_definition 6 2 4 796 37 - function_modes
+field vehicle_definition 3 16 1 944 0 - suspension_sound
+field vehicle_definition 3 16 1 960 0 - crash_sound
+field vehicle_definition 3 16 1 976 0 - material_effects
+field vehicle_definition 3 16 1 992 0 - effect
+field vehicle_definition 10 0 1 0 0 - vehicle_type_check
+group item obje ____ item_definition
+def item_definition 776
+field item_definition 9 380 1 0 0 object object
+field item_definition 9 396 1 380 0 item item
+def item 396
+field item 3 16 1 204 0 - material_effects
+field item 3 16 1 220 0 - collision_sound
+field item 3 16 1 364 0 - detonating_effect
+field item 3 16 1 380 0 - detonation_effect
+group weap item obje weapon_definition
+def weapon_definition 1288
+field weapon_definition 9 380 1 0 0 object object
+field weapon_definition 9 396 1 380 0 item item
+field weapon_definition 9 512 1 776 0 weapon weapon
+field weapon_definition 10 0 1 0 0 - weapon_type_check
+field weapon_definition 10 0 1 0 0 - weapon_magazines_check
+def weapon 512
+field weapon 7 32 1 4 0 - label
+field weapon 6 2 1 36 5 - secondary_trigger_mode
+field weapon 6 2 4 40 17 - function_modes
+field weapon 3 16 1 52 0 - ready_effect
+field weapon 3 16 1 108 0 - overheated_effect
+field weapon 3 16 1 124 0 - detonation_effect
+field weapon 3 16 1 140 0 - melee_attack_damage
+field weapon 3 16 1 156 0 - melee_attack_response
+field weapon 3 16 1 180 0 - ai_firing_parameters
+field weapon 6 2 1 244 3 - movement_penalty_mode
+field weapon 3 16 1 280 0 - integrated_light_on_effect
+field weapon 3 16 1 296 0 - integrated_light_off_effect
+field weapon 3 16 1 340 0 - interface_definition.first_person_model
+field weapon 3 16 1 356 0 - interface_definition.first_person_animations
+field weapon 3 16 1 376 0 - interface_definition.hud_interface
+field weapon 3 16 1 392 0 - pickup_sound
+field weapon 3 16 1 408 0 - zoom_in_sound
+field weapon 3 16 1 424 0 - zoom_out_sound
+field weapon 6 2 1 474 5 - weapon_type
+field weapon 0 12 1 476 1024 predicted_resource predicted_resources
+field weapon 0 12 1 488 2 weapon_magazine magazines
+field weapon 0 12 1 500 2 weapon_trigger triggers
+def weapon_magazine 112
+field weapon_magazine 3 16 1 56 0 - reloading_effect
+field weapon_magazine 3 16 1 72 0 - chambering_effect
+field weapon_magazine 0 12 1 100 8 weapon_ammunition_object ammunition_objects
+def weapon_ammunition_object 28
+field weapon_ammunition_object 3 16 1 12 0 - object
+def weapon_trigger 276
+field weapon_trigger 5 2 1 32 0 - magazine_index
+field weapon_trigger 6 2 1 46 5 - firing_noise
+field weapon_trigger 6 2 1 80 3 - overcharged_action
+field weapon_trigger 3 16 1 92 0 - charging_effect
+field weapon_trigger 6 2 1 108 2 - projectile_distribution_function
+field weapon_trigger 3 16 1 148 0 - projectile
+field weapon_trigger 0 12 1 264 8 weapon_firing_effect firing_effects
+def weapon_firing_effect 132
+field weapon_firing_effect 3 16 1 36 0 - firing_effect
+field weapon_firing_effect 3 16 1 52 0 - misfire_effect
+field weapon_firing_effect 3 16 1 68 0 - empty_effect
+field weapon_firing_effect 3 16 1 84 0 - firing_damage
+field weapon_firing_effect 3 16 1 100 0 - misfire_damage
+field weapon_firing_effect 3 16 1 116 0 - empty_damage
+group eqip item obje equipment_definition
+def equipment_definition 800
+field equipment_definition 9 380 1 0 0 object object
+field equipment_definition 9 396 1 380 0 item item
+field equipment_definition 9 24 1 776 0 equipment equipment
+field equipment_definition 10 0 1 0 0 - equipment_type_check
+def equipment 24
+field equipment 6 2 1 0 7 - powerup_type
+field equipment 6 2 1 2 2 - grenade_type
+field equipment 3 16 1 8 0 - pickup_sound
+group garb item obje garbage_definition
+def garbage_definition 776
+field garbage_definition 9 380 1 0 0 object object
+field garbage_definition 9 396 1 380 0 item item
+field garbage_definition 10 0 1 0 0 - garbage_type_check
+group proj obje ____ projectile_definition
+def projectile_definition 588
+field projectile_definition 9 380 1 0 0 object object
+field projectile_definition 9 208 1 380 0 projectile projectile
+field projectile_definition 10 0 1 0 0 - projectile_type_check
+def projectile 208
+field projectile 6 2 1 4 3 - detonation_timer_starts
+field projectile 6 2 1 6 5 - impact_noise
+field projectile 6 2 4 8 4 - function_inputs
+field projectile 3 16 1 16 0 - super_detonation
+field projectile 3 16 1 48 0 - effect
+field projectile 6 2 1 116 5 - detonation_noise
+field projectile 3 16 1 120 0 - detonation_started
+field projectile 3 16 1 136 0 - flyby_sound
+field projectile 3 16 1 152 0 - attached_detonation_damage
+field projectile 3 16 1 168 0 - impact_damage
+field projectile 0 12 1 196 33 projectile_material_response material_responses
+def projectile_material_response 160
+field projectile_material_response 6 2 1 2 5 - default_response
+field projectile_material_response 3 16 1 4 0 - default_effect
+field projectile_material_response 6 2 1 36 5 - potential_response
+field projectile_material_response 3 16 1 60 0 - potential_effect
+field projectile_material_response 6 2 1 92 2 - scale_effects_by
+field projectile_material_response 3 16 1 104 0 - detonation_effect
+group scen obje ____ scenery_definition
+def scenery_definition 380
+field scenery_definition 9 380 1 0 0 object object
+field scenery_definition 10 0 1 0 0 - scenery_type_check
+group ssce obje ____ sound_scenery_definition
+def sound_scenery_definition 380
+field sound_scenery_definition 9 380 1 0 0 object object
+field sound_scenery_definition 10 0 1 0 0 - sound_scenery_type_check
+group plac obje ____ placeholder_definition
+def placeholder_definition 380
+field placeholder_definition 9 380 1 0 0 object object
+field placeholder_definition 10 0 1 0 0 - placeholder_type_check
+group devi obje ____ device_definition
+def device_definition 656
+field device_definition 9 380 1 0 0 object object
+field device_definition 9 276 1 380 0 device device
+def device 276
+field device 6 2 4 28 7 - function_modes
+field device 3 16 1 36 0 - positive_start_effect
+field device 3 16 1 52 0 - negative_start_effect
+field device 3 16 1 68 0 - positive_stop_effect
+field device 3 16 1 84 0 - negative_stop_effect
+field device 3 16 1 100 0 - depowered_effect
+field device 3 16 1 116 0 - repowered_effect
+field device 3 16 1 144 0 - delay_effect
+group mach devi obje machine_definition
+def machine_definition 804
+field machine_definition 9 380 1 0 0 object object
+field machine_definition 9 276 1 380 0 device device
+field machine_definition 9 148 1 656 0 machine machine
+field machine_definition 10 0 1 0 0 - machine_type_check
+field machine_definition 10 0 1 0 0 - machine_nodes_check
+def machine 148
+field machine 6 2 1 0 3 - type
+group ctrl devi obje control_definition
+def control_definition 792
+field control_definition 9 380 1 0 0 object object
+field control_definition 9 276 1 380 0 device device
+field control_definition 9 148 1 656 0 control control
+field control_definition 10 0 1 0 0 - control_type_check
+def control 136
+field control 6 2 1 0 4 - type
+field control 6 2 1 2 2 - triggers_when
+field control 3 16 1 88 0 - on_effect
+field control 3 16 1 104 0 - off_effect
+field control 3 16 1 120 0 - denied_effect
+group lifi devi obje light_fixture_definition
+def light_fixture_definition 656
+field light_fixture_definition 9 380 1 0 0 object object
+field light_fixture_definition 9 276 1 380 0 device device
+field light_fixture_definition 10 0 1 0 0 - light_fixture_type_check
+group actr ____ ____ actor_definition
+def actor_definition 1272
+field actor_definition 6 2 1 20 16 - type
+group actv ____ ____ actor_variant_definition
+def actor_variant_definition 568
+field actor_variant_definition 3 16 1 4 0 - actor_reference
+field actor_variant_definition 3 16 1 20 0 - unit_reference
+field actor_variant_definition 3 16 1 36 0 - major_upgrade_reference
+field actor_variant_definition 3 16 1 100 0 - ranged_combat.reference
+field actor_variant_definition 3 16 1 448 0 - items.equipment_reference
+field actor_variant_definition 0 12 1 556 4 actor_variant_change_colors change_colors
+def actor_variant_change_colors 32
+group udlg ____ ____ dialogue_definition
+def dialogue_definition 4112
+field dialogue_definition 3 16 3 16 0 - vocalizations
+field dialogue_definition 3 16 14 112 0 - vocalizations
+field dialogue_definition 3 16 4 352 0 - vocalizations
+field dialogue_definition 3 16 17 480 0 - vocalizations
+field dialogue_definition 3 16 28 800 0 - vocalizations
+field dialogue_definition 3 16 13 1296 0 - vocalizations
+field dialogue_definition 3 16 10 1552 0 - vocalizations
+field dialogue_definition 3 16 13 1744 0 - vocalizations
+field dialogue_definition 3 16 21 1984 0 - vocalizations
+field dialogue_definition 3 16 23 2384 0 - vocalizations
+field dialogue_definition 3 16 7 2848 0 - vocalizations
+field dialogue_definition 3 16 5 3024 0 - vocalizations
+field dialogue_definition 3 16 8 3168 0 - vocalizations
+field dialogue_definition 10 0 1 0 0 - dialogue_padding_check
+group itmc ____ ____ item_collection_definition
+def item_collection_definition 92
+field item_collection_definition 0 12 1 0 32767 item_permutation permutations
+def item_permutation 84
+field item_permutation 3 16 1 36 0 - item
+group mode ____ ____ model
+def model 232
+field model 0 12 1 172 256 model_marker markers
+field model 0 12 1 184 64 model_node nodes
+field model 0 12 1 196 32 model_region regions
+field model 0 12 1 208 256 model_geometry geometries
+field model 0 12 1 220 32 model_shader_reference shaders
+field model 10 0 1 0 0 - model_check
+def model_marker 64
+field model_marker 7 32 1 0 0 - name
+field model_marker 0 12 1 52 32 model_marker_instance instances
+def model_marker_instance 32
+field model_marker_instance 5 1 1 0 0 - region_index
+field model_marker_instance 5 1 1 2 0 - node_index
+def model_node 156
+field model_node 7 32 1 0 0 - name
+field model_node 5 2 1 32 0 - next_sibling_node_index
+field model_node 5 2 1 34 0 - first_child_node_index
+field model_node 5 2 1 36 0 - parent_node_index
+def model_region 76
+field model_region 7 32 1 0 0 - name
+field model_region 0 12 1 64 32 model_region_permutation permutations
+def model_region_permutation 88
+field model_region_permutation 7 32 1 0 0 - name
+field model_region_permutation 5 2 5 64 0 - geometry_indices
+field model_region_permutation 0 12 1 76 64 model_region_permutation_marker markers
+def model_region_permutation_marker 80
+def model_geometry 48
+field model_geometry 0 12 1 36 32 model_geometry_part parts
+def model_geometry_part 104
+field model_geometry_part 5 2 1 4 0 - shader_index
+field model_geometry_part 5 1 1 6 0 - previous_part_index
+field model_geometry_part 5 1 1 7 0 - next_part_index
+field model_geometry_part 5 2 1 8 0 - centroid_primary_node_index
+field model_geometry_part 5 2 1 10 0 - centroid_secondary_node_index
+field model_geometry_part 0 12 1 32 65535 model_vertex_uncompressed uncompressed_vertices
+field model_geometry_part 0 12 1 44 65535 model_vertex_compressed compressed_vertices
+field model_geometry_part 0 12 1 56 65535 model_triangle triangles
+field model_geometry_part 6 2 1 68 2 - triangle_buffer.type
+field model_geometry_part 6 2 1 84 12 - vertex_buffer.type
+field model_geometry_part 10 0 1 0 0 - model_geometry_part_check
+def model_vertex_uncompressed 68
+def model_vertex_compressed 32
+def model_triangle 6
+def model_shader_reference 32
+field model_shader_reference 3 16 1 0 0 - shader
+group antr ____ ____ animation_graph
+def animation_graph 128
+field animation_graph 0 12 1 0 4 animation_graph_object_overlay object_overlays
+field animation_graph 0 12 1 12 32 animation_graph_unit_seat unit_seats
+field animation_graph 0 12 1 24 1 animation_graph_weapon_animations weapon_animations
+field animation_graph 0 12 1 36 1 vehicle_animation vehicle_animations
+field animation_graph 0 12 1 48 1 animation_graph_device_animations device_animations
+field animation_graph 0 12 1 60 176 animation_index unit_damage_animations
+field animation_graph 0 12 1 72 1 animation_graph_first_person_weapon_animations first_person_weapon_animations
+field animation_graph 0 12 1 84 257 animation_graph_sound_reference sound_references
+field animation_graph 0 12 1 104 64 animation_graph_node nodes
+field animation_graph 0 12 1 116 256 animation animations
+field animation_graph 10 0 1 0 0 - animation_graph_check
+def animation_graph_object_overlay 20
+field animation_graph_object_overlay 5 2 1 0 0 - animation_index
+field animation_graph_object_overlay 6 2 1 2 4 - function_index
+field animation_graph_object_overlay 6 2 1 4 2 - mode
+def animation_graph_unit_seat 100
+field animation_graph_unit_seat 7 32 1 0 0 - label
+field animation_graph_unit_seat 0 12 1 64 30 animation_index animations
+field animation_graph_unit_seat 0 12 1 76 4 animation_graph_ik_point ik_points
+field animation_graph_unit_seat 0 12 1 88 16 animation_graph_weapon_class weapon_classes
+def animation_index 2
+field animation_index 5 2 1 0 0 - animation_index
+def animation_graph_ik_point 64
+field animation_graph_ik_point 7 32 1 0 0 - marker_name
+field animation_graph_ik_point 7 32 1 32 0 - attached_to_marker_name
+def animation_graph_weapon_class 188
+field animation_graph_weapon_class 7 32 1 0 0 - label
+field animation_graph_weapon_class 7 32 1 32 0 - grip_marker_name
+field animation_graph_weapon_class 7 32 1 64 0 - hand_marker_name
+field animation_graph_weapon_class 0 12 1 152 55 animation_index animations
+field animation_graph_weapon_class 0 12 1 164 4 animation_graph_ik_point ik_points
+field animation_graph_weapon_class 0 12 1 176 16 animation_graph_weapon_type weapon_types
+def animation_graph_weapon_type 60
+field animation_graph_weapon_type 7 32 1 0 0 - label
+field animation_graph_weapon_type 0 12 1 48 10 animation_index animations
+def animation_graph_weapon_animations 28
+field animation_graph_weapon_animations 0 12 1 16 11 animation_index animations
+def vehicle_animation 116
+field vehicle_animation 0 12 1 92 8 animation_index animations
+field vehicle_animation 0 12 1 104 8 vehicle_suspension suspensions
+def vehicle_suspension 20
+field vehicle_suspension 5 2 1 2 0 - animation_index
+def animation_graph_device_animations 96
+field animation_graph_device_animations 0 12 1 84 2 animation_index animations
+def animation_graph_first_person_weapon_animations 28
+field animation_graph_first_person_weapon_animations 0 12 1 16 28 animation_index animations
+def animation_graph_sound_reference 20
+field animation_graph_sound_reference 3 16 1 0 0 - sound
+def animation_graph_node 64
+field animation_graph_node 7 32 1 0 0 - name
+field animation_graph_node 5 2 1 32 0 - next_sibling_node_index
+field animation_graph_node 5 2 1 34 0 - first_child_node_index
+field animation_graph_node 5 2 1 36 0 - parent_node_index
+def animation 180
+field animation 7 32 1 0 0 - name
+field animation 6 2 1 32 3 - type
+field animation 6 2 1 38 4 - frame_info_type
+field animation 5 2 1 56 0 - next_animation_index
+field animation 5 2 1 60 0 - sound_index
+field animation 5 2 1 66 0 - runtime_parent_animation_index
+field animation 1 20 1 72 32768 - frame_info
+field animation 1 20 1 140 1536 - default_data
+field animation 1 20 1 160 3145728 - data
+field animation 10 0 1 0 0 - animation_check
+group coll ____ ____ collision_model
+def collision_model 664
+field collision_model 9 600 1 0 0 damage_resistance resistance
+field collision_model 0 12 1 640 32 pathfinding_sphere pathfinding_spheres
+field collision_model 0 12 1 652 64 collision_node nodes
+def damage_resistance 600
+field damage_resistance 5 2 1 4 0 - indirect_damage_material_index
+field damage_resistance 3 16 1 112 0 - localized_damage_effect
+field damage_resistance 3 16 1 132 0 - area_damage_effect
+field damage_resistance 3 16 1 152 0 - body_damaged_effect
+field damage_resistance 3 16 1 168 0 - body_depleted_effect
+field damage_resistance 3 16 1 188 0 - body_destroyed_effect
+field damage_resistance 6 2 1 210 33 - shield_material_type
+field damage_resistance 6 2 1 236 6 - shield_failure_function
+field damage_resistance 3 16 1 392 0 - shield_damaged_effect
+field damage_resistance 3 16 1 408 0 - shield_depleted_effect
+field damage_resistance 3 16 1 424 0 - shield_recharging_effect
+field damage_resistance 0 12 1 564 32 damage_resistance_material materials
+field damage_resistance 0 12 1 576 8 damage_region regions
+def damage_resistance_material 72
+field damage_resistance_material 6 2 1 36 33 - material_type
+def damage_region 84
+field damage_region 3 16 1 56 0 - destroyed_effect
+field damage_region 0 12 1 72 32 damage_permutation permutations
+def damage_permutation 32
+def pathfinding_sphere 32
+field pathfinding_sphere 6 2 1 0 64 - node_index
+def collision_node 64
+field collision_node 7 32 1 0 0 - name
+field collision_node 5 2 1 32 0 - region_index
+field collision_node 5 2 1 34 0 - parent_node_index
+field collision_node 5 2 1 36 0 - next_sibling_node_index
+field collision_node 5 2 1 38 0 - first_child_node_index
+field collision_node 0 12 1 52 32 collision_bsp bsps
+def collision_bsp 96
+field collision_bsp 0 12 1 12 65536 real_plane3d bsp3d.planes
+field collision_bsp 0 12 1 0 131072 bsp3d_node bsp3d.nodes
+field collision_bsp 0 12 1 24 65536 collision_leaf leaves
+field collision_bsp 0 12 1 36 131072 bsp2d_reference bsp2d_references
+field collision_bsp 0 12 1 48 65535 bsp2d_node bsp2d.nodes
+field collision_bsp 0 12 1 84 131072 collision_vertex vertices
+field collision_bsp 0 12 1 72 262144 collision_edge edges
+field collision_bsp 0 12 1 60 131072 collision_surface surfaces
+field collision_bsp 10 0 1 0 0 - collision_model_bsp_check
+def real_plane3d 16
+def bsp3d_node 12
+field bsp3d_node 5 4 1 0 0 - plane_designator
+def collision_leaf 8
+def bsp2d_reference 8
+def bsp2d_node 20
+def collision_vertex 16
+field collision_vertex 5 4 1 12 0 - first_edge_index
+def collision_edge 24
+field collision_edge 5 4 2 0 0 - vertex_indices
+field collision_edge 5 4 2 8 0 - edge_indices
+field collision_edge 5 4 2 16 0 - surface_indices
+def collision_surface 12
+field collision_surface 5 4 1 4 0 - first_edge_index
+field collision_surface 5 2 1 10 0 - material_index
+group phys ____ ____ physics
+def physics 128
+field physics 0 12 1 92 2 inertial_matrix inertial_matrix
+field physics 0 12 1 104 32 powered_mass_point powered_mass_points
+field physics 0 12 1 116 32 mass_point mass_points
+def inertial_matrix 36
+def powered_mass_point 128
+def mass_point 128
+field mass_point 5 2 1 32 0 - powered_mass_point_index
+field mass_point 6 2 1 92 4 - friction_type
+group pphy ____ ____ point_physics
+def point_physics 64
+group sbsp ____ ____ structure_bsp
+def structure_bsp 648
+field structure_bsp 3 16 1 0 0 - lightmap_group
+field structure_bsp 9 116 1 44 0 render_lighting default_lighting
+field structure_bsp 0 12 1 164 512 structure_collision_material collision_materials
+field structure_bsp 0 12 1 176 1 collision_bsp collision_bsp
+field structure_bsp 0 12 1 188 131072 structure_node nodes
+field structure_bsp 0 12 1 224 65536 structure_leaf leaves
+field structure_bsp 0 12 1 236 262144 structure_surface_reference surface_references
+field structure_bsp 0 12 1 248 131072 structure_surface surfaces
+field structure_bsp 0 12 1 260 128 structure_lightmap lightmaps
+field structure_bsp 0 12 1 284 256 structure_lens_flare lens_flares
+field structure_bsp 0 12 1 296 65536 structure_lens_flare_marker lens_flare_markers
+field structure_bsp 0 12 1 308 512 structure_cluster clusters
+field structure_bsp 1 20 1 320 65536 - cluster_data
+field structure_bsp 0 12 1 340 512 structure_cluster_portal cluster_portals
+field structure_bsp 0 12 1 364 256 structure_breakable_surface breakable_surfaces
+field structure_bsp 0 12 1 376 32 structure_fog_plane fog_planes
+field structure_bsp 0 12 1 388 32 structure_fog_region fog_regions
+field structure_bsp 0 12 1 400 32 structure_fog_palette_entry fog_palette
+field structure_bsp 0 12 1 436 32 structure_weather_palette_entry weather_palette
+field structure_bsp 0 12 1 448 32 structure_weather_polyhedron weather_polyhedra
+field structure_bsp 0 12 1 484 131072 byte pathfinding_surfaces
+field structure_bsp 0 12 1 496 262144 byte pathfinding_edges
+field structure_bsp 0 12 1 508 64 structure_background_sound_palette_entry background_sound_palette
+field structure_bsp 0 12 1 520 64 structure_sound_environment_palette_entry sound_environment_palette
+field structure_bsp 1 20 1 532 65536 - sound_cluster_data
+field structure_bsp 0 12 1 588 1 structure_detail_object_data detail_object_data
+field structure_bsp 0 12 1 600 6144 structure_runtime_decal runtime_decals
+field structure_bsp 9 28 1 620 0 leaf_map leaf_map
+field structure_bsp 10 0 1 0 0 - structure_bsp_check
+def render_lighting 116
+field render_lighting 6 2 1 12 3 - distant_light_count
+field render_lighting 6 2 1 64 1 - point_light_count
+def structure_collision_material 20
+field structure_collision_material 3 16 1 0 0 - shader
+field structure_collision_material 6 2 1 18 33 - runtime_physics_material_type
+def collision_bsp 96
+field collision_bsp 0 12 1 12 65536 real_plane3d bsp3d.planes
+field collision_bsp 0 12 1 0 131072 bsp3d_node bsp3d.nodes
+field collision_bsp 0 12 1 24 65536 collision_leaf leaves
+field collision_bsp 0 12 1 36 131072 bsp2d_reference bsp2d_references
+field collision_bsp 0 12 1 48 65535 bsp2d_node bsp2d.nodes
+field collision_bsp 0 12 1 84 131072 collision_vertex vertices
+field collision_bsp 0 12 1 72 262144 collision_edge edges
+field collision_bsp 0 12 1 60 131072 collision_surface surfaces
+field collision_bsp 10 0 1 0 0 - structure_collision_bsp_check
+def collision_surface 12
+field collision_surface 5 4 1 4 0 - first_edge_index
+field collision_surface 5 2 1 10 0 - material_index
+def structure_node 6
+def structure_leaf 16
+field structure_leaf 5 2 1 8 0 - cluster_index
+def structure_surface_reference 8
+field structure_surface_reference 5 4 1 0 0 - surface_index
+def structure_surface 6
+def structure_lightmap 32
+field structure_lightmap 0 12 1 20 2048 structure_material materials
+def structure_material 256
+field structure_material 3 16 1 0 0 - shader
+field structure_material 9 116 1 40 0 render_lighting lighting
+field structure_material 5 2 1 172 0 - breakable_surface_index
+field structure_material 1 20 1 216 4864000 - uncompressed_vertex_data
+field structure_material 1 20 1 236 2560000 - compressed_vertex_data
+def structure_lens_flare 16
+field structure_lens_flare 3 16 1 0 0 - lens_flare
+def structure_lens_flare_marker 16
+field structure_lens_flare_marker 5 1 1 15 0 - lens_flare_index
+def structure_cluster 104
+field structure_cluster 5 2 1 4 0 - background_sound_palette_index
+field structure_cluster 5 2 1 6 0 - sound_environment_palette_index
+field structure_cluster 5 2 1 8 0 - weather_palette_index
+field structure_cluster 0 12 1 40 1024 predicted_resource predicted_resources
+field structure_cluster 0 12 1 52 4096 structure_subcluster subclusters
+field structure_cluster 0 12 1 68 32768 long surface_indices
+field structure_cluster 0 12 1 80 16 structure_mirror mirrors
+field structure_cluster 0 12 1 92 128 structure_portal_index portal_indices
+def predicted_resource 8
+field predicted_resource 6 2 1 0 2 - type
+field predicted_resource 4 4 1 4 0 - tag_index
+def structure_subcluster 36
+field structure_subcluster 0 12 1 24 128 long surface_indices
+def long 4
+def structure_mirror 64
+field structure_mirror 3 16 1 36 0 - shader
+field structure_mirror 0 12 1 52 256 real_point3d points
+def real_point3d 12
+def structure_portal_index 2
+field structure_portal_index 5 2 1 0 0 - portal_index
+def structure_cluster_portal 64
+field structure_cluster_portal 5 2 2 0 0 - cluster_indices
+field structure_cluster_portal 0 12 1 52 128 real_point3d vertices
+def structure_breakable_surface 48
+def structure_fog_plane 32
+field structure_fog_plane 5 2 1 0 0 - region_index
+field structure_fog_plane 6 2 1 2 33 - runtime_material_type
+field structure_fog_plane 0 12 1 20 4096 real_point3d vertices
+def structure_fog_region 40
+field structure_fog_region 5 2 1 36 0 - fog_palette_index
+field structure_fog_region 5 2 1 38 0 - weather_palette_index
+def structure_fog_palette_entry 136
+field structure_fog_palette_entry 3 16 1 32 0 - fog
+def structure_weather_palette_entry 240
+field structure_weather_palette_entry 3 16 1 32 0 - particle_system
+field structure_weather_palette_entry 3 16 1 128 0 - wind
+def structure_weather_polyhedron 32
+field structure_weather_polyhedron 0 12 1 20 16 real_plane3d planes
+def byte 1
+def structure_background_sound_palette_entry 116
+field structure_background_sound_palette_entry 3 16 1 32 0 - background_sound
+def structure_sound_environment_palette_entry 80
+field structure_sound_environment_palette_entry 3 16 1 32 0 - sound_environment
+def structure_detail_object_data 64
+field structure_detail_object_data 0 12 1 0 262144 detail_object_cell cells
+field structure_detail_object_data 0 12 1 12 2097152 detail_object detail_objects
+field structure_detail_object_data 0 12 1 24 8388608 detail_object_count counts
+field structure_detail_object_data 0 12 1 36 8388608 detail_object_z_reference_vector z_reference_vectors
+field structure_detail_object_data 10 0 1 0 0 - structure_detail_object_data_check
+def detail_object_cell 32
+def detail_object 6
+def detail_object_count 2
+def detail_object_z_reference_vector 16
+def structure_runtime_decal 16
+def leaf_map 28
+field leaf_map 8 4 1 0 0 - bsp
+field leaf_map 0 12 1 4 65536 map_leaf leaves
+field leaf_map 0 12 1 16 131072 leaf_portal portals
+def map_leaf 24
+field map_leaf 0 12 1 0 65536 map_leaf_face faces
+field map_leaf 0 12 1 12 65536 long portal_designators
+def map_leaf_face 16
+field map_leaf_face 0 12 1 4 65536 real_point2d vertices
+def real_point2d 8
+def leaf_portal 24
+field leaf_portal 0 12 1 12 65536 real_point3d vertices
+group bitm ____ ____ bitmap_group
+def bitmap_group 108
+field bitmap_group 6 2 1 0 5 - type
+field bitmap_group 0 12 1 84 256 bitmap_sequence sequences
+field bitmap_group 0 12 1 96 2048 bitmap_data bitmaps
+field bitmap_group 10 0 1 0 0 - bitmap_group_check
+def bitmap_sequence 64
+field bitmap_sequence 7 32 1 0 0 - name
+field bitmap_sequence 0 12 1 52 64 bitmap_sprite sprites
+def bitmap_sprite 32
+field bitmap_sprite 5 2 1 0 0 - bitmap_index
+def bitmap_data 48
+field bitmap_data 6 2 1 10 3 - type
+field bitmap_data 6 2 1 12 18 - format
+field bitmap_data 4 4 1 32 0 - tag_index
+field bitmap_data 8 4 1 36 0 - cache_block_index
+field bitmap_data 8 4 1 40 0 - hardware_format
+field bitmap_data 8 4 1 44 0 - base_address
+field bitmap_data 10 0 1 0 0 - bitmap_data_check
+group shdr ____ ____ shader_definition
+def shader_definition 40
+field shader_definition 10 0 1 0 0 - shader_group_check
+group schi shdr ____ shader_transparent_chicago
+def shader_transparent_chicago 108
+field shader_transparent_chicago 9 40 1 0 0 shader shader
+field shader_transparent_chicago 9 56 1 40 0 shader_transparent transparent
+field shader_transparent_chicago 0 12 1 72 4 shader_layer transparent.extra_layers
+field shader_transparent_chicago 0 12 1 84 4 shader_transparent_chicago_map transparent.maps
+field shader_transparent_chicago 10 0 1 0 0 - shader_transparent_chicago_check
+def shader 40
+field shader 6 2 1 36 11 - base.type
+def shader_transparent 56
+field shader_transparent 6 2 1 2 4 - first_map_type
+field shader_transparent 6 2 1 4 8 - framebuffer_blend_function
+field shader_transparent 6 2 1 6 3 - framebuffer_fade_mode
+field shader_transparent 6 2 1 8 5 - framebuffer_fade_source
+field shader_transparent 3 16 1 16 0 - lens_flare
+def shader_layer 16
+field shader_layer 3 16 1 0 0 - shader
+def shader_transparent_chicago_map 220
+field shader_transparent_chicago_map 6 2 1 44 13 - color_function
+field shader_transparent_chicago_map 6 2 1 46 13 - alpha_function
+field shader_transparent_chicago_map 3 16 1 108 0 - map
+field shader_transparent_chicago_map 9 56 1 164 0 shader_texture_animation map_animation
+def shader_texture_animation 56
+field shader_texture_animation 6 2 1 0 5 - u_source
+field shader_texture_animation 6 2 1 2 12 - u_function
+field shader_texture_animation 6 2 1 16 5 - v_source
+field shader_texture_animation 6 2 1 18 12 - v_function
+field shader_texture_animation 6 2 1 32 5 - r_source
+field shader_texture_animation 6 2 1 34 12 - r_function
+group scex shdr ____ shader_transparent_chicago_extended
+def shader_transparent_chicago_extended 120
+field shader_transparent_chicago_extended 9 40 1 0 0 shader shader
+field shader_transparent_chicago_extended 9 56 1 40 0 shader_transparent transparent
+field shader_transparent_chicago_extended 0 12 1 72 4 shader_layer transparent.extra_layers
+field shader_transparent_chicago_extended 0 12 1 84 4 shader_transparent_chicago_map transparent.maps
+field shader_transparent_chicago_extended 0 12 1 96 2 shader_transparent_chicago_map two_stage_maps
+field shader_transparent_chicago_extended 10 0 1 0 0 - shader_transparent_chicago_extended_check
+group senv shdr ____ shader_environment
+def shader_environment 836
+field shader_environment 9 40 1 0 0 shader shader
+field shader_environment 6 2 1 42 3 - type
+field shader_environment 3 16 1 48 0 - lens_flare
+field shader_environment 3 16 1 136 0 - base_map
+field shader_environment 6 2 1 176 3 - detail_map_function
+field shader_environment 3 16 1 184 0 - primary_detail_map
+field shader_environment 3 16 1 204 0 - secondary_detail_map
+field shader_environment 6 2 1 244 3 - micro_detail_map_function
+field shader_environment 3 16 1 252 0 - micro_detail_map
+field shader_environment 3 16 1 296 0 - bump_map
+field shader_environment 6 2 1 336 12 - u_animation_function
+field shader_environment 6 2 1 348 12 - v_animation_function
+field shader_environment 6 2 1 436 12 - primary_animation_function
+field shader_environment 6 2 1 496 12 - secondary_animation_function
+field shader_environment 6 2 1 556 12 - plasma_animation_function
+field shader_environment 3 16 1 596 0 - self_illumination_map
+field shader_environment 6 2 1 722 3 - reflection_type
+field shader_environment 3 16 1 804 0 - reflection_cube_map
+field shader_environment 10 0 1 0 0 - shader_environment_check
+group sgla shdr ____ shader_transparent_glass
+def shader_transparent_glass 480
+field shader_transparent_glass 9 40 1 0 0 shader shader
+field shader_transparent_glass 3 16 1 100 0 - tint_map
+field shader_transparent_glass 6 2 1 138 3 - reflection_type
+field shader_transparent_glass 3 16 1 172 0 - reflection_map
+field shader_transparent_glass 3 16 1 192 0 - reflection_bump_map
+field shader_transparent_glass 3 16 1 344 0 - diffuse_map
+field shader_transparent_glass 3 16 1 364 0 - diffuse_detail_map
+field shader_transparent_glass 10 0 1 0 0 - shader_transparent_glass_check
+group smet shdr ____ shader_transparent_meter
+def shader_transparent_meter 260
+field shader_transparent_meter 9 40 1 0 0 shader shader
+field shader_transparent_meter 3 16 1 76 0 - map
+field shader_transparent_meter 10 0 1 0 0 - shader_transparent_meter_check
+group soso shdr ____ shader_model
+def shader_model 440
+field shader_model 9 40 1 0 0 shader shader
+field shader_model 6 2 1 114 12 - self_illumination_animation_function
+field shader_model 3 16 1 164 0 - base_map
+field shader_model 3 16 1 188 0 - multipurpose_map
+field shader_model 6 2 1 212 3 - detail_function
+field shader_model 6 2 1 214 9 - detail_mask
+field shader_model 3 16 1 220 0 - detail_map
+field shader_model 9 56 1 252 0 shader_texture_animation texture_animation
+field shader_model 3 16 1 356 0 - reflection_cube_map
+field shader_model 10 0 1 0 0 - shader_model_check
+group sotr shdr ____ shader_transparent_generic
+def shader_transparent_generic 108
+field shader_transparent_generic 9 40 1 0 0 shader shader
+field shader_transparent_generic 9 56 1 40 0 shader_transparent transparent
+field shader_transparent_generic 0 12 1 72 4 shader_layer transparent.extra_layers
+field shader_transparent_generic 0 12 1 84 4 shader_transparent_generic_map transparent.maps
+field shader_transparent_generic 0 12 1 96 7 shader_transparent_generic_stage stages
+field shader_transparent_generic 10 0 1 0 0 - shader_transparent_generic_check
+def shader_transparent_generic_map 100
+field shader_transparent_generic_map 3 16 1 28 0 - map
+field shader_transparent_generic_map 9 56 1 44 0 shader_texture_animation map_animation
+def shader_transparent_generic_stage 112
+field shader_transparent_generic_stage 6 2 1 4 5 - constant_color0_animation_source
+field shader_transparent_generic_stage 6 2 1 6 12 - constant_color0_animation_function
+field shader_transparent_generic_stage 6 2 1 60 25 - color_input_A
+field shader_transparent_generic_stage 6 2 1 62 8 - color_input_A_mapping
+field shader_transparent_generic_stage 6 2 1 64 25 - color_input_B
+field shader_transparent_generic_stage 6 2 1 66 8 - color_input_B_mapping
+field shader_transparent_generic_stage 6 2 1 68 25 - color_input_C
+field shader_transparent_generic_stage 6 2 1 70 8 - color_input_C_mapping
+field shader_transparent_generic_stage 6 2 1 72 25 - color_input_D
+field shader_transparent_generic_stage 6 2 1 74 8 - color_input_D_mapping
+field shader_transparent_generic_stage 6 2 1 76 9 - color_output_AB
+field shader_transparent_generic_stage 6 2 1 78 2 - color_output_AB_function
+field shader_transparent_generic_stage 6 2 1 80 9 - color_output_CD
+field shader_transparent_generic_stage 6 2 1 82 2 - color_output_CD_function
+field shader_transparent_generic_stage 6 2 1 84 9 - color_output_AB_CD_mux_sum
+field shader_transparent_generic_stage 6 2 1 86 6 - color_output_mapping
+field shader_transparent_generic_stage 6 2 1 88 25 - alpha_input_A
+field shader_transparent_generic_stage 6 2 1 90 8 - alpha_input_A_mapping
+field shader_transparent_generic_stage 6 2 1 92 25 - alpha_input_B
+field shader_transparent_generic_stage 6 2 1 94 8 - alpha_input_B_mapping
+field shader_transparent_generic_stage 6 2 1 96 25 - alpha_input_C
+field shader_transparent_generic_stage 6 2 1 98 8 - alpha_input_C_mapping
+field shader_transparent_generic_stage 6 2 1 100 25 - alpha_input_D
+field shader_transparent_generic_stage 6 2 1 102 8 - alpha_input_D_mapping
+field shader_transparent_generic_stage 6 2 1 104 9 - alpha_output_A
+field shader_transparent_generic_stage 6 2 1 106 9 - alpha_output_B
+field shader_transparent_generic_stage 6 2 1 108 9 - alpha_output_C
+field shader_transparent_generic_stage 6 2 1 110 6 - alpha_output_mapping
+group spla shdr ____ shader_transparent_plasma
+def shader_transparent_plasma 332
+field shader_transparent_plasma 9 40 1 0 0 shader shader
+field shader_transparent_plasma 3 16 1 212 0 - primary_noise_map
+field shader_transparent_plasma 3 16 1 284 0 - secondary_noise_map
+field shader_transparent_plasma 10 0 1 0 0 - shader_transparent_plasma_check
+group swat shdr ____ shader_transparent_water
+def shader_transparent_water 320
+field shader_transparent_water 9 40 1 0 0 shader shader
+field shader_transparent_water 3 16 1 76 0 - base_map
+field shader_transparent_water 3 16 1 156 0 - reflection_map
+field shader_transparent_water 3 16 1 200 0 - ripple_maps
+field shader_transparent_water 6 2 1 216 32768 - ripple_mipmap_levels
+field shader_transparent_water 0 12 1 292 4 water_ripple ripples
+field shader_transparent_water 10 0 1 0 0 - shader_transparent_water_check
+def water_ripple 76
+field water_ripple 6 2 1 58 32768 - map_index
+group sky_ ____ ____ sky
+def sky 208
+field sky 3 16 1 0 0 - model
+field sky 3 16 1 16 0 - animation_graph
+field sky 3 16 1 152 0 - indoor_fog_screen
+field sky 0 12 1 172 8 sky_shader_function shader_functions
+field sky 0 12 1 184 8 sky_animation animations
+field sky 0 12 1 196 8 sky_light lights
+def sky_shader_function 36
+field sky_shader_function 7 32 1 4 0 - global_function_name
+def sky_animation 36
+def sky_light 116
+field sky_light 3 16 1 0 0 - lens_flare
+field sky_light 7 32 1 16 0 - marker_name
+group fog_ ____ ____ fog
+def fog 396
+field fog 3 16 1 188 0 - screen.map
+field fog 3 16 1 244 0 - background_sound
+field fog 3 16 1 260 0 - sound_environment
+field fog 10 0 1 0 0 - fog_check
+group lens ____ ____ lens_flare
+def lens_flare 240
+field lens_flare 6 2 1 20 3 - occlusion_offset_direction
+field lens_flare 3 16 1 32 0 - primary_map
+field lens_flare 6 2 1 128 5 - corona_rotation_function
+field lens_flare 0 12 1 196 32 lens_flare_reflection reflections
+def lens_flare_reflection 128
+field lens_flare_reflection 6 2 1 4 32768 - bitmap_index
+field lens_flare_reflection 6 2 1 60 4 - brightness_scale_function
+field lens_flare_reflection 6 2 1 114 12 - animation_function
+group ligh ____ ____ light
+def light 352
+field light 3 16 1 100 0 - gel_map
+field light 3 16 1 124 0 - gel_secondary_map
+field light 6 2 1 142 12 - yaw_function
+field light 6 2 1 150 12 - roll_function
+field light 6 2 1 158 12 - pitch_function
+field light 3 16 1 172 0 - lens_flare
+field light 6 2 1 250 6 - falloff_function
+group glw! ____ ____ glow
+def glow 340
+field glow 7 32 1 0 0 - attachment_marker
+field glow 6 2 1 34 2 - boundary_effect
+field glow 6 2 1 36 2 - particle_distribution
+field glow 6 2 1 38 3 - trailing_particle_distribution
+field glow 6 2 1 96 4 - effect_rotational_velocity_attachment_index
+field glow 6 2 1 112 4 - effect_translational_velocity_attachment_index
+field glow 6 2 1 128 4 - distance_to_object_attachment_index
+field glow 6 2 1 176 4 - color_attachment_index
+field glow 3 16 1 324 0 - texture
+field glow 10 0 1 0 0 - glow_check
+group cont ____ ____ contrail
+def contrail 324
+field contrail 6 2 1 24 5 - render_type
+field contrail 3 16 1 48 0 - bitmap
+field contrail 9 180 1 132 0 shader_effect shader
+field contrail 0 12 1 312 16 contrail_point_state states
+field contrail 10 0 1 0 0 - contrail_check
+def shader_effect 180
+field shader_effect 9 40 1 0 0 shader shader
+field shader_effect 6 2 1 42 8 - framebuffer_blend_function
+field shader_effect 6 2 1 44 3 - framebuffer_fade_mode
+field shader_effect 3 16 1 76 0 - secondary_map
+field shader_effect 6 2 1 92 3 - secondary_map_anchor
+field shader_effect 9 56 1 96 0 shader_texture_animation secondary_map_animation
+field shader_effect 10 0 1 0 0 - shader_effect_check
+def contrail_point_state 104
+field contrail_point_state 3 16 1 16 0 - physics
+field contrail_point_state 10 0 1 0 0 - contrail_point_state_check
+group part ____ ____ particle
+def particle 356
+field particle 3 16 1 4 0 - bitmap
+field particle 3 16 1 20 0 - physics
+field particle 3 16 1 36 0 - collision_material_effects
+field particle 3 16 1 72 0 - collision_effect
+field particle 3 16 1 88 0 - effect
+field particle 6 2 1 172 3 - sprite_orientation
+field particle 9 180 1 176 0 shader_effect shader
+field particle 10 0 1 0 0 - particle_check
+group pctl ____ ____ particle_system
+def particle_system 104
+field particle_system 3 16 1 56 0 - system_update_point_physics
+field particle_system 6 2 1 72 2 - system_update_physics
+field particle_system 0 12 1 92 4 particle_system_type types
+def particle_system_type 128
+field particle_system_type 7 32 1 0 0 - name
+field particle_system_type 6 2 1 40 2 - complex_sprite_render_mode
+field particle_system_type 6 2 1 42 3 - sprite_render_mode
+field particle_system_type 6 2 1 84 3 - initial_particle_creation_physics
+field particle_system_type 0 12 1 92 16 particle_system_physics_constant physics_constants
+field particle_system_type 0 12 1 104 8 particle_system_type_state type_states
+field particle_system_type 0 12 1 116 8 particle_system_particle_state particle_states
+field particle_system_type 10 0 1 0 0 - particle_system_type_check
+def particle_system_physics_constant 4
+def particle_system_type_state 192
+field particle_system_type_state 7 32 1 0 0 - name
+field particle_system_type_state 6 2 1 176 3 - particle_creation_physics
+field particle_system_type_state 6 2 1 178 1 - particle_update_physics
+field particle_system_type_state 0 12 1 180 16 particle_system_physics_constant physics_constants
+field particle_system_type_state 10 0 1 0 0 - particle_system_type_state_check
+def particle_system_particle_state 376
+field particle_system_particle_state 7 32 1 0 0 - name
+field particle_system_particle_state 3 16 1 48 0 - bitmaps
+field particle_system_particle_state 3 16 1 132 0 - point_physics
+field particle_system_particle_state 9 180 1 184 0 shader_effect shader
+field particle_system_particle_state 10 0 1 0 0 - particle_system_particle_state_check
+group deca ____ ____ decal
+def decal 268
+field decal 6 2 1 2 4 - type
+field decal 6 2 1 4 5 - layer
+field decal 3 16 1 8 0 - next_decal_in_chain
+field decal 6 2 1 192 8 - shader.framebuffer_blend_function
+field decal 3 16 1 216 0 - shader.map
+field decal 10 0 1 0 0 - decal_check
+group ant! ____ ____ antenna
+def antenna 208
+field antenna 7 32 1 0 0 - attachment_marker
+field antenna 3 16 1 32 0 - texture
+field antenna 3 16 1 48 0 - physics
+field antenna 0 12 1 196 20 antenna_vertex vertices
+def antenna_vertex 128
+group flag ____ ____ flag
+def flag 96
+field flag 3 16 1 24 0 - shader_red
+field flag 3 16 1 40 0 - physics
+field flag 3 16 1 68 0 - shader_blue
+field flag 0 12 1 84 5 flag_attachment_point attachment_points
+field flag 10 0 1 0 0 - flag_check
+def flag_attachment_point 52
+field flag_attachment_point 7 32 1 20 0 - marker_name
+group elec ____ ____ lightning
+def lightning 264
+field lightning 3 16 1 52 0 - map
+field lightning 0 12 1 152 16 lightning_marker markers
+field lightning 0 12 1 164 1 lightning_shader shaders
+field lightning 10 0 1 0 0 - lightning_check
+def lightning_marker 228
+field lightning_marker 7 32 1 0 0 - attachment_marker
+def lightning_shader 180
+field lightning_shader 9 180 1 0 0 shader_effect shader
+group rain ____ ____ weather_particle_system
+def weather_particle_system 48
+field weather_particle_system 0 12 1 36 8 weather_particle_type particle_types
+def weather_particle_type 604
+field weather_particle_type 7 32 1 0 0 - name
+field weather_particle_type 3 16 1 172 0 - physics
+field weather_particle_type 3 16 1 404 0 - bitmap
+field weather_particle_type 6 2 1 420 3 - render_mode
+field weather_particle_type 6 2 1 422 2 - render_direction_source
+field weather_particle_type 9 180 1 424 0 shader_effect shader
+field weather_particle_type 10 0 1 0 0 - weather_particle_type_check
+group wind ____ ____ wind
+def wind 64
+group dobc ____ ____ detail_object_collection
+def detail_object_collection 128
+field detail_object_collection 6 2 1 0 2 - collection_type
+field detail_object_collection 3 16 1 52 0 - map
+field detail_object_collection 0 12 1 68 16 detail_object_type type_definitions
+def detail_object_type 96
+field detail_object_type 7 32 1 0 0 - name
+field detail_object_type 10 0 1 0 0 - detail_object_type_check
+group colo ____ ____ color_table
+def color_table 12
+field color_table 0 12 1 0 512 color_table_color colors
+def color_table_color 48
+field color_table_color 7 32 1 0 0 - name
+group effe ____ ____ effect
+def effect 64
+field effect 5 2 1 4 0 - loop_start_index
+field effect 5 2 1 6 0 - loop_stop_index
+field effect 0 12 1 40 32 effect_location locations
+field effect 0 12 1 52 32 effect_event events
+def effect_location 32
+field effect_location 7 32 1 0 0 - marker_name
+def effect_event 68
+field effect_event 0 12 1 44 32 effect_part parts
+field effect_event 0 12 1 56 32 effect_particles particles
+def effect_part 104
+field effect_part 6 2 1 0 4 - environment
+field effect_part 6 2 1 2 3 - disposition
+field effect_part 3 16 1 24 0 - reference
+field effect_part 10 0 1 0 0 - effect_part_check
+def effect_particles 232
+field effect_particles 6 2 1 0 4 - environment
+field effect_particles 6 2 1 2 3 - disposition
+field effect_particles 6 2 1 4 4 - camera_mode
+field effect_particles 3 16 1 84 0 - particle
+field effect_particles 6 2 1 104 6 - distribution_function
+field effect_particles 10 0 1 0 0 - effect_particles_check
+group jpt! ____ ____ damage_effect
+def damage_effect 672
+field damage_effect 6 2 1 36 7 - screen_flash.type
+field damage_effect 6 2 1 38 3 - screen_flash.priority
+field damage_effect 6 2 1 56 6 - screen_flash.fade_function
+field damage_effect 9 20 2 92 0 vibrate_frequency vibrate.vibrate_frequencies
+field damage_effect 6 2 1 156 6 - camera_impulse.temporary_transition
+field damage_effect 6 2 1 208 6 - camera_shake.falloff_transition_function
+field damage_effect 6 2 1 232 12 - camera_shake.periodic_function
+field damage_effect 3 16 1 276 0 - sound
+field damage_effect 9 220 1 452 0 damage damage
+def vibrate_frequency 20
+field vibrate_frequency 6 2 1 8 6 - fade_function
+def damage 220
+field damage 6 2 1 0 4 - side_effect
+field damage 6 2 1 2 13 - category
+group cdmg ____ ____ continuous_damage_effect
+def continuous_damage_effect 512
+field continuous_damage_effect 6 2 1 88 12 - camera_shake.periodic_function
+field continuous_damage_effect 9 220 1 292 0 damage damage
+group foot ____ ____ material_effects
+def material_effects 12
+field material_effects 0 12 1 0 13 material_effect effects
+def material_effect 28
+field material_effect 0 12 1 0 33 material_effect_material materials
+def material_effect_material 48
+field material_effect_material 3 16 1 0 0 - effect
+field material_effect_material 3 16 1 16 0 - sound
+group snd! ____ ____ sound
+def sound 164
+field sound 6 2 1 4 51 - sound_class
+field sound 6 2 1 6 2 - sample_rate
+field sound 6 2 1 108 2 - encoding
+field sound 6 2 1 110 4 - compression
+field sound 3 16 1 112 0 - promotion_sound
+field sound 8 4 1 136 0 - promotion_counter
+field sound 8 4 1 140 0 - promotion_time
+field sound 8 4 1 144 0 - scripting_time
+field sound 8 4 1 148 0 - scripting_sound_index
+field sound 0 12 1 152 8 sound_pitch_range pitch_ranges
+field sound 10 0 1 0 0 - sound_check
+def sound_pitch_range 72
+field sound_pitch_range 7 32 1 0 0 - name
+field sound_pitch_range 8 4 1 52 0 - played_permutation_mask
+field sound_pitch_range 8 2 1 56 0 - previous_permutation_index
+field sound_pitch_range 8 2 1 58 0 - forced_permutation_index
+field sound_pitch_range 0 12 1 60 256 sound_permutation permutations
+def sound_permutation 124
+field sound_permutation 7 32 1 0 0 - name
+field sound_permutation 5 2 1 42 0 - next_permutation_index
+field sound_permutation 8 4 1 44 0 - unknown0
+field sound_permutation 8 4 1 48 0 - unknown1
+field sound_permutation 2 20 1 64 4194304 - samples
+field sound_permutation 1 20 1 84 8192 - mouth_data
+field sound_permutation 1 20 1 104 512 - subtitle_data
+group lsnd ____ ____ looping_sound
+def looping_sound 84
+field looping_sound 8 4 1 28 0 - runtime_scripting_sound_index
+field looping_sound 3 16 1 44 0 - continuous_damage_effect
+field looping_sound 0 12 1 60 4 looping_sound_track tracks
+field looping_sound 0 12 1 72 32 looping_sound_detail details
+def looping_sound_track 160
+field looping_sound_track 3 16 1 48 0 - start_sound
+field looping_sound_track 3 16 1 64 0 - loop_sound
+field looping_sound_track 3 16 1 80 0 - stop_sound
+field looping_sound_track 3 16 1 128 0 - alternate_loop_sound
+field looping_sound_track 3 16 1 144 0 - alternate_stop_sound
+def looping_sound_detail 104
+field looping_sound_detail 3 16 1 0 0 - sound
+group snde ____ ____ sound_environment
+def sound_environment 72
+group grhi ____ ____ grenade_hud_interface
+def grenade_hud_interface 504
+field grenade_hud_interface 9 36 1 0 0 hud_absolute_placement absolute_placement
+field grenade_hud_interface 9 104 1 36 0 optional_static_hud_element background
+field grenade_hud_interface 9 192 1 140 0 grenade_count_panel grenade_count_panel
+field grenade_hud_interface 9 28 1 332 0 weapon_hud_overlay overlays
+def hud_absolute_placement 36
+field hud_absolute_placement 6 2 1 0 5 - corner
+def optional_static_hud_element 104
+field optional_static_hud_element 9 104 1 0 0 static_hud_element element
+field optional_static_hud_element 10 0 1 0 0 - optional_static_hud_element_check
+def static_hud_element 104
+field static_hud_element 3 16 1 36 0 - interface_bitmap
+field static_hud_element 0 12 1 88 30 multitexture_overlay multitexture_overlays
+def multitexture_overlay 480
+field multitexture_overlay 6 2 1 4 8 - framebuffer_blend_function
+field multitexture_overlay 6 2 2 46 5 - map_blending_function
+field multitexture_overlay 3 16 3 100 0 - map
+field multitexture_overlay 0 12 1 340 30 multitexture_overlay_effector functions
+field multitexture_overlay 10 0 1 0 0 - multitexture_overlay_check
+def multitexture_overlay_effector 220
+field multitexture_overlay_effector 6 2 1 64 4 - destination_type
+field multitexture_overlay_effector 6 2 1 66 4 - destination
+field multitexture_overlay_effector 6 2 1 68 8 - source
+def grenade_count_panel 192
+field grenade_count_panel 9 104 1 0 0 optional_static_hud_element background
+def weapon_hud_overlay 28
+field weapon_hud_overlay 3 16 1 0 0 - bitmap
+field weapon_hud_overlay 0 12 1 16 16 weapon_hud_overlay_item items
+def weapon_hud_overlay_item 136
+group unhi ____ ____ unit_hud_interface
+def unit_hud_interface 1388
+field unit_hud_interface 9 36 1 0 0 hud_absolute_placement absolute_placement
+field unit_hud_interface 9 104 1 36 0 optional_static_hud_element background
+field unit_hud_interface 9 240 1 140 0 metered_panel shield_meter
+field unit_hud_interface 9 240 1 380 0 metered_panel health_meter
+field unit_hud_interface 9 240 1 620 0 motion_sensor_panel motion_sensor
+field unit_hud_interface 9 36 1 896 0 hud_absolute_placement auxilary_panel.absolute_placement
+field unit_hud_interface 0 12 1 932 16 auxilary_overlay auxilary_panel.auxilary_overlays
+field unit_hud_interface 0 12 1 960 12 hud_sound warning_sounds
+field unit_hud_interface 0 12 1 972 16 auxilary_meter auxilary_meters
+def metered_panel 240
+field metered_panel 9 104 1 0 0 optional_static_hud_element background
+field metered_panel 9 104 1 104 0 optional_meter_hud_element meter
+def optional_meter_hud_element 104
+field optional_meter_hud_element 9 104 1 0 0 meter_hud_element element
+field optional_meter_hud_element 10 0 1 0 0 - optional_meter_hud_element_check
+def meter_hud_element 104
+field meter_hud_element 3 16 1 36 0 - meter_bitmap
+field meter_hud_element 0 12 1 88 30 multitexture_overlay multitexture_overlays
+def motion_sensor_panel 240
+field motion_sensor_panel 9 104 1 0 0 optional_static_hud_element background
+field motion_sensor_panel 9 104 1 104 0 optional_static_hud_element foreground
+def auxilary_overlay 132
+field auxilary_overlay 9 104 1 0 0 static_hud_element static_element
+field auxilary_overlay 6 2 1 104 16 - type
+field auxilary_overlay 10 0 1 0 0 - auxilary_overlay_check
+def hud_sound 56
+field hud_sound 3 16 1 0 0 - sound
+def auxilary_meter 324
+field auxilary_meter 6 2 1 0 1 - type
+field auxilary_meter 9 240 1 20 0 metered_panel panel
+field auxilary_meter 10 0 1 0 0 - auxilary_meter_check
+group wphi ____ ____ weapon_hud_interface
+def weapon_hud_interface 380
+field weapon_hud_interface 3 16 1 0 0 - parent_hud
+field weapon_hud_interface 9 36 1 60 0 hud_absolute_placement absolute_placement
+field weapon_hud_interface 0 12 1 96 16 weapon_hud_static_element statics
+field weapon_hud_interface 0 12 1 108 16 weapon_hud_meter_element meters
+field weapon_hud_interface 0 12 1 120 16 weapon_hud_number_element numbers
+field weapon_hud_interface 0 12 1 132 19 weapon_hud_crosshairs_element crosshairs
+field weapon_hud_interface 0 12 1 144 16 weapon_hud_overlays_element overlays
+field weapon_hud_interface 0 12 1 172 1 hud_screen_effect screen_effects
+field weapon_hud_interface 10 0 1 0 0 - weapon_hud_interface_check
+def weapon_hud_static_element 180
+field weapon_hud_static_element 9 36 1 0 0 weapon_hud_element_header header
+field weapon_hud_static_element 9 104 1 36 0 static_hud_element static_element
+field weapon_hud_static_element 10 0 1 0 0 - weapon_hud_static_element_check
+def weapon_hud_element_header 36
+field weapon_hud_element_header 6 2 1 0 8 - state_type
+field weapon_hud_element_header 6 2 1 4 3 - use_on_map_type
+def weapon_hud_meter_element 180
+field weapon_hud_meter_element 9 36 1 0 0 weapon_hud_element_header header
+field weapon_hud_meter_element 9 104 1 36 0 meter_hud_element meter_element
+field weapon_hud_meter_element 10 0 1 0 0 - weapon_hud_meter_element_check
+def weapon_hud_number_element 160
+field weapon_hud_number_element 9 36 1 0 0 weapon_hud_element_header header
+def weapon_hud_crosshairs_element 104
+field weapon_hud_crosshairs_element 6 2 1 0 19 - crosshair_type
+field weapon_hud_crosshairs_element 6 2 1 4 3 - use_on_map_type
+field weapon_hud_crosshairs_element 3 16 1 36 0 - crosshairs.bitmap
+field weapon_hud_crosshairs_element 0 12 1 52 64 weapon_hud_crosshair_item crosshairs.items
+def weapon_hud_crosshair_item 108
+def weapon_hud_overlays_element 104
+field weapon_hud_overlays_element 6 2 1 0 8 - state_type
+field weapon_hud_overlays_element 6 2 1 4 3 - use_on_map_type
+field weapon_hud_overlays_element 9 28 1 36 0 weapon_hud_overlay overlays
+def hud_screen_effect 184
+field hud_screen_effect 3 16 1 24 0 - mask_fullscreen
+field hud_screen_effect 3 16 1 40 0 - mask_splitscreen
+group hud# ____ ____ hud_number
+def hud_number 100
+field hud_number 3 16 1 0 0 - number_bitmap
+group hudg ____ ____ hud_globals
+def hud_globals 1104
+field hud_globals 9 36 1 0 0 hud_absolute_placement messaging.absolute_placement
+field hud_globals 3 16 1 72 0 - messaging.single_player_font
+field hud_globals 3 16 1 88 0 - messaging.multi_player_font
+field hud_globals 3 16 1 148 0 - messaging.hud_item_messages
+field hud_globals 3 16 1 164 0 - messaging.messaging_icons
+field hud_globals 3 16 1 180 0 - messaging.alternate_icon_text
+field hud_globals 0 12 1 196 18 icon_hud_element messaging.button_icons
+field hud_globals 3 16 1 240 0 - messaging.hud_messages
+field hud_globals 3 16 1 336 0 - waypoint.arrow_bitmap
+field hud_globals 0 12 1 352 16 hud_waypoint_arrow waypoint.arrows
+field hud_globals 3 16 1 704 0 - defaults.default_weapon_hud
+field hud_globals 3 16 1 824 0 - damage_indicators.indicator_bitmap
+field hud_globals 3 16 1 968 0 - carnage_report_bitmap
+field hud_globals 3 16 1 992 0 - checkpoint_sound
+field hud_globals 10 0 1 0 0 - hud_globals_check
+def icon_hud_element 16
+def hud_waypoint_arrow 104
+field hud_waypoint_arrow 7 32 1 0 0 - name
+group hmt_ ____ ____ hud_message_text
+def hud_message_text 128
+field hud_message_text 1 20 1 0 131072 - text_data
+field hud_message_text 0 12 1 20 8192 hud_state_message_element elements
+field hud_message_text 0 12 1 32 1024 hud_state_message messages
+field hud_message_text 10 0 1 0 0 - hud_message_text_check
+def hud_state_message_element 2
+field hud_state_message_element 6 1 1 0 2 - type
+def hud_state_message 64
+field hud_state_message 7 32 1 0 0 - name
+group metr ____ ____ -
+group mgs2 ____ ____ light_volume
+def light_volume 332
+field light_volume 7 32 1 0 0 - attachment_marker
+field light_volume 6 2 1 68 5 - brightness_scale_source
+field light_volume 3 16 1 92 0 - map
+field light_volume 6 2 1 184 5 - frame_animation_source
+field light_volume 0 12 1 288 2 light_volume_frame frames
+def light_volume_frame 176
+group font ____ ____ font
+def font 156
+field font 0 12 1 48 256 font_character_table character_tables
+field font 3 16 4 60 0 - style_fonts
+field font 0 12 1 124 32767 font_character characters
+field font 1 20 1 136 8388608 - pixels
+field font 10 0 1 0 0 - font_check
+def font_character_table 12
+field font_character_table 0 12 1 0 256 font_character_index character_indices
+def font_character_index 2
+field font_character_index 5 2 1 0 0 - index
+def font_character 20
+field font_character 8 2 1 12 0 - hardware_character_index
+field font_character 8 2 1 14 0 - pad
+group str# ____ ____ string_list
+def string_list 12
+field string_list 0 12 1 0 32767 string_list_entry strings
+def string_list_entry 20
+field string_list_entry 1 20 1 0 32767 - string
+field string_list_entry 10 0 1 0 0 - string_list_entry_check
+group ustr ____ ____ unicode_string_list
+def unicode_string_list 12
+field unicode_string_list 0 12 1 0 32767 unicode_string_list_entry strings
+def unicode_string_list_entry 20
+field unicode_string_list_entry 1 20 1 0 65534 - string
+field unicode_string_list_entry 10 0 1 0 0 - unicode_string_list_entry_check
+group DeLa ____ ____ ui_widget
+def ui_widget 1004
+field ui_widget 6 2 1 0 7 - type
+field ui_widget 6 2 1 2 5 - controller_index
+field ui_widget 7 32 1 4 0 - name
+field ui_widget 3 16 1 56 0 - background_bitmap
+field ui_widget 0 12 1 72 64 ui_widget_game_data_input game_data_inputs
+field ui_widget 0 12 1 84 32 ui_widget_event_handler event_handlers
+field ui_widget 0 12 1 96 32 ui_widget_search_and_replace search_and_replace_functions
+field ui_widget 3 16 1 236 0 - text_label_string_list
+field ui_widget 3 16 1 252 0 - text_font
+field ui_widget 6 2 1 284 3 - justification
+field ui_widget 3 16 1 340 0 - list_header_bitmap
+field ui_widget 3 16 1 356 0 - list_footer_bitmap
+field ui_widget 3 16 1 420 0 - extended_description_widget
+field ui_widget 0 12 1 724 32 ui_widget_conditional conditional_widgets
+field ui_widget 0 12 1 992 32 ui_widget_child child_widgets
+field ui_widget 10 0 1 0 0 - ui_widget_check
+def ui_widget_game_data_input 36
+def ui_widget_event_handler 72
+field ui_widget_event_handler 3 16 1 8 0 - widget_tag
+field ui_widget_event_handler 3 16 1 24 0 - sound_effect
+field ui_widget_event_handler 7 32 1 40 0 - script
+def ui_widget_search_and_replace 34
+field ui_widget_search_and_replace 7 32 1 0 0 - search_string
+field ui_widget_search_and_replace 10 0 1 0 0 - ui_widget_search_and_replace_check
+def ui_widget_conditional 80
+field ui_widget_conditional 3 16 1 0 0 - widget_tag
+def ui_widget_child 80
+field ui_widget_child 3 16 1 0 0 - widget_tag
+group Soul ____ ____ ui_widget_collection
+def ui_widget_collection 12
+field ui_widget_collection 0 12 1 0 32 ui_widget_collection_widget widgets
+def ui_widget_collection_widget 16
+field ui_widget_collection_widget 3 16 1 0 0 - widget
+group vcky ____ ____ virtual_keyboard
+def virtual_keyboard 60
+field virtual_keyboard 3 16 1 0 0 - font_tag
+field virtual_keyboard 3 16 1 16 0 - background_bitmap_tag
+field virtual_keyboard 3 16 1 32 0 - special_key_labels_string_list_tag
+field virtual_keyboard 0 12 1 48 44 virtual_keyboard_key keys
+field virtual_keyboard 10 0 1 0 0 - virtual_keyboard_check
+def virtual_keyboard_key 80
+field virtual_keyboard_key 3 16 1 16 0 - unselected_background_bitmap_tag
+field virtual_keyboard_key 3 16 1 32 0 - selected_background_bitmap_tag
+field virtual_keyboard_key 3 16 1 48 0 - active_background_bitmap_tag
+field virtual_keyboard_key 3 16 1 64 0 - sticky_background_bitmap_tag
+group trak ____ ____ camera_track
+def camera_track 48
+field camera_track 0 12 1 4 16 camera_track_control_point control_points
+def camera_track_control_point 60
+group matg ____ ____ game_globals
+def game_globals 428
+field game_globals 0 12 1 248 2 tag_reference_sound sounds
+field game_globals 0 12 1 260 1 tag_reference_camera_track camera
+field game_globals 0 12 1 272 1 game_globals_player_control player_control
+field game_globals 0 12 1 284 1 game_globals_difficulty_information difficulty_information
+field game_globals 0 12 1 296 2 game_globals_grenade grenades
+field game_globals 0 12 1 308 1 game_globals_rasterizer_data rasterizer_data
+field game_globals 0 12 1 320 1 game_globals_interface_tag_references interface_tag_references
+field game_globals 0 12 1 332 20 tag_reference_item weapon_list
+field game_globals 0 12 1 344 20 tag_reference_object cheat_powerups
+field game_globals 0 12 1 356 1 game_globals_multiplayer_information multiplayer_information
+field game_globals 0 12 1 368 1 game_globals_player_information player_information
+field game_globals 0 12 1 380 1 game_globals_first_person_interface first_person_interface
+field game_globals 0 12 1 392 1 game_globals_falling_damage falling_damage
+field game_globals 0 12 1 404 33 material materials
+field game_globals 10 0 1 0 0 - game_globals_check
+def tag_reference_sound 16
+field tag_reference_sound 3 16 1 0 0 - reference
+def tag_reference_camera_track 16
+field tag_reference_camera_track 3 16 1 0 0 - reference
+def game_globals_player_control 128
+field game_globals_player_control 0 12 1 116 16 look_function_value look_function
+def look_function_value 4
+def game_globals_difficulty_information 644
+def game_globals_grenade 68
+field game_globals_grenade 3 16 1 4 0 - throwing_effect
+field game_globals_grenade 3 16 1 20 0 - hud_interface
+field game_globals_grenade 3 16 1 36 0 - item
+field game_globals_grenade 3 16 1 52 0 - projectile
+def game_globals_rasterizer_data 428
+field game_globals_rasterizer_data 3 16 1 0 0 - distance_attenuation
+field game_globals_rasterizer_data 3 16 1 16 0 - vector_normalization
+field game_globals_rasterizer_data 3 16 1 32 0 - atmospheric_fog_density
+field game_globals_rasterizer_data 3 16 1 48 0 - planar_fog_density
+field game_globals_rasterizer_data 3 16 1 64 0 - linear_corner_fade
+field game_globals_rasterizer_data 3 16 1 80 0 - active_camouflage_distortion
+field game_globals_rasterizer_data 3 16 1 96 0 - glow
+field game_globals_rasterizer_data 3 16 3 172 0 - default_textures
+field game_globals_rasterizer_data 3 16 4 220 0 - test
+field game_globals_rasterizer_data 3 16 1 284 0 - screen_effect_video_scanline_map
+field game_globals_rasterizer_data 3 16 1 300 0 - screen_effect_video_noise_map
+field game_globals_rasterizer_data 3 16 1 412 0 - distance_attenuation_2d_for_the_pc
+def game_globals_interface_tag_references 304
+field game_globals_interface_tag_references 3 16 1 0 0 - interface_tag_references[_interface_font_system]
+field game_globals_interface_tag_references 3 16 1 16 0 - interface_tag_references[_interface_font_terminal]
+field game_globals_interface_tag_references 3 16 1 32 0 - interface_tag_references[_interface_color_table_screen]
+field game_globals_interface_tag_references 3 16 1 48 0 - interface_tag_references[_interface_color_table_hud]
+field game_globals_interface_tag_references 3 16 1 64 0 - interface_tag_references[_interface_color_table_editor]
+field game_globals_interface_tag_references 3 16 1 80 0 - interface_tag_references[_interface_color_table_dialog]
+field game_globals_interface_tag_references 3 16 1 96 0 - interface_tag_references[_interface_hud_globals]
+field game_globals_interface_tag_references 3 16 1 112 0 - interface_tag_references[_interface_bitmap_motion_sweep]
+field game_globals_interface_tag_references 3 16 1 128 0 - interface_tag_references[_interface_bitmap_motion_sweep_mask]
+field game_globals_interface_tag_references 3 16 1 144 0 - interface_tag_references[_interface_bitmap_multiplayer_hud]
+field game_globals_interface_tag_references 3 16 1 160 0 - interface_tag_references[_interface_string_list_localization]
+field game_globals_interface_tag_references 3 16 1 176 0 - interface_tag_references[_interface_hud_digits]
+field game_globals_interface_tag_references 3 16 1 192 0 - interface_tag_references[_interface_bitmap_motion_blip]
+field game_globals_interface_tag_references 3 16 1 208 0 - interface_tag_references[_interface_bitmap_iface_map1]
+field game_globals_interface_tag_references 3 16 1 224 0 - interface_tag_references[_interface_bitmap_iface_map2]
+field game_globals_interface_tag_references 3 16 1 240 0 - interface_tag_references[_interface_bitmap_iface_map3]
+field game_globals_interface_tag_references 10 0 1 0 0 - game_globals_interface_tag_references_check
+def tag_reference_item 16
+field tag_reference_item 3 16 1 0 0 - reference
+def tag_reference_object 16
+field tag_reference_object 3 16 1 0 0 - reference
+def game_globals_multiplayer_information 160
+field game_globals_multiplayer_information 3 16 1 0 0 - flag
+field game_globals_multiplayer_information 3 16 1 16 0 - unit
+field game_globals_multiplayer_information 0 12 1 32 20 game_globals_vehicle vehicles
+field game_globals_multiplayer_information 3 16 1 44 0 - hill_shader
+field game_globals_multiplayer_information 3 16 1 60 0 - flag_shader
+field game_globals_multiplayer_information 3 16 1 76 0 - ball
+field game_globals_multiplayer_information 0 12 1 92 60 tag_reference_sound sounds
+def game_globals_vehicle 16
+field game_globals_vehicle 3 16 1 0 0 - vehicle
+def game_globals_player_information 244
+field game_globals_player_information 3 16 1 0 0 - player_unit
+field game_globals_player_information 3 16 1 184 0 - coop_respawn_effect
+def game_globals_first_person_interface 192
+field game_globals_first_person_interface 3 16 1 0 0 - hands
+field game_globals_first_person_interface 3 16 1 72 0 - night_vision_off_on_effect
+field game_globals_first_person_interface 3 16 1 88 0 - night_vision_on_off_effect
+def game_globals_falling_damage 152
+field game_globals_falling_damage 3 16 1 16 0 - falling_damage
+field game_globals_falling_damage 3 16 1 44 0 - maximum_distance_damage
+field game_globals_falling_damage 3 16 1 60 0 - vehicle_hit_environment_damage_effect
+field game_globals_falling_damage 3 16 1 76 0 - vehicle_killed_unit_damage_effect
+field game_globals_falling_damage 3 16 1 92 0 - vehicle_collision_damage
+field game_globals_falling_damage 3 16 1 108 0 - flaming_death_damage
+def material 884
+field material 3 16 1 740 0 - breakable_surface.effect
+field material 3 16 1 756 0 - breakable_surface.sound
+field material 0 12 1 796 32 breakable_surface_particle_effect breakable_surface.particle_effects
+field material 3 16 1 868 0 - melee_hit_sound
+def breakable_surface_particle_effect 128
+field breakable_surface_particle_effect 3 16 1 0 0 - particle
+field breakable_surface_particle_effect 10 0 1 0 0 - breakable_surface_particle_effect_check
+group mply ____ ____ multiplayer_scenario_descriptions
+def multiplayer_scenario_descriptions 12
+field multiplayer_scenario_descriptions 0 12 1 0 32 multiplayer_scenario_description scenarios
+def multiplayer_scenario_description 68
+field multiplayer_scenario_description 3 16 1 0 0 - descriptive_bitmap
+field multiplayer_scenario_description 3 16 1 16 0 - displayed_map_name
+field multiplayer_scenario_description 7 32 1 32 0 - scenario_tag_path
+group scnr ____ ____ scenario
+def scenario 1456
+field scenario 0 12 1 48 8 sky_reference sky_references
+field scenario 6 2 1 60 3 - type
+field scenario 0 12 1 236 1024 predicted_resource predicted_ui_resources
+field scenario 0 12 1 516 512 object_name object_names
+field scenario 0 12 1 528 2000 scenery scenery
+field scenario 0 12 1 540 100 scenery_palette scenery_palette
+field scenario 0 12 1 552 128 biped bipeds
+field scenario 0 12 1 564 100 biped_palette biped_palette
+field scenario 0 12 1 576 80 vehicle vehicles
+field scenario 0 12 1 588 100 vehicle_palette vehicle_palette
+field scenario 0 12 1 600 256 equipment equipment
+field scenario 0 12 1 612 100 equipment_palette equipment_palette
+field scenario 0 12 1 624 128 weapon weapons
+field scenario 0 12 1 636 100 weapon_palette weapon_palette
+field scenario 0 12 1 648 128 device_group device_groups
+field scenario 0 12 1 660 400 machine machines
+field scenario 0 12 1 672 100 machine_palette machine_palette
+field scenario 0 12 1 684 100 control controls
+field scenario 0 12 1 696 100 control_palette control_palette
+field scenario 0 12 1 708 500 light_fixture light_fixtures
+field scenario 0 12 1 720 100 light_fixture_palette light_fixtures_palette
+field scenario 0 12 1 732 256 sound_scenery sound_scenery
+field scenario 0 12 1 744 100 sound_scenery_palette sound_scenery_palette
+field scenario 0 12 1 840 256 starting_profile starting_profiles
+field scenario 0 12 1 852 256 player_starting_location players
+field scenario 0 12 1 864 256 trigger_volume trigger_volumes
+field scenario 0 12 1 876 1024 recorded_animation recorded_animations
+field scenario 0 12 1 888 200 netgame_flag netgame_flags
+field scenario 0 12 1 900 200 netgame_equipment netgame_equipment
+field scenario 0 12 1 912 200 starting_equipment scenario_starting_equipment
+field scenario 0 12 1 924 256 bsp_switch_trigger_volume bsp_switch_trigger_volumes
+field scenario 0 12 1 948 128 decal_palette decal_palette
+field scenario 0 12 1 960 32 detail_object_collection_palette detail_object_collection_palette
+field scenario 0 12 1 1056 64 actor_palette ai_actor_palette
+field scenario 0 12 1 1068 128 encounter ai_encounters
+field scenario 0 12 1 1080 256 ai_command_list ai_command_lists
+field scenario 0 12 1 1092 128 ai_animation_reference ai_animation_references
+field scenario 0 12 1 1104 128 ai_script_reference ai_script_references
+field scenario 0 12 1 1116 128 ai_recording_reference ai_recording_references
+field scenario 0 12 1 1128 128 conversation ai_conversations
+field scenario 1 20 1 1140 380076 - hs_syntax_data
+field scenario 1 20 1 1160 262144 - hs_string_constants
+field scenario 0 12 1 1180 512 hs_script hs_scripts
+field scenario 0 12 1 1192 581 hs_global hs_globals
+field scenario 0 12 1 1204 256 hs_reference hs_references
+field scenario 0 12 1 1216 8 hs_source_file hs_source_files
+field scenario 0 12 1 1252 512 cutscene_flag cutscene_flags
+field scenario 0 12 1 1264 512 cutscene_camera_point cutscene_camera_points
+field scenario 0 12 1 1276 64 cutscene_title cutscene_chapter_titles
+field scenario 3 16 1 1396 0 - custom_object_names
+field scenario 3 16 1 1412 0 - ingame_help_text
+field scenario 3 16 1 1428 0 - hud_messages
+field scenario 0 12 1 1444 16 structure_bsp_reference structure_bsp_references
+field scenario 10 0 1 0 0 - scenario_check_object_names
+field scenario 10 0 1 0 0 - scenario_check_scripts
+def sky_reference 16
+field sky_reference 3 16 1 0 0 - reference
+def predicted_resource 8
+field predicted_resource 6 2 1 0 2 - type
+field predicted_resource 4 4 1 4 0 - tag_index
+field predicted_resource 10 0 1 0 0 - predicted_resource_check
+def object_name 36
+field object_name 7 32 1 0 0 - name
+def scenery 72
+field scenery 5 2 1 0 0 - object.palette_entry_index
+field scenery 5 2 1 2 0 - object.name_index
+def scenery_palette 48
+field scenery_palette 3 16 1 0 0 - reference
+def biped 120
+field biped 5 2 1 0 0 - object.palette_entry_index
+field biped 5 2 1 2 0 - object.name_index
+def biped_palette 48
+field biped_palette 3 16 1 0 0 - reference
+def vehicle 120
+field vehicle 5 2 1 0 0 - object.palette_entry_index
+field vehicle 5 2 1 2 0 - object.name_index
+def vehicle_palette 48
+field vehicle_palette 3 16 1 0 0 - reference
+def equipment 40
+field equipment 5 2 1 0 0 - equipment.object.palette_entry_index
+field equipment 5 2 1 2 0 - equipment.object.name_index
+def equipment_palette 48
+field equipment_palette 3 16 1 0 0 - reference
+def weapon 92
+field weapon 5 2 1 0 0 - object.palette_entry_index
+field weapon 5 2 1 2 0 - object.name_index
+def weapon_palette 48
+field weapon_palette 3 16 1 0 0 - reference
+def device_group 52
+field device_group 7 32 1 0 0 - name
+def machine 64
+field machine 5 2 1 0 0 - machine.object.palette_entry_index
+field machine 5 2 1 2 0 - machine.object.name_index
+field machine 5 2 1 40 0 - machine.device.power_group_index
+field machine 5 2 1 42 0 - machine.device.position_group_index
+def machine_palette 48
+field machine_palette 3 16 1 0 0 - reference
+def control 64
+field control 5 2 1 0 0 - object.palette_entry_index
+field control 5 2 1 2 0 - object.name_index
+field control 5 2 1 40 0 - device.power_group_index
+field control 5 2 1 42 0 - device.position_group_index
+def control_palette 48
+field control_palette 3 16 1 0 0 - reference
+def light_fixture 88
+field light_fixture 5 2 1 0 0 - light_fixture.object.palette_entry_index
+field light_fixture 5 2 1 2 0 - light_fixture.object.name_index
+field light_fixture 5 2 1 40 0 - light_fixture.device.power_group_index
+field light_fixture 5 2 1 42 0 - light_fixture.device.position_group_index
+def light_fixture_palette 48
+field light_fixture_palette 3 16 1 0 0 - reference
+def sound_scenery 40
+field sound_scenery 5 2 1 0 0 - object.palette_entry_index
+field sound_scenery 5 2 1 2 0 - object.name_index
+def sound_scenery_palette 48
+field sound_scenery_palette 3 16 1 0 0 - reference
+def starting_profile 104
+field starting_profile 7 32 1 0 0 - name
+field starting_profile 3 16 1 40 0 - primary_weapon.weapon
+field starting_profile 3 16 1 60 0 - secondary_weapon.weapon
+def player_starting_location 52
+def trigger_volume 96
+field trigger_volume 6 2 1 0 2 - type
+field trigger_volume 7 32 1 4 0 - name
+def recorded_animation 64
+field recorded_animation 7 32 1 0 0 - name
+field recorded_animation 1 20 1 44 2097152 - event_stream
+field recorded_animation 10 0 1 0 0 - recorded_animation_check
+def netgame_flag 148
+field netgame_flag 6 2 1 16 9 - type
+def netgame_equipment 144
+field netgame_equipment 3 16 1 80 0 - item_collection
+def starting_equipment 204
+field starting_equipment 3 16 6 60 0 - item_collection
+def bsp_switch_trigger_volume 8
+field bsp_switch_trigger_volume 5 2 1 6 0 - cutscene_flag_index
+def decal_palette 16
+field decal_palette 3 16 1 0 0 - reference
+def detail_object_collection_palette 48
+field detail_object_collection_palette 3 16 1 0 0 - collection
+def actor_palette 16
+field actor_palette 3 16 1 0 0 - reference
+def encounter 176
+field encounter 7 32 1 0 0 - name
+field encounter 6 2 1 36 10 - team_index
+field encounter 6 2 1 40 3 - searching
+field encounter 0 12 1 128 64 squad squads
+field encounter 0 12 1 140 32 platoon platoons
+field encounter 0 12 1 152 512 firing_position firing_positions
+field encounter 0 12 1 164 256 encounter_player_starting_location player_starting_locations
+def squad 232
+field squad 7 32 1 0 0 - name
+field squad 5 2 1 32 0 - actor_palette_index
+field squad 6 2 1 36 12 - initial_state
+field squad 6 2 1 38 12 - default_state
+field squad 6 2 1 44 5 - unique_leader_type
+field squad 6 2 1 128 5 - major_upgrade
+field squad 0 12 1 196 32 move_position move_positions
+field squad 0 12 1 208 32 actor_starting_location starting_locations
+def move_position 80
+field move_position 5 2 1 28 0 - animation_reference_index
+def actor_starting_location 28
+field actor_starting_location 6 2 1 20 12 - default_state
+field actor_starting_location 6 2 1 22 12 - initial_state
+field actor_starting_location 5 2 1 24 0 - actor_variant_index
+field actor_starting_location 5 2 1 26 0 - command_list_index
+def platoon 172
+field platoon 7 32 1 0 0 - name
+field platoon 9 8 1 48 0 platoon_rule attacking_defending_rule
+field platoon 9 8 1 60 0 platoon_rule maneuvering_rule
+def platoon_rule 8
+field platoon_rule 6 2 1 0 10 - rule_type
+def firing_position 24
+field firing_position 6 2 1 12 26 - group_index
+def encounter_player_starting_location 52
+def ai_command_list 96
+field ai_command_list 7 32 1 0 0 - name
+field ai_command_list 0 12 1 48 255 ai_command commands
+field ai_command_list 0 12 1 60 64 ai_command_point points
+def ai_command 32
+field ai_command 6 2 1 0 28 - atom_type
+field ai_command 5 2 1 16 0 - animation_reference_index
+field ai_command 5 2 1 18 0 - script_reference_index
+field ai_command 5 2 1 20 0 - recording_reference_index
+field ai_command 5 2 1 24 0 - object_name_index
+def ai_command_point 20
+def ai_animation_reference 60
+field ai_animation_reference 7 32 1 0 0 - animation_name
+field ai_animation_reference 3 16 1 32 0 - animation_graph
+def ai_script_reference 40
+field ai_script_reference 7 32 1 0 0 - script_name
+def ai_recording_reference 40
+field ai_recording_reference 7 32 1 0 0 - recording_name
+def conversation 116
+field conversation 7 32 1 0 0 - name
+field conversation 0 12 1 80 8 conversation_participant participants
+field conversation 0 12 1 92 32 conversation_line lines
+def conversation_participant 84
+field conversation_participant 6 2 1 4 8 - selection_type
+field conversation_participant 5 2 1 8 0 - preexisting_object_name_index
+field conversation_participant 5 2 1 10 0 - new_attach_object_name_index
+def conversation_line 124
+field conversation_line 5 2 1 2 0 - participant_index
+field conversation_line 6 2 1 4 3 - address_type
+field conversation_line 5 2 1 6 0 - address_participant_index
+field conversation_line 3 16 6 28 0 - dialogue
+def hs_script 92
+field hs_script 7 32 1 0 0 - name
+field hs_script 6 2 1 32 5 - script_type
+field hs_script 6 2 1 34 49 - return_type
+def hs_global 92
+field hs_global 7 32 1 0 0 - name
+field hs_global 6 2 1 32 49 - type
+def hs_reference 40
+field hs_reference 3 16 1 24 0 - reference
+def hs_source_file 52
+field hs_source_file 7 32 1 0 0 - name
+field hs_source_file 1 20 1 32 262144 - source
+def cutscene_flag 92
+field cutscene_flag 7 31 1 4 0 - name
+def cutscene_camera_point 104
+field cutscene_camera_point 7 32 1 4 0 - name
+def cutscene_title 96
+field cutscene_title 7 32 1 4 0 - name
+field cutscene_title 6 2 1 50 5 - style
+field cutscene_title 6 2 1 52 3 - justification
+def structure_bsp_reference 32
+field structure_bsp_reference 3 16 1 16 0 - structure_bsp

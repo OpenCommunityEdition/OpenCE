@@ -998,6 +998,8 @@ boolean cache_files_map_plays_multiplayer(
 
 		if (ReadFile(file, &header, sizeof(header), &bytes_read, NULL) &&
 			bytes_read == sizeof(header) &&
+			/* port: the file's words are little endian (port/mac/xbox_swap.c; nothing on a little-endian host) */
+			(mac_xbox_cache_header_to_native(&header), TRUE) &&
 			cache_file_header_verify(&header, path, FALSE))
 		{
 			csstrncpy(build, header.build, 0x20);
@@ -1096,7 +1098,20 @@ boolean cache_files_map_present(
 		if (cache_files_precache_map_loaded(map_name))
 			return TRUE;
 		snprintf(path, sizeof(path), "%s%s.map", cache_files_map_directory(), name);
+#ifdef HALO_MAC
+		/* port: the Mac's map directory is the host's path of the folder the
+		session's map is in (port/mac/engine_cache_files.c), which the
+		Windows file calls here do not read */
+		{
+			int mac_cache_files_map_file_exists(char const *path);
+
+			if (mac_cache_files_map_file_exists(path))
+				return TRUE;
+			file = INVALID_HANDLE_VALUE;
+		}
+#else
 		file = CreateFileA(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+#endif
 		if (file != INVALID_HANDLE_VALUE)
 		{
 			CloseHandle(file);
@@ -1141,6 +1156,17 @@ boolean cache_files_give_time_to_precache(
 	there yet: precached once it is */
 	if (map_share_downloading(map_name))
 		return FALSE;
+#ifdef HALO_MAC
+	/* port: the Mac's menus' session holds the title's map, and a game's map
+	is loaded by the session the game begins in (port/mac/engine_network_test.c):
+	a map this machine has is as precached as it can be before then */
+	{
+		int mac_engine_network_map_precached(char const *map_name);
+
+		if (mac_engine_network_map_precached(map_name))
+			return TRUE;
+	}
+#endif
 	if (cache_files_precache_map_loaded(map_name))
 	{
 		result = TRUE;

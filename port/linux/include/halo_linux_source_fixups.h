@@ -68,4 +68,12 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
 
+/* an Xbox cache's header words, little endian in the file, into host order (cache_files.c;
+   port/mac/xbox_swap.c: the Mac's; the other builds run on little-endian hosts) */
+#ifdef HALO_MAC
+void mac_xbox_cache_header_to_native(void *header);
+#else
+#define mac_xbox_cache_header_to_native(header) ((void)(header))
+#endif
+
 #endif
