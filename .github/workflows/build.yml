@@ -101,7 +101,7 @@ jobs:
       - name: Install the toolchain
         run: |
           printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
-          pacman -Syu --noconfirm --needed git zstd python python-pytest python-pillow python-numpy ninja ccache \
+          pacman -Syu --noconfirm --needed git zstd python python-pytest python-pillow python-numpy python-fonttools ninja ccache \
             clang lld gcc lib32-glibc lib32-gcc-libs cmake pkgconf wayland
 
       - uses: actions/checkout@v4
