@@ -23,7 +23,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, STB_VORBIS_SOURCE, XDK_INCLUDE,
                           compile_launcher, configuration_defines, game_defines_and_includes, game_sources,
@@ -238,7 +238,7 @@ def android_configure_inputs() -> List[Path]:
 
 def guest_image_build(n: Writer, sln: Any, config: Dict[str, Any], *, rule_prefix: str, build: Path, guest_cc: str,
                       musl_dir: Path, sdl_include: Path, gl_headers: Path, ar: str, lld: str, builtins: str,
-                      imports_options: str, imports_outputs: List[Path]) -> Path:
+                      imports_options: str, imports_outputs: List[Path], defines: Sequence[str] = ()) -> Path:
     """The guest image's rules, shared by the Android build and the macOS one
     (tools/macos_build.py): musl, the game, the platform layer and the guest
     runtime compiled for the ILP32 guest, and linked to <build>/halo_guest.elf.
@@ -247,8 +247,9 @@ def guest_image_build(n: Writer, sln: Any, config: Dict[str, Any], *, rule_prefi
     gl_headers holds GLES2, GLES3 and KHR; ar and lld are the archiver and
     the linker, builtins what is linked after the C library (the compiler's
     runtime); imports_options are tools/android_imports.py's options, and
-    imports_outputs the files they write besides the stubs. The caller
-    declares the variable <rule_prefix>_guest_cc. Returns the image."""
+    imports_outputs the files they write besides the stubs; defines are
+    added to every compile of guest code. The caller declares the variable
+    <rule_prefix>_guest_cc. Returns the image."""
     label = rule_prefix.upper()
     guest_dir = build / "guest"
     obj_dir = guest_dir / "obj"
@@ -355,7 +356,7 @@ def guest_image_build(n: Writer, sln: Any, config: Dict[str, Any], *, rule_prefi
         f"-isystem {libc_include}", f"-isystem {arch}", f"-isystem {musl_dir}/arch/generic",
         f"-isystem {musl_dir}/include",
     ]
-    guest_abi = " ".join(GUEST_ABI_FLAGS + configuration_defines(sln))
+    guest_abi = " ".join(GUEST_ABI_FLAGS + configuration_defines(sln) + list(defines))
     guest_code = " ".join(GUEST_CODE_FLAGS)
     tool_implicit = [Path("tools/android_asm_convert.py"), *generated_headers]
     # profile-guided optimisation with the Linux build's profile (committed,

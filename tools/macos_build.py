@@ -90,7 +90,10 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     image = guest_image_build(n, sln, config, rule_prefix="macos", build=BUILD, guest_cc=guest_cc,
                               musl_dir=MUSL_DIR, sdl_include=Path(sdl_include), gl_headers=Path(gles_include),
                               ar=ar, lld=lld, builtins="", imports_options=f"--svc --host-names {names_c}",
-                              imports_outputs=[names_c])
+                              imports_outputs=[names_c],
+                              # the guest's code paths for the VM (the thread
+                              # pointer in TPIDR_EL0, port/android/guest/runtime)
+                              defines=["-DHALO_GUEST_VM=1"])
 
     # ---------- the host
 
