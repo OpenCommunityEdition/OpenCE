@@ -16,7 +16,8 @@ forward slashes (main_menu/main_menu); the root is the main menu.
 
 The bitmaps are drawn from the high-res redraws (--redraws, hand-made SVGs
 in the PC bitmaps' layout), copied to port/assets/menus/svg, at up to 4
-times their size. The pictures with no redraw (renders, screenshots, logos)
+times their size. Pictures drawn by hand with no SVG are kept in port/assets/menus/art and copied
+as they are (HAND_PNGS). The pictures with no redraw (renders, screenshots, logos)
 are the Xbox map's bitmap of the same name, where it has the same pictures
 in the same order (XBOX_BITMAPS: the player's own ui.map draws them, and
 nothing is shipped), else blank (or the --placeholder image, if given,
@@ -58,6 +59,9 @@ ROOT = Path(__file__).resolve().parent.parent
 MENUS = ROOT / "port/assets/menus"
 CE = MENUS / "ce"
 SVG_COPIES = MENUS / "svg"
+# pictures drawn by hand with no SVG source (kept, not written by this script): the PNG for
+# a frame, at the frame's path, is copied to ce/ as it is (a 4x or 2x PNG, with bled edges)
+HAND_PNGS = MENUS / "art"
 MAIN_MENU = "ui\\shell\\main_menu\\main_menu"
 TITLE_FONT = ROOT / "port/assets/fonts/OpenCE-Regular.ttf"
 # the widgets left out, with their pictures (and all they alone lead to):
@@ -130,13 +134,11 @@ XBOX_BITMAPS = {
 # the frames with no redraw that are drawn from a frame of the Xbox map's
 # bitmap of the same name, whose other frames differ (<frame map=...>):
 # the same picture, or for the profile settings the Xbox's for the same
-# thing (Change Name; its Controller Setup for Gamepads)
+# thing (Change Color's)
 XBOX_FRAMES = {
     "shell/main_menu/multiplayer_type_select/mp_options__2": 3,
     "shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__2": 2,
     "shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__5": 4,
-    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__0": 0,
-    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__2": 1,
     "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__7": 3,
 }
 PLACEHOLDER_SCALE = 2
@@ -321,6 +323,7 @@ class Art:
         self.placeholder = Image.open(placeholder).convert("RGBA") if placeholder else None
         self.pictures = []  # (frame, size, PC picture) of the frames drawn as the placeholder
         self.redrawn = set()  # the frames (by source name) drawn from a redraw
+        self.hand_pngs = set()  # the frames (by source name) copied from HAND_PNGS
         self.xbox_frames = []  # (PC frame, Xbox bitmap, its frame) drawn from the Xbox map
         self.added_frames = []  # (our bitmap, Xbox bitmap, its frame): port_settings.BITMAP_FRAMES
         self.svgs = []
@@ -388,6 +391,15 @@ class Art:
         for index in indices:
             width, height = data[index]["width"], data[index]["height"]
             name = self.frame_sources(relative, index, len(data))[-1]
+            hand = HAND_PNGS / f"{name}.png"
+            if hand.is_file():
+                png = f"ce/{relative}__{index}.png"
+                (MENUS / png).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(hand, MENUS / png)
+                self.hand_pngs.add(name)
+                self.pngs.append(png)
+                lines.append(f"\t\t<frame{attributes([('png', png), ('width', width), ('height', height)])}/>")
+                continue
             if name in XBOX_FRAMES and not any((self.redraws / f"{source}.svg").is_file()
                                                for source in self.frame_sources(relative, index, len(data))):
                 self.xbox_frames.append((name, tag, XBOX_FRAMES[name]))
@@ -729,13 +741,13 @@ def main() -> None:
         "`/Applications/Halo.app`, `paths.custom_edition`, then the `custom_maps` folder), it draws these frames",
         "from the same bitmap tag and frame of that install's `ui.map` (the pixels are in its `bitmaps.map`):",
         "read and decoded when the menu draws them, and never shipped, written or kept",
-        "(`port/linux/src/menu_pc_art.c`). Without one it draws the PNG written for it: a redraw (`svg/`) where",
+        "(`port/linux/src/menu_pc_art.c`). Without one it draws the PNG written for it: a redraw (`svg/`) or the hand-drawn picture (`art/`) where",
         "there is one, else blank.",
         "",
         "| File | Without an install |",
         "| --- | --- |",
     ]
-    report += [f"| `ce/{name}.png` | {'redraw' if name in art.redrawn else 'blank (to be redrawn)'} |"
+    report += [f"| `ce/{name}.png` | {'hand-drawn (`art/`)' if name in art.hand_pngs else 'redraw' if name in art.redrawn else 'blank (to be redrawn)'} |"
                for name in PC_INSTALL_FRAMES]
     report += [
         "",

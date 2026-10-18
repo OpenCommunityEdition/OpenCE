@@ -14,10 +14,14 @@
 - **The menus' mouse pointer** (the arrowhead and chevrons the menus draw
   under the mouse): drawn in code by OpenCE contributors
   (`port/linux/game/menu_cursor.c`).
-- **The settings pictures** (the nine redraws of the pictures beside the
-  multiplayer type, gametype and profile screens' settings, which the menus
-  draw when the player's own install has none): by OpenCE contributors
+- **The settings pictures** (the redraws of the pictures beside the
+  multiplayer type and gametype screens' settings, which the menus draw
+  when the player's own install has none): by OpenCE contributors
   (`port/assets/menus/svg/shell/main_menu`).
+- **The profile settings' pictures** (Change Name, Controls Setup,
+  Gamepads, Mouse Setup, Audio Setup, Video Setup, Network Setup and About:
+  frames 0 to 6 and 8 of `profile_options`): drawn by Adam Cipoletti
+  (`port/assets/menus/art`).
 - **The Mac's reduced HUD** (the high-res HUD scaled down for the Mac's
   small video memory): reductions by OpenCE contributors of MrBruh's redraws
   (`port/assets/hud_mac`, made by `tools/mac_hud_reduce.py`).
