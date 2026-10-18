@@ -22,6 +22,12 @@ void platform_log(const char *format,...)
 	fputc('\n',stderr);
 }
 
+const char *config_string(const char *name)
+{
+	(void)name;
+	return "default";
+}
+
 int main(void)
 {
 	float frame[VOICE_FRAME_SAMPLES], output[VOICE_FRAME_SAMPLES * 6];
@@ -30,7 +36,8 @@ int main(void)
 	double left=0.0, right=0.0;
 	for (i=0;i<VOICE_FRAME_SAMPLES;i++)
 		frame[i]=0.3f*sinf((float)i*0.071f);
-	CHECK(!voice_audio_microphone(1));
+	/* (the microphone is never opened here: closed, it gives nothing) */
+	CHECK(!voice_audio_microphone(0));
 	CHECK(!voice_audio_read_frame(frame));
 	length=voice_audio_encode(frame,24000,packet,sizeof(packet));
 	CHECK(length>0 && length<=VOICE_MAXIMUM_PACKET);

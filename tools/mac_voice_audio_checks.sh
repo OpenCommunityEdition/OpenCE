@@ -37,8 +37,12 @@ for arch in ppc i386; do
 			-c "port/third_party/opus/$source" -o "$object"
 		echo "$object" >> "$out/opus_$arch.rsp"
 	done < port/third_party/opus/sources.txt
-	$cc $flags -Wl,-dead_strip "$out/probe_$arch.o" "$out/voice_$arch.o" \
-		"$out/clock_$arch.o" \
-		$(cat "$out/opus_$arch.rsp") -lpthread -lm -o "$out/probe_$arch"
+	$cc $flags -std=gnu89 -O2 $fp -Iport/mac -c port/mac/mac_voice_capture.c -o "$out/capture_$arch.o"
+	$cc $flags -std=gnu89 -O2 $fp -Iport/mac -c port/mac/mac_voice_dsp.c -o "$out/dsp_$arch.o"
+	$cc $flags -std=gnu89 -O2 -c tools/mac_voice_probe_shims.c -o "$out/shims_$arch.o"
+	$cc $flags -Wl,-dead_strip "$out/shims_$arch.o" "$out/probe_$arch.o" "$out/voice_$arch.o" \
+		"$out/clock_$arch.o" "$out/capture_$arch.o" "$out/dsp_$arch.o" \
+		$(cat "$out/opus_$arch.rsp") -framework AudioUnit -framework AudioToolbox -framework CoreAudio \
+		-framework CoreServices -lpthread -lm -o "$out/probe_$arch"
 done
 "$out/probe_i386"

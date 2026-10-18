@@ -375,6 +375,22 @@ does. No machine may use `127.0.0.1` as its `network.address`: it means "this
 machine" in the game's addressing; give each copy on one machine its own
 (`127.0.0.2`, ...). Use `HALO_MAC_ENGINE_LOG=1` to see the netcode's own log.
 
+## Voice chat microphone
+
+Voice chat's microphone is `mac_voice_capture.c`, a CoreAudio AUHAL input unit
+(the HAL output unit with its input bus on; Mac OS X 10.4 and later, PowerPC and Intel).
+It reads the device's own rate and channels as native-endian float, averages the
+channels to mono and resamples to 48 kHz (`mac_voice_dsp.c`: averaging above the
+rate, linear at or below) into a ring that voice chat's thread reads in frames of
+960 samples, so the Opus encoder is given the frames of the SDL builds. Nothing
+opens the microphone (or makes the system ask for it) until `network_voice.c`
+first asks to send: push to talk on the first press, open mic when voice chat
+is on; `audio.voice_chat` `"off"` never opens it. `audio.input_device` names the
+device (changed, it reopens); a microphone that will not open is tried again every
+10 seconds. `sh tools/mac_voice_capture_checks.sh` runs the ring and resampler tests and
+builds a hidden probe (`MAC_VOICE_CAPTURE_SECONDS=5` records from the microphone
+to a file of float frames). Manual two-machine test: `docs/mac-voice-manual-test.md`.
+
 ## Known limitations
 
 - Xbox maps on the PowerPC Macs: the conversion is checked in both byte orders on Intel and
@@ -382,8 +398,8 @@ machine" in the game's addressing; give each copy on one machine its own
 - No Mac 10.4 machine has run the game; the 10.5 and 10.6 results are from
   three machines. The Controller Setup needs 10.5.
 - System link (LAN) multiplayer works from the menus (Multiplayer > Create
-  Game > LAN, Join Game > LAN; see "System link" above). Internet play, voice
-  chat, map sharing and Custom Edition maps are not available on the Mac yet.
+  Game > LAN, Join Game > LAN; see "System link" above). Voice chat sends and receives
+  (below); internet play, map sharing and Custom Edition maps are not available on the Mac yet.
 - Full screen switches the display to 640 x 480 and stretches the picture;
   the menus' pointer is not tracked in full screen.
 - Audio is OpenAL (`HALO_MAC_AUDIO_OPENAL=0` selects the software mixer). Music

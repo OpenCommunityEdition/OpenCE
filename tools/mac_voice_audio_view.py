@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Generate a checked Mac view of the real Opus voice mixer.
 
-Only microphone capture is unavailable on this native boundary. Opus encode,
+The microphone is port/mac/mac_voice_capture.c's AUHAL input; Opus encode,
 decode, packet sequencing, concealment, speaker buffering and mixing remain the
 shared implementation from port/linux/src/voice_audio.c.
 """
@@ -33,20 +33,73 @@ NATIVE_INCLUDES = '''#include "engine_xdk_prefix.h"
 #include <string.h>
 
 typedef unsigned long long Uint64;
-void platform_log(const char *format, ...);'''
+void platform_log(const char *format, ...);
+const char *config_string(const char *name);
+#include "mac_voice_capture.h"
+#define PLATFORM_AUDIO_DEVICE_NAME_SIZE 128'''
 
-NATIVE_INPUT = '''/* Tiger's native output is available, but this port has no microphone
-   input device provider yet. Sending voice stays disabled until one exists. */
+NATIVE_INPUT = '''/* The microphone: an AUHAL input unit (port/mac/mac_voice_capture.c), open only
+   while voice chat may send, and opened on the first request (the system asks
+   for the permission then, never before). It gives mono float at 48 kHz, the
+   frame the SDL builds' microphone does. */
 int voice_audio_microphone(int open)
 {
-	(void)open;
-	return FALSE;
+	if (!open)
+	{
+		if (microphone_open)
+		{
+			mac_voice_capture_close(&microphone);
+			microphone_open = FALSE;
+			capture_count = 0;
+			microphone_failed = FALSE;
+			platform_log("voice chat: microphone closed");
+		}
+		return FALSE;
+	}
+	{
+		/* (audio.input_device: Settings > Audio's) */
+		const char *device = config_string("audio.input_device");
+
+		device = device && device[0] ? device : "default";
+		/* (another device chosen: the one open closes, and the new opens) */
+		if (microphone_open && strcmp(microphone_device, device))
+		{
+			mac_voice_capture_close(&microphone);
+			microphone_open = FALSE;
+			capture_count = 0;
+			microphone_failed = FALSE;
+		}
+		if (!microphone_open && (!microphone_failed || GetTickCount() - microphone_failed_ms >= VOICE_RETRY_MS))
+		{
+			long status = 0;
+
+			snprintf(microphone_device, sizeof(microphone_device), "%s", device);
+			microphone_open = mac_voice_capture_open(&microphone, device, &status) != 0;
+			microphone_failed = !microphone_open;
+			microphone_failed_ms = GetTickCount();
+			if (microphone_open)
+				platform_log("voice chat: microphone open");
+			else
+				platform_log("voice chat: no microphone (%ld)", status);
+		}
+	}
+	return microphone_open;
 }
 
 int voice_audio_read_frame(float *frame)
 {
-	(void)frame;
-	return FALSE;
+	if (!microphone_open)
+		return FALSE;
+	/* (a backlog dropped but for the latest frames) */
+	if (mac_voice_capture_available(&microphone) > VOICE_MAXIMUM_BACKLOG)
+		mac_voice_capture_trim(&microphone, VOICE_MAXIMUM_BACKLOG);
+	capture_count += (int)mac_voice_capture_read(&microphone, capture + capture_count,
+		(unsigned)(VOICE_FRAME_SAMPLES - capture_count));
+	if (capture_count < VOICE_FRAME_SAMPLES)
+		return FALSE;
+	memcpy(frame, capture, sizeof(capture));
+	capture_count = 0;
+	return TRUE;
 }
 
 '''
@@ -78,7 +131,16 @@ def generate():
 	text = replace_once(text, OLD_INCLUDES, NATIVE_INCLUDES, 'include block')
 	declarations_start = text.index('/* the microphone (under voice_lock: the opening thread sets it) */')
 	declarations_end = text.index('/* ---------- the microphone */', declarations_start)
-	text = text[:declarations_start] + '''static OpusEncoder *encoder;
+	text = text[:declarations_start] + '''/* the microphone (voice chat's thread only), the device it was opened on, and
+a failed open's time (it is tried again after VOICE_RETRY_MS) */
+static struct mac_voice_capture microphone;
+static BOOL microphone_open;
+static BOOL microphone_failed;
+static unsigned long microphone_failed_ms;
+static char microphone_device[PLATFORM_AUDIO_DEVICE_NAME_SIZE];
+static float capture[VOICE_FRAME_SAMPLES];
+static int capture_count;
+static OpusEncoder *encoder;
 static int encoder_bitrate;
 
 ''' + text[declarations_end:]
@@ -90,7 +152,7 @@ static int encoder_bitrate;
 	if count != 2:
 		raise ValueError('native clock anchors found %d times, expected 2' % count)
 	text = text.replace('SDL_GetTicks()', 'GetTickCount()')
-	if 'SDL_' in text or 'sdl_platform.h' in text or 'port_config.h' in text:
+	if 'SDL_' in text or 'sdl_platform.h' in text :
 		raise ValueError('native voice source still depends on SDL or port config')
 	return text
 
