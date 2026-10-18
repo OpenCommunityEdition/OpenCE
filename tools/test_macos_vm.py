@@ -38,7 +38,7 @@ def run_case(image, tmp_path, *arguments, environment=None):
     return result.returncode, result.stdout, result.stderr
 
 
-@pytest.mark.parametrize("case", ["threads", "condition", "timed_wait", "time", "memory"])
+@pytest.mark.parametrize("case", ["threads", "condition", "timed_wait", "time", "memory", "sockets"])
 def test_case(image, tmp_path, case):
     status, stdout, stderr = run_case(image, tmp_path, case)
     assert (status, stdout.strip()) == (0, "ok"), stdout + stderr
@@ -75,3 +75,25 @@ def test_the_thread_pointer_costs_no_exit(image, tmp_path):
     counts = import_counts(stderr)
     assert counts.get("host_syscall", 0) > 0, stderr
     assert counts.get("host_get_tp", 0) == 0 and counts.get("host_set_tp", 0) == 0, counts
+
+
+def test_the_hosts_system_calls_natively(tmp_path):
+    # port/macos/host/host_syscall.c, built for this Mac with guest memory as
+    # a buffer: its errno table, and calls made with Linux's numbers and flags
+    import os
+    import subprocess
+
+    exe = tmp_path / "host_syscall_test"
+    sdl_include = os.environ.get("HALO_MACOS_SDL_INCLUDE", "")
+    build = subprocess.run([
+        "cc", "-std=gnu11", "-Wall", "-Werror", "-D_DARWIN_C_SOURCE", "-mmacosx-version-min=26.0",
+        "-Iport/macos/host", "-Ibuild/macos/runtime", "-Iport/android/include",
+        "-Iport/android/guest/libc/arch/arm64_32", f"-I{sdl_include}",
+        "port/macos/tests/host_syscall_test.c", "port/macos/host/host_syscall.c", "-o", str(exe),
+    ], cwd=ROOT, capture_output=True, text=True)
+    assert build.returncode == 0, build.stderr
+    folder = tmp_path / "files"
+    folder.mkdir()
+    result = subprocess.run([str(exe), str(folder)], capture_output=True, text=True, timeout=30)
+    assert (result.returncode, result.stdout.strip()) == (0, "ok"), result.stdout + result.stderr
+    assert list(folder.iterdir()) == []
