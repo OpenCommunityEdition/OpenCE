@@ -4,9 +4,9 @@
 - [x] Task: Split the C host into a library and its command-line front end 45cee3fa
     - [x] Write tests: the build graph has `libhalo_host.a` and `halo_host` links it (tools/test_macos_build.py); the headless runs stay green
     - [x] Move host_main.c's start-up into `halo_host_run(image, options)`, keeping `halo_host` as a thin main
-- [ ] Task: Build OpenCE.app with Nix (`nix build .#app`)
-    - [ ] Write tests: pytest checks the bundle layout, Info.plist, the embedded guest image and the hypervisor entitlement in the signature
-    - [ ] A Swift app target (SwiftPM or xcodebuild under Nix, settled here; tech-stack.md updated first if it differs), signed ad hoc with sigtool
+- [x] Task: Build OpenCE.app with Nix (`nix build .#app`) 71b7cb62
+    - [x] Write tests: pytest checks the bundle layout, Info.plist, the embedded guest image and the hypervisor entitlement in the signature
+    - [x] A Swift app target (SwiftPM or xcodebuild under Nix, settled here; tech-stack.md updated first if it differs), signed ad hoc with sigtool
 - [ ] Task: UniFFI bindings from the Rust runtime to Swift
     - [ ] Write tests: cargo test for the exported API; a Swift test that maps a guest range through the bindings
     - [ ] Export what Swift needs (the guest memory view and its range checks)
