@@ -17,13 +17,15 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_allow_upnp" x="54" y="103" platform="desktop android mac"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_join_from_clipboard" x="54" y="133" platform="desktop android"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_auto" x="54" y="163" platform="desktop android"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_auto" x="54" y="133" platform="mac"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_update_now" x="54" y="163" platform="mac"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_map_sharing" x="54" y="193" platform="desktop android"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_multiplayer_hud" x="54" y="223" platform="desktop android"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_multiplayer_hud" x="54" y="103" platform="web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_multiplayer_hud" x="54" y="133" platform="mac"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_multiplayer_hud" x="54" y="193" platform="mac"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_streamer_mode" x="54" y="253" platform="desktop android"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_streamer_mode" x="54" y="133" platform="web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_streamer_mode" x="54" y="163" platform="mac"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_streamer_mode" x="54" y="223" platform="mac"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -58,7 +60,7 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/join_from_clipboard_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.join_from_clipboard" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_auto" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop android">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_auto" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop android mac">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/auto_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/auto_spinner" x="320" y="1"/>
 	</widget>
@@ -66,6 +68,17 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/auto_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="update.auto" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_update_now" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="mac">
+		<on event="a" run="port check updates"/>
+		<on event="start" run="port check updates"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/update_now_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/update_now_value" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/update_now_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/update_now_value" type="text" controller="1" left="3" top="2" width="177" height="20" text="QUIT AND CHECK" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_map_sharing" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop android">
 		<on event="a" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_sharing_settings_screen"/>
@@ -109,6 +122,7 @@
 		<string text="MAP SHARING:"/>
 		<string text="MULTIPLAYER HUD:"/>
 		<string text="STREAMER MODE:"/>
+		<string text="CHECK NOW FOR UPDATES:"/>
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/help_strings">
 		<string text=""/>
@@ -119,5 +133,6 @@
 		<string text="Downloading Custom Edition maps you do not have,\nand helping send them to other players."/>
 		<string text="Players' names above their heads, the\nscoreboard, and the text chat."/>
 		<string text="Hide offensive words in names and text from\nother players, maps and mods, as stars."/>
+		<string text="Save these settings, quit the game and look for a\nnew version; the start window follows."/>
 	</strings>
 </menus>

@@ -120,6 +120,14 @@ int lb_load(struct lb_branding *b, const char *resources)
 		if (dict_string((CFDictionaryRef)plist, "FeedbackURL", url, sizeof(url)) && strncmp(url, "https://", 8) == 0)
 			snprintf(b->feedback_url, sizeof(b->feedback_url), "%s", url);
 	}
+	{
+		char url[256], key[64];
+
+		if (dict_string((CFDictionaryRef)plist, "UpdateFeedURL", url, sizeof(url)) && strncmp(url, "https://", 8) == 0)
+			snprintf(b->update_feed, sizeof(b->update_feed), "%s", url);
+		if (dict_string((CFDictionaryRef)plist, "UpdatePublicKey", key, sizeof(key)))
+			snprintf(b->update_key, sizeof(b->update_key), "%s", key);
+	}
 	if (dict_string((CFDictionaryRef)plist, "LogoFile", text, sizeof(text)))
 		file_in(b->logo_path, sizeof(b->logo_path), folder, text);
 	if (dict_string((CFDictionaryRef)plist, "CAFile", text, sizeof(text)))
@@ -149,4 +157,14 @@ int lb_feedback_ready(const struct lb_branding *b)
 	struct stat st;
 
 	return b->feedback_url[0] && b->ca_path[0] && b->sender_path[0] && stat(b->sender_path, &st) == 0;
+}
+
+int lb_update_ready(const struct lb_branding *b)
+{
+	struct stat st;
+	size_t n = strlen(b->update_key);
+
+	/* (32 bytes in base64 are 44 characters, the last of them padding) */
+	return b->update_feed[0] && n == 44 && b->update_key[43] == '=' && b->ca_path[0] && b->updater_path[0] &&
+		stat(b->updater_path, &st) == 0;
 }

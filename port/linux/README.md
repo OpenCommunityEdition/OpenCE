@@ -567,6 +567,10 @@ let the game write to it.
 Builds that you make yourself have no build number. They do not look for
 updates.
 
+The Mac build (PowerSpark) updates through its launcher from an appcast named in its branding, not from
+GitHub; refer to [port/mac/README.md](../mac/README.md#updates). `update.auto` turns its check at launch on
+and off too.
+
 ## Frame rate
 
 The game calculates its world at 30 Hz, as on the Xbox. On the Xbox, the

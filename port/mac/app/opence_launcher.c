@@ -9,7 +9,7 @@
 
    Usage: PowerSpark [--dry-run] [--setup | --controller-setup] [--data-source
    auto|xbox|retail] [--dialog | --no-dialog | --dialog-dump |
-   --dialog-layout] [--about | --feedback | --about-dump | --about-selftest] [game arguments]
+   --dialog-layout] [--about | --feedback | --about-dump | --about-selftest] [--check-updates [--wait-pid N] | --update-launch-check | --update-dump] [game arguments]
      --dry-run          print what would be run (folders, data, settings set,
                         the game's command) and do nothing else
      --setup            open PowerSpark Setup (the Xbox disc image) and quit
@@ -24,6 +24,11 @@
      --feedback         show the Send Feedback window and quit (when the build has an endpoint)
      --about-dump       print the About and Send Feedback windows' layout like --dialog-layout
      --about-selftest   make both windows without showing them, and read their controls back
+     --check-updates    look for a new version now and say what was found, then go on (the game's Settings
+                        start this with --wait-pid, the game to wait for, after saving and quitting)
+     --update-launch-check  look for a new version as the launch does (quietly, at most once a day, not when
+                        update.auto is false), and quit
+     --update-dump      print the update windows' layout like --dialog-layout (and quit with 1 if text does not fit)
    The startup dialog (settings, Play, Quit, Setup, Controller Setup) opens
    before the game unless "Don't show this at startup" was checked (the file
    startup-dialog holds "off"); holding Option while the app opens shows it
@@ -49,6 +54,8 @@
 #include "launcher_about.h"
 #include "feedback_report.h"
 #include "launcher_invite.h"
+#include "launcher_update.h"
+#include "update_core.h"
 
 #define MAX_ENVIRONMENT 24
 #define LOGS_KEPT 20
@@ -74,6 +81,7 @@ static char g_retail[PATH_MAX];
 static int g_have_retail;
 static struct la_env g_about;
 static struct lb_branding g_branding;
+static struct lu_env g_update;
 
 static int path_join(char *out, const char *a, const char *b)
 {
@@ -199,6 +207,31 @@ static void alert(const char *title, const char *message)
 		&response);
 	CFRelease(t);
 	CFRelease(m);
+}
+
+/* the updater's messages (a test with HALO_MAC_UPDATE_HEADLESS has no one to click them) */
+static void update_alert(const char *title, const char *message)
+{
+	const char *headless = getenv("HALO_MAC_UPDATE_HEADLESS");
+
+	if (headless && *headless && strcmp(headless, "0") != 0)
+		fprintf(stderr, "PowerSpark: %s: %s\n", title, message);
+	else
+		alert(title, message);
+}
+
+/* a text entry of the app's Info.plist */
+static void bundle_text(const char *key, char *out, size_t size)
+{
+	CFBundleRef bundle = CFBundleGetMainBundle();
+	CFStringRef k = CFStringCreateWithCString(NULL, key, kCFStringEncodingUTF8);
+	CFTypeRef v = bundle && k ? CFBundleGetValueForInfoDictionaryKey(bundle, k) : NULL;
+
+	out[0] = 0;
+	if (v && CFGetTypeID(v) == CFStringGetTypeID())
+		CFStringGetCString((CFStringRef)v, out, (CFIndex)size, kCFStringEncodingUTF8);
+	if (k)
+		CFRelease(k);
 }
 
 /* 0: first button, 1: second, 2: third */
@@ -458,11 +491,20 @@ static int detect_xbox(char *xbox_data, char *xbox_maps)
 	return 0;
 }
 
+/* Controller Setup is built for Mac OS X 10.5 and later (IOHIDManager) */
+static int controller_setup_supported(void)
+{
+	int major = 10, minor = 5;
+
+	lu_system_version(&major, &minor);
+	return !(major == 10 && minor < 5);
+}
+
 static void dialog_controller_setup(void)
 {
 	char *av[] = { (char *)g_controller, "--config", config_file, NULL };
 
-	if (is_file(g_controller))
+	if (is_file(g_controller) && controller_setup_supported())
 		run_and_wait(av);
 }
 
@@ -593,6 +635,8 @@ int main(int argc, char **argv)
 	int config_dir_support;
 	int force_dialog = 0, no_dialog = 0, dialog_dump = 0, dialog_layout = 0;
 	int about_dump = 0, about_show = 0, feedback_show = 0, about_selftest = 0;
+	int check_updates = 0, update_dump = 0, update_launch_check = 0;
+	long wait_pid = 0;
 	struct lc_model dialog_model;
 	const char *dialog_env;
 	time_t now;
@@ -626,6 +670,14 @@ int main(int argc, char **argv)
 			about_show = 1;
 		else if (strcmp(argv[i], "--feedback") == 0)
 			feedback_show = 1;
+		else if (strcmp(argv[i], "--check-updates") == 0)
+			check_updates = 1;
+		else if (strcmp(argv[i], "--wait-pid") == 0 && i + 1 < argc)
+			wait_pid = atol(argv[++i]);
+		else if (strcmp(argv[i], "--update-launch-check") == 0)
+			update_launch_check = 1;
+		else if (strcmp(argv[i], "--update-dump") == 0)
+			update_dump = dry_run = 1;
 		else if (strcmp(argv[i], "--dialog-dump") == 0)
 			dialog_dump = dry_run = 1;	/* (it writes and runs nothing) */
 		else if (strcmp(argv[i], "--data-source") == 0 && i + 1 < argc)
@@ -775,6 +827,7 @@ int main(int argc, char **argv)
 	/* the About and Send Feedback windows: what the build adds (branding.plist), and the feedback sender */
 	lb_load(&g_branding, resources);
 	path_join(g_branding.sender_path, macos, "PowerSpark-send");
+	path_join(g_branding.updater_path, macos, "PowerSpark-update");
 	g_about.home = home;
 	g_about.logs_dir = logs;
 	g_about.branding = &g_branding;
@@ -786,6 +839,24 @@ int main(int argc, char **argv)
 			app_path[strlen(app_path) - 9] = 0;	/* .../PowerSpark.app/Contents */
 		g_about.app_path = app_path;
 	}
+	/* the updater: this app's version, and where it looks (branding.plist's UpdateFeedURL) */
+	memset(&g_update, 0, sizeof(g_update));
+	g_update.app_path = g_about.app_path;
+	g_update.config_file = config_file;
+	g_update.support = support;
+	g_update.logs_dir = logs;
+	g_update.branding = &g_branding;
+	g_update.wait_pid = (pid_t)wait_pid;
+	g_update.alert = update_alert;
+	bundle_text("CFBundleShortVersionString", g_update.version, sizeof(g_update.version));
+	{
+		char build[32];
+
+		bundle_text("CFBundleVersion", build, sizeof(build));
+		g_update.build = atol(build);
+	}
+	if (update_dump)
+		return lu_layout_report(&g_update, stdout) != 0;
 	if (about_dump)
 		return la_layout_report(&g_about, stdout) != 0;
 	if (about_selftest)
@@ -822,6 +893,34 @@ int main(int argc, char **argv)
 			printf("  data status: %s\n", status);
 		}
 		return 0;
+	}
+	/* updates: a leftover of an earlier one is removed, then a look (asked for, or the day's first launch) before
+	   the start window; if the app was replaced the new one opens by itself */
+	if (!dry_run)
+	{
+		uc_clean_leftovers(g_about.app_path, "org.opence.PowerSpark");
+		if (check_updates)
+		{
+			int replaced = lu_run(&g_update, LU_ASKED);
+
+			/* (a test, HALO_MAC_UPDATE_HEADLESS, ends here; the player goes on to the start window) */
+			if (replaced || (getenv("HALO_MAC_UPDATE_HEADLESS") && *getenv("HALO_MAC_UPDATE_HEADLESS")))
+				return 0;
+		}
+		else if (update_launch_check)
+		{
+			/* (a test: what the launch does, and nothing after it) */
+			if (lu_auto_wanted(&g_update, (long)time(NULL)))
+				return lu_run(&g_update, LU_AT_LAUNCH) ? 10 : 0;	/* (10: PowerSpark.app was replaced) */
+			fprintf(stderr, "PowerSpark: no update check today (no feed, update.auto is off, or already looked today)\n");
+			return 0;
+		}
+		else if (!want_setup && !want_controller && !no_dialog && nargs == 0 &&
+			!(dialog_env && strcmp(dialog_env, "0") == 0) && lu_auto_wanted(&g_update, (long)time(NULL)))
+		{
+			if (lu_run(&g_update, LU_AT_LAUNCH))
+				return 0;
+		}
 	}
 	if (!dry_run && !want_setup && !want_controller && !no_dialog && !(dialog_env && strcmp(dialog_env, "0") == 0) &&
 		(force_dialog || (nargs == 0 && (!dialog_model.hide || (GetCurrentKeyModifiers() & optionKey)))))
@@ -875,6 +974,11 @@ int main(int argc, char **argv)
 	{
 		char *av[] = { controller, "--config", config_file, NULL };
 
+		if (!controller_setup_supported())
+		{
+			fprintf(stderr, "Controller Setup needs Mac OS X 10.5 or later.\n");
+			return 1;
+		}
 		if (dry_run)
 		{
 			printf("would run: %s --config %s\n", controller, config_file);
@@ -936,6 +1040,12 @@ int main(int argc, char **argv)
 	if (!config_dir_support)
 		shown_environment_count--, unsetenv("HALO_MAC_CONFIG_DIR");
 	set_game_environment("HALO_MAC_MENU_ART_DIR", menus);
+	/* the launcher, for the game's Settings > Network Setup > CHECK FOR UPDATES NOW, when this build looks for updates */
+	if (lu_ready(&g_update))
+	{
+		path_join(text, macos, "PowerSpark");
+		set_game_environment("HALO_MAC_UPDATE_LAUNCHER", text);
+	}
 	set_game_environment("HALO_START_IN_MENU", "1");
 	/* the Xbox disc's movies (bink/ and default.xbe of the XboxData folder), when it has them:
 	   the game plays them in place of MacSoft's logos and ending */
@@ -1016,6 +1126,7 @@ int main(int argc, char **argv)
 					line_value(config_text, "input.gamepad_setup_done", text, sizeof(text))) &&
 					strcmp(text, "true") == 0 ? "done" : "yes");
 			printf("feedback:      %s\n", lb_feedback_ready(&g_branding) ? g_branding.feedback_url : "off");
+			printf("updates:       %s\n", lu_ready(&g_update) ? g_branding.update_feed : "off (no feed in this build)");
 			printf("config via:    %s\n", config_dir_support ? "HALO_MAC_CONFIG_DIR" : "staged copy of the game");
 			for (k = 0; k < shown_environment_count; ++k)
 				printf("env:           %s\n", shown_environment[k]);
@@ -1027,7 +1138,7 @@ int main(int argc, char **argv)
 		}
 
 		/* the controller setup, the first time (it records in config.toml that it was offered) */
-		if (is_file(controller) && !getenv("HALO_SKIP_CONTROLLER_SETUP"))
+		if (is_file(controller) && controller_setup_supported() && !getenv("HALO_SKIP_CONTROLLER_SETUP"))
 		{
 			int done = config_text &&
 				(line_value(config_text, "gamepad_setup_done", text, sizeof(text)) ||

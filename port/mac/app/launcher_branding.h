@@ -25,6 +25,9 @@ struct lb_branding
 	char logo_path[PATH_MAX];	/* a PNG, or empty */
 	char ca_path[PATH_MAX];		/* the CA list that the feedback's HTTPS is checked with */
 	char sender_path[PATH_MAX];	/* Contents/MacOS/PowerSpark-send; set by the caller */
+	char update_feed[256];		/* the appcast's https address, or empty: no updates (UpdateFeedURL) */
+	char update_key[64];		/* the release key's public half, base64 (UpdatePublicKey) */
+	char updater_path[PATH_MAX];	/* Contents/MacOS/PowerSpark-update; set by the caller */
 };
 
 /* the neutral build */
@@ -35,5 +38,7 @@ void lb_defaults(struct lb_branding *b);
 int lb_load(struct lb_branding *b, const char *resources);
 /* feedback can be sent: an https address, a CA list and the sender are all there */
 int lb_feedback_ready(const struct lb_branding *b);
+/* updates can be looked for: an https feed, a 32-byte release key, a CA list and the downloader are all there */
+int lb_update_ready(const struct lb_branding *b);
 
 #endif

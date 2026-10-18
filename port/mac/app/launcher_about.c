@@ -224,6 +224,20 @@ static int layout_about(const struct la_env *env)
 	}
 	y = add_paragraph(disclaimer, kThemeSmallSystemFont, MARGIN, y, column) + 6;
 	y = add_paragraph(credit, kThemeSmallSystemFont, MARGIN, y, column) + 6;
+	if (lb_update_ready(b))
+	{
+		char updates[400], host[256];
+		const char *start = strstr(b->update_feed, "://") + 3;
+		size_t n = strcspn(start, "/");
+
+		snprintf(host, sizeof(host), "%.*s", (int)(n < sizeof(host) ? n : sizeof(host) - 1), start);
+		snprintf(updates, sizeof(updates), "PowerSpark looks for new versions at %s, at most once a day, and installs one only "
+			"when you say so and it carries the maker's signature. Turn it off in Settings, Network Setup.", host);
+		y = add_paragraph(updates, kThemeSmallSystemFont, MARGIN, y, column) + 6;
+	}
+	else
+		y = add_paragraph("This build has no update feed, so it never looks for new versions; get a new one from wherever "
+			"you got this one.", kThemeSmallSystemFont, MARGIN, y, column) + 6;
 	if (b->publisher[0])
 		y = add_paragraph(b->publisher, kThemeSmallSystemFont, MARGIN, y, column) + 8;
 	if (b->logo_path[0])
@@ -746,7 +760,7 @@ static WindowRef make_window(int width, int height, const char *title)
 
 	set_rect(&bounds, 100, 100, 100 + width, 100 + height);
 	if (CreateNewWindow(kMovableModalWindowClass,
-		kWindowCloseBoxAttribute | kWindowCompositingAttribute | kWindowStandardHandlerAttribute, &bounds, &w) != noErr)
+		kWindowCompositingAttribute | kWindowStandardHandlerAttribute, &bounds, &w) != noErr)
 		w = NULL;
 	if (w)
 		SetWindowTitleWithCFString(w, t);

@@ -25,9 +25,13 @@
 #                  repository like the icon (see port/mac/README.md, "About and feedback"):
 #                  PublisherText, Links (Title and URL), LogoFile and CAFile (names of files
 #                  beside the plist, which are copied in), FeedbackURL, FeedbackApp,
-#                  FeedbackToken. Without it the About window has the OpenCE link only and there
-#                  is no Send Feedback. With a FeedbackURL (and a CAFile), PowerSpark-send, the
-#                  program that posts a report with mbedtls, is built and added.
+#                  FeedbackToken, UpdateFeedURL, UpdatePublicKey. Without it the About window has
+#                  the OpenCE link only, there is no Send Feedback and the app does not look for
+#                  updates. With a FeedbackURL (and a CAFile), PowerSpark-send, the program that posts a
+#                  report with mbedtls, is built and added. With an UpdateFeedURL (https; the appcast of
+#                  tools/powerspark_sign_update.py), a CAFile and an UpdatePublicKey (the release key's
+#                  public half, base64), PowerSpark-update, the program that downloads updates, is
+#                  built and added (port/mac/README.md, "Updates").
 #   --out          the output folder (default build/mac-app)
 #
 # Writes OUT/PowerSpark.app and, unless --no-dmg, OUT/PowerSpark-VERSION.dmg.
@@ -86,11 +90,20 @@ $CC -std=gnu89 -Wall -o "$WORK/test_feedback_report" "$APPSRC/test_feedback_repo
 mkdir -p "$WORK/invite_test"
 $CC -std=gnu89 -Wall -o "$WORK/test_launcher_invite" "$APPSRC/test_launcher_invite.c" "$APPSRC/launcher_invite.c"
 "$WORK/test_launcher_invite" "$WORK/invite_test"
-$CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -Wall -std=gnu89 \
+# (the updater's appcast, signature, SHA-256, bundle and swap code is tested the same way; its Ed25519 is Monocypher's)
+MONO=$ROOT/port/third_party/monocypher
+$CC -std=gnu99 -Wall -I"$MONO" -I"$APPSRC" -o "$WORK/test_update_core" "$APPSRC/test_update_core.c" "$APPSRC/update_core.c" \
+    "$MONO/monocypher.c" "$MONO/monocypher-ed25519.c" -framework CoreFoundation
+"$WORK/test_update_core" "$WORK/update_test"
+for src in monocypher monocypher-ed25519; do
+    $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -std=gnu99 -I"$MONO" -c "$MONO/$src.c" -o "$WORK/$src.o"
+done
+$CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -Wall -std=gnu89 -I"$MONO" \
     -o "$APP/Contents/MacOS/PowerSpark" "$APPSRC/opence_launcher.c" "$APPSRC/launcher_config.c" \
     "$APPSRC/launcher_dialog.c" "$APPSRC/launcher_about.c" "$APPSRC/launcher_branding.c" "$APPSRC/feedback_report.c" \
-    "$APPSRC/launcher_invite.c" \
-    "$WORK/launcher_toml_check.o" "$WORK/tomlc17.o" -framework Carbon -framework CoreFoundation
+    "$APPSRC/launcher_invite.c" "$APPSRC/launcher_update.c" "$APPSRC/update_core.c" \
+    "$WORK/launcher_toml_check.o" "$WORK/tomlc17.o" "$WORK/monocypher.o" "$WORK/monocypher-ed25519.o" \
+    -framework Carbon -framework CoreFoundation
 
 # the game
 if [ -n "$ENGINE" ]; then
@@ -143,10 +156,24 @@ if [ -n "$BRANDING" ]; then
         esac
     done
     FEEDBACK_URL=$(brand_key FeedbackURL)
+    UPDATE_URL=$(brand_key UpdateFeedURL)
+    UPDATE_KEY=$(brand_key UpdatePublicKey)
     if [ -n "$FEEDBACK_URL" ]; then
         [ -n "$(brand_key CAFile)" ] || { echo "branding: FeedbackURL needs a CAFile (the CA list the HTTPS is checked with)" >&2; exit 2; }
-        # PowerSpark-send: mbedtls (the vendored copy, with the Mac's configuration) and the sender. The library's
-        # objects are kept in build/mac-feedback and rebuilt when a source is newer, since they take a while
+    fi
+    if [ -n "$UPDATE_URL" ] || [ -n "$UPDATE_KEY" ]; then
+        [ -n "$(brand_key CAFile)" ] || { echo "branding: UpdateFeedURL needs a CAFile (the CA list the HTTPS is checked with)" >&2; exit 2; }
+        case $UPDATE_URL in https://*) ;; *) echo "branding: UpdateFeedURL must be an https address" >&2; exit 2 ;; esac
+        # (32 bytes in base64: 44 characters, the last of them padding)
+        case $UPDATE_KEY in
+            ????????????????????????????????????????????) ;;
+            *) echo "branding: UpdatePublicKey must be the release key's 32 bytes in base64 (tools/powerspark_sign_update.py keygen)" >&2; exit 2 ;;
+        esac
+        case $UPDATE_KEY in *=) ;; *) echo "branding: UpdatePublicKey is not 32 bytes in base64" >&2; exit 2 ;; esac
+    fi
+    if [ -n "$FEEDBACK_URL" ] || [ -n "$UPDATE_URL" ]; then
+        # mbedtls (the vendored copy, with the Mac's configuration) for PowerSpark-send and PowerSpark-update. The
+        # library's objects are kept in build/mac-feedback and rebuilt when a source is newer, since they take a while
         MB=$ROOT/port/third_party/mbedtls
         OBJ=$ROOT/build/mac-feedback
         mkdir -p "$OBJ"
@@ -158,11 +185,22 @@ if [ -n "$BRANDING" ]; then
                     -I"$ROOT/port/mac" -I"$MB/include" -I"$MB/library" -c "$src" -o "$o"
             fi
         done
+    fi
+    if [ -n "$FEEDBACK_URL" ]; then
+        # PowerSpark-send: the sender of reports
         $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -std=gnu99 -Os -Wall \
             -DMBEDTLS_CONFIG_FILE='"mac_mbedtls_config.h"' -ffunction-sections -fdata-sections \
             -I"$ROOT/port/mac" -I"$MB/include" -o "$APP/Contents/MacOS/PowerSpark-send" "$APPSRC/feedback_send.c" \
             "$ROOT/port/mac/mac_mbedtls_time.c" "$OBJ"/*.o -framework CoreServices -Wl,-dead_strip
         chmod 755 "$APP/Contents/MacOS/PowerSpark-send"
+    fi
+    if [ -n "$UPDATE_URL" ]; then
+        # PowerSpark-update: the downloader of the appcast and of releases
+        $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -std=gnu99 -Os -Wall \
+            -DMBEDTLS_CONFIG_FILE='"mac_mbedtls_config.h"' -ffunction-sections -fdata-sections \
+            -I"$ROOT/port/mac" -I"$MB/include" -o "$APP/Contents/MacOS/PowerSpark-update" "$APPSRC/update_fetch.c" \
+            "$ROOT/port/mac/mac_mbedtls_time.c" "$OBJ"/*.o -framework CoreServices -Wl,-dead_strip
+        chmod 755 "$APP/Contents/MacOS/PowerSpark-update"
     fi
 fi
 
@@ -178,6 +216,7 @@ printf 'APPL????' > "$APP/Contents/PkgInfo"
 plutil -lint "$APP/Contents/Info.plist"
 lipo -info "$APP/Contents/MacOS/PowerSpark" "$APP/Contents/MacOS/PowerSpark-game"
 if [ -f "$APP/Contents/MacOS/PowerSpark-send" ]; then lipo -info "$APP/Contents/MacOS/PowerSpark-send"; fi
+if [ -f "$APP/Contents/MacOS/PowerSpark-update" ]; then lipo -info "$APP/Contents/MacOS/PowerSpark-update"; fi
 
 if [ "$DMG" = 1 ]; then
     DMGDIR=$WORK/dmg

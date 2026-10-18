@@ -123,6 +123,38 @@ and says when the Mac's clock is the reason it cannot. `PowerSpark-send --url UR
 checks a site's certificate against a CA list and sends nothing. Its objects are kept in `build/mac-feedback`.
 No screenshot is offered: the launcher's windows are all there is to see, and the log says more.
 
+## Updates
+
+A build made with `tools/mac_app_bundle.sh --branding FILE` whose branding.plist has `UpdateFeedURL` (an https
+address), `UpdatePublicKey` (the release key's public half, base64) and `CAFile` looks for new versions; the
+public build has no feed, the About window says so and the app never looks. The feed is an appcast on the
+maker's site: a property list with a `versions` array (or one release at the top level) whose items hold
+`version`, `build`, `url`, `sha256`, `length`, `minimumSystemVersion`, `notes` and an Ed25519 `signature` of
+those facts (`port/mac/app/update_core.h`). `tools/powerspark_sign_update.py` (run on the maker's own Mac, with
+the private key kept out of the repository) writes the items; `keygen` makes the key pair.
+
+- At launch, before the start window, the launcher looks quietly, at most once a day (`update-check` in the
+  settings folder), unless `update.auto` is false or `HALO_UPDATE_AUTO` says no. Network trouble is only logged
+  (`~/Library/Logs/OpenCE/update.log`). A newer release is offered with its notes: Install, Later, or Never Ask
+  Again (which writes `update.auto = false`).
+- Settings > Network Setup > CHECK FOR UPDATES turns the launch check on and off; CHECK NOW FOR UPDATES saves the
+  settings, quits the game and starts `PowerSpark --check-updates --wait-pid N`, which always says what it
+  found (a newer release, "up to date", or why it could not look), then goes on to the start window.
+- Installing downloads the zip with `PowerSpark-update` (mbedtls and the branding's CA list, since Mac OS X 10.4 to
+  10.6 stop at TLS 1.0), checks its size and SHA-256 against the signed appcast, unpacks it with `ditto` into a
+  folder beside the app, checks that it is PowerSpark (bundle identifier, version, build, code for this Mac's
+  processor), renames the app to `PowerSpark.app.old` and the new one into place (undone if the second rename
+  fails), opens the new app and removes the old one. Any failure leaves the old app as it was. If the folder
+  holding the app cannot be written (a disk image, another account's folder) it says so before downloading.
+  Only PowerSpark.app is replaced; nothing in `~/Library/Application Support/OpenCE` is touched.
+- Tests: `tools/test_powerspark_update.py` (the signing tool, and `update_core.c` on the host, including the
+  swap in a temporary folder), and `tools/mac_update_checks.py`, which runs `tools/mac_update_scenarios.sh` on an
+  old Mac against a local HTTPS server (`tools/mac_update_test_server.py`) through an ssh tunnel: 18 scenarios on
+  each processor (install, tampered zip, wrong key, wrong app, truncated download, redirects, chunked answers,
+  read-only folder, offline, wrong CA list, Never Ask Again, the daily limit, no feed). Test hooks:
+  `HALO_UPDATE_ANSWER=yes|no|never`, `HALO_MAC_UPDATE_HEADLESS=1` (no windows, alerts to stderr),
+  `HALO_MAC_UPDATE_OPENER` (replaces `open`), `HALO_MAC_BRANDING` (another branding.plist).
+
 ## Game data
 
 PowerSpark does not contain Halo's maps. It reads them from the player's own copy.

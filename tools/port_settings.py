@@ -228,8 +228,9 @@ SCREENS = {
             # port/mac/app/launcher_invite.c)
             ("JOIN FROM CLIPBOARD:", "network.join_from_clipboard", ON_OFF,
              "Join the game of an invite link copied before\nswitching to the game.", "desktop android"),
+            # (the Mac's launcher looks, once a day: port/mac/app/launcher_update.c)
             ("CHECK FOR UPDATES:", "update.auto", ON_OFF,
-             "Look for a new version when the game starts.", "desktop android"),
+             "Look for a new version when the game starts.", "desktop android mac"),
             ("PLAYER NAMES:", "display.player_names",
              [("ALL", "all"), ("ALLIES", "allies"), ("ENEMIES", "enemies"), ("NONE", "none")],
              "In multiplayer, whose names are drawn above their\nheads.", None),
@@ -347,6 +348,13 @@ _network["categories"] = [
      "Players' names above their heads, the\nscoreboard, and the text chat."),
     ("STREAMER MODE:", "network_setup/streamer_mode",
      "Hide offensive words in names and text from\nother players, maps and mods, as stars."),
+]
+# (an action: a row that runs a function when chosen, not a setting. The Mac's
+# CHECK NOW FOR UPDATES saves the settings, quits the game and starts the
+# launcher to look: menu_functions.c's updates_check)
+_network["actions"] = [
+    ("CHECK NOW FOR UPDATES:", "update_now", "QUIT AND CHECK", "port check updates",
+     "Save these settings, quit the game and look for a\nnew version; the start window follows.", "mac"),
 ]
 SCREENS["network_setup/map_sharing"] = {
     "screen": "map_sharing_settings_screen", "header": _network["header"], "spacing": 30,
@@ -579,6 +587,33 @@ def _setting_screen(folder: str, spec: dict) -> list:
                           ("header_bounds", "7 -13 19 -7" if wide else "7 -6 19 0"),
                           ("footer_bounds", "7 208 19 214" if wide else "7 150 19 156")],
                          ['<on event="created" run="port setting load"/>'])
+    # (each action's row: its label, what it shows, the function it runs, its help and its platforms; its label
+    # and help string come after the categories)
+    for index, (label, key, shown, run, _, *action_platform) in enumerate(spec.get("actions", ())):
+        row = f"{base}/op_{key}"
+        platform = action_platform[0] if action_platform else None
+        if spec.get("platform_places"):
+            members = platform.split() if platform else list(places)
+            for name in members:
+                places[name] += 1
+            rows += _placed(row, platform, members, places)
+        else:
+            rows.append((row, platform, place + 1 + index))
+        string = len(spec["rows"]) + len(spec.get("categories", ())) + index
+        extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
+                               ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
+                         [f'<on event="a" run="{run}"/>', f'<on event="start" run="{run}"/>',
+                          '<on event="left_mouse" run="mouse emit accept event"/>',
+                          f'<child widget="{base}/{key}_label"/>',
+                          f'<child widget="{base}/{key}_value" x="320" y="1"/>'])
+        extra += _widget(f"{base}/{key}_label",
+                         [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
+                          ("string_list", f"{base}/labels"), ("string_index", string), ("font", "ui\\large_ui"),
+                          ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+        extra += _widget(f"{base}/{key}_value",
+                         [("type", "text"), ("controller", 1), ("left", 3), ("top", 2), ("width", 177),
+                          ("height", 20), ("text", shown), ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
+                          ("align", "center"), ("text_y", 1), ("text_flags", "no_focus_test")], [])
     # (each category's row: its label, the screen it opens, its help, and the
     # platforms it is for, as a row's: every one's when it names none)
     for index, (label, category_folder, _, *category_platform) in enumerate(spec.get("categories", ())):
@@ -607,11 +642,13 @@ def _setting_screen(folder: str, spec: dict) -> list:
     extra += _button(f"{base}/button_ok", 1, ['<on event="a" run="port settings save" back="true"/>',
                                               '<on event="start" run="port settings save" back="true"/>'])
     extra += _strings(f"{base}/labels", [label for label, *_ in spec["rows"]] +
-                      [label for label, *_ in spec.get("categories", ())])
+                      [label for label, *_ in spec.get("categories", ())] +
+                      [label for label, *_ in spec.get("actions", ())])
     # (the help of the row whose label is string n is n + 1: the buttons' is 0)
     extra += _strings(f"{base}/help_strings",
                       [""] + [help_text.replace("\n", "\\n") for _, _, _, help_text, *_ in spec["rows"]] +
-                      [help_text.replace("\n", "\\n") for _, _, help_text, *_ in spec.get("categories", ())])
+                      [help_text.replace("\n", "\\n") for _, _, help_text, *_ in spec.get("categories", ())] +
+                      [help_text.replace("\n", "\\n") for _, _, _, _, help_text, *_ in spec.get("actions", ())])
     return _screen(folder, spec, rows, ["port settings help"], [], extra)
 
 

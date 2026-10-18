@@ -1513,6 +1513,52 @@ static boolean setting_default_show(struct widget_instance *spinner, struct pc_m
 	return TRUE;
 }
 
+/* "port check updates" (the Mac's Network Setup, CHECK NOW FOR UPDATES): the
+settings changed on the screen are saved, the launcher is started to look for
+a new version once this game has quit, and the game quits. The launcher
+(PowerSpark.app's) tells the game where it is in HALO_MAC_UPDATE_LAUNCHER, only
+when its build has an update feed; without it the row only says no. The
+launcher is started by the shell, in the background, so that it outlives this
+game: $PPID is this game's process, which the launcher waits for. */
+static boolean updates_check(struct widget_instance *row)
+{
+#ifdef HALO_MAC
+	char const *launcher = getenv("HALO_MAC_UPDATE_LAUNCHER");
+	char command[2200];
+	long length = 0;
+
+	if (!launcher || !launcher[0] || strlen(launcher) > 500)
+	{
+		platform_log("menus: this build has no update feed");
+		return campaign_fail();
+	}
+	settings_each(screen_of(row), setting_changed_save);
+	command[length++] = '\'';
+	for (; *launcher; launcher++)
+	{
+		if (*launcher == '\'')
+		{
+			memcpy(command + length, "'\\''", 4);
+			length += 4;
+		}
+		else
+			command[length++] = *launcher;
+	}
+	command[length] = 0;
+	strcat(command, "' --check-updates --wait-pid $PPID >/dev/null 2>&1 &");
+	if (system(command) != 0)
+	{
+		platform_log("menus: the launcher could not be started");
+		return campaign_fail();
+	}
+	platform_log("menus: quitting to look for updates");
+	platform_request_quit();
+#else
+	(void)row;
+#endif
+	return TRUE;
+}
+
 /* "port settings help": the line of the row chosen (by its label's string:
 the buttons' is the first) */
 static void settings_help(struct widget_instance *list)
@@ -6466,6 +6512,10 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port mods move up") || !strcmp(name, "port mods move down"))
 		{
 			return mods_move(widget, (short)(!strcmp(name, "port mods move up") ? -1 : 1));
+		}
+		else if (!strcmp(name, "port check updates"))
+		{
+			return updates_check(widget);
 		}
 		else if (!strcmp(name, "port mods save"))
 		{
