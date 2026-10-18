@@ -189,6 +189,71 @@ static char *read_text(const char *path)
 	return text;
 }
 
+/* writes text to path through path.tmp; 0 or -1 */
+static int write_text_file(const char *path, const char *text, size_t length)
+{
+	char tmp[PATH_MAX];
+	FILE *f;
+	int ok;
+
+	snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+	f = fopen(tmp, "wb");
+	if (!f)
+		return -1;
+	ok = fwrite(text, 1, length, f) == length;
+	if (fclose(f) != 0)
+		ok = 0;
+	if (ok && rename(tmp, path) != 0)
+		ok = 0;
+	if (!ok)
+		remove(tmp);
+	return ok ? 0 : -1;
+}
+
+/* An older Controller Setup wrote "input.gamepad_*" lines at the top of config.toml, above the
+   file's own [input] table; the game refuses such a file (table defined before) and starts with
+   its defaults. The lines are moved into the table, once, keeping the file as it was beside it
+   (config.toml.bak-before-repair). Returns the text to use (text, or its replacement). */
+static char *repair_config(const char *path, char *text)
+{
+	size_t length;
+	char backup[PATH_MAX];
+	char *fixed;
+	int moved;
+
+	if (!text || dry_run)
+		return text;
+	length = strlen(text);
+	fixed = (char *)malloc(length + 1);
+	if (!fixed)
+		return text;
+	memcpy(fixed, text, length + 1);
+	moved = lc_text_repair(&fixed, &length);
+	if (moved > 0)
+	{
+		snprintf(backup, sizeof(backup), "%s.bak-before-repair", path);
+		if (!is_file(backup))
+			write_text_file(backup, text, strlen(text));
+		if (write_text_file(path, fixed, length) == 0)
+		{
+			fprintf(stderr, "PowerSpark: moved %d settings of %s into their [input] table\n", moved, path);
+			free(text);
+			return fixed;
+		}
+	}
+	free(fixed);
+	return text;
+}
+
+/* Whether the game will accept config.toml. When it will not, it ignores the whole file and
+   starts with its defaults (the player's choices seem lost), so say so, with the line.
+   The message goes in message (a line for --dry-run); returns 1 if the file is valid or missing. */
+static int config_is_valid(const char *text, char *message, size_t size)
+{
+	message[0] = 0;
+	return !text || lc_text_check(text, strlen(text), message, size);
+}
+
 /* the value of the first line "name = ..." (at the start of a line, with or
    without a section's prefix), its quotes taken off; 1 if found */
 static int line_value(const char *text, const char *name, char *out, size_t size)
@@ -501,7 +566,7 @@ int main(int argc, char **argv)
 	/* the data: the retail game's (HALO_MAC_DATA_ROOT, then paths.data, then
 	   a GameData folder in the support folder, then Halo.app) and the maps
 	   OpenCE Setup copied out of the player's Xbox disc */
-	config_text = read_text(config_file);
+	config_text = repair_config(config_file, read_text(config_file));
 	retail[0] = 0;
 	env_data = getenv("HALO_MAC_DATA_ROOT");
 	if (env_data && *env_data)
@@ -770,6 +835,8 @@ int main(int argc, char **argv)
 			printf("support:       %s\nconfig:        %s%s\n", support, config_file,
 				config_text ? "" : " (the game writes it on its first run)");
 			printf("log:           %s\n", log_path);
+			config_is_valid(config_text, text, sizeof(text));
+			printf("config check:  %s\n", text[0] ? text : "valid");
 			printf("architecture:  %s\n", ARCH_POWERPC ? "PowerPC" : "Intel");
 			printf("data source:   %s -> %s (retail data: %s, Xbox maps: %s)\n", source_name,
 				use_xbox ? "xbox" : "retail", have_retail ? retail : "none", have_xbox ? xbox_maps : "none");
@@ -803,6 +870,22 @@ int main(int argc, char **argv)
 			}
 		}
 		free(config_text);
+		{
+			/* (read again: the dialog and the controller setup may have written it) */
+			char *latest = read_text(config_file);
+
+			if (!config_is_valid(latest, text, sizeof(text)))
+			{
+				char message[400];
+
+				snprintf(message, sizeof(message),
+					"The game cannot read its settings file, %s: %s. It will start with its default settings "
+					"(so your display and other choices are not used) until the file is fixed or deleted.",
+					config_file, text);
+				alert("PowerSpark's settings file has an error", message);
+			}
+			free(latest);
+		}
 
 		prune_logs();
 		{

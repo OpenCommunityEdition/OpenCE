@@ -61,10 +61,19 @@ mkdir -p "$WORK" "$APP/Contents/MacOS" "$APP/Contents/Resources/Helpers"
 # the launcher (its settings file code is tested first, on this Mac)
 $CC -std=gnu89 -Wall -o "$WORK/test_launcher_config" "$APPSRC/test_launcher_config.c" "$APPSRC/launcher_config.c"
 "$WORK/test_launcher_config" "$WORK/launcher_test.toml"
+# (the settings file's repair and check, with the vendored TOML parser the game reads it with; GCC 4 needs the shim for static_assert)
+TOML=$ROOT/port/third_party/tomlc17
+$CC -std=gnu99 -Wall -include "$APPSRC/mac_toml_assert.h" -I"$TOML" -o "$WORK/test_launcher_toml" \
+    "$APPSRC/test_launcher_toml.c" "$APPSRC/launcher_config.c" "$APPSRC/launcher_toml_check.c" "$TOML/tomlc17.c"
+"$WORK/test_launcher_toml"
+$CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -std=gnu99 -include "$APPSRC/mac_toml_assert.h" \
+    -I"$APPSRC" -I"$TOML" -c "$APPSRC/launcher_toml_check.c" -o "$WORK/launcher_toml_check.o"
+$CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -std=gnu99 -include "$APPSRC/mac_toml_assert.h" \
+    -I"$TOML" -c "$TOML/tomlc17.c" -o "$WORK/tomlc17.o"
 # (the startup dialog's sources are beside it: launcher_config.c is plain C, launcher_dialog.c Carbon)
 $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -Wall -std=gnu89 \
     -o "$APP/Contents/MacOS/PowerSpark" "$APPSRC/opence_launcher.c" "$APPSRC/launcher_config.c" \
-    "$APPSRC/launcher_dialog.c" -framework Carbon -framework CoreFoundation
+    "$APPSRC/launcher_dialog.c" "$WORK/launcher_toml_check.o" "$WORK/tomlc17.o" -framework Carbon -framework CoreFoundation
 
 # the game
 if [ -n "$ENGINE" ]; then

@@ -58,6 +58,14 @@ void lc_model_dump(const struct lc_model *m, FILE *out);
 /* the value of "section.name", from "name = ..." under [section] or "section.name = ..."
    at the top; quotes and a trailing comment taken off. 1 if found */
 int lc_text_get(const char *text, const char *key, char *out, size_t size);
+/* Moves each dotted "section.name = value" line at the top of the text into [section],
+   when the file has that table further down (the old Controller Setup wrote its keys so,
+   and TOML then refuses the file: "table defined before"). The moved line's value
+   replaces the table's own value of that key. Returns the lines moved, or -1. */
+int lc_text_repair(char **text, size_t *length);
+/* A parse of the text as the game parses config.toml (launcher_toml_check.c). 1 if it is valid;
+   else 0, with the parser's message (it names the line) in message. */
+int lc_text_check(const char *text, size_t length, char *message, size_t size);
 /* sets "section.name" to raw (TOML text: quote strings) in *text (malloc'd, grown); 0 or -1 */
 int lc_text_set(char **text, size_t *length, const char *key, const char *raw);
 

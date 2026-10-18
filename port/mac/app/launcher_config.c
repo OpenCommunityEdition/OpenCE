@@ -314,6 +314,73 @@ int lc_text_set(char **text, size_t *length, const char *key, const char *raw)
 	return insert_text(text, length, *length, line_text);
 }
 
+/* The first dotted "section.name = value" line before every table whose section is a
+   table of the file: its extent [start, next), key and value. 0 if there is none. */
+static int find_misplaced(const char *text, size_t length, struct line *where, char *key, size_t ksize,
+	char *raw, size_t rsize)
+{
+	char current[64], section[64];
+	struct line l, h;
+	size_t pos = 0, ks, ke, vs, end;
+
+	current[0] = 0;
+	while (next_line(text, length, pos, &l))
+	{
+		int kind;
+
+		pos = l.next;
+		kind = parse_header(text, &l, current, sizeof(current));
+		if (kind)
+			return 0;	/* (the lines after the first table belong to tables) */
+		if (!parse_assignment(text, &l, &ks, &ke, &vs) || memchr(text + ks, '.', ke - ks) == NULL)
+			continue;
+		snprintf(key, ksize, "%.*s", (int)(ke - ks), text + ks);
+		snprintf(section, sizeof(section), "%.*s", (int)(strchr(key, '.') - key), key);
+		/* (declared later as [section]) */
+		{
+			size_t p2 = l.next;
+			int found = 0;
+
+			while (next_line(text, length, p2, &h))
+			{
+				p2 = h.next;
+				if (parse_header(text, &h, current, sizeof(current)) == 1 && strcmp(current, section) == 0)
+				{
+					found = 1;
+					break;
+				}
+			}
+			if (!found)
+				continue;
+		}
+		end = l.end;
+		snprintf(raw, rsize, "%.*s", (int)(end - vs), text + vs);
+		*where = l;
+		return 1;
+	}
+	return 0;
+}
+
+int lc_text_repair(char **text, size_t *length)
+{
+	struct line where;
+	char key[96], raw[160];
+	int moved = 0;
+
+	if (!*text)
+		return 0;
+	while (moved < 256 && find_misplaced(*text, *length, &where, key, sizeof(key), raw, sizeof(raw)))
+	{
+		if (replace_range(text, length, where.start, where.next, "") != 0)
+			return -1;
+		/* (the dotted line was the newer: it replaces the table's own value of the key) */
+		if (lc_text_set(text, length, key, raw) != 0)
+			return -1;
+		++moved;
+	}
+	return moved;
+}
+
 /* ---------- the model */
 
 static void put(struct lc_model *m, int id, const char *v)

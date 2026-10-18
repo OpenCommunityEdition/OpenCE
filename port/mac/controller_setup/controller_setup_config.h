@@ -7,11 +7,13 @@
 extern "C" {
 #endif
 
-/* Replaces the value of each key (a line "key = value", whitespace around
-   the key and '=' ignored; comment and [section] lines are never matched) or
-   adds the key before the first [section] line (at the end if there is none).
-   All other lines are kept byte for byte. The file is created if missing and
-   is replaced through "<path>.tmp". Returns 0, or -1 on an error. */
+/* Sets each key "section.name" to its value (TOML text) under [section] of
+   the file: the line is replaced in place if it is there, else added after the
+   section's last line, else the section is added at the end. Dotted keys at
+   the top of a file that has the table are moved into it first (an older
+   version wrote them there, and the game then refuses the whole file). All
+   other lines are kept. The file is created if missing and is replaced
+   through "<path>.tmp". Returns 0, or -1 on an error. */
 int cs_config_set(const char *path, const char *const *keys,
 	const char *const *values, int count);
 
