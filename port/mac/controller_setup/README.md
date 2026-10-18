@@ -9,14 +9,24 @@ universal (ppc + i386) binary.
 
 ## What it does
 
-- Instructions (plug in the adapter, its pair button, the controller's own
-  pairing combination, a solid light means connected; Mac mode and firmware
-  update notes; wired USB pads and the Xbox 360 pad driver are not covered).
+- Instructions (plug in the adapter, with a USB data cable if possible: a
+  charge-only cable is not seen at all; its pair button, the controller's own
+  pairing combination, Dinput mode (Create + D-pad Left for 3 seconds) as the
+  best on these Macs, a solid light means connected; the adapter detaches and
+  attaches again by itself while it pairs; firmware update notes; wired USB
+  pads and the Xbox 360 pad driver are not covered).
 - A live status line: "No input received yet: press a button on the
   controller.", "Receiving input", and after 4 quiet seconds "Controller found
   but sending nothing: make sure it's paired (LED solid) and press a button."
-- A DualShock 4 or DualSense (including 8BitDo's adapter as one) is read from
-  its USB input reports with the game's decoder (`../mac_gamepad_report.c`);
+- While only the adapter's waiting identity (2DC8:3107 "IDLE", a vendor-defined
+  page, not a game pad) is present, the status line says "Adapter found,
+  waiting for a controller". A device that goes is dropped and the next game
+  pad that appears (the adapter attaches again as 2DC8:3105 in Dinput mode, or
+  as a DualShock 4) is chosen at once.
+- A DualShock 4 or DualSense (including 8BitDo's adapter as one) and the
+  adapter in Dinput mode (2DC8:3105) are read from their USB input reports
+  with the game's decoder (`../mac_gamepad_report.c`; analog triggers and the
+  touchpad click come from the report);
   every other HID pad from its elements.
 - Calibrate: live sticks with their dead-zone rings, triggers, d-pad and 12
   button lights; dead zones 0..16000 (9000 is the stock game's); invert look.

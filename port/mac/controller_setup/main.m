@@ -19,12 +19,13 @@ static NSString *gConfigPath = nil;
 static NSString *const kHeading = @"Connect a modern controller with the 8BitDo Wireless USB Adapter 2";
 static NSString *const kInstructions =
 	@"Works with PS5 DualSense, PS4 DualShock 4, Xbox One/Series, Switch Pro and 8BitDo pads.\n"
-	@"1. Plug the adapter into a USB port.\n"
+	@"1. Plug the adapter into a USB port. A USB data cable is the most reliable way; a charge-only cable is not seen at all.\n"
 	@"2. Press the pair button on the adapter. Its light blinks fast.\n"
 	@"3. Put the controller in pairing mode: hold Create + PS (DualSense) or Share + PS (DualShock 4) for 3 seconds; "
 	@"on an Xbox pad press the Xbox button, then hold its pair button for 3 seconds; on a Switch Pro hold Sync for 3 seconds.\n"
-	@"4. A solid light means it is connected. Next time, just press PS, Xbox or any button.\n"
-	@"Nothing happens? Hold Share (Create, or View on Xbox) + Right for 3 seconds until the light blinks twice to pick Mac mode, then pair again. "
+	@"4. Best on these Macs: Dinput mode. Hold Create (Share on a DualShock 4, View on Xbox) + D-pad Left for 3 seconds until the light blinks twice, then pair again.\n"
+	@"5. A solid light means it is connected. Next time, just press PS, Xbox or any button.\n"
+	@"Nothing happens? The adapter unplugs and plugs itself in again a few times while it pairs: wait a few seconds, and try another port or cable. "
 	@"Some pads need a firmware update first: use 8BitDo's updater on a newer computer.\n"
 	@"Not covered: wired USB pads and the Xbox 360 pad driver.";
 
@@ -34,6 +35,7 @@ static NSString *const kStatusWaiting = @"No input received yet: press a button 
 static NSString *const kStatusReceiving = @"Receiving input";
 static NSString *const kStatusSilent = @"Controller found but sending nothing: make sure it's paired (LED solid) and press a button.";
 static NSString *const kStatusQuiet = @"Receiving input earlier, quiet now: press a button.";
+static NSString *const kStatusAdapterIdle = @"Adapter found, waiting for a controller: pair it now (adapter button, then Create + PS).";
 #define SILENCE_SECONDS 4.0
 
 static int DeviceNumber(IOHIDDeviceRef device, CFStringRef key)
@@ -303,6 +305,18 @@ static CFMutableDictionaryRef MatchElementPage(int page)
 	return d;
 }
 
+/* every device of a vendor (8BitDo's adapter waiting for a controller is not a game pad: it shows only as a
+   vendor-defined page, so it is matched by its vendor to say that it is there) */
+static CFMutableDictionaryRef MatchVendor(int vendor)
+{
+	CFMutableDictionaryRef d = CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
+		&kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+	CFNumberRef a = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &vendor);
+	CFDictionarySetValue(d, CFSTR(kIOHIDVendorIDKey), a);
+	CFRelease(a);
+	return d;
+}
+
 static CFMutableDictionaryRef MatchPage(int page, int usage)
 {
 	CFMutableDictionaryRef d = CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
@@ -365,11 +379,11 @@ static CFMutableDictionaryRef MatchPage(int page, int usage)
    wrapping, which is a little wider than the theme's. */
 - (float)statusHeight
 {
-	NSString *all[5];
+	NSString *all[6];
 	float h = 0;
 	int i;
-	all[0] = kStatusNoPad; all[1] = kStatusWaiting; all[2] = kStatusReceiving; all[3] = kStatusSilent; all[4] = kStatusQuiet;
-	for (i = 0; i < 5; i++) {
+	all[0] = kStatusNoPad; all[1] = kStatusWaiting; all[2] = kStatusReceiving; all[3] = kStatusSilent; all[4] = kStatusQuiet; all[5] = kStatusAdapterIdle;
+	for (i = 0; i < 6; i++) {
 		float t = ThemeSize(all[i], kThemeSmallSystemFont, 490, YES).height;
 		if (t > h)
 			h = t;
@@ -487,13 +501,13 @@ static int DumpView(NSView *view, int depth, NSString *indent)
 
 - (void)dumpText
 {
-	NSString *all[5];
+	NSString *all[6];
 	int i, bad;
 	NSRect f = [[window contentView] frame];
-	all[0] = kStatusNoPad; all[1] = kStatusWaiting; all[2] = kStatusReceiving; all[3] = kStatusSilent; all[4] = kStatusQuiet;
+	all[0] = kStatusNoPad; all[1] = kStatusWaiting; all[2] = kStatusReceiving; all[3] = kStatusSilent; all[4] = kStatusQuiet; all[5] = kStatusAdapterIdle;
 	printf("window %dx%d\n", (int)f.size.width, (int)f.size.height);
 	bad = DumpView([window contentView], 0, @"  ");
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < 6; i++) {
 		NSSize n = ThemeSize(all[i], kThemeSmallSystemFont, 496, YES);
 		NSRect sf = [status frame];
 		printf("status %d needs %dx%d in %dx%d%s: %s\n", i, (int)n.width, (int)n.height, (int)sf.size.width, (int)sf.size.height,
@@ -516,6 +530,9 @@ static int DumpView(NSView *view, int depth, NSString *indent)
 	CFArrayAppendValue(matches, m);
 	CFRelease(m);
 	m = MatchPage(CS_PAGE_GENERIC_DESKTOP, 4); /* joystick */
+	CFArrayAppendValue(matches, m);
+	CFRelease(m);
+	m = MatchVendor(CS_VENDOR_8BITDO);
 	CFArrayAppendValue(matches, m);
 	CFRelease(m);
 	IOHIDManagerSetDeviceMatchingMultiple(manager, matches);
@@ -569,6 +586,19 @@ static int DumpView(NSView *view, int depth, NSString *indent)
 	if (DeviceNumber(d, CFSTR(kIOHIDVendorIDKey)) == CS_VENDOR_NINTENDO)
 		return CS_LAYOUT_NINTENDO;
 	return CS_LAYOUT_GENERIC;
+}
+
+/* Whether 8BitDo's adapter is plugged in without a game pad's identity: it is waiting for a controller to pair
+   (2dc8:3107, "IDLE") or is between two of its identities. */
+- (BOOL)adapterWaiting
+{
+	unsigned i;
+	for (i = 0; i < [devices count]; i++) {
+		IOHIDDeviceRef d = (IOHIDDeviceRef)[[devices objectAtIndex:i] pointerValue];
+		if (DeviceNumber(d, CFSTR(kIOHIDVendorIDKey)) == CS_VENDOR_8BITDO && ![self isPad:d])
+			return YES;
+	}
+	return NO;
 }
 
 /* Chooses the first game pad (one that an Xbox driver made, if there is one, before any other). */
@@ -733,7 +763,7 @@ static int DumpView(NSView *view, int depth, NSString *indent)
 	CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
 
 	if (!chosen)
-		text = kStatusNoPad;
+		text = [self adapterWaiting] ? kStatusAdapterIdle : kStatusNoPad;
 	else if (inputCount > 0 && now - lastInput < SILENCE_SECONDS)
 		text = kStatusReceiving;
 	else if (inputCount > 0)

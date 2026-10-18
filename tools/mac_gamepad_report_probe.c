@@ -204,6 +204,115 @@ int main(void)
         CHECK(mac_gamepad_rumble_report(MAC_PAD_REPORT_DUALSHOCK4, 0, 0, o, 32) == 32 && o[4] == 0 && o[5] == 0);
     }
 
+    /* 8BitDo's Wireless USB Adapter 2 in Dinput mode (2dc8:3105), the reports as it sent them with a
+       DualSense paired (MacBook6,1, 10.6.8: ds4watch's log), and the same states by its HID elements */
+    {
+        static const struct { const char *text; unsigned char r[10]; } real[] = {
+            { "idle", { 0x01, 0x00, 0x00, 0x0f, 0x7f, 0x7f, 0x7f, 0x7f, 0x00, 0x00 } },
+            { "button 7 with the left stick", { 0x01, 0x40, 0x00, 0x0f, 0x07, 0xdc, 0x7f, 0x7f, 0x00, 0x00 } },
+            { "button 4 and hat east", { 0x01, 0x08, 0x00, 0x02, 0x7f, 0x7f, 0x7f, 0x7f, 0x00, 0x00 } },
+            { "button 10 with L2 analog", { 0x01, 0x00, 0x02, 0x0f, 0x7f, 0x7f, 0x7f, 0x7f, 0xff, 0x00 } },
+            { "L3 and R3 with sticks", { 0x01, 0x00, 0x60, 0x0f, 0xb7, 0xa5, 0x7f, 0x7f, 0x00, 0x00 } },
+            { "touchpad click (byte 3 bit 4)", { 0x01, 0x00, 0x00, 0x1f, 0x7f, 0x7f, 0x7f, 0x7f, 0x00, 0x00 } }
+        };
+        unsigned char b[10];
+        struct mac_gamepad_element e[22];
+        long v[22];
+        unsigned i, n;
+        CHECK(mac_gamepad_report_kind(0x2dc8, 0x3105) == MAC_PAD_REPORT_8BITDO_DINPUT);
+        CHECK(mac_gamepad_report_kind(0x2dc8, 0x3107) == MAC_PAD_REPORT_NONE);
+        CHECK(!strcmp(mac_gamepad_report_name(MAC_PAD_REPORT_8BITDO_DINPUT), "8BitDo Dinput"));
+        CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_8BITDO_DINPUT, real[0].r, 10, &f, NULL) == 1);
+        CHECK(f.connected && f.buttons == 0 && f.left_x == 127 * 257 - 32768 && f.left_y == -(127 * 257 - 32768) - 1);
+        CHECK(f.right_x == f.left_x && f.right_y == f.left_y && f.analog[MAC_GAMEPAD_A] == 0);
+        mac_gamepad_decode_report(MAC_PAD_REPORT_8BITDO_DINPUT, real[1].r, 10, &f, NULL);
+        CHECK(f.analog[MAC_GAMEPAD_WHITE] == 255 && !f.analog[MAC_GAMEPAD_BLACK] && f.buttons == 0);
+        CHECK(f.left_x == 7 * 257 - 32768 && f.left_y == -(0xdc * 257 - 32768) - 1);
+        mac_gamepad_decode_report(MAC_PAD_REPORT_8BITDO_DINPUT, real[2].r, 10, &f, NULL);
+        CHECK(f.analog[MAC_GAMEPAD_X] == 255 && f.buttons == MAC_GAMEPAD_DPAD_RIGHT);
+        mac_gamepad_decode_report(MAC_PAD_REPORT_8BITDO_DINPUT, real[3].r, 10, &f, NULL);
+        CHECK(f.analog[MAC_GAMEPAD_LEFT_TRIGGER] == 255 && f.analog[MAC_GAMEPAD_RIGHT_TRIGGER] == 0 && f.buttons == 0);
+        mac_gamepad_decode_report(MAC_PAD_REPORT_8BITDO_DINPUT, real[4].r, 10, &f, NULL);
+        CHECK(f.buttons == (MAC_GAMEPAD_LEFT_THUMB | MAC_GAMEPAD_RIGHT_THUMB));
+        mac_gamepad_decode_report(MAC_PAD_REPORT_8BITDO_DINPUT, real[5].r, 10, &f, &n);
+        CHECK(f.buttons == 0 && n == MAC_PAD_EXTRA_TOUCHPAD);
+        /* each button alone, in the DualSense's terms; the digital L2 and R2 are full pulls */
+        for (i = 1; i <= 15; ++i) {
+            static const int analog_of[16] = { -1, MAC_GAMEPAD_A, MAC_GAMEPAD_B, -1, MAC_GAMEPAD_X, MAC_GAMEPAD_Y, -1,
+                MAC_GAMEPAD_WHITE, MAC_GAMEPAD_BLACK, MAC_GAMEPAD_RIGHT_TRIGGER, MAC_GAMEPAD_LEFT_TRIGGER, -1, -1, -1, -1, -1 };
+            static const unsigned bits_of[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, MAC_GAMEPAD_BACK, MAC_GAMEPAD_START, 0,
+                MAC_GAMEPAD_LEFT_THUMB, MAC_GAMEPAD_RIGHT_THUMB };
+            memcpy(b, real[0].r, 10);
+            b[1 + (i - 1) / 8] = (unsigned char)(1 << ((i - 1) % 8));
+            mac_gamepad_decode_report(MAC_PAD_REPORT_8BITDO_DINPUT, b, 10, &f, NULL);
+            n = 0;
+            if (analog_of[i] >= 0) { CHECK(f.analog[analog_of[i]] == 255); ++n; }
+            CHECK(f.buttons == bits_of[i]);
+            for (hat = 0; hat < MAC_GAMEPAD_ANALOG_COUNT; ++hat) if (f.analog[hat]) --n;
+            CHECK(n == 0);
+        }
+        /* the hat, and a short or another report (the receiver's report 2 is vendor-defined) */
+        for (hat = 0; hat < 16; ++hat) {
+            memcpy(b, real[0].r, 10);
+            b[3] = (unsigned char)hat;
+            mac_gamepad_decode_report(MAC_PAD_REPORT_8BITDO_DINPUT, b, 10, &f, NULL);
+            CHECK(f.buttons == (hat < 8 ? ((unsigned []){ MAC_GAMEPAD_DPAD_UP, MAC_GAMEPAD_DPAD_UP | MAC_GAMEPAD_DPAD_RIGHT,
+                MAC_GAMEPAD_DPAD_RIGHT, MAC_GAMEPAD_DPAD_DOWN | MAC_GAMEPAD_DPAD_RIGHT, MAC_GAMEPAD_DPAD_DOWN,
+                MAC_GAMEPAD_DPAD_DOWN | MAC_GAMEPAD_DPAD_LEFT, MAC_GAMEPAD_DPAD_LEFT,
+                MAC_GAMEPAD_DPAD_UP | MAC_GAMEPAD_DPAD_LEFT })[hat] : 0));
+        }
+        memcpy(b, real[0].r, 10);
+        b[0] = 2;
+        CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_8BITDO_DINPUT, b, 10, &f, NULL) == 0);
+        CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_8BITDO_DINPUT, real[0].r, 9, &f, NULL) == 0);
+        /* the analog triggers: R2 is byte 8 (Accelerator), L2 byte 9 (Brake) */
+        memcpy(b, real[0].r, 10);
+        b[8] = 90; b[9] = 200;
+        mac_gamepad_decode_report(MAC_PAD_REPORT_8BITDO_DINPUT, b, 10, &f, NULL);
+        CHECK(f.analog[MAC_GAMEPAD_LEFT_TRIGGER] == 90 && f.analog[MAC_GAMEPAD_RIGHT_TRIGGER] == 200);
+        /* the elements the receiver lists (buttons 1 to 15, the hat, X Y Z Rz, Accelerator and Brake) give
+           the same states as its reports */
+        for (i = 0; i < 15; ++i) { e[i].usage_page = 9; e[i].usage = i + 1; e[i].minimum = 0; e[i].maximum = 1; }
+        e[15].usage_page = 1; e[15].usage = 0x39; e[15].minimum = 0; e[15].maximum = 7;
+        e[16].usage_page = 1; e[16].usage = 0x30; e[17].usage_page = 1; e[17].usage = 0x31;
+        e[18].usage_page = 1; e[18].usage = 0x32; e[19].usage_page = 1; e[19].usage = 0x35;
+        e[20].usage_page = 2; e[20].usage = 0xc4; e[21].usage_page = 2; e[21].usage = 0xc5;
+        for (i = 16; i < 22; ++i) { e[i].minimum = 0; e[i].maximum = 255; }
+        for (n = 0; n < sizeof(real) / sizeof(real[0]) + 2; ++n) {
+            const unsigned char *rr = n < sizeof(real) / sizeof(real[0]) ? real[n].r : b;
+            unsigned char mixed[10];
+            if (n == sizeof(real) / sizeof(real[0])) { memcpy(mixed, real[0].r, 10); mixed[1] = 0xff; mixed[2] = 0x7f; mixed[3] = 0x05;
+                mixed[4] = 3; mixed[5] = 250; mixed[6] = 99; mixed[7] = 180; mixed[8] = 60; mixed[9] = 30; rr = mixed; }
+            for (i = 0; i < 15; ++i) v[i] = (rr[1 + i / 8] >> (i % 8)) & 1;
+            v[15] = rr[3] & 0x0f;
+            for (i = 0; i < 4; ++i) v[16 + i] = rr[4 + i];
+            v[20] = rr[8]; v[21] = rr[9];
+            mac_gamepad_decode_report(MAC_PAD_REPORT_8BITDO_DINPUT, rr, 10, &f, NULL);
+            mac_gamepad_map(e, v, 22, 0x2dc8, 0x3105, &g);
+            CHECK(same(&f, &g));
+            if (!same(&f, &g)) printf("8BitDo case %u differs: buttons %x %x, A %d %d\n", n, f.buttons, g.buttons, f.analog[0], g.analog[0]);
+        }
+        /* the PlayStation Classic pad by elements (SDL's database): cross A, circle B, square X, triangle Y,
+           L1 and R1, select and start, L2 and R2 full pulls, the d-pad on X and Y */
+        {
+            struct mac_gamepad_element pe[12];
+            long pv[12];
+            for (i = 0; i < 10; ++i) { pe[i].usage_page = 9; pe[i].usage = i + 1; pe[i].minimum = 0; pe[i].maximum = 1; pv[i] = 0; }
+            pe[10].usage_page = 1; pe[10].usage = 0x30; pe[11].usage_page = 1; pe[11].usage = 0x31;
+            pe[10].minimum = pe[11].minimum = 0; pe[10].maximum = pe[11].maximum = 255;
+            pv[10] = 127; pv[11] = 127;
+            mac_gamepad_map(pe, pv, 12, 0x054c, 0x0cda, &g);
+            CHECK(g.connected && g.buttons == 0 && g.left_x == 0 && g.left_y == 0 && !g.analog[0]);
+            pv[2] = 1; pv[1] = 1; pv[3] = 1; pv[0] = 1; pv[4] = 1; pv[5] = 1; pv[6] = 1; pv[7] = 1; pv[8] = 1; pv[9] = 1;
+            pv[10] = 255; pv[11] = 0;
+            mac_gamepad_map(pe, pv, 12, 0x054c, 0x0cda, &g);
+            CHECK(g.analog[MAC_GAMEPAD_A] == 255 && g.analog[MAC_GAMEPAD_B] == 255 && g.analog[MAC_GAMEPAD_X] == 255 && g.analog[MAC_GAMEPAD_Y] == 255);
+            CHECK(g.analog[MAC_GAMEPAD_WHITE] == 255 && g.analog[MAC_GAMEPAD_BLACK] == 255);
+            CHECK(g.analog[MAC_GAMEPAD_LEFT_TRIGGER] == 255 && g.analog[MAC_GAMEPAD_RIGHT_TRIGGER] == 255);
+            CHECK(g.buttons == (MAC_GAMEPAD_BACK | MAC_GAMEPAD_START | MAC_GAMEPAD_DPAD_RIGHT | MAC_GAMEPAD_DPAD_UP));
+        }
+    }
+
     printf("%d checks, %d failures\n", checks, failures);
     return failures != 0;
 }

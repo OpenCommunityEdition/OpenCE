@@ -14,6 +14,10 @@ struct mac_gamepad_frame;
 /* PlayStation pads (and adapters that present themselves as one, such as
    8BitDo's USB Wireless Adapter 2): sticks X/Y and Z/Rz, triggers Rx/Ry */
 #define CS_VENDOR_SONY 0x054C
+/* 8BitDo's own ids: the adapter is 2DC8:3105 in Dinput mode (a game pad whose reports
+   mac_gamepad_report.h decodes) and 2DC8:3107 "IDLE" while it waits for a controller
+   (a vendor-defined page, not a game pad) */
+#define CS_VENDOR_8BITDO 0x2DC8
 /* the game reads these three from their USB reports (mac_gamepad_report.h);
    this app sees their HID elements, which carry the same state */
 #define CS_PRODUCT_DUALSHOCK4 0x05C4

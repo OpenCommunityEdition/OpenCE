@@ -3,6 +3,7 @@
 #include "mac_gamepad_report.h"
 #include <IOKit/IOKitLib.h>
 #include <IOKit/IOCFPlugIn.h>
+#include <IOKit/IOMessage.h>
 #include <IOKit/hid/IOHIDLib.h>
 #include <IOKit/hid/IOHIDKeys.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -37,6 +38,16 @@
    digital, full trigger pulls */
 #define NINTENDO_VENDOR 0x057e
 #define RESCAN_INTERVAL 2.0
+/* After a HID device appears or one is terminated the pads are looked for
+   again at once, and a few times more (a device is published before its
+   properties and elements are all there). */
+#define EVENT_SCAN_DELAY 0.05
+#define EVENT_SCAN_STEP 0.3
+#define EVENT_SCAN_COUNT 6
+/* A slot whose pad left is kept for a pad of the same kind this long: an
+   adapter detaches and attaches again, with other ids, as it works out what
+   it is paired with, and the player that it is must keep the slot. */
+#define SLOT_HOLD_SECONDS 20.0
 /* A raw report stream is the pad's state until the next report arrives (an
    adapter may send only when something changes, so a quiet stream is not a
    pad that let go). A stream whose first reports do not decode is given up
@@ -113,9 +124,12 @@ void mac_gamepad_map(const struct mac_gamepad_element *elements,
     unsigned i;
     int has_rx = 0, has_ry = 0;
     static const unsigned char nintendo_buttons[14] = { 1, 2, 3, 4, 5, 6, 0, 0, 7, 8, 9, 10, 0, 0 };
-    int playstation = vendor == SONY_VENDOR;
+    /* the PlayStation Classic pad (an adapter's mode too) is Sony's id but not the DualShock's layout */
+    int psclassic = vendor == SONY_VENDOR && product == MAC_PAD_PSCLASSIC_PRODUCT;
+    int playstation = vendor == SONY_VENDOR && !psclassic;
     int nintendo = vendor == NINTENDO_VENDOR;
-    (void)product;
+    /* 8BitDo's Wireless USB Adapter 2 in Dinput mode (mac_gamepad_report.h) */
+    int dinput = vendor == MAC_PAD_8BITDO_VENDOR && product == MAC_PAD_8BITDO_DINPUT_PRODUCT;
     memset(out, 0, sizeof(*out));
     out->connected = 1;
     for (i = 0; i < count; ++i)
@@ -127,7 +141,19 @@ void mac_gamepad_map(const struct mac_gamepad_element *elements,
         const struct mac_gamepad_element *e = &elements[i];
         long v = values[i];
         if (e->usage_page == PAGE_BUTTON) {
-            if (nintendo && (e->usage == 7 || e->usage == 8)) {
+            if (dinput) {
+                if (e->usage == 9 || e->usage == 10) {
+                    /* (R2 and L2 as buttons 9 and 10: a full pull, unless the analog values say more) */
+                    if (v && !out->analog[e->usage == 10 ? MAC_GAMEPAD_LEFT_TRIGGER : MAC_GAMEPAD_RIGHT_TRIGGER])
+                        out->analog[e->usage == 10 ? MAC_GAMEPAD_LEFT_TRIGGER : MAC_GAMEPAD_RIGHT_TRIGGER] = 255;
+                } else
+                    button_value(mac_gamepad_dinput_button(e->usage), v != 0, out);
+            } else if (psclassic) {
+                if (e->usage == 5 || e->usage == 6) {
+                    if (v) out->analog[e->usage == 5 ? MAC_GAMEPAD_LEFT_TRIGGER : MAC_GAMEPAD_RIGHT_TRIGGER] = 255;
+                } else
+                    button_value(mac_gamepad_psclassic_button(e->usage), v != 0, out);
+            } else if (nintendo && (e->usage == 7 || e->usage == 8)) {
                 if (v) out->analog[e->usage == 7 ? MAC_GAMEPAD_LEFT_TRIGGER : MAC_GAMEPAD_RIGHT_TRIGGER] = 255;
             } else if (nintendo)
                 button_value(e->usage >= 1 && e->usage <= 14 ? nintendo_buttons[e->usage - 1] : 0,
@@ -138,11 +164,24 @@ void mac_gamepad_map(const struct mac_gamepad_element *elements,
             else
                 button_value(e->usage, v != 0, out);
         } else if (e->usage_page == PAGE_SIMULATION) {
+            /* (the Dinput receiver's Accelerator is L2: it is swapped) */
             if (e->usage == USAGE_ACCELERATOR)
-                out->analog[MAC_GAMEPAD_RIGHT_TRIGGER] = trigger_value(v, e->minimum, e->maximum);
+                out->analog[dinput ? MAC_GAMEPAD_LEFT_TRIGGER : MAC_GAMEPAD_RIGHT_TRIGGER] = trigger_value(v, e->minimum, e->maximum);
             else if (e->usage == USAGE_BRAKE)
-                out->analog[MAC_GAMEPAD_LEFT_TRIGGER] = trigger_value(v, e->minimum, e->maximum);
+                out->analog[dinput ? MAC_GAMEPAD_RIGHT_TRIGGER : MAC_GAMEPAD_LEFT_TRIGGER] = trigger_value(v, e->minimum, e->maximum);
         } else if (e->usage_page == PAGE_GENERIC_DESKTOP) {
+            /* the PlayStation Classic pad's d-pad is its X and Y axes, 0 or 255 */
+            if (psclassic && (e->usage == USAGE_X || e->usage == USAGE_Y)) {
+                long quarter = (e->maximum - e->minimum) / 4;
+                if (e->usage == USAGE_X) {
+                    if (v <= e->minimum + quarter) out->buttons |= MAC_GAMEPAD_DPAD_LEFT;
+                    else if (v >= e->maximum - quarter) out->buttons |= MAC_GAMEPAD_DPAD_RIGHT;
+                } else {
+                    if (v <= e->minimum + quarter) out->buttons |= MAC_GAMEPAD_DPAD_UP;
+                    else if (v >= e->maximum - quarter) out->buttons |= MAC_GAMEPAD_DPAD_DOWN;
+                }
+                continue;
+            }
             switch (e->usage) {
             case USAGE_X: out->left_x = stick_value(v, e->minimum, e->maximum, 0); break;
             case USAGE_Y: out->left_y = stick_value(v, e->minimum, e->maximum, 1); break;
@@ -200,6 +239,10 @@ struct gamepad_device {
     unsigned char rumble_strong, rumble_weak;
     CFAbsoluteTime rumble_sent;
     CFRunLoopSourceRef raw_source;
+    /* the service's termination (IOKit tells of it at once; the elements of a
+       pad that went cannot be read, but that is found only on a poll) */
+    io_object_t notifier;
+    volatile int gone;
     struct mac_gamepad_frame raw_frame;
     unsigned char raw_buffer[RAW_BUFFER_SIZE];
 };
@@ -207,6 +250,18 @@ struct gamepad_device {
 static struct gamepad_device pads[MAC_GAMEPAD_MAXIMUM_DEVICES];
 static CFAbsoluteTime last_scan = -1.0e9;
 static int reported;
+/* hot plug: a notification port (its source runs in RAW_MODE, in poll_all),
+   the iterator of newly published HID devices, and the scans it asks for */
+static IONotificationPortRef note_port;
+static io_iterator_t added_iterator;
+static CFRunLoopSourceRef note_source;
+static CFAbsoluteTime next_event_scan;
+static int event_scans_left;
+/* the slot a pad left, held for a pad of its kind (SLOT_HOLD_SECONDS) */
+static int held_slot = -1;
+static CFAbsoluteTime held_until;
+static unsigned held_vendor, held_product;
+static int held_adapter;
 /* the run loop mode the raw reports are delivered in, run only by poll_all */
 #define RAW_MODE CFSTR("OpenCEGamepad")
 
@@ -235,8 +290,10 @@ static int rumble_send(struct gamepad_device *pad, unsigned char strong, unsigne
 
 static void device_close(struct gamepad_device *pad)
 {
-    if (pad->interface && (pad->rumble_strong || pad->rumble_weak))
+    if (pad->interface && !pad->gone && (pad->rumble_strong || pad->rumble_weak))
         rumble_send(pad, 0, 0);
+    if (pad->notifier)
+        IOObjectRelease(pad->notifier);
     if (pad->raw_source) {
         CFRunLoopRemoveSource(CFRunLoopGetCurrent(), pad->raw_source, RAW_MODE);
         CFRelease(pad->raw_source);
@@ -248,6 +305,106 @@ static void device_close(struct gamepad_device *pad)
     if (pad->service)
         IOObjectRelease(pad->service);
     memset(pad, 0, sizeof(*pad));
+}
+
+/* Whether the pad is one of 8BitDo's adapters, which detach and attach again
+   as they pair (their ids change: 2dc8:3105, a DualShock 4 or a PlayStation
+   Classic pad's), by vendor or by the name the adapter gives. */
+static int adapter_like(unsigned vendor, const char *name)
+{
+    return vendor == MAC_PAD_8BITDO_VENDOR || (name && strstr(name, "8BitDo") != NULL);
+}
+
+static void request_scan(void)
+{
+    next_event_scan = CFAbsoluteTimeGetCurrent() + EVENT_SCAN_DELAY;
+    event_scans_left = EVENT_SCAN_COUNT;
+}
+
+/* a pad that is gone: its slot is closed now, and held for its kind */
+static void pad_lost(int slot)
+{
+    struct gamepad_device *pad = &pads[slot];
+    if (reported < 16) { ++reported; fprintf(stderr, "game pad: %s (%04x:%04x) went away\n", pad->name, pad->vendor, pad->product); }
+    held_slot = slot;
+    held_until = CFAbsoluteTimeGetCurrent() + SLOT_HOLD_SECONDS;
+    held_vendor = pad->vendor;
+    held_product = pad->product;
+    held_adapter = adapter_like(pad->vendor, pad->name);
+    pad->gone = 1;
+    device_close(pad);
+    request_scan();
+}
+
+/* the slot for a pad being opened: its held slot if it is of the kind that
+   left it, else the lowest free one (not the held one while another is free);
+   -1 when none is free */
+static int pick_slot(unsigned vendor, unsigned product, const char *name)
+{
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    int slot, first_free = -1;
+    if (held_slot >= 0 && (now >= held_until || pads[held_slot].interface))
+        held_slot = -1;
+    if (held_slot >= 0 &&
+        ((vendor == held_vendor && product == held_product) ||
+         (held_adapter && adapter_like(vendor, name)))) {
+        slot = held_slot;
+        held_slot = -1;
+        return slot;
+    }
+    for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
+        if (!pads[slot].interface && slot != held_slot) { first_free = slot; break; }
+    if (first_free < 0 && held_slot >= 0) {
+        first_free = held_slot;
+        held_slot = -1;
+    }
+    return first_free;
+}
+
+/* IOKit: a HID device was published (the iterator must be drained to be armed again) */
+static void devices_added(void *refcon, io_iterator_t iterator)
+{
+    io_service_t service;
+    (void)refcon;
+    while ((service = IOIteratorNext(iterator)) != 0)
+        IOObjectRelease(service);
+    request_scan();
+}
+
+/* IOKit: a message for a pad's service; its termination is the pad's removal */
+static void pad_message(void *refcon, io_service_t service, natural_t type, void *argument)
+{
+    struct gamepad_device *pad = (struct gamepad_device *)refcon;
+    (void)service; (void)argument;
+    if (type == kIOMessageServiceIsTerminated) {
+        pad->gone = 1;
+        request_scan();
+    }
+}
+
+static void notify_start(void)
+{
+    if (note_port) return;
+    note_port = IONotificationPortCreate(kIOMasterPortDefault);
+    if (!note_port) return;
+    note_source = IONotificationPortGetRunLoopSource(note_port);
+    if (note_source) CFRunLoopAddSource(CFRunLoopGetCurrent(), note_source, RAW_MODE);
+    if (IOServiceAddMatchingNotification(note_port, kIOFirstMatchNotification,
+            IOServiceMatching(kIOHIDDeviceKey), devices_added, NULL, &added_iterator) == kIOReturnSuccess)
+        devices_added(NULL, added_iterator);
+}
+
+static void notify_stop(void)
+{
+    if (added_iterator) { IOObjectRelease(added_iterator); added_iterator = 0; }
+    if (note_port) {
+        if (note_source) CFRunLoopRemoveSource(CFRunLoopGetCurrent(), note_source, RAW_MODE);
+        IONotificationPortDestroy(note_port);
+        note_port = NULL;
+        note_source = NULL;
+    }
+    event_scans_left = 0;
+    held_slot = -1;
 }
 
 /* The device's input elements: buttons, axes and hats. */
@@ -345,6 +502,8 @@ static int device_open(struct gamepad_device *pad, io_service_t service)
     }
     if (!device_elements(pad)) { device_close(pad); return 0; }
     device_raw_start(pad);
+    if (note_port)
+        IOServiceAddInterestNotification(note_port, service, kIOGeneralInterest, pad_message, pad, &pad->notifier);
     name = IORegistryEntryCreateCFProperty(service, CFSTR(kIOHIDTransportKey), kCFAllocatorDefault, 0);
     if (name) {
         pad->usb = CFGetTypeID(name) == CFStringGetTypeID() &&
@@ -392,13 +551,21 @@ static void open_more(long usage, int xbox_only)
     if (IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iterator) != kIOReturnSuccess)
         return;
     while ((service = IOIteratorNext(iterator)) != 0) {
-        int slot = 0;
-        while (slot < MAC_GAMEPAD_MAXIMUM_DEVICES && pads[slot].interface) ++slot;
-        if (slot < MAC_GAMEPAD_MAXIMUM_DEVICES && !service_is_open(service) &&
-            (!xbox_only ||
-             (service_long(service, CFSTR(kIOHIDVendorIDKey), 0) == XBOX_VENDOR &&
-              service_long(service, CFSTR(kIOHIDProductIDKey), 0) == XBOX_360_PRODUCT)) &&
-            device_open(&pads[slot], service)) {
+        int slot = -1;
+        unsigned vendor = (unsigned)service_long(service, CFSTR(kIOHIDVendorIDKey), 0);
+        unsigned product = (unsigned)service_long(service, CFSTR(kIOHIDProductIDKey), 0);
+        if (!service_is_open(service) && (!xbox_only || (vendor == XBOX_VENDOR && product == XBOX_360_PRODUCT))) {
+            char name[64];
+            CFTypeRef property = IORegistryEntryCreateCFProperty(service, CFSTR(kIOHIDProductKey), kCFAllocatorDefault, 0);
+            name[0] = 0;
+            if (property) {
+                if (CFGetTypeID(property) == CFStringGetTypeID())
+                    CFStringGetCString((CFStringRef)property, name, sizeof(name), kCFStringEncodingUTF8);
+                CFRelease(property);
+            }
+            slot = pick_slot(vendor, product, name);
+        }
+        if (slot >= 0 && device_open(&pads[slot], service)) {
             pads[slot].joystick = usage == USAGE_JOYSTICK;
             if (reported < 16) {
                 ++reported;
@@ -438,9 +605,8 @@ static int device_poll(struct gamepad_device *pad, struct mac_gamepad_frame *out
         IOHIDEventStruct event;
         memset(&event, 0, sizeof(event));
         /* (the pad's removal shows as an element that cannot be read) */
-        if ((*pad->interface)->getElementValue(pad->interface, pad->cookies[0], &event) != kIOReturnSuccess) {
-            if (reported < 16) { ++reported; fprintf(stderr, "game pad: %s went away\n", pad->name); }
-            device_close(pad);
+        if (pad->gone || (*pad->interface)->getElementValue(pad->interface, pad->cookies[0], &event) != kIOReturnSuccess) {
+            pad_lost((int)(pad - pads));
             return 0;
         }
         if (pad->raw_seen)
@@ -454,9 +620,8 @@ static int device_poll(struct gamepad_device *pad, struct mac_gamepad_frame *out
     for (i = 0; i < pad->count; ++i) {
         IOHIDEventStruct event;
         memset(&event, 0, sizeof(event));
-        if ((*pad->interface)->getElementValue(pad->interface, pad->cookies[i], &event) != kIOReturnSuccess) {
-            if (reported < 16) { ++reported; fprintf(stderr, "game pad: %s went away\n", pad->name); }
-            device_close(pad);
+        if (pad->gone || (*pad->interface)->getElementValue(pad->interface, pad->cookies[i], &event) != kIOReturnSuccess) {
+            pad_lost((int)(pad - pads));
             return 0;
         }
         values[i] = (long)event.value;
@@ -503,14 +668,18 @@ int mac_gamepad_poll_all(struct mac_gamepad_frame frames[MAC_GAMEPAD_MAXIMUM_DEV
 {
     int slot, count = 0;
     memset(frames, 0, sizeof(frames[0]) * MAC_GAMEPAD_MAXIMUM_DEVICES);
-    /* the raw reports waiting (the run loop mode holds only the pads' sources) */
+    notify_start();
+    /* the raw reports and the hot plug notifications waiting (the run loop
+       mode holds only the pads' sources and the notification port's) */
+    {
+        int n = 0;
+        while (n++ < MAX_REPORTS_PER_POLL &&
+            CFRunLoopRunInMode(RAW_MODE, 0.0, true) == kCFRunLoopRunHandledSource) {}
+    }
+    /* a pad whose device was terminated is let go before anything is read from it */
     for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
-        if (pads[slot].raw_source) {
-            int n = 0;
-            while (n++ < MAX_REPORTS_PER_POLL &&
-                CFRunLoopRunInMode(RAW_MODE, 0.0, true) == kCFRunLoopRunHandledSource) {}
-            break;
-        }
+        if (pads[slot].interface && pads[slot].gone)
+            pad_lost(slot);
     for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
         if (pads[slot].interface && device_poll(&pads[slot], &frames[slot]))
             ++count;
@@ -519,20 +688,26 @@ int mac_gamepad_poll_all(struct mac_gamepad_frame frames[MAC_GAMEPAD_MAXIMUM_DEV
         if (pads[slot].interface && (pads[slot].rumble_strong || pads[slot].rumble_weak) &&
             CFAbsoluteTimeGetCurrent() - pads[slot].rumble_sent >= 1.0)
             rumble_send(&pads[slot], pads[slot].rumble_strong, pads[slot].rumble_weak);
+    count = device_connected_count();
     if (count < MAC_GAMEPAD_MAXIMUM_DEVICES) {
         CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
-        if (now - last_scan >= RESCAN_INTERVAL) {
+        int event = event_scans_left > 0 && now >= next_event_scan;
+        if (event || now - last_scan >= RESCAN_INTERVAL) {
             last_scan = now;
-            scan();
-            if (device_connected_count() != count) {
-                /* (a pad connected: its first state now) */
-                for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
-                    if (pads[slot].interface && !frames[slot].connected)
-                        device_poll(&pads[slot], &frames[slot]);
-                count = device_connected_count();
+            if (event) {
+                --event_scans_left;
+                next_event_scan = now + EVENT_SCAN_STEP;
             }
+            scan();
+            /* (a pad connected: its first state now) */
+            for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
+                if (pads[slot].interface && !frames[slot].connected)
+                    device_poll(&pads[slot], &frames[slot]);
         }
     }
+    count = 0;
+    for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
+        if (frames[slot].connected) ++count;
     return count;
 }
 
@@ -554,6 +729,7 @@ void mac_gamepad_stop(void)
     int slot;
     for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
         device_close(&pads[slot]);
+    notify_stop();
     last_scan = -1.0e9;
 }
 

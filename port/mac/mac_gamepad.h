@@ -6,8 +6,11 @@
    read (the first found is in slot 0), a pad published as an Xbox 360 pad (vendor 0x045E, product
    0x028E: the Xbox One S controller's driver, or a wired 360 pad's) before
    any other. A Sony DualShock 4 or DualSense (mac_gamepad_report.h) is
-   read from its USB input reports; every other pad from its HID elements,
-   by usage (mac_gamepad_map). The values come in XInput's shape: sticks -32768..32767 with
+   read from its USB input reports, as is 8BitDo's Wireless USB Adapter 2 in
+   Dinput mode (2dc8:3105); every other pad from its HID elements, by usage
+   (mac_gamepad_map). A device that is not a game pad, as the adapter is
+   while it waits for a controller (2dc8:3107, a vendor-defined page), is
+   never opened. The values come in XInput's shape: sticks -32768..32767 with
    up positive, triggers and the face buttons 0..255. */
 
 enum {
@@ -53,7 +56,11 @@ void mac_gamepad_map(const struct mac_gamepad_element *elements,
 
 /* Every pad's state now, by slot (a pad keeps its slot while it stays
    connected; a free slot is not connected). Returns the pads connected.
-   Looks for more pads every two seconds while a slot is free. */
+   Looks for more pads every two seconds while a slot is free, and at once
+   when IOKit publishes a HID device or terminates a pad's (a pad that goes
+   is closed on the next call, and its slot is held for twenty seconds for a
+   pad of its kind: 8BitDo's adapter detaches and attaches again, with other
+   ids, as it pairs, and keeps its player). */
 int mac_gamepad_poll_all(struct mac_gamepad_frame frames[MAC_GAMEPAD_MAXIMUM_DEVICES]);
 const char *mac_gamepad_name_at(int slot);
 /* whether the slot's pad is a Sony pad (a DualShock 4 or DualSense, or an
