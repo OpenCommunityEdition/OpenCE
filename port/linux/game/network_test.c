@@ -678,6 +678,25 @@ static void network_test_seat_together(
 		object_get(units[1])->object.parent_object_index == best_index ? "in" : "out");
 }
 
+/* debug.network_test_chat: the last player's name, in ASCII (the host
+mutes it) */
+static void network_test_last_player_name(
+	char *name,
+	short size)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct player_datum *last = NULL;
+	short index;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		last = player;
+	for (index = 0; last && index < size - 1 && index < (short)NUMBEROF(last->name) && last->name[index]; index++)
+		name[index] = player_name_character_ascii(last->name[index]);
+	name[index] = 0;
+}
+
 /* both machines stand the last player at the driver's entrance of the
 nearest vehicle no one rides (a joining machine's player then holds the
 action button, as a player getting in does) */
@@ -887,7 +906,11 @@ void network_test_update(
 		/* debug.network_test_chat: each machine's player says a line to
 		everyone that many seconds in, one to the team two seconds on, and
 		one to the vehicle two more on, the host having seated the last two
-		players in one vehicle (the others in none) three seconds before */
+		players in one vehicle (the others in none) three seconds before;
+		then the host mutes the last player for a minute (a client's /mute
+		of the host refused), each says a line to everyone (the last
+		player's going no further than the host), the host unmutes it, and
+		each says another */
 		if (network_test.chat_time > 0.0f)
 		{
 			long chat_time = (long)(network_test.chat_time * TICKS_PER_SECOND);
@@ -918,6 +941,42 @@ void network_test_update(
 			{
 				snprintf(text, sizeof(text), "hello vehicle from %s", machine);
 				network_chat_say(_chat_channel_vehicle, text);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 3 && game_time_get() >= chat_time + 6 * TICKS_PER_SECOND)
+			{
+				char name[16];
+
+				network_test_last_player_name(name, sizeof(name));
+				if (network_test.mode == _network_test_host)
+					snprintf(text, sizeof(text), "/mute %s 1", name);
+				else
+					snprintf(text, sizeof(text), "/mute host");
+				network_chat_say(_chat_channel_everyone, text);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 4 && game_time_get() >= chat_time + 8 * TICKS_PER_SECOND)
+			{
+				snprintf(text, sizeof(text), "while muted from %s", machine);
+				network_chat_say(_chat_channel_everyone, text);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 5 && game_time_get() >= chat_time + 10 * TICKS_PER_SECOND)
+			{
+				char name[16];
+
+				network_test_last_player_name(name, sizeof(name));
+				if (network_test.mode == _network_test_host)
+				{
+					snprintf(text, sizeof(text), "/unmute %s", name);
+					network_chat_say(_chat_channel_everyone, text);
+				}
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 6 && game_time_get() >= chat_time + 12 * TICKS_PER_SECOND)
+			{
+				snprintf(text, sizeof(text), "after unmute from %s", machine);
+				network_chat_say(_chat_channel_everyone, text);
 				network_test.chat_lines_said++;
 			}
 		}

@@ -23,6 +23,15 @@ are, and the sender's own. A client shows only what the
 host sends, its own lines too, so every machine shows the same lines in the
 same order. A build without the chat drops both kinds as unknown: its
 players neither send nor see lines.
+
+The host may type "/mute <player> [minutes]" (5 when it gives none, a day
+at most) or "/unmute <player>", the player as the console's kick finds one
+(the whole name in either case, else the one it begins). It keeps the mute
+by the player's name, which then sends no line further than the host till
+the minutes are up (or the host unmutes it) and is told for how long; every
+machine is told of each mute and unmute, a line of the host's alone in the
+chat (_chat_line_notice_bit). A client's /mute is not sent: only the host
+mutes.
 */
 
 #include "cseries.h"
@@ -85,6 +94,14 @@ enum
 	CHAT_LINES_SHOWN_ANDROID = 4,
 	/* a key's Ctrl (struct key_stroke's modifier_flags: menu_functions.c's) */
 	CHAT_KEY_MODIFIER_CONTROL_BIT = 1,
+	/* the host's /mute: the minutes when it gives none, and the most (a day) */
+	CHAT_MUTE_DEFAULT_MINUTES = 5,
+	CHAT_MUTE_MAXIMUM_MINUTES = 1440,
+	CHAT_MILLISECONDS_PER_MINUTE = 60000,
+	/* the players muted at once */
+	CHAT_MAXIMUM_MUTES = MAXIMUM_TRACKED_PLAYERS,
+	/* (chat_name_match) a name more than one player's begins with */
+	CHAT_NAME_AMBIGUOUS = -2,
 };
 
 /* the line's flags */
@@ -94,15 +111,29 @@ enum
 	_chat_line_team_bit,
 	/* to those in the sender's vehicle alone */
 	_chat_line_vehicle_bit,
+	/* the host's notice (a mute's): its text alone, from no player */
+	_chat_line_notice_bit,
 };
 
 /* who a line is to (network_chat.h's _chat_channel_*) */
 
-/* a line's colour: its sender's team's */
+/* a line's colour: its sender's team's, or a notice's */
 enum
 {
 	_chat_color_red,
 	_chat_color_blue,
+	_chat_color_notice,
+};
+
+/* what a typed line asks (chat_command_parse) */
+enum
+{
+	/* nothing: it is said */
+	_chat_command_none,
+	_chat_command_mute,
+	_chat_command_unmute,
+	/* /mute or /unmute without a player, or a mute of no minutes */
+	_chat_command_usage,
 };
 
 /* ---------- structures */
@@ -127,6 +158,17 @@ struct chat_rate
 	short tokens;
 	/* (system_milliseconds) when the last token came, or the bucket was last full */
 	unsigned long refilled;
+};
+
+/* the host: a player muted, by name (one who leaves and joins again under
+it still is), till its minutes are up */
+struct chat_mute
+{
+	boolean active;
+	char name[CHAT_NAME_SIZE];
+	/* (system_milliseconds) */
+	unsigned long started;
+	unsigned long milliseconds;
 };
 
 /* a line shown */
@@ -160,6 +202,7 @@ static unsigned long chat_actions_held;
 
 /* the host's */
 static struct chat_rate chat_rates[MAXIMUM_CHAT_MACHINES];
+static struct chat_mute chat_mutes[CHAT_MAXIMUM_MUTES];
 
 /* each local player's motion sensor as last drawn (the window's units),
 and whether it has been */
@@ -299,6 +342,193 @@ static real chat_line_alpha(
 	return 1.0f - (real)(age - CHAT_LINE_MILLISECONDS) / (real)CHAT_FADE_MILLISECONDS;
 }
 
+static char chat_lower(
+	char character)
+{
+	return character >= 'A' && character <= 'Z' ? (char)(character - 'A' + 'a') : character;
+}
+
+/* what follows a command's word (lower case) at the start of a line, in
+either case, after its spaces; NULL when the line does not start with it
+(a word of its own: "/muted" is not "/mute") */
+static char const *chat_command_word(
+	char const *text,
+	char const *word)
+{
+	short index;
+
+	for (index = 0; word[index]; index++)
+	{
+		if (chat_lower(text[index]) != word[index])
+			return NULL;
+	}
+	if (text[index] && text[index] != ' ')
+		return NULL;
+	while (text[index] == ' ')
+		index++;
+	return text + index;
+}
+
+/* what a typed line (chat_text_clean's) asks: "/mute <player> [minutes]" or
+"/unmute <player>", the word in either case; the player's name as typed (at
+most name_size with its end: it may have spaces) and the minutes (a mute's
+last word when all digits after a name; CHAT_MUTE_DEFAULT_MINUTES when it
+gives none, CHAT_MUTE_MAXIMUM_MINUTES at most); _chat_command_none for any
+other line, said as it is */
+static short chat_command_parse(
+	char const *text,
+	char *name,
+	short name_size,
+	short *minutes)
+{
+	char const *rest;
+	short command;
+	short length;
+	short last_word;
+	short index;
+
+	name[0] = 0;
+	*minutes = CHAT_MUTE_DEFAULT_MINUTES;
+	if ((rest = chat_command_word(text, "/mute")) != NULL)
+		command = _chat_command_mute;
+	else if ((rest = chat_command_word(text, "/unmute")) != NULL)
+		command = _chat_command_unmute;
+	else
+		return _chat_command_none;
+	length = (short)csstrlen(rest);
+	for (last_word = length; last_word > 0 && rest[last_word - 1] != ' '; last_word--)
+		;
+	if (command == _chat_command_mute && last_word > 0 && last_word < length)
+	{
+		long typed_minutes = 0;
+
+		for (index = last_word; index < length && rest[index] >= '0' && rest[index] <= '9'; index++)
+			typed_minutes = MIN(typed_minutes * 10 + (rest[index] - '0'), (long)CHAT_MUTE_MAXIMUM_MINUTES);
+		if (index == length)
+		{
+			if (typed_minutes == 0)
+				return _chat_command_usage;
+			*minutes = (short)typed_minutes;
+			for (length = last_word; length > 0 && rest[length - 1] == ' '; length--)
+				;
+		}
+	}
+	for (index = 0; index < length && index < name_size - 1; index++)
+		name[index] = rest[index];
+	name[index] = 0;
+	return index ? command : _chat_command_usage;
+}
+
+/* the player a typed name means among the players' names (ASCII; "" where
+there is no player), as the console's kick and ban find one
+(network_server_manager.c): the one of that name, in either case, else the
+one whose name begins with it; NONE for none, CHAT_NAME_AMBIGUOUS for more
+than one */
+static short chat_name_match(
+	char const *typed,
+	char const (*names)[CHAT_NAME_SIZE],
+	short count)
+{
+	short exact_index = NONE;
+	short exact_count = 0;
+	short begins_index = NONE;
+	short begins_count = 0;
+	short index;
+
+	for (index = 0; typed[0] && index < count; index++)
+	{
+		char const *name = names[index];
+		short length;
+
+		/* (a name's end differs from any character typed: never read past it) */
+		for (length = 0; typed[length] && chat_lower(name[length]) == chat_lower(typed[length]); length++)
+			;
+		if (typed[length])
+			continue;
+		begins_index = index;
+		begins_count++;
+		if (!name[length])
+		{
+			exact_index = index;
+			exact_count++;
+		}
+	}
+	if (exact_count == 1)
+		return exact_index;
+	if (exact_count > 1 || begins_count > 1)
+		return CHAT_NAME_AMBIGUOUS;
+	return begins_index;
+}
+
+/* the minutes a mute has left at now (system_milliseconds), the one begun
+counted whole; 0 once it has run out, when it is let go */
+static short chat_mute_minutes_left(
+	struct chat_mute *mute,
+	unsigned long now)
+{
+	unsigned long elapsed = now - mute->started;
+
+	if (!mute->active)
+		return 0;
+	if (elapsed >= mute->milliseconds)
+	{
+		mute->active = FALSE;
+		return 0;
+	}
+	return (short)((mute->milliseconds - elapsed + CHAT_MILLISECONDS_PER_MINUTE - 1) / CHAT_MILLISECONDS_PER_MINUTE);
+}
+
+/* the mute of a player's name, while it runs; NULL */
+static struct chat_mute *chat_mute_find(
+	struct chat_mute *mutes,
+	short count,
+	char const *name,
+	unsigned long now)
+{
+	short index;
+
+	for (index = 0; index < count; index++)
+	{
+		if (chat_mute_minutes_left(&mutes[index], now) && !csstrcmp(mutes[index].name, name))
+			return &mutes[index];
+	}
+	return NULL;
+}
+
+/* a player's name muted for minutes from now: its mute again if it has one,
+else one run out; FALSE when every one is held */
+static boolean chat_mute_set(
+	struct chat_mute *mutes,
+	short count,
+	char const *name,
+	short minutes,
+	unsigned long now)
+{
+	struct chat_mute *mute = chat_mute_find(mutes, count, name, now);
+	short index;
+
+	for (index = 0; !mute && index < count; index++)
+	{
+		if (!chat_mute_minutes_left(&mutes[index], now))
+			mute = &mutes[index];
+	}
+	if (!mute)
+		return FALSE;
+	mute->active = TRUE;
+	csstrncpy(mute->name, name, CHAT_NAME_SIZE - 1);
+	mute->name[CHAT_NAME_SIZE - 1] = 0;
+	mute->started = now;
+	mute->milliseconds = (unsigned long)minutes * CHAT_MILLISECONDS_PER_MINUTE;
+	return TRUE;
+}
+
+/* the minutes in a notice: "5 minutes", "1 minute" */
+static char const *chat_minutes_plural(
+	short minutes)
+{
+	return minutes == 1 ? "" : "s";
+}
+
 /* ---------- the lines */
 
 static boolean chat_network_game(
@@ -309,6 +539,38 @@ static boolean chat_network_game(
 	return connection == _game_connection_network_client || connection == _game_connection_network_server;
 }
 
+/* a player's name in ASCII ("?" for what is not), as debug.txt and /mute
+have it */
+static void chat_player_name_ascii(
+	struct player_datum const *player,
+	char *name)
+{
+	short index;
+
+	for (index = 0; index < CHAT_NAME_SIZE - 1 && index < (short)NUMBEROF(player->name) && player->name[index];
+		index++)
+	{
+		name[index] = player_name_character_ascii(player->name[index]);
+	}
+	name[index] = 0;
+}
+
+/* the newest line, cleared (the oldest gives way) */
+static struct chat_line *chat_new_line(
+	char const *text)
+{
+	struct chat_line *line;
+
+	chat_newest_line = (short)((chat_newest_line + 1) % CHAT_MAXIMUM_LINES);
+	if (chat_line_count < CHAT_MAXIMUM_LINES)
+		chat_line_count++;
+	line = &chat_lines[chat_newest_line];
+	csmemset(line, 0, sizeof(*line));
+	csstrncpy(line->text, text, CHAT_TEXT_SIZE - 1);
+	line->time = system_milliseconds();
+	return line;
+}
+
 /* a line shown, from a player (absolute index) */
 static void chat_add_line(
 	short player_index,
@@ -317,34 +579,34 @@ static void chat_add_line(
 {
 	struct player_datum *player = distributed_player(player_index);
 	struct chat_line *line;
+	char name[CHAT_NAME_SIZE];
 	short index;
 
 	if (!player)
 		return;
-	chat_newest_line = (short)((chat_newest_line + 1) % CHAT_MAXIMUM_LINES);
-	if (chat_line_count < CHAT_MAXIMUM_LINES)
-		chat_line_count++;
-	line = &chat_lines[chat_newest_line];
-	csmemset(line, 0, sizeof(*line));
+	line = chat_new_line(text);
 	for (index = 0; index < CHAT_NAME_SIZE - 1 && index < (short)NUMBEROF(player->name) && player->name[index];
 		index++)
 	{
 		line->name[index] = player->name[index];
 	}
-	csstrncpy(line->text, text, CHAT_TEXT_SIZE - 1);
 	line->color = game_engine_has_teams() && player->team_index == 0 ? _chat_color_red : _chat_color_blue;
 	line->channel = channel;
-	line->time = system_milliseconds();
 	/* (debug.txt has the lines, in ASCII) */
-	{
-		char name[CHAT_NAME_SIZE];
+	chat_player_name_ascii(player, name);
+	error(_error_log, "chat%s: %s: %s", channel == _chat_channel_team ? " (team)" :
+		channel == _chat_channel_vehicle ? " (vehicle)" : "", name, line->text);
+}
 
-		for (index = 0; line->name[index]; index++)
-			name[index] = player_name_character_ascii(line->name[index]);
-		name[index] = 0;
-		error(_error_log, "chat%s: %s: %s", channel == _chat_channel_team ? " (team)" :
-			channel == _chat_channel_vehicle ? " (vehicle)" : "", name, line->text);
-	}
+/* a notice shown (the host's): its text alone */
+static void chat_add_notice(
+	char const *text)
+{
+	struct chat_line *line = chat_new_line(text);
+
+	line->color = _chat_color_notice;
+	line->channel = _chat_channel_everyone;
+	error(_error_log, "chat notice: %s", line->text);
 }
 
 /* ---------- the host */
@@ -441,6 +703,104 @@ static void chat_host_send(
 	}
 }
 
+/* (the host) a notice to a client machine; or (NONE) to every one, and
+shown here */
+static void chat_host_notice(
+	long machine_index,
+	char const *text)
+{
+	long machine_indices[MAXIMUM_CHAT_MACHINES];
+	short count;
+	struct
+	{
+		struct distributed_message_header header;
+		struct distributed_chat_line line;
+	} message;
+	short index;
+
+	csmemset(&message, 0, sizeof(message));
+	message.line.flags = (byte)FLAG(_chat_line_notice_bit);
+	csstrncpy(message.line.text, text, CHAT_TEXT_SIZE - 1);
+	if (machine_index != NONE)
+	{
+		distributed_send_to_machine_reliably(machine_index, &message, _distributed_message_chat_down, 1,
+			(word)sizeof(message));
+		return;
+	}
+	count = distributed_client_machines(machine_indices, MAXIMUM_CHAT_MACHINES);
+	for (index = 0; index < count; index++)
+	{
+		distributed_send_to_machine_reliably(machine_indices[index], &message, _distributed_message_chat_down, 1,
+			(word)sizeof(message));
+	}
+	chat_add_notice(text);
+}
+
+/* (the host) its player's /mute or /unmute: the player named muted for the
+minutes, or let speak again, every machine told; what is wrong with it shown
+to the host alone; FALSE for a line that is no command (said as it is) */
+static boolean chat_host_command(
+	short speaker_index,
+	char const *text)
+{
+	char typed[CHAT_TEXT_SIZE];
+	char names[MAXIMUM_TRACKED_PLAYERS][CHAT_NAME_SIZE];
+	char notice[2 * CHAT_TEXT_SIZE];
+	unsigned long now = system_milliseconds();
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct chat_mute *mute;
+	short minutes;
+	short command = chat_command_parse(text, typed, sizeof(typed), &minutes);
+	short found;
+
+	if (command == _chat_command_none)
+		return FALSE;
+	if (command == _chat_command_usage)
+	{
+		chat_add_notice("Say /mute <player> [minutes] or /unmute <player>");
+		return TRUE;
+	}
+	csmemset(names, 0, sizeof(names));
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		short index = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+
+		if (!player->quit_out_of_game && index >= 0 && index < MAXIMUM_TRACKED_PLAYERS)
+			chat_player_name_ascii(player, names[index]);
+	}
+	found = chat_name_match(typed, (char const (*)[CHAT_NAME_SIZE])names, MAXIMUM_TRACKED_PLAYERS);
+	if (found == NONE)
+		snprintf(notice, sizeof(notice), "No player's name begins with \"%s\"", typed);
+	else if (found == CHAT_NAME_AMBIGUOUS)
+		snprintf(notice, sizeof(notice), "More than one player's name begins with \"%s\"", typed);
+	else if (found == speaker_index)
+		snprintf(notice, sizeof(notice), "You can't %s yourself", command == _chat_command_mute ? "mute" : "unmute");
+	else if (command == _chat_command_mute)
+	{
+		if (chat_mute_set(chat_mutes, NUMBEROF(chat_mutes), names[found], minutes, now))
+		{
+			snprintf(notice, sizeof(notice), "%s muted for %d minute%s", names[found], minutes,
+				chat_minutes_plural(minutes));
+			chat_host_notice(NONE, notice);
+			return TRUE;
+		}
+		snprintf(notice, sizeof(notice), "Too many players are muted");
+	}
+	else if ((mute = chat_mute_find(chat_mutes, NUMBEROF(chat_mutes), names[found], now)) != NULL)
+	{
+		mute->active = FALSE;
+		snprintf(notice, sizeof(notice), "%s unmuted", names[found]);
+		chat_host_notice(NONE, notice);
+		return TRUE;
+	}
+	else
+		snprintf(notice, sizeof(notice), "%s isn't muted", names[found]);
+	chat_add_notice(notice);
+	return TRUE;
+}
+
 void network_chat_handle_up(
 	long machine_index,
 	void const *entries,
@@ -448,6 +808,10 @@ void network_chat_handle_up(
 {
 	struct distributed_chat_line line;
 	char text[CHAT_TEXT_SIZE];
+	char name[CHAT_NAME_SIZE];
+	struct player_datum *sender;
+	struct chat_mute *mute;
+	unsigned long now = system_milliseconds();
 
 	if (!chat_host() || machine_index < 0 || machine_index >= MAXIMUM_CHAT_MACHINES || !from_stream)
 		return;
@@ -455,9 +819,21 @@ void network_chat_handle_up(
 	/* (one of the machine's own players; then counted, and its text) */
 	if (line.player_index >= MAXIMUM_TRACKED_PLAYERS ||
 		!distributed_machine_has_player(machine_index, line.player_index) ||
-		!chat_rate_take(&chat_rates[machine_index], system_milliseconds()) ||
-		!chat_text_clean(text, line.text, CHAT_TEXT_SIZE))
+		!chat_rate_take(&chat_rates[machine_index], now) ||
+		!chat_text_clean(text, line.text, CHAT_TEXT_SIZE) ||
+		(sender = distributed_player(line.player_index)) == NULL)
 	{
+		return;
+	}
+	/* (a muted player's line goes no further: they are told for how long) */
+	chat_player_name_ascii(sender, name);
+	if ((mute = chat_mute_find(chat_mutes, NUMBEROF(chat_mutes), name, now)) != NULL)
+	{
+		short minutes = chat_mute_minutes_left(mute, now);
+		char notice[CHAT_TEXT_SIZE];
+
+		snprintf(notice, sizeof(notice), "You are muted for %d more minute%s", minutes, chat_minutes_plural(minutes));
+		chat_host_notice(machine_index, notice);
 		return;
 	}
 	chat_host_send(line.player_index, chat_channel_from_flags(line.flags), text);
@@ -480,7 +856,14 @@ void network_chat_handle_down(
 	if (game_connection() != _game_connection_network_client)
 		return;
 	csmemcpy(&line, entries, sizeof(line));
-	if (distributed_player_from_byte(line.player_index) == NONE || !chat_text_clean(text, line.text, CHAT_TEXT_SIZE))
+	if (!chat_text_clean(text, line.text, CHAT_TEXT_SIZE))
+		return;
+	if (TEST_FLAG(line.flags, _chat_line_notice_bit))
+	{
+		chat_add_notice(text);
+		return;
+	}
+	if (distributed_player_from_byte(line.player_index) == NONE)
 		return;
 	chat_add_line(line.player_index, chat_channel_from_flags(line.flags), text);
 }
@@ -502,13 +885,21 @@ static void chat_send(
 	char const *typed)
 {
 	char text[CHAT_TEXT_SIZE];
+	char name[CHAT_TEXT_SIZE];
+	short minutes;
 	short player_index = chat_speaker();
 
 	if (player_index == NONE || !chat_text_clean(text, typed, CHAT_TEXT_SIZE))
 		return;
 	if (chat_host())
 	{
-		chat_host_send(player_index, channel, text);
+		if (!chat_host_command(player_index, text))
+			chat_host_send(player_index, channel, text);
+	}
+	/* (the host's alone: a client's is not sent) */
+	else if (chat_command_parse(text, name, sizeof(name), &minutes) != _chat_command_none)
+	{
+		chat_add_notice("Only the host can mute players");
 	}
 	else
 	{
@@ -664,7 +1055,7 @@ static boolean chat_style_white(
 	return white;
 }
 
-/* a name's colour: its team's, or white */
+/* a name's colour: its team's (a notice's a pale gold), or white */
 static void chat_color(
 	short color,
 	real alpha,
@@ -680,6 +1071,12 @@ static void chat_color(
 		result->red = 0.86f;
 		result->green = 0.32f;
 		result->blue = 0.28f;
+	}
+	else if (color == _chat_color_notice)
+	{
+		result->red = 0.93f;
+		result->green = 0.82f;
+		result->blue = 0.45f;
 	}
 	else
 	{
@@ -895,8 +1292,17 @@ void network_chat_draw(
 		/* (the older ones have faded too) */
 		if (alpha <= 0.0f)
 			break;
-		chat_line_name(line, name, NUMBEROF(name));
-		chat_line_text(line->text, text, NUMBEROF(text));
+		/* (a notice's text alone, in the name's place) */
+		if (line->color == _chat_color_notice)
+		{
+			chat_line_text(line->text, name, NUMBEROF(name));
+			text[0] = 0;
+		}
+		else
+		{
+			chat_line_name(line, name, NUMBEROF(name));
+			chat_line_text(line->text, text, NUMBEROF(text));
+		}
 		bounds.x0 = left;
 		bounds.x1 = window.x1;
 		bounds.y0 = step < 0 ? (short)(edge - line_height) : edge;

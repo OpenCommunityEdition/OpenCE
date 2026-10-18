@@ -699,6 +699,16 @@ The host sends each line on: a player of an older build does not see the
 lines and cannot send them. The host takes 5 lines at once from a machine,
 then one each 1.5 seconds.
 
+The host can mute a player's text chat: type `/mute <player> <minutes>` in
+the chat, as `/mute Milenko 5` (5 minutes when you give none, 1440 at
+most). The player is found as the console's `kick` finds one: the whole
+name in either case, else the one player whose name begins with what you
+typed. All the players see "Milenko muted for 5 minutes". The muted
+player's lines go to no one, and they see how many minutes are left. The
+mute ends when its minutes are up, or with `/unmute <player>`. A player
+who leaves and joins again under the same name is still muted. Only the
+host mutes: a player's `/mute` is not sent.
+
 ### Voice chat
 
 Network games have voice chat, on the local network and on the internet.

@@ -294,6 +294,14 @@ of, so any map's vehicles), as the host has them; the sender's machine gets
 its own line whatever it is. The host shows it itself if one of its own
 players hears it or said it. A client shows only
 the host's lines, its own too, so every machine shows them in one order.
+The host's own `/mute <player> [minutes]` and `/unmute <player>` are
+commands, not lines: it keeps a mute by the player's name (in ASCII) and
+its minutes by its own clock, drops the lines of a muted player's machine
+when they come up, and sends that machine alone a notice of the minutes
+left; it tells every machine of each mute and unmute. A notice is a down
+line with `_chat_line_notice_bit` set, its text alone (no sender). A
+client's `/mute` is never sent, and the host takes the text of a line that
+came up as a line, never a command.
 Builds without the chat drop both kinds as unknown, so the network version
 is unchanged.
 
@@ -752,8 +760,10 @@ swap the bots' wandering does not reach (`debug.network_test_pickup_weapon`
 picks the weapon: the first whose tag name has it in it, as "sniper"),
 `debug.network_test_chat` has each machine's player say a chat line to
 everyone, one to the team and one to the vehicle (the host seats the last
-two players in one first), which every machine's `debug.txt` records as
-it shows them, and `debug.network_test_score`
+two players in one first), then the host mutes the last player for a
+minute, each says a line, the host unmutes them and each says another,
+which every machine's `debug.txt` records as
+it shows them (the notices as `chat notice:`), and `debug.network_test_score`
 shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's
 button on the scores does). `debug.network_test_public` lists the host's

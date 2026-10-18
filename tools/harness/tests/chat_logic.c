@@ -3,15 +3,18 @@ CHAT_LOGIC.C (test)
 
 The rules of port/linux/game/network_chat.c's text chat: what a line's text
 may hold (another machine's is untrusted), how many lines the host takes
-from a machine, who hears a team's line, and how long a line shows.
-test_chat_logic.py takes the constants and structures (config.inc) and the
-code (under_test.inc).
+from a machine, who hears a team's line, how long a line shows, and the
+host's /mute (what it reads from a line, the player a name means, how long a
+mute lasts). test_chat_logic.py takes the constants and structures
+(config.inc) and the code (under_test.inc).
 */
 
 #include "harness.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define csstrlen strlen
+#define csstrcmp strcmp
+#define csstrncpy strncpy
 
 #include "config.inc"
 #include "under_test.inc"
@@ -164,6 +167,174 @@ int main(int argc, char **argv)
 			chat_line_alpha(CHAT_LINE_MILLISECONDS + CHAT_FADE_MILLISECONDS / 2, FALSE) < 0.6f, "not half way");
 		CHECK(chat_line_alpha(CHAT_LINE_MILLISECONDS + CHAT_FADE_MILLISECONDS, FALSE) == 0.0f, "still shown");
 		CHECK(chat_line_alpha(10 * CHAT_LINE_MILLISECONDS, TRUE) == 1.0f, "faded while typing");
+	}
+
+	/* /mute: the player (a name of more than one word too) and the minutes,
+	the word in either case; the default when it gives none, a day at most;
+	the name cut to its buffer */
+	CASE("command-mute")
+	{
+		struct
+		{
+			char name[8];
+			char canary[64];
+		} bounded;
+		char name[CHAT_TEXT_SIZE];
+		short minutes = 0;
+
+		CHECK(chat_command_parse("/mute Milenko 5", name, sizeof(name), &minutes) == _chat_command_mute,
+			"not a mute");
+		CHECK(!strcmp(name, "Milenko") && minutes == 5, "'%s' %d", name, minutes);
+		CHECK(chat_command_parse("/MUTE Master Chief   12", name, sizeof(name), &minutes) == _chat_command_mute,
+			"not a mute in capitals");
+		CHECK(!strcmp(name, "Master Chief") && minutes == 12, "'%s' %d", name, minutes);
+		CHECK(chat_command_parse("/mute jonas", name, sizeof(name), &minutes) == _chat_command_mute &&
+			!strcmp(name, "jonas") && minutes == CHAT_MUTE_DEFAULT_MINUTES, "'%s' %d", name, minutes);
+		/* (a name all digits, alone, is the name) */
+		CHECK(chat_command_parse("/mute 1337", name, sizeof(name), &minutes) == _chat_command_mute &&
+			!strcmp(name, "1337") && minutes == CHAT_MUTE_DEFAULT_MINUTES, "'%s' %d", name, minutes);
+		/* (a last word not all digits is the name's) */
+		CHECK(chat_command_parse("/mute agent 47b", name, sizeof(name), &minutes) == _chat_command_mute &&
+			!strcmp(name, "agent 47b") && minutes == CHAT_MUTE_DEFAULT_MINUTES, "'%s' %d", name, minutes);
+		CHECK(chat_command_parse("/mute x 99999999999999999999", name, sizeof(name), &minutes) == _chat_command_mute &&
+			minutes == CHAT_MUTE_MAXIMUM_MINUTES, "%d minutes", minutes);
+		memset(&bounded, 'Z', sizeof(bounded));
+		chat_command_parse("/mute averyveryverylongname 3", bounded.name, sizeof(bounded.name), &minutes);
+		CHECK(bounded.canary[0] == 'Z' && strlen(bounded.name) == sizeof(bounded.name) - 1, "the name overran: '%s'",
+			bounded.name);
+	}
+
+	CASE("command-unmute")
+	{
+		char name[CHAT_TEXT_SIZE];
+		short minutes = 0;
+
+		CHECK(chat_command_parse("/unmute Milenko", name, sizeof(name), &minutes) == _chat_command_unmute &&
+			!strcmp(name, "Milenko"), "'%s'", name);
+		/* (an unmute takes no minutes: a last word of digits is the name's) */
+		CHECK(chat_command_parse("/Unmute Milenko 5", name, sizeof(name), &minutes) == _chat_command_unmute &&
+			!strcmp(name, "Milenko 5"), "'%s'", name);
+	}
+
+	/* any other line is said as it is */
+	CASE("command-not")
+	{
+		char name[CHAT_TEXT_SIZE];
+		short minutes = 0;
+
+		CHECK(chat_command_parse("/muted Milenko", name, sizeof(name), &minutes) == _chat_command_none, "/muted");
+		CHECK(chat_command_parse("/mutex", name, sizeof(name), &minutes) == _chat_command_none, "/mutex");
+		CHECK(chat_command_parse("mute Milenko 5", name, sizeof(name), &minutes) == _chat_command_none, "no slash");
+		CHECK(chat_command_parse("hi /mute x", name, sizeof(name), &minutes) == _chat_command_none, "within a line");
+		CHECK(chat_command_parse("/mut", name, sizeof(name), &minutes) == _chat_command_none, "/mut");
+		CHECK(chat_command_parse("", name, sizeof(name), &minutes) == _chat_command_none, "nothing");
+	}
+
+	/* without a player, or for no minutes: how to say it */
+	CASE("command-usage")
+	{
+		char name[CHAT_TEXT_SIZE];
+		short minutes = 0;
+
+		CHECK(chat_command_parse("/mute", name, sizeof(name), &minutes) == _chat_command_usage, "/mute alone");
+		CHECK(chat_command_parse("/unmute", name, sizeof(name), &minutes) == _chat_command_usage, "/unmute alone");
+		CHECK(chat_command_parse("/mute Milenko 0", name, sizeof(name), &minutes) == _chat_command_usage,
+			"a mute of no minutes");
+		CHECK(chat_command_parse("/mute Milenko 000", name, sizeof(name), &minutes) == _chat_command_usage,
+			"a mute of no minutes");
+	}
+
+	/* the whole name in either case first, else the one it begins; none,
+	or more than one */
+	CASE("name-match")
+	{
+		static char const names[6][CHAT_NAME_SIZE] = { "Milenko", "", "Mil", "jonas", "Jonathan", "Bob" };
+
+		CHECK(chat_name_match("Milenko", names, 6) == 0, "the whole name: %d", chat_name_match("Milenko", names, 6));
+		CHECK(chat_name_match("milenko", names, 6) == 0, "in lower case");
+		CHECK(chat_name_match("mil", names, 6) == 2, "the whole name before one it begins: %d",
+			chat_name_match("mil", names, 6));
+		CHECK(chat_name_match("mile", names, 6) == 0, "the one it begins: %d", chat_name_match("mile", names, 6));
+		CHECK(chat_name_match("jon", names, 6) == CHAT_NAME_AMBIGUOUS, "two names begin with it: %d",
+			chat_name_match("jon", names, 6));
+		CHECK(chat_name_match("JONAS", names, 6) == 3, "the whole name over one it begins");
+		CHECK(chat_name_match("Alice", names, 6) == NONE, "no such player");
+		CHECK(chat_name_match("", names, 6) == NONE, "no name");
+	}
+
+	/* a name longer than any player's means none (never read past a name) */
+	CASE("name-bounds")
+	{
+		static char const names[2][CHAT_NAME_SIZE] = { "Bob", "Bobby" };
+
+		CHECK(chat_name_match("Bobbyyyyyyyyyyyyyyyyyy", names, 2) == NONE, "a longer name matched");
+		CHECK(chat_name_match("Bobb", names, 2) == 1, "%d", chat_name_match("Bobb", names, 2));
+	}
+
+	/* a mute's minutes, the one begun counted whole, then none; let go */
+	CASE("mute-time")
+	{
+		struct chat_mute mutes[2];
+		unsigned long now = 1000;
+
+		memset(mutes, 0, sizeof(mutes));
+		CHECK(chat_mute_set(mutes, 2, "Milenko", 5, now), "not muted");
+		CHECK(chat_mute_find(mutes, 2, "Milenko", now) != NULL, "not found");
+		CHECK(chat_mute_find(mutes, 2, "milenko", now) == NULL, "found by another name");
+		CHECK(chat_mute_minutes_left(&mutes[0], now) == 5, "%d", chat_mute_minutes_left(&mutes[0], now));
+		CHECK(chat_mute_minutes_left(&mutes[0], now + 1) == 5, "%d", chat_mute_minutes_left(&mutes[0], now + 1));
+		CHECK(chat_mute_minutes_left(&mutes[0], now + CHAT_MILLISECONDS_PER_MINUTE) == 4, "%d",
+			chat_mute_minutes_left(&mutes[0], now + CHAT_MILLISECONDS_PER_MINUTE));
+		CHECK(chat_mute_minutes_left(&mutes[0], now + 5 * CHAT_MILLISECONDS_PER_MINUTE - 1) == 1, "the last minute");
+		CHECK(chat_mute_find(mutes, 2, "Milenko", now + 5 * CHAT_MILLISECONDS_PER_MINUTE) == NULL, "still muted");
+		CHECK(!mutes[0].active, "not let go");
+		CHECK(!strcmp(chat_minutes_plural(1), "") && !strcmp(chat_minutes_plural(2), "s"), "plurals");
+	}
+
+	/* the clock wrapping round (system_milliseconds) changes nothing */
+	CASE("mute-wrap")
+	{
+		struct chat_mute mute;
+		unsigned long now = 0xFFFFFFFFUL - 1000;
+
+		memset(&mute, 0, sizeof(mute));
+		chat_mute_set(&mute, 1, "Milenko", 1, now);
+		CHECK(chat_mute_minutes_left(&mute, now + 2000) == 1, "ended across the wrap");
+		CHECK(chat_mute_minutes_left(&mute, now + CHAT_MILLISECONDS_PER_MINUTE) == 0, "not ended across the wrap");
+	}
+
+	/* muting a player again sets their minutes again, in the one mute */
+	CASE("mute-again")
+	{
+		struct chat_mute mutes[3];
+		unsigned long now = 1000;
+		int index;
+		int held = 0;
+
+		memset(mutes, 0, sizeof(mutes));
+		chat_mute_set(mutes, 3, "Milenko", 5, now);
+		chat_mute_set(mutes, 3, "Milenko", 1, now + 1000);
+		for (index = 0; index < 3; index++)
+			held += mutes[index].active;
+		CHECK(held == 1, "%d mutes held for one player", held);
+		CHECK(chat_mute_minutes_left(chat_mute_find(mutes, 3, "Milenko", now + 1000), now + 1000) == 1,
+			"the minutes not set again");
+	}
+
+	/* every mute held: no other player's mute ends early to make room;
+	one run out is taken again */
+	CASE("mute-full")
+	{
+		struct chat_mute mutes[2];
+		unsigned long now = 1000;
+
+		memset(mutes, 0, sizeof(mutes));
+		CHECK(chat_mute_set(mutes, 2, "a", 10, now) && chat_mute_set(mutes, 2, "b", 1, now), "not muted");
+		CHECK(!chat_mute_set(mutes, 2, "c", 5, now), "a third mute taken from two");
+		CHECK(chat_mute_find(mutes, 2, "a", now) && chat_mute_find(mutes, 2, "b", now), "a mute let go early");
+		CHECK(chat_mute_set(mutes, 2, "c", 5, now + CHAT_MILLISECONDS_PER_MINUTE), "the run out mute not taken");
+		CHECK(chat_mute_find(mutes, 2, "a", now + CHAT_MILLISECONDS_PER_MINUTE) &&
+			chat_mute_find(mutes, 2, "c", now + CHAT_MILLISECONDS_PER_MINUTE), "the wrong mute taken");
 	}
 
 	return 0;
