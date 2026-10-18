@@ -15,7 +15,10 @@ where the two differ:
 - memory: the guest's mappings are pages of the pools (host_guest_allocate),
   already in the VM.
 
-Guest addresses become host ones with host_guest_pointer.
+Guest addresses become host ones with host_guest_pointer, and each buffer
+the guest passes is checked first (outside): one that reaches outside the
+guest's memory fails with EFAULT, as on Linux, instead of reaching the
+host's own memory past the guest's 4 GB.
 */
 
 #include "host.h"
@@ -226,12 +229,33 @@ struct guest_rlimit64
 
 #define GUEST(type, value) ((type)host_guest_pointer((uint32_t)(value)))
 
+/* whether all `size` bytes at guest `address` are mapped guest memory */
+static int in_guest_memory(uint64_t address, uint64_t size)
+{
+	return address < 0x100000000ULL && size <= 0x100000000ULL - address &&
+		opence_guest_host_pointer(host_guest, (uint32_t)address, size) != NULL;
+}
+
+/* whether a buffer the guest passes, `size` bytes at `address`, reaches
+outside its memory (an empty one never does). A bug in the guest's code
+that a map file or a packet sets off must not become a write to the
+host's memory. (Paths, which are only read, up to their NUL, are not
+checked) */
+static int outside(uint64_t address, uint64_t size)
+{
+	return size && !in_guest_memory(address, size);
+}
+
+/* 1 with the time in *result, 0 for none (NULL), -1 if it is outside the
+guest's memory */
 static int timespec_in(uint64_t address, struct timespec *result)
 {
 	const struct guest_timespec *value = GUEST(const struct guest_timespec *, address);
 
 	if (!value)
 		return 0;
+	if (outside(address, sizeof(*value)))
+		return -1;
 	result->tv_sec = value->seconds;
 	result->tv_nsec = value->nanoseconds;
 	return 1;
@@ -241,7 +265,7 @@ static void timespec_out(uint64_t address, const struct timespec *value)
 {
 	struct guest_timespec *result = GUEST(struct guest_timespec *, address);
 
-	if (!result)
+	if (!result || outside(address, sizeof(*result)))
 		return;
 	result->seconds = (int32_t)value->tv_sec;
 	result->nanoseconds = (int32_t)value->tv_nsec;
@@ -382,8 +406,12 @@ static long long vector_io(int fd, uint64_t vector, int count, int64_t offset, i
 
 	if (count < 0 || count > 64)
 		return LINUX(22);
+	if (outside(vector, (uint64_t)count * sizeof(*guest_vector)))
+		return LINUX(14);
 	for (index = 0; index < count; index++)
 	{
+		if (outside(guest_vector[index].base, guest_vector[index].length))
+			return LINUX(14);
 		host_vector[index].iov_base = host_guest_pointer(guest_vector[index].base);
 		host_vector[index].iov_len = guest_vector[index].length;
 	}
@@ -421,6 +449,8 @@ static long long getdents64(int fd, uint64_t buffer_address, uint32_t size)
 
 	if (fd < 0 || fd >= DIRECTORY_STREAMS)
 		return LINUX(9);
+	if (outside(buffer_address, size))
+		return LINUX(14);
 	pthread_mutex_lock(&directory_lock);
 	stream = directory_streams[fd];
 	if (!stream)
@@ -469,11 +499,6 @@ static long long getdents64(int fd, uint64_t buffer_address, uint32_t size)
 }
 
 /* ---------- memory: pages of the guest's pools, already in the VM */
-
-static int in_guest_memory(uint64_t address, uint64_t size)
-{
-	return address + size <= 0x100000000ULL && opence_guest_host_pointer(host_guest, (uint32_t)address, size) != NULL;
-}
 
 static long long guest_mmap(uint64_t address, uint64_t size, int protection, long long flags, int fd, int64_t offset)
 {
@@ -535,16 +560,21 @@ static long long guest_futex(uint64_t address, long long operation, uint32_t val
 	struct timespec wait;
 
 	(void)address2;
+	if (!word || outside(address, sizeof(*word)))
+		return LINUX(14);
 	switch (command)
 	{
 	case LINUX_FUTEX_WAIT:
 	case LINUX_FUTEX_WAIT_BITSET:
 	{
-		int result;
+		int result, timed;
 
 		if (__atomic_load_n(word, __ATOMIC_SEQ_CST) != value)
 			return LINUX(11);
-		if (timespec_in(timeout, &wait))
+		timed = timespec_in(timeout, &wait);
+		if (timed < 0)
+			return LINUX(14);
+		if (timed)
 		{
 			uint64_t nanoseconds;
 
@@ -605,7 +635,7 @@ static long long guest_clock_nanosleep(long long clock, long long flags, uint64_
 
 	if (host_clock < 0)
 		return LINUX(22);
-	if (!timespec_in(request_address, &request))
+	if (timespec_in(request_address, &request) <= 0)
 		return LINUX(14);
 	if (flags & LINUX_TIMER_ABSTIME)
 	{
@@ -644,12 +674,20 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	switch (number)
 	{
 	case __NR_read:
+		if (outside((uint64_t)b, (uint32_t)c))
+			return LINUX(14);
 		return result_of(read((int)a, GUEST(void *, b), (size_t)(uint32_t)c));
 	case __NR_write:
+		if (outside((uint64_t)b, (uint32_t)c))
+			return LINUX(14);
 		return result_of(write((int)a, GUEST(const void *, b), (size_t)(uint32_t)c));
 	case __NR_pread64:
+		if (outside((uint64_t)b, (uint32_t)c))
+			return LINUX(14);
 		return result_of(pread((int)a, GUEST(void *, b), (size_t)(uint32_t)c, d));
 	case __NR_pwrite64:
+		if (outside((uint64_t)b, (uint32_t)c))
+			return LINUX(14);
 		return result_of(pwrite((int)a, GUEST(const void *, b), (size_t)(uint32_t)c, d));
 	case __NR_readv:
 		return vector_io((int)a, (uint64_t)b, (int)c, 0, 0, 0);
@@ -696,6 +734,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	{
 		struct stat information;
 
+		if (outside((uint64_t)b, sizeof(struct guest_kstat)))
+			return LINUX(14);
 		if (fstat((int)a, &information) == -1)
 			return result_of(-1);
 		kstat_out((uint64_t)b, &information);
@@ -707,6 +747,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		const char *path = GUEST(const char *, b);
 		int result;
 
+		if (outside((uint64_t)c, sizeof(struct guest_kstat)))
+			return LINUX(14);
 		if ((d & LINUX_AT_EMPTY_PATH) && (!path || !*path))
 			result = fstat(directory_fd(a), &information);
 		else
@@ -739,6 +781,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	{
 		char *buffer = GUEST(char *, a);
 
+		if (!buffer || outside((uint64_t)a, (uint32_t)b))
+			return LINUX(14);
 		if (!getcwd(buffer, (size_t)(uint32_t)b))
 			return result_of(-1);
 		return (long long)strlen(buffer) + 1;
@@ -746,6 +790,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	case __NR_chdir:
 		return result_of(chdir(GUEST(const char *, a)));
 	case __NR_readlinkat:
+		if (outside((uint64_t)c, (uint32_t)d))
+			return LINUX(14);
 		return result_of(readlinkat(directory_fd(a), GUEST(const char *, b), GUEST(char *, c), (size_t)(uint32_t)d));
 	case __NR_faccessat:
 		return result_of(faccessat(directory_fd(a), GUEST(const char *, b), (int)c, (d & LINUX_AT_EACCESS) ? AT_EACCESS : 0));
@@ -763,6 +809,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	{
 		int *fds = GUEST(int *, a);
 
+		if (!fds || outside((uint64_t)a, 2 * sizeof(*fds)))
+			return LINUX(14);
 		if (pipe(fds) == -1)
 			return result_of(-1);
 		if (b & LINUX_O_CLOEXEC)
@@ -780,9 +828,11 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	case __NR_ppoll:
 	{
 		struct timespec timeout;
-		int milliseconds = -1;
+		int milliseconds = -1, timed = timespec_in((uint64_t)c, &timeout);
 
-		if (timespec_in((uint64_t)c, &timeout))
+		if (timed < 0 || outside((uint64_t)a, (uint64_t)(uint32_t)b * sizeof(struct pollfd)))
+			return LINUX(14);
+		if (timed)
 			milliseconds = (int)(timeout.tv_sec * 1000 + timeout.tv_nsec / 1000000);
 		/* (struct pollfd and the POLL* bits are the same on both) */
 		return result_of(poll(GUEST(struct pollfd *, a), (nfds_t)(uint32_t)b, milliseconds));
@@ -793,6 +843,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		const struct guest_timespec *guest_times = GUEST(const struct guest_timespec *, c);
 		int index;
 
+		if (guest_times && outside((uint64_t)c, 2 * sizeof(*guest_times)))
+			return LINUX(14);
 		for (index = 0; guest_times && index < 2; index++)
 		{
 			times[index].tv_sec = guest_times[index].seconds;
@@ -820,6 +872,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		struct guest_timespec *result = GUEST(struct guest_timespec *, a);
 
 		clock_gettime(CLOCK_REALTIME, &value);
+		if (result && outside((uint64_t)a, sizeof(*result)))
+			return LINUX(14);
 		if (result)
 		{
 			result->seconds = (int32_t)value.tv_sec;
@@ -874,6 +928,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		sched_yield();
 		return 0;
 	case __NR_getrandom:
+		if (outside((uint64_t)a, (uint32_t)b))
+			return LINUX(14);
 		arc4random_buf(GUEST(void *, a), (size_t)(uint32_t)b);
 		return (uint32_t)b;
 	case __NR_kill:
@@ -888,6 +944,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		host_fatal("the guest raised signal %d", signal_number);
 	}
 	case __NR_rt_sigprocmask:
+		if (c && d > 0 && outside((uint64_t)c, (uint32_t)d))
+			return LINUX(14);
 		if (c && d > 0)
 			memset(GUEST(void *, c), 0, (size_t)(uint32_t)d);
 		return 0;
@@ -902,6 +960,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		const char *fields[6];
 		int index;
 
+		if (!result || outside((uint64_t)a, 6 * 65))
+			return LINUX(14);
 		if (uname(&information) == -1)
 			return result_of(-1);
 		fields[0] = information.sysname;
@@ -919,6 +979,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	{
 		struct guest_rlimit64 *old_limit = GUEST(struct guest_rlimit64 *, d);
 
+		if (old_limit && outside((uint64_t)d, sizeof(*old_limit)))
+			return LINUX(14);
 		if (old_limit)
 		{
 			old_limit->current = ~0ULL;

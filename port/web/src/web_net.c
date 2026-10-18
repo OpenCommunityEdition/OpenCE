@@ -48,6 +48,10 @@ with), the desktop's link handler, Discord.
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef __APPLE__
+/* (getentropy, for tools/test_web_build.py's native build on a Mac) */
+#include <sys/random.h>
+#endif
 
 #include "posix.h"
 

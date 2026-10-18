@@ -115,6 +115,18 @@ int main(int argc, char **argv)
 	fd = host_syscall(__NR_openat, -100, 0x1000, 02000, 0, 0, 0);
 	CHECK(fd >= 0);
 	CHECK(host_syscall(__NR_fcntl, fd, F_GETFL, 0, 0, 0, 0) == 02000);
+	/* a buffer that reaches past the guest's memory is EFAULT (14), and
+	nothing is written; one that ends at its last byte is read into */
+	CHECK(host_syscall(__NR_read, fd, sizeof(memory) - 2, 5, 0, 0, 0) == -14);
+	CHECK(host_syscall(__NR_pread64, fd, sizeof(memory) - 5, 5, 0, 0, 0) == 5);
+	CHECK(!memcmp(memory + sizeof(memory) - 5, "linux", 5));
+	CHECK(host_syscall(__NR_read, fd, 0x100000000LL - 2, 5, 0, 0, 0) == -14);
+	CHECK(host_syscall(__NR_getrandom, sizeof(memory) - 8, 16, 0, 0, 0, 0) == -14);
+	CHECK(host_syscall(__NR_futex, sizeof(memory) - 2, 1, 1, 0, 0, 0) == -14);
+	/* an iovec whose own buffer reaches past it */
+	((uint32_t *)(memory + 0x3000))[0] = sizeof(memory) - 2;
+	((uint32_t *)(memory + 0x3000))[1] = 5;
+	CHECK(host_syscall(__NR_preadv, fd, 0x3000, 1, 0, 0, 0) == -14);
 	CHECK(host_syscall(__NR_close, fd, 0, 0, 0, 0, 0) == 0);
 	/* unlinkat, and then ENOENT (2) */
 	CHECK(host_syscall(__NR_unlinkat, -100, 0x1000, 0, 0, 0, 0) == 0);

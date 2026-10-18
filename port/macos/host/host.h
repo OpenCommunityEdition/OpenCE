@@ -40,9 +40,9 @@ extern OpenceGuest *host_guest;
 /* the image's header, as loaded */
 extern OpenceImageInfo host_image_info;
 
-/* the host address of guest address `address`; NULL for 0. Guest
-addresses are trusted to point into guest memory: they are the guest's
-own code's (the image is checked when it loads) */
+/* the host address of guest address `address`; NULL for 0. It is not
+checked: the buffers a system call is given are checked by its caller
+(host_syscall.c's outside) */
 void *host_guest_pointer(uint32_t address);
 /* the guest address of host address `pointer` inside guest memory */
 uint32_t host_guest_address(const void *pointer);

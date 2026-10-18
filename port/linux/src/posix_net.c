@@ -72,7 +72,9 @@ family first, AF_INET6 being 10. Darwin's start with a length byte and an
 8-bit family, AF_INET6 being 30. An address with a second byte of 0 is
 Linux's (no family Darwin has is 0); the host's own callers (posix_upnp.c)
 pass Darwin's, which are left as they are. Addresses given back are always
-Linux's: only the guest asks for them. */
+Linux's: only the guest asks for them. The length a call gives back is
+the address's, which may be more than the `size` of the buffer it was cut
+to fit. */
 #define LINUX_AF_INET6 10
 
 static const void *address_in(const void *address, int length, struct sockaddr_storage *storage)
@@ -87,18 +89,18 @@ static const void *address_in(const void *address, int length, struct sockaddr_s
 	return storage;
 }
 
-static void address_out(void *address, socklen_t length)
+static void address_out(void *address, socklen_t size, socklen_t length)
 {
 	unsigned char *bytes = address;
 
-	if (!address || length < 2)
+	if (!address || size < 2 || length < 2)
 		return;
 	bytes[0] = bytes[1] == AF_INET6 ? LINUX_AF_INET6 : bytes[1];
 	bytes[1] = 0;
 }
 #else
 #define address_in(address, length, storage) (address)
-#define address_out(address, length) ((void)0)
+#define address_out(address, size, length) ((void)0)
 #endif
 
 /* Winsock error codes (winsockx.h) */
@@ -246,13 +248,13 @@ int posix_socket_listen(int socket, int backlog)
 
 int posix_socket_accept(int socket, void *address, int *address_length)
 {
-	socklen_t length = address_length ? (socklen_t)*address_length : 0;
+	socklen_t size = address_length ? (socklen_t)*address_length : 0, length = size;
 	int result = accept4(socket, address, address_length ? &length : NULL, SOCK_CLOEXEC);
 
 	if (address_length)
 		*address_length = (int)length;
 	if (result >= 0 && address_length)
-		address_out(address, length);
+		address_out(address, size, length);
 	return succeed(result);
 }
 
@@ -290,10 +292,10 @@ int posix_socket_recvfrom(int socket, void *buffer, int length, int flags,
 	message.msg_iov = &vector;
 	message.msg_iovlen = 1;
 	result = (int)recvmsg(socket, &message, flags);
+	if (result >= 0 && message.msg_name)
+		address_out(address, (socklen_t)*address_length, message.msg_namelen);
 	if (address_length)
 		*address_length = (int)message.msg_namelen;
-	if (result >= 0 && message.msg_name)
-		address_out(address, message.msg_namelen);
 	/* a datagram larger than the buffer: both give its start, but Winsock
 	with WSAEMSGSIZE, which the game takes as an error, not as the datagram */
 	if (result >= 0 && (message.msg_flags & MSG_TRUNC))
@@ -391,23 +393,23 @@ int posix_socket_getsockopt(int socket, int level, int name, void *value, int *l
 
 int posix_socket_getsockname(int socket, void *address, int *address_length)
 {
-	socklen_t length = (socklen_t)*address_length;
+	socklen_t size = (socklen_t)*address_length, length = size;
 	int result = getsockname(socket, address, &length);
 
 	*address_length = (int)length;
 	if (result == 0)
-		address_out(address, length);
+		address_out(address, size, length);
 	return succeed(result);
 }
 
 int posix_socket_getpeername(int socket, void *address, int *address_length)
 {
-	socklen_t length = (socklen_t)*address_length;
+	socklen_t size = (socklen_t)*address_length, length = size;
 	int result = getpeername(socket, address, &length);
 
 	*address_length = (int)length;
 	if (result == 0)
-		address_out(address, length);
+		address_out(address, size, length);
 	return succeed(result);
 }
 

@@ -1466,7 +1466,10 @@ void platform_pump_events(void)
 	BOOL look_at_clipboard = !looked_at_clipboard;
 
 	/* (before the window's events: without one, under debug.null_renderer,
-	the time is counted from the first call) */
+	the time is counted from the first call; with one, only its thread
+	ends the game, as before) */
+	if (platform_window && SDL_GetCurrentThreadID() != platform_event_thread)
+		return;
 	if (exit_ticks == (Uint64)-1)
 	{
 		double seconds = config_real("debug.exit_after");
@@ -1478,7 +1481,7 @@ void platform_pump_events(void)
 		platform_log("exiting after debug.exit_after");
 		exit(EXIT_SUCCESS);
 	}
-	if (!platform_window || SDL_GetCurrentThreadID() != platform_event_thread)
+	if (!platform_window)
 		return;
 	platform_show_pending_message();
 #ifndef HALO_ANDROID
