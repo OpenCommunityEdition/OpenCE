@@ -1,7 +1,7 @@
 /*
 XISO.H
 
-The maps folder out of an Xbox disc image (xiso.c).
+The maps folder out of an Xbox disc image, and the movies (xiso.c).
 */
 
 #ifndef __HALO_LINUX_XISO_H
@@ -12,9 +12,11 @@ all the files' */
 typedef void (*xiso_progress_proc)(void *context, const char *file, unsigned long long done,
 	unsigned long long total);
 
-/* copies the image's maps folder to <destination>/maps; returns nonzero on
-success, or 0 with the reason (for the player) in error. Called from any
-thread */
+/* copies the image's maps folder to <destination>/maps, and its default.xbe
+and bink folder to <destination>/default.xbe and <destination>/bink (the
+movies: the extraction succeeds without them if the disc has none or they
+cannot be copied); returns nonzero on success, or 0 with the reason (for the
+player) in error. Called from any thread */
 int xiso_extract_maps(const char *image_path, const char *destination, xiso_progress_proc progress, void *context,
 	char *error, int error_size);
 

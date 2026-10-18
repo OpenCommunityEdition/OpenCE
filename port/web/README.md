@@ -143,7 +143,7 @@ reloads.
 - No Custom Edition maps (their tag data's address is in the C heap there),
   so a browser neither downloads nor sends one (map sharing,
   `port/linux/NETCODE.md`).
-- No Bink videos (as on the other ports).
+- No Bink videos: the movies need `default.xbe` and `bink/` of the disc, which the page does not import. The game skips the movies.
 - The browser's WebGL 2 is OpenGL ES 3.0 without its 3.1 and 3.2 additions:
   the visibility tests (lens flares) report whether anything was drawn, a
   frame late; supersampling and SMAA are not offered (FXAA and MSAA are).

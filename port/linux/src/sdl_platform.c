@@ -188,7 +188,7 @@ static void *data_extraction_thread(void *context)
 	return NULL;
 }
 
-/* copies the maps, showing how far it has got; closing the window quits */
+/* copies the maps (and the movies), showing how far it has got; closing the window quits */
 static BOOL data_extract(const char *image, const char *destination, char *error, int error_size)
 {
 	static struct data_extraction extraction;
@@ -246,7 +246,7 @@ static BOOL data_extract(const char *image, const char *destination, char *error
 			SDL_RenderClear(renderer);
 			SDL_SetRenderDrawColor(renderer, 230, 230, 230, 255);
 			SDL_SetRenderScale(renderer, 2.0f, 2.0f);
-			SDL_RenderDebugText(renderer, 10.0f, 10.0f, "Extracting the maps folder...");
+			SDL_RenderDebugText(renderer, 10.0f, 10.0f, "Extracting the game data...");
 			SDL_SetRenderScale(renderer, 1.0f, 1.0f);
 			snprintf(line, sizeof(line), "%s  (%llu of %llu MB)", file, done >> 20, total >> 20);
 			SDL_RenderDebugText(renderer, 20.0f, 70.0f, line);

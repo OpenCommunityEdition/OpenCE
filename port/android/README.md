@@ -475,7 +475,7 @@ assembly of the port is necessary:
 
 ## Limits
 
-- Bink video is not available. The game skips the movies.
+- Bink video is not available: the movies need `default.xbe` and `bink/` of the disc, which the app does not import. The game skips the movies.
 - The device must let the app reserve the fixed guest addresses, from
   `0x80000000` to `0x8c000000`. If ART uses them, the app shows a message
   (refer to "The fixed addresses").

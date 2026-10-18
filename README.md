@@ -48,9 +48,14 @@ so players of the two versions can play together.
 
 1. Start the game.
 2. At the first start, the game asks for the disc image. Select it.
-3. The game extracts the `maps/` folder. Then the game starts.
+3. The game extracts the `maps/` folder, and `default.xbe` and the `bink/`
+   folder of the movies. Then the game starts.
 
-On Linux and Windows, the game puts `maps/` next to the executable. On
+On Linux and Windows, the game puts `maps/`, `default.xbe` and `bink/` next
+to the executable. The movies of the disc (the logos at the start, the credits
+and the movies of the main menu) play if `default.xbe` and `bink/` are there:
+the decoder reads the tables of the movie format from that executable.
+`game.movies = false` skips them. On
 Android, copy the disc image to the phone first. The app puts `maps/` in its
 data folder. Refer to [port/android/README.md](port/android/README.md). On
 the web, the page copies `maps/` out of the disc image into the browser's
