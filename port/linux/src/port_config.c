@@ -53,6 +53,8 @@ enum
 	_platform_windows = 4,
 	/* (the web build, which has the desktop's settings, and these) */
 	_platform_web = 8,
+	/* (the Mac build, which has the desktop's settings, and these) */
+	_platform_mac = 16,
 };
 
 struct config_setting
@@ -76,28 +78,47 @@ Ctrl+D, which moving and crouching would press, from the browser) */
 #define CROUCH_KEYS "\"Left Ctrl, C\""
 #endif
 
+/* (the Mac's has a window, and fullscreen taken when the game starts; its
+Video Setup shows no borderless one) */
+#ifdef HALO_MAC
+#define DISPLAY_MODE_DEFAULT "\"windowed\""
+#else
+#define DISPLAY_MODE_DEFAULT "\"\""
+#endif
+
 static const struct config_setting config_settings[] =
 {
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
 		"Where display.mode is empty: start borderless over the whole display;\n"
 		"false starts in a window. F11 switches." },
-	{ "display.mode", _config_string, "\"\"", "HALO_DISPLAY_MODE", _environment_value, _platform_desktop,
+	{ "display.mode", _config_string, DISPLAY_MODE_DEFAULT, "HALO_DISPLAY_MODE", _environment_value, _platform_desktop,
 		"\"fullscreen\" takes the display (at display.resolution's mode),\n"
 		"\"borderless\" is a window over the whole desktop, \"windowed\" a window\n"
 		"(display.window_size). Empty: display.fullscreen's (true: borderless).\n"
 		"F11 switches to the window and back." },
+	{ "display.fullscreen_exclusive", _config_boolean, "false", "HALO_FULLSCREEN_EXCLUSIVE", _environment_set_is_true,
+		_platform_mac,
+		"Mac: display.mode \"fullscreen\" takes the display itself (captured, as the\n"
+		"Mac games of the time did) instead of covering it with a borderless window;\n"
+		"it applies when the game starts, and without the menu mouse or the cursor's\n"
+		"capture. A display.resolution that is not the desktop's does the same." },
 	{ "display.resolution", _config_string, "\"native\"", "HALO_RESOLUTION", _environment_value, _platform_desktop,
 		"What fullscreen and borderless draw at: \"native\", the display's own, or\n"
 		"\"<width>x<height>\" (\"1920x1080\"), 640x480 or more. Fullscreen sets the\n"
-		"display to it; borderless draws it scaled to the display." },
+		"display to it; borderless draws it scaled to the display. Mac: the\n"
+		"display's mode when fullscreen takes it, at the next start; the 640x480\n"
+		"picture is scaled to it." },
 	{ "display.resolution_scaling", _config_string, "\"native\"", "HALO_RESOLUTION_SCALING", _environment_value,
 		_platform_desktop,
 		"\"native\" draws at the window's resolution (fullscreen, the display's or\n"
 		"display.resolution); \"original\" draws the Xbox's 640x480 and scales it\n"
-		"up." },
+		"up. Mac: \"native\" is a picture of the window's shape, 480 lines and as\n"
+		"many columns as it gives (to 1280), scaled to the window; \"original\" is\n"
+		"640x480 with bars." },
 	{ "display.window_size", _config_string, "\"\"", "HALO_WINDOW_SIZE", _environment_value, _platform_desktop,
 		"The window's size, \"<width>x<height>\" (\"1920x1080\"), 640x480 or more (it\n"
-		"can be resized). Empty: display.window_scale's." },
+		"can be resized). Empty: display.window_scale's (Mac: 640x480; the\n"
+		"picture takes a larger window's shape and is scaled to it)." },
 	{ "display.window_scale", _config_integer, "2", "HALO_WINDOW_SCALE", _environment_value, _platform_desktop,
 		"Where display.window_size is empty: the window's size as a multiple of\n"
 		"640x480." },
@@ -114,7 +135,13 @@ static const struct config_setting config_settings[] =
 		"or \"smaa\" smooth the 3D view once it is drawn (the HUD and menus stay\n"
 		"sharp); \"ssaa2x\" draws at twice the resolution each way (four times\n"
 		"the work); \"msaa2x\", \"msaa4x\" or \"msaa8x\" draw with that many samples\n"
-		"a pixel. Android has \"fxaa\" for \"smaa\", and no \"ssaa2x\"." },
+		"a pixel. Android has \"fxaa\" for \"smaa\", and no \"ssaa2x\". The Mac has\n"
+		"\"off\" and \"fxaa\"." },
+	{ "display.gamma", _config_real, "1.0", "HALO_GAMMA", _environment_value, _platform_all,
+		"The picture's brightness, as Halo Custom Edition's Gamma: 0.5 to 3.0.\n"
+		"The finished picture is raised to 1 / gamma as it is presented, so\n"
+		"above 1.0 brightens it and below darkens it; 1.0 draws it as it is,\n"
+		"with no extra work. The display's own gamma is not changed." },
 	{ "display.interpolation", _config_boolean, "true", "HALO_INTERPOLATION", _environment_value, _platform_all,
 		"Draw a frame for every display refresh, blending between the game's 30\n"
 		"ticks a second; false keeps the original 30 frames a second." },
@@ -135,16 +162,46 @@ static const struct config_setting config_settings[] =
 		"Off, they are not drawn; firing, animation, sound and lights go on." },
 	{ "display.high_res_hud", _config_boolean, "true", "HALO_HIGH_RES_HUD", _environment_value, _platform_all,
 		"Draw the HUD (meters, counters, panels, motion sensor, reticles,\n"
-		"waypoints, scopes) from the high-res assets (8x the maps' bitmaps);\n"
-		"false draws the maps' own bitmaps." },
+		"waypoints, scopes) from the high-res assets (8x the maps' bitmaps;\n"
+		"2x on a Mac, not the meters); false draws the maps' own bitmaps." },
 	{ "display.high_res_text", _config_boolean, "true", "HALO_HIGH_RES_TEXT", _environment_value, _platform_all,
 		"Draw the menus' and HUD's text with the fonts in port/assets/fonts\n"
 		"(Overpass) at the resolution the game draws at, and the menus' titles\n"
 		"from port/assets/titles; false draws the maps' bitmap fonts and titles." },
+	{ "display.texture_pack", _config_string, "\"\"", "HALO_TEXTURE_PACK", _environment_value, _platform_mac,
+		"The name of a texture pack in the data root's texture_packs folder,\n"
+		"whose pictures are drawn in place of the maps' bitmaps they are named\n"
+		"for (docs/texture_packs.md); empty is the stock game. Mac build only.\n"
+		"A pack must carry a pack.toml with a name and a licence. On a card of\n"
+		"32 MB or less, pictures larger than 1024 pixels lose their largest\n"
+		"levels, and the pack's textures count against mac.texture_cache_mb." },
 	{ "display.shadow_resolution", _config_integer, "128", "HALO_SHADOW_RESOLUTION", _environment_value,
 		_platform_all,
 		"The size the objects' shadows are drawn at, in pixels each way: 128 as\n"
 		"on the Xbox, or 256, 512 or 1024 for smoother edges, as soft." },
+	{ "display.scenery_minimum_pixels", _config_real, "0.0", "HALO_SCENERY_MINIMUM_PIXELS", _environment_value,
+		_platform_all,
+		"Scenery (trees, rocks and other placed objects, never units, vehicles\n"
+		"or weapons) smaller on screen than this many pixels across is not\n"
+		"drawn, for slower machines; 0 draws all of it, as the original." },
+	{ "display.batch_scenery", _config_boolean, "false", "HALO_BATCH_SCENERY", _environment_value,
+		_platform_all,
+		"Draw the scenery (trees, rocks and other placed objects) a definition\n"
+		"and a shader at a time, so that the graphics card has fewer changes of\n"
+		"shader and bitmap to make: the same picture, faster on some machines.\n"
+		"false draws the objects in the original's order." },
+	{ "display.specular", _config_boolean, "true", "HALO_SPECULAR", _environment_value, _platform_all,
+		"The PC version's Specular: false leaves out the level's specular and\n"
+		"reflection passes, for slower machines. true: as the original." },
+	{ "display.shadows", _config_boolean, "true", "HALO_SHADOWS", _environment_value, _platform_all,
+		"The PC version's Shadows: false draws no shadows under objects, for\n"
+		"slower machines. true: as the original." },
+	{ "display.decals", _config_boolean, "true", "HALO_DECALS", _environment_value, _platform_all,
+		"The PC version's Decals: false draws no bullet holes, scorch marks or\n"
+		"blood on the level, for slower machines. true: as the original." },
+	{ "display.particles", _config_string, "\"high\"", "HALO_PARTICLES", _environment_value, _platform_all,
+		"The PC version's Particles: \"high\" as the original, \"low\" without\n"
+		"particle systems (smoke, dust) and weather, \"off\" without particles." },
 	{ "display.menus", _config_string, "\"pc\"", "HALO_MENUS", _environment_value, _platform_all,
 		"The menus: \"pc\" for the PC version's main menu (port/assets/menus,\n"
 		"and a menus folder here for your own), \"xbox\" for the Xbox's." },
@@ -188,7 +245,8 @@ static const struct config_setting config_settings[] =
 	{ "audio.reverb", _config_boolean, "true", "HALO_REVERB", _environment_value, _platform_all,
 		"Reverberate the world's sounds as the place the player is in does (the\n"
 		"maps' sound environments, as the Xbox's I3DL2 reverb did); false keeps\n"
-		"them dry." },
+		"them dry. On a Mac whose mac.detail is low (a PowerPC Mac by default) it\n"
+		"is off unless this is set." },
 	{ "audio.voice_chat", _config_string, "\"push_to_talk\"", "HALO_VOICE_CHAT", _environment_value, _platform_all,
 		"Talking in network games' voice chat: \"push_to_talk\" (while\n"
 		"controls.push_to_talk is held; the microphone opens the first time),\n"
@@ -220,10 +278,27 @@ static const struct config_setting config_settings[] =
 		"The touch controls' swipe aiming gets a controller's aim assist: the\n"
 		"aim slows over a target and follows a moving one. false: none, as a\n"
 		"mouse (the bullets' own autoaim stays)." },
+	{ "input.prompts", _config_string, "\"auto\"", "HALO_PROMPTS", _environment_value, _platform_desktop | _platform_web,
+		"Which controls the game's prompts name (\"Press E to pick up\", \"Hold\n"
+		"Tab for score\", the menus' button hints): \"auto\" follows the device\n"
+		"used last, the keyboard and mouse (the keys of [controls]) after a key,\n"
+		"a mouse button or the mouse moving, a controller's buttons after one of\n"
+		"its buttons or sticks; \"keyboard\" and \"gamepad\" always name one." },
 	{ "input.mouse_sensitivity", _config_real, "1.0", "HALO_MOUSE_SENSITIVITY", _environment_value, _platform_desktop,
 		"How far the view turns for the mouse's movement." },
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,
 		"Moving the mouse forward looks down." },
+	{ "input.mouse_capture", _config_boolean, "true", "HALO_NO_MOUSE_CAPTURE", _environment_set_is_false, _platform_mac,
+		"In a game the window holds the mouse (the cursor hidden, the view turned\n"
+		"by its movement), as the other builds do; F12, the menus, another\n"
+		"application in front or a minimised window give the cursor back. false:\n"
+		"the cursor stays free." },
+	{ "input.menu_cursor", _config_boolean, "true", "HALO_NO_MENU_CURSOR", _environment_set_is_false,
+		_platform_desktop | _platform_mac,
+		"In the menus the game draws a mouse pointer (an arrow) over the menu, as\n"
+		"Halo Custom Edition does, and hides the system's cursor over the window; it\n"
+		"goes while a controller was used last. false: the system's cursor, as the\n"
+		"Xbox's menus had none." },
 	{ "input.mouse_aim_assist", _config_boolean, "false", "HALO_MOUSE_AIM_ASSIST", _environment_value, _platform_desktop,
 		"Magnetism while aiming with the mouse, as with a controller: the view\n"
 		"slowed and dragged along by a target. The last of the mouse and the\n"
@@ -233,6 +308,46 @@ static const struct config_setting config_settings[] =
 		_platform_desktop,
 		"How far the view turns up and down for the mouse's movement; 0 for the\n"
 		"same as input.mouse_sensitivity." },
+	/* the Mac builds' game pads (port/mac/engine_input.c, mac_gamepad.c), which
+	"OpenCE Controller Setup" calibrates */
+	{ "input.gamepad_left_dead_zone", _config_integer, "9000", "HALO_GAMEPAD_LEFT_DEAD_ZONE", _environment_value,
+		_platform_mac,
+		"Mac: how far the left stick moves (of 32767) before it counts; 9000, the\n"
+		"Xbox's." },
+	{ "input.gamepad_right_dead_zone", _config_integer, "9000", "HALO_GAMEPAD_RIGHT_DEAD_ZONE", _environment_value,
+		_platform_mac,
+		"Mac: how far the right stick moves (of 32767) before it counts; 9000,\n"
+		"the Xbox's." },
+	{ "input.gamepad_invert_look", _config_boolean, "false", "HALO_GAMEPAD_INVERT_LOOK", _environment_set_is_true,
+		_platform_mac,
+		"Mac: pushing the right stick forward looks down." },
+	{ "input.gamepad_setup_done", _config_boolean, "false", "HALO_GAMEPAD_SETUP_DONE", _environment_set_is_true,
+		_platform_mac,
+		"Mac: the launcher has offered the controller setup (set by it)." },
+	/* the Mac builds' menus (port/mac/engine_menu.c) */
+	{ "game.start_in_menu", _config_boolean, "false", "HALO_START_IN_MENU", _environment_set_is_true,
+		_platform_mac,
+		"Mac: start in the PC version's main menu (the map on the command line\n"
+		"is its background) and start games from it, instead of going straight\n"
+		"into that map. Escape in a game opens the pause menu." },
+	{ "game.movies", _config_boolean, "true", "HALO_MOVIES", _environment_value, _platform_all,
+		"Play the Xbox game's Bink movies (the start-up logos, the credits and\n"
+		"the movies the main menu plays when left alone) when the game data has\n"
+		"them: the disc's bink folder next to maps, and its default.xbe, which\n"
+		"the decoder takes the format's tables from. A key, a click or a pad\n"
+		"button skips a movie. false skips them all, as data without them does.\n"
+		"On the Mac, game.intro_movies plays the Mac version's logos instead." },
+	{ "game.attract_movies", _config_boolean, "false", "HALO_ATTRACT_MOVIES", _environment_set_is_true,
+		_platform_all,
+		"The Xbox game's attract mode: the main menu, left alone for 75 seconds,\n"
+		"plays one of the three movies of the disc's bink folder (game.movies),\n"
+		"and a key, a click or a pad button ends it. The PC version's menus,\n"
+		"which the port uses, have no such mode, so it is off." },
+	{ "game.intro_movies", _config_boolean, "true", "HALO_INTRO_MOVIES", _environment_value, _platform_mac,
+		"Mac: play the Xbox game's start-up logos (Movies/mgs.mov and\n"
+		"bungie.mov in the game data folder) when the game starts. A key, a\n"
+		"click or a pad button skips the movie, Escape the\n"
+		"rest; a missing movie is skipped. false starts the game at once." },
 
 	/* the keyboard and mouse's own controls (port/linux/src/xinput_sdl.c) */
 	{ "controls.move_forward", _config_string, "\"W\"", "HALO_KEY_MOVE_FORWARD", _environment_value, _platform_all,
@@ -278,7 +393,8 @@ static const struct config_setting config_settings[] =
 	{ "controls.pause", _config_string, "\"Escape\"", "HALO_KEY_PAUSE", _environment_value, _platform_all,
 		"The pause menu (the controller's Start)." },
 	{ "controls.screenshot", _config_string, "\"F10\"", "HALO_KEY_SCREENSHOT", _environment_value, _platform_all,
-		"Save a PNG screenshot beside maps/ (press once per capture)." },
+		"Save a PNG screenshot beside maps/ (press once per capture; Mac: in\n"
+		"screenshots/ of the save folder)." },
 	{ "controls.push_to_talk", _config_string, "\"V\"", "HALO_KEY_PUSH_TO_TALK", _environment_value, _platform_all,
 		"Voice chat: talk while it is held (audio.voice_chat \"push_to_talk\")." },
 
@@ -334,6 +450,49 @@ static const struct config_setting config_settings[] =
 		"A Halo Custom Edition install whose maps folder is looked in after the\n"
 		"custom_maps folder for Custom Edition maps and their bitmaps.map,\n"
 		"sounds.map and loc.map (game.custom_edition); empty for none." },
+	{ "paths.pc_data", _config_string, "\"\"", "HALO_PC_DATA", _environment_value, _platform_desktop,
+		"A Halo PC, Halo for Mac or Halo Custom Edition install (its folder, or\n"
+		"the one holding its ui.map and bitmaps.map): the menus draw the\n"
+		"preview pictures of the Edit Profile Settings, multiplayer and gametype\n"
+		"lists from its maps, which hold pictures the Xbox's do not. Read when\n"
+		"the menus draw them, and kept nowhere. Set: only that\n"
+		"folder is looked in. Empty: the Mac's /Applications/\n"
+		"Halo.app, else the Custom Edition install (paths.custom_edition) or\n"
+		"custom_maps folder, else the port's own pictures." },
+
+	{ "mac.map", _config_string, "\"bloodgulch\"", "HALO_MAC_MAP", _environment_value, _platform_mac,
+		"The map the game starts on when it is opened with no arguments (a\n"
+		"double click): its name in the maps folder of the data root, such as\n"
+		"\"bloodgulch\", \"longest\" or, for the campaign, \"b30\"." },
+	{ "mac.detail", _config_string, "\"auto\"", "HALO_MAC_DETAIL", _environment_value, _platform_mac,
+		"How much the Mac draws: \"auto\" (the stock detail, except on a PowerPC\n"
+		"Mac: \"low\" with 32 MB of video memory or less, \"medium\" with 64 MB\n"
+		"or less), \"high\" (as on the Xbox), \"medium\" (no specular, shadows\n"
+		"or decals, low particles, and scenery smaller than 8 pixels left out,\n"
+		"24 in the campaign), \"low\" (medium, and scenery smaller than 16\n"
+		"pixels left out, 64 in the campaign, other objects but units smaller\n"
+		"than 6 pixels, 12 in the campaign, no lens flares, and particles no\n"
+		"wider than 160 pixels) or \"lowest\" (low, and no particles). A\n"
+		"display.* detail setting that is not at its default wins over this." },
+	{ "mac.texture_cache_mb", _config_integer, "0", "HALO_MAC_RETAIL_TEXTURE_CACHE_MB", _environment_value,
+		_platform_mac,
+		"The megabytes of the graphics card's memory that the game's textures may\n"
+		"use at once, 4 to 48; 0 picks by the card: 16 below 64 MB of video\n"
+		"memory, 32 on larger cards (48 in the campaign)." },
+	{ "mac.texture_skip_levels", _config_integer, "-1", "HALO_MAC_TEXTURE_SKIP_LEVELS", _environment_value,
+		_platform_mac,
+		"How many of the largest levels of each texture are left out, 0 to 4, as\n"
+		"the PC version's lower texture quality does; -1 picks by the card: 1\n"
+		"for the heavy maps (the campaign, longest, hangemhigh, prisoner) on a\n"
+		"card of 32 MB or less, else 0." },
+
+	{ "mac.network_test", _config_string, "\"\"", "HALO_MAC_NETWORK_TEST", _environment_value,
+		_platform_mac,
+		"Automated system link sessions in the Mac session without the menus\n"
+		"(port/mac/engine_network_test.c): \"host:<map>\" hosts a\n"
+		"slayer game on the map already loaded, \"join\" joins the first game\n"
+		"found. Set debug.network_test as well, which logs every player's state\n"
+		"every second, and debug.network_test_start for the countdown." },
 
 	{ "network.address", _config_string, "\"\"", "HALO_NET_ADDRESS", _environment_value, _platform_all,
 		"This machine's IPv4 address for system link, for a machine on several\n"
@@ -552,6 +711,9 @@ static const struct config_setting config_settings[] =
 		"each voice heard logged once a second." },
 	{ "debug.null_renderer", _config_boolean, "false", "HALO_NULL_RENDERER", _environment_set_is_true, _platform_all,
 		"Run without a window, drawing nothing." },
+	{ "debug.gamestate_log", _config_boolean, "false", "HALO_GAMESTATE_LOG", _environment_set_is_true, _platform_all,
+		"Write the game state's allocations (name, type, size) to a file named\n"
+		"d:\\gamestate.txt in the working directory, as the Xbox game's debug log." },
 	{ "debug.gl_debug", _config_boolean, "false", "HALO_GL_DEBUG", _environment_set_is_true, _platform_all,
 		"Report OpenGL errors in the log." },
 	{ "debug.menu_open", _config_string, "\"\"", "HALO_MENU_OPEN", _environment_value, _platform_all,
@@ -617,6 +779,8 @@ static const struct config_setting config_settings[] =
 #define CONFIG_PLATFORM _platform_android
 #elif defined(HALO_WEB)
 #define CONFIG_PLATFORM (_platform_desktop | _platform_web)
+#elif defined(HALO_MAC)
+#define CONFIG_PLATFORM (_platform_desktop | _platform_mac)
 #elif defined(_WIN32)
 #define CONFIG_PLATFORM (_platform_desktop | _platform_windows)
 #else
@@ -1486,6 +1650,41 @@ int config_default(const char *name, char *text, size_t size)
 	}
 	snprintf(text, size, "%.*s", (int)length, value);
 	return 1;
+}
+
+int config_is_default(const char *name)
+{
+	long index = config_setting_index(name);
+	const struct config_setting *setting;
+	const struct config_value *value;
+	struct config_value stock = { 0, 0, 0.0, NULL };
+	char text[256];
+	int same;
+
+	if (index < 0)
+		return 1;
+	setting = &config_settings[index];
+	value = config_value(name, setting->type);
+	if (!config_default(name, text, sizeof(text)))
+		return 1;
+	config_set_from_text(&stock, setting->type, text);
+	switch (setting->type)
+	{
+	case _config_boolean:
+		same = !stock.boolean == !value->boolean;
+		break;
+	case _config_integer:
+		same = stock.integer == value->integer;
+		break;
+	case _config_real:
+		same = stock.real == value->real;
+		break;
+	default:
+		same = value->string && !strcmp(stock.string, value->string);
+		break;
+	}
+	free(stock.string);
+	return same;
 }
 
 int config_boolean(const char *name)

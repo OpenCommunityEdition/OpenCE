@@ -176,7 +176,12 @@ void hs_print(
 	(0x4b8970 +0x0c pushes it as terminal_printf's format), so a '%' in it,
 	from a scenario script or typed at the console, read arguments that
 	were never passed */
-	terminal_printf(global_real_argb_green, "%s", message);
+	/* port: a scenario's own (print ...) is the game's chatter (Silent
+	Cartographer's music scripts print the looping sound's name), which
+	the retail game does not draw: shown as config.toml's game.console_log
+	says, and a command someone typed always shows its answer */
+	if (terminal_shows(terminal_command_running ? _terminal_message_serious : _terminal_message_chatter))
+		terminal_printf(global_real_argb_green, "%s", message);
 
 	return;
 }

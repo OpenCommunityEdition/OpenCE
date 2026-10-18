@@ -521,8 +521,12 @@ static void game_state_allocation_record(
 	// The January compiler inlines this logger into both arena allocators while
 	// retaining one out-of-line copy under its private address-derived name.
 	FILE *file = bss_004d27b0;
+	extern int config_boolean(const char *name); /* port: port/linux/src/port_config.c */
 
-	if (!file)
+	/* port: the log is written only when debug.gamestate_log is set, as a debugging aid: "d:\\gamestate.txt" is not a
+	host path (the host's fopen made a file of that name in the working directory, in the app's folder
+	when it was started from there) */
+	if (!file && config_boolean("debug.gamestate_log"))
 	{
 		file = fopen("d:\\gamestate.txt", "w");
 		bss_004d27b0 = file;

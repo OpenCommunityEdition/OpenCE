@@ -392,6 +392,11 @@ static long current_line(struct reader *reader)
 #define MENU_PLATFORM "android"
 #elif defined(HALO_WEB)
 #define MENU_PLATFORM "web"
+#elif defined(HALO_MAC) || defined(MENU_PLATFORM_MAC)
+/* (the Mac's: a desktop of its own, with its own display and audio; the
+parser's view for the Mac build, tools/mac_menu_files_view.py, defines the
+second) */
+#define MENU_PLATFORM "mac"
 #else
 #define MENU_PLATFORM "desktop"
 #endif
@@ -416,9 +421,9 @@ static int for_this_platform(struct reader *reader, const XML_Char **attributes)
 				if (length)
 				{
 					if ((length != 7 || strncmp(name, "desktop", 7)) && (length != 7 || strncmp(name, "android", 7)) &&
-						(length != 3 || strncmp(name, "web", 3)))
+						(length != 3 || strncmp(name, "web", 3)) && (length != 3 || strncmp(name, "mac", 3)))
 					{
-						reader_error(reader, "platform=\"%s\" names one that is not desktop, android or web",
+						reader_error(reader, "platform=\"%s\" names one that is not desktop, android, web or mac",
 							attributes[index + 1]);
 						return 1;
 					}

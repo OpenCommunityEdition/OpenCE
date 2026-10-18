@@ -181,7 +181,7 @@ def test_the_menus_name_known_platforms_and_match_their_generator():
 
     for path in sorted((ROOT / "port/assets/menus/ce").glob("*.xml")):
         for value in re.findall(r'platform="([^"]*)"', path.read_text()):
-            assert value.split() and set(value.split()) <= {"desktop", "android", "web"}, (path.name, value)
+            assert value.split() and set(value.split()) <= {"desktop", "android", "web", "mac"}, (path.name, value)
     for name, lines in [*port_settings.settings_files().items(), *port_settings.multiplayer_files().items()]:
         assert (ROOT / "port/assets/menus/ce" / name).read_text() == "\n".join(lines), name
     # the rows a browser has no use for are not on its screens; internet

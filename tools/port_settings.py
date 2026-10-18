@@ -35,9 +35,9 @@ SCREENS = {
     "video_settings": {
         "screen": "video_settings_screen",
         "header": ("header_profile_video_settings", f"{PE}/video_settings/header_profile_video_settings"),
-        # the other screens' 30px step. each platform packs its own rows, so
-        # a row hidden on this machine does not leave a gap
-        "spacing": 30,
+        # the other screens' 30px step, less one: with Gamma, ten rows fit above the help.
+        # each platform packs its own rows, so a row hidden on this machine does not leave a gap
+        "spacing": 29,
         "help_top": 364,
         "platform_places": True,
         # (rows in the place of the row before them: Window Size in
@@ -50,6 +50,10 @@ SCREENS = {
              "Fullscreen takes the display; borderless covers it\nwith a window. F11 switches to the window.",
              "desktop"),
             # (port/linux/game/menu_tags.c adds the display's resolutions)
+            # (the Mac's: its display is taken when the game starts, at the window's size, 640x480;
+            # windowed first, which a mode this row does not know is shown as)
+            ("DISPLAY MODE:", "display.mode", [("WINDOWED", "windowed"), ("FULLSCREEN", "fullscreen")],
+             "Fullscreen takes the display when the game next\nstarts; windowed is a window.", "mac", "mode_mac"),
             ("RESOLUTION:", "display.resolution", [("NATIVE", "native")],
              "What fullscreen and borderless draw at. Fullscreen\nsets the display to it; borderless scales it.",
              "desktop"),
@@ -57,20 +61,42 @@ SCREENS = {
             # in place of this one)
             ("WINDOW SIZE:", "display.window_size", [("1280 x 960", "1280x960")],
              "The window's size: 4:3, then 16:10, 16:9 and 21:9\n(its edges can also be dragged).", "desktop"),
+            # (the Mac's: the display's mode when the game starts in fullscreen,
+            # and the window's size, which the game's 640x480 picture is scaled to
+            # (no more of either than the picture's own shape: black bars);
+            # menu_functions.c shows the one the display mode chosen uses, as
+            # for the desktop's two)
+            ("RESOLUTION:", "display.resolution", [("NATIVE", "native")],
+             "The display's mode when fullscreen takes it (from\nthe next start); Native keeps the desktop's.", "mac",
+             "resolution_mac"),
+            ("WINDOW SIZE:", "display.window_size", [("640 x 480", "640x480")],
+             "The window's size: the game's picture is scaled to\nit (its edges can also be dragged).", "mac",
+             "window_size_mac"),
             ("RESOLUTION SCALING:", "display.resolution_scaling", [("NATIVE", "native"), ("ORIGINAL", "original")],
              "Native draws at the resolution; Original draws\nthe Xbox's 640x480 and scales it up.", "desktop web"),
+            # (the Mac's: a wider picture for a wider window or display, 480
+            # lines and as many columns as its shape gives, rather than the
+            # Xbox's 640x480 with bars; the setting the desktop's Resolution
+            # Scaling is, port/mac/mac_window.c)
+            ("WIDESCREEN:", "display.resolution_scaling", [("ON", "native"), ("OFF", "original")],
+             "On: a window or display wider than 4:3 shows a wider\nview. Off: the Xbox's 4:3 picture, with bars.", "mac",
+             "widescreen_mac"),
             ("V-SYNC:", "display.vsync", ON_OFF,
              "Wait for the display between frames, so that the\npicture never tears.", None),
             ("FRAME RATE LIMIT:", "display.max_fps",
              [("AUTO", "0"), ("30", "30"), ("60", "60"), ("120", "120"), ("144", "144"), ("165", "165"),
               ("240", "240"), ("NONE", "-1")],
-             "With V-Sync off, the most frames a second. Auto:\ntwice the display's refresh rate.", "desktop web"),
+             "With V-Sync off, the most frames a second. Auto:\ntwice the display's refresh rate.", "desktop web mac"),
             ("SMOOTH MOTION:", "display.interpolation", ON_OFF,
              "Draw a frame for every display refresh, blending\nbetween the game's 30 ticks a second.", None),
             ("INSTANT AIM:", "display.direct_camera", ON_OFF,
-             "In first person, turn the view the moment the\nmouse moves, not up to two ticks later.", "desktop web"),
+             "In first person, turn the view the moment the\nmouse moves, not up to two ticks later.", "desktop mac web"),
+            # (Halo Custom Edition's Gamma row, "darken / brighten": 1 is the picture as drawn;
+            # port/linux/src/xgpu_post.c)
+            ("GAMMA:", "display.gamma", [("DEFAULT", "1.0")] + [(f"{n / 10:.1f}", f"{n / 10:.1f}") for n in range(5, 21) if n != 10],
+             "Darken or brighten the whole picture. Default is\nthe picture as it is drawn.", None),
             ("HIGH-RES HUD:", "display.high_res_hud", ON_OFF,
-             "Draw the HUD from the high-res redraws; off\ndraws the game's own pictures.", None),
+             "Draw the HUD from the high-res redraws; off\ndraws the game's own pictures.", "desktop android web mac"),
             ("HIGH-RES TEXT:", "display.high_res_text", ON_OFF,
              "Draw text and titles with high-res fonts; off\ndraws the game's own.", None),
             ("ANTI-ALIASING:", "display.anti_aliasing",
@@ -82,12 +108,28 @@ SCREENS = {
              [("OFF", "off"), ("FXAA", "fxaa"), ("MSAA 2X", "msaa2x"), ("MSAA 4X", "msaa4x")],
              "Smooth jagged edges, which the Xbox did not. FXAA\nis cheap; MSAA is sharper.",
              "android web", "anti_aliasing_android"),
+            # (the Mac: the game's picture smoothed once it is drawn, FXAA only
+            # (port/mac/engine_device_state.c); MSAA, SMAA and SSAA need the
+            # picture in a target the Mac's older cards cannot sample)
+            ("ANTI-ALIASING:", "display.anti_aliasing", [("OFF", "off"), ("FXAA", "fxaa")],
+             "Smooth jagged edges, which the Xbox did not. FXAA\nsmooths the 3D view once it is drawn.",
+             "mac", "anti_aliasing_mac"),
+            # (the Mac's own: its detail preset, the one the game picks by the
+            # card, and the textures' size, port/mac/mac_gpu_info.c)
+            ("DETAIL:", "mac.detail",
+             [("AUTO", "auto"), ("HIGH", "high"), ("LOW", "low"), ("LOWEST", "lowest")],
+             "High draws as the Xbox did; Low leaves out specular,\nshadows, decals and small things. Auto picks by Mac.",
+             "mac"),
+            ("TEXTURE QUALITY:", "mac.texture_skip_levels",
+             [("AUTO", "-1"), ("HIGH", "0"), ("MEDIUM", "1"), ("LOW", "2"), ("LOWEST", "3")],
+             "Smaller textures use less video memory. Applies when\nthe game next starts. Auto picks by the card.", "mac"),
             ("SHADOW RESOLUTION:", "display.shadow_resolution",
              [("128", "128"), ("256", "256"), ("512", "512"), ("1024", "1024")],
              "The size objects' shadows are drawn at: 128 as on\nthe Xbox; larger for smoother, as soft, edges.",
              None),
             ("PER-PIXEL LIGHTING:", "display.per_pixel_lighting", ON_OFF,
-             "Light models for each pixel, without the facets\nof the Xbox's lighting for each vertex.", None),
+             "Light models for each pixel, without the facets\nof the Xbox's lighting for each vertex.",
+             "desktop android web"),
             ("SHIELD GLOW:", "display.shield_glow", ON_OFF,
              "Shields light their surroundings as they flare,\nin the shield's own color.", None),
             ("GLOW INTENSITY:", "display.shield_glow_intensity", [("DEFAULT", "default"), ("LIGHT SHOW", "light_show")],
@@ -118,7 +160,7 @@ SCREENS = {
         "rows": [
             # (port/linux/game/menu_tags.c adds the devices SDL finds)
             ("OUTPUT DEVICE:", "audio.output_device", [("SYSTEM DEFAULT", "default")],
-             "Where the game's sound and the voices play.", "desktop"),
+             "Where the game's sound and the voices play.", "desktop mac"),
             ("INPUT DEVICE:", "audio.input_device", [("SYSTEM DEFAULT", "default")],
              "The microphone voice chat listens to.", "desktop"),
             ("MASTER VOLUME:", "audio.volume", VOLUMES, "The volume of everything.", None),
@@ -194,11 +236,12 @@ SCREENS = {
 # Video Setup's categories open ordinary settings screens. Each has the same
 # pending edits, Defaults, OK and Cancel as the other settings screens.
 _video = SCREENS["video_settings"]
-_graphics = {"display.high_res_hud", "display.high_res_text", "display.anti_aliasing",
+_graphics = {"mac.detail", "mac.texture_skip_levels", "display.high_res_hud", "display.high_res_text", "display.anti_aliasing",
              "display.shadow_resolution", "display.per_pixel_lighting",
              "display.shield_glow", "display.shield_glow_intensity"}
 SCREENS["video_settings/graphics"] = {
     "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 30,
+    "platform_places": True,
     "same_place": ["anti_aliasing_android"],
     "rows": [row for row in _video["rows"] if row[1] in _graphics],
 }
@@ -379,7 +422,8 @@ def _setting_screen(folder: str, spec: dict) -> list:
     # (platform_places: each platform's rows in places of their own, with
     # no gap where the others' are; a row in one place for all its
     # platforms, else a child for each place)
-    places = {"desktop": -1, "android": -1, "web": -1}
+    places = {"desktop": -1, "android": -1, "web": -1, "mac": -1}
+    previous = []
     for index, (label, setting, choices, _, platform, *named) in enumerate(spec["rows"]):
         key = named[0] if named else setting.split(".", 1)[1]
         row = f"{base}/op_{key}"
@@ -387,8 +431,11 @@ def _setting_screen(folder: str, spec: dict) -> list:
         if spec.get("platform_places"):
             members = platform.split() if platform else list(places)
             for name in members:
-                if not shares:
+                # (a row in the place of the row before it, for the platforms
+                # that have that row: those that have not take the next)
+                if not shares or name not in previous:
                     places[name] += 1
+            previous = members
             rows += _placed(row, platform, members, places)
         else:
             if setting not in spec.get("same_place", ()) and key not in spec.get("same_place", ()):

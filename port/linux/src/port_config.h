@@ -34,6 +34,9 @@ guest has no SDL_LoadFile) */
 char *config_file_read(const char *path, size_t *size);
 /* a setting's default, as text; 0 if there is no such setting */
 int config_default(const char *name, char *text, size_t size);
+/* whether a setting has its default value (the file or the environment did
+not change it) */
+int config_is_default(const char *name);
 /* how many times config_write has changed a setting: what keeps one reads
 it again when this moves */
 unsigned long config_changes(void);
