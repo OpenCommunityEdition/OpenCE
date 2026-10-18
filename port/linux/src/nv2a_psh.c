@@ -621,10 +621,6 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		"in float xFog;\n"
 		"layout(location = 0) out vec4 fragment_color;\n"
 		XGPU_PIXEL_UNIFORMS);
-#ifndef HALO_GLES
-	if (key->visibility_explicit_depth)
-		xgpu_text_append(&text, "uniform float visibility_depth_offset;\n");
-#endif
 	for (stage = 0; stage < 4; stage++)
 		xgpu_text_append(&text, "uniform %s tex%d;\n", sampler_declaration(key->sampler_type[stage]), stage);
 	if (key->source_blend)
@@ -750,12 +746,6 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		xgpu_text_append(&text, "\tresult = vec4(t0.rgb, 1.0);\n");
 	if (config_boolean("debug.gpu_debug_flat"))
 		xgpu_text_append(&text, "\tresult = xD0.a > 0.0 ? vec4(xD0.rgb, 1.0) : vec4(1.0, 0.0, 1.0, 1.0);\n");
-	/* The diagnostic uses normalized D24 steps, after rasterization and
-	clipping. No native polygon offset is applied to these draws. */
-#ifndef HALO_GLES
-	if (key->visibility_explicit_depth)
-		xgpu_text_append(&text, "\tgl_FragDepth = clamp(gl_FragCoord.z + visibility_depth_offset, 0.0, 1.0);\n");
-#endif
 #ifdef HALO_GLES
 	if (key->count_samples)
 		xgpu_text_append(&text, "\tatomicCounterIncrement(visible_samples);\n");

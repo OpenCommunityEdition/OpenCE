@@ -153,10 +153,6 @@ struct nv2a_pixel_shader_key
 	unsigned char source_blend;
 	/* MCC environment lightmap pass only; part of the compiled shader key. */
 	unsigned char mcc_bump_attenuation;
-#ifndef HALO_GLES
-	/* Desktop diagnostic variant; ordinary shaders never write depth. */
-	unsigned char visibility_explicit_depth;
-#endif
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
