@@ -190,10 +190,16 @@ review guidance. Those standards do not relax the isolation rules.
   brief covering scope, relevant paths and decisions, applicable repository
   instructions, completion criteria and required validation. Require workers
   to read and follow those instructions; do not assume inherited context.
+  Include a concise summary of the verified environment, decisions, relevant
+  findings and completed checks. Investigate gaps or contradictions rather
+  than rediscovering established information.
 - Assign complete bounded deliverables: implementation, relevant tests and
   corrections arising from review. Validation ownership may include the
   capture harness, coordinated test runs, evidence collection and cleanup,
   rather than only instructions for the primary to perform that work.
+  Return review corrections and requirement changes to the existing owner
+  where practical. The primary takes over when integration, ambiguity or
+  repeated failures justify it.
 - Have one agent establish the relevant toolchain, dependencies, fixtures
   and capture method, then share a concise environment summary with the
   others. Recheck those findings only when something changes, fails or
@@ -208,10 +214,14 @@ review guidance. Those standards do not relax the isolation rules.
   conversation history, repeated reads of unchanged material and unchanged
   test reruns without a new reason. Review actual changes and evidence in
   proportion to risk without routinely repeating the worker's entire task.
-  Use clear review handoffs: workers summarize changes, checks and unresolved
-  concerns; the primary reviews the diff and evidence and requests focused
-  corrections. Rerun checks when integration, new changes, failures or
-  unresolved uncertainty justify them, while completing all required checks.
+  Use clear review handoffs: workers summarize changes, what was tested,
+  the tested code state, results and limitations; the primary reviews the
+  diff and evidence and requests focused corrections. After changes, rerun
+  affected checks and required integration checks; reuse evidence for
+  unchanged paths unless failures or unresolved uncertainty justify a rerun.
+  Complete all required checks. Keep coordination and reporting proportional
+  to the task, using concise handoffs rather than repeated full-file reads,
+  status polling or duplicate summaries.
 - Return unresolved isolation questions, contradictory evidence, invalid
   assumptions or repeated failed approaches to the primary for diagnosis.
   Astra cannot waive isolation rules: stop any conflicting part and follow
