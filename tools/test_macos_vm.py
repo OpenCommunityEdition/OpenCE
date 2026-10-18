@@ -99,6 +99,27 @@ def test_the_hosts_system_calls_natively(tmp_path):
     assert list(folder.iterdir()) == []
 
 
+def test_the_main_threads_queue_natively(tmp_path):
+    # port/macos/host/host_main_thread.c, built for this Mac: requests from
+    # other threads run on the main thread's run loop, and fail cleanly once
+    # the host shuts down
+    import os
+    import subprocess
+
+    exe = tmp_path / "host_main_thread_test"
+    sdl_include = os.environ.get("HALO_MACOS_SDL_INCLUDE", "")
+    build = subprocess.run([
+        "cc", "-std=gnu11", "-Wall", "-Werror", "-D_DARWIN_C_SOURCE", "-mmacosx-version-min=26.0",
+        "-Iport/macos/host", "-Ibuild/macos/runtime", "-Iport/android/include",
+        "-Iport/android/guest/libc/arch/arm64_32", f"-I{sdl_include}",
+        "port/macos/tests/host_main_thread_test.c", "port/macos/host/host_main_thread.c",
+        "-framework", "CoreFoundation", "-o", str(exe),
+    ], cwd=ROOT, capture_output=True, text=True)
+    assert build.returncode == 0, build.stderr
+    result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60)
+    assert (result.returncode, result.stdout.strip()) == (0, "ok"), result.stdout + result.stderr
+
+
 # ---------- SDL, headless
 
 SDL_DRIVERS = {"SDL_AUDIO_DRIVER": "dummy", "SDL_VIDEO_DRIVER": "dummy"}
@@ -128,3 +149,16 @@ def test_opengl_es_is_refused_while_headless(sdl_image, tmp_path):
     status, stdout, stderr = run_case(sdl_image, tmp_path, "gl", environment=SDL_DRIVERS)
     assert (status, stdout.strip()) == (0, "ok"), stdout + stderr
     assert stderr.count("the guest called hostgl_glClear, which this host does not carry out") == 1, stderr
+
+
+def test_window_imports_run_on_the_hosts_main_thread(sdl_image, tmp_path):
+    # with the host's main thread running its run loop (as the app's does),
+    # a guest thread's SDL_Init and SDL_CreateWindow are carried out there
+    status, stdout, stderr = run_case(sdl_image, tmp_path, "window_from_thread",
+                                      environment={**SDL_DRIVERS, "HALO_HOST_MAIN_LOOP": "1",
+                                                   "HALO_HOST_TRACE_MAIN_THREAD": "1"})
+    assert (status, stdout.strip()) == (0, "ok"), stdout + stderr
+    assert "halo_host: host_sdl_init ran on the main thread" in stderr
+    assert "halo_host: host_sdl_create_window ran on the main thread" in stderr
+    # (an import that need not be there is not)
+    assert "host_sdl_ticks ran on the main thread" not in stderr

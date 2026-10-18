@@ -93,6 +93,8 @@ struct host_call
 	/* what goes back in x0 and d0 */
 	uint64_t result_x;
 	uint64_t result_d;
+	/* errno after an import carried out on the main thread */
+	int error;
 };
 
 /* carries out import `index` (the w16 of the guest's svc stub); 0 if it
@@ -101,6 +103,19 @@ int host_dispatch(struct host_call *call, uint32_t index);
 /* the host's errno after this thread's last import: host_errno's (the
 host's own work between two imports may change errno itself) */
 extern __thread int host_saved_errno;
+
+/* ---------- the main thread's imports (host_main_thread.c) */
+
+/* runs work(context) on the main thread and waits for it (here, if this is
+the main thread or halo_host_use_main_queue has not been called); 0, or
+ECANCELED once halo_host_shutdown has been called. `name` is for
+HALO_HOST_TRACE_MAIN_THREAD */
+int host_main_thread_run(const char *name, void (*work)(void *context), void *context);
+/* the import `call` by work(call), which sets call->error to its errno, on
+the main thread; a failed request returns 0 with errno ECANCELED */
+void host_call_on_main_thread(struct host_call *call, const char *name, void (*work)(struct host_call *call));
+/* the requests waiting for the main thread (for the tests) */
+int host_main_thread_queued(void);
 
 /* ---------- system calls (host_syscall.c) */
 

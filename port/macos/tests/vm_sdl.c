@@ -85,6 +85,45 @@ static void case_events(void)
 	SDL_free(gamepads);
 }
 
+/* ---------- a window made on a guest thread: the host carries the
+window imports out on its main thread (host_main_thread.c), as AppKit
+needs */
+
+struct window_state
+{
+	int initialized;
+	SDL_Window *window;
+	int width, height;
+};
+
+static void *make_window(void *argument)
+{
+	struct window_state *state = argument;
+
+	state->initialized = SDL_Init(SDL_INIT_VIDEO);
+	if (!state->initialized)
+		printf("SDL_Init: %s\n", SDL_GetError());
+	state->window = SDL_CreateWindow("vm_sdl", 64, 48, 0);
+	if (!state->window)
+		printf("SDL_CreateWindow: %s\n", SDL_GetError());
+	else
+		SDL_GetWindowSizeInPixels(state->window, &state->width, &state->height);
+	return NULL;
+}
+
+static void case_window_from_thread(void)
+{
+	struct window_state state;
+	pthread_t thread;
+
+	memset(&state, 0, sizeof(state));
+	CHECK(pthread_create(&thread, NULL, make_window, &state) == 0);
+	CHECK(pthread_join(thread, NULL) == 0);
+	CHECK(state.initialized);
+	CHECK(state.window != NULL);
+	CHECK(state.width == 64 && state.height == 48);
+}
+
 /* ---------- an OpenGL ES import while headless: refused, and said once */
 
 void hostgl_glClear(unsigned int mask);
@@ -109,6 +148,8 @@ int main(int argc, char **argv)
 	}
 	else if (!strcmp(name, "events"))
 		case_events();
+	else if (!strcmp(name, "window_from_thread"))
+		case_window_from_thread();
 	else if (!strcmp(name, "gl"))
 		case_gl();
 	else

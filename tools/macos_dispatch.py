@@ -17,6 +17,12 @@ host_* imports) and port/linux/src/posix.h (each hostposix_<name> import is
 the host's posix_<name>). The OpenGL ES imports (hostgl_*) are not carried
 out while the host is headless: they return 0 and are reported once.
 
+The imports AppKit needs on its main thread (MAIN_THREAD: windows, events,
+message boxes, the clipboard) are carried out there: each case's call is a
+function of its own, which host_call_on_main_thread
+(port/macos/host/host_main_thread.c) runs on the main thread for the vCPU
+that asked, bringing its errno back.
+
 Usage: macos_dispatch.py --prototypes header.h [--prototypes ...] output.c list...
 """
 
@@ -35,6 +41,13 @@ RAW_RESULTS = {"posix_directory_open"}
 ERRNO_RESULTS = set()
 SIXTY_FOUR_BIT = {"long long", "unsigned long long", "int64_t", "uint64_t"}
 FLOATS = {"float", "double"}
+# (not the OpenGL context's imports, which are bound to the thread that
+# makes the context current)
+MAIN_THREAD = {
+    "host_sdl_init", "host_sdl_create_window", "host_sdl_window_size_in_pixels", "host_sdl_set_relative_mouse",
+    "host_sdl_poll_event", "host_sdl_set_clipboard_text", "host_sdl_get_clipboard_text", "host_sdl_show_toast",
+    "host_sdl_show_simple_message_box", "host_sdl_show_message_box",
+}
 
 
 def parse_prototypes(paths):
@@ -97,7 +110,7 @@ def stack_offset(position, size):
     return offset
 
 
-def case(index, name, prototypes):
+def case(index, name, prototypes, functions=None):
     if name.startswith("hostgl_"):
         return [f"\tcase {index}: /* {name}: no OpenGL ES while headless */",
                 f'\t\thost_dispatch_unsupported(call, {index}, "{name}");',
@@ -125,6 +138,15 @@ def case(index, name, prototypes):
         raise ValueError(f"{function} returns a host pointer, which the guest cannot hold")
     else:
         lines.append(f"\t\tcall->result_x = (uint32_t){call};")
+    if name in MAIN_THREAD:
+        if functions is None:
+            raise ValueError(f"{name} needs the main thread")
+        functions += [f"/* {name}, on the main thread */",
+                      f"static void main_thread_{index}(struct host_call *call)", "{",
+                      *(line[1:] for line in lines[1:]), "\tcall->error = errno;", "}", ""]
+        return [f"\tcase {index}: /* {name}, on the main thread */",
+                f'\t\thost_call_on_main_thread(call, "{name}", main_thread_{index});',
+                "\t\treturn 1;"]
     if function != "host_errno":
         lines.append("\t\thost_saved_errno = errno;")
     lines.append("\t\treturn 1;")
@@ -216,6 +238,15 @@ def main():
         "\tcall->result_d = 0;",
         "}",
         "",
+    ]
+    cases, functions = [], []
+    try:
+        for index, name in enumerate(names):
+            cases += case(index, name, prototypes, functions)
+    except ValueError as error:
+        sys.exit(f"macos_dispatch.py: {error}")
+    out += functions
+    out += [
         "int host_dispatch(struct host_call *call, uint32_t index)",
         "{",
         "\t(void)host_call_float;",
@@ -227,11 +258,7 @@ def main():
         "\tswitch (index)",
         "\t{",
     ]
-    try:
-        for index, name in enumerate(names):
-            out += case(index, name, prototypes)
-    except ValueError as error:
-        sys.exit(f"macos_dispatch.py: {error}")
+    out += cases
     out += ["\tdefault:", "\t\treturn 0;", "\t}", "}"]
     with open(output, "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")

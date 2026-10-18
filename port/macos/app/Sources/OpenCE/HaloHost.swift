@@ -10,7 +10,9 @@ enum HaloHost {
     /// Runs the guest image's main with `arguments` (the first is its
     /// program name) on a thread of its own, which becomes the guest's
     /// main thread. The host ends the process when the game quits; if the
-    /// VM cannot be created, `failed` is called on the main actor.
+    /// VM cannot be created, `failed` is called on the main actor. The
+    /// imports that need the main thread (windows, events, message boxes)
+    /// are carried out by the main run loop for the guest's threads.
     static func start(image: URL, arguments: [String], failed: @escaping @MainActor @Sendable () -> Void) {
         let thread = Thread {
             // The C strings are copied once and never freed: halo_host_run
@@ -29,6 +31,14 @@ enum HaloHost {
         // (the guest's own stacks are in guest memory; this is the host's
         // side of its main thread, as large as a process's main thread)
         thread.stackSize = 8 << 20
+        halo_host_use_main_queue()
         thread.start()
+    }
+
+    /// Fails the guest's requests for the main thread, which is stopping:
+    /// a guest thread waiting for one goes on instead of waiting for ever.
+    @MainActor
+    static func shutDown() {
+        halo_host_shutdown()
     }
 }

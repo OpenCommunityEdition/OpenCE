@@ -254,6 +254,26 @@ def test_the_dispatcher_reads_floats_from_the_fp_registers(tmp_path):
     assert "host_dispatch_unsupported(" in gl
 
 
+def test_the_dispatcher_runs_window_imports_on_the_main_thread(tmp_path):
+    text = generate_dispatcher(tmp_path)
+    index, window = dispatch_case(text, "host_sdl_create_window")
+    assert window == f'host_call_on_main_thread(call, "host_sdl_create_window", main_thread_{index});'
+    # the call itself is in a function of its own, which keeps its errno in
+    # the request (errno is the main thread's own there)
+    function = re.search(rf"static void main_thread_{index}\(struct host_call \*call\)\n\{{\n(.*?)\n\}}\n",
+                         text, re.S)
+    assert function, "no function for host_sdl_create_window"
+    body = " ".join(function.group(1).split())
+    assert body.startswith("call->result_x = (uint32_t)host_sdl_create_window((const char *)host_guest_pointer(")
+    assert body.endswith("call->error = errno;") and "host_saved_errno" not in body
+    _, events = dispatch_case(text, "host_sdl_poll_event")
+    assert "host_call_on_main_thread(" in events
+    # what needs no main thread is called where it is asked for
+    for name in ("host_sdl_ticks", "host_sdl_gl_swap_window", "host_sdl_put_audio_stream_data"):
+        _, body = dispatch_case(text, name)
+        assert "host_call_on_main_thread" not in body, name
+
+
 def test_the_dispatcher_refuses_imports_it_cannot_pass(tmp_path):
     lists = [tmp_path / "imports.list"]
     lists[0].write_text("host_unknown_function\n")

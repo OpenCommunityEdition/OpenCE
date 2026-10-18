@@ -241,6 +241,34 @@ The host's own settings:
 | `HALO_HOST_QUIET` | Logs only the host's warnings and errors |
 | `HALO_HOST_IMPORT_COUNTS` | At exit, reports the VM's exits per second, in all and by import (busiest first) |
 | `HALO_HOST_SAMPLE=<seconds>` | Every that many seconds, prints each vCPU's guest address and its frames |
+| `HALO_HOST_MAIN_LOOP=1` | Runs the guest on a thread of its own and the main dispatch queue on the main thread, as the app does |
+| `HALO_HOST_TRACE_MAIN_THREAD` | Reports each import the first time it is carried out on the main thread |
+
+### The main thread
+
+AppKit, and SDL's windows and events with it, must be used on the main
+thread. The app's main thread runs AppKit, so the guest's threads cannot
+call those imports there themselves. The imports that need it are listed in
+`tools/macos_dispatch.py` (`MAIN_THREAD`): SDL's initialisation, the window
+and its size, relative mouse mode, the event queue, message boxes and the
+clipboard. The OpenGL context's imports are not among them, because they
+belong to the thread that made the context current.
+
+When the guest asks for one of these imports, its vCPU thread queues the
+request (`port/macos/host/host_main_thread.c`). The main dispatch queue is
+asked to run it, and the thread waits. The run loop drains that queue in its
+common modes, so a request also runs during a modal alert or a live resize.
+The import's result and errno are brought back to the vCPU.
+
+The app turns this on with `halo_host_use_main_queue` before it starts the
+guest. Before that, and on the main thread itself, an import runs where it
+is asked for. As the app terminates, `halo_host_shutdown` fails any queued
+request with `ECANCELED`, and any made later, so that no guest thread
+waits for a run loop that has stopped.
+
+SDL keeps its error message per thread. After a failed import on the main
+thread, `SDL_GetError` on the guest's thread does not have that import's
+message.
 
 A guest crash is reported with its registers, the exception's syndrome and
 the guest's frames, by address in the image (`llvm-symbolizer` on
@@ -275,7 +303,10 @@ python -m pytest -q tools/harness         # the asset-free harness, in the VM
 ```
 
 `tools/test_macos_vm.py` runs guest programs (`port/macos/tests`) in the
-host: threads, futexes, time, files, memory, sockets and SDL, headless.
+host: threads, futexes, time, files, memory, sockets and SDL, headless, and
+a window made from a guest thread in the main-loop mode. It also builds two
+of the host's files natively and tests them: the system calls, and the
+main thread's queue with its shutdown.
 `tools/test_macos_host.py` runs the game: without maps, with them, a
 hosted network game, and a second copy that joins it (when `lo0` has the
 aliases).

@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        HaloHost.shutDown()
+    }
+
     private func fail(_ message: String) {
         let alert = NSAlert()
         alert.messageText = message

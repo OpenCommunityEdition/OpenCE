@@ -19,4 +19,13 @@ calling thread. It returns only if the VM cannot be created, with 1; a
 guest image that cannot be read or loaded ends the process (71) */
 int halo_host_run(const char *image_path, int argc, char **argv);
 
+/* from now on, the imports that need the main thread (windows, events,
+message boxes) are carried out there, by its run loop, for the guest's
+threads: called before halo_host_run is, on another thread, by a host whose
+main thread runs a run loop (the app's NSApplication, or dispatch_main) */
+void halo_host_use_main_queue(void);
+/* fails the main thread's queued requests, and any made later (as the app
+terminates, when its run loop stops) */
+void halo_host_shutdown(void);
+
 #endif
