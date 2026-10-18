@@ -126,7 +126,7 @@ def test_the_site_holds_the_page_its_fonts_licences_and_version():
     phony = re.search(r"^build web: phony ([^\n]*)", text, re.M).group(1)
     outputs = set(phony.split())
     for name in ("halo.js", "halo.wasm", "version.json", "licenses.txt", "fonts/OpenCE-Regular.ttf",
-                 "fonts/Overpass-750.ttf"):
+                 "fonts/Overpass-750.ttf", "fonts/Overpass-900.ttf"):
         assert f"build/web/site/{name}" in outputs, name
     for source in web_build.site_sources():
         assert f"build/web/site/{source.relative_to(Path('port/web/site')).as_posix()}" in outputs, source

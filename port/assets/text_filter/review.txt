@@ -294,3 +294,33 @@ drop oop
 drop ojp
 drop ow
 drop fcvpx
+
+# The project's own words, which Surge AI's list has not: sexual words and
+# those for sexualised minors, hate phrases, and harassment (a term's
+# severity puts it under the default levels: slurs mild, swearing strong)
+term swearing strong anywhere cbea
+term swearing strong anywhere uragnv
+term swearing strong whole ahqrf
+term swearing mild whole ubeal
+term swearing strong start vaprfg
+term swearing severe - orfgvnyvgl
+term swearing severe start mbbcuvy
+term swearing strong - lvss
+term swearing strong whole shgn
+term swearing strong - shgnanev
+term swearing strong - nurtnb
+term swearing strong - pnztvey
+term swearing severe whole ybyv
+term swearing severe - ybyvpba
+term swearing severe whole fubgn
+term swearing severe - fubgnpba
+term swearing strong whole encr
+term swearing strong whole encvfg
+term slurs severe - shesnt
+term slurs severe - urvyuvgyre
+term slurs severe - fvrturvy
+term insults strong whole xlf
+term insults severe - xvyylbhefrys
+term insults severe - xvyyhefrys
+term insults strong whole gubg
+term insults mild whole phpx

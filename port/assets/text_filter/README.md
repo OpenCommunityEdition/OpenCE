@@ -40,6 +40,11 @@ The groups are made from its categories (`tools/text_filter_terms.py`'s
 | SWEARING | sexual anatomy / sexual acts, bodily fluids / excrement, religious offense |
 | INSULTS | other / general insult, animal references, physical attributes |
 
+The review adds words of the project's own that their list has not (`term`
+lines at its end): sexual words (porn, hentai and the like), words for
+sexualised minors, hate phrases and harassment ("kill yourself"), each with a
+severity the default levels hide (slurs from mild, swearing from strong).
+
 The table is made from their list, so it carries their notice:
 
 ```

@@ -5267,8 +5267,8 @@ static struct gametype_option const gametype_options[] =
 	/* map sharing's (Server Setup's MAP SHARING: tools/port_settings.py's
 	MAP_SHARE_SETUP; map_share.c) */
 	{ "map_share_spinner", _option_setting, 0, 0, 2, { 0 }, "network.map_share", { "true", "false" } },
-	{ "map_share_upload_spinner", _option_setting, 0, 0, 6, { 0 }, "network.map_share_upload",
-		{ "256", "512", "1024", "2048", "4096", "8192" } },
+	{ "map_share_upload_spinner", _option_setting, 0, 0, 8, { 0 }, "network.map_share_upload",
+		{ "256", "512", "1024", "2048", "4096", "8192", "16384", "20480" } },
 	/* vehicle options (the side's set and counts: vehicles_update) */
 	{ "vehicles_respawn_spinner", _option_short, OPTIONS_FIELD(vehicle_respawn_time), 0, 7,
 		{ 0, 30, 60, 90, 120, 180, 300 } },

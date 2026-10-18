@@ -351,6 +351,7 @@ async function refreshMods() {
   }));
   $('mods-status').textContent = found.length ? `${found.length} mod${found.length === 1 ? '' : 's'} in this browser.` :
     'No mods yet.';
+  summarize('summary-mods', null, found.length ? `${found.length} mod${found.length === 1 ? '' : 's'}` : 'None yet');
   await refreshStorage();
 }
 
@@ -513,10 +514,19 @@ function canPlay() {
   return checksPassed && dataReady && !gameStarted;
 }
 
+// the Ready to play screen's rows: a row good or bad, and its value
+function summarize(id, good, text) {
+  $(id).classList.toggle('good', good === true);
+  $(id).classList.toggle('bad', good === false);
+  $(id + '-value').textContent = text;
+}
+
 function updatePlay() {
   $('play').disabled = !canPlay();
-  $('play-note').textContent = !checksPassed ? 'This browser cannot run the game (above).' :
+  $('play-note').textContent = !checksPassed ? 'This browser cannot run the game: see This browser, below.' :
     !dataReady ? 'The game data is needed first.' : '';
+  summarize('summary-browser', checksPassed, checksPassed ? 'Runs the game' : 'Cannot run the game');
+  summarize('summary-data', dataReady, dataReady ? $('data-status').textContent : 'Needed first');
 }
 
 // init.txt in the data folder: the console commands the game runs as it
