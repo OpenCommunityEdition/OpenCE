@@ -2,6 +2,7 @@
    nib), so it runs on 10.4 to 10.6 on both architectures. Layout: the title, then
    Display and Graphics (and Sound) side by side, Options below, and the buttons. */
 #include "launcher_dialog.h"
+#include "launcher_update.h"
 #include <Carbon/Carbon.h>
 #include <string.h>
 
@@ -713,9 +714,20 @@ static void build(struct lc_model *m, ControlActionUPP action, ControlRef *play,
 	c_status = make_label(28 + rw + 6 + wide + 56 + 10, 442, 612, 474, "Found: Xbox disc data and MacSoft's Halo.", 0, 1);
 	make_button(32, 482, 32 + text_width("Set Up from Disc Image\xE2\x80\xA6", kThemeSystemFont) + 80,
 		"Set Up from Disc Image\xE2\x80\xA6", CMD_DISC);
-	make_button(32 + text_width("Set Up from Disc Image\xE2\x80\xA6", kThemeSystemFont) + 92, 482,
-		32 + text_width("Set Up from Disc Image\xE2\x80\xA6", kThemeSystemFont) + 92 +
-		text_width("Controller Setup\xE2\x80\xA6", kThemeSystemFont) + 80, "Controller Setup\xE2\x80\xA6", CMD_PAD);
+	{
+		/* Controller Setup is built for Mac OS X 10.5 (IOHIDManager) */
+		ControlRef pad = make_button(32 + text_width("Set Up from Disc Image\xE2\x80\xA6", kThemeSystemFont) + 92, 482,
+			32 + text_width("Set Up from Disc Image\xE2\x80\xA6", kThemeSystemFont) + 92 +
+			text_width("Controller Setup\xE2\x80\xA6", kThemeSystemFont) + 80, "Controller Setup\xE2\x80\xA6", CMD_PAD);
+		int major = 10, minor = 5;
+
+		lu_system_version(&major, &minor);
+		if (pad && major == 10 && minor < 5)
+		{
+			DisableControl(pad);
+			help(pad, "Controller Setup needs Mac OS X 10.5 or later.");
+		}
+	}
 
 	/* the buttons */
 	c_hide = make_check(20, 524, 330, "Don't show this at startup", m->hide, 0);
@@ -748,7 +760,7 @@ int ld_run(struct lc_model *m, const struct ld_env *env)
 
 	set_rect(&bounds, 100, 100, 100 + WINDOW_WIDTH, 100 + WINDOW_HEIGHT);
 	if (CreateNewWindow(kMovableModalWindowClass,
-		kWindowCloseBoxAttribute | kWindowCompositingAttribute | kWindowStandardHandlerAttribute, &bounds,
+		kWindowCompositingAttribute | kWindowStandardHandlerAttribute, &bounds,
 		&window) != noErr)
 		return -1;
 	SetWindowTitleWithCFString(window, cs("PowerSpark"));

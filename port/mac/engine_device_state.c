@@ -36,6 +36,7 @@
 #include "engine_screen.h"
 #include "mac_render_scale.h" /* port: the render resolution */
 #include <stdlib.h>
+#include <dlfcn.h>
 void mac_gpu_textures_meter_draw(int meter); /* mac_gpu_textures.c */
 const unsigned char *mac_native_bitmap_cache_rgba(const void *,uint32_t,uint32_t *,uint32_t *,size_t *);
 #define VERTEX_PROGRAM_SLOTS 136
@@ -2749,8 +2750,13 @@ static long mac_index_cache_span(const WORD *indices,unsigned long count)
         {
             /* New spans never overlap ones pending draws read. */
             const char *extensions=(const char *)glGetString(GL_EXTENSIONS);
-            if(extensions&&strstr(extensions,"GL_APPLE_flush_buffer_range"))
-                glBufferParameteriAPPLE(GL_ELEMENT_ARRAY_BUFFER,GL_BUFFER_SERIALIZED_MODIFY_APPLE,GL_FALSE);
+            if(extensions&&strstr(extensions,"GL_APPLE_flush_buffer_range")) {
+                /* port: looked up at run time; Mac OS X 10.4 has no such symbol, so it cannot be bound at load */
+                typedef void (*buffer_parameteri_fn)(GLenum,GLenum,GLint);
+                buffer_parameteri_fn buffer_parameteri=(buffer_parameteri_fn)dlsym(RTLD_DEFAULT,"glBufferParameteriAPPLE");
+                if(buffer_parameteri)
+                    buffer_parameteri(GL_ELEMENT_ARRAY_BUFFER,GL_BUFFER_SERIALIZED_MODIFY_APPLE,GL_FALSE);
+            }
         }
         gpu_index_arena_used=0;
     } else glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,gpu_index_arena);
