@@ -18,6 +18,7 @@ high-res HUD's are (hud_hires.c).
 */
 
 #include "halo_menus.h"
+#include "changelog_menu.h"
 #include "hud_hires.h"
 #include "menu_files.h"
 #include "platform.h"
@@ -978,6 +979,7 @@ struct halo_menus const *halo_menus_load(void)
 	if (!reader.menus.root)
 		reader.menus.root = "main_menu";
 	menus = reader.menus;
+	changelog_menu_configure(&menus, config_boolean("display.changelog"));
 	succeeded = 1;
 	return &menus;
 }

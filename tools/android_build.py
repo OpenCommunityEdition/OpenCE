@@ -450,7 +450,11 @@ def generate_android_build(n: Writer, sln: Any) -> None:
             cflags += f" -include {PORT_DIR}/include/halo_android_variadic_prototypes.h"
         objects.append(guest_object(source, cflags))
     for source in sorted(Path(config["game_sources"]).glob("*.c")):
-        objects.append(guest_object(source, game_cflags))
+        cflags = game_cflags
+        # The main menu labels the executable with its release number.
+        if source.as_posix() == "port/linux/game/menu_functions.c":
+            cflags += " " + updater_defines(getattr(sln, "port_release", False))
+        objects.append(guest_object(source, cflags))
     objects.append(guest_object(STB_VORBIS_SOURCE, game_cflags))
 
     # the platform layer shared with Linux, and the guest runtime

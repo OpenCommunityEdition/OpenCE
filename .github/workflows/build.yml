@@ -45,7 +45,52 @@ env:
   CCACHE_MAXSIZE: 1G
 
 jobs:
+  changelog:
+    # Generate once so every platform embeds exactly the same player notes.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find the last published build
+        id: previous
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 tools/changelog_release_base.py --head "$GITHUB_SHA" --current-tag "build-$GITHUB_RUN_NUMBER" --output "$GITHUB_OUTPUT" --archive-output build/previous-changelog.json
+
+      - name: Collect player notes
+        if: github.ref == 'refs/heads/main'
+        env:
+          PREVIOUS: ${{ steps.previous.outputs.base }}
+        run: |
+          args=(--build-number "$GITHUB_RUN_NUMBER")
+          if [ -n "$PREVIOUS" ]; then args+=(--base "$PREVIOUS"); fi
+          if [ -f build/previous-changelog.json ]; then args+=(--previous build/previous-changelog.json); fi
+          python3 tools/player_notes.py --head "$GITHUB_SHA" "${args[@]}" --output build/changelog
+          python3 tools/changelog_menu.py --notes build/changelog/changelog.json --text-only
+          cp port/assets/menus/ce/main_menu.changelog.port.xml build/changelog/
+
+      - name: Use checked-in notes for development builds
+        if: github.ref != 'refs/heads/main'
+        run: |
+          mkdir -p build/changelog
+          cp port/assets/changelog/notes.json build/changelog/changelog.json
+          cp port/assets/menus/ce/main_menu.changelog.port.xml build/changelog/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: player-changelog
+          path: build/changelog
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 3
+
   linux:
+    needs: [changelog]
     # Arch Linux has what the build needs as packages: clang 22 (for the
     # profile-guided optimisation in pgo/), and CMake, pkg-config and
     # wayland-scanner for the SDL 3 that the portable build brings. The build
@@ -63,6 +108,16 @@ jobs:
             clang lld gcc lib32-glibc lib32-gcc-libs cmake pkgconf wayland
 
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: player-changelog
+          path: build/changelog
+
+      - name: Install player notes
+        run: |
+          cp build/changelog/main_menu.changelog.port.xml port/assets/menus/ce/
+          cp build/changelog/changelog.json port/assets/changelog/notes.json
 
       - uses: actions/cache@v4
         with:
@@ -110,6 +165,7 @@ jobs:
           retention-days: 3
 
   android:
+    needs: [changelog]
     # The runner image has the Android SDK and NDK, a JDK and CMake.
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -124,6 +180,16 @@ jobs:
           echo "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
 
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: player-changelog
+          path: build/changelog
+
+      - name: Install player notes
+        run: |
+          cp build/changelog/main_menu.changelog.port.xml port/assets/menus/ce/
+          cp build/changelog/changelog.json port/assets/changelog/notes.json
 
       - uses: actions/cache@v4
         with:
@@ -190,6 +256,7 @@ jobs:
           retention-days: 3
 
   windows:
+    needs: [changelog]
     # The runner image has LLVM, Python and Visual Studio's x86 libraries and
     # Windows SDK.
     runs-on: windows-2025
@@ -210,6 +277,16 @@ jobs:
           "$env:RUNNER_TEMP\tools" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
 
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: player-changelog
+          path: build/changelog
+
+      - name: Install player notes
+        run: |
+          cp build/changelog/main_menu.changelog.port.xml port/assets/menus/ce/
+          cp build/changelog/changelog.json port/assets/changelog/notes.json
 
       - uses: actions/cache@v4
         with:
@@ -261,6 +338,7 @@ jobs:
           retention-days: 3
 
   web:
+    needs: [changelog]
     # Emscripten (emsdk, the version below, cached) builds the web port's
     # site (port/web/README.md); the tests check its graph, the page's
     # importer and service worker, its sockets, that it starts in a
@@ -272,6 +350,16 @@ jobs:
       EMSDK_VERSION: 6.0.10
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: player-changelog
+          path: build/changelog
+
+      - name: Install player notes
+        run: |
+          cp build/changelog/main_menu.changelog.port.xml port/assets/menus/ce/
+          cp build/changelog/changelog.json port/assets/changelog/notes.json
 
       - uses: actions/cache@v4
         with:
@@ -360,6 +448,11 @@ jobs:
           pattern: halo-*
           path: artifacts
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: player-changelog
+          path: changelog
+
       - name: Package
         run: |
           mkdir release
@@ -372,15 +465,14 @@ jobs:
       - name: Publish
         id: publish
         env:
-          MESSAGE: ${{ github.event.head_commit.message }}
           COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           tag="build-$GITHUB_RUN_NUMBER"
-          subject="$(printf '%s' "${MESSAGE:-manual run}" | head -n 1)"
-          printf '%s\n\nCommit: %s\nBuild: %s\n\nThe release builds are for playing; the debug builds stop at the first failed assertion and log it.\n' \
-            "$subject" "$COMMIT_URL" "$RUN_URL" > notes.md
-          gh release create "$tag" release/*.zip --target "$GITHUB_SHA" --latest \
+          cp changelog/notes.md notes.md
+          printf '\nCommit: %s\nBuild: %s\n\nThe release builds are for playing; the debug builds stop at the first failed assertion and log it.\n' \
+            "$COMMIT_URL" "$RUN_URL" >> notes.md
+          gh release create "$tag" release/*.zip changelog/changelog.json --target "$GITHUB_SHA" --latest \
             --title "Build $GITHUB_RUN_NUMBER (${GITHUB_SHA:0:7})" --notes-file notes.md
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
