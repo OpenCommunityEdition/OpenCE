@@ -8743,6 +8743,39 @@ static boolean internal_rasterize_score(
 			buffer,
 			format,
 			buffer_size);
+		/* port: the string is 'Hold "%s" for score', which Halo PC formats
+		with the name of its score key and this build copied as it is: the
+		name of the scoreboard's key (controls.scoreboard) goes in its place, or of the
+controller's Back while a controller is in use (input.prompts) */
+		{
+			wchar_t *placeholder = buffer;
+			wchar_t tail[64];
+			wchar_t key[48];
+			long key_length = 0;
+			long length = 0;
+			long tail_length = 0;
+
+			while (placeholder[0] && !(placeholder[0] == L'%' && placeholder[1] == L's'))
+				placeholder++;
+			if (placeholder[0] && ui_prompt_scoreboard_text(key, NUMBEROF(key)))
+			{
+				placeholder[0] = 0;
+				placeholder += 2;
+				while (placeholder[tail_length] && tail_length < NUMBEROF(tail) - 1)
+				{
+					tail[tail_length] = placeholder[tail_length];
+					tail_length++;
+				}
+				tail[tail_length] = 0;
+				while (buffer[length])
+					length++;
+				while (key[key_length] && length < buffer_size - 1)
+					buffer[length++] = key[key_length++];
+				for (tail_length = 0; tail[tail_length] && length < buffer_size - 1; tail_length++)
+					buffer[length++] = tail[tail_length];
+				buffer[length] = 0;
+			}
+		}
 		break;
 	default:
 		result = FALSE;

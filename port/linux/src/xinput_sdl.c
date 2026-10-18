@@ -42,6 +42,7 @@ drive the controller.
 #include "port_config.h"
 #include "touch_input.h"
 #include "halo_keyboard.h"
+#include "input_prompts.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -718,6 +719,56 @@ static void wheel_update(void)
 	pthread_mutex_unlock(&mouse_lock);
 }
 
+/* ---------- the device in use (input.prompts) */
+
+static struct input_prompt_tracker prompt_tracker = { 1, 0.0f };
+
+int platform_prompts_keyboard(void)
+{
+#ifdef HALO_ANDROID
+	/* (the touch controls draw the controller's icons, as they always have) */
+	return FALSE;
+#else
+	static unsigned long read_at = (unsigned long)-1;
+	static int mode;
+
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		mode = input_prompts_mode(config_string("input.prompts"));
+	}
+	return mode == 1 ? TRUE : mode == 2 ? FALSE : prompt_tracker.keyboard;
+#endif
+}
+
+/* the keyboard and mouse were used since the last poll: a key or mouse button
+went down, the wheel turned, or the mouse moved some distance */
+static void prompt_note_keyboard(const struct platform_input_state *input)
+{
+	static unsigned char keys[SDL_SCANCODE_COUNT];
+	static unsigned char buttons[PLATFORM_MOUSE_BUTTON_COUNT];
+	int index;
+
+	for (index = 0; index < SDL_SCANCODE_COUNT; index++)
+	{
+		if (input->keys[index] && !keys[index])
+			input_prompt_tracker_keyboard(&prompt_tracker);
+		keys[index] = input->keys[index];
+	}
+	for (index = 0; index < PLATFORM_MOUSE_BUTTON_COUNT; index++)
+	{
+		if (!input->mouse_released && input->mouse_buttons[index] && !buttons[index])
+			input_prompt_tracker_keyboard(&prompt_tracker);
+		buttons[index] = input->mouse_buttons[index];
+	}
+	if (!input->mouse_released)
+	{
+		if (input->mouse_wheel != 0.0f)
+			input_prompt_tracker_keyboard(&prompt_tracker);
+		input_prompt_tracker_motion(&prompt_tracker, fabsf(input->mouse_dx) + fabsf(input->mouse_dy));
+	}
+}
+
 /* ---------- SDL gamepads */
 
 /* the SDL gamepads in connection order, at most one per port */
@@ -874,6 +925,34 @@ static void sdl_gamepad_state(SDL_Gamepad *gamepad, XINPUT_GAMEPAD *pad)
 	if (abs(value) > abs(pad->sThumbRY)) pad->sThumbRY = value;
 }
 
+/* the first gamepad was used since the last poll: a button went down, or a
+stick or trigger moved while past the dead zone (a stick held still does not
+count, nor drift) */
+static void prompt_note_gamepad(SDL_Gamepad *gamepad)
+{
+	static unsigned long buttons;
+	static int axes[SDL_GAMEPAD_AXIS_COUNT];
+	unsigned long now = 0;
+	int index;
+
+	for (index = 0; index < SDL_GAMEPAD_BUTTON_COUNT && index < 32; index++)
+	{
+		if (SDL_GetGamepadButton(gamepad, (SDL_GamepadButton)index))
+			now |= 1UL << index;
+	}
+	if (now & ~buttons)
+		input_prompt_tracker_gamepad(&prompt_tracker);
+	buttons = now;
+	for (index = 0; index < SDL_GAMEPAD_AXIS_COUNT; index++)
+	{
+		int value = SDL_GetGamepadAxis(gamepad, (SDL_GamepadAxis)index);
+
+		if (abs(value) > 12000 && abs(value - axes[index]) > 1500)
+			input_prompt_tracker_gamepad(&prompt_tracker);
+		axes[index] = value;
+	}
+}
+
 /* ---------- XAPI */
 
 VOID WINAPI XInitDevices(DWORD preallocation_type_count, PXDEVICE_PREALLOC_TYPE preallocation_types)
@@ -985,6 +1064,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 
 		platform_input_read(&input, TRUE);
 		mouse_poll(&input);
+		prompt_note_keyboard(&input);
 		wheel_update();
 		keyboard_actions_held = 0;
 		keys_held_over_switch(&input);
@@ -999,7 +1079,10 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 				keyboard_controls(held, &state->Gamepad);
 		}
 		if (port_gamepad(gamepads, count, 0))
+		{
+			prompt_note_gamepad(gamepads[0]);
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+		}
 		test_input_gamepad(&state->Gamepad);
 		touch_input_gamepad(&state->Gamepad);
 #if defined(HALO_ANDROID) || defined(HALO_WEB)

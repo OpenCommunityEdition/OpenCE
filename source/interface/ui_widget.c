@@ -4087,6 +4087,223 @@ static void render_state_bitmap(
 	return;
 }
 
+
+/* ---------- port: prompts that follow the device in use */
+
+#define PROMPT_TEXT_LENGTH 64
+
+/* port/linux/include/input_prompts.h: input.prompts (port_config.c), and
+the device the player used last when it is "auto" */
+extern int platform_prompts_keyboard(void);
+extern const char *config_string(const char *name);
+
+/* the keyboard and mouse setting for each game control of the controller's
+buttons (input_abstraction.c's order: jump, switch grenades, action, switch
+weapons, melee, flashlight, grenade, primary trigger, start, back, crouch,
+zoom) */
+static char const *const prompt_control_settings[12] =
+{
+	"controls.jump",
+	"controls.switch_grenade",
+	"controls.action",
+	"controls.switch_weapon",
+	"controls.melee",
+	"controls.flashlight",
+	"controls.throw_grenade",
+	"controls.fire",
+	"controls.pause",
+	"controls.scoreboard",
+	"controls.crouch",
+	"controls.zoom"
+};
+
+static boolean prompt_text_set(
+	wchar_t *buffer,
+	long size,
+	char const *text,
+	long length)
+{
+	long index;
+
+	if (length <= 0 || length >= size)
+		return FALSE;
+	for (index = 0; index < length; index++)
+		buffer[index] = (wchar_t)(unsigned char)text[index];
+	buffer[length] = 0;
+	return TRUE;
+}
+
+/* the name of a binding's first key or mouse button, as a player reads it
+("Mouse Left" is "Left Mouse"); FALSE when the control is unbound */
+static boolean prompt_binding_text(
+	char const *setting,
+	wchar_t *buffer,
+	long size)
+{
+	char const *text = config_string(setting);
+	char name[48];
+	long length = 0;
+
+	if (!text)
+		return FALSE;
+	while (*text == ' ' || *text == ',')
+		text++;
+	while (text[length] && text[length] != ',' && length < (long)sizeof(name) - 1)
+	{
+		name[length] = text[length];
+		length++;
+	}
+	while (length && name[length - 1] == ' ')
+		length--;
+	name[length] = 0;
+	if (!strncmp(name, "Mouse ", 6) && (!strcmp(name + 6, "Left") || !strcmp(name + 6, "Right") ||
+		!strcmp(name + 6, "Middle")))
+	{
+		char swapped[48];
+
+		sprintf(swapped, "%s Mouse", name + 6);
+		return prompt_text_set(buffer, size, swapped, (long)strlen(swapped));
+	}
+	if (!strcmp(name, "Wheel") || !strcmp(name, "Wheel Up") || !strcmp(name, "Wheel Down"))
+	{
+		char wheel[48];
+
+		sprintf(wheel, "Mouse %s", name);
+		return prompt_text_set(buffer, size, wheel, (long)strlen(wheel));
+	}
+	return prompt_text_set(buffer, size, name, length);
+}
+
+/* the name of the keyboard's key of the controller's "Back" for the score
+("Hold Tab for score"), in the language of the other prompts: the controller's
+when it is in use (game_engine.c) */
+boolean ui_prompt_scoreboard_text(
+	wchar_t *buffer,
+	long size)
+{
+	if (platform_prompts_keyboard() && prompt_binding_text("controls.scoreboard", buffer, size))
+		return TRUE;
+	return prompt_text_set(buffer, size, "Back", 4);
+}
+
+/* the text for a button's icon (an icon type of icon_names) while the
+keyboard and mouse are the device in use: the key that does what the button
+does for the player. FALSE draws the button's icon: a controller in use, or
+no key for it. */
+boolean ui_prompt_keyboard_text(
+	short icon_type,
+	short local_player_index,
+	wchar_t *buffer,
+	long size)
+{
+	short control = NONE;
+
+	/* (the keyboard and mouse are the first local player's) */
+	if (icon_type < 0 || icon_type >= _icon_custom_1 || (local_player_index != NONE && local_player_index != 0))
+		return FALSE;
+	if (!platform_prompts_keyboard())
+		return FALSE;
+	switch (icon_type)
+	{
+	case _icon_left_stick:
+	case _icon_move:
+		{
+			/* the four movement keys together, "W A S D" */
+			static char const *const move_settings[4] =
+			{
+				"controls.move_forward", "controls.strafe_left", "controls.move_backward", "controls.strafe_right"
+			};
+			wchar_t part[24];
+			long index, length = 0;
+
+			for (index = 0; index < 4; index++)
+			{
+				long part_length = 0;
+
+				if (!prompt_binding_text(move_settings[index], part, NUMBEROF(part)))
+					return FALSE;
+				while (part[part_length])
+					part_length++;
+				if (length + part_length + 1 >= size)
+					return FALSE;
+				if (length)
+					buffer[length++] = L' ';
+				memcpy(buffer + length, part, part_length * sizeof(wchar_t));
+				length += part_length;
+			}
+			buffer[length] = 0;
+			return TRUE;
+		}
+	case _icon_right_stick:
+	case _icon_look:
+		return prompt_text_set(buffer, size, "Mouse", 5);
+	case _icon_dpad_up:
+		return prompt_text_set(buffer, size, "Up", 2);
+	case _icon_dpad_down:
+		return prompt_text_set(buffer, size, "Down", 4);
+	case _icon_dpad_left:
+		return prompt_text_set(buffer, size, "Left", 4);
+	case _icon_dpad_right:
+		return prompt_text_set(buffer, size, "Right", 5);
+	case _icon_accept:
+		return prompt_text_set(buffer, size, "Enter", 5);
+	case _icon_back:
+		return prompt_text_set(buffer, size, "Escape", 6);
+	case _icon_action:
+	case _icon_throw_grenade:
+	case _icon_primary_trigger:
+	case _icon_integrated_light:
+	case _icon_jump:
+	case _icon_use_equipment:
+	case _icon_rotate_weapons:
+	case _icon_rotate_grenades:
+	case _icon_crouch:
+	case _icon_zoom:
+		/* (the control the icon shows the button of) */
+		control = button_mappings[icon_type - _icon_action];
+		break;
+	default:
+		/* a button of the controller: the control it is set to */
+		if (ui_widgets_active())
+		{
+			/* in the menus the keys drive the buttons (the keyboard stands
+			in for the pad: Enter is A, Escape and Backspace B, F1 Back) */
+			switch (icon_type)
+			{
+			case _icon_a_button:
+			case _icon_start_button:
+				return prompt_text_set(buffer, size, "Enter", 5);
+			case _icon_b_button:
+				return prompt_text_set(buffer, size, "Escape", 6);
+			case _icon_back_button:
+				return prompt_text_set(buffer, size, "F1", 2);
+			}
+			return FALSE;
+		}
+		else
+		{
+			struct game_input_preferences preferences;
+			short index;
+
+			input_abstraction_get_local_player_preferences(
+				local_player_index == NONE ? 0 : local_player_index,
+				&preferences);
+			for (index = 0; index < NUMBEROF(prompt_control_settings); index++)
+			{
+				if (preferences.game_control_to_xbox_buttons[index] == icon_type)
+				{
+					control = index;
+					break;
+				}
+			}
+		}
+		break;
+	}
+	if (control < 0 || control >= NUMBEROF(prompt_control_settings))
+		return FALSE;
+	return prompt_binding_text(prompt_control_settings[control], buffer, size);
+}
+
 void draw_string_and_hack_in_icons(
 	rectangle2d *bounds,
 	rectangle2d *clip,
@@ -4098,6 +4315,7 @@ void draw_string_and_hack_in_icons(
 	wchar_t *current = string_data;
 	rectangle2d cursor_bounds = *bounds;
 	unsigned long length;
+	wchar_t prompt_text[PROMPT_TEXT_LENGTH]; /* port: a key's name */
 
 	/* port: no more than the buffer holds (the text is the map's: a string
 	list's or a hud message's; retail strings are up to 398 characters of
@@ -4123,6 +4341,12 @@ void draw_string_and_hack_in_icons(
 		wchar_t *icon_spec = wcschr(current, L'%');
 		short icon_type;
 
+		/* port: a '%' that names no icon is text, drawn with what is round
+		it: split there, its pieces were each clipped to the bounds of the
+		whole string, which the pieces (each starting a pixel on) overran,
+		cutting the last character of 'Hold "%s" for score' */
+		while (icon_spec && get_icon_type(icon_spec + 1) == NONE)
+			icon_spec = wcschr(icon_spec + 1, L'%');
 		if (!icon_spec)
 			break;
 		*icon_spec = 0;
@@ -4140,6 +4364,17 @@ void draw_string_and_hack_in_icons(
 			short icon_index;
 
 			current = icon_spec + wcslen(icon_names[icon_type]);
+			/* port: while the keyboard and mouse are in use (input.prompts), the
+			button is named by its key, drawn as text */
+			if (ui_prompt_keyboard_text(
+				icon_type,
+				local_player_index_for_draw_string_and_hack_in_icons,
+				prompt_text,
+				NUMBEROF(prompt_text)))
+			{
+				render_state_text(bounds, &cursor_bounds, prompt_text);
+				continue;
+			}
 			remapped_icon_type = remap_sticks_for_local_player(
 				icon_type,
 				local_player_index_for_draw_string_and_hack_in_icons);

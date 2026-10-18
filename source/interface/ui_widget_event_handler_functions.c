@@ -2020,7 +2020,15 @@ static boolean pause_game_quit_to_main_menu(
 	/* port: in co-op, take every player on this machine out of the network
 	game with one press (not one per split screen player). The solo save is
 	left alone. */
-	if (network_coop_active())
+	/* port: the Mac's pause menu (port/mac/menus/pause_menu.xml) leaves a
+	network game the same way: this machine's players quit, and the last
+	one's quit ends the game for this machine (LEAVE GAME) */
+	if (network_coop_active()
+#ifdef HALO_MAC
+		|| game_connection() == _game_connection_network_client
+		|| game_connection() == _game_connection_network_server
+#endif
+		)
 	{
 		short controller_index;
 
@@ -2570,6 +2578,16 @@ static boolean close_calling_widget_if_not_editing_profile(
 	boolean *widget_deleted)
 {
 	boolean result;
+	/* port: Edit Profile opened with no edit begun (a path of the menus that did not begin it: it was
+	closed at once) begins it on the active profile; the screen closes only if that cannot be */
+	if (!player_ui_get_edit_player_profile() && !player_ui_get_edit_playlist_profile())
+	{
+		extern boolean pc_menu_profile_edit_begin(void);
+		struct widget_instance *top = widget_instance_get_topmost_parent(widget);
+
+		if (!csstrcmp(top->name, "player_profile_edit_screen"))
+			pc_menu_profile_edit_begin();
+	}
 	if (!player_ui_get_edit_player_profile() && !player_ui_get_edit_playlist_profile())
 	{
 		struct widget_instance *top = widget_instance_get_topmost_parent(widget);
@@ -3465,7 +3483,11 @@ boolean ui_widget_event_handler_function_invoke(
 	if ((short)function_index >= 0 && function_index < 102)
 	{
 		result = event_handler_function_list.functions[(short)function_index](widget, event, widget_deleted);
-		if (!result)
+		/* port: "new game if no plyr profiles" fails by design (it asks for the new profile's name, and
+		the handler's open and close actions then do not run): not a warning drawn on the screen */
+		/* port: "close if not editing profile" fails by design when it closes the screen (nothing is being edited) */
+		if (!result && csstrcmp(event_handler_function_list.names[(short)function_index], "new game if no plyr profiles") &&
+			csstrcmp(event_handler_function_list.names[(short)function_index], "close if not editing profile"))
 			console_warning("event handler '%s' failed", event_handler_function_list.names[(short)function_index]);
 		return result;
 	}

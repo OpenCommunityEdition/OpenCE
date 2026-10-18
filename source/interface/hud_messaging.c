@@ -1578,6 +1578,23 @@ void hud_messaging_update(
 					case _hud_message_type_icon:
 						{
 							short icon_index = NONE;
+							wchar_t prompt_text[64];
+
+							/* port: while the keyboard and mouse are in use
+							(input.prompts), a button is named by its key */
+							if (ui_prompt_keyboard_text(
+								element->data,
+								local_player_index,
+								prompt_text,
+								NUMBEROF(prompt_text)))
+							{
+								render_state_text(
+									&line_bounds,
+									&line_cursor,
+									prompt_text,
+									FALSE);
+								break;
+							}
 
 							if (element->data > _icon_right_stick)
 							{

@@ -188,6 +188,18 @@ void draw_string_and_hack_in_icons(
 	short height_adjust,
 	wchar_t const *instring,
 	boolean ignore_icon_color);
+/* port: the key that stands for a button's icon (an icon type, as the
+HUD's messages and "%action" name them) while the keyboard and mouse are in
+use (input.prompts); FALSE: draw the icon */
+boolean ui_prompt_keyboard_text(
+	short icon_type,
+	short local_player_index,
+	wchar_t *buffer,
+	long size);
+/* port: the name of the scoreboard's key, or of the controller's Back */
+boolean ui_prompt_scoreboard_text(
+	wchar_t *buffer,
+	long size);
 void ui_widgets_dispose(
 	void);
 boolean widget_event_function_list_widget_goto_next_item(
