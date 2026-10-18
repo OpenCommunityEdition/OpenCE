@@ -490,6 +490,20 @@ vertices. */
 #define INDEX_BUFFER_SIZE (8 * 1024 * 1024)
 #endif
 #define VISIBILITY_TEST_SLOTS 4096
+
+#ifndef HALO_GLES
+#define VISIBILITY_BATCH_COUNT 3
+struct visibility_batch
+{
+	GLuint queries[VISIBILITY_TEST_SLOTS];
+	unsigned short slots[VISIBILITY_TEST_SLOTS];
+	float areas[VISIBILITY_TEST_SLOTS];
+	unsigned long count, frame;
+	ULONGLONG serial;
+	GLsync fence;
+	BOOL sealed, failed;
+};
+#endif
 #ifdef HALO_GLES
 #define VISIBILITY_QUERY GL_ANY_SAMPLES_PASSED
 #define VISIBILITY_ALL_SAMPLES 1000000
@@ -564,8 +578,8 @@ struct gl_device
 	(render_target_get), which its count is divided by */
 	float query_area[VISIBILITY_TEST_SLOTS];
 	GLuint active_query;
-	/* the query a test runs on until it ends (swapped into its slot, or with
-	the results mapped and the batch full, dropped): a slot of its own, so
+	/* the fallback query a test runs on until it ends and swaps into its
+	slot: a slot of its own, so
 	that every slot, 0 too, is a test's (the game's lens flares number
 	theirs from 0) */
 	GLuint scratch_query;
@@ -597,22 +611,19 @@ struct gl_device
 	GLuint counter_values[VISIBILITY_TEST_SLOTS];
 	GLuint visibility_latest[VISIBILITY_TEST_SLOTS];
 #else
-	/* each test's latest result, which the GPU writes (as a query buffer)
-	a frame after the test (visibility_copy_batch): the game waits for
-	results at the start of the next frame, and a query would stop the CPU
-	there until the GPU had caught up */
+	/* Each batch owns a staging range until its GPU fence completes.
+	Only completed results are published to visibility_known on the CPU. */
 	GLuint visibility_results_buffer;
 	volatile GLuint *visibility_results;
-	/* the tests of this frame and of the one before, whose counts the GPU
-	is yet to copy into their slots; each batch keeps its own query objects,
-	which are not reused until their counts are copied */
+	struct visibility_batch visibility_batches[VISIBILITY_BATCH_COUNT];
+	unsigned long visibility_batch;
+	ULONGLONG visibility_serial;
+	BOOL visibility_logging;
 	struct
 	{
-		GLuint queries[VISIBILITY_TEST_SLOTS];
-		unsigned short slots[VISIBILITY_TEST_SLOTS];
-		unsigned long count;
-	} visibility_batches[2];
-	unsigned long visibility_batch;
+		unsigned long submitted, completed, samples, nonzero, maximum;
+		unsigned long timeouts, dropped, failures;
+	} visibility_stats;
 	/* a pipeline flush every flush_every draws (draw_flush), 0 never */
 	unsigned long flush_every;
 	unsigned long flush_draws;
@@ -1603,6 +1614,7 @@ static BOOL bind_targets(BOOL *has_depth)
 
 #ifndef HALO_GLES
 static BOOL visibility_queries_initialize(void);
+static void visibility_results_initialize(void);
 #endif
 
 static void gl_initialize(void)
@@ -1708,19 +1720,7 @@ static void gl_initialize(void)
 		platform_log("GPU: cannot create a valid visibility query pool; stopping before rendering");
 		exit(EXIT_FAILURE);
 	}
-	glGenBuffers(1, &device.visibility_results_buffer);
-	glBindBuffer(GL_QUERY_BUFFER, device.visibility_results_buffer);
-	glBufferStorage(GL_QUERY_BUFFER, sizeof(device.visibility_known), device.visibility_known,
-		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-	device.visibility_results = glMapBufferRange(GL_QUERY_BUFFER, 0, VISIBILITY_TEST_SLOTS * sizeof(GLuint),
-		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-	if (device.visibility_results)
-		platform_log("GPU: asynchronous visibility readback enabled; mapped results, deferred query batches");
-	else
-		platform_log("GPU: cannot map visibility results; using availability-polled query readback");
-	/* (unbound: a query read into a bound query buffer takes its pointer
-	for an offset into it) */
-	glBindBuffer(GL_QUERY_BUFFER, 0);
+	visibility_results_initialize();
 	{
 		long every = config_integer("debug.gpu_flush_draws");
 		const char *renderer = (const char *)glGetString(GL_RENDERER);
@@ -2238,8 +2238,8 @@ static int visibility_query_compare(const void *left, const void *right)
 
 static BOOL visibility_queries_initialize(void)
 {
-	GLuint queries[VISIBILITY_TEST_SLOTS * 3 + 1] = {0};
-	unsigned long count = VISIBILITY_TEST_SLOTS * 3 + 1;
+	GLuint queries[VISIBILITY_TEST_SLOTS * (VISIBILITY_BATCH_COUNT + 1) + 1] = {0};
+	unsigned long count = VISIBILITY_TEST_SLOTS * (VISIBILITY_BATCH_COUNT + 1) + 1;
 	unsigned long i, zeros = 0, duplicates = 0, invalid = 0;
 	GLenum error;
 	BOOL success = TRUE;
@@ -2268,9 +2268,30 @@ static BOOL visibility_queries_initialize(void)
 		return FALSE;
 	memcpy(device.queries, queries, sizeof(device.queries));
 	device.scratch_query = queries[VISIBILITY_TEST_SLOTS];
-	memcpy(device.visibility_batches[0].queries, queries + VISIBILITY_TEST_SLOTS + 1, sizeof(device.queries));
-	memcpy(device.visibility_batches[1].queries, queries + VISIBILITY_TEST_SLOTS * 2 + 1, sizeof(device.queries));
+	for (i = 0; i < VISIBILITY_BATCH_COUNT; i++)
+		memcpy(device.visibility_batches[i].queries, queries + VISIBILITY_TEST_SLOTS * (i + 1) + 1,
+			sizeof(device.queries));
 	return TRUE;
+}
+
+static void visibility_results_initialize(void)
+{
+	GLuint initial[VISIBILITY_TEST_SLOTS * VISIBILITY_BATCH_COUNT] = {0};
+
+	glGenBuffers(1, &device.visibility_results_buffer);
+	glBindBuffer(GL_QUERY_BUFFER, device.visibility_results_buffer);
+	glBufferStorage(GL_QUERY_BUFFER, sizeof(initial), initial,
+		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+	device.visibility_results = glMapBufferRange(GL_QUERY_BUFFER, 0, sizeof(initial),
+		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+	device.visibility_logging = config_boolean("debug.gl_debug");
+	if (device.visibility_results)
+		platform_log("GPU: completion-aware asynchronous visibility readback enabled; %d fenced batches, no CPU waits",
+			VISIBILITY_BATCH_COUNT);
+	else
+		platform_log("GPU: cannot map visibility results; using availability-polled query readback");
+	/* A CPU query read treats its pointer as an offset if this stays bound. */
+	glBindBuffer(GL_QUERY_BUFFER, 0);
 }
 #endif
 
@@ -2296,13 +2317,20 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 #else
 	if (device.visibility_results)
 	{
-		unsigned long count = device.visibility_batches[device.visibility_batch].count;
+		device.active_query = 0;
+		if (device.visibility_batch < VISIBILITY_BATCH_COUNT)
+		{
+			struct visibility_batch *batch = &device.visibility_batches[device.visibility_batch];
 
-		/* the batch's next query, or (with the batch full) a scratch one
-		whose count is dropped */
-		device.active_query = count < VISIBILITY_TEST_SLOTS ?
-			device.visibility_batches[device.visibility_batch].queries[count] : device.scratch_query;
-		glBeginQuery(VISIBILITY_QUERY, device.active_query);
+			if (!batch->sealed && !batch->failed && batch->count < VISIBILITY_TEST_SLOTS)
+				device.active_query = batch->queries[batch->count];
+		}
+		/* A full ring keeps the last completed counts; never wait or reuse
+		a query whose result still belongs to an outstanding batch. */
+		if (device.active_query)
+			glBeginQuery(VISIBILITY_QUERY, device.active_query);
+		else
+			device.visibility_stats.dropped++;
 		return;
 	}
 #endif
@@ -2333,6 +2361,9 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 		device.query_pending[index] = TRUE;
 		return S_OK;
 	}
+#else
+	if (device.visibility_results && !device.active_query)
+		return S_OK;
 #endif
 	glEndQuery(VISIBILITY_QUERY);
 	/* the target's samples to a game pixel (its pixels, by its samples a
@@ -2344,15 +2375,11 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 #ifndef HALO_GLES
 	if (device.visibility_results)
 	{
-		/* the GPU copies the count into the slot at the next frame's end
-		(visibility_copy_batch) */
-		unsigned long *count = &device.visibility_batches[device.visibility_batch].count;
+		struct visibility_batch *batch = &device.visibility_batches[device.visibility_batch];
 
-		if (*count < VISIBILITY_TEST_SLOTS)
-		{
-			device.visibility_batches[device.visibility_batch].slots[(*count)++] = (unsigned short)index;
-			device.query_pending[index] = TRUE;
-		}
+		batch->slots[batch->count] = (unsigned short)index;
+		batch->areas[batch->count++] = device.query_area[index];
+		device.query_pending[index] = TRUE;
 		return S_OK;
 	}
 #endif
@@ -2400,10 +2427,10 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 #ifndef HALO_GLES
 	if (device.visibility_results)
 	{
-		/* the latest count the GPU has written: from this test, or while
-		the GPU is still behind, from the slot's earlier ones */
+		/* Never read staging memory here: a coherent mapping still needs
+		a completed GPU fence before the CPU can consume its writes. */
 		if (result)
-			*result = visibility_unscaled(device.visibility_results[index], index);
+			*result = device.visibility_known[index];
 		return S_OK;
 	}
 #endif
@@ -5870,27 +5897,123 @@ static void write_screenshot(struct render_target_entry *target)
 }
 
 #ifndef HALO_GLES
-/* the GPU copies the counts of the previous frame's tests into their slots
-(given by name: Mesa's GL thread waits for everything before a
-glGetQueryObjectuiv, even one into a bound buffer). A copy right after each
-test stopped the GPU until that test's draws were through, hundreds of times
-a frame in The Library; a frame later the draws are long done, so the copies
-do not wait. */
+/* Defer copies by a frame to avoid interrupting the GPU after each test.
+Query-buffer copies queue GPU work; coherent mapping alone does not make
+that work complete. Retire fenced batches in submission order, publishing
+only finished counts and keeping their query objects and staging ranges
+owned until then. A slow GPU may exhaust the ring; retain the CPU cache
+and skip new measurements rather than block or overwrite pending work. */
 static void visibility_copy_batch(void)
 {
-	unsigned long i;
+	struct visibility_batch *batch;
+	unsigned long i, oldest, pending = 0;
+	BOOL submitted = FALSE;
 
 	if (!device.visibility_results)
 		return;
-	/* this frame's tests wait for the next present */
-	device.visibility_batch ^= 1;
-	for (i = 0; i < device.visibility_batches[device.visibility_batch].count; i++)
+	for (;;)
 	{
-		glGetQueryBufferObjectuiv(device.visibility_batches[device.visibility_batch].queries[i],
-			device.visibility_results_buffer, GL_QUERY_RESULT,
-			(GLintptr)(device.visibility_batches[device.visibility_batch].slots[i] * sizeof(GLuint)));
+		GLenum status;
+		unsigned long test;
+
+		oldest = VISIBILITY_BATCH_COUNT;
+		for (i = 0; i < VISIBILITY_BATCH_COUNT; i++)
+		{
+			batch = &device.visibility_batches[i];
+			if (batch->sealed && !batch->failed && (oldest == VISIBILITY_BATCH_COUNT ||
+				batch->serial < device.visibility_batches[oldest].serial))
+				oldest = i;
+		}
+		if (oldest == VISIBILITY_BATCH_COUNT)
+			break;
+		batch = &device.visibility_batches[oldest];
+		if (!batch->fence)
+			break;
+		status = glClientWaitSync(batch->fence, 0, 0);
+		if (status == GL_TIMEOUT_EXPIRED)
+		{
+			device.visibility_stats.timeouts++;
+			break;
+		}
+		if (status == GL_ALREADY_SIGNALED || status == GL_CONDITION_SATISFIED)
+		{
+			for (test = 0; test < batch->count; test++)
+			{
+				GLuint samples = device.visibility_results[oldest * VISIBILITY_TEST_SLOTS + test];
+				float area = batch->areas[test];
+
+				device.visibility_known[batch->slots[test]] = area > 1.0f ?
+					(GLuint)(samples / area + 0.5f) : samples;
+				device.visibility_stats.nonzero += samples != 0;
+				if (samples > device.visibility_stats.maximum)
+					device.visibility_stats.maximum = samples;
+			}
+			device.visibility_stats.samples += batch->count;
+			device.visibility_stats.completed++;
+			batch->count = 0;
+			batch->sealed = FALSE;
+		}
+		else
+		{
+			/* Completion is unknown: quarantine this range and its queries.
+			The context owns them until shutdown; other batches can proceed. */
+			batch->failed = TRUE;
+			device.visibility_stats.failures++;
+			platform_log("GPU: visibility fence poll failed (0x%x); batch %lu quarantined", status, oldest);
+		}
+		glDeleteSync(batch->fence);
+		batch->fence = NULL;
 	}
-	device.visibility_batches[device.visibility_batch].count = 0;
+	if (device.visibility_batch < VISIBILITY_BATCH_COUNT)
+	{
+		batch = &device.visibility_batches[device.visibility_batch];
+		if (batch->count)
+		{
+			batch->sealed = TRUE;
+			batch->serial = ++device.visibility_serial;
+			batch->frame = device.frame;
+			device.visibility_batch = VISIBILITY_BATCH_COUNT;
+		}
+	}
+	for (i = 0; i < VISIBILITY_BATCH_COUNT; i++)
+	{
+		unsigned long test;
+
+		batch = &device.visibility_batches[i];
+		if (!batch->sealed || batch->failed || batch->fence || batch->frame == device.frame)
+			continue;
+		for (test = 0; test < batch->count; test++)
+			glGetQueryBufferObjectuiv(batch->queries[test], device.visibility_results_buffer, GL_QUERY_RESULT,
+				(GLintptr)((i * VISIBILITY_TEST_SLOTS + test) * sizeof(GLuint)));
+		batch->fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+		device.visibility_stats.submitted++;
+		submitted = TRUE;
+		if (!batch->fence)
+		{
+			batch->failed = TRUE;
+			device.visibility_stats.failures++;
+			platform_log("GPU: cannot fence visibility copies; batch %lu quarantined", i);
+		}
+	}
+	/* Submit the fences even when presentation does not flush this context.
+	Flush dispatches commands; it does not wait for their completion. */
+	if (submitted)
+		glFlush();
+	for (i = 0; i < VISIBILITY_BATCH_COUNT; i++)
+	{
+		batch = &device.visibility_batches[i];
+		pending += batch->sealed && !batch->failed;
+		if (device.visibility_batch == VISIBILITY_BATCH_COUNT && !batch->sealed && !batch->failed)
+			device.visibility_batch = i;
+	}
+	if (device.visibility_logging && device.frame % 120 == 0)
+	{
+		platform_log("GPU: visibility completion frame=%lu submitted=%lu completed=%lu pending=%lu samples=%lu nonzero=%lu raw_max=%lu timeouts=%lu dropped=%lu failures=%lu",
+			device.frame, device.visibility_stats.submitted, device.visibility_stats.completed, pending,
+			device.visibility_stats.samples, device.visibility_stats.nonzero, device.visibility_stats.maximum,
+			device.visibility_stats.timeouts, device.visibility_stats.dropped, device.visibility_stats.failures);
+		memset(&device.visibility_stats, 0, sizeof(device.visibility_stats));
+	}
 }
 
 #endif
