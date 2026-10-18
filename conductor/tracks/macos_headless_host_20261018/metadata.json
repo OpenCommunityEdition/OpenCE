@@ -1,0 +1,8 @@
+{
+  "track_id": "macos_headless_host_20261018",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-10-18T11:52:52Z",
+  "updated_at": "2026-10-18T11:52:52Z",
+  "description": "Run the game on macOS: a Nix flake and a native arm64 host for the arm64_32 guest (headless)"
+}
