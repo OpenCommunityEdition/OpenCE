@@ -35,7 +35,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: Implement `GuestPtr` and the guest memory, with the Darwin reservation behind a `platform` module 1a9b22a
 - [x] Task: Write tests for the guest's address-space plan, from `port/android/host/host_memory.c`'s layout: the fixed ranges (`0x80000000`–`0x88000000`, image to `0x8c000000`), the pools and stacks, overlap checks, and the error for a range already taken (red) caa8a80
 - [x] Task: Implement the address-space plan 9743893
-- [ ] Task: Write tests for the guest's page tables: a 4 KB-granule, 4 GB stage-1 map (TCR `T0SZ=32`) built from the plan, with normal cacheable memory, EL0 access, execute only where the image's code is, and the descriptor bits checked against the Arm architecture (red)
+- [x] Task: Write tests for the guest's page tables: a 4 KB-granule, 4 GB stage-1 map (TCR `T0SZ=32`) built from the plan, with normal cacheable memory, EL0 access, execute only where the image's code is, and the descriptor bits checked against the Arm architecture (red) eebe8b7
 - [ ] Task: Implement the page-table builder and the system-register values the vCPUs start with (`TTBR0_EL1`, `TCR_EL1`, `MAIR_EL1`, `SCTLR_EL1`, `CPACR_EL1`, `VBAR_EL1`)
 - [ ] Task: Write tests for the ELF image checks: the header, program headers inside the file, segments inside the image range, the import table's bounds, with malformed images (red)
 - [ ] Task: Implement the image checks from `host_loader.c`, and export the C ABI with a cbindgen header; `cargo fmt`, `cargo clippy -D warnings`, and coverage >80%
