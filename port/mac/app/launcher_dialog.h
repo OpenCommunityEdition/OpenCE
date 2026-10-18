@@ -10,6 +10,7 @@ struct ld_env
 	const char *app_path;		/* PowerSpark.app, for its icon */
 	void (*run_controller_setup)(void);
 	void (*run_disc_setup)(void);
+	void (*show_about)(void);	/* the About window (the button, and the application menu's About) */
 	/* describes the game data found, for the dialog's status line */
 	void (*data_status)(char *out, size_t size);
 };

@@ -14,7 +14,7 @@
 enum
 {
 	CMD_PLAY = 'PLAY', CMD_QUIT = 'QUIT', CMD_FULL = 'FULL', CMD_WINDOW = 'WNDW', CMD_SOUND = 'SOND',
-	CMD_DISC = 'DISC', CMD_PAD = 'CTRL'
+	CMD_DISC = 'DISC', CMD_PAD = 'CTRL', CMD_ABOUT = 'ABUT'
 };
 
 struct choice
@@ -531,6 +531,11 @@ static OSStatus window_handler(EventHandlerCallRef call, EventRef event, void *d
 	else if (class == kEventClassWindow && kind == kEventWindowClose)
 	{
 		finish(0);
+		case CMD_ABOUT:
+		case kHICommandAbout:
+			if (environment->show_about)
+				environment->show_about();
+			return noErr;
 		return noErr;
 	}
 	else if (class == kEventClassKeyboard && kind == kEventRawKeyDown)
@@ -593,8 +598,14 @@ static void build(struct lc_model *m, ControlActionUPP action, ControlRef *play,
 	item_count = 0;
 	if (!dry)
 		make_icon();
-	make_label(76, 14, 460, 38, "PowerSpark", 0, 0);
-	make_label(76, 38, 620, 56, "Halo: Combat Evolved. Choose your settings, then click Play.", 0, 1);
+	/* port: the About window's button, at the top right (the tagline stops short of it) */
+	{
+		int about_width = text_width("About PowerSpark\xE2\x80\xA6", kThemeSystemFont) + 40;
+
+		make_label(76, 14, 460, 38, "PowerSpark", 0, 0);
+		make_label(76, 38, 624 - about_width - 8, 56, "Halo: Combat Evolved. Choose your settings, then click Play.", 0, 1);
+		make_button(624 - about_width, 14, 624, "About PowerSpark\xE2\x80\xA6", CMD_ABOUT);
+	}
 
 	/* Display */
 	lw = label_width(left_labels, 3);
@@ -741,6 +752,8 @@ int ld_run(struct lc_model *m, const struct ld_env *env)
 	SelectWindow(window);
 	RunAppModalLoopForWindow(window);
 	HideWindow(window);
+	/* (the application menu's About item) */
+	EnableMenuCommand(NULL, kHICommandAbout);
 	DisposeWindow(window);
 	DisposeControlActionUPP(action);
 	return result;

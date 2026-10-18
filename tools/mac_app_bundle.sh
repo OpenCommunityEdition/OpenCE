@@ -4,7 +4,7 @@
 # SDK), in the repository's root.
 #
 #   sh tools/mac_app_bundle.sh --engine PATH | --engine-ppc PATH --engine-i386 PATH
-#       [--helpers DIR] [--driver PKG] [--icon FILE] [--out DIR] [--version X.Y] [--no-dmg]
+#       [--helpers DIR] [--driver PKG] [--icon FILE] [--branding FILE] [--out DIR] [--version X.Y] [--no-dmg]
 #
 #   --engine       the game as one universal program, or
 #   --engine-ppc / --engine-i386   its two builds (joined with lipo): the
@@ -21,6 +21,13 @@
 #                  tools/mac_icns.py); kept out of the repository (PowerSpark's
 #                  is fan art, not OpenCE's to ship). Without it the app has
 #                  OpenCE's own icon (port/mac/app/OpenCE.icns).
+#   --branding     a branding.plist for the About and Send Feedback windows, kept out of the
+#                  repository like the icon (see port/mac/README.md, "About and feedback"):
+#                  PublisherText, Links (Title and URL), LogoFile and CAFile (names of files
+#                  beside the plist, which are copied in), FeedbackURL, FeedbackApp,
+#                  FeedbackToken. Without it the About window has the OpenCE link only and there
+#                  is no Send Feedback. With a FeedbackURL (and a CAFile), PowerSpark-send, the
+#                  program that posts a report with mbedtls, is built and added.
 #   --out          the output folder (default build/mac-app)
 #
 # Writes OUT/PowerSpark.app and, unless --no-dmg, OUT/PowerSpark-VERSION.dmg.
@@ -31,7 +38,7 @@ CC=${CC:-gcc-4.0}
 SDK=${SDK:-/Developer/SDKs/MacOSX10.4u.sdk}
 OUT=$ROOT/build/mac-app
 VERSION=0.1
-ENGINE= ENGINE_PPC= ENGINE_I386= HELPERS= DRIVER= ICON= DMG=1
+ENGINE= ENGINE_PPC= ENGINE_I386= HELPERS= DRIVER= ICON= BRANDING= DMG=1
 while [ $# -gt 0 ]; do
     case $1 in
         --engine) ENGINE=$2; shift ;;
@@ -40,6 +47,7 @@ while [ $# -gt 0 ]; do
         --helpers) HELPERS=$2; shift ;;
         --driver) DRIVER=$2; shift ;;
         --icon) ICON=$2; shift ;;
+        --branding) BRANDING=$2; shift ;;
         --out) OUT=$2; shift ;;
         --version) VERSION=$2; shift ;;
         --no-dmg) DMG=0 ;;
@@ -71,9 +79,13 @@ $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -std=gnu
 $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -std=gnu99 -include "$APPSRC/mac_toml_assert.h" \
     -I"$TOML" -c "$TOML/tomlc17.c" -o "$WORK/tomlc17.o"
 # (the startup dialog's sources are beside it: launcher_config.c is plain C, launcher_dialog.c Carbon)
+# (the feedback report's JSON, log and Outbox code is tested the same way)
+$CC -std=gnu89 -Wall -o "$WORK/test_feedback_report" "$APPSRC/test_feedback_report.c" "$APPSRC/feedback_report.c"
+"$WORK/test_feedback_report" "$WORK/feedback_test"
 $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -Wall -std=gnu89 \
     -o "$APP/Contents/MacOS/PowerSpark" "$APPSRC/opence_launcher.c" "$APPSRC/launcher_config.c" \
-    "$APPSRC/launcher_dialog.c" "$WORK/launcher_toml_check.o" "$WORK/tomlc17.o" -framework Carbon -framework CoreFoundation
+    "$APPSRC/launcher_dialog.c" "$APPSRC/launcher_about.c" "$APPSRC/launcher_branding.c" "$APPSRC/feedback_report.c" \
+    "$WORK/launcher_toml_check.o" "$WORK/tomlc17.o" -framework Carbon -framework CoreFoundation
 
 # the game
 if [ -n "$ENGINE" ]; then
@@ -109,6 +121,46 @@ if [ -n "$DRIVER" ]; then
     echo "mac_app_bundle: --driver is ignored; the app carries no controller driver" >&2
 fi
 
+# the About and Send Feedback windows' branding (--branding): the plist and the files it names
+if [ -n "$BRANDING" ]; then
+    [ -f "$BRANDING" ] || { echo "no branding file $BRANDING" >&2; exit 2; }
+    BRANDDIR=$(CDPATH= cd "$(dirname "$BRANDING")" && pwd)
+    plutil -lint "$BRANDING" > /dev/null
+    cp "$BRANDING" "$APP/Contents/Resources/branding.plist"
+    brand_key() { /usr/libexec/PlistBuddy -c "Print :$1" "$BRANDING" 2> /dev/null || true; }
+    for key in LogoFile CAFile; do
+        name=$(brand_key $key)
+        case $name in
+            "") ;;
+            */*|.*) echo "branding: $key must be a plain file name beside the plist" >&2; exit 2 ;;
+            *) [ -f "$BRANDDIR/$name" ] || { echo "branding: no $BRANDDIR/$name" >&2; exit 2; }
+               cp "$BRANDDIR/$name" "$APP/Contents/Resources/$name" ;;
+        esac
+    done
+    FEEDBACK_URL=$(brand_key FeedbackURL)
+    if [ -n "$FEEDBACK_URL" ]; then
+        [ -n "$(brand_key CAFile)" ] || { echo "branding: FeedbackURL needs a CAFile (the CA list the HTTPS is checked with)" >&2; exit 2; }
+        # PowerSpark-send: mbedtls (the vendored copy, with the Mac's configuration) and the sender. The library's
+        # objects are kept in build/mac-feedback and rebuilt when a source is newer, since they take a while
+        MB=$ROOT/port/third_party/mbedtls
+        OBJ=$ROOT/build/mac-feedback
+        mkdir -p "$OBJ"
+        for src in "$MB"/library/*.c; do
+            o=$OBJ/$(basename "$src" .c).o
+            if [ ! -f "$o" ] || [ "$src" -nt "$o" ] || [ "$ROOT/port/mac/mac_mbedtls_config.h" -nt "$o" ]; then
+                $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -std=gnu99 -Os \
+                    -DMBEDTLS_CONFIG_FILE='"mac_mbedtls_config.h"' -ffunction-sections -fdata-sections \
+                    -I"$ROOT/port/mac" -I"$MB/include" -I"$MB/library" -c "$src" -o "$o"
+            fi
+        done
+        $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -std=gnu99 -Os -Wall \
+            -DMBEDTLS_CONFIG_FILE='"mac_mbedtls_config.h"' -ffunction-sections -fdata-sections \
+            -I"$ROOT/port/mac" -I"$MB/include" -o "$APP/Contents/MacOS/PowerSpark-send" "$APPSRC/feedback_send.c" \
+            "$ROOT/port/mac/mac_mbedtls_time.c" "$OBJ"/*.o -framework CoreServices -Wl,-dead_strip
+        chmod 755 "$APP/Contents/MacOS/PowerSpark-send"
+    fi
+fi
+
 # the icon: --icon's (.icns as it is, .png through tools/mac_icns.py), else OpenCE's
 case $ICON in
     *.icns) cp "$ICON" "$APP/Contents/Resources/PowerSpark.icns" ;;
@@ -120,6 +172,7 @@ sed -e "s/@VERSION@/$VERSION/" -e "s/@BUILD@/$BUILD/" "$APPSRC/Info.plist" > "$A
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 plutil -lint "$APP/Contents/Info.plist"
 lipo -info "$APP/Contents/MacOS/PowerSpark" "$APP/Contents/MacOS/PowerSpark-game"
+if [ -f "$APP/Contents/MacOS/PowerSpark-send" ]; then lipo -info "$APP/Contents/MacOS/PowerSpark-send"; fi
 
 if [ "$DMG" = 1 ]; then
     DMGDIR=$WORK/dmg

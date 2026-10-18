@@ -9,7 +9,7 @@
 
    Usage: PowerSpark [--dry-run] [--setup | --controller-setup] [--data-source
    auto|xbox|retail] [--dialog | --no-dialog | --dialog-dump |
-   --dialog-layout] [game arguments]
+   --dialog-layout] [--about | --feedback | --about-dump | --about-selftest] [game arguments]
      --dry-run          print what would be run (folders, data, settings set,
                         the game's command) and do nothing else
      --setup            open PowerSpark Setup (the Xbox disc image) and quit
@@ -20,6 +20,10 @@
      --dialog-dump      print what the dialog would show, and quit; no window
      --dialog-layout    print each control's rectangle and its text's width, and
                         quit with 1 if some text does not fit its control
+     --about            show the About window and quit
+     --feedback         show the Send Feedback window and quit (when the build has an endpoint)
+     --about-dump       print the About and Send Feedback windows' layout like --dialog-layout
+     --about-selftest   make both windows without showing them, and read their controls back
    The startup dialog (settings, Play, Quit, Setup, Controller Setup) opens
    before the game unless "Don't show this at startup" was checked (the file
    startup-dialog holds "off"); holding Option while the app opens shows it
@@ -42,6 +46,8 @@
 #include <unistd.h>
 #include "launcher_config.h"
 #include "launcher_dialog.h"
+#include "launcher_about.h"
+#include "feedback_report.h"
 
 #define MAX_ENVIRONMENT 24
 #define LOGS_KEPT 20
@@ -65,6 +71,8 @@ static const char *g_controller, *g_disc;
 static char g_xbox_data[PATH_MAX];
 static char g_retail[PATH_MAX];
 static int g_have_retail;
+static struct la_env g_about;
+static struct lb_branding g_branding;
 
 static int path_join(char *out, const char *a, const char *b)
 {
@@ -416,6 +424,67 @@ static void dialog_data_status(char *out, size_t size)
 		snprintf(out, size, "No game data yet. Click Set Up from Disc Image and choose your Halo disc image.");
 }
 
+static void dialog_about(void)
+{
+	la_show_about(&g_about);
+}
+
+/* starts the sender on the Outbox (reports kept from an earlier try) without waiting for it: the first process
+   is waited for, its child (started by a second fork) is left to launchd, so that no zombie follows the game */
+static void flush_outbox(void)
+{
+	char dir[PATH_MAX], version[32] = "?";
+	DIR *d;
+	struct dirent *e;
+	int any = 0;
+	pid_t pid;
+
+	if (!lb_feedback_ready(&g_branding) || fb_outbox_dir(g_about.home, dir, sizeof(dir), 0) != 0)
+		return;
+	d = opendir(dir);
+	if (!d)
+		return;
+	while ((e = readdir(d)) != NULL)
+	{
+		size_t n = strlen(e->d_name);
+
+		if (e->d_name[0] != '.' && n > 5 && strcmp(e->d_name + n - 5, ".json") == 0)
+			any = 1;
+	}
+	closedir(d);
+	if (!any)
+		return;
+	{
+		CFBundleRef bundle = CFBundleGetMainBundle();
+		CFTypeRef v = bundle ? CFBundleGetValueForInfoDictionaryKey(bundle, CFSTR("CFBundleShortVersionString")) : NULL;
+
+		if (v && CFGetTypeID(v) == CFStringGetTypeID())
+			CFStringGetCString((CFStringRef)v, version, sizeof(version), kCFStringEncodingUTF8);
+	}
+	pid = fork();
+	if (pid == 0)
+	{
+		if (fork() == 0)
+		{
+			int null = open("/dev/null", O_RDWR);
+
+			setsid();
+			if (null >= 0)
+			{
+				dup2(null, 0);
+				dup2(null, 1);
+				dup2(null, 2);
+			}
+			execl(g_branding.sender_path, g_branding.sender_path, "--url", g_branding.feedback_url, "--ca",
+				g_branding.ca_path, "--token", g_branding.feedback_token, "--app-version", version, dir, (char *)NULL);
+		}
+		_exit(0);
+	}
+	if (pid > 0)
+		while (waitpid(pid, NULL, 0) < 0 && errno == EINTR)
+			;
+}
+
 /* "off" in a one-word file of the support folder: the startup dialog is not shown */
 static int read_dialog_hidden(void)
 {
@@ -458,6 +527,7 @@ int main(int argc, char **argv)
 	int i, nargs = 0, want_setup = 0, want_controller = 0, have_retail = 0, have_xbox = 0, use_xbox = 0;
 	int config_dir_support;
 	int force_dialog = 0, no_dialog = 0, dialog_dump = 0, dialog_layout = 0;
+	int about_dump = 0, about_show = 0, feedback_show = 0, about_selftest = 0;
 	struct lc_model dialog_model;
 	const char *dialog_env;
 	time_t now;
@@ -480,6 +550,14 @@ int main(int argc, char **argv)
 			no_dialog = 1;
 		else if (strcmp(argv[i], "--dialog-layout") == 0)
 			dialog_layout = dry_run = 1;
+		else if (strcmp(argv[i], "--about-dump") == 0)
+			about_dump = dry_run = 1;
+		else if (strcmp(argv[i], "--about-selftest") == 0)
+			about_selftest = dry_run = 1;
+		else if (strcmp(argv[i], "--about") == 0)
+			about_show = 1;
+		else if (strcmp(argv[i], "--feedback") == 0)
+			feedback_show = 1;
 		else if (strcmp(argv[i], "--dialog-dump") == 0)
 			dialog_dump = dry_run = 1;	/* (it writes and runs nothing) */
 		else if (strcmp(argv[i], "--data-source") == 0 && i + 1 < argc)
@@ -626,6 +704,34 @@ int main(int argc, char **argv)
 	snprintf(dialog_model.data_source, sizeof(dialog_model.data_source), "%s", source_name);
 	snprintf(dialog_model.data_source_original, sizeof(dialog_model.data_source_original), "%s", source_name);
 	dialog_model.hide = dialog_model.hide_original = read_dialog_hidden();
+	/* the About and Send Feedback windows: what the build adds (branding.plist), and the feedback sender */
+	lb_load(&g_branding, resources);
+	path_join(g_branding.sender_path, macos, "PowerSpark-send");
+	g_about.home = home;
+	g_about.logs_dir = logs;
+	g_about.branding = &g_branding;
+	{
+		static char app_path[PATH_MAX];
+
+		snprintf(app_path, sizeof(app_path), "%s", contents);
+		if (strlen(app_path) > 9)
+			app_path[strlen(app_path) - 9] = 0;	/* .../PowerSpark.app/Contents */
+		g_about.app_path = app_path;
+	}
+	if (about_dump)
+		return la_layout_report(&g_about, stdout) != 0;
+	if (about_selftest)
+		return la_selftest(&g_about, stdout) != 0;
+	if (about_show)
+	{
+		la_show_about(&g_about);
+		return 0;
+	}
+	if (feedback_show)
+	{
+		la_show_feedback(&g_about);
+		return 0;
+	}
 	if (dialog_layout)
 	{
 		/* (no window: each control's rectangle and its text's width in the system font; 1 if some text does not fit) */
@@ -663,6 +769,7 @@ int main(int argc, char **argv)
 		env.run_controller_setup = dialog_controller_setup;
 		env.run_disc_setup = dialog_disc_setup;
 		env.data_status = dialog_data_status;
+		env.show_about = dialog_about;
 		shown = ld_run(&dialog_model, &env);
 		if (shown == 0)
 			return 0;
@@ -835,6 +942,7 @@ int main(int argc, char **argv)
 				config_text && (line_value(config_text, "gamepad_setup_done", text, sizeof(text)) ||
 					line_value(config_text, "input.gamepad_setup_done", text, sizeof(text))) &&
 					strcmp(text, "true") == 0 ? "done" : "yes");
+			printf("feedback:      %s\n", lb_feedback_ready(&g_branding) ? g_branding.feedback_url : "off");
 			printf("config via:    %s\n", config_dir_support ? "HALO_MAC_CONFIG_DIR" : "staged copy of the game");
 			for (k = 0; k < shown_environment_count; ++k)
 				printf("env:           %s\n", shown_environment[k]);
@@ -878,6 +986,7 @@ int main(int argc, char **argv)
 			free(latest);
 		}
 
+		flush_outbox();
 		prune_logs();
 		{
 			int fd = open(log_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);

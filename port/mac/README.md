@@ -71,6 +71,57 @@ what it would show, without a window; `--dialog-layout` prints each control's re
 and its text's width in the system font and exits 1 if a text does not fit its control
 (the labels beside the popups are as wide as their longest text, so a longer translation
 makes the popups narrower, not the text cut). Hovering a control shows a help tag.
+The window's "About PowerSpark..." button (and the application menu's About item) opens the About
+window, below.
+
+## About and Send Feedback
+
+The About window shows the icon, the name, the version and build (from `Info.plist`), the build's stage
+(`OpenCEBuildStage`, "alpha"), a disclaimer (PowerSpark is not made by or affiliated with Microsoft, Bungie
+or 343 Industries; it is built on OpenCE, a community port of the Xbox game's decompilation, and plays from the
+player's own copy of the game), a credit to OpenCE with a button to its project page, and whatever the build's
+maker adds (below). Links open in the Mac's default browser (`LSOpenCFURLRef`). Both windows are Carbon controls
+made in code (`port/mac/app/launcher_about.c`), measured like the start window: a paragraph is measured at
+its width in the system font, and the window is as tall as the text needs. `PowerSpark --about-dump` prints each
+control's rectangle and its text's size and exits 1 if one does not fit; `--about` and `--feedback` open the
+windows alone; `--about-selftest` makes both without showing them and reads their controls back
+(`tools/mac_about_checks.sh` runs the lot on the build Mac).
+
+What a build adds of its own is not in the repository. `tools/mac_app_bundle.sh --branding FILE` copies a
+`branding.plist` (and the files it names, which sit beside it) into `Contents/Resources`:
+
+| Key | Meaning |
+| --- | --- |
+| `PublisherText` | a paragraph about the build's maker, in the About window |
+| `Links` | up to three `{Title, URL}` buttons (http and https only) |
+| `LogoFile` | a PNG shown in the About window, a plain file name beside the plist |
+| `CAFile` | the CA list (PEM) that the feedback's HTTPS is checked with |
+| `FeedbackURL` | an `https://` endpoint; without it there is no Send Feedback |
+| `FeedbackApp` | the report's `app` field (default `powerspark`) |
+| `FeedbackToken` | sent as `X-Feedback-Client` |
+
+Without `--branding` the About window has the OpenCE link only and there is no feedback button. The
+repository carries no CA list: a build with a `FeedbackURL` supplies its own (Mozilla's, from curl.se,
+for instance).
+
+Send Feedback asks for a topic (The game crashed or quit, Something looked wrong, It was too slow, A controller
+didn't work, Network play, A suggestion, Something else), what happened, an optional email, and whether to
+include the end of the newest log in `~/Library/Logs/OpenCE` (about 48 KB, with the home folder written as
+`~`). Nothing is sent until Send is pressed; the window says what travels: the version and build, the Mac's
+model, system and processor, and the log if ticked. The report is JSON (`feedback_report.c`: `id`, `app`,
+`version`, `build`, `topic`, `summary`, `message`, `email`, `system` with `os`, `arch`, `model`, `cpu`,
+`memoryMB`, `screen`, and `log`), written first to `~/Library/Application Support/OpenCE/Outbox/ID.json`
+and then posted. A report the site takes, or refuses for good (400 or 413), is deleted; any other failure
+leaves it in the Outbox, and PowerSpark tries the whole Outbox again, in the background, each time it starts
+(a report older than 60 days is dropped).
+
+The post is made by `Contents/MacOS/PowerSpark-send`, a program of its own (`feedback_send.c`) that the
+launcher starts: it uses the vendored mbedtls (the Mac's configuration, `mac_mbedtls_config.h`) with the
+branding's CA list, so TLS 1.2 and 1.3 work on every Mac (10.4 to 10.6's own networking stops at TLS 1.0),
+PowerPC or Intel, and the launcher carries none of the library. It verifies the site's certificate and name,
+and says when the Mac's clock is the reason it cannot. `PowerSpark-send --url URL --ca FILE --handshake`
+checks a site's certificate against a CA list and sends nothing. Its objects are kept in `build/mac-feedback`.
+No screenshot is offered: the launcher's windows are all there is to see, and the log says more.
 
 ## Game data
 
@@ -292,7 +343,7 @@ sh tools/mac_app_bundle.sh --engine-ppc $OUT/mac_rendered_session_ppc \
 menus, the icon and `Info.plist`, checks the plist and the architectures,
 and makes `build/mac-app/PowerSpark-VERSION.dmg` (`hdiutil`). The icon is
 `--icon FILE`, which is not in the repository: PowerSpark's is fan art and is
-not the project's to ship. Without `--icon`, the app gets OpenCE's own
+not the project's to ship. `--branding FILE` (above) is kept out of the repository the same way. Without `--icon`, the app gets OpenCE's own
 `port/mac/app/OpenCE.icns`. A `.png` given to `--icon` is
 written by `tools/mac_icns.py` (Python 3 with Pillow): the classic icon types
 that 10.4 reads (16 to 128 pixels, with 8-bit masks) and JPEG 2000 at 256 and
