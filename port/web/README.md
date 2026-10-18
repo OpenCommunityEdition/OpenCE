@@ -378,6 +378,11 @@ takes the site's copy only when that fails; the page loads `halo.wasm` from
 the site as before, from the worker's cache. jsDelivr serves files of at most
 20 MB from GitHub: a larger wasm comes from the site, and the step says so.
 
+The page counts its visits with Umami (`https://nexus.mrbruh.com/app-state`
+in `index.html`, which sets no cookies). The page being cross-origin
+isolated, the script is loaded with `crossorigin="anonymous"`: its host sends
+CORS headers, not `Cross-Origin-Resource-Policy`.
+
 Once, an owner of the organization sets it up:
 
 1. Organization settings → Pages → **Add a verified domain**:
