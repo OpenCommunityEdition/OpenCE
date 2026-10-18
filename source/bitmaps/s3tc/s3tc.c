@@ -655,7 +655,19 @@ void DecodeBlockRGB__single_pixel(
 
 	if (pblockSrc == NULL)
 	{
-		memset(colorDst, 0, sizeof(*colorDst));
+		/* BUG (original, preserved for exact matching): January clears S3TC_BLOCK_PIXELS colors here,
+		 * 0x40 bytes (0x45fc30 +0x11 push 0x40, +0x15 call _csmemset), as the full-block decoder
+		 * DecodeBlockRGB does, but colorDst addresses ONE color. In bitmap_2d_get_pixel, the only caller
+		 * chain, that color is the four-byte local pixel, so the clear would overwrite 60 further bytes of
+		 * that function's frame.
+		 * The clear is not executed in January: bitmap_2d_get_pixel decodes only when
+		 * bitmap->base_address is not NULL and halts (display_assert, then an unconditional system_exit)
+		 * unless block_address >= bitmap->base_address; it passes block_address here for dxt1, and
+		 * DecodeBlockAlpha4__single_pixel and DecodeBlockAlpha3__single_pixel pass &source->rgb
+		 * (block_address + 8) for dxt3 and dxt5. No other function references this one.
+		 * January's bytes give the length (0x40) only; its spelling here is inferred from DecodeBlockRGB,
+		 * not recovered source. A corrected build clears sizeof(*colorDst). */
+		memset(colorDst, 0, S3TC_BLOCK_PIXELS * sizeof(struct s3tc_color));
 		return;
 	}
 
@@ -692,8 +704,13 @@ void DecodeBlockRGB__single_pixel(
 		colors[3].rgba[S3TC_ALPHA] = 0;
 	}
 
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\s3tc\\s3tc.c", 773, u >= 0 && u < 4);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\s3tc\\s3tc.c", 774, v >= 0 && v < 4);
+	/* BUG (original, preserved for exact matching): both assertions admit 4 (0x45fc30 +0x17c cmp si,4 /
+	 * +0x180 jle; +0x1aa cmp bx,4 / +0x1ae jle; the assertion strings are January's "u>=0 && u<=4" and
+	 * "v>=0 && v<=4"), although a block has four columns and four rows, 0..3. With u or v equal to 4 the
+	 * selector shift below can reach 32 or more. bitmap_2d_get_pixel masks both coordinates with 3 before
+	 * every call, so neither value exceeds 3 in January. A corrected build asserts u<4 and v<4. */
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\s3tc\\s3tc.c", 773, u>=0 && u<=4);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\s3tc\\s3tc.c", 774, v>=0 && v<=4);
 
 	*colorDst = colors[(pblockSrc->bitmap >> (2 * (4 * v + u))) & 3];
 
