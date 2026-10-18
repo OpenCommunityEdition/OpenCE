@@ -68,10 +68,10 @@ typedef unsigned short message_header;
 ''' + structure(header, "distributed_message_header") + r'''
 static int unreliable,accepted;
 static int network_connection_last_read_was_unreliable(void) {return unreliable;}
-enum {NONE=-1,_distributed_message_mcc_game_speed=90};
+enum {NONE=-1,_distributed_message_mcc_game_speed=93};
 static void dispatch(int machine_index,unsigned int size,unsigned int count) {
  struct distributed_message_header header={0};
- unsigned int entry_size=0;header.type=90;header.count=count;
+ unsigned int entry_size=0;header.type=_distributed_message_mcc_game_speed;header.count=count;
  switch(header.type) {
 ''' + case + r'''
  }
@@ -125,8 +125,11 @@ typedef word message_header;
 int main(void) {
  struct distributed_message_header h = {0};
  int i;
- CHECK(_distributed_message_mcc_grenades == 87);
- CHECK(_distributed_message_mcc_campaign == 88);
+ CHECK(_distributed_message_chat_up == 87);
+ CHECK(_distributed_message_chat_down == 88);
+ CHECK(_distributed_message_chat_config == 89);
+ CHECK(_distributed_message_mcc_grenades == 90);
+ CHECK(_distributed_message_mcc_campaign == 91);
  for (i = 0; i < NUMBER_OF_DISTRIBUTED_MESSAGES; ++i) {
   h.type = i;
   CHECK(!!map_share_handles_message((word *)&h, sizeof(h)) == (i >= 83 && i <= 86));
