@@ -6,10 +6,10 @@ static int checks, failures;
 #define CHECK(x) do { ++checks; if (!(x)) { ++failures; fprintf(stderr,"line %d failed: %s\n",__LINE__,#x); } } while (0)
 int main(void)
 {
-    /* PowerPC: the iBook's 32 MB draws low, the PowerBook's 64 MB medium */
+    /* PowerPC: the iBook's 32 MB draws low, the PowerBook's 64 MB low too */
     CHECK(mac_gpu_pick_preset(32, 1) == MAC_DETAIL_LOW);
-    CHECK(mac_gpu_pick_preset(64, 1) == MAC_DETAIL_MEDIUM);
-    CHECK(mac_gpu_pick_preset(33, 1) == MAC_DETAIL_MEDIUM);
+    CHECK(mac_gpu_pick_preset(64, 1) == MAC_DETAIL_LOW);
+    CHECK(mac_gpu_pick_preset(33, 1) == MAC_DETAIL_LOW);
     CHECK(mac_gpu_pick_preset(16, 1) == MAC_DETAIL_LOW);
     CHECK(mac_gpu_pick_preset(128, 1) == MAC_DETAIL_HIGH);
     CHECK(mac_gpu_pick_preset(256, 1) == MAC_DETAIL_HIGH);

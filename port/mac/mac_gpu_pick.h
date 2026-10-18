@@ -7,15 +7,16 @@
 
 enum { MAC_DETAIL_HIGH, MAC_DETAIL_LOW, MAC_DETAIL_LOWEST, MAC_DETAIL_MEDIUM };
 
-/* Detail for mac.detail "auto": a PowerPC Mac with 32 MB of video memory or
-   less (the iBook's Radeon 9550) draws the low preset, one with 64 MB or less
-   (the PowerBook's Radeon 9600 and 9700) the medium preset; an Intel Mac, or a
-   PowerPC Mac with a larger card, the stock detail. */
+/* Detail for mac.detail "auto": a PowerPC Mac with 64 MB of video memory or
+   less (the iBook's Radeon 9550, the PowerBook's Radeon 9600 and 9700) draws
+   the low preset: the medium preset ran the PowerBook's Radeon 9700 at about
+   10 frames a second in b30, and the low preset is the one the 30 frame work
+   was measured with; an Intel Mac, or a PowerPC Mac with a larger card, the
+   stock detail. */
 static __inline__ int mac_gpu_pick_preset(int vram_mb, int is_ppc)
 {
     if (!is_ppc) return MAC_DETAIL_HIGH;
-    if (vram_mb <= 32) return MAC_DETAIL_LOW;
-    return vram_mb <= 64 ? MAC_DETAIL_MEDIUM : MAC_DETAIL_HIGH;
+    return vram_mb <= 64 ? MAC_DETAIL_LOW : MAC_DETAIL_HIGH;
 }
 
 /* The picture's height in lines for mac.render_resolution "auto" (0: the
