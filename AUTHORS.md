@@ -23,8 +23,9 @@
   (`port/assets/menus/svg/shell/main_menu`).
 - **The profile settings' pictures** (Change Name, Controls Setup,
   Gamepads, Mouse Setup, Audio Setup, Video Setup, Network Setup and About:
-  frames 0 to 6 and 8 of `profile_options`): drawn by Adam Cipoletti
-  (`port/assets/menus/art`).
+  frames 0 to 6 and 8 of `profile_options`, and the PlayStation pad's
+  versions of Controls Setup and Gamepads, `profile_options__1@ps` and
+  `__2@ps`): drawn by Adam Cipoletti (`port/assets/menus/art`).
 - **The Mac's reduced HUD** (the high-res HUD scaled down for the Mac's
   small video memory): reductions by OpenCE contributors of MrBruh's redraws
   (`port/assets/hud_mac`, made by `tools/mac_hud_reduce.py`).

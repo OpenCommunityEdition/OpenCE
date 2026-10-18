@@ -4,6 +4,8 @@
    HALO_MAC_MENU_ART_DIR (port/assets/menus of a checkout, until the kit
    embeds them). */
 #include "engine_menu_art.h"
+#include "../linux/include/input_prompts.h"
+#include "../linux/src/port_config.h"
 #include <ApplicationServices/ApplicationServices.h>
 #include <OpenGL/gl.h>
 #include <mach-o/dyld.h>
@@ -14,7 +16,11 @@
 /* mac_gpu_textures.c: the binder's shadow of a texture name, let go before the name is */
 void mac_gpu_textures_forget(GLuint name);
 #define MAXIMUM_ART 1024
-struct art { const void *texture; char *png; GLuint name; float scale_u, scale_v; long width, height; int failed; };
+/* name, scale_u, scale_v, width, height and failed are the picture's; variant_* the
+   PlayStation pad's picture of the frame (its PNG's name with "@ps" before the
+   extension), if it has one */
+struct art { const void *texture; char *png; GLuint name; float scale_u, scale_v; long width, height; int failed;
+    GLuint variant_name; float variant_scale_u, variant_scale_v; int variant_failed; };
 static struct art arts[MAXIMUM_ART];
 static unsigned art_count;
 void mac_menu_art_register(const void *texture, const char *png)
@@ -31,6 +37,7 @@ void mac_menu_art_forget(void)
     unsigned i;
     for(i=0;i<art_count;++i) {
         if(arts[i].name){mac_gpu_textures_forget(arts[i].name);glDeleteTextures(1,&arts[i].name);}
+        if(arts[i].variant_name){mac_gpu_textures_forget(arts[i].variant_name);glDeleteTextures(1,&arts[i].variant_name);}
         free(arts[i].png);
     }
     memset(arts,0,sizeof(arts));art_count=0;
@@ -66,10 +73,10 @@ static const char *art_directory(void)
    it has one of this PNG's picture and there is such an install */
 unsigned char *halo_menus_pc_art(const char *png,long *width,long *height);
 const char *halo_menus_pc_art_source(void);
-static unsigned char *decode(const char *png,unsigned long *width,unsigned long *height)
+static unsigned char *decode(const char *png,unsigned long *width,unsigned long *height,int variant)
 {
     const char *directory=art_directory();
-    {
+    if(!variant) {
         long pc_width=0,pc_height=0;
         unsigned char *pc=halo_menus_pc_art(png,&pc_width,&pc_height);
         if(pc) {
@@ -114,12 +121,23 @@ static unsigned char *decode(const char *png,unsigned long *width,unsigned long 
     *width=w;*height=h;return pixels;
 }
 /* ImageIO's rows are top first; so are the game's texture coordinates */
-static int upload(struct art *art,long width,long height)
+static int upload(struct art *art,long width,long height,int variant)
 {
     unsigned long w=0,h=0,pw,ph,y;unsigned char *pixels,*padded;
     GLint binding,unpack;GLuint name;
-    pixels=decode(art->png,&w,&h);
-    if(!pixels){fprintf(stderr,"menus: could not read %s\n",art->png);art->failed=1;return 0;}
+    char variant_png[1024];
+    const char *png=art->png;
+    size_t length=strlen(png);
+    if(variant) {
+        if(length<5||length+4>sizeof(variant_png)||strcmp(png+length-4,".png")){art->variant_failed=1;return 0;}
+        memcpy(variant_png,png,length-4);strcpy(variant_png+length-4,"@ps.png");png=variant_png;
+    }
+    pixels=decode(png,&w,&h,variant);
+    if(!pixels){
+        if(variant)art->variant_failed=1;
+        else {fprintf(stderr,"menus: could not read %s\n",png);art->failed=1;}
+        return 0;
+    }
     if(getenv("HALO_MAC_MENU_DEBUG")) {
         unsigned long i,opaque=0,visible=0;
         for(i=0;i<w*h;++i){if(pixels[i*4+3])++visible;if(pixels[i*4+3]==255)++opaque;}
@@ -128,7 +146,7 @@ static int upload(struct art *art,long width,long height)
     }
     pw=power_of_two(w);ph=power_of_two(h);
     padded=(unsigned char *)calloc(pw*ph,4);
-    if(!padded){free(pixels);art->failed=1;return 0;}
+    if(!padded){free(pixels);if(variant)art->variant_failed=1;else art->failed=1;return 0;}
     for(y=0;y<h;++y)memcpy(padded+y*pw*4,pixels+y*w*4,w*4);
     free(pixels);
     glGetIntegerv(GL_TEXTURE_BINDING_2D,&binding);
@@ -140,7 +158,12 @@ static int upload(struct art *art,long width,long height)
     glBindTexture(GL_TEXTURE_2D,(GLuint)binding);
     glPixelStorei(GL_UNPACK_ALIGNMENT,unpack);
     free(padded);
-    if(glGetError()!=GL_NO_ERROR){glDeleteTextures(1,&name);art->failed=1;return 0;}
+    if(glGetError()!=GL_NO_ERROR){glDeleteTextures(1,&name);if(variant)art->variant_failed=1;else art->failed=1;return 0;}
+    if(variant) {
+        art->variant_name=name;
+        art->variant_scale_u=(float)w/(float)pw;art->variant_scale_v=(float)h/(float)ph;
+        return 1;
+    }
     art->name=name;art->width=width;art->height=height;
     /* the game's coordinates are 0 to 1 over the picture (the bitmap's own
        size is the picture's, whatever its texels): over the padded texture's
@@ -157,7 +180,16 @@ int mac_menu_art_texture(const void *texture, long width, long height,
     for(i=0;i<art_count;++i)if(arts[i].texture==texture){art=&arts[i];break;}
     if(!art)return 0;
     if(art->failed||width<=0||height<=0)return -1;
-    if(!art->name&&!upload(art,width,height))return -1;
+    /* the pad in use is a PlayStation pad (input.prompt_glyphs): its picture, if the frame has one */
+    if(!art->variant_failed&&input_prompt_glyphs_playstation(config_string("input.prompt_glyphs"))) {
+        if(!art->variant_name)upload(art,width,height,1);
+        if(art->variant_name) {
+            *name=(unsigned int)art->variant_name;
+            scale[0]=art->variant_scale_u;scale[1]=art->variant_scale_v;scale[2]=scale[3]=1.0f;
+            return 1;
+        }
+    }
+    if(!art->name&&!upload(art,width,height,0))return -1;
     *name=(unsigned int)art->name;
     scale[0]=art->scale_u;scale[1]=art->scale_v;scale[2]=scale[3]=1.0f;
     return 1;

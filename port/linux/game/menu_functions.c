@@ -67,6 +67,7 @@ their handlers open opens.
 
 #include "cseries.h"
 #include "input/input.h"
+#include "input_prompts.h"
 #include "interface/event_manager.h"
 #include "interface/player_ui.h"
 #include "interface/ui_widget.h"
@@ -1749,12 +1750,20 @@ the PC version's nine the Xbox's five of the button settings */
 #define PROFILE_FIRST_LAYOUT_FRAME 9
 
 /* "port gamepad layout preview" (the picture's own): on Gamepad Setup's
-row, the edited profile's button settings */
+row, the edited profile's button settings; with a PlayStation pad in use
+(input.prompt_glyphs) the Xbox's controller is the wrong drawing, so the row
+keeps its own picture (frame 2), which has a PlayStation variant */
 static void profile_gamepad_layout(struct widget_instance *picture)
 {
 	struct player_profile *profile = player_ui_get_edit_player_profile();
 	short frame = picture->animation.current_frame_index;
 
+	if (input_prompt_glyphs_playstation(config_string("input.prompt_glyphs")))
+	{
+		if (frame >= PROFILE_FIRST_LAYOUT_FRAME && frame < PROFILE_FIRST_LAYOUT_FRAME + NUMBER_OF_BUTTON_PRESETS)
+			picture->animation.current_frame_index = PROFILE_GAMEPAD_FRAME;
+		return;
+	}
 	if (frame == PROFILE_GAMEPAD_FRAME ||
 		(frame >= PROFILE_FIRST_LAYOUT_FRAME && frame < PROFILE_FIRST_LAYOUT_FRAME + NUMBER_OF_BUTTON_PRESETS))
 	{

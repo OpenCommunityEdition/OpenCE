@@ -86,4 +86,14 @@ static __inline int input_prompt_glyphs_mode(char const *setting)
 	return 0;
 }
 
+/* whether the pad in use shows PlayStation pictures and prompts: input.prompt_glyphs
+"playstation", or "auto" with a PlayStation pad. The menus' variant pictures
+(menu_art_texture, mac_menu_art_texture) and Gamepad Setup's preview ask this. */
+static __inline int input_prompt_glyphs_playstation(char const *setting)
+{
+	int mode = input_prompt_glyphs_mode(setting);
+
+	return mode == 2 || (mode == 0 && platform_prompts_playstation());
+}
+
 #endif

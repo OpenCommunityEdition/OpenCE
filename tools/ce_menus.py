@@ -62,6 +62,9 @@ SVG_COPIES = MENUS / "svg"
 # pictures drawn by hand with no SVG source (kept, not written by this script): the PNG for
 # a frame, at the frame's path, is copied to ce/ as it is (a 4x or 2x PNG, with bled edges)
 HAND_PNGS = MENUS / "art"
+# a hand-drawn frame's picture for a PlayStation pad: art/<frame>@ps.png beside art/<frame>.png, copied
+# to ce/ as <frame>@ps.png and listed in menus.json (menu_files.c, engine_menu_art.c draw it)
+VARIANT_SUFFIX = "@ps"
 MAIN_MENU = "ui\\shell\\main_menu\\main_menu"
 TITLE_FONT = ROOT / "port/assets/fonts/OpenCE-Regular.ttf"
 # the widgets left out, with their pictures (and all they alone lead to):
@@ -319,6 +322,7 @@ class Art:
         self.placeholder = Image.open(placeholder).convert("RGBA") if placeholder else None
         self.pictures = []  # (frame, size, PC picture) of the frames drawn as the placeholder
         self.redrawn = set()  # the frames (by source name) drawn from a redraw
+        self.variant_pngs = []  # the PlayStation variants (VARIANT_SUFFIX) copied from HAND_PNGS
         self.hand_pngs = set()  # the frames (by source name) copied from HAND_PNGS
         self.xbox_frames = []  # (PC frame, Xbox bitmap, its frame) drawn from the Xbox map
         self.added_frames = []  # (our bitmap, Xbox bitmap, its frame): port_settings.BITMAP_FRAMES
@@ -394,6 +398,13 @@ class Art:
                 shutil.copy2(hand, MENUS / png)
                 self.hand_pngs.add(name)
                 self.pngs.append(png)
+                # (a variant is not a <frame>: the menu art layer draws it in place of the
+                # frame while a PlayStation pad is in use, from the frame's PNG name)
+                variant = HAND_PNGS / f"{name}{VARIANT_SUFFIX}.png"
+                if variant.is_file():
+                    variant_png = f"ce/{relative}__{index}{VARIANT_SUFFIX}.png"
+                    shutil.copy2(variant, MENUS / variant_png)
+                    self.variant_pngs.append(variant_png)
                 lines.append(f"\t\t<frame{attributes([('png', png), ('width', width), ('height', height)])}/>")
                 continue
             if name in XBOX_FRAMES and not any((self.redraws / f"{source}.svg").is_file()
@@ -788,7 +799,7 @@ def main() -> None:
     report += ["", "Wired: " + ", ".join(f"`{name}`" for name in sorted(WIRED)) + ".", ""]
     (MENUS / "UNWIRED.md").write_text("\n".join(report))
     files = sorted(path.relative_to(MENUS).as_posix() for path in MENUS.rglob("*.xml"))
-    files += sorted(art.pngs)
+    files += sorted(art.pngs) + sorted(art.variant_pngs)
     (MENUS / "menus.json").write_text(json.dumps({
         "comment": "The menus' files the game embeds (tools/ce_menus.py, tools/embed_assets.py).",
         "files": files,

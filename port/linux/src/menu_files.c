@@ -19,6 +19,7 @@ high-res HUD's are (hud_hires.c).
 
 #include "halo_menus.h"
 #include "hud_hires.h"
+#include "input_prompts.h"
 #include "menu_files.h"
 #include "platform.h"
 #include "port_config.h"
@@ -1034,8 +1035,27 @@ static struct
 	unsigned int texture;
 	unsigned long levels;
 	int failed;
+	/* the PlayStation pad's picture of the frame (art_variant_texture), if it has one */
+	unsigned int variant_texture;
+	unsigned long variant_levels;
+	int variant_failed;
 } art[MAXIMUM_ART];
 static long art_count;
+
+/* the textures of a picture, let go */
+static void art_delete(long index)
+{
+	if (art[index].texture)
+	{
+		xgpu_gl_texture_deleted(art[index].texture);
+		glDeleteTextures(1, &art[index].texture);
+	}
+	if (art[index].variant_texture)
+	{
+		xgpu_gl_texture_deleted(art[index].variant_texture);
+		glDeleteTextures(1, &art[index].variant_texture);
+	}
+}
 
 void halo_menus_art_register(void const *texture, char const *png)
 {
@@ -1063,11 +1083,7 @@ void halo_menus_art_register(void const *texture, char const *png)
 	else
 	{
 		free(art[index].png);
-		if (art[index].texture)
-		{
-			xgpu_gl_texture_deleted(art[index].texture);
-			glDeleteTextures(1, &art[index].texture);
-		}
+		art_delete(index);
 	}
 	memset(&art[index], 0, sizeof(art[index]));
 	art[index].data = data;
@@ -1081,18 +1097,44 @@ void halo_menus_art_forget(void)
 	for (index = 0; index < art_count; index++)
 	{
 		free(art[index].png);
-		if (art[index].texture)
-		{
-			xgpu_gl_texture_deleted(art[index].texture);
-			glDeleteTextures(1, &art[index].texture);
-		}
+		art_delete(index);
 	}
 	art_count = 0;
+}
+
+/* the PlayStation pad's picture of a frame: its PNG's name with "@ps" before
+the extension (ce/.../profile_options__1.png has ce/.../profile_options__1@ps.png) */
+static unsigned int art_variant_texture(long index, unsigned long *levels)
+{
+	char name[512];
+	size_t length = strlen(art[index].png);
+	unsigned long size = 0;
+	const unsigned char *png;
+
+	if (!art[index].variant_texture && !art[index].variant_failed)
+	{
+		if (length < 5 || length + 4 > sizeof(name) || strcmp(art[index].png + length - 4, ".png"))
+		{
+			art[index].variant_failed = 1;
+			return 0;
+		}
+		memcpy(name, art[index].png, length - 4);
+		strcpy(name + length - 4, "@ps.png");
+		png = file_data(name, &size);
+		art[index].variant_texture = png ? hud_hires_png_texture(png, size, &art[index].variant_levels) : 0;
+		if (!art[index].variant_texture)
+			art[index].variant_failed = 1;
+	}
+	if (!art[index].variant_texture)
+		return 0;
+	*levels = art[index].variant_levels;
+	return art[index].variant_texture;
 }
 
 unsigned int menu_art_texture(unsigned long data, unsigned long *levels)
 {
 	long index;
+	unsigned int variant;
 
 	for (index = 0; index < art_count; index++)
 	{
@@ -1102,6 +1144,10 @@ unsigned int menu_art_texture(unsigned long data, unsigned long *levels)
 	/* (no png: out of memory registering it) */
 	if (index == art_count || art[index].failed || !art[index].png)
 		return 0;
+	/* (the pad in use is a PlayStation pad, input.prompt_glyphs: its picture, if the frame has one) */
+	if (input_prompt_glyphs_playstation(config_string("input.prompt_glyphs")) &&
+		(variant = art_variant_texture(index, levels)) != 0)
+		return variant;
 	if (!art[index].texture)
 	{
 		unsigned long size = 0;
