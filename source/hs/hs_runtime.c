@@ -266,7 +266,7 @@ symbols in this file:
 #include "ai/ai_script.h"
 #include "hs/hs.h"
 #include "hs/hs_library_internal.h"
-#include "hs/hs_library_internal_runtime.h"
+/* Empty reconstructed header removed; no declarations to include. */
 #include "hs/object_lists.h"
 #include "hs/hs_scenario_definitions.h"
 #include "math/real_math.h"
@@ -2752,10 +2752,13 @@ static void hs_thread_main(
 
 			match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2d8, function->evaluate);
 
-			function->evaluate(
-				expression->index,
-				thread_index,
-				initialize);
+			/* port: MCC may release a completed conditional frame before
+			entering its selected branch; legacy evaluation is unchanged. */
+			if (!mcc_hs_if_tail(expression->index, thread_index, initialize))
+				function->evaluate(
+					expression->index,
+					thread_index,
+					initialize);
 		}
 		else
 		{

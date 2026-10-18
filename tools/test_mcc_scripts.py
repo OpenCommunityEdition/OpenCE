@@ -101,6 +101,12 @@ def test_mcc_player_input_and_profile_slots(native_mcc_harness):
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_mcc_weapon_movement(native_mcc_harness):
+    result = subprocess.run([str(native_mcc_harness("mcc_movement"))], capture_output=True,
+                            text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 @pytest.mark.parametrize("counter", "012345")
 def test_mcc_scratch_globals_are_map_local(scripts_tool, counter):
     result = subprocess.run([str(scripts_tool), "scratch", counter], capture_output=True, text=True, timeout=10)

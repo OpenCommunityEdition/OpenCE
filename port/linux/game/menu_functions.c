@@ -89,6 +89,7 @@ their handlers open opens.
 #include "text/draw_string.h"
 /* (internet play's server browser: the platform layer's) */
 #include "../src/p2p.h"
+#include "text_filter.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -668,6 +669,8 @@ static void text_set(struct widget_instance *text_box, wchar_t const *text)
 {
 	text_set_length(text_box, text, ROW_TEXT_LENGTH);
 }
+
+#include "changelog_menu_runtime.inl"
 
 /* one of our string lists' strings, on one line (its line breaks spaces) */
 static void string_get(char const *list, short index, wchar_t *text)
@@ -2214,7 +2217,9 @@ static struct
 	{ "controls.scoreboard", L"SHOW SCORES", 2 },
 	{ "controls.pause", L"PAUSE MENU", 2 },
 	{ "controls.screenshot", L"SCREENSHOT", 2 },
-	{ "controls.push_to_talk", L"PUSH TO TALK", 2 },
+	{ "controls.push_to_talk", L"PUSH TO TALK", 3 },
+	{ "controls.chat", L"CHAT", 3 },
+	{ "controls.team_chat", L"TEAM CHAT", 3 },
 };
 
 static struct
@@ -2989,6 +2994,7 @@ boolean game_engine_running(void);
 void game_engine_end_game(void);
 /* the platform layer's */
 int p2p_join_invite(char const *text);
+int p2p_join_listing(struct p2p_listing const *listing);
 int p2p_invite_link(char *link, int size);
 void p2p_set_hosting_allowed(int allowed);
 int p2p_peer_address(unsigned char const *identifier, unsigned long *address);
@@ -3161,6 +3167,12 @@ static void text_field_show(struct widget_instance *value, char const *text, boo
 		shown[index++] = L'_';
 	shown[index] = 0;
 	text_set(value, shown);
+	/* (what is being typed shown as it is: streamer mode hides nothing of it,
+	text_filter.c) */
+	if (editing && value)
+		text_filter_exempt(value->parameters.text_box.text);
+	else if (!text_field_editing(NULL))
+		text_filter_exempt(NULL);
 }
 
 /* ---- the menu */
@@ -4540,7 +4552,9 @@ static void lobby_browser_update(struct widget_instance *list)
 lobby_browser_update) */
 static boolean lobby_browser_join(struct p2p_listing const *game, short controller)
 {
-	if (!p2p_join_invite(game->invite))
+	/* (a public game: the text chat is off in it, whatever its host says:
+	network_chat.c) */
+	if (!p2p_join_listing(game))
 		return FALSE;
 	csmemcpy(lobby_browser.identifier, game->identifier, sizeof(lobby_browser.identifier));
 	csmemcpy(lobby_browser.name, game->name, sizeof(lobby_browser.name));
@@ -5646,6 +5660,8 @@ static struct gametype_option const gametype_options[] =
 		{ "5", "10", "15", "20", "30", "50" } },
 	/* (and the players' votes to kick: port/linux/game/network_votekick.c) */
 	{ "votekick_spinner", _option_setting, 0, 0, 2, { 0 }, "network.votekick", { "true", "false" } },
+	/* (and the text chat: port/linux/game/network_chat.c) */
+	{ "text_chat_spinner", _option_setting, 0, 0, 3, { 0 }, "network.text_chat", { "on", "links", "off" } },
 	/* co-op's options (Server Setup's CO-OP OPTIONS: tools/port_settings.py's
 	COOP_SETUP_SCREENS; coop_enemies.c) */
 	{ "coop_friendly_fire_spinner", _option_setting, 0, 0, 4, { 0 }, "network.coop_friendly_fire",
@@ -5661,12 +5677,24 @@ static struct gametype_option const gametype_options[] =
 	/* map sharing's (Server Setup's MAP SHARING: tools/port_settings.py's
 	MAP_SHARE_SETUP; map_share.c) */
 	{ "map_share_spinner", _option_setting, 0, 0, 2, { 0 }, "network.map_share", { "true", "false" } },
-	{ "map_share_upload_spinner", _option_setting, 0, 0, 6, { 0 }, "network.map_share_upload",
-		{ "256", "512", "1024", "2048", "4096", "8192" } },
+	{ "map_share_upload_spinner", _option_setting, 0, 0, 8, { 0 }, "network.map_share_upload",
+		{ "256", "512", "1024", "2048", "4096", "8192", "16384", "20480" } },
 	/* vehicle options (the side's set and counts: vehicles_update) */
 	{ "vehicles_respawn_spinner", _option_short, OPTIONS_FIELD(vehicle_respawn_time), 0, 7,
 		{ 0, 30, 60, 90, 120, 180, 300 } },
 };
+
+/* TEXT CHAT's (network.text_chat) OFF, which it shows while the game is
+listed in the server browser, and its host cannot change: a listed game has
+no text chat whatever the setting (network_chat.c), which is kept for a
+private game or a LAN one */
+#define TEXT_CHAT_SPINNER "text_chat_spinner"
+#define TEXT_CHAT_OFF 2
+
+static boolean text_chat_locked(struct gametype_option const *option)
+{
+	return !strcmp(option->spinner, TEXT_CHAT_SPINNER) && p2p_hosting_listed();
+}
 
 /* an option of the host's own setting: the value shown for it (the one
 set, else the nearest) */
@@ -5802,8 +5830,11 @@ static void gametype_options_each(struct widget_instance *list, boolean save)
 				if (!gametype_edit.setup)
 					continue;
 				if (!save)
-					spinner->parameters.list.selected_index = gametype_option_setting_index(option);
-				else if (index != gametype_option_setting_index(option) &&
+				{
+					spinner->parameters.list.selected_index = text_chat_locked(option) ? TEXT_CHAT_OFF :
+						gametype_option_setting_index(option);
+				}
+				else if (!text_chat_locked(option) && index != gametype_option_setting_index(option) &&
 					!setting_write(option->setting, option->setting_values[index]))
 				{
 					platform_log("menus: could not set %s", option->setting);
@@ -5843,8 +5874,11 @@ static void setting_options_each(struct widget_instance *list, boolean save)
 				continue;
 			index = (short)PIN(spinner->parameters.list.selected_index, 0, option->count - 1);
 			if (!save)
-				spinner->parameters.list.selected_index = gametype_option_setting_index(option);
-			else if (index != gametype_option_setting_index(option) &&
+			{
+				spinner->parameters.list.selected_index = text_chat_locked(option) ? TEXT_CHAT_OFF :
+					gametype_option_setting_index(option);
+			}
+			else if (!text_chat_locked(option) && index != gametype_option_setting_index(option) &&
 				!setting_write(option->setting, option->setting_values[index]))
 			{
 				platform_log("menus: could not set %s", option->setting);
@@ -6185,6 +6219,9 @@ static void gametype_option_help(struct widget_instance *list)
 		visible_set(named(list, "op_primary_weapon", 0), custom);
 		visible_set(named(list, "op_secondary_weapon", 0), custom);
 	}
+	/* (TEXT CHAT held at OFF while the game is listed: text_chat_locked) */
+	if (named(list, TEXT_CHAT_SPINNER, 0) && p2p_hosting_listed())
+		named(list, TEXT_CHAT_SPINNER, 0)->parameters.list.selected_index = TEXT_CHAT_OFF;
 	/* (CO-OP OPTIONS: the row of the amount of the extra enemies chosen,
 	PER PLAYER's or MULTIPLIER's, in the one place) */
 	if (named(list, "coop_extra_enemies_spinner", 0))
@@ -6298,7 +6335,11 @@ boolean pc_menu_event_function_invoke(
 
 		if (!name)
 			return FALSE;
-		if (!strcmp(name, "main menu quit game"))
+		if (!strncmp(name, "port changelog ", 15))
+		{
+			return changelog_menu_event(widget, name);
+		}
+		else if (!strcmp(name, "main menu quit game"))
 		{
 			platform_request_quit();
 		}

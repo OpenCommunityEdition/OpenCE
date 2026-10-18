@@ -1,7 +1,7 @@
 """Admission, framing and the pinned OpenCE 29 wire contract.
 
 The CC0 baseline fixture comes unchanged from OpenCommunityEdition/OpenCE
-8102e711c353068d22d62efe6bf67ebc8a90a22e, port/linux/network_format.txt.
+38ccb5f9a4232bb51fc8a79e797b5570f6b69fb8, port/linux/network_format.txt.
 Update it only after auditing and testing a new upstream protocol.
 """
 from pathlib import Path
@@ -347,3 +347,19 @@ int main(void) {
     exe = compile_tool(tmp_path, [path])
     run = subprocess.run([str(exe)], capture_output=True, text=True)
     assert run.returncode == 0, run.stdout + run.stderr
+
+
+def test_chat_and_mcc_message_ids_are_disjoint():
+    actual = network_format.items()
+    messages = {key: int(value) for key, value in actual.items()
+                if key.startswith("enum _distributed_message_")}
+    assert len(messages.values()) == len(set(messages.values()))
+    assert [messages["enum _distributed_message_chat_" + name]
+            for name in ("up", "down", "config")] == [87, 88, 89]
+    assert [messages["enum _distributed_message_mcc_" + name]
+            for name in ("grenades", "campaign", "object_names", "game_speed")] == [90, 91, 92, 93]
+    # The receive boundary must admit chat in ordinary sessions while rejecting
+    # MCC data before dispatch; it also applies recursively to batched messages.
+    receiver = function((ROOT / "port/linux/game/network_distributed.c").read_text(),
+                        "network_distributed_handle_message")
+    assert "header.type >= _distributed_message_mcc_grenades && !mcc_cache_tags_loaded()" in receiver

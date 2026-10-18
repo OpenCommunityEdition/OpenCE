@@ -20,7 +20,7 @@ typedef unsigned short word;
 #define _error_silent 0
 #define match_assert(a,b,c) do {if(!(c))abort();} while(0)
 #define CHECK(c) do {if(!(c)){fprintf(stderr,"line %d: %s\n",__LINE__,#c);return 1;}}while(0)
-enum {_game_connection_network_server=1,_game_connection_network_client=2,_distributed_message_mcc_object_names=89,_distributed_to_clients=0};
+enum {_game_connection_network_server=1,_game_connection_network_client=2,_distributed_message_mcc_object_names=92,_distributed_to_clients=0};
 struct scenario_object_name {char name[32];short runtime_object_type;};
 static struct scenario_object_name definitions[32767];
 struct scenario {struct {long count;void *address;} object_names;};
@@ -43,7 +43,7 @@ static long player_index_from_unit_index(long i){(void)i;return NONE;}
 static char const *tag_get_name(long id){(void)id;return "object";}
 static void error(int level,char const *fmt,...){(void)level;(void)fmt;}
 static void distributed_send(void *msg,short type,short count,word size,short dest){
-    if(type!=89||count!=1||size!=80||dest||sends>=64)abort();
+    if(type!=_distributed_message_mcc_object_names||count!=1||size!=80||dest||sends>=64)abort();
     memcpy(packets[sends++],(byte *)msg+sizeof(struct distributed_message_header),72);
 }
 long object_index_from_name_index(short name);

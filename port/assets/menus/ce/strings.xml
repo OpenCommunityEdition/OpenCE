@@ -1045,6 +1045,9 @@
 		<string text="Players 150 metres apart or less are near\nfor voice chat."/>
 		<string text="Players can vote to kick a player, from the\nscoreboard."/>
 		<string text="Players cannot vote to kick anyone."/>
+		<string text="Players can type to each other; lines with links\nare refused. Off in a public internet game."/>
+		<string text="Players can type to each other, links too. Off\nin a public internet game."/>
+		<string text="No text chat in the game."/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels">
 		<string text="FRIENDLY FIRE:"/>
@@ -1055,6 +1058,7 @@
 		<string text="VOICE QUALITY:"/>
 		<string text="VOICE NEAR DISTANCE:"/>
 		<string text="VOTE KICK:"/>
+		<string text="TEXT CHAT:"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_friendly_fire">
 		<string text="OFF"/>

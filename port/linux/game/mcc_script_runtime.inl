@@ -5,6 +5,36 @@
 #include "mcc_campaign.h"
 #include "mcc_game_speed.h"
 
+/* Once an if has selected a branch, its frame only forwards that branch's
+ * result. MCC's deeply nested equipment selectors need not retain all those
+ * forwarding frames. Keep script-call frames (lexical parameters) intact and
+ * only elide identical result types, so native casts and sleep remain valid.
+ * All live state stays in the native checkpointed thread buffer. */
+static boolean mcc_hs_if_tail(short function, long thread_index, boolean initialize)
+{
+    struct hs_thread_datum *thread;
+    struct hs_syntax_node *call, *predicate, *condition, *branch;
+    long *state, selected, *destination;
+    if (!mcc_cache_tags_loaded() || function != _hs_function_if || initialize) return FALSE;
+    thread = hs_thread_get(thread_index);
+    state = (long *)thread->stack->data;
+    if (state[1] != NONE) return FALSE;
+    call = hs_syntax_get(thread->stack->expression_index);
+    predicate = call ? hs_syntax_get(call->data) : NULL;
+    condition = predicate ? hs_syntax_get(predicate->next_node_index) : NULL;
+    branch = condition ? hs_syntax_get(condition->next_node_index) : NULL;
+    if (!branch) { hs_syntax_error(thread_index); return TRUE; }
+    selected = (boolean)state[0] ? condition->next_node_index : branch->next_node_index;
+    if (selected == NONE) return FALSE;
+    branch = hs_syntax_get(selected);
+    if (!branch) { hs_syntax_error(thread_index); return TRUE; }
+    if (branch->type != call->type) return FALSE;
+    destination = thread->stack->previous->result;
+    thread->stack = thread->stack->previous;
+    hs_evaluate(thread_index, selected, destination);
+    return TRUE;
+}
+
 static void mcc_hs_speed_reconcile(word designator, boolean write)
 {
     struct hs_global_datum *global;
@@ -17,6 +47,7 @@ static void mcc_hs_speed_reconcile(word designator, boolean write)
     global->value=value.bits;
 }
 long hs_cast(long thread_index, short actual_type, short desired_type, long value);
+static void mcc_hs_release_thread(long thread_index);
 
 void mcc_script_finished_evaluate(short function, long thread_index, boolean initialize)
 {
@@ -51,11 +82,20 @@ void mcc_sleep_forever_evaluate(short function, long thread_index, boolean initi
     if ((short)*script!=NONE) target=hs_find_thread_by_script((short)*script);
     if (target!=NONE) {
         struct hs_thread_datum *sleeper=hs_thread_get(target);
-        if (sleeper->sleep_until!=NONE) {
-            if (target!=thread_index && !TEST_FLAG(sleeper->flags,_hs_thread_sleeping_bit)) {
-                sleeper->previous_sleep_until=sleeper->sleep_until;
-                SET_FLAG(sleeper->flags,_hs_thread_sleeping_bit,TRUE);
-            }
+        if (target!=thread_index && !hs_scenario_script_disabled((short)*script)) {
+            /* MCC's named sleep_forever cancels this invocation. A later
+             * wake starts it again, including an already completed dormant
+             * script (Warthog Rally's race/setup reset sequence). Ordinary
+             * wake and the native sleep adapter retain their own semantics. */
+            mcc_hs_release_thread(target);
+            sleeper->stack=(struct hs_stack_frame *)sleeper->stack_data;
+            sleeper->stack->previous=NULL;
+            sleeper->stack->expression_index=NONE;
+            sleeper->stack->size=0;
+            sleeper->flags=0;
+            sleeper->previous_sleep_until=0;
+            sleeper->sleep_until=NONE-1;
+        } else if (target==thread_index && sleeper->sleep_until!=NONE) {
             sleeper->sleep_until=NONE-1;
         }
     }

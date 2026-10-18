@@ -7,6 +7,15 @@
 #include "physics/powered_mass_point_datum.h"
 #include <string.h>
 
+/* MeinCrap's dropped block weapon uses a 0.001 tag scale. The item update
+ * already applies this authored value on every peer; only its Xbox-era
+ * assertion excludes it. Admit this bounded positive interval for MCC,
+ * without relaxing the native upper limit or admitting zero/NaN. */
+boolean mcc_item_small_scale(real scale)
+{
+    return mcc_cache_tags_loaded() && scale >= 0.001f && scale < 0.5f;
+}
+
 /* The three-point boat controller assigns only its propeller's friction
  * speed. MCC boats can enable water friction on the other two hydrofoils,
  * too. Their inactive controls must start at zero, not leftover stack data.

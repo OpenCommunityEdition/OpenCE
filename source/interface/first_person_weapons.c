@@ -898,6 +898,9 @@ static void first_person_weapon_forget_weapon(
 	return;
 }
 
+/* port: MCC equipment replacement invalidates the cached weapon before deletion. */
+#include "mcc_first_person.inl"
+
 static void first_person_weapon_predict(
 	short local_player_index)
 {

@@ -866,6 +866,8 @@ void rasterizer_transparent_geometry_dispose_aux_buffer(
 
 /* ---------- private code */
 
+#include "mcc_chicago.inl" /* port: MCC-only authored blending compatibility. */
+
 /* port: mesh and material checks run only when model tags load. */
 #include "rasterizer/rasterizer_transparent_enclosure.h"
 
@@ -2831,6 +2833,9 @@ void rasterizer_transparent_geometry_group_draw(
 									}
 								}
 							}
+							/* port: keep MCC blend semantics out of the legacy shader path. */
+							mcc_chicago_blend(&shader_transparent_chicago->chicago,
+								&pixel_shader, rasterizer_debug_options.draw_environment_fog);
 							break;
 						}
 

@@ -188,6 +188,19 @@ int mcc_tags_prepare(struct mcc_runtime *r)
         }
         if (group == 'weap') {
             unsigned j;
+            uint16_t mode;
+            float forward, sideways;
+            memcpy(&mode, p + 0x3FC, 2);
+            memcpy(&forward, p + 0x400, 4);
+            memcpy(&sideways, p + 0x404, 4);
+            /* Do not silently drop authored movement rules, or admit values
+             * which expand the native host's validated speed envelope. */
+            if (mode > 2 || !(forward >= 0.0f && forward <= 2.0f) ||
+                !(sideways >= 0.0f && sideways <= 2.0f)) {
+                error(_error_silent, "mcc: weapon tag #%lu has unsupported movement penalties (mode %u, forward %g, sideways %g)",
+                    (unsigned long)i, (unsigned)mode, (double)forward, (double)sideways);
+                return FALSE;
+            }
             for (j = 0; j < 4; ++j) {
                 uint16_t value;
                 memcpy(&value, p + 0x330 + j * 2, 2);

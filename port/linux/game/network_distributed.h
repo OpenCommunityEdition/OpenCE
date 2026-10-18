@@ -125,14 +125,22 @@ enum
 	_distributed_message_map_share_offer = 84,
 	_distributed_message_map_share_sources = 85,
 	_distributed_message_map_share_progress = 86,
+	/* the text chat (network_chat.c): a player's line to the host,
+	reliably, which takes it only from the player's own machine's stream; and
+	the line the host sends on to each machine that hears it, reliably */
+	_distributed_message_chat_up = 87,
+	_distributed_message_chat_down = 88,
+	/* the host's text chat settings (network_chat.c): whether its players
+	may chat and send links, to every client, reliably */
+	_distributed_message_chat_config = 89,
 	/* MCC-only extra grenade slots; ordinary inventory packets stay exact. */
-	_distributed_message_mcc_grenades = 87,
+	_distributed_message_mcc_grenades = 90,
 	/* MCC-only campaign gravity and breadcrumb state. */
-	_distributed_message_mcc_campaign = 88,
+	_distributed_message_mcc_campaign = 91,
 	/* Expanded MCC scenario-name presence, in bounded chunks. */
-	_distributed_message_mcc_object_names = 89,
+	_distributed_message_mcc_object_names = 92,
 	/* MCC host-authorized speed, ordered on the reliable stream, even paused. */
-	_distributed_message_mcc_game_speed = 90,
+	_distributed_message_mcc_game_speed = 93,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -301,6 +309,19 @@ word network_votekick_request_entry_size(void);
 /* (a client) the host's count */
 void network_votekick_handle_status(void const *entries);
 word network_votekick_status_entry_size(void);
+
+/* ---------- prototypes/NETWORK_CHAT.C */
+
+/* (the host) a client's line; from_stream: it came over the machine's own
+stream (anything else is refused) */
+void network_chat_handle_up(long machine_index, void const *entries, boolean from_stream);
+/* (a client) a line the host sent on; from_stream: it came over the host's
+connection's stream (anything else is refused) */
+void network_chat_handle_down(void const *entries, boolean from_stream);
+word network_chat_line_entry_size(void);
+/* (a client) the host's chat settings; from_stream: as above */
+void network_chat_handle_config(void const *entries, boolean from_stream);
+word network_chat_config_entry_size(void);
 
 /* ---------- prototypes/NETWORK_ACTORS.C */
 

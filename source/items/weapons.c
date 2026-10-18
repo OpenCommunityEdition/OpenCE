@@ -910,6 +910,8 @@ void weapon_set_total_rounds(
 void weapon_delete(
 	long weapon_index)
 {
+	/* port: release MCC first-person references before the object disappears. */
+	mcc_first_person_weapon_deleted(weapon_index);
 	if (game_engine_running())
 	{
 		match_assert("c:\\halo\\SOURCE\\items\\weapons.c", 234, !weapon_is_flag(weapon_index));
