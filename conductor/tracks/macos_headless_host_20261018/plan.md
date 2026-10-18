@@ -63,6 +63,6 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: Fix what the headless run finds until the test passes `7460d36`
 - [x] Task: Count the exits: the host logs the exits per second by import, as the baseline for the renderer's batching in the next track `f2c905a`
 - [x] Task: Join test: two copies on loopback addresses (`HALO_NET_ADDRESS`), one hosting and one joining; both log the other player `9ead8ee` (skipped until lo0 has the aliases)
-- [ ] Task: Document the macOS build in `docs/macos_host.md` (building, signing, running headless, what is not supported yet) and link it from `README.md`
+- [x] Task: Document the macOS build in `docs/macos_host.md` (building, signing, running headless, what is not supported yet) and link it from `README.md` `bb35180`
 - [ ] Task: Final build: `nix build .#host` from a clean checkout, then the whole test suite inside `nix develop`
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: A headless game, and the final build' (Protocol in workflow.md)
