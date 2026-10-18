@@ -174,6 +174,19 @@ static unsigned long environment_serial;
 /* audio.reverb */
 static BOOL reverb_enabled = TRUE;
 
+/* audio.reverb, and on the Mac off where the detail preset is low (a PowerPC
+Mac; Apple's reverb costs about 2% of a G4) unless the setting was given */
+static BOOL audio_reverb_setting(void)
+{
+#ifdef HALO_MAC
+	struct mac_detail_preset preset;
+
+	if (config_is_default("audio.reverb") && mac_gpu_info_detail(&preset))
+		return FALSE;
+#endif
+	return config_boolean("audio.reverb");
+}
+
 static float gain_from_millibels(LONG millibels)
 {
 	if (millibels <= DSBVOLUME_MIN)
@@ -1356,7 +1369,7 @@ static void audio_start(void)
 		return;
 	audio_started = TRUE;
 	master_volume = (float)config_real("audio.volume");
-	reverb_enabled = config_boolean("audio.reverb");
+	reverb_enabled = audio_reverb_setting();
 	resampler_initialize();
 	resampler_phases_initialize();
 	reverb_initialize();
@@ -1695,7 +1708,7 @@ VOID WINAPI DirectSoundDoWork(void)
 	{
 		volume_read_at = config_changes();
 		master_volume = (float)config_real("audio.volume");
-		reverb_enabled = config_boolean("audio.reverb");
+		reverb_enabled = audio_reverb_setting();
 	}
 	streams_complete_finished();
 }

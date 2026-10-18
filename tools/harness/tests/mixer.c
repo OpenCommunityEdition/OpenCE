@@ -53,6 +53,13 @@ static void voice_audio_mix(float *output, unsigned long frames)
 	(void)frames;
 }
 
+/* port: audio.reverb (port_config.c) */
+static int config_boolean(const char *name)
+{
+	(void)name;
+	return 1;
+}
+
 #include "under_test.inc"
 
 #define PI 3.14159265358979323846

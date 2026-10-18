@@ -337,6 +337,15 @@ struct render_lighting *object_get_cached_render_lighting(
 	return &lighting_storage;
 }
 
+/* port: port/linux/game/render_detail.c */
+real render_detail_scenery_minimum_pixels(void);
+real render_detail_lod_scale(void);
+real render_detail_object_minimum_pixels(void);
+void render_detail_update(void);
+/* port: scenery batching (port/linux/game/render_detail.c) */
+boolean render_detail_batch_scenery_model(long model_index, real level_of_detail_pixels, real_matrix4x3 const *node_matrices, char const *region_permutation_indices, real_rgb_color const *change_colors, real const *function_values, struct render_lighting const *lighting, real_point3d const *centroid, real radius, struct render_model_effect const *model_effect, long object_index, short forced_shader_permutation_index, unsigned long flags);
+void render_detail_batch_scenery_flush(void);
+
 void render_objects(
 	void)
 {
@@ -344,6 +353,9 @@ void render_objects(
 	boolean first_person_pass = FALSE;
 
 	profile_enter(render_objects_section);
+
+	/* port: the detail settings (port/linux/game/render_detail.c) */
+	render_detail_update();
 
 	rasterizer_models_begin(FALSE);
 	find_rendered_objects();
@@ -617,9 +629,41 @@ static void render_object_list(
 						}
 					}
 
+					/* port: scenery smaller on screen than the player's minimum
+					(display.scenery_minimum_pixels; 0, the default, draws all) is
+					not drawn */
+					/* port: and any other object smaller than display's object minimum
+					(the Mac's presets; 0 draws all), but not a unit (a biped or a vehicle), a child
+					(it is drawn with its parent) or the player's own */
+					if ((object->object.type != _object_type_scenery ||
+						level_of_detail_pixels >= render_detail_scenery_minimum_pixels()) &&
+						(object->object.type == _object_type_scenery ||
+						TEST_FLAG(_object_mask_unit, object->object.type) ||
+						object->object.parent_object_index != NONE ||
+						level_of_detail_pixels >= render_detail_object_minimum_pixels()))
+					/* port: scenery without widgets or children may be kept
+					and drawn together with the rest of its definition */
+					if (!(object->object.type == _object_type_scenery &&
+						object->object.first_widget_index == NONE &&
+						object->object.first_child_object_index == NONE &&
+						!legs &&
+						render_detail_batch_scenery_model(
+							definition->object.model.index,
+							level_of_detail_pixels * render_detail_lod_scale(),
+							node_matrices,
+							object->object.region_permutations,
+							object->object.outgoing_change_colors,
+							object->object.outgoing_function_values,
+							data->lighting,
+							&object->object.bounding_sphere_center,
+							object->object.bounding_sphere_radius,
+							&model_effect,
+							object_index,
+							object->object.forced_shader_permutation_index,
+							data->no_planar_fog ? FLAG(_render_model_no_planar_fog_bit) : 0)))
 					render_model(
 						definition->object.model.index,
-						level_of_detail_pixels,
+						level_of_detail_pixels * render_detail_lod_scale(),
 						node_matrices,
 						object->object.region_permutations,
 						object->object.outgoing_change_colors,
@@ -1224,6 +1268,9 @@ static void process_rendered_objects(
 			render_object_globals.rendered_object_indices[rendered_object_index];
 		render_object(data);
 	}
+
+	/* port: the scenery kept for drawing together */
+	render_detail_batch_scenery_flush();
 
 	return;
 }

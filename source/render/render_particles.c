@@ -30,6 +30,10 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/units.h"
 #include "view_fov.h" /* port: port/linux/game/view_fov.c */
+/* port: the detail settings' particle limit (port/linux/game/render_detail.c sets them; common
+symbols, so that a program without that file links) */
+real render_detail_particle_maximum;
+short render_detail_particle_limit_mode;
 
 /* ---------- constants */
 
@@ -318,6 +322,19 @@ void render_particles(
 									&position,
 									radius);
 
+							/* port: at the low detail a particle wider on screen than the
+							preset's maximum is drawn at that width (mode 3: and a share of
+							those much wider left out) */
+							if (diameter > definition->lod_cutoff &&
+								render_detail_particle_maximum > 0.0f && diameter > render_detail_particle_maximum &&
+								render_detail_particle_limit_mode == 3 &&
+								(long)diameter >= (long)(render_detail_particle_maximum + render_detail_particle_maximum) &&
+								(rendered_particle->particle_index & 0xFFFF) % ((long)(diameter / render_detail_particle_maximum)) != 0)
+							{
+								rendered_particle++;
+								continue;
+							}
+
 							if (diameter > definition->lod_cutoff)
 							{
 								real fade;
@@ -352,6 +369,24 @@ void render_particles(
 								{
 									fade *=
 										remaining_life / definition->fade_out_time;
+								}
+
+								/* port: the detail settings' particle limit: a particle
+								wider than the maximum is scaled down to it, and faded
+								by the ratio (mode 1) or its square (mode 2) */
+								if (render_detail_particle_maximum > 0.0f && diameter > render_detail_particle_maximum)
+								{
+									real ratio = render_detail_particle_maximum / diameter;
+
+									scale = ratio * scale;
+									if (render_detail_particle_limit_mode == 1)
+									{
+										fade *= ratio;
+									}
+									else if (render_detail_particle_limit_mode == 2)
+									{
+										fade *= ratio * ratio;
+									}
 								}
 
 								flags = 0;

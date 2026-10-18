@@ -249,7 +249,16 @@ static void model_data_error(
 
 /* ---------- globals */
 
+/* port: the scenery batching (port/linux/game/render_detail.c) draws a
+group of models of one definition a shader at a time, so that the draws
+which share a shader and its bitmaps follow one another: NONE draws every
+part, as the original; a shader index draws only the opaque parts with that
+shader; RENDER_MODEL_BATCH_REST only the decal and transparent parts */
+short render_model_batch_filter = NONE;
+
 extern boolean rasterizer_model_cortana_hack;
+
+#define RENDER_MODEL_BATCH_REST (-2)
 
 extern boolean render_model_nodes;
 extern boolean render_model_markers;
@@ -265,6 +274,76 @@ static char default_render_model_region_permutation_indices[MAXIMUM_REGIONS_PER_
 static struct profile_section render_model_section = { "render_model", NONE, TRUE };
 
 /* ---------- private code */
+
+/* port: whether render_model_parts would draw a part under
+render_model_batch_filter (what the batching draws for one model: a model
+with none is not begun) */
+static boolean render_model_batch_has_parts(
+	struct model const *model,
+	char const *region_permutation_indices,
+	short region_permutation_count,
+	short geometry_detail_level_index)
+{
+	short region_count = (short)MIN(model->regions.count, region_permutation_count);
+	short region_index;
+
+	for (region_index = 0; region_index<region_count; region_index++)
+	{
+		struct model_region *region = TAG_BLOCK_GET_ELEMENT(&model->regions, region_index, struct model_region);
+		char permutation_index = region_permutation_indices[region_index];
+
+		if (permutation_index!=NONE && VALID_INDEX(permutation_index, region->permutations.count))
+		{
+			struct model_region_permutation *permutation = TAG_BLOCK_GET_ELEMENT(
+				&region->permutations,
+				permutation_index,
+				struct model_region_permutation);
+			short geometry_index = permutation->geometry_indices[geometry_detail_level_index];
+
+			if (geometry_index!=NONE && VALID_INDEX(geometry_index, model->geometries.count))
+			{
+				struct model_geometry *geometry = TAG_BLOCK_GET_ELEMENT(&model->geometries, geometry_index, struct model_geometry);
+				short part_index;
+
+				for (part_index = 0; part_index<geometry->parts.count; part_index++)
+				{
+					struct model_geometry_part *part = TAG_BLOCK_GET_ELEMENT(&geometry->parts, part_index, struct model_geometry_part);
+
+					if (VALID_INDEX(part->shader_index, model->shaders.count) &&
+						!TEST_FLAG(part->flags, _model_geometry_part_stripped_bit))
+					{
+						struct shader *shader = shader_definition_get(
+							TAG_BLOCK_GET_ELEMENT(&model->shaders, part->shader_index, struct model_shader_reference)->shader.index);
+
+						if (shader_type_is_valid_for_model(shader->base.type))
+						{
+							boolean rest = shader_type_is_transparent(shader->base.type) ||
+								(shader->base.type==_shader_type_model &&
+								TEST_FLAG(((struct shader_model_definition *)shader_get_and_verify_type(shader, _shader_type_model))->flags, _shader_model_alpha_blended_decal_bit));
+
+							if (render_model_batch_filter==RENDER_MODEL_BATCH_REST ? rest : (!rest && part->shader_index==render_model_batch_filter))
+							{
+								return TRUE;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return FALSE;
+}
+
+/* port: the tag index of a model's first shader, which the batching orders
+the definitions by (models sharing shaders are drawn together) */
+long render_model_batch_first_shader(
+	struct model const *model)
+{
+	return model->shaders.count>0 ?
+		TAG_BLOCK_GET_ELEMENT(&model->shaders, 0, struct model_shader_reference)->shader.index :
+		NONE;
+}
 
 static void render_model_parts(
 	struct model const *model,
@@ -350,7 +429,10 @@ static void render_model_parts(
 						{
 							if (shader_type_is_transparent(shader->base.type))
 							{
-								if (pass==_render_model_pass_transparent)
+								/* port: scenery batching draws no transparent part
+								until its rest pass (port/linux/game/render_detail.c) */
+								if (pass==_render_model_pass_transparent &&
+									(render_model_batch_filter==NONE || render_model_batch_filter==RENDER_MODEL_BATCH_REST))
 								{
 									/* port: the root's matrix for a node the model
 									doesn't have (a map's index) */
@@ -402,7 +484,10 @@ static void render_model_parts(
 							else if (shader->base.type==_shader_type_model &&
 								TEST_FLAG(((struct shader_model_definition *)shader_get_and_verify_type(shader, _shader_type_model))->flags, _shader_model_alpha_blended_decal_bit))
 							{
-								if (pass==_render_model_pass_decal)
+								/* port: as the transparent parts, for scenery batching
+								(port/linux/game/render_detail.c) */
+								if (pass==_render_model_pass_decal &&
+									(render_model_batch_filter==NONE || render_model_batch_filter==RENDER_MODEL_BATCH_REST))
 								{
 									match_assert("c:\\halo\\SOURCE\\models\\models.c", 491, !TEST_FLAG(flags, _render_model_shadow_bit));
 
@@ -416,7 +501,10 @@ static void render_model_parts(
 										NONE);
 								}
 							}
-							else if (pass==_render_model_pass_solid)
+							/* port: scenery batching draws only the opaque parts of
+							the batch's shader (port/linux/game/render_detail.c) */
+							else if (pass==_render_model_pass_solid &&
+								(render_model_batch_filter==NONE || render_model_batch_filter==part->shader_index))
 							{
 								if (TEST_FLAG(flags, _render_model_shadow_bit))
 								{
@@ -1225,6 +1313,16 @@ void render_model(
 					render_debug_string_at_point(FALSE, &point, string, color);
 				}
 			}
+		}
+
+		/* port: scenery batching (port/linux/game/render_detail.c) begins no
+		model that has no part to draw under the filter */
+		if (render_model_batch_filter!=NONE &&
+			!render_model_batch_has_parts(model, region_permutation_indices, region_permutation_count, geometry_detail_level_index))
+		{
+			rasterizer_model_cortana_hack = FALSE;
+			profile_exit(render_model_section);
+			return;
 		}
 
 		model_parameters.unique_identifier = unique_identifier;

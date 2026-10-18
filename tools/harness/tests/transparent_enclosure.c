@@ -13,6 +13,10 @@ typedef void real_matrix4x3;
 #define square_root sqrt
 #include "types.inc"
 
+/* port: models.c's scenery batching switch (render_detail.c sets it) */
+static short render_model_batch_filter = NONE;
+#define RENDER_MODEL_BATCH_REST (-2)
+
 static struct model model;
 static struct model_geometry geometry;
 static struct model_geometry_part parts[4];
