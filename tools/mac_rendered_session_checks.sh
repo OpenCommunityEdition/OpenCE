@@ -266,7 +266,7 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
         # mixture of the two would be neither. engine_p2p_offline is skipped without
         # a replacement of its name: the p2p units below define what it stood for.
         case "$obj" in
-            */engine_sockets_$arch.o|*/engine_winsock_init_$arch.o|*/engine_p2p_offline_$arch.o|\
+            */engine_sockets_$arch.o|*/engine_winsock_init_$arch.o|*/engine_p2p_offline_$arch.o|*/engine_host_misc_$arch.o|\
             */p2p_$arch.o|*/p2p_crypto_$arch.o|*/p2p_discord_$arch.o|*/p2p_lobby_$arch.o|\
             */p2p_signal_$arch.o|*/p2p_webrtc_$arch.o|*/posix_net_$arch.o|*/posix_dtls_$arch.o|\
             */posix_upnp_$arch.o|*/mac_p2p_hardware_id_$arch.o|\
@@ -477,6 +477,25 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
         objects="$objects $obj"
         source_units="$source_units $unit"
     done
+
+    # port: engine_host_misc.c again, with its posix_random_bytes under another name: posix_net.c defines the
+    # shared one now, and the manifest's object (made before posix_net.c was linked) defines it too, which stops
+    # the link on a duplicate. OutputDebugStringA is all the session takes from it.
+    name=engine_host_misc
+    recognized_units="$recognized_units $name "
+    obj="$out/${name}_gpu_$arch.o"
+    if [ "${MAC_RENDERED_SESSION_INCREMENTAL:-0}" != 1 ] || \
+        case "$recompile" in *" $name "*) true ;; *) false ;; esac; then
+        "$cc" -arch "$arch" -isysroot "$sdk" -mmacosx-version-min=10.4 \
+            -std=gnu89 -O2 $fp -Dposix_random_bytes=mac_host_misc_random_bytes \
+            -ffunction-sections -fdata-sections \
+            -c port/mac/engine_host_misc.c -o "$obj" > "$obj.txt" 2>&1
+    elif [ ! -f "$obj" ]; then
+        echo "incremental object is missing: $obj" >&2
+        exit 1
+    fi
+    objects="$objects $obj"
+    source_units="$source_units port/mac/engine_host_misc.c"
 
     # Internet play, in place of the port/mac/engine_p2p_offline.c that used
     # to answer the shared P2P API with nothing.
