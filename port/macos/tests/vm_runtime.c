@@ -274,9 +274,9 @@ static void case_sockets(void)
 	int receiver, sender, length = sizeof(from);
 	char buffer[16];
 
-	/* struct sockaddr_in for 127.0.0.1, port 0 (any): the guest's (Linux's)
-	layout, which the host's helper passes on; a first byte of 16 and the
-	family in the second is Darwin's, 2 in the first two is Linux's */
+	/* struct sockaddr_in for 127.0.0.1, port 0 (any) in the guest's (Linux's)
+	layout, a 16-bit family of 2 first; Darwin's has a length byte (16)
+	before an 8-bit family. posix_net.c converts both ways */
 	memset(address, 0, sizeof(address));
 	address[0] = 2;
 	address[4] = 127;
@@ -285,6 +285,7 @@ static void case_sockets(void)
 	CHECK(receiver >= 0);
 	CHECK(posix_socket_bind(receiver, address, sizeof(address)) == 0);
 	CHECK(posix_socket_getsockname(receiver, address, &length) == 0);
+	CHECK(address[0] == 2 && address[1] == 0 && address[4] == 127 && (address[2] | address[3]));
 	CHECK(posix_socket_set_nonblocking(receiver, 1) == 0);
 	/* nothing waits: WSAEWOULDBLOCK (10035), the Windows Sockets code
 	posix_net.c gives the platform layer for EAGAIN */
@@ -305,6 +306,7 @@ static void case_sockets(void)
 				usleep(10000);
 		}
 		CHECK(received == 4 && !memcmp(buffer, "ping", 4));
+		CHECK(from[0] == 2 && from[1] == 0 && from[4] == 127);
 	}
 	CHECK(posix_socket_close(sender) == 0);
 	CHECK(posix_socket_close(receiver) == 0);

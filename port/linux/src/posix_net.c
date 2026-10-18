@@ -66,6 +66,39 @@ static ssize_t getrandom(void *buffer, size_t size, unsigned int flags)
 	arc4random_buf(buffer, size);
 	return (ssize_t)size;
 }
+
+/* The guest's addresses are Linux's (musl's struct sockaddr): a 16-bit
+family first, AF_INET6 being 10. Darwin's start with a length byte and an
+8-bit family, AF_INET6 being 30. An address with a second byte of 0 is
+Linux's (no family Darwin has is 0); the host's own callers (posix_upnp.c)
+pass Darwin's, which are left as they are. Addresses given back are always
+Linux's: only the guest asks for them. */
+#define LINUX_AF_INET6 10
+
+static const void *address_in(const void *address, int length, struct sockaddr_storage *storage)
+{
+	const unsigned char *bytes = address;
+
+	if (!address || length < 2 || length > (int)sizeof(*storage) || bytes[1] != 0)
+		return address;
+	memcpy(storage, address, (size_t)length);
+	storage->ss_len = (unsigned char)length;
+	storage->ss_family = bytes[0] == LINUX_AF_INET6 ? AF_INET6 : bytes[0];
+	return storage;
+}
+
+static void address_out(void *address, socklen_t length)
+{
+	unsigned char *bytes = address;
+
+	if (!address || length < 2)
+		return;
+	bytes[0] = bytes[1] == AF_INET6 ? LINUX_AF_INET6 : bytes[1];
+	bytes[1] = 0;
+}
+#else
+#define address_in(address, length, storage) (address)
+#define address_out(address, length) ((void)0)
 #endif
 
 /* Winsock error codes (winsockx.h) */
@@ -182,7 +215,9 @@ int posix_socket_close(int socket)
 
 int posix_socket_bind(int socket, const void *address, int address_length)
 {
-	return succeed(bind(socket, address, (socklen_t)address_length));
+	struct sockaddr_storage storage;
+
+	return succeed(bind(socket, address_in(address, address_length, &storage), (socklen_t)address_length));
 }
 
 int posix_socket_connect(int socket, const void *address, int address_length)
@@ -193,7 +228,8 @@ int posix_socket_connect(int socket, const void *address, int address_length)
 	transport_endpoint_winsock.c); as WSAEINPROGRESS it gave up at once,
 	and every system link join failed, a split screen game's join of its
 	own host included. */
-	int result = connect(socket, address, (socklen_t)address_length);
+	struct sockaddr_storage storage;
+	int result = connect(socket, address_in(address, address_length, &storage), (socklen_t)address_length);
 
 	if (result < 0 && errno == EINPROGRESS)
 	{
@@ -215,6 +251,8 @@ int posix_socket_accept(int socket, void *address, int *address_length)
 
 	if (address_length)
 		*address_length = (int)length;
+	if (result >= 0 && address_length)
+		address_out(address, length);
 	return succeed(result);
 }
 
@@ -226,8 +264,10 @@ int posix_socket_send(int socket, const void *buffer, int length, int flags)
 int posix_socket_sendto(int socket, const void *buffer, int length, int flags,
 	const void *address, int address_length)
 {
+	struct sockaddr_storage storage;
+
 	return succeed((int)sendto(socket, buffer, (size_t)length, flags | MSG_NOSIGNAL,
-		address, (socklen_t)address_length));
+		address_in(address, address_length, &storage), (socklen_t)address_length));
 }
 
 int posix_socket_recv(int socket, void *buffer, int length, int flags)
@@ -252,6 +292,8 @@ int posix_socket_recvfrom(int socket, void *buffer, int length, int flags,
 	result = (int)recvmsg(socket, &message, flags);
 	if (address_length)
 		*address_length = (int)message.msg_namelen;
+	if (result >= 0 && message.msg_name)
+		address_out(address, message.msg_namelen);
 	/* a datagram larger than the buffer: both give its start, but Winsock
 	with WSAEMSGSIZE, which the game takes as an error, not as the datagram */
 	if (result >= 0 && (message.msg_flags & MSG_TRUNC))
@@ -353,6 +395,8 @@ int posix_socket_getsockname(int socket, void *address, int *address_length)
 	int result = getsockname(socket, address, &length);
 
 	*address_length = (int)length;
+	if (result == 0)
+		address_out(address, length);
 	return succeed(result);
 }
 
@@ -362,6 +406,8 @@ int posix_socket_getpeername(int socket, void *address, int *address_length)
 	int result = getpeername(socket, address, &length);
 
 	*address_length = (int)length;
+	if (result == 0)
+		address_out(address, length);
 	return succeed(result);
 }
 
