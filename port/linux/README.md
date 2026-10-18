@@ -738,7 +738,8 @@ WITH LINKS, or OFF. A domain that is a word as well (`.me`, `.to`, `.is`)
 counts only with a path after it (`youtu.be/...`), so that `go.to` and
 `he.is` are not refused. A game listed in
 the server browser (a public internet game) never has the text chat,
-whatever it says; a private game, joined by its invite, and a LAN game have
+whatever it says (TEXT CHAT shows OFF there, and cannot be changed, while
+LISTING is PUBLIC); a private game, joined by its invite, and a LAN game have
 it as chosen. A player who joins a game from the server browser has no text
 chat in it even if its host turns it on: their game takes no line from that
 host and sends none. Pressing T where the chat is off says so, and a refused line
