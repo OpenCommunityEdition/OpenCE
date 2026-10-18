@@ -10,8 +10,11 @@ the system:
    `0x88000000` and the image above it, to `0x8c000000`. The cache files
    hold pointers to these addresses, so they cannot move.
 2. An executable mapping of the guest image.
-3. A thread pointer in `TPIDR_EL0` for each guest thread, which the guest's
-   musl reads.
+3. A thread pointer for each guest thread. On Android the guest does not
+   keep it in `TPIDR_EL0` (the host's bionic uses the register): the guest
+   asks the host for it (`host_get_tp`, `pthread_arch.h`). The spike checks
+   whether macOS would let a guest use the register, because asking the
+   host costs an exit in a VM.
 
 The programs in `port/macos/spikes` check each one on arm64 macOS, and
 `tools/test_macos_spikes.py` builds and runs them.
@@ -57,8 +60,10 @@ FAIL: thread 0 lost its TPIDR_EL0 at round 1
 ```
 
 macOS uses `TPIDR_EL0` itself (it holds a value before the program sets
-it), and the kernel writes it again at each context switch. A guest running
-in the host's process could not keep its thread pointer there.
+it), and the kernel writes it again at each context switch. A guest in the
+host's process keeps asking the host for its thread pointer, as on Android.
+Inside a VM the register is the guest's own, so there the guest can read it
+directly and save an exit on each access to thread-local data.
 
 ### Executable image
 
@@ -97,9 +102,18 @@ The guest image is unchanged. The host:
 - gives the guest a small EL1 runtime: exception vectors, and page tables
   that map the guest's range as normal, cacheable memory (with the MMU off,
   all memory is device memory: slow, and unaligned accesses fault);
-- turns the guest's system calls and host imports into an `hvc` exit, which
-  the host carries out as the Android host does (`host_syscall.c`,
-  `host_sdl.c`);
+- turns the guest's host imports into exits. Every call the guest makes
+  to the host, system calls included (`__guest_syscall` calls
+  `host_syscall`), goes through one generated stub
+  (`tools/android_imports.py`) that branches through
+  `__host_import_table`. In the VM build the stub is `mov w16, #index;
+  svc #0; ret`, and the EL1 vector turns the `svc` into an `hvc`. The host
+  reads the arguments from the vCPU's registers, turns guest addresses into
+  host addresses, and carries out the call as the Android host does
+  (`host_syscall.c`, `host_sdl.c`). The game's sources do not change;
+- keeps the thread pointer in `TPIDR_EL0`, which is the guest's own in a
+  VM, instead of the `host_get_tp` import, which would be an exit on each
+  access to thread-local data;
 - sends rendering in batches: a command buffer in shared memory, handed to
   the host once per buffer or per frame, not one exit per call. At about
   1 µs per exit, the thousands of draw calls of a frame cannot each be an
@@ -111,8 +125,7 @@ signing is enough for development. A distributed app is signed with it.
 ### B. The guest in the host's process, with rewritten code
 
 The guest's code would be changed so that it does not need low addresses.
-Every memory access would add a base register (`[x28, w1, uxtw]`), and the
-thread pointer would be kept in another reserved register. The place for
+Every memory access would add a base register (`[x28, w1, uxtw]`). The place for
 this is the step that already converts the guest's assembly
 (`tools/android_asm_convert.py`). There would be no VM exits, but every
 load, store, atomic and address computation in the game must be found and
