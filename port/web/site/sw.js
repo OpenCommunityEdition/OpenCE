@@ -13,7 +13,13 @@ The site's service worker:
   its files; they are fetched together into a cache of their own, and a new
   build replaces them as a whole only when the page asks (once the player
   agrees). version.json?latest always asks the network, so that the page can
-  tell a new build is out.
+  tell a new build is out;
+- it takes the game's wasm, most of a build, from the copy version.json
+  names (jsDelivr's, of the commit the deployment pushed it in:
+  .github/workflows/build.yml's pages job), checked against its SHA-256,
+  and from the site only when that copy cannot be had: GitHub Pages serves
+  100 GB a month. The page loads halo.wasm from the site as before, which
+  this worker then serves from its cache.
 */
 
 'use strict';
@@ -38,13 +44,42 @@ async function setActiveVersion(version) {
   await meta.put('active', new Response(JSON.stringify({ version })));
 }
 
-// a build's files into a cache of their own; then it is the one served, and
-// the others go
+const WASM = 'halo.wasm';
+
+function hex(bytes) {
+  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// the build's wasm from the copy its version.json names ({url, sha256}: an
+// https address and the file's SHA-256), as a response to keep; null when
+// there is none, or it cannot be fetched or is not that file
+async function mirroredWasm(stamp) {
+  const mirror = stamp.wasm;
+  if (!mirror || typeof mirror.url !== 'string' || !mirror.url.startsWith('https://') ||
+      !/^[0-9a-f]{64}$/.test(mirror.sha256 || '')) {
+    return null;
+  }
+  try {
+    const response = await fetch(mirror.url, { mode: 'cors', credentials: 'omit' });
+    if (!response.ok) return null;
+    const bytes = await response.arrayBuffer();
+    if (hex(await crypto.subtle.digest('SHA-256', bytes)) !== mirror.sha256) return null;
+    return new Response(bytes, { status: 200, headers: { 'Content-Type': 'application/wasm' } });
+  } catch {
+    return null;
+  }
+}
+
+// a build's files into a cache of their own (its wasm from its copy where it
+// has one); then it is the one served, and the others go
 async function installVersion(stamp) {
   const name = CACHE_PREFIX + stamp.version;
   const cache = await caches.open(name);
-  const files = ['./', 'version.json', ...stamp.files.filter((file) => file !== 'version.json')];
+  const wasm = stamp.files.includes(WASM) ? await mirroredWasm(stamp) : null;
+  const files = ['./', 'version.json',
+    ...stamp.files.filter((file) => file !== 'version.json' && !(wasm && file === WASM))];
   await cache.addAll(files.map((path) => new Request(path, { cache: 'no-store' })));
+  if (wasm) await cache.put(new Request(WASM), wasm);
   await setActiveVersion(stamp.version);
   for (const other of await caches.keys()) {
     if (other.startsWith(CACHE_PREFIX) && other !== name && other !== META_CACHE) await caches.delete(other);
@@ -129,5 +164,5 @@ self.addEventListener('message', (event) => {
 
 // (for the tests: port/web/tests)
 if (typeof module !== 'undefined') {
-  module.exports = { isolated, installVersion, activeVersion, cachedResponse, respond, CACHE_PREFIX };
+  module.exports = { isolated, installVersion, activeVersion, cachedResponse, respond, mirroredWasm, CACHE_PREFIX };
 }

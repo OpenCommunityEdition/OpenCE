@@ -6,6 +6,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
+const { createHash } = require('node:crypto');
 
 const ORIGIN = 'https://halocombatevolved.com';
 
@@ -65,9 +66,13 @@ class FakeCacheStorage {
   }
 }
 
+// the addresses the fake network was asked for, in turn
+let fetched = [];
+
 globalThis.fetch = async (request) => {
   const url = new URL(typeof request === 'string' ? request : request.url, ORIGIN + '/');
   const name = url.pathname.replace(/^\//, '');
+  fetched.push(url.href);
   if (!(name in served)) return new Response('missing', { status: 404 });
   return new Response(served[name], { status: 200, headers: { 'Content-Type': 'text/plain' } });
 };
@@ -131,4 +136,48 @@ test('a build whose files cannot all be fetched is not made the one served', asy
   served['version.json'] = JSON.stringify({ version: 'eeee', files: ['index.html', 'halo.js', 'halo.wasm'] });
   await assert.rejects(sw.installVersion(JSON.parse(served['version.json'])));
   assert.strictEqual(await sw.activeVersion(), 'dddd');
+});
+
+// the wasm's copy on jsDelivr, as the deployment names it in version.json
+const MIRROR = 'https://cdn.jsdelivr.net/gh/OpenCommunityEdition/OpenCE@0123abcd/halo.wasm';
+
+function serveMirrored(version, wasm, sha256) {
+  serve(version, { 'index.html': `<page ${version}>`, 'halo.js': `js ${version}`, 'halo.wasm': `site ${wasm}` });
+  served[new URL(MIRROR).pathname.replace(/^\//, '')] = wasm;
+  const stamp = JSON.parse(served['version.json']);
+  stamp.wasm = { url: MIRROR, sha256: sha256 || createHash('sha256').update(wasm).digest('hex') };
+  served['version.json'] = JSON.stringify(stamp);
+  return stamp;
+}
+
+test("the wasm comes from its copy, not the site, when the copy is the file", async () => {
+  const stamp = serveMirrored('ffff', 'wasm f');
+  fetched = [];
+  await sw.installVersion(stamp);
+  assert.ok(fetched.includes(MIRROR));
+  assert.ok(!fetched.includes(ORIGIN + '/halo.wasm'), 'the site served the wasm');
+  assert.strictEqual(await (await sw.respond(new Request(ORIGIN + '/halo.wasm'))).text(), 'wasm f');
+});
+
+test("a copy that is not the file is not kept: the site's wasm is", async () => {
+  const stamp = serveMirrored('gggg', 'wasm g', '0'.repeat(64));
+  fetched = [];
+  await sw.installVersion(stamp);
+  assert.ok(fetched.includes(ORIGIN + '/halo.wasm'));
+  assert.strictEqual(await (await sw.respond(new Request(ORIGIN + '/halo.wasm'))).text(), 'site wasm g');
+});
+
+test("a copy that cannot be fetched leaves the site's wasm", async () => {
+  const stamp = serveMirrored('hhhh', 'wasm h');
+  delete served[new URL(MIRROR).pathname.replace(/^\//, '')];
+  await sw.installVersion(stamp);
+  assert.strictEqual(await (await sw.respond(new Request(ORIGIN + '/halo.wasm'))).text(), 'site wasm h');
+});
+
+test('a copy elsewhere than https is never fetched', async () => {
+  const stamp = serveMirrored('iiii', 'wasm i');
+  stamp.wasm.url = 'http://cdn.jsdelivr.net/x/halo.wasm';
+  fetched = [];
+  assert.strictEqual(await sw.mirroredWasm(stamp), null);
+  assert.deepStrictEqual(fetched, []);
 });
