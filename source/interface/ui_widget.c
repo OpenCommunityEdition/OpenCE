@@ -1372,6 +1372,11 @@ boolean pc_menu_tag(
 split screen, the lobby's (port/linux/game/menu_functions.c) */
 unsigned char pc_menu_split_players(
 	void);
+/* port: the Xbox lobby functions in the Mac's local lobby, which has no
+network game (port/linux/game/menu_functions.c) */
+boolean pc_menu_local_lobby_function(
+	short function_index,
+	boolean *result);
 /* port: local_player_count, 0 before the players' globals are made
 (source/game/players.c) */
 short players_port_local_player_count(
@@ -2142,6 +2147,21 @@ boolean main_menu_screen_is_active(
 		strcmp(widget_globals.active_widgets[0]->name, "the_main_menu") == 0)
 	{
 		return TRUE;
+	}
+
+	/* port: the PC version's menus' main screen is "main_menu", and has no attract
+	   mode (what this is asked for: attract_mode_should_start), so only a setting
+	   (game.attract_movies) makes it the Xbox's main menu here */
+	{
+		extern int config_boolean(const char *name);
+
+		if (we_are_at_the_main_menu == TRUE &&
+			widget_globals.active_widgets[0] &&
+			strcmp(widget_globals.active_widgets[0]->name, "main_menu") == 0 &&
+			config_boolean("game.attract_movies"))
+		{
+			return TRUE;
+		}
 	}
 
 	return FALSE;
@@ -3284,6 +3304,25 @@ static __inline struct widget_instance *widget_instance_find_by_tag_index(
 	return result;
 }
 
+/* port: ui_widget_event_handler_function_invoke, but the Xbox's functions of
+the network lobby (a table index of 81 to 85) are the Mac's local lobby's
+when that is open (pc_menu_local_lobby_function) */
+static boolean ui_widget_port_function_invoke(
+	struct widget_instance *widget,
+	struct event_record *event,
+	word function_index,
+	boolean *widget_deleted)
+{
+	boolean result;
+
+	if (function_index >= 81 && function_index <= 85 &&
+		pc_menu_local_lobby_function((short)function_index, &result))
+	{
+		return result;
+	}
+	return ui_widget_event_handler_function_invoke(widget, event, function_index, widget_deleted);
+}
+
 static void event_handler_dispatch(
 	struct widget_instance *widget,
 	struct ui_widget_definition *definition,
@@ -3307,7 +3346,9 @@ static void event_handler_dispatch(
 	}
 	if (TEST_FLAG(handler->flags, _event_handler_run_function_bit) &&
 		!widget_deleted &&
-		!ui_widget_event_handler_function_invoke(
+		/* port: ui_widget_port_function_invoke in place of
+		ui_widget_event_handler_function_invoke (see above) */
+		!ui_widget_port_function_invoke(
 			widget,
 			event,
 			handler->function,
@@ -3810,7 +3851,10 @@ static void widget_instance_initialize(
 	if (widget->pause_game_time == TRUE)
 	{
 		widget_globals.pause_game_time_count++;
-		if (!game_time_get_paused())
+		/* port: not at the main menu: a paused game time runs no game_frame, which is what updates the
+		sound (game_sound_update), so the title music stopped when Settings (whose screens are
+		pause_game) opened; the sound is not paused there either (below) */
+		if (!game_time_get_paused() && !we_are_at_the_main_menu)
 			game_time_set_paused(TRUE);
 		if (!widget_globals.sound_paused && !we_are_at_the_main_menu)
 		{
@@ -4806,7 +4850,8 @@ void display_error(
 							widget_globals.pause_game_time_count>=0,
 							"widget pause counter is out of whack");
 						widget_globals.pause_game_time_count++;
-						if (!game_time_get_paused())
+						/* port: (not at the main menu: as above) */
+						if (!game_time_get_paused() && !we_are_at_the_main_menu)
 							game_time_set_paused(TRUE);
 						if (!widget_globals.sound_paused && !we_are_at_the_main_menu)
 						{
@@ -8478,12 +8523,42 @@ static void widget_instance_process_one_event_recursive(
 	return;
 }
 
+#ifdef HALO_MAC
+/* port: the Mac's maps have not the Xbox's pause screens (ui\shell\...);
+a player's Start opens the Mac's own (port/mac/menus/pause_menu.xml) on their
+part of the screen instead: the full screen's, or the split screen's for a
+window of 640 by 240 (window_kind 1) or 320 by 240 (2) */
+static char const *ui_port_pause_screen(
+	char const *name,
+	short window_kind)
+{
+	if (tag_loaded(UI_WIDGET_DEFINITION_TAG, name) == NONE &&
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, "pc\\pause\\pause_screen") != NONE)
+	{
+		name = window_kind == 1 ? "pc\\pause\\pause_screen_wide" :
+			window_kind == 2 ? "pc\\pause\\pause_screen_narrow" : "pc\\pause\\pause_screen";
+	}
+	return name;
+}
+#else
+#define ui_port_pause_screen(name, window_kind) (name)
+#endif
+
 static boolean ui_check_for_pause_game(
 	void)
 {
 	boolean pause_pressed = FALSE;
 	boolean network_game = network_game_is_active();
 	short controller_index = NONE;
+
+#ifdef HALO_MAC
+	/* port: the Mac's split screen multiplayer game when it has no network
+	game (Server Setup's local lobby, if the netcode did not start) pauses as
+	a network game's players do:
+	each player's own pause menu, on their part of the screen */
+	if (!network_game && game_engine && players_port_local_player_count() > 1)
+		network_game = TRUE;
+#endif
 
 	if (game_in_progress() &&
 		!cinematic_in_progress() &&
@@ -8535,10 +8610,11 @@ static boolean ui_check_for_pause_game(
 				if (!widget_globals.active_widgets[controller_index])
 				{
 					struct network_game_client *client = global_network_game_client_get();
+					/* port: the Mac's local game has no client */
 					struct network_game *network_game_data =
-						network_game_client_get_game(client);
+						client ? network_game_client_get_game(client) : NULL;
 					short machine_index =
-						network_game_client_get_machine_index(client);
+						client ? network_game_client_get_machine_index(client) : NONE;
 					char const *widget_name;
 
 					/* port: a campaign map has only the campaign's pause screen */
@@ -8570,9 +8646,13 @@ static boolean ui_check_for_pause_game(
 						widget_name = NULL;
 						break;
 					}
+					/* port: ui_port_pause_screen names the Mac's pause screen
+					when the map has not the Xbox's (as for the others below) */
 					if (widget_name &&
 						!ui_widget_load_by_name_or_tag(
-							widget_name,
+							ui_port_pause_screen(widget_name,
+								local_player_count == 2 || (local_player_count == 3 && pressed_by_first_local_player) ? 1 :
+								local_player_count >= 3 ? 2 : 0),
 							NONE,
 							NULL,
 							controller_index,
@@ -8626,8 +8706,9 @@ static boolean ui_check_for_pause_game(
 							"failed to load multiplayer pause game window");
 					}
 				}
+				/* port: ui_port_pause_screen, as above */
 				else if (!ui_widget_load_by_name_or_tag(
-					"ui\\shell\\solo_game\\pause_game\\pause_game",
+					ui_port_pause_screen("ui\\shell\\solo_game\\pause_game\\pause_game", 0),
 					NONE,
 					NULL,
 					controller_index,
@@ -8648,8 +8729,9 @@ static boolean ui_check_for_pause_game(
 				}
 				else if (!game_time_get_paused())
 				{
+					/* port: ui_port_pause_screen, as above */
 					if (!ui_widget_load_by_name_or_tag(
-						"ui\\shell\\solo_game\\pause_game\\pause_game_split_screen",
+						ui_port_pause_screen("ui\\shell\\solo_game\\pause_game\\pause_game_split_screen", 1),
 						NONE,
 						NULL,
 						controller_index,

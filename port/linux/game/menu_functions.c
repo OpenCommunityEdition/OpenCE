@@ -341,6 +341,12 @@ static boolean setting_text(char const *name, char *text, unsigned int size, boo
 			scale = atol(scale_text);
 			if (scale < 1)
 				scale = 1;
+#ifdef HALO_MAC
+			/* port: the Mac's window is the game's own size until a size is chosen
+			(display.window_scale, which its config.toml may carry from the
+			desktop's default of 2, is not used) */
+			scale = 1;
+#endif
 			snprintf(text, size, "%ldx%ld", 640 * scale, 480 * scale);
 		}
 		return TRUE;
@@ -516,6 +522,17 @@ boolean pc_menu_profile_edit_begin(void)
 	if (!campaign_profile(0, &profile))
 		return FALSE;
 	player_ui_begin_editing_profile(player_ui_get_active_player_profile_index(0));
+	/* (an edit that did not begin, as the profile read again says: once more) */
+	if (!player_ui_get_edit_player_profile())
+	{
+		player_ui_end_editing_profile();
+		player_ui_begin_editing_profile(player_ui_get_active_player_profile_index(0));
+	}
+	if (!player_ui_get_edit_player_profile())
+	{
+		platform_log("menus: the profile could not be edited");
+		return FALSE;
+	}
 	return TRUE;
 }
 
@@ -897,14 +914,35 @@ static void profile_name_show(struct widget_instance *description)
 	text_set(named(description, "current_profile_name", 0), profile.player_name);
 }
 
+#define CAMPAIGN_ITEM_SPACING 36
+
 /* (Campaign's menu) "campaign menu init": player 1's profile and saved
 game, for its items */
-static boolean campaign_menu_initialize(short controller)
+static boolean campaign_menu_initialize(struct widget_instance *list, short controller)
 {
 	struct player_profile profile;
+	struct widget_instance *item;
+	boolean saved;
 
+	campaign.saved_level = NONE;
 	if (campaign_profile(controller, &profile))
 		campaign_levels_read(&profile);
+	/* port: Continue is there only while the profile has a saved game to go on with (with none,
+	it only failed with an error sound); the items below it then take its place */
+	saved = campaign.saved_level != NONE;
+	item = named(list, "menu_item_continue", 0);
+	/* (the screen's items are made again each time it opens) */
+	if (item && !saved && item->visible)
+	{
+		struct widget_instance *other;
+
+		item->visible = FALSE;
+		item->disabled = TRUE;
+		for (other = item->next; other; other = other->next)
+			other->vertical_offset = (short)(other->vertical_offset - CAMPAIGN_ITEM_SPACING);
+		if (list->focused_child == item && item->next)
+			list->focused_child = item->next;
+	}
 	return TRUE;
 }
 
@@ -1502,9 +1540,18 @@ static void video_rows_show(struct widget_instance *list)
 	struct widget_instance *mode = named(list, "mode_spinner", 0);
 	struct widget_instance *resolution = named(list, "op_resolution", 0);
 	struct widget_instance *window_size = named(list, "op_window_size", 0);
-	struct pc_menu_setting *setting = mode ? pc_menu_setting_get(mode->definition_tag_index) : NULL;
+	struct pc_menu_setting *setting;
 	struct widget_instance *shown, *child;
 	short index;
+
+	/* (the Mac's own rows, tools/port_settings.py) */
+	if (!mode)
+		mode = named(list, "mode_mac_spinner", 0);
+	if (!resolution)
+		resolution = named(list, "op_resolution_mac", 0);
+	if (!window_size)
+		window_size = named(list, "op_window_size_mac", 0);
+	setting = mode ? pc_menu_setting_get(mode->definition_tag_index) : NULL;
 
 	if (!setting || !resolution || !window_size)
 		return;
@@ -2172,6 +2219,8 @@ Xbox's networking, run by the engine's port entry points
 #define BROWSER_ROWS 15
 #define LOBBY_ROWS 11
 #define TEXT_FIELD_LENGTH 128
+/* the most of a text field's text its row shows */
+#define TEXT_FIELD_SHOWN 30
 #define PLAYLIST_READ_ONLY_BIT 0x40000000UL
 /* (a key stroke's modifier, as input_xbox.c has them: shift, control) */
 #define KEY_MODIFIER_CONTROL_BIT 1
@@ -2432,6 +2481,9 @@ static void text_field_show(struct widget_instance *value, char const *text, boo
 		}
 		text = text_field.text;
 	}
+	/* (a long text by its end, where it is typed) */
+	if (strlen(text) > TEXT_FIELD_SHOWN)
+		text += strlen(text) - TEXT_FIELD_SHOWN;
 	for (index = 0; text[index] && index < TEXT_FIELD_LENGTH; index++)
 		shown[index] = editing && text_field.masked ? L'*' : (wchar_t)(unsigned char)text[index];
 	if (editing && (system_milliseconds() / 500) % 2)
@@ -3066,6 +3118,15 @@ static boolean invite_copy(void)
 	return TRUE;
 }
 
+#ifdef HALO_MAC
+/* port: the Mac's lobby when the netcode could not start (a hosted game is
+the network's, as in the other ports), so it is this machine's: the players
+are the controllers that joined (player_ui), START NOW plays the map and
+gametype chosen, and nothing is sent. Set by START GAME on Server Setup
+when there is no server */
+static boolean mac_local_lobby;
+#endif
+
 /* "ss start game": the settings given the server, then the lobby */
 static boolean server_start(void)
 {
@@ -3100,6 +3161,25 @@ static boolean server_start(void)
 	}
 	else if (!gametype_setup_apply())
 		return campaign_fail();
+#ifdef HALO_MAC
+	/* port: START GAME hosts the network game the server made (the Mac has
+	the netcode now: port/mac/engine_network_test.c starts it with the menus,
+	and this machine's split screen players join the game as in the other
+	ports). Only if there is no server (the netcode could not start) it plays
+	the map and the gametype chosen here (player_ui keeps it) on this
+	machine, as New Game > Multiplayer plays a map */
+	if (!hosting_cooperative() && !global_network_game_server_get())
+	{
+		char const *map_name = main_get_multiplayer_map_name();
+
+		if (!map_name || !map_name[0])
+			return campaign_fail();
+		/* (the lobby, local: other controllers join with START, then
+		START NOW plays) */
+		mac_local_lobby = TRUE;
+		return TRUE;
+	}
+#endif
 	return global_network_game_server_get() != NULL;
 }
 
@@ -3945,6 +4025,65 @@ static boolean direct_link_from_clipboard(void)
 	return TRUE;
 }
 
+/* ---- Direct IP (the PC version's screen of a server's address and
+password, direct_ip_screen). This game has no join by address: a machine is
+reached through an invite link (p2p.c). So SERVER ADDRESS holds an invite
+link (or its 64 digits, a Discord invite's code), and JOIN joins it: with
+none typed, the clipboard's, as Direct Link's PASTE LINK does. The password
+row is hidden: an invite joins without one (a game with a password is joined
+through the Server Browser). */
+
+static char direct_ip_address[TEXT_FIELD_LENGTH];
+
+static void direct_ip_address_done(char const *text)
+{
+	snprintf(direct_ip_address, sizeof(direct_ip_address), "%s", text);
+}
+
+/* "direct ip connect init" (the screen made): nothing typed yet */
+static boolean direct_ip_initialize(struct widget_instance *list)
+{
+	direct_ip_address[0] = 0;
+	visible_set(named(list, "op_server_password", 0), FALSE);
+	return TRUE;
+}
+
+/* "direct ip connect update": the address shown (a long link by its end) */
+static void direct_ip_update(struct widget_instance *list)
+{
+	struct widget_instance *value = named(list, "server_address_value_label", 0);
+	boolean editing = value && text_field_editing(value);
+
+	visible_set(named(list, "op_server_password", 0), FALSE);
+	text_field_show(value, direct_ip_address[0] ? direct_ip_address : "THE CLIPBOARD'S LINK", editing);
+}
+
+/* "direct ip edit field" (the address' A: begins, or ends) */
+static boolean direct_ip_edit(struct widget_instance *value)
+{
+	if (text_field_editing(value))
+		text_field_end(TRUE);
+	else if (!strstr(value->name, "password"))
+		text_field_begin(value, direct_ip_address, TEXT_FIELD_LENGTH - 1, direct_ip_address_done);
+	return TRUE;
+}
+
+/* "direct ip connect go" (JOIN): the link typed, else the clipboard's */
+static boolean direct_ip_connect(void)
+{
+	if (text_field_editing(NULL))
+		text_field_end(TRUE);
+	if (!direct_ip_address[0])
+		return direct_link_from_clipboard();
+	if (!p2p_join_invite(direct_ip_address))
+	{
+		platform_log("menus: the address is not an invite link");
+		return campaign_fail();
+	}
+	direct_ip_address[0] = 0;
+	return TRUE;
+}
+
 /* joining the game chosen: player 1 in, then the lobby */
 static boolean browser_join(struct widget_instance *widget, short controller, boolean *widget_deleted)
 {
@@ -4092,6 +4231,14 @@ static short lobby_local_player_count(void)
 {
 	short controller, count = 0;
 
+#ifdef HALO_MAC
+	if (mac_local_lobby)
+	{
+		for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
+			count += player_ui_local_player_wants_to_play_multiplayer(controller) ? 1 : 0;
+		return count;
+	}
+#endif
 	if (!global_network_game_client_get())
 		return 0;
 	for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
@@ -4151,6 +4298,15 @@ static boolean lobby_join_start(struct widget_instance *widget, short controller
 		ui_widget_port_dispatch_event(focused_leaf(widget), BUTTON_START, controller, widget_deleted);
 		return FALSE;
 	}
+#ifdef HALO_MAC
+	if (mac_local_lobby)
+	{
+		if (lobby_local_player_count() >= MAXIMUM_LOCAL_PLAYERS)
+			return campaign_fail();
+		lobby_join.controller = controller;
+		return TRUE;
+	}
+#endif
 	if (!game || network_game_client_get_state(client, &state_data) != _client_state_pregame)
 		return campaign_fail();
 	if (lobby_player_count >= game->maximum_players)
@@ -4173,6 +4329,19 @@ static boolean lobby_leave(struct widget_instance *widget, struct event_record *
 		lobby_join_reset();
 		return FALSE;
 	}
+#ifdef HALO_MAC
+	if (mac_local_lobby)
+	{
+		/* (the machine's last player leaving goes back to Server Setup) */
+		player_ui_local_player_left_multiplayer_game(controller);
+		if (lobby_local_player_count() == 0)
+		{
+			mac_local_lobby = FALSE;
+			return TRUE;
+		}
+		return FALSE;
+	}
+#endif
 	return ui_widget_port_unjoin_player(widget, event, widget_deleted);
 }
 
@@ -4354,6 +4523,65 @@ void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d c
 	}
 }
 
+#ifdef HALO_MAC
+/* the Mac's local lobby's rows: the controllers that joined, by profile */
+static void mac_lobby_row_text(short row, wchar_t *text)
+{
+	short controller;
+
+	for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
+	{
+		if (player_ui_local_player_wants_to_play_multiplayer(controller) && row-- == 0)
+		{
+			struct player_profile profile;
+			wchar_t name[NUMBEROF(profile.player_name) + 1];
+
+			player_ui_get_active_player_profile(controller, &profile);
+			ustrncpy(name, profile.player_name, NUMBEROF(profile.player_name));
+			name[NUMBEROF(profile.player_name)] = 0;
+			usnprintf(text, ROW_TEXT_LENGTH - 1, L"%s  [P%d]", name, controller + 1);
+			text[ROW_TEXT_LENGTH - 1] = 0;
+			return;
+		}
+	}
+	text[0] = 0;
+}
+
+/* "port lobby update", the Mac's local lobby */
+static void mac_lobby_update(struct widget_instance *list)
+{
+	struct widget_instance *description = list->parameters.list.extended_description;
+	short count = lobby_local_player_count();
+	wchar_t text[LOBBY_TEXT_LENGTH];
+
+	rows_update(list, (short)MIN(count, LOBBY_ROWS), mac_lobby_row_text);
+	lobby_join_help(list);
+	visible_set(named(list, "lobby_button_team", 0), FALSE);
+	focus_off_hidden(named(list, "lobby_button_bar", 0));
+	visible_set(named(description, "lobby_right_item", 0), TRUE);
+	lobby_map_show(description, main_get_multiplayer_map_name());
+	usnprintf(text, NUMBEROF(text) - 1, L"%d of %d players\r\n\r\nSTART NOW plays", count, MAXIMUM_LOCAL_PLAYERS);
+	text[NUMBEROF(text) - 1] = 0;
+	text_set_length(named(description, "lobby_game_data", 0), text, LOBBY_TEXT_LENGTH);
+	profile_name_show(description);
+}
+
+/* "net game speed start" (START NOW), the Mac's local lobby: the game
+starts on this machine with the players joined */
+static boolean mac_lobby_start(void)
+{
+	char const *map_name = main_get_multiplayer_map_name();
+
+	platform_log("menus: START NOW (local game): map %s, %d players", map_name ? map_name : "(none)",
+		(int)lobby_local_player_count());
+	if (!map_name || !map_name[0] || lobby_local_player_count() < 1)
+		return campaign_fail();
+	campaign_start(map_name, main_get_difficulty(), 0);
+	mac_local_lobby = FALSE;
+	return FALSE;
+}
+#endif
+
 /* "port lobby update" */
 static void lobby_update(struct widget_instance *list)
 {
@@ -4364,6 +4592,13 @@ static void lobby_update(struct widget_instance *list)
 	wchar_t text[LOBBY_TEXT_LENGTH];
 	short index;
 
+#ifdef HALO_MAC
+	if (mac_local_lobby)
+	{
+		mac_lobby_update(list);
+		return;
+	}
+#endif
 	lobby_player_count = 0;
 	for (index = 0; game && state >= _client_state_pregame && index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; index++)
 	{
@@ -5369,6 +5604,27 @@ static void gametype_engine_name(struct widget_instance *text_box)
 
 /* ---------- public code */
 
+/* port: (ui_widget.c) the Xbox functions of the network lobby, in the Mac's
+local lobby (mac_local_lobby): START NOW plays on this machine, and the
+network server's functions do nothing. The functions are the Xbox's by their
+index in its table (ui_widget_event_handler_functions.c): 81 "net game speed
+start", 82 "net game delay start", 83 "net server accept conx", 84 "net server
+defer start", 85 "net server allow start". FALSE: not handled (every other
+port, and the Mac outside its local lobby) */
+boolean pc_menu_local_lobby_function(short function_index, boolean *result)
+{
+#ifdef HALO_MAC
+	if (mac_local_lobby && function_index >= 81 && function_index <= 85)
+	{
+		*result = function_index == 81 ? mac_lobby_start() : TRUE;
+		return TRUE;
+	}
+#endif
+	(void)function_index;
+	(void)result;
+	return FALSE;
+}
+
 boolean pc_menu_event_function_invoke(
 	struct widget_instance *widget,
 	struct event_record *event,
@@ -5528,7 +5784,16 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "direct ip connect go"))
 		{
-			return direct_link_from_clipboard();
+			/* (Direct IP's JOIN: the link typed; Direct Link's PASTE LINK: the clipboard's) */
+			return strstr(widget->name, "direct_ip_button_join") ? direct_ip_connect() : direct_link_from_clipboard();
+		}
+		else if (!strcmp(name, "direct ip connect init"))
+		{
+			return direct_ip_initialize(widget);
+		}
+		else if (!strcmp(name, "direct ip edit field"))
+		{
+			return direct_ip_edit(widget);
 		}
 		else if (!strcmp(name, "join controller to mp game"))
 		{
@@ -5691,7 +5956,7 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "campaign menu init"))
 		{
-			return campaign_menu_initialize(controller);
+			return campaign_menu_initialize(widget, controller);
 		}
 		else if (!strcmp(name, "campaign menu continue"))
 		{
@@ -5762,6 +6027,10 @@ void pc_menu_game_data_function_invoke(
 		password_screen_update(widget);
 	else if (!strcmp(name, "gamespy screen update"))
 		browser_update(widget);
+	else if (!strcmp(name, "direct ip connect update"))
+		direct_ip_update(widget);
+	else if (!strcmp(name, "common button bar update"))
+		focus_off_hidden(widget);
 	else if (!strcmp(name, "gt edit list update"))
 		gametype_edit_list_update(widget);
 	else if (!strcmp(name, "get edit game settings name"))

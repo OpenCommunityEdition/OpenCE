@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The Mac's pause menu (Escape in a game), in the style of the quit dialog (ce/main_menu.quit_select.xml).
+     The PC version's own is widgets of the map (ui\shell\multiplayer_game\pause_game), which this build does not read.
+     Embedded after the generated menus by tools/mac_menu_files_view.py (the mac option: the rendered session). -->
+<menus>
+	<widget name="pause/title" type="text" controller="1" width="240" height="20" text="PAUSED" font="ui\large_ui" color="#FF2896FF" align="center">
+	</widget>
+	<widget name="pause/resume" type="text" width="160" height="24" bitmap="bitmaps/text_button_background" text="RESUME GAME" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a start" close="current"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="pause/settings" type="text" width="160" height="24" bitmap="bitmaps/text_button_background" text="SETTINGS" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="profile set edit begin" label="settings" open="main_menu/settings_select/player_setup/player_profile_edit/player_profile_edit_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="pause/leave" type="text" width="160" height="24" bitmap="bitmaps/text_button_background" text="LEAVE GAME" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="pause game return to main menu" close="current"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="pause/button_list" type="column_list" width="160" height="104" flags="pass_unhandled_to_focused_child up_down_tabs_items">
+		<child widget="pause/resume" y="0"/>
+		<child widget="pause/settings" y="32"/>
+		<child widget="pause/leave" y="64"/>
+	</widget>
+	<widget name="pause/pause_screen" controller="1" left="180" top="160" width="280" height="160" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/alert_bkd">
+		<on event="b" close="current"/>
+		<child widget="pause/title" x="200" y="168"/>
+		<child widget="pause/button_list" x="240" y="204"/>
+	</widget>
+	<!-- A split screen player's pause menu, on their part of the screen (a 640 by 240 window for two players or the
+	     first of three, a 320 by 240 one for the others): RESUME and LEAVE GAME (which ends the game for them all;
+	     the Mac has no network game). Their coordinates are the window's. -->
+	<widget name="pause/button_list_split" type="column_list" width="160" height="56" flags="pass_unhandled_to_focused_child up_down_tabs_items">
+		<child widget="pause/resume" y="0"/>
+		<child widget="pause/leave" y="32"/>
+	</widget>
+	<widget name="pause/pause_screen_wide" controller="1" left="180" top="40" width="280" height="130" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/alert_bkd">
+		<on event="b" close="current"/>
+		<child widget="pause/title" x="200" y="48"/>
+		<child widget="pause/button_list_split" x="240" y="84"/>
+	</widget>
+	<widget name="pause/pause_screen_narrow" controller="1" left="20" top="40" width="280" height="130" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/alert_bkd">
+		<on event="b" close="current"/>
+		<child widget="pause/title" x="40" y="48"/>
+		<child widget="pause/button_list_split" x="80" y="84"/>
+	</widget>
+</menus>

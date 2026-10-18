@@ -10,27 +10,7 @@ do (save a setting, join a game) does not happen; the screens open and close as 
 
 | Function | Uses | |
 | --- | --- | --- |
-| `common button bar update` | 27 | PC function |
-| `direct ip connect init` | 1 | PC function |
-| `direct ip connect update` | 1 | PC function |
-| `direct ip edit field` | 4 | PC function |
-| `gamespy screen update` | 1 | PC function |
-| `gamespy select button` | 8 | PC function |
 | `gamespy select header` | 22 | PC function |
-| `gamespy select item` | 49 | PC function |
 | `gamespy update filter settings` | 2 | PC function |
-| `gt edit list update` | 1 | PC function |
-| `gt select list update` | 1 | PC function |
-| `mouse spinner 1wide click` | 82 | PC function |
-| `mp map list update` | 1 | PC function |
-| `mp prof init teamplay options` | 1 | PC function |
-| `mp prof init vehicle options` | 1 | PC function |
-| `mp prof save teamplay options` | 1 | PC function |
-| `mp prof save vehicle options` | 1 | PC function |
-| `mp prof vehicles update` | 1 | PC function |
-| `server settings init` | 1 | PC function |
-| `server settings update` | 1 | PC function |
-| `ss edit server name` | 2 | PC function |
-| `ss start game` | 2 | PC function |
 
-Wired: `campaign menu continue`, `campaign menu init`, `controls back handler`, `controls begin binding`, `controls screen change set`, `controls screen defaults`, `controls screen init`, `controls update menu`, `difficulty item select`, `direct ip connect go`, `emit custom activation event`, `gamespy back handler`, `gamespy dismiss error`, `gamespy dismiss filters`, `gamespy screen dispose`, `gamespy screen init`, `load game list update`, `load game menu activated`, `load game menu delete finish`, `load game menu delete request`, `load game menu dispose`, `load game menu init`, `main menu quit game`, `mouse emit accept event`, `mouse emit back event`, `mouse emit x event`, `mp type set mode`, `profile manager select`, `profile set edit begin`, `single prev cl item activated`, `solo map list update`, `ss edit server password`.
+Wired: `campaign menu continue`, `campaign menu init`, `common button bar update`, `controls back handler`, `controls begin binding`, `controls screen change set`, `controls screen defaults`, `controls screen init`, `controls update menu`, `difficulty item select`, `direct ip connect go`, `direct ip connect init`, `direct ip connect update`, `direct ip edit field`, `emit custom activation event`, `gamespy back handler`, `gamespy dismiss error`, `gamespy dismiss filters`, `gamespy screen dispose`, `gamespy screen init`, `gamespy screen update`, `gamespy select button`, `gamespy select item`, `gt edit list update`, `gt select list update`, `load game list update`, `load game menu activated`, `load game menu delete finish`, `load game menu delete request`, `load game menu dispose`, `load game menu init`, `main menu quit game`, `mouse emit accept event`, `mouse emit back event`, `mouse emit x event`, `mouse spinner 1wide click`, `mp map list update`, `mp prof init teamplay options`, `mp prof init vehicle options`, `mp prof save teamplay options`, `mp prof save vehicle options`, `mp prof vehicles update`, `mp type set mode`, `profile manager select`, `profile set edit begin`, `server settings init`, `server settings update`, `single prev cl item activated`, `solo map list update`, `ss edit server name`, `ss edit server password`, `ss start game`.

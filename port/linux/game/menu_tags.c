@@ -270,6 +270,10 @@ struct pc_menu_setting
 
 /* ---------- globals */
 
+/* set before menu_tags_loaded by a build whose map has no ui.map tags (the
+Mac's): the files' main menu is built over the game map's tags */
+boolean menu_tags_standalone;
+
 /* the names the files may use, by their values */
 static char const *const event_names[] =
 {
@@ -441,6 +445,10 @@ static struct
 	long *strings_tags;
 	long *text_tags;
 	long *spinner_tags;
+	/* the keyboard's and its strings' (menu_tags_standalone) */
+	long keyboard_tag;
+	long keyboard_strings_tag;
+	long gametype_names_tag;
 	boolean failed;
 	/* a game map's build (the pause menu's SETTINGS): what the map has not
 	got is none, not a failure */
@@ -849,8 +857,8 @@ static void *bitmap_build(struct halo_menu_bitmap const *source, long tag_index)
 
 		/* (a frame of the map's: a copy of its bitmap, which the texture cache
 		loads from the map as its own; in a game map that has not got it,
-		nothing) */
-		if (data->map && build.game_map && tag_loaded(BITMAP_GROUP_TAG, data->map) == NONE)
+		nothing; standalone, always nothing: the Mac's textures are not the map's) */
+		if (data->map && build.game_map && (menu_tags_standalone || tag_loaded(BITMAP_GROUP_TAG, data->map) == NONE))
 		{
 			png = BLANK_PNG;
 			width = height = PLACEHOLDER_SIZE;
@@ -1387,6 +1395,145 @@ static struct cache_file_tag_instance *instances_grow(long count, long *first_in
 	*first_index = existing;
 	*first_salt = salt + 1;
 	return grown;
+}
+
+/* ---------- the keyboard (menu_tags_standalone only): ui.map's on-screen
+keyboard, "ui\english" ('vcky', virtual_keyboard.c's), which a build that
+has no ui.map (the Mac's) makes here: the keys' characters, the labels and
+captions of the strings it draws, pictures of the menus' own */
+
+#define VIRTUAL_KEYBOARD_TAG 'vcky'
+#define KEYBOARD_NAME "ui\\english"
+#define KEYBOARD_FONT "ui\\large_ui"
+#define KEYBOARD_CONFIGURABLE_KEYS 36
+#define KEYBOARD_KEYS 44
+/* the extra tags it takes: its keyboard and its strings, and the names of the
+game's default gametypes (playlist_profile.c reads "ui\default_multiplayer_game_setting_names"
+to make them: ui.map's, which a build that has none lacks) */
+#define KEYBOARD_TAGS 3
+#define DEFAULT_GAMETYPE_NAMES "ui\\default_multiplayer_game_setting_names"
+
+struct virtual_keyboard_key
+{
+	short keycode;
+	wchar_t character;
+	wchar_t shift_character;
+	wchar_t caps_character;
+	wchar_t symbols_character;
+	wchar_t shift_caps_character;
+	wchar_t shift_symbols_character;
+	wchar_t caps_symbols_character;
+	struct tag_reference unselected_background_bitmap_tag;
+	struct tag_reference selected_background_bitmap_tag;
+	struct tag_reference active_background_bitmap_tag;
+	struct tag_reference sticky_background_bitmap_tag;
+};
+
+struct virtual_keyboard_definition
+{
+	struct tag_reference font_tag;
+	struct tag_reference background_bitmap_tag;
+	struct tag_reference special_key_labels_string_list_tag;
+	struct tag_block keys;
+};
+
+typedef char verify_virtual_keyboard_key_size[sizeof(struct virtual_keyboard_key) == 0x50 ? 1 : -1];
+typedef char verify_virtual_keyboard_definition_size[sizeof(struct virtual_keyboard_definition) == 0x3C ? 1 : -1];
+
+/* the keys' strings: the special keys' labels (done, shift, caps, symbols,
+backspace, left, right, space), the captions the callers pass (8 to 10), then
+the ten the ".fortune" command shows (11 on) */
+static char const *const keyboard_strings[] =
+{
+	"DONE", "SHIFT", "CAPS", "SYMBOLS", "BACKSPACE", "<", ">", "SPACE",
+	"Type a name for the player profile.", "Type a name for the gametype.", "Type a name.",
+	"You will have a good day.", "Today is a good day to play.", "The Covenant fear you.",
+	"A friend will help you soon.", "Fortune favors the quick.", "Aim for the head.",
+	"Cover is your friend.", "Keep moving.", "Nothing is certain but the next respawn.",
+	"Reload before you need to.",
+};
+
+/* the default gametypes' names, in playlist_profile.c's order: at most 11
+characters, which a name has room for */
+static char const *const default_gametype_names[] =
+{
+	"Slayer", "Slayer Pro", "Elimination", "Phantoms", "Endurance", "Rockets", "Snipers", "Oddball",
+	"Reverse Tag", "Accumulate", "Juggernaut", "Stalker", "King", "King Pro", "Crazy King", "Race",
+	"Rally", "CTF", "Invasion", "Iron CTF", "CTF Pro", "Team Race", "Team Rally", "Team Ball",
+	"Team King", "Team Slayer",
+};
+
+/* the keys' characters, in the keyboard's order: 1 to 9 and 0, a to z */
+static char const keyboard_digits[] = "1234567890";
+static char const keyboard_digit_shifts[] = "!@#$%^&*()";
+static char const keyboard_symbols[] = "-_=+[]{};:'\",.<>/?\\|`~!@#$%^&*";
+
+static void *keyboard_strings_build(void)
+{
+	return string_list_build(keyboard_strings, NUMBEROF(keyboard_strings));
+}
+
+/* whether its font and pictures are there */
+static boolean keyboard_can_be_made(void)
+{
+	return tag_loaded(FONT_TAG, KEYBOARD_FONT) != NONE &&
+		find("bitmaps/option_bkds_sm2", build.menus->bitmap_count, bitmap_name) != NONE &&
+		find("bitmaps/text_button_background", build.menus->bitmap_count, bitmap_name) != NONE;
+}
+
+static void *keyboard_build(long strings_tag)
+{
+	struct virtual_keyboard_definition *definition = allocate(sizeof(*definition));
+	struct virtual_keyboard_key *keys = allocate(KEYBOARD_KEYS * sizeof(*keys));
+	long font = tag_loaded(FONT_TAG, KEYBOARD_FONT);
+	long plain = find("bitmaps/option_bkds_sm2", build.menus->bitmap_count, bitmap_name);
+	long lit = find("bitmaps/text_button_background", build.menus->bitmap_count, bitmap_name);
+	long key;
+
+	plain = plain == NONE ? NONE : build.bitmap_tags[plain];
+	lit = lit == NONE ? NONE : build.bitmap_tags[lit];
+
+	if (!definition || !keys || font == NONE || plain == NONE || lit == NONE)
+	{
+		platform_log("menus: the on-screen keyboard is not made: no %s or pictures", KEYBOARD_FONT);
+		return NULL;
+	}
+	reference_set(&definition->font_tag, FONT_TAG, font);
+	{
+		/* (the screens' own background: the keyboard draws all of the screen) */
+		long background = find("bitmaps/gradient", build.menus->bitmap_count, bitmap_name);
+
+		reference_set(&definition->background_bitmap_tag, BITMAP_GROUP_TAG,
+			background == NONE ? NONE : build.bitmap_tags[background]);
+	}
+	reference_set(&definition->special_key_labels_string_list_tag, UNICODE_STRING_LIST_TAG, strings_tag);
+	definition->keys.count = KEYBOARD_KEYS;
+	definition->keys.address = keys;
+	for (key = 0; key < KEYBOARD_KEYS; key++)
+	{
+		keys[key].keycode = (short)key;
+		reference_set(&keys[key].unselected_background_bitmap_tag, BITMAP_GROUP_TAG, plain);
+		reference_set(&keys[key].selected_background_bitmap_tag, BITMAP_GROUP_TAG, lit);
+		reference_set(&keys[key].active_background_bitmap_tag, BITMAP_GROUP_TAG, lit);
+		reference_set(&keys[key].sticky_background_bitmap_tag, BITMAP_GROUP_TAG, lit);
+		if (key < 10)
+		{
+			keys[key].character = keys[key].caps_character = (wchar_t)keyboard_digits[key];
+			keys[key].shift_character = keys[key].shift_caps_character = keys[key].shift_symbols_character =
+				(wchar_t)keyboard_digit_shifts[key];
+			keys[key].symbols_character = keys[key].caps_symbols_character = (wchar_t)keyboard_digit_shifts[key];
+		}
+		else if (key < KEYBOARD_CONFIGURABLE_KEYS)
+		{
+			long letter = key - 10;
+
+			keys[key].character = keys[key].shift_caps_character = (wchar_t)('a' + letter);
+			keys[key].shift_character = keys[key].caps_character = (wchar_t)('A' + letter);
+			keys[key].symbols_character = keys[key].shift_symbols_character = keys[key].caps_symbols_character =
+				(wchar_t)keyboard_symbols[letter];
+		}
+	}
+	return definition;
 }
 
 static long next_tag(void)
@@ -2057,20 +2204,43 @@ static boolean menus_pc_chosen(void)
 	return FALSE;
 }
 
+/* the size in the files' units of a menu bitmap's frame, by its texture
+(hardware_format), else FALSE: the texture itself is a small placeholder */
+boolean pc_menu_art_size(
+	void const *hardware_format,
+	long *width,
+	long *height)
+{
+	long index;
+
+	for (index = 0; index < menu_tags.bitmap_count; index++)
+	{
+		if (menu_tags.bitmaps[index]->hardware_format == hardware_format)
+		{
+			*width = menu_tags.bitmaps[index]->width;
+			*height = menu_tags.bitmaps[index]->height;
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 void menu_tags_loaded(
 	char const *map_name)
 {
 	struct halo_menus const *menus;
 	struct cache_file_tag_instance *instances;
 	long widget_count, own_lists = 0, total, index;
-
+	boolean keyboard_wanted;
 	boolean game_map = strcmp(map_name, "ui") != 0;
-	boolean campaign = game_map && single_player_campaign_map();
+	boolean campaign = game_map && !menu_tags_standalone && single_player_campaign_map();
 
 	/* (ui.map, and a multiplayer map: its pause menu's SETTINGS; a
-	single-player campaign's too) */
-	if ((game_map && tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE && !campaign) ||
-		!menus_pc_chosen())
+	single-player campaign's too. menu_tags_standalone: the main menu over a
+	game map, for a build that has no ui.map (the Mac's): the map's tags the
+	files name that it has not are none, and no pause screen is patched) */
+	if ((game_map && !menu_tags_standalone && tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE && !campaign) ||
+		(!menu_tags_standalone && !menus_pc_chosen()))
 	{
 		return;
 	}
@@ -2097,8 +2267,11 @@ void menu_tags_loaded(
 			problem(menus->widgets[index].file, menus->widgets[index].line, "two widgets are named",
 				menus->widgets[index].name);
 	}
+	/* port: a game map that has no keyboard of its own (the Xbox's ui.map has one: a game map does not) gets it
+	too, so that the pause menu's Settings can rename the profile */
+	keyboard_wanted = menu_tags_standalone || (game_map && tag_loaded(VIRTUAL_KEYBOARD_TAG, KEYBOARD_NAME) == NONE);
 	total = widget_count + own_lists + menus->string_list_count + menus->bitmap_count +
-		(game_map ? PAUSE_PATCH_TAGS : 0);
+		(game_map && !menu_tags_standalone ? PAUSE_PATCH_TAGS : 0) + (keyboard_wanted ? KEYBOARD_TAGS : 0);
 	instances = build.failed ? NULL : instances_grow(total, &build.first_index, &build.first_salt);
 	if (!instances)
 		goto failed;
@@ -2113,6 +2286,14 @@ void menu_tags_loaded(
 		build.strings_tags[index] = next_tag();
 	for (index = 0; index < menus->bitmap_count; index++)
 		build.bitmap_tags[index] = next_tag();
+	build.keyboard_tag = build.keyboard_strings_tag = build.gametype_names_tag = NONE;
+	if (keyboard_wanted)
+	{
+		build.keyboard_strings_tag = next_tag();
+		build.keyboard_tag = next_tag();
+		if (menu_tags_standalone)
+			build.gametype_names_tag = next_tag();
+	}
 	/* the tags: the bitmaps and strings first, which the widgets name; the
 	widgets' names in the table before any is built, which they find there */
 	for (index = 0; index < menus->bitmap_count && !build.failed; index++)
@@ -2146,6 +2327,33 @@ void menu_tags_loaded(
 		}
 		instance_set(instances, UI_WIDGET_DEFINITION_TAG, build.widget_tags[index], widget->name, "", NULL);
 	}
+	if (build.gametype_names_tag != NONE && !build.failed)
+	{
+		instance_set(instances, UNICODE_STRING_LIST_TAG, build.gametype_names_tag, "gametypes", " names",
+			string_list_build(default_gametype_names, NUMBEROF(default_gametype_names)));
+		instances[DATUM_INDEX_TO_ABSOLUTE_INDEX(build.gametype_names_tag)].name = DEFAULT_GAMETYPE_NAMES;
+	}
+	if (build.keyboard_tag != NONE && !build.failed)
+	{
+		/* (a keyboard it cannot make is none: the names are typed another way) */
+		instance_set(instances, UNICODE_STRING_LIST_TAG, build.keyboard_strings_tag, "keyboard", " strings",
+			keyboard_strings_build());
+		/* (its definition after the table is given, as the widgets', which
+		name tags by their indices; its name when it is made) */
+		instance_set(instances, VIRTUAL_KEYBOARD_TAG, build.keyboard_tag, "keyboard", "", NULL);
+		/* (named as ui.map's, which virtual_keyboard_initialize loads; with
+		no font or pictures for it, there is none) */
+		if (keyboard_can_be_made())
+		{
+			instances[DATUM_INDEX_TO_ABSOLUTE_INDEX(build.keyboard_tag)].name = KEYBOARD_NAME;
+		}
+		else
+		{
+			instances[DATUM_INDEX_TO_ABSOLUTE_INDEX(build.keyboard_tag)].group_tag = NONE;
+			instances[DATUM_INDEX_TO_ABSOLUTE_INDEX(build.keyboard_tag)].tag_index = NONE;
+			build.keyboard_tag = NONE;
+		}
+	}
 	if (build.failed)
 		goto failed;
 	/* (pause_patch's, until it makes them: nothing a name finds) */
@@ -2158,9 +2366,15 @@ void menu_tags_loaded(
 	cache_files_set_tag_instances(instances, build.first_index + total);
 	for (index = 0; index < widget_count && !build.failed; index++)
 		instances[DATUM_INDEX_TO_ABSOLUTE_INDEX(build.widget_tags[index])].base_address = widget_build(index);
+	if (build.keyboard_tag != NONE && !build.failed)
+	{
+		struct cache_file_tag_instance *keyboard = &instances[DATUM_INDEX_TO_ABSOLUTE_INDEX(build.keyboard_tag)];
+
+		keyboard->base_address = keyboard_build(build.keyboard_strings_tag);
+	}
 	if (build.failed)
 		goto failed;
-	if (game_map)
+	if (game_map && !menu_tags_standalone)
 	{
 		pause_patch(instances);
 		if (campaign)

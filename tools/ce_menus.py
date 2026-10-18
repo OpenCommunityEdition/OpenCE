@@ -157,6 +157,10 @@ WIRED = {
     "load game menu delete request", "load game menu delete finish",
     "controls screen init", "controls begin binding", "controls screen change set", "controls screen defaults",
     "controls update menu", "profile manager select", "direct ip connect go", "ss edit server password",
+    # (a click on a spinner's arrow or value is the pointer's own: ui_widget.c's mouse targets step it)
+    "mouse spinner 1wide click",
+    # (Create Game, the gametype editor and picker, Direct IP, the browser's rows: menu_functions.c)
+    "common button bar update", "direct ip connect init", "direct ip connect update", "direct ip edit field", "gamespy screen update", "gamespy select button", "gamespy select item", "gt edit list update", "gt select list update", "mp map list update", "mp prof init teamplay options", "mp prof init vehicle options", "mp prof save teamplay options", "mp prof save vehicle options", "mp prof vehicles update", "server settings init", "server settings update", "ss edit server name", "ss start game",
 }
 
 # The frames (by file, without .png) that neither the Xbox's map nor the
