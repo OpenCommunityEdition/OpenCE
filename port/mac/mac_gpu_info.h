@@ -40,4 +40,19 @@ unsigned long mac_gpu_info_serial(void);
    setting is not available */
 long mac_gpu_info_texture_cache_mb(void);
 int mac_gpu_info_texture_skip_levels(void);
+
+/* mac.adaptive_detail: the frame-time governor (mac_adaptive_detail.h). The loop reports each
+   frame; the renderer reads the level (0: none of the ladder's rungs in force; render_detail.c
+   applies them) and the serial, which changes when the level or the setting does. */
+int mac_adaptive_detail_enabled(void);
+int mac_adaptive_detail_level(void);
+unsigned long mac_adaptive_detail_serial(void);
+/* the rungs (MAC_ADAPT_*, as bits) the renderer cannot or need not apply */
+void mac_adaptive_detail_set_skipped(unsigned mask);
+/* whether the last rung is in force: the frame is drawn with 480 lines */
+int mac_adaptive_detail_resolution_capped(void);
+void mac_adaptive_detail_note_frame(double seconds, double wait_seconds);
+void mac_adaptive_detail_new_map(void);
+/* the run's summary into the log, if the governor was on */
+void mac_adaptive_detail_summary(void);
 #endif

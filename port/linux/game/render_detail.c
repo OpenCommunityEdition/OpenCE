@@ -23,6 +23,7 @@ its default, so scripts and the console keep them otherwise.
 
 #ifdef HALO_MAC
 #include "mac_gpu_info.h" /* port: port/mac/mac_gpu_info.c */
+#include "mac_adaptive_detail.h" /* port: port/mac/mac_adaptive_detail.h */
 #endif
 
 /* port/linux/src/port_config.c */
@@ -121,6 +122,200 @@ real render_detail_object_minimum_pixels(
 	return render_detail_object_pixels;
 }
 
+/* The settings as the preset and the display.* settings leave them. On the Mac the adaptive detail
+(mac.adaptive_detail, port/mac/mac_adaptive_detail.h) lowers some of them from these while the frames
+are slow, and puts them back: every value it uses is derived from these again. */
+static real render_detail_base_scenery = 0.f;
+static real render_detail_base_object_pixels = 0.f;
+static real render_detail_base_lod = 1.f;
+static real render_detail_base_particle_maximum = 0.f;
+static short render_detail_base_particle_mode = 0;
+static short render_detail_base_particles = _render_detail_particles_high;
+static boolean render_detail_base_lens_flares = TRUE;
+static boolean render_detail_base_decals = TRUE;
+
+#ifdef HALO_MAC
+/* source/game/cheats.c: a client draws what the host's rules say */
+boolean network_game_distributed_client(void);
+
+/* the level and the client state the rungs were last applied for, and the flags the governor has taken
+(with what they were) */
+static int render_detail_governor_level = 0;
+static int render_detail_governor_client = 0;
+static boolean render_detail_governor_dirty = TRUE;
+static boolean render_detail_governor_objects_taken = FALSE;
+static boolean render_detail_governor_fog_taken = FALSE;
+static boolean render_detail_governor_objects_saved = TRUE;
+static boolean render_detail_governor_fog_planar_saved = TRUE;
+static boolean render_detail_governor_fog_screen_saved = TRUE;
+
+static real render_detail_governor_most(
+	real value,
+	real minimum)
+{
+	return value > minimum ? value : minimum;
+}
+
+static real render_detail_governor_cap(
+	real value,
+	real maximum)
+{
+	return value > 0.f && value < maximum ? value : maximum;
+}
+
+/* The rungs the renderer need not or cannot apply: the base has them already, or the game is another's (a client
+draws what the host's rules say: cheats_network_client_enforce puts these flags back every tick). */
+static unsigned render_detail_governor_skipped(
+	boolean client)
+{
+	unsigned skipped = 0;
+
+	if (client)
+	{
+		skipped |= (1u << MAC_ADAPT_DETAIL_OBJECTS) | (1u << MAC_ADAPT_FLARES) | (1u << MAC_ADAPT_FOG);
+	}
+	if (!render_detail_base_decals)
+	{
+		skipped |= 1u << MAC_ADAPT_DECALS;
+	}
+	if (!render_detail_base_lens_flares)
+	{
+		skipped |= 1u << MAC_ADAPT_FLARES;
+	}
+	if (render_detail_base_particles == _render_detail_particles_off)
+	{
+		skipped |= (1u << MAC_ADAPT_PARTICLES_WIDE) | (1u << MAC_ADAPT_PARTICLES_TINY);
+	}
+	else if (render_detail_base_particle_mode == 3 && render_detail_base_particle_maximum > 0.f)
+	{
+		if (render_detail_base_particle_maximum <= 96.f)
+		{
+			skipped |= 1u << MAC_ADAPT_PARTICLES_WIDE;
+		}
+		if (render_detail_base_particle_maximum <= 48.f)
+		{
+			skipped |= 1u << MAC_ADAPT_PARTICLES_TINY;
+		}
+	}
+	return skipped;
+}
+
+/* Takes or gives back one of the game's own switches */
+static void render_detail_governor_switch(
+	boolean want,
+	boolean *taken,
+	boolean *flag,
+	boolean *saved)
+{
+	if (want && !*taken)
+	{
+		*saved = *flag;
+		*taken = TRUE;
+	}
+	else if (!want && *taken)
+	{
+		*flag = *saved;
+		*taken = FALSE;
+	}
+	if (want)
+	{
+		*flag = FALSE;
+	}
+}
+
+/* Puts the base settings and the governor's level into the values the renderer reads. Only drawing changes. */
+static void render_detail_governor_apply(
+	void)
+{
+	int level = mac_adaptive_detail_level();
+	boolean client = network_game_distributed_client() != 0;
+	boolean lens_flares = render_detail_base_lens_flares;
+	boolean decals = render_detail_base_decals;
+	real scenery = render_detail_base_scenery;
+	real object_pixels = render_detail_base_object_pixels;
+	real lod = render_detail_base_lod;
+	real particle_maximum = render_detail_base_particle_maximum;
+	short particle_mode = render_detail_base_particle_mode;
+	boolean particles = render_detail_base_particles != _render_detail_particles_off;
+
+	mac_adaptive_detail_set_skipped(render_detail_governor_skipped(client));
+	if (level == render_detail_governor_level && client == render_detail_governor_client && !render_detail_governor_dirty)
+	{
+		return;
+	}
+
+	if (particles && level > MAC_ADAPT_PARTICLES_WIDE)
+	{
+		particle_maximum = render_detail_governor_cap(particle_maximum, 96.f);
+		particle_mode = 3;
+	}
+	if (particles && level > MAC_ADAPT_PARTICLES_TINY)
+	{
+		particle_maximum = render_detail_governor_cap(particle_maximum, 48.f);
+		particle_mode = 3;
+	}
+	if (level > MAC_ADAPT_DECALS)
+	{
+		decals = FALSE;
+	}
+	if (level > MAC_ADAPT_FLARES && !client)
+	{
+		lens_flares = FALSE;
+	}
+	if (level > MAC_ADAPT_SIZES_NEAR)
+	{
+		scenery = render_detail_governor_most(render_detail_base_scenery * 2.f, 24.f);
+		object_pixels = render_detail_governor_most(render_detail_base_object_pixels * 2.f, 8.f);
+		lod = lod > 0.75f ? 0.75f : lod;
+	}
+	if (level > MAC_ADAPT_SIZES_FAR)
+	{
+		scenery = render_detail_governor_most(render_detail_base_scenery * 4.f, 48.f);
+		object_pixels = render_detail_governor_most(render_detail_base_object_pixels * 4.f, 16.f);
+		scenery = scenery > 192.f ? 192.f : scenery;
+		object_pixels = object_pixels > 40.f ? 40.f : object_pixels;
+		lod = lod > 0.5f ? 0.5f : lod;
+	}
+
+	render_detail_scenery_pixels = scenery > 0.f && scenery < 4096.f ? scenery : 0.f;
+	render_detail_particle_maximum = particles && particle_maximum > 0.f &&
+		(render_detail_base_particles == _render_detail_particles_low || level > MAC_ADAPT_PARTICLES_WIDE) ?
+		particle_maximum : 0.f;
+	render_detail_particle_limit_mode = particle_mode;
+	render_detail_lod = lod > 0.f && lod <= 1.f ? lod : 1.f;
+	render_detail_object_pixels = object_pixels > 0.f && object_pixels < 4096.f ? object_pixels : 0.f;
+	rasterizer_debug_options.draw_lens_flares = lens_flares;
+	if (decals != render_detail_decals)
+	{
+		rasterizer_debug_options.draw_environment_decals = decals;
+		render_detail_decals = decals;
+	}
+	render_detail_governor_switch(!client && level > MAC_ADAPT_DETAIL_OBJECTS, &render_detail_governor_objects_taken,
+		&rasterizer_debug_options.draw_detail_objects, &render_detail_governor_objects_saved);
+	if (!client && level > MAC_ADAPT_FOG)
+	{
+		if (!render_detail_governor_fog_taken)
+		{
+			render_detail_governor_fog_planar_saved = rasterizer_debug_options.fog_planar_enabled;
+			render_detail_governor_fog_screen_saved = rasterizer_debug_options.draw_environment_fog_screen;
+			render_detail_governor_fog_taken = TRUE;
+		}
+		rasterizer_debug_options.fog_planar_enabled = FALSE;
+		rasterizer_debug_options.draw_environment_fog_screen = FALSE;
+	}
+	else if (render_detail_governor_fog_taken)
+	{
+		rasterizer_debug_options.fog_planar_enabled = render_detail_governor_fog_planar_saved;
+		rasterizer_debug_options.draw_environment_fog_screen = render_detail_governor_fog_screen_saved;
+		render_detail_governor_fog_taken = FALSE;
+	}
+
+	render_detail_governor_level = level;
+	render_detail_governor_client = client;
+	render_detail_governor_dirty = FALSE;
+}
+#endif
+
 void render_detail_update(
 	void)
 {
@@ -128,6 +323,7 @@ void render_detail_update(
 #ifdef HALO_MAC
 	/* (also when the machine or the map is known) */
 	changes += 65536UL * mac_gpu_info_serial();
+	(void)mac_adaptive_detail_enabled();
 #endif
 
 	if (changes != render_detail_changes)
@@ -169,15 +365,24 @@ void render_detail_update(
 		}
 #endif
 
-		render_detail_scenery_pixels = value > 0.0 && value < 4096.0 ? (real)value : 0.f;
-		(void)lens_flares;
-		render_detail_particle_maximum = particles == _render_detail_particles_low && particle_maximum > 0.f ?
+		render_detail_base_scenery = value > 0.0 && value < 4096.0 ? (real)value : 0.f;
+		render_detail_base_particles = particles;
+		render_detail_base_particle_maximum = particles == _render_detail_particles_low && particle_maximum > 0.f ?
 			particle_maximum : 0.f;
-		render_detail_particle_limit_mode = particle_mode;
-		render_detail_lod = lod > 0.f && lod <= 1.f ? lod : 1.f;
-		render_detail_object_pixels = object_pixels > 0.f && object_pixels < 4096.f ? object_pixels : 0.f;
+		render_detail_base_particle_mode = particle_mode;
+		render_detail_base_lod = lod > 0.f && lod <= 1.f ? lod : 1.f;
+		render_detail_base_object_pixels = object_pixels > 0.f && object_pixels < 4096.f ? object_pixels : 0.f;
+		render_detail_base_lens_flares = lens_flares;
+		render_detail_base_decals = decals;
 #ifdef HALO_MAC
-		rasterizer_debug_options.draw_lens_flares = lens_flares;
+		/* (the base, and the adaptive detail's level over it) */
+		render_detail_governor_dirty = TRUE;
+#else
+		render_detail_scenery_pixels = render_detail_base_scenery;
+		render_detail_particle_maximum = render_detail_base_particle_maximum;
+		render_detail_particle_limit_mode = render_detail_base_particle_mode;
+		render_detail_lod = render_detail_base_lod;
+		render_detail_object_pixels = render_detail_base_object_pixels;
 #endif
 		if (specular != render_detail_specular)
 		{
@@ -194,11 +399,13 @@ void render_detail_update(
 			render_shadows = shadows;
 			render_detail_shadows = shadows;
 		}
+#ifndef HALO_MAC
 		if (decals != render_detail_decals)
 		{
 			rasterizer_debug_options.draw_environment_decals = decals;
 			render_detail_decals = decals;
 		}
+#endif
 		if (particles != render_detail_particles)
 		{
 			/* low keeps the effects' own particles and contrails, without
@@ -211,6 +418,10 @@ void render_detail_update(
 		}
 		render_detail_changes = changes;
 	}
+#ifdef HALO_MAC
+	/* port: the adaptive detail's level (mac.adaptive_detail) over the base, when either changed */
+	render_detail_governor_apply();
+#endif
 }
 
 real render_detail_scenery_minimum_pixels(

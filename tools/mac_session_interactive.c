@@ -7,6 +7,7 @@
 #include "engine_config.h"
 #define MAC_INPUT_NO_CARBON
 #include "mac_window.h"
+#include "mac_gpu_info.h" /* port: mac.adaptive_detail */
 #include "input/input.h"
 #include "input/input_abstraction.h"
 #include "game/game.h"
@@ -1223,8 +1224,14 @@ static int mac_interactive_frame(void *opaque,
     now = mac_interactive_now();
     elapsed = (double)(unsigned long)(now - context->last_time) / 1000.0;
     context->last_time = now;
-    if (context->frames)
-        mac_interpolation_note_frame(elapsed); /* port: halo_interpolation_enabled (port/mac/engine_config.c) */
+    {
+        /* port: the limiter's wait is taken whether or not it is used, so that it does not add up */
+        double limiter_wait = mac_window_take_limiter_wait();
+        if (context->frames) {
+            mac_interpolation_note_frame(elapsed); /* port: halo_interpolation_enabled (port/mac/engine_config.c) */
+            mac_adaptive_detail_note_frame(elapsed, limiter_wait); /* port: mac.adaptive_detail (port/mac/mac_gpu_info.c) */
+        }
+    }
     if (elapsed > MAC_INTERACTIVE_MAX_ELAPSED)
         elapsed = MAC_INTERACTIVE_MAX_ELAPSED;
     if (context->fixed_step)
@@ -2110,6 +2117,7 @@ int mac_session_interactive_run(unsigned max_frames, int visible,
         context.quit_requested=1;
     fprintf(stderr,"native rendered timing: frames=%u elapsed_ms=%lu first_frame_ms=%lu\n",
         context.frames,(unsigned long)(mac_interactive_now()-start_time),first_frame_ms);
+    mac_adaptive_detail_summary(); /* port: mac.adaptive_detail (port/mac/mac_gpu_info.c) */
     if (context.warm_audio_valid && context.frames > 1) {
         struct mac_dsound_audio_stats audio;
         if (mac_dsound_audio_statistics(&audio)) {

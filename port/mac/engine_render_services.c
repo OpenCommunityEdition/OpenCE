@@ -152,6 +152,9 @@ int mac_gpu_info_vram_mb(void) __attribute__((weak));
 int mac_gpu_info_is_ppc(void) __attribute__((weak));
 int mac_gpu_info_vram_mb(void) { return 32; }
 int mac_gpu_info_is_ppc(void) { return 0; }
+/* (mac.adaptive_detail's last rung: the frame drawn with the Xbox's 480 lines) */
+int mac_adaptive_detail_resolution_capped(void) __attribute__((weak));
+int mac_adaptive_detail_resolution_capped(void) { return 0; }
 
 static const char *mac_render_setting(int *vram_mb, int *is_ppc)
 {
@@ -165,6 +168,8 @@ static const char *mac_render_setting(int *vram_mb, int *is_ppc)
 	}
 	*vram_mb = mac_gpu_info_vram_mb();
 	*is_ppc = mac_gpu_info_is_ppc();
+	if (mac_adaptive_detail_resolution_capped())
+		return "original";
 	return setting;
 }
 

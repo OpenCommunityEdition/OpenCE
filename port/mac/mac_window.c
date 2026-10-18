@@ -719,6 +719,7 @@ int mac_window_quit_requested_active(void)
    this (0: auto, twice a 60 Hz display's; -1: no limit); with it on the swap
    waits for the display and nothing is added. Called after each presented
    frame of a visible window. */
+static double mac_window_limiter_wait;
 static void mac_window_limit_frame_rate(void)
 {
     static unsigned long read_at=(unsigned long)-1;
@@ -737,11 +738,27 @@ static void mac_window_limit_frame_rate(void)
     }
     if(vsync||limit<0||!interval)return;
     now=mach_absolute_time();
-    if(deadline&&now<deadline)mach_wait_until(deadline);
-    else deadline=now;
+    if(deadline&&now<deadline) {
+        mach_wait_until(deadline);
+        /* port: the wait is not the frame's work (the adaptive detail, mac_window_take_limiter_wait) */
+        if(!timebase.denom)mach_timebase_info(&timebase);
+        mac_window_limiter_wait+=(double)(deadline-now)*timebase.numer/timebase.denom/1e9;
+    } else deadline=now;
     deadline+=interval;
 }
 #endif
+
+/* port: the seconds the frame rate limiter has waited since this was last asked */
+double mac_window_take_limiter_wait(void)
+{
+#if defined(__APPLE__)
+    double wait=mac_window_limiter_wait;
+    mac_window_limiter_wait=0.0;
+    return wait;
+#else
+    return 0.0;
+#endif
+}
 
 int mac_window_frame(struct mac_window *window,mac_window_frame_proc frame,void *context)
 {

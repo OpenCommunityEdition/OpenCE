@@ -32,6 +32,8 @@ void platform_request_quit(void);
 /* True only when the active window was closed by the user or an explicit
    platform_request_quit call. Renderer and callback failures remain false. */
 int mac_window_quit_requested_active(void);
+/* the seconds the frame rate limiter has waited since this was last asked (a frame's work is its time less this) */
+double mac_window_take_limiter_wait(void);
 /* Resize the one active window/surface. Returns false where the requested
    dimensions cannot be applied by its native owner. */
 int mac_window_resize_active(unsigned width,unsigned height);

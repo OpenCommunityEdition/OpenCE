@@ -55,6 +55,11 @@ static const struct choice render_choices[] =
 	{ "720 lines", "720" }, { "768 lines", "768" }, { "900 lines", "900" }, { "1080 lines", "1080" },
 	{ "1440 lines", "1440" }
 };
+static const struct choice adaptive_choices[] =
+{
+	{ "Auto", "auto" }, { "Off", "off" }, { "On, 30 fps", "30" }, { "On, 24 fps", "24" }, { "On, 45 fps", "45" },
+	{ "On, 60 fps", "60" }
+};
 static const struct choice source_choices[] =
 {
 	{ "Automatic", "auto" }, { "Xbox disc data", "xbox" }, { "MacSoft's Halo", "retail" }
@@ -68,7 +73,7 @@ static int fullscreen_selected;
 static char resolution_value[2][LC_VALUE];	/* [0] fullscreen's display.resolution, [1] the window's size */
 static struct choice resolution_choices[MAX_CHOICES];
 static char resolution_labels[MAX_CHOICES][32], resolution_values[MAX_CHOICES][16];
-static struct popup p_resolution, p_render, p_fps, p_detail, p_texture, p_aa, p_shadow, p_source;
+static struct popup p_resolution, p_render, p_adaptive, p_fps, p_detail, p_texture, p_aa, p_shadow, p_source;
 static ControlRef c_full, c_window, c_wide, c_vsync, c_smooth, c_gamma, c_gamma_text, c_hud, c_text, c_ppl;
 static ControlRef c_sound, c_reverb, c_volume, c_volume_text, c_movies, c_achievements, c_status, c_hide;
 
@@ -448,6 +453,7 @@ static void gather(void)
 	snprintf(m->value[LC_DETAIL], LC_VALUE, "%s", popup_value(&p_detail));
 	snprintf(m->value[LC_TEXTURE_SKIP], LC_VALUE, "%s", popup_value(&p_texture));
 	snprintf(m->value[LC_RENDER], LC_VALUE, "%s", popup_value(&p_render));
+	snprintf(m->value[LC_ADAPTIVE], LC_VALUE, "%s", popup_value(&p_adaptive));
 	snprintf(m->value[LC_ANTI_ALIASING], LC_VALUE, "%s", popup_value(&p_aa));
 	snprintf(m->value[LC_SHADOW_RESOLUTION], LC_VALUE, "%s", popup_value(&p_shadow));
 	lc_set_bool(m, LC_HIRES_HUD, GetControl32BitValue(c_hud));
@@ -578,7 +584,7 @@ static void build(struct lc_model *m, ControlActionUPP action, ControlRef *play,
 {
 	static const char *const left_labels[] = { "Resolution:", "Render resolution:", "Frame rate limit:" };
 	static const char *const volume_label[] = { "Volume:" };
-	static const char *const right_labels[] = { "Detail:", "Texture quality:", "Anti-aliasing:", "Shadow quality:", "Gamma:" };
+	static const char *const right_labels[] = { "Detail:", "Texture quality:", "Anti-aliasing:", "Shadow quality:", "Adaptive detail:", "Gamma:" };
 	static const char *const data_label[] = { "Game data:" };
 	int lw, px, rw, rx, wide;
 	Rect bounds;
@@ -631,7 +637,7 @@ static void build(struct lc_model *m, ControlActionUPP action, ControlRef *play,
 	c_volume_text = make_label(254, 334, 306, 350, "100%", 0, 1);
 
 	/* Graphics */
-	rw = label_width(right_labels, 5);
+	rw = label_width(right_labels, 6);
 	rx = 336 + rw + 6;
 	make_box(328, 72, 624, 362, "Graphics");
 	make_label(336, 98, 336 + rw, 116, right_labels[0], 1, 0);
@@ -644,18 +650,21 @@ static void build(struct lc_model *m, ControlActionUPP action, ControlRef *play,
 	make_popup(&p_aa, rx, 158, 616, aa_choices, 2, m->value[LC_ANTI_ALIASING]);
 	make_label(336, 194, 336 + rw, 212, right_labels[3], 1, 0);
 	make_popup(&p_shadow, rx, 190, 616, shadow_choices, 4, m->value[LC_SHADOW_RESOLUTION]);
-	make_label(336, 228, 336 + rw, 246, right_labels[4], 1, 0);
+	make_label(336, 226, 336 + rw, 244, right_labels[4], 1, 0);
+	make_popup(&p_adaptive, rx, 222, 616, adaptive_choices, 6, m->value[LC_ADAPTIVE]);
+	help(p_adaptive.control, "Lowers small details (grass, small objects, effects, lens flares, at last the resolution) while frames take longer than the target, and puts them back when there is time. Auto: on for a PowerPC Mac, off for an Intel one. The game itself plays the same.");
+	make_label(336, 256, 336 + rw, 274, right_labels[5], 1, 0);
 	if (!dry)
 	{
-		set_rect(&bounds, rx, 228, 566, 246);
+		set_rect(&bounds, rx, 256, 566, 274);
 		c_gamma = NULL;
 		CreateSliderControl(window, &bounds, lc_tenths(m->value[LC_GAMMA], 5, 20), 5, 20, kControlSliderDoesNotPoint,
 			0, true, action, &c_gamma);
 	}
-	c_gamma_text = make_label(574, 230, 616, 246, "1.0", 0, 1);
-	c_hud = make_check(344, 262, 616, "High-resolution HUD", lc_bool(m->value[LC_HIRES_HUD]), 0);
-	c_text = make_check(344, 290, 616, "High-resolution text", lc_bool(m->value[LC_HIRES_TEXT]), 0);
-	c_ppl = make_check(344, 318, 616, "Per-pixel lighting (not available)", lc_bool(m->value[LC_PER_PIXEL_LIGHTING]), 0);
+	c_gamma_text = make_label(574, 258, 616, 274, "1.0", 0, 1);
+	c_hud = make_check(344, 284, 616, "High-resolution HUD", lc_bool(m->value[LC_HIRES_HUD]), 0);
+	c_text = make_check(344, 310, 616, "High-resolution text", lc_bool(m->value[LC_HIRES_TEXT]), 0);
+	c_ppl = make_check(344, 336, 616, "Per-pixel lighting (not available)", lc_bool(m->value[LC_PER_PIXEL_LIGHTING]), 0);
 	/* port: the Mac renderer's shader translator does not make per-pixel lighting (mac_nv2a_arbfp.c refuses it), so the
 	   row stays, as every Mac has the same options, but it is disabled and says why */
 	help(c_ppl, "Not available on this renderer yet: the Mac's shaders do not draw per-pixel lighting, so this setting changes nothing. The game logs it if it is on in config.toml.");

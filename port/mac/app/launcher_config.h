@@ -26,6 +26,7 @@ enum lc_id
 	LC_DETAIL,		/* mac.detail */
 	LC_TEXTURE_SKIP,	/* mac.texture_skip_levels */
 	LC_RENDER,		/* mac.render_resolution: auto, native, original, or a line count */
+	LC_ADAPTIVE,		/* mac.adaptive_detail: auto, off, or a target frame rate */
 	LC_AUDIO,		/* audio.enabled */
 	LC_VOLUME,		/* audio.volume, 0.0 to 1.0 */
 	LC_REVERB,

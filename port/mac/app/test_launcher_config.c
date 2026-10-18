@@ -48,6 +48,7 @@ int main(int argc, char **argv)
 	CHECK(!strcmp(m.value[LC_MODE], "windowed") && !strcmp(m.value[LC_DETAIL], "auto"));
 	CHECK(lc_bool(m.value[LC_VSYNC]) && !lc_bool(m.value[LC_ACHIEVEMENTS]));
 	CHECK(!strcmp(lc_key(LC_RENDER), "mac.render_resolution") && !strcmp(m.value[LC_RENDER], "auto"));
+	CHECK(!strcmp(lc_key(LC_ADAPTIVE), "mac.adaptive_detail") && !strcmp(m.value[LC_ADAPTIVE], "auto"));
 	CHECK(lc_model_save(&m, path) == 0);			/* nothing changed: no file */
 	CHECK(fopen(path, "rb") == NULL);
 
@@ -74,11 +75,12 @@ int main(int argc, char **argv)
 	lc_set_tenths(&m, LC_VOLUME, 5);
 	strcpy(m.value[LC_DETAIL], "low");
 	strcpy(m.value[LC_RENDER], "720");
+	strcpy(m.value[LC_ADAPTIVE], "45");
 	lc_set_bool(&m, LC_MOVIES, 0);
 	CHECK(lc_model_save(&m, path) == 0);
 	t = read_all(path);
 	CHECK(strstr(t, "# header\ninput.gamepad_setup_done = true\n\n[display]\n# the mode\nmode = \"fullscreen\"\nvsync = false\nresolution = \"1024x768\"\n\n[audio]\nvolume = 0.5\n\n[mac]\ndetail = \"low\"\n") != NULL);
-	CHECK(strstr(t, "detail = \"low\"\nrender_resolution = \"720\"\n") != NULL);
+	CHECK(strstr(t, "detail = \"low\"\nrender_resolution = \"720\"\nadaptive_detail = \"45\"\n") != NULL);
 	CHECK(strstr(t, "[game]\nmovies = false\n") != NULL);
 	lc_model_load(&m, t);
 	CHECK(!strcmp(m.value[LC_RESOLUTION], "1024x768") && !lc_bool(m.value[LC_VSYNC]) && !lc_bool(m.value[LC_MOVIES]));

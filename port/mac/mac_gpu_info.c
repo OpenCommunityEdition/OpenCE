@@ -4,14 +4,19 @@
 #include <ApplicationServices/ApplicationServices.h>
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "mac_gpu_info.h"
+#include "mac_adaptive_detail.h"
+#include "mac_render_scale.h"
+#include <mach/mach_time.h>
 
 /* port/linux/src/port_config.c, when linked */
 extern const char *config_string(const char *name) __attribute__((weak));
 extern long config_integer(const char *name) __attribute__((weak));
+extern unsigned long config_changes(void) __attribute__((weak));
 
 static int info_vram_mb;
 static int info_resolved;
@@ -98,6 +103,7 @@ void mac_gpu_info_set_map(const char *name)
     memcpy(info_map, name, length);
     info_map[length] = 0;
     ++info_serial;
+    mac_adaptive_detail_new_map();
 }
 
 int mac_gpu_info_campaign(void)
@@ -189,4 +195,172 @@ int mac_gpu_info_texture_skip_levels(void)
     levels = mac_gpu_pick_texture_skip_levels(mac_gpu_info_vram_mb(), info_map);
     if (levels) fprintf(stderr, "mac settings: texture levels skipped: %ld\n", levels);
     return (int)levels;
+}
+
+/* ---------- mac.adaptive_detail */
+
+static const char *const adaptive_rung_names[MAC_ADAPT_RUNGS] =
+{
+    "detail objects off", "particles no wider than 96 pixels", "decals off", "lens flares off",
+    "scenery and objects: twice the minimum pixels, a lower detail level", "scenery and objects: four times the minimum pixels, two levels lower",
+    "planar fog and fog screen off", "particles no wider than 48 pixels", "480 lines"
+};
+
+static struct mac_governor adaptive;
+static int adaptive_on;
+static double adaptive_fps = 30.0;
+static unsigned long adaptive_read_at = (unsigned long)-1;
+static unsigned adaptive_render_skipped;
+static unsigned long adaptive_serial;
+static int adaptive_started;
+static int adaptive_resolution_known, adaptive_resolution_possible;
+static uint64_t adaptive_last_log;
+static unsigned long adaptive_suppressed;
+
+/* the setting: "auto" (on for the PowerPC presets, low and medium, off for the rest), "off", "on" (30 frames a
+   second) or a target between 10 and 120 */
+static void adaptive_read_setting(void)
+{
+    const char *value = config_string ? config_string("mac.adaptive_detail") : "auto";
+    int on;
+    double fps = 30.0;
+    if (!value || !value[0] || !strcmp(value, "auto"))
+        on = mac_gpu_pick_preset(mac_gpu_info_vram_mb(), mac_gpu_info_is_ppc()) != MAC_DETAIL_HIGH;
+    else if (!strcmp(value, "off") || !strcmp(value, "false") || !strcmp(value, "0"))
+        on = 0;
+    else if (!strcmp(value, "on") || !strcmp(value, "true"))
+        on = 1;
+    else {
+        fps = atof(value);
+        on = fps >= 10.0 && fps <= 120.0;
+        if (!on) {
+            fprintf(stderr, "mac settings: mac.adaptive_detail must be auto, off, on or 10 to 120; using auto\n");
+            on = mac_gpu_pick_preset(mac_gpu_info_vram_mb(), mac_gpu_info_is_ppc()) != MAC_DETAIL_HIGH;
+            fps = 30.0;
+        }
+    }
+    if (on && (!adaptive_started || fps != adaptive_fps)) {
+        mac_governor_reset(&adaptive, fps);
+        adaptive_started = 1;
+    }
+    adaptive_fps = fps;
+    adaptive_on = on;
+    adaptive_resolution_known = 0;
+}
+
+/* whether the last rung would change anything: the frame is drawn with more than 480 lines */
+static int adaptive_resolution_available(void)
+{
+    if (!adaptive_resolution_known) {
+        const char *setting = config_string ? config_string("mac.render_resolution") : "auto";
+        long lines = mac_render_parse(setting);
+        if (lines == MAC_RENDER_LINES_AUTO)
+            lines = mac_gpu_pick_render_lines(mac_gpu_info_vram_mb(), mac_gpu_info_is_ppc());
+        adaptive_resolution_possible = lines != MAC_RENDER_LINES_MINIMUM;
+        adaptive_resolution_known = 1;
+    }
+    return adaptive_resolution_possible;
+}
+
+static void adaptive_refresh(void)
+{
+    unsigned long changes = config_changes ? config_changes() : 0;
+    if (changes != adaptive_read_at || !adaptive_started) {
+        int was = adaptive_on;
+        adaptive_read_at = changes;
+        adaptive_read_setting();
+        if (adaptive_on != was || !adaptive_started) {
+            ++adaptive_serial;
+            if (adaptive_on)
+                fprintf(stderr, "adaptive detail: on, target %g frames a second (%.1f ms)\n", adaptive_fps, adaptive.budget_ms);
+        }
+        if (!adaptive_on && adaptive.level) {
+            adaptive.level = 0;
+            ++adaptive_serial;
+        }
+    }
+}
+
+int mac_adaptive_detail_enabled(void)
+{
+    adaptive_refresh();
+    return adaptive_on;
+}
+
+int mac_adaptive_detail_level(void)
+{
+    return adaptive_on ? adaptive.level : 0;
+}
+
+unsigned long mac_adaptive_detail_serial(void)
+{
+    return adaptive_serial;
+}
+
+void mac_adaptive_detail_set_skipped(unsigned mask)
+{
+    adaptive_render_skipped = mask;
+}
+
+int mac_adaptive_detail_resolution_capped(void)
+{
+    return adaptive_on && adaptive.level > MAC_ADAPT_RESOLUTION && adaptive_resolution_available();
+}
+
+/* seconds: the time since the previous frame; wait_seconds: how much of it a frame rate limiter waited */
+void mac_adaptive_detail_note_frame(double seconds, double wait_seconds)
+{
+    double work = seconds - wait_seconds;
+    unsigned skipped;
+    int direction = 0, before;
+    if (work < 0.0) work = 0.0;
+    adaptive_refresh();
+    if (!adaptive_on) return;
+    skipped = adaptive_render_skipped;
+    if (!adaptive_resolution_available()) skipped |= 1u << MAC_ADAPT_RESOLUTION;
+    before = adaptive.level;
+    if (mac_governor_note(&adaptive, work * 1000.0, seconds * 1000.0, skipped, &direction)) {
+        static mach_timebase_info_data_t timebase;
+        uint64_t now = mach_absolute_time();
+        double since;
+        ++adaptive_serial;
+        if (!timebase.denom) mach_timebase_info(&timebase);
+        since = adaptive_last_log ? (double)(now - adaptive_last_log) * timebase.numer / timebase.denom / 1e9 : 1e9;
+        if (since >= 1.0) {
+            fprintf(stderr, "adaptive detail: level %d to %d (%s %s), average %.1f ms of a target %.1f ms",
+                before, adaptive.level, direction < 0 ? "lower:" : "back:",
+                adaptive_rung_names[(direction < 0 ? adaptive.level : before) - 1], adaptive.average_ms,
+                adaptive.budget_ms);
+            if (adaptive_suppressed)
+                fprintf(stderr, " (%lu changes in the last second not logged)", adaptive_suppressed);
+            fputc('\n', stderr);
+            adaptive_last_log = now;
+            adaptive_suppressed = 0;
+        } else {
+            ++adaptive_suppressed;
+        }
+    }
+}
+
+/* a new map starts the ladder again */
+void mac_adaptive_detail_new_map(void)
+{
+    if (adaptive_started) {
+        mac_governor_new_map(&adaptive);
+        ++adaptive_serial;
+    }
+}
+
+void mac_adaptive_detail_summary(void)
+{
+    int level;
+    if (!adaptive_started || !adaptive_on || !adaptive.counted) return;
+    fprintf(stderr, "adaptive detail summary: target %.1f ms, frames %lu, mean %.2f ms, maximum level %d, final level %d, steps down %lu, up %lu, last 300 frames mean %.2f ms\n",
+        adaptive.budget_ms, adaptive.counted, adaptive.total_ms / (double)adaptive.counted, adaptive.maximum_level,
+        adaptive.level, adaptive.downs, adaptive.ups, adaptive.last_window_ms);
+    for (level = 0; level <= MAC_ADAPT_RUNGS; ++level)
+        if (adaptive.level_frames[level])
+            fprintf(stderr, "adaptive detail level %d: %lu frames, mean %.2f ms%s%s\n", level, adaptive.level_frames[level],
+                adaptive.level_ms[level] / (double)adaptive.level_frames[level], level ? ", last rung: " : "",
+                level ? adaptive_rung_names[level - 1] : "");
 }
