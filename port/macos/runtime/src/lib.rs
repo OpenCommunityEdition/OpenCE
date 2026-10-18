@@ -3,10 +3,14 @@
 //!
 //! - [`memory`]: guest addresses ([`GuestPtr`]) and the host memory that
 //!   backs the guest's 4 GB address space.
+//! - [`plan`]: where each kind of memory lives in that space, and the
+//!   allocator of its pools.
 //!
 //! The C host (port/macos/host) calls this crate through its C ABI.
 
 pub mod memory;
+pub mod plan;
 mod platform;
 
 pub use memory::{GuestMemory, GuestPtr, GuestRange, MemoryError, GUEST_SPACE};
+pub use plan::{AddressSpacePlan, PlanError, PoolAllocator, Region, RegionKind};
