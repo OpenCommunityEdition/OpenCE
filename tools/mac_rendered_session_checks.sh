@@ -267,6 +267,7 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
         # a replacement of its name: the p2p units below define what it stood for.
         case "$obj" in
             */engine_sockets_$arch.o|*/engine_winsock_init_$arch.o|*/engine_p2p_offline_$arch.o|*/engine_host_misc_$arch.o|\
+            */sha1_$arch.o|*/platform_util_$arch.o|\
             */p2p_$arch.o|*/p2p_crypto_$arch.o|*/p2p_discord_$arch.o|*/p2p_lobby_$arch.o|\
             */p2p_signal_$arch.o|*/p2p_webrtc_$arch.o|*/posix_net_$arch.o|*/posix_dtls_$arch.o|\
             */posix_upnp_$arch.o|*/mac_p2p_hardware_id_$arch.o|\
