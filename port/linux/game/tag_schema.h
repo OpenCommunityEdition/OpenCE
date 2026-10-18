@@ -390,6 +390,16 @@ void *tag_validate_index_buffer_data(
 	struct tag_validation *validation,
 	void const *buffer);
 
+/* ---------- prototypes/TAG_SCHEMA_EFFECTS.C */
+
+/* Ends a unicode string of `length` characters (the last of them a
+terminator) where draw_string.c's parse_unicode_string, which takes the
+character after a '|' as part of it, reads it to an end: whether it had to
+be ended sooner. */
+boolean tag_schema_unicode_string_end(
+	wchar_t *string,
+	long length);
+
 /* ---------- prototypes/where the validator's messages go (tag_validate_report.c) */
 
 void tag_validate_report(

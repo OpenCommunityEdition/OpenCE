@@ -769,16 +769,18 @@ static boolean texture_cache_bitmap_valid(
 			compressed_flag==compressed_format;
 	}
 	/* port: a Custom Edition map's linear rows need not be whole steps of the
-	pitch: they are padded to them as its pixels load
-	(port/linux/game/custom_edition_bitmaps.c) */
+	pitch, nor a mod's: they are padded to them as its pixels load
+	(port/linux/game/custom_edition_bitmaps.c, mod_bitmaps.c) */
 	if (valid && linear)
 	{
+		extern boolean mod_bitmaps_contain(struct bitmap_data const *bitmap);
 		long row_pitch = bitmap_mipmap_get_row_pitch(bitmap, 0);
 		long steps = (row_pitch+D3DTEXTURE_PITCH_ALIGNMENT-1)/D3DTEXTURE_PITCH_ALIGNMENT;
 
 		valid =
 			row_pitch>0 &&
-			(row_pitch%D3DTEXTURE_PITCH_ALIGNMENT==0 || custom_edition_cache_tags_loaded()) &&
+			(row_pitch%D3DTEXTURE_PITCH_ALIGNMENT==0 || custom_edition_cache_tags_loaded() ||
+				mod_bitmaps_contain(bitmap)) &&
 			steps<=(long)((D3DSIZE_PITCH_MASK>>D3DSIZE_PITCH_SHIFT)+1);
 	}
 	if (!valid && !reported)
@@ -841,13 +843,27 @@ static boolean texture_cache_start_loading_bitmap(
 		bitmap->base_address = base_address;
 		texture->bitmap = bitmap;
 		texture_cache_initialize_hardware_format(bitmap, &texture->hardware_format);
-		texture->read_request_handle = cache_file_read(
-			bitmap->tag_index,
-			bitmap->pixels_offset,
-			bitmap->pixels_size,
-			base_address,
-			&texture->loaded,
-			block);
+		/* port: or, the bitmap of a mod played over the map's, from its
+		file, at once (port/linux/game/mod_bitmaps.c) */
+		{
+			extern boolean mod_bitmaps_read(struct bitmap_data *bitmap, void *buffer);
+
+			if (mod_bitmaps_read(bitmap, base_address))
+			{
+				texture->loaded = TRUE;
+				texture->read_request_handle = NONE;
+			}
+			else
+			{
+				texture->read_request_handle = cache_file_read(
+					bitmap->tag_index,
+					bitmap->pixels_offset,
+					bitmap->pixels_size,
+					base_address,
+					&texture->loaded,
+					block);
+			}
+		}
 
 		return TRUE;
 	}

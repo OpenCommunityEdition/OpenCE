@@ -14,6 +14,7 @@ and the debug keyboard that the game's console reads.
 #include "gl.h"
 #include "port_config.h"
 #include "p2p.h"
+#include "port_mods.h"
 #include "xiso.h"
 #include "touch_input.h"
 
@@ -143,6 +144,9 @@ BOOL platform_sdl_initialize(void)
 	/* (a new version looked for meanwhile, updater_poll asking about it) */
 	updater_start();
 #endif
+	/* (the mods, and whether to play those that say they cannot be played
+	together, before the window opens: port_mods.c) */
+	port_mods_startup();
 	return TRUE;
 }
 
@@ -1235,6 +1239,60 @@ void platform_show_message(const char *title, const char *message)
 	snprintf(platform_message_text, sizeof(platform_message_text), "%s", message);
 	platform_message_pending = TRUE;
 	pthread_mutex_unlock(&platform_message_lock);
+}
+
+#ifdef HALO_WEB
+/* web_library.js's: the page asks, and writes the answer in web_shared's
+_web_answer */
+void web_js_ask(const char *title, const char *text, const char *labels);
+#endif
+
+int platform_ask(const char *title, const char *text, const char *const *labels, int count, int default_index)
+{
+#ifdef HALO_WEB
+	char joined[512] = "";
+	int index;
+
+	/* (the page's dialog: the game's thread waits for the player there, as
+	SDL's box would, which a page's worker cannot show) */
+	for (index = 0; index < count; index++)
+	{
+		size_t length = strlen(joined);
+
+		snprintf(joined + length, sizeof(joined) - length, "%s%s", index ? "\n" : "", labels[index]);
+	}
+	__atomic_store_n(&web_shared[_web_answer], -1, __ATOMIC_SEQ_CST);
+	web_js_ask(title, text, joined);
+	while (__atomic_load_n(&web_shared[_web_answer], __ATOMIC_SEQ_CST) < 0)
+		SDL_Delay(50);
+	(void)default_index;
+	return __atomic_load_n(&web_shared[_web_answer], __ATOMIC_SEQ_CST);
+#else
+	SDL_MessageBoxButtonData buttons[3];
+	SDL_MessageBoxData question;
+	int answer = -1;
+	int index;
+
+	if (count > 3)
+		count = 3;
+	for (index = 0; index < count; index++)
+	{
+		buttons[index].flags = index == default_index ?
+			SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT | SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT : 0;
+		buttons[index].buttonID = index;
+		buttons[index].text = labels[index];
+	}
+	question.flags = SDL_MESSAGEBOX_WARNING;
+	question.window = NULL;
+	question.title = title;
+	question.message = text;
+	question.numbuttons = count;
+	question.buttons = buttons;
+	question.colorScheme = NULL;
+	if (!SDL_ShowMessageBox(&question, &answer))
+		return -1;
+	return answer;
+#endif
 }
 
 static void platform_show_pending_message(void)

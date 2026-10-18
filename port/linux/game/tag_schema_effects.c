@@ -2685,8 +2685,9 @@ static boolean unicode_string_ends(
 }
 
 /* ends a string of length characters (it ends at the latest with its last)
-so that it is read to an end in it: whether it had to */
-static boolean unicode_string_end(
+so that it is read to an end in it: whether it had to (the mods' strings
+too: mod_strings.c) */
+boolean tag_schema_unicode_string_end(
 	wchar_t *string,
 	long length)
 {
@@ -2703,7 +2704,7 @@ static boolean unicode_string_end(
 }
 
 /* (a string is terminated, at its last whole character, as it is got:
-text_group.c; it is then read as its characters say: unicode_string_end) */
+text_group.c; it is then read as its characters say: tag_schema_unicode_string_end) */
 static boolean unicode_string_list_entry_check(
 	struct tag_validation *validation,
 	void *base)
@@ -2725,7 +2726,7 @@ static boolean unicode_string_list_entry_check(
 		tag_validate_correct(validation, "is not terminated: terminated");
 		string[length - 1] = 0;
 	}
-	if (unicode_string_end(string, length))
+	if (tag_schema_unicode_string_end(string, length))
 		tag_validate_correct(validation, "ends in a '|': ended before it");
 
 	return TRUE;

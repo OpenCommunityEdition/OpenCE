@@ -46,6 +46,20 @@
       Xbox) into this browser's storage for this site. Nothing is uploaded, and the site serves no game data.</p>
   </section>
 
+  <section class="panel" id="mods-panel" aria-labelledby="mods-title">
+    <h2 id="mods-title">Mods</h2>
+    <p id="mods-status" class="status">No mods yet.</p>
+    <ul id="mods-list" class="mods"></ul>
+    <div class="actions">
+      <label class="button" id="mod-label">Add a mod folder…
+        <input type="file" id="mod-input" webkitdirectory multiple hidden>
+      </label>
+    </div>
+    <p class="note">A mod is a folder with a mod.toml and a tags folder of Halo PC tag files: sounds, textures and
+      text that play over the maps' for you alone. Each is played once added: the game's main menu's Mods turns them
+      off and sets the order they load in.</p>
+  </section>
+
   <section class="panel" id="room-panel" aria-labelledby="room-title">
     <h2 id="room-title">Play together</h2>
     <p id="room-status" class="status">Play system link with friends in their browsers: create a room and send them
@@ -117,6 +131,14 @@
   <div class="toolbar" id="toolbar">
     <button id="fullscreen" title="Fullscreen">Fullscreen</button>
     <button id="leave" title="Back to the launcher (the game stops)">Quit</button>
+  </div>
+</div>
+
+<div id="ask" class="sheet" role="alertdialog" aria-labelledby="ask-title" hidden>
+  <div class="sheet-body">
+    <h2 id="ask-title"></h2>
+    <p id="ask-text"></p>
+    <div class="actions" id="ask-buttons"></div>
   </div>
 </div>
 

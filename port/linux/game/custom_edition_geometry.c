@@ -33,6 +33,7 @@ Edition vertices (docs/custom_edition_caches.md).
 #include "structures/structure_bsp_definitions.h"
 #include "cache_file_formats.h"
 #include "custom_edition_cache.h"
+#include "mods.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -914,7 +915,9 @@ short custom_edition_part_palette(
 			return globals->palettes[index].node_count;
 		}
 	}
-	return 0;
+	/* (a mod's model of many nodes, drawn its parts' nodes at a time too:
+	mod_models.c) */
+	return mod_models_part_palette(vertex_buffer, nodes);
 }
 
 void custom_edition_models_dispose(

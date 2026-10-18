@@ -1,14 +1,10 @@
 /*
-LOOSE_SOUNDS.C
+MOD_SOUNDS.C
 
-Sound tags played over a map's, for those making them (audio.loose_sounds,
-off unless set). When a map's tags load (scenario_tags_load), each of its
-sound tags that has a tag file of its name in the data root's tags folder
-(tags/sound/.../name.sound, as the Halo Editing Kit and Invader write them)
-is played from that file instead of the map, and the script function
-loose_sounds_reload, typed at the console, reads them again: a changed
-file is taken, a removed one gives the map's sound back. loose_sounds false
-gives every sound back until loose_sounds true.
+The sounds of mods (mods.c): each of a map's sound tags that a mod has a
+tag file of (tags\sound\...\name.sound) is played from that file instead of
+the map, and mods_reload, typed at the console, reads them again: a changed
+file is taken, a removed one gives the map's sound back.
 
 A tag file is Halo PC's (big-endian, version 4): the sound, the path of its
 promotion sound, its pitch ranges, then each range's permutations, each
@@ -24,14 +20,15 @@ build (tool.exe, Invader) fills in are filled in as it does: the defaults
 of the sound's class, the pitch ranges' playback rates, the per-tick bend.
 The longest permutation length is Tool's measure of a permutation, a split
 (linked) sound's chain of them summed: the whole chain plays, and the
-scripts and AI speech that wait for a sound wait for it.
+scripts and AI speech that wait for a sound wait for it (on the host, the
+only machine of a network game that runs them).
 
 The map's definition takes the file's values in place, so everything that
 holds the sound keeps holding it; only what the game counts as it plays
 (promotion counter and time, scripting time and sound) stays the map's
 definition's own, kept across a reload or switch. The map's own values come
 back when the file goes. The samples are read into the sound cache from
-memory (loose_sounds_read, xbox_sound_cache.c).
+memory (mod_sounds_read, xbox_sound_cache.c).
 
 A sound playing holds its permutation by index and the sound cache by
 address, so nothing is changed under one: when a reload changes anything,
@@ -51,40 +48,26 @@ no cache block holds them (at the latest when the map goes).
 #include "sound/sound_manager.h"
 #include "tag_files/tag_groups.h"
 #include "custom_edition_cache.h"
+#include "mods.h"
 
 #include <math.h>
 #include <stddef.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/* the platform layer's (port/linux/src) */
-int config_boolean(char const *name);
 
 /* the game's (port) */
 char *tag_get_name(long tag_index);
 
 /* ---------- constants */
 
-/* where a sound tag's file is: tags\\<its name>.sound in the data root */
-#define TAG_FILE_FOLDER "d:\\tags\\"
+/* a sound tag's file: tags\<its name>.sound */
 #define TAG_FILE_EXTENSION ".sound"
 
-/* a tag file's header, and the sizes of its sound, pitch range and
-permutation (sound_definitions.h's structures, as the file has them) */
-#define TAG_FILE_HEADER_SIZE 0x40
-#define TAG_FILE_GROUP_OFFSET 0x24
-#define TAG_FILE_HEADER_SIZE_OFFSET 0x2C
-#define TAG_FILE_VERSION_OFFSET 0x38
-#define TAG_FILE_SIGNATURE_OFFSET 0x3C
+/* the sizes of a tag file's sound, pitch range and permutation
+(sound_definitions.h's structures, as the file has them) */
 #define SOUND_SIZE 0xA4
 #define PITCH_RANGE_SIZE 0x48
 #define PERMUTATION_SIZE 0x7C
-
-/* the largest file read (the largest of Halo PC's sounds is a few MB), and
-the most the files and their samples together keep */
-#define MAXIMUM_FILE_SIZE (64UL * 1024 * 1024)
-#define MAXIMUM_KEPT_BYTES (512UL * 1024 * 1024)
 
 #define SOUND_COMPRESSION_NONE 0
 #define SOUND_COMPRESSION_XBOX_ADPCM 1
@@ -132,11 +115,12 @@ enum
 /* ---------- structures */
 
 /* a sound tag file read, and what it makes */
-struct loose_sound
+struct mod_sound
 {
-	struct loose_sound *next;
+	struct mod_sound *next;
 	long tag_index;
-	/* the file, kept to tell whether it changed */
+	/* the file, kept to tell whether it changed (its mouth and subtitle
+	data are read from it) */
 	byte *file;
 	unsigned long file_size;
 	/* the definition it makes (its counters unused), its pitch ranges and
@@ -150,144 +134,26 @@ struct loose_sound
 
 /* a sound of the map played from a file: the map's own values, given back
 when it goes */
-struct loose_override
+struct mod_sound_override
 {
-	struct loose_sound *sound;
+	struct mod_sound *sound;
 	struct sound_definition map_definition;
 };
 
 static struct
 {
-	boolean map_loaded;
-	boolean enabled;
 	/* by the map's sound tag, its override (none: the map's own) */
-	struct loose_override *overrides;
+	struct mod_sound_override *overrides;
 	long override_count;
 	/* the sounds made and not yet let go: those of the overrides, and those
 	gone but still in the sound cache */
-	struct loose_sound *sounds;
-	unsigned long kept_bytes;
-} loose_sounds_globals;
+	struct mod_sound *sounds;
+} mod_sounds_globals;
 
 /* ---------- private code */
 
-static unsigned long read_be16(
-	byte const *bytes)
-{
-	return ((unsigned long)bytes[0] << 8) | bytes[1];
-}
-
-static unsigned long read_be32(
-	byte const *bytes)
-{
-	return ((unsigned long)bytes[0] << 24) | ((unsigned long)bytes[1] << 16) |
-		((unsigned long)bytes[2] << 8) | bytes[3];
-}
-
-static short read_short(
-	byte const *bytes)
-{
-	return (short)read_be16(bytes);
-}
-
-static real read_real(
-	byte const *bytes)
-{
-	unsigned long bits = read_be32(bytes);
-	real value;
-
-	memcpy(&value, &bits, sizeof(value));
-
-	return value;
-}
-
-/* whether `size` bytes at `offset` lie within `file_size` */
-static boolean in_file(
-	unsigned long offset,
-	unsigned long size,
-	unsigned long file_size)
-{
-	return offset <= file_size && size <= file_size - offset;
-}
-
-static boolean finite_real(
-	real value)
-{
-	return value == value && value - value == 0.f;
-}
-
-/* the tag file of the sound tag `name`, in the data root's tags folder (an
-Xbox path, which the game's fopen finds there: port/linux/src/xbox_files.c);
-FALSE when the name could reach outside it */
-static boolean tag_file_path(
-	char const *name,
-	char *path,
-	size_t path_size)
-{
-	char const *character;
-
-	if (!name || !*name || strlen(name) + sizeof(TAG_FILE_FOLDER TAG_FILE_EXTENSION) > path_size)
-	{
-		return FALSE;
-	}
-	/* (a name is relative and of the folder: no drive, no parent, no
-	absolute or empty part) */
-	for (character = name; *character; character++)
-	{
-		boolean separator = *character == '\\' || *character == '/';
-
-		if (*character == ':' ||
-			(separator && (character == name || !character[1] || character[1] == '\\' || character[1] == '/')) ||
-			(*character == '.' && character[1] == '.' &&
-				(character == name || character[-1] == '\\' || character[-1] == '/')))
-		{
-			return FALSE;
-		}
-	}
-	sprintf(path, "%s%s%s", TAG_FILE_FOLDER, name, TAG_FILE_EXTENSION);
-
-	return TRUE;
-}
-
-/* the file at `path` in a buffer of the game's allocator, or NULL (no file:
-*missing) */
-static byte *file_read(
-	char const *path,
-	unsigned long *size,
-	boolean *missing)
-{
-	FILE *file = fopen(path, "rb");
-	byte *data = NULL;
-	long length;
-
-	*missing = file == NULL;
-	if (!file)
-	{
-		return NULL;
-	}
-	if (fseek(file, 0, SEEK_END) == 0 &&
-		(length = ftell(file)) >= TAG_FILE_HEADER_SIZE + SOUND_SIZE &&
-		(unsigned long)length <= MAXIMUM_FILE_SIZE &&
-		fseek(file, 0, SEEK_SET) == 0 &&
-		(data = malloc((size_t)length)) != NULL)
-	{
-		if (fread(data, 1, (size_t)length, file) == (size_t)length)
-		{
-			*size = (unsigned long)length;
-		}
-		else
-		{
-			free(data);
-			data = NULL;
-		}
-	}
-	fclose(file);
-
-	return data;
-}
-
-static void loose_sound_free(
-	struct loose_sound *sound)
+static void mod_sound_free(
+	struct mod_sound *sound)
 {
 	long permutation_index;
 
@@ -443,16 +309,16 @@ static real permutation_length(
 
 /* The sound the tag file `file` makes for the map's sound tag
 `tag_index`, or NULL with *reason saying why not. */
-static struct loose_sound *loose_sound_new(
+static struct mod_sound *mod_sound_new(
 	long tag_index,
 	byte *file,
 	unsigned long file_size,
 	char const **reason)
 {
-	struct loose_sound *sound;
+	struct mod_sound *sound;
 	struct sound_definition *definition;
-	byte const *root = file + TAG_FILE_HEADER_SIZE;
-	unsigned long cursor = TAG_FILE_HEADER_SIZE + SOUND_SIZE;
+	byte const *root = file + MOD_TAG_FILE_HEADER_SIZE;
+	unsigned long cursor = MOD_TAG_FILE_HEADER_SIZE + SOUND_SIZE;
 	unsigned long range_count;
 	unsigned long promotion_length;
 	unsigned long range_index;
@@ -464,10 +330,8 @@ static struct loose_sound *loose_sound_new(
 	real longest = 0.f;
 
 	*reason = "not a sound tag file of this version";
-	if (memcmp(file + TAG_FILE_GROUP_OFFSET, "snd!", 4) ||
-		memcmp(file + TAG_FILE_SIGNATURE_OFFSET, "blam", 4) ||
-		read_be32(file + TAG_FILE_HEADER_SIZE_OFFSET) != TAG_FILE_HEADER_SIZE ||
-		read_be16(file + TAG_FILE_VERSION_OFFSET) != SOUND_DEFINITION_VERSION)
+	if (file_size < MOD_TAG_FILE_HEADER_SIZE + SOUND_SIZE ||
+		!mods_tag_file_header_valid(file, SOUND_DEFINITION_TAG, SOUND_DEFINITION_VERSION))
 	{
 		return NULL;
 	}
@@ -482,9 +346,9 @@ static struct loose_sound *loose_sound_new(
 	definition = &sound->definition;
 
 	/* the sound's values */
-#define SOUND_SHORT(field) definition->field = read_short(root + offsetof(struct sound_definition, field))
-#define SOUND_REAL(field) definition->field = read_real(root + offsetof(struct sound_definition, field))
-	definition->flags = read_be32(root + offsetof(struct sound_definition, flags));
+#define SOUND_SHORT(field) definition->field = mods_read_short(root + offsetof(struct sound_definition, field))
+#define SOUND_REAL(field) definition->field = mods_read_real(root + offsetof(struct sound_definition, field))
+	definition->flags = mods_read_be32(root + offsetof(struct sound_definition, flags));
 	SOUND_SHORT(sound_class);
 	SOUND_SHORT(sample_rate);
 	SOUND_SHORT(encoding);
@@ -513,17 +377,17 @@ static struct loose_sound *loose_sound_new(
 		(definition->sample_rate != 0 && definition->sample_rate != 1) ||
 		(definition->encoding != 0 && definition->encoding != 1) ||
 		definition->promotion_count < 0 ||
-		!finite_real(definition->minimum_distance) || !finite_real(definition->maximum_distance) ||
+		!mods_finite_real(definition->minimum_distance) || !mods_finite_real(definition->maximum_distance) ||
 		definition->minimum_distance < 0.f || definition->maximum_distance < 0.f ||
-		!finite_real(definition->skip_fraction) ||
-		!finite_real(definition->random_pitch_bounds.lower) || !finite_real(definition->random_pitch_bounds.upper) ||
+		!mods_finite_real(definition->skip_fraction) ||
+		!mods_finite_real(definition->random_pitch_bounds.lower) || !mods_finite_real(definition->random_pitch_bounds.upper) ||
 		definition->random_pitch_bounds.lower < 0.f || definition->random_pitch_bounds.upper < 0.f ||
-		!finite_real(definition->inner_cone_angle) || !finite_real(definition->outer_cone_angle) ||
-		!finite_real(definition->outer_cone_gain) || !finite_real(definition->gain_modifier) ||
-		!finite_real(definition->maximum_bend_per_second) || definition->maximum_bend_per_second < 0.f ||
-		!finite_real(definition->zero_skip_fraction_modifier) || !finite_real(definition->one_skip_fraction_modifier) ||
-		!finite_real(definition->zero_gain_modifier) || !finite_real(definition->one_gain_modifier) ||
-		!finite_real(definition->zero_pitch_modifier) || !finite_real(definition->one_pitch_modifier) ||
+		!mods_finite_real(definition->inner_cone_angle) || !mods_finite_real(definition->outer_cone_angle) ||
+		!mods_finite_real(definition->outer_cone_gain) || !mods_finite_real(definition->gain_modifier) ||
+		!mods_finite_real(definition->maximum_bend_per_second) || definition->maximum_bend_per_second < 0.f ||
+		!mods_finite_real(definition->zero_skip_fraction_modifier) || !mods_finite_real(definition->one_skip_fraction_modifier) ||
+		!mods_finite_real(definition->zero_gain_modifier) || !mods_finite_real(definition->one_gain_modifier) ||
+		!mods_finite_real(definition->zero_pitch_modifier) || !mods_finite_real(definition->one_pitch_modifier) ||
 		definition->zero_pitch_modifier < 0.f || definition->one_pitch_modifier < 0.f)
 	{
 		goto refused;
@@ -537,7 +401,7 @@ static struct loose_sound *loose_sound_new(
 	}
 	definition_defaults(definition);
 	*reason = "a value of the sound is out of range";
-	if (!finite_real(definition->maximum_bend_per_second) ||
+	if (!mods_finite_real(definition->maximum_bend_per_second) ||
 		MIN(definition->random_pitch_bounds.lower, definition->random_pitch_bounds.upper) *
 			MIN(definition->zero_pitch_modifier, definition->one_pitch_modifier) <= 0.f)
 	{
@@ -550,7 +414,7 @@ static struct loose_sound *loose_sound_new(
 	encoded_rate = channels == 1 ? 22050 : rate;
 
 	/* the promotion sound: one of the map's, or none */
-	promotion_length = read_be32(root + offsetof(struct sound_definition, promotion_sound.name_length));
+	promotion_length = mods_read_be32(root + offsetof(struct sound_definition, promotion_sound.name_length));
 	definition->promotion_sound.group_tag = SOUND_DEFINITION_TAG;
 	definition->promotion_sound.index = NONE;
 	definition->promotion_sound.name = NULL;
@@ -561,7 +425,7 @@ static struct loose_sound *loose_sound_new(
 		long promotion_index;
 
 		*reason = "the promotion sound's name is not in the file";
-		if (promotion_length >= sizeof(promotion) || !in_file(cursor, promotion_length + 1, file_size) ||
+		if (promotion_length >= sizeof(promotion) || !mods_in_file(cursor, promotion_length + 1, file_size) ||
 			file[cursor + promotion_length] != 0 || memchr(file + cursor, 0, promotion_length))
 		{
 			goto refused;
@@ -578,17 +442,17 @@ static struct loose_sound *loose_sound_new(
 	}
 
 	/* the pitch ranges, then each one's permutations and their data */
-	range_count = read_be32(root + offsetof(struct sound_definition, pitch_ranges.count));
+	range_count = mods_read_be32(root + offsetof(struct sound_definition, pitch_ranges.count));
 	*reason = "its pitch ranges are not in the file";
 	if (range_count < 1 || range_count > MAXIMUM_PITCH_RANGES_PER_SOUND ||
-		!in_file(cursor, range_count * PITCH_RANGE_SIZE, file_size))
+		!mods_in_file(cursor, range_count * PITCH_RANGE_SIZE, file_size))
 	{
 		goto refused;
 	}
 	for (range_index = 0; range_index < range_count; range_index++)
 	{
 		/* (no more than a range takes: a larger count is refused below) */
-		permutation_total += (long)MIN(read_be32(file + cursor + range_index * PITCH_RANGE_SIZE +
+		permutation_total += (long)MIN(mods_read_be32(file + cursor + range_index * PITCH_RANGE_SIZE +
 			offsetof(struct sound_pitch_range, permutations.count)), MAXIMUM_PERMUTATIONS_PER_PITCH_RANGE);
 	}
 	sound->ranges = malloc(range_count * sizeof(*sound->ranges));
@@ -608,29 +472,30 @@ static struct loose_sound *loose_sound_new(
 		{
 			byte const *range_bytes = ranges + range_index * PITCH_RANGE_SIZE;
 			struct sound_pitch_range *range = &sound->ranges[range_index];
-			unsigned long count = read_be32(range_bytes + offsetof(struct sound_pitch_range, permutations.count));
+			unsigned long count = mods_read_be32(range_bytes + offsetof(struct sound_pitch_range, permutations.count));
 			struct sound_permutation *permutations = sound->permutations + sound->permutation_count;
 			byte const *permutation_bytes = file + cursor;
 			unsigned long permutation_index;
 			real *lengths;
 
-			*reason = "a pitch range's permutations are not in the file";
+			*reason = count < 1 ? "a pitch range has no permutations (an empty sound)" :
+				"a pitch range's permutations are not in the file";
 			if (count < 1 || count > MAXIMUM_PERMUTATIONS_PER_PITCH_RANGE ||
-				!in_file(cursor, count * PERMUTATION_SIZE, file_size))
+				!mods_in_file(cursor, count * PERMUTATION_SIZE, file_size))
 			{
 				goto refused;
 			}
 			cursor += count * PERMUTATION_SIZE;
 			memcpy(range->name, range_bytes, sizeof(range->name));
 			range->name[sizeof(range->name) - 1] = 0;
-			range->natural_pitch = read_real(range_bytes + offsetof(struct sound_pitch_range, natural_pitch));
-			range->bend_bounds.lower = read_real(range_bytes + offsetof(struct sound_pitch_range, bend_bounds.lower));
-			range->bend_bounds.upper = read_real(range_bytes + offsetof(struct sound_pitch_range, bend_bounds.upper));
+			range->natural_pitch = mods_read_real(range_bytes + offsetof(struct sound_pitch_range, natural_pitch));
+			range->bend_bounds.lower = mods_read_real(range_bytes + offsetof(struct sound_pitch_range, bend_bounds.lower));
+			range->bend_bounds.upper = mods_read_real(range_bytes + offsetof(struct sound_pitch_range, bend_bounds.upper));
 			range->actual_permutation_count = linked ?
-				read_short(range_bytes + offsetof(struct sound_pitch_range, actual_permutation_count)) : (short)count;
+				mods_read_short(range_bytes + offsetof(struct sound_pitch_range, actual_permutation_count)) : (short)count;
 			*reason = "a value of a pitch range is out of range";
-			if (!finite_real(range->natural_pitch) || !finite_real(range->bend_bounds.lower) ||
-				!finite_real(range->bend_bounds.upper) ||
+			if (!mods_finite_real(range->natural_pitch) || !mods_finite_real(range->bend_bounds.lower) ||
+				!mods_finite_real(range->bend_bounds.upper) ||
 				range->actual_permutation_count < 1 ||
 				range->actual_permutation_count > MAXIMUM_PERMUTATIONS_PER_RANDOM_PITCH_RANGE ||
 				(unsigned long)range->actual_permutation_count > count)
@@ -663,22 +528,22 @@ static struct loose_sound *loose_sound_new(
 			{
 				byte const *bytes = permutation_bytes + permutation_index * PERMUTATION_SIZE;
 				struct sound_permutation *permutation = &permutations[permutation_index];
-				unsigned long samples_size = read_be32(bytes + offsetof(struct sound_permutation, samples.size));
-				unsigned long mouth_size = read_be32(bytes + offsetof(struct sound_permutation, mouth_data.size));
-				unsigned long subtitle_size = read_be32(bytes + offsetof(struct sound_permutation, subtitle_data.size));
-				unsigned long buffer_size = read_be32(bytes + offsetof(struct sound_permutation, sample_buffer_size));
-				short compression = read_short(bytes + offsetof(struct sound_permutation, compression));
-				short next = read_short(bytes + offsetof(struct sound_permutation, next_permutation_index));
+				unsigned long samples_size = mods_read_be32(bytes + offsetof(struct sound_permutation, samples.size));
+				unsigned long mouth_size = mods_read_be32(bytes + offsetof(struct sound_permutation, mouth_data.size));
+				unsigned long subtitle_size = mods_read_be32(bytes + offsetof(struct sound_permutation, subtitle_data.size));
+				unsigned long buffer_size = mods_read_be32(bytes + offsetof(struct sound_permutation, sample_buffer_size));
+				short compression = mods_read_short(bytes + offsetof(struct sound_permutation, compression));
+				short next = mods_read_short(bytes + offsetof(struct sound_permutation, next_permutation_index));
 				byte const *samples = file + cursor;
 				unsigned long encoded_bytes = 0;
 
 				sound->permutation_count++;
 				*reason = "a permutation's data is not in the file";
-				if (samples_size == 0 || samples_size > MAXIMUM_FILE_SIZE ||
+				if (samples_size == 0 || samples_size > MAXIMUM_MOD_TAG_FILE_SIZE ||
 					mouth_size > MAXIMUM_SOUND_MOUTH_DATA_SIZE || subtitle_size > MAXIMUM_SOUND_SUBTITLE_DATA_SIZE ||
-					!in_file(cursor, samples_size, file_size) ||
-					!in_file(cursor + samples_size, mouth_size, file_size) ||
-					!in_file(cursor + samples_size + mouth_size, subtitle_size, file_size))
+					!mods_in_file(cursor, samples_size, file_size) ||
+					!mods_in_file(cursor + samples_size, mouth_size, file_size) ||
+					!mods_in_file(cursor + samples_size + mouth_size, subtitle_size, file_size))
 				{
 					free(lengths);
 					goto refused;
@@ -686,10 +551,10 @@ static struct loose_sound *loose_sound_new(
 				*reason = "a permutation's values are out of range";
 				memcpy(permutation->name, bytes, sizeof(permutation->name));
 				permutation->name[sizeof(permutation->name) - 1] = 0;
-				permutation->skip_fraction = read_real(bytes + offsetof(struct sound_permutation, skip_fraction));
-				permutation->gain = read_real(bytes + offsetof(struct sound_permutation, gain));
+				permutation->skip_fraction = mods_read_real(bytes + offsetof(struct sound_permutation, skip_fraction));
+				permutation->gain = mods_read_real(bytes + offsetof(struct sound_permutation, gain));
 				if (compression != definition->compression ||
-					!finite_real(permutation->skip_fraction) || !finite_real(permutation->gain) ||
+					!mods_finite_real(permutation->skip_fraction) || !mods_finite_real(permutation->gain) ||
 					(linked && next != NONE && (next < 0 || (unsigned long)next >= count)) ||
 					(compression == SOUND_COMPRESSION_XBOX_ADPCM && samples_size % (ADPCM_BLOCK_BYTES * channels)) ||
 					(compression == SOUND_COMPRESSION_NONE && samples_size % (2 * channels)))
@@ -798,7 +663,7 @@ static struct loose_sound *loose_sound_new(
 	return sound;
 
 refused:
-	loose_sound_free(sound);
+	mod_sound_free(sound);
 
 	return NULL;
 }
@@ -820,18 +685,18 @@ holds a sound cache block (the cache's blocks point at their permutations). */
 static void sounds_let_go(
 	boolean all)
 {
-	struct loose_sound **reference = &loose_sounds_globals.sounds;
+	struct mod_sound **reference = &mod_sounds_globals.sounds;
 
 	while (*reference)
 	{
-		struct loose_sound *sound = *reference;
+		struct mod_sound *sound = *reference;
 		boolean in_use = FALSE;
 		long index;
 
 		if (!all)
 		{
-			struct loose_override const *override =
-				&loose_sounds_globals.overrides[DATUM_INDEX_TO_ABSOLUTE_INDEX(sound->tag_index)];
+			struct mod_sound_override const *override =
+				&mod_sounds_globals.overrides[DATUM_INDEX_TO_ABSOLUTE_INDEX(sound->tag_index)];
 
 			in_use = override->sound == sound;
 			for (index = 0; !in_use && index < sound->permutation_count; index++)
@@ -846,8 +711,8 @@ static void sounds_let_go(
 		else
 		{
 			*reference = sound->next;
-			loose_sounds_globals.kept_bytes -= sound->kept_bytes;
-			loose_sound_free(sound);
+			mods_memory_give(sound->kept_bytes);
+			mod_sound_free(sound);
 		}
 	}
 
@@ -855,55 +720,85 @@ static void sounds_let_go(
 }
 
 /* the override of the sound tag `tag_index` */
-static struct loose_override *override_get(
+static struct mod_sound_override *override_get(
 	long tag_index)
 {
 	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(tag_index);
 
-	return absolute_index >= 0 && absolute_index < loose_sounds_globals.override_count ?
-		&loose_sounds_globals.overrides[absolute_index] : NULL;
+	return absolute_index >= 0 && absolute_index < mod_sounds_globals.override_count ?
+		&mod_sounds_globals.overrides[absolute_index] : NULL;
 }
 
-/* Reads every sound tag's file again (or, `remove_all`, none), and plays
-the map's sounds from what changed. As the map loads (`at_load`) nothing
-plays yet and nothing is said at the console. */
-static void loose_sounds_update(
+/* Makes the table of overrides, one for each of the map's tags up to its
+last sound tag; FALSE when it cannot be. */
+static boolean overrides_new(
+	void)
+{
+	struct tag_iterator iterator;
+	long tag_index;
+	long count = 0;
+
+	if (mod_sounds_globals.overrides)
+	{
+		return TRUE;
+	}
+	tag_iterator_new(&iterator, SOUND_DEFINITION_TAG);
+	while ((tag_index = tag_iterator_next(&iterator)) != NONE)
+	{
+		count = MAX(count, DATUM_INDEX_TO_ABSOLUTE_INDEX(tag_index) + 1);
+	}
+	if (count <= 0 || !(mod_sounds_globals.overrides = malloc((size_t)count * sizeof(struct mod_sound_override))))
+	{
+		return FALSE;
+	}
+	memset(mod_sounds_globals.overrides, 0, (size_t)count * sizeof(struct mod_sound_override));
+	mod_sounds_globals.override_count = count;
+
+	return TRUE;
+}
+
+/* ---------- public code */
+
+long mod_sounds_update(
 	boolean remove_all,
 	boolean at_load)
 {
 	struct tag_iterator iterator;
 	long tag_index;
-	struct loose_sound *made = NULL;
+	struct mod_sound *made = NULL;
 	long loaded_count = 0;
 	long removed_count = 0;
 	long refused_count = 0;
+	long played_count = 0;
 	boolean stopped = FALSE;
 
-	if (!loose_sounds_globals.map_loaded || !loose_sounds_globals.overrides)
+	if (!mods_map_loaded() || !overrides_new())
 	{
-		return;
+		return 0;
 	}
 
 	/* what each file makes, before anything is changed */
 	tag_iterator_new(&iterator, SOUND_DEFINITION_TAG);
 	while ((tag_index = tag_iterator_next(&iterator)) != NONE)
 	{
-		struct loose_override *override = override_get(tag_index);
-		char path[1024];
+		struct mod_sound_override *override = override_get(tag_index);
+		long file_index = remove_all ? NONE : mods_tag_file_find(tag_index, TAG_FILE_EXTENSION);
 		byte *file = NULL;
 		unsigned long file_size = 0;
-		boolean missing = TRUE;
+		char const *reason = NULL;
 
 		if (!override)
 		{
 			continue;
 		}
-		if (!remove_all && tag_file_path(tag_get_name(tag_index), path, sizeof(path)))
+		if (file_index != NONE)
 		{
-			file = file_read(path, &file_size, &missing);
-			if (!file && !missing)
+			file = mods_tag_file_read(file_index, &file_size, &reason);
+			if (!file)
 			{
-				error(_error_silent, "loose sounds: cannot read %s", path);
+				error(_error_silent, "mods: %s left out: %s", port_mods_file_path(file_index), reason);
+				console_warning("mods: %s.sound of %s left out: %s", tag_get_name(tag_index),
+					port_mods_file_mod(file_index), reason);
 				refused_count++;
 				continue;
 			}
@@ -917,29 +812,34 @@ static void loose_sounds_update(
 		}
 		if (file)
 		{
-			char const *reason = NULL;
-			struct loose_sound *sound = NULL;
+			/* (refused before its samples are decoded when the file alone
+			is more than the mods may keep) */
+			struct mod_sound *sound = mods_memory_left() < file_size ? NULL :
+				mod_sound_new(tag_index, file, file_size, &reason);
 
-			if (loose_sounds_globals.kept_bytes + file_size > MAXIMUM_KEPT_BYTES)
+			if (!sound && mods_memory_left() < file_size)
 			{
-				reason = "the sounds read already hold too much memory";
+				reason = "the mods' tags already hold too much memory";
 			}
-			else
+			if (sound && !mods_memory_take(sound->kept_bytes))
 			{
-				sound = loose_sound_new(tag_index, file, file_size, &reason);
+				reason = "the mods' tags already hold too much memory";
+				sound->file = NULL;
+				mod_sound_free(sound);
+				sound = NULL;
 			}
 			if (!sound)
 			{
 				/* (one refused leaves what was played before) */
-				error(_error_silent, "loose sounds: %s left out: %s", path, reason);
-				console_warning("loose sounds: %s left out: %s", tag_get_name(tag_index), reason);
+				error(_error_silent, "mods: %s left out: %s", port_mods_file_path(file_index), reason);
+				console_warning("mods: %s.sound of %s left out: %s", tag_get_name(tag_index),
+					port_mods_file_mod(file_index), reason);
 				free(file);
 				refused_count++;
 				continue;
 			}
 			sound->next = made;
 			made = sound;
-			loose_sounds_globals.kept_bytes += sound->kept_bytes;
 		}
 		else if (!override->sound)
 		{
@@ -974,94 +874,52 @@ static void loose_sounds_update(
 	/* the sounds made join those kept, and those no longer played go */
 	while (made)
 	{
-		struct loose_sound *next = made->next;
+		struct mod_sound *next = made->next;
 
-		made->next = loose_sounds_globals.sounds;
-		loose_sounds_globals.sounds = made;
+		made->next = mod_sounds_globals.sounds;
+		mod_sounds_globals.sounds = made;
 		made = next;
 	}
 	sounds_let_go(FALSE);
 
+	for (tag_index = 0; tag_index < mod_sounds_globals.override_count; tag_index++)
+	{
+		if (mod_sounds_globals.overrides[tag_index].sound)
+			played_count++;
+	}
 	if (!at_load || loaded_count || refused_count)
 	{
-		error(_error_silent, "loose sounds: %ld from tags, %ld given back, %ld left out (%lu KB kept)",
-			loaded_count, removed_count, refused_count, loose_sounds_globals.kept_bytes / 1024);
-		if (!at_load)
+		error(_error_silent, "mods: %ld sounds from their files (%ld new), %ld given back, %ld left out",
+			played_count, loaded_count, removed_count, refused_count);
+		if (!at_load && mods_say())
 		{
-			console_printf(FALSE, "loose sounds: %ld from tags, %ld given back, %ld left out",
-				loaded_count, removed_count, refused_count);
+			console_printf(FALSE, "mods: %ld sounds from their files (%ld new), %ld given back, %ld left out",
+				played_count, loaded_count, removed_count, refused_count);
 		}
 	}
 
-	return;
+	return played_count;
 }
 
-/* Makes the table of overrides, one for each of the map's tags up to its
-last sound tag; FALSE when it cannot be. */
-static boolean overrides_new(
-	void)
-{
-	struct tag_iterator iterator;
-	long tag_index;
-	long count = 0;
-
-	if (loose_sounds_globals.overrides)
-	{
-		return TRUE;
-	}
-	tag_iterator_new(&iterator, SOUND_DEFINITION_TAG);
-	while ((tag_index = tag_iterator_next(&iterator)) != NONE)
-	{
-		count = MAX(count, DATUM_INDEX_TO_ABSOLUTE_INDEX(tag_index) + 1);
-	}
-	if (count <= 0 || !(loose_sounds_globals.overrides = malloc((size_t)count * sizeof(struct loose_override))))
-	{
-		return FALSE;
-	}
-	memset(loose_sounds_globals.overrides, 0, (size_t)count * sizeof(struct loose_override));
-	loose_sounds_globals.override_count = count;
-
-	return TRUE;
-}
-
-/* ---------- public code */
-
-/* (scenario_tags_load, once a map's tags are loaded) */
-void loose_sounds_tags_loaded(
-	void)
-{
-	loose_sounds_globals.map_loaded = TRUE;
-	loose_sounds_globals.enabled = config_boolean("audio.loose_sounds") != 0;
-	if (loose_sounds_globals.enabled && overrides_new())
-	{
-		loose_sounds_update(FALSE, TRUE);
-	}
-
-	return;
-}
-
-/* (scenario_tags_unload, once the sound cache is closed: no block holds a
-permutation) */
-void loose_sounds_tags_unloaded(
+/* (once the sound cache is closed: no block holds a permutation) */
+void mod_sounds_tags_unloaded(
 	void)
 {
 	sounds_let_go(TRUE);
-	if (loose_sounds_globals.overrides)
-		free(loose_sounds_globals.overrides);
-	memset(&loose_sounds_globals, 0, sizeof(loose_sounds_globals));
+	if (mod_sounds_globals.overrides)
+		free(mod_sounds_globals.overrides);
+	memset(&mod_sounds_globals, 0, sizeof(mod_sounds_globals));
 
 	return;
 }
 
-/* (sound_cache_start_loading_sound) Whether `permutation` is one of a tag
-file's, read at once into `buffer`. */
-boolean loose_sounds_read(
+boolean mod_sounds_read(
 	struct sound_permutation const *permutation,
 	void *buffer)
 {
-	struct loose_sound const *sound;
+	struct mod_sound const *sound;
 
-	for (sound = loose_sounds_globals.sounds; sound; sound = sound->next)
+	for (sound = mod_sounds_globals.sounds; sound; sound = sound->next)
 	{
 		if (permutation >= sound->permutations && permutation < sound->permutations + sound->permutation_count)
 		{
@@ -1071,41 +929,4 @@ boolean loose_sounds_read(
 	}
 
 	return FALSE;
-}
-
-/* (the script function loose_sounds_reload) */
-void loose_sounds_reload(
-	void)
-{
-	if (!loose_sounds_globals.map_loaded)
-	{
-		return;
-	}
-	if (!loose_sounds_globals.enabled)
-	{
-		console_warning("loose sounds are off (loose_sounds true, or audio.loose_sounds in config.toml)");
-		return;
-	}
-	loose_sounds_update(FALSE, FALSE);
-
-	return;
-}
-
-/* (the script function loose_sounds) Plays the sounds of tag files, or
-gives the map's back, until the map goes. */
-void loose_sounds_enable(
-	boolean enabled)
-{
-	if (!loose_sounds_globals.map_loaded || enabled == loose_sounds_globals.enabled)
-	{
-		return;
-	}
-	if (enabled && !overrides_new())
-	{
-		return;
-	}
-	loose_sounds_globals.enabled = enabled;
-	loose_sounds_update(!enabled, FALSE);
-
-	return;
 }

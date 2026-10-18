@@ -3183,93 +3183,73 @@ static int hud_bitmap_halves_scale(
 	return flag_is_set(flags, BITMAP_HALF_HUD_SCALE_BIT) || flag_is_set(flags, BITMAP_FORCE_HUD_HIGH_RESOLUTION_SCALE_BIT);
 }
 
-/* the element at `element`, whose bitmap is `bitmap_offset` bytes on
-(NO_HUD_BITMAP: none) */
-static void hud_element_convert(
-	struct load_state const *state,
-	uint8_t *element,
-	int32_t bitmap_offset,
-	struct custom_edition_conversion_report *report)
-{
-	hud_placement_convert(
-		element,
-		bitmap_offset != NO_HUD_BITMAP && hud_bitmap_halves_scale(state, element + bitmap_offset),
-		report);
-
-	return;
-}
-
 /* the placement at `placement_offset` in each element of the block at
-`block`, when the block lies within the tag cache: each drawing the bitmap
-`bitmap_offset` bytes after its placement (NO_HUD_BITMAP: none of its own),
-or the items of a bitmap that halves their scale */
-static void hud_placement_block_convert(
-	struct load_state const *state,
+`block`: each drawing the bitmap `bitmap_offset` bytes after its placement
+(NO_HUD_BITMAP: none of its own) */
+static void hud_walk_block(
+	struct custom_edition_hud_walk const *walk,
 	uint8_t const *block,
 	uint32_t element_bytes,
 	uint32_t placement_offset,
-	int32_t bitmap_offset,
-	int items_of_halving_bitmap,
-	struct custom_edition_conversion_report *report)
+	int32_t bitmap_offset)
 {
 	int32_t element_count;
-	uint32_t elements_offset;
+	uint8_t *elements = walk->block_elements(walk->context, block, element_bytes, &element_count);
 	int32_t element_index;
 
-	if (!loaded_block_get(block, CUSTOM_EDITION_TAG_CACHE_ADDRESS, state->used_bytes, element_bytes, &element_count, &elements_offset))
+	for (element_index = 0; elements && element_index < element_count; element_index++)
 	{
-		return;
-	}
-	for (element_index = 0; element_index < element_count; element_index++)
-	{
-		uint8_t *placement = state->tag_cache + elements_offset + (uint32_t)element_index * element_bytes + placement_offset;
+		uint8_t *placement = elements + (uint32_t)element_index * element_bytes + placement_offset;
 
-		if (items_of_halving_bitmap)
-			hud_placement_convert(placement, 1, report);
-		else
-			hud_element_convert(state, placement, bitmap_offset, report);
+		walk->placement(walk->context, placement, bitmap_offset != NO_HUD_BITMAP ? placement + bitmap_offset : NULL, 0);
 	}
 
 	return;
 }
 
-/* the placements of the items of each weapon HUD crosshair or overlay in
-the block at `block` whose bitmap halves their scale */
-static void weapon_hud_items_convert(
-	struct load_state const *state,
+/* the items of the block at `block`, of `item_bytes` each starting with its
+placement, all drawing the bitmap `bitmap` names */
+static void hud_walk_items(
+	struct custom_edition_hud_walk const *walk,
 	uint8_t const *block,
 	uint32_t item_bytes,
-	struct custom_edition_conversion_report *report)
+	uint8_t const *bitmap)
 {
-	int32_t element_count;
-	uint32_t elements_offset;
-	int32_t element_index;
+	int32_t item_count;
+	uint8_t *items = walk->block_elements(walk->context, block, item_bytes, &item_count);
+	int32_t item_index;
 
-	if (!loaded_block_get(
-		block,
-		CUSTOM_EDITION_TAG_CACHE_ADDRESS,
-		state->used_bytes,
-		WEAPON_HUD_CROSSHAIRS_OR_OVERLAYS_BYTES,
-		&element_count,
-		&elements_offset))
+	for (item_index = 0; items && item_index < item_count; item_index++)
 	{
-		return;
-	}
-	for (element_index = 0; element_index < element_count; element_index++)
-	{
-		uint8_t const *element = state->tag_cache + elements_offset +
-			(uint32_t)element_index * WEAPON_HUD_CROSSHAIRS_OR_OVERLAYS_BYTES;
-
-		if (hud_bitmap_halves_scale(state, element + WEAPON_HUD_CROSSHAIRS_OR_OVERLAYS_BITMAP_OFFSET))
-			hud_placement_block_convert(state, element + WEAPON_HUD_ITEMS_OFFSET, item_bytes, 0, NO_HUD_BITMAP, 1, report);
+		walk->placement(walk->context, items + (uint32_t)item_index * item_bytes, bitmap, 1);
 	}
 
 	return;
 }
 
-/* the size of a HUD definition whose placements hud_placements_convert
-converts, or 0 for any other group */
-static uint32_t hud_definition_bytes(
+/* the items of each weapon HUD crosshair or overlay in the block at `block` */
+static void hud_walk_weapon_items(
+	struct custom_edition_hud_walk const *walk,
+	uint8_t const *block,
+	uint32_t item_bytes)
+{
+	int32_t element_count;
+	uint8_t *elements = walk->block_elements(walk->context, block, WEAPON_HUD_CROSSHAIRS_OR_OVERLAYS_BYTES,
+		&element_count);
+	int32_t element_index;
+
+	for (element_index = 0; elements && element_index < element_count; element_index++)
+	{
+		uint8_t const *element = elements + (uint32_t)element_index * WEAPON_HUD_CROSSHAIRS_OR_OVERLAYS_BYTES;
+
+		hud_walk_items(walk, element + WEAPON_HUD_ITEMS_OFFSET, item_bytes,
+			element + WEAPON_HUD_CROSSHAIRS_OR_OVERLAYS_BITMAP_OFFSET);
+	}
+
+	return;
+}
+
+uint32_t custom_edition_hud_definition_bytes(
 	uint32_t group_tag)
 {
 	switch (group_tag)
@@ -3287,6 +3267,109 @@ static uint32_t hud_definition_bytes(
 	}
 }
 
+void custom_edition_hud_placements_walk(
+	uint8_t *definition,
+	uint32_t group_tag,
+	struct custom_edition_hud_walk const *walk)
+{
+	size_t index;
+
+	switch (group_tag)
+	{
+	case UNIT_HUD_INTERFACE_GROUP_TAG:
+		for (index = 0; index < sizeof(unit_hud_interface_elements) / sizeof(unit_hud_interface_elements[0]); index++)
+		{
+			uint8_t *placement = definition + unit_hud_interface_elements[index];
+
+			walk->placement(walk->context, placement, placement + HUD_ELEMENT_BITMAP_OFFSET, 0);
+		}
+		walk->placement(walk->context, definition + UNIT_HUD_INTERFACE_BLIPS_OFFSET, NULL, 0);
+		hud_walk_block(walk, definition + UNIT_HUD_INTERFACE_AUXILIARY_OVERLAYS_OFFSET,
+			UNIT_HUD_INTERFACE_AUXILIARY_OVERLAY_BYTES, 0, HUD_ELEMENT_BITMAP_OFFSET);
+		hud_walk_block(walk, definition + UNIT_HUD_INTERFACE_AUXILIARY_METERS_OFFSET,
+			UNIT_HUD_INTERFACE_AUXILIARY_METER_BYTES, UNIT_HUD_INTERFACE_AUXILIARY_METER_BACKGROUND_OFFSET,
+			HUD_ELEMENT_BITMAP_OFFSET);
+		hud_walk_block(walk, definition + UNIT_HUD_INTERFACE_AUXILIARY_METERS_OFFSET,
+			UNIT_HUD_INTERFACE_AUXILIARY_METER_BYTES, UNIT_HUD_INTERFACE_AUXILIARY_METER_METER_OFFSET,
+			HUD_ELEMENT_BITMAP_OFFSET);
+		break;
+	case WEAPON_HUD_INTERFACE_GROUP_TAG:
+		hud_walk_block(walk, definition + WEAPON_HUD_INTERFACE_STATICS_OFFSET,
+			WEAPON_HUD_STATIC_OR_METER_BYTES, WEAPON_HUD_ELEMENT_PLACEMENT_OFFSET, HUD_ELEMENT_BITMAP_OFFSET);
+		hud_walk_block(walk, definition + WEAPON_HUD_INTERFACE_METERS_OFFSET,
+			WEAPON_HUD_STATIC_OR_METER_BYTES, WEAPON_HUD_ELEMENT_PLACEMENT_OFFSET, HUD_ELEMENT_BITMAP_OFFSET);
+		hud_walk_weapon_items(walk, definition + WEAPON_HUD_INTERFACE_CROSSHAIRS_OFFSET, WEAPON_HUD_CROSSHAIR_ITEM_BYTES);
+		hud_walk_weapon_items(walk, definition + WEAPON_HUD_INTERFACE_OVERLAYS_OFFSET, WEAPON_HUD_OVERLAY_ITEM_BYTES);
+		break;
+	case GRENADE_HUD_INTERFACE_GROUP_TAG:
+		for (index = 0; index < sizeof(grenade_hud_interface_elements) / sizeof(grenade_hud_interface_elements[0]); index++)
+		{
+			uint8_t *placement = definition + grenade_hud_interface_elements[index];
+
+			walk->placement(walk->context, placement, placement + HUD_ELEMENT_BITMAP_OFFSET, 0);
+		}
+		hud_walk_items(walk, definition + GRENADE_HUD_INTERFACE_OVERLAY_ITEMS_OFFSET, WEAPON_HUD_OVERLAY_ITEM_BYTES,
+			definition + GRENADE_HUD_INTERFACE_OVERLAY_BITMAP_OFFSET);
+		break;
+	case HUD_GLOBALS_GROUP_TAG:
+		walk->placement(walk->context, definition + HUD_GLOBALS_MESSAGING_PLACEMENT_OFFSET, NULL, 0);
+		break;
+	default:
+		break;
+	}
+
+	return;
+}
+
+/* what hud_placements_convert walks with */
+struct hud_conversion
+{
+	struct load_state const *state;
+	struct custom_edition_conversion_report *report;
+};
+
+static uint8_t *hud_conversion_block_elements(
+	void *context,
+	uint8_t const *block,
+	uint32_t element_bytes,
+	int32_t *count)
+{
+	struct hud_conversion const *conversion = context;
+	uint32_t elements_offset;
+
+	if (!loaded_block_get(block, CUSTOM_EDITION_TAG_CACHE_ADDRESS, conversion->state->used_bytes, element_bytes, count,
+		&elements_offset) || !*count)
+	{
+		return NULL;
+	}
+
+	return conversion->state->tag_cache + elements_offset;
+}
+
+/* an element's placement halved where Halo PC halves it; a crosshair's or
+overlay's item's by its bitmap's flags alone (hud_placement_convert) */
+static void hud_conversion_placement(
+	void *context,
+	uint8_t *placement,
+	uint8_t const *bitmap,
+	int items)
+{
+	struct hud_conversion const *conversion = context;
+	int bitmap_halves_scale = bitmap && hud_bitmap_halves_scale(conversion->state, bitmap);
+
+	if (items)
+	{
+		if (bitmap_halves_scale)
+			hud_placement_convert(placement, 1, conversion->report);
+	}
+	else
+	{
+		hud_placement_convert(placement, bitmap_halves_scale, conversion->report);
+	}
+
+	return;
+}
+
 /* every placement of the HUD definition of group `group_tag` at `offset` */
 static void hud_placements_convert(
 	struct load_state const *state,
@@ -3294,45 +3377,15 @@ static void hud_placements_convert(
 	uint32_t offset,
 	struct custom_edition_conversion_report *report)
 {
-	uint8_t *definition = state->tag_cache + offset;
-	size_t index;
+	struct hud_conversion conversion;
+	struct custom_edition_hud_walk walk;
 
-	switch (group_tag)
-	{
-	case UNIT_HUD_INTERFACE_GROUP_TAG:
-		for (index = 0; index < sizeof(unit_hud_interface_elements) / sizeof(unit_hud_interface_elements[0]); index++)
-			hud_element_convert(state, definition + unit_hud_interface_elements[index], HUD_ELEMENT_BITMAP_OFFSET, report);
-		hud_element_convert(state, definition + UNIT_HUD_INTERFACE_BLIPS_OFFSET, NO_HUD_BITMAP, report);
-		hud_placement_block_convert(state, definition + UNIT_HUD_INTERFACE_AUXILIARY_OVERLAYS_OFFSET,
-			UNIT_HUD_INTERFACE_AUXILIARY_OVERLAY_BYTES, 0, HUD_ELEMENT_BITMAP_OFFSET, 0, report);
-		hud_placement_block_convert(state, definition + UNIT_HUD_INTERFACE_AUXILIARY_METERS_OFFSET,
-			UNIT_HUD_INTERFACE_AUXILIARY_METER_BYTES, UNIT_HUD_INTERFACE_AUXILIARY_METER_BACKGROUND_OFFSET,
-			HUD_ELEMENT_BITMAP_OFFSET, 0, report);
-		hud_placement_block_convert(state, definition + UNIT_HUD_INTERFACE_AUXILIARY_METERS_OFFSET,
-			UNIT_HUD_INTERFACE_AUXILIARY_METER_BYTES, UNIT_HUD_INTERFACE_AUXILIARY_METER_METER_OFFSET,
-			HUD_ELEMENT_BITMAP_OFFSET, 0, report);
-		break;
-	case WEAPON_HUD_INTERFACE_GROUP_TAG:
-		hud_placement_block_convert(state, definition + WEAPON_HUD_INTERFACE_STATICS_OFFSET,
-			WEAPON_HUD_STATIC_OR_METER_BYTES, WEAPON_HUD_ELEMENT_PLACEMENT_OFFSET, HUD_ELEMENT_BITMAP_OFFSET, 0, report);
-		hud_placement_block_convert(state, definition + WEAPON_HUD_INTERFACE_METERS_OFFSET,
-			WEAPON_HUD_STATIC_OR_METER_BYTES, WEAPON_HUD_ELEMENT_PLACEMENT_OFFSET, HUD_ELEMENT_BITMAP_OFFSET, 0, report);
-		weapon_hud_items_convert(state, definition + WEAPON_HUD_INTERFACE_CROSSHAIRS_OFFSET, WEAPON_HUD_CROSSHAIR_ITEM_BYTES, report);
-		weapon_hud_items_convert(state, definition + WEAPON_HUD_INTERFACE_OVERLAYS_OFFSET, WEAPON_HUD_OVERLAY_ITEM_BYTES, report);
-		break;
-	case GRENADE_HUD_INTERFACE_GROUP_TAG:
-		for (index = 0; index < sizeof(grenade_hud_interface_elements) / sizeof(grenade_hud_interface_elements[0]); index++)
-			hud_element_convert(state, definition + grenade_hud_interface_elements[index], HUD_ELEMENT_BITMAP_OFFSET, report);
-		if (hud_bitmap_halves_scale(state, definition + GRENADE_HUD_INTERFACE_OVERLAY_BITMAP_OFFSET))
-			hud_placement_block_convert(state, definition + GRENADE_HUD_INTERFACE_OVERLAY_ITEMS_OFFSET,
-				WEAPON_HUD_OVERLAY_ITEM_BYTES, 0, NO_HUD_BITMAP, 1, report);
-		break;
-	case HUD_GLOBALS_GROUP_TAG:
-		hud_element_convert(state, definition + HUD_GLOBALS_MESSAGING_PLACEMENT_OFFSET, NO_HUD_BITMAP, report);
-		break;
-	default:
-		break;
-	}
+	conversion.state = state;
+	conversion.report = report;
+	walk.block_elements = hud_conversion_block_elements;
+	walk.placement = hud_conversion_placement;
+	walk.context = &conversion;
+	custom_edition_hud_placements_walk(state->tag_cache + offset, group_tag, &walk);
 
 	return;
 }
@@ -3705,8 +3758,9 @@ enum cache_file_status custom_edition_cache_convert(
 		{
 			sound_prepare(&state, offset, read_u32(instance + TAG_INSTANCE_HANDLE_OFFSET), report);
 		}
-		if (hud_definition_bytes(group_tag) &&
-			tag_cache_offset(&state, read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET), hud_definition_bytes(group_tag), &offset))
+		if (custom_edition_hud_definition_bytes(group_tag) &&
+			tag_cache_offset(&state, read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET),
+				custom_edition_hud_definition_bytes(group_tag), &offset))
 		{
 			hud_placements_convert(&state, group_tag, offset, report);
 			hud_meters_convert(&state, group_tag, offset, report);
