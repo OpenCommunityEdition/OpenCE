@@ -22,7 +22,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: Write `tools/test_macos_build.py`: the configured build graph has a `macos` target with the guest image and the host, and `ninja -n macos` succeeds; the VM build's import stubs are `mov w16, #index; svc #0; ret` (red) 6e19415
 - [x] Task: Add `flake.nix` and `flake.lock`: `devShells.default` with clang (arm64_32 target), `ld.lld`, ninja, Python 3 with pytest, Rust stable (`rust-toolchain.toml`), `cargo-llvm-cov` and SDL3, using the impure Apple SDK from Xcode dc40b99
 - [x] Task: Add the VM import stubs: a mode of `tools/android_imports.py` (shared with Android, not copied) that writes each stub as `mov w16, #index; svc #0; ret`, and the host's table of import names by index 75634e7
-- [ ] Task: Add `tools/macos_build.py` and the `macos` target to `configure.py`: the guest image with the Android guest's rules and the VM stubs, and an empty host signed ad hoc with `com.apple.security.hypervisor`
+- [x] Task: Add `tools/macos_build.py` and the `macos` target to `configure.py`: the guest image with the Android guest's rules and the VM stubs, and an empty host signed ad hoc with `com.apple.security.hypervisor` a5ed7eb
 - [ ] Task: Add the flake packages `guest` and `host`, which run `configure.py` and `ninja macos` in the sandbox
 - [ ] Task: Check that `python configure.py` and the existing `linux` and `android` targets are unchanged (`ninja -t commands` before and after)
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Nix flake and the macOS build' (Protocol in workflow.md)
