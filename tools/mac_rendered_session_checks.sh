@@ -263,9 +263,10 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
         # port: the netcode is compiled from this checkout rather than taken
         # from the manifest. The wire's byte order (port/linux/include/halo_endian.h)
         # and the Mac's sockets changed after those objects were made, and a
-        # mixture of the two would be neither.
+        # mixture of the two would be neither. engine_p2p_offline is skipped without
+        # a replacement of its name: the p2p units below define what it stood for.
         case "$obj" in
-            */engine_sockets_$arch.o|*/engine_winsock_init_$arch.o|\
+            */engine_sockets_$arch.o|*/engine_winsock_init_$arch.o|*/engine_p2p_offline_$arch.o|\
             */p2p_$arch.o|*/p2p_crypto_$arch.o|*/p2p_discord_$arch.o|*/p2p_lobby_$arch.o|\
             */p2p_signal_$arch.o|*/p2p_webrtc_$arch.o|*/posix_net_$arch.o|*/posix_dtls_$arch.o|\
             */posix_upnp_$arch.o|*/mac_p2p_hardware_id_$arch.o|\
