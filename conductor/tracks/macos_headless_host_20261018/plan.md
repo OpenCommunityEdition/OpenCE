@@ -53,7 +53,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: The thread pointer in `TPIDR_EL0`: under the VM build, `__guest_get_tp` reads the register and `host_set_tp` sets it on the vCPU, so thread-local data costs no exit 7cce78a
 - [x] Task: System calls: `host_syscall` carries out the guest's Linux-numbered calls with Darwin calls (from `host_syscall.c`), with guest addresses turned into host addresses, futexes on guest memory, and `errno` mapped; unit tests for the number and `errno` mapping 76bead7 d4c8684
 - [x] Task: Files, sockets and settings: the data root next to the executable (`assets/` in development), sockets for the network test 8295d2f
-- [ ] Task: SDL: audio and input through `host_sdl.c`'s imports, with SDL's dummy video driver (the audio callback runs on a vCPU of its own); the OpenGL ES imports return errors, since only `debug.null_renderer` is supported in this track
+- [x] Task: SDL: audio and input through `host_sdl.c`'s imports, with SDL's dummy video driver (the audio callback runs on a vCPU of its own); the OpenGL ES imports return errors, since only `debug.null_renderer` is supported in this track 76bead7 a74f5ed
 - [ ] Task: Run the asset-free harness (`tools/harness`) in the VM: on macOS it compiles each test for the arm64_32 guest, links it as a guest image with the guest runtime, and runs it in the VM host, which reports the test's output and status; the harness's tests pass on macOS as on Linux (on macOS every test fails today to compile, as on `main`)
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: The VM host' (Protocol in workflow.md)
 
