@@ -95,7 +95,43 @@ def test_macos_graph(tmp_path, monkeypatch):
     assert dry.returncode == 0, dry.stdout + dry.stderr
 
 
-@pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only")
+HOST = ROOT / "build/macos/halo_host"
+IMAGE = ROOT / "build/macos/halo_guest.elf"
+on_macos = pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only")
+
+
+@on_macos
+@pytest.mark.skipif(not HOST.is_file(), reason="needs `ninja macos`")
+def test_host_creates_its_vm():
+    # (only a host signed with the entitlement may create one)
+    result = subprocess.run([str(HOST)], capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    assert re.match(r"halo_host: VM created; \d+ guest imports, the first host_syscall", result.stdout)
+
+
+@pytest.mark.skipif(not IMAGE.is_file(), reason="needs `ninja macos`")
+def test_guest_image_is_the_vm_guest():
+    import struct
+
+    data = IMAGE.read_bytes()
+    # an AArch64 ELF executable entered at the guest's fixed address
+    assert data[:4] == b"\x7fELF" and data[4] == 2
+    machine, = struct.unpack_from("<H", data, 18)
+    entry, = struct.unpack_from("<Q", data, 24)
+    assert machine == 183 and entry == 0x88000000
+    # its loaded segments end below the guest's range's end
+    phoff, = struct.unpack_from("<Q", data, 32)
+    phentsize, phnum = struct.unpack_from("<HH", data, 54)
+    for index in range(phnum):
+        kind, _, _, vaddr, _, _, memsz = struct.unpack_from("<IIQQQQQ", data, phoff + index * phentsize)
+        if kind == 1:
+            assert 0x88000000 <= vaddr and vaddr + memsz <= 0x8C000000
+    # the import stubs exit with an svc: mov w16, #1; svc #0; ret is in the
+    # image (host_log, the second import)
+    assert struct.pack("<III", 0x52800030, 0xD4000001, 0xD65F03C0) in data
+
+
+@on_macos
 def test_configure_emits_macos_here(tmp_path):
     # on this platform configure.py includes the macOS graph and makes it the
     # default target; the graph's own test above checks its contents
