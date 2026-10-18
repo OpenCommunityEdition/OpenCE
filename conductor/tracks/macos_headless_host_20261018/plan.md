@@ -59,8 +59,8 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 
 ## Phase 5: A headless game, and the final build
 
-- [ ] Task: Extend `tools/test_macos_host.py`: with `assets/maps`, `HALO_NETWORK_TEST=host:bloodgulch`, `debug.null_renderer`, `debug.hidden_window` and `debug.exit_after=30` log the hosted game's player state each second and exit 0 with no failed assertion; skipped without the maps (red)
-- [ ] Task: Fix what the headless run finds until the test passes
+- [x] Task: Extend `tools/test_macos_host.py`: with `assets/maps`, `HALO_NETWORK_TEST=host:bloodgulch`, `debug.null_renderer`, `debug.hidden_window` and `debug.exit_after=30` log the hosted game's player state each second and exit 0 with no failed assertion; skipped without the maps (red) `7460d36`
+- [x] Task: Fix what the headless run finds until the test passes `7460d36`
 - [ ] Task: Count the exits: the host logs the exits per second by import, as the baseline for the renderer's batching in the next track
 - [ ] Task: Join test: two copies on loopback addresses (`HALO_NET_ADDRESS`), one hosting and one joining; both log the other player
 - [ ] Task: Document the macOS build in `docs/macos_host.md` (building, signing, running headless, what is not supported yet) and link it from `README.md`
