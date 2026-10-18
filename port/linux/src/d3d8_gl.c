@@ -503,6 +503,13 @@ struct visibility_batch
 	GLsync fence;
 	BOOL sealed, failed;
 };
+struct visibility_comparison_stats
+{
+	unsigned long attempted, compared, matched, mismatched, both_zero;
+	unsigned long mapped_nonzero, cpu_nonzero, mapped_changed, unavailable, errors;
+	GLuint mapped_max, cpu_max;
+	unsigned long example_mask;
+};
 #endif
 #ifdef HALO_GLES
 #define VISIBILITY_QUERY GL_ANY_SAMPLES_PASSED
@@ -619,6 +626,8 @@ struct gl_device
 	unsigned long visibility_batch;
 	ULONGLONG visibility_serial;
 	BOOL visibility_logging;
+	BOOL visibility_compare;
+	struct visibility_comparison_stats visibility_comparison;
 	struct
 	{
 		unsigned long submitted, completed, samples, nonzero, maximum;
@@ -2285,6 +2294,7 @@ static void visibility_results_initialize(void)
 	device.visibility_results = glMapBufferRange(GL_QUERY_BUFFER, 0, sizeof(initial),
 		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
 	device.visibility_logging = config_boolean("debug.gl_debug");
+	device.visibility_compare = config_boolean("debug.gpu_compare_visibility");
 	if (device.visibility_results)
 		platform_log("GPU: completion-aware asynchronous visibility readback enabled; %d fenced batches, no CPU waits",
 			VISIBILITY_BATCH_COUNT);
@@ -2292,6 +2302,89 @@ static void visibility_results_initialize(void)
 		platform_log("GPU: cannot map visibility results; using availability-polled query readback");
 	/* A CPU query read treats its pointer as an offset if this stays bound. */
 	glBindBuffer(GL_QUERY_BUFFER, 0);
+	if (device.visibility_compare)
+		platform_log("GPU: same-query visibility comparison %s; mapped rendering retained, direct reads only when available; diagnostic overhead may reduce frame rate",
+			device.visibility_results ? "enabled" : "unavailable (no mapped buffer)");
+}
+
+static BOOL visibility_comparison_gl_ok(const char *phase, GLuint query)
+{
+	GLenum error;
+	BOOL success = TRUE;
+
+	while ((error = glGetError()) != GL_NO_ERROR)
+	{
+		device.visibility_comparison.errors++;
+		platform_log("GPU: visibility comparison GL error 0x%x at %s query=%u", error, phase, query);
+		success = FALSE;
+	}
+	return success;
+}
+
+/* Called only after this batch's fence signals, before query/range reuse.
+Compare raw counts, without replacing the count used to render the flare. */
+static void visibility_compare_result(unsigned long batch_index, unsigned long test, GLuint mapped)
+{
+	struct visibility_batch *batch = &device.visibility_batches[batch_index];
+	struct visibility_comparison_stats *stats = &device.visibility_comparison;
+	GLuint query = batch->queries[test], available = 0, direct = 0, after;
+	GLint binding = 0;
+	unsigned long category;
+	BOOL valid;
+
+	stats->attempted++;
+	if (!visibility_comparison_gl_ok("before comparison", query))
+		return;
+	/* A bound query buffer would interpret CPU pointers as offsets. */
+	glGetIntegerv(GL_QUERY_BUFFER_BINDING, &binding);
+	if (!visibility_comparison_gl_ok("read binding", query))
+		return;
+	glBindBuffer(GL_QUERY_BUFFER, 0);
+	valid = visibility_comparison_gl_ok("unbind", query);
+	if (valid)
+	{
+		glGetQueryObjectuiv(query, GL_QUERY_RESULT_AVAILABLE, &available);
+		valid = visibility_comparison_gl_ok("availability", query);
+	}
+	if (valid && available)
+	{
+		glGetQueryObjectuiv(query, GL_QUERY_RESULT, &direct);
+		valid = visibility_comparison_gl_ok("direct result", query);
+	}
+	after = device.visibility_results[batch_index * VISIBILITY_TEST_SLOTS + test];
+	glBindBuffer(GL_QUERY_BUFFER, (GLuint)binding);
+	valid = visibility_comparison_gl_ok("restore binding", query) && valid;
+	if (!valid)
+		return;
+	if (!available)
+	{
+		stats->unavailable++;
+		if (!(stats->example_mask & 8))
+			platform_log("GPU: visibility pair unavailable frame=%lu submit_frame=%lu batch=%lu test=%lu slot=%u query=%u mapped=%u; no direct result read",
+				device.frame, batch->frame, batch_index, test, (unsigned)batch->slots[test], query, mapped);
+		stats->example_mask |= 8;
+		return;
+	}
+	stats->compared++;
+	stats->matched += mapped == direct;
+	stats->mismatched += mapped != direct;
+	stats->both_zero += mapped == 0 && direct == 0;
+	stats->mapped_nonzero += mapped != 0;
+	stats->cpu_nonzero += direct != 0;
+	stats->mapped_changed += mapped != after;
+	if (mapped > stats->mapped_max)
+		stats->mapped_max = mapped;
+	if (direct > stats->cpu_max)
+		stats->cpu_max = direct;
+	category = mapped != after ? 16 : mapped != direct ? 4 : mapped ? 2 : 1;
+	/* One example per outcome per summary interval, including mismatches
+	even when earlier zero results have already been logged. */
+	if (!(stats->example_mask & category))
+		platform_log("GPU: visibility pair frame=%lu submit_frame=%lu batch=%lu test=%lu slot=%u query=%u offset=%lu mapped_before=%u cpu=%u mapped_after=%u scale=%g available=1",
+			device.frame, batch->frame, batch_index, test, (unsigned)batch->slots[test], query,
+			(unsigned long)((batch_index * VISIBILITY_TEST_SLOTS + test) * sizeof(GLuint)),
+			mapped, direct, after, (double)batch->areas[test]);
+	stats->example_mask |= category;
 }
 #endif
 
@@ -5942,6 +6035,8 @@ static void visibility_copy_batch(void)
 				GLuint samples = device.visibility_results[oldest * VISIBILITY_TEST_SLOTS + test];
 				float area = batch->areas[test];
 
+				if (device.visibility_compare)
+					visibility_compare_result(oldest, test, samples);
 				device.visibility_known[batch->slots[test]] = area > 1.0f ?
 					(GLuint)(samples / area + 0.5f) : samples;
 				device.visibility_stats.nonzero += samples != 0;
@@ -6013,6 +6108,16 @@ static void visibility_copy_batch(void)
 			device.visibility_stats.samples, device.visibility_stats.nonzero, device.visibility_stats.maximum,
 			device.visibility_stats.timeouts, device.visibility_stats.dropped, device.visibility_stats.failures);
 		memset(&device.visibility_stats, 0, sizeof(device.visibility_stats));
+	}
+	if (device.visibility_compare && device.frame % 120 == 0)
+	{
+		struct visibility_comparison_stats *stats = &device.visibility_comparison;
+
+		platform_log("GPU: visibility comparison frame=%lu attempted=%lu compared=%lu matched=%lu mismatched=%lu both_zero=%lu mapped_nonzero=%lu cpu_nonzero=%lu mapped_changed=%lu unavailable=%lu errors=%lu mapped_max=%u cpu_max=%u",
+			device.frame, stats->attempted, stats->compared, stats->matched, stats->mismatched, stats->both_zero,
+			stats->mapped_nonzero, stats->cpu_nonzero, stats->mapped_changed, stats->unavailable, stats->errors,
+			stats->mapped_max, stats->cpu_max);
+		memset(stats, 0, sizeof(*stats));
 	}
 }
 

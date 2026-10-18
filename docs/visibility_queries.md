@@ -64,5 +64,33 @@ unsignaled polls, `dropped` skipped measurements, and `failures` fence failures.
 Timeouts alone are normal; sustained drops or absent completions need review.
 
 Earlier sync, no-depth and explicit-depth diagnostics remain removed. The
-completion-aware AMD package is a new test candidate, not an AMD-verified fix.
-Do not merge into testing until the player's results have been reviewed.
+2cbf57dd AMD test still had missing lights: its log recorded 2359 completed
+batches and 8116 measurements, all mapped raw counts zero, with no fence
+timeouts, failures or dropped tests. Completion handling alone did not fix it.
+
+The opt-in desktop setting `debug.gpu_compare_visibility` (environment
+`HALO_GPU_COMPARE_VISIBILITY`, default false) compares each completed mapped
+measurement with a direct CPU read of the same query before reuse. It checks
+availability first and skips unavailable results, rather than requesting a
+blocking result. Query-buffer binding is saved, cleared for CPU pointers and
+restored. GL errors invalidate the comparison and are explicitly logged.
+Rendering uses the original mapped value; it does not substitute the CPU
+result or alter depth, bias, query generation, or batch lifetime. Driver calls
+can still affect timing/performance; this diagnostic is not a performance fix.
+
+`visibility pair` examples include query/slot/batch identity, byte offset,
+submission/observation frames, scale, and raw `mapped_before`, `cpu`, and
+`mapped_after` counts. The latter checks whether the mapped value changed
+during the diagnostic calls. Examples are bounded to one per outcome per
+120-frame interval. `visibility comparison` summaries count attempted and
+valid comparisons, matches, mismatches, both-zero pairs, nonzero counts by
+path, mapped changes, unavailable results and GL errors. Maxima are raw counts;
+summary counters reset every interval. No comparison occurs before a signaled
+fence, and disabling the setting retains the normal asynchronous path.
+
+A positive CPU result with a zero mapped value isolates a readback discrepancy
+for that query. Matching zeros leave query execution/state/lifetime in question;
+neither outcome alone establishes a driver root cause. The same-query tests
+inject both discrepancy directions, changed mapping, unavailable queries,
+GL errors and a nonzero query-buffer binding, alongside the delayed-GPU tests.
+Do not merge into testing until the AMD results have been reviewed.

@@ -13,7 +13,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.mark.parametrize("negative_control", [None, "untyped_pool", "invalid_pool",
                                              "early_read", "wrong_scale", "wrong_range",
-                                             "reuse_pending", "no_flush", "mapped_read"])
+                                             "reuse_pending", "no_flush", "mapped_read",
+                                             "compare_no_ready", "compare_wrong_query",
+                                             "compare_no_unbind", "compare_after_read"])
 def test_visibility_readback(tmp_path, negative_control):
     compiler = shutil.which("clang")
     if not compiler:
@@ -23,6 +25,7 @@ def test_visibility_readback(tmp_path, negative_control):
     code = code.split("/* ---------- render and texture stage state */", 1)[0]
     copy_code = function(source, "visibility_copy_batch")
     batch_type = structure(source, "visibility_batch")
+    batch_type += "\n" + structure(source, "visibility_comparison_stats")
     if negative_control == "untyped_pool":
         code = mutated(code, "glCreateQueries(VISIBILITY_QUERY, (GLsizei)count, queries)",
                        "glGenQueries((GLsizei)count, queries)")
@@ -42,6 +45,17 @@ def test_visibility_readback(tmp_path, negative_control):
     if negative_control == "mapped_read":
         code = mutated(code, "\t\t\t*result = device.visibility_known[index];",
                        "\t\t\t*result = device.visibility_results[index];")
+    if negative_control == "compare_no_ready":
+        code = mutated(code, "if (valid && available)", "if (valid)")
+    if negative_control == "compare_wrong_query":
+        code = mutated(code, "glGetQueryObjectuiv(query, GL_QUERY_RESULT, &direct);",
+                       "glGetQueryObjectuiv(query + 1, GL_QUERY_RESULT, &direct);")
+    if negative_control == "compare_no_unbind":
+        code = mutated(code, "glBindBuffer(GL_QUERY_BUFFER, 0);\n\tvalid =", "/* still bound */\n\tvalid =")
+    if negative_control == "compare_after_read":
+        copy_code = mutated(copy_code, "visibility_compare_result(oldest, test, samples);",
+                            "visibility_compare_result(oldest, test, samples);\n"
+                            "samples = device.visibility_results[oldest * VISIBILITY_TEST_SLOTS + test];")
     prefix = r"""
 #include <assert.h>
 #include <stdio.h>
@@ -50,7 +64,7 @@ def test_visibility_readback(tmp_path, negative_control):
 typedef unsigned int GLuint, DWORD, UINT, GLenum;
 typedef unsigned long long ULONGLONG;
 typedef struct fence *GLsync;
-typedef int BOOL, HRESULT, GLsizei;
+typedef int BOOL, HRESULT, GLsizei, GLint;
 typedef long GLintptr;
 #define WINAPI
 #define TRUE 1
@@ -63,6 +77,7 @@ typedef long GLintptr;
 #define GL_QUERY_RESULT 3
 #define GL_NO_ERROR 0
 #define GL_QUERY_BUFFER 4
+#define GL_QUERY_BUFFER_BINDING 10
 #define GL_MAP_READ_BIT 1
 #define GL_MAP_PERSISTENT_BIT 2
 #define GL_MAP_COHERENT_BIT 4
@@ -86,6 +101,8 @@ static struct {
     unsigned long visibility_batch, frame;
     ULONGLONG visibility_serial;
     BOOL visibility_logging;
+    BOOL visibility_compare;
+    struct visibility_comparison_stats visibility_comparison;
     struct { unsigned long submitted, completed, samples, nonzero, maximum,
                            timeouts, dropped, failures; } visibility_stats;
 } device;
@@ -100,6 +117,9 @@ static unsigned command_count, command_done, fence_count;
 static BOOL write_pending[8 * VISIBILITY_BATCH_COUNT];
 static BOOL fail_fence, fail_wait, fail_mapping;
 static unsigned sync_polls, flushes;
+static GLuint query_buffer;
+static BOOL force_unavailable, direct_error, availability_error, change_mapping;
+static unsigned changed_offset;
 static int zero_at = -1, duplicate_at = -1;
 static BOOL fail_object, fail_create, fail_all;
 static GLenum gpu_error;
@@ -137,14 +157,17 @@ static void glEndQuery(GLenum target) {
     active = 0;
 }
 static void glGetQueryObjectuiv(GLuint query, GLenum pname, GLuint *value) {
-    assert(query && gpu[query].object);
+    assert(query && gpu[query].object && !query_buffer);
     if (pname == GL_QUERY_RESULT_AVAILABLE) {
         polls++;
-        *value = gpu[query].available;
+        *value = gpu[query].available && !force_unavailable;
+        if (availability_error) gpu_error = 0x502;
     } else {
-        assert(pname == GL_QUERY_RESULT && gpu[query].available);
+        assert(pname == GL_QUERY_RESULT && gpu[query].available && !force_unavailable);
         reads++;
         *value = gpu[query].samples;
+        if (direct_error) gpu_error = 0x502;
+        if (change_mapping) mapped[changed_offset] = *value;
     }
 }
 static void glGetQueryBufferObjectuiv(GLuint query, GLuint buffer, GLenum pname, GLintptr offset) {
@@ -191,11 +214,13 @@ static void finish_gpu(unsigned fence_index) {
         mapped[commands[c].offset] = commands[c].samples;
         write_pending[commands[c].offset] = FALSE;
         gpu[commands[c].query].pending = FALSE;
+        gpu[commands[c].query].available = TRUE;
     }
     for (i = 0; i <= fence_index; i++) fences[i].done = TRUE;
 }
 static void glGenBuffers(GLsizei count, GLuint *buffers) { assert(count == 1); *buffers = 1; }
-static void glBindBuffer(GLenum target, GLuint buffer) { assert(target == GL_QUERY_BUFFER); }
+static void glBindBuffer(GLenum target, GLuint buffer) { assert(target == GL_QUERY_BUFFER); query_buffer = buffer; }
+static void glGetIntegerv(GLenum pname, GLint *value) { assert(pname == GL_QUERY_BUFFER_BINDING); *value = query_buffer; }
 static void glBufferStorage(GLenum target, size_t size, const void *data, unsigned flags) {
     assert(target == GL_QUERY_BUFFER && size == sizeof(mapped) && flags == 7);
     if (data) memcpy(mapped, data, size);
@@ -228,6 +253,8 @@ static void reset(void) {
     command_count = command_done = fence_count = 0;
     copies = sync_polls = flushes = reads = polls = 0;
     fail_fence = fail_wait = fail_mapping = FALSE;
+    force_unavailable = direct_error = availability_error = change_mapping = FALSE;
+    query_buffer = 0;
     target_scale[0] = 2; target_scale[1] = 3; target_samples = 4;
 }
 int main(void) {
@@ -358,8 +385,68 @@ int main(void) {
     CHECK(result(0) == 0 && reads == 2 && polls == 4);
     present();
     CHECK(!copies && !sync_polls);
+    /* Compare the same completed objects, without changing mapped rendering.
+       Model both disagreement directions and a nonzero agreement. */
+    reset();
+    CHECK(visibility_queries_initialize());
+    visibility_results_initialize();
+    device.gl_ready = TRUE;
+    device.visibility_compare = TRUE;
+    submit(5, 240); submit(6, 0); submit(7, 480);
+    present(); present();
+    for (i = 0; i < 5; i++) present();
+    CHECK(!reads && !polls && !device.visibility_comparison.attempted);
+    finish_gpu(0);
+    mapped[0] = 0; mapped[1] = 48;
+    query_buffer = 91; /* An unrelated binding must be saved and restored. */
+    present();
+    CHECK(reads == 3 && polls == 3 && query_buffer == 91);
+    CHECK(device.visibility_comparison.compared == 3 && device.visibility_comparison.mismatched == 2);
+    CHECK(device.visibility_comparison.matched == 1 && device.visibility_comparison.both_zero == 0);
+    CHECK(device.visibility_comparison.mapped_nonzero == 2 && device.visibility_comparison.cpu_nonzero == 2);
+    CHECK(device.visibility_comparison.cpu_max == 480 && device.visibility_comparison.mapped_max == 480);
+    CHECK(result(5) == 0 && result(6) == 2 && result(7) == 20);
+    /* Reading the direct result may reveal a mapping visibility discrepancy.
+       Capture it without changing the pre-read value used for rendering. */
+    changed_offset = device.visibility_batch * VISIBILITY_TEST_SLOTS;
+    submit(0, 240); present(); present(); finish_gpu(fence_count - 1);
+    mapped[changed_offset] = 0;
+    change_mapping = TRUE;
+    present();
+    CHECK(device.visibility_comparison.mapped_changed == 1 && result(0) == 0);
+    CHECK(mapped[changed_offset] == 240 && query_buffer == 91);
+    change_mapping = FALSE;
+    /* An unavailable query is skipped, even after a signaled batch fence. */
+    submit(0, 48); present(); present(); finish_gpu(fence_count - 1);
+    before = reads;
+    force_unavailable = TRUE;
+    present();
+    CHECK(reads == before && device.visibility_comparison.unavailable == 1);
+    CHECK(result(0) == 2 && query_buffer == 91);
+    force_unavailable = FALSE;
+    /* Errors must not be counted as valid zero results or comparisons. */
+    submit(0, 0); present(); present(); finish_gpu(fence_count - 1);
+    before = device.visibility_comparison.compared;
+    direct_error = TRUE;
+    present();
+    CHECK(device.visibility_comparison.errors == 1 && device.visibility_comparison.compared == before);
+    CHECK(query_buffer == 91);
+    direct_error = FALSE;
+    submit(0, 0); present(); present(); finish_gpu(fence_count - 1);
+    before = reads;
+    availability_error = TRUE;
+    present();
+    CHECK(reads == before && device.visibility_comparison.errors == 2 && query_buffer == 91);
+    availability_error = FALSE;
+    submit(0, 0); present(); present(); finish_gpu(fence_count - 1);
+    gpu_error = 0x502;
+    present();
+    CHECK(reads == before && device.visibility_comparison.errors == 3 && query_buffer == 91);
+    submit(0, 0); present(); present(); finish_gpu(fence_count - 1);
+    present();
+    CHECK(device.visibility_comparison.both_zero == 1 && device.visibility_comparison.matched == 2);
     /* No partially valid pool may be published, including every batch. */
-    memset(&device, 0, sizeof(device));
+    reset();
     zero_at = 0;
     CHECK(!visibility_queries_initialize() && !device.scratch_query && !device.queries[0]);
     for (i = 0; i < VISIBILITY_BATCH_COUNT; i++) {
