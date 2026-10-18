@@ -24,7 +24,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: Add the VM import stubs: a mode of `tools/android_imports.py` (shared with Android, not copied) that writes each stub as `mov w16, #index; svc #0; ret`, and the host's table of import names by index 75634e7
 - [x] Task: Add `tools/macos_build.py` and the `macos` target to `configure.py`: the guest image with the Android guest's rules and the VM stubs, and an empty host signed ad hoc with `com.apple.security.hypervisor` a5ed7eb
 - [x] Task: Add the flake packages `guest` and `host`, which run `configure.py` and `ninja macos` in the sandbox be4f87a
-- [ ] Task: Check that `python configure.py` and the existing `linux` and `android` targets are unchanged (`ninja -t commands` before and after)
+- [x] Task: Check that `python configure.py` and the existing `linux` and `android` targets are unchanged (`ninja -t commands` before and after) (checked: identical commands, no code change)
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Nix flake and the macOS build' (Protocol in workflow.md)
 
 ## Phase 3: The Rust runtime crate
