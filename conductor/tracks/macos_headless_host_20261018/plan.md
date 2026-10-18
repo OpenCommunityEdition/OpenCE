@@ -41,7 +41,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: Implement the image checks from `host_loader.c`, and export the C ABI with a cbindgen header; `cargo fmt`, `cargo clippy -D warnings`, and coverage >80% b6bd54a 8f580af
 - [x] Task: Conductor - User Manual Verification 'Phase 3: The Rust runtime crate' (Protocol in workflow.md)
 
-## Phase 4: The VM host
+## Phase 4: The VM host [checkpoint: 2b0b0d1]
 
 `port/macos/host/`: the VM, and the imports adapted from `port/android/host/`. Shared code is moved or included rather than copied where the Android host stays as it is.
 
@@ -55,7 +55,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: Files, sockets and settings: the data root next to the executable (`assets/` in development), sockets for the network test 8295d2f
 - [x] Task: SDL: audio and input through `host_sdl.c`'s imports, with SDL's dummy video driver (the audio callback runs on a vCPU of its own); the OpenGL ES imports return errors, since only `debug.null_renderer` is supported in this track 76bead7 a74f5ed
 - [x] Task: Run the asset-free harness (`tools/harness`) in the VM: on macOS it compiles each test for the arm64_32 guest, links it as a guest image with the guest runtime, and runs it in the VM host, which reports the test's output and status; the harness's tests pass on macOS as on Linux (on macOS every test fails today to compile, as on `main`) 93dd075
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: The VM host' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4: The VM host' (Protocol in workflow.md)
 
 ## Phase 5: A headless game, and the final build
 
