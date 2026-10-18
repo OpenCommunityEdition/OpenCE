@@ -64,6 +64,11 @@ static struct
 	GLuint color_framebuffer, edges_framebuffer, weights_framebuffer;
 	/* SMAA's lookup textures */
 	GLuint area, search;
+	/* display.gamma's program (made when it is first used), its uniforms,
+	and whether it could not be made */
+	GLuint gamma_program;
+	GLint gamma_rectangle, gamma_exponent;
+	BOOL gamma_failed;
 	/* linear and clamped, as FXAA and SMAA sample */
 	GLuint sampler;
 	/* no attributes: the triangle comes from gl_VertexID */
@@ -421,6 +426,20 @@ static void intermediate_clear(GLuint framebuffer)
 	glClear(GL_COLOR_BUFFER_BIT);
 }
 
+/* the sampler and the vertex array every pass uses */
+static void common_prepare(void)
+{
+	if (!post.sampler)
+	{
+		glGenSamplers(1, &post.sampler);
+		glSamplerParameteri(post.sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glSamplerParameteri(post.sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(post.sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glSamplerParameteri(post.sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glGenVertexArrays(1, &post.vertex_array);
+	}
+}
+
 BOOL xgpu_post_prepare(BOOL smaa)
 {
 	int first = smaa ? _post_program_smaa_edges : _post_program_fxaa;
@@ -452,15 +471,7 @@ BOOL xgpu_post_prepare(BOOL smaa)
 		}
 	}
 #endif
-	if (!post.sampler)
-	{
-		glGenSamplers(1, &post.sampler);
-		glSamplerParameteri(post.sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glSamplerParameteri(post.sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glSamplerParameteri(post.sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glSamplerParameteri(post.sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glGenVertexArrays(1, &post.vertex_array);
-	}
+	common_prepare();
 	return TRUE;
 }
 
@@ -520,5 +531,93 @@ BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, un
 		pass_draw(_post_program_smaa_blend, framebuffer, corners, TRUE);
 	}
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	return TRUE;
+}
+
+/* ---------- gamma */
+
+/* display.gamma: the picture raised to 1 / gamma as it is presented, from
+the back buffer's texture (row 0 the top of the picture) to the window's
+rectangle; the triangle's pixels are found from gl_FragCoord, whose rows
+count from the bottom */
+static const char gamma_source[] =
+	"uniform sampler2D color_texture;\n"
+	"/* the rectangle in the window: left, bottom, width, height */\n"
+	"uniform vec4 rectangle;\n"
+	"uniform float exponent;\n"
+	"out vec4 result;\n"
+	"\n"
+	"void main()\n"
+	"{\n"
+	"\tvec2 position = (gl_FragCoord.xy - rectangle.xy) / rectangle.zw;\n"
+	"\tvec3 color = textureLod(color_texture, vec2(position.x, 1.0 - position.y), 0.0).rgb;\n"
+	"\tresult = vec4(pow(max(color, vec3(0.0)), vec3(exponent)), 1.0);\n"
+	"}\n";
+
+static GLuint gamma_program_build(void)
+{
+	struct xgpu_text text = { 0 };
+	GLuint fragment_shader, program;
+
+	if (!post.vertex_shader)
+	{
+		shader_header(&text);
+		xgpu_text_append(&text, "%s", vertex_source);
+		post.vertex_shader = xgpu_compile_shader(GL_VERTEX_SHADER, text.buffer, "post-process");
+		text.length = 0;
+	}
+	shader_header(&text);
+	xgpu_text_append(&text, "%s", gamma_source);
+	fragment_shader = post.vertex_shader ? xgpu_compile_shader(GL_FRAGMENT_SHADER, text.buffer, "gamma") : 0;
+	free(text.buffer);
+	if (!fragment_shader)
+		return 0;
+	program = xgpu_link_program(post.vertex_shader, fragment_shader, "gamma");
+	glDeleteShader(fragment_shader);
+	if (!program)
+		return 0;
+	glUseProgram(program);
+	glUniform1i(glGetUniformLocation(program, "color_texture"), 0);
+	post.gamma_rectangle = glGetUniformLocation(program, "rectangle");
+	post.gamma_exponent = glGetUniformLocation(program, "exponent");
+	return program;
+}
+
+BOOL xgpu_post_gamma(GLuint texture, double gamma, const GLint rectangle[4])
+{
+	float rectangle_float[4];
+
+	if (post.gamma_failed)
+		return FALSE;
+	if (!post.gamma_program && !(post.gamma_program = gamma_program_build()))
+	{
+		platform_log("display.gamma: its program does not build, so the picture is not adjusted");
+		post.gamma_failed = TRUE;
+		return FALSE;
+	}
+	common_prepare();
+	glDisable(GL_SCISSOR_TEST);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_STENCIL_TEST);
+	glDisable(GL_BLEND);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_POLYGON_OFFSET_FILL);
+#ifndef HALO_GLES
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+#endif
+	glBindVertexArray(post.vertex_array);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glViewport(rectangle[0], rectangle[1], rectangle[2], rectangle[3]);
+	texture_bind(0, texture);
+	glUseProgram(post.gamma_program);
+	rectangle_float[0] = (float)rectangle[0];
+	rectangle_float[1] = (float)rectangle[1];
+	rectangle_float[2] = (float)rectangle[2];
+	rectangle_float[3] = (float)rectangle[3];
+	glUniform4fv(post.gamma_rectangle, 1, rectangle_float);
+	glUniform1f(post.gamma_exponent, (float)(1.0 / gamma));
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glBindSampler(0, 0);
 	return TRUE;
 }

@@ -5830,6 +5830,26 @@ static void visibility_copy_batch(void)
 }
 
 #endif
+/* display.gamma, 0.5 to 3.0 (read again when a setting is written) */
+static double display_gamma(void)
+{
+	static unsigned long read_at = (unsigned long)-1;
+	static double gamma = 1.0;
+
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		gamma = config_real("display.gamma");
+		if (!(gamma > 0.0))
+			gamma = 1.0;
+		else if (gamma < 0.5)
+			gamma = 0.5;
+		else if (gamma > 3.0)
+			gamma = 3.0;
+	}
+	return gamma;
+}
+
 void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destination_rectangle,
 	void *unused, void *unused2)
 {
@@ -5846,6 +5866,8 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	{
 		struct render_target_entry *back_buffer = render_target_get(&device.back_buffer);
 		int window_width, window_height, width, height, x, y;
+		double gamma;
+		BOOL drawn = FALSE;
 
 		if (trace_frame())
 			platform_log("present back buffer %08lx texture %u", (unsigned long)device.back_buffer.Data,
@@ -5877,10 +5899,26 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(back_buffer->target.texture, 0));
-		/* row 0 of the render target is the top of the picture */
-		glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
-			x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+		/* display.gamma: the picture drawn through a pass in the blit's place
+		(nothing changes at 1.0, the default) */
+		gamma = display_gamma();
+		if (gamma != 1.0)
+		{
+			GLint rectangle[4];
+
+			rectangle[0] = x;
+			rectangle[1] = y;
+			rectangle[2] = width;
+			rectangle[3] = height;
+			drawn = xgpu_post_gamma(back_buffer->target.texture, gamma, rectangle);
+		}
+		if (!drawn)
+		{
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(back_buffer->target.texture, 0));
+			/* row 0 of the render target is the top of the picture */
+			glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
+				x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+		}
 		platform_video_swap();
 		xgpu_gl_state_invalidate();
 		memory_watch_begin_frame();

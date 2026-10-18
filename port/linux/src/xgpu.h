@@ -255,4 +255,10 @@ not build */
 BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, unsigned long height,
 	const GLint corners[4]);
 
+/* display.gamma: a render target's texture (GL_TEXTURE_2D, row 0 the top)
+drawn to the window's framebuffer over the rectangle (left, bottom, width,
+height), raised to 1 / gamma; FALSE, drawing nothing, if its program does not
+build */
+BOOL xgpu_post_gamma(GLuint texture, double gamma, const GLint rectangle[4]);
+
 #endif
