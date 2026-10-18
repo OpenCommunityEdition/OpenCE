@@ -687,9 +687,10 @@ the key, X deletes, Y switches capitals, D-pad Up and Down change who the
 line is to (all the players, your team, your vehicle), Start sends the
 line, and B closes the keyboard. Its last row has Aa (capitals), #+= (the
 symbols), space, DEL and SEND. On a touchscreen (Android, and a browser on
-a phone or tablet), the touch controls' D-pad Up opens it, and a tap on a
-key types it. While the keyboard is up the controller and the touch
-controls move nothing in the game. The face buttons are the same places on
+a phone or tablet), the touch controls' D-pad Up opens it, a tap on a key
+types it, and a tap anywhere else closes it: the touch controls hide while
+it is up. While the keyboard is up the controller and the touch controls
+move nothing in the game. The face buttons are the same places on
 other controllers (on a PlayStation controller: Cross types, Square
 deletes, Triangle switches capitals, Circle closes).
 

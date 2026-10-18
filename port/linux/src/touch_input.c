@@ -286,9 +286,11 @@ void touch_input_controls(XINPUT_GAMEPAD *pad, int menus)
 	int index;
 
 	/* (the controls show only in a game: not while it starts, at the main
-	menu, in a menu or during a cinematic) */
+	menu, in a menu or during a cinematic; nor while the text chat's
+	on-screen keyboard is up, whose keys the fingers then tap) */
 	host_touch_scene(_touch_scene_known | touch_controls_setting() |
-		(menus || !touch_game_playing() || touch_game_cinematic_playing() ? _touch_scene_menus : 0));
+		(menus || !touch_game_playing() || touch_game_cinematic_playing() || network_chat_keyboard_open() ?
+			_touch_scene_menus : 0));
 	/* (the profile's mapping, for the buttons' names; only when it changes) */
 	touch_game_button_controls(bindings);
 	if (!bindings_known || memcmp(bindings, bindings_sent, sizeof(bindings)))

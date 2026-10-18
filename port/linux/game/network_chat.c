@@ -1528,13 +1528,18 @@ static void chat_keyboard_update(
 		chat_input_delete();
 	if (chat_input.active && TEST_FLAG(pressed, HALO_CHAT_PAD_Y))
 		chat_keyboard.shift = !chat_keyboard.shift;
-	/* (a tap on a key presses it; elsewhere, nothing) */
-	if (chat_input.active && halo_chat_taps(&x, &y) && chat_keyboard.drawn &&
-		chat_keyboard_key_at((real)(x * 1000.0f - chat_keyboard.left) / (real)(chat_keyboard.right - chat_keyboard.left),
+	/* (a tap on a key presses it; elsewhere it closes the keyboard, as the
+	touch controls, B among them, hide while it is up: touch_input.c) */
+	if (chat_input.active && halo_chat_taps(&x, &y) && chat_keyboard.drawn)
+	{
+		if (chat_keyboard_key_at((real)(x * 1000.0f - chat_keyboard.left) / (real)(chat_keyboard.right - chat_keyboard.left),
 			(real)(y * 1000.0f - chat_keyboard.top) / (real)(chat_keyboard.bottom - chat_keyboard.top),
 			&chat_keyboard.row, &chat_keyboard.column))
-	{
-		chat_keyboard_press();
+		{
+			chat_keyboard_press();
+		}
+		else
+			chat_input_end();
 	}
 }
 
@@ -1912,11 +1917,21 @@ static void chat_keyboard_draw(
 			rasterizer_draw_unicode_string(&bounds, NULL, NULL, 0, label);
 		}
 	}
-	chat_keyboard.drawn = TRUE;
-	chat_keyboard.left = (short)((keys.x0 - window->x0) * 1000 / window_width);
-	chat_keyboard.right = (short)((keys.x1 - window->x0) * 1000 / window_width);
-	chat_keyboard.top = (short)((keys.y0 - window->y0) * 1000 / window_height);
-	chat_keyboard.bottom = (short)((keys.y1 - window->y0) * 1000 / window_height);
+	/* (in thousandths of the viewport, which fills the screen as a tap's
+	place is of it: the window inside it can be smaller, as on Android; the
+	keys are drawn from the viewport's top left) */
+	{
+		short viewport_width = (short)(render.camera.viewport_bounds.x1 - render.camera.viewport_bounds.x0);
+		short viewport_height = (short)(render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0);
+
+		if (viewport_width <= 0 || viewport_height <= 0)
+			return;
+		chat_keyboard.drawn = TRUE;
+		chat_keyboard.left = (short)(keys.x0 * 1000 / viewport_width);
+		chat_keyboard.right = (short)(keys.x1 * 1000 / viewport_width);
+		chat_keyboard.top = (short)(keys.y0 * 1000 / viewport_height);
+		chat_keyboard.bottom = (short)(keys.y1 * 1000 / viewport_height);
+	}
 }
 
 void network_chat_draw(
