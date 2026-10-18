@@ -148,9 +148,13 @@ OpenCE releases. Do not change the base version without auditing its wire format
 simulation rules and admission behavior and testing unmodified upstream clients.
 The pinned fixture and settings-prefix check are in `tools/test_mcc_protocol.py`.
 
-MCC sessions use separate MCC protocol version 49 (previous GulchCE builds used
-48). Version 49 requires weapon-authored movement penalties on every MCC peer
-and campaign snapshot version 4, which carries the map's screen-flash setting.
+MCC sessions use separate MCC protocol version 50 (previous GulchCE builds used
+49). Version 50 requires peers to agree on bounded conditional execution for
+MCC equipment scripts. It releases completed same-type conditional frames
+before entering their selected branch while retaining lexical call scopes and
+the checkpointed thread stack. Version 49 requires weapon-authored movement
+penalties on every MCC peer and campaign snapshot version 4, which carries the
+map's screen-flash setting.
 It also corrects named sleep_forever resets and online cooperative script queries.
 It retains signed/vector damage impulses from version 48 and initialized
 three-point boat controls from version 47. Packet sizes are unchanged.
