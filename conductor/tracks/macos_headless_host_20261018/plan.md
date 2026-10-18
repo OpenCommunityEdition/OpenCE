@@ -15,7 +15,7 @@ Small stand-alone C programs in `port/macos/spikes/`, each one printing PASS or 
 - [x] Task: Write `docs/macos_host.md` with each risk's result, the commands and their output, and the chosen approach; update `tech-stack.md` (remove "Unverified") or stop the track if no approach works 94ba2cf (approach pending the user's decision)
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Feasibility spike on macOS' (Protocol in workflow.md)
 
-## Phase 2: Nix flake and the macOS build
+## Phase 2: Nix flake and the macOS build [checkpoint: 1155c87]
 
 Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM under Hypervisor.framework.
 
@@ -25,7 +25,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: Add `tools/macos_build.py` and the `macos` target to `configure.py`: the guest image with the Android guest's rules and the VM stubs, and an empty host signed ad hoc with `com.apple.security.hypervisor` a5ed7eb
 - [x] Task: Add the flake packages `guest` and `host`, which run `configure.py` and `ninja macos` in the sandbox be4f87a
 - [x] Task: Check that `python configure.py` and the existing `linux` and `android` targets are unchanged (`ninja -t commands` before and after) (checked: identical commands, no code change)
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Nix flake and the macOS build' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Nix flake and the macOS build' (Protocol in workflow.md)
 
 ## Phase 3: The Rust runtime crate
 
