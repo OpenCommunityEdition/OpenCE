@@ -230,6 +230,16 @@ async function refreshData() {
     const marker = await (await maps.getFileHandle('.complete')).getFile();
     const complete = JSON.parse(await marker.text());
     text = `${complete.files.length} files of maps (${formatBytes(complete.bytes)}), ready.`;
+    // the movies are optional: default.xbe and the bink folder, both
+    try {
+      await root.getFileHandle('default.xbe');
+      const bink = await root.getDirectoryHandle('bink');
+      let movies = 0;
+      for await (const [name] of bink.entries()) if (/\.bik$/i.test(name)) movies++;
+      if (movies) text += ` ${movies} movie${movies === 1 ? '' : 's'}.`;
+    } catch {
+      text += ' No movies.';
+    }
     dataReady = true;
   } catch {
     // none, or a copy that did not finish
@@ -267,8 +277,9 @@ function importData(message) {
     worker.terminate();
     setImporting(false);
     if (data.type === 'done') {
-      $('import-text').textContent = `Copied ${data.files} files.`;
-      logLine(`import: ${data.files} files, ${data.bytes} bytes`);
+      $('import-text').textContent = `Copied ${data.files} files` +
+        (data.movies ? ` and ${data.movies} movies.` : data.image ? ', without movies.' : '.');
+      logLine(`import: ${data.files} files, ${data.bytes} bytes, ${data.movies || 0} movies`);
     } else {
       $('import-text').textContent = data.message;
       logLine('import failed: ' + data.message);
@@ -286,6 +297,7 @@ function importData(message) {
 function setImporting(importing) {
   for (const id of ['image-label', 'folder-label']) $(id).classList.toggle('disabled', importing);
   $('image-input').disabled = importing;
+  $('attract-movies').disabled = importing;
   $('folder-input').disabled = importing;
   $('play').disabled = importing || !canPlay();
 }
@@ -293,7 +305,7 @@ function setImporting(importing) {
 $('image-input').addEventListener('change', (event) => {
   const file = event.target.files[0];
   event.target.value = '';
-  if (file) importData({ type: 'image', file });
+  if (file) importData({ type: 'image', file, attract: $('attract-movies').checked });
 });
 $('folder-input').addEventListener('change', (event) => {
   const files = [...event.target.files];
@@ -389,9 +401,11 @@ $('mod-input').addEventListener('change', (event) => {
 });
 
 $('delete-data').addEventListener('click', async () => {
-  if (!confirm('Delete the maps copied into this browser? Saved games stay.')) return;
+  if (!confirm('Delete the maps and movies copied into this browser? Saved games stay.')) return;
   const root = await navigator.storage.getDirectory();
   await root.removeEntry('maps', { recursive: true }).catch(() => {});
+  await root.removeEntry('bink', { recursive: true }).catch(() => {});
+  await root.removeEntry('default.xbe').catch(() => {});
   // (and the game's copies of them, save/z/cache000.map and on)
   try {
     const drive = await (await root.getDirectoryHandle('save')).getDirectoryHandle('z');

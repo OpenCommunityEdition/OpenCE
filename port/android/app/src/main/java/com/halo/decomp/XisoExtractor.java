@@ -28,6 +28,9 @@ import java.util.List;
  *
  * The files are written to maps.partial first and moved into maps once they
  * all are, so an interrupted extraction never leaves maps/ui.map behind.
+ * The disc's default.xbe and bink folder follow the same way (the Bink movies
+ * need both: bink_sdk.c); a failure there leaves the game without movies, not
+ * without its maps.
  *
  * Some parts of this code are copyright in@fishtank.com. This product
  * includes software developed by in &lt;in@fishtank.com&gt;.
@@ -111,7 +114,7 @@ final class XisoExtractor {
         this.image = image;
     }
 
-    /** copies the image's maps folder to destination/maps */
+    /** copies the image's maps folder to destination/maps, and default.xbe and bink/ */
     static void extractMaps(FileChannel image, File destination, Progress progress) throws IOException {
         new XisoExtractor(image).extract(destination, progress);
     }
@@ -213,22 +216,77 @@ final class XisoExtractor {
             walk(table, right, depth + 1, directories, out, visited);
     }
 
+    /** copies one file to path, counting what it has copied in done[0] */
+    private void copyFile(Entry file, File path, ByteBuffer buffer, long[] done, long total, Progress progress)
+        throws IOException {
+        long offset = partition + file.sector * SECTOR_SIZE;
+        long remaining = file.size;
+
+        try (FileOutputStream out = new FileOutputStream(path)) {
+            FileChannel output = out.getChannel();
+
+            while (remaining > 0) {
+                buffer.clear();
+                buffer.limit((int) Math.min(remaining, COPY_BUFFER_SIZE));
+                readAt(offset, buffer);
+                int count = buffer.remaining();
+                while (buffer.hasRemaining())
+                    output.write(buffer);
+                offset += count;
+                remaining -= count;
+                done[0] += count;
+                progress.report(file.name, done[0], total);
+            }
+        } catch (ExtractException e) {
+            throw new ExtractException("Could not read " + file.name + " from the disc image (is it complete?).");
+        } catch (IOException e) {
+            throw new ExtractException("Could not write " + path + " (is the storage full?).");
+        }
+    }
+
     private void extract(File destination, Progress progress) throws IOException {
         long[] root = findVolume();
 
-        /* the root's maps folder */
+        /* the root's maps and bink folders, and its default.xbe */
         ByteBuffer table = readDirectory(root[0], root[1], "The disc image's file system is damaged.");
         List<Entry> directories = new ArrayList<>();
         walk(table, 0, 0, true, directories, new int[1]);
+        List<Entry> rootFiles = new ArrayList<>();
+        walk(table, 0, 0, false, rootFiles, new int[1]);
         Entry maps = null;
+        Entry bink = null;
+        Entry executable = null;
         for (Entry entry : directories) {
             if (entry.name.equalsIgnoreCase("maps"))
                 maps = entry;
+            else if (entry.name.equalsIgnoreCase("bink"))
+                bink = entry;
+        }
+        for (Entry entry : rootFiles) {
+            if (entry.name.equalsIgnoreCase("default.xbe"))
+                executable = entry;
         }
         if (maps == null)
             throw new ExtractException("The disc image has no maps folder: it is not a Halo disc.");
 
-        /* its files */
+        /* the movies, if the disc has them (the executable is read whole by the
+        decoder, so a size that is not an executable's means no movies) */
+        List<Entry> movies = new ArrayList<>();
+        long moviesTotal = 0;
+        if (bink != null && executable != null && executable.size >= 0x1000 && executable.size <= (16L << 20)) {
+            try {
+                ByteBuffer folder = readDirectory(bink.sector, bink.size, "");
+                walk(folder, 0, 0, false, movies, new int[1]);
+            } catch (IOException e) {
+                movies.clear();
+            }
+            for (Entry movie : movies)
+                moviesTotal += movie.size;
+            if (!movies.isEmpty())
+                moviesTotal += executable.size;
+        }
+
+        /* the maps' files */
         table = readDirectory(maps.sector, maps.size, "The disc image's maps folder is damaged.");
         List<Entry> files = new ArrayList<>();
         walk(table, 0, 0, false, files, new int[1]);
@@ -240,39 +298,16 @@ final class XisoExtractor {
         }
         if (!hasUi)
             throw new ExtractException("The disc image's maps folder has no ui.map: it is not a Halo disc.");
+        total += moviesTotal;
 
         File partial = new File(destination, "maps.partial");
         File finished = new File(destination, "maps");
         if (!partial.isDirectory() && !partial.mkdirs())
             throw new ExtractException("Could not create " + partial + ".");
         ByteBuffer buffer = ByteBuffer.allocateDirect(COPY_BUFFER_SIZE);
-        long done = 0;
-        for (Entry file : files) {
-            File path = new File(partial, file.name);
-            long offset = partition + file.sector * SECTOR_SIZE;
-            long remaining = file.size;
-
-            try (FileOutputStream out = new FileOutputStream(path)) {
-                FileChannel output = out.getChannel();
-
-                while (remaining > 0) {
-                    buffer.clear();
-                    buffer.limit((int) Math.min(remaining, COPY_BUFFER_SIZE));
-                    readAt(offset, buffer);
-                    int count = buffer.remaining();
-                    while (buffer.hasRemaining())
-                        output.write(buffer);
-                    offset += count;
-                    remaining -= count;
-                    done += count;
-                    progress.report(file.name, done, total);
-                }
-            } catch (ExtractException e) {
-                throw new ExtractException("Could not read " + file.name + " from the disc image (is it complete?).");
-            } catch (IOException e) {
-                throw new ExtractException("Could not write " + path + " (is the storage full?).");
-            }
-        }
+        long[] done = new long[1];
+        for (Entry file : files)
+            copyFile(file, new File(partial, file.name), buffer, done, total, progress);
 
         /* (the maps folder may be there, empty: the app makes it for adb) */
         if (!finished.isDirectory() && !finished.mkdirs())
@@ -286,5 +321,39 @@ final class XisoExtractor {
                 throw new ExtractException("Could not move " + file.name + " into " + finished + ".");
         }
         partial.delete();
+
+        /* then the movies: default.xbe, then bink/ through bink.partial */
+        if (!movies.isEmpty()) {
+            File executablePartial = new File(destination, "default.xbe.partial");
+            File binkPartial = new File(destination, "bink.partial");
+            File binkFinished = new File(destination, "bink");
+
+            try {
+                copyFile(executable, executablePartial, buffer, done, total, progress);
+                if (!binkPartial.isDirectory() && !binkPartial.mkdirs())
+                    throw new ExtractException("Could not create " + binkPartial + ".");
+                for (Entry movie : movies)
+                    copyFile(movie, new File(binkPartial, movie.name), buffer, done, total, progress);
+                if (!binkFinished.isDirectory() && !binkFinished.mkdirs())
+                    throw new ExtractException("Could not create " + binkFinished + ".");
+                for (Entry movie : movies) {
+                    File to = new File(binkFinished, movie.name);
+
+                    to.delete();
+                    if (!new File(binkPartial, movie.name).renameTo(to))
+                        throw new ExtractException("Could not move " + movie.name + " into " + binkFinished + ".");
+                }
+                binkPartial.delete();
+                /* (default.xbe last: the movies play only when both are there) */
+                File executableFinished = new File(destination, "default.xbe");
+
+                executableFinished.delete();
+                if (!executablePartial.renameTo(executableFinished))
+                    throw new ExtractException("Could not create " + executableFinished + ".");
+            } catch (IOException e) {
+                /* only the movies are lost */
+                executablePartial.delete();
+            }
+        }
     }
 }

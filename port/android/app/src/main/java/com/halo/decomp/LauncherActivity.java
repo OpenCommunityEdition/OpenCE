@@ -141,7 +141,7 @@ public class LauncherActivity extends Activity {
 
         TextView message = new TextView(this);
         message.setText("Choose an Xbox disc image of Halo: Combat Evolved (an .iso or .xiso file, any "
-            + "version) on this device. Its maps folder is copied into the app's storage (about 1.8 GB), "
+            + "version) on this device. Its maps folder is copied into the app's storage (about 1.8 GB, and 0.65 GB more for the movies), "
             + "and you can delete the image afterwards.\n\n"
             + "You can also copy a maps folder from a computer:\n"
             + "adb push <folder with maps>/. " + (dataRoot != null ? dataRoot.getAbsolutePath() : "") + "/");
@@ -227,7 +227,7 @@ public class LauncherActivity extends Activity {
                 FileChannel channel = in.getChannel();
 
                 XisoExtractor.extractMaps(channel, dataRoot, (file, done, total) ->
-                    report("Extracting maps/" + file + " (" + (done >> 20) + " of " + (total >> 20) + " MB)",
+                    report("Extracting " + file + " (" + (done >> 20) + " of " + (total >> 20) + " MB)",
                         total > 0 ? (int) (done * 1000 / total) : 0));
             }
             handler.post(() -> {

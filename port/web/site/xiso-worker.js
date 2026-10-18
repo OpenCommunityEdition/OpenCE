@@ -2,7 +2,9 @@
 XISO-WORKER.JS
 
 Copies the game's maps folder into the site's Origin Private File System,
-where the game finds it (/data/maps: port/web/src/web_main.c), from the
+where the game finds it (/data/maps: port/web/src/web_main.c), with the
+disc's default.xbe and the movies of its bink folder (/data/default.xbe and
+/data/bink: the Bink movies need both, port/linux/src/bink_sdk.c), from the
 player's own Xbox disc image of Halo: Combat Evolved (an "xiso", .iso), as
 port/linux/src/xiso.c does for the desktop ports, or from a maps folder
 already copied out of one. It runs in a Worker, which can write with
@@ -25,9 +27,16 @@ Each map is checked as the game checks it when it loads it (cache_files.c):
 "head" and "foot" signatures, the Xbox's cache version, and the build of a
 retail disc (01.10.12.2276) or of this decompilation's (01.01.14.2342).
 
-Messages from the page: { type: 'image', file } or { type: 'folder', files }
-(a maps folder's File objects). To the page: { type: 'progress', file, done,
-total }, then { type: 'done', files, bytes } or { type: 'error', message }.
+The movies are optional. The start-up movie and the credits are copied (about
+210 MB); the three attract-mode movies (about 430 MB more) only when the page
+asks (attract: true), as game.attract_movies, which plays them, is off by
+default. A disc image without movies, or a failure copying them, leaves the
+game with its maps and without movies.
+
+Messages from the page: { type: 'image', file, attract } or { type: 'folder',
+files } (a maps folder's File objects; the movies already copied stay). To the
+page: { type: 'progress', file, done, total }, then { type: 'done', files,
+bytes, movies } (movies: how many were copied) or { type: 'error', message }.
 */
 
 'use strict';
@@ -47,6 +56,10 @@ const CACHE_VERSION = 5;
 const BUILDS = ['01.10.12.2276', '01.01.14.2342'];
 // written last: the page starts the game only when it is there
 const COMPLETE_MARKER = '.complete';
+// the movies of the disc's bink folder worth their size on a browser's storage
+const ATTRACT_MOVIE = /^attract\d*\.bik$/i;
+const MOVIE = /\.bik$/i;
+const MAXIMUM_EXECUTABLE_SIZE = 16 * 1024 * 1024;
 
 async function readAt(file, offset, size) {
   const end = Math.min(offset + size, file.size);
@@ -174,8 +187,45 @@ async function imageFiles(file) {
   }));
 }
 
+// the disc's default.xbe and bink movies: { executable, movies }, or null when
+// the image has none (the movies are optional, so nothing here is an error)
+async function imageMovies(file, attract) {
+  const volume = await findVolume(file);
+  if (!volume) return null;
+  const root = await readDirectory(file, volume, volume.rootSector, volume.rootSize);
+  if (!root) return null;
+  const entries = walkDirectory(root);
+  const named = (entry, name) => entry.name.toLowerCase() === name;
+  const executableEntry = entries.find((entry) => !entry.directory && named(entry, 'default.xbe'));
+  const binkEntry = entries.find((entry) => entry.directory && named(entry, 'bink'));
+  if (!executableEntry || !binkEntry) return null;
+  if (executableEntry.size < 0x1000 || executableEntry.size > MAXIMUM_EXECUTABLE_SIZE) return null;
+  const table = await readDirectory(file, volume, binkEntry.sector, binkEntry.size);
+  if (!table) return null;
+  const source = (entry) => {
+    const offset = volume.partition + entry.sector * SECTOR_SIZE;
+    if (offset + entry.size > file.size) return null;
+    return { name: entry.name, size: entry.size, read: (at, size) => readAt(file, offset + at, Math.min(size, entry.size - at)) };
+  };
+  const movies = [];
+  for (const entry of walkDirectory(table)) {
+    if (entry.directory || !plainName(entry.name) || !MOVIE.test(entry.name)) continue;
+    if (!attract && ATTRACT_MOVIE.test(entry.name)) continue;
+    const movie = source(entry);
+    if (!movie) return null;
+    movies.push(movie);
+  }
+  const executable = source(executableEntry);
+  return executable && movies.length ? { executable, movies } : null;
+}
+
 async function folderFiles(list) {
   return checkedFiles(list.map((file) => ({ name: file.name, size: file.size, read: (at, size) => readAt(file, at, size) })));
+}
+
+// (an old copy, or none)
+async function removeQuietly(directory, name) {
+  await directory.removeEntry(name, { recursive: true }).catch(() => {});
 }
 
 async function writeFile(directory, source, onChunk) {
@@ -203,22 +253,21 @@ async function writeFile(directory, source, onChunk) {
   }
 }
 
-async function copy(files) {
-  const total = files.reduce((sum, entry) => sum + entry.size, 0);
+async function copy(files, movies) {
+  const movieFiles = movies ? [movies.executable, ...movies.movies] : [];
+  const mapsTotal = files.reduce((sum, entry) => sum + entry.size, 0);
+  const total = mapsTotal + movieFiles.reduce((sum, entry) => sum + entry.size, 0);
   const storage = await navigator.storage.getDirectory();
   if (navigator.storage.estimate) {
     const { quota, usage } = await navigator.storage.estimate();
     if (quota && quota - usage < total) {
       throw new Error(`The browser lets this site keep ${Math.floor((quota - usage) / 1e6)} MB more, ` +
-        `and the maps take ${Math.ceil(total / 1e6)} MB.`);
+        `and the game data takes ${Math.ceil(total / 1e6)} MB.`);
     }
   }
-  // a new copy replaces whatever an earlier, perhaps interrupted, one left
-  await storage.removeEntry('maps', { recursive: true }).catch(() => {});
-  const directory = await storage.getDirectoryHandle('maps', { create: true });
   let done = 0;
   let lastReport = 0;
-  for (const entry of files) {
+  const copyInto = async (directory, entry) => {
     await writeFile(directory, entry, (count) => {
       done += count;
       const now = Date.now();
@@ -227,21 +276,46 @@ async function copy(files) {
         postMessage({ type: 'progress', file: entry.name, done, total });
       }
     });
+  };
+  // a new copy replaces whatever an earlier, perhaps interrupted, one left
+  await removeQuietly(storage, 'maps');
+  const directory = await storage.getDirectoryHandle('maps', { create: true });
+  for (const entry of files) await copyInto(directory, entry);
+
+  // then the movies: default.xbe last, as the movies play only when it is
+  // there. A failure leaves the game without movies, not without its maps.
+  let copiedMovies = [];
+  if (movies) {
+    await removeQuietly(storage, 'default.xbe');
+    await removeQuietly(storage, 'bink');
+    try {
+      const bink = await storage.getDirectoryHandle('bink', { create: true });
+      for (const movie of movies.movies) await copyInto(bink, movie);
+      await copyInto(storage, { ...movies.executable, name: 'default.xbe' });
+      copiedMovies = movies.movies.map((movie) => movie.name);
+    } catch (error) {
+      await removeQuietly(storage, 'default.xbe');
+      await removeQuietly(storage, 'bink');
+    }
   }
   const marker = await directory.getFileHandle(COMPLETE_MARKER, { create: true });
   const access = await marker.createSyncAccessHandle();
   access.truncate(0);
-  access.write(new TextEncoder().encode(JSON.stringify({ files: files.map((f) => f.name), bytes: total })), { at: 0 });
+  access.write(new TextEncoder().encode(JSON.stringify({
+    files: files.map((f) => f.name), bytes: mapsTotal, movies: copiedMovies,
+  })), { at: 0 });
   access.flush();
   access.close();
-  return { files: files.length, bytes: total };
+  return { files: files.length, bytes: mapsTotal, movies: copiedMovies.length };
 }
 
 if (typeof onmessage !== 'undefined' || typeof WorkerGlobalScope !== 'undefined') {
   onmessage = async (event) => {
     try {
-      const files = event.data.type === 'folder' ? await folderFiles(event.data.files) : await imageFiles(event.data.file);
-      postMessage({ type: 'done', ...(await copy(files)) });
+      const image = event.data.type !== 'folder';
+      const files = image ? await imageFiles(event.data.file) : await folderFiles(event.data.files);
+      const movies = image ? await imageMovies(event.data.file, !!event.data.attract).catch(() => null) : null;
+      postMessage({ type: 'done', image, ...(await copy(files, movies)) });
     } catch (error) {
       postMessage({ type: 'error', message: error && error.message ? error.message : String(error) });
     }
@@ -250,5 +324,5 @@ if (typeof onmessage !== 'undefined' || typeof WorkerGlobalScope !== 'undefined'
 
 // (for the tests: port/web/tests)
 if (typeof module !== 'undefined') {
-  module.exports = { findVolume, walkDirectory, mapProblem, imageFiles, folderFiles, plainName };
+  module.exports = { findVolume, walkDirectory, mapProblem, imageFiles, imageMovies, folderFiles, plainName };
 }

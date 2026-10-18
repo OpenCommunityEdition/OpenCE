@@ -60,9 +60,10 @@ to the executable. The movies of the disc (the logos at the start, the credits
 and the movies of the main menu) play if `default.xbe` and `bink/` are there:
 the decoder reads the tables of the movie format from that executable.
 `game.movies = false` skips them. On
-Android, copy the disc image to the phone first. The app puts `maps/` in its
-data folder. Refer to [port/android/README.md](port/android/README.md). On
-the web, the page copies `maps/` out of the disc image into the browser's
+Android, copy the disc image to the phone first. The app puts `maps/`, `default.xbe` and
+`bink/` in its data folder. Refer to [port/android/README.md](port/android/README.md). On
+the web, the page copies `maps/`, `default.xbe` and the start-up and credits
+movies out of the disc image into the browser's
 storage for the site; nothing is uploaded. Refer to
 [port/web/README.md](port/web/README.md).
 

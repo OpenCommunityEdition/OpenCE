@@ -30,8 +30,8 @@ the site. Nothing is uploaded.
 
 1. Open the site. The **This browser** panel lists the checks.
 2. Under **Game data**, choose **Choose a disc image…** and select the disc
-   image. The page reads it in place and copies `maps/` into the browser's
-   storage (about a minute for 2 GB). **Choose a maps folder…** takes a
+   image. The page reads it in place and copies `maps/`, `default.xbe` and the
+   movies of `bink/` into the browser's storage (about a minute for 2 GB). **Choose a maps folder…** takes a
    `maps/` folder that an earlier extraction made (a desktop build's).
 3. Choose **Play**.
 
@@ -151,7 +151,7 @@ reloads.
 - No Custom Edition maps (their tag data's address is in the C heap there),
   so a browser neither downloads nor sends one (map sharing,
   `port/linux/NETCODE.md`).
-- No Bink videos: the movies need `default.xbe` and `bink/` of the disc, which the page does not import. The game skips the movies.
+- Bink movies: the page copies the disc's `default.xbe` and the start-up and credits movies of `bink/` (`intro.bik` and `credits.bik`, about 210 MB) with the maps. The three attract-mode movies (about 430 MB more) are copied only if the box under the buttons is checked, and play only with `game.attract_movies`, which is off. A disc image without them, or a copy of a maps folder, gives the game no movies, which it skips. The movies play on the game's thread as on the other builds; a slow computer drops pictures, not sound.
 - The browser's WebGL 2 is OpenGL ES 3.0 without its 3.1 and 3.2 additions:
   the visibility tests (lens flares) report whether anything was drawn, a
   frame late; supersampling and SMAA are not offered (FXAA and MSAA are).

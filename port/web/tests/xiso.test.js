@@ -63,7 +63,7 @@ function directoryTable(entries) {
 
 // an image: its maps folder's files, where its game partition starts, and
 // other entries of its root
-function image({ maps, partition = 0, rootEntries = [] }) {
+function image({ maps, partition = 0, rootEntries = [], bink = null, executableSize = 100 }) {
   const chunks = new Map();
   let nextSector = 0x30;
   const allocate = (bytes) => {
@@ -75,8 +75,15 @@ function image({ maps, partition = 0, rootEntries = [] }) {
   const mapEntries = maps.map((map) => ({ name: map.name, size: map.data.length, sector: allocate(map.data) }));
   const mapsTable = directoryTable(mapEntries);
   const mapsSector = allocate(mapsTable);
+  const binkEntries = [];
+  if (bink) {
+    const movies = bink.map((movie) => ({ name: movie.name, size: movie.data.length, sector: allocate(movie.data) }));
+    const binkTable = directoryTable(movies);
+    binkEntries.push({ name: 'bink', directory: true, sector: allocate(binkTable), size: binkTable.length });
+  }
   const root = directoryTable([{ name: 'maps', directory: true, sector: mapsSector, size: mapsTable.length },
-    { name: 'default.xbe', sector: allocate(new Uint8Array(100)), size: 100 }, ...rootEntries]);
+    { name: 'default.xbe', sector: allocate(new Uint8Array(executableSize)), size: executableSize },
+    ...binkEntries, ...rootEntries]);
   const rootSector = allocate(root);
   const size = partition + nextSector * SECTOR;
   const bytes = new Uint8Array(size);
@@ -115,6 +122,31 @@ test('the maps folder comes out of an image, at either partition offset', async 
     const start = await a10.read(0, 4);
     assert.strictEqual(Buffer.from(start).toString('latin1'), 'daeh');
   }
+});
+
+test('default.xbe and the start-up and credits movies come out of an image; attract movies when asked', async () => {
+  const bink = ['intro.bik', 'credits.bik', 'attract1.bik', 'attract2.bik', 'notes.txt'].map((name) => ({
+    name, data: new Uint8Array(3000).fill(name.length),
+  }));
+  const names = (found) => found.movies.map((movie) => movie.name).sort();
+  for (const partition of [0, 0x02080000]) {
+    const disc = image({ maps: goodMaps, partition, bink, executableSize: 0x2000 });
+    const found = await xiso.imageMovies(disc, false);
+    assert.strictEqual(found.executable.name, 'default.xbe');
+    assert.strictEqual(found.executable.size, 0x2000);
+    assert.deepStrictEqual(names(found), ['credits.bik', 'intro.bik']);
+    assert.deepStrictEqual(names(await xiso.imageMovies(disc, true)),
+      ['attract1.bik', 'attract2.bik', 'credits.bik', 'intro.bik']);
+    const intro = found.movies.find((movie) => movie.name === 'intro.bik');
+    assert.strictEqual((await intro.read(0, 4)).length, 4);
+  }
+});
+
+test('no movies without a bink folder, or with a default.xbe that is not an executable', async () => {
+  const bink = [{ name: 'intro.bik', data: new Uint8Array(3000) }];
+  assert.strictEqual(await xiso.imageMovies(image({ maps: goodMaps, executableSize: 0x2000 }), true), null);
+  assert.strictEqual(await xiso.imageMovies(image({ maps: goodMaps, bink }), true), null);
+  assert.strictEqual(await xiso.imageMovies(new File([new Uint8Array(0x20000)], 'x.iso'), true), null);
 });
 
 test('an image without ui.map, or with a map the game would not load, is refused', async () => {
