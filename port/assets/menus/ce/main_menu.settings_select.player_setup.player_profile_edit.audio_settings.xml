@@ -14,28 +14,21 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/help">
 		<data input="port settings help"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_output_device" x="54" y="73" platform="desktop mac"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_input_device" x="54" y="103" platform="desktop"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_volume" x="54" y="133" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_input_device" x="54" y="103" platform="desktop mac"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_volume" x="54" y="133" platform="desktop mac"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_volume" x="54" y="73" platform="android web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_volume" x="54" y="103" platform="mac"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_music_volume" x="54" y="163" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_music_volume" x="54" y="163" platform="desktop mac"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_music_volume" x="54" y="103" platform="android web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_music_volume" x="54" y="133" platform="mac"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_effects_volume" x="54" y="193" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_effects_volume" x="54" y="193" platform="desktop mac"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_effects_volume" x="54" y="133" platform="android web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_effects_volume" x="54" y="163" platform="mac"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_enabled" x="54" y="223" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_enabled" x="54" y="223" platform="desktop mac"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_enabled" x="54" y="163" platform="android web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_enabled" x="54" y="193" platform="mac"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_voice_chat" x="54" y="253" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_voice_chat" x="54" y="253" platform="desktop mac"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_voice_chat" x="54" y="193" platform="android web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_voice_chat" x="54" y="223" platform="mac"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_voice_volume" x="54" y="283" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_voice_volume" x="54" y="283" platform="desktop mac"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_voice_volume" x="54" y="223" platform="android web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_voice_volume" x="54" y="253" platform="mac"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_sound_processing" x="54" y="313" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_sound_processing" x="54" y="313" platform="desktop mac"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_sound_processing" x="54" y="253" platform="android web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_sound_processing" x="54" y="283" platform="mac"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -52,7 +45,7 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/output_device_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="SYSTEM DEFAULT" setting="audio.output_device" values="default" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_input_device" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_input_device" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop mac">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/input_device_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/input_device_spinner" x="286" y="1"/>
 	</widget>

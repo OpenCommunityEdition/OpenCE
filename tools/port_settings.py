@@ -191,7 +191,7 @@ SCREENS = {
             ("OUTPUT DEVICE:", "audio.output_device", [("SYSTEM DEFAULT", "default")],
              "Where the game's sound and the voices play.", "desktop mac"),
             ("INPUT DEVICE:", "audio.input_device", [("SYSTEM DEFAULT", "default")],
-             "The microphone voice chat listens to.", "desktop"),
+             "The microphone voice chat listens to.", "desktop mac"),
             ("MASTER VOLUME:", "audio.volume", VOLUMES, "The volume of everything.", None),
             ("MUSIC VOLUME:", "audio.music_volume", VOLUMES, "The music's volume.", None),
             ("EFFECTS VOLUME:", "audio.effects_volume", VOLUMES,
@@ -217,10 +217,15 @@ SCREENS = {
         "rows": [
             ("INTERNET PLAY:", "network.online", ON_OFF,
              "Host and join games over the internet by invite\nlinks; off keeps to the local network.",
-             "desktop android web"),
+             "desktop android web mac"),
             ("UPNP PORT FORWARDING:", "network.allow_upnp", ON_OFF,
              "Let internet play ask the router to forward its\nport, for networks that stop connections.",
-             "desktop android"),
+             "desktop android mac"),
+            # (not "mac": the clipboard is watched for an invite in
+            # port/linux/src/sdl_platform.c, which the Mac build does not
+            # compile, so the row would set a setting nothing reads. The Mac
+            # takes an invite from a halo:// link instead, through
+            # port/mac/app/launcher_invite.c)
             ("JOIN FROM CLIPBOARD:", "network.join_from_clipboard", ON_OFF,
              "Join the game of an invite link copied before\nswitching to the game.", "desktop android"),
             ("CHECK FOR UPDATES:", "update.auto", ON_OFF,
