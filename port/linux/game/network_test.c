@@ -41,6 +41,7 @@ Called from the main loop every frame (main.c).
 #include "cseries.h"
 #include "main/main.h"
 #include "interface/player_ui.h"
+#include "saved games/player_profile.h"
 #include "interface/ui_widget.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_client_manager.h"
@@ -61,6 +62,7 @@ Called from the main loop every frame (main.c).
 #include "camera/observer.h"
 
 #include "../src/p2p.h" /* port: port/linux/src/p2p.c, p2p_lobby.c */
+#include "network_chat.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -116,6 +118,9 @@ static struct
 	real vehicle_time;
 	real pickup_time;
 	char pickup_weapon[64];
+	/* debug.network_test_chat's, and the lines said this game */
+	real chat_time;
+	short chat_lines_said;
 	long score_to_win;
 	long logged_time;
 	boolean public_game;
@@ -183,6 +188,7 @@ static void network_test_read_settings(
 	network_test.shoot_interval = (real)config_real("debug.network_test_shoot");
 	network_test.vehicle_time = (real)config_real("debug.network_test_vehicle");
 	network_test.pickup_time = (real)config_real("debug.network_test_pickup");
+	network_test.chat_time = (real)config_real("debug.network_test_chat");
 	snprintf(network_test.pickup_weapon, sizeof(network_test.pickup_weapon), "%s",
 		config_string("debug.network_test_pickup_weapon"));
 	network_test.score_to_win = (long)config_integer("debug.network_test_score");
@@ -591,6 +597,106 @@ static void network_test_vehicle(
 	}
 }
 
+/* debug.network_test_name: the name the machine's first player takes (its
+profile's, which it joins with), in ASCII */
+static void network_test_set_name(
+	void)
+{
+	char const *name = config_string("debug.network_test_name");
+	struct player_profile profile;
+	short index;
+
+	if (!name || !name[0])
+		return;
+	player_ui_get_active_player_profile(0, &profile);
+	for (index = 0; name[index] && index < MAXIMUM_PLAYER_PROFILE_NAME_LENGTH - 1; index++)
+		profile.player_name[index] = (wchar_t)(unsigned char)name[index];
+	profile.player_name[index] = 0;
+	player_ui_set_active_player_profile(0, player_ui_get_active_player_profile_index(0), &profile);
+	platform_log("network test: this machine's player is named %s", name);
+}
+
+/* debug.network_test_chat: the host seats the last two players in one
+vehicle, the nearest to the first of them with seats for both (any, a map's
+own), for the vehicle chat (two joining machines' players, of one team: they
+start near each other) */
+static void network_test_seat_together(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct object_iterator vehicles;
+	long units[2];
+	long best_index = NONE;
+	real best_distance = 0.0f;
+	short count = 0;
+	short index;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->unit_index == NONE)
+			continue;
+		units[0] = count ? units[1] : NONE;
+		units[1] = player->unit_index;
+		count++;
+	}
+	if (count < 2)
+		return;
+	object_iterator_new(&vehicles, _object_mask_vehicle, 0);
+	while (object_iterator_next(&vehicles))
+	{
+		real distance;
+
+		if (unit_definition_get(object_get(vehicles.index)->definition_index)->unit.seats.count < 2)
+			continue;
+		distance = distance_squared3d(&object_get(units[0])->object.position, &object_get(vehicles.index)->object.position);
+		if (best_index == NONE || distance < best_distance)
+		{
+			best_index = vehicles.index;
+			best_distance = distance;
+		}
+	}
+	if (best_index == NONE)
+	{
+		platform_log("network test: no vehicle with two seats");
+		return;
+	}
+	for (index = 0; index < (short)NUMBEROF(units); index++)
+	{
+		short seat_index;
+
+		for (seat_index = 0;
+			seat_index < unit_definition_get(object_get(best_index)->definition_index)->unit.seats.count; seat_index++)
+		{
+			if (!unit_seat_filled(best_index, seat_index) && unit_enter_seat(units[index], best_index, seat_index))
+				break;
+		}
+	}
+	platform_log("network test: the last two players ride vehicle %lx: %s, %s", best_index,
+		object_get(units[0])->object.parent_object_index == best_index ? "in" : "out",
+		object_get(units[1])->object.parent_object_index == best_index ? "in" : "out");
+}
+
+/* debug.network_test_chat: the last player's name, in ASCII (the host
+mutes it) */
+static void network_test_last_player_name(
+	char *name,
+	short size)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct player_datum *last = NULL;
+	short index;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		last = player;
+	for (index = 0; last && index < size - 1 && index < (short)NUMBEROF(last->name) && last->name[index]; index++)
+		name[index] = player_name_character_ascii(last->name[index]);
+	name[index] = 0;
+}
+
 /* both machines stand the last player at the driver's entrance of the
 nearest vehicle no one rides (a joining machine's player then holds the
 action button, as a player getting in does) */
@@ -795,6 +901,83 @@ void network_test_update(
 					game_time_get() < pickup_time + 4 * TICKS_PER_SECOND;
 
 				test_input_hold_action(hold);
+			}
+		}
+		/* debug.network_test_chat: each machine's player says a line to
+		everyone that many seconds in, one to the team two seconds on, and
+		one to the vehicle two more on, the host having seated the last two
+		players in one vehicle (the others in none) three seconds before;
+		then the host mutes the last player for a minute (a client's /mute
+		of the host refused), each says a line to everyone (the last
+		player's going no further than the host), the host unmutes it, and
+		each says another */
+		if (network_test.chat_time > 0.0f)
+		{
+			long chat_time = (long)(network_test.chat_time * TICKS_PER_SECOND);
+			char const *machine = network_test.mode == _network_test_host ? "the host" : "a client";
+			char text[64];
+
+			if (game_time_get() < chat_time - 3 * TICKS_PER_SECOND)
+				network_test.chat_lines_said = 0;
+			if (network_test.mode == _network_test_host && network_test.chat_lines_said == 0 &&
+				game_time_get() >= chat_time - 3 * TICKS_PER_SECOND)
+			{
+				network_test_seat_together();
+				network_test.chat_lines_said = -1;
+			}
+			if (network_test.chat_lines_said <= 0 && game_time_get() >= chat_time)
+			{
+				snprintf(text, sizeof(text), "hello everyone from %s", machine);
+				network_chat_say(_chat_channel_everyone, text);
+				network_test.chat_lines_said = 1;
+			}
+			if (network_test.chat_lines_said == 1 && game_time_get() >= chat_time + 2 * TICKS_PER_SECOND)
+			{
+				snprintf(text, sizeof(text), "hello team from %s", machine);
+				network_chat_say(_chat_channel_team, text);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 2 && game_time_get() >= chat_time + 4 * TICKS_PER_SECOND)
+			{
+				snprintf(text, sizeof(text), "hello vehicle from %s", machine);
+				network_chat_say(_chat_channel_vehicle, text);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 3 && game_time_get() >= chat_time + 6 * TICKS_PER_SECOND)
+			{
+				char name[16];
+
+				network_test_last_player_name(name, sizeof(name));
+				if (network_test.mode == _network_test_host)
+					snprintf(text, sizeof(text), "/mute %s 1", name);
+				else
+					snprintf(text, sizeof(text), "/mute host");
+				network_chat_say(_chat_channel_everyone, text);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 4 && game_time_get() >= chat_time + 8 * TICKS_PER_SECOND)
+			{
+				snprintf(text, sizeof(text), "while muted from %s", machine);
+				network_chat_say(_chat_channel_everyone, text);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 5 && game_time_get() >= chat_time + 10 * TICKS_PER_SECOND)
+			{
+				char name[16];
+
+				network_test_last_player_name(name, sizeof(name));
+				if (network_test.mode == _network_test_host)
+				{
+					snprintf(text, sizeof(text), "/unmute %s", name);
+					network_chat_say(_chat_channel_everyone, text);
+				}
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 6 && game_time_get() >= chat_time + 12 * TICKS_PER_SECOND)
+			{
+				snprintf(text, sizeof(text), "after unmute from %s", machine);
+				network_chat_say(_chat_channel_everyone, text);
+				network_test.chat_lines_said++;
 			}
 		}
 		if (network_test.mode == _network_test_host && network_test.vehicle_time > 0.0f)
@@ -1032,7 +1215,10 @@ void network_test_update(
 				network_test.map_set = TRUE;
 			}
 			if (!network_test.player_added && network_test.setup_seconds >= 2.0f && global_network_game_client_get())
+			{
+				network_test_set_name();
 				network_test.player_added = network_game_client_add_player(global_network_game_client_get(), 0);
+			}
 			if (network_test.setup_seconds >= network_test.start_delay)
 			{
 				network_test.started = TRUE;
@@ -1047,6 +1233,7 @@ void network_test_update(
 			network_test.set_up = TRUE;
 			dispose_global_network_game_client();
 			dispose_global_network_game_server();
+			network_test_set_name();
 			if (create_global_network_game_client())
 			{
 				game_connection_set(_game_connection_network_client);
