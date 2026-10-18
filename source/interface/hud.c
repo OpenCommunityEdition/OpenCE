@@ -109,6 +109,7 @@ symbols in this file:
 #include "text/draw_string.h"
 #include "coop_spectate.h" /* port: port/linux/game/coop_spectate.c */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "network_chat.h" /* port: port/linux/game/network_chat.c */
 #include "text/font_group.h"
 #include "text/text_group.h"
 #include "units/unit_definitions.h"
@@ -1455,6 +1456,9 @@ void hud_draw_screen(
 		}
 
 		hud_messaging_update(render.local_player_index);
+		/* port: network games' text chat, in the first local player's view */
+		if (render.local_player_index == local_player_get_next(NONE))
+			network_chat_draw(render.local_player_index);
 	}
 
 	rasterizer_hud_end();

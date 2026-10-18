@@ -30,7 +30,10 @@ decodes, and a machine's own voice never comes back to it.
 Each machine decides only for itself: whether it talks (audio.voice_chat:
 push to talk, open mic, or not), how loud the others are
 (audio.voice_volume), and whom it mutes (the scoreboard's menu,
-game_engine.c), which it does not tell anyone.
+game_engine.c: their voice and their text chat lines), which it does not
+tell anyone. The host's mute for everyone (the scoreboard's, or the chat's
+/mute: network_chat.c) is the host's alone: it relays none of a muted
+player's voice.
 */
 
 #include "cseries.h"
@@ -52,6 +55,7 @@ game_engine.c), which it does not tell anyone.
 #include "objects/objects.h"
 #include "network_distributed.h"
 #include "network_voice.h"
+#include "network_chat.h"
 #include "../src/voice_audio.h"
 
 #include <math.h>
@@ -608,6 +612,9 @@ static void voice_host_relay(
 	{
 		return;
 	}
+	/* (a player the host muted for everyone is heard by no one) */
+	if (network_chat_host_machine_muted(speaker_machine))
+		return;
 	/* (no more than so many at once: those talking keep talking) */
 	if (!(voice_machines[speaker_machine].talked && now - voice_machines[speaker_machine].talked_at < VOICE_TALKING_MS) &&
 		voice_host_talkers(speaker_machine, now) >= VOICE_MAXIMUM_TALKERS)
@@ -924,7 +931,7 @@ void network_voice_update(
 	}
 	/* the microphone: open mic, open while voice is on; push to talk, from
 	the first press (none asked for until then) */
-	held = push_to_talk && halo_push_to_talk_held() && !console_is_active();
+	held = push_to_talk && halo_push_to_talk_held() && !console_is_active() && !network_chat_typing();
 	if (!voice_may_talk() || (!open_mic && !push_to_talk))
 		voice_microphone_wanted = FALSE;
 	else if (open_mic || held)

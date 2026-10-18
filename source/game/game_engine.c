@@ -571,6 +571,7 @@ symbols in this file:
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "network_votekick.h" /* port: port/linux/game/network_votekick.c */
 #include "network_voice.h" /* port: port/linux/game/network_voice.c */
+#include "network_chat.h" /* port: port/linux/game/network_chat.c */
 /* (network_server_manager_internal.h's: the host's game record) */
 struct network_game *network_game_server_get_game(struct network_game_server *server);
 #include "objects.h"
@@ -1867,12 +1868,14 @@ static boolean scoreboard_team_columns(
 /* a network game's scoreboard picks players with the mouse
 (halo_scoreboard_pointer_update: a right click frees it): a player's name
 picked opens a menu of what may be done to them, the players' vote to kick
-them (network_votekick.c), muting their voice (network_voice.c), and the
-host's Kick and Ban, Ban picked twice */
+them (network_votekick.c), muting their voice and text chat on this
+machine (network_voice.c, network_chat.c), and the host's Mute for everyone
+(network_chat.c), Kick and Ban, Ban picked twice */
 enum
 {
 	_scoreboard_item_vote,
 	_scoreboard_item_mute,
+	_scoreboard_item_host_mute,
 	_scoreboard_item_kick,
 	_scoreboard_item_ban,
 	_scoreboard_item_cancel,
@@ -1932,20 +1935,26 @@ static void scoreboard_menu_items(
 	{
 		usprintf(labels[_scoreboard_item_vote], L"Start a vote to kick");
 	}
-	/* (its machine's voice: this machine's own choice) */
+	/* (its machine's voice and text chat lines: this machine's own choice) */
 	{
 		struct player_datum *player = player_try_and_get(scoreboard_menu.player_index);
 
-		if (player && network_voice_available())
+		if (player)
 		{
 			offered[_scoreboard_item_mute] = TRUE;
 			usprintf(labels[_scoreboard_item_mute],
-				network_voice_machine_muted(player->network_player_data.machine_index) ? L"Unmute voice" :
-					L"Mute voice");
+				network_voice_machine_muted(player->network_player_data.machine_index) ? L"Unmute voice and chat" :
+					L"Mute voice and chat");
 		}
 	}
 	if (network_votekick_host())
 	{
+		/* (the host's mute of their voice and lines, for every machine:
+		network_chat.c) */
+		offered[_scoreboard_item_host_mute] = TRUE;
+		usprintf(labels[_scoreboard_item_host_mute],
+			network_chat_host_mute_minutes((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(scoreboard_menu.player_index)) ?
+				L"Unmute for everyone" : L"Mute for everyone");
 		offered[_scoreboard_item_kick] = TRUE;
 		offered[_scoreboard_item_ban] = TRUE;
 		usprintf(labels[_scoreboard_item_kick], L"Kick");
@@ -2016,6 +2025,9 @@ static void scoreboard_menu_pick(
 		}
 		break;
 	}
+	case _scoreboard_item_host_mute:
+		network_chat_host_mute(player_index, !network_chat_host_mute_minutes(player_index));
+		break;
 	case _scoreboard_item_kick:
 		network_votekick_host_kick(player_index, FALSE);
 		break;

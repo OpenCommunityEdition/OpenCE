@@ -145,6 +145,11 @@ void hud_draw_numbers(
 	long flash_reference_time,
 	real override_scale);
 
+/* port: the left of the last picture drawn, in the window's units
+(hud_unit.c: the motion sensor's, which the text chat goes above:
+port/linux/game/network_chat.c) */
+extern short hud_draw_last_left;
+
 /* ---------- public code */
 
 __inline short check_stack_buffer(

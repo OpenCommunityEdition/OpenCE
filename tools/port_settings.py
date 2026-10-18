@@ -253,9 +253,26 @@ SCREENS["audio_settings/sound_processing"] = {
     ],
 }
 _audio["rows"] = [row for row in _audio["rows"] if row[1] not in _processing]
+
+# Audio Setup's voice chat (port/linux/game/network_voice.c) with the text
+# chat's colours (network_chat.c), a screen of their own (a category, as
+# Video Setup's): Audio Setup has no room for another row, and Network Setup,
+# which has none either, is not offered in a game (menu_tags.c)
+_chat = {"audio.voice_chat", "audio.voice_volume"}
+SCREENS["audio_settings/chat"] = {
+    "screen": "chat_settings_screen", "header": _audio["header"], "spacing": 30,
+    "rows": [row for row in _audio["rows"] if row[1] in _chat] + [
+        ("TEXT CHAT:", "display.text_chat", [("SHOW", "true"), ("HIDE", "false")],
+         "SHOW the text chat, or HIDE it: no lines, and\nits keys open nothing.", None),
+        ("CHAT TEXT:", "display.chat_style", [("DEFAULT", "default"), ("WHITE", "white")],
+         "The text chat's colors: DEFAULT, names in their\nteam's color; WHITE, all white, as Custom Edition.", None),
+    ],
+}
+_audio["rows"] = [row for row in _audio["rows"] if row[1] not in _chat]
 _audio["categories"] = [
     ("SOUND PROCESSING:", "audio_settings/sound_processing",
      "The reverb, and how sounds are converted to the\noutput's rate."),
+    ("VOICE AND TEXT CHAT:", "audio_settings/chat", "Voice chat, and showing the text chat and its\ncolors."),
 ]
 
 # Network Setup's map sharing (port/linux/game/map_share.c): this machine's
@@ -317,7 +334,7 @@ SCREENS["network_setup/streamer_mode"] = {
 
 # Controls Setup: the keyboard and mouse's actions, in groups (the order of
 # port/linux/game/menu_functions.c's table of them)
-CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS"]
+CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS", "COMMUNICATION"]
 CONTROL_ROWS = 7
 
 # the settings whose rows have the wider spinner (a device's name)
@@ -350,6 +367,13 @@ TEAMPLAY_ROWS = [
     ("votekick", "VOTE KICK:", ["ON", "OFF"], [
         "Players can vote to kick a player, from the\\nscoreboard.",
         "Players cannot vote to kick anyone.",
+    ]),
+    # (network_chat.c: one row for the chat and its links, as Teamplay
+    # Options has room for one more)
+    ("text_chat", "TEXT CHAT:", ["ON", "WITH LINKS", "OFF"], [
+        "Players can type to each other; lines with links\\nare refused. Off in a public internet game.",
+        "Players can type to each other, links too. Off\\nin a public internet game.",
+        "No text chat in the game.",
     ]),
 ]
 
@@ -1159,7 +1183,8 @@ COOP_SETUP_SCREENS = [
             "Players walk through each other, so that no one\\nblocks a doorway. The AI's characters still block.",
         ]),
     ]),
-    ("voice_options", "VOICE AND VOTING", "Voice chat and votes to kick a player, for this\\ngame.", TEAMPLAY_ROWS),
+    ("voice_options", "VOICE AND VOTING", "Voice chat, text chat and votes to kick a player,\\nfor this game.",
+     TEAMPLAY_ROWS),
 ]
 # Server Setup's map sharing (port/linux/game/map_share.c), for any game,
 # laid out as co-op's options are (its key, its title, its row's help and
