@@ -50,8 +50,65 @@
         pkgs.darwin.sigtool
       ];
       libraries = [ pkgs.sdl3 pkgs.apple-sdk_26 ];
+
+      # the guest's C library, where tools/macos_build.py would download it
+      # (the sandbox has no network)
+      musl = pkgs.fetchurl {
+        url = "https://musl.libc.org/releases/musl-1.2.5.tar.gz";
+        hash = "sha256-qaEYu+hNh2TaDqDSizqz+uhHf8fkCF2QECuFlvx8deQ=";
+      };
+
+      # configure.py and ninja in the sandbox, building target (a ninja
+      # target) and installing what install says
+      macosBuild = { pname, target, install }:
+        pkgs.stdenv.mkDerivation (buildEnvironment // {
+          inherit pname;
+          version = self.shortRev or self.dirtyShortRev or "dirty";
+          src = self;
+          nativeBuildInputs = tools;
+          buildInputs = libraries;
+          configurePhase = ''
+            runHook preConfigure
+            mkdir -p build/macos/third_party
+            tar xzf ${musl} -C build/macos/third_party
+            python configure.py
+            runHook postConfigure
+          '';
+          buildPhase = ''
+            runHook preBuild
+            ninja -j $NIX_BUILD_CORES ${target}
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            ${install}
+            runHook postInstall
+          '';
+          # the fixup phase strips and signs binaries again ad hoc, which
+          # would drop the host's hypervisor entitlement
+          dontFixup = true;
+        });
     in
     {
+      packages.${system} = rec {
+        guest = macosBuild {
+          pname = "opence-guest";
+          target = "build/macos/halo_guest.elf";
+          install = ''
+            install -Dm644 build/macos/halo_guest.elf $out/share/opence/halo_guest.elf
+          '';
+        };
+        host = macosBuild {
+          pname = "opence-host";
+          target = "macos";
+          install = ''
+            install -Dm755 build/macos/halo_host $out/bin/halo_host
+            install -Dm644 build/macos/halo_guest.elf $out/share/opence/halo_guest.elf
+          '';
+        };
+        default = host;
+      };
+
       devShells.${system}.default = pkgs.mkShell (buildEnvironment // {
         packages = tools;
         buildInputs = libraries;
