@@ -2,6 +2,17 @@
 
 #include <string.h>
 
+const char *cs_sony_model(int vendor, int product)
+{
+	if (vendor != CS_VENDOR_SONY)
+		return "";
+	if (product == CS_PRODUCT_DUALSHOCK4 || product == CS_PRODUCT_DUALSHOCK4_V2)
+		return "DualShock 4";
+	if (product == CS_PRODUCT_DUALSENSE)
+		return "DualSense";
+	return "";
+}
+
 void cs_pad_clear(cs_pad_state *pad, int xbox)
 {
 	memset(pad, 0, sizeof(*pad));

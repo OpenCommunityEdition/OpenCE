@@ -13,6 +13,11 @@ extern "C" {
 /* PlayStation pads (and adapters that present themselves as one, such as
    8BitDo's USB Wireless Adapter 2): sticks X/Y and Z/Rz, triggers Rx/Ry */
 #define CS_VENDOR_SONY 0x054C
+/* the game reads these three from their USB reports (mac_gamepad_report.h);
+   this app sees their HID elements, which carry the same state */
+#define CS_PRODUCT_DUALSHOCK4 0x05C4
+#define CS_PRODUCT_DUALSHOCK4_V2 0x09CC
+#define CS_PRODUCT_DUALSENSE 0x0CE6
 /* Nintendo pads (the Switch Pro controller, and adapters in Switch mode):
    buttons B, A, Y, X, L, R, ZL, ZR, minus, plus, L3, R3, home, capture;
    ZL and ZR are digital, so they are full trigger pulls */
@@ -34,6 +39,9 @@ typedef struct cs_pad_state {
 	                          triggers; PlayStation: Rx and Ry are) */
 	int seen_rstick;       /* Rx or Ry arrived (generic pads) */
 } cs_pad_state;
+
+/* "DualShock 4" or "DualSense" for those Sony ids, else "" */
+const char *cs_sony_model(int vendor, int product);
 
 void cs_pad_clear(cs_pad_state *pad, int xbox);
 

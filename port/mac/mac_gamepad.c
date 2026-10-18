@@ -1,5 +1,6 @@
 /* Game pads through IOKit's HID device interface (mac_gamepad.h). */
 #include "mac_gamepad.h"
+#include "mac_gamepad_report.h"
 #include <IOKit/IOKitLib.h>
 #include <IOKit/IOCFPlugIn.h>
 #include <IOKit/hid/IOHIDLib.h>
@@ -36,6 +37,13 @@
    digital, full trigger pulls */
 #define NINTENDO_VENDOR 0x057e
 #define RESCAN_INTERVAL 2.0
+/* A raw report stream is the pad's state until the next report arrives (an
+   adapter may send only when something changes, so a quiet stream is not a
+   pad that let go). A stream whose first reports do not decode is given up
+   for the elements. */
+#define RAW_BAD_LIMIT 8
+#define RAW_BUFFER_SIZE 256
+#define MAX_REPORTS_PER_POLL 64
 
 /* ---------- mapping */
 
@@ -45,7 +53,9 @@ static short stick_value(long value, long minimum, long maximum, int flip)
     if (maximum <= minimum) return 0;
     if (value < minimum) value = minimum;
     if (value > maximum) value = maximum;
-    scaled = ((double)(value - minimum) / (double)(maximum - minimum)) * 65535.0 - 32768.0;
+    /* (rounded to the nearest, so that a byte axis gives the exact 257 steps of
+       mac_gamepad_report.c's) */
+    scaled = (double)(long)(((double)(value - minimum) / (double)(maximum - minimum)) * 65535.0 + 0.5) - 32768.0;
     if (flip) scaled = -scaled - 1.0;
     if (scaled < -32768.0) scaled = -32768.0;
     if (scaled > 32767.0) scaled = 32767.0;
@@ -178,11 +188,22 @@ struct gamepad_device {
     struct mac_gamepad_element elements[MAC_GAMEPAD_MAXIMUM_ELEMENTS];
     IOHIDElementCookie cookies[MAC_GAMEPAD_MAXIMUM_ELEMENTS];
     char name[64];
+    /* Sony pads (mac_gamepad_report.h): their input reports, which the
+       interrupt pipe delivers to raw_report as the run loop runs in
+       RAW_MODE, give the state; the HID elements' values are not read
+       (an adapter may answer a poll with a canned frame, and a pad's
+       elements are only as fresh as the driver's last report). */
+    int raw_kind, raw_seen, raw_bad;
+    CFRunLoopSourceRef raw_source;
+    struct mac_gamepad_frame raw_frame;
+    unsigned char raw_buffer[RAW_BUFFER_SIZE];
 };
 
 static struct gamepad_device pads[MAC_GAMEPAD_MAXIMUM_DEVICES];
 static CFAbsoluteTime last_scan = -1.0e9;
 static int reported;
+/* the run loop mode the raw reports are delivered in, run only by poll_all */
+#define RAW_MODE CFSTR("OpenCEGamepad")
 
 static long dictionary_long(CFDictionaryRef dictionary, CFStringRef key, long fallback)
 {
@@ -207,6 +228,10 @@ static long service_long(io_service_t service, CFStringRef key, long fallback)
 
 static void device_close(struct gamepad_device *pad)
 {
+    if (pad->raw_source) {
+        CFRunLoopRemoveSource(CFRunLoopGetCurrent(), pad->raw_source, RAW_MODE);
+        CFRelease(pad->raw_source);
+    }
     if (pad->interface) {
         (*pad->interface)->close(pad->interface);
         (*pad->interface)->Release(pad->interface);
@@ -246,6 +271,38 @@ static int device_elements(struct gamepad_device *pad)
     return pad->count != 0;
 }
 
+/* one input report from the pad's interrupt pipe */
+static void raw_report(void *target, IOReturn result, void *refcon, void *sender, UInt32 size)
+{
+    struct gamepad_device *pad = (struct gamepad_device *)target;
+    struct mac_gamepad_frame frame;
+    (void)refcon; (void)sender;
+    if (result != kIOReturnSuccess) return;
+    if (size > RAW_BUFFER_SIZE) size = RAW_BUFFER_SIZE;
+    if (mac_gamepad_decode_report(pad->raw_kind, pad->raw_buffer, size, &frame, NULL)) {
+        pad->raw_frame = frame;
+        pad->raw_seen = 1;
+    } else if (pad->raw_bad < RAW_BAD_LIMIT && !pad->raw_seen)
+        ++pad->raw_bad;
+}
+
+/* starts a Sony pad's reports; left off (the elements are read) when the
+   interface will not deliver them */
+static void device_raw_start(struct gamepad_device *pad)
+{
+    pad->raw_kind = mac_gamepad_report_kind(pad->vendor, pad->product);
+    if (!pad->raw_kind) return;
+    if ((*pad->interface)->createAsyncEventSource(pad->interface, &pad->raw_source) != kIOReturnSuccess ||
+        !pad->raw_source ||
+        (*pad->interface)->setInterruptReportHandlerCallback(pad->interface, pad->raw_buffer,
+            sizeof(pad->raw_buffer), raw_report, pad, NULL) != kIOReturnSuccess) {
+        if (pad->raw_source) { CFRelease(pad->raw_source); pad->raw_source = NULL; }
+        pad->raw_kind = MAC_PAD_REPORT_NONE;
+        return;
+    }
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), pad->raw_source, RAW_MODE);
+}
+
 static int device_open(struct gamepad_device *pad, io_service_t service)
 {
     IOCFPlugInInterface **plugin = NULL;
@@ -278,6 +335,7 @@ static int device_open(struct gamepad_device *pad, io_service_t service)
         CFRelease(name);
     }
     if (!device_elements(pad)) { device_close(pad); return 0; }
+    device_raw_start(pad);
     return 1;
 }
 
@@ -357,6 +415,27 @@ static int device_poll(struct gamepad_device *pad, struct mac_gamepad_frame *out
 {
     long values[MAC_GAMEPAD_MAXIMUM_ELEMENTS];
     unsigned i;
+    if (pad->raw_kind && pad->raw_bad >= RAW_BAD_LIMIT) {
+        /* (the reports are not the layout expected: the elements are read) */
+        pad->raw_kind = MAC_PAD_REPORT_NONE;
+    }
+    if (pad->raw_kind) {
+        IOHIDEventStruct event;
+        memset(&event, 0, sizeof(event));
+        /* (the pad's removal shows as an element that cannot be read) */
+        if ((*pad->interface)->getElementValue(pad->interface, pad->cookies[0], &event) != kIOReturnSuccess) {
+            if (reported < 16) { ++reported; fprintf(stderr, "game pad: %s went away\n", pad->name); }
+            device_close(pad);
+            return 0;
+        }
+        if (pad->raw_seen)
+            *out = pad->raw_frame;
+        else {
+            memset(out, 0, sizeof(*out));
+            out->connected = 1;
+        }
+        return 1;
+    }
     for (i = 0; i < pad->count; ++i) {
         IOHIDEventStruct event;
         memset(&event, 0, sizeof(event));
@@ -375,6 +454,14 @@ int mac_gamepad_poll_all(struct mac_gamepad_frame frames[MAC_GAMEPAD_MAXIMUM_DEV
 {
     int slot, count = 0;
     memset(frames, 0, sizeof(frames[0]) * MAC_GAMEPAD_MAXIMUM_DEVICES);
+    /* the raw reports waiting (the run loop mode holds only the pads' sources) */
+    for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
+        if (pads[slot].raw_source) {
+            int n = 0;
+            while (n++ < MAX_REPORTS_PER_POLL &&
+                CFRunLoopRunInMode(RAW_MODE, 0.0, true) == kCFRunLoopRunHandledSource) {}
+            break;
+        }
     for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
         if (pads[slot].interface && device_poll(&pads[slot], &frames[slot]))
             ++count;
@@ -419,6 +506,12 @@ void mac_gamepad_stop(void)
 const char *mac_gamepad_name_at(int slot)
 {
     return slot >= 0 && slot < MAC_GAMEPAD_MAXIMUM_DEVICES && pads[slot].interface ? pads[slot].name : "";
+}
+
+int mac_gamepad_is_playstation_at(int slot)
+{
+    return slot >= 0 && slot < MAC_GAMEPAD_MAXIMUM_DEVICES && pads[slot].interface &&
+        pads[slot].vendor == SONY_VENDOR;
 }
 
 const char *mac_gamepad_name(void)

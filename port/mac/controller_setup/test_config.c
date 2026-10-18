@@ -87,6 +87,22 @@ int main(int argc, char **argv)
 	CHECK(cs_config_get(path, "nothing", val, sizeof val) == 0);
 	remove(path);
 
+	/* Sony pads' names, and a DualShock 4's elements (square, cross, circle, triangle, hat 0..7 with 8 neutral) */
+	CHECK(strcmp(cs_sony_model(0x054c, 0x05c4), "DualShock 4") == 0);
+	CHECK(strcmp(cs_sony_model(0x054c, 0x09cc), "DualShock 4") == 0);
+	CHECK(strcmp(cs_sony_model(0x054c, 0x0ce6), "DualSense") == 0);
+	CHECK(cs_sony_model(0x045e, 0x05c4)[0] == 0 && cs_sony_model(0x054c, 0x0268)[0] == 0);
+	cs_pad_clear(&p, CS_LAYOUT_PLAYSTATION);
+	CHECK(cs_hid_apply(&p, 9, 2, 1, 0, 1) && (p.buttons & 1)); /* cross is the Xbox A */
+	CHECK(cs_hid_apply(&p, 9, 3, 1, 0, 1) && (p.buttons & 2)); /* circle: B */
+	CHECK(cs_hid_apply(&p, 9, 1, 1, 0, 1) && (p.buttons & 4)); /* square: X */
+	CHECK(cs_hid_apply(&p, 9, 4, 1, 0, 1) && (p.buttons & 8)); /* triangle: Y */
+	CHECK(cs_hid_apply(&p, 9, 10, 1, 0, 1) && (p.buttons & (1UL << 7))); /* options: Menu */
+	CHECK(cs_hid_apply(&p, 1, 0x33, 255, 0, 255) && p.lt == 1023); /* L2 analog */
+	CHECK(cs_hid_apply(&p, 1, 0x35, 255, 0, 255) && p.ry == 32767); /* Rz is the right stick's y */
+	CHECK(cs_hid_apply(&p, 1, 0x39, 8, 0, 7) && p.hat == 0);
+	CHECK(cs_hid_apply(&p, 1, 0x39, 2, 0, 7) && p.hat == 3);
+
 	/* hid mapping, Xbox layout */
 	cs_pad_clear(&p, 1);
 	CHECK(cs_hid_apply(&p, 1, 0x30, -32768, -32768, 32767) && p.lx == -32768);

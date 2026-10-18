@@ -391,7 +391,7 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     objects="$objects $obj"
     source_units="$source_units port/mac/engine_files.c"
 
-    for unit in port/mac/mac_hud_hires.c "$out/mac_hud_assets.c" port/mac/mac_gpu_info.c port/mac/mac_input.c port/mac/mac_gamepad.c port/mac/mac_window.c port/mac/mac_audio_output.c port/mac/engine_messages.c port/mac/mac_gl_visibility.c port/mac/mac_gl_program_cache.c port/mac/mac_render_timing.c port/mac/mac_movie.c port/mac/mac_bink_movie.c port/linux/src/bink_decode.c port/linux/src/bink_tables.c port/mac/mac_loading.c; do
+    for unit in port/mac/mac_hud_hires.c "$out/mac_hud_assets.c" port/mac/mac_gpu_info.c port/mac/mac_input.c port/mac/mac_gamepad.c port/mac/mac_gamepad_report.c port/mac/mac_window.c port/mac/mac_audio_output.c port/mac/engine_messages.c port/mac/mac_gl_visibility.c port/mac/mac_gl_program_cache.c port/mac/mac_render_timing.c port/mac/mac_movie.c port/mac/mac_bink_movie.c port/linux/src/bink_decode.c port/linux/src/bink_tables.c port/mac/mac_loading.c; do
         name=$(basename "$unit" .c)
         recognized_units="$recognized_units $name "
         obj="$out/${name}_gpu_$arch.o"

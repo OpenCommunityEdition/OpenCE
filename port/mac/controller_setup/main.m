@@ -57,6 +57,7 @@ static BOOL ProcessRunning(const char *name)
 	int leftDeadZone;
 	int rightDeadZone;
 	NSString *padName;
+	NSString *sonyModel; /* "DualShock 4", "DualSense" or nil */
 }
 @end
 
@@ -65,6 +66,7 @@ static BOOL ProcessRunning(const char *name)
 - (void)dealloc
 {
 	[padName release];
+	[sonyModel release];
 	[super dealloc];
 }
 
@@ -152,7 +154,7 @@ static BOOL ProcessRunning(const char *name)
 		[self drawBarAt:NSMakeRect(228, 60, 16, 80) value:pad.rt max:1023 label:@"RT"];
 	}
 	[padName ? padName : @"" drawAtPoint:NSMakePoint(370, 120) withAttributes:attrs];
-	[(isXbox == CS_LAYOUT_XBOX ? @"Xbox layout" : isXbox == CS_LAYOUT_PLAYSTATION ? @"PlayStation layout" : isXbox == CS_LAYOUT_NINTENDO ? @"Nintendo layout" : @"Generic pad") drawAtPoint:NSMakePoint(370, 104) withAttributes:attrs];
+	[(isXbox == CS_LAYOUT_XBOX ? @"Xbox layout" : isXbox == CS_LAYOUT_PLAYSTATION ? (sonyModel && [sonyModel length] ? [NSString stringWithFormat:@"PlayStation layout (%@)", sonyModel] : @"PlayStation layout") : isXbox == CS_LAYOUT_NINTENDO ? @"Nintendo layout" : @"Generic pad") drawAtPoint:NSMakePoint(370, 104) withAttributes:attrs];
 
 	for (i = 0; i < 12; i++) {
 		NSRect r = NSMakeRect(10 + i * 40, 4, 36, 18);
@@ -436,7 +438,11 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 		padView->hasPad = best != NULL;
 		[padView->padName release];
 		padView->padName = nil;
+		[padView->sonyModel release];
+		padView->sonyModel = nil;
 		if (best) {
+			padView->sonyModel = [[NSString stringWithUTF8String:cs_sony_model(DeviceNumber(best, CFSTR(kIOHIDVendorIDKey)),
+				DeviceNumber(best, CFSTR(kIOHIDProductIDKey)))] retain];
 			CFTypeRef n = IOHIDDeviceGetProperty(best, CFSTR(kIOHIDProductKey));
 			if (n && CFGetTypeID(n) == CFStringGetTypeID())
 				padView->padName = [[NSString stringWithString:(NSString *)n] retain];

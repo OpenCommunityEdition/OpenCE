@@ -133,6 +133,20 @@ one (`--driver`); otherwise place it in
 Bluetooth first, and never update its firmware. `HALO_SKIP_CONTROLLER_SETUP=1`
 skips the first-run window.
 
+Sony pads need no driver. A DualShock 4 (054C:05C4 and 054C:09CC, which includes
+an 8BitDo USB receiver in its PlayStation 4 mode) and a DualSense (054C:0CE6, on a
+USB cable) are read from their USB input reports (`mac_gamepad_report.c`, read
+byte by byte, so PowerPC and Intel decode alike): Cross, Circle, Square and Triangle
+are A, B, X and Y; L1 and R1 the white and black buttons (as the Xbox One S
+driver's bumpers); L2 and R2 the triggers (their analog bytes); Share (Create)
+is Back, Options is Start; L3, R3 and the d-pad as they are. The touchpad
+click and the PS button are decoded but not used. Every other HID pad is mapped by
+its usages (X, Y, Z, Rz or Rx, Ry for the sticks, the hat, buttons 1 to 10 in the Xbox order). Up to four pads play
+at once and may be connected while the game runs. The probe `tools/mac_gamepad_probe.c`
+(`sh tools/mac_gamepad_probe_checks.sh`) shows a pad's raw reports and
+the game's view of it. The button prompts (`display.hud_button_style`) have no
+PlayStation faces yet; `mac_gamepad_is_playstation_at(slot)` says when the pad is one.
+
 ## Settings
 
 The settings are those of the other builds (`config.toml`, with the table in
