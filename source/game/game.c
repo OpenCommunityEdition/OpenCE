@@ -182,6 +182,7 @@ struct game_options;
 #include "units/units.h"
 #include "units/vehicles.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "achievements.h" /* port: port/linux/game/achievements.c */
 #ifdef HALO_PROFILE
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
@@ -389,6 +390,8 @@ void game_tick(
 	profile_scope(game_tick_recorded_animations_section, recorded_animations_update();)
 	profile_scope(game_tick_objects_section, objects_update();)
 	profile_scope(game_tick_players_after_section, players_update_after_game();)
+	/* port: achievements */
+	achievements_tick();
 	profile_scope(game_tick_hud_section, hud_update();)
 	profile_scope(game_tick_player_effect_section, player_effect_update();)
 	/* port: and at its end, before the frame draws the lights */
@@ -688,6 +691,8 @@ void game_initialize_for_new_map(
 	point_physics_initialize_for_new_map();
 	game_engine_initialize_for_new_map();
 	game_statistics_start();
+	/* port: achievements (port/linux/game/achievements.c) */
+	achievements_new_map();
 	update_server_new();
 	player_control_initialize_for_new_map();
 	rumble_initialize_for_new_map();

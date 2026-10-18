@@ -2844,6 +2844,7 @@ symbols in this file:
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #ifdef HALO_PROFILE
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
+#include "achievements.h" /* port: port/linux/game/achievements.c */
 #endif
 
 /* ---------- constants */
@@ -15415,6 +15416,8 @@ boolean hs_compile_and_evaluate(
 	boolean was_running = terminal_command_running;
 	boolean result;
 
+	/* port: a typed command disqualifies the level's achievements */
+	achievements_note_command(expression);
 	terminal_command_running = TRUE;
 	result = hs_compile_and_evaluate_command(expression);
 	terminal_command_running = was_running;

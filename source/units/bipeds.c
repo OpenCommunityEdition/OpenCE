@@ -276,6 +276,7 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "structures/structure_bsp_definitions.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "achievements.h" /* port: port/linux/game/achievements.c */
 
 /* port: port/linux/game/network_objects.c's (a client deletes the host's
 objects on the host's word alone) */
@@ -1876,6 +1877,8 @@ static boolean biped_jump(
 		real jump_magnitude;
 
 		jumped = TRUE;
+		/* port: achievements */
+		achievements_note_jump(biped_index);
 		jump_magnitude = definition->biped.jump_velocity;
 		if (biped->unit.player_index!=NONE)
 		{

@@ -235,6 +235,7 @@ symbols in this file:
 #include "bitmaps/bitmap_group.h"
 #include "cache/texture_cache.h"
 #include "effects/contrail_definitions.h"
+#include "achievements.h" /* port: port/linux/game/achievements.c */
 #endif
 
 /* port/linux/game/pal_tags.c's */
@@ -2754,6 +2755,8 @@ static void weapon_trigger_fire(
 
 	if (fired)
 	{
+		/* port: achievements */
+		achievements_note_weapon_fired(weapon_index, owner_object_index);
 		if (TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit) && game_engine_running())
 		{
 			long player_index= player_index_from_unit_index(owner_object_index);

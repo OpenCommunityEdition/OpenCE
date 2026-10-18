@@ -138,6 +138,7 @@ symbols in this file:
 #include "units/bipeds.h"
 #include "units/units.h"
 #include "units/vehicles.h"
+#include "achievements.h" /* port: port/linux/game/achievements.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -1139,6 +1140,9 @@ static void object_damage_aftermath(
 				TRUE);
 		}
 	}
+
+	/* port: achievements (not a client's replay of the host's damage) */
+	achievements_note_damage(object_index, damage, being_damaged_flags, shield_damage, body_damage);
 
 	if (TEST_FLAG(_object_mask_unit, object->object.type))
 	{

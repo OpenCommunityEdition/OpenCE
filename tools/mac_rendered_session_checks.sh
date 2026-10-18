@@ -270,6 +270,8 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     units="$units source/interface/ui_widget_event_handler_functions.c"
     # port: the menus' mouse pointer (menu_cursor.c, input.menu_cursor)
     units="$units port/linux/game/menu_cursor.c"
+    # port: the optional achievements (achievements.c; game.achievements)
+    units="$units port/linux/game/achievements.c"
     source_units=
     recognized_units=" mac_engine_session_probe engine_text_gl "
     index=0

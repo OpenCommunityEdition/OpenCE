@@ -279,6 +279,7 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
+#include "achievements.h" /* port: port/linux/game/achievements.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -301,7 +302,9 @@ enum
 	_network_pickup_powerup,
 };
 
+/* port: and the achievements' (port/linux/game/achievements.c) */
 #define player_network_picked_up(player, player_index, kind, definition_index, count) \
+	achievements_note_pickup(player_index, kind, definition_index); \
 	if ((player)->local_player_index == NONE) \
 		network_distributed_player_picked_up(player_index, kind, definition_index, count)
 
@@ -1944,6 +1947,8 @@ static boolean player_handle_action(
 				player->unit_index,
 				player->action_object_index,
 				player->action_seat_index);
+			/* port: achievements (not a scripted entry) */
+			achievements_note_vehicle_entered(player_index, player->action_object_index);
 		}
 		else if (nearby_unit_index != NONE)
 		{

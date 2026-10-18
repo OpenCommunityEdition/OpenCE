@@ -141,6 +141,7 @@ symbols in this file:
 #include "sound/sound_definitions.h"
 #include "units/bipeds.h"
 #include "units/units.h"
+#include "achievements.h" /* port: port/linux/game/achievements.c */
 
 /* ---------- constants */
 
@@ -1835,6 +1836,9 @@ static void projectile_collision(
 		object_translate(projectile_index, new_position, &collision->location);
 		if (collision->type == _collision_result_object)
 			object_attach_to_node(collision->object_index, projectile_index, collision->node_index);
+		/* port: achievements */
+		achievements_note_projectile_attached(projectile_index,
+			collision->type == _collision_result_object ? collision->object_index : NONE);
 
 		if (TEST_FLAG(definition->projectile.flags, _projectile_detonation_max_time_if_attached_bit))
 		{

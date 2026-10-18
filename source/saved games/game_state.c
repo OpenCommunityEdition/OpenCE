@@ -122,6 +122,7 @@ symbols in this file:
 #include "lruv_cache.h"
 #include "memory_pool.h"
 #include "cluster_partitions.h"
+#include "achievements.h" /* port: port/linux/game/achievements.c */
 /* port: object_bounds_cache.c's */
 void object_bounds_cache_invalidate(void);
 
@@ -181,6 +182,8 @@ typedef void (*game_state_before_save_proc)(void);
 static game_state_before_save_proc before_save_procs[] =
 {
 	dummy,
+	/* port: the achievements' counts kept with the checkpoint */
+	achievements_checkpoint_save,
 };
 
 static game_state_before_load_proc before_load_procs[] =
@@ -207,7 +210,9 @@ static game_state_after_load_proc after_load_procs[] =
 	game_state_set_revert_time,
 	player_control_fix_for_loaded_game_state,
 	director_initialize_for_saved_game,
-	scripted_hud_messages_clear
+	scripted_hud_messages_clear,
+	/* port: and put back (a revert) */
+	achievements_checkpoint_load
 };
 
 /* ---------- public code */
@@ -521,12 +526,11 @@ static void game_state_allocation_record(
 	// The January compiler inlines this logger into both arena allocators while
 	// retaining one out-of-line copy under its private address-derived name.
 	FILE *file = bss_004d27b0;
-	extern int config_boolean(const char *name); /* port: port/linux/src/port_config.c */
 
-	/* port: the log is written only when debug.gamestate_log is set, as a debugging aid: "d:\\gamestate.txt" is not a
+	/* port: the log is written only when HALO_GAMESTATE_LOG is set, as a debugging aid: "d:\\gamestate.txt" is not a
 	host path (the host's fopen made a file of that name in the working directory, in the app's folder
 	when it was started from there) */
-	if (!file && config_boolean("debug.gamestate_log"))
+	if (!file && getenv("HALO_GAMESTATE_LOG"))
 	{
 		file = fopen("d:\\gamestate.txt", "w");
 		bss_004d27b0 = file;
@@ -1013,6 +1017,8 @@ void game_state_try_and_load_from_persistent_storage(
 			GAME_STATE_SIZE);
 		game_difficulty_level_set(main_get_difficulty());
 		game_state_call_after_load_procs();
+		/* port: a level resumed has no history of its own */
+		achievements_note_resumed();
 		game_state_save();
 	}
 
@@ -1035,6 +1041,8 @@ void game_state_load_core(
 			GAME_STATE_SIZE);
 		console_printf(FALSE, "loaded '%s'", name);
 		game_state_call_after_load_procs();
+		/* port: a debug core disqualifies the level */
+		achievements_note_core_loaded();
 	}
 	else
 	{

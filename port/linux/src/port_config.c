@@ -428,6 +428,12 @@ static const struct config_setting config_settings[] =
 		"to throw and reload, and a player turns with the aim while throwing;\n"
 		"false: the original animations, which freeze the legs and stand a\n"
 		"rider up." },
+	{ "game.achievements", _config_boolean, "false", "HALO_ACHIEVEMENTS", _environment_value, _platform_all,
+		"Campaign achievements (38), kept in each player profile's own folder, so\n"
+		"deleting a profile deletes them. Only a single-player game, or the host of\n"
+		"a co-op one, counts them, for its own players; a typed command or cheat\n"
+		"disqualifies the level. Off: nothing is counted, shown or written\n"
+		"(port/linux/README.md, \"Achievements\")." },
 	{ "game.custom_edition", _config_boolean, "true", "HALO_CUSTOM_EDITION", _environment_value, _platform_all,
 		"Load and run Halo Custom Edition maps (not those that need OpenSauce):\n"
 		"put them and Custom Edition's bitmaps.map, sounds.map and loc.map in\n"
@@ -742,6 +748,15 @@ static const struct config_setting config_settings[] =
 	{ "debug.update_answer", _config_string, "\"\"", "HALO_UPDATE_ANSWER", _environment_value, _platform_desktop,
 		"The answer to the new version question, for automated tests: \"yes\",\n"
 		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },
+	{ "debug.achievements_log", _config_boolean, "false", "HALO_ACHIEVEMENTS_LOG", _environment_set_is_true, _platform_all,
+		"Log each unlock and what the achievements do with a level (for testing)." },
+	{ "debug.achievements_allow_commands", _config_boolean, "false", "HALO_ACHIEVEMENTS_ALLOW_COMMANDS",
+		_environment_set_is_true, _platform_all,
+		"Typed commands do not disqualify a level's achievements (for tests that\n"
+		"drive the game with commands)." },
+	{ "debug.achievements_day", _config_integer, "0", "HALO_ACHIEVEMENTS_DAY", _environment_value, _platform_all,
+		"The day of the month A Day To Remember takes the game to be on (to test\n"
+		"the unlock notice); 0 the date." },
 	{ "debug.exit_after", _config_real, "0.0", "HALO_EXIT_AFTER", _environment_value, _platform_all,
 		"Quit this many seconds after the window opens; 0 never." },
 	{ "debug.hidden_window", _config_boolean, "false", "HALO_HIDDEN_WINDOW", _environment_set_is_true, _platform_desktop,
@@ -751,9 +766,6 @@ static const struct config_setting config_settings[] =
 		"each voice heard logged once a second." },
 	{ "debug.null_renderer", _config_boolean, "false", "HALO_NULL_RENDERER", _environment_set_is_true, _platform_all,
 		"Run without a window, drawing nothing." },
-	{ "debug.gamestate_log", _config_boolean, "false", "HALO_GAMESTATE_LOG", _environment_set_is_true, _platform_all,
-		"Write the game state's allocations (name, type, size) to a file named\n"
-		"d:\\gamestate.txt in the working directory, as the Xbox game's debug log." },
 	{ "debug.gl_debug", _config_boolean, "false", "HALO_GL_DEBUG", _environment_set_is_true, _platform_all,
 		"Report OpenGL errors in the log." },
 	{ "debug.menu_open", _config_string, "\"\"", "HALO_MENU_OPEN", _environment_value, _platform_all,

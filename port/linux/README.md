@@ -419,6 +419,7 @@ the setting for one start of the game. It has priority over the file.
 | `mac.detail` | `"auto"` | `HALO_MAC_DETAIL` | Mac build only: how much the Mac draws. `"auto"`: the stock detail, except on a PowerPC Mac, which draws `"low"` with 32 MB of video memory or less (the iBook G4's Radeon 9550) and `"medium"` with 64 MB or less (the PowerBook G4's Radeon 9600 and 9700). `"high"`: as on the Xbox. `"medium"`: no specular, shadows or decals, `display.particles` `low`, and scenery smaller than 8 pixels left out (24 in the campaign). `"low"`: as medium, and scenery smaller than 16 pixels left out (64 in the campaign), other objects (not units) smaller than 6 pixels (12 in the campaign), no lens flares, and the effects' particles (dust, smoke) no wider than 160 pixels on screen. `"lowest"`: `"low"` and no particles. A `display.*` detail setting that is not at its default wins over this. To measure a preset's parts, `HALO_MAC_PRESET_SCENERY`, `HALO_MAC_PRESET_OBJECT` (pixels), `HALO_MAC_PRESET_LOD` (a fraction of the size the models' level of detail is chosen by, 1 as the original) and `HALO_MAC_PRESET_FLARES` (0 or 1), `HALO_MAC_PRESET_PARTICLE` (the widest a particle is drawn, in pixels; 0 for no limit) and `HALO_MAC_PRESET_PARTICLE_MODE` (what is done with the wider: 0 drawn at that width, 1 and less opaque in proportion, 2 and less opaque as their area is cut, 3 and some left out) replace its numbers for one run. |
 | `mac.texture_cache_mb` | `0` | `HALO_MAC_RETAIL_TEXTURE_CACHE_MB` | Mac build only: the megabytes of video memory the game's textures may use at once (`4` to `48`). `0`: by the card, 16 below 64 MB of video memory and 32 above (48 in the campaign). |
 | `mac.texture_skip_levels` | `-1` | `HALO_MAC_TEXTURE_SKIP_LEVELS` | Mac build only: how many of the largest levels of each texture are left out (`0` to `4`), as the PC version's lower texture quality does. `-1`: by the card, 1 for the heavy maps (the campaign, `longest`, `hangemhigh`, `prisoner`) on a card of 32 MB or less, else 0. |
+| `game.achievements` | `false` | `HALO_ACHIEVEMENTS` | The campaign's 38 achievements (see "Achievements"). Off: nothing is counted, shown or written. |
 | `mac.network_test` | `""` | `HALO_MAC_NETWORK_TEST` | Mac build only: automated system link sessions in the Mac session without the menus. `"host:<map>"` hosts a slayer game on the map already loaded, `"join"` joins the first game found. Set `debug.network_test` as well, which logs every player's state every second, and `debug.network_test_start` for the countdown. |
 | `network.address` | `""` | `HALO_NET_ADDRESS` | The IPv4 address of this machine for system link. Refer to "Play on one computer". |
 | `network.broadcast` | `""` | `HALO_NET_BROADCAST` | IPv4 addresses, with commas between them, that get the broadcasts of the game. Empty: 255.255.255.255. |
@@ -457,6 +458,8 @@ the setting for one start of the game. It has priority over the file.
 | `streamer.insults` | `"off"` | `HALO_STREAMER_INSULTS` | With `streamer.enabled`, the insults that are not slurs hidden: `"off"`, `"severe"`, `"strong"` or `"mild"`. CENSOR INSULTS in Settings > Network Setup > Streamer Mode. |
 | `crash_reports.upload` | `"ask"` | `HALO_CRASH_REPORTS` | Windows only. `"yes"`: the game sends a report of each crash to the developers. `"no"`: the game sends no reports. `"ask"`: the game asks at the next crash and writes the answer here. Refer to "Crash reports" in [port/windows/README.md](../windows/README.md#crash-reports). |
 | `debug.update_answer` | `""` | `HALO_UPDATE_ANSWER` | The answer to the update question, for automatic tests: `yes`, `no` or `never`. Empty: the game asks. |
+| `debug.achievements_log`, `debug.achievements_allow_commands` | off | `HALO_ACHIEVEMENTS_LOG`, `HALO_ACHIEVEMENTS_ALLOW_COMMANDS` | Log each unlock and what the achievements do with a level; or let typed commands not disqualify a level (for tests that drive the game with commands). |
+| `debug.achievements_day` | `0` | `HALO_ACHIEVEMENTS_DAY` | The day of the month that A Day To Remember takes the game to be on, to test the unlock notice. `0`: the date. |
 | `debug.exit_after` | `0.0` | `HALO_EXIT_AFTER` | The game stops after this number of seconds. `0`: never. |
 | `debug.screenshot_directory`, `debug.screenshot_every` | `""`, `0` | `HALO_SCREENSHOT_DIR`, `HALO_SCREENSHOT_EVERY` | The game writes each Nth frame to this folder as a BMP file. |
 | `debug.hidden_window`, `debug.null_renderer` | `false` | `HALO_HIDDEN_WINDOW`, `HALO_NULL_RENDERER` | `true`: no visible window, or no graphics. |
@@ -474,6 +477,65 @@ the setting for one start of the game. It has priority over the file.
 
 With Mesa drivers, the game sends its GL calls through the GL thread of
 Mesa. To stop this, set the environment variable `mesa_glthread=false`.
+
+## Achievements
+
+`game.achievements` (off) turns on 38 campaign achievements, in a notice drawn over the game with a
+sound when one unlocks. They are kept per player profile, in `achieve.bin` in the profile's own folder (a
+checksummed file, written beside itself and moved over, only when something is unlocked, a level is won
+or a checkpoint is saved), so deleting a profile deletes its achievements.
+
+- Only a single-player game, or the host of a co-op one, counts them, and only for its own local players.
+  Nothing is sent to another machine (the network version is unchanged).
+- The counts of a level (damage taken, health packs, shots, kills) are saved with each checkpoint and put
+  back by a revert; deaths are not put back, and the time is strict: a lost segment's time still counts.
+- A level does not count if a command was typed (the console, telnet, a cheat button, `init.txt`), a cheat is on,
+  or a debug core was loaded. A level resumed from a saved game counts its win but not its challenges.
+- Custom Edition maps and multiplayer have none.
+
+| Achievement | Rule |
+| --- | --- |
+| Birth of a Spartan | Complete the level Pillar of Autumn on any difficulty. |
+| Believe in a Hero | Complete the campaign on Heroic difficulty. |
+| Living Legend | Complete the campaign on Legendary difficulty. |
+| Standard Operating Procedure | Complete any level on Normal difficulty or higher without using health packs. |
+| Walk it Off | Complete Pillar of Autumn on Heroic difficulty or higher without picking up a health pack. |
+| Shielded | Complete Pillar of Autumn on Legendary without losing your shield. |
+| Scunt | Complete Halo on Heroic difficulty or higher without entering a vehicle. |
+| How Can I Hit You If You Won't Move? | Complete Halo on Legendary difficulty without taking any health damage. |
+| All According to Plan | On Truth and Reconciliation, kill all enemies in the boarding area without being detected on Heroic or higher. |
+| Close Quarters | Complete Truth and Reconciliation on Heroic or higher without firing a scoped weapon. |
+| Beachhead | Complete The Silent Cartographer on Heroic or higher without taking body damage during the beach landing. |
+| Grenadier | Complete The Silent Cartographer on Heroic or higher using only grenades and melee attacks. |
+| Speed Reader | Complete Assault on the Control Room in under 30 minutes on Heroic or higher. |
+| I'll Be Back | Complete Assault on the Control Room on Heroic or higher without taking health damage. |
+| The Flood | Complete 343 Guilty Spark on Heroic or higher without taking health damage. |
+| Bug Spray | Complete 343 Guilty Spark on Heroic or higher using only the Shotgun. |
+| That Just Happened | Complete The Library on Heroic or higher without dying. |
+| Read the History Books | Complete The Library on Legendary difficulty in under 30 minutes. |
+| Mind the Gap | Complete Two Betrayals on Heroic or higher without using a Banshee. |
+| Cheap Thrills | Complete Two Betrayals on Heroic or higher without using health packs. |
+| Popcorn | On Keyes, kill 50 Infection Forms with the Shotgun on Heroic or higher. |
+| What? Back Already? | Complete Keyes on Heroic or higher in under 15 minutes. |
+| Leave It Where It Lay | Complete The Maw on Heroic or higher without picking up any weapons. |
+| Never Tell Me the Odds | Escape The Maw on Legendary with at least 1 minute remaining on the countdown. |
+| Get Me Out of Here! | Ride in a Pelican for several seconds on 343 Guilty Spark. |
+| You Are The Weapon | Kill a Hunter with a single Pistol round. |
+| Feet Firmly Planted | Complete a level without jumping. |
+| Pacifist | Complete The Silent Cartographer without firing a weapon, throwing a grenade, using melee or dying. |
+| Overshielded | Pick up 5 Overshields in a single level. |
+| Precision Shooting | Get 50 headshots with the Pistol or Sniper Rifle. |
+| Wrap It Up | Perform 10 assassinations (melee from behind). |
+| Sticky Situation | Stick 20 enemies with Plasma Grenades. |
+| Heavy Artillery | Kill 20 enemies with the Rocket Launcher in a single level. |
+| Bro Slayer | Complete any level in co-op mode. |
+| Together Again | Complete the entire campaign in co-op mode. |
+| Tying Up Loose Ends | Kill 5 enemies with a single Plasma Grenade in co-op. |
+| Airborne | Launch a Warthog into the air for 5 seconds and splatter an enemy with it. |
+| A Day To Remember | Play the game on the 15th of a month. |
+
+The notice is a placeholder drawn in code (a dark pill with an icon slot, "Achievement unlocked" and the
+name) with the game's checkpoint sound; `port/assets/achievements/README.md` says what replaces them.
 
 ## Updates
 
