@@ -29,8 +29,9 @@ the build in the working tree.
 ## Install
 
 Open `PowerSpark-0.1.dmg` and drag `PowerSpark.app` to the Applications folder (or
-anywhere). Open it. A window asks for the controller setup the first time
-(see "Controllers"); then the game starts with the PC version's menus. The
+anywhere). Open it. The startup dialog opens (see "Startup dialog"); Play
+starts the game with the PC version's menus, after the controller setup the
+first time (see "Controllers"). The
 app writes only to two folders of the user. They keep the name `OpenCE`, the
 project's, from before the app was called PowerSpark, so that the settings,
 saves and map cache of earlier versions are found:
@@ -40,9 +41,31 @@ saves and map cache of earlier versions are found:
 | `~/Library/Application Support/OpenCE/` | `config.toml` (the settings), saved games and profiles, `XboxData/` (the maps copied from the Xbox disc), `data-source` (optional) |
 | `~/Library/Logs/OpenCE/` | One log for each run, `OpenCE-YYYYMMDD-HHMMSS.log`. The newest 20 are kept. Send the newest when something is wrong |
 
-To start over, delete these folders. To open the setup windows without the
-first-run condition, hold Option while the app opens: it asks whether to
-play, to open the Controller Setup or to open the Disc Image Setup.
+To start over, delete these folders. To show the startup dialog once it is
+turned off, hold Option while the app opens.
+
+## Startup dialog
+
+PowerSpark opens a window before the game, as MacSoft's Halo and Halo PC do: Display (Full
+Screen or Windowed, Resolution from the display's modes, Widescreen, V-Sync, Smooth
+motion, Frame rate limit), Graphics (Detail, Texture quality, Anti-aliasing, Shadow
+quality, Gamma, High-resolution HUD and text, Per-pixel lighting), Sound (on, Reverb,
+Volume), Options (Play intro movies, Achievements, the Game data source, Set Up from
+Disc Image, Controller Setup), and Play (Return), Quit (Escape, Command-Q) and "Don't
+show this at startup". Every option is shown on every Mac, PowerPC or Intel; only the
+defaults differ with the card (`mac.detail` auto), and the game limits at run time what
+a card cannot do. Play writes the settings that were changed to `config.toml` with the
+keys the game's Settings menus use (`display.mode`, `display.resolution`,
+`display.window_size`, `display.resolution_scaling`, `display.vsync`, `display.max_fps`,
+`display.interpolation`, `display.gamma`, `display.high_res_hud`, `display.high_res_text`,
+`display.anti_aliasing`, `display.shadow_resolution`, `display.per_pixel_lighting`,
+`mac.detail`, `mac.texture_skip_levels`, `audio.enabled`, `audio.volume`, `audio.reverb`,
+`game.movies` with `game.intro_movies`, `game.achievements`), each in its section, and
+keeps the rest of the file as it is. The data source goes to the `data-source` file;
+"Don't show this at startup" writes `off` to the file `startup-dialog` in the support
+folder. The dialog is not shown for scripted runs: with game arguments, `--no-dialog`
+or `HALO_MAC_LAUNCHER_DIALOG=0`. `--dialog` shows it anyway; `--dialog-dump` prints
+what it would show, without a window.
 
 ## Game data
 
@@ -172,7 +195,7 @@ Everything else is the game's own choice for the Mac it is on.
 
 `PowerSpark --dry-run` prints the folders, the data source, the settings it would
 set and the command, and does nothing else. `--setup` and
-`--controller-setup` open the two setup windows. An engine built before
+`--controller-setup` open the two setup windows (the startup dialog has buttons for both). An engine built before
 `HALO_MAC_CONFIG_DIR` existed (`Resources/engine.txt` lacks `config_dir`)
 reads `config.toml` beside its own program; the launcher then copies it to
 `Application Support/OpenCE/engine/` with a link to the real file.

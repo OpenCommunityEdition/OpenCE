@@ -5,16 +5,22 @@
    (PowerSpark-game, beside it), which keeps this process and its Dock icon.
 
    Mac OS X 10.4 and later, ppc and i386: C and Core Foundation only; Carbon
-   for the Option key. Plain gnu89.
+   for the startup dialog (launcher_dialog.c) and the Option key. Plain gnu89.
 
    Usage: PowerSpark [--dry-run] [--setup | --controller-setup] [--data-source
-   auto|xbox|retail] [game arguments]
+   auto|xbox|retail] [--dialog | --no-dialog | --dialog-dump] [game arguments]
      --dry-run          print what would be run (folders, data, settings set,
                         the game's command) and do nothing else
      --setup            open PowerSpark Setup (the Xbox disc image) and quit
      --controller-setup open the controller setup and quit
-   Holding Option while the app opens asks which of the two (or the game) to
-   start. Environment: HALO_MAC_DATA_SOURCE (as --data-source),
+     --dialog           show the startup dialog even if it is turned off
+     --no-dialog        do not show it (so does HALO_MAC_LAUNCHER_DIALOG=0, and
+                        game arguments: they mean a scripted run)
+     --dialog-dump      print what the dialog would show, and quit; no window
+   The startup dialog (settings, Play, Quit, Setup, Controller Setup) opens
+   before the game unless "Don't show this at startup" was checked (the file
+   startup-dialog holds "off"); holding Option while the app opens shows it
+   anyway. Environment: HALO_MAC_DATA_SOURCE (as --data-source),
    HALO_MAC_DATA_ROOT (the retail data, as the game reads it). Support files:
    see port/mac/README.md. */
 #include <CoreFoundation/CoreFoundation.h>
@@ -31,6 +37,8 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include "launcher_config.h"
+#include "launcher_dialog.h"
 
 #define MAX_ENVIRONMENT 24
 #define LOGS_KEPT 20
@@ -49,6 +57,11 @@ static char logs[PATH_MAX];      /* ~/Library/Logs/OpenCE */
 static char config_file[PATH_MAX];
 static char shown_environment[MAX_ENVIRONMENT][PATH_MAX + 64];
 static int shown_environment_count;
+/* what the dialog's buttons and status line need from main */
+static const char *g_controller, *g_disc, *g_driver;
+static char g_xbox_data[PATH_MAX];
+static char g_retail[PATH_MAX];
+static int g_have_retail;
 
 static int path_join(char *out, const char *a, const char *b)
 {
@@ -281,6 +294,90 @@ static int engine_has(const char *feature)
 	return found;
 }
 
+/* the Xbox disc's maps: in the support folder, else the XboxData folder beside the app (as the test kit keeps
+   it). xbox_data and xbox_maps name where they are, or where PowerSpark Setup will put them */
+static int detect_xbox(char *xbox_data, char *xbox_maps)
+{
+	char ui[PATH_MAX], beside_data[PATH_MAX], beside_maps[PATH_MAX];
+
+	path_join(xbox_data, support, "XboxData");
+	path_join(xbox_maps, xbox_data, "maps");
+	path_join(ui, xbox_maps, "ui.map");
+	if (is_file(ui))
+		return 1;
+	path_join(beside_data, beside, "XboxData");
+	path_join(beside_maps, beside_data, "maps");
+	path_join(ui, beside_maps, "ui.map");
+	if (is_file(ui))
+	{
+		snprintf(xbox_data, PATH_MAX, "%s", beside_data);
+		snprintf(xbox_maps, PATH_MAX, "%s", beside_maps);
+		return 1;
+	}
+	return 0;
+}
+
+static void dialog_controller_setup(void)
+{
+	char *av[] = { (char *)g_controller, "--config", config_file, "--package", (char *)g_driver, NULL };
+
+	if (is_file(g_controller))
+		run_and_wait(av);
+}
+
+static void dialog_disc_setup(void)
+{
+	char *av[] = { (char *)g_disc, "--data", g_xbox_data, NULL };
+
+	if (is_file(g_disc))
+		run_and_wait(av);
+}
+
+static void dialog_data_status(char *out, size_t size)
+{
+	char data[PATH_MAX], maps[PATH_MAX];
+	int xbox = detect_xbox(data, maps);
+
+	if (xbox && g_have_retail)
+		snprintf(out, size, "Found: Xbox disc data and MacSoft's Halo.");
+	else if (xbox)
+		snprintf(out, size, "Found: Xbox disc data.");
+	else if (g_have_retail)
+		snprintf(out, size, "Found: MacSoft's Halo. To play from your Xbox disc, click Set Up from Disc Image.");
+	else
+		snprintf(out, size, "No game data yet. Click Set Up from Disc Image and choose your Halo disc image.");
+}
+
+/* "off" in a one-word file of the support folder: the startup dialog is not shown */
+static int read_dialog_hidden(void)
+{
+	char p[PATH_MAX], word[16], *t;
+	int hidden = 0;
+
+	path_join(p, support, "startup-dialog");
+	t = read_text(p);
+	if (t)
+	{
+		hidden = sscanf(t, "%15s", word) == 1 && strcmp(word, "off") == 0;
+		free(t);
+	}
+	return hidden;
+}
+
+static void write_word_file(const char *name, const char *word)
+{
+	char p[PATH_MAX];
+	FILE *f;
+
+	path_join(p, support, name);
+	f = fopen(p, "wb");
+	if (f)
+	{
+		fprintf(f, "%s\n", word);
+		fclose(f);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	char exe[PATH_MAX], real[PATH_MAX], macos[PATH_MAX], resources[PATH_MAX], game[PATH_MAX];
@@ -292,6 +389,9 @@ int main(int argc, char **argv)
 	uint32_t size = sizeof(exe);
 	int i, nargs = 0, want_setup = 0, want_controller = 0, have_retail = 0, have_xbox = 0, use_xbox = 0;
 	int config_dir_support;
+	int force_dialog = 0, no_dialog = 0, dialog_dump = 0;
+	struct lc_model dialog_model;
+	const char *dialog_env;
 	time_t now;
 	struct tm *tm;
 	char *slash;
@@ -306,6 +406,12 @@ int main(int argc, char **argv)
 			want_setup = 1;
 		else if (strcmp(argv[i], "--controller-setup") == 0)
 			want_controller = 1;
+		else if (strcmp(argv[i], "--dialog") == 0)
+			force_dialog = 1;
+		else if (strcmp(argv[i], "--no-dialog") == 0)
+			no_dialog = 1;
+		else if (strcmp(argv[i], "--dialog-dump") == 0)
+			dialog_dump = dry_run = 1;	/* (it writes and runs nothing) */
 		else if (strcmp(argv[i], "--data-source") == 0 && i + 1 < argc)
 			snprintf(source_name, sizeof(source_name), "%s", argv[++i]);
 		else if (strncmp(argv[i], "-psn_", 5) == 0)
@@ -415,23 +521,10 @@ int main(int argc, char **argv)
 		}
 	}
 	have_retail = retail[0] && has_maps(retail);
+	have_xbox = detect_xbox(xbox_data, xbox_maps);
 	path_join(ui, xbox_maps, "ui.map");
-	have_xbox = is_file(ui);
-	/* (or the XboxData folder beside the app, as the test kit keeps it) */
-	if (!have_xbox)
-	{
-		char beside_data[PATH_MAX], beside_maps[PATH_MAX];
-
-		path_join(beside_data, beside, "XboxData");
-		path_join(beside_maps, beside_data, "maps");
-		path_join(ui, beside_maps, "ui.map");
-		if (is_file(ui))
-		{
-			snprintf(xbox_data, sizeof(xbox_data), "%s", beside_data);
-			snprintf(xbox_maps, sizeof(xbox_maps), "%s", beside_maps);
-			have_xbox = 1;
-		}
-	}
+	g_have_retail = have_retail;
+	snprintf(g_retail, sizeof(g_retail), "%s", retail);
 
 	/* the data source: a switch, so that Xbox maps can become the default
 	   without a new launcher. HALO_MAC_DATA_SOURCE, --data-source, or the
@@ -451,22 +544,90 @@ int main(int argc, char **argv)
 	if (strcmp(source_name, "xbox") != 0 && strcmp(source_name, "retail") != 0)
 		snprintf(source_name, sizeof(source_name), "auto");
 
-	if (!dry_run && !want_setup && !want_controller && (GetCurrentKeyModifiers() & optionKey))
-	{
-		int pick = choose("PowerSpark", "What would you like to open?", "Play", "Controller Setup", "Disc Image Setup");
-
-		if (pick == 1)
-			want_controller = 1;
-		else if (pick == 2)
-			want_setup = 1;
-	}
-
 	path_join(driver, resources, "Driver/XboxOneController-1.0.pkg");
 	if (!is_file(driver))
 	{
 		path_join(text, support, "Driver/XboxOneController-1.0.pkg");
 		if (is_file(text))
 			snprintf(driver, sizeof(driver), "%s", text);
+	}
+
+	g_controller = controller;
+	g_disc = disc;
+	g_driver = driver;
+	snprintf(g_xbox_data, sizeof(g_xbox_data), "%s", xbox_data);
+
+	/* the startup dialog: the settings, Play and Quit, Setup and Controller Setup. It opens unless it was turned
+	   off (or the run is scripted: game arguments, --no-dialog, HALO_MAC_LAUNCHER_DIALOG=0); Option shows it
+	   anyway. It writes config.toml with the keys the game's Settings menus use */
+	dialog_env = getenv("HALO_MAC_LAUNCHER_DIALOG");
+	lc_model_load(&dialog_model, config_text);
+	snprintf(dialog_model.data_source, sizeof(dialog_model.data_source), "%s", source_name);
+	snprintf(dialog_model.data_source_original, sizeof(dialog_model.data_source_original), "%s", source_name);
+	dialog_model.hide = dialog_model.hide_original = read_dialog_hidden();
+	if (dialog_dump)
+	{
+		int modes[64][2], n = ld_modes(modes, 64);
+
+		printf("startup dialog (would be shown: %s)\n", read_dialog_hidden() ? "no, turned off; Option shows it" : "yes");
+		lc_model_dump(&dialog_model, stdout);
+		printf("  display modes (%d):", n);
+		for (i = 0; i < n; ++i)
+			printf(" %dx%d", modes[i][0], modes[i][1]);
+		printf("\n");
+		{
+			char status[256];
+
+			dialog_data_status(status, sizeof(status));
+			printf("  data status: %s\n", status);
+		}
+		return 0;
+	}
+	if (!dry_run && !want_setup && !want_controller && !no_dialog && !(dialog_env && strcmp(dialog_env, "0") == 0) &&
+		(force_dialog || (nargs == 0 && (!dialog_model.hide || (GetCurrentKeyModifiers() & optionKey)))))
+	{
+		struct ld_env env;
+		char app[PATH_MAX];
+		int shown;
+
+		snprintf(app, sizeof(app), "%s", contents);
+		if (strlen(app) > 9)
+			app[strlen(app) - 9] = 0;	/* .../PowerSpark.app/Contents */
+		env.app_path = app;
+		env.run_controller_setup = dialog_controller_setup;
+		env.run_disc_setup = dialog_disc_setup;
+		env.data_status = dialog_data_status;
+		shown = ld_run(&dialog_model, &env);
+		if (shown == 0)
+			return 0;
+		if (shown < 0)
+		{
+			/* (no window: the old chooser) */
+			int pick = choose("PowerSpark", "What would you like to open?", "Play", "Controller Setup",
+				"Disc Image Setup");
+
+			if (pick == 1)
+				want_controller = 1;
+			else if (pick == 2)
+				want_setup = 1;
+		}
+		else
+		{
+			if (lc_model_save(&dialog_model, config_file) != 0)
+				fprintf(stderr, "PowerSpark: cannot write %s\n", config_file);
+			if (strcmp(dialog_model.data_source, dialog_model.data_source_original) != 0)
+			{
+				write_word_file("data-source", dialog_model.data_source);
+				snprintf(source_name, sizeof(source_name), "%s", dialog_model.data_source);
+			}
+			if (dialog_model.hide != dialog_model.hide_original)
+				write_word_file("startup-dialog", dialog_model.hide ? "off" : "on");
+			/* (Disc Image Setup may have added the maps; Controller Setup may have written config.toml) */
+			have_xbox = detect_xbox(xbox_data, xbox_maps);
+			path_join(ui, xbox_maps, "ui.map");
+			free(config_text);
+			config_text = read_text(config_file);
+		}
 	}
 
 	if (want_controller)

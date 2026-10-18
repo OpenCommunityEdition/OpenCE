@@ -58,10 +58,13 @@ WORK=$OUT/work
 rm -rf "$APP" "$WORK"
 mkdir -p "$WORK" "$APP/Contents/MacOS" "$APP/Contents/Resources/Helpers"
 
-# the launcher
+# the launcher (its settings file code is tested first, on this Mac)
+$CC -std=gnu89 -Wall -o "$WORK/test_launcher_config" "$APPSRC/test_launcher_config.c" "$APPSRC/launcher_config.c"
+"$WORK/test_launcher_config" "$WORK/launcher_test.toml"
+# (the startup dialog's sources are beside it: launcher_config.c is plain C, launcher_dialog.c Carbon)
 $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -Wall -std=gnu89 \
-    -o "$APP/Contents/MacOS/PowerSpark" "$APPSRC/opence_launcher.c" \
-    -framework Carbon -framework CoreFoundation
+    -o "$APP/Contents/MacOS/PowerSpark" "$APPSRC/opence_launcher.c" "$APPSRC/launcher_config.c" \
+    "$APPSRC/launcher_dialog.c" -framework Carbon -framework CoreFoundation
 
 # the game
 if [ -n "$ENGINE" ]; then
