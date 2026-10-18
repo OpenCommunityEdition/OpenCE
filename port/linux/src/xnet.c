@@ -49,6 +49,7 @@ alone peers reach.
 #include "posix.h"
 #include "port_config.h"
 #include "p2p.h"
+#include "net_fault.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -311,9 +312,6 @@ static int broadcast_targets(unsigned long *targets, int maximum_count)
 
 /* ---------- Winsock */
 
-/* (debug.network_latency, below) */
-static int delayed_enabled(void);
-static void delayed_closed(int socket);
 
 static int winsock_result(int result)
 {
@@ -343,7 +341,7 @@ int WSAAPI WSAStartup(WORD version_requested, LPWSADATA data)
 
 	/* here, before the game's network threads start */
 	net_settings_read();
-	delayed_enabled();
+	net_fault_enabled();
 	p2p_initialize(local_address_setting(&local) ? local : loopback_address());
 	if (data)
 	{
@@ -383,7 +381,7 @@ int WSAAPI halo_ws_closesocket(SOCKET socket)
 
 	posix_socket_getsockopt((int)socket, SOL_SOCKET, SO_TYPE, &type, &type_length);
 	p2p_socket_closed((int)socket, type == SOCK_DGRAM ? socket_port(socket) : 0);
-	delayed_closed((int)socket);
+	net_fault_socket_closed((int)socket);
 	return winsock_result(posix_socket_close((int)socket));
 }
 
@@ -608,226 +606,27 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 	return result;
 }
 
-/* debug.network_latency and debug.network_loss: what this machine receives
-is held back that many milliseconds (both ways between two machines: a
-round trip of twice it) and that share of its datagrams lost, to test the
-netcode as over the internet. debug.network_corrupt: that share of the
-datagrams it receives, and debug.network_corrupt_stream that share of its
-reads of streams, is damaged at random (bytes changed, cut short,
-stretched, or replaced) from debug.network_corrupt_after seconds after the
-start (so that the game can be set up and started: what a host sends its
-own client over the loopback is damaged too), to test that nothing another
-machine sends can crash the game */
-#define DELAYED_PACKET_SIZE 1500
-#define MAXIMUM_DELAYED_PACKETS 4096
-
-struct delayed_packet
-{
-	int socket;
-	int length;
-	int offset;
-	int address_length;
-	DWORD time;
-	/* (large enough for any address the sockets give) */
-	char address[128];
-	char data[DELAYED_PACKET_SIZE];
-};
-
-static struct
-{
-	int checked;
-	DWORD latency;
-	int loss_percent;
-	int corrupt_percent;
-	int corrupt_stream_percent;
-	DWORD corrupt_after;
-	DWORD started_time;
-	unsigned corrupt_seed;
-	struct delayed_packet *packets;
-	int first;
-	int count;
-} delayed;
-
-/* (the game's network threads share the queue) */
-static pthread_mutex_t delayed_lock = PTHREAD_MUTEX_INITIALIZER;
-
-/* first from WSAStartup, before the game's network threads */
-static int delayed_enabled(void)
-{
-	if (!delayed.checked)
-	{
-		double latency = config_real("debug.network_latency");
-		double loss = config_real("debug.network_loss");
-		double corrupt = config_real("debug.network_corrupt");
-		double corrupt_stream = config_real("debug.network_corrupt_stream");
-		double corrupt_after = config_real("debug.network_corrupt_after");
-
-		/* up to ten seconds, and shares */
-		latency = !(latency > 0.0) ? 0.0 : latency > 10000.0 ? 10000.0 : latency;
-		loss = !(loss > 0.0) ? 0.0 : loss > 100.0 ? 100.0 : loss;
-		corrupt = !(corrupt > 0.0) ? 0.0 : corrupt > 100.0 ? 100.0 : corrupt;
-		corrupt_stream = !(corrupt_stream > 0.0) ? 0.0 : corrupt_stream > 100.0 ? 100.0 : corrupt_stream;
-		corrupt_after = !(corrupt_after > 0.0) ? 0.0 : corrupt_after > 86400.0 ? 86400.0 : corrupt_after;
-		delayed.latency = (DWORD)latency;
-		delayed.loss_percent = (int)loss;
-		delayed.corrupt_percent = (int)corrupt;
-		delayed.corrupt_stream_percent = (int)corrupt_stream;
-		delayed.corrupt_after = (DWORD)(corrupt_after * 1000.0);
-		delayed.started_time = GetTickCount();
-		delayed.corrupt_seed = (unsigned)GetTickCount() ^ (unsigned)(size_t)&delayed.checked;
-		delayed.checked = 1;
-		if (delayed.latency || delayed.loss_percent || delayed.corrupt_percent || delayed.corrupt_stream_percent)
-		{
-			delayed.packets = calloc(MAXIMUM_DELAYED_PACKETS, sizeof(*delayed.packets));
-			platform_log("network: receiving %lu ms late, losing %d%% of datagrams, damaging %d%% of them and %d%% of stream reads after %lu s (testing)",
-				(unsigned long)delayed.latency, delayed.loss_percent, delayed.corrupt_percent,
-				delayed.corrupt_stream_percent, (unsigned long)(delayed.corrupt_after / 1000));
-		}
-	}
-	return delayed.packets != NULL;
-}
-
-/* (the test's own numbers, so that the game's rand() goes as without it) */
-static unsigned delayed_random(void)
-{
-	delayed.corrupt_seed = delayed.corrupt_seed * 1103515245u + 12345u;
-	return delayed.corrupt_seed >> 8;
-}
-
-/* damages a packet at random: a few bytes changed, cut short, stretched
-with random bytes (a datagram, up to the largest), or replaced throughout;
-the length it has after */
-static int delayed_corrupt(char *data, int length, int datagram)
-{
-	int count, index;
-
-	switch (delayed_random() % 8)
-	{
-	case 0:
-		/* (cut short, a datagram to nothing at times; a stream's read of
-		nothing would be the stream closing) */
-		if (length > 0)
-			length = datagram ? (int)(delayed_random() % (unsigned)(length + 1)) :
-				1 + (int)(delayed_random() % (unsigned)length);
-		break;
-	case 1:
-		if (datagram)
-		{
-			int stretched = (int)(delayed_random() % (unsigned)(DELAYED_PACKET_SIZE + 1));
-
-			for (index = length; index < stretched; index++)
-				data[index] = (char)delayed_random();
-			if (stretched > length)
-				length = stretched;
-		}
-		else if (length > 0)
-		{
-			data[delayed_random() % (unsigned)length] = (char)delayed_random();
-		}
-		break;
-	case 2:
-		for (index = 0; index < length; index++)
-			data[index] = (char)delayed_random();
-		break;
-	case 3:
-		/* (a run of bytes: a field, with its neighbours) */
-		if (length > 0)
-		{
-			int start = (int)(delayed_random() % (unsigned)length);
-			int run = 1 + (int)(delayed_random() % 16u);
-
-			for (index = start; index < length && index < start + run; index++)
-				data[index] = (char)delayed_random();
-		}
-		break;
-	case 4:
-		/* (the extremes a size or an index is checked against) */
-		if (length > 0)
-		{
-			static const unsigned char extremes[] = { 0x00, 0xFF, 0x7F, 0x80, 0x01, 0xFE };
-
-			count = 1 + (int)(delayed_random() % 4u);
-			for (index = 0; index < count; index++)
-				data[delayed_random() % (unsigned)length] = (char)extremes[delayed_random() % sizeof(extremes)];
-		}
-		break;
-	default:
-		/* (a few bits) */
-		count = 1 + (int)(delayed_random() % 8u);
-		for (index = 0; index < count && length > 0; index++)
-			data[delayed_random() % (unsigned)length] ^= (char)(1u << (delayed_random() % 8u));
-		break;
-	}
-	return length;
-}
-
-/* drops what is held back for socket, and what has been read (socket -1),
-keeping the rest in order */
-static void delayed_drop(int socket)
-{
-	int index, kept = 0;
-
-	for (index = 0; index < delayed.count; index++)
-	{
-		struct delayed_packet *packet = &delayed.packets[(delayed.first + index) % MAXIMUM_DELAYED_PACKETS];
-
-		if (packet->socket == socket || packet->socket == -1)
-			continue;
-		if (kept != index)
-			delayed.packets[(delayed.first + kept) % MAXIMUM_DELAYED_PACKETS] = *packet;
-		kept++;
-	}
-	delayed.count = kept;
-}
-
-/* the socket closes: what it had goes (and a socket given its number later
-must not have it) */
-static void delayed_closed(int socket)
-{
-	if (!delayed.packets)
-		return;
-	pthread_mutex_lock(&delayed_lock);
-	delayed_drop(socket);
-	pthread_mutex_unlock(&delayed_lock);
-}
-
-/* whether something held back for the socket is due */
-static int delayed_due(int socket)
-{
-	int result = 0;
-	int index;
-
-	pthread_mutex_lock(&delayed_lock);
-	for (index = 0; index < delayed.count; index++)
-	{
-		struct delayed_packet const *packet = &delayed.packets[(delayed.first + index) % MAXIMUM_DELAYED_PACKETS];
-
-		if (packet->socket == socket)
-		{
-			result = GetTickCount() - packet->time >= delayed.latency;
-			break;
-		}
-	}
-	pthread_mutex_unlock(&delayed_lock);
-	return result;
-}
-
-/* what the socket has now, held back; then the oldest of the socket's that
-has waited long enough, or would-block */
-static int delayed_receive_locked(SOCKET socket, char *buffer, int length, int flags,
+/* debug.network_latency and its companions: what this machine receives is
+held back, lost and damaged (port/linux/src/net_fault.c, which says what
+each setting does). The settings, the queue, the random numbers and the
+damage are shared with the Mac's socket adapter, which has no xnet.c; the
+reads below are this platform's, and so is peer_incoming_address, which
+internet play needs applied to a datagram's source. */
+static int delayed_receive(SOCKET socket, char *buffer, int length, int flags,
 	struct sockaddr *address, int *address_length, int datagram)
 {
-	int index;
+	char scratch[NET_FAULT_PACKET_SIZE];
+	/* (large enough for any address the sockets give) */
+	char from[128];
+	int taken;
+	int truncated = 0;
+	int from_length;
 
-	/* (full: what was read, behind what was not, goes) */
-	if (delayed.count == MAXIMUM_DELAYED_PACKETS)
-		delayed_drop(-1);
-	while (delayed.count < MAXIMUM_DELAYED_PACKETS)
+	for (;;)
 	{
-		struct delayed_packet *packet = &delayed.packets[(delayed.first + delayed.count) % MAXIMUM_DELAYED_PACKETS];
-		int address_size = (int)sizeof(packet->address);
 		int readable = (int)socket;
 		int readable_count = 1;
+		int address_size = (int)sizeof(from);
 		int result;
 
 		/* (only what is there now: some of the game's sockets block) */
@@ -837,10 +636,9 @@ static int delayed_receive_locked(SOCKET socket, char *buffer, int length, int f
 			break;
 		}
 		result = datagram ?
-			posix_socket_recvfrom((int)socket, packet->data, DELAYED_PACKET_SIZE, flags,
-				(struct sockaddr *)&packet->address, &address_size) :
-			posix_socket_recv((int)socket, packet->data, DELAYED_PACKET_SIZE, flags);
-
+			posix_socket_recvfrom((int)socket, scratch, NET_FAULT_PACKET_SIZE, flags,
+				from, &address_size) :
+			posix_socket_recv((int)socket, scratch, NET_FAULT_PACKET_SIZE, flags);
 		if (result < 0)
 		{
 			/* (an error but would-block is the caller's now) */
@@ -851,82 +649,38 @@ static int delayed_receive_locked(SOCKET socket, char *buffer, int length, int f
 		/* (a stream closing is at once) */
 		if (!datagram && result == 0)
 			return 0;
-		if (datagram && rand() % 100 < delayed.loss_percent)
-			continue;
-		/* (a stream's reads by their own share: a damaged stream is dropped,
-		and the game must go on for its datagrams to be tested) */
-		if ((datagram ? delayed.corrupt_percent : delayed.corrupt_stream_percent) &&
-			GetTickCount() - delayed.started_time >= delayed.corrupt_after &&
-			(int)(delayed_random() % 100u) < (datagram ? delayed.corrupt_percent : delayed.corrupt_stream_percent))
-		{
-			result = delayed_corrupt(packet->data, result, datagram);
-		}
-		packet->socket = (int)socket;
-		packet->length = result;
-		packet->offset = 0;
-		packet->address_length = address_size;
-		packet->time = GetTickCount();
-		delayed.count++;
+		net_fault_keep((int)socket, scratch, result, datagram ? from : NULL,
+			datagram ? address_size : 0, datagram, GetTickCount());
 	}
-	for (index = 0; index < delayed.count; index++)
+	from_length = (int)sizeof(from);
+	taken = net_fault_take((int)socket, buffer, length, datagram ? from : NULL,
+		datagram ? &from_length : NULL, datagram, GetTickCount(), &truncated);
+	if (taken < 0)
 	{
-		struct delayed_packet *packet = &delayed.packets[(delayed.first + index) % MAXIMUM_DELAYED_PACKETS];
-		int size;
-		int truncated;
-
-		if (packet->socket != (int)socket)
-			continue;
-		if (GetTickCount() - packet->time < delayed.latency)
-			break;
-		size = packet->length - packet->offset;
-		/* (a datagram larger than the buffer: its start, and WSAEMSGSIZE, as
-		Winsock does) */
-		truncated = datagram && size > length;
-		if (size > length)
-			size = length;
-		memcpy(buffer, packet->data + packet->offset, (size_t)size);
-		if (datagram && address && address_length)
-		{
-			int copied = packet->address_length < *address_length ? packet->address_length : *address_length;
-
-			memcpy(address, &packet->address, (size_t)copied);
-			*address_length = copied;
-			peer_incoming_address(0, address, address_length);
-		}
-		packet->offset += size;
-		if (datagram || packet->offset >= packet->length)
-			packet->socket = -1;
-		/* (the spent ones at the front go) */
-		while (delayed.count > 0 && delayed.packets[delayed.first].socket == -1)
-		{
-			delayed.first = (delayed.first + 1) % MAXIMUM_DELAYED_PACKETS;
-			delayed.count--;
-		}
-		if (truncated)
-		{
-			WSASetLastError(WSAEMSGSIZE);
-			return SOCKET_ERROR;
-		}
-		return size;
+		WSASetLastError(WSAEWOULDBLOCK);
+		return SOCKET_ERROR;
 	}
-	WSASetLastError(WSAEWOULDBLOCK);
-	return SOCKET_ERROR;
-}
+	if (datagram && address && address_length)
+	{
+		int copied = from_length < *address_length ? from_length : *address_length;
 
-static int delayed_receive(SOCKET socket, char *buffer, int length, int flags,
-	struct sockaddr *address, int *address_length, int datagram)
-{
-	int result;
-
-	pthread_mutex_lock(&delayed_lock);
-	result = delayed_receive_locked(socket, buffer, length, flags, address, address_length, datagram);
-	pthread_mutex_unlock(&delayed_lock);
-	return result;
+		memcpy(address, from, (size_t)copied);
+		*address_length = copied;
+		peer_incoming_address(0, address, address_length);
+	}
+	/* (a datagram larger than the buffer: its start, and WSAEMSGSIZE, as
+	Winsock does) */
+	if (truncated)
+	{
+		WSASetLastError(WSAEMSGSIZE);
+		return SOCKET_ERROR;
+	}
+	return taken;
 }
 
 int WSAAPI halo_ws_recv(SOCKET socket, char *buffer, int length, int flags)
 {
-	if (delayed_enabled())
+	if (net_fault_enabled())
 		return delayed_receive(socket, buffer, length, flags, NULL, NULL, 0);
 	return winsock_result(posix_socket_recv((int)socket, buffer, length, flags));
 }
@@ -936,7 +690,7 @@ int WSAAPI halo_ws_recvfrom(SOCKET socket, char *buffer, int length, int flags,
 {
 	int result;
 
-	if (delayed_enabled())
+	if (net_fault_enabled())
 		return delayed_receive(socket, buffer, length, flags, address, address_length, 1);
 	result = posix_socket_recvfrom((int)socket, buffer, length, flags, address, address_length);
 	if (result >= 0)
@@ -1028,7 +782,7 @@ int WSAAPI halo_ws_select(int descriptor_count, halo_ws_fd_set *read_set, halo_w
 	if (result < 0)
 		return winsock_result(result);
 	/* (debug.network_latency: what is held back and due is there to read) */
-	if (read_set && delayed_enabled())
+	if (read_set && net_fault_enabled())
 	{
 		int asked_index;
 
@@ -1039,7 +793,7 @@ int WSAAPI halo_ws_select(int descriptor_count, halo_ws_fd_set *read_set, halo_w
 
 			for (index = 0; index < read_count; index++)
 				present |= read[index] == asked[asked_index];
-			if (!present && read_count < FD_SETSIZE && delayed_due(asked[asked_index]))
+			if (!present && read_count < FD_SETSIZE && net_fault_due(asked[asked_index], GetTickCount()))
 			{
 				read[read_count++] = asked[asked_index];
 				result++;
