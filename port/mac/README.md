@@ -220,7 +220,7 @@ file with its defaults when it is missing. Of the settings, the Mac reads
 | `mac.map` | `"bloodgulch"` | `HALO_MAC_MAP` | The map the game starts on when opened with no arguments (not by PowerSpark.app, which starts the menus) |
 | `mac.detail` | `"auto"` | `HALO_MAC_DETAIL` | The performance preset: `"auto"`, `"high"`, `"low"` or `"lowest"` |
 | `mac.render_resolution` | `"auto"` | `HALO_MAC_RENDER_RESOLUTION` | Pixels a frame is drawn with: `"native"` (the window's), `"original"` (480 lines), a number of lines (`"720"`) or `"auto"` (native on an Intel Mac with more than 64 MB, else 480 lines). Every choice is offered on every Mac; one that does not fit the window or the card is cut to what does |
-| `mac.adaptive_detail` | `"auto"` | `HALO_MAC_ADAPTIVE_DETAIL` | Lowers what the game draws while the frames take longer than a target, and puts it back when there is time. The game plays the same: only drawing changes. `"auto"`: on for a PowerPC Mac whose detail is low or medium, off for the rest (Intel); `"off"`; `"on"` (a target of 30 frames a second); or a target from 10 to 120 (`"45"`). Every choice is offered on every Mac (the start window's Graphics box). It measures the smoothed time of the frames (a limiter's wait is not counted) and steps down a fixed ladder after 40 frames over the target, back up after 240 frames comfortably under it (a step soon undone makes the next wait longer), never twice in a second. The ladder: detail objects (grass), particles no wider than 96 pixels, decals, lens flares, scenery and objects under twice the preset's pixels with a lower model detail level, four times, planar fog and the fog screen, particles no wider than 48 pixels, and last the frame's resolution (`mac.render_resolution` drawn as 480 lines). A step the preset already has is passed over, and a client in another's game keeps the host's rules (grass, flares and fog). The log has a line for each step (at most one a second) and, at the end of a run, a summary with the frame time at each level (`adaptive detail`). |
+| `mac.adaptive_detail` | `"auto"` | `HALO_MAC_ADAPTIVE_DETAIL` | Lowers what the game draws while the frames take longer than a target, and puts it back when there is time. The game plays the same: only drawing changes. `"auto"`: on for a PowerPC Mac whose detail is low or medium, off for the rest (Intel); `"off"`; `"on"` (a target of 30 frames a second); or a target from 10 to 120 (`"45"`). Every choice is offered on every Mac (the start window's Graphics box). It measures the smoothed time of the frames (a limiter's wait is not counted) and steps down a fixed ladder after 40 frames over the target, back up after 240 frames comfortably under it (a step soon undone makes the next wait longer), never twice in a second. The ladder: detail objects (grass), particles no wider than 96 pixels, decals, lens flares, scenery and objects under twice the preset's pixels with a lower model detail level, four times, planar fog and the fog screen, particles no wider than 48 pixels, every model at its lowest level of detail, bipeds and vehicles (and what they carry) under 12 pixels and then under 24 pixels left out, and last the frame's resolution (`mac.render_resolution` drawn as 480 lines). A step the preset already has is passed over, and a client in another's game keeps the host's rules (grass, flares and fog). The log has a line for each step (at most one a second) and, at the end of a run, a summary with the frame time at each level (`adaptive detail`). |
 | `mac.texture_cache_mb` | `0` | `HALO_MAC_RETAIL_TEXTURE_CACHE_MB` | Video memory for textures, 4 to 48; 0 by the card |
 | `mac.texture_skip_levels` | `-1` | `HALO_MAC_TEXTURE_SKIP_LEVELS` | Largest texture levels left out, 0 to 4; -1 by the card |
 
@@ -302,10 +302,19 @@ about 45 ms on the iBook).
 
 `mac.adaptive_detail` (on by default on a PowerPC Mac with the low or medium
 preset) keeps a heavy level near 30 frames a second by lowering, one rung at a
-time, grass, wide particles, decals, lens flares, small scenery and objects, fog
-and last the frame's resolution while the smoothed frame time is over the target,
+time, grass, wide particles, decals, lens flares, small scenery and objects, fog,
+model detail, distant bipeds and vehicles and last the frame's resolution while the smoothed frame time is over the target,
 and restoring them when it is under; see the settings table. The simulation does
 not read any of these, so a game plays the same with it on or off.
+
+Measuring a slow Mac: `HALO_MAC_PHASE_TIMING=<n>` (a hidden `--gpu-render` run, with
+`HALO_MAC_RENDER_TIMING=1` for the renderer's buckets) logs, every n frames and for the
+whole run, the milliseconds a frame goes to the game's tick, to drawing the world, to
+presenting it and to the rest, and the draws a frame. `HALO_MAC_ADAPTIVE_LEVEL=<0 to 12>`
+holds the ladder at a rung, `HALO_MAC_ADAPTIVE_MAX_LEVEL=<n>` gives it only its first n rungs. The game keeps the node matrices of objects that nothing moves
+(rocks, trees; `HALO_MAC_PERF_NODE_STAMPS=0` computes them every tick as the game does,
+`=2` checks every use of a kept one against the computed matrices and reports a count of
+differences at the end of a run, which is 0).
 
 ## How PowerSpark.app starts the game
 

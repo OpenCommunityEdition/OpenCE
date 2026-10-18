@@ -203,7 +203,8 @@ static const char *const adaptive_rung_names[MAC_ADAPT_RUNGS] =
 {
     "detail objects off", "particles no wider than 96 pixels", "decals off", "lens flares off",
     "scenery and objects: twice the minimum pixels, a lower detail level", "scenery and objects: four times the minimum pixels, two levels lower",
-    "planar fog and fog screen off", "particles no wider than 48 pixels", "480 lines"
+    "planar fog and fog screen off", "particles no wider than 48 pixels", "models at the lowest level of detail",
+    "bipeds and vehicles under 12 pixels left out", "bipeds and vehicles under 24 pixels left out", "480 lines"
 };
 
 static struct mac_governor adaptive;
@@ -216,6 +217,34 @@ static int adaptive_started;
 static int adaptive_resolution_known, adaptive_resolution_possible;
 static uint64_t adaptive_last_log;
 static unsigned long adaptive_suppressed;
+/* HALO_MAC_ADAPTIVE_LEVEL=<0 to 12> (diagnostic): the ladder held at that level, for the gates and for pictures */
+static int adaptive_forced = -2;
+
+/* HALO_MAC_ADAPTIVE_MAX_LEVEL=<n> (diagnostic): the ladder has only its first n rungs (8 is the ladder before the model and unit rungs) */
+static unsigned adaptive_capped_rungs(void)
+{
+    static int cap = -2;
+    unsigned mask = 0;
+    int rung;
+    if (cap == -2) {
+        const char *value = getenv("HALO_MAC_ADAPTIVE_MAX_LEVEL");
+        cap = value && value[0] ? atoi(value) : -1;
+    }
+    if (cap >= 0)
+        for (rung = cap; rung < MAC_ADAPT_RUNGS; ++rung) mask |= 1u << rung;
+    return mask;
+}
+
+static int adaptive_forced_level(void)
+{
+    if (adaptive_forced == -2) {
+        const char *value = getenv("HALO_MAC_ADAPTIVE_LEVEL");
+        adaptive_forced = value && value[0] ? atoi(value) : -1;
+        if (adaptive_forced > MAC_ADAPT_RUNGS) adaptive_forced = MAC_ADAPT_RUNGS;
+        if (adaptive_forced < -1) adaptive_forced = -1;
+    }
+    return adaptive_forced;
+}
 
 /* the setting: "auto" (on for the PowerPC presets, low and medium, off for the rest), "off", "on" (30 frames a
    second) or a target between 10 and 120 */
@@ -316,7 +345,14 @@ void mac_adaptive_detail_note_frame(double seconds, double wait_seconds)
     if (work < 0.0) work = 0.0;
     adaptive_refresh();
     if (!adaptive_on) return;
-    skipped = adaptive_render_skipped;
+    if (adaptive_forced_level() >= 0) {
+        if (adaptive.level != adaptive_forced) {
+            adaptive.level = adaptive_forced;
+            ++adaptive_serial;
+        }
+        return;
+    }
+    skipped = adaptive_render_skipped | adaptive_capped_rungs();
     if (!adaptive_resolution_available()) skipped |= 1u << MAC_ADAPT_RESOLUTION;
     before = adaptive.level;
     if (mac_governor_note(&adaptive, work * 1000.0, seconds * 1000.0, skipped, &direction)) {

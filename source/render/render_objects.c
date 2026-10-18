@@ -341,6 +341,7 @@ struct render_lighting *object_get_cached_render_lighting(
 real render_detail_scenery_minimum_pixels(void);
 real render_detail_lod_scale(void);
 real render_detail_object_minimum_pixels(void);
+real render_detail_unit_minimum_pixels(void);
 void render_detail_update(void);
 /* port: scenery batching (port/linux/game/render_detail.c) */
 boolean render_detail_batch_scenery_model(long model_index, real level_of_detail_pixels, real_matrix4x3 const *node_matrices, char const *region_permutation_indices, real_rgb_color const *change_colors, real const *function_values, struct render_lighting const *lighting, real_point3d const *centroid, real radius, struct render_model_effect const *model_effect, long object_index, short forced_shader_permutation_index, unsigned long flags);
@@ -496,6 +497,8 @@ static void render_object_list(
 		real_matrix4x3 const *node_matrices = legs ?
 			first_person_legs_node_matrices(object_index, object_get_node_matrices(object_index)) :
 			object_get_node_matrices(object_index);
+		/* port: a unit too small on screen to draw (render_detail_unit_minimum_pixels), whose children are left out too */
+		boolean unit_left_out = FALSE;
 
 		if (!object_is_first_person_camera(object_index) || render.camera.mirrored || (legs && node_matrices))
 		{
@@ -531,6 +534,12 @@ static void render_object_list(
 				struct object_definition *definition =
 					object_definition_get(object->definition_index);
 				real level_of_detail_pixels = object_get_level_of_detail_pixels(object_index);
+
+				if (!data->shadow && !legs && TEST_FLAG(_object_mask_unit, object->object.type) &&
+					level_of_detail_pixels < render_detail_unit_minimum_pixels())
+				{
+					unit_left_out = TRUE;
+				}
 
 				match_assert(
 					"c:\\halo\\SOURCE\\render\\render_objects.c",
@@ -635,7 +644,8 @@ static void render_object_list(
 					/* port: and any other object smaller than display's object minimum
 					(the Mac's presets; 0 draws all), but not a unit (a biped or a vehicle), a child
 					(it is drawn with its parent) or the player's own */
-					if ((object->object.type != _object_type_scenery ||
+					if (!unit_left_out &&
+						(object->object.type != _object_type_scenery ||
 						level_of_detail_pixels >= render_detail_scenery_minimum_pixels()) &&
 						(object->object.type == _object_type_scenery ||
 						TEST_FLAG(_object_mask_unit, object->object.type) ||
@@ -709,7 +719,7 @@ static void render_object_list(
 				widgets_render(object_index, data->lighting, &animation);
 			}
 
-			if (object->object.first_child_object_index != NONE && !legs)
+			if (object->object.first_child_object_index != NONE && !legs && !unit_left_out)
 			{
 				render_object_list(
 					data,

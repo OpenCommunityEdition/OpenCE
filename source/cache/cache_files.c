@@ -1521,7 +1521,26 @@ void *tag_get(
 	char expected_group[16];
 	char returned_group[16];
 
-	struct cache_file_tag_instance *tag_instance = cache_get_tag_instance(tag_index);
+	struct cache_file_tag_instance *tag_instance;
+	short fast_absolute_index = (short)tag_index;
+
+	/* port: the usual call, a loaded tag of the group asked for, answered at once; the checks below
+	(which say what is wrong, or give the empty tag) run for the rest, and give this answer for it */
+	if (cache_file_globals.tags_loaded && global_tag_instances &&
+		fast_absolute_index >= 0 && fast_absolute_index < global_tag_count)
+	{
+		tag_instance = &global_tag_instances[fast_absolute_index];
+		if ((!(tag_index & 0xFFFF0000) || tag_instance->tag_index == tag_index) &&
+			tag_instance->base_address &&
+			(tag_instance->group_tag == group_tag ||
+				tag_instance->parent_group_tags[0] == group_tag ||
+				tag_instance->parent_group_tags[1] == group_tag))
+		{
+			return tag_instance->base_address;
+		}
+	}
+
+	tag_instance = cache_get_tag_instance(tag_index);
 	match_vassert(
 		"c:\\halo\\SOURCE\\cache\\cache_files.c",
 		298,

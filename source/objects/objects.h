@@ -455,6 +455,24 @@ void objects_reconnect_to_structure_bsp(void);
 void objects_paparazzi(void);
 void object_export_function_values(long object_index);
 void object_compute_node_matrices(long object_index);
+/* port: object_bounds_cache.c: the inputs of the node matrices of an object that nothing moves or animates,
+and the matrices' bounding sphere, kept until the game state is replaced (see object_compute_node_matrices) */
+struct object_node_stamp_key
+{
+	long definition_index;
+	long mirrored;
+	real_point3d position;
+	real_vector3d forward;
+	real_vector3d up;
+	real scale;
+};
+boolean object_node_stamp_unchanged(long object_index, struct object_node_stamp_key const *key, real_point3d *center, real *radius);
+void object_node_stamp_store(long object_index, struct object_node_stamp_key const *key, real_point3d const *center, real radius);
+void object_node_stamp_forget(long object_index);
+long object_node_stamps_mode(void);
+void object_node_stamps_set(long mode);
+void object_node_stamp_checked(boolean same, long object_index);
+void object_node_stamps_report(void);
 void objects_scripting_detach(long parent_object_index, long child_object_index);
 void object_render_debug(long object_index);
 void object_set_position(long object_index, real_point3d const *position, real_vector3d const *forward, real_vector3d const *up);

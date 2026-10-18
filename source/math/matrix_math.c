@@ -936,6 +936,45 @@ void matrix4x3_multiply(
 	real *result_elements = result->n[0];
 	real const *a_scale = &a->scale;
 
+#ifdef __APPLE__
+	/* port: the Mac build: the same sums in the same order, written out (the loops below cost this much on a G4:
+	the 12 results with their indices computed each time). Single precision products and sums, each rounded, and
+	a result that is also an input is not written until every input has been read. */
+	{
+		real a0 = a->n[0][0], a1 = a->n[0][1], a2 = a->n[0][2];
+		real a3 = a->n[1][0], a4 = a->n[1][1], a5 = a->n[1][2];
+		real a6 = a->n[2][0], a7 = a->n[2][1], a8 = a->n[2][2];
+		real a9 = a->n[3][0], a10 = a->n[3][1], a11 = a->n[3][2];
+		real b0 = b->n[0][0], b1 = b->n[0][1], b2 = b->n[0][2];
+		real b3 = b->n[1][0], b4 = b->n[1][1], b5 = b->n[1][2];
+		real b6 = b->n[2][0], b7 = b->n[2][1], b8 = b->n[2][2];
+		real b9 = b->n[3][0], b10 = b->n[3][1], b11 = b->n[3][2];
+		real scale = a->scale;
+		real p0 = b0 * a0 + b1 * a3 + b2 * a6;
+		real p1 = b0 * a1 + b1 * a4 + b2 * a7;
+		real p2 = b0 * a2 + b1 * a5 + b2 * a8;
+		real p3 = b3 * a0 + b4 * a3 + b5 * a6;
+		real p4 = b3 * a1 + b4 * a4 + b5 * a7;
+		real p5 = b3 * a2 + b4 * a5 + b5 * a8;
+		real p6 = b6 * a0 + b7 * a3 + b8 * a6;
+		real p7 = b6 * a1 + b7 * a4 + b8 * a7;
+		real p8 = b6 * a2 + b7 * a5 + b8 * a8;
+		real p9 = b9 * a0 + b10 * a3 + b11 * a6;
+		real p10 = b9 * a1 + b10 * a4 + b11 * a7;
+		real p11 = b9 * a2 + b10 * a5 + b11 * a8;
+
+		p9 = p9 * scale + a9;
+		p10 = p10 * scale + a10;
+		p11 = p11 * scale + a11;
+		result->n[0][0] = p0; result->n[0][1] = p1; result->n[0][2] = p2;
+		result->n[1][0] = p3; result->n[1][1] = p4; result->n[1][2] = p5;
+		result->n[2][0] = p6; result->n[2][1] = p7; result->n[2][2] = p8;
+		result->n[3][0] = p9; result->n[3][1] = p10; result->n[3][2] = p11;
+		result->scale = scale * b->scale;
+	}
+	return;
+#endif
+
 	{
 		/* the SSE block below: rows of b combine the rows of a, and the
 		position is scaled by a's scale before a's own is added */

@@ -33,6 +33,12 @@ find_source() {
         printf '%s\n' port/mac/engine_arena.c
         return 0
     fi
+    # port: mac_constructor_storage (tools/) includes source/objects/objects.c, the objects' tick (node matrices,
+    # lights, updates); without this a change to objects.c never reached a build
+    if [ "$n" = mac_constructor_storage ] && [ -f tools/mac_constructor_storage.c ]; then
+        printf '%s\n' tools/mac_constructor_storage.c
+        return 0
+    fi
     for f in source/*/"$n".c source/*/*/"$n".c "source/saved games/$n.c" port/linux/game/"$n".c; do
         [ -f "$f" ] || continue
         found=$f

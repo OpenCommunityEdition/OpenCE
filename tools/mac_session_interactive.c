@@ -8,6 +8,7 @@
 #define MAC_INPUT_NO_CARBON
 #include "mac_window.h"
 #include "mac_gpu_info.h" /* port: mac.adaptive_detail */
+#include "mac_flags.h" /* port: mac_perf_flag */
 #include "input/input.h"
 #include "input/input_abstraction.h"
 #include "game/game.h"
@@ -434,7 +435,7 @@ static void mac_interactive_trace_tick(struct mac_interactive_context *context)
    the player's, and the random seed, so that two builds (Mac i386, Mac ppc,
    the Linux build's own code) can be compared tick by tick for identical
    floating point results. The digest hashes bit patterns, never text. */
-static unsigned long mac_sim_hash;
+static unsigned long mac_sim_hash, mac_sim_nodes_hash;
 static void mac_sim_hash_word(unsigned long value)
 {
     int shift;
@@ -464,6 +465,7 @@ static void mac_interactive_sim_digest(const struct mac_interactive_context *con
     if (!getenv("HALO_MAC_SIM_DIGEST"))
         return;
     mac_sim_hash = 2166136261UL;
+    mac_sim_nodes_hash = 2166136261UL;
     object_iterator_new(&objects, 0xFFFFFFFFUL, 0);
     while ((object = (struct object_datum *)object_iterator_next(&objects)) != NULL) {
         unsigned long before = mac_sim_hash;
@@ -475,13 +477,27 @@ static void mac_interactive_sim_digest(const struct mac_interactive_context *con
         mac_sim_hash_vector(object->object.angular_velocity.i, object->object.angular_velocity.j, object->object.angular_velocity.k);
         mac_sim_hash_real(object->object.body_vitality);
         mac_sim_hash_real(object->object.shield_vitality);
+        /* port: HALO_MAC_SIM_DIGEST=2 also hashes the node matrices and the bounding sphere apart (nodes=), so that a change to
+           how they are computed shows */
+        if (getenv("HALO_MAC_SIM_DIGEST")[0] == '2') {
+            const real *matrices = (const real *)object_header_block_get(objects.index, &object->object.node_matrices);
+            unsigned long words = matrices ? (unsigned long)object->object.node_matrices.size / sizeof(real) : 0, word;
+            unsigned long saved = mac_sim_hash;
+            mac_sim_hash = mac_sim_nodes_hash;
+            for (word = 0; word < words; ++word)
+                mac_sim_hash_real(matrices[word]);
+            mac_sim_hash_vector(object->object.bounding_sphere_center.x, object->object.bounding_sphere_center.y, object->object.bounding_sphere_center.z);
+            mac_sim_hash_real(object->object.bounding_sphere_radius);
+            mac_sim_nodes_hash = mac_sim_hash;
+            mac_sim_hash = saved;
+        }
         if ((long)objects.index == player_unit)
             player_hash = mac_sim_hash ^ before;
         ++count;
     }
     mac_sim_hash_word(*get_global_local_random_seed_address());
-    fprintf(stderr, "sim digest tick=%u objects=%lu player=%08lx all=%08lx seed=%08lx\n",
-        context->ticks + 1, count, player_hash, mac_sim_hash, *get_global_local_random_seed_address());
+    fprintf(stderr, "sim digest tick=%u objects=%lu player=%08lx all=%08lx seed=%08lx nodes=%08lx\n",
+        context->ticks + 1, count, player_hash, mac_sim_hash, *get_global_local_random_seed_address(), mac_sim_nodes_hash);
 }
 
 /* HALO_MAC_SIM_INPUT=1 (diagnostic): input scripted from the tick number
@@ -515,6 +531,84 @@ static double mac_interactive_microseconds(void)
     if (!base.denom)
         mach_timebase_info(&base);
     return (double)mach_absolute_time() * (double)base.numer / (double)base.denom / 1000.0;
+}
+
+/* port: HALO_MAC_PHASE_TIMING=<n> (diagnostic): every n frames, and at the end of a run, a line with the milliseconds a
+   frame went to in the game's tick, in drawing the world, in presenting it and in the rest (the window's frame, the driver's
+   waits). It splits the frame time of a slow Mac into its CPU phases, without the sampling tools it does not have. */
+static unsigned mac_phase_window;
+static int mac_phase_known;
+static double mac_phase_tick, mac_phase_render, mac_phase_present, mac_phase_total;
+static double mac_phase_run_tick, mac_phase_run_render, mac_phase_run_present, mac_phase_run_total;
+static unsigned mac_phase_frames, mac_phase_run_frames;
+
+static int mac_phase_enabled(void)
+{
+    if (!mac_phase_known) {
+        const char *value = getenv("HALO_MAC_PHASE_TIMING");
+        mac_phase_window = value ? (unsigned)atoi(value) : 0;
+        mac_phase_known = 1;
+    }
+    return mac_phase_window != 0;
+}
+
+static void mac_phase_print(const char *label, unsigned frames, double tick, double render, double present, double total)
+{
+    if (frames)
+        fprintf(stderr, "phase timing %s (%u frames): tick %.2f, render %.2f, present %.2f, other %.2f, total %.2f ms a frame\n",
+            label, frames, tick / frames, render / frames, present / frames,
+            (total - tick - render - present) / frames, total / frames);
+}
+
+/* (with HALO_MAC_RENDER_TIMING=1: the draws of the frames and what the renderer's buckets took, as they grew) */
+static void mac_phase_buckets(unsigned frames, const char *label)
+{
+    static mac_render_timing_stamp last_us[mac_render_timing_bucket_count];
+    static unsigned long last_calls[mac_render_timing_bucket_count];
+    mac_render_timing_stamp us[mac_render_timing_bucket_count];
+    unsigned long calls[mac_render_timing_bucket_count];
+    int i;
+
+    if (!mac_render_timing_enabled() || !frames)
+        return;
+    for (i = 0; i < mac_render_timing_bucket_count; ++i)
+        mac_render_timing_get((enum mac_render_timing_bucket)i, &us[i], &calls[i]);
+    fprintf(stderr, "phase timing %s: draws %.1f, draw call %.2f, texture bind %.2f, decode %.2f, shader %.2f, program %.2f, state %.2f ms a frame\n",
+        label, (double)(calls[mac_render_timing_draw_call] - last_calls[mac_render_timing_draw_call]) / frames,
+        (double)(us[mac_render_timing_draw_call] - last_us[mac_render_timing_draw_call]) / 1000.0 / frames,
+        (double)(us[mac_render_timing_texture_bind] - last_us[mac_render_timing_texture_bind]) / 1000.0 / frames,
+        (double)(us[mac_render_timing_stream_decode] - last_us[mac_render_timing_stream_decode]) / 1000.0 / frames,
+        (double)(us[mac_render_timing_shader_sources] - last_us[mac_render_timing_shader_sources]) / 1000.0 / frames,
+        (double)(us[mac_render_timing_program_lookup] - last_us[mac_render_timing_program_lookup]) / 1000.0 / frames,
+        (double)(us[mac_render_timing_draw_state_setup] - last_us[mac_render_timing_draw_state_setup]) / 1000.0 / frames);
+    for (i = 0; i < mac_render_timing_bucket_count; ++i) {
+        last_us[i] = us[i];
+        last_calls[i] = calls[i];
+    }
+}
+
+static void mac_phase_frame(unsigned frame, double tick, double render, double present, double total)
+{
+    if (frame < 2)
+        return;
+    mac_phase_tick += tick;
+    mac_phase_render += render;
+    mac_phase_present += present;
+    mac_phase_total += total;
+    ++mac_phase_frames;
+    mac_phase_run_tick += tick;
+    mac_phase_run_render += render;
+    mac_phase_run_present += present;
+    mac_phase_run_total += total;
+    ++mac_phase_run_frames;
+    if (mac_phase_frames >= mac_phase_window) {
+        char label[32];
+        sprintf(label, "frames %u to %u", frame - mac_phase_frames + 1, frame);
+        mac_phase_print(label, mac_phase_frames, mac_phase_tick, mac_phase_render, mac_phase_present, mac_phase_total);
+        mac_phase_buckets(mac_phase_frames, label);
+        mac_phase_tick = mac_phase_render = mac_phase_present = mac_phase_total = 0.0;
+        mac_phase_frames = 0;
+    }
 }
 
 static int mac_interactive_checkpoints_enabled(void)
@@ -1209,6 +1303,7 @@ static int mac_interactive_frame(void *opaque,
     int shot = 0, screenshot = 0;
     unsigned long tick_started;
     int console_open = 0;
+    double phase_tick_at = 0.0, phase_render_at = 0.0, phase_present_at = 0.0;
 
     if (!context || !native_input || !width || !height) {
         if (context)
@@ -1934,6 +2029,7 @@ radar_free_done:
     }
     /* port: the script console (debug.telnet_console), once a frame as main.c's loop does */
     telnet_console_process();
+    phase_tick_at = mac_phase_enabled() ? mac_interactive_microseconds() : 0.0;
     tick_started = system_milliseconds();
     while (context->accumulator + 0.0000001 >= MAC_INTERACTIVE_TICK &&
         tick_count < 3) {
@@ -1994,6 +2090,8 @@ radar_free_done:
         mac_interactive_trace_rng(context, "tick");
     }
     context->tick_milliseconds += system_milliseconds() - tick_started;
+    if (phase_tick_at != 0.0)
+        phase_render_at = mac_interactive_microseconds();
     /* HALO_MAC_HUD_MESSAGE=<index>|sweep (diagnostic): the HUD's help
        message of that index (sweepN: the next one every 30 ticks, the first at tick 30*N) is set every
        tick, to draw its button prompts */
@@ -2019,6 +2117,8 @@ radar_free_done:
     render_interpolation_frame_begin();
     mac_engine_main_game_render(MAC_INTERACTIVE_TICK);
     render_interpolation_frame_end();
+    if (phase_tick_at != 0.0)
+        phase_present_at = mac_interactive_microseconds();
     mac_interactive_trace_rng(context, "render");
     /* The caller reads the last bounded frame's pixels. */
     /* HALO_MAC_SHOT_EVERY (diagnostic): a capture every that many frames
@@ -2031,6 +2131,11 @@ radar_free_done:
     if ((context->max_frames && context->frames + 1 == context->max_frames) || shot || screenshot || context->request)
         mac_device_gpu_request_readback();
     main_present_frame();
+    if (phase_tick_at != 0.0) {
+        double phase_end = mac_interactive_microseconds();
+        mac_phase_frame(context->frames + 1, (phase_render_at - phase_tick_at) / 1000.0, (phase_present_at - phase_render_at) / 1000.0,
+            (phase_end - phase_present_at) / 1000.0, elapsed * 1000.0);
+    }
     if (shot)
         mac_interactive_write_shot();
     if (screenshot)
@@ -2065,6 +2170,10 @@ int mac_session_interactive_run(unsigned max_frames, int visible,
         return 0;
     }
     context.max_frames = max_frames;
+    /* port: the node matrices of objects that nothing moves are kept (source/objects/objects.c); HALO_MAC_PERF_NODE_STAMPS=0 or
+       HALO_MAC_PERF=0 computes them every tick as the game does */
+    object_node_stamps_set(getenv("HALO_MAC_PERF_NODE_STAMPS") && getenv("HALO_MAC_PERF_NODE_STAMPS")[0] == '2' ?
+        2 : mac_perf_flag("HALO_MAC_PERF_NODE_STAMPS") ? 1 : 0);
     /* port: the developer console's state, as main.c sets it before the game starts (the game is already initialized) */
     {
         static int console_ready;
@@ -2117,6 +2226,10 @@ int mac_session_interactive_run(unsigned max_frames, int visible,
         context.quit_requested=1;
     fprintf(stderr,"native rendered timing: frames=%u elapsed_ms=%lu first_frame_ms=%lu\n",
         context.frames,(unsigned long)(mac_interactive_now()-start_time),first_frame_ms);
+    if (mac_phase_enabled())
+        mac_phase_print("whole run after the first frame", mac_phase_run_frames, mac_phase_run_tick, mac_phase_run_render,
+            mac_phase_run_present, mac_phase_run_total);
+    object_node_stamps_report();
     mac_adaptive_detail_summary(); /* port: mac.adaptive_detail (port/mac/mac_gpu_info.c) */
     if (context.warm_audio_valid && context.frames > 1) {
         struct mac_dsound_audio_stats audio;

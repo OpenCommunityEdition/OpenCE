@@ -122,6 +122,16 @@ real render_detail_object_minimum_pixels(
 	return render_detail_object_pixels;
 }
 
+/* Units (bipeds and vehicles) smaller on screen than this many pixels are left out, with what they carry (the Mac's adaptive
+detail: a biped is about five draws, however small it is; 0 draws them all, as the original) */
+static real render_detail_unit_pixels = 0.f;
+
+real render_detail_unit_minimum_pixels(
+	void)
+{
+	return render_detail_unit_pixels;
+}
+
 /* The settings as the preset and the display.* settings leave them. On the Mac the adaptive detail
 (mac.adaptive_detail, port/mac/mac_adaptive_detail.h) lowers some of them from these while the frames
 are slow, and puts them back: every value it uses is derived from these again. */
@@ -233,6 +243,7 @@ static void render_detail_governor_apply(
 	boolean decals = render_detail_base_decals;
 	real scenery = render_detail_base_scenery;
 	real object_pixels = render_detail_base_object_pixels;
+	real unit_pixels = 0.f;
 	real lod = render_detail_base_lod;
 	real particle_maximum = render_detail_base_particle_maximum;
 	short particle_mode = render_detail_base_particle_mode;
@@ -276,6 +287,14 @@ static void render_detail_governor_apply(
 		object_pixels = object_pixels > 40.f ? 40.f : object_pixels;
 		lod = lod > 0.5f ? 0.5f : lod;
 	}
+	if (level > MAC_ADAPT_MODELS_LOWEST)
+	{
+		lod = lod > 0.1f ? 0.1f : lod;
+	}
+	if (level > MAC_ADAPT_UNITS_SMALL)
+	{
+		unit_pixels = level > MAC_ADAPT_UNITS_MEDIUM ? 24.f : 12.f;
+	}
 
 	render_detail_scenery_pixels = scenery > 0.f && scenery < 4096.f ? scenery : 0.f;
 	render_detail_particle_maximum = particles && particle_maximum > 0.f &&
@@ -284,6 +303,7 @@ static void render_detail_governor_apply(
 	render_detail_particle_limit_mode = particle_mode;
 	render_detail_lod = lod > 0.f && lod <= 1.f ? lod : 1.f;
 	render_detail_object_pixels = object_pixels > 0.f && object_pixels < 4096.f ? object_pixels : 0.f;
+	render_detail_unit_pixels = unit_pixels;
 	rasterizer_debug_options.draw_lens_flares = lens_flares;
 	if (decals != render_detail_decals)
 	{

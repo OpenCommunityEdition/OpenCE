@@ -2454,7 +2454,96 @@ if (!valid_real_matrix4x3(matrix)) \
 	ocnm_parent_matrix_internal(file, line, matrix, string); \
 }
 
+static void object_compute_node_matrices_full(
+	long object_index);
+
+/* port: an object that nothing moves or animates (no parent, no animation graph of its own or its
+definition's, no interpolation: a rock, a tree, a crate) has node matrices and a bounding sphere that are a
+function of its position, orientation, scale, mirroring and definition alone, and the game computes them again
+every tick. The values it computed are kept (object_bounds_cache.c, until the game state is replaced) with the
+inputs they came from; the same inputs, bit for bit, give the same matrices that the object's memory still
+holds, and the bounding sphere is put back from the copy. Off unless a port turns it on (object_node_stamps_set;
+the Mac build does, HALO_MAC_PERF_NODE_STAMPS=0 turns it off, 2 checks every hit by computing the matrices anyway). */
+static void object_node_stamp_key_get(
+	struct object_datum const *object,
+	struct object_node_stamp_key *key)
+{
+	key->definition_index = object->definition_index;
+	key->mirrored = TEST_FLAG(object->object.flags, _object_mirrored_bit) ? 1 : 0;
+	key->position = object->object.position;
+	key->forward = object->object.forward;
+	key->up = object->object.up;
+	key->scale = object->object.scale;
+
+	return;
+}
+
 void object_compute_node_matrices(
+	long object_index)
+{
+	long mode = object_node_stamps_mode();
+
+	if (mode)
+	{
+		struct object_datum *object = object_get(object_index);
+
+		if (object->object.parent_object_index==NONE &&
+			object->object.animation.animation_graph_index==NONE &&
+			object->object.animation.interpolation_frame_count==0)
+		{
+			struct object_node_stamp_key key;
+
+			object_node_stamp_key_get(object, &key);
+			if (object_node_stamp_unchanged(object_index, &key, &object->object.bounding_sphere_center, &object->object.bounding_sphere_radius))
+			{
+				if (mode > 1)
+				{
+					/* (the check: the matrices are computed anyway and must come out as they are, bit for bit) */
+					real_matrix4x3 saved[MAXIMUM_NODES_PER_MODEL];
+					real_matrix4x3 *nodes = (real_matrix4x3 *)object_header_block_get(object_index, &object->object.node_matrices);
+					short node_count = (short)MIN(object->object.node_matrices.size / (short)sizeof(real_matrix4x3), MAXIMUM_NODES_PER_MODEL);
+					real_point3d center = object->object.bounding_sphere_center;
+					real radius = object->object.bounding_sphere_radius;
+
+					memcpy(saved, nodes, node_count * sizeof(real_matrix4x3));
+					object_compute_node_matrices_full(object_index);
+					object = object_get(object_index);
+					nodes = (real_matrix4x3 *)object_header_block_get(object_index, &object->object.node_matrices);
+					object_node_stamp_checked(
+						memcmp(saved, nodes, node_count * sizeof(real_matrix4x3)) == 0 &&
+						memcmp(&center, &object->object.bounding_sphere_center, sizeof(center)) == 0 &&
+						memcmp(&radius, &object->object.bounding_sphere_radius, sizeof(radius)) == 0,
+						object_index);
+				}
+				return;
+			}
+
+			object_compute_node_matrices_full(object_index);
+			object = object_get(object_index);
+			if (object_definition_get(object->definition_index)->object.animation_graph.index==NONE)
+			{
+				object_node_stamp_store(object_index, &key, &object->object.bounding_sphere_center, object->object.bounding_sphere_radius);
+			}
+			else
+			{
+				object_node_stamp_forget(object_index);
+			}
+		}
+		else
+		{
+			object_node_stamp_forget(object_index);
+			object_compute_node_matrices_full(object_index);
+		}
+	}
+	else
+	{
+		object_compute_node_matrices_full(object_index);
+	}
+
+	return;
+}
+
+static void object_compute_node_matrices_full(
 	long object_index)
 {
 	real_orientation cannot_interpolate_node_orientations_storage[MAXIMUM_NODES_PER_MODEL];
@@ -3626,6 +3715,8 @@ long object_new(
 				object_choose_random_change_colors(object_index, data->change_colors);
 				object_choose_random_region_permutations(object_index);
 				object_initialize_vitality(object_index, NULL, NULL);
+				/* port: a new object's matrices are not computed yet (a stamp of an earlier object of the index says nothing) */
+				object_node_stamp_forget(object_index);
 				object_compute_node_matrices(object_index);
 				object_reconnect_to_map(object_index, NULL);
 				object_postprocess_node_matrices(object_index);
