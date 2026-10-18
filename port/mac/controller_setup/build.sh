@@ -8,7 +8,7 @@ SDK=${SDK:-/Developer/SDKs/MacOSX10.5.sdk}
 APP="OpenCE Controller Setup.app"
 FLAGS="-arch ppc -arch i386 -isysroot $SDK -mmacosx-version-min=10.5 -O2 -Wall -std=gnu89"
 
-$CC -o test_config.bin test_config.c controller_setup_config.c controller_setup_hid.c ../app/launcher_config.c -std=gnu89 -Wall
+$CC -o test_config.bin test_config.c controller_setup_config.c controller_setup_hid.c ../mac_gamepad_report.c ../app/launcher_config.c -std=gnu89 -Wall
 ./test_config.bin
 rm -f test_config.bin
 
@@ -18,10 +18,11 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 $CC $FLAGS -fno-objc-gc -x objective-c -std=gnu99 -c main.m -o main.o
 $CC $FLAGS -c controller_setup_config.c -o config.o
 $CC $FLAGS -c controller_setup_hid.c -o hid.o
+$CC $FLAGS -c ../mac_gamepad_report.c -o report.o
 $CC $FLAGS -c ../app/launcher_config.c -o launcher_config.o
-$CC $FLAGS -o "$APP/Contents/MacOS/OpenCE Controller Setup" main.o config.o hid.o launcher_config.o \
-	-framework Cocoa -framework IOKit -framework Security
-rm -f main.o config.o hid.o launcher_config.o
+$CC $FLAGS -o "$APP/Contents/MacOS/OpenCE Controller Setup" main.o config.o hid.o report.o launcher_config.o \
+	-framework Cocoa -framework Carbon -framework IOKit -framework Security
+rm -f main.o config.o hid.o report.o launcher_config.o
 cp Info.plist "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 lipo -info "$APP/Contents/MacOS/OpenCE Controller Setup"

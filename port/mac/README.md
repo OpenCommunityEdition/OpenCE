@@ -121,24 +121,30 @@ holds it again. Escape in a game opens the pause menu
 
 ### Controllers
 
-The game reads the first HID game pad: an Xbox One S controller through its
-driver (`XboxOneController-1.0.pkg`, a separate project that is not in this
-repository), or another USB pad. Sticks, triggers, d-pad and buttons map as
-on the Xbox. PowerSpark Controller Setup (`port/mac/controller_setup/`) installs
-the driver and calibrates the dead zones and the look inversion; its
-choices go to `input.gamepad_*` in `config.toml`. It needs Mac OS X 10.5 or
-later. The driver package is put in the app only when the build is given
-one (`--driver`); otherwise place it in
-`~/Library/Application Support/OpenCE/Driver/`. Pair the controller over
-Bluetooth first, and never update its firmware. `HALO_SKIP_CONTROLLER_SETUP=1`
-skips the first-run window.
+The game reads the first HID game pad. The way to connect a modern
+controller (PS5 DualSense, PS4 DualShock 4, Xbox One/Series, Switch Pro or an
+8BitDo pad) is the 8BitDo Wireless USB Adapter 2: plug it in, press its pair
+button, put the controller in pairing mode (Create + PS, Share + PS, the Xbox
+pad's pair button, the Switch Pro's Sync button; hold 3 seconds) and wait for
+the adapter's light to stay solid. Where 8BitDo's manual puts the adapter in
+Mac mode (hold Share, Create or View + Right for 3 seconds on a connected pad)
+and for firmware updates (8BitDo's updater, on a newer computer), Controller
+Setup says so. Wired USB pads and the Xbox 360 pad driver are not covered.
+PowerSpark Controller Setup (`port/mac/controller_setup/`) shows these steps,
+a live status line ("No input received yet", "Receiving input", or "Controller
+found but sending nothing" after four quiet seconds), the pad's sticks and
+buttons, and calibrates the dead zones and the look inversion; its choices go
+to `input.gamepad_*` in `config.toml`. Sticks, triggers, d-pad and buttons map
+as on the Xbox. It needs Mac OS X 10.5 or later. `HALO_SKIP_CONTROLLER_SETUP=1`
+skips the first-run window. The app carries and advertises no controller driver (the build's
+`--driver` is ignored); a pad that a driver the player installed publishes as an
+Xbox 360 pad (045E:028E) is still read.
 
-Sony pads need no driver. A DualShock 4 (054C:05C4 and 054C:09CC, which includes
+Sony pads (and the adapter in a Sony mode) need no driver. A DualShock 4 (054C:05C4 and 054C:09CC, which includes
 an 8BitDo USB receiver in its PlayStation 4 mode) and a DualSense (054C:0CE6, on a
 USB cable) are read from their USB input reports (`mac_gamepad_report.c`, read
 byte by byte, so PowerPC and Intel decode alike): Cross, Circle, Square and Triangle
-are A, B, X and Y; L1 and R1 the white and black buttons (as the Xbox One S
-driver's bumpers); L2 and R2 the triggers (their analog bytes); Share (Create)
+are A, B, X and Y; L1 and R1 the white and black buttons (as an Xbox pad's bumpers); L2 and R2 the triggers (their analog bytes); Share (Create)
 is Back, Options is Start; L3, R3 and the d-pad as they are. The touchpad
 click and the PS button are decoded but not used. Every other HID pad is mapped by
 its usages (X, Y, Z, Rz or Rx, Ry for the sticks, the hat, buttons 1 to 10 in the Xbox order). Up to four pads play
@@ -270,7 +276,7 @@ sh tools/mac_config_checks.sh                    # first, with MAC_CHECK_DIR=<ou
 sh tools/mac_rendered_session_checks.sh bloodgulch.map bitmaps.map sounds.map
     # writes mac_rendered_session_ppc and _i386 in $MAC_RENDERED_SESSION_OUT
 sh tools/mac_app_bundle.sh --engine-ppc $OUT/mac_rendered_session_ppc \
-    --engine-i386 $OUT/mac_rendered_session_i386 [--driver PKG] [--version 0.1]
+    --engine-i386 $OUT/mac_rendered_session_i386 [--version 0.1]
 ```
 
 `tools/mac_app_bundle.sh` builds the launcher and the two helper apps (when

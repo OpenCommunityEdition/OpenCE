@@ -7,9 +7,10 @@
 extern "C" {
 #endif
 
+struct mac_gamepad_frame;
+
 #define CS_VENDOR_MICROSOFT 0x045E
 #define CS_PRODUCT_XBOX_VIRTUAL 0x028E
-#define CS_PRODUCT_XBOX_ONE_S_RAW 0x02FD
 /* PlayStation pads (and adapters that present themselves as one, such as
    8BitDo's USB Wireless Adapter 2): sticks X/Y and Z/Rz, triggers Rx/Ry */
 #define CS_VENDOR_SONY 0x054C
@@ -48,6 +49,12 @@ void cs_pad_clear(cs_pad_state *pad, int xbox);
 /* Applies one element value. Returns 1 if it was a used element. */
 int cs_hid_apply(cs_pad_state *pad, int usage_page, int usage, int value,
 	int logical_min, int logical_max);
+
+/* Sets the pad from a decoded Sony report (mac_gamepad_report.h), the state the
+   game plays with: sticks (positive y down here), triggers, hat and buttons in
+   the Xbox pad's order. extra is the report's MAC_PAD_EXTRA_* bits (PS is the
+   Xbox button, the touchpad click the Share button). */
+void cs_pad_from_frame(cs_pad_state *pad, const struct mac_gamepad_frame *frame, unsigned extra);
 
 /* Scales value in [min, max] to -32768..32767 / 0..1023. */
 int cs_hid_scale_stick(int value, int logical_min, int logical_max);

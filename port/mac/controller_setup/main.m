@@ -1,24 +1,40 @@
-/* OpenCE Controller Setup: installs and calibrates an Xbox One S controller.
-   Cocoa, IOKit HID Manager and nothing else; Mac OS X 10.5 or later, no
-   garbage collection, no nibs. */
+/* OpenCE Controller Setup: shows how to connect a modern game controller
+   (with the 8BitDo Wireless USB Adapter 2), checks that its input arrives,
+   and calibrates its dead zones. Cocoa, IOKit HID Manager and Carbon's text
+   measuring; Mac OS X 10.5 or later, no garbage collection, no nibs. */
 #import <Cocoa/Cocoa.h>
+#include <Carbon/Carbon.h>
 #include <IOKit/hid/IOHIDLib.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 
 #include "controller_setup_config.h"
 #include "controller_setup_hid.h"
+#include "../mac_gamepad_report.h"
 
 static NSString *gConfigPath = nil;
-static NSString *gPackagePath = nil;
 
-static BOOL FileExists(NSString *path)
-{
-	struct stat st;
-	return stat([path fileSystemRepresentation], &st) == 0;
-}
+/* the instructions: short, in the order a person does them */
+static NSString *const kHeading = @"Connect a modern controller with the 8BitDo Wireless USB Adapter 2";
+static NSString *const kInstructions =
+	@"Works with PS5 DualSense, PS4 DualShock 4, Xbox One/Series, Switch Pro and 8BitDo pads.\n"
+	@"1. Plug the adapter into a USB port.\n"
+	@"2. Press the pair button on the adapter. Its light blinks fast.\n"
+	@"3. Put the controller in pairing mode: hold Create + PS (DualSense) or Share + PS (DualShock 4) for 3 seconds; "
+	@"on an Xbox pad press the Xbox button, then hold its pair button for 3 seconds; on a Switch Pro hold Sync for 3 seconds.\n"
+	@"4. A solid light means it is connected. Next time, just press PS, Xbox or any button.\n"
+	@"Nothing happens? Hold Share (Create, or View on Xbox) + Right for 3 seconds until the light blinks twice to pick Mac mode, then pair again. "
+	@"Some pads need a firmware update first: use 8BitDo's updater on a newer computer.\n"
+	@"Not covered: wired USB pads and the Xbox 360 pad driver.";
+
+/* the live status line */
+static NSString *const kStatusNoPad = @"No game controller found yet: plug in the adapter (or the pad) and follow the steps above.";
+static NSString *const kStatusWaiting = @"No input received yet: press a button on the controller.";
+static NSString *const kStatusReceiving = @"Receiving input";
+static NSString *const kStatusSilent = @"Controller found but sending nothing: make sure it's paired (LED solid) and press a button.";
+static NSString *const kStatusQuiet = @"Receiving input earlier, quiet now: press a button.";
+#define SILENCE_SECONDS 4.0
 
 static int DeviceNumber(IOHIDDeviceRef device, CFStringRef key)
 {
@@ -27,24 +43,6 @@ static int DeviceNumber(IOHIDDeviceRef device, CFStringRef key)
 	if (value && CFGetTypeID(value) == CFNumberGetTypeID())
 		CFNumberGetValue((CFNumberRef)value, kCFNumberIntType, &n);
 	return n;
-}
-
-static BOOL ProcessRunning(const char *name)
-{
-	FILE *p = popen("/bin/ps -axco command", "r");
-	char line[256];
-	BOOL found = NO;
-	if (!p)
-		return NO;
-	while (fgets(line, sizeof line, p)) {
-		size_t n = strlen(line);
-		while (n > 0 && (line[n - 1] == '\n' || line[n - 1] == ' '))
-			line[--n] = 0;
-		if (strcmp(line, name) == 0)
-			found = YES;
-	}
-	pclose(p);
-	return found;
 }
 
 /* ---- the live view ---- */
@@ -175,22 +173,29 @@ static BOOL ProcessRunning(const char *name)
 @interface SetupController : NSObject {
 	NSWindow *window;
 	PadView *padView;
-	NSTextField *statusLines[4];
-	NSTextField *hint;
+	NSBox *box;
+	NSTextField *headingLabel, *instructions, *status;
 	NSTextField *leftLabel, *rightLabel;
 	NSSlider *leftSlider, *rightSlider;
-	NSButton *invertBox, *installButton, *saveButton;
+	NSButton *invertBox, *saveButton, *skipButton;
 	IOHIDManagerRef manager;
 	NSMutableArray *devices; /* NSValue of IOHIDDeviceRef */
+	NSMutableDictionary *reportBuffers; /* NSValue of IOHIDDeviceRef -> NSMutableData */
 	IOHIDDeviceRef chosen;
-	int rawCount;
-	BOOL installOpened;
+	int reportKind;       /* MAC_PAD_REPORT_*: the chosen pad's reports are decoded */
+	BOOL reportSeen;      /* a report of the chosen pad decoded: its elements are then ignored */
+	unsigned long inputCount;
+	CFAbsoluteTime chosenAt, lastInput;
 }
+- (void)buildUI;
 - (void)start;
+- (void)dumpText;
 - (void)sliderChanged:(id)sender;
 - (void)refresh:(id)sender;
 - (void)readInitialValues;
 - (void)handleValue:(IOHIDValueRef)value;
+- (void)applyValue:(IOHIDValueRef)value counted:(BOOL)counted;
+- (void)handleReport:(const uint8_t *)report length:(CFIndex)length id:(uint32_t)reportID device:(IOHIDDeviceRef)device;
 - (void)deviceAdded:(IOHIDDeviceRef)device;
 - (void)deviceRemoved:(IOHIDDeviceRef)device;
 @end
@@ -208,6 +213,83 @@ static void DeviceRemoved(void *ctx, IOReturn r, void *sender, IOHIDDeviceRef de
 static void InputValue(void *ctx, IOReturn r, void *sender, IOHIDValueRef value)
 {
 	[(SetupController *)ctx handleValue:value];
+}
+
+static void InputReport(void *ctx, IOReturn r, void *sender, IOHIDReportType type, uint32_t reportID,
+	uint8_t *report, CFIndex length)
+{
+	if (r == kIOReturnSuccess && type == kIOHIDReportTypeInput)
+		[(SetupController *)ctx handleReport:report length:length id:reportID device:(IOHIDDeviceRef)sender];
+}
+
+static NSSize ThemeSizeOne(NSString *text, ThemeFontID font, float width, BOOL wrap);
+
+/* the size theme text takes (what the launcher measures with), wrapped to width when wrap is set; each line of
+   the text (split at a newline) is measured on its own, as the measuring does not break at a newline */
+static NSSize ThemeSize(NSString *text, ThemeFontID font, float width, BOOL wrap)
+{
+	NSArray *lines = [text componentsSeparatedByString:@"\n"];
+	NSSize total = NSMakeSize(0, 0);
+	unsigned i;
+	for (i = 0; i < [lines count]; i++) {
+		NSSize one = ThemeSizeOne([lines objectAtIndex:i], font, width, wrap);
+		if (one.width > total.width)
+			total.width = one.width;
+		total.height += one.height;
+	}
+	return total;
+}
+
+/* the size theme text takes (what the launcher measures with), wrapped to width when wrap is set */
+static NSSize ThemeSizeOne(NSString *text, ThemeFontID font, float width, BOOL wrap)
+{
+	Point bounds;
+	SInt16 baseline;
+
+	/* one line: its own width and height. (GetThemeTextDimensions measures one line, as the launcher uses it, so a
+	   wrapped text is broken into lines here, a word at a time.) */
+	bounds.h = 0;
+	bounds.v = 0;
+	if (GetThemeTextDimensions((CFStringRef)(wrap && [text length] == 0 ? @" " : text), font, kThemeStateActive, false,
+			&bounds, &baseline) != noErr || bounds.h <= 0 || bounds.v <= 0) {
+		/* (no metrics: a generous guess) */
+		float chars = (float)[text length];
+		float perLine = width > 0 ? width / 6.0f : chars;
+		return NSMakeSize(wrap ? width : chars * 7.0f, 15.0f * (float)(1 + (int)(chars / perLine)));
+	}
+	if (!wrap || bounds.h <= width)
+		return NSMakeSize(bounds.h, bounds.v);
+	{
+		NSArray *words = [text componentsSeparatedByString:@" "];
+		NSString *line = @"";
+		float widest = 0;
+		int lines = 1;
+		unsigned i;
+		for (i = 0; i < [words count]; i++) {
+			NSString *tryLine = [line length] ? [line stringByAppendingFormat:@" %@", [words objectAtIndex:i]] : [words objectAtIndex:i];
+			Point b2;
+			b2.h = b2.v = 0;
+			GetThemeTextDimensions((CFStringRef)tryLine, font, kThemeStateActive, false, &b2, &baseline);
+			if (b2.h > width && [line length]) {
+				Point b3;
+				b3.h = b3.v = 0;
+				GetThemeTextDimensions((CFStringRef)line, font, kThemeStateActive, false, &b3, &baseline);
+				if (b3.h > widest)
+					widest = b3.h;
+				line = [words objectAtIndex:i];
+				lines++;
+			} else
+				line = tryLine;
+		}
+		{
+			Point b4;
+			b4.h = b4.v = 0;
+			GetThemeTextDimensions((CFStringRef)line, font, kThemeStateActive, false, &b4, &baseline);
+			if (b4.h > widest)
+				widest = b4.h;
+		}
+		return NSMakeSize(widest, (float)(lines * bounds.v));
+	}
 }
 
 /* an element usage page, for the input values asked for */
@@ -234,22 +316,9 @@ static CFMutableDictionaryRef MatchPage(int page, int usage)
 	return d;
 }
 
-static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
-{
-	CFMutableDictionaryRef d = CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
-		&kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-	CFNumberRef a = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &vendor);
-	CFNumberRef b = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &product);
-	CFDictionarySetValue(d, CFSTR(kIOHIDVendorIDKey), a);
-	CFDictionarySetValue(d, CFSTR(kIOHIDProductIDKey), b);
-	CFRelease(a);
-	CFRelease(b);
-	return d;
-}
-
 @implementation SetupController
 
-- (NSTextField *)labelAt:(NSRect)frame text:(NSString *)text bold:(BOOL)bold
+- (NSTextField *)labelIn:(NSView *)parent frame:(NSRect)frame text:(NSString *)text bold:(BOOL)bold
 {
 	NSTextField *t = [[[NSTextField alloc] initWithFrame:frame] autorelease];
 	[t setEditable:NO];
@@ -257,9 +326,15 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 	[t setDrawsBackground:NO];
 	[t setSelectable:NO];
 	[t setStringValue:text];
-	[t setFont:bold ? [NSFont boldSystemFontOfSize:13] : [NSFont systemFontOfSize:12]];
-	[[window contentView] addSubview:t];
+	[t setFont:bold ? [NSFont boldSystemFontOfSize:13] : [NSFont systemFontOfSize:[NSFont smallSystemFontSize]]];
+	[[t cell] setWraps:YES];
+	[parent addSubview:t];
 	return t;
+}
+
+- (NSTextField *)labelAt:(NSRect)frame text:(NSString *)text bold:(BOOL)bold
+{
+	return [self labelIn:[window contentView] frame:frame text:text bold:bold];
 }
 
 - (NSButton *)buttonAt:(NSRect)frame title:(NSString *)title action:(SEL)action
@@ -286,14 +361,37 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 	return s;
 }
 
-- (void)start
+/* The height the status line needs: the tallest of its texts, wrapped, with a line to spare for Cocoa's own
+   wrapping, which is a little wider than the theme's. */
+- (float)statusHeight
 {
+	NSString *all[5];
+	float h = 0;
 	int i;
-	NSRect frame = NSMakeRect(0, 0, 520, 420);
-	CFMutableArrayRef matches;
-	CFMutableDictionaryRef m;
+	all[0] = kStatusNoPad; all[1] = kStatusWaiting; all[2] = kStatusReceiving; all[3] = kStatusSilent; all[4] = kStatusQuiet;
+	for (i = 0; i < 5; i++) {
+		float t = ThemeSize(all[i], kThemeSmallSystemFont, 490, YES).height;
+		if (t > h)
+			h = t;
+	}
+	/* (two lines at least: Cocoa breaks a line a little earlier than the theme's measure) */
+	return (h < 26 ? 26 : h) + 4;
+}
+
+- (void)buildUI
+{
+	/* the window, from the bottom up: buttons, invert, sliders, the pad view (160), the status line, the instructions */
+	const float margin = 10, inner = 474;
+	float instrH = ThemeSize(kInstructions, kThemeSmallSystemFont, inner - 6, YES).height + 14;
+	float headH = ThemeSize(kHeading, kThemeEmphasizedSystemFont, inner - 6, YES).height + 4;
+	float statusH = [self statusHeight];
+	float boxH = headH + instrH + 12 + 8;
+	float statusY = 286, boxY = statusY + statusH + 6;
+	float height = boxY + boxH + 10;
+	NSRect frame = NSMakeRect(0, 0, 520, height);
 
 	devices = [[NSMutableArray alloc] init];
+	reportBuffers = [[NSMutableDictionary alloc] init];
 	window = [[NSWindow alloc] initWithContentRect:frame
 		styleMask:NSTitledWindowMask | NSClosableWindowMask
 		backing:NSBackingStoreBuffered defer:NO];
@@ -301,12 +399,13 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 	[window setReleasedWhenClosed:NO];
 	[window setDelegate:(id)self];
 
-	[self labelAt:NSMakeRect(10, 392, 400, 18) text:@"Xbox One S controller setup" bold:YES];
-	for (i = 0; i < 4; i++)
-		statusLines[i] = [self labelAt:NSMakeRect(10, 368 - i * 20, 360, 18) text:@"" bold:NO];
-	installButton = [self buttonAt:NSMakeRect(380, 346, 130, 32) title:@"Install Driver..." action:@selector(install:)];
-	hint = [self labelAt:NSMakeRect(10, 284, 500, 32) text:@"" bold:NO];
-	[[hint cell] setWraps:YES];
+	box = [[[NSBox alloc] initWithFrame:NSMakeRect(margin, boxY, 500, boxH)] autorelease];
+	[box setTitlePosition:NSNoTitle];
+	[box setContentViewMargins:NSMakeSize(6, 6)];
+	[[window contentView] addSubview:box];
+	headingLabel = [self labelIn:[box contentView] frame:NSMakeRect(2, boxH - 12 - headH - 4, inner, headH) text:kHeading bold:YES];
+	instructions = [self labelIn:[box contentView] frame:NSMakeRect(2, boxH - 12 - headH - 4 - instrH, inner, instrH) text:kInstructions bold:NO];
+	status = [self labelAt:NSMakeRect(margin, statusY, 500, statusH) text:kStatusNoPad bold:NO];
 
 	padView = [[[PadView alloc] initWithFrame:NSMakeRect(10, 122, 500, 160)] autorelease];
 	padView->leftDeadZone = padView->rightDeadZone = 9000;
@@ -323,7 +422,7 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 	[invertBox setTitle:@"Invert look (right stick Y)"];
 	[[window contentView] addSubview:invertBox];
 
-	[self buttonAt:NSMakeRect(10, 6, 90, 32) title:@"Skip" action:@selector(skip:)];
+	skipButton = [self buttonAt:NSMakeRect(10, 6, 90, 32) title:@"Skip" action:@selector(skip:)];
 	saveButton = [self buttonAt:NSMakeRect(410, 6, 100, 32) title:@"Save" action:@selector(save:)];
 	[saveButton setKeyEquivalent:@"\r"];
 
@@ -339,16 +438,84 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 			[invertBox setState:strcmp(v, "true") == 0 ? NSOnState : NSOffState];
 	}
 	[self sliderChanged:nil];
+}
 
+/* --dump-text: every text and control with its size and the size its text needs (GetThemeTextDimensions, as
+   the launcher measures), and a CUT OFF line for each that does not fit. Returns the number cut off. */
+static int DumpView(NSView *view, int depth, NSString *indent)
+{
+	NSArray *subs = [view subviews];
+	unsigned i;
+	int bad = 0;
+	for (i = 0; i < [subs count]; i++) {
+		NSView *v = [subs objectAtIndex:i];
+		NSRect f = [v frame];
+		NSString *text = nil;
+		ThemeFontID font = kThemeSmallSystemFont;
+		BOOL wrap = NO, clipped = NO;
+		NSSize need = NSMakeSize(0, 0);
+		if ([v isKindOfClass:[NSTextField class]]) {
+			text = [(NSTextField *)v stringValue];
+			font = [[(NSTextField *)v font] pointSize] > 12 ? kThemeEmphasizedSystemFont : kThemeSmallSystemFont;
+			wrap = YES;
+			need = ThemeSize(text, font, f.size.width - 4, YES);
+			clipped = need.height > f.size.height;
+		} else if ([v isKindOfClass:[NSButton class]]) {
+			text = [(NSButton *)v title];
+			font = kThemeSystemFont;
+			need = ThemeSize(text, font, 0, NO);
+			need.height = 0; /* (a button's height is the bezel's) */
+			clipped = need.width + ([(NSButton *)v bezelStyle] == NSRoundedBezelStyle ? 24 : 20) > f.size.width;
+		}
+		printf("%s%s (%d,%d) %dx%d", [indent UTF8String], [[v className] UTF8String], (int)f.origin.x, (int)f.origin.y,
+			(int)f.size.width, (int)f.size.height);
+		if (text)
+			printf(" needs %dx%d%s \"%s\"", (int)need.width, (int)need.height, wrap ? " wrapped" : "", [text UTF8String]);
+		if (clipped) {
+			printf("  <-- CUT OFF");
+			bad++;
+		}
+		printf("\n");
+		if (!NSContainsRect([view bounds], f)) {
+			printf("%s  <-- OUTSIDE ITS PARENT\n", [indent UTF8String]);
+			bad++;
+		}
+		bad += DumpView(v, depth + 1, [indent stringByAppendingString:@"  "]);
+	}
+	return bad;
+}
+
+- (void)dumpText
+{
+	NSString *all[5];
+	int i, bad;
+	NSRect f = [[window contentView] frame];
+	all[0] = kStatusNoPad; all[1] = kStatusWaiting; all[2] = kStatusReceiving; all[3] = kStatusSilent; all[4] = kStatusQuiet;
+	printf("window %dx%d\n", (int)f.size.width, (int)f.size.height);
+	bad = DumpView([window contentView], 0, @"  ");
+	for (i = 0; i < 5; i++) {
+		NSSize n = ThemeSize(all[i], kThemeSmallSystemFont, 496, YES);
+		NSRect sf = [status frame];
+		printf("status %d needs %dx%d in %dx%d%s: %s\n", i, (int)n.width, (int)n.height, (int)sf.size.width, (int)sf.size.height,
+			n.height > sf.size.height ? "  <-- CUT OFF" : "", [all[i] UTF8String]);
+		if (n.height > sf.size.height)
+			bad++;
+	}
+	printf("%s\n", bad ? "CUT OFF: yes" : "nothing cut off");
+}
+
+- (void)start
+{
+	CFMutableArrayRef matches;
+	CFMutableDictionaryRef m;
+
+	[self buildUI];
 	manager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
 	matches = CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
 	m = MatchPage(CS_PAGE_GENERIC_DESKTOP, 5); /* game pad */
 	CFArrayAppendValue(matches, m);
 	CFRelease(m);
 	m = MatchPage(CS_PAGE_GENERIC_DESKTOP, 4); /* joystick */
-	CFArrayAppendValue(matches, m);
-	CFRelease(m);
-	m = MatchVendorProduct(CS_VENDOR_MICROSOFT, CS_PRODUCT_XBOX_ONE_S_RAW);
 	CFArrayAppendValue(matches, m);
 	CFRelease(m);
 	IOHIDManagerSetDeviceMatchingMultiple(manager, matches);
@@ -376,15 +543,9 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 	IOHIDManagerOpen(manager, kIOHIDOptionsTypeNone);
 
 	[self refresh:nil];
-	[NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(refresh:) userInfo:nil repeats:YES];
+	[NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(refresh:) userInfo:nil repeats:YES];
 	[window center];
 	[window makeKeyAndOrderFront:nil];
-}
-
-- (BOOL)isRaw:(IOHIDDeviceRef)d
-{
-	return DeviceNumber(d, CFSTR(kIOHIDVendorIDKey)) == CS_VENDOR_MICROSOFT
-		&& DeviceNumber(d, CFSTR(kIOHIDProductIDKey)) == CS_PRODUCT_XBOX_ONE_S_RAW;
 }
 
 - (BOOL)isXboxPad:(IOHIDDeviceRef)d
@@ -410,20 +571,15 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 	return CS_LAYOUT_GENERIC;
 }
 
-/* Chooses the Xbox virtual pad if there is one, else the first other pad. */
+/* Chooses the first game pad (one that an Xbox driver made, if there is one, before any other). */
 - (void)choose
 {
 	IOHIDDeviceRef best = NULL;
 	unsigned i;
 	BOOL bestXbox = NO;
 
-	rawCount = 0;
 	for (i = 0; i < [devices count]; i++) {
 		IOHIDDeviceRef d = (IOHIDDeviceRef)[[devices objectAtIndex:i] pointerValue];
-		if ([self isRaw:d]) {
-			rawCount++;
-			continue;
-		}
 		if (![self isPad:d])
 			continue;
 		if (!best || (!bestXbox && [self isXboxPad:d])) {
@@ -433,6 +589,11 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 	}
 	if (best != chosen) {
 		chosen = best;
+		reportSeen = NO;
+		reportKind = best ? mac_gamepad_report_kind((unsigned)DeviceNumber(best, CFSTR(kIOHIDVendorIDKey)),
+			(unsigned)DeviceNumber(best, CFSTR(kIOHIDProductIDKey))) : MAC_PAD_REPORT_NONE;
+		inputCount = 0;
+		chosenAt = CFAbsoluteTimeGetCurrent();
 		cs_pad_clear(&padView->pad, best ? [self layoutOf:best] : CS_LAYOUT_GENERIC);
 		padView->isXbox = best ? [self layoutOf:best] : CS_LAYOUT_GENERIC;
 		padView->hasPad = best != NULL;
@@ -446,7 +607,8 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 			CFTypeRef n = IOHIDDeviceGetProperty(best, CFSTR(kIOHIDProductKey));
 			if (n && CFGetTypeID(n) == CFStringGetTypeID())
 				padView->padName = [[NSString stringWithString:(NSString *)n] retain];
-			NSLog(@"controller setup: chose %@ (layout %d); reading its values", padView->padName, (int)padView->isXbox);
+			NSLog(@"controller setup: chose %@ (layout %d, reports %d); reading its values", padView->padName,
+				(int)padView->isXbox, reportKind);
 			[self readInitialValues];
 			NSLog(@"controller setup: values read");
 		}
@@ -474,27 +636,58 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 		if (page != CS_PAGE_GENERIC_DESKTOP && page != 0x02 && page != CS_PAGE_BUTTON)
 			continue;
 		if (IOHIDDeviceGetValue(chosen, e, &v) == kIOReturnSuccess && v)
-			[self handleValue:v];
+			[self applyValue:v counted:NO];
 	}
 	CFRelease(elements);
 }
 
 - (void)deviceAdded:(IOHIDDeviceRef)device
 {
-	NSLog(@"controller setup: device %04x:%04x added", DeviceNumber(device, CFSTR(kIOHIDVendorIDKey)),
-		DeviceNumber(device, CFSTR(kIOHIDProductIDKey)));
+	unsigned vendor = (unsigned)DeviceNumber(device, CFSTR(kIOHIDVendorIDKey));
+	unsigned product = (unsigned)DeviceNumber(device, CFSTR(kIOHIDProductIDKey));
+	NSLog(@"controller setup: device %04x:%04x added", vendor, product);
 	[devices addObject:[NSValue valueWithPointer:device]];
+	/* a Sony pad's input reports, which carry the whole state (the game reads these, mac_gamepad_report.c) */
+	if (mac_gamepad_report_kind(vendor, product) != MAC_PAD_REPORT_NONE) {
+		NSMutableData *buffer = [NSMutableData dataWithLength:256];
+		[reportBuffers setObject:buffer forKey:[NSValue valueWithPointer:device]];
+		IOHIDDeviceRegisterInputReportCallback(device, (uint8_t *)[buffer mutableBytes], 256, InputReport, self);
+	}
 	[self choose];
 	[self refresh:nil];
 }
 
 - (void)deviceRemoved:(IOHIDDeviceRef)device
 {
-	[devices removeObject:[NSValue valueWithPointer:device]];
+	NSValue *key = [NSValue valueWithPointer:device];
+	if ([reportBuffers objectForKey:key]) {
+		IOHIDDeviceRegisterInputReportCallback(device, (uint8_t *)[[reportBuffers objectForKey:key] mutableBytes], 256, NULL, NULL);
+		[reportBuffers removeObjectForKey:key];
+	}
+	[devices removeObject:key];
 	if (chosen == device)
 		chosen = NULL;
 	[self choose];
 	[self refresh:nil];
+}
+
+- (void)noteInput
+{
+	inputCount++;
+	lastInput = CFAbsoluteTimeGetCurrent();
+}
+
+- (void)applyValue:(IOHIDValueRef)value counted:(BOOL)counted
+{
+	IOHIDElementRef e = IOHIDValueGetElement(value);
+	if (reportSeen)
+		return; /* (the reports are the state; the elements only trail them) */
+	if (counted)
+		[self noteInput];
+	if (cs_hid_apply(&padView->pad, IOHIDElementGetUsagePage(e), IOHIDElementGetUsage(e),
+			(int)IOHIDValueGetIntegerValue(value), (int)IOHIDElementGetLogicalMin(e),
+			(int)IOHIDElementGetLogicalMax(e)))
+		[padView setNeedsDisplay:YES];
 }
 
 - (void)handleValue:(IOHIDValueRef)value
@@ -503,49 +696,54 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 	IOHIDDeviceRef d = IOHIDElementGetDevice(e);
 	if (!chosen || d != chosen)
 		return;
-	if (cs_hid_apply(&padView->pad, IOHIDElementGetUsagePage(e), IOHIDElementGetUsage(e),
-			(int)IOHIDValueGetIntegerValue(value), (int)IOHIDElementGetLogicalMin(e),
-			(int)IOHIDElementGetLogicalMax(e)))
-		[padView setNeedsDisplay:YES];
+	[self applyValue:value counted:YES];
 }
 
-- (void)setStatus:(int)i ok:(BOOL)ok text:(NSString *)text
+- (void)handleReport:(const uint8_t *)report length:(CFIndex)length id:(uint32_t)reportID device:(IOHIDDeviceRef)device
 {
-	[statusLines[i] setStringValue:[NSString stringWithFormat:@"%@ %@", ok ? @"[x]" : @"[ ]", text]];
+	unsigned char data[260];
+	struct mac_gamepad_frame frame;
+	unsigned extra = 0;
+	unsigned size;
+
+	if (!chosen || device != chosen || length <= 0 || length > 256)
+		return;
+	[self noteInput];
+	if (reportKind == MAC_PAD_REPORT_NONE)
+		return;
+	/* the decoder wants the report id first: the system may or may not have left it in */
+	if (reportID != 0 && report[0] != (uint8_t)reportID) {
+		data[0] = (unsigned char)reportID;
+		memcpy(data + 1, report, (size_t)length);
+		size = (unsigned)length + 1;
+	} else {
+		memcpy(data, report, (size_t)length);
+		size = (unsigned)length;
+	}
+	if (mac_gamepad_decode_report(reportKind, data, size, &frame, &extra)) {
+		cs_pad_from_frame(&padView->pad, &frame, extra);
+		reportSeen = YES;
+		[padView setNeedsDisplay:YES];
+	}
 }
 
 - (void)refresh:(id)sender
 {
-	BOOL installed = FileExists(@"/usr/local/bin/xboxd")
-		&& FileExists(@"/usr/local/share/XboxOnePad/XboxOnePad.kext")
-		&& FileExists(@"/Library/LaunchDaemons/net.xboxcontroller.xboxd.plist");
-	BOOL running = ProcessRunning("xboxd");
-	BOOL virt = NO;
-	unsigned i;
-	NSString *h;
+	NSString *text;
+	CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
 
-	for (i = 0; i < [devices count]; i++)
-		if ([self isXboxPad:(IOHIDDeviceRef)[[devices objectAtIndex:i] pointerValue]])
-			virt = YES;
-	[self setStatus:0 ok:installed text:@"Driver installed"];
-	[self setStatus:1 ok:running text:@"Driver running (xboxd)"];
-	[self setStatus:2 ok:virt text:@"Virtual game pad visible"];
-	[self setStatus:3 ok:(rawCount > 0 || virt) text:@"Controller connected over Bluetooth"];
-	[installButton setTitle:installed ? @"Reinstall Driver..." : @"Install Driver..."];
-
-	if (virt)
-		h = @"Move the sticks and press buttons to check them, then set the dead zones.";
-	else if (chosen)
-		h = @"No Xbox driver pad, but another game pad works. Move it to check, then save.";
-	else if (!installed)
-		h = @"Install the driver first. Never update the controller's firmware.";
-	else if (!running)
-		h = @"The driver is installed but not running. Restart the Mac, or run the installer again.";
-	else if (rawCount == 0)
-		h = @"Pair the controller in System Preferences > Bluetooth (hold the pairing button until the Xbox light flashes), then press the Xbox button.";
+	if (!chosen)
+		text = kStatusNoPad;
+	else if (inputCount > 0 && now - lastInput < SILENCE_SECONDS)
+		text = kStatusReceiving;
+	else if (inputCount > 0)
+		text = kStatusQuiet;
+	else if (now - chosenAt < SILENCE_SECONDS)
+		text = kStatusWaiting;
 	else
-		h = @"The controller is connected but the pad is not visible yet. Wait a moment.";
-	[hint setStringValue:h];
+		text = kStatusSilent;
+	if (![[status stringValue] isEqualToString:text])
+		[status setStringValue:text];
 	[leftSlider setEnabled:chosen != NULL];
 	[rightSlider setEnabled:chosen != NULL];
 	[invertBox setEnabled:chosen != NULL];
@@ -558,40 +756,6 @@ static CFMutableDictionaryRef MatchVendorProduct(int vendor, int product)
 	[leftLabel setStringValue:[NSString stringWithFormat:@"%d", [leftSlider intValue]]];
 	[rightLabel setStringValue:[NSString stringWithFormat:@"%d", [rightSlider intValue]]];
 	[padView setNeedsDisplay:YES];
-}
-
-- (NSString *)findPackage
-{
-	NSFileManager *fm = [NSFileManager defaultManager];
-	NSString *dir;
-	NSArray *names;
-	unsigned i;
-
-	if (gPackagePath && FileExists(gPackagePath))
-		return gPackagePath;
-	dir = [[[NSBundle mainBundle] bundlePath] stringByDeletingLastPathComponent];
-	names = [fm directoryContentsAtPath:dir];
-	for (i = 0; i < [names count]; i++) {
-		NSString *n = [names objectAtIndex:i];
-		if ([n hasPrefix:@"XboxOneController"] && [n hasSuffix:@".pkg"])
-			return [dir stringByAppendingPathComponent:n];
-	}
-	return nil;
-}
-
-- (void)install:(id)sender
-{
-	NSString *pkg = [self findPackage];
-	if (!pkg) {
-		NSRunAlertPanel(@"Driver package not found",
-			@"Put XboxOneController-1.0.pkg next to this app, or start the app with --package PATH.",
-			@"OK", nil, nil);
-		return;
-	}
-	/* The system Installer asks for the administrator password itself. */
-	[NSTask launchedTaskWithLaunchPath:@"/usr/bin/open" arguments:[NSArray arrayWithObject:pkg]];
-	installOpened = YES;
-	[hint setStringValue:@"The Installer is open. Finish it, then come back here: this window checks again every 2 seconds."];
 }
 
 - (void)finish:(BOOL)skipOnly
@@ -633,10 +797,17 @@ int main(int argc, char **argv)
 		if (strcmp(argv[i], "--config") == 0)
 			gConfigPath = [[NSString stringWithUTF8String:argv[++i]] retain];
 		else if (strcmp(argv[i], "--package") == 0)
-			gPackagePath = [[NSString stringWithUTF8String:argv[++i]] retain];
+			i++; /* (older launchers pass a driver package; there is none now) */
 	}
 	[NSApplication sharedApplication];
 	controller = [[SetupController alloc] init];
+	for (i = 1; i < argc; i++)
+		if (strcmp(argv[i], "--dump-text") == 0) {
+			/* the window is built but never shown, and no pad is opened */
+			[controller buildUI];
+			[controller dumpText];
+			return 0;
+		}
 	[controller start];
 	[NSApp activateIgnoringOtherApps:YES];
 	[NSApp run];

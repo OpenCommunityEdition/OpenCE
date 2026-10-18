@@ -61,7 +61,7 @@ static char config_file[PATH_MAX];
 static char shown_environment[MAX_ENVIRONMENT][PATH_MAX + 64];
 static int shown_environment_count;
 /* what the dialog's buttons and status line need from main */
-static const char *g_controller, *g_disc, *g_driver;
+static const char *g_controller, *g_disc;
 static char g_xbox_data[PATH_MAX];
 static char g_retail[PATH_MAX];
 static int g_have_retail;
@@ -387,7 +387,7 @@ static int detect_xbox(char *xbox_data, char *xbox_maps)
 
 static void dialog_controller_setup(void)
 {
-	char *av[] = { (char *)g_controller, "--config", config_file, "--package", (char *)g_driver, NULL };
+	char *av[] = { (char *)g_controller, "--config", config_file, NULL };
 
 	if (is_file(g_controller))
 		run_and_wait(av);
@@ -449,7 +449,7 @@ static void write_word_file(const char *name, const char *word)
 int main(int argc, char **argv)
 {
 	char exe[PATH_MAX], real[PATH_MAX], macos[PATH_MAX], resources[PATH_MAX], game[PATH_MAX];
-	char menus[PATH_MAX], controller[PATH_MAX], disc[PATH_MAX], driver[PATH_MAX];
+	char menus[PATH_MAX], controller[PATH_MAX], disc[PATH_MAX];
 	char retail[PATH_MAX], xbox_data[PATH_MAX], xbox_maps[PATH_MAX], ui[PATH_MAX], bitmaps[PATH_MAX];
 	char sounds[PATH_MAX], source_name[32], data_root[PATH_MAX], text[PATH_MAX], log_path[PATH_MAX];
 	char *config_text, *args[64];
@@ -614,17 +614,8 @@ int main(int argc, char **argv)
 	if (strcmp(source_name, "xbox") != 0 && strcmp(source_name, "retail") != 0)
 		snprintf(source_name, sizeof(source_name), "auto");
 
-	path_join(driver, resources, "Driver/XboxOneController-1.0.pkg");
-	if (!is_file(driver))
-	{
-		path_join(text, support, "Driver/XboxOneController-1.0.pkg");
-		if (is_file(text))
-			snprintf(driver, sizeof(driver), "%s", text);
-	}
-
 	g_controller = controller;
 	g_disc = disc;
-	g_driver = driver;
 	snprintf(g_xbox_data, sizeof(g_xbox_data), "%s", xbox_data);
 
 	/* the startup dialog: the settings, Play and Quit, Setup and Controller Setup. It opens unless it was turned
@@ -707,11 +698,11 @@ int main(int argc, char **argv)
 
 	if (want_controller)
 	{
-		char *av[] = { controller, "--config", config_file, "--package", driver, NULL };
+		char *av[] = { controller, "--config", config_file, NULL };
 
 		if (dry_run)
 		{
-			printf("would run: %s --config %s --package %s\n", controller, config_file, driver);
+			printf("would run: %s --config %s\n", controller, config_file);
 			return 0;
 		}
 		return run_and_wait(av) == 0 ? 0 : 1;
@@ -864,7 +855,7 @@ int main(int argc, char **argv)
 
 			if (!done)
 			{
-				char *av[] = { controller, "--config", config_file, "--package", driver, NULL };
+				char *av[] = { controller, "--config", config_file, NULL };
 
 				run_and_wait(av);
 			}

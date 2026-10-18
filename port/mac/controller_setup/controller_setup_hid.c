@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include "../mac_gamepad_report.h"
+
 const char *cs_sony_model(int vendor, int product)
 {
 	if (vendor != CS_VENDOR_SONY)
@@ -156,4 +158,44 @@ int cs_hid_apply(cs_pad_state *pad, int usage_page, int usage, int value,
 		return 1;
 	}
 	return 0;
+}
+
+void cs_pad_from_frame(cs_pad_state *pad, const struct mac_gamepad_frame *frame, unsigned extra)
+{
+	unsigned dpad = frame->buttons;
+	int up = (dpad & MAC_GAMEPAD_DPAD_UP) != 0, down = (dpad & MAC_GAMEPAD_DPAD_DOWN) != 0;
+	int left = (dpad & MAC_GAMEPAD_DPAD_LEFT) != 0, right = (dpad & MAC_GAMEPAD_DPAD_RIGHT) != 0;
+	unsigned long b = 0;
+
+	/* (the decoder's up is positive; this view's y grows down) */
+	pad->lx = frame->left_x;
+	pad->ly = -frame->left_y - 1;
+	pad->rx = frame->right_x;
+	pad->ry = -frame->right_y - 1;
+	pad->lt = frame->analog[MAC_GAMEPAD_LEFT_TRIGGER] * 1023 / 255;
+	pad->rt = frame->analog[MAC_GAMEPAD_RIGHT_TRIGGER] * 1023 / 255;
+	if (up && right) pad->hat = 2;
+	else if (down && right) pad->hat = 4;
+	else if (down && left) pad->hat = 6;
+	else if (up && left) pad->hat = 8;
+	else if (up) pad->hat = 1;
+	else if (right) pad->hat = 3;
+	else if (down) pad->hat = 5;
+	else if (left) pad->hat = 7;
+	else pad->hat = 0;
+	/* A B X Y LB RB View Menu LS RS Xbox Share */
+	if (frame->analog[MAC_GAMEPAD_A]) b |= 1UL << 0;
+	if (frame->analog[MAC_GAMEPAD_B]) b |= 1UL << 1;
+	if (frame->analog[MAC_GAMEPAD_X]) b |= 1UL << 2;
+	if (frame->analog[MAC_GAMEPAD_Y]) b |= 1UL << 3;
+	if (frame->analog[MAC_GAMEPAD_WHITE]) b |= 1UL << 4;
+	if (frame->analog[MAC_GAMEPAD_BLACK]) b |= 1UL << 5;
+	if (dpad & MAC_GAMEPAD_BACK) b |= 1UL << 6;
+	if (dpad & MAC_GAMEPAD_START) b |= 1UL << 7;
+	if (dpad & MAC_GAMEPAD_LEFT_THUMB) b |= 1UL << 8;
+	if (dpad & MAC_GAMEPAD_RIGHT_THUMB) b |= 1UL << 9;
+	if (extra & MAC_PAD_EXTRA_PS) b |= 1UL << 10;
+	if (extra & MAC_PAD_EXTRA_TOUCHPAD) b |= 1UL << 11;
+	pad->buttons = b;
+	pad->seen_rstick = 1;
 }

@@ -1,6 +1,7 @@
-/* cc -o test_config test_config.c controller_setup_config.c controller_setup_hid.c ../app/launcher_config.c */
+/* cc -o test_config test_config.c controller_setup_config.c controller_setup_hid.c ../mac_gamepad_report.c ../app/launcher_config.c */
 #include "controller_setup_config.h"
 #include "controller_setup_hid.h"
+#include "../mac_gamepad_report.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -131,6 +132,24 @@ int main(int argc, char **argv)
 	CHECK(p.seen_rstick && p.rx == -32768);
 	CHECK(!cs_hid_apply(&p, 1, 0x32, 255, 0, 255));
 	CHECK(cs_hid_in_dead_zone(100, 100, 9000) && !cs_hid_in_dead_zone(9000, 9000, 9000));
+
+	/* a DualShock 4 report: stick right-down, cross and L1 down, hat north-east, L2 half */
+	{
+		unsigned char r[64];
+		struct mac_gamepad_frame fr;
+		unsigned extra = 0;
+		cs_pad_state q;
+		memset(r, 0, sizeof r);
+		r[0] = 1; r[1] = 255; r[2] = 255; r[3] = 128; r[4] = 0;
+		r[5] = 0x20 | 1; r[6] = 0x01 | 0x20; r[7] = 0x01; r[8] = 128;
+		CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSHOCK4, r, 64, &fr, &extra));
+		cs_pad_clear(&q, CS_LAYOUT_PLAYSTATION);
+		cs_pad_from_frame(&q, &fr, extra);
+		CHECK(q.lx == 32767 && q.ly == 32767 && q.ry == -32768);
+		CHECK(q.hat == 2);
+		CHECK((q.buttons & 1UL) && (q.buttons & (1UL << 4)) && (q.buttons & (1UL << 7)) && (q.buttons & (1UL << 10)));
+		CHECK(q.lt == 128 * 1023 / 255 && q.rt == 0);
+	}
 
 	printf(failures ? "%d failures\n" : "all tests passed\n", failures);
 	return failures != 0;

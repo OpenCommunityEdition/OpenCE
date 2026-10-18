@@ -14,9 +14,9 @@
 #                  Controller Setup.app" (port/mac/xiso_setup/build.sh and
 #                  port/mac/controller_setup/build.sh write them); they are
 #                  built here when it is not given
-#   --driver       the Xbox One controller driver package, put in the app
-#                  (not in the disk image unless this is given: it is not
-#                  OpenCE's to ship)
+#   --driver       ignored (older scripts pass it): the app no longer carries
+#                  a controller driver; Controller Setup tells players to use
+#                  the 8BitDo Wireless USB Adapter 2 instead
 #   --icon         the app's icon, a .icns or a square .png (made into one by
 #                  tools/mac_icns.py); kept out of the repository (PowerSpark's
 #                  is fan art, not OpenCE's to ship). Without it the app has
@@ -106,8 +106,7 @@ for h in "OpenCE Setup.app" "OpenCE Controller Setup.app"; do
     cp -R "$HELPERS/$h" "$APP/Contents/Resources/Helpers/$h"
 done
 if [ -n "$DRIVER" ]; then
-    mkdir -p "$APP/Contents/Resources/Driver"
-    cp "$DRIVER" "$APP/Contents/Resources/Driver/XboxOneController-1.0.pkg"
+    echo "mac_app_bundle: --driver is ignored; the app carries no controller driver" >&2
 fi
 
 # the icon: --icon's (.icns as it is, .png through tools/mac_icns.py), else OpenCE's
