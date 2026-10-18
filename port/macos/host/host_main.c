@@ -36,11 +36,18 @@ static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* ---------- logging and ending */
 
+/* HALO_HOST_QUIET: only warnings and errors (tests compare the guest's
+own output) */
+static int quiet = -1;
+
 void host_logf(int priority, const char *format, ...)
 {
 	va_list arguments;
 
-	(void)priority;
+	if (quiet < 0)
+		quiet = getenv("HALO_HOST_QUIET") && *getenv("HALO_HOST_QUIET");
+	if (quiet && priority < HOST_LOG_WARN)
+		return;
 	fputs("halo_host: ", stderr);
 	va_start(arguments, format);
 	vfprintf(stderr, format, arguments);
@@ -63,6 +70,7 @@ void host_fatal(const char *format, ...)
 
 void host_exit(int code)
 {
+	host_vm_report_import_counts();
 	host_logf(HOST_LOG_INFO, "the guest exited with status %d", code);
 	fflush(stdout);
 	fflush(stderr);

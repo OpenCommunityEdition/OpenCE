@@ -66,6 +66,15 @@ struct vcpu
 	int depth;
 };
 
+/* (build/macos/host/host_import_names.c) */
+extern const char *const host_import_names[];
+extern const unsigned int host_import_name_count;
+
+/* HALO_HOST_IMPORT_COUNTS: each import's calls, counted */
+#define COUNTED_IMPORTS 1024
+static int counting = -1;
+static _Atomic unsigned long long import_counts[COUNTED_IMPORTS];
+
 static __thread struct vcpu *current_vcpu;
 /* the guest stack size the next vCPU made on this thread gets */
 static __thread uint32_t next_stack_size;
@@ -236,6 +245,10 @@ static void vcpu_import(struct vcpu *vcpu)
 		call.x[register_index] = get_reg(vcpu, (hv_reg_t)(HV_REG_X0 + register_index));
 		call.d[register_index] = get_d(vcpu, register_index);
 	}
+	if (counting < 0)
+		counting = getenv("HALO_HOST_IMPORT_COUNTS") && *getenv("HALO_HOST_IMPORT_COUNTS");
+	if (counting && index < COUNTED_IMPORTS)
+		import_counts[index]++;
 	call.sp = (uint32_t)get_sys(vcpu, HV_SYS_REG_SP_EL0);
 	call.result_x = 0;
 	call.result_d = 0;
@@ -323,6 +336,19 @@ static uint64_t vcpu_call(uint32_t function, const uint32_t *arguments, int coun
 		free(saved);
 	}
 	return result;
+}
+
+void host_vm_report_import_counts(void)
+{
+	uint32_t index;
+
+	if (counting <= 0)
+		return;
+	for (index = 0; index < host_import_name_count && index < COUNTED_IMPORTS; index++)
+	{
+		if (import_counts[index])
+			fprintf(stderr, "halo_host: import %s: %llu\n", host_import_names[index], import_counts[index]);
+	}
 }
 
 /* ---------- the VM */

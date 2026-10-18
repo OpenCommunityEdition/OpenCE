@@ -1,0 +1,77 @@
+"""The guest runtime's services in the macOS host's VM (docs/macos_host.md).
+
+port/macos/tests/vm_runtime.c is built as a guest image (tools/macos_guest_image.py)
+and each of its cases is run in the host: threads with their own thread
+pointers and TLS, futexes (mutexes, condition variables, timed waits), time,
+files with Linux's flags and errno values, and memory. Needs `ninja macos` in
+`nix develop`.
+"""
+
+import platform
+import re
+import shutil
+import sys
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from tools import macos_guest_image  # noqa: E402
+
+pytestmark = [
+    pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only"),
+    pytest.mark.skipif(not macos_guest_image.available() or shutil.which("ninja") is None,
+                       reason="needs `ninja macos` in nix develop"),
+]
+
+
+@pytest.fixture(scope="module")
+def image(tmp_path_factory):
+    work = tmp_path_factory.mktemp("vm_runtime")
+    return macos_guest_image.build_guest_image([ROOT / "port/macos/tests/vm_runtime.c"], work, "vm_runtime")
+
+
+def run_case(image, tmp_path, *arguments, environment=None):
+    result = macos_guest_image.run_guest(image, arguments, tmp_path / "run", environment)
+    return result.returncode, result.stdout, result.stderr
+
+
+@pytest.mark.parametrize("case", ["threads", "condition", "timed_wait", "time", "memory"])
+def test_case(image, tmp_path, case):
+    status, stdout, stderr = run_case(image, tmp_path, case)
+    assert (status, stdout.strip()) == (0, "ok"), stdout + stderr
+
+
+def test_files(image, tmp_path):
+    folder = tmp_path / "files"
+    folder.mkdir()
+    status, stdout, stderr = run_case(image, tmp_path, "files", str(folder))
+    assert (status, stdout.strip()) == (0, "ok"), stdout + stderr
+    assert list(folder.iterdir()) == []
+
+
+def test_the_guests_exit_status_is_the_hosts(image, tmp_path):
+    status, stdout, stderr = run_case(image, tmp_path, "exit")
+    assert status == 42, stdout + stderr
+
+
+def test_the_host_stays_quiet_unless_asked(image, tmp_path):
+    status, stdout, stderr = run_case(image, tmp_path, "time")
+    assert status == 0 and "halo_host" not in stdout + stderr, stdout + stderr
+
+
+def import_counts(stderr):
+    return {name: int(count) for name, count in re.findall(r"halo_host: import (\w+): (\d+)", stderr)}
+
+
+def test_the_thread_pointer_costs_no_exit(image, tmp_path):
+    # In the VM, TPIDR_EL0 is the guest's own: the guest reads and sets its
+    # thread pointer there, not through host_get_tp and host_set_tp, which
+    # would each be an exit (musl reads it for every lock and errno)
+    status, stdout, stderr = run_case(image, tmp_path, "threads", environment={"HALO_HOST_IMPORT_COUNTS": "1"})
+    assert (status, stdout.strip()) == (0, "ok"), stdout + stderr
+    counts = import_counts(stderr)
+    assert counts.get("host_syscall", 0) > 0, stderr
+    assert counts.get("host_get_tp", 0) == 0 and counts.get("host_set_tp", 0) == 0, counts

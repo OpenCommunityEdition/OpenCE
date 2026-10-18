@@ -68,6 +68,9 @@ int host_native_thread_create(void *(*function)(void *), void *argument, size_t 
 void host_vm_run_main(uint32_t boot) __attribute__((noreturn));
 /* the import: a host thread running the image's __guest_thread_start(thread) */
 int host_thread_create(uint32_t guest_thread, uint32_t stack_size);
+/* with HALO_HOST_IMPORT_COUNTS set, the number of times the guest called
+each import, to standard error ("halo_host: import <name>: <count>") */
+void host_vm_report_import_counts(void);
 /* this thread's vCPU's TPIDR_EL0: the guest's thread pointer */
 uint32_t host_vcpu_thread_pointer(void);
 void host_vcpu_set_thread_pointer(uint32_t value);
