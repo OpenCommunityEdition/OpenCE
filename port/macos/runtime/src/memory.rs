@@ -28,7 +28,7 @@ impl GuestPtr {
     /// The address `offset` bytes further on, or `None` past the end of the
     /// address space.
     pub fn checked_add(self, offset: u32) -> Option<GuestPtr> {
-        todo!("{offset}")
+        self.0.checked_add(offset).map(GuestPtr)
     }
 }
 
@@ -49,7 +49,19 @@ pub struct GuestRange {
 impl GuestRange {
     /// The range of `size` bytes at `start`.
     pub fn new(start: GuestPtr, size: u64) -> Result<GuestRange, MemoryError> {
-        todo!("{start:?} {size}")
+        if size == 0 {
+            return Err(MemoryError::Empty { address: start.0 });
+        }
+        match u64::from(start.0).checked_add(size) {
+            Some(end) if end <= GUEST_SPACE => Ok(GuestRange {
+                start: start.0,
+                end,
+            }),
+            _ => Err(MemoryError::OutOfRange {
+                address: start.0,
+                size,
+            }),
+        }
     }
 
     pub fn start(&self) -> GuestPtr {
@@ -77,8 +89,14 @@ pub enum MemoryError {
     Unmapped { address: u32, size: u64 },
     #[error("{size:#x} bytes at {address:#010x} overlap memory already mapped")]
     Overlap { address: u32, size: u64 },
-    #[error("{size:#x} bytes at {address:#010x} are not aligned to the host's {page:#x}-byte pages")]
-    Misaligned { address: u32, size: u64, page: usize },
+    #[error(
+        "{size:#x} bytes at {address:#010x} are not aligned to the host's {page:#x}-byte pages"
+    )]
+    Misaligned {
+        address: u32,
+        size: u64,
+        page: usize,
+    },
     #[error("no NUL within {limit} bytes at {address:#010x}")]
     Unterminated { address: u32, limit: u32 },
     #[error("cannot reserve the guest's address space: {0}")]
@@ -105,7 +123,14 @@ unsafe impl Sync for GuestMemory {}
 impl GuestMemory {
     /// Reserves the guest's whole address space, with nothing mapped yet.
     pub fn reserve() -> Result<GuestMemory, MemoryError> {
-        todo!()
+        let size = usize::try_from(GUEST_SPACE)
+            .map_err(|_| MemoryError::Reserve(io::Error::from(io::ErrorKind::Unsupported)))?;
+        let reservation = Reservation::new(size).map_err(MemoryError::Reserve)?;
+        debug_assert_eq!(reservation.size(), size);
+        Ok(GuestMemory {
+            reservation,
+            mapped: BTreeMap::new(),
+        })
     }
 
     /// The host's page size, which [`GuestMemory::map`] works in.
@@ -115,47 +140,145 @@ impl GuestMemory {
 
     /// The host address of guest address 0.
     pub fn host_base(&self) -> *mut u8 {
-        todo!()
+        self.reservation.base()
     }
 
     /// Maps `range`, zero-filled, readable and writable. It must be aligned
     /// to the host's pages and not overlap a range already mapped.
     pub fn map(&mut self, range: GuestRange) -> Result<(), MemoryError> {
-        todo!("{range:?}")
+        let page = GuestMemory::page_size();
+        let page_mask = page as u64 - 1;
+        if u64::from(range.start) & page_mask != 0 || range.size() & page_mask != 0 {
+            return Err(MemoryError::Misaligned {
+                address: range.start,
+                size: range.size(),
+                page,
+            });
+        }
+        if self.overlaps(range) {
+            return Err(MemoryError::Overlap {
+                address: range.start,
+                size: range.size(),
+            });
+        }
+        // (both fit a usize: the reservation is GUEST_SPACE bytes)
+        self.reservation
+            .commit(range.start as usize, range.size() as usize)
+            .map_err(MemoryError::Commit)?;
+        self.mapped.insert(range.start, range.end);
+        Ok(())
+    }
+
+    fn overlaps(&self, range: GuestRange) -> bool {
+        // the mapping that starts at or before the range's start, and any
+        // that starts inside it
+        let before = self
+            .mapped
+            .range(..=range.start)
+            .next_back()
+            .is_some_and(|(_, &end)| end > u64::from(range.start));
+        before
+            || self
+                .mapped
+                .range(range.start..)
+                .next()
+                .is_some_and(|(&start, _)| u64::from(start) < range.end)
     }
 
     /// Whether all of `range` is mapped (by one or by adjacent mappings).
     pub fn is_mapped(&self, range: GuestRange) -> bool {
-        todo!("{range:?}")
+        // follow the mappings from the range's start while each ends where
+        // the next begins
+        let mut covered = u64::from(range.start);
+        while covered < range.end {
+            let Ok(address) = u32::try_from(covered) else {
+                return false;
+            };
+            match self.mapped.range(..=address).next_back() {
+                Some((_, &end)) if end > covered => covered = end,
+                _ => return false,
+            }
+        }
+        true
+    }
+
+    /// `size` bytes at `address`, if all are mapped.
+    fn mapped_range(&self, address: GuestPtr, size: u64) -> Result<GuestRange, MemoryError> {
+        let range = GuestRange::new(address, size)?;
+        if self.is_mapped(range) {
+            Ok(range)
+        } else {
+            Err(MemoryError::Unmapped {
+                address: address.0,
+                size,
+            })
+        }
     }
 
     /// The host address of `size` mapped bytes at `address`, for the C host.
     pub fn host_pointer(&self, address: GuestPtr, size: u64) -> Result<*mut u8, MemoryError> {
-        todo!("{address:?} {size}")
+        self.mapped_range(address, size)?;
+        // SAFETY: the address is below GUEST_SPACE, the reservation's size,
+        // so the result stays inside the reservation.
+        Ok(unsafe { self.host_base().add(address.0 as usize) })
     }
 
     /// Copies guest memory at `address` into `buffer`.
     pub fn read(&self, address: GuestPtr, buffer: &mut [u8]) -> Result<(), MemoryError> {
-        todo!("{address:?} {}", buffer.len())
+        if buffer.is_empty() {
+            return Ok(());
+        }
+        let source = self.host_pointer(address, buffer.len() as u64)?;
+        // SAFETY: host_pointer checked that all buffer.len() bytes at source
+        // are mapped; buffer is host memory the caller owns, not guest
+        // memory, so the two do not overlap.
+        unsafe { std::ptr::copy_nonoverlapping(source, buffer.as_mut_ptr(), buffer.len()) };
+        Ok(())
     }
 
     /// Copies `data` into guest memory at `address`.
     pub fn write(&self, address: GuestPtr, data: &[u8]) -> Result<(), MemoryError> {
-        todo!("{address:?} {}", data.len())
+        if data.is_empty() {
+            return Ok(());
+        }
+        let destination = self.host_pointer(address, data.len() as u64)?;
+        // SAFETY: as for read: data.len() mapped bytes at destination, and
+        // data is the caller's own memory.
+        unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), destination, data.len()) };
+        Ok(())
     }
 
+    /// A little-endian 32-bit value; the address need not be aligned.
     pub fn read_u32(&self, address: GuestPtr) -> Result<u32, MemoryError> {
-        todo!("{address:?}")
+        let mut bytes = [0u8; 4];
+        self.read(address, &mut bytes)?;
+        Ok(u32::from_le_bytes(bytes))
     }
 
     pub fn write_u32(&self, address: GuestPtr, value: u32) -> Result<(), MemoryError> {
-        todo!("{address:?} {value}")
+        self.write(address, &value.to_le_bytes())
     }
 
     /// The NUL-terminated string at `address`, without its NUL; at most
     /// `limit` bytes are looked at.
     pub fn read_c_string(&self, address: GuestPtr, limit: u32) -> Result<Vec<u8>, MemoryError> {
-        todo!("{address:?} {limit}")
+        let mut text = Vec::new();
+        for offset in 0..limit {
+            let at = address.checked_add(offset).ok_or(MemoryError::OutOfRange {
+                address: address.0,
+                size: u64::from(offset) + 1,
+            })?;
+            let mut byte = [0u8];
+            self.read(at, &mut byte)?;
+            if byte[0] == 0 {
+                return Ok(text);
+            }
+            text.push(byte[0]);
+        }
+        Err(MemoryError::Unterminated {
+            address: address.0,
+            limit,
+        })
     }
 }
 
@@ -176,16 +299,24 @@ mod tests {
 
     fn with_window() -> GuestMemory {
         let mut memory = GuestMemory::reserve().expect("4 GB of address space");
-        memory.map(range(WINDOW, WINDOW_SIZE)).expect("the window maps");
+        memory
+            .map(range(WINDOW, WINDOW_SIZE))
+            .expect("the window maps");
         memory
     }
 
     #[test]
     fn pointers_add_up_to_the_end_of_the_address_space() {
         assert_eq!(GuestPtr(0x1000).checked_add(0x20), Some(GuestPtr(0x1020)));
-        assert_eq!(GuestPtr(0xffff_fff0).checked_add(0xf), Some(GuestPtr(0xffff_ffff)));
+        assert_eq!(
+            GuestPtr(0xffff_fff0).checked_add(0xf),
+            Some(GuestPtr(0xffff_ffff))
+        );
         assert_eq!(GuestPtr(0xffff_fff0).checked_add(0x10), None);
-        assert_eq!(format!("{:?}", GuestPtr(0x8000_0000)), "GuestPtr(0x80000000)");
+        assert_eq!(
+            format!("{:?}", GuestPtr(0x8000_0000)),
+            "GuestPtr(0x80000000)"
+        );
     }
 
     #[test]
@@ -195,7 +326,10 @@ mod tests {
         assert_eq!(top.size(), 0x1000);
         assert!(matches!(
             GuestRange::new(GuestPtr(0xffff_f000), 0x1001),
-            Err(MemoryError::OutOfRange { address: 0xffff_f000, size: 0x1001 })
+            Err(MemoryError::OutOfRange {
+                address: 0xffff_f000,
+                size: 0x1001
+            })
         ));
         assert!(matches!(
             GuestRange::new(GuestPtr(0xffff_fff0), u64::MAX),
@@ -214,7 +348,10 @@ mod tests {
         assert!(!memory.is_mapped(range(WINDOW, 1)));
         assert!(matches!(
             memory.read(GuestPtr(WINDOW), &mut byte),
-            Err(MemoryError::Unmapped { address: WINDOW, size: 1 })
+            Err(MemoryError::Unmapped {
+                address: WINDOW,
+                size: 1
+            })
         ));
         assert!(memory.host_pointer(GuestPtr(0), 1).is_err());
     }
@@ -224,9 +361,14 @@ mod tests {
         let memory = with_window();
         let last = GuestPtr(WINDOW + (WINDOW_SIZE as u32) - 4);
         assert_eq!(memory.read_u32(GuestPtr(WINDOW)).expect("mapped"), 0);
-        memory.write_u32(GuestPtr(WINDOW), 0x1234_5678).expect("mapped");
+        memory
+            .write_u32(GuestPtr(WINDOW), 0x1234_5678)
+            .expect("mapped");
         memory.write_u32(last, 0x9abc_def0).expect("mapped");
-        assert_eq!(memory.read_u32(GuestPtr(WINDOW)).expect("mapped"), 0x1234_5678);
+        assert_eq!(
+            memory.read_u32(GuestPtr(WINDOW)).expect("mapped"),
+            0x1234_5678
+        );
         assert_eq!(memory.read_u32(last).expect("mapped"), 0x9abc_def0);
         let mut bytes = [0u8; 4];
         memory.read(GuestPtr(WINDOW), &mut bytes).expect("mapped");
@@ -236,9 +378,16 @@ mod tests {
     #[test]
     fn host_addresses_are_the_base_plus_the_guest_address() {
         let memory = with_window();
-        let pointer = memory.host_pointer(GuestPtr(WINDOW + 0x10), 0x10).expect("mapped");
-        assert_eq!(pointer as usize, memory.host_base() as usize + WINDOW as usize + 0x10);
-        memory.write_u32(GuestPtr(WINDOW + 0x10), 7).expect("mapped");
+        let pointer = memory
+            .host_pointer(GuestPtr(WINDOW + 0x10), 0x10)
+            .expect("mapped");
+        assert_eq!(
+            pointer as usize,
+            memory.host_base() as usize + WINDOW as usize + 0x10
+        );
+        memory
+            .write_u32(GuestPtr(WINDOW + 0x10), 7)
+            .expect("mapped");
         // SAFETY: the pointer is to four mapped bytes, written just above.
         assert_eq!(unsafe { pointer.cast::<u32>().read_unaligned() }, 7);
     }
@@ -271,8 +420,13 @@ mod tests {
         let end = WINDOW + WINDOW_SIZE as u32;
         memory.map(range(end, page())).expect("the next pages map");
         assert!(memory.is_mapped(range(end - 4, 8)));
-        memory.write(GuestPtr(end - 4), &[1, 2, 3, 4, 5, 6, 7, 8]).expect("both mapped");
-        assert_eq!(memory.read_u32(GuestPtr(end)).expect("mapped"), u32::from_le_bytes([5, 6, 7, 8]));
+        memory
+            .write(GuestPtr(end - 4), &[1, 2, 3, 4, 5, 6, 7, 8])
+            .expect("both mapped");
+        assert_eq!(
+            memory.read_u32(GuestPtr(end)).expect("mapped"),
+            u32::from_le_bytes([5, 6, 7, 8])
+        );
     }
 
     #[test]
@@ -301,12 +455,27 @@ mod tests {
     #[test]
     fn strings_end_at_their_nul_within_the_limit() {
         let memory = with_window();
-        memory.write(GuestPtr(WINDOW), b"host_syscall\0host_log\0").expect("mapped");
-        assert_eq!(memory.read_c_string(GuestPtr(WINDOW), 64).expect("terminated"), b"host_syscall");
-        assert_eq!(memory.read_c_string(GuestPtr(WINDOW + 13), 64).expect("terminated"), b"host_log");
+        memory
+            .write(GuestPtr(WINDOW), b"host_syscall\0host_log\0")
+            .expect("mapped");
+        assert_eq!(
+            memory
+                .read_c_string(GuestPtr(WINDOW), 64)
+                .expect("terminated"),
+            b"host_syscall"
+        );
+        assert_eq!(
+            memory
+                .read_c_string(GuestPtr(WINDOW + 13), 64)
+                .expect("terminated"),
+            b"host_log"
+        );
         assert!(matches!(
             memory.read_c_string(GuestPtr(WINDOW), 12),
-            Err(MemoryError::Unterminated { address: WINDOW, limit: 12 })
+            Err(MemoryError::Unterminated {
+                address: WINDOW,
+                limit: 12
+            })
         ));
         // a string that runs off the mapped memory
         let end = WINDOW + WINDOW_SIZE as u32;
