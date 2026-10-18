@@ -44,7 +44,11 @@ pub enum ImageError {
     #[error("the guest image's {0} lies outside the image")]
     OutsideImage(&'static str),
     #[error("the guest's import {index} is {found:?}; the host expects {expected:?}")]
-    ImportMismatch { index: usize, expected: String, found: String },
+    ImportMismatch {
+        index: usize,
+        expected: String,
+        found: String,
+    },
     #[error("the guest has {found} imports; the host expects {expected}")]
     ImportCount { expected: usize, found: usize },
     #[error("guest memory: {0}")]
@@ -90,45 +94,268 @@ impl GuestImage {
     /// Checks `file` as an image to be loaded in `image_range`, starting at
     /// its start.
     pub fn parse(file: &[u8], image_range: GuestRange) -> Result<GuestImage, ImageError> {
-        todo!("{} {image_range:?}", file.len())
+        let is_executable = file.len() >= ELF_HEADER_SIZE
+            && file[..4] == *b"\x7fELF"
+            && file[4] == 2 // ELFCLASS64
+            && file[5] == 1 // little-endian
+            && u16_at(file, 16) == Some(2) // ET_EXEC
+            && u16_at(file, 18) == Some(EM_AARCH64);
+        if !is_executable {
+            return Err(ImageError::NotAnExecutable);
+        }
+        let headers = u64_at(file, 32).ok_or(ImageError::ProgramHeaders)?;
+        let entry_size = u16_at(file, 54).ok_or(ImageError::ProgramHeaders)? as u64;
+        let count = u16_at(file, 56).ok_or(ImageError::ProgramHeaders)? as u64;
+        let headers_end = headers
+            .checked_add(entry_size * count)
+            .ok_or(ImageError::ProgramHeaders)?;
+        if entry_size < PROGRAM_HEADER_SIZE as u64 || headers_end > file.len() as u64 {
+            return Err(ImageError::ProgramHeaders);
+        }
+
+        let mut segments = Vec::new();
+        for index in 0..count as usize {
+            // (inside the file: checked above)
+            let at = (headers + index as u64 * entry_size) as usize;
+            let field = |offset| u64_at(file, at + offset).ok_or(ImageError::ProgramHeaders);
+            if u32_at(file, at) != Some(PT_LOAD) {
+                continue;
+            }
+            let flags = u32_at(file, at + 4).ok_or(ImageError::ProgramHeaders)?;
+            let (file_offset, address, file_size, memory_size) =
+                (field(8)?, field(16)?, field(32)?, field(40)?);
+            if file_offset
+                .checked_add(file_size)
+                .is_none_or(|end| end > file.len() as u64)
+            {
+                return Err(ImageError::SegmentData(index));
+            }
+            if file_size > memory_size {
+                return Err(ImageError::SegmentSize(index));
+            }
+            if memory_size == 0 {
+                continue;
+            }
+            let inside = address >= u64::from(image_range.start().0)
+                && address
+                    .checked_add(memory_size)
+                    .is_some_and(|end| end <= image_range.end());
+            if !inside {
+                return Err(ImageError::SegmentOutsideImage { index, address });
+            }
+            segments.push(Segment {
+                // (inside the image's range, so below 4 GB)
+                range: GuestRange::new(GuestPtr(address as u32), memory_size)?,
+                file_offset,
+                file_size,
+                writable: flags & PF_W != 0,
+                executable: flags & PF_X != 0,
+            });
+        }
+
+        let low = segments
+            .iter()
+            .map(|segment| segment.range.start().0 & !(PAGE - 1))
+            .min()
+            .ok_or(ImageError::NoSegments)?;
+        if low != image_range.start().0 {
+            return Err(ImageError::WrongBase {
+                expected: image_range.start().0,
+                found: low,
+            });
+        }
+        let high = segments
+            .iter()
+            .map(|segment| segment.range.end())
+            .max()
+            .unwrap_or(u64::from(low));
+        let high = high.div_ceil(u64::from(PAGE)) * u64::from(PAGE);
+        Ok(GuestImage {
+            segments,
+            range: GuestRange::new(GuestPtr(low), high - u64::from(low))?,
+        })
     }
 
     pub fn segments(&self) -> &[Segment] {
-        todo!()
+        &self.segments
     }
 
     /// From the first segment's page to the last one's end, in whole pages.
     pub fn range(&self) -> GuestRange {
-        todo!()
+        self.range
     }
 
     /// How the page tables are to map the segments.
     pub fn access(&self) -> Vec<SegmentAccess> {
-        todo!()
+        self.segments
+            .iter()
+            .map(|segment| SegmentAccess {
+                range: segment.range,
+                writable: segment.writable,
+                executable: segment.executable,
+            })
+            .collect()
     }
 
     /// Copies the segments from `file` (the one parse checked) into guest
     /// memory, where the image's range must be mapped; each segment's
     /// memory past its file contents (its bss) is zeroed.
     pub fn load(&self, file: &[u8], memory: &GuestMemory) -> Result<(), ImageError> {
-        todo!("{} {}", file.len(), memory.host_base() as usize)
+        static ZEROES: [u8; 0x1_0000] = [0; 0x1_0000];
+        for (index, segment) in self.segments.iter().enumerate() {
+            let contents = usize::try_from(segment.file_offset)
+                .ok()
+                .zip(usize::try_from(segment.file_size).ok())
+                .and_then(|(start, size)| file.get(start..start.checked_add(size)?))
+                .ok_or(ImageError::SegmentData(index))?;
+            memory.write(segment.range.start(), contents)?;
+            // the bss: (file_size <= the segment's size, checked by parse)
+            let mut offset = segment.file_size;
+            while offset < segment.range.size() {
+                let size = (segment.range.size() - offset).min(ZEROES.len() as u64);
+                // (offset < the segment's size, which is below 4 GB)
+                let at = GuestPtr(segment.range.start().0 + offset as u32);
+                memory.write(at, &ZEROES[..size as usize])?;
+                offset += size;
+            }
+        }
+        Ok(())
     }
 
     /// The header of the loaded image, checked: the magic and ABI version,
-    /// and its import table, count and names inside the image.
+    /// and its end, import table, count and names inside the image.
     pub fn header(&self, memory: &GuestMemory) -> Result<GuestHeader, ImageError> {
-        todo!("{}", memory.host_base() as usize)
+        let base = self.range.start();
+        let mut words = [0u32; 12];
+        for (index, word) in words.iter_mut().enumerate() {
+            *word = memory.read_u32(GuestPtr(base.0 + 4 * index as u32))?;
+        }
+        let header = GuestHeader {
+            magic: words[0],
+            abi_version: words[1],
+            image_end: words[2],
+            import_table: words[3],
+            import_names: words[4],
+            import_count: words[5],
+            start: words[6],
+            thread_start: words[7],
+            thread_attach: words[8],
+            thread_detach: words[9],
+            init_array_start: words[10],
+            init_array_end: words[11],
+        };
+        if header.magic != GUEST_MAGIC || header.abi_version != GUEST_ABI_VERSION {
+            return Err(ImageError::WrongHeader {
+                magic: header.magic,
+                abi_version: header.abi_version,
+            });
+        }
+        let header_end = u64::from(base.0) + 4 * words.len() as u64;
+        if u64::from(header.image_end) < header_end
+            || u64::from(header.image_end) > self.range.end()
+        {
+            return Err(ImageError::OutsideImage("end"));
+        }
+        self.inside(&header, header.import_count, 4, "import count")?;
+        let count = memory.read_u32(GuestPtr(header.import_count))?;
+        self.inside(
+            &header,
+            header.import_table,
+            8 * u64::from(count),
+            "import table",
+        )?;
+        self.inside(&header, header.import_names, 1, "import names")?;
+        Ok(header)
     }
 
     /// The loaded image's import names, in the order its stubs number them.
-    pub fn import_names(&self, memory: &GuestMemory, header: &GuestHeader) -> Result<Vec<String>, ImageError> {
-        todo!("{} {header:?}", memory.host_base() as usize)
+    pub fn import_names(
+        &self,
+        memory: &GuestMemory,
+        header: &GuestHeader,
+    ) -> Result<Vec<String>, ImageError> {
+        let count = memory.read_u32(GuestPtr(header.import_count))?;
+        let mut names = Vec::new();
+        let mut at = header.import_names;
+        for _ in 0..count {
+            self.inside(header, at, 1, "import names")?;
+            let limit = IMPORT_NAME_LIMIT.min(header.image_end - at);
+            let name = memory
+                .read_c_string(GuestPtr(at), limit)
+                .map_err(|error| match error {
+                    MemoryError::Unterminated { .. } => ImageError::OutsideImage("import names"),
+                    other => ImageError::Memory(other),
+                })?;
+            // (shorter than limit, so at stays below image_end)
+            at += name.len() as u32 + 1;
+            names.push(String::from_utf8_lossy(&name).into_owned());
+        }
+        Ok(names)
+    }
+
+    /// Checks that `size` bytes at `address` lie between the image's start
+    /// and the header's image_end.
+    fn inside(
+        &self,
+        header: &GuestHeader,
+        address: u32,
+        size: u64,
+        what: &'static str,
+    ) -> Result<(), ImageError> {
+        let start = u64::from(address);
+        let fits = address >= self.range.start().0
+            && start
+                .checked_add(size)
+                .is_some_and(|end| end <= u64::from(header.image_end));
+        if fits {
+            Ok(())
+        } else {
+            Err(ImageError::OutsideImage(what))
+        }
     }
 }
 
 /// Checks the guest's import names against the host's, index for index.
 pub fn check_imports(guest: &[String], host: &[&str]) -> Result<(), ImageError> {
-    todo!("{} {}", guest.len(), host.len())
+    if guest.len() != host.len() {
+        return Err(ImageError::ImportCount {
+            expected: host.len(),
+            found: guest.len(),
+        });
+    }
+    match guest
+        .iter()
+        .zip(host)
+        .position(|(found, expected)| found != expected)
+    {
+        Some(index) => Err(ImageError::ImportMismatch {
+            index,
+            expected: host[index].to_string(),
+            found: guest[index].clone(),
+        }),
+        None => Ok(()),
+    }
+}
+
+/// The guest's pages, which segments are rounded to.
+const PAGE: u32 = 0x1000;
+
+fn u16_at(bytes: &[u8], at: usize) -> Option<u16> {
+    Some(u16::from_le_bytes(
+        bytes.get(at..at.checked_add(2)?)?.try_into().ok()?,
+    ))
+}
+
+fn u32_at(bytes: &[u8], at: usize) -> Option<u32> {
+    Some(u32::from_le_bytes(
+        bytes.get(at..at.checked_add(4)?)?.try_into().ok()?,
+    ))
+}
+
+fn u64_at(bytes: &[u8], at: usize) -> Option<u64> {
+    Some(u64::from_le_bytes(
+        bytes.get(at..at.checked_add(8)?)?.try_into().ok()?,
+    ))
 }
 
 #[cfg(test)]
@@ -234,7 +461,12 @@ mod tests {
 
     fn sample() -> Vec<u8> {
         elf(&[
-            segment(0x8800_0000, 4 | PF_X, &header_bytes(&["host_syscall", "host_log"]), 0x2000),
+            segment(
+                0x8800_0000,
+                4 | PF_X,
+                &header_bytes(&["host_syscall", "host_log"]),
+                0x2000,
+            ),
             segment(0x8801_0000, 4 | PF_W, b"data", 0x3000),
         ])
     }
@@ -248,7 +480,10 @@ mod tests {
         assert!(segments[1].writable && !segments[1].executable);
         assert_eq!(segments[1].range.start(), GuestPtr(0x8801_0000));
         assert_eq!(segments[1].range.size(), 0x3000);
-        assert_eq!((image.range().start(), image.range().end()), (GuestPtr(IMAGE_BASE), 0x8801_3000));
+        assert_eq!(
+            (image.range().start(), image.range().end()),
+            (GuestPtr(IMAGE_BASE), 0x8801_3000)
+        );
         let access = image.access();
         assert_eq!(access[0].range, segments[0].range);
         assert!(access[0].executable && access[1].writable);
@@ -260,14 +495,24 @@ mod tests {
         let image = GuestImage::parse(&file, image_range()).expect("a good image");
         let memory = mapped_memory();
         // (what was there before is overwritten)
-        memory.write(GuestPtr(0x8801_0004), &[0xff; 8]).expect("mapped");
+        memory
+            .write(GuestPtr(0x8801_0004), &[0xff; 8])
+            .expect("mapped");
         image.load(&file, &memory).expect("it loads");
         let mut data = [0u8; 12];
-        memory.read(GuestPtr(0x8801_0000), &mut data).expect("mapped");
+        memory
+            .read(GuestPtr(0x8801_0000), &mut data)
+            .expect("mapped");
         assert_eq!(&data, b"data\0\0\0\0\0\0\0\0");
         let header = image.header(&memory).expect("a good header");
-        assert_eq!((header.magic, header.abi_version), (GUEST_MAGIC, GUEST_ABI_VERSION));
-        assert_eq!(image.import_names(&memory, &header).expect("names"), ["host_syscall", "host_log"]);
+        assert_eq!(
+            (header.magic, header.abi_version),
+            (GUEST_MAGIC, GUEST_ABI_VERSION)
+        );
+        assert_eq!(
+            image.import_names(&memory, &header).expect("names"),
+            ["host_syscall", "host_log"]
+        );
     }
 
     #[test]
@@ -281,7 +526,10 @@ mod tests {
         }
         for (index, bad) in cases.iter().enumerate() {
             assert!(
-                matches!(GuestImage::parse(bad, image_range()), Err(ImageError::NotAnExecutable)),
+                matches!(
+                    GuestImage::parse(bad, image_range()),
+                    Err(ImageError::NotAnExecutable)
+                ),
                 "case {index}"
             );
         }
@@ -292,39 +540,69 @@ mod tests {
         let good = sample();
         let mut far = good.clone();
         far[32..40].copy_from_slice(&u64::MAX.to_le_bytes());
-        assert!(matches!(GuestImage::parse(&far, image_range()), Err(ImageError::ProgramHeaders)));
+        assert!(matches!(
+            GuestImage::parse(&far, image_range()),
+            Err(ImageError::ProgramHeaders)
+        ));
         let mut short_entries = good.clone();
         short_entries[54..56].copy_from_slice(&8u16.to_le_bytes());
-        assert!(matches!(GuestImage::parse(&short_entries, image_range()), Err(ImageError::ProgramHeaders)));
+        assert!(matches!(
+            GuestImage::parse(&short_entries, image_range()),
+            Err(ImageError::ProgramHeaders)
+        ));
         // the second segment's file size past the end of the file
         let mut data_past = good.clone();
         let at = ELF_HEADER_SIZE + PROGRAM_HEADER_SIZE + 32;
         data_past[at..at + 8].copy_from_slice(&0x1_0000u64.to_le_bytes());
-        assert!(matches!(GuestImage::parse(&data_past, image_range()), Err(ImageError::SegmentData(1))));
+        assert!(matches!(
+            GuestImage::parse(&data_past, image_range()),
+            Err(ImageError::SegmentData(1))
+        ));
         // an offset that wraps
         let mut wrapping = good.clone();
         let at = ELF_HEADER_SIZE + PROGRAM_HEADER_SIZE + 8;
         wrapping[at..at + 8].copy_from_slice(&u64::MAX.to_le_bytes());
-        assert!(matches!(GuestImage::parse(&wrapping, image_range()), Err(ImageError::SegmentData(1))));
+        assert!(matches!(
+            GuestImage::parse(&wrapping, image_range()),
+            Err(ImageError::SegmentData(1))
+        ));
     }
 
     #[test]
     fn segments_must_fit_their_memory_and_the_image_range() {
         let bigger_file = elf(&[segment(0x8800_0000, 4, b"0123456789", 4)]);
-        assert!(matches!(GuestImage::parse(&bigger_file, image_range()), Err(ImageError::SegmentSize(0))));
-        let past_end = elf(&[segment(0x8800_0000, 4, b"x", 0x1000), segment(0x8bff_f000, 4, b"x", 0x2000)]);
+        assert!(matches!(
+            GuestImage::parse(&bigger_file, image_range()),
+            Err(ImageError::SegmentSize(0))
+        ));
+        let past_end = elf(&[
+            segment(0x8800_0000, 4, b"x", 0x1000),
+            segment(0x8bff_f000, 4, b"x", 0x2000),
+        ]);
         assert!(matches!(
             GuestImage::parse(&past_end, image_range()),
-            Err(ImageError::SegmentOutsideImage { index: 1, address: 0x8bff_f000 })
+            Err(ImageError::SegmentOutsideImage {
+                index: 1,
+                address: 0x8bff_f000
+            })
         ));
         let huge = elf(&[segment(0x8800_0000, 4, b"x", u64::MAX)]);
-        assert!(matches!(GuestImage::parse(&huge, image_range()), Err(ImageError::SegmentOutsideImage { index: 0, .. })));
+        assert!(matches!(
+            GuestImage::parse(&huge, image_range()),
+            Err(ImageError::SegmentOutsideImage { index: 0, .. })
+        ));
         let elsewhere = elf(&[segment(0x8801_0000, 4, b"x", 0x1000)]);
         assert!(matches!(
             GuestImage::parse(&elsewhere, image_range()),
-            Err(ImageError::WrongBase { expected: IMAGE_BASE, found: 0x8801_0000 })
+            Err(ImageError::WrongBase {
+                expected: IMAGE_BASE,
+                found: 0x8801_0000
+            })
         ));
-        assert!(matches!(GuestImage::parse(&elf(&[]), image_range()), Err(ImageError::NoSegments)));
+        assert!(matches!(
+            GuestImage::parse(&elf(&[]), image_range()),
+            Err(ImageError::NoSegments)
+        ));
     }
 
     fn loaded_with_header(edit: impl FnOnce(&mut Vec<u8>)) -> Result<GuestHeader, ImageError> {
@@ -346,12 +624,16 @@ mod tests {
             loaded_with_header(|h| h[0] = 0),
             Err(ImageError::WrongHeader { abi_version: 2, .. })
         ));
-        assert!(matches!(loaded_with_header(|h| h[4] = 1), Err(ImageError::WrongHeader { abi_version: 1, .. })));
+        assert!(matches!(
+            loaded_with_header(|h| h[4] = 1),
+            Err(ImageError::WrongHeader { abi_version: 1, .. })
+        ));
         // the table, the count and the names, each pointing out of the image
         for field in [3usize, 4, 5] {
             assert!(
                 matches!(
-                    loaded_with_header(|h| h[field * 4..field * 4 + 4].copy_from_slice(&0x8000_0000u32.to_le_bytes())),
+                    loaded_with_header(|h| h[field * 4..field * 4 + 4]
+                        .copy_from_slice(&0x8000_0000u32.to_le_bytes())),
                     Err(ImageError::OutsideImage(_))
                 ),
                 "field {field}"
@@ -372,7 +654,10 @@ mod tests {
 
     #[test]
     fn the_guests_imports_must_be_the_hosts() {
-        let guest: Vec<String> = ["host_syscall", "host_log"].iter().map(|s| s.to_string()).collect();
+        let guest: Vec<String> = ["host_syscall", "host_log"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         assert!(check_imports(&guest, &["host_syscall", "host_log"]).is_ok());
         assert!(matches!(
             check_imports(&guest, &["host_syscall", "host_abort"]),
@@ -380,14 +665,18 @@ mod tests {
         ));
         assert!(matches!(
             check_imports(&guest, &["host_syscall"]),
-            Err(ImageError::ImportCount { expected: 1, found: 2 })
+            Err(ImageError::ImportCount {
+                expected: 1,
+                found: 2
+            })
         ));
     }
 
     #[test]
     fn the_built_guest_image_loads() {
         // (after `ninja macos`)
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../build/macos/halo_guest.elf");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../build/macos/halo_guest.elf");
         let Ok(file) = std::fs::read(&path) else {
             eprintln!("skipped: no {}", path.display());
             return;
@@ -397,7 +686,9 @@ mod tests {
         let memory = mapped_memory();
         image.load(&file, &memory).expect("it loads");
         let header = image.header(&memory).expect("its header is good");
-        let names = image.import_names(&memory, &header).expect("its names are good");
+        let names = image
+            .import_names(&memory, &header)
+            .expect("its names are good");
         assert_eq!(names.first().map(String::as_str), Some("host_syscall"));
         assert_eq!(names.get(1).map(String::as_str), Some("host_log"));
         assert!(names.len() > 100);
