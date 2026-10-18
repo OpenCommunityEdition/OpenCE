@@ -13,9 +13,9 @@
 - [x] Task: Run main-thread imports on the main thread 988639b1
     - [x] Write tests: a guest program (port/macos/tests) whose thread asks for a main-thread import and gets its result; a request during shutdown fails cleanly
     - [x] A request queue: the vCPU posts and waits, the AppKit run loop carries it out
-- [ ] Task: The data root, and a dialog for missing maps
-    - [ ] Write tests: the root is HALO_DATA_ROOT, else Application Support/OpenCE; missing maps give the dialog's message
-    - [ ] Implement it in the Swift shell
+- [x] Task: The data root, and a dialog for missing maps d7b772b6
+    - [x] Write tests: the root is HALO_DATA_ROOT, else Application Support/OpenCE; missing maps give the dialog's message
+    - [x] Implement it in the Swift shell
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: The Swift app runs the VM host' (Protocol in workflow.md)
 
 ## Phase 2: Window, native input and audio
