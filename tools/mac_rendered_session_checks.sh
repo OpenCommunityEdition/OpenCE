@@ -265,7 +265,10 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
         # and the Mac's sockets changed after those objects were made, and a
         # mixture of the two would be neither.
         case "$obj" in
-            */engine_sockets_$arch.o|*/engine_winsock_init_$arch.o|*/engine_p2p_offline_$arch.o|\
+            */engine_sockets_$arch.o|*/engine_winsock_init_$arch.o|\
+            */p2p_$arch.o|*/p2p_crypto_$arch.o|*/p2p_discord_$arch.o|*/p2p_lobby_$arch.o|\
+            */p2p_signal_$arch.o|*/p2p_webrtc_$arch.o|*/posix_net_$arch.o|*/posix_dtls_$arch.o|\
+            */posix_upnp_$arch.o|*/mac_p2p_hardware_id_$arch.o|\
             */data_encoding_$arch.o|*/message_header_$arch.o|\
             */transport_endpoint_winsock_$arch.o|*/transport_endpoint_set_winsock_$arch.o|\
             */game_engine_slayer_$arch.o|*/game_engine_ctf_$arch.o|*/game_engine_oddball_$arch.o|\
@@ -454,7 +457,7 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     # port: the socket adapter, the settings it reads and the stand-ins for
     # internet play. These include the Darwin headers under private names and
     # must not take the game's prefix or its include aliases.
-    for unit in port/mac/engine_sockets.c port/linux/src/net_settings.c port/linux/src/net_fault.c port/mac/engine_p2p_offline.c port/linux/src/menu_pc_art.c; do
+    for unit in port/mac/engine_sockets.c port/linux/src/net_settings.c port/linux/src/net_fault.c port/linux/src/menu_pc_art.c; do
         name=$(basename "$unit" .c)
         recognized_units="$recognized_units $name "
         obj="$out/${name}_gpu_$arch.o"
@@ -472,6 +475,89 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
         fi
         objects="$objects $obj"
         source_units="$source_units $unit"
+    done
+
+    # Internet play, in place of the port/mac/engine_p2p_offline.c that used
+    # to answer the shared P2P API with nothing.
+    #
+    # These are the same sources every other build uses. Three things differ
+    # on the Mac and all three are forced rather than chosen:
+    #
+    #  - p2p.c, p2p_discord.c, p2p_lobby.c and p2p_signal.c are given
+    #    -include port/mac/platform.h. They say #include "platform.h" and
+    #    live in port/linux/src beside the real one, and a quoted include
+    #    looks in the including file's own directory first, so no -I order
+    #    can put the Mac's in front. The Mac header defines the real one's
+    #    include guard, so their own line then reads a file that yields
+    #    nothing and the XDK headers are never opened. The other two p2p
+    #    sources do not include it and do not take the flag.
+    #  - gnu99 rather than the gnu89 above: these are port sources, not game
+    #    sources, and the ninja builds compile them as gnu11.
+    #  - every mbedtls unit takes the same MBEDTLS_CONFIG_FILE. Its options
+    #    decide structure layouts, so a library built half one way and half
+    #    the other misbehaves later rather than failing at the link.
+    #
+    # mbedtls and miniupnpc are globbed, as tools/linux_build.py globs them,
+    # so a vendored update brings its new files with it. Neither vendored
+    # copy is changed; what the Mac cannot build is turned off in
+    # port/mac/mac_mbedtls_config.h.
+    # (no -D__int64 here: it is given on the line below, where its value can
+    # carry a space without the shell splitting it in two)
+    p2p_common="-std=gnu99 -O2 $fp -w -ffunction-sections -fdata-sections \
+        -fms-extensions -fshort-wchar -D__stdcall= -D__fastcall= \
+        -Iport/mac -Iport/linux/src -Iport/linux/include -Iport/include -Iport/include/xdk \
+        -Iport/third_party/monocypher -Iport/third_party/kcp \
+        -Iport/third_party/mbedtls/include -Iport/third_party/miniupnpc/include"
+    for unit in port/linux/src/p2p.c port/linux/src/p2p_crypto.c port/linux/src/p2p_discord.c \
+        port/linux/src/p2p_lobby.c port/linux/src/p2p_signal.c port/linux/src/p2p_webrtc.c \
+        port/linux/src/posix_net.c port/linux/src/posix_dtls.c port/linux/src/posix_upnp.c \
+        port/mac/mac_mbedtls_time.c port/mac/mac_p2p_hardware_id.c; do
+        name=$(basename "$unit" .c)
+        recognized_units="$recognized_units $name "
+        obj="$out/${name}_$arch.o"
+        shim=
+        case "$name" in
+            p2p|p2p_discord|p2p_lobby|p2p_signal) shim="-include port/mac/platform.h" ;;
+        esac
+        if [ "${MAC_RENDERED_SESSION_INCREMENTAL:-0}" != 1 ] || \
+            case "$recompile" in *" $name "*) true ;; *) false ;; esac; then
+            "$cc" -arch "$arch" -isysroot "$sdk" -mmacosx-version-min=10.4 \
+                -D__int64='long long' $shim \
+                -DMBEDTLS_CONFIG_FILE='"mac_mbedtls_config.h"' \
+                -DMINIUPNP_STATICLIB -DMINIUPNPC_SET_SOCKET_TIMEOUT -DMINIUPNPC_GET_SRC_ADDR \
+                $p2p_common \
+                -idirafter port/linux/include \
+                -c "$unit" -o "$obj" > "$obj.txt" 2>&1
+        elif [ ! -f "$obj" ]; then
+            echo "incremental object is missing: $obj" >&2
+            exit 1
+        fi
+        objects="$objects $obj"
+        source_units="$source_units $unit"
+    done
+    for unit in port/third_party/mbedtls/library/*.c; do
+        name=mbedtls_$(basename "$unit" .c)
+        obj="$out/${name}_$arch.o"
+        if [ "${MAC_RENDERED_SESSION_INCREMENTAL:-0}" != 1 ] || [ ! -f "$obj" ]; then
+            "$cc" -arch "$arch" -isysroot "$sdk" -mmacosx-version-min=10.4 \
+                -std=gnu99 -O2 $fp -w -ffunction-sections -fdata-sections \
+                -DMBEDTLS_CONFIG_FILE='"mac_mbedtls_config.h"' \
+                -Iport/mac -Iport/third_party/mbedtls/include -Iport/third_party/mbedtls/library \
+                -c "$unit" -o "$obj" > "$obj.txt" 2>&1
+        fi
+        objects="$objects $obj"
+    done
+    for unit in port/third_party/miniupnpc/src/*.c; do
+        name=upnp_$(basename "$unit" .c)
+        obj="$out/${name}_$arch.o"
+        if [ "${MAC_RENDERED_SESSION_INCREMENTAL:-0}" != 1 ] || [ ! -f "$obj" ]; then
+            "$cc" -arch "$arch" -isysroot "$sdk" -mmacosx-version-min=10.4 \
+                -std=gnu99 -O2 $fp -w -ffunction-sections -fdata-sections \
+                -DMINIUPNP_STATICLIB -DMINIUPNPC_SET_SOCKET_TIMEOUT -DMINIUPNPC_GET_SRC_ADDR \
+                -Iport/third_party/miniupnpc/include \
+                -c "$unit" -o "$obj" > "$obj.txt" 2>&1
+        fi
+        objects="$objects $obj"
     done
 
     # engine_files reads paths.data and paths.saves (the game's file flags)
@@ -492,7 +578,7 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     objects="$objects $obj"
     source_units="$source_units port/mac/engine_files.c"
 
-    for unit in port/mac/mac_hud_hires.c "$out/mac_hud_assets.c" port/mac/mac_gpu_info.c port/mac/mac_input.c port/mac/mac_gamepad.c port/mac/mac_gamepad_report.c port/mac/mac_window.c port/mac/mac_audio_output.c port/mac/engine_messages.c port/mac/mac_gl_visibility.c port/mac/mac_gl_program_cache.c port/mac/mac_render_timing.c port/mac/mac_movie.c port/mac/mac_bink_movie.c port/linux/src/bink_decode.c port/linux/src/bink_tables.c port/mac/mac_loading.c; do
+    for unit in port/mac/mac_hud_hires.c "$out/mac_hud_assets.c" port/mac/mac_gpu_info.c port/mac/mac_input.c port/mac/mac_gamepad.c port/mac/mac_gamepad_report.c port/mac/mac_window.c port/mac/mac_audio_output.c port/mac/mac_voice_capture.c port/mac/mac_voice_dsp.c port/mac/engine_messages.c port/mac/mac_gl_visibility.c port/mac/mac_gl_program_cache.c port/mac/mac_render_timing.c port/mac/mac_movie.c port/mac/mac_bink_movie.c port/linux/src/bink_decode.c port/linux/src/bink_tables.c port/mac/mac_loading.c; do
         name=$(basename "$unit" .c)
         recognized_units="$recognized_units $name "
         obj="$out/${name}_gpu_$arch.o"
