@@ -54,6 +54,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [ ] Task: System calls: `host_syscall` carries out the guest's Linux-numbered calls with Darwin calls (from `host_syscall.c`), with guest addresses turned into host addresses, futexes on guest memory, and `errno` mapped; unit tests for the number and `errno` mapping
 - [ ] Task: Files, sockets and settings: the data root next to the executable (`assets/` in development), sockets for the network test
 - [ ] Task: SDL: audio and input through `host_sdl.c`'s imports, with SDL's dummy video driver (the audio callback runs on a vCPU of its own); the OpenGL ES imports return errors, since only `debug.null_renderer` is supported in this track
+- [ ] Task: Run the asset-free harness (`tools/harness`) in the VM: on macOS it compiles each test for the arm64_32 guest, links it as a guest image with the guest runtime, and runs it in the VM host, which reports the test's output and status; the harness's tests pass on macOS as on Linux (it fails today on every platform but 32-bit x86 Linux)
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: The VM host' (Protocol in workflow.md)
 
 ## Phase 5: A headless game, and the final build
