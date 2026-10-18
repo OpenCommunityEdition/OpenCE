@@ -100,14 +100,11 @@ requirements still apply.
 - Use relevant available skills through the tools the environment actually
   provides, reading their instructions when applying them. Do not require
   Superpowers, a particular skill tool or a plugin installation by default.
-- Keep small, contained work inline. When delegation is authorized and
-  useful, give tasks clear scope and ownership. Choose available models
-  according to task needs and user preferences rather than a fixed roster.
-  Do not assume subagents or independent reviewers are available.
+- Work directly as the primary agent. Use subagents only when the user
+  explicitly requests them for the assignment.
 - Review substantial changes both by component and as a complete diff.
-  Seek an independent review where available and authorized for changes
-  with significant correctness or security risk. Distinguish independent
-  review from self-review in the report.
+  Distinguish self-review from any independent review in the report;
+  review requirements do not authorize spawning subagents.
 - Mutation tests can establish that a regression test catches the intended
   fault. Use them selectively in isolated temporary copies; never leave
   intentional faults in a shared working tree or run them concurrently with
