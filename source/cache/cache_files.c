@@ -607,6 +607,14 @@ void scenario_tags_unload(
 
 		mods_tags_unloaded();
 	}
+	/* port: the singleplayer HUD leaves the table before the menus restore
+	the map's own (port/linux/game/stock_hud.c). the texture cache has
+	closed, so nothing still holds one of its bitmaps */
+	{
+		extern void stock_hud_tags_unloaded(void);
+
+		stock_hud_tags_unloaded();
+	}
 	/* port: the menus' tags go, and the map's own table comes back
 	(port/linux/game/menu_tags.c): after the texture cache, which writes to
 	the bitmaps it has loaded as it closes, theirs among them */
@@ -1212,6 +1220,13 @@ long scenario_tags_load(
 				extern void mods_tags_loaded(char const *map_name);
 
 				mods_tags_loaded(stripped_scenario_name);
+			}
+			/* port: the singleplayer HUD, in place of this map's
+			(port/linux/game/stock_hud.c) */
+			{
+				extern void stock_hud_tags_loaded(void);
+
+				stock_hud_tags_loaded();
 			}
 			result = cache_file_globals.tag_header->scenario_tag_index;
 		}

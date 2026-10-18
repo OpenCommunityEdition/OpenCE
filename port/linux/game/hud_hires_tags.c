@@ -213,6 +213,66 @@ void hud_hires_tags_loaded(
 	return;
 }
 
+/* the bitmap itself, not the first tag of its name: a custom map has its
+own copy of the Xbox HUD's bitmap names, and that copy is not the redraw */
+void hud_hires_register_bitmap(
+	char const *tag_name,
+	struct bitmap_data *bitmap,
+	long bitmap_index)
+{
+	long asset_count = hud_hires_asset_count();
+	long asset;
+	long index;
+
+	if (!tag_name || !bitmap)
+		return;
+	for (asset = 0; asset < asset_count; asset++)
+	{
+		if (hud_hires_asset_bitmap(asset) != bitmap_index || _stricmp(hud_hires_asset_tag(asset), tag_name))
+			continue;
+		if (!hud_hires_asset_fits(asset, bitmap->width, bitmap->height))
+		{
+			platform_log("high-res hud: %s bitmap %ld is %dx%d here, which its texture does not fit",
+				tag_name, bitmap_index, bitmap->width, bitmap->height);
+			return;
+		}
+		if (hud_hires_asset_sprites(asset))
+		{
+			for (index = 0; index < hires_sprite_bitmap_count; index++)
+			{
+				if (hires_sprite_bitmaps[index].asset == asset)
+				{
+					hires_sprite_bitmaps[index].bitmap = bitmap;
+					return;
+				}
+			}
+			if (hires_sprite_bitmap_count >= MAXIMUM_HIRES_SPRITE_BITMAPS)
+				return;
+			csmemset(&hires_sprite_bitmaps[hires_sprite_bitmap_count], 0, sizeof(hires_sprite_bitmaps[0]));
+			hires_sprite_bitmaps[hires_sprite_bitmap_count].bitmap = bitmap;
+			hires_sprite_bitmaps[hires_sprite_bitmap_count].asset = asset;
+			hires_sprite_bitmap_count++;
+			return;
+		}
+		for (index = 0; index < hires_bitmap_count; index++)
+		{
+			if (hires_bitmaps[index].asset == asset)
+			{
+				hires_bitmaps[index].bitmap = bitmap;
+				return;
+			}
+		}
+		if (hires_bitmap_count >= MAXIMUM_HIRES_BITMAPS)
+			return;
+		hires_bitmaps[hires_bitmap_count].bitmap = bitmap;
+		hires_bitmaps[hires_bitmap_count].asset = asset;
+		hires_bitmap_count++;
+		return;
+	}
+
+	return;
+}
+
 void hud_hires_tags_unloaded(
 	void)
 {

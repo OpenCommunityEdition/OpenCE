@@ -1137,7 +1137,12 @@ void custom_edition_cache_read(
 	unsigned long file_offset;
 	long read_bytes;
 	boolean read;
+	extern boolean stock_hud_read(long tag_index, long offset, long size, void *buffer);
 
+	/* a bitmap injected from the stock map is not in this map's files
+	(port/linux/game/stock_hud.c) */
+	if (stock_hud_read(tag_index, offset, size, buffer))
+		return;
 	if ((unsigned long)offset >= COMBINED_SOUNDS_OFFSET)
 	{
 		file = &globals->resource_files[_resource_map_sounds];
