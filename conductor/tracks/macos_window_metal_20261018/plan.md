@@ -1,9 +1,9 @@
 # Plan: The game in a macOS window: a Swift app, a Metal renderer, native input and audio
 
 ## Phase 1: The Swift app runs the VM host
-- [ ] Task: Split the C host into a library and its command-line front end
-    - [ ] Write tests: the build graph has `libhalo_host.a` and `halo_host` links it (tools/test_macos_build.py); the headless runs stay green
-    - [ ] Move host_main.c's start-up into `halo_host_run(image, options)`, keeping `halo_host` as a thin main
+- [x] Task: Split the C host into a library and its command-line front end 45cee3fa
+    - [x] Write tests: the build graph has `libhalo_host.a` and `halo_host` links it (tools/test_macos_build.py); the headless runs stay green
+    - [x] Move host_main.c's start-up into `halo_host_run(image, options)`, keeping `halo_host` as a thin main
 - [ ] Task: Build OpenCE.app with Nix (`nix build .#app`)
     - [ ] Write tests: pytest checks the bundle layout, Info.plist, the embedded guest image and the hypervisor entitlement in the signature
     - [ ] A Swift app target (SwiftPM or xcodebuild under Nix, settled here; tech-stack.md updated first if it differs), signed ad hoc with sigtool
