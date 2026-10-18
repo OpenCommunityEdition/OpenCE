@@ -29,6 +29,7 @@ memory for it.
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 /* where a guest function the host calls returns to: in the first 2 MB,
@@ -71,10 +72,13 @@ struct vcpu
 extern const char *const host_import_names[];
 extern const unsigned int host_import_name_count;
 
-/* HALO_HOST_IMPORT_COUNTS: each import's calls, counted */
+/* HALO_HOST_IMPORT_COUNTS: each import's calls, and every exit from the
+VM (imports, timers, the sampler's), counted from the VM's start */
 #define COUNTED_IMPORTS 1024
-static int counting = -1;
+static int counting;
 static _Atomic unsigned long long import_counts[COUNTED_IMPORTS];
+static _Atomic unsigned long long exit_count;
+static struct timespec counting_start;
 
 /* the vCPUs, for the sampler (HALO_HOST_SAMPLE) */
 #define MAXIMUM_VCPUS 64
@@ -298,9 +302,7 @@ static void vcpu_import(struct vcpu *vcpu)
 		call.x[register_index] = get_reg(vcpu, (hv_reg_t)(HV_REG_X0 + register_index));
 		call.d[register_index] = get_d(vcpu, register_index);
 	}
-	if (counting < 0)
-		counting = getenv("HALO_HOST_IMPORT_COUNTS") && *getenv("HALO_HOST_IMPORT_COUNTS");
-	if (counting && index < COUNTED_IMPORTS)
+	if (counting > 0 && index < COUNTED_IMPORTS)
 		import_counts[index]++;
 	call.sp = (uint32_t)get_sys(vcpu, HV_SYS_REG_SP_EL0);
 	call.result_x = 0;
@@ -321,6 +323,8 @@ static void vcpu_run(struct vcpu *vcpu)
 
 		if (result != HV_SUCCESS)
 			host_fatal("hv_vcpu_run failed (%#x)", (unsigned int)result);
+		if (counting > 0)
+			exit_count++;
 		if (vcpu->exit->reason == HV_EXIT_REASON_CANCELED)
 		{
 			/* the sampler's request: where this thread's guest code is */
@@ -444,17 +448,36 @@ void host_vm_start_sampler(void)
 		pthread_detach(thread);
 }
 
+static int by_count(const void *left, const void *right)
+{
+	unsigned long long a = import_counts[*(const uint32_t *)left], b = import_counts[*(const uint32_t *)right];
+
+	return a < b ? 1 : a > b ? -1 : 0;
+}
+
 void host_vm_report_import_counts(void)
 {
+	static uint32_t order[COUNTED_IMPORTS];
+	uint32_t count = host_import_name_count < COUNTED_IMPORTS ? host_import_name_count : COUNTED_IMPORTS;
 	uint32_t index;
+	struct timespec now;
+	double seconds;
 
 	if (counting <= 0)
 		return;
-	for (index = 0; index < host_import_name_count && index < COUNTED_IMPORTS; index++)
-	{
-		if (import_counts[index])
-			fprintf(stderr, "halo_host: import %s: %llu\n", host_import_names[index], import_counts[index]);
-	}
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	seconds = (double)(now.tv_sec - counting_start.tv_sec) + (now.tv_nsec - counting_start.tv_nsec) / 1e9;
+	if (seconds <= 0)
+		seconds = 1e-9;
+	fprintf(stderr, "halo_host: exits: %llu in %.1f s, %.0f/s\n", (unsigned long long)exit_count, seconds,
+		exit_count / seconds);
+	/* (the busiest first) */
+	for (index = 0; index < count; index++)
+		order[index] = index;
+	qsort(order, count, sizeof(order[0]), by_count);
+	for (index = 0; index < count && import_counts[order[index]]; index++)
+		fprintf(stderr, "halo_host: import %s: %llu, %.0f/s\n", host_import_names[order[index]],
+			(unsigned long long)import_counts[order[index]], import_counts[order[index]] / seconds);
 }
 
 /* ---------- the VM */
@@ -465,6 +488,8 @@ int host_vm_initialize(void)
 	uint32_t count = opence_guest_region_count(host_guest), index;
 	void *at;
 
+	counting = getenv("HALO_HOST_IMPORT_COUNTS") && *getenv("HALO_HOST_IMPORT_COUNTS");
+	clock_gettime(CLOCK_MONOTONIC, &counting_start);
 	if (hv_vm_create(NULL) != HV_SUCCESS)
 	{
 		host_logf(HOST_LOG_ERROR, "cannot create a VM (is the host signed with com.apple.security.hypervisor?)");

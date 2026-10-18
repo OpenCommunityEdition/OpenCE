@@ -8,7 +8,9 @@ data, the game stops itself there (its debug.txt says "no valid map
 directory exists") and the guest ends the process through exit, not by a
 crash. With the game data in assets/maps, a run under debug.exit_after
 ends with status 0, and one under debug.network_test hosts a game on
-bloodgulch and logs its player's state each second.
+bloodgulch and logs its player's state each second. With
+HALO_HOST_IMPORT_COUNTS set, that run reports its VM exits per second,
+in all and by import: the baseline for the renderer's batching.
 
 The runs never touch the home folder: HOME and XDG_DATA_HOME (where the
 platform layer keeps saves) are the test's own.
@@ -91,7 +93,8 @@ def game_data(tmp_path):
 @pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game data in assets/maps")
 def test_a_hosted_network_game_plays_headless(tmp_path):
     result = run_host(game_data(tmp_path), tmp_path / "home", exit_after=30, timeout=180,
-                      extra={"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NET_ADDRESS": "127.0.0.1"})
+                      extra={"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NET_ADDRESS": "127.0.0.1",
+                             "HALO_HOST_IMPORT_COUNTS": "1"})
     output = result.stdout + result.stderr
     assert result.returncode == 0, output[-4000:]
     assert "halo_host: guest crash" not in output, output[-4000:]
@@ -100,3 +103,10 @@ def test_a_hosted_network_game_plays_headless(tmp_path):
     # the local player joined its own game: its state each second
     ticks = re.findall(r"network test: tick \d+ player 0: \(", output)
     assert len(ticks) >= 5, output[-4000:]
+    # the exits: "halo_host: exits: <count> in <seconds> s, <rate>/s", and
+    # each import's "halo_host: import <name>: <count>, <rate>/s"
+    exits = re.search(r"halo_host: exits: (\d+) in ([\d.]+) s, (\d+)/s", output)
+    assert exits and int(exits[1]) > 0 and float(exits[2]) >= 25, output[-4000:]
+    imports = re.findall(r"halo_host: import (\w+): (\d+), (\d+)/s", output)
+    assert ("host_syscall" in {name for name, _, _ in imports}), output[-4000:]
+    assert sum(int(count) for _, count, _ in imports) <= int(exits[1])
