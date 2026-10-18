@@ -1,0 +1,44 @@
+# Streamer mode's allowed words (tools/text_filter_terms.py): words never
+# hidden, nor any part of them, however a hidden word sits inside them
+# (Scunthorpe). One a line, lowercase.
+assess
+assesses
+bereshith
+brushite
+chashitsu
+cushite
+cushitic
+elkoshite
+girgashite
+kaneshite
+koreishite
+mackintoshite
+marshite
+matsushita
+metabrushite
+mishit
+mishits
+mishitting
+niggard
+peshito
+phage
+phages
+placuntitis
+placuntoma
+scunthorpe
+shiitake
+shiite
+shiites
+shiitic
+shitake
+shittah
+shittahs
+shitterton
+shittim
+shittims
+shittimwood
+snigger
+unniggard
+washita
+wiggeries
+wiggery

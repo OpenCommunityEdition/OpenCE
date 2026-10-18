@@ -10,6 +10,7 @@ typedef short SHORT;
 struct platform_input_state { unsigned char keys[TEST_SCANCODE_COUNT], mouse_buttons[8]; BOOL mouse_released, menus; };
 #define SDL_SCANCODE_COUNT TEST_SCANCODE_COUNT
 #define console_is_active() FALSE
+#define network_chat_typing() FALSE
 #define platform_screen_keyboard(show, password) ((void)0)
 typedef struct { unsigned short wButtons; BYTE bAnalogButtons[8]; SHORT sThumbLX, sThumbLY; } XINPUT_GAMEPAD;
 #define SDL_BUTTON_X1 4

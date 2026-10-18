@@ -1545,6 +1545,9 @@ void hud_draw_static_element(
 	return;
 }
 
+/* port: the left of the last picture drawn (hud_draw.h) */
+short hud_draw_last_left;
+
 static void hud_draw_bitmap_internal(
 	void *meter_parameters,
 	struct bitmap_data const *bitmap,
@@ -1584,6 +1587,11 @@ static void hud_draw_bitmap_internal(
 		vertices[vertex_index].texture_coordinates.y = texture_y;
 		vertices[vertex_index].color = color;
 	}
+
+	/* port: where it is drawn (hud_draw_last_left) */
+	hud_draw_last_left = SHORT_MAX;
+	for (vertex_index = 0; vertex_index < 4; vertex_index++)
+		hud_draw_last_left = (short)MIN(hud_draw_last_left, vertices[vertex_index].position.x);
 
 	if (reticle_scale != 1.0f)
 	{
