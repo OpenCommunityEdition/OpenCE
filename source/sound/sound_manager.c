@@ -241,6 +241,11 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "tag_files/tag_files.h"
 
+/* port: debug.sound_log (port/linux/src/port_config.c) notes each impulse
+sound as it starts */
+int config_boolean(char const *name);
+void platform_log(char const *format, ...);
+
 #include <math.h>
 #include <stdio.h>
 
@@ -2509,6 +2514,11 @@ long sound_new_impulse(
 									sound->playing_channel_index = NONE;
 									sound->listener_index = listener_index;
 									sound->type = _sound_impulse;
+									if (config_boolean("debug.sound_log")) /* port */
+									{
+										platform_log("sound log: %ld impulse %s", game_time_get(),
+											tag_get_name(definition_index));
+									}
 									sound->pitch = sound_scale_random_value(
 										definition->random_pitch_bounds.lower,
 										definition->random_pitch_bounds.upper,

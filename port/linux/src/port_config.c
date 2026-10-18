@@ -501,6 +501,15 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"The weapon network_test_pickup stands the player on: the first whose tag\n"
 		"name has this in it (\"sniper\", say); empty any." },
+	{ "debug.network_test_powerup", _config_real, "0.0", "HALO_NETWORK_TEST_POWERUP", _environment_value, _platform_all,
+		"This many seconds into an automated test game the host stands its last\n"
+		"player on a powerup lying about, which the player then picks up; 0\n"
+		"never." },
+	{ "debug.network_test_powerup_name", _config_string, "\"over shield\"", "HALO_NETWORK_TEST_POWERUP_NAME",
+		_environment_value, _platform_all,
+		"The powerup network_test_powerup stands the player on: the first whose\n"
+		"tag name has this in it (\"over shield\", \"active camouflage\", \"health\n"
+		"pack\")." },
 	{ "debug.network_test_public", _config_boolean, "false", "HALO_NETWORK_TEST_PUBLIC", _environment_value,
 		_platform_all,
 		"The network test's host lists its game in the server browser, as Create\n"
@@ -554,6 +563,9 @@ static const struct config_setting config_settings[] =
 		"Run without a window, drawing nothing." },
 	{ "debug.gl_debug", _config_boolean, "false", "HALO_GL_DEBUG", _environment_set_is_true, _platform_all,
 		"Report OpenGL errors in the log." },
+	{ "debug.sound_log", _config_boolean, "false", "HALO_SOUND_LOG", _environment_set_is_true, _platform_all,
+		"Log each sound as it starts (the game time and the sound's tag), and\n"
+		"the HUD's warning sounds as they start and stop." },
 	{ "debug.menu_open", _config_string, "\"\"", "HALO_MENU_OPEN", _environment_value, _platform_all,
 		"Start on this screen of the menus (port/assets/menus) instead of the main\n"
 		"menu, a player profile being edited; empty for the main menu." },

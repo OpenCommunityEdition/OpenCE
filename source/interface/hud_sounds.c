@@ -19,6 +19,12 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "sound/sound_manager.h"
 #include "tag_files/tag_groups.h"
+#include "game/game.h" /* port: game_time_get, for debug.sound_log */
+
+/* port: debug.sound_log (port/linux/src/port_config.c) notes the HUD's
+warning sounds as they start and stop */
+int config_boolean(char const *name);
+void platform_log(char const *format, ...);
 
 /* ---------- constants */
 
@@ -95,13 +101,25 @@ void hud_play_sound(
 							sound_stop_impulse(sound_indices[absolute_sound_index]);
 						sound_indices[absolute_sound_index] =
 							unspatialized_impulse_sound_new(sound->sound.index, sound->scale);
+						if (config_boolean("debug.sound_log")) /* port */
+						{
+							platform_log("sound log: %ld hud sound %ld starts (state %lx): %s", game_time_get(),
+								absolute_sound_index, state_flags, tag_get_name(sound->sound.index));
+						}
 					}
 					break;
 
 				case LOOPING_SOUND_DEFINITION_TAG:
 					if (sound_indices[absolute_sound_index] == NONE)
+					{
 						sound_indices[absolute_sound_index] =
 							unattached_looping_sound_start(sound->sound.index, NONE, sound->scale);
+						if (config_boolean("debug.sound_log")) /* port */
+						{
+							platform_log("sound log: %ld hud loop %ld starts (state %lx): %s", game_time_get(),
+								absolute_sound_index, state_flags, tag_get_name(sound->sound.index));
+						}
+					}
 					break;
 				}
 
@@ -121,6 +139,11 @@ void hud_play_sound(
 					case LOOPING_SOUND_DEFINITION_TAG:
 						unattached_looping_sound_stop(sound_indices[absolute_sound_index]);
 						break;
+					}
+					if (config_boolean("debug.sound_log")) /* port */
+					{
+						platform_log("sound log: %ld hud sound %ld ends (state %lx): %s", game_time_get(),
+							absolute_sound_index, state_flags, tag_get_name(sound->sound.index));
 					}
 
 					sound_indices[absolute_sound_index] = NONE;
