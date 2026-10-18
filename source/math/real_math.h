@@ -1556,7 +1556,7 @@ __inline real plane3d_distance_to_point(
 	real_plane3d const *plane,
 	real_point3d const *point)
 {
-	return (dot_product3d((real_vector3d *)point, &plane->n) - plane->d);
+	return dot_product3d((real_vector3d *)point, &plane->n) - plane->d;
 }
 #endif
 
