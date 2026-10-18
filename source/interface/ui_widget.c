@@ -1394,6 +1394,15 @@ texture from, or the sheet if it has none (port/linux/game/hud_hires_tags.c) */
 struct bitmap_data const *hud_hires_sprite_bitmap(
 	struct bitmap_data const *sheet,
 	short sequence_index);
+/* port: the PlayStation pad's face drawn in place of a button's sprite, when
+its symbols are chosen (port/linux/game/hud_hires_tags.c) */
+boolean hud_hires_playstation_icon_draw(
+	struct icon_hud_element_definition const *icon,
+	point2d const *point,
+	real_rectangle2d const *clip,
+	struct bitmap_data const *sheet,
+	real scale,
+	pixel32 color);
 static void widget_instance_initialize(
 	struct widget_instance *widget,
 	struct widget_instance *parent,
@@ -4106,20 +4115,30 @@ static void render_state_bitmap(
 	if (bitmap && _texture_cache_bitmap_get_hardware_format(
 		(struct bitmap_data *)bitmap, FALSE, TRUE))
 	{
-		/* port: the sprite from a high-res texture, if it has one */
-		bitmap = hud_hires_sprite_bitmap(bitmap, icon->sequence_index);
 		scale = hud_globals_get_scale(local_player_count() > 1);
 		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0 + 1.0f);
 		point.y = (short)(cursor_bounds->y1 - icon->offset.y * scale - 2.0f);
-		hud_draw_bitmap_direct(
-			bitmap,
-			_hud_anchor_bottom_left,
+		/* port: the PlayStation pad's face for the button, while its symbols are chosen */
+		if (!hud_hires_playstation_icon_draw(
+			icon,
 			&point,
 			clip,
+			bitmap,
 			scale,
-			0.0f,
-			TEST_FLAG(icon->flags, _hud_icon_use_color_bit) ? icon->color : color,
-			FALSE);
+			TEST_FLAG(icon->flags, _hud_icon_use_color_bit) ? icon->color : color))
+		{
+			/* port: the sprite from a high-res texture, if it has one */
+			bitmap = hud_hires_sprite_bitmap(bitmap, icon->sequence_index);
+			hud_draw_bitmap_direct(
+				bitmap,
+				_hud_anchor_bottom_left,
+				&point,
+				clip,
+				scale,
+				0.0f,
+				TEST_FLAG(icon->flags, _hud_icon_use_color_bit) ? icon->color : color,
+				FALSE);
+		}
 		if (TEST_FLAG(icon->flags, _hud_icon_absolute_width_bit))
 			cursor_bounds->x0 = icon->width_offset + point.x;
 		else if (clip)

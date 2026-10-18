@@ -21,6 +21,8 @@ zlib (port/third_party/zlib).
 */
 
 #include "hud_hires.h"
+#include "hud_button_variants.h"
+#include "input_prompts.h"
 #include "platform.h"
 #include "port_config.h"
 #include "xgpu.h"
@@ -216,7 +218,7 @@ unsigned int hud_hires_placeholder_texture(unsigned long data, unsigned long *le
 	for (index = 0; data && index < placeholder_count; index++)
 	{
 		if (placeholders[index].data == data)
-			return hud_hires_override_texture(placeholders[index].asset, levels);
+			return hud_hires_shown_texture(placeholders[index].asset, levels);
 	}
 	return 0;
 }
@@ -525,6 +527,90 @@ unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned
 	texture = hud_hires_rgba_texture(pixels, width, height, levels);
 	free(pixels);
 	return texture;
+}
+
+/* ---------- the PlayStation faces of the menus' button icons */
+
+/* the textures made of a PlayStation face placed in a small icon's bitmap
+(hud_button_variants.h): a large icon's is the face's own texture */
+static struct
+{
+	unsigned int texture;
+	unsigned long levels;
+	int failed;
+} variant_textures[MAXIMUM_TEXTURES];
+
+/* the asset of the PlayStation face for an Xbox icon's asset, or -1 (the faces are 32 texels
+across, as the icons' bitmaps are) */
+static long variant_asset(long asset, struct hud_button_variant const **variant)
+{
+	static long found[MAXIMUM_TEXTURES];
+	static unsigned char known[MAXIMUM_TEXTURES];
+	long index;
+
+	if (asset < 0 || asset >= hud_hires_asset_count())
+		return -1;
+	if (!known[asset])
+	{
+		known[asset] = 1;
+		found[asset] = -1;
+		if (hud_button_variant_find(hud_hires_embedded[asset].tag))
+		{
+			for (index = 0; index < hud_hires_asset_count(); index++)
+			{
+				if (!strcmp(hud_hires_embedded[index].tag, hud_button_variant_find(hud_hires_embedded[asset].tag)->playstation_tag))
+					found[asset] = index;
+			}
+		}
+	}
+	if (found[asset] >= 0)
+		*variant = hud_button_variant_find(hud_hires_embedded[asset].tag);
+	return found[asset];
+}
+
+unsigned int hud_hires_shown_texture(long asset, unsigned long *levels)
+{
+	struct hud_button_variant const *variant = NULL;
+	long face;
+
+	if (asset >= 0 && asset < hud_hires_asset_count() && !variant_textures[asset].failed &&
+		input_prompt_glyphs_playstation(config_string("input.prompt_glyphs")) &&
+		(face = variant_asset(asset, &variant)) >= 0)
+	{
+		if (variant->scale == 1.0f && variant->x == 0.0f && variant->y == 0.0f)
+		{
+			unsigned int texture = hud_hires_override_texture(face, levels);
+
+			if (texture)
+				return texture;
+		}
+		else if (variant_textures[asset].texture)
+		{
+			*levels = variant_textures[asset].levels;
+			return variant_textures[asset].texture;
+		}
+		else
+		{
+			unsigned long width = 0, height = 0;
+			unsigned char *pixels = png_decode(hud_hires_embedded[face].png, hud_hires_embedded[face].png_size,
+				&width, &height);
+			unsigned char *placed = pixels ? hud_button_variant_place(pixels, width, height,
+				32,
+				variant->scale, variant->x, variant->y) : NULL;
+
+			free(pixels);
+			if (placed)
+			{
+				variant_textures[asset].texture = hud_hires_rgba_texture(placed, width, height,
+					&variant_textures[asset].levels);
+				free(placed);
+				*levels = variant_textures[asset].levels;
+				return variant_textures[asset].texture;
+			}
+			variant_textures[asset].failed = 1;
+		}
+	}
+	return hud_hires_override_texture(asset, levels);
 }
 
 unsigned int hud_hires_override_texture(long asset, unsigned long *levels)

@@ -36,7 +36,8 @@ settings[LC_COUNT] =
 	{ "audio.reverb", T_BOOL, "true" },
 	{ "game.movies", T_BOOL, "true" },
 	{ "game.intro_movies", T_BOOL, "true" },
-	{ "game.achievements", T_BOOL, "false" }
+	{ "game.achievements", T_BOOL, "false" },
+	{ "input.prompt_glyphs", T_STRING, "auto" }
 };
 
 const char *lc_key(int id)

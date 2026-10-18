@@ -329,6 +329,120 @@ long hud_hires_upscale_at(unsigned long address, long width, long height)
 	return FALSE;
 }
 
+/* The placeholder bitmap a button face's texture is drawn from (hud_buttons[slot]), made when
+ * first wanted: 32x32 for a face and 64x64 for a trigger's, stick's or text pill's cell, in the
+ * style's set (hud_buttons_style: the set changes with display.hud_button_style and with
+ * input.prompt_glyphs). NULL if the build has no texture of that name, or no placeholder can
+ * be made. */
+static struct bitmap_data *hud_button_bitmap(
+	short style,
+	short slot,
+	char const *asset_name,
+	boolean large)
+{
+	long asset;
+
+	if (style != hud_buttons_style)
+	{
+		hud_buttons_forget();
+		hud_buttons_style = style;
+	}
+	if (!hud_buttons[slot].attempted)
+	{
+		hud_buttons[slot].attempted = TRUE;
+		for (asset = 0; asset < hud_hires_asset_count(); asset++)
+		{
+			struct bitmap_data *bitmap;
+
+			if (strcmp(hud_hires_asset_tag(asset), asset_name)) continue;
+			bitmap = bitmap_2d_new(large ? 64 : 32, large ? 64 : 32, 0, 11);
+			if (!bitmap) break;
+			if (!rasterizer_bitmap_new(bitmap))
+			{
+				bitmap_delete(bitmap);
+				break;
+			}
+			hud_hires_register_placeholder(asset, bitmap->hardware_format);
+			hud_buttons[slot].asset = asset;
+			hud_buttons[slot].bitmap = bitmap;
+			break;
+		}
+	}
+	return hud_buttons[slot].bitmap;
+}
+
+/* whether the pad in use shows PlayStation symbols (input.prompt_glyphs) */
+static boolean hud_playstation_prompts(
+	void)
+{
+	long mode = input_prompt_glyphs_mode(config_string("input.prompt_glyphs"));
+
+	return mode == 2 || (mode == 0 && platform_prompts_playstation());
+}
+
+/* the PlayStation faces' textures, by the Xbox button they stand for (A, B, X, Y) */
+static char const *const hud_playstation_face_names[4] = {
+	"ui\\hud\\buttons\\ps_cross", "ui\\hud\\buttons\\ps_circle",
+	"ui\\hud\\buttons\\ps_square", "ui\\hud\\buttons\\ps_triangle"};
+
+/* The menus' text draws a button (A SELECT, B BACK) as a sprite of the message icons' sheet, tinted
+ * (ui_widget.c's render_state_bitmap): while the pad in use shows PlayStation symbols, the face of the
+ * pad is drawn in its place, in the sprite's cell: the sprite is clip of sheet at scale with its corner at
+ * point. The face's own colours are kept (the sprite's tint is the Xbox button's). Returns FALSE, to draw
+ * the sprite, when the icon is not A, B, X or Y, the symbols are the Xbox's, the HUD's high-res art is off or
+ * the build has no face. */
+boolean hud_hires_playstation_icon_draw(
+	struct icon_hud_element_definition const *icon,
+	point2d const *point,
+	real_rectangle2d const *clip,
+	struct bitmap_data const *sheet,
+	real scale,
+	pixel32 color)
+{
+	struct icon_hud_element_definition const *buttons;
+	struct rasterizer_dynamic_screen_geometry_parameters parameters;
+	struct dynamic_screen_vertex vertices[4];
+	struct bitmap_data *bitmap;
+	real sprite_width, sprite_height, face_scale, x, y, width, height;
+	short index, i;
+
+	if (!hud_globals || !config_boolean("display.high_res_hud") || !hud_playstation_prompts())
+		return FALSE;
+	buttons = hud_globals->messaging.button_icons.address;
+	if (!buttons || !sheet) return FALSE;
+	for (index = 0; index < 4 && index < hud_globals->messaging.button_icons.count; index++)
+		if (icon == buttons + index) break;
+	if (index >= 4 || index >= hud_globals->messaging.button_icons.count)
+		return FALSE;
+	bitmap = hud_button_bitmap(3, index, hud_playstation_face_names[index], FALSE);
+	if (!bitmap) return FALSE;
+	sprite_width = (clip ? clip->x1 - clip->x0 : 1.0f) * sheet->width * scale;
+	sprite_height = (clip ? clip->y1 - clip->y0 : 1.0f) * sheet->height * scale;
+	/* (the face's circle, 20.3 texels across with its rim, fills the sprite's width; its art is the
+	 * top left 21x26 texels of the 32x32 picture, the circle's centre at 10.5, 13) */
+	face_scale = sprite_width / 20.3f;
+	width = 21.0f * face_scale;
+	height = 26.0f * face_scale;
+	x = point->x + sprite_width * 0.5f - 10.5f * face_scale;
+	y = point->y - sprite_height * 0.5f - 13.0f * face_scale;
+	csmemset(&parameters, 0, sizeof(parameters));
+	parameters.map[0] = bitmap;
+	parameters.map_texture_scale[0].i = parameters.map_texture_scale[0].j = 1.0f;
+	parameters.map_scale[0].i = parameters.map_scale[0].j = 1.0f;
+	parameters.framebuffer_blend_function = 0;
+	for (i = 0; i < 4; i++)
+	{
+		boolean right = ((i + 1) & 2) != 0, bottom = i > 1;
+		vertices[i].position.x = x + (right ? width : 0.0f);
+		vertices[i].position.y = y + (bottom ? height : 0.0f);
+		vertices[i].texture_coordinates.x = right ? 21.0f / 32.0f : 0.0f;
+		vertices[i].texture_coordinates.y = bottom ? 26.0f / 32.0f : 0.0f;
+		vertices[i].color = (color & 0xFF000000UL) | 0xFFFFFFUL;
+	}
+	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
+	return TRUE;
+}
+
 /* Match the controller entry itself: weapon icons may reuse its sequence.
  * Draw the existing Xbox menu faces with straight alpha, independently of
  * the messaging sheet and its tint. Disabling the HUD keeps the map's art. */
@@ -362,7 +476,7 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	struct bitmap_data *bitmap;
 	real viewport, scale, x, y, width, height, u, v;
 	short advance;
-	long index, asset;
+	long index;
 	short i;
 	short style, slot, playstation, pill;
 	char const *asset_name;
@@ -378,11 +492,7 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	slot = index < 6 ? (short)index : hud_button_control_slot((short)index,
 		icon->frame_rate > 0 ? game_time_get() / icon->frame_rate : 0);
 	/* port: the PlayStation pad's start and back are Options and Share (slots 14, 15) */
-	{
-		long mode = input_prompt_glyphs_mode(config_string("input.prompt_glyphs"));
-
-		playstation = mode == 2 || (mode == 0 && platform_prompts_playstation());
-	}
+	playstation = hud_playstation_prompts();
 	if (playstation && (index == 12 || index == 13)) slot = (short)(index + 2);
 	if (slot < 0) return FALSE;
 	/* the shoulders, triggers, Options and Share are wide pills in the triggers' cell */
@@ -390,34 +500,11 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	style = (!strcmp(config_string("display.hud_button_style"), "dark_gems") || !strcmp(config_string("display.hud_button_style"), "menu_gems")) ? 2 :
 		!strcmp(config_string("display.hud_button_style"), "gems");
 	if (playstation) style = 3;
-	if (style != hud_buttons_style)
-	{
-		hud_buttons_forget();
-		hud_buttons_style = style;
-	}
-	if (!hud_buttons[slot].attempted)
-	{
-		hud_buttons[slot].attempted = TRUE;
-		for (asset = 0; asset < hud_hires_asset_count(); asset++)
-		{
-			asset_name = playstation && slot < 8 ? playstation_names[slot] :
-				playstation && slot >= 14 ? playstation_start_names[slot - 14] :
-				slot >= 6 ? hud_button_control_name(slot) : style == 0 ? classic_names[index] :
-				style == 1 ? gem_names[index] : names[index];
-			if (strcmp(hud_hires_asset_tag(asset), asset_name)) continue;
-			bitmap = bitmap_2d_new(slot >= 6 || pill ? 64 : 32, slot >= 6 || pill ? 64 : 32, 0, 11);
-			if (!bitmap) break;
-			if (!rasterizer_bitmap_new(bitmap))
-			{
-				bitmap_delete(bitmap);
-				break;
-			}
-			hud_hires_register_placeholder(asset, bitmap->hardware_format);
-			hud_buttons[slot].asset = asset;
-			hud_buttons[slot].bitmap = bitmap;
-			break;
-		}
-	}
+	asset_name = playstation && slot < 8 ? playstation_names[slot] :
+		playstation && slot >= 14 ? playstation_start_names[slot - 14] :
+		slot >= 6 ? hud_button_control_name(slot) : style == 0 ? classic_names[index] :
+		style == 1 ? gem_names[index] : names[index];
+	hud_button_bitmap(style, slot, asset_name, slot >= 6 || pill);
 	bitmap = hud_buttons[slot].bitmap;
 	if (!bitmap) return FALSE;
 	viewport = local_player_count() > 1 ? 0.75f : 1.0f;

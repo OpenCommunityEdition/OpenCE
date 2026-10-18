@@ -52,7 +52,7 @@ PowerSpark opens a window before the game, as MacSoft's Halo and Halo PC do: Dis
 Screen or Windowed, Resolution from the display's modes, Render resolution
 (`mac.render_resolution`), Widescreen, V-Sync, Smooth motion, Frame rate limit), Graphics (Detail, Texture quality, Anti-aliasing, Shadow
 quality, Adaptive detail, Gamma, High-resolution HUD and text, Per-pixel lighting), Sound (on, Reverb,
-Volume), Options (Play intro movies, Achievements, the Game data source, Set Up from
+Volume), Options (Play intro movies, Achievements, Button symbols, the Game data source, Set Up from
 Disc Image, Controller Setup), and Play (Return), Quit (Escape, Command-Q) and "Don't
 show this at startup". Every option is shown on every Mac, PowerPC or Intel; only the
 defaults differ with the card (`mac.detail` auto), and the game limits at run time what
@@ -202,8 +202,11 @@ its usages (X, Y, Z, Rz or Rx, Ry for the sticks, the hat, buttons 1 to 10 in th
 at once and may be connected while the game runs. The probe `tools/mac_gamepad_probe.c`
 (`sh tools/mac_gamepad_probe_checks.sh`) shows a pad's raw reports and
 the game's view of it. `mac_gamepad_is_playstation_at(slot)` says when a pad is one, and
-`input.prompt_glyphs` ("auto") follows it (`platform_prompts_playstation`), but the Mac's
-reduced HUD (`port/assets/hud_mac`) has no button art yet, so the prompts keep the maps' icons.
+`input.prompt_glyphs` ("auto") follows it (`platform_prompts_playstation`): the HUD's prompts then draw the
+PlayStation faces, and the Xbox ui's button bar (A SELECT, B BACK) the cross and circle, from the button
+pictures reduced to `port/assets/hud_mac` with the HUD's (`tools/mac_hud_reduce.py` reduces `port/assets/buttons` too;
+run it again after replacing the PNGs there, such as the `ps_*.png`). A pad that cannot say which it is (an
+8BitDo adapter in Dinput mode) is chosen once: Button symbols in PowerSpark's start window or in Gamepad Setup.
 
 ## Settings
 

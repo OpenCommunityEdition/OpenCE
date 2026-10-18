@@ -67,6 +67,10 @@ long hud_hires_override_find(unsigned long address, unsigned long width, unsigne
 /* its GL texture (decoded and uploaded, mipmapped, on first use; 0 if it
 could not be), and the number of its mip levels */
 unsigned int hud_hires_override_texture(long asset, unsigned long *levels);
+/* the texture to draw for the asset now: its own, or while the pad in use shows PlayStation
+faces (input.prompt_glyphs) and it is one of the Xbox icons of the menus' button bar (hud_button_variants.h),
+the PlayStation face for it. Asked at each draw, so that a pad change or the setting shows at once. */
+unsigned int hud_hires_shown_texture(long asset, unsigned long *levels);
 /* a GL texture drawn from an 8-bit RGBA PNG (as the tools write them), with
 all its mip levels, and their number; 0 if it could not be */
 unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned long *levels);

@@ -1371,6 +1371,7 @@ struct xbox_texture_entry {
     unsigned long data, generation, format_word, size_word, last_use, palette;
     long hud_asset; /* port: the high-res HUD texture standing for the bitmap, or -1 */
     int hud_on;     /* ... and whether it was drawn in its place */
+    long hud_shown; /* ... and the asset whose texels it was made of (another when the prompts show PlayStation faces) */
     GLuint name;
     GLenum target;
     unsigned levels;
@@ -1392,6 +1393,14 @@ static const struct mac_gpu_hud_provider *hud_provider;
 void mac_gpu_textures_hud_provider(const struct mac_gpu_hud_provider *provider)
 {
     hud_provider = provider;
+}
+/* whether an entry's HUD texture is still the one to draw: its setting as it was, and the same faces
+   (input.prompt_glyphs, or the pad in use, may have changed which of a button's pictures is shown) */
+static int hud_entry_current(const struct xbox_texture_entry *entry)
+{
+    if (entry->hud_asset < 0) return 1;
+    if (entry->hud_on != (hud_provider && hud_provider->enabled())) return 0;
+    return !entry->hud_on || entry->hud_shown == hud_provider->shown(entry->hud_asset);
 }
 /* the texels reduced to half, a level of the chain: the average of 2x2 */
 static unsigned char *hud_texels_halved(const unsigned char *texels, unsigned width, unsigned height,
@@ -1491,7 +1500,7 @@ static GLuint xbox_texture_get(const void *resource, unsigned char sampler, unsi
     entry = xbox_texture_find(native->Data, &found);
     if (!xbox_texture_simple && found && !entry->palettized && entry->format_word == native->Format && entry->size_word == native->Size &&
         entry->sampler == sampler &&
-        (entry->hud_asset < 0 || entry->hud_on == (hud_provider && hud_provider->enabled())) &&
+        hud_entry_current(entry) &&
         mac_resource_range_generation(PLATFORM_PHYSICAL_TO_VIRTUAL(native->Data), entry->total) <= entry->generation) {
         ++xbox_texture_hits;
         entry->last_use = xbox_texture_bind_serial;
@@ -1526,7 +1535,7 @@ static GLuint xbox_texture_get(const void *resource, unsigned char sampler, unsi
     entry = xbox_texture_find(native->Data, &found);
     if (found && entry->palette == (unsigned long)palette && entry->format_word == native->Format && entry->size_word == native->Size &&
         entry->generation >= generation && entry->sampler == sampler &&
-        (entry->hud_asset < 0 || entry->hud_on == (hud_provider && hud_provider->enabled()))) {
+        hud_entry_current(entry)) {
         ++xbox_texture_hits;
         entry->last_use = xbox_texture_bind_serial;
         *target_out = entry->target; *levels_out = entry->levels;
@@ -1675,6 +1684,7 @@ static GLuint xbox_texture_get(const void *resource, unsigned char sampler, unsi
     entry->generation = generation; entry->name = object; entry->target = target;
     entry->levels = hud_on ? hud_levels : (unsigned)(description.levels - first_level); entry->bytes = gl_bytes;
     entry->hud_asset = hud_asset; entry->hud_on = hud_on;
+    entry->hud_shown = hud_on ? hud_provider->shown(hud_asset) : -1;
     entry->sampler = sampler; entry->palette = (unsigned long)palette; entry->live = 1; entry->last_use = xbox_texture_bind_serial;
     entry->total = total; entry->palettized = description.format == 0x0b;
     entry->scale[0] = entry->scale[1] = 1.0f;
@@ -2028,7 +2038,7 @@ int mac_gpu_textures_bind(struct mac_gpu_texture_scope *scope,
                 const D3DBaseTexture *native = (const D3DBaseTexture *)textures[stage];
                 if (entry->live && entry->name == memo->object && entry->data == native->Data &&
                     entry->format_word == native->Format && entry->size_word == native->Size &&
-                    (entry->hud_asset < 0 || entry->hud_on == (hud_provider && hud_provider->enabled())) &&
+                    hud_entry_current(entry) &&
                     mac_resource_range_generation(memo->xbox_source, memo->xbox_total) <= entry->generation) {
                     entry->last_use = xbox_texture_bind_serial;
                     ++xbox_texture_hits; ++xbox_texture_memo_hits;

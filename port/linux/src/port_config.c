@@ -292,7 +292,8 @@ static const struct config_setting config_settings[] =
 		"to pick up\"): \"auto\" follows the pad in use, PlayStation symbols\n"
 		"(cross, circle, square, triangle, L1, R1, L2, R2, Options, Share) for a\n"
 		"PlayStation pad and the Xbox's for any other; \"xbox\" and \"playstation\"\n"
-		"always draw one. Needs display.high_res_hud." },
+		"always draw one. Needs display.high_res_hud. The Xbox menus' button bar\n"
+		"(A Select, B Back) follows it too." },
 	{ "input.mouse_sensitivity", _config_real, "1.0", "HALO_MOUSE_SENSITIVITY", _environment_value, _platform_desktop,
 		"How far the view turns for the mouse's movement." },
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,

@@ -33,6 +33,7 @@ enum lc_id
 	LC_MOVIES,		/* game.movies (the dialog sets game.intro_movies with it) */
 	LC_INTRO_MOVIES,
 	LC_ACHIEVEMENTS,	/* game.achievements */
+	LC_PROMPT_GLYPHS,	/* input.prompt_glyphs: "auto", "xbox" or "playstation" */
 	LC_COUNT
 };
 

@@ -949,7 +949,7 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 	}
 	if (entry->override >= 0)
 	{
-		GLuint texture = hud_hires_override_texture(entry->override, &description->levels);
+		GLuint texture = hud_hires_shown_texture(entry->override, &description->levels);
 
 		if (texture)
 		{

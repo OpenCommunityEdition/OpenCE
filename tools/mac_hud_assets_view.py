@@ -28,6 +28,10 @@ def main():
     listing = json.loads(read(os.path.join(ROOT, "port/assets/hud/layout.json")).decode("utf-8"))["assets"]
     lines = ['#include "mac_hud_hires.h"', ""]
     table = []
+    # (and the controller buttons' pictures, but not the message icons' sheet, which
+    # stands for only some of its bitmap's sprites: tools/mac_hud_reduce.py)
+    listing += [asset for asset in json.loads(read(os.path.join(ROOT, "port/assets/buttons/buttons.json")).decode("utf-8"))["assets"]
+                if "sprites" not in asset]
     for asset in listing:
         if any(cell["kind"] == "meter" for cell in asset.get("cells", [])):
             continue

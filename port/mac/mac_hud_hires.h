@@ -30,12 +30,16 @@ extern const unsigned int mac_hud_assets_count;
    the texture of a bitmap whose texels are at address (in the engine's memory),
    width by height, its first mip level level0_size bytes: find, which
    asset stands for it (its number), or -1; enabled, whether the setting is on;
-   decode, the asset's texels, RGBA with the top row first (allocated; the
-   cache frees them), or NULL */
+   shown, the asset whose texels draw for it now (its own, or the PlayStation
+   face standing for an Xbox button icon while the prompts show those:
+   hud_button_variants.h; a cached texture made of another is made again);
+   decode, the asset's texels (as shown says), RGBA with the top row first
+   (allocated; the cache frees them), or NULL */
 struct mac_gpu_hud_provider
 {
     long (*find)(unsigned long address, unsigned long width, unsigned long height, unsigned long level0_size);
     int (*enabled)(void);
+    long (*shown)(long asset);
     unsigned char *(*decode)(long asset, unsigned *width, unsigned *height);
 };
 

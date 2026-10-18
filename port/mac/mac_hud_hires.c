@@ -11,6 +11,8 @@
    port/linux/src/hud_hires.c. Only 8-bit RGBA, non-interlaced PNGs are read
    (the ones tools/mac_hud_reduce.py writes), inflated by the system's zlib. */
 #include "mac_hud_hires.h"
+#include "../linux/include/hud_button_variants.h"
+#include "../linux/include/input_prompts.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,6 +23,7 @@ extern void mac_gpu_textures_hud_provider(const struct mac_gpu_hud_provider *pro
 /* port/linux/src/port_config.c */
 extern int config_boolean(const char *name);
 extern unsigned long config_changes(void);
+extern const char *config_string(const char *name);
 /* port/linux/game/hud_hires_tags.c: the asset whose bitmap's pixels are at
    address (guest virtual), of this size, or -1 */
 extern long hud_hires_asset_at(unsigned long address, long width, long height);
@@ -73,12 +76,32 @@ int hud_hires_sprites_drawable(long asset, unsigned long address, unsigned long 
     return 0;
 }
 
+/* The textures the game draws from a placeholder bitmap of its own making (the gameplay
+   prompts' button faces, port/linux/game/hud_hires_tags.c): the placeholder's texels are
+   never written, so the texture cache asks which asset stands for the address of its
+   Data (hud_find) and draws that. */
+#define MAXIMUM_PLACEHOLDERS 32
+/* (a D3D texture's Data is a physical address; the engine's contiguous memory is mapped at this base:
+   PLATFORM_CONTIGUOUS_BASE of native_resource_memory.h, which needs the engine's headers) */
+#define CONTIGUOUS_BASE 0x80000000UL
+
+static struct {
+    unsigned long address;
+    long asset;
+} placeholders[MAXIMUM_PLACEHOLDERS];
+static long placeholder_count;
+
 void hud_hires_register_placeholder(long asset, unsigned long const *texture)
 {
-    (void)asset;
-    if (texture) {
-        fprintf(stderr, "native high-res HUD: placeholder registration is unsupported\n");
-        abort();
+    long index;
+
+    for (index = 0; index < placeholder_count && placeholders[index].asset != asset; index++)
+        ;
+    if (texture && index == placeholder_count && placeholder_count < MAXIMUM_PLACEHOLDERS)
+        placeholder_count++;
+    if (index < placeholder_count) {
+        placeholders[index].address = texture ? (texture[1] | CONTIGUOUS_BASE) : 0;
+        placeholders[index].asset = asset;
     }
 }
 
@@ -125,8 +148,13 @@ static int hud_enabled(void)
 static long hud_find(unsigned long address, unsigned long width, unsigned long height, unsigned long level0_size)
 {
     static unsigned char reported[256];
-    long asset = hud_hires_asset_at(address, (long)width, (long)height);
+    long asset, index;
 
+    for (index = 0; address && index < placeholder_count; index++) {
+        if (placeholders[index].address == address)
+            return placeholders[index].asset;
+    }
+    asset = hud_hires_asset_at(address, (long)width, (long)height);
     if (asset < 0 || asset >= hud_hires_asset_count())
         return -1;
     if (crc32_bytes((const unsigned char *)address, level0_size) != mac_hud_assets[asset].crc) {
@@ -256,18 +284,59 @@ failed:
     return NULL;
 }
 
+/* the asset whose texels draw for this one now: the PlayStation face for an Xbox button
+   icon while the prompts show PlayStation faces (hud_button_variants.h), else itself */
+static long hud_shown(long asset)
+{
+    static long found[256];
+    static unsigned char known[256];
+    long index;
+    const struct hud_button_variant *variant;
+
+    if (asset < 0 || asset >= hud_hires_asset_count() || asset >= 256)
+        return asset;
+    if (!known[asset]) {
+        known[asset] = 1;
+        found[asset] = -1;
+        variant = hud_button_variant_find(mac_hud_assets[asset].tag);
+        for (index = 0; variant && index < hud_hires_asset_count(); index++) {
+            if (!strcmp(mac_hud_assets[index].tag, variant->playstation_tag))
+                found[asset] = index;
+        }
+    }
+    if (found[asset] < 0 || !input_prompt_glyphs_playstation(config_string("input.prompt_glyphs")))
+        return asset;
+    return found[asset];
+}
+
 static unsigned char *hud_decode(long asset, unsigned *width, unsigned *height)
 {
     unsigned long png_width = 0, png_height = 0;
     unsigned char *pixels;
+    const struct hud_button_variant *variant = NULL;
+    long own = asset;
 
     if (asset < 0 || asset >= hud_hires_asset_count())
         return NULL;
+    asset = hud_shown(asset);
+    if (asset != own)
+        variant = hud_button_variant_find(mac_hud_assets[own].tag);
     pixels = png_decode(mac_hud_assets[asset].png, mac_hud_assets[asset].png_size, &png_width, &png_height);
     if (!pixels) {
         fprintf(stderr, "high-res hud: could not decode the texture for %s bitmap %d\n",
             mac_hud_assets[asset].tag, mac_hud_assets[asset].bitmap);
         return NULL;
+    }
+    if (variant && (variant->scale != 1.0f || variant->x != 0.0f || variant->y != 0.0f)) {
+        /* (a small icon: the face where that icon's art lies in its bitmap, whose size is the same
+           32 texels across) */
+        unsigned char *placed = hud_button_variant_place(pixels, png_width, png_height, 32, variant->scale,
+            variant->x, variant->y);
+
+        free(pixels);
+        pixels = placed;
+        if (!pixels)
+            return NULL;
     }
     *width = (unsigned)png_width;
     *height = (unsigned)png_height;
@@ -276,7 +345,7 @@ static unsigned char *hud_decode(long asset, unsigned *width, unsigned *height)
 
 void mac_hud_hires_install(void)
 {
-    static const struct mac_gpu_hud_provider provider = { hud_find, hud_enabled, hud_decode };
+    static const struct mac_gpu_hud_provider provider = { hud_find, hud_enabled, hud_shown, hud_decode };
 
     if (mac_hud_assets_count)
         mac_gpu_textures_hud_provider(&provider);

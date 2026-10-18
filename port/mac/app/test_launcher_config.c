@@ -49,6 +49,7 @@ int main(int argc, char **argv)
 	CHECK(lc_bool(m.value[LC_VSYNC]) && !lc_bool(m.value[LC_ACHIEVEMENTS]));
 	CHECK(!strcmp(lc_key(LC_RENDER), "mac.render_resolution") && !strcmp(m.value[LC_RENDER], "auto"));
 	CHECK(!strcmp(lc_key(LC_ADAPTIVE), "mac.adaptive_detail") && !strcmp(m.value[LC_ADAPTIVE], "auto"));
+	CHECK(!strcmp(lc_key(LC_PROMPT_GLYPHS), "input.prompt_glyphs") && !strcmp(m.value[LC_PROMPT_GLYPHS], "auto"));
 	CHECK(lc_model_save(&m, path) == 0);			/* nothing changed: no file */
 	CHECK(fopen(path, "rb") == NULL);
 
@@ -57,8 +58,10 @@ int main(int argc, char **argv)
 	strcpy(m.value[LC_MODE], "fullscreen");
 	lc_set_bool(&m, LC_ACHIEVEMENTS, 1);
 	lc_set_tenths(&m, LC_GAMMA, 12);
+	strcpy(m.value[LC_PROMPT_GLYPHS], "playstation");
 	CHECK(lc_model_save(&m, path) == 0);
 	t = read_all(path);
+	CHECK(strstr(t, "[input]\nprompt_glyphs = \"playstation\"\n") != NULL);
 	CHECK(strstr(t, "[display]\nmode = \"fullscreen\"\ngamma = 1.2\n") != NULL);
 	CHECK(strstr(t, "[game]\nachievements = true\n") != NULL);
 	lc_model_load(&m, t);

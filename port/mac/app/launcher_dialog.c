@@ -6,7 +6,7 @@
 #include <string.h>
 
 #define WINDOW_WIDTH 640
-#define WINDOW_HEIGHT 556
+#define WINDOW_HEIGHT 582
 #define MAX_ITEMS 160
 #define MAX_MODES 64
 #define MAX_CHOICES (MAX_MODES + 4)
@@ -60,6 +60,10 @@ static const struct choice adaptive_choices[] =
 	{ "Auto", "auto" }, { "Off", "off" }, { "On, 30 fps", "30" }, { "On, 24 fps", "24" }, { "On, 45 fps", "45" },
 	{ "On, 60 fps", "60" }
 };
+static const struct choice glyph_choices[] =
+{
+	{ "Auto", "auto" }, { "Xbox", "xbox" }, { "PlayStation", "playstation" }
+};
 static const struct choice source_choices[] =
 {
 	{ "Automatic", "auto" }, { "Xbox disc data", "xbox" }, { "MacSoft's Halo", "retail" }
@@ -73,7 +77,7 @@ static int fullscreen_selected;
 static char resolution_value[2][LC_VALUE];	/* [0] fullscreen's display.resolution, [1] the window's size */
 static struct choice resolution_choices[MAX_CHOICES];
 static char resolution_labels[MAX_CHOICES][32], resolution_values[MAX_CHOICES][16];
-static struct popup p_resolution, p_render, p_adaptive, p_fps, p_detail, p_texture, p_aa, p_shadow, p_source;
+static struct popup p_resolution, p_render, p_adaptive, p_fps, p_detail, p_texture, p_aa, p_shadow, p_source, p_glyphs;
 static ControlRef c_full, c_window, c_wide, c_vsync, c_smooth, c_gamma, c_gamma_text, c_hud, c_text, c_ppl;
 static ControlRef c_sound, c_reverb, c_volume, c_volume_text, c_movies, c_achievements, c_status, c_hide;
 
@@ -466,6 +470,7 @@ static void gather(void)
 	lc_set_bool(m, LC_MOVIES, GetControl32BitValue(c_movies));
 	lc_set_bool(m, LC_INTRO_MOVIES, GetControl32BitValue(c_movies));
 	lc_set_bool(m, LC_ACHIEVEMENTS, GetControl32BitValue(c_achievements));
+	snprintf(m->value[LC_PROMPT_GLYPHS], LC_VALUE, "%s", popup_value(&p_glyphs));
 	snprintf(m->data_source, sizeof(m->data_source), "%s", popup_value(&p_source));
 	m->hide = (int)GetControl32BitValue(c_hide);
 }
@@ -526,16 +531,16 @@ static OSStatus window_handler(EventHandlerCallRef call, EventRef event, void *d
 		case CMD_PAD:
 			run_helper(environment->run_controller_setup);
 			return noErr;
-		}
-	}
-	else if (class == kEventClassWindow && kind == kEventWindowClose)
-	{
-		finish(0);
 		case CMD_ABOUT:
 		case kHICommandAbout:
 			if (environment->show_about)
 				environment->show_about();
 			return noErr;
+		}
+	}
+	else if (class == kEventClassWindow && kind == kEventWindowClose)
+	{
+		finish(0);
 		return noErr;
 	}
 	else if (class == kEventClassKeyboard && kind == kEventRawKeyDown)
@@ -590,7 +595,7 @@ static void build(struct lc_model *m, ControlActionUPP action, ControlRef *play,
 	static const char *const left_labels[] = { "Resolution:", "Render resolution:", "Frame rate limit:" };
 	static const char *const volume_label[] = { "Volume:" };
 	static const char *const right_labels[] = { "Detail:", "Texture quality:", "Anti-aliasing:", "Shadow quality:", "Adaptive detail:", "Gamma:" };
-	static const char *const data_label[] = { "Game data:" };
+	static const char *const options_labels[] = { "Button symbols:", "Game data:" };
 	int lw, px, rw, rx, wide;
 	Rect bounds;
 	ControlRef c;
@@ -683,32 +688,40 @@ static void build(struct lc_model *m, ControlActionUPP action, ControlRef *play,
 		DisableControl(c_ppl);
 
 	/* Options */
-	make_box(16, 370, 624, 488, "Options");
+	make_box(16, 370, 624, 514, "Options");
 	c_movies = make_check(32, 392, 300, "Play intro movies", lc_bool(m->value[LC_MOVIES]), 0);
 	c_achievements = make_check(320, 392, 612, "Achievements", lc_bool(m->value[LC_ACHIEVEMENTS]), 0);
-	rw = label_width(data_label, 1);
-	make_label(28, 422, 28 + rw, 440, "Game data:", 1, 0);
+	rw = label_width(options_labels, 2);
 	wide = 0;
 	{
 		int i;
 
 		for (i = 0; i < 3; ++i)
+		{
 			if (text_width(source_choices[i].label, kThemeMenuItemFont) > wide)
 				wide = text_width(source_choices[i].label, kThemeMenuItemFont);
+			if (text_width(glyph_choices[i].label, kThemeMenuItemFont) > wide)
+				wide = text_width(glyph_choices[i].label, kThemeMenuItemFont);
+		}
 	}
-	make_popup(&p_source, 28 + rw + 6, 418, 28 + rw + 6 + wide + 56, source_choices, 3, m->data_source);
-	c_status = make_label(28 + rw + 6 + wide + 56 + 10, 416, 612, 448, "Found: Xbox disc data and MacSoft's Halo.", 0, 1);
-	make_button(32, 456, 32 + text_width("Set Up from Disc Image\xE2\x80\xA6", kThemeSystemFont) + 80,
+	make_label(28, 422, 28 + rw, 440, options_labels[0], 1, 0);
+	make_popup(&p_glyphs, 28 + rw + 6, 418, 28 + rw + 6 + wide + 56, glyph_choices, 3, m->value[LC_PROMPT_GLYPHS]);
+	help(p_glyphs.control, "The symbols the game's prompts and button icons show: Xbox, PlayStation, or Auto, which follows the pad in use. Choose one when an adapter (an 8BitDo in Dinput mode) cannot say which pad is paired.");
+	make_label(28 + rw + 6 + wide + 56 + 10, 422, 612, 440, "Auto follows a wired PlayStation pad.", 0, 1);
+	make_label(28, 448, 28 + rw, 466, options_labels[1], 1, 0);
+	make_popup(&p_source, 28 + rw + 6, 444, 28 + rw + 6 + wide + 56, source_choices, 3, m->data_source);
+	c_status = make_label(28 + rw + 6 + wide + 56 + 10, 442, 612, 474, "Found: Xbox disc data and MacSoft's Halo.", 0, 1);
+	make_button(32, 482, 32 + text_width("Set Up from Disc Image\xE2\x80\xA6", kThemeSystemFont) + 80,
 		"Set Up from Disc Image\xE2\x80\xA6", CMD_DISC);
-	make_button(32 + text_width("Set Up from Disc Image\xE2\x80\xA6", kThemeSystemFont) + 92, 456,
+	make_button(32 + text_width("Set Up from Disc Image\xE2\x80\xA6", kThemeSystemFont) + 92, 482,
 		32 + text_width("Set Up from Disc Image\xE2\x80\xA6", kThemeSystemFont) + 92 +
 		text_width("Controller Setup\xE2\x80\xA6", kThemeSystemFont) + 80, "Controller Setup\xE2\x80\xA6", CMD_PAD);
 
 	/* the buttons */
-	c_hide = make_check(20, 498, 330, "Don't show this at startup", m->hide, 0);
-	make_label(38, 520, 440, 548, "Hold Option while opening PowerSpark to show this window again.", 0, 1);
-	*quit = make_button(456, 504, 536, "Quit", CMD_QUIT);
-	*play = make_button(544, 504, 624, "Play", CMD_PLAY);
+	c_hide = make_check(20, 524, 330, "Don't show this at startup", m->hide, 0);
+	make_label(38, 546, 440, 574, "Hold Option while opening PowerSpark to show this window again.", 0, 1);
+	*quit = make_button(456, 530, 536, "Quit", CMD_QUIT);
+	*play = make_button(544, 530, 624, "Play", CMD_PLAY);
 	(void)c;
 }
 
@@ -739,6 +752,8 @@ int ld_run(struct lc_model *m, const struct ld_env *env)
 		&window) != noErr)
 		return -1;
 	SetWindowTitleWithCFString(window, cs("PowerSpark"));
+	/* (the application menu's About item) */
+	EnableMenuCommand(NULL, kHICommandAbout);
 	build(m, action, &play, &quit);
 	update_labels();
 	refresh_status();
@@ -752,8 +767,6 @@ int ld_run(struct lc_model *m, const struct ld_env *env)
 	SelectWindow(window);
 	RunAppModalLoopForWindow(window);
 	HideWindow(window);
-	/* (the application menu's About item) */
-	EnableMenuCommand(NULL, kHICommandAbout);
 	DisposeWindow(window);
 	DisposeControlActionUPP(action);
 	return result;

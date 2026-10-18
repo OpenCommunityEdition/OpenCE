@@ -258,6 +258,10 @@ SCREENS = {
              "Which stick moves and which looks.", None),
             ("VIBRATION:", "profile.vibration", ON_OFF, "Rumble the controller.", None),
             ("IN-GAME HELP:", "profile.ingame_help", ON_OFF, "Show the game's hints about its controls.", None),
+            # (input.prompt_glyphs: an adapter that cannot say which pad is paired is chosen here once)
+            ("BUTTON SYMBOLS:", "input.prompt_glyphs",
+             [("AUTO", "auto"), ("XBOX", "xbox"), ("PLAYSTATION", "playstation")],
+             "Symbols for prompts and button icons. Auto follows\nthe pad; pick one if your adapter cannot say.", None),
         ],
     },
 }
