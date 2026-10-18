@@ -521,6 +521,160 @@
     36,
     40
    ]
+  },
+  {
+   "name": "ps_cross__0",
+   "tag": "ui\\hud\\buttons\\ps_cross",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 0,
+   "svg": "ps_cross.svg",
+   "place": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "ps_circle__0",
+   "tag": "ui\\hud\\buttons\\ps_circle",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 0,
+   "svg": "ps_circle.svg",
+   "place": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "ps_square__0",
+   "tag": "ui\\hud\\buttons\\ps_square",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 0,
+   "svg": "ps_square.svg",
+   "place": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "ps_triangle__0",
+   "tag": "ui\\hud\\buttons\\ps_triangle",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 0,
+   "svg": "ps_triangle.svg",
+   "place": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "ps_l1__0",
+   "tag": "ui\\hud\\buttons\\ps_l1",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "svg": "ps_l1.svg",
+   "control_cell": [
+    50,
+    35
+   ]
+  },
+  {
+   "name": "ps_r1__0",
+   "tag": "ui\\hud\\buttons\\ps_r1",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "svg": "ps_r1.svg",
+   "control_cell": [
+    50,
+    35
+   ]
+  },
+  {
+   "name": "ps_l2__0",
+   "tag": "ui\\hud\\buttons\\ps_l2",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "svg": "ps_l2.svg",
+   "control_cell": [
+    50,
+    35
+   ]
+  },
+  {
+   "name": "ps_r2__0",
+   "tag": "ui\\hud\\buttons\\ps_r2",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "svg": "ps_r2.svg",
+   "control_cell": [
+    50,
+    35
+   ]
+  },
+  {
+   "name": "ps_options__0",
+   "tag": "ui\\hud\\buttons\\ps_options",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "svg": "ps_options.svg",
+   "control_cell": [
+    50,
+    35
+   ]
+  },
+  {
+   "name": "ps_share__0",
+   "tag": "ui\\hud\\buttons\\ps_share",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0,
+   "svg": "ps_share.svg",
+   "control_cell": [
+    50,
+    35
+   ]
   }
  ]
 }

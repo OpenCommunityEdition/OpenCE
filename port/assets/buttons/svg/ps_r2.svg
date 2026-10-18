@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="50" height="35" viewBox="0 0 50 35">
+<!-- The R2 (right trigger) prompt of a PlayStation pad, drawn for this port (tools/button_assets.py): a
+dark pill with a pale rim and its label in plain strokes. No maker's mark. -->
+<defs>
+<linearGradient id="body" gradientUnits="userSpaceOnUse" x1="0" y1="4" x2="0" y2="31">
+<stop offset="0" stop-color="#3f424a"/>
+<stop offset="1" stop-color="#1c1e23"/>
+</linearGradient>
+</defs>
+<rect id="pill" x="1.6" y="4.1" width="46.8" height="26.8" rx="13.4" fill="url(#body)" stroke="#c9ccd2" stroke-width="1.2"/>
+<g fill="none" stroke="#f2f2f2" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+<path d="M17.80,23.50 L17.80,11.50 L22.30,11.50 L23.80,13.50 L23.80,15.50 L22.30,17.50 L17.80,17.50"/>
+<path d="M21.10,17.50 L23.80,23.50"/>
+<path d="M26.20,13.50 L27.70,11.50 L30.70,11.50 L32.20,13.50 L32.20,15.50 L26.20,23.50 L32.20,23.50"/>
+</g>
+</svg>

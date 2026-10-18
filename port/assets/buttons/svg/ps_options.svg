@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="50" height="35" viewBox="0 0 50 35">
+<!-- The Options prompt of a PlayStation pad, drawn for this port (tools/button_assets.py): a
+dark pill with a pale rim and its label in plain strokes. No maker's mark. -->
+<defs>
+<linearGradient id="body" gradientUnits="userSpaceOnUse" x1="0" y1="4" x2="0" y2="31">
+<stop offset="0" stop-color="#3f424a"/>
+<stop offset="1" stop-color="#1c1e23"/>
+</linearGradient>
+</defs>
+<rect id="pill" x="1.6" y="4.1" width="46.8" height="26.8" rx="13.4" fill="url(#body)" stroke="#c9ccd2" stroke-width="1.2"/>
+<g fill="none" stroke="#f2f2f2" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round">
+<path d="M7.85,13.60 L9.75,13.60 L10.70,14.90 L10.70,20.10 L9.75,21.40 L7.85,21.40 L6.90,20.10 L6.90,14.90 L7.85,13.60"/>
+<path d="M12.30,21.40 L12.30,13.60 L15.15,13.60 L16.10,14.90 L16.10,16.20 L15.15,17.50 L12.30,17.50"/>
+<path d="M17.70,13.60 L21.50,13.60"/>
+<path d="M19.60,13.60 L19.60,21.40"/>
+<path d="M23.58,13.60 L26.43,13.60"/>
+<path d="M25.00,13.60 L25.00,21.40"/>
+<path d="M23.58,21.40 L26.43,21.40"/>
+<path d="M29.45,13.60 L31.35,13.60 L32.30,14.90 L32.30,20.10 L31.35,21.40 L29.45,21.40 L28.50,20.10 L28.50,14.90 L29.45,13.60"/>
+<path d="M33.90,21.40 L33.90,13.60 L37.70,21.40 L37.70,13.60"/>
+<path d="M43.10,14.90 L42.15,13.60 L40.25,13.60 L39.30,14.90 L39.30,16.20 L40.25,17.50 L42.15,17.50 L43.10,18.80 L43.10,20.10 L42.15,21.40 L40.25,21.40 L39.30,20.10"/>
+</g>
+</svg>

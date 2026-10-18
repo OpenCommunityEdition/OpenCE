@@ -20,6 +20,11 @@ platform_prompts_keyboard; the game (source/interface/ui_widget.c) asks.
 controller's buttons (input.prompts) */
 int platform_prompts_keyboard(void);
 
+/* whether the controller in use is a PlayStation pad, so that the gameplay
+prompts draw its symbols (input.prompt_glyphs "auto"): the SDL gamepad's type
+(port/linux/src/xinput_sdl.c), the Mac's HID vendor (port/mac/engine_input.c) */
+int platform_prompts_playstation(void);
+
 /* the last device used. Mouse motion counts once it adds up to several
 pixels within a few frames, so that a mouse nudged by the table does not
 take the prompts from a controller in hand. */
@@ -67,6 +72,16 @@ static __inline int input_prompts_mode(char const *setting)
 	if (setting && (setting[0] == 'k' || setting[0] == 'K'))
 		return 1;
 	if (setting && (setting[0] == 'g' || setting[0] == 'G'))
+		return 2;
+	return 0;
+}
+
+/* input.prompt_glyphs: 0 auto (the pad's own), 1 xbox, 2 playstation */
+static __inline int input_prompt_glyphs_mode(char const *setting)
+{
+	if (setting && (setting[0] == 'x' || setting[0] == 'X'))
+		return 1;
+	if (setting && (setting[0] == 'p' || setting[0] == 'P'))
 		return 2;
 	return 0;
 }

@@ -7,6 +7,9 @@
   which is this picture in the icns format): by ORION (`port/assets/icon`).
 - **The controller's A, B, X and Y buttons** (the menus' button icons and
   the HUD messages'): redraws by saulob (`port/assets/buttons`).
+- **The PlayStation pad's button symbols** (the gameplay prompts' cross,
+  circle, square, triangle, L1, R1, L2, R2, Options and Share): drawn by
+  OpenCE contributors (`port/assets/buttons/svg/ps_*.svg`).
 - **The high-res HUD** (its meters, icons, scopes and messages, and the
   weapons' reticles): redraws by MrBruh (`port/assets/hud`), based on
   reference photos by Aerocatia. The sniper rifle's zoom labels (2x, 10x)

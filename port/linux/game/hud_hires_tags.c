@@ -33,6 +33,7 @@ When the texture cannot be drawn, the sprites are drawn from their bitmap.
 #include "rasterizer/rasterizer.h"
 #include "text/draw_string.h"
 #include "hud_button_layout.h"
+#include "input_prompts.h"
 
 /* the platform layer's (port/linux/src) */
 void platform_log(char const *format, ...);
@@ -95,13 +96,13 @@ static struct
 	struct bitmap_data *bitmap;
 	long asset;
 	boolean attempted;
-} hud_buttons[14];
+} hud_buttons[16];
 static short hud_buttons_style;
 
 static void hud_buttons_forget(void)
 {
 	long index;
-	for (index = 0; index < 14; index++)
+	for (index = 0; index < 16; index++)
 	{
 		if (hud_buttons[index].bitmap)
 		{
@@ -346,6 +347,15 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 		"ui\\hud\\buttons\\gem_a", "ui\\hud\\buttons\\gem_b",
 		"ui\\hud\\buttons\\gem_x", "ui\\hud\\buttons\\gem_y",
 		"ui\\shell\\bitmaps\\black_butn", "ui\\shell\\bitmaps\\white_butn"};
+	/* the PlayStation pad's symbols (input.prompt_glyphs): cross, circle, square
+	 * and triangle for A, B, X and Y; text pills for the others */
+	static char const *playstation_names[] = {
+		"ui\\hud\\buttons\\ps_cross", "ui\\hud\\buttons\\ps_circle",
+		"ui\\hud\\buttons\\ps_square", "ui\\hud\\buttons\\ps_triangle",
+		"ui\\hud\\buttons\\ps_r1", "ui\\hud\\buttons\\ps_l1",
+		"ui\\hud\\buttons\\ps_l2", "ui\\hud\\buttons\\ps_r2"};
+	static char const *playstation_start_names[] = {
+		"ui\\hud\\buttons\\ps_options", "ui\\hud\\buttons\\ps_share"};
 	struct icon_hud_element_definition const *buttons;
 	struct rasterizer_dynamic_screen_geometry_parameters parameters;
 	struct dynamic_screen_vertex vertices[4];
@@ -354,7 +364,8 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	short advance;
 	long index, asset;
 	short i;
-	short style, slot;
+	short style, slot, playstation, pill;
+	char const *asset_name;
 
 	if (!config_boolean("display.high_res_hud") || !hud_globals)
 		return FALSE;
@@ -366,9 +377,19 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 		return FALSE;
 	slot = index < 6 ? (short)index : hud_button_control_slot((short)index,
 		icon->frame_rate > 0 ? game_time_get() / icon->frame_rate : 0);
+	/* port: the PlayStation pad's start and back are Options and Share (slots 14, 15) */
+	{
+		long mode = input_prompt_glyphs_mode(config_string("input.prompt_glyphs"));
+
+		playstation = mode == 2 || (mode == 0 && platform_prompts_playstation());
+	}
+	if (playstation && (index == 12 || index == 13)) slot = (short)(index + 2);
 	if (slot < 0) return FALSE;
+	/* the shoulders, triggers, Options and Share are wide pills in the triggers' cell */
+	pill = playstation && (slot == 4 || slot == 5 || slot == 6 || slot == 7 || slot >= 14);
 	style = (!strcmp(config_string("display.hud_button_style"), "dark_gems") || !strcmp(config_string("display.hud_button_style"), "menu_gems")) ? 2 :
 		!strcmp(config_string("display.hud_button_style"), "gems");
+	if (playstation) style = 3;
 	if (style != hud_buttons_style)
 	{
 		hud_buttons_forget();
@@ -379,9 +400,12 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 		hud_buttons[slot].attempted = TRUE;
 		for (asset = 0; asset < hud_hires_asset_count(); asset++)
 		{
-			if (strcmp(hud_hires_asset_tag(asset), slot >= 6 ? hud_button_control_name(slot) : style == 0 ? classic_names[index] :
-				style == 1 ? gem_names[index] : names[index])) continue;
-			bitmap = bitmap_2d_new(slot >= 6 ? 64 : 32, slot >= 6 ? 64 : 32, 0, 11);
+			asset_name = playstation && slot < 8 ? playstation_names[slot] :
+				playstation && slot >= 14 ? playstation_start_names[slot - 14] :
+				slot >= 6 ? hud_button_control_name(slot) : style == 0 ? classic_names[index] :
+				style == 1 ? gem_names[index] : names[index];
+			if (strcmp(hud_hires_asset_tag(asset), asset_name)) continue;
+			bitmap = bitmap_2d_new(slot >= 6 || pill ? 64 : 32, slot >= 6 || pill ? 64 : 32, 0, 11);
 			if (!bitmap) break;
 			if (!rasterizer_bitmap_new(bitmap))
 			{
@@ -408,23 +432,26 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	hud_button_face_bounds(style, (short)index, &x, &y, &width, &height);
 	u = 21.0f / 32.0f;
 	v = 26.0f / 32.0f;
-	if (slot >= 6)
+	if (slot >= 6 || pill)
 	{
-		width = (slot < 8 ? 44.0f : 32.0f) * scale;
-		height = (slot < 8 ? 33.0f : 34.0f) * scale;
+		short bounds_slot = pill ? 6 : slot;
+		boolean wide = slot < 8 || pill;
+
+		width = (wide ? 44.0f : 32.0f) * scale;
+		height = (wide ? 33.0f : 34.0f) * scale;
 		x = cursor->x0 + 4.0f * viewport;
 		y = draw_unicode_string_capital_middle(cursor, L"") - height * 0.5f;
-		u = (slot < 8 ? 50.0f : 36.0f) / 64.0f;
-		v = (slot < 8 ? 35.0f : 40.0f) / 64.0f;
+		u = (wide ? 50.0f : 36.0f) / 64.0f;
+		v = (wide ? 35.0f : 40.0f) / 64.0f;
 		advance = (short)(cursor->x0 + width + viewport);
-		hud_button_control_bounds(slot, &x, &y, &width, &height);
+		hud_button_control_bounds(bounds_slot, &x, &y, &width, &height);
 	}
 	csmemset(&parameters, 0, sizeof(parameters));
 	parameters.map[0] = bitmap;
 	parameters.map_texture_scale[0].i = parameters.map_texture_scale[0].j = 1.0f;
 	parameters.map_scale[0].i = parameters.map_scale[0].j = 1.0f;
 	/* Stick/trigger art uses the original HUD blend, with premultiplied edges. */
-	parameters.framebuffer_blend_function = slot >= 6 ? 7 : 0;
+	parameters.framebuffer_blend_function = slot >= 6 || pill ? 7 : 0;
 	/* Keep the icon's authored opacity, as the low-resolution path does.
 	 * The embedded artwork supplies RGB; prompt text may be translucent. */
 	if (icon->flags & 2) color = icon->color;
@@ -435,7 +462,7 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 		vertices[i].position.y = y + (bottom ? height : 0.0f);
 		vertices[i].texture_coordinates.x = right ? u : 0.0f;
 		vertices[i].texture_coordinates.y = bottom ? v : 0.0f;
-		vertices[i].color = slot >= 6 ? color : (color & 0xFF000000UL) | 0xFFFFFFUL;
+		vertices[i].color = slot >= 6 || pill ? color : (color & 0xFF000000UL) | 0xFFFFFFUL;
 	}
 	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
 	cursor->x0 = advance;

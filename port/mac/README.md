@@ -144,8 +144,9 @@ click and the PS button are decoded but not used. Every other HID pad is mapped 
 its usages (X, Y, Z, Rz or Rx, Ry for the sticks, the hat, buttons 1 to 10 in the Xbox order). Up to four pads play
 at once and may be connected while the game runs. The probe `tools/mac_gamepad_probe.c`
 (`sh tools/mac_gamepad_probe_checks.sh`) shows a pad's raw reports and
-the game's view of it. The button prompts (`display.hud_button_style`) have no
-PlayStation faces yet; `mac_gamepad_is_playstation_at(slot)` says when the pad is one.
+the game's view of it. `mac_gamepad_is_playstation_at(slot)` says when a pad is one, and
+`input.prompt_glyphs` ("auto") follows it (`platform_prompts_playstation`), but the Mac's
+reduced HUD (`port/assets/hud_mac`) has no button art yet, so the prompts keep the maps' icons.
 
 ## Settings
 

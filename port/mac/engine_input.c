@@ -701,6 +701,15 @@ static void mac_pad_note_activity(int port, const struct mac_gamepad_frame *fram
 		input_prompt_tracker_gamepad(&mac_prompt_tracker);
 }
 
+/* the slot of the pad at port 0 (the first pad, or the lone pad even while
+   it plays as port 1), for input.prompt_glyphs */
+static int mac_port0_slot = -1;
+
+int platform_prompts_playstation(void)
+{
+	return mac_gamepad_is_playstation_at(mac_port0_slot);
+}
+
 /* input.prompts: whether the prompts name the keyboard and mouse's controls */
 int platform_prompts_keyboard(void)
 {
@@ -762,12 +771,14 @@ static void mac_pad_assign(const struct mac_gamepad_frame slots[MAC_GAMEPAD_MAXI
 	int slot, count = 0, only = 0;
 
 	memset(ports, 0, sizeof(ports[0]) * MAXIMUM_GAMEPADS);
+	mac_port0_slot = -1;
 	for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; slot++)
 		if (slots[slot].connected)
 		{
 			count++;
 			only = slot;
 		}
+	mac_port0_slot = count == 1 ? only : 0;
 	if (count == 1)
 	{
 		boolean split = pc_menu_split_players() != 0;

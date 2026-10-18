@@ -287,6 +287,12 @@ static const struct config_setting config_settings[] =
 		"used last, the keyboard and mouse (the keys of [controls]) after a key,\n"
 		"a mouse button or the mouse moving, a controller's buttons after one of\n"
 		"its buttons or sticks; \"keyboard\" and \"gamepad\" always name one." },
+	{ "input.prompt_glyphs", _config_string, "\"auto\"", "HALO_PROMPT_GLYPHS", _environment_value, _platform_all,
+		"Which controller's button symbols the gameplay prompts draw (\"Press X\n"
+		"to pick up\"): \"auto\" follows the pad in use, PlayStation symbols\n"
+		"(cross, circle, square, triangle, L1, R1, L2, R2, Options, Share) for a\n"
+		"PlayStation pad and the Xbox's for any other; \"xbox\" and \"playstation\"\n"
+		"always draw one. Needs display.high_res_hud." },
 	{ "input.mouse_sensitivity", _config_real, "1.0", "HALO_MOUSE_SENSITIVITY", _environment_value, _platform_desktop,
 		"How far the view turns for the mouse's movement." },
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,
@@ -506,6 +512,17 @@ static const struct config_setting config_settings[] =
 		"choice is offered on every Mac; one the window, the card's largest\n"
 		"texture or its video memory cannot hold is cut to what they can, and the\n"
 		"log says so. The log line \"render resolution\" gives the size drawn." },
+	{ "mac.adaptive_detail", _config_string, "\"auto\"", "HALO_MAC_ADAPTIVE_DETAIL", _environment_value,
+		_platform_mac,
+		"Lowers what the game draws while the frames take longer than a target,\n"
+		"and puts it back when there is time (the game itself plays the same):\n"
+		"\"auto\" (on for a PowerPC Mac whose detail is low or medium, off\n"
+		"otherwise), \"off\", \"on\" (a target of 30 frames a second) or a target\n"
+		"from 10 to 120 (\"45\"). Steps, in this order: detail objects (grass),\n"
+		"wide particles, decals, lens flares, smaller scenery and objects and\n"
+		"their lower detail levels, fog, smaller particles, and last the frame's\n"
+		"resolution (480 lines). The log gives each change and, at the end of a\n"
+		"run, a summary (\"adaptive detail\")." },
 	{ "mac.texture_cache_mb", _config_integer, "0", "HALO_MAC_RETAIL_TEXTURE_CACHE_MB", _environment_value,
 		_platform_mac,
 		"The megabytes of the graphics card's memory that the game's textures may\n"

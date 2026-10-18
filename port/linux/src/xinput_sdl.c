@@ -887,6 +887,14 @@ int platform_prompts_keyboard(void)
 #endif
 }
 
+/* whether the first gamepad is a PlayStation pad (input.prompt_glyphs) */
+static int prompt_pad_playstation;
+
+int platform_prompts_playstation(void)
+{
+	return prompt_pad_playstation;
+}
+
 /* the keyboard and mouse were used since the last poll: a key or mouse button
 went down, the wheel turned, or the mouse moved some distance */
 static void prompt_note_keyboard(const struct platform_input_state *input)
@@ -1080,7 +1088,10 @@ static void prompt_note_gamepad(SDL_Gamepad *gamepad)
 	static int axes[SDL_GAMEPAD_AXIS_COUNT];
 	unsigned long now = 0;
 	int index;
+	SDL_GamepadType type = SDL_GetGamepadType(gamepad);
 
+	prompt_pad_playstation = type == SDL_GAMEPAD_TYPE_PS3 || type == SDL_GAMEPAD_TYPE_PS4 ||
+		type == SDL_GAMEPAD_TYPE_PS5;
 	for (index = 0; index < SDL_GAMEPAD_BUTTON_COUNT && index < 32; index++)
 	{
 		if (SDL_GetGamepadButton(gamepad, (SDL_GamepadButton)index))
@@ -1230,6 +1241,8 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 			prompt_note_gamepad(gamepads[0]);
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
 		}
+		else
+			prompt_pad_playstation = FALSE;
 		test_input_gamepad(&state->Gamepad);
 		touch_input_gamepad(&state->Gamepad);
 #if defined(HALO_ANDROID) || defined(HALO_WEB)

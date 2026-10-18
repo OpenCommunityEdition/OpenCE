@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+<!-- The square button of a PlayStation pad, drawn for this port (tools/button_assets.py), in the
+texels of the 32x32 prompt bitmap, whose art is in the top left 21x26: a dark round button with a
+pale rim and its plain shape in light grey. No maker's mark, no colours. -->
+<defs>
+<linearGradient id="body" gradientUnits="userSpaceOnUse" x1="0" y1="2.7" x2="0" y2="23.3">
+<stop offset="0" stop-color="#454850"/>
+<stop offset="1" stop-color="#1b1d22"/>
+</linearGradient>
+</defs>
+<circle id="oval" cx="10.5" cy="13" r="9.6" fill="url(#body)" stroke="#c9ccd2" stroke-width="1.1"/>
+<g id="symbol" fill="none" stroke="#ececec" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<rect x="6.6" y="9.1" width="7.8" height="7.8"/>
+</g>
+</svg>

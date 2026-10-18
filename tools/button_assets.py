@@ -119,9 +119,27 @@ CONTROL_BUTTONS = [dict(name=f"{name}__0", tag=f"ui\\hud\\buttons\\{name}",
                     for state in ("", "-halfway", "-full") for side in ("left", "right")]]
 
 
+# PlayStation pad prompts (input.prompt_glyphs): hand-drawn shapes on a dark
+# round button in the faces' cell, and text pills in the triggers' cell.
+# Cross, circle, square and triangle stand for A, B, X and Y.
+PLAYSTATION_FACES = [dict(name=f"ps_{shape}__0", tag=f"ui\\hud\\buttons\\ps_{shape}",
+                          bitmap=0, width=32, height=32, format="dxt3", scale=8, crc=0,
+                          svg=f"ps_{shape}.svg", place=[1, 0, 0])
+                     for shape in ("cross", "circle", "square", "triangle")]
+PLAYSTATION_PILLS = [dict(name=f"ps_{pill}__0", tag=f"ui\\hud\\buttons\\ps_{pill}",
+                          bitmap=0, width=64, height=64, format="a8r8g8b8", scale=8, crc=0,
+                          svg=f"ps_{pill}.svg", control_cell=[50, 35])
+                     for pill in ("l1", "r1", "l2", "r2", "options", "share")]
+
+
 def gameplay_control(entry: dict) -> np.ndarray:
     """Keep supplied artwork proportional inside a padded legacy-sized cell."""
-    source = Image.open(ASSETS / entry["source_png"]).convert("RGBA")
+    if "svg" in entry:
+        source = Image.fromarray(render(document(50, 35, "".join(
+            ElementTree.tostring(child, encoding="unicode")
+            for child in ElementTree.parse(ASSETS / "svg" / entry["svg"]).getroot())), entry["scale"]), "RGBA")
+    else:
+        source = Image.open(ASSETS / entry["source_png"]).convert("RGBA")
     face = source.crop(source.getchannel("A").getbbox())
     scale = entry["scale"]
     width, height = [n * scale for n in entry["control_cell"]]
@@ -380,7 +398,8 @@ def layout(arguments) -> None:
     classic_buttons = [dict(entry) for entry in CLASSIC_BUTTONS]
     for entry, sprite in zip(classic_buttons, sprites):
         entry["letter"] = [round(n / sprite["place"][0], 4) for n in sprite["letter"]]
-    LIST.write_text(json.dumps({"assets": entries + HUD_BUTTONS + classic_buttons + GEM_BUTTONS + CONTROL_BUTTONS}, indent=1) + "\n")
+    LIST.write_text(json.dumps({"assets": entries + HUD_BUTTONS + classic_buttons + GEM_BUTTONS + CONTROL_BUTTONS
+                                         + PLAYSTATION_FACES + PLAYSTATION_PILLS}, indent=1) + "\n")
 
 
 def build(arguments) -> None:
