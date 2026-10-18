@@ -254,25 +254,11 @@ SCREENS["audio_settings/sound_processing"] = {
 }
 _audio["rows"] = [row for row in _audio["rows"] if row[1] not in _processing]
 
-# Audio Setup's voice chat (port/linux/game/network_voice.c) with the text
-# chat's colours (network_chat.c), a screen of their own (a category, as
-# Video Setup's): Audio Setup has no room for another row, and Network Setup,
-# which has none either, is not offered in a game (menu_tags.c)
-_chat = {"audio.voice_chat", "audio.voice_volume"}
-SCREENS["audio_settings/chat"] = {
-    "screen": "chat_settings_screen", "header": _audio["header"], "spacing": 30,
-    "rows": [row for row in _audio["rows"] if row[1] in _chat] + [
-        ("TEXT CHAT:", "display.text_chat", [("SHOW", "true"), ("HIDE", "false")],
-         "SHOW the text chat, or HIDE it: no lines, and\nits keys and D-pad Up open nothing.", None),
-        ("CHAT TEXT:", "display.chat_style", [("WHITE", "white"), ("COLORS", "colors")],
-         "The text chat's colors: WHITE, as Custom Edition;\nCOLORS, names in their team's color.", None),
-    ],
-}
-_audio["rows"] = [row for row in _audio["rows"] if row[1] not in _chat]
+# (voice chat stays on Audio Setup; the text chat's rows are the multiplayer
+# HUD's, on Network Setup)
 _audio["categories"] = [
     ("SOUND PROCESSING:", "audio_settings/sound_processing",
      "The reverb, and how sounds are converted to the\noutput's rate."),
-    ("VOICE AND TEXT CHAT:", "audio_settings/chat", "Voice chat, and showing the text chat and its\ncolors."),
 ]
 
 # Network Setup's map sharing (port/linux/game/map_share.c): this machine's
@@ -290,7 +276,7 @@ _network["categories"] = [
      "Downloading Custom Edition maps you do not have,\nand helping send them to other players.",
      "desktop android"),
     ("MULTIPLAYER HUD:", "network_setup/multiplayer_hud",
-     "Players' names above their heads, and the\nscoreboard."),
+     "Players' names above their heads, the\nscoreboard, and the text chat."),
     ("STREAMER MODE:", "network_setup/streamer_mode",
      "Hide offensive words in names and text from\nother players, maps and mods, as stars."),
 ]
@@ -308,10 +294,16 @@ SCREENS["network_setup/map_sharing"] = {
     ],
 }
 
-# Network Setup's multiplayer HUD: its rows, moved from Network Setup
+# Network Setup's multiplayer HUD: its rows, moved from Network Setup, and the
+# text chat's (port/linux/game/network_chat.c)
 SCREENS["network_setup/multiplayer_hud"] = {
     "screen": "multiplayer_hud_settings_screen", "header": _network["header"], "spacing": 30,
-    "rows": _hud_rows,
+    "rows": _hud_rows + [
+        ("TEXT CHAT:", "display.text_chat", [("SHOW", "true"), ("HIDE", "false")],
+         "SHOW the text chat, or HIDE it: no lines, and\nits keys and D-pad Up open nothing.", None),
+        ("CHAT TEXT:", "display.chat_style", [("WHITE", "white"), ("COLORS", "colors")],
+         "The text chat's colors: WHITE, as Custom Edition;\nCOLORS, names in their team's color.", None),
+    ],
 }
 
 # Network Setup's streamer mode (port/linux/game/text_filter.c): words hidden
@@ -330,6 +322,15 @@ SCREENS["network_setup/streamer_mode"] = {
         ("CENSOR INSULTS:", "streamer.insults", STREAMER_LEVELS,
          "Name-calling and insults that are not slurs.", None),
     ],
+}
+
+# Network Setup in a game (the pause menu's SETTINGS: port/linux/game/
+# menu_tags.c's pause_network_patch): its pages alone, without the rows that
+# would drop the game (internet play) or are for the main menu (the router,
+# the clipboard, the updates)
+SCREENS["network_setup/in_game"] = {
+    "screen": "in_game_network_settings_screen", "header": _network["header"], "spacing": 30,
+    "platform_places": True, "rows": [], "categories": _network["categories"],
 }
 
 # Controls Setup: the keyboard and mouse's actions, in groups (the order of

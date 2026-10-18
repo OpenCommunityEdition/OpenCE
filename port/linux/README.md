@@ -288,6 +288,9 @@ PLAYER then START, and JOIN GAME brings them all into the game.
 
 In a multiplayer game, the pause menu (escape) has SETTINGS, which opens
 the profile's settings while the game goes on, and for the host END GAME.
+There Network Setup has only its pages that work in a game (Map Sharing,
+Multiplayer HUD with the text chat, and Streamer Mode), not INTERNET PLAY,
+which would drop the game, nor the rows for the main menu.
 END GAME ends the game as its time limit does: the players stay, and after
 the carnage report the host picks the next map and gametype (PICK GAME).
 LEAVE GAME of the host still ends the game for everyone. The buttons go into
@@ -301,7 +304,8 @@ In a single-player campaign, the pause menu has SETTINGS too, before REVERT
 TO SAVED, in the same box: a list with room for it centres its rows, and
 one without keeps its size, its rows closer. It opens the same settings,
 while the game stays paused, with only Controls, Gamepads, Mouse, Audio and
-Video Setup; Gamepads' OK saves the profile at once.
+Video Setup; Gamepads' OK saves the profile at once. In co-op the settings
+have Network Setup too, with its in-game pages as in a multiplayer game.
 
 The menus are XML files in `port/assets/menus` (`tools/ce_menus.py` writes
 them from the PC version's tags), which the game contains. To change them,
@@ -354,8 +358,8 @@ the setting for one start of the game. It has priority over the file.
 | `display.menus` | `"pc"` | `HALO_MENUS` | `"pc"`: the PC version's menus, from the files in `port/assets/menus` and a `menus` folder next to `config.toml`. Refer to "Menus". `"xbox"`: the Xbox's menus. |
 | `display.player_names` | `"all"` | `HALO_PLAYER_NAMES` | In multiplayer, whose names are drawn above their heads: `"all"`, `"allies"`, `"enemies"` or `"none"`. An ally's name is drawn above the triangle the game shows over teammates. An enemy's name shows only within the motion sensor's reach, while the enemy is in sight and not camouflaged, so it never shows where an enemy hides. The gametype's motion tracker setting also applies: no names if it shows no players, only allies' if it shows only friends. |
 | `display.player_name_scale` | `1.0` | `HALO_PLAYER_NAME_SCALE` | How large the players' names are drawn: `1.0` is three quarters of the size of the HUD's text, from `0.25` to `4`. With high-res text, larger names are rasterized at their size, so they stay sharp. |
-| `display.text_chat` | `true` | `HALO_TEXT_CHAT` | Show the text chat of network games (Settings > Audio > Voice and Text Chat > TEXT CHAT). `false` hides its lines, and its keys and a controller's D-pad Up open nothing. Refer to "Text chat". |
-| `display.chat_style` | `"white"` | `HALO_CHAT_STYLE` | The text chat's colours (Settings > Audio > Voice and Text Chat > CHAT TEXT): `"white"`, all of it white, as Custom Edition; `"colors"`, the player's name in their team's colour and the text a pale blue. |
+| `display.text_chat` | `true` | `HALO_TEXT_CHAT` | Show the text chat of network games (Settings > Network Setup > Multiplayer HUD > TEXT CHAT). `false` hides its lines, and its keys and a controller's D-pad Up open nothing. Refer to "Text chat". |
+| `display.chat_style` | `"white"` | `HALO_CHAT_STYLE` | The text chat's colours (Settings > Network Setup > Multiplayer HUD > CHAT TEXT): `"white"`, all of it white, as Custom Edition; `"colors"`, the player's name in their team's colour and the text a pale blue. |
 | `display.scoreboard_team_layout` | `"teams"` | `HALO_SCOREBOARD_TEAM_LAYOUT` | How the multiplayer scoreboard (hold BACK, or tab) lists a team game's players. `"teams"`: a column for each team, red on the left and blue on the right. `"score"`: all the players in order of score. With more players than fit, the mouse wheel and Page Up / Page Down scroll the scoreboard. |
 | `display.scoreboard_background` | `true` | `HALO_SCOREBOARD_BACKGROUND` | `true`: the multiplayer scoreboard (hold BACK, or tab) has a panel behind its text, for clearer text. |
 | `display.scoreboard_background_color` | `"16, 16, 16, 150"` | `HALO_SCOREBOARD_BACKGROUND_COLOR` | The colour of the scoreboard's panel: `"red, green, blue, alpha"`, each from `0` to `255`. Alpha `0` is see-through, `255` is solid. |
@@ -698,7 +702,7 @@ deletes, Triangle switches capitals, Circle closes).
 The lines show above the motion sensor, in a column a little over half the
 screen wide: a long line wraps onto the next rows, and the line you type
 shows its end when it is wider. They are white, as Custom Edition draws
-them; COLORS in CHAT TEXT in Settings > Audio > Voice and Text Chat
+them; COLORS in CHAT TEXT in Settings > Network Setup > Multiplayer HUD
 (`display.chat_style`) draws the player's name in the colour of their team
 (blue in a game without teams) and the text in a pale blue. A line to the
 team says "(team)" after the name, one to the vehicle "(vehicle)". The
@@ -721,7 +725,7 @@ The host sends each line on: a player of an older build does not see the
 lines and cannot send them. The host takes 5 lines at once from a machine,
 then one each 1.5 seconds; a machine that joins starts afresh.
 
-TEXT CHAT in Settings > Audio > Voice and Text Chat (`display.text_chat`)
+TEXT CHAT in Settings > Network Setup > Multiplayer HUD (`display.text_chat`)
 can HIDE the chat entirely, for purists and streamers: no lines show, and
 its keys open nothing.
 
@@ -763,7 +767,7 @@ host mutes: a player's `/mute` is not sent.
 
 Network games have voice chat, on the local network and on the internet.
 Hold V (`controls.push_to_talk`, Settings > Controls Setup) to talk, or set
-VOICE CHAT in Settings > Audio > Voice and Text Chat to OPEN MIC. VOICE VOLUME sets the volume of
+VOICE CHAT in Settings > Audio to OPEN MIC. VOICE VOLUME sets the volume of
 the other players. On Android, set VOICE CHAT to OPEN MIC to talk: the game
 then asks for the microphone.
 

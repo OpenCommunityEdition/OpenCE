@@ -1766,13 +1766,17 @@ profile itself. */
 
 #define PAUSE_SETTINGS_LIST "main_menu/settings_select/player_setup/player_profile_edit/profile_edit_select_list"
 #define PAUSE_SETTINGS_GAMEPADS_OK "main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_ok"
+#define PAUSE_NETWORK_ITEM "main_menu/settings_select/player_setup/player_profile_edit/network_settings_profile_item"
+#define PAUSE_NETWORK_SCREEN \
+	"main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/in_game_network_settings_screen"
 
 /* Change Name's keyboard and Change Color's pictures are ui.map's, Network
-Setup's settings are not for a game under way, and About is nothing to it */
+Setup is for others' games (shown in co-op: its pages, pause_network_patch),
+and About is nothing to it */
 static char const *const pause_settings_hidden_items[] =
 {
 	"main_menu/settings_select/player_setup/player_profile_edit/name_profile_item",
-	"main_menu/settings_select/player_setup/player_profile_edit/network_settings_profile_item",
+	PAUSE_NETWORK_ITEM,
 	"main_menu/settings_select/player_setup/player_profile_edit/color_profile_item",
 	"main_menu/settings_select/player_setup/player_profile_edit/about_item",
 };
@@ -1905,10 +1909,38 @@ static boolean pause_settings_item_hidden(long tag_index)
 	{
 		long widget = widget_named(pause_settings_hidden_items[index]);
 
+		/* (Network Setup stays in a co-op game, which is a network one or
+		has players beside this one: build.campaign is a game alone) */
+		if (!build.campaign && !strcmp(pause_settings_hidden_items[index], PAUSE_NETWORK_ITEM))
+			continue;
 		if (widget != NONE && build.widget_tags[widget] == tag_index)
 			return TRUE;
 	}
 	return FALSE;
+}
+
+/* in a game (a multiplayer map's pause menu, a campaign's in co-op),
+Network Setup opens its pages alone (PAUSE_NETWORK_SCREEN: map sharing, the
+multiplayer HUD and the text chat, streamer mode: tools/port_settings.py),
+not the rows that would drop the game (internet play) or are for the main
+menu (the router, the clipboard, the updates) */
+static void pause_network_patch(void)
+{
+	long item_widget = widget_named(PAUSE_NETWORK_ITEM);
+	long screen_widget = widget_named(PAUSE_NETWORK_SCREEN);
+	struct ui_widget_definition *item;
+	struct ui_widget_event_handler_reference *handlers;
+	long handler;
+
+	if (item_widget == NONE || screen_widget == NONE)
+		return;
+	item = tag_get(UI_WIDGET_DEFINITION_TAG, build.widget_tags[item_widget]);
+	handlers = item->event_handlers.address;
+	for (handler = 0; handler < item->event_handlers.count; handler++)
+	{
+		if (TEST_FLAG(handlers[handler].flags, _event_handler_open_widget_bit))
+			reference_set(&handlers[handler].widget_tag, UI_WIDGET_DEFINITION_TAG, build.widget_tags[screen_widget]);
+	}
 }
 
 /* the hidden items stay in the list, empty and taking no events (which it
@@ -2177,6 +2209,7 @@ void menu_tags_loaded(
 		pause_patch(instances);
 		if (campaign)
 			pause_campaign_patch(instances);
+		pause_network_patch();
 		if (build.failed)
 			goto failed;
 		/* (those it made) */
