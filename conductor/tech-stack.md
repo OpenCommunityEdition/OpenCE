@@ -14,7 +14,7 @@
 
 ## Build & Toolchain
 - **Nix (flake)**: the primary dev shell (Rust, ninja, Python, lld, clang with the `arm64_32` target) for quick iteration. `nix build` produces the final build that closes out a track. The SDK is nixpkgs' `apple-sdk_26` (deployment target 26.0); the host is signed ad hoc with sigtool and the hypervisor entitlement; the packages are `guest` and `host` (`nix build .#host`).
-- **Xcode / xcodebuild**: the Swift app target, Metal shader compilation, code signing and .app packaging. It runs under Nix as the host's impure Apple SDK.
+- **Xcode's Swift toolchain and SwiftPM**: the Swift app (`port/macos/app/Package.swift`, built with `xcrun swift build` from ninja), XCTest, Metal shader compilation and code signing (`/usr/bin/codesign`); `tools/macos_app.py` lays out the .app. It runs under Nix as the host's impure Apple toolchain (no sandbox): nixpkgs' Swift cannot link against the macOS 26 SDK.
 - **configure.py + Ninja**: stays for the guest image during the transition.
 - **Python 3**: build scripts, generators (menus, settings, assets) and tests.
 

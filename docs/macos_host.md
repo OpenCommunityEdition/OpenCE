@@ -151,7 +151,20 @@ nix develop                    # the shell: every tool the build needs
 python configure.py            # on a Mac, the default target is macos
 ninja macos                    # build/macos/halo_host and build/macos/halo_guest.elf
 nix build .#host               # the final build: result/bin/halo_host, result/share/opence/halo_guest.elf
+ninja macos_app                # build/macos/OpenCE.app (needs Xcode)
+nix build .#app                # result/Applications/OpenCE.app
 ```
+
+The app, `OpenCE.app`, is the Swift package `port/macos/app` built with
+Xcode's Swift toolchain (`xcrun swift build`; nixpkgs' Swift cannot link
+against the macOS 26 SDK) and linked with `libhalo_host.a`, the runtime
+crate and SDL3. `tools/macos_app.py` lays out the bundle
+(`Contents/MacOS/OpenCE`, `Contents/Info.plist`,
+`Contents/Resources/halo_guest.elf`) and signs it ad hoc with the
+hypervisor entitlement, using Apple's `codesign`. AppKit keeps the main
+thread; the guest's main runs on a thread of its own. Being outside the
+store, Xcode makes `nix build .#app` impure: it needs a Nix without the
+sandbox.
 
 `ninja macos` builds:
 

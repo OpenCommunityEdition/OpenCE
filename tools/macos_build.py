@@ -48,6 +48,8 @@ ENTITLEMENTS = PORT_DIR / "host" / "halo_host.entitlements"
 HOST_FRAMEWORKS = ["Hypervisor"]
 # the host's oldest macOS (conductor/tech-stack.md: macOS 26; os_sync_wait_on_address needs 14.4)
 MACOS_MINIMUM = "26.0"
+APP_DIR = PORT_DIR / "app"
+APP_VERSION = "0.1.0"
 
 
 def is_macos_host() -> bool:
@@ -55,8 +57,8 @@ def is_macos_host() -> bool:
 
 
 def macos_configure_inputs() -> List[Path]:
-    return [Path(__file__), PORT_DIR / "host", PORT_DIR / "cli", PORT_DIR / "runtime" / "src",
-            Path("tools/macos_dispatch.py")]
+    return [Path(__file__), PORT_DIR / "host", PORT_DIR / "cli", APP_DIR / "Sources" / "OpenCE",
+            PORT_DIR / "runtime" / "src", Path("tools/macos_dispatch.py")]
 
 
 def generate_macos_build(n: Writer, sln: Any) -> None:
@@ -189,6 +191,41 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     )
     n.build(outputs=host, rule="macos_host_link", inputs=[cli_object, host_library],
             implicit=[ENTITLEMENTS, runtime_library])
+
+    # ---------- the app
+
+    # Swift is Xcode's (conductor/tech-stack.md), run outside the Nix
+    # toolchain: the environment's SDKROOT and compilers are the Nix SDK's,
+    # which Xcode's Swift cannot link against. SwiftPM keeps its caches in
+    # the build folder (a Nix build has no home), and the libraries' paths
+    # are absolute because the linker runs in the package's folder.
+    swift_build = BUILD / "swift"
+    swift = environment.get("HALO_MACOS_SWIFT", "/usr/bin/xcrun swift")
+    app_codesign = environment.get("HALO_MACOS_APP_CODESIGN", "/usr/bin/codesign")
+    app = BUILD / "OpenCE.app"
+    app_executable = app / "Contents" / "MacOS" / "OpenCE"
+    linker_flags = f'-Xlinker "$$PWD/{host_library}" -Xlinker "$$PWD/{runtime_library}"'
+    for name in HOST_FRAMEWORKS:
+        linker_flags += f" -Xlinker -framework -Xlinker {name}"
+    if sdl_lib:
+        linker_flags += f" -Xlinker -L{sdl_lib} -Xlinker -rpath -Xlinker {sdl_lib}"
+    linker_flags += " -Xlinker -lSDL3"
+    n.rule(
+        name="macos_app",
+        command=(f"env -u SDKROOT -u DEVELOPER_DIR -u MACOSX_DEPLOYMENT_TARGET -u CC -u CXX -u LD "
+                 f"{swift} build --quiet -c release --disable-sandbox --package-path {APP_DIR} "
+                 f"--scratch-path {swift_build} --cache-path {swift_build}/cache "
+                 f"--config-path {swift_build}/config --security-path {swift_build}/security {linker_flags} && "
+                 f"$python tools/macos_app.py {swift_build}/release/OpenCE {image} {ENTITLEMENTS} {app_codesign} "
+                 f"{APP_VERSION} {app}"),
+        description="MACOS APP $out",
+    )
+    swift_sources = [APP_DIR / "Package.swift", *sorted((APP_DIR / "Sources").rglob("*.swift")),
+                     APP_DIR / "Sources" / "CHaloHost" / "module.modulemap", PORT_DIR / "host" / "halo_host.h"]
+    n.build(outputs=app_executable, rule="macos_app",
+            inputs=[*swift_sources, host_library, runtime_library, image, ENTITLEMENTS],
+            implicit=[Path("tools/macos_app.py")])
+    n.build(outputs="macos_app", rule="phony", inputs=[app_executable])
 
     # ---------- the runtime crate
 

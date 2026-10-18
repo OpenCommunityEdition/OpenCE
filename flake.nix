@@ -113,6 +113,18 @@
             install -Dm644 build/macos/halo_guest.elf $out/share/opence/halo_guest.elf
           '';
         };
+        # OpenCE.app. Its Swift is Xcode's, from outside the store (the
+        # tech stack's impure Apple toolchain: nixpkgs' Swift cannot link
+        # against the macOS 26 SDK), so it needs Xcode and a build without
+        # the sandbox, as this Mac's Nix runs them
+        app = macosBuild {
+          pname = "opence-app";
+          target = "macos_app";
+          install = ''
+            mkdir -p $out/Applications
+            cp -R build/macos/OpenCE.app $out/Applications/OpenCE.app
+          '';
+        };
         default = host;
       };
 

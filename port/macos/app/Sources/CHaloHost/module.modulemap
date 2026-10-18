@@ -1,0 +1,4 @@
+module CHaloHost [system] {
+    header "../../../host/halo_host.h"
+    export *
+}
