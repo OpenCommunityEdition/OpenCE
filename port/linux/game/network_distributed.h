@@ -125,11 +125,6 @@ enum
 	_distributed_message_map_share_offer = 84,
 	_distributed_message_map_share_sources = 85,
 	_distributed_message_map_share_progress = 86,
-	/* the text chat (network_chat.c): a player's line to the host,
-	reliably, which takes it only from the player's own machine's stream; and
-	the line the host sends on to each machine that hears it, reliably */
-	_distributed_message_chat_up = 87,
-	_distributed_message_chat_down = 88,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -298,15 +293,6 @@ word network_votekick_request_entry_size(void);
 /* (a client) the host's count */
 void network_votekick_handle_status(void const *entries);
 word network_votekick_status_entry_size(void);
-
-/* ---------- prototypes/NETWORK_CHAT.C */
-
-/* (the host) a client's line; from_stream: it came over the machine's own
-stream (anything else is refused) */
-void network_chat_handle_up(long machine_index, void const *entries, boolean from_stream);
-/* (a client) a line the host sent on */
-void network_chat_handle_down(void const *entries);
-word network_chat_line_entry_size(void);
 
 /* ---------- prototypes/NETWORK_ACTORS.C */
 
