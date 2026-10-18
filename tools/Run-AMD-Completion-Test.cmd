@@ -27,7 +27,7 @@ echo Completion-aware asynchronous visibility test> "%AMD_TEST_LOG%"
 if exist "BUILD.txt" type "BUILD.txt" >> "%AMD_TEST_LOG%"
 halo.exe >> "%AMD_TEST_LOG%" 2>&1
 set "AMD_TEST_RESULT=%ERRORLEVEL%"
-echo Game exit code: %AMD_TEST_RESULT%>> "%AMD_TEST_LOG%"
+echo Game exit code: %AMD_TEST_RESULT% >> "%AMD_TEST_LOG%"
 echo Saved %AMD_TEST_LOG%
 popd
 exit /b %AMD_TEST_RESULT%
