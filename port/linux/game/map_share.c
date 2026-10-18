@@ -320,6 +320,29 @@ struct distributed_map_share_progress
 	unsigned long total;
 };
 
+/* what the messages are on the wire, which is little-endian (port:
+halo_endian.h): the fields from the first, the sizes checked against the
+structures'. A message is swapped in place just before it is sent, and what
+is read from one right after it is copied out. The offer and the sources have
+bytes alone but for their entries. */
+#define MAP_SHARE_REQUEST_LAYOUT(X) X(b,64) X(l,1) X(b,4)
+#define MAP_SHARE_OFFER_FILE_LAYOUT(X) X(b,4) X(l,1) X(b,32)
+#define MAP_SHARE_SOURCE_LAYOUT(X) X(b,4) X(l,1) X(b,24)
+#define MAP_SHARE_PROGRESS_LAYOUT(X) X(b,4) X(l,2)
+
+typedef char distributed_map_share_request_layout_assert[
+	HALO_WIRE_SIZE(MAP_SHARE_REQUEST_LAYOUT) == sizeof(struct distributed_map_share_request) ? 1 : -1];
+typedef char distributed_map_share_offer_file_layout_assert[
+	HALO_WIRE_SIZE(MAP_SHARE_OFFER_FILE_LAYOUT) == sizeof(struct distributed_map_share_offer_file) ? 1 : -1];
+typedef char distributed_map_share_source_layout_assert[
+	HALO_WIRE_SIZE(MAP_SHARE_SOURCE_LAYOUT) == sizeof(struct distributed_map_share_source) ? 1 : -1];
+typedef char distributed_map_share_progress_layout_assert[
+	HALO_WIRE_SIZE(MAP_SHARE_PROGRESS_LAYOUT) == sizeof(struct distributed_map_share_progress) ? 1 : -1];
+
+/* a message's header to the wire's order, just before it is sent */
+#define MAP_SHARE_HEADER_TO_WIRE(header) \
+	halo_wire_swap_le(header, DISTRIBUTED_MESSAGE_HEADER_LAYOUT(HALO_WIRE_STRING), 1)
+
 typedef char distributed_map_share_request_size_assert[sizeof(struct distributed_map_share_request) == 72 ? 1 : -1];
 typedef char distributed_map_share_offer_size_assert[sizeof(struct distributed_map_share_offer) == 68 ? 1 : -1];
 typedef char distributed_map_share_offer_file_size_assert[sizeof(struct distributed_map_share_offer_file) == 40 ? 1 : -1];
@@ -542,6 +565,8 @@ static unsigned long get_long(
 		(unsigned long)bytes[3] << 24;
 }
 
+/* (port: the bytes of an address in network order as a host's word has them,
+on a little-endian host or a big-endian one) */
 static unsigned long network_order(
 	unsigned long value)
 {
@@ -1388,6 +1413,8 @@ static void download_report(
 	message.progress.state = state;
 	message.progress.done = download->done_bytes;
 	message.progress.total = download->total_bytes;
+	MAP_SHARE_HEADER_TO_WIRE(&message.header);
+	halo_wire_swap_le(&message.progress, MAP_SHARE_PROGRESS_LAYOUT(HALO_WIRE_STRING), 1);
 	network_distributed_client_send_reliably(&message, (word)sizeof(message));
 	download->reported_at = system_milliseconds();
 }
@@ -1407,6 +1434,8 @@ static void download_ask(
 	level_name_copy(message.request.level_name, download->level_name);
 	message.request.version = download->version;
 	message.request.wanted = download->wanted;
+	MAP_SHARE_HEADER_TO_WIRE(&message.header);
+	halo_wire_swap_le(&message.request, MAP_SHARE_REQUEST_LAYOUT(HALO_WIRE_STRING), 1);
 	network_distributed_client_send_reliably(&message, (word)sizeof(message));
 }
 
@@ -2951,6 +2980,7 @@ static void host_offer(
 	short count = result == _offer_ok ? machine->file_count : 0;
 	word size = (word)(sizeof(message.header) + sizeof(message.offer) + count * sizeof(message.files[0]));
 	short index;
+	unsigned long offered_total = 0;
 
 	csmemset(&message, 0, sizeof(message));
 	map_share_fill_header(&message.header, _distributed_message_map_share_offer, size);
@@ -2965,13 +2995,14 @@ static void host_offer(
 		message.files[index].kind = (byte)machine->file_kinds[index];
 		message.files[index].size = file->size;
 		csmemcpy(message.files[index].hash, file->hash, MAP_SHARE_HASH_BYTES);
+		offered_total += file->size;
 	}
+	MAP_SHARE_HEADER_TO_WIRE(&message.header);
+	halo_wire_swap_le(message.files, MAP_SHARE_OFFER_FILE_LAYOUT(HALO_WIRE_STRING), count);
 	network_distributed_server_send_to_machine_reliably(machine_index, &message, size);
 	/* (the files' bytes, and the time its progress is counted from: a
 	request asked again does not start it again, host_request) */
-	machine->offered_total = 0;
-	for (index = 0; index < count; index++)
-		machine->offered_total += message.files[index].size;
+	machine->offered_total = offered_total;
 	if (!machine->advanced_at && result == _offer_ok)
 	{
 		machine->advanced_at = system_milliseconds() | 1;
@@ -3024,6 +3055,8 @@ static void host_sources(
 	map_share_fill_header(&message.header, _distributed_message_map_share_sources, size);
 	message.sources.count = (byte)count;
 	message.sources.flags = host_in_game() ? FLAG(_offer_in_progress_bit) : 0;
+	MAP_SHARE_HEADER_TO_WIRE(&message.header);
+	halo_wire_swap_le(message.entries, MAP_SHARE_SOURCE_LAYOUT(HALO_WIRE_STRING), count);
 	network_distributed_server_send_to_machine_reliably(machine_index, &message, size);
 	globals->machines[machine_index].sources_at = system_milliseconds();
 }
@@ -3279,6 +3312,7 @@ void map_share_handle_message(
 			return;
 		}
 		csmemcpy(&request, entries, sizeof(request));
+		halo_wire_swap_le(&request, MAP_SHARE_REQUEST_LAYOUT(HALO_WIRE_STRING), 1);
 		if (!level_name_valid(request.level_name))
 			return;
 		host_asked(machine_index, &request);
@@ -3294,6 +3328,7 @@ void map_share_handle_message(
 			return;
 		}
 		csmemcpy(&progress, entries, sizeof(progress));
+		halo_wire_swap_le(&progress, MAP_SHARE_PROGRESS_LAYOUT(HALO_WIRE_STRING), 1);
 		host_progress(machine_index, &progress);
 		break;
 	}
@@ -3311,6 +3346,7 @@ void map_share_handle_message(
 			return;
 		}
 		csmemcpy(files, entries + sizeof(offer), offer.file_count * sizeof(files[0]));
+		halo_wire_swap_le(files, MAP_SHARE_OFFER_FILE_LAYOUT(HALO_WIRE_STRING), offer.file_count);
 		download_offered(&offer, files);
 		break;
 	}
@@ -3328,6 +3364,7 @@ void map_share_handle_message(
 			return;
 		}
 		csmemcpy(sources_entries, entries + sizeof(sources), sources.count * sizeof(sources_entries[0]));
+		halo_wire_swap_le(sources_entries, MAP_SHARE_SOURCE_LAYOUT(HALO_WIRE_STRING), sources.count);
 		download_sources(&sources, sources_entries);
 		break;
 	}

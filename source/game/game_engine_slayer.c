@@ -79,6 +79,7 @@ symbols in this file:
 #include "game/game_engine_place.h"
 #include "game/game_engine_slayer.h"
 #include "game/players.h"
+#include "halo_endian.h" /* port: port/linux/include/halo_endian.h */
 #include "memory/data.h"
 #include "objects/objects.h"
 #include "tag_files/tag_groups.h"
@@ -729,6 +730,13 @@ struct slayer_network_state
 
 #define SLAYER_SPEED_UNITS 16384.0f
 
+/* port: what the state is on the wire, which is little-endian (halo_endian.h):
+its fields from the first, the size checked against the structure's */
+#define SLAYER_NETWORK_STATE_LAYOUT(X) \
+	X(l,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(l,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(b,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(s,HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+typedef char verify_slayer_network_state_layout[
+	HALO_WIRE_SIZE(SLAYER_NETWORK_STATE_LAYOUT) == sizeof(struct slayer_network_state) ? 1 : -1];
+
 typedef char verify_slayer_network_state_size[
 	sizeof(struct slayer_network_state) <= GAME_ENGINE_MAXIMUM_NETWORK_STATE_SIZE ? 1 : -1];
 
@@ -763,6 +771,7 @@ long game_engine_slayer_write_network_state(
 		}
 	}
 	csmemcpy(buffer, &state, sizeof(state));
+	halo_wire_swap_le(buffer, SLAYER_NETWORK_STATE_LAYOUT(HALO_WIRE_STRING), 1); /* port: little-endian on the wire */
 	return sizeof(state);
 }
 
@@ -778,6 +787,7 @@ boolean game_engine_slayer_read_network_state(
 	if (size != (long)sizeof(state))
 		return FALSE;
 	csmemcpy(&state, buffer, sizeof(state));
+	halo_wire_swap_le(&state, SLAYER_NETWORK_STATE_LAYOUT(HALO_WIRE_STRING), 1); /* port: little-endian on the wire */
 	slayer_globals = state.globals;
 	data_iterator_new(&iterator, player_data);
 	while ((player = (struct player_datum *)data_iterator_next(&iterator)))

@@ -160,6 +160,26 @@ struct distributed_voice_config
 	byte pad[2];
 };
 
+/* what the messages are on the wire, which is little-endian (port:
+halo_endian.h): the fields from the first, the sizes checked against the
+structures'. A message is swapped in place when it is made, and the structure
+a message is read into when it has come. */
+#define VOICE_UP_LAYOUT(X) X(l,1) X(s,1) X(b,2)
+#define VOICE_DOWN_LAYOUT(X) X(l,1) X(s,1) X(b,6)
+#define VOICE_CONFIG_LAYOUT(X) X(l,1) X(b,4) X(s,1) X(b,2)
+
+typedef char distributed_voice_up_layout_assert[
+	HALO_WIRE_SIZE(VOICE_UP_LAYOUT) == sizeof(struct distributed_voice_up) ? 1 : -1];
+typedef char distributed_voice_down_layout_assert[
+	HALO_WIRE_SIZE(VOICE_DOWN_LAYOUT) == sizeof(struct distributed_voice_down) ? 1 : -1];
+typedef char distributed_voice_config_layout_assert[
+	HALO_WIRE_SIZE(VOICE_CONFIG_LAYOUT) == sizeof(struct distributed_voice_config) ? 1 : -1];
+
+/* a message's headers and body to the wire's order, just before it is sent */
+#define VOICE_TO_WIRE(header, body, layout) \
+	(halo_wire_swap_le(header, DISTRIBUTED_MESSAGE_HEADER_LAYOUT(HALO_WIRE_STRING), 1), \
+		halo_wire_swap_le(body, layout(HALO_WIRE_STRING), 1))
+
 typedef char distributed_voice_up_size_assert[sizeof(struct distributed_voice_up) == 8 ? 1 : -1];
 typedef char distributed_voice_down_size_assert[sizeof(struct distributed_voice_down) == 12 ? 1 : -1];
 typedef char distributed_voice_config_size_assert[sizeof(struct distributed_voice_config) == 12 ? 1 : -1];
@@ -491,6 +511,7 @@ static void voice_host_tell(
 	message.config.mode = (byte)voice_host_settings.mode;
 	message.config.kbps = (byte)voice_host_settings.kbps;
 	message.config.proximity_tenths = (word)(voice_host_settings.proximity * 10.0f);
+	VOICE_TO_WIRE(&message.header, &message.config, VOICE_CONFIG_LAYOUT);
 	if (network_distributed_server_send_to_machine_reliably(machine_index, &message, (word)sizeof(message)))
 	{
 		voice_machines[machine_index].told = TRUE;
@@ -662,6 +683,7 @@ static void voice_host_relay(
 			message.down.route = (byte)route;
 			message.down.length = (byte)length;
 			csmemcpy(message.packet, packet, length);
+			VOICE_TO_WIRE(&message.header, &message.down, VOICE_DOWN_LAYOUT);
 			network_distributed_server_send_to_machine(listener, &message,
 				(word)(sizeof(message.header) + sizeof(message.down) + length));
 		}
@@ -739,6 +761,7 @@ void network_voice_handle_message(
 		if (machine_index == NONE || !voice_host() || length < (long)sizeof(up))
 			return;
 		csmemcpy(&up, entries, sizeof(up));
+		halo_wire_swap_le(&up, VOICE_UP_LAYOUT(HALO_WIRE_STRING), 1);
 		voice_host_handle_up(machine_index, &up, entries + sizeof(up), length - (long)sizeof(up));
 		break;
 	}
@@ -749,6 +772,7 @@ void network_voice_handle_message(
 		if (machine_index != NONE || voice_host() || !voice_settings_heard || length < (long)sizeof(down))
 			return;
 		csmemcpy(&down, entries, sizeof(down));
+		halo_wire_swap_le(&down, VOICE_DOWN_LAYOUT(HALO_WIRE_STRING), 1);
 		if (down.key != voice_key || down.length != length - (long)sizeof(down) ||
 			down.machine_index == network_game_client_get_local_machine_index())
 		{
@@ -765,6 +789,7 @@ void network_voice_handle_message(
 		if (machine_index != NONE || voice_host() || length < (long)sizeof(config))
 			return;
 		csmemcpy(&config, entries, sizeof(config));
+		halo_wire_swap_le(&config, VOICE_CONFIG_LAYOUT(HALO_WIRE_STRING), 1);
 		voice_key = config.key;
 		voice_settings.lobby = TEST_FLAG(config.flags, _voice_config_lobby_bit);
 		voice_settings.mode = config.mode < NUMBER_OF_VOICE_MODES ? config.mode : _voice_mode_off;
@@ -851,6 +876,7 @@ static void voice_send(
 		message.up.length = (byte)length;
 		if (length > 0)
 			csmemcpy(message.packet, packet, length);
+		VOICE_TO_WIRE(&message.header, &message.up, VOICE_UP_LAYOUT);
 		network_distributed_client_send(&message, (word)(sizeof(message.header) + sizeof(message.up) + length));
 	}
 	if (length > 0)

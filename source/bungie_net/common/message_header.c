@@ -28,6 +28,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "message_header.h"
+#include "halo_endian.h" /* port: port/linux/include/halo_endian.h */
 
 /* ---------- constants */
 
@@ -67,17 +68,20 @@ void byte_swap_message_header(
 
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\message_header.c", 80, header);
 
+	/* port: the network order is big-endian; a big-endian host has the
+	header in it already, and sends the bytes a little-endian host's swap
+	makes (the golden vectors of tools/net_wire_golden.c) */
 	if (byte_order == _byte_order_network)
 	{
 		value = *header;
-		*header = (value << 8) | (value >> 8);
+		*header = halo_be16(value);
 		return;
 	}
 
 	if (byte_order == _byte_order_host)
 	{
 		value = *header;
-		*header = (value << 8) | (value >> 8);
+		*header = halo_be16(value);
 		return;
 	}
 

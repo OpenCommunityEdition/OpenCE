@@ -305,6 +305,21 @@ struct distributed_inventory
 
 #define AGE_SCALE 65535.0f
 
+/* what the entries are on the wire, which is little-endian (port:
+halo_endian.h): their fields from the first, the sizes checked against the
+structures' */
+#define OBJECT_CHANGE_LAYOUT(X) X(b,4) X(l,2) X(s,2) X(l,27) X(b,8)
+#define OBJECT_STATE_LAYOUT(X) X(l,1) X(b,2) X(s,1) X(l,3) X(s,12)
+#define INVENTORY_LAYOUT(X) X(l,1) X(b,4) X(l,4) X(s,20)
+#define DAMAGE_ANIMATION_LAYOUT(X) X(l,1) X(s,1) X(b,2)
+
+typedef char distributed_object_change_layout_assert[
+	HALO_WIRE_SIZE(OBJECT_CHANGE_LAYOUT) == sizeof(struct distributed_object_change) ? 1 : -1];
+typedef char distributed_object_state_layout_assert[
+	HALO_WIRE_SIZE(OBJECT_STATE_LAYOUT) == sizeof(struct distributed_object_state) ? 1 : -1];
+typedef char distributed_inventory_layout_assert[
+	HALO_WIRE_SIZE(INVENTORY_LAYOUT) == sizeof(struct distributed_inventory) ? 1 : -1];
+
 struct distributed_object_change_message
 {
 	struct distributed_message_header header;
@@ -617,6 +632,28 @@ word network_objects_entry_size(
 	return 0;
 }
 
+#ifdef HALO_BIG_ENDIAN_HOST
+/* (network_distributed.c) the layout of a message's entries on the wire */
+char const *network_objects_entry_layout(
+	byte type)
+{
+	static char const change[] = OBJECT_CHANGE_LAYOUT(HALO_WIRE_STRING);
+	static char const state[] = OBJECT_STATE_LAYOUT(HALO_WIRE_STRING);
+	static char const inventory[] = INVENTORY_LAYOUT(HALO_WIRE_STRING);
+	static char const damage_animation[] = DAMAGE_ANIMATION_LAYOUT(HALO_WIRE_STRING);
+
+	switch (type)
+	{
+	case _distributed_message_object_changes: return change;
+	case _distributed_message_object_states:
+	case _distributed_message_vehicle_prediction: return state;
+	case _distributed_message_inventories: return inventory;
+	case _distributed_message_damage_animations: return damage_animation;
+	}
+	return NULL;
+}
+#endif
+
 static boolean distributed_vector_valid(
 	real_vector3d const *vector)
 {
@@ -925,6 +962,9 @@ struct distributed_damage_animation
 	byte type;
 	byte number;
 };
+
+typedef char distributed_damage_animation_layout_assert[
+	HALO_WIRE_SIZE(DAMAGE_ANIMATION_LAYOUT) == sizeof(struct distributed_damage_animation) ? 1 : -1];
 
 struct distributed_damage_animations_message
 {

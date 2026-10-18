@@ -152,6 +152,10 @@ static void connection_close(struct connection *connection, char const *reason)
 	connection->used = FALSE;
 }
 
+/* port: the wire order (halo_endian.h) is the host's on this test's */
+#define halo_wire_swap_le(data, layout, count) ((void)0)
+#define MAP_SHARE_HEADER_TO_WIRE(header) ((void)0)
+
 #include "under_test.inc"
 
 #define ADDRESS(a, b, c, d) \

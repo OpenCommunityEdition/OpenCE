@@ -139,6 +139,28 @@ A host's game advertisement says that it plays this netcode. A client does
 not join a host that does not (one of network version 4 built before the
 lockstep netcode was removed, set to play it): it tells the player why.
 
+## Byte order
+
+What the machines send is the same bytes on every host, big-endian ones
+included (the PowerPC Mac). The port's own messages (`network_*.c`,
+`map_share.c`, voice) are little-endian on the wire: their structures go
+as they are in memory on a little-endian host, and a big-endian host swaps
+each field by the structure's layout (`halo_wire_swap_le`,
+`port/linux/include/halo_endian.h`; a layout is a macro next to its
+structure, whose size is checked against `sizeof`, and a message put
+together a field at a time goes through `distributed_put` and
+`distributed_take`, which take the size of the parts). The game's own
+messages (the message headers, `data_encoding.c`'s, the transport's
+addresses) are big-endian, the Xbox's network order, as they were. On a
+little-endian host every one of these compiles to what it was, so the
+version does not change.
+
+A change to a message changes its layout with it. `tools/net_wire_golden.c`
+builds representative messages through the real code (taken from the sources
+by `tools/net_wire_extract.py`) and compares them with the bytes a
+little-endian x86 build made (`tools/net_wire_golden.inc`);
+`tools/mac_net_wire_checks.sh` runs it for i386 and, under Rosetta, ppc.
+
 ## Versions
 
 The native builds' network code has a version, an unsigned 16-bit number

@@ -77,6 +77,7 @@ machine (their datum identifiers need not be).
 #include "network_distributed.h"
 #include "network_voice.h"
 #include "map_share.h"
+#include "halo_endian.h"
 #include "profile_sections.h"
 
 #include <limits.h>
@@ -425,6 +426,129 @@ struct distributed_pings_message
 	struct distributed_message_header header;
 	struct distributed_player_ping players[MAXIMUM_PINGS_PER_MESSAGE];
 };
+
+/* ---------- the wire (port: little-endian; halo_endian.h)
+
+The messages whose entries are the structures above go on the wire as they
+are in memory but for their byte order, which a big-endian host swaps by the
+layout of an entry. The sizes are checked against the structures'. The
+others are written a field at a time (distributed_put), or are bytes. */
+
+/* a game_statistics: shorts, then its longs after two bytes of padding,
+two more shorts and the game type's three, and two bytes of padding */
+#define DISTRIBUTED_GAME_STATISTICS_LAYOUT(X) X(s,17) X(b,2) X(l,3) X(s,5) X(b,2)
+#define DISTRIBUTED_PLAYER_STATISTICS_LAYOUT(X) X(s,2) DISTRIBUTED_GAME_STATISTICS_LAYOUT(X)
+#define DISTRIBUTED_PICKUP_LAYOUT(X) X(b,2) X(s,1) X(l,1)
+#define DISTRIBUTED_PLAYER_PING_LAYOUT(X) X(b,2) X(s,1)
+/* the ticks, the action's reals then its shorts, and the buttons */
+#define DISTRIBUTED_PLAYER_INPUT_LAYOUT(X) X(b,4) X(l,8) X(s,8)
+
+typedef char distributed_header_layout_assert[
+	HALO_WIRE_SIZE(DISTRIBUTED_MESSAGE_HEADER_LAYOUT) == sizeof(struct distributed_message_header) ? 1 : -1];
+typedef char distributed_game_statistics_layout_assert[
+	HALO_WIRE_SIZE(DISTRIBUTED_GAME_STATISTICS_LAYOUT) == sizeof(struct game_statistics) ? 1 : -1];
+typedef char distributed_player_statistics_layout_assert[
+	HALO_WIRE_SIZE(DISTRIBUTED_PLAYER_STATISTICS_LAYOUT) == sizeof(struct distributed_player_statistics) ? 1 : -1];
+typedef char distributed_pickup_layout_assert[
+	HALO_WIRE_SIZE(DISTRIBUTED_PICKUP_LAYOUT) == sizeof(struct distributed_pickup) ? 1 : -1];
+typedef char distributed_player_ping_layout_assert[
+	HALO_WIRE_SIZE(DISTRIBUTED_PLAYER_PING_LAYOUT) == sizeof(struct distributed_player_ping) ? 1 : -1];
+typedef char distributed_player_input_layout_assert[
+	HALO_WIRE_SIZE(DISTRIBUTED_PLAYER_INPUT_LAYOUT) == sizeof(struct distributed_player_input) ? 1 : -1];
+
+#ifdef HALO_BIG_ENDIAN_HOST
+
+static char const distributed_message_header_layout[] = DISTRIBUTED_MESSAGE_HEADER_LAYOUT(HALO_WIRE_STRING);
+static char const distributed_player_statistics_layout[] = DISTRIBUTED_PLAYER_STATISTICS_LAYOUT(HALO_WIRE_STRING);
+static char const distributed_pickup_layout[] = DISTRIBUTED_PICKUP_LAYOUT(HALO_WIRE_STRING);
+static char const distributed_player_ping_layout[] = DISTRIBUTED_PLAYER_PING_LAYOUT(HALO_WIRE_STRING);
+static char const distributed_player_input_layout[] = DISTRIBUTED_PLAYER_INPUT_LAYOUT(HALO_WIRE_STRING);
+/* (the structure BSP's: 2 shorts) */
+static char const distributed_structure_bsp_wire_layout[] = "2s";
+
+/* the layout of the entries of a message of the type, NULL for none (it has
+none, or its bytes are written a field at a time) */
+static char const *distributed_entry_layout(
+	byte type)
+{
+	switch (type)
+	{
+	case _distributed_message_player_statistics: return distributed_player_statistics_layout;
+	case _distributed_message_pings: return distributed_player_ping_layout;
+	case _distributed_message_pickups: return distributed_pickup_layout;
+	case _distributed_message_player_inputs: return distributed_player_input_layout;
+	case _distributed_message_structure_bsp: return distributed_structure_bsp_wire_layout;
+	case _distributed_message_player_prediction:
+	case _distributed_message_unit_states:
+	case _distributed_message_relayed_actions:
+	case _distributed_message_game_state:
+	case _distributed_message_objects_synchronized:
+	case _distributed_message_client_ready:
+	case _distributed_message_client_identity:
+	case _distributed_message_notice:
+	case _distributed_message_batch:
+	case _distributed_message_votekick:
+	case _distributed_message_votekick_status:
+	case _distributed_message_coop_skip_vote:
+		return NULL;
+	case _distributed_message_actor_states:
+	case _distributed_message_actor_damage: return network_actors_entry_layout(type);
+	case _distributed_message_coop_presentation:
+	case _distributed_message_coop_events:
+	case _distributed_message_coop_device_groups:
+	case _distributed_message_coop_object_names:
+	case _distributed_message_coop_object_transforms:
+	case _distributed_message_coop_object_looks:
+	case _distributed_message_coop_screen_effect:
+	case _distributed_message_coop_device_states: return network_coop_entry_layout(type);
+	case _distributed_message_damage_events:
+	case _distributed_message_hit_reports: return network_damage_entry_layout(type);
+	default: return network_objects_entry_layout(type);
+	}
+}
+
+/* the entries of a message in place between the order of the host and the
+wire's, no further than size bytes */
+static void distributed_entries_swap(
+	byte type,
+	void *entries,
+	short count,
+	long size)
+{
+	char const *layout = distributed_entry_layout(type);
+
+	if (layout && count > 0 && count * halo_wire_layout_size(layout) <= size)
+		halo_wire_swap_le(entries, layout, count);
+}
+
+/* a copy of a message as it goes on the wire */
+static void *distributed_wire_copy(
+	void const *message,
+	byte type,
+	short count,
+	word size)
+{
+	static unsigned long copy[(MAXIMUM_MESSAGE_SIZE + 3) / 4 + 1];
+
+	if (size > sizeof(copy))
+		size = (word)sizeof(copy);
+	csmemcpy(copy, message, size);
+	if (size >= sizeof(struct distributed_message_header))
+	{
+		halo_wire_swap_le(copy, distributed_message_header_layout, 1);
+		distributed_entries_swap(type, (byte *)copy + sizeof(struct distributed_message_header), count,
+			size - sizeof(struct distributed_message_header));
+	}
+	return copy;
+}
+
+#define DISTRIBUTED_WIRE(message, type, count, size) distributed_wire_copy(message, type, count, size)
+
+#else
+
+#define DISTRIBUTED_WIRE(message, type, count, size) (message)
+
+#endif /* HALO_BIG_ENDIAN_HOST */
 
 /* a batch's datagram: its header, then each message's size and its bytes
 past its message header */
@@ -877,7 +1001,7 @@ static void distributed_batch_flush(
 		return;
 	header->type = _distributed_message_batch;
 	header->count = 0;
-	header->game_time = game_time_get();
+	header->game_time = (long)halo_le32(game_time_get()); /* port: little-endian on the wire */
 	header->header = 0;
 	build_message_header(&header->header, batch->size, 2, 0);
 	if (sender == HOST_SENDER)
@@ -915,13 +1039,24 @@ static void distributed_batch_append(
 {
 	struct distributed_batch *batch = &distributed_batches[sender];
 	word length = (word)(sizeof(*header) - sizeof(message_header) + entries_size);
+	word length_on_wire;
 
 	if (!batch->size)
 		batch->size = sizeof(struct distributed_message_header);
-	csmemcpy(batch->data + batch->size, &length, sizeof(word));
+	/* (port: the length, the game time and the entries little-endian) */
+	length_on_wire = halo_le16(length);
+	csmemcpy(batch->data + batch->size, &length_on_wire, sizeof(word));
 	csmemcpy(batch->data + batch->size + sizeof(word), (byte const *)header + sizeof(message_header),
 		sizeof(*header) - sizeof(message_header));
 	csmemcpy(batch->data + batch->size + BATCH_MESSAGE_OVERHEAD, entries, entries_size);
+#ifdef HALO_BIG_ENDIAN_HOST
+	{
+		/* (the game time past the type and count) */
+		halo_wire_swap_le(batch->data + batch->size + sizeof(word), "2b1l", 1);
+		distributed_entries_swap(header->type, batch->data + batch->size + BATCH_MESSAGE_OVERHEAD, header->count,
+			entries_size);
+	}
+#endif
 	batch->size += (word)(BATCH_MESSAGE_OVERHEAD + entries_size);
 }
 
@@ -1035,11 +1170,15 @@ void distributed_send(
 			distributed_batch_add((short)machine_indices[index], message, size, distributed_entry_size(count, size));
 		break;
 	}
-	case _distributed_to_clients_reliably: network_distributed_server_send_to_all_reliably(message, size); break;
+	case _distributed_to_clients_reliably:
+		network_distributed_server_send_to_all_reliably(DISTRIBUTED_WIRE(message, type, count, size), size);
+		break;
 	case _distributed_to_host:
 		distributed_batch_add(HOST_SENDER, message, size, distributed_entry_size(count, size));
 		break;
-	case _distributed_to_host_reliably: network_distributed_client_send_reliably(message, size); break;
+	case _distributed_to_host_reliably:
+		network_distributed_client_send_reliably(DISTRIBUTED_WIRE(message, type, count, size), size);
+		break;
 	}
 }
 
@@ -1064,7 +1203,7 @@ void distributed_send_to_machine_reliably(
 	word size)
 {
 	distributed_fill_header(message, type, count, size);
-	network_distributed_server_send_to_machine_reliably(machine_index, message, size);
+	network_distributed_server_send_to_machine_reliably(machine_index, DISTRIBUTED_WIRE(message, type, count, size), size);
 }
 
 /* a packer's messages of the type, to the machine (or the host), each
@@ -1120,13 +1259,17 @@ static void distributed_packer_add(
 }
 
 /* the bytes of what a message says, in order: written, and read no further
-than its end (FALSE past it) */
+than its end (FALSE past it). They are little-endian on the wire: unit is the
+size of the 1, 2 or 4 bytes each of the size's bytes' parts is (port: a
+big-endian host swaps them, halo_endian.h) */
 static byte *distributed_put(
 	byte *cursor,
 	void const *data,
-	short size)
+	short size,
+	short unit)
 {
 	csmemcpy(cursor, data, size);
+	halo_swap_units(cursor, size, unit);
 	return cursor + size;
 }
 
@@ -1134,11 +1277,13 @@ static boolean distributed_take(
 	byte const **cursor,
 	byte const *end,
 	void *data,
-	short size)
+	short size,
+	short unit)
 {
 	if (end - *cursor < size)
 		return FALSE;
 	csmemcpy(data, *cursor, size);
+	halo_swap_units(data, size, unit);
 	*cursor += size;
 	return TRUE;
 }
@@ -1439,36 +1584,36 @@ static word distributed_unit_state_write(
 		SET_FLAG(flags, _distributed_unit_predicted_bit, FALSE);
 	if (TEST_FLAG(flags, _distributed_unit_alive_bit))
 	{
-		cursor = distributed_put(cursor, &state->unit_index, sizeof(state->unit_index));
+		cursor = distributed_put(cursor, &state->unit_index, sizeof(state->unit_index), 4);
 		if (state->vehicle_index != NONE)
 		{
 			SET_FLAG(parts, _distributed_unit_part_riding_bit, TRUE);
-			cursor = distributed_put(cursor, &state->vehicle_index, sizeof(state->vehicle_index));
-			cursor = distributed_put(cursor, &state->seat_index, sizeof(state->seat_index));
+			cursor = distributed_put(cursor, &state->vehicle_index, sizeof(state->vehicle_index), 4);
+			cursor = distributed_put(cursor, &state->seat_index, sizeof(state->seat_index), 2);
 		}
 		if (TEST_FLAG(flags, _distributed_unit_placed_bit))
 		{
-			cursor = distributed_put(cursor, &state->position, sizeof(state->position));
-			cursor = distributed_put(cursor, &state->velocity, sizeof(state->velocity));
-			cursor = distributed_put(cursor, &state->forward, sizeof(state->forward));
+			cursor = distributed_put(cursor, &state->position, sizeof(state->position), 4);
+			cursor = distributed_put(cursor, &state->velocity, sizeof(state->velocity), 2);
+			cursor = distributed_put(cursor, &state->forward, sizeof(state->forward), 2);
 			if (state->up.i || state->up.j || state->up.k != (short)DISTRIBUTED_UNIT_SCALE)
 			{
 				SET_FLAG(parts, _distributed_unit_part_up_bit, TRUE);
-				cursor = distributed_put(cursor, &state->up, sizeof(state->up));
+				cursor = distributed_put(cursor, &state->up, sizeof(state->up), 2);
 			}
 		}
 		if (TEST_FLAG(flags, _distributed_unit_predicted_bit))
-			cursor = distributed_put(cursor, &state->predicted_time, sizeof(state->predicted_time));
-		cursor = distributed_put(cursor, &state->body_vitality, sizeof(state->body_vitality));
-		cursor = distributed_put(cursor, &state->shield_vitality, sizeof(state->shield_vitality));
+			cursor = distributed_put(cursor, &state->predicted_time, sizeof(state->predicted_time), 2);
+		cursor = distributed_put(cursor, &state->body_vitality, sizeof(state->body_vitality), 2);
+		cursor = distributed_put(cursor, &state->shield_vitality, sizeof(state->shield_vitality), 2);
 		if (state->current_body_damage || state->recent_body_damage || state->current_shield_damage ||
 			state->recent_shield_damage)
 		{
 			SET_FLAG(parts, _distributed_unit_part_damage_bit, TRUE);
-			cursor = distributed_put(cursor, &state->current_body_damage, sizeof(state->current_body_damage));
-			cursor = distributed_put(cursor, &state->recent_body_damage, sizeof(state->recent_body_damage));
-			cursor = distributed_put(cursor, &state->current_shield_damage, sizeof(state->current_shield_damage));
-			cursor = distributed_put(cursor, &state->recent_shield_damage, sizeof(state->recent_shield_damage));
+			cursor = distributed_put(cursor, &state->current_body_damage, sizeof(state->current_body_damage), 2);
+			cursor = distributed_put(cursor, &state->recent_body_damage, sizeof(state->recent_body_damage), 2);
+			cursor = distributed_put(cursor, &state->current_shield_damage, sizeof(state->current_shield_damage), 2);
+			cursor = distributed_put(cursor, &state->recent_shield_damage, sizeof(state->recent_shield_damage), 2);
 		}
 		{
 			short powerup_index;
@@ -1481,20 +1626,20 @@ static word distributed_unit_state_write(
 			if (powerup_index < NUMBER_OF_PLAYER_POWERUPS)
 			{
 				SET_FLAG(parts, _distributed_unit_part_powerups_bit, TRUE);
-				cursor = distributed_put(cursor, state->powerup_durations, sizeof(state->powerup_durations));
+				cursor = distributed_put(cursor, state->powerup_durations, sizeof(state->powerup_durations), 2);
 			}
 		}
 		if (state->unit_flags || state->active_camouflage)
 		{
 			SET_FLAG(parts, _distributed_unit_part_camouflage_bit, TRUE);
-			cursor = distributed_put(cursor, &state->unit_flags, sizeof(state->unit_flags));
-			cursor = distributed_put(cursor, &state->active_camouflage, sizeof(state->active_camouflage));
+			cursor = distributed_put(cursor, &state->unit_flags, sizeof(state->unit_flags), 1);
+			cursor = distributed_put(cursor, &state->active_camouflage, sizeof(state->active_camouflage), 1);
 		}
 	}
 	else if (state->killing_player_index != NO_PLAYER)
 	{
 		SET_FLAG(parts, _distributed_unit_part_killer_bit, TRUE);
-		cursor = distributed_put(cursor, &state->killing_player_index, sizeof(state->killing_player_index));
+		cursor = distributed_put(cursor, &state->killing_player_index, sizeof(state->killing_player_index), 1);
 	}
 	buffer[0] = state->player_index;
 	buffer[1] = flags;
@@ -1518,63 +1663,63 @@ static word distributed_unit_state_read(
 	state->seat_index = NONE;
 	state->killing_player_index = NO_PLAYER;
 	state->up.k = (short)DISTRIBUTED_UNIT_SCALE;
-	if (!distributed_take(&cursor, end, &state->player_index, sizeof(state->player_index)) ||
-		!distributed_take(&cursor, end, &state->flags, sizeof(state->flags)) ||
-		!distributed_take(&cursor, end, &parts, sizeof(parts)))
+	if (!distributed_take(&cursor, end, &state->player_index, sizeof(state->player_index), 1) ||
+		!distributed_take(&cursor, end, &state->flags, sizeof(state->flags), 1) ||
+		!distributed_take(&cursor, end, &parts, sizeof(parts), 1))
 	{
 		return 0;
 	}
 	if (TEST_FLAG(state->flags, _distributed_unit_alive_bit))
 	{
-		if (!distributed_take(&cursor, end, &state->unit_index, sizeof(state->unit_index)))
+		if (!distributed_take(&cursor, end, &state->unit_index, sizeof(state->unit_index), 4))
 			return 0;
 		if (TEST_FLAG(parts, _distributed_unit_part_riding_bit) &&
-			(!distributed_take(&cursor, end, &state->vehicle_index, sizeof(state->vehicle_index)) ||
-				!distributed_take(&cursor, end, &state->seat_index, sizeof(state->seat_index))))
+			(!distributed_take(&cursor, end, &state->vehicle_index, sizeof(state->vehicle_index), 4) ||
+				!distributed_take(&cursor, end, &state->seat_index, sizeof(state->seat_index), 2)))
 		{
 			return 0;
 		}
 		if (TEST_FLAG(state->flags, _distributed_unit_placed_bit) &&
-			(!distributed_take(&cursor, end, &state->position, sizeof(state->position)) ||
-				!distributed_take(&cursor, end, &state->velocity, sizeof(state->velocity)) ||
-				!distributed_take(&cursor, end, &state->forward, sizeof(state->forward)) ||
+			(!distributed_take(&cursor, end, &state->position, sizeof(state->position), 4) ||
+				!distributed_take(&cursor, end, &state->velocity, sizeof(state->velocity), 2) ||
+				!distributed_take(&cursor, end, &state->forward, sizeof(state->forward), 2) ||
 				(TEST_FLAG(parts, _distributed_unit_part_up_bit) &&
-					!distributed_take(&cursor, end, &state->up, sizeof(state->up)))))
+					!distributed_take(&cursor, end, &state->up, sizeof(state->up), 2))))
 		{
 			return 0;
 		}
 		if (TEST_FLAG(state->flags, _distributed_unit_predicted_bit) &&
-			!distributed_take(&cursor, end, &state->predicted_time, sizeof(state->predicted_time)))
+			!distributed_take(&cursor, end, &state->predicted_time, sizeof(state->predicted_time), 2))
 		{
 			return 0;
 		}
-		if (!distributed_take(&cursor, end, &state->body_vitality, sizeof(state->body_vitality)) ||
-			!distributed_take(&cursor, end, &state->shield_vitality, sizeof(state->shield_vitality)))
+		if (!distributed_take(&cursor, end, &state->body_vitality, sizeof(state->body_vitality), 2) ||
+			!distributed_take(&cursor, end, &state->shield_vitality, sizeof(state->shield_vitality), 2))
 		{
 			return 0;
 		}
 		if (TEST_FLAG(parts, _distributed_unit_part_damage_bit) &&
-			(!distributed_take(&cursor, end, &state->current_body_damage, sizeof(state->current_body_damage)) ||
-				!distributed_take(&cursor, end, &state->recent_body_damage, sizeof(state->recent_body_damage)) ||
-				!distributed_take(&cursor, end, &state->current_shield_damage, sizeof(state->current_shield_damage)) ||
-				!distributed_take(&cursor, end, &state->recent_shield_damage, sizeof(state->recent_shield_damage))))
+			(!distributed_take(&cursor, end, &state->current_body_damage, sizeof(state->current_body_damage), 2) ||
+				!distributed_take(&cursor, end, &state->recent_body_damage, sizeof(state->recent_body_damage), 2) ||
+				!distributed_take(&cursor, end, &state->current_shield_damage, sizeof(state->current_shield_damage), 2) ||
+				!distributed_take(&cursor, end, &state->recent_shield_damage, sizeof(state->recent_shield_damage), 2)))
 		{
 			return 0;
 		}
 		if (TEST_FLAG(parts, _distributed_unit_part_powerups_bit) &&
-			!distributed_take(&cursor, end, state->powerup_durations, sizeof(state->powerup_durations)))
+			!distributed_take(&cursor, end, state->powerup_durations, sizeof(state->powerup_durations), 2))
 		{
 			return 0;
 		}
 		if (TEST_FLAG(parts, _distributed_unit_part_camouflage_bit) &&
-			(!distributed_take(&cursor, end, &state->unit_flags, sizeof(state->unit_flags)) ||
-				!distributed_take(&cursor, end, &state->active_camouflage, sizeof(state->active_camouflage))))
+			(!distributed_take(&cursor, end, &state->unit_flags, sizeof(state->unit_flags), 1) ||
+				!distributed_take(&cursor, end, &state->active_camouflage, sizeof(state->active_camouflage), 1)))
 		{
 			return 0;
 		}
 	}
 	else if (TEST_FLAG(parts, _distributed_unit_part_killer_bit) &&
-		!distributed_take(&cursor, end, &state->killing_player_index, sizeof(state->killing_player_index)))
+		!distributed_take(&cursor, end, &state->killing_player_index, sizeof(state->killing_player_index), 1))
 	{
 		return 0;
 	}
@@ -2542,21 +2687,21 @@ static word distributed_relayed_action_write(
 	byte *cursor = buffer + 2;
 	short history;
 
-	cursor = distributed_put(cursor, &relayed->desired_weapon_index, sizeof(relayed->desired_weapon_index));
-	cursor = distributed_put(cursor, &relayed->desired_grenade_index, sizeof(relayed->desired_grenade_index));
-	cursor = distributed_put(cursor, &relayed->desired_zoom_level, sizeof(relayed->desired_zoom_level));
-	cursor = distributed_put(cursor, &relayed->yaw, sizeof(relayed->yaw));
-	cursor = distributed_put(cursor, &relayed->pitch, sizeof(relayed->pitch));
-	cursor = distributed_put(cursor, &relayed->throttle_i, sizeof(relayed->throttle_i));
-	cursor = distributed_put(cursor, &relayed->throttle_j, sizeof(relayed->throttle_j));
-	cursor = distributed_put(cursor, &relayed->primary_trigger, sizeof(relayed->primary_trigger));
-	cursor = distributed_put(cursor, &relayed->control_flags[0], sizeof(relayed->control_flags[0]));
+	cursor = distributed_put(cursor, &relayed->desired_weapon_index, sizeof(relayed->desired_weapon_index), 1);
+	cursor = distributed_put(cursor, &relayed->desired_grenade_index, sizeof(relayed->desired_grenade_index), 1);
+	cursor = distributed_put(cursor, &relayed->desired_zoom_level, sizeof(relayed->desired_zoom_level), 1);
+	cursor = distributed_put(cursor, &relayed->yaw, sizeof(relayed->yaw), 2);
+	cursor = distributed_put(cursor, &relayed->pitch, sizeof(relayed->pitch), 2);
+	cursor = distributed_put(cursor, &relayed->throttle_i, sizeof(relayed->throttle_i), 1);
+	cursor = distributed_put(cursor, &relayed->throttle_j, sizeof(relayed->throttle_j), 1);
+	cursor = distributed_put(cursor, &relayed->primary_trigger, sizeof(relayed->primary_trigger), 1);
+	cursor = distributed_put(cursor, &relayed->control_flags[0], sizeof(relayed->control_flags[0]), 2);
 	for (history = 1; history < DISTRIBUTED_INPUT_HISTORY; history++)
 	{
 		if (relayed->control_flags[history] != relayed->control_flags[history - 1])
 		{
 			SET_FLAG(parts, history - 1, TRUE);
-			cursor = distributed_put(cursor, &relayed->control_flags[history], sizeof(relayed->control_flags[history]));
+			cursor = distributed_put(cursor, &relayed->control_flags[history], sizeof(relayed->control_flags[history]), 2);
 		}
 	}
 	buffer[0] = relayed->player_index;
@@ -2576,17 +2721,17 @@ static word distributed_relayed_action_read(
 	short history;
 
 	csmemset(relayed, 0, sizeof(*relayed));
-	if (!distributed_take(&cursor, end, &relayed->player_index, sizeof(relayed->player_index)) ||
-		!distributed_take(&cursor, end, &parts, sizeof(parts)) ||
-		!distributed_take(&cursor, end, &relayed->desired_weapon_index, sizeof(relayed->desired_weapon_index)) ||
-		!distributed_take(&cursor, end, &relayed->desired_grenade_index, sizeof(relayed->desired_grenade_index)) ||
-		!distributed_take(&cursor, end, &relayed->desired_zoom_level, sizeof(relayed->desired_zoom_level)) ||
-		!distributed_take(&cursor, end, &relayed->yaw, sizeof(relayed->yaw)) ||
-		!distributed_take(&cursor, end, &relayed->pitch, sizeof(relayed->pitch)) ||
-		!distributed_take(&cursor, end, &relayed->throttle_i, sizeof(relayed->throttle_i)) ||
-		!distributed_take(&cursor, end, &relayed->throttle_j, sizeof(relayed->throttle_j)) ||
-		!distributed_take(&cursor, end, &relayed->primary_trigger, sizeof(relayed->primary_trigger)) ||
-		!distributed_take(&cursor, end, &relayed->control_flags[0], sizeof(relayed->control_flags[0])))
+	if (!distributed_take(&cursor, end, &relayed->player_index, sizeof(relayed->player_index), 1) ||
+		!distributed_take(&cursor, end, &parts, sizeof(parts), 1) ||
+		!distributed_take(&cursor, end, &relayed->desired_weapon_index, sizeof(relayed->desired_weapon_index), 1) ||
+		!distributed_take(&cursor, end, &relayed->desired_grenade_index, sizeof(relayed->desired_grenade_index), 1) ||
+		!distributed_take(&cursor, end, &relayed->desired_zoom_level, sizeof(relayed->desired_zoom_level), 1) ||
+		!distributed_take(&cursor, end, &relayed->yaw, sizeof(relayed->yaw), 2) ||
+		!distributed_take(&cursor, end, &relayed->pitch, sizeof(relayed->pitch), 2) ||
+		!distributed_take(&cursor, end, &relayed->throttle_i, sizeof(relayed->throttle_i), 1) ||
+		!distributed_take(&cursor, end, &relayed->throttle_j, sizeof(relayed->throttle_j), 1) ||
+		!distributed_take(&cursor, end, &relayed->primary_trigger, sizeof(relayed->primary_trigger), 1) ||
+		!distributed_take(&cursor, end, &relayed->control_flags[0], sizeof(relayed->control_flags[0]), 2))
 	{
 		return 0;
 	}
@@ -2595,7 +2740,7 @@ static word distributed_relayed_action_read(
 		if (!TEST_FLAG(parts, history - 1))
 			relayed->control_flags[history] = relayed->control_flags[history - 1];
 		else if (!distributed_take(&cursor, end, &relayed->control_flags[history],
-			sizeof(relayed->control_flags[history])))
+			sizeof(relayed->control_flags[history]), 2))
 		{
 			return 0;
 		}
@@ -2844,9 +2989,11 @@ static void distributed_host_send_players(
 	{
 		long machine_index = machine_indices[machine_number];
 		short player_index;
+		/* (port: the update number is little-endian on the wire) */
+		long update_number_on_wire = (long)halo_le32(distributed_host_update_number);
 
 		distributed_packer_begin(&distributed_packer, (short)machine_index, _distributed_message_relayed_actions,
-			&distributed_host_update_number, sizeof(distributed_host_update_number));
+			&update_number_on_wire, sizeof(update_number_on_wire));
 		for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 		{
 			byte entry[DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE];
@@ -2884,7 +3031,7 @@ static void distributed_handle_actions(
 	long update_number;
 	short index;
 
-	if (!distributed_take(&data, end, &update_number, sizeof(update_number)))
+	if (!distributed_take(&data, end, &update_number, sizeof(update_number), 4))
 		return;
 	for (index = 0; index < count; index++)
 	{
@@ -3126,6 +3273,10 @@ struct distributed_structure_bsp
 	short structure_bsp_index;
 	short pad;
 };
+
+#define DISTRIBUTED_STRUCTURE_BSP_LAYOUT(X) X(s,2)
+typedef char distributed_structure_bsp_layout_assert[
+	HALO_WIRE_SIZE(DISTRIBUTED_STRUCTURE_BSP_LAYOUT) == sizeof(struct distributed_structure_bsp) ? 1 : -1];
 
 struct distributed_structure_bsp_message
 {
@@ -3971,6 +4122,10 @@ void network_distributed_handle_message(
 	void const *entries = (byte const *)message + sizeof(header);
 	short index;
 	word entry_size;
+#ifdef HALO_BIG_ENDIAN_HOST
+	/* port: the message as it came (read-only), and a copy of it in the order of the host */
+	unsigned long wire[(MAXIMUM_MESSAGE_SIZE + 3) / 4 + 1];
+#endif
 
 	/* (voice chat's, in the lobby too: network_voice.c) */
 	if (network_voice_handles_message(message, size))
@@ -3989,6 +4144,14 @@ void network_distributed_handle_message(
 	/* (none between games: loading, or in the menus) */
 	if (size < sizeof(header) || !game_in_progress())
 		return;
+#ifdef HALO_BIG_ENDIAN_HOST
+	if (size > sizeof(wire))
+		return;
+	csmemcpy(wire, message, size);
+	message = (word const *)wire;
+	entries = (byte const *)wire + sizeof(header);
+	halo_wire_swap_le(wire, distributed_message_header_layout, 1);
+#endif
 	csmemcpy(&header, message, sizeof(header));
 	/* a tick's messages in one: each as if it came alone */
 	if (header.type == _distributed_message_batch)
@@ -4001,6 +4164,7 @@ void network_distributed_handle_message(
 			word length;
 
 			csmemcpy(&length, (byte const *)message + offset, sizeof(word));
+			length = halo_le16(length); /* port: little-endian on the wire */
 			offset += sizeof(word);
 			if (length > size - offset || length < sizeof(header) - sizeof(message_header) ||
 				sizeof(message_header) + length > sizeof(buffer))
@@ -4060,6 +4224,10 @@ void network_distributed_handle_message(
 	{
 		return;
 	}
+#ifdef HALO_BIG_ENDIAN_HOST
+	/* port: the entries in the order of the host (size was checked) */
+	distributed_entries_swap(header.type, (byte *)wire + sizeof(header), header.count, size - sizeof(header));
+#endif
 	/* (the kinds whose handlers read one entry: not without it) */
 	switch (header.type)
 	{

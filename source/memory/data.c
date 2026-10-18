@@ -385,7 +385,10 @@ void data_delete_all(
 	data->count = 0;
 	data->actual_count = 0;
 	data->first_free_absolute_index = 0;
-	csstrncpy((char *)&data->next_identifier, data->name, sizeof(data->next_identifier));
+	/* port: preserve the Xbox's little-endian identifier seed on PPC,
+	   including strncpy's zero padding for an empty name. */
+	data->next_identifier = (unsigned char)data->name[0] |
+		(data->name[0] ? (unsigned char)data->name[1] << 8 : 0);
 	data->next_identifier |= 0x8000;
 
 	for (absolute_index = 0; absolute_index<data->maximum_count; absolute_index++)

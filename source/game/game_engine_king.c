@@ -81,6 +81,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "halo_endian.h" /* port: port/linux/include/halo_endian.h */
 #include "cseries/errors.h"
 #include "game/game_globals.h"
 #include "game/game_engine_king.h"
@@ -1132,6 +1133,13 @@ struct game_engine king_engine =
 typedef char verify_king_network_state_size[
 	sizeof(struct king_globals) <= GAME_ENGINE_MAXIMUM_NETWORK_STATE_SIZE ? 1 : -1];
 
+/* port: what the state is on the wire, which is little-endian (halo_endian.h):
+the fields of king_globals from the first (the hill's points and hull, centre,
+state, controllers, top and bottom, id and timer are 71 words) */
+#define KING_NETWORK_STATE_LAYOUT(X) X(l,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(l,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(b,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(l,71)
+typedef char verify_king_network_state_layout[
+	HALO_WIRE_SIZE(KING_NETWORK_STATE_LAYOUT) == sizeof(struct king_globals) ? 1 : -1];
+
 /* the distributed netcode (port/linux/game/network_distributed.c): the game
 type's state the host sends its clients */
 long game_engine_king_write_network_state(
@@ -1141,6 +1149,7 @@ long game_engine_king_write_network_state(
 	if (size < (long)sizeof(king_globals))
 		return 0;
 	csmemcpy(buffer, &king_globals, sizeof(king_globals));
+	halo_wire_swap_le(buffer, KING_NETWORK_STATE_LAYOUT(HALO_WIRE_STRING), 1); /* port: little-endian on the wire */
 	return sizeof(king_globals);
 }
 
@@ -1209,6 +1218,7 @@ boolean game_engine_king_read_network_state(
 	if (size != (long)sizeof(state))
 		return FALSE;
 	csmemcpy(&state, buffer, sizeof(state));
+	halo_wire_swap_le(&state, KING_NETWORK_STATE_LAYOUT(HALO_WIRE_STRING), 1); /* port: little-endian on the wire */
 	for (team_index = 0; team_index < (long)NUMBEROF(state.score); team_index++)
 	{
 		if (!first)

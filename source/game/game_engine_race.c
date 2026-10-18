@@ -104,6 +104,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "halo_endian.h" /* port: port/linux/include/halo_endian.h */
 #include "game_engine_place.h"
 #include "game_engine_race.h"
 #include "game_globals.h"
@@ -1604,6 +1605,15 @@ struct race_network_state
 typedef char verify_race_network_state_size[
 	sizeof(struct race_network_state) <= GAME_ENGINE_MAXIMUM_NETWORK_STATE_SIZE ? 1 : -1];
 
+/* port: what the state is on the wire, which is little-endian (halo_endian.h):
+its fields from the first (the globals', and the events' bytes then the
+statistics' shorts) */
+#define RACE_NETWORK_STATE_LAYOUT(X) \
+	X(l,1) X(l,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(l,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(l,1) X(l,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(l,1) X(b,4) \
+	X(b,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(b,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(b,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(s,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(s,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(s,HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+typedef char verify_race_network_state_layout[
+	HALO_WIRE_SIZE(RACE_NETWORK_STATE_LAYOUT) == sizeof(struct race_network_state) ? 1 : -1];
+
 long game_engine_race_write_network_state(
 	byte *buffer,
 	long size)
@@ -1632,6 +1642,7 @@ long game_engine_race_write_network_state(
 		state.laps_completed[absolute_index] = statistics->laps;
 	}
 	csmemcpy(buffer, &state, sizeof(state));
+	halo_wire_swap_le(buffer, RACE_NETWORK_STATE_LAYOUT(HALO_WIRE_STRING), 1); /* port: little-endian on the wire */
 	return sizeof(state);
 }
 
@@ -1649,6 +1660,7 @@ boolean game_engine_race_read_network_state(
 	if (size != (long)sizeof(state))
 		return FALSE;
 	csmemcpy(&state, buffer, sizeof(state));
+	halo_wire_swap_le(&state, RACE_NETWORK_STATE_LAYOUT(HALO_WIRE_STRING), 1); /* port: little-endian on the wire */
 	race_globals = state.globals;
 	race_globals.vehicles_have_been_added = vehicles_have_been_added;
 	race_globals.lap_completed_value = lap_completed_value;

@@ -123,6 +123,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "game_engine.h"
 #include "players.h"
+#include "halo_endian.h" /* port: port/linux/include/halo_endian.h */
 #include "players_runtime.h"
 #include "items/weapons.h"
 #include "objects/objects.h"
@@ -1546,6 +1547,12 @@ struct ctf_network_state
 typedef char verify_ctf_network_state_size[
 	sizeof(struct ctf_network_state) == 0x38 ? 1 : -1];
 
+/* port: what the state is on the wire, which is little-endian (halo_endian.h):
+its fields from the first (the flags' warnings are bytes, padded) */
+#define CTF_NETWORK_STATE_LAYOUT(X) X(l,4) X(b,4) X(l,5) X(s,2) X(b,12)
+typedef char verify_ctf_network_state_layout[
+	HALO_WIRE_SIZE(CTF_NETWORK_STATE_LAYOUT) == sizeof(struct ctf_network_state) ? 1 : -1];
+
 /* the distributed netcode (port/linux/game/network_distributed.c): the game
 type's state the host sends its clients, which take it as it is */
 long game_engine_ctf_write_network_state(
@@ -1583,6 +1590,7 @@ long game_engine_ctf_write_network_state(
 		}
 	}
 	csmemcpy(buffer, &state, sizeof(state));
+	halo_wire_swap_le(buffer, CTF_NETWORK_STATE_LAYOUT(HALO_WIRE_STRING), 1); /* port: little-endian on the wire */
 	return sizeof(state);
 }
 
@@ -1597,6 +1605,7 @@ boolean game_engine_ctf_read_network_state(
 	if (size != (long)sizeof(state))
 		return FALSE;
 	csmemcpy(&state, buffer, sizeof(state));
+	halo_wire_swap_le(&state, CTF_NETWORK_STATE_LAYOUT(HALO_WIRE_STRING), 1); /* port: little-endian on the wire */
 	/* the scores first: a capture's message shows them (ctf_show_capture) */
 	csmemcpy(ctf_globals.weapon_indices, state.weapon_indices, sizeof(state.weapon_indices));
 	csmemcpy(ctf_globals.scores, state.scores, sizeof(state.scores));

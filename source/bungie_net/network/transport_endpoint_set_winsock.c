@@ -108,6 +108,8 @@ symbols in this file:
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
 #include "memory/byte_swapping.h"
+/* port: the address in network order is big-endian on any host (SWAP4 was a swap on a little-endian one) */
+#include "halo_endian.h" /* port: port/linux/include/halo_endian.h */
 
 /* ---------- constants */
 
@@ -753,7 +755,7 @@ void transport_client_start(
 	transport_client_stop();
 	transport_push_key(key, key_id);
 	XNetXnAddrToInAddr(xnaddr, key_id, &in_addr);
-	address->address.long_words[0] = SWAP4(in_addr.s_addr);
+	address->address.long_words[0] = halo_be32(in_addr.s_addr);
 	address->address_length = IPV4_ADDRESS_LENGTH;
 	address->port = port;
 	address->address_type = 0;

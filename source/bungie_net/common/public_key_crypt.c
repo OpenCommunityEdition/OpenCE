@@ -43,6 +43,7 @@ symbols in this file:
 #include "bungie_net/common/prime_numbers.h"
 #include "bungie_net/common/random_numbers.h"
 #include "memory/byte_swapping.h"
+#include "halo_endian.h" /* port: port/linux/include/halo_endian.h */
 
 /* ---------- constants */
 
@@ -145,7 +146,8 @@ void generate_private_key(
 			p->dwords[i],
 			x->dwords[i]);
 
-		private_key->dwords[i] = SWAP4(private_key->dwords[i]);
+		/* port: the key's bytes are big-endian in memory on any host */
+		private_key->dwords[i] = halo_be32(private_key->dwords[i]);
 	}
 
 	error(

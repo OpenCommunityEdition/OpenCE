@@ -14,6 +14,7 @@ clients, and the clients' hits, reported to the host).
 
 #include "bungie_net/common/message_header.h"
 #include "networking/network_connection.h"
+#include "halo_endian.h"
 
 /* ---------- constants */
 
@@ -180,6 +181,10 @@ struct distributed_vector
 	short k;
 };
 
+/* the header on the wire (port: little-endian, halo_endian.h): its message
+header (which the transport orders), the type and count, and the game time */
+#define DISTRIBUTED_MESSAGE_HEADER_LAYOUT(X) X(b,4) X(l,1)
+
 /* (what goes on the wire, as it is on every machine) */
 typedef char distributed_message_header_size_assert[
 	sizeof(struct distributed_message_header) == 8 ? 1 : -1];
@@ -280,6 +285,18 @@ internet play peer's endpoint, not its stand-in; 0 if not known */
 unsigned long distributed_machine_real_address(long machine_index);
 /* ... and the real address of a machine's address, as it joined from */
 unsigned long distributed_real_address(unsigned long address);
+
+/* ---------- the wire (port: little-endian, halo_endian.h)
+
+The layout (a string of halo_endian.h's) of the entries of a message of the
+type, NULL for none to swap; only a big-endian host needs them */
+
+#ifdef HALO_BIG_ENDIAN_HOST
+char const *network_actors_entry_layout(byte type);
+char const *network_coop_entry_layout(byte type);
+char const *network_damage_entry_layout(byte type);
+char const *network_objects_entry_layout(byte type);
+#endif
 
 /* ---------- prototypes/NETWORK_VOTEKICK.C */
 

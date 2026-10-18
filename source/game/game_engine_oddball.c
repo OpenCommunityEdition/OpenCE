@@ -112,6 +112,7 @@ symbols in this file:
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "players.h"
+#include "halo_endian.h" /* port: port/linux/include/halo_endian.h */
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "tag_files/tag_groups.h"
@@ -1384,6 +1385,12 @@ struct oddball_network_state
 typedef char verify_oddball_network_state_size[
 	sizeof(struct oddball_network_state) <= GAME_ENGINE_MAXIMUM_NETWORK_STATE_SIZE ? 1 : -1];
 
+/* port: what the state is on the wire, which is little-endian (halo_endian.h):
+its fields from the first (MAXIMUM_ODDBALLS is 16) */
+#define ODDBALL_NETWORK_STATE_LAYOUT(X) X(l,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(l,HALO_PORT_MAXIMUM_NETWORK_PLAYERS) X(l,16) X(b,20)
+typedef char verify_oddball_network_state_layout[
+	HALO_WIRE_SIZE(ODDBALL_NETWORK_STATE_LAYOUT) == sizeof(struct oddball_network_state) ? 1 : -1];
+
 /* port/linux/game/network_distributed.c's */
 byte distributed_player_to_byte(long player_index);
 long distributed_player_from_byte(byte player_index);
@@ -1481,6 +1488,7 @@ long game_engine_oddball_write_network_state(
 	state.transfers = oddball_events.transfers;
 	state.transfer_player = oddball_events.transfer_player;
 	csmemcpy(buffer, &state, sizeof(state));
+	halo_wire_swap_le(buffer, ODDBALL_NETWORK_STATE_LAYOUT(HALO_WIRE_STRING), 1); /* port: little-endian on the wire */
 	return sizeof(state);
 }
 
@@ -1495,6 +1503,7 @@ boolean game_engine_oddball_read_network_state(
 	if (size != (long)sizeof(state))
 		return FALSE;
 	csmemcpy(&state, buffer, sizeof(state));
+	halo_wire_swap_le(&state, ODDBALL_NETWORK_STATE_LAYOUT(HALO_WIRE_STRING), 1); /* port: little-endian on the wire */
 	for (ball_index = 0; ball_index < MAXIMUM_ODDBALLS; ball_index++)
 		oddball_globals.current_ball_owner[ball_index] = distributed_player_from_byte(state.current_ball_owner[ball_index]);
 	if (!first)

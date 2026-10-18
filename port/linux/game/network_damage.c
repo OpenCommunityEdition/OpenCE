@@ -315,6 +315,20 @@ typedef char distributed_hit_report_size_assert[sizeof(struct distributed_hit_re
 typedef char distributed_hit_report_host_time_offset_assert[
 	offsetof(struct distributed_hit_report, host_time) == 0x68 ? 1 : -1];
 
+/* what the entries are on the wire, which is little-endian (port:
+halo_endian.h): their fields from the first, the sizes checked against the
+structures' */
+#define DISTRIBUTED_DAMAGE_LAYOUT(X) X(l,2) X(b,2) X(s,1) X(l,13) X(s,2)
+#define DISTRIBUTED_DAMAGE_EVENT_LAYOUT(X) X(b,4) X(l,1) DISTRIBUTED_DAMAGE_LAYOUT(X) X(l,5) X(s,4) X(l,1)
+#define DISTRIBUTED_HIT_REPORT_LAYOUT(X) X(l,1) DISTRIBUTED_DAMAGE_LAYOUT(X) X(l,6) X(s,3) X(b,2) X(l,1)
+
+typedef char distributed_damage_layout_assert[
+	HALO_WIRE_SIZE(DISTRIBUTED_DAMAGE_LAYOUT) == sizeof(struct distributed_damage) ? 1 : -1];
+typedef char distributed_damage_event_layout_assert[
+	HALO_WIRE_SIZE(DISTRIBUTED_DAMAGE_EVENT_LAYOUT) == sizeof(struct distributed_damage_event) ? 1 : -1];
+typedef char distributed_hit_report_layout_assert[
+	HALO_WIRE_SIZE(DISTRIBUTED_HIT_REPORT_LAYOUT) == sizeof(struct distributed_hit_report) ? 1 : -1];
+
 struct distributed_damage_event_message
 {
 	struct distributed_message_header header;
@@ -451,6 +465,18 @@ word network_damage_entry_size(
 	return type == _distributed_message_damage_events ?
 		sizeof(struct distributed_damage_event) : sizeof(struct distributed_hit_report);
 }
+
+#ifdef HALO_BIG_ENDIAN_HOST
+/* (network_distributed.c) the layout of a message's entries on the wire */
+char const *network_damage_entry_layout(
+	byte type)
+{
+	static char const event[] = DISTRIBUTED_DAMAGE_EVENT_LAYOUT(HALO_WIRE_STRING);
+	static char const report[] = DISTRIBUTED_HIT_REPORT_LAYOUT(HALO_WIRE_STRING);
+
+	return type == _distributed_message_damage_events ? event : report;
+}
+#endif
 
 static void distributed_damage_from_data(
 	struct damage_data const *damage,

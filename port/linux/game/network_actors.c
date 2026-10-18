@@ -793,6 +793,30 @@ void network_actors_host_tick(
 	}
 }
 
+/* what the entries are on the wire, which is little-endian (port:
+halo_endian.h): their fields from the first, the sizes checked against the
+structures' */
+#define ACTOR_STATE_LAYOUT(X) \
+	X(l,2) X(s,1) X(b,6) X(s,1) X(b,6) X(s,10) X(l,2) X(s,1) X(b,2) X(l,3) X(s,9) X(b,2)
+#define ACTOR_DAMAGE_LAYOUT(X) X(l,1) X(s,4)
+
+typedef char distributed_actor_state_layout_assert[
+	HALO_WIRE_SIZE(ACTOR_STATE_LAYOUT) == sizeof(struct distributed_actor_state) ? 1 : -1];
+typedef char distributed_actor_damage_layout_assert[
+	HALO_WIRE_SIZE(ACTOR_DAMAGE_LAYOUT) == sizeof(struct distributed_actor_damage) ? 1 : -1];
+
+#ifdef HALO_BIG_ENDIAN_HOST
+/* (network_distributed.c) the layout of a message's entries on the wire */
+char const *network_actors_entry_layout(
+	byte type)
+{
+	static char const state[] = ACTOR_STATE_LAYOUT(HALO_WIRE_STRING);
+	static char const damage[] = ACTOR_DAMAGE_LAYOUT(HALO_WIRE_STRING);
+
+	return type == _distributed_message_actor_states ? state : damage;
+}
+#endif
+
 word network_actors_damage_entry_size(
 	void)
 {

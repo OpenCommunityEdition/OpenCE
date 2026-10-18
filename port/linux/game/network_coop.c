@@ -1165,6 +1165,66 @@ struct distributed_coop_screen_effect_message
 	struct rasterizer_screen_effect_port_state state;
 };
 
+/* what the entries are on the wire, which is little-endian (port:
+halo_endian.h): their fields from the first, the sizes checked against the
+structures' */
+#define COOP_PRESENTATION_LAYOUT(X) \
+	X(b,4) X(s,2) X(l,4) X(s,7) X(b,2) X(l,3) X(s,5) X(b,2) X(l,4) X(b,2) X(s,1) X(l,10)
+#define COOP_EVENT_LAYOUT(X) X(b,2) X(s,4) X(b,2) X(l,7)
+#define COOP_DEVICE_GROUP_LAYOUT(X) X(s,2) X(l,2) X(b,4) X(l,1)
+/* (the names' bytes after the two shorts are bytes) */
+#define COOP_OBJECT_NAMES_LAYOUT(X) X(s,2)
+#define COOP_OBJECT_TRANSFORM_LAYOUT(X) X(s,2) X(l,5) X(s,6)
+#define COOP_OBJECT_LOOK_LAYOUT(X) X(s,2) X(l,2) X(b,8) X(l,1)
+#define COOP_DEVICE_STATE_LAYOUT(X) X(s,1) X(b,2) X(l,4)
+#define COOP_SCREEN_EFFECT_LAYOUT(X) X(b,6) X(s,3) X(l,19)
+
+typedef char distributed_coop_presentation_layout_assert[
+	HALO_WIRE_SIZE(COOP_PRESENTATION_LAYOUT) == sizeof(struct distributed_coop_presentation) ? 1 : -1];
+typedef char distributed_coop_event_layout_assert[
+	HALO_WIRE_SIZE(COOP_EVENT_LAYOUT) == sizeof(struct distributed_coop_event) ? 1 : -1];
+typedef char distributed_coop_device_group_layout_assert[
+	HALO_WIRE_SIZE(COOP_DEVICE_GROUP_LAYOUT) == sizeof(struct distributed_coop_device_group) ? 1 : -1];
+typedef char distributed_coop_object_names_layout_assert[
+	HALO_WIRE_SIZE(COOP_OBJECT_NAMES_LAYOUT) + OBJECT_NAME_BYTES == sizeof(struct distributed_coop_object_names) ? 1 : -1];
+typedef char distributed_coop_object_transform_layout_assert[
+	HALO_WIRE_SIZE(COOP_OBJECT_TRANSFORM_LAYOUT) == sizeof(struct distributed_coop_object_transform) ? 1 : -1];
+typedef char distributed_coop_object_look_layout_assert[
+	HALO_WIRE_SIZE(COOP_OBJECT_LOOK_LAYOUT) == sizeof(struct distributed_coop_object_look) ? 1 : -1];
+typedef char distributed_coop_device_state_layout_assert[
+	HALO_WIRE_SIZE(COOP_DEVICE_STATE_LAYOUT) == sizeof(struct distributed_coop_device_state) ? 1 : -1];
+typedef char distributed_coop_screen_effect_layout_assert[
+	HALO_WIRE_SIZE(COOP_SCREEN_EFFECT_LAYOUT) == sizeof(struct rasterizer_screen_effect_port_state) ? 1 : -1];
+
+#ifdef HALO_BIG_ENDIAN_HOST
+/* (network_distributed.c) the layout of a message's entries on the wire */
+char const *network_coop_entry_layout(
+	byte type)
+{
+	static char const presentation[] = COOP_PRESENTATION_LAYOUT(HALO_WIRE_STRING);
+	static char const event[] = COOP_EVENT_LAYOUT(HALO_WIRE_STRING);
+	static char const device_group[] = COOP_DEVICE_GROUP_LAYOUT(HALO_WIRE_STRING);
+	static char const object_names[] = COOP_OBJECT_NAMES_LAYOUT(HALO_WIRE_STRING);
+	static char const object_transform[] = COOP_OBJECT_TRANSFORM_LAYOUT(HALO_WIRE_STRING);
+	static char const object_look[] = COOP_OBJECT_LOOK_LAYOUT(HALO_WIRE_STRING);
+	static char const device_state[] = COOP_DEVICE_STATE_LAYOUT(HALO_WIRE_STRING);
+	static char const screen_effect[] = COOP_SCREEN_EFFECT_LAYOUT(HALO_WIRE_STRING);
+
+	switch (type)
+	{
+	case _distributed_message_coop_presentation: return presentation;
+	case _distributed_message_coop_events: return event;
+	case _distributed_message_coop_device_groups: return device_group;
+	case _distributed_message_coop_object_names: return object_names;
+	case _distributed_message_coop_object_transforms: return object_transform;
+	case _distributed_message_coop_object_looks: return object_look;
+	case _distributed_message_coop_device_states: return device_state;
+	case _distributed_message_coop_screen_effect: return screen_effect;
+	}
+	return NULL;
+}
+#endif
+
 /* host: the state last sent */
 static struct rasterizer_screen_effect_port_state host_sent_screen_effect;
 

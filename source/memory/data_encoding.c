@@ -69,6 +69,7 @@ symbols in this file:
 #include "cseries.h"
 #include "memory/byte_swapping.h"
 #include "memory/data_encoding.h"
+#include "halo_endian.h" /* port: port/linux/include/halo_endian.h */
 
 /* ---------- constants */
 
@@ -143,8 +144,12 @@ boolean data_encode_memory(
 		else
 			csmemset(destination, 0, memory_size);
 
+		/* port: the network order is big-endian, so a big-endian host has
+		the data in it already (HALO_BIG_ENDIAN_HOST) */
+#ifndef HALO_BIG_ENDIAN_HOST
 		if (element_size != 1)
 			byte_swap_memory(destination, element_count, element_size);
+#endif
 		state->offset += memory_size;
 	}
 	else
@@ -219,7 +224,9 @@ boolean data_encode_structures(
 		{
 			destination = state->buffer + state->offset;
 			csmemcpy(destination, source_structures, memory_size);
+#ifndef HALO_BIG_ENDIAN_HOST /* port: as data_encode_memory */
 			byte_swap_data(bs_definition, destination, structure_count);
+#endif
 			state->offset += memory_size;
 		}
 		else
@@ -377,7 +384,9 @@ void *data_decode_structures(
 		structures = state->buffer + state->offset;
 		if (memory_size)
 		{
+#ifndef HALO_BIG_ENDIAN_HOST /* port: as data_encode_memory */
 			byte_swap_data(bs_definition, structures, structure_count);
+#endif
 			state->offset += memory_size;
 		}
 	}
@@ -430,10 +439,12 @@ void *data_decode_memory(
 	if (state->offset+memory_size<=state->buffer_size && !state->overflow)
 	{
 		memory = state->buffer+state->offset;
+#ifndef HALO_BIG_ENDIAN_HOST /* port: as data_encode_memory */
 		if (element_size!=1)
 		{
 			byte_swap_memory(memory, count, element_size);
 		}
+#endif
 		state->offset += memory_size;
 	}
 	else

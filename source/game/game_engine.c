@@ -539,6 +539,7 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries_windows.h"
 #include "errors.h"
+#include "halo_endian.h" /* port: port/linux/include/halo_endian.h */
 #include "aim_assist.h"
 #include "game_engine.h"
 #include "game_engine_list.h"
@@ -9548,7 +9549,7 @@ long game_engine_write_network_state(
 	if (!game_engine || size < (long)sizeof(postgame_state))
 		return 0;
 	/* whether the game is over, then the game type's */
-	postgame_state = game_engine_globals.postgame_state;
+	postgame_state = (long)halo_le32(game_engine_globals.postgame_state); /* port: little-endian on the wire */
 	csmemcpy(buffer, &postgame_state, sizeof(postgame_state));
 	buffer += sizeof(postgame_state);
 	size -= sizeof(postgame_state);
@@ -9576,6 +9577,7 @@ void game_engine_read_network_state(
 	if (!game_engine || size < (long)sizeof(postgame_state))
 		return;
 	csmemcpy(&postgame_state, buffer, sizeof(postgame_state));
+	postgame_state = (long)halo_le32(postgame_state); /* port: little-endian on the wire */
 	buffer += sizeof(postgame_state);
 	size -= sizeof(postgame_state);
 	first = !game_engine_network_state_read;

@@ -59,10 +59,11 @@ symbols in this file:
 
 /* ---------- macros */
 
+/* port: construct the wide masks without MSVC-only integer suffixes. */
 #define SWAP8(q) \
 	(((q)>>56) | (((q)>>40)&0xff00) | (((q)>>24)&0xff0000) | (((q)>>8)&0xff000000) | \
-	 (((q)<<8)&0xff00000000ui64) | (((q)<<24)&0xff0000000000ui64) | \
-	 (((q)<<40)&0xff000000000000ui64) | ((q)<<56))
+	 (((q)<<8)&((unsigned __int64)0xff<<32)) | (((q)<<24)&((unsigned __int64)0xff<<40)) | \
+	 (((q)<<40)&((unsigned __int64)0xff<<48)) | ((q)<<56))
 
 /* ---------- structures */
 
