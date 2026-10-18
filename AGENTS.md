@@ -166,6 +166,47 @@ review guidance. Those standards do not relax the isolation rules.
 - Apply the required platform, networking and regression checks to the
   affected paths. Report what was verified and any remaining limits.
 
+### Efficient model use and delegation
+
+- Keep GPT-6 Astra as the primary agent unless the user selects otherwise.
+  The primary handles the conversation, planning, architecture, ambiguous
+  diagnosis, consequential compatibility and networking decisions, final
+  review and integration. It remains responsible for delegated work.
+- This workflow authorizes delegation of suitable bounded subtasks within
+  the user's assignment. Explicitly select GPT-6.1 Sol (`gpt-6.1-sol`) with
+  High (`high`) reasoning for substantive implementation, debugging, test
+  design and code investigation. Report unavailable models or delegation
+  tools rather than silently substituting a more expensive model.
+- Low or Medium reasoning may suit straightforward searches, mechanical
+  edits or running defined checks. Use Extra High only when evidence
+  suggests deeper reasoning would help; do not make it an automatic retry.
+  Effort levels are starting points, not equivalent intelligence scores
+  across models, and this policy guarantees neither savings nor a spending
+  cap. Optimize total work needed for a correct, verified result.
+- Keep tiny tasks inline. Normally use no more than two concurrent
+  subagents across the assignment; concurrency is optional, not a target.
+  Give each worker distinct file ownership and a concise, self-contained
+  brief covering scope, relevant paths and decisions, applicable repository
+  instructions, completion criteria and required validation. Require workers
+  to read and follow those instructions; do not assume inherited context.
+- The primary coordinates edits, builds, game processes and cleanup to avoid
+  conflicting changes or tests against files still being edited. The limit
+  of two concurrent game instances applies across the whole team. Existing
+  isolation, hidden-window, data-preservation and cleanup rules still apply.
+- Request concise findings, evidence, changed files, validation results and
+  unresolved concerns. Avoid duplicate investigations, unnecessary full
+  conversation history, repeated reads of unchanged material and unchanged
+  test reruns without a new reason. Review actual changes and evidence in
+  proportion to risk without routinely repeating the worker's entire task.
+- Return unresolved isolation questions, contradictory evidence, invalid
+  assumptions or repeated failed approaches to the primary for diagnosis.
+  Astra cannot waive isolation rules: stop any conflicting part and follow
+  the existing requirements for resolving it with the user.
+- Efficiency never overrides correctness, isolation, source provenance,
+  networking rules, required platform and regression checks, or cleanup.
+  The primary verifies integration and reports actual validation and its
+  limits, distinguishing independent review from self-review.
+
 ### Project preferences
 
 - Use descriptive branch names without a `codex/` prefix.
