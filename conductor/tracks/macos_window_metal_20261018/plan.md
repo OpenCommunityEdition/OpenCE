@@ -1,6 +1,6 @@
 # Plan: The game in a macOS window: a Swift app, a Metal renderer, native input and audio
 
-## Phase 1: The Swift app runs the VM host
+## Phase 1: The Swift app runs the VM host [checkpoint: 0605ccac]
 - [x] Task: Split the C host into a library and its command-line front end 45cee3fa
     - [x] Write tests: the build graph has `libhalo_host.a` and `halo_host` links it (tools/test_macos_build.py); the headless runs stay green
     - [x] Move host_main.c's start-up into `halo_host_run(image, options)`, keeping `halo_host` as a thin main
@@ -16,7 +16,7 @@
 - [x] Task: The data root, and a dialog for missing maps d7b772b6
     - [x] Write tests: the root is HALO_DATA_ROOT, else Application Support/OpenCE; missing maps give the dialog's message
     - [x] Implement it in the Swift shell
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: The Swift app runs the VM host' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: The Swift app runs the VM host' (Protocol in workflow.md)
 
 ## Phase 2: Window, native input and audio
 - [ ] Task: The window and its Metal layer
