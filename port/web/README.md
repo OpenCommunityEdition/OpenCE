@@ -40,6 +40,14 @@ and `foot` signatures, the Xbox cache version and the build of a retail disc,
 `01.10.12.2276`, or of the decompilation, `01.01.14.2342`). A disc image is
 untrusted input: the reader checks every offset and size in it.
 
+Mods (`docs/mods.md`): under **Mods**, **Add a mod folder…** copies a mod's
+`mod.toml` and `tags` folder into the browser's storage (`mods/`, which the
+game reads as a native build reads the data root's), replacing a mod of the
+same folder's name, and **Remove** deletes one. The folder's paths are
+checked as it is copied (`mods-worker.js`). Every mod is on; the game's main
+menu, Mods, orders them and turns them off. The game asks in a dialog of the
+page when mods say they cannot be played together (`web_js_ask`).
+
 The page asks the browser to keep the site's data. A browser that is short
 of space may delete it otherwise; **Settings and data** says which. The
 storage belongs to the site's address: `halocombatevolved.com` and the
@@ -358,6 +366,23 @@ the `pages` job deploys the release build to GitHub Pages: only from `main`,
 only once every platform built and the release is out, and never cancelled
 halfway. The Discord post has a Web field and the site's address.
 
+The game's wasm, most of a build, does not come from GitHub Pages, which
+serves 100 GB a month: the `pages` job pushes it alone in a commit of the
+`web-wasm` branch (over the last one, so the repository keeps one copy),
+checks that jsDelivr serves that commit's file
+(`https://cdn.jsdelivr.net/gh/OpenCommunityEdition/OpenCE@<commit>/halo.wasm`,
+with CORS, which GitHub's release downloads lack), and names it and its
+SHA-256 in `version.json` (`"wasm": {"url", "sha256"}`). The service worker
+fetches the wasm from there as it caches the build, checks its SHA-256, and
+takes the site's copy only when that fails; the page loads `halo.wasm` from
+the site as before, from the worker's cache. jsDelivr serves files of at most
+20 MB from GitHub: a larger wasm comes from the site, and the step says so.
+
+The page counts its visits with Umami (`https://nexus.mrbruh.com/app-state`
+in `index.html`, which sets no cookies). The page being cross-origin
+isolated, the script is loaded with `crossorigin="anonymous"`: its host sends
+CORS headers, not `Cross-Origin-Resource-Policy`.
+
 Once, an owner of the organization sets it up:
 
 1. Organization settings → Pages → **Add a verified domain**:
@@ -379,7 +404,8 @@ response header rule adding `Cross-Origin-Opener-Policy: same-origin`,
 `Cross-Origin-Embedder-Policy: require-corp` and
 `Cross-Origin-Resource-Policy: same-origin`: the first visit then needs no
 reload, and Cloudflare's cache takes GitHub Pages' bandwidth (100 GB a month;
-a first visit downloads about 10 MB, compressed).
+a first visit downloads about 10 MB, compressed, most of it the wasm from
+jsDelivr).
 
 ## Files
 
@@ -395,7 +421,7 @@ a first visit downloads about 10 MB, compressed).
 | `port/web/src/web_stubs.c` | UPnP and an MSVC intrinsic |
 | `port/web/src/web_shared.h`, `web_touch.c` | The words of memory the page reads and writes: frames shown, the touch controls' state |
 | `port/web/src/web_library.js`, `web_pre.js` | The JavaScript halves: messages to the page, the brokers' WebSockets, the workers' errors |
-| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), the touch controls (`touch.js`), rooms (`net.js`), internet play's WebRTC (`p2p.js`), its service worker (`sw.js`), the importer (`xiso-worker.js`), the web app's manifest and icons |
+| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), the touch controls (`touch.js`), rooms (`net.js`), internet play's WebRTC (`p2p.js`), its service worker (`sw.js`), the importers (`xiso-worker.js`, the maps; `mods-worker.js`, the mods), the web app's manifest and icons |
 | `port/web/stamp_version.py`, `licenses.py` | `version.json` and `licenses.txt` |
 | `port/web/tests/` | The tests above |
 | `tools/web_serve.py` | A local server for the site |

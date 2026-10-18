@@ -96,6 +96,7 @@ symbols in this file:
 #include "text/font_group.h"
 #include "text/text_group.h"
 #include "text/unicode.h"
+#include "text_filter.h" /* port: port/linux/game/text_filter.c */
 
 /* ---------- constants */
 
@@ -691,6 +692,9 @@ static void virtual_keyboard_render_internal(
 		rasterizer_draw_unicode_string(&bounds, &bounds, NULL, 0, caption);
 	}
 
+	/* port: the text being typed drawn as it is, not hidden by streamer mode
+	(port/linux/game/text_filter.c) */
+	text_filter_suspend();
 	draw_string_set_draw_mode(virtual_keyboard_globals.keyboard->font_tag.index, NONE, 2, 0, &text_color);
 	{
 		rectangle2d bounds;
@@ -716,6 +720,7 @@ static void virtual_keyboard_render_internal(
 		}
 		rasterizer_draw_unicode_string(&bounds, &bounds, NULL, 0, virtual_keyboard_globals.text_buffer);
 	}
+	text_filter_resume(); /* port */
 
 	if (!virtual_keyboard_globals.first_key_replaces_buffer &&
 		virtual_keyboard_globals.caret_bitmap_index != NONE &&

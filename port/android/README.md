@@ -96,6 +96,7 @@ To install the data from a computer:
 | Item | Location in `/sdcard/Android/data/com.halo.decomp/files` |
 | --- | --- |
 | Saved games (`z:\` and `u:\`) | `save` |
+| Mods (`docs/mods.md`) | `mods`: `adb push <mod folder> /sdcard/Android/data/com.halo.decomp/files/mods/`; the main menu's Mods orders them and turns them off |
 | Log | `debug.txt` |
 | Settings | `config.toml` |
 
@@ -158,7 +159,7 @@ controller for player 1. With the default buttons of the profile:
 | Crouch, Zoom | left and right stick clicks |
 | Light, Gren. type | white, black |
 | Pause, Back | start, back |
-| Up, Down, Left, Right | D-pad |
+| Up, Down, Left, Right | D-pad (in a network game, Up opens the text chat's keyboard) |
 
 The names on the buttons follow the profile's "Button layout" (Settings >
 Gamepads): with "Swap triggers", the right trigger's button says "Grenade".
@@ -307,7 +308,9 @@ The guest is the game, the platform layer and a small runtime:
    AArch64 target of clang. The options `-U__APPLE__` and
    `-fno-define-target-os-macros` hide the Darwin environment.
 2. `tools/android_asm_convert.py` changes the Mach-O assembly to ELF
-   assembly.
+   assembly. It renames symbols, but keeps string literals (`.ascii`,
+   `.asciz`) byte for byte: they hold tables as well as text
+   (`tools/test_android_asm_convert.py`).
 3. The AArch64 assembler makes the objects.
 4. `ld.lld` links the objects with `guest/guest.ld` to a static image,
    `build/android/halo_guest.elf`, at a fixed address above the Xbox memory

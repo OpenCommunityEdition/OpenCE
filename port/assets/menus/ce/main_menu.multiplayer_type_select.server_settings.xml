@@ -219,7 +219,7 @@
 		<string text="Anyone can see and join your game: it is listed\nin everyone's Server Browser."/>
 		<string text="Only players with your invite link can join."/>
 		<string text="Friendly fire, the enemies and player collisions,\nfor this game."/>
-		<string text="Voice chat and votes to kick a player, for this\ngame."/>
+		<string text="Voice chat, text chat and votes to kick a player,\nfor this game."/>
 		<string text="Players from the Server Browser must type it to\njoin (an invite link needs none). Enter sets it."/>
 		<string text="Sending players who join without the game's\nCustom Edition map the map, and how fast."/>
 	</strings>
@@ -369,6 +369,7 @@
 		<child widget="main_menu/multiplayer_type_select/server_settings/voice_options/op_voice_kbps" x="54" y="133"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/voice_options/op_voice_proximity" x="54" y="163"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/voice_options/op_votekick" x="54" y="193"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/voice_options/op_text_chat" x="54" y="223"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/voice_options/voice_options_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/voice_options/voice_options_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -458,12 +459,27 @@
 		<string text="ON"/>
 		<string text="OFF"/>
 	</strings>
+	<widget name="main_menu/multiplayer_type_select/server_settings/voice_options/op_text_chat" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/server_settings/voice_options/text_chat_label"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/voice_options/text_chat_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/voice_options/text_chat_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/voice_options/voice_options_labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/voice_options/text_chat_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/multiplayer_type_select/server_settings/voice_options/var_text_chat" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/multiplayer_type_select/server_settings/voice_options/var_text_chat">
+		<string text="ON"/>
+		<string text="WITH LINKS"/>
+		<string text="OFF"/>
+	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/voice_options/voice_options_labels">
 		<string text="VOICE CHAT:"/>
 		<string text="LOBBY VOICE CHAT:"/>
 		<string text="VOICE QUALITY:"/>
 		<string text="VOICE NEAR DISTANCE:"/>
 		<string text="VOTE KICK:"/>
+		<string text="TEXT CHAT:"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/voice_options/cap_voice_options">
 		<string text="No voice chat during the game."/>
@@ -488,6 +504,9 @@
 		<string text="Players 150 metres apart or less are near\nfor voice chat."/>
 		<string text="Players can vote to kick a player, from the\nscoreboard."/>
 		<string text="Players cannot vote to kick anyone."/>
+		<string text="Players can type to each other; lines with links\nare refused. Off in a public internet game."/>
+		<string text="Players can type to each other, links too. Off\nin a public internet game."/>
+		<string text="No text chat in the game."/>
 	</strings>
 	<widget name="main_menu/multiplayer_type_select/server_settings/map_share_options/map_share_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
 		<child widget="main_menu/multiplayer_type_select/server_settings/map_share_options/header_map_share_options"/>
@@ -543,6 +562,8 @@
 		<string text="2 MB/S"/>
 		<string text="4 MB/S"/>
 		<string text="8 MB/S"/>
+		<string text="16 MB/S"/>
+		<string text="20 MB/S"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/map_share_options/map_share_options_labels">
 		<string text="SHARE MAPS:"/>
@@ -551,6 +572,8 @@
 	<strings name="main_menu/multiplayer_type_select/server_settings/map_share_options/cap_map_share_options">
 		<string text="Players who join without the map download it\nfrom you and the other players."/>
 		<string text="Players who join without the map cannot play."/>
+		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>
+		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>
 		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>
 		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>
 		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>

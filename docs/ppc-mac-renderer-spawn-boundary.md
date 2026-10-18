@@ -298,7 +298,7 @@ or audio source was changed for this investigation.
   using that status in a native reader; leaving completion false would instead
   risk an endless blocking wait. Do not adopt the existing CE zero-fill-on-I/O-
   failure behavior as proof that a sound loaded correctly.
-- `loose_sounds_read` (`port/linux/game/loose_sounds.c:1058`) really copies owned
+- `loose_sounds_read` (`port/linux/game/mod_sounds.c:1058`) really copies owned
   sample data only when the permutation belongs to a registered loose sound;
   otherwise it returns false so the normal cache read proceeds
   (`xbox_sound_cache.c:612`). Prefer compiling this genuine implementation and
