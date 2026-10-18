@@ -604,6 +604,9 @@ struct gl_device
 	BOOL visibility_sync;
 	BOOL visibility_no_depth;
 	BOOL visibility_explicit_depth;
+	BOOL visibility_query_started;
+	unsigned long visibility_query_faults, visibility_replacements;
+	unsigned long visibility_failed_tests, visibility_failed_reads;
 	/* State at the query's draw, not at the next frame's readback. Slots
 	are reused by the game and do not identify a particular light. */
 	struct visibility_observation
@@ -1629,6 +1632,10 @@ static BOOL bind_targets(BOOL *has_depth)
 
 /* ---------- device creation */
 
+#ifndef HALO_GLES
+static void visibility_queries_initialize(void);
+#endif
+
 static void gl_initialize(void)
 {
 	GLint major = 0, minor = 0;
@@ -1723,8 +1730,10 @@ static void gl_initialize(void)
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
 #endif
 	glGenSamplers(D3DTSS_MAXSTAGES, device.samplers);
+#ifdef HALO_GLES
 	glGenQueries(VISIBILITY_TEST_SLOTS, device.queries);
 	glGenQueries(1, &device.scratch_query);
+#endif
 #ifndef HALO_GLES
 	device.visibility_no_depth = config_boolean("debug.gpu_visibility_no_depth") != 0;
 	device.visibility_explicit_depth = config_boolean("debug.gpu_visibility_explicit_depth") != 0;
@@ -1732,6 +1741,7 @@ static void gl_initialize(void)
 		device.visibility_no_depth = FALSE;
 	device.visibility_sync = config_boolean("debug.gpu_sync_visibility") != 0 || device.visibility_no_depth || device.visibility_explicit_depth;
 	device.visibility_log_time = SDL_GetTicks();
+	visibility_queries_initialize();
 	if (device.visibility_sync)
 		platform_log("GPU: synchronized visibility readback enabled; occlusion remains active, GPU waits may reduce frame rate");
 	else
@@ -2280,17 +2290,110 @@ static float visibility_depth_offset(void)
 		-(float)D3D__RenderState[D3DRS_ZBIAS] / 16777215.0f : 0.0f;
 }
 
-static void visibility_check_errors(const char *operation)
+static BOOL visibility_check_errors(const char *operation)
 {
 	GLenum error;
+	BOOL success = TRUE;
 
 	if (!device.visibility_sync)
-		return;
+		return TRUE;
 	while ((error = glGetError()) != GL_NO_ERROR)
 	{
+		success = FALSE;
 		if (device.visibility_errors++ < 16)
 			platform_log("GPU: visibility GL error 0x%x at %s frame %lu", error, operation, device.frame);
 	}
+	return success;
+}
+
+static void visibility_query_fault(const char *operation, GLuint query, long slot)
+{
+	if (device.visibility_query_faults++ < 16)
+		platform_log("GPU: visibility query fault phase=%s query=%u slot=%ld frame=%lu; failed tests retain the last valid result",
+			operation, query, slot, device.frame);
+}
+
+static BOOL visibility_query_alias(GLuint query, unsigned long count)
+{
+	unsigned long i;
+
+	for (i = 0; i < count; i++)
+		if (device.queries[i] == query)
+			return TRUE;
+	return FALSE;
+}
+
+static void visibility_queries_initialize(void)
+{
+	unsigned long i, zeros = 0, duplicates = 0;
+
+	visibility_check_errors("before query creation");
+	glGenQueries(VISIBILITY_TEST_SLOTS, device.queries);
+	visibility_check_errors("slot query creation");
+	glGenQueries(1, &device.scratch_query);
+	visibility_check_errors("scratch query creation");
+	if (!device.visibility_sync)
+		return;
+	/* GenQueries reserves names; IsQuery may legitimately be false until
+	the first BeginQuery. Check the names here, and the GL operation at use. */
+	for (i = 0; i <= VISIBILITY_TEST_SLOTS; i++)
+	{
+		GLuint query = i < VISIBILITY_TEST_SLOTS ? device.queries[i] : device.scratch_query;
+		BOOL duplicate = query && visibility_query_alias(query, i);
+
+		zeros += query == 0;
+		duplicates += duplicate;
+		if (!query || duplicate)
+			visibility_query_fault(!query ? "creation zero" : "creation duplicate", query,
+				i < VISIBILITY_TEST_SLOTS ? (long)i : -1);
+	}
+	platform_log("GPU: visibility query pool slots=%d first=%u last=%u scratch=%u zeros=%lu duplicates=%lu; validation enabled",
+		VISIBILITY_TEST_SLOTS, device.queries[0], device.queries[VISIBILITY_TEST_SLOTS - 1],
+		device.scratch_query, zeros, duplicates);
+}
+
+static BOOL visibility_query_prepare(void)
+{
+	GLuint replacement = 0;
+
+	if (device.scratch_query && !visibility_query_alias(device.scratch_query, VISIBILITY_TEST_SLOTS))
+		return TRUE;
+	visibility_query_fault(!device.scratch_query ? "before begin zero" : "before begin duplicate", device.scratch_query, -1);
+	/* A bad recycled name must not circulate through the slots. Generate
+	a replacement without deleting a possibly aliased object's valid result. */
+	glGenQueries(1, &replacement);
+	if (!visibility_check_errors("replacement query creation") || !replacement ||
+		visibility_query_alias(replacement, VISIBILITY_TEST_SLOTS))
+	{
+		visibility_query_fault("replacement rejected", replacement, -1);
+		return FALSE;
+	}
+	if (device.visibility_replacements++ < 16)
+		platform_log("GPU: visibility query replacement old=%u new=%u frame=%lu",
+			device.scratch_query, replacement, device.frame);
+	device.scratch_query = replacement;
+	return TRUE;
+}
+
+static BOOL visibility_query_read(DWORD index, GLuint *samples)
+{
+	GLuint query = device.queries[index];
+	BOOL valid;
+
+	visibility_check_errors("before query read");
+	valid = query && glIsQuery(query);
+	if (!visibility_check_errors("validate query read") || !valid)
+	{
+		visibility_query_fault("invalid read object", query, (long)index);
+		return FALSE;
+	}
+	glGetQueryObjectuiv(query, GL_QUERY_RESULT, samples);
+	if (!visibility_check_errors("read query result"))
+	{
+		visibility_query_fault("failed read", query, (long)index);
+		return FALSE;
+	}
+	return TRUE;
 }
 
 static void visibility_log_summary(void)
@@ -2303,11 +2406,12 @@ static void visibility_log_summary(void)
 	now = SDL_GetTicks();
 	if (now - device.visibility_log_time < 1000)
 		return;
-	platform_log("GPU: visibility summary ms=%llu frame=%lu depth=%s reads=%lu zero=%lu nonzero=%lu rounded_zero=%lu raw_min=%u raw_max=%u GL_errors_total=%lu",
+	platform_log("GPU: visibility summary ms=%llu frame=%lu depth=%s reads=%lu zero=%lu nonzero=%lu rounded_zero=%lu raw_min=%u raw_max=%u GL_errors_total=%lu query_faults_total=%lu replacements_total=%lu failed_tests_total=%lu failed_reads_total=%lu",
 		(unsigned long long)now, device.frame, device.visibility_no_depth ? "off" : "normal",
 		device.visibility_reads, device.visibility_zeros, device.visibility_reads - device.visibility_zeros,
 		device.visibility_rounded_zeros, device.visibility_reads ? device.visibility_min : 0,
-		device.visibility_max, device.visibility_errors);
+		device.visibility_max, device.visibility_errors, device.visibility_query_faults, device.visibility_replacements,
+		device.visibility_failed_tests, device.visibility_failed_reads);
 	for (i = 0; i < 2; i++)
 	{
 		const struct visibility_sample *sample = &device.visibility_examples[i];
@@ -2339,6 +2443,9 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 		memset(&device.visibility_draw, 0, sizeof(device.visibility_draw));
 		device.visibility_draw.frame = device.frame;
 		visibility_check_errors("before begin query");
+		device.visibility_query_started = FALSE;
+		if (!visibility_query_prepare())
+			return;
 	}
 #endif
 #ifdef HALO_GLES
@@ -2369,7 +2476,12 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 #endif
 	glBeginQuery(VISIBILITY_QUERY, device.scratch_query);
 #ifndef HALO_GLES
-	visibility_check_errors("begin query");
+	if (device.visibility_sync)
+	{
+		device.visibility_query_started = visibility_check_errors("begin query");
+		if (!device.visibility_query_started)
+			visibility_query_fault("failed begin", device.scratch_query, -1);
+	}
 #endif
 }
 
@@ -2398,14 +2510,31 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 		return S_OK;
 	}
 #endif
-	glEndQuery(VISIBILITY_QUERY);
 #ifndef HALO_GLES
 	if (device.visibility_sync)
 	{
-		visibility_check_errors("draw/end query");
+		BOOL success = device.visibility_query_started;
+
+		if (success)
+		{
+			glEndQuery(VISIBILITY_QUERY);
+			success = visibility_check_errors("draw/end query");
+			if (!success)
+				visibility_query_fault("failed end", device.scratch_query, (long)index);
+		}
+		device.visibility_query_started = FALSE;
+		if (!success)
+		{
+			device.visibility_failed_tests++;
+			device.query_pending[index] = TRUE;
+			device.visibility_unread[index] = FALSE;
+			return S_OK;
+		}
 		device.visibility_observations[index] = device.visibility_draw;
 	}
+	else
 #endif
+		glEndQuery(VISIBILITY_QUERY);
 	/* the target's samples to a game pixel (its pixels, by its samples a
 	pixel with multisampling): the result is a count of the game's pixels
 	(visibility_unscaled), which the game divides by its own test's area
@@ -2493,6 +2622,20 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 		glGetQueryObjectuiv(device.queries[index], GL_QUERY_RESULT_AVAILABLE, &available);
 		if (available)
 		{
+#ifndef HALO_GLES
+			if (device.visibility_sync)
+			{
+				if (!visibility_query_read(index, &samples))
+				{
+					device.visibility_failed_reads++;
+					device.visibility_unread[index] = FALSE;
+					if (result)
+						*result = device.visibility_known[index];
+					return S_OK;
+				}
+			}
+			else
+#endif
 			glGetQueryObjectuiv(device.queries[index], GL_QUERY_RESULT, &samples);
 #ifdef HALO_GLES
 			/* ES only says whether any sample passed. The game divides the
@@ -2506,7 +2649,6 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 			{
 				struct visibility_sample *sample = &device.visibility_examples[samples != 0];
 
-				visibility_check_errors("read query result");
 				sample->draw = device.visibility_observations[index];
 				sample->slot = index;
 				sample->query = device.queries[index];

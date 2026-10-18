@@ -566,7 +566,8 @@ static const struct config_setting config_settings[] =
 		"Log the renderer's draw counts once a second." },
 	{ "debug.gpu_sync_visibility", _config_boolean, "false", "HALO_GPU_SYNC_VISIBILITY", _environment_value, _platform_desktop,
 		"Diagnostic: wait for completed OpenGL visibility queries instead of asynchronous\n"
-		"readback. Logs query counts/state each second; may reduce frame rate. Restart required." },
+		"readback. Validates query names, replaces zero/aliased scratch names, and keeps the\n"
+		"last valid count on failure. Logs query state/faults; may reduce frame rate. Restart required." },
 	{ "debug.gpu_visibility_no_depth", _config_boolean, "false", "HALO_GPU_VISIBILITY_NO_DEPTH", _environment_value, _platform_desktop,
 		"Diagnostic: disable depth testing only while drawing visibility queries. Implies\n"
 		"gpu_sync_visibility. Glows may show through walls; not a gameplay fix. Restart required." },

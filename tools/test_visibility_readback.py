@@ -9,7 +9,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize("negative_control", [None, "readback", "depth_restore", "offset_restore"])
+@pytest.mark.parametrize("negative_control", [None, "readback", "depth_restore", "offset_restore",
+                                             "invalid_query", "failed_read"])
 def test_visibility_readback(tmp_path, negative_control):
     compiler = shutil.which("clang")
     if not compiler:
@@ -34,6 +35,12 @@ def test_visibility_readback(tmp_path, negative_control):
     if negative_control == "offset_restore":
         code = code.replace("device.visibility_test_active && device.visibility_explicit_depth",
                             "device.visibility_explicit_depth")
+    if negative_control == "invalid_query":
+        code = code.replace("if (device.scratch_query && !visibility_query_alias(device.scratch_query, VISIBILITY_TEST_SLOTS))",
+                            "if (TRUE)")
+    if negative_control == "failed_read":
+        code = code.replace("if (!visibility_query_read(index, &samples))",
+                            "if ((visibility_query_read(index, &samples), FALSE))")
     prefix = r'''
 #include <assert.h>
 #include <stdio.h>
@@ -43,6 +50,7 @@ typedef unsigned long long ULONGLONG;
 typedef unsigned long long Uint64;
 typedef unsigned int GLenum;
 typedef int GLint;
+typedef int GLsizei;
 typedef int BOOL, HRESULT;
 #define WINAPI
 #define TRUE 1
@@ -73,7 +81,8 @@ typedef int BOOL, HRESULT;
 #define platform_log(...) ((void)0)
 static Uint64 ticks;
 static Uint64 SDL_GetTicks(void) { return ticks; }
-static GLenum glGetError(void) { return GL_NO_ERROR; }
+static GLenum gpu_error;
+static GLenum glGetError(void) { GLenum error = gpu_error; gpu_error = GL_NO_ERROR; return error; }
 static struct {
     BOOL gl_ready, visibility_test_active, visibility_sync;
     DIAGNOSTIC_FIELDS
@@ -89,9 +98,24 @@ static struct {
 } device;
 static float target_scale[2] = {2, 3};
 static int target_samples = 4;
-static struct { GLuint samples; BOOL available; } gpu[10];
+static struct { GLuint samples; BOOL available, reserved, object; } gpu[64];
 static GLuint active, next_samples;
 static unsigned reads, polls;
+static unsigned next_query = 1, invalid_begins, invalid_ends, end_calls;
+static int zero_at = -1, duplicate_at = -1;
+static BOOL fail_generation, fail_begin, fail_end, fail_read;
+static void glGenQueries(GLsizei count, GLuint *queries) {
+    int i;
+    for (i = 0; i < count; i++) {
+        if (fail_generation || i == zero_at) { queries[i] = 0; continue; }
+        if (i == duplicate_at && i) { queries[i] = queries[i - 1]; continue; }
+        assert(next_query < 64);
+        queries[i] = next_query++;
+        gpu[queries[i]].reserved = TRUE;
+    }
+    zero_at = duplicate_at = -1;
+}
+static BOOL glIsQuery(GLuint query) { return query < 64 && gpu[query].object; }
 static DWORD D3D__RenderState[10];
 static struct {
     GLint viewport[4], scissor[4]; float depth_range[2];
@@ -121,14 +145,22 @@ static void state_enable(unsigned char *cached, GLenum state, BOOL enabled) {
     }
 }
 static void glBeginQuery(int target, GLuint query) {
-    assert(target == VISIBILITY_QUERY && !active && query);
+    assert(target == VISIBILITY_QUERY && !active);
+    if (!query || query >= 64 || !gpu[query].reserved) {
+        invalid_begins++; gpu_error = 0x502; return;
+    }
+    if (fail_begin) { gpu_error = 0x502; return; }
+    gpu[query].object = TRUE;
     active = query;
 }
 static void glEndQuery(int target) {
-    assert(target == VISIBILITY_QUERY && active);
+    assert(target == VISIBILITY_QUERY);
+    end_calls++;
+    if (!active) { invalid_ends++; gpu_error = 0x502; return; }
     gpu[active].samples = next_samples;
     gpu[active].available = FALSE;
     active = 0;
+    if (fail_end) gpu_error = 0x502;
 }
 static void glGetQueryObjectuiv(GLuint query, int pname, GLuint *value) {
     assert(query);
@@ -137,6 +169,7 @@ static void glGetQueryObjectuiv(GLuint query, int pname, GLuint *value) {
         *value = gpu[query].available;
     } else {
         assert(pname == GL_QUERY_RESULT);
+        if (fail_read) { gpu_error = 0x502; return; }
         /* A blocking GL read completes the pending GPU work. */
         reads++;
         gpu[query].available = TRUE;
@@ -154,11 +187,10 @@ static void submit(unsigned slot, unsigned samples) {
 int main(void) {
     UINT value = 99;
     ULONGLONG stamp = 99;
-    unsigned i;
+    unsigned old_ends, old_reads;
     GLuint mapped[8] = {0};
     device.gl_ready = TRUE;
-    device.scratch_query = 9;
-    for (i = 0; i < 8; i++) device.queries[i] = i + 1;
+    visibility_queries_initialize();
     D3DDevice_GetVisibilityTestResult(0, &value, &stamp);
     CHECK(value == 0 && stamp == 0 && reads == 0);
     submit(0, 240);
@@ -248,6 +280,76 @@ int main(void) {
     apply_raster_state(TRUE);
     CHECK(actual_offset_fill && actual_offset_line && actual_depth);
     CHECK(visibility_depth_offset() == 0.0f);
+    /* The pool audit catches creation failures. A generated name is not
+       an object until BeginQuery; this must not reject healthy fresh names. */
+    memset(&device, 0, sizeof(device));
+    device.gl_ready = device.visibility_sync = TRUE;
+    zero_at = 0;
+    duplicate_at = 3;
+    visibility_queries_initialize();
+    CHECK(device.visibility_query_faults == 2 && device.queries[0] == 0);
+    CHECK(!glIsQuery(device.scratch_query));
+    submit(0, 7);
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 7 && device.scratch_query == 0);
+    /* A zero recycled from slot 0 is replaced before the next BeginQuery. */
+    submit(0, 11);
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 11 && device.visibility_replacements == 1 && invalid_begins == 0);
+    /* A scratch name that aliases a slot must not overwrite that slot's GPU result. */
+    device.scratch_query = device.queries[0];
+    submit(1, 13);
+    D3DDevice_GetVisibilityTestResult(1, &value, NULL);
+    CHECK(value == 13 && device.visibility_replacements == 2);
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 11);
+    /* If a replacement cannot be generated, do not begin/end/read the
+       invalid query or overwrite the last valid result. Later draws recover. */
+    device.scratch_query = 0;
+    fail_generation = TRUE;
+    old_ends = end_calls;
+    old_reads = reads;
+    submit(0, 99);
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 11 && reads == old_reads && end_calls == old_ends);
+    CHECK(device.visibility_failed_tests == 1 && !device.visibility_test_active);
+    fail_generation = FALSE;
+    submit(0, 17);
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 17);
+    fail_begin = TRUE;
+    old_ends = end_calls;
+    submit(0, 99);
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 17 && end_calls == old_ends && device.visibility_failed_tests == 2);
+    fail_begin = FALSE;
+    fail_end = TRUE;
+    submit(0, 99);
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 17 && device.visibility_failed_tests == 3);
+    fail_end = FALSE;
+    submit(0, 19);
+    fail_read = TRUE;
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 17 && device.visibility_failed_reads == 1);
+    CHECK(!device.visibility_unread[0]);
+    fail_read = FALSE;
+    submit(0, 19);
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 19);
+    /* Invalid read objects (zero or a reserved but never-used name) are
+       rejected before retrieval. A genuine successful zero still replaces 19. */
+    device.queries[0] = 0;
+    device.visibility_unread[0] = TRUE;
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 19 && device.visibility_failed_reads == 2);
+    glGenQueries(1, &device.queries[0]);
+    device.visibility_unread[0] = TRUE;
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 19 && device.visibility_failed_reads == 3);
+    submit(0, 0);
+    D3DDevice_GetVisibilityTestResult(0, &value, NULL);
+    CHECK(value == 0 && invalid_begins == 0 && invalid_ends == 0);
     return 0;
 }
 '''
@@ -262,7 +364,9 @@ int main(void) {
     if negative_control:
         assert run.returncode != 0, "The negative control must fail"
         expected = {"readback": "value == 20", "depth_restore": "actual_depth && actual_depth_mask",
-                    "offset_restore": "actual_offset_fill && actual_offset_line"}[negative_control]
+                    "offset_restore": "actual_offset_fill && actual_offset_line",
+                    "invalid_query": "value == 11 && device.visibility_replacements",
+                    "failed_read": "value == 17 && device.visibility_failed_reads"}[negative_control]
         assert expected in run.stderr
     else:
         assert run.returncode == 0, run.stderr
