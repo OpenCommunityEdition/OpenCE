@@ -36,7 +36,8 @@ boolean network_chat_typing(void);
 and the top of its circle, in the window's units */
 void network_chat_note_motion_sensor(short local_player_index, short left, short top);
 /* (hud.c, in the HUD of the first local player's view) the lines, above the
-motion sensor, and the one being typed */
+motion sensor (on Android, under the weapon's panel at the top left), and the
+one being typed */
 void network_chat_draw(short local_player_index);
 
 #endif // __NETWORK_CHAT_H

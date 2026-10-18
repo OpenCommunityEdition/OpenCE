@@ -6,7 +6,9 @@ had it: T (controls.chat) starts a line to everyone, Y (controls.team_chat)
 one to the player's team; Tab, while typing, turns it to everyone, the team
 or the vehicle in turn; Enter sends it, Escape lets it go. The lines are
 drawn above the motion sensor, each with its player's name in their team's
-colour, and fade after a while.
+colour, and fade after a while; on Android, where the touch controls hold the
+bottom left, they go at the top left under the weapon's panel, the newest
+highest.
 
 A client sends its line to the host (_distributed_message_chat_up,
 reliably), which takes it only from the client's own stream, from one of
@@ -30,6 +32,7 @@ players neither send nor see lines.
 #include "game/game_engine.h"
 #include "game/players.h"
 #include "input/input.h"
+#include "interface/hud_draw.h"
 #include "interface/hud_messaging.h"
 #include "main/console.h"
 #include "objects/objects.h"
@@ -74,6 +77,12 @@ enum
 	CHAT_DRAWN_SIZE = 2 * CHAT_TEXT_SIZE,
 	/* the caret's half period while typing */
 	CHAT_CARET_MILLISECONDS = 500,
+	/* Android: the top of the lines, in the HUD's units (480 high, before
+	its scale), below the tallest weapon's panel at the top left */
+	CHAT_TOP_UNITS = 60,
+	/* Android: the lines shown at once there, the one being typed among
+	them (a fifth would reach the tops of the touch controls' Up and Fire) */
+	CHAT_LINES_SHOWN_ANDROID = 4,
 	/* a key's Ctrl (struct key_stroke's modifier_flags: menu_functions.c's) */
 	CHAT_KEY_MODIFIER_CONTROL_BIT = 1,
 };
@@ -810,8 +819,11 @@ void network_chat_draw(
 	struct font_header *font;
 	short line_height;
 	short left;
-	short bottom;
+	/* the edge the next line is drawn from, and from it to the next's */
+	short edge;
+	short step;
 	short shown;
+	short maximum_shown = CHAT_LINES_SHOWN;
 	short index;
 
 	if (!chat_network_game() || font_index == NONE || local_player_index < 0 ||
@@ -824,18 +836,27 @@ void network_chat_draw(
 	line_height = font->ascending_height + font->descending_height + font->leading_height;
 	if (line_height <= 0)
 		return;
-	/* (above the motion sensor, a little in from its left; where it has not
-	been drawn, where it would be) */
+	/* (above the motion sensor, a little in from its left, the newest
+	lowest; where it has not been drawn, where it would be) */
 	if (chat_motion_sensors[local_player_index].valid)
 	{
 		left = chat_motion_sensors[local_player_index].left + line_height / 2;
-		bottom = chat_motion_sensors[local_player_index].top - line_height / 2;
+		edge = chat_motion_sensors[local_player_index].top - line_height / 2;
 	}
 	else
 	{
 		left = window.x0 + 2 * line_height;
-		bottom = window.y1 - 9 * line_height;
+		edge = window.y1 - 9 * line_height;
 	}
+	step = -line_height;
+#ifdef HALO_ANDROID
+	/* (the touch controls' stick and buttons are at the bottom left: the
+	lines go at the top left, under the weapon's panel, in the same column,
+	the newest highest) */
+	edge = (short)(window.y0 + CHAT_TOP_UNITS * hud_globals_get_scale(local_player_count() > 1));
+	step = line_height;
+	maximum_shown = typing ? CHAT_LINES_SHOWN_ANDROID - 1 : CHAT_LINES_SHOWN_ANDROID;
+#endif
 	if (typing)
 	{
 		real_argb_color color;
@@ -845,8 +866,8 @@ void network_chat_draw(
 
 		bounds.x0 = left;
 		bounds.x1 = window.x1;
-		bounds.y1 = bottom;
-		bounds.y0 = (short)(bottom - line_height);
+		bounds.y0 = step < 0 ? (short)(edge - line_height) : edge;
+		bounds.y1 = (short)(bounds.y0 + line_height);
 		/* (streamer mode replaces its words as in every text drawn) */
 		for (length = 0; chat_input.text[length]; length++)
 			text[length] = (wchar_t)(unsigned char)chat_input.text[length];
@@ -859,9 +880,9 @@ void network_chat_draw(
 		chat_color(_chat_color_blue, 1.0f, &color);
 		chat_draw_line(font_index, &bounds, chat_input.channel == _chat_channel_team ? L"Say to team:" :
 			chat_input.channel == _chat_channel_vehicle ? L"Say to vehicle:" : L"Say:", &color, text, 1.0f);
-		bottom = bounds.y0;
+		edge = (short)(edge + step);
 	}
-	for (shown = 0, index = 0; index < chat_line_count && shown < CHAT_LINES_SHOWN; index++)
+	for (shown = 0, index = 0; index < chat_line_count && shown < maximum_shown; index++)
 	{
 		struct chat_line const *line =
 			&chat_lines[(chat_newest_line - index + CHAT_MAXIMUM_LINES) % CHAT_MAXIMUM_LINES];
@@ -878,11 +899,11 @@ void network_chat_draw(
 		chat_line_text(line->text, text, NUMBEROF(text));
 		bounds.x0 = left;
 		bounds.x1 = window.x1;
-		bounds.y1 = bottom;
-		bounds.y0 = (short)(bottom - line_height);
+		bounds.y0 = step < 0 ? (short)(edge - line_height) : edge;
+		bounds.y1 = (short)(bounds.y0 + line_height);
 		chat_color(line->color, alpha, &color);
 		chat_draw_line(font_index, &bounds, name, &color, text, alpha);
-		bottom = bounds.y0;
+		edge = (short)(edge + step);
 		shown++;
 	}
 }
