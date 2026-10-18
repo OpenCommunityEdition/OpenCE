@@ -55,7 +55,8 @@ def is_macos_host() -> bool:
 
 
 def macos_configure_inputs() -> List[Path]:
-    return [Path(__file__), PORT_DIR / "host", PORT_DIR / "runtime" / "src", Path("tools/macos_dispatch.py")]
+    return [Path(__file__), PORT_DIR / "host", PORT_DIR / "cli", PORT_DIR / "runtime" / "src",
+            Path("tools/macos_dispatch.py")]
 
 
 def generate_macos_build(n: Writer, sln: Any) -> None:
@@ -160,6 +161,18 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         n.build(outputs=obj, rule="macos_host_cc", inputs=source,
                 variables={"cflags": mbedtls_cflags + (" -w" if source.name != "posix_dtls.c" else "")})
         host_objects.append(obj)
+    # the host as a library, which the command-line host and the app link
+    host_library = BUILD / "libhalo_host.a"
+    n.rule(
+        name="macos_host_archive",
+        command=f"rm -f $out && {ar} --format=darwin rcs $out $in",
+        description="MACOS HOST AR $out",
+    )
+    n.build(outputs=host_library, rule="macos_host_archive", inputs=host_objects)
+    cli_object = BUILD / "cli" / "obj" / "main.c.o"
+    n.build(outputs=cli_object, rule="macos_host_cc", inputs=PORT_DIR / "cli" / "main.c",
+            variables={"cflags": host_cflags})
+
     host = BUILD / "halo_host"
     libraries = " ".join(f"-framework {name}" for name in HOST_FRAMEWORKS)
     libraries += f" {runtime_library}"
@@ -174,7 +187,8 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
                  f"{codesign} -s - -f --entitlements {ENTITLEMENTS} $out"),
         description="MACOS HOST LINK $out",
     )
-    n.build(outputs=host, rule="macos_host_link", inputs=host_objects, implicit=[ENTITLEMENTS, runtime_library])
+    n.build(outputs=host, rule="macos_host_link", inputs=[cli_object, host_library],
+            implicit=[ENTITLEMENTS, runtime_library])
 
     # ---------- the runtime crate
 
@@ -196,5 +210,5 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     )
     n.build(outputs=runtime_header, rule="macos_cbindgen", implicit=[*runtime_inputs, runtime_dir / "cbindgen.toml"])
 
-    n.build(outputs="macos", rule="phony", inputs=[image, host, runtime_library, runtime_header])
+    n.build(outputs="macos", rule="phony", inputs=[image, host_library, host, runtime_library, runtime_header])
     n.newline()

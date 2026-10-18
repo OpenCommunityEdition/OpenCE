@@ -161,11 +161,14 @@ nix build .#host               # the final build: result/bin/halo_host, result/s
 - the runtime crate, a static library with a C header made by cbindgen
   (`build/macos/runtime/opence_runtime.h`): the guest's memory plan, its
   page tables and the image's checks;
-- the host, `build/macos/halo_host`: `port/macos/host`, the Android host's
-  SDL bridge (`host_sdl.c`), the platform layer's files and sockets
-  (`posix_files.c`, `posix_net.c`), UPnP and DTLS, and the import
+- the host library, `build/macos/libhalo_host.a`: `port/macos/host`, the
+  Android host's SDL bridge (`host_sdl.c`), the platform layer's files and
+  sockets (`posix_files.c`, `posix_net.c`), UPnP and DTLS, and the import
   dispatcher that `tools/macos_dispatch.py` writes from
-  `port/android/host_imports.list`.
+  `port/android/host_imports.list`. Its entry point is `halo_host_run`
+  (`port/macos/host/halo_host.h`);
+- the command-line host, `build/macos/halo_host`: `port/macos/cli/main.c`
+  linked with the library.
 
 ### Signing
 

@@ -4,16 +4,17 @@ HOST_MAIN.C
 The macOS host (docs/macos_host.md): it loads the guest image into guest
 memory (the runtime crate checks it, and builds its page tables), checks
 that the image's imports are the ones this host numbers, creates the VM,
-and runs the guest's __guest_start on the main thread.
+and runs the guest's __guest_start on the calling thread. It is the
+library libhalo_host.a, whose entry point (halo_host.h) the command-line
+host (port/macos/cli/main.c) and the app call.
 
-  halo_host [image]
-
-The image defaults to halo_guest.elf beside the host, or in
+The image defaults to halo_guest.elf beside the executable, or in
 ../share/opence (the Nix package's layout). The game's data folder is
 HALO_DATA_ROOT, else the current folder.
 */
 
 #include "host.h"
+#include "halo_host.h"
 
 #include <errno.h>
 #include <mach-o/dyld.h>
@@ -134,8 +135,7 @@ static void *read_file(const char *path, size_t *size)
 	return data;
 }
 
-/* halo_guest.elf beside the executable, or in ../share/opence */
-static void default_image_path(char *path, size_t size)
+void halo_host_default_image_path(char *path, size_t size)
 {
 	char executable[1024];
 	uint32_t length = sizeof(executable);
@@ -220,17 +220,12 @@ static uint32_t boot_block(int argc, char **argv)
 	return block;
 }
 
-int main(int argc, char **argv)
+int halo_host_run(const char *image_path, int argc, char **argv)
 {
-	char image_path[1100];
 	size_t size = 0;
 	void *file;
 	OpenceStatus status;
 
-	if (argc > 1)
-		snprintf(image_path, sizeof(image_path), "%s", argv[1]);
-	else
-		default_image_path(image_path, sizeof(image_path));
 	file = read_file(image_path, &size);
 	if (!file)
 		host_fatal("cannot read the guest image %s (%s)", image_path, strerror(errno));
@@ -251,7 +246,5 @@ int main(int argc, char **argv)
 	if (host_vm_initialize() != 0)
 		return 1;
 	host_vm_start_sampler();
-	/* (the guest's arguments: from the image's path on, if one was given,
-	which so is its argv[0]) */
-	host_vm_run_main(boot_block(argc > 1 ? argc - 1 : argc, argc > 1 ? argv + 1 : argv));
+	host_vm_run_main(boot_block(argc, argv));
 }

@@ -82,13 +82,23 @@ def test_macos_graph(tmp_path, monkeypatch):
     generate_linux_build(n, sln)
     generate_macos_build(n, sln)
     graph = out.getvalue()
+    # (ninja_syntax wraps long lines with $ continuations)
+    flat = re.sub(r" \$\n +", " ", graph)
 
-    assert re.search(r"^build macos: phony .*build/macos/halo_guest\.elf", graph, re.MULTILINE)
-    assert re.search(r"^build macos: phony .*build/macos/halo_host", graph, re.MULTILINE)
+    assert re.search(r"^build macos: phony .*build/macos/halo_guest\.elf", flat, re.MULTILINE)
+    assert re.search(r"^build macos: phony .*build/macos/halo_host", flat, re.MULTILINE)
     # the VM's stubs, and a host that may create a VM
     assert "tools/android_imports.py --svc" in graph
     assert "com.apple.security.hypervisor" in Path("port/macos/host/halo_host.entitlements").read_text()
     assert "--entitlements port/macos/host/halo_host.entitlements" in graph
+    # the host is a library that the app links too; halo_host is its
+    # command-line front end, which links the library and nothing of the host
+    # beside it
+    assert re.search(r"^build macos: phony .*build/macos/libhalo_host\.a", flat, re.MULTILINE)
+    library = re.search(r"^build build/macos/libhalo_host\.a: macos_host_archive (.*)$", flat, re.MULTILINE)
+    assert library and "host_vm.c.o" in library.group(1) and "host_main.c.o" in library.group(1)
+    link = re.search(r"^build build/macos/halo_host: macos_host_link (.*?)(?: \||$)", flat, re.MULTILINE)
+    assert link and link.group(1).split() == ["build/macos/cli/obj/main.c.o", "build/macos/libhalo_host.a"]
 
     ninja_file = tmp_path / "macos.ninja"
     ninja_file.write_text(graph)
