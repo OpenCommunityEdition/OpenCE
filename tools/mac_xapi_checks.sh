@@ -23,12 +23,17 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     "$mac_cc" $common -DMBEDTLS_CONFIG_FILE='"mac_mbedtls_config.h"' -I. -Isource -Isource/cseries -Isource/math -Iport/mac \
         -Iport/include/xdk -Iport/third_party/mbedtls/include -idirafter port/linux/include \
         -c port/mac/engine_xapi.c -o "$out/engine_xapi_$arch.o"
-    # (port/linux/src for port_config.h, which engine_config.c includes:
-    # without it this probe has not built since that include was added)
+    # config_string comes from the settings table the session links: port_config.c with the Mac's
+    # file calls (mac_shared_config), engine_config.c and tomlc17, as tools/mac_config_checks.sh
+    # builds them (tools/mac_rendered_session_checks.sh does the same). Without them this probe
+    # has not linked since engine_files.c and engine_config.c began to call config_string.
+    MAC_ARCHS="$arch" MAC_CHECK_DIR="$out/config" sh tools/mac_config_checks.sh
     "$mac_cc" $common -I. -Isource -Isource/cseries -Isource/math -Iport/mac -Iport/linux/src \
         -Iport/include/xdk -Iport/third_party/mbedtls/include -idirafter port/linux/include \
-        port/mac/engine_handles.c port/mac/engine_config.c port/mac/engine_files.c \
+        port/mac/engine_handles.c port/mac/engine_files.c \
         tools/mac_xapi_probe.c "$out/engine_xapi_$arch.o" "$out/sha1_$arch.o" "$out/platform_util_$arch.o" \
+        "$out/config/mac_shared_config_config_$arch.o" "$out/config/engine_config_config_$arch.o" \
+        "$out/config/tomlc17_config_$arch.o" \
         -Wl,-dead_strip -o "$out/probe_$arch"
 done
 if [ "${MAC_RUN:-i386}" != none ];then
