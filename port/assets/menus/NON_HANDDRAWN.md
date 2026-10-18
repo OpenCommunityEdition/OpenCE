@@ -46,7 +46,8 @@ When the game finds a Halo PC, Halo for Mac or Halo Custom Edition install (`pat
 from the same bitmap tag and frame of that install's `ui.map` (the pixels are in its `bitmaps.map`):
 read and decoded when the menu draws them, and never shipped, written or kept
 (`port/linux/src/menu_pc_art.c`). Without one it draws the PNG written for it: a redraw (`svg/`) or the hand-drawn picture (`art/`) where
-there is one, else blank.
+there is one, else blank. A hand-drawn picture (`art/`) is drawn instead of the install's, so the
+profile settings' pictures are not among these.
 
 | File | Without an install |
 | --- | --- |
@@ -57,12 +58,6 @@ there is one, else blank.
 | `ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__4.png` | blank (to be redrawn) |
 | `ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__6.png` | blank (to be redrawn) |
 | `ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__7.png` | redraw |
-| `ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__1.png` | hand-drawn (`art/`) |
-| `ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__3.png` | hand-drawn (`art/`) |
-| `ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__4.png` | hand-drawn (`art/`) |
-| `ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__5.png` | hand-drawn (`art/`) |
-| `ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__6.png` | hand-drawn (`art/`) |
-| `ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__8.png` | hand-drawn (`art/`) |
 
 ## Blank frames, to be redrawn
 

@@ -106,8 +106,6 @@ PNG's path and as a tag path. */
 #define MP_TAG "main_menu\\multiplayer_type_select"
 #define GAMETYPE "main_menu/settings_select/multiplayer_setup/playlist_edit"
 #define GAMETYPE_TAG "main_menu\\settings_select\\multiplayer_setup\\playlist_edit"
-#define PROFILE "main_menu/settings_select/player_setup/player_profile_edit"
-#define PROFILE_TAG "main_menu\\settings_select\\player_setup\\player_profile_edit"
 
 struct picture
 {
@@ -116,6 +114,8 @@ struct picture
 	long frame;
 };
 
+/* (not the profile settings' pictures: the user-drawn ones in
+   port/assets/menus/art are drawn instead of the install's) */
 static struct picture const pictures[] =
 {
 	PICTURE(MP, MP_TAG, "mp_options", 0),
@@ -125,12 +125,6 @@ static struct picture const pictures[] =
 	PICTURE(GAMETYPE, GAMETYPE_TAG, "gametype_options", 4),
 	PICTURE(GAMETYPE, GAMETYPE_TAG, "gametype_options", 6),
 	PICTURE(GAMETYPE, GAMETYPE_TAG, "gametype_options", 7),
-	PICTURE(PROFILE, PROFILE_TAG, "profile_options", 1),
-	PICTURE(PROFILE, PROFILE_TAG, "profile_options", 3),
-	PICTURE(PROFILE, PROFILE_TAG, "profile_options", 4),
-	PICTURE(PROFILE, PROFILE_TAG, "profile_options", 5),
-	PICTURE(PROFILE, PROFILE_TAG, "profile_options", 6),
-	PICTURE(PROFILE, PROFILE_TAG, "profile_options", 8),
 };
 #define PICTURE_COUNT ((long)(sizeof(pictures) / sizeof(*pictures)))
 

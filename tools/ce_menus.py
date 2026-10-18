@@ -172,6 +172,8 @@ WIRED = {
 # PC, Halo for Mac or Custom Edition install when it has one: the same tag
 # and frame in its ui.map (port/linux/src/menu_pc_art.c lists them too, and
 # says where it looks). The PNG written for each is what is drawn without one.
+# A frame with a hand-drawn PNG (HAND_PNGS) is not among them: it is drawn
+# instead of the install's.
 PC_INSTALL_FRAMES = [
     "shell/main_menu/multiplayer_type_select/mp_options__0",
     "shell/main_menu/multiplayer_type_select/mp_options__1",
@@ -180,12 +182,6 @@ PC_INSTALL_FRAMES = [
     "shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__4",
     "shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__6",
     "shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__7",
-    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__1",
-    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__3",
-    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__4",
-    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__5",
-    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__6",
-    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__8",
 ]
 
 # ---------- HEK tags
