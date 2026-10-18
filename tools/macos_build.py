@@ -8,7 +8,10 @@ The macOS host runs the game's guest image in a VM under Hypervisor.framework
   but import stubs that exit to the host with an svc (tools/android_imports.py
   --svc);
 - the host, build/macos/halo_host, a native arm64 executable signed ad hoc
-  with the com.apple.security.hypervisor entitlement.
+  with the com.apple.security.hypervisor entitlement;
+- the host's runtime, the Rust crate port/macos/runtime: its static library
+  (build/macos/cargo/release/libopence_runtime.a) and the C header cbindgen
+  writes for it (build/macos/runtime/opence_runtime.h).
 
 The tools come from the environment that `nix develop` sets (flake.nix):
 HALO_MACOS_GUEST_CC (a clang with the arm64_32 target, not the Nix wrapper,
@@ -48,7 +51,7 @@ def is_macos_host() -> bool:
 
 
 def macos_configure_inputs() -> List[Path]:
-    return [Path(__file__), PORT_DIR / "host"]
+    return [Path(__file__), PORT_DIR / "host", PORT_DIR / "runtime" / "src"]
 
 
 def generate_macos_build(n: Writer, sln: Any) -> None:
@@ -114,5 +117,28 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     )
     n.build(outputs=host, rule="macos_host_link", inputs=host_objects, implicit=[ENTITLEMENTS])
 
-    n.build(outputs="macos", rule="phony", inputs=[image, host])
+    # ---------- the runtime crate
+
+    runtime_dir = PORT_DIR / "runtime"
+    runtime_inputs = [runtime_dir / "Cargo.toml", runtime_dir / "Cargo.lock",
+                      *sorted((runtime_dir / "src").glob("*.rs"))]
+    runtime_library = BUILD / "cargo" / "release" / "libopence_runtime.a"
+    runtime_header = BUILD / "runtime" / "opence_runtime.h"
+    n.rule(
+        name="macos_cargo",
+        # (cargo reads .cargo/config.toml from the folder it runs in, not the
+        # crate's, so the target folder is named here too)
+        command=f"cargo build --quiet --release --manifest-path {runtime_dir}/Cargo.toml --target-dir {BUILD / 'cargo'}",
+        description="MACOS CARGO $out",
+        restat=True,
+    )
+    n.build(outputs=runtime_library, rule="macos_cargo", implicit=runtime_inputs)
+    n.rule(
+        name="macos_cbindgen",
+        command=f"cbindgen --quiet --config {runtime_dir}/cbindgen.toml --output $out {runtime_dir}",
+        description="MACOS CBINDGEN $out",
+    )
+    n.build(outputs=runtime_header, rule="macos_cbindgen", implicit=[*runtime_inputs, runtime_dir / "cbindgen.toml"])
+
+    n.build(outputs="macos", rule="phony", inputs=[image, host, runtime_library, runtime_header])
     n.newline()

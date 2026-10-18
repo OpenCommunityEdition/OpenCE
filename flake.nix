@@ -47,6 +47,7 @@
         llvm.llvm
         rust
         pkgs.cargo-llvm-cov
+        pkgs.rust-cbindgen
         pkgs.darwin.sigtool
       ];
       libraries = [ pkgs.sdl3 pkgs.apple-sdk_26 ];
@@ -65,8 +66,14 @@
           inherit pname;
           version = self.shortRev or self.dirtyShortRev or "dirty";
           src = self;
-          nativeBuildInputs = tools;
+          nativeBuildInputs = tools ++ [ pkgs.rustPlatform.cargoSetupHook ];
           buildInputs = libraries;
+          # the runtime crate's dependencies, from its Cargo.lock (the
+          # sandbox has no network)
+          cargoDeps = pkgs.rustPlatform.importCargoLock {
+            lockFile = ./port/macos/runtime/Cargo.lock;
+          };
+          cargoRoot = "port/macos/runtime";
           configurePhase = ''
             runHook preConfigure
             mkdir -p build/macos/third_party

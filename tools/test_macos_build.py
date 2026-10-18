@@ -131,6 +131,36 @@ def test_guest_image_is_the_vm_guest():
     assert struct.pack("<III", 0x52800030, 0xD4000001, 0xD65F03C0) in data
 
 
+RUNTIME_LIBRARY = ROOT / "build/macos/cargo/release/libopence_runtime.a"
+RUNTIME_HEADER = ROOT / "build/macos/runtime/opence_runtime.h"
+
+
+@on_macos
+@pytest.mark.skipif(not (RUNTIME_LIBRARY.is_file() and RUNTIME_HEADER.is_file()), reason="needs `ninja macos`")
+def test_the_runtime_is_usable_from_c(tmp_path):
+    # the header compiles as the host compiles, and the library links: a
+    # guest is made with the plan's 15 regions, its window has a host
+    # address, and an unmapped address has none
+    program = tmp_path / "abi_check.c"
+    program.write_text(
+        '#include "opence_runtime.h"\n'
+        "int main(void)\n"
+        "{\n"
+        "\tOpenceGuest *guest = opence_guest_create();\n"
+        "\tint ok = guest && opence_guest_region_count(guest) == 15\n"
+        "\t\t&& opence_guest_host_pointer(guest, 0x80000000u, 4) != NULL\n"
+        "\t\t&& opence_guest_host_pointer(guest, 0x1000u, 4) == NULL;\n"
+        "\topence_guest_destroy(guest);\n"
+        "\treturn ok ? 0 : 1;\n"
+        "}\n")
+    exe = tmp_path / "abi_check"
+    build = subprocess.run(["cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+                            f"-I{RUNTIME_HEADER.parent}", str(program), str(RUNTIME_LIBRARY), "-o", str(exe)],
+                           capture_output=True, text=True)
+    assert build.returncode == 0, build.stderr
+    assert subprocess.run([str(exe)]).returncode == 0
+
+
 @on_macos
 def test_configure_emits_macos_here(tmp_path):
     # on this platform configure.py includes the macOS graph and makes it the

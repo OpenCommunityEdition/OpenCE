@@ -9,13 +9,17 @@
 //!   registers its vCPUs start with.
 //! - [`image`]: the guest image's checks, and its loading into guest memory.
 //!
-//! The C host (port/macos/host) calls this crate through its C ABI.
+//! The C host (port/macos/host) calls this crate through its C ABI
+//! ([`ffi`]).
 
+pub mod ffi;
 pub mod image;
 pub mod memory;
 pub mod page_tables;
 pub mod plan;
 mod platform;
+#[cfg(test)]
+mod test_images;
 
 pub use image::{check_imports, GuestHeader, GuestImage, ImageError, Segment};
 pub use memory::{GuestMemory, GuestPtr, GuestRange, MemoryError, GUEST_SPACE};
