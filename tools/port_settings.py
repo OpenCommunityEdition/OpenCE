@@ -13,6 +13,8 @@ settings defaults" shows the defaults. Controls Setup binds the keyboard and
 mouse's controls, by the functions the PC version names for it.
 """
 
+import re
+import sys
 from pathlib import Path
 from xml.sax.saxutils import quoteattr
 
@@ -251,6 +253,9 @@ SCREENS["audio_settings/sound_processing"] = {
     ],
 }
 _audio["rows"] = [row for row in _audio["rows"] if row[1] not in _processing]
+
+# (voice chat stays on Audio Setup; the text chat's rows are the multiplayer
+# HUD's, on Network Setup)
 _audio["categories"] = [
     ("SOUND PROCESSING:", "audio_settings/sound_processing",
      "The reverb, and how sounds are converted to the\noutput's rate."),
@@ -258,12 +263,22 @@ _audio["categories"] = [
 
 # Network Setup's map sharing (port/linux/game/map_share.c): this machine's
 # part in another's game, a screen of its own (a category, as Video Setup's)
-SEED_UPLOADS = (64, 128, 256, 512, 1024, 2048)
+SEED_UPLOADS = (64, 128, 256, 512, 1024, 2048, 4096, 8192, 10240)
 _network = SCREENS["network_setup"]
+# (and the multiplayer HUD's rows, and streamer mode, screens of their own:
+# Network Setup has room for nine places)
+_hud_settings = ("display.player_names", "display.player_name_scale", "display.scoreboard_team_layout",
+                 "display.scoreboard_background")
+_hud_rows = [row for row in _network["rows"] if row[1] in _hud_settings]
+_network["rows"] = [row for row in _network["rows"] if row[1] not in _hud_settings]
 _network["categories"] = [
     ("MAP SHARING:", "network_setup/map_sharing",
      "Downloading Custom Edition maps you do not have,\nand helping send them to other players.",
      "desktop android"),
+    ("MULTIPLAYER HUD:", "network_setup/multiplayer_hud",
+     "Players' names above their heads, the\nscoreboard, and the text chat."),
+    ("STREAMER MODE:", "network_setup/streamer_mode",
+     "Hide offensive words in names and text from\nother players, maps and mods, as stars."),
 ]
 SCREENS["network_setup/map_sharing"] = {
     "screen": "map_sharing_settings_screen", "header": _network["header"], "spacing": 30,
@@ -279,13 +294,53 @@ SCREENS["network_setup/map_sharing"] = {
     ],
 }
 
+# Network Setup's multiplayer HUD: its rows, moved from Network Setup, and the
+# text chat's (port/linux/game/network_chat.c)
+SCREENS["network_setup/multiplayer_hud"] = {
+    "screen": "multiplayer_hud_settings_screen", "header": _network["header"], "spacing": 30,
+    "rows": _hud_rows + [
+        ("TEXT CHAT:", "display.text_chat", [("SHOW", "true"), ("HIDE", "false")],
+         "SHOW the text chat, or HIDE it: no lines, and\nits keys and D-pad Up open nothing.", None),
+        ("CHAT TEXT:", "display.chat_style", [("COLORS", "colors"), ("WHITE", "white")],
+         "The text chat's colors: COLORS, names in their\nteam's color; WHITE, as Custom Edition.", None),
+    ],
+}
+
+# Network Setup's streamer mode (port/linux/game/text_filter.c): words hidden
+# in what other players, maps and mods show, each group from a severity of
+# Surge AI's on (port/assets/text_filter)
+STREAMER_LEVELS = [("OFF", "off"), ("SEVERE", "severe"), ("STRONG AND WORSE", "strong"), ("MILD AND WORSE", "mild")]
+SCREENS["network_setup/streamer_mode"] = {
+    "screen": "streamer_mode_settings_screen", "header": _network["header"], "spacing": 30,
+    "rows": [
+        ("STREAMER MODE:", "streamer.enabled", ON_OFF,
+         "Hide offensive words in names and text from\nother players, maps and mods, as stars.", None),
+        ("CENSOR SLURS:", "streamer.slurs", STREAMER_LEVELS,
+         "Slurs about race, sexuality, gender and\ndisability.", None),
+        ("CENSOR SWEARING:", "streamer.swearing", STREAMER_LEVELS,
+         "Swearing and sexual words (STRONG AND WORSE\nleaves the mildest showing).", None),
+        ("CENSOR INSULTS:", "streamer.insults", STREAMER_LEVELS,
+         "Name-calling and insults that are not slurs.", None),
+    ],
+}
+
+# Network Setup in a game (the pause menu's SETTINGS: port/linux/game/
+# menu_tags.c's pause_network_patch): its pages alone, without the rows that
+# would drop the game (internet play) or are for the main menu (the router,
+# the clipboard, the updates)
+SCREENS["network_setup/in_game"] = {
+    "screen": "in_game_network_settings_screen", "header": _network["header"], "spacing": 30,
+    "platform_places": True, "rows": [], "categories": _network["categories"],
+}
+
 # Controls Setup: the keyboard and mouse's actions, in groups (the order of
 # port/linux/game/menu_functions.c's table of them)
-CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS"]
+CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS", "COMMUNICATION"]
 CONTROL_ROWS = 7
 
 # the settings whose rows have the wider spinner (a device's name)
-WIDE_SETTINGS = {"audio.output_device", "audio.input_device"}
+WIDE_SETTINGS = {"audio.output_device", "audio.input_device", "streamer.slurs", "streamer.swearing",
+                 "streamer.insults"}
 
 # the host's voice chat and vote kicks, on Teamplay Options
 # (_teamplay_options_extras): each row's key, its label, its choices' words
@@ -313,6 +368,13 @@ TEAMPLAY_ROWS = [
     ("votekick", "VOTE KICK:", ["ON", "OFF"], [
         "Players can vote to kick a player, from the\\nscoreboard.",
         "Players cannot vote to kick anyone.",
+    ]),
+    # (network_chat.c: one row for the chat and its links, as Teamplay
+    # Options has room for one more)
+    ("text_chat", "TEXT CHAT:", ["ON", "WITH LINKS", "OFF"], [
+        "Players can type to each other; lines with links\\nare refused. Off in a public internet game.",
+        "Players can type to each other, links too. Off\\nin a public internet game.",
+        "No text chat in the game.",
     ]),
 ]
 
@@ -1145,12 +1207,13 @@ COOP_SETUP_SCREENS = [
             "Players walk through each other, so that no one\\nblocks a doorway. The AI's characters still block.",
         ]),
     ]),
-    ("voice_options", "VOICE AND VOTING", "Voice chat and votes to kick a player, for this\\ngame.", TEAMPLAY_ROWS),
+    ("voice_options", "VOICE AND VOTING", "Voice chat, text chat and votes to kick a player,\\nfor this game.",
+     TEAMPLAY_ROWS),
 ]
 # Server Setup's map sharing (port/linux/game/map_share.c), for any game,
 # laid out as co-op's options are (its key, its title, its row's help and
 # its rows: menu_functions.c's gametype_options give their settings' values)
-MAP_SHARE_UPLOADS = (256, 512, 1024, 2048, 4096, 8192)
+MAP_SHARE_UPLOADS = (256, 512, 1024, 2048, 4096, 8192, 16384, 20480)
 MAP_SHARE_SETUP = ("map_share_options", "MAP SHARING",
                    "Sending players who join without the game's\\nCustom Edition map the map, and how fast.", [
     ("map_share", "SHARE MAPS:", ["ON", "OFF"], [
@@ -1566,11 +1629,15 @@ REPLACED_FOLDERS = [f"{MT}/server_settings"]
 # each turned on or off and moved up or down (menu_functions.c's "port mods"
 # functions)
 
-# the redraws' main menu items (svg/shell/main_menu/menu_*.svg): their text's
-# capitals' top and height, its colour dim (not chosen) and its glow chosen,
-# and where its middle is
-MENU_ITEM_TOP, MENU_ITEM_CAP, MENU_ITEM_MIDDLE = 6.57, 21.5 * 0.9037, 130.0
-TITLE_FONT_PATH = Path(__file__).resolve().parent.parent / "port/assets/fonts/OpenCE-Regular.ttf"
+# the redraws' main menu items (svg/shell/main_menu/menu_*.svg): their
+# letters' top and scale, and where their middle is
+MENU_ITEM_TOP, MENU_ITEM_SCALE, MENU_ITEM_MIDDLE = 6.57, 0.9037, 130.0
+# the space between two of the redraws' letters, in their units (their
+# capitals are 21.5 high), for the pairs the port's items have: no redraw has
+# these pairs, so each is the sum of a space after the first letter and one
+# before the second, fitted (least squares) to the 53 pairs the redraws' items
+# and headers have (D-I, of the main menu's Credits, gives D's right side)
+MENU_ITEM_SPACES = {"MO": 3.17, "OD": 2.8, "DS": 2.3}
 # the mods' status icons (port/assets/icons/lucide): a mod out of the order it
 # asks for, and one that cannot be played (another mod says it cannot be
 # played with it, or this build cannot play it): menu_functions.c's
@@ -1578,50 +1645,49 @@ TITLE_FONT_PATH = Path(__file__).resolve().parent.parent / "port/assets/fonts/Op
 MOD_STATUS_ICONS = [("triangle-alert", "#FFB020"), ("circle-x", "#FF4040")]
 
 
-def menu_item_frames(text: str) -> list:
-    """the frames (svg, width, height) of a main menu item of the port's:
-    its text set in OpenCE (Newtown respaced: port/assets/fonts) as the
-    redraws' items are, dim, then white with their blue glow"""
-    from fontTools.pens.boundsPen import BoundsPen
-    from fontTools.pens.svgPathPen import SVGPathPen
-    from fontTools.pens.transformPen import TransformPen
-    from fontTools.ttLib import TTFont
+def redraw_letters(redraws: Path) -> dict:
+    """the redraws' letters (their <path id="gA">s, one drawing of each
+    letter in every item and header), by letter"""
+    letters = {}
+    for svg in sorted(redraws.rglob("*.svg")):
+        if any(part.startswith("_") for part in svg.relative_to(redraws).parts):
+            continue
+        for letter, path in re.findall(r'<path id="g([A-Z])" d="([^"]+)"', svg.read_text()):
+            if letters.setdefault(letter, path) != path:
+                sys.exit(f"{svg}: the redraws draw {letter} two ways")
+    return letters
 
-    font = TTFont(str(TITLE_FONT_PATH))
-    glyphs = font.getGlyphSet()
-    cmap = font.getBestCmap()
-    kerning = font["kern"].kernTables[0].kernTable if "kern" in font else {}
-    cap = glyphs["H"]
-    pen = BoundsPen(glyphs)
-    cap.draw(pen)
-    scale = MENU_ITEM_CAP / (pen.bounds[3] - pen.bounds[1])
-    names = [cmap[ord(character)] for character in text]
-    widths = [font["hmtx"][name][0] for name in names]
-    advance = sum(widths) + sum(kerning.get((first, second), 0) for first, second in zip(names, names[1:]))
-    x = MENU_ITEM_MIDDLE / scale - advance / 2
-    baseline = MENU_ITEM_TOP + MENU_ITEM_CAP
-    defs, uses = {}, []
-    for index, name in enumerate(names):
-        if name not in defs and name != "space":
-            path = SVGPathPen(glyphs, lambda value: f"{value:.2f}".rstrip("0").rstrip("."))
-            glyphs[name].draw(TransformPen(path, (1, 0, 0, -1, 0, 0)))
-            defs[name] = path.getCommands()
-        if name != "space":
-            uses.append(f'<use href="#g{name}" transform="translate({x * scale:.2f},{baseline:.2f}) scale({scale:.5f})"/>')
-        x += widths[index] + (kerning.get((name, names[index + 1]), 0) if index + 1 < len(names) else 0)
-    paths = [f'    <path id="g{name}" d="{commands}"/>' for name, commands in sorted(defs.items())]
-    head = ['<svg xmlns="http://www.w3.org/2000/svg" width="256" height="64" viewBox="0 0 256 64">', "  <defs>", *paths]
-    # (as heavy as the redraws' letters: a thin edge of their colour)
-    edge = f'stroke-width="{0.9 / scale:.2f}" stroke-linejoin="round"'
+
+def menu_item_frames(text: str, redraws: Path) -> list:
+    """the frames (svg, width, height) of a main menu item of the port's: its
+    text in the redraws' own letters (redraw_letters), spaced, placed and
+    coloured as their items are, dim, then white with their blue glow"""
+    from fontTools.pens.boundsPen import BoundsPen
+    from fontTools.svgLib.path import parse_path
+
+    letters = redraw_letters(redraws)
+    widths = []
+    for letter in text:
+        pen = BoundsPen(None)
+        parse_path(letters[letter], pen)
+        widths.append(pen.bounds[2])
+    spaces = [MENU_ITEM_SPACES[first + second] for first, second in zip(text, text[1:])]
+    x = MENU_ITEM_MIDDLE - (sum(widths) + sum(spaces)) * MENU_ITEM_SCALE / 2
+    uses = []
+    for index, letter in enumerate(text):
+        uses.append(f'<use href="#g{letter}" transform="translate({x:.2f},{MENU_ITEM_TOP}) scale({MENU_ITEM_SCALE})"/>')
+        x += (widths[index] + (spaces[index] if index < len(spaces) else 0)) * MENU_ITEM_SCALE
+    paths = [f'    <path id="g{letter}" d="{letters[letter]}"/>' for letter in sorted(set(text))]
+    head = ['<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256" '
+            'height="64" viewBox="0 0 256 64">', "  <defs>", *paths]
     dim = [*head, "  </defs>", f'  <!-- "{text}" (normal state: dim blue) -->',
-           f'  <g id="text" fill="#2895ff" stroke="#2895ff" opacity="0.467" {edge}>',
-           *[f"    {use}" for use in uses], "  </g>", "</svg>", ""]
+           '  <g id="text" fill="#2895ff" fill-opacity="0.467">', *[f"    {use}" for use in uses], "  </g>", "</svg>", ""]
     glow = [*head, '    <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="256" height="64">',
             '      <feGaussianBlur stdDeviation="2.19"/>', "    </filter>", "  </defs>",
             f'  <!-- "{text}" (highlighted: white with blue glow) -->',
-            f'  <g fill="#2895ff" stroke="#2895ff" stroke-width="{6.3 / scale:.2f}" stroke-linejoin="round" '
-            'opacity="0.650" filter="url(#glow)">', *[f"    {use}" for use in uses], "  </g>",
-            f'  <g id="text" fill="#fff" stroke="#fff" {edge}>', *[f"    {use}" for use in uses], "  </g>", "</svg>", ""]
+            '  <g fill="#2895ff" stroke="#2895ff" stroke-width="6.3" stroke-linejoin="round" opacity="0.650" '
+            'filter="url(#glow)">', *[f"    {use}" for use in uses], "  </g>",
+            '  <g id="text" fill="#fff">', *[f"    {use}" for use in uses], "  </g>", "</svg>", ""]
     return [("\n".join(dim), 256, 64), ("\n".join(glow), 256, 64)]
 
 

@@ -1,0 +1,326 @@
+# Streamer mode's review of Surge AI's profanity list (tools/text_filter_terms.py):
+# every base word of its profanity_en.csv kept (its group, severity and rule;
+# - for Surge AI's severity and the rule worked out) or dropped. The words are
+# ROT13'd; tools/text_filter_terms.py --list shows them.
+#
+# Dropped: everyday words the list has because they can be offensive in some
+# uses (the filter has no context), and words for identities or anatomy that
+# are neither slurs nor swearing. Moved: gendered insults filed under
+# "sexual orientation / gender" go to SWEARING, homophobic phrases filed under
+# the sexual categories go to SLURS, and the mild insults filed under "mental
+# disability" or "sexual orientation / gender" go to INSULTS. Severities
+# raised or lowered where one spelling's rating set the word's (damn and butt
+# are mild, as Ofcom rates them; the Australian slur rated mild is strong).
+
+drop 69
+keep - - - norrq
+keep - strong whole nob
+drop noenunz
+keep - - whole nany
+drop nahf
+drop ncr
+keep - - - nefr
+keep - - whole nff
+keep - - - onol onggre
+keep - - - onyyfnpx
+drop onat
+keep - - - onfgneq
+keep - - - orna dhrra
+keep - - whole ornare
+keep - - - orng bss
+keep - - - oryyraq
+drop oraqre
+keep swearing - - ovgpu
+keep - - whole oynpxl
+keep - - - oybj n ybnq
+keep - - - oybjwbo
+keep - - - oyhzcxva
+keep - - - obvbynf
+keep - - - obyybpxf
+drop obaqntr
+keep - - whole obare
+drop obax
+keep - - whole obbof
+drop obbgl
+drop oernfg
+keep - - whole ohttre
+drop ohz
+drop ohat
+keep - mild whole ohgg
+drop ohggrezvyx
+keep - - - pnzry wbpxrl
+keep - - - pnzrygbr
+keep slurs - - pnecrg zhapure
+keep - - - puvan ivehf
+keep - - - puvatpubat
+keep - - whole puvax
+keep - - - pubnq
+keep - - - pubpun
+keep - - - pubxr gur puvpxra
+drop pubyb
+keep - - - pyvg
+keep - - whole pbpx
+drop pbwbarf
+keep - - whole pbbyvr
+keep - - whole pbba
+drop pbbg
+drop pbbgvrf
+keep - - - pbggba cvpxre
+keep - - - pernzcvr
+drop pebgpu
+drop pebj
+keep - - whole phz
+keep - - - phaavyvathf
+keep - - anywhere phag
+keep - - whole qntb
+keep - mild - qnza
+keep - - whole qnexl
+keep - - whole qvpx
+keep - - whole qvqqyr
+keep - - - qvyqb
+drop qvcfgvpx
+keep - - - qvegl fnapurm
+keep - - - qbttl fglyr
+keep insults - whole qbyg
+drop qbat
+keep - - - qbgurnq
+drop qbhoyr cra
+keep - - whole qbhpur
+keep - - - qhzc n ybnq
+keep - - whole qlxr
+drop rwnphyngvba
+keep - - - rerpgbcynfz
+keep - - whole snt
+keep - - anywhere snttbg
+keep - - whole sneg
+keep - - - sryyngvb
+drop svatre
+keep - - whole synzre
+drop sberfxva
+keep - - anywhere shpx
+keep slurs - - shqtr cnpxre
+keep - - - shaontf
+drop tneontr ont
+keep - - - tnfu-fgnoore
+drop tnl
+keep - - - tva wbpxrl
+keep - - - tveyl ovgf
+keep insults - - tveylobl
+keep - - whole tbbx
+keep - - whole tbjy
+drop ternfre
+keep - - start tebvq
+drop tebcr
+keep - - whole tlcfl
+drop unt
+keep - - - uneel cnyzf
+keep - - whole uror
+keep - - whole uryy
+keep swearing - whole ubr
+drop ubzbfrkhny
+drop ubbgref
+drop uhfgyre
+keep - - whole vawha
+keep - - - wnpx bss
+keep - - - wnpxbss
+keep - - - wnvyonvg
+keep - - whole wnc
+keep - - whole wrex
+keep - - - wrex bss
+drop wrj
+keep - - - wvttnobb
+drop wvz pebj
+keep - - - wvmm
+keep - - - xvqgbhpure
+keep - - whole xvxr
+keep - - - xvggl chapure
+keep slurs - whole xxx
+keep - - whole xyna
+keep - strong whole xabo
+keep - - - xh xyhkre
+keep - - - ynqlobl
+drop yrfovna
+drop ybbfr
+keep - - - zna pubjqre
+keep - - - zna frrq
+keep - - - znfgheongr
+drop zrng
+keep - - - zrng phegnvaf
+keep - - - zvys
+drop zbyrfg
+keep - - whole zbat
+keep - - whole zbatbybvq
+drop zbatery
+drop zbaxrl
+keep - - - zbgureshpxre
+keep - - whole zhss
+keep - - - zhfuebbz gvc
+keep - - whole arteb
+keep - - anywhere avttn
+keep - - anywhere avttre
+keep - - - avttref
+keep - - - avtttre
+drop avccyr
+keep - - whole abapr
+drop ahg ohggre
+keep - - - ahgfnpx
+drop alzcu
+keep - - - betnfz
+keep - - - bira qbqtre
+keep - - whole cnxv
+keep - - - cnyz wbpxrl
+keep - - - cnapnxr snpr
+keep - - whole crpxre
+keep insults - - crqbcuvyr
+drop cravf
+keep - - - crgre chssre
+drop cvt
+keep slurs - - cvyybj ovgre
+keep - - - cvff
+keep - - - cbyr yvpxre
+keep - - - cbyr fzbxre
+keep - - - cbyr fhpxre
+keep - - - cbyrfzbxre
+keep - - - cbepu zbaxrl
+keep - - whole cevpx
+keep - - - chyy gur chq
+keep - - - chanav
+drop chagn
+keep - - whole chffl
+drop dhrre
+keep - - - enturnq
+drop enzebq
+keep - - - ernpunebhaq
+drop erpghz
+keep - - - erqfxva
+keep - - whole ergneq
+keep - - whole ergneqrq
+keep - - - evz wbo
+drop fnqbznfbpuvfz
+keep - - - fnynq gbffre
+keep - - whole fnzob
+keep - - - fnhfntr wbpxrl
+keep - - - fpuybat
+keep insults - whole fphz
+drop fphg
+drop frk
+keep - - - furznyr
+drop fuvrfgre
+keep - - anywhere fuvg
+keep - - - fuybat
+keep - - whole fulybpx
+keep insults - whole fvffl
+keep swearing - - fxnax
+keep swearing - whole fynt
+keep - - - fynag rlr
+drop fyvg
+keep swearing - - fyhg
+drop fangpu
+drop fcnax
+drop fcrez
+drop fcuvapgre
+keep - - whole fcvp
+drop fcbbx
+drop fchax
+keep - - - fghzc purjre
+drop fhpx
+drop fjvar
+keep - - - gnpburnq
+keep - - - gnqtre
+keep - - - gnxvat gur cvff
+keep - - - gnyyljnpxre
+keep - - - gne-onol
+drop gneg
+drop grfgvpyrf
+keep - - - guebng lbtheg
+keep - - - guebngre
+keep - - - gvpxyr gur cvpxyr
+keep - - whole gvg
+keep - - whole gvgf
+keep - - whole gbffre
+keep - - - gbffvat fnynq
+keep - - - gbjryurnq
+drop genzc
+keep - - whole genaal
+drop genafirfgvgr
+drop genfu
+keep - - - gebhfre fanxr
+keep - - - gebhfrefanxr
+keep - - whole gheq
+keep - - - gjng
+drop gjvax
+keep - - - hcfxveg
+drop intvan
+drop ihyin
+drop jnat
+keep - - - jnax
+drop jrravr
+drop jrvare
+keep - - - jrgonpx
+keep - - - junpx bss
+keep swearing - - juber
+keep - - - jvyyl-junpxre
+keep - - - jvaqbj yvpxre
+keep - - whole jbc
+drop jbhaq
+keep - - - mvccreurnq
+
+# spellings of kept words that are everyday words, or another's initials
+drop onfgvanqb
+drop crgre
+drop ahttrgf
+drop ahttrg
+drop xavpxref
+drop avpxre
+drop avpxref
+drop fnpx
+drop ongre
+drop ongrf
+drop abof
+drop abo
+drop fbof
+drop fbo
+drop ubne
+drop chfflpng
+drop chffrf
+drop chff
+drop qvk
+drop srq
+drop sre
+drop srt
+drop sbexrq
+drop furrg
+drop oop
+drop ojp
+drop ow
+drop fcvpx
+
+# The project's own words, which Surge AI's list has not: sexual words and
+# those for sexualised minors, hate phrases, and harassment (a term's
+# severity puts it under the default levels: slurs mild, swearing strong)
+term swearing strong anywhere cbea
+term swearing strong anywhere uragnv
+term swearing strong whole ahqrf
+term swearing mild whole ubeal
+term swearing strong start vaprfg
+term swearing severe - orfgvnyvgl
+term swearing severe start mbbcuvy
+term swearing strong - lvss
+term swearing strong whole shgn
+term swearing strong - shgnanev
+term swearing strong - nurtnb
+term swearing strong - pnztvey
+term swearing severe whole ybyv
+term swearing severe - ybyvpba
+term swearing severe whole fubgn
+term swearing severe - fubgnpba
+term swearing strong whole encr
+term swearing strong whole encvfg
+term slurs severe - shesnt
+term slurs severe - urvyuvgyre
+term slurs severe - fvrturvy
+term insults strong whole xlf
+term insults severe - xvyylbhefrys
+term insults severe - xvyyhefrys
+term insults strong whole gubg
+term insults mild whole phpx

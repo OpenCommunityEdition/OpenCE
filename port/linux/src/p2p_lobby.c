@@ -726,6 +726,16 @@ void p2p_set_hosting_public(int public)
 	pthread_mutex_unlock(&p2p_lock);
 }
 
+int p2p_hosting_listed(void)
+{
+	int listed;
+
+	pthread_mutex_lock(&p2p_lock);
+	listed = lobby.public && config_boolean("network.public_lobby");
+	pthread_mutex_unlock(&p2p_lock);
+	return listed;
+}
+
 void p2p_set_hosting_password(const char *password)
 {
 	unsigned char key[P2P_PASSWORD_KEY_SIZE];

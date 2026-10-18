@@ -66,6 +66,7 @@ symbols in this file:
 #include "tag_groups.h"
 #include "text_group.h"
 #include "font_group.h"
+#include "text_filter.h" /* port: port/linux/game/text_filter.c */
 
 /* ---------- constants */
 
@@ -250,9 +251,13 @@ void terminal_draw(
 				}
 				buffer[cursor_index] = '_';
 			}
+			/* port: the line being typed drawn as it is, not hidden by streamer
+			mode (port/linux/game/text_filter.c) */
+			text_filter_suspend();
 			/* port: MCC terminal font scaling does not modify the font tag. */
 			if (!mcc_terminal_draw(font_tag_index, &terminal_gets_bounds, buffer))
 			rasterizer_draw_string(&terminal_gets_bounds, NULL, NULL, 0, buffer);
+			text_filter_resume();
 		}
 
 		if (terminal_render_enable)

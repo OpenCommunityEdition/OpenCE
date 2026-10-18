@@ -142,13 +142,13 @@ lockstep netcode was removed, set to play it): it tells the player why.
 ## GulchCE crossplay boundary
 
 Xbox and Custom Edition sessions use OpenCE network version 29, verified against
-OpenCommunityEdition/OpenCE commit `8102e711c353068d22d62efe6bf67ebc8a90a22e`.
+OpenCommunityEdition/OpenCE commit `38ccb5f9a4232bb51fc8a79e797b5570f6b69fb8`.
 This is an explicit protocol baseline, not automatic compatibility with future
 OpenCE releases. Do not change the base version without auditing its wire format,
 simulation rules and admission behavior and testing unmodified upstream clients.
 The pinned fixture and settings-prefix check are in `tools/test_mcc_protocol.py`.
 
-MCC sessions use separate MCC protocol version 50 (previous GulchCE builds used
+MCC sessions use separate MCC protocol version 51 (previous GulchCE builds used
 49). Version 50 requires peers to agree on bounded conditional execution for
 MCC equipment scripts. It releases completed same-type conditional frames
 before entering their selected branch while retaining lexical call scopes and
@@ -435,6 +435,62 @@ for `network.votekick_ban_minutes`. The host sends each client
 as it changes), for the scoreboard, whose right click frees the mouse to
 pick a player; the host's own scoreboard adds Kick and Ban. Builds without
 votes drop both kinds as unknown, so the network version is unchanged.
+
+The text chat (`network_chat.c`): a client sends its player's line to the
+host (`_distributed_message_chat_up`, reliably), which takes it only from
+the client's own stream and from one of that machine's players, at most 5
+lines at once and one each 1.5 seconds after (more are dropped; a machine
+gone from the game has its count let go, so one new to its slot starts
+afresh), its text cut to 63 characters of printable ASCII but `|` (which
+the game's text drawing takes for the start of a code; it becomes `?`, on
+the host and again on each client). The host alone sends the line on
+(`_distributed_message_chat_down`, reliably, with the sender's absolute
+index and its channel, the line's flags): to every client, a team's line
+only to the machines with a player of the sender's team (to every one in a
+game without teams), and a vehicle's line only to those with a player
+riding in the sender's vehicle (the outermost object each unit is a child
+of, so any map's vehicles), as the host has them; the sender's machine gets
+its own line whatever it is. The host shows it itself if one of its own
+players hears it or said it. A client shows only
+the host's lines, its own too, so every machine shows them in one order,
+and takes them (and the chat settings below) only over the host's
+connection's stream: a datagram from the host's address could be anyone's.
+Each local player's view shows the lines that player hears.
+The host's own `/mute <player> [minutes]` and `/unmute <player>` are
+commands, not lines: it keeps a mute by the player's name (in ASCII,
+matched in either case, as the host keeps names apart) and its minutes by
+its own clock, drops the lines of a muted player's machine
+when they come up, and sends that machine alone a notice of the minutes
+left; it tells every machine of each mute and unmute. A notice is a down
+line with `_chat_line_notice_bit` set, its text alone (no sender). A
+client's `/mute` is never sent, and the host takes the text of a line that
+came up as a line, never a command. The host's scoreboard Mute for everyone
+is the same mute (20 minutes), and the host relays none of a muted player's
+machine's voice either (`network_voice.c`'s `voice_host_relay`, by the
+names of the network game's players, which the lobby has too). A
+machine's own scoreboard mute stays its own: it plays none of that
+machine's voice and shows none of its players' lines, and tells no one.
+The host's chat settings (`network.text_chat`: on, links allowed, or off;
+always off while its game is listed in the server browser,
+`p2p_hosting_listed`) go to every client in
+`_distributed_message_chat_config` (one byte of flags), reliably, as they
+change and every 3 seconds. A client without them (from a host without the
+chat, or before they come) has the chat off, and so does a client in a
+public game it joined from the server browser, whatever its host sends (a
+changed host could turn the chat on): while the tunnel reaches the host of
+the listing it joined (`p2p_join_listing`, `p2p_joined_listed_host`; any
+other invite joined since forgets it), it takes no chat line or notice and
+sends none. A client refuses a line the
+settings refuse before sending it, and the host refuses it again whatever
+the client knew, telling its machine why: a changed build gets no further.
+Links are found in the line's text (`chat_text_has_link`): a scheme, `www.`,
+an address of four numbers, or a name and a common top-level domain, its
+dots also written `(dot)`, `[dot]`, `{dot}`, `(.)`, `[.]` or ` dot `, with
+spaces about them or not, or a dot with spaces both sides; a domain that is
+a word as well (`me`, `to`, `is`) counts only with a path, a port or another
+domain after it (`chat_link_domain`).
+Builds without the chat drop the three kinds as unknown, so the network
+version is unchanged.
 
 Voice chat (`network_voice.c`, the sound in `port/linux/src/voice_audio.c`)
 travels as distributed messages too, but in the lobby as well as in a game:
@@ -894,7 +950,18 @@ two machines' views of one game can be compared. `debug.network_test_kill`,
 `debug.network_test_shoot`, `debug.network_test_vehicle` and
 `debug.network_test_pickup` script kills, hits, a vehicle ride and a weapon
 swap the bots' wandering does not reach (`debug.network_test_pickup_weapon`
-picks the weapon: the first whose tag name has it in it, as "sniper"), and `debug.network_test_score`
+picks the weapon: the first whose tag name has it in it, as "sniper"),
+`debug.network_test_chat` has each machine's player say a chat line to
+everyone, one to the team and one to the vehicle (the host seats the last
+two players in one first), then the host mutes the last player for a
+minute, each says a line, the host unmutes them and each says another,
+each says a line with a link (a client's sent past its own check, for the
+host to refuse), the host turns the text chat off (and on again) as each
+says one more, the host mutes the last player for everyone (as its
+scoreboard does) around a line each, and the last player's machine mutes
+the host's for itself (as a client's scoreboard does) before another,
+which every machine's `debug.txt` records as
+it shows them (the notices as `chat notice:`), and `debug.network_test_score`
 shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's
 button on the scores does). `debug.network_test_public` lists the host's
@@ -918,3 +985,8 @@ The host logs to `debug.txt` when a player on another machine presses the
 action button where the host has nothing for them to pick up, with where it
 has them and the nearest item: a client that sees a pickup the host does
 not.
+
+MCC protocol version 51 moves MCC data messages to IDs 90-93, reserving
+87-89 for OpenCE text chat. Older MCC peers are rejected before admission.
+Ordinary Xbox and Custom Edition sessions retain upstream version 29 and
+its unchanged message numbers; the new chat messages are additive upstream.

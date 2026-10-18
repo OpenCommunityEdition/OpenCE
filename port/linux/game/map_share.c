@@ -160,9 +160,11 @@ enum
 	MAXIMUM_MAP_BYTES = 0x30000000,
 	MAXIMUM_RESOURCE_MAP_BYTES = 0x20000000,
 
-	/* the kilobytes a second a machine sends, at least and at most */
+	/* the kilobytes a second a machine sends, at least and at most: the
+	host 20 MB/s, a player helping it 10 MB/s */
 	MINIMUM_UPLOAD_KILOBYTES = 16,
-	MAXIMUM_UPLOAD_KILOBYTES = 65536,
+	MAXIMUM_HOST_UPLOAD_KILOBYTES = 20480,
+	MAXIMUM_SEED_UPLOAD_KILOBYTES = 10240,
 
 	/* network_server_manager.c's host state in game, transport_endpoint_winsock.c's
 	stream endpoint and hud_messaging.c's centred text (their enums are their
@@ -659,10 +661,11 @@ static unsigned long map_share_host_address(
 static long upload_limit(
 	void)
 {
-	long kilobytes = map_share_host() ? config_integer("network.map_share_upload") :
-		config_integer("network.map_seed_upload");
+	boolean host = map_share_host();
+	long kilobytes = host ? config_integer("network.map_share_upload") : config_integer("network.map_seed_upload");
 
-	return PIN(kilobytes, MINIMUM_UPLOAD_KILOBYTES, MAXIMUM_UPLOAD_KILOBYTES) * 1024;
+	return PIN(kilobytes, MINIMUM_UPLOAD_KILOBYTES, host ? MAXIMUM_HOST_UPLOAD_KILOBYTES : MAXIMUM_SEED_UPLOAD_KILOBYTES) *
+		1024;
 }
 
 /* whether this machine sends the game's files to the others: in a game on

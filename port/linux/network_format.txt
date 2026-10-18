@@ -1,4 +1,5 @@
-version 50
+version 51
+bound CHAT_TEXT_SIZE 64
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
 bound DISTRIBUTED_INPUT_HISTORY 4
@@ -44,7 +45,7 @@ define MCC_PROTOCOL_ADVERTISED_FLAG 0x04
 define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 3
 define MCC_PROTOCOL_JOIN_KIND 91
 define MCC_PROTOCOL_JOIN_MAX 256
-define MCC_PROTOCOL_VERSION 50
+define MCC_PROTOCOL_VERSION 51
 enum _distributed_actor_camouflaged_bit 4
 enum _distributed_actor_impulse_aligned_bit 6
 enum _distributed_actor_rides_bit 0
@@ -56,6 +57,9 @@ enum _distributed_actor_super_camouflaged_bit 5
 enum _distributed_message_actor_damage 73
 enum _distributed_message_actor_states 64
 enum _distributed_message_batch 16
+enum _distributed_message_chat_config 89
+enum _distributed_message_chat_down 88
+enum _distributed_message_chat_up 87
 enum _distributed_message_client_identity 18
 enum _distributed_message_client_ready 9
 enum _distributed_message_coop_device_groups 68
@@ -77,10 +81,10 @@ enum _distributed_message_map_share_offer 84
 enum _distributed_message_map_share_progress 86
 enum _distributed_message_map_share_request 83
 enum _distributed_message_map_share_sources 85
-enum _distributed_message_mcc_campaign 88
-enum _distributed_message_mcc_game_speed 90
-enum _distributed_message_mcc_grenades 87
-enum _distributed_message_mcc_object_names 89
+enum _distributed_message_mcc_campaign 91
+enum _distributed_message_mcc_game_speed 93
+enum _distributed_message_mcc_grenades 90
+enum _distributed_message_mcc_object_names 92
 enum _distributed_message_notice 17
 enum _distributed_message_object_changes 5
 enum _distributed_message_object_states 6
@@ -238,6 +242,8 @@ struct distributed_actor_damage 96a57e13e2b8
 struct distributed_actor_damage_message f985e899a708
 struct distributed_actor_state 8bd5e771659d
 struct distributed_actor_state_message 51a56e04a536
+struct distributed_chat_config dfa4e32efe1e
+struct distributed_chat_line cdab1468ffe0
 struct distributed_client_identity 4d9e62025616
 struct distributed_coop_device_group 4aa3499be2cc
 struct distributed_coop_device_groups_message b96ad0030ccc
