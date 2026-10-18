@@ -66,3 +66,6 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: Document the macOS build in `docs/macos_host.md` (building, signing, running headless, what is not supported yet) and link it from `README.md` `bb35180`
 - [x] Task: Final build: `nix build .#host` from a clean checkout, then the whole test suite inside `nix develop` (nix build .#host ok; suite: 678 passed, 3 failed in tools/test_profile.py as on main on a Mac)
 - [x] Task: Conductor - User Manual Verification 'Phase 5: A headless game, and the final build' (Protocol in workflow.md)
+
+## Phase: Review Fixes
+- [x] Task: Apply review suggestions 6aeb40a2
