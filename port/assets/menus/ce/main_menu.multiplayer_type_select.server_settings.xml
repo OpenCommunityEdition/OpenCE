@@ -562,6 +562,8 @@
 		<string text="2 MB/S"/>
 		<string text="4 MB/S"/>
 		<string text="8 MB/S"/>
+		<string text="16 MB/S"/>
+		<string text="20 MB/S"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/map_share_options/map_share_options_labels">
 		<string text="SHARE MAPS:"/>
@@ -570,6 +572,8 @@
 	<strings name="main_menu/multiplayer_type_select/server_settings/map_share_options/cap_map_share_options">
 		<string text="Players who join without the map download it\nfrom you and the other players."/>
 		<string text="Players who join without the map cannot play."/>
+		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>
+		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>
 		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>
 		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>
 		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>
