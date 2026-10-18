@@ -26,6 +26,8 @@ Mirrored from port/linux/src/platform.h:
 	void platform_log(const char *format, ...)    36 uses in the four
 	const char *platform_data_root(void)           3 uses in the four
 
+and, for the mods (port/linux/src/port_mods.c), the three below it.
+
 Nothing else in that header is named by them, which is why nothing else is
 here. Two units in port/linux/src keep this honest on every Linux build and in
 CI, where the Mac's own compiler cannot reach:
@@ -93,5 +95,17 @@ play reads and writes join_link.txt here, which is how a launcher hands
 the running game a halo:// invite. port/mac/platform.c answers it from the
 Mac's own mac_engine_files_data_root. */
 const char *platform_data_root(void);
+
+/* whether an address is in the Xbox's contiguous memory, which the renderer
+watches (port/mac/native_resource_memory.c), and the call that tells it a
+write is coming. The mods' file reads go through both. */
+int platform_is_contiguous(const void *address);
+void memory_watch_prepare_write(void *address, unsigned long size);
+
+/* asks the player a question in a box with a button for each label: the
+button chosen, or -1 if it cannot ask. The Mac cannot yet (port/mac/platform.c),
+so the mods that cannot be played together are all played, as a run nobody
+watches plays them, and the Mods menu turns them off. */
+int platform_ask(const char *title, const char *text, const char *const *labels, int count, int default_index);
 
 #endif

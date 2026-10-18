@@ -52,10 +52,18 @@ at startup whether to play them anyway, turn those named off, or quit
 #include "posix.h"
 #include "tomlc17.h"
 
+#ifndef HALO_MAC
 #include <SDL3/SDL.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* the files are read and written with the C library where SDL's are the host's
+(the Android guest) or not linked (the Mac build, which has no SDL) */
+#if defined(HALO_ARM64_GUEST) || defined(HALO_MAC)
+#define MODS_STDIO
+#endif
 
 #ifdef HALO_WEB
 /* (port/web/src/web_library.js) */
@@ -777,13 +785,13 @@ static int text_file_write(const char *path, const char *text)
 {
 	char temporary[MAXIMUM_PATH_LENGTH];
 	int written;
-#ifdef HALO_ARM64_GUEST
+#ifdef MODS_STDIO
 	FILE *file;
 #endif
 
 	if (snprintf(temporary, sizeof(temporary), "%s.new", path) >= (int)sizeof(temporary))
 		return 0;
-#ifdef HALO_ARM64_GUEST
+#ifdef MODS_STDIO
 	/* (the guest's own C library: SDL's are the host's) */
 	file = fopen(temporary, "wb");
 	if (!file)
@@ -1011,7 +1019,7 @@ int port_mods_file_read(long file, unsigned long offset, void *buffer, unsigned 
 	unsigned char *staging = NULL;
 	unsigned long done = 0;
 	int read = 1;
-#ifdef HALO_ARM64_GUEST
+#ifdef MODS_STDIO
 	FILE *stream;
 #else
 	SDL_IOStream *stream;
@@ -1022,7 +1030,7 @@ int port_mods_file_read(long file, unsigned long offset, void *buffer, unsigned 
 	path = port_mods.files[file].path;
 	if (bounce && !(staging = malloc(READ_BOUNCE_SIZE)))
 		return 0;
-#ifdef HALO_ARM64_GUEST
+#ifdef MODS_STDIO
 	stream = fopen(path, "rb");
 	if (!stream || fseek(stream, (long)offset, SEEK_SET) != 0)
 		read = 0;
@@ -1039,7 +1047,7 @@ int port_mods_file_read(long file, unsigned long offset, void *buffer, unsigned 
 
 		if (bounce && wanted > READ_BOUNCE_SIZE)
 			wanted = READ_BOUNCE_SIZE;
-#ifdef HALO_ARM64_GUEST
+#ifdef MODS_STDIO
 		read = fread(bounce ? staging : destination, 1, wanted, stream) == wanted;
 #else
 		read = SDL_ReadIO(stream, bounce ? staging : destination, wanted) == wanted;
@@ -1053,7 +1061,7 @@ int port_mods_file_read(long file, unsigned long offset, void *buffer, unsigned 
 	}
 	if (stream)
 	{
-#ifdef HALO_ARM64_GUEST
+#ifdef MODS_STDIO
 		fclose(stream);
 #else
 		SDL_CloseIO(stream);
@@ -1426,7 +1434,11 @@ void port_mods_startup(void)
 	}
 	else if (answer < 0)
 	{
+#ifdef HALO_MAC
+		platform_log("mods: cannot ask: played all anyway");
+#else
 		platform_log("mods: cannot ask (%s): played all anyway", SDL_GetError());
+#endif
 	}
 	else
 	{

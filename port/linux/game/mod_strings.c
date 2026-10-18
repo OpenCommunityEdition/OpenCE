@@ -34,6 +34,7 @@ made is kept until the map goes, as what is shown may hold its strings.
 #include "text/text_group.h"
 #include "tag_schema.h"
 #include "mods.h"
+#include "halo_endian.h" /* port: HALO_BIG_ENDIAN_HOST (port/linux/include/halo_endian.h) */
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -144,16 +145,31 @@ static void mod_string_list_free(
 	return;
 }
 
-/* the character at `index` of a string of `size` bytes */
+/* the character at `index` of a string of `size` bytes: a tag file's
+unicode string is little-endian, a loaded tag's (`native`) is the host's */
 static unsigned short character_get(
 	byte const *string,
 	unsigned long size,
 	unsigned long index,
-	boolean unicode)
+	boolean unicode,
+	boolean native)
 {
 	if (unicode)
 	{
-		return 2 * index + 1 < size ? (unsigned short)(string[2 * index] | string[2 * index + 1] << 8) : 0;
+		if (2 * index + 1 >= size)
+		{
+			return 0;
+		}
+#ifdef HALO_BIG_ENDIAN_HOST
+		/* port: the loaded tags of a big-endian host hold their characters as it does */
+		if (native)
+		{
+			return (unsigned short)(string[2 * index] << 8 | string[2 * index + 1]);
+		}
+#endif
+		(void)native;
+
+		return (unsigned short)(string[2 * index] | string[2 * index + 1] << 8);
 	}
 
 	return index < size ? string[index] : 0;
@@ -173,25 +189,26 @@ static long format_conversions(
 	byte const *string,
 	unsigned long size,
 	boolean unicode,
+	boolean native,
 	struct conversion *conversions)
 {
 	unsigned long length = unicode ? size / 2 : size;
 	unsigned long index = 0;
 	long count = 0;
 
-	while (index < length && character_get(string, size, index, unicode))
+	while (index < length && character_get(string, size, index, unicode, native))
 	{
 		struct conversion *conversion;
 		unsigned short character;
 		short modifier_length = 0;
 
-		if (character_get(string, size, index, unicode) != '%')
+		if (character_get(string, size, index, unicode, native) != '%')
 		{
 			index++;
 			continue;
 		}
 		index++;
-		if (character_get(string, size, index, unicode) == '%')
+		if (character_get(string, size, index, unicode, native) == '%')
 		{
 			index++;
 			continue;
@@ -203,7 +220,7 @@ static long format_conversions(
 		conversion = &conversions[count++];
 		memset(conversion, 0, sizeof(*conversion));
 		/* (flags, width and precision, then the length modifier) */
-		while (character_in(character = character_get(string, size, index, unicode), "-+ #0123456789.*hlLqjzt"))
+		while (character_in(character = character_get(string, size, index, unicode, native), "-+ #0123456789.*hlLqjzt"))
 		{
 			if (character == '*')
 			{
@@ -235,8 +252,8 @@ static boolean formats_match(
 {
 	struct conversion conversions[MAXIMUM_CONVERSIONS];
 	struct conversion map_conversions[MAXIMUM_CONVERSIONS];
-	long count = format_conversions(string, size, unicode, conversions);
-	long map_count = format_conversions(map_string, map_size, unicode, map_conversions);
+	long count = format_conversions(string, size, unicode, FALSE, conversions);
+	long map_count = format_conversions(map_string, map_size, unicode, TRUE, map_conversions);
 	long index;
 
 	if (count == NONE || count != map_count)
@@ -351,6 +368,20 @@ static struct mod_string_list *mod_string_list_new(
 				character_cursor += size + terminator;
 				if (group->unicode)
 				{
+#ifdef HALO_BIG_ENDIAN_HOST
+					/* port: the file's characters are little-endian */
+					{
+						unsigned long swap;
+
+						for (swap = 0; swap + 1 < size; swap += 2)
+						{
+							byte low = characters[swap];
+
+							characters[swap] = characters[swap + 1];
+							characters[swap + 1] = low;
+						}
+					}
+#endif
 					tag_schema_unicode_string_end((wchar_t *)characters, (long)((size + terminator) / 2));
 				}
 				entry->string.size = (long)(size + terminator);

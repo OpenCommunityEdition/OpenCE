@@ -11,6 +11,7 @@ the host ABI and _FILE_OFFSET_BITS=64.
 #include <strings.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -30,6 +31,15 @@ static void fill_information(const struct stat *st, struct posix_file_informatio
 	if (!(st->st_mode & S_IWUSR))
 		information->flags |= _posix_file_is_read_only;
 	split64((unsigned long long)st->st_size, &information->size_low, &information->size_high);
+#ifdef __APPLE__
+	/* port: the Mac's names for the times (Mac OS X 10.4 and later) */
+	information->modification_seconds = (posix_ulong)st->st_mtimespec.tv_sec;
+	information->modification_nanoseconds = (posix_ulong)st->st_mtimespec.tv_nsec;
+	information->access_seconds = (posix_ulong)st->st_atimespec.tv_sec;
+	information->access_nanoseconds = (posix_ulong)st->st_atimespec.tv_nsec;
+	information->creation_seconds = (posix_ulong)st->st_ctimespec.tv_sec;
+	information->creation_nanoseconds = (posix_ulong)st->st_ctimespec.tv_nsec;
+#else
 	information->modification_seconds = (posix_ulong)st->st_mtim.tv_sec;
 	information->modification_nanoseconds = (posix_ulong)st->st_mtim.tv_nsec;
 	information->access_seconds = (posix_ulong)st->st_atim.tv_sec;
@@ -37,6 +47,7 @@ static void fill_information(const struct stat *st, struct posix_file_informatio
 	/* Linux has no portable creation time; the change time is the closest */
 	information->creation_seconds = (posix_ulong)st->st_ctim.tv_sec;
 	information->creation_nanoseconds = (posix_ulong)st->st_ctim.tv_nsec;
+#endif
 }
 
 int posix_stat(const char *path, struct posix_file_information *information)
@@ -63,6 +74,19 @@ int posix_set_file_times(const char *path,
 	posix_ulong access_seconds, posix_ulong access_nanoseconds,
 	posix_ulong modification_seconds, posix_ulong modification_nanoseconds)
 {
+#ifdef __APPLE__
+	/* port: Mac OS X 10.4 has no utimensat: utimes, with the time left alone taken from the file (microseconds) */
+	struct stat st;
+	struct timeval times[2];
+
+	if (stat(path, &st) != 0)
+		return -1;
+	times[0].tv_sec = access_seconds ? (time_t)access_seconds : st.st_atimespec.tv_sec;
+	times[0].tv_usec = access_seconds ? (int)(access_nanoseconds / 1000) : (int)(st.st_atimespec.tv_nsec / 1000);
+	times[1].tv_sec = modification_seconds ? (time_t)modification_seconds : st.st_mtimespec.tv_sec;
+	times[1].tv_usec = modification_seconds ? (int)(modification_nanoseconds / 1000) : (int)(st.st_mtimespec.tv_nsec / 1000);
+	return utimes(path, times);
+#else
 	struct timespec times[2];
 
 	times[0].tv_sec = (time_t)access_seconds;
@@ -70,6 +94,7 @@ int posix_set_file_times(const char *path,
 	times[1].tv_sec = (time_t)modification_seconds;
 	times[1].tv_nsec = modification_seconds ? (long)modification_nanoseconds : UTIME_OMIT;
 	return utimensat(AT_FDCWD, path, times, 0);
+#endif
 }
 
 int posix_seek(int descriptor, posix_long offset_low, posix_long offset_high, int whence,

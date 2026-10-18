@@ -535,14 +535,17 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     for unit in port/linux/src/p2p.c port/linux/src/p2p_crypto.c port/linux/src/p2p_discord.c \
         port/linux/src/p2p_lobby.c port/linux/src/p2p_signal.c port/linux/src/p2p_webrtc.c \
         port/linux/src/posix_net.c port/linux/src/posix_dtls.c port/linux/src/posix_upnp.c \
-        port/mac/mac_mbedtls_time.c port/mac/mac_p2p_hardware_id.c \
-        port/third_party/monocypher/monocypher-ed25519.c; do
+        port/mac/mac_mbedtls_time.c port/mac/mac_p2p_hardware_id.c port/third_party/monocypher/monocypher-ed25519.c \
+        port/linux/src/port_mods.c port/linux/src/posix_files.c port/mac/platform.c; do
         name=$(basename "$unit" .c)
         recognized_units="$recognized_units $name "
         obj="$out/${name}_$arch.o"
         shim=
         case "$name" in
             p2p|p2p_discord|p2p_lobby|p2p_signal) shim="-include port/mac/platform.h" ;;
+            # port: the mods folder's scan and file reads (the stubs in engine_upstream_stubs.c are gone), with the
+            # C library's files in place of SDL's (HALO_MAC)
+            port_mods) shim="-include port/mac/platform.h -DHALO_MAC -Iport/third_party/tomlc17" ;;
         esac
         if [ "${MAC_RENDERED_SESSION_INCREMENTAL:-0}" != 1 ] || \
             case "$recompile" in *" $name "*) true ;; *) false ;; esac; then

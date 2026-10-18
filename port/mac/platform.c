@@ -40,3 +40,11 @@ const char *platform_data_root(void)
 	}
 	return root;
 }
+
+/* (no box with several buttons yet: Carbon's standard alert has two, and
+engine_messages.c shows one-button messages on the window's own thread) */
+int platform_ask(const char *title, const char *text, const char *const *labels, int count, int default_index)
+{
+	(void)title; (void)text; (void)labels; (void)count; (void)default_index;
+	return -1;
+}

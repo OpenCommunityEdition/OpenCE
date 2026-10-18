@@ -145,6 +145,14 @@ game.
 ### Getting a mod onto each platform
 
 - **Linux, Windows**: put the mod's folder in `mods/` next to `maps/`.
+- **Mac**: put it in `mods/` in the data root, next to `maps/`. The Mac
+  build (PowerSpark) compiles `port_mods.c` with the C library's files in
+  place of SDL's (`HALO_MAC`). It cannot yet ask about mods that say they
+  cannot be played together: it plays them all, and the Mods menu turns
+  them off. Mods are checked on Intel Macs (a mod's bitmap changed the
+  frame of an Xbox Blood Gulch). On PowerPC the mod files' bytes are read
+  as they are (Halo PC's tags are big-endian, as the host is) and a mod's
+  text is swapped to the host's order, but no PowerPC has run them yet.
 - **Android**: put it in `mods/` in the app's data folder,
   `/sdcard/Android/data/com.halo.decomp/files/mods`, for example with
   `adb push hd_audio /sdcard/Android/data/com.halo.decomp/files/mods/`.
