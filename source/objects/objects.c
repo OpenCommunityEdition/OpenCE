@@ -232,22 +232,112 @@ long cluster_get_next_noncollideable_object(
 		reference_index);
 }
 
+#ifdef __APPLE__
+/* port: the Mac build. The collision loops walk a cluster's objects (a reference list, then each object's header,
+datum, and the fields at the datum's start and its end), every one a cache miss on a G4 that waits for the one
+before. The lines of the object after the one handed out are asked for now, so that the misses overlap with the
+work on this one. Nothing is read that a result depends on and nothing is written (a hint has no effect on any
+value), and indices outside the arrays are left alone. */
+struct object_reference_view
+{
+	short identifier;
+	word pad;
+	long datum_index;
+	long next_reference_index;
+};
+
+static __inline__ void object_datum_prefetch(
+	struct object_datum const *object)
+{
+	halo_prefetch(object);
+	halo_prefetch((char const *)object + 32);
+	halo_prefetch((char const *)object + 64);
+	halo_prefetch((char const *)object + 96);
+	halo_prefetch(&object->object.next_object_index);
+
+	return;
+}
+
+static __inline__ void object_prefetch_by_index(
+	long object_index)
+{
+	struct data_array const *headers = object_header_data;
+	short absolute_index = (short)object_index;
+
+	if (headers && absolute_index >= 0 && absolute_index < headers->count)
+	{
+		struct object_header_datum const *header = (struct object_header_datum const *)
+			((char const *)headers->data + sizeof(struct object_header_datum) * absolute_index);
+
+		if (header->datum)
+		{
+			object_datum_prefetch(header->datum);
+		}
+	}
+
+	return;
+}
+
+static __inline__ void collideable_reference_prefetch(
+	long reference_index)
+{
+	struct data_array const *references = collideable_object_cluster_partition.data_reference_data;
+	short absolute_index = (short)reference_index;
+
+	if (references && absolute_index >= 0 && absolute_index < references->count)
+	{
+		struct object_reference_view const *reference = (struct object_reference_view const *)
+			((char const *)references->data + references->size * absolute_index);
+		short next_index = (short)reference->next_reference_index;
+
+		object_prefetch_by_index(reference->datum_index);
+		if (next_index >= 0 && next_index < references->count)
+		{
+			halo_prefetch((char const *)references->data + references->size * next_index);
+		}
+	}
+
+	return;
+}
+#endif
+
 long cluster_get_first_collideable_object(
 	long *reference_index,
 	short cluster_index)
 {
+#ifdef __APPLE__
+	long result = cluster_partition_get_first_datum(
+		&collideable_object_cluster_partition,
+		reference_index,
+		cluster_index);
+
+	collideable_reference_prefetch(*reference_index);
+
+	return result;
+#else
 	return cluster_partition_get_first_datum(
 		&collideable_object_cluster_partition,
 		reference_index,
 		cluster_index);
+#endif
 }
 
 long cluster_get_next_collideable_object(
 	long *reference_index)
 {
+#ifdef __APPLE__
+	long result = cluster_partition_get_next_datum(
+		&collideable_object_cluster_partition,
+		reference_index);
+
+	collideable_reference_prefetch(*reference_index);
+
+	return result;
+#else
 	return cluster_partition_get_next_datum(
 		&collideable_object_cluster_partition,
 		reference_index);
+#endif
 }
 
 short object_get_next_cluster(
@@ -4596,6 +4686,13 @@ void objects_update(
 	object_header = (struct object_header_datum *)object_header_data->data;
 	for (i = 0; i<object_header_data->count; ++object_header)
 	{
+#ifdef __APPLE__
+		/* port: the datum of the header three on, asked for now (see cluster_get_next_collideable_object) */
+		if (i + 3 < object_header_data->count && object_header[3].datum)
+		{
+			object_datum_prefetch(object_header[3].datum);
+		}
+#endif
 		if (object_header->identifier)
 		{
 			if (TEST_FLAG(object_header->flags, _object_header_active_bit) &&

@@ -76,4 +76,13 @@ void mac_xbox_cache_header_to_native(void *header);
 #define mac_xbox_cache_header_to_native(header) ((void)(header))
 #endif
 
+/* port: a hint to the processor to load the cache line holding p (no effect on any result; a G4 stalls on
+   every miss of the game's pointer-chasing loops, which this lets overlap). Apple builds only; nothing
+   elsewhere */
+#if defined(__APPLE__) && defined(__GNUC__)
+#define halo_prefetch(p) __builtin_prefetch((void const *)(p))
+#else
+#define halo_prefetch(p) ((void)0)
+#endif
+
 #endif

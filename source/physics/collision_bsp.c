@@ -251,19 +251,6 @@ static boolean collision_surface_test_point(
 	short projection,
 	boolean sign,
 	real_point2d const *point);
-static boolean collision_bsp3d_enter_node(
-	struct collision_bsp const *bsp,
-	long node_index,
-	short depth,
-	long *nodes_left);
-static boolean collision_bsp2d_enter_node(
-	struct collision_bsp const *bsp,
-	long node_index,
-	short depth,
-	long *nodes_left);
-static boolean collision_bsp_valid_leaf(
-	struct collision_bsp const *bsp,
-	long leaf_index);
 static boolean collision_bsp_test_pill_new_recursive(
 	struct collision_bsp_test_pill_new_context *data,
 	long node_index,
@@ -342,6 +329,101 @@ static boolean warned_about_collision_surface_index;
 static boolean warned_about_collision_bsp_nodes;
 static boolean warned_about_collision_bsp2d_nodes;
 static boolean warned_about_collision_leaf;
+
+/* port: the three below are small and called for every node and leaf of a test, so they are inline (a call
+to each cost a G4 a frame and a branch per node); defined here, before their uses */
+/* port: whether a test may enter a node (from the map) `depth` nodes deep
+in the bsp3d. One that is no node, deeper than the plane stacks hold
+(MAXIMUM_BSP3D_TRAVERSAL_DEPTH: the retail bsps are at most 66 deep), or
+past `nodes_left` (the bsp's node count when the test begins: a test enters
+each node of a tree at most once, so nodes that make no tree, a cycle or a
+node with two parents, would make it never end) ends the test there. The
+retail bsps are all trees */
+static __inline__ boolean collision_bsp3d_enter_node(
+	struct collision_bsp const *bsp,
+	long node_index,
+	short depth,
+	long *nodes_left)
+{
+	if (node_index < bsp->bsp3d.nodes.count &&
+		depth < MAXIMUM_BSP3D_TRAVERSAL_DEPTH &&
+		--*nodes_left >= 0)
+	{
+		return TRUE;
+	}
+
+	if (!warned_about_collision_bsp_nodes)
+	{
+		error(_error_silent, "a collision bsp's nodes are not a tree of its nodes at most %d deep",
+			MAXIMUM_BSP3D_TRAVERSAL_DEPTH);
+		warned_about_collision_bsp_nodes = TRUE;
+	}
+
+	return FALSE;
+}
+
+/* port: (as collision_bsp3d_enter_node, in a bsp2d of the bsp, at most
+MAXIMUM_BSP2D_TRAVERSAL_DEPTH deep, where the retail bsp2ds are at most 8:
+`nodes_left` is the bsp2d's node count when a bsp2d test begins) */
+static __inline__ boolean collision_bsp2d_enter_node(
+	struct collision_bsp const *bsp,
+	long node_index,
+	short depth,
+	long *nodes_left)
+{
+	if (node_index < bsp->bsp2d.nodes.count &&
+		depth < MAXIMUM_BSP2D_TRAVERSAL_DEPTH &&
+		--*nodes_left >= 0)
+	{
+		return TRUE;
+	}
+
+	if (!warned_about_collision_bsp2d_nodes)
+	{
+		error(_error_silent, "a collision bsp's bsp2d nodes are not a tree of its nodes at most %d deep",
+			MAXIMUM_BSP2D_TRAVERSAL_DEPTH);
+		warned_about_collision_bsp2d_nodes = TRUE;
+	}
+
+	return FALSE;
+}
+
+/* port: whether a leaf (from the map) is one of the bsp's, whose bsp2d
+references are all the bsp's (a test skips one that is not) */
+static __inline__ boolean collision_bsp_valid_leaf(
+	struct collision_bsp const *bsp,
+	long leaf_index)
+{
+	struct collision_leaf const *leaf;
+
+	if (leaf_index >= 0 && leaf_index < bsp->leaves.count)
+	{
+		leaf = TAG_BLOCK_GET_ELEMENT(
+			&bsp->leaves,
+			leaf_index,
+			struct collision_leaf);
+		/* (one with no references may name none: NONE) */
+		if (leaf->bsp2d_reference_count == 0 ||
+			(leaf->first_bsp2d_reference_index >= 0 &&
+			leaf->bsp2d_reference_count > 0 &&
+			leaf->first_bsp2d_reference_index <=
+				bsp->bsp2d_references.count - leaf->bsp2d_reference_count))
+		{
+			return TRUE;
+		}
+	}
+
+	if (!warned_about_collision_leaf)
+	{
+		error(_error_silent, "collision leaf #%ld is not one of the bsp's %ld, or its references are not the bsp's",
+			leaf_index,
+			bsp->leaves.count);
+		warned_about_collision_leaf = TRUE;
+	}
+
+	return FALSE;
+}
+
 
 /* ---------- public code */
 
@@ -1260,98 +1342,6 @@ boolean collision_bsp_test_vector(
 }
 
 /* ---------- private code */
-
-/* port: whether a test may enter a node (from the map) `depth` nodes deep
-in the bsp3d. One that is no node, deeper than the plane stacks hold
-(MAXIMUM_BSP3D_TRAVERSAL_DEPTH: the retail bsps are at most 66 deep), or
-past `nodes_left` (the bsp's node count when the test begins: a test enters
-each node of a tree at most once, so nodes that make no tree, a cycle or a
-node with two parents, would make it never end) ends the test there. The
-retail bsps are all trees */
-static boolean collision_bsp3d_enter_node(
-	struct collision_bsp const *bsp,
-	long node_index,
-	short depth,
-	long *nodes_left)
-{
-	if (node_index < bsp->bsp3d.nodes.count &&
-		depth < MAXIMUM_BSP3D_TRAVERSAL_DEPTH &&
-		--*nodes_left >= 0)
-	{
-		return TRUE;
-	}
-
-	if (!warned_about_collision_bsp_nodes)
-	{
-		error(_error_silent, "a collision bsp's nodes are not a tree of its nodes at most %d deep",
-			MAXIMUM_BSP3D_TRAVERSAL_DEPTH);
-		warned_about_collision_bsp_nodes = TRUE;
-	}
-
-	return FALSE;
-}
-
-/* port: (as collision_bsp3d_enter_node, in a bsp2d of the bsp, at most
-MAXIMUM_BSP2D_TRAVERSAL_DEPTH deep, where the retail bsp2ds are at most 8:
-`nodes_left` is the bsp2d's node count when a bsp2d test begins) */
-static boolean collision_bsp2d_enter_node(
-	struct collision_bsp const *bsp,
-	long node_index,
-	short depth,
-	long *nodes_left)
-{
-	if (node_index < bsp->bsp2d.nodes.count &&
-		depth < MAXIMUM_BSP2D_TRAVERSAL_DEPTH &&
-		--*nodes_left >= 0)
-	{
-		return TRUE;
-	}
-
-	if (!warned_about_collision_bsp2d_nodes)
-	{
-		error(_error_silent, "a collision bsp's bsp2d nodes are not a tree of its nodes at most %d deep",
-			MAXIMUM_BSP2D_TRAVERSAL_DEPTH);
-		warned_about_collision_bsp2d_nodes = TRUE;
-	}
-
-	return FALSE;
-}
-
-/* port: whether a leaf (from the map) is one of the bsp's, whose bsp2d
-references are all the bsp's (a test skips one that is not) */
-static boolean collision_bsp_valid_leaf(
-	struct collision_bsp const *bsp,
-	long leaf_index)
-{
-	struct collision_leaf const *leaf;
-
-	if (leaf_index >= 0 && leaf_index < bsp->leaves.count)
-	{
-		leaf = TAG_BLOCK_GET_ELEMENT(
-			&bsp->leaves,
-			leaf_index,
-			struct collision_leaf);
-		/* (one with no references may name none: NONE) */
-		if (leaf->bsp2d_reference_count == 0 ||
-			(leaf->first_bsp2d_reference_index >= 0 &&
-			leaf->bsp2d_reference_count > 0 &&
-			leaf->first_bsp2d_reference_index <=
-				bsp->bsp2d_references.count - leaf->bsp2d_reference_count))
-		{
-			return TRUE;
-		}
-	}
-
-	if (!warned_about_collision_leaf)
-	{
-		error(_error_silent, "collision leaf #%ld is not one of the bsp's %ld, or its references are not the bsp's",
-			leaf_index,
-			bsp->leaves.count);
-		warned_about_collision_leaf = TRUE;
-	}
-
-	return FALSE;
-}
 
 static void add_feature(
 	long *count,

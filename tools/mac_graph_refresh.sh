@@ -60,7 +60,8 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     refreshed="$out/render-graph/engine_objects_refreshed_$arch.txt"
     report="$fresh/report_$arch.txt"
     fp=
-    [ "$arch" != ppc ] || fp=-mno-fused-madd
+    # port: -mdynamic-no-pic as in mac_rendered_session_checks.sh's compile_engine_unit (MAC_PPC_CODEGEN= for none)
+    [ "$arch" != ppc ] || fp="-mno-fused-madd ${MAC_PPC_CODEGEN--mdynamic-no-pic}"
     : > "$report"
     : > "$refreshed"
     for obj in $(cat "$list"); do

@@ -115,7 +115,10 @@ compile_engine_unit() {
     # port: ui_widget.c's wide-string redirect (as in mac_game_tick_checks.sh)
     if [ "$source" = source/interface/ui_widget.c ]; then last="-include port/mac/engine_wide_redirect.h"; fi
     fp=
-    if [ "$arch" = ppc ]; then fp=-mno-fused-madd; fi
+    # port: -mdynamic-no-pic (PowerPC): the session is an executable, so the game's code reaches its globals and
+    # strings by address and not through a position-independent base it sets up in each function (a G4 pays
+    # for that in every call); no result changes. MAC_PPC_CODEGEN= (empty) builds it the old way.
+    if [ "$arch" = ppc ]; then fp="-mno-fused-madd ${MAC_PPC_CODEGEN--mdynamic-no-pic}"; fi
     # shellcheck disable=SC2086
     "$cc" -arch "$arch" -isysroot "$sdk" -mmacosx-version-min=10.4 \
         -std=gnu89 -O2 $fp -DHALO_MAC -fms-extensions -fshort-wchar \
