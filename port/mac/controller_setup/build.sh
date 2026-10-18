@@ -20,9 +20,16 @@ $CC $FLAGS -c controller_setup_config.c -o config.o
 $CC $FLAGS -c controller_setup_hid.c -o hid.o
 $CC $FLAGS -c ../mac_gamepad_report.c -o report.o
 $CC $FLAGS -c ../app/launcher_config.c -o launcher_config.o
-$CC $FLAGS -o "$APP/Contents/MacOS/OpenCE Controller Setup" main.o config.o hid.o report.o launcher_config.o \
+# the Bluetooth stack (../bt/, C89) and its window
+$CC $FLAGS -fno-objc-gc -x objective-c -std=gnu99 -c bt_panel.m -o bt_panel.o
+BT=""
+for f in util pad keys realtek l2cap hid hci ssp fake usb_iokit session selftest; do
+	$CC $FLAGS -c ../bt/bt_$f.c -o bt_$f.o
+	BT="$BT bt_$f.o"
+done
+$CC $FLAGS -o "$APP/Contents/MacOS/OpenCE Controller Setup" main.o bt_panel.o $BT config.o hid.o report.o launcher_config.o \
 	-framework Cocoa -framework Carbon -framework IOKit -framework Security
-rm -f main.o config.o hid.o report.o launcher_config.o
+rm -f main.o bt_panel.o $BT config.o hid.o report.o launcher_config.o
 cp Info.plist "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 lipo -info "$APP/Contents/MacOS/OpenCE Controller Setup"

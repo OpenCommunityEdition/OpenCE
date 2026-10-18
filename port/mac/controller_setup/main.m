@@ -12,6 +12,8 @@
 #include "controller_setup_config.h"
 #include "controller_setup_hid.h"
 #include "../mac_gamepad_report.h"
+#include "controller_setup_ui.h"
+#include "../bt/bt_selftest.h"
 
 static NSString *gConfigPath = nil;
 
@@ -50,17 +52,7 @@ static int DeviceNumber(IOHIDDeviceRef device, CFStringRef key)
 
 /* ---- the live view ---- */
 
-@interface PadView : NSView {
-@public
-	cs_pad_state pad;
-	BOOL hasPad;
-	BOOL isXbox;
-	int leftDeadZone;
-	int rightDeadZone;
-	NSString *padName;
-	NSString *sonyModel; /* "DualShock 4", "DualSense" or nil */
-}
-@end
+
 
 @implementation PadView
 
@@ -150,6 +142,23 @@ static int DeviceNumber(IOHIDDeviceRef device, CFStringRef key)
 	}
 	[@"D-pad" drawAtPoint:NSMakePoint(150, 44) withAttributes:attrs];
 
+	if (showTouch) {
+		/* the touchpad, with the fingers on it (a Bluetooth DualSense or DualShock 4) */
+		NSRect tp = NSMakeRect(368, 34, 124, 58);
+		int f;
+		[[NSColor colorWithCalibratedWhite:0.93 alpha:1] set];
+		NSRectFill(tp);
+		[[NSColor grayColor] set];
+		NSFrameRect(tp);
+		[@"Touchpad" drawAtPoint:NSMakePoint(tp.origin.x + 2, tp.origin.y - 14) withAttributes:small];
+		for (f = 0; f < 2; f++)
+			if (touchActive[f] && touchWidth > 0 && touchHeight > 0) {
+				float fx = tp.origin.x + tp.size.width * (float)touchX[f] / (float)touchWidth;
+				float fy = tp.origin.y + tp.size.height - tp.size.height * (float)touchY[f] / (float)touchHeight;
+				[[NSColor colorWithCalibratedRed:f ? 0.1 : 0.8 green:0.4 blue:f ? 0.8 : 0.1 alpha:1] set];
+				[[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(fx - 5, fy - 5, 10, 10)] fill];
+			}
+	}
 	if (isXbox != CS_LAYOUT_GENERIC) {
 		[self drawBarAt:NSMakeRect(205, 60, 16, 80) value:pad.lt max:1023 label:@"LT"];
 		[self drawBarAt:NSMakeRect(228, 60, 16, 80) value:pad.rt max:1023 label:@"RT"];
@@ -439,6 +448,7 @@ static CFMutableDictionaryRef MatchPage(int page, int usage)
 	[[window contentView] addSubview:invertBox];
 
 	skipButton = [self buttonAt:NSMakeRect(10, 6, 90, 32) title:@"Skip" action:@selector(skip:)];
+	[self buttonAt:NSMakeRect(110, 6, 200, 32) title:@"Bluetooth (experimental)..." action:@selector(openBluetooth:)];
 	saveButton = [self buttonAt:NSMakeRect(410, 6, 100, 32) title:@"Save" action:@selector(save:)];
 	[saveButton setKeyEquivalent:@"\r"];
 
@@ -499,6 +509,16 @@ static int DumpView(NSView *view, int depth, NSString *indent)
 		bad += DumpView(v, depth + 1, [indent stringByAppendingString:@"  "]);
 	}
 	return bad;
+}
+
+int CSDumpView(NSView *view, int depth, NSString *indent)
+{
+	return DumpView(view, depth, indent);
+}
+
+NSSize CSThemeSize(NSString *text, ThemeFontID font, float width, BOOL wrap)
+{
+	return ThemeSize(text, font, width, wrap);
 }
 
 - (void)dumpText
@@ -818,14 +838,17 @@ static int DumpView(NSView *view, int depth, NSString *indent)
 		NSRunAlertPanel(@"Could not write the config file", @"%@", @"OK", nil, nil, gConfigPath);
 		return;
 	}
+	CSBluetoothShutdown();
 	exit(0);
 }
 
+- (void)openBluetooth:(id)sender { CSBluetoothShow(gConfigPath); }
 - (void)save:(id)sender { [self finish:NO]; }
 - (void)skip:(id)sender { [self finish:YES]; }
 
 - (void)windowWillClose:(NSNotification *)n
 {
+	CSBluetoothShutdown();
 	exit(1); /* closed without saving: the launcher asks again next time */
 }
 
@@ -837,6 +860,10 @@ int main(int argc, char **argv)
 	SetupController *controller;
 	int i;
 
+	/* the Bluetooth stack's headless checks: no window, no application */
+	for (i = 1; i < argc; i++)
+		if (strcmp(argv[i], "--bt-selftest") == 0)
+			return bt_selftest_main(argc, argv);
 	for (i = 1; i + 1 < argc; i++) {
 		if (strcmp(argv[i], "--config") == 0)
 			gConfigPath = [[NSString stringWithUTF8String:argv[++i]] retain];
@@ -850,6 +877,8 @@ int main(int argc, char **argv)
 			/* the window is built but never shown, and no pad is opened */
 			[controller buildUI];
 			[controller dumpText];
+			printf("\nBluetooth panel\n");
+			printf("%s\n", CSBluetoothDumpText() ? "CUT OFF: yes (Bluetooth panel)" : "nothing cut off (Bluetooth panel)");
 			return 0;
 		}
 	[controller start];

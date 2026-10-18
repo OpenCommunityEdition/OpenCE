@@ -334,6 +334,13 @@ static const struct config_setting config_settings[] =
 	{ "input.gamepad_setup_done", _config_boolean, "false", "HALO_GAMEPAD_SETUP_DONE", _environment_set_is_true,
 		_platform_mac,
 		"Mac: the launcher has offered the controller setup (set by it)." },
+	{ "input.bluetooth_firmware_dir", _config_string, "\"\"", "HALO_BLUETOOTH_FIRMWARE_DIR", _environment_value,
+		_platform_mac,
+		"Mac: a folder with rtl8761bu_fw.bin (and rtl8761bu_config.bin), the\n"
+		"Realtek firmware that Controller Setup's Bluetooth (experimental) window\n"
+		"loads into a TP-Link UB500 dongle. Empty: ~/Library/Application\n"
+		"Support/OpenCE/Bluetooth/, then /Library/Application Support/\n"
+		"RealtekBTFirmware/. The firmware is not shipped with the game." },
 	/* the Mac builds' menus (port/mac/engine_menu.c) */
 	{ "game.start_in_menu", _config_boolean, "false", "HALO_START_IN_MENU", _environment_set_is_true,
 		_platform_mac,
