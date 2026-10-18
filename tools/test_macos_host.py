@@ -102,7 +102,7 @@ def game_data(tmp_path):
 def test_a_hosted_network_game_plays_headless(tmp_path):
     result = run_host(game_data(tmp_path), tmp_path / "home", exit_after=30, timeout=180,
                       extra={"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NET_ADDRESS": "127.0.0.1",
-                             "HALO_HOST_IMPORT_COUNTS": "1"})
+                             "HALO_HOST_IMPORT_COUNTS": "1", "HALO_HOST_SAMPLE": "10"})
     output = result.stdout + result.stderr
     assert result.returncode == 0, output[-4000:]
     assert "halo_host: guest crash" not in output, output[-4000:]
@@ -118,6 +118,8 @@ def test_a_hosted_network_game_plays_headless(tmp_path):
     imports = re.findall(r"halo_host: import (\w+): (\d+), (\d+)/s", output)
     assert ("host_syscall" in {name for name, _, _ in imports}), output[-4000:]
     assert sum(int(count) for _, count, _ in imports) <= int(exits[1])
+    # the sampler (HALO_HOST_SAMPLE): where each vCPU's guest code was
+    assert re.search(r"halo_host: sample: vCPU \d+ at 0x8[89ab][0-9a-f]{6}", output), output[-4000:]
 
 
 def bindable(address):

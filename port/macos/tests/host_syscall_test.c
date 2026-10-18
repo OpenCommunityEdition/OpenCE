@@ -99,6 +99,8 @@ int main(int argc, char **argv)
 	CHECK(host_syscall(__NR_clone, 0, 0, 0, 0, 0, 0) == -38);
 	CHECK(host_syscall(100000, 0, 0, 0, 0, 0, 0) == -38);
 	CHECK(host_syscall(__NR_getpid, 0, 0, 0, 0, 0, 0) == getpid());
+	/* one musl makes that the host does not, quietly */
+	CHECK(host_syscall(__NR_sysinfo, 0, 0, 0, 0, 0, 0) == -38);
 
 	/* openat with Linux's AT_FDCWD (-100) and its O_CREAT | O_EXCL | O_WRONLY
 	(0100 | 0200 | 01): the file is made, and a second time EEXIST (17) */
