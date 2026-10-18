@@ -10,7 +10,10 @@ crash. With the game data in assets/maps, a run under debug.exit_after
 ends with status 0, and one under debug.network_test hosts a game on
 bloodgulch and logs its player's state each second. With
 HALO_HOST_IMPORT_COUNTS set, that run reports its VM exits per second,
-in all and by import: the baseline for the renderer's batching.
+in all and by import: the baseline for the renderer's batching. Two
+copies on loopback addresses of their own, one hosting and one joining,
+each log the other's player; macOS has only 127.0.0.1 on lo0, so this
+needs aliases (`sudo ifconfig lo0 alias 127.0.0.2 up`, and 127.0.0.3).
 
 The runs never touch the home folder: HOME and XDG_DATA_HOME (where the
 platform layer keeps saves) are the test's own.
@@ -22,6 +25,7 @@ dummy video and audio drivers.
 import os
 import platform
 import re
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -39,7 +43,7 @@ pytestmark = [
 ]
 
 
-def run_host(data_root, home, exit_after=2, timeout=120, extra=None):
+def host_environment(data_root, home, exit_after, extra=None):
     environment = dict(os.environ)
     (home / "saves").mkdir(parents=True, exist_ok=True)
     environment.update({
@@ -53,8 +57,12 @@ def run_host(data_root, home, exit_after=2, timeout=120, extra=None):
         "SDL_AUDIO_DRIVER": "dummy",
         **(extra or {}),
     })
-    return subprocess.run([str(HOST), str(IMAGE)], cwd=data_root, env=environment, capture_output=True,
-                          text=True, timeout=timeout)
+    return environment
+
+
+def run_host(data_root, home, exit_after=2, timeout=120, extra=None):
+    return subprocess.run([str(HOST), str(IMAGE)], cwd=data_root, env=host_environment(data_root, home, exit_after, extra),
+                          capture_output=True, text=True, timeout=timeout)
 
 
 def test_the_guest_runs_its_main_and_exits_by_itself(tmp_path):
@@ -110,3 +118,44 @@ def test_a_hosted_network_game_plays_headless(tmp_path):
     imports = re.findall(r"halo_host: import (\w+): (\d+), (\d+)/s", output)
     assert ("host_syscall" in {name for name, _, _ in imports}), output[-4000:]
     assert sum(int(count) for _, count, _ in imports) <= int(exits[1])
+
+
+def bindable(address):
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        try:
+            probe.bind((address, 0))
+        except OSError:
+            return False
+    return True
+
+
+HOSTING, JOINING = "127.0.0.2", "127.0.0.3"
+
+
+@pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game data in assets/maps")
+@pytest.mark.skipif(not (bindable(HOSTING) and bindable(JOINING)),
+                    reason=f"needs {HOSTING} and {JOINING} on lo0 (sudo ifconfig lo0 alias <address> up)")
+def test_a_second_copy_joins_the_hosted_game(tmp_path):
+    def start(name, test, address, other, exit_after):
+        folder = tmp_path / name
+        folder.mkdir()
+        data_root = game_data(folder)
+        environment = host_environment(data_root, folder / "home", exit_after, {
+            "HALO_NETWORK_TEST": test, "HALO_NET_ADDRESS": address, "HALO_NET_BROADCAST": other})
+        return subprocess.Popen([str(HOST), str(IMAGE)], cwd=data_root, env=environment, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True)
+
+    host = start("host", "host:bloodgulch", HOSTING, JOINING, 60)
+    client = start("client", "join", JOINING, HOSTING, 50)
+    try:
+        client_output, _ = client.communicate(timeout=180)
+        host_output, _ = host.communicate(timeout=180)
+    finally:
+        for process in (host, client):
+            if process.poll() is None:
+                process.kill()
+    for process, output in ((host, host_output), (client, client_output)):
+        assert process.returncode == 0, output[-4000:]
+        assert "halo_host: guest crash" not in output, output[-4000:]
+        # each logs both players: its own and the other machine's
+        assert re.search(r"network test: tick \d+ player 1: \(", output), output[-4000:]
