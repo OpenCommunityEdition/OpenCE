@@ -301,8 +301,8 @@ SCREENS["network_setup/multiplayer_hud"] = {
     "rows": _hud_rows + [
         ("TEXT CHAT:", "display.text_chat", [("SHOW", "true"), ("HIDE", "false")],
          "SHOW the text chat, or HIDE it: no lines, and\nits keys and D-pad Up open nothing.", None),
-        ("CHAT TEXT:", "display.chat_style", [("WHITE", "white"), ("COLORS", "colors")],
-         "The text chat's colors: WHITE, as Custom Edition;\nCOLORS, names in their team's color.", None),
+        ("CHAT TEXT:", "display.chat_style", [("COLORS", "colors"), ("WHITE", "white")],
+         "The text chat's colors: COLORS, names in their\nteam's color; WHITE, as Custom Edition.", None),
     ],
 }
 

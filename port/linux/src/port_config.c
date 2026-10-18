@@ -303,9 +303,9 @@ static const struct config_setting config_settings[] =
 		"Show the text chat of network games: false hides its lines and keeps\n"
 		"its keys (and a controller's D-pad Up) from opening it, as for purists\n"
 		"and streamers." },
-	{ "display.chat_style", _config_string, "\"white\"", "HALO_CHAT_STYLE", _environment_value, _platform_all,
-		"The text chat's colours: \"white\" (all white, as Custom Edition) or\n"
-		"\"colors\" (names in their team's colour, the text a pale blue)." },
+	{ "display.chat_style", _config_string, "\"colors\"", "HALO_CHAT_STYLE", _environment_value, _platform_all,
+		"The text chat's colours: \"colors\" (names in their team's colour, the\n"
+		"text a pale blue) or \"white\" (all white, as Custom Edition)." },
 	{ "game.enhanced_animations", _config_boolean, "true", "HALO_ENHANCED_ANIMATIONS", _environment_value, _platform_all,
 		"The player bipeds' grenade throws keep their legs moving (crouched,\n"
 		"in the air and in a vehicle's seat too), riders' hands leave the grips\n"

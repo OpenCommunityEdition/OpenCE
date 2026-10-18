@@ -359,7 +359,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.player_names` | `"all"` | `HALO_PLAYER_NAMES` | In multiplayer, whose names are drawn above their heads: `"all"`, `"allies"`, `"enemies"` or `"none"`. An ally's name is drawn above the triangle the game shows over teammates. An enemy's name shows only within the motion sensor's reach, while the enemy is in sight and not camouflaged, so it never shows where an enemy hides. The gametype's motion tracker setting also applies: no names if it shows no players, only allies' if it shows only friends. |
 | `display.player_name_scale` | `1.0` | `HALO_PLAYER_NAME_SCALE` | How large the players' names are drawn: `1.0` is three quarters of the size of the HUD's text, from `0.25` to `4`. With high-res text, larger names are rasterized at their size, so they stay sharp. |
 | `display.text_chat` | `true` | `HALO_TEXT_CHAT` | Show the text chat of network games (Settings > Network Setup > Multiplayer HUD > TEXT CHAT). `false` hides its lines, and its keys and a controller's D-pad Up open nothing. Refer to "Text chat". |
-| `display.chat_style` | `"white"` | `HALO_CHAT_STYLE` | The text chat's colours (Settings > Network Setup > Multiplayer HUD > CHAT TEXT): `"white"`, all of it white, as Custom Edition; `"colors"`, the player's name in their team's colour and the text a pale blue. |
+| `display.chat_style` | `"colors"` | `HALO_CHAT_STYLE` | The text chat's colours (Settings > Network Setup > Multiplayer HUD > CHAT TEXT): `"colors"`, the player's name in their team's colour and the text a pale blue; `"white"`, all of it white, as Custom Edition. |
 | `display.scoreboard_team_layout` | `"teams"` | `HALO_SCOREBOARD_TEAM_LAYOUT` | How the multiplayer scoreboard (hold BACK, or tab) lists a team game's players. `"teams"`: a column for each team, red on the left and blue on the right. `"score"`: all the players in order of score. With more players than fit, the mouse wheel and Page Up / Page Down scroll the scoreboard. |
 | `display.scoreboard_background` | `true` | `HALO_SCOREBOARD_BACKGROUND` | `true`: the multiplayer scoreboard (hold BACK, or tab) has a panel behind its text, for clearer text. |
 | `display.scoreboard_background_color` | `"16, 16, 16, 150"` | `HALO_SCOREBOARD_BACKGROUND_COLOR` | The colour of the scoreboard's panel: `"red, green, blue, alpha"`, each from `0` to `255`. Alpha `0` is see-through, `255` is solid. |
@@ -701,10 +701,11 @@ deletes, Triangle switches capitals, Circle closes).
 
 The lines show above the motion sensor, in a column a little over half the
 screen wide: a long line wraps onto the next rows, and the line you type
-shows its end when it is wider. They are white, as Custom Edition draws
-them; COLORS in CHAT TEXT in Settings > Network Setup > Multiplayer HUD
-(`display.chat_style`) draws the player's name in the colour of their team
-(blue in a game without teams) and the text in a pale blue. A line to the
+shows its end when it is wider. The player's name is in the colour of
+their team (blue in a game without teams), the text in a pale blue, and the
+host's notices in a pale gold; WHITE in CHAT TEXT in Settings > Network
+Setup > Multiplayer HUD (`display.chat_style`) draws them all white, as
+Custom Edition does. A line to the
 team says "(team)" after the name, one to the vehicle "(vehicle)". The
 lines go after ten seconds; while you type, the last six rows show. Where
 the touch controls are (Android, and a browser whose touch controls you

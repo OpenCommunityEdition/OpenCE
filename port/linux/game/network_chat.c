@@ -1894,8 +1894,8 @@ static boolean chat_touch_layout(
 }
 
 /* whether the lines are all white, as Custom Edition draws them
-(display.chat_style "white", or anything but "colors"), not in their teams'
-colours ("colors") */
+(display.chat_style "white"), not in their teams' colours ("colors", or
+anything else) */
 static boolean chat_style_white(
 	void)
 {
@@ -1908,7 +1908,7 @@ static boolean chat_style_white(
 		const char *style = config_string("display.chat_style");
 
 		read_at = config_changes();
-		white = !style || !chat_names_equal(style, "colors");
+		white = style && chat_names_equal(style, "white");
 	}
 	return white;
 }
