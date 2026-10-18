@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """Reuse exact shared CPU resource declarations/layout code without GL headers."""
 import os
-outdir = 'build/mac-audit'
+import sys
+outdir = sys.argv[1] if len(sys.argv) > 1 else 'build/mac-audit'
 if not os.path.isdir(outdir): os.makedirs(outdir)
 header = open('port/linux/src/xgpu.h').read()
 start = header.index('struct xgpu_texture_description\n')

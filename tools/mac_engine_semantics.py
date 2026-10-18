@@ -11,7 +11,7 @@ from tools.linux_msvc_semantics import scan_tags, scan_inline_functions, render
 
 if __name__ == '__main__':
     headers = list(Path('source').rglob('*.h'))
-    output = Path('build/mac-audit/mac_engine_semantics.h')
+    output = Path(sys.argv[1] if len(sys.argv) > 1 else 'build/mac-audit/mac_engine_semantics.h')
     output.parent.mkdir(parents=True, exist_ok=True)
     text = render(scan_tags(headers), scan_inline_functions(headers, True))
     # GCC does not macro-expand a name inside #pragma weak.

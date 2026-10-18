@@ -15,6 +15,13 @@ out=${MAC_RENDERED_SESSION_OUT:-build/mac-rendered-session}
 audit=${MAC_RENDER_AUDIT_BASE:-build/mac-audit}
 mkdir -p "$out"
 
+# port: every generated body is made again from the current sources, each build (tools/mac_audit_bodies.sh says
+# why), and so is the settings table the session links (port_config.c with the Mac's file calls; the graph's own
+# is as old as the graph). A body left in $audit once went out of date silently: high-res text off, and
+# achievements that never started because game.c's view lacked their calls.
+sh tools/mac_audit_bodies.sh "$audit"
+MAC_ARCHS="${MAC_ARCHS:-ppc i386}" MAC_CHECK_DIR="$out/config" sh tools/mac_config_checks.sh > "$out/config-build.log" 2>&1
+
 # Reuse the source-checked original main_game_render view and its reachable
 # original render units, but start from the latest complete session manifest.
 # Incremental mode reuses that graph and the native objects already listed in
@@ -45,12 +52,9 @@ if [ "${MAC_GRAPH_REFRESH:-on}" != off ]; then
     MAC_ARCHS="${MAC_ARCHS:-ppc i386}" sh tools/mac_graph_refresh.sh "$out" "$audit"
 fi
 
-default_pixels_source=${MAC_RASTERIZER_DEFAULT_SOURCE:-build/mac-audit/mac_rasterizer_xbox_default_pixels.c}
-if [ -f "$default_pixels_source" ]; then
-    cp "$default_pixels_source" "$out/mac_rasterizer_xbox_default_pixels.c"
-else
-    python tools/mac_rasterizer_default_pixels_view.py "$out/mac_rasterizer_xbox_default_pixels.c"
-fi
+# port: made by tools/mac_audit_bodies.sh from the current sources; a copy kept in $audit used to be taken as it was
+default_pixels_source=${MAC_RASTERIZER_DEFAULT_SOURCE:-$audit/mac_rasterizer_xbox_default_pixels.c}
+cp "$default_pixels_source" "$out/mac_rasterizer_xbox_default_pixels.c"
 python tools/mac_device_state_view.py \
     "$out/mac_device_state_body.inc" "$out/mac_device_state_defaults.inc"
 python tools/mac_dsound_view.py "$out/mac_dsound_native.c"
@@ -73,6 +77,29 @@ python tools/mac_xbox_texture_cache_view.py source/cache/xbox_texture_cache.c \
 python tools/mac_material_effects_view.py "$out/mac_material_effects_native.c"
 # port: the game state's checkpoint kept in memory (replaces the graph's mac_game_state_xbox)
 python tools/mac_game_state_storage_view.py "$out/mac_game_state_xbox.c"
+# port: the units tools/mac_game_tick_checks.sh built from generated views and the graph still carries as built
+# long ago (mac_voice_audio lacked upstream's check of a voice packet's length). They are made and compiled again here.
+python tools/mac_voice_audio_view.py "$out/mac_voice_audio_native.c"
+python tools/mac_dsound_globals_view.py source/sound/sound_dsound_xbox.c "$out/mac_sound_dsound_xbox.c"
+python tools/mac_lruv_view.py "$out/mac_lruv_cache.c"
+python tools/mac_startup_globals_view.py "$out/mac_startup_globals.c"
+python tools/mac_cache_vertex_view.py source/cache/cache_files_windows.c "$out/mac_cache_vertex_native.c"
+python tools/mac_memory_diagnostics_view.py "$out/mac_memory_diagnostics.c"
+sed -e 's/#include "platform.h"/#include "engine_wide.h"\
+typedef int BOOL;\
+#define TRUE 1\
+#define FALSE 0/' \
+    -e '/^#include <wchar.h>$/d' \
+    -e 's/static __thread wchar_t \*next;/wchar_t **mac_next = mac_wide_tokenizer_state();\
+#define next (*mac_next)/' \
+    -e '/^wchar_t \*msvc_wcsdup/i\
+#undef next\
+' \
+    -e 's/halo_linux_fopen/fopen/g' -e 's/halo_linux_freopen/freopen/g' \
+    -e 's/halo_linux_remove/remove/g' port/linux/src/msvc_wide.c > "$out/mac_shared_wide.c"
+printf '#define __deprecated__(message)\n' > "$out/mac_expat_compat.h"
+cp port/mac/mac_bink_null.c "$out/mac_bink_null.c"
+
 tag_diag_unit=
 if [ "${MAC_TAG_BOUNDS_DIAGNOSTIC:-0}" = 1 ]; then
     tag_diag_unit="$out/mac_tag_groups_diag.c"
@@ -130,6 +157,34 @@ compile_native_helper() {
     "$cc" -arch "$arch" -isysroot "$sdk" -mmacosx-version-min=10.4 \
         -std=gnu89 -O2 $fp -Iport/mac \
         -c "$source" -o "$object" > "$object.txt" 2>&1
+}
+
+# port: an incremental build recompiles a unit that is a generated file, or that includes a generated body, when
+# the file or the body is not what the object was compiled from (a checksum kept in $out/unit-stamps), so that
+# MAC_RENDERED_SESSION_RECOMPILE need not name them and a stale one cannot be linked
+unit_owners=" engine_game_runtime engine_bitmaps engine_frame_statistics shared_texture_layout shared_d3d_resources engine_device_state mac_gpu_textures mac_text_fonts native_scenario_scripts "
+unit_key() {
+    {
+        cat "$1"
+        case "$unit_owners" in
+            *" $2 "*)
+                find "$audit" -maxdepth 1 \( -name 'mac_*_body.*' -o -name 'mac_resource_declarations.h' -o -name 'mac_texture_layout.inc' \
+                    -o -name 'mac_scenario_script_validators.h' -o -name 'mac_engine_semantics.h' \) | sort | while read -r body; do cat "$body"; done
+                cat "$out"/mac_*.inc 2> /dev/null
+                ;;
+        esac
+    } | md5 -q
+}
+unit_changed() { # unit name arch
+    case "$1" in
+        "$out"/*|"$audit"/*) ;;
+        *) case "$unit_owners" in *" $2 "*) ;; *) return 1 ;; esac ;;
+    esac
+    test "$(cat "$out/unit-stamps/$2_$3" 2> /dev/null)" != "$(unit_key "$1" "$2")"
+}
+record_unit_stamp() { # unit name arch
+    mkdir -p "$out/unit-stamps"
+    unit_key "$1" "$2" > "$out/unit-stamps/$2_$3"
 }
 
 for arch in ${MAC_ARCHS:-ppc i386}; do
@@ -196,6 +251,14 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
             */rasterizer_spawn_link_$arch.o|*/rasterizer_public_$arch.o|*/render_objects_$arch.o|*/render_particles_$arch.o|\
             */rasterizer_detail_$arch.o|*/engine_files_$arch.o|*/hs_library_external_$arch.o|*/weapons_spawn_link_$arch.o|*/ui_widget_$arch.o|*/hud_messaging_$arch.o|*/engine_game_engine_spawn_link_$arch.o|\
             */mac_game_state_xbox_$arch.o|*/rasterizer_vertex_init_$arch.o|*/cache_files_$arch.o|*/scenario_spawn_link_$arch.o|*/engine_scenario_transition_$arch.o) continue ;;
+        esac
+        # port: and the units that own a generated body or are a generated view, compiled again below from the
+        # current tree (the graph's are as old as the bodies they were made with)
+        case "$obj" in
+            */engine_game_runtime_$arch.o|*/engine_bitmaps_$arch.o|*/engine_frame_statistics_$arch.o|\
+            */shared_texture_layout_cpu_resources_$arch.o|*/mac_text_fonts_text_$arch.o|\
+            */mac_voice_audio_$arch.o|*/mac_sound_dsound_xbox_$arch.o|*/mac_lruv_cache_$arch.o|*/mac_startup_globals_$arch.o|\
+            */mac_cache_vertex_native_$arch.o|*/mac_memory_diagnostics_$arch.o|*/mac_shared_wide_$arch.o|*/mac_bink_null_$arch.o) continue ;;
         esac
         # port: the netcode is compiled from this checkout rather than taken
         # from the manifest. The wire's byte order (port/linux/include/halo_endian.h)
@@ -280,6 +343,10 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     # port: the developer console and its terminal (the session loop now services them) take their line editor from
     # edit_text.c
     units="$units source/dialogs/edit_text.c"
+    # port: the units that include a generated body (game.c's view with the achievements' calls, the bitmap sampler,
+    # the frame statistics, the texture layout, the font data) and the views of the graph's other generated units
+    units="$units port/mac/engine_game_runtime.c port/mac/engine_bitmaps.c port/mac/engine_frame_statistics.c port/mac/shared_texture_layout.c $audit/mac_text_fonts.c"
+    units="$units $out/mac_voice_audio_native.c $out/mac_sound_dsound_xbox.c $out/mac_lruv_cache.c $out/mac_startup_globals.c $out/mac_cache_vertex_native.c $out/mac_memory_diagnostics.c $out/mac_shared_wide.c $out/mac_bink_null.c"
     # port: the game's rumble goes to the pads (engine_input_rumble.c, in place of the graph's)
     units="$units port/mac/engine_input_rumble.c"
     source_units=
@@ -293,12 +360,40 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
             name=mac_dsound_native
         elif [ "$unit" = "$out/mac_xbox_texture_cache.c" ]; then
             name=mac_xbox_texture_cache
+        elif [ "$unit" = "$audit/mac_text_fonts.c" ]; then
+            name=mac_text_fonts
         fi
         recognized_units="$recognized_units $name "
         obj="$out/${name}_gpu_$arch.o"
         if [ "${MAC_RENDERED_SESSION_INCREMENTAL:-0}" != 1 ] || \
-            case "$recompile" in *" $name "*) true ;; *) false ;; esac; then
+            case "$recompile" in *" $name "*) true ;; *) false ;; esac || \
+            unit_changed "$unit" "$name" "$arch"; then
             case "$unit" in
+              "$out/mac_voice_audio_native.c")
+                # tools/mac_game_tick_checks.sh's flags for it
+                compile_engine_unit "$arch" "$unit" "$obj" \
+                    "-Dfast_ftol=mac_game_voice_unused_fast_ftol -Iport/third_party/opus/include"
+                ;;
+              "$out/mac_memory_diagnostics.c")
+                compile_engine_unit "$arch" "$unit" "$obj" "-Dfast_ftol=mac_memory_diag_unused_fast_ftol"
+                ;;
+              "$out/mac_shared_wide.c")
+                "$cc" -arch "$arch" -isysroot "$sdk" -mmacosx-version-min=10.4 -std=gnu89 -O2 $fp -fshort-wchar \
+                    -Iport/mac -Iport/linux/include -c "$unit" -o "$obj" > "$obj.txt" 2>&1
+                ;;
+              port/mac/shared_texture_layout.c)
+                # the flags of tools/mac_cpu_resources_checks.sh, which made it
+                "$cc" -arch "$arch" -isysroot "$sdk" -mmacosx-version-min=10.4 -std=gnu89 -O2 $fp \
+                    -fms-extensions -fshort-wchar -fno-strict-aliasing -fwrapv -I. -Isource -Isource/cseries \
+                    -Iport/mac -Iport/include/xdk -idirafter port/linux/include \
+                    -include port/mac/engine_xdk_prefix.h -include port/mac/resource_c_runtime.h \
+                    -include "$audit/mac_engine_semantics.h" -c "$unit" -o "$obj" > "$obj.txt" 2>&1
+                ;;
+              "$audit/mac_text_fonts.c")
+                # tools/mac_text_checks.sh's
+                "$cc" -arch "$arch" -isysroot "$sdk" -mmacosx-version-min=10.4 -std=gnu99 -O2 $fp \
+                    -I. -Iport/mac -Iport/linux/src -I"$audit" -c "$unit" -o "$obj" > "$obj.txt" 2>&1
+                ;;
               port/mac/mapped_file.c|port/mac/xbox_map.c|port/mac/xbox_swap.c|port/mac/xbox_header.c|port/mac/xbox_blob.c|port/mac/retail_cache.c|port/mac/retail_geometry.c|port/mac/xbox_tag_tables.c|port/mac/xbox_tag_walk.c|\
               port/mac/retail_texture.c|port/mac/retail_spawns.c|port/mac/retail_skeleton.c|\
               port/mac/retail_object_spawn.c|port/mac/native_tags.c|\
@@ -329,6 +424,7 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
                 ;;
               *) compile_engine_unit "$arch" "$unit" "$obj" ;;
             esac
+            record_unit_stamp "$unit" "$name" "$arch"
         elif [ ! -f "$obj" ]; then
             echo "incremental object is missing: $obj" >&2
             exit 1
@@ -428,13 +524,8 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
         -std=gnu99 -O2 $fp -I. -Iport/mac -Iport/linux/src -I"$audit" \
         -c port/mac/engine_text_gl.c -o "$text_obj" > "$text_obj.txt" 2>&1
     objects="$objects $text_obj"
-    # port: engine_text_gl.c includes engine_text.c, which includes the generated body of text_hires.c, and with it
-    # text_hires_enabled (the display.high_res_text setting). A body made before that function existed left the
-    # link with nothing for it, and engine_upstream_stubs.c answered 0, so the text was never high-resolution.
-    if ! grep -q text_hires_enabled "$audit/mac_text_body.h"; then
-        echo "$audit/mac_text_body.h is out of date: run python3 tools/mac_text_boundary.py $audit" >&2
-        exit 1
-    fi
+    # port: engine_text_gl.c includes engine_text.c, which includes the generated body of text_hires.c (text_hires_enabled,
+    # the display.high_res_text setting); tools/mac_audit_bodies.sh made it from the current text_hires.c above
     source_units="$source_units port/mac/engine_text_gl.c port/mac/engine_text.c"
 
     # Opt-in: recompile the game's listed prebuilt objects with extra flags
@@ -490,13 +581,16 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
         echo "generated-view-owners: recompile engine_device_state for state views, mac_dsound_native for audio view, and mac_gpu_textures for texture decode view when those generated includes change"
         shasum -a 256 "$base/engine_objects_$arch.txt"
         shasum -a 256 $objects
-        shasum -a 256 "$audit/mac_text_body.h" "$audit/mac_text_gl_body.h"
+        shasum -a 256 "$audit"/mac_*_body.* "$audit/mac_resource_declarations.h" "$audit/mac_texture_layout.inc" \
+            "$audit/mac_scenario_script_validators.h" "$audit/mac_engine_semantics.h" "$audit/mac_text_fonts.c"
         for source in $source_units tools/mac_engine_session_probe.c \
             tools/mac_rendered_session_checks.sh tools/mac_main_game_render_checks.sh \
             tools/mac_main_game_render_view.py \
             tools/mac_rasterizer_default_pixels_view.py tools/mac_device_state_view.py \
             tools/mac_xgpu_texture_decode_view.py tools/mac_text_boundary.py \
-            tools/mac_dsound_view.py; do
+            tools/mac_dsound_view.py tools/mac_audit_bodies.sh tools/mac_game_state_boundary.py \
+            tools/mac_menu_state_boundary.py tools/mac_frame_statistics_boundary.py \
+            tools/mac_bitmap_sampling_boundary.py tools/mac_resource_boundary.py; do
             shasum -a 256 "$source"
         done
     } > "$out/source_provenance_$arch.txt"
