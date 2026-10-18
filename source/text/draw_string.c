@@ -116,7 +116,6 @@ symbols in this file:
 #include "text/font_group.h"
 #include "text/international_strings.h"
 #include "text/text_group.h"
-#include "chat_filter.h" /* port: port/linux/game/chat_filter.c */
 
 #include <ctype.h>
 
@@ -1015,8 +1014,6 @@ void draw_string(
 
 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 648, bounds);
 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 649, string);
-	/* port: as streamer mode shows it, players' names too (chat_filter.c) */
-	string = chat_filter_shown_ascii(string);
 
 	parse_string_new(
 		&state,
@@ -1215,8 +1212,6 @@ void draw_unicode_string(
 
 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 848, bounds);
 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 849, string);
-	/* port: as streamer mode shows it, players' names too (chat_filter.c) */
-	string = chat_filter_shown(string);
 
 	parse_string_new(
 		&state,

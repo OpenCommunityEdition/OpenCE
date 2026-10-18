@@ -253,27 +253,9 @@ SCREENS["audio_settings/sound_processing"] = {
     ],
 }
 _audio["rows"] = [row for row in _audio["rows"] if row[1] not in _processing]
-
-# Audio Setup's voice chat (port/linux/game/network_voice.c) with the text
-# chat's colours and streamer mode (network_chat.c, chat_filter.c), a screen
-# of their own (a category, as
-# Video Setup's): Audio Setup has no room for another row, and Network Setup,
-# which has none either, is not offered in a game (menu_tags.c)
-_chat = {"audio.voice_chat", "audio.voice_volume"}
-SCREENS["audio_settings/chat"] = {
-    "screen": "chat_settings_screen", "header": _audio["header"], "spacing": 30,
-    "rows": [row for row in _audio["rows"] if row[1] in _chat] + [
-        ("CHAT TEXT:", "display.chat_style", [("DEFAULT", "default"), ("WHITE", "white")],
-         "The text chat's colors: DEFAULT, names in their\nteam's color; WHITE, all white, as Custom Edition.", None),
-        ("STREAMER MODE:", "game.streamer_mode", ON_OFF,
-         "Show slurs and swearing in the text chat as\nharmless words, for streaming.", None),
-    ],
-}
-_audio["rows"] = [row for row in _audio["rows"] if row[1] not in _chat]
 _audio["categories"] = [
     ("SOUND PROCESSING:", "audio_settings/sound_processing",
      "The reverb, and how sounds are converted to the\noutput's rate."),
-    ("VOICE AND TEXT CHAT:", "audio_settings/chat", "Voice chat, and the text chat's streamer\nmode."),
 ]
 
 # Network Setup's map sharing (port/linux/game/map_share.c): this machine's
@@ -301,7 +283,7 @@ SCREENS["network_setup/map_sharing"] = {
 
 # Controls Setup: the keyboard and mouse's actions, in groups (the order of
 # port/linux/game/menu_functions.c's table of them)
-CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS", "COMMUNICATION"]
+CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS"]
 CONTROL_ROWS = 7
 
 # the settings whose rows have the wider spinner (a device's name)

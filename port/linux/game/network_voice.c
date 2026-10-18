@@ -52,7 +52,6 @@ game_engine.c), which it does not tell anyone.
 #include "objects/objects.h"
 #include "network_distributed.h"
 #include "network_voice.h"
-#include "network_chat.h"
 #include "../src/voice_audio.h"
 
 #include <math.h>
@@ -925,7 +924,7 @@ void network_voice_update(
 	}
 	/* the microphone: open mic, open while voice is on; push to talk, from
 	the first press (none asked for until then) */
-	held = push_to_talk && halo_push_to_talk_held() && !console_is_active() && !network_chat_typing();
+	held = push_to_talk && halo_push_to_talk_held() && !console_is_active();
 	if (!voice_may_talk() || (!open_mic && !push_to_talk))
 		voice_microphone_wanted = FALSE;
 	else if (open_mic || held)
