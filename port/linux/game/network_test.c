@@ -64,6 +64,7 @@ Called from the main loop every frame (main.c).
 #include "../src/p2p.h" /* port: port/linux/src/p2p.c, p2p_lobby.c */
 #include "network_chat.h"
 #include "network_voice.h"
+#include "halo_keyboard.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -85,6 +86,7 @@ void network_distributed_item_statistics(long *creates, long *deletes, long *fai
 void network_damage_statistics(long *sent_reports, long *dealt_reports, long *rejected_reports, long *replayed_events);
 /* xinput_sdl.c's */
 void test_input_hold_action(int hold);
+void test_input_press(unsigned long buttons);
 
 enum
 {
@@ -680,6 +682,44 @@ static void network_test_seat_together(
 		object_get(units[1])->object.parent_object_index == best_index ? "in" : "out");
 }
 
+/* debug.network_test_chat: a line typed on the text chat's on-screen
+keyboard with the controller's buttons, ticks since it began: each held
+for two ticks and let go for two (the keyboard opens on the first key,
+'q': "gg ez", then D-pad Down to the team, then Start) */
+static void network_test_keyboard_line(
+	long ticks)
+{
+	enum { STEP_TICKS = 4 };
+	static unsigned long const steps[] =
+	{
+		1UL << HALO_CHAT_PAD_UP,
+		1UL << HALO_CHAT_PAD_STICK_DOWN,
+		1UL << HALO_CHAT_PAD_STICK_RIGHT, 1UL << HALO_CHAT_PAD_STICK_RIGHT, 1UL << HALO_CHAT_PAD_STICK_RIGHT,
+		1UL << HALO_CHAT_PAD_STICK_RIGHT,
+		1UL << HALO_CHAT_PAD_A, 1UL << HALO_CHAT_PAD_A,
+		1UL << HALO_CHAT_PAD_STICK_DOWN, 1UL << HALO_CHAT_PAD_STICK_DOWN,
+		1UL << HALO_CHAT_PAD_A,
+		1UL << HALO_CHAT_PAD_STICK_UP, 1UL << HALO_CHAT_PAD_STICK_UP, 1UL << HALO_CHAT_PAD_STICK_UP,
+		1UL << HALO_CHAT_PAD_STICK_LEFT, 1UL << HALO_CHAT_PAD_STICK_LEFT,
+		1UL << HALO_CHAT_PAD_A,
+		1UL << HALO_CHAT_PAD_STICK_DOWN, 1UL << HALO_CHAT_PAD_STICK_DOWN,
+		1UL << HALO_CHAT_PAD_STICK_LEFT, 1UL << HALO_CHAT_PAD_STICK_LEFT,
+		1UL << HALO_CHAT_PAD_A,
+		1UL << HALO_CHAT_PAD_DOWN,
+		1UL << HALO_CHAT_PAD_START,
+	};
+	long step = ticks / STEP_TICKS;
+
+	if (step >= (long)NUMBEROF(steps))
+	{
+		/* (after the line, let go: a held key would move nothing more) */
+		if (step == (long)NUMBEROF(steps))
+			test_input_press(0);
+		return;
+	}
+	test_input_press(ticks % STEP_TICKS < STEP_TICKS / 2 ? steps[step] : 0);
+}
+
 /* debug.network_test_chat: the last player (absolute index; NONE), whom the
 host mutes; whether it is this machine's; and the first player's machine
 (the network's index: the host's), which the last player's mutes */
@@ -896,6 +936,16 @@ void network_test_update(
 	if (network_test.mode == _network_test_off)
 		return;
 
+	/* debug.network_test_chat: each client's player types "gg ez" on the
+	text chat's on-screen keyboard 32 seconds on, as a controller does, and
+	sends it to the team (each tick, not each second, as the rest) */
+	if (network_test.chat_time > 0.0f && network_test.mode != _network_test_host && game_in_progress() &&
+		!main_menu_loaded &&
+		game_time_get() >= (long)(network_test.chat_time * TICKS_PER_SECOND) + 32 * TICKS_PER_SECOND)
+	{
+		network_test_keyboard_line(game_time_get() - (long)(network_test.chat_time * TICKS_PER_SECOND) -
+			32 * TICKS_PER_SECOND);
+	}
 	/* the game running: report (from the start of each game: the next
 	game's time starts over) */
 	if (game_in_progress() && game_time_get() < network_test.logged_time)

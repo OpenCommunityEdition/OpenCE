@@ -216,6 +216,9 @@ gamepads' only.
 | type a chat line to your team | Y |
 | while typing a chat line: to everyone, the team or the vehicle, in turn | Tab |
 
+With a controller, or the touch controls' D-pad, D-pad Up opens the text
+chat's on-screen keyboard (refer to "Text chat").
+
 Always: \` opens the developer console, F12 releases or captures the mouse,
 F11 changes between fullscreen and window. Screenshot (default F10,
 rebindable under Controls Setup > Actions, below Pause Menu; not on Android) saves a PNG of the completed
@@ -676,6 +679,19 @@ turn: all the players, your team, or your vehicle (the players riding in
 the vehicle you ride in, whatever the map's vehicles are, Custom Edition
 maps' too; on foot, only you see it). Enter sends the line, Escape cancels
 it. While you type, your player does not move.
+
+With a controller, D-pad Up opens an on-screen keyboard at the bottom right
+(on Android, at the bottom in the middle) for a line to all the players:
+the left stick (or D-pad Left and Right) moves between the keys, A types
+the key, X deletes, Y switches capitals, D-pad Up and Down change who the
+line is to (all the players, your team, your vehicle), Start sends the
+line, and B closes the keyboard. Its last row has Aa (capitals), #+= (the
+symbols), space, DEL and SEND. On a touchscreen (Android, and a browser on
+a phone or tablet), the touch controls' D-pad Up opens it, and a tap on a
+key types it. While the keyboard is up the controller and the touch
+controls move nothing in the game. The face buttons are the same places on
+other controllers (on a PlayStation controller: Cross types, Square
+deletes, Triangle switches capitals, Circle closes).
 
 The lines show above the motion sensor: the player's name in the colour of
 their team (blue in a game without teams), then the text in a pale blue;

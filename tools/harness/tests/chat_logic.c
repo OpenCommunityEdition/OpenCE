@@ -398,5 +398,60 @@ int main(int argc, char **argv)
 		CHECK(chat_refused(links, "see discord.gg/x") == NULL, "a link refused where links are allowed");
 	}
 
+	/* the on-screen keyboard's characters: a letter in capitals with shift,
+	nothing else changed; none on the last row, or off the keyboard */
+	CASE("keyboard-character")
+	{
+		/* (and a row past them, which no key reads) */
+		static char const *const rows[CHAT_KEYBOARD_ROWS] =
+			{ "1234567890", "qwertyuiop", "asdfghjkl'", "zxcvbnm,.?", "##########" };
+
+		CHECK(chat_keyboard_character(rows, 1, 0, FALSE) == 'q', "'%c'", chat_keyboard_character(rows, 1, 0, FALSE));
+		CHECK(chat_keyboard_character(rows, 1, 0, TRUE) == 'Q', "'%c'", chat_keyboard_character(rows, 1, 0, TRUE));
+		CHECK(chat_keyboard_character(rows, 0, 3, TRUE) == '4', "a digit changed by shift");
+		CHECK(chat_keyboard_character(rows, 3, 9, TRUE) == '?', "a sign changed by shift");
+		CHECK(chat_keyboard_character(rows, CHAT_KEYBOARD_ROWS - 1, 0, FALSE) == 0, "the last row has a character");
+		CHECK(chat_keyboard_character(rows, -1, 0, FALSE) == 0 && chat_keyboard_character(rows, 0, CHAT_KEYBOARD_COLUMNS,
+			FALSE) == 0, "a key off the keyboard");
+	}
+
+	/* moving: round the edges; on the last row a wide key at a time, and its
+	first column */
+	CASE("keyboard-move")
+	{
+		short row = 0;
+		short column = 0;
+
+		chat_keyboard_move(&row, &column, -1, 0);
+		CHECK(row == CHAT_KEYBOARD_ROWS - 1 && column == 0, "up from the top: %d %d", row, column);
+		chat_keyboard_move(&row, &column, 0, -1);
+		CHECK(column == CHAT_KEYBOARD_COLUMNS - CHAT_KEYBOARD_WIDE_COLUMNS, "left round the last row: %d", column);
+		row = 3;
+		column = 5;
+		chat_keyboard_move(&row, &column, 1, 0);
+		CHECK(row == CHAT_KEYBOARD_ROWS - 1 && column == 4, "down onto a wide key: %d %d", row, column);
+		chat_keyboard_move(&row, &column, 0, 1);
+		CHECK(column == 4 + CHAT_KEYBOARD_WIDE_COLUMNS, "right on the last row: %d", column);
+		chat_keyboard_move(&row, &column, 1, 0);
+		CHECK(row == 0 && column == 4 + CHAT_KEYBOARD_WIDE_COLUMNS, "down round the bottom: %d %d", row, column);
+		column = CHAT_KEYBOARD_COLUMNS - 1;
+		chat_keyboard_move(&row, &column, 0, 1);
+		CHECK(column == 0, "right round a row: %d", column);
+	}
+
+	/* a tap: the key under it, a wide key's first column; none outside */
+	CASE("keyboard-tap")
+	{
+		short row = -1;
+		short column = -1;
+
+		CHECK(chat_keyboard_key_at(0.05f, 0.05f, &row, &column) && row == 0 && column == 0, "%d %d", row, column);
+		CHECK(chat_keyboard_key_at(0.95f, 0.3f, &row, &column) && row == 1 && column == 9, "%d %d", row, column);
+		CHECK(chat_keyboard_key_at(0.55f, 0.9f, &row, &column) && row == CHAT_KEYBOARD_ROWS - 1 && column == 4,
+			"the space key: %d %d", row, column);
+		CHECK(!chat_keyboard_key_at(-0.01f, 0.5f, &row, &column) && !chat_keyboard_key_at(0.5f, 1.0f, &row, &column),
+			"a tap outside taken");
+	}
+
 	return 0;
 }

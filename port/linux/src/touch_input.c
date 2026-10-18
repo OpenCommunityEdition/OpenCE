@@ -169,6 +169,25 @@ void touch_input_menu_read(struct platform_ui_pointer *pointer)
 	pointer->touch = TRUE;
 }
 
+/* port/linux/game/network_chat.c: its on-screen keyboard is up, which
+takes the taps outside the menus */
+extern unsigned char network_chat_keyboard_open(void);
+
+/* the taps for that keyboard since it last took them, and the latest's
+place (0 to 1 of the window) */
+static int chat_taps;
+static float chat_tap_x, chat_tap_y;
+
+int touch_input_chat_taps(float *x, float *y)
+{
+	int taps = chat_taps;
+
+	*x = chat_tap_x;
+	*y = chat_tap_y;
+	chat_taps = 0;
+	return taps;
+}
+
 void touch_input_gamepad(XINPUT_GAMEPAD *pad)
 {
 	/* outside the menus the touchscreen only skips a cinematic that can be
@@ -179,7 +198,17 @@ void touch_input_gamepad(XINPUT_GAMEPAD *pad)
 
 		menu_setup();
 		touch_menu_read(&menu, &output);
-		if (output.clicks && touch_game_cinematic_skippable())
+		/* (or, while the text chat's on-screen keyboard is up, its keys) */
+		if (output.clicks && network_chat_keyboard_open())
+		{
+			int width = 0, height = 0;
+
+			platform_video_drawable_size(&width, &height);
+			chat_taps += output.clicks;
+			chat_tap_x = width > 0 ? output.click_x / (float)width : 0.0f;
+			chat_tap_y = height > 0 ? output.click_y / (float)height : 0.0f;
+		}
+		else if (output.clicks && touch_game_cinematic_skippable())
 		{
 			skip_polls = TOUCH_PRESS_POLLS;
 			platform_log("touch: A pressed to skip a cinematic");
