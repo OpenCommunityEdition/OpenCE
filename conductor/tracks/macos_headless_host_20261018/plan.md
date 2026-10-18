@@ -57,7 +57,7 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: Run the asset-free harness (`tools/harness`) in the VM: on macOS it compiles each test for the arm64_32 guest, links it as a guest image with the guest runtime, and runs it in the VM host, which reports the test's output and status; the harness's tests pass on macOS as on Linux (on macOS every test fails today to compile, as on `main`) 93dd075
 - [x] Task: Conductor - User Manual Verification 'Phase 4: The VM host' (Protocol in workflow.md)
 
-## Phase 5: A headless game, and the final build
+## Phase 5: A headless game, and the final build [checkpoint: 9f7ddd3]
 
 - [x] Task: Extend `tools/test_macos_host.py`: with `assets/maps`, `HALO_NETWORK_TEST=host:bloodgulch`, `debug.null_renderer`, `debug.hidden_window` and `debug.exit_after=30` log the hosted game's player state each second and exit 0 with no failed assertion; skipped without the maps (red) `7460d36`
 - [x] Task: Fix what the headless run finds until the test passes `7460d36`
@@ -65,4 +65,4 @@ Phase 1 settled the approach (`docs/macos_host.md`): the guest runs in a VM unde
 - [x] Task: Join test: two copies on loopback addresses (`HALO_NET_ADDRESS`), one hosting and one joining; both log the other player `9ead8ee` (skipped until lo0 has the aliases)
 - [x] Task: Document the macOS build in `docs/macos_host.md` (building, signing, running headless, what is not supported yet) and link it from `README.md` `bb35180`
 - [x] Task: Final build: `nix build .#host` from a clean checkout, then the whole test suite inside `nix develop` (nix build .#host ok; suite: 678 passed, 3 failed in tools/test_profile.py as on main on a Mac)
-- [ ] Task: Conductor - User Manual Verification 'Phase 5: A headless game, and the final build' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 5: A headless game, and the final build' (Protocol in workflow.md)
