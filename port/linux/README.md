@@ -354,8 +354,8 @@ the setting for one start of the game. It has priority over the file.
 | `display.menus` | `"pc"` | `HALO_MENUS` | `"pc"`: the PC version's menus, from the files in `port/assets/menus` and a `menus` folder next to `config.toml`. Refer to "Menus". `"xbox"`: the Xbox's menus. |
 | `display.player_names` | `"all"` | `HALO_PLAYER_NAMES` | In multiplayer, whose names are drawn above their heads: `"all"`, `"allies"`, `"enemies"` or `"none"`. An ally's name is drawn above the triangle the game shows over teammates. An enemy's name shows only within the motion sensor's reach, while the enemy is in sight and not camouflaged, so it never shows where an enemy hides. The gametype's motion tracker setting also applies: no names if it shows no players, only allies' if it shows only friends. |
 | `display.player_name_scale` | `1.0` | `HALO_PLAYER_NAME_SCALE` | How large the players' names are drawn: `1.0` is three quarters of the size of the HUD's text, from `0.25` to `4`. With high-res text, larger names are rasterized at their size, so they stay sharp. |
-| `display.text_chat` | `true` | `HALO_TEXT_CHAT` | Show the text chat of network games (Settings > Audio > Voice and Text Chat > TEXT CHAT). `false` hides its lines, and its keys open nothing. Refer to "Text chat". |
-| `display.chat_style` | `"default"` | `HALO_CHAT_STYLE` | The text chat's colours (Settings > Audio > Voice and Text Chat > CHAT TEXT): `"default"`, the player's name in their team's colour and the text a pale blue, as the PC version drew them; `"white"`, all of it white, as Custom Edition. |
+| `display.text_chat` | `true` | `HALO_TEXT_CHAT` | Show the text chat of network games (Settings > Audio > Voice and Text Chat > TEXT CHAT). `false` hides its lines, and its keys and a controller's D-pad Up open nothing. Refer to "Text chat". |
+| `display.chat_style` | `"white"` | `HALO_CHAT_STYLE` | The text chat's colours (Settings > Audio > Voice and Text Chat > CHAT TEXT): `"white"`, all of it white, as Custom Edition; `"colors"`, the player's name in their team's colour and the text a pale blue. |
 | `display.scoreboard_team_layout` | `"teams"` | `HALO_SCOREBOARD_TEAM_LAYOUT` | How the multiplayer scoreboard (hold BACK, or tab) lists a team game's players. `"teams"`: a column for each team, red on the left and blue on the right. `"score"`: all the players in order of score. With more players than fit, the mouse wheel and Page Up / Page Down scroll the scoreboard. |
 | `display.scoreboard_background` | `true` | `HALO_SCOREBOARD_BACKGROUND` | `true`: the multiplayer scoreboard (hold BACK, or tab) has a panel behind its text, for clearer text. |
 | `display.scoreboard_background_color` | `"16, 16, 16, 150"` | `HALO_SCOREBOARD_BACKGROUND_COLOR` | The colour of the scoreboard's panel: `"red, green, blue, alpha"`, each from `0` to `255`. Alpha `0` is see-through, `255` is solid. |
@@ -398,7 +398,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.voice_mode` | `"team_global_enemy_proximity"` | `HALO_NET_VOICE_MODE` | When you host: who hears whom during a game. `"off"`; `"team_proximity"` (teammates who are near); `"team_enemy_proximity"` (all players who are near); `"team_global"` (all teammates); `"team_global_enemy_proximity"` (all teammates, and enemies who are near). Refer to "Voice chat". |
 | `network.voice_kbps` | `24` | `HALO_NET_VOICE_KBPS` | When you host: the voice quality in the lobby and in a game, in kilobits per second, `8` to `64`. |
 | `network.voice_proximity` | `15.0` | `HALO_NET_VOICE_PROXIMITY` | When you host: the distance in world units (1 unit is approximately 3 metres) at which players are near, for voice chat. `5` to `100`. |
-| `network.text_chat` | `"on"` | `HALO_NET_TEXT_CHAT` | When you host: the text chat. `"on"`, lines with links refused; `"links"`, links allowed; `"off"`, no chat. Always off in a game listed in the server browser. TEXT CHAT in Server Setup > Teamplay Options (in co-op, Voice and Voting) writes its choice here. Refer to "Text chat". |
+| `network.text_chat` | `"on"` | `HALO_NET_TEXT_CHAT` | When you host: the text chat. `"on"`, lines with links refused; `"links"`, links allowed; `"off"`, no chat (in either case). Always off in a game listed in the server browser. TEXT CHAT in Server Setup > Teamplay Options (in co-op, Voice and Voting) writes its choice here. Refer to "Text chat". |
 | `network.votekick` | `true` | `HALO_NET_VOTEKICK` | When you host: `true`, the players can vote to kick a player. Refer to "Security". `false`: no votes. VOTE KICK in Server Setup > Teamplay Options (in co-op, Voice and Voting) writes its choice here. |
 | `network.votekick_minutes` | `5` | `HALO_NET_VOTEKICK_MINUTES` | When you host: the minutes that a player must play on the server before the player can start a vote to kick (`0` to `60`). To vote, a player must play for 2 minutes, or for this time if it is less. |
 | `network.votekick_ban_minutes` | `30` | `HALO_NET_VOTEKICK_BAN_MINUTES` | When you host: the minutes that a player who is kicked by a vote cannot join again (`1` to `1440`). |
@@ -685,7 +685,8 @@ With a controller, D-pad Up opens an on-screen keyboard at the bottom right
 the left stick (or D-pad Left and Right) moves between the keys, A types
 the key, X deletes, Y switches capitals, D-pad Up and Down change who the
 line is to (all the players, your team, your vehicle), Start sends the
-line, and B closes the keyboard. Its last row has Aa (capitals), #+= (the
+line, and B closes the keyboard (the button that closed it does nothing in
+the game until you let it go). Its last row has Aa (capitals), #+= (the
 symbols), space, DEL and SEND. On a touchscreen (Android, and a browser on
 a phone or tablet), the touch controls' D-pad Up opens it, a tap on a key
 types it, and a tap anywhere else closes it: the touch controls hide while
@@ -694,21 +695,31 @@ move nothing in the game. The face buttons are the same places on
 other controllers (on a PlayStation controller: Cross types, Square
 deletes, Triangle switches capitals, Circle closes).
 
-The lines show above the motion sensor: the player's name in the colour of
-their team (blue in a game without teams), then the text in a pale blue;
-CHAT TEXT in Settings > Audio > Voice and Text Chat (`display.chat_style`)
-draws them all white instead, as Custom Edition does. A line to the
-team says "(team)" after the name, one to the vehicle "(vehicle)". The lines go after ten seconds; while
-you type, the last six show. A line has 63 characters at most, letters,
-numbers and punctuation only (ASCII). `debug.txt` gets every line.
+The lines show above the motion sensor, in a column a little over half the
+screen wide: a long line wraps onto the next rows, and the line you type
+shows its end when it is wider. They are white, as Custom Edition draws
+them; COLORS in CHAT TEXT in Settings > Audio > Voice and Text Chat
+(`display.chat_style`) draws the player's name in the colour of their team
+(blue in a game without teams) and the text in a pale blue. A line to the
+team says "(team)" after the name, one to the vehicle "(vehicle)". The
+lines go after ten seconds; while you type, the last six rows show. Where
+the touch controls are (Android, and a browser whose touch controls you
+use), the lines go at the top left, the newest highest. In split screen,
+each player's view shows the lines that player hears, and the first player
+types. No line shows, and none can be typed, in a menu, in a cinematic or
+while the HUD is hidden; opening a menu ends the line being typed. A new
+game starts with no lines. A line has 63 characters at most, letters,
+numbers and punctuation but `|` only (ASCII; `|` becomes `?`). `debug.txt`
+gets every line.
 
 Streamer mode (refer to "Streamer mode") hides offensive words in the
 chat's lines and players' names as it does in all the text the game draws:
-only on your screen, never in what is sent.
+only on your screen, never in what is sent, and never in the line you are
+typing.
 
 The host sends each line on: a player of an older build does not see the
 lines and cannot send them. The host takes 5 lines at once from a machine,
-then one each 1.5 seconds.
+then one each 1.5 seconds; a machine that joins starts afresh.
 
 TEXT CHAT in Settings > Audio > Voice and Text Chat (`display.text_chat`)
 can HIDE the chat entirely, for purists and streamers: no lines show, and
@@ -717,10 +728,15 @@ its keys open nothing.
 The host chooses the text chat for its games with TEXT CHAT in Server
 Setup > Teamplay Options (in co-op, Voice and Voting; `network.text_chat`):
 ON (the default: a line with a link, such as `discord.gg/...`,
-`example.com` or `www.`, is refused), WITH LINKS, or OFF. A game listed in
+`example.com`, `www.`, an address, or `example [dot] com`, is refused),
+WITH LINKS, or OFF. A domain that is a word as well (`.me`, `.to`, `.is`)
+counts only with a path after it (`youtu.be/...`), so that `go.to` and
+`he.is` are not refused. A game listed in
 the server browser (a public internet game) never has the text chat,
 whatever it says; a private game, joined by its invite, and a LAN game have
-it as chosen. Pressing T where the chat is off says so, and a refused line
+it as chosen. A player who joins a game from the server browser has no text
+chat in it even if its host turns it on: their game takes no line from that
+host and sends none. Pressing T where the chat is off says so, and a refused line
 tells its sender why.
 
 On the scoreboard (right-click, then click the player), Mute voice and chat
@@ -728,7 +744,9 @@ mutes a player for you alone: you no longer see their lines or hear their
 voice, and nobody else is told. The host's scoreboard also has Mute for
 everyone: no machine sees the player's lines or hears their voice for 20
 minutes, or until the host picks Unmute for everyone, and all the players
-see "Milenko muted for 20 minutes".
+see "Milenko muted for 20 minutes". The mute holds in the lobby too. A
+machine's voice is one: muting one of two players in split screen mutes
+the other's voice too.
 
 The host can also mute a player from the chat: type `/mute <player>
 <minutes>`, as `/mute Milenko 5` (20 minutes when you give none, 1440 at
@@ -737,7 +755,8 @@ name in either case, else the one player whose name begins with what you
 typed. All the players see "Milenko muted for 5 minutes". The muted
 player's lines go to no one, and they see how many minutes are left. The
 mute ends when its minutes are up, or with `/unmute <player>`. A player
-who leaves and joins again under the same name is still muted. Only the
+who leaves and joins again under the same name, in either case, is still
+muted. Only the
 host mutes: a player's `/mute` is not sent.
 
 ### Voice chat
@@ -1311,6 +1330,7 @@ Other changes:
 | `cutscene/cinematics.c` | A scenario's titles (some Custom Edition maps show their name for the whole game) are not drawn over a menu, as the letterbox is not: the screen's overlays are drawn after the players' menus. |
 | `tag_files/tag_groups.h` | `TAG_BLOCK_GET_ELEMENT` returns an element in the block without a call, and calls `tag_block_get_element_with_size` for anything else. |
 | `input/input_xbox.c`, `physics/collision_usage.c` | The clock is read only for a button held, and for collision tests only when their times are shown: a read of the clock is slow in a browser. |
+| `main/main.c`, `interface/hud.c`, `interface/hud_unit.c`, `interface/hud_draw.c`, `game/game_engine.c` | The text chat of network games (`game/network_chat.c`): its keys are read each frame, and the debug keys are not while a line is typed; each view's HUD draws its lines, above the motion sensor, whose place the HUD notes (the left of the last picture drawn); the scoreboard's menu has Mute voice and chat, and the host's Mute for everyone. |
 
 The x86 inline assembly of the game is replaced by C. Thus the compiler
 can optimize that code for each processor:

@@ -263,9 +263,9 @@ SCREENS["audio_settings/chat"] = {
     "screen": "chat_settings_screen", "header": _audio["header"], "spacing": 30,
     "rows": [row for row in _audio["rows"] if row[1] in _chat] + [
         ("TEXT CHAT:", "display.text_chat", [("SHOW", "true"), ("HIDE", "false")],
-         "SHOW the text chat, or HIDE it: no lines, and\nits keys open nothing.", None),
-        ("CHAT TEXT:", "display.chat_style", [("DEFAULT", "default"), ("WHITE", "white")],
-         "The text chat's colors: DEFAULT, names in their\nteam's color; WHITE, all white, as Custom Edition.", None),
+         "SHOW the text chat, or HIDE it: no lines, and\nits keys and D-pad Up open nothing.", None),
+        ("CHAT TEXT:", "display.chat_style", [("WHITE", "white"), ("COLORS", "colors")],
+         "The text chat's colors: WHITE, as Custom Edition;\nCOLORS, names in their team's color.", None),
     ],
 }
 _audio["rows"] = [row for row in _audio["rows"] if row[1] not in _chat]

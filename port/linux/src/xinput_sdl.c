@@ -211,6 +211,58 @@ int halo_chat_taps(float *x, float *y)
 	return touch_input_chat_taps(x, y);
 }
 
+int halo_chat_touch_layout(void)
+{
+#if defined(HALO_ANDROID)
+	return TRUE;
+#elif defined(HALO_WEB)
+	int used;
+
+	pthread_mutex_lock(&mouse_lock);
+	used = touch_aimed_ms != 0;
+	pthread_mutex_unlock(&mouse_lock);
+	return used;
+#else
+	return FALSE;
+#endif
+}
+
+/* the first controller's buttons held as the on-screen keyboard closed (the
+B that closed it, the Start or the A that sent the line), which the game
+gets none of till each is let go: it would see a new press of it, a pause
+menu opened, a melee, a jump (the triggers are analog buttons too) */
+static WORD chat_held_buttons;
+static unsigned char chat_held_analog;
+
+static void chat_pad_hold_over(XINPUT_GAMEPAD *pad)
+{
+	int index;
+
+	if (network_chat_keyboard_open())
+	{
+		chat_held_buttons = pad->wButtons;
+		chat_held_analog = 0;
+		for (index = 0; index < 8; index++)
+		{
+			if (pad->bAnalogButtons[index])
+				chat_held_analog |= (unsigned char)(1 << index);
+		}
+		memset(pad, 0, sizeof(*pad));
+		return;
+	}
+	chat_held_buttons &= pad->wButtons;
+	pad->wButtons &= (WORD)~chat_held_buttons;
+	for (index = 0; index < 8; index++)
+	{
+		if (!(chat_held_analog & (1 << index)))
+			continue;
+		if (pad->bAnalogButtons[index])
+			pad->bAnalogButtons[index] = 0;
+		else
+			chat_held_analog &= (unsigned char)~(1 << index);
+	}
+}
+
 /* the touch controls' stick as the player's movement (input_abstraction.c's
 keyboard_controls_update), forward and strafe -1..1, whatever the
 profile's sticks do; nonzero while it is pushed. Nothing but on Android and
@@ -1103,8 +1155,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		/* (the text chat's on-screen keyboard reads them, and takes them
 		while it is up) */
 		chat_pad_record(&state->Gamepad);
-		if (network_chat_keyboard_open())
-			memset(&state->Gamepad, 0, sizeof(state->Gamepad));
+		chat_pad_hold_over(&state->Gamepad);
 		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
 			abs(state->Gamepad.sThumbRY) > STICK_AIMING_DEFLECTION)
 		{

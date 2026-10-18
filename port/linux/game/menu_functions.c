@@ -2755,6 +2755,7 @@ boolean game_engine_running(void);
 void game_engine_end_game(void);
 /* the platform layer's */
 int p2p_join_invite(char const *text);
+int p2p_join_listing(struct p2p_listing const *listing);
 int p2p_invite_link(char *link, int size);
 void p2p_set_hosting_allowed(int allowed);
 int p2p_peer_address(unsigned char const *identifier, unsigned long *address);
@@ -4157,7 +4158,9 @@ static void lobby_browser_update(struct widget_instance *list)
 lobby_browser_update) */
 static boolean lobby_browser_join(struct p2p_listing const *game, short controller)
 {
-	if (!p2p_join_invite(game->invite))
+	/* (a public game: the text chat is off in it, whatever its host says:
+	network_chat.c) */
+	if (!p2p_join_listing(game))
 		return FALSE;
 	csmemcpy(lobby_browser.identifier, game->identifier, sizeof(lobby_browser.identifier));
 	csmemcpy(lobby_browser.name, game->name, sizeof(lobby_browser.name));

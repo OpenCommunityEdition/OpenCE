@@ -379,6 +379,27 @@ static void voice_machine_name(
 	}
 }
 
+/* (the host) whether a machine has a player the host muted for everyone
+(network_chat.c), by the network game's names, which the lobby has too */
+static boolean voice_machine_muted_for_everyone(
+	long machine_index)
+{
+	struct network_game *game = voice_network_game();
+	short index;
+
+	for (index = 0; game && index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; index++)
+	{
+		struct network_player *player = &game->players[index];
+
+		if (network_player_is_valid(player) && player->machine_index == machine_index &&
+			network_chat_host_name_muted(player->name))
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 /* a player's living unit's position */
 static boolean voice_player_position(
 	struct player_datum const *player,
@@ -613,7 +634,7 @@ static void voice_host_relay(
 		return;
 	}
 	/* (a player the host muted for everyone is heard by no one) */
-	if (network_chat_host_machine_muted(speaker_machine))
+	if (voice_machine_muted_for_everyone(speaker_machine))
 		return;
 	/* (no more than so many at once: those talking keep talking) */
 	if (!(voice_machines[speaker_machine].talked && now - voice_machines[speaker_machine].talked_at < VOICE_TALKING_MS) &&

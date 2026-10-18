@@ -684,12 +684,16 @@ static void network_test_seat_together(
 
 /* debug.network_test_chat: a line typed on the text chat's on-screen
 keyboard with the controller's buttons, ticks since it began: each held
-for two ticks and let go for two (the keyboard opens on the first key,
-'q': "gg ez", then D-pad Down to the team, then Start) */
+for two frames and let go for two, whatever the frame rate (a press of two
+ticks falls between two frames of a machine drawing slowly) (the keyboard
+opens on the first key, 'q': "gg ez", then D-pad Down to the team, then
+Start) */
 static void network_test_keyboard_line(
 	long ticks)
 {
-	enum { STEP_TICKS = 4 };
+	enum { STEP_FRAMES = 4 };
+	static long frames;
+	static long last_ticks = -1;
 	static unsigned long const steps[] =
 	{
 		1UL << HALO_CHAT_PAD_UP,
@@ -708,8 +712,14 @@ static void network_test_keyboard_line(
 		1UL << HALO_CHAT_PAD_DOWN,
 		1UL << HALO_CHAT_PAD_START,
 	};
-	long step = ticks / STEP_TICKS;
+	long step;
 
+	/* (frames since it began: again for the next game's line) */
+	if (ticks < last_ticks)
+		frames = 0;
+	last_ticks = ticks;
+	step = frames / STEP_FRAMES;
+	frames++;
 	if (step >= (long)NUMBEROF(steps))
 	{
 		/* (after the line, let go: a held key would move nothing more) */
@@ -717,7 +727,7 @@ static void network_test_keyboard_line(
 			test_input_press(0);
 		return;
 	}
-	test_input_press(ticks % STEP_TICKS < STEP_TICKS / 2 ? steps[step] : 0);
+	test_input_press((frames - 1) % STEP_FRAMES < STEP_FRAMES / 2 ? steps[step] : 0);
 }
 
 /* debug.network_test_chat: the last player (absolute index; NONE), whom the
@@ -938,7 +948,7 @@ void network_test_update(
 
 	/* debug.network_test_chat: each client's player types "gg ez" on the
 	text chat's on-screen keyboard 32 seconds on, as a controller does, and
-	sends it to the team (each tick, not each second, as the rest) */
+	sends it to the team (each frame, not each second, as the rest) */
 	if (network_test.chat_time > 0.0f && network_test.mode != _network_test_host && game_in_progress() &&
 		!main_menu_loaded &&
 		game_time_get() >= (long)(network_test.chat_time * TICKS_PER_SECOND) + 32 * TICKS_PER_SECOND)
@@ -1023,7 +1033,8 @@ void network_test_update(
 			}
 			if (network_test.chat_lines_said <= 0 && game_time_get() >= chat_time)
 			{
-				snprintf(text, sizeof(text), "hello everyone from %s", machine);
+				/* (long enough to wrap in the chat's column) */
+				snprintf(text, sizeof(text), "hello everyone from %s, long enough to wrap the column", machine);
 				network_chat_say(_chat_channel_everyone, text);
 				network_test.chat_lines_said = 1;
 			}
@@ -1313,7 +1324,7 @@ void network_test_update(
 					listed[index].invite[0] ? "" : ", locked");
 			}
 		}
-		if (count > 0 && p2p_join_invite(games[0].invite))
+		if (count > 0 && p2p_join_listing(&games[0]))
 		{
 			p2p_lobby_browse(FALSE);
 			platform_log("network test: joining %s's game (%s) from the server browser", games[0].name, games[0].map);

@@ -53,6 +53,18 @@ int main(int argc, char **argv)
 		CHECK(!strcmp(text, "a?b?c?d?"), "'%s'", text);
 	}
 
+	/* "|", which the game's text drawing takes for the start of a code (one
+	at a line's end reads past it), never reaches the screen, sent or typed */
+	CASE("text-pipe")
+	{
+		char line[CHAT_TEXT_SIZE] = "a";
+
+		CHECK(clean(text, "gg|", 64) == 3 && !strcmp(text, "gg?"), "'%s'", text);
+		CHECK(clean(text, "a|nb", 64) == 4 && !strcmp(text, "a?nb"), "'%s'", text);
+		chat_text_append(line, "|b|");
+		CHECK(!strcmp(line, "ab"), "'%s'", line);
+	}
+
 	/* a message cut at CHAT_TEXT_SIZE - 1 characters, and never read past
 	its buffer when another machine sent it unended */
 	CASE("text-bounds")
@@ -284,7 +296,11 @@ int main(int argc, char **argv)
 		memset(mutes, 0, sizeof(mutes));
 		CHECK(chat_mute_set(mutes, 2, "Milenko", 5, now), "not muted");
 		CHECK(chat_mute_find(mutes, 2, "Milenko", now) != NULL, "not found");
-		CHECK(chat_mute_find(mutes, 2, "milenko", now) == NULL, "found by another name");
+		/* (in either case, as the host keeps names apart) */
+		CHECK(chat_mute_find(mutes, 2, "milenko", now) != NULL, "not found in another case");
+		CHECK(chat_mute_find(mutes, 2, "MILENKO", now) != NULL, "not found in capitals");
+		CHECK(chat_mute_find(mutes, 2, "Milenk", now) == NULL, "found by another name");
+		CHECK(chat_mute_find(mutes, 2, "Milenkos", now) == NULL, "found by a longer name");
 		CHECK(chat_mute_minutes_left(&mutes[0], now) == 5, "%d", chat_mute_minutes_left(&mutes[0], now));
 		CHECK(chat_mute_minutes_left(&mutes[0], now + 1) == 5, "%d", chat_mute_minutes_left(&mutes[0], now + 1));
 		CHECK(chat_mute_minutes_left(&mutes[0], now + CHAT_MILLISECONDS_PER_MINUTE) == 4, "%d",
@@ -348,7 +364,7 @@ int main(int argc, char **argv)
 		static char const *const links[] =
 		{
 			"join https://example.org/x", "ftp://files", "go to WWW.SITE.NET now", "www.halo",
-			"discord.gg/abc", "my clan is at Example.COM", "check yt.tv, it's good", "halo.lol!",
+			"discord.gg/abc", "my clan is at Example.COM", "check yt.tv, it's good", "halo.lol/x!",
 			"ip 192.168.1.20 port 2302", "10.0.0.1",
 		};
 		int index;
@@ -368,6 +384,38 @@ int main(int argc, char **argv)
 			CHECK(chat_text_has_link(links[index]), "not a link: '%s'", links[index]);
 	}
 
+	/* the dots written out with spaces about them, or a dot with spaces both
+	sides */
+	CASE("link-spaced")
+	{
+		static char const *const links[] = { "example [dot] com", "discord (dot) gg/abc", "site [.] net",
+			"example . com", "1 . 2 . 3 . 4", "join discord dot gg/x", "EXAMPLE DOT COM", "evil {dot} io" };
+		static char const *const lines[] = { "polka dot me", "the dot is red", "dot dot dot", "the end . then",
+			"wait . . . ok" };
+		int index;
+
+		for (index = 0; index < (int)NUMBEROF(links); index++)
+			CHECK(chat_text_has_link(links[index]), "not a link: '%s'", links[index]);
+		for (index = 0; index < (int)NUMBEROF(lines); index++)
+			CHECK(!chat_text_has_link(lines[index]), "a link: '%s'", lines[index]);
+	}
+
+	/* a domain that is a word as well counts only with a path, a port or
+	another domain after it: "go.to" is a slip of typing */
+	CASE("link-word-domains")
+	{
+		static char const *const links[] = { "youtu.be/abc", "t.co/xyz", "example.co.uk", "halo.me:8080",
+			"clan.us/join" };
+		static char const *const lines[] = { "go.to the base", "he.is camping", "nice shot.Me", "wow.live",
+			"next.fun round", "k.top", "lol.it was close", "me.to", "x.win", "ok.so" };
+		int index;
+
+		for (index = 0; index < (int)NUMBEROF(links); index++)
+			CHECK(chat_text_has_link(links[index]), "not a link: '%s'", links[index]);
+		for (index = 0; index < (int)NUMBEROF(lines); index++)
+			CHECK(!chat_text_has_link(lines[index]), "a link: '%s'", lines[index]);
+	}
+
 	/* what is not one: sentences, numbers, abbreviations, a dot and a word
 	that is not a domain, a domain's letters running into more */
 	CASE("link-not")
@@ -376,7 +424,7 @@ int main(int argc, char **argv)
 		{
 			"gg ez", "nice shot. com on", "the score is 1.5 to 2", "e.g. the sniper", "i.e. no", "U.S.A",
 			"version 1.2.3", "lol...ok", "use the www to read", "wait.comrades", "Mr.Chief", "a.b", "dot com",
-			"hello world", "3.14159", "", "it's .com", "1.2.3.4567", "player.com2",
+			"hello world", "3.14159", "", "it's .com", "1.2.3.4567", "player.com2", "v1.2.3.4.5",
 		};
 		int index;
 

@@ -1456,9 +1456,8 @@ void hud_draw_screen(
 		}
 
 		hud_messaging_update(render.local_player_index);
-		/* port: network games' text chat, in the first local player's view */
-		if (render.local_player_index == local_player_get_next(NONE))
-			network_chat_draw(render.local_player_index);
+		/* port: network games' text chat, the lines this view's player hears */
+		network_chat_draw(render.local_player_index);
 	}
 
 	rasterizer_hud_end();

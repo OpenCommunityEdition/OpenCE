@@ -2462,6 +2462,11 @@ static int parse_invite(const char *text, unsigned char *host_hash, unsigned cha
 	return 1;
 }
 
+/* the host of the public game this machine joined from the server browser
+(p2p_join_listing), till another invite is joined: its identifier */
+static unsigned char listed_host[P2P_IDENTIFIER_SIZE];
+static int listed_host_known;
+
 /* under p2p_lock: parse_invite's result */
 static int join_invite(const char *text)
 {
@@ -2474,6 +2479,8 @@ static int join_invite(const char *text)
 			"cannot join");
 	if (parsed <= 0)
 		return parsed;
+	/* (any invite's game is no listed one, unless p2p_join_listing says) */
+	listed_host_known = 0;
 	p2p_identifier_from_hash(hash, host);
 	if (!memcmp(host, identifier, P2P_IDENTIFIER_SIZE))
 		return 1;
@@ -2504,6 +2511,37 @@ int p2p_join_invite(const char *text)
 	if (result > 0 && !p2p.running)
 		platform_log("Internet play is off (network.online in config.toml): the invite is ignored");
 	return result > 0;
+}
+
+int p2p_join_listing(const struct p2p_listing *listing)
+{
+	unsigned char hash[P2P_KEY_HASH_SIZE], token[P2P_TOKEN_SIZE];
+
+	if (!p2p_join_invite(listing->invite))
+		return 0;
+	/* (its host as the invite names it, as the tunnel knows its peers) */
+	pthread_mutex_lock(&p2p_lock);
+	if (parse_invite(listing->invite, hash, token) > 0)
+	{
+		p2p_identifier_from_hash(hash, listed_host);
+		listed_host_known = 1;
+	}
+	pthread_mutex_unlock(&p2p_lock);
+	return 1;
+}
+
+int p2p_joined_listed_host(void)
+{
+	struct peer *peer;
+	int reached;
+
+	if (!p2p.running)
+		return 0;
+	pthread_mutex_lock(&p2p_lock);
+	peer = listed_host_known ? find_peer(listed_host) : NULL;
+	reached = peer && peer->connected;
+	pthread_mutex_unlock(&p2p_lock);
+	return reached;
 }
 
 void p2p_invite_received(const char *text)

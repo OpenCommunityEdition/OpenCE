@@ -283,8 +283,11 @@ votes drop both kinds as unknown, so the network version is unchanged.
 The text chat (`network_chat.c`): a client sends its player's line to the
 host (`_distributed_message_chat_up`, reliably), which takes it only from
 the client's own stream and from one of that machine's players, at most 5
-lines at once and one each 1.5 seconds after (more are dropped), its text
-cut to 63 characters of printable ASCII. The host alone sends the line on
+lines at once and one each 1.5 seconds after (more are dropped; a machine
+gone from the game has its count let go, so one new to its slot starts
+afresh), its text cut to 63 characters of printable ASCII but `|` (which
+the game's text drawing takes for the start of a code; it becomes `?`, on
+the host and again on each client). The host alone sends the line on
 (`_distributed_message_chat_down`, reliably, with the sender's absolute
 index and its channel, the line's flags): to every client, a team's line
 only to the machines with a player of the sender's team (to every one in a
@@ -293,17 +296,22 @@ riding in the sender's vehicle (the outermost object each unit is a child
 of, so any map's vehicles), as the host has them; the sender's machine gets
 its own line whatever it is. The host shows it itself if one of its own
 players hears it or said it. A client shows only
-the host's lines, its own too, so every machine shows them in one order.
+the host's lines, its own too, so every machine shows them in one order,
+and takes them (and the chat settings below) only over the host's
+connection's stream: a datagram from the host's address could be anyone's.
+Each local player's view shows the lines that player hears.
 The host's own `/mute <player> [minutes]` and `/unmute <player>` are
-commands, not lines: it keeps a mute by the player's name (in ASCII) and
-its minutes by its own clock, drops the lines of a muted player's machine
+commands, not lines: it keeps a mute by the player's name (in ASCII,
+matched in either case, as the host keeps names apart) and its minutes by
+its own clock, drops the lines of a muted player's machine
 when they come up, and sends that machine alone a notice of the minutes
 left; it tells every machine of each mute and unmute. A notice is a down
 line with `_chat_line_notice_bit` set, its text alone (no sender). A
 client's `/mute` is never sent, and the host takes the text of a line that
 came up as a line, never a command. The host's scoreboard Mute for everyone
 is the same mute (20 minutes), and the host relays none of a muted player's
-machine's voice either (`network_voice.c`'s `voice_host_relay`). A
+machine's voice either (`network_voice.c`'s `voice_host_relay`, by the
+names of the network game's players, which the lobby has too). A
 machine's own scoreboard mute stays its own: it plays none of that
 machine's voice and shows none of its players' lines, and tells no one.
 The host's chat settings (`network.text_chat`: on, links allowed, or off;
@@ -311,12 +319,20 @@ always off while its game is listed in the server browser,
 `p2p_hosting_listed`) go to every client in
 `_distributed_message_chat_config` (one byte of flags), reliably, as they
 change and every 3 seconds. A client without them (from a host without the
-chat, or before they come) has the chat off. A client refuses a line the
+chat, or before they come) has the chat off, and so does a client in a
+public game it joined from the server browser, whatever its host sends (a
+changed host could turn the chat on): while the tunnel reaches the host of
+the listing it joined (`p2p_join_listing`, `p2p_joined_listed_host`; any
+other invite joined since forgets it), it takes no chat line or notice and
+sends none. A client refuses a line the
 settings refuse before sending it, and the host refuses it again whatever
 the client knew, telling its machine why: a changed build gets no further.
 Links are found in the line's text (`chat_text_has_link`): a scheme, `www.`,
 an address of four numbers, or a name and a common top-level domain, its
-dots also written `(dot)`, `[dot]`, `(.)` or `[.]`.
+dots also written `(dot)`, `[dot]`, `{dot}`, `(.)`, `[.]` or ` dot `, with
+spaces about them or not, or a dot with spaces both sides; a domain that is
+a word as well (`me`, `to`, `is`) counts only with a path, a port or another
+domain after it (`chat_link_domain`).
 Builds without the chat drop the three kinds as unknown, so the network
 version is unchanged.
 

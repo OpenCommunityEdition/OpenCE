@@ -301,11 +301,11 @@ static const struct config_setting config_settings[] =
 		"empty for English. The game data decides what is translated." },
 	{ "display.text_chat", _config_boolean, "true", "HALO_TEXT_CHAT", _environment_value, _platform_all,
 		"Show the text chat of network games: false hides its lines and keeps\n"
-		"its keys from opening it, as for purists and streamers." },
-	{ "display.chat_style", _config_string, "\"default\"", "HALO_CHAT_STYLE", _environment_value, _platform_all,
-		"The text chat's colours: \"default\" (names in their team's colour,\n"
-		"the text a pale blue, as the PC version) or \"white\" (all white, as\n"
-		"Custom Edition)." },
+		"its keys (and a controller's D-pad Up) from opening it, as for purists\n"
+		"and streamers." },
+	{ "display.chat_style", _config_string, "\"white\"", "HALO_CHAT_STYLE", _environment_value, _platform_all,
+		"The text chat's colours: \"white\" (all white, as Custom Edition) or\n"
+		"\"colors\" (names in their team's colour, the text a pale blue)." },
 	{ "game.enhanced_animations", _config_boolean, "true", "HALO_ENHANCED_ANIMATIONS", _environment_value, _platform_all,
 		"The player bipeds' grenade throws keep their legs moving (crouched,\n"
 		"in the air and in a vehicle's seat too), riders' hands leave the grips\n"
@@ -401,8 +401,8 @@ static const struct config_setting config_settings[] =
 		"to be heard by proximity voice chat (5 to 100)." },
 	{ "network.text_chat", _config_string, "\"on\"", "HALO_NET_TEXT_CHAT", _environment_value, _platform_all,
 		"Hosting: the text chat: \"on\" (links in lines are refused), \"links\"\n"
-		"(links allowed) or \"off\". Always off in a game listed in the server\n"
-		"browser (a public internet game)." },
+		"(links allowed) or \"off\", in either case. Always off in a game listed\n"
+		"in the server browser (a public internet game)." },
 	{ "network.votekick", _config_boolean, "true", "HALO_NET_VOTEKICK", _environment_value, _platform_all,
 		"Hosting: let the players vote to kick a player (the scoreboard's\n"
 		"right-click, or the console's votekick). More than half of the players\n"
@@ -530,7 +530,9 @@ static const struct config_setting config_settings[] =
 	{ "debug.network_test_chat", _config_real, "0.0", "HALO_NETWORK_TEST_CHAT", _environment_value, _platform_all,
 		"This many seconds into an automated test game each machine's player\n"
 		"says a chat line to everyone, then to the team and to the vehicle (the\n"
-		"host seats the last two players in one first); 0 never." },
+		"host seats the last two players in one first), then the host mutes and\n"
+		"unmutes a player, refuses a link and turns the chat off, and the\n"
+		"clients type on the on-screen keyboard (port/linux/NETCODE.md); 0 never." },
 	{ "debug.network_test_name", _config_string, "\"\"", "HALO_NETWORK_TEST_NAME", _environment_value, _platform_all,
 		"The name this machine's player takes in an automated test game (ASCII);\n"
 		"empty keeps its profile's." },

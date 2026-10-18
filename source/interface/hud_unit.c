@@ -1163,6 +1163,8 @@ void hud_render_unit_interface(
 
 					if (hud_definition->motion_sensor.background.interface_bitmap.index != NONE)
 					{
+						/* port: none, unless it is drawn (its bitmap can be missing) */
+						hud_draw_last_left = NONE;
 						hud_draw_static_element(
 							local_player_index,
 							&absolute_placement,

@@ -159,7 +159,7 @@ controller for player 1. With the default buttons of the profile:
 | Crouch, Zoom | left and right stick clicks |
 | Light, Gren. type | white, black |
 | Pause, Back | start, back |
-| Up, Down, Left, Right | D-pad |
+| Up, Down, Left, Right | D-pad (in a network game, Up opens the text chat's keyboard) |
 
 The names on the buttons follow the profile's "Button layout" (Settings >
 Gamepads): with "Swap triggers", the right trigger's button says "Grenade".

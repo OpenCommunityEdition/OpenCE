@@ -1545,6 +1545,7 @@ void hud_draw_static_element(
 	return;
 }
 
+/* port: the left of the last picture drawn (hud_draw.h) */
 short hud_draw_last_left;
 
 static void hud_draw_bitmap_internal(

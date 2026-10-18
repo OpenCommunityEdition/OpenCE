@@ -4158,11 +4158,13 @@ void network_distributed_handle_message(
 	case _distributed_message_chat_up:
 		network_chat_handle_up(machine_index, entries, distributed_handling_stream_message);
 		break;
+	/* (the host's, over its connection's stream alone: a datagram from its
+	address could be anyone's) */
 	case _distributed_message_chat_down:
-		network_chat_handle_down(entries);
+		network_chat_handle_down(entries, !network_connection_last_read_was_unreliable());
 		break;
 	case _distributed_message_chat_config:
-		network_chat_handle_config(entries);
+		network_chat_handle_config(entries, !network_connection_last_read_was_unreliable());
 		break;
 	case _distributed_message_coop_device_groups:
 		network_coop_handle_device_groups(entries, header.count);
