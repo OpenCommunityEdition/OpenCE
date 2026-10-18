@@ -501,7 +501,17 @@ void host_sdl_get_clipboard_text(char *buffer, uint32_t size)
 
 int host_sdl_show_toast(const char *message, int duration, int gravity, int x, int y)
 {
+#ifdef __ANDROID__
 	return SDL_ShowAndroidToast(message, duration, gravity, x, y) ? 1 : 0;
+#else
+	/* (the macOS host, port/macos/host, builds this file too: no toasts) */
+	(void)message;
+	(void)duration;
+	(void)gravity;
+	(void)x;
+	(void)y;
+	return 0;
+#endif
 }
 
 /* ---------- a message for the player (a host of another network version) */

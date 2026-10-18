@@ -34,16 +34,20 @@ import sys
 from pathlib import Path
 from typing import Any, List
 
-from .android_build import MUSL_VERSION, fetch_musl, guest_image_build
+from .android_build import MBEDTLS_DIR, MUSL_VERSION, fetch_musl, guest_image_build
+from .linux_build import MINIUPNPC_DEFINES, MINIUPNPC_DIR, miniupnpc_sources
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/macos")
+ANDROID_DIR = Path("port/android")
 LINUX_DIR = Path("port/linux")
 BUILD = Path("build/macos")
 THIRD_PARTY = BUILD / "third_party"
 MUSL_DIR = THIRD_PARTY / f"musl-{MUSL_VERSION}"
 ENTITLEMENTS = PORT_DIR / "host" / "halo_host.entitlements"
 HOST_FRAMEWORKS = ["Hypervisor"]
+# the host's oldest macOS (conductor/tech-stack.md: macOS 26; os_sync_wait_on_address needs 14.4)
+MACOS_MINIMUM = "26.0"
 
 
 def is_macos_host() -> bool:
@@ -51,7 +55,7 @@ def is_macos_host() -> bool:
 
 
 def macos_configure_inputs() -> List[Path]:
-    return [Path(__file__), PORT_DIR / "host", PORT_DIR / "runtime" / "src"]
+    return [Path(__file__), PORT_DIR / "host", PORT_DIR / "runtime" / "src", Path("tools/macos_dispatch.py")]
 
 
 def generate_macos_build(n: Writer, sln: Any) -> None:
@@ -97,33 +101,82 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         depfile="$out.d",
         deps="gcc",
     )
-    host_cflags = " ".join(["-O2", "-g", "-Wall", "-Werror", "-std=gnu11", f"-I{PORT_DIR}/host"])
+    # the runtime crate (below), whose header the host includes
+    runtime_dir = PORT_DIR / "runtime"
+    runtime_library = BUILD / "cargo" / "release" / "libopence_runtime.a"
+    runtime_header = BUILD / "runtime" / "opence_runtime.h"
+
+    # the import dispatcher, from the stubs' lists and the imports' prototypes
+    dispatch_c = host_dir / "host_dispatch.c"
+    gen_dir = BUILD / "guest" / "gen"
+    import_lists = [ANDROID_DIR / "host_imports.list", gen_dir / "posix_imports.list", gen_dir / "gl_imports.list"]
+    prototype_headers = [ANDROID_DIR / "guest" / "runtime" / "guest_host.h", LINUX_DIR / "src" / "posix.h"]
+    n.rule(
+        name="macos_dispatch",
+        command=("$python tools/macos_dispatch.py "
+                 + " ".join(f"--prototypes {header}" for header in prototype_headers)
+                 + " $out $in"),
+        description="MACOS DISPATCH $out",
+    )
+    n.build(outputs=dispatch_c, rule="macos_dispatch", inputs=import_lists,
+            implicit=[Path("tools/macos_dispatch.py"), *prototype_headers])
+
+    host_cflags = " ".join([
+        "-O2", "-g", "-Wall", "-Werror", "-std=gnu11", "-D_DARWIN_C_SOURCE", f"-mmacosx-version-min={MACOS_MINIMUM}",
+        f"-I{PORT_DIR}/host", f"-I{runtime_header.parent}", f"-I{ANDROID_DIR}/include",
+        f"-I{ANDROID_DIR}/guest/runtime", f"-I{ANDROID_DIR}/guest/libc/arch/arm64_32", f"-I{LINUX_DIR}/src",
+        f"-I{sdl_include}",
+    ])
+    # the files the Android host shares: its SDL bridge, and the platform
+    # layer's POSIX helpers (with UPnP and DTLS, as there)
+    shared_cflags = host_cflags.replace("-Werror", "") + " -Wno-unused-function"
     host_objects: List[Path] = []
-    for source in [*sorted((PORT_DIR / "host").glob("*.c")), names_c]:
+    for source in [*sorted((PORT_DIR / "host").glob("*.c")), names_c, dispatch_c]:
         obj = host_dir / "obj" / (source.name + ".o")
-        n.build(outputs=obj, rule="macos_host_cc", inputs=source, variables={"cflags": host_cflags})
+        n.build(outputs=obj, rule="macos_host_cc", inputs=source, variables={"cflags": host_cflags},
+                order_only=[runtime_header])
+        host_objects.append(obj)
+    for source in [ANDROID_DIR / "host" / "host_sdl.c", LINUX_DIR / "src" / "posix_files.c",
+                   LINUX_DIR / "src" / "posix_net.c"]:
+        obj = host_dir / "obj" / (source.name + ".o")
+        n.build(outputs=obj, rule="macos_host_cc", inputs=source, variables={"cflags": shared_cflags},
+                order_only=[runtime_header])
+        host_objects.append(obj)
+    miniupnpc_cflags = " ".join([shared_cflags, f"-I{MINIUPNPC_DIR / 'include'}", f"-I{MINIUPNPC_DIR / 'src'}",
+                                 *MINIUPNPC_DEFINES])
+    for source in [LINUX_DIR / "src" / "posix_upnp.c", *miniupnpc_sources()]:
+        obj = host_dir / "obj" / ("miniupnpc_" + source.name + ".o" if source.parent.parent == MINIUPNPC_DIR
+                                  else source.name + ".o")
+        n.build(outputs=obj, rule="macos_host_cc", inputs=source,
+                variables={"cflags": miniupnpc_cflags + (" -w" if source.name != "posix_upnp.c" else "")})
+        host_objects.append(obj)
+    mbedtls_cflags = " ".join([shared_cflags, f"-I{MBEDTLS_DIR / 'include'}", f"-I{MBEDTLS_DIR / 'library'}"])
+    for source in [LINUX_DIR / "src" / "posix_dtls.c", *sorted((MBEDTLS_DIR / "library").glob("*.c"))]:
+        obj = host_dir / "obj" / ("mbedtls_" + source.name + ".o" if source.parent.parent == MBEDTLS_DIR
+                                  else source.name + ".o")
+        n.build(outputs=obj, rule="macos_host_cc", inputs=source,
+                variables={"cflags": mbedtls_cflags + (" -w" if source.name != "posix_dtls.c" else "")})
         host_objects.append(obj)
     host = BUILD / "halo_host"
     libraries = " ".join(f"-framework {name}" for name in HOST_FRAMEWORKS)
+    libraries += f" {runtime_library}"
     if sdl_lib:
         libraries += f" -L{sdl_lib} -Wl,-rpath,{sdl_lib}"
+    libraries += " -lSDL3"
     # signed as it is linked, so that no unsigned host is ever left: without
     # the entitlement it cannot create its VM
     n.rule(
         name="macos_host_link",
-        command=(f"$macos_host_cc -o $out $in {libraries} && "
+        command=(f"$macos_host_cc -mmacosx-version-min={MACOS_MINIMUM} -o $out $in {libraries} && "
                  f"{codesign} -s - -f --entitlements {ENTITLEMENTS} $out"),
         description="MACOS HOST LINK $out",
     )
-    n.build(outputs=host, rule="macos_host_link", inputs=host_objects, implicit=[ENTITLEMENTS])
+    n.build(outputs=host, rule="macos_host_link", inputs=host_objects, implicit=[ENTITLEMENTS, runtime_library])
 
     # ---------- the runtime crate
 
-    runtime_dir = PORT_DIR / "runtime"
     runtime_inputs = [runtime_dir / "Cargo.toml", runtime_dir / "Cargo.lock",
                       *sorted((runtime_dir / "src").glob("*.rs"))]
-    runtime_library = BUILD / "cargo" / "release" / "libopence_runtime.a"
-    runtime_header = BUILD / "runtime" / "opence_runtime.h"
     n.rule(
         name="macos_cargo",
         # (cargo reads .cargo/config.toml from the folder it runs in, not the

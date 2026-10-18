@@ -30,6 +30,44 @@ with the host ABI.
 
 #include "posix.h"
 
+#ifdef __APPLE__
+/* The macOS host builds this file too (port/macos/host). Darwin has no
+SOCK_CLOEXEC or SOCK_NONBLOCK flags of socket()'s type, no accept4 and no
+getrandom: they are made of the calls it has. */
+#define SOCK_CLOEXEC 0x10000000
+#define SOCK_NONBLOCK 0x20000000
+
+static int socket_with_flags(int family, int type, int protocol)
+{
+	int descriptor = socket(family, type & ~(SOCK_CLOEXEC | SOCK_NONBLOCK), protocol);
+
+	if (descriptor >= 0 && (type & SOCK_CLOEXEC))
+		fcntl(descriptor, F_SETFD, FD_CLOEXEC);
+	if (descriptor >= 0 && (type & SOCK_NONBLOCK))
+		fcntl(descriptor, F_SETFL, fcntl(descriptor, F_GETFL) | O_NONBLOCK);
+	return descriptor;
+}
+
+/* (function-like, so the parameters named socket are left alone) */
+#define socket(family, type, protocol) socket_with_flags(family, type, protocol)
+
+static int accept4(int listener, struct sockaddr *address, socklen_t *length, int flags)
+{
+	int descriptor = accept(listener, address, length);
+
+	if (descriptor >= 0 && (flags & SOCK_CLOEXEC))
+		fcntl(descriptor, F_SETFD, FD_CLOEXEC);
+	return descriptor;
+}
+
+static ssize_t getrandom(void *buffer, size_t size, unsigned int flags)
+{
+	(void)flags;
+	arc4random_buf(buffer, size);
+	return (ssize_t)size;
+}
+#endif
+
 /* Winsock error codes (winsockx.h) */
 #define WSAEINTR 10004
 #define WSAEBADF 10009
