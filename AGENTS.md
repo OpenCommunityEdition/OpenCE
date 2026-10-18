@@ -185,11 +185,21 @@ review guidance. Those standards do not relax the isolation rules.
   cap. Optimize total work needed for a correct, verified result.
 - Keep tiny tasks inline. Normally use no more than two concurrent
   subagents across the assignment; concurrency is optional, not a target.
+  Do not impose delegation quotas or target an Astra usage percentage.
   Give each worker distinct file ownership and a concise, self-contained
   brief covering scope, relevant paths and decisions, applicable repository
   instructions, completion criteria and required validation. Require workers
   to read and follow those instructions; do not assume inherited context.
-- The primary coordinates edits, builds, game processes and cleanup to avoid
+- Assign complete bounded deliverables: implementation, relevant tests and
+  corrections arising from review. Validation ownership may include the
+  capture harness, coordinated test runs, evidence collection and cleanup,
+  rather than only instructions for the primary to perform that work.
+- Have one agent establish the relevant toolchain, dependencies, fixtures
+  and capture method, then share a concise environment summary with the
+  others. Recheck those findings only when something changes, fails or
+  leaves material uncertainty.
+- The primary coordinates edits, builds, game processes and cleanup, but
+  may delegate their execution to a worker with clear ownership. Avoid
   conflicting changes or tests against files still being edited. The limit
   of two concurrent game instances applies across the whole team. Existing
   isolation, hidden-window, data-preservation and cleanup rules still apply.
@@ -198,6 +208,10 @@ review guidance. Those standards do not relax the isolation rules.
   conversation history, repeated reads of unchanged material and unchanged
   test reruns without a new reason. Review actual changes and evidence in
   proportion to risk without routinely repeating the worker's entire task.
+  Use clear review handoffs: workers summarize changes, checks and unresolved
+  concerns; the primary reviews the diff and evidence and requests focused
+  corrections. Rerun checks when integration, new changes, failures or
+  unresolved uncertainty justify them, while completing all required checks.
 - Return unresolved isolation questions, contradictory evidence, invalid
   assumptions or repeated failed approaches to the primary for diagnosis.
   Astra cannot waive isolation rules: stop any conflicting part and follow
