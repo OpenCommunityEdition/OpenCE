@@ -223,9 +223,10 @@ def test_the_dispatcher_translates_pointers_but_not_handles(tmp_path):
     # the ninth argument is on the guest's stack, in 4 bytes (Apple's ABI)
     _, select = dispatch_case(text, "hostposix_socket_select")
     assert "(posix_long)call->x[7], (int)host_call_stack32(call, 0));" in select
-    # the socket error is the host's errno, which the guest reads as Linux's
+    # the socket error is already a Windows Sockets code (posix_net.c): not
+    # translated again
     _, error = dispatch_case(text, "hostposix_socket_last_error")
-    assert "host_linux_errno(posix_socket_last_error())" in error
+    assert "call->result_x = (uint32_t)posix_socket_last_error();" in error
     # every import but host_errno keeps the errno it left
     assert "host_saved_errno = errno;" in log
     _, errno_case = dispatch_case(text, "host_errno")

@@ -60,6 +60,8 @@ def compile_guest(source: Path, obj: Path, extra_flags: Iterable[str] = ()) -> N
 def link_guest(objects: Iterable[Path], image: Path) -> None:
     lld = os.environ.get("HALO_MACOS_LLD", "ld.lld")
     runtime = [OBJECTS / f"port/android/guest/runtime/{name}.o" for name in RUNTIME]
+    # the platform layer's POSIX helpers' guest side (port/linux/src/posix.h)
+    runtime.append(OBJECTS / "guest/gen/guest_posix.o")
     command = [lld, "-m", "aarch64linux", "-static", "-nostdlib", "-T", str(LINKER_SCRIPT), "-o", str(image),
                *map(str, objects), *map(str, runtime), str(OBJECTS / "gen/imports.o"), str(GUEST / "libguestc.a")]
     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)

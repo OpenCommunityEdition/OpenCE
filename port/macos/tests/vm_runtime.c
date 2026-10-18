@@ -21,6 +21,8 @@ cases take a folder of their own as argv[2].
 #include <time.h>
 #include <unistd.h>
 
+#include "posix.h"
+
 #define CHECK(condition) do { if (!(condition)) { printf("failed: %s (line %d)\n", #condition, __LINE__); exit(1); } } while (0)
 
 /* ---------- threads */
@@ -263,6 +265,51 @@ static void case_memory(void)
 	CHECK((unsigned long)&size < 0x100000000UL);
 }
 
+/* ---------- sockets: the platform layer's (port/linux/src/posix.h), which
+the host's posix_net.c carries out */
+
+static void case_sockets(void)
+{
+	unsigned char address[16], from[16];
+	int receiver, sender, length = sizeof(from);
+	char buffer[16];
+
+	/* struct sockaddr_in for 127.0.0.1, port 0 (any): the guest's (Linux's)
+	layout, which the host's helper passes on; a first byte of 16 and the
+	family in the second is Darwin's, 2 in the first two is Linux's */
+	memset(address, 0, sizeof(address));
+	address[0] = 2;
+	address[4] = 127;
+	address[7] = 1;
+	receiver = posix_socket(2, 2, 0);
+	CHECK(receiver >= 0);
+	CHECK(posix_socket_bind(receiver, address, sizeof(address)) == 0);
+	CHECK(posix_socket_getsockname(receiver, address, &length) == 0);
+	CHECK(posix_socket_set_nonblocking(receiver, 1) == 0);
+	/* nothing waits: WSAEWOULDBLOCK (10035), the Windows Sockets code
+	posix_net.c gives the platform layer for EAGAIN */
+	CHECK(posix_socket_recv(receiver, buffer, sizeof(buffer), 0) == -1);
+	CHECK(posix_socket_last_error() == 10035);
+	sender = posix_socket(2, 2, 0);
+	CHECK(sender >= 0);
+	CHECK(posix_socket_sendto(sender, "ping", 4, 0, address, sizeof(address)) == 4);
+	length = sizeof(from);
+	{
+		int tries;
+		int received = -1;
+
+		for (tries = 0; tries < 100 && received < 0; tries++)
+		{
+			received = posix_socket_recvfrom(receiver, buffer, sizeof(buffer), 0, from, &length);
+			if (received < 0)
+				usleep(10000);
+		}
+		CHECK(received == 4 && !memcmp(buffer, "ping", 4));
+	}
+	CHECK(posix_socket_close(sender) == 0);
+	CHECK(posix_socket_close(receiver) == 0);
+}
+
 int main(int argc, char **argv)
 {
 	const char *name = argc > 1 ? argv[1] : "";
@@ -279,6 +326,8 @@ int main(int argc, char **argv)
 		case_files(argv[2]);
 	else if (!strcmp(name, "memory"))
 		case_memory();
+	else if (!strcmp(name, "sockets"))
+		case_sockets();
 	else if (!strcmp(name, "exit"))
 		exit(42);
 	else

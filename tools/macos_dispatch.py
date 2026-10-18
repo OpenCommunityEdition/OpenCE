@@ -28,7 +28,11 @@ import sys
 RAW_PARAMETERS = {("posix_directory_next", "directory"), ("posix_directory_close", "directory")}
 RAW_RESULTS = {"posix_directory_open"}
 # results that are the host's errno values, which the guest reads as Linux's
-ERRNO_RESULTS = {"posix_socket_last_error"}
+# (none: posix_socket_last_error gives Windows Sockets codes, which
+# port/linux/src/posix_net.c makes from the host's own errno names; the
+# guest's errno after an import is host_errno's, which host_imports.c
+# translates)
+ERRNO_RESULTS = set()
 SIXTY_FOUR_BIT = {"long long", "unsigned long long", "int64_t", "uint64_t"}
 FLOATS = {"float", "double"}
 

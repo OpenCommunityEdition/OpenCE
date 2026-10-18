@@ -369,8 +369,8 @@ def guest_image_build(n: Writer, sln: Any, config: Dict[str, Any], *, rule_prefi
 
     def guest_object(source: Path, cflags: str, prefix: str = "") -> Path:
         obj = obj_dir / prefix / Path(str(source).lstrip("/")).with_suffix(".o")
-        if str(source).startswith(str(BUILD)):
-            obj = obj_dir / prefix / source.relative_to(BUILD).with_suffix(".o")
+        if str(source).startswith(str(build)):
+            obj = obj_dir / prefix / source.relative_to(build).with_suffix(".o")
         n.build(outputs=obj, rule=f"{rule_prefix}_guest_cc", inputs=source, implicit=tool_implicit,
                 variables={"cflags": cflags})
         return obj
