@@ -80,7 +80,7 @@ def run_layout(tool, mode):
 def test_corner_is_separate_from_original_six_rows(layout_tool):
     rows = run_layout(layout_tool, "on")
     assert [row for row in rows if row[0].endswith("changelog_corner")] == [
-        ["main_menu/changelog_corner", "456", "444"]]
+        ["main_menu/changelog_corner", "447", "438"]]
     tree = ET.parse(ROOT / "port/assets/menus/ce/main_menu.xml")
     central = tree.find("widget[@name='main_menu/main_menu_select_list']").findall("child")
     assert len(central) == 6

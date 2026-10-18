@@ -2,22 +2,22 @@
 <!-- Player notes (tools/changelog_menu.py) -->
 <menus>
 	<bitmap name="main_menu/menu_changelog">
-		<frame png="ce/port/main_menu/menu_changelog__0.png" width="160" height="32"/>
-		<frame png="ce/port/main_menu/menu_changelog__1.png" width="160" height="32"/>
+		<frame png="ce/port/main_menu/menu_changelog__0.png" width="104" height="21"/>
+		<frame png="ce/port/main_menu/menu_changelog__1.png" width="104" height="21"/>
 	</bitmap>
 	<bitmap name="main_menu/changelog/header_changelog">
 		<frame png="ce/port/main_menu/changelog/header_changelog.png" width="512" height="64"/>
 	</bitmap>
-	<widget name="main_menu/main_menu_item_changelog" type="text" width="160" height="28" bitmap="main_menu/menu_changelog">
+	<widget name="main_menu/main_menu_item_changelog" type="text" width="104" height="21" bitmap="main_menu/menu_changelog">
 		<on event="a start" open="main_menu/changelog/build_1"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
-	<widget name="main_menu/changelog_corner" type="column_list" width="160" height="28" flags="pass_unhandled_to_focused_child">
+	<widget name="main_menu/changelog_corner" type="column_list" width="104" height="21" flags="pass_unhandled_to_focused_child">
 		<child widget="main_menu/main_menu_item_changelog"/>
 	</widget>
 	<widget name="main_menu/changelog/header_changelog" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/changelog/header_changelog">
 	</widget>
-	<widget name="main_menu/gulch_build_number" type="text" controller="1" width="150" height="20" font="ui\small_ui" color="#FFFF8000">
+	<widget name="main_menu/gulch_build_number" type="text" controller="1" width="150" height="20" font="ui\small_ui" color="#FFFF8000" align="center">
 		<on event="created" run="port gulch build label"/>
 	</widget>
 	<strings name="main_menu/changelog/build_1/lines">

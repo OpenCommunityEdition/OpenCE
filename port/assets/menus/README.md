@@ -110,9 +110,12 @@ that instance normally. Xbox, Custom Edition and MCC screens outside the
 feature keep their existing paths. The footer omits horizontal tab flags so
 the mouse wheel follows the vertical scroll handlers, including over buttons.
 
-CHANGELOG occupies its own small bottom-right list, leaving the six original
+CHANGELOG occupies its own small list beneath the build labels, leaving the six original
 central buttons, coordinates and Up/Down wrapping intact. Right selects the
-corner button; Left returns to the remembered central selection. Mouse hover
+corner button directly beneath the orange version labels. Its existing
+artwork is scaled uniformly to the visible text block's width.
+Both the Gulch build label and button share the original version text's
+visible centerline. Left returns to the remembered central selection. Mouse hover
 and clicks use the existing column-list target rules, including the paired
 scroll arrows. The feature runtime handles only this exact PC main root and
 its own corner container. Its small focus/update handlers are necessary because

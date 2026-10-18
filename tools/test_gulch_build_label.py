@@ -1,11 +1,16 @@
-"""Exercise the actual build-label handler and existing widget text ownership."""
+"""Exercise generated build metadata, the actual label and widget text ownership."""
 
+import io
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
+from types import SimpleNamespace
 
 import pytest
+
+from tools import android_build, linux_build, ninja_syntax, web_build, windows_build
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,11 +20,8 @@ def function(source, name):
     return source[start:source.index("\n}", start) + 2]
 
 
-@pytest.mark.parametrize("number,expected", [
-    (0, "gulch build local"), (321, "gulch build 321"),
-    (2147483647, "gulch build 2147483647"),
-])
-def test_handler_uses_executable_build_and_owns_only_its_widget(tmp_path, number, expected):
+def run_handler(tmp_path, metadata_flags, expected):
+    tmp_path.mkdir(exist_ok=True)
     compiler = os.environ.get("CC") or shutil.which("clang") or shutil.which("cc")
     if not compiler:
         pytest.skip("C compiler unavailable")
@@ -90,10 +92,65 @@ int main(void) {
     source.write_text(code, encoding="utf-8")
     flags = ["-std=gnu89", "-fshort-wchar", "-Wall", "-Wextra", "-Werror",
              "-I", str(ROOT / "port/linux/game"), f'-DEXPECTED="{expected}"']
-    flags.append(f"-DHALO_BUILD_NUMBER={number}")
+    flags.extend(metadata_flags)
     if os.name == "nt":
         flags.insert(0, "--target=i686-pc-windows-msvc")
     built = subprocess.run([compiler, *flags, str(source), "-o", str(binary)],
                            capture_output=True, text=True)
     assert built.returncode == 0, built.stdout + built.stderr
     subprocess.run([str(binary)], check=True, capture_output=True, text=True)
+
+
+@pytest.mark.parametrize("number,expected", [
+    (0, "gulch build local"), (321, "gulch build 321"),
+    (2147483647, "gulch build 2147483647"),
+])
+def test_handler_uses_executable_build_and_owns_only_its_widget(tmp_path, number, expected):
+    run_handler(tmp_path, [f"-DHALO_BUILD_NUMBER={number}"], expected)
+
+
+def menu_compile_flags(platform, monkeypatch, tmp_path):
+    """Run the real graph generators without downloading or compiling dependencies."""
+    output = io.StringIO()
+    sln = SimpleNamespace(build_dir=tmp_path / "graph", linux_cc="clang", windows_cc="clang",
+                          compiler_launcher=None, port_release=True, port_profile=False,
+                          port_portable=False, port_lto="off", port_pgo="off", port_pgo_profile=None,
+                          web_emcc="/test/emsdk/emcc", android_guest_cc="clang")
+    with monkeypatch.context() as setup:
+        setup.chdir(ROOT)
+        if platform == "windows":
+            setup.setattr(windows_build.sys, "platform", "win32")
+            setup.setattr(windows_build, "fetch_sdl", lambda: None)
+            setup.setattr(windows_build, "inline_export_wrapper", lambda source: source)
+            generate = windows_build.generate_windows_build
+        elif platform == "android":
+            sln.android_ndk = tmp_path / "ndk"
+            (sln.android_ndk / "toolchains/llvm/prebuilt/test-host").mkdir(parents=True, exist_ok=True)
+            setup.setenv("ANDROID_NDK_HOST_TAG", "test-host")
+            setup.setattr(android_build, "fetch_third_party", lambda: None)
+            generate = android_build.generate_android_build
+        else:
+            generate = {"linux": linux_build.generate_linux_build,
+                        "web": web_build.generate_web_build}[platform]
+        generate(ninja_syntax.Writer(output), sln)
+    text = re.sub(r" \$\n *", " ", output.getvalue())
+    rule = "android_guest_cc" if platform == "android" else platform + "_cc"
+    source = r"port[/\\]linux[/\\]game[/\\]menu_functions\.c"
+    match = re.search(r"^build [^\n]*: " + rule + " " + source +
+                      r"(?: [^\n]*)?\n  cflags = ([^\n]*)", text, re.M)
+    assert match, f"{platform} graph did not compile menu_functions.c"
+    return match.group(1)
+
+
+@pytest.mark.parametrize("platform", ["linux", "windows", "android", "web"])
+def test_generated_menu_flags_reach_the_actual_label_and_reset_to_local(platform, monkeypatch, tmp_path):
+    for number in (192, None):
+        if number is None:
+            monkeypatch.delenv("HALO_BUILD_NUMBER", raising=False)
+        else:
+            monkeypatch.setenv("HALO_BUILD_NUMBER", str(number))
+        flags = menu_compile_flags(platform, monkeypatch, tmp_path)
+        metadata = re.findall(r"-DHALO_BUILD_NUMBER=\S+", flags)
+        assert metadata == [f"-DHALO_BUILD_NUMBER={number or 0}"], flags
+        expected = f"gulch build {number}" if number else "gulch build local"
+        run_handler(tmp_path / ("numbered" if number else "local"), metadata, expected)
