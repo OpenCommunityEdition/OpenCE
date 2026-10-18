@@ -1,6 +1,5 @@
 /* The Mac session's stand-ins for the platform layer's functions that the
-   game's upstream units call: mods (port/linux/src/port_mods.c), the hi-res
-   text switch (text_hires.c), the test input (xinput_sdl.c), internet play's
+   game's upstream units call: mods (port/linux/src/port_mods.c), the test input (xinput_sdl.c), internet play's
    listings (p2p.c) and the touch chat layout. The Mac has no mods folder, no
    internet play and no touch chat, so each says "none"; the units that call
    them (mods.c, network_chat.c, menu_functions.c, network_test.c) are built
@@ -32,7 +31,6 @@ int port_mods_conflicting_names(char *text, unsigned long size) { (void)text; (v
 void port_mods_disable_conflicting(void) { }
 void port_mods_startup(void) { }
 
-int text_hires_enabled(void) { return 0; }
 void test_input_press(unsigned long buttons) { (void)buttons; }
 int halo_chat_touch_layout(void) { return 0; }
 

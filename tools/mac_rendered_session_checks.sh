@@ -423,6 +423,13 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
         -std=gnu99 -O2 $fp -I. -Iport/mac -Iport/linux/src -I"$audit" \
         -c port/mac/engine_text_gl.c -o "$text_obj" > "$text_obj.txt" 2>&1
     objects="$objects $text_obj"
+    # port: engine_text_gl.c includes engine_text.c, which includes the generated body of text_hires.c, and with it
+    # text_hires_enabled (the display.high_res_text setting). A body made before that function existed left the
+    # link with nothing for it, and engine_upstream_stubs.c answered 0, so the text was never high-resolution.
+    if ! grep -q text_hires_enabled "$audit/mac_text_body.h"; then
+        echo "$audit/mac_text_body.h is out of date: run python3 tools/mac_text_boundary.py $audit" >&2
+        exit 1
+    fi
     source_units="$source_units port/mac/engine_text_gl.c port/mac/engine_text.c"
 
     # Opt-in: recompile the game's listed prebuilt objects with extra flags
