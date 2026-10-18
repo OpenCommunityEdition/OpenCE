@@ -42,5 +42,15 @@ void network_chat_note_motion_sensor(short local_player_index, short left, short
 motion sensor (on Android, under the weapon's panel at the top left), and the
 one being typed */
 void network_chat_draw(short local_player_index);
+/* (the host) the minutes a player (absolute index) is muted for everyone;
+0 for none */
+short network_chat_host_mute_minutes(short player_index);
+/* (the host: the scoreboard) a player (absolute index) muted for everyone,
+their lines and their voice, for /mute's minutes when it gives none (every
+machine told), or unmuted */
+void network_chat_host_mute(short player_index, boolean mute);
+/* (the host: network_voice.c) whether a machine's (the network's index)
+player is muted for everyone: its voice goes no further */
+boolean network_chat_host_machine_muted(long machine_index);
 
 #endif // __NETWORK_CHAT_H

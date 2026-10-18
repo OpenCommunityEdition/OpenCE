@@ -301,7 +301,11 @@ when they come up, and sends that machine alone a notice of the minutes
 left; it tells every machine of each mute and unmute. A notice is a down
 line with `_chat_line_notice_bit` set, its text alone (no sender). A
 client's `/mute` is never sent, and the host takes the text of a line that
-came up as a line, never a command.
+came up as a line, never a command. The host's scoreboard Mute for everyone
+is the same mute (20 minutes), and the host relays none of a muted player's
+machine's voice either (`network_voice.c`'s `voice_host_relay`). A
+machine's own scoreboard mute stays its own: it plays none of that
+machine's voice and shows none of its players' lines, and tells no one.
 The host's chat settings (`network.text_chat`: on, links allowed, or off;
 always off while its game is listed in the server browser,
 `p2p_hosting_listed`) go to every client in
@@ -780,8 +784,11 @@ everyone, one to the team and one to the vehicle (the host seats the last
 two players in one first), then the host mutes the last player for a
 minute, each says a line, the host unmutes them and each says another,
 each says a line with a link (a client's sent past its own check, for the
-host to refuse), and the host turns the text chat off (and on again) as each
-says one more, which every machine's `debug.txt` records as
+host to refuse), the host turns the text chat off (and on again) as each
+says one more, the host mutes the last player for everyone (as its
+scoreboard does) around a line each, and the last player's machine mutes
+the host's for itself (as a client's scoreboard does) before another,
+which every machine's `debug.txt` records as
 it shows them (the notices as `chat notice:`), and `debug.network_test_score`
 shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's

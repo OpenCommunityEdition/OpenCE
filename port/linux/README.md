@@ -706,9 +706,16 @@ whatever it says; a private game, joined by its invite, and a LAN game have
 it as chosen. Pressing T where the chat is off says so, and a refused line
 tells its sender why.
 
-The host can mute a player's text chat: type `/mute <player> <minutes>` in
-the chat, as `/mute Milenko 5` (20 minutes when you give none, 1440 at
-most). The player is found as the console's `kick` finds one: the whole
+On the scoreboard (right-click, then click the player), Mute voice and chat
+mutes a player for you alone: you no longer see their lines or hear their
+voice, and nobody else is told. The host's scoreboard also has Mute for
+everyone: no machine sees the player's lines or hears their voice for 20
+minutes, or until the host picks Unmute for everyone, and all the players
+see "Milenko muted for 20 minutes".
+
+The host can also mute a player from the chat: type `/mute <player>
+<minutes>`, as `/mute Milenko 5` (20 minutes when you give none, 1440 at
+most), which mutes their voice too. The player is found as the console's `kick` finds one: the whole
 name in either case, else the one player whose name begins with what you
 typed. All the players see "Milenko muted for 5 minutes". The muted
 player's lines go to no one, and they see how many minutes are left. The
@@ -748,8 +755,10 @@ A speaker shows next to the name of a player who talks: in the lobby, on
 the scoreboard, in a list at the left of the screen during a game, and
 beside the name above their head (when names are shown there:
 `display.player_names`). To mute a player, open the scoreboard,
-right-click, click the player, and click Mute voice. You no longer hear
-them, and nobody else is told.
+right-click, click the player, and click Mute voice and chat. You no longer
+hear them or see their text chat lines, and nobody else is told. The host's
+Mute for everyone silences a player's voice for every machine (refer to
+"Text chat").
 
 The host sends each voice on to the players who can hear it. The host
 accepts a voice only from the machine of the player (with a key that it

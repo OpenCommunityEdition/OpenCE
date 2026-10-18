@@ -63,6 +63,7 @@ Called from the main loop every frame (main.c).
 
 #include "../src/p2p.h" /* port: port/linux/src/p2p.c, p2p_lobby.c */
 #include "network_chat.h"
+#include "network_voice.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -679,6 +680,45 @@ static void network_test_seat_together(
 		object_get(units[1])->object.parent_object_index == best_index ? "in" : "out");
 }
 
+/* debug.network_test_chat: the last player (absolute index; NONE), whom the
+host mutes; whether it is this machine's; and the first player's machine
+(the network's index: the host's), which the last player's mutes */
+static short network_test_last_player_index(
+	void)
+{
+	struct data_iterator iterator;
+	short last = NONE;
+
+	data_iterator_new(&iterator, player_data);
+	while (data_iterator_next(&iterator) != NULL)
+		last = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+	return last;
+}
+
+static boolean network_test_last_player_local(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct player_datum *last = NULL;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		last = player;
+	return last && last->local_player_index != NONE;
+}
+
+static long network_test_first_player_machine(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	data_iterator_new(&iterator, player_data);
+	player = (struct player_datum *)data_iterator_next(&iterator);
+	return player ? player->network_player_data.machine_index : NONE;
+}
+
 /* debug.network_test_chat: the last player's name, in ASCII (the host
 mutes it) */
 static void network_test_last_player_name(
@@ -913,7 +953,10 @@ void network_test_update(
 		player's going no further than the host), the host unmutes it, and
 		each says another; then each says a line with a link (refused, as
 		network.text_chat "on" refuses links), the host turns the text chat
-		off (network.text_chat "off"), and each says a line (refused) */
+		off (network.text_chat "off"), and each says a line (refused); then
+		the host mutes the last player for everyone, as its scoreboard does,
+		and each says a line, and the last player's machine mutes the host's
+		for itself, as a client's scoreboard does, and each says another */
 		if (network_test.chat_time > 0.0f)
 		{
 			long chat_time = (long)(network_test.chat_time * TICKS_PER_SECOND);
@@ -1013,6 +1056,35 @@ void network_test_update(
 			{
 				if (network_test.mode == _network_test_host && !config_write("network.text_chat", "on"))
 					platform_log("network test: could not turn the text chat on");
+				network_test.chat_lines_said++;
+			}
+			/* (the scoreboard's mutes: the host's of the last player for
+			everyone, their lines and voice, then the last player's machine's
+			own mute of the host's machine, here alone) */
+			if (network_test.chat_lines_said == 11 && game_time_get() >= chat_time + 22 * TICKS_PER_SECOND)
+			{
+				if (network_test.mode == _network_test_host)
+					network_chat_host_mute(network_test_last_player_index(), TRUE);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 12 && game_time_get() >= chat_time + 24 * TICKS_PER_SECOND)
+			{
+				snprintf(text, sizeof(text), "after the scoreboard mute from %s", machine);
+				network_chat_say(_chat_channel_everyone, text);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 13 && game_time_get() >= chat_time + 28 * TICKS_PER_SECOND)
+			{
+				if (network_test.mode == _network_test_host)
+					network_chat_host_mute(network_test_last_player_index(), FALSE);
+				else if (network_test_last_player_local())
+					network_voice_mute_machine(network_test_first_player_machine(), TRUE);
+				network_test.chat_lines_said++;
+			}
+			if (network_test.chat_lines_said == 14 && game_time_get() >= chat_time + 30 * TICKS_PER_SECOND)
+			{
+				snprintf(text, sizeof(text), "after the local mute from %s", machine);
+				network_chat_say(_chat_channel_everyone, text);
 				network_test.chat_lines_said++;
 			}
 		}

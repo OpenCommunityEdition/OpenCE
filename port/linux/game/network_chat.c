@@ -58,6 +58,7 @@ mutes.
 #include "text/font_group.h"
 #include "text/text_group.h"
 #include "network_distributed.h"
+#include "network_voice.h"
 #include "network_chat.h"
 #include "halo_keyboard.h"
 
@@ -839,7 +840,9 @@ static void chat_add_line(
 	struct chat_line *line;
 	char name[CHAT_NAME_SIZE];
 
-	if (!player)
+	/* (nor one of a machine this player muted on the scoreboard: its voice
+	and its lines, here alone) */
+	if (!player || network_voice_machine_muted(player->network_player_data.machine_index))
 		return;
 	line = chat_new_line(text);
 	csmemcpy(line->name, player->name, chat_player_name_length(player) * sizeof(line->name[0]));
@@ -991,6 +994,45 @@ static void chat_host_notice(
 	chat_add_notice(text);
 }
 
+/* (the host) a player's name muted for everyone, their lines and their
+voice (network_voice.c), for minutes, every machine told; FALSE (said to the
+host alone) when every mute is held */
+static boolean chat_host_mute_name(
+	char const *name,
+	short minutes)
+{
+	char notice[2 * CHAT_TEXT_SIZE];
+
+	if (!chat_mute_set(chat_mutes, NUMBEROF(chat_mutes), name, minutes, system_milliseconds()))
+	{
+		chat_add_notice("Too many players are muted");
+		return FALSE;
+	}
+	snprintf(notice, sizeof(notice), "%s muted for %d minute%s", name, minutes, chat_minutes_plural(minutes));
+	chat_host_notice(NONE, notice);
+	return TRUE;
+}
+
+/* (the host) a player's name unmuted, every machine told; FALSE (said to
+the host alone) when it was not muted */
+static boolean chat_host_unmute_name(
+	char const *name)
+{
+	struct chat_mute *mute = chat_mute_find(chat_mutes, NUMBEROF(chat_mutes), name, system_milliseconds());
+	char notice[2 * CHAT_TEXT_SIZE];
+
+	if (!mute)
+	{
+		snprintf(notice, sizeof(notice), "%s isn't muted", name);
+		chat_add_notice(notice);
+		return FALSE;
+	}
+	mute->active = FALSE;
+	snprintf(notice, sizeof(notice), "%s unmuted", name);
+	chat_host_notice(NONE, notice);
+	return TRUE;
+}
+
 /* (the host) its player's /mute or /unmute: the player named muted for the
 minutes, or let speak again, every machine told; what is wrong with it shown
 to the host alone; FALSE for a line that is no command (said as it is) */
@@ -1001,10 +1043,8 @@ static boolean chat_host_command(
 	char typed[CHAT_TEXT_SIZE];
 	char names[MAXIMUM_TRACKED_PLAYERS][CHAT_NAME_SIZE];
 	char notice[2 * CHAT_TEXT_SIZE];
-	unsigned long now = system_milliseconds();
 	struct data_iterator iterator;
 	struct player_datum *player;
-	struct chat_mute *mute;
 	short minutes;
 	short command = chat_command_parse(text, typed, sizeof(typed), &minutes);
 	short found;
@@ -1034,26 +1074,76 @@ static boolean chat_host_command(
 		snprintf(notice, sizeof(notice), "You can't %s yourself", command == _chat_command_mute ? "mute" : "unmute");
 	else if (command == _chat_command_mute)
 	{
-		if (chat_mute_set(chat_mutes, NUMBEROF(chat_mutes), names[found], minutes, now))
-		{
-			snprintf(notice, sizeof(notice), "%s muted for %d minute%s", names[found], minutes,
-				chat_minutes_plural(minutes));
-			chat_host_notice(NONE, notice);
-			return TRUE;
-		}
-		snprintf(notice, sizeof(notice), "Too many players are muted");
-	}
-	else if ((mute = chat_mute_find(chat_mutes, NUMBEROF(chat_mutes), names[found], now)) != NULL)
-	{
-		mute->active = FALSE;
-		snprintf(notice, sizeof(notice), "%s unmuted", names[found]);
-		chat_host_notice(NONE, notice);
+		chat_host_mute_name(names[found], minutes);
 		return TRUE;
 	}
 	else
-		snprintf(notice, sizeof(notice), "%s isn't muted", names[found]);
+	{
+		chat_host_unmute_name(names[found]);
+		return TRUE;
+	}
 	chat_add_notice(notice);
 	return TRUE;
+}
+
+/* the player (absolute index) of a machine (the network's index) muted for
+everyone, if one is; NONE */
+static short chat_host_muted_player_of_machine(
+	long machine_index)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	unsigned long now = system_milliseconds();
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		char name[CHAT_NAME_SIZE];
+
+		if (player->quit_out_of_game || player->network_player_data.machine_index != machine_index)
+			continue;
+		chat_player_name_ascii(player, name);
+		if (chat_mute_find(chat_mutes, NUMBEROF(chat_mutes), name, now))
+			return (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+	}
+	return NONE;
+}
+
+short network_chat_host_mute_minutes(
+	short player_index)
+{
+	struct player_datum *player = chat_host() ? distributed_player(player_index) : NULL;
+	unsigned long now = system_milliseconds();
+	struct chat_mute *mute;
+	char name[CHAT_NAME_SIZE];
+
+	if (!player)
+		return 0;
+	chat_player_name_ascii(player, name);
+	mute = chat_mute_find(chat_mutes, NUMBEROF(chat_mutes), name, now);
+	return mute ? chat_mute_minutes_left(mute, now) : 0;
+}
+
+void network_chat_host_mute(
+	short player_index,
+	boolean mute)
+{
+	struct player_datum *player = chat_host() ? distributed_player(player_index) : NULL;
+	char name[CHAT_NAME_SIZE];
+
+	if (!player)
+		return;
+	chat_player_name_ascii(player, name);
+	if (mute)
+		chat_host_mute_name(name, CHAT_MUTE_DEFAULT_MINUTES);
+	else
+		chat_host_unmute_name(name);
+}
+
+boolean network_chat_host_machine_muted(
+	long machine_index)
+{
+	return chat_host() && chat_host_muted_player_of_machine(machine_index) != NONE;
 }
 
 void network_chat_handle_up(
