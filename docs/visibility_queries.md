@@ -66,8 +66,20 @@ counts polls that deferred consumption, `dropped` counts skipped measurements,
 and `failures` counts GL errors. Unavailable polls alone are normal; sustained
 drops, failures or absent completions need review.
 
-Use `tools/Run-AMD-CPU-Query-Test.cmd` and the instructions in
-`docs/amd_cpu_query_test.md` for the current package. Older test instructions
-and launchers describe historical builds and are not included in this package.
-Local NVIDIA smoke tests do not establish AMD correctness. Do not merge into
-`testing` until the AMD visual and performance results have been reviewed.
+The b0c5d017 AMD test used this normal asynchronous CPU path on Radeon
+RX 6900 XT / driver 26.8.1.260806, at 1920x1200 with anti-aliasing off. The
+player reported correct lights with no flickering. Its emitted summaries
+recorded 7416 submitted and completed batches, 36160 query results and 32405
+nonzero results, with no unavailable polls, dropped measurements or readback
+failures. The process exited normally. The log supports successful delivery;
+visual correctness comes from the player's report, not the counters alone.
+
+No diagnostic launcher or special rendering setting is needed. For a regression
+report, enable `debug.gl_debug` (`HALO_GL_DEBUG=1`), keep lens-flare occlusion
+enabled, and capture the startup lines and `visibility CPU` summaries along
+with GPU/driver, map, resolution, anti-aliasing, symptoms and a short video.
+Check visible glows, occlusion behind solid cover, repeated camera movement,
+map changes and restart. Include frame-rate observations: this validation does
+not establish performance parity across all drivers or GPUs. Earlier diagnostic
+launchers and test instructions have been retired; historical commits and
+delivered packages retain the investigation steps.
