@@ -1173,8 +1173,8 @@ static void chat_draw_line(
 	rasterizer_text_set_shadow_color(0);
 }
 
-/* a line's text as drawn (streamer mode's words are replaced as in every text
-the game draws: draw_string.c, chat_filter.c) */
+/* a line's text as drawn (streamer mode hides its words as in every text the
+game draws: draw_string.c, text_filter.c) */
 static void chat_line_text(
 	char const *text,
 	wchar_t *drawn,

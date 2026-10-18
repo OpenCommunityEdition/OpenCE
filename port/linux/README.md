@@ -374,7 +374,6 @@ the setting for one start of the game. It has priority over the file.
 | `controls.<action>` | (the table in "Controls") | `HALO_KEY_<ACTION>` | The keys and mouse buttons of an action, up to two, separated by a comma: `move_forward`, `move_backward`, `strafe_left`, `strafe_right`, `jump`, `crouch`, `fire`, `throw_grenade`, `melee`, `reload`, `zoom`, `switch_weapon`, `switch_grenade`, `action`, `flashlight`, `scoreboard`, `pause`, `screenshot`, `push_to_talk`, `chat`, `team_chat`. Keys by their names (`"W"`, `"Space"`, `"Left Ctrl"`, `"F1"`), and `"Mouse Left"`, `"Mouse Right"`, `"Mouse Middle"`, `"Mouse 4"`, `"Mouse 5"`, `"Wheel"` (either way), `"Wheel Up"`, `"Wheel Down"`. |
 | `game.console_log` | `"important"` | `HALO_CONSOLE_LOG` | What the console shows on the screen. `"important"`: bans, players that the host drops for cheating, the reasons that the game refuses a command, and the asserts that stop the game. `"all"`: all the lines. `"none"`: only the asserts that stop the game. The output of a command always shows. `debug.txt` gets all the lines. |
 | `game.language` | `""` | `HALO_LANGUAGE` | The language of the menus: `ja`, `de`, `fr`, `es` or `it`. Empty: English. |
-| `game.streamer_mode` | `false` | `HALO_STREAMER_MODE` | Streamer mode (Settings > Audio > Voice and Text Chat > STREAMER MODE): the text chat shows the slurs and swearing in players' names and lines as harmless words. Only what this machine shows. Refer to "Text chat". |
 | `game.enhanced_animations` | `true` | `HALO_ENHANCED_ANIMATIONS` | `true`: the player bipeds' grenade throws keep their legs moving, blended by speed and direction (crouched throws stay crouched, throws in the air use the jump's legs), Warthog and Scorpion riders stay seated to throw and let go of the grips to throw and reload, and a player turns with the aim while throwing, as while meleeing. `false`: the original animations, which freeze the legs during a throw and stand a rider up. Only in config.toml, not in the menus. |
 | `paths.data` | `""` | `HALO_DATA_ROOT` | The data root. Refer to "Start the game". |
 | `paths.saves` | `""` | `HALO_SAVE_ROOT` | The save root. Refer to "Files and folders". |
@@ -684,20 +683,9 @@ team says "(team)" after the name, one to the vehicle "(vehicle)". The lines go 
 you type, the last six show. A line has 63 characters at most, letters,
 numbers and punctuation only (ASCII). `debug.txt` gets every line.
 
-STREAMER MODE in Settings > Audio > Voice and Text Chat
-(`game.streamer_mode`, off by default; in a game, from the pause menu's
-SETTINGS too) replaces the slurs, swearing and sexual words in all the text
-the game draws with harmless ones: the chat's lines, and players' names
-wherever they show (the chat, the scoreboard, above their heads, the kills,
-the lobby), so that a stream shows none: "fuck" shows as "fudge",
-"cunt" as "chop stick", "faggot" as "flurry". It finds them in either case,
-with digits and signs for letters ("n1gg3r", "c00n", "f*ck"), letters
-typed more than once ("fuuuck"), spelled out ("n i g g e r", "c.u.n.t") and
-run together ("sonofabitch"), and leaves alone the words that hold one
-("Scunthorpe", "snigger", "spicy", "assassin", "cocktail", "rapper"). It changes only what your game shows: the other
-players see the lines and names as they were typed, and `debug.txt` keeps
-them so. The line you type shows replaced too. The list is in
-`port/linux/game/chat_filter.c`.
+Streamer mode (refer to "Streamer mode") hides offensive words in the
+chat's lines and players' names as it does in all the text the game draws:
+only on your screen, never in what is sent.
 
 The host sends each line on: a player of an older build does not see the
 lines and cannot send them. The host takes 5 lines at once from a machine,
@@ -1052,7 +1040,8 @@ network game agree on. Refer to [docs/mods.md](../../docs/mods.md).
 
 Streamer mode (Settings > Network Setup > Streamer Mode, `streamer.enabled`)
 hides offensive words as stars wherever the game draws text that other
-people or files wrote: players' names over their heads, in the kill feed, on
+people or files wrote: the text chat's lines, players' names over their
+heads, in the chat, in the kill feed, on
 the scoreboards and in the lobbies, the server browser's games, the host's
 notices in the console, map and mod names, and the text of a map's or mod's
 own string lists, as well as the message boxes about mods and maps. It
