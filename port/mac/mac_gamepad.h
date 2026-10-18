@@ -60,6 +60,11 @@ const char *mac_gamepad_name_at(int slot);
    adapter presenting itself as one): for the PlayStation button names */
 int mac_gamepad_is_playstation_at(int slot);
 
+/* Sets the motors of the pad in a slot (strong: the large one, weak: the small
+   one; 0 to 255). Only a Sony pad on USB takes it (mac_gamepad_report.h's
+   output reports); returns 1 when the pad has them set, 0 for any other pad. */
+int mac_gamepad_rumble(int slot, unsigned char strong, unsigned char weak);
+
 /* The first pad's state now; not connected when there is none. Looks for a
    pad again every two seconds while there is none, and when one goes. */
 void mac_gamepad_poll(struct mac_gamepad_frame *out);

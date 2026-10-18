@@ -186,7 +186,7 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
             */mac_window_$arch.o|*/mac_audio_output_$arch.o|*/mac_input_$arch.o|*/engine_messages_$arch.o|*/mac_gl_visibility_$arch.o|*/mac_gl_program_cache_$arch.o|*/mac_vertex_upload_$arch.o|*/mac_index_decode_cache_$arch.o|*/bsp_decode_cache_$arch.o|*/mac_bone_gather_$arch.o|*/mac_nv2a_arb_$arch.o|*/mac_nv2a_arbfp_$arch.o|\
             */engine_device_resources_$arch.o|*/engine_device_factory_$arch.o|\
             */engine_texture_lifecycle_$arch.o|*/engine_cache_resources_$arch.o|*/engine_physical_memory_$arch.o|*/engine_tag_compat_$arch.o|*/engine_script_cache_$arch.o|*/xbox_texture_cache_$arch.o|\
-            */engine_rasterizer_services_$arch.o|*/engine_text_text_$arch.o|*/native_object_tags_$arch.o|*/native_effect_assets_$arch.o|*/native_interface_assets_$arch.o|*/native_font_tags_$arch.o|*/native_interface_dependencies_$arch.o|\
+            */engine_rasterizer_services_$arch.o|*/engine_text_text_$arch.o|*/engine_input_rumble_$arch.o|*/native_object_tags_$arch.o|*/native_effect_assets_$arch.o|*/native_interface_assets_$arch.o|*/native_font_tags_$arch.o|*/native_interface_dependencies_$arch.o|\
             */engine_texture_cache_$arch.o|*/native_bitmap_tags_$arch.o|*/native_scenario_blocks_$arch.o|*/native_scenario_objects_$arch.o|*/native_scenario_gameplay_$arch.o|*/native_environment_assets_$arch.o|*/native_animation_tags_$arch.o|*/native_sky_tags_$arch.o|*/native_sky_assets_$arch.o|*/native_scenario_scripts_$arch.o|*/engine_input_$arch.o|*/engine_screen_$arch.o|*/engine_hud_hires_assets_$arch.o|*/menu_tags_$arch.o|*/menu_functions_$arch.o|*/mac_main_game_render_$arch.o|*/mac_menu_xml_$arch.o|*/mac_menu_parser_$arch.o|*/engine_render_services_$arch.o|*/engine_synchronous_precache_$arch.o|*/engine_handles_$arch.o|*/engine_display_$arch.o|\
             */native_resource_memory*_$arch.o|*/mac_glsl120_$arch.o|\
             */native_model_buffers_$arch.o|*/native_actor_assets_$arch.o|\
@@ -280,6 +280,8 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     # port: the developer console and its terminal (the session loop now services them) take their line editor from
     # edit_text.c
     units="$units source/dialogs/edit_text.c"
+    # port: the game's rumble goes to the pads (engine_input_rumble.c, in place of the graph's)
+    units="$units port/mac/engine_input_rumble.c"
     source_units=
     recognized_units=" mac_engine_session_probe engine_text_gl "
     index=0
@@ -426,13 +428,6 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
         -std=gnu99 -O2 $fp -I. -Iport/mac -Iport/linux/src -I"$audit" \
         -c port/mac/engine_text_gl.c -o "$text_obj" > "$text_obj.txt" 2>&1
     objects="$objects $text_obj"
-    # port: engine_text_gl.c includes engine_text.c, which includes the generated body of text_hires.c, and with it
-    # text_hires_enabled (the display.high_res_text setting). A body made before that function existed left the
-    # link with nothing for it, and engine_upstream_stubs.c answered 0, so the text was never high-resolution.
-    if ! grep -q text_hires_enabled "$audit/mac_text_body.h"; then
-        echo "$audit/mac_text_body.h is out of date: run python3 tools/mac_text_boundary.py $audit" >&2
-        exit 1
-    fi
     # port: engine_text_gl.c includes engine_text.c, which includes the generated body of text_hires.c, and with it
     # text_hires_enabled (the display.high_res_text setting). A body made before that function existed left the
     # link with nothing for it, and engine_upstream_stubs.c answered 0, so the text was never high-resolution.

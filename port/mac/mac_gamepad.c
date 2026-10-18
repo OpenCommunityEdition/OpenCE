@@ -194,6 +194,11 @@ struct gamepad_device {
        (an adapter may answer a poll with a canned frame, and a pad's
        elements are only as fresh as the driver's last report). */
     int raw_kind, raw_seen, raw_bad;
+    /* rumble (mac_gamepad_rumble): the pad is on USB (the Bluetooth output
+       reports carry a checksum, not made), what it was last told and when */
+    int usb, rumble_failed;
+    unsigned char rumble_strong, rumble_weak;
+    CFAbsoluteTime rumble_sent;
     CFRunLoopSourceRef raw_source;
     struct mac_gamepad_frame raw_frame;
     unsigned char raw_buffer[RAW_BUFFER_SIZE];
@@ -226,8 +231,12 @@ static long service_long(io_service_t service, CFStringRef key, long fallback)
     return result;
 }
 
+static int rumble_send(struct gamepad_device *pad, unsigned char strong, unsigned char weak);
+
 static void device_close(struct gamepad_device *pad)
 {
+    if (pad->interface && (pad->rumble_strong || pad->rumble_weak))
+        rumble_send(pad, 0, 0);
     if (pad->raw_source) {
         CFRunLoopRemoveSource(CFRunLoopGetCurrent(), pad->raw_source, RAW_MODE);
         CFRelease(pad->raw_source);
@@ -336,6 +345,12 @@ static int device_open(struct gamepad_device *pad, io_service_t service)
     }
     if (!device_elements(pad)) { device_close(pad); return 0; }
     device_raw_start(pad);
+    name = IORegistryEntryCreateCFProperty(service, CFSTR(kIOHIDTransportKey), kCFAllocatorDefault, 0);
+    if (name) {
+        pad->usb = CFGetTypeID(name) == CFStringGetTypeID() &&
+            CFStringCompare((CFStringRef)name, CFSTR("USB"), 0) == kCFCompareEqualTo;
+        CFRelease(name);
+    }
     return 1;
 }
 
@@ -450,6 +465,40 @@ static int device_poll(struct gamepad_device *pad, struct mac_gamepad_frame *out
     return 1;
 }
 
+/* Sets a Sony pad's motors with its USB output report. Returns 1 when the
+   report was written. */
+static int rumble_send(struct gamepad_device *pad, unsigned char strong, unsigned char weak)
+{
+    unsigned char report[MAC_PAD_RUMBLE_REPORT_MAXIMUM];
+    unsigned length;
+    IOReturn result;
+    if (!pad->interface || !pad->usb || !pad->raw_kind || pad->rumble_failed) return 0;
+    length = mac_gamepad_rumble_report(pad->raw_kind, strong, weak, report, sizeof(report));
+    if (!length) return 0;
+    result = (*pad->interface)->setReport(pad->interface, kIOHIDReportTypeOutput, report[0],
+        report, length, 100, NULL, NULL, NULL);
+    if (result != kIOReturnSuccess) {
+        /* (one try for a pad that refuses it, and no more) */
+        fprintf(stderr, "game pad: %s refused the rumble report (0x%x); no rumble\n", pad->name, (unsigned)result);
+        pad->rumble_failed = 1;
+        return 0;
+    }
+    pad->rumble_strong = strong;
+    pad->rumble_weak = weak;
+    pad->rumble_sent = CFAbsoluteTimeGetCurrent();
+    return 1;
+}
+
+int mac_gamepad_rumble(int slot, unsigned char strong, unsigned char weak)
+{
+    struct gamepad_device *pad;
+    if (slot < 0 || slot >= MAC_GAMEPAD_MAXIMUM_DEVICES) return 0;
+    pad = &pads[slot];
+    if (!pad->interface || !pad->usb || !pad->raw_kind || pad->rumble_failed) return 0;
+    if (pad->rumble_strong == strong && pad->rumble_weak == weak) return 1;
+    return rumble_send(pad, strong, weak);
+}
+
 int mac_gamepad_poll_all(struct mac_gamepad_frame frames[MAC_GAMEPAD_MAXIMUM_DEVICES])
 {
     int slot, count = 0;
@@ -465,6 +514,11 @@ int mac_gamepad_poll_all(struct mac_gamepad_frame frames[MAC_GAMEPAD_MAXIMUM_DEV
     for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
         if (pads[slot].interface && device_poll(&pads[slot], &frames[slot]))
             ++count;
+    /* a motor left on is told again each second (the pad may stop it of itself) */
+    for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
+        if (pads[slot].interface && (pads[slot].rumble_strong || pads[slot].rumble_weak) &&
+            CFAbsoluteTimeGetCurrent() - pads[slot].rumble_sent >= 1.0)
+            rumble_send(&pads[slot], pads[slot].rumble_strong, pads[slot].rumble_weak);
     if (count < MAC_GAMEPAD_MAXIMUM_DEVICES) {
         CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
         if (now - last_scan >= RESCAN_INTERVAL) {

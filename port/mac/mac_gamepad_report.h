@@ -50,6 +50,17 @@ int mac_gamepad_report_kind(unsigned vendor, unsigned product);
 /* the pad's name for lists, or "" */
 const char *mac_gamepad_report_name(int kind);
 
+/* The output report that sets the rumble motors, as the pad takes it over USB (the report id first, as
+   IOHIDDeviceInterface::setReport is given it): strong is the large motor, weak the small one, each 0 to 255.
+     DualShock 4 (report 0x05, 32 bytes): [1] 0x01 (rumble; the light bar is left as it is),
+         [4] the small motor, [5] the large motor.
+     DualSense (report 0x02, 63 bytes): [1] 0x03 (compatible vibration, haptics select), [2] 0,
+         [3] the right (small) motor, [4] the left (large) motor.
+   Returns the report's length, or 0 when the kind has none or size is too small. */
+#define MAC_PAD_RUMBLE_REPORT_MAXIMUM 63
+unsigned mac_gamepad_rumble_report(int kind, unsigned char strong, unsigned char weak,
+    unsigned char *out, unsigned size);
+
 /* Decodes one input report as the interrupt pipe delivers it (the report id
    first). Returns 1, with the frame connected, or 0 when the report is not
    the pad's state (another report id, too short). extra may be NULL. */

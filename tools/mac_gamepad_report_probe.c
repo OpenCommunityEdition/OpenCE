@@ -187,6 +187,23 @@ int main(void)
         if (!same(&f, &g)) printf("report: %d %d %d %d buttons %x  elements: %d %d %d %d buttons %x\n", f.left_x, f.left_y, f.right_x, f.right_y, f.buttons, g.left_x, g.left_y, g.right_x, g.right_y, g.buttons);
     }
 
+    /* the rumble output reports (bytes as the pads take them over USB) */
+    {
+        unsigned char o[MAC_PAD_RUMBLE_REPORT_MAXIMUM];
+        unsigned i, n, others;
+        n = mac_gamepad_rumble_report(MAC_PAD_REPORT_DUALSHOCK4, 200, 50, o, sizeof(o));
+        CHECK(n == 32 && o[0] == 0x05 && o[1] == 0x01 && o[4] == 50 && o[5] == 200);
+        for (others = 0, i = 0; i < n; ++i) if (i != 0 && i != 1 && i != 4 && i != 5 && o[i]) ++others;
+        CHECK(others == 0);
+        n = mac_gamepad_rumble_report(MAC_PAD_REPORT_DUALSENSE, 255, 7, o, sizeof(o));
+        CHECK(n == 63 && o[0] == 0x02 && o[1] == 0x03 && o[2] == 0 && o[3] == 7 && o[4] == 255);
+        for (others = 0, i = 5; i < n; ++i) if (o[i]) ++others;
+        CHECK(others == 0);
+        CHECK(mac_gamepad_rumble_report(MAC_PAD_REPORT_NONE, 1, 1, o, sizeof(o)) == 0);
+        CHECK(mac_gamepad_rumble_report(MAC_PAD_REPORT_DUALSENSE, 1, 1, o, 62) == 0);
+        CHECK(mac_gamepad_rumble_report(MAC_PAD_REPORT_DUALSHOCK4, 0, 0, o, 32) == 32 && o[4] == 0 && o[5] == 0);
+    }
+
     printf("%d checks, %d failures\n", checks, failures);
     return failures != 0;
 }

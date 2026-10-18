@@ -764,6 +764,9 @@ static boolean mac_pad_frame_idle(const struct mac_gamepad_frame *frame)
 		abs(frame->right_x) <= 8000 && abs(frame->right_y) <= 8000;
 }
 
+/* the slot of the pad at each port, or -1 (for the rumble) */
+static int mac_port_slot[MAXIMUM_GAMEPADS] = { -1, -1, -1, -1 };
+
 /* the pads by slot to the ports; ports[0] keeps the keyboard's controller */
 static void mac_pad_assign(const struct mac_gamepad_frame slots[MAC_GAMEPAD_MAXIMUM_DEVICES],
 	struct mac_gamepad_frame ports[MAXIMUM_GAMEPADS])
@@ -779,6 +782,8 @@ static void mac_pad_assign(const struct mac_gamepad_frame slots[MAC_GAMEPAD_MAXI
 			only = slot;
 		}
 	mac_port0_slot = count == 1 ? only : 0;
+	for (slot = 0; slot < MAXIMUM_GAMEPADS; slot++)
+		mac_port_slot[slot] = -1;
 	if (count == 1)
 	{
 		boolean split = pc_menu_split_players() != 0;
@@ -786,10 +791,23 @@ static void mac_pad_assign(const struct mac_gamepad_frame slots[MAC_GAMEPAD_MAXI
 		if (split != mac_lone_pad_split && mac_pad_frame_idle(&slots[only]))
 			mac_lone_pad_split = split;
 		ports[mac_lone_pad_split ? 1 : 0] = slots[only];
+		mac_port_slot[mac_lone_pad_split ? 1 : 0] = only;
 	}
 	else
 		for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES && slot < MAXIMUM_GAMEPADS; slot++)
+		{
 			ports[slot] = slots[slot];
+			mac_port_slot[slot] = slot;
+		}
+}
+
+/* port: the game's rumble (input_set_gamepad_rumbler_state): the motors of the pad at a port, which only a Sony pad on
+   USB has (mac_gamepad_rumble); the large motor is the left, the small one the right. Returns 1 when a pad took it. */
+int mac_engine_input_rumble(unsigned port, unsigned short left, unsigned short right)
+{
+	int slot = port < MAXIMUM_GAMEPADS ? mac_port_slot[port] : -1;
+
+	return mac_gamepad_rumble(slot, (unsigned char)(left >> 8), (unsigned char)(right >> 8));
 }
 
 /* ---------- diagnostic: virtual game pads

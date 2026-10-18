@@ -108,3 +108,26 @@ int mac_gamepad_decode_report(int kind, const unsigned char *data, unsigned size
     }
     return 1;
 }
+
+unsigned mac_gamepad_rumble_report(int kind, unsigned char strong, unsigned char weak,
+    unsigned char *out, unsigned size)
+{
+    unsigned length;
+    if (kind == MAC_PAD_REPORT_DUALSHOCK4) length = 32;
+    else if (kind == MAC_PAD_REPORT_DUALSENSE) length = 63;
+    else return 0;
+    if (!out || size < length) return 0;
+    memset(out, 0, length);
+    if (kind == MAC_PAD_REPORT_DUALSHOCK4) {
+        out[0] = 0x05;
+        out[1] = 0x01;
+        out[4] = weak;
+        out[5] = strong;
+    } else {
+        out[0] = 0x02;
+        out[1] = 0x03;
+        out[3] = weak;
+        out[4] = strong;
+    }
+    return length;
+}

@@ -335,6 +335,9 @@ machine" in the game's addressing; give each copy on one machine its own
   console, as on the other builds.
 - Per-pixel lighting (`display.per_pixel_lighting`) is not drawn: the Mac's shader translator does not make it
   yet. The start window shows its row disabled ("not available") and the log says so when the setting is on.
+- Controller rumble works for a DualShock 4 or DualSense on USB (its output report, written through the HID
+  interface). Bluetooth Sony pads and Xbox One pads (their driver is a separate package) have none yet; the
+  Settings menu's vibration row does nothing for them. Not yet tried on a pad.
 - The app is not signed or notarized (10.4 to 10.6 do not need it).
 - `HALO_MAC_*` variables beyond those above are diagnostics for the port's
   tests and may change.

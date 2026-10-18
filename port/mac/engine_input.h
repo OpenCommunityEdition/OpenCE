@@ -55,5 +55,8 @@ int mac_engine_input_bound_held(unsigned action,const struct mac_input_frame *fr
 /* port: the screenshot key (controls.screenshot) was pressed since this was
    last asked; 1 once for each press */
 int mac_engine_input_screenshot_pressed(void);
+/* port: the rumble of the game pad at a port (left: the large motor, right: the small one, 0 to 65535);
+   1 when a pad took it, 0 for none (only a Sony pad on USB has rumble) */
+int mac_engine_input_rumble(unsigned port, unsigned short left, unsigned short right);
 
 #endif
