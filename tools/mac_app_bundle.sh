@@ -82,9 +82,14 @@ $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -std=gnu
 # (the feedback report's JSON, log and Outbox code is tested the same way)
 $CC -std=gnu89 -Wall -o "$WORK/test_feedback_report" "$APPSRC/test_feedback_report.c" "$APPSRC/feedback_report.c"
 "$WORK/test_feedback_report" "$WORK/feedback_test"
+# (what the launcher does with a halo:// invite link, which needs no Mac)
+mkdir -p "$WORK/invite_test"
+$CC -std=gnu89 -Wall -o "$WORK/test_launcher_invite" "$APPSRC/test_launcher_invite.c" "$APPSRC/launcher_invite.c"
+"$WORK/test_launcher_invite" "$WORK/invite_test"
 $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -Wall -std=gnu89 \
     -o "$APP/Contents/MacOS/PowerSpark" "$APPSRC/opence_launcher.c" "$APPSRC/launcher_config.c" \
     "$APPSRC/launcher_dialog.c" "$APPSRC/launcher_about.c" "$APPSRC/launcher_branding.c" "$APPSRC/feedback_report.c" \
+    "$APPSRC/launcher_invite.c" \
     "$WORK/launcher_toml_check.o" "$WORK/tomlc17.o" -framework Carbon -framework CoreFoundation
 
 # the game

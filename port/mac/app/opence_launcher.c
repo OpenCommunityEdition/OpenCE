@@ -48,6 +48,7 @@
 #include "launcher_dialog.h"
 #include "launcher_about.h"
 #include "feedback_report.h"
+#include "launcher_invite.h"
 
 #define MAX_ENVIRONMENT 24
 #define LOGS_KEPT 20
@@ -118,6 +119,70 @@ static void set_game_environment(const char *name, const char *value)
 	if (shown_environment_count < MAX_ENVIRONMENT)
 		snprintf(shown_environment[shown_environment_count++], sizeof(shown_environment[0]), "%s=%s", name, value);
 	setenv(name, value, 1);
+}
+
+/* ---------- halo:// invite links
+
+Launch Services opens this bundle for a halo:// link (CFBundleURLTypes in
+Info.plist) and sends the URL in an Apple event, GURL. The game reads an
+invite from <data root>/join_link.txt — that is how a launcher hands one
+to a copy already playing (port/linux/src/p2p.c, which renames the file
+and reads it once a second) — so the event is turned into that file. The
+game then joins whether this launch starts it or one is already running.
+
+The event is queued before the application runs and arrives as soon as it
+asks for one, so a short wait catches it. A start with no link waits that
+long once and no longer; there is no way to know in advance that none is
+coming. */
+
+static char invite_link[1024];
+
+static pascal OSErr invite_event(const AppleEvent *event, AppleEvent *reply, long context)
+{
+	DescType type;
+	Size size = 0;
+	OSErr error;
+
+	(void)reply;
+	(void)context;
+	error = AEGetParamPtr(event, keyDirectObject, typeChar, &type,
+		invite_link, (Size)(sizeof(invite_link) - 1), &size);
+	if (error != noErr)
+		return error;
+	if (size < 0 || size > (Size)(sizeof(invite_link) - 1))
+		size = 0;
+	invite_link[size] = 0;
+	return noErr;
+}
+
+/* waits a third of a second for a GURL event, and leaves invite_link empty
+when none comes */
+static void collect_invite_link(void)
+{
+	AEEventHandlerUPP handler;
+	UInt32 deadline;
+
+	handler = NewAEEventHandlerUPP(invite_event);
+	if (!handler)
+		return;
+	if (AEInstallEventHandler(kInternetEventClass, kAEGetURL, handler, 0, false) != noErr)
+	{
+		DisposeAEEventHandlerUPP(handler);
+		return;
+	}
+	deadline = TickCount() + 20;
+	while (!invite_link[0] && TickCount() < deadline)
+	{
+		EventRecord record;
+
+		if (WaitNextEvent(highLevelEventMask, &record, 1, NULL) &&
+			record.what == kHighLevelEvent)
+		{
+			AEProcessAppleEvent(&record);
+		}
+	}
+	AERemoveEventHandler(kInternetEventClass, kAEGetURL, handler, false);
+	DisposeAEEventHandlerUPP(handler);
 }
 
 static void alert(const char *title, const char *message)
@@ -536,6 +601,9 @@ int main(int argc, char **argv)
 
 	request = getenv("HALO_MAC_DATA_SOURCE");
 	snprintf(source_name, sizeof(source_name), "%s", request && *request ? request : "");
+	/* (before the data root is looked for, because the event is waiting
+	now; it is written out below, once there is a root to write it in) */
+	collect_invite_link();
 	for (i = 1; i < argc; ++i)
 	{
 		if (strcmp(argv[i], "--dry-run") == 0)
@@ -905,6 +973,11 @@ int main(int argc, char **argv)
 		snprintf(bitmaps, sizeof(bitmaps), "%s/Maps/bitmaps.map", data_root);
 		snprintf(sounds, sizeof(sounds), "%s/Maps/sounds.map", data_root);
 	}
+
+	/* an invite from a halo:// link, for the game this is about to start or
+	for one already playing (launcher_invite.c) */
+	if (invite_link[0] && !launcher_invite_write(data_root, invite_link))
+		fprintf(stderr, "PowerSpark: the invite link could not be handed to the game\n");
 
 	{
 		char *cmd[64];
