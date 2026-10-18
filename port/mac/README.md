@@ -333,6 +333,8 @@ machine" in the game's addressing; give each copy on one machine its own
 - The developer console opens with the backquote key in a game (Escape or the backquote closes it; the
   game stands still while it is open), and `debug.telnet_console` listens on `127.0.0.1` for the script
   console, as on the other builds.
+- Per-pixel lighting (`display.per_pixel_lighting`) is not drawn: the Mac's shader translator does not make it
+  yet. The start window shows its row disabled ("not available") and the log says so when the setting is on.
 - The app is not signed or notarized (10.4 to 10.6 do not need it).
 - `HALO_MAC_*` variables beyond those above are diagnostics for the port's
   tests and may change.

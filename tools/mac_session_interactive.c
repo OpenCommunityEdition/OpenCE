@@ -61,6 +61,8 @@ declared as source/main/main.c declares it */
 void network_test_update(boolean main_menu_loaded, real seconds);
 /* port: main_globals' own, through the generated view of main.c */
 int mac_engine_main_menu_loaded(void);
+/* port: port/linux/src/port_config.c's */
+int config_boolean(const char *name);
 #include "engine_network_test.h"
 extern struct data_array *hs_thread_data;
 #include "hs/hs_scenario_definitions.h"
@@ -2064,6 +2066,10 @@ int mac_session_interactive_run(unsigned max_frames, int visible,
             console_ready = 1;
         }
     }
+    /* port: the Mac's shader translator makes no per-pixel lighting (mac_nv2a_arbfp.c refuses it), so the setting is
+       read by no one; the log says so when a config.toml has it on (the start window shows the row disabled) */
+    if (config_boolean("display.per_pixel_lighting"))
+        fprintf(stderr, "display.per_pixel_lighting is on, but this renderer does not draw per-pixel lighting yet: ignored\n");
     /* A bounded hidden image-comparison probe advances the real engine once
        per captured frame, independently of driver speed. Visible play always
        retains wall-clock scheduling. */

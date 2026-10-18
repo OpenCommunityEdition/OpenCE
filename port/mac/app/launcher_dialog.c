@@ -655,7 +655,12 @@ static void build(struct lc_model *m, ControlActionUPP action, ControlRef *play,
 	c_gamma_text = make_label(574, 230, 616, 246, "1.0", 0, 1);
 	c_hud = make_check(344, 262, 616, "High-resolution HUD", lc_bool(m->value[LC_HIRES_HUD]), 0);
 	c_text = make_check(344, 290, 616, "High-resolution text", lc_bool(m->value[LC_HIRES_TEXT]), 0);
-	c_ppl = make_check(344, 318, 616, "Per-pixel lighting", lc_bool(m->value[LC_PER_PIXEL_LIGHTING]), 0);
+	c_ppl = make_check(344, 318, 616, "Per-pixel lighting (not available)", lc_bool(m->value[LC_PER_PIXEL_LIGHTING]), 0);
+	/* port: the Mac renderer's shader translator does not make per-pixel lighting (mac_nv2a_arbfp.c refuses it), so the
+	   row stays, as every Mac has the same options, but it is disabled and says why */
+	help(c_ppl, "Not available on this renderer yet: the Mac's shaders do not draw per-pixel lighting, so this setting changes nothing. The game logs it if it is on in config.toml.");
+	if (!dry)
+		DisableControl(c_ppl);
 
 	/* Options */
 	make_box(16, 370, 624, 488, "Options");
