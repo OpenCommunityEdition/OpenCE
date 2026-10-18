@@ -2844,8 +2844,8 @@ symbols in this file:
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #ifdef HALO_PROFILE
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
-#include "achievements.h" /* port: port/linux/game/achievements.c */
 #endif
+#include "achievements.h" /* port: port/linux/game/achievements.c */
 
 /* ---------- constants */
 
