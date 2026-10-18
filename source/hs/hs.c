@@ -2774,6 +2774,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "hs_value.h" /* port: native scripting slot layout */
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "cseries/profile.h"
@@ -3004,11 +3005,11 @@ static void evaluator( \
 	long thread_index, \
 	boolean initialize) \
 { \
-	unsigned short *arguments = (unsigned short *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
+	long *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
 		union hs_real_value result; \
-		result.real_value = function(arguments[0]); \
+		result.real_value = function((unsigned short)arguments[0]); /* port: low-bit argument */ \
 		hs_return(thread_index, result.long_value); \
 	} \
 	return; \
@@ -3267,10 +3268,11 @@ static void evaluator( \
 
 /* ---------- structures */
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_object_list_get_element_arguments
 {
 	long object_list_index;
-	unsigned short element_index;
+	HS_WORD_SLOT(element_index);
 };
 
 union hs_real_value
@@ -3279,25 +3281,28 @@ union hs_real_value
 	long long_value;
 };
 
+/* port: narrow aliases address the numeric low bits. */
 union hs_short_result
 {
-	short short_value;
+	HS_SHORT_ALIAS(short_value);
 	long value;
 };
 
+/* port: narrow aliases address the numeric low bits. */
 union hs_evaluation_argument
 {
 	long long_value;
 	real real_value;
-	short short_value;
-	unsigned short unsigned_short_value;
-	boolean boolean_value;
+	HS_SHORT_ALIAS(short_value);
+	HS_WORD_ALIAS(unsigned_short_value);
+	HS_BOOLEAN_ALIAS(boolean_value);
 	char const *string_value;
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_boolean
 {
-	boolean value;
+	HS_BOOLEAN_SLOT(value);
 };
 
 struct hs_arguments_long
@@ -3305,22 +3310,24 @@ struct hs_arguments_long
 	long value;
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_word
 {
-	word value;
+	HS_WORD_SLOT(value);
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_short_long
 {
-	short value0;
-	word pad0;
+	HS_SHORT_SLOT(value0);
 	long value1;
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_long_word
 {
 	long value0;
-	word value1;
+	HS_WORD_SLOT(value1);
 };
 
 struct hs_arguments_string
@@ -3347,11 +3354,11 @@ struct hs_arguments_long_long_string
 	char const *value2;
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_short_word
 {
-	short value0;
-	word pad0;
-	word value1;
+	HS_SHORT_SLOT(value0);
+	HS_WORD_SLOT(value1);
 };
 
 struct hs_arguments_long_long_long
@@ -3402,30 +3409,32 @@ struct hs_arguments_long_string_long_string
 	char const *value3;
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_long_long_string_word
 {
 	long value0;
 	long value1;
 	char const *value2;
-	word value3;
+	HS_WORD_SLOT(value3);
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_long_long_long_boolean
 {
 	long value0;
 	long value1;
 	char const *value2;
-	boolean value3;
+	HS_BOOLEAN_SLOT(value3);
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_long_long_long_boolean_word
 {
 	long value0;
 	long value1;
 	char const *value2;
-	boolean value3;
-	byte pad3[3];
-	word value4;
+	HS_BOOLEAN_SLOT(value3);
+	HS_WORD_SLOT(value4);
 };
 
 struct hs_arguments_real
@@ -3454,43 +3463,41 @@ struct hs_arguments_real_real_real_real
 	real value3;
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_word_word_word_real
 {
-	word value0;
-	word pad0;
-	word value1;
-	word pad1;
-	word value2;
-	word pad2;
+	HS_WORD_SLOT(value0);
+	HS_WORD_SLOT(value1);
+	HS_WORD_SLOT(value2);
 	real value3;
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_word_word_long_real
 {
-	word value0;
-	word pad0;
-	word value1;
-	word pad1;
+	HS_WORD_SLOT(value0);
+	HS_WORD_SLOT(value1);
 	long value2;
 	real value3;
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_real_real_real_real_boolean_real
 {
 	real value0;
 	real value1;
 	real value2;
 	real value3;
-	boolean value4;
-	byte pad4[3];
+	HS_BOOLEAN_SLOT(value4);
 	real value5;
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_long_real_word
 {
 	long value0;
 	real value1;
-	word value2;
+	HS_WORD_SLOT(value2);
 };
 
 struct hs_arguments_long_real_real
@@ -3500,54 +3507,53 @@ struct hs_arguments_long_real_real
 	real value2;
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_real_real_real_word
 {
 	real value0;
 	real value1;
 	real value2;
-	word value3;
+	HS_WORD_SLOT(value3);
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_short_word_real_real_real
 {
-	short value0;
-	word pad0;
-	word value1;
-	word pad1;
+	HS_SHORT_SLOT(value0);
+	HS_WORD_SLOT(value1);
 	real value2;
 	real value3;
 	real value4;
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_word_word_word
 {
-	word value0;
-	word pad0;
-	word value1;
-	word pad1;
-	word value2;
+	HS_WORD_SLOT(value0);
+	HS_WORD_SLOT(value1);
+	HS_WORD_SLOT(value2);
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_word_word_long
 {
-	word value0;
-	word pad0;
-	word value1;
-	word pad1;
+	HS_WORD_SLOT(value0);
+	HS_WORD_SLOT(value1);
 	long value2;
 };
 
+/* port: each typed argument occupies one numeric slot. */
 struct hs_arguments_long_word_boolean
 {
 	long value0;
-	word value1;
-	word pad1;
-	boolean value2;
+	HS_WORD_SLOT(value1);
+	HS_BOOLEAN_SLOT(value2);
 };
 
+/* port: narrow aliases address the numeric low bits. */
 union hs_boolean_result
 {
-	boolean boolean;
+	HS_BOOLEAN_ALIAS(boolean);
 	long value;
 };
 

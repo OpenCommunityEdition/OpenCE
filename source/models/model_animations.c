@@ -1760,10 +1760,14 @@ void aiming_screen_apply(
 	real pitch,
 	struct real_orientation *node_orientations)
 {
-	short grid_width = aiming_screen_bounds->negative_yaw_frame_count+
-		aiming_screen_bounds->positive_yaw_frame_count+1;
-	short grid_height = aiming_screen_bounds->negative_pitch_frame_count+
-		aiming_screen_bounds->positive_pitch_frame_count+1;
+	/* port: the frame counts are summed as longs and checked before they
+	are narrowed to the shorts the original summed them in (see below) */
+	long grid_width_value = (long)aiming_screen_bounds->negative_yaw_frame_count+
+		(long)aiming_screen_bounds->positive_yaw_frame_count+1;
+	long grid_height_value = (long)aiming_screen_bounds->negative_pitch_frame_count+
+		(long)aiming_screen_bounds->positive_pitch_frame_count+1;
+	short grid_width;
+	short grid_height;
 	short yaw_frame_index;
 	boolean compressed;
 	real yaw_delta;
@@ -1789,16 +1793,35 @@ void aiming_screen_apply(
 	unsigned long translation_flags;
 	short node_index;
 
-	if (animation->type!=_animation_overlay ||
-		animation->frame_count<grid_width*grid_height)
+	/* port: these counts come from map data; keep their sum and the frame
+	grid inside the short frame-index range used below. */
+	if (aiming_screen_bounds->negative_yaw_frame_count<0 ||
+		aiming_screen_bounds->positive_yaw_frame_count<0 ||
+		aiming_screen_bounds->negative_pitch_frame_count<0 ||
+		aiming_screen_bounds->positive_pitch_frame_count<0 ||
+		grid_width_value<=0 || grid_width_value>0x7FFF ||
+		grid_height_value<=0 || grid_height_value>0x7FFF ||
+		animation->frame_count<=0 ||
+		grid_width_value>animation->frame_count/grid_height_value ||
+		animation->type!=_animation_overlay)
 	{
 		return;
 	}
+	grid_width = (short)grid_width_value;
+	grid_height = (short)grid_height_value;
 
 	compressed = animation_is_compressed(animation);
 	yaw_delta = yaw<0.0f ? aiming_screen_bounds->negative_yaw_delta :
 		aiming_screen_bounds->positive_yaw_delta;
 	yaw_frame = yaw_delta==0.0f ? 0.0f : yaw/yaw_delta;
+	/* port: clamp before conversion because an untrusted angle or delta can
+	otherwise make the float-to-short conversion undefined. */
+	if (!(yaw_frame==yaw_frame))
+		return;
+	if (yaw_frame>aiming_screen_bounds->positive_yaw_frame_count)
+		yaw_frame = (real)aiming_screen_bounds->positive_yaw_frame_count;
+	if (yaw_frame<-aiming_screen_bounds->negative_yaw_frame_count)
+		yaw_frame = (real)-aiming_screen_bounds->negative_yaw_frame_count;
 	yaw_frame_index = (short)yaw_frame;
 	yaw_fraction = (real)fmod((double)yaw_frame, 1.0);
 	if (yaw_fraction<0.0f)
@@ -1833,6 +1856,13 @@ void aiming_screen_apply(
 	pitch_delta = pitch<0.0f ? aiming_screen_bounds->negative_pitch_delta :
 		aiming_screen_bounds->positive_pitch_delta;
 	pitch_frame = pitch_delta==0.0f ? 0.0f : pitch/pitch_delta;
+	/* port: clamp the pitch's frame before conversion, as the yaw's above */
+	if (!(pitch_frame==pitch_frame))
+		return;
+	if (pitch_frame>aiming_screen_bounds->positive_pitch_frame_count)
+		pitch_frame = (real)aiming_screen_bounds->positive_pitch_frame_count;
+	if (pitch_frame<-aiming_screen_bounds->negative_pitch_frame_count)
+		pitch_frame = (real)-aiming_screen_bounds->negative_pitch_frame_count;
 	pitch_frame_index = (short)pitch_frame;
 	pitch_fraction = (real)fmod((double)pitch_frame, 1.0);
 	if (pitch_fraction<0.0f)

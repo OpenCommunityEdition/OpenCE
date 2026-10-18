@@ -261,6 +261,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "hs_value.h" /* port: native scripting slot layout */
 #include "cseries/cseries.h"
 #include "ai/ai_debug_scripting.h"
 #include "ai/ai_script.h"
@@ -1655,7 +1656,7 @@ static long hs_long_to_boolean(
 	long result;
 
 	result = 0;
-	*(boolean *)&result = n==0;
+	result = (boolean)(n==0); /* port: low-bit scalar slot */
 
 	return result;
 }
@@ -1666,7 +1667,7 @@ static long hs_short_to_boolean(
 	long result;
 
 	result = 0;
-	*(boolean *)&result = (short)s==0;
+	result = (boolean)((short)s==0); /* port: low-bit scalar slot */
 
 	return result;
 }
@@ -1719,7 +1720,7 @@ static long hs_real_to_short(
 	long result;
 
 	result = 0;
-	*(short *)&result = (short)*(real *)&r;
+	result = (unsigned short)(short)*(real *)&r; /* port: low-bit scalar slot */
 
 	return result;
 }
@@ -1736,7 +1737,7 @@ static long hs_long_to_short(
 	long result;
 
 	result = 0;
-	*(short *)&result = (short)l;
+	result = (unsigned short)(short)l; /* port: low-bit scalar slot */
 
 	return result;
 }
@@ -1969,13 +1970,13 @@ void hs_evaluate_equality(
 	arguments = hs_arguments_evaluate(thread_index, 2, parameter_types, initialize);
 	if (arguments)
 	{
-		boolean equal = csmemcmp(arguments, arguments+1, hs_type_sizes[type])==0;
+		boolean equal = hs_slot_equal(arguments[0], arguments[1], hs_type_sizes[type]) /* port: low-bit comparison */;
 
 		if (function_index==_hs_function_not_equal)
 			equal = !equal;
 
 		result_long = 0;
-		*(boolean *)&result_long = equal;
+		result_long = equal; /* port: low-bit scalar slot */
 		hs_return(thread_index, result_long);
 	}
 
@@ -2021,7 +2022,7 @@ void hs_evaluate_inequality(
 		}
 
 		result_long = 0;
-		*(boolean *)&result_long = comparison;
+		result_long = comparison; /* port: low-bit scalar slot */
 		hs_return(thread_index, result_long);
 	}
 
@@ -2035,7 +2036,7 @@ void hs_evaluate_logical(
 {
 	struct hs_thread_datum *thread = hs_thread_get(thread_index);
 	long *expression_index = hs_stack_allocate(thread_index, sizeof(long));
-	boolean *value = hs_stack_allocate(thread_index, sizeof(long));
+	long *value = hs_stack_allocate(thread_index, sizeof(long)); /* port: full slot */
 	boolean *result = hs_stack_allocate(thread_index, sizeof(boolean));
 	boolean and = function_index==_hs_function_and;
 	long result_long;
@@ -2055,7 +2056,7 @@ void hs_evaluate_logical(
 	}
 	else
 	{
-		boolean argument = *value;
+		boolean argument = (boolean)*value; /* port: low-bit reader */
 
 		if (and)
 			*result = *result && argument;
@@ -2071,7 +2072,7 @@ void hs_evaluate_logical(
 	else
 	{
 		result_long = 0;
-		*(boolean *)&result_long = *result;
+		result_long = *result; /* port: low-bit scalar slot */
 
 		hs_return(thread_index, result_long);
 	}
@@ -2512,10 +2513,10 @@ void hs_evaluate_sleep_until(
 
 	if (initialize)
 	{
-		*(boolean *)condition = FALSE;
+		*condition = FALSE; /* port: initialize the entire slot */
 		*start_time = game_time_get();
 		*argument_index = 0;
-		*(short *)ticks = 30;
+		*ticks = 30; /* port: initialize the entire slot */
 		*timeout = NONE;
 
 		if (expression_index!=NONE)
@@ -2934,9 +2935,9 @@ static void hs_global_reconcile_read(
 		switch (hs_global_get_type(global_designator))
 		{
 		case _hs_type_boolean:
-			*(boolean *)&global->value = external->address
+			hs_slot_store_boolean(&global->value, external->address
 				? *(boolean *)external->address
-				: _hs_type_boolean_default;
+				: _hs_type_boolean_default); /* port: low-bit store */
 			break;
 		case _hs_type_real:
 			*(real *)&global->value = external->address
@@ -2944,9 +2945,9 @@ static void hs_global_reconcile_read(
 				: _hs_type_real_default;
 			break;
 		case _hs_type_short_integer:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_short_integer_default;
+				: _hs_type_short_integer_default); /* port: low-bit store */
 			break;
 		case _hs_type_long_integer:
 			global->value = external->address
@@ -2959,39 +2960,39 @@ static void hs_global_reconcile_read(
 				: _hs_type_string_default;
 			break;
 		case _hs_type_script:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_script_default;
+				: _hs_type_script_default); /* port: low-bit store */
 			break;
 		case _hs_type_trigger_volume:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_trigger_volume_default;
+				: _hs_type_trigger_volume_default); /* port: low-bit store */
 			break;
 		case _hs_type_cutscene_flag:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_cutscene_flag_default;
+				: _hs_type_cutscene_flag_default); /* port: low-bit store */
 			break;
 		case _hs_type_cutscene_camera_point:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_cutscene_camera_point_default;
+				: _hs_type_cutscene_camera_point_default); /* port: low-bit store */
 			break;
 		case _hs_type_cutscene_title:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_cutscene_title_default;
+				: _hs_type_cutscene_title_default); /* port: low-bit store */
 			break;
 		case _hs_type_cutscene_recording:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_cutscene_recording_default;
+				: _hs_type_cutscene_recording_default); /* port: low-bit store */
 			break;
 		case _hs_type_device_group:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_device_group_default;
+				: _hs_type_device_group_default); /* port: low-bit store */
 			break;
 		case _hs_type_ai:
 			global->value = external->address
@@ -2999,29 +3000,29 @@ static void hs_global_reconcile_read(
 				: _hs_type_ai_default;
 			break;
 		case _hs_type_ai_command_list:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_ai_command_list_default;
+				: _hs_type_ai_command_list_default); /* port: low-bit store */
 			break;
 		case _hs_type_starting_profile:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_starting_profile_default;
+				: _hs_type_starting_profile_default); /* port: low-bit store */
 			break;
 		case _hs_type_conversation:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_conversation_default;
+				: _hs_type_conversation_default); /* port: low-bit store */
 			break;
 		case _hs_type_navpoint:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_navpoint_default;
+				: _hs_type_navpoint_default); /* port: low-bit store */
 			break;
 		case _hs_type_hud_message:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_hud_message_default;
+				: _hs_type_hud_message_default); /* port: low-bit store */
 			break;
 		case _hs_type_object_list:
 			global->value = external->address
@@ -3069,29 +3070,29 @@ static void hs_global_reconcile_read(
 				: _hs_type_object_definition_default;
 			break;
 		case _hs_type_enum_game_difficulty:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_enum_game_difficulty_default;
+				: _hs_type_enum_game_difficulty_default); /* port: low-bit store */
 			break;
 		case _hs_type_enum_team:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_enum_team_default;
+				: _hs_type_enum_team_default); /* port: low-bit store */
 			break;
 		case _hs_type_enum_ai_default_state:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_enum_ai_default_state_default;
+				: _hs_type_enum_ai_default_state_default); /* port: low-bit store */
 			break;
 		case _hs_type_enum_actor_type:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_enum_actor_type_default;
+				: _hs_type_enum_actor_type_default); /* port: low-bit store */
 			break;
 		case _hs_type_enum_hud_corner:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_enum_hud_corner_default;
+				: _hs_type_enum_hud_corner_default); /* port: low-bit store */
 			break;
 		case _hs_type_object:
 			global->value = external->address
@@ -3124,9 +3125,9 @@ static void hs_global_reconcile_read(
 				: _hs_type_scenery_default;
 			break;
 		case _hs_type_object_name:
-			*(short *)&global->value = external->address
+			hs_slot_store_short(&global->value, external->address
 				? *(short *)external->address
-				: _hs_type_object_name_default;
+				: _hs_type_object_name_default); /* port: low-bit store */
 			break;
 		default:
 			display_assert(NULL, "c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x638, TRUE);

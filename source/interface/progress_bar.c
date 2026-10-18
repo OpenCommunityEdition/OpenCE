@@ -1562,7 +1562,15 @@ void progress_bar_initialize(
 	char destination_path[40];
 	char source_path[40];
 
+	/* port: the names below take the drive letter off the map directory ("d:\\maps\\", so "z:\\maps\\loading.tga"
+	and a "z:\\maps" folder). A host's map directory (the Mac's is a host path, or empty before a map is
+	open) has no drive: the path made from it was a relative one, a folder named from whatever followed
+	the empty string in memory, made in the data root; and it overran these buffers. No copy then. */
 	csstrcpy(map_directory, cache_files_map_directory());
+	if (csstrlen(map_directory) < 3 || map_directory[1] != ':' || csstrlen(map_directory) > 30)
+	{
+		return;
+	}
 	sprintf(source_path, "d%sloading.tga", map_directory + 1);
 	sprintf(destination_path, "z%sloading.tga", map_directory + 1);
 	sprintf(destination_directory, "z%s", map_directory + 1);
@@ -2248,8 +2256,13 @@ static void progress_bar_load_loading_texture(
 	IDirect3DTexture8_GetLevelDesc(*texture, 0, &surface_description);
 	pixels= locked_rect.pBits;
 	csstrcpy(map_directory, cache_files_map_directory());
-	sprintf(source_path, "z%sloading.tga", map_directory + 1);
-	file= fopen(source_path, "rb");
+	/* port: as in progress_bar_initialize, a map directory with no drive makes no path */
+	file= NULL;
+	if (csstrlen(map_directory) >= 3 && map_directory[1] == ':' && csstrlen(map_directory) <= 30)
+	{
+		sprintf(source_path, "z%sloading.tga", map_directory + 1);
+		file= fopen(source_path, "rb");
+	}
 	if (file)
 	{
 		image.width= 0;

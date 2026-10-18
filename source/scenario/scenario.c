@@ -869,7 +869,14 @@ boolean scenario_test_pvs(
 	short cluster_index1)
 {
 	struct structure_bsp *structure_bsp = global_structure_bsp_get();
-	unsigned long *pvs = structure_bsp_get_cluster_pvs(structure_bsp, cluster_index0);
+	unsigned long *pvs;
+
+	/* port: a cluster of another bsp (an encounter's firing position, when
+	the player has switched bsp) is not visible from this one */
+	if (cluster_index0 < 0 || cluster_index0 >= structure_bsp->clusters.count ||
+		cluster_index1 < 0 || cluster_index1 >= structure_bsp->clusters.count)
+		return FALSE;
+	pvs = structure_bsp_get_cluster_pvs(structure_bsp, cluster_index0);
 
 	match_assert("c:\\halo\\SOURCE\\scenario\\scenario.c", 468,
 		cluster_index1>=0 && cluster_index1<structure_bsp->clusters.count);

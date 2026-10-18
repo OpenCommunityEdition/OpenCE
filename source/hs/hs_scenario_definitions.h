@@ -8,6 +8,8 @@ header included in hcex build.
 #define __HS_SCENARIO_DEFINITIONS_H
 #pragma once
 
+#include "hs_value.h" /* port: native syntax scalar aliases */
+
 /* ---------- constants */
 
 enum
@@ -80,9 +82,9 @@ struct hs_syntax_node
 	union
 	{
 		long data;
-		boolean boolean_value;
+		HS_BOOLEAN_ALIAS(boolean_value); /* port: the value in the slot's low bits on either byte order (hs_value.h) */
 		real real_value;
-		short short_value;
+		HS_SHORT_ALIAS(short_value); /* port: as above */
 	};
 };
 
