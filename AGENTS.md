@@ -233,6 +233,8 @@ review guidance. Those standards do not relax the isolation rules.
 
 ### Project preferences
 
+- Work directly as the primary agent. Do not use subagents unless the user
+  explicitly requests them for the assignment.
 - Use descriptive branch names without a `codex/` prefix.
 - Do not write or update PR descriptions unless the user explicitly asks;
   the user handles them. This does not remove the requirement to record
