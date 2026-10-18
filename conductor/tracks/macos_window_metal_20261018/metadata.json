@@ -1,0 +1,8 @@
+{
+  "track_id": "macos_window_metal_20261018",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-10-18T21:26:53Z",
+  "updated_at": "2026-10-18T21:26:53Z",
+  "description": "The game in a macOS window: a Swift app, a Metal renderer, native input and audio"
+}
