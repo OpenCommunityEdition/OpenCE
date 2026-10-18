@@ -19,11 +19,14 @@ in the PC bitmaps' layout), copied to port/assets/menus/svg, at up to 4
 times their size. The pictures with no redraw (renders, screenshots, logos)
 are the Xbox map's bitmap of the same name, where it has the same pictures
 in the same order (XBOX_BITMAPS: the player's own ui.map draws them, and
-nothing is shipped), else the --placeholder image, fitted to each frame
-where the PC version's picture is (--pictures: only their bounds are read),
-else to the part of it the widgets show;
-port/assets/menus/NON_HANDDRAWN.md lists both, the placeholders as ones to
-be redrawn.
+nothing is shipped), else blank (or the --placeholder image, if given,
+fitted to each frame where the PC version's picture is (--pictures: only
+their bounds are read), else to the part of it the widgets show). 13 frames
+(PC_INSTALL_FRAMES) are also drawn at run time from the player's own Halo PC,
+Halo for Mac or Custom Edition install, if there is one
+(port/linux/src/menu_pc_art.c): the PNG written here, a redraw or blank, is
+what the game draws when there is none. port/assets/menus/NON_HANDDRAWN.md
+lists them all, the blank frames as ones to be redrawn.
 
 What this engine (the Xbox's) has no use for is written but never runs: the
 PC version's mouse events (the port's own mouse support clicks with A), and
@@ -155,6 +158,27 @@ WIRED = {
     "controls screen init", "controls begin binding", "controls screen change set", "controls screen defaults",
     "controls update menu", "profile manager select", "direct ip connect go", "ss edit server password",
 }
+
+# The frames (by file, without .png) that neither the Xbox's map nor the
+# redraws could always give, which the game draws from the player's own Halo
+# PC, Halo for Mac or Custom Edition install when it has one: the same tag
+# and frame in its ui.map (port/linux/src/menu_pc_art.c lists them too, and
+# says where it looks). The PNG written for each is what is drawn without one.
+PC_INSTALL_FRAMES = [
+    "shell/main_menu/multiplayer_type_select/mp_options__0",
+    "shell/main_menu/multiplayer_type_select/mp_options__1",
+    "shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__0",
+    "shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__3",
+    "shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__4",
+    "shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__6",
+    "shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__7",
+    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__1",
+    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__3",
+    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__4",
+    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__5",
+    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__6",
+    "shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__8",
+]
 
 # ---------- HEK tags
 
@@ -288,8 +312,9 @@ def bounds_text(bounds: tuple) -> str:
 class Art:
     def __init__(self, tags: Tags, redraws: Path, placeholder: Path, shown: dict, pictures: Optional[Path]):
         self.tags, self.redraws, self.shown, self.pictures_folder = tags, redraws, shown, pictures
-        self.placeholder = Image.open(placeholder).convert("RGBA")
+        self.placeholder = Image.open(placeholder).convert("RGBA") if placeholder else None
         self.pictures = []  # (frame, size, PC picture) of the frames drawn as the placeholder
+        self.redrawn = set()  # the frames (by source name) drawn from a redraw
         self.xbox_frames = []  # (PC frame, Xbox bitmap, its frame) drawn from the Xbox map
         self.added_frames = []  # (our bitmap, Xbox bitmap, its frame): port_settings.BITMAP_FRAMES
         self.svgs = []
@@ -388,6 +413,7 @@ class Art:
                 if image.shape[:2] != (height * scale, width * scale):
                     sys.exit(f"{svg}: {image.shape[1]}x{image.shape[0]}, not {scale}x {width}x{height}")
                 Image.fromarray(bleed(image), "RGBA").save(output, optimize=True)
+                self.redrawn.add(name)
                 return
         # (no redraw: the placeholder, as large as fits, in the middle of where
         # the PC version's picture is (only its bounds are read), else of the
@@ -404,9 +430,10 @@ class Art:
                     if bounds:
                         area = (bounds[0], bounds[1], min(bounds[2], area[2]), min(bounds[3], area[3]))
         area = tuple(value * PLACEHOLDER_SCALE for value in area)
-        picture = self.placeholder.copy()
-        picture.thumbnail((area[2] - area[0], area[3] - area[1]), Image.LANCZOS)
-        image.paste(picture, ((area[0] + area[2] - picture.width) // 2, (area[1] + area[3] - picture.height) // 2))
+        if self.placeholder:
+            picture = self.placeholder.copy()
+            picture.thumbnail((area[2] - area[0], area[3] - area[1]), Image.LANCZOS)
+            image.paste(picture, ((area[0] + area[2] - picture.width) // 2, (area[1] + area[3] - picture.height) // 2))
         image.save(output, optimize=True)
         self.pictures.append((output.relative_to(MENUS).as_posix(), width, height, f"{name}.png"))
 
@@ -547,7 +574,8 @@ def main() -> None:
     parser.add_argument("--tags", type=Path, required=True)
     parser.add_argument("--definitions", type=Path, required=True)
     parser.add_argument("--redraws", type=Path, required=True)
-    parser.add_argument("--placeholder", type=Path, required=True, help="the picture for frames with no redraw")
+    parser.add_argument("--placeholder", type=Path,
+                        help="a picture for frames with no redraw; with none they are blank (nothing is drawn: the Mac port showed the PLACE HOLDER box)")
     parser.add_argument("--pictures", type=Path,
                         help="the PC version's pictures, as PNGs by tag path: only where each is, to place its placeholder")
     arguments = parser.parse_args()
@@ -675,16 +703,32 @@ def main() -> None:
     report += [f"| `{name}` | `{tag}` frame {index} |" for name, tag, index in art.added_frames]
     report += [
         "",
-        "## Placeholders, to be redrawn",
+        "## From the player's own install, at run time",
         "",
-        "The Xbox's map has none of these (or other pictures under the name), so each frame is a placeholder",
-        "until it is redrawn.",
+        "When the game finds a Halo PC, Halo for Mac or Halo Custom Edition install (`paths.pc_data`, the Mac's",
+        "`/Applications/Halo.app`, `paths.custom_edition`, then the `custom_maps` folder), it draws these frames",
+        "from the same bitmap tag and frame of that install's `ui.map` (the pixels are in its `bitmaps.map`):",
+        "read and decoded when the menu draws them, and never shipped, written or kept",
+        "(`port/linux/src/menu_pc_art.c`). Without one it draws the PNG written for it: a redraw (`svg/`) where",
+        "there is one, else blank.",
+        "",
+        "| File | Without an install |",
+        "| --- | --- |",
+    ]
+    report += [f"| `ce/{name}.png` | {'redraw' if name in art.redrawn else 'blank (to be redrawn)'} |"
+               for name in PC_INSTALL_FRAMES]
+    report += [
+        "",
+        "## Blank frames, to be redrawn",
+        "",
+        "The Xbox's map has none of these (or other pictures under the name), so each frame is blank (nothing",
+        "is drawn: the screen shows its text only) until it is redrawn.",
         "",
         "| File | Size | The PC version's picture |",
         "| --- | --- | --- |",
     ]
     report += [f"| `{png}` | {w}x{h} | `{source}` |" for png, w, h, source in sorted(art.pictures)]
-    report += ["", f"{len(art.pictures)} of {len(art.pngs)} frames are placeholders.",
+    report += ["", f"{len(art.pictures)} of {len(art.pngs)} frames are blank.",
                "", "The PC version's `ui\\gamespy` and `ui\\ticker` fonts are drawn with `ui\\small_ui`, which",
                "the Xbox's map has.", ""]
     (MENUS / "NON_HANDDRAWN.md").write_text("\n".join(report))

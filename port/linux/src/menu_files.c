@@ -1105,9 +1105,25 @@ unsigned int menu_art_texture(unsigned long data, unsigned long *levels)
 	if (!art[index].texture)
 	{
 		unsigned long size = 0;
-		const unsigned char *png = file_data(art[index].png, &size);
+		const unsigned char *png;
+		long pc_width = 0, pc_height = 0;
+		unsigned char *pc_pixels = halo_menus_pc_art(art[index].png, &pc_width, &pc_height);
 
-		art[index].texture = png ? hud_hires_png_texture(png, size, &art[index].levels) : 0;
+		/* (a frame the player's own Halo install has the picture of, before
+		the port's redraw or the blank one; else the PNG) */
+		if (pc_pixels)
+		{
+			art[index].texture = hud_hires_rgba_texture(pc_pixels, (unsigned long)pc_width, (unsigned long)pc_height,
+				&art[index].levels);
+			free(pc_pixels);
+			if (art[index].texture)
+				platform_log("menus: %s is drawn from %s", art[index].png, halo_menus_pc_art_source());
+		}
+		if (!art[index].texture)
+		{
+			png = file_data(art[index].png, &size);
+			art[index].texture = png ? hud_hires_png_texture(png, size, &art[index].levels) : 0;
+		}
 		if (!art[index].texture)
 		{
 			platform_log("menus: could not draw %s", art[index].png);

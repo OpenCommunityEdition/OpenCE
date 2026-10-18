@@ -326,14 +326,12 @@ failed:
 	return NULL;
 }
 
-unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned long *levels)
+unsigned int hud_hires_rgba_texture(const unsigned char *pixels, unsigned long width, unsigned long height,
+	unsigned long *levels)
 {
-	unsigned long width = 0, height = 0, largest;
-	unsigned char *pixels = png_decode(png, size, &width, &height);
+	unsigned long largest;
 	GLuint texture;
 
-	if (!pixels)
-		return 0;
 	*levels = 1;
 	for (largest = width > height ? width : height; largest > 1; largest >>= 1)
 		(*levels)++;
@@ -346,6 +344,18 @@ unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)width, (GLsizei)height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	xgpu_gl_state_invalidate();
+	return texture;
+}
+
+unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned long *levels)
+{
+	unsigned long width = 0, height = 0;
+	unsigned char *pixels = png_decode(png, size, &width, &height);
+	GLuint texture;
+
+	if (!pixels)
+		return 0;
+	texture = hud_hires_rgba_texture(pixels, width, height, levels);
 	free(pixels);
 	return texture;
 }

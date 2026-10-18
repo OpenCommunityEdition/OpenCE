@@ -154,4 +154,14 @@ drawn for, until halo_menus_art_forget */
 void halo_menus_art_register(void const *texture, char const *png);
 void halo_menus_art_forget(void);
 
+/* a frame's picture from the player's own Halo PC, Halo for Mac or Custom
+Edition install (paths.pc_data and the places port/linux/src/menu_pc_art.c
+lists), for the frames the Xbox's map and the redraws have not got: its
+RGBA texels (top row first; free() them) and size, or NULL when the PNG is
+not such a frame or there is no install with it. The caller draws its own PNG
+then. */
+unsigned char *halo_menus_pc_art(char const *png, long *width, long *height);
+/* the install's ui.map, once one has been read (for the log), or NULL */
+char const *halo_menus_pc_art_source(void);
+
 #endif

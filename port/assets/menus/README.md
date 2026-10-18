@@ -9,8 +9,8 @@ controller, the keyboard and the mouse, on every port.
 | Path | Contents |
 | --- | --- |
 | `ce/*.xml` | The PC version's screens, one file for each folder of its tags, laid out as it has them; `ce/strings.xml` their text, `ce/bitmaps.xml` their pictures |
-| `ce/shell/...png` | The pictures, drawn from the high-res redraws in `svg/` (up to 4x), else a placeholder |
-| `NON_HANDDRAWN.md` | The pictures that are not redraws: those drawn from the Xbox's map (the player's own), and the placeholders, to be redrawn |
+| `ce/shell/...png` | The pictures, drawn from the high-res redraws in `svg/` (up to 4x), else blank. 13 frames are drawn from the player's own Halo PC, Mac or Custom Edition install when there is one (`paths.pc_data`; `NON_HANDDRAWN.md`) |
+| `NON_HANDDRAWN.md` | The pictures that are not redraws: those drawn from the Xbox's map (the player's own), and the blank frames, to be redrawn |
 | `UNWIRED.md` | The menus' functions that do nothing yet: the lists they fill are empty, and the settings they change do not change |
 | `menus.json` | The files the game embeds |
 
@@ -40,7 +40,6 @@ python3 tools/ce_menus.py \
     --tags <halopc-restored>/tags \
     --definitions <invader>/src/tag/hek/definition \
     --redraws <ui-svg-handmade> \
-    --placeholder <placeholder.png> \
     --pictures <extracted-ui-assets-fixed>
 ```
 
@@ -49,8 +48,8 @@ python3 tools/ce_menus.py \
 - `--definitions`: Invader's tag definitions, which say how the tags are
   laid out.
 - `--redraws`: the hand-made SVG redraws, copied to `svg/`.
-- `--placeholder`: the picture drawn where a picture has no redraw and the
-  Xbox's map has not got it.
+- `--placeholder` (optional): a picture drawn where a picture has no redraw
+  and the Xbox's map has not got it; with none the frame is blank.
 - `--pictures` (optional): the PC version's pictures, of which only where
   each sits in its frame is read.
 
@@ -126,7 +125,7 @@ be a child of many).
 | `description` | A column list's extended description: a widget |
 | `controller` | `1` to `4`, or `any` (the default); a `<child>`'s or `child_controller`: the one it is for |
 | `auto_close`, `auto_close_fade` | It closes itself after this many milliseconds, fading for this many |
-| `platform` | `desktop`, `android` or `web`, or several separated by spaces: it is only there. Every element takes this. |
+| `platform` | `desktop` (Linux and Windows), `android`, `web` or `mac`, or several separated by spaces: it is only there. Every element takes this. |
 
 Widget flags: `pass_unhandled_to_focused_child` (an event it does not handle
 goes to its focused child: a screen needs it for its list to get events),
@@ -202,7 +201,7 @@ number).
 `tools/ce_menus.py` draws each frame from its redraw in `svg/` (copied from
 ui-svg-handmade) at up to 4x its size. A picture with no redraw is the
 Xbox's map's, where it has the same one (a whole bitmap, or a `<frame
-map=...>`), else a placeholder, placed where the PC version's picture is in
-its frame (`--pictures`: only where, not the picture, is read);
+map=...>`), else blank (or a placeholder, if one is given, placed where the PC version's picture is in
+its frame (`--pictures`: only where, not the picture, is read));
 `NON_HANDDRAWN.md` lists both. It needs `rsvg-convert`, Pillow, NumPy and
 SciPy.
