@@ -99,7 +99,7 @@ def test_feature_files_are_embedded_and_navigation_resolves():
                 if child.get(attribute):
                     assert child.get(attribute) in widgets
             assert child.get("run") in (None, "mouse emit accept event", "port changelog init",
-                                        "port changelog up", "port changelog down")
+                                        "port changelog up", "port changelog down", "port gulch build label")
     for bitmap in feature().findall("bitmap"):
         for frame in bitmap:
             assert frame.get("png") in manifest
@@ -208,10 +208,14 @@ def test_reading_width_and_bottom_right_arrow_pair():
     widgets = widgets_for(data)
     screen = widgets[f"{changelog_menu.BASE}/build_1"]
     children = {child.get("widget").rsplit("/", 1)[-1]: child for child in screen.findall("child")}
-    up, down = children["scroll_up"], children["scroll_down"]
-    assert up.get("x") == down.get("x") == "480"
-    assert up.get("y") == "314" and down.get("y") == "342"
-    assert int(down.get("y")) - int(up.get("y")) - 24 == 4
+    controls = children["scroll_controls"]
+    assert controls.get("x") == "480" and controls.get("y") == "314"
+    column = widgets[f"{changelog_menu.BASE}/build_1/scroll_controls"]
+    assert column.get("type") == "column_list"
+    assert "tabs" not in column.get("flags")
+    up, down = column.findall("child")
+    assert int(up.get("y", 0)) == 0 and down.get("y") == "28"
+    assert int(down.get("y")) - int(up.get("y", 0)) - 24 == 4
     for name in ("scroll_up", "scroll_down"):
         assert widgets[f"{changelog_menu.BASE}/build_1/{name}"].get("width") == "128"
 
@@ -330,9 +334,16 @@ def test_insertion_preserves_legacy_menu_and_is_idempotent():
     assert changelog_menu.insert_item(baseline) == main
     assert changelog_menu.insert_item(main) == main
     rows = ET.fromstring(main).find("widget[@name='main_menu/main_menu_select_list']").findall("child")
-    assert [row.get("widget") for row in rows[-3:]] == [
-        "main_menu/main_menu_item_mods", changelog_menu.ITEM, "main_menu/main_menu_item_quit_game"]
-    assert [int(row.get("y")) for row in rows] == [247, 283, 319, 355, 391, 427, 427]
+    assert [row.get("widget") for row in rows[-2:]] == [
+        "main_menu/main_menu_item_mods", "main_menu/main_menu_item_quit_game"]
+    assert [int(row.get("y")) for row in rows] == [247, 283, 319, 355, 391, 427]
+    root = ET.fromstring(main).find("widget[@name='main_menu/main_menu']")
+    assert root.find(f"child[@widget='{changelog_menu.CORNER}']").attrib == {
+        "widget": changelog_menu.CORNER, "x": "456", "y": "444"}
+    assert root.find(f"child[@widget='{changelog_menu.BUILD_LABEL}']").get("y") == "420"
+    corner = feature().find(f"widget[@name='{changelog_menu.CORNER}']")
+    assert corner.get("type") == "column_list"
+    assert corner.find("child").get("widget") == changelog_menu.ITEM
 
 
 def c_function(source, name):
@@ -354,6 +365,7 @@ def test_real_scroll_runtime_and_existing_wheel_route(tmp_path):
     engine = (ROOT / "source/interface/ui_widget.c").read_text()
     wheel = c_function(engine, "static struct widget_instance *ui_mouse_wheel_widget(")
     directions = c_function(engine, "static void ui_mouse_list_directions(")
+    mouse_item = c_function(engine, "static boolean ui_mouse_widget_is_item(")
     code = r'''
 #include <assert.h>
 #include <stdio.h>
@@ -373,22 +385,26 @@ typedef int boolean;
 enum { _widget_dpad_updown_tabs_thru_children_bit=3,
  _widget_dpad_leftright_tabs_thru_children_bit,
  _widget_dpad_updown_tabs_thru_list_items_bit,
- _widget_dpad_leftright_tabs_thru_list_items_bit };
+ _widget_dpad_leftright_tabs_thru_list_items_bit,
+ _widget_pass_unhandled_events_to_children_bit };
 enum { _ui_widget_type_spinner_list=2, _ui_widget_type_column_list=3 };
 enum { _widget_event_dpad_up=8, _widget_event_dpad_down,
  _widget_event_dpad_left, _widget_event_dpad_right };
 struct widget_instance {
  long definition_tag_index; char const *name; short type; boolean disabled;
  struct widget_instance *parent, *child, *next, *focused_child;
- union { struct { short selected_index; } list;
+ union { struct { short selected_index; void *list_items; long number_of_items; } list;
          struct { short string_list_index; } text_box; } parameters;
+ struct { short current_frame_index, number_of_sprite_frames; } animation;
 };
-struct ui_widget_definition { long flags; } definitions[6];
+struct ui_widget_definition { long flags; struct { long count; } event_handlers; } definitions[6];
 struct string_list { struct { long count; } strings; } strings, headings;
 static struct ui_widget_definition *ui_widget_definition_get(long n) { return &definitions[n]; }
 static boolean ui_mouse_list_shows_several(struct widget_instance *w) { (void)w; return FALSE; }
+static long ui_mouse_child_index(struct widget_instance *w) { return w && w->parent ? 0 : NONE; }
+static boolean widget_instance_can_receive_events(struct widget_instance *w) { return !w->disabled; }
 char *tag_get_name(long n) {
- return n==1 ? "pc\\main_menu\\changelog\\build_1" : n==2 ? "pc\\main_menu\\changelog\\build_2" : "pc\\main_menu\\settings";
+ return n==1 ? "pc\\main_menu\\changelog\\build_1" : n==2 ? "pc\\main_menu\\changelog\\build_2" : n==4 ? "pc\\main_menu\\main_menu" : "pc\\main_menu\\settings";
 }
 static int missing_tag, missing_heading;
 static long heading_count=-1;
@@ -405,6 +421,7 @@ static struct string_list *test_strings(long n) {
 static wchar_t position[64];
 static struct widget_instance *named(struct widget_instance *root, char const *name, long nth) {
  struct widget_instance *child;
+ if(!root) return NULL;
  for(child=root->child;child;child=child->next)
   if(!strcmp(child->name,name) && nth--==0) return child;
  return NULL;
@@ -418,10 +435,12 @@ static int position_is(char const *value) {
 static long halo_menus_utf16(char const *text, unsigned short *out, long capacity) {
  long n=0; while(text[n] && n+1<capacity) { out[n]=(unsigned char)text[n]; n++; } out[n]=0; return n+1;
 }
-''' + wheel + "\n" + directions + '\n#include "changelog_menu_runtime.inl"\n' + r'''
+''' + wheel + "\n" + directions + "\n" + mouse_item + '\n#include "changelog_menu_runtime.inl"\n' + r'''
 int main(void) {
  struct widget_instance root={0}, other={0}, nodes[12]={{0}}, other_nodes[12], footer={0}, button={0};
  struct widget_instance heading_nodes[8]={{0}}, other_headings[8];
+ struct widget_instance main={0}, central={0}, corner={0}, item={0}, rows[6]={{0}};
+ struct widget_instance controls={0}, arrows[2]={{0}};
  char names[8][16], heading_names[8][24]; long n; short back,forward;
  root.definition_tag_index=1; other.definition_tag_index=2;
  root.child=nodes; other.child=other_nodes;
@@ -477,6 +496,51 @@ int main(void) {
  assert(ui_mouse_wheel_widget(&root,FALSE)==&footer);
  ui_mouse_list_directions(&footer,&back,&forward);
  assert(back==_widget_event_dpad_left && forward==_widget_event_dpad_right);
+ root.child=&footer;footer.name="buttons";footer.child=&button;footer.next=&controls;
+ controls.name="scroll_controls";controls.type=3;controls.child=arrows;
+ arrows[0].next=&arrows[1];arrows[0].disabled=TRUE;
+ arrows[0].animation.number_of_sprite_frames=arrows[1].animation.number_of_sprite_frames=2;
+ button.animation.number_of_sprite_frames=2;button.animation.current_frame_index=1;
+ arrows[0].animation.current_frame_index=1;controls.focused_child=&arrows[1];root.focused_child=&controls;
+ changelog_menu_focus_update(&root);
+ assert(button.animation.current_frame_index==0 && arrows[0].animation.current_frame_index==0);
+ assert(arrows[1].animation.current_frame_index==1);
+ root.focused_child=&footer;changelog_menu_focus_update(&root);
+ assert(button.animation.current_frame_index==1 && arrows[1].animation.current_frame_index==0);
+ root.definition_tag_index=3;arrows[1].animation.current_frame_index=1;
+ changelog_menu_focus_update(&root);assert(arrows[1].animation.current_frame_index==1);
+ /* Right/Left preserve the six-row list and its remembered selection.
+    A mouse transition can clear focused_child without clearing the index. */
+ main.definition_tag_index=4;main.child=&central;main.focused_child=&central;
+ central.name="main_menu_select_list";central.type=3;central.parent=&main;
+ central.next=&corner;central.child=rows;central.parameters.list.selected_index=5;
+ for(n=0;n<6;n++) { rows[n].parent=&central;rows[n].next=n<5 ? &rows[n+1] : NULL; }
+ central.focused_child=&rows[5];rows[5].animation.number_of_sprite_frames=2;
+ rows[5].animation.current_frame_index=1;corner.name="changelog_corner";corner.type=3;corner.parent=&main;
+ corner.child=&item;item.name="main_menu_item_changelog";item.parent=&corner;
+ assert(changelog_menu_event(&rows[5],"port changelog corner focus"));
+ assert(main.focused_child==&corner && central.parameters.list.selected_index==5);
+ assert(central.focused_child==NULL);
+ assert(ui_mouse_widget_is_item(&item));
+ /* Standalone root buttons were not mouse targets. The arrows now
+    belong to a column list, preserving the engine's existing contract. */
+ button.parent=&main;assert(!ui_mouse_widget_is_item(&button));
+ button.parent=&footer;assert(ui_mouse_widget_is_item(&button));
+ button.disabled=TRUE;assert(!ui_mouse_widget_is_item(&button));button.disabled=FALSE;
+ changelog_menu_focus_update(&main);assert(item.animation.current_frame_index==1);
+ assert(rows[5].animation.current_frame_index==0);
+ central.focused_child=NULL;
+ assert(changelog_menu_event(&item,"port changelog main focus"));
+ assert(main.focused_child==&central && central.focused_child==&rows[5]);
+ assert(rows[5].animation.current_frame_index==1);
+ changelog_menu_focus_update(&main);assert(item.animation.current_frame_index==0);
+ /* Mouse focus uses the engine's direct focus path, not our event helper. */
+ main.focused_child=&corner;corner.focused_child=&item;central.focused_child=NULL;
+ rows[5].animation.current_frame_index=1;
+ changelog_menu_focus_update(&main);assert(rows[5].animation.current_frame_index==0);
+ main.definition_tag_index=3;assert(!changelog_menu_event(&main,"port changelog corner focus"));
+ main.definition_tag_index=4;central.next=NULL;
+ assert(!changelog_menu_event(&main,"port changelog corner focus"));
  return 0;
 }
 '''

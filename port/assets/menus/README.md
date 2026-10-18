@@ -107,14 +107,21 @@ existing menu interfaces: generated XML alone cannot change visible text
 indices in response to input. The runtime accepts only the changelog's own
 root namespace and resets the instance offset on creation; deletion frees
 that instance normally. Xbox, Custom Edition and MCC screens outside the
-changelog keep their existing paths. The footer omits horizontal tab flags so the mouse
-wheel always follows the vertical scroll handlers, including over buttons.
+feature keep their existing paths. The footer omits horizontal tab flags so
+the mouse wheel follows the vertical scroll handlers, including over buttons.
 
-The generated CHANGELOG child is inserted immediately before Quit while
-retaining all original child coordinates. `changelog_menu.c` applies the
-optional layout at startup: `display.changelog = true` moves the preceding
-rows up one slot; false removes the new child and retains the original menu.
-Changes to this setting take effect after restarting the game.
+CHANGELOG occupies its own small bottom-right list, leaving the six original
+central buttons, coordinates and Up/Down wrapping intact. Right selects the
+corner button; Left returns to the remembered central selection. Mouse hover
+and clicks use the existing column-list target rules, including the paired
+scroll arrows. The feature runtime handles only this exact PC main root and
+its own corner container. Its small focus/update handlers are necessary because
+XML alone cannot preserve the central selection while updating the corner's
+selection frame. The same callback synchronizes only the changelog's own
+arrow/footer selection frames, since the engine updates only the active list.
+Disabling `display.changelog` unlinks only that container at
+startup; the original menu behavior remains. Changes take effect after restart.
+The additional orange Gulch build label matches the existing version label.
 
 A settings screen (Controls Setup, Gamepads, Mouse, Audio, Video or Network
 Setup) is changed in `tools/port_settings.py`, not in its XML, and written

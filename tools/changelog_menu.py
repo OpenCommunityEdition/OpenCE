@@ -21,8 +21,10 @@ ROOT = Path(__file__).resolve().parent.parent
 MENUS = ROOT / "port/assets/menus"
 FILE = "main_menu.changelog.port.xml"
 ITEM = "main_menu/main_menu_item_changelog"
+CORNER = "main_menu/changelog_corner"
 BASE = "main_menu/changelog"
-CHILD = f'<child widget="{ITEM}" x="192" y="427"/>'
+CHILD = f'<child widget="{CORNER}" x="456" y="444"/>'
+BUILD_LABEL = "main_menu/gulch_build_number"
 BITMAP = "main_menu/menu_changelog"
 TITLE = f"{BASE}/header_changelog"
 NOTES = ROOT / "port/assets/changelog/notes.json"
@@ -137,6 +139,21 @@ def _text(name, text, x, y, width, height=24, font="small", color="#FFCCCCCC", a
     ], [])
 
 
+def corner_frames(redraws):
+    """Reuse the handmade caption/glow and the standard button outline."""
+    frames = []
+    for index, (caption, _, _) in enumerate(port_settings.menu_item_frames("CHANGELOG", redraws, SPACING)):
+        border = (redraws / f"shell/bitmaps/text_button_background__{index}.svg").read_text(encoding="utf-8")
+        inner = lambda svg: svg[svg.index(">") + 1:svg.rindex("</svg>")]
+        svg = '\n'.join([
+            '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
+            'width="160" height="32" viewBox="0 0 160 32">',
+            '  <g transform="translate(0,3) scale(1.25,1)">', inner(border), '  </g>',
+            '  <g transform="translate(2,4) scale(0.6)">', inner(caption), '  </g>', '</svg>', ''])
+        frames.append((svg, 160, 32))
+    return frames
+
+
 def widget_lines(data=None):
     """One scrolling screen per build, with one invoking-menu history entry.
 
@@ -147,10 +164,18 @@ def widget_lines(data=None):
     data = load_notes() if data is None else validate_notes(data)
     entries = data["entries"] or [None]
     lines = port_settings._widget(ITEM, [
-        ("type", "text"), ("width", 256), ("height", 33), ("bitmap", BITMAP),
+        ("type", "text"), ("width", 160), ("height", 28), ("bitmap", BITMAP),
     ], [f'<on event="a start" open="{BASE}/build_1"/>',
         '<on event="left_mouse" run="mouse emit accept event"/>'])
+    lines += port_settings._widget(CORNER, [
+        ("type", "column_list"), ("width", 160), ("height", 28),
+        ("flags", "pass_unhandled_to_focused_child"),
+    ], [f'<child widget="{ITEM}"/>'])
     lines += port_settings._header(TITLE, TITLE)
+    lines += port_settings._widget(BUILD_LABEL, [
+        ("type", "text"), ("controller", 1), ("width", 150), ("height", 20),
+        ("font", "ui\\small_ui"), ("color", "#FFFF8000"),
+    ], ['<on event="created" run="port gulch build label"/>'])
     for index, entry in enumerate(entries, 1):
         page = f"{BASE}/build_{index}"
         contents = reading_rows(entry)
@@ -168,8 +193,7 @@ def widget_lines(data=None):
         children += [f'<child widget="{page}/scroll_position"/>',
                      f'<child widget="{page}/instructions"/>',
                      f'<child widget="{page}/buttons" y="414"/>',
-                     f'<child widget="{page}/scroll_up" x="480" y="314"/>',
-                     f'<child widget="{page}/scroll_down" x="480" y="342"/>']
+                     f'<child widget="{page}/scroll_controls" x="480" y="314"/>']
         events = ['<on event="b back start" back="true"/>',
                   '<on event="created" run="port changelog init"/>',
                   '<on event="up stick_up" run="port changelog up"/>',
@@ -181,7 +205,7 @@ def widget_lines(data=None):
         lines += port_settings._widget(page, [
             ("width", 640), ("height", 480), ("flags", "pass_unhandled_to_focused_child pause_game no_history"),
             ("bitmap", "bitmaps/gradient"),
-        ], events + children)
+        ], events + ['<data input="port changelog focus update"/>'] + children)
         lines += _text(f"{page}/build_number", f"{index} / {len(entries)}", 430, 44, 170,
                        color="#FF2896FF", align="right")
         lines += _text(f"{page}/label", "PLAYER NOTES", 55, 90, 530, color="#FFFFB020")
@@ -204,6 +228,13 @@ def widget_lines(data=None):
         for direction, label in (("up", "UP"), ("down", "DOWN")):
             lines += port_settings._text_button(f"{page}/scroll_{direction}", label,
                 [f'<on event="a" run="port changelog {direction}"/>'])
+        # Mouse targets must belong to a list (or a parent that tabs its
+        # children). Root-level text buttons cannot receive pointer focus.
+        lines += port_settings._widget(f"{page}/scroll_controls", [
+            ("type", "column_list"), ("width", 128), ("height", 52),
+            ("flags", "pass_unhandled_to_focused_child"),
+        ], [f'<child widget="{page}/scroll_up"/>',
+            f'<child widget="{page}/scroll_down" y="28"/>'])
         buttons = []
         for label, target, x in (("PREVIOUS", index + 1, 80), ("NEXT", index - 1, 250)):
             if not 1 <= target <= len(entries):
@@ -230,7 +261,7 @@ def document(bitmaps, data=None):
 
 def generate(art, data=None):
     """Write the same feature file and art in focused and full generation."""
-    bitmaps = [art.port_picture(BITMAP, port_settings.menu_item_frames("CHANGELOG", art.redraws, SPACING)),
+    bitmaps = [art.port_picture(BITMAP, corner_frames(art.redraws)),
                art.title(TITLE, "CHANGELOG")]
     (MENUS / "ce" / FILE).write_text(document(bitmaps, data), encoding="utf-8")
 
@@ -244,16 +275,33 @@ def regenerate_text(data=None):
     if len(bitmaps) != 2 or {node.get("name") for node in root.findall("bitmap")} != {BITMAP, TITLE}:
         raise ValueError("expected existing changelog item and title bitmap definitions")
     path.write_text(document(bitmaps, data), encoding="utf-8")
+    main = MENUS / "ce/main_menu.xml"
+    if main.exists():
+        main.write_text(insert_item(main.read_text(encoding="utf-8")), encoding="utf-8")
 
 
 def insert_item(text):
     """Add only the feature child; retain every legacy attribute/position."""
-    if f'<child widget="{ITEM}"' in text:
-        return text
-    pattern = r'(\t\t<child widget="main_menu/main_menu_item_quit_game"[^\n]+)'
-    updated, count = re.subn(pattern, '\t\t' + CHILD + '\n' + r'\1', text)
+    for name in (ITEM, CORNER, BUILD_LABEL):
+        text, count = re.subn(r'\t\t<child widget="' + re.escape(name) + r'"[^\n]*/>\n', '', text)
+        if count > 1:
+            raise ValueError(f"expected at most one child for {name}")
+    for owned in ('<on event="right stick_right" run="port changelog corner focus"/>',
+                  '<on event="left stick_left" run="port changelog main focus"/>',
+                  '<data input="port changelog corner update"/>',
+                  '<data input="port changelog focus update"/>'):
+        text = text.replace('\t\t' + owned + '\n', '')
+    pattern = r'(\t<widget name="main_menu/main_menu"[^\n]+\n)'
+    updated, count = re.subn(pattern, r'\1' + '\t\t<on event="right stick_right" run="port changelog corner focus"/>\n'
+                           '\t\t<on event="left stick_left" run="port changelog main focus"/>\n'
+                           '\t\t<data input="port changelog focus update"/>\n', text)
     if count != 1:
-        raise ValueError("expected one main menu Quit child")
+        raise ValueError("expected one main menu root")
+    pattern = r'(\t\t<child widget="main_menu/build_number"[^\n]+)'
+    updated, count = re.subn(pattern, r'\1' + f'\n\t\t<child widget="{BUILD_LABEL}" x="450" y="420"/>'
+                           + '\n\t\t' + CHILD, updated)
+    if count != 1:
+        raise ValueError("expected one main menu build-number child")
     return updated
 
 

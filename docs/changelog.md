@@ -7,6 +7,13 @@ menu; `notes.md` supplies release highlights from the same authored source.
 Each published entry uses its exact GitHub release build number. Previous and
 Next navigate these published builds; long notes scroll within a build's page.
 
+The main menu also shows `gulch build N` directly below the original Xbox
+version, using its orange font and style. `N` comes from the executable's
+`HALO_BUILD_NUMBER`, the same GitHub Actions number used for its release;
+the label does not infer a number from Git history or the notes archive.
+Local and testing builds without a release number show `gulch build local`.
+This label remains visible when the optional changelog is disabled.
+
 ## Writing a note
 
 Add one or more lines to the commit message body:
