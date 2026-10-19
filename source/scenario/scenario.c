@@ -194,6 +194,7 @@ symbols in this file:
 #include "sound/sound_manager.h"
 #include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
+#include "structure_culling.h" /* port: port/linux/game/structure_culling.c */
 
 /* ---------- constants */
 
@@ -366,6 +367,8 @@ void scenario_unload(
 		0xA4,
 		!bink_playback_active());
 
+	/* port: release pointers into the bsp before its tags go away */
+	structure_culling_dispose();
 	scenario_tags_unload();
 	global_scenario_index = NONE;
 	global_structure_bsp_index = NONE;
@@ -1147,6 +1150,8 @@ boolean scenario_switch_structure_bsp(
 				struct collision_bsp);
 			scenario_globals->structure_bsp_index = structure_bsp_index;
 			global_structure_bsp_index = structure_bsp_index;
+			/* port: cache buckets while the newly current bsp's tags are loaded */
+			structure_culling_structure_bsp_loaded();
 
 			if (had_old_structure_bsp)
 			{
