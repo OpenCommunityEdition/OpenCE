@@ -36,7 +36,7 @@ enum
 #define MAC_GOV_SEVERE_DWELL 20         /* the same when the average is 1.5 times the target */
 #define MAC_GOV_UP_DWELL 240            /* frames to wait after a step before an up (times the back-off) */
 #define MAC_GOV_MIN_SECONDS 1.0         /* and no two steps closer than this */
-#define MAC_GOV_DOWN_OVER 1.04          /* down while the average is above the target times this */
+#define MAC_GOV_DOWN_OVER 1.00          /* down while the average is above the target times this (1.04 left iBook b30 hovering at a level of 33.9 ms, 0.6 over the target, when one step down holds 32.3) */
 #define MAC_GOV_UP_UNDER 0.78           /* up while it is below the target times this */
 #define MAC_GOV_IGNORE_MS 250.0         /* a frame this long is a load or a pause, not a measure */
 #define MAC_GOV_OVER_RUN 15             /* frames the average must have been over the target before a step down (8 when it is 1.5 times) */
