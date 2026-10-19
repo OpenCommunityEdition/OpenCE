@@ -584,7 +584,12 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             sdk_flags,
         ])
         posix_cflags = " ".join(POSIX_FLAGS + target + [f"-I{platform_dir}"])
-        mbedtls_include = f"-I{MBEDTLS_DIR / 'include'}"
+        # (with Mbed TLS's own locks, as built from its unchanged config by
+        # these defines: on Linux the self-updater's thread (posix_update.c)
+        # and internet play's (posix_dtls.c) both use it, and two threads
+        # setting up its PSA crypto or drawing on its random generator at
+        # once crashed it; the other builds use it on one thread)
+        mbedtls_include = f"-I{MBEDTLS_DIR / 'include'} -DMBEDTLS_THREADING_C -DMBEDTLS_THREADING_PTHREAD"
         for source in sorted(platform_dir.glob("*.c")):
             if source.name in ("posix_update.c", "posix_dtls.c"):
                 add_object(source, f"{posix_cflags} {mbedtls_include}", posix=True)
