@@ -16,9 +16,9 @@ CASES = ["rotations", "translations"]
 def generated(fault=None):
     source = read("source/models/model_animations.c")
     definitions = read("source/models/model_animation_definitions.h")
-    start = source.index("#if defined(__BIG_ENDIAN__) || defined(__ppc__) || defined(__POWERPC__)\nstatic unsigned char aiming_data_little_endian_byte")
+    start = source.index("#define AIMING_MAP_ENTRIES")
     end = source.index("#else\n#define aiming_decompress_8byte", start)
-    helpers = "#if 1" + source[start + len("#if defined(__BIG_ENDIAN__) || defined(__ppc__) || defined(__POWERPC__)"):end] + "#endif\n"
+    helpers = source[start:end]
     if fault:
         helpers = mutated(helpers, *fault)
     types = """
@@ -39,7 +39,7 @@ def test_case(case):
 
 
 def test_negative_control_raw_bytes():
-    fault = ("return base[frame_start + cursor + unit_start + (unit - 1 - (relative - unit_start))];",
-             "return base[frame_start + cursor + unit_start + (relative - unit_start)];")
+    fault = ("map[position] = (unsigned short)(cursor + unit_start + (unit - 1 - (relative - unit_start)));",
+             "map[position] = (unsigned short)(cursor + unit_start + (relative - unit_start));")
     status, output = run(build("aiming_frame_bytes", generated(fault)), "rotations")
     assert status == CHECK_FAILED, f"reading the converted bytes as they are passed: {output}"
