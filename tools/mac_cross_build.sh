@@ -11,7 +11,8 @@
 #                      architecture (default OUT build/mac-cross-session): OUT/ppc/ and OUT/i386/ hold
 #                      mac_rendered_session_ppc and mac_rendered_session_i386
 #   controller         OpenCE Controller Setup.app (port/mac/controller_setup/build.sh), 10.5 SDK, in that directory
-#   app [OUT]          PowerSpark.app without the dmg, from OUT/ppc and OUT/i386 of `session` (hdiutil is a Mac's)
+#   app [OUT] [bundle options]   PowerSpark.app without the dmg, from OUT/ppc and OUT/i386 of `session` (hdiutil is a
+#                      Mac's); further arguments (--icon, --branding, --version) go to tools/mac_app_bundle.sh
 #
 # The host needs gcc, make, python3, rsync and, for the toolchain, clang, wget, patch. The session links objects built
 # by the Macs' gates (build/mac-game-tick, mac-audit, mac-graphics-audit, mac-game-tick-session-final*); copy them
@@ -137,6 +138,18 @@ DRIVER
     printf '#!/bin/sh\nexit 0\n' > "$MACCROSS_ROOT/bin/plutil"
     chmod +x "$MACCROSS_ROOT/bin/md5" "$MACCROSS_ROOT/bin/plutil"
     ln -sf "$(command -v python3)" "$MACCROSS_ROOT/bin/python"
+    # PlistBuddy -c "Print :Key" FILE, for the branding keys mac_app_bundle.sh reads (PLISTBUDDY)
+    cat > "$MACCROSS_ROOT/bin/PlistBuddy" <<'PLB'
+#!/usr/bin/env python3
+import plistlib, sys
+key = sys.argv[2].split("Print :", 1)[1]
+try:
+    value = plistlib.load(open(sys.argv[3], "rb"))[key]
+except Exception:
+    sys.exit(1)
+print(value)
+PLB
+    chmod +x "$MACCROSS_ROOT/bin/PlistBuddy"
     echo "#include <stddef.h>" > "$MACCROSS_ROOT/shim/StdDef.h"
 }
 
@@ -268,9 +281,10 @@ controller() {
 app() {
     setup_env
     out=${1:-build/mac-cross-session}
+    [ $# -eq 0 ] || shift
     cd "$repo"
-    MAC_CROSS=1 sh tools/mac_app_bundle.sh --engine-ppc "$out/ppc/mac_rendered_session_ppc" \
-        --engine-i386 "$out/i386/mac_rendered_session_i386" --no-dmg --out "$repo/build/mac-app-cross"
+    MAC_CROSS=1 PLISTBUDDY=$MACCROSS_ROOT/bin/PlistBuddy sh tools/mac_app_bundle.sh --engine-ppc "$out/ppc/mac_rendered_session_ppc" \
+        --engine-i386 "$out/i386/mac_rendered_session_i386" --no-dmg --out "$repo/build/mac-app-cross" "$@"
 }
 
 case $cmd in

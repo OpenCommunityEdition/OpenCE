@@ -148,7 +148,8 @@ if [ -n "$BRANDING" ]; then
     BRANDDIR=$(CDPATH= cd "$(dirname "$BRANDING")" && pwd)
     plutil -lint "$BRANDING" > /dev/null
     cp "$BRANDING" "$APP/Contents/Resources/branding.plist"
-    brand_key() { /usr/libexec/PlistBuddy -c "Print :$1" "$BRANDING" 2> /dev/null || true; }
+    # port: PLISTBUDDY names a stand-in where /usr/libexec/PlistBuddy does not exist (tools/mac_cross_build.sh)
+    brand_key() { ${PLISTBUDDY:-/usr/libexec/PlistBuddy} -c "Print :$1" "$BRANDING" 2> /dev/null || true; }
     for key in LogoFile CAFile; do
         name=$(brand_key $key)
         case $name in
