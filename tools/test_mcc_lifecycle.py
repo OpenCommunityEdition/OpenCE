@@ -191,6 +191,7 @@ static struct structure_bsp *structure_bsp_definition_get(int index) {(void)inde
 static int structure_bsp_port_verify(struct structure_bsp *value) {
     (void)value;observed.verifies++;return mode!=4 || observed.verifies>1;
 }
+static void structure_culling_structure_bsp_loaded(void) {}
 static void main_goto_main_menu(void) {observed.menu++;}
 static void error(int priority,char const *format,...) {
     (void)format;if(priority==_error_immediate)observed.modal++;else observed.silent++;

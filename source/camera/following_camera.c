@@ -41,6 +41,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "following_camera.h"
+#include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c */
 #include "cseries/errors.h" /* port: (error, for a short camera track) */
 #include "observer.h"
 
@@ -195,11 +196,13 @@ void following_camera_update(
 {
 	struct player_control_unit_camera_info camera_info;
 	struct camera_command *command;
+	boolean passenger; /* port: only this local display view borrows a seat's camera */
 
 	match_assert("c:\\halo\\SOURCE\\camera\\following_camera.c", 138, camera);
 	match_assert("c:\\halo\\SOURCE\\camera\\following_camera.c", 139, result);
 
 	player_control_get_unit_camera_info(controls->local_player_index, &camera_info);
+	passenger = passenger_camera_info(controls->local_player_index, &camera_info);
 	command = &result->command;
 
 	command->position = camera_info.position;
@@ -234,7 +237,7 @@ void following_camera_update(
 			camera->crouched = crouched;
 		}
 
-		if (controls->active)
+		if (controls->active && !passenger) /* port: no free orbit outside the passenger's firing arc */
 		{
 			camera->facing_offset.yaw += controls->facing_delta.yaw;
 			camera->facing_offset.pitch += controls->facing_delta.pitch;
@@ -253,6 +256,9 @@ void following_camera_update(
 			facing.pitch + camera->facing_offset.pitch,
 			-_pi / 2.f,
 			_pi / 2.f);
+		/* port: keep the reference camera inside this passenger's weapon arc */
+		if (passenger)
+			passenger_camera_clamp_facing(controls->local_player_index, &facing);
 		vector3d_from_euler_angles2d(&command->forward, &facing);
 
 		match_vassert(

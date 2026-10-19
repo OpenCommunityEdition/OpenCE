@@ -214,7 +214,7 @@ review guidance. Those standards do not relax the isolation rules.
 | `port/assets/` | What the builds embed or ship: high-res HUD (`hud/`), fonts, titles, menus (`menus/`), icons, network brokers |
 | `port/third_party/` | Vendored libraries, each with a README naming its upstream, version and checksum |
 | `port/tools/` | Stand-alone tools (`cache_file_report.c`) |
-| `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py`, `web_build.py`, `ci_build.py`, `web_serve.py`), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `xdk_headers.py`) and tests |
+| `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py`, `web_build.py`, `ci_build.py`, `web_serve.py`), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `xdk_headers.py`), tests, and `stagekit/` (scenarios staged and instrumented on the real engine, no retail assets) |
 | `docs/` | Longer design notes (`custom_edition_caches.md`, `mods.md`) |
 | `pgo/` | Profile-guided optimisation profiles |
 | `assets/` | Game data for local runs (gitignored: `maps/`, `custom_maps/`) |
@@ -228,7 +228,7 @@ ninja linux                    # build/linux/halo
 ninja android                  # the Android guest image and native libraries
 ninja android_apk              # the APK (Gradle)
 ninja web                      # build/web/site (Emscripten: port/web/README.md)
-ninja windows                  # on Windows only
+ninja windows                  # on Windows, or on Linux after configure.py --windows-cross
 python tools/ci_build.py linux release   # what CI builds
 ```
 
@@ -272,8 +272,10 @@ setting (`game.custom_edition`), checked at run time with
 
 ```sh
 python -m pytest -q tools/harness tools/test_touch_menu.py   # the engine's functions in a fake world
+python -m pytest -q tools/stagekit/tests                    # scenarios on the real engine, no retail assets (Linux)
 python -m pytest -q tools/test_linux_port.py                # the build, the maps' checks (needs assets/maps)
 python -m pytest -q tools/test_mods.py                      # mods played over a map (needs assets/maps)
+python -m pytest -q tools/test_bots.py                      # the bots in local games (needs assets/maps)
 python -m pytest -q tools/test_cache_file_formats.py tools/test_bmp_files.py tools/test_profile.py
 python tools/test_touch_layout.py                           # the Android touch layout (JDK 17+)
 python tools/test_light_storage.py
@@ -281,10 +283,14 @@ python tools/test_death_timing.py
 python -m pytest -q tools/test_web_build.py                 # the web build's graph, sockets, menus
 node --test "port/web/tests/*.test.js"                      # the web page's importer and service worker
 node port/web/tests/webrtc_native.mjs chromium firefox      # the native builds' WebRTC with browsers (Playwright)
+python -m pytest -q tools/test_net_compare.py               # net_compare.py's judging of logs, its copies and their processes
+python tools/net_compare.py --a build/linux/halo --b <other build> --data <game data> --swap
+                                                            # two builds in one network game, in step (retail maps: local only)
 ```
 
 `tools/harness/README.md` explains how to add an asset-free test: the code
-under test is taken from the sources, not copied.
+under test is taken from the sources, not copied. `tools/stagekit/README.md`
+explains how to add a scenario: the real engine, with no retail assets.
 
 Running the game without a person at it:
 
@@ -379,10 +385,18 @@ otherwise.
 
 ### Third-party code and licences
 
-The repository is CC0. Vendored code goes in `port/third_party/<name>`,
-copied unchanged, with a README naming the upstream, the version or commit,
-the checksum and what uses it. GPL code (OpenSauce, Reclaimer) may be read
-as documentation of file formats, never copied.
+The repository is `AGPL-3.0-or-later` (`LICENSE`); the commits before the
+change, and the releases built from them, stay CC0 (`LICENSES/CC0-1.0.txt`).
+The README's "Licence" section says what each part is under. Vendored code
+goes in `port/third_party/<name>`, copied unchanged, with a README naming
+the upstream, the version or commit, the licence, the checksum and what uses
+it. Its licence must let it be combined with the AGPL 3.0: MIT, BSD (without
+an advertising clause), ISC, zlib, Apache 2.0, MPL 2.0, LGPL or GPL 3.0 or
+later, public domain. GPL-2.0-only code and the 4-clause BSD licence cannot
+be. Code taken from another project, GPL 3.0 code included, keeps its
+notices and its licence, and says where it came from.
+The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
+2026; bnunu/halo-1 is CC0.
 
 ### Commits and pull requests
 
@@ -421,5 +435,6 @@ as documentation of file formats, never copied.
 | [port/assets/menus/UNWIRED.md](port/assets/menus/UNWIRED.md) | Menu functions that do nothing yet |
 | [port/assets/fonts/README.md](port/assets/fonts/README.md) | The fonts and their licences |
 | [tools/harness/README.md](tools/harness/README.md) | Asset-free regression tests |
+| [tools/stagekit/README.md](tools/stagekit/README.md) | Scenarios staged and instrumented on the real engine, no retail assets |
 | `port/third_party/*/README.md` | Each vendored library |
 | [AUTHORS.md](AUTHORS.md) | Art credits |

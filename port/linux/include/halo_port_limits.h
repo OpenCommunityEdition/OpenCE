@@ -66,21 +66,7 @@ is newer (network_client_manager.c). A host advertises it, with its netcode,
 in its game's advertisement's reserved bytes (network_server_message_handler.c),
 which hosts built before there was a version send as zeros: version 0.
 Raise it with any change to what the machines send each other. */
-/* MCC packets and upstream CE map sharing have distinct message IDs. */
-/* Versions 31-32 are reserved for the separately published camera branch. */
-/* Combine upstream version 28 simulation/admission rules with MCC version 34. */
-/* MCC package/root selection and dependency-based resource checksums must agree. */
-/* Version 37 belongs to the optional camera branch. MCC weapon-authored
- * cameras change deterministic aiming; all peers must implement that choice. */
-/* Version 39 admits MCC biped parents in host-authoritative seat state. */
-/* Version 40: MCC campaign snapshots carry host-approved movement/ammo flags.
- * MCC possession preserves the former body until host death replication. */
-/* Version 41: MCC hosts send reliable clock multipliers, including while paused. */
-/* Version 44 combines MCC content identity with upstream CE map-name/version rules.
- * Version 43 belongs to the optional camera branch. */
-/* OpenCE 38ccb5f9 (version 29) is authoritative for ordinary sessions.
- * MCC protocol 51 is negotiated separately (mcc_protocol.h). */
-#define HALO_PORT_NETWORK_VERSION 29
+#define HALO_PORT_NETWORK_VERSION 32
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags */
 #define HALO_PORT_ADVERTISED_VERSION_OFFSET 0

@@ -175,8 +175,11 @@ void hs_print(
 	/* port: printed through "%s". January passes the text as the format
 	(0x4b8970 +0x0c pushes it as terminal_printf's format), so a '%' in it,
 	from a scenario script or typed at the console, read arguments that
-	were never passed */
-	terminal_printf(global_real_argb_green, "%s", message);
+	were never passed. A scenario script's print is the game's chatter,
+	which the Xbox never showed: on screen as config.toml's game.console_log
+	says; print typed at the console, always. */
+	if (terminal_shows(terminal_command_running ? _terminal_message_serious : _terminal_message_chatter))
+		terminal_printf(global_real_argb_green, "%s", message);
 
 	return;
 }

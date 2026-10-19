@@ -39,8 +39,8 @@ static void set_error(char *error, int error_size, const char *what)
 		snprintf(error, (size_t)error_size, "%s (error %lu)", what, (unsigned long)code);
 }
 
-int update_download(const char *url, const char *path, update_progress_proc progress, void *context, char *error,
-	int error_size)
+int update_download(const char *url, const char *path, unsigned long long maximum, update_progress_proc progress,
+	void *context, char *error, int error_size)
 {
 	wchar_t wide_url[2048], wide_path[MAX_PATH * 2], host[256], url_path[2048];
 	URL_COMPONENTS components;
@@ -107,6 +107,11 @@ int update_download(const char *url, const char *path, update_progress_proc prog
 	{
 		length = 0;
 	}
+	if (length > maximum)
+	{
+		snprintf(error, (size_t)error_size, "the download is larger than expected");
+		goto done;
+	}
 	file = CreateFileW(wide_path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (file == INVALID_HANDLE_VALUE)
 	{
@@ -125,6 +130,12 @@ int update_download(const char *url, const char *path, update_progress_proc prog
 		}
 		if (!count)
 			break;
+		/* (no more than the caller expects: a body that goes on is refused) */
+		if (count > maximum - received)
+		{
+			snprintf(error, (size_t)error_size, "the download is larger than expected");
+			goto done;
+		}
 		if (!WriteFile(file, buffer, count, &written, NULL) || written != count)
 		{
 			set_error(error, error_size, "could not write the download");

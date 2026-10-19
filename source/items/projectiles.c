@@ -141,6 +141,9 @@ symbols in this file:
 #include "sound/sound_definitions.h"
 #include "units/bipeds.h"
 #include "units/units.h"
+/* port: port/linux/game/overshield_effect.c */
+boolean overshield_effect_active(long object_index);
+boolean overshield_effect_hit_effect_allowed(long effect_index);
 
 /* ---------- constants */
 
@@ -1611,6 +1614,23 @@ static void projectile_collision(
 	{
 		response = material_response->default_response;
 		effect_definition_index = material_response->default_effect.index;
+	}
+
+	/* port: a hit on an overshield plays what the projectile plays on an
+	Elite's shield, when the map has it and it only shows and sounds; how
+	the projectile responds stays the hit's own
+	(port/linux/game/overshield_effect.c) */
+	if (collision->type == _collision_result_object &&
+		VALID_INDEX(_material_elite_energy_shield, definition->projectile.material_responses.count) &&
+		overshield_effect_active(collision->object_index))
+	{
+		struct projectile_material_response_definition const *elite_response = TAG_BLOCK_GET_ELEMENT(
+			&definition->projectile.material_responses,
+			_material_elite_energy_shield,
+			struct projectile_material_response_definition);
+
+		if (overshield_effect_hit_effect_allowed(elite_response->default_effect.index))
+			effect_definition_index = elite_response->default_effect.index;
 	}
 
 	if (collision->type == _collision_result_structure &&

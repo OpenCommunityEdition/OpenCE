@@ -8,6 +8,8 @@ OBJECTS.C
 #include "objects.h"
 #include "mcc_object_names.h" /* port: port/linux/game/mcc_object_names.c */
 #include "mcc_objects.h" /* port: port/linux/game/mcc_objects.c */
+#include "coop_pickups.h" /* port: the host's extra campaign pickups */
+#include "coop_vehicles.h" /* port: the host's extra campaign vehicles */
 
 #include "damage.h"
 #include "light_definitions.h"
@@ -20,6 +22,7 @@ OBJECTS.C
 #include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "devices/device_definitions.h"
+#include "devices/device_machines.h" /* port: elevator movement and rider carry */
 #include "devices/devices.h"
 #include "editor/editor_stubs.h"
 #include "effects/contrail_definitions.h"
@@ -148,6 +151,7 @@ on the host's word */
 long network_objects_new_object_index(void);
 boolean network_objects_creating_host_object(void);
 boolean network_objects_may_delete(long object_index);
+boolean network_objects_client_deleting(void);
 /* port/linux/game/network_coop.c's: the scripts' attaching, on co-op's clients */
 void network_coop_note_attach(long parent_index, char const *parent_marker_name, long child_index,
 	char const *child_marker_name);
@@ -1802,7 +1806,11 @@ static void object_delete_initial_recursive(
 	struct object_header_datum *header = object_header_get(object_index);
 	struct object_datum *object = object_get(object_index);
 
-	if (game_engine_running() && object->object.type == _object_type_weapon)
+	/* (port: but on a client of the distributed netcode, which deletes the
+	host's objects on the host's word, a flag or ball among them: the game
+	deletes none, but a host may, and the client lets go of it first,
+	network_objects.c's distributed_client_delete) */
+	if (game_engine_running() && object->object.type == _object_type_weapon && !network_objects_client_deleting())
 	{
 		match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 829, !(weapon_is_flag(object_index)));
 	}
@@ -3833,6 +3841,9 @@ boolean object_force_inside_bsp(
 static boolean object_update(
 	long object_index)
 {
+	/* port: the floor transform before this tick's device motion. */
+	real_point3d elevator_position;
+	boolean elevator;
 	struct object_header_datum *header = object_header_get(object_index);
 	struct object_datum *object = object_get(object_index);
 	struct object_definition *object_definition = object_definition_get(object->definition_index);
@@ -3855,6 +3866,10 @@ static boolean object_update(
 			}
 		}
 
+		/* port: preserve the floor before device_update advances its phase. */
+		elevator = object->object.type == _object_type_machine &&
+			machine_get_elevator_position(object_index, &elevator_position);
+
 		object_type_update(object_index);
 		if (object_definition->object.collision_model.index!=NONE)
 		{
@@ -3866,6 +3881,9 @@ static boolean object_update(
 		if (!TEST_FLAG(object->object.flags, _object_do_not_recompute_node_matrices_bit))
 		{
 			object_compute_node_matrices(object_index);
+			/* port: carry by this tick's movement, after its collision nodes. */
+			if (elevator)
+				machine_move_elevator_riders(object_index, &elevator_position);
 		}
 
 		object_compute_function_values(object_index);
@@ -3962,6 +3980,9 @@ long object_new_from_scenario(
 				if (result!=NONE)
 				{
 					object_type_place(result, scenario_object);
+					/* port: only authored placements receive extra pickups and vehicles. */
+					coop_pickups_register(result, scenario_object, palette);
+					coop_vehicles_register(result, scenario_object);
 					if (scenario_object->name_index!=NONE)
 					{
 						object_name_list_new(result, scenario_object->name_index);

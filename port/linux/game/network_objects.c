@@ -590,6 +590,15 @@ boolean network_objects_may_delete(
 		objects_client_has[absolute_index] != object_index;
 }
 
+/* whether a client is in distributed_client_delete: deleting an object on
+the host's word, or one of its own the host never told it of; a flag or
+ball among them, which the game itself never deletes (objects.c, weapons.c) */
+boolean network_objects_client_deleting(
+	void)
+{
+	return objects_client_deleting;
+}
+
 /* the map's objects placed (game.c): a client's own come from the upper
 half from now on */
 void network_objects_placed(
@@ -2116,6 +2125,12 @@ static void distributed_client_delete(
 		return;
 	if (TEST_FLAG(_object_mask_item, object->object.type))
 		distributed_client_release_item(object_index, TRUE);
+	/* (a flag or ball, which the game never deletes but a host has, for a
+	reason not known: the client follows its word all the same. Out of its
+	carrier's hands above, as any weapon; and the goal its game type shows
+	at it goes too) */
+	if (object->object.type == _object_type_weapon && game_engine_running() && weapon_is_flag(object_index))
+		game_engine_objective_weapon_deleted(object_index);
 	if (TEST_FLAG(_object_mask_unit, object->object.type))
 	{
 		struct unit_datum *unit = unit_get(object_index);
@@ -2490,6 +2505,9 @@ static boolean distributed_client_correct_own_vehicle(
 	{
 		return FALSE;
 	}
+	/* (driving: the round trip as the host has its vehicle, the latency
+	meter's) */
+	distributed_note_own_round_trip(time);
 	{
 		struct distributed_own_vehicle const *own =
 			&objects_client_own_vehicles[local_player_index][time & (OWN_VEHICLE_POSITION_TICKS - 1)];
@@ -2942,6 +2960,27 @@ static void distributed_client_apply_inventory(
 				distributed_client_own_settled(own->grenade_times[grenade_type]))
 			{
 				unit->unit.grenade_counts[grenade_type] = count;
+			}
+		}
+		/* an AI unit's grenade type: the host's actor chose it as it gave the
+		unit its grenades (unit_add_grenade_type_to_inventory), and a client
+		has no actors. Without one, the throws the host's control starts
+		never begin here (unit_throw_grenade_begin), and the grenades, whose
+		blasts the host's damage brings, are never seen. The type it carries
+		is it; not changed in the middle of a throw */
+		if (!own && unit->unit.player_index == NONE &&
+			unit->unit.grenade_throw_state == _unit_grenade_throw_idle &&
+			(unit->unit.current_grenade_index == NONE ||
+				unit->unit.grenade_counts[unit->unit.current_grenade_index] == 0))
+		{
+			for (grenade_type = 0; grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES; grenade_type++)
+			{
+				if (unit->unit.grenade_counts[grenade_type] > 0)
+				{
+					unit->unit.current_grenade_index = grenade_type;
+					unit->unit.desired_grenade_index = grenade_type;
+					break;
+				}
 			}
 		}
 	}

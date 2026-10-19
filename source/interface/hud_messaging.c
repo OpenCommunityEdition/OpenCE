@@ -114,7 +114,8 @@ symbols in this file:
 
 /* ---------- headers */
 
-#include "mcc_hud_draw.h"
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
+#include "mcc_cache.h" /* port: preserve MCC-authored gameplay icons */
 #include "cseries/cseries.h"
 
 #include "cseries/errors.h"
@@ -538,6 +539,13 @@ static void render_state_bitmap(
 	real scale;
 	point2d point;
 
+	/* port: keep gameplay prompts on the high-resolution HUD path, which
+	draws a button by its place among the HUD globals' button icons: before
+	the map's own picture of it is looked for, which a Custom Edition map's
+	message icons (13 sequences to the Xbox's 24) may not have, so that the
+	button was not drawn */
+	if (!mcc_cache_tags_loaded() && hud_hires_button_draw(icon, cursor_bounds, color))
+		return;
 	if (icon->frame_rate)
 		frame_index = game_time_get() / icon->frame_rate;
 	hud_retrieve_bitmap_and_bounding_rect(
@@ -551,8 +559,8 @@ static void render_state_bitmap(
 	{
 		if (mcc_hud_icon_draw(bitmap_group_index, bitmap, clip, cursor_bounds, color, icon, FALSE))
 			return;
-		/* port: keep gameplay prompts on the high-resolution HUD path. */
-		if (hud_hires_button_draw(icon, cursor_bounds, color))
+		/* port: retain MCC icon ownership before the high-resolution fallback. */
+		if (mcc_cache_tags_loaded() && hud_hires_button_draw(icon, cursor_bounds, color))
 			return;
 		bitmap = hud_hires_sprite_bitmap(bitmap, icon->sequence_index);
 		scale = local_player_count() > 1 ? 0.75f : 1.0f;

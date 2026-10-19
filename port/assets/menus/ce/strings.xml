@@ -1,505 +1,505 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- The PC version's menus' text (tools/ce_menus.py) -->
 <menus>
-	<strings name="multiplayer_game_text">
-		<string text="Searching for available games..."/>
-		<string text=" "/>
-		<string text="Single Player"/>
-		<string text="Capture the Flag"/>
-		<string text="Slayer"/>
-		<string text="Oddball"/>
-		<string text="King of the Hill"/>
-		<string text="Race"/>
-		<string text="Unknown"/>
-		<string text="Game:"/>
-		<string text="Map:"/>
-		<string text="# of Players:"/>
-		<string text="Team Game"/>
-		<string text="Free for All"/>
-		<string text="Score Limit:"/>
-		<string text="Time Limit, minutes:"/>
-		<string text="Auto Start"/>
-		<string text="Red Team"/>
-		<string text="Blue Team"/>
-		<string text="(closed)"/>
-		<string text="Accepting Players"/>
-		<string text="Game In Progress"/>
-		<string text="Captures"/>
-		<string text="Minutes"/>
-		<string text="Frags"/>
-		<string text="Laps"/>
-		<string text="Choose teams using D-pad"/>
-		<string text="You must form 2 teams"/>
-		<string text="Single flag Assault"/>
-		<string text="Assault"/>
-		<string text="Single flag CTF"/>
-		<string text="Reverse Tag"/>
-		<string text="Juggernaut"/>
-		<string text="Rally"/>
-		<string text="Waiting for another Xbox console"/>
-		<string text="Waiting for another player"/>
-		<string text="1st"/>
-		<string text="2nd"/>
-		<string text="3rd"/>
-		<string text="4th"/>
-		<string text="5th"/>
-		<string text="6th"/>
-		<string text="7th"/>
-		<string text="8th"/>
-		<string text="9th"/>
-		<string text="10th"/>
-		<string text="11th"/>
-		<string text="12th"/>
-		<string text="13th"/>
-		<string text="14th"/>
-		<string text="15th"/>
-		<string text="16th"/>
-		<string text="(no lives)"/>
-		<string text="(1 life)"/>
-		<string text="(%d lives)"/>
-		<string text="Game ends in a draw"/>
-		<string text="Your team lost"/>
-		<string text="You lost"/>
-		<string text="Your team won"/>
-		<string text="You won"/>
-		<string text="Red leads Blue %s to %s %s"/>
-		<string text="Blue leads Red %s to %s %s"/>
-		<string text="Teams tied at %s %s"/>
-		<string text="Tied for %s place with %s %s"/>
-		<string text="In %s place with %s %s"/>
-		<string text="&#9;Red Team&#9;%s"/>
-		<string text="&#9;Blue Team&#9;%s"/>
-		<string text="Place"/>
-		<string text="Name"/>
-		<string text="Kills"/>
-		<string text="Assists"/>
-		<string text="Deaths"/>
-		<string text="&#9;ESCAPE = Quit    ENTER = Continue"/>
-		<string text="&#9;ESCAPE = Quit"/>
-		<string text="Welcome %s"/>
-		<string text="%s died"/>
-		<string text="%s was killed by the guardians"/>
-		<string text="%s was killed by a vehicle"/>
-		<string text="%s was killed by %s"/>
-		<string text="%s was betrayed by %s"/>
-		<string text="%s quit"/>
-		<string text="%s committed suicide"/>
-		<string text="You betrayed %s"/>
-		<string text="Killtacular!"/>
-		<string text="Triple Kill!"/>
-		<string text="Double Kill!"/>
-		<string text="Running Riot!"/>
-		<string text="You are on a killing spree!"/>
-		<string text="You killed %s"/>
-		<string text="Killtacular! (%d)"/>
-		<string text="Triple Kill! (%d)"/>
-		<string text="Double Kill! (%d)"/>
-		<string text="Running Riot! (%d)"/>
-		<string text="You are on a killing spree! (%d)"/>
-		<string text="You killed %s (%d)"/>
-		<string text="You are the odd man out"/>
-		<string text="You are out of lives"/>
-		<string text="Rejoin in %d"/>
-		<string text="Waiting for space to clear"/>
-		<string text="You quit out of the game"/>
-		<string text='Hold "%s" for score'/>
-		<string text="Teleporter is blocked"/>
-		<string text="first place"/>
-		<string text="second place"/>
-		<string text="third place"/>
-		<string text="fourth place"/>
-		<string text="fifth place"/>
-		<string text="sixth place"/>
-		<string text="seventh place"/>
-		<string text="eighth place"/>
-		<string text="9th place"/>
-		<string text="10th place"/>
-		<string text="11th place"/>
-		<string text="12th place"/>
-		<string text="13th place"/>
-		<string text="14th place"/>
-		<string text="15th place"/>
-		<string text="16th place"/>
-		<string text="tied for first place"/>
-		<string text="tied for second place"/>
-		<string text="tied for third place"/>
-		<string text="tied for fourth place"/>
-		<string text="tied for fifth place"/>
-		<string text="tied for sixth place"/>
-		<string text="tied for seventh place"/>
-		<string text="tied for eighth place"/>
-		<string text="tied for 9th place"/>
-		<string text="tied for 10th place"/>
-		<string text="tied for 11th place"/>
-		<string text="tied for 12th place"/>
-		<string text="tied for 13th place"/>
-		<string text="tied for 14th place"/>
-		<string text="tied for 15th place"/>
-		<string text="tied for 16th place"/>
-		<string text="even"/>
-		<string text="winning"/>
-		<string text="losing"/>
-		<string text="tied"/>
-		<string text="Dead"/>
-		<string text="Quit"/>
-		<string text="Red Team %d Blue Team %d"/>
-		<string text="You scored %d to %d."/>
-		<string text="Enemy scored %d to %d."/>
-		<string text="Your ally scored %d to %d."/>
-		<string text="You returned the flag."/>
-		<string text="The enemy has your flag."/>
-		<string text="The enemy returned the flag."/>
-		<string text="Your ally has the flag."/>
-		<string text="Your ally returned the flag."/>
-		<string text="Your flag was returned."/>
-		<string text="The enemy's flag was returned."/>
-		<string text="Time expired."/>
-		<string text="You are on offense."/>
-		<string text="You are on defense."/>
-		<string text="Score"/>
-		<string text="%s (%d seconds)"/>
-		<string text="Ally %s in on the hill (%d seconds)"/>
-		<string text="Enemy %s in on the hill (%d seconds)"/>
-		<string text="Time"/>
-		<string text="You are it!"/>
-		<string text="Ally is it!"/>
-		<string text="%s is it."/>
-		<string text="You have the ball."/>
-		<string text="An ally has the ball."/>
-		<string text="%s has the ball."/>
-		<string text="Ally %s has the ball (%d seconds)"/>
-		<string text="Enemy %s has the ball (%d seconds)"/>
-		<string text="You scored a flag!"/>
-		<string text="Ally %s scored a flag!"/>
-		<string text="Enemy %s scored a flag!"/>
-		<string text="You completed lap %d in %.2f seconds."/>
-		<string text="Ally %s completed a lap %d."/>
-		<string text="Enemy %s completed a lap."/>
-		<string text="new best lap time %.2f."/>
-		<string text="%s 1 flag"/>
-		<string text="%s %d flags"/>
-		<string text="%s all laps complete"/>
-		<string text="%s lap %d of %d"/>
-		<string text="Flags"/>
-		<string text="%d team %d"/>
-		<string text="New Target %s"/>
-		<string text="%s kills %d team %d of %d"/>
-		<string text="%s kills %d of %d"/>
-		<string text="You were telefragged"/>
-		<string text="All - "/>
-		<string text="Team - "/>
-		<string text="Vehicle - "/>
-		<string text="%s: "/>
-		<string text="[%s]: "/>
-		<string text=" Remaining"/>
-		<string text="Server IP Address - "/>
+	<strings name="multiplayer_game_text" map="ui\multiplayer_game_text">
+		<string text="Searching for available games..." map="0"/>
+		<string text=" " map="1"/>
+		<string text="Single Player" map="2"/>
+		<string text="Capture the Flag" map="3"/>
+		<string text="Slayer" map="4"/>
+		<string text="Oddball" map="5"/>
+		<string text="King of the Hill" map="6"/>
+		<string text="Race" map="7"/>
+		<string text="Unknown" map="8"/>
+		<string text="Game:" map="9"/>
+		<string text="Map:" map="10"/>
+		<string text="# of Players:" map="11"/>
+		<string text="Team Game" map="12"/>
+		<string text="Free for All" map="13"/>
+		<string text="Score Limit:" map="14"/>
+		<string text="Time Limit, minutes:" map="15"/>
+		<string text="Auto Start" map="16"/>
+		<string text="Red Team" map="17"/>
+		<string text="Blue Team" map="18"/>
+		<string text="(closed)" map="19"/>
+		<string text="Accepting Players" map="20"/>
+		<string text="Game In Progress" map="21"/>
+		<string text="Captures" map="22"/>
+		<string text="Minutes" map="23"/>
+		<string text="Frags" map="24"/>
+		<string text="Laps" map="25"/>
+		<string text="Choose teams using D-pad" map="26"/>
+		<string text="You must form 2 teams" map="27"/>
+		<string text="Single flag Assault" map="28"/>
+		<string text="Assault" map="29"/>
+		<string text="Single flag CTF" map="30"/>
+		<string text="Reverse Tag" map="31"/>
+		<string text="Juggernaut" map="32"/>
+		<string text="Rally" map="33"/>
+		<string text="Waiting for another Xbox console" map="34"/>
+		<string text="Waiting for another player" map="35"/>
+		<string text="1st" map="36"/>
+		<string text="2nd" map="37"/>
+		<string text="3rd" map="38"/>
+		<string text="4th" map="39"/>
+		<string text="5th" map="40"/>
+		<string text="6th" map="41"/>
+		<string text="7th" map="42"/>
+		<string text="8th" map="43"/>
+		<string text="9th" map="44"/>
+		<string text="10th" map="45"/>
+		<string text="11th" map="46"/>
+		<string text="12th" map="47"/>
+		<string text="13th" map="48"/>
+		<string text="14th" map="49"/>
+		<string text="15th" map="50"/>
+		<string text="16th" map="51"/>
+		<string text="(no lives)" map="52"/>
+		<string text="(1 life)" map="53"/>
+		<string text="(%d lives)" map="54"/>
+		<string text="Game ends in a draw" map="55"/>
+		<string text="Your team lost" map="56"/>
+		<string text="You lost" map="57"/>
+		<string text="Your team won" map="58"/>
+		<string text="You won" map="59"/>
+		<string text="Red leads Blue %s to %s %s" map="60"/>
+		<string text="Blue leads Red %s to %s %s" map="61"/>
+		<string text="Teams tied at %s %s" map="62"/>
+		<string text="Tied for %s place with %s %s" map="63"/>
+		<string text="In %s place with %s %s" map="64"/>
+		<string text="&#9;Red Team&#9;%s" map="65"/>
+		<string text="&#9;Blue Team&#9;%s" map="66"/>
+		<string text="Place" map="67"/>
+		<string text="Name" map="68"/>
+		<string text="Kills" map="69"/>
+		<string text="Assists" map="70"/>
+		<string text="Deaths" map="71"/>
+		<string text="&#9;ESCAPE = Quit    ENTER = Continue" map="72"/>
+		<string text="&#9;ESCAPE = Quit" map="73"/>
+		<string text="Welcome %s" map="74"/>
+		<string text="%s died" map="75"/>
+		<string text="%s was killed by the guardians" map="76"/>
+		<string text="%s was killed by a vehicle" map="77"/>
+		<string text="%s was killed by %s" map="78"/>
+		<string text="%s was betrayed by %s" map="79"/>
+		<string text="%s quit" map="80"/>
+		<string text="%s committed suicide" map="81"/>
+		<string text="You betrayed %s" map="82"/>
+		<string text="Killtacular!" map="83"/>
+		<string text="Triple Kill!" map="84"/>
+		<string text="Double Kill!" map="85"/>
+		<string text="Running Riot!" map="86"/>
+		<string text="You are on a killing spree!" map="87"/>
+		<string text="You killed %s" map="88"/>
+		<string text="Killtacular! (%d)" map="89"/>
+		<string text="Triple Kill! (%d)" map="90"/>
+		<string text="Double Kill! (%d)" map="91"/>
+		<string text="Running Riot! (%d)" map="92"/>
+		<string text="You are on a killing spree! (%d)" map="93"/>
+		<string text="You killed %s (%d)" map="94"/>
+		<string text="You are the odd man out" map="95"/>
+		<string text="You are out of lives" map="96"/>
+		<string text="Rejoin in %d" map="97"/>
+		<string text="Waiting for space to clear" map="98"/>
+		<string text="You quit out of the game" map="99"/>
+		<string text='Hold "%s" for score' map="100"/>
+		<string text="Teleporter is blocked" map="101"/>
+		<string text="first place" map="102"/>
+		<string text="second place" map="103"/>
+		<string text="third place" map="104"/>
+		<string text="fourth place" map="105"/>
+		<string text="fifth place" map="106"/>
+		<string text="sixth place" map="107"/>
+		<string text="seventh place" map="108"/>
+		<string text="eighth place" map="109"/>
+		<string text="9th place" map="110"/>
+		<string text="10th place" map="111"/>
+		<string text="11th place" map="112"/>
+		<string text="12th place" map="113"/>
+		<string text="13th place" map="114"/>
+		<string text="14th place" map="115"/>
+		<string text="15th place" map="116"/>
+		<string text="16th place" map="117"/>
+		<string text="tied for first place" map="118"/>
+		<string text="tied for second place" map="119"/>
+		<string text="tied for third place" map="120"/>
+		<string text="tied for fourth place" map="121"/>
+		<string text="tied for fifth place" map="122"/>
+		<string text="tied for sixth place" map="123"/>
+		<string text="tied for seventh place" map="124"/>
+		<string text="tied for eighth place" map="125"/>
+		<string text="tied for 9th place" map="126"/>
+		<string text="tied for 10th place" map="127"/>
+		<string text="tied for 11th place" map="128"/>
+		<string text="tied for 12th place" map="129"/>
+		<string text="tied for 13th place" map="130"/>
+		<string text="tied for 14th place" map="131"/>
+		<string text="tied for 15th place" map="132"/>
+		<string text="tied for 16th place" map="133"/>
+		<string text="even" map="134"/>
+		<string text="winning" map="135"/>
+		<string text="losing" map="136"/>
+		<string text="tied" map="137"/>
+		<string text="Dead" map="138"/>
+		<string text="Quit" map="139"/>
+		<string text="Red Team %d Blue Team %d" map="140"/>
+		<string text="You scored %d to %d." map="141"/>
+		<string text="Enemy scored %d to %d." map="142"/>
+		<string text="Your ally scored %d to %d." map="143"/>
+		<string text="You returned the flag." map="144"/>
+		<string text="The enemy has your flag." map="145"/>
+		<string text="The enemy returned the flag." map="146"/>
+		<string text="Your ally has the flag." map="147"/>
+		<string text="Your ally returned the flag." map="148"/>
+		<string text="Your flag was returned." map="149"/>
+		<string text="The enemy's flag was returned." map="150"/>
+		<string text="Time expired." map="151"/>
+		<string text="You are on offense." map="152"/>
+		<string text="You are on defense." map="153"/>
+		<string text="Score" map="154"/>
+		<string text="%s (%d seconds)" map="155"/>
+		<string text="Ally %s in on the hill (%d seconds)" map="156"/>
+		<string text="Enemy %s in on the hill (%d seconds)" map="157"/>
+		<string text="Time" map="158"/>
+		<string text="You are it!" map="159"/>
+		<string text="Ally is it!" map="160"/>
+		<string text="%s is it." map="161"/>
+		<string text="You have the ball." map="162"/>
+		<string text="An ally has the ball." map="163"/>
+		<string text="%s has the ball." map="164"/>
+		<string text="Ally %s has the ball (%d seconds)" map="165"/>
+		<string text="Enemy %s has the ball (%d seconds)" map="166"/>
+		<string text="You scored a flag!" map="167"/>
+		<string text="Ally %s scored a flag!" map="168"/>
+		<string text="Enemy %s scored a flag!" map="169"/>
+		<string text="You completed lap %d in %.2f seconds." map="170"/>
+		<string text="Ally %s completed a lap %d." map="171"/>
+		<string text="Enemy %s completed a lap." map="172"/>
+		<string text="new best lap time %.2f." map="173"/>
+		<string text="%s 1 flag" map="174"/>
+		<string text="%s %d flags" map="175"/>
+		<string text="%s all laps complete" map="176"/>
+		<string text="%s lap %d of %d" map="177"/>
+		<string text="Flags" map="178"/>
+		<string text="%d team %d" map="179"/>
+		<string text="New Target %s" map="180"/>
+		<string text="%s kills %d team %d of %d" map="181"/>
+		<string text="%s kills %d of %d" map="182"/>
+		<string text="You were telefragged" map="183"/>
+		<string text="All - " map="184"/>
+		<string text="Team - " map="185"/>
+		<string text="Vehicle - " map="186"/>
+		<string text="%s: " map="187"/>
+		<string text="[%s]: " map="188"/>
+		<string text=" Remaining" map="189"/>
+		<string text="Server IP Address - " map="190"/>
 	</strings>
-	<strings name="error/error_headers">
-		<string text="ATTENTION"/>
-		<string text="ATTENTION"/>
-		<string text="ARE YOU SURE?"/>
-		<string text="SAVING..."/>
-		<string text="ATTENTION:"/>
-		<string text="DID YOU KNOW..."/>
-		<string text="OOPS!"/>
-		<string text="ALERT!"/>
+	<strings name="error/error_headers" map="ui\shell\error\error_headers">
+		<string text="ATTENTION" map="0"/>
+		<string text="ATTENTION" map="1"/>
+		<string text="ARE YOU SURE?" map="2"/>
+		<string text="SAVING..." map="3"/>
+		<string text="ATTENTION:" map="4"/>
+		<string text="DID YOU KNOW..." map="5"/>
+		<string text="OOPS!" map="6"/>
+		<string text="ALERT!" map="7"/>
 	</strings>
-	<strings name="main_menu/difficulty_select/difficulty_descriptions">
-		<string text="Your foes cower and fall before\nyour unstoppable onslaught, yet\nfinal victory will leave you\nwanting more."/>
-		<string text="Hordes of aliens vie to destroy \nyou, but nerves of steel and a\nquick trigger finger give you a\nsolid chance to prevail."/>
-		<string text="Your enemies are as numerous \nas they are ferocious; their \nattacks are devastating. \nSurvival is not guaranteed."/>
-		<string text="You face opponents who have \nnever known defeat, who laugh\nin alien tongues at your efforts \nto survive. This is suicide."/>
+	<strings name="main_menu/difficulty_select/difficulty_descriptions" map="ui\shell\main_menu\difficulty_select\difficulty_descriptions">
+		<string text="Your foes cower and fall before\nyour unstoppable onslaught, yet\nfinal victory will leave you\nwanting more." map="0"/>
+		<string text="Hordes of aliens vie to destroy \nyou, but nerves of steel and a\nquick trigger finger give you a\nsolid chance to prevail." map="1"/>
+		<string text="Your enemies are as numerous \nas they are ferocious; their \nattacks are devastating. \nSurvival is not guaranteed." map="2"/>
+		<string text="You face opponents who have \nnever known defeat, who laugh\nin alien tongues at your efforts \nto survive. This is suicide." map="3"/>
 	</strings>
-	<strings name="main_menu/difficulty_select/difficulty_options">
-		<string text="EASY"/>
-		<string text="NORMAL"/>
-		<string text="HEROIC"/>
-		<string text="LEGENDARY"/>
+	<strings name="main_menu/difficulty_select/difficulty_options" map="ui\shell\main_menu\difficulty_select\difficulty_options">
+		<string text="EASY" map="0"/>
+		<string text="NORMAL" map="1"/>
+		<string text="HEROIC" map="2"/>
+		<string text="LEGENDARY" map="3"/>
 	</strings>
-	<strings name="main_menu/difficulty_select/warning_message">
-		<string text="WARNING! If you select\nthis difficulty setting\nyou will lose your\nsaved progress on\nthis level."/>
+	<strings name="main_menu/difficulty_select/warning_message" map="ui\shell\main_menu\difficulty_select\warning_message">
+		<string text="WARNING! If you select\nthis difficulty setting\nyou will lose your\nsaved progress on\nthis level." map="0"/>
 	</strings>
-	<strings name="main_menu/gametype_select/var_gametype_banks">
-		<string text="STANDARD"/>
-		<string text="CUSTOM"/>
+	<strings name="main_menu/gametype_select/var_gametype_banks" map="ui\shell\main_menu\gametype_select\var_gametype_banks">
+		<string text="STANDARD" map="0"/>
+		<string text="CUSTOM" map="2"/>
 	</strings>
-	<strings name="main_menu/main_menu_options">
-		<string text="NEW CAMPAIGN"/>
-		<string text="LOAD CAMPAIGN"/>
-		<string text="MULTIPLAYER"/>
-		<string text="SETTINGS"/>
-		<string text="GAME DEMOS"/>
+	<strings name="main_menu/main_menu_options" map="ui\shell\main_menu\main_menu_options">
+		<string text="NEW CAMPAIGN" map="0"/>
+		<string text="LOAD CAMPAIGN" map="1"/>
+		<string text="MULTIPLAYER" map="2"/>
+		<string text="SETTINGS" map="3"/>
+		<string text="GAME DEMOS" map="4"/>
 	</strings>
-	<strings name="main_menu/map_list">
-		<string text="The Pillar of \nAutumn"/>
-		<string text="Halo"/>
-		<string text="The Truth and \nReconciliation"/>
-		<string text="The Silent \nCartographer"/>
-		<string text="Assault on the\nControl Room"/>
-		<string text="343 Guilty \nSpark"/>
-		<string text="The Library"/>
-		<string text="Two Betrayals"/>
-		<string text="Keyes"/>
-		<string text="The Maw"/>
-		<string text="This Level\nUnavailable"/>
+	<strings name="main_menu/map_list" map="ui\shell\main_menu\map_list">
+		<string text="The Pillar of \nAutumn" map="0"/>
+		<string text="Halo" map="1"/>
+		<string text="The Truth and \nReconciliation" map="2"/>
+		<string text="The Silent \nCartographer" map="3"/>
+		<string text="Assault on the\nControl Room" map="4"/>
+		<string text="343 Guilty \nSpark" map="5"/>
+		<string text="The Library" map="6"/>
+		<string text="Two Betrayals" map="7"/>
+		<string text="Keyes" map="8"/>
+		<string text="The Maw" map="9"/>
+		<string text="This Level\nUnavailable" map="10"/>
 	</strings>
-	<strings name="main_menu/mp_map_list">
-		<string text="Battle Creek"/>
-		<string text="Sidewinder"/>
-		<string text="Damnation"/>
-		<string text="Rat Race"/>
-		<string text="Prisoner"/>
-		<string text="Hang 'Em High"/>
-		<string text="Chill Out"/>
-		<string text="Derelict"/>
-		<string text="Boarding Action"/>
-		<string text="Blood Gulch"/>
-		<string text="Wizard"/>
-		<string text="Chiron TL34"/>
-		<string text="Longest"/>
-		<string text="Ice Fields"/>
-		<string text="Death Island"/>
-		<string text="Danger Canyon"/>
-		<string text="Infinity"/>
-		<string text="Timberland"/>
-		<string text="Gephyrophobia"/>
-		<string text="Unknown Level"/>
-		<string text=" "/>
+	<strings name="main_menu/mp_map_list" map="ui\shell\main_menu\mp_map_list">
+		<string text="Battle Creek" map="0"/>
+		<string text="Sidewinder" map="1"/>
+		<string text="Damnation" map="2"/>
+		<string text="Rat Race" map="3"/>
+		<string text="Prisoner" map="4"/>
+		<string text="Hang 'Em High" map="5"/>
+		<string text="Chill Out" map="6"/>
+		<string text="Derelict" map="7"/>
+		<string text="Boarding Action" map="8"/>
+		<string text="Blood Gulch" map="9"/>
+		<string text="Wizard" map="10"/>
+		<string text="Chiron TL34" map="11"/>
+		<string text="Longest" map="12"/>
+		<string text="Ice Fields" map="13"/>
+		<string text="Death Island" map="14"/>
+		<string text="Danger Canyon" map="15"/>
+		<string text="Infinity" map="16"/>
+		<string text="Timberland" map="17"/>
+		<string text="Gephyrophobia" map="18"/>
+		<string text="Unknown Level" map="19"/>
+		<string text=" " map="20"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/direct_ip/cap_direct_ip_options">
-		<string text="Enter the address of  the server you want to\nconnect to, and optionally a colon and port\nnumber. Example: 206.0.8.4:2304."/>
-		<string text="Enter a password for the server you want\nto connect to."/>
+	<strings name="main_menu/multiplayer_type_select/direct_ip/cap_direct_ip_options" map="ui\shell\main_menu\multiplayer_type_select\direct_ip\cap_direct_ip_options">
+		<string text="Enter the address of  the server you want to\nconnect to, and optionally a colon and port\nnumber. Example: 206.0.8.4:2304." map="0"/>
+		<string text="Enter a password for the server you want\nto connect to." map="1"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/direct_ip/direct_ip_options">
-		<string text="SERVER ADDRESS"/>
-		<string text="PASSWORD"/>
+	<strings name="main_menu/multiplayer_type_select/direct_ip/direct_ip_options" map="ui\shell\main_menu\multiplayer_type_select\direct_ip\direct_ip_options">
+		<string text="SERVER ADDRESS" map="0"/>
+		<string text="PASSWORD" map="1"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/join_game/filters/cap_filter_options">
-		<string text="Do not show empty servers."/>
-		<string text="Show empty servers."/>
-		<string text="Do not show full servers."/>
-		<string text="Show full servers."/>
-		<string text="Filter servers by connection latency (in ms).\nLatency is how fast data travels from the server."/>
-		<string text="Show only games matching the selected\ngame type."/>
-		<string text="Show servers running both free-for-all\nand teamplay modes."/>
-		<string text="Show only servers running free-for-all modes."/>
-		<string text="Show only servers running teamplay modes."/>
-		<string text="Show only servers with custom maps that are\ncurrently installed."/>
-		<string text="Show servers with custom maps that are not\ncurrently installed."/>
+	<strings name="main_menu/multiplayer_type_select/join_game/filters/cap_filter_options" map="ui\shell\main_menu\multiplayer_type_select\join_game\filters\cap_filter_options">
+		<string text="Do not show empty servers." map="0"/>
+		<string text="Show empty servers." map="1"/>
+		<string text="Do not show full servers." map="2"/>
+		<string text="Show full servers." map="3"/>
+		<string text="Filter servers by connection latency (in ms).\nLatency is how fast data travels from the server." map="4"/>
+		<string text="Show only games matching the selected\ngame type." map="5"/>
+		<string text="Show servers running both free-for-all\nand teamplay modes." map="6"/>
+		<string text="Show only servers running free-for-all modes." map="7"/>
+		<string text="Show only servers running teamplay modes." map="8"/>
+		<string text="Show only servers with custom maps that are\ncurrently installed." map="9"/>
+		<string text="Show servers with custom maps that are not\ncurrently installed." map="10"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/join_game/filters/filter_options">
-		<string text="SHOW EMPTY SERVERS"/>
-		<string text="SHOW FULL SERVERS"/>
-		<string text="PING"/>
-		<string text="GAME TYPE"/>
-		<string text="TEAMPLAY OPTIONS"/>
-		<string text="SHOW MISSING MAPS"/>
+	<strings name="main_menu/multiplayer_type_select/join_game/filters/filter_options" map="ui\shell\main_menu\multiplayer_type_select\join_game\filters\filter_options">
+		<string text="SHOW EMPTY SERVERS" map="0"/>
+		<string text="SHOW FULL SERVERS" map="1"/>
+		<string text="PING" map="2"/>
+		<string text="GAME TYPE" map="3"/>
+		<string text="TEAMPLAY OPTIONS" map="4"/>
+		<string text="SHOW MISSING MAPS" map="5"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/join_game/filters/var_filter_game_options">
-		<string text="ANY"/>
-		<string text="FREE-FOR-ALL"/>
-		<string text="TEAMPLAY"/>
+	<strings name="main_menu/multiplayer_type_select/join_game/filters/var_filter_game_options" map="ui\shell\main_menu\multiplayer_type_select\join_game\filters\var_filter_game_options">
+		<string text="ANY" map="0"/>
+		<string text="FREE-FOR-ALL" map="1"/>
+		<string text="TEAMPLAY" map="2"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/join_game/filters/var_filter_gametype">
-		<string text="ANY"/>
-		<string text="CTF"/>
-		<string text="SLAYER"/>
-		<string text="ODDBALL"/>
-		<string text="KING"/>
-		<string text="RACE"/>
+	<strings name="main_menu/multiplayer_type_select/join_game/filters/var_filter_gametype" map="ui\shell\main_menu\multiplayer_type_select\join_game\filters\var_filter_gametype">
+		<string text="ANY" map="0"/>
+		<string text="CTF" map="1"/>
+		<string text="SLAYER" map="2"/>
+		<string text="ODDBALL" map="3"/>
+		<string text="KING" map="4"/>
+		<string text="RACE" map="5"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/join_game/filters/var_filter_ping">
-		<string text="ANY"/>
-		<string text="&lt; 50"/>
-		<string text="&lt; 100"/>
-		<string text="&lt; 150"/>
-		<string text="&lt; 200"/>
-		<string text="&lt; 300"/>
+	<strings name="main_menu/multiplayer_type_select/join_game/filters/var_filter_ping" map="ui\shell\main_menu\multiplayer_type_select\join_game\filters\var_filter_ping">
+		<string text="ANY" map="0"/>
+		<string text="&lt; 50" map="1"/>
+		<string text="&lt; 100" map="2"/>
+		<string text="&lt; 150" map="3"/>
+		<string text="&lt; 200" map="4"/>
+		<string text="&lt; 300" map="5"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/join_game/join_game_buttons">
-		<string text="GET LIST"/>
-		<string text="REFRESH"/>
-		<string text="STOP"/>
-		<string text="FILTERS"/>
-		<string text="JOIN GAME"/>
+	<strings name="main_menu/multiplayer_type_select/join_game/join_game_buttons" map="ui\shell\main_menu\multiplayer_type_select\join_game\join_game_buttons">
+		<string text="GET LIST" map="0"/>
+		<string text="REFRESH" map="1"/>
+		<string text="STOP" map="2"/>
+		<string text="FILTERS" map="3"/>
+		<string text="JOIN GAME" map="4"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/join_game/join_game_column_headers">
-		<string text="Server Name"/>
-		<string text="Map"/>
-		<string text="Players"/>
-		<string text="Game"/>
-		<string text="Ping"/>
+	<strings name="main_menu/multiplayer_type_select/join_game/join_game_column_headers" map="ui\shell\main_menu\multiplayer_type_select\join_game\join_game_column_headers">
+		<string text="Server Name" map="0"/>
+		<string text="Map" map="1"/>
+		<string text="Players" map="2"/>
+		<string text="Game" map="3"/>
+		<string text="Ping" map="4"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/join_game/join_game_mode">
-		<string text="Internet"/>
-		<string text="LAN"/>
+	<strings name="main_menu/multiplayer_type_select/join_game/join_game_mode" map="ui\shell\main_menu\multiplayer_type_select\join_game\join_game_mode">
+		<string text="Internet" map="0"/>
+		<string text="LAN" map="1"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/join_game/join_game_ticker_labels">
-		<string text="Players"/>
-		<string text="Rules"/>
-		<string text="Message"/>
-		<string text="Getting Server Info..."/>
-		<string text="Getting Message of the Day..."/>
-		<string text="Welcome to Halo Multiplayer!"/>
-		<string text="SERVERS:"/>
-		<string text="PLAYERS:"/>
-		<string text="PAGE"/>
-		<string text="TODO: MOTD URL"/>
+	<strings name="main_menu/multiplayer_type_select/join_game/join_game_ticker_labels" map="ui\shell\main_menu\multiplayer_type_select\join_game\join_game_ticker_labels">
+		<string text="Players" map="0"/>
+		<string text="Rules" map="1"/>
+		<string text="Message" map="2"/>
+		<string text="Getting Server Info..." map="3"/>
+		<string text="Getting Message of the Day..." map="4"/>
+		<string text="Welcome to Halo Multiplayer!" map="5"/>
+		<string text="SERVERS:" map="6"/>
+		<string text="PLAYERS:" map="7"/>
+		<string text="PAGE" map="8"/>
+		<string text="TODO: MOTD URL" map="9"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/mp_map_select/map_data">
-		<string text="Splash Splash\nBang Bang\n\n2-8 players"/>
-		<string text="Red Blood\nWhite Snow\n\n4-16 players\n\nSupports vehicles"/>
-		<string text="Covenant Hydro-\nProcessing Center\n\n4-8 players"/>
-		<string text="Up the Ramps\nDown the Tubes\n\n2-6 players"/>
-		<string text="Get on Top\n\n\n2-8 players"/>
-		<string text="Tombstones for\nEverybody\n\n4-16 players"/>
-		<string text="Dude, you really\nneed to...\n\n2-8 players"/>
-		<string text="Deep-Space\nAnomaly #0198\n\n4-8 players"/>
-		<string text="Ship-to-Ship\nCombat\n\n4-16 players"/>
-		<string text="The Quick \nand the Dead\n\n4-16 players\n\nSupports vehicles"/>
-		<string text="Round and Round \nand Round\n\n2-8 players"/>
-		<string text="Spartan Clone\nTraining Complex\n\n2-6 players"/>
-		<string text="A long walk\ndown a short hall...\n\n2-8 players"/>
-		<string text="Slipping and\nSliding\n\n4-16 players\n\nSupports vehicles"/>
-		<string text="Sand, Surf, and \nSpent Shells\n\n4-16 players\n\nSupports vehicles"/>
-		<string text="Don't Look Down...\nUnless You Fall\n\n4-16 players\n\nSupports vehicles"/>
-		<string text="I Imagined it\nWould Be Bigger\n\n4-16 players\n\nSupports vehicles"/>
-		<string text="An Enemy Behind\nEvery Tree\n\n4-16 players\n\nSupports vehicles"/>
-		<string text="Scary, huh?\n\n\n2-12 players\n\nSupports vehicles"/>
-		<string text="UNKNOWN LEVEL\n\n\n"/>
+	<strings name="main_menu/multiplayer_type_select/mp_map_select/map_data" map="ui\shell\main_menu\multiplayer_type_select\mp_map_select\map_data">
+		<string text="Splash Splash\nBang Bang\n\n2-8 players" map="0"/>
+		<string text="Red Blood\nWhite Snow\n\n4-16 players\n\nSupports vehicles" map="1"/>
+		<string text="Covenant Hydro-\nProcessing Center\n\n4-8 players" map="2"/>
+		<string text="Up the Ramps\nDown the Tubes\n\n2-6 players" map="3"/>
+		<string text="Get on Top\n\n\n2-8 players" map="4"/>
+		<string text="Tombstones for\nEverybody\n\n4-16 players" map="5"/>
+		<string text="Dude, you really\nneed to...\n\n2-8 players" map="6"/>
+		<string text="Deep-Space\nAnomaly #0198\n\n4-8 players" map="7"/>
+		<string text="Ship-to-Ship\nCombat\n\n4-16 players" map="8"/>
+		<string text="The Quick \nand the Dead\n\n4-16 players\n\nSupports vehicles" map="9"/>
+		<string text="Round and Round \nand Round\n\n2-8 players" map="10"/>
+		<string text="Spartan Clone\nTraining Complex\n\n2-6 players" map="11"/>
+		<string text="A long walk\ndown a short hall...\n\n2-8 players" map="12"/>
+		<string text="Slipping and\nSliding\n\n4-16 players\n\nSupports vehicles" map="13"/>
+		<string text="Sand, Surf, and \nSpent Shells\n\n4-16 players\n\nSupports vehicles" map="14"/>
+		<string text="Don't Look Down...\nUnless You Fall\n\n4-16 players\n\nSupports vehicles" map="15"/>
+		<string text="I Imagined it\nWould Be Bigger\n\n4-16 players\n\nSupports vehicles" map="16"/>
+		<string text="An Enemy Behind\nEvery Tree\n\n4-16 players\n\nSupports vehicles" map="17"/>
+		<string text="Scary, huh?\n\n\n2-12 players\n\nSupports vehicles" map="18"/>
+		<string text="UNKNOWN LEVEL\n\n\n" map="19"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/multiplayer_option_descriptions">
-		<string text="Browse the games on the\nInternet."/>
-		<string text="Join a multiplayer game on\nyour LAN."/>
+	<strings name="main_menu/multiplayer_type_select/multiplayer_option_descriptions" map="ui\shell\main_menu\multiplayer_type_select\multiplayer_option_descriptions">
+		<string text="Browse the games on the\nInternet." map="0"/>
+		<string text="Join a multiplayer game on\nyour LAN." map="1"/>
 		<string text="Join a game by its invite link,\nor one a Discord invite\nreached."/>
 		<string text="Host a game on the Internet:\nplayers join by its invite\nlink or Discord."/>
-		<string text="Host a game on your LAN\nonly."/>
+		<string text="Host a game on your LAN\nonly." map="4"/>
 		<string text="Play the campaign with a\nfriend in split screen:\nplayer 2 on a gamepad."/>
-		<string text="Set all the attributes for your \nmultiplayer gametypes and\nkeep them for future use."/>
+		<string text="Set all the attributes for your \nmultiplayer gametypes and\nkeep them for future use." map="5"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/multiplayer_options">
-		<string text="JOIN GAME"/>
-		<string text="CREATE GAME"/>
-		<string text="INTERNET"/>
-		<string text="LAN"/>
+	<strings name="main_menu/multiplayer_type_select/multiplayer_options" map="ui\shell\main_menu\multiplayer_type_select\multiplayer_options">
+		<string text="JOIN GAME" map="0"/>
+		<string text="CREATE GAME" map="1"/>
+		<string text="INTERNET" map="2"/>
+		<string text="LAN" map="3"/>
 		<string text="DIRECT LINK"/>
-		<string text="EDIT GAMETYPES"/>
+		<string text="EDIT GAMETYPES" map="5"/>
 		<string text="SERVER BROWSER"/>
 		<string text="CO-OP CAMPAIGN"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/server_settings/cap_server_settings_options">
-		<string text="Enter a name for your server."/>
-		<string text="You may optionally enter a password for\nyour server."/>
-		<string text="The networking system will use settings optimized\nfor 56 Kbps modem connections. When creating\nmultiplayer games, one other player will be allowed\nto join (for a total of 2 players)."/>
-		<string text="The networking system will use settings optimized\nfor 128 Kbps upstream DSL / Cable connections. When\ncreating multiplayer games, three other players will\nbe allowed to join (for a total of 4 players)."/>
-		<string text="The networking system will use settings optimized\nfor 384 Kbps upstream DSL / Cable connections. When \ncreating multiplayer games, seven other players will \nbe allowed to join (for a total of 8 players)."/>
-		<string text="The networking system will use settings optimized\nfor 512 Kbps upstream DSL / Cable connections. When\ncreating multiplayer games, nine other players\nwill be allowed to join (for a total of 10 players)."/>
-		<string text="The networking system will use settings optimized\nfor over 768 Kbps upstream T1 / LAN connections. When\ncreating multiplayer games, fifteen other players\nwill be allowed to join (for a total of 16 players)."/>
-		<string text="Choose the maximum number of players you want to\nbe able to play in your game.  Note that the\nmaximum number of players for a server is based\non your connection speed."/>
+	<strings name="main_menu/multiplayer_type_select/server_settings/cap_server_settings_options" map="ui\shell\main_menu\multiplayer_type_select\server_settings\cap_server_settings_options">
+		<string text="Enter a name for your server." map="0"/>
+		<string text="You may optionally enter a password for\nyour server." map="1"/>
+		<string text="The networking system will use settings optimized\nfor 56 Kbps modem connections. When creating\nmultiplayer games, one other player will be allowed\nto join (for a total of 2 players)." map="2"/>
+		<string text="The networking system will use settings optimized\nfor 128 Kbps upstream DSL / Cable connections. When\ncreating multiplayer games, three other players will\nbe allowed to join (for a total of 4 players)." map="3"/>
+		<string text="The networking system will use settings optimized\nfor 384 Kbps upstream DSL / Cable connections. When \ncreating multiplayer games, seven other players will \nbe allowed to join (for a total of 8 players)." map="4"/>
+		<string text="The networking system will use settings optimized\nfor 512 Kbps upstream DSL / Cable connections. When\ncreating multiplayer games, nine other players\nwill be allowed to join (for a total of 10 players)." map="5"/>
+		<string text="The networking system will use settings optimized\nfor over 768 Kbps upstream T1 / LAN connections. When\ncreating multiplayer games, fifteen other players\nwill be allowed to join (for a total of 16 players)." map="6"/>
+		<string text="Choose the maximum number of players you want to\nbe able to play in your game.  Note that the\nmaximum number of players for a server is based\non your connection speed." map="7"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/server_settings/server_settings_options">
-		<string text="SERVER NAME"/>
-		<string text="PASSWORD"/>
-		<string text="SERVER MODE"/>
-		<string text="MAX PLAYERS"/>
-		<string text="START GAME"/>
-		<string text="SERVER IP"/>
+	<strings name="main_menu/multiplayer_type_select/server_settings/server_settings_options" map="ui\shell\main_menu\multiplayer_type_select\server_settings\server_settings_options">
+		<string text="SERVER NAME" map="0"/>
+		<string text="PASSWORD" map="1"/>
+		<string text="SERVER MODE" map="2"/>
+		<string text="MAX PLAYERS" map="3"/>
+		<string text="START GAME" map="4"/>
+		<string text="SERVER IP" map="5"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/server_settings/var_max_players">
-		<string text="2"/>
-		<string text="3"/>
-		<string text="4"/>
-		<string text="5"/>
-		<string text="6"/>
-		<string text="7"/>
-		<string text="8"/>
-		<string text="9"/>
-		<string text="10"/>
-		<string text="11"/>
-		<string text="12"/>
-		<string text="13"/>
-		<string text="14"/>
-		<string text="15"/>
-		<string text="16"/>
+	<strings name="main_menu/multiplayer_type_select/server_settings/var_max_players" map="ui\shell\main_menu\multiplayer_type_select\server_settings\var_max_players">
+		<string text="2" map="0"/>
+		<string text="3" map="1"/>
+		<string text="4" map="2"/>
+		<string text="5" map="3"/>
+		<string text="6" map="4"/>
+		<string text="7" map="5"/>
+		<string text="8" map="6"/>
+		<string text="9" map="7"/>
+		<string text="10" map="8"/>
+		<string text="11" map="9"/>
+		<string text="12" map="10"/>
+		<string text="13" map="11"/>
+		<string text="14" map="12"/>
+		<string text="15" map="13"/>
+		<string text="16" map="14"/>
 	</strings>
-	<strings name="main_menu/player_profiles_select/difficulty_names">
-		<string text="Easy"/>
-		<string text="Normal"/>
-		<string text="Heroic"/>
-		<string text="Legendary"/>
+	<strings name="main_menu/player_profiles_select/difficulty_names" map="ui\shell\main_menu\player_profiles_select\difficulty_names">
+		<string text="Easy" map="0"/>
+		<string text="Normal" map="1"/>
+		<string text="Heroic" map="2"/>
+		<string text="Legendary" map="3"/>
 	</strings>
-	<strings name="main_menu/player_profiles_select/empty_profile_selected">
-		<string text="You have selected an \nempty player profile \nslot. Would you like to \ncreate a new profile?"/>
+	<strings name="main_menu/player_profiles_select/empty_profile_selected" map="ui\shell\main_menu\player_profiles_select\empty_profile_selected">
+		<string text="You have selected an \nempty player profile \nslot. Would you like to \ncreate a new profile?" map="0"/>
 	</strings>
-	<strings name="main_menu/player_profiles_select/joystick_set_defaults_descriptions">
-		<string text="Default"/>
-		<string text="Inverted"/>
+	<strings name="main_menu/player_profiles_select/joystick_set_defaults_descriptions" map="ui\shell\main_menu\player_profiles_select\joystick_set_defaults_descriptions">
+		<string text="Default" map="0"/>
+		<string text="Inverted" map="1"/>
 	</strings>
-	<strings name="main_menu/player_profiles_select/profile_description_labels">
-		<string text="Current Level:"/>
-		<string text="Difficulty:"/>
-		<string text="Controls:"/>
-		<string text="unused"/>
-		<string text="Create New\nPlayer Profile"/>
-		<string text="Empty game\nsetting slot"/>
+	<strings name="main_menu/player_profiles_select/profile_description_labels" map="ui\shell\main_menu\player_profiles_select\profile_description_labels">
+		<string text="Current Level:" map="0"/>
+		<string text="Difficulty:" map="1"/>
+		<string text="Controls:" map="2"/>
+		<string text="unused" map="3"/>
+		<string text="Create New\nPlayer Profile" map="4"/>
+		<string text="Empty game\nsetting slot" map="5"/>
 	</strings>
-	<strings name="main_menu/quit_select/header_quit_game_prompt">
-		<string text="Are you sure you wish to\nexit Halo?"/>
-		<string text="Quit?"/>
+	<strings name="main_menu/quit_select/header_quit_game_prompt" map="ui\shell\main_menu\quit_select\header_quit_game_prompt">
+		<string text="Are you sure you wish to\nexit Halo?" map="0"/>
+		<string text="Quit?" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/cap_indicator_options">
-		<string text="The game's objectives (hills, flags, balls and the like)\nwill appear in your Motion Tracker."/>
-		<string text="The game's objectives will have special markers\ndisplayed over them on screen."/>
-		<string text="The game's objectives will not be visible in your\nMotion Tracker or on screen."/>
-		<string text="All other players in the game will show up on your \nMotion Tracker when mobile."/>
-		<string text="Other friendly players in the game will show up on \nyour Motion Tracker when mobile."/>
-		<string text="Other players in the game will never show up on your\nMotion Tracker."/>
-		<string text="Green triangles will appear over the heads of your\nteammates as a reminder that you should not shoot\nthem."/>
-		<string text="Your teammates will only be denoted by the color of\ntheir armor."/>
+	<strings name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/cap_indicator_options" map="ui\shell\main_menu\settings_select\multiplayer_setup\indicator_options_edit\cap_indicator_options">
+		<string text="The game's objectives (hills, flags, balls and the like)\nwill appear in your Motion Tracker." map="0"/>
+		<string text="The game's objectives will have special markers\ndisplayed over them on screen." map="1"/>
+		<string text="The game's objectives will not be visible in your\nMotion Tracker or on screen." map="2"/>
+		<string text="All other players in the game will show up on your \nMotion Tracker when mobile." map="3"/>
+		<string text="Other friendly players in the game will show up on \nyour Motion Tracker when mobile." map="4"/>
+		<string text="Other players in the game will never show up on your\nMotion Tracker." map="5"/>
+		<string text="Green triangles will appear over the heads of your\nteammates as a reminder that you should not shoot\nthem." map="6"/>
+		<string text="Your teammates will only be denoted by the color of\ntheir armor." map="7"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_labels">
-		<string text="OBJECTIVES INDICATOR:"/>
-		<string text="OBJECTIVES ON SCREEN:"/>
-		<string text="OTHER PLAYERS ON RADAR:"/>
-		<string text="FRIEND INDICATORS ON SCREEN:"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\indicator_options_edit\indicator_options_labels">
+		<string text="OBJECTIVES INDICATOR:" map="0"/>
+		<string text="OBJECTIVES ON SCREEN:" map="1"/>
+		<string text="OTHER PLAYERS ON RADAR:" map="2"/>
+		<string text="FRIEND INDICATORS ON SCREEN:" map="3"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/var_friends_on_screen">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/var_friends_on_screen" map="ui\shell\main_menu\settings_select\multiplayer_setup\indicator_options_edit\var_friends_on_screen">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/var_objectives_on_screen">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/var_objectives_on_screen" map="ui\shell\main_menu\settings_select\multiplayer_setup\indicator_options_edit\var_objectives_on_screen">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/var_others_on_radar">
-		<string text="ALL"/>
-		<string text="FRIENDS"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/var_others_on_radar" map="ui\shell\main_menu\settings_select\multiplayer_setup\indicator_options_edit\var_others_on_radar">
+		<string text="ALL" map="0"/>
+		<string text="FRIENDS" map="1"/>
+		<string text="NO" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/var_radar display">
-		<string text="MOTION TRACKER"/>
-		<string text="NAV POINTS"/>
-		<string text="NONE"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/var_radar display" map="ui\shell\main_menu\settings_select\multiplayer_setup\indicator_options_edit\var_radar display">
+		<string text="MOTION TRACKER" map="0"/>
+		<string text="NAV POINTS" map="1"/>
+		<string text="NONE" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/cap_item_options">
+	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/cap_item_options" map="ui\shell\main_menu\settings_select\multiplayer_setup\item_options_edit\cap_item_options">
 		<string text="Everyone has a limitless supply of grenades, which\nmakes for loud, explosive and occasionally messy fun."/>
-		<string text="Each player can only carry up to 4 grenades of each\ntype at any given time."/>
-		<string text="The map will contain whatever weapons the designers\nplaced on it."/>
-		<string text="All the weapons on the map will be replaced by\npistols."/>
-		<string text="All the weapons on the map will be replaced by\nassault rifles and plasma rifles."/>
-		<string text="All the weapons on the map will be replaced by\nplasma weapons."/>
-		<string text="The guns on the map will be replaced by weapons\nwith sniper scopes."/>
-		<string text="Sniper rifles and pistols will not appear on the map."/>
-		<string text="All the weapons on the map will be replaced by\nrocket launchers."/>
-		<string text="All the weapons on the map will be replaced by\nshotguns."/>
-		<string text="All the weapons on the map are only effective at\nshort ranges."/>
-		<string text="There are no weapons on the map that were made in\nCovenant sweat shops."/>
-		<string text="Only weapons made by the Covenant will appear\nin the map."/>
-		<string text="The flamethrower and fuel rod gun will not appear\nin the map."/>
-		<string text="Only the most devastating and dangerous of weapons\nwill appear in the map."/>
+		<string text="Each player can only carry up to 4 grenades of each\ntype at any given time." map="1"/>
+		<string text="The map will contain whatever weapons the designers\nplaced on it." map="2"/>
+		<string text="All the weapons on the map will be replaced by\npistols." map="3"/>
+		<string text="All the weapons on the map will be replaced by\nassault rifles and plasma rifles." map="4"/>
+		<string text="All the weapons on the map will be replaced by\nplasma weapons." map="5"/>
+		<string text="The guns on the map will be replaced by weapons\nwith sniper scopes." map="6"/>
+		<string text="Sniper rifles and pistols will not appear on the map." map="7"/>
+		<string text="All the weapons on the map will be replaced by\nrocket launchers." map="8"/>
+		<string text="All the weapons on the map will be replaced by\nshotguns." map="9"/>
+		<string text="All the weapons on the map are only effective at\nshort ranges." map="10"/>
+		<string text="There are no weapons on the map that were made in\nCovenant sweat shops." map="11"/>
+		<string text="Only weapons made by the Covenant will appear\nin the map." map="12"/>
+		<string text="The flamethrower and fuel rod gun will not appear\nin the map." map="13"/>
+		<string text="Only the most devastating and dangerous of weapons\nwill appear in the map." map="14"/>
 		<string text="The map's weapons, without any grenades."/>
-		<string text="You will start the game with the weapon set that the \nmap designers custom tailored for it."/>
-		<string text="Use the generic starting weapons across all maps."/>
+		<string text="You will start the game with the weapon set that the \nmap designers custom tailored for it." map="15"/>
+		<string text="Use the generic starting weapons across all maps." map="16"/>
 		<string text="The map's weapons appear where its designers\nplaced them."/>
 		<string text="No weapons appear on the map: with a loadout of\nNONE and NONE, melee and grenades only."/>
 		<string text="The weapons follow the weapon set above."/>
@@ -525,482 +525,485 @@
 		<string text="Everyone spawns with a plasma rifle as their secondary\nweapon (where the map has one)."/>
 		<string text="Everyone spawns with a needler as their secondary\nweapon (where the map has one)."/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels">
-		<string text="INFINITE GRENADES:"/>
-		<string text="WEAPON SET:"/>
-		<string text="VEHICLE SET:"/>
-		<string text="STARTING EQUIPMENT:"/>
-		<string text="VEHICLE RESPAWN TIME:"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\item_options_edit\item_options_labels">
+		<string text="INFINITE GRENADES:" map="0"/>
+		<string text="WEAPON SET:" map="1"/>
+		<string text="VEHICLE SET:" map="2"/>
+		<string text="STARTING EQUIPMENT:" map="3"/>
+		<string text="VEHICLE RESPAWN TIME:" map="4"/>
 		<string text="LOADOUT:"/>
 		<string text="PRIMARY WEAPON:"/>
 		<string text="SECONDARY WEAPON:"/>
 		<string text="MAP WEAPONS:"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/var_infinite_grenades">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/var_infinite_grenades" map="ui\shell\main_menu\settings_select\multiplayer_setup\item_options_edit\var_infinite_grenades">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/var_starting_equipment">
-		<string text="CUSTOM"/>
-		<string text="GENERIC"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/var_starting_equipment" map="ui\shell\main_menu\settings_select\multiplayer_setup\item_options_edit\var_starting_equipment">
+		<string text="CUSTOM" map="0"/>
+		<string text="GENERIC" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/var_weapon_set">
-		<string text="NORMAL"/>
-		<string text="PISTOLS"/>
-		<string text="RIFLES"/>
-		<string text="PLASMA WEAPONS"/>
-		<string text="SNIPER"/>
-		<string text="NO SNIPING"/>
-		<string text="ROCKET LAUNCHERS"/>
-		<string text="SHOTGUNS"/>
-		<string text="SHORT RANGE"/>
-		<string text="HUMAN"/>
-		<string text="COVENANT"/>
-		<string text="CLASSIC"/>
-		<string text="HEAVY WEAPONS"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/var_weapon_set" map="ui\shell\main_menu\settings_select\multiplayer_setup\item_options_edit\var_weapon_set">
+		<string text="NORMAL" map="0"/>
+		<string text="PISTOLS" map="1"/>
+		<string text="RIFLES" map="2"/>
+		<string text="PLASMA WEAPONS" map="3"/>
+		<string text="SNIPER" map="4"/>
+		<string text="NO SNIPING" map="5"/>
+		<string text="ROCKET LAUNCHERS" map="6"/>
+		<string text="SHOTGUNS" map="7"/>
+		<string text="SHORT RANGE" map="8"/>
+		<string text="HUMAN" map="9"/>
+		<string text="COVENANT" map="10"/>
+		<string text="CLASSIC" map="11"/>
+		<string text="HEAVY WEAPONS" map="12"/>
 		<string text="NO GRENADES"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/cap_player_options">
-		<string text="You will respawn indefinitely until you end the game\nor reach a time limit."/>
-		<string text="You have one life to live. But at least you're using it\nto kick ass across the galaxy instead of just sitting\nin a mansion crying with your rich socialite lovers."/>
-		<string text="You will have three lives to live, which makes you\none-third as cool as a cat."/>
-		<string text="You have five lives, which is four more than you'd get\nin the real world.  Use them wisely."/>
-		<string text="You will begin the game with half your health already\ngone, and shields at half capacity."/>
-		<string text="You begin the game with full health and shields."/>
-		<string text="You begin the game with 50% more health and shield\nstrength than usual."/>
-		<string text="You begin the game with twice as much health and\nshield strength as you normally do."/>
-		<string text="You begin the game with three times as much health \nand shield strength as you normally do."/>
-		<string text="You begin the game with four times as much health \nand shield strength as you normally do."/>
-		<string text="Your battle suit will have shields and thus make you\nharder to kill."/>
-		<string text="The shields on your battle suit will not work, making\nit much easier for everyone to perish."/>
-		<string text="After you die, you'll be able to respawn immediately."/>
-		<string text="When you die, there will be a five-second wait before\nyou can rejoin the game."/>
-		<string text="You'll wait ten seconds after you perish before you\ncan return to the game."/>
-		<string text="When you die, you must wait fifteen seconds before\nyou can respawn. This will give you an idea of what\neternity is like."/>
-		<string text="Respawn time will always remain at its initial\nsetting."/>
-		<string text="Every time you die your respawn time will increase\nby five seconds. Every time you kill someone your\nrespawn time will decrease by five seconds."/>
-		<string text="Your respawn time increases by ten seconds each\ntime you die, and decreases by ten seconds each\ntime you kill someone."/>
-		<string text="Every time you die you'll add fifteen seconds to your\nrespawn time. Every time you kill someone you'll\nsubtract fifteen seconds."/>
-		<string text="When he dies, the Odd Man Out cannot respawn until\nsomeone else assumes the shameful burden of Odd\nMan Out by dying."/>
-		<string text="When you die, you will respawn immediately without\nwaiting for someone else to repeat your mistakes."/>
-		<string text="All the players will be completely invisible."/>
-		<string text="All players will be visible unless they happen to find\nan Active Camouflage powerup."/>
-		<string text="You pay no price for ending your own life prematurely."/>
-		<string text="Every time you cause your own death, there will be a \nfive-second wait before you can rejoin the game. "/>
-		<string text="You'll wait ten seconds after you cause your own \ndeath before you can return to the game."/>
-		<string text="When you suicide, you must wait fifteen seconds \nbefore you can respawn. This will give you an idea of \nwhat eternity is like."/>
+	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/cap_player_options" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\cap_player_options">
+		<string text="You will respawn indefinitely until you end the game\nor reach a time limit." map="0"/>
+		<string text="You have one life to live. But at least you're using it\nto kick ass across the galaxy instead of just sitting\nin a mansion crying with your rich socialite lovers." map="1"/>
+		<string text="You will have three lives to live, which makes you\none-third as cool as a cat." map="2"/>
+		<string text="You have five lives, which is four more than you'd get\nin the real world.  Use them wisely." map="3"/>
+		<string text="You will begin the game with half your health already\ngone, and shields at half capacity." map="4"/>
+		<string text="You begin the game with full health and shields." map="5"/>
+		<string text="You begin the game with 50% more health and shield\nstrength than usual." map="6"/>
+		<string text="You begin the game with twice as much health and\nshield strength as you normally do." map="7"/>
+		<string text="You begin the game with three times as much health \nand shield strength as you normally do." map="8"/>
+		<string text="You begin the game with four times as much health \nand shield strength as you normally do." map="9"/>
+		<string text="Your battle suit will have shields and thus make you\nharder to kill." map="10"/>
+		<string text="The shields on your battle suit will not work, making\nit much easier for everyone to perish." map="11"/>
+		<string text="After you die, you'll be able to respawn immediately." map="12"/>
+		<string text="When you die, there will be a five-second wait before\nyou can rejoin the game." map="13"/>
+		<string text="You'll wait ten seconds after you perish before you\ncan return to the game." map="14"/>
+		<string text="When you die, you must wait fifteen seconds before\nyou can respawn. This will give you an idea of what\neternity is like." map="15"/>
+		<string text="Respawn time will always remain at its initial\nsetting." map="16"/>
+		<string text="Every time you die your respawn time will increase\nby five seconds. Every time you kill someone your\nrespawn time will decrease by five seconds." map="17"/>
+		<string text="Your respawn time increases by ten seconds each\ntime you die, and decreases by ten seconds each\ntime you kill someone." map="18"/>
+		<string text="Every time you die you'll add fifteen seconds to your\nrespawn time. Every time you kill someone you'll\nsubtract fifteen seconds." map="19"/>
+		<string text="When he dies, the Odd Man Out cannot respawn until\nsomeone else assumes the shameful burden of Odd\nMan Out by dying." map="20"/>
+		<string text="When you die, you will respawn immediately without\nwaiting for someone else to repeat your mistakes." map="21"/>
+		<string text="All the players will be completely invisible." map="22"/>
+		<string text="All players will be visible unless they happen to find\nan Active Camouflage powerup." map="23"/>
+		<string text="You pay no price for ending your own life prematurely." map="24"/>
+		<string text="Every time you cause your own death, there will be a \nfive-second wait before you can rejoin the game. " map="25"/>
+		<string text="You'll wait ten seconds after you cause your own \ndeath before you can return to the game." map="26"/>
+		<string text="When you suicide, you must wait fifteen seconds \nbefore you can respawn. This will give you an idea of \nwhat eternity is like." map="27"/>
+		<string text="Players keep their current mouse aim assist setting."/>
+		<string text="Disable mouse aim assist for mouse/keyboard players.\nController and touch aim assist are unchanged."/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/player_options_labels">
-		<string text="NUMBER OF LIVES:"/>
-		<string text="MAXIMUM HEALTH:"/>
-		<string text="SHIELDS:"/>
-		<string text="RESPAWN TIME:"/>
-		<string text="RESPAWN TIME GROWTH:"/>
-		<string text="ODD MAN OUT:"/>
-		<string text="INVISIBLE PLAYERS:"/>
-		<string text="SUICIDE PENALTY:"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/player_options_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\player_options_labels">
+		<string text="NUMBER OF LIVES:" map="0"/>
+		<string text="MAXIMUM HEALTH:" map="1"/>
+		<string text="SHIELDS:" map="2"/>
+		<string text="RESPAWN TIME:" map="3"/>
+		<string text="RESPAWN TIME GROWTH:" map="4"/>
+		<string text="ODD MAN OUT:" map="5"/>
+		<string text="INVISIBLE PLAYERS:" map="6"/>
+		<string text="SUICIDE PENALTY:" map="7"/>
+		<string text="AIM ASSIST:"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_invisible_players">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_invisible_players" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\var_invisible_players">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_maximum_health">
-		<string text="50%"/>
-		<string text="100%"/>
-		<string text="150%"/>
-		<string text="200%"/>
-		<string text="300%"/>
-		<string text="400%"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_maximum_health" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\var_maximum_health">
+		<string text="50%" map="0"/>
+		<string text="100%" map="1"/>
+		<string text="150%" map="2"/>
+		<string text="200%" map="3"/>
+		<string text="300%" map="4"/>
+		<string text="400%" map="5"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_number_of_lives">
-		<string text="INFINITE"/>
-		<string text="1"/>
-		<string text="3"/>
-		<string text="5"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_number_of_lives" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\var_number_of_lives">
+		<string text="INFINITE" map="0"/>
+		<string text="1" map="1"/>
+		<string text="3" map="2"/>
+		<string text="5" map="3"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_odd_man_out">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_odd_man_out" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\var_odd_man_out">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_respawn_time">
-		<string text="INSTANT"/>
-		<string text="5 SECONDS"/>
-		<string text="10 SECONDS"/>
-		<string text="15 SECONDS"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_respawn_time" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\var_respawn_time">
+		<string text="INSTANT" map="0"/>
+		<string text="5 SECONDS" map="1"/>
+		<string text="10 SECONDS" map="2"/>
+		<string text="15 SECONDS" map="3"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_respawn_time_growh">
-		<string text="NONE"/>
-		<string text="5 SECONDS"/>
-		<string text="10 SECONDS"/>
-		<string text="15 SECONDS"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_respawn_time_growh" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\var_respawn_time_growh">
+		<string text="NONE" map="0"/>
+		<string text="5 SECONDS" map="1"/>
+		<string text="10 SECONDS" map="2"/>
+		<string text="15 SECONDS" map="3"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_shields">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_shields" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\var_shields">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_suicide_penalty">
-		<string text="NONE"/>
-		<string text="5 SECONDS"/>
-		<string text="10 SECONDS"/>
-		<string text="15 SECONDS"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_suicide_penalty" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\var_suicide_penalty">
+		<string text="NONE" map="0"/>
+		<string text="5 SECONDS" map="1"/>
+		<string text="10 SECONDS" map="2"/>
+		<string text="15 SECONDS" map="3"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/cap_ctf">
-		<string text="You must carry your own flag into the opposing\nteam's base to score."/>
-		<string text="You must capture the enemy's flag and return it to\nyour own base."/>
-		<string text="Each team will have its own individual flag."/>
-		<string text="There will be only one flag on the map at any given\ntime. It will appear in a team base. Each team alter-\nnates offense and defense every minute."/>
-		<string text="There will be only one flag on the map at any given\ntime. It will appear in a team base. Each team alter-\nnates offense and defense in 2 minute intervals."/>
-		<string text="There will be only one flag on the map at any given\ntime. It will appear in a team base. Each team alter-\nnates offense and defense in 3 minute intervals."/>
-		<string text="There will be only one flag on the map at any given\ntime. It will appear in a team base. Each team alter-\nnates offense and defense in 5 minute intervals."/>
-		<string text="There will be only one flag on the map at any given\ntime. It will appear in a team base. Each team alter-\nnates offense and defense in 10 minute intervals."/>
-		<string text="You cannot return the flag to your base; it will return\nitself after a set amount of time."/>
-		<string text="The flag will return to the base if you walk over it."/>
-		<string text="In order to score, your team's flag must be in its home\nlocation. Use this option if you enjoy chasing\nflag-bearing enemies before you can score."/>
-		<string text="You will be able to score even if your own flag is in\nthe scurrilous hands of the enemy."/>
-		<string text="The first team to capture the flag wins."/>
-		<string text="You'll need to capture three flags to win the game."/>
-		<string text="Capture the flag five times and you'll win the game."/>
-		<string text="You'll need to capture ten flags if you want to win."/>
-		<string text="Grab fifteen flags and you'll rack up a win - not to\nmention an impressive flag collection."/>
-		<string text="The game will have no time limit.  It will only end\nwhen someone wins."/>
-		<string text="This game will have a 10 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 15 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 20 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 25 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 30 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 45 minute time limit.  It will\nend after the time limit is up or someone wins."/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/cap_ctf" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\ctf_edit\cap_ctf">
+		<string text="You must carry your own flag into the opposing\nteam's base to score." map="0"/>
+		<string text="You must capture the enemy's flag and return it to\nyour own base." map="1"/>
+		<string text="Each team will have its own individual flag." map="2"/>
+		<string text="There will be only one flag on the map at any given\ntime. It will appear in a team base. Each team alter-\nnates offense and defense every minute." map="3"/>
+		<string text="There will be only one flag on the map at any given\ntime. It will appear in a team base. Each team alter-\nnates offense and defense in 2 minute intervals." map="4"/>
+		<string text="There will be only one flag on the map at any given\ntime. It will appear in a team base. Each team alter-\nnates offense and defense in 3 minute intervals." map="5"/>
+		<string text="There will be only one flag on the map at any given\ntime. It will appear in a team base. Each team alter-\nnates offense and defense in 5 minute intervals." map="6"/>
+		<string text="There will be only one flag on the map at any given\ntime. It will appear in a team base. Each team alter-\nnates offense and defense in 10 minute intervals." map="7"/>
+		<string text="You cannot return the flag to your base; it will return\nitself after a set amount of time." map="8"/>
+		<string text="The flag will return to the base if you walk over it." map="9"/>
+		<string text="In order to score, your team's flag must be in its home\nlocation. Use this option if you enjoy chasing\nflag-bearing enemies before you can score." map="10"/>
+		<string text="You will be able to score even if your own flag is in\nthe scurrilous hands of the enemy." map="11"/>
+		<string text="The first team to capture the flag wins." map="12"/>
+		<string text="You'll need to capture three flags to win the game." map="13"/>
+		<string text="Capture the flag five times and you'll win the game." map="14"/>
+		<string text="You'll need to capture ten flags if you want to win." map="15"/>
+		<string text="Grab fifteen flags and you'll rack up a win - not to\nmention an impressive flag collection." map="16"/>
+		<string text="The game will have no time limit.  It will only end\nwhen someone wins." map="17"/>
+		<string text="This game will have a 10 minute time limit.  It will\nend after the time limit is up or someone wins." map="18"/>
+		<string text="This game will have a 15 minute time limit.  It will\nend after the time limit is up or someone wins." map="19"/>
+		<string text="This game will have a 20 minute time limit.  It will\nend after the time limit is up or someone wins." map="20"/>
+		<string text="This game will have a 25 minute time limit.  It will\nend after the time limit is up or someone wins." map="21"/>
+		<string text="This game will have a 30 minute time limit.  It will\nend after the time limit is up or someone wins." map="22"/>
+		<string text="This game will have a 45 minute time limit.  It will\nend after the time limit is up or someone wins." map="23"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_labels">
-		<string text="ASSAULT:"/>
-		<string text="SINGLE FLAG:"/>
-		<string text="FLAG MUST RESET:"/>
-		<string text="FLAG AT HOME TO SCORE:"/>
-		<string text="CAPTURES TO WIN:"/>
-		<string text="TIME LIMIT:"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\ctf_edit\ctf_labels">
+		<string text="ASSAULT:" map="0"/>
+		<string text="SINGLE FLAG:" map="1"/>
+		<string text="FLAG MUST RESET:" map="2"/>
+		<string text="FLAG AT HOME TO SCORE:" map="3"/>
+		<string text="CAPTURES TO WIN:" map="4"/>
+		<string text="TIME LIMIT:" map="5"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_assault">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_assault" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\ctf_edit\var_assault">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_captures_to_win">
-		<string text="1"/>
-		<string text="3"/>
-		<string text="5"/>
-		<string text="10"/>
-		<string text="15"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_captures_to_win" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\ctf_edit\var_captures_to_win">
+		<string text="1" map="0"/>
+		<string text="3" map="1"/>
+		<string text="5" map="2"/>
+		<string text="10" map="3"/>
+		<string text="15" map="4"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_flag_at_home">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_flag_at_home" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\ctf_edit\var_flag_at_home">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_flag_must_reset">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_flag_must_reset" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\ctf_edit\var_flag_must_reset">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_single_flag">
-		<string text="OFF"/>
-		<string text="1 MINUTE"/>
-		<string text="2 MINUTES"/>
-		<string text="3 MINUTES"/>
-		<string text="5 MINUTES"/>
-		<string text="10 MINUTES"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_single_flag" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\ctf_edit\var_single_flag">
+		<string text="OFF" map="0"/>
+		<string text="1 MINUTE" map="1"/>
+		<string text="2 MINUTES" map="2"/>
+		<string text="3 MINUTES" map="3"/>
+		<string text="5 MINUTES" map="4"/>
+		<string text="10 MINUTES" map="5"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_time_limit">
-		<string text="NONE"/>
-		<string text="10 MINUTES"/>
-		<string text="15 MINUTES"/>
-		<string text="20 MINUTES"/>
-		<string text="25 MINUTES"/>
-		<string text="30 MINUTES"/>
-		<string text="45 MINUTES"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_time_limit" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\ctf_edit\var_time_limit">
+		<string text="NONE" map="0"/>
+		<string text="10 MINUTES" map="1"/>
+		<string text="15 MINUTES" map="2"/>
+		<string text="20 MINUTES" map="3"/>
+		<string text="25 MINUTES" map="4"/>
+		<string text="30 MINUTES" map="5"/>
+		<string text="45 MINUTES" map="6"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_extended_dsc_text">
-		<string text="Find the enemy's flag and\nreturn it to your base while\nkeeping them away from yours.\nCurrent Rules:"/>
-		<string text="Get your bad self to the hill \nand defend it against those \nwho would take it from you.\nCurrent Rules:"/>
-		<string text="Sometimes you have to kill. \nNow is one of those times. \nWhack or be whacked.\nCurrent Rules:"/>
-		<string text="Become one with the ball. And \nkeep the ball away from every-\none else while you're at it.\nCurrent Rules:"/>
-		<string text="Complete the required number \nof laps before your opponents, \nblowing away the competition.\nCurrent Rules:"/>
-		<string text=" \n \n \nCurrent Rules:"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_extended_dsc_text" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\game_type_select\gametype_select_list_extended_dsc_text">
+		<string text="Find the enemy's flag and\nreturn it to your base while\nkeeping them away from yours.\nCurrent Rules:" map="0"/>
+		<string text="Get your bad self to the hill \nand defend it against those \nwho would take it from you.\nCurrent Rules:" map="1"/>
+		<string text="Sometimes you have to kill. \nNow is one of those times. \nWhack or be whacked.\nCurrent Rules:" map="2"/>
+		<string text="Become one with the ball. And \nkeep the ball away from every-\none else while you're at it.\nCurrent Rules:" map="3"/>
+		<string text="Complete the required number \nof laps before your opponents, \nblowing away the competition.\nCurrent Rules:" map="4"/>
+		<string text=" \n \n \nCurrent Rules:" map="5"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_options">
-		<string text="CAPTURE THE FLAG"/>
-		<string text="KING OF THE HILL"/>
-		<string text="SLAYER"/>
-		<string text="ODDBALL"/>
-		<string text="RACE"/>
-		<string text="SAVE CHANGES"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_options" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\game_type_select\gametype_select_list_options">
+		<string text="CAPTURE THE FLAG" map="0"/>
+		<string text="KING OF THE HILL" map="1"/>
+		<string text="SLAYER" map="2"/>
+		<string text="ODDBALL" map="3"/>
+		<string text="RACE" map="4"/>
+		<string text="SAVE CHANGES" map="5"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/cap_koth">
-		<string text="During the course of the game, the Hill will teleport to\na random location."/>
-		<string text="The Hill will always be in the same spot."/>
-		<string text="The first player to spend sixty seconds atop the hill\nwins."/>
-		<string text="You'll need to hold the hill for a mere two minutes to \nwin the crown."/>
-		<string text="You'll need to hold the hill for five minutes to win."/>
-		<string text="Spend a full ten minutes dominating the hill and the\ngame is yours."/>
-		<string text="Get a comfy chair, because you'll need to control the\nhill for a solid fifteen minutes in order to win."/>
-		<string text="This is a team game."/>
-		<string text="It's every man for himself."/>
-		<string text="The game will have no time limit.  It will only end\nwhen someone wins."/>
-		<string text="This game will have a 10 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 15 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 20 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 25 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 30 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 45 minute time limit.  It will\nend after the time limit is up or someone wins."/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/cap_koth" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\koth_edit\cap_koth">
+		<string text="During the course of the game, the Hill will teleport to\na random location." map="0"/>
+		<string text="The Hill will always be in the same spot." map="1"/>
+		<string text="The first player to spend sixty seconds atop the hill\nwins." map="2"/>
+		<string text="You'll need to hold the hill for a mere two minutes to \nwin the crown." map="3"/>
+		<string text="You'll need to hold the hill for five minutes to win." map="4"/>
+		<string text="Spend a full ten minutes dominating the hill and the\ngame is yours." map="5"/>
+		<string text="Get a comfy chair, because you'll need to control the\nhill for a solid fifteen minutes in order to win." map="6"/>
+		<string text="This is a team game." map="7"/>
+		<string text="It's every man for himself." map="8"/>
+		<string text="The game will have no time limit.  It will only end\nwhen someone wins." map="9"/>
+		<string text="This game will have a 10 minute time limit.  It will\nend after the time limit is up or someone wins." map="10"/>
+		<string text="This game will have a 15 minute time limit.  It will\nend after the time limit is up or someone wins." map="11"/>
+		<string text="This game will have a 20 minute time limit.  It will\nend after the time limit is up or someone wins." map="12"/>
+		<string text="This game will have a 25 minute time limit.  It will\nend after the time limit is up or someone wins." map="13"/>
+		<string text="This game will have a 30 minute time limit.  It will\nend after the time limit is up or someone wins." map="14"/>
+		<string text="This game will have a 45 minute time limit.  It will\nend after the time limit is up or someone wins." map="15"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_labels">
-		<string text="MOVING HILL:"/>
-		<string text="SCORE TO WIN:"/>
-		<string text="TEAM PLAY:"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\koth_edit\koth_labels">
+		<string text="MOVING HILL:" map="0"/>
+		<string text="SCORE TO WIN:" map="1"/>
+		<string text="TEAM PLAY:" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/var_moving_hill">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/var_moving_hill" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\koth_edit\var_moving_hill">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/var_score_to_win">
-		<string text="1 MINUTE"/>
-		<string text="2 MINUTES"/>
-		<string text="5 MINUTES"/>
-		<string text="10 MINUTES"/>
-		<string text="15 MINUTES"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/var_score_to_win" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\koth_edit\var_score_to_win">
+		<string text="1 MINUTE" map="0"/>
+		<string text="2 MINUTES" map="1"/>
+		<string text="5 MINUTES" map="2"/>
+		<string text="10 MINUTES" map="3"/>
+		<string text="15 MINUTES" map="4"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/var_team_play">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/var_team_play" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\koth_edit\var_team_play">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/cap_oddball">
-		<string text="You will have no special abilities while carrying the\nball."/>
-		<string text="While the ball is in your possession, you will be\ninvisible to the other players."/>
-		<string text="While carrying the ball, you will do extra damage to\nyour opponents."/>
-		<string text="While you're carrying the ball, you will be more\nresistant to damage."/>
-		<string text="You will have no special abilities when you are not\ncarrying the ball."/>
-		<string text="Only the player carrying the ball is visible; all others\nare invisible."/>
-		<string text="Players who are not carrying the ball do extra damage;\nthis ability disappears while they have the ball."/>
-		<string text="Players who are not carrying the ball are more\nresistant to damage than the player who has the ball."/>
-		<string text="You will run at the same speed whether you have the\nball or not."/>
-		<string text="When you have the ball, you will run slower than the\nother players."/>
-		<string text="When you have the ball, you'll run faster than the\nother players."/>
-		<string text="The object of the game is to hold the ball for as long\nas possible. The winner is the first player to hold the\nball for the specified time."/>
-		<string text="The first player to kill another becomes It. Others\nbecome It by killing the player who is It. Be It for\nthe specified time to win. There is no ball. Odd, eh?"/>
-		<string text="The first player to kill becomes the Juggernaut, and\nscores for all kills. Others take his place by killing\nhim. Once again there is no ball to speak of."/>
-		<string text="The ball will appear in random locations on the map."/>
-		<string text="The ball will always appear in the same spot on\nthe map."/>
-		<string text="Like Cinderella, you will concern yourself with only\none ball."/>
-		<string text="You probably expected a crass &quot;two balls&quot; joke in\nthis space. Are you nuts? We'd get sacked!"/>
-		<string text="Three balls equals thrice the fun."/>
-		<string text="What has four balls and thrills for all? This game!"/>
-		<string text="Five balls are scattered about willy-nilly."/>
-		<string text="Six balls, and all's well."/>
-		<string text="What is the hidden significance of the seventh ball?"/>
-		<string text="Eight balls is definitely enough."/>
-		<string text="This game shall henceforth be known as the\nGame O' Nine Balls."/>
-		<string text="Ten! Ten balls in this game! Ha ha ha ha ha ha ha!"/>
-		<string text="This game goes to eleven. Balls, that is."/>
-		<string text="... and then there were twelve balls in the game."/>
-		<string text="Lucky you - there are thirteen balls in this game."/>
-		<string text="What do you get when you double the excitement and\nmystery of seven balls? Fourteen balls, that's what!"/>
-		<string text="Be the first on your block to collect all fifteen balls!"/>
-		<string text="You'll barely be able to walk without stepping over\none of the sixteen balls in this game."/>
-		<string text="You'll only need to hang onto the ball or be It for a\ntotal of one minute to win. Juggernauts only need\none kill to win."/>
-		<string text="Control the ball or be It for two minutes and the\ngame is yours. First Juggernaut with two kills wins."/>
-		<string text="Control the ball or be It for five minutes and the\ngame is yours. First Juggernaut to five kills wins."/>
-		<string text="First person to carry the ball or be It for ten minutes\nwins the game. First Juggernaut to ten kills wins."/>
-		<string text="You'll need to spend fifteen minutes of quality time\nwith the ball or being It in order to win. Juggernauts\nmust score an impressive fifteen kills."/>
-		<string text="This is a team game."/>
-		<string text="It's every man for himself."/>
-		<string text="The game will have no time limit.  It will only end\nwhen someone wins."/>
-		<string text="This game will have a 10 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 15 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 20 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 25 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 30 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 45 minute time limit.  It will\nend after the time limit is up or someone wins."/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/cap_oddball" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\oddball_edit\cap_oddball">
+		<string text="You will have no special abilities while carrying the\nball." map="0"/>
+		<string text="While the ball is in your possession, you will be\ninvisible to the other players." map="1"/>
+		<string text="While carrying the ball, you will do extra damage to\nyour opponents." map="2"/>
+		<string text="While you're carrying the ball, you will be more\nresistant to damage." map="3"/>
+		<string text="You will have no special abilities when you are not\ncarrying the ball." map="4"/>
+		<string text="Only the player carrying the ball is visible; all others\nare invisible." map="5"/>
+		<string text="Players who are not carrying the ball do extra damage;\nthis ability disappears while they have the ball." map="6"/>
+		<string text="Players who are not carrying the ball are more\nresistant to damage than the player who has the ball." map="7"/>
+		<string text="You will run at the same speed whether you have the\nball or not." map="8"/>
+		<string text="When you have the ball, you will run slower than the\nother players." map="9"/>
+		<string text="When you have the ball, you'll run faster than the\nother players." map="10"/>
+		<string text="The object of the game is to hold the ball for as long\nas possible. The winner is the first player to hold the\nball for the specified time." map="11"/>
+		<string text="The first player to kill another becomes It. Others\nbecome It by killing the player who is It. Be It for\nthe specified time to win. There is no ball. Odd, eh?" map="12"/>
+		<string text="The first player to kill becomes the Juggernaut, and\nscores for all kills. Others take his place by killing\nhim. Once again there is no ball to speak of." map="13"/>
+		<string text="The ball will appear in random locations on the map." map="14"/>
+		<string text="The ball will always appear in the same spot on\nthe map." map="15"/>
+		<string text="Like Cinderella, you will concern yourself with only\none ball." map="16"/>
+		<string text="You probably expected a crass &quot;two balls&quot; joke in\nthis space. Are you nuts? We'd get sacked!" map="17"/>
+		<string text="Three balls equals thrice the fun." map="18"/>
+		<string text="What has four balls and thrills for all? This game!" map="19"/>
+		<string text="Five balls are scattered about willy-nilly." map="20"/>
+		<string text="Six balls, and all's well." map="21"/>
+		<string text="What is the hidden significance of the seventh ball?" map="22"/>
+		<string text="Eight balls is definitely enough." map="23"/>
+		<string text="This game shall henceforth be known as the\nGame O' Nine Balls." map="24"/>
+		<string text="Ten! Ten balls in this game! Ha ha ha ha ha ha ha!" map="25"/>
+		<string text="This game goes to eleven. Balls, that is." map="26"/>
+		<string text="... and then there were twelve balls in the game." map="27"/>
+		<string text="Lucky you - there are thirteen balls in this game." map="28"/>
+		<string text="What do you get when you double the excitement and\nmystery of seven balls? Fourteen balls, that's what!" map="29"/>
+		<string text="Be the first on your block to collect all fifteen balls!" map="30"/>
+		<string text="You'll barely be able to walk without stepping over\none of the sixteen balls in this game." map="31"/>
+		<string text="You'll only need to hang onto the ball or be It for a\ntotal of one minute to win. Juggernauts only need\none kill to win." map="32"/>
+		<string text="Control the ball or be It for two minutes and the\ngame is yours. First Juggernaut with two kills wins." map="33"/>
+		<string text="Control the ball or be It for five minutes and the\ngame is yours. First Juggernaut to five kills wins." map="34"/>
+		<string text="First person to carry the ball or be It for ten minutes\nwins the game. First Juggernaut to ten kills wins." map="35"/>
+		<string text="You'll need to spend fifteen minutes of quality time\nwith the ball or being It in order to win. Juggernauts\nmust score an impressive fifteen kills." map="36"/>
+		<string text="This is a team game." map="37"/>
+		<string text="It's every man for himself." map="38"/>
+		<string text="The game will have no time limit.  It will only end\nwhen someone wins." map="39"/>
+		<string text="This game will have a 10 minute time limit.  It will\nend after the time limit is up or someone wins." map="40"/>
+		<string text="This game will have a 15 minute time limit.  It will\nend after the time limit is up or someone wins." map="41"/>
+		<string text="This game will have a 20 minute time limit.  It will\nend after the time limit is up or someone wins." map="42"/>
+		<string text="This game will have a 25 minute time limit.  It will\nend after the time limit is up or someone wins." map="43"/>
+		<string text="This game will have a 30 minute time limit.  It will\nend after the time limit is up or someone wins." map="44"/>
+		<string text="This game will have a 45 minute time limit.  It will\nend after the time limit is up or someone wins." map="45"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/oddball_labels">
-		<string text="TRAIT WITH BALL:"/>
-		<string text="TRAIT WITHOUT BALL:"/>
-		<string text="SPEED WITH BALL:"/>
-		<string text="BALL TYPE:"/>
-		<string text="RANDOM START:"/>
-		<string text="BALL SPAWN COUNT:"/>
-		<string text="MINUTES/POINTS TO WIN:"/>
-		<string text="TEAM PLAY:"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/oddball_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\oddball_edit\oddball_labels">
+		<string text="TRAIT WITH BALL:" map="0"/>
+		<string text="TRAIT WITHOUT BALL:" map="1"/>
+		<string text="SPEED WITH BALL:" map="2"/>
+		<string text="BALL TYPE:" map="3"/>
+		<string text="RANDOM START:" map="4"/>
+		<string text="BALL SPAWN COUNT:" map="5"/>
+		<string text="MINUTES/POINTS TO WIN:" map="6"/>
+		<string text="TEAM PLAY:" map="7"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_ball_spawn_count">
-		<string text="1"/>
-		<string text="2"/>
-		<string text="3"/>
-		<string text="4"/>
-		<string text="5"/>
-		<string text="6"/>
-		<string text="7"/>
-		<string text="8"/>
-		<string text="9"/>
-		<string text="10"/>
-		<string text="11"/>
-		<string text="12"/>
-		<string text="13"/>
-		<string text="14"/>
-		<string text="15"/>
-		<string text="16"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_ball_spawn_count" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\oddball_edit\var_ball_spawn_count">
+		<string text="1" map="0"/>
+		<string text="2" map="1"/>
+		<string text="3" map="2"/>
+		<string text="4" map="3"/>
+		<string text="5" map="4"/>
+		<string text="6" map="5"/>
+		<string text="7" map="6"/>
+		<string text="8" map="7"/>
+		<string text="9" map="8"/>
+		<string text="10" map="9"/>
+		<string text="11" map="10"/>
+		<string text="12" map="11"/>
+		<string text="13" map="12"/>
+		<string text="14" map="13"/>
+		<string text="15" map="14"/>
+		<string text="16" map="15"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_ball_type">
-		<string text="NORMAL"/>
-		<string text="REVERSE TAG"/>
-		<string text="JUGGERNAUT"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_ball_type" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\oddball_edit\var_ball_type">
+		<string text="NORMAL" map="0"/>
+		<string text="REVERSE TAG" map="1"/>
+		<string text="JUGGERNAUT" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_random_start">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_random_start" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\oddball_edit\var_random_start">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_score_to_win">
-		<string text="1"/>
-		<string text="2"/>
-		<string text="5"/>
-		<string text="10"/>
-		<string text="15"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_score_to_win" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\oddball_edit\var_score_to_win">
+		<string text="1" map="0"/>
+		<string text="2" map="1"/>
+		<string text="5" map="2"/>
+		<string text="10" map="3"/>
+		<string text="15" map="4"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_speed_with_ball">
-		<string text="NORMAL"/>
-		<string text="SLOW"/>
-		<string text="FAST"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_speed_with_ball" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\oddball_edit\var_speed_with_ball">
+		<string text="NORMAL" map="0"/>
+		<string text="SLOW" map="1"/>
+		<string text="FAST" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_team_play">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_team_play" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\oddball_edit\var_team_play">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_trait_with_ball">
-		<string text="NONE"/>
-		<string text="INVISIBLE"/>
-		<string text="EXTRA DAMAGE"/>
-		<string text="DAMAGE RESISTANT"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_trait_with_ball" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\oddball_edit\var_trait_with_ball">
+		<string text="NONE" map="0"/>
+		<string text="INVISIBLE" map="1"/>
+		<string text="EXTRA DAMAGE" map="2"/>
+		<string text="DAMAGE RESISTANT" map="3"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_trait_without_ball">
-		<string text="NONE"/>
-		<string text="INVISIBLE"/>
-		<string text="EXTRA DAMAGE"/>
-		<string text="DAMAGE RESISTANT"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/var_trait_without_ball" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\oddball_edit\var_trait_without_ball">
+		<string text="NONE" map="0"/>
+		<string text="INVISIBLE" map="1"/>
+		<string text="EXTRA DAMAGE" map="2"/>
+		<string text="DAMAGE RESISTANT" map="3"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_list_extended_dsc_text">
-		<string text="Rename this gametype.\n\n\nThis gametype:"/>
-		<string text="Specify the type of game you\nwant to play and the rules\nthat apply to it.\nThis gametype:"/>
-		<string text="Choose the player settings and \nrestrictions that apply to\nthis gametype.\nThis gametype:"/>
-		<string text="Choose the weapons and\nother items that appear in\nthis gametype.\nThis gametype:"/>
-		<string text="Specify options that change\nhow vehicles work and which\nones spawn in this gametype.\nThis gametype:"/>
-		<string text="Choose which interface indica-\ntors are available while playing \nthis gametype.\nThis gametype:"/>
-		<string text="Modify gameplay options and\nrules used by teamplay game\nmodes.\nThis gametype:"/>
-		<string text="Save changes you've made to\nthis gametype and return to\nthe previous screen.\nThis gametype:"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_list_extended_dsc_text" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\playlist_edit_list_extended_dsc_text">
+		<string text="Rename this gametype.\n\n\nThis gametype:" map="0"/>
+		<string text="Specify the type of game you\nwant to play and the rules\nthat apply to it.\nThis gametype:" map="1"/>
+		<string text="Choose the player settings and \nrestrictions that apply to\nthis gametype.\nThis gametype:" map="2"/>
+		<string text="Choose the weapons and\nother items that appear in\nthis gametype.\nThis gametype:" map="3"/>
+		<string text="Specify options that change\nhow vehicles work and which\nones spawn in this gametype.\nThis gametype:" map="4"/>
+		<string text="Choose which interface indica-\ntors are available while playing \nthis gametype.\nThis gametype:" map="5"/>
+		<string text="Modify gameplay options and\nrules used by teamplay game\nmodes.\nThis gametype:" map="6"/>
+		<string text="Save changes you've made to\nthis gametype and return to\nthe previous screen.\nThis gametype:" map="7"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_options">
-		<string text="CHANGE NAME"/>
-		<string text="GAME OPTIONS"/>
-		<string text="PLAYER OPTIONS"/>
-		<string text="ITEM OPTIONS"/>
-		<string text="INDICATOR OPTIONS"/>
-		<string text="SAVE CHANGES"/>
-		<string text="VEHICLE OPTIONS"/>
-		<string text="TEAMPLAY OPTIONS"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_options" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\playlist_edit_options">
+		<string text="CHANGE NAME" map="0"/>
+		<string text="GAME OPTIONS" map="1"/>
+		<string text="PLAYER OPTIONS" map="2"/>
+		<string text="ITEM OPTIONS" map="3"/>
+		<string text="INDICATOR OPTIONS" map="4"/>
+		<string text="SAVE CHANGES" map="5"/>
+		<string text="VEHICLE OPTIONS" map="6"/>
+		<string text="TEAMPLAY OPTIONS" map="7"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/cap_race">
-		<string text="When the game ends, each team is ranked by its\nlowest-scoring member."/>
-		<string text="Each team's score is equal to that of the highest-\nscoring team member."/>
-		<string text="Each team's score is the sum total of its individual\nmember's scores."/>
-		<string text="To complete a lap, you must reach all the flags in\norder."/>
-		<string text="You complete a lap by touching all the flags, in\nwhatever order you please."/>
-		<string text="Everyone has one point as the destination, and the\nplayer who reaches it first scores a lap."/>
-		<string text="A single lap is all that's required to win the game. \nUnless your pants are on fire, this should be quick \nand easy."/>
-		<string text="Three quick laps and you're done.  Just like a\nlollipop."/>
-		<string text="You'll need to use all the fingers on one of your hands\nto count the laps in this game."/>
-		<string text="To win, you'll need nerves of steel, brass balls and\nten laps."/>
-		<string text="You'll need fifteen laps (and maybe one pit stop) to \ncomplete this race."/>
-		<string text="You'll want to keep a barf bag handy if you want to\nfinish all 25 laps to win."/>
-		<string text="This is a team game."/>
-		<string text="It's every man for himself."/>
-		<string text="The game will have no time limit.  It will only end\nwhen someone wins."/>
-		<string text="This game will have a 10 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 15 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 20 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 25 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 30 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 45 minute time limit.  It will\nend after the time limit is up or someone wins."/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/cap_race" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\race_edit\cap_race">
+		<string text="When the game ends, each team is ranked by its\nlowest-scoring member." map="0"/>
+		<string text="Each team's score is equal to that of the highest-\nscoring team member." map="1"/>
+		<string text="Each team's score is the sum total of its individual\nmember's scores." map="2"/>
+		<string text="To complete a lap, you must reach all the flags in\norder." map="3"/>
+		<string text="You complete a lap by touching all the flags, in\nwhatever order you please." map="4"/>
+		<string text="Everyone has one point as the destination, and the\nplayer who reaches it first scores a lap." map="5"/>
+		<string text="A single lap is all that's required to win the game. \nUnless your pants are on fire, this should be quick \nand easy." map="6"/>
+		<string text="Three quick laps and you're done.  Just like a\nlollipop." map="7"/>
+		<string text="You'll need to use all the fingers on one of your hands\nto count the laps in this game." map="8"/>
+		<string text="To win, you'll need nerves of steel, brass balls and\nten laps." map="9"/>
+		<string text="You'll need fifteen laps (and maybe one pit stop) to \ncomplete this race." map="10"/>
+		<string text="You'll want to keep a barf bag handy if you want to\nfinish all 25 laps to win." map="11"/>
+		<string text="This is a team game." map="12"/>
+		<string text="It's every man for himself." map="13"/>
+		<string text="The game will have no time limit.  It will only end\nwhen someone wins." map="14"/>
+		<string text="This game will have a 10 minute time limit.  It will\nend after the time limit is up or someone wins." map="15"/>
+		<string text="This game will have a 15 minute time limit.  It will\nend after the time limit is up or someone wins." map="16"/>
+		<string text="This game will have a 20 minute time limit.  It will\nend after the time limit is up or someone wins." map="17"/>
+		<string text="This game will have a 25 minute time limit.  It will\nend after the time limit is up or someone wins." map="18"/>
+		<string text="This game will have a 30 minute time limit.  It will\nend after the time limit is up or someone wins." map="19"/>
+		<string text="This game will have a 45 minute time limit.  It will\nend after the time limit is up or someone wins." map="20"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/race_labels">
-		<string text="TEAM SCORING:"/>
-		<string text="RACE TYPE:"/>
-		<string text="LAPS TO WIN:"/>
-		<string text="TEAM PLAY:"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/race_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\race_edit\race_labels">
+		<string text="TEAM SCORING:" map="0"/>
+		<string text="RACE TYPE:" map="1"/>
+		<string text="LAPS TO WIN:" map="2"/>
+		<string text="TEAM PLAY:" map="3"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/var_laps_to_win">
-		<string text="1"/>
-		<string text="3"/>
-		<string text="5"/>
-		<string text="10"/>
-		<string text="15"/>
-		<string text="25"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/var_laps_to_win" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\race_edit\var_laps_to_win">
+		<string text="1" map="0"/>
+		<string text="3" map="1"/>
+		<string text="5" map="2"/>
+		<string text="10" map="3"/>
+		<string text="15" map="4"/>
+		<string text="25" map="5"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/var_race_type">
-		<string text="NORMAL"/>
-		<string text="ANY ORDER"/>
-		<string text="RALLY"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/var_race_type" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\race_edit\var_race_type">
+		<string text="NORMAL" map="0"/>
+		<string text="ANY ORDER" map="1"/>
+		<string text="RALLY" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/var_team_play">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/var_team_play" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\race_edit\var_team_play">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/var_team_scoring">
-		<string text="MINIMUM"/>
-		<string text="MAXIMUM"/>
-		<string text="SUM"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/var_team_scoring" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\race_edit\var_team_scoring">
+		<string text="MINIMUM" map="0"/>
+		<string text="MAXIMUM" map="1"/>
+		<string text="SUM" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/cap_slayer">
-		<string text="When you die and respawn you'll run a little faster.\nGives new meaning to &quot;The Quick and the Dead.&quot; This \nhelps balance play with newbies and experts."/>
-		<string text="You will always run at the same speed no matter how\nmany times you die."/>
-		<string text="You will only score when you kill your designated\ntarget. The target will change each time you make\na kill."/>
-		<string text="Each kill you make counts toward your score."/>
-		<string text="Every time you kill another player, you will run a\nlittle slower. An entertaining handicap for the\nsharp-eyed marksman."/>
-		<string text="You will always run at the same speed, no matter how\nmany other players you kill."/>
-		<string text="Scoring a mere five kills will win the game for you."/>
-		<string text="First player to plug ten enemies wins."/>
-		<string text="At the end of this game there will be fifteen angry\nmen. Angry because the winning player killed them."/>
-		<string text="You'll need to secure twenty-five kills in order to\nwin the game."/>
-		<string text="We hope you've got plenty of time, because you'll\nneed to make a full fifty kills to win this one."/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/cap_slayer" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\slayer_edit\cap_slayer">
+		<string text="When you die and respawn you'll run a little faster.\nGives new meaning to &quot;The Quick and the Dead.&quot; This \nhelps balance play with newbies and experts." map="0"/>
+		<string text="You will always run at the same speed no matter how\nmany times you die." map="1"/>
+		<string text="You will only score when you kill your designated\ntarget. The target will change each time you make\na kill." map="2"/>
+		<string text="Each kill you make counts toward your score." map="3"/>
+		<string text="Every time you kill another player, you will run a\nlittle slower. An entertaining handicap for the\nsharp-eyed marksman." map="4"/>
+		<string text="You will always run at the same speed, no matter how\nmany other players you kill." map="5"/>
+		<string text="Scoring a mere five kills will win the game for you." map="6"/>
+		<string text="First player to plug ten enemies wins." map="7"/>
+		<string text="At the end of this game there will be fifteen angry\nmen. Angry because the winning player killed them." map="8"/>
+		<string text="You'll need to secure twenty-five kills in order to\nwin the game." map="9"/>
+		<string text="We hope you've got plenty of time, because you'll\nneed to make a full fifty kills to win this one." map="10"/>
 		<string text="Seventy-five kills to win. Settle in for a long\nfight."/>
 		<string text="A hundred kills to win. Made for big games."/>
 		<string text="A hundred and fifty kills to win. Only a crowded\nserver gets there."/>
 		<string text="Two hundred kills to win. Bring friends. Lots of\nthem."/>
 		<string text="Two hundred and fifty kills to win."/>
 		<string text="Five hundred kills to win. You'll be here a while."/>
-		<string text="This is a team game."/>
-		<string text="It's every man for himself."/>
-		<string text="The game will have no time limit.  It will only end\nwhen someone wins."/>
-		<string text="This game will have a 10 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 15 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 20 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 25 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 30 minute time limit.  It will\nend after the time limit is up or someone wins."/>
-		<string text="This game will have a 45 minute time limit.  It will\nend after the time limit is up or someone wins."/>
+		<string text="This is a team game." map="11"/>
+		<string text="It's every man for himself." map="12"/>
+		<string text="The game will have no time limit.  It will only end\nwhen someone wins." map="13"/>
+		<string text="This game will have a 10 minute time limit.  It will\nend after the time limit is up or someone wins." map="14"/>
+		<string text="This game will have a 15 minute time limit.  It will\nend after the time limit is up or someone wins." map="15"/>
+		<string text="This game will have a 20 minute time limit.  It will\nend after the time limit is up or someone wins." map="16"/>
+		<string text="This game will have a 25 minute time limit.  It will\nend after the time limit is up or someone wins." map="17"/>
+		<string text="This game will have a 30 minute time limit.  It will\nend after the time limit is up or someone wins." map="18"/>
+		<string text="This game will have a 45 minute time limit.  It will\nend after the time limit is up or someone wins." map="19"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_labels">
-		<string text="DEATH BONUS:"/>
-		<string text="KILL PENALTY:"/>
-		<string text="KILL IN ORDER:"/>
-		<string text="KILLS TO WIN:"/>
-		<string text="TEAM PLAY:"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\slayer_edit\slayer_labels">
+		<string text="DEATH BONUS:" map="0"/>
+		<string text="KILL PENALTY:" map="1"/>
+		<string text="KILL IN ORDER:" map="2"/>
+		<string text="KILLS TO WIN:" map="3"/>
+		<string text="TEAM PLAY:" map="4"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_death_bonus">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_death_bonus" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\slayer_edit\var_death_bonus">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_kill_in_order">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_kill_in_order" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\slayer_edit\var_kill_in_order">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_kills_to_win">
-		<string text="5"/>
-		<string text="10"/>
-		<string text="15"/>
-		<string text="25"/>
-		<string text="50"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_kills_to_win" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\slayer_edit\var_kills_to_win">
+		<string text="5" map="0"/>
+		<string text="10" map="1"/>
+		<string text="15" map="2"/>
+		<string text="25" map="3"/>
+		<string text="50" map="4"/>
 		<string text="75"/>
 		<string text="100"/>
 		<string text="150"/>
@@ -1008,21 +1011,21 @@
 		<string text="250"/>
 		<string text="500"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_team_play">
-		<string text="YES"/>
-		<string text="NO"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_team_play" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\slayer_edit\var_team_play">
+		<string text="YES" map="0"/>
+		<string text="NO" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/cap_teamplay_options">
-		<string text="Players can not be hurt by weapons and explosives\nfired by their teammates."/>
-		<string text="Players can be hurt by weapons or explosives\nfired by their teammates."/>
-		<string text="Damage from friendly fire will only reduce shields.\nHealth will be unaffected."/>
-		<string text="Players can be hurt by damage from explosives \nfired by their teammates."/>
-		<string text="No respawn time penalty will be assessed to players\nwho kill a teammate."/>
-		<string text="Players who kill a teammate will be assessed a \nfive-second respawn penalty the next time they die."/>
-		<string text="Players who kill a teammate will be assessed a \nten-second respawn penalty the next time they die."/>
-		<string text="Players who kill a teammate will be assessed\na fifteen-second respawn penalty the next time\nthey die."/>
-		<string text="Team autobalancing will be disabled.  Players will\nbe free to change teams as they wish."/>
-		<string text="Team autobalancing will be enabled.  Players will\nnot be able to change to a more full team."/>
+	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/cap_teamplay_options" map="ui\shell\main_menu\settings_select\multiplayer_setup\teamplay_options_edit\cap_teamplay_options">
+		<string text="Players can not be hurt by weapons and explosives\nfired by their teammates." map="0"/>
+		<string text="Players can be hurt by weapons or explosives\nfired by their teammates." map="1"/>
+		<string text="Damage from friendly fire will only reduce shields.\nHealth will be unaffected." map="2"/>
+		<string text="Players can be hurt by damage from explosives \nfired by their teammates." map="3"/>
+		<string text="No respawn time penalty will be assessed to players\nwho kill a teammate." map="4"/>
+		<string text="Players who kill a teammate will be assessed a \nfive-second respawn penalty the next time they die." map="5"/>
+		<string text="Players who kill a teammate will be assessed a \nten-second respawn penalty the next time they die." map="6"/>
+		<string text="Players who kill a teammate will be assessed\na fifteen-second respawn penalty the next time\nthey die." map="7"/>
+		<string text="Team autobalancing will be disabled.  Players will\nbe free to change teams as they wish." map="8"/>
+		<string text="Team autobalancing will be enabled.  Players will\nnot be able to change to a more full team." map="9"/>
 		<string text="No voice chat during the game."/>
 		<string text="Players hear their teammates who are near them."/>
 		<string text="Players hear everyone who is near them."/>
@@ -1049,10 +1052,10 @@
 		<string text="Players can type to each other, links too. Off\nin a public internet game."/>
 		<string text="No text chat in the game."/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels">
-		<string text="FRIENDLY FIRE:"/>
-		<string text="FRIENDLY FIRE PENALTY:"/>
-		<string text="AUTO TEAM BALANCE:"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\teamplay_options_edit\teamplay_options_labels">
+		<string text="FRIENDLY FIRE:" map="0"/>
+		<string text="FRIENDLY FIRE PENALTY:" map="1"/>
+		<string text="AUTO TEAM BALANCE:" map="2"/>
 		<string text="VOICE CHAT:"/>
 		<string text="LOBBY VOICE CHAT:"/>
 		<string text="VOICE QUALITY:"/>
@@ -1060,458 +1063,458 @@
 		<string text="VOTE KICK:"/>
 		<string text="TEXT CHAT:"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_friendly_fire">
-		<string text="OFF"/>
-		<string text="ON"/>
-		<string text="SHIELD ONLY"/>
-		<string text="EXPLOSIVES ONLY"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_friendly_fire" map="ui\shell\main_menu\settings_select\multiplayer_setup\teamplay_options_edit\var_friendly_fire">
+		<string text="OFF" map="0"/>
+		<string text="ON" map="1"/>
+		<string text="SHIELD ONLY" map="2"/>
+		<string text="EXPLOSIVES ONLY" map="3"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_friendly_fire_penalty">
-		<string text="NONE"/>
-		<string text="5 SECONDS"/>
-		<string text="10 SECONDS"/>
-		<string text="15 SECONDS"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_friendly_fire_penalty" map="ui\shell\main_menu\settings_select\multiplayer_setup\teamplay_options_edit\var_friendly_fire_penalty">
+		<string text="NONE" map="0"/>
+		<string text="5 SECONDS" map="1"/>
+		<string text="10 SECONDS" map="2"/>
+		<string text="15 SECONDS" map="3"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/cap_vehicle_options">
-		<string text="Vehicles will not respawn."/>
-		<string text="Vehicles will respawn every 30 seconds if idle."/>
-		<string text="Vehicles will respawn every 60 seconds if idle."/>
-		<string text="Vehicles will respawn every 90 seconds if idle."/>
-		<string text="Vehicles will respawn every 2 minutes if idle."/>
-		<string text="Vehicles will respawn every 3 minutes if idle."/>
-		<string text="Vehicles will respawn every 5 minutes if idle."/>
-		<string text="Adjust vehicle placement for the Red Team."/>
-		<string text="Adjust vehicle placement for the Blue Team."/>
-		<string text="The map will contain the default vehicles specified\nin the map.  Includes Warthogs, Scorpion tanks, \nGhosts, Banshees and Covenant Gun Turrets."/>
-		<string text="No vehicles will appear anywhere on this map; you will\ntravel on foot at all times."/>
-		<string text="You'll traverse the map in the nimble Warthog, a\nhardy jeep with a chain gun mounted in the back."/>
-		<string text="Zip around in the Ghost, a nimble hovercraft with \npowerful energy cannons and the snazziest paint job \nin the galaxy."/>
-		<string text="Grind your way across the landscape in the Scorpion\ntank, a mighty killing machine."/>
-		<string text="You'll traverse the map in the Rocket Warthog, a\nhardy jeep with a rocket launcher mounted in the back."/>
-		<string text="Command the skies in the Banshee."/>
-		<string text="Defend the lands with the powerful Covenant Gun\nTurret."/>
-		<string text="Customize the set of vehicles which will spawn\nin the map."/>
-		<string text="No Warthogs will spawn in the map."/>
-		<string text="Up to one Warthog will spawn in the map."/>
-		<string text="Up to two Warthogs will spawn in the map."/>
-		<string text="Up to three Warthogs will spawn in the map."/>
-		<string text="Up to four Warthogs will spawn in the map."/>
-		<string text="No Ghosts will spawn in the map."/>
-		<string text="Up to one Ghost will spawn in the map."/>
-		<string text="Up to two Ghosts will spawn in the map."/>
-		<string text="Up to three Ghosts will spawn in the map."/>
-		<string text="Up to four Ghosts will spawn in the map."/>
-		<string text="No Scorpions will spawn in the map."/>
-		<string text="Up to one Scorpion will spawn in the map."/>
-		<string text="Up to two Scorpions will spawn in the map."/>
-		<string text="Up to three Scorpions will spawn in the map."/>
-		<string text="Up to four Scorpions will spawn in the map."/>
-		<string text="No Rocket Warthogs will spawn in the map."/>
-		<string text="Up to one Rocket Warthog will spawn in the map."/>
-		<string text="Up to two Rocket Warthogs will spawn in the map."/>
-		<string text="Up to three Rocket Warthogs will spawn in the map."/>
-		<string text="Up to four Rocket Warthogs will spawn in the map."/>
-		<string text="No Banshees will spawn in the map."/>
-		<string text="Up to one Banshee will spawn in the map."/>
-		<string text="Up to two Banshees will spawn in the map."/>
-		<string text="Up to three Banshees will spawn in the map."/>
-		<string text="Up to four Banshees will spawn in the map."/>
-		<string text="No Gun Turrets will spawn in the map."/>
-		<string text="Up to one Gun Turret will spawn in the map."/>
-		<string text="Up to two Gun Turrets will spawn in the map."/>
-		<string text="Up to three Gun Turrets will spawn in the map."/>
-		<string text="Up to four Gun Turrets will spawn in the map."/>
+	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/cap_vehicle_options" map="ui\shell\main_menu\settings_select\multiplayer_setup\vehicle_options_edit\cap_vehicle_options">
+		<string text="Vehicles will not respawn." map="0"/>
+		<string text="Vehicles will respawn every 30 seconds if idle." map="1"/>
+		<string text="Vehicles will respawn every 60 seconds if idle." map="2"/>
+		<string text="Vehicles will respawn every 90 seconds if idle." map="3"/>
+		<string text="Vehicles will respawn every 2 minutes if idle." map="4"/>
+		<string text="Vehicles will respawn every 3 minutes if idle." map="5"/>
+		<string text="Vehicles will respawn every 5 minutes if idle." map="6"/>
+		<string text="Adjust vehicle placement for the Red Team." map="7"/>
+		<string text="Adjust vehicle placement for the Blue Team." map="8"/>
+		<string text="The map will contain the default vehicles specified\nin the map.  Includes Warthogs, Scorpion tanks, \nGhosts, Banshees and Covenant Gun Turrets." map="9"/>
+		<string text="No vehicles will appear anywhere on this map; you will\ntravel on foot at all times." map="10"/>
+		<string text="You'll traverse the map in the nimble Warthog, a\nhardy jeep with a chain gun mounted in the back." map="11"/>
+		<string text="Zip around in the Ghost, a nimble hovercraft with \npowerful energy cannons and the snazziest paint job \nin the galaxy." map="12"/>
+		<string text="Grind your way across the landscape in the Scorpion\ntank, a mighty killing machine." map="13"/>
+		<string text="You'll traverse the map in the Rocket Warthog, a\nhardy jeep with a rocket launcher mounted in the back." map="14"/>
+		<string text="Command the skies in the Banshee." map="15"/>
+		<string text="Defend the lands with the powerful Covenant Gun\nTurret." map="16"/>
+		<string text="Customize the set of vehicles which will spawn\nin the map." map="17"/>
+		<string text="No Warthogs will spawn in the map." map="18"/>
+		<string text="Up to one Warthog will spawn in the map." map="19"/>
+		<string text="Up to two Warthogs will spawn in the map." map="20"/>
+		<string text="Up to three Warthogs will spawn in the map." map="21"/>
+		<string text="Up to four Warthogs will spawn in the map." map="22"/>
+		<string text="No Ghosts will spawn in the map." map="23"/>
+		<string text="Up to one Ghost will spawn in the map." map="24"/>
+		<string text="Up to two Ghosts will spawn in the map." map="25"/>
+		<string text="Up to three Ghosts will spawn in the map." map="26"/>
+		<string text="Up to four Ghosts will spawn in the map." map="27"/>
+		<string text="No Scorpions will spawn in the map." map="28"/>
+		<string text="Up to one Scorpion will spawn in the map." map="29"/>
+		<string text="Up to two Scorpions will spawn in the map." map="30"/>
+		<string text="Up to three Scorpions will spawn in the map." map="31"/>
+		<string text="Up to four Scorpions will spawn in the map." map="32"/>
+		<string text="No Rocket Warthogs will spawn in the map." map="33"/>
+		<string text="Up to one Rocket Warthog will spawn in the map." map="34"/>
+		<string text="Up to two Rocket Warthogs will spawn in the map." map="35"/>
+		<string text="Up to three Rocket Warthogs will spawn in the map." map="36"/>
+		<string text="Up to four Rocket Warthogs will spawn in the map." map="37"/>
+		<string text="No Banshees will spawn in the map." map="38"/>
+		<string text="Up to one Banshee will spawn in the map." map="39"/>
+		<string text="Up to two Banshees will spawn in the map." map="40"/>
+		<string text="Up to three Banshees will spawn in the map." map="41"/>
+		<string text="Up to four Banshees will spawn in the map." map="42"/>
+		<string text="No Gun Turrets will spawn in the map." map="43"/>
+		<string text="Up to one Gun Turret will spawn in the map." map="44"/>
+		<string text="Up to two Gun Turrets will spawn in the map." map="45"/>
+		<string text="Up to three Gun Turrets will spawn in the map." map="46"/>
+		<string text="Up to four Gun Turrets will spawn in the map." map="47"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/var_team">
-		<string text="RED TEAM"/>
-		<string text="BLUE TEAM"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/var_team" map="ui\shell\main_menu\settings_select\multiplayer_setup\vehicle_options_edit\var_team">
+		<string text="RED TEAM" map="0"/>
+		<string text="BLUE TEAM" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/var_vehicle_options">
-		<string text="NONE"/>
-		<string text="1"/>
-		<string text="2"/>
-		<string text="3"/>
-		<string text="4"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/var_vehicle_options" map="ui\shell\main_menu\settings_select\multiplayer_setup\vehicle_options_edit\var_vehicle_options">
+		<string text="NONE" map="0"/>
+		<string text="1" map="1"/>
+		<string text="2" map="2"/>
+		<string text="3" map="3"/>
+		<string text="4" map="4"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/var_vehicle_set">
-		<string text="DEFAULT"/>
-		<string text="NONE"/>
-		<string text="WARTHOGS"/>
-		<string text="GHOSTS"/>
-		<string text="SCORPIONS"/>
-		<string text="ROCKET WARTHOGS"/>
-		<string text="BANSHEES"/>
-		<string text="GUN TURRETS"/>
-		<string text="CUSTOM"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/var_vehicle_set" map="ui\shell\main_menu\settings_select\multiplayer_setup\vehicle_options_edit\var_vehicle_set">
+		<string text="DEFAULT" map="0"/>
+		<string text="NONE" map="1"/>
+		<string text="WARTHOGS" map="2"/>
+		<string text="GHOSTS" map="3"/>
+		<string text="SCORPIONS" map="4"/>
+		<string text="ROCKET WARTHOGS" map="5"/>
+		<string text="BANSHEES" map="6"/>
+		<string text="GUN TURRETS" map="7"/>
+		<string text="CUSTOM" map="8"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/var_vehicles_respawn">
-		<string text="NEVER"/>
-		<string text="30 SECONDS"/>
-		<string text="60 SECONDS"/>
-		<string text="90 SECONDS"/>
-		<string text="2 MINUTES"/>
-		<string text="3 MINUTES"/>
-		<string text="5 MINUTES"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/var_vehicles_respawn" map="ui\shell\main_menu\settings_select\multiplayer_setup\vehicle_options_edit\var_vehicles_respawn">
+		<string text="NEVER" map="0"/>
+		<string text="30 SECONDS" map="1"/>
+		<string text="60 SECONDS" map="2"/>
+		<string text="90 SECONDS" map="3"/>
+		<string text="2 MINUTES" map="4"/>
+		<string text="3 MINUTES" map="5"/>
+		<string text="5 MINUTES" map="6"/>
 	</strings>
-	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/vehicle_options_labels">
-		<string text="VEHICLE SET:"/>
-		<string text="WARTHOG:"/>
-		<string text="GHOST:"/>
-		<string text="SCORPION:"/>
-		<string text="ROCKET WARTHOG:"/>
-		<string text="BANSHEE:"/>
-		<string text="GUN TURRET:"/>
-		<string text="VEHICLE RESPAWN TIME:"/>
-		<string text="SIDE:"/>
+	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/vehicle_options_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\vehicle_options_edit\vehicle_options_labels">
+		<string text="VEHICLE SET:" map="0"/>
+		<string text="WARTHOG:" map="1"/>
+		<string text="GHOST:" map="2"/>
+		<string text="SCORPION:" map="3"/>
+		<string text="ROCKET WARTHOG:" map="4"/>
+		<string text="BANSHEE:" map="5"/>
+		<string text="GUN TURRET:" map="6"/>
+		<string text="VEHICLE RESPAWN TIME:" map="7"/>
+		<string text="SIDE:" map="8"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/audio_option_labels">
-		<string text="MASTER VOLUME:"/>
-		<string text="MUSIC VOLUME:"/>
-		<string text="ENVIRONMENTAL SOUND:"/>
-		<string text="HARDWARE ACCELERATION:"/>
-		<string text="SOUND QUALITY:"/>
-		<string text="SOUND VARIETY:"/>
-		<string text="EFFECTS VOLUME:"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/audio_option_labels" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\audio_settings\audio_option_labels">
+		<string text="MASTER VOLUME:" map="0"/>
+		<string text="MUSIC VOLUME:" map="1"/>
+		<string text="ENVIRONMENTAL SOUND:" map="2"/>
+		<string text="HARDWARE ACCELERATION:" map="3"/>
+		<string text="SOUND QUALITY:" map="4"/>
+		<string text="SOUND VARIETY:" map="5"/>
+		<string text="EFFECTS VOLUME:" map="6"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/cap_audio_settings_strings">
-		<string text="Set the master volume level."/>
-		<string text="Set the volume level of game sound effects."/>
-		<string text="Set the music volume level."/>
-		<string text="The sound system will only use the software sound\nbuffers.  The hardware sound card will not process\nthe sound buffers."/>
-		<string text="The sound system will use hardware-accelerated\nsound buffers.  Sound buffers hold data chunks\nfor processing sounds."/>
-		<string text="Basic audio quality and effects for best\nperformance."/>
-		<string text="Improved audio quality plus Doppler effects,\nfor mid-range PCs."/>
-		<string text="Best audio quality including Doppler and 3D\npositional effects, for high-end PCs."/>
-		<string text="Environmental sound will be disabled. Environmental\nsounds bounce off surrounding objects."/>
-		<string text="Environmental sound will be enabled using \nEnvironmental Audio Extensions (EAX)."/>
-		<string text="Game sounds will be played with minimal variety.\nThis provides the best performance for a slower CPU."/>
-		<string text="Game sounds will be played with some variety.\nThis balances quality and performance."/>
-		<string text="Game sounds will be played with full variety.\nThis provides the best quality for a fast CPU."/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/cap_audio_settings_strings" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\audio_settings\cap_audio_settings_strings">
+		<string text="Set the master volume level." map="0"/>
+		<string text="Set the volume level of game sound effects." map="1"/>
+		<string text="Set the music volume level." map="2"/>
+		<string text="The sound system will only use the software sound\nbuffers.  The hardware sound card will not process\nthe sound buffers." map="3"/>
+		<string text="The sound system will use hardware-accelerated\nsound buffers.  Sound buffers hold data chunks\nfor processing sounds." map="4"/>
+		<string text="Basic audio quality and effects for best\nperformance." map="5"/>
+		<string text="Improved audio quality plus Doppler effects,\nfor mid-range PCs." map="6"/>
+		<string text="Best audio quality including Doppler and 3D\npositional effects, for high-end PCs." map="7"/>
+		<string text="Environmental sound will be disabled. Environmental\nsounds bounce off surrounding objects." map="8"/>
+		<string text="Environmental sound will be enabled using \nEnvironmental Audio Extensions (EAX)." map="9"/>
+		<string text="Game sounds will be played with minimal variety.\nThis provides the best performance for a slower CPU." map="10"/>
+		<string text="Game sounds will be played with some variety.\nThis balances quality and performance." map="11"/>
+		<string text="Game sounds will be played with full variety.\nThis provides the best quality for a fast CPU." map="12"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/var_environmental_sound">
-		<string text="OFF"/>
-		<string text="EAX"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/var_environmental_sound" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\audio_settings\var_environmental_sound">
+		<string text="OFF" map="0"/>
+		<string text="EAX" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/var_supplementary_buffers">
-		<string text="LOW"/>
-		<string text="NORMAL"/>
-		<string text="HIGH"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/var_supplementary_buffers" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\audio_settings\var_supplementary_buffers">
+		<string text="LOW" map="0"/>
+		<string text="NORMAL" map="1"/>
+		<string text="HIGH" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/var_volumes">
-		<string text="0"/>
-		<string text="1"/>
-		<string text="2"/>
-		<string text="3"/>
-		<string text="4"/>
-		<string text="5"/>
-		<string text="6"/>
-		<string text="7"/>
-		<string text="8"/>
-		<string text="9"/>
-		<string text="10"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/var_volumes" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\audio_settings\var_volumes">
+		<string text="0" map="0"/>
+		<string text="1" map="1"/>
+		<string text="2" map="2"/>
+		<string text="3" map="3"/>
+		<string text="4" map="4"/>
+		<string text="5" map="5"/>
+		<string text="6" map="6"/>
+		<string text="7" map="7"/>
+		<string text="8" map="8"/>
+		<string text="9" map="9"/>
+		<string text="10" map="10"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/color_edit/colors_list">
-		<string text="White"/>
-		<string text="Black"/>
-		<string text="Red"/>
-		<string text="Blue"/>
-		<string text="Gray"/>
-		<string text="Yellow"/>
-		<string text="Green"/>
-		<string text="Pink"/>
-		<string text="Purple"/>
-		<string text="Cyan"/>
-		<string text="Cobalt"/>
-		<string text="Orange"/>
-		<string text="Teal"/>
-		<string text="Sage"/>
-		<string text="Brown"/>
-		<string text="Tan"/>
-		<string text="Maroon"/>
-		<string text="Salmon"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/color_edit/colors_list" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\color_edit\colors_list">
+		<string text="White" map="0"/>
+		<string text="Black" map="1"/>
+		<string text="Red" map="2"/>
+		<string text="Blue" map="3"/>
+		<string text="Gray" map="4"/>
+		<string text="Yellow" map="5"/>
+		<string text="Green" map="6"/>
+		<string text="Pink" map="7"/>
+		<string text="Purple" map="8"/>
+		<string text="Cyan" map="9"/>
+		<string text="Cobalt" map="10"/>
+		<string text="Orange" map="11"/>
+		<string text="Teal" map="12"/>
+		<string text="Sage" map="13"/>
+		<string text="Brown" map="14"/>
+		<string text="Tan" map="15"/>
+		<string text="Maroon" map="16"/>
+		<string text="Salmon" map="17"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/cap_controls_setup_strings">
-		<string text="Choose a device from the list to configure."/>
-		<string text="Cycle through the command groups to\nconfigure all available commands."/>
-		<string text="Select this command to modify the button or\naxis assigned to it.  "/>
-		<string text="Press a button or move an axis to assign.\nESC = cancel.  BACKSPACE = clear."/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/cap_controls_setup_strings" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\controls_setup\cap_controls_setup_strings">
+		<string text="Choose a device from the list to configure." map="0"/>
+		<string text="Cycle through the command groups to\nconfigure all available commands." map="1"/>
+		<string text="Select this command to modify the button or\naxis assigned to it.  " map="2"/>
+		<string text="Press a button or move an axis to assign.\nESC = cancel.  BACKSPACE = clear." map="3"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_binding_labels">
-		<string text=" "/>
-		<string text="MOVE FORWARD"/>
-		<string text="MOVE BACKWARD"/>
-		<string text="MOVE LEFT"/>
-		<string text="MOVE RIGHT"/>
-		<string text="LOOK UP"/>
-		<string text="LOOK DOWN"/>
-		<string text="LOOK LEFT"/>
-		<string text="LOOK RIGHT"/>
-		<string text="FIRE WEAPON"/>
-		<string text="THROW GRENADE"/>
-		<string text="SWITCH GRENADE"/>
-		<string text="SWITCH WEAPON"/>
-		<string text="RELOAD"/>
-		<string text="MELEE ATTACK"/>
-		<string text="EXCHANGE WEAPON"/>
-		<string text="JUMP"/>
-		<string text="CROUCH"/>
-		<string text="FLASHLIGHT"/>
-		<string text="SCOPE ZOOM"/>
-		<string text="ACTION"/>
-		<string text="MENU ACCEPT"/>
-		<string text="MENU BACK"/>
-		<string text="SAY"/>
-		<string text="SAY TO TEAM"/>
-		<string text="SAY TO VEHICLE"/>
-		<string text="SHOW SCORES"/>
-		<string text="SCREENSHOT"/>
-		<string text="SHOW RULES"/>
-		<string text="SHOW PLAYER NAMES"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_binding_labels" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\controls_setup\controls_binding_labels">
+		<string text=" " map="0"/>
+		<string text="MOVE FORWARD" map="1"/>
+		<string text="MOVE BACKWARD" map="2"/>
+		<string text="MOVE LEFT" map="3"/>
+		<string text="MOVE RIGHT" map="4"/>
+		<string text="LOOK UP" map="5"/>
+		<string text="LOOK DOWN" map="6"/>
+		<string text="LOOK LEFT" map="7"/>
+		<string text="LOOK RIGHT" map="8"/>
+		<string text="FIRE WEAPON" map="9"/>
+		<string text="THROW GRENADE" map="10"/>
+		<string text="SWITCH GRENADE" map="11"/>
+		<string text="SWITCH WEAPON" map="12"/>
+		<string text="RELOAD" map="13"/>
+		<string text="MELEE ATTACK" map="14"/>
+		<string text="EXCHANGE WEAPON" map="15"/>
+		<string text="JUMP" map="16"/>
+		<string text="CROUCH" map="17"/>
+		<string text="FLASHLIGHT" map="18"/>
+		<string text="SCOPE ZOOM" map="19"/>
+		<string text="ACTION" map="20"/>
+		<string text="MENU ACCEPT" map="21"/>
+		<string text="MENU BACK" map="22"/>
+		<string text="SAY" map="23"/>
+		<string text="SAY TO TEAM" map="24"/>
+		<string text="SAY TO VEHICLE" map="25"/>
+		<string text="SHOW SCORES" map="26"/>
+		<string text="SCREENSHOT" map="27"/>
+		<string text="SHOW RULES" map="28"/>
+		<string text="SHOW PLAYER NAMES" map="29"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_option_labels">
-		<string text="DEVICE:"/>
-		<string text="CATEGORY:"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_option_labels" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\controls_setup\controls_option_labels">
+		<string text="DEVICE:" map="0"/>
+		<string text="CATEGORY:" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/var_command_groups">
-		<string text="MOVEMENT"/>
-		<string text="COMBAT"/>
-		<string text="ACTIONS"/>
-		<string text="MISC."/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/var_command_groups" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\controls_setup\var_command_groups">
+		<string text="MOVEMENT" map="0"/>
+		<string text="COMBAT" map="1"/>
+		<string text="ACTIONS" map="2"/>
+		<string text="MISC." map="3"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/cap_gamepad_setup_strings">
-		<string text="Select the current item to deactivate it \nand remove it from your profile."/>
-		<string text="Select the current item to activate it\nand add it to your profile."/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/cap_gamepad_setup_strings" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\gamepad_setup\cap_gamepad_setup_strings">
+		<string text="Select the current item to deactivate it \nand remove it from your profile." map="0"/>
+		<string text="Select the current item to activate it\nand add it to your profile." map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_setup_labels">
-		<string text="DEVICES IN PROFILE"/>
-		<string text="AVAILABLE DEVICES"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_setup_labels" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\gamepad_setup\gamepad_setup_labels">
+		<string text="DEVICES IN PROFILE" map="0"/>
+		<string text="AVAILABLE DEVICES" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/cap_mouse_settings_strings">
-		<string text="Looking side-to-side will be moderately sluggish."/>
-		<string text="Looking side-to-side will be a little sluggish."/>
-		<string text="Looking side-to-side will be just right - not too fast,\nnot too slow."/>
-		<string text="Looking side-to-side will be just a tiny bit faster\nthan average."/>
-		<string text="Looking side-to-side will be just a little faster\nthan average."/>
-		<string text="Looking side-to-side will be faster than average."/>
-		<string text="Looking side-to-side will be moderately faster\nthan average."/>
-		<string text="Looking side-to-side will be quite fast."/>
-		<string text="Looking side-to-side will be extremely fast."/>
-		<string text="Looking side-to-side will be ultra-sensitive."/>
-		<string text="Looking up and down will be moderately sluggish."/>
-		<string text="Looking up and down will be a little sluggish."/>
-		<string text="Looking up and down will be just right - not too fast,\nnot too slow."/>
-		<string text="Looking up and down will be just a tiny bit faster\nthan average."/>
-		<string text="Looking up and down will be just a little faster\nthan average."/>
-		<string text="Looking up and down will be faster than average."/>
-		<string text="Looking up and down will be moderately faster\nthan average."/>
-		<string text="Looking up and down will be quite fast."/>
-		<string text="Looking up and down will be extremely fast."/>
-		<string text="Looking up and down will be ultra-sensitive."/>
-		<string text="Your mouse will use the default settings: \npush forward to look up and pull back to look down."/>
-		<string text="The Y-axis of your mouse will reverse, so that\npushing forward makes you look down, and vice versa."/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/cap_mouse_settings_strings" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\mouse_settings\cap_mouse_settings_strings">
+		<string text="Looking side-to-side will be moderately sluggish." map="0"/>
+		<string text="Looking side-to-side will be a little sluggish." map="1"/>
+		<string text="Looking side-to-side will be just right - not too fast,\nnot too slow." map="2"/>
+		<string text="Looking side-to-side will be just a tiny bit faster\nthan average." map="3"/>
+		<string text="Looking side-to-side will be just a little faster\nthan average." map="4"/>
+		<string text="Looking side-to-side will be faster than average." map="5"/>
+		<string text="Looking side-to-side will be moderately faster\nthan average." map="6"/>
+		<string text="Looking side-to-side will be quite fast." map="7"/>
+		<string text="Looking side-to-side will be extremely fast." map="8"/>
+		<string text="Looking side-to-side will be ultra-sensitive." map="9"/>
+		<string text="Looking up and down will be moderately sluggish." map="10"/>
+		<string text="Looking up and down will be a little sluggish." map="11"/>
+		<string text="Looking up and down will be just right - not too fast,\nnot too slow." map="12"/>
+		<string text="Looking up and down will be just a tiny bit faster\nthan average." map="13"/>
+		<string text="Looking up and down will be just a little faster\nthan average." map="14"/>
+		<string text="Looking up and down will be faster than average." map="15"/>
+		<string text="Looking up and down will be moderately faster\nthan average." map="16"/>
+		<string text="Looking up and down will be quite fast." map="17"/>
+		<string text="Looking up and down will be extremely fast." map="18"/>
+		<string text="Looking up and down will be ultra-sensitive." map="19"/>
+		<string text="Your mouse will use the default settings: \npush forward to look up and pull back to look down." map="20"/>
+		<string text="The Y-axis of your mouse will reverse, so that\npushing forward makes you look down, and vice versa." map="21"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_option_labels">
-		<string text="HORIZONTAL SENSITIVITY:"/>
-		<string text="VERTICAL SENSITIVITY:"/>
-		<string text="INVERT VERTICAL AXIS:"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_option_labels" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\mouse_settings\mouse_option_labels">
+		<string text="HORIZONTAL SENSITIVITY:" map="0"/>
+		<string text="VERTICAL SENSITIVITY:" map="1"/>
+		<string text="INVERT VERTICAL AXIS:" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/var_mouse_sensitivity">
-		<string text="1"/>
-		<string text="2"/>
-		<string text="3"/>
-		<string text="4"/>
-		<string text="5"/>
-		<string text="6"/>
-		<string text="7"/>
-		<string text="8"/>
-		<string text="9"/>
-		<string text="10"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/var_mouse_sensitivity" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\mouse_settings\var_mouse_sensitivity">
+		<string text="1" map="0"/>
+		<string text="2" map="1"/>
+		<string text="3" map="2"/>
+		<string text="4" map="3"/>
+		<string text="5" map="4"/>
+		<string text="6" map="5"/>
+		<string text="7" map="6"/>
+		<string text="8" map="7"/>
+		<string text="9" map="8"/>
+		<string text="10" map="9"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/cap_network_settings_strings">
-		<string text="The networking system will use settings optimized\nfor 56 Kbps modem connections. When creating\nmultiplayer games, one other player will be allowed\nto join (for a total of 2 players)."/>
-		<string text="The networking system will use settings optimized\nfor 128 Kbps upstream DSL / Cable connections. When\ncreating multiplayer games, three other players will\nbe allowed to join (for a total of 4 players)."/>
-		<string text="The networking system will use settings optimized\nfor 384 Kbps upstream DSL / Cable connections. When \ncreating multiplayer games, seven other players will \nbe allowed to join (for a total of 8 players)."/>
-		<string text="The networking system will use settings optimized\nfor 512 Kbps upstream DSL / Cable connections. When\ncreating multiplayer games, nine other players\nwill be allowed to join (for a total of 10 players)."/>
-		<string text="The networking system will use settings optimized\nfor over 768 Kbps upstream T1 / LAN connections. When\ncreating multiplayer games, fifteen other players\nwill be allowed to join (for a total of 16 players).&#9;"/>
-		<string text="Customize the network port the server\nlistens on.  Also affects the port that\nclients look for LAN games on."/>
-		<string text="Customize the network port the client\nsends on."/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/cap_network_settings_strings" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\network_setup\cap_network_settings_strings">
+		<string text="The networking system will use settings optimized\nfor 56 Kbps modem connections. When creating\nmultiplayer games, one other player will be allowed\nto join (for a total of 2 players)." map="0"/>
+		<string text="The networking system will use settings optimized\nfor 128 Kbps upstream DSL / Cable connections. When\ncreating multiplayer games, three other players will\nbe allowed to join (for a total of 4 players)." map="1"/>
+		<string text="The networking system will use settings optimized\nfor 384 Kbps upstream DSL / Cable connections. When \ncreating multiplayer games, seven other players will \nbe allowed to join (for a total of 8 players)." map="2"/>
+		<string text="The networking system will use settings optimized\nfor 512 Kbps upstream DSL / Cable connections. When\ncreating multiplayer games, nine other players\nwill be allowed to join (for a total of 10 players)." map="3"/>
+		<string text="The networking system will use settings optimized\nfor over 768 Kbps upstream T1 / LAN connections. When\ncreating multiplayer games, fifteen other players\nwill be allowed to join (for a total of 16 players).&#9;" map="4"/>
+		<string text="Customize the network port the server\nlistens on.  Also affects the port that\nclients look for LAN games on." map="5"/>
+		<string text="Customize the network port the client\nsends on." map="6"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/network_option_labels">
-		<string text="CONNECTION TYPE:"/>
-		<string text="SERVER PORT:"/>
-		<string text="CLIENT PORT:"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/network_option_labels" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\network_setup\network_option_labels">
+		<string text="CONNECTION TYPE:" map="0"/>
+		<string text="SERVER PORT:" map="1"/>
+		<string text="CLIENT PORT:" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/var_connection_type">
-		<string text="56k"/>
-		<string text="DSL/Cable (LOW)"/>
-		<string text="DSL/Cable (AVG)"/>
-		<string text="DSL/Cable (HIGH)"/>
-		<string text="T1/LAN"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/var_connection_type" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\network_setup\var_connection_type">
+		<string text="56k" map="0"/>
+		<string text="DSL/Cable (LOW)" map="1"/>
+		<string text="DSL/Cable (AVG)" map="2"/>
+		<string text="DSL/Cable (HIGH)" map="3"/>
+		<string text="T1/LAN" map="4"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/profile_edit_descriptions">
-		<string text="Rename this profile.\n\n\nProfile:"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/profile_edit_descriptions" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\profile_edit_descriptions">
+		<string text="Rename this profile.\n\n\nProfile:" map="0"/>
 		<string text="Choose the keys and mouse\nbuttons for each action.\n\nProfile:"/>
 		<string text="Set this profile's controller\nsensitivity and layouts.\n\nProfile:"/>
 		<string text="Adjust the mouse's sensitivity\nand aiming.\n\nProfile:"/>
 		<string text="Adjust the volume of the music\nand of everything else.\n\nProfile:"/>
 		<string text="Choose a window or the full\nscreen, the frame rate and more.\n\nProfile:"/>
 		<string text="Internet play, updates and the\nmultiplayer HUD.\n\nProfile:"/>
-		<string text="Change the current profile's\nfree-for-all multiplayer color.\n\nProfile:"/>
+		<string text="Change the current profile's\nfree-for-all multiplayer color.\n\nProfile:" map="7"/>
 		<string text="Halo: Combat Evolved, the Xbox\ngame, on this computer.\n\nProfile:"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/profile_edit_options">
-		<string text="CHANGE NAME"/>
-		<string text="CONTROLS SETUP"/>
-		<string text="GAMEPADS"/>
-		<string text="MOUSE SETUP"/>
-		<string text="AUDIO SETUP"/>
-		<string text="VIDEO SETUP"/>
-		<string text="CHANGE COLOR"/>
-		<string text="SAVE CHANGES "/>
-		<string text="NETWORK SETUP "/>
-		<string text="ABOUT"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/profile_edit_options" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\profile_edit_options">
+		<string text="CHANGE NAME" map="0"/>
+		<string text="CONTROLS SETUP" map="1"/>
+		<string text="GAMEPADS" map="2"/>
+		<string text="MOUSE SETUP" map="3"/>
+		<string text="AUDIO SETUP" map="4"/>
+		<string text="VIDEO SETUP" map="5"/>
+		<string text="CHANGE COLOR" map="6"/>
+		<string text="SAVE CHANGES " map="7"/>
+		<string text="NETWORK SETUP " map="8"/>
+		<string text="ABOUT" map="9"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/cap_video_settings_strings">
-		<string text="Select a display resolution."/>
-		<string text="Select a monitor refresh rate."/>
-		<string text="Framerate may go higher than refresh rate.  This presents a\nvariable visual performance as horizontal tearing can occur. "/>
-		<string text="Framerate will never go higher than refresh rate.\nThis presents the smoothest visual performance."/>
-		<string text="Framerate is locked at 30 frames per second.\nThis presents the most consistent visual performance."/>
-		<string text="Specular effects will be disabled.  Specular\neffects add luster to objects."/>
-		<string text="Specular effects will be enabled.  Specular\neffects add luster to objects."/>
-		<string text="Dynamic shadows will be disabled."/>
-		<string text="Dynamic shadows will be enabled."/>
-		<string text="Decals will be disabled."/>
-		<string text="Decals will be enabled.  Decals include bullet\nholes and blood."/>
-		<string text="Particles will be disabled.  Particles include\ndust and sparks."/>
-		<string text="Particles will be enabled but will only\ndraw at half density."/>
-		<string text="Particles will be fully enabled.  Particles\ninclude dust and sparks."/>
-		<string text="Textures will be drawn at their lowest detail level.\nTextures include patterns on walls and other objects."/>
-		<string text="Textures will be drawn at a medium detail level.\nTextures include patterns on walls and other objects."/>
-		<string text="Textures will be drawn at their highest detail level.\nTextures include patterns on walls and other objects."/>
-		<string text="Gamma controls the brightness."/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/cap_video_settings_strings" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\video_settings\cap_video_settings_strings">
+		<string text="Select a display resolution." map="0"/>
+		<string text="Select a monitor refresh rate." map="1"/>
+		<string text="Framerate may go higher than refresh rate.  This presents a\nvariable visual performance as horizontal tearing can occur. " map="2"/>
+		<string text="Framerate will never go higher than refresh rate.\nThis presents the smoothest visual performance." map="3"/>
+		<string text="Framerate is locked at 30 frames per second.\nThis presents the most consistent visual performance." map="4"/>
+		<string text="Specular effects will be disabled.  Specular\neffects add luster to objects." map="5"/>
+		<string text="Specular effects will be enabled.  Specular\neffects add luster to objects." map="6"/>
+		<string text="Dynamic shadows will be disabled." map="7"/>
+		<string text="Dynamic shadows will be enabled." map="8"/>
+		<string text="Decals will be disabled." map="9"/>
+		<string text="Decals will be enabled.  Decals include bullet\nholes and blood." map="10"/>
+		<string text="Particles will be disabled.  Particles include\ndust and sparks." map="11"/>
+		<string text="Particles will be enabled but will only\ndraw at half density." map="12"/>
+		<string text="Particles will be fully enabled.  Particles\ninclude dust and sparks." map="13"/>
+		<string text="Textures will be drawn at their lowest detail level.\nTextures include patterns on walls and other objects." map="14"/>
+		<string text="Textures will be drawn at a medium detail level.\nTextures include patterns on walls and other objects." map="15"/>
+		<string text="Textures will be drawn at their highest detail level.\nTextures include patterns on walls and other objects." map="16"/>
+		<string text="Gamma controls the brightness." map="17"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/var_environmental_effects">
-		<string text="LOW"/>
-		<string text="MEDIUM"/>
-		<string text="HIGH"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/var_environmental_effects" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\video_settings\var_environmental_effects">
+		<string text="LOW" map="0"/>
+		<string text="MEDIUM" map="1"/>
+		<string text="HIGH" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/var_framerate">
-		<string text="NO VSYNC"/>
-		<string text="VSYNC"/>
-		<string text="30 FPS"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/var_framerate" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\video_settings\var_framerate">
+		<string text="NO VSYNC" map="0"/>
+		<string text="VSYNC" map="1"/>
+		<string text="30 FPS" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/var_gamma">
-		<string text="DARKEN / BRIGHTEN"/>
-		<string text="DARKEN / BRIGHTEN"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/var_gamma" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\video_settings\var_gamma">
+		<string text="DARKEN / BRIGHTEN" map="0"/>
+		<string text="DARKEN / BRIGHTEN" map="1"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/var_particles">
-		<string text="OFF"/>
-		<string text="LOW"/>
-		<string text="HIGH"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/var_particles" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\video_settings\var_particles">
+		<string text="OFF" map="0"/>
+		<string text="LOW" map="1"/>
+		<string text="HIGH" map="2"/>
 	</strings>
-	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_option_labels">
-		<string text="RESOLUTION:"/>
-		<string text="REFRESH RATE:"/>
-		<string text="EFFECTS DETAIL:"/>
-		<string text="REFLECTIONS:"/>
-		<string text="SPECULAR:"/>
-		<string text="SHADOWS:"/>
-		<string text="DECALS:"/>
-		<string text="PARTICLES:"/>
-		<string text="TEXTURE QUALITY:"/>
-		<string text="MODEL QUALITY:"/>
-		<string text="GAMMA:"/>
-		<string text="FRAMERATE:"/>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_option_labels" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\video_settings\video_option_labels">
+		<string text="RESOLUTION:" map="0"/>
+		<string text="REFRESH RATE:" map="1"/>
+		<string text="EFFECTS DETAIL:" map="2"/>
+		<string text="REFLECTIONS:" map="3"/>
+		<string text="SPECULAR:" map="4"/>
+		<string text="SHADOWS:" map="5"/>
+		<string text="DECALS:" map="6"/>
+		<string text="PARTICLES:" map="7"/>
+		<string text="TEXTURE QUALITY:" map="8"/>
+		<string text="MODEL QUALITY:" map="9"/>
+		<string text="GAMMA:" map="10"/>
+		<string text="FRAMERATE:" map="11"/>
 	</strings>
-	<strings name="main_menu/solo_level_select/map_data">
-		<string text="Escape intact as \nCovenant forces \nboard your ship."/>
-		<string text="Seek out surviving \nMarines and help \nthem fight the Cove-\nnant."/>
-		<string text="Board a Covenant \nship in an attempt to \nrescue Captain \nKeyes."/>
-		<string text="Search for the map \nroom that will lead \nyou to the secrets of \nHalo."/>
-		<string text="Defend the Control \nRoom against wave \nafter wave of Cove-\nnant troops."/>
-		<string text="Creep through a \nswamp to meet the \nonly enemy the \nCovenant fear."/>
-		<string text="Fight your way \nthrough an ancient \nsecurity facility in \nsearch of the Index."/>
-		<string text="Reactivate the wea-\npon at the heart of \nHalo...and learn the \ntruth."/>
-		<string text="Stage a one-cyborg \nassault on a Cove-\nnant ship and bring \nback the Captain."/>
-		<string text="Destroy Halo before \nHalo destroys all life \nin the galaxy."/>
-		<string text="You cannot play\nthis level... yet!"/>
-		<string text="You have a game in\nprogress on this\nlevel. Select to\ncontinue your game."/>
+	<strings name="main_menu/solo_level_select/map_data" map="ui\shell\main_menu\solo_level_select\map_data">
+		<string text="Escape intact as \nCovenant forces \nboard your ship." map="0"/>
+		<string text="Seek out surviving \nMarines and help \nthem fight the Cove-\nnant." map="1"/>
+		<string text="Board a Covenant \nship in an attempt to \nrescue Captain \nKeyes." map="2"/>
+		<string text="Search for the map \nroom that will lead \nyou to the secrets of \nHalo." map="3"/>
+		<string text="Defend the Control \nRoom against wave \nafter wave of Cove-\nnant troops." map="4"/>
+		<string text="Creep through a \nswamp to meet the \nonly enemy the \nCovenant fear." map="5"/>
+		<string text="Fight your way \nthrough an ancient \nsecurity facility in \nsearch of the Index." map="6"/>
+		<string text="Reactivate the wea-\npon at the heart of \nHalo...and learn the \ntruth." map="7"/>
+		<string text="Stage a one-cyborg \nassault on a Cove-\nnant ship and bring \nback the Captain." map="8"/>
+		<string text="Destroy Halo before \nHalo destroys all life \nin the galaxy." map="9"/>
+		<string text="You cannot play\nthis level... yet!" map="10"/>
+		<string text="You have a game in\nprogress on this\nlevel. Select to\ncontinue your game." map="11"/>
 	</strings>
-	<strings name="strings/common_button_captions">
-		<string text="BACK"/>
-		<string text="OK"/>
-		<string text="CANCEL"/>
-		<string text="DEFAULTS"/>
-		<string text="CREATE NEW"/>
-		<string text="DELETE"/>
-		<string text="ADVANCED"/>
-		<string text="Profile:"/>
+	<strings name="strings/common_button_captions" map="ui\shell\strings\common_button_captions">
+		<string text="BACK" map="0"/>
+		<string text="OK" map="1"/>
+		<string text="CANCEL" map="2"/>
+		<string text="DEFAULTS" map="3"/>
+		<string text="CREATE NEW" map="4"/>
+		<string text="DELETE" map="5"/>
+		<string text="ADVANCED" map="6"/>
+		<string text="Profile:" map="7"/>
 	</strings>
-	<strings name="strings/displayed_error_messages">
-		<string text="Unable to complete\nthe last operation."/>
-		<string text="A networking error\nhas occurred."/>
-		<string text="Unable to join game \nbecause it is closed."/>
-		<string text="Unable to join game."/>
-		<string text="The game has\nclosed down."/>
-		<string text="Halo can't connect to\nthe network."/>
-		<string text="Network connection lost."/>
-		<string text="Failed to join the game."/>
-		<string text="Your game has\ngone out of sync with\nthe others in\nthe game. Resetting..."/>
-		<string text="Your connection is\nexperiencing\ndifficulties..."/>
-		<string text="unused network error"/>
-		<string text="A controller error\nhas occurred."/>
-		<string text="Please reconnect\ncontroller #%controller.\nPress START to continue\nafter reconnecting."/>
-		<string text="Please reconnect\n#%controller controller."/>
-		<string text="A controller\nmemory card error\nhas occurred."/>
-		<string text="Saving... one moment\nplease."/>
-		<string text="Creating player profile...\none moment please."/>
-		<string text="Creating game settings\nfile... one moment please."/>
-		<string text="Player 2 must use a\ndifferent controller\nthan Player 1."/>
-		<string text="unused controller error"/>
-		<string text="unused controller error"/>
-		<string text="Please insert\nanother quarter."/>
-		<string text="All progress since the\nlast checkpoint will\nbe lost."/>
-		<string text="All progress on this \nlevel will be lost."/>
-		<string text="Are you sure you wish \nto delete this profile? \nAll your progress and \nsettings will be lost."/>
-		<string text="Are you sure you wish \nto delete this\ngametype? All your\nsettings will be lost."/>
-		<string text="Sorry, you can't delete\nthe default multiplayer\ngame settings."/>
-		<string text="Sorry, there is already \na saved gametype or \nprofile with that name."/>
-		<string text="Do you really want to\nback out without saving\nyour changes?"/>
-		<string text="Sorry, you can't create\na saved game file with\nan empty name."/>
-		<string text="Saving last checkpoint...\none moment please."/>
-		<string text="Unable to load saved\ngame file."/>
-		<string text="unused warning"/>
-		<string text="Insufficient free space to\nsave game."/>
-		<string text="Insufficient free save slots."/>
-		<string text="An error has occurred\nloading a map file."/>
-		<string text="You have reached the\nmaximum number of Halo\ngame files. Unable to\ncreate additional ones."/>
-		<string text="Unable to create new\nplayer profile."/>
-		<string text="Unable to create new\nmultiplayer game\nsettings entry."/>
-		<string text="Unable to load saved\nprogress for this\nprofile."/>
-		<string text="An error has occurred\ntrying to contact the \nGameSpy master server."/>
-		<string text="Video settings changed...\nPress OK to accept."/>
-		<string text="The server you selected\nrequires a password!"/>
-		<string text="Unable to join the game\nserver!"/>
-		<string text="The server reported\nan invalid connection\nrequest."/>
-		<string text="Your password was\nrejected by the server."/>
-		<string text="The server is full."/>
-		<string text="Your CD Key is invalid."/>
-		<string text="Your CD Key is in use\nby another player."/>
-		<string text="The server operator has\nbanned you from playing\non this server."/>
-		<string text="The server operator has\nkicked you from this\nserver."/>
-		<string text="Video settings will be\ntested.  If you do not see\na confirm dialog after\nthe change, press ESC."/>
-		<string text="Checkpoint saved."/>
-		<string text="The address is invalid."/>
-		<string text="You need to create or\nselect a profile in order\nto continue."/>
-		<string text="Your client is running an\nincompatible network \nprotocol version."/>
-		<string text="Connection rejected: Your\nclient is older than the\nserver."/>
-		<string text="Connection rejected: Your\nclient is newer than the\nserver."/>
-		<string text="You must have\nAdministrator privileges\nto download this required\npatch."/>
-		<string text="Are you sure you want to\ndelete this saved game?"/>
+	<strings name="strings/displayed_error_messages" map="ui\shell\strings\displayed_error_messages">
+		<string text="Unable to complete\nthe last operation." map="0"/>
+		<string text="A networking error\nhas occurred." map="1"/>
+		<string text="Unable to join game \nbecause it is closed." map="2"/>
+		<string text="Unable to join game." map="3"/>
+		<string text="The game has\nclosed down." map="4"/>
+		<string text="Halo can't connect to\nthe network." map="5"/>
+		<string text="Network connection lost." map="6"/>
+		<string text="Failed to join the game." map="7"/>
+		<string text="Your game has\ngone out of sync with\nthe others in\nthe game. Resetting..." map="8"/>
+		<string text="Your connection is\nexperiencing\ndifficulties..." map="9"/>
+		<string text="unused network error" map="10"/>
+		<string text="A controller error\nhas occurred." map="11"/>
+		<string text="Please reconnect\ncontroller #%controller.\nPress START to continue\nafter reconnecting." map="12"/>
+		<string text="Please reconnect\n#%controller controller." map="13"/>
+		<string text="A controller\nmemory card error\nhas occurred." map="14"/>
+		<string text="Saving... one moment\nplease." map="15"/>
+		<string text="Creating player profile...\none moment please." map="16"/>
+		<string text="Creating game settings\nfile... one moment please." map="17"/>
+		<string text="Player 2 must use a\ndifferent controller\nthan Player 1." map="18"/>
+		<string text="unused controller error" map="19"/>
+		<string text="unused controller error" map="20"/>
+		<string text="Please insert\nanother quarter." map="21"/>
+		<string text="All progress since the\nlast checkpoint will\nbe lost." map="22"/>
+		<string text="All progress on this \nlevel will be lost." map="23"/>
+		<string text="Are you sure you wish \nto delete this profile? \nAll your progress and \nsettings will be lost." map="24"/>
+		<string text="Are you sure you wish \nto delete this\ngametype? All your\nsettings will be lost." map="25"/>
+		<string text="Sorry, you can't delete\nthe default multiplayer\ngame settings." map="26"/>
+		<string text="Sorry, there is already \na saved gametype or \nprofile with that name." map="27"/>
+		<string text="Do you really want to\nback out without saving\nyour changes?" map="28"/>
+		<string text="Sorry, you can't create\na saved game file with\nan empty name." map="29"/>
+		<string text="Saving last checkpoint...\none moment please." map="30"/>
+		<string text="Unable to load saved\ngame file." map="31"/>
+		<string text="unused warning" map="32"/>
+		<string text="Insufficient free space to\nsave game." map="33"/>
+		<string text="Insufficient free save slots." map="34"/>
+		<string text="An error has occurred\nloading a map file." map="35"/>
+		<string text="You have reached the\nmaximum number of Halo\ngame files. Unable to\ncreate additional ones." map="36"/>
+		<string text="Unable to create new\nplayer profile." map="37"/>
+		<string text="Unable to create new\nmultiplayer game\nsettings entry." map="38"/>
+		<string text="Unable to load saved\nprogress for this\nprofile." map="39"/>
+		<string text="An error has occurred\ntrying to contact the \nGameSpy master server." map="40"/>
+		<string text="Video settings changed...\nPress OK to accept." map="41"/>
+		<string text="The server you selected\nrequires a password!" map="42"/>
+		<string text="Unable to join the game\nserver!" map="43"/>
+		<string text="The server reported\nan invalid connection\nrequest." map="44"/>
+		<string text="Your password was\nrejected by the server." map="45"/>
+		<string text="The server is full." map="46"/>
+		<string text="Your CD Key is invalid." map="47"/>
+		<string text="Your CD Key is in use\nby another player." map="48"/>
+		<string text="The server operator has\nbanned you from playing\non this server." map="49"/>
+		<string text="The server operator has\nkicked you from this\nserver." map="50"/>
+		<string text="Video settings will be\ntested.  If you do not see\na confirm dialog after\nthe change, press ESC." map="51"/>
+		<string text="Checkpoint saved." map="52"/>
+		<string text="The address is invalid." map="53"/>
+		<string text="You need to create or\nselect a profile in order\nto continue." map="54"/>
+		<string text="Your client is running an\nincompatible network \nprotocol version." map="55"/>
+		<string text="Connection rejected: Your\nclient is older than the\nserver." map="56"/>
+		<string text="Connection rejected: Your\nclient is newer than the\nserver." map="57"/>
+		<string text="You must have\nAdministrator privileges\nto download this required\npatch." map="58"/>
+		<string text="Are you sure you want to\ndelete this saved game?" map="59"/>
 	</strings>
-	<strings name="strings/var_boolean">
-		<string text="NO"/>
-		<string text="YES"/>
+	<strings name="strings/var_boolean" map="ui\shell\strings\var_boolean">
+		<string text="NO" map="0"/>
+		<string text="YES" map="1"/>
 	</strings>
 </menus>

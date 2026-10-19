@@ -49,6 +49,12 @@ The host also makes up for scripts written for one player: vitality they
 set on player0 is set on every player (a10's shields), and a Pelican's
 Warthog drop brings more Warthogs in a larger game.
 
+Friendly fire between two players is also each player's own choice
+(network.coop_own_friendly_fire): both must play with it. A client's input
+says its choice, and the host, which alone deals damage, keeps everyone's.
+A player away from the controls for over 70 seconds is hurt by every
+player, whatever either chose, until their next input.
+
 Skipping a cutscene is a vote. Pressing the skip key during a skippable
 cutscene votes (a client sends its vote to the host every tick), and the
 host skips once more than half the machines have voted. The skip itself is
@@ -112,6 +118,8 @@ index and tag, since the map placed them at the same index everywhere.
 #include "sound/sound_definitions.h"
 #include "units/units.h"
 #include "coop_enemies.h"
+#include "coop_pickups.h"
+#include "coop_vehicles.h"
 #include "coop_spectate.h"
 #include "network_coop.h"
 #include "network_distributed.h"
@@ -169,6 +177,9 @@ enum
 	/* the types network_objects.c syncs; the object names sync skips them */
 	NETWORKED_OBJECT_TYPES = _object_mask_biped | _object_mask_vehicle | _object_mask_weapon | _object_mask_equipment,
 
+	/* a player with no input for longer than this is away from the controls:
+	every player's fire hurts them */
+	FRIENDLY_FIRE_AWAY_TICKS = 70 * TICKS_PER_SECOND,
 	/* the host forgets a client's skip vote it hasn't heard again for this long */
 	SKIP_VOTE_HELD_TICKS = TICKS_PER_SECOND,
 	/* After a skip the cutscene stays skippable until the script reaches
@@ -564,6 +575,8 @@ static struct
 static void client_play_presentation(void);
 /* unit_scripting_commands.c */
 void unit_scripting_set_current_vitality_of(long unit_index, real body_vitality, real shield_vitality);
+/* port_config.c */
+int config_boolean(char const *name);
 
 /* ---------- private code */
 
@@ -970,6 +983,17 @@ static struct
 /* host: the structure BSP each client player's machine last said it has,
 NONE before its first input */
 static short host_player_structure_bsps[MAXIMUM_TRACKED_PLAYERS];
+
+/* host: each player's friendly fire, by the player's absolute index: whether
+they chose to play without it, the buttons of their last input, and the ticks
+since an input showed them at the controls */
+static struct friendly_fire_player
+{
+	long player_index;
+	boolean declined;
+	unsigned long control_flags;
+	long idle_ticks;
+} host_friendly_fire[MAXIMUM_TRACKED_PLAYERS];
 
 /* host, each tick: the devices that moved or changed power (and, with the
 resent state, all that ever have) */
@@ -1897,6 +1921,66 @@ static short coop_player_count(
 	return count;
 }
 
+/* host: the player's friendly fire, begun again for a new player in the place
+of one who left (NULL: no such player) */
+static struct friendly_fire_player *host_friendly_fire_player(
+	long player_index)
+{
+	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+	struct friendly_fire_player *entry;
+
+	if (player_index == NONE || absolute_index >= MAXIMUM_TRACKED_PLAYERS)
+		return NULL;
+	entry = &host_friendly_fire[absolute_index];
+	if (entry->player_index != player_index)
+	{
+		csmemset(entry, 0, sizeof(*entry));
+		entry->player_index = player_index;
+	}
+	return entry;
+}
+
+/* host, each tick: the host's own players' choice, and how long each player
+has been away from the controls. The input the tick ran for them shows them
+there if a button was pressed or let go, or a stick or the trigger is held
+(the game itself turns a player's view and chooses their weapon). */
+static void host_friendly_fire_update(
+	void)
+{
+	long update_number = update_server_ticked_update_number();
+	short action_count = 0;
+	struct player_action const *actions =
+		update_number != NONE ? update_server_update_actions(update_number, &action_count) : NULL;
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		short absolute_index = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+		struct friendly_fire_player *entry = host_friendly_fire_player(iterator.datum_index);
+		struct player_action const *action;
+
+		if (!entry)
+			continue;
+		if (player->local_player_index != NONE)
+			entry->declined = !network_coop_own_friendly_fire();
+		if (!actions || absolute_index >= action_count)
+			continue;
+		action = &actions[absolute_index];
+		if (action->control_flags != entry->control_flags || action->throttle.i != 0.0f ||
+			action->throttle.j != 0.0f || action->primary_trigger != 0.0f)
+		{
+			entry->idle_ticks = 0;
+		}
+		else if (entry->idle_ticks <= FRIENDLY_FIRE_AWAY_TICKS)
+		{
+			entry->idle_ticks++;
+		}
+		entry->control_flags = action->control_flags;
+	}
+}
+
 static boolean tag_name_has(
 	long definition_index,
 	char const *text)
@@ -1950,6 +2034,7 @@ void network_coop_new_game(
 	csmemset(host_sent_looks, 0, sizeof(host_sent_looks));
 	csmemset(host_sent_devices, 0, sizeof(host_sent_devices));
 	csmemset(host_player_structure_bsps, NONE, sizeof(host_player_structure_bsps));
+	csmemset(host_friendly_fire, 0, sizeof(host_friendly_fire));
 	csmemset(&host_sent_screen_effect, 0, sizeof(host_sent_screen_effect));
 	csmemset(&host_resend, 0, sizeof(host_resend));
 	csmemset(&players_vitality, 0, sizeof(players_vitality));
@@ -1963,6 +2048,8 @@ void network_coop_new_game(
 	skip_vote.cooldown_until = 0;
 	skip_vote.skip_save_written = FALSE;
 	coop_enemies_new_game();
+	coop_pickups_new_game();
+	coop_vehicles_new_game();
 }
 
 /* A network game on a campaign scenario with no game engine. Checking the
@@ -1985,6 +2072,40 @@ boolean network_coop_player_collisions(
 	if (!network_coop_active() || !(game = network_game_get_game()))
 		return TRUE;
 	return !TEST_FLAG(game->cooperative_flags, _network_game_cooperative_no_player_collisions_bit);
+}
+
+boolean network_coop_own_friendly_fire(
+	void)
+{
+	return config_boolean("network.coop_own_friendly_fire") != 0;
+}
+
+void network_coop_note_player_friendly_fire(
+	long player_index,
+	boolean friendly_fire)
+{
+	struct friendly_fire_player *entry = coop_host() ? host_friendly_fire_player(player_index) : NULL;
+
+	if (entry)
+		entry->declined = !friendly_fire;
+}
+
+boolean network_coop_players_friendly_fire(
+	long attacker_player_index,
+	long victim_player_index)
+{
+	struct friendly_fire_player *attacker, *victim;
+
+	/* (a client deals no damage, and a player's own fire is the game's) */
+	if (!coop_host() || attacker_player_index == victim_player_index)
+		return TRUE;
+	attacker = host_friendly_fire_player(attacker_player_index);
+	victim = host_friendly_fire_player(victim_player_index);
+	if (!attacker || !victim)
+		return TRUE;
+	/* one who is away is hurt whatever either chose; else both must play
+	with it */
+	return victim->idle_ticks > FRIENDLY_FIRE_AWAY_TICKS || (!attacker->declined && !victim->declined);
 }
 
 boolean network_coop_devices_remote(
@@ -2627,7 +2748,10 @@ void network_coop_host_tick(
 		return;
 	host_resend_update();
 	players_vitality_keep();
+	host_friendly_fire_update();
 	coop_enemies_update();
+	coop_pickups_update();
+	coop_vehicles_update();
 	host_count_skip_votes();
 	host_presentation(&message.presentation);
 	send_to_clients(&message, _distributed_message_coop_presentation, 1, sizeof(message.presentation));
@@ -3018,8 +3142,9 @@ static void client_presentation_apply(
 	a dead camera at the world origin. */
 	client_host_camera_set((coop_presentation.cinematic_started && presentation->camera_scripted &&
 		!coop_spectate_watching_rider(0)) || coop_spectate_nothing_to_watch(0));
-	if (coop_presentation.cinematic_started)
-		cinematic_show_letterbox(TEST_FLAG(presentation->flags, _presentation_letterbox_bit));
+	/* (also outside a cinematic: a cutscene that leaves the players their
+	controls shows the bars too) */
+	cinematic_show_letterbox(TEST_FLAG(presentation->flags, _presentation_letterbox_bit));
 	objects_port_set_activating_cluster((short)(presentation->activating_cluster - 1));
 	if (coop_presentation.host_camera)
 	{

@@ -175,33 +175,29 @@ char const *transport_address_to_string(
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c", 75, IPV4_ADDRESS_LENGTH == addr->address_length);
 
 	transport_address_string[0] = 0;
+	/* port: only ever logged (network_event), and players post their logs:
+	a public address as log_address writes it, never whole */
 	if (addr->address_length == IPV4_ADDRESS_LENGTH)
 	{
-		_snprintf(
-			transport_address_string,
-			NUMBEROF(transport_address_string),
-			"%hd.%hd.%hd.%hd:%hd",
-			addr->address.bytes[3],
-			addr->address.bytes[2],
-			addr->address.bytes[1],
-			addr->address.bytes[0],
-			addr->port);
+		unsigned char bytes[4];
+
+		bytes[0] = addr->address.bytes[3];
+		bytes[1] = addr->address.bytes[2];
+		bytes[2] = addr->address.bytes[1];
+		bytes[3] = addr->address.bytes[0];
+		log_address(bytes, 4, (word)addr->port, transport_address_string, NUMBEROF(transport_address_string));
 	}
 	else if (addr->address_length == IPV6_ADDRESS_LENGTH)
 	{
-		_snprintf(
-			transport_address_string,
-			NUMBEROF(transport_address_string),
-			"%4X.%4X.%4X.%4X.%4X.%4X.%4X.%4X:%hd",
-			addr->address.words[0],
-			addr->address.words[1],
-			addr->address.words[2],
-			addr->address.words[3],
-			addr->address.words[4],
-			addr->address.words[5],
-			addr->address.words[6],
-			addr->address.words[7],
-			addr->port);
+		unsigned char bytes[16];
+		long index;
+
+		for (index = 0; index < 8; index++)
+		{
+			bytes[2 * index] = (unsigned char)(addr->address.words[index] >> 8);
+			bytes[2 * index + 1] = (unsigned char)addr->address.words[index];
+		}
+		log_address(bytes, 16, (word)addr->port, transport_address_string, NUMBEROF(transport_address_string));
 	}
 
 	return transport_address_string;

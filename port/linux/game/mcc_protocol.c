@@ -6,7 +6,7 @@
 #include "bungie_net/common/message_header.h"
 #include <stddef.h>
 
-/* The base record is exactly OpenCE version 29, through local_data. */
+/* The base record is exactly OpenCE version 32, through local_data. */
 typedef char mcc_protocol_base_layout[
     offsetof(struct network_game, mcc_content_sha256) ==
         HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x2A ? 1 : -1];
