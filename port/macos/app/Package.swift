@@ -23,7 +23,9 @@ let package = Package(
         .target(name: "OpenCEWindow", dependencies: ["OpenCEShell"]),
         // the game's sound: AVAudioEngine
         .target(name: "OpenCEAudio"),
-        .executableTarget(name: "OpenCE", dependencies: ["CHaloHost", "OpenCERuntime", "OpenCEShell", "OpenCEWindow", "OpenCEAudio"]),
-        .testTarget(name: "OpenCETests", dependencies: ["OpenCERuntime", "OpenCEShell", "OpenCEWindow", "OpenCEAudio"]),
+        // the render commands (port/macos/include/opence_render.h) on Metal
+        .target(name: "OpenCERender", dependencies: ["OpenCERuntime"]),
+        .executableTarget(name: "OpenCE", dependencies: ["CHaloHost", "OpenCERuntime", "OpenCEShell", "OpenCEWindow", "OpenCEAudio", "OpenCERender"]),
+        .testTarget(name: "OpenCETests", dependencies: ["OpenCERuntime", "OpenCEShell", "OpenCEWindow", "OpenCEAudio", "OpenCERender"]),
     ]
 )

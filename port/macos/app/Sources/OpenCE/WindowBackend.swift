@@ -24,7 +24,13 @@ enum WindowBackend {
             // as a window, which the player can make fullscreen)
             let title = title.map { String(cString: $0) } ?? ""
             return MainActor.assumeIsolated {
-                WindowBackend.windows.create(title: title, width: Int(width), height: Int(height))
+                let handle = WindowBackend.windows.create(title: title, width: Int(width), height: Int(height))
+                // (the first window is the one the game draws in)
+                if RenderBackend.window.layer == nil, let view = WindowBackend.windows.window(handle)?.gameView {
+                    view.clearsOnResize = false
+                    RenderBackend.window.layer = view.metalLayer
+                }
+                return handle
             }
         }
         backend.size_in_pixels = { _, window, width, height in

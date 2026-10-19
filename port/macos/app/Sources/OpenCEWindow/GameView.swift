@@ -9,6 +9,9 @@ import QuartzCore
 public final class GameView: NSView {
     public let metalLayer = CAMetalLayer()
     private let queue: MTLCommandQueue?
+    /// Whether a resize presents a black frame: until the renderer draws in
+    /// the layer, which then has its drawables to itself.
+    public var clearsOnResize = true
     /// Where the view's keyboard and mouse go (GameWindows').
     var onInput: ((GameInputEvent) -> Void)?
 
@@ -116,7 +119,9 @@ public final class GameView: NSView {
         metalLayer.contentsScale = scale
         if metalLayer.drawableSize != size {
             metalLayer.drawableSize = size
-            clear()
+            if clearsOnResize {
+                clear()
+            }
         }
     }
 

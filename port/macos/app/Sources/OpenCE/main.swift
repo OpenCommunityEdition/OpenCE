@@ -28,6 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         WindowBackend.install()
         // (and its sound the app's AVAudioEngine)
         AudioBackend.install()
+        // (and its batches drawn with Metal in that window)
+        RenderBackend.install()
         log.info("starting the guest image \(image.path) with the data in \(root.path)")
         // (the guest's program name, then any arguments the app was given)
         HaloHost.start(image: image, arguments: ["OpenCE"] + CommandLine.arguments.dropFirst()) { [weak self] in

@@ -390,8 +390,6 @@ checks each batch, because the guest is untrusted.
   vertex buffer, which Metal on Apple silicon keeps inside the process's
   own GPU address space.
 
-The Swift app makes one `RenderDecoder` for each guest, and tells it the
-window's drawable size.
 
 The guest writes its batches with `port/macos/guest/opence_render_writer.c`
 (`opence_render_writer.h`), a buffer of its own per thread. It rings the
@@ -408,6 +406,42 @@ installed one (`halo_host_set_render_backend`). Without one, as in the
 command-line host, the runtime checks it (`opence_render_check`, with its
 own objects) and drops it. Refusals are logged as warnings, the first 32
 of them.
+
+The app's renderer is `Sources/OpenCERender/MetalRenderer.swift`, installed
+by `Sources/OpenCE/RenderBackend.swift`. It is made at the first batch, with
+its own `RenderDecoder`, which it tells the window's drawable size before
+each batch. It draws in the layer of the first window the guest opens, and
+from then on the view leaves the layer's drawables to it (a resize no longer
+clears the window). What the decoder lets through is carried out in the
+order the guest wrote it:
+
+- **One command buffer** lasts from batch to batch, so a pass may begin in
+  one batch and end in the next. It is committed at `PRESENT`, without
+  waiting, and at `READ_TEXTURE`, which waits for it and then writes the
+  pixels to guest memory.
+- **Uploads are blits** from a copy of the guest's bytes, in the same
+  command buffer as the draws, so a draw sees what was uploaded before it
+  and not what comes after. Buffers are shared, textures private.
+- **An upload inside a pass** ends the pass's encoder, storing its targets.
+  The next draw begins another, which loads them, and the pass's state is
+  set on it again. A multisampled pass resolves only at `END_PASS`.
+- **The window** is colour texture 0. Its passes draw one drawable of the
+  layer until `PRESENT` presents it. `nextDrawable` blocks while the
+  layer's three drawables are all in flight, which keeps the guest at most
+  three frames ahead of the GPU.
+- **States are made once** for what they are made of: a library for its
+  source, a pipeline for its libraries and descriptor, a depth-stencil or
+  sampler state for its fields. Direct3D's state changes make the same few
+  states again and again, and Metal compiles them slowly.
+- **What Metal will not make** (a shader that does not compile, a pipeline
+  whose functions do not match) is refused, and so is what uses it: the
+  `SET_*` commands that name it, and draws without a pipeline. These count
+  with the decoder's refusals in what `host_render_submit` answers, and are
+  logged (the first 99) in the `render` category of the app's log.
+
+The guest's shaders name their functions `vertex_main` and `fragment_main`.
+A scissor is clipped to the pass's target, which a window resized since the
+pass began can make smaller than the decoder's drawable size.
 
 A guest crash is reported with its registers, the exception's syndrome and
 the guest's frames, by address in the image (`llvm-symbolizer` on
@@ -438,6 +472,7 @@ In `nix develop`, after `ninja macos`:
 ```sh
 python -m pytest -q tools/test_macos_spikes.py tools/test_macos_build.py tools/test_macos_vm.py tools/test_macos_host.py
 python -m pytest -q tools/test_macos_render.py   # render batches through the doorbell
+ninja macos_app_test                              # the app's Swift tests, the Metal renderer's pixels too
 cargo test --manifest-path port/macos/runtime/Cargo.toml
 python -m pytest -q tools/harness         # the asset-free harness, in the VM
 ```
@@ -453,8 +488,9 @@ aliases).
 
 ## Not supported yet
 
-- Drawing: OpenGL ES is refused while headless, and there is no Metal
-  renderer yet. The game runs only with `debug.null_renderer`.
+- Drawing: the Metal renderer carries out the render batches, but the
+  game's Direct3D is not yet written as them, and OpenGL ES is refused while
+  headless. The game runs only with `debug.null_renderer`.
 - A window, and input from it.
 - Intel Macs, and macOS before 26.
 - An app bundle.
