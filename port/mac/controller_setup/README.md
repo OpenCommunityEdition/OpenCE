@@ -39,13 +39,14 @@ universal (ppc + i386) binary.
 - `--dump-text` prints the window's texts and control sizes, with the size
   each text needs (`GetThemeTextDimensions`), and marks any that is cut off;
   it opens no window.
-- Bluetooth (experimental...) opens a test window for pairing and live-testing a
+- The Bluetooth (experimental) tab, in the same window as the Controllers tab (one window, a tab view), is a test area for pairing and live-testing a
   DualSense or DualShock 4 over PowerSpark's own Bluetooth stack (`../bt/`), through a
   TP-Link UB500 (Realtek RTL8761BU) dongle. It shows the dongle's state (not found,
   found, in use by Apple's Bluetooth, firmware loaded), searches and pairs, lists
   paired pads (press PS to reconnect, Forget), shows the pad live (sticks, analog
   triggers, buttons, touchpad), tests the light bar, player lights and rumble, and
-  shows the report rate. The Realtek firmware (`rtl8761bu_fw.bin`,
+  shows the report rate. The stack starts only when Start is pressed, and stops when the tab is left or the
+  window closes. The Realtek firmware (`rtl8761bu_fw.bin`,
   `rtl8761bu_config.bin`) is not shipped: it is looked for in
   `input.bluetooth_firmware_dir`, `~/Library/Application Support/OpenCE/Bluetooth/` and
   `/Library/Application Support/RealtekBTFirmware/`. If Apple's driver takes the dongle,
@@ -57,6 +58,14 @@ universal (ppc + i386) binary.
   report layout, firmware image, key file, a whole search, pairing and input session),
   or with `--live [--fw DIR] [--search SECONDS] [--pair] [--reconnect SECONDS]
   [--secs N] [--output]` on the real dongle.
+- Only one Controller Setup runs at a time. The first holds a lock (`flock` on
+  `~/Library/Application Support/OpenCE/controller_setup.lock`, dropped by the system when the
+  process ends). One started later, by whatever route (the launcher's button, its first-run hook,
+  `--controller-setup`, Finder, `open`), asks the first, by a distributed notification carrying its
+  `--config` path, to come to the front (and take the path if it has none), waits for the first to
+  finish and quits without a window with status 1, so the launcher carries on only when the first is
+  done. `--hold-test` holds the lock for 6 seconds with no window and prints each request to come to the
+  front (a test).
 - There is no driver and no installer. `--package` is accepted and ignored.
 
 ## Files
@@ -65,7 +74,7 @@ universal (ppc + i386) binary.
 - `controller_setup_config.c/.h`: pure C config read/modify/write.
 - `controller_setup_hid.c/.h`: pure C mapping of HID elements to a pad state.
 - `test_config.c`: tests of both; `cc -o t test_config.c controller_setup_config.c controller_setup_hid.c && ./t`.
-- `bt_panel.m`, `controller_setup_ui.h`: the Bluetooth window.
+- `bt_panel.m`, `controller_setup_ui.h`: the Bluetooth tab.
 - `../bt/`: the Bluetooth stack (see `bt_stack.h`).
 - `build.sh`, `Info.plist`.
 

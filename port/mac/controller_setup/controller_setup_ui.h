@@ -30,9 +30,16 @@
 NSSize CSThemeSize(NSString *text, ThemeFontID font, float width, BOOL wrap);
 int CSDumpView(NSView *view, int depth, NSString *indent);
 
-/* the Bluetooth (experimental) window */
-void CSBluetoothShow(NSString *configPath);
-/* builds the window, prints its texts and sizes, returns the number cut off; shows nothing */
+/* the Bluetooth (experimental) tab: its controls in a view 520 wide (CSBluetoothContentHeight tall); the tab view
+   is main.m's */
+NSView *CSBluetoothMakeView(NSString *configPath);
+float CSBluetoothContentHeight(void);
+void CSBluetoothSetConfigPath(NSString *configPath);
+/* the tab is shown (YES: it draws the stack's state; the stack starts only when Start is pressed) or left (NO:
+   the stack is stopped) */
+void CSBluetoothSetActive(BOOL active);
+/* prints the tab's texts as they are in each state, returns the number cut off (the view itself is walked by
+   CSDumpView); shows nothing */
 int CSBluetoothDumpText(void);
 /* stops the Bluetooth session (if one runs) so the dongle is left tidy; call before exiting */
 void CSBluetoothShutdown(void);

@@ -1,6 +1,6 @@
-/* The Bluetooth (experimental) window of Controller Setup: pairs and live-tests a
+/* The Bluetooth (experimental) tab of Controller Setup: pairs and live-tests a
    PlayStation pad over PowerSpark's own Bluetooth stack (../bt/), through a
-   TP-Link UB500 (Realtek RTL8761BU) dongle. It is a test window, not the game's
+   TP-Link UB500 (Realtek RTL8761BU) dongle. It is a test area, not the game's
    feature. The stack runs on its own thread (../bt/bt_session.c); this file only
    asks it for things and draws its snapshot. */
 #import <Cocoa/Cocoa.h>
@@ -18,7 +18,7 @@
 #define FIRMWARE_PROJECT_LINK @"https://github.com/<your-account>/<firmware-project> (link to follow)"
 
 static NSString *const kIntro =
-	@"A test window: pair a PlayStation controller with PowerSpark's own Bluetooth, through a TP-Link UB500 dongle "
+	@"Experimental: pair a PlayStation controller with PowerSpark's own Bluetooth, through a TP-Link UB500 dongle "
 	@"(Realtek RTL8761BU), and check what arrives. It is not the game's controller support yet; the game does not use it.";
 static NSString *const kDongleNone = @"Dongle: not found. Plug in the TP-Link UB500.";
 static NSString *const kDongleFound = @"Dongle: found. Press Start to open it.";
@@ -36,7 +36,7 @@ static NSString *const kNoticeApple =
 	@"This only stops Apple's driver switching to a second Bluetooth controller; the Mac's own Bluetooth keeps working. "
 	@"To undo it: sudo nvram -d bluetoothHostControllerSwitchBehavior";
 static NSString *const kNoticeNvramSet = @" (It is set on this Mac already: unplug the dongle and plug it in again.)";
-static NSString *const kNoticeBusy = @"Another program has the dongle open. Quit it (another copy of this window, a Bluetooth tool) and press Start again.";
+static NSString *const kNoticeBusy = @"Another program has the dongle open. Quit it (a Bluetooth tool) and press Start again.";
 static NSString *const kMessageIdle = @"Press Start to open the dongle. Pads paired before reconnect when you press PS on them.";
 
 static struct { const char *name; int r, g, b; } const colours[7] = {
@@ -46,10 +46,11 @@ static struct { const char *name; int r, g, b; } const colours[7] = {
 static const unsigned char playerPatterns[6] = { 0x04, 0x0a, 0x15, 0x1b, 0x1f, 0x00 };
 
 @interface BTPanel : NSObject {
-	NSWindow *window;
+@public
+	NSView *container;              /* the tab's controls, 520 wide; main.m puts it in the tab view */
 	NSString *configPath;
 	NSTextField *intro, *dongleLabel, *notice, *listHeading, *messageLabel, *rateLabel, *testLabel;
-	NSButton *startButton, *searchButton, *disconnectButton, *lightButton, *playersButton, *rumbleButton, *closeButton;
+	NSButton *startButton, *searchButton, *disconnectButton, *lightButton, *playersButton, *rumbleButton;
 	NSTextField *rowLabel[ROWS];
 	NSButton *rowButton[ROWS];
 	int rowKind[ROWS];              /* 0 none, 1 paired (Forget), 2 found (Pair) */
@@ -64,7 +65,8 @@ static const unsigned char playerPatterns[6] = { 0x04, 0x0a, 0x15, 0x1b, 0x1f, 0
 	float noticeHeight;
 }
 - (void)buildUI;
-- (void)show;
+- (float)contentHeight;
+- (void)activate;
 - (void)setConfigPath:(NSString *)path;
 - (int)dumpText;
 - (void)shutdown;
@@ -85,7 +87,7 @@ static BTPanel *gPanel = nil;
 	[t setStringValue:text];
 	[t setFont:bold ? [NSFont boldSystemFontOfSize:13] : [NSFont systemFontOfSize:[NSFont smallSystemFontSize]]];
 	[[t cell] setWraps:YES];
-	[[window contentView] addSubview:t];
+	[container addSubview:t];
 	return t;
 }
 
@@ -96,17 +98,16 @@ static BTPanel *gPanel = nil;
 	[b setBezelStyle:NSRoundedBezelStyle];
 	[b setTarget:self];
 	[b setAction:action];
-	[[window contentView] addSubview:b];
+	[container addSubview:b];
 	return b;
 }
 
-/* the window from the top down; y is measured down from the top, and every control is placed by its top */
-- (void)buildUI
+/* the height of the tab's controls, from its texts */
+- (float)measure
 {
-	const float margin = 10, width = 500;
+	const float width = 500;
 	float introH = CSThemeSize(kIntro, kThemeSmallSystemFont, width - 8, YES).height + 6;
-	float headH = 20, dongleH = 32, msgH = 32;
-	float h, y;
+	float dongleH = 20, msgH = 32;
 	NSString *notices[4];
 	int i;
 
@@ -118,17 +119,27 @@ static BTPanel *gPanel = nil;
 		if (n > noticeHeight)
 			noticeHeight = n;
 	}
-	/* heading, intro, dongle, notice, buttons, list heading, rows, message, pad view, test row, rate, close */
-	h = 8 + headH + introH + dongleH + noticeHeight + 34 + 18 + ROWS * 26 + msgH + 160 + 14 + 34 + 20 + 40;
-	window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 520, h) styleMask:NSTitledWindowMask | NSClosableWindowMask
-		backing:NSBackingStoreBuffered defer:NO];
-	[window setTitle:@"PowerSpark Bluetooth (experimental)"];
-	[window setReleasedWhenClosed:NO];
-	[window setDelegate:(id)self];
+	/* intro, dongle, notice, buttons, list heading, rows, message, pad view, test row, rate */
+	return 8 + introH + dongleH + noticeHeight + 34 + 18 + ROWS * 26 + msgH + 160 + 14 + 34 + 20 + 8;
+}
+
+- (float)contentHeight
+{
+	return [self measure];
+}
+
+/* the tab from the top down; y is measured down from the top, and every control is placed by its top */
+- (void)buildUI
+{
+	const float margin = 10, width = 500;
+	float introH = CSThemeSize(kIntro, kThemeSmallSystemFont, width - 8, YES).height + 6;
+	float dongleH = 20, msgH = 32;
+	float h = [self measure], y;
+	int i;
+
+	container = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 520, h)];
 
 	y = 8;
-	[self labelAt:NSMakeRect(margin, h - y - headH, width, headH) text:@"Bluetooth (experimental)" bold:YES];
-	y += headH;
 	intro = [self labelAt:NSMakeRect(margin, h - y - introH, width, introH) text:kIntro bold:NO];
 	y += introH;
 	dongleLabel = [self labelAt:NSMakeRect(margin, h - y - dongleH, width, dongleH) text:kDongleNone bold:NO];
@@ -153,15 +164,13 @@ static BTPanel *gPanel = nil;
 	padView = [[[PadView alloc] initWithFrame:NSMakeRect(margin, h - y - 160, width, 160)] autorelease];
 	padView->leftDeadZone = padView->rightDeadZone = 9000;
 	padView->showTouch = YES;
-	[[window contentView] addSubview:padView];
+	[container addSubview:padView];
 	y += 160 + 14;
 	lightButton = [self buttonAt:NSMakeRect(margin, h - y - 30, 140, 32) title:@"Light bar color" action:@selector(lightPressed:)];
 	playersButton = [self buttonAt:NSMakeRect(margin + 150, h - y - 30, 120, 32) title:@"Player lights" action:@selector(playersPressed:)];
 	rumbleButton = [self buttonAt:NSMakeRect(margin + 280, h - y - 30, 90, 32) title:@"Rumble" action:@selector(rumblePressed:)];
 	y += 34;
 	rateLabel = [self labelAt:NSMakeRect(margin, h - y - 18, width, 18) text:@"Reports: -" bold:NO];
-	y += 20;
-	closeButton = [self buttonAt:NSMakeRect(margin + 400, h - y - 36, 100, 32) title:@"Close" action:@selector(closePressed:)];
 	(void)testLabel;
 	[padView setNeedsDisplay:YES];
 }
@@ -184,15 +193,12 @@ static BTPanel *gPanel = nil;
 	configPath = path;
 }
 
-- (void)show
+/* the tab is shown: draw its state (the stack starts only when Start is pressed) */
+- (void)activate
 {
-	if (!window)
-		[self buildUI];
 	[self refresh:nil];
 	if (!timer)
 		timer = [[NSTimer scheduledTimerWithTimeInterval:0.04 target:self selector:@selector(refresh:) userInfo:nil repeats:YES] retain];
-	[window center];
-	[window makeKeyAndOrderFront:nil];
 }
 
 - (void)startPressed:(id)sender
@@ -278,16 +284,6 @@ static BTPanel *gPanel = nil;
 	o.weak = 120;
 	o.set_rumble = 1;
 	bt_session_output(session, &o);   /* (the stack switches it off again after a moment) */
-}
-
-- (void)closePressed:(id)sender
-{
-	[window close];
-}
-
-- (void)windowWillClose:(NSNotification *)n
-{
-	[self shutdown];
 }
 
 - (void)shutdown
@@ -454,12 +450,9 @@ static NSString *AddressText(const unsigned char *a)
 {
 	NSString *all[10];
 	int i, bad;
-	NSRect f;
-	if (!window)
+	bad = 0;
+	if (!container)
 		[self buildUI];
-	f = [[window contentView] frame];
-	printf("window %dx%d\n", (int)f.size.width, (int)f.size.height);
-	bad = CSDumpView([window contentView], 0, @"  ");
 	all[0] = kDongleNone; all[1] = kDongleFound; all[2] = kDongleApple; all[3] = kDongleBusy; all[4] = kDongleOpening;
 	all[5] = kDongleFailed;
 	all[6] = @"Dongle: ready, Realtek RTL8761B, firmware dfc6d922. Address 20:e1:5d:8d:15:d8.";
@@ -491,19 +484,43 @@ static NSString *AddressText(const unsigned char *a)
 
 @end
 
-void CSBluetoothShow(NSString *configPath)
+static BTPanel *Panel(void)
 {
 	if (!gPanel)
 		gPanel = [[BTPanel alloc] init];
-	[gPanel setConfigPath:configPath];
-	[gPanel show];
+	return gPanel;
+}
+
+NSView *CSBluetoothMakeView(NSString *configPath)
+{
+	BTPanel *p = Panel();
+	[p setConfigPath:configPath];
+	if (!p->container)
+		[p buildUI];
+	return p->container;
+}
+
+float CSBluetoothContentHeight(void)
+{
+	return [Panel() contentHeight];
+}
+
+void CSBluetoothSetConfigPath(NSString *configPath)
+{
+	[Panel() setConfigPath:configPath];
+}
+
+void CSBluetoothSetActive(BOOL active)
+{
+	if (active)
+		[Panel() activate];
+	else
+		[gPanel shutdown];
 }
 
 int CSBluetoothDumpText(void)
 {
-	if (!gPanel)
-		gPanel = [[BTPanel alloc] init];
-	return [gPanel dumpText];
+	return [Panel() dumpText];
 }
 
 void CSBluetoothShutdown(void)

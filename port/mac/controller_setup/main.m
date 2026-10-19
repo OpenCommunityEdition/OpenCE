@@ -8,6 +8,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/file.h>
 
 #include "controller_setup_config.h"
 #include "controller_setup_hid.h"
@@ -16,6 +21,10 @@
 #include "../bt/bt_selftest.h"
 
 static NSString *gConfigPath = nil;
+static BOOL gHoldTest = NO; /* --hold-test: the single-instance checks, with no window */
+
+/* a second Controller Setup asks the first to come to the front with this (its --config path rides along) */
+static NSString *const kRaiseNotification = @"org.opence.controller-setup.raise";
 
 /* the instructions: short, in the order a person does them */
 static NSString *const kHeading = @"Connect a modern controller with the 8BitDo Wireless USB Adapter 2";
@@ -184,6 +193,9 @@ static int DeviceNumber(IOHIDDeviceRef device, CFStringRef key)
 
 @interface SetupController : NSObject {
 	NSWindow *window;
+	NSTabView *tabView;
+	NSView *padGroup; /* the Controllers tab's controls; the controls below are added to it */
+	NSTabViewItem *padItem, *btItem;
 	PadView *padView;
 	NSBox *box;
 	NSTextField *headingLabel, *instructions, *status;
@@ -201,6 +213,7 @@ static int DeviceNumber(IOHIDDeviceRef device, CFStringRef key)
 	CFAbsoluteTime chosenAt, lastInput;
 }
 - (void)buildUI;
+- (void)raise:(NSNotification *)note;
 - (void)start;
 - (void)dumpText;
 - (void)sliderChanged:(id)sender;
@@ -359,7 +372,7 @@ static CFMutableDictionaryRef MatchPage(int page, int usage)
 
 - (NSTextField *)labelAt:(NSRect)frame text:(NSString *)text bold:(BOOL)bold
 {
-	return [self labelIn:[window contentView] frame:frame text:text bold:bold];
+	return [self labelIn:padGroup frame:frame text:text bold:bold];
 }
 
 - (NSButton *)buttonAt:(NSRect)frame title:(NSString *)title action:(SEL)action
@@ -369,7 +382,7 @@ static CFMutableDictionaryRef MatchPage(int page, int usage)
 	[b setBezelStyle:NSRoundedBezelStyle];
 	[b setTarget:self];
 	[b setAction:action];
-	[[window contentView] addSubview:b];
+	[padGroup addSubview:b];
 	return b;
 }
 
@@ -382,7 +395,7 @@ static CFMutableDictionaryRef MatchPage(int page, int usage)
 	[s setContinuous:YES];
 	[s setTarget:self];
 	[s setAction:@selector(sliderChanged:)];
-	[[window contentView] addSubview:s];
+	[padGroup addSubview:s];
 	return s;
 }
 
@@ -405,7 +418,9 @@ static CFMutableDictionaryRef MatchPage(int page, int usage)
 
 - (void)buildUI
 {
-	/* the window, from the bottom up: buttons, invert, sliders, the pad view (160), the status line, the instructions */
+	/* the window is a tab view with two tabs, Controllers and Bluetooth (experimental), 520 points wide inside; the
+	   Controllers tab, from the bottom up: buttons, invert, sliders, the pad view (160), the status line, the
+	   instructions */
 	const float margin = 10, inner = 474;
 	float instrH = ThemeSize(kInstructions, kThemeSmallSystemFont, inner - 6, YES).height + 14;
 	float headH = ThemeSize(kHeading, kThemeEmphasizedSystemFont, inner - 6, YES).height + 4;
@@ -413,28 +428,60 @@ static CFMutableDictionaryRef MatchPage(int page, int usage)
 	float boxH = headH + instrH + 12 + 8;
 	float statusY = 286, boxY = statusY + statusH + 6;
 	float height = boxY + boxH + 10;
-	NSRect frame = NSMakeRect(0, 0, 520, height);
+	float btHeight = CSBluetoothContentHeight();
+	float contentH = height > btHeight ? height : btHeight;
+	const float outer = 10; /* the tab view's distance from the window's edges */
+	NSRect probe, frame;
+	float overW, overH;
+	NSView *padPage, *btPage, *btGroup;
 
 	devices = [[NSMutableArray alloc] init];
 	reportBuffers = [[NSMutableDictionary alloc] init];
+	/* how much the tab view's own chrome (the tabs and the border) takes around its pages */
+	tabView = [[[NSTabView alloc] initWithFrame:NSMakeRect(0, 0, 600, 600)] autorelease];
+	probe = [tabView contentRect];
+	overW = 600 - probe.size.width;
+	overH = 600 - probe.size.height;
+	[tabView setFrame:NSMakeRect(outer, outer, 520 + overW, contentH + overH)];
+	frame = NSMakeRect(0, 0, 520 + overW + 2 * outer, contentH + overH + 2 * outer);
 	window = [[NSWindow alloc] initWithContentRect:frame
-		styleMask:NSTitledWindowMask | NSClosableWindowMask
+		styleMask:NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask
 		backing:NSBackingStoreBuffered defer:NO];
 	[window setTitle:@"PowerSpark Controller Setup"];
 	[window setReleasedWhenClosed:NO];
 	[window setDelegate:(id)self];
+	[[window contentView] addSubview:tabView];
+
+	/* the pages are sized to the tab view's content area; each tab's controls sit at the top of its page */
+	padPage = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 520, contentH)] autorelease];
+	padGroup = [[[NSView alloc] initWithFrame:NSMakeRect(0, contentH - height, 520, height)] autorelease];
+	[padPage addSubview:padGroup];
+	btPage = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 520, contentH)] autorelease];
+	btGroup = CSBluetoothMakeView(gConfigPath);
+	[btGroup setFrameOrigin:NSMakePoint(0, contentH - btHeight)];
+	[btPage addSubview:btGroup];
+	padItem = [[[NSTabViewItem alloc] initWithIdentifier:@"controllers"] autorelease];
+	[padItem setLabel:@"Controllers"];
+	[padItem setView:padPage];
+	btItem = [[[NSTabViewItem alloc] initWithIdentifier:@"bluetooth"] autorelease];
+	[btItem setLabel:@"Bluetooth (experimental)"];
+	[btItem setView:btPage];
+	[tabView addTabViewItem:padItem];
+	[tabView addTabViewItem:btItem];
+	[tabView selectTabViewItem:padItem];
+	[tabView setDelegate:(id)self];
 
 	box = [[[NSBox alloc] initWithFrame:NSMakeRect(margin, boxY, 500, boxH)] autorelease];
 	[box setTitlePosition:NSNoTitle];
 	[box setContentViewMargins:NSMakeSize(6, 6)];
-	[[window contentView] addSubview:box];
+	[padGroup addSubview:box];
 	headingLabel = [self labelIn:[box contentView] frame:NSMakeRect(2, boxH - 12 - headH - 4, inner, headH) text:kHeading bold:YES];
 	instructions = [self labelIn:[box contentView] frame:NSMakeRect(2, boxH - 12 - headH - 4 - instrH, inner, instrH) text:kInstructions bold:NO];
 	status = [self labelAt:NSMakeRect(margin, statusY, 500, statusH) text:kStatusNoPad bold:NO];
 
 	padView = [[[PadView alloc] initWithFrame:NSMakeRect(10, 122, 500, 160)] autorelease];
 	padView->leftDeadZone = padView->rightDeadZone = 9000;
-	[[window contentView] addSubview:padView];
+	[padGroup addSubview:padView];
 
 	[self labelAt:NSMakeRect(10, 94, 150, 18) text:@"Left stick dead zone" bold:NO];
 	leftSlider = [self sliderAt:NSMakeRect(160, 94, 280, 20)];
@@ -445,10 +492,9 @@ static CFMutableDictionaryRef MatchPage(int page, int usage)
 	invertBox = [[[NSButton alloc] initWithFrame:NSMakeRect(10, 44, 300, 18)] autorelease];
 	[invertBox setButtonType:NSSwitchButton];
 	[invertBox setTitle:@"Invert look (right stick Y)"];
-	[[window contentView] addSubview:invertBox];
+	[padGroup addSubview:invertBox];
 
 	skipButton = [self buttonAt:NSMakeRect(10, 6, 90, 32) title:@"Skip" action:@selector(skip:)];
-	[self buttonAt:NSMakeRect(110, 6, 200, 32) title:@"Bluetooth (experimental)..." action:@selector(openBluetooth:)];
 	saveButton = [self buttonAt:NSMakeRect(410, 6, 100, 32) title:@"Save" action:@selector(save:)];
 	[saveButton setKeyEquivalent:@"\r"];
 
@@ -529,6 +575,22 @@ NSSize CSThemeSize(NSString *text, ThemeFontID font, float width, BOOL wrap)
 	all[0] = kStatusNoPad; all[1] = kStatusWaiting; all[2] = kStatusReceiving; all[3] = kStatusSilent; all[4] = kStatusQuiet; all[5] = kStatusAdapterIdle; all[6] = kStatusAsleep;
 	printf("window %dx%d\n", (int)f.size.width, (int)f.size.height);
 	bad = DumpView([window contentView], 0, @"  ");
+	/* (only the selected tab's page is in the tab view: walk each page on its own) */
+	for (i = 0; i < (int)[[tabView tabViewItems] count]; i++) {
+		NSTabViewItem *item = [[tabView tabViewItems] objectAtIndex:i];
+		NSRect pf = [[item view] frame];
+		printf("tab \"%s\" page %dx%d\n", [[item label] UTF8String], (int)pf.size.width, (int)pf.size.height);
+		bad += DumpView([item view], 0, @"  ");
+	}
+	{
+		NSRect wf = [window frame], tf = [tabView frame];
+		printf("tab view %dx%d, window %dx%d\n", (int)tf.size.width, (int)tf.size.height, (int)wf.size.width, (int)wf.size.height);
+		/* the smallest screens the Macs here have are 1024x768 with a menu bar and a Dock */
+		if (wf.size.height > 700) {
+			printf("  <-- TOO TALL for a 1024x768 screen\n");
+			bad++;
+		}
+	}
 	for (i = 0; i < 7; i++) {
 		NSSize n = ThemeSize(all[i], kThemeSmallSystemFont, 496, YES);
 		NSRect sf = [status frame];
@@ -537,6 +599,8 @@ NSSize CSThemeSize(NSString *text, ThemeFontID font, float width, BOOL wrap)
 		if (n.height > sf.size.height)
 			bad++;
 	}
+	printf("\nBluetooth tab's texts\n");
+	bad += CSBluetoothDumpText();
 	printf("%s\n", bad ? "CUT OFF: yes" : "nothing cut off");
 }
 
@@ -842,9 +906,36 @@ NSSize CSThemeSize(NSString *text, ThemeFontID font, float width, BOOL wrap)
 	exit(0);
 }
 
-- (void)openBluetooth:(id)sender { CSBluetoothShow(gConfigPath); }
 - (void)save:(id)sender { [self finish:NO]; }
 - (void)skip:(id)sender { [self finish:YES]; }
+
+/* The Bluetooth tab runs the stack only while it is shown (and only after Start): leaving it, or closing the
+   window, stops the stack and gives the dongle back. */
+- (void)tabView:(NSTabView *)view didSelectTabViewItem:(NSTabViewItem *)item
+{
+	CSBluetoothSetActive(item == btItem);
+}
+
+/* another Controller Setup was started (from the launcher, the game or Finder): this window comes to the front
+   instead, and takes the other's config file if it was started with none */
+- (void)raise:(NSNotification *)note
+{
+	NSString *path = [[note userInfo] objectForKey:@"config"];
+	if (gHoldTest) {
+		printf("raised, config %s\n", path ? [path UTF8String] : "(none)");
+		fflush(stdout);
+	}
+	if (path && [path length] && !gConfigPath) {
+		gConfigPath = [path retain];
+		CSBluetoothSetConfigPath(gConfigPath);
+	}
+	if (!window)
+		return;
+	if ([window isMiniaturized])
+		[window deminiaturize:nil];
+	[NSApp activateIgnoringOtherApps:YES];
+	[window makeKeyAndOrderFront:nil];
+}
 
 - (void)windowWillClose:(NSNotification *)n
 {
@@ -853,6 +944,45 @@ NSSize CSThemeSize(NSString *text, ThemeFontID font, float width, BOOL wrap)
 }
 
 @end
+
+/* Only one Controller Setup runs at a time. The first holds a lock on a file in the user's OpenCE folder (the
+   system drops it when the process ends, however it ends); one started later (by the launcher, the game or Finder
+   through the same program) asks the first to come to the front, waits for it to finish, and quits without a
+   window, so that whatever started it carries on only when the first is done. Returns 1 for the first. */
+static int gLockFD = -1;
+
+static int AcquireSingleInstance(void)
+{
+	const char *home = getenv("HOME");
+	char dir[1024], path[1100];
+	int tries;
+
+	if (!home || !*home)
+		return 1;
+	snprintf(dir, sizeof dir, "%s/Library/Application Support", home);
+	mkdir(dir, 0755);
+	snprintf(dir, sizeof dir, "%s/Library/Application Support/OpenCE", home);
+	mkdir(dir, 0755);
+	snprintf(path, sizeof path, "%s/controller_setup.lock", dir);
+	gLockFD = open(path, O_RDWR | O_CREAT, 0600);
+	if (gLockFD < 0)
+		return 1; /* (no lock file: better two windows than none) */
+	if (flock(gLockFD, LOCK_EX | LOCK_NB) == 0)
+		return 1;
+	for (tries = 0;; tries++) {
+		/* (asked again a few times: the first may still be starting up and not listening yet) */
+		if (tries == 0 || tries == 4 || tries == 12) {
+			NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+			NSDictionary *info = gConfigPath ? [NSDictionary dictionaryWithObject:gConfigPath forKey:@"config"] : nil;
+			[[NSDistributedNotificationCenter defaultCenter] postNotificationName:kRaiseNotification object:nil
+				userInfo:info deliverImmediately:YES];
+			[pool release];
+		}
+		usleep(250000);
+		if (flock(gLockFD, LOCK_EX | LOCK_NB) == 0)
+			return 0;
+	}
+}
 
 int main(int argc, char **argv)
 {
@@ -870,15 +1000,32 @@ int main(int argc, char **argv)
 		else if (strcmp(argv[i], "--package") == 0)
 			i++; /* (older launchers pass a driver package; there is none now) */
 	}
+	for (i = 1; i < argc; i++)
+		if (strcmp(argv[i], "--hold-test") == 0)
+			gHoldTest = YES;
+	for (i = 1; i < argc; i++)
+		if (strcmp(argv[i], "--dump-text") == 0)
+			break;
+	if (i == argc && !AcquireSingleInstance()) {
+		fprintf(stderr, "Controller Setup is already open: brought it to the front.\n");
+		return 1;
+	}
 	[NSApplication sharedApplication];
 	controller = [[SetupController alloc] init];
+	[[NSDistributedNotificationCenter defaultCenter] addObserver:controller selector:@selector(raise:)
+		name:kRaiseNotification object:nil];
+	if (gHoldTest) {
+		/* no window: holds the lock for a few seconds and reports each request to come to the front */
+		printf("holding the lock\n");
+		fflush(stdout);
+		[[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:6.0]];
+		return 0;
+	}
 	for (i = 1; i < argc; i++)
 		if (strcmp(argv[i], "--dump-text") == 0) {
 			/* the window is built but never shown, and no pad is opened */
 			[controller buildUI];
 			[controller dumpText];
-			printf("\nBluetooth panel\n");
-			printf("%s\n", CSBluetoothDumpText() ? "CUT OFF: yes (Bluetooth panel)" : "nothing cut off (Bluetooth panel)");
 			return 0;
 		}
 	[controller start];
