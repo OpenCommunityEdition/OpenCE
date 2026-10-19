@@ -159,7 +159,7 @@ static void RunInstall(const char *image, const char *data)
 	{
 		/* this is "Cancel" while copying */
 		gState.cancel = 1;
-		[status setStringValue:@"Cancelling..."];
+		[status setStringValue:@"Canceling..."];
 		[quitButton setEnabled:NO];
 		return;
 	}

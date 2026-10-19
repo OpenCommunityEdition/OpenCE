@@ -231,7 +231,7 @@ static BOOL data_extract(const char *image, const char *destination, char *error
 		{
 			if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
 			{
-				platform_log("extraction cancelled");
+				platform_log("extraction canceled");
 				exit(EXIT_SUCCESS);
 			}
 		}

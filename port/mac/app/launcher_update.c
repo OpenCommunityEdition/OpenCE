@@ -216,7 +216,7 @@ static void size_text(long bytes, char *out, size_t size)
 /* the strings the progress window shows, the widest of which its labels are measured against */
 static const char *const stage_texts[] = {
 	"Looking for a new version\xE2\x80\xA6", "Downloading\xE2\x80\xA6", "Checking the download\xE2\x80\xA6",
-	"Unpacking\xE2\x80\xA6", "Putting the new version in place\xE2\x80\xA6", "Cancelling\xE2\x80\xA6"
+	"Unpacking\xE2\x80\xA6", "Putting the new version in place\xE2\x80\xA6", "Canceling\xE2\x80\xA6"
 };
 #define STAGE_COUNT 6
 
@@ -1152,7 +1152,7 @@ static void install_cancel(struct install *in)
 		fclose(in->hash_file);
 	in->hash_file = NULL;
 	in->stage = ST_DONE;
-	say("update cancelled", NULL, 0);
+	say("update canceled", NULL, 0);
 }
 
 static void install_fail(struct install *in, const char *why)
@@ -1467,7 +1467,7 @@ int lu_run(const struct lu_env *env, int mode)
 		look_quietly(env, found);
 	if (found->result == -2)
 	{
-		say("cancelled", NULL, 0);
+		say("canceled", NULL, 0);
 		free(found);
 		return 0;
 	}

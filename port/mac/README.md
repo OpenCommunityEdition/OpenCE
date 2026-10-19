@@ -24,7 +24,7 @@ the build in the working tree.
   that shape; a wider window or display gets a wider picture (480 lines and
   as many columns as its shape gives, to 1280: Settings > Video > Widescreen,
   `display.resolution_scaling`), with the 3D view wider, the HUD at the
-  corners and the menus centred. The picture is drawn with as many pixels as
+  corners and the menus centered. The picture is drawn with as many pixels as
   the window has (`mac.render_resolution`, "Render resolution"), not scaled
   up from 640x480.
 
@@ -187,7 +187,7 @@ on the launcher's command line, or the first word of the file
 `config.toml` or `HALO_MAC_DATA_ROOT` names the MacSoft data folder explicitly.
 
 PAL discs: the maps are read as the NTSC ones are. The engine's own loader
-(`scenario_tags_load`, as on Linux) recognises the PAL build (`01.01.14.2342`)
+(`scenario_tags_load`, as on Linux) recognizes the PAL build (`01.01.14.2342`)
 and calls `pal_tags_loaded` (`port/linux/game/pal_tags.c`), which restores the
 NTSC values the PAL maps changed for 25 Hz; PowerSpark Setup copies a PAL disc's
 `maps` folder like any other. Not tested (there is no PAL image here); the

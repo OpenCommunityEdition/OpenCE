@@ -177,7 +177,7 @@ static const struct config_setting config_settings[] =
 		"The name of a texture pack in the data root's texture_packs folder,\n"
 		"whose pictures are drawn in place of the maps' bitmaps they are named\n"
 		"for (docs/texture_packs.md); empty is the stock game. Mac build only.\n"
-		"A pack must carry a pack.toml with a name and a licence. On a card of\n"
+		"A pack must carry a pack.toml with a name and a license. On a card of\n"
 		"32 MB or less, pictures larger than 1024 pixels lose their largest\n"
 		"levels, and the pack's textures count against mac.texture_cache_mb." },
 	{ "display.shadow_resolution", _config_integer, "128", "HALO_SHADOW_RESOLUTION", _environment_value,
@@ -229,7 +229,7 @@ static const struct config_setting config_settings[] =
 		"Draw a panel behind the multiplayer scoreboard, for clearer text." },
 	{ "display.scoreboard_background_color", _config_string, "\"16, 16, 16, 150\"", "HALO_SCOREBOARD_BACKGROUND_COLOR",
 		_environment_value, _platform_all,
-		"The scoreboard panel's colour: \"red, green, blue, alpha\", each 0 to 255\n"
+		"The scoreboard panel's color: \"red, green, blue, alpha\", each 0 to 255\n"
 		"(alpha 0 is see-through, 255 solid)." },
 	{ "display.per_pixel_lighting", _config_boolean, "false", "HALO_PER_PIXEL_LIGHTING", _environment_value,
 		_platform_all,
@@ -254,7 +254,7 @@ static const struct config_setting config_settings[] =
 		"is off unless this is set." },
 	{ "audio.resampler", _config_string, "\"sinc\"", "HALO_AUDIO_RESAMPLER", _environment_value, _platform_all,
 		"How sounds are converted to the output's rate: \"sinc\" with a\n"
-		"band-limited low pass; \"linear\" between neighbouring samples,\n"
+		"band-limited low pass; \"linear\" between neighboring samples,\n"
 		"brighter for the aliasing it lets through." },
 	{ "audio.voice_chat", _config_string, "\"push_to_talk\"", "HALO_VOICE_CHAT", _environment_value, _platform_all,
 		"Talking in network games' voice chat: \"push_to_talk\" (while\n"
@@ -301,7 +301,7 @@ static const struct config_setting config_settings[] =
 	{ "input.mouse_capture", _config_boolean, "true", "HALO_NO_MOUSE_CAPTURE", _environment_set_is_false, _platform_mac,
 		"In a game the window holds the mouse (the cursor hidden, the view turned\n"
 		"by its movement), as the other builds do; F12, the menus, another\n"
-		"application in front or a minimised window give the cursor back. false:\n"
+		"application in front or a minimized window give the cursor back. false:\n"
 		"the cursor stays free." },
 	{ "input.menu_cursor", _config_boolean, "true", "HALO_NO_MENU_CURSOR", _environment_set_is_false,
 		_platform_desktop | _platform_mac,
@@ -435,7 +435,7 @@ static const struct config_setting config_settings[] =
 		"its keys (and a controller's D-pad Up) from opening it, as for purists\n"
 		"and streamers." },
 	{ "display.chat_style", _config_string, "\"colors\"", "HALO_CHAT_STYLE", _environment_value, _platform_all,
-		"The text chat's colours: \"colors\" (names in their team's colour, the\n"
+		"The text chat's colors: \"colors\" (names in their team's color, the\n"
 		"text a pale blue) or \"white\" (all white, as Custom Edition)." },
 	{ "game.enhanced_animations", _config_boolean, "true", "HALO_ENHANCED_ANIMATIONS", _environment_value, _platform_all,
 		"The player bipeds' grenade throws keep their legs moving (crouched,\n"
@@ -576,7 +576,7 @@ static const struct config_setting config_settings[] =
 		"machine's game, and when joining a game takes too long. False never\n"
 		"asks." },
 	{ "network.public_lobby", _config_boolean, "true", "HALO_NET_PUBLIC_LOBBY", _environment_value, _platform_all,
-		"The server browser: public games are listed through the signalling\n"
+		"The server browser: public games are listed through the signaling\n"
 		"brokers, and Join Game > Server Browser shows them. False lists no\n"
 		"game of this machine's and shows none." },
 	{ "network.host_public", _config_boolean, "true", "HALO_NET_HOST_PUBLIC", _environment_value, _platform_all,
@@ -826,7 +826,7 @@ static const struct config_setting config_settings[] =
 	{ "debug.gpu_debug_texture0", _config_boolean, "false", "HALO_GPU_DEBUG_T0", _environment_set_is_true, _platform_all,
 		"Pixel shaders show their first texture." },
 	{ "debug.gpu_debug_flat", _config_boolean, "false", "HALO_GPU_DEBUG_FLAT", _environment_set_is_true, _platform_all,
-		"Pixel shaders show their vertex colour." },
+		"Pixel shaders show their vertex color." },
 	{ "debug.screenshot_directory", _config_string, "\"\"", "HALO_SCREENSHOT_DIR", _environment_value, _platform_all,
 		"A folder to save frames to (with screenshot_every); empty none." },
 	{ "debug.screenshot_every", _config_integer, "0", "HALO_SCREENSHOT_EVERY", _environment_value, _platform_all,

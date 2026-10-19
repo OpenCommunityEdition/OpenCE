@@ -199,7 +199,7 @@ int xiso_install(const char *image_path, const char *data_root, xiso_install_pro
 	{
 		if (cancelled)
 			*cancelled = 1;
-		set_error(error, error_size, "Cancelled.%s", NULL);
+		set_error(error, error_size, "Canceled.%s", NULL);
 		remove_tree(temporary, 0);
 		return 0;
 	}

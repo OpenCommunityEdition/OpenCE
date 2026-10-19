@@ -799,7 +799,7 @@ static void broker_connect(struct broker *broker)
 		if (!broker->address)
 		{
 			if (!broker->failures)
-				platform_log("Internet play: cannot look up the signalling broker %s", broker->host);
+				platform_log("Internet play: cannot look up the signaling broker %s", broker->host);
 			broker_close(broker, 1);
 			return;
 		}
@@ -1466,7 +1466,7 @@ static int broker_acknowledged(struct broker *broker, const unsigned char *body,
 	version), or 3.1.1's 1 (unacceptable protocol version) */
 	if (broker->protocol == 5 && (code == 0x84 || (size == 2 && code == 1)))
 	{
-		platform_log("Internet play: the signalling broker %s has not MQTT 5; using 3.1.1", broker->host);
+		platform_log("Internet play: the signaling broker %s has not MQTT 5; using 3.1.1", broker->host);
 		broker->protocol = 4;
 		broker_close(broker, 0);
 		/* (again at once) */
@@ -1475,7 +1475,7 @@ static int broker_acknowledged(struct broker *broker, const unsigned char *body,
 	}
 	if (code != 0)
 	{
-		platform_log("Internet play: the signalling broker %s refused the connection", broker->host);
+		platform_log("Internet play: the signaling broker %s refused the connection", broker->host);
 		broker_close(broker, 1);
 		return 0;
 	}
@@ -1806,9 +1806,9 @@ void p2p_signal_start(void)
 		text = *end ? end + 1 : end;
 	}
 	if (!signalling.broker_count)
-		platform_log("Internet play: no signalling brokers (network.brokers_file), so invites cannot work");
+		platform_log("Internet play: no signaling brokers (network.brokers_file), so invites cannot work");
 	else if (text[strspn(text, ", ")])
-		platform_log("Internet play: only the first %d signalling brokers are used", MAXIMUM_BROKERS);
+		platform_log("Internet play: only the first %d signaling brokers are used", MAXIMUM_BROKERS);
 }
 
 void p2p_signal_select_sets(int *read, int *read_count, int *write, int *write_count, int maximum_count)

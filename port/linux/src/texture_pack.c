@@ -241,7 +241,7 @@ static int read_pack_toml(char *message, size_t message_size)
 	free(text);
 	(void)message_size;
 	if (!pack_name[0]) { sprintf(message, "pack.toml has no name"); return 0; }
-	if (!pack_licence[0]) { sprintf(message, "pack.toml has no licence"); return 0; }
+	if (!pack_licence[0]) { sprintf(message, "pack.toml has no license"); return 0; }
 	return 1;
 }
 
@@ -291,7 +291,7 @@ int texture_pack_open(const char *data_root, const char *pack, unsigned int max_
 	summary_logged = 0;
 	pack_open = 1;
 	if (!exit_registered) { exit_registered = 1; atexit(summary_at_exit); }
-	fprintf(stderr, "texture pack \"%s\" %s by %s, licence %s: levels up to %u px, %s%s%s, %lu bytes of budget\n",
+	fprintf(stderr, "texture pack \"%s\" %s by %s, license %s: levels up to %u px, %s%s%s, %lu bytes of budget\n",
 		pack_name, pack_version[0] ? pack_version : "(no version)", pack_author[0] ? pack_author : "(no author)",
 		pack_licence, max_dimension, dxt_allowed ? "DXT" : "", dxt_allowed && rgba_allowed ? " and " : "",
 		rgba_allowed ? "RGBA" : "", (unsigned long)budget_bytes);

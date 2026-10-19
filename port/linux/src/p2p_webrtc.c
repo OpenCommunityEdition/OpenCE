@@ -999,7 +999,7 @@ static void connection_receive(struct connection *connection)
 			if (!posix_dtls_peer_fingerprint(connection->dtls, fingerprint) ||
 				!p2p_equal(fingerprint, connection->remote_fingerprint, P2P_FINGERPRINT_SIZE))
 			{
-				connection_fail(connection, "its certificate is not the one it signalled");
+				connection_fail(connection, "its certificate is not the one it signaled");
 				break;
 			}
 			connection->secure = 1;
@@ -1016,7 +1016,7 @@ static void connection_receive(struct connection *connection)
 			if (p2p_equal(fingerprint, connection->remote_fingerprint, P2P_FINGERPRINT_SIZE))
 				connection->secure = 1;
 			else
-				connection_fail(connection, "its certificate is not the one it signalled");
+				connection_fail(connection, "its certificate is not the one it signaled");
 		}
 	}
 	if (connection->sack_due && connection->state == _sctp_established)

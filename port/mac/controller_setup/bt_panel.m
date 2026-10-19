@@ -155,7 +155,7 @@ static BTPanel *gPanel = nil;
 	padView->showTouch = YES;
 	[[window contentView] addSubview:padView];
 	y += 160 + 14;
-	lightButton = [self buttonAt:NSMakeRect(margin, h - y - 30, 140, 32) title:@"Light bar colour" action:@selector(lightPressed:)];
+	lightButton = [self buttonAt:NSMakeRect(margin, h - y - 30, 140, 32) title:@"Light bar color" action:@selector(lightPressed:)];
 	playersButton = [self buttonAt:NSMakeRect(margin + 150, h - y - 30, 120, 32) title:@"Player lights" action:@selector(playersPressed:)];
 	rumbleButton = [self buttonAt:NSMakeRect(margin + 280, h - y - 30, 90, 32) title:@"Rumble" action:@selector(rumblePressed:)];
 	y += 34;
