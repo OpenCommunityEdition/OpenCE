@@ -22,9 +22,9 @@
 - [x] Task: The window and its Metal layer 01316243
     - [x] Write tests: host_sdl_create_window and host_sdl_window_size_in_pixels report the backing size, and a resize is reported (XCTest with a window off-screen)
     - [x] An AppKit window with a CAMetalLayer at the backing scale; live resize; native fullscreen from the menu bar and a key; a cleared frame each present (manual check: window lifecycle)
-- [ ] Task: Keyboard and mouse from NSEvent
-    - [ ] Write tests: key codes map to SDL scancodes (table test); mouse buttons, wheel and relative motion become SDL-shaped events; focus loss releases the capture
-    - [ ] Implement the event queue behind host_sdl_poll_event, host_sdl_set_relative_mouse and the scancode imports
+- [x] Task: Keyboard and mouse from NSEvent 9d85891f
+    - [x] Write tests: key codes map to SDL scancodes (table test); mouse buttons, wheel and relative motion become SDL-shaped events; focus loss releases the capture
+    - [x] Implement the event queue behind host_sdl_poll_event, host_sdl_set_relative_mouse and the scancode imports
 - [ ] Task: Gamepads from GameController
     - [ ] Write tests: a fake controller's buttons and axes map to the gamepad imports; connect/disconnect events; rumble requests reach the haptics engine
     - [ ] Implement it with GCController, incl. hot-plug and rumble
