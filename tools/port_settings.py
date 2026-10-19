@@ -211,7 +211,7 @@ SCREENS = {
 _video = SCREENS["video_settings"]
 _graphics = {"display.high_res_hud", "display.hud_button_style", "display.high_res_text", "display.anti_aliasing",
              "display.shadow_resolution", "display.per_pixel_lighting",
-             "display.shield_glow", "display.shield_glow_intensity"}
+             "display.shield_glow", "display.shield_glow_intensity", "display.match_timer"}
 SCREENS["video_settings/graphics"] = {
     "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 30,
     "same_place": ["anti_aliasing_android"],
