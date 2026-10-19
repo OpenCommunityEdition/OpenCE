@@ -350,10 +350,10 @@ while the game stays paused, with only Controls, Gamepads, Mouse, Audio and
 Video Setup; Gamepads' OK saves the profile at once. In co-op the settings
 have Network Setup too, with its in-game pages as in a multiplayer game.
 
-In an online co-op game, the pause menu has FRIENDLY FIRE ON or FRIENDLY FIRE
-OFF in that place instead: whether this computer's players hurt, and are
-hurt by, the other players (`network.coop_own_friendly_fire`). A or enter
-changes it, from that moment.
+In an online co-op game, the pause menu also has FRIENDLY FIRE ON or
+FRIENDLY FIRE OFF, after SETTINGS, in a box drawn taller for it: whether this
+computer's players hurt, and are hurt by, the other players
+(`network.coop_own_friendly_fire`). A or enter changes it, from that moment.
 
 The menus are XML files in `port/assets/menus` (`tools/ce_menus.py` writes
 them from the PC version's tags), which the game contains. To change them,

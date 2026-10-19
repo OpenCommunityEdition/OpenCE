@@ -906,10 +906,12 @@ def title_backdrop(width: float) -> str:
 # hold each number of buttons, one frame each (the Xbox's 2-button box is
 # 159 units high, and each button 35 more)
 PAUSE_BOX_BUTTONS = [3, 4]
-# the campaign pause box, tall enough for five rows at the PC version's pause
-# menu's pitch (30) with the prompts still under the last row: the stock box
-# is 159, and those rows need 36 more
-PAUSE_BOX_EXTRA_HEIGHTS = [195]
+# the campaign pause box, tall enough for five rows (SETTINGS added) or six
+# (network co-op's FRIENDLY FIRE too) at the PC version's pause menu's pitch
+# (30) with the prompts still under the last row: the stock box is 159, and
+# those rows need 36 and 66 more (menu_tags.c's pause_campaign_patch); the
+# mission objectives' box beside it grows with it
+PAUSE_BOX_EXTRA_HEIGHTS = [195, 225]
 
 
 def pause_box_height(buttons: int) -> int:
