@@ -15,7 +15,15 @@ int mac_host_memory_query(struct mac_host_memory *out)
     if(!out)return 0;
     out->physical=out->available=0;
     size=sizeof(physical);
-    if(sysctl(mib,2,&physical,&size,NULL,0)!=0 || size!=sizeof(physical) || !physical)return 0;
+    if(sysctl(mib,2,&physical,&size,NULL,0)!=0 || size!=sizeof(physical) || !physical) {
+        /* port: a system without hw.memsize (Mac OS X 10.4 may lack it) has hw.physmem, a 32-bit number
+           that stops at 2 GB; the engine's memory query used to fail there */
+        int small_mib[2]={CTL_HW,HW_PHYSMEM};
+        unsigned int small=0;
+        size=sizeof(small);physical=0;
+        if(sysctl(small_mib,2,&small,&size,NULL,0)!=0 || size!=sizeof(small) || !small)return 0;
+        physical=small;
+    }
     host=mach_host_self();
     result=host_page_size(host,&page_size);
     if(result==KERN_SUCCESS)
