@@ -60,6 +60,39 @@ static int framebuffer_extension_available(void)
     return 0;
 }
 
+/* port: GL_EXT_packed_depth_stencil, asked once. The targets' depth buffers are depth 24 / stencil 8 in one
+   renderbuffer; a driver without the extension (Mac OS X 10.4's, on some cards) refuses that format and the
+   target is incomplete. Without it the buffer is depth only, and the stencil attachment is left out: a pass
+   that needs the stencil draws without it, and the rest of the target works. */
+static int packed_depth_stencil_available(void)
+{
+    static int known=-1;
+    if(known<0) {
+        const char *extensions=(const char *)glGetString(GL_EXTENSIONS);
+        const char *position=extensions;
+        static const char name[]="GL_EXT_packed_depth_stencil";
+        known=0;
+        while(position&&(position=strstr(position,name))!=NULL) {
+            if((position==extensions||position[-1]==' ')&&
+               (position[sizeof(name)-1]==' '||position[sizeof(name)-1]=='\0')){known=1;break;}
+            position+=sizeof(name)-1;
+        }
+        /* (HALO_MAC_NO_PACKED_DEPTH_STENCIL=1 takes the fallback on any driver, to try it) */
+        if(known&&getenv("HALO_MAC_NO_PACKED_DEPTH_STENCIL"))known=0;
+        if(!known)fprintf(stderr,"native render targets: depth buffers without stencil (no GL_EXT_packed_depth_stencil, or HALO_MAC_NO_PACKED_DEPTH_STENCIL)\n");
+    }
+    return known;
+}
+#ifndef GL_DEPTH_COMPONENT24
+#define GL_DEPTH_COMPONENT24 0x81A6
+#endif
+static GLenum depth_buffer_format(void)
+{ return packed_depth_stencil_available()?GL_DEPTH24_STENCIL8_EXT:GL_DEPTH_COMPONENT24; }
+static void attach_stencil(GLuint renderbuffer)
+{
+    if(packed_depth_stencil_available())
+        glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,GL_STENCIL_ATTACHMENT_EXT,GL_RENDERBUFFER_EXT,renderbuffer);
+}
 static void delete_level_targets(struct native_render_target *entry)
 {
     unsigned level;
@@ -104,7 +137,7 @@ static void create_level_targets(struct native_render_target *entry,
         glGenFramebuffersEXT(1,&entry->level_framebuffer[level]);
         glGenRenderbuffersEXT(1,&entry->level_depth_buffer[level]);
         glBindRenderbufferEXT(GL_RENDERBUFFER_EXT,entry->level_depth_buffer[level]);
-        glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT,GL_DEPTH24_STENCIL8_EXT,(GLsizei)width,(GLsizei)height);
+        glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT,depth_buffer_format(),(GLsizei)width,(GLsizei)height);
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,entry->level_framebuffer[level]);
         glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
         glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
@@ -112,8 +145,7 @@ static void create_level_targets(struct native_render_target *entry,
             GL_TEXTURE_2D,entry->texture,(GLint)level);
         glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,GL_DEPTH_ATTACHMENT_EXT,
             GL_RENDERBUFFER_EXT,entry->level_depth_buffer[level]);
-        glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,GL_STENCIL_ATTACHMENT_EXT,
-            GL_RENDERBUFFER_EXT,entry->level_depth_buffer[level]);
+        attach_stencil(entry->level_depth_buffer[level]);
         status=glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
         if(status!=GL_FRAMEBUFFER_COMPLETE_EXT||glGetError()!=GL_NO_ERROR) {
             fprintf(stderr,"native render target %ux%u: level %u framebuffer incomplete (0x%x); its draws are skipped\n",
@@ -161,7 +193,7 @@ static int create_gl_render_target(D3DTexture *resource,unsigned width,
     glGenFramebuffersEXT(1,&entry->framebuffer);
     glGenRenderbuffersEXT(1,&entry->depth_buffer);
     glBindRenderbufferEXT(GL_RENDERBUFFER_EXT,entry->depth_buffer);
-    glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT,GL_DEPTH24_STENCIL8_EXT,
+    glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT,depth_buffer_format(),
         (GLsizei)width,(GLsizei)height);
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,entry->framebuffer);
     glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
@@ -170,8 +202,7 @@ static int create_gl_render_target(D3DTexture *resource,unsigned width,
         GL_TEXTURE_2D,entry->texture,0);
     glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,GL_DEPTH_ATTACHMENT_EXT,
         GL_RENDERBUFFER_EXT,entry->depth_buffer);
-    glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,GL_STENCIL_ATTACHMENT_EXT,
-        GL_RENDERBUFFER_EXT,entry->depth_buffer);
+    attach_stencil(entry->depth_buffer);
     status=glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
     error=glGetError();
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,(GLuint)old_framebuffer);
@@ -484,8 +515,7 @@ int mac_engine_device_resources_bind_target(D3DSurface *surface,D3DSurface *dept
     glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
     glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,GL_DEPTH_ATTACHMENT_EXT,
         GL_RENDERBUFFER_EXT,depth_attachment);
-    glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,GL_STENCIL_ATTACHMENT_EXT,
-        GL_RENDERBUFFER_EXT,depth_attachment);
+    attach_stencil(depth_attachment);
     status=glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
     if(status!=GL_FRAMEBUFFER_COMPLETE_EXT||glGetError()!=GL_NO_ERROR) {
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,(GLuint)old_framebuffer);

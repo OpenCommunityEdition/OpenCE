@@ -525,6 +525,10 @@ to a file of float frames). Manual two-machine test: `docs/mac-voice-manual-test
   `HALO_MAC_GL_DIAGNOSTICS=1 /Applications/PowerSpark.app/Contents/MacOS/PowerSpark 2>&1 | tee ~/Desktop/tiger.log`
   from Terminal (the launcher starts the game with that environment; the log has the capabilities line, the
   limits, and every shader compile or link message).
+- Render targets (the water, shadows, the screen copies) keep a depth 24 / stencil 8 buffer when the driver has
+  `GL_EXT_packed_depth_stencil`, and a depth 24 buffer without a stencil attachment when it does not (logged once);
+  `HALO_MAC_NO_PACKED_DEPTH_STENCIL=1` takes that path on any driver (the five hidden runs give the same counts and
+  Blood Gulch the same frame). The screen's own buffers come from the window's pixel format and are not touched.
 - No Mac 10.4 machine has run the game; the 10.5 and 10.6 results are from
   three machines. The Controller Setup needs 10.5.
 - System link (LAN) multiplayer works from the menus (Multiplayer > Create
