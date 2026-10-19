@@ -1753,6 +1753,109 @@ void overlay_animation_apply_continuous_scaled(
 	return;
 }
 
+/* port: aiming_screen_apply walks an uncompressed animation's frames reading rotations and translations only, never skipping
+the scales of nodes that animate them (BUG (original, preserved for exact matching): the pointers fall behind by a scale's
+four bytes for each such node before them, so a later node's rotation is read from the bytes of the scales, as shorts, and
+its translation from the bytes of rotations). The original's x86 reads those bytes as they are laid out in a little-endian
+frame. On a big-endian host the frame's data is converted (a short or a float is swapped in its own width), so the same
+read finds other values; these read the bytes as the x86 would see them, by the width of the field that holds each byte
+(a rotation's shorts, a translation's or a scale's floats). */
+#if defined(__BIG_ENDIAN__) || defined(__ppc__) || defined(__POWERPC__)
+static unsigned char aiming_data_little_endian_byte(
+	struct animation const *animation,
+	byte const *data,
+	long offset)
+{
+	byte const *base = (byte const *)animation->data.address;
+	long frame_size = animation->frame_size;
+
+	(void)data;
+	if (frame_size > 0 && offset >= 0 && offset < animation->data.size)
+	{
+		long position = offset % frame_size;
+		long frame_start = offset - position;
+		long cursor = 0;
+		short node_index;
+
+		for (node_index = 0; node_index < animation->node_count && node_index < 64; node_index++)
+		{
+			short long_index = node_index >> LONG_BITS_BITS;
+			unsigned long bit = FLAG(node_index & (LONG_BITS - 1));
+			long kind;
+
+			for (kind = 0; kind < 3; kind++)
+			{
+				unsigned long flags = kind == 0 ? animation->nodes_with_rotation_flags[long_index] :
+					kind == 1 ? animation->nodes_with_translation_flags[long_index] :
+					animation->nodes_with_scale_flags[long_index];
+				long size = kind == 0 ? 8 : kind == 1 ? 12 : 4;
+				long unit = kind == 0 ? 2 : 4;
+
+				if (flags & bit)
+				{
+					if (position < cursor + size)
+					{
+						long relative = position - cursor;
+						long unit_start = relative - relative % unit;
+
+						return base[frame_start + cursor + unit_start + (unit - 1 - (relative - unit_start))];
+					}
+					cursor += size;
+				}
+			}
+		}
+	}
+
+	return offset >= 0 && offset < animation->data.size ? base[offset] : (unsigned char)0;
+}
+
+static void aiming_decompress_8byte(
+	struct animation const *animation,
+	byte const *data,
+	real_quaternion *quaternion)
+{
+	long offset = (long)(data - (byte const *)animation->data.address);
+	short components[4];
+	short component;
+
+	for (component = 0; component < 4; component++)
+	{
+		components[component] = (short)(aiming_data_little_endian_byte(animation, data, offset + component * 2) |
+			(aiming_data_little_endian_byte(animation, data, offset + component * 2 + 1) << 8));
+	}
+	quaternion_decompress_8byte((struct compressed_quaternion_8byte const *)components, quaternion);
+
+	return;
+}
+
+static void aiming_read_point3d(
+	struct animation const *animation,
+	byte const *data,
+	real_point3d *point)
+{
+	long offset = (long)(data - (byte const *)animation->data.address);
+	union { unsigned long bits[3]; real_point3d point; } converted;
+	short component;
+
+	for (component = 0; component < 3; component++)
+	{
+		long at = offset + component * 4;
+
+		converted.bits[component] = (unsigned long)aiming_data_little_endian_byte(animation, data, at) |
+			((unsigned long)aiming_data_little_endian_byte(animation, data, at + 1) << 8) |
+			((unsigned long)aiming_data_little_endian_byte(animation, data, at + 2) << 16) |
+			((unsigned long)aiming_data_little_endian_byte(animation, data, at + 3) << 24);
+	}
+	*point = converted.point;
+
+	return;
+}
+#else
+#define aiming_decompress_8byte(animation, data, quaternion) \
+	quaternion_decompress_8byte((struct compressed_quaternion_8byte const *)(data), (quaternion))
+#define aiming_read_point3d(animation, data, point) (*(point) = *(real_point3d const *)(data))
+#endif
+
 void aiming_screen_apply(
 	struct animation const *animation,
 	struct animation_aiming_screen_bounds const *aiming_screen_bounds,
@@ -1941,13 +2044,13 @@ void aiming_screen_apply(
 			}
 			else
 			{
-				quaternion_decompress_8byte((struct compressed_quaternion_8byte const *)data00, &rotation00);
+				aiming_decompress_8byte(animation, data00, &rotation00);
 				data00 += sizeof(struct compressed_quaternion_8byte);
-				quaternion_decompress_8byte((struct compressed_quaternion_8byte const *)data10, &rotation10);
+				aiming_decompress_8byte(animation, data10, &rotation10);
 				data10 += sizeof(struct compressed_quaternion_8byte);
-				quaternion_decompress_8byte((struct compressed_quaternion_8byte const *)data01, &rotation01);
+				aiming_decompress_8byte(animation, data01, &rotation01);
 				data01 += sizeof(struct compressed_quaternion_8byte);
-				quaternion_decompress_8byte((struct compressed_quaternion_8byte const *)data11, &rotation11);
+				aiming_decompress_8byte(animation, data11, &rotation11);
 				data11 += sizeof(struct compressed_quaternion_8byte);
 			}
 
@@ -1976,13 +2079,13 @@ void aiming_screen_apply(
 			}
 			else
 			{
-				translation00 = *(real_point3d const *)data00;
+				aiming_read_point3d(animation, data00, &translation00);
 				data00 += sizeof(real_point3d);
-				translation10 = *(real_point3d const *)data10;
+				aiming_read_point3d(animation, data10, &translation10);
 				data10 += sizeof(real_point3d);
-				translation01 = *(real_point3d const *)data01;
+				aiming_read_point3d(animation, data01, &translation01);
 				data01 += sizeof(real_point3d);
-				translation11 = *(real_point3d const *)data11;
+				aiming_read_point3d(animation, data11, &translation11);
 				data11 += sizeof(real_point3d);
 			}
 
