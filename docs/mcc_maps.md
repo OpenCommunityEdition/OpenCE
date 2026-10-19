@@ -1277,6 +1277,11 @@ not certified by the successful load check.
 
 ## OpenCE upstream integration through 09597313
 
+Historical validation below describes the October 11 integration. The optional
+first-person legs, shield color/glow and first-person shield features were
+removed from `testing` on October 19, including the legs-only mesh reader and
+its MCC palette test. The MCC rendering and model palette APIs remain intact.
+
 The October 11 integration includes upstream's optional first-person legs,
 shield color/glow, campaign pause spacing, vehicle-home ownership, and stale
 player-handle fixes. The visual options retain upstream's stock defaults
