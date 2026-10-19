@@ -647,9 +647,19 @@ static char const *recorded_animation_decode(
 			if (offset >= size)
 				return "ends inside an event";
 			header = stream[offset];
+			/* port: the header's bit fields (struct animation_event_header, time delta first) lie in the low bits of
+			the byte on the console's and Intel's compilers and in the high bits on PowerPC's: the Mac converts the
+			stream to that (xbox_blob.c), so a big-endian host reads them from the other end. Without this, the
+			Mac's PowerPC dropped every recorded animation of an Xbox map as unplayable. */
+#if defined(__BIG_ENDIAN__) || defined(__ppc__) || defined(__POWERPC__)
+			event_type = header & 0x3f;
+#define RECORDED_EVENT_TIME_DELTA(header) ((header) >> 6)
+#else
 			event_type = header >> 2;
+#define RECORDED_EVENT_TIME_DELTA(header) ((header) & 3)
+#endif
 			/* (its time since the last: none or a tick, a byte or a word) */
-			switch (header & 3)
+			switch (RECORDED_EVENT_TIME_DELTA(header))
 			{
 			case 0:
 			case 1:
