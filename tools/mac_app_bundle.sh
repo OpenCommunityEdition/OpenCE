@@ -115,6 +115,9 @@ else
     lipo -create "$ENGINE_PPC" "$ENGINE_I386" -output "$APP/Contents/MacOS/PowerSpark-game"
 fi
 chmod 755 "$APP/Contents/MacOS/PowerSpark" "$APP/Contents/MacOS/PowerSpark-game"
+# the public MQTT brokers internet play's invites go through (network.brokers_file, "brokers.txt" beside the game): without
+# it a hosted game logs "no signaling brokers" and no invite can be answered
+cp "$ROOT/port/assets/network/brokers.txt" "$APP/Contents/MacOS/brokers.txt"
 
 # what the game program supports, for the launcher (engine.txt)
 : > "$APP/Contents/Resources/engine.txt"
