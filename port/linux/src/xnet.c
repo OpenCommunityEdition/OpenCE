@@ -48,8 +48,8 @@ alone peers reach.
 #include "platform.h"
 #include "posix.h"
 #include "port_config.h"
-#include "p2p.h"
 #include "net_fault.h"
+#include "net_peer.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -64,8 +64,6 @@ alone peers reach.
 enum
 {
 	MAXIMUM_BROADCAST_TARGETS = 256,
-	/* a system link game's other machines (include/halo_port_limits.h) */
-	P2P_BROADCAST_PEERS = 127,
 };
 
 /* network.address and network.broadcast, read once (net_settings_read),
@@ -229,7 +227,7 @@ static int peer_outgoing_address(int stream, int connecting, const struct sockad
 		return 0;
 	ip = ((const struct sockaddr_in *)*address)->sin_addr.s_addr;
 	port = ((const struct sockaddr_in *)*address)->sin_port;
-	result = p2p_outgoing(stream, connecting, &ip, &port);
+	result = net_peer_outgoing(stream, connecting, &ip, &port);
 	if (result < 0)
 		WSASetLastError(WSAEHOSTUNREACH);
 	if (result <= 0)
@@ -256,12 +254,8 @@ static void note_socket_port(SOCKET socket, int listening)
 		return;
 	}
 	posix_socket_getsockopt((int)socket, SOL_SOCKET, SO_TYPE, &type, &type_length);
-	/* (one bound to this machine alone, as the telnet console's, is not for
-	peers to reach, and is not hosting; its port is still no stand-in's) */
-	if (bound.sin_addr.s_addr == loopback_address())
-		p2p_port_taken(type == SOCK_STREAM, bound.sin_port);
-	else
-		p2p_socket_port((int)socket, type == SOCK_STREAM, listening, bound.sin_port);
+	net_peer_socket_bound((int)socket, type == SOCK_STREAM, listening,
+		bound.sin_addr.s_addr, bound.sin_port);
 }
 
 /* traffic from an internet play peer's stand-in comes from the peer, and
@@ -275,7 +269,7 @@ static void peer_incoming_address(int stream, struct sockaddr *address, const in
 		unsigned long ip = in->sin_addr.s_addr;
 		unsigned short port = in->sin_port;
 
-		if (p2p_incoming(stream, &ip, &port))
+		if (net_peer_incoming(stream, &ip, &port))
 		{
 			in->sin_addr.s_addr = ip;
 			in->sin_port = port;
@@ -337,12 +331,8 @@ void WSAAPI WSASetLastError(int error)
 
 int WSAAPI WSAStartup(WORD version_requested, LPWSADATA data)
 {
-	unsigned long local;
-
 	/* here, before the game's network threads start */
-	net_settings_read();
-	net_fault_enabled();
-	p2p_initialize(local_address_setting(&local) ? local : loopback_address());
+	net_peer_start();
 	if (data)
 	{
 		memset(data, 0, sizeof(*data));
@@ -380,8 +370,7 @@ int WSAAPI halo_ws_closesocket(SOCKET socket)
 	int type_length = sizeof(type);
 
 	posix_socket_getsockopt((int)socket, SOL_SOCKET, SO_TYPE, &type, &type_length);
-	p2p_socket_closed((int)socket, type == SOCK_DGRAM ? socket_port(socket) : 0);
-	net_fault_socket_closed((int)socket);
+	net_peer_socket_closing((int)socket, type == SOCK_DGRAM ? socket_port(socket) : 0);
 	return winsock_result(posix_socket_close((int)socket));
 }
 
@@ -501,7 +490,7 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 		((const struct sockaddr_in *)address)->sin_addr.s_addr == INADDR_BROADCAST)
 	{
 		unsigned long targets[MAXIMUM_BROADCAST_TARGETS];
-		unsigned short ports[P2P_BROADCAST_PEERS];
+		unsigned short ports[NET_PEER_BROADCAST_PEERS];
 		int target_count = broadcast_targets(targets, MAXIMUM_BROADCAST_TARGETS);
 		int peer_count;
 		int index;
@@ -538,7 +527,7 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 		}
 		if (source_port)
 		{
-			if (p2p_broadcast_datagram(source_port, ((const struct sockaddr_in *)address)->sin_port, buffer,
+			if (net_peer_broadcast(source_port, ((const struct sockaddr_in *)address)->sin_port, buffer,
 				length) > 0 && result < 0)
 			{
 				result = length;
@@ -550,8 +539,8 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 			}
 			return result;
 		}
-		peer_count = p2p_broadcast_targets(((const struct sockaddr_in *)address)->sin_port, targets, ports,
-			P2P_BROADCAST_PEERS);
+		peer_count = net_peer_broadcast_targets(((const struct sockaddr_in *)address)->sin_port, targets, ports,
+			NET_PEER_BROADCAST_PEERS);
 		for (index = 0; index < peer_count; index++)
 		{
 			int sent;
@@ -573,9 +562,9 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 	port (one not bound yet goes through a stand-in, which the system's send
 	binds it for) */
 	if (address && address->sa_family == AF_INET && address_length >= (int)sizeof(struct sockaddr_in) &&
-		(halo_ws_ntohl(((const struct sockaddr_in *)address)->sin_addr.s_addr) & 0xFFC00000) == 0x64400000)
+		net_peer_is_peer(((const struct sockaddr_in *)address)->sin_addr.s_addr))
 	{
-		switch (source_port ? p2p_send_datagram(source_port, ((const struct sockaddr_in *)address)->sin_addr.s_addr,
+		switch (source_port ? net_peer_send(source_port, ((const struct sockaddr_in *)address)->sin_addr.s_addr,
 			((const struct sockaddr_in *)address)->sin_port, buffer, length) : 0)
 		{
 		case 1:
@@ -916,7 +905,7 @@ INT WSAAPI XNetXnAddrToInAddr(const XNADDR *address, const XNKID *key_identifier
 
 	(void)key_identifier;
 	/* an internet play peer's XNADDR carries its identifier */
-	if (p2p_peer_address(address->abEnet, &peer))
+	if (net_peer_address(address->abEnet, &peer))
 		result->s_addr = peer;
 	else
 		*result = address->ina;
@@ -941,7 +930,7 @@ DWORD WSAAPI XNetGetTitleXnAddr(XNADDR *address)
 	memset(address, 0, sizeof(*address));
 	address->bSizeOfStruct = sizeof(*address);
 	address->ina.s_addr = ip;
-	memcpy(address->abEnet, p2p_identifier(), sizeof(address->abEnet));
+	memcpy(address->abEnet, net_peer_identifier(), sizeof(address->abEnet));
 	return ip ? (XNET_GET_XNADDR_ETHERNET | XNET_GET_XNADDR_DHCP) : XNET_GET_XNADDR_ETHERNET;
 }
 

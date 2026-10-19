@@ -39,6 +39,7 @@ enum {
     MAC_SO_BROADCAST = SO_BROADCAST,
     MAC_SO_SNDBUF = SO_SNDBUF,
     MAC_SO_RCVBUF = SO_RCVBUF,
+    MAC_SO_TYPE = SO_TYPE,
     MAC_MSG_OOB = MSG_OOB,
     MAC_MSG_PEEK = MSG_PEEK,
     MAC_MSG_DONTROUTE = MSG_DONTROUTE,
@@ -89,6 +90,7 @@ static int mac_bsd_fd_has(int fd, const mac_bsd_fd_set *set) { return FD_ISSET(f
 #include "engine_sockets.h"
 #include "net_settings.h"
 #include "net_fault.h"
+#include "net_peer.h"
 #undef accept
 #undef bind
 #undef closesocket
@@ -327,10 +329,59 @@ static const struct sockaddr *mac_outgoing_address(const struct sockaddr *addres
     return address;
 }
 
+/* port: traffic from an internet play peer's stand-in is really from the
+   peer, and internet play says which peer and which port, as
+   peer_incoming_address does in port/linux/src/xnet.c. Nonzero when the
+   address has been rewritten to the peer's. */
+static int mac_peer_incoming_address(int stream, struct sockaddr *address, const int *address_length)
+{
+    if(address && address_length && *address_length>=(int)sizeof(struct sockaddr_in) &&
+        address->sa_family==AF_INET)
+    {
+        unsigned long ip=((struct sockaddr_in *)address)->sin_addr.s_addr;
+        unsigned short port=((struct sockaddr_in *)address)->sin_port;
+
+        if(net_peer_incoming(stream,&ip,&port))
+        {
+            ((struct sockaddr_in *)address)->sin_addr.s_addr=ip;
+            ((struct sockaddr_in *)address)->sin_port=port;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* port: a destination that is an internet play peer's goes to its stand-in
+   (1); -1, with WSAEHOSTUNREACH, if it is a peer's that cannot be reached
+   now; 0 if it is not a peer's. connecting: the socket (UDP) is connected to
+   it, else -1. As peer_outgoing_address in port/linux/src/xnet.c. */
+static int mac_peer_outgoing_address(int stream, int connecting, const struct sockaddr **address,
+    int address_length, struct sockaddr_in *storage)
+{
+    unsigned long ip;
+    unsigned short port;
+    int result;
+
+    if(!*address || (*address)->sa_family!=AF_INET || address_length<(int)sizeof(*storage))return 0;
+    ip=((const struct sockaddr_in *)*address)->sin_addr.s_addr;
+    port=((const struct sockaddr_in *)*address)->sin_port;
+    result=net_peer_outgoing(stream,connecting,&ip,&port);
+    if(result<0)WSASetLastError(WSAEHOSTUNREACH);
+    if(result<=0)return result;
+    memcpy(storage,*address,sizeof(*storage));
+    storage->sin_addr.s_addr=ip;
+    storage->sin_port=port;
+    *address=(const struct sockaddr *)storage;
+    return 1;
+}
+
 /* traffic from the network.address address comes from 127.0.0.1 */
 static void mac_incoming_address(struct sockaddr *address, const int *address_length)
 {
     unsigned long local;
+    /* (both callers are datagram paths; only what is no peer's gets the
+       system link translation below) */
+    if(mac_peer_incoming_address(0,address,address_length))return;
     if(address && address_length && *address_length>=(int)sizeof(struct sockaddr_in) &&
         address->sa_family==AF_INET && net_settings_local_address(&local) &&
         ((struct sockaddr_in *)address)->sin_addr.s_addr==local)
@@ -416,6 +467,14 @@ unsigned int WSAAPI halo_ws_socket(int family, int type, int protocol)
     return mac_socket_handle(result);
 }
 
+/* (defined below, with mac_name_query which they read the socket's name
+   through) */
+static void mac_note_socket_port(int fd, int listening);
+static unsigned short mac_socket_local_port(int fd);
+/* the descriptors internet play has been told a port of (a send from a socket
+   not bound yet gives it one, which a peer is reached through) */
+static unsigned char mac_port_noted[256];
+
 int WSAAPI halo_ws_bind(SOCKET socket, const struct sockaddr *address, int address_length)
 {
     int fd, error, native_length; struct mac_bsd_sockaddr_storage storage; struct mac_bsd_sockaddr *native;
@@ -428,7 +487,11 @@ int WSAAPI halo_ws_bind(SOCKET socket, const struct sockaddr *address, int addre
         int result = bind(fd, native, native_length), saved = errno;
         mac_trace(fd, "bind", native, result, saved);
         errno = saved;
-        return result < 0 ? mac_socket_failure(errno) : 0;
+        if (result < 0)
+            return mac_socket_failure(errno);
+        /* port: the port the game just took is internet play's to know */
+        mac_note_socket_port(fd, 0);
+        return 0;
     }
 }
 
@@ -437,7 +500,21 @@ int WSAAPI halo_ws_connect(SOCKET socket, const struct sockaddr *address, int ad
     int fd, error, native_length; struct mac_bsd_sockaddr_storage storage; struct mac_bsd_sockaddr *native;
     struct sockaddr_in rewritten;
     if (!mac_socket_fd(socket, &fd)) return mac_socket_failure(ENOTSOCK);
-    address = mac_outgoing_address(address, address_length, &rewritten);
+    {
+        /* port: an internet play peer's TCP or UDP port goes to its stand-in
+           (xnet.c's connect does the same) */
+        int type = MAC_SOCK_STREAM;
+        socklen_t type_length = sizeof(type);
+
+        if (address && address->sa_family == AF_INET && address_length >= (int)sizeof(struct sockaddr_in) &&
+            net_peer_is_peer(((const struct sockaddr_in *)address)->sin_addr.s_addr))
+            getsockopt(fd, MAC_SOL_SOCKET, MAC_SO_TYPE, &type, &type_length);
+        switch (mac_peer_outgoing_address(type == MAC_SOCK_STREAM, fd, &address, address_length, &rewritten))
+        {
+        case -1: return SOCKET_ERROR;
+        case 0: address = mac_outgoing_address(address, address_length, &rewritten); break;
+        }
+    }
     error = mac_native_address(address, address_length, &storage, &native, &native_length);
     if (error) { WSASetLastError(error); return SOCKET_ERROR; }
     /* A connection from an unbound socket leaves from whichever address the
@@ -470,6 +547,9 @@ int WSAAPI halo_ws_connect(SOCKET socket, const struct sockaddr *address, int ad
     {
         int result = connect(fd, native, native_length), saved = errno;
         mac_trace(fd, "connect", native, result, saved);
+        /* port: the port the system gave it (a connection under way has one
+           too), which internet play is told as xnet.c's connect tells it */
+        mac_note_socket_port(fd, 0);
         errno = saved;
         if (result >= 0) return 0;
     }
@@ -493,7 +573,11 @@ int WSAAPI halo_ws_listen(SOCKET socket, int backlog)
     int fd;
     if (!mac_socket_fd(socket, &fd)) return mac_socket_failure(ENOTSOCK);
     if (backlog < 0) return mac_socket_failure(EINVAL);
-    return listen(fd, backlog) < 0 ? mac_socket_failure(errno) : 0;
+    if (listen(fd, backlog) < 0) return mac_socket_failure(errno);
+    /* port: and it listens for connections while it hosts (internet play
+       learns of a hosted game from this) */
+    mac_note_socket_port(fd, 1);
+    return 0;
 }
 
 unsigned int WSAAPI halo_ws_accept(SOCKET socket, struct sockaddr *address, int *address_length)
@@ -510,6 +594,8 @@ unsigned int WSAAPI halo_ws_accept(SOCKET socket, struct sockaddr *address, int 
     {
         error = mac_xdk_address((struct mac_bsd_sockaddr *)&storage,(int)native_length,address,address_length);
         if (error) { close(result); WSASetLastError(error); return INVALID_SOCKET; }
+        /* port: a connection off the tunnel is from the peer */
+        mac_peer_incoming_address(1,address,address_length);
     }
     mac_socket_no_delay(result, MAC_SOCK_STREAM);
     return mac_socket_handle(result);
@@ -544,6 +630,42 @@ int WSAAPI halo_ws_getsockname(SOCKET socket, struct sockaddr *address, int *add
 {
     int fd;if(!mac_socket_fd(socket,&fd))return mac_socket_failure(ENOTSOCK);
     return mac_name_query(fd,0,address,address_length);
+}
+
+/* port: tells internet play the local port this socket has, as
+   note_socket_port does in port/linux/src/xnet.c. A peer is reached through
+   the port the game's socket is bound to, so a socket whose port internet
+   play is not told of is one no peer can be reached through.
+
+   The type is read with the native names rather than through
+   halo_ws_getsockopt: SO_TYPE is not one of the options mac_option_name
+   translates, and these are Darwin's own values, captured in the enum at
+   the top of this file before the Winsock names shadow them. */
+static void mac_note_socket_port(int fd, int listening)
+{
+    struct sockaddr_in bound;
+    int length=(int)sizeof(bound);
+    int type=MAC_SOCK_DGRAM;
+    socklen_t type_length=sizeof(type);
+
+    if(mac_name_query(fd,0,(struct sockaddr *)&bound,&length)!=0)return;
+    if(bound.sin_family!=AF_INET || !bound.sin_port)return;
+    if(fd>=0 && fd<256)mac_port_noted[fd]=1;
+    getsockopt(fd,MAC_SOL_SOCKET,MAC_SO_TYPE,&type,&type_length);
+    net_peer_socket_bound(fd,type==MAC_SOCK_STREAM,listening,
+        bound.sin_addr.s_addr,bound.sin_port);
+}
+
+/* port: the port this socket is bound to, in network byte order, or 0 when
+   it is not bound yet. Internet play sends from it. */
+static unsigned short mac_socket_local_port(int fd)
+{
+    struct sockaddr_in bound;
+    int length=(int)sizeof(bound);
+
+    if(mac_name_query(fd,0,(struct sockaddr *)&bound,&length)!=0)return 0;
+    if(bound.sin_family!=AF_INET)return 0;
+    return bound.sin_port;
 }
 
 static int mac_option_name(int level, int option, int *native_level, int *native_option)
@@ -722,6 +844,27 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
     if(length<0||((length&&!buffer))||((!to&&to_length)||(to&&to_length<0)))return mac_socket_failure(EFAULT);
     if(!mac_native_flags(flags,&native_flags))return mac_socket_failure(EOPNOTSUPP);
     if(mac_socket_no_sigpipe(fd)<0)return mac_socket_failure(errno);
+    /* port: an internet play peer's stand-in address goes on the tunnel
+       rather than on the wire, from this socket's own port, as the sendto
+       in port/linux/src/xnet.c does it. A socket with no port yet has
+       nothing to send from: the system's send below binds it, and the next
+       datagram to that peer goes on the tunnel. */
+    if(to && to->sa_family==AF_INET && to_length>=(int)sizeof(struct sockaddr_in) &&
+        net_peer_is_peer(((const struct sockaddr_in *)to)->sin_addr.s_addr))
+    {
+        unsigned short source_port=mac_socket_local_port(fd);
+
+        if(source_port)
+        {
+            switch(net_peer_send(source_port,((const struct sockaddr_in *)to)->sin_addr.s_addr,
+                ((const struct sockaddr_in *)to)->sin_port,buffer,length))
+            {
+                case 1:return length;
+                case -1:WSASetLastError(WSAEHOSTUNREACH);return SOCKET_ERROR;
+                default:break;
+            }
+        }
+    }
     /* a broadcast goes to each of network.broadcast's addresses instead, one
        datagram each, and counts as sent if any of them was */
     if(to && to->sa_family==AF_INET && to_length>=(int)sizeof(struct sockaddr_in) &&
@@ -742,13 +885,39 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
                 sent=(int)sendto(fd,buffer,(size_t)length,native_flags,native,native_length);
                 if(sent>=0||index==0){sent_result=sent;if(sent<0)sent_errno=errno;}
             }
+            /* port: and to every internet play peer, on the tunnel. After
+               the sends above, which bind the socket if it was not, so that
+               it has a port to send from. */
+            {
+                unsigned short source_port=mac_socket_local_port(fd);
+
+                if(source_port)
+                {
+                    mac_note_socket_port(fd,0);
+                    if(net_peer_broadcast(source_port,rewritten.sin_port,buffer,length)>0 &&
+                        sent_result<0)
+                    {
+                        sent_result=length;sent_errno=0;
+                    }
+                }
+            }
             return sent_result<0?mac_socket_failure(sent_errno):sent_result;
         }
     }
-    if(to)to=mac_outgoing_address(to,to_length,&rewritten);
+    if(to)
+    {
+        /* port: a peer's address the tunnel did not take (no port yet) goes to its stand-in */
+        switch(mac_peer_outgoing_address(0,-1,&to,to_length,&rewritten))
+        {
+            case -1:return SOCKET_ERROR;
+            case 0:to=mac_outgoing_address(to,to_length,&rewritten);break;
+        }
+    }
     if(to){int native_length;error=mac_native_address(to,to_length,&storage,&native,&native_length);if(error){WSASetLastError(error);return SOCKET_ERROR;}to_length=native_length;}
     result=sendto(fd,buffer,(size_t)length,native_flags,native,to?to_length:0);
     {int saved=errno;mac_trace(fd,"sendto",native,(long)result,saved);errno=saved;}
+    /* port: the port the send gave an unbound socket (one that failed binds it too) */
+    if(fd>=0 && fd<256 && !mac_port_noted[fd]){int saved=errno;mac_note_socket_port(fd,0);errno=saved;}
     return result<0?mac_socket_failure(errno):(int)result;
 }
 
@@ -851,10 +1020,26 @@ int WSAAPI halo_ws_closesocket(unsigned int socket)
 {
     int fd;
     if(!mac_socket_fd(socket,&fd))return mac_socket_failure(ENOTSOCK);
-    net_fault_socket_closed(fd);
-    /* (port/linux/src/xnet.c reads the socket's type here for internet play's
-       bookkeeping, which this build has none of; reading it and then failing
-       the close on an error left the descriptor open) */
+    {
+        /* port: internet play's bookkeeping, as xnet.c's closesocket does
+           it: a datagram socket gives its port back, so that a later socket
+           of that number does not inherit the peers reached through it. Read
+           before the close and never allowed to fail it - reading it and
+           then failing the close on an error left the descriptor open. */
+        struct sockaddr_in bound;
+        int length=(int)sizeof(bound);
+        int type=MAC_SOCK_STREAM;
+        socklen_t type_length=sizeof(type);
+        int datagram_port=0;
+
+        getsockopt(fd,MAC_SOL_SOCKET,MAC_SO_TYPE,&type,&type_length);
+        if(type==MAC_SOCK_DGRAM && mac_name_query(fd,0,(struct sockaddr *)&bound,&length)==0 &&
+            bound.sin_family==AF_INET)
+            datagram_port=bound.sin_port;
+        /* (this gives net_fault the socket as well) */
+        net_peer_socket_closing(fd,datagram_port);
+        if(fd>=0 && fd<256)mac_port_noted[fd]=0;
+    }
     return close(fd)<0?mac_socket_failure(errno):0;
 }
 

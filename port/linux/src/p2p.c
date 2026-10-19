@@ -485,13 +485,27 @@ static int hex_value(char digit)
 	return -1;
 }
 
+/* port: these swapped unconditionally, which is right for every little-endian build and wrong on the
+Mac's PowerPC (and gcc 4.0 has no __builtin_bswap32): a big-endian host's value is already in network
+byte order */
+static int host_is_little_endian(void)
+{
+	const unsigned short probe = 1;
+
+	return *(const unsigned char *)&probe;
+}
+
 static unsigned long network_long(unsigned long value)
 {
-	return __builtin_bswap32(value);
+	if (!host_is_little_endian())
+		return value & 0xFFFFFFFF;
+	return ((value & 0xFF) << 24) | ((value & 0xFF00) << 8) | ((value >> 8) & 0xFF00) | ((value >> 24) & 0xFF);
 }
 
 static unsigned short network_short(unsigned short value)
 {
+	if (!host_is_little_endian())
+		return value;
 	return (unsigned short)(value << 8 | value >> 8);
 }
 

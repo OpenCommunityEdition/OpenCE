@@ -19,6 +19,11 @@ int XNetCleanup(void)
     return 0;
 }
 
+/* port/linux/src/net_peer.c (declared here, as this file declares
+   net_settings_*, so the unit needs no new include path) */
+const unsigned char *net_peer_identifier(void);
+int net_peer_address(const unsigned char *identifier,unsigned long *address);
+
 unsigned long XNetGetTitleXnAddr(struct XNADDR *address)
 {
     unsigned long ipv4;
@@ -38,15 +43,22 @@ unsigned long XNetGetTitleXnAddr(struct XNADDR *address)
         unsigned long configured;
         if(net_settings_local_address(&configured))
         {
-            mac_xnet_local_address(&ipv4,hardware);
+            const unsigned char *identity=net_peer_identifier();
             address->ina.s_addr=configured;
-            for(i=0;i<sizeof(address->abEnet);++i)address->abEnet[i]=hardware[i];
+            for(i=0;i<sizeof(address->abEnet);++i)address->abEnet[i]=identity[i];
             return XNET_GET_XNADDR_ETHERNET|XNET_GET_XNADDR_DHCP;
         }
     }
     if(!mac_xnet_local_address(&ipv4,hardware))return XNET_GET_XNADDR_NONE;
     address->ina.s_addr=ipv4;
-    for(i=0;i<sizeof(address->abEnet);++i)address->abEnet[i]=hardware[i];
+    /* port: the six bytes are internet play's identifier, not this machine's
+       ethernet address, as port/linux/src/xnet.c has them: a peer looks the
+       XNADDR up by them (XNetXnAddrToInAddr below). The hardware address is
+       still read above, for whether there is a link at all. */
+    {
+        const unsigned char *identity=net_peer_identifier();
+        for(i=0;i<sizeof(address->abEnet);++i)address->abEnet[i]=identity[i];
+    }
     return XNET_GET_XNADDR_ETHERNET|XNET_GET_XNADDR_DHCP;
 }
 
@@ -82,11 +94,19 @@ int XNetUnregisterKey(const struct XNKID *identifier)
 int XNetXnAddrToInAddr(const struct XNADDR *address,const struct XNKID *key,
     struct in_addr *result)
 {
+    unsigned long peer;
     (void)key;
     if(!address || !result)return WSAEFAULT;
-    /* Native compatibility supports ordinary IPv4 system-link addresses.
-       Opaque tunnel identities need a real P2P mapping and must not silently
-       turn into an unrelated address. */
+    /* port: an internet play peer's XNADDR carries its identifier, and
+       net_peer_address turns that back into the stand-in address the socket
+       layer routes onto the tunnel, as port/linux/src/xnet.c does. What is
+       left is an ordinary IPv4 system-link address; an opaque identity that
+       is no peer's must not silently become an unrelated address. */
+    if(net_peer_address(address->abEnet,&peer))
+    {
+        result->s_addr=peer;
+        return 0;
+    }
     if(!address->ina.s_addr)return WSAEHOSTUNREACH;
     *result=address->ina;
     return 0;

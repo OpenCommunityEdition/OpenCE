@@ -4,9 +4,13 @@
 #define BUILDING_CSERIES 1
 #include "engine_xdk_prefix.h"
 
-/* port/linux/src/net_settings.c (declared here, as the socket adapter
-   declares the host's calls, so this unit needs no new include path) */
-void net_settings_read(void);
+/* port/linux/src/net_peer.c (declared here, as the socket adapter declares
+   the host's calls, so this unit needs no new include path). It reads the
+   settings, arms the fault simulation and starts internet play, which is
+   what port/linux/src/xnet.c's WSAStartup does; without this call nothing
+   on the Mac ever entered the tunnel and the whole of it was dead-stripped
+   out of the game again. */
+void net_peer_start(void);
 
 static void copy_text(char *destination,unsigned size,const char *source)
 {
@@ -24,7 +28,7 @@ int WSAStartup(unsigned short requested,struct WSAData *data)
     if(!data)return WSAEFAULT;
     if(major!=2 || minor>2)return WSAVERNOTSUPPORTED;
     /* here, before the game's network threads start: nothing locks them */
-    net_settings_read();
+    net_peer_start();
     data->wVersion=requested;
     data->wHighVersion=0x0202;
     copy_text(data->szDescription,sizeof(data->szDescription),"Native POSIX sockets");

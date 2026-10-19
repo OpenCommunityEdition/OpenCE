@@ -462,7 +462,7 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     # port: the socket adapter, the settings it reads and the stand-ins for
     # internet play. These include the Darwin headers under private names and
     # must not take the game's prefix or its include aliases.
-    for unit in port/mac/engine_sockets.c port/linux/src/net_settings.c port/linux/src/net_fault.c port/linux/src/menu_pc_art.c; do
+    for unit in port/mac/engine_sockets.c port/linux/src/net_settings.c port/linux/src/net_fault.c port/linux/src/net_peer.c port/linux/src/menu_pc_art.c; do
         name=$(basename "$unit" .c)
         recognized_units="$recognized_units $name "
         obj="$out/${name}_gpu_$arch.o"
@@ -535,7 +535,7 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
     for unit in port/linux/src/p2p.c port/linux/src/p2p_crypto.c port/linux/src/p2p_discord.c \
         port/linux/src/p2p_lobby.c port/linux/src/p2p_signal.c port/linux/src/p2p_webrtc.c \
         port/linux/src/posix_net.c port/linux/src/posix_dtls.c port/linux/src/posix_upnp.c \
-        port/mac/mac_mbedtls_time.c port/mac/mac_p2p_hardware_id.c port/third_party/monocypher/monocypher-ed25519.c \
+        port/third_party/kcp/ikcp.c port/mac/mac_mbedtls_time.c port/mac/mac_p2p_hardware_id.c port/third_party/monocypher/monocypher-ed25519.c \
         port/linux/src/port_mods.c port/linux/src/posix_files.c port/mac/platform.c; do
         name=$(basename "$unit" .c)
         recognized_units="$recognized_units $name "
