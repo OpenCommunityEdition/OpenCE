@@ -408,29 +408,12 @@ static const struct config_setting config_settings[] =
 	{ "bots.teams", _config_string, "\"even\"", "HALO_BOT_TEAMS", _environment_value, _platform_all,
 		"In team games: \"even\" puts the bots on both teams, evening them with\n"
 		"the players; \"against\" puts them all on the team the players are not on." },
-	{ "display.viewmodel_shield", _config_boolean, "false", "HALO_VIEWMODEL_SHIELD", _environment_value, _platform_all,
-		"The energy shield's flare on the first-person arms too, as on the body\n"
-		"(the stock game draws it on the body only)." },
-	{ "display.first_person_legs", _config_boolean, "false", "HALO_FIRST_PERSON_LEGS", _environment_value, _platform_all,
-		"Your own legs in first person, seen looking down: your body as others\n"
-		"see it, drawn from the waist down, moving as it moves." },
 	{ "display.overshield_effect", _config_boolean, "false", "HALO_OVERSHIELD_EFFECT", _environment_value, _platform_all,
 		"The overshield as this machine draws it: its flare rising up the body as\n"
 		"it charges (2 seconds, 3 from a shield that was down) and staying lit,\n"
-		"its energy slower, in its own color (the powerup's), on the first-person\n"
-		"arms too with viewmodel_shield; a hit on it plays what the projectile\n"
-		"plays on an Elite's shield. Only what is drawn and heard changes." },
-	{ "display.shield_glow", _config_boolean, "false", "HALO_SHIELD_GLOW", _environment_value, _platform_all,
-		"Energy shields light what is around them as they flare, as plasma\n"
-		"does, in the shield's own color." },
-	{ "display.shield_glow_intensity", _config_string, "\"default\"", "HALO_SHIELD_GLOW_INTENSITY", _environment_value, _platform_all,
-		"How far the shield glow reaches: \"default\" or \"light_show\" (three\n"
-		"times as far, and at full strength from a third of the flare)." },
-	{ "display.shield_color", _config_string, "\"default\"", "HALO_SHIELD_COLOR", _environment_value, _platform_all,
-		"Your energy shield's color, as this machine draws it: \"default\" (the\n"
-		"shield's own) or a multiplayer armor color: white, black, red, blue,\n"
-		"gray, yellow, green, pink, purple, cyan, cobalt, orange, teal, sage,\n"
-		"brown, tan, maroon or salmon." },
+		"its energy slower, in its own color (the powerup's); a hit on it plays\n"
+		"what the projectile plays on an Elite's shield. Only what is drawn\n"
+		"and heard changes." },
 
 	{ "game.unlock_all_levels", _config_boolean, "false", "HALO_UNLOCK_ALL_LEVELS", _environment_value, _platform_all,
 		"true: a profile made from now on starts with every campaign level\n"
@@ -1514,9 +1497,6 @@ static const struct
 	{ "display.player_names", { "all", "allies", "enemies", "none", NULL }, NULL },
 	{ "display.scoreboard_team_layout", { "teams", "score", NULL }, NULL },
 	{ "display.chat_style", { "colors", "white", NULL }, NULL },
-	{ "display.shield_glow_intensity", { "default", "light_show", NULL }, NULL },
-	{ "display.shield_color", { "default", "white", "black", "red", "blue", "gray", "yellow", "green", "pink",
-		"purple", "cyan", "cobalt", "orange", "teal", "sage", "brown", "tan", "maroon", "salmon", NULL }, NULL },
 	{ "audio.resampler", { "sinc", "linear", NULL }, NULL },
 	{ "audio.voice_chat", { "push_to_talk", "open_mic", "off", NULL }, NULL },
 	{ "input.touch_controls", { "auto", "on", "off", NULL }, NULL },

@@ -28,9 +28,6 @@ MODS_ITEM_PLACE = (192, 391)
 QUIT_ITEM_PLACE = (192, 427)
 YES_NO = [("YES", "true"), ("NO", "false")]
 ON_OFF = [("ON", "true"), ("OFF", "false")]
-# the multiplayer armor colors, in the profile's order (player_profile.c)
-SHIELD_COLORS = ["white", "black", "red", "blue", "gray", "yellow", "green", "pink", "purple", "cyan", "cobalt",
-                 "orange", "teal", "sage", "brown", "tan", "maroon", "salmon"]
 SENSITIVITIES = [(f"{value:g}", f"{value:g}") for value in (0.1, 0.15, 0.25, 0.4, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4)]
 VOLUMES = [(str(step), f"{step / 10:g}") for step in range(11)]
 
@@ -108,10 +105,6 @@ SCREENS = {
              "The overshield rises up the body as it charges\nand stays lit, in its own color. Off: stock.", None),
             ("MODEL DETAIL:", "display.model_detail", [("STOCK", "stock"), ("NATIVE", "native"), ("HIGHEST", "highest")],
              "Stock picks models' detail by the Xbox's 480 lines;\nnative by this display's; highest, always the best.", None),
-            ("SHIELD GLOW:", "display.shield_glow", ON_OFF,
-             "Shields light their surroundings as they flare,\nin the shield's own color.", None),
-            ("GLOW INTENSITY:", "display.shield_glow_intensity", [("DEFAULT", "default"), ("LIGHT SHOW", "light_show")],
-             "Light Show: the shield glow three times as far,\nat full from a third of the flare.", None),
             ("MATCH TIMER:", "display.match_timer", ON_OFF,
              "Draw a clock at the bottom right in multiplayer,\ncounting up from the start of the game.", None),
             ("HDR:", "display.hdr", ON_OFF,
@@ -224,8 +217,7 @@ _graphics = {"display.high_res_hud", "display.hud_button_style", "display.high_r
              "display.anisotropic_filtering", "display.shadow_resolution", "display.per_pixel_lighting", "display.match_timer",
              "display.model_detail"}
 # (the visual modifiers: a screen of their own, Extra Effects)
-_extra_effects = {"display.shield_glow", "display.shield_glow_intensity",
-                  "display.overshield_effect", "display.hdr", "display.hdr_output"}
+_extra_effects = {"display.overshield_effect", "display.hdr", "display.hdr_output"}
 SCREENS["video_settings/graphics"] = {
     "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 30,
     "same_place": ["anti_aliasing_android"],
@@ -241,7 +233,7 @@ _video["categories"] = [
     ("FOV AND VIEWMODELS:", "video_settings/fov_viewmodels",
      "The field of view and the first-person\nweapon. Their defaults keep the stock view."),
     ("EXTRA EFFECTS:", "video_settings/extra_effects",
-     "Visual modifiers the stock game does not\nhave, such as the shield glow."),
+     "Visual modifiers the stock game does not\nhave, such as HDR and overshields."),
 ]
 SCREENS["video_settings/fov_viewmodels"] = {
     "screen": "fov_viewmodel_settings_screen", "header": _video["header"], "spacing": 30,
@@ -254,12 +246,6 @@ SCREENS["video_settings/fov_viewmodels"] = {
          "Draw first-person weapons, hands and attached\nvisuals. Gameplay and sound continue when off.", None),
         ("PASSENGER THIRD PERSON:", "display.passenger_third_person", ON_OFF,
          "Third-person Warthog and Scorpion passengers in\nthe campaign and co-op. Weapon zoom is disabled.", None),
-        ("ARM SHIELDS:", "display.viewmodel_shield", ON_OFF,
-         "The energy shield's flare on your first-person\narms too, as on your body.", None),
-        ("LEGS:", "display.first_person_legs", ON_OFF,
-         "Your legs in first person, seen looking down,\nmoving as you run. Your body as others see it.", None),
-        ("SHIELD COLOR:", "display.shield_color", [("DEFAULT", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
-         "Your shield's flare in an armor color, whatever\nyour armor. Only you see it. Default: its own.", None),
     ],
 }
 
