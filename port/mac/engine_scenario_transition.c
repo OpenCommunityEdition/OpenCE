@@ -144,6 +144,23 @@ boolean mac_engine_scenario_load(const char *map_name)
     return TRUE;
 }
 
+/* port: the session that owns what the unload below held is closing
+   (mac_engine_session_close). Without this the next session's first load
+   asks tag_get_name for the index this one left, which names a tag in a
+   table that has been built again since - or no tag at all - and a leaf
+   that happened to match would put the freed world's scenario and bsp
+   back. Only the Xbox path is reached today, and it returns before any of
+   this; a converted-retail session on a second map would not. */
+void mac_engine_scenario_forget(void)
+{
+    held_scenario=NULL;
+    held_structure_bsp=NULL;
+    held_collision_bsp=NULL;
+    held_bsp3d=NULL;
+    held_scenario_index=NONE;
+    held_structure_bsp_index=NONE;
+}
+
 void mac_engine_scenario_unload(void)
 {
     if(mac_cache_files_xbox_active()) {

@@ -4,6 +4,7 @@
 #include "engine_tags.h"
 #include "engine_texture_lifecycle.h"
 #include "engine_synchronous_precache.h"
+#include "engine_scenario_transition.h"
 #include "native_interface_assets.h"
 #include "native_environment_assets.h"
 #include "native_globals_tags.h"
@@ -880,6 +881,8 @@ void mac_engine_session_close(struct mac_engine_session *session)
     mac_device_bsp_decode_cache_clear();
     dispose_bsp_buffers(&session->world);
     mac_engine_world_free(&session->world);
+    /* port: what mac_engine_scenario_unload held points into that world */
+    mac_engine_scenario_forget();
     mac_actor_assets_free(&session->assets);
     mac_cache_files_close(&session->files);
     memset(session,0,sizeof(*session));
