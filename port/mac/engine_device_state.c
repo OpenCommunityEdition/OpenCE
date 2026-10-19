@@ -375,10 +375,17 @@ static int gpu_env_log;
 static int gpu_fast_minmax;
 static int gpu_fast_jmp;
 static uint64_t gpu_segment_time[12];static unsigned long gpu_segment_calls;
+/* port: four floats equal bit for bit (memcmp's answer, without the call: each constant a draw sends is compared) */
+typedef unsigned int __attribute__((__may_alias__)) mac_alias_word;
+static __inline__ int mac_vec4_same(const float *a,const float *b)
+{
+    const mac_alias_word *x=(const mac_alias_word *)a,*y=(const mac_alias_word *)b;
+    return x[0]==y[0]&&x[1]==y[1]&&x[2]==y[2]&&x[3]==y[3];
+}
 static void mac_arbfp_env_set(unsigned index,const float value[4])
 {
     if(index>=MAC_NV2A_ARBFP_ENV_COUNT)return;
-    if(gpu_arbfp_env_valid[index]&&!memcmp(gpu_arbfp_env[index],value,sizeof(gpu_arbfp_env[index])))return;
+    if(gpu_arbfp_env_valid[index]&&mac_vec4_same(gpu_arbfp_env[index],value))return;
     glProgramEnvParameter4fvARB(GL_FRAGMENT_PROGRAM_ARB,index,value);
     memcpy(gpu_arbfp_env[index],value,sizeof(gpu_arbfp_env[index]));
     gpu_arbfp_env_valid[index]=1;++gpu_arbfp_env_writes;
@@ -387,7 +394,7 @@ static void mac_arbfp_env_set(unsigned index,const float value[4])
 static void mac_arb_env_set(GLuint index,const float value[4])
 {
     if(index>=MAC_NV2A_ARB_ENV_COUNT)return;
-    if(gpu_arb_env_valid[index]&&!memcmp(gpu_arb_env[index],value,sizeof(gpu_arb_env[index])))return;
+    if(gpu_arb_env_valid[index]&&mac_vec4_same(gpu_arb_env[index],value))return;
     glProgramEnvParameter4fvARB(GL_VERTEX_PROGRAM_ARB,index,value);
     memcpy(gpu_arb_env[index],value,sizeof(gpu_arb_env[index]));
     gpu_arb_env_valid[index]=1;++gpu_arb_env_writes;
@@ -407,6 +414,12 @@ static unsigned long gpu_index_arena_used;
 static WORD *gpu_index_shadow;
 static struct index_cache_entry gpu_index_entries[INDEX_CACHE_SLOTS];
 static unsigned long long gpu_index_hits,gpu_index_uploads,gpu_index_resets,gpu_index_bypasses;
+/* port: the range of indices of draws seen before (see the draw function) */
+#define INDEX_RANGE_SLOTS 512
+struct index_range_entry {const WORD *indices;unsigned long count,base,generation;WORD minimum,maximum;};
+static struct index_range_entry gpu_index_ranges[INDEX_RANGE_SLOTS];
+static int gpu_index_range_enabled=-1;
+static unsigned long long gpu_index_range_hits;
 void mac_device_gpu_request_readback(void){gpu_readback_requested=1;}
 static long mac_index_cache_span(const WORD *indices,unsigned long count);
 static struct {
@@ -889,6 +902,7 @@ void mac_device_state_stop(void)
             gpu_world_vbo_draws,gpu_world_vbo_builds,gpu_world_vbo_rejections,gpu_world_vbo_bypasses,
             gpu_world_vbo_fallbacks,gpu_world_vbo_gather_skips,gpu_world_vbo_gather_draws,gpu_world_vbo_evictions,gpu_world_vbo_bytes,
             gpu_world_vbo_peak);
+        if(gpu_index_range_hits)fprintf(stderr,"native index range cache: hits=%llu\n",gpu_index_range_hits);
         if(gpu_index_cache_enabled||gpu_index_hits||gpu_index_uploads)
             fprintf(stderr,"native index cache: hits=%llu uploads=%llu resets=%llu bypasses=%llu used=%lu\n",
                 gpu_index_hits,gpu_index_uploads,gpu_index_resets,gpu_index_bypasses,gpu_index_arena_used);
@@ -2978,6 +2992,7 @@ static void mac_index_range(const WORD *indices,UINT count,WORD *minimum_out,WOR
 static void mac_device_draw_stream_indices(D3DPRIMITIVETYPE type,UINT count,
     CONST WORD *indices,unsigned long base_vertex,int validate_index_buffer,int indexed_call)
 {
+    int range_known=0;struct index_range_entry *range_entry=NULL;unsigned long range_generation=0;
     struct vertex_shader_object *vertex=device.program_address<VERTEX_PROGRAM_SLOTS?
         device.program_slots[device.program_address]:device.vertex_shader;
     unsigned long index_base,index_start,index_offset,vertex_count,needed,strides[16]={0};
@@ -3020,15 +3035,32 @@ static void mac_device_draw_stream_indices(D3DPRIMITIVETYPE type,UINT count,
         if(!index_base||index_start<index_base||index_start-index_base>0xffffffffUL-count*sizeof(WORD))
             mac_gpu_shader_failure("index pointer is not in the selected buffer");
         index_offset=index_start-index_base;
-        if(!mac_resource_range_is_allocated((const void *)index_base,index_offset+count*sizeof(WORD))) {
+        /* port: (HALO_MAC_PERF_INDEX_RANGE, on) a draw of indices seen before, with no write to the pages of its indices since
+           (mac_resource_range_generation, as the Xbox textures are kept; freeing or allocating a buffer counts as a write
+           to all of it) is in the same live allocation and has the same range */
+        if(gpu_index_range_enabled<0)gpu_index_range_enabled=mac_perf_flag("HALO_MAC_PERF_INDEX_RANGE");
+        if(gpu_index_range_enabled) {
+            unsigned long generation=mac_resource_range_generation(indices,count*sizeof(WORD));
+            unsigned long slot=(((unsigned long)indices>>1)^(count*2654435761UL))%INDEX_RANGE_SLOTS;
+            struct index_range_entry *entry=&gpu_index_ranges[slot];
+            if(generation&&entry->indices==indices&&entry->count==count&&entry->base==index_base&&entry->generation==generation) {
+                minimum=entry->minimum;maximum=entry->maximum;range_known=1;++gpu_index_range_hits;
+            } else {range_entry=generation?entry:NULL;range_generation=generation;}
+        }
+        if(!range_known&&!mac_resource_range_is_allocated((const void *)index_base,index_offset+count*sizeof(WORD))) {
             fprintf(stderr,"native index range: base=%08lx start=%08lx offset=%lu count=%u type=%u\n",
                 index_base,index_start,index_offset,(unsigned)count,(unsigned)type);
             mac_gpu_shader_failure("indexed draw exceeds a live index-buffer allocation");
         }
     }
     SEGMENT_MARK(1);
-    if(gpu_fast_minmax)mac_index_range(indices,count,&minimum,&maximum);
+    if(range_known);
+    else if(gpu_fast_minmax)mac_index_range(indices,count,&minimum,&maximum);
     else for(i=0;i<count;i++){WORD value=indices[i];if(value<minimum)minimum=value;if(value>maximum)maximum=value;}
+    if(range_entry) {
+        range_entry->indices=indices;range_entry->count=count;range_entry->base=index_base;range_entry->generation=range_generation;
+        range_entry->minimum=minimum;range_entry->maximum=maximum;
+    }
     SEGMENT_MARK(2);
     if(base_vertex>0xffffffffUL-(unsigned long)maximum-1UL)
         mac_gpu_shader_failure("base vertex index overflows");
