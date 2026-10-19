@@ -1761,6 +1761,96 @@ frame. On a big-endian host the frame's data is converted (a short or a float is
 read finds other values; these read the bytes as the x86 would see them, by the width of the field that holds each byte
 (a rotation's shorts, a translation's or a scale's floats). */
 #if defined(__BIG_ENDIAN__) || defined(__ppc__) || defined(__POWERPC__)
+/* port: where in a frame each of its bytes is read from, as the original's pointers walk it, once for an animation
+(the walk below was made again for every byte, at 12% of a b30 battle's frame on a G4). A byte of position p is read from
+aiming_map[p]; a position past the nodes' data, or an animation too large for the table, is read where it lies. The entry
+is checked against the animation's frame size, node count and flags, so a new animation at an old address is made again. */
+#define AIMING_MAP_ENTRIES 64
+#define AIMING_MAP_FRAME_SIZE 4096
+struct aiming_map_entry
+{
+	struct animation const *animation;
+	long frame_size;
+	short node_count;
+	unsigned long flags[6];
+	unsigned short *map;
+};
+static struct aiming_map_entry aiming_maps[AIMING_MAP_ENTRIES];
+static long aiming_map_next = 0;
+
+static unsigned short const *aiming_map_get(
+	struct animation const *animation)
+{
+	long frame_size = animation->frame_size;
+	struct aiming_map_entry *entry = &aiming_maps[(((unsigned long)animation) >> 4) % AIMING_MAP_ENTRIES];
+	unsigned long flags[6];
+	short index;
+
+	if (frame_size <= 0 || frame_size > AIMING_MAP_FRAME_SIZE)
+	{
+		return NULL;
+	}
+	for (index = 0; index < 2; index++)
+	{
+		flags[index] = animation->nodes_with_rotation_flags[index];
+		flags[2 + index] = animation->nodes_with_translation_flags[index];
+		flags[4 + index] = animation->nodes_with_scale_flags[index];
+	}
+	if (entry->map && entry->animation == animation && entry->frame_size == frame_size &&
+		entry->node_count == animation->node_count && !memcmp(entry->flags, flags, sizeof(flags)))
+	{
+		return entry->map;
+	}
+	{
+		unsigned short *map = (unsigned short *)realloc(entry->map, (size_t)frame_size * sizeof(unsigned short));
+		long cursor = 0;
+		long position;
+		short node_index;
+
+		if (!map)
+		{
+			return NULL;
+		}
+		entry->map = map;
+		for (position = 0; position < frame_size; position++)
+		{
+			map[position] = (unsigned short)position;
+		}
+		for (node_index = 0; node_index < animation->node_count && node_index < 64; node_index++)
+		{
+			short long_index = node_index >> LONG_BITS_BITS;
+			unsigned long bit = FLAG(node_index & (LONG_BITS - 1));
+			long kind;
+
+			for (kind = 0; kind < 3; kind++)
+			{
+				unsigned long kind_flags = kind == 0 ? animation->nodes_with_rotation_flags[long_index] :
+					kind == 1 ? animation->nodes_with_translation_flags[long_index] :
+					animation->nodes_with_scale_flags[long_index];
+				long size = kind == 0 ? 8 : kind == 1 ? 12 : 4;
+				long unit = kind == 0 ? 2 : 4;
+
+				if (kind_flags & bit)
+				{
+					for (position = cursor; position < cursor + size && position < frame_size; position++)
+					{
+						long relative = position - cursor;
+						long unit_start = relative - relative % unit;
+
+						map[position] = (unsigned short)(cursor + unit_start + (unit - 1 - (relative - unit_start)));
+					}
+					cursor += size;
+				}
+			}
+		}
+		entry->animation = animation;
+		entry->frame_size = frame_size;
+		entry->node_count = animation->node_count;
+		memcpy(entry->flags, flags, sizeof(flags));
+		return map;
+	}
+}
+
 static unsigned char aiming_data_little_endian_byte(
 	struct animation const *animation,
 	byte const *data,
@@ -1772,35 +1862,44 @@ static unsigned char aiming_data_little_endian_byte(
 	(void)data;
 	if (frame_size > 0 && offset >= 0 && offset < animation->data.size)
 	{
+		unsigned short const *map = aiming_map_get(animation);
 		long position = offset % frame_size;
 		long frame_start = offset - position;
-		long cursor = 0;
-		short node_index;
 
-		for (node_index = 0; node_index < animation->node_count && node_index < 64; node_index++)
+		if (map && frame_start + map[position] < animation->data.size)
 		{
-			short long_index = node_index >> LONG_BITS_BITS;
-			unsigned long bit = FLAG(node_index & (LONG_BITS - 1));
-			long kind;
+			return base[frame_start + map[position]];
+		}
+		else if (!map)
+		{
+			long cursor = 0;
+			short node_index;
 
-			for (kind = 0; kind < 3; kind++)
+			for (node_index = 0; node_index < animation->node_count && node_index < 64; node_index++)
 			{
-				unsigned long flags = kind == 0 ? animation->nodes_with_rotation_flags[long_index] :
-					kind == 1 ? animation->nodes_with_translation_flags[long_index] :
-					animation->nodes_with_scale_flags[long_index];
-				long size = kind == 0 ? 8 : kind == 1 ? 12 : 4;
-				long unit = kind == 0 ? 2 : 4;
+				short long_index = node_index >> LONG_BITS_BITS;
+				unsigned long bit = FLAG(node_index & (LONG_BITS - 1));
+				long kind;
 
-				if (flags & bit)
+				for (kind = 0; kind < 3; kind++)
 				{
-					if (position < cursor + size)
-					{
-						long relative = position - cursor;
-						long unit_start = relative - relative % unit;
+					unsigned long flags = kind == 0 ? animation->nodes_with_rotation_flags[long_index] :
+						kind == 1 ? animation->nodes_with_translation_flags[long_index] :
+						animation->nodes_with_scale_flags[long_index];
+					long size = kind == 0 ? 8 : kind == 1 ? 12 : 4;
+					long unit = kind == 0 ? 2 : 4;
 
-						return base[frame_start + cursor + unit_start + (unit - 1 - (relative - unit_start))];
+					if (flags & bit)
+					{
+						if (position < cursor + size)
+						{
+							long relative = position - cursor;
+							long unit_start = relative - relative % unit;
+
+							return base[frame_start + cursor + unit_start + (unit - 1 - (relative - unit_start))];
+						}
+						cursor += size;
 					}
-					cursor += size;
 				}
 			}
 		}
