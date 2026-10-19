@@ -34,9 +34,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Window, native input and audio' (Protocol in workflow.md)
 
 ## Phase 3: The command ring and the Metal backend
-- [ ] Task: Define the ring's format
-    - [ ] Write tests: cargo test decodes valid batches, and rejects truncated commands, out-of-range sizes, indices and guest offsets
-    - [ ] A shared C header for the commands; the decoder and validator in Rust (port/macos/runtime), exported to Swift
+- [x] Task: Define the ring's format 56e08e51
+    - [x] Write tests: cargo test decodes valid batches, and rejects truncated commands, out-of-range sizes, indices and guest offsets
+    - [x] A shared C header for the commands; the decoder and validator in Rust (port/macos/runtime), exported to Swift
 - [ ] Task: The guest's encoder and the doorbell
     - [ ] Write tests: a guest program writes batches that the host decodes intact; the exits per batch are counted
     - [ ] The guest-side writer and the host_render_submit import
