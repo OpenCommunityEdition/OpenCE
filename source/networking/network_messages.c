@@ -679,7 +679,11 @@ void *create_network_game_message(
 	union network_game_message_size encoded_message_size;
 	void *message;
 
-	encoded_message_size.value = sizeof(encoded_message);
+	/* port: the encoder reads and writes the short, which is the long's HIGH half on a big-endian machine: the long
+	set to the size left the short zero and the assert at the encoder failed, and the long was not what the
+	encoder wrote. Both are read through the short. */
+	encoded_message_size.value = 0;
+	encoded_message_size.encoded = (short)sizeof(encoded_message);
 
 	switch ((short)message_type)
 	{
@@ -834,13 +838,13 @@ void *create_network_game_message(
 		/* a message header holds lengths up to HALO_PORT_MAXIMUM_NETWORK_MESSAGE_SIZE-1,
 		header included: a longer message would go out with a wrong length and
 		derail the stream (create_message only asserts on it) */
-		if (encoded_message_size.value + sizeof(word) >= HALO_PORT_MAXIMUM_NETWORK_MESSAGE_SIZE)
+		if (encoded_message_size.encoded + sizeof(word) >= HALO_PORT_MAXIMUM_NETWORK_MESSAGE_SIZE)
 		{
 			network_event("create_network_game_message(): the encoded message is too long");
 			message = NULL;
 		}
 		else
-		message = create_message(3, encoded_message, encoded_message_size.value, network_game_message_buffer, sizeof(network_game_message_buffer));
+		message = create_message(3, encoded_message, encoded_message_size.encoded, network_game_message_buffer, sizeof(network_game_message_buffer));
 		if (!message)
 		{
 			network_event("create_message() failed");
