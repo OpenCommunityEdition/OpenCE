@@ -228,7 +228,6 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 	X(glVertexAttribBinding) \
 	X(glBindVertexBuffer) \
 	X(glBindTextures) \
-	X(glGetQueryBufferObjectuiv) \
 	X(glVertexAttrib4fv) \
 	X(glVertexAttribI4ui) \
 	X(glDrawArrays) \
@@ -259,6 +258,12 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 	X(glEndQuery) \
 	X(glGetQueryObjectuiv) \
 	X(glMemoryBarrier) \
+	X(glCreateQueries) \
+	X(glIsQuery) \
+	X(glGetQueryBufferObjectuiv) \
+	X(glFenceSync) \
+	X(glClientWaitSync) \
+	X(glDeleteSync) \
 	X(glDebugMessageCallback)
 #endif
 
@@ -463,7 +468,6 @@ pointers, sees the declarations without these aliases */
 #define glVertexAttribBinding halo_glVertexAttribBinding
 #define glBindVertexBuffer halo_glBindVertexBuffer
 #define glBindTextures halo_glBindTextures
-#define glGetQueryBufferObjectuiv halo_glGetQueryBufferObjectuiv
 #define glVertexAttrib4fv halo_glVertexAttrib4fv
 #define glVertexAttribI4ui halo_glVertexAttribI4ui
 #define glDrawArrays halo_glDrawArrays
@@ -494,6 +498,12 @@ pointers, sees the declarations without these aliases */
 #define glEndQuery halo_glEndQuery
 #define glGetQueryObjectuiv halo_glGetQueryObjectuiv
 #define glMemoryBarrier halo_glMemoryBarrier
+#define glCreateQueries halo_glCreateQueries
+#define glIsQuery halo_glIsQuery
+#define glGetQueryBufferObjectuiv halo_glGetQueryBufferObjectuiv
+#define glFenceSync halo_glFenceSync
+#define glClientWaitSync halo_glClientWaitSync
+#define glDeleteSync halo_glDeleteSync
 #define glDebugMessageCallback halo_glDebugMessageCallback
 
 #endif
