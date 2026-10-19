@@ -4,7 +4,9 @@
    mac_gamepad.c, on stderr), and the state when it changes: buttons, sticks, triggers, battery.
    The large motor rumbles with the right trigger and the small one with the left, which also sets the
    light bar (blue) and the player lights (Bluetooth output report 0x31).
-   Usage: mac_gamepad_system_probe [seconds]
+   With a second number the probe stops polling for that many seconds after the third second, as the game
+   does while a map loads, and then goes on (the pad must still answer).
+   Usage: mac_gamepad_system_probe [seconds] [stall seconds]
    Build: tools/mac_gamepad_system_probe_checks.sh */
 #include "mac_gamepad.h"
 #include <stdio.h>
@@ -25,12 +27,20 @@ int main(int argc, char **argv)
     double seconds = argc > 1 ? atof(argv[1]) : 30.0;
     double start = now(), last_rumble = 0;
     struct mac_gamepad_frame frames[MAC_GAMEPAD_MAXIMUM_DEVICES], previous[MAC_GAMEPAD_MAXIMUM_DEVICES];
-    int slot;
+    int slot, stalled = 0;
+    double stall = argc > 2 ? atof(argv[2]) : 0.0;
     memset(previous, 0, sizeof(previous));
     if (seconds <= 0) seconds = 30.0;
     setvbuf(stdout, NULL, _IOLBF, 0);
     printf("polling for %.0f seconds\n", seconds);
     while (now() - start < seconds) {
+        if (stall > 0 && !stalled && now() - start >= 3.0) {
+            stalled = 1;
+            printf("%6.2f stalling for %.0f seconds\n", now() - start, stall);
+            sleep((unsigned)stall);
+            printf("%6.2f polling again\n", now() - start);
+            start += stall;
+        }
         mac_gamepad_poll_all(frames);
         for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot) {
             const struct mac_gamepad_frame *f = &frames[slot];
