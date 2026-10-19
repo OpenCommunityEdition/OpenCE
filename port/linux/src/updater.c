@@ -521,13 +521,15 @@ static void updater_update(void)
 	}
 }
 
-/* the files a previous update left behind */
+/* the files a previous update left behind, and the notice of extract-xiso,
+which releases carried until the disc image readers were written again */
 static void updater_clean_up(void)
 {
 	static const char *const names[] =
 	{
 		"halo.old", "halo.exe.old", "SDL3.dll.old", "libSDL3.so.0.old", "SDL3-LICENSE.txt.old",
-		"extract-xiso-LICENSE.txt.old", "mbedtls-LICENSE.txt.old",
+		"extract-xiso-LICENSE.txt.old", "mbedtls-LICENSE.txt.old", "LICENSE.txt.old",
+		"extract-xiso-LICENSE.txt",
 	};
 	char path[1200];
 	size_t index;
