@@ -218,7 +218,12 @@ Xbox game's begin game, graceful exit and pregame keep-alive field lists
 under their own messages (its table had each on its neighbour's) and makes
 the keep-alive a long, as it was sent: not a byte on the wire moves but the
 keep-alive's last two, the sender's stack before and zero now, and the
-table's record changed with it.
+table's record changed with it; and with it, every machine drops a datagram
+of the netcode stamped more than 15 seconds from its sender's latest, the
+host takes a client's hits, Discord user and readiness only over its
+connection, and the host answers each machine's datagrams where they come
+from, so that a second copy of the game on one computer, on a port of its
+own, plays too.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
