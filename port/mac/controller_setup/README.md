@@ -39,6 +39,7 @@ universal (ppc + i386) binary.
 - `--dump-text` prints the window's texts and control sizes, with the size
   each text needs (`GetThemeTextDimensions`), and marks any that is cut off;
   it opens no window.
+- The Bluetooth tab's checkbox "Use Bluetooth controllers in PowerSpark" sets `input.bluetooth` in config.toml (through `cs_config_set`), which lets the game open the dongle and take a paired pad's input (`../mac_bt_input.c`).
 - The Bluetooth (experimental) tab, in the same window as the Controllers tab (one window, a tab view), is a test area for pairing and live-testing a
   DualSense or DualShock 4 over PowerSpark's own Bluetooth stack (`../bt/`), through a
   TP-Link UB500 (Realtek RTL8761BU) dongle. It shows the dongle's state (not found,

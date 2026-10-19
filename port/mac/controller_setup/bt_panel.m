@@ -50,6 +50,7 @@ static const unsigned char playerPatterns[6] = { 0x04, 0x0a, 0x15, 0x1b, 0x1f, 0
 	NSView *container;              /* the tab's controls, 520 wide; main.m puts it in the tab view */
 	NSString *configPath;
 	NSTextField *intro, *dongleLabel, *notice, *listHeading, *messageLabel, *rateLabel, *testLabel;
+	NSButton *useCheckbox;           /* input.bluetooth: the game takes input from a Bluetooth controller */
 	NSButton *startButton, *searchButton, *disconnectButton, *lightButton, *playersButton, *rumbleButton;
 	NSTextField *rowLabel[ROWS];
 	NSButton *rowButton[ROWS];
@@ -120,7 +121,7 @@ static BTPanel *gPanel = nil;
 			noticeHeight = n;
 	}
 	/* intro, dongle, notice, buttons, list heading, rows, message, pad view, test row, rate */
-	return 8 + introH + dongleH + noticeHeight + 34 + 18 + ROWS * 26 + msgH + 160 + 14 + 34 + 20 + 8;
+	return 8 + introH + 24 + dongleH + noticeHeight + 34 + 18 + ROWS * 26 + msgH + 160 + 14 + 34 + 20 + 8;
 }
 
 - (float)contentHeight
@@ -142,6 +143,15 @@ static BTPanel *gPanel = nil;
 	y = 8;
 	intro = [self labelAt:NSMakeRect(margin, h - y - introH, width, introH) text:kIntro bold:NO];
 	y += introH;
+	useCheckbox = [[[NSButton alloc] initWithFrame:NSMakeRect(margin, h - y - 22, width, 20)] autorelease];
+	[useCheckbox setButtonType:NSSwitchButton];
+	[useCheckbox setTitle:@"Use Bluetooth controllers in PowerSpark"];
+	[[useCheckbox cell] setControlSize:NSSmallControlSize];
+	[useCheckbox setFont:[NSFont systemFontOfSize:[NSFont smallSystemFontSize]]];
+	[useCheckbox setTarget:self];
+	[useCheckbox setAction:@selector(usePressed:)];
+	[container addSubview:useCheckbox];
+	y += 24;
 	dongleLabel = [self labelAt:NSMakeRect(margin, h - y - dongleH, width, dongleH) text:kDongleNone bold:NO];
 	y += dongleH;
 	notice = [self labelAt:NSMakeRect(margin, h - y - noticeHeight, width, noticeHeight) text:@"" bold:NO];
@@ -175,6 +185,28 @@ static BTPanel *gPanel = nil;
 	[padView setNeedsDisplay:YES];
 }
 
+/* input.bluetooth in config.toml */
+- (void)readUseSetting
+{
+	char v[32];
+	int on = configPath && cs_config_get([configPath fileSystemRepresentation], "input.bluetooth", v, sizeof v) == 1 &&
+		strcmp(v, "true") == 0;
+	[useCheckbox setState:on ? NSOnState : NSOffState];
+}
+
+- (void)usePressed:(id)sender
+{
+	static const char *const keys[1] = { "input.bluetooth" };
+	const char *values[1];
+	if (!configPath)
+		return;
+	values[0] = [useCheckbox state] == NSOnState ? "true" : "false";
+	if (cs_config_set([configPath fileSystemRepresentation], keys, values, 1) != 0) {
+		NSBeep();
+		[self readUseSetting];
+	}
+}
+
 - (NSString *)firmwareDir
 {
 	char v[600];
@@ -196,6 +228,7 @@ static BTPanel *gPanel = nil;
 /* the tab is shown: draw its state (the stack starts only when Start is pressed) */
 - (void)activate
 {
+	[self readUseSetting];
 	[self refresh:nil];
 	if (!timer)
 		timer = [[NSTimer scheduledTimerWithTimeInterval:0.04 target:self selector:@selector(refresh:) userInfo:nil repeats:YES] retain];
@@ -466,6 +499,12 @@ static NSString *AddressText(const unsigned char *a)
 		printf("text %d needs %dx%d in %dx%d%s: %s\n", i, (int)n.width, (int)n.height, (int)lf.size.width, (int)lf.size.height,
 			n.height > lf.size.height ? "  <-- CUT OFF" : "", [all[i] UTF8String]);
 		if (n.height > lf.size.height)
+			bad++;
+	}
+	{
+		NSSize n = CSThemeSize(@"Use Bluetooth controllers in PowerSpark", kThemeSmallSystemFont, 470, YES);
+		printf("checkbox needs %dx%d in 470x20%s\n", (int)n.width, (int)n.height, n.height > 20 ? "  <-- CUT OFF" : "");
+		if (n.height > 20)
 			bad++;
 	}
 	{
