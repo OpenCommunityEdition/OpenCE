@@ -262,8 +262,9 @@ drawn as the Xbox drew it at 480. "stock" keeps that; "native" measures in
 the display's lines (not supersampling's, which the display scales down;
 "original" resolution scaling draws 480); "highest" measures as "native"
 which models are too small to draw, and draws the others at their most
-detailed level. level: the scale for choosing the level, otherwise for
-whether to draw at all. */
+detailed level. Other than "stock", each permutation then draws the level
+that port/linux/game/model_detail.c chooses from the model's. level: the
+scale for choosing the level, otherwise for whether to draw at all. */
 enum
 {
 	_model_detail_stock,
@@ -274,10 +275,8 @@ enum
 static int model_detail = -1;
 static unsigned long model_detail_read_at;
 
-float halo_model_detail_scale(int level)
+static int model_detail_setting(void)
 {
-	float display_scale;
-
 	if (model_detail < 0 || model_detail_read_at != config_changes())
 	{
 		const char *setting = config_string("display.model_detail");
@@ -294,6 +293,19 @@ float halo_model_detail_scale(int level)
 		}
 		model_detail = value;
 	}
+	return model_detail;
+}
+
+int halo_model_detail_stock(void)
+{
+	return model_detail_setting() == _model_detail_stock;
+}
+
+float halo_model_detail_scale(int level)
+{
+	float display_scale;
+
+	model_detail_setting();
 	if (model_detail == _model_detail_stock)
 		return 1.0f;
 	if (model_detail == _model_detail_highest && level)

@@ -86,6 +86,7 @@ symbols in this file:
 /* port: model tags and static enclosure recognition at map initialization. */
 #include "cache/cache_files.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
+#include "model_detail.h" /* port: port/linux/game/model_detail.c */
 
 /* ---------- constants */
 
@@ -239,6 +240,7 @@ static void render_model_parts(
 	struct render_skinning const *skinning,
 	long object_index,
 	short geometry_detail_level_index,
+	short detail_rules, /* port: model_detail_rules */
 	short forced_shader_permutation_index,
 	long flags);
 static void model_geometry_part_build_tangent_matrices(
@@ -273,6 +275,7 @@ static void render_model_parts(
 	struct render_skinning const *skinning,
 	long object_index,
 	short geometry_detail_level_index,
+	short detail_rules, /* port: model_detail_rules */
 	short forced_shader_permutation_index,
 	long flags)
 {
@@ -314,7 +317,9 @@ static void render_model_parts(
 					&region->permutations,
 					permutation_index,
 					struct model_region_permutation);
-				geometry_index = permutation->geometry_indices[geometry_detail_level_index];
+				/* port: the level display.model_detail chooses for the permutation
+				(port/linux/game/model_detail.c): stock, the model's */
+				geometry_index = model_detail_geometry_index(model, permutation, geometry_detail_level_index, detail_rules);
 				if (geometry_index!=NONE && !VALID_INDEX(geometry_index, model->geometries.count))
 				{
 					model_data_error(model, "geometry");
@@ -1007,6 +1012,8 @@ void render_model(
 		short node_count = (short)MIN(model->nodes.count, MAXIMUM_NODES_PER_MODEL);
 		/* port: the size the level of detail is chosen by (display.model_detail) */
 		real detail_level_pixels = level_of_detail_pixels*halo_model_detail_scale(TRUE);
+		/* port: how the permutations take that level (display.model_detail) */
+		short detail_rules;
 
 		if (!region_permutation_indices)
 		{
@@ -1063,6 +1070,8 @@ void render_model(
 			"c:\\halo\\SOURCE\\models\\models.c",
 			169,
 			geometry_detail_level_index>=0 && geometry_detail_level_index<NUMBER_OF_DETAIL_LEVELS_PER_MODEL);
+		/* port: stock, unless display.model_detail chose the level */
+		detail_rules = model_detail_rules(model, centroid, radius);
 
 		if (!TEST_FLAG(flags, _render_model_shadow_bit))
 		{
@@ -1161,7 +1170,8 @@ void render_model(
 							(actual_detail_level_index >= 0) && (actual_detail_level_index < NUMBER_OF_DETAIL_LEVELS_PER_MODEL));
 						maximum_actual_detail_level_index = MAX(maximum_actual_detail_level_index, actual_detail_level_index);
 
-						geometry_index = permutation->geometry_indices[geometry_detail_level_index];
+						/* port: the geometry render_model_parts draws */
+						geometry_index = model_detail_geometry_index(model, permutation, geometry_detail_level_index, detail_rules);
 						if (VALID_INDEX(geometry_index, model->geometries.count))
 						{
 							struct model_geometry *geometry = TAG_BLOCK_GET_ELEMENT(&model->geometries, geometry_index, struct model_geometry);
@@ -1271,6 +1281,7 @@ void render_model(
 			&model_parameters.skinning,
 			unique_identifier,
 			geometry_detail_level_index,
+			detail_rules,
 			forced_shader_permutation_index,
 			flags);
 		if (TEST_FLAG(flags, _render_model_shadow_bit))

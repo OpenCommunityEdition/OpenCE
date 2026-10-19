@@ -73,6 +73,9 @@ long halo_shadow_map_scale(void);
 it at (display.model_detail, source/models/models.c): level nonzero, to
 choose its level of detail, otherwise whether it is drawn */
 float halo_model_detail_scale(int level);
+/* whether display.model_detail is "stock" (port/linux/src/d3d8_gl.c), for
+each permutation's level (port/linux/game/model_detail.c) */
+int halo_model_detail_stock(void);
 /* while TRUE, drawing shifts right to center 640-column layouts */
 void halo_screen_ui_offset(unsigned char centered);
 /* names a model lighting vertex program, whose draws can be lit for each
