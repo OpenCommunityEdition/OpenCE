@@ -19,7 +19,7 @@ The comparison and its tolerances are described in port/linux/NETCODE.md
 self-hosted) check, not a public CI one.
 
     python tools/net_compare.py --a build/linux/halo --data /path/to/halo \\
-        --b build/linux_x86_64/halo --maps bloodgulch,beavercreek --swap
+        --b ../other/build/linux/halo --maps bloodgulch,beavercreek --swap
 
 Exit status: 0 when every run passes; 1 when a run diverges (FAIL), even if
 another could not be played, as a divergence is the finding and an error
@@ -410,7 +410,7 @@ def prepare_copy(work, name, executable, data_root, wrapper=""):
     saves = folder / "saves"
     for path in (bin_folder, data, saves):
         path.mkdir(parents=True, exist_ok=True)
-    # what the executable needs beside it (its libraries, a guest image),
+    # what the executable needs beside it (its libraries),
     # linked; the executable copied, so that its folder is this one
     for entry in executable.parent.iterdir():
         if entry.name in (executable.name, "config.toml") or entry.name.endswith(".log"):
@@ -771,7 +771,7 @@ def main():
     parser.add_argument("--b-env", action="append", default=[], metavar="KEY=VALUE",
                         help="an environment variable for B's copies (repeatable)")
     parser.add_argument("--a-wrapper", default="", metavar="COMMAND",
-                        help="a command A's executable is run with (an emulator: \"qemu-aarch64 -L ...\")")
+                        help="a command A's executable is run with (a tracer: \"strace -f -o a.trace\")")
     parser.add_argument("--b-wrapper", default="", metavar="COMMAND", help="the same for B")
     parser.add_argument("--maps", default="bloodgulch,beavercreek",
                         help="comma-separated multiplayer maps, a game on each")

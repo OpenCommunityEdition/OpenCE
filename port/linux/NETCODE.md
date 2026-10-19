@@ -880,9 +880,8 @@ not.
 ### Comparing two builds
 
 `tools/net_compare.py` checks that two builds play a network game in step:
-a new port or architecture against the i686 Linux build (x86-64 against
-i686, arm64 against x86), or a build with a change to the simulation
-against one without. It plays them together on the loopback, build A
+a build with a change to the simulation, the compiler or the maths against
+one without. It plays them together on the loopback, build A
 hosting and B joining (and, with `--swap`, the other way round), on each
 map given, each copy's player a seeded bot (`debug.test_input`
 `bot:<seed>`, `--events` adds `debug.network_test_shoot` and
@@ -892,13 +891,13 @@ started with, `DISPLAY` or `WAYLAND_DISPLAY`, or `--display`'s: a virtual
 one, Xvfb, rather than a desktop), and compares the two machines' logs:
 
 ```sh
-python tools/net_compare.py --a build/linux/halo --b build/linux_x86_64/halo \
+python tools/net_compare.py --a build/linux/halo --b <other checkout>/build/linux/halo \
     --data <folder holding maps/> --maps bloodgulch,beavercreek,hangemhigh --swap
 ```
 
 It needs the retail maps, so it runs on a developer's machine or a
 self-hosted runner, not in the public CI; run it before merging a change to
-a build's compiler, architecture, maths or the simulation itself. A build
+a build's compiler, maths or the simulation itself. A build
 is its executable: a build's (`build/linux/halo`) or a release's. Each copy
 gets its own folder (an executable, `config.toml` written in the copy's
 folder, a data root linking the maps, and saves) in `build/net_compare/`,
@@ -912,7 +911,8 @@ own, which the tool ends however it ends: stopped with Ctrl-C, SIGTERM or
 SIGHUP, it stops the copies and exits 128 plus the signal's number, and
 killed outright, the kernel ends the copies (`PR_SET_PDEATHSIG`). `--compare <host log>
 <client log>` judges two logs already written, and
-`--a-wrapper`/`--b-wrapper` run a build under an emulator. Both builds
+`--a-wrapper`/`--b-wrapper` run a build under another program (a tracer, a
+debugger). Both builds
 must log the drift (below): one built before it is an error.
 
 The host decides and a client predicts its own player, so the comparison
@@ -981,8 +981,8 @@ hangemhigh, chillout, prisoner, ratrace, longest and carousel):
 
 | Builds | Games | Result | Ticks apart |
 | --- | --- | --- | --- |
-| i686 against itself | 64 | 63 pass (one copy crashed, an error) | 0-13%, up to 42% with the frames uneven |
-| i686 against itself, `--events` | 12 | 12 pass | 7-36% |
+| The Linux build against itself | 64 | 63 pass (one copy crashed, an error) | 0-13%, up to 42% with the frames uneven |
+| The Linux build against itself, `--events` | 12 | 12 pass | 7-36% |
 | B's players 0.5% faster | 10 | 10 fail, at the first second compared | 77-88% |
 | B's players 2% faster | 6 | 6 fail, at the first second compared | 88-93% |
 | B's gravity 0.5% or 2% stronger | 14 | 14 pass | 25-38% |
