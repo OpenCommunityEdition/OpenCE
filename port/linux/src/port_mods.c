@@ -918,9 +918,30 @@ static int mod_for_map(const struct port_mod *mod, const char *map_name)
 	return 0;
 }
 
+/* the mods folder: the data root's mods, or paths.mods where it is set (the
+Mac's launcher sets it to a folder of the player's, as the data root can be
+an app folder that cannot be written). A mods folder in the data root that
+exists is kept while paths.mods has nothing in it. */
 static const char *mods_root(char *path, size_t size)
 {
+	const char *folder = config_string("paths.mods");
+
 	snprintf(path, size, "%s/mods", platform_data_root());
+	if (folder[0])
+	{
+		struct posix_file_information information;
+		int exists = posix_stat(path, &information) == 0 && (information.flags & _posix_file_is_directory);
+		void *directory = posix_directory_open(folder);
+		char name[256];
+		int empty = 1;
+
+		while (directory && empty && posix_directory_next(directory, name, sizeof(name)))
+			empty = name[0] == '.';
+		if (directory)
+			posix_directory_close(directory);
+		if (!exists || !empty)
+			snprintf(path, size, "%s", folder);
+	}
 	return path;
 }
 

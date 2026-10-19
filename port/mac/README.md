@@ -390,8 +390,10 @@ prefetch the next object's memory; neither changes a result.
 ## Mods
 
 Mods (`docs/mods.md`) work on the Mac: `port_mods.c` is compiled for it, reading files with the C
-library in place of SDL. Put a mod's folder in `mods/` in the data root, next to `maps/` (with the Xbox
-maps, `~/Library/Application Support/OpenCE/XboxData/mods`). When mods say they cannot be played
+library in place of SDL. Put a mod's folder in `~/Library/Application Support/OpenCE/mods`, which the launcher creates and
+passes to the game as `HALO_MODS_ROOT` (`paths.mods`), so it is the same whichever data root the
+player has (the retail install or the Xbox disc's folder) and is always writable. A `mods/` in the
+data root, next to `maps/`, that already exists is played while that folder has nothing in it. When mods say they cannot be played
 together, a visible run asks before the window opens, in Carbon's standard alert (`platform_ask` in
 `platform.c`, 10.4 to 10.6, PowerPC and Intel): play them anyway, turn them off, or quit, with Escape
 leaving Quit. A hidden run and the `--gpu-render` checks are not asked and play the mods. Checked on

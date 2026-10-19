@@ -1040,6 +1040,12 @@ int main(int argc, char **argv)
 	if (!config_dir_support)
 		shown_environment_count--, unsetenv("HALO_MAC_CONFIG_DIR");
 	set_game_environment("HALO_MAC_MENU_ART_DIR", menus);
+	/* the mods: a folder of the player's in Application Support, whatever the data root is (the retail install or
+	   the XboxData folder, which an app folder can make unwritable) */
+	snprintf(text, sizeof(text), "%s/mods", support);
+	if (!dry_run)
+		make_dirs(text);
+	set_game_environment("HALO_MODS_ROOT", text);
 	/* the launcher, for the game's Settings > Network Setup > CHECK FOR UPDATES NOW, when this build looks for updates */
 	if (lu_ready(&g_update))
 	{

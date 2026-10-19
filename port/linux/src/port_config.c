@@ -490,6 +490,11 @@ static const struct config_setting config_settings[] =
 	{ "paths.saves", _config_string, "\"\"", "HALO_SAVE_ROOT", _environment_value, _platform_desktop,
 		"Where saved games and profiles go; empty for the usual place\n"
 		"(~/.local/share/halo-linux, or %APPDATA%\\halo on Windows)." },
+	{ "paths.mods", _config_string, "\"\"", "HALO_MODS_ROOT", _environment_value, _platform_mac,
+		"Mac build only: the folder of mods (docs/mods.md); empty is the mods\n"
+		"folder of the data root. The launcher sets it to OpenCE/mods in\n"
+		"Application Support. A mods folder in the data root that already\n"
+		"exists is played while this one has nothing in it." },
 	{ "paths.custom_edition", _config_string, "\"\"", "HALO_CUSTOM_EDITION_ROOT", _environment_value, _platform_desktop,
 		"A Halo Custom Edition install whose maps folder is looked in after the\n"
 		"custom_maps folder for Custom Edition maps and their bitmaps.map,\n"

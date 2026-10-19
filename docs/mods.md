@@ -145,7 +145,9 @@ game.
 ### Getting a mod onto each platform
 
 - **Linux, Windows**: put the mod's folder in `mods/` next to `maps/`.
-- **Mac**: put it in `mods/` in the data root, next to `maps/`. The Mac
+- **Mac**: put it in `~/Library/Application Support/OpenCE/mods` (the
+  launcher creates it and sets `paths.mods`; a `mods/` in the data root
+  that already exists is played while that folder is empty). The Mac
   build (PowerSpark) compiles `port_mods.c` with the C library's files in
   place of SDL's (`HALO_MAC`). When mods say they cannot be played
   together, a visible run asks at startup (a Carbon alert: play them anyway,
