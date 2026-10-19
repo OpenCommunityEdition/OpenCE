@@ -3051,14 +3051,14 @@ void actor_communication_update(
 			--actor->control.idle_vocalization_timer == 0)
 		{
 			long sound_definition_index = NONE;
-			long vocalization_type = in_combat != FALSE;
+			short vocalization_type = in_combat != FALSE; /* port: a short, as unit_test_speech takes it (was a long passed as a short *, its high half on a big-endian host) */
 			short play_type = unit_test_speech(
 				actor->meta.unit_index,
 				_unit_speech_idle,
 				TRUE,
 				FALSE,
 				NULL,
-				(short *)&vocalization_type,
+				&vocalization_type,
 				&sound_definition_index);
 			if (play_type > 0)
 			{
