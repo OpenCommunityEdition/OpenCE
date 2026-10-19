@@ -37,9 +37,9 @@
 - [x] Task: Define the ring's format 56e08e51
     - [x] Write tests: cargo test decodes valid batches, and rejects truncated commands, out-of-range sizes, indices and guest offsets
     - [x] A shared C header for the commands; the decoder and validator in Rust (port/macos/runtime), exported to Swift
-- [ ] Task: The guest's encoder and the doorbell
-    - [ ] Write tests: a guest program writes batches that the host decodes intact; the exits per batch are counted
-    - [ ] The guest-side writer and the host_render_submit import
+- [x] Task: The guest's encoder and the doorbell 48fa14c6
+    - [x] Write tests: a guest program writes batches that the host decodes intact; the exits per batch are counted
+    - [x] The guest-side writer and the host_render_submit import
 - [ ] Task: The Swift Metal backend
     - [ ] Write tests: XCTest submits decoded commands (buffers, textures, pipelines, draws) to an offscreen target and reads pixels back
     - [ ] Buffers and textures uploaded from guest memory; pipeline and depth-stencil state caches; presenting to the layer
