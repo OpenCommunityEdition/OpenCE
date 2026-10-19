@@ -1225,11 +1225,6 @@ COOP_SETUP_SCREENS = [
             "Damage from the other players will only reduce\\nshields. Health will be unaffected.",
             "Players can be hurt by damage from explosives\\nfired by the other players.",
         ]),
-        ("coop_team_wipe", "TEAM WIPE:", ["AUTO", "REVERT CHECKPOINT", "RESPAWN ONLY"], [
-            "Private games revert the checkpoint; public games\\nonly respawn. A changed team or missing save\\nalways uses respawn only.",
-            "Revert the checkpoint after everyone dies. A changed\\nteam or missing save uses respawn only.",
-            "Respawn at checkpoint positions after everyone dies.\\nThe world keeps its progress.",
-        ]),
         ("coop_extra_enemies", "EXTRA ENEMIES:", ["PER PLAYER", "STATIC MULTIPLIER", "NONE"], [
             "Enemy squads grow with the players: by the value of\\n'Per Player' for each player past the first.",
             "Enemy squads use 'Multiplier', however many players\\nthere are.",
@@ -1253,6 +1248,11 @@ COOP_SETUP_SCREENS = [
         ("coop_player_collisions", "PLAYER COLLISIONS:", ["ON", "OFF"], [
             "Players bump into each other, as in the campaign.",
             "Players walk through each other, so that no one\\nblocks a doorway. The AI's characters still block.",
+        ]),
+        ("coop_team_wipe", "TEAM WIPE:", ["AUTO", "REVERT CHECKPOINT", "RESPAWN ONLY"], [
+            "Private games revert the checkpoint; public games\\nonly respawn. A changed team or missing save\\nalways uses respawn only.",
+            "Revert the checkpoint after everyone dies. A changed\\nteam or missing save uses respawn only.",
+            "Respawn at checkpoint positions after everyone dies.\\nThe world keeps its progress.",
         ]),
     ]),
     ("voice_options", "VOICE AND VOTING", "Voice chat, text chat and votes to kick a player,\\nfor this game.",

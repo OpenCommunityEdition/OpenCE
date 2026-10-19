@@ -211,8 +211,8 @@ enum
 	_coop_event_reverted,
 	/* a unit opened (value TRUE) or closed: a dropship's doors */
 	_coop_event_unit_open,
-	/* type 0: a break, value its index, frame its BSP, reals the epicenter;
-	type 1: 32 surfaces' extant bits in object_index, value the first index */
+	/* a breakable surface broke: value its index, frame its BSP, reals the
+	damage's epicenter */
 	_coop_event_surface_broken,
 };
 
@@ -525,12 +525,6 @@ static struct
 	boolean joined;
 	boolean refresh;
 } host_resend;
-
-/* A revert must refresh surfaces even between the periodic refreshes.
-Kept set if the event queue has no room for the whole state. */
-static boolean host_surfaces_refresh;
-static short host_surfaces_next;
-static short host_surfaces_bsp = NONE;
 
 /* Checkpoints restore player_data, but not the live machines' player
 table. A team wipe may rewind only while both still name the saved team. */
@@ -1845,41 +1839,6 @@ static void client_stop_script_sounds(
 	}
 }
 
-/* A full chunk includes intact surfaces too: a checkpoint can put back a
-pane that an earlier break event removed. Every index is checked before
-touching the BSP or the engine's fixed-size surface arrays. */
-static void client_apply_surface_state(
-	struct distributed_coop_event const *event)
-{
-	struct structure_bsp *structure_bsp;
-	short count;
-	short index;
-	unsigned long extant = (unsigned long)event->object_index;
-
-	if (global_structure_bsp_index < 0 || global_structure_bsp_index >= MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO ||
-		event->frame != global_structure_bsp_index || event->value < 0 ||
-		event->value >= MAXIMUM_BREAKABLE_SURFACES_PER_MAP || event->value % 32 != 0)
-	{
-		return;
-	}
-	structure_bsp = global_structure_bsp_get();
-	if (!structure_bsp)
-		return;
-	count = (short)MIN(structure_bsp->breakable_surfaces.count, MAXIMUM_BREAKABLE_SURFACES_PER_MAP);
-	for (index = event->value; index < count && index < event->value + 32; index++)
-	{
-		if (extant & (1UL << (index - event->value)))
-			breakable_surface_port_restore(index);
-		else
-		{
-			struct structure_breakable_surface *surface = TAG_BLOCK_GET_ELEMENT(&structure_bsp->breakable_surfaces,
-				index, struct structure_breakable_surface);
-
-			breakable_surface_port_break(index, &surface->centroid);
-		}
-	}
-}
-
 static void client_apply_event(
 	struct distributed_coop_event const *event)
 {
@@ -1917,10 +1876,7 @@ static void client_apply_event(
 		client_stop_script_sounds();
 		break;
 	case _coop_event_surface_broken:
-		if (event->type == 1)
-			client_apply_surface_state(event);
-		else if (event->type == 0 && event->frame == global_structure_bsp_index &&
-			global_structure_bsp_index >= 0 && global_structure_bsp_index < MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO)
+		if (event->frame == global_structure_bsp_index)
 		{
 			real_point3d epicenter = { event->reals[0], event->reals[1], event->reals[2] };
 
@@ -2093,9 +2049,6 @@ void network_coop_new_game(
 	csmemset(host_friendly_fire, 0, sizeof(host_friendly_fire));
 	csmemset(&host_sent_screen_effect, 0, sizeof(host_sent_screen_effect));
 	csmemset(&host_resend, 0, sizeof(host_resend));
-	host_surfaces_refresh = FALSE;
-	host_surfaces_next = 0;
-	host_surfaces_bsp = NONE;
 	csmemset(&checkpoint_players, 0, sizeof(checkpoint_players));
 	csmemset(&players_vitality, 0, sizeof(players_vitality));
 	host_attachment_count = 0;
@@ -2775,52 +2728,34 @@ void network_coop_note_surface_broken(
 	event->reals[2] = epicenter->z;
 }
 
-/* host: complete surface state on each refresh, with progress retained
-across a full event queue so later chunks cannot starve. */
+/* host: a few broken surfaces again each refresh, round them all, for a
+machine that joined since or lost the message (broken from their middle) */
 static void host_send_broken_surfaces(
 	void)
 {
+	enum { SURFACES_PER_REFRESH = 8 };
+	static short cursor;
 	struct structure_bsp *structure_bsp = global_structure_bsp_get();
-	short count;
+	short count = (short)structure_bsp->breakable_surfaces.count;
+	short sent = 0;
+	short step;
 
-	if (!structure_bsp || global_structure_bsp_index < 0 ||
-		global_structure_bsp_index >= MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO)
+	if (!host_resend.refresh || count <= 0)
 		return;
-	if (host_surfaces_bsp != global_structure_bsp_index)
+	for (step = 0; step < count && sent < SURFACES_PER_REFRESH; step++)
 	{
-		host_surfaces_bsp = global_structure_bsp_index;
-		host_surfaces_next = 0;
-		host_surfaces_refresh = TRUE;
-	}
-	if (!host_surfaces_refresh && !host_resend.refresh)
-		return;
-	if (!host_surfaces_refresh)
-		host_surfaces_next = 0;
-	count = (short)MIN(structure_bsp->breakable_surfaces.count, MAXIMUM_BREAKABLE_SURFACES_PER_MAP);
-	/* Event numbers order these after any pre-revert breaks. A complete
-	refresh also repairs a lost batch, without needing the revert event. */
-	host_surfaces_refresh = TRUE;
-	for (; host_surfaces_next < count; host_surfaces_next += 32)
-	{
-		struct distributed_coop_event *event = event_new(_coop_event_surface_broken);
-		unsigned long extant = 0;
-		short first = host_surfaces_next;
-		short index;
+		short index = (short)((cursor + step) % count);
 
-		if (!event)
-			return;
-		for (index = first; index < count && index < first + 32; index++)
+		if (!breakable_surface_extant(index))
 		{
-			if (breakable_surface_extant(index))
-				extant |= 1UL << (index - first);
+			struct structure_breakable_surface *surface = TAG_BLOCK_GET_ELEMENT(&structure_bsp->breakable_surfaces,
+				index, struct structure_breakable_surface);
+
+			network_coop_note_surface_broken(index, &surface->centroid);
+			sent++;
 		}
-		event->type = 1;
-		event->frame = global_structure_bsp_index;
-		event->value = first;
-		event->object_index = (long)extant;
 	}
-	host_surfaces_refresh = FALSE;
-	host_surfaces_next = 0;
+	cursor = (short)((cursor + step) % count);
 }
 
 void network_coop_note_object_effect(
@@ -2884,9 +2819,6 @@ void network_coop_reverted(
 	}
 	/* (the dropships' riders kept are of the game state reverted from) */
 	coop_enemies_reset();
-	host_surfaces_refresh = TRUE;
-	host_surfaces_next = 0;
-	host_surfaces_bsp = NONE;
 	error(_error_silent, "co-op: reverted %ld ticks, clock kept at %ld", ticks, now);
 	event_new(_coop_event_reverted);
 }
