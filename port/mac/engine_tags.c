@@ -24,7 +24,8 @@ static int tag_memo_enabled=-1;
 /* port: an Xbox (version 5) map's tags are the engine's own (cache_files.c,
    as scenario_tags_load reads them in place); the cache's definitions, which
    tools/mac_cache_files_native_view.py renames, answer for them */
-#define XBOX() mac_cache_files_xbox_active()
+extern int mac_cache_files_xbox_flag; /* port: engine_cache_files.c; read without a call, as tag_get is called most of all */
+#define XBOX() (mac_cache_files_xbox_flag)
 void *tag_get_retail_legacy(long group,long handle);
 char *tag_get_name_retail_legacy(long handle);
 unsigned long tag_get_group_tag_retail_legacy(long handle);

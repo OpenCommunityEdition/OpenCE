@@ -17,6 +17,11 @@ enum mac_render_timing_bucket {
     mac_render_timing_draw_restore,
     mac_render_timing_bone_gather,
     mac_render_timing_stream_decode,
+    /* inside draw_call: the attribute arrays, the vertex program and its constants, the fragment program and its constants, the GL draw */
+    mac_render_timing_dc_attributes,
+    mac_render_timing_dc_vertex_program,
+    mac_render_timing_dc_fragment_program,
+    mac_render_timing_dc_gl_draw,
     mac_render_timing_bucket_count
 };
 

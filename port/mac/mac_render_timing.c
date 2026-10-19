@@ -11,6 +11,7 @@ struct mac_render_timing_total {
 };
 
 static int timing_enabled;
+static int timing_detail;
 static struct mac_render_timing_total timing_totals[mac_render_timing_bucket_count];
 #define MAC_RENDER_TIMING_VERTEX_IDS 136
 static struct mac_render_timing_total vertex_totals[MAC_RENDER_TIMING_VERTEX_IDS];
@@ -27,7 +28,11 @@ static const char *const timing_names[mac_render_timing_bucket_count] = {
     "draw_call",
     "draw_restore",
     "bone_gather",
-    "stream_decode"
+    "stream_decode",
+    "dc_attributes",
+    "dc_vertex_program",
+    "dc_fragment_program",
+    "dc_gl_draw"
 };
 
 static int timing_bucket_valid(enum mac_render_timing_bucket bucket)
@@ -49,7 +54,9 @@ void mac_render_timing_init(void)
     memset(timing_totals,0,sizeof(timing_totals));
     memset(vertex_totals,0,sizeof(vertex_totals));
     enabled=getenv("HALO_MAC_RENDER_TIMING");
-    timing_enabled=enabled&&enabled[0]=='1'&&enabled[1]=='\0';
+    timing_enabled=enabled&&(enabled[0]=='1'||enabled[0]=='2')&&enabled[1]=='\0';
+    /* port: "2" also times the parts of a draw call (the dc_ buckets); "1" leaves them out so that it costs what it did */
+    timing_detail=timing_enabled&&enabled[0]=='2';
 }
 
 int mac_render_timing_enabled(void)
@@ -61,6 +68,7 @@ mac_render_timing_stamp mac_render_timing_begin(
     enum mac_render_timing_bucket bucket)
 {
     if(!timing_enabled||!timing_bucket_valid(bucket))return 0;
+    if(bucket>=mac_render_timing_dc_attributes&&!timing_detail)return 0;
     return timing_now();
 }
 

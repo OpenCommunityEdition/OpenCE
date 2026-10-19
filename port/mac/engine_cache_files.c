@@ -86,6 +86,8 @@ fail:mac_cache_files_close(&result);return 0;
 static int xbox_mode;
 void mac_xbox_mode_set(int on){xbox_mode=on?1:0;}
 int mac_xbox_mode(void){return xbox_mode;}
+/* port: the same answer in a variable, which the tag functions read without a call (engine_tags.c) */
+int mac_cache_files_xbox_flag;
 int mac_cache_files_xbox_active(void){return active&&active->xbox;}
 const unsigned char *mac_cache_files_xbox_image(size_t *size)
 {
@@ -124,15 +126,15 @@ void cache_file_close(void)
 int mac_cache_files_bind(struct mac_cache_files *scope)
 {
     if(active||!scope||!scope->map.data)return 0;
-    active=scope;return 1;
+    active=scope;mac_cache_files_xbox_flag=active->xbox?1:0;return 1;
 }
 int mac_cache_files_unbind(struct mac_cache_files *scope)
 {
-    if(!scope||active!=scope)return 0;active=NULL;return 1;
+    if(!scope||active!=scope)return 0;active=NULL;mac_cache_files_xbox_flag=0;return 1;
 }
 void mac_cache_files_close(struct mac_cache_files *scope)
 {
-    if(!scope)return;if(active==scope)active=NULL;
+    if(!scope)return;if(active==scope){active=NULL;mac_cache_files_xbox_flag=0;}
     if(mac_cache_files_converted_reset_hook)mac_cache_files_converted_reset_hook();
     mac_mapped_file_close(&scope->sounds);mac_mapped_file_close(&scope->bitmaps);mac_mapped_file_close(&scope->map);
     memset(scope,0,sizeof(*scope));

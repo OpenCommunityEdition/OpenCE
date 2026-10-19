@@ -1742,7 +1742,7 @@ static void mac_gpu_draw_immediate(void)
     struct nv2a_pixel_shader_key key;
     const char *legacy_vertex=NULL,*legacy_pixel=NULL;
     struct mac_shader_source_result source_result;
-    mac_render_timing_stamp phase_stamp, detail_stamp;
+    mac_render_timing_stamp phase_stamp, detail_stamp, sub_stamp;
     char error[160];unsigned long input_mask=0,i;
     unsigned long active_attribute_mask=0;
     GLuint program=0;GLint old_program=0,old_array_buffer=0;
@@ -2200,6 +2200,7 @@ programs_done:
     }
     mac_render_timing_end(mac_render_timing_draw_uniforms,detail_stamp);
     detail_stamp=mac_render_timing_begin(mac_render_timing_draw_call);
+    sub_stamp=mac_render_timing_begin(mac_render_timing_dc_attributes);
     if(gpu_world_draw.active) {
         const struct world_vbo_entry *world=gpu_world_draw.entry;
         unsigned long first=gpu_world_draw.base_vertex*world->stride;
@@ -2258,6 +2259,8 @@ programs_done:
             } else mac_gl_shadow_attribute_off((GLuint)i);
         }
     }
+    mac_render_timing_end(mac_render_timing_dc_attributes,sub_stamp);
+    sub_stamp=mac_render_timing_begin(mac_render_timing_dc_vertex_program);
     if(arb_vertex) {
         float screen_point[4]={0.0f,1.0f,0.0f,0.0f};
         screen_point[0]=(float)mac_engine_ui_offset(); /* port: the menus' centring (halo_screen_ui_offset) */
@@ -2319,6 +2322,8 @@ programs_done:
         mac_gl_shadow_cap(SHADOW_CAP_VERTEX_PROGRAM,GL_VERTEX_PROGRAM_ARB,0);
         mac_gl_shadow_cap(SHADOW_CAP_POINT_SIZE,GL_VERTEX_PROGRAM_POINT_SIZE_ARB,0);
     }
+    mac_render_timing_end(mac_render_timing_dc_vertex_program,sub_stamp);
+    sub_stamp=mac_render_timing_begin(mac_render_timing_dc_fragment_program);
     if(ff) {
         mac_gl_shadow_cap(SHADOW_CAP_FRAGMENT_PROGRAM,GL_FRAGMENT_PROGRAM_ARB,0);
         mac_ff_apply(ff,key.sampler_type);
@@ -2389,6 +2394,7 @@ programs_done:
         }
     } else mac_gl_shadow_cap(SHADOW_CAP_FRAGMENT_PROGRAM,GL_FRAGMENT_PROGRAM_ARB,0);
     if(!ff)mac_ff_alpha_off();
+    mac_render_timing_end(mac_render_timing_dc_fragment_program,sub_stamp);
     {
         /* Diagnostic only (HALO_MAC_DIAG_DRAW_KEYS=<frame>): that frame's
            draws, one line each: vertex shader, programs, textures. */
@@ -2415,6 +2421,7 @@ programs_done:
     }
     if(gpu_diag_draw_times<0){const char *v=getenv("HALO_MAC_DIAG_DRAW_TIMES");gpu_diag_draw_times=v&&v[0]=='1';}
     if(gpu_diag_draw_times&&device.gpu_present_count==5)diag_start=mach_absolute_time();
+    sub_stamp=mac_render_timing_begin(mac_render_timing_dc_gl_draw);
     if(gpu_world_draw.active) {
         GLint old_elements=0;
         long span;
@@ -2466,6 +2473,7 @@ programs_done:
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,(GLuint)old_elements);
         gpu_remapped_draws++;
     } else glDrawArrays(primitive,0,(GLsizei)device.immediate_count);
+    mac_render_timing_end(mac_render_timing_dc_gl_draw,sub_stamp);
     mac_render_timing_draw_end(vertex->id,detail_stamp);
     if(diag_start)mac_diag_draw_time(vertex->id,(unsigned long)device.immediate_count,diag_start,
         diag_vertex_binds,diag_fragment_binds,diag_env_writes);
