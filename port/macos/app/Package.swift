@@ -19,7 +19,9 @@ let package = Package(
                 swiftSettings: [.swiftLanguageMode(.v5)]),
         // the app's own logic, kept apart from AppKit so that it is tested
         .target(name: "OpenCEShell"),
-        .executableTarget(name: "OpenCE", dependencies: ["CHaloHost", "OpenCERuntime", "OpenCEShell"]),
-        .testTarget(name: "OpenCETests", dependencies: ["OpenCERuntime", "OpenCEShell"]),
+        // the game's windows: AppKit with a Metal layer
+        .target(name: "OpenCEWindow", dependencies: ["OpenCEShell"]),
+        .executableTarget(name: "OpenCE", dependencies: ["CHaloHost", "OpenCERuntime", "OpenCEShell", "OpenCEWindow"]),
+        .testTarget(name: "OpenCETests", dependencies: ["OpenCERuntime", "OpenCEShell", "OpenCEWindow"]),
     ]
 )

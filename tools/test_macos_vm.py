@@ -120,6 +120,25 @@ def test_the_main_threads_queue_natively(tmp_path):
     assert (result.returncode, result.stdout.strip()) == (0, "ok"), result.stdout + result.stderr
 
 
+def test_the_window_imports_use_the_apps_windows_natively(tmp_path):
+    # port/macos/host/host_window.c, built for this Mac: the window imports
+    # go to the windows the app installs, else to SDL's
+    import os
+    import subprocess
+
+    exe = tmp_path / "host_window_test"
+    sdl_include = os.environ.get("HALO_MACOS_SDL_INCLUDE", "")
+    build = subprocess.run([
+        "cc", "-std=gnu11", "-Wall", "-Werror", "-D_DARWIN_C_SOURCE", "-mmacosx-version-min=26.0",
+        "-Iport/macos/host", "-Ibuild/macos/runtime", "-Iport/android/include",
+        "-Iport/android/guest/libc/arch/arm64_32", f"-I{sdl_include}",
+        "port/macos/tests/host_window_test.c", "port/macos/host/host_window.c", "-o", str(exe),
+    ], cwd=ROOT, capture_output=True, text=True)
+    assert build.returncode == 0, build.stderr
+    result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=30)
+    assert (result.returncode, result.stdout.strip()) == (0, "ok"), result.stdout + result.stderr
+
+
 # ---------- SDL, headless
 
 SDL_DRIVERS = {"SDL_AUDIO_DRIVER": "dummy", "SDL_VIDEO_DRIVER": "dummy"}

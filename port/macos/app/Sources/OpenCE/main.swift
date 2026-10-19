@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // (the host's: the app's own working folder is /)
         setenv("HALO_DATA_ROOT", root.path, 1)
+        // (the guest's window is the app's, made when the guest asks)
+        WindowBackend.install()
         log.info("starting the guest image \(image.path) with the data in \(root.path)")
         // (the guest's program name, then any arguments the app was given)
         HaloHost.start(image: image, arguments: ["OpenCE"] + CommandLine.arguments.dropFirst()) { [weak self] in
@@ -61,4 +63,5 @@ let application = NSApplication.shared
 let delegate = AppDelegate()
 application.delegate = delegate
 application.setActivationPolicy(.regular)
+application.mainMenu = MainMenu.make()
 application.run()

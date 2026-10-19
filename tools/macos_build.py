@@ -57,7 +57,8 @@ def is_macos_host() -> bool:
 
 
 def macos_configure_inputs() -> List[Path]:
-    return [Path(__file__), PORT_DIR / "host", PORT_DIR / "cli", APP_DIR / "Sources" / "OpenCE", APP_DIR / "Tests",
+    return [Path(__file__), PORT_DIR / "host", PORT_DIR / "cli", APP_DIR / "Sources" / "OpenCE",
+            APP_DIR / "Sources" / "OpenCEShell", APP_DIR / "Sources" / "OpenCEWindow", APP_DIR / "Tests",
             PORT_DIR / "runtime" / "src", Path("tools/macos_dispatch.py")]
 
 
@@ -244,6 +245,7 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
             implicit=[runtime_dir / "src" / "bin" / "uniffi-bindgen.rs"])
     swift_sources = [APP_DIR / "Package.swift", *sorted((APP_DIR / "Sources" / "OpenCE").glob("*.swift")),
                      *sorted((APP_DIR / "Sources" / "OpenCEShell").glob("*.swift")),
+                     *sorted((APP_DIR / "Sources" / "OpenCEWindow").glob("*.swift")),
                      APP_DIR / "Sources" / "CHaloHost" / "module.modulemap", PORT_DIR / "host" / "halo_host.h",
                      *bindings]
     n.build(outputs=app_executable, rule="macos_app",

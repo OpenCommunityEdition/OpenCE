@@ -117,6 +117,18 @@ void host_call_on_main_thread(struct host_call *call, const char *name, void (*w
 /* the requests waiting for the main thread (for the tests) */
 int host_main_thread_queued(void);
 
+/* ---------- windows (host_window.c)
+
+The window imports (host_sdl_create_window, host_sdl_window_size_in_pixels)
+are these: the app's windows when it has installed them
+(halo_host_set_window_backend), else SDL's (host_sdl.c). */
+
+uint32_t host_window_create(const char *title, int width, int height, int64_t flags);
+void host_window_size_in_pixels(uint32_t window, int *width, int *height);
+/* SDL's (port/android/host/host_sdl.c) */
+uint32_t host_sdl_create_window(const char *title, int width, int height, int64_t flags);
+void host_sdl_window_size_in_pixels(uint32_t window, int *width, int *height);
+
 /* ---------- system calls (host_syscall.c) */
 
 /* the Linux errno value of a host (Darwin) one */

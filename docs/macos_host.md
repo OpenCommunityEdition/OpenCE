@@ -276,6 +276,25 @@ SDL keeps its error message per thread. After a failed import on the main
 thread, `SDL_GetError` on the guest's thread does not have that import's
 message.
 
+### The window
+
+In the app, the guest's window is an AppKit window, not SDL's. Before it
+starts the guest, the app installs its windows with
+`halo_host_set_window_backend` (`port/macos/host/host_window.c`). From then
+on, `host_sdl_create_window` and `host_sdl_window_size_in_pixels` are the
+app's (`Sources/OpenCE/WindowBackend.swift`). The command-line host
+installs none and keeps SDL's.
+
+The window (`Sources/OpenCEWindow`) is resizable and can go fullscreen in a
+Space of its own, from View > Enter Full Screen or Control-Command-F. The
+guest asks for a fullscreen window, as Android's does; the app opens it as a
+window instead. Its first size is the one the game asks for (640 by 480
+times `display.window_scale`), shrunk to fit the screen if needed while
+keeping 4:3. Its content is a `CAMetalLayer` at the window's backing scale,
+cleared to black until the Metal renderer draws in it. The guest reads the
+window's size in pixels each frame, so a resize reaches the game on its
+next frame. Closing the window quits the app.
+
 A guest crash is reported with its registers, the exception's syndrome and
 the guest's frames, by address in the image (`llvm-symbolizer` on
 `halo_guest.elf` names them).

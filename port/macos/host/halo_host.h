@@ -9,6 +9,7 @@ libhalo_host.a exports to the command-line host and the app.
 #define HALO_HOST_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 /* halo_guest.elf beside the executable, or in ../share/opence */
 void halo_host_default_image_path(char *path, size_t size);
@@ -27,5 +28,20 @@ void halo_host_use_main_queue(void);
 /* fails the main thread's queued requests, and any made later (as the app
 terminates, when its run loop stops) */
 void halo_host_shutdown(void);
+
+/* the app's windows, in place of SDL's (host_window.c): its functions are
+called on the main thread. create gives the window's handle, nonzero, or 0;
+size_in_pixels gives a window's drawable size now (0 by 0 for a handle
+create did not give) */
+struct halo_host_window_backend
+{
+	void *context;
+	uint32_t (*create)(void *context, const char *title, int width, int height, int64_t flags);
+	void (*size_in_pixels)(void *context, uint32_t window, int *width, int *height);
+};
+
+/* the windows the guest makes from now on are backend's (copied), or SDL's
+again with NULL: called before the guest makes its window */
+void halo_host_set_window_backend(const struct halo_host_window_backend *backend);
 
 #endif

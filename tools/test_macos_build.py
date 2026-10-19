@@ -264,8 +264,12 @@ def test_the_dispatcher_runs_window_imports_on_the_main_thread(tmp_path):
                          text, re.S)
     assert function, "no function for host_sdl_create_window"
     body = " ".join(function.group(1).split())
-    assert body.startswith("call->result_x = (uint32_t)host_sdl_create_window((const char *)host_guest_pointer(")
+    # (the host's windows, the app's or else SDL's: host_window.c)
+    assert body.startswith("call->result_x = (uint32_t)host_window_create((const char *)host_guest_pointer(")
     assert body.endswith("call->error = errno;") and "host_saved_errno" not in body
+    _, size = dispatch_case(text, "host_sdl_window_size_in_pixels")
+    index, _ = dispatch_case(text, "host_sdl_window_size_in_pixels")
+    assert f"static void main_thread_{index}(struct host_call *call)\n{{\n\thost_window_size_in_pixels(" in text
     _, events = dispatch_case(text, "host_sdl_poll_event")
     assert "host_call_on_main_thread(" in events
     # what needs no main thread is called where it is asked for

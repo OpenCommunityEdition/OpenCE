@@ -21,7 +21,9 @@ The imports AppKit needs on its main thread (MAIN_THREAD: windows, events,
 message boxes, the clipboard) are carried out there: each case's call is a
 function of its own, which host_call_on_main_thread
 (port/macos/host/host_main_thread.c) runs on the main thread for the vCPU
-that asked, bringing its errno back.
+that asked, bringing its errno back. The window imports (HOST_FUNCTIONS)
+call the macOS host's own functions, which use the app's windows when it has
+some and SDL's otherwise.
 
 Usage: macos_dispatch.py --prototypes header.h [--prototypes ...] output.c list...
 """
@@ -47,6 +49,13 @@ MAIN_THREAD = {
     "host_sdl_init", "host_sdl_create_window", "host_sdl_window_size_in_pixels", "host_sdl_set_relative_mouse",
     "host_sdl_poll_event", "host_sdl_set_clipboard_text", "host_sdl_get_clipboard_text", "host_sdl_show_toast",
     "host_sdl_show_simple_message_box", "host_sdl_show_message_box",
+}
+
+# imports whose host function is the macOS host's own, with the same
+# prototype: the app's windows, else SDL's (port/macos/host/host_window.c)
+HOST_FUNCTIONS = {
+    "host_sdl_create_window": "host_window_create",
+    "host_sdl_window_size_in_pixels": "host_window_size_in_pixels",
 }
 
 
@@ -121,7 +130,7 @@ def case(index, name, prototypes, functions=None):
     result, parameters = prototypes[function]
     position = [0, 0, 0]
     arguments = [argument(function, kind, parameter, position) for kind, parameter in parameters]
-    call = f"{function}({', '.join(arguments)})"
+    call = f"{HOST_FUNCTIONS.get(function, function)}({', '.join(arguments)})"
     lines = [f"\tcase {index}: /* {name} */"]
     if result == "void":
         lines.append(f"\t\t{call};")
