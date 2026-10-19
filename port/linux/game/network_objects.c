@@ -2122,9 +2122,10 @@ static void distributed_client_delete(
 		return;
 	if (TEST_FLAG(_object_mask_item, object->object.type))
 		distributed_client_release_item(object_index, TRUE);
-	/* (a flag or ball, which the game never deletes but a host may: a
-	release build's assertions do not stop it. Out of its carrier's hands
-	above, as any weapon; and the goal its game type shows at it goes too) */
+	/* (a flag or ball, which the game never deletes but a host has, for a
+	reason not known: the client follows its word all the same. Out of its
+	carrier's hands above, as any weapon; and the goal its game type shows
+	at it goes too) */
 	if (object->object.type == _object_type_weapon && game_engine_running() && weapon_is_flag(object_index))
 		game_engine_objective_weapon_deleted(object_index);
 	if (TEST_FLAG(_object_mask_unit, object->object.type))
