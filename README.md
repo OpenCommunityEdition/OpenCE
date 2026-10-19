@@ -51,7 +51,11 @@ console. The port changes them to play as the North American (NTSC) maps do,
 so players of the two versions can play together.
 
 1. Start the game.
-2. At the first start, the game asks for the disc image. Select it.
+2. At the first start, the game asks for the disc image. Select it in the
+   file picker. On Linux and Windows, a disc image (`.iso` or `.xiso`) next
+   to the executable is used without the file picker. Where no file picker
+   can be shown (on Linux, without the desktop portal or `zenity`), the game
+   says to put the disc image next to the executable, and stops.
 3. The game extracts the `maps/` folder. Then the game starts.
 
 On Linux and Windows, the game puts `maps/` next to the executable. On

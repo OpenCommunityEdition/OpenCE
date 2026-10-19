@@ -107,11 +107,23 @@ sequence:
    contains the executable.
 
 If the game finds no data, it asks for an Xbox disc image (`.xiso` or
-`.iso`). This occurs at the first start:
+`.iso`). This occurs at the first start. First the game looks for a disc
+image in the folder of the executable (a name that ends in `.iso` or
+`.xiso`, in capitals or not). If it finds one, it names that image in its
+question:
 
 - Select "No" to stop the game.
-- Select "Yes" to open a file picker. Select the disc image. The game copies
-  `maps/` next to the executable and shows the progress.
+- Select "Yes" to copy `maps/` from the disc image. If the game found an
+  image next to the executable, it uses that image and shows no file picker.
+  Otherwise it opens a file picker: select the disc image, or cancel to see
+  the question again. The game copies `maps/` next to the executable and
+  shows the progress. If the copy from the image found next to the
+  executable fails, the next "Yes" opens the file picker.
+
+On Linux, the file picker needs the desktop portal or `zenity`. If neither
+is present, the game says to put the disc image next to the executable (or
+to install `zenity`) and stops. Put the image there and start the game
+again.
 
 The game writes the copy to `maps.partial`. When the copy is complete, the
 game changes the name to `maps`. If the copy stops before it is complete,
