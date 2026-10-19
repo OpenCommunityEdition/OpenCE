@@ -535,7 +535,10 @@ static int mac_window_create_native(struct mac_window_state *state,int borderles
        not wanted */
     if(state->fixed_size&&!borderless) {
         HISize least;
-        if(ChangeWindowAttributes(*window,0,kWindowFullZoomAttribute)!=noErr){DisposeWindow(*window);*window=NULL;return 0;}
+        /* (a system that refuses to take the zoom box off, as Mac OS X 10.4 may, leaves it: the window
+           is still a game window, and failing here ended the game with no window at all) */
+        OSStatus zoom=ChangeWindowAttributes(*window,0,kWindowFullZoomAttribute);
+        if(zoom!=noErr)fprintf(stderr,"Mac window: the zoom box stays (ChangeWindowAttributes %ld)\n",(long)zoom);
         least.width=(float)state->min_width;least.height=(float)state->min_height;
         SetWindowResizeLimits(*window,&least,NULL);
     }
