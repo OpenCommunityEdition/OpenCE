@@ -28,9 +28,9 @@
 - [x] Task: Leave gamepads out (keyboard and mouse only) 7f20b49b
     - [x] Write tests: with the app's windows, SDL's joystick and gamepad events are left out of the guest's polls; without them they pass
     - [x] Skip SDL's events 0x600 to 0x6ff in host_input_poll_event (GameController support was dropped at the user's request)
-- [ ] Task: Sound with AVAudioEngine
-    - [ ] Write tests: the audio-stream imports' format conversion and buffering (XCTest); vm_sdl's audio test plays through the new backend
-    - [ ] Implement host_sdl_open_audio_stream and the rest with AVAudioEngine
+- [x] Task: Sound with AVAudioEngine 84e34cda
+    - [x] Write tests: the audio-stream imports' format conversion, buffering and callbacks (host_audio_test.c, native); the engine's source node renders what the host gives (XCTest, offline rendering); vm_sdl's audio test still plays through SDL in the command-line host
+    - [x] Implement host_sdl_open_audio_stream and the rest with AVAudioEngine
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Window, native input and audio' (Protocol in workflow.md)
 
 ## Phase 3: The command ring and the Metal backend
