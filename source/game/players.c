@@ -4780,6 +4780,7 @@ void players_update_before_game(
 	profile_enter(PLAYERS_UPDATE_BEFORE_GAME_PROFILE);
 	players_coop_note_on_foot();
 	players_coop_rescue_stranded();
+	/* port: or the main menu's scene's idle players (players_idle_actions) */
 	if (update_client_dequeue(actions) || players_idle_actions(actions))
 	{
 		data_iterator_new(&iterator, player_data);

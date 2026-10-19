@@ -75,7 +75,7 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
 #include "saved games/game_state.h"
-#include "scenario/scenario.h"
+#include "scenario/scenario.h" /* port: game_time_menu_scene */
 #include "scenario/scenario_definitions.h"
 #include "profile_sections.h" /* port: port/linux/include/profile_sections.h */
 /* port/linux/game/network_distributed.c's */
@@ -502,8 +502,8 @@ void game_time_update(
 						profile_scope(game_time_render_interpolation_tick_section, render_interpolation_tick();)
 						game_time_globals->server_time++;
 						game_time_globals->local_time++;
-						/* the distributed netcode's per-tick state (none of the
-						main menu's scene, which a lobby's machines do not share) */
+						/* the distributed netcode's per-tick state (port: none of
+						the main menu's scene, which a lobby's machines do not share) */
 						if (!game_time_menu_scene())
 							profile_scope(game_time_network_distributed_tick_section, network_distributed_tick();)
 					}

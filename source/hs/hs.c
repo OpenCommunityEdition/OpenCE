@@ -2829,7 +2829,7 @@ symbols in this file:
 #include "interface/hud_weapon.h"
 #include "interface/interface.h"
 #include "interface/player_ui.h"
-#include "saved games/player_profile.h"
+#include "saved games/player_profile.h" /* port: profile_reset_campaign */
 #include "rasterizer/rasterizer_cinematics.h"
 #include "shaders/shaders.h"
 #include "sound/game_sound.h"
@@ -3666,6 +3666,7 @@ enum
 	_hs_node_refusal_global,
 	_hs_node_refusal_arguments,
 	_hs_node_refusal_damaged,
+	/* port: a downloaded map's (hs_functions_denied_to_downloaded_maps) */
 	_hs_node_refusal_downloaded_function,
 	_hs_node_refusal_downloaded_global,
 };
@@ -12890,8 +12891,8 @@ static boolean hs_syntax_node_linked_twice(
 	return twice;
 }
 
-/* port: what a downloaded map's scripts (map_is_downloaded: one a map
-download brought, or game.downloaded_maps names) may not call or set, on top
+/* port: what a downloaded map's scripts (map_share_map_downloaded: one map
+sharing downloaded, or game.downloaded_maps names) may not call or set, on top
 of what no map's may (hs_function_allowed_in_maps,
 hs_external_global_settable_by_maps): what changes the player's settings
 (their profile's), other players' games (ending a game for everyone, the
@@ -12982,6 +12983,7 @@ static short hs_syntax_node_refusal(
 	*name = function->name;
 	if (!hs_function_allowed_in_maps[function_index])
 		return _hs_node_refusal_function;
+	/* port: a downloaded map's (hs_functions_denied_to_downloaded_maps) */
 	if (hs_scenario_downloaded && hs_name_listed(function->name, hs_functions_denied_to_downloaded_maps))
 		return _hs_node_refusal_downloaded_function;
 
@@ -13052,6 +13054,7 @@ static short hs_syntax_node_refusal(
 			*name = hs_global_external_get(designator & 0x7FFF)->name;
 			return _hs_node_refusal_global;
 		}
+		/* port: a downloaded map's (hs_globals_denied_to_downloaded_maps) */
 		if ((designator & 0x8000) && hs_scenario_downloaded &&
 			hs_name_listed(hs_global_external_get(designator & 0x7FFF)->name, hs_globals_denied_to_downloaded_maps))
 		{
@@ -13167,7 +13170,7 @@ static void hs_scenario_functions_check(
 	short disabled_global_count = 0;
 	char reason[128];
 
-	/* (a downloaded map's are held to tighter rules: map_share.c's
+	/* port: a downloaded map's are held to tighter rules (map_share.c's
 	map_share_map_downloaded) */
 	hs_scenario_downloaded = map_share_map_downloaded(cache_file_loaded_map_name());
 	if (hs_scenario_downloaded)
@@ -13279,6 +13282,7 @@ static void hs_scenario_functions_check(
 		case _hs_node_refusal_global:
 			csprintf(reason, "sets %s, which a map's scripts may not", first_name);
 			break;
+		/* port: a downloaded map's */
 		case _hs_node_refusal_downloaded_function:
 			csprintf(reason, "calls %s, which a downloaded map's scripts may not", first_name);
 			break;

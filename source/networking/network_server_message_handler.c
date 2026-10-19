@@ -1623,6 +1623,8 @@ boolean network_game_server_handle_datagram(
 				those that joined, and only in game: else dropped) */
 				if (network_game_server_get_state(server, NULL) == _network_game_server_state_ingame)
 				{
+					/* port: not the host's own machine first (a second game on its
+					computer shares its address) */
 					struct network_game_server_client_machine *client_machine =
 						network_game_server_get_remote_client_machine_at_address(server, source_address->address.long_words[0]);
 
@@ -1633,6 +1635,8 @@ boolean network_game_server_handle_datagram(
 
 						network_game_server_client_machine_heard(server, client_machine);
 						network_game_server_get_client_machine(server, client_machine, &machine_index);
+						/* port: where its datagrams come from, which the host answers
+						(network_distributed_return_addresses) */
 						if (VALID_INDEX(machine_index, MAXIMUM_NETWORK_MACHINE_COUNT))
 						{
 							network_distributed_return_addresses[machine_index].connection =
@@ -1726,7 +1730,8 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 	{
 		struct network_game *game = network_game_server_get_game(server);
 
-		/* (the time taken only by a search answered) */
+		/* (the time taken only by a search answered; port: one off the client
+		port is always answered) */
 		if (game && !broadcast_due && !answer_directly)
 			return TRUE;
 		if (game)
@@ -1806,6 +1811,8 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 				struct network_connection *connection =
 					network_game_server_get_connection(server);
 
+				/* port: the broadcast when it is due, and a searcher off the
+				client port answered directly */
 				if (broadcast_due)
 				{
 					last_advertised_time = now ? now : 1;

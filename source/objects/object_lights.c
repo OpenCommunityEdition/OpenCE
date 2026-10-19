@@ -374,6 +374,7 @@ struct lights_globals
 	long marker;
 	short scene_point_light_count;
 	short padA;
+	/* port: the native builds' (render.h: the Xbox's 128) */
 	long scene_point_lights[MAXIMUM_RENDERED_LIGHTS];
 	struct rasterizer_lens_flare_submit_parameters queued_lens_flares[8];
 	short queued_lens_flare_count;
@@ -398,6 +399,7 @@ typedef char verify_light_datum_size[
 	sizeof(struct light_datum) == 0x7C ? 1 : -1];
 typedef char verify_rasterizer_light_submit_parameters_size[
 	sizeof(struct rasterizer_light_submit_parameters) == 0x38 ? 1 : -1];
+/* port: (scene_point_lights' size) */
 typedef char verify_lights_globals_size[
 	sizeof(struct lights_globals) == 0x350 + 4 * (MAXIMUM_RENDERED_LIGHTS - 128) ? 1 : -1];
 

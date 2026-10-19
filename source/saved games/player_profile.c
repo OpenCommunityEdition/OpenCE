@@ -391,6 +391,7 @@ boolean player_profile_get_enclosing_directory_path(
 	return saved_game_file_get_path_to_enclosing_directory(profile, full_path);
 }
 
+/* port: port_config.c's (game.unlock_all_levels) */
 int config_boolean(char const *name);
 
 long player_profile_new(

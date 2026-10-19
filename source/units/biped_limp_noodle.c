@@ -781,6 +781,7 @@ static boolean biped_limp_noodle_nodes_valid(
 	long node_count = animation_graph->nodes.count;
 	boolean valid = node_count > 0 &&
 		node_count <= MAXIMUM_NODES_PER_ANIMATION &&
+		/* (port: more nodes than its matrices are posed in a copy) */
 		object->object.node_matrices.size >= (long)sizeof(real_matrix4x3);
 	long node_index;
 

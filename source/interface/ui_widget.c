@@ -5701,8 +5701,8 @@ static boolean ui_mouse_click_pending = FALSE;
 then doesn't scroll on at its end, which the pointer, moving, would make it
 do every frame (menu_functions.c) */
 static boolean ui_mouse_focused_last = FALSE;
-/* whether the pointer passing over a widget moved the focus last, not a
-click (or the d-pad): the server browser's game stays chosen
+/* port: whether the pointer passing over a widget moved the focus last, not
+a click (or the d-pad): the server browser's game stays chosen
 (menu_functions.c) */
 static boolean ui_mouse_hovered_last = FALSE;
 static short ui_mouse_hover_x, ui_mouse_hover_y;
@@ -6904,6 +6904,7 @@ static void ui_widgets_process_mouse(
 					if (!ui_mouse_selection_row(target->widget))
 					{
 						ui_mouse_give_focus(target->widget);
+						/* port: (ui_mouse_hovered_last) */
 						ui_mouse_hovered_last = TRUE;
 					}
 					break;
@@ -6922,6 +6923,7 @@ static void ui_widgets_process_mouse(
 		if (!ui_mouse_press_count && ui_mouse_click_pending)
 		{
 			ui_mouse_click_pending = FALSE;
+			/* port: (ui_mouse_hovered_last) */
 			ui_mouse_hovered_last = FALSE;
 			target = ui_mouse_target_at(ui_mouse_click_x, ui_mouse_click_y);
 			if (ui_debug_targets_enabled())
@@ -7754,6 +7756,7 @@ static void widget_instance_process_one_event_recursive(
 		event->data.button.index <= _widget_event_dpad_right)
 	{
 		ui_mouse_focused_last = FALSE;
+		/* port: (ui_mouse_hovered_last) */
 		ui_mouse_hovered_last = FALSE;
 	}
 	if (event->type == _event_type_button &&

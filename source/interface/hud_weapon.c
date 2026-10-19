@@ -774,6 +774,7 @@ static void hud_update_weapon_local_player(
 					result = weapon_state->magazines[0].can_fire;
 					break;
 
+				/* port: (secondary_magazine) */
 				case _crosshair_state_secondary_trigger_ready:
 					result = secondary_magazine && weapon_state->magazines[1].can_fire;
 					break;
@@ -859,6 +860,7 @@ static void hud_update_weapon_local_player(
 						weapon_state->magazines[0].rounds_loaded <= root_definition->flash_cutoffs.loaded_ammo;
 					break;
 
+				/* port: (secondary_magazine) */
 				case _crosshair_state_flash_secondary_ammo:
 					result = secondary_magazine &&
 						(weapon_state->magazines[1].rounds_remaining || weapon_state->magazines[1].rounds_loaded) &&
@@ -875,6 +877,7 @@ static void hud_update_weapon_local_player(
 						!weapon_state->magazines[1].reloading;
 					break;
 
+				/* port: (secondary_magazine) */
 				case _crosshair_state_secondary_reload:
 					result = secondary_magazine && weapon_state->magazines[1].reloading;
 					break;
@@ -889,6 +892,7 @@ static void hud_update_weapon_local_player(
 						state->value.reference_data != NONE);
 					break;
 
+				/* port: (secondary_magazine) */
 				case _crosshair_state_flash_secondary_ammo_none_for_reload:
 					result = secondary_magazine &&
 						(weapon_state->magazines[1].rounds_remaining || weapon_state->magazines[1].rounds_loaded) &&

@@ -3522,6 +3522,8 @@ struct network_game_server_client_machine *network_game_server_get_client_machin
 	return client_machine;
 }
 
+/* port: the machine at an address, one not the host's own first (a second
+game on the host's computer shares its address) */
 struct network_game_server_client_machine *network_game_server_get_remote_client_machine_at_address(
 	struct network_game_server *server,
 	unsigned long ip_address)
