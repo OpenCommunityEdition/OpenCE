@@ -292,7 +292,7 @@ DEFINE_NETWORK_GAME_MESSAGE(message_server_game_settings_update, 8 + HALO_PORT_N
 DEFINE_NETWORK_GAME_MESSAGE(message_server_pregame_countdown, 0x02);
 DEFINE_NETWORK_GAME_MESSAGE(message_server_begin_game, 0x04);
 DEFINE_NETWORK_GAME_MESSAGE(message_server_graceful_game_exit_pregame, 0x04);
-/* (a long on the wire, though the Xbox game sent a short: see
+/* port: a long on the wire, though the Xbox game sent a short (see
 server_pregame_keep_alive_fields) */
 DEFINE_NETWORK_GAME_MESSAGE(message_server_pregame_keep_alive, 0x04);
 DEFINE_NETWORK_GAME_MESSAGE(message_server_postgame_keep_alive, 0x02);
@@ -378,7 +378,7 @@ static struct network_game_message_packet_definitions data_0030aa68 =
 		DATA_PACKET_FIELD_END,
 	},
 	NETWORK_GAME_MESSAGE_DEFINITION(server_pregame_countdown, "message_server_pregame_countdown_packet", message_server_pregame_countdown),
-	/* the Xbox game's packet table had begin game, graceful exit and
+	/* port: the Xbox game's packet table had begin game, graceful exit and
 	keep-alive each on its neighbor's field list (table order keep-alive,
 	begin game, exit; type order begin game, exit, keep-alive): the wire, which
 	upstream and every earlier build share, carries begin game as a short

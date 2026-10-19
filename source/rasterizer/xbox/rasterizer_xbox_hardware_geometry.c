@@ -94,6 +94,9 @@ boolean rasterizer_vertex_buffer_new(
 	void const *vertices,
 	long buffer_size)
 {
+	/* port: NULL, the Xbox's bug fixed: a failed CreateVertexBuffer returns
+	without writing it (January 0x5de713..0x5de719), and the test below read
+	it uninitialised */
 	D3DVertexBuffer *d3d_vertex_buffer = NULL;
 	byte *locked_vertices;
 	boolean success;

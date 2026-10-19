@@ -315,7 +315,7 @@ struct message_server_pregame_countdown
 
 struct message_server_pregame_keep_alive
 {
-	/* (a short on the Xbox, a long on the wire: network_messages.c) */
+	/* port: a short on the Xbox, a long on the wire (network_messages.c) */
 	long unused;
 };
 

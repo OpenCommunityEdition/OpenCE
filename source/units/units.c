@@ -5102,6 +5102,8 @@ void unit_render_debug(
 		struct object_marker marker;
 		real mouth_aperture;
 
+		/* port: the Xbox's bug fixed: it ignored the marker count and read
+		the marker of a unit with no head marker uninitialised */
 		if (object_get_marker_by_name(unit_index, "head", &marker, 1) > 0)
 		{
 			mouth_aperture = unit->unit.mouth_aperture;
