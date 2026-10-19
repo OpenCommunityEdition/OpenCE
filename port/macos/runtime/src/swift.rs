@@ -17,7 +17,7 @@
 use std::sync::{Arc, Mutex, Weak};
 
 use crate::memory::{GuestMemory, GuestPtr, GuestRange, MemoryError};
-use crate::render::{BatchError, DecodedBatch, RenderValidator, MAX_BATCH_LENGTH};
+use crate::render::{copy_batch, BatchError, DecodedBatch, RenderValidator};
 
 /// Why a guest range cannot be used, as Swift sees it.
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
@@ -195,17 +195,7 @@ impl RenderDecoder {
     /// batch is copied out first, so the guest writing the ring meanwhile
     /// cannot change what was checked.
     pub fn decode_guest(&self, address: u32, size: u32) -> Result<DecodedBatch, BatchError> {
-        if size > MAX_BATCH_LENGTH {
-            return Err(BatchError::Size {
-                size: u64::from(size),
-            });
-        }
-        let mut bytes = vec![0; size as usize];
-        self.memory
-            .read(GuestPtr(address), &mut bytes)
-            .map_err(|error| BatchError::Guest {
-                reason: error.to_string(),
-            })?;
+        let bytes = copy_batch(&self.memory, address, size)?;
         self.validator().decode(&bytes, &*self.memory)
     }
 }
@@ -221,6 +211,7 @@ impl RenderDecoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::render::MAX_BATCH_LENGTH;
 
     const PAGE: u64 = 0x4000;
 

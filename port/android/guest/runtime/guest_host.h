@@ -113,6 +113,13 @@ the GPU to finish the work last fenced for a slot */
 void host_gl_fence_frame(unsigned int slot);
 void host_gl_wait_frame(unsigned int slot);
 
+/* ---------- the macOS app's renderer (port/macos/include/opence_render.h) */
+
+/* the doorbell: the host copies out and checks the `size` bytes of render
+batch at guest address `batch` (port/macos/host/host_render.c). The number
+of its commands the host refused, or -1 if it refused the batch whole */
+int host_render_submit(unsigned int batch, unsigned int size);
+
 /* ---------- Android */
 
 /* the storage directories the port uses, copied into buffer */

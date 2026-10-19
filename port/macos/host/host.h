@@ -187,6 +187,18 @@ int host_sdl_get_audio_stream_data(uint32_t stream, void *data, int length);
 int host_sdl_get_audio_stream_available(uint32_t stream);
 void host_sdl_destroy_audio_stream(uint32_t stream);
 
+/* ---------- the renderer's batches (host_render.c, opence_render.h)
+
+host_render_submit, the guest's doorbell, gives each batch to the app's
+renderer when it has installed one (halo_host_set_render_backend); else the
+runtime checks it (opence_render_check) and it is dropped. Refusals are
+logged as warnings (the first HOST_RENDER_LOGGED_REFUSALS of them), and with
+HALO_HOST_RENDER_LOG each batch's counts too. */
+
+#define HOST_RENDER_LOGGED_REFUSALS 32
+
+int host_render_submit(unsigned int batch, unsigned int size);
+
 /* ---------- system calls (host_syscall.c) */
 
 /* the Linux errno value of a host (Darwin) one */

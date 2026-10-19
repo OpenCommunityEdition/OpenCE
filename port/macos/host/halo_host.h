@@ -82,4 +82,19 @@ channel it has not); on Core Audio's real-time thread, which it never
 blocks */
 void halo_host_audio_render(uint32_t stream, float *const *channels, int channel_count, int frames);
 
+/* the app's renderer, in place of the host's own check (host_render.c):
+submit is given each render batch the guest sends (host_render_submit), on
+the guest's thread that sent it, as its guest address and size in bytes. It
+copies the batch out before it returns, and gives the number of its
+commands refused, or -1 for a batch refused whole */
+struct halo_host_render_backend
+{
+	void *context;
+	int (*submit)(void *context, uint32_t batch, uint32_t size);
+};
+
+/* the batches the guest sends from now on are backend's (copied), or the
+host's to check and drop again with NULL: called before the guest starts */
+void halo_host_set_render_backend(const struct halo_host_render_backend *backend);
+
 #endif

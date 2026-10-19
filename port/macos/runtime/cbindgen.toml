@@ -13,10 +13,10 @@ no_includes = true
 parse_deps = false
 
 [export]
-include = ["OpenceStatus", "OpenceRegionKind", "OpenceRegion", "OpenceImageInfo"]
+include = ["OpenceStatus", "OpenceRegionKind", "OpenceRegion", "OpenceImageInfo", "OpenceRenderCheck"]
 # no constants: the crate's are Rust's (some would overflow C's int); where
 # the vectors and tables go is in OpenceImageInfo's registers
-item_types = ["enums", "structs", "opaque", "functions"]
+item_types = ["enums", "structs", "opaque", "typedefs", "functions"]
 
 [enum]
 rename_variants = "ScreamingSnakeCase"

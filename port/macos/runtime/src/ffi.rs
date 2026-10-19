@@ -7,12 +7,13 @@
 //! with. Functions return an [`OpenceStatus`]; after a failure,
 //! `opence_guest_last_error` gives the reason.
 //!
-//! `opence_guest_host_pointer` and `opence_guest_host_base` may be called
-//! from any thread at any time. The others change the guest and must not run
+//! `opence_guest_host_pointer`, `opence_guest_host_base` and
+//! `opence_render_check` may be called from any thread at any time. The others change the guest and must not run
 //! at the same time as each other: the host serialises them.
 
-use std::ffi::{c_char, CStr, CString};
+use std::ffi::{c_char, c_void, CStr, CString};
 use std::ptr;
+use std::sync::Mutex;
 
 use crate::image::{check_imports, GuestHeader, GuestImage};
 use std::sync::Arc;
@@ -20,6 +21,7 @@ use std::sync::Arc;
 use crate::memory::{GuestMemory, GuestPtr, GuestRange};
 use crate::page_tables::{PageTables, SystemRegisters};
 use crate::plan::{AddressSpacePlan, PoolAllocator, RegionKind, IMAGE_BASE, RUNTIME_BASE};
+use crate::render::{copy_batch, RenderValidator};
 
 /// Where the host puts the guest's EL1 exception vectors (VBAR_EL1).
 pub const OPENCE_VECTORS: u32 = 0x0020_0000;
@@ -34,6 +36,9 @@ pub struct OpenceGuest {
     pools: PoolAllocator,
     image: Option<GuestImage>,
     last_error: CString,
+    // the render batches' objects, for a host with no app to draw them
+    // (opence_render_check)
+    render: Mutex<RenderValidator>,
 }
 
 #[repr(C)]
@@ -50,6 +55,8 @@ pub enum OpenceStatus {
     Tables = 4,
     /// the pools have no room
     NoRoom = 5,
+    /// a render batch was refused whole
+    Refused = 6,
 }
 
 /// What a region is for (crate::plan::RegionKind).
@@ -167,6 +174,7 @@ impl OpenceGuest {
             pools,
             image: None,
             last_error: CString::default(),
+            render: Mutex::new(RenderValidator::new()),
         })
     }
 
@@ -482,6 +490,103 @@ pub unsafe extern "C" fn opence_guest_free(
     }
 }
 
+/// What opence_render_check found in a batch.
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct OpenceRenderCheck {
+    /// the commands that passed, and those refused
+    pub commands: u32,
+    pub refused: u32,
+    /// the batch's bytes as the host copied them, hashed (FNV-1a), for tests
+    /// that compare them with what the guest wrote
+    pub fnv: u32,
+}
+
+/// Told of each command refused: its place in the batch (bytes), its op
+/// and why, as text valid for the call.
+pub type OpenceRenderRefusal =
+    Option<unsafe extern "C" fn(context: *mut c_void, offset: u32, op: u32, reason: *const c_char)>;
+
+/// Copies out the `size` bytes of render batch at guest `address` and
+/// checks it (src/render.rs) against the objects the guest's batches before
+/// it made, for a host with no app to draw them. Each command refused is
+/// given to `refusal` (if not NULL) and the counts are written to `*check`.
+/// OPENCE_STATUS_REFUSED if the batch is refused whole, with the reason in
+/// the `reason_size` bytes at `reason` (if not NULL).
+///
+/// # Safety
+/// `guest` is NULL or a live guest; `check` is NULL or points to an
+/// OpenceRenderCheck the function may write; `reason` is NULL or points to
+/// `reason_size` bytes it may write; `refusal` is safe to call with
+/// `context`.
+#[no_mangle]
+pub unsafe extern "C" fn opence_render_check(
+    guest: *const OpenceGuest,
+    address: u32,
+    size: u32,
+    check: *mut OpenceRenderCheck,
+    reason: *mut c_char,
+    reason_size: usize,
+    refusal: OpenceRenderRefusal,
+    context: *mut c_void,
+) -> OpenceStatus {
+    // SAFETY: NULL or a live guest (the caller's promise).
+    let Some(guest) = (unsafe { guest.as_ref() }) else {
+        return OpenceStatus::Argument;
+    };
+    if check.is_null() {
+        return OpenceStatus::Argument;
+    }
+    let decoded = copy_batch(&guest.memory, address, size).and_then(|bytes| {
+        let mut validator = guest
+            .render
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        validator
+            .decode(&bytes, &*guest.memory)
+            .map(|decoded| (decoded, fnv(&bytes)))
+    });
+    let (decoded, hash) = match decoded {
+        Ok(found) => found,
+        Err(error) => {
+            if !reason.is_null() && reason_size > 0 {
+                let text = error.to_string().replace('\0', " ");
+                let length = text.len().min(reason_size - 1);
+                // SAFETY: reason has reason_size writable bytes (the
+                // caller's promise); length + 1 of them are written.
+                unsafe {
+                    ptr::copy_nonoverlapping(text.as_ptr().cast(), reason, length);
+                    reason.add(length).write(0);
+                }
+            }
+            return OpenceStatus::Refused;
+        }
+    };
+    if let Some(refusal) = refusal {
+        for rejection in &decoded.rejected {
+            let text = CString::new(rejection.reason.replace('\0', " ")).unwrap_or_default();
+            // SAFETY: refusal may be called with context (the caller's
+            // promise); text lives for the call.
+            unsafe { refusal(context, rejection.offset, rejection.op, text.as_ptr()) };
+        }
+    }
+    // SAFETY: check is not NULL and may be written (the caller's promise).
+    unsafe {
+        check.write(OpenceRenderCheck {
+            commands: decoded.commands.len() as u32,
+            refused: decoded.rejected.len() as u32,
+            fnv: hash,
+        })
+    };
+    OpenceStatus::Ok
+}
+
+fn fnv(bytes: &[u8]) -> u32 {
+    bytes.iter().fold(0x811c_9dc5, |hash: u32, &byte| {
+        (hash ^ u32::from(byte)).wrapping_mul(0x0100_0193)
+    })
+}
+
 // (the constants the header gives C are the plan's)
 const _: () = assert!(OPENCE_VECTORS == RUNTIME_BASE && OPENCE_TABLES == RUNTIME_BASE + 0x1000);
 const _: () = assert!(IMAGE_BASE == 0x8800_0000);
@@ -658,6 +763,139 @@ mod tests {
         // SAFETY: a live guest; a null file is refused.
         let status = unsafe { opence_guest_load_image(guest.0, ptr::null(), 0, ptr::null_mut()) };
         assert_eq!(status, OpenceStatus::Argument);
+    }
+
+    /// The batch of `commands` (each its op and fields), as bytes.
+    fn render_batch(commands: &[(u32, &[u32])]) -> Vec<u8> {
+        let mut words = vec![crate::render::MAGIC, crate::render::VERSION, 0, 0];
+        for &(op, fields) in commands {
+            words.push(op | (fields.len() as u32 + 1) << 16);
+            words.extend_from_slice(fields);
+        }
+        words[2] = words.len() as u32 * 4;
+        words[3] = commands.len() as u32;
+        words.iter().flat_map(|word| word.to_le_bytes()).collect()
+    }
+
+    unsafe extern "C" fn note_refusal(
+        context: *mut c_void,
+        offset: u32,
+        op: u32,
+        reason: *const c_char,
+    ) {
+        // SAFETY: the test's context is its Vec, and reason a C string.
+        let refusals = unsafe { &mut *context.cast::<Vec<(u32, u32, String)>>() };
+        let reason = unsafe { CStr::from_ptr(reason) }
+            .to_string_lossy()
+            .into_owned();
+        refusals.push((offset, op, reason));
+    }
+
+    #[test]
+    fn render_batches_are_checked_in_guest_memory() {
+        use crate::render::op;
+        let guest = guest();
+        let mut address = 0u32;
+        // SAFETY: a live guest; address may be written.
+        assert_eq!(
+            unsafe { opence_guest_allocate(guest.0, 0x4000, &mut address) },
+            OpenceStatus::Ok
+        );
+        let batch = render_batch(&[
+            (op::CREATE_BUFFER, &[1, 64]),
+            (op::UPLOAD_BUFFER, &[1, 0, address, 64]),
+            (op::UPLOAD_BUFFER, &[2, 0, address, 64]),
+        ]);
+        // SAFETY: a live guest; the batch fits the memory just allocated.
+        unsafe {
+            let at = opence_guest_host_pointer(guest.0, address, batch.len() as u64);
+            ptr::copy_nonoverlapping(batch.as_ptr(), at, batch.len());
+        }
+        let mut check = OpenceRenderCheck::default();
+        let mut refusals: Vec<(u32, u32, String)> = Vec::new();
+        let mut reason = [0 as c_char; 128];
+        // SAFETY: a live guest; check, reason and refusals live for the call.
+        let status = unsafe {
+            opence_render_check(
+                guest.0,
+                address,
+                batch.len() as u32,
+                &mut check,
+                reason.as_mut_ptr(),
+                reason.len(),
+                Some(note_refusal),
+                (&mut refusals as *mut Vec<(u32, u32, String)>).cast(),
+            )
+        };
+        assert_eq!(status, OpenceStatus::Ok);
+        assert_eq!(
+            check,
+            OpenceRenderCheck {
+                commands: 2,
+                refused: 1,
+                fnv: fnv(&batch),
+            }
+        );
+        // (the third command, after the header and 3 + 5 words)
+        assert_eq!(refusals.len(), 1);
+        assert_eq!((refusals[0].0, refusals[0].1), (48, op::UPLOAD_BUFFER));
+        assert!(!refusals[0].2.is_empty());
+
+        // the objects last: buffer 1 is the batch before's
+        let next = render_batch(&[(op::UPLOAD_BUFFER, &[1, 0, address, 64])]);
+        // SAFETY: as above.
+        let status = unsafe {
+            let at = opence_guest_host_pointer(guest.0, address, next.len() as u64);
+            ptr::copy_nonoverlapping(next.as_ptr(), at, next.len());
+            opence_render_check(
+                guest.0,
+                address,
+                next.len() as u32,
+                &mut check,
+                ptr::null_mut(),
+                0,
+                None,
+                ptr::null_mut(),
+            )
+        };
+        assert_eq!(status, OpenceStatus::Ok);
+        assert_eq!((check.commands, check.refused), (1, 0));
+
+        // a batch not mapped, or not a batch, is refused whole with its reason
+        for (at, size) in [(0xffff_f000, 16), (address, 6)] {
+            // SAFETY: a live guest; check and reason live for the call.
+            let status = unsafe {
+                opence_render_check(
+                    guest.0,
+                    at,
+                    size,
+                    &mut check,
+                    reason.as_mut_ptr(),
+                    reason.len(),
+                    None,
+                    ptr::null_mut(),
+                )
+            };
+            assert_eq!(status, OpenceStatus::Refused);
+            // SAFETY: the reason is NUL-terminated.
+            assert!(!unsafe { CStr::from_ptr(reason.as_ptr()) }.is_empty());
+        }
+        // SAFETY: no guest, and no place for the counts.
+        assert_eq!(
+            unsafe {
+                opence_render_check(
+                    ptr::null(),
+                    address,
+                    16,
+                    &mut check,
+                    ptr::null_mut(),
+                    0,
+                    None,
+                    ptr::null_mut(),
+                )
+            },
+            OpenceStatus::Argument
+        );
     }
 
     #[test]

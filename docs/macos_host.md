@@ -249,6 +249,7 @@ The host's own settings:
 | `HALO_HOST_SAMPLE=<seconds>` | Every that many seconds, prints each vCPU's guest address and its frames |
 | `HALO_HOST_MAIN_LOOP=1` | Runs the guest on a thread of its own and the main dispatch queue on the main thread, as the app does |
 | `HALO_HOST_TRACE_MAIN_THREAD` | Reports each import the first time it is carried out on the main thread |
+| `HALO_HOST_RENDER_LOG` | Reports each render batch the host checks: its commands, those refused, and its bytes' FNV-1a |
 
 ### The main thread
 
@@ -356,7 +357,7 @@ still SDL's.
 ### The renderer
 
 The guest's Direct3D 8 will draw through Metal, not OpenGL. It writes
-Metal-level commands in batches to a ring in its own memory. The format is
+Metal-level commands in batches in its own memory. The format is
 `port/macos/include/opence_render.h`:
 
 - A batch is a header (`OCRB`, version, size, count) and its commands,
@@ -392,6 +393,22 @@ checks each batch, because the guest is untrusted.
 The Swift app makes one `RenderDecoder` for each guest, and tells it the
 window's drawable size.
 
+The guest writes its batches with `port/macos/guest/opence_render_writer.c`
+(`opence_render_writer.h`), a buffer of its own per thread. It rings the
+host with one import, `host_render_submit(batch, size)`, once a batch: when
+the frame asks, or when the next command would not fit. That is one exit
+for a batch of up to 16 MB, not one for each call, as OpenGL ES has.
+The host copies the batch out before it returns, so the buffer is the
+writer's again at once, with no ring to share and no fence to wait on.
+The answer is the number of commands refused, or -1 for a batch refused
+whole.
+
+`host_render_submit` gives the batch to the app's renderer once it has
+installed one (`halo_host_set_render_backend`). Without one, as in the
+command-line host, the runtime checks it (`opence_render_check`, with its
+own objects) and drops it. Refusals are logged as warnings, the first 32
+of them.
+
 A guest crash is reported with its registers, the exception's syndrome and
 the guest's frames, by address in the image (`llvm-symbolizer` on
 `halo_guest.elf` names them).
@@ -420,6 +437,7 @@ In `nix develop`, after `ninja macos`:
 
 ```sh
 python -m pytest -q tools/test_macos_spikes.py tools/test_macos_build.py tools/test_macos_vm.py tools/test_macos_host.py
+python -m pytest -q tools/test_macos_render.py   # render batches through the doorbell
 cargo test --manifest-path port/macos/runtime/Cargo.toml
 python -m pytest -q tools/harness         # the asset-free harness, in the VM
 ```

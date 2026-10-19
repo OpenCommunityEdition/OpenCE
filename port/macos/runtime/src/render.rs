@@ -803,6 +803,23 @@ impl GuestRanges for GuestMemory {
     }
 }
 
+/// The `size` bytes of the batch at guest `address`, copied out of
+/// `memory` for [`RenderValidator::decode`].
+pub fn copy_batch(memory: &GuestMemory, address: u32, size: u32) -> Result<Vec<u8>, BatchError> {
+    if size > MAX_BATCH_LENGTH {
+        return Err(BatchError::Size {
+            size: u64::from(size),
+        });
+    }
+    let mut bytes = vec![0; size as usize];
+    memory
+        .read(GuestPtr(address), &mut bytes)
+        .map_err(|error| BatchError::Guest {
+            reason: error.to_string(),
+        })?;
+    Ok(bytes)
+}
+
 // ---------- the validator
 
 #[derive(Clone, Copy, Debug)]
