@@ -337,7 +337,9 @@ static const struct config_setting config_settings[] =
 		"profile's BUTTON LAYOUT, Halo: Combat Evolved's own, which Halo 2's is\n"
 		"too), \"halo2\", \"halo3\", \"halo4\", \"halo5\" or \"infinite\" (the game's\n"
 		"default layout, with what Combat Evolved has no control for left unbound;\n"
-		"a d-pad direction that has a control no longer moves the player)." },
+		"a d-pad direction that has a control no longer moves the player).\n"
+		"Halo 4, Halo 5 and Infinite put sprint (gameplay.unlimited_sprint) on\n"
+		"the left stick." },
 	{ "input.gamepad_setup_done", _config_boolean, "false", "HALO_GAMEPAD_SETUP_DONE", _environment_set_is_true,
 		_platform_mac,
 		"Mac: the launcher has offered the controller setup (set by it)." },
@@ -435,6 +437,17 @@ static const struct config_setting config_settings[] =
 		"Escape lets it go)." },
 	{ "controls.team_chat", _config_string, "\"Y\"", "HALO_KEY_TEAM_CHAT", _environment_value, _platform_all,
 		"Network games' text chat: type a line to your team." },
+	{ "controls.sprint", _config_string, "\"Left Shift\"", "HALO_KEY_SPRINT", _environment_value, _platform_all,
+		"Sprinting, while gameplay.unlimited_sprint is on (the controller's is\n"
+		"set by input.gamepad_layout)." },
+	{ "gameplay.unlimited_sprint", _config_boolean, "false", "HALO_UNLIMITED_SPRINT", _environment_set_is_true,
+		_platform_all,
+		"Sprinting, as Halo Infinite has it, with no stamina: holding the sprint\n"
+		"control (controls.sprint, or the controller's by input.gamepad_layout)\n"
+		"while moving forward and not crouching runs half as fast again as the\n"
+		"player's run. It changes the game's rules, so in a network game only the\n"
+		"host's setting counts (the clients are told it with the game's settings\n"
+		"and cannot turn it on); off, the stock game." },
 
 	{ "game.console_log", _config_string, "\"important\"", "HALO_CONSOLE_LOG", _environment_value, _platform_all,
 		"What the game's console shows on screen of what it logs: \"important\"\n"

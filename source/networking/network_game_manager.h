@@ -48,6 +48,10 @@ enum
 	/* the players pass through each other (Server Setup's PLAYER COLLISIONS:
 	OFF, co-op's): network_coop_player_collisions */
 	_network_game_cooperative_no_player_collisions_bit = 0,
+	/* the host's gameplay.unlimited_sprint, the rule of the whole game (any
+	game, not co-op's alone): network_game_unlimited_sprint. Builds before
+	network version 30 do not read it. */
+	_network_game_unlimited_sprint_bit = 1,
 };
 
 struct network_game

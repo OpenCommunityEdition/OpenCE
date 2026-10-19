@@ -144,6 +144,16 @@ typedef char verify_unit_control_port_action_only_bit[
 	UNIT_CONTROL_PORT_ACTION_ONLY_BIT >= NUMBER_OF_UNIT_CONTROL_FLAGS &&
 	UNIT_CONTROL_PORT_ACTION_ONLY_BIT < 16 ? 1 : -1];
 
+/* port: the player holds the sprint control (unlimited sprint:
+gameplay.unlimited_sprint). The player's action has 32 bits of control
+flags, the unit's 16, so the bit goes with the action (to the host in a
+client's input, and back in the host's relayed input: network_distributed.c)
+and not to the unit; players.c turns it into speed if the game's rules have
+sprinting (network_game_unlimited_sprint). */
+#define UNIT_CONTROL_PORT_SPRINT_BIT 16
+typedef char verify_unit_control_port_sprint_bit[
+	UNIT_CONTROL_PORT_SPRINT_BIT >= 16 && UNIT_CONTROL_PORT_SPRINT_BIT < 32 ? 1 : -1];
+
 enum
 {
 	_unit_state_idle = 0,

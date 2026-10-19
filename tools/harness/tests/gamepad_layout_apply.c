@@ -11,6 +11,7 @@ struct game_input_preferences
 {
 	byte game_control_to_xbox_buttons[12];
 };
+static byte port_sprint_buttons[MAXIMUM_GAMEPADS];
 static char const *layout_setting;
 static char const *config_string(char const *name)
 {
@@ -67,6 +68,19 @@ int main(int argc, char **argv)
 				preferences.game_control_to_xbox_buttons[_game_control_back] == 13, "%s moved start or back",
 				gamepad_layouts[index].name);
 		}
+	}
+	else if (!strcmp(argv[1], "sprint_button"))
+	{
+		/* the left stick's click sprints in Halo 4, Halo 5 and Infinite; the others and the profile have no button */
+		apply("halo4", &preferences);
+		CHECK(port_sprint_buttons[0] == 14, "halo4 sprint");
+		apply("infinite", &preferences);
+		CHECK(port_sprint_buttons[0] == 14, "infinite sprint");
+		apply("halo3", &preferences);
+		CHECK(port_sprint_buttons[0] == GAMEPAD_LAYOUT_NONE, "halo3 has sprint");
+		apply("halo5", &preferences);
+		apply("profile", &preferences);
+		CHECK(port_sprint_buttons[0] == GAMEPAD_LAYOUT_NONE, "the profile's layout kept the last one's sprint");
 	}
 	else if (!strcmp(argv[1], "halo2"))
 	{

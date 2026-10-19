@@ -315,6 +315,13 @@ netcode, whose players' weapons, grenades and power-ups are the host's
 (port/linux/game/network_distributed.c) */
 #define players_decide_pickups() (!network_game_distributed_client())
 
+/* port: unlimited sprint (gameplay.unlimited_sprint): the forward speed a
+sprinting player has against a run, and the least the stick must be pushed
+forward to sprint; both exact in single precision, so that every machine
+computes the same */
+#define UNLIMITED_SPRINT_SPEED_SCALE 1.5f
+#define UNLIMITED_SPRINT_MINIMUM_THROTTLE 0.5f
+
 /* ---------- constants */
 
 enum
@@ -4739,6 +4746,27 @@ void player_aiming_vector_from_facing(
 	return;
 }
 
+/* port: unlimited sprint (units.h, UNIT_CONTROL_PORT_SPRINT_BIT): a player
+on foot who holds the sprint control with the stick pushed forward, not
+crouching, goes half as fast again forward, if the game's rules have it
+(network_game_unlimited_sprint). The throttle may then be 1.5 (unit_control
+allows 3); the action, which crosses the network, is still one a controller
+can make, and every other throttle is the action's. */
+static real player_forward_throttle(
+	struct player_action const *action,
+	struct unit_datum const *unit)
+{
+	if (TEST_FLAG(action->control_flags, UNIT_CONTROL_PORT_SPRINT_BIT) &&
+		action->throttle.i > UNLIMITED_SPRINT_MINIMUM_THROTTLE &&
+		!TEST_FLAG(action->control_flags, _unit_control_crouch_modifier_bit) &&
+		unit->object.parent_object_index == NONE &&
+		network_game_unlimited_sprint())
+	{
+		return action->throttle.i * UNLIMITED_SPRINT_SPEED_SCALE;
+	}
+	return action->throttle.i;
+}
+
 void players_update_before_game(
 	void)
 {
@@ -4912,9 +4940,10 @@ void players_update_before_game(
 						&action->desired_facing);
 					control_data.facing_vector =
 						control_data.looking_vector = control_data.aiming_vector;
-					control_data.throttle.i = action->throttle.i;
 					control_data.throttle.j = action->throttle.j;
 					control_data.throttle.k = 0.f;
+					/* port: unlimited sprint (units.h, UNIT_CONTROL_PORT_SPRINT_BIT) */
+					control_data.throttle.i = player_forward_throttle(action, unit);
 					control_data.primary_trigger = action->primary_trigger;
 					control_data.animation_state = _unit_animation_state_in_combat;
 					control_data.weapon_index = action->desired_weapon_index;

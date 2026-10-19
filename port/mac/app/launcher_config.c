@@ -38,7 +38,8 @@ settings[LC_COUNT] =
 	{ "game.intro_movies", T_BOOL, "true" },
 	{ "game.achievements", T_BOOL, "false" },
 	{ "input.prompt_glyphs", T_STRING, "auto" },
-	{ "input.gamepad_layout", T_STRING, "profile" }
+	{ "input.gamepad_layout", T_STRING, "profile" },
+	{ "gameplay.unlimited_sprint", T_BOOL, "false" }
 };
 
 const char *lc_key(int id)

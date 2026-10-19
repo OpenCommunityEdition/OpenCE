@@ -48,6 +48,12 @@ boolean network_coop_active(void);
 /* whether the players collide with each other: FALSE in a co-op game whose
 host set Server Setup's PLAYER COLLISIONS off (bipeds.c, collisions.c) */
 boolean network_coop_player_collisions(void);
+/* whether the game's rules have unlimited sprint (gameplay.unlimited_sprint):
+in a network game the host's choice, which it sends with the game's settings
+(_network_game_unlimited_sprint_bit), else this machine's; players.c */
+boolean network_game_unlimited_sprint(void);
+/* the host's choice, put in the game it sets up (network_server_manager.c) */
+boolean network_game_unlimited_sprint_setting(void);
 /* whether this machine is a co-op client, whose devices only the host moves */
 boolean network_coop_devices_remote(void);
 /* devices.c: a group's devices were set straight to its value */

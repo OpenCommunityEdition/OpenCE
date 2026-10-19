@@ -42,6 +42,9 @@ enum halo_keyboard_action
 	everyone, or to the team: port/linux/game/network_chat.c) */
 	HALO_KEYBOARD_CHAT,
 	HALO_KEYBOARD_TEAM_CHAT,
+	/* (unlimited sprint's: controls.sprint, read by the game as the
+	controller's sprint button is: input_abstraction_port_sprint) */
+	HALO_KEYBOARD_SPRINT,
 	NUMBER_OF_HALO_KEYBOARD_ACTIONS
 };
 

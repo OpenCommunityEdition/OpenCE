@@ -359,6 +359,9 @@ struct distributed_relayed_action
 	signed char desired_grenade_index;
 	signed char desired_zoom_level;
 	unsigned short control_flags[DISTRIBUTED_INPUT_HISTORY];
+	/* the latest tick's sprint (UNIT_CONTROL_PORT_SPRINT_BIT: a bit of the
+	player's action beyond the 16 of the buttons), in the parts' last bit */
+	boolean sprint;
 	/* of a turn */
 	short yaw;
 	short pitch;
@@ -368,10 +371,13 @@ struct distributed_relayed_action
 	byte primary_trigger;
 };
 
+/* the parts' bit for the sprint, after those of the ticks before the latest */
+#define DISTRIBUTED_RELAYED_SPRINT_PART 7
+
 /* a relayed action's parts on the wire: which of the ticks' buttons before
 the latest it has (bit h - 1 for tick h), the others those of the tick
 after */
-typedef char distributed_relayed_action_parts_assert[DISTRIBUTED_INPUT_HISTORY - 1 <= 8 ? 1 : -1];
+typedef char distributed_relayed_action_parts_assert[DISTRIBUTED_INPUT_HISTORY - 1 <= DISTRIBUTED_RELAYED_SPRINT_PART ? 1 : -1];
 
 enum
 {
@@ -2656,6 +2662,7 @@ static boolean distributed_relayed_action_from(
 	relayed->desired_weapon_index = (signed char)action->desired_weapon_index;
 	relayed->desired_grenade_index = (signed char)action->desired_grenade_index;
 	relayed->desired_zoom_level = (signed char)MIN(action->desired_zoom_level, 127);
+	relayed->sprint = TEST_FLAG(action->control_flags, UNIT_CONTROL_PORT_SPRINT_BIT);
 	for (history = 0; history < DISTRIBUTED_INPUT_HISTORY; history++)
 	{
 		struct player_action const *past = recent[history] && player_index < recent_counts[history] ?
@@ -2665,7 +2672,8 @@ static boolean distributed_relayed_action_from(
 		if (history > 0 && (!past || relayed->control_flags[history] != relayed->control_flags[history - 1] ||
 			past->desired_weapon_index != action->desired_weapon_index ||
 			past->desired_grenade_index != action->desired_grenade_index ||
-			past->desired_zoom_level != action->desired_zoom_level))
+			past->desired_zoom_level != action->desired_zoom_level ||
+			TEST_FLAG(past->control_flags, UNIT_CONTROL_PORT_SPRINT_BIT) != relayed->sprint))
 		{
 			changed = TRUE;
 		}
@@ -2708,6 +2716,7 @@ static word distributed_relayed_action_write(
 			cursor = distributed_put(cursor, &relayed->control_flags[history], sizeof(relayed->control_flags[history]), 2);
 		}
 	}
+	SET_FLAG(parts, DISTRIBUTED_RELAYED_SPRINT_PART, relayed->sprint);
 	buffer[0] = relayed->player_index;
 	buffer[1] = parts;
 	return (word)(cursor - buffer);
@@ -2739,6 +2748,7 @@ static word distributed_relayed_action_read(
 	{
 		return 0;
 	}
+	relayed->sprint = TEST_FLAG(parts, DISTRIBUTED_RELAYED_SPRINT_PART);
 	for (history = 1; history < DISTRIBUTED_INPUT_HISTORY; history++)
 	{
 		if (!TEST_FLAG(parts, history - 1))
@@ -3048,6 +3058,8 @@ static void distributed_handle_actions(
 		data += size;
 		csmemset(&action, 0, sizeof(action));
 		action.control_flags = relayed.control_flags[0];
+		if (relayed.sprint)
+			SET_FLAG(action.control_flags, UNIT_CONTROL_PORT_SPRINT_BIT, TRUE);
 		action.desired_facing.yaw = distributed_angle_unpack(relayed.yaw, FALSE);
 		action.desired_facing.pitch = distributed_angle_unpack(relayed.pitch, TRUE);
 		action.throttle.i = PIN((real)relayed.throttle_i / 127.0f, -1.0f, 1.0f);

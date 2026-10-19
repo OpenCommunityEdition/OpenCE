@@ -1138,6 +1138,7 @@ boolean network_game_server_send_game_data_pregame(
 	struct network_game_server *server)
 {
 	network_game_settings_update_pending = TRUE;
+	network_game_server_port_apply_sprint(server); /* port */
 
 	return network_game_server_flush_game_data_pregame(server);
 }

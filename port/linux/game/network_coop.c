@@ -115,6 +115,8 @@ index and tag, since the map placed them at the same index everywhere.
 #include "network_coop.h"
 #include "network_distributed.h"
 
+int config_boolean(const char *name);
+
 /* ---------- constants */
 
 /* A joining player with nobody to spectate yet watches the host's view
@@ -2042,6 +2044,31 @@ boolean network_coop_player_collisions(
 	if (!network_coop_active() || !(game = network_game_get_game()))
 		return TRUE;
 	return !TEST_FLAG(game->cooperative_flags, _network_game_cooperative_no_player_collisions_bit);
+}
+
+/* whether this machine's setting has unlimited sprint on (the host's, put
+in its game's settings as it sets the game up) */
+boolean network_game_unlimited_sprint_setting(
+	void)
+{
+	return config_boolean("gameplay.unlimited_sprint") != 0;
+}
+
+/* a client takes the host's rule from the game's settings the host sent,
+never its own; a game with no network (single player, split screen) follows
+this machine's setting; a film plays as it was made, without sprint */
+boolean network_game_unlimited_sprint(
+	void)
+{
+	short connection = game_connection();
+	struct network_game *game;
+
+	if (connection == _game_connection_network_server || connection == _game_connection_network_client)
+	{
+		game = network_game_get_game();
+		return game && TEST_FLAG(game->cooperative_flags, _network_game_unlimited_sprint_bit);
+	}
+	return connection == _game_connection_local && network_game_unlimited_sprint_setting();
 }
 
 boolean network_coop_devices_remote(

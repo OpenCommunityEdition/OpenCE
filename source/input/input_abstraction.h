@@ -48,6 +48,8 @@ void input_abstraction_reset_controller_detection_timer(
 void input_abstraction_get_local_player_preferences(
 	short local_player_index,
 	struct game_input_preferences *preferences);
+boolean input_abstraction_port_sprint(
+	short controller_index);
 void input_abstraction_update_local_player_preferences(
 	short controller_index,
 	struct game_input_preferences const *preferences);
@@ -70,7 +72,7 @@ void input_abstraction_port_button_controls(
 boolean input_abstraction_port_look_inverted(
 	short controller_index);
 /* port: input.gamepad_layout's buttons over a controller's preferences
-(gamepad_layouts.h) */
+(gamepad_layouts.h), and whether its player holds the sprint control */
 struct game_input_preferences;
 void input_abstraction_port_apply_layout(
 	short controller_index,

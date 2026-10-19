@@ -85,7 +85,7 @@ static struct choice resolution_choices[MAX_CHOICES];
 static char resolution_labels[MAX_CHOICES][32], resolution_values[MAX_CHOICES][16];
 static struct popup p_resolution, p_render, p_adaptive, p_fps, p_detail, p_texture, p_aa, p_shadow, p_source, p_glyphs, p_layout;
 static ControlRef c_full, c_window, c_wide, c_vsync, c_smooth, c_gamma, c_gamma_text, c_hud, c_text, c_ppl;
-static ControlRef c_sound, c_reverb, c_volume, c_volume_text, c_movies, c_achievements, c_status, c_hide;
+static ControlRef c_sound, c_reverb, c_volume, c_volume_text, c_movies, c_achievements, c_sprint, c_status, c_hide;
 
 /* ---------- the display's modes */
 
@@ -476,6 +476,7 @@ static void gather(void)
 	lc_set_bool(m, LC_MOVIES, GetControl32BitValue(c_movies));
 	lc_set_bool(m, LC_INTRO_MOVIES, GetControl32BitValue(c_movies));
 	lc_set_bool(m, LC_ACHIEVEMENTS, GetControl32BitValue(c_achievements));
+	lc_set_bool(m, LC_UNLIMITED_SPRINT, GetControl32BitValue(c_sprint));
 	snprintf(m->value[LC_PROMPT_GLYPHS], LC_VALUE, "%s", popup_value(&p_glyphs));
 	snprintf(m->value[LC_GAMEPAD_LAYOUT], LC_VALUE, "%s", popup_value(&p_layout));
 	snprintf(m->data_source, sizeof(m->data_source), "%s", popup_value(&p_source));
@@ -696,8 +697,10 @@ static void build(struct lc_model *m, ControlActionUPP action, ControlRef *play,
 
 	/* Options */
 	make_box(16, 370, 624, 514, "Options");
-	c_movies = make_check(32, 392, 300, "Play intro movies", lc_bool(m->value[LC_MOVIES]), 0);
-	c_achievements = make_check(320, 392, 612, "Achievements", lc_bool(m->value[LC_ACHIEVEMENTS]), 0);
+	c_movies = make_check(32, 392, 200, "Play intro movies", lc_bool(m->value[LC_MOVIES]), 0);
+	c_achievements = make_check(210, 392, 380, "Achievements", lc_bool(m->value[LC_ACHIEVEMENTS]), 0);
+	c_sprint = make_check(390, 392, 612, "Unlimited sprint", lc_bool(m->value[LC_UNLIMITED_SPRINT]), 0);
+	help(c_sprint, "Hold the sprint control (Left Shift, or the left stick with the Halo 4, Halo 5 or Halo Infinite controller layout) to run half as fast again, with no stamina, as Halo Infinite does. In a network game only the host's choice counts. Off is the stock game.");
 	rw = label_width(options_labels, 2);
 	wide = 0;
 	{

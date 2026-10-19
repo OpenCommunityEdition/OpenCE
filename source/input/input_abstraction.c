@@ -211,7 +211,13 @@ static struct
 	long down_times[NUMBER_OF_GAME_CONTROLS];
 	byte reload_ticks;
 	long reload_down_time;
+	/* the keyboard's sprint key (controls.sprint) is held */
+	boolean sprint_held;
 } keyboard_controls[MAXIMUM_GAMEPADS];
+
+/* port: the button each controller's sprint is on by input.gamepad_layout
+(gamepad_layouts.h), GAMEPAD_LAYOUT_NONE for none */
+static byte port_sprint_buttons[MAXIMUM_GAMEPADS];
 
 static void keyboard_hold_ticks(
 	byte *ticks,
@@ -262,6 +268,7 @@ static void keyboard_controls_update(
 		&keyboard_controls[controller_index].reload_ticks,
 		&keyboard_controls[controller_index].reload_down_time,
 		TEST_FLAG(held, HALO_KEYBOARD_RELOAD));
+	keyboard_controls[controller_index].sprint_held = TEST_FLAG(held, HALO_KEYBOARD_SPRINT);
 	x = TEST_FLAG(held, HALO_KEYBOARD_STRAFE_RIGHT) - TEST_FLAG(held, HALO_KEYBOARD_STRAFE_LEFT);
 	y = TEST_FLAG(held, HALO_KEYBOARD_MOVE_FORWARD) - TEST_FLAG(held, HALO_KEYBOARD_MOVE_BACKWARD);
 	if (x || y)
@@ -317,6 +324,24 @@ byte input_abstraction_port_accept(
 		keyboard_controls[controller_index].ticks[_game_control_jump] : 0;
 }
 
+/* port: whether the controller's player holds the sprint control: its
+button by input.gamepad_layout, or the keyboard's key (controls.sprint).
+Whether sprinting does anything is up to the game (unlimited sprint:
+players.c) */
+boolean input_abstraction_port_sprint(
+	short controller_index)
+{
+	struct gamepad_state const *gamepad;
+
+	if (controller_index < 0 || controller_index >= MAXIMUM_GAMEPADS)
+		return FALSE;
+	if (keyboard_controls[controller_index].sprint_held)
+		return TRUE;
+	gamepad = input_get_gamepad_state(controller_index);
+	return gamepad && port_sprint_buttons[controller_index] < NUMBER_OF_GAMEPAD_BUTTONS &&
+		gamepad->buttons[port_sprint_buttons[controller_index]] != 0;
+}
+
 /* port: input.gamepad_layout's buttons (gamepad_layouts.h) over a
 controller's preferences, which the profile's BUTTON LAYOUT made; "profile"
 leaves them */
@@ -330,6 +355,7 @@ void input_abstraction_port_apply_layout(
 
 	if (controller_index < 0 || controller_index >= MAXIMUM_GAMEPADS)
 		return;
+	port_sprint_buttons[controller_index] = GAMEPAD_LAYOUT_NONE;
 	for (layout_index = _gamepad_layout_halo2; name && layout_index < NUMBER_OF_GAMEPAD_LAYOUTS; layout_index++)
 	{
 		if (!strcmp(name, gamepad_layouts[layout_index].name))
@@ -342,6 +368,7 @@ void input_abstraction_port_apply_layout(
 						gamepad_layouts[layout_index].buttons[control_index];
 				}
 			}
+			port_sprint_buttons[controller_index] = gamepad_layouts[layout_index].sprint;
 			break;
 		}
 	}
@@ -428,6 +455,10 @@ void input_abstraction_initialize(
 	for (controller_index = 0; controller_index < MAXIMUM_GAMEPADS; controller_index++)
 	{
 		set_default_game_input_preferences(
+			&input_abstraction_globals.player_control_preferences[controller_index]);
+		/* port: before any profile is in use (and for a controller none is) */
+		input_abstraction_port_apply_layout(
+			(short)controller_index,
 			&input_abstraction_globals.player_control_preferences[controller_index]);
 		input_abstraction_globals.controller_available[controller_index] =
 			input_has_gamepad((short)controller_index);

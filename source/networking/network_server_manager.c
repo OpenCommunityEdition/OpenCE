@@ -475,6 +475,7 @@ symbols in this file:
 #include "interface/player_ui.h"
 #include "tag_files/tag_files.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* port: internet play's Discord presence (port/linux/src/p2p.c), and the
 server browser's listing of a public game (p2p_lobby.c) */
@@ -4224,9 +4225,25 @@ static struct
 	long maximum_players;
 } network_game_server_port_settings;
 
+/* port: this host's unlimited sprint is the game's rule, for every machine
+(network_coop.h): put in the game's settings whenever the host sets the game
+up or changes them in its lobby, and not changed while it plays */
+void network_game_server_port_apply_sprint(
+	struct network_game_server *server)
+{
+	if (server->state == _network_game_server_state_pregame || server->state == _network_game_server_state_postgame)
+	{
+		SET_FLAG(
+			server->game.cooperative_flags,
+			_network_game_unlimited_sprint_bit,
+			network_game_unlimited_sprint_setting());
+	}
+}
+
 static void network_game_server_port_settings_apply(
 	struct network_game_server *server)
 {
+	network_game_server_port_apply_sprint(server);
 	if (network_game_server_port_settings.name[0])
 	{
 		ustrncpy(server->game.name, network_game_server_port_settings.name, NETWORK_GAME_NAME_LENGTH - 1);
@@ -5064,6 +5081,7 @@ boolean network_game_server_reset_to_pregame(
 	 */
 	server->game.number_of_games_played =
 		(long)((unsigned long)server->game.number_of_games_played + 1);
+	network_game_server_port_apply_sprint(server);
 
 	if (server->state == _network_game_server_state_postgame)
 	{

@@ -229,6 +229,10 @@ SCREENS = {
             # (the Mac's launcher looks, once a day: port/mac/app/launcher_update.c)
             ("CHECK FOR UPDATES:", "update.auto", ON_OFF,
              "Look for a new version when the game starts.", "desktop android mac"),
+            # (the host's rule in a network game: gameplay.unlimited_sprint)
+            ("UNLIMITED SPRINT:", "gameplay.unlimited_sprint", ON_OFF,
+             "Hold the sprint control to run half as fast again,\nas Halo Infinite does. The host's rule in a network game.",
+             None),
             ("PLAYER NAMES:", "display.player_names",
              [("ALL", "all"), ("ALLIES", "allies"), ("ENEMIES", "enemies"), ("NONE", "none")],
              "In multiplayer, whose names are drawn above their\nheads.", None),

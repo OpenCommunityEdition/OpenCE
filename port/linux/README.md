@@ -226,6 +226,28 @@ direction that has a control does not move the player. The tables are in
 
 (CE's white and black buttons are the left and right bumpers.)
 
+### Unlimited sprint
+
+`gameplay.unlimited_sprint` (Settings > Network Setup > UNLIMITED SPRINT; the
+Mac's start window has a check box), off by default, adds sprinting as Halo
+Infinite has it: holding the sprint control (`controls.sprint`, left shift;
+on a game pad the left stick's click with the Halo 4, Halo 5 or Halo Infinite
+button preset, which put crouch elsewhere; the stock layout has no pad
+button for it) while on foot, with the move stick (or key) pushed more than
+half way forward and not crouching, runs half as fast again as a run, with no
+stamina to run out. Nothing else changes: weapons can be fired and
+grenades thrown while sprinting, the legs animate as for a run, and sideways
+and backward movement are not faster.
+
+It changes the game's rules, so a network game plays by its host's setting
+alone: the host puts it in the game's settings when it sets a game up
+(`cooperative_flags`, network version 30), clients read it from there and
+ignore their own, and a client's sprint control reaches the host in its
+input, so the host can run the same speed. It applies to single player,
+co-op and split screen as well, by the setting of the machine. Everything
+is computed from exact values in single precision (1.5 times the throttle,
+no maths function), so every machine gets the same result (`NETCODE.md`).
+
 | Action | Keys and buttons (default) |
 | --- | --- |
 | move | W, A, S, D |
@@ -235,6 +257,7 @@ direction that has a control does not move the player. The tables are in
 | jump (and skip a cutscene) | space |
 | crouch | left ctrl, C (C alone in the web build) |
 | melee | F, mouse button 4 |
+| sprint (unlimited sprint, below) | left shift |
 | reload | R |
 | action (pick up, hold to swap weapons, enter or leave a vehicle; never reloads) | E |
 | change the weapon | mouse wheel, 1 |
@@ -454,6 +477,7 @@ the setting for one start of the game. It has priority over the file.
 | `mac.adaptive_detail` | `"auto"` | `HALO_MAC_ADAPTIVE_DETAIL` | Mac build only: lowers what the game draws while the frames take longer than a target, and puts it back when there is time. The game plays the same: only drawing changes. `"auto"`: on for a PowerPC Mac whose detail is low or medium, off for the rest (Intel); `"off"`; `"on"` (a target of 30 frames a second); or a target from 10 to 120 (`"45"`). Every choice is offered on every Mac (the start window's Graphics box). It measures the smoothed time of the frames (a limiter's wait is not counted) and steps down a fixed ladder after 40 frames over the target, back up after 240 frames comfortably under it (a step soon undone makes the next wait longer), never twice in a second. The ladder: detail objects (grass), particles no wider than 96 pixels, decals, lens flares, scenery and objects under twice the preset's pixels with a lower model detail level, four times, planar fog and the fog screen, particles no wider than 48 pixels, every model at its lowest level of detail, bipeds and vehicles (and what they carry) under 12 pixels and then under 24 pixels left out, and last the frame's resolution (`mac.render_resolution` drawn as 480 lines). A step the preset already has is passed over, and a client in another's game keeps the host's rules (grass, flares and fog). The log has a line for each step (at most one a second) and, at the end of a run, a summary with the frame time at each level (`adaptive detail`). |
 | `mac.texture_cache_mb` | `0` | `HALO_MAC_RETAIL_TEXTURE_CACHE_MB` | Mac build only: the megabytes of video memory the game's textures may use at once (`4` to `48`). `0`: by the card, 16 below 64 MB of video memory and 32 above (48 in the campaign). |
 | `mac.texture_skip_levels` | `-1` | `HALO_MAC_TEXTURE_SKIP_LEVELS` | Mac build only: how many of the largest levels of each texture are left out (`0` to `4`), as the PC version's lower texture quality does. `-1`: by the card, 1 for the heavy maps (the campaign, `longest`, `hangemhigh`, `prisoner`) on a card of 32 MB or less, else 0. |
+| `gameplay.unlimited_sprint` | `false` | `HALO_UNLIMITED_SPRINT=1` sets `true` | Halo Infinite's sprint, with no stamina: holding the sprint control (`controls.sprint`, or the game pad's by `input.gamepad_layout`) while moving forward on foot and not crouching runs half as fast again as a run. In a network game only the host's setting counts. See "Unlimited sprint". |
 | `game.achievements` | `false` | `HALO_ACHIEVEMENTS` | The campaign's 38 achievements (see "Achievements"). Off: nothing is counted, shown or written. |
 | `mac.network_test` | `""` | `HALO_MAC_NETWORK_TEST` | Mac build only: automated system link sessions in the Mac session without the menus. `"host:<map>"` hosts a slayer game on the map already loaded, `"join"` joins the first game found. Set `debug.network_test` as well, which logs every player's state every second, and `debug.network_test_start` for the countdown. |
 | `network.address` | `""` | `HALO_NET_ADDRESS` | The IPv4 address of this machine for system link. Refer to "Play on one computer". |

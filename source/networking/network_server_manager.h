@@ -77,6 +77,9 @@ void network_game_server_port_set_cooperative(
 Server Setup's FRIENDLY FIRE), kept for the levels after */
 void network_game_server_port_set_cooperative_friendly_fire(
 	short friendly_fire);
+/* port: the game's unlimited sprint rule is this host's setting (network_coop.h) */
+void network_game_server_port_apply_sprint(
+	struct network_game_server *server);
 /* port: whether co-op's players collide with each other (Server Setup's
 PLAYER COLLISIONS), kept for the levels after */
 void network_game_server_port_set_cooperative_player_collisions(

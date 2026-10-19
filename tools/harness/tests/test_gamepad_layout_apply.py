@@ -7,9 +7,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import build, enum_with, function, mutated, read, run
 
-CASES = ['profile', 'infinite', 'start_back', 'halo2']
+CASES = ['profile', 'infinite', 'start_back', 'halo2', 'sprint_button']
 CONTROLS = [
     ('if (!strcmp(name, gamepad_layouts[layout_index].name))', 'if (strcmp(name, gamepad_layouts[layout_index].name))', 'infinite'),
+    ('port_sprint_buttons[controller_index] = GAMEPAD_LAYOUT_NONE;', ';', 'sprint_button'),
     ('for (layout_index = _gamepad_layout_halo2;', 'for (layout_index = _gamepad_layout_profile;', 'profile'),
 ]
 

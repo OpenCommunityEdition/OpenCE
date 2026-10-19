@@ -223,12 +223,29 @@ limits, and readies a second weapon picked up while firing; version 29 names
 a Custom Edition map by its own name (`custom_maps\hugeass`, which every
 screen shows) and says which version it is by the map version of the game
 record, its hash's first 32 bits (the header checksum before), which a
-client finds its file by (below, "Map sharing").
+client finds its file by (below, "Map sharing"); version 30 plays
+unlimited sprint by the host's rule: the host's `gameplay.unlimited_sprint`
+is a bit of the game's settings (`cooperative_flags`, which the clients read
+before they play), the sprint control is a bit of a player's action beyond
+the 16 of its buttons (`UNIT_CONTROL_PORT_SPRINT_BIT`, in a client's input
+to the host, and in the host's relayed input in the parts' last bit), and a
+build of version 29 would run a sprinting player at the speed of a running one.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
 sources' messages, kinds, bits, structs sent whole or the sizes of their
 arrays differ from it.
+
+Unlimited sprint (`gameplay.unlimited_sprint`, off by default) is a rule the host
+decides for the game: while the player holds the sprint control on foot, pushing the stick
+more than half way forward and not crouching, the unit's forward throttle is
+1.5 times the action's (`players.c`: exact in single precision, no maths
+function), so it goes half as fast again as a run; the action itself
+(throttle, at most 1) is what crosses the network, so the host's bounds on
+how fast a client's player moves (twice a run) hold it. Each machine reads
+the rule from the game's settings (`network_game_unlimited_sprint`): the host
+puts its own setting there when it sets a game up or changes the lobby's
+settings, never while the game plays, and a client's own setting is ignored.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
@@ -806,8 +823,9 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
 
 `debug.network_test` (`port/linux/game/network_test.c`) hosts or joins a
 game without the menus (in a team game the joining player takes the other
-team), and `debug.test_input` plays controller 1 with a scripted bot (or,
-`look:<seed>`, one that stands still, only turning and looking up and
+team), and `debug.test_input` plays controller 1 with a scripted bot (`bot:<seed>,sprint`
+holds the left stick's click, sprint's with `input.gamepad_layout` `infinite`;
+or, `look:<seed>`, one that stands still, only turning and looking up and
 down); each machine logs every player's position, health and shields,
 where they aim and face, their animation state and how hard they move,
 weapons, grenades, score, kills and deaths every second, with the objects

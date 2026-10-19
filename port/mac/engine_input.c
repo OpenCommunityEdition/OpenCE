@@ -141,7 +141,7 @@ static const char *const mac_binding_settings[NUMBER_OF_HALO_KEYBOARD_ACTIONS] =
 	"controls.jump","controls.crouch","controls.fire","controls.throw_grenade","controls.melee",
 	"controls.reload","controls.zoom","controls.switch_weapon","controls.switch_grenade","controls.action",
 	"controls.flashlight","controls.scoreboard","controls.pause","controls.screenshot","controls.push_to_talk",
-	"controls.chat","controls.team_chat"
+	"controls.chat","controls.team_chat","controls.sprint"
 };
 static const unsigned mac_binding_actions[NUMBER_OF_HALO_KEYBOARD_ACTIONS] = {
 	HALO_KEYBOARD_MOVE_FORWARD,HALO_KEYBOARD_MOVE_BACKWARD,HALO_KEYBOARD_STRAFE_LEFT,HALO_KEYBOARD_STRAFE_RIGHT,
@@ -149,7 +149,7 @@ static const unsigned mac_binding_actions[NUMBER_OF_HALO_KEYBOARD_ACTIONS] = {
 	HALO_KEYBOARD_RELOAD,HALO_KEYBOARD_ZOOM,HALO_KEYBOARD_SWITCH_WEAPON,HALO_KEYBOARD_SWITCH_GRENADE,
 	HALO_KEYBOARD_ACTION,HALO_KEYBOARD_FLASHLIGHT,HALO_KEYBOARD_SCOREBOARD,HALO_KEYBOARD_PAUSE,
 	HALO_KEYBOARD_SCREENSHOT,HALO_KEYBOARD_PUSH_TO_TALK,
-	HALO_KEYBOARD_CHAT,HALO_KEYBOARD_TEAM_CHAT
+	HALO_KEYBOARD_CHAT,HALO_KEYBOARD_TEAM_CHAT,HALO_KEYBOARD_SPRINT
 };
 static void mac_binding_capture_update(void);
 static void mac_bindings_read(void);

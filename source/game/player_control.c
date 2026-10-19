@@ -1471,6 +1471,11 @@ static void get_local_player_input_blob(
 					input->unit_control_flags,
 					_unit_control_use_equipment_bit,
 					effective_buttons[_button_melee_attack]);
+				/* port: the sprint control (units.h, UNIT_CONTROL_PORT_SPRINT_BIT) */
+				SET_FLAG(
+					input->unit_control_flags,
+					UNIT_CONTROL_PORT_SPRINT_BIT,
+					input_abstraction_port_sprint(gamepad_index));
 				SET_FLAG(
 					input->player_control_flags,
 					_player_control_rotate_weapons_bit,

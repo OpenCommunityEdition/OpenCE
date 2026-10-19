@@ -227,6 +227,7 @@ buttons, and calibrates the dead zones and the look inversion; its choices go
 to `input.gamepad_*` in `config.toml`. Sticks, triggers, d-pad and buttons map
 as on the Xbox; the pad's buttons can be those of a later Halo game (the start window's
 Controller layout popup, `input.gamepad_layout`: Halo 3, 4, 5 or Infinite; Halo CE's own is the default).
+The start window's Options box also has an Unlimited sprint check box (`gameplay.unlimited_sprint`, off: the sprint control is left shift, or the left stick's click with the Halo 4, 5 or Infinite layout; in a network game the host's choice counts).
 It needs Mac OS X 10.5 or later. `HALO_SKIP_CONTROLLER_SETUP=1`
 skips the first-run window. The app carries and advertises no controller driver (the build's
 `--driver` is ignored); a pad that a driver the player installed publishes as an

@@ -531,7 +531,7 @@ static const char *const binding_settings[NUMBER_OF_HALO_KEYBOARD_ACTIONS] =
 	"controls.jump", "controls.crouch", "controls.fire", "controls.throw_grenade", "controls.melee",
 	"controls.reload", "controls.zoom", "controls.switch_weapon", "controls.switch_grenade", "controls.action",
 	"controls.flashlight", "controls.scoreboard", "controls.pause", "controls.screenshot",
-	"controls.push_to_talk", "controls.chat", "controls.team_chat",
+	"controls.push_to_talk", "controls.chat", "controls.team_chat", "controls.sprint",
 };
 
 static const struct
@@ -778,6 +778,7 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 	static int checked;
 	static int seed = -1;
 	static int looking;
+	static int sprinting;
 	double t;
 	int index;
 
@@ -807,7 +808,12 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 
 		checked = 1;
 		if (!strncmp(setting, "bot:", 4))
+		{
 			seed = atoi(setting + 4);
+			/* ("bot:<seed>,sprint" holds the left stick's click, which input.gamepad_layout
+			"halo4", "halo5" and "infinite" sprint with: gameplay.unlimited_sprint) */
+			sprinting = strstr(setting, ",sprint") != NULL;
+		}
 		else if (!strcmp(setting, "bot"))
 			seed = 0;
 		else if (!strncmp(setting, "look:", 5))
@@ -832,6 +838,8 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 		pad->sThumbRY = (SHORT)(sin(t * 0.3) * 32000.0);
 		return;
 	}
+	if (sprinting)
+		pad->wButtons |= XINPUT_GAMEPAD_LEFT_THUMB;
 	pad->sThumbLY = (SHORT)(sin(t * 0.9) * 32000.0);
 	pad->sThumbLX = (SHORT)(cos(t * 0.6 + seed) * 20000.0);
 	pad->sThumbRX = (SHORT)(sin(t * 0.4) * 14000.0);
