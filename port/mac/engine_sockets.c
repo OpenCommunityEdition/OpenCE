@@ -622,8 +622,12 @@ static int mac_name_query(int fd, int peer, struct sockaddr *address, int *addre
 
 int WSAAPI halo_ws_getpeername(SOCKET socket, struct sockaddr *address, int *address_length)
 {
-    int fd;if(!mac_socket_fd(socket,&fd))return mac_socket_failure(ENOTSOCK);
-    return mac_name_query(fd,1,address,address_length);
+    int fd,result;if(!mac_socket_fd(socket,&fd))return mac_socket_failure(ENOTSOCK);
+    result=mac_name_query(fd,1,address,address_length);
+    /* port: a connection that came off the tunnel is from the peer, and this is how the game learns whose
+       (the accepted address alone is the tunnel's proxy, 127.0.0.1): xnet.c's getpeername does the same */
+    if(result==0)mac_peer_incoming_address(1,address,address_length);
+    return result;
 }
 
 int WSAAPI halo_ws_getsockname(SOCKET socket, struct sockaddr *address, int *address_length)
