@@ -69,7 +69,7 @@ def test_empty_history_and_no_subject_fallback(repo):
     repo.commit("Player-visible sounding subject with no annotation")
     data, markdown, _ = repo.collect()
     assert data["entries"][0]["notes"] == []
-    assert markdown == "No new player-facing changes.\n"
+    assert markdown == "No player-facing notes were recorded for this build.\n"
     assert repo.collect(head=repo.baseline)[0]["entries"][0]["notes"] == []
 
 
@@ -78,6 +78,40 @@ def test_prose_mentioning_annotation_syntax_is_not_an_annotation(repo):
                 "Write Player-Note: short text in the body.\n"
                 "    Player-Note: an indented documentation example.")
     assert repo.collect()[0]["entries"][0]["notes"] == []
+
+
+def test_release_requires_notes_for_unannotated_upstream_merge(repo):
+    repo.git("checkout", "-b", "upstream")
+    repo.commit("Add an upstream feature without our annotation convention")
+    repo.git("checkout", "main")
+    repo.commit("Maintenance\n\nPlayer-Note: none")
+    repo.git("merge", "--no-ff", "upstream", "-m", "Merge upstream")
+    with pytest.raises(player_notes.NotesError, match="new commits have no release notes"):
+        repo.collect(base=repo.baseline, build_number=2, require_notes=True)
+    merge = repo.git("rev-parse", "HEAD")
+    repo.manifest([{"commit": merge, "text": "Added local Slayer bots."}])
+    assert texts(repo.collect(base=repo.baseline, build_number=2,
+                              require_notes=True)[0]) == ["Added local Slayer bots."]
+
+
+def test_release_tip_can_explicitly_review_internal_only_range(repo):
+    repo.commit("Internal refactor without an annotation")
+    repo.commit("Release internal maintenance\n\nPlayer-Note: none")
+    assert texts(repo.collect(build_number=2, require_notes=True)[0]) == []
+
+
+def test_empty_release_range_and_explicit_omissions_are_allowed(repo):
+    tip = repo.commit("Maintenance\n\nPlayer-Note: none")
+    assert texts(repo.collect(base=tip, build_number=2, require_notes=True)[0]) == []
+    assert texts(repo.collect(base=repo.baseline, build_number=2,
+                              require_notes=True)[0]) == []
+
+
+def test_old_duplicate_note_cannot_satisfy_release_check(repo):
+    base = repo.commit("Old feature\n\nPlayer-Note: Added bots.")
+    repo.commit("Unreviewed integration\n\nPlayer-Note: Added bots.")
+    with pytest.raises(player_notes.NotesError, match="new commits have no release notes"):
+        repo.collect(base=base, build_number=2, require_notes=True)
 
 
 def test_all_merged_commits_group_once_and_keep_chronological_order(repo):
@@ -326,7 +360,7 @@ def test_no_change_release_and_same_sha_new_build_have_pages(repo, tmp_path):
     data, markdown, _ = repo.collect(build_number=6, base=head, previous=previous)
     assert [entry["build"] for entry in data["entries"]] == [6, 5]
     assert all(entry["commit"] == head and entry["notes"] == [] for entry in data["entries"])
-    assert markdown == "No new player-facing changes.\n"
+    assert markdown == "No player-facing notes were recorded for this build.\n"
 
 
 def test_rollout_without_archive_does_not_invent_prior_build_numbers(repo):
