@@ -213,7 +213,12 @@ screen shows) and says which version it is by the map version of the game
 record, its hash's first 32 bits (the header checksum before), which a
 client finds its file by (below, "Map sharing"); version 30 carries an
 elevator's riders by its movement of the same tick, which the Xbox game did
-a tick late, so that every machine moves them alike.
+a tick late, so that every machine moves them alike; version 31 puts the
+Xbox game's begin game, graceful exit and pregame keep-alive field lists
+under their own messages (its table had each on its neighbour's) and makes
+the keep-alive a long, as it was sent: not a byte on the wire moves but the
+keep-alive's last two, the sender's stack before and zero now, and the
+table's record changed with it.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

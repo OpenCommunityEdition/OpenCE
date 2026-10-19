@@ -1,4 +1,4 @@
-version 30
+version 31
 bound CHAT_TEXT_SIZE 64
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
@@ -168,7 +168,7 @@ fields client_remove_player_request_pregame 06ff007a9b35
 fields client_settings_request d6a7048d6284
 fields client_switch_to_pregame 678699dea271
 fields server_add_player_ingame 06ff007a9b35
-fields server_begin_game 678699dea271
+fields server_begin_game 87e5d5c7565c
 fields server_game_advertise 2d5f42b781a4
 fields server_game_over 678699dea271
 fields server_game_settings_update 4c2744d8b8e8
@@ -180,7 +180,7 @@ fields server_machine_rejected 758215ada4e1
 fields server_pong 678699dea271
 fields server_postgame_keep_alive 758215ada4e1
 fields server_pregame_countdown 758215ada4e1
-fields server_pregame_keep_alive 758215ada4e1
+fields server_pregame_keep_alive 678699dea271
 fields server_remove_player_ingame 1718d4189972
 fields server_switch_to_pregame 678699dea271
 size message_client_add_player_request_ingame 0x20
@@ -215,7 +215,7 @@ size message_server_machine_rejected 0x02
 size message_server_pong 0x04
 size message_server_postgame_keep_alive 0x02
 size message_server_pregame_countdown 0x02
-size message_server_pregame_keep_alive 0x02
+size message_server_pregame_keep_alive 0x04
 size message_server_remove_player_ingame 0x24
 size message_server_switch_to_pregame 0x04
 struct distributed_actor_damage 96a57e13e2b8
