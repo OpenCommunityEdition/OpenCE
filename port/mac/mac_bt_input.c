@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
 
 /* how long the dongle is left alone after it was unplugged or held by another program */
 #define RETRY_SECONDS 10.0
@@ -97,6 +99,24 @@ static void start_session(double now)
     note("opening the dongle");
 }
 
+/* port: whether this is Mac OS X 10.4 or earlier (Darwin 8 and below). There Apple's Bluetooth driver takes
+   every USB Bluetooth dongle and does not let go, so a dongle that is "busy" or Apple's will not become free
+   by waiting: trying again every ten seconds for the whole session only fills the log. */
+static int before_leopard(void)
+{
+    static int known = -1;
+    if (known < 0) {
+        char release[32];
+        size_t size = sizeof(release);
+        known = 0;
+        if (sysctlbyname("kern.osrelease", release, &size, NULL, 0) == 0 && size > 0) {
+            release[sizeof(release) - 1] = 0;
+            known = atoi(release) < 9;
+        }
+    }
+    return known;
+}
+
 /* the stack gave up (its message says why): it is started again only when the dongle may have become
    free (not there, or held by another program), and for anything else when a setting changes */
 static void session_failed(const struct bt_snapshot *snap, double now)
@@ -105,6 +125,10 @@ static void session_failed(const struct bt_snapshot *snap, double now)
     int retry = snap->dongle == BT_DONGLE_NONE || snap->dongle == BT_DONGLE_BUSY;
     sprintf(line, "unavailable: %s", snap->message);
     note(line);
+    if (retry && snap->dongle == BT_DONGLE_BUSY && before_leopard()) {
+        retry = 0;
+        note("Mac OS X 10.4: Apple's driver holds the dongle and does not let go; not trying again");
+    }
     release_later();
     if (retry) next_try = now + RETRY_SECONDS;
     else {
