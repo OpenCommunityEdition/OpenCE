@@ -69,6 +69,9 @@ from a down one (the charge's own times: 2 and 3 of shield a second) */
 /* where on the rise the arms come up, and over how much of it */
 #define OVERSHIELD_EFFECT_ARMS_START 0.55f
 #define OVERSHIELD_EFFECT_ARMS_LENGTH 0.3f
+/* effects.c's _effect_definition_must_be_deterministic_bit, of an effect
+definition's flags (its enum is effects.c's own) */
+#define EFFECT_MUST_BE_DETERMINISTIC_BIT 1
 
 /* the overshield's color: the powerup's */
 static real_rgb_color const overshield_effect_rgb = { 0.992f, 0.306f, 0.455f }; /* (253, 78, 116) */
@@ -382,7 +385,9 @@ boolean overshield_effect_hit_effect_allowed(
 	if (effect_index == NONE)
 		return FALSE;
 	definition = (struct effect_definition const *)tag_get(EFFECT_DEFINITION_TAG, effect_index);
-	if (!definition)
+	/* (nor one that must be deterministic: it draws from the game's random
+	seed, which every machine must use alike, as this machine's swap would not) */
+	if (!definition || TEST_FLAG(definition->flags, EFFECT_MUST_BE_DETERMINISTIC_BIT))
 		return FALSE;
 	for (event_index = 0; event_index < definition->events.count; event_index++)
 	{
