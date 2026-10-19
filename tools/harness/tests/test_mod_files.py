@@ -27,7 +27,7 @@ NEGATIVE_CONTROLS = {
     "ignores-stars": (("conversions[index].stars != map_conversions[index].stars ||", ""), "formats_match", "formats"),
     "ignores-modifiers": (("strcmp(conversions[index].modifier, map_conversions[index].modifier)", "0"),
                           "formats_match", "formats"),
-    "counts-percent-signs": (("if (character_get(string, size, index, unicode) == '%')\n\t\t{",
+    "counts-percent-signs": (("if (character_get(string, size, index, unicode, native) == '%')\n\t\t{",
                               "if (0)\n\t\t{"), "format_conversions", "formats"),
     "reads-low-bytes": (("return character && character < 0x80 &&", "return character &&"), "character_in",
                         "long-formats"),

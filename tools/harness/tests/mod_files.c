@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 		/* (a string that is not terminated ends at its size: "%%%%" then a
 		'%' with nothing after it) */
 		memset(bytes, '%', sizeof(bytes));
-		CHECK(format_conversions(bytes, 5, FALSE, (struct conversion[MAXIMUM_CONVERSIONS]){ { 0 } }) == 1,
+		CHECK(format_conversions(bytes, 5, FALSE, FALSE, (struct conversion[MAXIMUM_CONVERSIONS]){ { 0 } }) == 1,
 			"a string was read past its size");
 		/* (a character past ASCII is no conversion's: U+016C after '%' is not
 		the 'l' of its low byte) */
