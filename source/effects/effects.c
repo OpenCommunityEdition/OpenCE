@@ -521,6 +521,9 @@ static real effect_scale(
 	unsigned long scale_b_flags,
 	short bit_index);
 
+static byte effect_real_to_byte(
+	real value);
+
 // effect_real_random_range: effect, both scale masks and the bit index are passed in registers
 static real effect_real_random_range(
 	unsigned long *seed,
@@ -2439,21 +2442,21 @@ static void effect_update(
 					&event->particles,
 					particle_index,
 					struct effect_particles_definition);
-				byte count = (byte)(long)effect_real_random_range(
+				byte count = effect_real_to_byte(effect_real_random_range(
 					get_global_local_random_seed_address(),
 					effect,
 					particles->count_lower_bound,
 					particles->count_upper_bound,
 					particles->scale_a_flags,
 					particles->scale_b_flags,
-					_effect_particle_count_bit);
+					_effect_particle_count_bit));
 
 				effect->particle_counts[particle_index] = count;
 
 				if (count > MAXIMUM_SPLIT_SCREEN_PARTICLE_COUNT)
 				{
-					effect->particle_counts[particle_index] = (byte)(long)
-						(((real)count - MAXIMUM_SPLIT_SCREEN_PARTICLE_COUNT) /
+					effect->particle_counts[particle_index] = effect_real_to_byte(
+						((real)count - MAXIMUM_SPLIT_SCREEN_PARTICLE_COUNT) /
 						local_player_count() +
 						MAXIMUM_SPLIT_SCREEN_PARTICLE_COUNT);
 				}
@@ -2465,6 +2468,19 @@ static void effect_update(
 	}
 
 	return;
+}
+
+/* port: (byte)(long)value as the x86 does it: a value outside a long (an infinity from dividing by the 0 local players
+there are before the players are made, or a NaN) converts to 0x80000000, whose low byte is 0. PowerPC and ARM saturate it
+(an infinity became 0x7FFFFFFF, a byte of 255 particles), so a machine of those did not make the particles an x86 one did
+not, and the local random seed they use drifted from the first tick. */
+static byte effect_real_to_byte(
+	real value)
+{
+	if (!(value >= -2147483648.0f && value < 2147483648.0f))
+		return 0;
+
+	return (byte)(long)value;
 }
 
 static real effect_scale(
