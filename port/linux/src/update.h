@@ -18,10 +18,10 @@ different structure layouts.
 typedef void (*update_progress_proc)(void *context, unsigned long long received, unsigned long long total);
 
 /* fetches the https:// url (following redirects) into the file at path,
-with the certificate and host name checked; 1 on success, else 0 and why in
-error */
-int update_download(const char *url, const char *path, update_progress_proc progress, void *context,
-	char *error, int error_size);
+with the certificate and host name checked, and no more than maximum bytes
+of it; 1 on success, else 0 and why in error */
+int update_download(const char *url, const char *path, unsigned long long maximum, update_progress_proc progress,
+	void *context, char *error, int error_size);
 
 /* the full path of this executable; 1 on success */
 int update_executable_path(char *path, int size);

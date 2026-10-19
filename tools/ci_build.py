@@ -117,10 +117,8 @@ def main() -> int:
         for pdb in [ROOT / "build/windows/halo.pdb", *sorted((ROOT / "build/windows/third_party").glob("SDL3-*/lib/x86/SDL3.pdb"))]:
             shutil.copy2(pdb, symbols)
             print(f"{pdb.relative_to(ROOT)} -> {symbols.relative_to(ROOT)}", flush=True)
-    # the disc image readers (port/linux/src/xiso.c, and the Android app's
-    # XisoExtractor.java) follow extract-xiso, whose license asks binaries
-    # to carry its notice
-    shutil.copy2(ROOT / "port/third_party/extract-xiso/LICENSE.TXT", dist / "extract-xiso-LICENSE.txt")
+    # OpenCE's own licence, the AGPL, which asks each copy to carry its text
+    shutil.copy2(ROOT / "LICENSE", dist / "LICENSE.txt")
     if args.platform != "web":
         # internet play's DTLS with browsers, and the Linux self-updater's TLS
         # (port/third_party/mbedtls), whose Apache license asks the same

@@ -40,8 +40,7 @@ def graph(release=False, emcc="/opt/emsdk/upstream/emscripten/emcc"):
     sln = SimpleNamespace(build_dir=Path("build"), web_emcc=emcc, port_release=release, port_profile=False,
                           compiler_launcher=None)
     web_build.generate_web_build(ninja_syntax.Writer(out), sln)
-    # Ninja accepts the host's separators; assertions compare portable paths.
-    return re.sub(r" \$\n +", " ", out.getvalue()).replace('\\', '/')
+    return re.sub(r" \$\n +", " ", out.getvalue())
 
 
 def compile_flags(text, source):
@@ -107,6 +106,22 @@ def test_the_link_makes_the_memory_the_window_needs():
     release = graph(release=True)
     assert "-DHALO_RELEASE" in compile_flags(release, "source/main/main.c")
     assert "-sASSERTIONS=0" in link_flags(release).split()
+
+
+def test_the_link_exports_what_the_page_calls():
+    """every function the page's scripts call on the game's module (game._x,
+    module._x) is exported: KEEPALIVE alone leaves it off the module, and the
+    page then waits for frames it cannot count (the loading notice stays)"""
+    exported = re.search(r"-sEXPORTED_FUNCTIONS=(\S+)", link_flags(graph())).group(1).split(",")
+    called = set()
+    for script in sorted(Path("port/web/site").glob("*.js")):
+        called |= set(re.findall(r"\b(?:game|module)\.(_[A-Za-z0-9_]+)", script.read_text()))
+    assert called, "no calls found: the pattern is stale"
+    assert not called - set(exported), f"called on the module, not exported: {sorted(called - set(exported))}"
+    for name in exported:
+        if name.startswith("_web_"):
+            assert re.search(r"EMSCRIPTEN_KEEPALIVE[^;{]*\b" + name[1:] + r"\(",
+                             "".join(path.read_text() for path in Path("port/web/src").glob("*.c"))), name
 
 
 def test_the_memory_layout_agrees_with_the_sources():

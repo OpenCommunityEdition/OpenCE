@@ -20,7 +20,6 @@
 		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_countdown_seconds" x="54" y="223"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_zombie_shields" x="54" y="253"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_time_limit" x="54" y="283"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/ammo_options_edit/open_ammo" x="54" y="313"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">

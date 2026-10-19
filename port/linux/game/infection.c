@@ -30,13 +30,12 @@ static real shield_maximum[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 static boolean equipping;
 static boolean missing_skull;
 void platform_log(char const *format, ...);
-long network_test_infection_initial_player(void);
 
 boolean infection_enabled(void)
 {
 	struct game_variant const *variant = game_engine_get_variant();
 	return game_engine_running() && variant && variant->game_engine_index == game_engine_slayer &&
-		variant->universal_variant.teams && game_variant_options_get()->infection_enabled;
+		variant->universal_variant.teams && infection_options_get(game_engine_get_variant())->infection_enabled;
 }
 
 static struct distributed_infection_player *infection_player(long index)
@@ -92,7 +91,7 @@ real infection_melee_multiplier(long index)
 		return 1.0f;
 	weapon = unit->unit.weapon_object_indices[unit->unit.current_weapon_index];
 	return weapon != NONE && object_get(weapon)->definition_index == get_ball_definition_index() ?
-		game_variant_options_get()->infection_damage_percent / 100.0f : 1.0f;
+		infection_options_get(game_engine_get_variant())->infection_damage_percent / 100.0f : 1.0f;
 }
 
 /* Preserve a directly struck exposed rider, never redirect a hull hit to
@@ -223,11 +222,11 @@ void infection_reconcile_player(long index)
 	team = role->role - 1;
 	player->team_index = team;
 	player->network_player_data.team_index = (char)team;
-	player->speed_multiplier = team ? game_variant_options_get()->infection_speed_percent / 100.0f : 1.0f;
+	player->speed_multiplier = team ? infection_options_get(game_engine_get_variant())->infection_speed_percent / 100.0f : 1.0f;
 	if (player->unit_index != NONE && (unit = unit_try_and_get(player->unit_index)))
 	{
 		infection_apply_shields(DATUM_INDEX_TO_ABSOLUTE_INDEX(index), player->unit_index, unit,
-			team && !game_variant_options_get()->infection_zombie_shields);
+			team && !infection_options_get(game_engine_get_variant())->infection_zombie_shields);
 		unit->object.owner_team_index = (short)team;
 		/* The alpha changes sides alive; update its armour as well as its team. */
 		infection_color_unit(unit, index);
@@ -500,18 +499,15 @@ static void infection_update(void)
 		infection_state.revision++;
 		platform_log("infection: countdown players=%ld", count);
 	}
-	if (now - infection_state.phase_tick < game_variant_options_get()->infection_countdown_seconds * TICKS_PER_SECOND)
+	if (now - infection_state.phase_tick < infection_options_get(game_engine_get_variant())->infection_countdown_seconds * TICKS_PER_SECOND)
 		return;
 	infection_state.phase = _distributed_infection_active;
 	infection_state.phase_tick = now;
 	/* Shuffle without replacement, leaving at least one human. */
-	for (index = 0; index < MIN(count - 1, game_variant_options_get()->infection_initial_zombies); index++)
+	for (index = 0; index < MIN(count - 1, infection_options_get(game_engine_get_variant())->infection_initial_zombies); index++)
 	{
 		long pick = index + (long)(real_random_range(0.0f, 0.99999f) * (count - index));
-		long fixture = network_test_infection_initial_player(), candidate;
 		long chosen, slot;
-		if (index == 0 && fixture != NONE)
-			for (candidate = index; candidate < count; candidate++) if (candidates[candidate] == fixture) { pick = candidate; break; }
 		chosen = candidates[pick];
 		slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(chosen);
 		candidates[pick] = candidates[index];
@@ -523,7 +519,7 @@ static void infection_update(void)
 	}
 	infection_state.revision++;
 	platform_log("infection: active players=%ld zombies=%ld spawned=%ld", humans + zombies,
-		MIN(count - 1, game_variant_options_get()->infection_initial_zombies), count);
+		MIN(count - 1, infection_options_get(game_engine_get_variant())->infection_initial_zombies), count);
 }
 
 long infection_remaining_ticks(void)
@@ -531,28 +527,6 @@ long infection_remaining_ticks(void)
 	long limit = game_variant_options_get()->time_limit * 60L * TICKS_PER_SECOND;
 	return infection_state.phase == _distributed_infection_active ?
 		MAX(0, limit - (game_time_get() - infection_state.phase_tick)) : limit;
-}
-
-void infection_log_state(void)
-{
-	struct data_iterator iterator;
-	struct player_datum *player;
-	long humans = 0, zombies = 0, armed = 0;
-	if (!infection_enabled()) return;
-	data_iterator_new(&iterator, player_data);
-	while ((player = (struct player_datum *)data_iterator_next(&iterator)))
-	{
-		struct distributed_infection_player *role = infection_player(iterator.datum_index);
-		if (!role || player->quit_out_of_game) continue;
-		if (role->role == 1) humans++;
-		if (role->role == 2)
-		{
-			zombies++;
-			if (player->unit_index != NONE && unit_has_weapon_definition_index(player->unit_index, get_ball_definition_index())) armed++;
-		}
-	}
-	platform_log("infection state: phase=%ld humans=%ld zombies=%ld skulls=%ld winner=%ld revision=%ld",
-		infection_state.phase, humans, zombies, armed, infection_state.winner, infection_state.revision);
 }
 
 static boolean infection_initialize(void)
@@ -568,10 +542,10 @@ static boolean infection_initialize(void)
 	missing_skull = get_ball_definition_index() == NONE;
 	equipping = FALSE;
 	platform_log("infection options: initial=%d speed=%d damage=%d respawn=%d countdown=%d minutes=%d shields=%d",
-		game_variant_options_get()->infection_initial_zombies, game_variant_options_get()->infection_speed_percent,
-		game_variant_options_get()->infection_damage_percent, game_variant_options_get()->infection_respawn_seconds,
-		game_variant_options_get()->infection_countdown_seconds, game_variant_options_get()->time_limit,
-		game_variant_options_get()->infection_zombie_shields);
+		infection_options_get(game_engine_get_variant())->infection_initial_zombies, infection_options_get(game_engine_get_variant())->infection_speed_percent,
+		infection_options_get(game_engine_get_variant())->infection_damage_percent, infection_options_get(game_engine_get_variant())->infection_respawn_seconds,
+		infection_options_get(game_engine_get_variant())->infection_countdown_seconds, game_variant_options_get()->time_limit,
+		infection_options_get(game_engine_get_variant())->infection_zombie_shields);
 	return TRUE;
 }
 

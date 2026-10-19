@@ -28,7 +28,25 @@ You do not need the Xbox SDK.
 2. Enter `python configure.py`.
 3. Enter `ninja windows`.
 
-`configure.py` generates the Windows build only on Windows.
+`configure.py` generates the Windows build only on Windows, and with
+`--windows-cross`, which cross-compiles it from Linux: the same clang and
+lld build against an MSVC toolchain, whose directories
+`--windows-vctools-dir` (the versioned folder under `VC/Tools/MSVC`, the
+one with `include` and `lib`) and `--windows-sdk-dir` (the SDK folder with
+`Include` and `Lib`) name, or `VCToolsInstallDir` and `WindowsSdkDir`. The
+build passes them to clang in `INCLUDE` and `LIB`. `--windows-cc` names
+the cross compiler (a run-of-the-mill clang by default).
+
+    python configure.py --windows-cross \
+        --windows-vctools-dir "$VCToolsInstallDir" \
+        --windows-sdk-dir "$WindowsSdkDir"
+    ninja windows
+
+The toolchain can be an [msvc-wine](https://github.com/mstorsjo/msvc-wine)
+install or an unmodified MSVC from a Windows install (from an NTFS volume,
+for instance). The SDK must have a versioned folder in each of `Include`
+and `Lib` (`Include/<version>/um`): a plain `xwin splat` does not, a splat
+made with `xwin splat --use-winsysroot-style` does.
 
 The build uses all the instructions of the processor of the computer that
 builds it (`-march=native`). Such a build does not always start on a

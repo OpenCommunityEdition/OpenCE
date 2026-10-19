@@ -3,10 +3,14 @@
 Like the Linux build (tools/linux_build.py), it compiles the game sources
 with clang for 32-bit x86 Windows (i686-pc-windows-msvc), adds the platform layer shared with
 Linux (``port/linux/src``) and the Windows parts in ``port/windows``, and
-links ``build/windows/halo.exe`` with lld. It is generated only when
-configure.py runs on Windows. See port/windows/README.md for the design.
+links ``build/windows/halo.exe`` with lld. It is generated when
+configure.py runs on Windows, or with configure.py --windows-cross, which
+cross-compiles it from Linux (tools/windows_cross_build.py) against the
+MSVC toolchain of --windows-vctools-dir and --windows-sdk-dir. See
+port/windows/README.md for the design.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -24,6 +28,7 @@ from .linux_build import (LINUX_PROFILE, MINIUPNPC_DIR, OPTIMISATION, STB_VORBIS
                           opus_sources, pgo_profile, profile_use_flags, xdk_headers)
 from .embed_assets import hud_assets_build, hud_configure_inputs
 from .ninja_syntax import Writer
+from .windows_cross_build import cross_toolchain_prefix
 
 LINUX_DIR = Path("port/linux")
 PORT_DIR = Path("port/windows")
@@ -36,6 +41,8 @@ SDL_URL = (
     f"https://github.com/libsdl-org/SDL/releases/download/release-{SDL_VERSION}/"
     f"SDL3-devel-{SDL_VERSION}-VC.zip"
 )
+# (its SHA-256 when it was pinned: the DLL ships in the builds)
+SDL_SHA256 = "1a784cb2a5c64d56fe7a62090fe9d242d9865f235e4ea9678f1a6ba4e693e7de"
 THIRD_PARTY = BUILD / "third_party"
 SDL_DIR = THIRD_PARTY / f"SDL3-{SDL_VERSION}"
 
@@ -146,7 +153,15 @@ def _load_config() -> Dict[str, Any]:
 
 def windows_configure_inputs() -> List[Path]:
     """Files whose change must re-run configure.py."""
-    return [Path(__file__), PORT_CONFIG, PORT_DIR / "src", LINUX_DIR / "src", LINUX_DIR / "game", *hud_configure_inputs()]
+    return [
+        Path(__file__),
+        Path(__file__).with_name("windows_cross_build.py"),
+        PORT_CONFIG,
+        PORT_DIR / "src",
+        LINUX_DIR / "src",
+        LINUX_DIR / "game",
+        *hud_configure_inputs(),
+    ]
 
 
 def _quote(path: Any) -> str:
@@ -164,6 +179,10 @@ def fetch_sdl() -> None:
     print(f"Downloading {SDL_URL}")
     with urllib.request.urlopen(SDL_URL) as response, open(archive, "wb") as f:
         shutil.copyfileobj(response, f)
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    if digest != SDL_SHA256:
+        archive.unlink()
+        raise SystemExit(f"{SDL_URL}: SHA-256 {digest}, not the pinned {SDL_SHA256}")
     with zipfile.ZipFile(archive) as z:
         z.extractall(THIRD_PARTY)
     archive.unlink()
@@ -258,7 +277,7 @@ def inline_export_wrapper(source: Path) -> Path:
 
 
 def generate_windows_build(n: Writer, sln: Any) -> None:
-    if sys.platform != "win32" or not PORT_CONFIG.is_file():
+    if (sys.platform != "win32" and not getattr(sln, "windows_cross", False)) or not PORT_CONFIG.is_file():
         return
     try:
         fetch_sdl()
@@ -277,6 +296,9 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
     crt_include = PORT_DIR / "include" / "crt"
     posix_include = PORT_DIR / "include" / "posix"
 
+    # setup cross compilation if we're not on Windows
+    cross_prefix = cross_toolchain_prefix(sln) if sys.platform != "win32" else ""
+
     n.comment("Native Windows build (ninja windows)")
     n.variable("windows_cc", cc)
     # MSVC gives struct tags first named in a prototype file scope; clang
@@ -292,14 +314,17 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             implicit=[Path("tools/linux_msvc_semantics.py"), *game_headers])
     n.rule(
         name="windows_cc",
-        command=f"{compile_launcher(sln)}$windows_cc -MMD -MF $out.d $cflags -c $in -o $out",
+        command=f"{cross_prefix}{compile_launcher(sln)}$windows_cc -MMD -MF $out.d $cflags -c $in -o $out",
         description="WINDOWS CC $out",
         depfile="$out.d",
         deps="gcc",
     )
+    # ninja quotes the response file's paths for the shell that runs the
+    # rule: Windows quoting on Windows, POSIX quoting elsewhere
+    rsp_quoting = "windows" if sys.platform == "win32" else "posix"
     n.rule(
         name="windows_link",
-        command="$windows_cc $ldflags -o $out --rsp-quoting=windows @$out.rsp $libs",
+        command=f"{cross_prefix}$windows_cc $ldflags -o $out --rsp-quoting={rsp_quoting} @$out.rsp $libs",
         description="WINDOWS LINK $out",
         rspfile="$out.rsp",
         rspfile_content="$in_newline",

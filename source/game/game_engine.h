@@ -94,11 +94,27 @@ struct ctf_variant
 	long single_flag_time;
 };
 
+/* port: optional Slayer rules in its existing engine-variant space. */
+struct infection_options
+{
+	byte infection_enabled;
+	byte infection_initial_zombies;
+	byte infection_speed_percent;
+	byte infection_damage_percent;
+	short infection_respawn_seconds;
+	short infection_countdown_seconds;
+	byte infection_zombie_shields;
+	byte reserved[3];
+};
+
 struct slayer_variant
 {
 	boolean no_death_bonus;
 	boolean no_kill_penalty;
 	boolean kill_in_order;
+	/* port: marker distinguishes legacy Slayer variants from Infection. */
+	unsigned long infection_signature;
+	struct infection_options infection;
 };
 
 struct king_variant
@@ -146,6 +162,8 @@ struct game_variant
 	union game_engine_variant game_engine_variant;
 	word flags;
 };
+
+typedef char verify_game_engine_variant_size[sizeof(union game_engine_variant) == 0x18 ? 1 : -1];
 
 typedef char verify_game_variant_size[sizeof(struct game_variant) == 0x68 ? 1 : -1];
 
@@ -236,30 +254,11 @@ struct game_variant_options
 	/* no weapons spawn on the map (its grenades and powerups do): for
 	a loadout of none, melee only */
 	boolean no_map_weapons;
-	/* port: optional Slayer infection rules, GPVO version 2 */
-	byte infection_enabled;
-	byte infection_initial_zombies;
-	byte infection_speed_percent;
-	byte infection_damage_percent;
-	short infection_respawn_seconds;
-	short infection_countdown_seconds;
-	/* port: GPVO v3, zero-filled reserved bytes keep the wire deterministic */
-	byte infection_zombie_shields;
-	byte infection_reserved[3];
-	/* port: GPVO v4 Infection reserves: unloaded rounds, -1 preserves the tag.
-	   Pistol, shotgun, assault rifle, sniper rifle; finite, at most 999. */
-	short ammo_reserves[4];
 };
 
-typedef char verify_game_variant_options_size[sizeof(struct game_variant_options) == 0x30 ? 1 : -1];
+typedef char verify_game_variant_options_size[sizeof(struct game_variant_options) == 0x1C ? 1 : -1];
 
-void variant_ammo_options_default(struct game_variant_options *options);
-void variant_ammo_options_validate(struct game_variant_options *options);
-short game_engine_weapon_reserve_limit(long definition_index, short magazine_index, short native_limit);
-/* port: new scenario weapons only; never on inventory attachment or pickup. */
-void game_engine_apply_map_reserves(long object_index);
-
-/* port: infection humans use the variant's ordinary spawn equipment */
+/* port: Infection humans use the ordinary spawn equipment. */
 void game_engine_default_postspawn_player_update(long player_index);
 
 struct game_engine
@@ -637,6 +636,9 @@ boolean game_engine_should_end_game(
 
 void game_engine_clear_goal_position(
 	short goal_index);
+
+void game_engine_objective_weapon_deleted(
+	long weapon_index);
 
 long get_flag_definition_index(
 	void);

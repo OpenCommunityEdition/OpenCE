@@ -2345,6 +2345,12 @@ void rasterizer_transparent_geometry_group_draw(
 									component_index < NUMBEROF(constant_color0.n);
 									component_index++)
 									constant_color0.n[component_index] = function_value*color_delta.n[component_index] + stage->constant_color0.n[component_index];
+								/* port: the native builds' rounding can put this blend
+								of two valid colours a hair outside [0, 1] */
+								for (component_index = 0;
+									component_index < NUMBEROF(constant_color0.n);
+									component_index++)
+									constant_color0.n[component_index] = PIN(constant_color0.n[component_index], 0.0f, 1.0f);
 
 								match_assert(
 									"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",

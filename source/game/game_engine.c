@@ -538,7 +538,6 @@ symbols in this file:
 
 #include "cseries.h"
 #include "infection.h" /* port: port/linux/game/infection.c */
-#include "network_test.h" /* port: port/linux/game/network_test.c */
 #include "cseries_windows.h"
 #include "errors.h"
 #include "aim_assist.h"
@@ -1270,9 +1269,8 @@ static void game_engine_generate_title_string(
 	}
 	else if (game_engine_has_teams())
 	{
-		/* port: a signed 32-bit team score needs up to 11 characters and NUL. */
-		wchar_t team0_name[12];
-		wchar_t team1_name[12];
+		wchar_t team0_name[8];
+		wchar_t team1_name[8];
 		long team0_score;
 		long team1_score;
 
@@ -4162,29 +4160,11 @@ boolean game_engine_showing_postgame(
 	return game_engine != NULL && game_engine_globals.postgame_state == game_engine_mode_postgame_rasterize;
 }
 
-/* port: stored per-variant reserves; applied only while Infection is enabled. */
-void variant_ammo_options_default(struct game_variant_options *options)
-{
-	short index;
-	for (index = 0; index < 4; index++) options->ammo_reserves[index] = NONE;
-}
-
-void variant_ammo_options_validate(struct game_variant_options *options)
-{
-	short index;
-	for (index = 0; index < 4; index++)
-		/* port: stock reserve counters display three decimal digits. */
-		options->ammo_reserves[index] = (short)PIN(options->ammo_reserves[index], NONE, 999);
-}
-
 void game_variant_options_default(
 	struct game_variant const *variant,
 	struct game_variant_options *options)
 {
 	csmemset(options, 0, sizeof(*options));
-	/* port: infection is opt-in */
-	infection_options_default(options);
-	variant_ammo_options_default(options);
 	options->friendly_fire = _friendly_fire_on;
 	options->loadout = _loadout_category;
 	options->primary_weapon = _loadout_weapon_assault_rifle;
@@ -5045,8 +5025,6 @@ void game_engine_player_killed(
 		dead_player->quit_out_of_game = TRUE;
 	}
 	dead_player->death_time = game_time_get();
-	/* port: preserve before/after role evidence for real deaths. */
-	network_test_verdict_log("death-before", killing_player_index, dead_player_index, friendly_fire);
 	if (game_engine->player_killed_player)
 	{
 		game_engine->player_killed_player(
@@ -5056,7 +5034,6 @@ void game_engine_player_killed(
 			friendly_fire);
 	}
 
-	network_test_verdict_log("death-after", killing_player_index, dead_player_index, friendly_fire);
 	same_player = killing_player_index == dead_player_index;
 	if (killing_player_index != NONE && dead_player_index != NONE)
 		valid_players = TRUE;
@@ -5090,7 +5067,8 @@ void game_engine_player_killed(
 	moves the dead to the other team when his is two or more bigger (his
 	next unit is the other team's, which the clients take it from:
 	network_player_attach_unit) */
-	if (global_variant.universal_variant.teams && game_variant_options_get()->auto_team_balance &&
+	/* port: Infection assigns roles instead of using automatic team balancing. */
+	if (!infection_enabled() && global_variant.universal_variant.teams && game_variant_options_get()->auto_team_balance &&
 		!network_game_distributed_client() && VALID_INDEX(dead_player->team_index, 2) && !dead_player->quit_out_of_game)
 	{
 		struct data_iterator iterator;
@@ -5122,7 +5100,7 @@ void game_engine_player_killed(
 	respawn later (the dead's own, if he has one waiting) */
 	/* port: Infection supplies the base timer, before the native penalty. */
 	if (infection_enabled())
-		dead_player->respawn_timer = game_variant_options_get()->infection_respawn_seconds * TICKS_PER_SECOND;
+		dead_player->respawn_timer = infection_options_get(game_engine_get_variant())->infection_respawn_seconds * TICKS_PER_SECOND;
 	{
 		long dead_absolute = DATUM_INDEX_TO_ABSOLUTE_INDEX(dead_player_index);
 
@@ -5231,6 +5209,12 @@ void game_engine_player_killed(
 			message = _game_engine_message_double_kill;
 		else if (killing_player->statistics.kills_in_a_row == 5)
 			message = _game_engine_message_five_kills_in_row;
+		/* port: none in a row is no spree. A network client's copy of the
+		killer's statistics can have this kill credited to no one, or to
+		someone else, before the host's statistics come (the Xbox's credited
+		the killer here, so never had none): Running Riot was announced */
+		else if (killing_player->statistics.kills_in_a_row <= 0)
+			message = _game_engine_message_killed_enemy;
 		else
 		{
 			message = (killing_player->statistics.kills_in_a_row % 5)
@@ -5641,6 +5625,30 @@ void game_engine_clear_goal_position(
 	return;
 }
 
+/* port: a flag or ball deleted on a client of the distributed netcode, on
+the host's word (port/linux/game/network_objects.c): the goals its game
+type's objective_weapon_update set at it each tick, which nothing else
+clears (ctf: its team's, and its carrier's goal; oddball: its team's) */
+void game_engine_objective_weapon_deleted(
+	long weapon_index)
+{
+	short team_index = weapon_get(weapon_index)->object.owner_team_index;
+
+	if (!game_engine || team_index == NONE)
+		return;
+	if (global_variant.game_engine_index == game_engine_ctf)
+	{
+		game_engine_clear_goal_position(team_index);
+		game_engine_clear_goal_position(team_index + 2);
+	}
+	else if (global_variant.game_engine_index == game_engine_oddball)
+	{
+		game_engine_clear_goal_position(team_index);
+	}
+
+	return;
+}
+
 long get_flag_definition_index(
 	void)
 {
@@ -5696,8 +5704,6 @@ void game_engine_switch_to_postgame(
 {
 	if (game_engine_globals.postgame_state==game_engine_mode_active)
 	{
-		/* port: distinguish replicated ends from the host's decision. */
-		network_test_verdict_log("end-game", NONE, NONE, FALSE);
 		if (global_network_game_server_get())
 		{
 			game_engine_globals.postgame_state = game_engine_mode_postgame_delay;
@@ -6362,7 +6368,9 @@ struct game_variant *build_game_variant_oddball(
 struct game_variant *build_game_variant_team_oddball(
 	struct game_variant *variant)
 {
-	struct game_variant result;
+	/* port: cleared, as every other builder's is: only some of its fields
+	are set below, and the rest were the stack's */
+	struct game_variant result = { 0 };
 
 	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
 	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
@@ -8963,9 +8971,6 @@ static void game_engine_update_item_spawn(
 				{
 					struct item_datum *item = item_get(object_index);
 
-					/* port: configure only this newly generated scenario item.
-					   Pickups and player drops must never replenish reserves. */
-					game_engine_apply_map_reserves(object_index);
 					object_set_garbage(object_index, FALSE);
 					if (TEST_FLAG(
 						equipment->flags,
@@ -9101,59 +9106,6 @@ static long game_engine_loadout_weapon_definition(
 		NONE;
 }
 
-/* port: only Infection's named stock weapon categories have reserve overrides. */
-static short game_engine_weapon_reserve_override(long definition_index)
-{
-	short slot = NONE;
-	if (!infection_enabled()) return NONE;
-	switch (weapon_definition_index_to_list_index(definition_index))
-	{
-	case _weapon_list_pistol: slot = 0; break;
-	case _weapon_list_shotgun: slot = 1; break;
-	case _weapon_list_assault_rifle: slot = 2; break;
-	case _weapon_list_sniper_rifle: slot = 3; break;
-	}
-	return slot == NONE ? NONE : (short)PIN(game_variant_options_get()->ammo_reserves[slot], NONE, 999);
-}
-
-/* port: called only by original scenario creation paths, including respawns.
-   No ownership heuristic or pickup hook: spent/dropped objects stay spent. */
-void game_engine_apply_map_reserves(long object_index)
-{
-	struct weapon_datum *weapon = weapon_try_and_get(object_index);
-	short reserve;
-	if (!weapon) return;
-	reserve = game_engine_weapon_reserve_override(weapon->definition_index);
-	if (reserve != NONE && weapon_definition_get(weapon->definition_index)->weapon.magazines.count)
-		weapon->weapon.magazines[0].rounds_total = reserve;
-}
-
-/* port: Infection's selected reserve is the actual inventory/pickup cap.
-   NORMAL and every other mode retain the unmodified weapon tag capacity. */
-short game_engine_weapon_reserve_limit(long definition_index, short magazine_index, short native_limit)
-{
-	short reserve = magazine_index == 0 ? game_engine_weapon_reserve_override(definition_index) : NONE;
-	return reserve == NONE ? native_limit : reserve;
-}
-
-static void game_engine_apply_spawn_reserves(long unit_index)
-{
-	struct unit_datum *unit = unit_try_and_get(unit_index);
-	short slot;
-	if (!unit) return;
-	for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
-	{
-		long index = unit->unit.weapon_object_indices[slot];
-		struct weapon_datum *weapon;
-		short reserve;
-		if (index == NONE) continue;
-		weapon = weapon_get(index);
-		reserve = game_engine_weapon_reserve_override(weapon->definition_index);
-		if (reserve != NONE && weapon_definition_get(weapon->definition_index)->weapon.magazines.count)
-			weapon->weapon.magazines[0].rounds_total = reserve;
-	}
-}
-
 /* port: the unit's weapons the loadout's (its others gone): the primary,
 then the secondary */
 static void game_engine_give_loadout(
@@ -9192,12 +9144,10 @@ void game_engine_postspawn_player_update(
 	/* port: expose the ordinary spawn equipment to infection humans. */
 	if (!game_engine)
 		return;
-	network_test_spawn_inventory_log(player_index, "before", game_engine_globals.flags);
 	if (game_engine->player_update)
 		game_engine->player_update(player_index);
 	else
 		game_engine_default_postspawn_player_update(player_index);
-	network_test_spawn_inventory_log(player_index, "after", game_engine_globals.flags);
 }
 
 /* port: shared normal loadout, without re-entering the engine callback. */
@@ -9303,8 +9253,6 @@ void game_engine_default_postspawn_player_update(
 			unit->unit.grenade_counts[
 				_unit_grenade_covenant_plasma] =
 				(char)starting_plasma_grenade_count;
-			/* port: apply once to the chosen native/custom spawn equipment. */
-			game_engine_apply_spawn_reserves(unit_index);
 		}
 	}
 

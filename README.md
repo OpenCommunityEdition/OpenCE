@@ -51,8 +51,16 @@ console. The port changes them to play as the North American (NTSC) maps do,
 so players of the two versions can play together.
 
 1. Start the game.
-2. At the first start, the game asks for the disc image. Select it.
+2. At the first start, the game asks for the disc image. Select it in the
+   file picker. On Linux and Windows, a disc image (`.iso` or `.xiso`) next
+   to the executable is used without the file picker. Where no file picker
+   can be shown (on Linux, without the desktop portal or `zenity`), the game
+   says to put the disc image next to the executable, and stops.
 3. The game extracts the `maps/` folder. Then the game starts.
+
+The `maps/` folder holds the Xbox maps only. If it holds Halo PC's maps
+instead (a Halo PC or Custom Edition install's `maps` folder), the game says
+so and stops: Custom Edition maps go in `custom_maps/`, beside `maps/`.
 
 On Linux and Windows, the game puts `maps/` next to the executable. On
 Android, copy the disc image to the phone first. The app puts `maps/` in its
@@ -117,7 +125,7 @@ To build the game:
 | Target | Result |
 | --- | --- |
 | `ninja linux` | `build/linux/halo` |
-| `ninja windows` (on Windows) | `build/windows/halo.exe` and `SDL3.dll` |
+| `ninja windows` (on Windows, or on Linux after `configure.py --windows-cross`) | `build/windows/halo.exe` and `SDL3.dll` |
 | `ninja android_apk` | `port/android/app/build/outputs/apk/debug/app-debug.apk` |
 | `ninja web` | `build/web/site/`, the web site (`python tools/web_serve.py` serves it) |
 
@@ -202,3 +210,56 @@ Enter `adb pull` to copy the recording parts to a computer.
 
 A profiling build plays with normal builds. It does not use
 `--pgo=train`.
+
+## Testing
+
+The tests are listed in [AGENTS.md](AGENTS.md) ("Testing"). Most run
+without the game data, in GitHub Actions too.
+
+One check needs the retail maps, so it runs on your own computer (or on a
+self-hosted runner), not in GitHub Actions: `tools/net_compare.py` plays
+two builds together in a network game on one computer and checks that they
+stay in step. Run it when a change can alter how a build calculates the
+game, as a change to the simulation, the compiler or the maths does,
+before it is merged. For example, to check a build with such a change
+against a build without it:
+
+```sh
+python tools/net_compare.py --a build/linux/halo --b <other checkout>/build/linux/halo \
+    --data <folder with maps/> --maps bloodgulch,beavercreek,hangemhigh --swap
+```
+
+Each game prints PASS or FAIL. A FAIL names the first player, tick and
+value that differ. Refer to "Comparing two builds" in
+[port/linux/NETCODE.md](port/linux/NETCODE.md).
+
+## Licence
+
+OpenCE is free software: you can give it to others and change it under the
+terms of the GNU Affero General Public License as published by the Free
+Software Foundation, version 3 of the License or (at your option) any later
+version (`AGPL-3.0-or-later`). It comes with no warranty. The full text is in
+[LICENSE](LICENSE).
+
+- **From the change.** The AGPL applies from the commit that made the change,
+  and to each release built from that commit or a later one. Earlier
+  releases, and the source at every earlier commit, were released under
+  [CC0 1.0](LICENSES/CC0-1.0.txt) and stay that way.
+- **What OpenCE builds on.** The decompilation of
+  [punpckhdq/halo](https://github.com/punpckhdq/halo) is under the AGPL 3.0
+  from 17 October 2026, and under CC0 1.0 before that date.
+  [bnunu/halo-1](https://github.com/bnunu/halo-1) is under CC0 1.0.
+- **Contributions** are under `AGPL-3.0-or-later`. A change taken from a
+  project under GPL 3.0 keeps that licence and its notices; the GPL 3.0 and
+  the AGPL 3.0 let the two be combined (section 13 of each).
+- **Hosts and servers.** If you change the game and let other persons play
+  with your version over a network (for example, as the host of an internet
+  game, or on a web site), the AGPL asks you to offer them the source of
+  your version (section 13). The game as released has its source here, and
+  each release's source is its tag (`build-<n>`).
+- **Third-party code, fonts and art** keep their own licences, which are
+  next to them (`port/third_party`, `port/assets/fonts`,
+  `port/assets/icons`, `port/assets/text_filter`). The release downloads and
+  the web site's `licenses.txt` carry their notices.
+- **Halo is not covered.** The licence covers the work of OpenCE's authors.
+  It gives no rights in Halo, its maps or anything else that Microsoft owns.

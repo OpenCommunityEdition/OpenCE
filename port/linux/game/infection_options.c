@@ -2,35 +2,37 @@
 #include "game/game_engine.h"
 #include "infection.h"
 
-void infection_options_default(struct game_variant_options *options)
+/* Versioned marker within Slayer's existing variant; GPVO stays unchanged. */
+#define INFECTION_SIGNATURE 0x31464E49UL /* INF1 */
+
+static struct infection_options const defaults = { FALSE, 1, 180, 200, 5, 5, TRUE, { 0, 0, 0 } };
+
+struct infection_options const *infection_options_get(struct game_variant const *variant)
 {
-	options->infection_enabled = FALSE;
-	options->infection_initial_zombies = 1;
-	options->infection_speed_percent = 180;
-	options->infection_damage_percent = 200;
-	options->infection_respawn_seconds = 5;
-	options->infection_countdown_seconds = 5;
-	options->infection_zombie_shields = TRUE;
-	options->infection_reserved[0] = options->infection_reserved[1] = options->infection_reserved[2] = 0;
+	struct infection_options const *options;
+	if (!variant || variant->game_engine_index != game_engine_slayer ||
+		variant->game_engine_variant.slayer.infection_signature != INFECTION_SIGNATURE)
+		return &defaults;
+	options = &variant->game_engine_variant.slayer.infection;
+	/* Saved and remote variants are untrusted. Invalid extensions stay off. */
+	if (options->infection_enabled > TRUE || options->infection_initial_zombies < 1 ||
+		options->infection_initial_zombies > 16 || options->infection_speed_percent < 100 ||
+		options->infection_speed_percent > 200 || options->infection_damage_percent < 100 ||
+		options->infection_damage_percent > 250 || options->infection_respawn_seconds < 1 ||
+		options->infection_respawn_seconds > 10 || options->infection_countdown_seconds < 0 ||
+		options->infection_countdown_seconds > 10 || options->infection_zombie_shields > TRUE ||
+		options->reserved[0] || options->reserved[1] || options->reserved[2])
+		return &defaults;
+	return options;
 }
 
-void infection_options_validate(struct game_variant const *variant, struct game_variant_options *options)
+struct infection_options *infection_options_edit(struct game_variant *variant)
 {
-	/* port: validate stored reserves even while their Infection rule is off. */
-	variant_ammo_options_validate(options);
-	options->infection_enabled = options->infection_enabled == TRUE && variant &&
-		variant->game_engine_index == game_engine_slayer && variant->universal_variant.teams;
-	options->infection_initial_zombies = (byte)PIN(options->infection_initial_zombies, 1, 16);
-	options->infection_speed_percent = (byte)PIN(options->infection_speed_percent, 100, 200);
-	options->infection_damage_percent = (byte)PIN(options->infection_damage_percent, 100, 250);
-	options->infection_respawn_seconds = (short)PIN(options->infection_respawn_seconds, 1, 10);
-	options->infection_countdown_seconds = (short)PIN(options->infection_countdown_seconds, 0, 10);
-	options->infection_zombie_shields = options->infection_zombie_shields != FALSE;
-	options->infection_reserved[0] = options->infection_reserved[1] = options->infection_reserved[2] = 0;
-	if (options->infection_enabled)
+	if (!variant || variant->game_engine_index != game_engine_slayer) return NULL;
+	if (infection_options_get(variant) == &defaults)
 	{
-		options->auto_team_balance = FALSE;
-		/* Team Options own friendly fire and its penalty, as in Team Slayer. */
-		options->time_limit = (short)PIN(options->time_limit, 0, 120);
+		variant->game_engine_variant.slayer.infection_signature = INFECTION_SIGNATURE;
+		variant->game_engine_variant.slayer.infection = defaults;
 	}
+	return &variant->game_engine_variant.slayer.infection;
 }

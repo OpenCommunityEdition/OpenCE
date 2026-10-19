@@ -728,6 +728,8 @@ static struct _main_globals main_globals = { 0 };
 /* Keep the original globals layout; these clocks belong to pending requests. */
 static long main_loss_last_tick;
 static long main_respawn_last_tick;
+/* port: the game tick a checkpoint last counted (main_save_map_private) */
+static long main_save_last_tick;
 boolean debug_force_frame_rate_update = FALSE;
 boolean debug_no_drawing = FALSE;
 boolean debug_game_save = FALSE;
@@ -1618,6 +1620,8 @@ void main_save_map_safe(
 		main_globals.ticks_until_next_save_check = 0;
 		main_globals.ticks_unable_to_save = 0;
 		main_globals.safe_intervals = 0;
+		/* port: the tick before: the first check is at once */
+		main_save_last_tick = game_time_get()-1;
 	}
 	return;
 }
@@ -1632,6 +1636,8 @@ void main_save_map_no_timeout(
 		main_globals.ticks_until_next_save_check = 0;
 		main_globals.ticks_unable_to_save = 0;
 		main_globals.safe_intervals = 0;
+		/* port: the tick before: the first check is at once */
+		main_save_last_tick = game_time_get()-1;
 	}
 	main_globals.save_map_timeout = FALSE;
 	return;
@@ -2087,26 +2093,40 @@ static void main_save_map_private(
 
 		if (save_map_safely)
 		{
-			if (main_globals.ticks_unable_to_save++ >= 240 &&
-				main_globals.save_map_timeout)
+			/* port: the counts below are of game ticks, as on the Xbox, whose
+			loop ran once a tick (30 a second). This loop runs once a frame, and
+			at 60 frames a second or more a checkpoint gave up in a few seconds,
+			before the fight it waited on was over: few checkpoints came */
+			long current_tick = game_time_get();
+			long ticks = current_tick-main_save_last_tick;
+
+			if (current_tick < main_save_last_tick)
+				ticks = 0;
+			main_save_last_tick = current_tick;
+
+			while (ticks-- > 0 && !save_map)
 			{
-				if (debug_game_save)
-					console_printf(FALSE, "gave up trying to save");
-				main_globals.saving_map = FALSE;
-				return;
-			}
-			else if (main_globals.ticks_until_next_save_check-- <= 0)
-			{
-				if (game_safe_to_save())
+				if (main_globals.ticks_unable_to_save++ >= 240 &&
+					main_globals.save_map_timeout)
 				{
-					if (main_globals.safe_intervals++ >= 3)
-						save_map = TRUE;
+					if (debug_game_save)
+						console_printf(FALSE, "gave up trying to save");
+					main_globals.saving_map = FALSE;
+					return;
 				}
-				else
+				else if (main_globals.ticks_until_next_save_check-- <= 0)
 				{
-					main_globals.safe_intervals = 0;
+					if (game_safe_to_save())
+					{
+						if (main_globals.safe_intervals++ >= 3)
+							save_map = TRUE;
+					}
+					else
+					{
+						main_globals.safe_intervals = 0;
+					}
+					main_globals.ticks_until_next_save_check = 10;
 				}
-				main_globals.ticks_until_next_save_check = 10;
 			}
 		}
 		else
@@ -2451,6 +2471,13 @@ static void main_update_time_unthrottled(
 	{
 		seconds_elapsed = main_globals.recording_dt;
 	}
+	else if (halo_fixed_step() && main_globals.connection == _game_connection_local)
+	{
+		/* port: debug.fixed_step, a frame a tick whatever time has passed, as
+		a movie's frames are its recording's: what runs once a frame (aiming)
+		sees the game's time, and the game plays the same every time */
+		seconds_elapsed = 1.0f / TICKS_PER_SECOND;
+	}
 	else
 	{
 		seconds_elapsed = PIN(seconds_elapsed, 0.0f, 1.0f);
@@ -2692,6 +2719,11 @@ static void main_update_time(
 	if (main_globals.movie)
 	{
 		seconds_elapsed = main_globals.recording_dt;
+	}
+	else if (halo_fixed_step() && main_globals.connection == _game_connection_local)
+	{
+		/* port: debug.fixed_step, as main_update_time_unthrottled */
+		seconds_elapsed = 1.0f / TICKS_PER_SECOND;
 	}
 	else
 	{

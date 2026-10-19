@@ -119,7 +119,6 @@ struct game_options;
 /* ---------- headers */
 
 #include "cseries/cseries.h"
-#include "infection.h" /* port: port/linux/game/infection.c */
 #include "game/game.h"
 #include "ai/ai.h"
 #include "bink/bink_playback.h"
@@ -495,8 +494,6 @@ void game_set_game_variant_options(
 		game_variant_options_global = *options;
 	else
 		game_variant_options_default(&game_variant_global, &game_variant_options_global);
-	/* port: bound the network/profile options before use */
-	infection_options_validate(&game_variant_global, &game_variant_options_global);
 
 	return;
 }

@@ -217,9 +217,10 @@ static void _data_packet_verify(
 
 	field = fields;
 	total_size = 0;
-	/* BUG (original): a first version-ineligible field reads an indeterminate
-	 * field_size; later ineligible fields reuse the preceding size. A corrected
-	 * build should initialize field_size to zero before the loop. */
+	/* port: the original's bug fixed: a first version-ineligible field read
+	an indeterminate field_size, and later ineligible fields reused the size
+	before them (no field of the game's has a version limit) */
+	field_size = 0;
 	while (field->type != _data_packet_field_end)
 	{
 		if (field->type < 0 || field->type >= _data_packet_field_type_count)

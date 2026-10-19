@@ -834,6 +834,10 @@ long host_guest_mprotect(uint64_t address, uint64_t size, int protection)
 
 #define WATCH_PAGE_COUNT (HALO_GUEST_WINDOW_SIZE / PAGE)
 
+/* (each page: 0 not watched, 1 watched and read-only, 2 made writable by a
+watched write. A fault on a page at 2 is a write another thread made as
+this one was making the page writable, and is made again; one on a page at
+0, freed memory or none of the watch's, is a crash) */
 static uint8_t page_protected[WATCH_PAGE_COUNT];
 static uint32_t page_generation[WATCH_PAGE_COUNT];
 static volatile uint32_t current_generation = 1;
@@ -867,7 +871,7 @@ static uint64_t watch_page(uint64_t address)
 static void mark_written(uint64_t page)
 {
 	page_generation[page] = __sync_add_and_fetch(&current_generation, 1);
-	page_protected[page] = 0;
+	page_protected[page] = 2;
 	mprotect((void *)(HALO_GUEST_WINDOW_BASE + page * PAGE), PAGE, PROT_READ | PROT_WRITE);
 }
 
@@ -934,11 +938,13 @@ static void segv_handler(int signal_number, siginfo_t *information, void *contex
 	{
 		uint64_t page = watch_page(address);
 
-		if (page_protected[page])
+		if (page_protected[page] == 1)
 		{
 			mark_written(page);
 			return;
 		}
+		if (page_protected[page] == 2)
+			return;
 	}
 	report_crash(signal_number, information, context);
 	chain(&previous_segv, signal_number, information, context);
@@ -1001,7 +1007,7 @@ void host_memory_watch_protect(uint32_t address, uint32_t size)
 	}
 	for (page = first; page <= last; page++)
 	{
-		if (!page_protected[page])
+		if (page_protected[page] != 1)
 		{
 			page_protected[page] = 1;
 			mprotect((void *)(HALO_GUEST_WINDOW_BASE + page * PAGE), PAGE, PROT_READ);
@@ -1056,7 +1062,7 @@ void host_memory_watch_prepare_write(uint32_t address, uint32_t size)
 		last = WATCH_PAGE_COUNT - 1;
 	for (page = first; page <= last; page++)
 	{
-		if (page_protected[page])
+		if (page_protected[page] == 1)
 			mark_written(page);
 	}
 }

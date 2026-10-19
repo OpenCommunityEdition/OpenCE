@@ -19,8 +19,9 @@ rest as the host has it:
   (player_queues_new.c).
 - Every tick, a client sends the host where its own players' units are (it
   predicts them from its own input); the host takes that as they are,
-  within a tolerance, as later Halo engines do, at its next tick (on a
-  moving elevator, only across: its own elevator takes them up and down).
+  within a tolerance, as later Halo engines do, at its next tick (riding
+  an elevator, moving or underfoot at rest, only across: its own elevator
+  takes them up and down).
 - Every tick, the host sends every client every player's unit: which unit
   the player has, alive or not, the seat it rides, its shields and health
   (down, recharging, the damage they show), and where it is (dead: who
@@ -108,6 +109,8 @@ void p2p_hardware_id_sanitize(char *destination, int size, const char *source);
 void p2p_discord_sanitize(char *destination, int size, const char *source, int name);
 void p2p_discord_identity(char *id, int id_size, char *name, int name_size);
 unsigned long p2p_peer_endpoint_address(unsigned long virtual_address);
+/* network_connection.c's */
+boolean network_connection_last_read_was_unreliable(void);
 unsigned long system_milliseconds(void);
 void console_warning(const char *format, ...);
 
@@ -128,6 +131,10 @@ host's copies go as its own ticks have them) ... */
 #define CLIENT_CLOCK_FAST_WINDOWS 5
 /* the longest notice's text (_distributed_message_notice) */
 #define MAXIMUM_NOTICE_LENGTH 160
+/* how far a datagram's tick may be from the latest a message from its
+sender had, either way (distributed_sender_times): as long as a machine may
+go silent before it is dropped */
+#define DISTRIBUTED_TIME_WINDOW_TICKS (15 * TICKS_PER_SECOND)
 /* a Discord user's id and name as kept, with their ends (p2p.h's
 P2P_DISCORD_ID_SIZE and P2P_DISCORD_NAME_SIZE) */
 #define DISCORD_ID_SIZE 24
@@ -249,12 +256,24 @@ enum
 	_distributed_unit_part_killer_bit,
 };
 
+/* world units: how far apart the host's run of a client's player and the
+client's may be, a tick from the same place, and agree (distributed_divergence:
+well past the last bits' rounding, well short of a player running 1% faster) */
+#define DIVERGENCE_APART_DISTANCE 0.0001f
+
 /* world units: how far a client's own player's unit may be from the host's
 before the host takes it no longer, and before the client is put where the
 host has it (no further than that: between the two they would disagree for
 good, the host's player somewhere its own is not) */
 #define HOST_ACCEPT_TOLERANCE 3.5f
 #define LOCAL_CORRECTION_TOLERANCE 3.0f
+/* world units: how far below or above the host's echo of its prediction a
+client's own player standing on the same elevator may be and keep its own
+floor's height (distributed_correct_own_unit). The two machines' elevators
+are apart by what the platform travels in a round trip (the history below
+holds 64 ticks, two seconds); a greater difference is not that lag but a
+teleport, a fall or a platform out of step, and is corrected. */
+#define ELEVATOR_PHASE_TOLERANCE 4.0f
 /* how fast a client's own player's unit moves at most (world units a tick) */
 #define MAXIMUM_PREDICTED_SPEED 2.0f
 /* ... on foot: this many times as fast as a player runs and jumps, or as
@@ -564,6 +583,8 @@ static struct distributed_own_position
 	long time;
 	long unit_index;
 	real_point3d position;
+	/* local history only: NONE after jumping or walking off the platform */
+	long elevator_index;
 } distributed_own_positions[MAXIMUM_LOCAL_PLAYERS][OWN_POSITION_TICKS];
 static real distributed_own_round_trip;
 /* the host: the players each machine had when it last told the host that it
@@ -621,6 +642,14 @@ static long distributed_game_state_time;
 /* the latest tick of each kind of unreliable message had from each sender
 (a machine, or the host), NONE for none */
 static long distributed_received_times[MAXIMUM_SENDERS][NUMBER_OF_DISTRIBUTED_MESSAGES];
+/* the latest tick of any message had from each sender, NONE for none: a
+datagram, which anyone can send as from another machine, is dropped when
+its tick is further from it than DISTRIBUTED_TIME_WINDOW_TICKS (one stamped
+far ahead would have every newer one of the sender's taken for stale, and
+its clock for fast); a message over the sender's stream, which only it can
+send, is taken whatever its tick, and moves it
+(distributed_message_time_bounded) */
+static long distributed_sender_times[MAXIMUM_SENDERS];
 /* the host: each client machine's clock, measured (CLIENT_CLOCK_WINDOW_MILLISECONDS):
 its latest tick, and its tick and the host's time as the window began
 (NONE: none begun); how many windows in a row it went fast, and whether
@@ -683,6 +712,35 @@ static struct
 	long received;
 	long corrections;
 } distributed_statistics;
+/* ... and (the host) how far apart a client's player moved in a tick on the
+client and on the host, where the host took the client's last prediction
+the tick before, that was of the client's tick before, and the host's tick
+ran the player with the client's input of that tick: both machines then
+moved the player one tick with the same input from much the same place, so
+builds that simulate alike move it alike to the last bit (but where the
+player touched something the two have in different places), and a build
+that moves a player otherwise moves it otherwise, every tick the player
+moves (tools/net_compare.py). The move, not where it ends: the host's
+copy is put only halfway to a prediction a little off, and would be as far
+off the next for ticks after. Since network_distributed_divergence last
+read them: how many such ticks, how many of them further apart than
+DIVERGENCE_APART_DISTANCE, and the mean and the largest distance. */
+static struct
+{
+	long samples;
+	long apart;
+	real total;
+	real largest;
+	/* the tick of the client's and of the host's last prediction taken */
+	long taken_time[MAXIMUM_TRACKED_PLAYERS];
+	long taken_host_time[MAXIMUM_TRACKED_PLAYERS];
+	/* where that prediction had the player, and where it left the host's */
+	real_point3d taken_position[MAXIMUM_TRACKED_PLAYERS];
+	real_point3d taken_host_position[MAXIMUM_TRACKED_PLAYERS];
+	/* the client's tick of the latest input the host has of each player
+	(what the host's tick ran it with) */
+	long input_time[MAXIMUM_TRACKED_PLAYERS];
+} distributed_divergence;
 
 /* ---------- shared (network_distributed.h) */
 
@@ -700,6 +758,22 @@ void distributed_count_correction(
 	void)
 {
 	distributed_statistics.corrections++;
+}
+
+void network_distributed_divergence(
+	long *samples,
+	long *apart,
+	real *mean,
+	real *largest)
+{
+	*samples = distributed_divergence.samples;
+	*apart = distributed_divergence.apart;
+	*mean = distributed_divergence.samples ? distributed_divergence.total / (real)distributed_divergence.samples : 0.0f;
+	*largest = distributed_divergence.largest;
+	distributed_divergence.samples = 0;
+	distributed_divergence.apart = 0;
+	distributed_divergence.total = 0.0f;
+	distributed_divergence.largest = 0.0f;
 }
 
 boolean distributed_real_valid(
@@ -1275,6 +1349,7 @@ static boolean distributed_machine_loaded(
 		sizeof(distributed_machine_players[machine_index]));
 	for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
 		distributed_received_times[machine_index][type] = NONE;
+	distributed_sender_times[machine_index] = NONE;
 	csmemset(&distributed_round_trips[machine_index], 0, sizeof(distributed_round_trips[machine_index]));
 	csmemset(distributed_viewers[machine_index], 0, sizeof(distributed_viewers[machine_index]));
 	csmemset(&distributed_client_clocks[machine_index], 0, sizeof(distributed_client_clocks[machine_index]));
@@ -1630,6 +1705,26 @@ static boolean distributed_apply_state(
 	return TRUE;
 }
 
+/* the elevator a unit stands on this tick, or NONE. A remembered elevator
+lasts after a jump. Only a current floor contact allows ignoring a height
+difference caused by the platforms' different phases. biped_update_moving
+(bipeds.c) sets elevator_ticks to 60 each tick the biped's physics finds it
+on an elevator, and counts it down from then on. */
+static long distributed_supported_elevator(
+	long unit_index)
+{
+	struct biped_datum *biped = (struct biped_datum *)object_try_and_get_and_verify_type(unit_index,
+		_object_mask_biped);
+	struct device_datum *elevator;
+
+	if (!biped || TEST_FLAG(biped->biped.flags, _biped_airborne_bit) ||
+		biped->biped.support_surface_index == NONE || biped->biped.elevator_ticks != 60)
+		return NONE;
+	elevator = (struct device_datum *)object_try_and_get_and_verify_type(biped->biped.elevator_object_index,
+		_object_mask_machine);
+	return elevator ? biped->biped.elevator_object_index : NONE;
+}
+
 /* (a client) where its own players' units are this tick, noted */
 static void distributed_note_own_positions(
 	void)
@@ -1649,6 +1744,7 @@ static void distributed_note_own_positions(
 			unit_index = NONE;
 		own->time = game_time_get();
 		own->unit_index = unit_index;
+		own->elevator_index = unit_index != NONE ? distributed_supported_elevator(unit_index) : NONE;
 		if (unit_index != NONE)
 			own->position = object_get(unit_index)->object.position;
 	}
@@ -1698,6 +1794,17 @@ static void distributed_correct_own_unit(
 			error.i = state->position.x - own->position.x;
 			error.j = state->position.y - own->position.y;
 			error.k = state->position.z - own->position.z;
+			/* The host echoes our prediction on its own elevator's floor. If
+			we still stand on that platform, a small height error is its phase
+			lag, not player motion. Keep local floor contact; teleports across,
+			a height error past the lag, a jump, a different platform and
+			unpredicted states correct normally. */
+			if (own->elevator_index != NONE &&
+				own->elevator_index == distributed_supported_elevator(unit_index) &&
+				error.i * error.i + error.j * error.j <=
+					LOCAL_CORRECTION_TOLERANCE * LOCAL_CORRECTION_TOLERANCE &&
+				error.k >= -ELEVATOR_PHASE_TOLERANCE && error.k <= ELEVATOR_PHASE_TOLERANCE)
+				error.k = 0.0f;
 			if (!(error.i * error.i + error.j * error.j + error.k * error.k >
 				LOCAL_CORRECTION_TOLERANCE * LOCAL_CORRECTION_TOLERANCE))
 			{
@@ -2028,9 +2135,12 @@ static boolean distributed_on_foot_move_valid(
 	return dx * dx + dy * dy + rise * rise <= reach * reach && -dz <= fall_reach;
 }
 
-/* (the host) whether a unit rides an elevator that is moving (bipeds.c's
-elevator, kept a moment after the unit leaves its floor, as in a jump) */
-static boolean distributed_riding_moving_elevator(
+/* (the host) whether a unit rides an elevator: one that is moving (bipeds.c's
+elevator, kept a moment after the unit leaves its floor, as in a jump), or
+one at rest whose floor it stands on, since a stop or reversal must not
+admit a delayed height under the floor. The remembered elevator alone, after
+leaving a stopped one, is not riding it. */
+static boolean distributed_riding_elevator(
 	long unit_index)
 {
 	struct biped_datum *biped = (struct biped_datum *)object_try_and_get_and_verify_type(unit_index,
@@ -2040,19 +2150,21 @@ static boolean distributed_riding_moving_elevator(
 	if (!biped || biped->biped.elevator_object_index == NONE)
 		return FALSE;
 	elevator = (struct device_datum *)object_try_and_get_and_verify_type(biped->biped.elevator_object_index,
-		_object_mask_device);
-	return elevator && elevator->device.position_velocity != 0.0f;
+		_object_mask_machine);
+	return elevator && (elevator->device.position_velocity != 0.0f ||
+		distributed_supported_elevator(unit_index) != NONE);
 }
 
 /* (the host) a client's player's prediction of its unit on foot, taken
-where it says within a tolerance (distributed_apply_predictions). Riding a
-moving elevator, only across: a client's elevator follows the host's
-(network_coop.c), behind it by the time the host's word takes to come, and
-the client's prediction a round trip behind the host's elevator when it
-comes. Taken up and down too, it would put the host's unit under its own
-elevator's floor going up, to fall through it, and the client's after it
-(distributed_correct_own_unit); each machine's elevator carries its own
-unit up and down as it moves, and they meet where it stops. */
+where it says within a tolerance (distributed_apply_predictions). Riding an
+elevator (distributed_riding_elevator), only across: a client's elevator
+follows the host's (network_coop.c), behind it by the time the host's word
+takes to come, and the client's prediction a round trip behind the host's
+elevator when it comes. Taken up and down too, it would put the host's unit
+under its own elevator's floor going up, to fall through it, and the
+client's after it (distributed_correct_own_unit); each machine's elevator
+carries its own unit up and down as it moves, and they meet where it
+stops. */
 static void distributed_take_prediction(
 	short player_index,
 	long unit_index,
@@ -2064,11 +2176,35 @@ static void distributed_take_prediction(
 	real_point3d position = state->position;
 	real dx, dy, dz;
 
-	if (distributed_riding_moving_elevator(unit_index))
+	if (distributed_riding_elevator(unit_index))
 		position.z = object->object.position.z;
 	dx = position.x - object->object.position.x;
 	dy = position.y - object->object.position.y;
 	dz = position.z - object->object.position.z;
+	/* (for the tests' reports: a tick on from the last taken, on both, with
+	the input the client's tick ran: an input's tick is the client's time
+	before it ran, a prediction's after; the prediction's time is the
+	client's word, kept from overflowing) */
+	if (distributed_divergence.taken_host_time[player_index] == now - 1 &&
+		distributed_predictions[player_index].time != LONG_MIN &&
+		distributed_divergence.taken_time[player_index] == distributed_predictions[player_index].time - 1 &&
+		distributed_divergence.input_time[player_index] == distributed_predictions[player_index].time - 1)
+	{
+		real_point3d const *client_from = &distributed_divergence.taken_position[player_index];
+		real_point3d const *host_from = &distributed_divergence.taken_host_position[player_index];
+		real mx = (position.x - client_from->x) - (object->object.position.x - host_from->x);
+		real my = (position.y - client_from->y) - (object->object.position.y - host_from->y);
+		real mz = (position.z - client_from->z) - (object->object.position.z - host_from->z);
+		real distance = (real)sqrt(mx * mx + my * my + mz * mz);
+
+		distributed_divergence.samples++;
+		if (distance > DIVERGENCE_APART_DISTANCE)
+			distributed_divergence.apart++;
+		distributed_divergence.total += distance;
+		if (distance > distributed_divergence.largest)
+			distributed_divergence.largest = distance;
+	}
+	distributed_divergence.taken_host_time[player_index] = NONE;
 	if (!(dx * dx + dy * dy + dz * dz <= HOST_ACCEPT_TOLERANCE * HOST_ACCEPT_TOLERANCE))
 		return;
 	if (distributed_accepted[player_index].valid)
@@ -2107,6 +2243,10 @@ static void distributed_take_prediction(
 	{
 		distributed_predictions[player_index].taken_time = distributed_predictions[player_index].time;
 		distributed_predictions[player_index].taken_host_time = now;
+		distributed_divergence.taken_time[player_index] = distributed_predictions[player_index].time;
+		distributed_divergence.taken_host_time[player_index] = now;
+		distributed_divergence.taken_position[player_index] = position;
+		distributed_divergence.taken_host_position[player_index] = object->object.position;
 		/* (a new anchor: the first, one a second on, or after a jump) */
 		if (!distributed_accepted[player_index].valid ||
 			now - distributed_accepted[player_index].host_time >= PREDICTION_ANCHOR_TICKS)
@@ -2445,6 +2585,18 @@ static void distributed_handle_inputs(
 		network_coop_note_player_structure_bsp(input->player_index, input->structure_bsp_index);
 		update_server_handle_distributed_input(DATUM_INDEX_NEW(input->player_index, player->identifier), input->tick,
 			&action, input->control_flags, DISTRIBUTED_INPUT_HISTORY);
+		/* (for the tests' reports: the newest, as the input taken is, or one
+		a second or more older, the client's clock set back; the subtraction
+		kept from overflowing, as the tick is the client's word) */
+		{
+			long newest = distributed_divergence.input_time[input->player_index];
+
+			if (newest == NONE || input->tick > newest ||
+				(newest >= LONG_MIN + TICKS_PER_SECOND && input->tick < newest - TICKS_PER_SECOND))
+			{
+				distributed_divergence.input_time[input->player_index] = input->tick;
+			}
+		}
 		if (input->host_time != NONE && (host_time == NONE || input->host_time > host_time))
 			host_time = input->host_time;
 	}
@@ -3337,6 +3489,7 @@ void network_distributed_new_game(
 		distributed_batches[sender].size = 0;
 		for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
 			distributed_received_times[sender][type] = NONE;
+		distributed_sender_times[sender] = NONE;
 	}
 	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 	{
@@ -3360,6 +3513,14 @@ void network_distributed_new_game(
 	distributed_host_time = NONE;
 	distributed_statistics_due = FALSE;
 	distributed_pickup_count = 0;
+	/* (the tests' drift figures: none taken, no input had, of this game) */
+	csmemset(&distributed_divergence, 0, sizeof(distributed_divergence));
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+	{
+		distributed_divergence.taken_time[player_index] = NONE;
+		distributed_divergence.taken_host_time[player_index] = NONE;
+		distributed_divergence.input_time[player_index] = NONE;
+	}
 	/* (each player's latest input: player_queues_new.c) */
 	update_queues_distributed_reset();
 	network_objects_new_game();
@@ -3437,6 +3598,61 @@ void network_distributed_tick(
 	profile_scope(distributed_tick_batches_flush_section, distributed_batches_flush();)
 	distributed_machines.in_tick = FALSE;
 	distributed_machines.valid = FALSE;
+}
+
+/* whether a message's tick is near enough the latest had from its sender
+to be taken (distributed_sender_times); from_stream: it came over the
+sender's stream (or a client's connection to the host), not in a datagram */
+static boolean distributed_message_time_bounded(
+	long machine_index,
+	long game_time,
+	boolean from_stream)
+{
+	short sender = machine_index == NONE ? HOST_SENDER : (short)machine_index;
+	long *latest;
+	unsigned long distance;
+	short type;
+
+	if (sender < 0 || sender >= MAXIMUM_SENDERS)
+		return FALSE;
+	latest = &distributed_sender_times[sender];
+	if (*latest == NONE)
+	{
+		*latest = game_time;
+		return TRUE;
+	}
+	/* (unsigned: no tick, however far, overflows it) */
+	distance = game_time > *latest ?
+		(unsigned long)game_time - (unsigned long)*latest :
+		(unsigned long)*latest - (unsigned long)game_time;
+	if (distance > DISTRIBUTED_TIME_WINDOW_TICKS)
+	{
+		static unsigned long last_logged_time;
+		static boolean logged;
+
+		if (!from_stream)
+		{
+			unsigned long now = system_milliseconds();
+
+			if (!logged || now - last_logged_time >= 1000)
+			{
+				error(_error_silent, "distributed message stamped %ld ticks from its sender's latest in a datagram; dropped",
+					game_time > *latest ? (long)distance : -(long)distance);
+				last_logged_time = now;
+				logged = TRUE;
+			}
+			return FALSE;
+		}
+		/* (the sender's own word: what a datagram sent as from it had moved
+		its latest to is forgotten) */
+		*latest = game_time;
+		for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
+			distributed_received_times[sender][type] = NONE;
+		return TRUE;
+	}
+	if (game_time > *latest)
+		*latest = game_time;
+	return TRUE;
 }
 
 /* whether an unreliable message of the kind is older than one had already
@@ -3622,7 +3838,8 @@ unsigned long distributed_machine_real_address(
 }
 
 /* (the host) a client machine's address as text: its real one, for an
-internet play peer's stand-in (p2p.c) */
+internet play peer's stand-in (p2p.c). Whole, for the host's own CHEATERS_FILE
+and BANS_FILE, which match on it: never for the log (log_address.h) */
 static void distributed_address_text(
 	unsigned long address,
 	char *text,
@@ -4083,6 +4300,15 @@ void network_distributed_handle_message(
 	}
 	distributed_statistics.received++;
 
+	/* (the kinds a client sends only over its stream: in a datagram, which
+	anyone can send as from it, they are not its) */
+	if ((header.type == _distributed_message_client_ready ||
+			header.type == _distributed_message_client_identity ||
+			header.type == _distributed_message_hit_reports) &&
+		!distributed_handling_stream_message)
+	{
+		return;
+	}
 	/* (each kind from the host, or from a client) */
 	switch (header.type)
 	{
@@ -4101,11 +4327,19 @@ void network_distributed_handle_message(
 	default:
 		if (game_connection() != _game_connection_network_client)
 			return;
-		/* (the host's latest tick, which this client's input messages tell
-		it back) */
-		if (distributed_host_time == NONE || header.game_time > distributed_host_time)
-			distributed_host_time = header.game_time;
 		break;
+	}
+	if (!distributed_message_time_bounded(machine_index, header.game_time,
+		machine_index == NONE ? !network_connection_last_read_was_unreliable() : distributed_handling_stream_message))
+	{
+		return;
+	}
+	/* (a client: the host's latest tick, which its input messages tell it
+	back) */
+	if (machine_index == NONE &&
+		(distributed_host_time == NONE || header.game_time > distributed_host_time))
+	{
+		distributed_host_time = header.game_time;
 	}
 	if ((distributed_handling_batch || header.type != _distributed_message_damage_events) &&
 		distributed_message_stale(machine_index, &header))

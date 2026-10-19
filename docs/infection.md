@@ -1,118 +1,56 @@
 # Classic Infection
 
-Infection is an optional submode of **Team Slayer**, retaining Slayer's
-engine ID, menus, scoreboard and Postgame Carnage Report. It is disabled by
-default. No commercial maps, tags or other game assets are supplied or edited.
+Infection is an optional Team Slayer submode, disabled by default. It keeps
+Slayer's engine ID, scoring and classic scoreboard. Maps and tags are unchanged.
 
-## Rules and configuration
+## Play
 
-Humans are red and use the variant's starting weapons. Zombies are blue,
-carry only the Oddball skull, and cannot drop it voluntarily or collect
-weapons, grenades or vehicles. Human deaths convert the victim, including
-suicide and environmental deaths, except for an attributed teammate betrayal:
-that victim respawns human. Dead zombies remain zombies. Late arrivals join
-the zombies. At least two players are needed to start, and initial selection
-always leaves a human. Zombies win when no humans remain; humans win at the
-active round's time limit. Lives are unlimited during Infection.
+Create or edit a Slayer variant under **Multiplayer > Edit Gametypes**.
+Open **Infection Options**, enable Infection, configure the rules and save.
+Select that variant when hosting a multiplayer game. Server Setup can also
+edit the current session; use Edit Gametypes to keep a named variant.
 
-1. Open **Multiplayer > Edit Gametypes** and create or edit a Slayer variant.
-2. Open **Infection Options** and turn **Infection ON**. This enables teams
-   and disables automatic team balancing.
-3. Select initial zombies, speed, skull damage, respawn, countdown, shields
-   and round time. Use a nonzero round time for survival victory.
-4. Choose human weapons in **Item Options** and friendly fire and the
-   betrayal penalty in **Team Options**. Save the variant.
-5. Create a multiplayer game, choose a map and that saved variant. Players
-   need compatible builds and their own legally obtained game data.
+Humans are red and keep the starting equipment selected in **Item Options**.
+Zombies are blue, carry only the skull, and cannot drop it voluntarily or
+collect weapons, grenades or vehicles. Human deaths convert the victim,
+except for attributed teammate betrayals. Dead zombies remain zombies; late
+arrivals join them. At least two players are needed, and initial selection
+leaves at least one human. Lives are unlimited. Zombies win by infecting all
+humans; humans win by surviving the configured time limit.
 
-Server Setup edits also work, but apply to the hosted game; use **Edit
-Gametypes** to save a named variant for later use.
+Defaults: one initial zombie, 180% zombie speed, 200% skull melee damage,
+five-second respawn and countdown, shields ON. Speed supports 100-200%;
+shields OFF disables zombie shields and recharge. The menu suggests a
+five-minute round; zero disables the survival time limit. Friendly fire and
+betrayal penalties use **Team Options**. Humans retain normal movement,
+ammunition, reloads and pickups. Skull melee retains native collision rays
+and backstabs; exposed vehicle riders require a valid close, unobstructed hit.
 
-Defaults are one initial zombie, 180% zombie speed, 200% skull melee damage,
-five-second respawn and countdown, and zombie shields ON. The menu suggests
-a five-minute round when enabling Infection in a new variant. Zombie speed
-choices include 100, 110, 115, 125, 150, 180, 190 and 200%. Humans retain normal
-movement. Shields OFF disables zombie shields and recharge after initial
-selection, conversion and every respawn; human shields remain normal.
+## Integration
 
-**Slayer > Infection Options > Ammo Reserves** independently sets pistol,
-shotgun, assault-rifle and sniper reserves. NORMAL uses the native limit;
-custom choices are 0, 50, 100, 120, 200, 300, 500 and 999 unloaded rounds.
-These finite values control starting reserves and pickup capacity only while
-Infection is ON. Firing, reloads, loaded capacity and partial pickups remain
-native. Death drops retain remaining ammunition. Infection OFF ignores stored
-custom reserves in all modes. Weapon Set NORMAL also retains the map's native
-starting-equipment flags, including any suppression of starting grenades.
+`port/linux/game/infection.c` specializes Slayer's callbacks; the host owns
+roles, inventory and victory. `network_infection.c` validates and synchronizes
+the round through the existing reliable game-state channel. Other modes keep
+their original callbacks. No new engine ID or custom ammunition system is added.
 
-Skull melee uses normal short collision rays. An exposed rider can be hit;
-hitting a vehicle hull does not damage every occupant or bypass closed seats.
-Remote rider hits require an unobstructed melee ray on the host too. Native
-backstab behavior is retained. Friendly fire uses the original Team Options
-modes; the pending betrayal penalty is applied after Infection's base respawn.
+Options use a validated `INF1` extension inside Slayer's existing engine-variant
+union. `game_variant` stays 104 bytes, shared options stay 28 bytes, and GPVO v1
+saved profiles keep their original format. Ordinary legacy variants default OFF.
+Older experimental Infection profiles with extended GPVO records must be recreated;
+this implementation does not migrate those unpublished profile extensions.
+All participants need **protocol 35** builds and their own game data.
 
-## Implementation and compatibility
+## Build and check
 
-- `port/linux/game/infection.c` copies Slayer's callbacks and substitutes
-  only Infection rules. Original modes use their existing callbacks.
-- `infection_options.c` validates opt-in settings; `source/game/game_engine.c`
-  contains the bounded inventory hooks and normal human loadout adapter.
-- `network_infection.c` sends roles, participant identities, round/revision,
-  phase, scores and winner over the existing reliable game-state channel.
-  The host owns role changes, equipment and wins. Clients validate snapshot
-  size, ranges, reserved bytes and round/revision before reconciliation.
-- Remote damage uses the existing authority checks; the host recomputes
-  the skull multiplier only for an eligible zombie and equipped skull.
-- GPVO v4 extends options to 48 bytes. v1-v3 profiles migrate without losing
-  existing values; absent Infection settings default OFF, absent shields ON,
-  and absent reserves NORMAL. Legacy reserve 1000 is clamped to 999.
-- Menus are generated by `tools/port_settings.py`, including the patch used
-  by the full CE generator. To regenerate just these additions, run
-  `python tools/port_settings.py --infection-only`.
+Follow the platform build instructions in the repository README. No additional
+runtime dependency is required. Regenerate the menu with
+`python tools/port_settings.py --infection-only`; check its layout and rules with
+`python -m pytest -q tools/test_infection.py`. `python tools/network_format.py`
+checks the recorded network layout.
 
-The contribution branch uses **network protocol 34**. The private development
-milestone was called **P33**, based on upstream protocol 28. Upstream now uses
-29 with a different Custom Edition map-name/hash agreement. This integration
-retains that upstream behavior and excludes old P33 builds; both peers must
-use the integrated build even for ordinary Slayer. See
-[NETCODE.md](../port/linux/NETCODE.md#versions).
-
-## Build and test
-
-Follow the platform requirements in the main README. For a portable debug
-build use `python configure.py --portable --pgo=off --lto=off`, then
-`ninja windows` or `ninja linux`. Web additionally needs `--web-emcc` and
-`ninja web`. Android needs `--android-ndk`, an `arm64_32`-capable
-`--android-guest-cc`, then `ninja android android_apk`. No new platform-specific
-runtime dependency is added by Infection.
-
-Asset-free checks include:
-
-```sh
-python -m pytest -q tools/test_infection.py tools/test_infection_classic.py tools/test_infection_ammo_caps.py tools/test_infection_saved_options.py tools/test_network_test_config.py
-python -m pytest -q tools/test_linux_port.py::test_menus_are_well_formed tools/test_linux_port.py::test_network_format_is_the_recorded_one
-```
-
-With a built executable and locally supplied maps, use separate new evidence
-directories for each test:
-
-```sh
-python tools/test_dual_combat.py --exe <halo> --maps <maps> --root <new-directory> --map bloodgulch --seconds 240
-python tools/test_verdict_session.py --exe <halo> --maps <maps> --root <another-new-directory> --seconds 480
-```
-
-The first runs two full engines through Slayer, both initial zombie roles and
-Slayer again. The second uses three full engines for friendly fire, penalties,
-conversion, respawn and wins. These use real controller input and damage;
-protocol-only bots are separate capacity fixtures and are not AI or full
-clients. Linux runs need an X display (Xvfb is suitable) and SDL dependencies.
-The headless fixtures disable high-resolution HUD/text because of the
-independent null-renderer issue described in the validation notes. Ordinary
-graphical configurations keep their normal HUD settings.
-
-See [validation and remaining limitations](infection-progress.md). Build
-success alone does not establish runtime or cross-platform correctness.
-
-The behavior was informed by classic Halo CE Zombies play and SAPP server
-configurations, including [Chalwk's Zombies Standard reference](https://github.com/Chalwk/SPCLib/blob/master/sapp/gametypes/zombies_standard.lua).
-This implementation uses OpenCE's native rules, inventories and networking;
-it does not require SAPP or distribute historical server archives.
+For a local full-engine session use separate data/save roots, host
+`debug.network_test="host:bloodgulch:infection"` and a second process with
+`debug.network_test="join"` (see `port/linux/NETCODE.md`). This test variant uses
+one minute. Verify conversion, respawn, skull-only zombies, human equipment,
+friendly fire ON/OFF, both victory conditions and a subsequent ordinary game.
+Unit tests and successful builds do not replace these multiplayer checks.

@@ -1407,7 +1407,18 @@ static void audio_start(void)
 #elif !defined(HALO_WEB)
 		/* (a browser's, SDL's own: with room for the page's scheduling, which
 		512 frames underran) */
-		SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "512");
+		{
+			/* audio.buffer_frames: the device's buffer (port_config.c) */
+			long buffer_frames = config_integer("audio.buffer_frames");
+			char frames[16];
+
+			if (buffer_frames < 64)
+				buffer_frames = 64;
+			if (buffer_frames > 8192)
+				buffer_frames = 8192;
+			snprintf(frames, sizeof(frames), "%ld", buffer_frames);
+			SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, frames);
+		}
 #endif
 		snprintf(audio_device_name, sizeof(audio_device_name), "%s", audio_device_setting());
 		audio_device_read_at = config_changes();

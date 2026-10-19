@@ -24,7 +24,15 @@ play's, sealed as to any peer; WebRTC is only their way through.
   the tunnel's datagrams, whose streams KCP makes reliable, as on UDP).
   Messages larger than a packet are split and joined again. What this end
   sends and the peer has not acknowledged in ABANDON_TIME is given up
-  (FORWARD-TSN, RFC 3758); what it receives is acknowledged at once.
+  (FORWARD-TSN, RFC 3758); what it receives is acknowledged at once, every
+  run past a gap (a SACK of only some has the peer count the others in
+  flight, and fill its window), and again each SACK_INTERVAL while a gap
+  stays. What is missing before a TSN that came GAP_TIME ago is given up as
+  the peer's FORWARD-TSN would give it up (the channel's messages are
+  never sent again, and the peer sent it before that TSN): Firefox's SCTP,
+  after one loss, gives up others only once its cumulative acknowledgement
+  has passed the first, which the gaps after it stop, and the channel would
+  stall for seconds, then fall out of TSN_WINDOW.
 
 Everything runs on the p2p thread, under p2p_lock.
 */
@@ -54,7 +62,9 @@ enum
 	TSN_WINDOW = 1024,
 	/* fragments of messages kept for joining */
 	MAXIMUM_FRAGMENTS = 16,
-	MAXIMUM_GAP_BLOCKS = 16,
+	/* the runs past the cumulative TSN a SACK reports: all of them, at a
+	tenth of the datagrams lost (a SACK of 12 + 4 * this bytes) */
+	MAXIMUM_GAP_BLOCKS = 128,
 	SCTP_PORT = 5000,
 	/* the window this end says it has: messages are passed on at once */
 	RECEIVE_WINDOW = 1 << 20,
@@ -65,6 +75,10 @@ enum
 	PUNCH_TIME = 30000,
 	ABANDON_TIME = 300,
 	FORWARD_INTERVAL = 200,
+	SACK_INTERVAL = 200,
+	/* a gap given up by this end (longer than ABANDON_TIME: what is only
+	late still comes, and the peer may give it up first) */
+	GAP_TIME = 1000,
 	/* a path not checked in this long is not one the browser uses */
 	PATH_TIME = 30000,
 };
@@ -178,7 +192,11 @@ struct connection
 	unsigned int cumulative;
 	unsigned int highest;
 	unsigned char received[TSN_WINDOW];
+	/* (system time) when each TSN past the cumulative one came */
+	unsigned long arrived[TSN_WINDOW];
 	int sack_due;
+	/* when the last SACK went */
+	unsigned long sack_time;
 	struct fragment fragments[MAXIMUM_FRAGMENTS];
 	/* sending: the next TSN, the peer's cumulative acknowledgement, when
 	each TSN past it was sent (by TSN modulo TSN_WINDOW), and the last
@@ -528,6 +546,7 @@ static void sctp_send_sack(struct connection *connection)
 	put_short(value + 10, 0);
 	sctp_send_chunk(connection, _chunk_sack, 0, value, 12 + blocks * 4);
 	connection->sack_due = 0;
+	connection->sack_time = p2p_now();
 }
 
 /* a message on the channel (stream 0, unordered), split as needed */
@@ -663,6 +682,7 @@ static void data_received(struct connection *connection, int flags, const unsign
 		return;
 	}
 	connection->received[tsn % TSN_WINDOW] = 1;
+	connection->arrived[tsn % TSN_WINDOW] = p2p_now();
 	if (tsn_after(tsn, connection->highest))
 		connection->highest = tsn;
 	while (connection->received[(connection->cumulative + 1) % TSN_WINDOW] &&
@@ -712,14 +732,13 @@ static void data_received(struct connection *connection, int flags, const unsign
 	}
 }
 
-static void forward_tsn_received(struct connection *connection, const unsigned char *value, int length)
+/* what the peer gave up (FORWARD-TSN), or this end did: the cumulative TSN
+moved to forward and past what came after it, and the fragments of messages
+given up let go */
+static void skip_to(struct connection *connection, unsigned int forward)
 {
-	unsigned int forward;
 	int index;
 
-	if (length < 4)
-		return;
-	forward = get_long(value);
 	connection->sack_due = 1;
 	if (!tsn_after(forward, connection->cumulative))
 		return;
@@ -747,6 +766,35 @@ static void forward_tsn_received(struct connection *connection, const unsigned c
 	{
 		if (connection->fragments[index].used && !tsn_after(connection->fragments[index].tsn, forward))
 			connection->fragments[index].used = 0;
+	}
+}
+
+static void forward_tsn_received(struct connection *connection, const unsigned char *value, int length)
+{
+	if (length >= 4)
+		skip_to(connection, get_long(value));
+}
+
+/* the gaps past the cumulative TSN: what is missing before a TSN that came
+GAP_TIME ago given up, and the rest told again each SACK_INTERVAL */
+static void gap_check(struct connection *connection)
+{
+	unsigned int tsn;
+
+	if (!tsn_after(connection->highest, connection->cumulative))
+		return;
+	for (tsn = connection->highest; tsn_after(tsn, connection->cumulative); tsn--)
+	{
+		if (connection->received[tsn % TSN_WINDOW] && elapsed(connection->arrived[tsn % TSN_WINDOW], GAP_TIME))
+		{
+			skip_to(connection, tsn);
+			break;
+		}
+	}
+	if (connection->sack_due || (tsn_after(connection->highest, connection->cumulative) &&
+		elapsed(connection->sack_time, SACK_INTERVAL)))
+	{
+		sctp_send_sack(connection);
 	}
 }
 
@@ -1138,7 +1186,10 @@ int p2p_webrtc_update(void)
 		/* (the handshake's retransmissions) */
 		connection_receive(connection);
 		if (connection->state == _sctp_established)
+		{
 			sctp_forward(connection);
+			gap_check(connection);
+		}
 		else if (!elapsed(connection->created_time, PUNCH_TIME) && elapsed(connection->punch_time, PUNCH_INTERVAL))
 			punch(connection);
 	}

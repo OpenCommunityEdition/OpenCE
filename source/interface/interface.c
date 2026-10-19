@@ -89,6 +89,7 @@ symbols in this file:
 #include "interface/interface.h"
 #include "interface/hud_messaging.h"
 #include "interface/terminal.h"
+#include "interface/virtual_keyboard.h"
 #include "interface/weapon_hud_interface_definition.h"
 #include "main/main.h"
 #include "math/real_math.h"
@@ -286,6 +287,10 @@ void interface_dispose_from_old_map(
 	draw_string_dispose_from_old_map();
 	hud_dispose_from_old_map();
 	first_person_weapons_dispose_from_old_map();
+	/* port: and the virtual keyboard, whose keyboard tag was the old map's
+	(ui.map's: main_screen_shell_load sets it up again); a game map has none,
+	so it cannot open there (the PC menus' Settings, from the pause menu) */
+	virtual_keyboard_dispose();
 
 	return;
 }

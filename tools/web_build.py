@@ -56,6 +56,10 @@ PORT_CONFIG = LINUX_DIR / "port.json"
 SDL_PORT = PORT_DIR / "halo_sdl3.py"
 # (the release port/web/halo_sdl3.py fetches, as the other builds')
 SDL_TAG = "release-3.4.16"
+# the game's functions the page (port/web/site) calls on its module, besides
+# main: tools/test_web_build.py checks that it names them all
+PAGE_EXPORTS = ["_main", "_malloc", "_free", "_web_state", "_web_net_receive", "_web_net_peer_lost",
+                "_web_p2p_fingerprint", "_web_p2p_described", "_web_p2p_receive"]
 # the page's fonts, the menus' own (port/assets/fonts)
 SITE_FONTS = ["OpenCE-Regular.ttf", "Overpass-750.ttf", "Overpass-900.ttf"]
 # the memory watch by page contents, shared with the Android host
@@ -323,7 +327,11 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         # (the memory, which the page reads web_state's words from, and what
         # the page hands the room's frames to the game with: net.js)
         "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU32",
-        "-sEXPORTED_FUNCTIONS=_main,_malloc,_free",
+        # (and what the page calls on the module: the frames shown, which hide
+        # its loading notice, the room's frames and internet play's
+        # connections; EMSCRIPTEN_KEEPALIVE alone keeps a function in the wasm,
+        # not on the module, since Emscripten 4)
+        "-sEXPORTED_FUNCTIONS=" + ",".join(PAGE_EXPORTS),
         f"-sASSERTIONS={0 if release else 1}",
         # function names in stack traces (the name section only)
         "--profiling-funcs",
@@ -358,7 +366,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         command=f"$python {PORT_DIR}/licenses.py $out {sdl_license}",
         description="WEB LICENSES $out",
     )
-    n.build(outputs=licenses, rule="web_licenses", implicit=[PORT_DIR / "licenses.py", sdl_license])
+    n.build(outputs=licenses, rule="web_licenses", implicit=[PORT_DIR / "licenses.py", Path("LICENSE"), sdl_license])
     site_files.append(licenses)
     n.rule(
         name="web_version",

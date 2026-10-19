@@ -1,4 +1,4 @@
-"""Execute production rules and GPVO migration without maps, with negative controls."""
+"""Focused production Infection rules, inventory, menu and save-layout checks."""
 import os
 from pathlib import Path
 import shutil
@@ -212,7 +212,6 @@ def test_human_native_spawn_inventory(tmp_path):
 def production():
     header = read("source/game/game_engine.h")
     network = read("port/linux/game/network_infection.h")
-    rules = read("port/linux/game/infection.c")
     options = read("port/linux/game/infection_options.c")
     profile = read("source/saved games/playlist_profile.c")
     return "\n".join([
@@ -221,53 +220,52 @@ def production():
         '#define TRUE 1\n#define FALSE 0\n#define NONE (-1)\n#define HALO_PORT_MAXIMUM_NETWORK_PLAYERS 128',
         '#define MIN(a,b) ((a)<(b)?(a):(b))\n#define MAX(a,b) ((a)>(b)?(a):(b))\n#define PIN(x,a,b) MIN(MAX(x,a),b)',
         '#define csmemcpy memcpy\n#define csmemcmp memcmp',
-        '#define NUMBER_OF_VARIANT_VEHICLES 6\n#define PLAYLIST_PROFILE_OPTIONS_VERSION ' + re.search(r'PLAYLIST_PROFILE_OPTIONS_VERSION = (\d+)', profile).group(1),
+        '#define NUMBER_OF_VARIANT_VEHICLES 6\n#define PLAYLIST_PROFILE_OPTIONS_VERSION 1',
         '#define PLAYLIST_PROFILE_OPTIONS_MAGIC 0x4F565047\n#define PLAYLIST_PROFILE_OPTIONS_OFFSET 0x100',
-        'struct game_variant { int game_engine_index; struct { int teams; } universal_variant; };',
         'enum { game_engine_slayer=2 };',
-        *(enum_with(header, s) for s in ('_friendly_fire_on', '_radar_players_none', '_loadout_category', '_loadout_weapon_none')),
-        structure(header, 'game_variant_options'),
-        structure(network, 'distributed_infection_player'),
-        structure(network, 'distributed_infection_state'),
+        *(enum_with(header, name) for name in ('_friendly_fire_on', '_radar_players_none', '_loadout_category', '_loadout_weapon_none')),
+        *(structure(header, name) for name in ('universal_variant', 'ctf_variant', 'infection_options', 'slayer_variant', 'king_variant', 'oddball_variant', 'race_variant')),
+        re.search(r'union game_engine_variant\s*\{[^}]+\};', header).group(),
+        structure(header, 'game_variant'), structure(header, 'game_variant_options'),
+        structure(network, 'distributed_infection_player'), structure(network, 'distributed_infection_state'),
         enum_with(network, '_distributed_infection_waiting'),
         structure(profile, 'playlist_profile_options_header'),
         'typedef struct { unsigned long value; } XCALCSIG_SIGNATURE;',
-        '''static void saved_game_file_generate_checksum(byte *p, unsigned long n, XCALCSIG_SIGNATURE *sum) {
-            unsigned long hash=2166136261UL; while(n--) hash=(hash ^ *p++)*16777619UL; sum->value=hash;
-        }''',
-        function(read('source/game/game_engine.c'), 'variant_ammo_options_default'),
-        function(read('source/game/game_engine.c'), 'variant_ammo_options_validate'),
-        function(options, 'infection_options_default'),
-        function(options, 'infection_options_validate'),
-        function(profile, 'playlist_profile_options_from_block'),
-        function(profile, 'playlist_profile_options_to_block'),
-        function(rules, 'infection_round_result'),
+        'static void saved_game_file_generate_checksum(byte *p,unsigned long n,XCALCSIG_SIGNATURE *sum) { unsigned long hash=2166136261UL; while(n--) hash=(hash^*p++)*16777619UL; sum->value=hash; }',
+        '\n'.join(line for line in options.splitlines() if not line.startswith('#include')),
+        function(profile, 'playlist_profile_options_from_block'), function(profile, 'playlist_profile_options_to_block'),
+        function(read('port/linux/game/infection.c'), 'infection_round_result'),
         function(read('port/linux/game/network_infection.c'), 'infection_snapshot_valid'),
     ])
 
 
+
 CASES = {
-    'victory': '''assert(infection_round_result(0,17,9000,9000)==1);
+    'victory': r'''
+assert(infection_round_result(0,17,9000,9000)==1);
         assert(infection_round_result(1,17,9000,9000)==0);
         assert(infection_round_result(1,17,900000,0)==NONE);
         assert(infection_round_result(1,0,1,9000)==0);
         assert(infection_round_result(0,0,1,9000)==2);
-        assert(infection_round_result(1,1,8999,9000)==NONE);''',
-    'options': '''struct game_variant v={2,{1}}; struct game_variant_options o;
-        memset(&o,0,sizeof(o)); infection_options_default(&o);
-        assert(sizeof(o)==0x30 && offsetof(struct game_variant_options,infection_enabled)==0x1C);
-        assert(!o.infection_enabled && o.infection_speed_percent==180);
-        o.infection_enabled=1; o.infection_initial_zombies=255; o.infection_speed_percent=0;
-        o.infection_damage_percent=255; o.infection_respawn_seconds=-1; o.infection_countdown_seconds=100;
-        o.auto_team_balance=1; infection_options_validate(&v,&o);
-        assert(o.infection_enabled && o.infection_initial_zombies==16 && o.infection_speed_percent==100);
-        assert(o.infection_damage_percent==250 && o.infection_respawn_seconds==1 && o.infection_countdown_seconds==10);
-        assert(!o.auto_team_balance);
-        o.infection_enabled=2; infection_options_validate(&v,&o); assert(!o.infection_enabled);
-        o.infection_enabled=1; v.game_engine_index=3; infection_options_validate(&v,&o); assert(!o.infection_enabled);
-        o.infection_enabled=1; v.game_engine_index=2; v.universal_variant.teams=0;
-        infection_options_validate(&v,&o); assert(!o.infection_enabled);''',
-    'snapshot': '''struct distributed_infection_state s; int i;
+        assert(infection_round_result(1,1,8999,9000)==NONE);
+    ''',
+    'options': r'''
+struct game_variant v={0}, saved; struct infection_options *o; byte bytes[104];
+ assert(sizeof(v)==104 && sizeof(struct game_variant_options)==28 && sizeof(union game_engine_variant)==24);
+ v.game_engine_index=2; v.universal_variant.teams=1;
+ assert(!infection_options_get(&v)->infection_enabled);
+ o=infection_options_edit(&v); assert(o && o->infection_speed_percent==180 && o->infection_respawn_seconds==5 && o->infection_zombie_shields);
+ o->infection_enabled=1; o->infection_speed_percent=190;
+ memcpy(bytes,&v,sizeof(v)); memcpy(&saved,bytes,sizeof(v));
+ assert(infection_options_get(&saved)->infection_enabled && infection_options_get(&saved)->infection_speed_percent==190);
+ o->infection_speed_percent=99; assert(!infection_options_get(&v)->infection_enabled);
+ o->infection_speed_percent=200; o->reserved[0]=1; assert(!infection_options_get(&v)->infection_enabled);
+ o->reserved[0]=0; assert(infection_options_get(&v)->infection_enabled);
+ v.game_engine_index=3; assert(!infection_options_get(&v)->infection_enabled && !infection_options_edit(&v));
+ assert(!infection_options_get(NULL)->infection_enabled);
+    ''',
+    'snapshot': r'''
+struct distributed_infection_state s; int i;
         memset(&s,0,sizeof(s)); s.game_number=7; s.revision=4; s.winner=NONE; s.phase=2;
         for(i=0;i<128;i++) { s.players[i].role=i<17?2:1; s.players[i].identity=i+1; }
         assert(infection_snapshot_valid(&s,7,3)); assert(!infection_snapshot_valid(&s,8,3));
@@ -275,22 +273,15 @@ CASES = {
         assert(!infection_snapshot_valid(&s,7,3)); s.players[127].role=2; s.players[127].reserved[2]=1;
         assert(!infection_snapshot_valid(&s,7,3)); s.players[127].reserved[2]=0; s.winner=1;
         assert(!infection_snapshot_valid(&s,7,3)); s.phase=3; assert(infection_snapshot_valid(&s,7,3));
-        s.players[127].score=-1; assert(!infection_snapshot_valid(&s,7,3));''',
-    'migration': '''byte block[512]; struct game_variant_options old, got;
-        struct playlist_profile_options_header h; unsigned long n;
-        memset(block,0,sizeof(block)); memset(&old,0,sizeof(old)); infection_options_default(&old);
-        old.time_limit=15; old.friendly_fire=2; old.vehicle_counts[1][5]=3; old.primary_weapon=4;
-        h.magic=PLAYLIST_PROFILE_OPTIONS_MAGIC; h.version=1; h.size=0x1C; n=sizeof(h)+h.size;
-        memcpy(block+256,&h,sizeof(h)); memcpy(block+256+sizeof(h),&old,0x1C);
-        saved_game_file_generate_checksum(block+256,n,(XCALCSIG_SIGNATURE *)(block+256+n));
-        memset(&got,0xAA,sizeof(got)); assert(playlist_profile_options_from_block(block,&got));
-        assert(!got.infection_enabled && got.infection_speed_percent==180 && got.time_limit==15);
-        assert(got.friendly_fire==2 && got.vehicle_counts[1][5]==3 && got.primary_weapon==4);
-        got.infection_enabled=1; got.infection_damage_percent=200;
-        playlist_profile_options_to_block(block,&got); memset(&old,0,sizeof(old));
-        assert(playlist_profile_options_from_block(block,&old)); assert(!memcmp(&old,&got,sizeof(got)));
-        block[268]^=1; assert(!playlist_profile_options_from_block(block,&old));
-        h.version=4; memcpy(block+256,&h,sizeof(h)); assert(!playlist_profile_options_from_block(block,&old));''',
+        s.players[127].score=-1; assert(!infection_snapshot_valid(&s,7,3));
+    ''',
+    'migration': r'''
+byte block[512]={0}; struct game_variant_options old={0},got={0}; struct playlist_profile_options_header h;
+ old.time_limit=15; old.friendly_fire=2; old.vehicle_counts[1][5]=3; old.primary_weapon=4;
+ playlist_profile_options_to_block(block,&old); memcpy(&h,block+256,sizeof(h));
+ assert(h.version==1 && h.size==28); assert(playlist_profile_options_from_block(block,&got));
+ assert(!memcmp(&old,&got,sizeof(old))); block[268]^=1; assert(!playlist_profile_options_from_block(block,&got));
+    ''',
 }
 
 
@@ -366,7 +357,7 @@ def test_production_rules(tmp_path, case):
 @pytest.mark.parametrize('before,after,case', [
     ('if (!humans) return 1;', 'if (!humans) return 0;', 'victory'),
     ('state->game_number != game_number', '0', 'snapshot'),
-    ('infection_options_default(options);', '/* deliberately omit v1 defaults */', 'migration'),
+    ('header.version != PLAYLIST_PROFILE_OPTIONS_VERSION', 'header.version == PLAYLIST_PROFILE_OPTIONS_VERSION', 'migration'),
 ])
 def test_negative_controls(tmp_path, before, after, case):
     source = production()
@@ -436,12 +427,12 @@ def test_death_authority_and_lifecycle(tmp_path):
 def test_human_loadout_preserved(tmp_path):
     assert compile_run(tmp_path, production() + '''
     int main(void) {
-        struct game_variant v={2,{1}}; struct game_variant_options o;
-        memset(&o,0,sizeof(o)); infection_options_default(&o); o.infection_enabled=1;
+        struct game_variant v={0}; struct game_variant_options o;
+        memset(&o,0,sizeof(o)); v.game_engine_index=2; infection_options_edit(&v)->infection_enabled=1;
         o.loadout=_loadout_custom; o.primary_weapon=_loadout_weapon_sniper_rifle; o.secondary_weapon=_loadout_weapon_pistol;
-        infection_options_validate(&v,&o);
+        (void)infection_options_get(&v);
         assert(o.primary_weapon==_loadout_weapon_sniper_rifle && o.secondary_weapon==_loadout_weapon_pistol);
-        o.loadout=_loadout_category; infection_options_validate(&v,&o); assert(o.loadout==_loadout_category);
+        o.loadout=_loadout_category; (void)infection_options_get(&v); assert(o.loadout==_loadout_category);
         return 0;
     }''') == 0
 
@@ -454,14 +445,14 @@ def test_skull_damage_and_pickup_rules(tmp_path):
     struct unit_datum { struct { long player_index; short current_weapon_index; long weapon_object_indices[4]; } unit; } units[3];
     struct object_datum { long definition_index; } objects[5];
     struct distributed_infection_state infection_state;
-    struct game_variant_options options;
+    struct game_variant variant;
     int enabled=1, equipping;
     static boolean infection_enabled(void) { return enabled; }
     static struct unit_datum *unit_try_and_get(long i) { return i>=0 && i<3 ? &units[i] : NULL; }
     static struct unit_datum *unit_get(long i) { return &units[i]; }
     static struct object_datum *object_get(long i) { return &objects[i]; }
     static long get_ball_definition_index(void) { return 42; }
-    static struct game_variant_options *game_variant_options_get(void) { return &options; }
+    static struct game_variant *game_engine_get_variant(void) { return &variant; }
     static struct distributed_infection_player *infection_player(long i) { return i==NONE ? NULL : &infection_state.players[i]; }
     ''' + '\n'.join(function(rules, name) for name in (
         'infection_unit_is_zombie', 'infection_can_delete_skull',
@@ -471,7 +462,7 @@ def test_skull_damage_and_pickup_rules(tmp_path):
         units[0].unit.weapon_object_indices[0]=1; objects[1].definition_index=42;
         objects[2].definition_index=99; units[1].unit.player_index=1;
         infection_state.players[0].role=2; infection_state.players[1].role=1;
-        infection_state.phase=2; options.infection_damage_percent=200;
+        infection_state.phase=2; variant.game_engine_index=2; infection_options_edit(&variant)->infection_damage_percent=200;
         assert(infection_melee_multiplier(0)==2.0f);
         assert(infection_melee_multiplier(1)==1.0f);
         infection_state.players[0].role=1; /* even a human holding a skull */
@@ -506,12 +497,13 @@ def menu_world(prefix='infection_'):
     bindings = re.findall(r'^\s*\{ "(?:' + '|'.join(map(re.escape, prefixes)) +
                           r')[^"]*".*?\},', menus, re.M | re.S)
     assert bindings
-    source = production().replace('int teams;', 'int teams; long flags, lives; real health; boolean odd_man_out;')
+    source = production()
     source += '''
     #define NUMBEROF(a) (sizeof(a)/sizeof((a)[0]))
     #define FLAG(b) (1UL<<(b))
     #define _game_variant_draw_object_in_motion_sensor_bit 0
     #define WIDGET_NAME_LENGTH 31
+    #define INFECTION_FIELD(field) (short)offsetof(struct infection_options, field)
     #define OPTIONS_FIELD(field) (short)offsetof(struct game_variant_options, field)
     ''' + enum_with(menus, '_option_option_byte') + structure(menus, 'gametype_option')
     # The common option walker also handles upstream's public-game chat lock.
@@ -549,11 +541,11 @@ def menu_world(prefix='infection_'):
 def test_menu_bindings_and_saved_values(tmp_path):
     source = menu_world() + '''
     int main(void) {
-        struct game_variant v={2,{1}}; struct game_variant_options o, restored;
+        struct game_variant v={0}, saved; struct game_variant_options o={0}, restored;
         byte block[4096]={0}; char shortname[32]; int i;
         long wanted[]={1,3,190,250,5,3,0,10};
         struct widget_instance list={0}, rows[8]={0}, spinners[8]={0};
-        infection_options_default(&o);
+        v.game_engine_index=2; v.universal_variant.teams=1;
         for(i=0;i<8;i++) {
             struct gametype_option const *binding;
             int j; for(j=0;j<31 && gametype_options[i].spinner[j];j++) shortname[j]=gametype_options[i].spinner[j]; shortname[j]=0;
@@ -562,10 +554,10 @@ def test_menu_bindings_and_saved_values(tmp_path):
             gametype_option_value_set(binding,wanted[i],&v,&o);
             assert(gametype_option_value(binding,&v,&o)==wanted[i]);
         }
-        infection_options_validate(&v,&o); playlist_profile_options_to_block(block,&o);
+        saved=v; playlist_profile_options_to_block(block,&o);
         assert(playlist_profile_options_from_block(block,&restored));
-        for(i=0;i<8;i++) assert(gametype_option_value(&gametype_options[i],&v,&restored)==wanted[i]);
-        variant=v; variant.universal_variant.teams=0; infection_options_default(&options);
+        for(i=0;i<8;i++) assert(gametype_option_value(&gametype_options[i],&saved,&restored)==wanted[i]);
+        memset(&variant,0,sizeof(variant)); variant.game_engine_index=2; memset(&options,0,sizeof(options));
         list.child=rows;
         for(i=0;i<8;i++) {
             int j;

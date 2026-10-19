@@ -75,7 +75,6 @@ static void distributed_damage_from_data(struct damage_data const *damage, struc
 static void object_get_origin(long index, real_point3d *point) { memset(point, 0, sizeof(*point)); }
 static long distributed_latest_host_time(void) { return 10; }
 static void distributed_damage_material(struct damage_data *damage, long index, short material) { material_calls++; }
-static void network_test_damage_log(char const *stage, struct damage_data const *damage, long target, boolean remote) { }
 #define csmemset memset
 #include "under_test.inc"
 

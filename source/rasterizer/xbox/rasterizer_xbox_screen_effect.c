@@ -457,6 +457,49 @@ static void rasterizer_screen_effect_set_texture_transforms(
 
 	return;
 }
+/* port: the passes a convolution draws after the Xbox's own on a screen of
+screen_scale pixels to the Xbox's one, 0 at the Xbox's size. Each of the
+Xbox's passes blends three copies of the screen a radius apart, and at
+several pixels to the Xbox's one the copies stand apart as sharp ghosts.
+Two more passes, at a third and a ninth of the radius, put eight copies
+between each two, a ninth of the radius apart: on a screen of up to nine
+pixels to the Xbox's one (2160 lines are 4.5) they stand no farther apart
+than the Xbox's did in its own pixels, where they blended, and two more
+again for up to 81. The blur stays as wide as the Xbox's (its variance 6%
+more). Splitting the radius into as many times the passes as the screen's
+scale, to six, drew ten full-screen passes at 2160 lines, where a scope's
+zoom halved the frame rate, and narrowed the blur to less than half the
+Xbox's. The count is even: the last pass draws into the screen, as the
+Xbox's does. */
+static short rasterizer_screen_effect_refinement_passes(
+	real screen_scale)
+{
+	short passes = 0;
+	real spacing = 1.0f;
+
+	while (screen_scale * spacing > 1.0f && passes < 4)
+	{
+		passes += 2;
+		spacing /= 9.0f;
+	}
+	return passes;
+}
+
+/* port: the radius of a pass of a convolution drawn with refinement
+passes: the Xbox's passes keep the effect's, each pass after them a third
+of the one before it */
+static real rasterizer_screen_effect_pass_radius(
+	real radius,
+	short pass,
+	short stock_pass_count)
+{
+	short refinement;
+
+	for (refinement = stock_pass_count; refinement <= pass; refinement++)
+		radius /= 3.0f;
+	return radius;
+}
+
 /* ---------- public code */
 
 void _rasterizer_screen_effect(
@@ -498,20 +541,21 @@ void _rasterizer_screen_effect(
 		Xbox's one (halo_screen_scale): a convolution's few copies of the
 		screen, apart by its radius in the Xbox's pixels, blended into a blur
 		at 640x480, and at four times the pixels they stand apart as sharp
-		ghosts (the zoom's warp). The same spread in that many times the
-		passes, each a step of it, blends them again. */
+		ghosts (the zoom's warp). The Xbox's passes are drawn as they were,
+		and a few more, each a third of the last one's radius, fill the gaps
+		between the copies (rasterizer_screen_effect_refinement_passes). */
+		short stock_pass_count = pass_count;
+		struct rasterizer_cinematic_screen_effect_parameters const *original_parameters = parameters;
+
 		if (parameters->convolution_type != _rasterizer_screen_effect_convolution_type_none && !parameters->video_on)
 		{
-			long steps = (long)(halo_screen_scale() + 0.999f);
+			short refinement_passes = rasterizer_screen_effect_refinement_passes(halo_screen_scale());
 
-			if (steps > 6)
-				steps = 6;
-			if (steps > 1)
+			if (refinement_passes > 0)
 			{
 				scaled_parameters = *parameters;
-				scaled_parameters.convolution_radius /= (real)steps;
 				parameters = &scaled_parameters;
-				pass_count *= (short)steps;
+				pass_count += refinement_passes;
 			}
 		}
 
@@ -734,6 +778,14 @@ void _rasterizer_screen_effect(
 				D3DRS_ZBIAS,
 				0);
 
+			/* port: the refinement passes' radius (above) */
+			if (parameters == &scaled_parameters)
+			{
+				scaled_parameters.convolution_radius = rasterizer_screen_effect_pass_radius(
+					original_parameters->convolution_radius,
+					pass,
+					stock_pass_count);
+			}
 			rasterizer_screen_effect_set_texture_transforms(parameters, pass, pass_count);
 
 			if (destination_target != NONE)

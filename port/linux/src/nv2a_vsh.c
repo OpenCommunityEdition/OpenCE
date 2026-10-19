@@ -586,3 +586,41 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		);
 	return text.buffer;
 }
+
+/* The fixed-function pipeline's vertex shader, for the draws that select it
+(SetVertexShader with 0): only the loading screen's
+(progress_bar.c), which gives each vertex its position, diffuse color and
+up to four texture coordinates in immediate mode. d3d8_gl.c transforms the
+positions by the world, view and projection matrices before the draw, so the
+position here is already in Direct3D's clip space. */
+char *nv2a_fixed_function_glsl(void)
+{
+	struct xgpu_text text = { 0 };
+	unsigned long index;
+
+#ifdef HALO_GLES
+	xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
+#endif
+	xgpu_text_append(&text, "%s", shader_prologue);
+	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+		xgpu_text_append(&text, "layout(location = %lu) in vec4 v%lu_in;\n", index, index);
+	xgpu_text_append(&text,
+		"void main()\n{\n"
+		"\tgl_Position = v0_in;\n"
+#ifdef HALO_GLES
+		"\tgl_Position.y = -gl_Position.y;\n"
+		"\tgl_Position.z = 2.0 * gl_Position.z - gl_Position.w;\n"
+#endif
+		"\tgl_PointSize = 1.0;\n"
+		"\txD0 = clamp(v3_in, 0.0, 1.0);\n"
+		"\txD1 = clamp(v4_in, 0.0, 1.0);\n"
+		"\txB0 = vec4(0.0, 0.0, 0.0, 1.0);\n"
+		"\txB1 = vec4(0.0, 0.0, 0.0, 1.0);\n"
+		"\txT0 = v9_in;\n"
+		"\txT1 = v10_in;\n"
+		"\txT2 = v11_in;\n"
+		"\txT3 = v12_in;\n"
+		"\txFog = 1.0;\n"
+		"}\n");
+	return text.buffer;
+}

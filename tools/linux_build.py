@@ -300,8 +300,13 @@ def portable_sdl(n: Writer, sln: Any, build_dir: Path, cc: str) -> Tuple[List[st
     options = SDL_OPTIONS + ([f"-DCMAKE_C_COMPILER_LAUNCHER={launcher}"] if launcher else [])
     n.rule(
         name="linux_sdl3",
-        command=(f"cmake -S {sdl_source} -B {sdl_build} -G Ninja --fresh "
-                 f"-DCMAKE_TOOLCHAIN_FILE=$$PWD/{SYSROOT_TOOLCHAIN} -DHALO_SYSROOT=$$PWD/{sysroot} "
+        # (SDL's build takes the system root's include folders from
+        # pkg-config, which splits a path at its spaces: a checkout in a folder
+        # with a space in its name is said, rather than failing deep in SDL)
+        command=(f"case \"$$PWD\" in *\" \"*) echo \"SDL3: the portable build cannot be made in a folder "
+                 f"whose path has a space ($$PWD): move the checkout\" >&2; exit 1;; esac && "
+                 f"cmake -S {sdl_source} -B {sdl_build} -G Ninja --fresh "
+                 f"\"-DCMAKE_TOOLCHAIN_FILE=$$PWD/{SYSROOT_TOOLCHAIN}\" \"-DHALO_SYSROOT=$$PWD/{sysroot}\" "
                  f"-DCMAKE_C_COMPILER={cc} {' '.join(options)} > {build_dir}/sdl3-configure.log && "
                  f"ninja -C {sdl_build} > {build_dir}/sdl3-build.log && "
                  f"$python {SYSROOT_SCRIPT} --check-sdl "
@@ -579,7 +584,12 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             sdk_flags,
         ])
         posix_cflags = " ".join(POSIX_FLAGS + target + [f"-I{platform_dir}"])
-        mbedtls_include = f"-I{MBEDTLS_DIR / 'include'}"
+        # (with Mbed TLS's own locks, as built from its unchanged config by
+        # these defines: on Linux the self-updater's thread (posix_update.c)
+        # and internet play's (posix_dtls.c) both use it, and two threads
+        # setting up its PSA crypto or drawing on its random generator at
+        # once crashed it; the other builds use it on one thread)
+        mbedtls_include = f"-I{MBEDTLS_DIR / 'include'} -DMBEDTLS_THREADING_C -DMBEDTLS_THREADING_PTHREAD"
         for source in sorted(platform_dir.glob("*.c")):
             if source.name in ("posix_update.c", "posix_dtls.c"):
                 add_object(source, f"{posix_cflags} {mbedtls_include}", posix=True)

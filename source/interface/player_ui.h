@@ -88,6 +88,12 @@ void player_ui_get_active_player_profile(
 	void *profile);
 void player_ui_activate_all_solo_levels(
 	void);
+/* port: the first player's profile's campaign progress cleared (hs.c's
+profile_reset_campaign) */
+boolean player_ui_reset_campaign_progress(
+	boolean reset,
+	wchar_t *name,
+	long name_length);
 void player_ui_set_game_variant(
 	struct game_variant *variant);
 boolean player_ui_game_variant_specified(

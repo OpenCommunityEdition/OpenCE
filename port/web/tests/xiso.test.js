@@ -61,9 +61,9 @@ function directoryTable(entries) {
   return table;
 }
 
-// an image: its maps folder's files, where its game partition starts, and
-// other entries of its root
-function image({ maps, partition = 0, rootEntries = [] }) {
+// an image: its maps folder's files, where its game partition starts, its
+// default.xbe and other entries of its root
+function image({ maps, partition = 0, rootEntries = [], xbe = new Uint8Array(100) }) {
   const chunks = new Map();
   let nextSector = 0x30;
   const allocate = (bytes) => {
@@ -76,7 +76,7 @@ function image({ maps, partition = 0, rootEntries = [] }) {
   const mapsTable = directoryTable(mapEntries);
   const mapsSector = allocate(mapsTable);
   const root = directoryTable([{ name: 'maps', directory: true, sector: mapsSector, size: mapsTable.length },
-    { name: 'default.xbe', sector: allocate(new Uint8Array(100)), size: 100 }, ...rootEntries]);
+    { name: 'default.xbe', sector: allocate(xbe), size: xbe.length }, ...rootEntries]);
   const rootSector = allocate(root);
   const size = partition + nextSector * SECTOR;
   const bytes = new Uint8Array(size);
@@ -167,4 +167,92 @@ test('a maps folder chosen as files is checked as an image is', async () => {
   const result = await xiso.folderFiles([...files, new File([new Uint8Array(10)], 'notes.txt')]);
   assert.deepStrictEqual(result.map((file) => file.name).sort(), ['a10.map', 'bloodgulch.map', 'loading.tga', 'ui.map']);
   await assert.rejects(xiso.folderFiles(files.filter((file) => file.name !== 'ui.map')), /no ui\.map/);
+});
+
+test("a multi-language disc's maps folder is the browser language's, else English's", () => {
+  const folders = (...names) => names.map((name) => ({ name, directory: true }));
+  assert.strictEqual(xiso.mapsFolder(folders('$SystemUpdate', 'maps'), 'es-ES').name, 'maps');
+  assert.strictEqual(xiso.mapsFolder(folders('maps_it', 'MAPS_ES', 'maps_en'), 'es-ES').name, 'MAPS_ES');
+  assert.strictEqual(xiso.mapsFolder(folders('maps_it', 'maps_en'), 'fr').name, 'maps_en');
+  assert.strictEqual(xiso.mapsFolder(folders('maps_it', 'maps_es'), '').name, 'maps_it');
+  assert.strictEqual(xiso.mapsFolder(folders('media', 'mapsx'), 'en'), undefined);
+});
+
+// the loading screen's picture (xiso-worker.js's loadingPicture): made-up
+// executables holding a picture of grey bands as the retail one holds its own
+const LOADING_WIDTH = 320;
+const LOADING_HEIGHT = 240;
+const loadingSizes = new Uint8Array([64, 1, 0, 0, 240, 0, 0, 0]);
+const loadingGreys = Uint8Array.from({ length: LOADING_WIDTH * LOADING_HEIGHT },
+  (_, pixel) => ((Math.floor(pixel / LOADING_WIDTH / 15) % 16) << 4));
+
+// greys (multiples of 16) as the executable's runs: a byte each, the run's
+// length in the high nibble, the grey's high bits in the low one
+function loadingRuns(greys) {
+  const out = [];
+  for (let at = 0; at < greys.length;) {
+    let length = 1;
+    while (at + length < greys.length && greys[at + length] === greys[at] && length < 15) length++;
+    out.push(length << 4 | greys[at] >> 4);
+    at += length;
+  }
+  return Uint8Array.from(out);
+}
+
+function concatenate(...parts) {
+  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+  let at = 0;
+  for (const part of parts) {
+    out.set(part, at);
+    at += part.length;
+  }
+  return out;
+}
+
+// (another 320, 240 before it, whose runs do not fill a picture)
+const loadingXbe = concatenate(new Uint8Array(1000).fill(0xCC), loadingSizes, new Uint8Array([0x10, 0x00]),
+  new Uint8Array(64).fill(0x90), loadingSizes, loadingRuns(loadingGreys), new Uint8Array(1000).fill(0xCC));
+
+test("the loading screen's picture is found in default.xbe and written as the TGA the game reads", () => {
+  const tga = xiso.loadingPicture(loadingXbe);
+  assert.ok(tga);
+  // (progress_bar.c: an uncompressed 24-bit picture of 320 by 240)
+  assert.strictEqual(tga[2], 2);
+  assert.strictEqual(tga[16], 24);
+  assert.strictEqual(tga[12] | tga[13] << 8, LOADING_WIDTH);
+  assert.strictEqual(tga[14] | tga[15] << 8, LOADING_HEIGHT);
+  assert.strictEqual(tga.length, 18 + LOADING_WIDTH * LOADING_HEIGHT * 3);
+  // (rows from the bottom, the grey in each channel)
+  for (const y of [0, 100, LOADING_HEIGHT - 1]) {
+    const row = tga.subarray(18 + (LOADING_HEIGHT - 1 - y) * LOADING_WIDTH * 3, 18 + (LOADING_HEIGHT - y) * LOADING_WIDTH * 3);
+    for (let x = 0; x < LOADING_WIDTH; x += 37) {
+      const grey = loadingGreys[y * LOADING_WIDTH + x];
+      assert.deepStrictEqual([...row.subarray(x * 3, x * 3 + 3)], [grey, grey, grey]);
+    }
+  }
+});
+
+test('runs that do not fill the picture exactly are not it', () => {
+  const runs = loadingRuns(loadingGreys);
+  assert.strictEqual(xiso.loadingPicture(new Uint8Array(100).fill(0xCC)), null);
+  assert.strictEqual(xiso.loadingPicture(concatenate(loadingSizes, runs.subarray(0, -1))), null);
+  // (a run past the picture's end: its last 15 pixels as 14 and then 2)
+  assert.strictEqual(xiso.loadingPicture(concatenate(loadingSizes, runs.subarray(0, -1), new Uint8Array([0xE0, 0x20]))), null);
+  // (a run of none)
+  assert.strictEqual(xiso.loadingPicture(concatenate(loadingSizes, runs.subarray(0, -1), new Uint8Array([0x00, 0xF0]))), null);
+});
+
+test("an image whose maps folder has no loading.tga gets one from its default.xbe; one that has one keeps it", async () => {
+  const maps = goodMaps.filter((map) => map.name !== 'loading.tga');
+  const files = await xiso.imageFiles(image({ maps, xbe: loadingXbe }));
+  const picture = files.find((file) => file.name === 'loading.tga');
+  assert.ok(picture);
+  assert.strictEqual(picture.size, 18 + LOADING_WIDTH * LOADING_HEIGHT * 3);
+  assert.deepStrictEqual([...(await picture.read(0, 18))], [...xiso.loadingPicture(loadingXbe).subarray(0, 18)]);
+  const kept = await xiso.imageFiles(image({ maps: goodMaps, xbe: loadingXbe }));
+  assert.strictEqual(kept.filter((file) => file.name === 'loading.tga').length, 1);
+  assert.strictEqual(kept.find((file) => file.name === 'loading.tga').size, 50);
+  // (no picture in the executable: none, and the light sweeps over black)
+  const none = await xiso.imageFiles(image({ maps }));
+  assert.ok(!none.some((file) => file.name === 'loading.tga'));
 });

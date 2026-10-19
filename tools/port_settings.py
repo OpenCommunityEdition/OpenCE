@@ -193,7 +193,7 @@ SCREENS = {
              "Level the view while walking.", None),
             ("BUTTON LAYOUT:", "profile.button_preset",
              [("DEFAULT", "0"), ("SWAP TRIGGERS", "1"), ("SWAP A, L TRIGGER", "2"), ("SWAP B, L TRIGGER", "3"),
-              ("SWAP B, R STICK", "4")],
+              ("SWAP B, R STICK", "4"), ("BUMPER JUMPER", "5")],
              "Which of the controller's buttons does what (not\nthe keyboard's: Controls Setup sets those).", None),
             ("STICK LAYOUT:", "profile.joystick_preset",
              [("DEFAULT", "0"), ("SOUTHPAW", "1"), ("LEGACY", "2"), ("LEGACY SOUTHPAW", "3")],
@@ -623,8 +623,6 @@ MT = "main_menu/multiplayer_type_select"
 # in turn: menu_functions.c's gametype_option_help)
 SLAYER_EDIT = "main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit"
 INFECTION_EDIT = "main_menu/settings_select/multiplayer_setup/infection_options_edit"
-AMMO_EDIT = "main_menu/settings_select/multiplayer_setup/ammo_options_edit"
-AMMO_CHILD = f'<child widget="{AMMO_EDIT}/open_ammo" x="54" y="313"/>'
 INFECTION_CHILD = f'<child widget="{INFECTION_EDIT}/open_infection" x="54" y="253"/>'
 STRING_INSERTS = {
     # (Teamplay Options' voice chat and vote kick rows, after its own:
@@ -1588,7 +1586,6 @@ def multiplayer_files() -> dict:
             "<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->", "<menus>"]
     return {
         INFECTION_EDIT.replace("/", ".") + ".port.xml": head + _infection_options() + ["</menus>", ""],
-        AMMO_EDIT.replace("/", ".") + ".port.xml": head + _ammo_options() + ["</menus>", ""],
         f"{MT}/join_game".replace("/", ".") + ".port.xml": head + _join_game_extras() + ["</menus>", ""],
         f"{MT}/server_settings".replace("/", ".") + ".xml": head + _server_settings() + ["</menus>", ""],
         f"{MT}/lobby".replace("/", ".") + ".xml": head + _lobby() + ["</menus>", ""],
@@ -1765,27 +1762,6 @@ def _mods() -> list:
                                               '<on event="start" run="port mods save" back="true"/>'])
     return lines
 
-def _ammo_options() -> list:
-    choices = ["NORMAL", "0", "50", "100", "120", "200", "300", "500", "999"]
-    rows = [(f"ammo_reserve_{i}", label, choices,
-             ["Use the weapon's normal starting reserve."] +
-             ["Infection reserve limit and starting ammo. Drops keep remaining ammo."] * (len(choices)-1))
-            for i, label in enumerate(("PISTOL:", "SHOTGUN:", "ASSAULT RIFLE:", "SNIPER RIFLE:"))]
-    lines = _setup_option_screen(AMMO_EDIT, "ammo", rows)
-    lines = [line.replace("port setup options init", "mp profile init slayer rules")
-             .replace("port setup options save", "mp profile set slayer rules")
-             .replace(f'bitmap="{AMMO_EDIT}/header_ammo"',
-                      'type="text" text="AMMO RESERVES" font="ui\\large_ui" color="#FFFFFFFF" text_y="14"')
-             for line in lines]
-    lines += _widget(f"{AMMO_EDIT}/open_ammo", [("type", "text"), ("width", 512), ("height", 28),
-                     ("bitmap", "bitmaps/option_bkds"), ("text", "AMMO RESERVES"),
-                     ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)],
-                     [f'<on event="a" run="mp profile set slayer rules" open="{AMMO_EDIT}/ammo_screen"/>',
-                      f'<on event="start" run="mp profile set slayer rules" open="{AMMO_EDIT}/ammo_screen"/>',
-                      '<on event="left_mouse" run="mouse emit accept event"/>'])
-    return lines
-
-
 def _infection_options() -> list:
     rows = [
         ("infection_enabled", "INFECTION:", ["OFF", "ON"], ["Classic Slayer.", "Human deaths join the zombies. Forces team play."]),
@@ -1806,8 +1782,6 @@ def _infection_options() -> list:
     ]
     lines = _setup_option_screen(INFECTION_EDIT, "infection", rows)
     anchor = f'\t\t<child widget="{INFECTION_EDIT}/infection_button_bar" y="414"/>'
-    assert lines.count(anchor) == 1
-    lines.insert(lines.index(anchor), "\t\t" + AMMO_CHILD)
     lines = [line.replace("port setup options init", "mp profile init slayer rules")
              .replace("port setup options save", "mp profile set slayer rules")
              .replace(f'bitmap="{INFECTION_EDIT}/header_infection"',
@@ -1846,28 +1820,10 @@ def write_infection_menus(root):
     path.write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8")
 
 
-def write_ammo_menus(root):
-    """Generate Infection reserves and remove the former Item Options entry."""
-    import json
-    base = root / "port/assets/menus"
-    filename = AMMO_EDIT.replace("/", ".") + ".port.xml"
-    (base / "ce" / filename).write_text("\n".join(multiplayer_files()[filename]), encoding="utf-8")
-    path = base / "ce/main_menu.settings_select.multiplayer_setup.item_options_edit.xml"
-    text = path.read_text(encoding="utf-8")
-    text = "\n".join(line for line in text.split("\n") if f'{AMMO_EDIT}/open_ammo' not in line)
-    path.write_text(text, encoding="utf-8")
-    write_infection_menus(root)
-    path = base / "menus.json"
-    manifest = json.loads(path.read_text(encoding="utf-8"))
-    files = set(manifest["files"]) | {"ce/" + filename}
-    manifest["files"] = sorted(f for f in files if f.endswith(".xml")) + sorted(f for f in files if not f.endswith(".xml"))
-    path.write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8")
-
-
 if __name__ == "__main__":
     import argparse
     from pathlib import Path
     parser = argparse.ArgumentParser()
     parser.add_argument("--infection-only", action="store_true", required=True)
     parser.parse_args()
-    write_ammo_menus(Path(__file__).resolve().parents[1])
+    write_infection_menus(Path(__file__).resolve().parents[1])

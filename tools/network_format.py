@@ -114,6 +114,8 @@ def items():
         pending += re.findall(r"\b[A-Z_][A-Z0-9_]*\b", " ".join(values))
     options = (ROOT / "source/game/game_engine.h").read_text(encoding="latin-1")
     add("struct game_variant_options", _hash(next(_blocks(options, r"^struct game_variant_options\s*\{"))))
+    for name in ("slayer_variant", "infection_options"):
+        add("struct " + name, _hash(next(_blocks(options, r"^struct " + name + r"\s*\{"))))
     limits = (ROOT / "port/linux/include/halo_port_limits.h").read_text()
     for name, value in re.findall(r"^#define (HALO_PORT_NETWORK_GAME_(?:VARIANT_OPTIONS_OFFSET|LOCAL_DATA_OFFSET|SIZE)) (.*)$", limits, re.M):
         add("layout " + name, value)

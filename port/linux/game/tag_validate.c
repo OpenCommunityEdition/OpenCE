@@ -750,6 +750,22 @@ static void validate_value(
 
 		if ((value >= 0 && value < field->maximum && value != none) || (none_allowed && value == none))
 			break;
+		/* (a Custom Edition map's tools left some shorts big-endian, as tag
+		files store them: Hornet's Nest's assault rifle muzzle flash light
+		has function types of 256 for 1. The value with its bytes swapped is
+		taken when that is one of the field's) */
+		if (tag_validate_globals.custom_edition && field->size == 2)
+		{
+			long swapped = ((value & 0xFF) << 8) | ((value >> 8) & 0xFF);
+
+			if (swapped < field->maximum)
+			{
+				tag_validate_correct(validation, "is %ld, past its %ld values: %ld, its bytes swapped",
+					value, field->maximum, swapped);
+				integer_set(address, field->size, swapped);
+				break;
+			}
+		}
 		tag_validate_correct(validation, "is %ld, past its %ld values: %s",
 			value, field->maximum, none_allowed ? "none" : "0");
 		integer_set(address, field->size, none_allowed ? NONE : 0);

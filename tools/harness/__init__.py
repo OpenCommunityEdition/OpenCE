@@ -86,20 +86,13 @@ def build(test, generated):
     work.mkdir(parents=True, exist_ok=True)
     for name, text in generated:
         (work / name).write_text(text)
-    executable = work / (test + ('.exe' if os.name == 'nt' else ''))
+    executable = work / test
     command = [os.environ.get("CC", "clang"), "-m32", "-std=gnu99", "-O2", "-Wall", "-Werror", "-Wno-unused-function",
                "-Wno-unused-variable", "-I", str(HARNESS / "include"), "-I", str(work),
-               str(HARNESS / "tests" / f"{test}.c"), "-o", str(executable)]
-    # The Windows CRT already supplies maths; MSVC has no separate m.lib.
-    if os.name == 'nt':
-        # Exercise standard C string functions, without MSVC's *_s advice.
-        command.append('-D_CRT_SECURE_NO_WARNINGS')
-    else:
-        # Match the portable engine's SSE2 arithmetic instead of x87 excess precision.
-        command.extend(['-march=x86-64', '-ffp-contract=off', '-lm'])
+               str(HARNESS / "tests" / f"{test}.c"), "-o", str(executable), "-lm"]
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode:
-        raise RuntimeError(f"{test}.c does not compile:\n{result.stdout}{result.stderr}")
+        raise RuntimeError(f"{test}.c does not compile:\n{result.stderr}")
     return executable
 
 

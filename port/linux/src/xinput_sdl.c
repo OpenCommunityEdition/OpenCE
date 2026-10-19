@@ -65,6 +65,9 @@ extern unsigned char network_chat_keyboard_open(void);
 /* port/linux/game/menu_functions.c: two or more players on this machine
 (co-op, or split screen in a network game) */
 extern unsigned char pc_menu_split_players(void);
+/* port/linux/game/network_test.c: the game's time in seconds while one runs,
+else -1 */
+extern double network_test_game_seconds(void);
 
 /* ---------- device tables */
 
@@ -610,6 +613,47 @@ void halo_input_name(int input, char *name, size_t size)
 		snprintf(name, size, "%s", "");
 }
 
+/* a binding's name as the keyboard's layout labels the key: config.toml
+names a key by where it sits (its scancode, named as on a US keyboard), so
+WASD stays under the fingers on any layout, as Halo PC's DirectInput keys
+did, but the menus show what is printed on it: the zoom key "Z" (the key
+right of the left Shift) shows as Y on a German keyboard. A key with no
+character of its own (Space, Left Shift, the keypad's) keeps its name, as
+does one whose character the menus' font has not (beyond Latin-1). */
+void halo_input_shown_name(const char *binding, char *shown, size_t size)
+{
+	int input = halo_input_from_name(binding);
+	SDL_Keycode key;
+
+	snprintf(shown, size, "%s", binding);
+#ifdef HALO_ANDROID
+	/* (the Android guest's SDL has no keyboard layouts to ask: the US
+	names, which match a hardware keyboard's usual labels there) */
+	(void)input;
+	(void)key;
+	return;
+#else
+	if (input < 0 || input >= SDL_SCANCODE_COUNT)
+		return;
+	/* (as in key events: the French number row shows its numbers, and a
+	non-Latin layout's letters the US ones) */
+	key = SDL_GetKeyFromScancode((SDL_Scancode)input, SDL_KMOD_NONE, true);
+	if (key == ',')
+		snprintf(shown, size, "%s", "Comma");
+	else if (key > ' ' && key < 0x7f)
+		snprintf(shown, size, "%c", key >= 'a' && key <= 'z' ? (char)(key - 'a' + 'A') : (char)key);
+	else if (key >= 0xa1 && key <= 0xff && size >= 2)
+	{
+		/* (Latin-1, a byte the menus take as its character; the small
+		letters made capitals but for sharp s and y with diaeresis) */
+		if (key >= 0xe0 && key <= 0xfe && key != 0xf7)
+			key -= 0x20;
+		shown[0] = (char)key;
+		shown[1] = 0;
+	}
+#endif
+}
+
 static void bindings_read(void)
 {
 	int action;
@@ -744,27 +788,16 @@ and then and throws a grenade every seven seconds; "look:<seed>" stands
 still, only turning and looking up and down (where remote players aim and
 whether they stand) */
 static int test_input_holding_action;
-static Uint64 test_input_holding_action_since;
-static int test_input_infection_buttons;
-static int test_input_combat_action;
-static int test_input_show_scoreboard;
+static double test_input_holding_action_since;
 
-/* Only driven by the opt-in network fixture; never by normal game input. */
-void test_input_scoreboard(int show)
+/* the scripted player's clock: the game's time while one runs (the main
+menu's too), so that it plays alike at any speed and tick for tick
+(debug.fixed_step), else real time */
+static double test_input_seconds(void)
 {
-	test_input_show_scoreboard = show;
-}
+	double seconds = network_test_game_seconds();
 
-/* Real gamepad actions for the opt-in two-player combat fixture. */
-void test_input_combat_actions(int action)
-{
-	test_input_combat_action = action;
-}
-
-/* Opt-in network objective regressions. Reset on menus and variant changes. */
-void test_input_objective_actions(int enabled)
-{
-	test_input_infection_buttons = enabled;
+	return seconds >= 0.0 ? seconds : (double)SDL_GetTicks() / 1000.0;
 }
 
 /* the automated tests (port/linux/game/network_test.c): the scripted player
@@ -773,7 +806,7 @@ after a second */
 void test_input_hold_action(int hold)
 {
 	if (hold && !test_input_holding_action)
-		test_input_holding_action_since = SDL_GetTicks();
+		test_input_holding_action_since = test_input_seconds();
 	test_input_holding_action = hold;
 }
 
@@ -786,6 +819,65 @@ static unsigned long test_input_pressed;
 void test_input_press(unsigned long buttons)
 {
 	test_input_pressed = buttons;
+}
+
+/* debug.test_input "menu:<buttons>": the buttons pressed one a second, from
+the first poll, for testing the menus: a, b, x, y, up, down, left, right,
+start, back, or wait (none), separated by spaces or commas */
+static char test_input_menu[512];
+static Uint64 test_input_menu_since;
+
+static void test_input_menu_gamepad(XINPUT_GAMEPAD *pad)
+{
+	static const struct
+	{
+		const char *name;
+		int analog;
+		WORD digital;
+	} buttons[] =
+	{
+		{ "a", XINPUT_GAMEPAD_A, 0 },
+		{ "b", XINPUT_GAMEPAD_B, 0 },
+		{ "x", XINPUT_GAMEPAD_X, 0 },
+		{ "y", XINPUT_GAMEPAD_Y, 0 },
+		{ "up", -1, XINPUT_GAMEPAD_DPAD_UP },
+		{ "down", -1, XINPUT_GAMEPAD_DPAD_DOWN },
+		{ "left", -1, XINPUT_GAMEPAD_DPAD_LEFT },
+		{ "right", -1, XINPUT_GAMEPAD_DPAD_RIGHT },
+		{ "start", -1, XINPUT_GAMEPAD_START },
+		{ "back", -1, XINPUT_GAMEPAD_BACK },
+	};
+	Uint64 elapsed = SDL_GetTicks() - test_input_menu_since;
+	Uint64 step = elapsed / 1000;
+	const char *token = test_input_menu;
+	size_t length;
+	unsigned int index;
+
+	/* (pressed for the first 150 ms of its second) */
+	if (elapsed % 1000 >= 150)
+		return;
+	for (;;)
+	{
+		token += strspn(token, " ,");
+		length = strcspn(token, " ,");
+		if (!length)
+			return;
+		if (!step)
+			break;
+		step--;
+		token += length;
+	}
+	for (index = 0; index < sizeof(buttons) / sizeof(buttons[0]); index++)
+	{
+		if (strlen(buttons[index].name) == length && !strncmp(token, buttons[index].name, length))
+		{
+			if (buttons[index].analog >= 0)
+				pad->bAnalogButtons[buttons[index].analog] = 255;
+			else
+				pad->wButtons |= buttons[index].digital;
+			return;
+		}
+	}
 }
 
 static void test_input_gamepad(XINPUT_GAMEPAD *pad)
@@ -826,7 +918,12 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 		const char *setting = config_string("debug.test_input");
 
 		checked = 1;
-		if (!strncmp(setting, "bot:", 4))
+		if (!strncmp(setting, "menu:", 5))
+		{
+			snprintf(test_input_menu, sizeof(test_input_menu), "%s", setting + 5);
+			test_input_menu_since = SDL_GetTicks();
+		}
+		else if (!strncmp(setting, "bot:", 4))
 			seed = atoi(setting + 4);
 		else if (!strcmp(setting, "bot"))
 			seed = 0;
@@ -836,77 +933,26 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 			looking = 1;
 		}
 	}
+	if (test_input_menu[0])
+	{
+		test_input_menu_gamepad(pad);
+		return;
+	}
 	if (seed < 0)
 		return;
-	if (test_input_show_scoreboard) pad->wButtons |= XINPUT_GAMEPAD_BACK;
-	if (!strncmp(config_string("debug.test_input"), "look:party", 10) ||
-		!strcmp(config_string("debug.test_input"), "look:classic"))
-	{
-		/* Full-client diagnostic: ordinary movement/buttons, no unit edits. */
-		if (test_input_combat_action & 4) pad->sThumbLY = 28000;
-		if (SDL_GetTicks() % 3000 < 150 && (test_input_combat_action & 8))
-			pad->bAnalogButtons[XINPUT_GAMEPAD_A] = 255;
-		if (SDL_GetTicks() % 600 < 250)
-		{
-			if (test_input_combat_action & 1) pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
-			if (test_input_combat_action & 2) pad->bAnalogButtons[XINPUT_GAMEPAD_B] = 255;
-			if (test_input_combat_action & 16) pad->bAnalogButtons[XINPUT_GAMEPAD_X] = 255;
-		}
-		return;
-	}
-	if (!strcmp(config_string("debug.test_input"), "look:combat") ||
-		!strncmp(config_string("debug.test_input"), "look:inventory", 14) ||
-		!strcmp(config_string("debug.test_input"), "look:vehicle"))
-	{
-		/* Release between presses: semi-automatic guns and melee both need
-		   distinct button edges. Aim is set by the engine-side fixture. */
-		/* The ammo probe holds one switch, rather than toggling twice. */
-		if (test_input_combat_action == 32) pad->bAnalogButtons[XINPUT_GAMEPAD_Y] = 255;
-		if (test_input_combat_action == 64) pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
-		if (SDL_GetTicks() % 600 < 250)
-		{
-			if (test_input_combat_action == 1) pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
-			if (test_input_combat_action == 2) pad->bAnalogButtons[XINPUT_GAMEPAD_B] = 255;
-			if (test_input_combat_action == 16) pad->bAnalogButtons[XINPUT_GAMEPAD_X] = 255;
-		}
-		return;
-	}
 	if (test_input_holding_action)
 	{
 		/* (standing still, the button held from a second on) */
-		if (SDL_GetTicks() - test_input_holding_action_since >= 1000)
+		if (test_input_seconds() - test_input_holding_action_since >= 1.0)
 			pad->bAnalogButtons[XINPUT_GAMEPAD_X] = 255;
 		return;
 	}
-	t = (double)SDL_GetTicks() / 1000.0 + seed * 1.7;
-	if (test_input_infection_buttons)
-	{
-		pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
-		pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
-		if (fmod(t, 2.0) < 1.0)
-		{
-			pad->bAnalogButtons[XINPUT_GAMEPAD_X] = 255;
-			pad->bAnalogButtons[XINPUT_GAMEPAD_Y] = 255;
-		}
-	}
+	t = test_input_seconds() + seed * 1.7;
 	if (looking)
 	{
 		pad->sThumbRX = (SHORT)(sin(t * 0.5) * 14000.0);
 		pad->sThumbRY = (SHORT)(sin(t * 0.3) * 32000.0);
 		return;
-	}
-	if (!strcmp(config_string("debug.test_input"), "bot:population"))
-	{
-		/* Opt-in population lifecycle probe: ordinary aim/grenade input,
-		   then walking. Never place units or assign damage/respawn state. */
-		double phase = fmod(t, 40.0);
-		pad->sThumbRY = -32000;
-		if (phase < 12.0)
-		{
-			if ((phase >= 4.0 && phase < 4.3) || (phase >= 7.0 && phase < 7.3))
-				pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
-			return;
-		}
 	}
 	pad->sThumbLY = (SHORT)(sin(t * 0.9) * 32000.0);
 	pad->sThumbLX = (SHORT)(cos(t * 0.6 + seed) * 20000.0);
@@ -915,7 +961,7 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 		pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
 	if (fmod(t, 5.0) < 0.1)
 		pad->bAnalogButtons[XINPUT_GAMEPAD_A] = 255;
-	if (strcmp(config_string("debug.test_input"), "bot:population") && fmod(t, 7.0) < 0.2)
+	if (fmod(t, 7.0) < 0.2)
 		pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
 }
 

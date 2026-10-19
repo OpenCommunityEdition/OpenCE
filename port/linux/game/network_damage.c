@@ -60,9 +60,6 @@ being hit looks and feels like on the clients).
 
 #include <math.h>
 
-/* Opt-in diagnostic only, implemented in network_test.c. */
-void network_test_damage_log(char const *stage, struct damage_data const *damage, long target, boolean remote);
-
 /* damage.c's */
 void damage_replay_player_effect(long player_index, struct damage_data *damage, real total_damage);
 void damage_replay_aftermath(long object_index, struct damage_data *damage, unsigned long being_damaged_flags,
@@ -695,7 +692,6 @@ boolean network_damage_deals(
 			return FALSE;
 		}
 	}
-	network_test_damage_log("before", damage, object_index, damage_dealing_report);
 	return TRUE;
 }
 
@@ -802,7 +798,6 @@ void network_damage_aftermath(
 	unit = (struct unit_datum *)object_try_and_get_and_verify_type(object_index, _object_mask_unit);
 	if (!unit)
 		return;
-	network_test_damage_log("after", damage, object_index, damage_dealing_report);
 	/* (the last events kept for killing blows: of a player's unit, whose
 	player the blow's aftermath has already taken from it, unit_died; or of
 	a biped no player's that was alive, an actor's: a body gibbed, or a

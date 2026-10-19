@@ -70,7 +70,7 @@ struct transport_address
 
 /* ---------- prototypes */
 
-short transport_initialize(
+long transport_initialize(
 	void);
 short transport_dispose(
 	void);

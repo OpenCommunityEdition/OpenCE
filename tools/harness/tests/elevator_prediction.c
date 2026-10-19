@@ -8,9 +8,10 @@ word comes a round trip after it, so the height it gives is where the host's
 elevator was a round trip before. Going up, taken whole, it puts the host's
 copy under its own elevator's floor, where the game's copy falls through and
 the client's player dies after it. Taken across only, the copy rides the
-host's elevator; off an elevator, or on one at rest, the client's word is
-taken whole. test_elevator_prediction.py takes the functions
-(under_test.inc) and the bound's structure and tolerance (config.inc); what
+host's elevator through movement, stops and reversals. After leaving a
+stopped elevator, the client's word is taken whole. test_elevator_prediction.py takes the functions
+(under_test.inc) and the bound's structure and tolerance, and the drift
+figures the function notes for the tests (config.inc); what
 they call besides is stubbed: the speed and height limits pass every move
 (the cases move no faster than a player may), and applying a state puts the
 unit there.
@@ -18,10 +19,15 @@ unit there.
 
 #include "harness.h"
 
+#include <limits.h>
+#include <math.h>
+
 /* ---------- the fake world */
 
 #define _object_mask_biped 1
 #define _object_mask_device 2
+#define _object_mask_machine 2
+#define _biped_airborne_bit 0
 
 /* the objects: a player's unit (a biped) and an elevator (a device) */
 struct fake_object
@@ -34,6 +40,9 @@ struct fake_object
 	struct
 	{
 		long elevator_object_index;
+		long support_surface_index;
+		char elevator_ticks;
+		unsigned flags;
 	} biped;
 	struct
 	{
@@ -69,6 +78,7 @@ struct distributed_unit_state
 };
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
+#define MAX(a,b) ((a)>(b)?(a):(b))
 #define MAXIMUM_TRACKED_PLAYERS 1
 #define PREDICTION_ANCHOR_TICKS 30
 #define PREDICTION_JITTER_TICKS 2
@@ -143,6 +153,8 @@ static void ride(long elevator_index, real rise, long round_trip)
 	bound.rise = 1000.0f;
 	objects[UNIT].mask = _object_mask_biped;
 	objects[UNIT].biped.elevator_object_index = elevator_index;
+	objects[UNIT].biped.support_surface_index = 1;
+	objects[UNIT].biped.elevator_ticks = 60;
 	objects[UNIT].object.position.z = floor;
 	objects[ELEVATOR].mask = _object_mask_device;
 	objects[ELEVATOR].device.position_velocity = rise;
@@ -176,6 +188,8 @@ static real taken_height(long elevator_index, real velocity, real client_z)
 	bound.rise = 1000.0f;
 	objects[UNIT].mask = _object_mask_biped;
 	objects[UNIT].biped.elevator_object_index = elevator_index;
+	objects[UNIT].biped.support_surface_index = 1;
+	objects[UNIT].biped.elevator_ticks = 60;
 	objects[UNIT].object.position.z = 10.0f;
 	objects[ELEVATOR].mask = _object_mask_device;
 	objects[ELEVATOR].device.position_velocity = velocity;
@@ -198,13 +212,12 @@ int main(int argc, char **argv)
 		ride(ELEVATOR, 0.1f, 6);
 		return 0;
 	}
-	/* an elevator at rest, the client's word a little lower (the snap to
-	the host's when it stopped yet to come): taken whole */
+	/* An elevator at rest still protects its rider from a delayed height. */
 	CASE("elevator-at-rest")
 	{
 		real height = taken_height(ELEVATOR, 0.0f, 9.8f);
 
-		CHECK(height == 9.8f, "at rest, the client's height 9.8 not taken: %f", height);
+		CHECK(height == 10.0f, "at rest, delayed height moved the rider below the floor: %f", height);
 		return 0;
 	}
 	/* on foot on the ground, no elevator: the client's height taken */
@@ -213,6 +226,53 @@ int main(int argc, char **argv)
 		real height = taken_height(NONE, 0.0f, 10.4f);
 
 		CHECK(height == 10.4f, "on foot, the client's height 10.4 not taken: %f", height);
+		return 0;
+	}
+	CASE("jump-at-rest")
+	{
+		objects[UNIT].biped.flags = FLAG(_biped_airborne_bit);
+		CHECK(taken_height(ELEVATOR, 0.0f, 10.4f) == 10.4f, "a jump was clamped to the stopped floor");
+		return 0;
+	}
+	CASE("left-platform")
+	{
+		(void)taken_height(ELEVATOR, 0.0f, 10.0f);
+		objects[UNIT].biped.elevator_ticks = 59;
+		game_time = 2;
+		distributed_predictions[0].time = 2;
+		distributed_predictions[0].state.position.z = 9.8f;
+		{
+			struct distributed_on_foot_bound bound = {0};
+			bound.rise = 1000.0f;
+			distributed_take_prediction(0, UNIT, &bound);
+		}
+		CHECK(objects[UNIT].object.position.z == 9.8f, "remembered attachment overrode walking off");
+		return 0;
+	}
+	if (!strcmp(case_name, "reversals-100ms") || !strcmp(case_name, "reversals-200ms"))
+	{
+		long delay = !strcmp(case_name, "reversals-100ms") ? 3 : 6;
+		real floors[181];
+		long tick;
+		struct distributed_on_foot_bound bound = {0};
+		bound.rise = 1000.0f;
+		(void)taken_height(ELEVATOR, 0.0f, 10.0f);
+		floors[0] = 10.0f;
+		for (tick = 1; tick <= 180; tick++)
+		{
+			long phase = tick % 45;
+			real step = phase < 15 ? 0.1f : phase < 20 ? 0.0f : phase < 35 ? -0.1f : 0.0f;
+			floors[tick] = floors[tick - 1];
+			elevator_tick(&floors[tick], step);
+			objects[ELEVATOR].device.position_velocity = step;
+			game_time = tick;
+			distributed_predictions[0].time = tick;
+			distributed_predictions[0].state.position.z = floors[MAX(0, tick - delay)];
+			distributed_take_prediction(0, UNIT, &bound);
+			CHECK(fabsf(objects[UNIT].object.position.z - floors[tick]) < 0.001f,
+				"%ld ms: tick %ld rider %f, floor %f", delay * 1000 / 30, tick,
+				objects[UNIT].object.position.z, floors[tick]);
+		}
 		return 0;
 	}
 	fprintf(stderr, "no case %s\n", case_name);

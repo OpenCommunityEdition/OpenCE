@@ -39,6 +39,9 @@ a mouse button (INPUT_MOUSE + SDL_BUTTON_*), or the wheel */
 /* an input by its name in config.toml ("W", "Mouse Left"), -1 if none */
 int halo_input_from_name(const char *name);
 void halo_input_name(int input, char *name, size_t size);
+/* a binding's name ("Z") as the keyboard's layout labels its key ("Y"),
+for the menus */
+void halo_input_shown_name(const char *binding, char *shown, size_t size);
 
 /* whether a menu is up (halo_ui_pointer_update, every frame) */
 void platform_menus_set_active(BOOL active);
