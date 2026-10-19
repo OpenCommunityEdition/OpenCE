@@ -29,7 +29,7 @@ calls them from PC_MENU_FUNCTION_BASE on):
   config.toml themselves), "port settings defaults" shows the defaults,
   "port settings help" the help of the row chosen (and Video Setup's
   Resolution or Window Size, for the display mode shown, and the Mac's
-  CHECK NOW FOR UPDATES, hidden without an update feed);
+  CHECK NOW FOR UPDATES and CHECK FOR UPDATES, hidden without an update feed);
 - Controls Setup's: the keyboard and mouse's controls, two bindings each,
   shown a group at a time ("controls update menu"); "controls begin
   binding" takes the next key or button pressed for the binding left and
@@ -1693,15 +1693,16 @@ static void hud_button_style_row_show(struct widget_instance *list)
 	}
 }
 
-/* Network Setup's CHECK NOW FOR UPDATES (tools/port_settings.py, the Mac's
-alone) is shown only when this build has an update feed: the launcher says so
-in HALO_MAC_UPDATE_LAUNCHER (updates_check). Without one the row is hidden and
-the rows after it close the gap, as the HUD button style's do. */
-static void updates_row_show(struct widget_instance *list)
+/* Network Setup's CHECK NOW FOR UPDATES and CHECK FOR UPDATES (tools/
+port_settings.py) are shown on the Mac only when this build has an update feed:
+the launcher says so in HALO_MAC_UPDATE_LAUNCHER (updates_check). Without one
+the rows are hidden and the rows after them close the gap, as the HUD button
+style's do. The other platforms' CHECK FOR UPDATES is always shown. */
+static void update_row_show(struct widget_instance *list, char const *name)
 {
-	struct widget_instance *row = named(list, "op_update_now", 0);
+	struct widget_instance *row = named(list, name, 0);
 	struct widget_instance *child, *previous;
-	boolean visible = FALSE;
+	boolean visible = TRUE;
 
 	if (!row)
 		return;
@@ -1738,6 +1739,12 @@ static void updates_row_show(struct widget_instance *list)
 			list->parameters.list.selected_index = index;
 		}
 	}
+}
+
+static void updates_rows_show(struct widget_instance *list)
+{
+	update_row_show(list, "op_update_now");
+	update_row_show(list, "op_auto");
 }
 
 /* ---------- Change Color: the profile's colour, from a list of the
@@ -6748,7 +6755,7 @@ void pc_menu_game_data_function_invoke(
 	{
 		video_rows_show(widget);
 		hud_button_style_row_show(widget);
-		updates_row_show(widget);
+		updates_rows_show(widget);
 		settings_help(widget);
 	}
 	else if (!strcmp(name, "controls update menu"))
