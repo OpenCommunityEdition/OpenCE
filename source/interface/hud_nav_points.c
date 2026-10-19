@@ -869,6 +869,30 @@ void hud_render_nav_points(
 			}
 
 			position.z += nav_point->z_offset;
+			/* port: a point added with no body keeps the cleared screen
+			kind. A spawn can land after that update and before this draw,
+			and NONE is not one of the arrow's sequences. */
+			if (nav_point->screen_type==NONE)
+			{
+				long unit_index = local_player_get_player_index(local_player_index)==NONE ?
+					NONE :
+					player_get(local_player_get_player_index(local_player_index))->unit_index;
+
+				if (unit_index==NONE)
+					continue;
+
+				{
+					real_point3d head_position;
+
+					unit_get_head_position(unit_index, &head_position);
+					nav_point->screen_type = hud_get_nav_point_render_type(
+						local_player_index,
+						&head_position,
+						&position,
+						nav_point->type==_hud_nav_point_type_object ?
+							nav_point->reference_index : NONE);
+				}
+			}
 			custom_render_nav_point(
 				local_player_index,
 				&position,
