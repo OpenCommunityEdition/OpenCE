@@ -102,7 +102,8 @@ The output directory contains:
 - `changelog.json`: the selected history for the in-game menu.
 - `notes.md`: all newly introduced highlights in `base..head`, or
   `baseline..head` without a base. With no highlights it contains
-  `No new player-facing changes.`
+  `No player-facing notes were recorded for this build.` This describes missing
+  notes without claiming that the code has no player-facing changes.
 
 The menu JSON has this schema:
 
@@ -199,7 +200,22 @@ the start of authored changelog coverage. Failed or cancelled builds create
 no published base, so the next successful release includes their highlights.
 Other branches receive one `UNRELEASED` preview entry.
 
-On `main`, the job passes `GITHUB_RUN_NUMBER` as `--build-number`. If the previous
+On `main`, the job passes `GITHUB_RUN_NUMBER` as `--build-number`, together with
+`--require-notes`. If the release range contains new commits but no new highlights,
+generation fails before any platform builds or publication. An empty range or a
+range containing only explicit `Player-Note: none` commits is allowed. For an
+internal-only integration, review the entire release range and put
+`Player-Note: none` on its tip commit to explicitly confirm that decision.
+An omission on an unrelated maintenance commit does not excuse an unannotated
+merge. Repeating an already released note does not satisfy this check.
+
+Upstream authors need not use our annotation convention. When merging upstream,
+review its changes and add short `Player-Note:` summaries to the integration
+commit, or add reviewed notes for that commit to the catch-up manifest. This
+guard catches empty releases; it cannot judge whether nonempty notes describe
+every player-facing change. That remains part of integration review.
+
+If the previous
 release has a `changelog.json` asset, the helper downloads it and the collector
 uses it as `--previous`. A release from before this feature has no archive and
 starts the numbered history at the current release. Existing but invalid

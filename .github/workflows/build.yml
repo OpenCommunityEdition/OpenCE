@@ -68,7 +68,7 @@ jobs:
         run: |
           args=()
           if [ "$GITHUB_REF" = refs/heads/main ]; then
-            args+=(--build-number "$GITHUB_RUN_NUMBER")
+            args+=(--build-number "$GITHUB_RUN_NUMBER" --require-notes)
           else
             args+=(--preview)
           fi

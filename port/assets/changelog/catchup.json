@@ -15,6 +15,24 @@
     {"commit": "eb16cf4bdc7d2d7d6325d365a39e7beddb494546", "text": "Raised the maximum map sharing speeds.", "category": "MULTIPLAYER"},
     {"commit": "bc37efd5da325afc5f157eaa4f85a7fd16271a7a", "text": "Refreshed the browser launcher with a clearer Ready to Play screen.", "category": "INTERFACE"},
     {"commit": "1b61b529294dee3bd3c90a816781400d24dcc709", "text": "Improved browser multiplayer on unreliable connections.", "category": "MULTIPLAYER"},
-    {"commit": "81a768bc81fadfdaa8a1a78141e7fc2efe69a07f", "text": "Fixed the browser loading notice and joining games from browser rooms.", "category": "INTERFACE"}
+    {"commit": "81a768bc81fadfdaa8a1a78141e7fc2efe69a07f", "text": "Fixed the browser loading notice and joining games from browser rooms.", "category": "INTERFACE"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Added optional bots for local Slayer games through the Xbox menus.", "category": "GAMEPLAY"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Co-op hosts can add extra weapons, pickups and vehicles.", "category": "GAMEPLAY"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Added a personal friendly-fire toggle to the online co-op pause menu.", "category": "GAMEPLAY"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Added optional third-person views for Warthog and Scorpion passengers in campaign and co-op.", "category": "GAMEPLAY"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Added the Bumper Jumper controller layout.", "category": "CONTROLS"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Added an alternate Linux driver option for PlayStation controllers.", "category": "CONTROLS"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Added optional HDR lighting and output for supported HDR displays.", "category": "GRAPHICS"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Added texture filtering and model detail options for sharper distant scenery.", "category": "GRAPHICS"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Added an Extra Effects menu for optional visual effects.", "category": "GRAPHICS"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Added an optional multiplayer match clock.", "category": "MULTIPLAYER"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Added a connection meter and colour-coded scoreboard ping readings.", "category": "MULTIPLAYER"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Hosts can disable optional mouse aim assist while keeping controller and touch assistance.", "category": "MULTIPLAYER"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Fixed starting split-screen matches without another computer joining.", "category": "MULTIPLAYER"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "PC menu text now follows the language of your Custom Edition maps where available.", "category": "INTERFACE"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "The main menu background now keeps playing behind other menus.", "category": "INTERFACE"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Added 5.1 surround sound and adjustable audio buffering on Windows and Linux.", "category": "AUDIO"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Game setup can find an Xbox disc image placed beside the executable.", "category": "QUALITY OF LIFE"},
+    {"commit": "6cb966a7d84b71459d18978ad8b3f7ecf16ff0c9", "text": "Improved startup on NVIDIA systems using a Linux Wayland desktop.", "category": "QUALITY OF LIFE"}
   ]
 }

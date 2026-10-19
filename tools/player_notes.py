@@ -237,7 +237,7 @@ def load_previous(repo, path, base, build_number):
 
 
 def collect(repo, head="HEAD", base=None, catchup=None, preview=False,
-            build_number=None, previous=None):
+            build_number=None, previous=None, require_notes=False):
     if build_number is not None and (type(build_number) is not int or not 1 <= build_number <= MAX_BUILD_NUMBER):
         raise NotesError(f"build number must be a positive integer at most {MAX_BUILD_NUMBER}")
     if preview and build_number is not None:
@@ -267,6 +267,18 @@ def collect(repo, head="HEAD", base=None, catchup=None, preview=False,
                 if commit.sha in release_range:
                     release_highlights.append((note, category))
     release_notes = [note for note, _ in release_highlights]
+    if require_notes and release_range and not release_notes:
+        # A release-tip omission is an explicit review of the integrated range.
+        # An omission on an unrelated maintenance commit cannot cover a merge.
+        reviewed = head in commits and commits[head].omitted
+        unreviewed = [sha for sha in release_range
+                      if sha not in commits or not commits[sha].omitted]
+        if unreviewed and not reviewed:
+            raise NotesError(
+                "new commits have no release notes; add Player-Note: highlights "
+                "to the integration commit or reviewed catch-up notes. If the "
+                "entire release has no player-facing changes, explicitly mark "
+                "its tip Player-Note: none after review")
     commit_date = git(repo, "show", "-s", "--format=%cs", head, "--").strip()
     entries = [{"build": build_number, "date": commit_date, "commit": head, "notes": release_notes}]
     categories = [category for _, category in release_highlights]
@@ -279,7 +291,7 @@ def collect(repo, head="HEAD", base=None, catchup=None, preview=False,
     entries = entries[:MAX_ENTRIES]
     if sum(len(entry["notes"]) for entry in entries) > MAX_NOTES:
         raise NotesError(f"changelog exceeds {MAX_NOTES} notes; shorten or consolidate authored notes (none were silently discarded)")
-    markdown = "\n".join("- " + note for note in release_notes) + "\n" if release_notes else "No new player-facing changes.\n"
+    markdown = "\n".join("- " + note for note in release_notes) + "\n" if release_notes else "No player-facing notes were recorded for this build.\n"
     return {"schema_version": 2, "head": head, "entries": entries}, markdown, warnings
 
 
@@ -309,11 +321,13 @@ def main(argv=None):
     parser.add_argument("--build-number", type=int, help="positive GitHub Actions build number; otherwise preview")
     parser.add_argument("--preview", action="store_true", help="create an UNRELEASED entry without a build number (default)")
     parser.add_argument("--previous", type=Path, help="published schema-2 changelog archive for --base")
+    parser.add_argument("--require-notes", action="store_true",
+                        help="reject new release commits without notes or explicit omission review")
     parser.add_argument("--output", type=Path, required=True, help="directory for changelog.json and notes.md")
     args = parser.parse_args(argv)
     try:
         data, markdown, warnings = collect(ROOT, args.head, args.base, args.catchup, args.preview,
-                                          args.build_number, args.previous)
+                                          args.build_number, args.previous, args.require_notes)
         write_outputs(args.output, data, markdown)
     except (NotesError, OSError) as exc:
         parser.exit(1, f"player notes: {exc}\n")
