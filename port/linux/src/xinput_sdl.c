@@ -65,6 +65,9 @@ extern unsigned char network_chat_keyboard_open(void);
 /* port/linux/game/menu_functions.c: two or more players on this machine
 (co-op, or split screen in a network game) */
 extern unsigned char pc_menu_split_players(void);
+/* port/linux/game/network_test.c: the game's time in seconds while one runs,
+else -1 */
+extern double network_test_game_seconds(void);
 
 /* ---------- device tables */
 
@@ -785,7 +788,17 @@ and then and throws a grenade every seven seconds; "look:<seed>" stands
 still, only turning and looking up and down (where remote players aim and
 whether they stand) */
 static int test_input_holding_action;
-static Uint64 test_input_holding_action_since;
+static double test_input_holding_action_since;
+
+/* the scripted player's clock: the game's time while one runs (the main
+menu's too), so that it plays alike at any speed and tick for tick
+(debug.fixed_step), else real time */
+static double test_input_seconds(void)
+{
+	double seconds = network_test_game_seconds();
+
+	return seconds >= 0.0 ? seconds : (double)SDL_GetTicks() / 1000.0;
+}
 
 /* the automated tests (port/linux/game/network_test.c): the scripted player
 stands still, holding the action button (X: picking up, swapping weapons)
@@ -793,7 +806,7 @@ after a second */
 void test_input_hold_action(int hold)
 {
 	if (hold && !test_input_holding_action)
-		test_input_holding_action_since = SDL_GetTicks();
+		test_input_holding_action_since = test_input_seconds();
 	test_input_holding_action = hold;
 }
 
@@ -930,11 +943,11 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 	if (test_input_holding_action)
 	{
 		/* (standing still, the button held from a second on) */
-		if (SDL_GetTicks() - test_input_holding_action_since >= 1000)
+		if (test_input_seconds() - test_input_holding_action_since >= 1.0)
 			pad->bAnalogButtons[XINPUT_GAMEPAD_X] = 255;
 		return;
 	}
-	t = (double)SDL_GetTicks() / 1000.0 + seed * 1.7;
+	t = test_input_seconds() + seed * 1.7;
 	if (looking)
 	{
 		pad->sThumbRX = (SHORT)(sin(t * 0.5) * 14000.0);
