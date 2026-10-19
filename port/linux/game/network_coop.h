@@ -45,6 +45,10 @@ enum
 /* whether this is a network co-op game (not its lobby, whose menu scene also
 has no game engine) */
 boolean network_coop_active(void);
+/* game_state.c: remember the team only after a checkpoint write succeeds. */
+void network_coop_checkpoint_saved(void);
+/* main.c: host team-wipe policy, including checkpoint roster compatibility. */
+boolean network_coop_wipe_reverts(void);
 /* whether the players collide with each other: FALSE in a co-op game whose
 host set Server Setup's PLAYER COLLISIONS off (bipeds.c, collisions.c) */
 boolean network_coop_player_collisions(void);
