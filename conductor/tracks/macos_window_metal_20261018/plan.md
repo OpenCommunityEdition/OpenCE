@@ -40,9 +40,9 @@
 - [x] Task: The guest's encoder and the doorbell 48fa14c6
     - [x] Write tests: a guest program writes batches that the host decodes intact; the exits per batch are counted
     - [x] The guest-side writer and the host_render_submit import
-- [ ] Task: The Swift Metal backend
-    - [ ] Write tests: XCTest submits decoded commands (buffers, textures, pipelines, draws) to an offscreen target and reads pixels back
-    - [ ] Buffers and textures uploaded from guest memory; pipeline and depth-stencil state caches; presenting to the layer
+- [x] Task: The Swift Metal backend 15c579bc
+    - [x] Write tests: XCTest submits decoded commands (buffers, textures, pipelines, draws) to an offscreen target and reads pixels back
+    - [x] Buffers and textures uploaded from guest memory; pipeline and depth-stencil state caches; presenting to the layer
 - [ ] Task: Offscreen captures and golden-frame checks
     - [ ] Write tests: the compare tool's tolerance (pytest, synthetic images)
     - [ ] A capture setting (debug, off by default) writing a frame to a file; tools/test_macos_frames.py comparing to approved references
