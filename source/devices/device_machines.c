@@ -54,6 +54,10 @@ enum
 	_object_runtime_unit_cannot_open_doors_automatically_bit = 14,
 };
 
+/* port: machine_update tests the unit's damage flags where the original read the byte at 0xb6 */
+typedef char verify_unit_damage_flags_offset[
+	offsetof(struct unit_datum, object.damage_flags) == 0xB6 ? 1 : -1];
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -248,7 +252,10 @@ boolean machine_update(
 				struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
 				boolean can_open = TRUE;
 
-				if (TEST_FLAG(*((byte *)unit + 0xb6), _object_function2_active_bit) ||
+				if (/* port: the damage flags word at offset 0xb6 of the unit (bit 2 is _object_dead_bit); the original read its
+					first byte, which on a big-endian host is the word's high byte, and so found the unit alive or dead
+					by the wrong bits (the Mac's PowerPC opened doors for dead units, and shut them differently) */
+					TEST_FLAG(unit->object.damage_flags, _object_function2_active_bit) ||
 					TEST_FLAG(*(unsigned long *)((byte *)unit_definition + 0x17c), _object_runtime_unit_cannot_open_doors_automatically_bit))
 				{
 					can_open = FALSE;
