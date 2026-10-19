@@ -15,9 +15,14 @@ the build in the working tree.
   supported: they have no PowerPC support, and the Intel build uses the
   OpenGL 2.1 of 10.6.
 - A PowerPC G4 or G5 at 1 GHz or more, or any Intel Mac.
-- A graphics card with OpenGL 2.1 vertex and fragment programs
-  (`GL_ARB_vertex_program`, `GL_ARB_fragment_program`) and 32 MB of video
-  memory or more. The Radeon 9550 (32 MB) of an iBook G4 and the Radeon 9600
+- A graphics card with OpenGL 2.0 and framebuffer objects (Mac OS X 10.5 and
+  later give OpenGL 2.1 to most cards; Mac OS X 10.4 gives OpenGL 2.0 and GLSL
+  1.10 only to newer cards, and the game makes GLSL 1.10 text there, which no 10.4
+  Mac has yet run), vertex and
+  fragment programs (`GL_ARB_vertex_program`, `GL_ARB_fragment_program`) and
+  32 MB of video memory or more. At start the game checks what the context
+  gives; on a card without OpenGL 2.0, the shading language or framebuffer
+  objects it says so in a Mac alert, naming the card, and quits. The Radeon 9550 (32 MB) of an iBook G4 and the Radeon 9600
   class of a PowerBook G4 run the game. A Rage Mobility (8 MB) does not.
 - 1 GB of memory. 2 GB of free disk for the Xbox maps (see "Game data").
 - The game draws 480 lines and 640 columns, the Xbox's size, in a window of
@@ -503,6 +508,13 @@ to a file of float frames). Manual two-machine test: `docs/mac-voice-manual-test
 
 - Xbox maps on the PowerPC Macs: the conversion is checked in both byte orders on Intel and
   the maps render on the G4s; long play on a G4 is not yet measured.
+- The graphics check: when the window's GL context is made the game logs one line, `native GL capabilities:`
+  (the card, `GL_VERSION`, the GLSL version, the video memory, which of framebuffer objects, packed depth
+  stencil, non-power-of-two and rectangle textures and the ARB programs the driver has, and which GLSL it will
+  be given). A context without OpenGL 2.0, the shading language 1.10 or framebuffer objects ends the program
+  there, with a Mac alert naming the card and what it lacks, and removes the 20 MB state file the start had
+  made. `HALO_MAC_GL_FORCE_CAPS_FAIL=1` pretends one is missing, to see that path (a hidden run only logs
+  it and exits with status 1).
 - No Mac 10.4 machine has run the game; the 10.5 and 10.6 results are from
   three machines. The Controller Setup needs 10.5.
 - System link (LAN) multiplayer works from the menus (Multiplayer > Create

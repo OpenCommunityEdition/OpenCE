@@ -73,3 +73,11 @@ void mac_engine_message_dispatch(int visible_window)
 	fprintf(stderr,"Mac message: %s: %s\n",title,body);
 #endif
 }
+
+/* port: for a message with nothing left to run (the renderer cannot start): shown
+   at once, by the caller's thread, which owns the window */
+void mac_engine_message_now(const char *title,const char *message)
+{
+	platform_show_message(title,message);
+	mac_engine_message_dispatch(1);
+}

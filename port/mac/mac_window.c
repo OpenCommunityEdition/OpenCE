@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <pthread.h>
+#include <unistd.h>
 #if defined(__APPLE__)
 #include <mach/mach_time.h>
 #include <OpenGL/OpenGL.h>
@@ -141,6 +142,71 @@ static int has_extension(const char *extensions,const char *name)
     }
     return 0;
 }
+/* port: what the renderer needs of the GL context, checked once, before the
+   first draw. The renderer calls OpenGL 2.0's own shader, buffer and vertex
+   attribute entry points and GLSL, and draws shadows and the water into
+   framebuffer objects; a driver without them (Mac OS X 10.4's on the older
+   Radeons, GMA 900) used to end in the engine's halt, a 20 MB savegame.bin and
+   no word to the player. The line it logs always is what a report needs. */
+extern void mac_glsl120_set_version(int version) __attribute__((weak));
+extern int mac_engine_files_translate_path(const char *,char *,size_t) __attribute__((weak));
+extern int mac_gpu_info_vram_mb(void) __attribute__((weak));
+extern const char *mac_gpu_info_renderer(void) __attribute__((weak));
+
+static void gl_version_numbers(const char *text,int *major,int *minor)
+{
+    *major=0;*minor=0;
+    if(!text)return;
+    while(*text>='0'&&*text<='9'&&*major<100)*major=*major*10+(*text++-'0');
+    if(*text=='.') {
+        text++;
+        /* ("1.10" is 1.10; the digits after the point as a number) */
+        while(*text>='0'&&*text<='9'&&*minor<1000)*minor=*minor*10+(*text++-'0');
+    }
+}
+
+/* 1 when the context can run the renderer. On 0, message holds what to tell
+   the player. *glsl is the GLSL text version to generate: 120, or 110 for a
+   driver whose language is 1.10 (HALO_MAC_GLSL_VERSION=110 asks for it on any
+   driver, to try that text) */
+static int mac_window_check_gl(char *message,size_t message_size,int *glsl)
+{
+    const char *vendor=(const char *)glGetString(GL_VENDOR);
+    const char *renderer=(const char *)glGetString(GL_RENDERER);
+    const char *version=(const char *)glGetString(GL_VERSION);
+    const char *shading=(const char *)glGetString(GL_SHADING_LANGUAGE_VERSION);
+    const char *extensions=(const char *)glGetString(GL_EXTENSIONS);
+    int gl_major,gl_minor,sl_major,sl_minor,gl_ok,sl_ok,fbo,packed,npot,rectangle,vertex_program,fragment_program;
+    int vram=-1;const char *forced=getenv("HALO_MAC_GL_FORCE_CAPS_FAIL");
+    char missing[400];
+    while(glGetError()!=GL_NO_ERROR){}
+    gl_version_numbers(version,&gl_major,&gl_minor);
+    gl_version_numbers(shading,&sl_major,&sl_minor);
+    gl_ok=gl_major>=2;
+    sl_ok=sl_major>1||(sl_major==1&&sl_minor>=10);
+    fbo=has_extension(extensions,"GL_EXT_framebuffer_object");
+    packed=has_extension(extensions,"GL_EXT_packed_depth_stencil");
+    npot=gl_major>=2&&has_extension(extensions,"GL_ARB_texture_non_power_of_two");
+    rectangle=has_extension(extensions,"GL_ARB_texture_rectangle");
+    vertex_program=has_extension(extensions,"GL_ARB_vertex_program");
+    fragment_program=has_extension(extensions,"GL_ARB_fragment_program");
+    if(mac_gpu_info_vram_mb)vram=mac_gpu_info_vram_mb();
+    missing[0]='\0';
+    if(!gl_ok)snprintf(missing+strlen(missing),sizeof(missing)-strlen(missing),"%sOpenGL 2.0 (this driver has %s)",missing[0]?"; ":"",version?version:"none");
+    if(gl_ok&&!sl_ok)snprintf(missing+strlen(missing),sizeof(missing)-strlen(missing),"%sthe OpenGL shading language 1.10 (this driver has %s)",missing[0]?"; ":"",shading?shading:"none");
+    if(!fbo)snprintf(missing+strlen(missing),sizeof(missing)-strlen(missing),"%sframebuffer objects (GL_EXT_framebuffer_object)",missing[0]?"; ":"");
+    if(forced&&forced[0]=='1')snprintf(missing+strlen(missing),sizeof(missing)-strlen(missing),"%sa feature the test asked to be missing (HALO_MAC_GL_FORCE_CAPS_FAIL)",missing[0]?"; ":"");
+    *glsl=(sl_major>1||(sl_major==1&&sl_minor>=20))?120:110;
+    if(getenv("HALO_MAC_GLSL_VERSION")&&!strcmp(getenv("HALO_MAC_GLSL_VERSION"),"110"))*glsl=110;
+    fprintf(stderr,"native GL capabilities: vendor=%s renderer=%s version=%s glsl=%s vram_mb=%d extensions={framebuffer_object=%d packed_depth_stencil=%d npot=%d texture_rectangle=%d arb_vertex_program=%d arb_fragment_program=%d} glsl_source=%d%s%s\n",
+        vendor?vendor:"unknown",renderer?renderer:"unknown",version?version:"unknown",shading?shading:"none",vram,
+        fbo,packed,npot,rectangle,vertex_program,fragment_program,*glsl,missing[0]?" unsupported: ":"",missing);
+    if(!missing[0])return 1;
+    snprintf(message,message_size,
+        "The graphics card in this Mac (%s) cannot run PowerSpark. It lacks %s. PowerSpark needs a card and a system with OpenGL 2.0, as Mac OS X 10.5 or later gives most Macs from 2004 on, or a newer driver for it.",
+        renderer&&*renderer?renderer:"unknown",missing);
+    return 0;
+}
 static unsigned next_power_of_two(unsigned value)
 {
     unsigned result=1;
@@ -151,6 +217,25 @@ static void discard_state(struct mac_window_state *state)
 {
     struct mac_window temporary;
     temporary.state=state;mac_window_close(&temporary);
+}
+/* port: the context is current; if the renderer cannot run on it, say so (a
+   hidden run only logs it) and end the program here, not later in the
+   engine's halt. Otherwise tell the shader text which GLSL to make. */
+static void mac_window_gl_gate(struct mac_window_state *state)
+{
+    char message[600];int glsl=120;
+    if(!mac_window_check_gl(message,sizeof(message),&glsl)) {
+        fprintf(stderr,"Mac window: %s\n",message);
+        if(state->visible)mac_engine_message_now("PowerSpark cannot start",message);
+        discard_state(state);
+        /* (the game's 20 MB state file was made at start, before the renderer: nothing will use it) */
+        if(mac_engine_files_translate_path) {
+            char path[1024];
+            if(mac_engine_files_translate_path("z:\\savegame.bin",path,sizeof(path))==0)unlink(path);
+        }
+        exit(1);
+    }
+    if(mac_glsl120_set_version)mac_glsl120_set_version(glsl);
 }
 static void mac_window_discard_cgl(struct mac_window_state *state)
 {
@@ -179,6 +264,7 @@ static int mac_window_open_cgl_offscreen(struct mac_window_state *state)
     if(cgl_error!=kCGLNoError||!state->cgl) { fprintf(stderr,"CGL context: %s\n",CGLErrorString(cgl_error));return 0; }
     cgl_error=CGLSetCurrentContext(state->cgl);
     if(cgl_error!=kCGLNoError) { fprintf(stderr,"CGL current context: %s\n",CGLErrorString(cgl_error));return 0; }
+    mac_window_gl_gate(state);
     extensions=(const char *)glGetString(GL_EXTENSIONS);
     if(!has_extension(extensions,"GL_EXT_packed_depth_stencil")) { fprintf(stderr,"CGL missing EXT_packed_depth_stencil\n");return 0; }
     if(!has_extension(extensions,"GL_EXT_framebuffer_object")) { fprintf(stderr,"CGL missing EXT_framebuffer_object\n");return 0; }
@@ -574,6 +660,7 @@ static int mac_window_open_agl(struct mac_window_state *state,const char *title)
     state->agl_format=format;state->agl=aglCreateContext(format,NULL);
     if(!state->agl||!aglSetDrawable(state->agl,GetWindowPort(state->window))||
        !aglSetCurrentContext(state->agl))return 0;
+    mac_window_gl_gate(state);
     mac_window_apply_vsync(state->agl);
     if(mac_input_install(&state->input,&state->input_handler)!=noErr)return 0;
     mac_input_focus_lost_hook=mac_window_focus_lost;
