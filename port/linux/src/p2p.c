@@ -3147,8 +3147,15 @@ static void handoff_readable(void)
 	p2p_invite_received(invite);
 }
 
-#ifdef HALO_ANDROID
-/* the app's activity writes a link it was opened with here */
+/* port: the Mac's launcher writes the halo:// link it was opened with to the same file (port/mac/app/launcher_invite.c);
+the Mac build compiles this with HALO_MAC. Without it a link was never read on the Mac: the game started and joined
+nothing. */
+#if defined(HALO_ANDROID) || defined(HALO_MAC)
+#define P2P_INVITE_FILE 1
+#endif
+
+#ifdef P2P_INVITE_FILE
+/* the app's activity (or the Mac's launcher) writes a link it was opened with here */
 static void poll_invite_file(void)
 {
 	static unsigned long checked_time;
@@ -3416,7 +3423,7 @@ static void *p2p_thread(void *unused)
 		update_reaching();
 		update_upnp();
 		p2p_discord_update();
-#ifdef HALO_ANDROID
+#ifdef P2P_INVITE_FILE
 		poll_invite_file();
 #endif
 #ifdef HALO_PROFILE

@@ -542,7 +542,8 @@ for arch in ${MAC_ARCHS:-ppc i386}; do
         obj="$out/${name}_$arch.o"
         shim=
         case "$name" in
-            p2p|p2p_discord|p2p_lobby|p2p_signal) shim="-include port/mac/platform.h" ;;
+            p2p) shim="-include port/mac/platform.h -DHALO_MAC" ;;
+            p2p_discord|p2p_lobby|p2p_signal) shim="-include port/mac/platform.h" ;;
             # port: the mods folder's scan and file reads (the stubs in engine_upstream_stubs.c are gone), with the
             # C library's files in place of SDL's (HALO_MAC)
             port_mods) shim="-include port/mac/platform.h -DHALO_MAC -Iport/third_party/tomlc17" ;;
