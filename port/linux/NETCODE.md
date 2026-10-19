@@ -84,6 +84,13 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   actor pool, `halo_port_capacity.h`, holds 1024). Riders a dropship has no
   seats for are kept, and placed beside its riders once they get out. Only
   the host runs the AI, so the clients see them as the host's other actors.
+
+  Each player chooses whether to play with friendly fire between players
+  (`network.coop_own_friendly_fire`, FRIENDLY FIRE in the pause menu): two
+  players hurt each other only if both do. A client's input tells the host
+  its choice. A player with no input for over 70 seconds (no button pressed
+  or let go, no stick or trigger held) is hurt by every player, whatever
+  either chose, until their next input.
 - **Host authoritative.** The host alone decides damage, deaths, spawns,
   pickups, scores and the game's objects; clients do not decide them but
   apply what the host sends.
@@ -151,7 +158,7 @@ lockstep netcode was removed, set to play it): it tells the player why.
 
 ## Versions
 
-Infection uses protocol version 35: Slayer's existing 24-byte engine-variant union
+Infection uses protocol version 36: Slayer's existing 24-byte engine-variant union
 contains an `INF1` marker and 12 bytes of optional rules. The full variant
 (104 bytes), shared options (28 bytes) and settings packet retain their
 upstream layouts. Legacy Slayer variants have no marker and stay disabled.
@@ -160,7 +167,8 @@ when enabled: identities, roles, scores, phase, round/revision and winner.
 Clients validate the complete snapshot before applying it; the host owns
 conversion, equipment and victory. Remote skull damage uses the original
 hit validation and recomputes the eligible zombie's multiplier on the host.
-Version 35 rejects upstream 31 and earlier development builds through 34,
+Version 36 retains upstream 32's aim-assist agreement and rejects earlier
+development builds through 35,
 whose options and game-state agreements differ, even in ordinary modes.
 
 
@@ -236,7 +244,10 @@ of the netcode stamped more than 15 seconds from its sender's latest, the
 host takes a client's hits, Discord user and readiness only over its
 connection, and the host answers each machine's datagrams where they come
 from, so that a second copy of the game on one computer, on a port of its
-own, plays too.
+own, plays too; version 32 sends the host's mouse aim assist policy
+(distributed message 90, `network_aim_assist.c`), which a client must not
+ignore, and has a client's input say whether its player plays co-op with
+friendly fire.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -394,6 +405,15 @@ host sends them none, and drop the kinds as unknown.
 A speed hack of less than a tenth is let be: the host's bounds on how far
 and how fast a client's player moves and fires hold it to the host's time
 anyway.
+
+The host's AIM ASSIST option in Player Options defaults to ALLOWED.
+BLOCK M+KB overrides optional mouse magnetism on every machine, including
+the host. Aiming with the controller or touch retains its existing behavior;
+the player's saved preference and the bullets' autoaim are unchanged.
+`network_aim_assist.c` sends the policy reliably on client ready and on
+change. Clients take it only from the host and default to blocked until it
+arrives. This adds distributed message 90; network version 32 requires
+matching builds so an older client cannot silently ignore the rule.
 
 ## Joining a game in progress
 
@@ -834,12 +854,25 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
   took to come (the reliable channel's resending holds it up), that is
   when the shooter saw the target (as far back as the host keeps). A
   report made more than three seconds ago is refused.
+- **The latency meter** (`latency_meter.c`, `display.latency_meter`) shows
+  the same round trips, timed in milliseconds by when each machine sent the
+  tick they come back naming (the last 64 ticks' send times kept), with
+  nothing more sent: the host each client's, by the host tick its input
+  names; a client its own, by its tick the host's state of its player (or,
+  driving, its vehicle) says the host has it at. Each is the network both
+  ways plus each machine's wait for its next tick, so a LAN reads 15 to 35
+  ms. A client that has heard nothing from the host for two seconds shows
+  "Connection problem"; the host logs a client silent as long. With the
+  meter on, the scoreboard shows these where the machine has them (the
+  host every client's, a client its own players'), and the host's measure
+  in ticks, which every machine is sent, for the others.
 
 ## Testing
 
 `debug.network_test` (`port/linux/game/network_test.c`) hosts or joins a
 game without the menus (in a team game the joining player takes the other
-team), and `debug.test_input` plays controller 1 with a scripted bot (or,
+team; `local:<map>` plays a local split screen game instead, which the
+bots of `bots.count` join), and `debug.test_input` plays controller 1 with a scripted bot (or,
 `look:<seed>`, one that stands still, only turning and looking up and
 down); each machine logs every player's position, health and shields,
 where they aim and face, their animation state and how hard they move,

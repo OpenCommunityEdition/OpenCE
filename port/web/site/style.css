@@ -110,6 +110,12 @@ code { font-size: 0.95em; }
   flex-direction: column;
   gap: 6px;
 }
+@media (min-width: 939px) {
+  .menu { 
+    position: sticky;
+    top: 20px; 
+  }
+}
 .menu > a {
   display: block;
   padding: 12px 22px;

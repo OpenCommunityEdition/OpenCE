@@ -38,7 +38,7 @@ union. `game_variant` stays 104 bytes, shared options stay 28 bytes, and GPVO v1
 saved profiles keep their original format. Ordinary legacy variants default OFF.
 Older experimental Infection profiles with extended GPVO records must be recreated;
 this implementation does not migrate those unpublished profile extensions.
-All participants need **protocol 35** builds and their own game data.
+All participants need **protocol 36** builds and their own game data.
 
 ## Build and check
 
