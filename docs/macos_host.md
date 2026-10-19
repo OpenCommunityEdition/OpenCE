@@ -295,6 +295,36 @@ cleared to black until the Metal renderer draws in it. The guest reads the
 window's size in pixels each frame, so a resize reaches the game on its
 next frame. Closing the window quits the app.
 
+Until the Metal renderer draws, the app's windows have a stand-in OpenGL
+context. `host_sdl_gl_create_context`, `host_sdl_gl_make_current`,
+`host_sdl_gl_set_swap_interval` and `host_sdl_gl_swap_window` succeed for
+them, so the guest's video starts and its event loop runs. The OpenGL ES
+imports themselves are still refused, so nothing is drawn.
+
+### The keyboard and mouse
+
+The window's view passes AppKit's key, modifier, mouse, wheel and focus
+events to the host (`halo_host_post_*`). `port/macos/host/host_input.c`
+turns them into the SDL events that the guest's event loop reads
+(`port/linux/src/sdl_platform.c`), and keeps them in a queue until the guest
+polls. With the app's windows, `host_sdl_poll_event` returns those events
+first, then SDL's own (the gamepads'). `host_sdl_set_relative_mouse`
+captures the mouse through the app: the pointer is hidden, held at the
+window's middle, and only relative moves are reported.
+
+- **Keys:** a key is its place on the keyboard. AppKit's key codes map to
+  SDL's scancodes in a table. A key with no scancode, such as Fn, is not
+  sent. Caps lock is a press and a release each time it changes.
+- **Mouse:** the moves since the last poll are one motion event. Positions
+  are in points from the view's top left. A trackpad's scrolling is a
+  tenth of a notch per point.
+- **Focus:** losing the focus releases the mouse at once and lets go of
+  the modifiers held. Gaining it captures the mouse again if the game
+  still wants it, because the guest, built as Android's, does not ask
+  again.
+- **A full queue** keeps the events it already has and drops new ones (the
+  guest polls each frame).
+
 A guest crash is reported with its registers, the exception's syndrome and
 the guest's frames, by address in the image (`llvm-symbolizer` on
 `halo_guest.elf` names them).

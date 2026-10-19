@@ -272,6 +272,24 @@ def test_the_dispatcher_runs_window_imports_on_the_main_thread(tmp_path):
     assert f"static void main_thread_{index}(struct host_call *call)\n{{\n\thost_window_size_in_pixels(" in text
     _, events = dispatch_case(text, "host_sdl_poll_event")
     assert "host_call_on_main_thread(" in events
+    # (the input, the app's or else SDL's: host_input.c)
+    for name, host in (("host_sdl_poll_event", "host_input_poll_event"),
+                       ("host_sdl_set_relative_mouse", "host_input_set_relative_mouse")):
+        index, _ = dispatch_case(text, name)
+        function = re.search(rf"static void main_thread_{index}\(struct host_call \*call\)\n\{{\n(.*?)\n\}}\n",
+                             text, re.S)
+        assert function and f"{host}(" in function.group(1), name
+    # (the app's windows' stand-in OpenGL context, else SDL's: host_window.c)
+    for name in ("create_context", "make_current", "set_swap_interval", "swap_window"):
+        index, body = dispatch_case(text, f"host_sdl_gl_{name}")
+        function = re.search(rf"static void main_thread_{index}\(struct host_call \*call\)\n\{{\n(.*?)\n\}}\n",
+                             text, re.S)
+        called = body + (function.group(1) if function else "")
+        assert f"host_window_gl_{name}(" in called and f"host_sdl_gl_{name}(" not in called, name
+    # (making one asks the app about its window, which AppKit answers on the
+    # main thread)
+    _, body = dispatch_case(text, "host_sdl_gl_create_context")
+    assert "host_call_on_main_thread(" in body
     # what needs no main thread is called where it is asked for
     for name in ("host_sdl_ticks", "host_sdl_gl_swap_window", "host_sdl_put_audio_stream_data"):
         _, body = dispatch_case(text, name)

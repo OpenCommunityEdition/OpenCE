@@ -64,6 +64,10 @@ def test_app_graph(monkeypatch):
     inputs = rule.group(1)
     assert "build/macos/libhalo_host.a" in inputs and "build/macos/halo_guest.elf" in inputs
     assert "port/macos/app/Sources/OpenCE/" in inputs
+    # SwiftPM does not count the libraries given to its linker as inputs, so
+    # its product is removed first: a changed host library is linked again
+    command = re.search(r"^rule macos_app\n  command = (.*)$", flat, re.MULTILINE)
+    assert command and command.group(1).startswith("rm -f build/macos/swift/release/OpenCE && "), command
     # and with the runtime's Swift bindings, generated from its library
     assert "port/macos/app/Sources/OpenCERuntime/opence_runtime.swift" in inputs
     bindings = re.search(r"^build (port/macos/app/Sources/OpenCERuntime/opence_runtime\.swift .*): "

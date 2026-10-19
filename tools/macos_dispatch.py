@@ -48,7 +48,7 @@ FLOATS = {"float", "double"}
 MAIN_THREAD = {
     "host_sdl_init", "host_sdl_create_window", "host_sdl_window_size_in_pixels", "host_sdl_set_relative_mouse",
     "host_sdl_poll_event", "host_sdl_set_clipboard_text", "host_sdl_get_clipboard_text", "host_sdl_show_toast",
-    "host_sdl_show_simple_message_box", "host_sdl_show_message_box",
+    "host_sdl_show_simple_message_box", "host_sdl_show_message_box", "host_sdl_gl_create_context",
 }
 
 # imports whose host function is the macOS host's own, with the same
@@ -56,6 +56,14 @@ MAIN_THREAD = {
 HOST_FUNCTIONS = {
     "host_sdl_create_window": "host_window_create",
     "host_sdl_window_size_in_pixels": "host_window_size_in_pixels",
+    # (a stand-in context for the app's windows until the Metal renderer)
+    "host_sdl_gl_create_context": "host_window_gl_create_context",
+    "host_sdl_gl_make_current": "host_window_gl_make_current",
+    "host_sdl_gl_set_swap_interval": "host_window_gl_set_swap_interval",
+    "host_sdl_gl_swap_window": "host_window_gl_swap_window",
+    # (the app's keyboard and mouse, then SDL's events: host_input.c)
+    "host_sdl_poll_event": "host_input_poll_event",
+    "host_sdl_set_relative_mouse": "host_input_set_relative_mouse",
 }
 
 

@@ -1,6 +1,7 @@
 // The game's windows: what the host's window imports
 // (port/macos/host/host_window.c) make and measure, through the app's
-// backend (Sources/OpenCE/WindowBackend.swift).
+// backend (Sources/OpenCE/WindowBackend.swift), and their keyboard, mouse
+// and focus (GameInput.swift).
 
 import AppKit
 import OpenCEShell
@@ -23,6 +24,9 @@ public final class GameWindow: NSWindow {
         contentMinSize = NSSize(width: 320, height: 240)
         backgroundColor = .black
         contentView = gameView
+        acceptsMouseMovedEvents = true
+        initialFirstResponder = gameView
+        makeFirstResponder(gameView)
     }
 
     public override func close() {
@@ -38,8 +42,15 @@ public final class GameWindow: NSWindow {
 public final class GameWindows {
     private var windows: [UInt32: GameWindow] = [:]
     private var nextHandle: UInt32 = 1
+    private var focusObservers: [UInt32: [NSObjectProtocol]] = [:]
+    /// The window the mouse is captured for.
+    private var captured: UInt32?
     /// Called when the player closes one of the windows.
     public var onClose: ((UInt32) -> Void)?
+    /// Where the windows' keyboard, mouse and focus go.
+    public var input: GameInputSink?
+    /// The pointer the windows capture.
+    public var pointer: PointerControl = SystemPointer()
 
     public init() {}
 
@@ -54,9 +65,18 @@ public final class GameWindows {
         let handle = nextHandle
         nextHandle &+= 1
         windows[handle] = window
+        window.gameView.onInput = { [weak self] event in
+            self?.input?.gameInput(window: handle, event)
+        }
+        focusObservers[handle] = [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification].map { name in
+            NotificationCenter.default.addObserver(forName: name, object: window, queue: nil) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.input?.gameInput(window: handle, .focus(name == NSWindow.didBecomeKeyNotification))
+                }
+            }
+        }
         window.closed = { [weak self] in
-            self?.windows[handle] = nil
-            self?.onClose?(handle)
+            self?.closed(handle)
         }
         if show {
             window.center()
@@ -78,5 +98,34 @@ public final class GameWindows {
 
     public func close(_ handle: UInt32) {
         windows[handle]?.close()
+    }
+
+    private func closed(_ handle: UInt32) {
+        if captured == handle, let window = windows[handle] {
+            captured = nil
+            pointer.setCaptured(false, in: window)
+        }
+        focusObservers[handle]?.forEach(NotificationCenter.default.removeObserver)
+        focusObservers[handle] = nil
+        windows[handle] = nil
+        onClose?(handle)
+    }
+
+    /// Captures the mouse for the window (hidden, held in it, moving only
+    /// relatively), or lets it go; false for a handle it does not have. The
+    /// host lets it go while the window has not the focus (host_input.c).
+    public func setRelativeMouse(_ handle: UInt32, _ enabled: Bool) -> Bool {
+        guard let window = windows[handle] else { return false }
+        if enabled, captured != handle {
+            if let other = captured, let otherWindow = windows[other] {
+                pointer.setCaptured(false, in: otherWindow)
+            }
+            captured = handle
+            pointer.setCaptured(true, in: window)
+        } else if !enabled, captured == handle {
+            captured = nil
+            pointer.setCaptured(false, in: window)
+        }
+        return true
     }
 }

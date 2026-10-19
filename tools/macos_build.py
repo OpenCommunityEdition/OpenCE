@@ -215,9 +215,11 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
                      f"{swift} %s --quiet --disable-sandbox --package-path {APP_DIR} "
                      f"--scratch-path {swift_build} --cache-path {swift_build}/cache "
                      f"--config-path {swift_build}/config --security-path {swift_build}/security {linker_flags}")
+    # (SwiftPM does not count the libraries given to its linker as inputs: its
+    # product is removed first, so that a changed host library is linked)
     n.rule(
         name="macos_app",
-        command=(f"{swift_package % 'build -c release'} && "
+        command=(f"rm -f {swift_build}/release/OpenCE && {swift_package % 'build -c release'} && "
                  f"$python tools/macos_app.py {swift_build}/release/OpenCE {image} {ENTITLEMENTS} {app_codesign} "
                  f"{APP_VERSION} {app}"),
         description="MACOS APP $out",

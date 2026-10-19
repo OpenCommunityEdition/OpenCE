@@ -139,6 +139,28 @@ def test_the_window_imports_use_the_apps_windows_natively(tmp_path):
     assert (result.returncode, result.stdout.strip()) == (0, "ok"), result.stdout + result.stderr
 
 
+def test_the_apps_keyboard_and_mouse_become_sdl_events_natively(tmp_path):
+    # port/macos/host/host_input.c, built for this Mac with SDL's headers and
+    # library: AppKit's key codes, modifiers, buttons, wheel and focus become
+    # the SDL events the guest polls for, and focus loss releases the mouse
+    import os
+    import subprocess
+
+    exe = tmp_path / "host_input_test"
+    sdl_include = os.environ.get("HALO_MACOS_SDL_INCLUDE", "")
+    sdl_lib = os.environ.get("HALO_MACOS_SDL_LIB", "")
+    build = subprocess.run([
+        "cc", "-std=gnu11", "-Wall", "-Werror", "-D_DARWIN_C_SOURCE", "-mmacosx-version-min=26.0",
+        "-Iport/macos/host", "-Ibuild/macos/runtime", "-Iport/android/include",
+        "-Iport/android/guest/libc/arch/arm64_32", f"-I{sdl_include}",
+        "port/macos/tests/host_input_test.c", "port/macos/host/host_input.c", "port/macos/host/host_window.c",
+        f"-L{sdl_lib}", f"-Wl,-rpath,{sdl_lib}", "-lSDL3", "-o", str(exe),
+    ], cwd=ROOT, capture_output=True, text=True)
+    assert build.returncode == 0, build.stderr
+    result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=30)
+    assert (result.returncode, result.stdout.strip()) == (0, "ok"), result.stdout + result.stderr
+
+
 # ---------- SDL, headless
 
 SDL_DRIVERS = {"SDL_AUDIO_DRIVER": "dummy", "SDL_VIDEO_DRIVER": "dummy"}

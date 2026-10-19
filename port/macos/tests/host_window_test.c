@@ -4,7 +4,8 @@ HOST_WINDOW_TEST.C
 A native test of port/macos/host/host_window.c (tools/test_macos_vm.py):
 without windows of the app's, the window imports are SDL's (stand-ins
 here); once the app installs its own, they are the app's, which keep the
-size each window has now.
+size each window has now. Their OpenGL context is a stand-in until the
+Metal renderer: it is made, made current and swapped, and draws nothing.
 */
 
 #include "host.h"
@@ -33,6 +34,31 @@ void host_sdl_window_size_in_pixels(uint32_t window, int *width, int *height)
 {
 	*width = window == 1 ? 640 : 0;
 	*height = window == 1 ? 480 : 0;
+}
+
+static int sdl_contexts, sdl_swaps;
+
+uint32_t host_sdl_gl_create_context(uint32_t window)
+{
+	(void)window;
+	return (uint32_t)++sdl_contexts;
+}
+
+int host_sdl_gl_make_current(uint32_t window, uint32_t context)
+{
+	return window != 0 && context != 0;
+}
+
+int host_sdl_gl_set_swap_interval(int interval)
+{
+	return interval == 0;
+}
+
+int host_sdl_gl_swap_window(uint32_t window)
+{
+	(void)window;
+	sdl_swaps++;
+	return 1;
 }
 
 /* ---------- the app's: a window of twice its points (a Retina screen) */
@@ -84,8 +110,14 @@ int main(void)
 	CHECK(window == 1 && sdl_windows == 1);
 	host_window_size_in_pixels(window, &width, &height);
 	CHECK(width == 640 && height == 480);
+	/* and SDL's OpenGL context */
+	CHECK(host_window_gl_create_context(window) == 1 && sdl_contexts == 1);
+	CHECK(host_window_gl_make_current(window, 1) == 1);
+	CHECK(host_window_gl_set_swap_interval(1) == 0);
+	CHECK(host_window_gl_swap_window(window) == 1 && sdl_swaps == 1);
 
 	memset(&windows, 0, sizeof(windows));
+	memset(&backend, 0, sizeof(backend));
 	backend.context = &windows;
 	backend.create = app_create;
 	backend.size_in_pixels = app_size_in_pixels;
@@ -107,6 +139,14 @@ int main(void)
 	width = height = -1;
 	host_window_size_in_pixels(7, &width, &height);
 	CHECK(width == 0 && height == 0);
+
+	/* the app's windows have a stand-in context, which SDL is not asked for */
+	CHECK(host_window_gl_create_context(window) != 0 && sdl_contexts == 1);
+	CHECK(host_window_gl_make_current(window, host_window_gl_create_context(window)) == 1);
+	CHECK(host_window_gl_set_swap_interval(1) == 1);
+	CHECK(host_window_gl_swap_window(window) == 1 && sdl_swaps == 1);
+	/* (but a window the app does not have has none) */
+	CHECK(host_window_gl_create_context(7) == 0);
 
 	/* and the app may take its windows back */
 	halo_host_set_window_backend(NULL);

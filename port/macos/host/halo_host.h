@@ -38,10 +38,26 @@ struct halo_host_window_backend
 	void *context;
 	uint32_t (*create)(void *context, const char *title, int width, int height, int64_t flags);
 	void (*size_in_pixels)(void *context, uint32_t window, int *width, int *height);
+	/* the mouse captured (hidden, held in the window, moving relatively)
+	or let go; 1 if done. host_input.c lets it go while the window has
+	not the focus */
+	int (*set_relative_mouse)(void *context, uint32_t window, int enabled);
 };
 
 /* the windows the guest makes from now on are backend's (copied), or SDL's
 again with NULL: called before the guest makes its window */
 void halo_host_set_window_backend(const struct halo_host_window_backend *backend);
+
+/* the app's windows' keyboard and mouse, as AppKit gives them (host_input.c),
+for the guest's next polls; on the main thread. key_code is an NSEvent's
+keyCode; flags its modifierFlags, for a modifier key's flagsChanged; x and
+y are in the view's points from its top left; button numbers are AppKit's
+(0 left, 1 right, 2 middle); precise is a trackpad's scrolling */
+void halo_host_post_key(uint32_t window, uint16_t key_code, int down, int repeat);
+void halo_host_post_modifiers(uint32_t window, uint16_t key_code, uint64_t flags);
+void halo_host_post_mouse_motion(uint32_t window, float x, float y, float dx, float dy);
+void halo_host_post_mouse_button(uint32_t window, int number, int down, float x, float y);
+void halo_host_post_wheel(uint32_t window, float dx, float dy, int precise);
+void halo_host_post_focus(uint32_t window, int has_focus);
 
 #endif

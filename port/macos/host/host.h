@@ -119,15 +119,43 @@ int host_main_thread_queued(void);
 
 /* ---------- windows (host_window.c)
 
-The window imports (host_sdl_create_window, host_sdl_window_size_in_pixels)
-are these: the app's windows when it has installed them
-(halo_host_set_window_backend), else SDL's (host_sdl.c). */
+The window imports (host_sdl_create_window, host_sdl_window_size_in_pixels
+and the OpenGL context's) are these: the app's windows when it has
+installed them (halo_host_set_window_backend), else SDL's (host_sdl.c). The
+app's windows have a stand-in context until the Metal renderer. */
 
 uint32_t host_window_create(const char *title, int width, int height, int64_t flags);
 void host_window_size_in_pixels(uint32_t window, int *width, int *height);
+uint32_t host_window_gl_create_context(uint32_t window);
+int host_window_gl_make_current(uint32_t window, uint32_t context);
+int host_window_gl_set_swap_interval(int interval);
+int host_window_gl_swap_window(uint32_t window);
+/* the app's windows, or NULL while it has installed none */
+struct halo_host_window_backend;
+const struct halo_host_window_backend *host_window_backend(void);
 /* SDL's (port/android/host/host_sdl.c) */
 uint32_t host_sdl_create_window(const char *title, int width, int height, int64_t flags);
 void host_sdl_window_size_in_pixels(uint32_t window, int *width, int *height);
+uint32_t host_sdl_gl_create_context(uint32_t window);
+int host_sdl_gl_make_current(uint32_t window, uint32_t context);
+int host_sdl_gl_set_swap_interval(int interval);
+int host_sdl_gl_swap_window(uint32_t window);
+
+/* ---------- the keyboard and mouse (host_input.c)
+
+The event imports (host_sdl_poll_event, host_sdl_set_relative_mouse) are
+these: the app's events, then SDL's, when the app has windows, else SDL's. */
+
+/* the events kept for the guest's polls */
+#define HOST_INPUT_QUEUE_SIZE 256
+
+/* an AppKit key code's SDL scancode, or SDL_SCANCODE_UNKNOWN (0) */
+int32_t host_input_scancode(uint16_t key_code);
+int host_input_poll_event(void *event);
+int host_input_set_relative_mouse(uint32_t window, int enabled);
+/* SDL's (port/android/host/host_sdl.c) */
+int host_sdl_poll_event(void *event);
+int host_sdl_set_relative_mouse(uint32_t window, int enabled);
 
 /* ---------- system calls (host_syscall.c) */
 
