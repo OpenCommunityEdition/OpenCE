@@ -65,8 +65,14 @@ static struct
 	int permanent_only;
 } upnp;
 
+/* port: a swap on a little-endian host, none on a big-endian one (the Mac's PowerPC), where a host order value is
+already in network byte order; swapping unconditionally put the broker's port wrong there */
 static unsigned short swap_short(unsigned short value)
 {
+	const unsigned short probe = 1;
+
+	if (!*(const unsigned char *)&probe)
+		return value;
 	return (unsigned short)(value << 8 | value >> 8);
 }
 
@@ -228,7 +234,16 @@ int posix_upnp_forward_udp(unsigned short port, unsigned short preferred_port, p
 			strupnperror(result) ? strupnperror(result) : "unknown");
 		return 0;
 	}
-	*external_address = (posix_ulong)(parts[0] | parts[1] << 8 | parts[2] << 16 | (posix_ulong)parts[3] << 24);
+	/* (the four bytes in the order they were read, which is network byte order on any host) */
+	{
+		unsigned char address_bytes[sizeof(posix_ulong)] = { 0 };
+
+		address_bytes[0] = (unsigned char)parts[0];
+		address_bytes[1] = (unsigned char)parts[1];
+		address_bytes[2] = (unsigned char)parts[2];
+		address_bytes[3] = (unsigned char)parts[3];
+		memcpy(external_address, address_bytes, sizeof(address_bytes));
+	}
 	*external_port = swap_short(try_port);
 	return 1;
 }

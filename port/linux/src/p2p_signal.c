@@ -370,8 +370,14 @@ static int elapsed(unsigned long since, unsigned long time)
 	return (unsigned int)(p2p_now() - since) >= (unsigned int)time;
 }
 
+/* port: a swap on a little-endian host, none on a big-endian one (the Mac's PowerPC), where a host order value is
+already in network byte order; swapping unconditionally put the broker's port wrong there */
 static unsigned short network_short(unsigned short value)
 {
+	const unsigned short probe = 1;
+
+	if (!*(const unsigned char *)&probe)
+		return value;
 	return (unsigned short)(value << 8 | value >> 8);
 }
 
@@ -1479,6 +1485,9 @@ static int broker_acknowledged(struct broker *broker, const unsigned char *body,
 		broker_close(broker, 1);
 		return 0;
 	}
+	/* port: seen once connected, so that a log of a machine that never reaches a broker (as the G4's did, with the
+	broker's port swapped) says so by lacking this line */
+	platform_log("Internet play: connected to the signaling broker %s", broker->host);
 	if (broker->protocol == 5 && get_variable(body, size, &offset, &properties))
 	{
 		int end = offset + properties > size ? size : offset + properties;
