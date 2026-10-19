@@ -28,7 +28,8 @@ calls them from PC_MENU_FUNCTION_BASE on):
   (OK) writes those changed and applies the window's (the rest follow
   config.toml themselves), "port settings defaults" shows the defaults,
   "port settings help" the help of the row chosen (and Video Setup's
-  Resolution or Window Size, for the display mode shown);
+  Resolution or Window Size, for the display mode shown, and the Mac's
+  CHECK NOW FOR UPDATES, hidden without an update feed);
 - Controls Setup's: the keyboard and mouse's controls, two bindings each,
   shown a group at a time ("controls update menu"); "controls begin
   binding" takes the next key or button pressed for the binding left and
@@ -1689,6 +1690,53 @@ static void hud_button_style_row_show(struct widget_instance *list)
 			index++;
 		list->focused_child = hud->parent;
 		list->parameters.list.selected_index = index;
+	}
+}
+
+/* Network Setup's CHECK NOW FOR UPDATES (tools/port_settings.py, the Mac's
+alone) is shown only when this build has an update feed: the launcher says so
+in HALO_MAC_UPDATE_LAUNCHER (updates_check). Without one the row is hidden and
+the rows after it close the gap, as the HUD button style's do. */
+static void updates_row_show(struct widget_instance *list)
+{
+	struct widget_instance *row = named(list, "op_update_now", 0);
+	struct widget_instance *child, *previous;
+	boolean visible = FALSE;
+
+	if (!row)
+		return;
+#ifdef HALO_MAC
+	{
+		char const *launcher = getenv("HALO_MAC_UPDATE_LAUNCHER");
+
+		visible = launcher && launcher[0];
+	}
+#endif
+	if (row->visible == visible)
+		return;
+	for (child = row->next; child; child = child->next)
+		if (!strncmp(child->name, "op_", 3))
+			child->vertical_offset += visible ? 30 : -30;
+	row->visible = visible;
+	if (!visible && list->focused_child == row)
+	{
+		short index = 0;
+
+		/* (the row before it, or the one after it if it was the first) */
+		for (previous = NULL, child = list->child; child && child != row; child = child->next)
+			previous = child, index++;
+		if (previous)
+			index--;
+		else
+		{
+			previous = row->next;
+			index = 1;
+		}
+		if (previous)
+		{
+			list->focused_child = previous;
+			list->parameters.list.selected_index = index;
+		}
 	}
 }
 
@@ -6700,6 +6748,7 @@ void pc_menu_game_data_function_invoke(
 	{
 		video_rows_show(widget);
 		hud_button_style_row_show(widget);
+		updates_row_show(widget);
 		settings_help(widget);
 	}
 	else if (!strcmp(name, "controls update menu"))
