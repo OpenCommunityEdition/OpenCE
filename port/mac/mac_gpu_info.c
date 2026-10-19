@@ -213,7 +213,8 @@ static const char *const adaptive_rung_names[MAC_ADAPT_RUNGS] =
     "detail objects off", "particles no wider than 96 pixels", "decals off", "lens flares off",
     "scenery and objects: twice the minimum pixels, a lower detail level", "scenery and objects: four times the minimum pixels, two levels lower",
     "planar fog and fog screen off", "particles no wider than 48 pixels", "models at the lowest level of detail",
-    "bipeds and vehicles under 12 pixels left out", "bipeds and vehicles under 24 pixels left out", "480 lines"
+    "bipeds and vehicles under 12 pixels left out", "bipeds and vehicles under 24 pixels left out",
+    "bipeds and vehicles under 48 pixels left out", "480 lines"
 };
 
 static struct mac_governor adaptive;

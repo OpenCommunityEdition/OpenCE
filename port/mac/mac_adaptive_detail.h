@@ -27,6 +27,7 @@ enum
     MAC_ADAPT_MODELS_LOWEST,    /* every model drawn at a tenth of its size on screen for its level of detail: the lowest but for the nearest */
     MAC_ADAPT_UNITS_SMALL,      /* bipeds and vehicles under 12 pixels (and what they carry) left out: a draw is 5 a biped */
     MAC_ADAPT_UNITS_MEDIUM,     /* and under 24 pixels */
+    MAC_ADAPT_UNITS_LARGE,      /* and under 48 pixels (iBook b30's battle: 2 ms; under 80 pixels bought 0.4 ms more and was left out) */
     MAC_ADAPT_RESOLUTION,       /* the frame drawn with the Xbox's 480 lines, the last step */
     MAC_ADAPT_RUNGS
 };

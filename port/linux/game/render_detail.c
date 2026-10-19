@@ -293,7 +293,7 @@ static void render_detail_governor_apply(
 	}
 	if (level > MAC_ADAPT_UNITS_SMALL)
 	{
-		unit_pixels = level > MAC_ADAPT_UNITS_MEDIUM ? 24.f : 12.f;
+		unit_pixels = level > MAC_ADAPT_UNITS_LARGE ? 48.f : level > MAC_ADAPT_UNITS_MEDIUM ? 24.f : 12.f;
 	}
 
 	render_detail_scenery_pixels = scenery > 0.f && scenery < 4096.f ? scenery : 0.f;

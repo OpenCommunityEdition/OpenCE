@@ -7,7 +7,7 @@ static int failures;
 #define CHECK(c) do { if (!(c)) { printf("FAIL line %d: %s\n", __LINE__, #c); failures++; } } while (0)
 
 /* each rung takes this many milliseconds off a frame */
-static const double gain[MAC_ADAPT_RUNGS] = { 8.0, 2.0, 1.0, 1.0, 5.0, 4.0, 2.0, 1.0, 3.0, 3.0, 3.0, 6.0 };
+static const double gain[MAC_ADAPT_RUNGS] = { 8.0, 2.0, 1.0, 1.0, 5.0, 4.0, 2.0, 1.0, 3.0, 3.0, 3.0, 3.0, 6.0 };
 
 static double cost(double base, int level)
 {
