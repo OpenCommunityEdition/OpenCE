@@ -18,7 +18,7 @@
     - [x] Implement it in the Swift shell
 - [x] Task: Conductor - User Manual Verification 'Phase 1: The Swift app runs the VM host' (Protocol in workflow.md)
 
-## Phase 2: Window, native input and audio
+## Phase 2: Window, native input and audio [checkpoint: 9ab0a0c4]
 - [x] Task: The window and its Metal layer 01316243
     - [x] Write tests: host_sdl_create_window and host_sdl_window_size_in_pixels report the backing size, and a resize is reported (XCTest with a window off-screen)
     - [x] An AppKit window with a CAMetalLayer at the backing scale; live resize; native fullscreen from the menu bar and a key; a cleared frame each present (manual check: window lifecycle)
@@ -31,7 +31,7 @@
 - [x] Task: Sound with AVAudioEngine 84e34cda
     - [x] Write tests: the audio-stream imports' format conversion, buffering and callbacks (host_audio_test.c, native); the engine's source node renders what the host gives (XCTest, offline rendering); vm_sdl's audio test still plays through SDL in the command-line host
     - [x] Implement host_sdl_open_audio_stream and the rest with AVAudioEngine
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Window, native input and audio' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Window, native input and audio' (Protocol in workflow.md)
 
 ## Phase 3: The command ring and the Metal backend
 - [ ] Task: Define the ring's format
