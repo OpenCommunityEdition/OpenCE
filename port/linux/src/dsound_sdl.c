@@ -1605,12 +1605,14 @@ static unsigned long choose_output_channels(SDL_AudioDeviceID device)
 	const char *setting = config_string("audio.channels");
 	SDL_AudioSpec format;
 
-	if (!strcmp(setting, "stereo"))
-		return 2;
 	if (!strcmp(setting, "5.1"))
 		return 6;
 	if (strcmp(setting, "auto"))
-		platform_log("audio.channels \"%s\" is not \"auto\", \"stereo\" or \"5.1\"; using auto", setting);
+	{
+		if (strcmp(setting, "stereo"))
+			platform_log("audio.channels \"%s\" is not \"auto\", \"stereo\" or \"5.1\"; using stereo", setting);
+		return 2;
+	}
 	if ((SDL_GetAudioDeviceFormat(device, &format, NULL) ||
 		SDL_GetAudioDeviceFormat(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &format, NULL)) && format.channels >= 6)
 		return 6;
@@ -1662,7 +1664,6 @@ static void audio_start(void)
 			SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, frames);
 		}
 #endif
-		snprintf(audio_device_name, sizeof(audio_device_name), "%s", audio_device_setting());
 		audio_device_read_at = config_changes();
 		audio_stream = SDL_OpenAudioDeviceStream(platform_audio_device(FALSE, audio_device_name), &spec,
 			audio_callback, NULL);
