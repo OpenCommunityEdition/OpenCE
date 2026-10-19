@@ -298,7 +298,12 @@ boolean machine_update(
 		}
 	}
 
-
+	/* port: the original carried the elevator's riders here, by the elevator
+	node's movement since the last tick, before this tick's node matrices
+	were computed: one tick late, and the wrong way as an elevator reverses.
+	machine_move_elevator_riders (below), which object_update calls after
+	computing them, carries them by this tick's movement instead, in single
+	player too. */
 	if (TEST_FLAG(machine->device.flags, _device_position_changed_bit))
 	{
 		object_translate(machine_index, &machine->object.position, NULL);
@@ -307,8 +312,6 @@ boolean machine_update(
 
 	return TRUE;
 }
-
-/* ---------- private code */
 
 /* port: sample the floor around its node recomputation, rather than carrying
 riders by the previous tick's movement (wrong when an elevator reverses). */
@@ -392,3 +395,5 @@ void machine_move_elevator_riders(
 		machine->machine.elevator_position = *node_position;
 	}
 }
+
+/* ---------- private code */

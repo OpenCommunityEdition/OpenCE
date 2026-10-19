@@ -19,8 +19,9 @@ rest as the host has it:
   (player_queues_new.c).
 - Every tick, a client sends the host where its own players' units are (it
   predicts them from its own input); the host takes that as they are,
-  within a tolerance, as later Halo engines do, at its next tick (on a
-  moving elevator, only across: its own elevator takes them up and down).
+  within a tolerance, as later Halo engines do, at its next tick (riding
+  an elevator, moving or underfoot at rest, only across: its own elevator
+  takes them up and down).
 - Every tick, the host sends every client every player's unit: which unit
   the player has, alive or not, the seat it rides, its shields and health
   (down, recharging, the damage they show), and where it is (dead: who
@@ -255,6 +256,13 @@ host has it (no further than that: between the two they would disagree for
 good, the host's player somewhere its own is not) */
 #define HOST_ACCEPT_TOLERANCE 3.5f
 #define LOCAL_CORRECTION_TOLERANCE 3.0f
+/* world units: how far below or above the host's echo of its prediction a
+client's own player standing on the same elevator may be and keep its own
+floor's height (distributed_correct_own_unit). The two machines' elevators
+are apart by what the platform travels in a round trip (the history below
+holds 64 ticks, two seconds); a greater difference is not that lag but a
+teleport, a fall or a platform out of step, and is corrected. */
+#define ELEVATOR_PHASE_TOLERANCE 4.0f
 /* how fast a client's own player's unit moves at most (world units a tick) */
 #define MAXIMUM_PREDICTED_SPEED 2.0f
 /* ... on foot: this many times as fast as a player runs and jumps, or as
@@ -1632,8 +1640,11 @@ static boolean distributed_apply_state(
 	return TRUE;
 }
 
-/* A remembered elevator lasts after a jump. Only a current floor contact
-allows ignoring a height difference caused by the platforms' different phases. */
+/* the elevator a unit stands on this tick, or NONE. A remembered elevator
+lasts after a jump. Only a current floor contact allows ignoring a height
+difference caused by the platforms' different phases. biped_update_moving
+(bipeds.c) sets elevator_ticks to 60 each tick the biped's physics finds it
+on an elevator, and counts it down from then on. */
 static long distributed_supported_elevator(
 	long unit_index)
 {
@@ -1719,13 +1730,15 @@ static void distributed_correct_own_unit(
 			error.j = state->position.y - own->position.y;
 			error.k = state->position.z - own->position.z;
 			/* The host echoes our prediction on its own elevator's floor. If
-			we still stand on that platform, a height error is its phase lag,
-			not player motion. Keep local floor contact; teleports across, a
-			jump, a different platform and unpredicted states correct normally. */
+			we still stand on that platform, a small height error is its phase
+			lag, not player motion. Keep local floor contact; teleports across,
+			a height error past the lag, a jump, a different platform and
+			unpredicted states correct normally. */
 			if (own->elevator_index != NONE &&
 				own->elevator_index == distributed_supported_elevator(unit_index) &&
 				error.i * error.i + error.j * error.j <=
-					LOCAL_CORRECTION_TOLERANCE * LOCAL_CORRECTION_TOLERANCE)
+					LOCAL_CORRECTION_TOLERANCE * LOCAL_CORRECTION_TOLERANCE &&
+				error.k >= -ELEVATOR_PHASE_TOLERANCE && error.k <= ELEVATOR_PHASE_TOLERANCE)
 				error.k = 0.0f;
 			if (!(error.i * error.i + error.j * error.j + error.k * error.k >
 				LOCAL_CORRECTION_TOLERANCE * LOCAL_CORRECTION_TOLERANCE))
@@ -2057,10 +2070,12 @@ static boolean distributed_on_foot_move_valid(
 	return dx * dx + dy * dy + rise * rise <= reach * reach && -dz <= fall_reach;
 }
 
-/* (the host) a moving elevator, or current floor contact at rest. A stop
-or reversal must not admit a delayed height under the floor. The remembered
-attachment alone, after leaving a stopped elevator, is not floor contact. */
-static boolean distributed_riding_moving_elevator(
+/* (the host) whether a unit rides an elevator: one that is moving (bipeds.c's
+elevator, kept a moment after the unit leaves its floor, as in a jump), or
+one at rest whose floor it stands on, since a stop or reversal must not
+admit a delayed height under the floor. The remembered elevator alone, after
+leaving a stopped one, is not riding it. */
+static boolean distributed_riding_elevator(
 	long unit_index)
 {
 	struct biped_datum *biped = (struct biped_datum *)object_try_and_get_and_verify_type(unit_index,
@@ -2070,20 +2085,21 @@ static boolean distributed_riding_moving_elevator(
 	if (!biped || biped->biped.elevator_object_index == NONE)
 		return FALSE;
 	elevator = (struct device_datum *)object_try_and_get_and_verify_type(biped->biped.elevator_object_index,
-		_object_mask_device);
+		_object_mask_machine);
 	return elevator && (elevator->device.position_velocity != 0.0f ||
 		distributed_supported_elevator(unit_index) != NONE);
 }
 
 /* (the host) a client's player's prediction of its unit on foot, taken
-where it says within a tolerance (distributed_apply_predictions). Riding a
-moving elevator, only across: a client's elevator follows the host's
-(network_coop.c), behind it by the time the host's word takes to come, and
-the client's prediction a round trip behind the host's elevator when it
-comes. Taken up and down too, it would put the host's unit under its own
-elevator's floor going up, to fall through it, and the client's after it
-(distributed_correct_own_unit); each machine's elevator carries its own
-unit up and down as it moves, and they meet where it stops. */
+where it says within a tolerance (distributed_apply_predictions). Riding an
+elevator (distributed_riding_elevator), only across: a client's elevator
+follows the host's (network_coop.c), behind it by the time the host's word
+takes to come, and the client's prediction a round trip behind the host's
+elevator when it comes. Taken up and down too, it would put the host's unit
+under its own elevator's floor going up, to fall through it, and the
+client's after it (distributed_correct_own_unit); each machine's elevator
+carries its own unit up and down as it moves, and they meet where it
+stops. */
 static void distributed_take_prediction(
 	short player_index,
 	long unit_index,
@@ -2095,7 +2111,7 @@ static void distributed_take_prediction(
 	real_point3d position = state->position;
 	real dx, dy, dz;
 
-	if (distributed_riding_moving_elevator(unit_index))
+	if (distributed_riding_elevator(unit_index))
 		position.z = object->object.position.z;
 	dx = position.x - object->object.position.x;
 	dy = position.y - object->object.position.y;

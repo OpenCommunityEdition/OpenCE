@@ -122,8 +122,9 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   than the player goes of their own (and up, what its tick added but a
   jump's), so a client that says it goes faster (a copy said to hover and
   fall, gaining the host's gravity each tick) gains nothing by it. A
-  teleporter, which moves the host's own copy too, starts afresh. On a
-  moving elevator the host takes only where a client's player is across,
+  teleporter, which moves the host's own copy too, starts afresh. Riding an
+  elevator (moving, or at rest with the player on its floor) the host takes
+  only where a client's player is across,
   not how high: the client's elevator follows the host's (co-op's device
   sync), so its player's height reaches the host a round trip behind the
   host's elevator, under its floor going up, where the host's copy would
@@ -132,11 +133,12 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   through a stop or reversal; the remembered attachment alone after leaving
   a stopped platform does not. A client echoing a prediction while still on
   the same elevator keeps its local floor height, rather than applying the
-  difference between the platforms' phases to its current height. Jumps,
-  leaving the platform and authoritative teleports correct normally. Rider
-  carry uses the platform's current collision displacement, including phase
-  corrections, rather than its previous tick's displacement. These changes
-  add no fields or messages to the network protocol.
+  difference between the platforms' phases to its current height, when that
+  difference is within 4 world units (the platform's travel over a round
+  trip); a greater one, jumps, leaving the platform and authoritative
+  teleports correct normally. Rider carry uses the platform's current
+  collision displacement, including phase corrections, rather than its
+  previous tick's displacement (network version 30).
 - **Shooter's hits.** A client reports what its own players hit; the host
   checks the report (the player's, a weapon they carry, fired from within
   its reach, the target where the host had it when the shooter saw it, no
@@ -209,7 +211,9 @@ limits, and readies a second weapon picked up while firing; version 29 names
 a Custom Edition map by its own name (`custom_maps\hugeass`, which every
 screen shows) and says which version it is by the map version of the game
 record, its hash's first 32 bits (the header checksum before), which a
-client finds its file by (below, "Map sharing").
+client finds its file by (below, "Map sharing"); version 30 carries an
+elevator's riders by its movement of the same tick, which the Xbox game did
+a tick late, so that every machine moves them alike.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

@@ -34,4 +34,4 @@ def test_carry_uses_new_collision_nodes():
     collision = update.index("object_compute_node_matrices(object_index)")
     carry = update.index("machine_move_elevator_riders(object_index, &elevator_position)")
     assert before < motion < collision < carry
-    assert "machine_move_elevator_riders" not in function(read("source/devices/device_machines.c"), "machine_update")
+    assert "machine_move_elevator_riders(" not in function(read("source/devices/device_machines.c"), "machine_update")

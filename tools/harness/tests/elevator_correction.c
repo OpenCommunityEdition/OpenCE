@@ -54,6 +54,7 @@ int main(int argc, char **argv) {
     if (!strcmp(case_name,"other-elevator")) objects[1].biped.elevator_object_index = 3;
     if (!strcmp(case_name,"on-foot")) own->elevator_index = NONE;
     if (!strcmp(case_name,"teleport")) s.position.x = 10;
+    if (!strcmp(case_name,"far")) s.position.z = -10;
     if (!strcmp(case_name,"unpredicted")) {s.flags = 0; s.position.z = 0;}
     if (!strcmp(case_name,"no-history")) {own->time = NONE; s.position.z = 0;}
     distributed_correct_own_unit(&p,1,&s);
