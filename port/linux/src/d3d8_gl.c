@@ -492,6 +492,9 @@ vertices. */
 
 #ifndef HALO_GLES
 #define VISIBILITY_BATCH_COUNT 3
+/* a frame's tests: their queries (kept until every count is read), the slot
+and area of each, and (once the frame is presented) the fence its copies
+wait on */
 struct visibility_batch
 {
 	GLuint queries[VISIBILITY_TEST_SLOTS];
@@ -505,10 +508,12 @@ struct visibility_batch
 #endif
 #ifdef HALO_GLES
 #define VISIBILITY_QUERY GL_ANY_SAMPLES_PASSED
-#define VISIBILITY_ALL_SAMPLES 1000000
 #else
 #define VISIBILITY_QUERY GL_SAMPLES_PASSED
 #endif
+/* a count more than any test covers (the game divides it by the test's
+area), well below what would overflow there */
+#define VISIBILITY_ALL_SAMPLES 1000000
 
 struct gl_device
 {
@@ -571,8 +576,11 @@ struct gl_device
 #endif
 	GLuint samplers[D3DTSS_MAXSTAGES];
 
-	/* GLES retains its single-query fallback; desktop batches own their queries. */
 #ifdef HALO_GLES
+	/* (without atomic counters) a query for each slot, and the one a test
+	runs on until it ends, then swapped into its slot: a slot of its own, so
+	that every slot, 0 too, is a test's (the game's lens flares number
+	theirs from 0); and whether each slot's query has yet to be read */
 	GLuint queries[VISIBILITY_TEST_SLOTS];
 	GLuint scratch_query;
 	BOOL visibility_unread[VISIBILITY_TEST_SLOTS];
@@ -583,8 +591,9 @@ struct gl_device
 	float query_area[VISIBILITY_TEST_SLOTS];
 	GLuint active_query;
 	BOOL visibility_test_active;
-	/* The game spins on an incomplete result: return the latest completed
-	count while the GPU is busy, rather than making the caller wait. */
+	/* each slot's latest count known: the game spins on a result it is told
+	is incomplete, so until a test's count has arrived the slot's earlier
+	count stands. A frame of The Library's lights makes hundreds of tests. */
 	GLuint visibility_known[VISIBILITY_TEST_SLOTS];
 #ifdef HALO_GLES
 	/* with atomic counters: one counter per test, used as a ring */
@@ -606,11 +615,21 @@ struct gl_device
 	GLuint counter_values[VISIBILITY_TEST_SLOTS];
 	GLuint visibility_latest[VISIBILITY_TEST_SLOTS];
 #else
-	/* Query objects remain owned until their available results are consumed. */
+	/* the tests of this frame and of the two before, whose counts are yet
+	to be read (visibility_read_batch): the game waits for results at the
+	start of the next frame, and a query read there would stop the CPU
+	until the GPU had caught up. visibility_batch is the batch this frame's
+	tests go in (VISIBILITY_BATCH_COUNT with none free: the tests are
+	dropped, and their slots keep their earlier counts). */
 	struct visibility_batch visibility_batches[VISIBILITY_BATCH_COUNT];
 	unsigned long visibility_batch;
 	ULONGLONG visibility_serial;
+	/* with no query objects to be had: every test reports its slot fully
+	visible */
+	BOOL visibility_unavailable;
 	BOOL visibility_logging;
+	/* except with AMD's own driver, the GPU copies each batch's counts into
+	its part of this buffer, mapped for the CPU to read */
 	GLuint visibility_buffer;
 	volatile GLuint *visibility_mapped;
 	struct
@@ -1722,12 +1741,13 @@ static void gl_initialize(void)
 	glGenQueries(VISIBILITY_TEST_SLOTS, device.queries);
 	glGenQueries(1, &device.scratch_query);
 #else
-	if (!visibility_queries_initialize())
+	if (visibility_queries_initialize())
+		visibility_results_initialize();
+	else
 	{
-		platform_log("GPU: cannot create a valid visibility query pool; stopping before rendering");
-		exit(EXIT_FAILURE);
+		device.visibility_unavailable = TRUE;
+		platform_log("GPU: cannot create the visibility test queries; every test reports fully visible");
 	}
-	visibility_results_initialize();
 	{
 		long every = config_integer("debug.gpu_flush_draws");
 		const char *renderer = (const char *)glGetString(GL_RENDERER);
@@ -2251,9 +2271,9 @@ static BOOL visibility_queries_initialize(void)
 	GLenum error;
 	BOOL success = TRUE;
 
-	/* CreateQueries (core 4.5) instantiates typed objects immediately. The
-	AMD diagnostic returned zero and overlapping names from GenQueries.
-	Create the entire pool together and audit it before publishing any IDs. */
+	/* every batch's queries at once, made with glCreateQueries (with
+	glGenQueries, AMD's driver gave some names as 0 or twice), and checked
+	before any is used */
 	while ((error = glGetError()) != GL_NO_ERROR)
 		platform_log("GPU: GL error 0x%x before visibility query creation", error);
 	glCreateQueries(VISIBILITY_QUERY, (GLsizei)count, queries);
@@ -2269,10 +2289,12 @@ static BOOL visibility_queries_initialize(void)
 		success = FALSE;
 		platform_log("GPU: GL error 0x%x creating visibility queries", error);
 	}
-	platform_log("GPU: visibility query pool created=%lu zeros=%lu duplicates=%lu invalid=%lu GL_ok=%d; glCreateQueries",
-		count, zeros, duplicates, invalid, success);
 	if (!success || zeros || duplicates || invalid)
+	{
+		platform_log("GPU: of %lu visibility test queries, %lu are 0, %lu repeated and %lu not queries",
+			count, zeros, duplicates, invalid);
 		return FALSE;
+	}
 	for (i = 0; i < VISIBILITY_BATCH_COUNT; i++)
 		memcpy(device.visibility_batches[i].queries, queries + VISIBILITY_TEST_SLOTS * i,
 			sizeof(device.visibility_batches[i].queries));
@@ -2287,9 +2309,13 @@ static void visibility_results_initialize(void)
 	BOOL success;
 
 	device.visibility_logging = config_boolean("debug.gl_debug");
-	/* AMD needs direct CPU delivery. Only NVIDIA uses the buffered path;
-	each batch has disjoint storage and a fence after all its copies. */
-	if (vendor && !strcmp(vendor, "NVIDIA Corporation"))
+	/* AMD's own driver gives wrong counts copied into a query buffer (lens
+	flares and lights go missing or flicker), so there each query is read
+	on the CPU once it is available. Elsewhere the GPU copies the counts
+	into the buffer (Mesa's GL thread waits for everything before a
+	glGetQueryObjectuiv, even one into a bound buffer), each batch into its
+	own part, with a fence after the copies. */
+	if (!vendor || strcmp(vendor, "ATI Technologies Inc."))
 	{
 		visibility_readback_gl_ok("before buffer creation");
 		glGenBuffers(1, &device.visibility_buffer);
@@ -2303,11 +2329,11 @@ static void visibility_results_initialize(void)
 			glDeleteBuffers(1, &device.visibility_buffer);
 			device.visibility_buffer = 0;
 			device.visibility_mapped = NULL;
-			platform_log("GPU: visibility buffer unavailable; using direct CPU readback");
+			platform_log("GPU: cannot map the visibility test results; queries are read on the CPU");
 		}
 	}
-	platform_log("GPU: asynchronous %s visibility readback enabled; %d query batches, no forced synchronization",
-		device.visibility_mapped ? "NVIDIA fenced buffer" : "direct CPU", VISIBILITY_BATCH_COUNT);
+	else
+		platform_log("GPU: AMD's driver; visibility test queries are read on the CPU");
 }
 
 static BOOL visibility_readback_gl_ok(const char *phase)
@@ -2329,7 +2355,7 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 {
 	if (!device.gl_ready || device.visibility_test_active)
 		return;
-	/* The result slot is supplied only when the test ends. */
+	/* the test's slot is given only when it ends */
 	device.visibility_test_active = TRUE;
 #ifdef HALO_GLES
 	if (xgpu_capabilities.atomic_counters)
@@ -2347,6 +2373,8 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 #else
 	{
 		device.active_query = 0;
+		if (device.visibility_unavailable)
+			return;
 		if (device.visibility_batch < VISIBILITY_BATCH_COUNT)
 		{
 			struct visibility_batch *batch = &device.visibility_batches[device.visibility_batch];
@@ -2354,8 +2382,9 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 			if (!batch->sealed && !batch->failed && batch->count < VISIBILITY_TEST_SLOTS)
 				device.active_query = batch->queries[batch->count];
 		}
-		/* A full ring keeps the last completed counts; never wait or reuse
-		a query whose result still belongs to an outstanding batch. */
+		/* (with every batch waiting to be read, no query: the test is
+		dropped, rather than waiting for the GPU or reusing a query whose
+		count is unread) */
 		if (device.active_query)
 			glBeginQuery(VISIBILITY_QUERY, device.active_query);
 		else
@@ -2396,7 +2425,14 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	}
 #else
 	if (!device.active_query)
+	{
+		if (device.visibility_unavailable)
+		{
+			device.visibility_known[index] = VISIBILITY_ALL_SAMPLES;
+			device.query_pending[index] = TRUE;
+		}
 		return S_OK;
+	}
 #endif
 	glEndQuery(VISIBILITY_QUERY);
 	/* the target's samples to a game pixel (its pixels, by its samples a
@@ -2458,8 +2494,7 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 			glGetQueryObjectuiv(device.queries[index], GL_QUERY_RESULT, &samples);
 			/* ES only says whether any sample passed. The game divides the
 			count by the test's area (lens flare brightness,
-			rasterizer_lights.c): report more than any test covers, well
-			below what would overflow there. */
+			rasterizer_lights.c): report more than any test covers. */
 			if (samples)
 				samples = VISIBILITY_ALL_SAMPLES;
 			device.visibility_known[index] = samples;
@@ -5957,11 +5992,14 @@ static void write_screenshot(struct render_target_entry *target)
 }
 
 #ifndef HALO_GLES
-/* Retire available queries in submission order. Never request a result
-before availability, overwrite an unread query, or publish an older result
-after a newer one. A full ring skips measurements and retains completed
-counts. Direct CPU reads avoid the mapped query-buffer delivery discrepancy
-observed on AMD; they do not disable occlusion or force GPU completion. */
+/* the counts of earlier frames' tests, read into their slots oldest batch
+first, and this frame's batch sent. A copy into the buffer right after each
+test stopped the GPU until that test's draws were through, hundreds of times
+a frame in The Library; the GPU copies a batch's counts when its frame is
+presented, and the CPU reads them once the fence after the copies has
+passed, a frame or more later. With AMD's driver the CPU reads each query
+once it says it is available. A batch is not reused until all its counts
+have been read. */
 static void visibility_read_batch(void)
 {
 	struct visibility_batch *batch;
@@ -5969,7 +6007,10 @@ static void visibility_read_batch(void)
 	GLint binding = 0;
 	BOOL bound = TRUE;
 
-	/* CPU pointers become byte offsets when a query buffer is bound. */
+	if (device.visibility_unavailable)
+		return;
+	/* (unbound: a query read with a query buffer bound takes its pointer for
+	an offset into it) */
 	if (!device.visibility_mapped)
 	{
 		visibility_readback_gl_ok("before readback");
@@ -6006,7 +6047,7 @@ static void visibility_read_batch(void)
 			{
 				batch->failed = TRUE;
 				device.visibility_stats.failures++;
-				platform_log("GPU: visibility batch %lu quarantined after fence error", oldest);
+				platform_log("GPU: visibility test batch %lu dropped: its fence failed", oldest);
 			}
 			glDeleteSync(batch->fence);
 			batch->fence = NULL;
@@ -6051,9 +6092,9 @@ static void visibility_read_batch(void)
 		}
 		if (batch->failed)
 		{
-			/* Unknown results must not become zeros or permit query reuse.
-			Other batches can continue; the context owns this pool for life. */
-			platform_log("GPU: visibility batch %lu quarantined after readback error", oldest);
+			/* (its slots keep their earlier counts, and its queries, whose
+			state is unknown, are not used again) */
+			platform_log("GPU: visibility test batch %lu dropped: its queries could not be read", oldest);
 			continue;
 		}
 		if (batch->read < batch->count)
@@ -6089,7 +6130,8 @@ static void visibility_read_batch(void)
 					if (batch->fence)
 						glDeleteSync(batch->fence);
 					batch->fence = NULL;
-					platform_log("GPU: visibility batch %lu quarantined after copy error", device.visibility_batch);
+					platform_log("GPU: visibility test batch %lu dropped: its counts could not be copied",
+						device.visibility_batch);
 				}
 			}
 			batch->sealed = TRUE;
@@ -6097,8 +6139,8 @@ static void visibility_read_batch(void)
 			batch->frame = device.frame;
 			device.visibility_batch = VISIBILITY_BATCH_COUNT;
 			device.visibility_stats.submitted++;
-			/* Dispatch without waiting, even if presentation does not flush.
-			This frame's queries are first polled on the next Present. */
+			/* (sent to the GPU now, whether or not presenting flushes: the
+			counts are first looked for at the next present) */
 			glFlush();
 		}
 	}
