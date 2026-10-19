@@ -1325,9 +1325,34 @@ static GLuint upload_shared_texture(struct mac_gpu_texture_scope *scope,
                     set_error(error, "native mip storage is shorter than A4R4G4B4 texels"); return 0;
                 }
             }
-            if (!mac_decode_level(&description, level,
-                source_bytes + face_offset + mac_xgpu_texture_level_offset(&description, level),
-                NULL, decoded)) {
+            {
+                const unsigned char *level_source = source_bytes + face_offset +
+                    mac_xgpu_texture_level_offset(&description, level);
+#if defined(__BIG_ENDIAN__) || defined(__ppc__)
+                /* port: the engine fills a D3D-created A4R4G4B4 texture (the font's glyph cache) with
+                   native 16-bit stores, but the shared decoder reads little-endian texels as the
+                   console wrote them: on PowerPC the nibbles came out swapped (the glyph's clear
+                   0x0FFF read as 0xFF0F, opaque magenta) and every glyph sat on a solid block. */
+                unsigned long level_length = mac_xgpu_texture_level_offset(&description, level + 1) -
+                    mac_xgpu_texture_level_offset(&description, level);
+                unsigned char *swapped = (unsigned char *)malloc(level_length);
+                unsigned long pair;
+                if (!swapped) {
+                    free(pixels); free(decoded);
+                    set_error(error, "native decoded mip allocation failed"); return 0;
+                }
+                for (pair = 0; pair + 1 < level_length; pair += 2) {
+                    swapped[pair] = level_source[pair + 1];
+                    swapped[pair + 1] = level_source[pair];
+                }
+                level_source = swapped;
+#endif
+                texel = (unsigned long)mac_decode_level(&description, level, level_source, NULL, decoded);
+#if defined(__BIG_ENDIAN__) || defined(__ppc__)
+                free(swapped);
+#endif
+            }
+            if (!texel) {
                 free(pixels); free(decoded);
                 set_error(error, "shared Xbox CPU texture decoder failed"); return 0;
             }
