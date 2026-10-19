@@ -1908,19 +1908,42 @@ static unsigned char aiming_data_little_endian_byte(
 	return offset >= 0 && offset < animation->data.size ? base[offset] : (unsigned char)0;
 }
 
+/* port: the same byte with the animation's table already found (the 8 bytes of a rotation and the 12 of a translation are read together) */
+static __inline__ unsigned char aiming_data_byte_with_map(
+	struct animation const *animation,
+	unsigned short const *map,
+	long offset)
+{
+	long frame_size = animation->frame_size;
+
+	if (map && offset >= 0 && offset < animation->data.size)
+	{
+		long position = offset % frame_size;
+		long source = offset - position + map[position];
+
+		if (source < animation->data.size)
+		{
+			return ((byte const *)animation->data.address)[source];
+		}
+	}
+
+	return aiming_data_little_endian_byte(animation, NULL, offset);
+}
+
 static void aiming_decompress_8byte(
 	struct animation const *animation,
 	byte const *data,
 	real_quaternion *quaternion)
 {
 	long offset = (long)(data - (byte const *)animation->data.address);
+	unsigned short const *map = aiming_map_get(animation);
 	short components[4];
 	short component;
 
 	for (component = 0; component < 4; component++)
 	{
-		components[component] = (short)(aiming_data_little_endian_byte(animation, data, offset + component * 2) |
-			(aiming_data_little_endian_byte(animation, data, offset + component * 2 + 1) << 8));
+		components[component] = (short)(aiming_data_byte_with_map(animation, map, offset + component * 2) |
+			(aiming_data_byte_with_map(animation, map, offset + component * 2 + 1) << 8));
 	}
 	quaternion_decompress_8byte((struct compressed_quaternion_8byte const *)components, quaternion);
 
@@ -1933,6 +1956,7 @@ static void aiming_read_point3d(
 	real_point3d *point)
 {
 	long offset = (long)(data - (byte const *)animation->data.address);
+	unsigned short const *map = aiming_map_get(animation);
 	union { unsigned long bits[3]; real_point3d point; } converted;
 	short component;
 
@@ -1940,10 +1964,10 @@ static void aiming_read_point3d(
 	{
 		long at = offset + component * 4;
 
-		converted.bits[component] = (unsigned long)aiming_data_little_endian_byte(animation, data, at) |
-			((unsigned long)aiming_data_little_endian_byte(animation, data, at + 1) << 8) |
-			((unsigned long)aiming_data_little_endian_byte(animation, data, at + 2) << 16) |
-			((unsigned long)aiming_data_little_endian_byte(animation, data, at + 3) << 24);
+		converted.bits[component] = (unsigned long)aiming_data_byte_with_map(animation, map, at) |
+			((unsigned long)aiming_data_byte_with_map(animation, map, at + 1) << 8) |
+			((unsigned long)aiming_data_byte_with_map(animation, map, at + 2) << 16) |
+			((unsigned long)aiming_data_byte_with_map(animation, map, at + 3) << 24);
 	}
 	*point = converted.point;
 

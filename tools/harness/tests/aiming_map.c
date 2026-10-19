@@ -80,7 +80,12 @@ static long compare(unsigned long seed, long trials)
 		for (i = 0; i < a.data.size + 16; i++) data[i] = (unsigned char)rand();
 		a.data.address = data;
 		for (offset = -3; offset < a.data.size + 3; offset++)
+		{
+			unsigned short const *map = aiming_map_get(&a);
+
 			if (original_byte(&a, offset) != aiming_data_little_endian_byte(&a, 0, offset)) differ++;
+			if (original_byte(&a, offset) != aiming_data_byte_with_map(&a, map, offset)) differ++;
+		}
 		free(data);
 	}
 	return differ;
