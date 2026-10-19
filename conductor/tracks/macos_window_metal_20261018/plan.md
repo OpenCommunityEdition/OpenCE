@@ -43,9 +43,9 @@
 - [x] Task: The Swift Metal backend 15c579bc
     - [x] Write tests: XCTest submits decoded commands (buffers, textures, pipelines, draws) to an offscreen target and reads pixels back
     - [x] Buffers and textures uploaded from guest memory; pipeline and depth-stencil state caches; presenting to the layer
-- [ ] Task: Offscreen captures and golden-frame checks
-    - [ ] Write tests: the compare tool's tolerance (pytest, synthetic images)
-    - [ ] A capture setting (debug, off by default) writing a frame to a file; tools/test_macos_frames.py comparing to approved references
+- [x] Task: Offscreen captures and golden-frame checks 1cc1db50
+    - [x] Write tests: the compare tool's tolerance (pytest, synthetic images)
+    - [x] A capture setting (debug, off by default) writing a frame to a file; tools/test_macos_frames.py comparing to approved references
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: The command ring and the Metal backend' (Protocol in workflow.md)
 
 ## Phase 4: Direct3D 8 on Metal
