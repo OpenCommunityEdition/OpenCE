@@ -140,6 +140,8 @@ the private key kept out of the repository) writes the items; `keygen` makes the
 - Settings > Network Setup > CHECK FOR UPDATES turns the launch check on and off; CHECK NOW FOR UPDATES saves the
   settings, quits the game and starts `PowerSpark --check-updates --wait-pid N`, which always says what it
   found (a newer release, "up to date", or why it could not look), then goes on to the start window.
+  Both rows are hidden on a Mac build with no update feed (the launcher leaves `HALO_MAC_UPDATE_LAUNCHER`
+  unset), and the rows after them move up; the other platforms keep the toggle.
 - Installing downloads the zip with `PowerSpark-update` (mbedtls and the branding's CA list, since Mac OS X 10.4 to
   10.6 stop at TLS 1.0), checks its size and SHA-256 against the signed appcast, unpacks it with `ditto` into a
   folder beside the app, checks that it is PowerSpark (bundle identifier, version, build, code for this Mac's
@@ -239,6 +241,38 @@ PlayStation faces, and the Xbox ui's button bar (A SELECT, B BACK) the cross and
 pictures reduced to `port/assets/hud_mac` with the HUD's (`tools/mac_hud_reduce.py` reduces `port/assets/buttons` too;
 run it again after replacing the PNGs there, such as the `ps_*.png`). A pad that cannot say which it is (an
 8BitDo adapter in Dinput mode) is chosen once: Button symbols in PowerSpark's start window or in Gamepad Setup.
+
+Controller Setup is one window with two tabs, Controllers and Bluetooth
+(experimental), and one instance at a time: a second start (the launcher's
+button, `--controller-setup`, Finder) brings the first to the front and quits
+(`port/mac/controller_setup/README.md`).
+
+#### Bluetooth (experimental)
+
+A DualSense or DualShock 4 can connect over PowerSpark's own Bluetooth stack
+(`port/mac/bt/`) through a TP-Link UB500 (Realtek RTL8761BU) dongle. It needs:
+
+- Realtek's firmware, `rtl8761bu_fw.bin` and `rtl8761bu_config.bin`, which
+  PowerSpark does not ship (a separate project provides a standalone driver
+  for it; that work is in progress). The files are looked for in
+  `input.bluetooth_firmware_dir`, `~/Library/Application Support/OpenCE/Bluetooth/`
+  and `/Library/Application Support/RealtekBTFirmware/`.
+- If Apple's driver takes the dongle, `sudo nvram bluetoothHostControllerSwitchBehavior=never`
+  and a replug keep it off (undo with `sudo nvram -d bluetoothHostControllerSwitchBehavior`).
+- A pad paired in Controller Setup's Bluetooth tab, and `input.bluetooth` set
+  (`HALO_BLUETOOTH=1`), which the tab's checkbox "Use Bluetooth controllers in
+  PowerSpark" writes to `config.toml`. It is off by default; with it off the
+  dongle is not touched.
+
+With the setting on, `mac_bt_input.c` runs the stack on its own thread; the game
+thread only copies its latest snapshot on each input poll, so a pad's frame
+enters through `mac_gamepad_poll_all` and takes a player slot, the PlayStation
+prompts and hot-plug as a wired one does. Pressing PS on a paired pad connects
+it. Rumble goes back through the stack (re-sent every 0.25 s). A dongle that is
+missing or in use (Controller Setup, Apple's driver) is tried again every ten
+seconds. The stack has not been run against the real dongle and pad with the
+game. `sh tools/mac_bt_input_checks.sh` builds and runs a probe of the pad poll
+with the stack.
 
 ## Settings
 
@@ -346,7 +380,25 @@ presenting it and to the rest, and the draws a frame. `HALO_MAC_ADAPTIVE_LEVEL=<
 holds the ladder at a rung, `HALO_MAC_ADAPTIVE_MAX_LEVEL=<n>` gives it only its first n rungs. The game keeps the node matrices of objects that nothing moves
 (rocks, trees; `HALO_MAC_PERF_NODE_STAMPS=0` computes them every tick as the game does,
 `=2` checks every use of a kept one against the computed matrices and reports a count of
-differences at the end of a run, which is 0).
+differences at the end of a run, which is 0). `HALO_MAC_RENDER_TIMING=2` also times the parts of a
+draw call (`dc_attributes`, `dc_vertex_program`, `dc_fragment_program`, `dc_gl_draw`); `=1` is
+unchanged. `HALO_MAC_FRAME_SLOW_MS=<n>` adds n milliseconds to each frame of a wall-clock hidden
+run, to starve the game of CPU as a slow Mac does. The PowerPC game is compiled with
+`-mdynamic-no-pic` (`MAC_PPC_CODEGEN=` restores the old flags), and the collision and update loops
+prefetch the next object's memory; neither changes a result.
+
+## Mods
+
+Mods (`docs/mods.md`) work on the Mac: `port_mods.c` is compiled for it, reading files with the C
+library in place of SDL. Put a mod's folder in `mods/` in the data root, next to `maps/` (with the Xbox
+maps, `~/Library/Application Support/OpenCE/XboxData/mods`). When mods say they cannot be played
+together, a visible run asks before the window opens, in Carbon's standard alert (`platform_ask` in
+`platform.c`, 10.4 to 10.6, PowerPC and Intel): play them anyway, turn them off, or quit, with Escape
+leaving Quit. A hidden run and the `--gpu-render` checks are not asked and play the mods. Checked on
+an Intel Mac, where a mod's bitmap changed the frame of an Xbox Blood Gulch
+(`tools/mac_make_test_mod.py` writes a small test mod). On PowerPC, a mod's little-endian text is
+swapped to the host's order (`mod_strings.c`) but no PowerPC has run mods, and the alert itself has
+not been shown by hand.
 
 ## How PowerSpark.app starts the game
 
@@ -394,6 +446,16 @@ that 10.4 reads (16 to 128 pixels, with 8-bit masks) and JPEG 2000 at 256 and
 512 pixels for 10.5 and 10.6. `python3 tools/mac_icns.py --check FILE`
 parses a file. Use `nice` on a shared build machine. Do not run the bundle's game on
 a machine whose desktop someone else is using.
+
+`tools/mac_rendered_session_checks.sh` also runs `tools/mac_duplicate_symbols.sh` on the objects of the
+session link before linking: it runs `nm` over the same object list and names both objects of any symbol
+two of them define (common and local symbols and weak definitions are ignored, since the linker merges or
+ignores them). A name defined twice was the cause of each link failure from the internet-play patches.
+
+`sh tools/mac_menu_b30_checks.sh` drives the menus with `HALO_MAC_MENU_KEYS` into The Silent Cartographer
+(Campaign > Load Level) and checks that the opening plays as it does when the level is started directly (the
+cinematic ends at about tick 1100); it passes on Intel (5/0), and the PowerPC run is the one that matters. The
+opening Pelican on PowerPC is a fix in progress.
 
 The other Mac tools are `tools/mac_*_checks.sh`; each one builds and runs a
 test of a part of the port on the Mac. Notes on the work are in
@@ -443,7 +505,8 @@ to a file of float frames). Manual two-machine test: `docs/mac-voice-manual-test
   three machines. The Controller Setup needs 10.5.
 - System link (LAN) multiplayer works from the menus (Multiplayer > Create
   Game > LAN, Join Game > LAN; see "System link" above). Voice chat sends and receives
-  (below); internet play, map sharing and Custom Edition maps are not available on the Mac yet.
+  (below); internet play (its settings rows are shown, and the launcher opens `halo://` invite links into
+  `join_link.txt`), map sharing and Custom Edition maps are not proven or not available on the Mac yet.
 - Full screen switches the display to 640 x 480 and stretches the picture;
   the menus' pointer is not tracked in full screen.
 - Audio is OpenAL (`HALO_MAC_AUDIO_OPENAL=0` selects the software mixer). Music
@@ -455,8 +518,10 @@ to a file of float frames). Manual two-machine test: `docs/mac-voice-manual-test
 - Per-pixel lighting (`display.per_pixel_lighting`) is not drawn: the Mac's shader translator does not make it
   yet. The start window shows its row disabled ("not available") and the log says so when the setting is on.
 - Controller rumble works for a DualShock 4 or DualSense on USB (its output report, written through the HID
-  interface). Bluetooth Sony pads and Xbox One pads (their driver is a separate package) have none yet; the
-  Settings menu's vibration row does nothing for them. Not yet tried on a pad.
+  interface), and for one over Bluetooth through PowerSpark's own stack (`input.bluetooth`). Xbox One pads (their
+  driver is a separate package) have none yet; the Settings menu's vibration row does nothing for them. Not yet
+  tried on a pad.
+- The Bluetooth stack is experimental and has not been run with the game against the real dongle and pad.
 - The app is not signed or notarized (10.4 to 10.6 do not need it).
 - `HALO_MAC_*` variables beyond those above are diagnostics for the port's
   tests and may change.
