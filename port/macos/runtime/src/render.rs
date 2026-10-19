@@ -255,6 +255,13 @@ word_enum! {
         Short4Normalized = 10 => "VERTEX_SHORT4_NORMALIZED",
         Uchar4 = 11 => "VERTEX_UCHAR4",
         Uint = 12 => "VERTEX_UINT",
+        Short = 13 => "VERTEX_SHORT",
+        Short3 = 14 => "VERTEX_SHORT3",
+        ShortNormalized = 15 => "VERTEX_SHORT_NORMALIZED",
+        Short3Normalized = 16 => "VERTEX_SHORT3_NORMALIZED",
+        UcharNormalized = 17 => "VERTEX_UCHAR_NORMALIZED",
+        Uchar2Normalized = 18 => "VERTEX_UCHAR2_NORMALIZED",
+        Uchar3Normalized = 19 => "VERTEX_UCHAR3_NORMALIZED",
     }
 }
 
@@ -443,6 +450,12 @@ impl VertexFormat {
     /// Its size in bytes.
     pub fn size(self) -> u32 {
         match self {
+            VertexFormat::UcharNormalized => 1,
+            VertexFormat::Short
+            | VertexFormat::ShortNormalized
+            | VertexFormat::Uchar2Normalized => 2,
+            VertexFormat::Uchar3Normalized => 3,
+            VertexFormat::Short3 | VertexFormat::Short3Normalized => 6,
             VertexFormat::Float
             | VertexFormat::Uchar4Normalized
             | VertexFormat::Uchar4NormalizedBgra

@@ -1368,3 +1368,21 @@ fn mipmaps_need_levels() {
         [value("levels", 1), value("format", BC1)]
     );
 }
+
+#[test]
+fn vertex_formats_have_their_sizes() {
+    let sizes = [
+        (VertexFormat::Short, 2),
+        (VertexFormat::Short3, 6),
+        (VertexFormat::ShortNormalized, 2),
+        (VertexFormat::Short3Normalized, 6),
+        (VertexFormat::UcharNormalized, 1),
+        (VertexFormat::Uchar2Normalized, 2),
+        (VertexFormat::Uchar3Normalized, 3),
+        (VertexFormat::Short4, 8),
+        (VertexFormat::Float3, 12),
+    ];
+    for (format, size) in sizes {
+        assert_eq!(format.size(), size, "{format:?}");
+    }
+}

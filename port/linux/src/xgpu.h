@@ -119,7 +119,8 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 vertex_main, its attributes those whose bit is set in
 present_attribute_mask ([[attribute(N)]], packed as above), the others read
 from the uniforms' attributes; the uniforms are struct
-nv2a_vertex_uniforms, in vertex buffer 30. Returns a malloc'd string. */
+nv2a_vertex_uniforms, in vertex buffer 29 (the last of the ring's 30).
+Returns a malloc'd string. */
 char *nv2a_vertex_shader_to_msl(const DWORD *instructions, unsigned long instruction_count,
 	unsigned long packed_attribute_mask, unsigned long present_attribute_mask,
 	const struct nv2a_vertex_lighting *lighting);
@@ -138,7 +139,7 @@ struct nv2a_vertex_uniforms
 	float pad[2];
 };
 
-#define XGPU_METAL_VERTEX_UNIFORM_BUFFER 30
+#define XGPU_METAL_VERTEX_UNIFORM_BUFFER 29
 
 /* ---------- pixel shaders */
 

@@ -50,6 +50,13 @@ extension VertexFormat {
         case .short4Normalized: .short4Normalized
         case .uchar4: .uchar4
         case .uint: .uint
+        case .short: .short
+        case .short3: .short3
+        case .shortNormalized: .shortNormalized
+        case .short3Normalized: .short3Normalized
+        case .ucharNormalized: .ucharNormalized
+        case .uchar2Normalized: .uchar2Normalized
+        case .uchar3Normalized: .uchar3Normalized
         }
     }
 }

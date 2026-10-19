@@ -1,0 +1,599 @@
+# Halo settings
+#
+# The game writes this file with the defaults when it is missing: delete
+# it to go back to them.
+
+[display]
+
+# Columns of the 480-line picture: 0 for the display's shape, 640 for the
+# Xbox's 4:3.
+screen_width = 0
+
+# Wait for the display between frames; false draws as fast as possible.
+vsync = true
+
+# Smoothing of jagged edges, which the Xbox did not have: "off"; "fxaa"
+# or "smaa" smooth the 3D view once it is drawn (the HUD and menus stay
+# sharp); "ssaa2x" draws at twice the resolution each way (four times
+# the work); "msaa2x", "msaa4x" or "msaa8x" draw with that many samples
+# a pixel. Android has "fxaa" for "smaa", and no "ssaa2x".
+anti_aliasing = "off"
+
+# Draw a frame for every display refresh, blending between the game's 30
+# ticks a second; false keeps the original 30 frames a second.
+interpolation = true
+
+# The first-person view's field of view on foot, in degrees across at
+# 16:9 (20 to 150); 0 keeps the stock view. Vehicles, cinematics and
+# scripted cameras keep their own.
+fov = 0.0
+
+# The first-person weapon's and hands' field of view, in degrees across
+# at 16:9 (20 to 150); 0 keeps the weapon's stock view, also when
+# display.fov widens the world.
+viewmodel_fov = 0.0
+
+# Draw the first-person weapon, hands and what is attached to them.
+# Off, they are not drawn; firing, animation, sound and lights go on.
+viewmodel_visible = true
+
+# Draw the HUD (meters, counters, panels, motion sensor, reticles,
+# waypoints, scopes) from the high-res assets (8x the maps' bitmaps);
+# false draws the maps' own bitmaps.
+high_res_hud = true
+
+# High-res gameplay controller buttons: classic uses plain Xbox faces;
+# gems uses shaded Xbox faces; menu_gems uses the menu's button art.
+# Requires display.high_res_hud.
+hud_button_style = "classic"
+
+# Draw the menus' and HUD's text with the fonts in port/assets/fonts
+# (Overpass) at the resolution the game draws at, and the menus' titles
+# from port/assets/titles; false draws the maps' bitmap fonts and titles.
+high_res_text = true
+
+# The size the objects' shadows are drawn at, in pixels each way: 128 as
+# on the Xbox, or 256, 512 or 1024 for smoother edges, as soft.
+shadow_resolution = 128
+
+# The menus: "pc" for the PC version's main menu (port/assets/menus,
+# and a menus folder here for your own), "xbox" for the Xbox's.
+menus = "pc"
+
+# In multiplayer, whose names are drawn above their heads: "all",
+# "allies", "enemies" or "none". An enemy's shows only within the
+# motion sensor's reach, in sight and not camouflaged; none show if the
+# gametype's motion tracker shows no players, only allies' if it shows
+# only friends.
+player_names = "all"
+
+# How large the players' names are drawn: 1.0 three quarters of the size of
+# the HUD's text, 0.25 to 4.
+player_name_scale = 1.0
+
+# How the scoreboard lists a team game's players: "teams" in a column for
+# each team (red on the left, blue on the right), "score" all in order of
+# score.
+scoreboard_team_layout = "teams"
+
+# Draw a panel behind the multiplayer scoreboard, for clearer text.
+scoreboard_background = true
+
+# The scoreboard panel's colour: "red, green, blue, alpha", each 0 to 255
+# (alpha 0 is see-through, 255 solid).
+scoreboard_background_color = "16, 16, 16, 150"
+
+# Light the models (characters, weapons, vehicles, scenery) for each
+# pixel by the lights the game gives them, without the facets the light
+# of each vertex shows across curved surfaces; false lights each vertex,
+# as the Xbox does.
+per_pixel_lighting = false
+
+# Show the text chat of network games: false hides its lines and keeps
+# its keys (and a controller's D-pad Up) from opening it, as for purists
+# and streamers.
+text_chat = true
+
+# The text chat's colours: "colors" (names in their team's colour, the
+# text a pale blue) or "white" (all white, as Custom Edition).
+chat_style = "colors"
+
+# The energy shield's flare on the first-person arms too, as on the body
+# (the stock game draws it on the body only).
+viewmodel_shield = false
+
+# Your own legs in first person, seen looking down: your body as others
+# see it, drawn from the waist down, moving as it moves.
+first_person_legs = false
+
+# Energy shields light what is around them as they flare, as plasma
+# does, in the shield's own color.
+shield_glow = false
+
+# How far the shield glow reaches: "default" or "light_show" (three
+# times as far, and at full strength from a third of the flare).
+shield_glow_intensity = "default"
+
+# Your energy shield's color, as this machine draws it: "default" (the
+# shield's own) or a multiplayer armor color: white, black, red, blue,
+# gray, yellow, green, pink, purple, cyan, cobalt, orange, teal, sage,
+# brown, tan, maroon or salmon.
+shield_color = "default"
+
+[audio]
+
+# Play sound.
+enabled = true
+
+# The volume of everything, 0.0 to 1.0.
+volume = 1.0
+
+# The music's volume, 0.0 to 1.0 (of audio.volume).
+music_volume = 1.0
+
+# The volume of every other sound (effects and speech), 0.0 to 1.0 (of
+# audio.volume).
+effects_volume = 1.0
+
+# Reverberate the world's sounds as the place the player is in does (the
+# maps' sound environments, as the Xbox's I3DL2 reverb did); false keeps
+# them dry.
+reverb = true
+
+# How sounds are converted to the output's rate: "sinc" with a
+# band-limited low pass; "linear" between neighbouring samples,
+# brighter for the aliasing it lets through.
+resampler = "sinc"
+
+# Talking in network games' voice chat: "push_to_talk" (while
+# controls.push_to_talk is held; the microphone opens the first time),
+# "open_mic" (whenever the microphone hears speech), or "off". Others'
+# voices play whatever this is (audio.voice_volume 0 silences them).
+voice_chat = "push_to_talk"
+
+# The volume of the other players' voices (0 to 2).
+voice_volume = 1.0
+
+[input]
+
+# The on-screen touch controls in a game: "auto" shows them on a
+# touchscreen while no controller is connected, "on" also with a
+# controller, "off" never. A device without a touchscreen never shows
+# them. The menus take taps in any case.
+touch_controls = "auto"
+
+# The touch controls' swipe aiming gets a controller's aim assist: the
+# aim slows over a target and follows a moving one. false: none, as a
+# mouse (the bullets' own autoaim stays).
+touch_aim_assist = true
+
+[controls]
+
+# The keyboard and mouse's controls, which Settings > Controls Setup
+# changes: up to two keys or buttons each, separated by a comma. Keys by
+# their names ("W", "Space", "Left Ctrl", "F1"), and "Mouse Left",
+# "Mouse Right", "Mouse Middle", "Mouse 4", "Mouse 5", "Wheel" (either
+# way), "Wheel Up" and "Wheel Down"; empty for none. Moving forward:
+move_forward = "W"
+
+# Moving backward.
+move_backward = "S"
+
+# Moving left.
+strafe_left = "A"
+
+# Moving right.
+strafe_right = "D"
+
+# Jumping (and skipping cutscenes).
+jump = "Space"
+
+# Crouching.
+crouch = "Left Ctrl, C"
+
+# Firing.
+fire = "Mouse Left"
+
+# Throwing a grenade.
+throw_grenade = "Mouse Right, G"
+
+# Melee attack.
+melee = "F, Mouse 4"
+
+# Reloading.
+reload = "R"
+
+# Zooming the scope.
+zoom = "Z, Mouse Middle"
+
+# Switching weapons.
+switch_weapon = "Wheel, 1"
+
+# Switching grenades.
+switch_grenade = "X"
+
+# The action: picking up (held: swapping weapons), entering and leaving
+# vehicles, pressing switches; never reloading (the controller's X does
+# when there is nothing to act on).
+action = "E"
+
+# The flashlight.
+flashlight = "Q"
+
+# Showing the scores (the controller's Back).
+scoreboard = "Tab"
+
+# The pause menu (the controller's Start).
+pause = "Escape"
+
+# Save a PNG screenshot beside maps/ (press once per capture).
+screenshot = "F10"
+
+# Voice chat: talk while it is held (audio.voice_chat "push_to_talk").
+push_to_talk = "V"
+
+# Network games' text chat: type a line to everyone (Enter sends it,
+# Escape lets it go).
+chat = "T"
+
+# Network games' text chat: type a line to your team.
+team_chat = "Y"
+
+[game]
+
+# What the game's console shows on screen of what it logs: "important"
+# (bans, players dropped for cheating, what refuses a command, and the
+# asserts that stop the game), "all" (every line, the game's own
+# chatter too), or "none" (the asserts that stop the game only). What
+# a command prints shows whatever this is, and debug.txt has every line.
+console_log = "important"
+
+# The language the game asks the Xbox for: "ja", "de", "fr", "es" or "it";
+# empty for English. The game data decides what is translated.
+language = ""
+
+# The player bipeds' grenade throws keep their legs moving (crouched,
+# in the air and in a vehicle's seat too), riders' hands leave the grips
+# to throw and reload, and a player turns with the aim while throwing;
+# false: the original animations, which freeze the legs and stand a
+# rider up.
+enhanced_animations = true
+
+# Load and run Halo Custom Edition maps (not those that need OpenSauce):
+# put them and Custom Edition's bitmaps.map, sounds.map and loc.map in
+# the custom_maps folder beside the maps folder; the map lists show them
+# as CUSTOM SINGLEPLAYER and CUSTOM MULTIPLAYER. Their tags are checked
+# as the game's own maps' are before they run; false refuses them
+# (docs/custom_edition_caches.md).
+custom_edition = true
+
+[network]
+
+# This machine's IPv4 address for system link, for a machine on several
+# networks; empty chooses one.
+address = ""
+
+# Comma-separated IPv4 addresses system link sends its announcements to
+# instead of the local network's broadcast address (for VPNs); empty for
+# the local network.
+broadcast = ""
+
+# Internet play: hosting makes an invite link (logged, and put on the
+# clipboard) that lets whoever has it join over the internet; opening a
+# link (or copying one before switching to the game) joins. Only people
+# with the invite can join. Off keeps system link to the local network.
+online = true
+
+# Join the game of an invite link found on the clipboard when the game
+# comes to the front.
+join_from_clipboard = true
+
+# The UDP port internet play uses; 0 picks one. A fixed one can be
+# forwarded on the router, for networks whose NAT stops connections.
+tunnel_port = 0
+
+# Let internet play ask the router (UPnP) to forward its port, for
+# networks whose NAT stops connections: when a player joins this
+# machine's game, and when joining a game takes too long. False never
+# asks.
+allow_upnp = true
+
+# The server browser: public games are listed through the signalling
+# brokers, and Join Game > Server Browser shows them. False lists no
+# game of this machine's and shows none.
+public_lobby = true
+
+# Whether a new game of Create Game > Internet starts as PUBLIC (listed
+# in everyone's server browser: anyone can see and join it) or, false,
+# PRIVATE (only players with its invite link can join). Server Setup's
+# LISTING changes it for each game.
+host_public = true
+
+# Hosting: voice chat in the lobby, before and after a game, where every
+# player hears every other.
+voice_lobby = true
+
+# Hosting: voice chat in a game: "off"; "team_proximity" (teammates
+# near); "team_enemy_proximity" (anyone near); "team_global" (all
+# teammates); or "team_global_enemy_proximity" (all teammates, and
+# enemies near). A game without teams has only enemies; co-op only
+# teammates.
+voice_mode = "team_global_enemy_proximity"
+
+# Hosting: the voices' quality, in the lobby and in a game, in kilobits a
+# second (8 to 64).
+voice_kbps = 24
+
+# Hosting: how near (world units: 1 is about 3 metres) a player must be
+# to be heard by proximity voice chat (5 to 100).
+voice_proximity = 15.0
+
+# Hosting: the text chat: "on" (links in lines are refused), "links"
+# (links allowed) or "off", in either case. Always off in a game listed
+# in the server browser (a public internet game).
+text_chat = "on"
+
+# Hosting: let the players vote to kick a player (the scoreboard's
+# right-click, or the console's votekick). More than half of the players
+# must vote, counted once per address.
+votekick = true
+
+# Hosting: the minutes a player must have played on this server to start
+# a vote to kick (0 to 60); to vote, 2 minutes or this, the less.
+votekick_minutes = 5
+
+# Hosting: the minutes a player kicked by a vote cannot join again (1 to
+# 1440).
+votekick_ban_minutes = 30
+
+# Hosting: send a player who joins without the game's Custom Edition map
+# the map (from custom_maps), and the resource maps it needs that the
+# player lacks (bitmaps.map, sounds.map, loc.map). The game's other
+# players help (network.map_seed).
+map_share = true
+
+# Hosting: the most kilobytes a second the host sends of maps (16 to
+# 20480: 20 MB/s), so that the game's own traffic keeps the rest of the
+# upload.
+map_share_upload = 1024
+
+# Playing in another's game: help send its map to players who join
+# without it, as a torrent's peers do (the pieces this machine has, at
+# most network.map_seed_upload).
+map_seed = true
+
+# Playing in another's game: the most kilobytes a second this machine
+# sends of maps to other players (16 to 10240: 10 MB/s).
+map_seed_upload = 256
+
+# Joining a game on a Custom Edition map this machine does not have:
+# download it (and the resource maps it needs) from the game's players
+# into custom_maps, if its host shares it (network.map_share); false
+# leaves the game, saying which map is missing.
+map_download = true
+
+# Whether an online co-op game (Create Game > Internet, a SINGLEPLAYER
+# map) starts as PUBLIC or, false, PRIVATE: Server Setup's LISTING in
+# co-op, which writes its choice here.
+coop_public = false
+
+# Whether the players of an online co-op game hurt each other: "off",
+# "on", "shields_only" or "explosives_only" (FRIENDLY FIRE in
+# co-op's Server Setup > Co-op Options writes its choice here). Their AI
+# allies they always can, as in the campaign.
+coop_friendly_fire = "on"
+
+# Whether the players of an online co-op game bump into each other;
+# false, they walk through each other (the AI's characters they still
+# bump into). PLAYER COLLISIONS in co-op's Server Setup > Co-op Options
+# writes its choice here.
+coop_player_collisions = true
+
+# Online co-op's extra enemies: "none", "per_player" (each squad of
+# enemies grows by coop_enemies for each player past the first) or
+# "multiplier" (each is coop_enemies_multiplier times as large, for any
+# number of players). EXTRA ENEMIES in co-op's Server Setup > Co-op
+# Options writes its choice here.
+coop_enemies_mode = "per_player"
+
+# Online co-op's extra enemies per player, a percentage: for each player
+# past the first, each squad of enemies a level places gets this much of
+# itself more (100: as many again; 25 to 200). PER PLAYER in co-op's
+# Server Setup > Co-op Options writes its choice here.
+coop_enemies = 50
+
+# Online co-op's static multiplier of its enemies: each squad of enemies
+# a level places is this many times as large (2 to 32). MULTIPLIER in
+# co-op's Server Setup > Co-op Options writes its choice here.
+coop_enemies_multiplier = 2
+
+# The file of the public MQTT brokers through which the machines of an
+# invite find each other (its messages are encrypted), beside this file
+# unless a full path: one host:port on each line, up to 4. Updates
+# replace brokers.txt: keep a list of your own under another name.
+brokers_file = "brokers.txt"
+
+# Public STUN servers that tell this machine its internet address;
+# comma-separated host:port.
+stun_servers = "stun.l.google.com:19302,stun.cloudflare.com:3478"
+
+[update]
+
+# Look for a new version when the game starts, and offer to update to it;
+# false never looks (the game's "Do not ask again" writes false here).
+auto = true
+
+[streamer]
+
+# Hide offensive words in names and text from other players, maps and mods
+# as stars, at the levels below (Settings > Network Setup > Streamer Mode).
+enabled = false
+
+# With streamer.enabled, the slurs (race, sexuality, gender, disability)
+# hidden: "off", "severe", "strong" (and severe) or "mild" (all).
+slurs = "mild"
+
+# With streamer.enabled, the swearing and sexual words hidden: "off",
+# "severe", "strong" (and severe) or "mild" (all).
+swearing = "strong"
+
+# With streamer.enabled, the insults that are not slurs hidden: "off",
+# "severe", "strong" (and severe) or "mild" (all).
+insults = "off"
+
+[debug]
+
+# Automated system link sessions for testing (port/linux/game/network_test.c):
+# "host:<map>" hosts a game on that map, "join" joins the first game found,
+# "browse" the one with the most players the server browser lists (not
+# co-op, if it can); empty for none.
+network_test = ""
+
+# Seconds after hosting that an automated test game starts.
+network_test_start = 15.0
+
+# Every this many seconds an automated test host kills its last player; 0 never.
+network_test_kill = 0.0
+
+# The score an automated test host's game type plays to (a short game, to
+# test the next); 0 the game type's own.
+network_test_score = 0
+
+# Every this many seconds each automated test player hits the next with
+# their weapon, within its reach (the host brings far players near the
+# first a second before); 0 never.
+network_test_shoot = 0.0
+
+# This many seconds into an automated test game the host seats its last
+# player as a vehicle's driver (and out 15 seconds on); 0 never.
+network_test_vehicle = 0.0
+
+# This many seconds into an automated test game the host stands its last
+# player on a weapon, which a joining player then picks up; 0 never.
+network_test_pickup = 0.0
+
+# This many seconds into an automated test game each machine's player
+# says a chat line to everyone, then to the team and to the vehicle (the
+# host seats the last two players in one first), then the host mutes and
+# unmutes a player, refuses a link and turns the chat off, and the
+# clients type on the on-screen keyboard (port/linux/NETCODE.md); 0 never.
+network_test_chat = 0.0
+
+# The name this machine's player takes in an automated test game (ASCII);
+# empty keeps its profile's.
+network_test_name = ""
+
+# The weapon network_test_pickup stands the player on: the first whose tag
+# name has this in it ("sniper", say); empty any.
+network_test_pickup_weapon = ""
+
+# The network test's host lists its game in the server browser, as Create
+# Game > Internet's PUBLIC does (debug.network_test "browse" joins it).
+network_test_public = false
+
+# Listen on 127.0.0.1 (port telnet_console_port) for a script console that
+# runs what it is sent as the game's console does, with no password; false
+# none.
+telnet_console = false
+
+# The port of the script console (telnet_console); the Xbox's was 23, which
+# only the administrator can listen on.
+telnet_console_port = 2323
+
+# Outline the menus' tap targets (item green, value blue, list slot yellow,
+# legend button red, the band beside a list's slots orange; the virtual
+# keyboard's keys white), mark where the last finger went down and the
+# last tap landed for 3 seconds, and log each tap with the target it hit
+# (and a value's split); to judge touch accuracy.
+touch_targets = false
+
+# Milliseconds everything received is held back (a round trip between two
+# machines of twice it), to test the netcode as over the internet; 0 none.
+network_latency = 0.0
+
+# Percent of datagrams received that are dropped, for the same; 0 none.
+network_loss = 0.0
+
+# Percent of the datagrams received that are damaged at random, to test
+# that nothing a machine sends can crash the game; 0 none.
+network_corrupt = 0.0
+
+# Percent of the reads of streams that are damaged at random, for the
+# same (a damaged stream is closed, so a little goes a long way); 0 none.
+network_corrupt_stream = 0.0
+
+# Seconds after the start before anything is damaged, so that a game can
+# be set up and started first (a host's messages to its own client are
+# damaged too).
+network_corrupt_after = 0.0
+
+# "bot:<seed>" plays controller 1 with a scripted pattern (automated
+# network tests); "look:<seed>" stands still, only turning and looking
+# up and down; empty for none.
+test_input = ""
+
+# Quit this many seconds after the window opens; 0 never.
+exit_after = 0.0
+
+# Voice chat's automated tests: a tone instead of the microphone, and
+# each voice heard logged once a second.
+voice_test = false
+
+# Run without a window, drawing nothing.
+null_renderer = false
+
+# Report OpenGL errors in the log.
+gl_debug = false
+
+# Start on this screen of the menus (port/assets/menus) instead of the main
+# menu, a player profile being edited; empty for the main menu.
+menu_open = ""
+
+# Log the renderer's draw counts once a second.
+gpu_stats = false
+
+# Log every draw of this frame; -1 none.
+gpu_trace_frame = -1
+
+# With gpu_trace_frame, also the vertex shader constants.
+gpu_trace_constants = false
+
+# Comma-separated ids of vertex shaders not to draw with.
+gpu_skip_vertex_shaders = ""
+
+# A folder to write the generated GLSL to; empty none.
+gpu_dump_shaders = ""
+
+# A GLSL expression every pixel shader shows instead of its result.
+gpu_debug_expression = ""
+
+# Pixel shaders show their first texture.
+gpu_debug_texture0 = false
+
+# Pixel shaders show their vertex colour.
+gpu_debug_flat = false
+
+# A folder to save frames to (with screenshot_every); empty none.
+screenshot_directory = ""
+
+# Save every this many frames to screenshot_directory; 0 none.
+screenshot_every = 0
+
+# A folder to write every texture to as it is uploaded; empty none.
+texture_dump_directory = ""
+
+# Log texture uploads.
+texture_log = false
+
+# Upload textures again every time they are used.
+texture_no_cache = false
+
+# Log where every game thread is this often, in seconds (read by the
+# app, port/android/host/host_debug.c); 0 never.
+sample_seconds = 0.0
+
+# Notice the game's writes to cached textures and vertices by page
+# protection; false compares page contents once a frame instead, which is
+# slower. Under ARM translation (the x86 emulator) the app always compares
+# contents. Read by the app from the file (port/android/host/host_main.c).
+memory_watch = true
