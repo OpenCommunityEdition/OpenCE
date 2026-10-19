@@ -223,7 +223,9 @@ of the netcode stamped more than 15 seconds from its sender's latest, the
 host takes a client's hits, Discord user and readiness only over its
 connection, and the host answers each machine's datagrams where they come
 from, so that a second copy of the game on one computer, on a port of its
-own, plays too.
+own, plays too; version 32 sends the host's mouse aim assist policy
+(distributed message 90, `network_aim_assist.c`), which a client must not
+ignore.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -388,7 +390,7 @@ the host. Aiming with the controller or touch retains its existing behavior;
 the player's saved preference and the bullets' autoaim are unchanged.
 `network_aim_assist.c` sends the policy reliably on client ready and on
 change. Clients take it only from the host and default to blocked until it
-arrives. This adds distributed message 87; network version 29 requires
+arrives. This adds distributed message 90; network version 32 requires
 matching builds so an older client cannot silently ignore the rule.
 
 ## Joining a game in progress

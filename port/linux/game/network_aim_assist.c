@@ -2,6 +2,7 @@
    stays intact; a controller or touch aiming takes its usual path. */
 #include "cseries.h"
 #include "game/game.h"
+#include "interface/ui_widget.h"
 #include "main/main.h"
 #include "networking/network_game_globals.h"
 #include "network_distributed.h"
