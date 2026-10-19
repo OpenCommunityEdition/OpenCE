@@ -392,6 +392,7 @@ symbols in this file:
 #include "networking/network_server_manager.h"
 #include "text/unicode.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
+void platform_log(char const *format, ...); /* port: the platform layer's */
 
 /* ---------- constants */
 
@@ -3176,6 +3177,31 @@ boolean network_game_client_join_first_available_game(
 	{
 		return FALSE;
 	}
+	/* port: what the automated join sees, once every ten seconds, so that a log of a search that finds nothing says
+	whether no advertisement came, or one came and was not taken (not open, another version, no address for it) */
+	{
+		static unsigned long last_report;
+		unsigned long now = system_milliseconds();
+
+		if (now - last_report >= 10000)
+		{
+			long valid = 0, open = 0;
+
+			last_report = now;
+			for (game_index = 0; game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES; game_index++)
+			{
+				struct network_advertised_game *seen = &client->available_games[game_index];
+
+				if (network_game_client_advertised_game_is_valid(seen))
+				{
+					valid++;
+					if (seen->open)
+						open++;
+				}
+			}
+			platform_log("join: %ld advertised games known, %ld open", valid, open);
+		}
+	}
 	for (game_index = 0; game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES; game_index++)
 	{
 		struct network_advertised_game *game = &client->available_games[game_index];
@@ -3198,7 +3224,18 @@ boolean network_game_client_join_first_available_game(
 			transport_client_start((XNADDR const *)&game->xnaddr, (XNKEY const *)&game->key,
 				(XNKID const *)&game->key_id, NETWORK_GAME_SERVER_PORT, &address);
 			if (!address.address.long_words[0] || !address.port)
+			{
+				/* port: said once (the automated test tries every frame) */
+				static boolean told_no_address;
+
+				if (!told_no_address)
+				{
+					told_no_address = TRUE;
+					platform_log("join: an open game is advertised, but the host's XNADDR has no address (internet "
+						"play does not know that host's identifier yet)");
+				}
 				return FALSE;
+			}
 			network_game_generate_join_game_token(join_parameters.join_token);
 			return network_game_client_initiate_join_game(client, game, &join_parameters, &address);
 		}
