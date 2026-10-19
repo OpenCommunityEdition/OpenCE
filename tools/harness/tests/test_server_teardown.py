@@ -19,7 +19,7 @@ CASES = [(platform, case) for platform in PLATFORMS for case in ('back', 'reopen
 CASES += [('windows', case) for case in ('postgame', 'ingame', 'message-failure',
                                        'send-failure', 'machine-failure', 'no-server')]
 CASES += [('xbox', case) for case in ('postgame', 'ingame')]
-GUARD = '#if !defined(HALO_WINDOWS) && !defined(HALO_ANDROID) && !defined(__linux__)'
+GUARD = '#if !defined(HALO_WINDOWS) && !defined(HALO_ANDROID) && !defined(HALO_WEB) && !defined(__linux__)'
 CONTROLS = {
     'native-sleeps': (GUARD, '#if 1', 'windows', 'back'),
     'xbox-loses-grace': ('SleepEx(MILLISECONDS_PER_SECOND, FALSE);', ';', 'xbox', 'back'),
