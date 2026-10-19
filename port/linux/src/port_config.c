@@ -576,6 +576,14 @@ static const struct config_setting config_settings[] =
 		"the PC version's lower texture quality does; -1 picks by the card: 1\n"
 		"for the heavy maps (the campaign, longest, hangemhigh, prisoner) on a\n"
 		"card of 32 MB or less, else 0." },
+	{ "mac.texture_native_depth", _config_integer, "-1", "HALO_MAC_TEXTURE_NATIVE_DEPTH", _environment_value,
+		_platform_mac,
+		"How the Xbox maps' uncompressed textures are held in video memory. 0:\n"
+		"four bytes a texel, as before. 1: the 8-bit formats (Y8, AY8, A8Y8, A8)\n"
+		"and the P8 bump maps whose palette is grey at one or two bytes a texel,\n"
+		"the picture the same. 2: also the 16-bit formats (R5G6B5, A1R5G5B5,\n"
+		"A4R4G4B4) at two bytes, which the driver widens by its own rule (the\n"
+		"picture may differ by 1/255 a channel). -1: 1." },
 
 	{ "mac.network_test", _config_string, "\"\"", "HALO_MAC_NETWORK_TEST", _environment_value,
 		_platform_mac,

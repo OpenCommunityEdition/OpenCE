@@ -197,6 +197,15 @@ int mac_gpu_info_texture_skip_levels(void)
     return (int)levels;
 }
 
+/* mac.texture_native_depth: 0 as before (every texture four bytes a texel), 1 the 8-bit formats and grey palettes
+   at their own depth (picture identical), 2 the 16-bit formats too; -1 picks 1 */
+int mac_gpu_info_texture_native_depth(void)
+{
+    long mode = config_integer ? config_integer("mac.texture_native_depth") : -1;
+    if (mode >= 0 && mode <= 2) return (int)mode;
+    return 1;
+}
+
 /* ---------- mac.adaptive_detail */
 
 static const char *const adaptive_rung_names[MAC_ADAPT_RUNGS] =

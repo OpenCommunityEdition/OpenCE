@@ -40,6 +40,8 @@ unsigned long mac_gpu_info_serial(void);
    setting is not available */
 long mac_gpu_info_texture_cache_mb(void);
 int mac_gpu_info_texture_skip_levels(void);
+/* mac.texture_native_depth, auto resolved: 0, 1 or 2 */
+int mac_gpu_info_texture_native_depth(void);
 
 /* mac.adaptive_detail: the frame-time governor (mac_adaptive_detail.h). The loop reports each
    frame; the renderer reads the level (0: none of the ladder's rungs in force; render_detail.c

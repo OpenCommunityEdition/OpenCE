@@ -135,6 +135,7 @@ static unsigned long xbox_texture_failures;
 static unsigned long xbox_format_uploads[XBOX_TEXTURE_FORMATS], xbox_format_native[XBOX_TEXTURE_FORMATS],
     xbox_format_gl[XBOX_TEXTURE_FORMATS];
 static void xbox_texture_format_report(void);
+static int native_depth_mode(void);
 
 static int retail_texture_cache_configure(const char **error)
 {
@@ -1442,7 +1443,8 @@ static void xbox_texture_format_report(void)
         total_uploads += xbox_format_uploads[i]; total_src += xbox_format_native[i]; total_gl += xbox_format_gl[i];
     }
     if (!total_uploads) return;
-    fprintf(stderr, "native xbox GL texture formats (format n/resident src KB gl KB; resident src KB gl KB):");
+    fprintf(stderr, "native xbox GL texture formats (format n/resident src KB gl KB; resident src KB gl KB), native depth %d:",
+        native_depth_mode());
     for (i = 0; i < XBOX_TEXTURE_FORMATS; ++i) {
         if (!xbox_format_uploads[i]) continue;
         if (i == XBOX_TEXTURE_FORMAT_HUD) fprintf(stderr, " hud");
@@ -1541,6 +1543,139 @@ static GLenum xbox_dxt_format(unsigned format)
 }
 /* The texture of an Xbox hardware format: found, or made from its texels. Owned
    by the cache; 0 with *error set if it cannot be made. */
+/* ---- port: native-depth uploads (mac.texture_native_depth)
+   The 8-bit and 16-bit formats were decoded to four bytes a texel. They go up in the depth they have where GL has
+   a format that gives the same texel: Y8 as LUMINANCE8 (alpha 1), AY8 as INTENSITY8 (all four the byte), A8Y8 as
+   LUMINANCE8_ALPHA8, A8 as LUMINANCE8_ALPHA8 with the luminance 255 (the decoder's white, GL's ALPHA8 would be
+   black), and P8 as LUMINANCE8 or LUMINANCE8_ALPHA8 when its palette is grey (a palette with colour stays RGBA8).
+   Mode 2 adds the 16-bit formats (R5G6B5, A1R5G5B5, A4R4G4B4), which the driver widens by its own rule. The
+   texels are read as xbox_textures.c's decoder reads them (the same bytes, the same swizzle), so a host's byte
+   order does not enter: a 16-bit texel is made a host-order short, which GL's packed types take. */
+enum native_conversion {
+    NATIVE_COPY1, NATIVE_COPY2, NATIVE_A8_TO_LA, NATIVE_P8_GREY, NATIVE_P8_GREY_ALPHA, NATIVE_P8_IDENTITY,
+    NATIVE_565, NATIVE_1555, NATIVE_4444
+};
+struct native_plan {
+    GLint internal;
+    GLenum format, type;
+    unsigned bytes;
+    int conversion;
+};
+extern int mac_gpu_info_texture_native_depth(void) __attribute__((weak));
+static int native_depth_mode(void)
+{
+    static int mode = -1;
+    if (mode < 0) {
+        const char *value = getenv("HALO_MAC_TEXTURE_NATIVE_DEPTH");
+        mode = value ? atoi(value) : 1;
+        if (!value && mac_gpu_info_texture_native_depth) mode = mac_gpu_info_texture_native_depth();
+        if (mode < 0 || mode > 2) mode = 1;
+    }
+    return mode;
+}
+/* whether the texture goes up at its own depth, and as what */
+static int native_plan_choose(const struct xgpu_texture_description *description, const D3DCOLOR *palette,
+    struct native_plan *plan)
+{
+    struct format_information information = format_information(description->format);
+    int mode = native_depth_mode();
+    if (!mode || description->compressed) return 0;
+    if (information.linear && information.bytes && description->pitch / information.bytes < description->width) return 0;
+    switch (information.kind) {
+    case _texel_l8:
+        plan->internal = GL_LUMINANCE8; plan->format = GL_LUMINANCE; plan->type = GL_UNSIGNED_BYTE;
+        plan->bytes = 1; plan->conversion = NATIVE_COPY1; return 1;
+    case _texel_al8:
+        plan->internal = GL_INTENSITY8; plan->format = GL_LUMINANCE; plan->type = GL_UNSIGNED_BYTE;
+        plan->bytes = 1; plan->conversion = NATIVE_COPY1; return 1;
+    case _texel_a8l8:
+        plan->internal = GL_LUMINANCE8_ALPHA8; plan->format = GL_LUMINANCE_ALPHA; plan->type = GL_UNSIGNED_BYTE;
+        plan->bytes = 2; plan->conversion = NATIVE_COPY2; return 1;
+    case _texel_a8:
+        plan->internal = GL_LUMINANCE8_ALPHA8; plan->format = GL_LUMINANCE_ALPHA; plan->type = GL_UNSIGNED_BYTE;
+        plan->bytes = 2; plan->conversion = NATIVE_A8_TO_LA; return 1;
+    case _texel_p8:
+        if (!palette) {
+            plan->internal = GL_LUMINANCE8; plan->format = GL_LUMINANCE; plan->type = GL_UNSIGNED_BYTE;
+            plan->bytes = 1; plan->conversion = NATIVE_P8_IDENTITY; return 1;
+        } else {
+            unsigned i; int grey = 1, opaque = 1;
+            for (i = 0; i < 256; ++i) {
+                unsigned long c = palette[i];
+                if (((c >> 16) & 0xff) != (c & 0xff) || ((c >> 8) & 0xff) != (c & 0xff)) grey = 0;
+                if ((c >> 24) != 0xff) opaque = 0;
+            }
+            if (!grey) return 0;
+            plan->internal = opaque ? GL_LUMINANCE8 : GL_LUMINANCE8_ALPHA8;
+            plan->format = opaque ? GL_LUMINANCE : GL_LUMINANCE_ALPHA; plan->type = GL_UNSIGNED_BYTE;
+            plan->bytes = opaque ? 1 : 2; plan->conversion = opaque ? NATIVE_P8_GREY : NATIVE_P8_GREY_ALPHA;
+            return 1;
+        }
+    case _texel_r5g6b5:
+        if (mode < 2) return 0;
+        plan->internal = GL_RGB5; plan->format = GL_RGB; plan->type = GL_UNSIGNED_SHORT_5_6_5;
+        plan->bytes = 2; plan->conversion = NATIVE_565; return 1;
+    case _texel_a1r5g5b5:
+        if (mode < 2) return 0;
+        plan->internal = GL_RGB5_A1; plan->format = GL_BGRA; plan->type = GL_UNSIGNED_SHORT_1_5_5_5_REV;
+        plan->bytes = 2; plan->conversion = NATIVE_1555; return 1;
+    case _texel_a4r4g4b4:
+        if (mode < 2) return 0;
+        plan->internal = GL_RGBA4; plan->format = GL_BGRA; plan->type = GL_UNSIGNED_SHORT_4_4_4_4_REV;
+        plan->bytes = 2; plan->conversion = NATIVE_4444; return 1;
+    default: return 0;
+    }
+}
+static void native_texel(const struct native_plan *plan, const unsigned char *t, const D3DCOLOR *palette, unsigned char *out)
+{
+    switch (plan->conversion) {
+    case NATIVE_COPY1: out[0] = t[0]; break;
+    case NATIVE_COPY2: out[0] = t[0]; out[1] = t[1]; break;
+    case NATIVE_A8_TO_LA: out[0] = 255; out[1] = t[0]; break;
+    case NATIVE_P8_IDENTITY: out[0] = t[0]; break;
+    case NATIVE_P8_GREY: out[0] = (unsigned char)palette[t[0]]; break;
+    case NATIVE_P8_GREY_ALPHA: out[0] = (unsigned char)palette[t[0]]; out[1] = (unsigned char)(palette[t[0]] >> 24); break;
+    default: {
+        unsigned short v = (unsigned short)(t[0] | (t[1] << 8));
+        memcpy(out, &v, 2);
+    }
+    }
+}
+/* one level (or 3D slice set) as xbox_textures.c's decode_level reads it, into the plan's texels */
+static int native_decode_level(const struct xgpu_texture_description *description, unsigned long level,
+    const unsigned char *source, const D3DCOLOR *palette, const struct native_plan *plan, unsigned char *destination)
+{
+    struct format_information information = format_information(description->format);
+    unsigned long width = mip_dimension(description->width, (unsigned)level);
+    unsigned long height = mip_dimension(description->height, (unsigned)level);
+    unsigned long depth = mip_dimension(description->depth, (unsigned)level);
+    unsigned long x, y, z;
+    if (description->linear) {
+        for (y = 0; y < height; y++) {
+            const unsigned char *row = source + y * description->pitch;
+            for (x = 0; x < width; x++)
+                native_texel(plan, row + x * information.bytes, palette, destination + (y * width + x) * plan->bytes);
+        }
+        return 1;
+    } else {
+        struct swizzle_masks masks = swizzle_masks(width, height, depth);
+        unsigned long *x_offsets = (unsigned long *)malloc(width * sizeof(unsigned long));
+        if (!x_offsets) return 0;
+        for (x = 0; x < width; x++) x_offsets[x] = spread(masks.x, x);
+        for (z = 0; z < depth; z++) {
+            unsigned long z_offset = spread(masks.z, z);
+            for (y = 0; y < height; y++) {
+                unsigned long y_offset = spread(masks.y, y) | z_offset;
+                for (x = 0; x < width; x++)
+                    native_texel(plan, source + (x_offsets[x] | y_offset) * information.bytes, palette,
+                        destination + ((z * height + y) * width + x) * plan->bytes);
+            }
+        }
+        free(x_offsets);
+    }
+    return 1;
+}
+
 static GLuint xbox_texture_get(const void *resource, unsigned char sampler, unsigned stage,
     GLenum *target_out, unsigned *levels_out, float scale_out[4], struct xbox_texture_entry **entry_out,
     const char **error)
@@ -1560,6 +1695,8 @@ static GLuint xbox_texture_get(const void *resource, unsigned char sampler, unsi
     size_t gl_bytes = 0, native_bytes = 0;
     const D3DCOLOR *palette = NULL;
     const struct mac_device_state *state = mac_device_state_get();
+    struct native_plan plan;   /* port: native-depth upload (see native_plan_choose) */
+    int use_native = 0;
     double load_begin;
     if (!native->Data) { set_error(error, "native texture has no data"); return 0; }
     /* (the usual case first: a texture made already, its pages not written since, nothing to work out) */
@@ -1630,13 +1767,14 @@ static GLuint xbox_texture_get(const void *resource, unsigned char sampler, unsi
     if (description.depth == 1 && !hud_on)
         skip = texture_levels_to_skip(description.levels, (uint32_t)description.width, (uint32_t)description.height);
     first_level = skip;
-    /* room: the bytes it will hold (compressed as is, else four bytes a texel) */
+    use_native = !hud_on && !as_dxt && native_plan_choose(&description, palette, &plan);
+    /* room: the bytes it will hold (compressed as is, else four bytes a texel, or the native depth's) */
     if (!hud_on) {
     for (level = first_level; level < description.levels; ++level) {
         unsigned long w = mip_dimension(description.width, (unsigned)level), h = mip_dimension(description.height, (unsigned)level);
         unsigned long d = mip_dimension(description.depth, (unsigned)level);
         gl_bytes += as_dxt ? (size_t)((w + 3) / 4) * ((h + 3) / 4) * (description.format == 0x0c ? 8U : 16U) :
-            (size_t)w * h * d * 4U;
+            (size_t)w * h * d * (use_native ? plan.bytes : 4U);
         native_bytes += mac_xgpu_texture_level_offset(&description, (unsigned)level + 1) -
             mac_xgpu_texture_level_offset(&description, (unsigned)level);
     }
@@ -1706,6 +1844,25 @@ static GLuint xbox_texture_get(const void *resource, unsigned char sampler, unsi
             if (as_dxt) {
                 glCompressedTexImage2D(face_target, (GLint)(level - first_level), xbox_dxt_format(description.format),
                     (GLsizei)width, (GLsizei)height, 0, (GLsizei)(next_offset - level_offset), texels);
+            } else if (use_native) {
+                size_t texel_count = (size_t)width * height * depth;
+                unsigned char *pixels;
+                if ((size_t)(next_offset - level_offset) < texel_count) {
+                    tex_shadow_forget_name(object); glDeleteTextures(1, &object);
+                    set_error(error, "native mip storage is shorter than its texels"); return 0;
+                }
+                pixels = (unsigned char *)malloc(texel_count * plan.bytes);
+                if (!pixels || !native_decode_level(&description, (unsigned long)level, texels, palette, &plan, pixels)) {
+                    free(pixels); tex_shadow_forget_name(object); glDeleteTextures(1, &object);
+                    set_error(error, "native decoded mip allocation failed"); return 0;
+                }
+                if (target == GL_TEXTURE_3D)
+                    glTexImage3D(target, (GLint)(level - first_level), plan.internal, (GLsizei)width,
+                        (GLsizei)height, (GLsizei)depth, 0, plan.format, plan.type, pixels);
+                else
+                    glTexImage2D(face_target, (GLint)(level - first_level), plan.internal, (GLsizei)width,
+                        (GLsizei)height, 0, plan.format, plan.type, pixels);
+                free(pixels);
             } else {
                 size_t texel_count = (size_t)width * height * depth, texel;
                 unsigned long *decoded;
