@@ -184,7 +184,10 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include "units/units.h"
 #include "cache/cache_files.h" /* port: (tag_iterator: light_port_glow_definition_get) */
+/* port: port/linux/game/spartan_colors.c */
+void spartan_colors_light(long object_index, real_rgb_color *color);
 void shield_glow_update(void); /* port: port/linux/game/shield_glow.c */
+void spartan_colors_glow_update(void); /* port: port/linux/game/spartan_colors.c */
 
 /* port: port/linux/src (halo.log) */
 void platform_log(const char *format, ...);
@@ -975,6 +978,7 @@ void lights_preprocess_scene(
 	between ticks: lights_port_recover) */
 	lights_port_recover();
 	shield_glow_update(); /* port: port/linux/game/shield_glow.c */
+	spartan_colors_glow_update(); /* port: port/linux/game/spartan_colors.c */
 	for (light_index = data_next_index(light_data, NONE);
 		light_index != NONE;
 		light_index = data_next_index(light_data, light_index))
@@ -1072,6 +1076,9 @@ void lights_preprocess_scene(
 				&definition->color_upper_bound,
 				color,
 				intensity);
+			/* port: a Spartan's flashlight in the color chosen
+			(port/linux/game/spartan_colors.c) */
+			spartan_colors_light(light->object_index, &light->color);
 		}
 		else
 		{

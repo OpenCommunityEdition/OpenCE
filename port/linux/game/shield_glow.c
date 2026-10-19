@@ -50,6 +50,10 @@ boolean light_port_glow_set(long light_index, long object_index, real_rgb_color 
 /* port/linux/game/overshield_effect.c */
 real overshield_effect_flare(long unit_index);
 real_rgb_color const *overshield_effect_glow_color(void);
+/* port/linux/game/shield_color.c */
+real_rgb_color const *shield_color_colors(long unit_index, real_rgb_color const *colors);
+boolean shield_color_override(real_rgb_color const *colors, real_rgb_color *chosen);
+void shield_color_apply(real_rgb_color const *chosen, real_rgb_color const *original, real_rgb_color *result);
 
 enum
 {
@@ -77,7 +81,10 @@ struct shield_glow_plasma
 	real_rgb_color perpendicular_color;
 	real parallel_alpha;
 	real_rgb_color parallel_color;
+	short color_source;
 };
+typedef char shield_glow_plasma_color_source_offset_assert[
+	offsetof(struct shield_glow_plasma, color_source) == 0x58 ? 1 : -1];
 
 struct shield_glow
 {
@@ -154,6 +161,7 @@ static real shield_glow_flare(
 	short source;
 	real value;
 	real peak;
+	real_rgb_color chosen;
 
 	if (!object || TEST_FLAG(object->object.flags, _object_invisible_bit))
 		return 0.f;
@@ -179,10 +187,27 @@ static real shield_glow_flare(
 		return 0.f;
 	value = (real)pow((double)value, (double)plasma->intensity_exponent);
 
+	/* (the color the flare is drawn in, rasterizer_xbox_plasma_energy.c's:
+	the shield color its player chose, else the shader's tinted by the
+	object's color the shader names, a multiplayer armor's) */
 	*color = plasma->perpendicular_color;
 	/* (an overshield: its own color) */
 	if (overshield_effect_flare(unit_index) >= 0.f)
+	{
 		*color = *overshield_effect_glow_color();
+	}
+	else if (shield_color_override(shield_color_colors(unit_index, object->object.outgoing_change_colors), &chosen))
+	{
+		shield_color_apply(&chosen, &plasma->perpendicular_color, color);
+	}
+	else if (plasma->color_source >= 1 && plasma->color_source <= 4)
+	{
+		real_rgb_color const *tint = &object->object.outgoing_change_colors[plasma->color_source - 1];
+
+		color->red *= tint->red;
+		color->green *= tint->green;
+		color->blue *= tint->blue;
+	}
 	peak = MAX(color->red, MAX(color->green, color->blue));
 	if (!(peak > 0.f))
 		return 0.f;

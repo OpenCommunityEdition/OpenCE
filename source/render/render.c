@@ -416,9 +416,17 @@ static void render_window(
 		structure_render_fog_screen();
 		rasterizer_lens_flares_draw();
 		/* port: the 3D view tone mapped (display.hdr) and antialiased
-		(display.anti_aliasing), before the HUD and menus are drawn over it */
+		(display.anti_aliasing), before the HUD and menus are drawn over it; a
+		Spartan's colored lights bloomed first (port/linux/game/spartan_colors.c) */
 		if (rasterizer_target == _render_target_primary)
 		{
+			void halo_screen_light_bloom(short x0, short y0, short x1, short y1); /* port: port/linux/src/d3d8_gl.c */
+
+			halo_screen_light_bloom(
+				rasterizer_camera->viewport_bounds.x0,
+				rasterizer_camera->viewport_bounds.y0,
+				rasterizer_camera->viewport_bounds.x1,
+				rasterizer_camera->viewport_bounds.y1);
 			halo_screen_tone_map(
 				rasterizer_camera->viewport_bounds.x0,
 				rasterizer_camera->viewport_bounds.y0,

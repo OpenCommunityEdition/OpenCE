@@ -497,6 +497,12 @@ struct program_entry
 	/* nv2a_pixel_shader_key's source_blend's color, and what it last had */
 	GLint blend_constant;
 	float blend_constant_value[4];
+	/* d3d8_gl_set_recolor's, and what it last had */
+	GLint recolor;
+	float recolor_value[4];
+	/* d3d8_gl_set_glow's, and what it last had */
+	GLint glow;
+	float glow_value[4];
 	/* the lights of a draw lit for each pixel (XGPU_MODEL_LIGHT_COUNT), and
 	constants_serial at their last upload */
 	GLint model_lights;
@@ -3321,6 +3327,10 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	entry->screen_offset = glGetUniformLocation(entry->program, "screen_offset");
 	entry->height_fade = glGetUniformLocation(entry->program, "height_fade");
 	entry->blend_constant = glGetUniformLocation(entry->program, "blend_constant");
+	entry->recolor = glGetUniformLocation(entry->program, "recolor");
+	entry->recolor_value[3] = -1.0f;
+	entry->glow = glGetUniformLocation(entry->program, "glow");
+	entry->glow_value[3] = -1.0f;
 	entry->model_lights = glGetUniformLocation(entry->program, "model_lights");
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 	{
@@ -4158,6 +4168,60 @@ void d3d8_gl_set_height_fade(float inverse_softness, float height, float offset,
 	height_fade_value[3] = scale;
 }
 
+/* the recolor of the draws that follow (d3d8_gl_set_recolor): off while its
+curve is zero */
+static float recolor_value[4];
+
+/* the glow of the draws that follow (d3d8_gl_set_glow): off while it has
+no color; its alpha the halo's strength */
+static float glow_value[4];
+/* the glow's colors this frame, for the light bloom (halo_screen_light_bloom):
+the lights' cores are drawn exactly so, and bloom where they are seen */
+enum { LIGHT_BLOOM_KEYS = 4 };
+static float light_bloom_keys[LIGHT_BLOOM_KEYS][4];
+static int light_bloom_key_count;
+static BOOL light_bloom_wanted;
+
+void d3d8_gl_set_glow(float red, float green, float blue, float halo)
+{
+	glow_value[0] = red;
+	glow_value[1] = green;
+	glow_value[2] = blue;
+	glow_value[3] = halo;
+	if (red > 0.0f || green > 0.0f || blue > 0.0f)
+	{
+		int key;
+
+		/* (each color drawn this frame, the first few: each player's
+		lights their own) */
+		for (key = 0; key < light_bloom_key_count; key++)
+		{
+			if (light_bloom_keys[key][0] == red && light_bloom_keys[key][1] == green &&
+				light_bloom_keys[key][2] == blue)
+			{
+				break;
+			}
+		}
+		if (key == light_bloom_key_count && key < LIGHT_BLOOM_KEYS)
+		{
+			light_bloom_keys[key][0] = red;
+			light_bloom_keys[key][1] = green;
+			light_bloom_keys[key][2] = blue;
+			light_bloom_keys[key][3] = 1.0f;
+			light_bloom_key_count++;
+		}
+		light_bloom_wanted = TRUE;
+	}
+}
+
+void d3d8_gl_set_recolor(float red, float green, float blue, float curve)
+{
+	recolor_value[0] = red;
+	recolor_value[1] = green;
+	recolor_value[2] = blue;
+	recolor_value[3] = curve;
+}
+
 static DWORD draw_uniform_inputs[DRAW_UNIFORM_INPUT_COUNT];
 static struct draw_uniforms draw_uniforms;
 static unsigned long draw_uniforms_serial;
@@ -4288,6 +4352,8 @@ static struct program_entry *prepare_draw(BOOL immediate)
 #endif
 	key.fog_enable = D3D__RenderState[D3DRS_FOGENABLE] != 0;
 	key.source_blend = source_blend_in_shader();
+	key.recolor = recolor_value[3] > 0.0f;
+	key.glow = glow_value[0] > 0.0f || glow_value[1] > 0.0f || glow_value[2] > 0.0f;
 	key.fog_table_mode = (unsigned char)D3D__RenderState[D3DRS_FOGTABLEMODE];
 #ifdef HALO_GLES
 	key.count_samples = device.visibility_test_active && xgpu_capabilities.atomic_counters;
@@ -4336,6 +4402,16 @@ static struct program_entry *prepare_draw(BOOL immediate)
 			memcpy(entry->blend_constant_value, blend_constant, sizeof(blend_constant));
 			glUniform4fv(entry->blend_constant, 1, blend_constant);
 		}
+	}
+	if (key.glow && entry->glow >= 0 && memcmp(entry->glow_value, glow_value, sizeof(glow_value)))
+	{
+		memcpy(entry->glow_value, glow_value, sizeof(glow_value));
+		glUniform4fv(entry->glow, 1, glow_value);
+	}
+	if (key.recolor && entry->recolor >= 0 && memcmp(entry->recolor_value, recolor_value, sizeof(recolor_value)))
+	{
+		memcpy(entry->recolor_value, recolor_value, sizeof(recolor_value));
+		glUniform4fv(entry->recolor, 1, recolor_value);
 	}
 #ifdef HALO_GLES
 	if (key.count_samples)
@@ -6246,6 +6322,339 @@ void halo_screen_tone_map(short x0, short y0, short x1, short y1)
 	}
 	glBindVertexArray(device.vertex_array);
 	xgpu_gl_state_invalidate();
+}
+
+/* ---------- light bloom
+
+A Spartan's armor lights in their chosen color (d3d8_gl_set_glow,
+port/linux/game/spartan_colors.c) bloom as lights do: after the 3D view is
+drawn, before the HUD (source/render/render.c), the pixels of the lights'
+cores - drawn exactly in the glow's color, so found by it - are taken at
+half the size, blurred narrowly and then widely, and both added back over
+the view in the light's color. Only where a core is seen: nothing covered
+blooms. Not in the ES builds. */
+
+#ifndef HALO_GLES
+static struct
+{
+	BOOL failed;
+	GLuint extract_program, blur_program, add_program;
+	GLint extract_key, extract_key_count, extract_size, extract_texel;
+	GLint blur_step, blur_bounds, blur_size;
+	GLint add_color, add_size;
+	GLuint color, half[3];
+	GLuint color_framebuffer, half_framebuffer[3];
+	unsigned long width, height;
+	/* (every pass a triangle over the screen: the vertex shader alone makes
+	it, from an empty vertex array) */
+	GLuint vertex_shader, vertex_array, sampler;
+} light_bloom;
+
+static GLuint light_bloom_program(const char *fragment, const char *what)
+{
+	GLuint shader, program;
+
+	if (!light_bloom.vertex_shader)
+	{
+		light_bloom.vertex_shader = xgpu_compile_shader(GL_VERTEX_SHADER,
+			"#version 450 core\n"
+			"void main()\n"
+			"{\n"
+			"\tgl_Position = vec4(float((gl_VertexID & 1) << 2) - 1.0, float((gl_VertexID & 2) << 1) - 1.0, 0.0, 1.0);\n"
+			"}\n", "light bloom");
+		if (!light_bloom.vertex_shader)
+			return 0;
+	}
+	shader = xgpu_compile_shader(GL_FRAGMENT_SHADER, fragment, what);
+	if (!shader)
+		return 0;
+	program = xgpu_link_program(light_bloom.vertex_shader, shader, what);
+	glDeleteShader(shader);
+	return program;
+}
+
+static BOOL light_bloom_prepare(void)
+{
+	if (light_bloom.failed)
+		return FALSE;
+	if (light_bloom.add_program)
+		return TRUE;
+	light_bloom.extract_program = light_bloom_program(
+		"#version 450 core\n"
+		"uniform sampler2D color_texture;\n"
+		"uniform vec4 keys[4];\n"
+		"uniform int key_count;\n"
+		"/* 1 / the half size; one full-size texel, as texture coordinates */\n"
+		"uniform vec2 size;\n"
+		"uniform vec2 texel;\n"
+		"out vec4 result;\n"
+		"void main()\n"
+		"{\n"
+		"\tvec2 at = gl_FragCoord.xy * size;\n"
+		"\tvec3 sum = vec3(0.0);\n"
+		"\tfor (int tap = 0; tap < 4; tap++)\n"
+		"\t{\n"
+		"\t\tvec2 offset = vec2((tap & 1) != 0 ? 0.5 : -0.5, (tap & 2) != 0 ? 0.5 : -0.5) * texel;\n"
+		"\t\tvec3 c = texture(color_texture, at + offset).rgb;\n"
+		"\t\tfor (int k = 0; k < key_count; k++)\n"
+		"\t\t{\n"
+		"\t\t\tvec3 d = abs(c - keys[k].rgb);\n"
+		"\t\t\tsum += keys[k].rgb * (1.0 - smoothstep(0.03, 0.09, max(d.r, max(d.g, d.b))));\n"
+		"\t\t}\n"
+		"\t}\n"
+		"\tresult = vec4(min(sum * 0.25, vec3(1.0)), 1.0);\n"
+		"}\n", "light bloom extract");
+	/* (nine taps of a Gaussian, the step apart, of the colors) */
+	light_bloom.blur_program = light_bloom_program(
+		"#version 450 core\n"
+		"uniform sampler2D mask_texture;\n"
+		"uniform vec2 step_size;\n"
+		"uniform vec4 bounds;\n"
+		"uniform vec2 size;\n"
+		"out vec4 result;\n"
+		"const float WEIGHTS[5] = float[5](0.2270, 0.1946, 0.1216, 0.0541, 0.0162);\n"
+		"void main()\n"
+		"{\n"
+		"\tvec2 at = gl_FragCoord.xy * size;\n"
+		"\tvec3 sum = texture(mask_texture, at).rgb * WEIGHTS[0];\n"
+		"\tfor (int tap = 1; tap < 5; tap++)\n"
+		"\t{\n"
+		"\t\tvec2 offset = step_size * float(tap);\n"
+		"\t\tsum += texture(mask_texture, clamp(at + offset, bounds.xy, bounds.zw)).rgb * WEIGHTS[tap];\n"
+		"\t\tsum += texture(mask_texture, clamp(at - offset, bounds.xy, bounds.zw)).rgb * WEIGHTS[tap];\n"
+		"\t}\n"
+		"\tresult = vec4(sum, 1.0);\n"
+		"}\n", "light bloom blur");
+	light_bloom.add_program = light_bloom_program(
+		"#version 450 core\n"
+		"uniform sampler2D narrow_texture;\n"
+		"uniform sampler2D wide_texture;\n"
+		"uniform vec4 bloom_color;\n"
+		"uniform vec2 size;\n"
+		"out vec4 result;\n"
+		"void main()\n"
+		"{\n"
+		"\tvec2 at = gl_FragCoord.xy * size;\n"
+		"\tvec3 narrow = texture(narrow_texture, at).rgb;\n"
+		"\tvec3 wide = texture(wide_texture, at).rgb;\n"
+		"\tresult = vec4(min(narrow * 5.0 + wide * 9.0, vec3(1.6)), 1.0);\n"
+		"}\n", "light bloom add");
+	if (!light_bloom.extract_program || !light_bloom.blur_program || !light_bloom.add_program)
+	{
+		platform_log("light bloom: the programs do not build; lights do not bloom");
+		light_bloom.failed = TRUE;
+		light_bloom.add_program = 0;
+		return FALSE;
+	}
+	glUseProgram(light_bloom.extract_program);
+	glUniform1i(glGetUniformLocation(light_bloom.extract_program, "color_texture"), 0);
+	light_bloom.extract_key = glGetUniformLocation(light_bloom.extract_program, "keys");
+	light_bloom.extract_key_count = glGetUniformLocation(light_bloom.extract_program, "key_count");
+	glUseProgram(light_bloom.blur_program);
+	glUniform1i(glGetUniformLocation(light_bloom.blur_program, "mask_texture"), 0);
+	light_bloom.blur_step = glGetUniformLocation(light_bloom.blur_program, "step_size");
+	light_bloom.blur_bounds = glGetUniformLocation(light_bloom.blur_program, "bounds");
+	light_bloom.blur_size = glGetUniformLocation(light_bloom.blur_program, "size");
+	light_bloom.extract_size = glGetUniformLocation(light_bloom.extract_program, "size");
+	light_bloom.extract_texel = glGetUniformLocation(light_bloom.extract_program, "texel");
+	glUseProgram(light_bloom.add_program);
+	glUniform1i(glGetUniformLocation(light_bloom.add_program, "narrow_texture"), 0);
+	glUniform1i(glGetUniformLocation(light_bloom.add_program, "wide_texture"), 1);
+	light_bloom.add_color = glGetUniformLocation(light_bloom.add_program, "bloom_color");
+	light_bloom.add_size = glGetUniformLocation(light_bloom.add_program, "size");
+	glGenSamplers(1, &light_bloom.sampler);
+	glSamplerParameteri(light_bloom.sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glSamplerParameteri(light_bloom.sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(light_bloom.sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glSamplerParameteri(light_bloom.sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glGenVertexArrays(1, &light_bloom.vertex_array);
+	return TRUE;
+}
+
+static GLuint light_bloom_texture(GLenum format, GLenum data_format, unsigned long width, unsigned long height,
+	GLuint *framebuffer)
+{
+	GLuint texture;
+	GLenum draw_buffer = GL_COLOR_ATTACHMENT0;
+
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	glTexImage2D(GL_TEXTURE_2D, 0, (GLint)format, (GLsizei)width, (GLsizei)height, 0, data_format,
+		GL_UNSIGNED_BYTE, NULL);
+	glGenFramebuffers(1, framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, *framebuffer);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+	glDrawBuffers(1, &draw_buffer);
+	return texture;
+}
+
+static void light_bloom_fit(unsigned long width, unsigned long height)
+{
+	int index;
+
+	if (light_bloom.width == width && light_bloom.height == height)
+		return;
+	if (light_bloom.color)
+	{
+		glDeleteFramebuffers(1, &light_bloom.color_framebuffer);
+		xgpu_gl_texture_deleted(light_bloom.color);
+		glDeleteTextures(1, &light_bloom.color);
+		for (index = 0; index < 3; index++)
+		{
+			glDeleteFramebuffers(1, &light_bloom.half_framebuffer[index]);
+			xgpu_gl_texture_deleted(light_bloom.half[index]);
+			glDeleteTextures(1, &light_bloom.half[index]);
+		}
+	}
+	light_bloom.width = width;
+	light_bloom.height = height;
+	light_bloom.color = light_bloom_texture(GL_RGBA8, GL_RGBA, width, height, &light_bloom.color_framebuffer);
+	for (index = 0; index < 3; index++)
+	{
+		light_bloom.half[index] = light_bloom_texture(GL_RGBA8, GL_RGBA, (width + 1) / 2, (height + 1) / 2,
+			&light_bloom.half_framebuffer[index]);
+	}
+}
+
+/* one blur pass of the half-size textures: from one into another, across or
+down, its taps step half-size texels apart */
+static void light_bloom_blur(int from, int to, BOOL down, float step, const GLint half_corners[4],
+	unsigned long half_width, unsigned long half_height)
+{
+	float bounds[4];
+
+	bounds[0] = ((float)half_corners[0] + 0.5f) / (float)half_width;
+	bounds[1] = ((float)half_corners[1] + 0.5f) / (float)half_height;
+	bounds[2] = ((float)half_corners[2] - 0.5f) / (float)half_width;
+	bounds[3] = ((float)half_corners[3] - 0.5f) / (float)half_height;
+	glBindFramebuffer(GL_FRAMEBUFFER, light_bloom.half_framebuffer[to]);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, light_bloom.half[from]);
+	glBindSampler(0, light_bloom.sampler);
+	glUniform4fv(light_bloom.blur_bounds, 1, bounds);
+	glUniform2f(light_bloom.blur_step, down ? 0.0f : step / (float)half_width, down ? step / (float)half_height : 0.0f);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+#endif
+
+void halo_screen_light_bloom(short x0, short y0, short x1, short y1)
+{
+#ifdef HALO_GLES
+	(void)x0;
+	(void)y0;
+	(void)x1;
+	(void)y1;
+	light_bloom_wanted = FALSE;
+	light_bloom_key_count = 0;
+#else
+	struct render_target_entry *color = render_target_get(device.render_target);
+	GLint corners[4], half_corners[4];
+	unsigned long width, height, half_width, half_height;
+	GLuint target_framebuffer;
+	int samples;
+	int key_count;
+
+	if (!light_bloom_wanted)
+		return;
+	light_bloom_wanted = FALSE;
+	key_count = light_bloom_key_count;
+	light_bloom_key_count = 0;
+	if (!device.gl_ready || !color || !color->target.texture ||
+		(color->target.samples && !color->target.multisample) || !light_bloom_prepare())
+	{
+		return;
+	}
+	samples = color->target.samples;
+	width = color->target.gl_width;
+	height = color->target.gl_height;
+	half_width = (width + 1) / 2;
+	half_height = (height + 1) / 2;
+	corners[0] = scaled_pixel(x0, color->target.scale[0]);
+	corners[1] = scaled_pixel(y0, color->target.scale[1]);
+	corners[2] = scaled_pixel(x1, color->target.scale[0]);
+	corners[3] = scaled_pixel(y1, color->target.scale[1]);
+	if (corners[2] <= corners[0] || corners[3] <= corners[1])
+		return;
+	half_corners[0] = corners[0] / 2;
+	half_corners[1] = corners[1] / 2;
+	half_corners[2] = (corners[2] + 1) / 2;
+	half_corners[3] = (corners[3] + 1) / 2;
+	light_bloom_fit(width, height);
+	target_framebuffer = samples ?
+		framebuffer_find(color->target.multisample, 0, TRUE) :
+		framebuffer_get(color->target.texture, 0);
+
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_STENCIL_TEST);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_POLYGON_OFFSET_FILL);
+	glDisable(GL_BLEND);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glBindVertexArray(light_bloom.vertex_array);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+	/* the view's pixels (resolved, if multisampled) */
+	glDisable(GL_SCISSOR_TEST);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, target_framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, light_bloom.color_framebuffer);
+	glBlitFramebuffer(corners[0], corners[1], corners[2], corners[3], corners[0], corners[1], corners[2], corners[3],
+		GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+	glEnable(GL_SCISSOR_TEST);
+	glViewport(half_corners[0], half_corners[1], half_corners[2] - half_corners[0], half_corners[3] - half_corners[1]);
+	glScissor(half_corners[0], half_corners[1], half_corners[2] - half_corners[0], half_corners[3] - half_corners[1]);
+
+	/* the cores, at half the size, into the first */
+	glBindFramebuffer(GL_FRAMEBUFFER, light_bloom.half_framebuffer[0]);
+	glUseProgram(light_bloom.extract_program);
+	glUniform4fv(light_bloom.extract_key, key_count, &light_bloom_keys[0][0]);
+	glUniform1i(light_bloom.extract_key_count, key_count);
+	glUniform2f(light_bloom.extract_size, 1.0f / (float)half_width, 1.0f / (float)half_height);
+	glUniform2f(light_bloom.extract_texel, 1.0f / (float)width, 1.0f / (float)height);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, light_bloom.color);
+	glBindSampler(0, light_bloom.sampler);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+
+	/* narrowly into the third (by the second), then that widely into the
+	first */
+	glUseProgram(light_bloom.blur_program);
+	glUniform2f(light_bloom.blur_size, 1.0f / (float)half_width, 1.0f / (float)half_height);
+	light_bloom_blur(0, 1, FALSE, 1.0f, half_corners, half_width, half_height);
+	light_bloom_blur(1, 2, TRUE, 1.0f, half_corners, half_width, half_height);
+	light_bloom_blur(2, 1, FALSE, 4.0f, half_corners, half_width, half_height);
+	light_bloom_blur(1, 0, TRUE, 4.0f, half_corners, half_width, half_height);
+
+	/* both added over the view, in the light's color */
+	glBindFramebuffer(GL_FRAMEBUFFER, target_framebuffer);
+	glViewport(corners[0], corners[1], corners[2] - corners[0], corners[3] - corners[1]);
+	glScissor(corners[0], corners[1], corners[2] - corners[0], corners[3] - corners[1]);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
+	glEnable(GL_BLEND);
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_ONE, GL_ONE);
+	glUseProgram(light_bloom.add_program);
+	glUniform2f(light_bloom.add_size, 1.0f / (float)width, 1.0f / (float)height);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, light_bloom.half[2]);
+	glBindSampler(0, light_bloom.sampler);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, light_bloom.half[0]);
+	glBindSampler(1, light_bloom.sampler);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+
+	glDisable(GL_SCISSOR_TEST);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glBindSampler(0, 0);
+	glBindSampler(1, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindVertexArray(device.vertex_array);
+	xgpu_gl_state_invalidate();
+	color->target.written = ++render_target_write_serial;
+	if (samples)
+		color->target.unresolved = TRUE;
+#endif
 }
 
 /* ---------- presentation */

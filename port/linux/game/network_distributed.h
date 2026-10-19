@@ -138,6 +138,12 @@ enum
 	client, reliably, when it is ready and when the policy changes */
 	_distributed_message_aim_assist_policy = 90,
 
+	/* a machine's Armor choices, to the host, reliably, which takes them
+	only from that machine's own stream; and every machine's, from the host
+	to each, reliably (armor_sync.c), in the lobby too */
+	_distributed_message_armor = 91,
+	_distributed_message_armors = 92,
+
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
 

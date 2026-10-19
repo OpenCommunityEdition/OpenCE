@@ -124,6 +124,13 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox_internal.h"
 #include "rasterizer/xbox/rasterizer_xbox_models.h"
 #include "view_fov.h" /* port: port/linux/game/view_fov.c */
+/* port: port/linux/game/visor_color.c */
+void visor_color_model_begin(void const *shader, long object_index);
+void visor_color_model_end(void);
+/* port: port/linux/game/spartan_colors.c */
+boolean spartan_colors_self_illumination(void const *shader, long object_index, real_rgb_color *color);
+real spartan_colors_reflection(void const *shader, long object_index);
+void spartan_colors_model_end(void);
 
 /* ---------- constants */
 
@@ -1728,6 +1735,9 @@ void _rasterizer_model_draw(
 			{
 				shader_model = (struct shader_model_definition *)
 					shader_get_and_verify_type(shader, _shader_type_model);
+				/* port: a Spartan's visor in its chosen color
+				(port/linux/game/visor_color.c) */
+				visor_color_model_begin(shader, local_parameters->unique_identifier);
 				alpha_blended_decal = (boolean)TEST_FLAG(
 					shader_model->model.flags,
 					_shader_model_alpha_blended_decal_bit);
@@ -1952,6 +1962,9 @@ void _rasterizer_model_draw(
 						shader_model->model.
 							self_illumination_animation_color_lower_bound.blue) *
 					self_illumination_animation_fraction;
+				/* port: a Spartan's armor lights in the color chosen
+				(port/linux/game/spartan_colors.c) */
+				spartan_colors_self_illumination(shader, local_parameters->unique_identifier, &self_illumination_color);
 
 				match_assert(
 					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
@@ -2103,6 +2116,14 @@ void _rasterizer_model_draw(
 				parallel.blue =
 					shader_model->model.parallel_tint_color.blue*
 					local_parameters->lighting.reflection_tint_color.blue;
+				/* port: a Spartan's blackout armor, its reflection dimmed
+				(port/linux/game/spartan_colors.c) */
+				{
+					real reflection_scale= spartan_colors_reflection(shader, local_parameters->unique_identifier);
+
+					perpendicular.alpha*= reflection_scale;
+					parallel.alpha*= reflection_scale;
+				}
 
 				vertex_constants[0].n[0] = shader_model->model.detail_map_scale;
 				vertex_constants[0].n[1] = shader_model->model.detail_map_scale*
@@ -2442,6 +2463,8 @@ void _rasterizer_model_draw(
 		}
 	}
 
+	visor_color_model_end(); /* port: port/linux/game/visor_color.c */
+	spartan_colors_model_end(); /* port: port/linux/game/spartan_colors.c */
 	return;
 }
 
