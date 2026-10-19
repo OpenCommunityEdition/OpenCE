@@ -2217,6 +2217,10 @@ int mac_session_interactive_run(unsigned max_frames, int visible,
                 mac_interactive_sleep(wait_ms - elapsed_ms);
         }
         frame_result = mac_device_gpu_frame(mac_interactive_frame, &context);
+        /* HALO_MAC_FRAME_SLOW_MS=<ms> (diagnostic): every frame takes that long more, as on a slow Mac, so a
+           wall-clock run plays several ticks in a frame */
+        if (!context.fixed_step && getenv("HALO_MAC_FRAME_SLOW_MS") && atoi(getenv("HALO_MAC_FRAME_SLOW_MS")) > 0)
+            mac_interactive_sleep((unsigned long)atoi(getenv("HALO_MAC_FRAME_SLOW_MS")));
         if (context.frames == 1)
             first_frame_ms = (unsigned long)(mac_interactive_now() - start_time);
         if (context.failed)
