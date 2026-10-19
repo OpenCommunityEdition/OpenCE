@@ -1208,7 +1208,9 @@ static boolean network_game_client_handle_message_server_begin_game(
 				the message carries 16 bits of it: the rest from the first
 				game update, network_game_client_handle_game_update) */
 				network_game_client_late_join_time = (long)((unsigned long)begin_game.unused & 0xFFFF);
-				result = network_game_client_game_has_started(client);
+				/* port: or once the map is there, if it is being downloaded
+				(network_game_client_begin_game) */
+				result = network_game_client_begin_game(client);
 				if (!result)
 				{
 					network_event("network_game_client_game_has_started() failed");
