@@ -16,7 +16,10 @@ menu, on the map the session already has.
 network_test.c still logs every player's state every second, which it does
 before that gate, so set debug.network_test as well as this one.
 
-mac.network_test (HALO_MAC_NETWORK_TEST): "host:<map>" or "join".
+mac.network_test (HALO_MAC_NETWORK_TEST): "host:<map>[:<variant>]" or "join".
+The variant is a game type's name (slayer by default), or "coop": network
+co-op on a campaign level (the level's path, levels\a10\a10), as
+network_test.c's.
 */
 
 #include "cseries.h"
@@ -48,6 +51,8 @@ int config_boolean(char const *name);
 int platform_clipboard_get(char *text, int size);
 int p2p_join_invite(const char *text);
 double config_real(char const *name);
+/* port/linux/game/menu_functions.c */
+boolean ui_widget_port_cooperative_level_choose(char const *map_name, short difficulty);
 long config_integer(char const *name);
 void platform_log(char const *format, ...);
 /* network_server_message_handler.c's and network_server_manager.c's, as
@@ -67,6 +72,9 @@ static struct
 	int checked;
 	int mode;
 	char map_name[64];
+	/* the game type after the map's colon ("slayer" by default; "coop" is
+	   network co-op on a campaign level, as network_test.c's) */
+	char variant_name[32];
 	real start_delay;
 	long score_to_win;
 	real seconds;
@@ -151,11 +159,22 @@ static void mac_network_test_read_settings(void)
 		mac_network_test.mode = _mac_network_test_host;
 		strncpy(mac_network_test.map_name, setting + 5, sizeof(mac_network_test.map_name) - 1);
 		mac_network_test.map_name[sizeof(mac_network_test.map_name) - 1] = 0;
-		/* (network_test.c's list of further games after a second colon: this
-		plays the first and stops there) */
+		/* (network_test.c's list of games after a second colon, separated by
+		commas: this plays the first and stops there) */
+		strcpy(mac_network_test.variant_name, "slayer");
 		variants = strchr(mac_network_test.map_name, ':');
 		if (variants)
-			*variants = 0;
+		{
+			size_t length;
+
+			*variants++ = 0;
+			length = strcspn(variants, ",");
+			if (length && length < sizeof(mac_network_test.variant_name))
+			{
+				memcpy(mac_network_test.variant_name, variants, length);
+				mac_network_test.variant_name[length] = 0;
+			}
+		}
 		if (!mac_network_test.map_name[0])
 		{
 			mac_network_test.mode = _mac_network_test_off;
@@ -184,14 +203,23 @@ static void mac_network_test_choose_game(void)
 	else
 		snprintf(path, sizeof(path), "levels\\test\\%s\\%s", mac_network_test.map_name,
 			mac_network_test.map_name);
+	if (!strcmp(mac_network_test.variant_name, "coop"))
+	{
+		/* port: the Map screen's co-op (port/linux/game/menu_functions.c), as
+		   network_test.c does */
+		if (!ui_widget_port_cooperative_level_choose(path, _game_difficulty_level_normal))
+			platform_log("mac network test: %s is not a campaign level, for co-op", path);
+		platform_log("mac network test: %s, co-op", path);
+		return;
+	}
 	network_game_server_change_map_name(global_network_game_server_get(), path);
-	variant = *game_engine_get_variant_by_name(&variant, "slayer");
+	variant = *game_engine_get_variant_by_name(&variant, mac_network_test.variant_name);
 	/* debug.network_test_score: a short game */
 	if (mac_network_test.score_to_win > 0)
 		variant.universal_variant.score_to_win = mac_network_test.score_to_win;
 	player_ui_set_game_variant(&variant);
 	network_game_server_change_game_variant(global_network_game_server_get(), &variant);
-	platform_log("mac network test: %s, slayer", path);
+	platform_log("mac network test: %s, %s", path, mac_network_test.variant_name);
 }
 
 /* Which machines the distributed netcode will send to, and the address each

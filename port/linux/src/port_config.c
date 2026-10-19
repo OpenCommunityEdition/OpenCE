@@ -580,8 +580,9 @@ static const struct config_setting config_settings[] =
 	{ "mac.network_test", _config_string, "\"\"", "HALO_MAC_NETWORK_TEST", _environment_value,
 		_platform_mac,
 		"Automated system link sessions in the Mac session without the menus\n"
-		"(port/mac/engine_network_test.c): \"host:<map>\" hosts a\n"
-		"slayer game on the map already loaded, \"join\" joins the first game\n"
+		"(port/mac/engine_network_test.c): \"host:<map>[:<variant>]\" hosts a\n"
+		"game (slayer, or the game type named; \"coop\" for network co-op on a\n"
+		"campaign level) on the map already loaded, \"join\" joins the first game\n"
 		"found. Set debug.network_test as well, which logs every player's state\n"
 		"every second, and debug.network_test_start for the countdown." },
 
