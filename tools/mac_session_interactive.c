@@ -480,7 +480,7 @@ static void mac_interactive_sim_digest(const struct mac_interactive_context *con
         mac_sim_hash_real(object->object.shield_vitality);
         /* port: HALO_MAC_SIM_DIGEST=2 also hashes the node matrices and the bounding sphere apart (nodes=), so that a change to
            how they are computed shows */
-        if (getenv("HALO_MAC_SIM_DIGEST")[0] == '2') {
+        if (getenv("HALO_MAC_SIM_DIGEST")[0] >= '2') {
             const real *matrices = (const real *)object_header_block_get(objects.index, &object->object.node_matrices);
             unsigned long words = matrices ? (unsigned long)object->object.node_matrices.size / sizeof(real) : 0, word;
             unsigned long saved = mac_sim_hash;
@@ -496,6 +496,12 @@ static void mac_interactive_sim_digest(const struct mac_interactive_context *con
             player_hash = mac_sim_hash ^ before;
         ++count;
     }
+    /* port: HALO_MAC_SIM_DIGEST=3 also prints the objects' hash before the local random seed is added to it, and the simulation's
+       own (global) seed: the local seed is also drawn by the renderer's particles and decals (a particle not rendered for some
+       frames is deleted, one that dies makes an effect), so it differs between machines whose renders differ while the
+       simulation is the same; "sim objects" is what two machines' simulations are compared by */
+    if (getenv("HALO_MAC_SIM_DIGEST")[0] >= '3')
+        fprintf(stderr, "sim objects tick=%u obj=%08lx global=%08lx\n", context->ticks + 1, mac_sim_hash, *get_global_random_seed_address());
     mac_sim_hash_word(*get_global_local_random_seed_address());
     fprintf(stderr, "sim digest tick=%u objects=%lu player=%08lx all=%08lx seed=%08lx nodes=%08lx\n",
         context->ticks + 1, count, player_hash, mac_sim_hash, *get_global_local_random_seed_address(), mac_sim_nodes_hash);
