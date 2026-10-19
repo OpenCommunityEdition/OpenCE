@@ -39,7 +39,7 @@ ninja linux                    # build/linux/halo
 ninja android                  # the Android guest image and native libraries
 ninja android_apk              # the APK (Gradle)
 ninja web                      # build/web/site (Emscripten: port/web/README.md)
-ninja windows                  # on Windows only
+ninja windows                  # on Windows, or on Linux after configure.py --windows-cross
 python tools/ci_build.py linux release   # what CI builds
 ```
 

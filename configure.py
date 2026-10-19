@@ -107,8 +107,8 @@ if not is_windows():
     parser.add_argument(
         "--windows-cc",
         metavar="BINARY",
-        help="compiler for the Windows cross build, `ninja windows` (default: clang)."
-             "Note that for now only Clang is supported.",
+        help="compiler for the Windows cross build, `ninja windows` (default: clang). "
+             "Only clang is supported for now.",
     )
     parser.add_argument(
         "--windows-vctools-dir",
