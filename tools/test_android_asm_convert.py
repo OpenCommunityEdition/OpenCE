@@ -3,7 +3,13 @@
 a quoted .ascii operand for a quoted symbol name and dropped its leading "_"
 (and, after an escaped quote, the "_" of any word after it), which shifted
 tables such as Opus's pulse cache by a byte: voice chat crashed in
-decode_pulses on the arm64 and Android builds."""
+decode_pulses on the arm64 and Android builds.
+
+Conversions from floating point to an integer in a SIMD register become
+the vector form, which the x86 emulator's ARM translation has: the scalar
+form stopped the app with SIGILL in hud_calculate_point once a game was
+drawn."""
+import re
 import shutil
 import struct
 import subprocess
@@ -74,3 +80,57 @@ def test_tables_survive_the_build(tmp_path):
     data = rodata(obj.read_bytes())
     assert table in data
     assert b"_starts with an underscore\0" in data
+
+
+@pytest.mark.parametrize("instruction, replacement", [
+    ("\tfcvtzs\ts0, s0", ["\tfmov s0, s0", "\tfcvtzs v0.2s, v0.2s"]),
+    ("\tfcvtzu\ts2, s17", ["\tfmov s2, s17", "\tfcvtzu v2.2s, v2.2s"]),
+    ("\tfcvtms\td31, d4", ["\tfmov d31, d4", "\tfcvtms v31.2d, v31.2d"]),
+    ("\tfcvtau\td1, d1", ["\tfmov d1, d1", "\tfcvtau v1.2d, v1.2d"]),
+    ("\tfcvtns\ts3, s4, #4", ["\tfmov s3, s4", "\tfcvtns v3.2s, v3.2s, #4"]),
+    ("\tfcvtpu\td5, d6, #16", ["\tfmov d5, d6", "\tfcvtpu v5.2d, v5.2d, #16"]),
+])
+def test_scalar_conversions_to_simd_registers_are_replaced(instruction, replacement):
+    assert convert(instruction) == replacement
+
+
+@pytest.mark.parametrize("instruction", [
+    "\tfcvtzs\tw0, s0", "\tfcvtzu\tx3, d1", "\tfcvtzs\tv0.4s, v1.4s", "\tscvtf\ts0, s0", "\tucvtf\td1, d2",
+    "\tfcvt\td0, s0", "\tfcvtzs\tw8, s0, #4",
+])
+def test_other_conversions_are_kept(instruction):
+    op, args = instruction.strip().split("\t")
+    assert convert(instruction) == [f"\t{op} {args}"]
+
+
+SCALAR_FROM_SIMD = re.compile(r"^\s*fcvt[amnpz][su]\s+[sd]\d+\s*,", re.MULTILINE)
+
+
+def test_compiled_conversions_are_replaced(tmp_path):
+    """what clang makes of a rounded short (as hud_calculate_point's
+    point), through the guest's pipeline: the converted assembly has no
+    scalar form left, and assembles"""
+    clang = shutil.which("clang")
+    if not clang:
+        pytest.skip("no clang")
+    source = tmp_path / "point.c"
+    source.write_text(
+        "struct point { short x, y; };\n"
+        "void calculate_point(float x, float y, struct point *result)\n"
+        "{ result->x = (short)__builtin_rintf(x); result->y = (short)__builtin_rintf(y); }\n"
+        "void store_doubles(double a, double b, long long *result) { result[0] = (long long)a; result[1] = (long long)b; }\n")
+    darwin, converted, obj = tmp_path / "point.darwin.s", tmp_path / "point.s", tmp_path / "point.o"
+    try:
+        subprocess.run([clang, "--target=arm64_32-apple-watchos", "-mcpu=cortex-a53", "-O2", "-mllvm",
+                        "-aarch64-neon-syntax=generic", "-S", str(source), "-o", str(darwin)],
+                       check=True, capture_output=True)
+    except subprocess.CalledProcessError:
+        pytest.skip("clang has no arm64_32 target")
+    if not SCALAR_FROM_SIMD.search(darwin.read_text()):
+        pytest.skip("this clang converts in general registers")
+    subprocess.run([sys.executable, str(ROOT / "tools" / "android_asm_convert.py"), str(darwin), str(converted)],
+                   check=True)
+    text = converted.read_text()
+    assert not SCALAR_FROM_SIMD.search(text)
+    assert re.search(r"fcvtzs v\d+\.2s, v\d+\.2s", text)
+    subprocess.run([clang, "--target=aarch64-linux-gnu", "-c", str(converted), "-o", str(obj)], check=True)
