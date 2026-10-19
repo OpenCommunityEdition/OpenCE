@@ -223,6 +223,7 @@ symbols in this file:
 #include "game/game.h"
 #include "game/game_engine.h"
 #include "game/players.h"
+#include "game/aim_assist.h" /* port: the reticle's read-only shot direction */
 #include "interface/first_person_weapons.h"
 #include "math/periodic_functions.h"
 #include "models/model_animation_definitions.h"
@@ -371,6 +372,11 @@ struct trigger_firing_effect
 };
 
 /* ---------- prototypes */
+
+/* port/linux/game/network_objects.c's: whether a client of the distributed
+netcode is deleting an object in distributed_client_delete (the host's, on
+its word, or one the host has not told it of) */
+boolean network_objects_client_deleting(void);
 
 static short weapon_magazine_count(
 	struct weapon_definition const *weapon_definition);
@@ -912,7 +918,10 @@ void weapon_delete(
 {
 	/* port: release MCC first-person references before the object disappears. */
 	mcc_first_person_weapon_deleted(weapon_index);
-	if (game_engine_running())
+	/* (port: but a flag or ball a client of the distributed netcode deletes,
+	on the host's word or as one the host has not told it of: objects.c's
+	object_delete_initial_recursive) */
+	if (game_engine_running() && !network_objects_client_deleting())
 	{
 		match_assert("c:\\halo\\SOURCE\\items\\weapons.c", 234, !weapon_is_flag(weapon_index));
 	}
@@ -2373,6 +2382,51 @@ static void projectile_distribute(
 	}
 
 	return;
+}
+
+/* port: the player's pre-spread ray, following trigger_create_projectiles'
+origin, offset, autoaim and weapon-origin rules, without creating a shot. */
+boolean weapon_get_projectile_ray(long weapon_index, short trigger_index, real_point3d *origin, real_vector3d *forward)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *definition = weapon_definition_get(weapon->definition_index);
+	long owner_index = weapon_get_owner_object_index(weapon_index);
+	struct unit_datum *unit = owner_index != NONE ? unit_try_and_get(owner_index) : NULL;
+	struct weapon_trigger_definition *trigger;
+	struct object_marker marker;
+	real velocity = 0.0f;
+
+	if (!unit || unit->unit.player_index == NONE || trigger_index < 0 ||
+		trigger_index >= definition->weapon.triggers.count)
+		return FALSE;
+	trigger = TAG_BLOCK_GET_ELEMENT(&definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+	if (trigger->projectile.index == NONE)
+		return FALSE;
+	object_get_marker_by_name(weapon_get_effect_object_index(weapon_index),
+		trigger_index == 0 ? "primary trigger" : "secondary trigger", &marker, 1);
+	*origin = marker.matrix.position;
+	*forward = marker.matrix.forward;
+	if (!TEST_FLAG(trigger->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit) &&
+		!TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+	{
+		struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+		real_vector3d right, up;
+
+		unit_adjust_projectile_ray(owner_index, origin, forward, &velocity,
+			TEST_FLAG(unit_definition->unit.flags, _unit_fires_from_camera_bit), TRUE);
+		cross_product3d(global_up3d, forward, &right);
+		if (normalize3d(&right) == 0.0f)
+			right = *global_left3d;
+		cross_product3d(forward, &right, &up);
+		normalize3d(&up);
+		point_from_line3d(origin, forward, trigger->first_person_weapon_offset.x, origin);
+		point_from_line3d(origin, &right, trigger->first_person_weapon_offset.y, origin);
+		point_from_line3d(origin, &up, trigger->first_person_weapon_offset.z, origin);
+		player_aim_projectile_preview(unit->unit.player_index, origin, forward);
+	}
+	if (TEST_FLAG(trigger->flags, _weapon_trigger_uses_weapon_origin_bit))
+		*origin = marker.matrix.position;
+	return normalize3d(forward) != 0.0f;
 }
 
 static void trigger_create_projectiles(

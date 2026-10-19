@@ -39,6 +39,9 @@ a mouse button (INPUT_MOUSE + SDL_BUTTON_*), or the wheel */
 /* an input by its name in config.toml ("W", "Mouse Left"), -1 if none */
 int halo_input_from_name(const char *name);
 void halo_input_name(int input, char *name, size_t size);
+/* a binding's name ("Z") as the keyboard's layout labels its key ("Y"),
+for the menus */
+void halo_input_shown_name(const char *binding, char *shown, size_t size);
 
 /* whether a menu is up (halo_ui_pointer_update, every frame) */
 void platform_menus_set_active(BOOL active);
@@ -81,6 +84,12 @@ int platform_audio_devices(int recording, char (*names)[PLATFORM_AUDIO_DEVICE_NA
 the system's default for "default", or one not found */
 SDL_AudioDeviceID platform_audio_device(int recording, const char *name);
 void platform_video_drawable_size(int *width, int *height);
+#ifndef HALO_ANDROID
+/* whether the window's display shows HDR, with the desktop's white (in
+scRGB's units, 1.0 being 80 nits) and how many times brighter than it the
+display goes (1.0 without HDR) */
+BOOL platform_video_hdr(float *sdr_white, float *headroom);
+#endif
 /* the window's mode and size and V-Sync, from config.toml as Settings has
 just written it (the main thread's) */
 void platform_display_apply(void);

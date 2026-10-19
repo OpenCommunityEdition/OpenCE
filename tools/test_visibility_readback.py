@@ -1,4 +1,4 @@
-"""Exercise actual CPU and NVIDIA buffered visibility readback with a delayed GPU."""
+"""Exercise actual CPU and buffered visibility readback with a delayed GPU."""
 import os
 from pathlib import Path
 import shutil
@@ -91,6 +91,7 @@ typedef int BOOL, HRESULT, GLsizei, GLint;
 #define S_OK 0
 #define VISIBILITY_TEST_SLOTS 8
 #define VISIBILITY_BATCH_COUNT 3
+#define VISIBILITY_ALL_SAMPLES 0x7fffffff
 #define VISIBILITY_QUERY 1
 #define GL_QUERY_RESULT_AVAILABLE 2
 #define GL_QUERY_RESULT 3
@@ -117,7 +118,7 @@ static struct {
     struct visibility_batch visibility_batches[VISIBILITY_BATCH_COUNT];
     unsigned long visibility_batch, frame;
     ULONGLONG visibility_serial;
-    BOOL visibility_logging;
+    BOOL visibility_logging, visibility_unavailable;
     GLuint visibility_buffer;
     volatile GLuint *visibility_mapped;
     struct { unsigned long submitted, completed, samples, nonzero, maximum,
@@ -211,7 +212,7 @@ static void glGetIntegerv(GLenum pname, GLint *value) {
     if (binding_error) { gpu_error = 0x502; return; }
     *value = query_buffer;
 }
-static const char *vendor = "AMD";
+static const char *vendor = "ATI Technologies Inc.";
 static GLuint mapped[VISIBILITY_BATCH_COUNT * VISIBILITY_TEST_SLOTS];
 static GLintptr offsets[1024];
 static unsigned copy_serial[1024];
@@ -220,7 +221,7 @@ static struct fake_fence fences[128];
 static BOOL map_null, map_error, copy_error, fence_null, wait_error;
 static const char *glGetString(GLenum name) { assert(name == GL_VENDOR); return vendor; }
 static void glGenBuffers(GLsizei n, GLuint *buffer) {
-    assert(n == 1 && !strcmp(vendor, "NVIDIA Corporation"));
+    assert(n == 1 && strcmp(vendor, "ATI Technologies Inc."));
     buffer_calls++; *buffer = 123;
 }
 static void glBufferStorage(GLenum target, GLsizeiptr size, void *data, GLbitfield flags) {
@@ -380,9 +381,7 @@ int main(void) {
         main = main[:main.index("int main(void)")] + r"""
 int main(void) {
     unsigned i, b, before;
-    /* Other vendors, including NVIDIA-like strings, retain direct CPU delivery. */
-    visibility_results_initialize(); CHECK(!buffer_calls && !device.visibility_mapped);
-    vendor = "NVIDIA other";
+    /* Only the proprietary AMD driver uses direct CPU delivery. */
     visibility_results_initialize(); CHECK(!buffer_calls && !device.visibility_mapped);
     vendor = "NVIDIA Corporation";
     map_null = TRUE; visibility_results_initialize();

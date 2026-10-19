@@ -597,6 +597,7 @@ struct network_game *network_game_server_get_game(struct network_game_server *se
 #include "mcc_cache.h"
 #include "mcc_objects.h"
 #include "mcc_player.h"
+#include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -2323,6 +2324,8 @@ static void game_engine_rasterize_scoreboard(
 		struct player_datum *player;
 		wchar_t *status_string;
 		real_argb_color *row_color;
+		long ping = NONE;
+		boolean ping_colored;
 
 		if (row >= rows || position >= list_counts[list])
 			continue;
@@ -2345,7 +2348,9 @@ static void game_engine_rasterize_scoreboard(
 		ping_string[0] = 0;
 		if (network)
 		{
-			long ping = distributed_player_ping((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(entry->player_index));
+			/* port: as this machine times it, with the latency meter on
+			(latency_meter.c); else the host's measure, as before */
+			ping = latency_meter_player_ping((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(entry->player_index));
 
 			/* (three digits at most: its column's width) */
 			if (ping == NONE)
@@ -2355,6 +2360,9 @@ static void game_engine_rasterize_scoreboard(
 			else
 				usprintf(ping_string, L"%ld", ping);
 		}
+		/* port: with the latency meter on, a known ping is drawn on its own,
+		in the meter's colour for it (display.latency_meter) */
+		ping_colored = ping != NONE && latency_meter_shown();
 		usnprintf(
 			row_string,
 			NUMBEROF(row_string),
@@ -2362,7 +2370,7 @@ static void game_engine_rasterize_scoreboard(
 			campaign ? L"" : get_place_string(entry),
 			player->name,
 			status_string,
-			ping_string);
+			ping_colored ? L"" : ping_string);
 		row_string[NUMBEROF(row_string) - 1] = 0;
 		row_color = has_teams ? &team_colors[PIN(player->team_index, 0, 1)] : &color;
 		/* port: a player talking (or muted) in voice chat, its speaker just
@@ -2435,6 +2443,23 @@ static void game_engine_rasterize_scoreboard(
 			top,
 			(short)(left + column * (SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP)),
 			TRUE);
+		if (ping_colored)
+		{
+			real_argb_color ping_color;
+
+			latency_meter_color(ping, &ping_color);
+			ping_color.alpha = alpha;
+			usnprintf(row_string, NUMBEROF(row_string), L"\t\t\t\t%s", ping_string);
+			row_string[NUMBEROF(row_string) - 1] = 0;
+			scoreboard_draw_row(
+				row_string,
+				FALSE,
+				&ping_color,
+				2 + row,
+				top,
+				(short)(left + column * (SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP)),
+				TRUE);
+		}
 	}
 	/* (where the scroll is, and how to move it) */
 	if (total > page)
@@ -4160,6 +4185,14 @@ boolean game_engine_showing_postgame(
 	return game_engine != NULL && game_engine_globals.postgame_state == game_engine_mode_postgame_rasterize;
 }
 
+/* port: whether a game is being played: one of no game engine's (the
+campaign, co-op), or its game not over (port/linux/game/latency_meter.c) */
+boolean game_engine_in_play(
+	void)
+{
+	return game_engine == NULL || game_engine_globals.postgame_state == game_engine_mode_active;
+}
+
 void game_variant_options_default(
 	struct game_variant const *variant,
 	struct game_variant_options *options)
@@ -5210,6 +5243,12 @@ void game_engine_player_killed(
 			message = _game_engine_message_double_kill;
 		else if (killing_player->statistics.kills_in_a_row == 5)
 			message = _game_engine_message_five_kills_in_row;
+		/* port: none in a row is no spree. A network client's copy of the
+		killer's statistics can have this kill credited to no one, or to
+		someone else, before the host's statistics come (the Xbox's credited
+		the killer here, so never had none): Running Riot was announced */
+		else if (killing_player->statistics.kills_in_a_row <= 0)
+			message = _game_engine_message_killed_enemy;
 		else
 		{
 			message = (killing_player->statistics.kills_in_a_row % 5)
@@ -5612,6 +5651,30 @@ void game_engine_clear_goal_position(
 	if (!VALID_INDEX(goal_index, NUMBEROF(global_goal)))
 		return;
 	csmemset(&global_goal[goal_index], 0, sizeof(struct netgame_goal));
+
+	return;
+}
+
+/* port: a flag or ball deleted on a client of the distributed netcode, on
+the host's word (port/linux/game/network_objects.c): the goals its game
+type's objective_weapon_update set at it each tick, which nothing else
+clears (ctf: its team's, and its carrier's goal; oddball: its team's) */
+void game_engine_objective_weapon_deleted(
+	long weapon_index)
+{
+	short team_index = weapon_get(weapon_index)->object.owner_team_index;
+
+	if (!game_engine || team_index == NONE)
+		return;
+	if (global_variant.game_engine_index == game_engine_ctf)
+	{
+		game_engine_clear_goal_position(team_index);
+		game_engine_clear_goal_position(team_index + 2);
+	}
+	else if (global_variant.game_engine_index == game_engine_oddball)
+	{
+		game_engine_clear_goal_position(team_index);
+	}
 
 	return;
 }
@@ -6335,7 +6398,9 @@ struct game_variant *build_game_variant_oddball(
 struct game_variant *build_game_variant_team_oddball(
 	struct game_variant *variant)
 {
-	struct game_variant result;
+	/* port: cleared, as every other builder's is: only some of its fields
+	are set below, and the rest were the stack's */
+	struct game_variant result = { 0 };
 
 	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
 	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
@@ -7683,7 +7748,8 @@ short game_engine_friendly_damage(
 
 	/* port: network co-op's friendly fire is Server Setup's FRIENDLY FIRE,
 	in the host's game settings (only the host deals damage), between its
-	players: their AI allies they always hurt, as in the campaign */
+	players: their AI allies they always hurt, as in the campaign. Each
+	player also has a choice of their own (network_coop_players_friendly_fire) */
 	if (network_coop_active())
 	{
 		struct network_game *game = network_game_get_game();
@@ -7692,6 +7758,8 @@ short game_engine_friendly_damage(
 
 		if (!game || !unit || unit->unit.player_index == NONE)
 			return _friendly_damage_all;
+		if (!network_coop_players_friendly_fire(attacker_player_index, unit->unit.player_index))
+			return _friendly_damage_none;
 		friendly_fire = game->variant_options.friendly_fire;
 	}
 	else if (!game_engine || !global_variant.universal_variant.teams)

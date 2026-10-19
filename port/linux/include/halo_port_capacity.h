@@ -69,6 +69,26 @@ the Xbox's. */
 #define HALO_PORT_SOUND_CACHE_SIZE 0x1000000 /* (0x400000) */
 #endif
 
+/* ---------- particles and lights a frame draws
+
+What one view draws in a frame, past which the rest is not drawn: the runs
+of particles that share a definition, and the dynamic lights (an assault
+rifle's flashlight, each plasma bolt's light) found in the clusters it sees.
+A busy multiplayer fight spends the Xbox's 512 and 128, and plasma bolts,
+charge glows and flashlights stop drawing. The desktop builds draw four
+times as many. Only what is drawn changes: these are rebuilt every frame,
+outside the game state, and nothing of them reaches the network, so
+machines with other limits still play the same game. Android's and the web
+build's keep the Xbox's. (The transparent geometry groups: below.) */
+
+#if defined(HALO_ARM64_GUEST) || defined(HALO_WEB)
+#define HALO_PORT_MAXIMUM_RENDERED_PARTICLE_GROUPS 512 /* (512) */
+#define HALO_PORT_MAXIMUM_RENDERED_LIGHTS 128 /* (128) */
+#else
+#define HALO_PORT_MAXIMUM_RENDERED_PARTICLE_GROUPS 2048 /* (512) */
+#define HALO_PORT_MAXIMUM_RENDERED_LIGHTS 512 /* (128) */
+#endif
+
 /* ---------- AI
 
 Network co-op adds enemies for its players (port/linux/game/coop_enemies.c):

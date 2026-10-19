@@ -100,18 +100,23 @@ def note_lines(note):
     def columns(text):
         return sum(2 if char.isupper() or char in "mw@%&#" else 1 for char in text)
 
-    lines, line = [], "- "
+    lines, line, width = [], "- ", 2
     for word in note.split(" "):
         separator = "" if line in ("- ", "  ") else " "
-        if columns(line + separator + word) > NOTE_COLUMNS and line not in ("- ", "  "):
+        if width + len(separator) + columns(word) > NOTE_COLUMNS and line not in ("- ", "  "):
             lines.append(line)
             line, separator = "  ", ""
+            width = 2
         line += separator
+        width += len(separator)
         for char in word:
-            if columns(line + char) > NOTE_COLUMNS:
+            char_width = columns(char)
+            if width + char_width > NOTE_COLUMNS:
                 lines.append(line)
                 line = "  "
+                width = 2
             line += char
+            width += char_width
     lines.append(line)
     return lines
 
@@ -119,9 +124,8 @@ def note_lines(note):
 def reading_rows(entry):
     groups = {}
     categories = entry.get("categories", [""] * len(entry["notes"])) if entry else []
-    for index, note in enumerate(entry["notes"] if entry else []):
-        category = categories[index] or "GENERAL"
-        groups.setdefault(category, []).append(note)
+    for category, note in zip(categories, entry["notes"] if entry else []):
+        groups.setdefault(category or "GENERAL", []).append(note)
     rows = []
     for category, notes in groups.items():
         if rows:

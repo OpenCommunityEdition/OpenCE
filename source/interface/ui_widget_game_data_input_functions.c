@@ -2922,7 +2922,7 @@ static void multiplayer_game_directions(
 
 	if (server)
 	{
-		/* port: one machine and one player may start (server_alone) */
+		/* port: one machine and its players may start (server_players_on_one_machine) */
 		boolean waiting_for_machines = !network_game_is_splitscreen_local() &&
 			game &&
 			game->machine_count < 1;

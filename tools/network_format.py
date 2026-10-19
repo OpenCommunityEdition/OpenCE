@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The combined OpenCE/MCC wire manifest (port/linux/network_format.txt).
 
-OpenCE protocol 29 is pinned separately by test_mcc_protocol.py. The combined
+OpenCE protocol 32 is pinned separately by test_mcc_protocol.py. The combined
 manifest is versioned with MCC_PROTOCOL_VERSION; changing legacy wire items
 requires a verified upstream update as well, not merely an MCC version bump.
 

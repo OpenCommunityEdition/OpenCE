@@ -426,6 +426,8 @@ boolean game_engine_running(
 	void);
 boolean game_engine_showing_postgame(
 	void);
+boolean game_engine_in_play(
+	void);
 
 boolean game_engine_get_state_message(
 	long player_index,
@@ -615,6 +617,9 @@ boolean game_engine_should_end_game(
 
 void game_engine_clear_goal_position(
 	short goal_index);
+
+void game_engine_objective_weapon_deleted(
+	long weapon_index);
 
 long get_flag_definition_index(
 	void);

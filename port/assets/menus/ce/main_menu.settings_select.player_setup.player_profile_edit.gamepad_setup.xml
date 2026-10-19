@@ -70,7 +70,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_preset_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_preset_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="DEFAULT|SWAP TRIGGERS|SWAP A, L TRIGGER|SWAP B, L TRIGGER|SWAP B, R STICK" setting="profile.button_preset" values="0|1|2|3|4" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_preset_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="DEFAULT|SWAP TRIGGERS|SWAP A, L TRIGGER|SWAP B, L TRIGGER|SWAP B, R STICK|BUMPER JUMPER" setting="profile.button_preset" values="0|1|2|3|4|5" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_joystick_preset" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">

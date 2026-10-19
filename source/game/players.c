@@ -238,6 +238,7 @@ symbols in this file:
 #include "data.h"
 #include "devices/devices.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "bots.h" /* port: port/linux/game/bots.c */
 #include "cutscene/cinematics.h" /* port: network co-op's first spawns */
 #include "editor/editor_stubs.h"
 #include "effects/effects.h"
@@ -609,6 +610,8 @@ void players_initialize_for_new_map(
 		machine_to_player_table,
 		NONE,
 		sizeof(machine_to_player_table));
+	/* port: the bots of local games (port/linux/game/bots.c) */
+	bots_initialize_for_new_map();
 
 	return;
 }
@@ -616,6 +619,8 @@ void players_initialize_for_new_map(
 void players_dispose_from_old_map(
 	void)
 {
+	/* port: the bots of local games (port/linux/game/bots.c) */
+	bots_dispose_from_old_map();
 	data_make_invalid(player_data);
 	data_make_invalid(team_data);
 
@@ -3330,6 +3335,16 @@ void players_respawn_at_checkpoint(
 		if (unplaced[DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)])
 			player_place_beside_teammate(iterator.datum_index);
 	}
+	/* port: a revert brings back the saved all_dead, FALSE; this brings no state
+	back, so it is cleared here once anyone is back, or the next death would
+	wait for a respawn that never comes: players_update_after_game neither
+	respawns a player nor ends the game while everyone is dead) */
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->unit_index != NONE)
+			players_globals->all_dead = FALSE;
+	}
 
 	return;
 }
@@ -4744,6 +4759,27 @@ void player_aiming_vector_from_facing(
 	return;
 }
 
+/* port: the main menu's scene takes no input (game_time.c's
+game_time_menu_scene), so the queues may have none for it: its players
+stand idle. Returns whether that is the case. */
+static boolean players_idle_actions(
+	struct player_action *actions)
+{
+	short index;
+
+	if (!game_time_menu_scene())
+		return FALSE;
+	for (index = 0; index < NETWORK_GAME_MAXIMUM_PLAYER_COUNT; index++)
+	{
+		csmemset(&actions[index], 0, sizeof(actions[index]));
+		actions[index].desired_weapon_index = NONE;
+		actions[index].desired_grenade_index = NONE;
+		actions[index].desired_zoom_level = NONE;
+	}
+
+	return TRUE;
+}
+
 void players_update_before_game(
 	void)
 {
@@ -4759,8 +4795,12 @@ void players_update_before_game(
 	profile_enter(PLAYERS_UPDATE_BEFORE_GAME_PROFILE);
 	players_coop_note_on_foot();
 	players_coop_rescue_stranded();
-	if (update_client_dequeue(actions))
+	/* port: or the main menu's scene's idle players (players_idle_actions) */
+	if (update_client_dequeue(actions) || players_idle_actions(actions))
 	{
+		/* port: the controls of a local game's bots this tick
+		(port/linux/game/bots.c), in place of what their queues held */
+		bots_update_actions(actions);
 		data_iterator_new(&iterator, player_data);
 		while (player = data_iterator_next(&iterator))
 		{

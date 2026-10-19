@@ -105,6 +105,8 @@ void object_lists_initialize_for_new_map(
 {
 	data_make_valid(object_list_header_data);
 	data_make_valid(object_list_data);
+	/* port: the new map's list warns again when full (cluster_partitions.c) */
+	reference_list_port_report(object_list_data);
 
 	return;
 }
@@ -112,6 +114,8 @@ void object_lists_initialize_for_new_map(
 void object_lists_dispose_from_old_map(
 	void)
 {
+	/* port: how many times the map's list was full past the first */
+	reference_list_port_report(object_list_data);
 	data_make_invalid(object_list_header_data);
 	data_make_invalid(object_list_data);
 

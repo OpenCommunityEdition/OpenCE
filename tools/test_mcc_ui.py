@@ -625,6 +625,7 @@ static int mcc, wants_settings, pc=1, campaign_tag, multiplayer_tag;
 static int built, built_campaign;
 static int mcc_cache_tags_loaded(void){return mcc;}
 static int mcc_ui_settings_needed(char const *name){(void)name;return wants_settings;}
+static int network_coop_campaign_map(void){return 0;}
 static int full_screen_campaign_map(void){return campaign_tag;}
 static long tag_loaded(long group,char const *name){(void)group;(void)name;return multiplayer_tag?1:NONE;}
 static int menus_pc_chosen(void){return pc;}

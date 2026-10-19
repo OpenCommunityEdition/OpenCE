@@ -41,6 +41,8 @@ drive the controller.
 #include "sdl_platform.h"
 #include "port_config.h"
 #include "touch_input.h"
+/* port/linux/game/network_aim_assist.c */
+extern unsigned char network_aim_assist_block_mouse(void);
 #include "halo_keyboard.h"
 
 #include <SDL3/SDL.h>
@@ -65,6 +67,9 @@ extern unsigned char network_chat_keyboard_open(void);
 /* port/linux/game/menu_functions.c: two or more players on this machine
 (co-op, or split screen in a network game) */
 extern unsigned char pc_menu_split_players(void);
+/* port/linux/game/network_test.c: the game's time in seconds while one runs,
+else -1 */
+extern double network_test_game_seconds(void);
 
 /* ---------- device tables */
 
@@ -340,6 +345,22 @@ int halo_linux_touch_aiming(short gamepad_index)
 #endif
 }
 
+/* Port zero defaults to keyboard/mouse until the stick or touch aims.
+   Merely having a controller connected does not enable mouse magnetism. */
+static int mouse_is_aim_device(short gamepad_index)
+{
+    int aiming;
+    if (gamepad_index != 0) return FALSE;
+    pthread_mutex_lock(&mouse_lock);
+    aiming = stick_aimed_ms == 0 || mouse_aimed_ms >= stick_aimed_ms;
+#ifdef HALO_ANDROID
+    if (touch_aimed_ms != 0 && touch_aimed_ms >= mouse_aimed_ms &&
+        touch_aimed_ms >= stick_aimed_ms) aiming = FALSE;
+#endif
+    pthread_mutex_unlock(&mouse_lock);
+    return aiming;
+}
+
 /* whether the player on the gamepad aims with the mouse (it moved after the
 right stick last did) and input.mouse_aim_assist is off: then the view's
 magnetism leaves them be (player_control.c); the bullets' autoaim stays */
@@ -356,6 +377,8 @@ int halo_linux_mouse_aiming(short gamepad_index)
 		read_at = config_changes();
 		aim_assist = config_boolean("input.mouse_aim_assist");
 	}
+	if (network_aim_assist_block_mouse() && mouse_is_aim_device(gamepad_index))
+		return TRUE;
 	if (aim_assist)
 		return FALSE;
 	pthread_mutex_lock(&mouse_lock);
@@ -610,6 +633,47 @@ void halo_input_name(int input, char *name, size_t size)
 		snprintf(name, size, "%s", "");
 }
 
+/* a binding's name as the keyboard's layout labels the key: config.toml
+names a key by where it sits (its scancode, named as on a US keyboard), so
+WASD stays under the fingers on any layout, as Halo PC's DirectInput keys
+did, but the menus show what is printed on it: the zoom key "Z" (the key
+right of the left Shift) shows as Y on a German keyboard. A key with no
+character of its own (Space, Left Shift, the keypad's) keeps its name, as
+does one whose character the menus' font has not (beyond Latin-1). */
+void halo_input_shown_name(const char *binding, char *shown, size_t size)
+{
+	int input = halo_input_from_name(binding);
+	SDL_Keycode key;
+
+	snprintf(shown, size, "%s", binding);
+#ifdef HALO_ANDROID
+	/* (the Android guest's SDL has no keyboard layouts to ask: the US
+	names, which match a hardware keyboard's usual labels there) */
+	(void)input;
+	(void)key;
+	return;
+#else
+	if (input < 0 || input >= SDL_SCANCODE_COUNT)
+		return;
+	/* (as in key events: the French number row shows its numbers, and a
+	non-Latin layout's letters the US ones) */
+	key = SDL_GetKeyFromScancode((SDL_Scancode)input, SDL_KMOD_NONE, true);
+	if (key == ',')
+		snprintf(shown, size, "%s", "Comma");
+	else if (key > ' ' && key < 0x7f)
+		snprintf(shown, size, "%c", key >= 'a' && key <= 'z' ? (char)(key - 'a' + 'A') : (char)key);
+	else if (key >= 0xa1 && key <= 0xff && size >= 2)
+	{
+		/* (Latin-1, a byte the menus take as its character; the small
+		letters made capitals but for sharp s and y with diaeresis) */
+		if (key >= 0xe0 && key <= 0xfe && key != 0xf7)
+			key -= 0x20;
+		shown[0] = (char)key;
+		shown[1] = 0;
+	}
+#endif
+}
+
 static void bindings_read(void)
 {
 	int action;
@@ -744,7 +808,17 @@ and then and throws a grenade every seven seconds; "look:<seed>" stands
 still, only turning and looking up and down (where remote players aim and
 whether they stand) */
 static int test_input_holding_action;
-static Uint64 test_input_holding_action_since;
+static double test_input_holding_action_since;
+
+/* the scripted player's clock: the game's time while one runs (the main
+menu's too), so that it plays alike at any speed and tick for tick
+(debug.fixed_step), else real time */
+static double test_input_seconds(void)
+{
+	double seconds = network_test_game_seconds();
+
+	return seconds >= 0.0 ? seconds : (double)SDL_GetTicks() / 1000.0;
+}
 
 /* the automated tests (port/linux/game/network_test.c): the scripted player
 stands still, holding the action button (X: picking up, swapping weapons)
@@ -752,7 +826,7 @@ after a second */
 void test_input_hold_action(int hold)
 {
 	if (hold && !test_input_holding_action)
-		test_input_holding_action_since = SDL_GetTicks();
+		test_input_holding_action_since = test_input_seconds();
 	test_input_holding_action = hold;
 }
 
@@ -765,6 +839,65 @@ static unsigned long test_input_pressed;
 void test_input_press(unsigned long buttons)
 {
 	test_input_pressed = buttons;
+}
+
+/* debug.test_input "menu:<buttons>": the buttons pressed one a second, from
+the first poll, for testing the menus: a, b, x, y, up, down, left, right,
+start, back, or wait (none), separated by spaces or commas */
+static char test_input_menu[512];
+static Uint64 test_input_menu_since;
+
+static void test_input_menu_gamepad(XINPUT_GAMEPAD *pad)
+{
+	static const struct
+	{
+		const char *name;
+		int analog;
+		WORD digital;
+	} buttons[] =
+	{
+		{ "a", XINPUT_GAMEPAD_A, 0 },
+		{ "b", XINPUT_GAMEPAD_B, 0 },
+		{ "x", XINPUT_GAMEPAD_X, 0 },
+		{ "y", XINPUT_GAMEPAD_Y, 0 },
+		{ "up", -1, XINPUT_GAMEPAD_DPAD_UP },
+		{ "down", -1, XINPUT_GAMEPAD_DPAD_DOWN },
+		{ "left", -1, XINPUT_GAMEPAD_DPAD_LEFT },
+		{ "right", -1, XINPUT_GAMEPAD_DPAD_RIGHT },
+		{ "start", -1, XINPUT_GAMEPAD_START },
+		{ "back", -1, XINPUT_GAMEPAD_BACK },
+	};
+	Uint64 elapsed = SDL_GetTicks() - test_input_menu_since;
+	Uint64 step = elapsed / 1000;
+	const char *token = test_input_menu;
+	size_t length;
+	unsigned int index;
+
+	/* (pressed for the first 150 ms of its second) */
+	if (elapsed % 1000 >= 150)
+		return;
+	for (;;)
+	{
+		token += strspn(token, " ,");
+		length = strcspn(token, " ,");
+		if (!length)
+			return;
+		if (!step)
+			break;
+		step--;
+		token += length;
+	}
+	for (index = 0; index < sizeof(buttons) / sizeof(buttons[0]); index++)
+	{
+		if (strlen(buttons[index].name) == length && !strncmp(token, buttons[index].name, length))
+		{
+			if (buttons[index].analog >= 0)
+				pad->bAnalogButtons[buttons[index].analog] = 255;
+			else
+				pad->wButtons |= buttons[index].digital;
+			return;
+		}
+	}
 }
 
 static void test_input_gamepad(XINPUT_GAMEPAD *pad)
@@ -805,7 +938,12 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 		const char *setting = config_string("debug.test_input");
 
 		checked = 1;
-		if (!strncmp(setting, "bot:", 4))
+		if (!strncmp(setting, "menu:", 5))
+		{
+			snprintf(test_input_menu, sizeof(test_input_menu), "%s", setting + 5);
+			test_input_menu_since = SDL_GetTicks();
+		}
+		else if (!strncmp(setting, "bot:", 4))
 			seed = atoi(setting + 4);
 		else if (!strcmp(setting, "bot"))
 			seed = 0;
@@ -815,16 +953,21 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 			looking = 1;
 		}
 	}
+	if (test_input_menu[0])
+	{
+		test_input_menu_gamepad(pad);
+		return;
+	}
 	if (seed < 0)
 		return;
 	if (test_input_holding_action)
 	{
 		/* (standing still, the button held from a second on) */
-		if (SDL_GetTicks() - test_input_holding_action_since >= 1000)
+		if (test_input_seconds() - test_input_holding_action_since >= 1.0)
 			pad->bAnalogButtons[XINPUT_GAMEPAD_X] = 255;
 		return;
 	}
-	t = (double)SDL_GetTicks() / 1000.0 + seed * 1.7;
+	t = test_input_seconds() + seed * 1.7;
 	if (looking)
 	{
 		pad->sThumbRX = (SHORT)(sin(t * 0.5) * 14000.0);

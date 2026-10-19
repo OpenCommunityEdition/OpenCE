@@ -2275,7 +2275,8 @@ void encounter_create(
 			/* port: network co-op's extra enemies, for its players
 			(coop_enemies.c) */
 			{
-				short extra_count = coop_enemies_extra_count(encounter_index, count);
+				/* port: the Monitor is a scripted character, even on a hostile team. */
+				short extra_count = actor_type == _actor_monitor ? 0 : coop_enemies_extra_count(encounter_index, count);
 
 				for (i = 0; i < extra_count; ++i)
 					encounter_place_actor(encounter_index, squad_index, 0, FALSE, (short)(i + 1));
@@ -3227,6 +3228,18 @@ static boolean encounter_place_actor(
 						upgrade_major = ai_consider_major_upgrade(encounter_index, squad_index, chance);
 				}
 
+				/* port: a starting location or major upgrade can replace the squad's
+				actor type. Never create an extra Monitor through either route. */
+				if (extra_number > 0)
+				{
+					struct actor_variant_definition *placed_variant = actor_variant_definition;
+
+					if (upgrade_major)
+						placed_variant = actor_variant_definition_get(actor_variant_definition->major_upgrade_reference.index);
+					if (placed_variant->actor_reference.index != NONE &&
+						actor_definition_get(placed_variant->actor_reference.index)->type == _actor_monitor)
+						return FALSE;
+				}
 				placed = actor_place(actor_palette_entry->index, encounter_index, squad_index, starting_location, upgrade_major, initial_variant) != NONE;
 			}
 		}

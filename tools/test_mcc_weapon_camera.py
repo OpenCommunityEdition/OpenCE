@@ -29,6 +29,8 @@ typedef short director_perspective;
 #define FALSE 0
 #define NONE -1
 #define MAXIMUM_WEAPONS_PER_UNIT 4
+#define MAXIMUM_NUMBER_OF_LOCAL_PLAYERS 4
+static int passenger_camera_enabled(short player) {(void)player;return 0;}
 #define TEST_FLAG(v,b) (((v)&(1UL<<(b)))!=0)
 #define TAG_BLOCK_GET_ELEMENT(b,i,t) (&((t *)(b)->address)[i])
 enum { _object_dead_bit, _object_mask_unit=2, _unit_seat_third_person_on_enter_bit=6,

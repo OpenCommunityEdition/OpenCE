@@ -256,6 +256,8 @@ static boolean cache_file_structure_bsp_tag_valid(
 /* ---------- globals */
 
 static struct cache_file_globals cache_file_globals = { 0 };
+/* port: the name the map loaded last was loaded by (scenario_tags_load) */
+static char cache_file_loaded_name[64];
 extern struct cache_file_tag_instance *global_tag_instances;
 /* port: global_tag_instances' count. The menus add their tags to a copy of
 the table (port/linux/game/menu_tags.c); the map's tag header keeps its own,
@@ -872,6 +874,14 @@ long tag_iterator_next(
 	return result;
 }
 
+/* port: the name the map loaded (or being loaded) was loaded by: its file's,
+<file>@ce and the like for the families past the Xbox's */
+char const *cache_file_loaded_map_name(
+	void)
+{
+	return cache_file_loaded_name;
+}
+
 boolean cache_file_header_verify(
 	struct cache_file_header *header,
 	char const *scenario_name,
@@ -1210,6 +1220,9 @@ long scenario_tags_load(
 
 	stripped_scenario_name = tag_name_strip_path(scenario_name);
 	result = NONE;
+	/* port: the map being loaded, by its name (cache_file_loaded_map_name) */
+	csstrncpy(cache_file_loaded_name, stripped_scenario_name, sizeof(cache_file_loaded_name) - 1);
+	cache_file_loaded_name[sizeof(cache_file_loaded_name) - 1] = 0;
 	texture_cache_open();
 	sound_cache_open();
 	if (mcc_level_name(scenario_name))
@@ -1367,9 +1380,9 @@ long scenario_tags_load(
 			}
 			/* port: the bitmaps the high-res HUD stands for (port/linux/game/hud_hires_tags.c) */
 			{
-				extern void hud_hires_tags_loaded(void);
+				extern void hud_hires_tags_loaded(long scenario_index);
 
-				hud_hires_tags_loaded();
+				hud_hires_tags_loaded(cache_file_globals.tag_header->scenario_tag_index);
 			}
 			/* port: the mods' sounds, bitmaps, text and models played over
 			the map's, last, over the menus' tags too, and with the high-res
