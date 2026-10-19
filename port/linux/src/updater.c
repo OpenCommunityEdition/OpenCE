@@ -744,8 +744,8 @@ void updater_poll(SDL_Window *window)
 	with debug.update_answer) */
 	if (updater_gamescope())
 	{
-		platform_log("update: %s is out (this is %s); not asking under gamescope (Steam Deck Game Mode)",
-			updater_latest_version, HALO_VERSION);
+		platform_log("update: build %ld is out (this is build %d); not asking under gamescope (Steam Deck Game Mode)",
+			updater_latest_build, HALO_BUILD_NUMBER);
 		return;
 	}
 	/* (a dialog cannot show above a fullscreen game) */
