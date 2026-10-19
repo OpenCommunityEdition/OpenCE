@@ -51,6 +51,9 @@ struct halo_menu_strings
 	char const *name;
 	/* its strings: count from first in the strings */
 	long first, count;
+	/* the PC version's list of the same strings (its tag's name), which a
+	map in another language has in its language; NULL if none */
+	char const *map;
 	char const *file;
 	long line;
 };
@@ -123,6 +126,9 @@ struct halo_menus
 	struct halo_menu_strings *string_lists;
 	long string_list_count;
 	char const **strings;
+	/* each string's index in its list's map list (HALO_MENU_NONE: the
+	port's own, in English only) */
+	long *string_maps;
 	long string_count;
 	struct halo_menu_widget *widgets;
 	long widget_count;

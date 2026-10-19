@@ -276,6 +276,31 @@ def text_value(utf16: bytes) -> str:
     return text.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "")
 
 
+def strings_xml(lists: dict) -> str:
+    """strings.xml: the PC version's string lists (each tag's strings), with
+    the port's changes to them (port_settings.STRING_OVERRIDES and
+    STRING_INSERTS). Each list names its tag (map=) and each of its strings
+    that is the PC version's its index there (map=), which a map in another
+    language has in its language (menu_tags.c's map_strings)."""
+    lines = ['<?xml version="1.0" encoding="UTF-8"?>',
+             "<!-- The PC version's menus' text (tools/ce_menus.py) -->", "<menus>"]
+    for tag in sorted(lists):
+        strings = lists[tag]
+        originals = list(range(len(strings)))
+        if our_name(tag) in port_settings.STRING_OVERRIDES:
+            strings = port_settings.STRING_OVERRIDES[our_name(tag)]
+            originals = port_settings.OVERRIDE_ORIGINALS.get(our_name(tag), [None] * len(strings))
+        for index, texts in port_settings.STRING_INSERTS.get(our_name(tag), []):
+            strings = strings[:index] + texts + strings[index:]
+            originals = originals[:index] + [None] * len(texts) + originals[index:]
+        lines.append(f"\t<strings{attributes([('name', our_name(tag)), ('map', tag)])}>")
+        lines += [f"\t\t<string{attributes([('text', text), ('map', original)])}/>"
+                  for text, original in zip(strings, originals)]
+        lines.append("\t</strings>")
+    lines.append("</menus>")
+    return "\n".join(lines) + "\n"
+
+
 def flag_names(value: int, names: list) -> str:
     return " ".join(name for bit, name in enumerate(names) if value >> bit & 1) or None
 
@@ -618,18 +643,9 @@ def main() -> None:
     for name, lines in [*port_settings.settings_files().items(), *port_settings.multiplayer_files().items()]:
         (CE / name).write_text("\n".join(lines))
     # their strings
-    lines = ['<?xml version="1.0" encoding="UTF-8"?>',
-             "<!-- The PC version's menus' text (tools/ce_menus.py) -->", "<menus>"]
-    for tag in sorted(string_lists):
-        strings = [text_value(item["string"]) for item in tags.load(tag, "unicode_string_list")["strings"]]
-        strings = port_settings.STRING_OVERRIDES.get(our_name(tag), strings)
-        for index, texts in port_settings.STRING_INSERTS.get(our_name(tag), []):
-            strings = strings[:index] + texts + strings[index:]
-        lines.append(f"\t<strings{attributes([('name', our_name(tag))])}>")
-        lines += [f"\t\t<string{attributes([('text', text)])}/>" for text in strings]
-        lines.append("\t</strings>")
-    lines.append("</menus>")
-    (CE / "strings.xml").write_text("\n".join(lines) + "\n")
+    (CE / "strings.xml").write_text(strings_xml({
+        tag: [text_value(item["string"]) for item in tags.load(tag, "unicode_string_list")["strings"]]
+        for tag in string_lists}))
     # their bitmaps
     lines = ['<?xml version="1.0" encoding="UTF-8"?>',
              "<!-- The PC version's menus' bitmaps, drawn from the redraws, else the PC version's own pictures"
