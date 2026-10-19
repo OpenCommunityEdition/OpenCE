@@ -20,6 +20,9 @@ memory_watch.c detects that by write-protecting the pages.
 #include "text_hires.h"
 #include "port_config.h"
 #include "../game/cache_file_formats.h"
+#ifdef HALO_METAL
+#include "opence_render.h"
+#endif
 
 #include <stdio.h>
 #ifdef HALO_GLES
@@ -548,6 +551,7 @@ static void dxt_decode_level(unsigned char kind, const unsigned char *source, un
 }
 #endif
 
+#ifndef HALO_METAL
 static GLenum compressed_format(unsigned char kind)
 {
 	switch (kind)
@@ -600,6 +604,7 @@ static void texture_dump(GLenum target, const struct xgpu_texture_description *d
 	}
 	free(pixels);
 }
+#endif
 #endif
 
 /* ---------- Custom Edition channel orders
@@ -695,6 +700,7 @@ void halo_custom_edition_texels_forget(void)
 	custom_edition_texel_capacity = 0;
 }
 
+#ifndef HALO_METAL
 static void upload(GLuint texture, GLenum target, const struct xgpu_texture_description *description,
 	const unsigned char *base, const D3DCOLOR *palette, unsigned char channel_order)
 {
@@ -837,6 +843,7 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 	free(converted);
 	texture_dump(target, description);
 }
+#endif
 
 /* ---------- cache */
 
@@ -860,6 +867,10 @@ struct texture_entry
 	memory watch serial read before it was found: the same while no watched
 	page has been written since (0: never found) */
 	unsigned long watched_serial, watched_generation;
+#ifdef HALO_METAL
+	/* the format its texture was made in (OPENCE_RENDER_FORMAT_*) */
+	unsigned int metal_format;
+#endif
 };
 
 #define TEXTURE_BUCKET_COUNT 4096
@@ -883,6 +894,149 @@ static struct
 } recent_textures[RECENT_TEXTURE_COUNT];
 static unsigned long texture_drop_serial = 1;
 static unsigned long texture_frame = 0;
+
+#ifdef HALO_METAL
+/* ---------- upload, to the macOS app's renderer
+
+Its texture is a ring texture (xgpu.h, "Metal"). Compressed texels go as
+they are, as BC1 to BC3, but for volumes, sides that are not multiples of 4
+and channels kept where Halo PC keeps them, which are decoded as other
+formats are: to BGRA (32-bit ARGB words), each channel put where it is
+sampled from on the way, as the web build's are. Texels in the contiguous
+window are read from it as the batch runs (a write after this has a newer
+generation, and is uploaded again); decoded ones are copied to the
+device's staging memory, or allocated and given at once when too large. */
+
+/* red, green, blue and alpha's shifts in an ARGB word */
+static const unsigned char argb_shifts[4] = { 16, 8, 0, 24 };
+
+static void metal_put_channels(unsigned long *texels, unsigned long count, unsigned char channel_order)
+{
+	unsigned long texel, channel;
+
+	for (texel = 0; texel < count; texel++)
+	{
+		unsigned long value = texels[texel];
+
+		texels[texel] = 0;
+		for (channel = 0; channel < 4; channel++)
+			texels[texel] |= ((value >> argb_shifts[custom_edition_channel_sources[channel_order][channel]]) & 0xffUL) <<
+				argb_shifts[channel];
+	}
+}
+
+static void metal_upload(struct texture_entry *entry, const unsigned char *base, const D3DCOLOR *palette,
+	unsigned char channel_order)
+{
+	const struct xgpu_texture_description *description = &entry->description;
+	struct format_information information = format_information(description->format);
+	unsigned long face_count = description->cube_map ? 6 : 1;
+	unsigned long face_size = xgpu_texture_face_size(description);
+	BOOL direct = description->compressed && entry->target != GL_TEXTURE_3D && !(description->width & 3) &&
+		!(description->height & 3) && channel_order == _custom_edition_channels_xbox;
+	unsigned int format = !direct ? OPENCE_RENDER_FORMAT_BGRA8 :
+		information.kind == _texel_dxt1 ? OPENCE_RENDER_FORMAT_BC1 :
+		information.kind == _texel_dxt3 ? OPENCE_RENDER_FORMAT_BC2 : OPENCE_RENDER_FORMAT_BC3;
+	unsigned long face, level;
+	unsigned int *fields;
+
+	if (!entry->texture || entry->metal_format != format)
+	{
+		xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, entry->texture);
+		entry->texture = xgpu_metal_new_id(OPENCE_RENDER_OBJECT_TEXTURE);
+		fields = entry->texture ? xgpu_metal_command(OPENCE_RENDER_OP_CREATE_TEXTURE,
+			OPENCE_RENDER_CREATE_TEXTURE_WORDS) : NULL;
+		if (!fields)
+		{
+			xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, entry->texture);
+			entry->texture = 0;
+			return;
+		}
+		fields[0] = entry->texture;
+		fields[1] = description->cube_map ? OPENCE_RENDER_TEXTURE_CUBE :
+			entry->target == GL_TEXTURE_3D ? OPENCE_RENDER_TEXTURE_3D : OPENCE_RENDER_TEXTURE_2D;
+		fields[2] = format;
+		fields[3] = (unsigned int)description->width;
+		fields[4] = (unsigned int)description->height;
+		fields[5] = (unsigned int)description->depth;
+		fields[6] = (unsigned int)description->levels;
+		fields[7] = OPENCE_RENDER_USAGE_SAMPLED;
+		fields[8] = 1;
+		entry->metal_format = format;
+	}
+	for (face = 0; face < face_count; face++)
+	{
+		for (level = 0; level < description->levels; level++)
+		{
+			const unsigned char *source = base + face * face_size + xgpu_texture_level_offset(description, level);
+			unsigned long width = level_dimension(description->width, level);
+			unsigned long height = level_dimension(description->height, level);
+			unsigned long depth = level_dimension(description->depth, level);
+			unsigned long row, length;
+			const void *texels = source;
+			unsigned long *allocated = NULL;
+
+			if (direct)
+			{
+				row = ((width + 3) / 4) * information.bytes;
+				length = level_bytes(description, level);
+			}
+			else
+			{
+				unsigned long *converted;
+
+				row = width * 4;
+				length = row * height * depth;
+				converted = xgpu_metal_stage_space(length);
+				if (!converted)
+					converted = allocated = malloc(length);
+				if (!converted)
+				{
+					platform_log("textures: no memory to convert a %lux%lux%lu texture; it is not drawn",
+						description->width, description->height, description->depth);
+					return;
+				}
+				if (description->compressed)
+				{
+					dxt_decode_level(information.kind, source, width, height, depth, converted);
+				}
+				else if (!decode_level(description, level, source, palette, converted))
+				{
+					platform_log("textures: no memory to convert a %lux%lux%lu texture; it is not drawn",
+						description->width, description->height, description->depth);
+					free(allocated);
+					return;
+				}
+				if (channel_order != _custom_edition_channels_xbox)
+					metal_put_channels(converted, width * height * depth, channel_order);
+				texels = converted;
+			}
+			fields = xgpu_metal_command(OPENCE_RENDER_OP_UPLOAD_TEXTURE, OPENCE_RENDER_UPLOAD_TEXTURE_WORDS);
+			if (fields)
+			{
+				fields[0] = entry->texture;
+				fields[1] = (unsigned int)level;
+				fields[2] = (unsigned int)face;
+				fields[3] = 0;
+				fields[4] = 0;
+				fields[5] = 0;
+				fields[6] = (unsigned int)width;
+				fields[7] = (unsigned int)height;
+				fields[8] = (unsigned int)depth;
+				fields[9] = (unsigned int)(unsigned long)texels;
+				fields[10] = (unsigned int)row;
+				fields[11] = (unsigned int)(length / depth);
+				fields[12] = (unsigned int)length;
+			}
+			if (allocated)
+			{
+				xgpu_metal_flush();
+				free(allocated);
+			}
+		}
+	}
+}
+#endif
 
 /* (every bit of the three mixed into the top ones: textures are aligned,
 and few sizes and formats are common) */
@@ -914,6 +1068,7 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 {
 	*target = entry->target;
 	*description = entry->description;
+#ifndef HALO_METAL
 	/* (the high-res text's atlas, for its placeholder bitmap: text_hires.h) */
 	{
 		GLuint atlas = text_hires_atlas_texture(entry->data);
@@ -991,6 +1146,7 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 			return entry->hud_upscale;
 		}
 	}
+#endif
 	return entry->texture;
 }
 
@@ -1074,7 +1230,9 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		}
 		entry->generation = 0;
 		entry->override = -1;
+#ifndef HALO_METAL
 		glGenTextures(1, &entry->texture);
+#endif
 		entry->next = *bucket;
 		*bucket = entry;
 	}
@@ -1100,14 +1258,17 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		if (!entry->generation)
 			entry->generation = 1;
 		/* (which bitmap is here may have changed with the pixels) */
+#ifndef HALO_METAL
 		if (entry->hud_upscale)
 		{
 			glDeleteTextures(1, &entry->hud_upscale);
 			entry->hud_upscale = 0;
 			xgpu_gl_state_invalidate();
 		}
+#endif
 		entry->hud_upscale_checked = FALSE;
 		entry->override = -1;
+#ifndef HALO_METAL
 		if (entry->size && !palettized && !entry->description.cube_map && entry->description.depth == 1)
 		{
 			unsigned long levels;
@@ -1118,6 +1279,7 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 			if (entry->override >= 0 && !hud_hires_override_texture(entry->override, &levels))
 				entry->override = -1;
 		}
+#endif
 		if (entry->override < 0 && entry->size && platform_is_contiguous((void *)entry->address) &&
 			platform_is_contiguous((void *)(entry->address + entry->size - 1)))
 		{
@@ -1136,8 +1298,13 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 					entry->description.height, entry->size, entry->generation,
 					ones * 100 / entry->size, zeros * 100 / entry->size);
 			}
+#ifdef HALO_METAL
+			metal_upload(entry, (const unsigned char *)entry->address, palette,
+				custom_edition_texels_order(entry->address));
+#else
 			upload(entry->texture, entry->target, &entry->description, (const unsigned char *)entry->address, palette,
 				custom_edition_texels_order(entry->address));
+#endif
 		}
 	}
 	entry->last_used_frame = texture_frame;
@@ -1156,7 +1323,12 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 void xgpu_texture_cache_begin_frame(void)
 {
 	unsigned long index;
+#ifdef HALO_METAL
+	/* (the high-res art is not drawn there yet) */
+	unsigned long changed = 0;
+#else
 	unsigned long changed = hud_hires_settings_changed();
+#endif
 
 	/* Refresh only map bitmaps belonging to the setting that changed. Keep
 	 * decoded replacement art and world textures; rebuild native pixels on
@@ -1191,9 +1363,13 @@ void xgpu_texture_cache_begin_frame(void)
 			if (texture_frame - entry->last_used_frame > TEXTURE_IDLE_FRAMES)
 			{
 				*link = entry->next;
+#ifdef HALO_METAL
+				xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, entry->texture);
+#else
 				glDeleteTextures(1, &entry->texture);
 				if (entry->hud_upscale)
 					glDeleteTextures(1, &entry->hud_upscale);
+#endif
 				xgpu_gl_state_invalidate();
 				texture_drop_serial++;
 				free(entry);

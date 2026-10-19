@@ -305,6 +305,55 @@ struct xgpu_render_target
 /* the GL texture holding a render target with this physical address, or 0 */
 struct xgpu_render_target *xgpu_render_target_find(unsigned long data);
 
+#ifdef HALO_METAL
+/* ---------- Metal (port/macos/guest/d3d8_metal.c)
+
+The macOS app's device writes Metal-level commands to the host's ring
+(port/macos/include/opence_render.h) in place of GL calls. Its textures,
+buffers and render targets are ring objects, named by ids the device gives
+out; "GLuint" texture names in the interfaces above are those ids there. */
+
+/* the place for a command's words - 1 fields (opence_render_command), or
+NULL with nothing written */
+unsigned int *xgpu_metal_command(unsigned int op, unsigned int words);
+/* gives the commands written so far to the host: once it returns, they have
+been read, and staged copies are free again */
+void xgpu_metal_flush(void);
+
+/* a free id of an object kind (OPENCE_RENDER_OBJECT_*), or 0 if none is
+left; and an object destroyed, its id free again */
+unsigned int xgpu_metal_new_id(unsigned int kind);
+void xgpu_metal_destroy(unsigned int kind, unsigned int id);
+
+/* size bytes of staging memory, or a copy of size bytes there, that stay
+as they are until the commands referring to them have been flushed (NULL
+for more than half the staging memory) */
+void *xgpu_metal_stage_space(unsigned long size);
+const void *xgpu_metal_stage(const void *data, unsigned long size);
+/* bytes copied into a buffer, staged as the command is written */
+void xgpu_metal_upload_buffer(unsigned int buffer, unsigned long offset, const void *data, unsigned long size);
+
+/* the frame the device is on (xgpu_metal_begin_frame counts them), which
+the contiguous window's mirror measures rewrites in */
+void xgpu_metal_begin_frame(void);
+
+/* [address, address + size) of the contiguous window made current in the
+mirror's buffers (d3d8_gl.c, mirror_range): the buffer holding it, the
+range's offset there and its pages' newest generation; FALSE if it is
+outside the window, spans two segments or is rewritten too often */
+BOOL xgpu_metal_mirror_range(unsigned long address, unsigned long size, unsigned int *buffer,
+	unsigned long *offset, unsigned long *generation);
+/* size bytes copied to the stream buffer, at a multiple of alignment (a
+power of two): the buffer and the offset they are at; FALSE if they are
+larger than it */
+BOOL xgpu_metal_stream(const void *data, unsigned long size, unsigned long alignment, unsigned int *buffer,
+	unsigned long *offset);
+
+/* the render target of a surface, made when first asked for: a BGRA8 colour
+texture, or a DEPTH32F_STENCIL8 depth one, sampled and drawn into */
+struct xgpu_render_target *xgpu_metal_render_target_get(const D3DSurface *surface);
+#endif
+
 /* ---------- anti-aliasing
 
 display.anti_aliasing's passes (xgpu_post.c): FXAA or SMAA antialias each
