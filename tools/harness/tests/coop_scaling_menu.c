@@ -15,6 +15,11 @@ static struct widget_instance *named(struct widget_instance *w,char const *name,
  return NULL;
 }
 static void visible_set(struct widget_instance *w,boolean visible){if(w)w->visible=visible;}
+/* menu_functions.c's TEXT CHAT row, which the function holds at OFF while a
+game is listed: none here */
+#define TEXT_CHAT_SPINNER "text_chat_spinner"
+#define TEXT_CHAT_OFF 2
+static int p2p_hosting_listed(void){return 0;}
 #include "under_test.inc"
 static char const *rows[]={"op_coop_friendly_fire","op_coop_extra_enemies","op_coop_extra_pickups","op_coop_extra_vehicles",
  "op_coop_enemies_multiplier","op_coop_enemies_per_player","op_coop_player_collisions"};
