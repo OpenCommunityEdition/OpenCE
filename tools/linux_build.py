@@ -564,7 +564,11 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # Port-specific units that must see the game exactly as its own
         # sources do (port/linux/game).
         for source in sorted(Path(config["game_sources"]).glob("*.c")):
-            add_object(source, game_cflags)
+            flags = game_cflags
+            # The main menu labels the executable with its release number.
+            if source.as_posix() == "port/linux/game/menu_functions.c":
+                flags += " " + updater_defines(getattr(sln, "port_release", False))
+            add_object(source, flags)
         add_object(STB_VORBIS_SOURCE, game_cflags)
 
         platform_dir = Path(config["platform_sources"])

@@ -664,6 +664,9 @@ static void text_set(struct widget_instance *text_box, wchar_t const *text)
 	text_set_length(text_box, text, ROW_TEXT_LENGTH);
 }
 
+#include "changelog_menu_runtime.inl"
+#include "build_label.inl"
+
 /* one of our string lists' strings, on one line (its line breaks spaces) */
 static void string_get(char const *list, short index, wchar_t *text)
 {
@@ -6033,7 +6036,15 @@ boolean pc_menu_event_function_invoke(
 
 		if (!name)
 			return FALSE;
-		if (!strcmp(name, "main menu quit game"))
+		if (!strncmp(name, "port changelog ", 15))
+		{
+			return changelog_menu_event(widget, name);
+		}
+		else if (!strcmp(name, "port build label"))
+		{
+			return build_label_event(widget);
+		}
+		else if (!strcmp(name, "main menu quit game"))
 		{
 			platform_request_quit();
 		}
@@ -6407,7 +6418,9 @@ void pc_menu_game_data_function_invoke(
 	/* (a text field whose screen has gone: let go of) */
 	if (text_field.row && system_milliseconds() - text_field_shown_time > 500)
 		text_field_end(FALSE);
-	if (!strcmp(name, "solo map list update"))
+	if (!strcmp(name, "port changelog focus update"))
+		changelog_menu_focus_update(widget);
+	else if (!strcmp(name, "solo map list update"))
 		level_list_update(widget);
 	else if (!strcmp(name, "mp map list update"))
 		map_list_update(widget);

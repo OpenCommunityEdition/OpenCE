@@ -248,7 +248,11 @@ def generate_web_build(n: Writer, sln: Any) -> None:
             cflags += " -Dmain=halo_game_main"
         add_object(source, cflags)
     for source in sorted(Path(config["game_sources"]).glob("*.c")):
-        add_object(source, game_cflags)
+        cflags = game_cflags
+        # The main menu labels the executable with its release number.
+        if source.as_posix() == "port/linux/game/menu_functions.c":
+            cflags += " " + updater_defines(release)
+        add_object(source, cflags)
     add_object(STB_VORBIS_SOURCE, game_cflags)
 
     # ---------- the platform layer and the web runtime
