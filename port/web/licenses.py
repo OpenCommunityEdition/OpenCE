@@ -1,7 +1,7 @@
-"""Writes the web site's licenses.txt (tools/web_build.py): the notices of
-the code and fonts that halo.wasm and the page carry, which their licences
-ask copies to include, as the other builds' releases carry them
-(tools/ci_build.py).
+"""Writes the web site's licenses.txt (tools/web_build.py): OpenCE's licence,
+and the notices of the code and fonts that halo.wasm and the page carry,
+which their licences ask copies to include, as the other builds' releases
+carry them (tools/ci_build.py).
 
     python port/web/licenses.py OUTPUT SDL3-LICENSE
 """
@@ -21,7 +21,6 @@ NOTICES = [
     ("tomlc17 (config.toml, mod.toml, load_order.toml)", "port/third_party/tomlc17/LICENSE"),
     ("musl (the maths functions)", "port/third_party/musl-math/COPYRIGHT"),
     ("stb_vorbis (Custom Edition maps' and mods' sounds)", "port/third_party/stb_vorbis/LICENSE"),
-    ("extract-xiso (how the disc image is read)", "port/third_party/extract-xiso/LICENSE.TXT"),
     ("Overpass (the menus' text and the page's)", "port/assets/fonts/Overpass-OFL.txt"),
     ("OpenCE (the title font, from Newtown)", "port/assets/fonts/OpenCE-OFL.txt"),
     ("Newtown", "port/assets/fonts/Newtown-LICENSE.txt"),
@@ -33,12 +32,17 @@ def main() -> None:
     output, sdl_license = Path(sys.argv[1]), Path(sys.argv[2])
     parts = [
         "OpenCE for the web\n\n"
-        "OpenCE's own code is CC0 (https://github.com/OpenCommunityEdition/OpenCE). The game data\n"
-        "comes from the player's own disc. It carries the following, under their licences:\n",
+        "OpenCE is free software under the GNU Affero General Public License, version 3 or (at\n"
+        "your option) any later version; its text is at the end of this file. Its source is at\n"
+        "https://github.com/OpenCommunityEdition/OpenCE, and each release's at its tag. The game\n"
+        "data comes from the player's own disc. OpenCE carries the following, under their\n"
+        "licences:\n",
         f"\n==================== SDL 3 (windows, input and audio)\n\n{sdl_license.read_text(encoding='utf-8')}",
     ]
     for title, path in NOTICES:
         parts.append(f"\n==================== {title}\n\n{(ROOT / path).read_text(encoding='utf-8')}")
+    parts.append(f"\n==================== OpenCE (GNU Affero General Public License)\n\n"
+                 f"{(ROOT / 'LICENSE').read_text(encoding='utf-8')}")
     output.write_text("".join(parts), encoding="utf-8")
 
 

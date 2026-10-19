@@ -190,10 +190,18 @@ otherwise.
 
 ### Third-party code and licences
 
-The repository is CC0. Vendored code goes in `port/third_party/<name>`,
-copied unchanged, with a README naming the upstream, the version or commit,
-the checksum and what uses it. GPL code (OpenSauce, Reclaimer) may be read
-as documentation of file formats, never copied.
+The repository is `AGPL-3.0-or-later` (`LICENSE`); the commits before the
+change, and the releases built from them, stay CC0 (`LICENSES/CC0-1.0.txt`).
+The README's "Licence" section says what each part is under. Vendored code
+goes in `port/third_party/<name>`, copied unchanged, with a README naming
+the upstream, the version or commit, the licence, the checksum and what uses
+it. Its licence must let it be combined with the AGPL 3.0: MIT, BSD (without
+an advertising clause), ISC, zlib, Apache 2.0, MPL 2.0, LGPL or GPL 3.0 or
+later, public domain. GPL-2.0-only code and the 4-clause BSD licence cannot
+be. Code taken from another project, GPL 3.0 code included, keeps its
+notices and its licence, and says where it came from.
+The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
+2026; bnunu/halo-1 is CC0.
 
 ### Commits and pull requests
 

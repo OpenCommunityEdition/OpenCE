@@ -202,3 +202,34 @@ Enter `adb pull` to copy the recording parts to a computer.
 
 A profiling build plays with normal builds. It does not use
 `--pgo=train`.
+
+## Licence
+
+OpenCE is free software: you can give it to others and change it under the
+terms of the GNU Affero General Public License as published by the Free
+Software Foundation, version 3 of the License or (at your option) any later
+version (`AGPL-3.0-or-later`). It comes with no warranty. The full text is in
+[LICENSE](LICENSE).
+
+- **From the change.** The AGPL applies from the commit that made the change,
+  and to each release built from that commit or a later one. Earlier
+  releases, and the source at every earlier commit, were released under
+  [CC0 1.0](LICENSES/CC0-1.0.txt) and stay that way.
+- **What OpenCE builds on.** The decompilation of
+  [punpckhdq/halo](https://github.com/punpckhdq/halo) is under the AGPL 3.0
+  from 17 October 2026, and under CC0 1.0 before that date.
+  [bnunu/halo-1](https://github.com/bnunu/halo-1) is under CC0 1.0.
+- **Contributions** are under `AGPL-3.0-or-later`. A change taken from a
+  project under GPL 3.0 keeps that licence and its notices; the GPL 3.0 and
+  the AGPL 3.0 let the two be combined (section 13 of each).
+- **Hosts and servers.** If you change the game and let other persons play
+  with your version over a network (for example, as the host of an internet
+  game, or on a web site), the AGPL asks you to offer them the source of
+  your version (section 13). The game as released has its source here, and
+  each release's source is its tag (`build-<n>`).
+- **Third-party code, fonts and art** keep their own licences, which are
+  next to them (`port/third_party`, `port/assets/fonts`,
+  `port/assets/icons`, `port/assets/text_filter`). The release downloads and
+  the web site's `licenses.txt` carry their notices.
+- **Halo is not covered.** The licence covers the work of OpenCE's authors.
+  It gives no rights in Halo, its maps or anything else that Microsoft owns.

@@ -14,11 +14,11 @@ Sources for the layouts, cited per structure below:
 - BlamLib, in the same archive: the font and unicode string list layouts.
 - Reclaimer (GPL-3.0, Gravemind2401; the Reclaimer-master archive): how
   bitmap tags and pixel data are found in bitmaps.map.
-No code from either project is used: they are documentation here, and this
-repository is CC0. Facts that neither source states were established by
-reading the sample Custom Edition maps; the comments below say so where they
-are used ("observed", "every map examined"), and
-docs/custom_edition_caches.md lists each with its evidence.
+No code from either project is used: they are documentation here. Facts
+that neither source states were established by reading the sample Custom
+Edition maps; the comments below say so where they are used ("observed",
+"every map examined"), and docs/custom_edition_caches.md lists each with its
+evidence.
 */
 
 /* ---------- headers */
