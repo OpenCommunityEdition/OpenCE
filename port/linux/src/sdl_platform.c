@@ -1062,6 +1062,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	(void)version;
 	platform_event_thread = SDL_GetCurrentThreadID();
 	platform_log("OpenGL %s on %s", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER));
+#if defined(__linux__) && !defined(HALO_ANDROID)
 	{
 		const char *renderer = (const char *)glGetString(GL_RENDERER);
 
@@ -1070,6 +1071,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 			platform_log("OpenGL is drawn on the processor, not the GPU (video driver %s): "
 				"refer to \"NVIDIA on Wayland\" in port/linux/README.md", SDL_GetCurrentVideoDriver());
 	}
+#endif
 #ifndef HALO_ANDROID
 	platform_mouse_capture(TRUE);
 #endif
