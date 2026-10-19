@@ -219,6 +219,12 @@ static wchar_t *fallback_string(long tag_index, short string_index)
 		return custom_edition_maps_name(string_index);
 	if (!csstrcasecmp(tag_name, LEVEL_DESCRIPTIONS_TAG_NAME) || !csstrcasecmp(tag_name, PC_LEVEL_DESCRIPTIONS_TAG_NAME))
 		return custom_edition_maps_description(string_index);
+	/* port: Comp 2v2 is the default gametype after the Xbox's 26. its
+	description is the one the list asks for by profile index plus 10 */
+	if (!csstrcasecmp(tag_name, "ui\\default_multiplayer_game_setting_names") && string_index == 26)
+		return L"Comp 2v2";
+	if (!csstrcasecmp(tag_name, "ui\\shell\\strings\\game_variant_descriptions") && string_index == 36)
+		return L"Slayer to 50.\r\nNo Motion Tracker.\r\nFriends are nav points.\r\nRespawn in 5 seconds.\r\nA death or a kill\r\ndoes not change the score.";
 	if (fallback_index < 0 ||
 		fallback_index >= (short)NUMBEROF(fallback_multiplayer_game_text_strings) ||
 		csstrcasecmp(tag_name, MULTIPLAYER_GAME_TEXT_TAG_NAME))

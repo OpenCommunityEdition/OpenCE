@@ -6121,6 +6121,42 @@ struct game_variant *build_game_variant_team_slayer(
 	return variant;
 }
 
+/* port: Comp 2v2. Slayer to 50, free for all, no motion sensor, friends
+as nav points, a 5 second respawn, and a death or a kill does not change
+the score. */
+struct game_variant *build_game_variant_comp_2v2(
+	struct game_variant *variant)
+{
+	struct game_variant result = { 0 };
+
+	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, FALSE);
+	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
+	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
+	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
+	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
+	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, TRUE);
+	result.game_engine_index = game_engine_slayer;
+	result.universal_variant.teams = FALSE;
+	result.universal_variant.goal_radar = _radar_none;
+	result.universal_variant.health = 1.0f;
+	result.universal_variant.lives = 0;
+	result.universal_variant.odd_man_out = FALSE;
+	result.universal_variant.respawn_time = 150;
+	result.universal_variant.respawn_time_growth = 0;
+	result.universal_variant.score_to_win = 50;
+	result.universal_variant.suicide_penalty = 0;
+	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+	result.flags = 1;
+	result.game_engine_variant.slayer.no_death_bonus = TRUE;
+	result.game_engine_variant.slayer.no_kill_penalty = TRUE;
+	result.game_engine_variant.slayer.kill_in_order = FALSE;
+
+	*variant = result;
+
+	return variant;
+}
+
 struct game_variant *build_game_variant_elimination(
 	struct game_variant *variant)
 {

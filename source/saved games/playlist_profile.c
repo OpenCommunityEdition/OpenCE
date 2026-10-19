@@ -102,7 +102,9 @@ enum
 	PLAYLIST_PROFILE_OPTIONS_MAGIC = 0x4F565047, /* 'GPVO' little-endian */
 	PLAYLIST_PROFILE_OPTIONS_VERSION = 1,
 	MAXIMUM_GAME_VARIANT_NAME_LENGTH = 12,
-	NUMBER_OF_DEFAULT_PLAYLIST_PROFILES = 26,
+	/* port: one past the Xbox's 26, for Comp 2v2. this count is only
+	the list of builders below */
+	NUMBER_OF_DEFAULT_PLAYLIST_PROFILES = 27,
 };
 
 enum
@@ -126,11 +128,11 @@ struct playlist_profile_data
 
 typedef char verify_playlist_profile_building_functions_size[
 	sizeof(((struct playlist_profile_data *)0)->
-		default_variant_building_functions) == 0x68 ? 1 : -1];
+		default_variant_building_functions) == 0x6C ? 1 : -1];
 typedef char verify_playlist_profile_first_time_offset[
-	offsetof(struct playlist_profile_data, first_time) == 0x68 ? 1 : -1];
+	offsetof(struct playlist_profile_data, first_time) == 0x6C ? 1 : -1];
 typedef char verify_playlist_profile_data_size[
-	sizeof(struct playlist_profile_data) == 0x69 ? 1 : -1];
+	sizeof(struct playlist_profile_data) == 0x6D ? 1 : -1];
 
 struct playlist_profile_write_request
 {
@@ -223,6 +225,7 @@ static struct playlist_profile_data playlist_profile_default_data =
 		build_game_variant_team_oddball,
 		build_game_variant_team_king,
 		build_game_variant_team_slayer,
+		build_game_variant_comp_2v2,
 	},
 	TRUE
 };
