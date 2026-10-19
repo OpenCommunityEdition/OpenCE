@@ -21,7 +21,9 @@ let package = Package(
         .target(name: "OpenCEShell"),
         // the game's windows: AppKit with a Metal layer
         .target(name: "OpenCEWindow", dependencies: ["OpenCEShell"]),
-        .executableTarget(name: "OpenCE", dependencies: ["CHaloHost", "OpenCERuntime", "OpenCEShell", "OpenCEWindow"]),
-        .testTarget(name: "OpenCETests", dependencies: ["OpenCERuntime", "OpenCEShell", "OpenCEWindow"]),
+        // the game's sound: AVAudioEngine
+        .target(name: "OpenCEAudio"),
+        .executableTarget(name: "OpenCE", dependencies: ["CHaloHost", "OpenCERuntime", "OpenCEShell", "OpenCEWindow", "OpenCEAudio"]),
+        .testTarget(name: "OpenCETests", dependencies: ["OpenCERuntime", "OpenCEShell", "OpenCEWindow", "OpenCEAudio"]),
     ]
 )

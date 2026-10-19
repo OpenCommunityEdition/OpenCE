@@ -159,6 +159,34 @@ int host_input_set_relative_mouse(uint32_t window, int enabled);
 int host_sdl_poll_event(void *event);
 int host_sdl_set_relative_mouse(uint32_t window, int enabled);
 
+/* ---------- sound (host_audio.c)
+
+The audio-stream imports (host_sdl_open_audio_stream and the rest) are
+these: the app's streams for a playback stream with a callback when it has
+installed its audio (halo_host_set_audio_backend), else SDL's. */
+
+/* an app stream's handle is this plus its place; SDL's are below it */
+#define HOST_AUDIO_HANDLE_BASE 0x10000u
+/* the frames an app stream holds */
+#define HOST_AUDIO_RING_FRAMES 8192u
+
+uint32_t host_audio_open_stream(uint32_t device, const void *spec, uint32_t callback, uint32_t userdata);
+int host_audio_put_stream_data(uint32_t stream, const void *data, int length);
+int host_audio_resume_stream_device(uint32_t stream);
+int host_audio_get_stream_data(uint32_t stream, void *data, int length);
+int host_audio_get_stream_available(uint32_t stream);
+void host_audio_destroy_stream(uint32_t stream);
+/* calls an app stream's callback for what it lacks of its target (its
+thread's work, and the tests'); 1 if it was called */
+int host_audio_fill(uint32_t stream);
+/* SDL's (port/android/host/host_sdl.c) */
+uint32_t host_sdl_open_audio_stream(uint32_t device, const void *spec, uint32_t callback, uint32_t userdata);
+int host_sdl_put_audio_stream_data(uint32_t stream, const void *data, int length);
+int host_sdl_resume_audio_stream_device(uint32_t stream);
+int host_sdl_get_audio_stream_data(uint32_t stream, void *data, int length);
+int host_sdl_get_audio_stream_available(uint32_t stream);
+void host_sdl_destroy_audio_stream(uint32_t stream);
+
 /* ---------- system calls (host_syscall.c) */
 
 /* the Linux errno value of a host (Darwin) one */

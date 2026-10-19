@@ -290,6 +290,12 @@ def test_the_dispatcher_runs_window_imports_on_the_main_thread(tmp_path):
     # main thread)
     _, body = dispatch_case(text, "host_sdl_gl_create_context")
     assert "host_call_on_main_thread(" in body
+    # (the sound, the app's or else SDL's: host_audio.c)
+    for name in ("open_audio_stream", "put_audio_stream_data", "resume_audio_stream_device",
+                 "get_audio_stream_data", "get_audio_stream_available", "destroy_audio_stream"):
+        _, body = dispatch_case(text, f"host_sdl_{name}")
+        host = "host_audio_" + name.replace("audio_", "", 1)
+        assert f"{host}(" in body and f"host_sdl_{name}(" not in body, name
     # what needs no main thread is called where it is asked for
     for name in ("host_sdl_ticks", "host_sdl_gl_swap_window", "host_sdl_put_audio_stream_data"):
         _, body = dispatch_case(text, name)

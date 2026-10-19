@@ -21,9 +21,9 @@ The imports AppKit needs on its main thread (MAIN_THREAD: windows, events,
 message boxes, the clipboard) are carried out there: each case's call is a
 function of its own, which host_call_on_main_thread
 (port/macos/host/host_main_thread.c) runs on the main thread for the vCPU
-that asked, bringing its errno back. The window imports (HOST_FUNCTIONS)
-call the macOS host's own functions, which use the app's windows when it has
-some and SDL's otherwise.
+that asked, bringing its errno back. The window, input and audio-stream
+imports (HOST_FUNCTIONS) call the macOS host's own functions, which use the
+app's windows, events and sound when it has them and SDL's otherwise.
 
 Usage: macos_dispatch.py --prototypes header.h [--prototypes ...] output.c list...
 """
@@ -52,7 +52,8 @@ MAIN_THREAD = {
 }
 
 # imports whose host function is the macOS host's own, with the same
-# prototype: the app's windows, else SDL's (port/macos/host/host_window.c)
+# prototype: the app's windows, input and sound, else SDL's
+# (port/macos/host/host_window.c, host_input.c, host_audio.c)
 HOST_FUNCTIONS = {
     "host_sdl_create_window": "host_window_create",
     "host_sdl_window_size_in_pixels": "host_window_size_in_pixels",
@@ -64,6 +65,13 @@ HOST_FUNCTIONS = {
     # (the app's keyboard and mouse, then SDL's events: host_input.c)
     "host_sdl_poll_event": "host_input_poll_event",
     "host_sdl_set_relative_mouse": "host_input_set_relative_mouse",
+    # (the app's sound for the game's stream, else SDL's: host_audio.c)
+    "host_sdl_open_audio_stream": "host_audio_open_stream",
+    "host_sdl_put_audio_stream_data": "host_audio_put_stream_data",
+    "host_sdl_resume_audio_stream_device": "host_audio_resume_stream_device",
+    "host_sdl_get_audio_stream_data": "host_audio_get_stream_data",
+    "host_sdl_get_audio_stream_available": "host_audio_get_stream_available",
+    "host_sdl_destroy_audio_stream": "host_audio_destroy_stream",
 }
 
 

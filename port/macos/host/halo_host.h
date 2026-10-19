@@ -60,4 +60,26 @@ void halo_host_post_mouse_button(uint32_t window, int number, int down, float x,
 void halo_host_post_wheel(uint32_t window, float dx, float dy, int precise);
 void halo_host_post_focus(uint32_t window, int has_focus);
 
+/* the app's sound, in place of SDL's (host_audio.c), for the game's
+playback stream: its functions are called on the guest's threads. open
+makes a stream of `channels` float channels at `rate` Hz, named by
+`stream`, whose frames halo_host_audio_render gives; resume plays it; 1 if
+done. close stops it: no render for it runs once close returns */
+struct halo_host_audio_backend
+{
+	void *context;
+	int (*open)(void *context, uint32_t stream, int channels, int rate);
+	int (*resume)(void *context, uint32_t stream);
+	void (*close)(void *context, uint32_t stream);
+};
+
+/* the streams the guest opens from now on are backend's (copied), or SDL's
+again with NULL: called before the guest opens its sound */
+void halo_host_set_audio_backend(const struct halo_host_audio_backend *backend);
+/* `frames` frames of stream `stream`, a channel each, into channels[0] to
+channels[channel_count - 1] (silence for what the stream lacks, and for a
+channel it has not); on Core Audio's real-time thread, which it never
+blocks */
+void halo_host_audio_render(uint32_t stream, float *const *channels, int channel_count, int frames);
+
 #endif

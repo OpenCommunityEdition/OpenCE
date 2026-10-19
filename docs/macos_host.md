@@ -329,6 +329,30 @@ window's middle, and only relative moves are reported.
   guest's polls, so the guest opens no pad and reads none. The command-line
   host keeps SDL's pads.
 
+### Sound
+
+The app plays the game's sound through AVAudioEngine
+(`Sources/OpenCEAudio`), not SDL. `port/macos/host/host_audio.c` answers
+the guest's audio-stream imports. A stream with a callback (the game's
+playback, `port/linux/src/dsound_sdl.c`) gets a handle from 0x10000 up.
+Each of these streams has its own engine, whose source node is fed from a
+ring of 8192 float frames. A stream with no callback (the microphone) is
+still SDL's.
+
+- **The render** runs on Core Audio's real-time thread. It only reads the
+  ring (`halo_host_audio_render`). Frames the ring lacks are silence. After
+  each render it wakes the stream's thread.
+- **The stream's thread** starts when the guest resumes the stream. It
+  calls the guest's callback for the bytes the ring lacks, in the stream's
+  own format, as SDL would. It keeps about 30 ms queued, and never less
+  than 1536 frames: one render of Core Audio's and one chunk of the game's
+  mixer.
+- **Formats:** U8, S8, S16, S32 and F32, at 1 to 8 channels, are converted
+  to float as the guest puts them. The engine's mixer converts to the
+  device's rate and channels.
+- **A new output device** stops the engine. It is started again.
+- The command-line host keeps SDL's sound.
+
 A guest crash is reported with its registers, the exception's syndrome and
 the guest's frames, by address in the image (`llvm-symbolizer` on
 `halo_guest.elf` names them).
