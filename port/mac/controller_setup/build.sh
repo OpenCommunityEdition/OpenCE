@@ -8,9 +8,12 @@ SDK=${SDK:-/Developer/SDKs/MacOSX10.5.sdk}
 APP="OpenCE Controller Setup.app"
 FLAGS="-arch ppc -arch i386 -isysroot $SDK -mmacosx-version-min=10.5 -O2 -Wall -std=gnu89"
 
+# port: MAC_CROSS=1 (tools/mac_cross_build.sh, a Linux host building with the cross compilers) cannot run the test; the Macs run it
+if [ -z "${MAC_CROSS:-}" ]; then
 $CC -o test_config.bin test_config.c controller_setup_config.c controller_setup_hid.c ../mac_gamepad_report.c ../app/launcher_config.c -std=gnu89 -Wall
 ./test_config.bin
 rm -f test_config.bin
+fi
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"

@@ -70,14 +70,17 @@ WORK=$OUT/work
 rm -rf "$APP" "$WORK"
 mkdir -p "$WORK" "$APP/Contents/MacOS" "$APP/Contents/Resources/Helpers"
 
+# port: MAC_CROSS=1 (tools/mac_cross_build.sh builds on Linux with the cross compilers) compiles the tests but cannot run them;
+# the Macs run them
+run_test() { if [ -z "${MAC_CROSS:-}" ]; then "$@"; fi; }
 # the launcher (its settings file code is tested first, on this Mac)
 $CC -std=gnu89 -Wall -o "$WORK/test_launcher_config" "$APPSRC/test_launcher_config.c" "$APPSRC/launcher_config.c"
-"$WORK/test_launcher_config" "$WORK/launcher_test.toml"
+run_test "$WORK/test_launcher_config" "$WORK/launcher_test.toml"
 # (the settings file's repair and check, with the vendored TOML parser the game reads it with; GCC 4 needs the shim for static_assert)
 TOML=$ROOT/port/third_party/tomlc17
 $CC -std=gnu99 -Wall -include "$APPSRC/mac_toml_assert.h" -I"$TOML" -o "$WORK/test_launcher_toml" \
     "$APPSRC/test_launcher_toml.c" "$APPSRC/launcher_config.c" "$APPSRC/launcher_toml_check.c" "$TOML/tomlc17.c"
-"$WORK/test_launcher_toml"
+run_test "$WORK/test_launcher_toml"
 $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -std=gnu99 -include "$APPSRC/mac_toml_assert.h" \
     -I"$APPSRC" -I"$TOML" -c "$APPSRC/launcher_toml_check.c" -o "$WORK/launcher_toml_check.o"
 $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -std=gnu99 -include "$APPSRC/mac_toml_assert.h" \
@@ -85,16 +88,16 @@ $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -std=gnu
 # (the startup dialog's sources are beside it: launcher_config.c is plain C, launcher_dialog.c Carbon)
 # (the feedback report's JSON, log and Outbox code is tested the same way)
 $CC -std=gnu89 -Wall -o "$WORK/test_feedback_report" "$APPSRC/test_feedback_report.c" "$APPSRC/feedback_report.c"
-"$WORK/test_feedback_report" "$WORK/feedback_test"
+run_test "$WORK/test_feedback_report" "$WORK/feedback_test"
 # (what the launcher does with a halo:// invite link, which needs no Mac)
 mkdir -p "$WORK/invite_test"
 $CC -std=gnu89 -Wall -o "$WORK/test_launcher_invite" "$APPSRC/test_launcher_invite.c" "$APPSRC/launcher_invite.c"
-"$WORK/test_launcher_invite" "$WORK/invite_test"
+run_test "$WORK/test_launcher_invite" "$WORK/invite_test"
 # (the updater's appcast, signature, SHA-256, bundle and swap code is tested the same way; its Ed25519 is Monocypher's)
 MONO=$ROOT/port/third_party/monocypher
 $CC -std=gnu99 -Wall -I"$MONO" -I"$APPSRC" -o "$WORK/test_update_core" "$APPSRC/test_update_core.c" "$APPSRC/update_core.c" \
     "$MONO/monocypher.c" "$MONO/monocypher-ed25519.c" -framework CoreFoundation
-"$WORK/test_update_core" "$WORK/update_test"
+run_test "$WORK/test_update_core" "$WORK/update_test"
 for src in monocypher monocypher-ed25519; do
     $CC -arch ppc -arch i386 -isysroot "$SDK" -mmacosx-version-min=10.4 -O2 -std=gnu99 -I"$MONO" -c "$MONO/$src.c" -o "$WORK/$src.o"
 done
