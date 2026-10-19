@@ -1035,9 +1035,16 @@ static void connection_close(
 		return;
 	if (reason || connection->bytes_in || connection->bytes_out)
 	{
-		error(_error_silent, "map sharing: the connection with %d.%d.%d.%d closed: %s (%lu bytes in, %lu out)",
-			(int)(connection->address >> 24), (int)(connection->address >> 16 & 255),
-			(int)(connection->address >> 8 & 255), (int)(connection->address & 255), reason ? reason : "done",
+		unsigned char bytes[4];
+		char address[56];
+
+		/* (a public address as a tag: log_address.h) */
+		bytes[0] = (unsigned char)(connection->address >> 24);
+		bytes[1] = (unsigned char)(connection->address >> 16);
+		bytes[2] = (unsigned char)(connection->address >> 8);
+		bytes[3] = (unsigned char)connection->address;
+		error(_error_silent, "map sharing: the connection with %s closed: %s (%lu bytes in, %lu out)",
+			log_address(bytes, 4, -1, address, sizeof(address)), reason ? reason : "done",
 			connection->bytes_in, connection->bytes_out);
 	}
 	if (connection->source != NONE && connection->source < download->source_count)

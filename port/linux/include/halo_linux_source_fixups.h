@@ -26,6 +26,10 @@ void render_interpolation_first_person(short local_player_index, struct real_mat
 	short node_count, struct render_camera const *camera);
 float render_interpolation_game_time_sec(long ticks);
 
+/* an IP address as the log may show it: a public one as a tag of the run's,
+never whole (port/linux/src/log_address.c, log_address.h) */
+const char *log_address(const unsigned char *bytes, int length, int port, char *text, int size);
+
 /* the port's menus' screen for one of ui.map's, by name, else the name
 (port/linux/game/menu_tags.c) */
 char const *pc_menus_screen(char const *name);

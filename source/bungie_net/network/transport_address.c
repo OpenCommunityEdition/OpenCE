@@ -102,9 +102,6 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-/* port: log_address.c's (an address as the log may show it) */
-const char *log_address(const unsigned char *bytes, int length, int port, char *text, int size);
-
 /* ---------- globals */
 
 #ifndef HALO_ARM64_GUEST /* Mach-O section names differ; the default is .bss anyway */
