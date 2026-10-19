@@ -515,6 +515,16 @@ to a file of float frames). Manual two-machine test: `docs/mac-voice-manual-test
   there, with a Mac alert naming the card and what it lacks, and removes the 20 MB state file the start had
   made. `HALO_MAC_GL_FORCE_CAPS_FAIL=1` pretends one is missing, to see that path (a hidden run only logs
   it and exits with status 1).
+- GLSL 1.10 (Mac OS X 10.4's language): when the driver's shading language is below 1.20 the shaders are given
+  `#version 110`; the generated shaders use nothing that 1.20 added, so the text is otherwise the 1.20 text,
+  byte for byte (`mac_glsl120.c`). `HALO_MAC_GLSL_VERSION=110` makes it so on any driver, which is how it was
+  checked on 10.6: the five hidden runs (Blood Gulch, menu, ui-menu, Xbox ui, b30) give the same counts as with
+  1.20. `HALO_MAC_GLSL_DUMP=<existing folder>` writes every shader text once, and
+  `sh tools/mac_glsl_validate.sh <folder> 110` checks them with `glslangValidator` (161 shaders from those runs,
+  with the ARB path's pixel shaders, have no errors as 1.10). A report from a 10.4 Mac wants
+  `HALO_MAC_GL_DIAGNOSTICS=1 /Applications/PowerSpark.app/Contents/MacOS/PowerSpark 2>&1 | tee ~/Desktop/tiger.log`
+  from Terminal (the launcher starts the game with that environment; the log has the capabilities line, the
+  limits, and every shader compile or link message).
 - No Mac 10.4 machine has run the game; the 10.5 and 10.6 results are from
   three machines. The Controller Setup needs 10.5.
 - System link (LAN) multiplayer works from the menus (Multiplayer > Create

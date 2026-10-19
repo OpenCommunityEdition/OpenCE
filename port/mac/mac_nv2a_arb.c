@@ -872,7 +872,8 @@ int mac_nv2a_arb_fragment_rewrite(const char *fragment_source,
     const struct mac_nv2a_arb_layout *layout, char **rewritten_out,
     char *error, size_t error_size)
 {
-    static const char version[] = "#version 120\n";
+    /* port: the text arrives as GLSL 1.20, or 1.10 on a Tiger driver (mac_glsl120.c); it leaves with the same line */
+    const char *version = "#version 120\n";
     struct text t;
     char prelude[1024];
     const char *line;
@@ -881,15 +882,16 @@ int mac_nv2a_arb_fragment_rewrite(const char *fragment_source,
     if (rewritten_out) *rewritten_out = NULL;
     if (error && error_size) error[0] = 0;
     if (!fragment_source || !rewritten_out || !layout) return -1;
-    if (strncmp(fragment_source, version, sizeof(version) - 1) ||
+    if (!strncmp(fragment_source, "#version 110\n", 13)) version = "#version 110\n";
+    if (strncmp(fragment_source, version, 13) ||
         !mac_nv2a_arb_fragment_prelude(layout, prelude, sizeof(prelude))) {
-        if (error && error_size) { strncpy(error, "fragment source is not GLSL 1.20 text", error_size - 1); error[error_size - 1] = 0; }
+        if (error && error_size) { strncpy(error, "fragment source is not GLSL 1.20 or 1.10 text", error_size - 1); error[error_size - 1] = 0; }
         return 0;
     }
     t.data = NULL; t.used = t.capacity = 0; t.failed = 0;
-    text_raw(&t, version, sizeof(version) - 1);
+    text_raw(&t, version, 13);
     text_raw(&t, prelude, strlen(prelude));
-    line = fragment_source + sizeof(version) - 1;
+    line = fragment_source + 13;
     while (*line && !t.failed) {
         const char *end = strchr(line, '\n');
         size_t length = end ? (size_t)(end - line) : strlen(line);

@@ -12,4 +12,13 @@ int mac_glsl120_vertex(const char *source, char **translated,
 int mac_glsl120_pixel(const char *source, char **translated,
     char *error, size_t error_size);
 
+
+/* port: the GLSL version the driver takes, 120 (the default) or 110 (Mac OS X
+   10.4's); the text made for 120 is unchanged. Set before the first shader. */
+void mac_glsl120_set_version(int version);
+int mac_glsl120_version(void);
+/* HALO_MAC_GLSL_DUMP=<folder>: writes a shader's text once (kind "vertex", "pixel"
+   or "arbfragment"); a diagnostic for validating the text offline. */
+void mac_glsl_dump(const char *kind, const char *source);
+
 #endif

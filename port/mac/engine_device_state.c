@@ -629,6 +629,7 @@ static GLuint mac_arb_fragment_program(const struct arb_vertex_program *vertex,c
         fprintf(stderr,"native ARB fragment refused: %s\n",error);free(rewritten);return 0;
     }
     mac_arb_projective_fetches(rewritten,projective);
+    mac_glsl_dump("arbfragment",rewritten);
     shader=glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(shader,1,(const GLchar **)&rewritten,NULL);glCompileShader(shader);
     glGetShaderiv(shader,GL_COMPILE_STATUS,&ok);

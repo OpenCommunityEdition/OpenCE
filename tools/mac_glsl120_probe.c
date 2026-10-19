@@ -163,6 +163,28 @@ int main(void)
     CHECK(!converted);
     CHECK(!mac_glsl120_pixel(unsupported_texture_query,&converted,error,sizeof(error)));
     CHECK(!converted);
+    /* GLSL 1.10 (Mac OS X 10.4's): the same text with only its version line changed, as the generated
+       shaders use no 1.20 construct (tools/mac_glsl_validate.sh checks real ones), and 120 is the default */
+    CHECK(mac_glsl120_version()==120);
+    {
+        char *text120=NULL,*text110=NULL;
+        unsigned long mask120=0,mask110=0;
+        CHECK(mac_glsl120_vertex(generated_relative,&text120,&mask120,error,sizeof(error)));
+        mac_glsl120_set_version(110);
+        CHECK(mac_glsl120_version()==110);
+        CHECK(mac_glsl120_vertex(generated_relative,&text110,&mask110,error,sizeof(error)));
+        CHECK(text120 && text110 && mask120==mask110 && strncmp(text110,"#version 110\n",13)==0 &&
+              strncmp(text120,"#version 120\n",13)==0 && strcmp(text110+13,text120+13)==0);
+        free(text120);free(text110);text120=text110=NULL;
+        CHECK(mac_glsl120_pixel(textured,&text110,error,sizeof(error)));
+        mac_glsl120_set_version(120);
+        CHECK(mac_glsl120_pixel(textured,&text120,error,sizeof(error)));
+        CHECK(text120 && text110 && strncmp(text110,"#version 110\n",13)==0 &&
+              strncmp(text120,"#version 120\n",13)==0 && strcmp(text110+13,text120+13)==0);
+        free(text120);free(text110);
+        mac_glsl120_set_version(7);
+        CHECK(mac_glsl120_version()==120);
+    }
     printf("mac_glsl120 checks=%d failures=%d\n",checks,failures);
     return failures?1:0;
 }

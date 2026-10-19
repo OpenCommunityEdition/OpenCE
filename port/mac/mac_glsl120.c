@@ -18,6 +18,40 @@
 
 struct text_buffer { char *data; size_t length, capacity; };
 
+/* port: the GLSL version the driver takes. 120 (Mac OS X 10.5 and later) is
+   the text this file has always made, byte for byte. 110 (Tiger's GLSL) is
+   that text with the few 1.20-only constructs rewritten (downgrade_110). Set
+   once, before the first shader, from the GL context (mac_window.c). */
+static int glsl_version = 120;
+
+void mac_glsl120_set_version(int version)
+{ glsl_version = version == 110 ? 110 : 120; }
+
+int mac_glsl120_version(void)
+{ return glsl_version; }
+
+/* HALO_MAC_GLSL_DUMP=<existing folder>: every shader text handed to the driver,
+   once, as <kind>-<hash>.vert or .frag. For checking the text with a GLSL
+   validator; nothing else reads it. */
+void mac_glsl_dump(const char *kind, const char *source)
+{
+    const char *folder = getenv("HALO_MAC_GLSL_DUMP");
+    unsigned long hash = 2166136261UL;
+    const unsigned char *p;
+    char path[512];
+    FILE *file;
+    if (!folder || !*folder || !kind || !source) return;
+    for (p = (const unsigned char *)source; *p; ++p) hash = ((hash ^ *p) * 16777619UL) & 0xffffffffUL;
+    if (strlen(folder) > 400) return;
+    sprintf(path, "%s/%s-%08lx.%s", folder, kind, hash, kind[0] == 'v' ? "vert" : "frag");
+    file = fopen(path, "rb");
+    if (file) { fclose(file); return; }
+    file = fopen(path, "wb");
+    if (!file) return;
+    fwrite(source, 1, strlen(source), file);
+    fclose(file);
+}
+
 static int append(struct text_buffer *out, const char *data, size_t length)
 {
     size_t capacity;
@@ -339,6 +373,12 @@ static int remap_clip_depth(struct text_buffer *text)
     return 1;
 }
 
+/* port: the text made for 1.20, as GLSL 1.10 takes it (nothing yet) */
+static int downgrade_110(struct text_buffer *text)
+{
+    return replace_exact(text, "#version 120\n", "#version 110\n");
+}
+
 int mac_glsl120_vertex(const char *source, char **translated,
     unsigned long *attribute_mask, char *error, size_t error_size)
 {
@@ -356,6 +396,10 @@ int mac_glsl120_vertex(const char *source, char **translated,
         free(out.data); set_error(error,error_size,"vertex shader uses unsupported GLSL 1.20 features or lacks one final position"); return 0;
     }
     if (!mask) { free(out.data); set_error(error,error_size,"vertex shader has no ordinary attributes"); return 0; }
+    if (glsl_version == 110 && !downgrade_110(&out)) {
+        free(out.data); set_error(error,error_size,"vertex shader cannot be made GLSL 1.10"); return 0;
+    }
+    mac_glsl_dump("vertex", out.data);
     *translated=out.data; *attribute_mask=mask; return 1;
 }
 
@@ -389,5 +433,9 @@ int mac_glsl120_pixel(const char *source, char **translated,
         out.length = out.length - old_length + new_length;
         p+=sizeof(replacement)-1;
     }
+    if (glsl_version == 110 && !downgrade_110(&out)) {
+        free(out.data); set_error(error,error_size,"pixel shader cannot be made GLSL 1.10"); return 0;
+    }
+    mac_glsl_dump("pixel", out.data);
     *translated=out.data; return 1;
 }
