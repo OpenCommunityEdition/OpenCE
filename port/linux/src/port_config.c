@@ -137,6 +137,9 @@ static const struct config_setting config_settings[] =
 		"Draw the HUD (meters, counters, panels, motion sensor, reticles,\n"
 		"waypoints, scopes) from the high-res assets (8x the maps' bitmaps);\n"
 		"false draws the maps' own bitmaps." },
+	{ "display.campaign_hud", _config_boolean, "false", "HALO_CAMPAIGN_HUD", _environment_value, _platform_all,
+		"On a Custom Edition map, draw the campaign HUD. The reticle stays\n"
+		"the map's. false draws the map's HUD. The next map loaded uses the choice." },
 	{ "display.hud_button_style", _config_string, "\"classic\"", "HALO_HUD_BUTTON_STYLE", _environment_value, _platform_all,
 		"High-res gameplay controller buttons: classic uses plain Xbox faces;\n"
 		"gems uses shaded Xbox faces; menu_gems uses the menu's button art.\n"

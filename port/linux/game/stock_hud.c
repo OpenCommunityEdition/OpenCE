@@ -4,10 +4,10 @@ STOCK_HUD.C
 A Custom Edition map draws its own HUD (its weapon and unit
 interface tags, and the bitmap sheets those point at). The singleplayer
 HUD is the Xbox one in the stock maps, which is also what the high-res
-redraw stands for. Those maps are loaded here from bloodgulch, added to
-the tag table, and the map's weapons, bipeds, vehicle seats and grenades
-are pointed at them. The map's own HUD tags stay in the table and are not
-drawn.
+redraw stands for. When display.campaign_hud is on, those maps are loaded
+here from bloodgulch and added to the tag table. Bipeds, vehicle seats,
+grenades and weapons are pointed at them. A weapon's crosshairs stay the
+map's, so the reticle is the map's. Off leaves the map's HUD.
 
 The stock tags' pointers are Xbox tag-cache addresses, so the tag bytes
 are copied to that cache rather than relocated. Their bitmap pixel
@@ -30,6 +30,7 @@ pixels are not the ones the redraw was made for.
 #include "game/game_globals.h"
 #include "interface/interface.h"
 #include "items/weapon_definitions.h"
+#include "interface/weapon_hud_interface_definition.h"
 #include "units/unit_definitions.h"
 #include "tag_schema.h"
 #include "cache_file_formats.h"
@@ -129,6 +130,8 @@ static boolean stock_tags_place(long tag_offset, long tag_size);
 static boolean stock_table_grow(long extra);
 static void stock_bitmap_prepare(struct stock_tag_instance *instance);
 static void stock_retarget(void);
+static void stock_wphi_splice(long map_index, long campaign_index);
+static void stock_crosshairs_register(struct weapon_hud_interface_definition *hud, long depth);
 static void stock_hires_register(void);
 
 void platform_log(char const *format, ...);
@@ -714,6 +717,40 @@ static void stock_bitmap_prepare(
 	return;
 }
 
+/* a crosshair element (0x68) keeps its bitmap 0x24 in (tag_schema_effects.c) */
+#define STOCK_OVERLAY_ELEMENT_BYTES 0x68
+#define STOCK_OVERLAY_BITMAP 0x24
+#define STOCK_SPLICE_DEPTH_MAXIMUM 4
+
+/* the campaign weapon tag is shared, so the map's own tag is the one
+rewritten. its crosshairs are the reticle and stay; the rest, including
+the parent that draws the ammo, is the campaign HUD */
+static void stock_wphi_splice(
+	long map_index,
+	long campaign_index)
+{
+	struct weapon_hud_interface_definition *map_hud;
+	struct weapon_hud_interface_definition *campaign;
+	struct tag_block crosshairs;
+	unsigned long crosshair_types;
+
+	if (map_index == NONE || campaign_index == NONE)
+		return;
+	if ((map_index & 0xFFFF) >= stock_hud.first)
+		return;
+	map_hud = (struct weapon_hud_interface_definition *)tag_get('wphi', map_index);
+	campaign = (struct weapon_hud_interface_definition *)tag_get('wphi', campaign_index);
+	if (!map_hud || !campaign)
+		return;
+	crosshairs = map_hud->crosshairs;
+	crosshair_types = map_hud->valid_crosshair_types_flags;
+	*map_hud = *campaign;
+	map_hud->crosshairs = crosshairs;
+	map_hud->valid_crosshair_types_flags = crosshair_types;
+
+	return;
+}
+
 static void stock_retarget_hud_block(
 	struct tag_block *block,
 	char const *owner_name,
@@ -767,6 +804,7 @@ static void stock_retarget(
 	{
 		struct weapon_definition *weapon;
 		long matched;
+		long map_hud;
 		long absolute = tag_index & 0xFFFF;
 
 		if (absolute >= stock_hud.first)
@@ -774,17 +812,18 @@ static void stock_retarget(
 		weapon = (struct weapon_definition *)tag_get('weap', tag_index);
 		if (!weapon)
 			continue;
-		/* the stock weapon HUD is named the weapon, so the weapon decides,
-		not the map's interface tag */
+		/* the map's tag is rewritten in place. pointing the weapon at the
+		campaign tag would replace the reticle with it */
+		map_hud = weapon->weapon.interface_definition.hud_interface.index;
 		matched = stock_match(
 			'wphi',
 			tag_get_name(tag_index),
 			weapon->weapon.interface_definition.hud_interface.name);
 		if (matched == NONE)
 			matched = stock_find('wphi', "ui\\hud\\empty", FALSE, FALSE);
-		if (matched != NONE)
+		if (map_hud != NONE && matched != NONE)
 		{
-			stock_reference_set(&weapon->weapon.interface_definition.hud_interface, matched);
+			stock_wphi_splice(map_hud, matched);
 			weapons++;
 		}
 	}
@@ -896,6 +935,49 @@ static void stock_retarget(
 	return;
 }
 
+/* the reticle that is drawn is the map's bitmap. the redraw follows whichever
+bitmap was named, so name this one or the campaign copy keeps the redraw */
+static void stock_crosshairs_register(
+	struct weapon_hud_interface_definition *hud,
+	long depth)
+{
+	long index;
+
+	if (!hud || depth > STOCK_SPLICE_DEPTH_MAXIMUM)
+		return;
+	if (hud->crosshairs.count > 0 && hud->crosshairs.address &&
+		hud->crosshairs.count <= STOCK_BLOCK_COUNT_MAXIMUM)
+	{
+		for (index = 0; index < hud->crosshairs.count; index++)
+		{
+			byte *element = (byte *)hud->crosshairs.address + index * STOCK_OVERLAY_ELEMENT_BYTES;
+			struct tag_reference *bitmap = (struct tag_reference *)(element + STOCK_OVERLAY_BITMAP);
+			struct bitmap_group *group;
+			long bitmap_index;
+
+			if (!bitmap || bitmap->index == NONE || !bitmap->name)
+				continue;
+			group = bitmap_group_get(bitmap->index);
+			if (!group || group->bitmaps.count <= 0 || !group->bitmaps.address ||
+				group->bitmaps.count > STOCK_BLOCK_COUNT_MAXIMUM)
+				continue;
+			for (bitmap_index = 0; bitmap_index < group->bitmaps.count; bitmap_index++)
+			{
+				struct bitmap_data *pixels = (struct bitmap_data *)(
+					(byte *)group->bitmaps.address + bitmap_index * (long)sizeof(*pixels));
+
+				hud_hires_register_bitmap(bitmap->name, pixels, bitmap_index);
+			}
+		}
+	}
+	if (hud->parent_hud.index != NONE)
+		stock_crosshairs_register(
+			(struct weapon_hud_interface_definition *)tag_get('wphi', hud->parent_hud.index),
+			depth + 1);
+
+	return;
+}
+
 static void stock_hires_register(
 	void)
 {
@@ -923,6 +1005,29 @@ static void stock_hires_register(
 			if (!stock_bytes_fit(bitmap, (long)sizeof(*bitmap)))
 				break;
 			hud_hires_register_bitmap(instance->name, bitmap, bitmap_index);
+		}
+	}
+	{
+		struct tag_iterator iterator;
+		long tag_index;
+
+		tag_iterator_new(&iterator, 'weap');
+		while ((tag_index = tag_iterator_next(&iterator)) != NONE)
+		{
+			struct weapon_definition *weapon;
+			long hud_index;
+
+			if ((tag_index & 0xFFFF) >= stock_hud.first)
+				continue;
+			weapon = (struct weapon_definition *)tag_get('weap', tag_index);
+			if (!weapon)
+				continue;
+			hud_index = weapon->weapon.interface_definition.hud_interface.index;
+			if (hud_index == NONE)
+				continue;
+			stock_crosshairs_register(
+				(struct weapon_hud_interface_definition *)tag_get('wphi', hud_index),
+				0);
 		}
 	}
 
@@ -1072,6 +1177,8 @@ static boolean stock_collect(
 
 /* ---------- public code */
 
+int config_boolean(char const *name);
+
 void stock_hud_tags_loaded(
 	void)
 {
@@ -1081,6 +1188,10 @@ void stock_hud_tags_loaded(
 	/* a map that loaded its tags over the previous one's has already
 	replaced the table. the previous stock tags are only bytes now */
 	stock_hud_drop();
+	/* Video Setup's Graphics. off keeps the map's HUD. the next map
+	loaded reads the choice */
+	if (!config_boolean("display.campaign_hud"))
+		return;
 	if (!stock_map_load(&tag_offset, &tag_size) || !stock_tags_place(tag_offset, tag_size))
 	{
 		stock_hud_drop();
