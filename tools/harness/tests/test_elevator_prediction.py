@@ -1,6 +1,6 @@
 """The host's taking of a co-op client's player where the client says (network_distributed.c's
-distributed_take_prediction) on a moving elevator: across only, so the host's copy rides its own elevator rather than
-falling through its floor going up; off one, or on one at rest, as the client says."""
+distributed_take_prediction) on a moving elevator or standing on its floor at rest: across only, so the host's copy
+rides its own elevator; after leaving a stopped one, the client's height is taken normally."""
 
 import re
 import sys
@@ -12,16 +12,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run, structure  # noqa: E402
 
 SOURCE = "port/linux/game/network_distributed.c"
-CASES = ["riding-up", "elevator-at-rest", "on-foot"]
-FUNCTIONS = ("distributed_riding_moving_elevator", "distributed_take_prediction")
+CASES = ["riding-up", "elevator-at-rest", "on-foot", "jump-at-rest", "left-platform",
+         "reversals-100ms", "reversals-200ms"]
+FUNCTIONS = ("distributed_supported_elevator", "distributed_riding_moving_elevator", "distributed_take_prediction")
 
 # a fault in network_distributed.c, the function it is in, and the case that must catch it
 NEGATIVE_CONTROLS = {
     "height-taken-riding": (("if (distributed_riding_moving_elevator(unit_index))\n\t\tposition.z",
                              "if (0)\n\t\tposition.z"), "distributed_take_prediction", "riding-up"),
-    "elevator-at-rest-rides": (("return elevator && elevator->device.position_velocity != 0.0f;",
-                                "return elevator != NULL;"), "distributed_riding_moving_elevator",
+    "stopped-floor-not-protected": (("distributed_supported_elevator(unit_index) != NONE",
+                                    "FALSE"), "distributed_riding_moving_elevator",
                                "elevator-at-rest"),
+    "airborne-is-supported": (("TEST_FLAG(biped->biped.flags, _biped_airborne_bit)", "FALSE"),
+                              "distributed_supported_elevator", "jump-at-rest"),
 }
 
 

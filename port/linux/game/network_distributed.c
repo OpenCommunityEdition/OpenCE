@@ -564,6 +564,8 @@ static struct distributed_own_position
 	long time;
 	long unit_index;
 	real_point3d position;
+	/* local history only: NONE after jumping or walking off the platform */
+	long elevator_index;
 } distributed_own_positions[MAXIMUM_LOCAL_PLAYERS][OWN_POSITION_TICKS];
 static real distributed_own_round_trip;
 /* the host: the players each machine had when it last told the host that it
@@ -1630,6 +1632,23 @@ static boolean distributed_apply_state(
 	return TRUE;
 }
 
+/* A remembered elevator lasts after a jump. Only a current floor contact
+allows ignoring a height difference caused by the platforms' different phases. */
+static long distributed_supported_elevator(
+	long unit_index)
+{
+	struct biped_datum *biped = (struct biped_datum *)object_try_and_get_and_verify_type(unit_index,
+		_object_mask_biped);
+	struct device_datum *elevator;
+
+	if (!biped || TEST_FLAG(biped->biped.flags, _biped_airborne_bit) ||
+		biped->biped.support_surface_index == NONE || biped->biped.elevator_ticks != 60)
+		return NONE;
+	elevator = (struct device_datum *)object_try_and_get_and_verify_type(biped->biped.elevator_object_index,
+		_object_mask_machine);
+	return elevator ? biped->biped.elevator_object_index : NONE;
+}
+
 /* (a client) where its own players' units are this tick, noted */
 static void distributed_note_own_positions(
 	void)
@@ -1649,6 +1668,7 @@ static void distributed_note_own_positions(
 			unit_index = NONE;
 		own->time = game_time_get();
 		own->unit_index = unit_index;
+		own->elevator_index = unit_index != NONE ? distributed_supported_elevator(unit_index) : NONE;
 		if (unit_index != NONE)
 			own->position = object_get(unit_index)->object.position;
 	}
@@ -1698,6 +1718,15 @@ static void distributed_correct_own_unit(
 			error.i = state->position.x - own->position.x;
 			error.j = state->position.y - own->position.y;
 			error.k = state->position.z - own->position.z;
+			/* The host echoes our prediction on its own elevator's floor. If
+			we still stand on that platform, a height error is its phase lag,
+			not player motion. Keep local floor contact; teleports across, a
+			jump, a different platform and unpredicted states correct normally. */
+			if (own->elevator_index != NONE &&
+				own->elevator_index == distributed_supported_elevator(unit_index) &&
+				error.i * error.i + error.j * error.j <=
+					LOCAL_CORRECTION_TOLERANCE * LOCAL_CORRECTION_TOLERANCE)
+				error.k = 0.0f;
 			if (!(error.i * error.i + error.j * error.j + error.k * error.k >
 				LOCAL_CORRECTION_TOLERANCE * LOCAL_CORRECTION_TOLERANCE))
 			{
@@ -2028,8 +2057,9 @@ static boolean distributed_on_foot_move_valid(
 	return dx * dx + dy * dy + rise * rise <= reach * reach && -dz <= fall_reach;
 }
 
-/* (the host) whether a unit rides an elevator that is moving (bipeds.c's
-elevator, kept a moment after the unit leaves its floor, as in a jump) */
+/* (the host) a moving elevator, or current floor contact at rest. A stop
+or reversal must not admit a delayed height under the floor. The remembered
+attachment alone, after leaving a stopped elevator, is not floor contact. */
 static boolean distributed_riding_moving_elevator(
 	long unit_index)
 {
@@ -2041,7 +2071,8 @@ static boolean distributed_riding_moving_elevator(
 		return FALSE;
 	elevator = (struct device_datum *)object_try_and_get_and_verify_type(biped->biped.elevator_object_index,
 		_object_mask_device);
-	return elevator && elevator->device.position_velocity != 0.0f;
+	return elevator && (elevator->device.position_velocity != 0.0f ||
+		distributed_supported_elevator(unit_index) != NONE);
 }
 
 /* (the host) a client's player's prediction of its unit on foot, taken
