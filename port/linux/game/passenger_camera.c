@@ -11,6 +11,7 @@ and the deterministic camera used for shooting keeps its original view.
 #include "passenger_camera.h"
 #include "camera/director.h"
 #include "cutscene/cinematics.h"
+#include "game/game_engine.h"
 #include "game/players.h"
 #include "items/weapons.h"
 #include "objects/objects.h"
@@ -40,8 +41,10 @@ static struct unit_seat const *reference_seat(short local_player_index, long *ve
 	char const *name;
 	short reference_role, index;
 
+	/* (not in multiplayer, where seeing around the vehicle is an advantage the
+	other players do not have) */
 	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS ||
-		!config_boolean("display.passenger_third_person") || cinematic_in_progress() ||
+		!config_boolean("display.passenger_third_person") || game_engine_running() || cinematic_in_progress() ||
 		(director_camera_scripted && *director_camera_scripted))
 		return NULL;
 	player_index = local_player_get_player_index(local_player_index);
