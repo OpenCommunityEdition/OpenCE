@@ -19,6 +19,13 @@ public protocol RenderWindow: AnyObject, Sendable {
     func nextFrame() -> RenderFrame?
     /// Shows `frame` once `commands` have run (before they are committed).
     func present(_ frame: RenderFrame, in commands: MTLCommandBuffer)
+    /// After a PRESENT's `commands` are committed: something for the log,
+    /// or nil.
+    func committed(_ commands: MTLCommandBuffer) -> String?
+}
+
+extension RenderWindow {
+    public func committed(_ commands: MTLCommandBuffer) -> String? { nil }
 }
 
 /// The game's window: its view's CAMetalLayer, BGRA8 (GameView), once the
@@ -65,12 +72,17 @@ public final class LayerWindow: RenderWindow, @unchecked Sendable {
 }
 
 /// A window off the screen: one BGRA8 texture, which each frame draws over,
-/// and a count of the frames presented.
+/// and a count of the frames presented. With a capture, the frame it names
+/// is written to its PNG before the guest is answered, so that the guest
+/// may exit at once.
 public final class OffscreenWindow: RenderWindow, @unchecked Sendable {
     public let texture: MTLTexture
+    private let capture: FrameCapture?
     private var presentedFrames = 0
+    private var capturing = false
 
-    public init?(device: MTLDevice, width: Int, height: Int) {
+    public init?(device: MTLDevice, width: Int, height: Int, capture: FrameCapture? = nil) {
+        self.capture = capture
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width,
                                                                   height: height, mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
@@ -87,6 +99,17 @@ public final class OffscreenWindow: RenderWindow, @unchecked Sendable {
 
     public func present(_ frame: RenderFrame, in commands: MTLCommandBuffer) {
         presentedFrames += 1
+        capturing = presentedFrames == capture?.frame
+    }
+
+    public func committed(_ commands: MTLCommandBuffer) -> String? {
+        guard capturing, let capture else { return nil }
+        capturing = false
+        commands.waitUntilCompleted()
+        if let failed = capture.write(pixels().flatMap { $0 }) {
+            return "frame \(capture.frame) was not captured: \(failed)"
+        }
+        return "captured frame \(capture.frame) to \(capture.path.path)"
     }
 
     /// The frames presented so far.

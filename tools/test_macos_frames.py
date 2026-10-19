@@ -1,0 +1,98 @@
+"""Golden frames: what OpenCE.app's Metal renderer draws, compared with
+approved references (docs/macos_host.md, "Frame captures").
+
+Each case runs a guest program in the app in the game's place
+(HALO_HOST_GUEST_IMAGE), with its window drawn off the screen and one frame
+written to a PNG (HALO_HOST_CAPTURE); tools/frame_compare.py compares it with
+port/macos/tests/frames/<case>.png. No window is shown. A frame that does
+not match leaves its capture and its difference image in build/macos/frames.
+
+To approve a new or changed frame, look at it, then run
+
+    HALO_APPROVE_FRAMES=1 python -m pytest -q tools/test_macos_frames.py
+
+which writes the references (the cases are then skipped), and commit them.
+Needs `ninja macos macos_app` in `nix develop`.
+"""
+
+import os
+import platform
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from tools import frame_compare, macos_guest_image  # noqa: E402
+
+APP = ROOT / "build/macos/OpenCE.app/Contents/MacOS/OpenCE"
+REFERENCES = ROOT / "port/macos/tests/frames"
+FAILED = ROOT / "build/macos/frames"
+SIZE = (320, 240)
+
+pytestmark = [
+    pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only"),
+    pytest.mark.skipif(not macos_guest_image.available() or shutil.which("ninja") is None,
+                       reason="needs `ninja macos` in nix develop"),
+    pytest.mark.skipif(not APP.is_file(), reason="needs `ninja macos_app`"),
+]
+
+
+@pytest.fixture(scope="module")
+def vm_render(tmp_path_factory):
+    work = tmp_path_factory.mktemp("vm_render")
+    return macos_guest_image.build_guest_image(
+        [ROOT / "port/macos/tests/vm_render.c", ROOT / "port/macos/guest/opence_render_writer.c"], work,
+        "vm_render", [f"-I{ROOT / 'port/macos/include'}"])
+
+
+def capture(image, case, tmp_path, frame=1):
+    """the frame the app drew of the guest's `case`"""
+    (tmp_path / "home").mkdir()
+    path = tmp_path / f"{case}.png"
+    environment = dict(os.environ, HOME=str(tmp_path / "home"), HALO_DATA_ROOT=str(tmp_path),
+                       HALO_HOST_GUEST_IMAGE=str(image), HALO_HOST_CAPTURE=str(path),
+                       HALO_HOST_CAPTURE_FRAME=str(frame), HALO_HOST_CAPTURE_SIZE="%dx%d" % SIZE)
+    run = subprocess.run([str(APP), case], cwd=tmp_path, env=environment, capture_output=True, text=True,
+                         timeout=60)
+    assert run.returncode == 0 and run.stdout.strip().endswith("ok"), run.stdout[-2000:] + run.stderr[-2000:]
+    assert path.is_file(), "no frame was captured: " + run.stderr[-2000:]
+    return frame_compare.read_png(path)
+
+
+def check(frame, name):
+    """compares `frame` with its reference, or approves it"""
+    reference = REFERENCES / f"{name}.png"
+    if os.environ.get("HALO_APPROVE_FRAMES") == "1":
+        REFERENCES.mkdir(parents=True, exist_ok=True)
+        frame_compare.write_png(reference, frame)
+        pytest.skip(f"approved {reference.relative_to(ROOT)}")
+    FAILED.mkdir(parents=True, exist_ok=True)
+    assert reference.is_file(), (f"{name} has no reference: look at the frame, then approve it with "
+                                 f"HALO_APPROVE_FRAMES=1 (this file's docstring)")
+    result = frame_compare.compare(frame, frame_compare.read_png(reference))
+    if not result.matches:
+        frame_compare.write_png(FAILED / f"{name}.png", frame)
+        if result.same_size:
+            frame_compare.write_png(FAILED / f"{name}-difference.png", result.difference())
+    assert result.matches, f"{name}: {result.describe()} (the frame and its difference are in {FAILED})"
+
+
+def test_the_scene_draws_as_approved(vm_render, tmp_path):
+    # a clear, a triangle of three colours and a quad blended over it
+    frame = capture(vm_render, "scene", tmp_path)
+    assert (frame.width, frame.height) == SIZE
+    # (the capture is the window's, not empty: the clear's dark blue in a
+    # corner, and the triangle's three colours near its corners, before the
+    # reference is consulted at all)
+    assert frame.pixel(2, 2) == pytest.approx((26, 26, 51, 255), abs=1)
+    width, height = SIZE
+    red, green, blue, _ = frame.pixel(int(width * 0.15), int(height * 0.85))
+    assert red > 200 and green < 60 and blue < 60
+    red, green, blue, _ = frame.pixel(width // 2, int(height * 0.15))
+    assert blue > 200 and red < 60 and green < 60
+    check(frame, "scene")

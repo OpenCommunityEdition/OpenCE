@@ -1,7 +1,8 @@
 // The app's renderer for the C host (halo_host_set_render_backend): the
 // guest's render batches (port/macos/include/opence_render.h) are drawn with
 // Metal (OpenCERender) in the game window's layer, in place of the host's
-// own check, which only counts them.
+// own check, which only counts them. With HALO_HOST_CAPTURE they are drawn
+// off the screen instead, and one frame is written to a PNG (FrameCapture).
 
 import CHaloHost
 import Foundation
@@ -29,7 +30,8 @@ enum RenderBackend {
                 tried = true
                 let log = Logger(subsystem: "org.opence.OpenCE", category: "render")
                 guard let device = MTLCreateSystemDefaultDevice(), let memory = runningGuestMemory(),
-                      let renderer = MetalRenderer(device: device, memory: memory, window: RenderBackend.window)
+                      let window = window(device, log),
+                      let renderer = MetalRenderer(device: device, memory: memory, window: window)
                 else {
                     log.error("no Metal renderer: the guest's batches are refused")
                     return nil
@@ -38,6 +40,20 @@ enum RenderBackend {
                 made = renderer
             }
             return made
+        }
+
+        /// The game's window, or the capture's off the screen.
+        private func window(_ device: MTLDevice, _ log: Logger) -> RenderWindow? {
+            let capture: FrameCapture?
+            do {
+                capture = try FrameCapture.parse(ProcessInfo.processInfo.environment)
+            } catch {
+                log.error("\(String(describing: error), privacy: .public): drawing in the window")
+                return RenderBackend.window
+            }
+            guard let capture else { return RenderBackend.window }
+            log.info("capturing frame \(capture.frame) at \(capture.width)x\(capture.height)")
+            return OffscreenWindow(device: device, width: capture.width, height: capture.height, capture: capture)
         }
     }
 

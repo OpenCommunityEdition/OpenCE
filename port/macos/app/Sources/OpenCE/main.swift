@@ -10,15 +10,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let log = Logger(subsystem: "org.opence.OpenCE", category: "app")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        guard let image = Bundle.main.url(forResource: "halo_guest", withExtension: "elf") else {
+        let environment = ProcessInfo.processInfo.environment
+        // (HALO_HOST_GUEST_IMAGE: another guest program in the game's place,
+        // such as the frame checks' scene, which needs no maps)
+        let other = environment["HALO_HOST_GUEST_IMAGE"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) }
+        guard let image = other ?? Bundle.main.url(forResource: "halo_guest", withExtension: "elf") else {
             fail("The game's image, halo_guest.elf, is missing from the app.")
             return
         }
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let root = DataRoot.resolve(environment: ProcessInfo.processInfo.environment, applicationSupport: support)
+        let root = DataRoot.resolve(environment: environment, applicationSupport: support)
         // (made, so that the player can open it and put the maps in it)
         try? FileManager.default.createDirectory(at: DataRoot.maps(in: root), withIntermediateDirectories: true)
-        if let message = DataRoot.missingMapsMessage(root: root) {
+        if other == nil, let message = DataRoot.missingMapsMessage(root: root) {
             missingMaps(message, folder: DataRoot.maps(in: root))
             return
         }

@@ -250,6 +250,10 @@ The host's own settings:
 | `HALO_HOST_MAIN_LOOP=1` | Runs the guest on a thread of its own and the main dispatch queue on the main thread, as the app does |
 | `HALO_HOST_TRACE_MAIN_THREAD` | Reports each import the first time it is carried out on the main thread |
 | `HALO_HOST_RENDER_LOG` | Reports each render batch the host checks: its commands, those refused, and its bytes' FNV-1a |
+| `HALO_HOST_GUEST_IMAGE=<elf>` | The app only: runs that guest program in the game's place, without the maps check |
+| `HALO_HOST_CAPTURE=<png>` | The app only: draws the window off the screen and writes one frame to that PNG ("Frame captures") |
+| `HALO_HOST_CAPTURE_FRAME=<n>` | The frame written: the guest's nth `PRESENT` (1) |
+| `HALO_HOST_CAPTURE_SIZE=<w>x<h>` | The size the window is drawn at while capturing (640x480) |
 
 ### The main thread
 
@@ -443,6 +447,35 @@ The guest's shaders name their functions `vertex_main` and `fragment_main`.
 A scissor is clipped to the pass's target, which a window resized since the
 pass began can make smaller than the decoder's drawable size.
 
+### Frame captures
+
+With `HALO_HOST_CAPTURE`, the app draws the guest's window off the screen,
+in a BGRA8 texture of `HALO_HOST_CAPTURE_SIZE`, not in the layer: a frame
+then depends neither on the screen's backing scale nor on a window being
+shown. At the `PRESENT` that `HALO_HOST_CAPTURE_FRAME` names, the renderer
+waits for the frame's commands and writes the texture to the PNG (8-bit
+RGBA, with ImageIO) before it answers the guest, so a guest may exit at
+once. The app logs what it wrote, or why it could not; a setting it cannot
+read is logged and the window drawn as usual. The capture's size is not yet
+the guest's window size: the game's Direct3D, once written as batches, will
+have to be told it.
+
+`tools/frame_compare.py` compares a capture with an approved reference: a
+pixel differs when one of its channels is more than 8 from the
+reference's (a GPU's rounding), and the frame matches when no more than
+0.5% of its pixels differ (an edge rasterised a pixel over) and none by
+more than 64 (a pixel drawn wrong). `--difference` writes the reference,
+faint, with the differing pixels red.
+
+`tools/test_macos_frames.py` runs guest programs in the app
+(`HALO_HOST_GUEST_IMAGE`), each with a capture, and compares their frames
+with the references in `port/macos/tests/frames`. The first,
+`vm_render.c`'s `scene`, is a clear, a triangle of three colours and a
+quad of half-transparent white blended over it. A frame that does not
+match is left in `build/macos/frames` with its difference image. A new or
+changed frame is approved, once looked at, by running the test with
+`HALO_APPROVE_FRAMES=1`, which writes the references.
+
 A guest crash is reported with its registers, the exception's syndrome and
 the guest's frames, by address in the image (`llvm-symbolizer` on
 `halo_guest.elf` names them).
@@ -473,6 +506,8 @@ In `nix develop`, after `ninja macos`:
 python -m pytest -q tools/test_macos_spikes.py tools/test_macos_build.py tools/test_macos_vm.py tools/test_macos_host.py
 python -m pytest -q tools/test_macos_render.py   # render batches through the doorbell
 ninja macos_app_test                              # the app's Swift tests, the Metal renderer's pixels too
+python -m pytest -q tools/test_frame_compare.py   # the frame comparison's tolerance
+python -m pytest -q tools/test_macos_frames.py    # golden frames from the app (after ninja macos_app)
 cargo test --manifest-path port/macos/runtime/Cargo.toml
 python -m pytest -q tools/harness         # the asset-free harness, in the VM
 ```

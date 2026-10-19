@@ -349,6 +349,9 @@ public final class MetalRenderer: @unchecked Sendable {
                 windowFrame = nil
             }
             commit()
+            if let message = window.committed(commands) {
+                log?(message)
+            }
             return true
         }
     }

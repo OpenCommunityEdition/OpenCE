@@ -2,6 +2,7 @@
 // writes them, in guest memory of the test's own, drawn to textures off the
 // screen and read back through READ_TEXTURE, as the guest reads them.
 import Foundation
+import ImageIO
 import Metal
 import Testing
 
@@ -124,10 +125,11 @@ private struct Fixture {
     let window: OffscreenWindow
     let renderer: MetalRenderer
 
-    init(windowSize: Int = 8) throws {
+    init(windowSize: Int = 8, capture: FrameCapture? = nil) throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
         memory = try GuestMemoryView.withRanges(ranges: [GuestRangeSpec(address: batchAddress, size: 0x8_0000)])
-        window = try #require(OffscreenWindow(device: device, width: windowSize, height: windowSize))
+        window = try #require(OffscreenWindow(device: device, width: windowSize, height: windowSize,
+                                              capture: capture))
         renderer = try #require(MetalRenderer(device: device, memory: memory, window: window))
     }
 
@@ -394,6 +396,45 @@ struct MetalRendererTests {
         #expect(fixture.renderer.statistics.refused == 4)
     }
 
+    // ---------- frame captures (HALO_HOST_CAPTURE)
+
+    @Test func theCaptureSettingIsRead() throws {
+        #expect(try FrameCapture.parse([:]) == nil)
+        let plain = try #require(try FrameCapture.parse(["HALO_HOST_CAPTURE": "/tmp/frame.png"]))
+        #expect(plain == FrameCapture(path: URL(fileURLWithPath: "/tmp/frame.png"), frame: 1, width: 640, height: 480))
+        let set = try #require(try FrameCapture.parse(["HALO_HOST_CAPTURE": "frame.png", "HALO_HOST_CAPTURE_FRAME": "3",
+                                                       "HALO_HOST_CAPTURE_SIZE": "320x200"]))
+        #expect(set.frame == 3 && set.width == 320 && set.height == 200)
+        for (name, value) in [("HALO_HOST_CAPTURE_FRAME", "0"), ("HALO_HOST_CAPTURE_FRAME", "two"),
+                              ("HALO_HOST_CAPTURE_SIZE", "640"), ("HALO_HOST_CAPTURE_SIZE", "0x480"),
+                              ("HALO_HOST_CAPTURE_SIZE", "99999x480")] {
+            #expect(throws: FrameCapture.Invalid.self, "\(name)=\(value)") {
+                try FrameCapture.parse(["HALO_HOST_CAPTURE": "frame.png", name: value])
+            }
+        }
+    }
+
+    @Test func theCapturedFrameIsWrittenAsAPNG() throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent("capture-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: path) }
+        let fixture = try Fixture(windowSize: 8, capture: FrameCapture(path: path, frame: 2, width: 8, height: 8))
+        let messages = Messages()
+        fixture.renderer.log = { messages.add($0) }
+        for clear in [(Float(0), Float(1), Float(0), Float(1)), (1, 0.5, 0, 0.5), (0, 0, 1, 1)] {
+            var batch = Batch()
+            batch.beginPass(color: 0, clear: clear)
+            batch.add(.endPass)
+            batch.add(.present)
+            #expect(try fixture.submit(batch) == 0)
+            // (written before the second PRESENT's batch is answered)
+            #expect(FileManager.default.fileExists(atPath: path.path) == (fixture.window.presented >= 2))
+        }
+        // the second frame's, not the first's or the third's, alpha too
+        let pixels = try pngPixels(path)
+        #expect(pixels.count == 64 && pixels.allSatisfy { near($0, [255, 128, 0, 128]) }, "\(pixels)")
+        #expect(messages.all.contains { $0.contains("captured frame 2") }, "\(messages.all)")
+    }
+
     @Test func aBatchThatIsNotOneIsRefusedWhole() throws {
         let fixture = try Fixture()
         try fixture.memory.write(address: batchAddress, bytes: Data(count: 16))
@@ -406,4 +447,22 @@ private extension Array where Element == UInt8 {
     func chunked() -> [[UInt8]] {
         stride(from: 0, to: count, by: 4).map { Array(self[$0..<$0 + 4]) }
     }
+}
+
+/// A PNG's pixels, RGBA, as ImageIO reads them back.
+private func pngPixels(_ path: URL) throws -> [[UInt8]] {
+    let source = try #require(CGImageSourceCreateWithURL(path as CFURL, nil))
+    let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+    let data = try #require(image.dataProvider?.data as Data?)
+    #expect(image.bitsPerComponent == 8 && image.bitsPerPixel == 32 && image.alphaInfo == .last)
+    return [UInt8](data).chunked()
+}
+
+/// What the renderer logged, from the thread it logs on.
+private final class Messages: @unchecked Sendable {
+    private let lock = NSLock()
+    private var messages: [String] = []
+
+    func add(_ message: String) { lock.withLock { messages.append(message) } }
+    var all: [String] { lock.withLock { messages } }
 }

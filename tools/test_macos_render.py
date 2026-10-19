@@ -73,6 +73,17 @@ def test_each_batch_is_one_exit(image, tmp_path):
     assert import_counts(stderr).get("host_render_submit") == 5, stderr
 
 
+def test_the_scenes_objects_are_valid(image, tmp_path):
+    # the frame tools/test_macos_frames.py captures in the app: here, with no
+    # window, the host's own check takes its library, pipelines and buffer,
+    # and refuses only the window's pass and what is drawn in it
+    result = macos_guest_image.run_guest(image, ["scene"], tmp_path / "run", LOGGING)
+    refused = re.findall(r"halo_host: render command refused at byte \d+ \(op (\d+)\): (.*)", result.stderr)
+    assert refused[0] == ("10", "the window has no size yet"), result.stderr
+    assert all(op in {"10", "11", "12", "18", "19", "22"} for op, _ in refused), result.stderr
+    assert decoded(result.stderr)[0][:2] == (6, 8), result.stderr
+
+
 def test_the_host_is_quiet_about_batches_unless_asked(image, tmp_path):
     result = macos_guest_image.run_guest(image, ["flush"], tmp_path / "run")
     assert result.returncode == 0 and "halo_host" not in result.stdout + result.stderr, result.stdout + result.stderr
