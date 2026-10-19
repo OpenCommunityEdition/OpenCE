@@ -103,9 +103,10 @@ int platform_is_contiguous(const void *address);
 void memory_watch_prepare_write(void *address, unsigned long size);
 
 /* asks the player a question in a box with a button for each label: the
-button chosen, or -1 if it cannot ask. The Mac cannot yet (port/mac/platform.c),
-so the mods that cannot be played together are all played, as a run nobody
-watches plays them, and the Mods menu turns them off. */
+button chosen, or -1 if it cannot ask. The Mac asks with Carbon's standard
+alert (port/mac/platform.c), in a visible run before the window opens; in a
+hidden run nobody is asked and the mods that cannot be played together are
+all played. */
 int platform_ask(const char *title, const char *text, const char *const *labels, int count, int default_index);
 
 #endif

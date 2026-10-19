@@ -68,6 +68,7 @@
 /* port/linux/src/port_config.c */
 const char *config_string(const char *name);
 int config_boolean(const char *name);
+void port_mods_startup(void); /* port/linux/src/port_mods.c */
 /* port/mac/engine_files.c */
 int mac_engine_files_data_root(char *root,size_t capacity);
 #include <sys/stat.h>
@@ -1181,6 +1182,9 @@ int main(int argc,char **argv)
     if(failures)goto done;
 #ifdef MAC_SESSION_GPU_RENDER
     if(mac_gpu_render_enabled) {
+        /* port: the mods, and whether to play those that say they cannot be played together (a box, platform_ask in
+           port/mac/platform.c), before the window opens; a hidden run is not asked and plays them */
+        if(mac_gpu_visible)port_mods_startup();
         fprintf(stderr,"stage: original rasterizer_initialize (%s)\n",
             mac_gpu_visible?"visible AGL":"hidden CGL");
         CHECK(rasterizer_initialize());
