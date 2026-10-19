@@ -367,16 +367,6 @@ static const struct config_setting config_settings[] =
 		"settings or other players' games (debug.txt names what they were\n"
 		"refused)." },
 
-	{ "game.move_old_map_folders", _config_string, "\"ask\"", "HALO_MOVE_OLD_MAP_FOLDERS", _environment_value,
-		_platform_all,
-		"Halo PC maps have folders of their own beside maps: maps_ce (Custom\n"
-		"Edition, with its bitmaps.map, sounds.map and loc.map), maps_md (HaloMD)\n"
-		"and maps_pc (Halo PC). The older maps/ce and md_maps are still played\n"
-		"from. \"ask\": the game offers once to move them into the new folders\n"
-		"(each folder moved whole, never copied; one that cannot be moved stays\n"
-		"where it is); \"yes\": moved without asking; \"no\": left where they are.\n"
-		"Android moves them unless this is \"no\"." },
-
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"
 		"working directory and its assets folder. Windows paths are easiest in\n"
