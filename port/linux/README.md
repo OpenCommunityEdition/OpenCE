@@ -35,9 +35,11 @@ To start the game:
 - The 32-bit OpenGL libraries (`lib32-mesa`).
 - The 32-bit PipeWire or PulseAudio client libraries (`lib32-pipewire` or
   `lib32-libpulse`).
-- The 32-bit X11 libraries (`lib32-libx11`, `lib32-libxext`). In a Wayland
-  session, the game uses them through XWayland. SDL uses Wayland itself
-  only if the 32-bit Wayland libraries are version 1.20 or later
+- The 32-bit X11 libraries (`lib32-libx11`, `lib32-libxext`, and
+  `lib32-libxi`, with which SDL holds the mouse; without it the game hides
+  the pointer and moves it back to the middle of the window instead). In a
+  Wayland session, the game uses them through XWayland. SDL uses Wayland
+  itself only if the 32-bit Wayland libraries are version 1.20 or later
   (`lib32-wayland`, `lib32-libxkbcommon`; Debian 11, Ubuntu 20.04 and
   Fedora 32 have older ones) and the compositor has the fifo-v1 protocol.
   On GNOME, the window then has borders only with the 32-bit libdecor

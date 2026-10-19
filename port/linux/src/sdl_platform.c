@@ -1088,7 +1088,11 @@ void platform_mouse_capture(BOOL capture)
 #if defined(HALO_ANDROID) || defined(HALO_WEB)
 	SDL_SetWindowRelativeMouseMode(platform_window, capture ? true : false);
 #else
-	if (!capture)
+	/* (without the focus, the mouse is taken when the focus comes back:
+	SDL_EVENT_WINDOW_FOCUS_GAINED. SDL_SetWindowRelativeMouseMode would only
+	set SDL_WINDOW_MOUSE_RELATIVE_MODE then, without testing XInput2, and
+	later calls would find it set and return at once) */
+	if (!capture || SDL_GetKeyboardFocus() != platform_window)
 	{
 		mouse_warp_capture = FALSE;
 		SDL_SetWindowRelativeMouseMode(platform_window, false);
@@ -1096,8 +1100,7 @@ void platform_mouse_capture(BOOL capture)
 		SDL_ShowCursor();
 		return;
 	}
-	if (SDL_GetKeyboardFocus() == platform_window &&
-		SDL_SetWindowRelativeMouseMode(platform_window, true))
+	if (SDL_SetWindowRelativeMouseMode(platform_window, true))
 	{
 		if (mouse_warp_capture)
 		{
@@ -1107,10 +1110,6 @@ void platform_mouse_capture(BOOL capture)
 		}
 		return;
 	}
-	/* (before the window has focus, SDL_SetWindowRelativeMouseMode sets
-	SDL_WINDOW_MOUSE_RELATIVE_MODE without testing XInput2; if XInput2 is
-	missing when focus arrives, non-relative motion is dropped until cleared) */
-	SDL_SetWindowRelativeMouseMode(platform_window, false);
 	mouse_warp_capture = TRUE;
 	SDL_HideCursor();
 	SDL_SetWindowMouseGrab(platform_window, true);
@@ -1776,22 +1775,7 @@ void platform_pump_events(void)
 			{
 				input_state.mouse_buttons[event.button.button] = event.button.down;
 				if (event.button.down)
-				{
 					mouse_buttons_pressed[event.button.button] = 1;
-#ifndef HALO_ANDROID
-					if (!input_state.ui_pointer && !scoreboard_pointer_active &&
-						(input_state.mouse_released ||
-						(!SDL_GetWindowRelativeMouseMode(platform_window)
-#ifndef HALO_WEB
-						&& !mouse_warp_capture
-#endif
-						)))
-					{
-						input_state.mouse_released = FALSE;
-						platform_mouse_capture(TRUE);
-					}
-#endif
-				}
 			}
 			break;
 		case SDL_EVENT_MOUSE_WHEEL:
