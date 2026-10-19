@@ -201,7 +201,7 @@ static void run_original_game_render(unsigned cycle)
     FILE *file;
 
     device=mac_device_state_get();
-    CHECK(device&&device->gpu&&device->gpu_width==640&&device->gpu_height==480);
+    CHECK(device&&device->gpu&&device->gpu_width>=640&&device->gpu_width<=1280&&device->gpu_height==480); /* port: 480 lines, 640 columns or a wide picture (768) */
     if(!device||!device->gpu)return;
     presents=device->gpu_present_count;
     memset(&call,0,sizeof(call));

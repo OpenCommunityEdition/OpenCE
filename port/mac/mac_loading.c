@@ -1,4 +1,5 @@
 #include "mac_loading.h"
+#include "mac_window.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,7 @@ static struct {
     unsigned base_width,base_height;
     GLuint feedback,mask;
     int feedback_ready;
+    unsigned feedback_width,feedback_height;
     /* progress_bar.c's wobble_phase and last_t */
     float wobble,last;
 } loading;
@@ -85,11 +87,27 @@ static void make_feedback(unsigned width,unsigned height)
         glTexImage2D(GL_TEXTURE_RECTANGLE_ARB,0,GL_RGBA8,(GLsizei)width,(GLsizei)height,0,GL_BGRA,
             GL_UNSIGNED_INT_8_8_8_8_REV,loading.base);
     else {
-        unsigned char *black=(unsigned char *)calloc((size_t)width*height,4);
-        glTexImage2D(GL_TEXTURE_RECTANGLE_ARB,0,GL_RGBA8,(GLsizei)width,(GLsizei)height,0,GL_RGBA,
-            GL_UNSIGNED_BYTE,black);
-        free(black);
+        /* port: the last picture was the game's own size (kept in its shape, centred, as the present
+           step places it in a larger window) and the window is not: fitted into black of the window's */
+        unsigned *fitted=(unsigned *)calloc((size_t)width*height,4);
+        if(fitted&&loading.base&&loading.base_width&&loading.base_height) {
+            unsigned fit_width=width,fit_height=(unsigned)((unsigned long long)width*loading.base_height/loading.base_width);
+            unsigned left,bottom,x,y;
+            if(fit_height>height){fit_height=height;fit_width=(unsigned)((unsigned long long)height*loading.base_width/loading.base_height);}
+            if(!fit_width)fit_width=1;
+            if(!fit_height)fit_height=1;
+            left=(width-fit_width)/2;bottom=(height-fit_height)/2;
+            for(y=0;y<fit_height;++y) {
+                const unsigned *row=loading.base+(size_t)((2*(unsigned long long)y+1)*loading.base_height/(2*fit_height))*loading.base_width;
+                unsigned *out=fitted+(size_t)(bottom+y)*width+left;
+                for(x=0;x<fit_width;++x)out[x]=row[(2*(unsigned long long)x+1)*loading.base_width/(2*fit_width)];
+            }
+        }
+        glTexImage2D(GL_TEXTURE_RECTANGLE_ARB,0,GL_RGBA8,(GLsizei)width,(GLsizei)height,0,GL_BGRA,
+            GL_UNSIGNED_INT_8_8_8_8_REV,fitted);
+        free(fitted);
     }
+    loading.feedback_width=width;loading.feedback_height=height;
     free(loading.base);
     loading.base=NULL;
     loading.feedback_ready=1;
@@ -116,10 +134,16 @@ static void write_shot(unsigned width,unsigned height,const char *path)
 void mac_loading_draw(unsigned width,unsigned height,float progress,const char *shot_path)
 {
     GLhandleARB old_program;
-    float w=(float)width,h=(float)height,t,tone,alpha,position,blur=0.1f;
-    int pass;
+    float w,h,unit,t,tone,alpha,position,blur=0.1f;
+    int pass,window_width=0,window_height=0;
     static const float taps[4][2]={{-1.0f,1.0f},{-1.0f,-1.0f},{1.0f,-1.0f},{1.0f,1.0f}};
     if(!loading.started||!width||!height)return;
+    /* port: over the whole window, as the movies are: the game's picture is 640x480 (or wider), but the
+       window's framebuffer is not, and a viewport of the picture's size sits in its lower left corner */
+    platform_video_window_size(&window_width,&window_height);
+    if(window_width>0&&window_height>0){width=(unsigned)window_width;height=(unsigned)window_height;}
+    w=(float)width;h=(float)height;
+    unit=h/480.0f; /* (the Xbox's band is 128 pixels wide in its 480 lines) */
     old_program=glGetHandleARB(GL_PROGRAM_OBJECT_ARB);
     glPushAttrib(GL_ALL_ATTRIB_BITS);
     glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
@@ -137,6 +161,10 @@ void mac_loading_draw(unsigned width,unsigned height,float progress,const char *
     glDisable(GL_TEXTURE_2D);glDisable(GL_TEXTURE_RECTANGLE_ARB);
     glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);
     if(!loading.mask)make_mask();
+    if(loading.feedback_ready&&(loading.feedback_width!=width||loading.feedback_height!=height)) {
+        /* (the window changed size: the fade starts again from black) */
+        glDeleteTextures(1,&loading.feedback);loading.feedback=0;loading.feedback_ready=0;
+    }
     if(!loading.feedback_ready)make_feedback(width,height);
 
     /* progress_bar_render: the progress follows the one given, with a wobble */
@@ -170,12 +198,12 @@ void mac_loading_draw(unsigned width,unsigned height,float progress,const char *
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D,loading.mask);
     glColor4f(0.55f*BAND_LEVEL*tone,0.75f*BAND_LEVEL*tone,BAND_LEVEL*tone,1.0f);
-    position=t*768.0f-64.0f-64.0f;
+    position=(t*768.0f-64.0f-64.0f)*unit;
     glBegin(GL_QUADS);
-    glTexCoord2f((0.0f-position)/(float)MASK_WIDTH,0.0f);glVertex2f(0.0f,h);
-    glTexCoord2f((w-position)/(float)MASK_WIDTH,0.0f);glVertex2f(w,h);
-    glTexCoord2f((w-position)/(float)MASK_WIDTH,1.0f);glVertex2f(w,0.0f);
-    glTexCoord2f((0.0f-position)/(float)MASK_WIDTH,1.0f);glVertex2f(0.0f,0.0f);
+    glTexCoord2f((0.0f-position)/(MASK_WIDTH*unit),0.0f);glVertex2f(0.0f,h);
+    glTexCoord2f((w-position)/(MASK_WIDTH*unit),0.0f);glVertex2f(w,h);
+    glTexCoord2f((w-position)/(MASK_WIDTH*unit),1.0f);glVertex2f(w,0.0f);
+    glTexCoord2f((0.0f-position)/(MASK_WIDTH*unit),1.0f);glVertex2f(0.0f,0.0f);
     glEnd();
     glDisable(GL_TEXTURE_2D);
     glDisable(GL_BLEND);

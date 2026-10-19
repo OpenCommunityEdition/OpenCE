@@ -350,6 +350,9 @@ viewport; more pixels than its memory allows (twelve bytes a pixel in half
 the video memory: 1.4 million on 32 MB, about 1440x1000). A picture drawn with
 fewer pixels than the window has is scaled with linear filtering, or doubled
 without blur where the window is a whole number of its pixels each way.
+The loading screen (mac_loading.c) is not the game's frame: it fills the window's
+framebuffer itself, as the movies do (`tools/mac_loading_checks.sh` enters a level
+through the menus in a hidden 1280x800 window and checks the loading frames' size).
 
 What is drawn with more pixels is the 3D view, the HUD's high-res redraws
 and everything drawn as geometry. Text and the HUD pictures the game has
