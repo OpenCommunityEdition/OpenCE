@@ -1,6 +1,7 @@
 /* Game pads through IOKit's HID device interface (mac_gamepad.h). */
 #include "mac_gamepad.h"
 #include "mac_gamepad_report.h"
+#include "mac_bt_input.h"
 #include <IOKit/IOKitLib.h>
 #include <IOKit/IOCFPlugIn.h>
 #include <IOKit/IOMessage.h>
@@ -261,6 +262,34 @@ static CFRunLoopSourceRef note_source;
 static CFAbsoluteTime next_event_scan;
 static int event_scans_left;
 /* the slot a pad left, held for a pad of its kind (SLOT_HOLD_SECONDS) */
+/* port: the Bluetooth pad (mac_bt_input.c, input.bluetooth) takes a slot as a HID pad does. These are
+   the stand-ins for the tools that link this file without it (the real ones replace them at the link). */
+__attribute__((weak)) int mac_bt_input_poll(struct mac_gamepad_frame *out)
+{
+    (void)out;
+    return 0;
+}
+
+__attribute__((weak)) int mac_bt_input_rumble(unsigned char strong, unsigned char weak)
+{
+    (void)strong; (void)weak;
+    return 0;
+}
+
+__attribute__((weak)) const char *mac_bt_input_name(void)
+{
+    return "";
+}
+
+__attribute__((weak)) void mac_bt_input_stop(void)
+{
+}
+
+/* the slot of the Bluetooth pad while it is connected, else -1; bt_last is the slot it had last, which it
+   takes again when that is free (a pad that sleeps and wakes keeps its player) */
+static int bt_slot = -1;
+static int bt_last = -1;
+
 static int held_slot = -1;
 static CFAbsoluteTime held_until;
 static unsigned held_vendor, held_product;
@@ -346,7 +375,7 @@ static int pick_slot(unsigned vendor, unsigned product, const char *name)
 {
     CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
     int slot, first_free = -1;
-    if (held_slot >= 0 && (now >= held_until || pads[held_slot].interface))
+    if (held_slot >= 0 && (now >= held_until || pads[held_slot].interface || held_slot == bt_slot))
         held_slot = -1;
     if (held_slot >= 0 &&
         ((vendor == held_vendor && product == held_product) ||
@@ -356,8 +385,8 @@ static int pick_slot(unsigned vendor, unsigned product, const char *name)
         return slot;
     }
     for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
-        if (!pads[slot].interface && slot != held_slot) { first_free = slot; break; }
-    if (first_free < 0 && held_slot >= 0) {
+        if (!pads[slot].interface && slot != held_slot && slot != bt_slot) { first_free = slot; break; }
+    if (first_free < 0 && held_slot >= 0 && held_slot != bt_slot) {
         first_free = held_slot;
         held_slot = -1;
     }
@@ -523,7 +552,7 @@ static int device_connected_count(void)
     int slot, count = 0;
     for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
         if (pads[slot].interface) ++count;
-    return count;
+    return count + (bt_slot >= 0);
 }
 
 /* whether the service is a pad already open (the same registry entry) */
@@ -675,10 +704,35 @@ int mac_gamepad_rumble(int slot, unsigned char strong, unsigned char weak)
 {
     struct gamepad_device *pad;
     if (slot < 0 || slot >= MAC_GAMEPAD_MAXIMUM_DEVICES) return 0;
+    if (slot == bt_slot) return mac_bt_input_rumble(strong, weak);
     pad = &pads[slot];
     if (!pad->interface || !pad->usb || !pad->raw_kind || pad->rumble_failed) return 0;
     if (pad->rumble_strong == strong && pad->rumble_weak == weak) return 1;
     return rumble_send(pad, strong, weak);
+}
+
+/* The Bluetooth pad's state into its slot: the slot it had last when that is free, else the lowest free one
+   (not the one held for a pad that left, while another is free); no slot free, and the pad is not used. */
+static void bt_update(struct mac_gamepad_frame frames[MAC_GAMEPAD_MAXIMUM_DEVICES])
+{
+    struct mac_gamepad_frame frame;
+    if (!mac_bt_input_poll(&frame)) {
+        if (bt_slot >= 0 && reported < 16) { ++reported; fprintf(stderr, "game pad: %s (Bluetooth) went away\n", mac_bt_input_name()); }
+        bt_slot = -1;
+        return;
+    }
+    if (bt_slot < 0) {
+        int slot;
+        if (bt_last >= 0 && !pads[bt_last].interface) bt_slot = bt_last;
+        for (slot = 0; bt_slot < 0 && slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
+            if (!pads[slot].interface && slot != held_slot) bt_slot = slot;
+        for (slot = 0; bt_slot < 0 && slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
+            if (!pads[slot].interface) bt_slot = slot;
+        if (bt_slot < 0) return;
+        bt_last = bt_slot;
+        if (reported < 16) { ++reported; fprintf(stderr, "game pad %d: %s (Bluetooth)\n", bt_slot + 1, mac_bt_input_name()); }
+    }
+    frames[bt_slot] = frame;
 }
 
 int mac_gamepad_poll_all(struct mac_gamepad_frame frames[MAC_GAMEPAD_MAXIMUM_DEVICES])
@@ -705,6 +759,7 @@ int mac_gamepad_poll_all(struct mac_gamepad_frame frames[MAC_GAMEPAD_MAXIMUM_DEV
         if (pads[slot].interface && (pads[slot].rumble_strong || pads[slot].rumble_weak) &&
             CFAbsoluteTimeGetCurrent() - pads[slot].rumble_sent >= 1.0)
             rumble_send(&pads[slot], pads[slot].rumble_strong, pads[slot].rumble_weak);
+    bt_update(frames);
     count = device_connected_count();
     if (count < MAC_GAMEPAD_MAXIMUM_DEVICES) {
         CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
@@ -746,12 +801,15 @@ void mac_gamepad_stop(void)
     int slot;
     for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
         device_close(&pads[slot]);
+    mac_bt_input_stop();
+    bt_slot = bt_last = -1;
     notify_stop();
     last_scan = -1.0e9;
 }
 
 const char *mac_gamepad_name_at(int slot)
 {
+    if (slot >= 0 && slot == bt_slot) return mac_bt_input_name();
     return slot >= 0 && slot < MAC_GAMEPAD_MAXIMUM_DEVICES && pads[slot].interface ? pads[slot].name : "";
 }
 
@@ -762,6 +820,7 @@ int mac_gamepad_asleep_at(int slot)
 
 int mac_gamepad_is_playstation_at(int slot)
 {
+    if (slot >= 0 && slot == bt_slot) return 1;   /* (a DualSense or DualShock 4) */
     return slot >= 0 && slot < MAC_GAMEPAD_MAXIMUM_DEVICES && pads[slot].interface &&
         pads[slot].vendor == SONY_VENDOR;
 }
@@ -771,5 +830,5 @@ const char *mac_gamepad_name(void)
     int slot;
     for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
         if (pads[slot].interface) return pads[slot].name;
-    return "";
+    return bt_slot >= 0 ? mac_bt_input_name() : "";
 }

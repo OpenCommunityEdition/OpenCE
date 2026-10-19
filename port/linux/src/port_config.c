@@ -334,6 +334,15 @@ static const struct config_setting config_settings[] =
 	{ "input.gamepad_setup_done", _config_boolean, "false", "HALO_GAMEPAD_SETUP_DONE", _environment_set_is_true,
 		_platform_mac,
 		"Mac: the launcher has offered the controller setup (set by it)." },
+	{ "input.bluetooth", _config_boolean, "false", "HALO_BLUETOOTH", _environment_set_is_true,
+		_platform_mac,
+		"Mac (experimental): play with a DualSense or DualShock 4 over Bluetooth\n"
+		"through PowerSpark's own Bluetooth stack and a TP-Link UB500 dongle\n"
+		"(with the Realtek firmware: input.bluetooth_firmware_dir). The game opens\n"
+		"the dongle if it is plugged in and no other program has it (Controller\n"
+		"Setup's window, Apple's driver), and a pad paired in Controller Setup\n"
+		"connects when its PS button is pressed. The pad plays as a wired one\n"
+		"does, with rumble. false: the dongle is not touched." },
 	{ "input.bluetooth_firmware_dir", _config_string, "\"\"", "HALO_BLUETOOTH_FIRMWARE_DIR", _environment_value,
 		_platform_mac,
 		"Mac: a folder with rtl8761bu_fw.bin (and rtl8761bu_config.bin), the\n"

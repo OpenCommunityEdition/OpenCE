@@ -34,21 +34,20 @@ trap 'rm -f "$work" "$work.pairs"' EXIT HUP INT TERM
 
 # (in batches: a session's list is over a thousand objects, more than one
 # command line holds)
-xargs nm -g < "$list" > "$work" 2>/dev/null || true
+xargs nm -gm < "$list" > "$work" 2>/dev/null || true
 
-# nm prints a blank line, "<object>:", then its symbols; an undefined one
-# has no address, so the type is the first field rather than the second
+# nm -m prints a blank line, "<object>:", then its symbols, each as
+# "<address> (<segment>,<section>) external <name>" (strong), "weak external"
+# (a weak definition, which a strong one in another object replaces, as the
+# port's stand-ins do; and inline functions every object emits), "(undefined)",
+# or "(common)" (a tentative definition, which the linker merges).
+# port: -m rather than -g alone: nm -g printed a weak definition as a plain
+# one, and every weak stand-in (pc_menu_split_players) was reported as a fault.
 awk '
     /^[^ \t].*:$/ { file = substr($0, 1, length($0) - 1); next }
-    NF == 3 { type = $2; name = $3 }
-    NF == 2 { type = $1; name = $2 }
-    NF < 2  { next }
-    # U is a reference, not a definition; C is a tentative definition, which
-    # the linker is allowed to merge
-    type == "U" || type == "C" { next }
-    # lower case is a local symbol, which cannot collide across objects
-    type ~ /^[a-z]$/ { next }
-    { print name "\t" file }
+    NF < 3 { next }
+    /\(undefined/ || /\(common\)/ || /weak/ { next }
+    /\([A-Za-z_]*,[A-Za-z_]*\)[ \t]+external[ \t]/ { print $NF "\t" file }
 ' "$work" | sort -u > "$work.pairs"
 
 count=$(cut -f1 "$work.pairs" | uniq -d | wc -l | tr -d ' ')
