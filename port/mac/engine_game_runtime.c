@@ -11,6 +11,7 @@
 #undef scenario_unload
 #undef scenario_load
 #include "engine_game_runtime.h"
+#include "mac_load_timing.h" /* port: load timing */
 #include <string.h>
 /* Native storage for the engine-declared variant, initialized by the core. */
 struct game_variant game_variant_global;
@@ -41,5 +42,11 @@ int mac_game_load_native_map(const char *map_name)
     game_options_new(&options);
     memcpy(options.map_name,map_name,bytes+1);
     if(!game_options_verify(&options))return 0;
-    return game_load(&options)?1:0;
+    {
+        /* port: load timing (mac_load_timing.h) */
+        double begin=mac_load_begin_tags();
+        int loaded=game_load(&options)?1:0;
+        mac_load_end(MAC_LOAD_SLOT_TAGS,begin);
+        return loaded;
+    }
 }

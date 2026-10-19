@@ -1,5 +1,6 @@
 /* Bounded, context-owned cache for exact translated GLSL source pairs. */
 #include "mac_gl_program_cache.h"
+#include "mac_load_timing.h" /* port: load timing */
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/glext.h>
 #undef malloc
@@ -257,6 +258,7 @@ static GLuint mac_gl_cache_compile(GLenum kind, const char *source,
     GLint compiled = GL_FALSE;
     GLint source_length;
     size_t length = strlen(source);
+    double load_begin = mac_load_begin();
     if (length > INT_MAX) {
         mac_gl_cache_error(error, error_size, "shader source is too large");
         return 0;
@@ -270,6 +272,7 @@ static GLuint mac_gl_cache_compile(GLenum kind, const char *source,
     glShaderSource(shader, 1, &source, &source_length);
     glCompileShader(shader);
     glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+    mac_load_end(MAC_LOAD_SLOT_PROGRAMS, load_begin);
     if (compiled != GL_TRUE) {
         char log[1024];
         GLsizei written = 0;
@@ -411,8 +414,12 @@ static int mac_gl_program_cache_get_internal(struct mac_gl_program_cache *cache,
             glBindAttribLocation(linked_program, (GLuint)i, name);
         }
     }
-    glLinkProgram(linked_program);
-    glGetProgramiv(linked_program, GL_LINK_STATUS, &linked);
+    {
+        double link_begin = mac_load_begin();
+        glLinkProgram(linked_program);
+        glGetProgramiv(linked_program, GL_LINK_STATUS, &linked);
+        mac_load_end(MAC_LOAD_SLOT_PROGRAMS, link_begin);
+    }
     if (linked != GL_TRUE) {
         char log[1024];
         GLsizei written = 0;

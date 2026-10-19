@@ -8,6 +8,7 @@
 #define MAC_INPUT_NO_CARBON
 #include "mac_window.h"
 #include "mac_gpu_info.h" /* port: mac.adaptive_detail */
+#include "mac_load_timing.h" /* port: load timing (the line printed at the first frame) */
 #include "mac_flags.h" /* port: mac_perf_flag */
 #include "input/input.h"
 #include "input/input_abstraction.h"
@@ -2224,8 +2225,10 @@ int mac_session_interactive_run(unsigned max_frames, int visible,
            wall-clock run plays several ticks in a frame */
         if (!context.fixed_step && getenv("HALO_MAC_FRAME_SLOW_MS") && atoi(getenv("HALO_MAC_FRAME_SLOW_MS")) > 0)
             mac_interactive_sleep((unsigned long)atoi(getenv("HALO_MAC_FRAME_SLOW_MS")));
-        if (context.frames == 1)
+        if (context.frames == 1) {
             first_frame_ms = (unsigned long)(mac_interactive_now() - start_time);
+            if (mac_load_timing_report) mac_load_timing_report();
+        }
         if (context.failed)
             break;
     }

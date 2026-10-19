@@ -1,4 +1,6 @@
+#define MAC_LOAD_TIMING_OWNER
 #include "xbox_map.h"
+#include "mac_load_timing.h"
 #include <string.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -9,6 +11,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <zlib.h>
+#include <sys/time.h>
 
 #ifndef MAP_ANON
 #define MAP_ANON MAP_ANONYMOUS
@@ -40,6 +43,45 @@ int mac_xbox_map_path_version(const char *path)
 static int looks_zlib(const unsigned char *p)
 {
     return (p[0] & 15) == 8 && ((p[0] << 8) | p[1]) % 31 == 0;
+}
+
+/* port: where the load time goes (mac_load_timing.h): the time of the first map open, and the milliseconds each part took */
+double mac_load_clock(void)
+{
+    struct timeval now;
+    gettimeofday(&now, 0);
+    return (double)now.tv_sec * 1000.0 + (double)now.tv_usec / 1000.0;
+}
+
+static double load_first_open;
+static double load_slot_ms[MAC_LOAD_SLOTS];
+static double load_open_in_tags, load_open_at_tags_begin;
+static int load_reported;
+
+void mac_load_timing_add(int slot, double milliseconds)
+{
+    if (slot == MAC_LOAD_TAGS_BEGIN) load_open_at_tags_begin = load_slot_ms[MAC_LOAD_SLOT_CACHE];
+    else if (slot == MAC_LOAD_SLOT_TAGS) {
+        load_slot_ms[slot] += milliseconds;
+        load_open_in_tags += load_slot_ms[MAC_LOAD_SLOT_CACHE] - load_open_at_tags_begin;
+    } else if (slot >= 0 && slot < MAC_LOAD_SLOTS) load_slot_ms[slot] += milliseconds;
+}
+
+/* once, when the first frame of the game has been drawn */
+void mac_load_timing_report(void)
+{
+    double total, tags;
+    if (load_reported || load_first_open == 0.0) return;
+    load_reported = 1;
+    total = mac_load_clock() - load_first_open;
+    /* game_load opens the cache file inside itself when the map is not open yet: that open is not counted twice */
+    tags = load_slot_ms[MAC_LOAD_SLOT_TAGS] - load_open_in_tags;
+    fprintf(stderr, "load timing: map open to first frame %.0f ms: cache file open (inflate or read) %.0f, tag load %.0f, "
+        "texture decode and upload %.0f, program compile %.0f, other %.0f\n",
+        total, load_slot_ms[MAC_LOAD_SLOT_CACHE], tags, load_slot_ms[MAC_LOAD_SLOT_TEXTURES],
+        load_slot_ms[MAC_LOAD_SLOT_PROGRAMS],
+        total - load_slot_ms[MAC_LOAD_SLOT_CACHE] - tags - load_slot_ms[MAC_LOAD_SLOT_TEXTURES] -
+        load_slot_ms[MAC_LOAD_SLOT_PROGRAMS]);
 }
 
 /* port: the loading screen's pump, called between the steps that inflate a map (set by the session program) */
@@ -153,7 +195,19 @@ done:
     return ok;
 }
 
+static int xbox_map_open(const char *path, struct mac_mapped_file *out, const char **error);
+
 int mac_xbox_map_open(const char *path, struct mac_mapped_file *out, const char **error)
+{
+    double begin = mac_load_clock(); /* port: mac_load_timing.h */
+    int opened;
+    if (load_first_open == 0.0) load_first_open = begin;
+    opened = xbox_map_open(path, out, error);
+    load_slot_ms[MAC_LOAD_SLOT_CACHE] += mac_load_clock() - begin;
+    return opened;
+}
+
+static int xbox_map_open(const char *path, struct mac_mapped_file *out, const char **error)
 {
     struct stat st;
     int fd;

@@ -26,6 +26,7 @@
 #include "mac_gl_program_cache.h"
 #include "mac_shader_source_cache.h"
 #include "mac_render_timing.h"
+#include "mac_load_timing.h" /* port: load timing */
 #include "mac_vertex_upload.h"
 #include "mac_index_decode_cache.h"
 #include "bsp_decode_cache.h"
@@ -499,7 +500,7 @@ static int mac_arb_vertex_wanted(unsigned long id)
 static const struct arb_vertex_program *mac_arb_vertex_program(const struct vertex_shader_object *vertex,int gather)
 {
     unsigned long i;struct arb_vertex_program *entry;
-    char *source=NULL,error[160];unsigned env_count=0;GLint position=-1,native=0,max_env=0;
+    char *source=NULL,error[160];unsigned env_count=0;GLint position=-1,native=0,max_env=0;double load_begin;
     for(i=0;i<gpu_arb_vertex_count;i++)
         if(gpu_arb_vertex[i].id==vertex->id&&gpu_arb_vertex[i].gather==gather)
             return gpu_arb_vertex[i].failed?NULL:&gpu_arb_vertex[i];
@@ -519,11 +520,13 @@ static const struct arb_vertex_program *mac_arb_vertex_program(const struct vert
         free(source);++gpu_arb_failures;return NULL;
     }
     while(glGetError()!=GL_NO_ERROR){}
+    load_begin=mac_load_begin(); /* port: load timing */
     glGenProgramsARB(1,&entry->program);
     glBindProgramARB(GL_VERTEX_PROGRAM_ARB,entry->program);
     glProgramStringARB(GL_VERTEX_PROGRAM_ARB,GL_PROGRAM_FORMAT_ASCII_ARB,(GLsizei)strlen(source),source);
     glGetIntegerv(GL_PROGRAM_ERROR_POSITION_ARB,&position);
     glGetProgramivARB(GL_VERTEX_PROGRAM_ARB,GL_PROGRAM_UNDER_NATIVE_LIMITS_ARB,&native);
+    mac_load_end(MAC_LOAD_SLOT_PROGRAMS,load_begin);
     glBindProgramARB(GL_VERTEX_PROGRAM_ARB,0);
     gl_shadow.valid&=~(unsigned long)SHADOW_ARB_PROGRAM;
     if(position!=-1||!native||glGetError()!=GL_NO_ERROR) {
@@ -610,7 +613,7 @@ static GLuint mac_arb_fragment_program(const struct arb_vertex_program *vertex,c
     unsigned long projective,const struct mac_shader_source_identity *identity)
 {
     unsigned long i,hash;struct arb_fragment_program *entry;
-    char *rewritten=NULL,error[160],log[512];GLuint shader,program;GLint ok=0;
+    char *rewritten=NULL,error[160],log[512];GLuint shader,program;GLint ok=0;double load_begin;
     /* (the source cache's identity of the pixel source: no text compare) */
     for(i=0;identity&&identity->cache_epoch&&i<ARB_FRAGMENT_PROGRAMS;i++)
         if(gpu_arb_fragment[i].program&&gpu_arb_fragment[i].vertex==vertex&&
@@ -630,6 +633,7 @@ static GLuint mac_arb_fragment_program(const struct arb_vertex_program *vertex,c
     }
     mac_arb_projective_fetches(rewritten,projective);
     mac_glsl_dump("arbfragment",rewritten);
+    load_begin=mac_load_begin(); /* port: load timing */
     shader=glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(shader,1,(const GLchar **)&rewritten,NULL);glCompileShader(shader);
     glGetShaderiv(shader,GL_COMPILE_STATUS,&ok);
@@ -641,6 +645,7 @@ static GLuint mac_arb_fragment_program(const struct arb_vertex_program *vertex,c
     program=glCreateProgram();glAttachShader(program,shader);glLinkProgram(program);
     glDeleteShader(shader);free(rewritten);
     glGetProgramiv(program,GL_LINK_STATUS,&ok);
+    mac_load_end(MAC_LOAD_SLOT_PROGRAMS,load_begin);
     if(!ok) {
         glGetProgramInfoLog(program,(GLsizei)sizeof(log),NULL,log);
         fprintf(stderr,"native ARB fragment link failed: %s\n",log);
@@ -667,7 +672,7 @@ static const struct arbfp_program *mac_arbfp_program(const struct nv2a_pixel_sha
     const struct mac_shader_source_identity *identity)
 {
     unsigned long i;struct arbfp_program *entry;struct mac_nv2a_arbfp_state state;
-    char *source=NULL,error[160];GLint position=-1,native=0;int result;
+    char *source=NULL,error[160];GLint position=-1,native=0;int result;double load_begin;
     int fog_texcoord=vertex->layout.fog_texcoord,fog_component=vertex->layout.fog_component;
     for(i=0;identity&&identity->cache_epoch&&i<gpu_arbfp_count;i++) {
         entry=&gpu_arbfp[i];
@@ -701,11 +706,13 @@ static const struct arbfp_program *mac_arbfp_program(const struct nv2a_pixel_sha
         free(source);++gpu_arbfp_failures;return NULL;
     }
     while(glGetError()!=GL_NO_ERROR){}
+    load_begin=mac_load_begin(); /* port: load timing */
     glGenProgramsARB(1,&entry->program);
     glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB,entry->program);
     glProgramStringARB(GL_FRAGMENT_PROGRAM_ARB,GL_PROGRAM_FORMAT_ASCII_ARB,(GLsizei)strlen(source),source);
     glGetIntegerv(GL_PROGRAM_ERROR_POSITION_ARB,&position);
     glGetProgramivARB(GL_FRAGMENT_PROGRAM_ARB,GL_PROGRAM_UNDER_NATIVE_LIMITS_ARB,&native);
+    mac_load_end(MAC_LOAD_SLOT_PROGRAMS,load_begin);
     gl_shadow.valid&=~(unsigned long)SHADOW_ARB_FRAGMENT;
     if(position!=-1||!native||glGetError()!=GL_NO_ERROR) {
         fprintf(stderr,"native ARB fragment program rejected: error_position=%d native=%d %s\n",

@@ -8,6 +8,7 @@
 #include "mac_gpu_textures.h"
 #include "mac_hud_hires.h"
 #include "mac_flags.h"
+#include "mac_load_timing.h" /* port: load timing (the textures' decoding and upload) */
 #undef malloc
 #undef calloc
 #undef free
@@ -127,6 +128,13 @@ static int xbox_texture_simple = -1;
 static unsigned long xbox_texture_memo_hits;
 static unsigned long xbox_texture_hits, xbox_texture_uploads, xbox_texture_evictions, xbox_texture_compressed;
 static unsigned long xbox_texture_failures;
+/* port: what the Xbox textures made are, by format (the log line at dispose): uploads, the texels' bytes in the
+   map (the levels uploaded), and the bytes of the GL textures; the high-res HUD's have their own row */
+#define XBOX_TEXTURE_FORMATS 0x44U
+#define XBOX_TEXTURE_FORMAT_HUD 0x43U
+static unsigned long xbox_format_uploads[XBOX_TEXTURE_FORMATS], xbox_format_native[XBOX_TEXTURE_FORMATS],
+    xbox_format_gl[XBOX_TEXTURE_FORMATS];
+static void xbox_texture_format_report(void);
 
 static int retail_texture_cache_configure(const char **error)
 {
@@ -393,6 +401,7 @@ int mac_gpu_textures_dispose(void)
         fprintf(stderr, "native xbox GL textures: uploads=%lu (dxt %lu) hits=%lu (stage memo %lu) evictions=%lu bytes=%lu\n",
             xbox_texture_uploads, xbox_texture_compressed, xbox_texture_hits, xbox_texture_memo_hits, xbox_texture_evictions,
             (unsigned long)xbox_texture_bytes);
+    xbox_texture_format_report();
     fprintf(stderr, "native GL texture calls: binds=%llu active=%llu bias=%llu\n", gl_texture_binds, gl_active_calls, gl_bias_writes);
     if (!mac_gpu_textures_bitmap_cache_invalidate()) return 0;
     fprintf(stderr, "native retail compressed uploads: %lu\n", retail_compressed_uploads);
@@ -1410,8 +1419,40 @@ struct xbox_texture_entry {
     int sampler_key_valid;
     unsigned long total;   /* the bytes of its texels in the console's memory (all faces) */
     int palettized;
+    unsigned char format_row; /* port: its row of the format table (xbox_format_uploads) */
+    size_t native_bytes;      /* ... and the bytes of the levels uploaded, in the map */
 };
 static struct xbox_texture_entry xbox_textures[XBOX_TEXTURE_ENTRIES];
+
+/* port: the line "native xbox GL texture formats": per format of the Xbox textures made, "n" uploads (and "r" of
+   them resident now), the map's bytes of the levels uploaded ("src") and the GL textures' bytes ("gl"), in KB */
+static void xbox_texture_format_report(void)
+{
+    unsigned long resident[XBOX_TEXTURE_FORMATS], resident_gl[XBOX_TEXTURE_FORMATS], resident_src[XBOX_TEXTURE_FORMATS];
+    unsigned long total_src = 0, total_gl = 0, total_uploads = 0;
+    unsigned i;
+    memset(resident, 0, sizeof(resident)); memset(resident_gl, 0, sizeof(resident_gl)); memset(resident_src, 0, sizeof(resident_src));
+    for (i = 0; i < XBOX_TEXTURE_ENTRIES; ++i)
+        if (xbox_textures[i].live) {
+            ++resident[xbox_textures[i].format_row];
+            resident_gl[xbox_textures[i].format_row] += (unsigned long)xbox_textures[i].bytes;
+            resident_src[xbox_textures[i].format_row] += (unsigned long)xbox_textures[i].native_bytes;
+        }
+    for (i = 0; i < XBOX_TEXTURE_FORMATS; ++i) {
+        total_uploads += xbox_format_uploads[i]; total_src += xbox_format_native[i]; total_gl += xbox_format_gl[i];
+    }
+    if (!total_uploads) return;
+    fprintf(stderr, "native xbox GL texture formats (format n/resident src KB gl KB; resident src KB gl KB):");
+    for (i = 0; i < XBOX_TEXTURE_FORMATS; ++i) {
+        if (!xbox_format_uploads[i]) continue;
+        if (i == XBOX_TEXTURE_FORMAT_HUD) fprintf(stderr, " hud");
+        else fprintf(stderr, " 0x%02x", i);
+        fprintf(stderr, " %lu/%lu src %lu gl %lu res %lu %lu;", xbox_format_uploads[i], resident[i],
+            (xbox_format_native[i] + 512) / 1024, (xbox_format_gl[i] + 512) / 1024,
+            (resident_src[i] + 512) / 1024, (resident_gl[i] + 512) / 1024);
+    }
+    fprintf(stderr, " total %lu uploads src %lu KB gl %lu KB\n", total_uploads, (total_src + 512) / 1024, (total_gl + 512) / 1024);
+}
 
 /* ---- port: the high-res HUD (mac_hud_hires.c, display.high_res_hud) */
 static const struct mac_gpu_hud_provider *hud_provider;
@@ -1516,9 +1557,10 @@ static GLuint xbox_texture_get(const void *resource, unsigned char sampler, unsi
     unsigned hud_width = 0, hud_height = 0, hud_levels = 0, hud_skip = 0;
     GLenum target;
     GLuint object = 0;
-    size_t gl_bytes = 0;
+    size_t gl_bytes = 0, native_bytes = 0;
     const D3DCOLOR *palette = NULL;
     const struct mac_device_state *state = mac_device_state_get();
+    double load_begin;
     if (!native->Data) { set_error(error, "native texture has no data"); return 0; }
     /* (the usual case first: a texture made already, its pages not written since, nothing to work out) */
     if (xbox_texture_simple < 0) { const char *v = getenv("HALO_MAC_XBOX_TEXTURE_SIMPLE"); xbox_texture_simple = v && v[0] == '1'; }
@@ -1593,9 +1635,12 @@ static GLuint xbox_texture_get(const void *resource, unsigned char sampler, unsi
     for (level = first_level; level < description.levels; ++level) {
         unsigned long w = mip_dimension(description.width, (unsigned)level), h = mip_dimension(description.height, (unsigned)level);
         unsigned long d = mip_dimension(description.depth, (unsigned)level);
-        gl_bytes += as_dxt ? (size_t)((w + 3) / 4) * ((h + 3) / 4) * (description.format == 0x0c ? 8U : 16U) : (size_t)w * h * d * 4;
+        gl_bytes += as_dxt ? (size_t)((w + 3) / 4) * ((h + 3) / 4) * (description.format == 0x0c ? 8U : 16U) :
+            (size_t)w * h * d * 4U;
+        native_bytes += mac_xgpu_texture_level_offset(&description, (unsigned)level + 1) -
+            mac_xgpu_texture_level_offset(&description, (unsigned)level);
     }
-    gl_bytes *= faces;
+    gl_bytes *= faces; native_bytes *= faces;
     }
     /* room: the least recently used go, but never one this draw has bound */
     while (xbox_texture_bytes + gl_bytes > retail_texture_cache_bytes_limit) {
@@ -1611,6 +1656,7 @@ static GLuint xbox_texture_get(const void *resource, unsigned char sampler, unsi
     entry = xbox_texture_find(native->Data, &found);
     if (!entry) { set_error(error, "native Xbox texture table is full"); return 0; }
     if (entry->live) { xbox_texture_drop(entry); ++xbox_texture_evictions; }
+    load_begin = mac_load_begin(); /* port: load timing */
     glGenTextures(1, &object);
     if (!object) { set_error(error, "OpenGL texture allocation failed"); return 0; }
     tex_bind(target, object);
@@ -1712,6 +1758,11 @@ static GLuint xbox_texture_get(const void *resource, unsigned char sampler, unsi
     entry->hud_shown = hud_on ? hud_provider->shown(hud_asset) : -1;
     entry->sampler = sampler; entry->palette = (unsigned long)palette; entry->live = 1; entry->last_use = xbox_texture_bind_serial;
     entry->total = total; entry->palettized = description.format == 0x0b;
+    entry->format_row = (unsigned char)(hud_on ? XBOX_TEXTURE_FORMAT_HUD : description.format < XBOX_TEXTURE_FORMAT_HUD ? description.format : 0x42U);
+    entry->native_bytes = native_bytes;
+    ++xbox_format_uploads[entry->format_row]; xbox_format_native[entry->format_row] += native_bytes;
+    xbox_format_gl[entry->format_row] += gl_bytes;
+    mac_load_end(MAC_LOAD_SLOT_TEXTURES, load_begin);
     entry->scale[0] = entry->scale[1] = 1.0f;
     if (description.linear) {
         entry->scale[0] = 1.0f / (float)description.width;
