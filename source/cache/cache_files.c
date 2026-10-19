@@ -679,6 +679,18 @@ unsigned long tag_groups_checksum(
 	return cache_file_globals.tag_header->checksum;
 }
 
+/* port: see tag_loaded */
+#define TAG_LOADED_MEMOS 128
+struct tag_loaded_memo_entry
+{
+	char const *name;
+	long group_tag;
+	struct cache_file_tag_instance const *table;
+	long count;
+	long absolute_index;
+};
+static struct tag_loaded_memo_entry tag_loaded_memo[TAG_LOADED_MEMOS];
+
 long tag_loaded(
 	long group_tag,
 	char const *name)
@@ -687,6 +699,7 @@ long tag_loaded(
 	0x7FFF, and the walk never ended) */
 	long absolute_index;
 	long result = NONE;
+	struct tag_loaded_memo_entry *memo;
 
 	if (cache_file_globals.tags_loaded)
 	{
@@ -694,6 +707,19 @@ long tag_loaded(
 			"c:\\halo\\SOURCE\\cache\\cache_files.c",
 			346,
 			global_tag_instances);
+
+		/* port: the tag the last search for this name pointer and group found (the interface asks for the same
+		few references every frame), when it still has the group and the name: a search for a name equal to it
+		ends at the same tag. The table is the one the search was made in. */
+		memo = &tag_loaded_memo[(((unsigned long)name >> 3) ^ (unsigned long)group_tag) % TAG_LOADED_MEMOS];
+		if (memo->name == name && memo->group_tag == group_tag && memo->table == global_tag_instances &&
+			memo->count == global_tag_count && memo->absolute_index >= 0 && memo->absolute_index < global_tag_count)
+		{
+			struct cache_file_tag_instance *remembered = &global_tag_instances[memo->absolute_index];
+
+			if (group_tag == remembered->group_tag && !_stricmp(name, remembered->name))
+				return remembered->tag_index;
+		}
 
 		for (absolute_index = 0;
 			absolute_index < global_tag_count;
@@ -703,6 +729,11 @@ long tag_loaded(
 				!_stricmp(name, global_tag_instances[absolute_index].name))
 			{
 				result = global_tag_instances[absolute_index].tag_index;
+				memo->name = name;
+				memo->group_tag = group_tag;
+				memo->table = global_tag_instances;
+				memo->count = global_tag_count;
+				memo->absolute_index = absolute_index;
 				break;
 			}
 		}
