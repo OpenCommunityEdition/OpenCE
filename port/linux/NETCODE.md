@@ -47,6 +47,13 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
     host's is once that stops, or if they drift apart while it moves;
   - which named objects exist, so scripted creates and deletes match.
 
+  Surface refreshes include intact and broken panes in 32-surface chunks.
+  They are sent after a checkpoint revert and every two seconds, in the
+  same numbered event stream as immediate breaks. Clients restore each
+  intact pane's drawing/collision flag and vitality; panes already broken
+  at the checkpoint stay broken. A full event queue retains the pending
+  refresh for the next tick, and periodic refreshes repair lost batches.
+
   Every machine follows the host's structure BSP: a switch is sent at once
   and reliably, and each client's input says which BSP it has loaded.
   Until a client has the host's, the host takes none of its players'
@@ -233,7 +240,10 @@ from, so that a second copy of the game on one computer, on a port of its
 own, plays too; version 32 sends the host's mouse aim assist policy
 (distributed message 90, `network_aim_assist.c`), which a client must not
 ignore, and has a client's input say whether its player plays co-op with
-friendly fire.
+friendly fire; version 33 refreshes co-op's intact and broken surfaces,
+including panes restored by a host checkpoint revert. Surface events keep
+their layout; type 0 is an immediate break and type 1 carries a 32-surface
+extant bitmap in `object_index`, starting at `value`, for BSP `frame`.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

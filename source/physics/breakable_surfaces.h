@@ -80,6 +80,9 @@ nothing if it is already broken */
 void breakable_surface_port_break(
 	short breakable_surface_index,
 	real_point3d const *epicenter);
+/* port: restore the host's intact surface, including its collision flag. */
+void breakable_surface_port_restore(
+	short breakable_surface_index);
 void breakable_surfaces_initialize(
 	void);
 void breakable_surfaces_dispose(

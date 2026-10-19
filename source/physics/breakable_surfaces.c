@@ -331,6 +331,22 @@ void breakable_surface_port_break(
 	breakable_surface_effect(breakable_surface_index, &damage, breakable_surface->collision_surface_index);
 }
 
+/* port: the host restored a surface from its checkpoint. The same flags
+control structure drawing, collision tests and path queries. */
+void breakable_surface_port_restore(
+	short breakable_surface_index)
+{
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+
+	if (!structure_bsp || !breakable_surface_indices_valid(breakable_surface_index) ||
+		breakable_surface_index >= structure_bsp->breakable_surfaces.count)
+	{
+		return;
+	}
+	breakable_surface_get(breakable_surface_index)->vitality = 1.0f;
+	BIT_VECTOR_SET_FLAG((long *)breakable_surface_flags_get(), breakable_surface_index, TRUE);
+}
+
 /* ---------- private code */
 
 /* port: whether a structure bsp index (the scenario's, from the map) and a
