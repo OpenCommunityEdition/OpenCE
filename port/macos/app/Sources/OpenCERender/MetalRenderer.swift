@@ -63,6 +63,19 @@ public final class MetalRenderer: @unchecked Sendable {
         /// the command, its ids 0
         let command: Command
     }
+    /// the options the translated NV2A shaders compile with (and
+    /// tools/msl_check.swift): positions computed alike in every pass (the
+    /// game draws a surface in several, with equal depths), and no fast maths,
+    /// as the native builds compile without fused multiply-add
+    public static var libraryOptions: MTLCompileOptions {
+        let options = MTLCompileOptions()
+        options.preserveInvariance = true
+        options.mathMode = .safe
+        options.languageVersion = .version3_2
+        return options
+    }
+    /// (the guest translates a shader again for each program it creates;
+    /// Metal keeps the compiled libraries on disk between runs)
     private var librariesBySource: [String: MTLLibrary] = [:]
     private var pipelinesByKey: [PipelineKey: MTLRenderPipelineState] = [:]
     private var depthStencilsByCommand: [Command: MTLDepthStencilState] = [:]
@@ -377,7 +390,7 @@ public final class MetalRenderer: @unchecked Sendable {
             return library
         }
         do {
-            let library = try device.makeLibrary(source: source, options: nil)
+            let library = try device.makeLibrary(source: source, options: Self.libraryOptions)
             librariesBySource[source] = library
             counts.librariesCompiled += 1
             return library

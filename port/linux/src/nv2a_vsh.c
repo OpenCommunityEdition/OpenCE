@@ -2,7 +2,7 @@
 NV2A_VSH.C
 
 Translation of NV2A vertex programs (Xbox vertex shader microcode) into
-GLSL.
+GLSL, and into Metal Shading Language for the macOS app.
 
 Each instruction is four little-endian words. Word 1 to 3 hold a MAC
 (vector) operation and an ILU (scalar) operation that execute in parallel
@@ -15,10 +15,17 @@ Xbox vertex programs finish by converting their clip-space position to
 screen space with the viewport constants c[-38] and c[-37], which Direct3D
 maintains. The generated shader inverts that transform to hand OpenGL a
 clip-space position again.
+
+The MSL is the GLSL's body, with the uniforms and attributes in structs
+(nv2a_vertex_uniforms, xgpu.h) and its outputs in nv2a_vertex_out. Metal's
+clip space is OpenGL's with glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE),
+as the desktop build sets it: the position needs no flip and no remap of z,
+which the GLES shaders do.
 */
 
 #include "xgpu.h"
 
+#include <stddef.h>
 #include <stdlib.h>
 
 /* ---------- instruction fields */
@@ -328,7 +335,7 @@ BOOL nv2a_vertex_shader_lighting(const DWORD *instructions, unsigned long instru
 
 /* ---------- translation */
 
-static const char shader_prologue[] =
+static const char glsl_declarations[] =
 #ifdef HALO_GLES
 	/* the #version line comes first, from the context's capabilities */
 	"precision highp float;\n"
@@ -351,7 +358,9 @@ static const char shader_prologue[] =
 	"out vec4 xT2;\n"
 	"out vec4 xT3;\n"
 	"out float xFog;\n"
-	"invariant gl_Position;\n"
+	"invariant gl_Position;\n";
+
+static const char shader_functions[] =
 	"vec4 unpack_normpacked3(uint p)\n"
 	"{\n"
 	"	int x = int(p << 21) >> 21;\n"
@@ -383,36 +392,121 @@ static const char shader_prologue[] =
 	"	return vec4(1.0, max(s.x, 0.0), specular, 1.0);\n"
 	"}\n";
 
-char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
-	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting)
+/* the outputs, the uniforms and the attributes of the MSL, and its
+vertex_main up to the program's body */
+static void msl_declarations(struct xgpu_text *text, unsigned long packed_attribute_mask,
+	unsigned long present_attribute_mask, const struct nv2a_vertex_lighting *lighting)
+{
+	static const char *const outputs[] = { "xD0", "xD1", "xB0", "xB1", "xT0", "xT1", "xT2", "xT3" };
+	unsigned long index;
+
+	xgpu_text_append(text, "%s", XGPU_MSL_PRELUDE);
+	xgpu_text_append(text,
+		"struct nv2a_vertex_uniforms\n"
+		"{\n"
+		"\tfloat4 c[%d];\n"
+		"\tfloat4 viewport_scale;\n"
+		"\tfloat4 viewport_offset;\n"
+		"\tfloat4 attributes[%d];\n"
+		"\tfloat point_size;\n"
+		/* columns the menus shift by to center on a wide screen (d3d8_gl.c) */
+		"\tfloat screen_offset;\n"
+		"};\n"
+		/* the C side's layout (xgpu.h), which fills the buffer */
+		"static_assert(sizeof(nv2a_vertex_uniforms) == %lu, \"nv2a_vertex_uniforms (xgpu.h)\");\n"
+		"static_assert(__builtin_offsetof(nv2a_vertex_uniforms, screen_offset) == %lu, \"nv2a_vertex_uniforms (xgpu.h)\");\n"
+		"struct nv2a_vertex_out\n"
+		"{\n"
+		"\tfloat4 position [[position, invariant]];\n"
+		"\tfloat point_size [[point_size]];\n",
+		XGPU_VERTEX_CONSTANT_COUNT, XGPU_VERTEX_ATTRIBUTE_COUNT, (unsigned long)sizeof(struct nv2a_vertex_uniforms),
+		(unsigned long)offsetof(struct nv2a_vertex_uniforms, screen_offset));
+	for (index = 0; index < sizeof(outputs) / sizeof(outputs[0]); index++)
+		xgpu_text_append(text, "\tfloat4 %s [[user(%s)]];\n", outputs[index], outputs[index]);
+	xgpu_text_append(text, "\tfloat xFog [[user(xFog)]];\n");
+	/* (the pixel shader's model_lighting; the normal's length in w) */
+	if (lighting)
+		xgpu_text_append(text, "\tfloat4 xWorldNormal [[user(xWorldNormal)]];\n");
+	if (lighting && lighting->lights == 2)
+		xgpu_text_append(text, "\tfloat3 xWorldPosition [[user(xWorldPosition)]];\n");
+	xgpu_text_append(text, "};\n");
+	if (present_attribute_mask)
+	{
+		xgpu_text_append(text, "struct nv2a_vertex_in\n{\n");
+		for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+		{
+			if (!(present_attribute_mask & (1UL << index)))
+				continue;
+			if (packed_attribute_mask & (1UL << index))
+				xgpu_text_append(text, "\tuint v%lu_packed [[attribute(%lu)]];\n", index, index);
+			else
+				xgpu_text_append(text, "\tfloat4 v%lu_in [[attribute(%lu)]];\n", index, index);
+		}
+		xgpu_text_append(text, "};\n");
+	}
+	xgpu_text_append(text, "%s", shader_functions);
+	xgpu_text_append(text, "vertex nv2a_vertex_out vertex_main(%sconstant nv2a_vertex_uniforms &u [[buffer(%d)]])\n"
+		"{\n"
+		"\tnv2a_vertex_out output;\n"
+		"\tconstant float4 *c = u.c;\n"
+		"\tfloat4 viewport_scale = u.viewport_scale;\n"
+		"\tfloat4 viewport_offset = u.viewport_offset;\n"
+		"\tfloat point_size = u.point_size;\n"
+		"\tfloat screen_offset = u.screen_offset;\n",
+		present_attribute_mask ? "nv2a_vertex_in input [[stage_in]], " : "", XGPU_METAL_VERTEX_UNIFORM_BUFFER);
+	if (lighting)
+		xgpu_text_append(text, "\tvec4 xWorldNormal = vec4(0.0);\n");
+	if (lighting && lighting->lights == 2)
+		xgpu_text_append(text, "\tvec3 xWorldPosition = vec3(0.0);\n");
+	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+	{
+		if (!(present_attribute_mask & (1UL << index)))
+			xgpu_text_append(text, "\tvec4 v%lu = u.attributes[%lu];\n", index, index);
+		else if (packed_attribute_mask & (1UL << index))
+			xgpu_text_append(text, "\tvec4 v%lu = unpack_normpacked3(input.v%lu_packed);\n", index, index);
+		else
+			xgpu_text_append(text, "\tvec4 v%lu = input.v%lu_in;\n", index, index);
+	}
+}
+
+static char *vertex_shader(const DWORD *instructions, unsigned long instruction_count,
+	unsigned long packed_attribute_mask, unsigned long present_attribute_mask,
+	const struct nv2a_vertex_lighting *lighting, BOOL msl)
 {
 	struct xgpu_text text = { 0 };
 	unsigned long index;
 
-#ifdef HALO_GLES
-	xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
-#endif
-	xgpu_text_append(&text, "%s", shader_prologue);
-	/* (the pixel shader's model_lighting; the normal's length in w) */
-	if (lighting)
-		xgpu_text_append(&text, "out vec4 xWorldNormal;\n");
-	if (lighting && lighting->lights == 2)
-		xgpu_text_append(&text, "out vec3 xWorldPosition;\n");
-	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+	if (msl)
 	{
-		if (packed_attribute_mask & (1UL << index))
-			xgpu_text_append(&text, "layout(location = %lu) in uint v%lu_packed;\n", index, index);
-		else
-			xgpu_text_append(&text, "layout(location = %lu) in vec4 v%lu_in;\n", index, index);
+		msl_declarations(&text, packed_attribute_mask, present_attribute_mask, lighting);
 	}
-
-	xgpu_text_append(&text, "void main()\n{\n");
-	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+	else
 	{
-		if (packed_attribute_mask & (1UL << index))
-			xgpu_text_append(&text, "\tvec4 v%lu = unpack_normpacked3(v%lu_packed);\n", index, index);
-		else
-			xgpu_text_append(&text, "\tvec4 v%lu = v%lu_in;\n", index, index);
+#ifdef HALO_GLES
+		xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
+#endif
+		xgpu_text_append(&text, "%s%s", glsl_declarations, shader_functions);
+		/* (the pixel shader's model_lighting; the normal's length in w) */
+		if (lighting)
+			xgpu_text_append(&text, "out vec4 xWorldNormal;\n");
+		if (lighting && lighting->lights == 2)
+			xgpu_text_append(&text, "out vec3 xWorldPosition;\n");
+		for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+		{
+			if (packed_attribute_mask & (1UL << index))
+				xgpu_text_append(&text, "layout(location = %lu) in uint v%lu_packed;\n", index, index);
+			else
+				xgpu_text_append(&text, "layout(location = %lu) in vec4 v%lu_in;\n", index, index);
+		}
+
+		xgpu_text_append(&text, "void main()\n{\n");
+		for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+		{
+			if (packed_attribute_mask & (1UL << index))
+				xgpu_text_append(&text, "\tvec4 v%lu = unpack_normpacked3(v%lu_packed);\n", index, index);
+			else
+				xgpu_text_append(&text, "\tvec4 v%lu = v%lu_in;\n", index, index);
+		}
 	}
 	xgpu_text_append(&text,
 		"\tvec4 r0 = vec4(0.0), r1 = vec4(0.0), r2 = vec4(0.0), r3 = vec4(0.0);\n"
@@ -563,7 +657,31 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		and the clipper takes the triangle; put it behind the camera instead,
 		which the clipper also takes. */
 		"\tif (!(abs(position.w) > 0.0))\n"
-		"\t\tposition = vec4(0.0, 0.0, 0.0, -1.0);\n"
+		"\t\tposition = vec4(0.0, 0.0, 0.0, -1.0);\n",
+		XGPU_VERTEX_CONSTANT_BIAS - 38, XGPU_VERTEX_CONSTANT_BIAS - 37
+		);
+	if (msl)
+	{
+		xgpu_text_append(&text,
+			"\toutput.position = position;\n"
+			"\toutput.point_size = oPts.x;\n"
+			"\toutput.xD0 = clamp(oD0, 0.0, 1.0);\n"
+			"\toutput.xD1 = clamp(oD1, 0.0, 1.0);\n"
+			"\toutput.xB0 = clamp(oB0, 0.0, 1.0);\n"
+			"\toutput.xB1 = clamp(oB1, 0.0, 1.0);\n"
+			"\toutput.xT0 = oT0;\n"
+			"\toutput.xT1 = oT1;\n"
+			"\toutput.xT2 = oT2;\n"
+			"\toutput.xT3 = oT3;\n"
+			"\toutput.xFog = oFog.x;\n");
+		if (lighting)
+			xgpu_text_append(&text, "\toutput.xWorldNormal = xWorldNormal;\n");
+		if (lighting && lighting->lights == 2)
+			xgpu_text_append(&text, "\toutput.xWorldPosition = xWorldPosition;\n");
+		xgpu_text_append(&text, "\treturn output;\n}\n");
+		return text.buffer;
+	}
+	xgpu_text_append(&text,
 		"\tgl_Position = position;\n"
 #ifdef HALO_GLES
 		/* what glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE) does on desktop
@@ -581,8 +699,20 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\txT2 = oT2;\n"
 		"\txT3 = oT3;\n"
 		"\txFog = oFog.x;\n"
-		"}\n",
-		XGPU_VERTEX_CONSTANT_BIAS - 38, XGPU_VERTEX_CONSTANT_BIAS - 37
-		);
+		"}\n");
 	return text.buffer;
+}
+
+char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
+	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting)
+{
+	return vertex_shader(instructions, instruction_count, packed_attribute_mask, 0, lighting, FALSE);
+}
+
+char *nv2a_vertex_shader_to_msl(const DWORD *instructions, unsigned long instruction_count,
+	unsigned long packed_attribute_mask, unsigned long present_attribute_mask,
+	const struct nv2a_vertex_lighting *lighting)
+{
+	return vertex_shader(instructions, instruction_count, packed_attribute_mask, present_attribute_mask,
+		lighting, TRUE);
 }

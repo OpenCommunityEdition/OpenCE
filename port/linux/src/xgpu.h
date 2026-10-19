@@ -66,6 +66,21 @@ struct xgpu_text
 
 void xgpu_text_append(struct xgpu_text *text, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
+/* ---------- Metal Shading Language
+
+What the translators' MSL (nv2a_vsh.c, nv2a_psh.c) begins with: GLSL's
+names for the types and functions the shared shader text uses. */
+#define XGPU_MSL_PRELUDE \
+	"#include <metal_stdlib>\n" \
+	"using namespace metal;\n" \
+	"typedef float4 vec4;\n" \
+	"typedef float3 vec3;\n" \
+	"typedef float2 vec2;\n" \
+	"typedef int2 ivec2;\n" \
+	"static inline float inversesqrt(float x) { return rsqrt(x); }\n" \
+	"static inline bool4 lessThan(float4 a, float4 b) { return a < b; }\n" \
+	"static inline bool4 greaterThanEqual(float4 a, float4 b) { return a >= b; }\n"
+
 /* ---------- vertex shaders */
 
 #define XGPU_VERTEX_ATTRIBUTE_COUNT 16
@@ -99,6 +114,31 @@ lights the diffuse color for each pixel (nv2a_pixel_shader_key
 per_pixel_lighting). Returns a malloc'd string. */
 char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
 	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting);
+
+/* Metal Shading Language for the same program (the macOS app's renderer):
+vertex_main, its attributes those whose bit is set in
+present_attribute_mask ([[attribute(N)]], packed as above), the others read
+from the uniforms' attributes; the uniforms are struct
+nv2a_vertex_uniforms, in vertex buffer 30. Returns a malloc'd string. */
+char *nv2a_vertex_shader_to_msl(const DWORD *instructions, unsigned long instruction_count,
+	unsigned long packed_attribute_mask, unsigned long present_attribute_mask,
+	const struct nv2a_vertex_lighting *lighting);
+
+/* the Metal vertex shader's uniforms, laid out as its nv2a_vertex_uniforms
+(which checks its size against this one's) */
+struct nv2a_vertex_uniforms
+{
+	float c[XGPU_VERTEX_CONSTANT_COUNT][4];
+	float viewport_scale[4];
+	float viewport_offset[4];
+	/* the values of the attributes the draw does not feed */
+	float attributes[XGPU_VERTEX_ATTRIBUTE_COUNT][4];
+	float point_size;
+	float screen_offset;
+	float pad[2];
+};
+
+#define XGPU_METAL_VERTEX_UNIFORM_BUFFER 30
 
 /* ---------- pixel shaders */
 
@@ -155,6 +195,12 @@ struct nv2a_pixel_shader_key
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
 
+/* Metal Shading Language for the same shader: fragment_main, its uniforms
+struct nv2a_pixel_uniforms in fragment buffer 0, texture and sampler N
+those of stage N (where its sampler type is not none). Returns a malloc'd
+string. */
+char *nv2a_pixel_shader_to_msl(const struct nv2a_pixel_shader_key *key);
+
 #ifdef HALO_GLES
 /* ES samplers have no LOD bias of their own */
 #define XGPU_PIXEL_UNIFORMS_ES "uniform vec4 texture_lod_bias;\n"
@@ -183,6 +229,27 @@ uniform space): [0] c[-82] (the translucency in z), [1] to [11] c[-79] to
 c[-69] (rasterizer_set_model_lighting's two point lights, two distant
 lights and the ambient light) */
 #define XGPU_MODEL_LIGHT_COUNT 12
+
+/* the Metal pixel shader's uniforms: XGPU_PIXEL_UNIFORMS, the LOD bias,
+blend_constant and model_lights in one buffer, laid out as its
+nv2a_pixel_uniforms (which checks its size against this one's) */
+struct nv2a_pixel_uniforms
+{
+	float ps_c0[8][4];
+	float ps_c1[8][4];
+	float ps_final_c0[4];
+	float ps_final_c1[4];
+	float fog_color[4];
+	float fog_parameters[4];
+	float bump_matrix[4][4];
+	float bump_luminance[4][4];
+	float texture_scale[4][4];
+	float texture_lod_bias[4];
+	float blend_constant[4];
+	float model_lights[XGPU_MODEL_LIGHT_COUNT][4];
+	float alpha_reference;
+	float pad[3];
+};
 
 /* ---------- textures */
 

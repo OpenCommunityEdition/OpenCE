@@ -13,7 +13,7 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Iterable, Optional
 
 ROOT = Path(__file__).resolve().parent.parent
 GUEST = ROOT / "build/macos/guest"
@@ -33,18 +33,21 @@ def available() -> bool:
             and REFERENCE_OBJECT.is_file())
 
 
-def _compile_command() -> str:
-    listing = subprocess.run(["ninja", "-t", "commands", str(REFERENCE_OBJECT.relative_to(ROOT))], cwd=ROOT,
+def _compile_command(reference: Path) -> str:
+    listing = subprocess.run(["ninja", "-t", "commands", str(reference.relative_to(ROOT))], cwd=ROOT,
                              capture_output=True, text=True, check=True)
     return listing.stdout.strip().splitlines()[-1]
 
 
-def compile_guest(source: Path, obj: Path, extra_flags: Iterable[str] = ()) -> None:
+def compile_guest(source: Path, obj: Path, extra_flags: Iterable[str] = (), like: Optional[str] = None) -> None:
     """compiles one C file as guest code (C, then Darwin assembly, ELF
-    assembly and an object, as tools/android_build.py does)"""
-    reference = REFERENCE_OBJECT.relative_to(ROOT).as_posix()
-    reference_source = "port/android/guest/runtime/guest_misc.c"
-    command = _compile_command()
+    assembly and an object, as tools/android_build.py does); with `like` (a
+    C file of the guest, such as "port/linux/src/xgpu_text.c"), with that
+    file's flags rather than the runtime's"""
+    reference_source = like or "port/android/guest/runtime/guest_misc.c"
+    reference_object = OBJECTS / Path(reference_source).with_suffix(".o")
+    reference = reference_object.relative_to(ROOT).as_posix()
+    command = _compile_command(reference_object)
     if reference_source not in command:
         raise RuntimeError("the guest's compile command is not as expected: " + command)
     obj.parent.mkdir(parents=True, exist_ok=True)
@@ -70,12 +73,14 @@ def link_guest(objects: Iterable[Path], image: Path) -> None:
         raise RuntimeError(f"the guest image {image} does not link:\n{result.stderr}")
 
 
-def build_guest_image(sources: Iterable[Path], work: Path, name: str, extra_flags: Iterable[str] = ()) -> Path:
-    """the guest image of these C files, in work"""
-    objects: List[Path] = []
+def build_guest_image(sources: Iterable[Path], work: Path, name: str, extra_flags: Iterable[str] = (),
+                      like: Optional[str] = None, objects: Iterable[Path] = ()) -> Path:
+    """the guest image of these C files (compiled `like` a guest file, as
+    compile_guest), and of objects the build made, in work"""
+    objects = list(objects)
     for source in sources:
         obj = work / "obj" / (Path(source).stem + ".o")
-        compile_guest(Path(source), obj, extra_flags)
+        compile_guest(Path(source), obj, extra_flags, like)
         objects.append(obj)
     image = work / f"{name}.elf"
     link_guest(objects, image)
