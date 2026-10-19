@@ -248,8 +248,10 @@ static void run_original_game_render(unsigned cycle)
     device=mac_device_state_get();
     fprintf(stderr,"native world visibility: cluster=%d rendered_clusters=%d surfaces=%ld\n",
         render.cluster_index,render.rendered_cluster_count,render.environment_surface_count);
-    /* port: a campaign cinematic (a10's, in space) may show no bsp surface */
-    if(!mac_gpu_visible)CHECK(probe_title || render.environment_surface_count>0 || (probe_campaign && cinematic_in_progress()));
+    /* port: a campaign cinematic (a10's, in space) may show no bsp surface, nor may the player's view of the sky once a
+       level's opening is over (b40's, at 1300 frames: the cluster is drawn, with no surface of it in view) */
+    if(!mac_gpu_visible)CHECK(probe_title || render.environment_surface_count>0 ||
+        (probe_campaign && (cinematic_in_progress() || render.rendered_cluster_count>0)));
     CHECK(call.calls>0&&device&&device->gpu_present_count==presents+call.calls);
     if(!device||!call.calls)return;
     pixels=(const unsigned int *)PLATFORM_PHYSICAL_TO_VIRTUAL(device->back_buffer.Data);
