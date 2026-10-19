@@ -33,7 +33,7 @@
     - [x] Implement host_sdl_open_audio_stream and the rest with AVAudioEngine
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Window, native input and audio' (Protocol in workflow.md)
 
-## Phase 3: The command ring and the Metal backend
+## Phase 3: The command ring and the Metal backend [checkpoint: 60cb70b3]
 - [x] Task: Define the ring's format 56e08e51
     - [x] Write tests: cargo test decodes valid batches, and rejects truncated commands, out-of-range sizes, indices and guest offsets
     - [x] A shared C header for the commands; the decoder and validator in Rust (port/macos/runtime), exported to Swift
@@ -46,7 +46,7 @@
 - [x] Task: Offscreen captures and golden-frame checks 1cc1db50
     - [x] Write tests: the compare tool's tolerance (pytest, synthetic images)
     - [x] A capture setting (debug, off by default) writing a frame to a file; tools/test_macos_frames.py comparing to approved references
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: The command ring and the Metal backend' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: The command ring and the Metal backend' (Protocol in workflow.md)
 
 ## Phase 4: Direct3D 8 on Metal
 - [ ] Task: NV2A shaders to Metal Shading Language
