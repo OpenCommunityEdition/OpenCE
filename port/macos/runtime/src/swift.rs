@@ -7,12 +7,17 @@
 //! before the view exists and never after, so the view needs no lock: a
 //! guest address the view accepts stays valid for as long as the view does.
 //!
+//! The app's Metal renderer decodes the guest's render batches through a
+//! [`RenderDecoder`], which checks every command against the objects it
+//! has seen (render.rs) before Metal is given any of it.
+//!
 //! The Swift bindings are generated from the library by uniffi-bindgen
 //! (src/bin/uniffi-bindgen.rs), as tools/macos_build.py runs it.
 
 use std::sync::{Arc, Mutex, Weak};
 
 use crate::memory::{GuestMemory, GuestPtr, GuestRange, MemoryError};
+use crate::render::{BatchError, DecodedBatch, RenderValidator, MAX_BATCH_LENGTH};
 
 /// Why a guest range cannot be used, as Swift sees it.
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
@@ -155,6 +160,64 @@ impl GuestMemoryView {
     }
 }
 
+/// The render ring's decoder for one guest (Swift: `RenderDecoder`). It
+/// keeps the objects and the open pass between batches, so the app makes
+/// one per guest and gives it every batch in order.
+#[derive(uniffi::Object)]
+pub struct RenderDecoder {
+    validator: Mutex<RenderValidator>,
+    memory: Arc<GuestMemory>,
+}
+
+#[uniffi::export]
+impl RenderDecoder {
+    /// A decoder for the guest whose memory `memory` views, with no window
+    /// yet (a pass on the window is refused until the app gives its size).
+    #[uniffi::constructor]
+    pub fn new(memory: Arc<GuestMemoryView>) -> Arc<RenderDecoder> {
+        Arc::new(RenderDecoder {
+            validator: Mutex::new(RenderValidator::new()),
+            memory: Arc::clone(&memory.memory),
+        })
+    }
+
+    /// The window's drawable size in pixels; 0 by 0 while it has none.
+    pub fn set_drawable_size(&self, width: u32, height: u32) {
+        self.validator().set_drawable_size(width, height);
+    }
+
+    /// Decodes a batch the app already holds.
+    pub fn decode_bytes(&self, bytes: Vec<u8>) -> Result<DecodedBatch, BatchError> {
+        self.validator().decode(&bytes, &*self.memory)
+    }
+
+    /// Decodes the `size` bytes of a batch at `address` in the guest. The
+    /// batch is copied out first, so the guest writing the ring meanwhile
+    /// cannot change what was checked.
+    pub fn decode_guest(&self, address: u32, size: u32) -> Result<DecodedBatch, BatchError> {
+        if size > MAX_BATCH_LENGTH {
+            return Err(BatchError::Size {
+                size: u64::from(size),
+            });
+        }
+        let mut bytes = vec![0; size as usize];
+        self.memory
+            .read(GuestPtr(address), &mut bytes)
+            .map_err(|error| BatchError::Guest {
+                reason: error.to_string(),
+            })?;
+        self.validator().decode(&bytes, &*self.memory)
+    }
+}
+
+impl RenderDecoder {
+    fn validator(&self) -> std::sync::MutexGuard<'_, RenderValidator> {
+        self.validator
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -289,6 +352,78 @@ mod tests {
             0,
         );
         assert!(matches!(error, GuestMemoryError::Host { reason } if reason.contains("reserve")));
+    }
+
+    /// A batch of `commands` (each its op and fields).
+    fn batch(commands: &[(u32, &[u32])]) -> Vec<u8> {
+        let mut words = vec![crate::render::MAGIC, crate::render::VERSION, 0, 0];
+        for (op, fields) in commands {
+            words.push(op | (fields.len() as u32 + 1) << 16);
+            words.extend_from_slice(fields);
+        }
+        words[2] = words.len() as u32 * 4;
+        words[3] = commands.len() as u32;
+        words.iter().flat_map(|word| word.to_le_bytes()).collect()
+    }
+
+    #[test]
+    fn the_decoder_keeps_its_objects_between_batches() {
+        use crate::render::{op, Command};
+        let decoder = RenderDecoder::new(view());
+        let made = decoder
+            .decode_bytes(batch(&[(op::CREATE_BUFFER, &[1, 64])]))
+            .unwrap();
+        assert_eq!(made.commands, [Command::CreateBuffer { id: 1, length: 64 }]);
+        // an upload from mapped guest memory into the buffer made before
+        let upload = decoder
+            .decode_bytes(batch(&[(op::UPLOAD_BUFFER, &[1, 0, 0x10_0000, 64])]))
+            .unwrap();
+        assert!(upload.rejected.is_empty());
+        assert_eq!(upload.commands.len(), 1);
+        // and none from memory that is not mapped
+        let wild = decoder
+            .decode_bytes(batch(&[(op::UPLOAD_BUFFER, &[1, 0, 0x30_0000, 64])]))
+            .unwrap();
+        assert!(wild.commands.is_empty());
+        assert_eq!(wild.rejected.len(), 1);
+    }
+
+    #[test]
+    fn the_decoder_reads_batches_from_the_guest() {
+        use crate::render::{op, Command};
+        let view = view();
+        let decoder = RenderDecoder::new(Arc::clone(&view));
+        // a pass on the window that leaves its contents be, before the
+        // window has a size and after
+        let mut pass = [0; 13];
+        pass[2..5].copy_from_slice(&[crate::render::Load::DontCare.word(); 3]);
+        let early = batch(&[(op::BEGIN_PASS, &pass), (op::END_PASS, &[])]);
+        view.write(0x20_0000, early.clone()).unwrap();
+        let refused = decoder.decode_guest(0x20_0000, early.len() as u32).unwrap();
+        assert!(refused.commands.is_empty());
+        decoder.set_drawable_size(640, 480);
+        let shown = decoder.decode_guest(0x20_0000, early.len() as u32).unwrap();
+        assert!(matches!(
+            shown.commands[..],
+            [
+                Command::BeginPass {
+                    width: 640,
+                    height: 480,
+                    ..
+                },
+                Command::EndPass
+            ]
+        ));
+        assert!(matches!(
+            decoder.decode_guest(0x30_0000, 16),
+            Err(BatchError::Guest { .. })
+        ));
+        assert_eq!(
+            decoder.decode_guest(0x20_0000, MAX_BATCH_LENGTH + 4),
+            Err(BatchError::Size {
+                size: u64::from(MAX_BATCH_LENGTH) + 4
+            })
+        );
     }
 
     #[test]

@@ -18,6 +18,7 @@ pub mod memory;
 pub mod page_tables;
 pub mod plan;
 mod platform;
+pub mod render;
 pub mod swift;
 #[cfg(test)]
 mod test_images;

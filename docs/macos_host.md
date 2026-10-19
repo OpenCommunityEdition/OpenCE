@@ -353,6 +353,45 @@ still SDL's.
 - **A new output device** stops the engine. It is started again.
 - The command-line host keeps SDL's sound.
 
+### The renderer
+
+The guest's Direct3D 8 will draw through Metal, not OpenGL. It writes
+Metal-level commands in batches to a ring in its own memory. The format is
+`port/macos/include/opence_render.h`:
+
+- A batch is a header (`OCRB`, version, size, count) and its commands,
+  all little-endian words.
+- A command's first word is its op, with its length in words in the high
+  half.
+- The commands make objects (buffers, textures, shader libraries,
+  pipelines, depth-stencil states, samplers), and fill buffers and
+  textures from guest memory. They open and close passes, set draw state
+  and draw inside a pass, and copy, read back, make mipmaps and present
+  outside one.
+
+Before Metal sees any of it, `port/macos/runtime/src/render.rs` decodes and
+checks each batch, because the guest is untrusted.
+
+- **The batch is copied out of guest memory first**
+  (`RenderDecoder.decodeGuest`), so the guest cannot change it after the
+  checks.
+- **Every command is checked against the decoder's state:** the objects
+  made so far, the open pass and its targets, the pipeline and the vertex
+  buffers bound. Checked: ids, values, sizes, formats, and that every
+  region lies inside its texture level or buffer. Guest ranges must be
+  mapped. A pipeline must match its pass. A draw must read only bytes
+  inside its vertex buffers.
+- **A command that fails is refused alone**, with its offset and reason
+  (`DecodedBatch.rejected`), and the rest of the batch goes on. A command
+  whose length runs past the batch ends the batch.
+- **What is not checked:** an indexed draw's indices themselves. Only the
+  index buffer's range is checked. A wild index makes the GPU read past a
+  vertex buffer, which Metal on Apple silicon keeps inside the process's
+  own GPU address space.
+
+The Swift app makes one `RenderDecoder` for each guest, and tells it the
+window's drawable size.
+
 A guest crash is reported with its registers, the exception's syndrome and
 the guest's frames, by address in the image (`llvm-symbolizer` on
 `halo_guest.elf` names them).
