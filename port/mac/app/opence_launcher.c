@@ -46,6 +46,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/sysctl.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -163,12 +165,27 @@ static pascal OSErr invite_event(const AppleEvent *event, AppleEvent *reply, lon
 	return noErr;
 }
 
-/* waits a third of a second for a GURL event, and leaves invite_link empty
-when none comes */
-static void collect_invite_link(void)
+/* waits for a GURL event, and leaves invite_link empty when none comes. Launch
+Services starts the program with a -psn_ argument (a double-click as well as a
+link): then it waits up to two seconds, as the event of a slow PowerPC at cold
+start has come after a third of a second and the invitation was lost. A program
+started otherwise, and any program on Mac OS X 10.6 and later (no PowerPC), waits
+the third of a second as before. It stops waiting the moment the event is handled. */
+static void collect_invite_link(int argc, char **argv)
 {
 	AEEventHandlerUPP handler;
-	UInt32 deadline;
+	UInt32 deadline, ticks = 20;
+	int i;
+
+	{
+		char release[32];
+		size_t size = sizeof(release);
+
+		if (sysctlbyname("kern.osrelease", release, &size, NULL, 0) == 0 && atoi(release) < 10)
+			for (i = 1; i < argc; ++i)
+				if (strncmp(argv[i], "-psn_", 5) == 0)
+					ticks = 120;
+	}
 
 	handler = NewAEEventHandlerUPP(invite_event);
 	if (!handler)
@@ -178,7 +195,7 @@ static void collect_invite_link(void)
 		DisposeAEEventHandlerUPP(handler);
 		return;
 	}
-	deadline = TickCount() + 20;
+	deadline = TickCount() + ticks;
 	while (!invite_link[0] && TickCount() < deadline)
 	{
 		EventRecord record;
@@ -647,7 +664,7 @@ int main(int argc, char **argv)
 	snprintf(source_name, sizeof(source_name), "%s", request && *request ? request : "");
 	/* (before the data root is looked for, because the event is waiting
 	now; it is written out below, once there is a root to write it in) */
-	collect_invite_link();
+	collect_invite_link(argc, argv);
 	for (i = 1; i < argc; ++i)
 	{
 		if (strcmp(argv[i], "--dry-run") == 0)
