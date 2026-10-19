@@ -49,9 +49,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 3: The command ring and the Metal backend' (Protocol in workflow.md)
 
 ## Phase 4: Direct3D 8 on Metal
-- [ ] Task: NV2A shaders to Metal Shading Language
-    - [ ] Write tests: harness tests of nv2a_vsh.c / nv2a_psh.c's MSL output for known programs, and that each compiles (newLibraryWithSource in a test tool)
-    - [ ] An MSL emitter beside the GLSL one; in-memory and on-disk shader caches
+- [x] Task: NV2A shaders to Metal Shading Language 5de109a4
+    - [x] Write tests: harness tests of nv2a_vsh.c / nv2a_psh.c's MSL output for known programs, and that each compiles (newLibraryWithSource in a test tool)
+    - [x] An MSL emitter beside the GLSL one; an in-memory library cache by source (Metal's own shader cache keeps them on disk)
 - [ ] Task: Resources and Xbox texture formats
     - [ ] Write tests: each format xbox_textures.c handles maps to a Metal pixel format or conversion, checked by pixel readback
     - [ ] Vertex/index buffers, textures, surfaces in d3d8_metal.c
