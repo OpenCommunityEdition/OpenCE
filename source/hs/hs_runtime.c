@@ -281,6 +281,7 @@ symbols in this file:
 #include "saved games/game_state.h"
 #include "text/draw_string.h"
 #include "cseries/errors.h"
+#include "interface/terminal.h"
 #include "main/console.h"
 #include "game/game.h"
 
@@ -2230,8 +2231,10 @@ void hs_evaluate_inspect(
 			hs_type_inspectors[expression->type](expression->type, *value, string);
 			/* port: printed through "%s". January passes the text as the
 			format (0x4bc840 +0xdd..+0xe6), so a '%' in an inspected string
-			read arguments that were never passed */
-			console_printf(FALSE, "%s", string);
+			read arguments that were never passed. A scenario script's
+			inspect is the game's chatter, as print is (hs_print) */
+			if (terminal_shows(terminal_command_running ? _terminal_message_serious : _terminal_message_chatter))
+				console_printf(FALSE, "%s", string);
 		}
 
 		hs_return(thread_index, 0);
@@ -2394,8 +2397,10 @@ void hs_evaluate_begin_random(
 			*argument_count += 1;
 		}
 
+		/* port: one long holds LONG_BITS choices, so a list of that
+		many fits the mask this function already allocates */
 		match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x50,
-			*argument_count<LONG_BITS);
+			*argument_count<=LONG_BITS);
 
 		csmemset(evaluated, 0, BIT_VECTOR_SIZE_IN_BYTES(*argument_count));
 	}

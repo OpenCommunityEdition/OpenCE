@@ -294,6 +294,10 @@ multiply-adds). `tools/web_build.py` writes the graph.
     to 32 MB, written again only when that frame comes round again
     (`web_chunk_get` in `d3d8_gl.c`). Written after each draw into one
     buffer, as before, the frames waited for the GPU some 2000 times each.
+    The index cache likewise has a buffer for each frame of the ring, and
+    an array it keeps is written into one as that frame begins: written
+    into a single buffer the moment it was kept, every few frames while a
+    level was explored, each was a wait of 20 to 40 ms.
 - **Memory watch.** WebAssembly cannot protect pages, so the textures'
   memory is watched by hashing it once a frame, as the Android host does
   under the x86 emulator (`port/web/src/web_memory_watch.c`,

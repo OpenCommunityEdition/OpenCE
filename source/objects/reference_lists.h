@@ -28,6 +28,12 @@ struct data_reference
 
 /* ---------- prototypes/EXAMPLE.C */
 
+/* ---------- prototypes/CLUSTER_PARTITIONS.C */
+
+/* port: a full list's warning, once a map (cluster_partitions.c) */
+void reference_list_port_full(struct data_array *array);
+void reference_list_port_report(struct data_array *array);
+
 /* ---------- globals */
 
 /* ---------- public code */
@@ -79,7 +85,8 @@ __inline void reference_list_add(
 	}
 	else
 	{
-		error(_error_silent, "WARNING: maximum %ss per map (%d) exceeded.", array->name, array->maximum_count);
+		/* port: once a map, the rest counted (reference_list_port_full) */
+		reference_list_port_full(array);
 	}
 
 	return;

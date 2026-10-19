@@ -162,6 +162,12 @@ static void map_share_map_hash_remember(char const *path, byte const *hash)
 	(void)hash;
 }
 
+/* (map_share.c's: a downloaded map named in custom_maps' list of them) */
+static void downloaded_maps_mark(char const *path)
+{
+	(void)path;
+}
+
 static void custom_edition_maps_look_again(void)
 {
 	fake_looked_again++;

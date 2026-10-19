@@ -1310,9 +1310,20 @@ static boolean bitmap_group_check(
 					bitmap_index, bitmap->pixels_size, bitmap_read_pixel_data_size(bitmap),
 					(unsigned long)bitmap->pixels_offset, (unsigned long)group->pixel_data.file_offset);
 				bitmap_make_empty(bitmap);
-				/* (the group's offset is added by the game: the start of the
-				file is where it stands) */
-				bitmap->pixels_offset = -group->pixel_data.file_offset;
+				/* (the group's offset is added by the game: its pixel at the
+				group's data, which is in the file unless the data starts at
+				its end, as bitmap_data_check has a bitmap's offset alone. A
+				negative one, the start of the file, was corrected again by
+				bitmap_data_check. Data starting at the end of the file is
+				moved to its start, and the bitmaps checked again) */
+				if (group->pixel_data.file_offset != 0 &&
+					!tag_validate_file_contains(validation, group->pixel_data.file_offset, 1))
+				{
+					tag_validate_correct(validation, "has its pixel data at %08lx, the end of the map's files: 0",
+						(unsigned long)group->pixel_data.file_offset);
+					group->pixel_data.file_offset = 0;
+					bitmap_index = -1;
+				}
 			}
 		}
 	}

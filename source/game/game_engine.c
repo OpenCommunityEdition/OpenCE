@@ -5201,6 +5201,12 @@ void game_engine_player_killed(
 			message = _game_engine_message_double_kill;
 		else if (killing_player->statistics.kills_in_a_row == 5)
 			message = _game_engine_message_five_kills_in_row;
+		/* port: none in a row is no spree. A network client's copy of the
+		killer's statistics can have this kill credited to no one, or to
+		someone else, before the host's statistics come (the Xbox's credited
+		the killer here, so never had none): Running Riot was announced */
+		else if (killing_player->statistics.kills_in_a_row <= 0)
+			message = _game_engine_message_killed_enemy;
 		else
 		{
 			message = (killing_player->statistics.kills_in_a_row % 5)
@@ -5603,6 +5609,30 @@ void game_engine_clear_goal_position(
 	if (!VALID_INDEX(goal_index, NUMBEROF(global_goal)))
 		return;
 	csmemset(&global_goal[goal_index], 0, sizeof(struct netgame_goal));
+
+	return;
+}
+
+/* port: a flag or ball deleted on a client of the distributed netcode, on
+the host's word (port/linux/game/network_objects.c): the goals its game
+type's objective_weapon_update set at it each tick, which nothing else
+clears (ctf: its team's, and its carrier's goal; oddball: its team's) */
+void game_engine_objective_weapon_deleted(
+	long weapon_index)
+{
+	short team_index = weapon_get(weapon_index)->object.owner_team_index;
+
+	if (!game_engine || team_index == NONE)
+		return;
+	if (global_variant.game_engine_index == game_engine_ctf)
+	{
+		game_engine_clear_goal_position(team_index);
+		game_engine_clear_goal_position(team_index + 2);
+	}
+	else if (global_variant.game_engine_index == game_engine_oddball)
+	{
+		game_engine_clear_goal_position(team_index);
+	}
 
 	return;
 }
@@ -6326,7 +6356,9 @@ struct game_variant *build_game_variant_oddball(
 struct game_variant *build_game_variant_team_oddball(
 	struct game_variant *variant)
 {
-	struct game_variant result;
+	/* port: cleared, as every other builder's is: only some of its fields
+	are set below, and the rest were the stack's */
+	struct game_variant result = { 0 };
 
 	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
 	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);

@@ -44,6 +44,10 @@ boolean network_game_server_reset_to_pregame(
 void network_game_server_pause_countdown(
 	struct network_game_server *server,
 	boolean pause_countdown);
+/* port: drop the joins a finished game left waiting, so the next one
+starts with none (network_test.c's host) */
+void network_game_server_port_clear_queued_players(
+	struct network_game_server *server);
 void network_game_generate_join_game_token(
 	byte *join_token);
 void network_game_server_kick_machine(

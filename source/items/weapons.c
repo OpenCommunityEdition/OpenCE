@@ -370,6 +370,11 @@ struct trigger_firing_effect
 
 /* ---------- prototypes */
 
+/* port/linux/game/network_objects.c's: whether a client of the distributed
+netcode is deleting an object in distributed_client_delete (the host's, on
+its word, or one the host has not told it of) */
+boolean network_objects_client_deleting(void);
+
 static short weapon_magazine_count(
 	struct weapon_definition const *weapon_definition);
 static short weapon_trigger_count(
@@ -908,7 +913,10 @@ void weapon_set_total_rounds(
 void weapon_delete(
 	long weapon_index)
 {
-	if (game_engine_running())
+	/* (port: but a flag or ball a client of the distributed netcode deletes,
+	on the host's word or as one the host has not told it of: objects.c's
+	object_delete_initial_recursive) */
+	if (game_engine_running() && !network_objects_client_deleting())
 	{
 		match_assert("c:\\halo\\SOURCE\\items\\weapons.c", 234, !weapon_is_flag(weapon_index));
 	}

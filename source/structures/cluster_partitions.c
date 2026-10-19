@@ -118,6 +118,17 @@ static short cluster_partitions_port_count;
 /* port: the list of a cluster index that fits no cluster's
 (cluster_partition_get_first_reference) */
 static long cluster_partition_port_no_cluster_first_reference;
+/* port: the full reference lists of this map (reference_list_port_full),
+with how many times each was full again */
+enum
+{
+	MAXIMUM_PORT_FULL_REFERENCE_LISTS = 8,
+};
+static struct
+{
+	struct data_array *array;
+	unsigned long suppressed_count;
+} reference_lists_port_full[MAXIMUM_PORT_FULL_REFERENCE_LISTS];
 
 /* ---------- public code */
 
@@ -235,6 +246,9 @@ void cluster_partition_make_valid(
 	data_make_valid(partition->cluster_reference_data);
 	data_make_valid(partition->data_reference_data);
 	cluster_partition_port_forget(partition);
+	/* port: the new map's lists warn again when full */
+	reference_list_port_report(partition->cluster_reference_data);
+	reference_list_port_report(partition->data_reference_data);
 
 	return;
 }
@@ -242,6 +256,10 @@ void cluster_partition_make_valid(
 void cluster_partition_make_invalid(
 	struct cluster_partition *partition)
 {
+	/* port: how many times the map's lists were full past the first */
+	reference_list_port_report(partition->cluster_reference_data);
+	reference_list_port_report(partition->data_reference_data);
+
 	if (partition->cluster_reference_data->valid)
 		data_make_invalid(partition->cluster_reference_data);
 
@@ -295,6 +313,57 @@ void cluster_partitions_port_forget(
 
 	for (index = 0; index < cluster_partitions_port_count; index++)
 		cluster_partition_port_forget(cluster_partitions_port[index]);
+}
+
+/* port: A full reference list said so each time a reference did not fit:
+on a map whose lights fill the light partition's lists, every light joining
+its clusters each tick, thousands of lines a second in debug.txt (gigabytes
+a day on a game left running). It says so the first time a map; the times
+after are counted, and told when the map's lists are let go or made anew
+(reference_list_port_report). What fits and what does not is as before. */
+void reference_list_port_full(
+	struct data_array *array)
+{
+	short index;
+	short free_index = NONE;
+
+	for (index = 0; index < MAXIMUM_PORT_FULL_REFERENCE_LISTS; index++)
+	{
+		if (reference_lists_port_full[index].array == array)
+		{
+			reference_lists_port_full[index].suppressed_count++;
+			return;
+		}
+		if (!reference_lists_port_full[index].array && free_index == NONE)
+			free_index = index;
+	}
+	if (free_index != NONE)
+	{
+		reference_lists_port_full[free_index].array = array;
+		reference_lists_port_full[free_index].suppressed_count = 0;
+	}
+	error(_error_silent, "WARNING: maximum %ss per map (%d) exceeded.%s", array->name, array->maximum_count,
+		free_index != NONE ? " (once a map: the rest are counted)" : "");
+}
+
+void reference_list_port_report(
+	struct data_array *array)
+{
+	short index;
+
+	for (index = 0; index < MAXIMUM_PORT_FULL_REFERENCE_LISTS; index++)
+	{
+		if (array && reference_lists_port_full[index].array == array)
+		{
+			if (reference_lists_port_full[index].suppressed_count)
+			{
+				error(_error_silent, "WARNING: maximum %ss per map (%d) exceeded %lu more times.", array->name,
+					array->maximum_count, reference_lists_port_full[index].suppressed_count);
+			}
+			reference_lists_port_full[index].array = NULL;
+			reference_lists_port_full[index].suppressed_count = 0;
+		}
+	}
 }
 
 long cluster_partition_get_next_datum(
@@ -471,7 +540,8 @@ static long cluster_partition_port_add(
 	}
 	else
 	{
-		error(_error_silent, "WARNING: maximum %ss per map (%d) exceeded.", array->name, array->maximum_count);
+		/* port: once a map, the rest counted (reference_list_port_full) */
+		reference_list_port_full(array);
 	}
 
 	return reference_index;

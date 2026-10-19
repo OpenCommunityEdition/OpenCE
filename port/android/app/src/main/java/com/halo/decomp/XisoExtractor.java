@@ -7,8 +7,10 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Copies the maps folder out of the player's Xbox disc image of Halo, for
@@ -44,6 +46,12 @@ import java.util.List;
  * deep and looks at most 4096 entries; and a file is written only under a
  * plain name that no file before it had (ignoring case).
  *
+ * The loading screen's picture, which the retail disc has no file of, is
+ * taken out of the root's default.xbe (read whole, at most 64 MB) and
+ * written beside the maps as the loading.tga the game reads, when the maps
+ * folder has none (loadingPicture, as xiso.c's xiso_write_loading_picture);
+ * without it the light sweeps over black, as the game's own does.
+ *
  * The app starts the game once maps/ui.map exists, and makes the maps folder
  * itself, so the copy is written to maps.partial (emptied first of what an
  * earlier attempt left) and its files moved into maps once all are
@@ -71,6 +79,12 @@ final class XisoExtractor {
     private static final int MAXIMUM_ENTRIES = 256;
     private static final int COPY_CHUNK = 1024 * 1024;
     private static final String PARTIAL_DIRECTORY = "maps.partial";
+    /** the loading screen's picture (source/interface/progress_bar.c), out of default.xbe; the executable is a few MB */
+    private static final int LOADING_WIDTH = 320;
+    private static final int LOADING_HEIGHT = 240;
+    private static final int TGA_HEADER_SIZE = 18;
+    private static final long MAXIMUM_XBE_SIZE = 64 * 1024 * 1024;
+    private static final String LOADING_PICTURE = "loading.tga";
 
     /** Told as the copy goes: the file being copied, and the bytes copied of all the files'. */
     interface Progress {
@@ -127,11 +141,38 @@ final class XisoExtractor {
         // the root's maps folder
         byte[] root = readTable(image, partition, rootSector, rootSize, "The disc image's file system is damaged.");
         Entry maps = null;
-        for (Entry entry : walkTable(root, true)) {
+        Entry xbe = null;
+        for (Entry entry : walkTable(root, false)) {
+            if (entry.name.equalsIgnoreCase("default.xbe"))
+                xbe = entry;
+        }
+        List<Entry> directories = walkTable(root, true);
+        for (Entry entry : directories) {
             if (entry.name.equalsIgnoreCase("maps")) {
                 maps = entry;
                 break;
             }
+        }
+        /* a multi-language European disc has no "maps" but a "maps_xx" per
+        language: the one for the device's language, else English, else the
+        first (as port/linux/src/xiso.c) */
+        if (maps == null) {
+            String wanted = "maps_" + Locale.getDefault().getLanguage();
+            Entry english = null, first = null;
+            for (Entry entry : directories) {
+                if (entry.name.length() != 7 || !entry.name.regionMatches(true, 0, "maps_", 0, 5))
+                    continue;
+                if (entry.name.equalsIgnoreCase(wanted)) {
+                    maps = entry;
+                    break;
+                }
+                if (english == null && entry.name.equalsIgnoreCase("maps_en"))
+                    english = entry;
+                if (first == null)
+                    first = entry;
+            }
+            if (maps == null)
+                maps = english != null ? english : first;
         }
         if (maps == null)
             throw new ExtractException("The disc image has no maps folder: it is not a Halo disc.");
@@ -140,9 +181,11 @@ final class XisoExtractor {
         byte[] table = readTable(image, partition, maps.sector, maps.size, "The disc image's maps folder is damaged.");
         List<Entry> files = walkTable(table, false);
         Entry userInterface = null;
+        boolean hasLoading = false;
         for (Entry file : files) {
             if (file.name.equalsIgnoreCase("ui.map"))
                 userInterface = file;
+            hasLoading |= file.name.equalsIgnoreCase(LOADING_PICTURE);
         }
         if (userInterface == null)
             throw new ExtractException("The disc image's maps folder has no ui.map: it is not a Halo disc.");
@@ -173,6 +216,8 @@ final class XisoExtractor {
         long done = 0;
         for (Entry file : files)
             done = copyFile(image, partition, file, new File(partial, file.name), buffer, done, total, progress);
+        if (!hasLoading && writeLoadingPicture(image, imageSize, partition, xbe, new File(partial, LOADING_PICTURE)))
+            files.add(new Entry(LOADING_PICTURE, 0, 0));
 
         // then into maps, ui.map (the app's sign that the data is there) last
         File mapsFolder = new File(destination, "maps");
@@ -314,6 +359,83 @@ final class XisoExtractor {
                 return;
         }
         walk.entries.add(new Entry(name, u32(table, offset + 4), u32(table, offset + 8)));
+    }
+
+    /* ---------- the loading screen's picture */
+
+    /**
+     * The loading screen's picture out of a default.xbe, as the TGA the game
+     * reads (uncompressed, 24 bits, rows from the bottom), or null. The
+     * executable holds it, 320 by 240, as runs of 4-bit greys (a byte each:
+     * the grey's high four bits in its low nibble, the run's length in its
+     * high one) after the width and height as u32s: found by those two
+     * numbers followed by runs that fill the picture exactly (a run of none,
+     * or one past the picture's end, is not it).
+     */
+    static byte[] loadingPicture(byte[] xbe) {
+        int pixels = LOADING_WIDTH * LOADING_HEIGHT;
+        byte[] greys = new byte[pixels];
+        boolean found = false;
+
+        for (int at = 0; at + 8 <= xbe.length && !found; at++) {
+            if (u32(xbe, at) != LOADING_WIDTH || u32(xbe, at + 4) != LOADING_HEIGHT)
+                continue;
+            int pixel = 0;
+            for (int next = at + 8; next < xbe.length && pixel < pixels; next++) {
+                int run = (xbe[next] & 0xFF) >> 4;
+
+                if (run == 0 || run > pixels - pixel)
+                    break;
+                Arrays.fill(greys, pixel, pixel + run, (byte) ((xbe[next] & 0x0F) << 4));
+                pixel += run;
+            }
+            found = pixel == pixels;
+        }
+        if (!found)
+            return null;
+        byte[] tga = new byte[TGA_HEADER_SIZE + pixels * 3];
+        tga[2] = 2;
+        tga[12] = (byte) (LOADING_WIDTH & 0xFF);
+        tga[13] = (byte) (LOADING_WIDTH >> 8);
+        tga[14] = (byte) (LOADING_HEIGHT & 0xFF);
+        tga[15] = (byte) (LOADING_HEIGHT >> 8);
+        tga[16] = 24;
+        for (int y = 0; y < LOADING_HEIGHT; y++) {
+            int row = (LOADING_HEIGHT - 1 - y) * LOADING_WIDTH;
+            for (int x = 0; x < LOADING_WIDTH; x++) {
+                int out = TGA_HEADER_SIZE + (y * LOADING_WIDTH + x) * 3;
+
+                tga[out] = tga[out + 1] = tga[out + 2] = greys[row + x];
+            }
+        }
+        return tga;
+    }
+
+    /**
+     * Writes default.xbe's picture to output, if it has one; whether it did.
+     * One that cannot be written whole is removed (the loading screen would
+     * read past one cut short).
+     */
+    private static boolean writeLoadingPicture(FileChannel image, long imageSize, long partition, Entry xbe,
+            File output) {
+        if (xbe == null || xbe.size <= 0 || xbe.size > MAXIMUM_XBE_SIZE
+                || partition + xbe.sector * SECTOR_SIZE + xbe.size > imageSize)
+            return false;
+        try {
+            ByteBuffer bytes = ByteBuffer.allocate((int) xbe.size);
+            if (!readFully(image, bytes, partition + xbe.sector * SECTOR_SIZE))
+                return false;
+            byte[] tga = loadingPicture(bytes.array());
+            if (tga == null)
+                return false;
+            try (FileOutputStream stream = new FileOutputStream(output)) {
+                stream.write(tga);
+            }
+            return true;
+        } catch (IOException | OutOfMemoryError exception) {
+            output.delete();
+            return false;
+        }
     }
 
     /* ---------- the copy */

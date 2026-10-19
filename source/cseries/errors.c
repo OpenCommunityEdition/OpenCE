@@ -68,6 +68,10 @@ symbols in this file:
 
 /* ---------- constants */
 
+/* port: how big debug.txt grows before it is rolled to debug.old.txt and
+begun again (write_to_debug_file) */
+#define DEBUG_FILE_PORT_MAXIMUM_SIZE (64L * 1024 * 1024)
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -119,38 +123,70 @@ char *error_get(
 
 /* The native builds keep the log open and flush each line: opening and
 closing it per line takes milliseconds on Windows, and a host logs
-thousands of lines when a hundred machines join, load or leave. The file is
-opened once even if threads log their first lines at once, and each line is
-one write, so lines from several threads do not interleave. */
+thousands of lines when a hundred machines join, load or leave. Each line is
+one write, under a lock, so lines from several threads do not interleave.
+
+port: A line written again as it was (the same warning each tick) is
+counted, not written, until a different one comes ("last line repeated N
+times"). Past DEBUG_FILE_PORT_MAXIMUM_SIZE the file is rolled to
+debug.old.txt (the one before that let go) and begun again: a game left
+running for days wrote without end. */
+static void debug_file_port_write(
+	FILE *file,
+	char const *prefix,
+	char const *string);
+
+static FILE *debug_file_port = NULL;
+static long debug_file_port_size = 0;
+static char debug_file_port_last_line[1024];
+static unsigned long debug_file_port_repeat_count = 0;
+static volatile long debug_file_port_lock = 0;
+/* (write_to_error_file's header again, atop the file begun again) */
+static boolean debug_file_port_rolled = FALSE;
+
 static void write_to_debug_file(
 	char const *string,
 	boolean date)
 {
-	static FILE *volatile debug_file = NULL;
-	FILE *file = debug_file;
+	FILE *file;
 	char prefix[32];
+	long spin;
 
+	/* (a moment's wait for another thread's line; a crash report written
+	while this thread held the lock goes on without it) */
+	for (spin = 0; spin < 50000000 && __sync_lock_test_and_set(&debug_file_port_lock, 1); spin++)
+	{
+	}
+
+	file = debug_file_port;
 	if (!file)
 	{
-		FILE *opened = fopen("d:\\debug.txt", "a+b");
-
-		if (!opened)
+		file = fopen("d:\\debug.txt", "a+b");
+		if (!file)
 		{
+			__sync_lock_release(&debug_file_port_lock);
 			return;
 		}
-		file = __sync_val_compare_and_swap(&debug_file, (FILE *)NULL, opened);
-		if (file)
+		fseek(file, 0, SEEK_END);
+		debug_file_port_size = ftell(file);
+		if (debug_file_port_size < 0)
 		{
-			fclose(opened);
+			/* (too big to say, as the 32-bit builds find one past 2 GB:
+			full) */
+			debug_file_port_size = DEBUG_FILE_PORT_MAXIMUM_SIZE;
 		}
-		else
-		{
-			file = opened;
-		}
+		debug_file_port = file;
+	}
+
+	if (!csstrcmp(string, debug_file_port_last_line))
+	{
+		debug_file_port_repeat_count++;
+		__sync_lock_release(&debug_file_port_lock);
+		return;
 	}
 
 	prefix[0] = 0;
-	if (date)
+	if (date || debug_file_port_repeat_count)
 	{
 		long timeptr;
 		struct tm *_time;
@@ -174,8 +210,62 @@ static void write_to_debug_file(
 			csstrcpy(prefix, "<TIME UNAVAILABLE>  ");
 		}
 	}
+
+	if (debug_file_port_repeat_count)
+	{
+		char repeated[64];
+
+		sprintf(repeated, "last line repeated %lu times\r\n", debug_file_port_repeat_count);
+		debug_file_port_write(file, prefix, repeated);
+		debug_file_port_repeat_count = 0;
+		file = debug_file_port;
+	}
+	if (file)
+	{
+		long index;
+
+		for (index = 0; index < (long)sizeof(debug_file_port_last_line) - 1 && string[index]; index++)
+		{
+			debug_file_port_last_line[index] = string[index];
+		}
+		debug_file_port_last_line[index] = 0;
+		debug_file_port_write(file, date ? prefix : "", string);
+	}
+
+	__sync_lock_release(&debug_file_port_lock);
+}
+
+/* port: a line to debug.txt (under write_to_debug_file's lock), rolling the
+file to debug.old.txt first when it is full */
+static void debug_file_port_write(
+	FILE *file,
+	char const *prefix,
+	char const *string)
+{
+	static char const rolled[] = "debug.txt was full: its earlier lines are in debug.old.txt\r\n";
+
+	if (debug_file_port_size >= DEBUG_FILE_PORT_MAXIMUM_SIZE)
+	{
+		fclose(file);
+		debug_file_port = NULL;
+		remove("d:\\debug.old.txt");
+		/* (or, where it cannot be renamed, begun again in place) */
+		file = rename("d:\\debug.txt", "d:\\debug.old.txt") ?
+			fopen("d:\\debug.txt", "w+b") :
+			fopen("d:\\debug.txt", "a+b");
+		if (!file)
+		{
+			return;
+		}
+		debug_file_port = file;
+		debug_file_port_size = 0;
+		debug_file_port_rolled = TRUE;
+		fprintf(file, "%s%s", prefix, rolled);
+		debug_file_port_size += (long)(csstrlen(prefix) + csstrlen(rolled));
+	}
 	fprintf(file, "%s%s", prefix, string);
 	fflush(file);
+	debug_file_port_size += (long)(csstrlen(prefix) + csstrlen(string));
 #ifdef HALO_WEB
 	/* port: and to the page's log (port/web/README.md) */
 	fputs(string, stderr);
@@ -189,6 +279,13 @@ void write_to_error_file(
 	char line[1024];
 	long time_value;
 
+	/* port: the header again in a debug.txt begun again (its reference
+	address places a crash report's addresses) */
+	if (debug_file_port_rolled)
+	{
+		debug_file_port_rolled = FALSE;
+		data_002dcd2c = TRUE;
+	}
 	if (data_002dcd2c)
 	{
 		data_002dcd2c = FALSE;

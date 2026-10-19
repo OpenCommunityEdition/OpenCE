@@ -95,6 +95,9 @@ struct transport_endpoint *accept_endpoint(
 	struct transport_endpoint *listening_endpoint);
 short reject_endpoint(
 	struct transport_endpoint *listening_endpoint);
+/* port: whether another socket already holds the UDP port */
+boolean transport_udp_port_taken(
+	word port);
 void disconnect_endpoint(
 	struct transport_endpoint *endpoint);
 short poll_endpoint_set(

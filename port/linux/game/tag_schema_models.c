@@ -762,7 +762,10 @@ static struct tag_schema_field const gbxmodel_fields[] =
 	TAG_SCHEMA_BLOCK(struct model, nodes, model_node_schema, MAXIMUM_NODES_PER_MODEL),
 	TAG_SCHEMA_BLOCK(struct model, regions, model_region_schema, MAXIMUM_REGIONS_PER_MODEL),
 	TAG_SCHEMA_BLOCK(struct model, geometries, gbxmodel_geometry_schema, MAXIMUM_GEOMETRIES_PER_MODEL),
-	TAG_SCHEMA_BLOCK(struct model, shaders, model_shader_reference_schema, MAXIMUM_SHADERS_PER_MODEL),
+	/* (the tools' 32: the game reads a model's shaders only through their
+	block, by its parts' shader indices, which are checked against it. Halo
+	PC's engine took more; h3_foundry's spartan has 56) */
+	TAG_SCHEMA_TOOL_BLOCK(struct model, shaders, model_shader_reference_schema, MAXIMUM_SHADERS_PER_MODEL),
 	TAG_SCHEMA_CHECK(model_check),
 	TAG_SCHEMA_END
 };

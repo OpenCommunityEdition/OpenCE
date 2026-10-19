@@ -622,7 +622,8 @@ struct message_server_pregame_countdown
 
 struct message_server_pregame_keep_alive
 {
-	short unused;
+	/* port: a short on the Xbox, a long on the wire (network_messages.c) */
+	long unused;
 };
 
 struct message_server_postgame_keep_alive
@@ -737,6 +738,10 @@ static void network_game_server_restore_held_players(
 	struct network_game_server *server);
 static void network_game_server_discard_held_players(
 	long machine_index);
+/* port: a player a machine still downloading the map asks for, held */
+static void network_game_server_hold_requested_player(
+	long machine_index,
+	struct network_player const *player);
 static boolean network_game_server_queue_held_players(
 	struct network_game_server *server,
 	long machine_index);
@@ -1414,8 +1419,9 @@ void network_game_server_dispose(
 
 #ifdef xbox
 	/* port: native transports flush before closing sockets, and unregistering
-	an XNet key is a stub. Preserve the original grace period on other builds. */
-#if !defined(HALO_WINDOWS) && !defined(HALO_ANDROID) && !defined(__linux__)
+	an XNet key is a stub (the web build's too: Emscripten is no __linux__).
+	Preserve the original grace period on other builds. */
+#if !defined(HALO_WINDOWS) && !defined(HALO_ANDROID) && !defined(HALO_WEB) && !defined(__linux__)
 	SleepEx(MILLISECONDS_PER_SECOND, FALSE);
 #endif
 	transport_server_terminate();
@@ -2618,7 +2624,17 @@ void network_game_server_update_ticks(
 					client_machine = &server->client_machines[client_machine_index];
 				}
 
-				if (client_machine &&
+				/* port: a machine still downloading the map is not in the game
+				yet: a player it asks for waits with those held at the start
+				(one whose download began in the pregame asks on, not knowing
+				the game has started), and joins with them once the map is
+				there (network_game_server_release_map_fetchers). Added now, it
+				was started at once, without the map: the damaged disc error */
+				if (client_machine && map_share_machine_needs_map(client_machine->machine_index))
+				{
+					network_game_server_hold_requested_player(client_machine_index, &server->queued_player);
+				}
+				else if (client_machine &&
 					network_game_server_machine_may_add_player_ingame(server, client_machine_index) &&
 					network_game_server_add_player_to_game(
 						server,
@@ -2883,6 +2899,32 @@ static void network_game_server_discard_held_players(
 				network_game_server_held_players[network_game_server_held_player_count];
 		}
 	}
+}
+
+/* port: a player a machine still downloading the map asked for in the game
+already going, held with those held at the start (once), and the machine
+released with them once the download is done */
+static void network_game_server_hold_requested_player(
+	long machine_index,
+	struct network_player const *player)
+{
+	long index;
+
+	if (!VALID_INDEX(machine_index, MAXIMUM_NETWORK_MACHINE_COUNT))
+		return;
+	network_game_server_map_pending[machine_index] = TRUE;
+	for (index = 0; index < network_game_server_held_player_count; index++)
+	{
+		if (network_game_server_held_players[index].machine_index == player->machine_index &&
+			network_game_server_held_players[index].controller_index == player->controller_index)
+		{
+			return;
+		}
+	}
+	if (network_game_server_held_player_count >= MAXIMUM_NETWORK_PLAYER_COUNT)
+		return;
+	network_game_server_held_players[network_game_server_held_player_count++] = *player;
+	network_event("holding a player on machine #%ld until the map is downloaded", machine_index);
 }
 
 /* the held players are queued to join the game that is already going, as
@@ -3308,12 +3350,34 @@ boolean server_has_enough_machines(
 	return has_enough_machines;
 }
 
-/* port: a game's one player, with no one else in it yet, may start it:
-a system link or internet game's host, or split screen's first player */
-static boolean server_alone(
+/* port: TRUE if the game has at least one player and every player is on the
+same machine; FALSE with no player. Such a game may start as a host alone
+does: a system link or internet game's host, alone or with split screen
+players. Machines are not counted, only players' machines: a machine that
+has joined without a player does not stop the host's countdown
+(server_ok_to_countdown) */
+static boolean server_players_on_one_machine(
 	struct network_game_server *server)
 {
-	return server->game.player_count == 1;
+	short first_machine_index = NONE;
+	long player_index;
+
+	for (player_index = 0;
+		player_index < MAXIMUM_NETWORK_PLAYER_COUNT;
+		player_index++)
+	{
+		struct network_player *player = &server->game.players[player_index];
+
+		if (!network_player_is_valid(player))
+			continue;
+
+		if (first_machine_index == NONE)
+			first_machine_index = (short)player->machine_index;
+		else if ((short)player->machine_index != first_machine_index)
+			return FALSE;
+	}
+
+	return first_machine_index != NONE;
 }
 
 /* port: a machine joining or leaving is in the game before its player is.
@@ -3324,8 +3388,8 @@ boolean server_ok_to_countdown(
 	struct network_game_server *server)
 {
 	if (server_has_enough_machines(server) &&
-		(!server_needs_more_teams(server) || server_alone(server)) &&
-		(server->game.player_count >= server->game.minimum_players || server_alone(server)))
+		(!server_needs_more_teams(server) || server_players_on_one_machine(server)) &&
+		(server->game.player_count >= server->game.minimum_players || server_players_on_one_machine(server)))
 	{
 		return TRUE;
 	}
@@ -3480,13 +3544,36 @@ struct network_game_server_client_machine *network_game_server_get_client_machin
 	return client_machine;
 }
 
+/* port: the machine at an address, one not the host's own first (a second
+game on the host's computer shares its address) */
+struct network_game_server_client_machine *network_game_server_get_remote_client_machine_at_address(
+	struct network_game_server *server,
+	unsigned long ip_address)
+{
+	long i;
+
+	for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
+	{
+		struct network_game_server_client_machine *client_machine = &server->client_machines[i];
+
+		if (network_game_server_client_machine_addresses[i] == ip_address &&
+			network_game_server_client_machine_is_joined_to_game(server, client_machine) &&
+			!network_game_server_client_machine_is_local(server, client_machine))
+		{
+			return client_machine;
+		}
+	}
+
+	return network_game_server_get_client_machine_at_address(server, ip_address);
+}
+
 boolean network_game_server_game_can_start(
 	struct network_game_server *server)
 {
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x782, server);
 
 	return server->state == 0 &&
-		(server->game.player_count >= server->game.minimum_players || server_alone(server));
+		(server->game.player_count >= server->game.minimum_players || server_players_on_one_machine(server));
 }
 
 void network_game_server_pause_countdown(
@@ -4003,7 +4090,7 @@ void network_game_server_update_countdown(
 				{
 					if (network_game_should_accept_remote_connections() == FALSE ||
 						network_game_server_get_client_machine_count(server) > 1 ||
-						server_alone(server))
+						server_players_on_one_machine(server))
 					{
 						unsigned long countdown;
 
@@ -4336,6 +4423,22 @@ void network_game_server_port_set_cooperative_player_collisions(
 	SET_FLAG(server->game.cooperative_flags, _network_game_cooperative_no_player_collisions_bit, !player_collisions);
 	if (server->state == _network_game_server_state_pregame && !network_game_server_send_game_data_pregame(server))
 		network_event("network_game_server_port_set_cooperative_player_collisions() failed to send updated game settings to clients");
+}
+
+/* port: a game a host runs afresh. A machine that asked to join as the last
+game ended, before the server switched to the pregame, is left waiting behind
+the one it holds (server->queued_player): the server refuses every later join
+with "network_game_add_player() failed" and sits in the lobby for good
+(network_test.c's host, which starts the next game by itself: the dedicated
+servers). */
+void network_game_server_port_clear_queued_players(
+	struct network_game_server *server)
+{
+	if (server)
+	{
+		server->queued_player_valid = FALSE;
+		server->waiting_player_count = 0;
+	}
 }
 
 /* port: a gametype's PC options: the menus' (player_ui_set_game_variant_options)
@@ -5040,8 +5143,9 @@ boolean network_game_server_reset_to_pregame(
 
 	csmemset(&server->countdown_state, 0, sizeof(server->countdown_state));
 	csmemset(network_game_server_map_pending, 0, sizeof(network_game_server_map_pending));
-	csmemset(network_game_server_held_players, 0, sizeof(network_game_server_held_players));
-	network_game_server_held_player_count = 0;
+	/* port: players held out of the game for a map download that did not
+	finish in it are the pregame's again, as the others are */
+	network_game_server_restore_held_players(server);
 	server->next_update_number = 0;
 	server->time_of_first_client_loading_completion = 0;
 	server->sent_start_game_message = FALSE;

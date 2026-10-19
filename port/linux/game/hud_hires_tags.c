@@ -33,6 +33,7 @@ When the texture cannot be drawn, the sprites are drawn from their bitmap.
 #include "rasterizer/rasterizer.h"
 #include "text/draw_string.h"
 #include "hud_button_layout.h"
+#include "scenario/scenario_definitions.h"
 
 /* the platform layer's (port/linux/src) */
 void platform_log(char const *format, ...);
@@ -46,8 +47,13 @@ long hud_hires_asset_fits(long asset, long width, long height);
 unsigned long hud_hires_asset_sprites(long asset);
 int hud_hires_sprites_drawable(long asset, unsigned long address, unsigned long level0_size);
 void hud_hires_register_placeholder(long asset, unsigned long const *texture);
+int hud_hires_asset_custom_edition(long asset);
+/* (custom_edition_cache.c) */
+boolean custom_edition_cache_stock_tag(long tag_index);
 
-void hud_hires_tags_loaded(void);
+void hud_hires_map_loaded(const long *assets, long count);
+void hud_hires_map_unloaded(void);
+void hud_hires_tags_loaded(long scenario_index);
 void hud_hires_tags_unloaded(void);
 long hud_hires_asset_at(unsigned long address, long width, long height);
 struct bitmap_data const *hud_hires_sprite_bitmap(struct bitmap_data const *bitmap, short sequence_index);
@@ -66,6 +72,9 @@ static struct
 {
 	struct bitmap_data *bitmap;
 	long asset;
+	/* a Custom Edition map's stock bitmap of a layout the texture was made
+	for, whose pixels are its own: drawn without the pixels' check */
+	boolean stock_custom_edition;
 } hires_bitmaps[MAXIMUM_HIRES_BITMAPS];
 static long hires_bitmap_count = 0;
 
@@ -136,7 +145,7 @@ static void hud_hires_sprite_bitmaps_forget(
 /* ---------- public code */
 
 void hud_hires_tags_loaded(
-	void)
+	long scenario_index)
 {
 	long asset_count = hud_hires_asset_count();
 	long asset;
@@ -204,11 +213,27 @@ void hud_hires_tags_loaded(
 		{
 			hires_bitmaps[hires_bitmap_count].bitmap = bitmap;
 			hires_bitmaps[hires_bitmap_count].asset = asset;
+			hires_bitmaps[hires_bitmap_count].stock_custom_edition =
+				hud_hires_asset_custom_edition(asset) && custom_edition_cache_stock_tag(group_index);
 			hires_bitmap_count++;
 		}
 	}
 	platform_log("high-res hud: %ld of %ld bitmaps in this map, %ld for some of their sprites (%ld not in it)",
 		hires_bitmap_count + hires_sprite_bitmap_count, asset_count, hires_sprite_bitmap_count, missing);
+	/* (their PNGs decoded now, ahead of the HUD's first frame: not the main
+	menu's, which draws no HUD) */
+	if (scenario_definition_get(scenario_index)->type != _scenario_type_main_menu)
+	{
+		long assets[MAXIMUM_HIRES_BITMAPS + MAXIMUM_HIRES_SPRITE_BITMAPS];
+		long count = 0;
+		long index;
+
+		for (index = 0; index < hires_bitmap_count; index++)
+			assets[count++] = hires_bitmaps[index].asset;
+		for (index = 0; index < hires_sprite_bitmap_count; index++)
+			assets[count++] = hires_sprite_bitmaps[index].asset;
+		hud_hires_map_loaded(assets, count);
+	}
 
 	return;
 }
@@ -219,6 +244,7 @@ void hud_hires_tags_unloaded(
 	hires_bitmap_count = 0;
 	upscale_bitmap_count = 0;
 	hud_hires_sprite_bitmaps_forget();
+	hud_hires_map_unloaded();
 
 	return;
 }
@@ -288,6 +314,30 @@ struct bitmap_data const *hud_hires_sprite_bitmap(
 	}
 
 	return bitmap;
+}
+
+/* whether the bitmap at address that `asset` stands for is a Custom Edition
+map's stock one (its pixels are not those the texture was drawn from) */
+long hud_hires_asset_stock_custom_edition(
+	unsigned long address,
+	long width,
+	long height,
+	long asset)
+{
+	long index;
+
+	for (index = 0; index < hires_bitmap_count; index++)
+	{
+		struct bitmap_data *bitmap = hires_bitmaps[index].bitmap;
+
+		if (hires_bitmaps[index].asset == asset && bitmap->cache_block_index != NONE &&
+			(unsigned long)bitmap->base_address == address && bitmap->width == width && bitmap->height == height)
+		{
+			return hires_bitmaps[index].stock_custom_edition;
+		}
+	}
+
+	return FALSE;
 }
 
 long hud_hires_asset_at(

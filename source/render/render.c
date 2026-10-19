@@ -89,6 +89,7 @@ symbols in this file:
 #include "structures/structures.h"
 /* port: static transparent part links for the newly loaded model tags. */
 #include "models/models.h"
+#include "structure_culling.h" /* port: port/linux/game/structure_culling.c */
 
 /* ---------- constants */
 
@@ -167,6 +168,8 @@ void render_initialize(
 	void)
 {
 	render_objects_initialize();
+	/* port: the structure culling tests display.structure_culling asks for */
+	structure_culling_initialize();
 }
 
 void render_initialize_for_new_map(

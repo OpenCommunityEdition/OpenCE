@@ -31,7 +31,9 @@ The image is the player's file and nothing read from it is trusted. Only the
 root's table and the maps folder's are read, each whole and at most 4 MB;
 the walk of a table visits each offset once, goes at most 64 links deep and
 looks at most 4096 entries; and a file is written only under a plain name
-that no file before it had (ignoring case).
+that no file before it had (ignoring case). The root's default.xbe, read
+whole and at most 64 MB, is searched for the loading screen's picture
+(xiso_write_loading_picture) when the maps folder has no loading.tga.
 
 The game takes a data root as having data once it has a maps folder, so the
 copy is written to maps.partial (emptied first of what an earlier attempt
@@ -79,6 +81,15 @@ left) and given the name maps only when every file is complete.
 #define XISO_COPY_CHUNK (1024 * 1024)
 
 #define XISO_PARTIAL_DIRECTORY "maps.partial"
+
+/* the loading screen's picture (source/interface/progress_bar.c), out of
+default.xbe; the executable is a few MB */
+#define XISO_LOADING_WIDTH 320
+#define XISO_LOADING_HEIGHT 240
+#define XISO_LOADING_PIXELS ((unsigned long)XISO_LOADING_WIDTH * XISO_LOADING_HEIGHT)
+#define XISO_TGA_HEADER_SIZE 18
+#define XISO_LOADING_TGA_SIZE (XISO_TGA_HEADER_SIZE + XISO_LOADING_PIXELS * 3)
+#define XISO_MAXIMUM_XBE_SIZE (64UL * 1024 * 1024)
 
 /* where the game partition may start, in the order they are tried */
 static const unsigned long xiso_partition_starts[] =
@@ -420,6 +431,165 @@ static int xiso_copy_file(struct xiso_image *image, const struct xiso_entry *ent
 	return 1;
 }
 
+/* the maps folder among the root's folders, count if none: "maps", or on a
+multi-language European disc, which has a "maps_xx" for each language
+instead, the one for the system's language (LC_ALL, LC_MESSAGES or LANG),
+else English's, else the first */
+static int xiso_maps_folder(const struct xiso_entry *entries, int count)
+{
+	static const char *const variables[] = { "LC_ALL", "LC_MESSAGES", "LANG" };
+	char language[8] = "maps_en";
+	int english = count, first = count;
+	int index;
+
+	for (index = 0; index < count; index++)
+	{
+		if (xiso_name_is(entries[index].name, (int)strlen(entries[index].name), "maps"))
+			return index;
+	}
+	for (index = 0; index < (int)(sizeof(variables) / sizeof(variables[0])); index++)
+	{
+		const char *value = getenv(variables[index]);
+
+		if (value && value[0])
+		{
+			if (value[0] >= 'a' && value[0] <= 'z' && value[1] >= 'a' && value[1] <= 'z')
+			{
+				language[5] = value[0];
+				language[6] = value[1];
+			}
+			break;
+		}
+	}
+	for (index = 0; index < count; index++)
+	{
+		const char *name = entries[index].name;
+
+		if (strlen(name) != 7 || !xiso_name_is(name, 5, "maps_"))
+			continue;
+		if (xiso_name_is(name, 7, language))
+			return index;
+		if (english == count && xiso_name_is(name, 7, "maps_en"))
+			english = index;
+		if (first == count)
+			first = index;
+	}
+	return english < count ? english : first;
+}
+
+/* ---------- the loading screen's picture */
+
+/* The loading screen's picture (source/interface/progress_bar.c reads it as
+maps/loading.tga). The retail disc has no such file: its default.xbe holds
+the picture, 320 by 240, as runs of 4-bit greys (a byte each: the grey's
+high four bits in its low nibble, the run's length in its high one) after
+the width and height as u32s. It is found by those two numbers followed by
+runs that fill the picture exactly (a run of none, or one past the
+picture's end, is not the picture), and written as the uncompressed 24-bit
+TGA progress_bar.c reads. Decodes into greys (XISO_LOADING_PIXELS bytes);
+returns nonzero if it was found. (Each try stops at the next try's u32s at
+the latest, whose zero bytes are runs of none, so the search reads each
+byte of the executable a bounded number of times.) */
+static int xiso_loading_greys(const unsigned char *xbe, unsigned long size, unsigned char *greys)
+{
+	unsigned long at, next, pixel = 0;
+
+	for (at = 0; at + 8 <= size; at++)
+	{
+		if (xiso_u32(xbe + at) != XISO_LOADING_WIDTH || xiso_u32(xbe + at + 4) != XISO_LOADING_HEIGHT)
+			continue;
+		for (pixel = 0, next = at + 8; next < size && pixel < XISO_LOADING_PIXELS; next++)
+		{
+			unsigned long run = xbe[next] >> 4;
+
+			if (!run || run > XISO_LOADING_PIXELS - pixel)
+				break;
+			memset(greys + pixel, (xbe[next] & 0x0F) << 4, run);
+			pixel += run;
+		}
+		if (pixel == XISO_LOADING_PIXELS)
+			return 1;
+	}
+	return 0;
+}
+
+/* writes all of size bytes to output; returns nonzero if it did */
+static int xiso_write_all(int output, const unsigned char *bytes, unsigned long size)
+{
+	unsigned long written = 0;
+
+	while (written < size)
+	{
+		int result = (int)write(output, bytes + written, (unsigned int)(size - written));
+
+		if (result < 0 && errno == EINTR)
+			continue;
+		if (result <= 0)
+			return 0;
+		written += (unsigned long)result;
+	}
+	return 1;
+}
+
+/* writes default.xbe's picture to folder/loading.tga, if it has one; a
+picture that cannot be written whole is removed (the loading screen would
+read past one cut short). Nothing is written when it is not found: the
+light then sweeps over black, as the game's own does */
+static void xiso_write_loading_picture(struct xiso_image *image, const struct xiso_entry *xbe, const char *folder,
+	char *path, size_t path_size)
+{
+	unsigned char *data = NULL, *greys = NULL, *tga = NULL;
+	int output, x, y, whole;
+
+	if (!xbe->size || xbe->size > XISO_MAXIMUM_XBE_SIZE ||
+		xiso_sector_offset(image, xbe->sector) + xbe->size > image->size)
+	{
+		return;
+	}
+	data = malloc(xbe->size);
+	greys = malloc(XISO_LOADING_PIXELS);
+	tga = malloc(XISO_LOADING_TGA_SIZE);
+	if (!data || !greys || !tga || !xiso_read(image, xiso_sector_offset(image, xbe->sector), data, xbe->size) ||
+		!xiso_loading_greys(data, xbe->size, greys))
+	{
+		goto done;
+	}
+	memset(tga, 0, XISO_TGA_HEADER_SIZE);
+	tga[2] = 2;
+	tga[12] = XISO_LOADING_WIDTH & 0xFF;
+	tga[13] = XISO_LOADING_WIDTH >> 8;
+	tga[14] = XISO_LOADING_HEIGHT & 0xFF;
+	tga[15] = XISO_LOADING_HEIGHT >> 8;
+	tga[16] = 24;
+	/* (rows from the bottom; blue, green and red each the grey) */
+	for (y = 0; y < XISO_LOADING_HEIGHT; y++)
+	{
+		for (x = 0; x < XISO_LOADING_WIDTH; x++)
+		{
+			unsigned char *out = tga + XISO_TGA_HEADER_SIZE + ((unsigned long)y * XISO_LOADING_WIDTH + x) * 3;
+
+			out[0] = out[1] = out[2] = greys[(unsigned long)(XISO_LOADING_HEIGHT - 1 - y) * XISO_LOADING_WIDTH + x];
+		}
+	}
+	if (snprintf(path, path_size, "%s/loading.tga", folder) >= (int)path_size)
+		goto done;
+	output = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
+	if (output < 0)
+		goto done;
+	whole = xiso_write_all(output, tga, XISO_LOADING_TGA_SIZE);
+	if (close(output) != 0)
+		whole = 0;
+	if (whole)
+		platform_log("extracting maps/loading.tga (the loading screen's picture, from default.xbe)");
+	else
+		remove(path);
+
+done:
+	free(tga);
+	free(greys);
+	free(data);
+}
+
 /* ---------- public code */
 
 int xiso_extract_maps(const char *image_path, const char *destination, xiso_progress_proc progress, void *context,
@@ -427,15 +597,18 @@ int xiso_extract_maps(const char *image_path, const char *destination, xiso_prog
 {
 	struct xiso_image image;
 	struct xiso_entry *entries = NULL;
+	/* the root's default.xbe (the loading screen's picture), size 0 if none */
+	struct xiso_entry xbe;
 	unsigned char *table = NULL;
 	unsigned char *buffer = NULL;
 	char *partial_path = NULL, *file_path = NULL, *maps_path = NULL;
 	unsigned long root_sector, root_size, maps_sector = 0, maps_size = 0;
 	unsigned long long done = 0, total = 0;
 	posix_ulong size_low, size_high;
-	int count, index, found, out_of_memory, succeeded = 0;
+	int count, index, found, has_loading, out_of_memory, succeeded = 0;
 
 	memset(&image, 0, sizeof(image));
+	memset(&xbe, 0, sizeof(xbe));
 	image.descriptor = open(image_path, O_RDONLY | O_LARGEFILE | O_CLOEXEC);
 	if (image.descriptor < 0)
 	{
@@ -470,7 +643,15 @@ int xiso_extract_maps(const char *image_path, const char *destination, xiso_prog
 		xiso_error(error, error_size, out_of_memory ? "Out of memory." : "The disc image's file system is damaged.");
 		goto done;
 	}
-	count = xiso_walk_table(table, root_size, 1, entries);
+	/* (its files first, for default.xbe) */
+	count = xiso_walk_table(table, root_size, 0, entries);
+	for (index = 0; index < count; index++)
+	{
+		if (xiso_name_is(entries[index].name, (int)strlen(entries[index].name), "default.xbe"))
+			xbe = entries[index];
+	}
+	if (count >= 0)
+		count = xiso_walk_table(table, root_size, 1, entries);
 	free(table);
 	table = NULL;
 	if (count < 0)
@@ -478,16 +659,16 @@ int xiso_extract_maps(const char *image_path, const char *destination, xiso_prog
 		xiso_error(error, error_size, "Out of memory.");
 		goto done;
 	}
-	for (found = 0, index = 0; index < count && !found; index++)
+	index = xiso_maps_folder(entries, count);
+	found = index < count;
+	if (found)
 	{
-		if (xiso_name_is(entries[index].name, (int)strlen(entries[index].name), "maps"))
-		{
-			maps_sector = entries[index].sector;
-			maps_size = entries[index].size;
-			found = 1;
-		}
+		maps_sector = entries[index].sector;
+		maps_size = entries[index].size;
+		if (!xiso_name_is(entries[index].name, (int)strlen(entries[index].name), "maps"))
+			platform_log("the disc image has no maps folder but one per language: extracting %s", entries[index].name);
 	}
-	if (!found)
+	else
 	{
 		xiso_error(error, error_size, "The disc image has no maps folder: it is not a Halo disc.");
 		goto done;
@@ -508,8 +689,11 @@ int xiso_extract_maps(const char *image_path, const char *destination, xiso_prog
 		xiso_error(error, error_size, "Out of memory.");
 		goto done;
 	}
-	for (found = 0, index = 0; index < count && !found; index++)
-		found = xiso_name_is(entries[index].name, (int)strlen(entries[index].name), "ui.map");
+	for (found = 0, has_loading = 0, index = 0; index < count; index++)
+	{
+		found |= xiso_name_is(entries[index].name, (int)strlen(entries[index].name), "ui.map");
+		has_loading |= xiso_name_is(entries[index].name, (int)strlen(entries[index].name), "loading.tga");
+	}
 	if (!found)
 	{
 		xiso_error(error, error_size, "The disc image's maps folder has no ui.map: it is not a Halo disc.");
@@ -554,6 +738,8 @@ int xiso_extract_maps(const char *image_path, const char *destination, xiso_prog
 			goto done;
 		}
 	}
+	if (!has_loading)
+		xiso_write_loading_picture(&image, &xbe, partial_path, file_path, XISO_MAXIMUM_PATH);
 	if (rename(partial_path, maps_path) != 0)
 	{
 		xiso_error(error, error_size, "Could not create %s.", maps_path);

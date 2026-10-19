@@ -1,0 +1,197 @@
+{
+ "note": "High-res HUD textures whose bitmap has the same layout in Halo Custom Edition (the same sprites, the same size or twice it), compared against the stock bitmaps.map and bloodgulch.map; hud_hires.c draws them for a Custom Edition map's stock bitmap of that name as well.",
+ "assets": [
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_outlines",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_outlines",
+   "bitmap": 1
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_outlines",
+   "bitmap": 2
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_outlines",
+   "bitmap": 3
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_type_icons",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_type_icons",
+   "bitmap": 1
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_type_icons",
+   "bitmap": 2
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_type_icons",
+   "bitmap": 3
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_type_icons",
+   "bitmap": 4
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_counter_numbers",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_damage_arrows",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 1
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 2
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 3
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 4
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 5
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 6
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 7
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_waypoints",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_weapon_backgrounds",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_weapon_backgrounds",
+   "bitmap": 1
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_weapon_backgrounds",
+   "bitmap": 2
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_weapon_backgrounds",
+   "bitmap": 3
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_weapon_backgrounds",
+   "bitmap": 4
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\hud_health_base",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\hud_multiplayer",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\hud_sensor_blip",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\hud_sensor_blip_custom",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\hud_sweeper",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\hud_sweeper_mask",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\pistol\\pistol_scope_mask",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\pistol\\pistol_scope_mask split",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs2",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs2",
+   "bitmap": 1
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs2",
+   "bitmap": 2
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs2",
+   "bitmap": 3
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs2",
+   "bitmap": 4
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs_sm",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs_sm",
+   "bitmap": 1
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs_sm",
+   "bitmap": 2
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs_sm",
+   "bitmap": 3
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs_sm",
+   "bitmap": 4
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_mask2",
+   "bitmap": 0
+  },
+  {
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_mask_sm",
+   "bitmap": 0
+  },
+  {
+   "tag": "weapons\\sniper rifle\\bitmaps\\angle_ticks",
+   "bitmap": 0
+  },
+  {
+   "tag": "weapons\\sniper rifle\\bitmaps\\angle_ticks2",
+   "bitmap": 0
+  },
+  {
+   "tag": "weapons\\sniper rifle\\bitmaps\\angle_ticks_mask",
+   "bitmap": 0
+  }
+ ]
+}

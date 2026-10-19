@@ -75,6 +75,8 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
 #include "saved games/game_state.h"
+#include "scenario/scenario.h" /* port: game_time_menu_scene */
+#include "scenario/scenario_definitions.h"
 #include "profile_sections.h" /* port: port/linux/include/profile_sections.h */
 /* port/linux/game/network_distributed.c's */
 void network_distributed_tick(void);
@@ -341,6 +343,18 @@ boolean game_time_held(
 	return client && !network_game_client_server_has_started_game(client);
 }
 
+/* port: whether the main menu's scene is what ticks. It runs on this
+machine's clock and takes no player input: a tick waits for the players'
+input, an action for each, and the menus change who the local players are
+(profiles), and a lobby's network game owns the queues, so with none the
+ticks stopped and the scene froze behind the menus (players.c gives its
+players idle actions) */
+boolean game_time_menu_scene(
+	void)
+{
+	return global_scenario && global_scenario->type == _scenario_type_main_menu;
+}
+
 void game_time_start(
 	void)
 {
@@ -440,6 +454,15 @@ void game_time_update(
 			game_time_globals->leftover_dt = game_time - ticks_elapsed_real/ticks_per_second;
 			if (game_time_globals->leftover_dt < 0.f)
 				game_time_globals->leftover_dt = 0.f;
+			/* port: debug.fixed_step, a game of this machine alone: one tick a
+			frame that has time (main.c gives it a tick's; a 30th of a second in
+			a float is not one tick exactly), so that what runs once a frame
+			(aiming) sees the game's time; game_speed has no effect */
+			if (halo_fixed_step() && game_connection() == _game_connection_local && time_delta_sec > 0.f)
+			{
+				ticks_elapsed = 1;
+				game_time_globals->leftover_dt = 0.f;
+			}
 			match_assert("c:\\halo\\SOURCE\\game\\game_time.c", 306,
 				game_time_globals->leftover_dt>=0.f && game_time_globals->leftover_dt<100.f);
 
@@ -463,7 +486,13 @@ void game_time_update(
 				with its own input and the latest the host relayed, from the
 				host's first game update, which brings the host's time: the
 				host ticks only once every machine has loaded) */
-				if (game_connection() == _game_connection_network_client)
+				/* port: the main menu's scene ticks on this machine's clock,
+				in a lobby too (game_time_menu_scene) */
+				if (game_time_menu_scene())
+				{
+					maximum_possible_server_time = final_local_time;
+				}
+				else if (game_connection() == _game_connection_network_client)
 				{
 					maximum_possible_server_time = game_time_held() ?
 						game_time_globals->server_time : final_local_time;
@@ -482,8 +511,10 @@ void game_time_update(
 						profile_scope(game_time_render_interpolation_tick_section, render_interpolation_tick();)
 						game_time_globals->server_time++;
 						game_time_globals->local_time++;
-						/* the distributed netcode's per-tick state */
-						profile_scope(game_time_network_distributed_tick_section, network_distributed_tick();)
+						/* the distributed netcode's per-tick state (port: none of
+						the main menu's scene, which a lobby's machines do not share) */
+						if (!game_time_menu_scene())
+							profile_scope(game_time_network_distributed_tick_section, network_distributed_tick();)
 					}
 				}
 

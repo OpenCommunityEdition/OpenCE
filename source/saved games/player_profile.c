@@ -391,6 +391,9 @@ boolean player_profile_get_enclosing_directory_path(
 	return saved_game_file_get_path_to_enclosing_directory(profile, full_path);
 }
 
+/* port: port_config.c's (game.unlock_all_levels) */
+int config_boolean(char const *name);
+
 long player_profile_new(
 	short local_player_index,
 	wchar_t *name)
@@ -424,18 +427,23 @@ long player_profile_new(
 			ustrncpy(profile->player_name, name, MAXIMUM_PLAYER_PROFILE_NAME_LENGTH-1);
 			profile->player_name[MAXIMUM_PLAYER_PROFILE_NAME_LENGTH-1] = 0;
 
-			error(_error_silent, "### DEBUG unlocking all solo levels for newly created profile");
-
-			for (level = 0; level < NUMBER_OF_SINGLE_PLAYER_LEVELS; level++)
+			/* port: a new profile starts with no level finished, as on the
+			Xbox (retail has no "### DEBUG unlocking all solo levels for newly
+			created profile", which this debug build did for every new
+			profile); config.toml's game.unlock_all_levels still does it */
+			if (config_boolean("game.unlock_all_levels"))
 			{
-				long difficulty = 0;
-
-				do
+				for (level = 0; level < NUMBER_OF_SINGLE_PLAYER_LEVELS; level++)
 				{
-					profile->single_player_map_flags[level] |= FLAG(difficulty);
-					difficulty++;
+					long difficulty = 0;
+
+					do
+					{
+						profile->single_player_map_flags[level] |= FLAG(difficulty);
+						difficulty++;
+					}
+					while (difficulty < NUMBER_OF_GAME_DIFFICULTY_LEVELS);
 				}
-				while (difficulty < NUMBER_OF_GAME_DIFFICULTY_LEVELS);
 			}
 
 			saved_game_file_generate_checksum(&block.profile, sizeof(block.profile),

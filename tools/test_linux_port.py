@@ -11,6 +11,10 @@ import pytest
 
 from tools import linux_build, linux_link_check, linux_msvc_semantics
 
+# for tests that compile for the Linux target (and run what they build)
+linux_host_only = pytest.mark.skipif(not sys.platform.startswith("linux"),
+                                     reason="builds for the Linux target, so needs a Linux host")
+
 
 # ---------- MSVC semantics header
 
@@ -80,6 +84,7 @@ def test_xdk_headers_use_the_sdk_spellings():
         assert not re.findall(r"\bhalo_\w+", text), header.name
 
 
+@linux_host_only
 @pytest.mark.skipif(shutil.which("clang") is None, reason="clang is needed to compile the headers")
 def test_xdk_headers_compile_for_the_game(tmp_path):
     root = XDK_INCLUDE.parent.parent.parent
@@ -311,6 +316,18 @@ def test_menu_settings_exist():
     assert controls == set(re.findall(r'\{ "(controls\.[a-z_]+)", L"', functions))
 
 
+def test_default_brokers_are_brokers_txt():
+    """The brokers a game uses with no brokers.txt beside its config.toml
+    (p2p_signal.c's DEFAULT_BROKERS) are port/assets/network/brokers.txt's."""
+    root = MENUS.parent.parent.parent
+    listed = [line.split("#", 1)[0].strip()
+              for line in (root / "port/assets/network/brokers.txt").read_text().splitlines()]
+    default = re.search(r'^#define DEFAULT_BROKERS "([^"]*)"',
+                        (root / "port/linux/src/p2p_signal.c").read_text(), re.M).group(1)
+    assert default.split(",") == [line for line in listed if line]
+
+
+@linux_host_only
 def test_p2p_signatures_and_listings(tmp_path):
     """internet play's Ed25519 (RFC 8032), the X25519 key of a seed, and the
     server browser's listings from host to browser (tools/p2p_lobby_check.c),

@@ -1187,6 +1187,20 @@ static boolean refresh_sound(
 		sound->playing_channel_index==NONE ||
 			channel_get(sound->playing_channel_index)->sound_index==sound_index);
 
+	/* port: a track of a looping sound that is gone stops, even when it
+	started this millisecond. The test of the start time below skips the
+	tracking, which is what notices the looping sound is gone, and a
+	looping sound not refreshed since the last frame is deleted
+	(process_looping_sounds): with three frames in one millisecond (no
+	frame limit, the null renderer) the track went on to
+	update_channel_for_looping_sound, which read the deleted looping
+	sound. BUG (original): the Xbox's frames were never that close. */
+	if (sound->type != _sound_impulse &&
+		!datum_try_and_get(looping_sound_data, sound->source_identifier))
+	{
+		return FALSE;
+	}
+
 	if (TEST_FLAG(sound->flags, _sound_delayed_bit) ||
 		!sound->track_proc ||
 		sound->start_time >= sound_manager_globals.render_time ||
@@ -2589,9 +2603,14 @@ long sound_new_impulse(
 		}
 		else
 		{
+			/* (port: which sound, and what it is) */
 			error(
 				_error_silent,
-				"attempt to play a sound that was not a mono 22k compressed sound or a stereo 22k or 44k compressed sound.");
+				"attempt to play a sound that was not a mono 22k compressed sound or a stereo 22k or 44k compressed sound: %s (compression %d, encoding %d, sample rate %d)",
+				tag_get_name(definition_index),
+				definition->compression,
+				definition->encoding,
+				definition->sample_rate);
 		}
 	}
 
@@ -3255,6 +3274,31 @@ void sound_dispose_from_old_map(
 	if (looping_sound_data)
 	{
 		data_delete_all(looping_sound_data);
+	}
+
+	/* port: a channel still holding a permutation that no sound owns any
+	longer (a weapon's charging loop, as a network game ended) stopped too,
+	so that its cache count is given back while the map's sounds are still
+	there; else the next map's sound_render finished it against the next
+	map's sound cache (sound_cache_sound_finished: "xbox sound index ... is
+	unused or changed") */
+	if (sound_manager_globals.initialized)
+	{
+		short channel_index;
+
+		for (
+			channel_index = 0;
+			channel_index < sound_manager_globals.channel_count;
+			channel_index++)
+		{
+			struct sound_channel_datum *channel = channel_get(channel_index);
+
+			if (channel->playing_permutation || channel->queued_permutation)
+			{
+				channel_stop(channel_index);
+				channel->sound_index = NONE;
+			}
+		}
 	}
 
 	return;

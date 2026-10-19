@@ -1708,6 +1708,26 @@ short reject_endpoint(
 	return 0;
 }
 
+boolean transport_udp_port_taken(
+	word port)
+{
+	/* no SO_REUSEADDR, so the bind fails if the port is taken */
+	SOCKET probe = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+	struct sockaddr_in socket_address;
+	boolean taken;
+
+	if (probe == INVALID_SOCKET)
+		return FALSE;
+	csmemset(&socket_address, 0, sizeof(socket_address));
+	socket_address.sin_family = AF_INET;
+	socket_address.sin_port = (word)SWAP2(port);
+	taken = bind(probe, (struct sockaddr *)&socket_address, sizeof(socket_address)) != 0 &&
+		WSAGetLastError() == WSAEADDRINUSE;
+	closesocket(probe);
+
+	return taken;
+}
+
 /* ---------- private code */
 
 static SOCKET create_socket(

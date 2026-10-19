@@ -26,9 +26,21 @@ void render_interpolation_first_person(short local_player_index, struct real_mat
 	short node_count, struct render_camera const *camera);
 float render_interpolation_game_time_sec(long ticks);
 
+/* whether the map being loaded, by the name it was loaded by, is a
+downloaded one, whose scripts may call and set less: one map sharing
+downloaded, or one game.downloaded_maps names (port/linux/game/map_share.c) */
+int map_share_map_downloaded(char const *map_name);
+
+/* an IP address as the log may show it: a public one as a tag of the run's,
+never whole (port/linux/src/log_address.c, log_address.h) */
+const char *log_address(const unsigned char *bytes, int length, int port, char *text, int size);
+
 /* the port's menus' screen for one of ui.map's, by name, else the name
 (port/linux/game/menu_tags.c) */
 char const *pc_menus_screen(char const *name);
+/* debug.fixed_step: a game of this machine alone runs a tick a frame
+(port/linux/src/port_config.c; game_time.c, main.c) */
+int halo_fixed_step(void);
 /* the Custom Edition tag cache window, or NULL unless the
 game.custom_edition setting reserved it (port/linux/src/xbox_memory.c) */
 void *halo_custom_edition_tag_cache(void);
