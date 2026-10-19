@@ -149,7 +149,7 @@
 		<string text="Draw text and titles with high-res fonts; off\ndraws the game's own."/>
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA\nand SMAA are cheap; SSAA and MSAA are sharper."/>
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA\nis cheap; MSAA is sharper."/>
-		<string text="Keep floors and walls sharp at a grazing angle,\nwhich the Xbox did not. 4X costs very little."/>
+		<string text="Keep floors and walls sharp at a grazing angle,\nwhich the Xbox did not. Off: as the Xbox."/>
 		<string text="The size objects' shadows are drawn at: 128 as on\nthe Xbox; larger for smoother, as soft, edges."/>
 		<string text="Light models for each pixel, without the facets\nof the Xbox's lighting for each vertex."/>
 		<string text="Stock picks models' detail by the Xbox's 480 lines;\nnative by this display's; highest, always the best."/>
