@@ -12,7 +12,6 @@ debug.log_addresses.
 #include "p2p_internal.h"
 #include "log_address.h"
 
-#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -23,12 +22,26 @@ enum
 	TAG_SIZE = 3,
 };
 
-static pthread_once_t salt_once = PTHREAD_ONCE_INIT;
+/* (made once, by the first thread to log an address: 0 none, 1 being made,
+2 made. Not pthread_once, which the Android guest's C library cannot link) */
+static volatile int salt_state;
 static unsigned char salt[SALT_SIZE];
 
 static void make_salt(void)
 {
-	posix_random_bytes(salt, sizeof(salt));
+	if (salt_state == 2)
+		return;
+	if (__sync_bool_compare_and_swap(&salt_state, 0, 1))
+	{
+		posix_random_bytes(salt, sizeof(salt));
+		__sync_synchronize();
+		salt_state = 2;
+		return;
+	}
+	while (salt_state != 2)
+	{
+	}
+	__sync_synchronize();
 }
 
 /* whether an address is no one's on the internet (log_address.h) */
@@ -87,7 +100,7 @@ const char *log_address(const unsigned char *bytes, int length, int port, char *
 		unsigned char digest[P2P_SHA256_SIZE];
 		char tag[2 * TAG_SIZE + 1];
 
-		pthread_once(&salt_once, make_salt);
+		make_salt();
 		memcpy(data, salt, SALT_SIZE);
 		data[SALT_SIZE] = (unsigned char)length;
 		memcpy(data + SALT_SIZE + 1, bytes, (size_t)length);
