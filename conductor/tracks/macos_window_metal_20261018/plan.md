@@ -25,9 +25,9 @@
 - [x] Task: Keyboard and mouse from NSEvent 9d85891f
     - [x] Write tests: key codes map to SDL scancodes (table test); mouse buttons, wheel and relative motion become SDL-shaped events; focus loss releases the capture
     - [x] Implement the event queue behind host_sdl_poll_event, host_sdl_set_relative_mouse and the scancode imports
-- [ ] Task: Gamepads from GameController
-    - [ ] Write tests: a fake controller's buttons and axes map to the gamepad imports; connect/disconnect events; rumble requests reach the haptics engine
-    - [ ] Implement it with GCController, incl. hot-plug and rumble
+- [x] Task: Leave gamepads out (keyboard and mouse only) 7f20b49b
+    - [x] Write tests: with the app's windows, SDL's joystick and gamepad events are left out of the guest's polls; without them they pass
+    - [x] Skip SDL's events 0x600 to 0x6ff in host_input_poll_event (GameController support was dropped at the user's request)
 - [ ] Task: Sound with AVAudioEngine
     - [ ] Write tests: the audio-stream imports' format conversion and buffering (XCTest); vm_sdl's audio test plays through the new backend
     - [ ] Implement host_sdl_open_audio_stream and the rest with AVAudioEngine
