@@ -318,7 +318,7 @@ void cluster_partitions_port_forget(
 /* port: A full reference list said so each time a reference did not fit:
 on a map whose lights fill the light partition's lists, every light joining
 its clusters each tick, thousands of lines a second in debug.txt (gigabytes
-a day on a dedicated server). It says so the first time a map; the times
+a day on a game left running). It says so the first time a map; the times
 after are counted, and told when the map's lists are let go or made anew
 (reference_list_port_report). What fits and what does not is as before. */
 void reference_list_port_full(

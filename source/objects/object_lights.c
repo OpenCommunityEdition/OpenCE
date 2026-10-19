@@ -1968,7 +1968,6 @@ void light_reconnect_to_map(
 			"c:\\halo\\SOURCE\\objects\\object_lights.c",
 			0x4F9,
 			!TEST_FLAG(light->flags, _point_light_connected_to_map_bit));
-#ifndef HALO_SERVER
 		if (light->object_index != NONE && object_try_and_get(light->object_index))
 		{
 			object_get_location(light->object_index, &location);
@@ -1984,18 +1983,6 @@ void light_reconnect_to_map(
 			&position,
 			radius,
 			&location);
-#else
-		/* port: The dedicated server draws nothing, and a light's clusters
-		are only for drawing: the lights that light an object or the map
-		(lights_prepare_for_object_dynamic, lights_render_diffuse and
-		_specular), and the point's illumination of a unit
-		(lights_illumination_at_point), which only debug_unit_illumination
-		reads; the lights it finds are the ones drawn this frame, none on the
-		server. So no light joins its clusters there, which every moving
-		light did each tick, and filled the light partition's lists on busy
-		maps. Its cluster_reference stays NONE: it leaves no clusters. */
-		(void)location;
-#endif
 		SET_FLAG(light->flags, _point_light_connected_to_map_bit, TRUE);
 	}
 

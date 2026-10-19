@@ -281,13 +281,11 @@ void write_to_error_file(
 
 	/* port: the header again in a debug.txt begun again (its reference
 	address places a crash report's addresses) */
-#ifndef HALO_XBOX_CONSOLE
 	if (debug_file_port_rolled)
 	{
 		debug_file_port_rolled = FALSE;
 		data_002dcd2c = TRUE;
 	}
-#endif
 	if (data_002dcd2c)
 	{
 		data_002dcd2c = FALSE;
