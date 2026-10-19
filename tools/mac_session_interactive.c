@@ -1233,6 +1233,9 @@ static int mac_interactive_network_start_frame(struct mac_interactive_context *c
        begin held for this session's map made (engine_network_test.c) */
     mac_engine_network_menu_update();
     mac_engine_network_begin_resume();
+    /* port: an invite link copied before switching to the game, which
+       sdl_platform.c watches for on the builds that compile it */
+    mac_engine_network_clipboard_update();
     network_test_update(mac_engine_main_menu_loaded() ? TRUE : FALSE,
         (real)MAC_INTERACTIVE_TICK);
     /* and the hosting or joining network_test.c leaves to the menu */

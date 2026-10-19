@@ -221,13 +221,11 @@ SCREENS = {
             ("UPNP PORT FORWARDING:", "network.allow_upnp", ON_OFF,
              "Let internet play ask the router to forward its\nport, for networks that stop connections.",
              "desktop android mac"),
-            # (not "mac": the clipboard is watched for an invite in
-            # port/linux/src/sdl_platform.c, which the Mac build does not
-            # compile, so the row would set a setting nothing reads. The Mac
-            # takes an invite from a halo:// link instead, through
-            # port/mac/app/launcher_invite.c)
+            # (the Mac watches the clipboard in
+            # port/mac/engine_network_test.c, not in sdl_platform.c, which it
+            # does not compile)
             ("JOIN FROM CLIPBOARD:", "network.join_from_clipboard", ON_OFF,
-             "Join the game of an invite link copied before\nswitching to the game.", "desktop android"),
+             "Join the game of an invite link copied before\nswitching to the game.", "desktop android mac"),
             # (the Mac's launcher looks, once a day: port/mac/app/launcher_update.c)
             ("CHECK FOR UPDATES:", "update.auto", ON_OFF,
              "Look for a new version when the game starts.", "desktop android mac"),

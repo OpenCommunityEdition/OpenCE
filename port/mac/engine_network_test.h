@@ -14,5 +14,8 @@ void mac_engine_network_menu_update(void);
 void mac_engine_network_session_open(const char *map_path);
 int mac_engine_network_begin_deferred(const char *map_name);
 void mac_engine_network_begin_resume(void);
+/* every frame: an invite link copied onto the clipboard before switching to
+   the game (network.join_from_clipboard) */
+void mac_engine_network_clipboard_update(void);
 void mac_engine_network_begin_failed(void);
 #endif

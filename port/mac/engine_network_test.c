@@ -43,6 +43,10 @@ int mac_cache_files_map_file_exists(const char *path);
 
 /* the platform layer's (port/linux/src/port_config.c) */
 const char *config_string(char const *name);
+int config_boolean(char const *name);
+/* port/mac/engine_clipboard.c, and port/linux/src/p2p.c */
+int platform_clipboard_get(char *text, int size);
+int p2p_join_invite(const char *text);
 double config_real(char const *name);
 long config_integer(char const *name);
 void platform_log(char const *format, ...);
@@ -422,6 +426,67 @@ int mac_engine_network_map_precached(const char *map_name)
 		return 0;
 	sprintf(path, "%s%s.map", cache_files_map_directory(), leaf);
 	return mac_cache_files_map_file_exists(path);
+}
+
+/* ---------- an invite link copied before switching to the game
+
+port/linux/src/sdl_platform.c watches the clipboard for the other builds.
+The Mac does not compile it - it has its own window and platform layer - so
+until now network.join_from_clipboard was a setting nothing on the Mac
+read, and its menu row stayed hidden. This is the same watch, over the
+Mac's own Carbon clipboard.
+
+An invite is joined once: the text that was acted on is remembered, so a
+link left on the clipboard does not rejoin every second, and copying the
+same link again after leaving the game does. */
+
+/* "halo://join/" anywhere in the text, in either case, as
+platform_text_has_invite_link has it in sdl_platform.c. A bare code is not
+enough: 64 hex digits alone are as often a checksum copied for something
+else. */
+static int mac_text_has_invite_link(const char *text)
+{
+	static const char prefix[] = "halo://join/";
+	int length = (int)(sizeof(prefix) - 1);
+
+	for (; *text; text++)
+	{
+		int index;
+
+		for (index = 0; index < length && text[index] &&
+			(text[index] | 0x20) == prefix[index]; index++)
+		{
+		}
+		if (index == length)
+			return 1;
+	}
+	return 0;
+}
+
+/* every frame; it looks at the clipboard about once a second. The count is
+frames rather than a clock because this file has no clock of its own and
+the rate it is called at is the session's own tick. */
+void mac_engine_network_clipboard_update(void)
+{
+	static char acted_on[1024];
+	static int frames;
+	char text[1024];
+
+	if (++frames < 30)
+		return;
+	frames = 0;
+	if (!config_boolean("network.join_from_clipboard"))
+		return;
+	if (!platform_clipboard_get(text, (int)sizeof(text)) || !text[0])
+		return;
+	if (!strcmp(text, acted_on) || !mac_text_has_invite_link(text))
+		return;
+	/* (remembered whether or not the join is taken, so that a link the game
+	   refuses is not tried again every second) */
+	strncpy(acted_on, text, sizeof(acted_on) - 1);
+	acted_on[sizeof(acted_on) - 1] = 0;
+	if (p2p_join_invite(text))
+		platform_log("Internet play: joining the invite link on the clipboard");
 }
 
 /* the host said begin, for this scenario (network_client_manager.c): TRUE if
