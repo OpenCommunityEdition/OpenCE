@@ -60,6 +60,7 @@ int main(int argc,char **argv)
    CHECK(!memcmp(wire_packet.data+28,want[pattern],4),"serialized mask lost high/all bits");
   }
   select_client();network_distributed_handle_message(NONE,(word const *)wire_packet.data,wire_size);
+  CHECK(!distributed_handling_batch,"batch consumer left its handling guard set");
   CHECK(wire_deliveries==1,"batch decoder lost or duplicated event");
   CHECK(delivered_mask==(pattern?0xffffffffUL:0x80000000UL),"mask changed through batch bytes");
   for(int index=0;index<32;index++)CHECK(breakable_surface_extant(index)==(pattern||index==31),"wire mask did not control surface%d",index);

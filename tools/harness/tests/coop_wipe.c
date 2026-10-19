@@ -108,9 +108,11 @@ int main(int argc,char **argv)
   setup();game_state_globals.saved_game_valid=FALSE;wipe();CHECK(!reverts&&respawns==1,"missing saved state rewound");
  } else CASE("new-map") {
   CHECK(network_coop_wipe_reverts(),"valid checkpoint rejected");
+  host_attachment_count=3;host_looping_sound_count=2;
   host_surfaces_refresh=TRUE;host_surfaces_next=96;host_surfaces_bsp=0;network_coop_new_game();
   CHECK(!network_coop_wipe_reverts(),"checkpoint metadata survived a new game/map");
   CHECK(!host_surfaces_refresh&&host_surfaces_next==0&&host_surfaces_bsp==NONE,"surface pass survived a new game/map");
+  CHECK(host_attachment_count==0&&host_looping_sound_count==0,"attachment or sound history survived a new game/map");
  } else CASE("delay") {
   main_lost_map();tick=91;main_lost_map_private();CHECK(!reverts&&!respawns,"rewound early");
   tick=92;main_lost_map_private();CHECK(reverts==1&&!main_globals.lost_map&&!main_globals.loss_timer,"wipe did not clear loss state");
