@@ -150,6 +150,7 @@ static unsigned long structure_culling_recorded[2][BIT_VECTOR_SIZE_IN_LONGS(MAXI
 /* ---------- prototypes */
 
 boolean tag_index_is_group(long tag_index, long group_tag);
+long config_integer(char const *name); /* port/linux/src/port_config.c */
 static void structure_culling_pairing_points(
 	struct structure_bsp *structure, struct structure_culling_pairing const *pairing, real_point3d *points);
 
@@ -949,6 +950,13 @@ void structure_culling_render_debug(void)
 	bounds.y1 = SHORT_MAX;
 	interface_set_bitmap_text_draw_mode(_interface_font_terminal, NONE, 0, 0, _interface_color_table_dialog, 0);
 	rasterizer_draw_string(&bounds, NULL, NULL, 0, text);
+}
+
+void structure_culling_initialize(void)
+{
+	/* display.structure_culling; the console's structure_culling changes it until the game quits */
+	structure_culling_tests = config_integer("display.structure_culling") &
+		(FLAG(NUMBER_OF_STRUCTURE_CULLING_TESTS) - 1);
 }
 
 void structure_culling_set_tests(long tests)

@@ -84,6 +84,8 @@ void structure_culling_structure_bsp_loaded(void);
 void structure_culling_dispose(void);
 void structure_culling_order_clusters(short *order, real const *distances, short count);
 boolean structure_culling_traverse(struct structure_bsp *structure);
+/* reads the starting tests from the settings */
+void structure_culling_initialize(void);
 void structure_culling_set_tests(long tests);
 void structure_culling_debug(boolean enable);
 void structure_culling_render_debug(void);
