@@ -17,6 +17,8 @@
    plain light here, dimmer than the mask itself, which the fade layer builds up on) */
 #define BAND_LEVEL 0.16f
 
+extern int config_boolean(const char *name);
+
 static struct {
     int started;
     unsigned *base;
@@ -111,6 +113,60 @@ static void make_feedback(unsigned width,unsigned height)
     free(loading.base);
     loading.base=NULL;
     loading.feedback_ready=1;
+}
+
+/* The indicator (mac.loading_indicator): "LOADING" in 5x7 block letters drawn here (no font is
+   loaded on this screen), a ring of dots turning, and a thin bar of the progress. All sizes are
+   of the window's height over 480 lines. */
+static const unsigned char indicator_glyphs[7][7]={
+    /* L */ {0x10,0x10,0x10,0x10,0x10,0x10,0x1f},
+    /* O */ {0x0e,0x11,0x11,0x11,0x11,0x11,0x0e},
+    /* A */ {0x0e,0x11,0x11,0x1f,0x11,0x11,0x11},
+    /* D */ {0x1e,0x11,0x11,0x11,0x11,0x11,0x1e},
+    /* I */ {0x0e,0x04,0x04,0x04,0x04,0x04,0x0e},
+    /* N */ {0x11,0x19,0x15,0x13,0x11,0x11,0x11},
+    /* G */ {0x0e,0x11,0x10,0x17,0x11,0x11,0x0f}
+};
+static void draw_indicator(float w,float h,float unit,float t)
+{
+    float cell=2.5f*unit,gap=cell*1.5f,text_width=7.0f*(5.0f*cell)+6.0f*gap;
+    float left=(w-text_width)*0.5f,base=h*0.5f-3.5f*cell-48.0f*unit,dot_size=4.0f*unit;
+    float centre_x=w*0.5f,centre_y=h*0.5f+14.0f*unit,radius=22.0f*unit;
+    float bar_left=w*0.5f-120.0f*unit,bar_right=w*0.5f+120.0f*unit,bar_y=base-28.0f*unit,bar_h=3.0f*unit;
+    int letter,row,column,dot;
+    glDisable(GL_TEXTURE_2D);glDisable(GL_TEXTURE_RECTANGLE_ARB);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.85f,0.92f,1.0f,0.9f);
+    glBegin(GL_QUADS);
+    for(letter=0;letter<7;++letter) {
+        const unsigned char *rows=indicator_glyphs[letter];
+        float x0=left+(float)letter*(5.0f*cell+gap);
+        for(row=0;row<7;++row)for(column=0;column<5;++column) {
+            if(rows[row]&(0x10>>column)) {
+                float x=x0+(float)column*cell,y=base+(float)(6-row)*cell;
+                glVertex2f(x,y);glVertex2f(x+cell,y);glVertex2f(x+cell,y+cell);glVertex2f(x,y+cell);
+            }
+        }
+    }
+    /* (twelve dots; the head of the turn is the brightest, the tail fades) */
+    for(dot=0;dot<12;++dot) {
+        float turn=loading.wobble*40.0f; /* (the wobble advances 0.01 a frame) */
+        int head=(int)turn%12;
+        int age=(head-dot+12)%12;
+        float angle=(float)dot*(float)(2.0*LOADING_PI/12.0);
+        float x=centre_x+(float)sin(angle)*radius,y=centre_y+(float)cos(angle)*radius;
+        glColor4f(0.85f,0.92f,1.0f,1.0f-(float)age*0.08f);
+        glVertex2f(x-dot_size,y-dot_size);glVertex2f(x+dot_size,y-dot_size);
+        glVertex2f(x+dot_size,y+dot_size);glVertex2f(x-dot_size,y+dot_size);
+    }
+    glColor4f(0.85f,0.92f,1.0f,0.25f);
+    glVertex2f(bar_left,bar_y);glVertex2f(bar_right,bar_y);glVertex2f(bar_right,bar_y+bar_h);glVertex2f(bar_left,bar_y+bar_h);
+    glColor4f(0.85f,0.92f,1.0f,0.9f);
+    {
+        float fill=bar_left+(bar_right-bar_left)*(t<0.0f?0.0f:t>1.0f?1.0f:t);
+        glVertex2f(bar_left,bar_y);glVertex2f(fill,bar_y);glVertex2f(fill,bar_y+bar_h);glVertex2f(bar_left,bar_y+bar_h);
+    }
+    glEnd();
+    glDisable(GL_BLEND);
 }
 
 static void write_shot(unsigned width,unsigned height,const char *path)
@@ -212,6 +268,7 @@ void mac_loading_draw(unsigned width,unsigned height,float progress,const char *
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB,loading.feedback);
     glCopyTexSubImage2D(GL_TEXTURE_RECTANGLE_ARB,0,0,0,0,0,(GLsizei)width,(GLsizei)height);
     glDisable(GL_TEXTURE_RECTANGLE_ARB);
+    if(config_boolean("mac.loading_indicator"))draw_indicator(w,h,unit,t);
     if(shot_path&&*shot_path)write_shot(width,height,shot_path);
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB,0);
     glBindTexture(GL_TEXTURE_2D,0);
