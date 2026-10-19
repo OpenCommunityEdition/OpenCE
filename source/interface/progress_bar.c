@@ -302,9 +302,6 @@ static void this_is_awful(
 
 static void progress_bar_render(
 	real progress);
-/* port: progress_bar_eachframe's release, a function of its own */
-static void progress_bar_let_go(
-	void);
 
 void tgaLoadHeader(
 	FILE *file,
@@ -326,8 +323,6 @@ extern struct pixel_shader_definition regular_shader;
 extern unsigned long current_time;
 
 static boolean progress_bar_rendering_enabled= TRUE;
-/* port: a map's download shows the screen (progress_bar_download_display) */
-static boolean progress_bar_downloading= FALSE;
 
 /* the compressed monk chant played behind the loading screen */
 byte compressed_monk_tone[18396]=
@@ -1784,6 +1779,7 @@ void progress_bar_eachframe(
 	void)
 {
 	unsigned long time= GetTickCount();
+	long sound_index;
 
 	if (progress_bar_restart)
 	{
@@ -1792,67 +1788,34 @@ void progress_bar_eachframe(
 		progress_bar_mode.state= 1;
 	}
 
-	/* port: (not while a map's download shows the screen over the menus,
-	whose frames come here) */
-	if (time - progress_bar_globals.start_time>1000 && !progress_bar_downloading)
-		progress_bar_let_go();
-
-	return;
-}
-
-/* port: the textures and sounds the screen made, let go of (as
-progress_bar_eachframe did once a load was over; the original released
-texture0 twice there, the second time already NULL: left out) */
-static void progress_bar_let_go(
-	void)
-{
-	long sound_index;
-
-	last_t= 0;
-	if (progress_bar_mode.texture0)
+	if (time - progress_bar_globals.start_time>1000)
 	{
-		IDirect3DTexture8_Release(progress_bar_mode.texture0);
-		progress_bar_mode.texture0= NULL;
-	}
-	if (progress_bar_mode.texture1)
-	{
-		IDirect3DTexture8_Release(progress_bar_mode.texture1);
-		progress_bar_mode.texture1= NULL;
-	}
-	for (sound_index= 0; sound_index<NUMBER_OF_PROGRESS_BAR_SOUNDS; sound_index++)
-	{
-		if (progress_bar_globals.sounds[sound_index])
+		last_t= 0;
+		if (progress_bar_mode.texture0)
 		{
-			IDirectSoundBuffer_Stop(progress_bar_globals.sounds[sound_index]);
-			IDirectSoundBuffer_Release(progress_bar_globals.sounds[sound_index]);
-			progress_bar_globals.sounds[sound_index]= NULL;
+			IDirect3DTexture8_Release(progress_bar_mode.texture0);
+			progress_bar_mode.texture0= NULL;
+		}
+		if (progress_bar_mode.texture1)
+		{
+			IDirect3DTexture8_Release(progress_bar_mode.texture1);
+			progress_bar_mode.texture1= NULL;
+		}
+		if (progress_bar_mode.texture0)
+		{
+			IDirect3DTexture8_Release(progress_bar_mode.texture0);
+			progress_bar_mode.texture0= NULL;
+		}
+		for (sound_index= 0; sound_index<NUMBER_OF_PROGRESS_BAR_SOUNDS; sound_index++)
+		{
+			if (progress_bar_globals.sounds[sound_index])
+			{
+				IDirectSoundBuffer_Stop(progress_bar_globals.sounds[sound_index]);
+				IDirectSoundBuffer_Release(progress_bar_globals.sounds[sound_index]);
+				progress_bar_globals.sounds[sound_index]= NULL;
+			}
 		}
 	}
-
-	return;
-}
-
-/* port: the screen of a map's download, over the menus
-(port/linux/game/download_screen.c): the loading screen at the download's
-progress, drawn each frame while the menus behind it go on (a load's
-blocks them: progress_bar_is_active) */
-void progress_bar_download_display(
-	real progress)
-{
-	progress_bar_downloading= TRUE;
-	progress_bar_display(progress);
-
-	return;
-}
-
-/* port: the download over (done, stopped or failed) */
-void progress_bar_download_end(
-	void)
-{
-	if (!progress_bar_downloading)
-		return;
-	progress_bar_downloading= FALSE;
-	progress_bar_let_go();
 
 	return;
 }
@@ -1863,14 +1826,12 @@ void progress_bar_display(
 #line 827 "c:\\halo\\SOURCE\\interface\\progress_bar.c"
 	match_assert(__FILE__, __LINE__, (progress>=0.f) && (progress<=1.f));
 
-	if ((progress_bar_mode.active || progress_bar_downloading) && progress>0.f)
+	if (progress_bar_mode.active && progress>0.f)
 	{
 		if (!progress_bar_mode.texture0)
 		{
 			progress_bar_make_stuff_ready();
-			/* port: a download's screen sweeps from its start, 0 (it may
-			first be drawn at 1, its files there and being checked: 0/0) */
-			progress_bar_globals.initial_progress= progress_bar_downloading ? 0.f : progress;
+			progress_bar_globals.initial_progress= progress;
 		}
 
 		if (progress_bar_rendering_enabled)
@@ -2289,66 +2250,6 @@ static void progress_bar_make_stuff_ready(
 	return;
 }
 
-/* port: a value of the clouds' lattice, 0 to 1, the same at every run */
-static real progress_bar_cloud_lattice(
-	long x,
-	long y)
-{
-	unsigned long hash= (unsigned long)x*374761393u + (unsigned long)y*668265263u;
-
-	hash= (hash ^ (hash>>13))*1274126177u;
-	hash^= hash>>16;
-
-	return (real)(hash & 0xffff)/65535.f;
-}
-
-/* port: soft clouds, four octaves of smoothed value noise that wrap at the
-picture's edges, as loading.tga intensities (tgaLoadImageData's tint) */
-static void progress_bar_make_clouds(
-	unsigned long *pixels,
-	long width,
-	long height)
-{
-	long x, y;
-
-	for (y= 0; y<height; y++)
-	{
-		for (x= 0; x<width; x++)
-		{
-			real value= 0.f, weight= 0.5f;
-			long cells= 4;
-			long octave;
-			unsigned long intensity;
-
-			for (octave= 0; octave<4; octave++, cells*= 2, weight*= 0.5f)
-			{
-				real u= (real)x*cells/width, v= (real)y*cells/height;
-				long x0= (long)u, y0= (long)v;
-				real fx= u - x0, fy= v - y0;
-				real a, b, c, d;
-
-				fx= fx*fx*(3.f - 2.f*fx);
-				fy= fy*fy*(3.f - 2.f*fy);
-				a= progress_bar_cloud_lattice(octave*1000 + x0%cells, y0%cells);
-				b= progress_bar_cloud_lattice(octave*1000 + (x0 + 1)%cells, y0%cells);
-				c= progress_bar_cloud_lattice(octave*1000 + x0%cells, (y0 + 1)%cells);
-				d= progress_bar_cloud_lattice(octave*1000 + (x0 + 1)%cells, (y0 + 1)%cells);
-				value+= weight*((a + (b - a)*fx)*(1.f - fy) + (c + (d - c)*fx)*fy);
-			}
-			/* (value is 0 to about 0.94: stretched so the clouds have dark gaps) */
-			value= (value - 0.25f)*1.6f;
-			if (value<0.f)
-				value= 0.f;
-			if (value>1.f)
-				value= 1.f;
-			intensity= (unsigned long)(value*255.f);
-			pixels[y*width + x]= ((intensity<<9) | (intensity & ~1))<<7 | intensity>>2;
-		}
-	}
-
-	return;
-}
-
 static void progress_bar_load_loading_texture(
 	IDirect3DTexture8 **texture)
 {
@@ -2358,8 +2259,6 @@ static void progress_bar_load_loading_texture(
 	struct tga_image image;
 	D3DLOCKED_RECT locked_rect;
 	unsigned long *pixels;
-	/* port: whether a picture was read (else the clouds, below) */
-	boolean loaded= FALSE;
 	FILE *file;
 
 	IDirect3DDevice8_CreateTexture(global_d3d_device, 320, 240, 1, 0, D3DFMT_LIN_A8B8G8R8, 0, texture);
@@ -2382,17 +2281,13 @@ static void progress_bar_load_loading_texture(
 		{
 			image.pixels= pixels;
 			tgaLoadImageData(file, &image);
-			loaded= TRUE;
 		}
 		fclose(file);
 	}
-	/* port: no loading.tga (no disc has one as a file: the retail
-	default.xbe holds the picture, which importing a disc writes as
-	loading.tga, port/linux/src/xiso.c and port/web/site/xiso-worker.js): the
-	picture the light sweeps over is made here, clouds, tinted as a
-	loading.tga's grey would be */
-	if (!loaded)
-		progress_bar_make_clouds(pixels, 320, 240);
+	/* port: no disc has loading.tga as a file (the retail default.xbe holds
+	the picture, which importing a disc writes as loading.tga:
+	port/linux/src/xiso.c); without it the texture is left as created,
+	black */
 	IDirect3DTexture8_UnlockRect(*texture, 0);
 
 	return;

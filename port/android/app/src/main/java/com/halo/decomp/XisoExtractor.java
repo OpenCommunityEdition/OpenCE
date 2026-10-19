@@ -50,7 +50,7 @@ import java.util.Locale;
  * taken out of the root's default.xbe (read whole, at most 64 MB) and
  * written beside the maps as the loading.tga the game reads, when the maps
  * folder has none (loadingPicture, as xiso.c's xiso_write_loading_picture);
- * without it the loading screen makes clouds.
+ * without it the light sweeps over black, as the game's own does.
  *
  * The app starts the game once maps/ui.map exists, and makes the maps folder
  * itself, so the copy is written to maps.partial (emptied first of what an

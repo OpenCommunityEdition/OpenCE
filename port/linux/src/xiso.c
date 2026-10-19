@@ -534,7 +534,7 @@ static int xiso_write_all(int output, const unsigned char *bytes, unsigned long 
 /* writes default.xbe's picture to folder/loading.tga, if it has one; a
 picture that cannot be written whole is removed (the loading screen would
 read past one cut short). Nothing is written when it is not found: the
-loading screen then makes its own */
+light then sweeps over black, as the game's own does */
 static void xiso_write_loading_picture(struct xiso_image *image, const struct xiso_entry *xbe, const char *folder,
 	char *path, size_t path_size)
 {

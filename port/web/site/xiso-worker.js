@@ -38,7 +38,7 @@ The loading screen's picture, which the retail disc has no file of, is
 taken out of the image's default.xbe (read whole, at most 64 MB) and kept
 with the maps as the loading.tga the game reads, when the maps folder has
 none (loadingPicture; xiso.c's xiso_write_loading_picture does the same).
-Without it the loading screen makes clouds of its own.
+Without it the light sweeps over black, as the game's own does.
 
 Messages from the page: { type: 'image', file } (the disc image) or
 { type: 'folder', files } (a chosen folder's File objects). To the page:

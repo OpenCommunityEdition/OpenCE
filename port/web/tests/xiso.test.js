@@ -252,7 +252,7 @@ test("an image whose maps folder has no loading.tga gets one from its default.xb
   const kept = await xiso.imageFiles(image({ maps: goodMaps, xbe: loadingXbe }));
   assert.strictEqual(kept.filter((file) => file.name === 'loading.tga').length, 1);
   assert.strictEqual(kept.find((file) => file.name === 'loading.tga').size, 50);
-  // (no picture in the executable: none, and the game makes clouds)
+  // (no picture in the executable: none, and the light sweeps over black)
   const none = await xiso.imageFiles(image({ maps }));
   assert.ok(!none.some((file) => file.name === 'loading.tga'));
 });
