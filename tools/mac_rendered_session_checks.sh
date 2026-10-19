@@ -763,3 +763,10 @@ cleanup() { if [ -n "$created_save_root" ]; then rm -rf "$created_save_root"; fi
 trap cleanup EXIT HUP INT TERM
 export HALO_MAC_RENDER_CAPTURE=${HALO_MAC_RENDER_CAPTURE:-$out/original-game-frame-$arch.ppm}
 "$out/mac_rendered_session_$arch" "$1" "$2" "$3" --gpu-render
+
+# port: MAC_MENU_B30_ROOT=<Xbox data root with maps/ui.map> also plays The Silent Cartographer's opening from the menus
+# and checks it ends on the beach (tools/mac_menu_b30_checks.sh; the PowerPC validator once dropped its recordings)
+if [ -n "${MAC_MENU_B30_ROOT:-}" ]; then
+    sh tools/mac_menu_b30_checks.sh "$out/mac_rendered_session_$arch" "$MAC_MENU_B30_ROOT" \
+        "$MAC_MENU_B30_ROOT/maps/ui.map" "$out/menu_b30"
+fi
