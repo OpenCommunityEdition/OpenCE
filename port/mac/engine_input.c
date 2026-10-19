@@ -911,6 +911,9 @@ static void mac_vpad_parse(void)
 	const char *pads = getenv("HALO_MAC_VIRTUAL_PADS");
 	mac_vpad.parsed = 1;
 	mac_vpad.pads = pads ? atoi(pads) : 0;
+	/* (debug.mac_local_players: a pad for each local player it makes) */
+	if (!mac_vpad.pads && config_integer("debug.mac_local_players") > 1)
+		mac_vpad.pads = (int)config_integer("debug.mac_local_players");
 	if (mac_vpad.pads < 0)
 		mac_vpad.pads = 0;
 	if (mac_vpad.pads > MAC_GAMEPAD_MAXIMUM_DEVICES)

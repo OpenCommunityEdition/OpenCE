@@ -86,6 +86,7 @@ int mac_engine_menu_requested(void)
 }
 
 int config_boolean(const char *name);
+long config_integer(const char *name);
 
 /* the diagnostic HALO_MAC_MENU=1, or the setting game.start_in_menu */
 int mac_engine_menu_enabled(void)
@@ -210,6 +211,26 @@ long mac_engine_menu_create_local_players(void)
 	long first = NONE;
 	boolean multiplayer = game_engine != NULL;
 
+	/* port: debug.mac_local_players (HALO_MAC_LOCAL_PLAYERS), for a hidden or
+	   scripted run: the players the menus would have chosen. Their pads are
+	   the virtual pads (engine_input.c). A campaign has 2 at most, as the
+	   co-op menu makes. */
+	{
+		long wanted = config_integer("debug.mac_local_players");
+
+		if (wanted > MAXIMUM_GAMEPADS)
+			wanted = MAXIMUM_GAMEPADS;
+		if (wanted > 1)
+		{
+			if (multiplayer)
+			{
+				for (controller = 0; controller < wanted; controller++)
+					player_ui_local_player_joined_multiplayer_game(controller);
+			}
+			else if (player_spawn_count < wanted)
+				player_spawn_count = (short)(wanted > 2 ? 2 : wanted);
+		}
+	}
 	memset(controllers, NONE, sizeof(controllers));
 	if (multiplayer)
 	{

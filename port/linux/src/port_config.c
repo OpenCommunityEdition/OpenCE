@@ -600,6 +600,14 @@ static const struct config_setting config_settings[] =
 	{ "network.join_from_clipboard", _config_boolean, "true", "HALO_NET_JOIN_FROM_CLIPBOARD", _environment_value,
 		_platform_all,
 		"Join the game of an invite link found on the clipboard when the game\n"
+	{ "debug.mac_local_players", _config_integer, "1", "HALO_MAC_LOCAL_PLAYERS", _environment_value,
+		_platform_mac,
+		"A test setting for hidden or scripted runs: the number of local players\n"
+		"(1 to 4) the game starts with, without the menus, each on a virtual pad\n"
+		"(HALO_MAC_VIRTUAL_PADS, which can still be set to script them). A\n"
+		"multiplayer map joins that many controllers; the campaign has 2 at most,\n"
+		"as the co-op menu makes. 1: as the menus chose." },
+
 		"comes to the front." },
 	{ "network.tunnel_port", _config_integer, "0", "HALO_NET_TUNNEL_PORT", _environment_value, _platform_all,
 		"The UDP port internet play uses; 0 picks one. A fixed one can be\n"

@@ -68,6 +68,8 @@
 /* port/linux/src/port_config.c */
 const char *config_string(const char *name);
 int config_boolean(const char *name);
+long config_integer(const char *name);
+short players_port_local_player_count(void); /* port: source/game/players.c */
 void port_mods_startup(void); /* port/linux/src/port_mods.c */
 /* port/mac/engine_files.c */
 int mac_engine_files_data_root(char *root,size_t capacity);
@@ -429,6 +431,24 @@ static void run_player_ticks(void)
     mac_engine_input_publish(NULL);
     input_update();
     CHECK(unit_index!=NONE);
+    /* port: debug.mac_local_players (HALO_MAC_LOCAL_PLAYERS): a split screen start has all its players, each with
+       a unit (a campaign level's opening cinematic may not have given them theirs yet) */
+    if(!probe_title && config_integer("debug.mac_local_players")>1) {
+        long wanted=config_integer("debug.mac_local_players"),present=0,with_units=0;
+        short controller;
+        if(wanted>4)wanted=4;
+        if(probe_campaign && wanted>2)wanted=2;
+        for(controller=0;controller<4;++controller)
+            if(local_player_get_player_index(controller)!=NONE) {
+                ++present;
+                if(player_control_get_unit_index(controller)!=NONE)++with_units;
+            }
+        fprintf(stderr,"split screen: %ld local players wanted, %ld present, %ld with units, %d in the game\n",
+            wanted,present,with_units,(int)players_port_local_player_count());
+        CHECK(present==wanted);
+        CHECK(players_port_local_player_count()==wanted);
+        CHECK(with_units==wanted || (probe_campaign && cinematic_in_progress()));
+    }
     if(probe_spawn_only())return;
     if(probe_campaign) {
         /* (the walk, look and shot checks belong to the multiplayer start) */
