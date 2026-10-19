@@ -210,6 +210,62 @@ static void collect_invite_link(int argc, char **argv)
 	DisposeAEEventHandlerUPP(handler);
 }
 
+/* port: is a copy of the game already running for this user?
+
+Launch Services starts another launcher for every halo:// link, so without
+this a link clicked while someone is playing would start a second game
+beside the first. The invite has already gone into join_link.txt by then,
+which the running game reads once a second, so the click still joins - it
+just joins the game that is up rather than opening another.
+
+The process list comes from sysctl, which needs no framework and reads the
+same on 10.4 as on 10.6. A name there is cut to MAXCOMLEN characters, so
+this compares that many of the game's own file name: deriving it from the
+path the launcher already built means a renamed binary cannot leave this
+quietly matching nothing. */
+static int game_already_running(const char *game_path)
+{
+	int query[3];
+	size_t size = 0;
+	struct kinfo_proc *list;
+	const char *leaf = strrchr(game_path, '/');
+	uid_t self = getuid();
+	pid_t mine = getpid();
+	unsigned count, index;
+	int running = 0;
+
+	leaf = leaf ? leaf + 1 : game_path;
+	if (!*leaf)
+		return 0;
+	query[0] = CTL_KERN;
+	query[1] = KERN_PROC;
+	query[2] = KERN_PROC_ALL;
+	if (sysctl(query, 3, NULL, &size, NULL, 0) != 0 || !size)
+		return 0;
+	list = (struct kinfo_proc *)malloc(size);
+	if (!list)
+		return 0;
+	if (sysctl(query, 3, list, &size, NULL, 0) == 0)
+	{
+		count = (unsigned)(size / sizeof(*list));
+		for (index = 0; index < count && !running; ++index)
+		{
+			if (list[index].kp_eproc.e_ucred.cr_uid != self ||
+				list[index].kp_proc.p_pid == mine)
+			{
+				continue;
+			}
+			if (!strncmp(list[index].kp_proc.p_comm, leaf,
+				sizeof(list[index].kp_proc.p_comm) - 1))
+			{
+				running = 1;
+			}
+		}
+	}
+	free(list);
+	return running;
+}
+
 static void alert(const char *title, const char *message)
 {
 	CFStringRef t, m;
@@ -1111,6 +1167,15 @@ int main(int argc, char **argv)
 	for one already playing (launcher_invite.c) */
 	if (invite_link[0] && !launcher_invite_write(data_root, invite_link))
 		fprintf(stderr, "PowerSpark: the invite link could not be handed to the game\n");
+
+	/* port: a link clicked while a game is playing belongs to that game. The
+	invite is in join_link.txt above, which it reads once a second, so this
+	launcher has nothing left to do and must not start a second game. */
+	if (invite_link[0] && !dry_run && game_already_running(game))
+	{
+		fprintf(stderr, "PowerSpark: a game is already running; the invite was left for it\n");
+		return 0;
+	}
 
 	{
 		char *cmd[64];
