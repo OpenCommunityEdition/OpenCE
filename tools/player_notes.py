@@ -28,7 +28,6 @@ class NotesError(ValueError):
 class Commit:
     sha: str
     parents: list
-    date: str
     notes: list
     omitted: bool
 
@@ -150,42 +149,40 @@ def load_catchup(repo, path, head):
 
 def read_commits(repo, baseline, head):
     raw = git(repo, "log", "--reverse", "--topo-order", "-z",
-              "--format=%H%x00%P%x00%cs%x00%B", f"{baseline}..{head}", "--")
+              "--format=%H%x00%P%x00%B", f"{baseline}..{head}", "--")
     fields = raw.split("\0")
     if fields[-1] == "":
         fields.pop()
-    if len(fields) % 4:
+    if len(fields) % 3:
         raise NotesError("Git returned an invalid commit record")
     commits = {}
-    for offset in range(0, len(fields), 4):
-        sha, parents, date, message = fields[offset:offset + 4]
+    for offset in range(0, len(fields), 3):
+        sha, parents, message = fields[offset:offset + 3]
         notes, omitted = parse_notes(message, f"commit {sha}")
-        commits[sha] = Commit(sha, parents.split(), date, notes, omitted)
+        commits[sha] = Commit(sha, parents.split(), notes, omitted)
     return commits
 
 
-def introduction_groups(commits, head):
-    """Assign merged ancestry to the first first-parent commit introducing it."""
+def ordered_commits(commits, head):
+    """Order by first-parent introduction, then Git's topological order."""
     chain = []
     sha = head
     while sha in commits:
         chain.append(sha)
         parents = commits[sha].parents
         sha = parents[0] if parents else None
-    introduced = set()
-    groups = []
-    for sha in reversed(chain):
-        added = set()
+    introduced = {}
+    for group, sha in enumerate(reversed(chain)):
         pending = [sha]
         while pending:
             current = pending.pop()
             if current not in commits or current in introduced:
                 continue
-            introduced.add(current)
-            added.add(current)
+            introduced[current] = group
             pending.extend(commits[current].parents)
-        groups.append((sha, added))
-    return groups
+    # Stable sorting retains Git's order within each group, without a
+    # complete history scan for every first-parent commit.
+    return sorted(commits.values(), key=lambda commit: introduced[commit.sha])
 
 
 def load_previous(repo, path, base, build_number):
@@ -259,24 +256,19 @@ def collect(repo, head="HEAD", base=None, catchup=None, preview=False,
         require_ancestor(repo, base, head, "base")
     previous_entries = load_previous(repo, previous, base, build_number) if previous is not None else []
     commits = read_commits(repo, baseline, head)
-    groups = introduction_groups(commits, head)
-    seen = set()
-    canonical = {}
-    # Deduplicate across full authored history, including already released notes.
-    for _, added in groups:
-        for commit in commits.values():
-            if commit.sha not in added:
-                continue
-            canonical[commit.sha] = []
-            if commit.omitted:
-                continue
-            for note, category in catchup_notes.get(commit.sha, []) + commit.notes:
-                key = note_key(note)
-                if key not in seen:
-                    seen.add(key)
-                    canonical[commit.sha].append((note, category))
     release_range = set(git(repo, "rev-list", f"{base or baseline}..{head}", "--").split())
-    release_highlights = [note for sha, notes in canonical.items() if sha in release_range for note in notes]
+    seen = set()
+    release_highlights = []
+    # Deduplicate across full authored history, including already released notes.
+    for commit in ordered_commits(commits, head):
+        if commit.omitted:
+            continue
+        for note, category in catchup_notes.get(commit.sha, []) + commit.notes:
+            key = note_key(note)
+            if key not in seen:
+                seen.add(key)
+                if commit.sha in release_range:
+                    release_highlights.append((note, category))
     release_notes = [note for note, _ in release_highlights]
     commit_date = git(repo, "show", "-s", "--format=%cs", head, "--").strip()
     entries = [{"build": build_number, "date": commit_date, "commit": head, "notes": release_notes}]
