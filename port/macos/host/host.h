@@ -144,7 +144,9 @@ int host_sdl_gl_swap_window(uint32_t window);
 /* ---------- the keyboard and mouse (host_input.c)
 
 The event imports (host_sdl_poll_event, host_sdl_set_relative_mouse) are
-these: the app's events, then SDL's, when the app has windows, else SDL's. */
+these: the app's events, then SDL's, when the app has windows, else SDL's.
+The app's game has no gamepads: SDL's joystick and gamepad events are left
+out. */
 
 /* the events kept for the guest's polls */
 #define HOST_INPUT_QUEUE_SIZE 256

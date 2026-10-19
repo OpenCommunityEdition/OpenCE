@@ -308,7 +308,7 @@ events to the host (`halo_host_post_*`). `port/macos/host/host_input.c`
 turns them into the SDL events that the guest's event loop reads
 (`port/linux/src/sdl_platform.c`), and keeps them in a queue until the guest
 polls. With the app's windows, `host_sdl_poll_event` returns those events
-first, then SDL's own (the gamepads'). `host_sdl_set_relative_mouse`
+first, then SDL's own. `host_sdl_set_relative_mouse`
 captures the mouse through the app: the pointer is hidden, held at the
 window's middle, and only relative moves are reported.
 
@@ -324,6 +324,10 @@ window's middle, and only relative moves are reported.
   again.
 - **A full queue** keeps the events it already has and drops new ones (the
   guest polls each frame).
+- **No gamepads:** the app is played with the keyboard and mouse only.
+  SDL's joystick and gamepad events (0x600 to 0x6ff) are left out of the
+  guest's polls, so the guest opens no pad and reads none. The command-line
+  host keeps SDL's pads.
 
 A guest crash is reported with its registers, the exception's syndrome and
 the guest's frames, by address in the image (`llvm-symbolizer` on

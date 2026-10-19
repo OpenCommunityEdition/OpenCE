@@ -4,9 +4,14 @@ HOST_INPUT.C
 The app's keyboard and mouse (port/macos/app's OpenCEWindow): the AppKit
 events its windows' views pass on (halo_host_post_*) become the SDL events
 the guest polls for (port/linux/src/sdl_platform.c), queued here until it
-does. A poll takes this queue's events first, then SDL's own (the gamepads',
-for now); without the app's windows the poll and the mouse capture are
-SDL's, as the command-line host has them.
+does. A poll takes this queue's events first, then SDL's own; without the
+app's windows the poll and the mouse capture are SDL's, as the command-line
+host has them.
+
+The app's game is played with the keyboard and mouse only: SDL's joystick
+and gamepad events are left out of its polls, so the guest opens no pad
+(port/linux/src/sdl_platform.c opens one on SDL_EVENT_GAMEPAD_ADDED) and
+reads none (xinput_sdl.c reads only the pads it has opened).
 
 The views post on the main thread and the game polls on it (host_sdl_poll_event
 is a main-thread import), but the queue has a lock all the same. Losing the
@@ -294,7 +299,16 @@ int host_input_poll_event(void *event)
 		return 1;
 	}
 	pthread_mutex_unlock(&input_lock);
-	return host_sdl_poll_event(event);
+	for (;;)
+	{
+		Uint32 type;
+
+		if (!host_sdl_poll_event(event))
+			return 0;
+		memcpy(&type, event, sizeof(type));
+		if (!app_windows() || type < SDL_EVENT_JOYSTICK_AXIS_MOTION || type >= SDL_EVENT_FINGER_DOWN)
+			return 1;
+	}
 }
 
 int host_input_set_relative_mouse(uint32_t window, int enabled)

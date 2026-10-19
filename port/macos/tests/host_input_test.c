@@ -4,8 +4,8 @@ HOST_INPUT_TEST.C
 A native test of port/macos/host/host_input.c (tools/test_macos_vm.py): the
 app's keyboard and mouse, as AppKit reports them, become the SDL events the
 guest polls for; losing the focus releases the mouse, and having it again
-takes the mouse back if the game wanted it. SDL's own imports are stand-ins
-here.
+takes the mouse back if the game wanted it; the app's game has no gamepads.
+SDL's own imports are stand-ins here.
 */
 
 #include "host.h"
@@ -27,6 +27,9 @@ here.
 
 static int sdl_polls;
 static int sdl_relative_calls;
+/* the events SDL's poll gives, in turn */
+static SDL_Event sdl_events[4];
+static int sdl_event_count;
 
 uint32_t host_sdl_create_window(const char *title, int width, int height, int64_t flags)
 {
@@ -71,9 +74,20 @@ int host_sdl_gl_swap_window(uint32_t window)
 
 int host_sdl_poll_event(void *event)
 {
-	(void)event;
 	sdl_polls++;
-	return 0;
+	if (!sdl_event_count)
+		return 0;
+	memcpy(event, &sdl_events[0], sizeof(SDL_Event));
+	memmove(&sdl_events[0], &sdl_events[1], sizeof(SDL_Event) * (size_t)--sdl_event_count);
+	return 1;
+}
+
+static void sdl_event(Uint32 type)
+{
+	memset(&sdl_events[sdl_event_count], 0, sizeof(SDL_Event));
+	sdl_events[sdl_event_count].type = type;
+	sdl_events[sdl_event_count].gdevice.which = 99;
+	sdl_event_count++;
 }
 
 int host_sdl_set_relative_mouse(uint32_t window, int enabled)
@@ -180,6 +194,10 @@ int main(void)
 	/* SDL's, while the app has given no windows */
 	CHECK(poll(&event) == 0 && sdl_polls == 1);
 	CHECK(host_input_set_relative_mouse(1, 1) == 1 && sdl_relative_calls == 1);
+	/* (the command-line host's gamepads are SDL's) */
+	sdl_event(SDL_EVENT_GAMEPAD_ADDED);
+	CHECK(poll(&event) == 1 && event.type == SDL_EVENT_GAMEPAD_ADDED && event.gdevice.which == 99);
+	sdl_polls = 1;
 
 	memset(&backend, 0, sizeof(backend));
 	backend.create = app_create;
@@ -198,8 +216,17 @@ int main(void)
 	CHECK(event.key.raw == 0x00 && event.key.which == 0);
 	CHECK(poll(&event) == 1 && event.type == SDL_EVENT_KEY_DOWN && event.key.repeat);
 	CHECK(poll(&event) == 1 && event.type == SDL_EVENT_KEY_UP && !event.key.down);
-	/* (then SDL's own, the gamepads') */
+	/* (then SDL's own) */
 	CHECK(poll(&event) == 0 && sdl_polls == 2);
+	/* the app's game is played with the keyboard and mouse: SDL's joystick
+	and gamepad events are left out, so it opens no pad; the others are not */
+	sdl_event(SDL_EVENT_GAMEPAD_ADDED);
+	sdl_event(SDL_EVENT_JOYSTICK_AXIS_MOTION);
+	sdl_event(SDL_EVENT_GAMEPAD_SENSOR_UPDATE);
+	sdl_event(SDL_EVENT_QUIT);
+	CHECK(poll(&event) == 1 && event.type == SDL_EVENT_QUIT);
+	CHECK(poll(&event) == 0 && sdl_event_count == 0);
+	sdl_polls = 2;
 	/* a key the game has no scancode for is not sent */
 	halo_host_post_key(1, 0x3f, 1, 0);
 	CHECK(poll(&event) == 0);

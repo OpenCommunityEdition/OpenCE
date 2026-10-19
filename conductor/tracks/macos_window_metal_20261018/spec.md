@@ -1,7 +1,7 @@
 # Spec: The game in a macOS window: a Swift app, a Metal renderer, native input and audio
 
 ## Overview
-The macOS host runs the game only headless today (debug.null_renderer, no window, no input, SDL's dummy audio). This track makes OpenCE.app: a Swift/AppKit application that runs the existing VM host (the guest in Hypervisor.framework) and gives the game a window, a Metal renderer, keyboard/mouse/gamepad input and sound, until bloodgulch plays at 4K and 120fps on Apple Silicon.
+The macOS host runs the game only headless today (debug.null_renderer, no window, no input, SDL's dummy audio). This track makes OpenCE.app: a Swift/AppKit application that runs the existing VM host (the guest in Hypervisor.framework) and gives the game a window, a Metal renderer, keyboard and mouse input and sound, until bloodgulch plays at 4K and 120fps on Apple Silicon.
 
 The renderer is cut in the guest: a new guest-side Direct3D 8 implementation (built from d3d8_gl.c's structure) turns the game's D3D8 state and draws into Metal-level commands written to a ring in shared guest memory; the NV2A shader translators (nv2a_vsh.c, nv2a_psh.c) emit Metal Shading Language as well as GLSL. The host decodes the ring and submits it to Metal, so a frame costs a few VM exits, not one per draw.
 
@@ -27,8 +27,8 @@ The renderer is cut in the guest: a new guest-side Direct3D 8 implementation (bu
 
 ### Input (native)
 13. Keyboard and mouse from NSEvent, including relative mouse for looking (cursor hidden and captured while playing, released in menus and on focus loss).
-14. Gamepads from GameController (Xbox, PlayStation, generic MFi), including hot-plug and rumble.
-15. These reach the guest through its existing SDL-shaped imports (host_sdl_poll_event, the gamepad and scancode imports), so xinput_sdl.c and sdl_platform.c's input handling stay unchanged.
+14. No gamepads: the app is played with the keyboard and mouse only, and SDL's joystick and gamepad events are left out of the guest's polls.
+15. These reach the guest through its existing SDL-shaped imports (host_sdl_poll_event and the scancode imports), so xinput_sdl.c and sdl_platform.c's input handling stay unchanged.
 
 ### Audio (native)
 16. AVAudioEngine plays the game's sound: the guest's DirectSound layer (dsound_sdl.c) is unchanged and its audio-stream imports are implemented with AVAudioEngine in the host.
@@ -42,7 +42,7 @@ The renderer is cut in the guest: a new guest-side Direct3D 8 implementation (bu
 
 ## Acceptance Criteria
 1. `nix build .#app` produces OpenCE.app; opening it shows the main menu at the window's native resolution.
-2. The menus navigate with keyboard, mouse and a gamepad; a bloodgulch game starts and plays (move, look, shoot, HUD) with sound.
+2. The menus navigate with keyboard and mouse; a bloodgulch game starts and plays (move, look, shoot, HUD) with sound.
 3. Resizing and fullscreen work without restarting; focus loss releases the mouse.
 4. Golden frames: offscreen captures of fixed scenes (main menu; bloodgulch from a fixed camera) match approved references within a tolerance (pytest, skipped without game data).
 5. Unit tests cover the NV2A→MSL translation, the command ring's encoding/decoding and its validation (bad commands rejected).
