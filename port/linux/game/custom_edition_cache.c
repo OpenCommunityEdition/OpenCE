@@ -375,6 +375,153 @@ static boolean custom_edition_resource_map_path(
 	return TRUE;
 }
 
+/* the locale resource map custom_edition_locale_open opened */
+static struct
+{
+	boolean open;
+	struct custom_edition_file file;
+	struct resource_map map;
+} custom_edition_locale;
+
+/* a unicode string list tag: its strings' block (count, address and
+definition), each element a tag_data of the string's UTF-16 characters
+(size, then the address 12 bytes in) */
+#define STRING_LIST_HEADER_BYTES 12
+#define STRING_LIST_ELEMENT_BYTES 20
+#define STRING_LIST_ELEMENT_ADDRESS_OFFSET 12
+#define STRING_LIST_MAXIMUM_COUNT 32767
+
+boolean custom_edition_locale_open(
+	void)
+{
+	char path[MAP_PATH_SIZE];
+	short folder;
+
+	custom_edition_locale_close();
+	for (folder = 0; folder < NUMBER_OF_MAPS_FOLDERS; folder++)
+	{
+		if (maps_folder_has(maps_folder(folder), resource_map_type_describe(_resource_map_locale), MAP_FILE_EXTENSION, path))
+		{
+			break;
+		}
+	}
+	if (folder == NUMBER_OF_MAPS_FOLDERS || !custom_edition_file_open(&custom_edition_locale.file, path))
+	{
+		return FALSE;
+	}
+	if (resource_map_open(&custom_edition_locale.file.source, _resource_map_locale, &custom_edition_locale.map) !=
+		_cache_file_status_ok)
+	{
+		error(_error_silent, "custom edition: '%s' is not a locale resource map", path);
+		custom_edition_file_close(&custom_edition_locale.file);
+		return FALSE;
+	}
+	custom_edition_locale.open = TRUE;
+
+	return TRUE;
+}
+
+void custom_edition_locale_close(
+	void)
+{
+	if (custom_edition_locale.open)
+	{
+		resource_map_close(&custom_edition_locale.map);
+		custom_edition_file_close(&custom_edition_locale.file);
+		custom_edition_locale.open = FALSE;
+	}
+
+	return;
+}
+
+struct custom_edition_string_list *custom_edition_locale_strings(
+	char const *name)
+{
+	struct resource_map const *map = &custom_edition_locale.map;
+	struct resource_map_item const *item = NULL;
+	struct custom_edition_string_list *list = NULL;
+	byte *tag;
+	int32_t count, index;
+	uint32_t address, text_bytes = 0;
+	unsigned short *characters;
+
+	for (index = 0; custom_edition_locale.open && index < map->item_count && !item; index++)
+	{
+		if (!csstrcasecmp(map->items[index].name, name))
+		{
+			item = &map->items[index];
+		}
+	}
+	if (!item || item->size < STRING_LIST_HEADER_BYTES || !(tag = malloc(item->size)))
+	{
+		return NULL;
+	}
+	if (!custom_edition_locale.file.source.read(custom_edition_locale.file.source.context, item->data_offset, item->size, tag))
+	{
+		goto done;
+	}
+	/* (the tag's addresses count from its start; every string lies within
+	it, so together they are no longer than it) */
+	memcpy(&count, tag, sizeof(count));
+	memcpy(&address, tag + sizeof(count), sizeof(address));
+	if (count <= 0 || count > STRING_LIST_MAXIMUM_COUNT || address > item->size ||
+		(uint32_t)count > (item->size - address) / STRING_LIST_ELEMENT_BYTES)
+	{
+		goto done;
+	}
+	for (index = 0; index < count; index++)
+	{
+		byte const *element = tag + address + (uint32_t)index * STRING_LIST_ELEMENT_BYTES;
+		int32_t size;
+		uint32_t data;
+
+		memcpy(&size, element, sizeof(size));
+		memcpy(&data, element + STRING_LIST_ELEMENT_ADDRESS_OFFSET, sizeof(data));
+		if (size < 0 || (size & 1) || data > item->size || (uint32_t)size > item->size - data ||
+			(uint32_t)size > item->size - text_bytes)
+		{
+			goto done;
+		}
+		text_bytes += (uint32_t)size;
+	}
+	/* one block: the list, its strings' addresses and lengths, then their
+	characters, each terminated */
+	list = malloc(sizeof(*list) + (size_t)count * (sizeof(*list->strings) + sizeof(*list->lengths)) +
+		(size_t)text_bytes + (size_t)count * sizeof(unsigned short));
+	if (!list)
+	{
+		goto done;
+	}
+	list->count = count;
+	list->strings = (unsigned short const **)(list + 1);
+	list->lengths = (long *)(list->strings + count);
+	characters = (unsigned short *)(list->lengths + count);
+	for (index = 0; index < count; index++)
+	{
+		byte const *element = tag + address + (uint32_t)index * STRING_LIST_ELEMENT_BYTES;
+		int32_t size;
+		uint32_t data;
+		long length;
+
+		memcpy(&size, element, sizeof(size));
+		memcpy(&data, element + STRING_LIST_ELEMENT_ADDRESS_OFFSET, sizeof(data));
+		memcpy(characters, tag + data, (size_t)size);
+		length = size / 2;
+		if (!length || characters[length - 1])
+		{
+			characters[length++] = 0;
+		}
+		list->strings[index] = characters;
+		list->lengths[index] = length;
+		characters += length;
+	}
+
+done:
+	free(tag);
+
+	return list;
+}
+
 static void custom_edition_cache_files_close(
 	void)
 {

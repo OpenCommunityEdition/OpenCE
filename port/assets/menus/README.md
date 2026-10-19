@@ -100,6 +100,14 @@ the bitmap has exactly two frames; the game's functions choose others.
 
 A list of texts, which widgets show by number. `\n` starts a new line.
 
+A list may name the PC version's list of the same texts with `map=` (its tag,
+`ui\shell\main_menu\main_menu_options`), and each of its texts that is one
+of that list's its number there (`<string text="NEW CAMPAIGN" map="0"/>`).
+Each Custom Edition has that list in its language in its `loc.map`: with
+`display.menu_language = "maps"`, a text with a number is the list's from
+the `loc.map` in `custom_maps`, when it has the list and the number. A text
+without one (the port's own) is always the file's.
+
 ### `<widget>`
 
 A screen, or a part of one. Its children are `<widget>` elements in it, or

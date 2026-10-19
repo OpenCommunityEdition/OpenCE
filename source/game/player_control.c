@@ -210,6 +210,7 @@ symbols in this file:
 #include "units/vehicles.h"
 
 #include "real_math.h"
+#include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c; after the limit2d alias above */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* ---------- constants */
@@ -739,7 +740,15 @@ static void handle_one_player_input(
 				1);
 		}
 
-		if (TEST_FLAG(input.player_control_flags, _player_control_input_zoom_bit) &&
+		/* port: this local passenger view has no weapon zoom, including a
+		scope held before entering the seat or enabling the setting. */
+		if (passenger_camera_enabled(local_player_index))
+		{
+			player->zoom_level = NONE;
+			if (unit->unit.current_zoom_level != NONE || unit->unit.desired_zoom_level != NONE)
+				unit_unzoom(player->unit_index);
+		}
+		else if (TEST_FLAG(input.player_control_flags, _player_control_input_zoom_bit) &&
 			player_control_camera_control_is_active() &&
 			current_weapon_index != NONE &&
 			!cinematic_in_progress())
@@ -2103,6 +2112,8 @@ static void player_control_modify_desired_angles(
 		player->desired_angles.pitch,
 		player->pitch_minimum,
 		player->pitch_maximum);
+	/* port: the local camera and the passenger's weapon share the aiming bounds */
+	passenger_camera_clamp_facing(local_player_index, &player->desired_angles);
 
 	return;
 }

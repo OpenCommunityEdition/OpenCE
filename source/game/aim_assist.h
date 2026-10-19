@@ -63,6 +63,9 @@ long player_aim_projectile(
 	long player_index,
 	real_point3d const *position,
 	real_vector3d *direction);
+/* port: the same shot direction, without recording a shot's aim-assist
+target or timestamp (the local passenger reticle's read-only query). */
+long player_aim_projectile_preview(long player_index, real_point3d const *position, real_vector3d *direction);
 long local_player_aim_assist(
 	short local_player_index,
 	real *autoaim_level,

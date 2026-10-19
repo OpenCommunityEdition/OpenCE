@@ -1,4 +1,4 @@
-version 31
+version 32
 bound CHAT_TEXT_SIZE 64
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
@@ -42,6 +42,7 @@ enum _distributed_actor_shield_over_charging_bit 3
 enum _distributed_actor_super_camouflaged_bit 5
 enum _distributed_message_actor_damage 73
 enum _distributed_message_actor_states 64
+enum _distributed_message_aim_assist_policy 90
 enum _distributed_message_batch 16
 enum _distributed_message_chat_config 89
 enum _distributed_message_chat_down 88
@@ -264,7 +265,7 @@ struct distributed_object_state 1b656bbda892
 struct distributed_object_state_message 004c4b7aa530
 struct distributed_pickup 46e6f981ac40
 struct distributed_pings_message 35c6009dee29
-struct distributed_player_input b8d724b59f5c
+struct distributed_player_input a0cf65a1197c
 struct distributed_player_ping 377e0e3045f4
 struct distributed_player_statistics 2a44afb8f96c
 struct distributed_statistics_message 79134e6e9811
