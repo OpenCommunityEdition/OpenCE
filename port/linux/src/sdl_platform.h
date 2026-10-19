@@ -84,6 +84,12 @@ int platform_audio_devices(int recording, char (*names)[PLATFORM_AUDIO_DEVICE_NA
 the system's default for "default", or one not found */
 SDL_AudioDeviceID platform_audio_device(int recording, const char *name);
 void platform_video_drawable_size(int *width, int *height);
+#ifndef HALO_ANDROID
+/* whether the window's display shows HDR, with the desktop's white (in
+scRGB's units, 1.0 being 80 nits) and how many times brighter than it the
+display goes (1.0 without HDR) */
+BOOL platform_video_hdr(float *sdr_white, float *headroom);
+#endif
 /* the window's mode and size and V-Sync, from config.toml as Settings has
 just written it (the main thread's) */
 void platform_display_apply(void);
