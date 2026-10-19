@@ -32,25 +32,9 @@ static unsigned active_count(unsigned long mask)
     return count;
 }
 
-static int has_extension(const char *extensions, const char *name)
-{
-    size_t length;
-    const char *at;
-    if (!extensions || !name || !*name) return 0;
-    length = strlen(name);
-    at = extensions;
-    while ((at = strstr(at, name)) != NULL) {
-        if ((at == extensions || at[-1] == ' ') &&
-            (at[length] == ' ' || at[length] == '\0')) return 1;
-        at += length;
-    }
-    return 0;
-}
-
 int mac_vertex_upload_supported(void)
 {
     const char *version = (const char *)glGetString(GL_VERSION);
-    const char *extensions = (const char *)glGetString(GL_EXTENSIONS);
     unsigned major = 0, minor = 0;
     if (version) {
         while (*version >= '0' && *version <= '9') major = major * 10 + (unsigned)(*version++ - '0');
@@ -59,8 +43,11 @@ int mac_vertex_upload_supported(void)
             while (*version >= '0' && *version <= '9') minor = minor * 10 + (unsigned)(*version++ - '0');
         }
     }
-    return major > 1 || (major == 1 && minor >= 5) ||
-        has_extension(extensions, "GL_ARB_vertex_buffer_object");
+    /* port: the upload calls OpenGL 1.5's own glGenBuffers, glBindBuffer, glBufferData
+       and glBufferSubData. A driver of 1.4 with only GL_ARB_vertex_buffer_object has the
+       ARB-named entries, and the core names are stubs there: it was accepted and then
+       failed or crashed in the first call. */
+    return major > 1 || (major == 1 && minor >= 5);
 }
 
 void mac_vertex_upload_init(struct mac_vertex_upload *upload)
