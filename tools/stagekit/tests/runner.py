@@ -5,6 +5,7 @@ import os
 import re
 import shlex
 import shutil
+import struct
 import subprocess
 import time
 from pathlib import Path
@@ -19,6 +20,9 @@ SCENARIOS = sorted(path.stem for path in (STAGEKIT / "scenarios").glob("*.c"))
 TICKS_PER_SECOND = 30
 # the game's start and the map's loading, before it plays
 LOADING_SECONDS = 10
+# a map file's first words: 'head' and the version, the Xbox's 5 (xbox_files.c's map_file_version)
+MAP_HEADER_SIGNATURE = 0x68656164
+XBOX_MAP_VERSION = 5
 
 
 def build(folder):
@@ -201,10 +205,12 @@ def play(folder, seconds, slot=0, cues=(), input="bot:1"):
     the run's addresses apart, so runs go side by side; the game runs the cues' (second, console line) at their
     ticks; input is debug.test_input's.
 
-    It plays the map in single player with no game data at all (an empty maps folder, which is all the game asks
-    for to start; map_name skips the menus), logged by debug.network_test "log", a tick a frame
-    (debug.fixed_step): as fast as the machine goes, and the same every time."""
+    It plays the map in single player with no game data at all (a maps folder with only the header of an Xbox
+    ui.map, which is all the game asks for to start: its check of the maps folder reads no more of it, and
+    map_name skips the menus), logged by debug.network_test "log", a tick a frame (debug.fixed_step): as fast as
+    the machine goes, and the same every time."""
     (folder / "maps").mkdir(exist_ok=True)
+    (folder / "maps" / "ui.map").write_bytes(struct.pack("<II", MAP_HEADER_SIGNATURE, XBOX_MAP_VERSION))
     game = launch(folder, input, f"127.10.{slot}.10", f"127.10.{slot}.11", "log",
                   init="map_name custom_maps\\void\n", HALO_FIXED_STEP="1", **cue_settings(cues, 1))
     # (stopped here: debug.exit_after is read with the window's events, and the null renderer opens no window)
