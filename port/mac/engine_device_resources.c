@@ -93,9 +93,11 @@ static void attach_stencil(GLuint renderbuffer)
     if(packed_depth_stencil_available())
         glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,GL_STENCIL_ATTACHMENT_EXT,GL_RENDERBUFFER_EXT,renderbuffer);
 }
+static void forget_bound_targets(void);
 static void delete_level_targets(struct native_render_target *entry)
 {
     unsigned level;
+    forget_bound_targets();
     for(level=1;level<MAC_NATIVE_RENDER_TARGET_LEVELS;++level) {
         if(entry->level_framebuffer[level])glDeleteFramebuffersEXT(1,&entry->level_framebuffer[level]);
         if(entry->level_depth_buffer[level])glDeleteRenderbuffersEXT(1,&entry->level_depth_buffer[level]);
@@ -212,6 +214,7 @@ static int create_gl_render_target(D3DTexture *resource,unsigned width,
        (format==D3DFMT_R5G6B5&&(red_size!=5||green_size!=6||blue_size!=5))||
        (format!=D3DFMT_R5G6B5&&
         (red_size!=8||green_size!=8||blue_size!=8||alpha_size!=8))) {
+        forget_bound_targets();
         if(entry->framebuffer)glDeleteFramebuffersEXT(1,&entry->framebuffer);
         if(entry->depth_buffer)glDeleteRenderbuffersEXT(1,&entry->depth_buffer);
         delete_level_targets(entry);
@@ -363,6 +366,7 @@ static struct native_render_target *screen_copy_ensure(DWORD data,DWORD size)
         for(link=&native_render_targets;*link;link=&(*link)->next)
             if(*link==screen_copy_entry) {
                 entry=*link;*link=entry->next;--native_render_target_count;
+                forget_bound_targets();
                 if(entry->framebuffer)glDeleteFramebuffersEXT(1,&entry->framebuffer);
                 if(entry->depth_buffer)glDeleteRenderbuffersEXT(1,&entry->depth_buffer);
                 delete_level_targets(entry);
@@ -457,6 +461,14 @@ static void diag_level_readback(GLuint framebuffer)
             }
 }
 
+/* port: the (framebuffer, depth buffer, size) triples bound before whose attachments were checked complete: binding
+   one again needs no new attachments or status check (the attachments are the target's own, made with it). Forgotten
+   whenever this file deletes a framebuffer or a depth buffer, so that a reused name is checked again. */
+#define BOUND_TARGETS 16
+static struct {unsigned framebuffer,depth,width,height;} bound_targets[BOUND_TARGETS];
+static unsigned bound_target_next;
+static void forget_bound_targets(void){memset(bound_targets,0,sizeof(bound_targets));bound_target_next=0;}
+static int diag_targets=-1;
 int mac_engine_device_resources_bind_target(D3DSurface *surface,D3DSurface *depth)
 {
     unsigned framebuffer;
@@ -508,8 +520,20 @@ int mac_engine_device_resources_bind_target(D3DSurface *surface,D3DSurface *dept
         }
     }
     depth_attachment=target_depth_buffer;
+    if(diag_targets<0)diag_targets=getenv("HALO_MAC_DIAG_TARGETS")!=NULL;
+    if(!diag_targets) {
+        unsigned slot;
+        for(slot=0;slot<BOUND_TARGETS;slot++)
+            if(bound_targets[slot].framebuffer==framebuffer&&bound_targets[slot].depth==depth_attachment&&
+               bound_targets[slot].width==width&&bound_targets[slot].height==height&&framebuffer) {
+                glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,(GLuint)framebuffer);
+                glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
+                glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
+                return 1;
+            }
+    }
     glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT,&old_framebuffer);
-    if(getenv("HALO_MAC_DIAG_TARGETS"))diag_level_readback((GLuint)old_framebuffer);
+    if(diag_targets)diag_level_readback((GLuint)old_framebuffer);
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,(GLuint)framebuffer);
     glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
     glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
@@ -521,6 +545,11 @@ int mac_engine_device_resources_bind_target(D3DSurface *surface,D3DSurface *dept
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,(GLuint)old_framebuffer);
         return 0;
     }
+    if(framebuffer&&!diag_targets) {
+        bound_targets[bound_target_next].framebuffer=framebuffer;bound_targets[bound_target_next].depth=depth_attachment;
+        bound_targets[bound_target_next].width=width;bound_targets[bound_target_next].height=height;
+        bound_target_next=(bound_target_next+1)%BOUND_TARGETS;
+    }
     return 1;
 }
 
@@ -529,6 +558,7 @@ void mac_engine_device_resources_stop(void)
     struct native_render_target *entry=native_render_targets,*next;
     while(entry) {
         next=entry->next;
+        forget_bound_targets();
         if(entry->framebuffer)glDeleteFramebuffersEXT(1,&entry->framebuffer);
         if(entry->depth_buffer)glDeleteRenderbuffersEXT(1,&entry->depth_buffer);
         delete_level_targets(entry);
