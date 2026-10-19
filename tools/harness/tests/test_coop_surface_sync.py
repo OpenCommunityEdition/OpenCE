@@ -9,7 +9,7 @@ from harness import build, run
 from harness.surface_sync import generated
 
 
-@pytest.mark.parametrize('case', ['rewind', 'ordering', 'repair', 'full', 'bounds', 'authority'])
+@pytest.mark.parametrize('case', ['rewind', 'ordering', 'repair', 'full', 'starvation', 'restart', 'bounds', 'authority'])
 def test_surface_state(case):
     status, output = run(build('coop_surface_sync', generated()), case)
     assert status == 0, output

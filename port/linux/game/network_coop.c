@@ -529,6 +529,8 @@ static struct
 /* A revert must refresh surfaces even between the periodic refreshes.
 Kept set if the event queue has no room for the whole state. */
 static boolean host_surfaces_refresh;
+static short host_surfaces_next;
+static short host_surfaces_bsp = NONE;
 
 /* Checkpoints restore player_data, but not the live machines' player
 table. A team wipe may rewind only while both still name the saved team. */
@@ -2092,6 +2094,8 @@ void network_coop_new_game(
 	csmemset(&host_sent_screen_effect, 0, sizeof(host_sent_screen_effect));
 	csmemset(&host_resend, 0, sizeof(host_resend));
 	host_surfaces_refresh = FALSE;
+	host_surfaces_next = 0;
+	host_surfaces_bsp = NONE;
 	csmemset(&checkpoint_players, 0, sizeof(checkpoint_players));
 	csmemset(&players_vitality, 0, sizeof(players_vitality));
 	host_attachment_count = 0;
@@ -2771,26 +2775,36 @@ void network_coop_note_surface_broken(
 	event->reals[2] = epicenter->z;
 }
 
-/* host: a few broken surfaces again each refresh, round them all, for a
-machine that joined since or lost the message (broken from their middle) */
+/* host: complete surface state on each refresh, with progress retained
+across a full event queue so later chunks cannot starve. */
 static void host_send_broken_surfaces(
 	void)
 {
 	struct structure_bsp *structure_bsp = global_structure_bsp_get();
 	short count;
-	short first;
 
-	if ((!host_resend.refresh && !host_surfaces_refresh) || !structure_bsp ||
-		global_structure_bsp_index < 0 || global_structure_bsp_index >= MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO)
+	if (!structure_bsp || global_structure_bsp_index < 0 ||
+		global_structure_bsp_index >= MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO)
 		return;
+	if (host_surfaces_bsp != global_structure_bsp_index)
+	{
+		host_surfaces_bsp = global_structure_bsp_index;
+		host_surfaces_next = 0;
+		host_surfaces_refresh = TRUE;
+	}
+	if (!host_surfaces_refresh && !host_resend.refresh)
+		return;
+	if (!host_surfaces_refresh)
+		host_surfaces_next = 0;
 	count = (short)MIN(structure_bsp->breakable_surfaces.count, MAXIMUM_BREAKABLE_SURFACES_PER_MAP);
 	/* Event numbers order these after any pre-revert breaks. A complete
 	refresh also repairs a lost batch, without needing the revert event. */
 	host_surfaces_refresh = TRUE;
-	for (first = 0; first < count; first += 32)
+	for (; host_surfaces_next < count; host_surfaces_next += 32)
 	{
 		struct distributed_coop_event *event = event_new(_coop_event_surface_broken);
 		unsigned long extant = 0;
+		short first = host_surfaces_next;
 		short index;
 
 		if (!event)
@@ -2806,6 +2820,7 @@ static void host_send_broken_surfaces(
 		event->object_index = (long)extant;
 	}
 	host_surfaces_refresh = FALSE;
+	host_surfaces_next = 0;
 }
 
 void network_coop_note_object_effect(
@@ -2870,6 +2885,8 @@ void network_coop_reverted(
 	/* (the dropships' riders kept are of the game state reverted from) */
 	coop_enemies_reset();
 	host_surfaces_refresh = TRUE;
+	host_surfaces_next = 0;
+	host_surfaces_bsp = NONE;
 	error(_error_silent, "co-op: reverted %ld ticks, clock kept at %ld", ticks, now);
 	event_new(_coop_event_reverted);
 }

@@ -59,6 +59,7 @@ static struct {int definition_indices[4];} client_script_sounds;
 static struct {int objective,nav_point_count;} host_hud_state;
 static struct {boolean offered,skip_save_written;int voters,cooldown_until;} skip_vote;
 static boolean host_surfaces_refresh;
+static short host_surfaces_next,host_surfaces_bsp=NONE;
 static void skip_vote_clear(void){}
 static void coop_enemies_new_game(void){}
 static void coop_pickups_new_game(void){}
@@ -106,8 +107,10 @@ int main(int argc,char **argv)
   CHECK(!network_coop_wipe_reverts(),"failed save replaced membership snapshot");
   setup();game_state_globals.saved_game_valid=FALSE;wipe();CHECK(!reverts&&respawns==1,"missing saved state rewound");
  } else CASE("new-map") {
-  CHECK(network_coop_wipe_reverts(),"valid checkpoint rejected");network_coop_new_game();
+  CHECK(network_coop_wipe_reverts(),"valid checkpoint rejected");
+  host_surfaces_refresh=TRUE;host_surfaces_next=96;host_surfaces_bsp=0;network_coop_new_game();
   CHECK(!network_coop_wipe_reverts(),"checkpoint metadata survived a new game/map");
+  CHECK(!host_surfaces_refresh&&host_surfaces_next==0&&host_surfaces_bsp==NONE,"surface pass survived a new game/map");
  } else CASE("delay") {
   main_lost_map();tick=91;main_lost_map_private();CHECK(!reverts&&!respawns,"rewound early");
   tick=92;main_lost_map_private();CHECK(reverts==1&&!main_globals.lost_map&&!main_globals.loss_timer,"wipe did not clear loss state");

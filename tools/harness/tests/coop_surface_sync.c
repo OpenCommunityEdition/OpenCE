@@ -26,6 +26,7 @@ static long tick=50;
 static int queue_resets;
 static struct {boolean refresh;} host_resend={TRUE};
 static boolean host_surfaces_refresh;
+static short host_surfaces_next,host_surfaces_bsp=NONE;
 static struct {
  struct distributed_coop_event events[MAXIMUM_QUEUED_EVENTS];
  short sends[MAXIMUM_QUEUED_EVENTS],count;
@@ -73,7 +74,8 @@ static void setup(void)
  memset(client.breakable_surface_flags,0xff,sizeof(client.breakable_surface_flags));
  for(int i=0;i<256;i++)host.breakable_surfaces[0][i].vitality=client.breakable_surfaces[0][i].vitality=1;
  memset(&coop_events,0,sizeof(coop_events));global_structure_bsp_index=0;effects=stopped=0;
- host_resend.refresh=TRUE;host_surfaces_refresh=FALSE;bsp.breakable_surfaces.count=64;tick=50;queue_resets=0;select_host();
+ host_resend.refresh=TRUE;host_surfaces_refresh=FALSE;host_surfaces_next=0;host_surfaces_bsp=NONE;
+ bsp.breakable_surfaces.count=64;tick=50;queue_resets=0;select_host();
 }
 static void set_extant(struct breakable_surface_globals *state,int index,boolean extant)
 {
@@ -128,7 +130,38 @@ int main(int argc,char **argv)
   CHECK(coop_events.count==2&&!host_surfaces_refresh,"pending restore did not retry completely");
   coop_events.count=MAXIMUM_QUEUED_EVENTS-1;host_surfaces_refresh=TRUE;host_send_broken_surfaces();
   CHECK(coop_events.count==MAXIMUM_QUEUED_EVENTS&&host_surfaces_refresh,"partial snapshot lost retry");
-  coop_events.count=0;host_send_broken_surfaces();CHECK(coop_events.count==2&&!host_surfaces_refresh,"partial snapshot did not recover");
+  struct distributed_coop_event first=coop_events.events[MAXIMUM_QUEUED_EVENTS-1];
+  CHECK(first.value==0,"partial snapshot did not start at first chunk");
+  memset(client.breakable_surface_flags[0],0,8);
+  select_client();network_coop_handle_events(&first,1);select_host();
+  coop_events.count=0;host_send_broken_surfaces();
+  CHECK(coop_events.count==1&&!host_surfaces_refresh,"partial snapshot did not resume remaining chunk");
+  CHECK(coop_events.events[0].value==32,"partial snapshot restarted instead of continuing at32");
+  deliver();select_client();
+  for(int index=0;index<64;index++)CHECK(breakable_surface_extant(index),"partial snapshot omitted surface%d",index);
+ } else CASE("starvation") {
+  bsp.breakable_surfaces.count=256;host_resend.refresh=FALSE;host_surfaces_refresh=TRUE;
+  memset(client.breakable_surface_flags[0],0,32);
+  for(int chunk=0;chunk<8;chunk++){
+   /* Other co-op traffic leaves exactly one slot on every call. */
+   coop_events.count=MAXIMUM_QUEUED_EVENTS-1;host_send_broken_surfaces();
+   CHECK(coop_events.count==MAXIMUM_QUEUED_EVENTS,"available event slot unused");
+   struct distributed_coop_event event=coop_events.events[MAXIMUM_QUEUED_EVENTS-1];
+   CHECK(event.value==32*chunk,"starved chunk%d: restarted at%d",chunk,event.value);
+   select_client();network_coop_handle_events(&event,1);select_host();
+   CHECK(host_surfaces_refresh==(chunk!=7),"pass completion lost under one-slot capacity");
+  }
+  select_client();for(int index=0;index<256;index++)CHECK(breakable_surface_extant(index),"chunk progress omitted surface%d",index);
+ } else CASE("restart") {
+  bsp.breakable_surfaces.count=256;host_resend.refresh=FALSE;host_surfaces_refresh=TRUE;
+  for(int chunk=0;chunk<3;chunk++){
+   coop_events.count=MAXIMUM_QUEUED_EVENTS-1;host_send_broken_surfaces();
+   CHECK(coop_events.events[MAXIMUM_QUEUED_EVENTS-1].value==32*chunk,"retry cursor failed before reset");
+  }
+  network_coop_reverted(100);coop_events.count=MAXIMUM_QUEUED_EVENTS-1;host_send_broken_surfaces();
+  CHECK(coop_events.events[MAXIMUM_QUEUED_EVENTS-1].value==0,"revert did not restart pass");
+  global_structure_bsp_index=1;coop_events.count=MAXIMUM_QUEUED_EVENTS-1;host_send_broken_surfaces();
+  CHECK(coop_events.events[MAXIMUM_QUEUED_EVENTS-1].value==0&&coop_events.events[MAXIMUM_QUEUED_EVENTS-1].frame==1,"BSP change did not restart pass");
  } else CASE("bounds") {
   struct distributed_coop_event event={.kind=_coop_event_surface_broken,.type=1,.frame=0,.value=0,.object_index=0};
   select_client();event.frame=1;client_apply_event(&event);CHECK(breakable_surface_extant(0),"wrong BSP applied");
