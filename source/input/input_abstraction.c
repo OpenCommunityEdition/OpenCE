@@ -69,6 +69,10 @@ symbols in this file:
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
 #include "halo_keyboard.h" /* port */
+#include "gamepad_layouts.h" /* port: port/linux/game/gamepad_layouts.h */
+
+/* port: config.toml's settings (port/linux/src/port_config.c) */
+extern const char *config_string(const char *name);
 
 /* ---------- constants */
 
@@ -313,6 +317,36 @@ byte input_abstraction_port_accept(
 		keyboard_controls[controller_index].ticks[_game_control_jump] : 0;
 }
 
+/* port: input.gamepad_layout's buttons (gamepad_layouts.h) over a
+controller's preferences, which the profile's BUTTON LAYOUT made; "profile"
+leaves them */
+void input_abstraction_port_apply_layout(
+	short controller_index,
+	struct game_input_preferences *preferences)
+{
+	char const *name = config_string("input.gamepad_layout");
+	short layout_index;
+	short control_index;
+
+	if (controller_index < 0 || controller_index >= MAXIMUM_GAMEPADS)
+		return;
+	for (layout_index = _gamepad_layout_halo2; name && layout_index < NUMBER_OF_GAMEPAD_LAYOUTS; layout_index++)
+	{
+		if (!strcmp(name, gamepad_layouts[layout_index].name))
+		{
+			for (control_index = 0; control_index < NUMBER_OF_GAME_CONTROLS; control_index++)
+			{
+				if (control_index != _game_control_start && control_index != _game_control_back)
+				{
+					preferences->game_control_to_xbox_buttons[control_index] =
+						gamepad_layouts[layout_index].buttons[control_index];
+				}
+			}
+			break;
+		}
+	}
+}
+
 /* port: how far the controller's player pulls the fire control, which a
 trigger with an analog rate of fire reads (weapons.c): a game input state's
 buttons count the ticks a control is held, not its pressure, so a click
@@ -553,6 +587,31 @@ void input_abstraction_update(
 			{
 				state->buttons[control_index] =
 					gamepad->buttons[input_abstraction_globals.player_control_preferences[controller_index].game_control_to_xbox_buttons[control_index]];
+			}
+			/* port: a d-pad direction that has a control (gamepad_layouts.h) no
+			longer moves or looks, as the stick layouts below have it */
+			{
+				static struct gamepad_state without_bound_dpad;
+				long direction;
+				boolean bound = FALSE;
+
+				without_bound_dpad = *gamepad;
+				for (control_index = 0; control_index < NUMBER_OF_GAME_CONTROLS; control_index++)
+				{
+					byte bound_button = input_abstraction_globals.player_control_preferences[controller_index].
+						game_control_to_xbox_buttons[control_index];
+
+					for (direction = _gamepad_binary_button_dpad_up; direction <= _gamepad_binary_button_dpad_right; direction++)
+					{
+						if (bound_button == direction)
+						{
+							without_bound_dpad.buttons[direction] = 0;
+							bound = TRUE;
+						}
+					}
+				}
+				if (bound)
+					gamepad = &without_bound_dpad;
 			}
 
 			if (input_abstraction_globals.player_control_preferences[controller_index].joystick_controls == _joystick_controls_legacy ||

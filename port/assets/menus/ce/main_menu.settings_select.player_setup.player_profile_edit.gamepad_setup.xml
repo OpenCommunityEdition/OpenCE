@@ -9,19 +9,20 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/header_profile_controller_setting" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/controller_edit/header_profile_controller_setting">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/help" type="text" controller="1" left="68" top="350" width="482" height="60" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/help_strings" font="ui\large_ui" color="#FFFFFFFF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/help" type="text" controller="1" left="68" top="364" width="482" height="60" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/help_strings" font="ui\large_ui" color="#FFFFFFFF">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/help">
 		<data input="port settings help"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_look_sensitivity" x="54" y="73"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_invert_look" x="54" y="103"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_flight_inversion" x="54" y="133"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_autocenter" x="54" y="163"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_button_preset" x="54" y="193"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_joystick_preset" x="54" y="223"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_vibration" x="54" y="253"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_ingame_help" x="54" y="283"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_prompt_glyphs" x="54" y="313"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_invert_look" x="54" y="102"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_flight_inversion" x="54" y="131"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_autocenter" x="54" y="160"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_gamepad_layout" x="54" y="189"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_button_preset" x="54" y="218"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_joystick_preset" x="54" y="247"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_vibration" x="54" y="276"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_ingame_help" x="54" y="305"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_prompt_glyphs" x="54" y="334"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -65,11 +66,20 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/autocenter_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="YES|NO" setting="profile.autocenter" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_gamepad_layout" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_layout_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_layout_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_layout_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_layout_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="HALO CE (PROFILE)|HALO 2|HALO 3|HALO 4|HALO 5|HALO INFINITE" setting="input.gamepad_layout" values="profile|halo2|halo3|halo4|halo5|infinite" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_button_preset" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_preset_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_preset_spinner" x="320" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_preset_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_preset_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_preset_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="DEFAULT|SWAP TRIGGERS|SWAP A, L TRIGGER|SWAP B, L TRIGGER|SWAP B, R STICK" setting="profile.button_preset" values="0|1|2|3|4" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
@@ -78,7 +88,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/joystick_preset_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/joystick_preset_spinner" x="320" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/joystick_preset_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/joystick_preset_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/joystick_preset_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="DEFAULT|SOUTHPAW|LEGACY|LEGACY SOUTHPAW" setting="profile.joystick_preset" values="0|1|2|3" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
@@ -87,7 +97,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/vibration_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/vibration_spinner" x="320" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/vibration_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/vibration_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/vibration_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="profile.vibration" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
@@ -96,7 +106,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/ingame_help_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/ingame_help_spinner" x="320" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/ingame_help_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/ingame_help_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/ingame_help_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="profile.ingame_help" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
@@ -105,7 +115,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/prompt_glyphs_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/prompt_glyphs_spinner" x="320" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/prompt_glyphs_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/prompt_glyphs_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/prompt_glyphs_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="AUTO|XBOX|PLAYSTATION" setting="input.prompt_glyphs" values="auto|xbox|playstation" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
@@ -125,6 +135,7 @@
 		<string text="INVERT LOOK:"/>
 		<string text="INVERT FLIGHT:"/>
 		<string text="AUTO-CENTER LOOK:"/>
+		<string text="BUTTON PRESET:"/>
 		<string text="BUTTON LAYOUT:"/>
 		<string text="STICK LAYOUT:"/>
 		<string text="VIBRATION:"/>
@@ -137,6 +148,7 @@
 		<string text="Pushing the right stick up looks down."/>
 		<string text="Flying vehicles pitch as aircraft do: pushing up\nflies down."/>
 		<string text="Level the view while walking."/>
+		<string text="The buttons of a later Halo game, over the button\nlayout below. Halo CE keeps the layout below."/>
 		<string text="Which of the controller's buttons does what (not\nthe keyboard's: Controls Setup sets those)."/>
 		<string text="Which stick moves and which looks."/>
 		<string text="Rumble the controller."/>

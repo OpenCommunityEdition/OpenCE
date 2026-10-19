@@ -69,6 +69,12 @@ void input_abstraction_port_button_controls(
 	short *controls);
 boolean input_abstraction_port_look_inverted(
 	short controller_index);
+/* port: input.gamepad_layout's buttons over a controller's preferences
+(gamepad_layouts.h) */
+struct game_input_preferences;
+void input_abstraction_port_apply_layout(
+	short controller_index,
+	struct game_input_preferences *preferences);
 
 /* ---------- globals */
 

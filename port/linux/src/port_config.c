@@ -331,6 +331,13 @@ static const struct config_setting config_settings[] =
 	{ "input.gamepad_invert_look", _config_boolean, "false", "HALO_GAMEPAD_INVERT_LOOK", _environment_set_is_true,
 		_platform_mac,
 		"Mac: pushing the right stick forward looks down." },
+	{ "input.gamepad_layout", _config_string, "\"profile\"", "HALO_GAMEPAD_LAYOUT", _environment_value,
+		_platform_all,
+		"The game pad's buttons as a later Halo game has them: \"profile\" (the\n"
+		"profile's BUTTON LAYOUT, Halo: Combat Evolved's own, which Halo 2's is\n"
+		"too), \"halo2\", \"halo3\", \"halo4\", \"halo5\" or \"infinite\" (the game's\n"
+		"default layout, with what Combat Evolved has no control for left unbound;\n"
+		"a d-pad direction that has a control no longer moves the player)." },
 	{ "input.gamepad_setup_done", _config_boolean, "false", "HALO_GAMEPAD_SETUP_DONE", _environment_set_is_true,
 		_platform_mac,
 		"Mac: the launcher has offered the controller setup (set by it)." },

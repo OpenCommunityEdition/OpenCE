@@ -225,7 +225,9 @@ a live status line ("No input received yet", "Receiving input", or "Controller
 found but sending nothing" after four quiet seconds), the pad's sticks and
 buttons, and calibrates the dead zones and the look inversion; its choices go
 to `input.gamepad_*` in `config.toml`. Sticks, triggers, d-pad and buttons map
-as on the Xbox. It needs Mac OS X 10.5 or later. `HALO_SKIP_CONTROLLER_SETUP=1`
+as on the Xbox; the pad's buttons can be those of a later Halo game (the start window's
+Controller layout popup, `input.gamepad_layout`: Halo 3, 4, 5 or Infinite; Halo CE's own is the default).
+It needs Mac OS X 10.5 or later. `HALO_SKIP_CONTROLLER_SETUP=1`
 skips the first-run window. The app carries and advertises no controller driver (the build's
 `--driver` is ignored); a pad that a driver the player installed publishes as an
 Xbox 360 pad (045E:028E) is still read.

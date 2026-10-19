@@ -6551,6 +6551,8 @@ boolean pc_menu_event_function_invoke(
 		{
 			settings_each(screen_of(widget), setting_changed_save);
 			platform_display_apply();
+			/* (input.gamepad_layout) */
+			player_ui_port_controls_changed();
 		}
 		else if (!strcmp(name, "port settings defaults"))
 		{

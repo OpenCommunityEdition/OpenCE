@@ -196,7 +196,35 @@ computer (co-op, or split screen in a network game) and only one gamepad,
 that gamepad is controller 2 (player 2) and the keyboard and mouse stay
 controller 1. The gamepad changes controller only when none of its buttons
 is held. The profile's button layout (Settings > Gamepads) is the
-gamepads' only.
+gamepads' only, unless a button preset (`input.gamepad_layout`) is chosen.
+
+### Game pad button presets
+
+Settings > Gamepads > BUTTON PRESET (`input.gamepad_layout`; the Mac's start
+window has the same choice, "Controller layout") puts the buttons of a later
+Halo game over the profile's BUTTON LAYOUT. HALO CE (PROFILE), the default,
+keeps the profile's, so the stock game is unchanged; it and HALO 2 are the
+same buttons. The others are each game's default layout (Halopedia's
+control scheme pages), with what Combat Evolved has no control for (the
+thruster pack, armor abilities, equipment) left unbound, and the d-pad used
+for what those games put on it (switching grenades, the flashlight); a d-pad
+direction that has a control does not move the player. The tables are in
+`port/linux/game/gamepad_layouts.h`.
+
+| Control | HALO CE / HALO 2 | HALO 3 | HALO 4 | HALO 5 | HALO INFINITE |
+| --- | --- | --- | --- | --- | --- |
+| jump | A | A | A | A | A |
+| crouch | left stick | left stick | B | right stick | B |
+| action, reload | X | right bumper | X | X | X |
+| switch weapons | Y | Y | Y | Y | Y |
+| melee | B | B | right bumper | right bumper | right stick |
+| throw a grenade | left trigger | left trigger | left trigger | left bumper | left bumper |
+| switch grenades | right bumper | left bumper | d-pad right | d-pad right | d-pad left |
+| flashlight | left bumper | d-pad up | left bumper | d-pad up | d-pad up |
+| fire | right trigger | right trigger | right trigger | right trigger | right trigger |
+| zoom | right stick | right stick | right stick | left trigger | left trigger |
+
+(CE's white and black buttons are the left and right bumpers.)
 
 | Action | Keys and buttons (default) |
 | --- | --- |
@@ -398,6 +426,7 @@ the setting for one start of the game. It has priority over the file.
 | `input.mouse_capture` | `true` | `HALO_NO_MOUSE_CAPTURE=1` sets `false` | Mac only: `true`: in a game the window holds the mouse (the cursor hidden and decoupled, the view turned by its movement), as the other builds do. F12 frees or holds it; the menus, another application in front and a minimised window free it. Clicking back into the window holds it again. `false`: the cursor stays free. |
 | `input.menu_cursor` | `true` | `HALO_NO_MENU_CURSOR=1` sets `false` | `true`: in the menus the game draws a mouse pointer (an arrow) that follows the mouse, as Halo Custom Edition does, and hides the system's cursor over the window. Hovering a button focuses it, a left click uses it (A), a right click goes back (B) and the wheel scrolls lists. A controller used last takes the arrow away; moving the mouse brings it back (and the prompts name the keyboard and mouse). `false`: the system's cursor. Not on Android (touch). |
 | `input.invert_mouse` | `false` | `HALO_MOUSE_INVERT=1` sets `true` | `true`: the vertical mouse aim is inverted. |
+| `input.gamepad_layout` | `"profile"` | `HALO_GAMEPAD_LAYOUT` | The game pad's buttons as a later Halo game has them: `"profile"` (the profile's BUTTON LAYOUT; Halo: Combat Evolved's own, which Halo 2's is too), `"halo2"`, `"halo3"`, `"halo4"`, `"halo5"` or `"infinite"` (see "Game pad button presets"). The Gamepad Setup screen has a row for it (`BUTTON PRESET`) and the Mac's start window a popup. |
 | `input.gamepad_left_dead_zone` | `9000` | `HALO_GAMEPAD_LEFT_DEAD_ZONE` | Mac only: how far the left stick moves (of 32767) before it counts. |
 | `input.gamepad_right_dead_zone` | `9000` | `HALO_GAMEPAD_RIGHT_DEAD_ZONE` | Mac only: the same for the right stick. |
 | `input.gamepad_invert_look` | `false` | `HALO_GAMEPAD_INVERT_LOOK=1` sets `true` | Mac only: pushing the right stick forward looks down. |

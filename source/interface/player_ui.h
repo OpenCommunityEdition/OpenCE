@@ -105,6 +105,9 @@ void player_ui_remember_player1_profile(
 	boolean save);
 void player_ui_begin_editing_profile(
 	long profile_index);
+/* port: the controls again from the profiles (input.gamepad_layout changed) */
+void player_ui_port_controls_changed(
+	void);
 void player_ui_set_active_player_profile(
 	short local_player_index,
 	long profile_index,

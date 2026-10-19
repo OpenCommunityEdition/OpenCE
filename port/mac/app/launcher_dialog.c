@@ -65,6 +65,11 @@ static const struct choice glyph_choices[] =
 {
 	{ "Auto", "auto" }, { "Xbox", "xbox" }, { "PlayStation", "playstation" }
 };
+static const struct choice layout_choices[] =
+{
+	{ "Halo CE (default)", "profile" }, { "Halo 2", "halo2" }, { "Halo 3", "halo3" }, { "Halo 4", "halo4" },
+	{ "Halo 5", "halo5" }, { "Halo Infinite", "infinite" }
+};
 static const struct choice source_choices[] =
 {
 	{ "Automatic", "auto" }, { "Xbox disc data", "xbox" }, { "MacSoft's Halo", "retail" }
@@ -78,7 +83,7 @@ static int fullscreen_selected;
 static char resolution_value[2][LC_VALUE];	/* [0] fullscreen's display.resolution, [1] the window's size */
 static struct choice resolution_choices[MAX_CHOICES];
 static char resolution_labels[MAX_CHOICES][32], resolution_values[MAX_CHOICES][16];
-static struct popup p_resolution, p_render, p_adaptive, p_fps, p_detail, p_texture, p_aa, p_shadow, p_source, p_glyphs;
+static struct popup p_resolution, p_render, p_adaptive, p_fps, p_detail, p_texture, p_aa, p_shadow, p_source, p_glyphs, p_layout;
 static ControlRef c_full, c_window, c_wide, c_vsync, c_smooth, c_gamma, c_gamma_text, c_hud, c_text, c_ppl;
 static ControlRef c_sound, c_reverb, c_volume, c_volume_text, c_movies, c_achievements, c_status, c_hide;
 
@@ -472,6 +477,7 @@ static void gather(void)
 	lc_set_bool(m, LC_INTRO_MOVIES, GetControl32BitValue(c_movies));
 	lc_set_bool(m, LC_ACHIEVEMENTS, GetControl32BitValue(c_achievements));
 	snprintf(m->value[LC_PROMPT_GLYPHS], LC_VALUE, "%s", popup_value(&p_glyphs));
+	snprintf(m->value[LC_GAMEPAD_LAYOUT], LC_VALUE, "%s", popup_value(&p_layout));
 	snprintf(m->data_source, sizeof(m->data_source), "%s", popup_value(&p_source));
 	m->hide = (int)GetControl32BitValue(c_hide);
 }
@@ -707,8 +713,15 @@ static void build(struct lc_model *m, ControlActionUPP action, ControlRef *play,
 	}
 	make_label(28, 422, 28 + rw, 440, options_labels[0], 1, 0);
 	make_popup(&p_glyphs, 28 + rw + 6, 418, 28 + rw + 6 + wide + 56, glyph_choices, 3, m->value[LC_PROMPT_GLYPHS]);
-	help(p_glyphs.control, "The symbols the game's prompts and button icons show: Xbox, PlayStation, or Auto, which follows the pad in use. Choose one when an adapter (an 8BitDo in Dinput mode) cannot say which pad is paired.");
-	make_label(28 + rw + 6 + wide + 56 + 10, 422, 612, 440, "Auto follows a wired PlayStation pad.", 0, 1);
+	help(p_glyphs.control, "The symbols the game's prompts and button icons show: Xbox, PlayStation, or Auto, which follows the pad in use (a wired PlayStation pad). Choose one when an adapter (an 8BitDo in Dinput mode) cannot say which pad is paired.");
+	/* port: the controller's button layout of a later Halo game (input.gamepad_layout), beside it */
+	{
+		int layout_width = text_width("Controller layout:", kThemeSystemFont) + 6;
+
+		make_label(330, 422, 330 + layout_width, 440, "Controller layout:", 1, 0);
+		make_popup(&p_layout, 330 + layout_width + 6, 418, 616, layout_choices, 6, m->value[LC_GAMEPAD_LAYOUT]);
+		help(p_layout.control, "The pad's buttons as a later Halo game has them: Halo CE keeps the game's own (the profile's button layout), Halo 2 is the same; Halo 3, 4, 5 and Infinite use that game's defaults, with what Halo CE has no control for left unbound.");
+	}
 	make_label(28, 448, 28 + rw, 466, options_labels[1], 1, 0);
 	make_popup(&p_source, 28 + rw + 6, 444, 28 + rw + 6 + wide + 56, source_choices, 3, m->data_source);
 	c_status = make_label(28 + rw + 6 + wide + 56 + 10, 442, 612, 474, "Found: Xbox disc data and MacSoft's Halo.", 0, 1);

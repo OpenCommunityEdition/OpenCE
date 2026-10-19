@@ -244,7 +244,9 @@ SCREENS = {
     "gamepad_setup": {
         "screen": "gamepad_setup_screen",
         "header": ("header_profile_controller_setting", f"{PE}/controller_edit/header_profile_controller_setting"),
-        "spacing": 30,
+        # (ten rows: the video screen's spacing, with the help below them)
+        "spacing": 29,
+        "help_top": 364,
         "rows": [
             ("LOOK SENSITIVITY:", "profile.look_sensitivity", [(str(step), str(step)) for step in range(1, 11)],
              "How fast the right stick turns the view.", None),
@@ -253,6 +255,10 @@ SCREENS = {
              "Flying vehicles pitch as aircraft do: pushing up\nflies down.", None),
             ("AUTO-CENTER LOOK:", "profile.autocenter", YES_NO,
              "Level the view while walking.", None),
+            ("BUTTON PRESET:", "input.gamepad_layout",
+             [("HALO CE (PROFILE)", "profile"), ("HALO 2", "halo2"), ("HALO 3", "halo3"), ("HALO 4", "halo4"),
+              ("HALO 5", "halo5"), ("HALO INFINITE", "infinite")],
+             "The buttons of a later Halo game, over the button\nlayout below. Halo CE keeps the layout below.", None),
             ("BUTTON LAYOUT:", "profile.button_preset",
              [("DEFAULT", "0"), ("SWAP TRIGGERS", "1"), ("SWAP A, L TRIGGER", "2"), ("SWAP B, L TRIGGER", "3"),
               ("SWAP B, R STICK", "4")],

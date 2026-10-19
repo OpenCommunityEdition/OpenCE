@@ -34,6 +34,7 @@ enum lc_id
 	LC_INTRO_MOVIES,
 	LC_ACHIEVEMENTS,	/* game.achievements */
 	LC_PROMPT_GLYPHS,	/* input.prompt_glyphs: "auto", "xbox" or "playstation" */
+	LC_GAMEPAD_LAYOUT,	/* input.gamepad_layout: "profile", "halo2", "halo3", "halo4", "halo5" or "infinite" */
 	LC_COUNT
 };
 

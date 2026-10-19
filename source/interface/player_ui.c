@@ -1174,6 +1174,11 @@ static void set_local_player_controls_from_player_profile(
 	preferences.invert_look = controls->invert_look;
 	preferences.invert_look_aircraft_control = controls->flight_stick_aircraft_controls;
 	controller_index = player_ui_globals.single_player_controller[local_player_index];
+	/* port: input.gamepad_layout's buttons over the profile's (the controller
+	is the one these preferences go to) */
+	input_abstraction_port_apply_layout(
+		controller_index != NONE ? controller_index : local_player_index,
+		&preferences);
 	if (controller_index != NONE)
 	{
 		input_abstraction_update_local_player_preferences(
@@ -1188,6 +1193,19 @@ static void set_local_player_controls_from_player_profile(
 	}
 
 	return;
+}
+
+/* port: the controls of every local player again from their profile, once
+input.gamepad_layout has changed (Settings > Gamepad Setup's OK) */
+void player_ui_port_controls_changed(
+	void)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
+	{
+		set_local_player_controls_from_player_profile(local_player_index);
+	}
 }
 
 void player_ui_set_active_player_profile(
