@@ -110,6 +110,51 @@ const char *mac_gamepad_report_name(int kind);
 unsigned mac_gamepad_rumble_report(int kind, unsigned char strong, unsigned char weak,
     unsigned char *out, unsigned size);
 
+/* ---- Bluetooth (a pad paired in the system's Bluetooth menu, read through IOHID) ----
+   A DualSense that has just connected sends the simple report 0x01 (10 bytes, the DualShock 4's USB
+   layout up to its triggers). Reading its feature report 0x05 (calibration, 41 bytes) switches it to the
+   full report 0x31 (78 bytes): [0] 0x31, [1] a sequence byte, then every field of the USB report 0x01 one
+   byte later (sticks at [2] to [5], triggers [6] and [7], buttons [9] to [11]), the touch points from
+   [34] and the battery at [54]; the last four bytes are a CRC-32. A DualShock 4 does the same with its
+   feature report 0x05 (or 0x02) and then sends 0x11 (two bytes later than USB's 0x01). The decoder takes
+   the simple report and the full one alike. */
+#define MAC_PAD_BLUETOOTH_SWITCH_REPORT 0x05
+#define MAC_PAD_BLUETOOTH_SWITCH_SIZE 41
+#define MAC_PAD_BLUETOOTH_SWITCH_ALTERNATE_REPORT 0x02
+#define MAC_PAD_BLUETOOTH_SWITCH_ALTERNATE_SIZE 37
+
+/* the battery of a full report as a percentage (0 to 100), or -1 when the report has none (USB's and the
+   simple ones; the DualSense's 0x31 and the DualShock 4's 0x11 carry it) */
+int mac_gamepad_report_battery(int kind, const unsigned char *data, unsigned size);
+
+/* whether the report is a Bluetooth pad's simple one (the pad has not been switched to the full report) */
+int mac_gamepad_report_is_simple(int kind, const unsigned char *data, unsigned size);
+
+/* What a pad is to show and do, for the output report over Bluetooth. */
+struct mac_pad_output {
+    unsigned char red, green, blue;
+    unsigned char player_leds;   /* the five lights as bits, 0 for none */
+    unsigned char strong, weak;  /* the motors, 0 to 255 */
+    int set_light;               /* send the colour */
+    int set_players;             /* send the player lights */
+    int set_rumble;              /* send the motors */
+    int fade_out_setup;          /* DualSense: stop the pairing light animation first */
+};
+
+/* The Bluetooth output report of a DualSense (0x31) or DualShock 4 (0x11), 78 bytes with the CRC-32 over
+   0xA2 and the first 74 (the layouts are in port/mac/bt/bt_pad.c's header); sequence is the DualSense's
+   0 to 15 counter, one more for every report. Returns 78, or 0 for another kind. Both Bluetooth paths send
+   these: the own stack (bt_pad.c) and the system's, through IOHID (mac_gamepad.c). */
+#define MAC_PAD_BLUETOOTH_OUTPUT_SIZE 78
+unsigned mac_pad_build_bluetooth_output(int kind, unsigned sequence, const struct mac_pad_output *o,
+    unsigned char *r);
+
+/* the reflected IEEE CRC-32 (polynomial 0xEDB88320) as Sony's reports use it: start from 0xFFFFFFFF and
+   complement the end. mac_pad_crc32_report does all of it, over a one-byte HIDP header (0xA1 input,
+   0xA2 output: part of the checksum, not of the report) and the data. */
+unsigned mac_pad_crc32_update(unsigned crc, const unsigned char *data, unsigned size);
+unsigned mac_pad_crc32_report(unsigned char header, const unsigned char *data, unsigned size);
+
 /* Decodes one input report as the interrupt pipe delivers it (the report id
    first). Returns 1, with the frame connected, or 0 when the report is not
    the pad's state (another report id, too short). extra may be NULL. */

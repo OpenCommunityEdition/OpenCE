@@ -37,35 +37,15 @@ void bt_put32(unsigned char *p, unsigned value)
     p[3] = (unsigned char)((value >> 24) & 0xff);
 }
 
-static unsigned crc_table[256];
-static int crc_ready;
-
-static void crc_init(void)
-{
-    unsigned n, k, c;
-    for (n = 0; n < 256; n++) {
-        c = n;
-        for (k = 0; k < 8; k++)
-            c = (c & 1) ? 0xedb88320u ^ (c >> 1) : c >> 1;
-        crc_table[n] = c;
-    }
-    crc_ready = 1;
-}
-
+/* (the CRC is shared with the system Bluetooth path: mac_gamepad_report.c) */
 unsigned bt_crc32_update(unsigned crc, const unsigned char *data, unsigned size)
 {
-    unsigned i;
-    if (!crc_ready) crc_init();
-    for (i = 0; i < size; i++)
-        crc = crc_table[(crc ^ data[i]) & 0xff] ^ (crc >> 8);
-    return crc;
+    return mac_pad_crc32_update(crc, data, size);
 }
 
 unsigned bt_crc32_report(unsigned char header, const unsigned char *data, unsigned size)
 {
-    unsigned crc = bt_crc32_update(0xffffffffu, &header, 1);
-    crc = bt_crc32_update(crc, data, size);
-    return ~crc;
+    return mac_pad_crc32_report(header, data, size);
 }
 
 void bt_addr_text(const unsigned char *a, char *out)

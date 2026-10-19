@@ -237,9 +237,16 @@ struct gamepad_device {
     /* when a report last came (or the pad was opened): a streaming pad that falls silent is asleep */
     CFAbsoluteTime raw_last;
     int asleep;
-    /* rumble (mac_gamepad_rumble): the pad is on USB (the Bluetooth output
-       reports carry a checksum, not made), what it was last told and when */
-    int usb, rumble_failed;
+    /* rumble (mac_gamepad_rumble): the pad is on USB, or on Bluetooth through the system's stack (the
+       output report 0x31 or 0x11 with its checksum), what it was last told and when */
+    int usb, bluetooth, rumble_failed;
+    /* Bluetooth: the pad starts with its simple report, and a feature report read switches it to the
+       full one (mac_gamepad_report.h); tried again while the reports stay simple. The output report's
+       sequence number, and whether the light bar and player lights were set. */
+    int bt_switched, bt_switch_tries, bt_lights_set, battery;
+    unsigned raw_first_size;
+    unsigned bt_sequence;
+    CFAbsoluteTime bt_switch_at;
     unsigned char rumble_strong, rumble_weak;
     CFAbsoluteTime rumble_sent;
     CFRunLoopSourceRef raw_source;
@@ -477,12 +484,41 @@ static void raw_report(void *target, IOReturn result, void *refcon, void *sender
     (void)refcon; (void)sender;
     if (result != kIOReturnSuccess) return;
     if (size > RAW_BUFFER_SIZE) size = RAW_BUFFER_SIZE;
+    if (!pad->raw_seen) pad->raw_first_size = size;
     if (mac_gamepad_decode_report(pad->raw_kind, pad->raw_buffer, size, &frame, NULL)) {
+        int battery = mac_gamepad_report_battery(pad->raw_kind, pad->raw_buffer, size);
+        if (battery >= 0) pad->battery = battery;
+        /* (a Bluetooth pad's simple reports go on until it is switched: the next poll tries again) */
+        pad->bt_switched = pad->bluetooth && !mac_gamepad_report_is_simple(pad->raw_kind, pad->raw_buffer, size);
         pad->raw_frame = frame;
         pad->raw_seen = 1;
         pad->raw_last = CFAbsoluteTimeGetCurrent();
     } else if (pad->raw_bad < RAW_BAD_LIMIT && !pad->raw_seen)
         ++pad->raw_bad;
+}
+
+/* Reads the feature report that switches a Bluetooth Sony pad from its simple report to the full one.
+   One try; the pad may not answer when it is only just connected (the poll tries again). */
+static void bluetooth_switch(struct gamepad_device *pad)
+{
+    unsigned char feature[MAC_PAD_BLUETOOTH_SWITCH_SIZE];
+    UInt32 size = sizeof(feature);
+    IOReturn result;
+    pad->bt_switch_at = CFAbsoluteTimeGetCurrent();
+    ++pad->bt_switch_tries;
+    memset(feature, 0, sizeof(feature));
+    result = (*pad->interface)->getReport(pad->interface, kIOHIDReportTypeFeature, MAC_PAD_BLUETOOTH_SWITCH_REPORT,
+        feature, &size, 200, NULL, NULL, NULL);
+    if (result != kIOReturnSuccess && pad->raw_kind == MAC_PAD_REPORT_DUALSHOCK4) {
+        size = MAC_PAD_BLUETOOTH_SWITCH_ALTERNATE_SIZE;
+        result = (*pad->interface)->getReport(pad->interface, kIOHIDReportTypeFeature,
+            MAC_PAD_BLUETOOTH_SWITCH_ALTERNATE_REPORT, feature, &size, 200, NULL, NULL, NULL);
+    }
+    if (reported < 16) {
+        ++reported;
+        fprintf(stderr, "game pad: %s (Bluetooth) feature report read %s (0x%x)\n", pad->name,
+            result == kIOReturnSuccess ? "ok" : "failed", (unsigned)result);
+    }
 }
 
 /* starts a Sony pad's reports; left off (the elements are read) when the
@@ -500,7 +536,9 @@ static void device_raw_start(struct gamepad_device *pad)
         return;
     }
     pad->raw_last = CFAbsoluteTimeGetCurrent();
+    pad->battery = -1;
     CFRunLoopAddSource(CFRunLoopGetCurrent(), pad->raw_source, RAW_MODE);
+    if (pad->bluetooth) bluetooth_switch(pad);
 }
 
 static int device_open(struct gamepad_device *pad, io_service_t service)
@@ -535,15 +573,17 @@ static int device_open(struct gamepad_device *pad, io_service_t service)
         CFRelease(name);
     }
     if (!device_elements(pad)) { device_close(pad); return 0; }
+    name = IORegistryEntryCreateCFProperty(service, CFSTR(kIOHIDTransportKey), kCFAllocatorDefault, 0);
+    if (name) {
+        if (CFGetTypeID(name) == CFStringGetTypeID()) {
+            pad->usb = CFStringCompare((CFStringRef)name, CFSTR("USB"), 0) == kCFCompareEqualTo;
+            pad->bluetooth = CFStringCompare((CFStringRef)name, CFSTR("Bluetooth"), 0) == kCFCompareEqualTo;
+        }
+        CFRelease(name);
+    }
     device_raw_start(pad);
     if (note_port)
         IOServiceAddInterestNotification(note_port, service, kIOGeneralInterest, pad_message, pad, &pad->notifier);
-    name = IORegistryEntryCreateCFProperty(service, CFSTR(kIOHIDTransportKey), kCFAllocatorDefault, 0);
-    if (name) {
-        pad->usb = CFGetTypeID(name) == CFStringGetTypeID() &&
-            CFStringCompare((CFStringRef)name, CFSTR("USB"), 0) == kCFCompareEqualTo;
-        CFRelease(name);
-    }
     return 1;
 }
 
@@ -633,6 +673,7 @@ static int device_poll(struct gamepad_device *pad, struct mac_gamepad_frame *out
     unsigned i;
     if (pad->raw_kind && pad->raw_bad >= RAW_BAD_LIMIT) {
         /* (the reports are not the layout expected: the elements are read) */
+        if (reported < 16) { ++reported; fprintf(stderr, "game pad: %s: reports not decoded (first one 0x%02x, %u bytes); reading the elements\n", pad->name, pad->raw_buffer[0], pad->raw_first_size); }
         pad->raw_kind = MAC_PAD_REPORT_NONE;
     }
     if (pad->raw_kind) {
@@ -655,6 +696,10 @@ static int device_poll(struct gamepad_device *pad, struct mac_gamepad_frame *out
             pad->asleep = 0;
             if (reported < 16) { ++reported; fprintf(stderr, "game pad: %s is back\n", pad->name); }
         }
+        /* (a Bluetooth pad still on its simple reports: read the feature report again, up to five times) */
+        if (pad->bluetooth && !pad->bt_switched && pad->bt_switch_tries < 5 &&
+            CFAbsoluteTimeGetCurrent() - pad->bt_switch_at >= 1.0)
+            bluetooth_switch(pad);
         if (pad->raw_seen)
             *out = pad->raw_frame;
         else {
@@ -680,11 +725,35 @@ static int device_poll(struct gamepad_device *pad, struct mac_gamepad_frame *out
    report was written. */
 static int rumble_send(struct gamepad_device *pad, unsigned char strong, unsigned char weak)
 {
-    unsigned char report[MAC_PAD_RUMBLE_REPORT_MAXIMUM];
+    unsigned char report[MAC_PAD_BLUETOOTH_OUTPUT_SIZE];
     unsigned length;
     IOReturn result;
-    if (!pad->interface || !pad->usb || !pad->raw_kind || pad->rumble_failed) return 0;
-    length = mac_gamepad_rumble_report(pad->raw_kind, strong, weak, report, sizeof(report));
+    if (!pad->interface || !(pad->usb || pad->bluetooth) || !pad->raw_kind || pad->rumble_failed) return 0;
+    if (pad->bluetooth) {
+        /* Bluetooth: the output report with its checksum. The first one also takes the light bar and the
+           player lights, after the setup report that stops the pad's pairing light (DualSense). */
+        struct mac_pad_output o;
+        if (!pad->bt_switched) return 0;
+        memset(&o, 0, sizeof(o));
+        if (!pad->bt_lights_set) {
+            static const unsigned char players[4] = { 0x04, 0x0a, 0x15, 0x1b };
+            pad->bt_lights_set = 1;
+            o.fade_out_setup = 1;
+            length = mac_pad_build_bluetooth_output(pad->raw_kind, pad->bt_sequence++, &o, report);
+            if (length) (*pad->interface)->setReport(pad->interface, kIOHIDReportTypeOutput, report[0],
+                report, length, 100, NULL, NULL, NULL);
+            memset(&o, 0, sizeof(o));
+            o.set_light = 1;
+            o.blue = 0xff;
+            o.set_players = 1;
+            o.player_leds = players[(pad - pads) & 3];
+        }
+        o.set_rumble = 1;
+        o.strong = strong;
+        o.weak = weak;
+        length = mac_pad_build_bluetooth_output(pad->raw_kind, pad->bt_sequence++, &o, report);
+    } else
+        length = mac_gamepad_rumble_report(pad->raw_kind, strong, weak, report, sizeof(report));
     if (!length) return 0;
     result = (*pad->interface)->setReport(pad->interface, kIOHIDReportTypeOutput, report[0],
         report, length, 100, NULL, NULL, NULL);
@@ -706,9 +775,17 @@ int mac_gamepad_rumble(int slot, unsigned char strong, unsigned char weak)
     if (slot < 0 || slot >= MAC_GAMEPAD_MAXIMUM_DEVICES) return 0;
     if (slot == bt_slot) return mac_bt_input_rumble(strong, weak);
     pad = &pads[slot];
-    if (!pad->interface || !pad->usb || !pad->raw_kind || pad->rumble_failed) return 0;
+    if (!pad->interface || !(pad->usb || pad->bluetooth) || !pad->raw_kind || pad->rumble_failed) return 0;
     if (pad->rumble_strong == strong && pad->rumble_weak == weak) return 1;
     return rumble_send(pad, strong, weak);
+}
+
+static int system_bluetooth_pad_open(void)
+{
+    int slot;
+    for (slot = 0; slot < MAC_GAMEPAD_MAXIMUM_DEVICES; ++slot)
+        if (pads[slot].interface && pads[slot].bluetooth) return 1;
+    return 0;
 }
 
 /* The Bluetooth pad's state into its slot: the slot it had last when that is free, else the lowest free one
@@ -716,6 +793,9 @@ int mac_gamepad_rumble(int slot, unsigned char strong, unsigned char weak)
 static void bt_update(struct mac_gamepad_frame frames[MAC_GAMEPAD_MAXIMUM_DEVICES])
 {
     struct mac_gamepad_frame frame;
+    /* port: a pad the system's Bluetooth stack owns (read through IOHID above) leaves the own stack
+       alone: the dongle is Apple's then, and the own stack could not open it. */
+    if (bt_slot < 0 && system_bluetooth_pad_open()) return;
     if (!mac_bt_input_poll(&frame)) {
         if (bt_slot >= 0 && reported < 16) { ++reported; fprintf(stderr, "game pad: %s (Bluetooth) went away\n", mac_bt_input_name()); }
         bt_slot = -1;
@@ -811,6 +891,11 @@ const char *mac_gamepad_name_at(int slot)
 {
     if (slot >= 0 && slot == bt_slot) return mac_bt_input_name();
     return slot >= 0 && slot < MAC_GAMEPAD_MAXIMUM_DEVICES && pads[slot].interface ? pads[slot].name : "";
+}
+
+int mac_gamepad_battery_at(int slot)
+{
+    return slot >= 0 && slot < MAC_GAMEPAD_MAXIMUM_DEVICES && pads[slot].interface && pads[slot].raw_kind ? pads[slot].battery : -1;
 }
 
 int mac_gamepad_asleep_at(int slot)

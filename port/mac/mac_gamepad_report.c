@@ -140,7 +140,16 @@ int mac_gamepad_decode_report(int kind, const unsigned char *data, unsigned size
         left_trigger = trigger_byte(data[8], (shoulder & 0x04) != 0);
         right_trigger = trigger_byte(data[9], (shoulder & 0x08) != 0);
     } else if (kind == MAC_PAD_REPORT_DUALSENSE) {
-        if (size < 11 || data[0] != 0x01) return 0;
+        if (size >= 12 && data[0] == 0x31) {
+            /* Bluetooth's full report: the USB layout one byte later (a sequence byte follows the id) */
+            ++data;
+            --size;
+        } else if (size >= 10 && size < 11 && data[0] == 0x01) {
+            /* Bluetooth's simple report, before the pad is switched: the DualShock 4's layout */
+            return mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSHOCK4, data, size, out, extra);
+        } else if (data[0] != 0x01)
+            return 0;
+        if (size < 11) return 0;
         memset(out, 0, sizeof(*out));
         out->connected = 1;
         out->left_x = stick_byte(data[1], 0);
@@ -187,4 +196,108 @@ unsigned mac_gamepad_rumble_report(int kind, unsigned char strong, unsigned char
         out[4] = strong;
     }
     return length;
+}
+
+int mac_gamepad_report_is_simple(int kind, const unsigned char *data, unsigned size)
+{
+    return data && size >= 10 && size < 11 && data[0] == 0x01 &&
+        (kind == MAC_PAD_REPORT_DUALSENSE || kind == MAC_PAD_REPORT_DUALSHOCK4);
+}
+
+int mac_gamepad_report_battery(int kind, const unsigned char *data, unsigned size)
+{
+    unsigned level;
+    if (!data) return -1;
+    if (kind == MAC_PAD_REPORT_DUALSENSE && data[0] == 0x31 && size >= 55) {
+        level = data[54] & 0x0f;
+        return level >= 10 ? 100 : (int)(level * 10 + 5);
+    }
+    if (kind == MAC_PAD_REPORT_DUALSHOCK4 && data[0] == 0x11 && size >= 33) {
+        level = data[32] & 0x0f;
+        return level >= 8 ? 100 : (int)(level * 100 / 8);
+    }
+    return -1;
+}
+
+static unsigned crc_table[256];
+static int crc_ready;
+
+unsigned mac_pad_crc32_update(unsigned crc, const unsigned char *data, unsigned size)
+{
+    unsigned i;
+    if (!crc_ready) {
+        unsigned n, k, c;
+        for (n = 0; n < 256; n++) {
+            c = n;
+            for (k = 0; k < 8; k++)
+                c = (c & 1) ? 0xedb88320u ^ (c >> 1) : c >> 1;
+            crc_table[n] = c;
+        }
+        crc_ready = 1;
+    }
+    for (i = 0; i < size; i++)
+        crc = crc_table[(crc ^ data[i]) & 0xff] ^ (crc >> 8);
+    return crc;
+}
+
+unsigned mac_pad_crc32_report(unsigned char header, const unsigned char *data, unsigned size)
+{
+    unsigned crc = mac_pad_crc32_update(0xffffffffu, &header, 1);
+    crc = mac_pad_crc32_update(crc, data, size);
+    return ~crc;
+}
+
+unsigned mac_pad_build_bluetooth_output(int kind, unsigned sequence, const struct mac_pad_output *o,
+    unsigned char *r)
+{
+    unsigned char *c = r + 3;
+    unsigned crc;
+    if (kind != MAC_PAD_REPORT_DUALSENSE && kind != MAC_PAD_REPORT_DUALSHOCK4) return 0;
+    memset(r, 0, MAC_PAD_BLUETOOTH_OUTPUT_SIZE);
+    if (kind == MAC_PAD_REPORT_DUALSENSE) {
+        r[0] = 0x31;
+        r[1] = (unsigned char)((sequence & 0x0f) << 4);
+        r[2] = 0x10;
+        if (o->fade_out_setup) {
+            /* the setup report: only the light bar setup, and nothing else */
+            c[38] = 0x02;
+            c[41] = 0x02;
+        } else {
+            if (o->set_rumble) {
+                c[0] = 0x03;
+                c[2] = o->weak;
+                c[3] = o->strong;
+            }
+            if (o->set_light) {
+                c[1] |= 0x04;
+                c[44] = o->red;
+                c[45] = o->green;
+                c[46] = o->blue;
+            }
+            if (o->set_players) {
+                c[1] |= 0x10;
+                c[43] = (unsigned char)(o->player_leds & 0x1f);
+            }
+        }
+    } else {
+        r[0] = 0x11;
+        r[1] = 0xc4;
+        if (o->set_rumble) {
+            c[0] |= 0x01;
+            c[3] = o->weak;
+            c[4] = o->strong;
+        }
+        if (o->set_light) {
+            c[0] |= 0x02;
+            c[5] = o->red;
+            c[6] = o->green;
+            c[7] = o->blue;
+        }
+    }
+    crc = mac_pad_crc32_report(0xa2, r, 74);
+    r[74] = (unsigned char)crc;
+    r[75] = (unsigned char)(crc >> 8);
+    r[76] = (unsigned char)(crc >> 16);
+    r[77] = (unsigned char)(crc >> 24);
+    return MAC_PAD_BLUETOOTH_OUTPUT_SIZE;
 }

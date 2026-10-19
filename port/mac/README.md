@@ -254,6 +254,13 @@ button, `--controller-setup`, Finder) brings the first to the front and quits
 
 #### Bluetooth (experimental)
 
+A DualSense or DualShock 4 that the Mac's own Bluetooth owns (paired in the system's Bluetooth menu, with
+any working controller, a dongle included) is read through IOHID like a USB one: the game reads the pad's
+feature report 0x05, which switches it from its simple report to the full report 0x31 (0x11), decodes the
+sticks, triggers, buttons, touchpad click and battery, and sends rumble, the light bar and the player lights
+as the output report 0x31 with its CRC-32 (the same builder as the own stack's, `mac_gamepad_report.c`). The
+own stack below stands aside while such a pad is open. Check with `tools/mac_gamepad_system_probe_checks.sh`.
+
 A DualSense or DualShock 4 can connect over PowerSpark's own Bluetooth stack
 (`port/mac/bt/`) through a TP-Link UB500 (Realtek RTL8761BU) dongle. It needs:
 

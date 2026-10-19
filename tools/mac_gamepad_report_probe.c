@@ -27,6 +27,13 @@ static void sense(unsigned char *r, unsigned char lx, unsigned char ly, unsigned
     r[12] = 0x9a; r[13] = 0xbc; r[40] = 0xff;
 }
 
+static short stick_ref(unsigned char value, int flip)
+{
+    int scaled = (int)value * 257 - 32768;
+    if (flip) scaled = -scaled - 1;
+    return (short)scaled;
+}
+
 static int same(const struct mac_gamepad_frame *a, const struct mac_gamepad_frame *b)
 {
     return memcmp(a, b, sizeof(*a)) == 0;
@@ -136,7 +143,8 @@ int main(void)
     CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSHOCK4, r, 9, &f, NULL) == 0);
     CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSHOCK4, NULL, 64, &f, NULL) == 0);
     CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_NONE, r, 64, &f, NULL) == 0);
-    CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSENSE, r, 10, &f, NULL) == 0);
+    /* (10 bytes is Bluetooth's simple report; 9 is too short) */
+    CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSENSE, r, 9, &f, NULL) == 0);
 
     /* DualSense: triggers at 5 and 6, buttons from 8 */
     sense(r, 128, 128, 128, 128, 0, 0, 0x08, 0, 0);
@@ -311,6 +319,76 @@ int main(void)
             CHECK(g.analog[MAC_GAMEPAD_LEFT_TRIGGER] == 255 && g.analog[MAC_GAMEPAD_RIGHT_TRIGGER] == 255);
             CHECK(g.buttons == (MAC_GAMEPAD_BACK | MAC_GAMEPAD_START | MAC_GAMEPAD_DPAD_RIGHT | MAC_GAMEPAD_DPAD_UP));
         }
+    }
+
+    /* Bluetooth (the pad paired in the system's menu, read through IOHID) */
+    {
+        /* a DualSense's first full report, as the own stack logged it (pair2.log), without the 0xA1 header */
+        static const unsigned char real[78] = {
+            0x31,0x31,0x72,0x76,0x7f,0x75,0x00,0x00,0x01,0x08,0x00,0x00,0x00,0xea,0x45,0xed,
+            0x83,0x13,0x00,0xe9,0xff,0x02,0x00,0xa4,0x02,0x21,0x1e,0xc9,0x06,0x14,0xee,0x07,
+            0x0b,0x00,0x80,0x00,0x00,0x00,0x80,0x00,0x00,0x00,0x00,0x09,0x09,0x00,0x00,0x00,
+            0x00,0x00,0x0d,0xfd,0x07,0x0b,0x07,0x00,0x00,0xb6,0xb1,0x54,0x3c,0xdf,0x00,0x00,
+            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
+        unsigned char b[78];
+        struct mac_pad_output o;
+        unsigned char out[78];
+        unsigned crc;
+        CHECK(mac_pad_crc32_report(0xa1, real, 4) != 0);
+        /* the full report 0x31: sticks at 2..5, nothing pressed (hat 8) */
+        memcpy(b, real, sizeof(b));
+        CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSENSE, b, 78, &f, &extra) == 1);
+        CHECK(f.connected && f.buttons == 0 && f.left_x == stick_ref(0x72, 0) && f.left_y == stick_ref(0x76, 1));
+        CHECK(f.right_x == stick_ref(0x7f, 0) && f.right_y == stick_ref(0x75, 1) && extra == 0);
+        /* the same state as the USB report 0x01 decodes */
+        sense(r, 0x72, 0x76, 0x7f, 0x75, 0, 0, 0x08, 0, 0);
+        CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSENSE, r, 64, &g, NULL) == 1 && same(&f, &g));
+        /* buttons: cross and R1 and L2 (analog 200), d-pad right, options, touchpad click and PS */
+        b[6] = 200; b[7] = 0;
+        b[9] = 0x22; /* hat 2 (east), cross */
+        b[10] = 0x02 | 0x20; /* R1, options */
+        b[11] = 0x03; /* PS, touchpad click */
+        CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSENSE, b, 78, &f, &extra) == 1);
+        CHECK((f.buttons & MAC_GAMEPAD_DPAD_RIGHT) && f.analog[MAC_GAMEPAD_A] == 255 && f.analog[MAC_GAMEPAD_BLACK] == 255);
+        CHECK((f.buttons & MAC_GAMEPAD_START) && f.analog[MAC_GAMEPAD_LEFT_TRIGGER] == 200 && extra == (MAC_PAD_EXTRA_PS | MAC_PAD_EXTRA_TOUCHPAD));
+        /* the full report that is too short or of another id is not state */
+        CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSENSE, b, 11, &f, NULL) == 0);
+        b[0] = 0x32;
+        CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSENSE, b, 78, &f, NULL) == 0);
+        /* the simple report (10 bytes): DualShock 4 layout, from a DualSense too */
+        memset(b, 0, sizeof(b));
+        b[0] = 1; b[1] = 0xff; b[2] = 0x00; b[3] = 0x80; b[4] = 0x80; b[5] = 0x08 | 0x40; b[6] = 0x01; b[7] = 0x01; b[8] = 0; b[9] = 77;
+        CHECK(mac_gamepad_report_is_simple(MAC_PAD_REPORT_DUALSENSE, b, 10));
+        CHECK(!mac_gamepad_report_is_simple(MAC_PAD_REPORT_DUALSENSE, real, 78));
+        CHECK(!mac_gamepad_report_is_simple(MAC_PAD_REPORT_DUALSENSE, r, 64));
+        CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSENSE, b, 10, &f, &extra) == 1);
+        CHECK(f.left_x == stick_ref(0xff, 0) && f.left_y == stick_ref(0, 1) && f.analog[MAC_GAMEPAD_B] == 255);
+        CHECK(f.analog[MAC_GAMEPAD_WHITE] == 255 && f.analog[MAC_GAMEPAD_RIGHT_TRIGGER] == 77 && extra == MAC_PAD_EXTRA_PS);
+        CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSENSE, b, 9, &f, NULL) == 0);
+        /* battery: the real report's byte 54 is 0x07 (level 7: 75 percent); other reports have none */
+        CHECK(mac_gamepad_report_battery(MAC_PAD_REPORT_DUALSENSE, real, 78) == 75);
+        CHECK(mac_gamepad_report_battery(MAC_PAD_REPORT_DUALSENSE, r, 64) == -1);
+        CHECK(mac_gamepad_report_battery(MAC_PAD_REPORT_DUALSENSE, b, 10) == -1);
+        /* a DualShock 4's simple report decodes as it does on USB */
+        CHECK(mac_gamepad_decode_report(MAC_PAD_REPORT_DUALSHOCK4, b, 10, &f, NULL) == 1 && f.analog[MAC_GAMEPAD_B] == 255);
+        /* output: the CRC-32 check value, the rumble report and the setup report */
+        CHECK(~mac_pad_crc32_update(0xffffffffu, (const unsigned char *)"123456789", 9) == 0xcbf43926u);
+        memset(&o, 0, sizeof(o));
+        o.set_rumble = 1; o.strong = 90; o.weak = 40; o.set_light = 1; o.red = 255; o.blue = 128; o.set_players = 1; o.player_leds = 4;
+        CHECK(mac_pad_build_bluetooth_output(MAC_PAD_REPORT_DUALSENSE, 5, &o, out) == 78);
+        CHECK(out[0] == 0x31 && out[1] == 0x50 && out[2] == 0x10 && out[3] == 0x03 && out[4] == 0x14);
+        CHECK(out[5] == 40 && out[6] == 90 && out[46] == 4 && out[47] == 255 && out[48] == 0 && out[49] == 128);
+        crc = (unsigned)out[74] | ((unsigned)out[75] << 8) | ((unsigned)out[76] << 16) | ((unsigned)out[77] << 24);
+        CHECK(crc == mac_pad_crc32_report(0xa2, out, 74));
+        o.fade_out_setup = 1;
+        CHECK(mac_pad_build_bluetooth_output(MAC_PAD_REPORT_DUALSENSE, 6, &o, out) == 78);
+        CHECK(out[3 + 38] == 0x02 && out[3 + 41] == 0x02 && out[4] == 0 && out[0 + 1] == 0x60);
+        o.fade_out_setup = 0;
+        CHECK(mac_pad_build_bluetooth_output(MAC_PAD_REPORT_DUALSHOCK4, 0, &o, out) == 78);
+        CHECK(out[0] == 0x11 && out[1] == 0xc4 && out[3] == 0x03 && out[6] == 40 && out[7] == 90 && out[8] == 255);
+        CHECK(mac_pad_build_bluetooth_output(MAC_PAD_REPORT_8BITDO_DINPUT, 0, &o, out) == 0);
+        /* a vector worked out by hand elsewhere: the DualSense report of the own stack's self test (bt_selftest.c) agrees
+           because bt_pad.c builds it with this function */
     }
 
     /* the silence timeout: only the streaming kind, only past a second */

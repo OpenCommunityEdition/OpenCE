@@ -55,60 +55,13 @@ const char *bt_pad_kind_name(int kind)
 
 unsigned bt_pad_build_dualsense(unsigned char *r, unsigned sequence, const struct bt_pad_output *o)
 {
-    unsigned char *c = r + 3;
-    unsigned crc;
-    memset(r, 0, 78);
-    r[0] = 0x31;
-    r[1] = (unsigned char)((sequence & 0x0f) << 4);
-    r[2] = 0x10;
-    if (o->fade_out_setup) {
-        /* the setup report: only the light bar setup, and nothing else */
-        c[38] = 0x02;
-        c[41] = 0x02;
-    } else {
-        if (o->set_rumble) {
-            c[0] = 0x03;
-            c[2] = o->weak;
-            c[3] = o->strong;
-        }
-        if (o->set_light) {
-            c[1] |= 0x04;
-            c[44] = o->red;
-            c[45] = o->green;
-            c[46] = o->blue;
-        }
-        if (o->set_players) {
-            c[1] |= 0x10;
-            c[43] = (unsigned char)(o->player_leds & 0x1f);
-        }
-    }
-    crc = bt_crc32_report(0xa2, r, 74);
-    bt_put32(r + 74, crc);
-    return 78;
+    return mac_pad_build_bluetooth_output(MAC_PAD_REPORT_DUALSENSE, sequence, o, r);
 }
 
 unsigned bt_pad_build_dualshock4(unsigned char *r, unsigned sequence, const struct bt_pad_output *o)
 {
-    unsigned char *c = r + 3;
-    unsigned crc;
     (void)sequence;
-    memset(r, 0, 78);
-    r[0] = 0x11;
-    r[1] = 0xc4;
-    if (o->set_rumble) {
-        c[0] |= 0x01;
-        c[3] = o->weak;
-        c[4] = o->strong;
-    }
-    if (o->set_light) {
-        c[0] |= 0x02;
-        c[5] = o->red;
-        c[6] = o->green;
-        c[7] = o->blue;
-    }
-    crc = bt_crc32_report(0xa2, r, 74);
-    bt_put32(r + 74, crc);
-    return 78;
+    return mac_pad_build_bluetooth_output(MAC_PAD_REPORT_DUALSHOCK4, 0, o, r);
 }
 
 int bt_pad_input_crc_ok(const unsigned char *r, unsigned size)

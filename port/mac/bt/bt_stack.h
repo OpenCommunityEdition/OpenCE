@@ -130,15 +130,7 @@ struct bt_pad_status {
 };
 
 /* what the pad is asked to show: light bar colour, player lights, motors */
-struct bt_pad_output {
-    unsigned char red, green, blue;
-    unsigned char player_leds;   /* the five lights as bits, 0 for none */
-    unsigned char strong, weak;  /* the motors, 0 to 255 */
-    int set_light;               /* send the colour */
-    int set_players;             /* send the player lights */
-    int set_rumble;              /* send the motors */
-    int fade_out_setup;          /* DualSense: stop the pairing light animation first */
-};
+#define bt_pad_output mac_pad_output /* (mac_gamepad_report.h: the system Bluetooth path builds the same reports) */
 
 enum {
     BT_DONGLE_NONE,        /* no dongle plugged in */

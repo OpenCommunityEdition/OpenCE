@@ -70,6 +70,9 @@ int mac_gamepad_asleep_at(int slot);
 /* whether the slot's pad is a Sony pad (a DualShock 4 or DualSense, or an
    adapter presenting itself as one): for the PlayStation button names */
 int mac_gamepad_is_playstation_at(int slot);
+/* the battery of the slot's Sony pad as a percentage, from its Bluetooth reports; -1 when unknown (USB,
+   and other pads) */
+int mac_gamepad_battery_at(int slot);
 
 /* Sets the motors of the pad in a slot (strong: the large one, weak: the small
    one; 0 to 255). Only a Sony pad on USB takes it (mac_gamepad_report.h's
