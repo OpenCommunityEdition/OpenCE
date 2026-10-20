@@ -1040,6 +1040,8 @@ static void object_damage_aftermath(
 
 	/* port: (a client's replay of the host's nonlethal damage too) */
 	damage_data_validate_owner(damage);
+	/* port: the hit, for a ragdoll's push (port/linux/game/ragdolls.c) */
+	ragdolls_damage(object_index, damage);
 
 	if (object_definition->object.acceleration_scale > _real_epsilon)
 	{

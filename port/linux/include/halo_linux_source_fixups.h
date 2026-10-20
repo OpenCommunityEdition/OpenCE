@@ -31,6 +31,11 @@ the structure bsp's collision triangles sent when it loads or switches, and
 everything removed with the map */
 void physics_jolt_structure_bsp_reconnect(void);
 void physics_jolt_dispose_from_old_map(void);
+/* dead bipeds' ragdolls (port/linux/game/ragdolls.c): the damage done to an
+object, and a unit's death (not a feigned one), with its pose */
+struct damage_data;
+void ragdolls_damage(long object_index, struct damage_data const *damage);
+void ragdolls_unit_died(long unit_index);
 
 /* the port's menus' screen for one of ui.map's, by name, else the name
 (port/linux/game/menu_tags.c) */

@@ -2801,6 +2801,8 @@ void unit_died(
 		}
 
 		unit->unit.time_of_death = game_time_get();
+		/* port: the body's ragdoll, from its pose now (port/linux/game/ragdolls.c) */
+		ragdolls_unit_died(unit_index);
 	}
 
 	unit->unit.flags &= ~(

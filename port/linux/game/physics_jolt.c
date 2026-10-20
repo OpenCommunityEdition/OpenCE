@@ -27,6 +27,7 @@ enabled.
 #include "tag_files/tag_groups.h"
 #include "physics_jolt.h"
 #include "ragdoll_bodies.h"
+#include "ragdolls.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -55,6 +56,7 @@ enum
 
 static unsigned long physics_jolt_changes = (unsigned long)-1;
 static boolean physics_jolt_on = FALSE;
+static boolean physics_jolt_ragdolls_on = FALSE;
 static short physics_jolt_level_bsp_index = NONE;
 
 boolean physics_jolt_enabled(void)
@@ -62,10 +64,16 @@ boolean physics_jolt_enabled(void)
 	if (config_changes() != physics_jolt_changes)
 	{
 		physics_jolt_changes = config_changes();
-		physics_jolt_on = PHYSICS_JOLT_HOST &&
-			(config_boolean("game.ragdolls") || config_boolean("game.physics_debris"));
+		physics_jolt_ragdolls_on = PHYSICS_JOLT_HOST && config_boolean("game.ragdolls");
+		physics_jolt_on = physics_jolt_ragdolls_on || (PHYSICS_JOLT_HOST && config_boolean("game.physics_debris"));
 	}
 	return physics_jolt_on;
+}
+
+boolean physics_jolt_ragdolls_enabled(void)
+{
+	physics_jolt_enabled();
+	return physics_jolt_ragdolls_on;
 }
 
 /* ---------- the level */
@@ -299,6 +307,7 @@ void physics_jolt_structure_bsp_reconnect(void)
 void physics_jolt_dispose_from_old_map(void)
 {
 	ragdoll_bodies_dispose_from_old_map();
+	ragdolls_dispose_from_old_map();
 	if (physics_jolt_level_bsp_index == NONE)
 		return;
 	physics_jolt_batch_begin();
@@ -316,6 +325,7 @@ void physics_jolt_structure_bsp_reconnect(void)
 void physics_jolt_dispose_from_old_map(void)
 {
 	ragdoll_bodies_dispose_from_old_map();
+	ragdolls_dispose_from_old_map();
 }
 
 #endif

@@ -15,6 +15,8 @@ struct collision_bsp;
 /* whether ragdolls or debris are on (game.ragdolls, game.physics_debris) and
 the host has a physics world (the macOS app) */
 boolean physics_jolt_enabled(void);
+/* whether ragdolls are (game.ragdolls, and the host's world) */
+boolean physics_jolt_ragdolls_enabled(void);
 
 /* the level's collision triangles: every vertex of the bsp (x, y, z each, in
 world units) and three vertex indices a triangle, facing out of the level
