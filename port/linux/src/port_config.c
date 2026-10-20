@@ -115,6 +115,9 @@ static const struct config_setting config_settings[] =
 		"sharp); \"ssaa2x\" draws at twice the resolution each way (four times\n"
 		"the work); \"msaa2x\", \"msaa4x\" or \"msaa8x\" draw with that many samples\n"
 		"a pixel. Android has \"fxaa\" for \"smaa\", and no \"ssaa2x\"." },
+	{ "display.frame_time", _config_boolean, "false", "HALO_FRAME_TIME", _environment_value, _platform_all,
+		"Show the time a frame takes and the frames a second in the top right\n"
+		"corner, averaged over half a second." },
 	{ "display.interpolation", _config_boolean, "true", "HALO_INTERPOLATION", _environment_value, _platform_all,
 		"Draw a frame for every display refresh, blending between the game's 30\n"
 		"ticks a second; false keeps the original 30 frames a second." },

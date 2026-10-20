@@ -126,6 +126,22 @@ def test_the_main_menu_draws_as_approved(tmp_path):
     check(frame, "main_menu")
 
 
+@pytest.mark.skipif(not (MAPS / "ui.map").is_file(), reason="needs the game's maps in assets/maps")
+def test_the_frame_time_draws_when_on(tmp_path):
+    # display.frame_time: its text at the top right of the title-safe area;
+    # the frame clock steps a 60th of a second a frame, so it reads
+    # "16.67 ms  60 fps" every run
+    frame = capture_game(tmp_path, 600, {"HALO_FRAME_TIME": "true"})
+    reference = frame_compare.read_png(REFERENCES / "main_menu.png")
+    corner = [(x, y) for y in range(30, 60) for x in range(440, 600)]
+    text = [point for point in corner
+            if min(frame.pixel(*point)[:3]) > 200 and min(reference.pixel(*point)[:3]) < 150]
+    assert len(text) > 50, "no white text in the corner"
+    # (the background's ship moves by the real time when the machine is
+    # busy: under 2% of the frame; the text does not)
+    check(frame, "main_menu_frame_time", frame_compare.Tolerance(fraction=0.02, largest=255))
+
+
 # the high-res HUD and text (hud_hires.c, text_hires.c) at the window's
 # own size: twice the game's 640x480
 NATIVE_SIZE = (1280, 960)

@@ -419,6 +419,7 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include "rasterizer_xbox_internal.h"
 #include "rasterizer_xbox_vertex_shaders.h"
+#include "frame_time.h" /* port: port/linux/game/frame_time.c */
 
 /* ---------- constants */
 
@@ -1816,6 +1817,8 @@ void _rasterizer_window_end(
 	{
 		rasterizer_frame_statistics_get_fps(&rasterizer_frame_statistics);
 		rasterizer_frame_statistics_draw();
+		/* port: display.frame_time's overlay */
+		frame_time_draw();
 	}
 	if (!suppress_window_begin_end)
 	{
