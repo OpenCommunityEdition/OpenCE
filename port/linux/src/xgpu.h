@@ -333,6 +333,13 @@ void *xgpu_metal_stage_space(unsigned long size);
 const void *xgpu_metal_stage(const void *data, unsigned long size);
 /* bytes copied into a buffer, staged as the command is written */
 void xgpu_metal_upload_buffer(unsigned int buffer, unsigned long offset, const void *data, unsigned long size);
+/* the device's render pass ended, for the commands that are taken only
+outside one (the next draw begins it again, keeping what it drew) */
+void xgpu_metal_pass_end(void);
+/* a texture of RGBA texels, rows top first, with its levels made from
+them; its id, or 0. The texels are read before it returns. */
+unsigned int xgpu_metal_rgba_texture(const unsigned char *rgba, unsigned long width, unsigned long height,
+	unsigned long levels);
 
 /* the frame the device is on (xgpu_metal_begin_frame counts them), which
 the contiguous window's mirror measures rewrites in */

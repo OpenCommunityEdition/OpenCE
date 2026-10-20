@@ -46,7 +46,8 @@ def vm_textures(tmp_path_factory):
     work = tmp_path_factory.mktemp("vm_textures")
     return macos_guest_image.build_guest_image(
         [ROOT / "port/macos/tests/vm_textures.c", ROOT / "port/macos/tests/vm_textures_stubs.c",
-         ROOT / "port/macos/tests/vm_nv2a_stubs.c", ROOT / "port/linux/src/xbox_textures.c",
+         ROOT / "port/macos/tests/vm_nv2a_stubs.c", ROOT / "port/macos/tests/vm_hires_stubs.c",
+         ROOT / "port/linux/src/xbox_textures.c",
          ROOT / "port/macos/guest/d3d8_metal.c", ROOT / "port/macos/guest/opence_render_writer.c"],
         work, "vm_textures", ["-DHALO_METAL", f"-I{ROOT / 'port/macos/include'}"],
         like="port/linux/src/xgpu_text.c")

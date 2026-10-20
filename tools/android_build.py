@@ -434,10 +434,21 @@ def guest_image_build(n: Writer, sln: Any, config: Dict[str, Any], *, rule_prefi
         f"-I{sdl_include}", f"-I{gl_include}", *libc_includes, f"-idirafter {XDK_INCLUDE}",
     ])
     guest_host_only = {"memory_watch.c"}  # replaced by guest_memory_watch.c
+    metal = "-DHALO_METAL" in defines
+    if metal:
+        # the macOS app's renderer: Direct3D on the host's Metal through the
+        # command ring (port/macos/guest), in place of the GL renderer and the
+        # passes and high-res text drawn with it (the high-res HUD's and the
+        # menus' art are Metal textures: xgpu_metal_rgba_texture)
+        platform_cflags += f" -I{Path('port/macos/include')}"
+        guest_host_only |= {"d3d8_gl.c", "xgpu_post.c", "text_hires.c"}
     for source in sorted((LINUX_DIR / "src").glob("*.c")):
         if source.name.startswith("posix_") or source.name in guest_host_only:
             continue
         objects.append(guest_object(source, platform_cflags))
+    if metal:
+        for source in sorted(Path("port/macos/guest").glob("*.c")):
+            objects.append(guest_object(source, platform_cflags))
     # the high-res HUD's textures (port/assets/hud; port/linux/src/hud_hires.c)
     for source in hud_assets_build(n, rule_prefix, gen_dir / "hud_hires_assets.c"):
         objects.append(guest_object(source, platform_cflags))

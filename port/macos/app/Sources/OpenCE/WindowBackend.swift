@@ -5,12 +5,19 @@
 
 import AppKit
 import CHaloHost
+import OpenCERender
 import OpenCEWindow
 
 @MainActor
 enum WindowBackend {
     static let windows = GameWindows()
     static let input = HostInput()
+    /// A capture's size, which the guest's window has in place of its own:
+    /// the frames are drawn to the capture's texture, not the window.
+    static let captureSize: (width: Int, height: Int)? = {
+        guard let capture = (try? FrameCapture.parse(ProcessInfo.processInfo.environment)) ?? nil else { return nil }
+        return (capture.width, capture.height)
+    }()
 
     /// Installs the windows, before the guest starts. The host calls them on
     /// the main thread (they are main-thread imports); closing the game's
@@ -34,7 +41,7 @@ enum WindowBackend {
             }
         }
         backend.size_in_pixels = { _, window, width, height in
-            let size = MainActor.assumeIsolated { WindowBackend.windows.sizeInPixels(window) }
+            let size = MainActor.assumeIsolated { WindowBackend.captureSize ?? WindowBackend.windows.sizeInPixels(window) }
             width?.pointee = Int32(clamping: size?.width ?? 0)
             height?.pointee = Int32(clamping: size?.height ?? 0)
         }

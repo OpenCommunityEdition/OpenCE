@@ -23,6 +23,9 @@ high-res HUD's are (hud_hires.c).
 #include "platform.h"
 #include "port_config.h"
 #include "xgpu.h"
+#ifdef HALO_METAL
+#include "opence_render.h"
+#endif
 
 #include "expat.h"
 
@@ -1061,7 +1064,11 @@ void halo_menus_art_register(void const *texture, char const *png)
 		if (art[index].texture)
 		{
 			xgpu_gl_texture_deleted(art[index].texture);
+#ifdef HALO_METAL
+			xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, art[index].texture);
+#else
 			glDeleteTextures(1, &art[index].texture);
+#endif
 		}
 	}
 	memset(&art[index], 0, sizeof(art[index]));
@@ -1079,7 +1086,11 @@ void halo_menus_art_forget(void)
 		if (art[index].texture)
 		{
 			xgpu_gl_texture_deleted(art[index].texture);
+#ifdef HALO_METAL
+			xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, art[index].texture);
+#else
 			glDeleteTextures(1, &art[index].texture);
+#endif
 		}
 	}
 	art_count = 0;

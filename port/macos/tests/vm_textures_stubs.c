@@ -4,8 +4,8 @@ VM_TEXTURES_STUBS.C
 The game's platform layer as the texture test (vm_textures.c) needs it: a
 memory watch whose generation and serial the test moves on itself, the
 contiguous window's part it maps, settings left at their defaults, and the
-log on the standard output. (The render state setters are
-vm_nv2a_stubs.c's.)
+log on the standard output; the device's render pass, which the test
+ends itself. (The render state setters are vm_nv2a_stubs.c's.)
 */
 
 #include "platform.h"
@@ -39,6 +39,10 @@ BOOL platform_is_contiguous(const void *address)
 	unsigned long at = (unsigned long)address;
 
 	return at >= PLATFORM_CONTIGUOUS_BASE && at < PLATFORM_CONTIGUOUS_BASE + 0x1000000UL;
+}
+
+void xgpu_metal_pass_end(void)
+{
 }
 
 int config_boolean(const char *name)

@@ -127,6 +127,51 @@ void xgpu_metal_upload_buffer(unsigned int buffer, unsigned long offset, const v
 	}
 }
 
+unsigned int xgpu_metal_rgba_texture(const unsigned char *rgba, unsigned long width, unsigned long height,
+	unsigned long levels)
+{
+	unsigned int id = xgpu_metal_new_id(OPENCE_RENDER_OBJECT_TEXTURE);
+	unsigned int *fields;
+
+	if (!id)
+		return 0;
+	if (!(fields = xgpu_metal_command(OPENCE_RENDER_OP_CREATE_TEXTURE, OPENCE_RENDER_CREATE_TEXTURE_WORDS)))
+	{
+		xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, id);
+		return 0;
+	}
+	fields[0] = id;
+	fields[1] = OPENCE_RENDER_TEXTURE_2D;
+	fields[2] = OPENCE_RENDER_FORMAT_RGBA8;
+	fields[3] = (unsigned int)width;
+	fields[4] = (unsigned int)height;
+	fields[5] = 1;
+	fields[6] = (unsigned int)levels;
+	fields[7] = OPENCE_RENDER_USAGE_SAMPLED;
+	fields[8] = 1;
+	/* (level 0 read from where the texels are, before this returns) */
+	if ((fields = xgpu_metal_command(OPENCE_RENDER_OP_UPLOAD_TEXTURE, OPENCE_RENDER_UPLOAD_TEXTURE_WORDS)))
+	{
+		memset(fields, 0, (OPENCE_RENDER_UPLOAD_TEXTURE_WORDS - 1) * sizeof(*fields));
+		fields[0] = id;
+		fields[6] = (unsigned int)width;
+		fields[7] = (unsigned int)height;
+		fields[8] = 1;
+		fields[9] = (unsigned int)(unsigned long)rgba;
+		fields[10] = (unsigned int)(width * 4);
+		fields[11] = (unsigned int)(width * height * 4);
+		fields[12] = (unsigned int)(width * height * 4);
+	}
+	if (levels > 1)
+	{
+		xgpu_metal_pass_end();
+		if ((fields = xgpu_metal_command(OPENCE_RENDER_OP_GENERATE_MIPMAPS, OPENCE_RENDER_GENERATE_MIPMAPS_WORDS)))
+			fields[0] = id;
+	}
+	xgpu_metal_flush();
+	return id;
+}
+
 /* ---------- ids
 
 Each kind of object has its ids, from 1 to the ring's limit for the kind;
@@ -148,6 +193,11 @@ static const unsigned int id_limits[ID_KINDS + 1] =
 static unsigned char ids_used[ID_KINDS + 1][OPENCE_RENDER_MAX_BUFFERS / 8 + 1];
 /* where the next search starts */
 static unsigned int id_next[ID_KINDS + 1];
+
+/* what the shared code asks of the GPU: Apple's GPUs sample the
+compressed formats (BC1 to BC3) as they are; the shaders are MSL, which
+the GLSL version string does not name */
+struct xgpu_capabilities xgpu_capabilities = { TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, "metal" };
 
 unsigned int xgpu_metal_new_id(unsigned int kind)
 {
@@ -495,4 +545,23 @@ struct xgpu_render_target *xgpu_metal_render_target_get(const D3DSurface *surfac
 	entry->next_in_bucket = *render_target_bucket(surface->Data);
 	*render_target_bucket(surface->Data) = entry;
 	return &entry->target;
+}
+
+/* the colour target whose memory starts at data, if it has been drawn to */
+struct xgpu_render_target *xgpu_render_target_find(unsigned long data)
+{
+	struct render_target_entry *entry;
+
+	for (entry = *render_target_bucket(data); entry; entry = entry->next_in_bucket)
+	{
+		if (entry->target.data == data && !entry->target.depth)
+			return &entry->target;
+	}
+	return NULL;
+}
+
+/* the menus' art is the GL renderer's; nothing of it is held here */
+void xgpu_gl_texture_deleted(unsigned int texture)
+{
+	(void)texture;
 }

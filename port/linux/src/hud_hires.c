@@ -355,6 +355,9 @@ unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long 
 	*levels = 1;
 	for (largest = (width > height ? width : height) * 4; largest > 1; largest >>= 1)
 		(*levels)++;
+#ifdef HALO_METAL
+	texture = xgpu_metal_rgba_texture(pixels, width * 4, height * 4, *levels);
+#else
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -364,6 +367,7 @@ unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long 
 		0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	xgpu_gl_state_invalidate();
+#endif
 	free(pixels);
 	return texture;
 }
@@ -504,6 +508,9 @@ unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned
 	*levels = 1;
 	for (largest = width > height ? width : height; largest > 1; largest >>= 1)
 		(*levels)++;
+#ifdef HALO_METAL
+	texture = xgpu_metal_rgba_texture(pixels, width, height, *levels);
+#else
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	xgpu_gl_state_invalidate();
@@ -513,6 +520,7 @@ unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)width, (GLsizei)height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	xgpu_gl_state_invalidate();
+#endif
 	free(pixels);
 	return texture;
 }

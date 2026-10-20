@@ -845,6 +845,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	platform_fullscreen_requested = platform_fullscreen_setting();
 	platform_fullscreen_kind_apply();
 #endif
+#ifndef HALO_METAL
 	platform_gl_context = SDL_GL_CreateContext(platform_window);
 #ifdef HALO_GLES
 	/* ES 3.2 where the driver has it, otherwise the renderer makes do with
@@ -865,8 +866,12 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		return FALSE;
 	version = SDL_GL_SetSwapInterval(config_boolean("display.vsync") ? 1 : 0);
 	(void)version;
-	platform_event_thread = SDL_GetCurrentThreadID();
 	platform_log("OpenGL %s on %s", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER));
+#else
+	/* the macOS app draws with Metal, through the host (d3d8_metal_device.c) */
+	(void)version;
+#endif
+	platform_event_thread = SDL_GetCurrentThreadID();
 #ifndef HALO_ANDROID
 	platform_mouse_capture(TRUE);
 #endif

@@ -1079,6 +1079,7 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 			return atlas;
 		}
 	}
+#endif
 	/* (a menu's bitmap: menu_files.h) */
 	{
 		unsigned long levels;
@@ -1146,7 +1147,6 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 			return entry->hud_upscale;
 		}
 	}
-#endif
 	return entry->texture;
 }
 
@@ -1258,17 +1258,18 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		if (!entry->generation)
 			entry->generation = 1;
 		/* (which bitmap is here may have changed with the pixels) */
-#ifndef HALO_METAL
 		if (entry->hud_upscale)
 		{
+#ifdef HALO_METAL
+			xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, entry->hud_upscale);
+#else
 			glDeleteTextures(1, &entry->hud_upscale);
+#endif
 			entry->hud_upscale = 0;
 			xgpu_gl_state_invalidate();
 		}
-#endif
 		entry->hud_upscale_checked = FALSE;
 		entry->override = -1;
-#ifndef HALO_METAL
 		if (entry->size && !palettized && !entry->description.cube_map && entry->description.depth == 1)
 		{
 			unsigned long levels;
@@ -1279,7 +1280,6 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 			if (entry->override >= 0 && !hud_hires_override_texture(entry->override, &levels))
 				entry->override = -1;
 		}
-#endif
 		if (entry->override < 0 && entry->size && platform_is_contiguous((void *)entry->address) &&
 			platform_is_contiguous((void *)(entry->address + entry->size - 1)))
 		{
@@ -1323,12 +1323,7 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 void xgpu_texture_cache_begin_frame(void)
 {
 	unsigned long index;
-#ifdef HALO_METAL
-	/* (the high-res art is not drawn there yet) */
-	unsigned long changed = 0;
-#else
 	unsigned long changed = hud_hires_settings_changed();
-#endif
 
 	/* Refresh only map bitmaps belonging to the setting that changed. Keep
 	 * decoded replacement art and world textures; rebuild native pixels on
@@ -1365,6 +1360,8 @@ void xgpu_texture_cache_begin_frame(void)
 				*link = entry->next;
 #ifdef HALO_METAL
 				xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, entry->texture);
+				if (entry->hud_upscale)
+					xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, entry->hud_upscale);
 #else
 				glDeleteTextures(1, &entry->texture);
 				if (entry->hud_upscale)

@@ -97,8 +97,9 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
                               ar=ar, lld=lld, builtins="", imports_options=f"--svc --host-names {names_c}",
                               imports_outputs=[names_c],
                               # the guest's code paths for the VM (the thread
-                              # pointer in TPIDR_EL0, port/android/guest/runtime)
-                              defines=["-DHALO_GUEST_VM=1"])
+                              # pointer in TPIDR_EL0, port/android/guest/runtime) and
+                              # its Metal renderer (port/macos/guest)
+                              defines=["-DHALO_GUEST_VM=1", "-DHALO_METAL"])
 
     # ---------- the host
 
