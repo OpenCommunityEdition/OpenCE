@@ -1,8 +1,8 @@
 # Plan: Ragdolls, dismemberment and physics debris with Jolt Physics in the macOS app
 
 ## Phase 1: Jolt in the host
-- [~] Task: Record C++17 for Jolt in the tech stack
-    - [ ] Update `conductor/tech-stack.md` (macOS Host: Jolt Physics, C++17, behind a C wrapper) before any code
+- [x] Task: Record C++17 for Jolt in the tech stack 1acd3b7e
+    - [x] Update `conductor/tech-stack.md` (macOS Host: Jolt Physics, C++17, behind a C wrapper) before any code
 - [ ] Task: Vendor Jolt Physics
     - [ ] Write tests: pytest checks `port/third_party/jolt/README.md` names the upstream, commit and checksum, and that the tree matches the checksum
     - [ ] Copy Jolt unchanged; build it in Nix and `configure.py` as a static library (C++17, single-threaded, `JPH_CROSS_PLATFORM_DETERMINISTIC`, no FMA)
