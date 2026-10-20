@@ -60,9 +60,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Dismemberment' (Protocol in workflow.md) 3ff16710
 
 ## Phase 5: Debris
-- [ ] Task: Particles as rigid bodies
-    - [ ] Write tests: harness tests that point-physics particles that collide with the level spawn debris bodies with the definition's size and lifetime, only with `game.physics_debris` on; the cap hands the oldest back to point physics
-    - [ ] A `port:` hook in the particle systems' point-physics update; drawing from the results
+- [x] Task: Particles as rigid bodies 9116affd
+    - [x] Write tests: harness tests that point-physics particles that collide with the level spawn debris bodies with the definition's size and lifetime, only with `game.physics_debris` on; the cap hands the oldest back to point physics
+    - [x] A `port:` hook in the particle systems' point-physics update; drawing from the results
 - [ ] Task: Garbage objects
     - [ ] Write tests: harness tests that garbage objects become debris bodies and are drawn from Jolt's pose
     - [ ] A `port:` hook for garbage
