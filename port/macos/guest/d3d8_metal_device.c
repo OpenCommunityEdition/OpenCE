@@ -124,7 +124,7 @@ static struct
 	/* the pass the draws go to: its targets' ring textures (depth 0 is
 	none) */
 	BOOL in_pass;
-	unsigned int pass_color, pass_depth;
+	unsigned int pass_color, pass_depth, pass_format;
 	unsigned long pass_width, pass_height;
 	/* display.per_pixel_lighting, read when the settings change */
 	unsigned long config_serial;
@@ -800,16 +800,6 @@ long halo_screen_commit(void)
 	return screen_width;
 }
 
-/* d3d8_gl.c's anti-aliasing of a rectangle of the screen (xgpu_post.c) is
-not drawn here yet */
-void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
-{
-	(void)x0;
-	(void)y0;
-	(void)x1;
-	(void)y1;
-}
-
 /* ---------- vertical blanks (d3d8_gl.c's) */
 
 #define VERTICAL_BLANK_NANOSECONDS (1000000000L / 60)
@@ -1081,10 +1071,10 @@ void xgpu_metal_pass_end(void)
 	pass_end();
 }
 
-/* begins a pass on the current targets (the window's is 0), keeping what
-they hold */
-static BOOL pass_begin(unsigned int color, unsigned int depth, unsigned long width, unsigned long height,
-	unsigned int color_load)
+/* begins a pass on a colour texture of a format and a depth one (0: none),
+a colour cleared to black of this alpha */
+static BOOL pass_begin_format(unsigned int color, unsigned int depth, unsigned int format, unsigned long width,
+	unsigned long height, unsigned int color_load, float clear_alpha)
 {
 	unsigned int *fields;
 
@@ -1097,15 +1087,24 @@ static BOOL pass_begin(unsigned int color, unsigned int depth, unsigned long wid
 	fields[2] = color_load;
 	fields[3] = depth ? OPENCE_RENDER_LOAD_LOAD : OPENCE_RENDER_LOAD_DONT_CARE;
 	fields[4] = fields[3];
-	fields[8] = opence_render_float(1.0f);
+	fields[8] = opence_render_float(clear_alpha);
 	fields[9] = opence_render_float(1.0f);
 	memset(sent, 0, sizeof(sent));
 	device.in_pass = TRUE;
 	device.pass_color = color;
 	device.pass_depth = depth;
+	device.pass_format = format;
 	device.pass_width = width;
 	device.pass_height = height;
 	return TRUE;
+}
+
+/* begins a pass on the current targets (the window's is 0), keeping what
+they hold */
+static BOOL pass_begin(unsigned int color, unsigned int depth, unsigned long width, unsigned long height,
+	unsigned int color_load)
+{
+	return pass_begin_format(color, depth, OPENCE_RENDER_FORMAT_BGRA8, width, height, color_load, 1.0f);
 }
 
 /* the pass of the device's targets, begun if it is not the open one; FALSE
@@ -1648,7 +1647,7 @@ static unsigned int pipeline_get(unsigned int vertex, unsigned int fragment, con
 	memset(fields, 0, sizeof(fields));
 	fields[1] = vertex;
 	fields[2] = fragment;
-	fields[3] = OPENCE_RENDER_FORMAT_BGRA8;
+	fields[3] = device.pass_format;
 	fields[4] = device.pass_depth ? OPENCE_RENDER_FORMAT_DEPTH32F_STENCIL8 : 0;
 	fields[5] = 1;
 	fields[6] = blend;
@@ -2075,6 +2074,324 @@ static void quad_draw(void)
 	fields[3] = 1;
 }
 
+/* ---------- display.anti_aliasing (d3d8_gl.c's; xgpu_post.c's passes)
+
+"fxaa" and "smaa" antialias each window's 3D view in place before the HUD
+and menus are drawn over it, as the GL build's do: the rectangle is copied,
+and the passes (d3d8_metal_post.c) draw from the copy into the target
+through its colour channels, keeping its alpha. The GL build's
+supersampling and multisampling are not drawn by this device, so those
+values are off here. The setting is read again when the settings change. */
+
+enum
+{
+	_anti_aliasing_off,
+	_anti_aliasing_fxaa,
+	_anti_aliasing_smaa
+};
+
+static const struct
+{
+	const char *name;
+	int mode;
+} anti_aliasing_values[] =
+{
+	{ "off", _anti_aliasing_off },
+	{ "fxaa", _anti_aliasing_fxaa },
+	{ "smaa", _anti_aliasing_smaa },
+	{ "ssaa2x", _anti_aliasing_off },
+	{ "msaa2x", _anti_aliasing_off },
+	{ "msaa4x", _anti_aliasing_off },
+	{ "msaa8x", _anti_aliasing_off },
+};
+
+#define NUMBER_OF_ANTI_ALIASING_VALUES ((int)(sizeof(anti_aliasing_values) / sizeof(anti_aliasing_values[0])))
+
+/* the libraries made, by pass and size (SMAA's metrics are a literal);
+never destroyed, as pipelines are found again by their libraries' ids */
+#define POST_LIBRARIES 16
+
+static struct
+{
+	/* the value in effect, -1 until the setting is first read */
+	int value;
+	unsigned long config_serial;
+	/* the copy of the target, SMAA's edges and weights, of the target's
+	size; and SMAA's lookup textures, made once */
+	unsigned int color, edges, weights;
+	unsigned long width, height;
+	BOOL lookups_made;
+	unsigned int area, search;
+	int library_count;
+	struct
+	{
+		int which;
+		unsigned long width, height;
+		unsigned int id;
+	} libraries[POST_LIBRARIES];
+} post = { -1 };
+
+/* display.anti_aliasing's mode (none of the values: the first, off) */
+static int anti_aliasing(void)
+{
+	const char *setting;
+	int value;
+
+	if (post.value >= 0 && post.config_serial == config_changes() + 1)
+		return anti_aliasing_values[post.value].mode;
+	post.config_serial = config_changes() + 1;
+	setting = config_string("display.anti_aliasing");
+	for (value = NUMBER_OF_ANTI_ALIASING_VALUES - 1;
+		value > 0 && strcmp(setting, anti_aliasing_values[value].name);
+		value--)
+	{
+	}
+	if (value != post.value)
+	{
+		if (strcmp(setting, anti_aliasing_values[value].name))
+			platform_log("anti-aliasing: \"%s\" is unknown, so off", setting);
+		else if (value && anti_aliasing_values[value].mode == _anti_aliasing_off)
+			platform_log("anti-aliasing: %s is not drawn by the Metal renderer, so off", setting);
+		else
+			platform_log("anti-aliasing: %s", setting);
+		post.value = value;
+	}
+	return anti_aliasing_values[value].mode;
+}
+
+static unsigned int post_texture(unsigned int format, unsigned long width, unsigned long height, unsigned int usage)
+{
+	unsigned int id = xgpu_metal_new_id(OPENCE_RENDER_OBJECT_TEXTURE);
+	unsigned int *fields;
+
+	if (!id || !(fields = xgpu_metal_command(OPENCE_RENDER_OP_CREATE_TEXTURE, OPENCE_RENDER_CREATE_TEXTURE_WORDS)))
+		return 0;
+	fields[0] = id;
+	fields[1] = OPENCE_RENDER_TEXTURE_2D;
+	fields[2] = format;
+	fields[3] = (unsigned int)width;
+	fields[4] = (unsigned int)height;
+	fields[5] = 1;
+	fields[6] = 1;
+	fields[7] = usage;
+	fields[8] = 1;
+	return id;
+}
+
+/* one of SMAA's lookup textures, uploaded; 0 if the build has none */
+static unsigned int post_lookup(BOOL search)
+{
+	unsigned long width, height, texel_size;
+	unsigned char *texels = xgpu_metal_post_lookup(search, &width, &height, &texel_size);
+	unsigned int id = texels ? post_texture(search ? OPENCE_RENDER_FORMAT_R8 : OPENCE_RENDER_FORMAT_RG8, width,
+		height, OPENCE_RENDER_USAGE_SAMPLED) : 0;
+	const void *staged = id ? xgpu_metal_stage(texels, width * height * texel_size) : NULL;
+	unsigned int *fields = staged ? xgpu_metal_command(OPENCE_RENDER_OP_UPLOAD_TEXTURE,
+		OPENCE_RENDER_UPLOAD_TEXTURE_WORDS) : NULL;
+
+	free(texels);
+	if (!fields)
+	{
+		platform_log("anti-aliasing: SMAA's %s texture is not in this build", search ? "search" : "area");
+		return 0;
+	}
+	memset(fields, 0, (OPENCE_RENDER_UPLOAD_TEXTURE_WORDS - 1) * sizeof(*fields));
+	fields[0] = id;
+	fields[6] = (unsigned int)width;
+	fields[7] = (unsigned int)height;
+	fields[8] = 1;
+	fields[9] = (unsigned int)(unsigned long)staged;
+	fields[10] = (unsigned int)(width * texel_size);
+	fields[11] = (unsigned int)(width * height * texel_size);
+	fields[12] = fields[11];
+	return id;
+}
+
+/* the textures the passes draw with, made for a target of this size; FALSE
+if they cannot be */
+static BOOL post_fit(BOOL smaa, unsigned long width, unsigned long height)
+{
+	if (post.width != width || post.height != height)
+	{
+		xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, post.color);
+		xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, post.edges);
+		xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, post.weights);
+		post.color = post.edges = post.weights = 0;
+		post.width = width;
+		post.height = height;
+	}
+	if (!post.color)
+		post.color = post_texture(OPENCE_RENDER_FORMAT_BGRA8, width, height, OPENCE_RENDER_USAGE_SAMPLED);
+	if (smaa && !post.edges)
+		post.edges = post_texture(OPENCE_RENDER_FORMAT_RG8, width, height,
+			OPENCE_RENDER_USAGE_SAMPLED | OPENCE_RENDER_USAGE_RENDER_TARGET);
+	if (smaa && !post.weights)
+		post.weights = post_texture(OPENCE_RENDER_FORMAT_RGBA8, width, height,
+			OPENCE_RENDER_USAGE_SAMPLED | OPENCE_RENDER_USAGE_RENDER_TARGET);
+	if (smaa && !post.lookups_made)
+	{
+		post.lookups_made = TRUE;
+		post.area = post_lookup(FALSE);
+		post.search = post_lookup(TRUE);
+	}
+	return post.color && (!smaa || (post.edges && post.weights && post.area && post.search));
+}
+
+/* a pass's library for this size, made once; 0 if it cannot be */
+static unsigned int post_library(int which, unsigned long width, unsigned long height)
+{
+	int index;
+	unsigned int id;
+
+	/* (FXAA's metrics are uniforms: one library for every size) */
+	if (which == _metal_post_fxaa)
+		width = height = 1;
+	for (index = 0; index < post.library_count; index++)
+	{
+		if (post.libraries[index].which == which && post.libraries[index].width == width &&
+			post.libraries[index].height == height)
+		{
+			return post.libraries[index].id;
+		}
+	}
+	if (post.library_count == POST_LIBRARIES)
+		return 0;
+	id = library_create(xgpu_metal_post_source(which, width, height));
+	if (!id)
+		platform_log("anti-aliasing: pass %d has no Metal library at %lux%lu", which, width, height);
+	/* (one that cannot be made is not tried again) */
+	post.libraries[post.library_count].which = which;
+	post.libraries[post.library_count].width = width;
+	post.libraries[post.library_count].height = height;
+	post.libraries[post.library_count].id = id;
+	post.library_count++;
+	return id;
+}
+
+/* a pass's triangle drawn into the open pass over the rectangle, from the
+textures named, through the channels of the mask */
+static void post_draw(unsigned int library, const unsigned int *textures, unsigned int texture_count,
+	unsigned int mask, const long *corners)
+{
+	unsigned int pipeline = pipeline_get(library, library, NULL, FALSE, mask);
+	unsigned int fields[3], index, *draw;
+
+	if (!pipeline)
+		return;
+	pipeline_send(pipeline);
+	depth_stencil_plain(FALSE, FALSE, 0);
+	raster_plain();
+	viewport_send((float)corners[0], (float)corners[1], (float)(corners[2] - corners[0]),
+		(float)(corners[3] - corners[1]), 0.0f, 1.0f);
+	for (index = 0; index < texture_count; index++)
+	{
+		fields[0] = OPENCE_RENDER_STAGE_FRAGMENT;
+		fields[1] = index;
+		fields[2] = textures[index];
+		command_send(_sent_texture0 + (int)index, OPENCE_RENDER_OP_SET_TEXTURE, 4, fields);
+	}
+	if (!(draw = xgpu_metal_command(OPENCE_RENDER_OP_DRAW, OPENCE_RENDER_DRAW_WORDS)))
+		return;
+	draw[0] = OPENCE_RENDER_PRIMITIVE_TRIANGLE;
+	draw[1] = 0;
+	draw[2] = 3;
+	draw[3] = 1;
+}
+
+/* display.anti_aliasing's pass over a window's 3D view, before the HUD and
+menus are drawn over it (source/render/render.c); the window's bounds in the
+game's units of the screen, which are the back buffer's pixels here */
+void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
+{
+	const unsigned int color_mask = OPENCE_RENDER_WRITE_RED | OPENCE_RENDER_WRITE_GREEN | OPENCE_RENDER_WRITE_BLUE;
+	const unsigned int all_mask = color_mask | OPENCE_RENDER_WRITE_ALPHA;
+	struct xgpu_render_target *target;
+	unsigned int libraries[3], textures[3], *fields;
+	unsigned long width, height;
+	long corners[4];
+	int mode = anti_aliasing();
+	BOOL smaa = mode == _anti_aliasing_smaa;
+
+	if (!device.ready || mode == _anti_aliasing_off)
+		return;
+	target = xgpu_metal_render_target_get(&device.back_buffer);
+	if (!target || target->depth)
+		return;
+	width = target->width;
+	height = target->height;
+	corners[0] = x0 < 0 ? 0 : x0 > (long)width ? (long)width : x0;
+	corners[1] = y0 < 0 ? 0 : y0 > (long)height ? (long)height : y0;
+	corners[2] = x1 < corners[0] ? corners[0] : x1 > (long)width ? (long)width : x1;
+	corners[3] = y1 < corners[1] ? corners[1] : y1 > (long)height ? (long)height : y1;
+	if (corners[2] == corners[0] || corners[3] == corners[1])
+		return;
+	/* (textures are made and copied outside passes) */
+	pass_end();
+	if (!post_fit(smaa, width, height))
+		return;
+	libraries[0] = post_library(smaa ? _metal_post_smaa_edges : _metal_post_fxaa, width, height);
+	libraries[1] = smaa ? post_library(_metal_post_smaa_weights, width, height) : libraries[0];
+	libraries[2] = smaa ? post_library(_metal_post_smaa_blend, width, height) : libraries[0];
+	if (!libraries[0] || !libraries[1] || !libraries[2])
+		return;
+
+	/* the target's pixels, read while the target is drawn into */
+	if (!(fields = xgpu_metal_command(OPENCE_RENDER_OP_COPY_TEXTURE, OPENCE_RENDER_COPY_TEXTURE_WORDS)))
+		return;
+	memset(fields, 0, (OPENCE_RENDER_COPY_TEXTURE_WORDS - 1) * sizeof(*fields));
+	fields[0] = target->texture;
+	fields[3] = (unsigned int)corners[0];
+	fields[4] = (unsigned int)corners[1];
+	fields[5] = post.color;
+	fields[8] = (unsigned int)corners[0];
+	fields[9] = (unsigned int)corners[1];
+	fields[10] = (unsigned int)(corners[2] - corners[0]);
+	fields[11] = (unsigned int)(corners[3] - corners[1]);
+
+	if (!smaa)
+	{
+		float uniforms[8];
+
+		uniforms[0] = 1.0f / (float)width;
+		uniforms[1] = 1.0f / (float)height;
+		uniforms[2] = (float)width;
+		uniforms[3] = (float)height;
+		/* (split screen: no texel of the next window is read) */
+		uniforms[4] = ((float)corners[0] + 0.5f) / (float)width;
+		uniforms[5] = ((float)corners[1] + 0.5f) / (float)height;
+		uniforms[6] = ((float)corners[2] - 0.5f) / (float)width;
+		uniforms[7] = ((float)corners[3] - 0.5f) / (float)height;
+		if (!pass_begin(target->texture, 0, width, height, OPENCE_RENDER_LOAD_LOAD))
+			return;
+		bytes_send(OPENCE_RENDER_STAGE_FRAGMENT, 0, uniforms, sizeof(uniforms));
+		post_draw(libraries[0], &post.color, 1, color_mask, corners);
+	}
+	else
+	{
+		if (!pass_begin_format(post.edges, 0, OPENCE_RENDER_FORMAT_RG8, width, height, OPENCE_RENDER_LOAD_CLEAR, 0.0f))
+			return;
+		post_draw(libraries[0], &post.color, 1, all_mask, corners);
+
+		if (!pass_begin_format(post.weights, 0, OPENCE_RENDER_FORMAT_RGBA8, width, height, OPENCE_RENDER_LOAD_CLEAR,
+			0.0f))
+		{
+			return;
+		}
+		textures[0] = post.edges;
+		textures[1] = post.area;
+		textures[2] = post.search;
+		post_draw(libraries[1], textures, 3, all_mask, corners);
+
+		if (!pass_begin(target->texture, 0, width, height, OPENCE_RENDER_LOAD_LOAD))
+			return;
+		textures[0] = post.color;
+		textures[1] = post.weights;
+		post_draw(libraries[2], textures, 2, color_mask, corners);
+	}
+	pass_end();
+	target->written++;
+}
+
 /* ---------- clearing
 
 A clear of the whole target, of all its colour channels or none, begins a
@@ -2161,6 +2478,7 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 			fields[10] = stencil & 0xff;
 			memset(sent, 0, sizeof(sent));
 			device.in_pass = TRUE;
+			device.pass_format = OPENCE_RENDER_FORMAT_BGRA8;
 			return;
 		}
 		clear_quad(viewport_left, viewport_top, viewport_right, viewport_bottom, mask, depth, clear_stencil, rgba, z,

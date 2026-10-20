@@ -188,3 +188,25 @@ def test_bloodgulch_draws_as_approved(tmp_path):
     # captured, so the clouds and the swaying trees far off differ run to
     # run: under 1% of the frame; the ground and the cliffs do not)
     check(frame, "bloodgulch", frame_compare.Tolerance(fraction=0.02, largest=255))
+
+
+@pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")
+@pytest.mark.parametrize("anti_aliasing", ["fxaa", "smaa"])
+def test_bloodgulch_draws_anti_aliased(tmp_path, anti_aliasing):
+    # the same view with display.anti_aliasing's passes (d3d8_metal_post.c),
+    # each drawn over the frame before the menus and the HUD; the stock frame
+    # above has the setting at its default, off
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "maps").symlink_to(MAPS)
+    (root / "camera.txt").write_text(BLOODGULCH_CAMERA)
+    frame = capture_game(tmp_path, 1500, {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NETWORK_TEST_CAMERA": "1",
+                                          "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+                                          "HALO_ANTI_ALIASING": anti_aliasing},
+                         seconds=75, data_root=root)
+    assert (frame.width, frame.height) == GAME_SIZE
+    red, green, blue, _ = frame.pixel(20, 10)
+    assert blue > red and blue > 150
+    red, green, blue, _ = frame.pixel(150, 320)
+    assert green > red and green > blue
+    check(frame, f"bloodgulch_{anti_aliasing}", frame_compare.Tolerance(fraction=0.02, largest=255))

@@ -447,6 +447,19 @@ The guest's shaders name their functions `vertex_main` and `fragment_main`.
 A scissor is clipped to the pass's target, which a window resized since the
 pass began can make smaller than the decoder's drawable size.
 
+`display.anti_aliasing`'s `"fxaa"` and `"smaa"` are the GL build's passes
+(`xgpu_post.c`) written in MSL (`port/macos/guest/d3d8_metal_post.c`), at
+the same point of the frame: the 3D view's rectangle is copied out of its
+target (`COPY_TEXTURE`), and each pass is one triangle drawn over that
+rectangle, the last one into the target with alpha masked off. SMAA
+(`port/third_party/smaa`, HIGH preset) has three passes, through an RG8
+edges texture and an RGBA8 weights texture, both cleared first since the
+edge pass discards where there is no edge. Its HLSL compiles as MSL with
+porting macros and a few rewrites of its `out` parameters into references.
+Its size is a literal in the source, so a library is made for each size of
+view. `"ssaa2x"` and the multisampled settings are not drawn by the Metal
+renderer, which logs this and draws without them.
+
 ### Frame captures
 
 With `HALO_HOST_CAPTURE`, the app draws the guest's window off the screen,
@@ -517,6 +530,7 @@ In `nix develop`, after `ninja macos`:
 python -m pytest -q tools/test_macos_spikes.py tools/test_macos_build.py tools/test_macos_vm.py tools/test_macos_host.py
 python -m pytest -q tools/test_macos_render.py   # render batches through the doorbell
 ninja macos_app_test                              # the app's Swift tests, the Metal renderer's pixels too
+python -m pytest -q tools/test_macos_post.py      # the post passes' MSL compiles; SMAA's lookup textures
 python -m pytest -q tools/test_frame_compare.py   # the frame comparison's tolerance
 python -m pytest -q tools/test_macos_frames.py    # golden frames from the app (after ninja macos_app)
 cargo test --manifest-path port/macos/runtime/Cargo.toml

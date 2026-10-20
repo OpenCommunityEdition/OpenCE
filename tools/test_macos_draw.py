@@ -25,6 +25,11 @@ from tools.frame_compare import read_png  # noqa: E402
 
 APP = ROOT / "build/macos/OpenCE.app/Contents/MacOS/OpenCE"
 TRANSLATORS = [macos_guest_image.OBJECTS / f"port/linux/src/{name}.o" for name in ("nv2a_vsh", "nv2a_psh", "xgpu_text")]
+# the post passes' (d3d8_metal_post.c): SMAA's text and lookup textures, and
+# zlib to inflate them
+POST = ([macos_guest_image.OBJECTS / "guest/gen/hud_hires_assets.o"]
+        + [macos_guest_image.OBJECTS / f"port/third_party/zlib/{name}.o"
+           for name in ("zutil", "inftrees", "uncompr", "inffast", "adler32", "inflate", "crc32")])
 
 RED = (255, 0, 0, 255)
 BLUE = (0, 0, 255, 255)
@@ -44,10 +49,11 @@ def vm_draw(tmp_path_factory):
         [ROOT / "port/macos/tests/vm_draw.c", ROOT / "port/macos/tests/vm_draw_stubs.c",
          ROOT / "port/macos/tests/vm_hires_stubs.c",
          ROOT / "port/macos/guest/d3d8_metal_device.c", ROOT / "port/macos/guest/d3d8_metal.c",
+         ROOT / "port/macos/guest/d3d8_metal_post.c",
          ROOT / "port/linux/src/d3d8_resources.c", ROOT / "port/linux/src/xbox_textures.c",
          ROOT / "port/macos/guest/opence_render_writer.c"],
-        work, "vm_draw", ["-DHALO_METAL", f"-I{ROOT / 'port/macos/include'}"],
-        like="port/linux/src/xgpu_text.c", objects=TRANSLATORS)
+        work, "vm_draw", ["-DHALO_METAL", f"-I{ROOT / 'port/macos/include'}", f"-I{ROOT / 'port/third_party/zlib'}"],
+        like="port/linux/src/xgpu_text.c", objects=TRANSLATORS + POST)
 
 
 def frame(image, tmp_path, case):

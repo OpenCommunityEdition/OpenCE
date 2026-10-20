@@ -360,6 +360,25 @@ BOOL xgpu_metal_stream(const void *data, unsigned long size, unsigned long align
 /* the render target of a surface, made when first asked for: a BGRA8 colour
 texture, or a DEPTH32F_STENCIL8 depth one, sampled and drawn into */
 struct xgpu_render_target *xgpu_metal_render_target_get(const D3DSurface *surface);
+
+/* display.anti_aliasing's passes in the Metal Shading Language
+(port/macos/guest/d3d8_metal_post.c): FXAA, and SMAA's three */
+enum
+{
+	_metal_post_fxaa,
+	_metal_post_smaa_edges,
+	_metal_post_smaa_weights,
+	_metal_post_smaa_blend,
+	NUMBER_OF_METAL_POST_PASSES
+};
+
+/* a pass's library for a target of width x height (malloc'd), NULL if the
+build has no SMAA or there is no memory */
+char *xgpu_metal_post_source(int which, unsigned long width, unsigned long height);
+/* SMAA's search texture (R8) or area texture (RG8), inflated (malloc'd):
+its size and bytes a texel; NULL if the build has none */
+unsigned char *xgpu_metal_post_lookup(BOOL search, unsigned long *width, unsigned long *height,
+	unsigned long *texel_size);
 #endif
 
 /* ---------- anti-aliasing
