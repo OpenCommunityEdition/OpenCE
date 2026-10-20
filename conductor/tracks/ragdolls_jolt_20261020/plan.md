@@ -15,9 +15,9 @@
 - [x] Task: The shared region's format d18100b1
     - [x] Write tests: native tests reject bad counts, indices, sizes, non-finite numbers and addresses outside guest memory; valid batches decode intact
     - [x] A shared C header (`port/macos/include/host_physics.h`) for the batch (deaths, impulses, kinematic poses, debris spawns, removals) and the results (bone matrices, debris poses)
-- [ ] Task: `host_physics_step` and the level geometry
-    - [ ] Write tests: a guest program (port/macos/tests) sends a triangle mesh and a batch and reads results back, at one exit a step
-    - [ ] The import in `host_imports.list`; the guest sends the structure BSP's collision triangles when a BSP loads or switches, and the host builds Jolt's static mesh
+- [x] Task: `host_physics_step` and the level geometry cb0d1cde
+    - [x] Write tests: a guest program (port/macos/tests) sends a triangle mesh and a batch and reads results back, at one exit a step
+    - [x] The import in `host_imports.list`; the guest sends the structure BSP's collision triangles when a BSP loads or switches, and the host builds Jolt's static mesh
 - [ ] Task: The settings
     - [ ] Write tests: `game.ragdolls`, `game.physics_debris`, `game.physics_debris_max` and `debug.physics_draw` parse from config and environment, off by default; the settings screen lists them (port_settings.py output)
     - [ ] Entries in `port_config.c`, the settings table in `port/linux/README.md`, `tools/port_settings.py` run again
