@@ -576,6 +576,12 @@ static const struct config_setting config_settings[] =
 		"\"on\", \"shields_only\" or \"explosives_only\" (FRIENDLY FIRE in\n"
 		"co-op's Server Setup > Co-op Options writes its choice here). Their AI\n"
 		"allies they always can, as in the campaign." },
+	{ "network.coop_score_type", _config_string, "\"cooperative\"", "HALO_NET_COOP_SCORE_TYPE", _environment_value,
+		_platform_all,
+		"How an online co-op game's campaign score (display.campaign_score) is\n"
+		"kept: \"cooperative\" adds the players' scores together, \"competitive\"\n"
+		"gives each player a score of their own. SCORING TYPE in co-op's\n"
+		"Server Setup > Co-op Options writes its choice here; the host's counts." },
 	{ "network.coop_own_friendly_fire", _config_boolean, "true", "HALO_NET_COOP_OWN_FRIENDLY_FIRE",
 		_environment_value, _platform_all,
 		"Whether this machine's players hurt, and are hurt by, the other players\n"
@@ -1543,6 +1549,7 @@ static const struct
 		"team_global_enemy_proximity", NULL }, NULL },
 	{ "network.coop_friendly_fire", { "off", "on", "shields_only", "explosives_only", NULL }, NULL },
 	{ "network.coop_enemies_mode", { "none", "per_player", "multiplier", NULL }, NULL },
+	{ "network.coop_score_type", { "cooperative", "competitive", NULL }, NULL },
 	{ "streamer.slurs", { "off", "severe", "strong", "mild", NULL }, NULL },
 	{ "streamer.swearing", { "off", "severe", "strong", "mild", NULL }, NULL },
 	{ "streamer.insults", { "off", "severe", "strong", "mild", NULL }, NULL },

@@ -1273,6 +1273,10 @@ COOP_SETUP_SCREENS = [
             "Scores each kill and shows the score and the\\nsummary at the end of each level.",
             "Hides the score and the summary.",
         ]),
+        ("coop_score_type", "SCORING TYPE:", ["COOPERATIVE", "COMPETITIVE"], [
+            "The players' scores are added together: every player\\nsees the team's score.",
+            "Each player has a score of their own, from the\\nenemies they kill.",
+        ]),
     ]),
     ("voice_options", "VOICE AND VOTING", "Voice chat, text chat and votes to kick a player,\\nfor this game.",
      TEAMPLAY_ROWS),
@@ -1319,10 +1323,12 @@ def _setup_option_screen(base: str, key: str, rows: list) -> list:
     children = ['<data input="game settings lists text update"/>',
                 '<on event="created" run="port setup options init"/>']
     place = -1
+    # (more than eight rows are closer, to stay above the help text)
+    step = 30 if len(rows) <= 8 else 25
     for row_key, *_ in rows:
         if row_key not in SETUP_OPTION_SAME_PLACE:
             place += 1
-        children.append(f'<child widget="{base}/op_{row_key}" x="54" y="{73 + 30 * place}"/>')
+        children.append(f'<child widget="{base}/op_{row_key}" x="54" y="{73 + step * place}"/>')
     children.append(f'<child widget="{base}/{key}_button_bar" y="414"/>')
     lines += _widget(f"{base}/{key}_menu", [("type", "column_list"), ("width", 640), ("height", 480),
                                            ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),

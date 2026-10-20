@@ -5811,6 +5811,8 @@ static struct gametype_option const gametype_options[] =
 		{ "true", "false" } },
 	{ "coop_campaign_score_spinner", _option_setting, 0, 0, 2, { 0 }, "display.campaign_score",
 		{ "true", "false" } },
+	{ "coop_score_type_spinner", _option_setting, 0, 0, 2, { 0 }, "network.coop_score_type",
+		{ "cooperative", "competitive" } },
 	/* map sharing's (Server Setup's MAP SHARING: tools/port_settings.py's
 	MAP_SHARE_SETUP; map_share.c) */
 	{ "map_share_spinner", _option_setting, 0, 0, 2, { 0 }, "network.map_share", { "true", "false" } },

@@ -40,7 +40,7 @@ void campaign_score_draw_view(long player_index);
 
 /* (network_coop.c) network co-op: the host scores the kills and sends each
 to the clients, and when the level is won */
-void campaign_score_network_kill(short player_index, long variant_index, short points);
-void campaign_score_network_won(void);
+void campaign_score_network_kill(short player_index, long variant_index, short points, boolean competitive);
+void campaign_score_network_won(boolean competitive);
 
 #endif

@@ -218,7 +218,8 @@ enum
 	damage's epicenter */
 	_coop_event_surface_broken,
 	/* the host scored a kill (campaign_score.c): value the player, frame the
-	points, tag_index the variant; or won the level */
+	points, tag_index the variant, target whether the scoring is competitive;
+	or won the level (target the same) */
 	_coop_event_score_kill,
 	_coop_event_score_won,
 	/* a grunt was shot dead in the head (headshot_party.c): reals the head's place */
@@ -1890,10 +1891,10 @@ static void client_apply_event(
 		}
 		break;
 	case _coop_event_score_kill:
-		campaign_score_network_kill(event->value, event->tag_index, event->frame);
+		campaign_score_network_kill(event->value, event->tag_index, event->frame, event->target == 1);
 		break;
 	case _coop_event_score_won:
-		campaign_score_network_won();
+		campaign_score_network_won(event->target == 1);
 		break;
 	case _coop_event_headshot_party:
 		{
@@ -2458,12 +2459,14 @@ void network_coop_note_unit_animation(
 void network_coop_note_score_kill(
 	short player_index,
 	long variant_index,
-	short points)
+	short points,
+	boolean competitive)
 {
 	struct distributed_coop_event *event = event_new(_coop_event_score_kill);
 
 	if (!event)
 		return;
+	event->target = competitive ? 1 : 0;
 	event->value = player_index;
 	event->frame = points;
 	event->tag_index = variant_index;
@@ -2482,9 +2485,12 @@ void network_coop_note_headshot_party(
 }
 
 void network_coop_note_score_won(
-	void)
+	boolean competitive)
 {
-	event_new(_coop_event_score_won);
+	struct distributed_coop_event *event = event_new(_coop_event_score_won);
+
+	if (event)
+		event->target = competitive ? 1 : 0;
 }
 
 void network_coop_note_unit_open(

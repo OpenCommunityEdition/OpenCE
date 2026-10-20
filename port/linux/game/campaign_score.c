@@ -108,8 +108,10 @@ void platform_log(char const *format, ...);
 /* network_coop.c's: co-op is a network game on a campaign level; the host's
 kills and its win are sent to the clients (campaign_score_network_kill, ...) */
 boolean network_coop_active(void);
-void network_coop_note_score_kill(short player_index, long variant_index, short points);
-void network_coop_note_score_won(void);
+void network_coop_note_score_kill(short player_index, long variant_index, short points, boolean competitive);
+void network_coop_note_score_won(boolean competitive);
+/* port_config.c's */
+char const *config_string(char const *name);
 
 /* ---------- globals */
 
@@ -128,6 +130,9 @@ static boolean campaign_score_button_primed = FALSE;
 static boolean campaign_score_button_held = FALSE;
 /* the summary is shown over the level just won, which waits for it */
 static boolean campaign_score_postgame = FALSE;
+/* whether each player keeps a score of their own in co-op (network.coop_score_type
+"competitive"): the host's choice, which a client is told with the kills */
+static boolean campaign_score_competitive = FALSE;
 
 /* the difficulty's share of a point, in tenths: easy, normal, heroic, legendary */
 static short const campaign_score_difficulty_tenths[NUMBER_OF_GAME_DIFFICULTY_LEVELS] = { 5, 10, 20, 50 };
@@ -180,6 +185,23 @@ static short campaign_score_difficulty(
 	short difficulty = game_difficulty_level_get();
 
 	return PIN(difficulty, 0, NUMBER_OF_GAME_DIFFICULTY_LEVELS - 1);
+}
+
+/* the host's (or a single machine's) co-op scoring type, from its config */
+static boolean campaign_score_type_competitive(
+	void)
+{
+	static unsigned long changes = (unsigned long)-1;
+	static boolean competitive = FALSE;
+
+	if (changes != config_changes())
+	{
+		char const *type = config_string("network.coop_score_type");
+
+		changes = config_changes();
+		competitive = type != NULL && !strcmp(type, "competitive");
+	}
+	return competitive;
 }
 
 /* the points a variant is worth (0 for one that is no enemy) */
@@ -422,7 +444,10 @@ static short campaign_score_compose(
 					(int)player_index + 1, campaign_score_total(player_index));
 		}
 	}
-	snprintf(lines[count++], CAMPAIGN_SCORE_SUMMARY_LENGTH, "SCORE %ld  KILLS %ld", points, kills);
+	if (campaign_score_competitive && players > 1)
+		snprintf(lines[count++], CAMPAIGN_SCORE_SUMMARY_LENGTH, "KILLS %ld", kills);
+	else
+		snprintf(lines[count++], CAMPAIGN_SCORE_SUMMARY_LENGTH, "SCORE %ld  KILLS %ld", points, kills);
 	/* (the best variants, the most points first) */
 	while (count < CAMPAIGN_SCORE_SUMMARY_LINES && variant_count > 0)
 	{
@@ -541,8 +566,9 @@ void campaign_score_record_kill(
 	}
 	if (points <= 0)
 		return;
+	campaign_score_competitive = campaign_score_type_competitive();
 	if (campaign_score_append(variant_index, (short)killing_player_index, points) && network_coop_active())
-		network_coop_note_score_kill((short)killing_player_index, variant_index, points);
+		network_coop_note_score_kill((short)killing_player_index, variant_index, points, campaign_score_competitive);
 
 	return;
 }
@@ -551,10 +577,12 @@ void campaign_score_record_kill(
 void campaign_score_network_kill(
 	short player_index,
 	long variant_index,
-	short points)
+	short points,
+	boolean competitive)
 {
 	if (!campaign_score_level() || player_index < 0 || player_index >= CAMPAIGN_SCORE_MAXIMUM_PLAYERS || points <= 0)
 		return;
+	campaign_score_competitive = competitive;
 	campaign_score_append(variant_index, player_index, points);
 
 	return;
@@ -617,9 +645,11 @@ void campaign_score_level_won(
 {
 	if (!campaign_score_level())
 		return;
+	if (game_connection() != _game_connection_network_client)
+		campaign_score_competitive = campaign_score_type_competitive();
 	/* (the clients write their own summaries from the kills they were sent) */
 	if (game_connection() == _game_connection_network_server && network_coop_active())
-		network_coop_note_score_won();
+		network_coop_note_score_won(campaign_score_competitive);
 	campaign_score_win_compose();
 
 	return;
@@ -627,10 +657,11 @@ void campaign_score_level_won(
 
 /* (network_coop.c) the host won the level, on a client */
 void campaign_score_network_won(
-	void)
+	boolean competitive)
 {
 	if (!campaign_score_level())
 		return;
+	campaign_score_competitive = competitive;
 	campaign_score_win_compose();
 	/* (shown at once: the host holds the level for its own, then the lobby
 	takes everyone) */
@@ -728,8 +759,12 @@ void campaign_score_draw_view(
 	window = render.camera.window_bounds;
 	offset_rectangle2d(&window, (short)-render.camera.viewport_bounds.x0, (short)-render.camera.viewport_bounds.y0);
 	campaign_score_update();
-	/* (co-op's players share one score: every player's kills added together) */
-	snprintf(text, sizeof(text), "SCORE %ld", campaign_score_team_total());
+	/* (co-op's players share one score, every player's kills added together,
+	or in a competitive game each has their own) */
+	if (game_connection() != _game_connection_network_client)
+		campaign_score_competitive = campaign_score_type_competitive();
+	snprintf(text, sizeof(text), "SCORE %ld",
+		campaign_score_competitive ? campaign_score_total((short)player_index) : campaign_score_team_total());
 	/* (above the match clock) */
 	bounds.x1 = (short)(window.x1 - CAMPAIGN_SCORE_RIGHT_MARGIN);
 	bounds.x0 = (short)(bounds.x1 - 320);
