@@ -21,7 +21,7 @@ struct hardcore_rules
 	unsigned char skip_draw;
 	unsigned char movement_sounds;  /* 1 on */
 	unsigned char spawns_visible;  /* training mode, with random_areas */
-	unsigned char random_pct;       /* training mode too, so this byte stays put */
+	unsigned char random_pct;       /* 1 the respawn percent. this byte stays put */
 	unsigned char omit_first;       /* 0 no, 1 yes, 2 power items */
 	unsigned char item_spawn_s;     /* 0 off, else seconds for every item */
 	unsigned char camo;             /* 0 xbox, 1 mcc, 2 custom */

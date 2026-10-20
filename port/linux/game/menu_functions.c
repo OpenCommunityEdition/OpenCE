@@ -6467,6 +6467,10 @@ static void hardcore_comp_apply(void)
 	hardcore_built_rules = hardcore_rules_for_engine(variant->game_engine_index);
 	hardcore_built_teams = variant->universal_variant.teams ? TRUE : FALSE;
 	hardcore_rules_reset_editing();
+	/* port: comp 2v2 shows the counters and the respawn percent.
+	   training mode stays off, so the pads stay hidden. */
+	hardcore_rules_editing()->team_scores = 1;
+	hardcore_rules_editing()->random_pct = 1;
 }
 
 /* port: opening the server replaces this screen. back builds it again,

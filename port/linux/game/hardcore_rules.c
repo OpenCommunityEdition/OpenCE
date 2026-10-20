@@ -72,23 +72,22 @@ void hardcore_rules_defaults(struct hardcore_rules *rules)
 	csmemset(rules, 0, sizeof(*rules));
 	rules->hill_move_s = 60;
 	rules->movement_sounds = 1;
-	/* training mode: the spawn pads, and the darker volumes where a
-	   teammate can respawn. the two bytes stay one switch. */
-	rules->spawns_visible = 1;
-	rules->random_areas = 1;
-	rules->random_pct = 1;
+	/* training mode stays off. the pads and the volumes wait for that
+	   switch. comp 2v2 turns the percent on by itself. */
 	rules->team_scores = 1;
 }
 
-/* the menu's one switch. an older sheet may have set only one of them.
-   the percent is that switch too, and its byte stays where it is. */
+/* the menu's one switch for the pads and the volumes. an older sheet may
+   have set only one of them. turning that switch on shows the percent.
+   the percent can stay on without the pads, and its byte stays put. */
 static void hardcore_training_pair(struct hardcore_rules *rules)
 {
 	unsigned char on = (rules->spawns_visible || rules->random_areas) ? 1 : 0;
 
 	rules->spawns_visible = on;
 	rules->random_areas = on;
-	rules->random_pct = on;
+	if (on)
+		rules->random_pct = 1;
 }
 
 struct hardcore_rules *hardcore_rules_editing(void)
@@ -521,15 +520,15 @@ static void hardcore_random_update(void)
 {
 	struct player_datum *local;
 	struct unit_datum *body;
-	struct game_variant const *variant;
 	real near_weight, total_weight;
 	short index, count;
 	long player_index;
 
 	hardcore_random_percent = -1;
-	variant = game_engine_get_variant();
-	if (!hardcore_live.random_areas || !variant || !variant->universal_variant.teams ||
-		!players_globals || players_globals->local_player_count <= 0)
+	/* the percent is its own byte. training mode is the pads and the
+	   volumes. a free for all still has a respawn weight. */
+	if (!hardcore_live.random_pct || !players_globals ||
+		players_globals->local_player_count <= 0)
 		return;
 	player_index = hardcore_local_player_index();
 	local = player_try_and_get(player_index);
