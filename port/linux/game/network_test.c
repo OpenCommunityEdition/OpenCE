@@ -35,6 +35,10 @@ and debug.network_test_pickup (the last player stands on a weapon lying
 about that many seconds in, and a joining machine's player holds the action
 button a second later, to pick it up).
 
+debug.network_test_camera holds the view at the debug camera of camera.txt
+in the data root (director_load_camera), for frames captured the same run
+to run.
+
 Called from the main loop every frame (main.c).
 */
 
@@ -60,6 +64,7 @@ Called from the main loop every frame (main.c).
 #include "scenario/scenario.h"
 #include "tag_files/tag_files.h"
 #include "camera/observer.h"
+#include "camera/director.h"
 
 #include "../src/p2p.h" /* port: port/linux/src/p2p.c, p2p_lobby.c */
 #include "network_chat.h"
@@ -122,6 +127,9 @@ static struct
 	real vehicle_time;
 	real pickup_time;
 	char pickup_weapon[64];
+	/* debug.network_test_camera: the debug camera of the data root's
+	camera.txt, loaded each second */
+	boolean camera;
 	/* debug.network_test_chat's, and the lines said this game */
 	real chat_time;
 	short chat_lines_said;
@@ -195,6 +203,7 @@ static void network_test_read_settings(
 	network_test.chat_time = (real)config_real("debug.network_test_chat");
 	snprintf(network_test.pickup_weapon, sizeof(network_test.pickup_weapon), "%s",
 		config_string("debug.network_test_pickup_weapon"));
+	network_test.camera = config_boolean("debug.network_test_camera") ? TRUE : FALSE;
 	network_test.score_to_win = (long)config_integer("debug.network_test_score");
 	if (network_test.mode != _network_test_off)
 		platform_log("network test: %s", setting);
@@ -964,6 +973,8 @@ void network_test_update(
 	{
 		network_test.logged_time = game_time_get();
 		network_test_log_players();
+		if (network_test.camera)
+			director_load_camera();
 		if (network_test.shoot_interval > 0.0f &&
 			game_time_get() % MAX(1, (long)(network_test.shoot_interval * TICKS_PER_SECOND)) < TICKS_PER_SECOND)
 		{

@@ -541,6 +541,11 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"The weapon network_test_pickup stands the player on: the first whose tag\n"
 		"name has this in it (\"sniper\", say); empty any." },
+	{ "debug.network_test_camera", _config_boolean, "false", "HALO_NETWORK_TEST_CAMERA", _environment_set_is_true,
+		_platform_all,
+		"In a test game, view from the debug camera of camera.txt in the data root\n"
+		"(position, forward, up and field of view, as debug_camera_save writes them),\n"
+		"set again each second." },
 	{ "debug.network_test_public", _config_boolean, "false", "HALO_NETWORK_TEST_PUBLIC", _environment_value,
 		_platform_all,
 		"The network test's host lists its game in the server browser, as Create\n"
@@ -592,7 +597,8 @@ static const struct config_setting config_settings[] =
 		"each voice heard logged once a second." },
 	{ "debug.frame_clock", _config_boolean, "false", "HALO_FRAME_CLOCK", _environment_set_is_true, _platform_all,
 		"From the first frame, the game's clock steps a 60th of a second a frame\n"
-		"shown, for frames captured the same run to run." },
+		"shown (the real time while none is shown for a tenth of a second), for\n"
+		"frames captured the same run to run." },
 	{ "debug.null_renderer", _config_boolean, "false", "HALO_NULL_RENDERER", _environment_set_is_true, _platform_all,
 		"Run without a window, drawing nothing." },
 	{ "debug.gl_debug", _config_boolean, "false", "HALO_GL_DEBUG", _environment_set_is_true, _platform_all,

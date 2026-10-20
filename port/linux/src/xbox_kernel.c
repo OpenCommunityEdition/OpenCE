@@ -9,6 +9,7 @@ threads, asynchronous procedure calls, time, memory and debug output.
 #include "port_config.h"
 
 #include <errno.h>
+#include <pthread.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -645,30 +646,32 @@ VOID WINAPI Sleep(DWORD milliseconds)
 
 /* ---------- time */
 
+/* debug.frame_clock: from the first frame shown, the clock steps a 60th of a
+second a frame, whatever the time between them, so that frames captured
+for tests (the macOS app's HALO_HOST_CAPTURE) are the same run to run.
+While no frame is shown for more than a tenth of a second (a map loading,
+the sounds of the old one fading out for 300 ms of this clock), it steps
+with the real time instead, so that the waits end. Read at the first
+frame, not in the clock: the settings' loading takes a lock and logs.
+(-1 not read yet, 0 off, 1 on) */
+#define PLATFORM_FRAME_CLOCK_NANOSECONDS 16666667ULL
+#define PLATFORM_FRAME_CLOCK_DARK_NANOSECONDS 100000000ULL
+
+static int frame_clock = -1;
+static pthread_mutex_t frame_clock_lock = PTHREAD_MUTEX_INITIALIZER;
+static unsigned long long frame_clock_start;
+static unsigned long long frame_clock_steps;
+static unsigned long long frame_clock_shown_at;
+
 /* The game's clocks count from when it started, as the Xbox's count from
 power-on. Its code keeps times in signed 32-bit variables, which a host up
 for more than 24.8 days (2^31 ms since boot) overflows: a hosted game then
 timed out its own clients. They start at 10 s, about where an Xbox's clock
 is by the time the game runs. */
-/* debug.frame_clock: from the first frame shown, the clock steps a 60th of a
-second a frame, whatever the time between them, so that frames captured
-for tests (the macOS app's HALO_HOST_CAPTURE) are the same run to run. Read
-at the first frame, not in the clock: the settings' loading takes a lock
-and logs. (-1 not read yet, 0 off, 1 on) */
-#define PLATFORM_FRAME_CLOCK_NANOSECONDS 16666667ULL
-
-static int frame_clock = -1;
-static unsigned long long frame_clock_start;
-static unsigned long long frame_clock_frames;
-
-static unsigned long long platform_clock_nanoseconds(void)
+static unsigned long long platform_real_clock_nanoseconds(void)
 {
 	static unsigned long long start;
 	unsigned long long value, expected = 0;
-
-	if (__atomic_load_n(&frame_clock, __ATOMIC_ACQUIRE) == 1)
-		return frame_clock_start + __atomic_load_n(&frame_clock_frames, __ATOMIC_RELAXED) *
-			PLATFORM_FRAME_CLOCK_NANOSECONDS;
 #ifdef HALO_WEB
 	/* (the browser's clock, in milliseconds, which clock_gettime reads too,
 	without the 64-bit conversions of its way there) */
@@ -683,18 +686,52 @@ static unsigned long long platform_clock_nanoseconds(void)
 	return value - __atomic_load_n(&start, __ATOMIC_RELAXED);
 }
 
+/* the steps the clock has taken in the dark since the last frame shown
+(frame_clock_lock held) */
+static unsigned long long frame_clock_dark_steps(unsigned long long now)
+{
+	unsigned long long dark = now - frame_clock_shown_at;
+
+	return dark > PLATFORM_FRAME_CLOCK_DARK_NANOSECONDS ?
+		(dark - PLATFORM_FRAME_CLOCK_DARK_NANOSECONDS) / PLATFORM_FRAME_CLOCK_NANOSECONDS : 0;
+}
+
+static unsigned long long platform_clock_nanoseconds(void)
+{
+	unsigned long long value;
+
+	if (__atomic_load_n(&frame_clock, __ATOMIC_ACQUIRE) != 1)
+		return platform_real_clock_nanoseconds();
+	pthread_mutex_lock(&frame_clock_lock);
+	value = frame_clock_start + (frame_clock_steps + frame_clock_dark_steps(platform_real_clock_nanoseconds())) *
+		PLATFORM_FRAME_CLOCK_NANOSECONDS;
+	pthread_mutex_unlock(&frame_clock_lock);
+	return value;
+}
+
 void platform_clock_frame_shown(void)
 {
+	unsigned long long now;
+
+	if (frame_clock == 0)
+		return;
+	now = platform_real_clock_nanoseconds();
 	if (frame_clock < 0)
 	{
 		int on = config_boolean("debug.frame_clock") ? 1 : 0;
 
 		if (on)
-			frame_clock_start = platform_clock_nanoseconds();
+		{
+			frame_clock_start = now;
+			frame_clock_shown_at = now;
+		}
 		__atomic_store_n(&frame_clock, on, __ATOMIC_RELEASE);
+		return;
 	}
-	else if (frame_clock)
-		__atomic_add_fetch(&frame_clock_frames, 1, __ATOMIC_RELAXED);
+	pthread_mutex_lock(&frame_clock_lock);
+	frame_clock_steps += frame_clock_dark_steps(now) + 1;
+	frame_clock_shown_at = now;
+	pthread_mutex_unlock(&frame_clock_lock);
 }
 
 DWORD WINAPI GetTickCount(void)
