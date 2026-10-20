@@ -229,11 +229,15 @@ bool valid_mass(float mass) { return std::isfinite(mass) && mass > 0.0f && mass 
 } // namespace
 
 struct physics_world {
+    // a step's scratch memory, which Jolt sizes by the most bodies and
+    // contacts: 16 MB and 4 KB a body (reserved, and touched only as used)
+    explicit physics_world(uint32 bodies) : temp_allocator(16 * 1024 * 1024 + 4096 * bodies) {}
+
     BroadPhaseLayers broad_phase_layers;
     ObjectVsBroadPhase object_vs_broad_phase;
     ObjectPairs object_pairs;
     PhysicsSystem system;
-    TempAllocatorImpl temp_allocator{16 * 1024 * 1024};
+    TempAllocatorImpl temp_allocator;
     JobSystemSingleThreaded job_system{cMaxPhysicsJobs};
     uint32 bodies_max = 0;
     uint32 collision_steps = 1;
@@ -277,8 +281,8 @@ extern "C" physics_world *physics_world_create(const physics_world_settings *set
         || settings->collision_steps > COLLISION_STEPS_MAX)
         return nullptr;
     start_jolt();
-    physics_world *world = new physics_world();
     // (one more body than asked for: the level's)
+    physics_world *world = new physics_world(settings->bodies_max + 1);
     world->bodies_max = settings->bodies_max + 1;
     world->collision_steps = settings->collision_steps;
     world->system.Init(world->bodies_max, 0, 4 * world->bodies_max, 4 * world->bodies_max,

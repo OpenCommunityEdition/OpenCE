@@ -47,29 +47,37 @@ def test_the_tree_matches_its_checksum():
     assert (JOLT / "Jolt/Jolt.h").is_file() and (JOLT / "Jolt/Physics/Ragdoll/Ragdoll.h").is_file()
 
 
-# ---------- the world, natively (port/macos/tests/host_physics_test.c)
+# ---------- the world and the bridge, natively (port/macos/tests/
+# host_physics_test.c, host_physics_bridge_test.c)
+
+PROGRAMS = ["host_physics_test", "host_physics_bridge_test"]
+
 
 @pytest.fixture(scope="module")
-def physics_test(tmp_path_factory):
+def programs(tmp_path_factory):
     built = subprocess.run(["ninja", str(PHYSICS_LIBRARY.relative_to(ROOT))], cwd=ROOT,
                            capture_output=True, text=True)
     assert built.returncode == 0, built.stdout + built.stderr
-    exe = tmp_path_factory.mktemp("physics") / "host_physics_test"
-    build = subprocess.run([
-        os.environ.get("CC", "cc"), "-std=gnu11", "-O1", "-Wall", "-Werror", "-mmacosx-version-min=26.0",
-        "-Iport/macos/host", "-Iport/macos/include", "port/macos/tests/host_physics_test.c",
-        str(PHYSICS_LIBRARY), "-lc++", "-o", str(exe),
-    ], cwd=ROOT, capture_output=True, text=True)
-    assert build.returncode == 0, build.stderr
-    return exe
+    folder = tmp_path_factory.mktemp("physics")
+    for name in PROGRAMS:
+        build = subprocess.run([
+            os.environ.get("CC", "cc"), "-std=gnu11", "-O1", "-Wall", "-Werror", "-mmacosx-version-min=26.0",
+            "-Iport/macos/host", "-Iport/macos/include", f"port/macos/tests/{name}.c",
+            str(PHYSICS_LIBRARY), "-lc++", "-o", str(folder / name),
+        ], cwd=ROOT, capture_output=True, text=True)
+        assert build.returncode == 0, build.stderr
+    return folder
 
 
-def physics_cases():
-    source = (ROOT / "port/macos/tests/host_physics_test.c").read_text(encoding="utf-8")
-    return re.findall(r'\{"(\w+)", \w+\}', source)
+def cases():
+    found = []
+    for name in PROGRAMS:
+        source = (ROOT / f"port/macos/tests/{name}.c").read_text(encoding="utf-8")
+        found += [(name, case) for case in re.findall(r'\{"(\w+)", \w+\}', source)]
+    return found
 
 
-@pytest.mark.parametrize("case", physics_cases())
-def test_physics(physics_test, case):
-    result = subprocess.run([str(physics_test), case], capture_output=True, text=True, timeout=120)
+@pytest.mark.parametrize("program,case", cases())
+def test_physics(programs, program, case):
+    result = subprocess.run([str(programs / program), case], capture_output=True, text=True, timeout=120)
     assert (result.returncode, result.stdout.strip()) == (0, "ok"), result.stdout + result.stderr

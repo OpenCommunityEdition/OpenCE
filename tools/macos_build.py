@@ -203,6 +203,15 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         obj = host_dir / "obj" / "physics" / (source.name + ".o")
         n.build(outputs=obj, rule="macos_host_cxx", inputs=source, variables={"cflags": physics_cflags})
         physics_objects.append(obj)
+    # the bridge to the guest's batches (port/macos/include/host_physics.h), in C
+    bridge_cflags = " ".join([
+        "-O2", "-g", "-Wall", "-Werror", "-std=gnu11", "-ffp-contract=off", f"-mmacosx-version-min={MACOS_MINIMUM}",
+        f"-I{PORT_DIR}/host", f"-I{PORT_DIR}/include",
+    ])
+    for source in sorted((PORT_DIR / "host" / "physics").glob("*.c")):
+        obj = host_dir / "obj" / "physics" / (source.name + ".o")
+        n.build(outputs=obj, rule="macos_host_cc", inputs=source, variables={"cflags": bridge_cflags})
+        physics_objects.append(obj)
     host_objects += physics_objects
     # the host as a library, which the command-line host and the app link
     host_library = BUILD / "libhalo_host.a"
