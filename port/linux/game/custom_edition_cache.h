@@ -39,9 +39,9 @@ never are: a map named as one of them (a30, bloodgulch) stays apart from it,
 in the menus, the loader and network games. The game engine keeps 63
 characters of a level name (game_engine.c, struct game_engine_stage). */
 #define CUSTOM_EDITION_LEVEL_NAME_PREFIX "custom_maps\\"
-/* (Evolved's maps, beside custom_maps. Classic never looks here.) */
-#define EVOLVED_MAP_DIRECTORY "d:\\evolved_maps\\"
-#define EVOLVED_LEVEL_NAME_PREFIX "evolved_maps\\"
+/* (Hardcore's maps, beside custom_maps. Classic never looks here.) */
+#define HARDCORE_MAP_DIRECTORY "d:\\hardcore_maps\\"
+#define HARDCORE_LEVEL_NAME_PREFIX "hardcore_maps\\"
 #define CUSTOM_EDITION_MAXIMUM_LEVEL_NAME_LENGTH 63
 
 /* ---------- structures */
@@ -194,8 +194,8 @@ boolean custom_edition_structure_bsp_reference_valid(
 custom_edition_behaviour, cache_file_formats.h); FALSE when none is loaded. */
 boolean custom_edition_cache_relies_on(
 	short behaviour);
-/* the loaded map was started from evolved_maps (FALSE once it is gone) */
-boolean custom_edition_cache_is_evolved(
+/* the loaded map was started from hardcore_maps (FALSE once it is gone) */
+boolean custom_edition_cache_is_hardcore(
 	void);
 void custom_edition_cache_tags_unload(
 	void);

@@ -796,10 +796,10 @@ void map_share_level_name_choose(
 	map_share_hash_digits(hash, digits);
 	if (map_share_name_hashed(name) && !csstrcmp(name + length - MAP_SHARE_NAME_DIGITS, digits))
 		length -= MAP_SHARE_NAME_DIGITS + 1;
-	/* (an evolved map's name already says its folder. Renaming it
+	/* (a hardcore map's name already says its folder. Renaming it
 	custom_maps would load that folder's file of the same name.) */
-	prefix = !_strnicmp(level_name, EVOLVED_LEVEL_NAME_PREFIX, csstrlen(EVOLVED_LEVEL_NAME_PREFIX)) ?
-		EVOLVED_LEVEL_NAME_PREFIX : CUSTOM_EDITION_LEVEL_NAME_PREFIX;
+	prefix = !_strnicmp(level_name, HARDCORE_LEVEL_NAME_PREFIX, csstrlen(HARDCORE_LEVEL_NAME_PREFIX)) ?
+		HARDCORE_LEVEL_NAME_PREFIX : CUSTOM_EDITION_LEVEL_NAME_PREFIX;
 	if (length <= 0 || csstrlen(prefix) + length >= (unsigned long)size ||
 		csstrlen(prefix) + length >= sizeof(globals->chosen_level))
 	{

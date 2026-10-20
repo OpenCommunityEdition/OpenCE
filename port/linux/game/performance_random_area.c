@@ -1,11 +1,11 @@
-/* An evolved match draws the darker teammate respawn area from the mesh
+/* A hardcore match draws the darker teammate respawn area from the mesh
 shipped with the game when that map has one. Hang 'em High does. The
-matching evolved map is used when this copy has no mesh for it. Maps that
+matching hardcore map is used when this copy has no mesh for it. Maps that
 never place one, Prisoner among them, draw nothing here. A classic game
 draws neither. */
 
 #include "cseries.h"
-#include "evolved_assets.h"
+#include "hardcore_assets.h"
 #include "bitmaps/bitmap_group.h"
 #include "cache/cache_files.h"
 #include "main/main.h"
@@ -307,7 +307,7 @@ static int area_bitmap_make(void)
 	area_bitmap_group.bitmaps.count = 1;
 	area_bitmap_group.bitmaps.address = &area_bitmap;
 	bitmap_tag = cache_files_register_runtime_ui_tag(BITMAP_GROUP_TAG,
-		"scenery\\randoms\\bitmaps\\evolved_random_area", &area_bitmap_group);
+		"scenery\\randoms\\bitmaps\\hardcore_random_area", &area_bitmap_group);
 	if (bitmap_tag == NONE)
 		return 0;
 	texture_cache_bitmap_new(bitmap_tag, &area_bitmap);
@@ -544,7 +544,7 @@ static int area_from_pack(char const *leaf)
 	unsigned long place_index;
 	unsigned long part_index;
 
-	if (!leaf || !evolved_assets_find(EVOLVED_ASSET_AREA, leaf, &payload, &size))
+	if (!leaf || !hardcore_assets_find(HARDCORE_ASSET_AREA, leaf, &payload, &size))
 		return 0;
 	if (size < 4)
 		return -1;
@@ -655,7 +655,7 @@ static void area_prepare(void)
 	}
 	if (packed < 0)
 		goto missing;
-	if (snprintf(path, sizeof(path), "d:\\evolved_maps\\%s.map", leaf) >= (int)sizeof(path))
+	if (snprintf(path, sizeof(path), "d:\\hardcore_maps\\%s.map", leaf) >= (int)sizeof(path))
 		goto fail;
 	file = fopen(path, "rb");
 	if (!file)
@@ -762,7 +762,7 @@ missing:
 	if (!area_logged)
 	{
 		area_logged = 1;
-		platform_log("evolved: random areas were not loaded from the game or evolved_maps/%s.map", leaf);
+		platform_log("hardcore: random areas were not loaded from the game or hardcore_maps/%s.map", leaf);
 	}
 fail:
 	if (file)

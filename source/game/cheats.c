@@ -51,6 +51,7 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "cheats.h"
+#include "hardcore_rules.h" /* port: hardcore ammo is a host rule */
 #include "cache/cache_files.h"
 #include "camera/director.h"
 #include "camera/observer.h"
@@ -173,14 +174,24 @@ what its drawing shows it that others' does not, set before it joined too
 void cheats_network_client_enforce(
 	void)
 {
-	static struct cheat_globals const none = { 0 };
+	struct cheat_globals allowed;
 	boolean changed;
 
 	if (!network_game_distributed_client())
 		return;
-	changed = csmemcmp(&cheat, &none, sizeof(cheat)) != 0 || !rider_ejection || !player_autoaim_flag ||
+	/* port: infinite ammo is the match's rule. wiping it warned every
+	   tick, and left the rule off until later in that tick. */
+	csmemset(&allowed, 0, sizeof(allowed));
+	if (hardcore_rules_active())
+	{
+		allowed.bottomless_clip = hardcore_rules_live()->infinite_ammo == 1;
+		allowed.infinite_ammo = hardcore_rules_live()->infinite_ammo == 2;
+	}
+	changed = csmemcmp(&cheat, &allowed, sizeof(cheat)) != 0 || !rider_ejection || !player_autoaim_flag ||
 		!player_magnetism_flag;
 	csmemset(&cheat, 0, sizeof(cheat));
+	cheat.bottomless_clip = allowed.bottomless_clip;
+	cheat.infinite_ammo = allowed.infinite_ammo;
 	rider_ejection = TRUE;
 	player_autoaim_flag = TRUE;
 	player_magnetism_flag = TRUE;

@@ -2,7 +2,7 @@
  * optional recordings in the existing mixer preserves the user's audio toggle,
  * master volume, output device and guest/host audio-thread handoff. */
 #include "performance_audio.h"
-#include "evolved_assets.h"
+#include "hardcore_assets.h"
 #include <stdio.h>
 
 enum
@@ -140,7 +140,7 @@ static int performance_audio_load_embedded(unsigned long index)
 	const unsigned char *bytes;
 	unsigned long size;
 
-	if (!evolved_assets_find(EVOLVED_ASSET_SOUND, performance_audio_cues[index], &bytes, &size))
+	if (!hardcore_assets_find(HARDCORE_ASSET_SOUND, performance_audio_cues[index], &bytes, &size))
 		return 0;
 	return performance_audio_take_wav(bytes, size, &performance_audio_clips[index]);
 }
@@ -153,7 +153,7 @@ static int performance_audio_load_clip(unsigned long index)
 	return performance_audio_load_embedded(index);
 }
 
-/* The spoken cues are shipped with the game. The user's evolved map still
+/* The spoken cues are shipped with the game. The user's hardcore map still
 has them as Xbox ADPCM when that copy is missing. */
 #define PERFORMANCE_AUDIO_TAG_BASE 0x40440000UL
 #define PERFORMANCE_AUDIO_TAG_MAXIMUM 0x1700000UL
@@ -299,7 +299,7 @@ static void performance_audio_load_map(void)
 
 	if (!root || !root[0])
 		return;
-	path_length = snprintf(path, sizeof(path), "%s/evolved_maps/prisoner.map", root);
+	path_length = snprintf(path, sizeof(path), "%s/hardcore_maps/prisoner.map", root);
 	if (path_length < 0 || (unsigned long)path_length >= sizeof(path))
 		return;
 	file = fopen(path, "rb");
@@ -368,7 +368,7 @@ int halo_performance_audio_available(void)
 				performance_audio_complete = FALSE;
 		}
 		if (!performance_audio_complete)
-			platform_log("evolved: timer callouts were not loaded from the game, sounds/performance, or evolved_maps/prisoner.map");
+			platform_log("hardcore: timer callouts were not loaded from the game, sounds/performance, or hardcore_maps/prisoner.map");
 	}
 	return performance_audio_complete != FALSE;
 }

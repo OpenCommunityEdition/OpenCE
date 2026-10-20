@@ -1080,7 +1080,7 @@ static enum cache_file_status cache_header_identify(
 	case CACHE_FILE_VERSION_HALO_PC:
 	case CACHE_FILE_VERSION_CUSTOM_EDITION:
 		/* (Halo PC and Custom Edition share this header and 0x40440000.
-		Evolved's maps are Halo PC caches.) */
+		Hardcore's maps are Halo PC caches.) */
 		identity->format = _cache_file_format_custom_edition_cache;
 		break;
 	default:

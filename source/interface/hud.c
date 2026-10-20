@@ -112,8 +112,8 @@ symbols in this file:
 #include "text/draw_string.h"
 #include "coop_spectate.h" /* port: port/linux/game/coop_spectate.c */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
-#include "evolved_rules.h" /* port: an evolved match draws its own clock */
-#include "evolved_views.h" /* port: a teammate pane draws that player's HUD */
+#include "hardcore_rules.h" /* port: a hardcore match draws its own clock */
+#include "hardcore_views.h" /* port: a teammate pane draws that player's HUD */
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
 #include "text/font_group.h"
 #include "text/text_group.h"
@@ -1434,9 +1434,9 @@ static void hud_draw_match_timer(
 	rectangle2d bounds;
 	struct font_header *font;
 
-	/* an evolved match draws its own clock. this one would sit on it
+	/* a hardcore match draws its own clock. this one would sit on it
 	when the setting is on */
-	if (evolved_rules_active() || !hud_match_timer_setting() || font_index == NONE)
+	if (hardcore_rules_active() || !hud_match_timer_setting() || font_index == NONE)
 		return;
 	ticks_to_unicode_time_string(game_time_get(), NUMBEROF(time_string), time_string);
 	/* (a time under a minute is drawn with no minutes digit, which a clock
@@ -1472,7 +1472,7 @@ void hud_draw_screen(
 	director_perspective perspective = director_get_perspective(render.local_player_index);
 	/* port: the spare slot has no director, so the first-person test would
 	skip their weapon, shield and reticle. their sounds stay off this machine */
-	boolean teammate_pane = evolved_views_is_teammate_window((short)render.window_index);
+	boolean teammate_pane = hardcore_views_is_teammate_window((short)render.window_index);
 
 	rasterizer_hud_begin();
 	if (player_index != NONE)

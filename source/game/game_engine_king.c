@@ -101,7 +101,7 @@ symbols in this file:
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "units/units.h"
-#include "evolved_rules.h" /* port: evolved hill order and period */
+#include "hardcore_rules.h" /* port: hardcore hill order and period */
 
 /* ---------- constants */
 
@@ -439,9 +439,9 @@ static boolean king_engine_initialize_for_new_map(
 	}
 
 	king_globals.hill_id = 0;
-	/* port: an evolved hill can stay up for a chosen number of seconds. */
-	king_globals.hill_timer = evolved_rules_active() ?
-		evolved_rules_hill_move_ticks() : HILL_MOVE_TIME;
+	/* port: a hardcore hill can stay up for a chosen number of seconds. */
+	king_globals.hill_timer = hardcore_rules_active() ?
+		hardcore_rules_hill_move_ticks() : HILL_MOVE_TIME;
 	king_globals.hill_previous_controller = NONE;
 	king_globals.hill_state = king_hill_uncontrolled;
 	find_hill();
@@ -791,8 +791,8 @@ static void king_engine_update(
 		game_engine_get_variant()->game_engine_variant.king.moving_hill &&
 		--king_globals.hill_timer == 0)
 	{
-		king_globals.hill_timer = evolved_rules_active() ?
-			evolved_rules_hill_move_ticks() : HILL_MOVE_TIME;
+		king_globals.hill_timer = hardcore_rules_active() ?
+			hardcore_rules_hill_move_ticks() : HILL_MOVE_TIME;
 		king_globals.hill_id = find_next_hill(king_globals.hill_id);
 		find_hill();
 		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
@@ -1082,7 +1082,7 @@ static long find_next_hill(
 
 	/* port: ordered hills walk the list. random_range would be a draw the
 	other machines do not make. */
-	if (evolved_rules_hill_ordered() && king_engine_num_hills > 0)
+	if (hardcore_rules_hill_ordered() && king_engine_num_hills > 0)
 	{
 		short next = 0;
 

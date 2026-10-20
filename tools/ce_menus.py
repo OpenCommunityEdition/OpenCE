@@ -70,7 +70,7 @@ LEFT_OUT = {
     "ui\\shell\\main_menu\\multiplayer_type_select\\checking_updates_screen_join",
 }
 # children moved: (parent, child) to (x, y); the main menu's Quit a row below
-# Mods, which takes Credits' place; Multiplayer's rows tightened so Evolved
+# Mods, which takes Credits' place; Multiplayer's rows tightened so Hardcore
 # fits below the line and above Edit Gametypes
 # (port_settings.WIDGET_PATCHES)
 CHILD_OFFSETS = {

@@ -595,7 +595,7 @@ struct network_game *network_game_server_get_game(struct network_game_server *se
 #include "units/units.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
-#include "evolved_rules.h" /* port: evolved kills, item spawns, and no motion sensor */
+#include "hardcore_rules.h" /* port: hardcore kills, item spawns, and no motion sensor */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -5048,8 +5048,8 @@ void game_engine_player_killed(
 	/* port: a killer who has left the game since is no one's kill */
 	if (killing_player_index != NONE && !player_try_and_get(killing_player_index))
 		killing_player_index = NONE;
-	/* port: evolved kill restore, and a dropped powerup. Vitality is simulated. */
-	evolved_rules_on_kill(killing_player_index, dead_player_index);
+	/* port: hardcore kill restore, and a dropped powerup. Vitality is simulated. */
+	hardcore_rules_on_kill(killing_player_index, dead_player_index);
 	/* the host's kill of a player who quit, ahead of this client's clock
 	(game_update_quit_players has not come to its time yet) */
 	if (network_game_distributed_client() && dead_player->quit_out_of_game_time != NONE &&
@@ -5355,8 +5355,8 @@ boolean game_engine_draw_object_in_motion_sensor(
 {
 	boolean draw_object = TRUE;
 
-	/* port: evolved draws no motion sensor, and the menu has no switch for it */
-	if (evolved_rules_active())
+	/* port: hardcore draws no motion sensor, and the menu has no switch for it */
+	if (hardcore_rules_active())
 		return FALSE;
 
 	if (game_engine)
@@ -5380,8 +5380,8 @@ boolean game_engine_hud_draw_motion_sensor(
 {
 	boolean draw_motion_sensor = TRUE;
 
-	/* port: evolved draws no motion sensor, and the menu has no switch for it */
-	if (evolved_rules_active())
+	/* port: hardcore draws no motion sensor, and the menu has no switch for it */
+	if (hardcore_rules_active())
 		return FALSE;
 
 	if (game_engine)
@@ -8967,9 +8967,9 @@ static void game_engine_update_item_spawn(
 				respawn_period = respawn_time * TICKS_PER_SECOND;
 			}
 
-			/* port: evolved item timing. A classic game keeps the tag's period. */
-			respawn_period = evolved_rules_item_period(respawn_period, respawn_time);
-			if (evolved_rules_omit_spawn(game_time_get(), respawn_time))
+			/* port: hardcore item timing. A classic game keeps the tag's period. */
+			respawn_period = hardcore_rules_item_period(respawn_period, respawn_time);
+			if (hardcore_rules_omit_spawn(game_time_get(), respawn_time))
 				continue;
 
 			if (game_time_get() % respawn_period == 0)

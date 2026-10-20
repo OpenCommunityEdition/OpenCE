@@ -107,8 +107,8 @@ symbols in this file:
 #include "units/units.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
-#include "evolved_timer.h" /* port: port/linux/game/evolved_timer.c */
-#include "evolved_views.h" /* port: a teammate pane still gets the weapon mask */
+#include "hardcore_timer.h" /* port: port/linux/game/hardcore_timer.c */
+#include "hardcore_views.h" /* port: a teammate pane still gets the weapon mask */
 
 /* ---------- constants */
 
@@ -388,8 +388,8 @@ void interface_draw_fullscreen_overlays(
 	void)
 {
 	cinematic_render();
-	/* port: an evolved match's clock. a classic game does not draw it */
-	evolved_timer_render();
+	/* port: a hardcore match's clock. a classic game does not draw it */
+	hardcore_timer_render();
 	interface_splitscreen_render();
 	hud_render_timer();
 	/* port: a map's download (port/linux/game/map_share.c) */
@@ -465,7 +465,7 @@ static long interface_get_weapon_hud_index(
 
 		if (hud_scripted_globals &&
 			hud_scripted_globals->show_hud &&
-			(evolved_views_is_teammate_window((short)render.window_index) ||
+			(hardcore_views_is_teammate_window((short)render.window_index) ||
 				(perspective != _director_perspective_neutral &&
 					perspective != _director_perspective_scripted)) &&
 			player->unit_index != NONE)
@@ -1240,9 +1240,9 @@ static void interface_splitscreen_render(
 	if (game_engine_force_single_screen() || cinematic_in_progress())
 		return;
 
-	/* port: the bar is the panes this screen draws. an evolved team game
+	/* port: the bar is the panes this screen draws. a hardcore team game
 	   leaves the other team's local player out */
-	window_count = evolved_views_local_count();
+	window_count = hardcore_views_local_count();
 
 	if (window_count <= 1)
 		return;

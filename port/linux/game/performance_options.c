@@ -21,19 +21,19 @@
 #include "text/text_group.h"
 #include "network_distributed.h"
 #include "performance_options.h"
-#include "evolved_rules.h"
+#include "hardcore_rules.h"
 #include "performance_audio.h"
 #include "performance_timer_schedule.h"
 #include "performance_timer_items.h"
 #include "performance_timer_render.h"
 #include "../src/port_config.h"
 
-/* The glowing pads are loaded from the user's evolved map. These stay
+/* The glowing pads are loaded from the user's hardcore map. These stay
 declared here so a missing model keeps the line markers. */
 boolean performance_spawn_marker_ready(void);
 void performance_spawn_marker_render(struct player_starting_location const *starts, short count);
 void performance_spawn_marker_reset(void);
-boolean evolved_rules_random_areas(void);
+boolean hardcore_rules_random_areas(void);
 void performance_random_area_render(struct player_starting_location const *starts, short count);
 void performance_random_area_reset(void);
 
@@ -286,11 +286,11 @@ void performance_options_update(void)
 
 	if (!game_in_progress() || !game_engine_running())
 		return;
-	/* port: evolved ammo rules, each tick, and only while that mode is on. */
-	evolved_rules_tick();
-	/* port: an evolved match uses the timer recordings on any map. the
+	/* port: hardcore ammo rules, each tick, and only while that mode is on. */
+	hardcore_rules_tick();
+	/* port: a hardcore match uses the timer recordings on any map. the
 	   cue toggles still choose which lines play. a missing pack is silent. */
-	if (((performance_flags & _performance_option_timer_audio) || evolved_rules_active()) &&
+	if (((performance_flags & _performance_option_timer_audio) || hardcore_rules_active()) &&
 		!cinematic_in_progress() && !game_engine_showing_postgame())
 	{
 		performance_timer_audio_update(performance_options_timer_ticks());
@@ -420,8 +420,8 @@ void performance_options_render(void)
 	if (!game_in_progress() || !game_engine_running() || cinematic_in_progress() || game_engine_showing_postgame())
 		return;
 	performance_options_render_spawn_points();
-	/* port: evolved markers and the random-spawn estimate. */
-	evolved_rules_render();
+	/* port: hardcore markers and the random-spawn estimate. */
+	hardcore_rules_render();
 	if (performance_flags & _performance_option_match_timer)
 		performance_timer_render(performance_options_timer_ticks());
 }
@@ -433,8 +433,8 @@ void performance_options_render_world(void)
 		return;
 	if ((performance_flags & _performance_option_spawn_markers) && performance_fallback_count >= 1)
 		performance_spawn_marker_render(performance_fallback, performance_fallback_count);
-	/* The darker zones are the evolved map's randoms mesh when it sits
+	/* The darker zones are the hardcore map's randoms mesh when it sits
 	on the starts. A map that never placed one draws none. */
-	if (evolved_rules_random_areas())
+	if (hardcore_rules_random_areas())
 		performance_random_area_render(performance_fallback, performance_fallback_count);
 }

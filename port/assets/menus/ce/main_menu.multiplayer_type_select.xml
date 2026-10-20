@@ -60,7 +60,7 @@
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_create_internet_item" y="218"/>
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_create_lan_item" y="246"/>
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_coop_item" y="274"/>
-		<child widget="main_menu/multiplayer_type_select/multiplayer_type_evolved_item" y="323"/>
+		<child widget="main_menu/multiplayer_type_select/multiplayer_type_hardcore_item" y="323"/>
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_gametypes_item" y="351"/>
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_button_bar" y="414"/>
 	</widget>

@@ -390,7 +390,7 @@ symbols in this file:
 #endif
 #include "camera/director.h"
 #include "camera/observer.h"
-#include "evolved_views.h" /* port: teammate panes in an evolved team game */
+#include "hardcore_views.h" /* port: teammate panes in a hardcore team game */
 #include "cutscene/cinematics.h"
 #include "effects/player_effects.h"
 #include "physics/collision_usage.h"
@@ -1452,13 +1452,13 @@ short main_get_window_count(
 
 	if (!single_window)
 	{
-		short count = (short)PIN(evolved_views_local_count(), 1, MAXIMUM_WINDOWS);
+		short count = (short)PIN(hardcore_views_local_count(), 1, MAXIMUM_WINDOWS);
 
 		/* port: one local player on this team, and that team's mates.
 		   the other team's local player is not a pane */
 		if (count == 1)
 		{
-			short views = evolved_views_window_count();
+			short views = hardcore_views_window_count();
 
 			if (views > 1)
 				return views;
@@ -3314,9 +3314,9 @@ static void main_game_render(
 	force_single_screen = game_engine_force_single_screen();
 	last_local_player_index = NONE;
 
-	/* port: an evolved team game draws one team. the other team's local
+	/* port: a hardcore team game draws one team. the other team's local
 	   player is not on this split */
-	window_count = PIN(evolved_views_local_count(), 1, MAXIMUM_LOCAL_PLAYERS);
+	window_count = PIN(hardcore_views_local_count(), 1, MAXIMUM_LOCAL_PLAYERS);
 	player_window_count = window_count;
 	if (force_single_screen || cinematic_in_progress())
 	{
@@ -3326,7 +3326,7 @@ static void main_game_render(
 	/* port: teammate panes share this screen. they are not local players */
 	else if (window_count == 1)
 	{
-		short views = evolved_views_window_count();
+		short views = hardcore_views_window_count();
 
 		if (views > 1)
 			player_window_count = views;
@@ -3348,19 +3348,19 @@ static void main_game_render(
 		{
 			window->local_player_index = NONE;
 		}
-		else if (evolved_views_is_teammate_window((short)window_index))
+		else if (hardcore_views_is_teammate_window((short)window_index))
 		{
 			/* port: a dead teammate keeps the pane, so the split and this
 			   machine's choice of pane stay for the match */
-			if (evolved_views_camera((short)window_index, &teammate_view))
+			if (hardcore_views_camera((short)window_index, &teammate_view))
 			{
-				window->local_player_index = evolved_views_hud_slot();
+				window->local_player_index = hardcore_views_hud_slot();
 				observer = &teammate_view;
 			}
 			else
 				window->local_player_index = NONE;
 		}
-		else if (evolved_views_is_local_window((short)window_index) ||
+		else if (hardcore_views_is_local_window((short)window_index) ||
 			window_index < window_count)
 		{
 			if (!rasterizer_debug_options.force_all_player_views_to_default_player ||
@@ -3372,7 +3372,7 @@ static void main_game_render(
 				}
 				else
 				{
-					last_local_player_index = evolved_views_next_local(last_local_player_index);
+					last_local_player_index = hardcore_views_next_local(last_local_player_index);
 				}
 			}
 

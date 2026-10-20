@@ -709,7 +709,7 @@ void network_actors_note_user_animation(long unit_index, long animation_graph_in
 
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
 #include "performance_sound.h"
-#include "evolved_rules.h" /* port: evolved skip of the first weapon draw */
+#include "hardcore_rules.h" /* port: hardcore skip of the first weapon draw */
 #endif
 
 /* ---------- constants */
@@ -2517,8 +2517,8 @@ boolean unit_new(
 		unit_definition_get(unit->definition_index);
 	result = FALSE;
 
-	/* port: remembered off the unit, so an evolved game can skip one draw. */
-	evolved_rules_skip_arm(unit_index);
+	/* port: remembered off the unit, so a hardcore game can skip one draw. */
+	hardcore_rules_skip_arm(unit_index);
 
 	if (unit_definition->object.animation_graph.index!=NONE)
 	{

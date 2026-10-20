@@ -80,7 +80,7 @@ symbols in this file:
 #include "game_engine.h"
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
 #include "../../port/linux/game/performance_options.h"
-#include "evolved_views.h" /* port: a teammate pane is a world view */
+#include "hardcore_views.h" /* port: a teammate pane is a world view */
 #endif
 #include "interface/first_person_weapons.h"
 #include "interface/interface.h"
@@ -400,7 +400,7 @@ static void render_window(
 		structure_render_fog();
 		game_engine_post_rasterize_objects();
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
-		/* port: the evolved spawn pads join this frame's transparent
+		/* port: the hardcore spawn pads join this frame's transparent
 		   models. a classic map has no pad scenery, so the model is drawn
 		   at its player starts. */
 		performance_options_render_world();
@@ -444,7 +444,7 @@ static void render_window(
 		rasterizer_screen_flash();
 		/* port: a teammate pane is their view, not a second copy of this
 		player's menus */
-		if (!evolved_views_is_teammate_window((short)render.window_index))
+		if (!hardcore_views_is_teammate_window((short)render.window_index))
 		{
 			halo_screen_ui_offset(TRUE);
 			render_ui_widgets(local_player_index, &rasterizer_camera->viewport_bounds);
@@ -645,13 +645,16 @@ void render_frame(
 		{
 			window_type = 0;
 		}
-		else if (evolved_views_is_teammate_window((short)window_index))
+		else if (hardcore_views_is_teammate_window((short)window_index) &&
+			window->local_player_index != NONE)
 		{
 			/* port: before the local-player branch. the pane borrows a HUD
-			slot, so local_player_index is set, and this still has to run */
-			evolved_views_begin((short)window_index);
+			slot, so local_player_index is set, and this still has to run.
+			a dead teammate, or the single postgame window, has none: that
+			pane stays clear. a camera at the origin is not an empty pane */
+			hardcore_views_begin((short)window_index);
 			render_player_frame(window, NULL);
-			evolved_views_end();
+			hardcore_views_end();
 			continue;
 		}
 		else if (window->local_player_index != NONE)

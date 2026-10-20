@@ -125,7 +125,7 @@ symbols in this file:
 #include "sound/sound_manager.h"
 #include "units/units.h"
 #include "view_fov.h" /* port: port/linux/game/view_fov.c */
-#include "evolved_views.h" /* port: a teammate pane is not a director camera */
+#include "hardcore_views.h" /* port: a teammate pane is not a director camera */
 #include "shaders/shader_definitions.h" /* port: (the shield's flare on the arms) */
 #include "shaders/shaders.h"
 /* port: port/linux/game/shield_color.c */
@@ -692,7 +692,7 @@ void first_person_weapon_render_update(
 		{
 			/* port: a teammate pane has no director, so the first-person
 			test would hide their weapon. zoom still puts it away */
-			boolean visible= (evolved_views_is_teammate_window((short)render.window_index) ||
+			boolean visible= (hardcore_views_is_teammate_window((short)render.window_index) ||
 				director_get_perspective(render.local_player_index)==_director_perspective_first_person) &&
 				player_control_get_zoom_level(render.local_player_index)==NONE;
 

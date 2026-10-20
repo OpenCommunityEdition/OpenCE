@@ -1229,8 +1229,8 @@ boolean mod_bitmaps_read(
 	struct mod_bitmap *made;
 	unsigned long size;
 	unsigned long stamp[2];
-	/* The evolved spawn pad's texture is not in the open map. Its pixels
-	were taken from the user's evolved map, and reading them here as the
+	/* The hardcore spawn pad's texture is not in the open map. Its pixels
+	were taken from the user's hardcore map, and reading them here as the
 	open map's would draw the wrong texels. */
 	{
 		extern boolean performance_spawn_marker_bitmap(struct bitmap_data *bitmap, void *buffer);

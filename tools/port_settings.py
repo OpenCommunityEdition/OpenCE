@@ -694,7 +694,7 @@ STRING_OVERRIDES.update({
         "Host a game on the Internet:\\nplayers join by its invite\\nlink or Discord.",
         "Host a game on your LAN\\nonly.",
         "Play the campaign with a\\nfriend in split screen:\\nplayer 2 on a gamepad.",
-        "An evolved mode for\\ncompetitive gameplay on the\\nclassic and custom maps.",
+        "A hardcore mode for\\ncompetitive gameplay on the\\nclassic and custom maps.",
         "Set all the attributes for your \\nmultiplayer gametypes and\\nkeep them for future use.",
     ],
     "main_menu/gametype_select/var_gametype_banks": ["STANDARD", "CUSTOM"],
@@ -794,11 +794,11 @@ WIDGET_PATCHES = {
         f'<on event="start" run="mp type set mode" open="{MT}/join_game/join_game_screen"/>',
         '<on event="left_mouse" run="mouse emit accept event"/>',
     ]},
-    # (Co-op, then the line, then Evolved above Edit Gametypes)
+    # (Co-op, then the line, then Hardcore above Edit Gametypes)
     f"{MT}/multiplayer_type_select_list": {"insert_before": {
         f"{MT}/multiplayer_type_gametypes_item": [
             f'<child widget="{MT}/multiplayer_type_coop_item" y="274"/>',
-            f'<child widget="{MT}/multiplayer_type_evolved_item" y="323"/>'],
+            f'<child widget="{MT}/multiplayer_type_hardcore_item" y="323"/>'],
     }},
     # (the Map screen's and New Game's lists: SINGLEPLAYER or MULTIPLAYER
     # maps, the first row's chooser's (_map_kind); B on the Map screen goes
@@ -884,12 +884,12 @@ TITLES = {
     f"{MT}/lobby/header_lobby": "GAME LOBBY",
     f"{MT}/coop/header_player_2": "PLAYER 2 PROFILE",
     f"{MT}/lobby/header_add_player": "ADD PLAYER",
-    "main_menu/settings_select/multiplayer_setup/evolved_options_edit/header_evolved": "EVOLVED",
-    "main_menu/settings_select/multiplayer_setup/evolved_options_edit/header_extras": "EVOLVED RULES",
-    "main_menu/settings_select/multiplayer_setup/evolved_options_edit/header_match": "MATCH RULES",
-    "main_menu/settings_select/multiplayer_setup/evolved_options_edit/header_world": "WORLD",
-    "main_menu/settings_select/multiplayer_setup/evolved_options_edit/header_tuning": "WEAPON TUNING",
-    "main_menu/settings_select/multiplayer_setup/evolved_options_edit/header_server": "SERVER SETUP",
+    "main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_hardcore": "HARDCORE",
+    "main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_extras": "HARDCORE RULES",
+    "main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_match": "MATCH RULES",
+    "main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_world": "WORLD",
+    "main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_tuning": "WEAPON TUNING",
+    "main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_server": "SERVER SETUP",
 }
 
 
@@ -1068,7 +1068,7 @@ def _server_settings() -> list:
     whether the server browser lists it (PUBLIC or PRIVATE: an internet
     game's)"""
     base = f"{MT}/server_settings"
-    # (thirteen rows: the help and the buttons sit under Evolved)
+    # (thirteen rows: the help and the buttons sit under Hardcore)
     spec = {"screen": "server_settings_screen", "spacing": 24, "help_top": 390, "help_height": 48,
             "button_y": 440,
             "header": ("header_server_settings", f"{base}/header_server_settings")}
@@ -1179,7 +1179,7 @@ def _server_settings() -> list:
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
     extra += _strings(f"{base}/labels", ["GAME NAME:", "MAXIMUM PLAYERS:", "INVITE LINK:", "GAME TYPE:",
                                          "PLAYER OPTIONS:", "ITEM OPTIONS:", "VEHICLE OPTIONS:", "INDICATOR OPTIONS:",
-                                         "TEAMPLAY OPTIONS:", "EVOLVED:", "LISTING:",
+                                         "TEAMPLAY OPTIONS:", "HARDCORE:", "LISTING:",
                                          *(f"{title}:" for _, title, _, _ in COOP_SETUP_SCREENS), "PASSWORD:",
                                          f"{MAP_SHARE_SETUP[1]}:"])
     extra += _strings(f"{base}/help_strings", [
@@ -1193,7 +1193,7 @@ def _server_settings() -> list:
         "Each team's vehicles and their respawn time, for\\nthis game.",
         "The motion tracker and nav points, for this game.",
         "Friendly fire and team balance, for this game.",
-        "Evolved rules, or this build's own, for\\nthis game.",
+        "Hardcore rules, or this build's own, for\\nthis game.",
         # (LISTING's, by its choice)
         "Anyone can see and join your game: it is listed\\nin everyone's Server Browser.",
         "Only players with your invite link can join.",
@@ -1679,7 +1679,7 @@ def _choice_wide(strings: str) -> bool:
     return any(len(piece) > 10 for piece in strings.split("|"))
 
 
-def _evolved_spinner(base: str, row: str, spin: str, label: str, strings: str) -> list:
+def _hardcore_spinner(base: str, row: str, spin: str, label: str, strings: str) -> list:
     wide = _choice_wide(strings)
     lines = _widget(f"{base}/{row}", [("width", 512), ("height", 28),
                                       ("flags", "pass_unhandled_to_focused_child"),
@@ -1702,18 +1702,18 @@ def _evolved_spinner(base: str, row: str, spin: str, label: str, strings: str) -
     return lines
 
 
-def _evolved_local_setting(base: str, row: str, label: str, setting: str, strings: str, values: str) -> list:
-    """A spinner of this machine's config, not a networked evolved rule."""
+def _hardcore_local_setting(base: str, row: str, label: str, setting: str, strings: str, values: str) -> list:
+    """A spinner of this machine's config, not a networked hardcore rule."""
     wide = _choice_wide(strings)
     lines = _widget(f"{base}/op_{row}", [("width", 512), ("height", 28),
                                          ("flags", "pass_unhandled_to_focused_child"),
                                          ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
                     [f'<child widget="{base}/op_{row}_label"/>',
-                     f'<child widget="{base}/comp_{row}" x="{286 if wide else 320}" y="1"/>'])
+                     f'<child widget="{base}/hardcore_{row}" x="{286 if wide else 320}" y="1"/>'])
     lines += _widget(f"{base}/op_{row}_label", [("type", "text"), ("controller", 1), ("width", 300),
                                                 ("height", 22), ("text", label), ("font", "ui\\large_ui"),
                                                 ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
-    lines += _widget(f"{base}/comp_{row}", [("type", "spinner"), ("left", None if wide else 3), ("top", 2),
+    lines += _widget(f"{base}/hardcore_{row}", [("type", "spinner"), ("left", None if wide else 3), ("top", 2),
                                             ("width", 206 if wide else 147), ("height", 20),
                                             ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
                                             ("strings", strings), ("setting", setting), ("values", values),
@@ -1729,15 +1729,15 @@ def _evolved_local_setting(base: str, row: str, label: str, setting: str, string
     return lines
 
 
-def _evolved_rule_page(base: str, key: str, title: str, rows: list, step: int, local_rows=None) -> list:
-    """One evolved sheet. Its rows are not on the shared Xbox screens.
+def _hardcore_rule_page(base: str, key: str, title: str, rows: list, step: int, local_rows=None) -> list:
+    """One hardcore sheet. Its rows are not on the shared Xbox screens.
     local_rows are this machine's settings, not bytes of the networked rules."""
     local_rows = local_rows or []
     children = [f'<child widget="{base}/op_{row[0]}" x="54" y="{73 + step * index}"/>'
                 for index, row in enumerate(rows)]
     children += [f'<child widget="{base}/op_{row[0]}" x="54" y="{73 + step * (len(rows) + index)}"/>'
                  for index, row in enumerate(local_rows)]
-    lines = _widget(f"{base}/evolved_{key}_screen", [("width", 640), ("height", 480),
+    lines = _widget(f"{base}/hardcore_{key}_screen", [("width", 640), ("height", 480),
                                                          ("flags", "pass_unhandled_to_focused_child pause_game"),
                                                          ("bitmap", "bitmaps/gradient")],
                     [f'<child widget="{base}/header_{key}"/>',
@@ -1763,13 +1763,13 @@ def _evolved_rule_page(base: str, key: str, title: str, rows: list, step: int, l
                       '<on event="start" run="mp profile set player options" back="true"/>',
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
     for row, label, strings in rows:
-        lines += _evolved_spinner(base, f"op_{row}", f"comp_{row}", label, strings)
+        lines += _hardcore_spinner(base, f"op_{row}", f"hardcore_{row}", label, strings)
     for row, label, setting, strings, values in local_rows:
-        lines += _evolved_local_setting(base, row, label, setting, strings, values)
+        lines += _hardcore_local_setting(base, row, label, setting, strings, values)
     return lines
 
 
-def _evolved_rule_pages(base: str) -> list:
+def _hardcore_rule_pages(base: str) -> list:
     match = [
         ("flag_pickup", "FLAG PICKUP", "MANUAL|AUTOMATIC"),
         ("ball_pickup", "BALL PICKUP", "MANUAL|AUTOMATIC"),
@@ -1789,6 +1789,7 @@ def _evolved_rule_pages(base: str) -> list:
         ("outlines", "TEAMMATE OUTLINES", "NO|YES"),
         ("os_visible", "OVERSHIELD VISIBLE", "NO|YES"),
         ("os_type", "OVERSHIELD TYPE", "CONSTANT|FADING"),
+        ("team_scores", "TEAM SCORES", "NO|YES"),
     ]
     tuning = [
         ("friction", "FRICTION", "TAG|NONE|HALF|FULL|STRONG"),
@@ -1798,21 +1799,21 @@ def _evolved_rule_pages(base: str) -> list:
         ("pistol_spread", "PISTOL SPREAD", "TAG|TIGHT|WIDE|DOUBLE"),
         ("shotgun_spread", "SHOTGUN SPREAD", "TAG|TIGHT|WIDE|DOUBLE"),
     ]
-    links = [("op_match", "MATCH RULES", "evolved_match_screen"),
-             ("op_world", "WORLD", "evolved_world_screen"),
-             ("op_tuning", "WEAPON TUNING", "evolved_tuning_screen")]
+    links = [("op_match", "MATCH RULES", "hardcore_match_screen"),
+             ("op_world", "WORLD", "hardcore_world_screen"),
+             ("op_tuning", "WEAPON TUNING", "hardcore_tuning_screen")]
     lines = _widget(f"{base}/op_extras", [("width", 512), ("height", 28),
                                           ("flags", "pass_unhandled_to_focused_child"),
                                           ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
-                    [f'<on event="a" run="port evolved prepare" open="{base}/evolved_extras_screen"/>',
-                     f'<on event="start" run="port evolved prepare" open="{base}/evolved_extras_screen"/>',
+                    [f'<on event="a" run="port hardcore prepare" open="{base}/hardcore_extras_screen"/>',
+                     f'<on event="start" run="port hardcore prepare" open="{base}/hardcore_extras_screen"/>',
                      '<on event="left_mouse" run="mouse emit accept event"/>',
                      f'<child widget="{base}/op_extras_label"/>'])
     lines += _widget(f"{base}/op_extras_label", [("type", "text"), ("controller", 1), ("width", 300),
-                                                 ("height", 22), ("text", "EVOLVED RULES"),
+                                                 ("height", 22), ("text", "HARDCORE RULES"),
                                                  ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
                                                  ("text_x", 13), ("text_y", 4)], [])
-    lines += _widget(f"{base}/evolved_extras_screen", [("width", 640), ("height", 480),
+    lines += _widget(f"{base}/hardcore_extras_screen", [("width", 640), ("height", 480),
                                                            ("flags", "pass_unhandled_to_focused_child pause_game"),
                                                            ("bitmap", "bitmaps/gradient")],
                      [f'<child widget="{base}/header_extras"/>',
@@ -1833,25 +1834,25 @@ def _evolved_rule_pages(base: str) -> list:
         lines += _widget(f"{base}/{key}", [("width", 512), ("height", 28),
                                            ("flags", "pass_unhandled_to_focused_child"),
                                            ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
-                         [f'<on event="a" run="port evolved prepare" open="{base}/{target}"/>',
-                          f'<on event="start" run="port evolved prepare" open="{base}/{target}"/>',
+                         [f'<on event="a" run="port hardcore prepare" open="{base}/{target}"/>',
+                          f'<on event="start" run="port hardcore prepare" open="{base}/{target}"/>',
                           '<on event="left_mouse" run="mouse emit accept event"/>',
                           f'<child widget="{base}/{key}_label"/>'])
         lines += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 300),
                                                  ("height", 22), ("text", label), ("font", "ui\\large_ui"),
                                                  ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
-    lines += _evolved_rule_page(base, "match", "MATCH RULES", match, 30)
-    lines += _evolved_rule_page(base, "world", "WORLD", world, 30, [
+    lines += _hardcore_rule_page(base, "match", "MATCH RULES", match, 30)
+    lines += _hardcore_rule_page(base, "world", "WORLD", world, 30, [
         ("views", "TEAMMATE VIEWS", "display.teammate_views", "OFF|ON", "false|true"),
         ("view_slot", "YOUR VIEW", "display.teammate_view_slot",
          "TOP|BOTTOM|TOP LEFT|TOP RIGHT|BOTTOM LEFT|BOTTOM RIGHT",
          "top|bottom|top_left|top_right|bottom_left|bottom_right"),
     ])
-    lines += _evolved_rule_page(base, "tuning", "WEAPON TUNING", tuning, 30)
+    lines += _hardcore_rule_page(base, "tuning", "WEAPON TUNING", tuning, 30)
     return lines
 
 
-def _evolved_field(base: str, key: str, label: str, run: str) -> list:
+def _hardcore_field(base: str, key: str, label: str, run: str) -> list:
     """a server row whose value is typed (the screen's back ends the edit)"""
     lines = _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
                                          ("flags", "pass_unhandled_to_focused_child"),
@@ -1869,36 +1870,36 @@ def _evolved_field(base: str, key: str, label: str, run: str) -> list:
     return lines
 
 
-def _evolved_screen() -> list:
-    """Evolved, its own game. The list is multiplayer or custom
+def _hardcore_screen() -> list:
+    """Hardcore, its own game. The list is multiplayer or custom
     multiplayer, then the server page (name, players, listing). Classic
     gametypes are not this screen."""
-    base = "main_menu/settings_select/multiplayer_setup/evolved_options_edit"
+    base = "main_menu/settings_select/multiplayer_setup/hardcore_options_edit"
     lobby = f"{MT}/lobby/lobby_screen"
-    server = f"{base}/evolved_server_screen"
-    lines = _widget(f"{base}/evolved_screen", [("width", 640), ("height", 480),
+    server = f"{base}/hardcore_server_screen"
+    lines = _widget(f"{base}/hardcore_screen", [("width", 640), ("height", 480),
                                                    ("flags", "pass_unhandled_to_focused_child pause_game"),
                                                    ("bitmap", "bitmaps/gradient")],
                     ['<child widget="main_menu/new_select/sel_list_desc_bkd"/>',
-                     f'<child widget="{base}/evolved_list"/>',
-                     f'<child widget="{base}/header_evolved"/>'])
-    lines += _header(f"{base}/header_evolved", f"{base}/header_evolved", width=605)
-    rows = [f'<child widget="{base}/evolved_kind" x="82" y="73"/>']
+                     f'<child widget="{base}/hardcore_list"/>',
+                     f'<child widget="{base}/header_hardcore"/>'])
+    lines += _header(f"{base}/header_hardcore", f"{base}/header_hardcore", width=605)
+    rows = [f'<child widget="{base}/hardcore_kind" x="82" y="73"/>']
     rows += [f'<child widget="{base}/list_item_{index}" x="20" y="{103 + 30 * index}"/>' for index in range(10)]
-    lines += _widget(f"{base}/evolved_list", [("type", "column_list"), ("width", 640), ("height", 480),
+    lines += _widget(f"{base}/hardcore_list", [("type", "column_list"), ("width", 640), ("height", 480),
                                                   ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
-                                                  ("description", f"{base}/evolved_desc")],
-                     ['<data input="port evolved maps"/>',
-                      '<on event="created" run="port evolved open"/>',
-                      f'<on event="custom_activation" run="port evolved choose" open="{server}"/>',
-                      '<on event="b" run="port evolved leave" back="true"/>',
-                      '<on event="back" run="port evolved leave" back="true"/>'] + rows +
+                                                  ("description", f"{base}/hardcore_desc")],
+                     ['<data input="port hardcore maps"/>',
+                      '<on event="created" run="port hardcore open"/>',
+                      f'<on event="custom_activation" run="port hardcore choose" open="{server}"/>',
+                      '<on event="b" run="port hardcore leave" back="true"/>',
+                      '<on event="back" run="port hardcore leave" back="true"/>'] + rows +
                      [f'<child widget="{base}/map_button_bar" y="414"/>'])
-    lines += _widget(f"{base}/evolved_kind", [("width", 256), ("height", 28),
+    lines += _widget(f"{base}/hardcore_kind", [("width", 256), ("height", 28),
                                                   ("flags", "pass_unhandled_to_focused_child"),
                                                   ("bitmap", "bitmaps/option_bkds_sm"), ("color", "#FF2896FF")],
-                     [f'<child widget="{base}/evolved_kind_spinner" x="9" y="2"/>'])
-    lines += _widget(f"{base}/evolved_kind_spinner",
+                     [f'<child widget="{base}/hardcore_kind_spinner" x="9" y="2"/>'])
+    lines += _widget(f"{base}/hardcore_kind_spinner",
                      [("type", "spinner"), ("width", 238), ("height", 22), ("flags", "left_right_tabs_items"),
                       ("strings", "MULTIPLAYER|CUSTOM MULTIPLAYER"), ("font", "ui\\large_ui"),
                       ("color", "#FF2896FF"), ("align", "center"), ("text_y", 1),
@@ -1911,15 +1912,16 @@ def _evolved_screen() -> list:
                                                         else "bitmaps/sel_list_item_bkd"),
                                                        ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
                                                        ("align", "center"), ("text_y", 3)],
-                         [f'<on event="a" run="port evolved choose" open="{server}"/>',
-                          f'<on event="start" run="port evolved choose" open="{server}"/>',
+                         [f'<on event="a" run="port hardcore choose" open="{server}"/>',
+                          f'<on event="start" run="port hardcore choose" open="{server}"/>',
                           '<on event="left_mouse" run="mouse emit accept event"/>',
                           '<child widget="main_menu/new_select/list_item_text" x="25"/>',
                           '<child widget="main_menu/new_select/list_item_arrows"/>',
                           '<child widget="main_menu/new_select/scroll_up_button" x="40"/>',
                           '<child widget="main_menu/new_select/scroll_down_button" x="40"/>'])
-    lines += _widget(f"{base}/evolved_desc", [("width", 640), ("height", 480)],
+    lines += _widget(f"{base}/hardcore_desc", [("width", 640), ("height", 480)],
                      ['<child widget="main_menu/current_profile_name"/>',
+                      '<child widget="main_menu/gametype_select/gametype_right_item" x="22" y="2"/>',
                       '<child widget="main_menu/multiplayer_type_select/mp_map_select/mp_map_right_item" x="22" y="2"/>'])
     lines += _widget(f"{base}/map_button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
                                                 ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
@@ -1934,17 +1936,17 @@ def _evolved_screen() -> list:
                      ['<on event="a" run="emit custom activation event"/>',
                       '<on event="start" run="emit custom activation event"/>',
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
-    lines += _widget(f"{base}/evolved_setup_screen", [("width", 640), ("height", 480),
+    lines += _widget(f"{base}/hardcore_setup_screen", [("width", 640), ("height", 480),
                                                           ("flags", "pass_unhandled_to_focused_child pause_game"),
                                                           ("bitmap", "bitmaps/gradient")],
                      [f'<child widget="{base}/header_setup"/>',
                       f'<child widget="{base}/setup_list"/>'])
-    lines += _header(f"{base}/header_setup", f"{base}/header_evolved", width=605)
+    lines += _header(f"{base}/header_setup", f"{base}/header_hardcore", width=605)
     lines += _widget(f"{base}/setup_list", [("type", "column_list"), ("width", 640), ("height", 480),
                                             ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
                                             ("description", f"{base}/setup_desc")],
-                     ['<data input="port evolved setup"/>',
-                      '<on event="created" run="port evolved setup open"/>',
+                     ['<data input="port hardcore setup"/>',
+                      '<on event="created" run="port hardcore setup open"/>',
                       '<on event="b" back="true"/>',
                       '<on event="back" back="true"/>',
                       f'<child widget="{base}/rules_row" x="54" y="73"/>',
@@ -1976,8 +1978,8 @@ def _evolved_screen() -> list:
         lines += _widget(f"{base}/{key}", [("width", 512), ("height", 28),
                                            ("flags", "pass_unhandled_to_focused_child"),
                                            ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
-                         [f'<on event="a" run="port evolved prepare" open="{target}"/>',
-                          f'<on event="start" run="port evolved prepare" open="{target}"/>',
+                         [f'<on event="a" run="port hardcore prepare" open="{target}"/>',
+                          f'<on event="start" run="port hardcore prepare" open="{target}"/>',
                           '<on event="left_mouse" run="mouse emit accept event"/>',
                           f'<child widget="{base}/{key}_label"/>'])
         lines += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 300),
@@ -1987,11 +1989,11 @@ def _evolved_screen() -> list:
                                            ("flags", "pass_unhandled_to_focused_child"),
                                            ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
                      [f'<child widget="{base}/rules_label"/>',
-                      f'<child widget="{base}/evolved_rules_spinner" x="320" y="1"/>'])
+                      f'<child widget="{base}/hardcore_rules_spinner" x="320" y="1"/>'])
     lines += _widget(f"{base}/rules_label", [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
                                              ("text", "GAME RULES"), ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
                                              ("text_x", 13), ("text_y", 4)], [])
-    lines += _widget(f"{base}/evolved_rules_spinner", [("type", "spinner"), ("left", 3), ("top", 2), ("width", 147),
+    lines += _widget(f"{base}/hardcore_rules_spinner", [("type", "spinner"), ("left", 3), ("top", 2), ("width", 147),
                                                            ("height", 20),
                                                            ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
                                                            ("strings", "SLAYER|CTF|ODDBALL|CRAZY KING"),
@@ -2006,11 +2008,11 @@ def _evolved_screen() -> list:
                                            ("flags", "pass_unhandled_to_focused_child"),
                                            ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
                      [f'<child widget="{base}/teams_label"/>',
-                      f'<child widget="{base}/evolved_teams_spinner" x="320" y="1"/>'])
+                      f'<child widget="{base}/hardcore_teams_spinner" x="320" y="1"/>'])
     lines += _widget(f"{base}/teams_label", [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
                                              ("text", "TEAMS"), ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
                                              ("text_x", 13), ("text_y", 4)], [])
-    lines += _widget(f"{base}/evolved_teams_spinner", [("type", "spinner"), ("left", 3), ("top", 2), ("width", 147),
+    lines += _widget(f"{base}/hardcore_teams_spinner", [("type", "spinner"), ("left", 3), ("top", 2), ("width", 147),
                                                            ("height", 20),
                                                            ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
                                                            ("strings", "YES|NO"),
@@ -2027,7 +2029,7 @@ def _evolved_screen() -> list:
                                             ("string_list", f"{base}/setup_help_strings"),
                                             ("font", "ui\\large_ui"), ("color", "#FFFFFFFF")], [])
     lines += _strings(f"{base}/setup_help_strings", [
-        "Player, items, indicators,\\nvehicles, teamplay, and the\\nevolved rules.",
+        "Player, items, indicators,\\nvehicles, teamplay, and the\\nhardcore rules.",
     ])
     lines += _widget(f"{base}/setup_button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
                                                   ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
@@ -2039,12 +2041,12 @@ def _evolved_screen() -> list:
                                           ("string_list", "strings/common_button_captions"), ("string_index", 1),
                                           ("font", "ui\\small_ui"), ("color", "#FFFFFFFF"), ("align", "center"),
                                           ("text_y", 2)],
-                     [f'<on event="a" run="port evolved start" open="{lobby}"/>',
-                      f'<on event="start" run="port evolved start" open="{lobby}"/>',
+                     [f'<on event="a" run="port hardcore start" open="{lobby}"/>',
+                      f'<on event="start" run="port hardcore start" open="{lobby}"/>',
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
-    lines += _evolved_rule_pages(base)
+    lines += _hardcore_rule_pages(base)
     share = f"{MT}/server_settings/map_share_options/map_share_options_screen"
-    lines += _widget(f"{base}/evolved_server_screen", [("width", 640), ("height", 480),
+    lines += _widget(f"{base}/hardcore_server_screen", [("width", 640), ("height", 480),
                                                            ("flags", "pass_unhandled_to_focused_child pause_game"),
                                                            ("bitmap", "bitmaps/gradient")],
                      [f'<child widget="{base}/header_server"/>',
@@ -2053,8 +2055,8 @@ def _evolved_screen() -> list:
     lines += _widget(f"{base}/server_list", [("type", "column_list"), ("width", 640), ("height", 480),
                                              ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
                                              ("description", f"{base}/server_desc")],
-                     ['<data input="port evolved server"/>',
-                      '<on event="created" run="port evolved server open"/>',
+                     ['<data input="port hardcore server"/>',
+                      '<on event="created" run="port hardcore server open"/>',
                       '<on event="b" run="gamespy back handler"/>',
                       '<on event="back" run="gamespy back handler"/>',
                       f'<child widget="{base}/op_server_name" x="54" y="73"/>',
@@ -2065,7 +2067,7 @@ def _evolved_screen() -> list:
                       f'<child widget="{base}/op_map_share" x="54" y="223"/>',
                       f'<child widget="{base}/op_game_rules" x="54" y="253"/>',
                       f'<child widget="{base}/server_button_bar" y="414"/>'])
-    lines += _evolved_field(base, "server_name", "GAME NAME", "ss edit server name")
+    lines += _hardcore_field(base, "server_name", "GAME NAME", "ss edit server name")
     lines += _widget(f"{base}/op_max_players", [("width", 512), ("height", 28),
                                                 ("flags", "pass_unhandled_to_focused_child"),
                                                 ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
@@ -2083,7 +2085,7 @@ def _evolved_screen() -> list:
                       ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
                       ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")],
                      ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
-    lines += _evolved_field(base, "invite", "INVITE LINK", "ss copy invite")
+    lines += _hardcore_field(base, "invite", "INVITE LINK", "ss copy invite")
     lines += _widget(f"{base}/op_listing", [("width", 512), ("height", 28),
                                             ("flags", "pass_unhandled_to_focused_child"),
                                             ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
@@ -2100,7 +2102,7 @@ def _evolved_screen() -> list:
                       ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
                       ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")],
                      ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
-    lines += _evolved_field(base, "password", "PASSWORD", "ss edit server password")
+    lines += _hardcore_field(base, "password", "PASSWORD", "ss edit server password")
     lines += _widget(f"{base}/op_map_share", [("width", 512), ("height", 28),
                                               ("flags", "pass_unhandled_to_focused_child"),
                                               ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
@@ -2113,8 +2115,8 @@ def _evolved_screen() -> list:
     lines += _widget(f"{base}/op_game_rules", [("width", 512), ("height", 28),
                                                ("flags", "pass_unhandled_to_focused_child"),
                                                ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
-                     [f'<on event="a" run="port evolved prepare" open="{base}/evolved_setup_screen"/>',
-                      f'<on event="start" run="port evolved prepare" open="{base}/evolved_setup_screen"/>',
+                     [f'<on event="a" run="port hardcore prepare" open="{base}/hardcore_setup_screen"/>',
+                      f'<on event="start" run="port hardcore prepare" open="{base}/hardcore_setup_screen"/>',
                       '<on event="left_mouse" run="mouse emit accept event"/>',
                       f'<child widget="{base}/game_rules_label"/>'])
     lines += _widget(f"{base}/game_rules_label", [("type", "text"), ("controller", 1), ("width", 300),
@@ -2134,7 +2136,7 @@ def _evolved_screen() -> list:
         "Only players with your invite link can join.",
         "Players from the Server Browser must type it to\\njoin. Enter sets it.",
         "Sending players who join without the map the map.",
-        "Slayer, CTF, oddball or crazy king, and the\\nevolved rules. A classic gametype is not used.",
+        "Slayer, CTF, oddball or crazy king, and the\\nhardcore rules.",
     ])
     lines += _widget(f"{base}/server_button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
                                                    ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
@@ -2145,15 +2147,15 @@ def _evolved_screen() -> list:
                                            ("bitmap", "bitmaps/text_button_background"), ("text", "START GAME"),
                                            ("font", "ui\\small_ui"), ("color", "#FFFFFFFF"), ("align", "center"),
                                            ("text_y", 2)],
-                     [f'<on event="a" run="port evolved start" open="{lobby}"/>',
-                      f'<on event="start" run="port evolved start" open="{lobby}"/>',
+                     [f'<on event="a" run="port hardcore start" open="{lobby}"/>',
+                      f'<on event="start" run="port hardcore start" open="{lobby}"/>',
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
-    lines += _widget(f"{MT}/multiplayer_type_evolved_item", [("type", "text"), ("left", 51), ("width", 232),
+    lines += _widget(f"{MT}/multiplayer_type_hardcore_item", [("type", "text"), ("left", 51), ("width", 232),
                                                                  ("height", 32), ("bitmap", "bitmaps/list_item_bkd"),
-                                                                 ("text", "EVOLVED"), ("font", "ui\\large_ui"),
+                                                                 ("text", "HARDCORE"), ("font", "ui\\large_ui"),
                                                                  ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 5)],
-                     [f'<on event="a" open="{base}/evolved_screen"/>',
-                      f'<on event="start" open="{base}/evolved_screen"/>',
+                     [f'<on event="a" open="{base}/hardcore_screen"/>',
+                      f'<on event="start" open="{base}/hardcore_screen"/>',
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
     return lines
 
@@ -2172,8 +2174,8 @@ def multiplayer_files() -> dict:
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
         PLAYER_EDIT.replace("/", ".") + ".port.xml": head + _player_options_extras() + ["</menus>", ""],
         TEAMPLAY_EDIT.replace("/", ".") + ".port.xml": head + _teamplay_options_extras() + ["</menus>", ""],
-        "main_menu/settings_select/multiplayer_setup/evolved_options_edit".replace("/", ".") + ".xml":
-            head + _evolved_screen() + ["</menus>", ""],
+        "main_menu/settings_select/multiplayer_setup/hardcore_options_edit".replace("/", ".") + ".xml":
+            head + _hardcore_screen() + ["</menus>", ""],
         MODS.replace("/", ".") + ".xml": [head[0], "<!-- The port's Mods screen, in the PC version's style "
                                           "(tools/port_settings.py) -->", head[2]] + _mods() + ["</menus>", ""],
     }

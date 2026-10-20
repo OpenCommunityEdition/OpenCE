@@ -111,6 +111,7 @@ symbols in this file:
 #include "game/game.h"
 #include "game/game_allegiance.h"
 #include "game/game_engine.h"
+#include "hardcore_rules.h" /* port: hardcore overshield type */
 #include "game/game_globals.h"
 #include "game/game_statistics_internal.h"
 #include "game/players.h"
@@ -2061,7 +2062,9 @@ void object_damage_update(
 					TRUE);
 			}
 		}
-		else if (object->object.shield_vitality > 1.f && game_engine_running())
+		/* port: constant holds the extra shield. fading is this drain. */
+		else if (object->object.shield_vitality > 1.f && game_engine_running() &&
+			hardcore_rules_overshield_fades())
 		{
 			long player_index = player_index_from_unit_index(object_index);
 			real overcharge = object->object.shield_vitality - 1.f;

@@ -1,0 +1,769 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_list"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_hardcore"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_hardcore" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_hardcore">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_desc">
+		<data input="port hardcore maps"/>
+		<on event="created" run="port hardcore open"/>
+		<on event="custom_activation" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="b" run="port hardcore leave" back="true"/>
+		<on event="back" run="port hardcore leave" back="true"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_kind" x="82" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_0" x="20" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_1" x="20" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_2" x="20" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_3" x="20" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_4" x="20" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_5" x="20" y="253"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_6" x="20" y="283"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_7" x="20" y="313"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_8" x="20" y="343"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_9" x="20" y="373"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/map_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_kind" width="256" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds_sm" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_kind_spinner" x="9" y="2"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_kind_spinner" type="spinner" width="238" height="22" flags="left_right_tabs_items" strings="MULTIPLAYER|CUSTOM MULTIPLAYER" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 238 19 244">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_0" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd_top" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="start" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_1" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="start" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_2" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="start" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_3" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="start" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_4" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="start" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_5" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="start" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_6" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="start" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_7" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="start" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_8" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="start" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/list_item_9" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="start" run="port hardcore choose" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_desc" width="640" height="480">
+		<child widget="main_menu/current_profile_name"/>
+		<child widget="main_menu/gametype_select/gametype_right_item" x="22" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/mp_map_select/mp_map_right_item" x="22" y="2"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/map_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/map_ok" x="380" y="1"/>
+		<child widget="common_button_back" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/map_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="emit custom activation event"/>
+		<on event="start" run="emit custom activation event"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_setup_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_setup"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/setup_list"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_setup" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_hardcore">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/setup_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/setup_desc">
+		<data input="port hardcore setup"/>
+		<on event="created" run="port hardcore setup open"/>
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/rules_row" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/teams_row" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_slayer_rules" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_ctf_rules" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_hill_rules" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_ball_rules" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_player" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_items" x="54" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_indicators" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_vehicles" x="54" y="253"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_teamplay" x="54" y="283"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_extras" x="54" y="313"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/setup_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_slayer_rules" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_options_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_slayer_rules_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_slayer_rules_label" type="text" controller="1" width="300" height="22" text="SLAYER RULES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_ctf_rules" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_options_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_ctf_rules_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_ctf_rules_label" type="text" controller="1" width="300" height="22" text="CTF RULES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_hill_rules" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_options_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_hill_rules_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_hill_rules_label" type="text" controller="1" width="300" height="22" text="HILL RULES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_ball_rules" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/oddball_options_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/oddball_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_ball_rules_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_ball_rules_label" type="text" controller="1" width="300" height="22" text="ODDBALL RULES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_player" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/player_options_edit/player_options_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/player_options_edit/player_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_player_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_player_label" type="text" controller="1" width="300" height="22" text="PLAYER OPTIONS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_items" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_items_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_items_label" type="text" controller="1" width="300" height="22" text="ITEM OPTIONS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_indicators" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_indicators_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_indicators_label" type="text" controller="1" width="300" height="22" text="INDICATOR OPTIONS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_vehicles" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/vehicle_options_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/vehicle_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_vehicles_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_vehicles_label" type="text" controller="1" width="300" height="22" text="VEHICLE OPTIONS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_teamplay" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_teamplay_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_teamplay_label" type="text" controller="1" width="300" height="22" text="TEAMPLAY OPTIONS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/rules_row" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/rules_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_rules_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/rules_label" type="text" controller="1" width="300" height="22" text="GAME RULES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_rules_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="SLAYER|CTF|ODDBALL|CRAZY KING" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/teams_row" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/teams_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_teams_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/teams_label" type="text" controller="1" width="300" height="22" text="TEAMS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_teams_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="YES|NO" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/setup_desc" width="640" height="480">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/setup_help" x="68" y="345"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/setup_help" type="text" controller="1" width="482" height="60" string_list="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/setup_help_strings" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<strings name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/setup_help_strings">
+		<string text="Player, items, indicators,\nvehicles, teamplay, and the\nhardcore rules."/>
+	</strings>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/setup_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/setup_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/setup_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port hardcore start" open="main_menu/multiplayer_type_select/lobby/lobby_screen"/>
+		<on event="start" run="port hardcore start" open="main_menu/multiplayer_type_select/lobby/lobby_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_extras" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_extras_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_extras_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_extras_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_extras_label" type="text" controller="1" width="300" height="22" text="HARDCORE RULES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_extras_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_extras"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/extras_list"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_extras" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_extras">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/extras_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_match" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_world" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_tuning" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/extras_buttons" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/extras_buttons" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_match" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_match_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_match_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_match_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_match_label" type="text" controller="1" width="300" height="22" text="MATCH RULES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_world" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_world_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_world_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_world_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_world_label" type="text" controller="1" width="300" height="22" text="WORLD" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_tuning" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_tuning_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_tuning_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_tuning_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_tuning_label" type="text" controller="1" width="300" height="22" text="WEAPON TUNING" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_match_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_match"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/match_list"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_match" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_match">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/match_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children">
+		<on event="created" run="mp profile init player opts"/>
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_flag_pickup" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_ball_pickup" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_hill_order" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_hill_move" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_fireteams" x="54" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_infinite_ammo" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_kill_restore" x="54" y="253"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_skip_draw" x="54" y="283"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_move_sounds" x="54" y="313"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/match_buttons" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/match_buttons" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/match_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/match_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mp profile set player options" back="true"/>
+		<on event="start" run="mp profile set player options" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_flag_pickup" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_flag_pickup_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_flag_pickup" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_flag_pickup_label" type="text" controller="1" width="300" height="22" text="FLAG PICKUP" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_flag_pickup" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="MANUAL|AUTOMATIC" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_ball_pickup" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_ball_pickup_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_ball_pickup" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_ball_pickup_label" type="text" controller="1" width="300" height="22" text="BALL PICKUP" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_ball_pickup" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="MANUAL|AUTOMATIC" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_hill_order" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_hill_order_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_hill_order" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_hill_order_label" type="text" controller="1" width="300" height="22" text="HILL ORDER" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_hill_order" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ORDERED|RANDOM" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_hill_move" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_hill_move_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_hill_move" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_hill_move_label" type="text" controller="1" width="300" height="22" text="HILL MOVE TIME" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_hill_move" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="15 S|30 S|45 S|60 S|90 S|120 S|180 S" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_fireteams" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_fireteams_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_fireteams" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_fireteams_label" type="text" controller="1" width="300" height="22" text="FIRETEAMS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_fireteams" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NO|YES" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_infinite_ammo" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_infinite_ammo_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_infinite_ammo" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_infinite_ammo_label" type="text" controller="1" width="300" height="22" text="INFINITE AMMO" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_infinite_ammo" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NO|AMMO|MAGAZINES" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_kill_restore" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_kill_restore_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_kill_restore" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_kill_restore_label" type="text" controller="1" width="300" height="22" text="KILL RESTORES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_kill_restore" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NO|YES" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_skip_draw" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_skip_draw_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_skip_draw" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_skip_draw_label" type="text" controller="1" width="300" height="22" text="SKIP FIRST DRAW" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_skip_draw" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NO|YES" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_move_sounds" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_move_sounds_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_move_sounds" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_move_sounds_label" type="text" controller="1" width="300" height="22" text="MOVEMENT SOUNDS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_move_sounds" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="YES|NO" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_world_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_world"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/world_list"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_world" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_world">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/world_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children">
+		<on event="created" run="mp profile init player opts"/>
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_random_areas" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_omit_first" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_item_spawn" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_camo" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_outlines" x="54" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_os_visible" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_os_type" x="54" y="253"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_team_scores" x="54" y="283"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_views" x="54" y="313"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_view_slot" x="54" y="343"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/world_buttons" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/world_buttons" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/world_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/world_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mp profile set player options" back="true"/>
+		<on event="start" run="mp profile set player options" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_random_areas" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_random_areas_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_random_areas" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_random_areas_label" type="text" controller="1" width="300" height="22" text="TRAINING MODE" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_random_areas" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NO|YES" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_omit_first" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_omit_first_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_omit_first" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_omit_first_label" type="text" controller="1" width="300" height="22" text="OMIT FIRST SPAWN" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_omit_first" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NO|YES|POWER" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_item_spawn" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_item_spawn_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_item_spawn" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_item_spawn_label" type="text" controller="1" width="300" height="22" text="ITEM SPAWN" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_item_spawn" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|15 S|30 S|45 S|60 S|90 S|120 S" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_camo" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_camo_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_camo" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_camo_label" type="text" controller="1" width="300" height="22" text="CAMO VARIANT" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_camo" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="XBOX|MCC|CUSTOM" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_outlines" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_outlines_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_outlines" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_outlines_label" type="text" controller="1" width="300" height="22" text="TEAMMATE OUTLINES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_outlines" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NO|YES" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_os_visible" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_os_visible_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_os_visible" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_os_visible_label" type="text" controller="1" width="300" height="22" text="OVERSHIELD VISIBLE" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_os_visible" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NO|YES" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_os_type" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_os_type_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_os_type" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_os_type_label" type="text" controller="1" width="300" height="22" text="OVERSHIELD TYPE" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_os_type" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="CONSTANT|FADING" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_team_scores" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_team_scores_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_team_scores" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_team_scores_label" type="text" controller="1" width="300" height="22" text="TEAM SCORES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_team_scores" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NO|YES" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_views" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_views_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_views" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_views_label" type="text" controller="1" width="300" height="22" text="TEAMMATE VIEWS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_views" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|ON" setting="display.teammate_views" values="false|true" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+		<on event="deleted" run="port setting save"/>
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_view_slot" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_view_slot_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_view_slot" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_view_slot_label" type="text" controller="1" width="300" height="22" text="YOUR VIEW" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_view_slot" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="TOP|BOTTOM|TOP LEFT|TOP RIGHT|BOTTOM LEFT|BOTTOM RIGHT" setting="display.teammate_view_slot" values="top|bottom|top_left|top_right|bottom_left|bottom_right" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="created" run="port setting load"/>
+		<on event="deleted" run="port setting save"/>
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_tuning_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_tuning"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/tuning_list"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_tuning" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_tuning">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/tuning_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children">
+		<on event="created" run="mp profile init player opts"/>
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_friction" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_adhesion" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_aim_delay" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_trig_delay" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_pistol_spread" x="54" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_shotgun_spread" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/tuning_buttons" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/tuning_buttons" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/tuning_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/tuning_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mp profile set player options" back="true"/>
+		<on event="start" run="mp profile set player options" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_friction" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_friction_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_friction" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_friction_label" type="text" controller="1" width="300" height="22" text="FRICTION" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_friction" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="TAG|NONE|HALF|FULL|STRONG" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_adhesion" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_adhesion_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_adhesion" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_adhesion_label" type="text" controller="1" width="300" height="22" text="ADHESION" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_adhesion" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="TAG|NONE|HALF|FULL|STRONG" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_aim_delay" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_aim_delay_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_aim_delay" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_aim_delay_label" type="text" controller="1" width="300" height="22" text="AIM DELAY" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_aim_delay" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|33 MS|66 MS|100 MS|166 MS|266 MS" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_trig_delay" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_trig_delay_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_trig_delay" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_trig_delay_label" type="text" controller="1" width="300" height="22" text="TRIGGER DELAY" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_trig_delay" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|33 MS|66 MS|100 MS|166 MS|266 MS" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_pistol_spread" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_pistol_spread_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_pistol_spread" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_pistol_spread_label" type="text" controller="1" width="300" height="22" text="PISTOL SPREAD" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_pistol_spread" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="TAG|TIGHT|WIDE|DOUBLE" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_shotgun_spread" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_shotgun_spread_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_shotgun_spread" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_shotgun_spread_label" type="text" controller="1" width="300" height="22" text="SHOTGUN SPREAD" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_shotgun_spread" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="TAG|TIGHT|WIDE|DOUBLE" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_server_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_server"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_list"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_server" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_server">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_desc">
+		<data input="port hardcore server"/>
+		<on event="created" run="port hardcore server open"/>
+		<on event="b" run="gamespy back handler"/>
+		<on event="back" run="gamespy back handler"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_server_name" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_max_players" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_invite" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_listing" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_password" x="54" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_map_share" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_game_rules" x="54" y="253"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_server_name" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="ss edit server name"/>
+		<on event="start" run="ss edit server name"/>
+		<on event="b"/>
+		<on event="back"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_name_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_name_value" x="230" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_name_label" type="text" controller="1" width="220" height="22" text="GAME NAME" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_name_value" type="text" controller="1" width="270" height="22" font="ui\small_ui" color="#FF2896FF" align="center" text_y="5" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_max_players" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/max_players_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/max_players_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/max_players_label" type="text" controller="1" width="300" height="22" text="MAXIMUM PLAYERS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/max_players_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="2|4|8|12|16|24|32|48|64|96|128" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_invite" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="ss copy invite"/>
+		<on event="start" run="ss copy invite"/>
+		<on event="b"/>
+		<on event="back"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/invite_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/invite_value" x="230" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/invite_label" type="text" controller="1" width="220" height="22" text="INVITE LINK" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/invite_value" type="text" controller="1" width="270" height="22" font="ui\small_ui" color="#FF2896FF" align="center" text_y="5" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_listing" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/listing_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/listing_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/listing_label" type="text" controller="1" width="300" height="22" text="LISTING" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/listing_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="PUBLIC|PRIVATE" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_password" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="ss edit server password"/>
+		<on event="start" run="ss edit server password"/>
+		<on event="b"/>
+		<on event="back"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/password_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/password_value" x="230" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/password_label" type="text" controller="1" width="220" height="22" text="PASSWORD" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/password_value" type="text" controller="1" width="270" height="22" font="ui\small_ui" color="#FF2896FF" align="center" text_y="5" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_map_share" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" open="main_menu/multiplayer_type_select/server_settings/map_share_options/map_share_options_screen"/>
+		<on event="start" open="main_menu/multiplayer_type_select/server_settings/map_share_options/map_share_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/map_share_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/map_share_label" type="text" controller="1" width="300" height="22" text="MAP SHARING" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/op_game_rules" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_setup_screen"/>
+		<on event="start" run="port hardcore prepare" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_setup_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/game_rules_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/game_rules_label" type="text" controller="1" width="300" height="22" text="GAME RULES" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_desc" width="640" height="480">
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_help" x="68" y="345"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_help" type="text" controller="1" width="482" height="60" string_list="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_help_strings" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<strings name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_help_strings">
+		<string text=""/>
+		<string text="The name the game shows in the lists of games.\nEnter changes it."/>
+		<string text="The most players the game takes (up to 128)."/>
+		<string text="Players join this game by its invite link.\nEnter copies the link."/>
+		<string text="Anyone can see and join your game: it is listed\nin everyone's Server Browser."/>
+		<string text="Only players with your invite link can join."/>
+		<string text="Players from the Server Browser must type it to\njoin. Enter sets it."/>
+		<string text="Sending players who join without the map the map."/>
+		<string text="Slayer, CTF, oddball or crazy king, and the\nhardcore rules."/>
+	</strings>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/server_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="START GAME" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port hardcore start" open="main_menu/multiplayer_type_select/lobby/lobby_screen"/>
+		<on event="start" run="port hardcore start" open="main_menu/multiplayer_type_select/lobby/lobby_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/multiplayer_type_hardcore_item" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd" text="HARDCORE" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_screen"/>
+		<on event="start" open="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/hardcore_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+</menus>
+

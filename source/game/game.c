@@ -122,9 +122,9 @@ struct game_options;
 #include "game/game.h"
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
 #include "../../port/linux/game/performance_options.h"
-#include "evolved_rules.h" /* port: evolved rules for this map */
+#include "hardcore_rules.h" /* port: hardcore rules for this map */
 #endif
-#include "evolved_timer.h" /* port: port/linux/game/evolved_timer.c */
+#include "hardcore_timer.h" /* port: port/linux/game/hardcore_timer.c */
 #include "ai/ai.h"
 #include "bink/bink_playback.h"
 #include "bungie_net/network/transport.h"
@@ -391,9 +391,9 @@ void game_tick(
 	decisions that belong to the host. */
 	if (!(network_game_distributed_client() && network_coop_active()))
 		profile_scope(game_tick_hs_section, hs_update();)
-	/* port: an evolved map's announcer is turned off by its own startup
+	/* port: a hardcore map's announcer is turned off by its own startup
 	script. put it back once the scripts have had this tick */
-	evolved_timer_after_scripts();
+	hardcore_timer_after_scripts();
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
 	performance_options_update();
 #endif
@@ -720,8 +720,8 @@ void game_initialize_for_new_map(
 	network_objects_placed();
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
 	performance_options_initialize_for_new_map();
-	/* port: after the practice flags are reset, so an evolved game can add its own. */
-	evolved_rules_begin_map();
+	/* port: after the practice flags are reset, so a hardcore game can add its own. */
+	hardcore_rules_begin_map();
 #endif
 	ui_widgets_safe_to_load(TRUE);
 

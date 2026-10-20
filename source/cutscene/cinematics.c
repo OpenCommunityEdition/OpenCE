@@ -76,8 +76,8 @@ symbols in this file:
 #include "text/text_group.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
-/* port: the loaded map came from evolved_maps (custom_edition_cache.c) */
-boolean custom_edition_cache_is_evolved(void);
+/* port: the loaded map came from hardcore_maps (custom_edition_cache.c) */
+boolean custom_edition_cache_is_hardcore(void);
 
 /* ---------- constants */
 
@@ -276,7 +276,7 @@ void cinematic_set_title_delayed(
 	and minute. four slots then fill, so later digits never replace the
 	ones on screen. a title in the same band (s_, t_, or m_) takes that
 	slot, and any older copy of that band is dropped. */
-	if (custom_edition_cache_is_evolved() &&
+	if (custom_edition_cache_is_hardcore() &&
 		title_index >= 0 &&
 		title_index < global_scenario_get()->cutscene_chapter_titles.count)
 	{
@@ -480,11 +480,11 @@ void cinematic_render(
 				fade_amount = PIN(fade_amount, 0.0f, 1.0f);
 			}
 
-			/* port: an evolved map's s_, t_ and m_ titles are the pieces
+			/* port: a hardcore map's s_, t_ and m_ titles are the pieces
 			of its match clock. the clock is one time, drawn with the
 			overlays, so these titles are not drawn on top of it. their
 			time still goes on, as a title under a menu does */
-			match_clock = custom_edition_cache_is_evolved() &&
+			match_clock = custom_edition_cache_is_hardcore() &&
 				title->name[1]=='_' &&
 				(title->name[0]=='s' || title->name[0]=='t' ||
 					title->name[0]=='m');

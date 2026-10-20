@@ -74,7 +74,7 @@ their handlers open opens.
 #include "main/main.h"
 #include "cache/cache_files.h"
 #include "game/game_engine.h"
-#include "evolved_rules.h"
+#include "hardcore_rules.h"
 #include "cache_file_formats.h"
 #include "scenario/scenario_definitions.h"
 #include "game/game_engine_playlist.h"
@@ -2777,6 +2777,9 @@ short network_game_client_get_seconds_to_game_start(void *client);
 boolean network_player_is_valid(struct network_player *player);
 boolean playlist_profile_get(long index, struct game_variant *variant);
 boolean playlist_profile_get_display_name(long index, wchar_t *name);
+boolean playlist_profile_get_options(long index, struct game_variant_options *options);
+void playlist_profiles_enumerate_available_to_local_player_index(short local_player_index,
+	word *number_of_profiles, long *playlist_profile_indices);
 boolean input_get_key(struct key_stroke *key);
 boolean game_engine_running(void);
 void game_engine_end_game(void);
@@ -2831,9 +2834,9 @@ static struct
 	/* Server Setup's PASSWORD (a public internet game's; empty: none), kept
 	while the game runs, never written down */
 	char game_password[PASSWORD_LENGTH + 1];
-	/* (Evolved's own game. Classic Create Game and Join Game leave it
+	/* (Hardcore's own game. Classic Create Game and Join Game leave it
 	clear, so their gametypes stay this build's.) */
-	boolean evolved;
+	boolean hardcore;
 } multiplayer = { .maximum_players_index = NUMBEROF(maximum_players) - 1 };
 
 /* ---- a text field (Direct Link's link, the game's name): the keyboard
@@ -2968,7 +2971,7 @@ static void text_field_show(struct widget_instance *value, char const *text, boo
 
 /* ---- the menu */
 
-static void evolved_variant_drop(void);
+static void hardcore_variant_drop(void);
 
 /* "mp type set mode": the item's (by its name) */
 static void multiplayer_mode_set(struct widget_instance *widget)
@@ -2977,9 +2980,9 @@ static void multiplayer_mode_set(struct widget_instance *widget)
 
 	/* (an instance's name is cut to 31 characters:
 	"multiplayer_type_create_interne") */
-	multiplayer.evolved = FALSE;
-	evolved_rules_clear_session();
-	evolved_variant_drop();
+	multiplayer.hardcore = FALSE;
+	hardcore_rules_clear_session();
+	hardcore_variant_drop();
 	multiplayer.mode =
 		strstr(name, "create_inter") ? _multiplayer_mode_host_internet :
 		strstr(name, "create_lan") ? _multiplayer_mode_host_lan :
@@ -3376,7 +3379,7 @@ static char const *const server_settings_gametype_rows[] =
 #define COOPERATIVE_DEFAULT_PLAYERS 16
 /* Server Setup's help for co-op's options' rows (CO-OP OPTIONS, VOICE AND
 VOTING), PASSWORD's and MAP SHARING's (its help_strings, tools/port_settings.py) */
-/* (Evolved's help is its label's, 10. The rows after it moved down one
+/* (Hardcore's help is its label's, 10. The rows after it moved down one
 when that page was added.) */
 #define COOPERATIVE_OPTIONS_HELP 13
 #define COOPERATIVE_VOICE_OPTIONS_HELP 14
@@ -3642,7 +3645,7 @@ static boolean server_start(void)
 		/* port: this is a regular game. a copy left from the mode is
 		   replaced when the chosen gametype is a classic one, and the
 		   sheet does not come with it. */
-		if (!multiplayer.evolved)
+		if (!multiplayer.hardcore)
 			gametype_setup_classic();
 		if (!gametype_setup_apply())
 			return campaign_fail();
@@ -5287,7 +5290,7 @@ enum
 	_option_option_byte,	/* a byte of the options */
 	_option_radar,		/* the options' radar players, and the variant's flag */
 	_option_setting,	/* the host's own (config.toml): Server Setup's copy only */
-	_option_evolved	/* a byte of the evolved sheet, not the variant */
+	_option_hardcore	/* a byte of the hardcore sheet, not the variant */
 };
 
 struct gametype_option
@@ -5305,7 +5308,7 @@ struct gametype_option
 
 #define VARIANT_FIELD(field) (short)offsetof(struct game_variant, field)
 #define OPTIONS_FIELD(field) (short)offsetof(struct game_variant_options, field)
-#define RULES_FIELD(field) (short)offsetof(struct evolved_rules, field)
+#define RULES_FIELD(field) (short)offsetof(struct hardcore_rules, field)
 #define TIME_LIMITS { 0, 10, 15, 20, 25, 30, 45 }
 
 static struct gametype_option const gametype_options[] =
@@ -5431,30 +5434,31 @@ static struct gametype_option const gametype_options[] =
 	/* vehicle options (the side's set and counts: vehicles_update) */
 	{ "vehicles_respawn_spinner", _option_short, OPTIONS_FIELD(vehicle_respawn_time), 0, 7,
 		{ 0, 30, 60, 90, 120, 180, 300 } },
-	/* evolved sheet (its own pages). Classic screens have none of these names. */
-	{ "comp_flag_pickup", _option_evolved, RULES_FIELD(flag_pickup), 0, 2, { 0, 1 } },
-	{ "comp_ball_pickup", _option_evolved, RULES_FIELD(ball_pickup), 0, 2, { 0, 1 } },
-	{ "comp_hill_order", _option_evolved, RULES_FIELD(hill_order), 0, 2, { 0, 1 } },
-	{ "comp_hill_move", _option_evolved, RULES_FIELD(hill_move_s), 0, 7, { 15, 30, 45, 60, 90, 120, 180 } },
-	{ "comp_fireteams", _option_evolved, RULES_FIELD(fireteams), 0, 2, { 0, 1 } },
-	{ "comp_infinite_ammo", _option_evolved, RULES_FIELD(infinite_ammo), 0, 3, { 0, 1, 2 } },
-	{ "comp_kill_restore", _option_evolved, RULES_FIELD(kill_restores), 0, 2, { 0, 1 } },
-	{ "comp_skip_draw", _option_evolved, RULES_FIELD(skip_draw), 0, 2, { 0, 1 } },
-	{ "comp_move_sounds", _option_evolved, RULES_FIELD(movement_sounds), 0, 2, { 1, 0 } },
-	{ "comp_spawns", _option_evolved, RULES_FIELD(spawns_visible), 0, 2, { 0, 1 } },
-	{ "comp_random_areas", _option_evolved, RULES_FIELD(random_areas), 0, 2, { 0, 1 } },
-	{ "comp_omit_first", _option_evolved, RULES_FIELD(omit_first), 0, 3, { 0, 1, 2 } },
-	{ "comp_item_spawn", _option_evolved, RULES_FIELD(item_spawn_s), 0, 7, { 0, 15, 30, 45, 60, 90, 120 } },
-	{ "comp_camo", _option_evolved, RULES_FIELD(camo), 0, 3, { 0, 1, 2 } },
-	{ "comp_outlines", _option_evolved, RULES_FIELD(outlines), 0, 2, { 0, 1 } },
-	{ "comp_os_visible", _option_evolved, RULES_FIELD(os_visible), 0, 2, { 0, 1 } },
-	{ "comp_os_type", _option_evolved, RULES_FIELD(os_type), 0, 2, { 0, 1 } },
-	{ "comp_friction", _option_evolved, RULES_FIELD(friction), 0, 5, { 0, 1, 2, 3, 4 } },
-	{ "comp_adhesion", _option_evolved, RULES_FIELD(adhesion), 0, 5, { 0, 1, 2, 3, 4 } },
-	{ "comp_aim_delay", _option_evolved, RULES_FIELD(aim_delay), 0, 6, { 0, 1, 2, 3, 5, 8 } },
-	{ "comp_trig_delay", _option_evolved, RULES_FIELD(trig_delay), 0, 6, { 0, 1, 2, 3, 5, 8 } },
-	{ "comp_pistol_spread", _option_evolved, RULES_FIELD(pistol_spread), 0, 4, { 0, 1, 2, 3 } },
-	{ "comp_shotgun_spread", _option_evolved, RULES_FIELD(shotgun_spread), 0, 4, { 0, 1, 2, 3 } },
+	/* hardcore sheet (its own pages). Classic screens have none of these names. */
+	{ "hardcore_flag_pickup", _option_hardcore, RULES_FIELD(flag_pickup), 0, 2, { 0, 1 } },
+	{ "hardcore_ball_pickup", _option_hardcore, RULES_FIELD(ball_pickup), 0, 2, { 0, 1 } },
+	{ "hardcore_hill_order", _option_hardcore, RULES_FIELD(hill_order), 0, 2, { 0, 1 } },
+	{ "hardcore_hill_move", _option_hardcore, RULES_FIELD(hill_move_s), 0, 7, { 15, 30, 45, 60, 90, 120, 180 } },
+	{ "hardcore_fireteams", _option_hardcore, RULES_FIELD(fireteams), 0, 2, { 0, 1 } },
+	{ "hardcore_infinite_ammo", _option_hardcore, RULES_FIELD(infinite_ammo), 0, 3, { 0, 1, 2 } },
+	{ "hardcore_kill_restore", _option_hardcore, RULES_FIELD(kill_restores), 0, 2, { 0, 1 } },
+	{ "hardcore_skip_draw", _option_hardcore, RULES_FIELD(skip_draw), 0, 2, { 0, 1 } },
+	{ "hardcore_move_sounds", _option_hardcore, RULES_FIELD(movement_sounds), 0, 2, { 1, 0 } },
+	{ "hardcore_spawns", _option_hardcore, RULES_FIELD(spawns_visible), 0, 2, { 0, 1 } },
+	{ "hardcore_random_areas", _option_hardcore, RULES_FIELD(random_areas), 0, 2, { 0, 1 } },
+	{ "hardcore_omit_first", _option_hardcore, RULES_FIELD(omit_first), 0, 3, { 0, 1, 2 } },
+	{ "hardcore_item_spawn", _option_hardcore, RULES_FIELD(item_spawn_s), 0, 7, { 0, 15, 30, 45, 60, 90, 120 } },
+	{ "hardcore_camo", _option_hardcore, RULES_FIELD(camo), 0, 3, { 0, 1, 2 } },
+	{ "hardcore_outlines", _option_hardcore, RULES_FIELD(outlines), 0, 2, { 0, 1 } },
+	{ "hardcore_os_visible", _option_hardcore, RULES_FIELD(os_visible), 0, 2, { 0, 1 } },
+	{ "hardcore_os_type", _option_hardcore, RULES_FIELD(os_type), 0, 2, { 0, 1 } },
+	{ "hardcore_team_scores", _option_hardcore, RULES_FIELD(team_scores), 0, 2, { 0, 1 } },
+	{ "hardcore_friction", _option_hardcore, RULES_FIELD(friction), 0, 5, { 0, 1, 2, 3, 4 } },
+	{ "hardcore_adhesion", _option_hardcore, RULES_FIELD(adhesion), 0, 5, { 0, 1, 2, 3, 4 } },
+	{ "hardcore_aim_delay", _option_hardcore, RULES_FIELD(aim_delay), 0, 6, { 0, 1, 2, 3, 5, 8 } },
+	{ "hardcore_trig_delay", _option_hardcore, RULES_FIELD(trig_delay), 0, 6, { 0, 1, 2, 3, 5, 8 } },
+	{ "hardcore_pistol_spread", _option_hardcore, RULES_FIELD(pistol_spread), 0, 4, { 0, 1, 2, 3 } },
+	{ "hardcore_shotgun_spread", _option_hardcore, RULES_FIELD(shotgun_spread), 0, 4, { 0, 1, 2, 3 } },
 };
 
 /* TEXT CHAT's (network.text_chat) OFF, which it shows while the game is
@@ -5518,7 +5522,7 @@ static long gametype_option_value(struct gametype_option const *option, struct g
 	case _option_short: return *(short *)(o + option->offset);
 	case _option_option_byte: return o[option->offset];
 	case _option_radar: return options->radar_players;
-	case _option_evolved: return ((unsigned char *)evolved_rules_editing())[option->offset];
+	case _option_hardcore: return ((unsigned char *)hardcore_rules_editing())[option->offset];
 	}
 	return 0;
 }
@@ -5550,16 +5554,16 @@ static void gametype_option_value_set(struct gametype_option const *option, long
 		else
 			variant->universal_variant.flags |= FLAG(_game_variant_draw_object_in_motion_sensor_bit);
 		break;
-	case _option_evolved:
-		((unsigned char *)evolved_rules_editing())[option->offset] = (unsigned char)value;
+	case _option_hardcore:
+		((unsigned char *)hardcore_rules_editing())[option->offset] = (unsigned char)value;
 		/* port: training mode is one switch. the pads, the respawn
 		volumes and the percent are still separate bytes, and they move together. */
 		if (option->offset == RULES_FIELD(spawns_visible) ||
 			option->offset == RULES_FIELD(random_areas))
 		{
-			evolved_rules_editing()->spawns_visible = (unsigned char)value;
-			evolved_rules_editing()->random_areas = (unsigned char)value;
-			evolved_rules_editing()->random_pct = (unsigned char)value;
+			hardcore_rules_editing()->spawns_visible = (unsigned char)value;
+			hardcore_rules_editing()->random_areas = (unsigned char)value;
+			hardcore_rules_editing()->random_pct = (unsigned char)value;
 		}
 		break;
 	}
@@ -5605,16 +5609,26 @@ static void gametype_options_each(struct widget_instance *list, boolean save)
 
 			if (!option)
 				continue;
-			/* port: evolved has no motion sensor, so those two rows are not
+			/* port: hardcore has no motion sensor, so those two rows are not
 			   there. friends moves up into the first row. */
-			if (multiplayer.evolved && (option->kind == _option_radar ||
+			if (multiplayer.hardcore && (option->kind == _option_radar ||
 				!strcmp(option->spinner, "indicator_options_radar display_spinner")))
 			{
 				visible_set(row, FALSE);
 				row->disabled = TRUE;
 				continue;
 			}
-			if (multiplayer.evolved &&
+			/* port: the hardcore page has the teams switch. this one is put
+			   back on the way out, so it cannot change the match. */
+			if (multiplayer.hardcore &&
+				(!strcmp(option->spinner, "team_play_spinner") ||
+				!strcmp(option->spinner, "koth_team_play_spinner")))
+			{
+				visible_set(row, FALSE);
+				row->disabled = TRUE;
+				continue;
+			}
+			if (multiplayer.hardcore &&
 				!strcmp(option->spinner, "indicator_options_friends_on_screen_spinner"))
 				row->vertical_offset = 73;
 			/* (the host's own settings: Server Setup's alone, their rows
@@ -5839,7 +5853,7 @@ static void gametype_setup_classic(void)
 {
 	struct game_variant chosen;
 
-	evolved_rules_clear_session();
+	hardcore_rules_clear_session();
 	if (gametype_edit.setup &&
 		TEST_FLAG(gametype_edit.setup_variant.universal_variant.flags,
 			_game_variant_anniversary_rules_bit) &&
@@ -5918,6 +5932,9 @@ static boolean gametype_edit_list_initialize(struct widget_instance *list)
 {
 	short last;
 
+	/* port: this list is a classic gametype. the hardcore menu had hidden
+	   its radar rows, and that flag does not belong here. */
+	multiplayer.hardcore = FALSE;
 	gametype_edit.setup = FALSE;
 	gametype_edit.count = ui_widget_port_gametypes(gametype_edit.gametypes, MAXIMUM_GAMETYPES, &last);
 	gametype_edit.chosen = last;
@@ -6152,38 +6169,68 @@ static void gametype_engine_name(struct widget_instance *text_box)
 		text_box->parameters.text_box.string_list_index = strings[PIN(variant->game_engine_index, 0, 5)];
 }
 
-/* ---- Evolved: its own game on the classic maps and the custom maps.
+/* ---- Hardcore: its own game on the classic maps and the custom maps.
 Classic Create Game and Join Game do not come here. Its setup edits a copy
 of the gametype (the editor's pages), which a classic profile is not. */
 
-static short evolved_built_rules = -1;
-static boolean evolved_built_teams = TRUE;
+static short hardcore_built_rules = -1;
+static boolean hardcore_built_teams = TRUE;
 /* port: a page is built again on the way back, which puts its spinners on
 slayer. the match already chose these, so the first update puts them back. */
-static boolean evolved_spinners_ready;
+static boolean hardcore_spinners_ready;
 
-static void evolved_variant_drop(void)
+static void hardcore_variant_drop(void)
 {
-	evolved_built_rules = -1;
+	hardcore_built_rules = -1;
 	gametype_setup_end();
 }
 
-/* the mode's builder, then this game's score. Slayer stays at 50 with its
-death bonus and kill penalty off, which is the sheet this setup opened with. */
-static void evolved_variant_make(short rules, boolean teams)
+/* port: the mode rides on the anniversary bit. the motion sensor stays off.
+   1 keeps the flag and the hill. 2 turns those off too. */
+static void hardcore_stamp(struct game_variant *variant)
+{
+	SET_FLAG(variant->universal_variant.flags, _game_variant_anniversary_rules_bit, TRUE);
+	SET_FLAG(variant->universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, FALSE);
+	variant->universal_variant.goal_radar = 1;
+}
+
+/* 0 slayer, 1 capture the flag, 2 oddball, 3 crazy king */
+static void hardcore_variant_make(short rules, boolean teams)
 {
 	struct game_variant *variant = &gametype_edit.setup_variant;
 	struct game_variant *(*build)(struct game_variant *);
 
-	if (evolved_built_rules == rules)
+	/* port: the engine keeps capture the flag on teams. a free-for-all
+	   choice is put back, and reported as a broken variant. */
+	if (rules == 1)
+		teams = TRUE;
+	if (hardcore_built_rules == rules)
 	{
+		/* port: teams alone keeps the sheet and the pages. the team and
+		   free-for-all builders still disagree on the respawn, and oddball
+		   on the ball delay and the starting weapons. a respawn the player
+		   changed is left as they set it. */
+		if (hardcore_built_teams != teams && rules == 0 &&
+			(variant->universal_variant.respawn_time == 0 ||
+				variant->universal_variant.respawn_time == 300))
+			variant->universal_variant.respawn_time = teams ? 300 : 0;
+		if (hardcore_built_teams != teams && rules == 2)
+		{
+			boolean equipment = TEST_FLAG(variant->universal_variant.flags,
+				_game_variant_generic_starting_equipment_bit) ? TRUE : FALSE;
+
+			if (variant->universal_variant.respawn_time == 150 ||
+				variant->universal_variant.respawn_time == 300)
+				variant->universal_variant.respawn_time = teams ? 300 : 150;
+			variant->game_engine_variant.oddball.ball_spawn_delay = teams ? FALSE : TRUE;
+			if (equipment == (hardcore_built_teams ? TRUE : FALSE))
+				SET_FLAG(variant->universal_variant.flags,
+					_game_variant_generic_starting_equipment_bit, teams);
+		}
 		variant->universal_variant.teams = teams;
-		SET_FLAG(variant->universal_variant.flags, _game_variant_anniversary_rules_bit, TRUE);
-		/* port: no motion sensor. 2 is the indicator page's none. */
-		SET_FLAG(variant->universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, FALSE);
-		variant->universal_variant.goal_radar = 2;
+		hardcore_stamp(variant);
 		gametype_edit.setup = TRUE;
-		evolved_built_teams = teams;
+		hardcore_built_teams = teams;
 		return;
 	}
 	if (rules == 1)
@@ -6207,21 +6254,18 @@ static void evolved_variant_make(short rules, boolean teams)
 	else
 		variant->universal_variant.score_to_win = 5;
 	variant->universal_variant.teams = teams;
-	SET_FLAG(variant->universal_variant.flags, _game_variant_anniversary_rules_bit, TRUE);
-	/* port: no motion sensor. 2 is the indicator page's none. */
-	SET_FLAG(variant->universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, FALSE);
-	variant->universal_variant.goal_radar = 2;
-	ustrncpy(variant->human_readable_game_description, L"EVOLVED", 8);
-	variant->human_readable_game_description[7] = 0;
+	hardcore_stamp(variant);
+	ustrncpy(variant->human_readable_game_description, L"HARDCORE", 9);
+	variant->human_readable_game_description[8] = 0;
 	gametype_edit.setup = TRUE;
 	gametype_edit.vehicle_side = 0;
-	evolved_built_rules = rules;
-	evolved_built_teams = teams;
+	hardcore_built_rules = rules;
+	hardcore_built_teams = teams;
 	/* port: a new mode starts from the sheet's defaults. Teams alone does not. */
-	evolved_rules_reset_editing();
+	hardcore_rules_reset_editing();
 }
 
-static void evolved_choices(struct widget_instance *widget, short *rules, boolean *teams)
+static void hardcore_choices(struct widget_instance *widget, short *rules, boolean *teams)
 {
 	struct widget_instance *screen = widget;
 	struct widget_instance *rules_row;
@@ -6229,12 +6273,12 @@ static void evolved_choices(struct widget_instance *widget, short *rules, boolea
 
 	/* port: the rules page is not up (server setup's start). the copy already
 	has the mode, and reading a missing spinner would rebuild slayer. */
-	*rules = evolved_built_rules < 0 ? 0 : evolved_built_rules;
-	*teams = evolved_built_teams;
+	*rules = hardcore_built_rules < 0 ? 0 : hardcore_built_rules;
+	*teams = hardcore_built_teams;
 	while (screen && screen->parent)
 		screen = screen->parent;
-	rules_row = named(screen, "evolved_rules_spinner", 0);
-	teams_row = named(screen, "evolved_teams_spinner", 0);
+	rules_row = named(screen, "hardcore_rules_spinner", 0);
+	teams_row = named(screen, "hardcore_teams_spinner", 0);
 	if (rules_row)
 		*rules = (short)PIN(rules_row->parameters.list.selected_index, 0, 3);
 	if (teams_row)
@@ -6242,17 +6286,35 @@ static void evolved_choices(struct widget_instance *widget, short *rules, boolea
 }
 
 /* the rules page for the mode on the spinner, and the others hidden */
-static void evolved_rules_rows(struct widget_instance *list, short rules)
+/* capture the flag stays on teams, so that row cannot offer free-for-all */
+static void hardcore_teams_row(struct widget_instance *list, short rules)
+{
+	struct widget_instance *row = named(list, "teams_row", 0);
+	struct widget_instance *spinner = named(list, "hardcore_teams_spinner", 0);
+
+	if (rules == 1 && spinner)
+		spinner->parameters.list.selected_index = 0;
+	if (!row)
+		return;
+	row->disabled = rules == 1;
+	if (rules == 1 && list->focused_child == row)
+		focus_row(list, 0);
+}
+
+/* oddball is the ball row, and crazy king is the hill row. */
+static void hardcore_rules_rows(struct widget_instance *list, short rules)
 {
 	static char const *const rows[] = { "op_slayer_rules", "op_ctf_rules", "op_hill_rules", "op_ball_rules" };
+	static short const page_of_rules[] = { 0, 1, 3, 2 };
+	short page = rules >= 0 && rules < 4 ? page_of_rules[rules] : 0;
 	short index;
 
 	for (index = 0; index < 4; index++)
 	{
 		struct widget_instance *row = named(list, rows[index], 0);
 
-		visible_set(row, index == rules);
-		if (row && index != rules && list->focused_child == row)
+		visible_set(row, index == page);
+		if (row && index != page && list->focused_child == row)
 			focus_row(list, 0);
 	}
 }
@@ -6262,27 +6324,29 @@ the chooser shows one kind at a time (0 the Xbox maps, 1 custom_maps). */
 static struct
 {
 	char const *const *levels;
-	short count, xbox_count, kind, first, chosen;
-} evolved_list;
+	short count, xbox_count, kind, first, chosen, gametype;
+	/* port: the gametypes, then the maps. comp 2v2 is the first gametype. */
+	boolean maps;
+} hardcore_list;
 
-static void evolved_maps_read(void)
+static void hardcore_maps_read(void)
 {
 	char const *const *levels = NULL;
 	short count;
 
 	custom_edition_maps_look_again();
 	count = ui_widget_port_multiplayer_maps(&levels, NULL);
-	evolved_list.levels = levels;
-	evolved_list.count = count;
-	evolved_list.xbox_count = (short)MAX(count - custom_edition_maps_count(FALSE), 0);
+	hardcore_list.levels = levels;
+	hardcore_list.count = count;
+	hardcore_list.xbox_count = (short)MAX(count - custom_edition_maps_count(FALSE), 0);
 }
 
 /* port: the name Create Game shows for this row */
-static void evolved_map_text(short map, wchar_t *text)
+static void hardcore_map_text(short map, wchar_t *text)
 {
 	wchar_t const *name;
 
-	if (map < evolved_list.xbox_count)
+	if (map < hardcore_list.xbox_count)
 	{
 		string_get("pc\\main_menu\\mp_map_list", map, text);
 		return;
@@ -6294,101 +6358,330 @@ static void evolved_map_text(short map, wchar_t *text)
 
 /* port: map_kind_rows_update passes the row within the kind. the name
 lookup wants that row in the combined list create game uses. */
-static void evolved_row_text(short entry, wchar_t *text)
+static void hardcore_row_text(short entry, wchar_t *text)
 {
-	evolved_map_text(evolved_list.kind ? (short)(evolved_list.xbox_count + entry) : entry, text);
+	hardcore_map_text(hardcore_list.kind ? (short)(hardcore_list.xbox_count + entry) : entry, text);
 }
 
 /* the maps of the kind on the chooser */
-static short evolved_kind_count(void)
+static short hardcore_kind_count(void)
 {
-	if (evolved_list.kind)
-		return (short)MAX(evolved_list.count - evolved_list.xbox_count, 0);
-	return evolved_list.xbox_count;
+	if (hardcore_list.kind)
+		return (short)MAX(hardcore_list.count - hardcore_list.xbox_count, 0);
+	return hardcore_list.xbox_count;
 }
 
 /* a row of the kind on the chooser, in the combined list Create Game uses */
-static short evolved_map_index(short row)
+static short hardcore_map_index(short row)
 {
-	short index = (short)(evolved_list.first + row);
+	short index = (short)(hardcore_list.first + row);
 
-	if (evolved_list.kind)
-		index = (short)(evolved_list.xbox_count + index);
+	if (hardcore_list.kind)
+		index = (short)(hardcore_list.xbox_count + index);
 	return index;
 }
 
-/* "port evolved open": this game, not a classic gametype */
-static boolean evolved_open(struct widget_instance *list)
+/* port: comp 2v2 is the saved gametype, and it stays the first row.
+   the other rows are this mode's. */
+static wchar_t const *const hardcore_gametype_names[] =
 {
-	struct widget_instance *spinner = named(list, "evolved_kind_spinner", 0);
+	L"Comp 2v2", L"Slayer", L"CTF", L"Oddball", L"Crazy King"
+};
 
-	multiplayer.evolved = TRUE;
-	evolved_rules_reset_editing();
-	evolved_spinners_ready = FALSE;
-	evolved_maps_read();
-	evolved_list.first = 0;
-	evolved_list.chosen = 0;
+static void hardcore_gametype_text(short entry, wchar_t *text)
+{
+	wchar_t const *name = entry >= 0 && entry < 5 ? hardcore_gametype_names[entry] : L"";
+
+	ustrncpy(text, name, ROW_TEXT_LENGTH - 1);
+	text[ROW_TEXT_LENGTH - 1] = 0;
+}
+
+static struct widget_instance *hardcore_list_of(struct widget_instance *widget)
+{
+	while (widget && strcmp(widget->name, "hardcore_list"))
+		widget = widget->parent;
+	return widget;
+}
+
+/* 1 capture the flag, 2 oddball, 3 crazy king, else slayer */
+static short hardcore_rules_for_engine(long engine)
+{
+	if (engine == game_engine_ctf)
+		return 1;
+	if (engine == game_engine_oddball)
+		return 2;
+	if (engine == game_engine_king)
+		return 3;
+	return 0;
+}
+
+/* port: the saved comp 2v2. without the file, the same slayer it was saved as. */
+static boolean hardcore_comp_find(long *profile)
+{
+	long indices[MAXIMUM_GAMETYPES];
+	word count = MAXIMUM_GAMETYPES;
+	short index;
+
+	playlist_profiles_enumerate_available_to_local_player_index(0, &count, indices);
+	for (index = 0; index < (short)count; index++)
+	{
+		wchar_t name[MAX_GAMENAME];
+
+		if (playlist_profile_get_display_name(indices[index], name) && !ustrcmp(name, L"Comp 2v2"))
+		{
+			*profile = indices[index];
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+static void hardcore_comp_apply(void)
+{
+	struct game_variant *variant = &gametype_edit.setup_variant;
+	long profile = NONE;
+
+	gametype_edit.setup = TRUE;
+	gametype_edit.vehicle_side = 0;
+	if (hardcore_comp_find(&profile) && playlist_profile_get(profile, variant))
+	{
+		if (!playlist_profile_get_options(profile, &gametype_edit.setup_options))
+			game_variant_options_default(variant, &gametype_edit.setup_options);
+	}
+	else
+	{
+		build_game_variant_slayer(variant);
+		variant->universal_variant.score_to_win = 50;
+		variant->universal_variant.respawn_time = 150;
+		variant->universal_variant.suicide_penalty = 0;
+		variant->universal_variant.teams = FALSE;
+		variant->game_engine_variant.slayer.no_death_bonus = TRUE;
+		variant->game_engine_variant.slayer.no_kill_penalty = TRUE;
+		SET_FLAG(variant->universal_variant.flags, _game_variant_generic_starting_equipment_bit, TRUE);
+		ustrncpy(variant->human_readable_game_description, L"Comp 2v2", 9);
+		variant->human_readable_game_description[8] = 0;
+		game_variant_options_default(variant, &gametype_edit.setup_options);
+		gametype_edit.setup_options.radar_players = _radar_players_none;
+	}
+	hardcore_stamp(variant);
+	hardcore_built_rules = hardcore_rules_for_engine(variant->game_engine_index);
+	hardcore_built_teams = variant->universal_variant.teams ? TRUE : FALSE;
+	hardcore_rules_reset_editing();
+}
+
+/* port: opening the server replaces this screen. back builds it again,
+   so the maps and the gametype have to be kept. a match starts over. */
+static boolean hardcore_resume_maps;
+
+void hardcore_list_match_started(void)
+{
+	hardcore_resume_maps = FALSE;
+	/* port: the copy is the menu's. the match already has it, and backing
+	   out of the lobby has to start the same game again. */
+	hardcore_variant_drop();
+}
+
+/* "port hardcore open": the gametypes. comp 2v2 is the first row.
+   back from the server keeps the maps. */
+static boolean hardcore_open(struct widget_instance *list)
+{
+	struct widget_instance *spinner = named(list, "hardcore_kind_spinner", 0);
+	boolean resume = hardcore_resume_maps;
+
+	hardcore_resume_maps = FALSE;
+	multiplayer.hardcore = TRUE;
+	hardcore_maps_read();
+	if (!resume)
+	{
+		hardcore_rules_reset_editing();
+		hardcore_spinners_ready = FALSE;
+		hardcore_list.maps = FALSE;
+		hardcore_list.gametype = 0;
+		hardcore_list.kind = 0;
+		hardcore_list.first = 0;
+		hardcore_list.chosen = 0;
+		focus_row(list, 1);
+	}
+	else if (hardcore_list.maps)
+	{
+		short row = (short)(1 + hardcore_list.chosen - hardcore_list.first);
+
+		if (row < 1)
+			row = 1;
+		focus_row(list, row);
+	}
 	if (spinner)
-		spinner->parameters.list.selected_index = evolved_list.kind ? 1 : 0;
+		spinner->parameters.list.selected_index = hardcore_list.kind ? 1 : 0;
 	return TRUE;
+}
+
+/* port: select gametype's rows start under the header. select map keeps
+   its chooser, so those rows stay one slot lower. */
+static void hardcore_rows_place(struct widget_instance *list, boolean maps)
+{
+	struct widget_instance *child;
+	short top = maps ? 103 : 73;
+
+	for (child = list->child; child; child = child->next)
+	{
+		if (!strncmp(child->name, "list_item_", 10))
+			child->vertical_offset = (short)(top + 30 * atoi(child->name + 10));
+	}
+}
+
+/* port: the same card select gametype draws: the picture, the name, and
+   the score. comp 2v2 is the saved game. the others are this list's. */
+static void hardcore_gametype_card(struct widget_instance *description, short gametype)
+{
+	struct widget_instance *pic;
+	struct game_variant variant;
+	wchar_t text[ROW_TEXT_LENGTH * 2];
+	long profile = NONE;
+	long engine = game_engine_slayer;
+	long score = 50;
+	boolean teams = TRUE;
+
+	visible_set(named(description, "gametype_right_item", 0), TRUE);
+	visible_set(named(description, "locked_gametype_icon", 0), FALSE);
+	if (gametype == 0)
+	{
+		teams = FALSE;
+		if (hardcore_comp_find(&profile) && playlist_profile_get(profile, &variant))
+		{
+			engine = PIN(variant.game_engine_index, 0, 5);
+			score = variant.universal_variant.score_to_win;
+			teams = variant.universal_variant.teams ? TRUE : FALSE;
+		}
+	}
+	else if (gametype == 2)
+	{
+		engine = game_engine_ctf;
+		score = 3;
+	}
+	else if (gametype == 3)
+	{
+		engine = game_engine_oddball;
+		score = 5;
+	}
+	else if (gametype == 4)
+	{
+		engine = game_engine_king;
+		score = 5;
+	}
+	text_set(named(description, "gametype_right_name", 0),
+		gametype >= 0 && gametype < 5 ? hardcore_gametype_names[gametype] : L"");
+	if ((pic = named(description, "gametype_right_pic", 0)) != NULL)
+		pic->animation.current_frame_index = (short)engine;
+	usnprintf(text, NUMBEROF(text) - 1, L"%s\r\n%s\r\nScore to win: %ld",
+		engine_names[PIN(engine, 0, 5)], teams ? L"Teams" : L"Free for all", score);
+	text[NUMBEROF(text) - 1] = 0;
+	text_set(named(description, "gametype_right_data", 0), text);
 }
 
 /* port: the same rows and card as select map. the chooser is the first
 child, so a map row is one past it. the card is that screen's map picture. */
-static void evolved_maps_update(struct widget_instance *list)
+static void hardcore_maps_update(struct widget_instance *list)
 {
 	struct widget_instance *description = list->parameters.list.extended_description;
-	struct widget_instance *spinner = named(list, "evolved_kind_spinner", 0);
+	struct widget_instance *kind_row = named(list, "hardcore_kind", 0);
+	struct widget_instance *spinner = named(list, "hardcore_kind_spinner", 0);
 	short kind = spinner ? (short)(spinner->parameters.list.selected_index != 0) : 0;
 	short count, entry, shown;
 
-	if (kind != evolved_list.kind)
+	visible_set(kind_row, hardcore_list.maps);
+	if (kind_row)
+		kind_row->disabled = !hardcore_list.maps;
+	hardcore_rows_place(list, hardcore_list.maps);
+	if (!hardcore_list.maps)
 	{
-		evolved_list.kind = kind;
-		evolved_list.first = 0;
-		evolved_list.chosen = 0;
+		hardcore_list.first = 0;
+		entry = map_kind_rows_update(list, &hardcore_list.first, 5, hardcore_gametype_text);
+		if (entry != NONE)
+			hardcore_list.gametype = entry;
+		if (!list->focused_child || list->focused_child->disabled || !list->focused_child->visible)
+			focus_row(list, 1);
+		visible_set(named(description, "mp_map_right_item", 0), FALSE);
+		map_description_show(description, NONE, NONE);
+		hardcore_gametype_card(description, hardcore_list.gametype);
+		profile_name_show(description);
+		return;
 	}
-	count = evolved_kind_count();
-	entry = map_kind_rows_update(list, &evolved_list.first, count, evolved_row_text);
+	if (kind != hardcore_list.kind)
+	{
+		hardcore_list.kind = kind;
+		hardcore_list.first = 0;
+		hardcore_list.chosen = 0;
+	}
+	count = hardcore_kind_count();
+	entry = map_kind_rows_update(list, &hardcore_list.first, count, hardcore_row_text);
 	if (entry != NONE)
-		evolved_list.chosen = entry;
+		hardcore_list.chosen = entry;
 	if (count <= 0)
 	{
 		if (list->focused_child && !strncmp(list->focused_child->name, "list_item_", 10))
 			focus_row(list, 0);
 	}
-	else if (list->focused_child && !list->focused_child->visible)
-		focus_row(list, 1);
-	shown = count > 0 && evolved_list.chosen < count;
+	else if (!list->focused_child || !list->focused_child->visible)
+	{
+		short row = (short)(1 + hardcore_list.chosen - hardcore_list.first);
+
+		if (row < 1)
+			row = 1;
+		focus_row(list, row);
+	}
+	shown = count > 0 && hardcore_list.chosen < count;
+	visible_set(named(description, "gametype_right_item", 0), FALSE);
 	visible_set(named(description, "mp_map_right_item", 0), shown);
 	map_description_show(description, NONE, shown ?
 		map_kind_display_index(kind ? MAP_KIND_CUSTOM_MULTIPLAYER : MAP_KIND_MULTIPLAYER,
-			evolved_list.chosen) : NONE);
+			hardcore_list.chosen) : NONE);
 	profile_name_show(description);
 }
 
-/* "port evolved choose": host this game on the map, then its setup.
+/* "port hardcore choose": host this game on the map, then its setup.
 The level name is the one Create Game already starts. */
-static boolean evolved_choose(struct widget_instance *widget)
+static boolean hardcore_choose(struct widget_instance *widget)
 {
 	struct widget_instance *row = widget;
+	struct widget_instance *list = hardcore_list_of(widget);
 	char const *level;
 	char build[0x20];
 	short map;
 
 	while (row && strncmp(row->name, "list_item_", 10))
 		row = row->parent;
-	if (!multiplayer.evolved)
+	if (!multiplayer.hardcore)
 		return campaign_fail();
+	/* port: a gametype stays on this screen and shows the maps.
+	   false keeps the server screen from opening. */
+	if (!hardcore_list.maps)
+	{
+		short gametype = row ? (short)atoi(row->name + 10) : hardcore_list.gametype;
+		struct widget_instance *spinner = list ? named(list, "hardcore_kind_spinner", 0) : NULL;
+
+		if (gametype < 0 || gametype > 4)
+			return campaign_fail();
+		hardcore_list.gametype = gametype;
+		hardcore_list.maps = TRUE;
+		hardcore_list.kind = 0;
+		hardcore_list.first = 0;
+		hardcore_list.chosen = 0;
+		if (spinner)
+			spinner->parameters.list.selected_index = 0;
+		if (list)
+			focus_row(list, 1);
+		ui_play_audio_feedback_sound(SOUND_FORWARD);
+		return FALSE;
+	}
 	/* port: ok is not a row. the row last focused is the one it starts. */
 	if (row)
-		map = evolved_map_index((short)atoi(row->name + 10));
+		map = hardcore_map_index((short)atoi(row->name + 10));
 	else
-		map = evolved_list.kind ? (short)(evolved_list.xbox_count + evolved_list.chosen) :
-			evolved_list.chosen;
-	if (map < 0 || map >= evolved_list.count || !evolved_list.levels)
+		map = hardcore_list.kind ? (short)(hardcore_list.xbox_count + hardcore_list.chosen) :
+			hardcore_list.chosen;
+	if (map < 0 || map >= hardcore_list.count || !hardcore_list.levels)
 		return campaign_fail();
-	level = evolved_list.levels[map];
+	level = hardcore_list.levels[map];
 	if (!level || !level[0])
 		return campaign_fail();
 	if (!global_network_game_server_get())
@@ -6412,90 +6705,109 @@ static boolean evolved_choose(struct widget_instance *widget)
 	game_engine_override_map_name(level);
 	if (global_network_game_server_get())
 		network_game_server_change_map_name(global_network_game_server_get(), level);
-	evolved_variant_drop();
-	evolved_spinners_ready = FALSE;
-	evolved_variant_make(0, TRUE);
+	hardcore_variant_drop();
+	hardcore_spinners_ready = FALSE;
+	if (hardcore_list.gametype == 0)
+		hardcore_comp_apply();
+	else
+		hardcore_variant_make((short)(hardcore_list.gametype - 1), TRUE);
+	hardcore_resume_maps = TRUE;
 	return TRUE;
 }
 
 /* the rules and teams spinners, after the page is built again */
-static void evolved_spinners_restore(struct widget_instance *list)
+static void hardcore_spinners_restore(struct widget_instance *list)
 {
 	struct widget_instance *spinner;
 
-	if (evolved_spinners_ready)
+	if (hardcore_spinners_ready)
 		return;
-	spinner = named(list, "evolved_rules_spinner", 0);
+	spinner = named(list, "hardcore_rules_spinner", 0);
 	if (spinner)
-		spinner->parameters.list.selected_index = evolved_built_rules < 0 ? 0 : evolved_built_rules;
-	spinner = named(list, "evolved_teams_spinner", 0);
+		spinner->parameters.list.selected_index = hardcore_built_rules < 0 ? 0 : hardcore_built_rules;
+	spinner = named(list, "hardcore_teams_spinner", 0);
 	if (spinner)
-		spinner->parameters.list.selected_index = evolved_built_teams ? 0 : 1;
-	evolved_spinners_ready = TRUE;
+		spinner->parameters.list.selected_index = hardcore_built_teams ? 0 : 1;
+	hardcore_spinners_ready = TRUE;
 }
 
-/* "port evolved setup open": the page is new, so its spinners are not
+/* "port hardcore setup open": the page is new, so its spinners are not
 the mode yet */
-static boolean evolved_setup_open(struct widget_instance *list)
+static boolean hardcore_setup_open(struct widget_instance *list)
 {
-	evolved_spinners_ready = FALSE;
-	evolved_spinners_restore(list);
+	hardcore_spinners_ready = FALSE;
+	hardcore_spinners_restore(list);
 	return TRUE;
 }
 
-/* "port evolved setup": the mode's rules page, and a fresh gametype when
+/* "port hardcore setup": the mode's rules page, and a fresh gametype when
 the mode changes. The pages write this copy, not a saved classic gametype. */
-static void evolved_setup_update(struct widget_instance *list)
+static void hardcore_setup_update(struct widget_instance *list)
 {
 	short rules;
 	boolean teams;
 
-	if (!multiplayer.evolved)
+	if (!multiplayer.hardcore)
 		return;
-	evolved_spinners_restore(list);
-	evolved_choices(list, &rules, &teams);
-	evolved_variant_make(rules, teams);
-	evolved_rules_rows(list, rules);
+	hardcore_spinners_restore(list);
+	hardcore_choices(list, &rules, &teams);
+	hardcore_teams_row(list, rules);
+	hardcore_choices(list, &rules, &teams);
+	hardcore_variant_make(rules, teams);
+	hardcore_rules_rows(list, rules);
 }
 
-/* "port evolved prepare": a page opens onto the copy */
-static boolean evolved_prepare(struct widget_instance *widget)
+/* "port hardcore prepare": a page opens onto the copy */
+static boolean hardcore_prepare(struct widget_instance *widget)
 {
 	short rules;
 	boolean teams;
 
-	if (!multiplayer.evolved)
+	if (!multiplayer.hardcore)
 		return campaign_fail();
-	evolved_choices(widget, &rules, &teams);
-	evolved_variant_make(rules, teams);
+	hardcore_choices(widget, &rules, &teams);
+	hardcore_variant_make(rules, teams);
 	/* port: the next page is built with its spinners on slayer until restored */
-	evolved_spinners_ready = FALSE;
+	hardcore_spinners_ready = FALSE;
 	return TRUE;
 }
 
-/* "port evolved leave": back to the multiplayer screen drops the copy,
-so Edit Gametypes is a classic profile again */
-static boolean evolved_leave(void)
+/* "port hardcore leave": back on the maps returns to the gametypes.
+back there drops the copy, so Edit Gametypes is a classic profile again */
+static boolean hardcore_leave(struct widget_instance *widget)
 {
-	evolved_variant_drop();
+	struct widget_instance *list = hardcore_list_of(widget);
+
+	if (list && hardcore_list.maps)
+	{
+		hardcore_list.maps = FALSE;
+		hardcore_list.first = 0;
+		focus_row(list, (short)(1 + PIN(hardcore_list.gametype, 0, 4)));
+		ui_play_audio_feedback_sound(SOUND_BACK);
+		return FALSE;
+	}
+	/* port: the shared option pages read this. leaving puts their radar back. */
+	hardcore_resume_maps = FALSE;
+	multiplayer.hardcore = FALSE;
+	hardcore_variant_drop();
 	return TRUE;
 }
 
-/* "port evolved start": the copy, including the pages. Classic gametypes
+/* "port hardcore start": the copy, including the pages. Classic gametypes
 are not written. */
-static boolean evolved_start(struct widget_instance *widget)
+static boolean hardcore_start(struct widget_instance *widget)
 {
 	short rules;
 	boolean teams;
 
-	if (!multiplayer.evolved || !gametype_edit.setup)
+	if (!multiplayer.hardcore || !gametype_edit.setup)
 		return campaign_fail();
 	if (text_field_editing(NULL))
 		text_field_end(TRUE);
-	evolved_choices(widget, &rules, &teams);
-	evolved_variant_make(rules, teams);
-	/* port: the sheet rides with this match. Dropping the copy does not clear it. */
-	evolved_rules_commit();
+	hardcore_choices(widget, &rules, &teams);
+	hardcore_variant_make(rules, teams);
+	/* port: the sheet rides with this match. the copy stays until the map loads. */
+	hardcore_rules_commit();
 	ui_widget_port_game_variant_set(&gametype_edit.setup_variant, &gametype_edit.setup_options);
 	/* port: the lobby was opened from the previous gametype. the next
 	   round and this machine's own copy both need this one. */
@@ -6513,7 +6825,6 @@ static boolean evolved_start(struct widget_instance *widget)
 			local->variant_options = hosted->variant_options;
 		}
 	}
-	evolved_variant_drop();
 	if (!multiplayer.game_name[0] && player_ui_get_active_player_profile_index(0) != NONE)
 	{
 		struct player_profile profile;
@@ -6530,9 +6841,9 @@ static boolean evolved_start(struct widget_instance *widget)
 	return global_network_game_server_get() != NULL;
 }
 
-/* "port evolved server open": the name, the player count and the listing.
+/* "port hardcore server open": the name, the player count and the listing.
 this is not Server Setup, which would edit a classic gametype. */
-static boolean evolved_server_open(struct widget_instance *list)
+static boolean hardcore_server_open(struct widget_instance *list)
 {
 	struct widget_instance *spinner = named(list, "max_players_spinner", 0);
 
@@ -6551,9 +6862,9 @@ static boolean evolved_server_open(struct widget_instance *list)
 	return TRUE;
 }
 
-/* "port evolved server": the same fields Server Setup shows, apart from
+/* "port hardcore server": the same fields Server Setup shows, apart from
 its gametype rows */
-static void evolved_server_update(struct widget_instance *list)
+static void hardcore_server_update(struct widget_instance *list)
 {
 	struct widget_instance *spinner = named(list, "max_players_spinner", 0);
 	struct widget_instance *row = named(list, "op_server_name", 0);
@@ -6563,7 +6874,7 @@ static void evolved_server_update(struct widget_instance *list)
 	char text[TEXT_FIELD_LENGTH];
 	boolean internet;
 
-	if (!multiplayer.evolved)
+	if (!multiplayer.hardcore)
 		return;
 	if (spinner)
 		multiplayer.maximum_players_index = (short)PIN(spinner->parameters.list.selected_index, 0,
@@ -6752,33 +7063,33 @@ boolean pc_menu_event_function_invoke(
 		{
 			return gametype_engine_set(widget);
 		}
-		else if (!strcmp(name, "port evolved open"))
+		else if (!strcmp(name, "port hardcore open"))
 		{
-			return evolved_open(widget);
+			return hardcore_open(widget);
 		}
-		else if (!strcmp(name, "port evolved setup open"))
+		else if (!strcmp(name, "port hardcore setup open"))
 		{
-			return evolved_setup_open(widget);
+			return hardcore_setup_open(widget);
 		}
-		else if (!strcmp(name, "port evolved server open"))
+		else if (!strcmp(name, "port hardcore server open"))
 		{
-			return evolved_server_open(widget);
+			return hardcore_server_open(widget);
 		}
-		else if (!strcmp(name, "port evolved choose"))
+		else if (!strcmp(name, "port hardcore choose"))
 		{
-			return evolved_choose(widget);
+			return hardcore_choose(widget);
 		}
-		else if (!strcmp(name, "port evolved start"))
+		else if (!strcmp(name, "port hardcore start"))
 		{
-			return evolved_start(widget);
+			return hardcore_start(widget);
 		}
-		else if (!strcmp(name, "port evolved prepare"))
+		else if (!strcmp(name, "port hardcore prepare"))
 		{
-			return evolved_prepare(widget);
+			return hardcore_prepare(widget);
 		}
-		else if (!strcmp(name, "port evolved leave"))
+		else if (!strcmp(name, "port hardcore leave"))
 		{
-			return evolved_leave();
+			return hardcore_leave(widget);
 		}
 		else if (!strncmp(name, "mp profile init ", 16) || !strcmp(name, "mp prof init teamplay options") ||
 			!strcmp(name, "mp prof init vehicle options"))
@@ -7098,12 +7409,12 @@ void pc_menu_game_data_function_invoke(
 		saved_game_list_update(widget);
 	else if (!strcmp(name, "port gamepad layout preview"))
 		profile_gamepad_layout(widget);
-	else if (!strcmp(name, "port evolved maps"))
-		evolved_maps_update(widget);
-	else if (!strcmp(name, "port evolved setup"))
-		evolved_setup_update(widget);
+	else if (!strcmp(name, "port hardcore maps"))
+		hardcore_maps_update(widget);
+	else if (!strcmp(name, "port hardcore setup"))
+		hardcore_setup_update(widget);
 	else if (!strcmp(name, "port coop friendly fire text"))
 		coop_friendly_fire_text(widget);
-	else if (!strcmp(name, "port evolved server"))
-		evolved_server_update(widget);
+	else if (!strcmp(name, "port hardcore server"))
+		hardcore_server_update(widget);
 }

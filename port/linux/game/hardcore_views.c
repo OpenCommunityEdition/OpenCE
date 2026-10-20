@@ -1,4 +1,4 @@
-/* One local player can watch teammates in an evolved team game for the
+/* One local player can watch teammates in a hardcore team game for the
 whole match, including while a teammate is dead. The extra panes are
 render windows only. They are not local players, so input, scoring and
 the single-player HUD stay with the one player. The menu option
@@ -17,27 +17,33 @@ their weapon, shield and reticle draw without a second local player. */
 #include "memory/data.h"
 #include "objects/objects.h"
 #include "units/units.h"
-#include "evolved_rules.h"
-#include "evolved_views.h"
+#include "hardcore_rules.h"
+#include "hardcore_views.h"
 #include "../src/port_config.h"
 #include <string.h>
 
 /* the drawn body is between ticks; the sight point is the tick's */
 real_matrix4x3 *render_interpolation_object_node_matrices(long object_index);
 
-#define EVOLVED_VIEW_MAXIMUM 4
+#define HARDCORE_VIEW_MAXIMUM 4
 
-static long view_unit[EVOLVED_VIEW_MAXIMUM];
+static long view_unit[HARDCORE_VIEW_MAXIMUM];
 static short view_count = 1;
 static short local_slot = 0;
 static short view_rendering = 0;
 static short view_hud_slot = NONE;
 static boolean view_hiding = FALSE;
 static boolean view_borrowed = FALSE;
+/* The teammates in the order the split first drew them. A later arrival
+sorts into the middle of the player list and would move every pane. */
+static long roster_player[HARDCORE_VIEW_MAXIMUM - 1];
+static short roster_count = 0;
+static long roster_team = NONE;
+static boolean roster_locked = FALSE;
 
 /* A pane's HUD needs a local player slot. Slot 1 is the second person
 when two play on this machine, and clearing it drops their listener. */
-static short evolved_views_free_slot(void)
+static short hardcore_views_free_slot(void)
 {
 	short slot;
 
@@ -52,15 +58,15 @@ static short evolved_views_free_slot(void)
 /* Two panes are top and bottom. Three are a wide top and two bottoms.
 Four are the corners. The name is this machine's setting, so a bottom
 choice stays on a bottom pane instead of being moved to the top. */
-/* An evolved team game has one team on this display. The other team's
+/* A hardcore team game has one team on this display. The other team's
 local player would be looking at this team, and this team at them. */
-static boolean evolved_views_team_screen(void)
+static boolean hardcore_views_team_screen(void)
 {
-	return evolved_rules_active() && game_in_progress() && game_engine_running() &&
+	return hardcore_rules_active() && game_in_progress() && game_engine_running() &&
 		game_engine_has_teams();
 }
 
-static long evolved_views_screen_team(void)
+static long hardcore_views_screen_team(void)
 {
 	short slot = local_player_get_next(NONE);
 	struct player_datum *local;
@@ -73,14 +79,14 @@ static long evolved_views_screen_team(void)
 	return local->team_index;
 }
 
-static boolean evolved_views_local_on_screen(short local_player_index)
+static boolean hardcore_views_local_on_screen(short local_player_index)
 {
 	struct player_datum *player;
 	long team;
 
-	if (!evolved_views_team_screen())
+	if (!hardcore_views_team_screen())
 		return TRUE;
-	team = evolved_views_screen_team();
+	team = hardcore_views_screen_team();
 	if (team == NONE)
 		return TRUE;
 	player = player_try_and_get(local_player_get_player_index(local_player_index));
@@ -89,16 +95,16 @@ static boolean evolved_views_local_on_screen(short local_player_index)
 	return player->team_index == team;
 }
 
-short evolved_views_local_count(void)
+short hardcore_views_local_count(void)
 {
 	short count = 0;
 	short index = NONE;
 
-	if (!evolved_views_team_screen() || evolved_views_screen_team() == NONE)
+	if (!hardcore_views_team_screen() || hardcore_views_screen_team() == NONE)
 		return local_player_count();
 	while ((index = local_player_get_next(index)) != NONE)
 	{
-		if (evolved_views_local_on_screen(index))
+		if (hardcore_views_local_on_screen(index))
 			count++;
 	}
 	if (count < 1)
@@ -106,21 +112,21 @@ short evolved_views_local_count(void)
 	return count;
 }
 
-short evolved_views_next_local(short previous)
+short hardcore_views_next_local(short previous)
 {
 	short index = previous;
 
-	if (!evolved_views_team_screen() || evolved_views_screen_team() == NONE)
+	if (!hardcore_views_team_screen() || hardcore_views_screen_team() == NONE)
 		return local_player_get_next(previous);
 	while ((index = local_player_get_next(index)) != NONE)
 	{
-		if (evolved_views_local_on_screen(index))
+		if (hardcore_views_local_on_screen(index))
 			return index;
 	}
 	return NONE;
 }
 
-static short evolved_views_slot(short count)
+static short hardcore_views_slot(short count)
 {
 	char const *name = config_string("display.teammate_view_slot");
 	boolean bottom;
@@ -154,14 +160,43 @@ static short evolved_views_slot(short count)
 	return slot;
 }
 
-static void evolved_views_refresh(void)
+static void hardcore_views_roster_clear(void)
+{
+	short index;
+
+	roster_locked = FALSE;
+	roster_count = 0;
+	roster_team = NONE;
+	for (index = 0; index < HARDCORE_VIEW_MAXIMUM - 1; index++)
+		roster_player[index] = NONE;
+}
+
+/* The players already in the match, in list order. This runs until the
+clock has started, then the list is kept as it was. */
+static void hardcore_views_roster_take(long local_index, long team)
 {
 	struct data_iterator iterator;
 	struct player_datum *player;
+
+	roster_count = 0;
+	roster_team = team;
+	data_iterator_new(&iterator, player_data);
+	while (roster_count < HARDCORE_VIEW_MAXIMUM - 1 &&
+		(player = data_iterator_next(&iterator)) != NULL)
+	{
+		if (iterator.datum_index == local_index || player->quit_out_of_game ||
+			player->team_index != team || player->local_player_index != NONE)
+			continue;
+		roster_player[roster_count++] = iterator.datum_index;
+	}
+}
+
+static void hardcore_views_refresh(void)
+{
+	struct player_datum *player;
 	struct player_datum *local;
 	long local_index;
-	long mates[EVOLVED_VIEW_MAXIMUM];
-	short mate_count;
+	long mates[HARDCORE_VIEW_MAXIMUM - 1];
 	short index;
 	short placed;
 
@@ -173,34 +208,45 @@ static void evolved_views_refresh(void)
 	local_slot = 0;
 	view_hud_slot = NONE;
 	view_unit[0] = NONE;
-	if (!config_boolean("display.teammate_views") || !evolved_views_team_screen() ||
-		evolved_views_local_count() != 1 || !player_data || !player_data->valid)
+	if (!hardcore_views_team_screen())
+	{
+		hardcore_views_roster_clear();
+		return;
+	}
+	if (!config_boolean("display.teammate_views") ||
+		hardcore_views_local_count() != 1 || !player_data || !player_data->valid)
 		return;
 	local_index = local_player_get_player_index(local_player_get_next(NONE));
 	local = player_try_and_get(local_index);
 	if (!local || local->team_index < 0)
 		return;
-	mate_count = 0;
-	data_iterator_new(&iterator, player_data);
-	while (mate_count < EVOLVED_VIEW_MAXIMUM - 1 &&
-		(player = data_iterator_next(&iterator)) != NULL)
+	if (roster_locked && roster_team != local->team_index)
+		hardcore_views_roster_clear();
+	if (!roster_locked)
 	{
-		/* The other team is never a pane, including another local player.
-		A dead teammate, or one waiting to spawn, keeps the pane. Dropping
-		them would change the split and move this machine's view. */
-		if (iterator.datum_index == local_index || player->quit_out_of_game ||
-			player->team_index != local->team_index || player->local_player_index != NONE)
-			continue;
-		mates[mate_count++] = player->unit_index;
+		hardcore_views_roster_take(local_index, local->team_index);
+		if (game_time_get() > 0)
+			roster_locked = TRUE;
 	}
-	if (!mate_count)
+	if (!roster_count)
 		return;
-	view_hud_slot = evolved_views_free_slot();
+	/* A player who leaves keeps the pane, empty, so the others stay
+	where the split put them. Their body is looked up from the same
+	handle, including after they respawn. */
+	for (index = 0; index < roster_count; index++)
+	{
+		player = player_try_and_get(roster_player[index]);
+		if (!player || player->quit_out_of_game || player->team_index != roster_team)
+			mates[index] = NONE;
+		else
+			mates[index] = player->unit_index;
+	}
+	view_hud_slot = hardcore_views_free_slot();
 	if (view_hud_slot == NONE)
 		return;
-	view_count = (short)(mate_count + 1);
-	local_slot = evolved_views_slot(view_count);
-	for (index = 0; index < EVOLVED_VIEW_MAXIMUM; index++)
+	view_count = (short)(roster_count + 1);
+	local_slot = hardcore_views_slot(view_count);
+	for (index = 0; index < HARDCORE_VIEW_MAXIMUM; index++)
 		view_unit[index] = NONE;
 	placed = 0;
 	for (index = 0; index < view_count; index++)
@@ -211,29 +257,35 @@ static void evolved_views_refresh(void)
 	}
 }
 
-short evolved_views_window_count(void)
+short hardcore_views_window_count(void)
 {
-	evolved_views_refresh();
+	hardcore_views_refresh();
 	return view_count;
 }
 
-boolean evolved_views_is_teammate_window(short window_index)
+boolean hardcore_views_is_teammate_window(short window_index)
 {
+	/* a classic split and the campaign still have the last match's pane
+	   count until something asks again. those windows are their players. */
+	if (!hardcore_views_team_screen())
+		return FALSE;
 	return view_count > 1 && window_index >= 0 && window_index < view_count &&
 		window_index != local_slot;
 }
 
-boolean evolved_views_is_local_window(short window_index)
+boolean hardcore_views_is_local_window(short window_index)
 {
+	if (!hardcore_views_team_screen())
+		return FALSE;
 	return view_count > 1 && window_index == local_slot;
 }
 
-short evolved_views_hud_slot(void)
+short hardcore_views_hud_slot(void)
 {
 	return view_hud_slot;
 }
 
-boolean evolved_views_camera(short window_index, struct observer_result *result)
+boolean hardcore_views_camera(short window_index, struct observer_result *result)
 {
 	long unit_index;
 	struct object_datum *object;
@@ -242,7 +294,7 @@ boolean evolved_views_camera(short window_index, struct observer_result *result)
 	real_matrix4x3 *drawn;
 	real length;
 
-	if (!result || !evolved_views_is_teammate_window(window_index))
+	if (!result || !hardcore_views_is_teammate_window(window_index))
 		return FALSE;
 	unit_index = view_unit[window_index];
 	object = object_try_and_get(unit_index);
@@ -253,7 +305,7 @@ boolean evolved_views_camera(short window_index, struct observer_result *result)
 	{
 		long watched = player_index_from_unit_index(unit_index);
 		struct player_datum *watched_player = player_try_and_get(watched);
-		long team = evolved_views_screen_team();
+		long team = hardcore_views_screen_team();
 
 		/* Another local player has their own pane, or none when they are
 		on the other team. This pane is a remote teammate only. */
@@ -283,14 +335,14 @@ boolean evolved_views_camera(short window_index, struct observer_result *result)
 	return TRUE;
 }
 
-void evolved_views_begin(short window_index)
+void hardcore_views_begin(short window_index)
 {
 	long player_index;
 
 	view_hiding = TRUE;
 	view_rendering = window_index;
 	view_borrowed = FALSE;
-	if (!evolved_views_is_teammate_window(window_index))
+	if (!hardcore_views_is_teammate_window(window_index))
 		return;
 	player_index = player_index_from_unit_index(view_unit[window_index]);
 	if (player_index == NONE || view_hud_slot == NONE ||
@@ -308,7 +360,7 @@ void evolved_views_begin(short window_index)
 	view_borrowed = TRUE;
 }
 
-void evolved_views_end(void)
+void hardcore_views_end(void)
 {
 	if (view_borrowed)
 	{
@@ -320,7 +372,7 @@ void evolved_views_end(void)
 	view_hiding = FALSE;
 }
 
-boolean evolved_views_hides_unit(long object_index)
+boolean hardcore_views_hides_unit(long object_index)
 {
 	return view_hiding && view_rendering >= 0 && view_rendering < view_count &&
 		view_unit[view_rendering] == object_index;

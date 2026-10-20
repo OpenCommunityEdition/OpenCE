@@ -261,7 +261,7 @@ symbols in this file:
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
 #include "networking/network_performance_protocol.h"
-#include "evolved_rules.h" /* port: evolved rules beside the variant */
+#include "hardcore_rules.h" /* port: hardcore rules beside the variant */
 #include "networking/network_server_manager_internal.h"
 #include "networking/network_server_message_handler.h"
 #include "text/unicode.h"
@@ -787,9 +787,9 @@ boolean network_game_server_send_message_to_client_machine(
 	return network_game_server_write(connection, buffer, size, NULL, 1);
 }
 
-/* port: the evolved sheet is not in the variant. Old builds ignore this
+/* port: the hardcore sheet is not in the variant. Old builds ignore this
 data message while they are still in the lobby. */
-static void evolved_rules_send_settings(
+static void hardcore_rules_send_settings(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *only)
 {
@@ -802,7 +802,7 @@ static void evolved_rules_send_settings(
 	   lobby's copy is the one this match will start. */
 	if (!server || !variant || !TEST_FLAG(variant->universal_variant.flags, _game_variant_anniversary_rules_bit))
 		return;
-	if (!evolved_rules_write_message(message, (long)sizeof(message)))
+	if (!hardcore_rules_write_message(message, (long)sizeof(message)))
 		return;
 	if (only)
 	{
@@ -847,8 +847,8 @@ boolean network_game_server_send_game_settings_to_client_machine(
 		if (!encoded_message || !network_game_server_send_message_to_client_machine(server, machine, encoded_message))
 			return FALSE;
 	}
-	/* port: the joining machine gets the evolved sheet with the variant. */
-	evolved_rules_send_settings(server, machine);
+	/* port: the joining machine gets the hardcore sheet with the variant. */
+	hardcore_rules_send_settings(server, machine);
 	return TRUE;
 }
 
@@ -1161,7 +1161,7 @@ boolean network_game_server_send_game_settings_to_all_machines(
 	network_game_settings_update_time = system_milliseconds();
 	/* port: with the settings. a machine that joins a game in progress is
 	   sent the sheet on its own as well. */
-	evolved_rules_send_settings(server, NULL);
+	hardcore_rules_send_settings(server, NULL);
 
 	return result;
 }

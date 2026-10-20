@@ -3,7 +3,7 @@ CACHE_FILE_FORMATS.H
 
 Recognition, validation and loading of the Halo 1 map files that this build
 did not ship with: Halo Custom Edition caches (version 609), Halo PC
-caches (version 7, the evolved maps), and the Custom
+caches (version 7, the hardcore maps), and the Custom
 Edition resource maps bitmaps.map, sounds.map and loc.map. A cache that
 needs OpenSauce (its header asks for memory upgrades, mod data files and the
 like) is refused; one that only carries OpenSauce's header and tags is run as
@@ -35,7 +35,7 @@ against the file or buffer it refers to before it is used.
 #define CACHE_FILE_STRING_BYTES 32
 
 #define CACHE_FILE_VERSION_XBOX 5
-/* Halo PC retail. Evolved maps are these. The header and the tag
+/* Halo PC retail. Hardcore maps are these. The header and the tag
 address are the ones the Custom Edition loader converts. */
 #define CACHE_FILE_VERSION_HALO_PC 7
 #define CACHE_FILE_VERSION_CUSTOM_EDITION 609

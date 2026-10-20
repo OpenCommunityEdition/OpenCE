@@ -234,7 +234,7 @@ symbols in this file:
 
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
 #include "performance_sound.h"
-#include "evolved_rules.h" /* port: evolved draw skip, spread and shot delay */
+#include "hardcore_rules.h" /* port: hardcore draw skip, spread and shot delay */
 #include "bitmaps/bitmap_group.h"
 #include "cache/texture_cache.h"
 #include "effects/contrail_definitions.h"
@@ -687,8 +687,8 @@ void weapon_ready(
 	}
 #endif
 	weapon->weapon.state_timer = weapon_get_first_person_animation_time(weapon_index, 0, _first_person_weapon_animation_ready, NONE);
-	/* port: the first ready of a new unit can be immediate in an evolved game. */
-	if (evolved_rules_skip_consume(weapon_get_owner_object_index(weapon_index)))
+	/* port: the first ready of a new unit can be immediate in a hardcore game. */
+	if (hardcore_rules_skip_consume(weapon_get_owner_object_index(weapon_index)))
 		weapon->weapon.state_timer = 0;
 
 	return;
@@ -2604,8 +2604,8 @@ static void trigger_create_projectiles(
 						trigger->error;
 
 					error= (1.0f-fraction)*trigger_definition->projectile_error_angle_lower_bound + fraction*trigger_definition->projectile_error_angle_upper_bound;
-					/* port: evolved pistol and shotgun spread, once for the shot. */
-					error= evolved_rules_spread(weapon->definition_index, error);
+					/* port: hardcore pistol and shotgun spread, once for the shot. */
+					error= hardcore_rules_spread(weapon->definition_index, error);
 				}
 
 				if (!TEST_FLAG(trigger_definition->flags, _weapon_trigger_use_error_when_unzoomed_bit) ||
@@ -2629,7 +2629,8 @@ static void trigger_create_projectiles(
 				/* port: Anniversary copies the shooter's whole velocity when
 				the projectile's combine bit (4) is set. projectile_new still
 				adds the muzzle speed along the aim. */
-				if (TEST_FLAG(game_engine_get_variant()->universal_variant.flags, _game_variant_anniversary_rules_bit) &&
+				if (game_engine_running() &&
+					TEST_FLAG(game_engine_get_variant()->universal_variant.flags, _game_variant_anniversary_rules_bit) &&
 					owner_object_index!=NONE)
 				{
 					struct projectile_definition const *projectile_definition=
@@ -2959,8 +2960,8 @@ static void weapon_trigger_begin_firing(
 		return;
 	}
 
-	/* port: evolved aim and trigger delay. The shot waits, and the round stays. */
-	if (evolved_rules_shot_blocked(weapon_index))
+	/* port: hardcore aim and trigger delay. The shot waits, and the round stays. */
+	if (hardcore_rules_shot_blocked(weapon_index))
 		return;
 
 	if (trigger_definition->magazine_index!=NONE)
@@ -3338,6 +3339,10 @@ boolean weapon_update(
 		{
 			SET_FLAG(trigger->flags, _weapon_trigger_released_since_last_shot_bit, TRUE);
 		}
+		/* port: the delay is one hold. a tick that cannot fire yet still
+		counts, or the next shot of the same hold waits again. */
+		else
+			hardcore_rules_shot_blocked(weapon_index);
 
 		if (trigger->ejection_port_position>0.0f)
 		{

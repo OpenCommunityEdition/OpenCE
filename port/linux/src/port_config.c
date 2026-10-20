@@ -180,7 +180,7 @@ static const struct config_setting config_settings[] =
 	{ "display.timer_scale", _config_real, "1.0", NULL, _environment_value, _platform_all,
 		"PB timer size, 0.5 to 1.0. These preferences do not enable the timer." },
 	{ "display.teammate_views", _config_boolean, "false", "HALO_TEAMMATE_VIEWS", _environment_value, _platform_all,
-		"In an evolved team game, split this screen so one player can see\n"
+		"In a hardcore team game, split this screen so one player can see\n"
 		"teammates from their own eyes, up to four panes, for the whole match.\n"
 		"A dead teammate keeps the pane. Off leaves the view as it is. Classic\n"
 		"multiplayer is unchanged." },
