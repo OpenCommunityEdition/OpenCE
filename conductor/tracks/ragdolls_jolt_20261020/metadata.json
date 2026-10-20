@@ -4,5 +4,5 @@
   "status": "new",
   "created_at": "2026-10-20T00:00:00Z",
   "updated_at": "2026-10-20T00:00:00Z",
-  "description": "Ragdolls and physics debris with Jolt Physics in the macOS app"
+  "description": "Ragdolls, dismemberment and physics debris with Jolt Physics in the macOS app"
 }

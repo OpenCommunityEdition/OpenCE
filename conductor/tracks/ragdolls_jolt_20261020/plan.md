@@ -1,4 +1,4 @@
-# Plan: Ragdolls and physics debris with Jolt Physics in the macOS app
+# Plan: Ragdolls, dismemberment and physics debris with Jolt Physics in the macOS app
 
 ## Phase 1: Jolt in the host
 - [ ] Task: Record C++17 for Jolt in the tech stack
@@ -44,7 +44,22 @@
     - [ ] Tune the overrides until the frames look right; approve the references
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Ragdolls' (Protocol in workflow.md)
 
-## Phase 4: Debris
+## Phase 4: Dismemberment
+- [ ] Task: Breakable joints
+    - [ ] Write tests: harness tests that an explosion's damage and distance against the per-species thresholds choose the joints that break, only for dying or dead bipeds and only with `game.dismemberment` and `game.ragdolls` on; bullets and melee break none
+    - [ ] Per-species breakable joints and thresholds in `port/assets/ragdolls/`; the `game.dismemberment` setting (port_config.c, settings table, port_settings.py)
+- [ ] Task: Limbs as bodies of their own
+    - [ ] Write tests: native tests that breaking a joint leaves two bodies, the limb flung by the impulse, both coming to rest with their remaining joints inside their limits
+    - [ ] Joint breaking in the C wrapper; the limb's bones reported in the results with their own root
+- [ ] Task: Drawing the cut
+    - [ ] Write tests: harness tests that the body's draw collapses the detached bones' vertices and each limb's draw collapses every other bone's; the species' blood effect and decal spawn at the joint
+    - [ ] Extra draws of the same model from `render_objects.c`'s `port:` swap; the blood effect from the biped's existing effects
+- [ ] Task: Golden frames of dismemberment
+    - [ ] Write tests: an Elite dismembered by a scripted grenade (mid-flight, at rest) and a bullet kill that stays whole, with the frame clock
+    - [ ] Tune the thresholds; approve the references
+- [ ] Task: Conductor - User Manual Verification 'Phase 4: Dismemberment' (Protocol in workflow.md)
+
+## Phase 5: Debris
 - [ ] Task: Particles as rigid bodies
     - [ ] Write tests: harness tests that point-physics particles that collide with the level spawn debris bodies with the definition's size and lifetime, only with `game.physics_debris` on; the cap hands the oldest back to point physics
     - [ ] A `port:` hook in the particle systems' point-physics update; drawing from the results
@@ -54,9 +69,9 @@
 - [ ] Task: Golden frames of debris
     - [ ] Write tests: casings and debris at rest after a burst of fire, with the frame clock
     - [ ] Approve the references
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Debris' (Protocol in workflow.md)
+- [ ] Task: Conductor - User Manual Verification 'Phase 5: Debris' (Protocol in workflow.md)
 
-## Phase 5: Performance, network and documentation
+## Phase 6: Performance, network and documentation
 - [ ] Task: The benchmark with ragdolls and debris
     - [ ] Write tests: the benchmark script spawns 30 ragdolls and 200 debris pieces on bloodgulch at 3840×2160 and reports p99 and the physics tick's time
     - [ ] Meet p99 ≤ 8.33 ms and ≤ 1 ms a tick on the M1 Max; record the results in `docs/macos_host.md`
@@ -65,4 +80,4 @@
 - [ ] Task: `debug.physics_draw` and documentation
     - [ ] Write tests: the wireframe pass draws only with the setting on
     - [ ] Describe the physics bridge in `docs/macos_host.md`
-- [ ] Task: Conductor - User Manual Verification 'Phase 5: Performance, network and documentation' (Protocol in workflow.md)
+- [ ] Task: Conductor - User Manual Verification 'Phase 6: Performance, network and documentation' (Protocol in workflow.md)
