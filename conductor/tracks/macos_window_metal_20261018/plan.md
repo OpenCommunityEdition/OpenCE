@@ -67,9 +67,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Direct3D 8 on Metal' (Protocol in workflow.md)
 
 ## Phase 5: Parity with the GL build's extras
-- [ ] Task: High-res HUD and text
-    - [ ] Write tests: golden frames with the HUD and text at native resolution
-    - [ ] hud_hires.c and text_hires.c through the Metal path
+- [x] Task: High-res HUD and text 33fe5b0b
+    - [x] Write tests: golden frames with the HUD and text at native resolution
+    - [x] hud_hires.c and text_hires.c through the Metal path
 - [ ] Task: Post-processing, incl. SMAA
     - [ ] Write tests: golden frames with each post pass on; stock frames unchanged with them at defaults
     - [ ] xgpu_post.c's passes in MSL, same settings and defaults
