@@ -356,3 +356,53 @@ def test_dismemberment_draws_as_approved(tmp_path, name, frame, camera, bullet):
                          seconds=75, data_root=root)
     assert (frame.width, frame.height) == GAME_SIZE
     check(frame, name, ragdoll_tolerance(name), RAGDOLL_OTHER_ENDINGS.get(name))
+
+
+# the debris scene (debug.network_test_debris): at 40 seconds of frames an
+# assault rifle held a metre above the slope three world units before the
+# camera fires twenty rounds, its own firing effect ejecting the casings
+# (effects\particles\solid\casing h ar bullet, 0.015 units wide, of
+# effects\point physics\stones: density 2.4, friction 0.1, elasticity 0.35);
+# with game.physics_debris on each casing that strikes the ground is a Jolt
+# capsule, tumbling and coming to rest lying along its body, and with it off
+# the game's point physics have them. The log counts them: those left after
+# the burst and how many are bodies, and nearly ten seconds later those at
+# rest (how many casings are left, and which, is the game's random lifetimes')
+DEBRIS_CAMERA = "95.0 -150.0 4.0\n-0.645 0.681 -0.349\n0 0 1\n0.5\n"
+
+
+@pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")
+@pytest.mark.parametrize("name, frame, debris", [
+    # (the casings in the air and on the ground mid-burst; all at rest, Jolt's
+    # and the game's)
+    ("debris_flying", 2430, True),
+    ("debris_at_rest", 2700, True),
+    ("debris_off_at_rest", 2700, False),
+])
+def test_debris_draws_as_approved(tmp_path, name, frame, debris):
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "maps").symlink_to(MAPS)
+    (root / "camera.txt").write_text(DEBRIS_CAMERA)
+    run = run_game(tmp_path, frame, {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NETWORK_TEST_CAMERA": "1",
+                                     "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+                                     "HALO_PHYSICS_DEBRIS": "true" if debris else "false",
+                                     "HALO_NETWORK_TEST_DEBRIS": "40"},
+                   seconds=frame // 60 + 6, data_root=root, size=NATIVE_SIZE)
+    log = run.stdout + run.stderr
+    burst = re.search(r"fired twenty rounds, (\d+) casings left, (\d+) of them Jolt's bodies", log)
+    later = re.search(r"network test: (\d+) casings left, (\d+) of them at rest, (\d+) Jolt's bodies", log)
+    assert burst and later, log[-3000:]
+    casings, at_rest, bodies = (int(count) for count in later.groups())
+    if debris:
+        # (casings struck the ground as bodies, and those left are at rest or
+        # bodies still settling, none lost through the ground)
+        assert int(burst[2]) > 0, burst[0]
+        assert at_rest > 0 and at_rest + bodies >= casings, later[0]
+    else:
+        assert int(burst[2]) == 0 and bodies == 0 and at_rest > 0, burst[0] + later[0]
+    path = tmp_path / "game.png"
+    assert path.is_file(), "no frame was captured: " + log[-2000:]
+    frame = frame_compare.read_png(path)
+    assert (frame.width, frame.height) == NATIVE_SIZE
+    check(frame, name, ragdoll_tolerance(name))

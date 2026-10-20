@@ -53,6 +53,11 @@ refused it */
 #define PHYSICS_DEBRIS_METRES_PER_UNIT 3.048f
 /* the fastest a body is sent (units a second; the host takes 300) */
 #define PHYSICS_DEBRIS_SPEED_MAX 250.0f
+/* a body slower than the game's particles at rest (units a second,
+particle_update_physics') for half a second, Jolt's time before sleep, is at
+rest: a casing is smaller than Jolt's contacts are exact, and creeps */
+#define PHYSICS_DEBRIS_REST_SPEED 0.25f
+#define PHYSICS_DEBRIS_REST_TICKS 15
 
 enum
 {
@@ -78,6 +83,7 @@ struct physics_debris
 	boolean posed;
 	boolean awake;
 	short ticks_unposed;
+	short ticks_slow;
 	/* the garbage's drawn matrices */
 	short drawn_index;
 	real elapsed;
@@ -237,6 +243,7 @@ static struct physics_debris *physics_debris_take(
 	debris->posed = FALSE;
 	debris->awake = TRUE;
 	debris->ticks_unposed = 0;
+	debris->ticks_slow = 0;
 	debris->drawn_index = NONE;
 	debris->elapsed = 0.0f;
 	*table = (short)(debris - physics_debris.debris) + 1;
@@ -322,6 +329,12 @@ boolean physics_debris_particle_body(
 	return TRUE;
 }
 
+boolean physics_debris_particle_is_body(
+	long particle_index)
+{
+	return physics_debris_of(_physics_debris_particle, particle_index) != NULL;
+}
+
 void physics_debris_particle_collided(
 	long particle_index)
 {
@@ -385,8 +398,8 @@ boolean physics_debris_particle_update(
 		particle->location = location;
 		particle->position = position;
 	}
-	*settled = !debris->awake;
-	if (!debris->awake)
+	*settled = !debris->awake || debris->ticks_slow >= PHYSICS_DEBRIS_REST_TICKS;
+	if (*settled)
 	{
 		real_matrix4x3 frame;
 		real_quaternion rotation;
@@ -619,6 +632,16 @@ void physics_debris_result(
 		return;
 	debris->previous = debris->posed ? debris->current : debris->previous;
 	debris->current = *pose;
+	{
+		real dx = (debris->current.position.x - debris->previous.position.x) * TICKS_PER_SECOND;
+		real dy = (debris->current.position.y - debris->previous.position.y) * TICKS_PER_SECOND;
+		real dz = (debris->current.position.z - debris->previous.position.z) * TICKS_PER_SECOND;
+
+		if (!debris->posed || dx * dx + dy * dy + dz * dz >= PHYSICS_DEBRIS_REST_SPEED * PHYSICS_DEBRIS_REST_SPEED)
+			debris->ticks_slow = 0;
+		else if (debris->ticks_slow < PHYSICS_DEBRIS_REST_TICKS)
+			debris->ticks_slow++;
+	}
 	debris->elapsed = 0.0f;
 	debris->awake = awake;
 	debris->posed = TRUE;

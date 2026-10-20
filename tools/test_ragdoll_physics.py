@@ -7,7 +7,10 @@ natively and checks that:
 - every body falls onto the ground and comes to rest there, whole, near where it fell;
 - a frag grenade's push (its instantaneous acceleration times the biped's acceleration scale, lifted as damage.c lifts
   it, half of it on a killing hit and all of it on a corpse) moves each body at the speed the game gives a biped;
-- a warthog's hull, driven at the ragdoll as a kinematic stand-in, shoves it along without passing through it."""
+- a warthog's hull, driven at the ragdoll as a kinematic stand-in, shoves it along without passing through it;
+- the assault rifle's casings, the bodies game.physics_debris makes of them (port/linux/game/physics_debris.c) from the
+  casing particle's radius and its point physics, thrown as the rifle throws them onto flat ground and onto a hillside,
+  come to rest and sleep, on the ground, near where they struck."""
 
 import functools
 import math
@@ -38,6 +41,22 @@ COLLISION_BSP_SIZE = 96
 
 FRAG = "weapons\\frag grenade\\explosion"
 WARTHOG = "vehicles\\warthog\\warthog"
+CASING = "effects\\particles\\solid\\casing h ar bullet"
+FIRE_BULLET = "weapons\\assault rifle\\effects\\fire bullet"
+# offsets in the tags: an effect's events, an event's particles, an effect particle's particle and radius (the particle's
+# own radius scales it) and their sizes; a particle's point physics and radius; a point physics' density, contact
+# friction and elasticity
+EFFECT_EVENTS = 0x34
+EVENT_SIZE = 0x44
+EVENT_PARTICLES = 0x38
+EFFECT_PARTICLE_SIZE = 0xE8
+EFFECT_PARTICLE_PARTICLE = 0x54
+EFFECT_PARTICLE_RADIUS_UPPER_BOUND = 0xA4
+PARTICLE_PHYSICS = 20
+PARTICLE_RADIUS_UPPER_BOUND = 120
+POINT_PHYSICS_DENSITY = 32
+POINT_PHYSICS_CONTACT_FRICTION = 44
+POINT_PHYSICS_ELASTICITY = 48
 # the bipeds the pushes are measured on, each its model's name too
 PUSHED = ("characters\\marine\\marine", "characters\\elite\\elite", "characters\\grunt\\grunt",
           "characters\\hunter\\hunter")
@@ -68,9 +87,10 @@ class Map:
 
 @functools.lru_cache(maxsize=None)
 def stock():
-    """{model name: (acceleration scale, [(parent, translation, game rotation)])}, the frag's acceleration, and the
-    warthog's hull (its first collision node's box: centre and half extents)"""
-    models, frag, hull = {}, None, None
+    """{model name: (acceleration scale, [(parent, translation, game rotation)])}, the frag's acceleration, the
+    warthog's hull (its first collision node's box: centre and half extents) and the assault rifle's casing's radius, density, contact
+    friction and elasticity"""
+    models, frag, hull, casing, ejected = {}, None, None, None, None
     for path in maps():
         tags = Map(path)
         for (group, name), address in tags.named.items():
@@ -98,7 +118,22 @@ def stock():
                 low = [min(p[axis] for p in points) for axis in range(3)]
                 high = [max(p[axis] for p in points) for axis in range(3)]
                 hull = ([(l + h) / 2 for l, h in zip(low, high)], [(h - l) / 2 for l, h in zip(low, high)])
-    return models, frag, hull
+            elif (group, name) == ("effe", FIRE_BULLET) and ejected is None:
+                event_count, event_address = tags.at(address + EFFECT_EVENTS, "iI")
+                for event in range(event_count):
+                    count, first = tags.at(event_address + EVENT_SIZE * event + EVENT_PARTICLES, "iI")
+                    for element in range(first, first + EFFECT_PARTICLE_SIZE * count, EFFECT_PARTICLE_SIZE):
+                        particle = tags.reference(element + EFFECT_PARTICLE_PARTICLE)
+                        if particle and particle[1] == CASING:
+                            ejected = tags.at(element + EFFECT_PARTICLE_RADIUS_UPPER_BOUND, "f")[0]
+            elif (group, name) == ("part", CASING) and casing is None:
+                physics = tags.reference(address + PARTICLE_PHYSICS)
+                casing = (tags.at(address + PARTICLE_RADIUS_UPPER_BOUND, "f")[0],
+                          *(tags.at(physics[2] + offset, "f")[0] for offset in
+                            (POINT_PHYSICS_DENSITY, POINT_PHYSICS_CONTACT_FRICTION, POINT_PHYSICS_ELASTICITY)))
+    # (the particle's radius is the effect's times its own: particle_get_radius)
+    casing = (ejected * casing[0], *casing[1:])
+    return models, frag, hull, casing
 
 
 def multiply(a, b):
@@ -142,9 +177,10 @@ def word(value):
 
 
 def profiles_include():
-    models, frag, hull = stock()
+    models, frag, hull, casing = stock()
     jolt = (ROOT / "port/linux/game/physics_jolt.c").read_text(encoding="utf-8")
     ragdolls = (ROOT / "port/linux/game/ragdolls.h").read_text(encoding="utf-8")
+    debris = (ROOT / "port/linux/game/physics_debris.c").read_text(encoding="utf-8")
     entries = []
     for name, body in sorted(bodies().items()):
         if body is None:
@@ -169,6 +205,12 @@ def profiles_include():
         f"#define STAND_IN_RESTITUTION {define(jolt, 'PHYSICS_JOLT_STAND_IN_RESTITUTION')!r}f",
         f"#define PUSH_LIFT {define(ragdolls, 'RAGDOLL_PUSH_LIFT')!r}f",
         f"#define FRAG_ACCELERATION {frag!r}f",
+        f"#define CASING_RADIUS {casing[0]!r}f",
+        f"#define CASING_DENSITY {casing[1]!r}f",
+        f"#define CASING_FRICTION {casing[2]!r}f",
+        f"#define CASING_ELASTICITY {casing[3]!r}f",
+        f"#define REST_SPEED {define(debris, 'PHYSICS_DEBRIS_REST_SPEED')!r}f",
+        f"#define REST_TICKS {int(define(debris, 'PHYSICS_DEBRIS_REST_TICKS'))}",
         f"static const float warthog_center[3] = {{{floats(hull[0])}}};",
         f"static const float warthog_half_extents[3] = {{{floats(hull[1])}}};",
         "static const char *const pushed[] = {" + ", ".join(f'"{n.replace(chr(92), "/")}"' for n in PUSHED) + "};",
@@ -193,8 +235,10 @@ def program(tmp_path_factory):
 @needs_maps
 def test_the_stock_values():
     """(what the cases rely on: the maps' values as the stock game has them)"""
-    models, frag, hull = stock()
+    models, frag, hull, casing = stock()
     assert frag == pytest.approx(4.0)
+    # (effects\\point physics\\stones: density, contact friction, elasticity)
+    assert casing == pytest.approx((0.015, 2.4, 0.1, 0.35), abs=0.001)
     assert models["characters\\marine\\marine"][0] == pytest.approx(1.0)
     assert models["characters\\hunter\\hunter"][0] == pytest.approx(0.5)
     assert hull[1] == pytest.approx([0.96, 0.45, 0.29], abs=0.01)
@@ -210,7 +254,8 @@ def test_the_marine_stands():
     assert head > pelvis + 0.1 > foot + 0.1
 
 
-CASES = ["every_body_comes_to_rest", "a_frag_grenade_pushes_as_the_game_does", "a_warthog_shoves_a_marine"]
+CASES = ["every_body_comes_to_rest", "a_frag_grenade_pushes_as_the_game_does", "a_warthog_shoves_a_marine",
+         "the_casings_come_to_rest"]
 
 
 @needs_maps

@@ -45,6 +45,13 @@ debug.network_test_ragdoll_bullet kills it with an assault rifle's bullet
 from the camera instead (game.dismemberment's frames: a bullet tears
 nothing).
 
+debug.network_test_debris (game.physics_debris' golden frames): that many
+seconds of frames shown in, an assault rifle held a metre above the ground
+three world units before the camera, across the view, fires twenty rounds at
+its rate of fire, each its own firing effect (weapons\assault rifle\effects\
+fire bullet: the flash, the sound and the casing the tag ejects), and is then
+let fall.
+
 debug.network_test_camera holds the view at the debug camera of camera.txt
 in the data root (director_load_camera), for frames captured the same run
 to run.
@@ -76,7 +83,10 @@ Called from the main loop every frame (main.c).
 #include "camera/observer.h"
 #include "camera/director.h"
 #include "effects/effects.h"
+#include "effects/effect_definitions.h"
+#include "effects/particles.h"
 #include "physics/collisions.h"
+#include "physics_debris.h"
 
 #include "../src/p2p.h" /* port: port/linux/src/p2p.c, p2p_lobby.c */
 #include "network_chat.h"
@@ -162,6 +172,13 @@ static struct
 	long ragdoll_biped_index;
 	real_point3d ragdoll_point;
 	real_vector3d ragdoll_right;
+	/* debug.network_test_debris's: when, the rounds fired, the rifle and
+	where it is held */
+	real debris_time;
+	short debris_rounds;
+	long debris_weapon_index;
+	real_point3d debris_point;
+	real_vector3d debris_forward;
 } network_test;
 
 /* the variant at the index of the list (copied to name), FALSE past its end */
@@ -227,6 +244,8 @@ static void network_test_read_settings(
 	network_test.ragdoll_time = (real)config_real("debug.network_test_ragdoll");
 	network_test.ragdoll_bullet = config_boolean("debug.network_test_ragdoll_bullet");
 	network_test.ragdoll_biped_index = NONE;
+	network_test.debris_time = (real)config_real("debug.network_test_debris");
+	network_test.debris_weapon_index = NONE;
 	snprintf(network_test.pickup_weapon, sizeof(network_test.pickup_weapon), "%s",
 		config_string("debug.network_test_pickup_weapon"));
 	network_test.camera = config_boolean("debug.network_test_camera") ? TRUE : FALSE;
@@ -633,6 +652,138 @@ static void network_test_vehicle(
 			}
 		}
 		platform_log("network test: the last player cannot drive vehicle %lx", nearest_index);
+	}
+}
+
+/* debug.network_test_debris's scene: a second before its time an assault
+rifle is made three world units before the camera, a metre above the ground,
+pointing to the view's left (its ejection port away from the camera, so the
+casings fly ahead of it, in view); from its time it fires a round every four
+frames (15 a second), held where it is, twenty in all, then it falls. Logged:
+the casings left after the burst and how many are Jolt's bodies, and those at
+rest 290 frames in. (A casing out of view, or too small to draw, for 15 ticks
+is deleted, as in the stock game: the scene keeps them near) */
+static void network_test_debris(
+	void)
+{
+	long frame = (long)platform_frames_shown();
+	long start = (long)(network_test.debris_time * 60.0f);
+
+	if (network_test.debris_rounds == 0 && network_test.debris_weapon_index == NONE && frame >= start - 60)
+	{
+		long weapon_definition_index = tag_loaded(WEAPON_DEFINITION_TAG, "weapons\\assault rifle\\assault rifle");
+		struct observer_result const *camera = observer_get_camera(0);
+		struct object_placement_data data;
+		struct collision_result collision;
+		real_vector3d forward;
+		real_vector3d down;
+		real_point3d above;
+
+		network_test.debris_rounds = -1;
+		if (weapon_definition_index == NONE)
+		{
+			platform_log("network test: no assault rifle, for the debris");
+			return;
+		}
+		forward = camera->forward;
+		forward.k = 0.0f;
+		normalize3d(&forward);
+		/* (the view's left) */
+		network_test.debris_forward.i = -forward.j;
+		network_test.debris_forward.j = forward.i;
+		network_test.debris_forward.k = 0.0f;
+		point_from_line3d(&camera->position, &forward, 3.0f, &above);
+		above.z += 2.0f;
+		down.i = 0.0f;
+		down.j = 0.0f;
+		down.k = -50.0f;
+		network_test.debris_point = above;
+		if (collision_test_vector(FLAG(_collision_test_structure_bit) | FLAG(_collision_test_front_facing_surfaces_bit),
+			&above, &down, NONE, &collision))
+		{
+			network_test.debris_point = collision.point;
+		}
+		network_test.debris_point.z += 1.0f / 3.048f;
+		object_placement_data_new(&data, weapon_definition_index, NONE);
+		data.position = network_test.debris_point;
+		data.forward = network_test.debris_forward;
+		data.up = *global_up3d;
+		network_test.debris_weapon_index = object_new(&data);
+		network_test.debris_rounds = network_test.debris_weapon_index == NONE ? -1 : 0;
+		platform_log("network test: an assault rifle %lx held at (%.2f %.2f %.2f)", network_test.debris_weapon_index,
+			network_test.debris_point.x, network_test.debris_point.y, network_test.debris_point.z);
+	}
+	if (network_test.debris_rounds >= 0 && network_test.debris_rounds < 20 &&
+		network_test.debris_weapon_index != NONE && frame >= start + 4 * network_test.debris_rounds)
+	{
+		long effect_index = tag_loaded(EFFECT_DEFINITION_TAG, "weapons\\assault rifle\\effects\\fire bullet");
+
+		/* (held where it is as it fires) */
+		object_set_position(network_test.debris_weapon_index, &network_test.debris_point,
+			&network_test.debris_forward, global_up3d);
+		object_get(network_test.debris_weapon_index)->object.translational_velocity = *global_zero_vector3d;
+		object_get(network_test.debris_weapon_index)->object.angular_velocity = *global_zero_vector3d;
+		if (effect_index == NONE)
+		{
+			platform_log("network test: no assault rifle firing effect, for the debris");
+			network_test.debris_rounds = -1;
+			return;
+		}
+		effect_new_from_object(effect_index, NONE, network_test.debris_weapon_index, NONE, 1.0f, 0.0f, NULL, NULL);
+		network_test.debris_rounds++;
+		if (network_test.debris_rounds == 20)
+		{
+			long casing_index = tag_loaded(PARTICLE_TAG, "effects\\particles\\solid\\casing h ar bullet");
+			struct data_iterator iterator;
+			struct particle_datum *particle;
+			short casings = 0;
+			short bodies = 0;
+
+			data_iterator_new(&iterator, particle_data);
+			while ((particle = (struct particle_datum *)data_iterator_next(&iterator)) != NULL)
+			{
+				if (particle->definition_index == casing_index)
+				{
+					casings++;
+					if (physics_debris_particle_is_body(iterator.datum_index))
+						bodies++;
+				}
+			}
+			platform_log("network test: the assault rifle has fired twenty rounds, %d casings left, %d of them Jolt's bodies",
+				casings, bodies);
+		}
+	}
+	/* (the casings left to be drawn, near the frames at rest) */
+	if (network_test.debris_rounds == 20 && frame >= start + 290)
+	{
+		long casing_index = tag_loaded(PARTICLE_TAG, "effects\\particles\\solid\\casing h ar bullet");
+		struct data_iterator iterator;
+		struct particle_datum *particle;
+		short casings = 0;
+		short at_rest = 0;
+		short bodies = 0;
+
+		data_iterator_new(&iterator, particle_data);
+		while ((particle = (struct particle_datum *)data_iterator_next(&iterator)) != NULL)
+		{
+			if (particle->definition_index == casing_index)
+			{
+				casings++;
+				if (TEST_FLAG(particle->flags, _particle_datum_at_rest_bit))
+					at_rest++;
+				if (physics_debris_particle_is_body(iterator.datum_index))
+					bodies++;
+			}
+		}
+		platform_log("network test: %d casings left, %d of them at rest, %d Jolt's bodies", casings, at_rest, bodies);
+		network_test.debris_rounds = 21;
+	}
+	/* (held until it has fired) */
+	if (network_test.debris_rounds > 0 && network_test.debris_rounds < 20 && network_test.debris_weapon_index != NONE)
+	{
+		object_set_position(network_test.debris_weapon_index, &network_test.debris_point,
+			&network_test.debris_forward, global_up3d);
+		object_get(network_test.debris_weapon_index)->object.translational_velocity = *global_zero_vector3d;
 	}
 }
 
@@ -1179,6 +1330,12 @@ void network_test_update(
 	{
 		network_test_keyboard_line(game_time_get() - (long)(network_test.chat_time * TICKS_PER_SECOND) -
 			32 * TICKS_PER_SECOND);
+	}
+	/* debug.network_test_debris: the host's casings, by the frame */
+	if (network_test.debris_time > 0.0f && network_test.mode == _network_test_host && game_in_progress() &&
+		!main_menu_loaded)
+	{
+		network_test_debris();
 	}
 	/* debug.network_test_ragdoll: the host's scene, by the tick */
 	if (network_test.ragdoll_time > 0.0f && network_test.mode == _network_test_host && game_in_progress() &&

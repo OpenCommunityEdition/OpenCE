@@ -422,6 +422,42 @@ int main(int argc, char **argv)
 		CHECK(near(particles[0].direction.i, 1.0f), "lying along its body");
 	}
 
+	CASE("creeping")
+	{
+		long particle = particle_new(0, 0x1234, 0, 0.02f);
+		struct ragdoll_pose pose = pose_at(13.0f, 20.0f, 0.0f);
+		boolean settled = TRUE;
+		int tick;
+
+		physics_debris_particle_collided(particle);
+		physics_debris_add(first);
+		physics_debris_result(first, TRUE, &pose);
+		/* (awake, creeping a hundredth of a unit a tick: 0.3 a second, faster than the game's at rest) */
+		for (tick = 0; tick < 30; tick++)
+		{
+			pose.position.y += 0.01f;
+			physics_debris_result(first, TRUE, &pose);
+			physics_debris_particle_update(particle, 1.0f / 30.0f, &settled);
+		}
+		CHECK(!settled, "faster than a particle at rest");
+		/* (then a two-hundredth: 0.15 a second) */
+		for (tick = 0; tick < 14; tick++)
+		{
+			pose.position.y += 0.005f;
+			physics_debris_result(first, TRUE, &pose);
+			physics_debris_particle_update(particle, 1.0f / 30.0f, &settled);
+		}
+		CHECK(!settled, "slow for less than half a second");
+		pose.position.y += 0.005f;
+		physics_debris_result(first, TRUE, &pose);
+		physics_debris_particle_update(particle, 1.0f / 30.0f, &settled);
+		CHECK(settled && particles[0].translational_velocity.j == 0.0f, "slow for half a second: at rest, awake or not");
+		pose.position.y += 0.05f;
+		physics_debris_result(first, TRUE, &pose);
+		physics_debris_particle_update(particle, 1.0f / 30.0f, &settled);
+		CHECK(!settled, "and moving again once struck");
+	}
+
 	CASE("out of the level")
 	{
 		long particle = particle_new(0, 0x1234, 0, 0.02f);

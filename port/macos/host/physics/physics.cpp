@@ -54,6 +54,12 @@ constexpr uint32 LEVEL_TRIANGLES_MAX = 1u << 21;
 constexpr float SIZE_MAX_METRES = 100.0f;
 constexpr float MASS_MAX = 100000.0f;
 constexpr float STEP_MAX = 1.0f;
+// a single body's turning slowed by this (1/s), Jolt's stand-in for rolling
+// resistance
+constexpr float BODY_ANGULAR_DAMPING = 2.0f;
+// how far bodies may sink into one another, and how near before they touch
+constexpr float PENETRATION_SLOP_METRES = 0.005f;
+constexpr float SPECULATIVE_CONTACT_METRES = 0.02f;
 constexpr uint32 RAGDOLLS_MAX = 1024;
 // a joint's motor, at most this torque (N m) a kilogram of its part
 constexpr float MOTOR_TORQUE_PER_KILOGRAM = 40.0f;
@@ -291,6 +297,15 @@ extern "C" physics_world *physics_world_create(const physics_world_settings *set
     world->system.Init(world->bodies_max, 0, 4 * world->bodies_max, 4 * world->bodies_max,
                        world->broad_phase_layers, world->object_vs_broad_phase, world->object_pairs);
     world->system.SetGravity(Vec3(settings->gravity[0], settings->gravity[1], settings->gravity[2]));
+    // (a casing is 16 mm wide: Jolt's 20 mm of slop lets it sink into the
+    // ground, and through it; and with less slop, a contact kept from the
+    // step before pushes a body lying still across the ground, a few
+    // centimetres a second, never asleep)
+    PhysicsSettings physics;
+    physics.mPenetrationSlop = PENETRATION_SLOP_METRES;
+    physics.mSpeculativeContactDistance = SPECULATIVE_CONTACT_METRES;
+    physics.mUseBodyPairContactCache = false;
+    world->system.SetPhysicsSettings(physics);
     return world;
 }
 
@@ -412,9 +427,13 @@ extern "C" uint32_t physics_body_add(physics_world *world, const physics_shape *
     settings.mMassPropertiesOverride.mMass = mass;
     // (a dynamic body is small and fast, a casing thrown from a gun: cast
     // along its step so that it does not pass through the level's thin
-    // triangles)
-    if (motion == PHYSICS_MOTION_DYNAMIC)
+    // triangles), and it slows its turning as it goes: Jolt has no
+    // rolling resistance, and a capsule would roll across level ground
+    // forever, never slow enough to sleep
+    if (motion == PHYSICS_MOTION_DYNAMIC) {
         settings.mMotionQuality = EMotionQuality::LinearCast;
+        settings.mAngularDamping = BODY_ANGULAR_DAMPING;
+    }
     Body *body = world->bodies().CreateBody(settings);
     if (body == nullptr)
         return PHYSICS_NONE;
@@ -729,6 +748,13 @@ extern "C" int physics_ragdoll_break_joint(physics_world *world, uint32_t ragdol
     constraint->SetEnabled(false);
     int parent = slot->settings->mSkeleton->GetJoint(int(part)).mParentJointIndex;
     slot->filter->EnableCollision(CollisionGroup::SubGroupID(part), CollisionGroup::SubGroupID(parent));
+    // (torn off, the limb rolls on its own as a single body does, and is
+    // slowed as one is, or it rolls across level ground forever)
+    {
+        BodyLockWrite lock(world->system.GetBodyLockInterface(), slot->ragdoll->GetBodyID(int(part)));
+        if (lock.Succeeded())
+            lock.GetBody().GetMotionProperties()->SetAngularDamping(BODY_ANGULAR_DAMPING);
+    }
     slot->ragdoll->Activate(false);
     return 0;
 }

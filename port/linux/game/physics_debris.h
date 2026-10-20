@@ -51,6 +51,8 @@ void physics_debris_particle_collided(long particle_index);
 /* (particles.c) a particle that is a body takes its position from the
 host's pose, and is settled once the body sleeps; FALSE for any other */
 boolean physics_debris_particle_update(long particle_index, real dt, boolean *settled);
+/* whether a particle is a body now (debug.network_test_debris) */
+boolean physics_debris_particle_is_body(long particle_index);
 /* (physics_jolt.c, each tick) new pieces of garbage made bodies */
 void physics_debris_garbage_update(void);
 /* the node matrices a piece of garbage is drawn with: its body's, else

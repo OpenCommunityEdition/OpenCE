@@ -2,10 +2,10 @@
 wide as it is, as heavy as its density makes it, of its material within the host's limits, flying on as it bounced;
 smoke and other particles lighter than air stay the game's, as does everything with game.physics_debris off. The
 particle is held where it struck until the host poses its body, then moved between the host's last two poses, and is
-settled once the body sleeps. The body goes with its particle; past game.physics_debris_max the oldest piece is handed
-back to point physics for good, as is one the host refused. The point physics are the maps' own: bloodgulch's casings
-(effects\\point physics\\stones: 2.4, 0.1, 0.35), the Warthog's (old tags\\stones: 2.4, 0.2, 0.5) and the smoke's
-(0.0004 to 0.00115)."""
+settled once the body sleeps or has crept slower than the game's particles at rest (0.25 units a second) for half a
+second. The body goes with its particle; past game.physics_debris_max the oldest piece is handed back to point physics
+for good, as is one the host refused. The point physics are the maps' own: bloodgulch's casings (effects\\point
+physics\\stones: 2.4, 0.1, 0.35), the Warthog's (old tags\\stones: 2.4, 0.2, 0.5) and the smoke's (0.0004 to 0.00115)."""
 
 import re
 import sys
@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run, structure  # noqa: E402
 
 CASES = ["capsule", "real profiles", "clamps", "collided", "off", "not debris", "not twice", "held until posed",
-         "moved by the host", "out of the level", "lifetime", "gone before added", "cap", "cap before added", "refused",
+         "moved by the host", "creeping", "out of the level", "lifetime", "gone before added", "cap", "cap before added", "refused",
          "ids", "disposed", "garbage", "garbage without a hull", "garbage not debris", "garbage drawn"]
 
 FUNCTIONS = ["physics_debris_maximum", "physics_debris_table", "physics_debris_handed_back", "physics_debris_of",
@@ -46,7 +46,13 @@ NEGATIVE_CONTROLS = {
                           "cap"),
     "not-held": (("\tif (!debris->posed)\n\t\treturn TRUE;\n", ""), "held until posed"),
     "uninterpolated": (("t = PIN(debris->elapsed * TICKS_PER_SECOND, 0.0f, 1.0f);", "t = 1.0f;"), "moved by the host"),
-    "never-settled": (("*settled = !debris->awake;", "*settled = FALSE;"), "moved by the host"),
+    "never-settled": (("*settled = !debris->awake || debris->ticks_slow >= PHYSICS_DEBRIS_REST_TICKS;",
+                       "*settled = FALSE;"), "moved by the host"),
+    "never-at-rest-awake": (("*settled = !debris->awake || debris->ticks_slow >= PHYSICS_DEBRIS_REST_TICKS;",
+                             "*settled = !debris->awake;"), "creeping"),
+    "at-rest-at-once": (("\t\t\tdebris->ticks_slow++;", "\t\t\tdebris->ticks_slow = PHYSICS_DEBRIS_REST_TICKS;"),
+                        "creeping"),
+    "slow-forever": (("\t\t\tdebris->ticks_slow = 0;\n", "\t\t\t;\n"), "creeping"),
     "left-the-level": (("if (location.cluster_index != NONE)", "if (TRUE)"), "out of the level"),
     "kept-at-rest": ((" || TEST_FLAG(particle->flags, _particle_datum_at_rest_bit)", ""), "lifetime"),
     "same-index-same-piece": ((" || debris->datum_index != datum_index)", ")"), "lifetime"),

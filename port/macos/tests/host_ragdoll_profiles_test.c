@@ -3,7 +3,8 @@
  * bridge (port/macos/host/physics/physics_bridge.c), natively, with guest
  * memory of its own: tools/test_ragdoll_physics.py writes the bodies, in
  * their models' default poses, and the frag grenade's and the warthog's
- * values, all read from the maps, into ragdoll_profiles.inc, builds this
+ * values, and the assault rifle casing's, all read from the maps, into
+ * ragdoll_profiles.inc, builds this
  * with the physics library and runs one case, given as its argument. It
  * prints a line for each body it measures, then "ok", or what failed.
  *
@@ -127,6 +128,24 @@ static void add_ground(void)
     static const uint32_t indices[] = {0, 1, 2, 0, 2, 3};
     uint32_t *fields = command(HOST_PHYSICS_OP_LEVEL, HOST_PHYSICS_LEVEL_WORDS);
 
+    memcpy(at(ARRAYS), vertices, sizeof(vertices));
+    memcpy(at(ARRAYS + 0x100), indices, sizeof(indices));
+    fields[0] = ARRAYS;
+    fields[1] = 4;
+    fields[2] = ARRAYS + 0x100;
+    fields[3] = 2;
+}
+
+/* a 400 unit square through the origin, tilted up by `degrees` along x */
+static void add_hillside(float degrees)
+{
+    float rise = 200.0f * tanf(degrees * 3.14159265f / 180.0f);
+    float vertices[] = {-200, -200, 0, 200, -200, 0, 200, 200, 0, -200, 200, 0};
+    static const uint32_t indices[] = {0, 1, 2, 0, 2, 3};
+    uint32_t *fields = command(HOST_PHYSICS_OP_LEVEL, HOST_PHYSICS_LEVEL_WORDS);
+
+    vertices[2] = vertices[11] = -rise;
+    vertices[5] = vertices[8] = rise;
     memcpy(at(ARRAYS), vertices, sizeof(vertices));
     memcpy(at(ARRAYS + 0x100), indices, sizeof(indices));
     fields[0] = ARRAYS;
@@ -296,6 +315,24 @@ static int ragdoll_result(uint32_t id, float *poses, int *awake)
             return 1;
         }
         offset += HOST_PHYSICS_RESULT_RAGDOLL_WORDS + part_count * HOST_PHYSICS_POSE_WORDS;
+    }
+    return 0;
+}
+
+/* a body's pose and whether it is awake, from the results */
+static int body_result(uint32_t id, float pose[HOST_PHYSICS_POSE_WORDS], int *awake)
+{
+    const uint32_t *words = at(RESULTS);
+    uint32_t ragdolls = words[3], bodies = words[4], index, offset = HOST_PHYSICS_RESULTS_HEADER_WORDS;
+
+    for (index = 0; index < ragdolls; index++)
+        offset += HOST_PHYSICS_RESULT_RAGDOLL_WORDS + words[offset + 1] * HOST_PHYSICS_POSE_WORDS;
+    for (index = 0; index < bodies; index++, offset += HOST_PHYSICS_RESULT_BODY_WORDS) {
+        if (words[offset] == id) {
+            memcpy(pose, words + offset + 2, HOST_PHYSICS_POSE_WORDS * 4);
+            *awake = (int)words[offset + 1];
+            return 1;
+        }
     }
     return 0;
 }
@@ -526,6 +563,163 @@ static void a_warthog_shoves_a_marine(void)
     physics_bridge_destroy(bridge);
 }
 
+/* The assault rifle's casings as game.physics_debris makes them
+(physics_debris_particle_body: a capsule 0.35 of the particle's radius wide
+and 1.3 of it long, between the caps, along the way it flies, as heavy as
+the point physics' density makes it, of its friction and elasticity,
+tumbling end over end), each striking the ground at the rifle's speed (3
+units a second, the fire effect's, a little down) in one of eight ways:
+on flat ground and across a hillside of 5 degrees (less steep than the
+stones' friction holds, atan 0.1: 5.7 degrees), every one comes to rest
+within 5 seconds as physics_debris_particle_update has it (asleep, or
+slower than the game's particles at rest for half a second), on the ground
+and not through it, no further than its friction lets it slide,
+as the game's own casings come to rest. */
+static void the_casings_come_to_rest(void)
+{
+    static const float slopes[2] = {0.0f, 5.0f};
+    float radius = 0.35f * CASING_RADIUS, half_length = 0.65f * CASING_RADIUS;
+    float a = radius * HOST_PHYSICS_METRES_PER_UNIT, h = half_length * HOST_PHYSICS_METRES_PER_UNIT;
+    float mass = CASING_DENSITY * 1000.0f * (3.14159265f * a * a * 2.0f * h + 4.0f / 3.0f * 3.14159265f * a * a * a);
+    float spin = fminf(3.0f / (4.0f * CASING_RADIUS), 50.0f);
+    /* (as far as it slides on its friction: v squared over 2 mu g) */
+    float slide = (3.0f * 3.0f + 1.0f) / (2.0f * CASING_FRICTION * 9.81f / HOST_PHYSICS_METRES_PER_UNIT);
+    int slope, way, ticks;
+
+    printf("a casing: a capsule %.5f units wide, %.5f long between its caps, %.2f g, sliding %.2f units\n", radius,
+           2.0f * half_length, mass * 1000.0f, slide);
+    for (slope = 0; slope < 2; slope++) {
+        float tilt = tanf(slopes[slope] * 3.14159265f / 180.0f), cosine = cosf(slopes[slope] * 3.14159265f / 180.0f);
+        float struck[8][3], last[8][3];
+        int asleep_at[8], slow[8];
+        physics_bridge *bridge = new_bridge();
+
+        if (slopes[slope] > 0.0f)
+            add_hillside(slopes[slope]);
+        else
+            add_ground();
+        for (way = 0; way < 8; way++) {
+            float angle = (float)way * 3.14159265f / 4.0f;
+            float forward[3] = {3.0f * cosf(angle), 3.0f * sinf(angle), -1.0f}, speed, left[3], length;
+            float pose[HOST_PHYSICS_POSE_WORDS], frame[3][3];
+            uint32_t *fields = command(HOST_PHYSICS_OP_BODY_ADD, HOST_PHYSICS_BODY_ADD_WORDS);
+            int axis;
+
+            /* a unit apart, just above the ground, flying as it struck it */
+            struck[way][0] = 2.0f * cosf(angle);
+            struck[way][1] = 2.0f * sinf(angle);
+            struck[way][2] = struck[way][0] * tilt + (radius + 0.002f) / cosine;
+            speed = sqrtf(forward[0] * forward[0] + forward[1] * forward[1] + forward[2] * forward[2]);
+            for (axis = 0; axis < 3; axis++)
+                frame[0][axis] = forward[axis] / speed;
+            left[0] = -frame[0][1];
+            left[1] = frame[0][0];
+            left[2] = 0.0f;
+            length = sqrtf(left[0] * left[0] + left[1] * left[1]);
+            for (axis = 0; axis < 3; axis++)
+                frame[1][axis] = left[axis] / length;
+            frame[2][0] = frame[0][1] * frame[1][2] - frame[0][2] * frame[1][1];
+            frame[2][1] = frame[0][2] * frame[1][0] - frame[0][0] * frame[1][2];
+            frame[2][2] = frame[0][0] * frame[1][1] - frame[0][1] * frame[1][0];
+            /* (the capsule along x: the rotation taking x to forward, y to
+               left, z to up) */
+            {
+                float m00 = frame[0][0], m11 = frame[1][1], m22 = frame[2][2], trace = m00 + m11 + m22, w, s4;
+
+                if (trace > 0.0f) {
+                    w = sqrtf(1.0f + trace) * 0.5f;
+                    s4 = 4.0f * w;
+                    pose[3] = (frame[1][2] - frame[2][1]) / s4;
+                    pose[4] = (frame[2][0] - frame[0][2]) / s4;
+                    pose[5] = (frame[0][1] - frame[1][0]) / s4;
+                    pose[6] = w;
+                } else if (m00 > m11 && m00 > m22) {
+                    s4 = 2.0f * sqrtf(1.0f + m00 - m11 - m22);
+                    pose[3] = 0.25f * s4;
+                    pose[4] = (frame[0][1] + frame[1][0]) / s4;
+                    pose[5] = (frame[2][0] + frame[0][2]) / s4;
+                    pose[6] = (frame[1][2] - frame[2][1]) / s4;
+                } else if (m11 > m22) {
+                    s4 = 2.0f * sqrtf(1.0f + m11 - m00 - m22);
+                    pose[3] = (frame[0][1] + frame[1][0]) / s4;
+                    pose[4] = 0.25f * s4;
+                    pose[5] = (frame[1][2] + frame[2][1]) / s4;
+                    pose[6] = (frame[2][0] - frame[0][2]) / s4;
+                } else {
+                    s4 = 2.0f * sqrtf(1.0f + m22 - m00 - m11);
+                    pose[3] = (frame[2][0] + frame[0][2]) / s4;
+                    pose[4] = (frame[1][2] + frame[2][1]) / s4;
+                    pose[5] = 0.25f * s4;
+                    pose[6] = (frame[0][1] - frame[1][0]) / s4;
+                }
+            }
+            fields[0] = (uint32_t)way + 1;
+            fields[1] = HOST_PHYSICS_MOTION_DYNAMIC;
+            fields[2] = HOST_PHYSICS_SHAPE_CAPSULE;
+            ((float *)fields)[3] = radius;
+            ((float *)fields)[4] = half_length;
+            ((float *)fields)[5] = radius;
+            ((float *)fields)[6] = mass;
+            ((float *)fields)[7] = fminf(fmaxf(CASING_FRICTION, 0.0f), 1.0f);
+            ((float *)fields)[8] = fminf(fmaxf(CASING_ELASTICITY, 0.0f), 1.0f);
+            for (axis = 0; axis < 3; axis++) {
+                ((float *)fields)[9 + axis] = struck[way][axis];
+                ((float *)fields)[16 + axis] = forward[axis];
+                ((float *)fields)[19 + axis] = frame[1][axis] * spin;
+            }
+            for (axis = 0; axis < 4; axis++)
+                ((float *)fields)[12 + axis] = pose[3 + axis];
+            asleep_at[way] = -1;
+        }
+        memcpy(last, struck, sizeof(last));
+        memset(slow, 0, sizeof(slow));
+        for (ticks = 0; ticks < 6 * 30; ticks++) {
+            tick(bridge);
+            for (way = 0; way < 8; way++) {
+                float pose[HOST_PHYSICS_POSE_WORDS], dx, dy, dz;
+                int awake = 1;
+
+                if (!body_result((uint32_t)way + 1, pose, &awake))
+                    continue;
+                /* (at rest as physics_debris_particle_update has it: asleep, or slower than the game's particles
+                   at rest for half a second) */
+                dx = (pose[0] - last[way][0]) * 30.0f;
+                dy = (pose[1] - last[way][1]) * 30.0f;
+                dz = (pose[2] - last[way][2]) * 30.0f;
+                slow[way] = dx * dx + dy * dy + dz * dz < REST_SPEED * REST_SPEED ? slow[way] + 1 : 0;
+                memcpy(last[way], pose, sizeof(last[way]));
+                if ((!awake || slow[way] >= REST_TICKS) && asleep_at[way] < 0)
+                    asleep_at[way] = ticks + 1;
+            }
+        }
+        for (way = 0; way < 8; way++) {
+            float pose[HOST_PHYSICS_POSE_WORDS], above, moved;
+            int awake = 1;
+
+            if (!body_result((uint32_t)way + 1, pose, &awake)) {
+                CHECK(0, "%.0f degrees, casing %d: in the results", slopes[slope], way);
+                continue;
+            }
+            /* (its centre's height above the ground, along the ground's normal) */
+            above = (pose[2] - pose[0] * tilt) * cosine;
+            moved = sqrtf((pose[0] - struck[way][0]) * (pose[0] - struck[way][0]) +
+                          (pose[1] - struck[way][1]) * (pose[1] - struck[way][1]) +
+                          (pose[2] - struck[way][2]) * (pose[2] - struck[way][2]));
+            printf("%2.0f degrees, casing %d: at rest after %d ticks (%s), moved %.3f, its centre %.4f above the "
+                   "ground\n", slopes[slope], way, asleep_at[way], awake ? "awake" : "asleep", moved, above);
+            CHECK(isfinite(pose[0]) && isfinite(pose[1]) && isfinite(pose[2]), "finite");
+            CHECK(asleep_at[way] > 0 && asleep_at[way] <= 5 * 30, "%.0f degrees, casing %d: at rest at %d",
+                  slopes[slope], way, asleep_at[way]);
+            CHECK(!awake || slow[way] >= REST_TICKS, "%.0f degrees, casing %d: still at rest", slopes[slope], way);
+            CHECK(above > 0.5f * radius && above < radius + 0.01f, "%.0f degrees, casing %d: %f above the ground",
+                  slopes[slope], way, above);
+            CHECK(moved < slide + 0.5f, "%.0f degrees, casing %d: moved %f, more than it slides (%f)", slopes[slope],
+                  way, moved, slide);
+        }
+        physics_bridge_destroy(bridge);
+    }
+}
+
 int main(int argc, char **argv)
 {
     static const struct {
@@ -535,6 +729,7 @@ int main(int argc, char **argv)
         {"every_body_comes_to_rest", every_body_comes_to_rest},
         {"a_frag_grenade_pushes_as_the_game_does", a_frag_grenade_pushes_as_the_game_does},
         {"a_warthog_shoves_a_marine", a_warthog_shoves_a_marine},
+        {"the_casings_come_to_rest", the_casings_come_to_rest},
     };
     int index;
 

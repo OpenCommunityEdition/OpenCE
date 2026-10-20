@@ -572,6 +572,11 @@ static const struct config_setting config_settings[] =
 	{ "debug.network_test_ragdoll_bullet", _config_boolean, "false", "HALO_NETWORK_TEST_RAGDOLL_BULLET", _environment_value, _platform_all,
 		"network_test_ragdoll's biped killed by an assault rifle's bullet from the\n"
 		"camera instead of the grenade (game.dismemberment's frames: it tears nothing)." },
+	{ "debug.network_test_debris", _config_real, "0.0", "HALO_NETWORK_TEST_DEBRIS", _environment_value, _platform_all,
+		"In a hosted test game, at this many seconds of frames shown (a 60th of a\n"
+		"second each): an assault rifle held a metre above the ground three world\n"
+		"units before the camera fires twenty rounds, its own firing effect, casings\n"
+		"and all (game.physics_debris' frames); 0 never." },
 	{ "debug.network_test_camera", _config_boolean, "false", "HALO_NETWORK_TEST_CAMERA", _environment_set_is_true,
 		_platform_all,
 		"In a test game, view from the debug camera of camera.txt in the data root\n"
