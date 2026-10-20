@@ -2,8 +2,9 @@
 
 A mod is a folder of Halo PC tag files that the game plays over a map's own
 tags on your machine, as a resource pack does: sounds (a high-res audio
-pack), bitmaps (a texture pack, a HUD redraw), text (a translation) and
-models (higher-detail weapons, vehicles and scenery). Only the machine that
+pack), bitmaps (a texture pack, a HUD redraw), text (a translation), unit
+HUDs (the layout of the player's shield, health and motion sensor) and models
+(higher-detail weapons, vehicles and scenery). Only the machine that
 has a mod plays it. Nothing of a mod is sent to another machine, and a mod
 changes nothing that the machines of a network game must agree on, so you
 can play with mods in any game, with players who have other mods or none. (A host's mod sounds of other lengths change how long
@@ -11,8 +12,8 @@ the host's scripts and AI wait for dialogue to end; the host decides those
 for every machine, so they still agree.)
 
 The game's code is `port/linux/game/mods.c` (with `mod_sounds.c`,
-`mod_bitmaps.c`, `mod_strings.c` and `mod_models.c`, one for each kind of
-tag) and `port/linux/src/port_mods.c` (the mods folder and its files).
+`mod_bitmaps.c`, `mod_strings.c`, `mod_unit_huds.c` and `mod_models.c`, one
+for each kind of tag) and `port/linux/src/port_mods.c` (the mods folder and its files).
 
 ## A mod's folder
 
@@ -135,7 +136,7 @@ At the console:
 
 | Command | What it does |
 | --- | --- |
-| `mods_list` | Lists the mods in the mods folder in their load order, and which are on, then how many of the map's string lists, bitmaps, sounds and models the mods play. |
+| `mods_list` | Lists the mods in the mods folder in their load order, and which are on, then how many of the map's string lists, unit HUDs, bitmaps, sounds and models the mods play. |
 | `mods_reload` | Finds the mods again and reads their files again: a changed file is read again (one that now fails a check leaves what was played before), a new one is played, and the map's tag comes back for a file that is gone. If a sound changed, all sounds stop. It does nothing while `mods_enable false`. |
 | `mods_enable false` | Plays the map's own tags until `mods_enable true` or the next map. |
 
@@ -165,6 +166,7 @@ game must agree on.
 | Bitmap | `.bitmap` | Textures, sprites, the HUD's pictures |
 | Unicode string list | `.unicode_string_list` | The text the game shows |
 | String list | `.string_list` | Other text |
+| Unit HUD interface | `.unit_hud_interface` | The HUD of a unit: the shield and health meters, the motion sensor, the auxiliary meters and overlays, the warning sounds |
 | Model | `.gbxmodel` (Halo PC's), `.model` (the Xbox's) | What objects look like: weapons, first-person weapons and arms, vehicles, scenery, characters |
 
 A file must be a Halo PC tag file of its group, as the Halo Editing Kit's
@@ -228,6 +230,45 @@ plays), and `debug.txt` and the console say why.
   whose text is in tags named `pc\...`. A mod's `ui\shell` lists change the
   Xbox's menus (`display.menus = "xbox"`) and the text shown while playing
   (HUD messages, the multiplayer messages, the pause menu).
+
+### Unit HUDs
+
+A unit HUD interface is the HUD the player sees while in a unit (the
+cyborg's, the flood's, a vehicle's), which a unit's tag names. A mod's file
+replaces the map's of its name (`tags/ui/hud/cyborg.unit_hud_interface`
+replaces the tag `ui\hud\cyborg`, say).
+
+- The HUD is what this machine draws and plays, and nothing the machines of a
+  network game must agree on, so the whole interface is the file's: where the
+  meters and sensor are anchored, their placements, colors and sequences,
+  their multitexture overlays and the effectors that move them, the
+  auxiliary overlays and meters, and the warning sounds.
+- A tag the file names (the bitmaps of its elements and overlays, and its
+  warning sounds, a sound or a looping sound) must be one the map has, as a
+  model's shaders must: a mod cannot add tags. A name the map has not got
+  leaves the file out and the map's HUD is drawn. A bitmap of the map can be
+  redrawn by a mod's `.bitmap` (see Bitmaps).
+- The placements (offsets and scales) are the map's convention, as the map's
+  own HUD has them: the Xbox's on a map of the Xbox, and a Custom Edition
+  map's once converted. They are not halved for Halo PC's high resolution
+  flags, as a Custom Edition map's are as it loads: a HUD made from Halo PC's
+  tags for a map of the Xbox needs its scales made for it. A mod's bitmaps
+  that are larger than the map's scale the placements that draw them, as
+  they do the map's.
+- The game checks every count and size in the file, that every real is a
+  number, and the values the HUD indexes by: an anchor is a corner or the
+  center, an auxiliary overlay's type is a bit of its flags, and a
+  multitexture overlay's blend functions, effectors' types, destinations and
+  sources are ones it draws (an effector that sets an alpha sets one from 0
+  to 1). A sequence index past a bitmap's sequences draws nothing, as it does
+  in a map.
+- A block holds at most 16 warning sounds, 32 auxiliary overlays, 32
+  auxiliary meters, and 64 multitexture overlays on an element and 64
+  effectors on an overlay. (The game plays as many warning sounds as it
+  has room for, those in order.)
+- Changing a HUD while a map is played (`mods_reload`, the Mods menu's OK)
+  takes effect at once. A warning sound that played from the HUD before may
+  finish.
 
 ### Models
 
@@ -306,6 +347,7 @@ summary of what each kind of tag plays from the mods:
 
 ```
 mods: 9 string lists from their files (9 new), 0 given back, 0 left out
+mods: 3 unit HUDs from their files (3 new), 0 given back, 0 left out
 mods: 66 HUD placements scaled to draw larger bitmaps at the map's size
 mods: 354 bitmaps from their files (354 new), 0 given back, 6 left out
 mods: 313 sounds from their files (313 new), 0 given back, 2 left out
@@ -316,14 +358,14 @@ mods: 4 models from their files (4 new), 0 given back, 1 left out
 
 - When a map's tags load, at `mods_reload` and at the Mods menu's **OK**,
   the game lists the files of the mods that are on, once, in a table of
-  their tag paths. Each of the map's sound, bitmap, string list and model
-  tags is looked up in it.
+  their tag paths. Each of the map's sound, bitmap, string list, unit HUD
+  and model tags is looked up in it.
 - A tag replaced by a mod takes the file's values in place, so everything
   that holds the tag keeps it, and the map's own values come back when the
   file goes. A sound playing or a texture in the cache is never changed
   under the game: before a reload changes anything, the sounds stop and the
   caches let go of what they hold.
 - The mods' tags keep at most 512 MB in memory (192 MB on Android and the
-  web): their files, their sounds' samples, their bitmaps' tags and their
-  models' geometry.
+  web): their files, their sounds' samples, their bitmaps' tags, their unit
+  HUDs and their models' geometry.
 - A Custom Edition map takes mods as an Xbox map does.

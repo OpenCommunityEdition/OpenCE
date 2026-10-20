@@ -110,11 +110,26 @@ pixels read at once into buffer and made the hardware's */
 boolean mod_bitmaps_read(struct bitmap_data *bitmap, void *buffer);
 /* whether a bitmap is a mod's (whose linear rows are padded as they load) */
 boolean mod_bitmaps_contain(struct bitmap_data const *bitmap);
+/* (mods.c) around the mods' unit HUDs changing: the HUD's placements' scales
+given back before, then scaled again for the mods' bitmaps they draw after
+(and, for new HUDs, the bitmaps the HUD cannot draw at the map's size given
+back) */
+void mod_bitmaps_hud_unscale(void);
+void mod_bitmaps_hud_rescale(boolean huds_changed, boolean at_load);
 
 /* ---------- prototypes/MOD_STRINGS.C */
 
 long mod_strings_update(boolean remove_all, boolean at_load);
 void mod_strings_tags_unloaded(void);
+
+/* ---------- prototypes/MOD_UNIT_HUDS.C */
+
+/* the map's unit HUD interfaces played from the mods' files (or, remove_all,
+none); *changed says whether any HUD was changed. How many of them the mods play */
+long mod_unit_huds_update(boolean remove_all, boolean at_load, boolean *changed);
+/* (before the tags go: the map's HUDs are given back, unless give_back is
+FALSE (the tags are gone already), and the mods' buffers let go) */
+void mod_unit_huds_tags_unloaded(boolean give_back);
 
 /* ---------- prototypes/MOD_MODELS.C */
 
