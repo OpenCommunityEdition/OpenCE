@@ -1152,9 +1152,12 @@ static void object_damage_aftermath(
 			mcc_ui_team_respawn_damage(player_index, object_index, FALSE);
 		}
 	}
+
 	/* port: the campaign's score (display.campaign_score): a player's kill
-	of an enemy, where no multiplayer game scores */
-	else if (!TEST_FLAG(damage->flags, _damage_no_statistics_bit) &&
+	of an enemy (game_engine_can_score is TRUE without a game engine, so the
+	statistics above run in the campaign too, and this is no part of their
+	chain) */
+	if (!TEST_FLAG(damage->flags, _damage_no_statistics_bit) &&
 		TEST_FLAG(being_damaged_flags, _object_being_damaged_body_depleted_bit) &&
 		TEST_FLAG(_object_mask_unit, object->object.type))
 	{

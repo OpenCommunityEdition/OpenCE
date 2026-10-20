@@ -414,6 +414,8 @@ void campaign_score_record_kill(
 	campaign_score_kills[campaign_score_kill_count].player_index = (short)killing_player_index;
 	campaign_score_kills[campaign_score_kill_count].points = points;
 	campaign_score_kill_count++;
+	console_printf(FALSE, "campaign score: player %ld killed %s for %d",
+		killing_player_index, tag_get_name(variant_index), (int)points);
 
 	return;
 }
