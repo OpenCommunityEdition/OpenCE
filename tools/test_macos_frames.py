@@ -67,13 +67,13 @@ def capture(image, case, tmp_path, frame=1):
     return frame_compare.read_png(path)
 
 
-def capture_game(tmp_path, frame, settings=None, seconds=30, data_root=None):
-    """the frame the app drew of the game at its `frame`th PRESENT"""
+def capture_game(tmp_path, frame, settings=None, seconds=30, data_root=None, size=GAME_SIZE):
+    """the frame the app drew of the game at its `frame`th PRESENT, at `size`"""
     (tmp_path / "home").mkdir()
     path = tmp_path / "game.png"
     environment = dict(os.environ, HOME=str(tmp_path / "home"), HALO_DATA_ROOT=str(data_root or ROOT / "assets"),
                        HALO_FRAME_CLOCK="1", HALO_HOST_CAPTURE=str(path), HALO_HOST_CAPTURE_FRAME=str(frame),
-                       HALO_HOST_CAPTURE_SIZE="%dx%d" % GAME_SIZE, HALO_EXIT_AFTER=str(seconds),
+                       HALO_HOST_CAPTURE_SIZE="%dx%d" % size, HALO_EXIT_AFTER=str(seconds),
                        **(settings or {}))
     environment.pop("HALO_HOST_GUEST_IMAGE", None)
     run = subprocess.run([str(APP)], cwd=tmp_path, env=environment, capture_output=True, text=True,
@@ -124,6 +124,41 @@ def test_the_main_menu_draws_as_approved(tmp_path):
     # (not black: the selected item, CAMPAIGN, is drawn light)
     assert max(frame.pixel(x, 262)[0] for x in range(250, 400)) > 200
     check(frame, "main_menu")
+
+
+# the high-res HUD and text (hud_hires.c, text_hires.c) at the window's
+# own size: twice the game's 640x480
+NATIVE_SIZE = (1280, 960)
+
+
+@pytest.mark.skipif(not (MAPS / "ui.map").is_file(), reason="needs the game's maps in assets/maps")
+def test_the_main_menu_draws_at_native_resolution(tmp_path):
+    # the menu's text, the version string of the high-res text's atlas among
+    # it, drawn at 1280x960
+    frame = capture_game(tmp_path, 600, size=NATIVE_SIZE)
+    assert (frame.width, frame.height) == NATIVE_SIZE
+    assert max(frame.pixel(x, 524)[0] for x in range(500, 800)) > 200
+    check(frame, "main_menu_native")
+
+
+@pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")
+def test_the_hud_draws_at_native_resolution(tmp_path):
+    # the player's own view of a network test game on bloodgulch at
+    # 1280x960: the shield and health meters, the motion sensor (which draws
+    # into the target it samples) and the text, high-res
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "maps").symlink_to(MAPS)
+    frame = capture_game(tmp_path, 1500, {"HALO_NETWORK_TEST": "host:bloodgulch",
+                                          "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false"},
+                         seconds=75, data_root=root, size=NATIVE_SIZE)
+    assert (frame.width, frame.height) == NATIVE_SIZE
+    # (the motion sensor is not the blank white of a target sampled while
+    # drawn: its middle is darker than white)
+    assert sum(frame.pixel(180, 800)[:3]) < 3 * 230
+    # (the frame clock's fixed seed spawns the player in one place; the
+    # plasma pistol's glow animates by the real time: 0.1% of the frame)
+    check(frame, "hud_native", frame_compare.Tolerance(fraction=0.01, largest=255))
 
 
 # the debug camera of camera.txt (debug.network_test_camera): over the

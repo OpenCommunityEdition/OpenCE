@@ -10,7 +10,8 @@ the Xbox maps' widths. A tag whose letters are narrower (the fonts of a
 Custom Edition loc.map) gets its font narrowed until its letters are, on
 the whole, as wide as the tag's, so that they do not run into each other;
 the Xbox maps' fonts are narrowed by a few hundredths. A glyph is rasterized when first drawn, at the display's
-pixels per unit of the 480 lines, into an 8-bit atlas; the GL texture the
+pixels per unit of the 480 lines, into an 8-bit atlas; the GL texture (a Metal
+one in the macOS app) the
 game's placeholder bitmap stands for (xbox_textures.c) is the atlas, its new
 rows uploaded when the placeholder is bound. A change of the display's
 scale (a window made fullscreen) or a full atlas starts it over.
@@ -20,6 +21,9 @@ scale (a window made fullscreen) or a full atlas starts it over.
 #include "platform.h"
 #include "port_config.h"
 #include "xgpu.h"
+#ifdef HALO_METAL
+#include "opence_render.h"
+#endif
 
 #include <math.h>
 #include <stdio.h>
@@ -309,12 +313,35 @@ unsigned int text_hires_atlas_texture(unsigned long data)
 		return 0;
 	if (!atlas_texture)
 	{
+#ifdef HALO_METAL
+		unsigned int *fields;
+
+		atlas_texture = xgpu_metal_new_id(OPENCE_RENDER_OBJECT_TEXTURE);
+		fields = atlas_texture ? xgpu_metal_command(OPENCE_RENDER_OP_CREATE_TEXTURE,
+			OPENCE_RENDER_CREATE_TEXTURE_WORDS) : NULL;
+		if (!fields)
+		{
+			xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, atlas_texture);
+			atlas_texture = 0;
+			return 0;
+		}
+		fields[0] = atlas_texture;
+		fields[1] = OPENCE_RENDER_TEXTURE_2D;
+		fields[2] = OPENCE_RENDER_FORMAT_RGBA8;
+		fields[3] = ATLAS_SIZE;
+		fields[4] = ATLAS_SIZE;
+		fields[5] = 1;
+		fields[6] = 1;
+		fields[7] = OPENCE_RENDER_USAGE_SAMPLED;
+		fields[8] = 1;
+#else
 		glGenTextures(1, &atlas_texture);
 		glBindTexture(GL_TEXTURE_2D, atlas_texture);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, ATLAS_SIZE, ATLAS_SIZE, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 		xgpu_gl_state_invalidate();
+#endif
 		dirty_top = 0;
 		dirty_bottom = ATLAS_SIZE;
 	}
@@ -334,10 +361,34 @@ unsigned int text_hires_atlas_texture(unsigned long data)
 				texels[index * 4 + 0] = texels[index * 4 + 1] = texels[index * 4 + 2] = 255;
 				texels[index * 4 + 3] = coverage[index];
 			}
+#ifdef HALO_METAL
+			/* (a blit after the draws batched before it, read from texels
+			when the commands are flushed) */
+			{
+				unsigned int *fields = xgpu_metal_command(OPENCE_RENDER_OP_UPLOAD_TEXTURE,
+					OPENCE_RENDER_UPLOAD_TEXTURE_WORDS);
+
+				if (fields)
+				{
+					memset(fields, 0, (OPENCE_RENDER_UPLOAD_TEXTURE_WORDS - 1) * sizeof(*fields));
+					fields[0] = atlas_texture;
+					fields[4] = (unsigned int)dirty_top;
+					fields[6] = ATLAS_SIZE;
+					fields[7] = (unsigned int)rows;
+					fields[8] = 1;
+					fields[9] = (unsigned int)(unsigned long)texels;
+					fields[10] = ATLAS_SIZE * 4;
+					fields[11] = (unsigned int)(rows * ATLAS_SIZE * 4);
+					fields[12] = (unsigned int)(rows * ATLAS_SIZE * 4);
+				}
+				xgpu_metal_flush();
+			}
+#else
 			glBindTexture(GL_TEXTURE_2D, atlas_texture);
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, dirty_top, ATLAS_SIZE, (GLsizei)rows, GL_RGBA, GL_UNSIGNED_BYTE, texels);
 			xgpu_gl_state_invalidate();
+#endif
 			free(texels);
 			dirty_top = ATLAS_SIZE;
 			dirty_bottom = 0;

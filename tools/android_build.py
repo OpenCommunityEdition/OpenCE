@@ -438,10 +438,10 @@ def guest_image_build(n: Writer, sln: Any, config: Dict[str, Any], *, rule_prefi
     if metal:
         # the macOS app's renderer: Direct3D on the host's Metal through the
         # command ring (port/macos/guest), in place of the GL renderer and the
-        # passes and high-res text drawn with it (the high-res HUD's and the
-        # menus' art are Metal textures: xgpu_metal_rgba_texture)
+        # passes drawn with it (the high-res HUD's and text's textures and the
+        # menus' art are Metal textures: xgpu_metal_rgba_texture, text_hires.c)
         platform_cflags += f" -I{Path('port/macos/include')}"
-        guest_host_only |= {"d3d8_gl.c", "xgpu_post.c", "text_hires.c"}
+        guest_host_only |= {"d3d8_gl.c", "xgpu_post.c"}
     for source in sorted((LINUX_DIR / "src").glob("*.c")):
         if source.name.startswith("posix_") or source.name in guest_host_only:
             continue

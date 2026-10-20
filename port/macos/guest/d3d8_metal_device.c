@@ -1158,11 +1158,67 @@ static unsigned int sampler_get(DWORD stage, BOOL mipmapped, BOOL hires)
 	return object_get(_cache_sampler, OPENCE_RENDER_OBJECT_SAMPLER, OPENCE_RENDER_OP_CREATE_SAMPLER, fields, 12);
 }
 
+/* Metal cannot sample a texture of the pass it draws into, which the GPU
+the game was made for draws, sampling the pixels as they were (the motion
+sensor draws its target over itself): a copy of the target is sampled
+instead, made again only once the target has been drawn into since (as
+d3d8_gl.c's feedback_copy for WebGL). Made before the draw's pass begins. */
+static unsigned int feedback_copy(const struct xgpu_render_target *target)
+{
+	static unsigned int copy;
+	static unsigned long copy_width, copy_height;
+	static unsigned int copied_texture;
+	static unsigned long copied_written;
+	unsigned int *fields;
+
+	if (!copy || copy_width != target->width || copy_height != target->height)
+	{
+		if (copy)
+			xgpu_metal_destroy(OPENCE_RENDER_OBJECT_TEXTURE, copy);
+		copy = xgpu_metal_new_id(OPENCE_RENDER_OBJECT_TEXTURE);
+		fields = copy ? xgpu_metal_command(OPENCE_RENDER_OP_CREATE_TEXTURE, OPENCE_RENDER_CREATE_TEXTURE_WORDS) : NULL;
+		if (!fields)
+		{
+			copy = 0;
+			return 0;
+		}
+		fields[0] = copy;
+		fields[1] = OPENCE_RENDER_TEXTURE_2D;
+		fields[2] = OPENCE_RENDER_FORMAT_BGRA8;
+		fields[3] = (unsigned int)target->width;
+		fields[4] = (unsigned int)target->height;
+		fields[5] = 1;
+		fields[6] = 1;
+		fields[7] = OPENCE_RENDER_USAGE_SAMPLED;
+		fields[8] = 1;
+		copy_width = target->width;
+		copy_height = target->height;
+		copied_texture = 0;
+	}
+	if (copied_texture != target->texture || copied_written != target->written)
+	{
+		/* (a copy is made outside passes) */
+		pass_end();
+		if (!(fields = xgpu_metal_command(OPENCE_RENDER_OP_COPY_TEXTURE, OPENCE_RENDER_COPY_TEXTURE_WORDS)))
+			return 0;
+		memset(fields, 0, (OPENCE_RENDER_COPY_TEXTURE_WORDS - 1) * sizeof(*fields));
+		fields[0] = target->texture;
+		fields[5] = copy;
+		fields[10] = (unsigned int)target->width;
+		fields[11] = (unsigned int)target->height;
+		copied_texture = target->texture;
+		copied_written = target->written;
+	}
+	return copy;
+}
+
 /* each stage's texture and sampler, the key's sampler types and the
 uniforms' texture scales; textures[stage] is 0 for a stage not sampled */
 static void textures_prepare(struct nv2a_pixel_shader_key *key, struct nv2a_pixel_uniforms *uniforms,
 	unsigned int *textures, unsigned int *samplers)
 {
+	/* the target the draw goes to */
+	struct xgpu_render_target *drawn = device.render_target ? xgpu_metal_render_target_get(device.render_target) : NULL;
 	DWORD stage;
 
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
@@ -1193,6 +1249,8 @@ static void textures_prepare(struct nv2a_pixel_shader_key *key, struct nv2a_pixe
 				uniforms->texture_scale[stage][1] = 1.0f / (float)target->height;
 			}
 			id = target->texture;
+			if (drawn && id == drawn->texture)
+				id = feedback_copy(target);
 		}
 		else
 		{
@@ -1219,9 +1277,8 @@ static void textures_prepare(struct nv2a_pixel_shader_key *key, struct nv2a_pixe
 					type == GL_TEXTURE_3D ? _xgpu_sampler_3d : _xgpu_sampler_2d;
 			}
 		}
-		/* a stage sampled without a texture reads the blank one; so does one
-		reading the target being drawn into, which Metal cannot */
-		if (key->sampler_type[stage] != _xgpu_sampler_none && (!id || id == device.pass_color))
+		/* a stage sampled without a texture reads the blank one */
+		if (key->sampler_type[stage] != _xgpu_sampler_none && !id)
 		{
 			id = device.blank_texture;
 			key->sampler_type[stage] = _xgpu_sampler_2d;

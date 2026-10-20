@@ -153,9 +153,18 @@ random_seed_debug_log(
 	return;
 }
 
+/* port: port_config.c's */
+int config_boolean(const char *name);
+
 unsigned long get_number_suitable_for_initializing_random_seed(
 	void)
 {
+	/* port: debug.frame_clock's runs are the same run to run, their
+	random numbers too */
+	if (config_boolean("debug.frame_clock"))
+	{
+		return 0x0badf00d;
+	}
 	return system_seconds()^system_milliseconds()^rand();
 }
 

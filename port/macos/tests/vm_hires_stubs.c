@@ -1,14 +1,15 @@
 /*
 VM_HIRES_STUBS.C
 
-The high-res HUD (port/linux/src/hud_hires.c) and the menus' art
-(menu_files.c) as the device's tests (vm_textures.c, vm_draw.c) need them:
+The high-res HUD (port/linux/src/hud_hires.c), the high-res text's atlas
+(text_hires.c) and the menus' art (menu_files.c) as the device's tests (vm_textures.c, vm_draw.c) need them:
 none, so that every texture is the game's own.
 */
 
 #include "xgpu.h"
 #include "hud_hires.h"
 #include "menu_files.h"
+#include "text_hires.h"
 
 long hud_hires_override_find(unsigned long address, unsigned long width, unsigned long height,
 	unsigned long level0_size)
@@ -86,3 +87,9 @@ unsigned int menu_art_texture(unsigned long data, unsigned long *levels)
 	return 0;
 }
 
+
+unsigned int text_hires_atlas_texture(unsigned long data)
+{
+	(void)data;
+	return 0;
+}

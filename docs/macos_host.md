@@ -467,7 +467,9 @@ game's clock steps a 60th of a second at each `PRESENT`, however long the
 frame took (`platform_clock_frame_shown`, `port/linux/src/xbox_kernel.c`).
 While no frame is shown for more than a tenth of a second, as a map loads,
 it follows the real time, so that the game's waits end; the vertical blank,
-sleeps and sound keep the real clock.
+sleeps and sound keep the real clock. The game's random numbers start from
+a fixed seed (`source/math/random_math.c`), so that a game spawns its
+players in the same places.
 
 `tools/frame_compare.py` compares a capture with an approved reference: a
 pixel differs when one of its channels is more than 8 from the

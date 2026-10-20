@@ -1068,7 +1068,6 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 {
 	*target = entry->target;
 	*description = entry->description;
-#ifndef HALO_METAL
 	/* (the high-res text's atlas, for its placeholder bitmap: text_hires.h) */
 	{
 		GLuint atlas = text_hires_atlas_texture(entry->data);
@@ -1079,7 +1078,6 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 			return atlas;
 		}
 	}
-#endif
 	/* (a menu's bitmap: menu_files.h) */
 	{
 		unsigned long levels;
