@@ -2,7 +2,9 @@
 the screen, logging each frame it presents (HALO_HOST_FRAME_LOG,
 port/macos/host/host_frames.c), and writes the frame times and the VM's exits
 per frame to build/macos/benchmark.txt (docs/macos_host.md, "The
-benchmark"). The game runs on the real clock, not the frame clock, with the
+benchmark"); then again with game.ragdolls and game.physics_debris on and
+debug.network_test_crowd's thirty ragdolls and two hundred casings, the
+host's physics steps timed too, to build/macos/benchmark_physics.txt. The game runs on the real clock, not the frame clock, with the
 debug camera of tools/test_macos_frames.py.
 
     python -m pytest -q tools/test_macos_benchmark.py -s
@@ -13,6 +15,7 @@ Needs `ninja macos macos_app` in `nix develop`, and the maps in assets/maps.
 import csv
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -29,8 +32,14 @@ from tools.test_macos_frames import APP, BLOODGULCH_CAMERA, MAPS  # noqa: E402
 SIZE = (3840, 2160)
 SECONDS = 60
 REPORT = ROOT / "build/macos/benchmark.txt"
+PHYSICS_REPORT = ROOT / "build/macos/benchmark_physics.txt"
 # the target: 120 frames a second
 TARGET_MILLISECONDS = 1000 / 120
+# and a physics tick (a 30th of a second) in no more than a millisecond
+TICK_TARGET_MILLISECONDS = 1.0
+# the crowd's time (debug.network_test_crowd, the game's seconds): ten
+# seconds into the game, with the camera held there
+CROWD_SECONDS = 10
 
 pytestmark = [
     pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only"),
@@ -94,7 +103,9 @@ def test_the_frame_log_is_summarised(tmp_path):
     assert result["exits_per_frame"] == 110
 
 
-def test_bloodgulch_at_4k_is_measured(tmp_path):
+def play(tmp_path, settings=None):
+    """bloodgulch played at 4K for SECONDS on the real clock; the frames after
+    the map's load and the app's stderr"""
     (tmp_path / "home").mkdir()
     root = tmp_path / "root"
     root.mkdir()
@@ -106,22 +117,73 @@ def test_bloodgulch_at_4k_is_measured(tmp_path):
                        HALO_HOST_CAPTURE=str(tmp_path / "never.png"), HALO_HOST_CAPTURE_FRAME="1000000000",
                        HALO_HOST_CAPTURE_SIZE="%dx%d" % SIZE, HALO_EXIT_AFTER=str(SECONDS),
                        HALO_HOST_FRAME_LOG=str(log), HALO_NETWORK_TEST="host:bloodgulch",
-                       HALO_NETWORK_TEST_CAMERA="1", HALO_NET_ONLINE="false", HALO_NET_JOIN_FROM_CLIPBOARD="false")
+                       HALO_NETWORK_TEST_CAMERA="1", HALO_NET_ONLINE="false", HALO_NET_JOIN_FROM_CLIPBOARD="false",
+                       **(settings or {}))
     environment.pop("HALO_HOST_GUEST_IMAGE", None)
     environment.pop("HALO_FRAME_CLOCK", None)
     run = subprocess.run([str(APP)], cwd=tmp_path, env=environment, capture_output=True, text=True,
                          timeout=SECONDS + 60)
     assert run.returncode == 0, run.stdout[-2000:] + run.stderr[-2000:]
     rows = in_game(read_frames(log))
-    result = summary(rows)
     # (the map loaded early in the run, and the game kept drawing)
-    assert result["seconds"] > SECONDS / 2, result
-    report = ("bloodgulch at %dx%d, %d frames in %.1f s after the map loaded\n"
-              "frame time: p50 %.2f ms, p99 %.2f ms, max %.2f ms (target p99 <= %.2f ms)\n"
-              "GPU time: p50 %.2f ms, p99 %.2f ms\n"
-              "VM exits: %.0f a frame\n") % (
-        SIZE[0], SIZE[1], result["frames"], result["seconds"], result["p50"], result["p99"], result["max"],
+    assert summary(rows)["seconds"] > SECONDS / 2, summary(rows)
+    return rows, run.stdout + run.stderr
+
+
+def frames_report(title, result):
+    return ("%s at %dx%d, %d frames in %.1f s after the map loaded\n"
+            "frame time: p50 %.2f ms, p99 %.2f ms, max %.2f ms (target p99 <= %.2f ms)\n"
+            "GPU time: p50 %.2f ms, p99 %.2f ms\n"
+            "VM exits: %.0f a frame\n") % (
+        title, SIZE[0], SIZE[1], result["frames"], result["seconds"], result["p50"], result["p99"], result["max"],
         TARGET_MILLISECONDS, result["gpu_p50"], result["gpu_p99"], result["exits_per_frame"])
+
+
+def physics_steps(log):
+    """the host's physics steps (HALO_HOST_PHYSICS_LOG): (ragdolls, bodies,
+    milliseconds) each"""
+    return [(int(ragdolls), int(bodies), float(milliseconds)) for ragdolls, bodies, milliseconds in
+            re.findall(r"halo_host: physics step: \d+ refused, (\d+) ragdolls, (\d+) bodies, level \d, ([0-9.]+) ms",
+                       log)]
+
+
+def test_the_physics_steps_are_read():
+    log = ("halo_host: physics step: 0 refused, 0 ragdolls, 0 bodies, level 1, 0.010 ms\n"
+           "halo_host: physics step: 0 refused, 30 ragdolls, 180 bodies, level 1, 0.750 ms\n")
+    assert physics_steps(log) == [(0, 0, 0.01), (30, 180, 0.75)]
+
+
+def test_bloodgulch_at_4k_is_measured(tmp_path):
+    rows, _ = play(tmp_path)
+    report = frames_report("bloodgulch", summary(rows))
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(report)
+    print("\n" + report)
+
+
+def test_ragdolls_and_debris_at_4k_are_measured(tmp_path):
+    # (debug.network_test_crowd: thirty bipeds shot dead before the camera and
+    # two hundred casings thrown among them, with game.ragdolls and
+    # game.physics_debris on; the physics step timed by the host)
+    rows, log = play(tmp_path, {"HALO_RAGDOLLS": "true", "HALO_PHYSICS_DEBRIS": "true",
+                                "HALO_NETWORK_TEST_CROWD": str(CROWD_SECONDS), "HALO_HOST_PHYSICS_LOG": "1"})
+    crowd = re.search(r"the crowd: (\d+) of (\d+) bipeds dead, (\d+) casings thrown", log)
+    later = re.search(r"the crowd: (\d+) ragdolls, (\d+) casings left, (\d+) of them Jolt's bodies", log)
+    assert crowd and later, log[-3000:]
+    assert int(crowd[1]) == int(crowd[2]) == 30 and int(crowd[3]) == 200, crowd[0]
+    assert int(later[3]) >= 50, later[0]
+    steps = physics_steps(log)
+    busy = [step for step in steps if step[0] > 0 or step[1] > 0]
+    assert busy, "no physics step had a ragdoll or a body"
+    most_ragdolls = max(step[0] for step in busy)
+    most_bodies = max(step[1] for step in busy)
+    assert most_ragdolls >= 30, (most_ragdolls, later[0])
+    milliseconds = [step[2] for step in busy]
+    report = frames_report("bloodgulch with 30 ragdolls and 200 casings", summary(rows)) + (
+        "physics: %d steps with bodies, at most %d ragdolls and %d bodies; %s\n"
+        "physics step: p50 %.3f ms, p99 %.3f ms, max %.3f ms (target <= %.2f ms)\n") % (
+        len(busy), most_ragdolls, most_bodies, later[0].split(": ", 1)[1], percentile(milliseconds, 0.50),
+        percentile(milliseconds, 0.99), max(milliseconds), TICK_TARGET_MILLISECONDS)
+    REPORT.parent.mkdir(parents=True, exist_ok=True)
+    PHYSICS_REPORT.write_text(report)
     print("\n" + report)

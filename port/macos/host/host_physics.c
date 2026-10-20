@@ -13,6 +13,7 @@ before the import returns.
 
 #include <stdatomic.h>
 #include <stdlib.h>
+#include <time.h>
 
 /* the guest (host_main.c) */
 extern OpenceGuest *host_guest;
@@ -48,6 +49,7 @@ int host_physics_step(unsigned int batch, unsigned int size, unsigned int result
 {
 	physics_bridge_memory memory = {guest_pointer, NULL};
 	char reason[256];
+	struct timespec began, ended;
 	int refusals;
 
 	if (logging < 0)
@@ -61,8 +63,10 @@ int host_physics_step(unsigned int batch, unsigned int size, unsigned int result
 		return -1;
 	}
 	reason[0] = '\0';
+	clock_gettime(CLOCK_MONOTONIC, &began);
 	refusals = physics_bridge_step(bridge, &memory, batch, size, results, results_size, refused, NULL, reason,
 		sizeof(reason));
+	clock_gettime(CLOCK_MONOTONIC, &ended);
 	if (refusals < 0)
 	{
 		if (log_refusal())
@@ -70,7 +74,9 @@ int host_physics_step(unsigned int batch, unsigned int size, unsigned int result
 		return -1;
 	}
 	if (logging)
-		fprintf(stderr, "halo_host: physics step: %d refused, %u ragdolls, %u bodies, level %d\n", refusals,
-			physics_bridge_ragdolls(bridge), physics_bridge_bodies(bridge), physics_bridge_has_level(bridge));
+		/* (and how long the step took, the benchmark's) */
+		fprintf(stderr, "halo_host: physics step: %d refused, %u ragdolls, %u bodies, level %d, %.3f ms\n", refusals,
+			physics_bridge_ragdolls(bridge), physics_bridge_bodies(bridge), physics_bridge_has_level(bridge),
+			(double)(ended.tv_sec - began.tv_sec) * 1000.0 + (double)(ended.tv_nsec - began.tv_nsec) / 1e6);
 	return refusals;
 }

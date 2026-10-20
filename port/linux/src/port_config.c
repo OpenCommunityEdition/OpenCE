@@ -577,6 +577,11 @@ static const struct config_setting config_settings[] =
 		"second each): an assault rifle held a metre above the ground three world\n"
 		"units before the camera fires twenty rounds, its own firing effect, casings\n"
 		"and all (game.physics_debris' frames); 0 never." },
+	{ "debug.network_test_crowd", _config_real, "0.0", "HALO_NETWORK_TEST_CROWD", _environment_value, _platform_all,
+		"In a hosted test game, at this many seconds of the game's time (three or\n"
+		"more): thirty bipeds before the camera shot dead and two hundred casings\n"
+		"thrown among them (game.ragdolls' and game.physics_debris' benchmark); 0\n"
+		"never." },
 	{ "debug.network_test_camera", _config_boolean, "false", "HALO_NETWORK_TEST_CAMERA", _environment_set_is_true,
 		_platform_all,
 		"In a test game, view from the debug camera of camera.txt in the data root\n"

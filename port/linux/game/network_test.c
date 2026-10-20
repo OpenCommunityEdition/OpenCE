@@ -126,6 +126,15 @@ enum
 	_network_test_browse,
 };
 
+/* debug.network_test_crowd's rows of bipeds and casings thrown */
+enum
+{
+	NETWORK_TEST_CROWD_COLUMNS = 5,
+	NETWORK_TEST_CROWD_ROWS = 6,
+	NETWORK_TEST_CROWD_BIPEDS = NETWORK_TEST_CROWD_COLUMNS * NETWORK_TEST_CROWD_ROWS,
+	NETWORK_TEST_CROWD_CASINGS = 200,
+};
+
 static struct
 {
 	boolean checked;
@@ -179,6 +188,16 @@ static struct
 	long debris_weapon_index;
 	real_point3d debris_point;
 	real_vector3d debris_forward;
+	/* debug.network_test_crowd's: when, how far the scene has gone, its
+	bipeds and the casings thrown */
+	real crowd_time;
+	short crowd_stage;
+	short crowd_killed;
+	short crowd_casings;
+	long crowd_tick;
+	long crowd_biped_indices[NETWORK_TEST_CROWD_BIPEDS];
+	real_point3d crowd_center;
+	real_point3d crowd_casing_origin;
 } network_test;
 
 /* the variant at the index of the list (copied to name), FALSE past its end */
@@ -246,6 +265,7 @@ static void network_test_read_settings(
 	network_test.ragdoll_biped_index = NONE;
 	network_test.debris_time = (real)config_real("debug.network_test_debris");
 	network_test.debris_weapon_index = NONE;
+	network_test.crowd_time = (real)config_real("debug.network_test_crowd");
 	snprintf(network_test.pickup_weapon, sizeof(network_test.pickup_weapon), "%s",
 		config_string("debug.network_test_pickup_weapon"));
 	network_test.camera = config_boolean("debug.network_test_camera") ? TRUE : FALSE;
@@ -784,6 +804,208 @@ static void network_test_debris(
 		object_set_position(network_test.debris_weapon_index, &network_test.debris_point,
 			&network_test.debris_forward, global_up3d);
 		object_get(network_test.debris_weapon_index)->object.translational_velocity = *global_zero_vector3d;
+	}
+}
+
+/* debug.network_test_crowd's scene, the benchmark's (tools/test_macos_benchmark.py):
+two seconds before its time thirty bipeds of the first player's kind stand
+on the ground in six rows of five, a world unit apart, eight world units
+before the camera; from its time three a tick are shot dead (their shields
+gone, an assault rifle's bullet from the camera), and ten casings a tick,
+two hundred in all, are thrown up from a world unit above the ground three
+world units before the camera, as near as a gun's are (further, they are
+smaller on the screen than their tag's cutoff, are not drawn, and go). Its
+time is the game's, in ticks, not frames shown: the menus show thousands of
+frames before the map loads, and debug.network_test_camera's camera is held
+only from the game's first second. By the ticks past its start too: a fast
+machine shows several frames a tick, and a tick queues no more than
+RAGDOLL_DEATHS_MAX deaths. Logged: how many died and were thrown, and
+two seconds of ticks on the ragdolls and the casings that are Jolt's
+bodies */
+static void network_test_crowd(
+	void)
+{
+	long tick = game_time_get();
+	long start = (long)(network_test.crowd_time * TICKS_PER_SECOND);
+	struct player_datum *first = NULL;
+	struct data_iterator iterator;
+
+	data_iterator_new(&iterator, player_data);
+	first = (struct player_datum *)data_iterator_next(&iterator);
+	if (network_test.crowd_stage == 0 && tick >= start - 2 * TICKS_PER_SECOND && first && first->unit_index != NONE)
+	{
+		struct observer_result const *camera = observer_get_camera(0);
+		real_vector3d forward;
+		real_vector3d right;
+		short biped;
+
+		forward = camera->forward;
+		forward.k = 0.0f;
+		normalize3d(&forward);
+		right.i = forward.j;
+		right.j = -forward.i;
+		right.k = 0.0f;
+		point_from_line3d(&camera->position, &forward, 8.0f + 0.5f * (NETWORK_TEST_CROWD_ROWS - 1),
+			&network_test.crowd_center);
+		point_from_line3d(&camera->position, &forward, 3.0f, &network_test.crowd_casing_origin);
+		for (biped = 0; biped < NETWORK_TEST_CROWD_BIPEDS; biped++)
+		{
+			struct object_placement_data data;
+			struct collision_result collision;
+			real_vector3d down;
+			real_point3d above;
+
+			point_from_line3d(&camera->position, &forward, 8.0f + (real)(biped / NETWORK_TEST_CROWD_COLUMNS), &above);
+			point_from_line3d(&above, &right, (real)(biped % NETWORK_TEST_CROWD_COLUMNS) -
+				0.5f * (NETWORK_TEST_CROWD_COLUMNS - 1), &above);
+			above.z += 2.0f;
+			down.i = 0.0f;
+			down.j = 0.0f;
+			down.k = -50.0f;
+			if (collision_test_vector(FLAG(_collision_test_structure_bit) | FLAG(_collision_test_front_facing_surfaces_bit),
+				&above, &down, NONE, &collision))
+			{
+				above = collision.point;
+			}
+			object_placement_data_new(&data, object_get(first->unit_index)->definition_index, NONE);
+			data.position = above;
+			data.position.z += 0.05f;
+			data.forward.i = -forward.i;
+			data.forward.j = -forward.j;
+			data.forward.k = 0.0f;
+			data.up = *global_up3d;
+			network_test.crowd_biped_indices[biped] = object_new(&data);
+			if (biped == NETWORK_TEST_CROWD_BIPEDS / 2)
+				network_test.crowd_center.z = above.z;
+		}
+		{
+			struct collision_result collision;
+			real_vector3d down;
+
+			network_test.crowd_casing_origin.z = camera->position.z;
+			down.i = 0.0f;
+			down.j = 0.0f;
+			down.k = -50.0f;
+			if (collision_test_vector(FLAG(_collision_test_structure_bit) | FLAG(_collision_test_front_facing_surfaces_bit),
+				&network_test.crowd_casing_origin, &down, NONE, &collision))
+			{
+				network_test.crowd_casing_origin = collision.point;
+			}
+			network_test.crowd_casing_origin.z += 1.0f;
+		}
+		network_test.crowd_stage = 1;
+		platform_log("network test: %d bipeds stand at (%.2f %.2f %.2f)", NETWORK_TEST_CROWD_BIPEDS,
+			network_test.crowd_center.x, network_test.crowd_center.y, network_test.crowd_center.z);
+	}
+	if (network_test.crowd_stage == 1 && tick >= start && tick != network_test.crowd_tick)
+	{
+		long bullet_index = tag_loaded(PROJECTILE_DEFINITION_TAG, "weapons\\assault rifle\\bullet");
+		long casing_index = tag_loaded(PARTICLE_TAG, "effects\\particles\\solid\\casing h ar bullet");
+		struct observer_result const *camera = observer_get_camera(0);
+		short count;
+
+		if (bullet_index == NONE || projectile_definition_get(bullet_index)->projectile.impact_damage.index == NONE ||
+			casing_index == NONE)
+		{
+			platform_log("network test: no assault rifle bullet or casing, for the crowd");
+			network_test.crowd_stage = 3;
+			return;
+		}
+		network_test.crowd_tick = game_time_get();
+		/* (three a tick, fewer than a tick's deaths queued, RAGDOLL_DEATHS_MAX) */
+		for (count = 0; count < 3 && network_test.crowd_killed < NETWORK_TEST_CROWD_BIPEDS; count++)
+		{
+			long biped_index = network_test.crowd_biped_indices[network_test.crowd_killed++];
+			struct object_datum *biped;
+			struct damage_data damage;
+
+			if (biped_index == NONE || !(biped = object_try_and_get_and_verify_type(biped_index, _object_mask_biped)))
+				continue;
+			biped->object.shield_vitality = 0.0f;
+			biped->object.body_vitality = 0.05f;
+			damage_data_new(&damage, projectile_definition_get(bullet_index)->projectile.impact_damage.index);
+			damage.origin = camera->position;
+			damage.epicenter = biped->object.position;
+			damage.epicenter.z += 0.5f;
+			vector_from_points3d(&damage.origin, &damage.epicenter, &damage.direction);
+			normalize3d(&damage.direction);
+			object_cause_damage(&damage, biped_index, NONE, NONE, NONE, NULL);
+		}
+		for (count = 0; count < 10 && network_test.crowd_casings < NETWORK_TEST_CROWD_CASINGS; count++)
+		{
+			struct new_particle_data data;
+
+			memset(&data, 0, sizeof(data));
+			data.definition_index = casing_index;
+			data.object_index = NONE;
+			data.node_index = NONE;
+			data.local_player_index = NONE;
+			data.position = network_test.crowd_casing_origin;
+			data.direction = *global_up3d;
+			/* (spread on a grid of ten by twenty, up to 0.7 world units a second
+			each way, to stay in view) */
+			data.velocity.i = 0.15f * ((real)(network_test.crowd_casings % 10) - 4.5f);
+			data.velocity.j = 0.075f * ((real)(network_test.crowd_casings / 10) - 9.5f);
+			data.velocity.k = 2.0f;
+			data.radius = 0.015f;
+			data.color.alpha = 1.0f;
+			data.color.rgb.red = 1.0f;
+			data.color.rgb.green = 1.0f;
+			data.color.rgb.blue = 1.0f;
+			particle_new(&data);
+			network_test.crowd_casings++;
+		}
+		if (network_test.crowd_killed == NETWORK_TEST_CROWD_BIPEDS && network_test.crowd_casings == NETWORK_TEST_CROWD_CASINGS)
+		{
+			short dead = 0;
+			short biped;
+
+			for (biped = 0; biped < NETWORK_TEST_CROWD_BIPEDS; biped++)
+			{
+				long biped_index = network_test.crowd_biped_indices[biped];
+
+				if (biped_index != NONE && object_try_and_get_and_verify_type(biped_index, _object_mask_biped) &&
+					TEST_FLAG(object_get(biped_index)->object.damage_flags, _object_dead_bit))
+				{
+					dead++;
+				}
+			}
+			network_test.crowd_stage = 2;
+			platform_log("network test: the crowd: %d of %d bipeds dead, %d casings thrown", dead,
+				NETWORK_TEST_CROWD_BIPEDS, NETWORK_TEST_CROWD_CASINGS);
+		}
+	}
+	if (network_test.crowd_stage == 2 && game_time_get() - network_test.crowd_tick >= 2 * TICKS_PER_SECOND)
+	{
+		long casing_index = tag_loaded(PARTICLE_TAG, "effects\\particles\\solid\\casing h ar bullet");
+		struct data_iterator particles;
+		struct particle_datum *particle;
+		short ragdolled = 0;
+		short casings = 0;
+		short bodies = 0;
+		short biped;
+
+		for (biped = 0; biped < NETWORK_TEST_CROWD_BIPEDS; biped++)
+		{
+			if (network_test.crowd_biped_indices[biped] != NONE &&
+				ragdolls_of_object(network_test.crowd_biped_indices[biped]))
+			{
+				ragdolled++;
+			}
+		}
+		data_iterator_new(&particles, particle_data);
+		while ((particle = (struct particle_datum *)data_iterator_next(&particles)) != NULL)
+		{
+			if (particle->definition_index == casing_index)
+			{
+				casings++;
+				if (physics_debris_particle_is_body(particles.datum_index))
+					bodies++;
+			}
+		}
+		network_test.crowd_stage = 3;
+		platform_log("network test: the crowd: %d ragdolls, %d casings left, %d of them Jolt's bodies", ragdolled,
+			casings, bodies);
 	}
 }
 
@@ -1336,6 +1558,12 @@ void network_test_update(
 		!main_menu_loaded)
 	{
 		network_test_debris();
+	}
+	/* debug.network_test_crowd: the host's benchmark scene, by the tick */
+	if (network_test.crowd_time > 0.0f && network_test.mode == _network_test_host && game_in_progress() &&
+		!main_menu_loaded)
+	{
+		network_test_crowd();
 	}
 	/* debug.network_test_ragdoll: the host's scene, by the tick */
 	if (network_test.ragdoll_time > 0.0f && network_test.mode == _network_test_host && game_in_progress() &&

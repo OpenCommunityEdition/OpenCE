@@ -14,7 +14,9 @@ README), checked by `tools/test_macos_physics.py`.
 
 Only the macOS host uses it: the ragdolls and the effects' debris
 (`port/macos/host/physics`, reached through the C interface `physics.h`).
-It is built single-threaded, as C++17, with
-`JPH_CROSS_PLATFORM_DETERMINISTIC` and without fused multiply-add, so that a
-run repeats exactly. Its compute and GPU back ends (`Jolt/Compute`, the
+It is built as C++17, with `JPH_CROSS_PLATFORM_DETERMINISTIC` and without
+fused multiply-add, and stepped by the calling thread and three of its
+worker threads (`JobSystemThreadPool`) with its deterministic simulation on,
+which sorts contacts and constraints before they are solved, so that a run
+repeats exactly whatever the threads do. Its compute and GPU back ends (`Jolt/Compute`, the
 `.hlsl` shaders) are not built.

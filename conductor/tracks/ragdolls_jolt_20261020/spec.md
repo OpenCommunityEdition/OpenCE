@@ -10,7 +10,7 @@ Jolt (C++, MIT) runs in the app's host process, outside the 32-bit guest. The gu
 ## Functional Requirements
 
 ### Jolt in the host
-1. Jolt Physics is vendored unchanged in `port/third_party/jolt`, with a README naming its upstream, version or commit, checksum and what uses it. It is built with Nix's clang as C++17, single-threaded and in its cross-platform deterministic mode, so runs repeat exactly.
+1. Jolt Physics is vendored unchanged in `port/third_party/jolt`, with a README naming its upstream, version or commit, checksum and what uses it. It is built with Nix's clang as C++17, in its cross-platform deterministic mode, so runs repeat exactly. (Amended in Phase 6: it is stepped by a pool of three worker threads beside the calling one, with Jolt's deterministic simulation on, which keeps runs exact; one thread took 6 ms a step with thirty ragdolls tumbling.)
 2. A thin C interface of our own (`port/macos/host/physics/`) wraps the parts of Jolt the host needs; the rest of the host stays C (gnu11).
 3. `conductor/tech-stack.md` is updated first: C++17 for Jolt and its wrapper in the host.
 

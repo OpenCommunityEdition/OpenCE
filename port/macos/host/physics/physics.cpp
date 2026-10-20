@@ -1,7 +1,10 @@
 // physics.cpp - the host's physics world on Jolt Physics (physics.h).
 //
-// One PhysicsSystem a world, stepped on the calling thread by Jolt's
-// single-threaded job system. Bodies are of two layers: the level's mesh
+// One PhysicsSystem a world, stepped by the calling thread and a few of
+// Jolt's worker threads (its thread pool). Each island of touching bodies is
+// solved on its own job, and Jolt sorts contacts and constraints before it
+// solves them (mDeterministicSimulation, on), so a step's result does not
+// depend on the threads: a run repeats exactly. Bodies are of two layers: the level's mesh
 // (static) and everything that moves (ragdoll parts, debris, kinematic
 // bodies), which collides with the level and with itself. A ragdoll's parts
 // share a collision group whose table keeps joined (and, at rest,
@@ -10,7 +13,7 @@
 #include <Jolt/Jolt.h>
 
 #include <Jolt/Core/Factory.h>
-#include <Jolt/Core/JobSystemSingleThreaded.h>
+#include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Collision/GroupFilterTable.h>
@@ -72,6 +75,9 @@ constexpr float FRICTION_TORQUE_PER_KILOGRAM = 2.0f;
 // defaults (10 and 2) to stay within its limits as it hits the ground
 constexpr uint RAGDOLL_VELOCITY_STEPS = 12;
 constexpr uint RAGDOLL_POSITION_STEPS = 6;
+// the step's worker threads, besides the calling one: thirty ragdolls
+// tumbling at once took 6 ms a step on one thread of an M1 Max
+constexpr uint PHYSICS_WORKER_THREADS = 3;
 
 class BroadPhaseLayers final : public BroadPhaseLayerInterface {
 public:
@@ -247,7 +253,7 @@ struct physics_world {
     ObjectPairs object_pairs;
     PhysicsSystem system;
     TempAllocatorImpl temp_allocator;
-    JobSystemSingleThreaded job_system{cMaxPhysicsJobs};
+    JobSystemThreadPool job_system{cMaxPhysicsJobs, cMaxPhysicsBarriers, int(PHYSICS_WORKER_THREADS)};
     uint32 bodies_max = 0;
     uint32 collision_steps = 1;
     BodyID level;

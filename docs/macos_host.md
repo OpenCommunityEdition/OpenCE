@@ -247,6 +247,7 @@ The host's own settings:
 | `HALO_HOST_QUIET` | Logs only the host's warnings and errors |
 | `HALO_HOST_IMPORT_COUNTS` | At exit, reports the VM's exits per second, in all and by import (busiest first) |
 | `HALO_HOST_FRAME_LOG` | A file the app writes a line to for each frame presented: its number, the milliseconds since the one before, the GPU's milliseconds on its last command buffer and the VM's exits in between (the benchmark) |
+| `HALO_HOST_PHYSICS_LOG` | Logs each physics step: the commands refused, the ragdolls and bodies in the world, whether the level is loaded and the step's milliseconds on the host (the benchmark) |
 | `HALO_HOST_SAMPLE=<seconds>` | Every that many seconds, prints each vCPU's guest address and its frames |
 | `HALO_HOST_MAIN_LOOP=1` | Runs the guest on a thread of its own and the main dispatch queue on the main thread, as the app does |
 | `HALO_HOST_TRACE_MAIN_THREAD` | Reports each import the first time it is carried out on the main thread |
@@ -587,6 +588,31 @@ frame's last command buffer, with 125 exits a frame. The main menu drew in
 The last is 10 061 frames in 42.3 seconds, about 240 a second, with p99
 well inside 8.33 ms (120 a second). The longest frame, 124 ms, is the first
 after the map's load.
+
+The second test plays the same with `game.ragdolls` and
+`game.physics_debris` on and `debug.network_test_crowd` at 10 seconds of
+the game's time: thirty bipeds in six rows before the camera, shot dead
+three a tick, and two hundred assault rifle casings thrown up among them,
+ten a tick. With `HALO_HOST_PHYSICS_LOG` the host times each physics step,
+and the steps with bodies go to `build/macos/benchmark_physics.txt`. The
+target for a step is a millisecond.
+
+| On an M1 Max, at 3840×2160, with the crowd | Frame p50 | Frame p99 | Step p50 | Step p99 | Step max |
+| --- | --- | --- | --- | --- | --- |
+| Jolt on one thread (the frame clock) | — | — | 0.82 ms | 8.07 ms | — |
+| Jolt on the calling thread and three workers | 4.52 ms | 29.2 ms | 0.45 ms | 2.82 ms | 2.96 ms |
+
+At most 30 ragdolls and 119 bodies were in the world; two seconds after
+the last shot, 118 casings were left, all of them Jolt's bodies. The step's
+p50 is within the millisecond; its peak is not: in the ticks after the
+shots, the thirty ragdolls' 480 parts and the casings are all awake and in
+contact (about 590 active bodies). The step is the host's time, while the
+guest waits for it; at its peak it is a third of a frame at 120 a second.
+
+The frames' p99 is the stock game's, not the physics': for the thirty
+seconds the casings live (their tag's life), the scene's frames take about
+26 ms, 11 ms of it the GPU's, and about the same with both settings off
+(25.4 ms against 25.9 ms). Thirty bipeds standing take about 11 ms a frame.
 
 ## Tests
 
