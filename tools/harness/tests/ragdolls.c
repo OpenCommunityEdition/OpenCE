@@ -663,6 +663,26 @@ int main(int argc, char **argv)
 			"no explosion");
 		return 0;
 	}
+	CASE("pieces")
+	{
+		struct ragdoll_death death = death_of(0);
+		struct ragdoll *ragdoll;
+		long replaced;
+
+		/* the first part's joint torn: it and the middle one beneath it a
+		piece of their own; then the middle's too, a third piece */
+		breakable();
+		ragdoll = ragdolls_get(ragdolls_start(&death, &replaced));
+		for (index = 0; index < 4; index++)
+			CHECK(ragdoll_part_piece(ragdoll, (short)index) == 0, "whole: part %ld", index);
+		ragdoll->broken_joints = 1UL << 1;
+		CHECK(ragdoll_part_piece(ragdoll, 0) == 0 && ragdoll_part_piece(ragdoll, 3) == 0, "the body");
+		CHECK(ragdoll_part_piece(ragdoll, 1) == 1 && ragdoll_part_piece(ragdoll, 2) == 1, "the limb");
+		ragdoll->broken_joints |= 1UL << 2;
+		CHECK(ragdoll_part_piece(ragdoll, 1) == 1 && ragdoll_part_piece(ragdoll, 2) == 2, "torn in two");
+		CHECK(ragdoll_part_piece(ragdoll, 4) == NONE && ragdoll_part_piece(ragdoll, -1) == NONE, "no part");
+		return 0;
+	}
 	CASE("chance")
 	{
 		real chance = ragdoll_break_chance(0, 1);

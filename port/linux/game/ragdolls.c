@@ -447,6 +447,17 @@ struct ragdoll *ragdolls_get(
 	return id >= 1 && id <= RAGDOLLS_MAX && ragdolls.active[id - 1].used ? &ragdolls.active[id - 1] : NULL;
 }
 
+short ragdoll_part_piece(
+	struct ragdoll const *ragdoll,
+	short part)
+{
+	if (part < 0 || part >= ragdoll->body->part_count)
+		return NONE;
+	while (part > 0 && !TEST_FLAG(ragdoll->broken_joints, part))
+		part = ragdoll->body->parts[part].parent_part_index;
+	return part;
+}
+
 struct ragdoll const *ragdolls_of_object(
 	long object_index)
 {

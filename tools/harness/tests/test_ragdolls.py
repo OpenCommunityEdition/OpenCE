@@ -18,7 +18,7 @@ from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run
 CASES = ["death", "killing hit", "newest hit", "stale hit", "bad numbers", "off", "not biped", "no body", "once",
          "capacity", "pose", "unused at first", "start", "drive then limp", "removed", "nearest part", "corpse push",
          "killing push", "pushes dropped", "replaced drops", "near", "stand-ins", "drawn", "drawn unposed",
-         "blast's damage", "falloff", "chance", "torn by a blast", "past their thresholds", "by chance", "bullets tear none", "tear off",
+         "blast's damage", "falloff", "pieces", "chance", "torn by a blast", "past their thresholds", "by chance", "bullets tear none", "tear off",
          "corpse torn", "torn once", "breaks dropped"]
 
 FUNCTIONS = ["ragdolls_enabled", "ragdolls_object_is_biped", "ragdoll_pose_transform", "ragdoll_part_nearest",
@@ -28,7 +28,7 @@ FUNCTIONS = ["ragdolls_enabled", "ragdolls_object_is_biped", "ragdoll_pose_trans
              "ragdolls_unit_died", "ragdolls_death_count", "ragdolls_death_get", "ragdolls_deaths_clear",
              "ragdoll_pose_from_matrix", "ragdolls_get", "ragdolls_of_object", "ragdolls_node_matrices",
              "ragdolls_start", "ragdolls_action", "ragdolls_stop", "ragdolls_impulse_count", "ragdolls_impulse_get",
-             "ragdolls_impulses_clear", "ragdolls_break_count", "ragdolls_break_get", "ragdolls_breaks_clear",
+             "ragdolls_impulses_clear", "ragdoll_part_piece", "ragdolls_break_count", "ragdolls_break_get", "ragdolls_breaks_clear",
              "ragdolls_near", "ragdolls_stand_ins_begin", "ragdolls_stand_in",
              "ragdolls_stand_in_unseen", "ragdolls_dispose_from_old_map"]
 
@@ -99,6 +99,9 @@ NEGATIVE_CONTROLS = {
     "always-scaled": (("\tif (!hit->scaled)\n\t\tscale = 1.0f;\n", ""), "falloff"),
     "past-the-cutoff": (("\tif (scale <= 0.0f)\n\t\treturn 0.0f;\n", ""), "falloff"),
     "no-tear-cap": (("count < RAGDOLL_BREAKS_PER_HIT && ", "count >= 0 && "), "torn by a blast"),
+    "pieces-whole": (("part > 0 && !TEST_FLAG(ragdoll->broken_joints, part)", "part > 0"), "pieces"),
+    "piece-one-up": (("\twhile (part > 0 && !TEST_FLAG", "\tif (part > 0 && !TEST_FLAG"), "pieces"),
+    "piece-past-the-parts": (("part < 0 || part >= ragdoll->body->part_count", "part < 0"), "pieces"),
     "no-chance": (("return 0.75f + 0.5f * ", "return 1.0f + 0.0f * "), "chance"),
     "chance-unused": ((" * ragdoll_break_chance(ragdoll->object_index, part))", ")"), "by chance"),
     "least-hurt": (("\t\t\t\tworst_share = share;\n", ""), "torn by a blast"),

@@ -177,6 +177,10 @@ short ragdolls_action(long id);
 void ragdolls_stop(long id);
 /* the ragdoll of an object, or NULL */
 struct ragdoll const *ragdolls_of_object(long object_index);
+/* The part at the top of the piece a part is in, its joints torn as the
+host last reported (broken_joints): the nearest of it and its ancestors
+whose joint to its parent is torn, or the root. NONE for no part. */
+short ragdoll_part_piece(struct ragdoll const *ragdoll, short part);
 
 /* The node matrices an object is drawn with: its ragdoll's, once the host
 has posed it, each node carried with its part as the game's matrices have

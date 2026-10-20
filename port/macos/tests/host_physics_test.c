@@ -388,6 +388,73 @@ static void a_broken_joint_lets_a_limb_go(void)
     physics_world_destroy(world);
 }
 
+/* a ragdoll with its head and left thigh torn off and flung apart, its
+   poses once all three pieces have come to rest */
+static void tear_two_limbs(physics_pose poses[PART_COUNT], float *worst_error, int *active)
+{
+    physics_world *world = new_world();
+    float head_fling[3] = {30.0f, 0, 10.0f}, thigh_fling[3] = {-40.0f, 0, 0};
+    uint32_t ragdoll;
+    int step;
+
+    add_ground(world);
+    ragdoll = add_ragdoll(world, 0.0f);
+    CHECK(physics_ragdoll_go_limp(world, ragdoll) == 0);
+    CHECK(physics_ragdoll_break_joint(world, ragdoll, HEAD) == 0);
+    CHECK(physics_ragdoll_break_joint(world, ragdoll, LEFT_THIGH) == 0);
+    CHECK(physics_ragdoll_get_poses(world, ragdoll, poses, PART_COUNT) == 0);
+    CHECK(physics_ragdoll_add_impulse(world, ragdoll, HEAD, head_fling, poses[HEAD].position) == 0);
+    CHECK(physics_ragdoll_add_impulse(world, ragdoll, LEFT_THIGH, thigh_fling, poses[LEFT_THIGH].position) == 0);
+    *worst_error = 0.0f;
+    for (step = 0; step < 10 * 30; step++) {
+        float error;
+        CHECK(physics_world_step(world, 1.0f / 30.0f) == 0);
+        error = physics_ragdoll_limit_error(world, ragdoll);
+        if (error > *worst_error)
+            *worst_error = error;
+    }
+    CHECK(physics_ragdoll_get_poses(world, ragdoll, poses, PART_COUNT) == 0);
+    *active = physics_ragdoll_active(world, ragdoll);
+    CHECK(physics_ragdoll_joint_broken(world, ragdoll, SPINE) == 0);
+    CHECK(physics_ragdoll_joint_broken(world, ragdoll, RIGHT_THIGH) == 0);
+    physics_world_destroy(world);
+}
+
+static float distance(const physics_pose *a, const physics_pose *b)
+{
+    float dx = a->position[0] - b->position[0], dy = a->position[1] - b->position[1];
+    float dz = a->position[2] - b->position[2];
+    return sqrtf(dx * dx + dy * dy + dz * dz);
+}
+
+static void torn_limbs_come_to_rest(void)
+{
+    physics_pose first[PART_COUNT], second[PART_COUNT];
+    float worst_error;
+    int active, i;
+
+    tear_two_limbs(first, &worst_error, &active);
+    /* the limbs flung clear of the body: each far from the joint it left
+       (the spine's end, the pelvis), each the way it was flung */
+    CHECK(distance(&first[HEAD], &first[SPINE]) > 1.0f);
+    CHECK(first[HEAD].position[0] > 0.5f);
+    CHECK(distance(&first[LEFT_THIGH], &first[PELVIS]) > 0.5f);
+    CHECK(first[LEFT_THIGH].position[0] < -0.5f);
+    /* the body still whole where its joints are: the spine and right thigh
+       at the pelvis, as they were joined (the frames are at the joints) */
+    CHECK(distance(&first[SPINE], &first[PELVIS]) < 0.2f);
+    CHECK(distance(&first[RIGHT_THIGH], &first[PELVIS]) < 0.2f);
+    /* all three pieces on the ground and asleep, the joints left within
+       their limits */
+    for (i = 0; i < PART_COUNT; i++)
+        CHECK(first[i].position[2] > 0.0f && first[i].position[2] < 0.5f);
+    CHECK(worst_error < 0.1f);
+    CHECK(active == 0);
+    /* and again, to the bit */
+    tear_two_limbs(second, &worst_error, &active);
+    CHECK(memcmp(first, second, sizeof(first)) == 0);
+}
+
 static void bad_ragdolls_are_refused(void)
 {
     physics_world *world = new_world();
@@ -571,6 +638,7 @@ int main(int argc, char **argv)
         {"a_driven_ragdoll_holds_its_pose", a_driven_ragdoll_holds_its_pose},
         {"motors_follow_for_the_blend_then_release", motors_follow_for_the_blend_then_release},
         {"a_broken_joint_lets_a_limb_go", a_broken_joint_lets_a_limb_go},
+        {"torn_limbs_come_to_rest", torn_limbs_come_to_rest},
         {"bad_ragdolls_are_refused", bad_ragdolls_are_refused},
         {"a_kinematic_body_pushes_debris", a_kinematic_body_pushes_debris},
         {"an_impulse_moves_a_ragdoll", an_impulse_moves_a_ragdoll},
