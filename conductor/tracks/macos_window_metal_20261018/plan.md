@@ -85,9 +85,9 @@
 - [x] Task: A repeatable benchmark 0a25b926
     - [x] Write tests: a pytest run of bloodgulch for 60 s at 3840×2160 logging per-frame times and VM exits per frame, reporting p99
     - [x] The frame-time log and the run
-- [~] Task: Optimise until the target is met
-    - [ ] Profile with Metal frame capture and Instruments; fix the largest costs one by one, each measured
-    - [ ] Record the result (p99 ≤ 8.33 ms) in docs/macos_host.md
-- [ ] Task: Documentation
+- [x] Task: Optimise until the target is met c0ff161a f4d0aa74
+    - [x] Profile with Metal frame capture and Instruments; fix the largest costs one by one, each measured
+    - [x] Record the result (p99 ≤ 8.33 ms) in docs/macos_host.md
+- [~] Task: Documentation
     - [ ] docs/macos_host.md (app, renderer, ring, input, audio), the settings table, tech-stack.md
 - [ ] Task: Conductor - User Manual Verification 'Phase 6: 4K at 120fps' (Protocol in workflow.md)
