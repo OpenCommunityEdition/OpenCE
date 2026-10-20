@@ -139,6 +139,7 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicles.h"
 #include "mcc_damage.h" /* port: port/linux/game/mcc_damage.c */
+#include "campaign_score.h" /* port: port/linux/game/campaign_score.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -1150,6 +1151,14 @@ static void object_damage_aftermath(
 				TRUE);
 			mcc_ui_team_respawn_damage(player_index, object_index, FALSE);
 		}
+	}
+	/* port: the campaign's score (display.campaign_score): a player's kill
+	of an enemy, where no multiplayer game scores */
+	else if (!TEST_FLAG(damage->flags, _damage_no_statistics_bit) &&
+		TEST_FLAG(being_damaged_flags, _object_being_damaged_body_depleted_bit) &&
+		TEST_FLAG(_object_mask_unit, object->object.type))
+	{
+		campaign_score_record_kill(object_index, damage->owner_player_index);
 	}
 
 	if (TEST_FLAG(_object_mask_unit, object->object.type))

@@ -107,6 +107,7 @@ symbols in this file:
 #include "units/units.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
+#include "campaign_score.h" /* port: port/linux/game/campaign_score.c */
 
 /* ---------- constants */
 
@@ -269,6 +270,8 @@ void interface_initialize_for_new_map(
 	void)
 {
 	hud_initialize_for_new_map();
+	/* port: a new level's score (display.campaign_score) */
+	campaign_score_new_map();
 	draw_string_initialize_for_new_map();
 	first_person_weapons_initialize_for_new_map();
 
@@ -392,6 +395,8 @@ void interface_draw_fullscreen_overlays(
 	map_share_render();
 	/* port: a network game's round trip to the host (display.latency_meter) */
 	latency_meter_draw();
+	/* port: the campaign's score (display.campaign_score) */
+	campaign_score_draw();
 	terminal_draw();
 	main_framerate_render();
 	render_debug_profile();

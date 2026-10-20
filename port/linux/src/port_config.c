@@ -182,6 +182,15 @@ static const struct config_setting config_settings[] =
 		"Draw a clock at the bottom right in the campaign (and co-op), counting up\n"
 		"from the level's start. Separate from display.match_timer, which is\n"
 		"multiplayer only." },
+	{ "display.campaign_score", _config_boolean, "false", "HALO_CAMPAIGN_SCORE", _environment_value, _platform_all,
+		"Score the campaign: each enemy a player kills is worth points by its\n"
+		"actor variant (a grunt 10, a jackal 15, an elite 30, a hunter 100, the\n"
+		"Flood's forms and sentinels less), times its rank (a major 1.5, an ultra\n"
+		"2, a zealot 3, and so on by the variant's name). The score is drawn above\n"
+		"the clock at the bottom right, and a level's totals are shown for a few\n"
+		"seconds over the next level's start. Going back to a checkpoint takes\n"
+		"back the kills after it. Only the host of a co-op game and a single\n"
+		"player see scores." },
 	{ "display.scoreboard_team_layout", _config_string, "\"teams\"", "HALO_SCOREBOARD_TEAM_LAYOUT", _environment_value,
 		_platform_all,
 		"How the scoreboard lists a team game's players: \"teams\" in a column for\n"

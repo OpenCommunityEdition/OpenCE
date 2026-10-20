@@ -382,6 +382,7 @@ symbols in this file:
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "network_voice.h" /* port: port/linux/game/network_voice.c */
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
+#include "campaign_score.h" /* port: port/linux/game/campaign_score.c */
 #include "network_aim_assist.h" /* port: port/linux/game/network_aim_assist.c */
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "profile_sections.h" /* port: port/linux/include/profile_sections.h */
@@ -928,6 +929,8 @@ void main_save_cancel(
 void main_won_map(
 	void)
 {
+	/* port: the level's score (display.campaign_score) */
+	campaign_score_level_won();
 	main_globals.saving_map = FALSE;
 	main_globals.won_map = TRUE;
 	return;
