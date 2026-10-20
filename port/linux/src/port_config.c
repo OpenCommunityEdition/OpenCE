@@ -81,7 +81,9 @@ Ctrl+D, which moving and crouching would press, from the browser) */
 
 static const struct config_setting config_settings[] =
 {
-	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
+	{ "game.mcc_map_path", _config_string, "mcc_maps", "HALO_MCC_MAPS", _environment_value, _platform_desktop,
+		"Where mcc_maps is located;\n" },
+		{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
 		"Where display.mode is empty: start borderless over the whole display;\n"
 		"false starts in a window. F11 switches." },
 	{ "display.mode", _config_string, "\"\"", "HALO_DISPLAY_MODE", _environment_value, _platform_desktop,
