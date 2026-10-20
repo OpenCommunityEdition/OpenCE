@@ -44,7 +44,7 @@
     - [x] Tune the overrides until the frames look right; approve the references
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Ragdolls' (Protocol in workflow.md)
 
-## Phase 4: Dismemberment
+## Phase 4: Dismemberment [checkpoint: 3ff16710]
 - [x] Task: Breakable joints c71f8faf
     - [x] Write tests: harness tests that an explosion's damage and distance against the per-species thresholds choose the joints that break, only for dying or dead bipeds and only with `game.dismemberment` and `game.ragdolls` on; bullets and melee break none
     - [x] Per-species breakable joints and thresholds in `port/assets/ragdolls/`; the `game.dismemberment` setting (port_config.c, settings table, port_settings.py)
@@ -57,7 +57,7 @@
 - [x] Task: Golden frames of dismemberment e2bc790a
     - [x] Write tests: an Elite dismembered by a scripted grenade (mid-flight, at rest) and a bullet kill that stays whole, with the frame clock
     - [x] Tune the thresholds; approve the references
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Dismemberment' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Dismemberment' (Protocol in workflow.md) 3ff16710
 
 ## Phase 5: Debris
 - [ ] Task: Particles as rigid bodies
