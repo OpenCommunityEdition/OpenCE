@@ -11,7 +11,7 @@ struct data_iterator
 	int slot;
 };
 static struct player_datum people[128];
-static int occupied[128], host = TRUE, list_count, calls[128];
+static int occupied[128], host = TRUE, calls[128];
 static long ref_head;
 static struct data_array *player_data, *object_list_data;
 static long data_next_index(struct data_array *data, long previous)
@@ -51,7 +51,6 @@ static void data_delete_all(struct data_array *data)
 #include "reference.inc"
 static long object_list_new(void)
 {
-	list_count++;
 	ref_head = NONE;
 	return 0;
 }
