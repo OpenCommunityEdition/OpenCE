@@ -30,6 +30,9 @@ public final class MetalRenderer: @unchecked Sendable {
 
     /// Where refusals and Metal's errors are told (none by default).
     public var log: (@Sendable (String) -> Void)?
+    /// Called as each PRESENT's commands complete, in order, with the GPU's
+    /// time on them in milliseconds (the frame log, HALO_HOST_FRAME_LOG).
+    public var presented: (@Sendable (Double) -> Void)?
 
     private let device: MTLDevice
     private let queue: MTLCommandQueue
@@ -360,6 +363,11 @@ public final class MetalRenderer: @unchecked Sendable {
             if let frame = windowFrame {
                 window.present(frame, in: commands)
                 windowFrame = nil
+            }
+            if let presented {
+                commands.addCompletedHandler { buffer in
+                    presented((buffer.gpuEndTime - buffer.gpuStartTime) * 1000)
+                }
             }
             commit()
             if let message = window.committed(commands) {

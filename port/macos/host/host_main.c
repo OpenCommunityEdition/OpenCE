@@ -72,6 +72,7 @@ void host_fatal(const char *format, ...)
 void host_exit(int code)
 {
 	host_vm_report_import_counts();
+	host_frames_close();
 	host_logf(HOST_LOG_INFO, "the guest exited with status %d", code);
 	fflush(stdout);
 	fflush(stderr);

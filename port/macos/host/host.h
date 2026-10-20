@@ -74,6 +74,12 @@ void host_vm_start_sampler(void);
 /* with HALO_HOST_IMPORT_COUNTS set, the number of times the guest called
 each import, to standard error ("halo_host: import <name>: <count>") */
 void host_vm_report_import_counts(void);
+/* the exits from the VM so far, counted with HALO_HOST_IMPORT_COUNTS or
+HALO_HOST_FRAME_LOG set (0 otherwise) */
+unsigned long long host_vm_exit_count(void);
+/* HALO_HOST_FRAME_LOG (host_frames.c): whether it is set; the log flushed */
+int host_frames_logging(void);
+void host_frames_close(void);
 /* this thread's vCPU's TPIDR_EL0: the guest's thread pointer */
 uint32_t host_vcpu_thread_pointer(void);
 void host_vcpu_set_thread_pointer(uint32_t value);

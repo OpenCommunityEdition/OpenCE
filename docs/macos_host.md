@@ -246,6 +246,7 @@ The host's own settings:
 | --- | --- |
 | `HALO_HOST_QUIET` | Logs only the host's warnings and errors |
 | `HALO_HOST_IMPORT_COUNTS` | At exit, reports the VM's exits per second, in all and by import (busiest first) |
+| `HALO_HOST_FRAME_LOG` | A file the app writes a line to for each frame presented: its number, the milliseconds since the one before, the GPU's milliseconds on its last command buffer and the VM's exits in between (the benchmark) |
 | `HALO_HOST_SAMPLE=<seconds>` | Every that many seconds, prints each vCPU's guest address and its frames |
 | `HALO_HOST_MAIN_LOOP=1` | Runs the guest on a thread of its own and the main dispatch queue on the main thread, as the app does |
 | `HALO_HOST_TRACE_MAIN_THREAD` | Reports each import the first time it is carried out on the main thread |
@@ -536,6 +537,25 @@ itself:
 The same game then made about 24 000 exits a second, nine in ten of them
 `host_syscall` (futexes, sleeps and the like).
 
+### The benchmark
+
+`tools/test_macos_benchmark.py` plays bloodgulch for 60 seconds at
+3840×2160, off the screen, on the real clock, from the debug camera of the
+golden frames, with `HALO_HOST_FRAME_LOG` set. The app's renderer logs each
+frame as its PRESENT's commands complete on the GPU, so the times are the
+GPU's pace, not only how fast the guest sends its batches. The frames after
+the longest wait (the map's load) are the game's; their times, the GPU's
+and the exits per frame go to `build/macos/benchmark.txt`:
+
+```sh
+python -m pytest -q tools/test_macos_benchmark.py -s
+```
+
+The first run, before any of the work to make it faster: 80 ms a frame at
+p50 and 84 ms at p99 (about 12 a second), 28 ms of it the GPU's on the
+frame's last command buffer, with 125 exits a frame. The main menu drew in
+7.5 ms.
+
 ## Tests
 
 In `nix develop`, after `ninja macos`:
@@ -547,6 +567,7 @@ ninja macos_app_test                              # the app's Swift tests, the M
 python -m pytest -q tools/test_macos_post.py      # the post passes' MSL compiles; SMAA's lookup textures
 python -m pytest -q tools/test_frame_compare.py   # the frame comparison's tolerance
 python -m pytest -q tools/test_macos_frames.py    # golden frames from the app (after ninja macos_app)
+python -m pytest -q tools/test_macos_benchmark.py -s   # bloodgulch's frame times at 4K
 cargo test --manifest-path port/macos/runtime/Cargo.toml
 python -m pytest -q tools/harness         # the asset-free harness, in the VM
 ```

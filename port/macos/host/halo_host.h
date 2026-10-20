@@ -97,4 +97,10 @@ struct halo_host_render_backend
 host's to check and drop again with NULL: called before the guest starts */
 void halo_host_set_render_backend(const struct halo_host_render_backend *backend);
 
+/* with HALO_HOST_FRAME_LOG=<file>: whether it is set, and a line in the file
+for each frame the renderer has finished presenting, with the GPU's time on
+it in milliseconds (host_frames.c); called in the frames' order */
+int halo_host_frame_log_enabled(void);
+void halo_host_frame_presented(double gpu_milliseconds);
+
 #endif

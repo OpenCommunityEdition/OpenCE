@@ -37,6 +37,9 @@ enum RenderBackend {
                     return nil
                 }
                 renderer.log = { message in log.error("\(message, privacy: .public)") }
+                if halo_host_frame_log_enabled() != 0 {
+                    renderer.presented = { milliseconds in halo_host_frame_presented(milliseconds) }
+                }
                 made = renderer
             }
             return made

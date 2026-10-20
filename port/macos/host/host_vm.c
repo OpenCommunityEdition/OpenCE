@@ -75,9 +75,11 @@ extern const char *const host_import_names[];
 extern const unsigned int host_import_name_count;
 
 /* HALO_HOST_IMPORT_COUNTS: each import's calls, and every exit from the
-VM (imports, timers, the sampler's), counted from the VM's start */
+VM (imports, timers, the sampler's), counted from the VM's start; the exits
+are counted for the frame log too (HALO_HOST_FRAME_LOG, host_frames.c) */
 #define COUNTED_IMPORTS 1024
 static int counting;
+static int counting_exits;
 static _Atomic unsigned long long import_counts[COUNTED_IMPORTS];
 static _Atomic unsigned long long exit_count;
 static struct timespec counting_start;
@@ -332,7 +334,7 @@ static void vcpu_run(struct vcpu *vcpu)
 
 		if (result != HV_SUCCESS)
 			host_fatal("hv_vcpu_run failed (%#x)", (unsigned int)result);
-		if (counting > 0)
+		if (counting_exits)
 			exit_count++;
 		if (vcpu->exit->reason == HV_EXIT_REASON_CANCELED)
 		{
@@ -464,6 +466,11 @@ static int by_count(const void *left, const void *right)
 	return a < b ? 1 : a > b ? -1 : 0;
 }
 
+unsigned long long host_vm_exit_count(void)
+{
+	return exit_count;
+}
+
 void host_vm_report_import_counts(void)
 {
 	static uint32_t order[COUNTED_IMPORTS];
@@ -498,6 +505,7 @@ int host_vm_initialize(void)
 	void *at;
 
 	counting = getenv("HALO_HOST_IMPORT_COUNTS") && *getenv("HALO_HOST_IMPORT_COUNTS");
+	counting_exits = counting || host_frames_logging();
 	clock_gettime(CLOCK_MONOTONIC, &counting_start);
 	if (hv_vm_create(NULL) != HV_SUCCESS)
 	{
