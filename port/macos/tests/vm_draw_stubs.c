@@ -3,7 +3,8 @@ VM_DRAW_STUBS.C
 
 The game's platform layer as the draw test (vm_draw.c) needs it: a window
 of the capture's size (64x64), settings left at their defaults, no
-pointer, a memory watch that never moves on, and the log
+pointer, a clock frames do not step, a memory watch that never moves on,
+and the log
 on the standard output. (No high-res HUD or menu art: vm_hires_stubs.c.)
 */
 
@@ -115,6 +116,10 @@ void platform_video_window_size(int *width, int *height)
 }
 
 void platform_pump_events(void)
+{
+}
+
+void platform_clock_frame_shown(void)
 {
 }
 

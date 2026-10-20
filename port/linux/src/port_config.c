@@ -590,6 +590,9 @@ static const struct config_setting config_settings[] =
 	{ "debug.voice_test", _config_boolean, "false", "HALO_VOICE_TEST", _environment_set_is_true, _platform_all,
 		"Voice chat's automated tests: a tone instead of the microphone, and\n"
 		"each voice heard logged once a second." },
+	{ "debug.frame_clock", _config_boolean, "false", "HALO_FRAME_CLOCK", _environment_set_is_true, _platform_all,
+		"From the first frame, the game's clock steps a 60th of a second a frame\n"
+		"shown, for frames captured the same run to run." },
 	{ "debug.null_renderer", _config_boolean, "false", "HALO_NULL_RENDERER", _environment_set_is_true, _platform_all,
 		"Run without a window, drawing nothing." },
 	{ "debug.gl_debug", _config_boolean, "false", "HALO_GL_DEBUG", _environment_set_is_true, _platform_all,

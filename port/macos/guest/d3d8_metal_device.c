@@ -2190,6 +2190,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		xgpu_texture_cache_begin_frame();
 	}
 	device.frame++;
+	platform_clock_frame_shown();
 	platform_pump_events();
 
 	pthread_mutex_lock(&vertical_blank_lock);

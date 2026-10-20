@@ -2,9 +2,10 @@
 approved references (docs/macos_host.md, "Frame captures").
 
 Each case runs a guest program in the app in the game's place
-(HALO_HOST_GUEST_IMAGE), with its window drawn off the screen and one frame
-written to a PNG (HALO_HOST_CAPTURE); tools/frame_compare.py compares it with
-port/macos/tests/frames/<case>.png. No window is shown. A frame that does
+(HALO_HOST_GUEST_IMAGE), or the game itself with the maps of assets/maps
+and its clock stepped a frame at a time (HALO_FRAME_CLOCK), with its window
+drawn off the screen and one frame written to a PNG (HALO_HOST_CAPTURE);
+tools/frame_compare.py compares it with port/macos/tests/frames/<case>.png. No window is shown. A frame that does
 not match leaves its capture and its difference image in build/macos/frames.
 
 To approve a new or changed frame, look at it, then run
@@ -33,6 +34,8 @@ APP = ROOT / "build/macos/OpenCE.app/Contents/MacOS/OpenCE"
 REFERENCES = ROOT / "port/macos/tests/frames"
 FAILED = ROOT / "build/macos/frames"
 SIZE = (320, 240)
+MAPS = ROOT / "assets/maps"
+GAME_SIZE = (640, 480)
 
 pytestmark = [
     pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only"),
@@ -61,6 +64,21 @@ def capture(image, case, tmp_path, frame=1):
                          timeout=60)
     assert run.returncode == 0 and run.stdout.strip().endswith("ok"), run.stdout[-2000:] + run.stderr[-2000:]
     assert path.is_file(), "no frame was captured: " + run.stderr[-2000:]
+    return frame_compare.read_png(path)
+
+
+def capture_game(tmp_path, frame, settings=None, seconds=30):
+    """the frame the app drew of the game at its `frame`th PRESENT"""
+    (tmp_path / "home").mkdir()
+    path = tmp_path / "game.png"
+    environment = dict(os.environ, HOME=str(tmp_path / "home"), HALO_DATA_ROOT=str(ROOT / "assets"),
+                       HALO_FRAME_CLOCK="1", HALO_HOST_CAPTURE=str(path), HALO_HOST_CAPTURE_FRAME=str(frame),
+                       HALO_HOST_CAPTURE_SIZE="%dx%d" % GAME_SIZE, HALO_EXIT_AFTER=str(seconds),
+                       **(settings or {}))
+    environment.pop("HALO_HOST_GUEST_IMAGE", None)
+    run = subprocess.run([str(APP)], cwd=tmp_path, env=environment, capture_output=True, text=True,
+                         timeout=seconds + 60)
+    assert path.is_file(), "no frame was captured: " + run.stdout[-2000:] + run.stderr[-2000:]
     return frame_compare.read_png(path)
 
 
@@ -96,3 +114,13 @@ def test_the_scene_draws_as_approved(vm_render, tmp_path):
     red, green, blue, _ = frame.pixel(width // 2, int(height * 0.15))
     assert blue > 200 and red < 60 and green < 60
     check(frame, "scene")
+
+
+@pytest.mark.skipif(not (MAPS / "ui.map").is_file(), reason="needs the game's maps in assets/maps")
+def test_the_main_menu_draws_as_approved(tmp_path):
+    # ten seconds in: the menu's background, the logo and its items
+    frame = capture_game(tmp_path, 600)
+    assert (frame.width, frame.height) == GAME_SIZE
+    # (not black: the selected item, CAMPAIGN, is drawn light)
+    assert max(frame.pixel(x, 262)[0] for x in range(250, 400)) > 200
+    check(frame, "main_menu")

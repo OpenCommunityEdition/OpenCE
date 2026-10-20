@@ -6,6 +6,7 @@ threads, asynchronous procedure calls, time, memory and debug output.
 */
 
 #include "platform.h"
+#include "port_config.h"
 
 #include <errno.h>
 #include <sched.h>
@@ -649,10 +650,25 @@ power-on. Its code keeps times in signed 32-bit variables, which a host up
 for more than 24.8 days (2^31 ms since boot) overflows: a hosted game then
 timed out its own clients. They start at 10 s, about where an Xbox's clock
 is by the time the game runs. */
+/* debug.frame_clock: from the first frame shown, the clock steps a 60th of a
+second a frame, whatever the time between them, so that frames captured
+for tests (the macOS app's HALO_HOST_CAPTURE) are the same run to run. Read
+at the first frame, not in the clock: the settings' loading takes a lock
+and logs. (-1 not read yet, 0 off, 1 on) */
+#define PLATFORM_FRAME_CLOCK_NANOSECONDS 16666667ULL
+
+static int frame_clock = -1;
+static unsigned long long frame_clock_start;
+static unsigned long long frame_clock_frames;
+
 static unsigned long long platform_clock_nanoseconds(void)
 {
 	static unsigned long long start;
 	unsigned long long value, expected = 0;
+
+	if (__atomic_load_n(&frame_clock, __ATOMIC_ACQUIRE) == 1)
+		return frame_clock_start + __atomic_load_n(&frame_clock_frames, __ATOMIC_RELAXED) *
+			PLATFORM_FRAME_CLOCK_NANOSECONDS;
 #ifdef HALO_WEB
 	/* (the browser's clock, in milliseconds, which clock_gettime reads too,
 	without the 64-bit conversions of its way there) */
@@ -665,6 +681,20 @@ static unsigned long long platform_clock_nanoseconds(void)
 #endif
 	__atomic_compare_exchange_n(&start, &expected, value - 10000000000ULL, 0, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 	return value - __atomic_load_n(&start, __ATOMIC_RELAXED);
+}
+
+void platform_clock_frame_shown(void)
+{
+	if (frame_clock < 0)
+	{
+		int on = config_boolean("debug.frame_clock") ? 1 : 0;
+
+		if (on)
+			frame_clock_start = platform_clock_nanoseconds();
+		__atomic_store_n(&frame_clock, on, __ATOMIC_RELEASE);
+	}
+	else if (frame_clock)
+		__atomic_add_fetch(&frame_clock_frames, 1, __ATOMIC_RELAXED);
 }
 
 DWORD WINAPI GetTickCount(void)

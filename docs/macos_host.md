@@ -460,6 +460,13 @@ read is logged and the window drawn as usual. The capture's size is not yet
 the guest's window size: the game's Direct3D, once written as batches, will
 have to be told it.
 
+A frame of the game is the same from run to run only if the game's clock
+is: its menus' backgrounds and its ticks follow the time. With
+`HALO_FRAME_CLOCK=1` (`debug.frame_clock`), from the first frame shown the
+game's clock steps a 60th of a second at each `PRESENT`, however long the
+frame took (`platform_clock_frame_shown`, `port/linux/src/xbox_kernel.c`);
+the vertical blank, sleeps and sound keep the real clock.
+
 `tools/frame_compare.py` compares a capture with an approved reference: a
 pixel differs when one of its channels is more than 8 from the
 reference's (a GPU's rounding), and the frame matches when no more than

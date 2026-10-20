@@ -962,6 +962,7 @@ void platform_video_swap(void)
 
 #endif
 	SDL_GL_SwapWindow(platform_window);
+	platform_clock_frame_shown();
 #ifdef HALO_WEB
 	web_frame_shown();
 #endif
