@@ -88,6 +88,6 @@
 - [x] Task: Optimise until the target is met c0ff161a f4d0aa74
     - [x] Profile with Metal frame capture and Instruments; fix the largest costs one by one, each measured
     - [x] Record the result (p99 ≤ 8.33 ms) in docs/macos_host.md
-- [~] Task: Documentation
-    - [ ] docs/macos_host.md (app, renderer, ring, input, audio), the settings table, tech-stack.md
+- [x] Task: Documentation a779e96f
+    - [x] docs/macos_host.md (app, renderer, ring, input, audio), the settings table, tech-stack.md
 - [ ] Task: Conductor - User Manual Verification 'Phase 6: 4K at 120fps' (Protocol in workflow.md)
