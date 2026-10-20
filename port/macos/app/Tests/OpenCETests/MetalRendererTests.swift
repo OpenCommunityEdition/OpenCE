@@ -14,7 +14,7 @@ private enum Op: UInt32 {
     case createBuffer = 1, uploadBuffer, createTexture, uploadTexture, destroy, createLibrary, createPipeline,
          createDepthStencil, createSampler, beginPass, endPass, setPipeline, setDepthStencil, setRaster,
          setViewport, setScissor, setBlendColor, setVertexBuffer, setBytes, setTexture, setSampler, draw,
-         drawIndexed, setVisibility, copyTexture, readTexture, generateMipmaps, present
+         drawIndexed, setVisibility, copyTexture, readTexture, generateMipmaps, present, writeBuffer
 }
 
 private let rgba8: UInt32 = 1, bgra8: UInt32 = 2, depth32f: UInt32 = 12
@@ -318,6 +318,67 @@ struct MetalRendererTests {
         let pixels = try fixture.pixels(16)
         for (index, pixel) in pixels.enumerated() {
             #expect(near(pixel, index % 4 < 2 ? [255, 255, 0, 255] : [0, 255, 255, 255]), "pixel \(index): \(pixel)")
+        }
+    }
+
+    @Test func aWriteInsideAPassIsDrawnWithWhatCameBefore() throws {
+        // (WRITE_BUFFER copies at once, the pass's encoder kept: the guest
+        // writes where no draw before it reads)
+        let fixture = try Fixture()
+        var batch = Batch()
+        batch.createTarget(1, size: 4)
+        try fixture.library(1, flatShader, at: 0x1000, in: &batch)
+        batch.createPipeline(1, library: 1)
+        batch.add(.createBuffer, [1, 96])
+        let left = try fixture.put(floats: [-1, -1, 0.5, 0, -1, 0.5, -1, 1, 0.5, 0, 1, 0.5], at: 0)
+        let right = try fixture.put(floats: [0, -1, 0.5, 1, -1, 0.5, 0, 1, 0.5, 1, 1, 0.5], at: 0x100)
+        batch.beginPass(color: 1, clear: (0, 0, 0, 0))
+        batch.add(.setPipeline, [1])
+        batch.add(.writeBuffer, [1, 0, left, 48])
+        batch.add(.setVertexBuffer, [1, 1, 0])
+        batch.setColor(1, 1, 0)
+        batch.add(.draw, [triangleStrip, 0, 4, 1])
+        batch.add(.writeBuffer, [1, 48, right, 48])
+        batch.add(.setVertexBuffer, [1, 1, 48])
+        batch.setColor(0, 1, 1)
+        batch.add(.draw, [triangleStrip, 0, 4, 1])
+        batch.add(.endPass)
+        batch.read(1, size: 4)
+        #expect(try fixture.submit(batch) == 0)
+        let pixels = try fixture.pixels(16)
+        for (index, pixel) in pixels.enumerated() {
+            #expect(near(pixel, index % 4 < 2 ? [255, 255, 0, 255] : [0, 255, 255, 255]), "pixel \(index): \(pixel)")
+        }
+    }
+
+    @Test func aWriteWaitsForTheFrameThatReadItsRange() throws {
+        // frame 1 draws the left half from the buffer's start and is
+        // presented (committed, not waited for); frame 2 writes the right
+        // half over it, which frame 1 must not see
+        let fixture = try Fixture()
+        var batch = Batch()
+        batch.createTarget(1, size: 4)
+        batch.createTarget(2, size: 4)
+        try fixture.library(1, flatShader, at: 0x1000, in: &batch)
+        batch.createPipeline(1, library: 1)
+        batch.add(.createBuffer, [1, 48])
+        let left = try fixture.put(floats: [-1, -1, 0.5, 0, -1, 0.5, -1, 1, 0.5, 0, 1, 0.5], at: 0)
+        let right = try fixture.put(floats: [0, -1, 0.5, 1, -1, 0.5, 0, 1, 0.5, 1, 1, 0.5], at: 0x100)
+        for (target, half) in [(UInt32(1), left), (2, right)] {
+            batch.beginPass(color: target, clear: (0, 0, 0, 1))
+            batch.add(.setPipeline, [1])
+            batch.add(.writeBuffer, [1, 0, half, 48])
+            batch.add(.setVertexBuffer, [1, 1, 0])
+            batch.setColor(1, 1, 0)
+            batch.add(.draw, [triangleStrip, 0, 4, 1])
+            batch.add(.endPass)
+            batch.add(.present)
+        }
+        batch.read(1, size: 4)
+        #expect(try fixture.submit(batch) == 0)
+        let pixels = try fixture.pixels(16)
+        for (index, pixel) in pixels.enumerated() {
+            #expect(near(pixel, index % 4 < 2 ? [255, 255, 0, 255] : [0, 0, 0, 255]), "pixel \(index): \(pixel)")
         }
     }
 

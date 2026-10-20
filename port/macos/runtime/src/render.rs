@@ -62,6 +62,7 @@ pub mod op {
     pub const READ_TEXTURE: u32 = 26;
     pub const GENERATE_MIPMAPS: u32 = 27;
     pub const PRESENT: u32 = 28;
+    pub const WRITE_BUFFER: u32 = 29;
 
     /// Each op's name in the header and its size in words.
     pub const SIZES: &[(u32, &str, u32)] = &[
@@ -93,6 +94,7 @@ pub mod op {
         (READ_TEXTURE, "READ_TEXTURE", 11),
         (GENERATE_MIPMAPS, "GENERATE_MIPMAPS", 2),
         (PRESENT, "PRESENT", 1),
+        (WRITE_BUFFER, "WRITE_BUFFER", 5),
     ];
 
     /// The size in words of a command of `op` (its fixed part).
@@ -730,6 +732,15 @@ pub enum Command {
         id: u32,
     },
     Present,
+    /// As UploadBuffer, but copied when it is read rather than in the GPU's
+    /// order (the guest's promise: nothing before it in the frame reads the
+    /// range).
+    WriteBuffer {
+        id: u32,
+        offset: u32,
+        address: u32,
+        length: u32,
+    },
 }
 
 /// Why a command was refused.
@@ -1028,6 +1039,20 @@ impl RenderValidator {
         let command = match code {
             op::CREATE_BUFFER => self.create_buffer(f)?,
             op::UPLOAD_BUFFER => self.upload_buffer(f, memory)?,
+            op::WRITE_BUFFER => match self.upload_buffer(f, memory)? {
+                Command::UploadBuffer {
+                    id,
+                    offset,
+                    address,
+                    length,
+                } => Command::WriteBuffer {
+                    id,
+                    offset,
+                    address,
+                    length,
+                },
+                _ => unreachable!("upload_buffer makes uploads"),
+            },
             op::CREATE_TEXTURE => self.create_texture(f)?,
             op::UPLOAD_TEXTURE => self.upload_texture(f, memory)?,
             op::DESTROY => self.destroy(f)?,

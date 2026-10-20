@@ -644,6 +644,42 @@ fn buffer_uploads_stay_inside() {
 }
 
 #[test]
+fn buffer_writes_are_checked_as_uploads_are() {
+    let batch = decode(
+        &mut validator(),
+        Writer::new()
+            .buffer(1, 64)
+            .command(op::WRITE_BUFFER, &[1, 16, GUEST, 16])
+            .command(op::WRITE_BUFFER, &[1, 32, GUEST, 33])
+            .command(op::WRITE_BUFFER, &[2, 0, GUEST, 4])
+            .command(op::WRITE_BUFFER, &[1, 0, u32::MAX - 3, 8]),
+    );
+    assert_eq!(
+        batch.commands.last(),
+        Some(&Command::WriteBuffer {
+            id: 1,
+            offset: 16,
+            address: GUEST,
+            length: 16
+        })
+    );
+    assert_eq!(
+        errors(&batch),
+        [
+            bounds("upload"),
+            RenderError::Missing {
+                kind: ObjectKind::Buffer,
+                id: 2
+            },
+            RenderError::Guest {
+                address: u32::MAX - 3,
+                length: 8
+            },
+        ]
+    );
+}
+
+#[test]
 fn textures_are_checked_when_made() {
     let texture = |fields: [u32; 8]| {
         let mut all = vec![1];

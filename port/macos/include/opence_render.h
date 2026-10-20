@@ -46,6 +46,12 @@ a pass's own targets while it lasts. */
 /* id, offset, guest address, length: guest memory copied into a buffer */
 #define OPENCE_RENDER_OP_UPLOAD_BUFFER 2
 #define OPENCE_RENDER_UPLOAD_BUFFER_WORDS 5
+/* id, offset, guest address, length: as UPLOAD_BUFFER, but copied by the
+host when it reads the command, not in the GPU's order. The guest promises
+that no command before it in the frame reads the range; the host waits for
+the GPU to finish the earlier frames that did. */
+#define OPENCE_RENDER_OP_WRITE_BUFFER 29
+#define OPENCE_RENDER_WRITE_BUFFER_WORDS 5
 /* id, kind, format, width, height, depth, levels, usage, samples */
 #define OPENCE_RENDER_OP_CREATE_TEXTURE 3
 #define OPENCE_RENDER_CREATE_TEXTURE_WORDS 10

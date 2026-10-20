@@ -106,6 +106,16 @@ public final class MetalRenderer: @unchecked Sendable {
         /// the state set, to set again in the pass's next encoder
         var state: [Slot: Command] = [:]
     }
+    /// A range of a buffer copied into by WRITE_BUFFER, and the command
+    /// buffer that was being encoded then, which may read it.
+    private struct Write {
+        var start: Int
+        var end: Int
+        let commands: MTLCommandBuffer
+    }
+    /// Each buffer's ranges written by WRITE_BUFFER that a command buffer the
+    /// GPU has not finished may read.
+    private var writes: [UInt32: [Write]] = [:]
     private var commands: MTLCommandBuffer?
     private var committed: MTLCommandBuffer?
     private var blit: MTLBlitCommandEncoder?
@@ -183,6 +193,7 @@ public final class MetalRenderer: @unchecked Sendable {
         case let .createBuffer(id, length):
             // (zeroed, as Metal makes them)
             buffers[id] = device.makeBuffer(length: max(Int(length), 1), options: .storageModeShared)
+            writes[id] = nil
             return buffers[id] != nil
         case let .uploadBuffer(id, offset, address, length):
             guard let buffer = buffers[id], let staging = staging(address, length), let blit = ensureBlit() else {
@@ -226,7 +237,7 @@ public final class MetalRenderer: @unchecked Sendable {
         case let .destroy(kind, id):
             // (the command buffer keeps what it uses until it has run)
             switch kind {
-            case .buffer: buffers[id] = nil
+            case .buffer: buffers[id] = nil; writes[id] = nil
             case .texture: textures[id] = nil
             case .library: libraries[id] = nil
             case .pipeline: pipelines[id] = nil
@@ -357,6 +368,8 @@ public final class MetalRenderer: @unchecked Sendable {
                 blit.generateMipmaps(for: texture.texture)
             }
             return true
+        case let .writeBuffer(id, offset, address, length):
+            return write(id, Int(offset), address, length)
         case .present:
             endBlit()
             guard let commands = ensureCommands() else { return false }
@@ -382,6 +395,40 @@ public final class MetalRenderer: @unchecked Sendable {
         texture.kind == .volume
             ? (0, MTLOrigin(x: Int(x), y: Int(y), z: Int(slice)))
             : (Int(slice), MTLOrigin(x: Int(x), y: Int(y), z: 0))
+    }
+
+    /// WRITE_BUFFER: the guest's bytes copied into the buffer now, without
+    /// ending the pass's encoder for a blit. The guest has promised that
+    /// nothing encoded in this frame reads the range; what an earlier frame's
+    /// command buffer may still read there is waited for.
+    private func write(_ id: UInt32, _ offset: Int, _ address: UInt32, _ length: UInt32) -> Bool {
+        guard let buffer = buffers[id], let commands = ensureCommands(),
+              let host = try? memory.hostAddress(address: address, size: UInt64(length)),
+              let source = UnsafeRawPointer(bitPattern: UInt(host)) else { return false }
+        let end = offset + Int(length)
+        var kept: [Write] = []
+        for write in writes[id] ?? [] {
+            if write.commands !== commands {
+                if write.commands.status == .completed || write.commands.status == .error {
+                    continue
+                }
+                if write.start < end && offset < write.end {
+                    write.commands.waitUntilCompleted()
+                    continue
+                }
+            }
+            kept.append(write)
+        }
+        // (the stream is written in order: a frame's writes are kept as one
+        // range while they follow each other)
+        if let last = kept.last, last.commands === commands, last.end == offset {
+            kept[kept.count - 1].end = end
+        } else {
+            kept.append(Write(start: offset, end: end, commands: commands))
+        }
+        writes[id] = kept
+        buffer.contents().advanced(by: offset).copyMemory(from: source, byteCount: Int(length))
+        return true
     }
 
     /// The guest's bytes, copied out for a blit.

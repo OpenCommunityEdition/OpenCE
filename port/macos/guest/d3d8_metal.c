@@ -104,7 +104,9 @@ void xgpu_gl_state_invalidate(void)
 {
 }
 
-void xgpu_metal_upload_buffer(unsigned int buffer, unsigned long offset, const void *data, unsigned long size)
+/* UPLOAD_BUFFER, or WRITE_BUFFER (copied by the host when it reads it) */
+static void copy_to_buffer(unsigned int op, unsigned int buffer, unsigned long offset, const void *data,
+	unsigned long size)
 {
 	const unsigned char *bytes = data;
 
@@ -112,8 +114,7 @@ void xgpu_metal_upload_buffer(unsigned int buffer, unsigned long offset, const v
 	{
 		unsigned long piece = size < STAGING_SIZE / 2 ? size : STAGING_SIZE / 2;
 		const void *copy = xgpu_metal_stage(bytes, piece);
-		unsigned int *fields = copy ? xgpu_metal_command(OPENCE_RENDER_OP_UPLOAD_BUFFER,
-			OPENCE_RENDER_UPLOAD_BUFFER_WORDS) : NULL;
+		unsigned int *fields = copy ? xgpu_metal_command(op, OPENCE_RENDER_UPLOAD_BUFFER_WORDS) : NULL;
 
 		if (!fields)
 			return;
@@ -125,6 +126,11 @@ void xgpu_metal_upload_buffer(unsigned int buffer, unsigned long offset, const v
 		bytes += piece;
 		size -= piece;
 	}
+}
+
+void xgpu_metal_upload_buffer(unsigned int buffer, unsigned long offset, const void *data, unsigned long size)
+{
+	copy_to_buffer(OPENCE_RENDER_OP_UPLOAD_BUFFER, buffer, offset, data, size);
 }
 
 unsigned int xgpu_metal_rgba_texture(const unsigned char *rgba, unsigned long width, unsigned long height,
@@ -251,10 +257,13 @@ static unsigned int create_buffer(unsigned long length)
 /* ---------- frames */
 
 static unsigned long frame;
+/* the bytes of the stream buffer's ring this frame has used */
+static unsigned long stream_frame_used;
 
 void xgpu_metal_begin_frame(void)
 {
 	frame++;
+	stream_frame_used = 0;
 }
 
 /* ---------- the contiguous window in Metal buffers
@@ -432,9 +441,11 @@ BOOL xgpu_metal_mirror_range(unsigned long address, unsigned long size, unsigned
 /* ---------- the stream buffer
 
 Vertices and indices that are not in the mirror (the game's own arrays,
-volatile pages) are copied to one buffer, used as a ring: when it wraps, the
-renderer orders the copy over its start after the draws that read what was
-there before. */
+volatile pages) are copied to one buffer, used as a ring. The host copies
+them when it reads the command (WRITE_BUFFER), so that a pass's encoder is
+not ended for a blit, and waits for earlier frames that read the range;
+nothing this frame has read is written over, unless the frame goes round
+the whole ring, when the copies are uploads ordered after the draws. */
 
 #define STREAM_SIZE 0x2000000UL
 
@@ -458,8 +469,15 @@ BOOL xgpu_metal_stream(const void *data, unsigned long size, unsigned long align
 		alignment = 1;
 	start = (stream_head + alignment - 1) & ~(alignment - 1);
 	if (start + size > STREAM_SIZE)
+	{
+		stream_frame_used += STREAM_SIZE - stream_head;
 		start = 0;
-	xgpu_metal_upload_buffer(stream_buffer, start, data, size);
+	}
+	else
+		stream_frame_used += start - stream_head;
+	stream_frame_used += size;
+	copy_to_buffer(stream_frame_used <= STREAM_SIZE ? OPENCE_RENDER_OP_WRITE_BUFFER : OPENCE_RENDER_OP_UPLOAD_BUFFER,
+		stream_buffer, start, data, size);
 	stream_head = start + size;
 	*buffer = stream_buffer;
 	*offset = start;

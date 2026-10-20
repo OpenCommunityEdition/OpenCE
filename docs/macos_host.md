@@ -429,7 +429,17 @@ order the guest wrote it:
   and not what comes after. Buffers are shared, textures private.
 - **An upload inside a pass** ends the pass's encoder, storing its targets.
   The next draw begins another, which loads them, and the pass's state is
-  set on it again. A multisampled pass resolves only at `END_PASS`.
+  set on it again. A multisampled pass resolves only at `END_PASS`. At 4K
+  each such split stores and loads about 66 MB of targets.
+- **Writes are not blits.** The stream buffer (the game's own vertex and
+  index arrays, copied each draw, about 400 KB a frame on bloodgulch) is
+  filled with `WRITE_BUFFER`, which the host copies into the shared buffer
+  as it reads the command, keeping the pass's encoder. The guest writes it
+  as a ring and so never over what this frame has drawn from (a frame that
+  goes round the whole ring uploads instead); the host keeps, for each
+  buffer, the ranges written for each command buffer the GPU has not
+  finished, and waits for one before writing over its range. It took
+  bloodgulch's frames from about 195 encoders to 3.
 - **The window** is colour texture 0. Its passes draw one drawable of the
   layer until `PRESENT` presents it. `nextDrawable` blocks while the
   layer's three drawables are all in flight, which keeps the guest at most
@@ -530,9 +540,21 @@ itself:
 - A `hostposix_*` import's stub takes its errno back in `w1`, which the
   host sets at each exit, and stores it in the guest's errno, so no
   `host_errno` follows the call.
-- The memory watch (which finds the game's writes to buffers the renderer
-  copied) answers in the guest: the Metal renderer copies what each draw
-  uses, so it needs no page protection, only a counter.
+- The memory watch (which finds the game's writes to the textures and
+  buffers the renderer copied, `port/linux/src/memory_watch.c` on Linux)
+  is read in the guest. The host tracks writes with the VM's own page
+  tables (`port/macos/host/host_watch.c`): `host_memory_watch_protect`
+  takes write access from the window's 16 KB pages (`hv_vm_protect`), and
+  the guest's first write to one is an exit (a data abort, `EC 0x24`) at
+  which the host gives the page a new generation, gives write access back
+  and lets the write run again. The generations are in a table in guest
+  memory that the guest shares once (`host_memory_watch_share`) and reads
+  without an exit, so asking whether a range was written costs nothing,
+  and the guest calls the host only to protect a page again or to forget
+  a range freed. The host's own writes into the window (file reads) go
+  through a buffer of its own and `memory_watch_prepare_write`, as on
+  Linux. Before it, every range looked written every frame, and the
+  renderer copied every texture again each frame.
 
 The same game then made about 24 000 exits a second, nine in ten of them
 `host_syscall` (futexes, sleeps and the like).
@@ -555,6 +577,16 @@ The first run, before any of the work to make it faster: 80 ms a frame at
 p50 and 84 ms at p99 (about 12 a second), 28 ms of it the GPU's on the
 frame's last command buffer, with 125 exits a frame. The main menu drew in
 7.5 ms.
+
+| On an M1 Max, at 3840×2160 | p50 | p99 | GPU p50 | Exits a frame |
+| --- | --- | --- | --- | --- |
+| The first run | 80 ms | 84 ms | 28 ms | 125 |
+| Writes tracked by stage 2 (textures copied only when written) | 13.0 ms | 17.2 ms | 13 ms | — |
+| Stream writes without blits (about 195 encoders a frame to 3) | 4.17 ms | 4.78 ms | 0.53 ms | 79 |
+
+The last is 10 061 frames in 42.3 seconds, about 240 a second, with p99
+well inside 8.33 ms (120 a second). The longest frame, 124 ms, is the first
+after the map's load.
 
 ## Tests
 
@@ -583,9 +615,8 @@ aliases).
 
 ## Not supported yet
 
-- Drawing: the Metal renderer carries out the render batches, but the
-  game's Direct3D is not yet written as them, and OpenGL ES is refused while
-  headless. The game runs only with `debug.null_renderer`.
-- A window, and input from it.
 - Intel Macs, and macOS before 26.
-- An app bundle.
+- Gamepads: the app takes the keyboard and the mouse only, by choice, and
+  leaves SDL's joystick and gamepad events out of the guest's polls.
+- Drawing from the command-line `halo_host`: it stays headless
+  (`debug.null_renderer`); the window and the Metal renderer are the app's.
