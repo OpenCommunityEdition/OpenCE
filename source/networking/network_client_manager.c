@@ -2635,6 +2635,7 @@ static boolean network_game_client_process_messages(
 	boolean budgeted)
 {
 	boolean success = TRUE;
+	boolean reliable;
 	word message_packet_size;
 	struct transport_address source_address;
 	word message_packet[MAXIMUM_NETWORK_MESSAGE_SIZE / sizeof(word)];

@@ -476,6 +476,36 @@ long first_person_weapon_get_local_index(
 	return (local_player_index==MAXIMUM_NUMBER_OF_LOCAL_PLAYERS) ? NONE : local_player_index;
 }
 
+/* port: the spare slot's weapon is that teammate's current one, held idle.
+their fire is not simulated here, and the slot is cleared after the pane */
+void first_person_weapon_observe_unit(
+	short local_player_index,
+	long unit_index)
+{
+	struct first_person_weapon *first_person_weapon;
+
+	first_person_weapon_new_unit(local_player_index, unit_index);
+	first_person_weapon= first_person_weapon_get(local_player_index);
+	/* no idle animation: leave the slot empty so the pose builder's assert
+	(a missing state animation) does not take the game down */
+	if (first_person_weapon->state_animation.index==NONE)
+	{
+		first_person_weapon->weapon_index= NONE;
+		first_person_weapon->visible= FALSE;
+	}
+}
+
+void first_person_weapon_observe_clear(
+	short local_player_index)
+{
+	struct first_person_weapon *first_person_weapon= first_person_weapon_get(local_player_index);
+
+	first_person_weapon_set_visibility(local_player_index, FALSE);
+	first_person_weapon->weapon_index= NONE;
+	first_person_weapon->unit_index= NONE;
+	first_person_weapon->state_animation.index= NONE;
+}
+
 void first_person_weapon_draw(
 	void)
 {

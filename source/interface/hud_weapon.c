@@ -1936,6 +1936,86 @@ void hud_fix_weapon_data(
 	return;
 }
 
+/* port: one local slot, so a teammate pane can fill its reticle alone */
+static void hud_update_weapon_one(
+	short local_player_index)
+{
+	long unit_index = local_player_get_player_index(local_player_index) == NONE ?
+		NONE :
+		player_get(local_player_get_player_index(local_player_index))->unit_index;
+
+	if (unit_index != NONE)
+	{
+		long weapon_index = unit_inventory_get_weapon(
+			unit_index,
+			unit_get(unit_index)->unit.current_weapon_index);
+		boolean clear_to_default = FALSE;
+
+		if (weapon_index == NONE)
+		{
+			struct unit_datum *unit = unit_get(unit_index);
+
+			if (unit->object.parent_object_index != NONE &&
+				unit->unit.parent_seat_index != NONE)
+			{
+				struct unit_datum *parent = unit_get(
+					unit->object.parent_object_index);
+				struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+					&unit_definition_get(parent->definition_index)->unit.seats,
+					unit->unit.parent_seat_index,
+					struct unit_seat);
+
+				if (TEST_FLAG(seat->flags, _unit_seat_gunner_bit))
+				{
+					weapon_index = unit_inventory_get_weapon(
+						unit->object.parent_object_index,
+						unit_get(unit->object.parent_object_index)->unit.current_weapon_index);
+				}
+				else
+				{
+					clear_to_default = TRUE;
+				}
+			}
+		}
+
+		if (weapon_index != NONE)
+		{
+			struct weapon_datum *weapon = weapon_get(weapon_index);
+			struct weapon_definition *definition = weapon_definition_get(
+				weapon->definition_index);
+			struct weapon_interface_state weapon_state;
+
+			weapon_build_weapon_interface_state(
+				weapon_index,
+				&weapon_state);
+			if (definition->weapon.interface_definition.hud_interface.index != NONE)
+			{
+				long hud_index =
+					definition->weapon.interface_definition.hud_interface.index;
+
+				hud_update_weapon_local_player(
+					local_player_index,
+					weapon_index,
+					hud_index,
+					&weapon_state);
+			}
+		}
+		else if (!clear_to_default && !unit_get_weapon_count(unit_index))
+		{
+			struct weapon_interface_state weapon_state = { 0 };
+			long hud_index = hud_globals->defaults.default_weapon_hud.index;
+
+			hud_update_weapon_local_player(
+				local_player_index,
+				NONE,
+				hud_index,
+				&weapon_state);
+		}
+
+		get_hud_state(local_player_index)->last_weapon_index = weapon_index;
+	}
+}
+
 void hud_update_weapon(
 	void)
 {
@@ -1952,85 +2032,24 @@ void hud_update_weapon(
 		local_player_index != NONE;
 		local_player_index = local_player_get_next(local_player_index))
 	{
-		long unit_index = local_player_get_player_index(local_player_index) == NONE ?
-			NONE :
-			player_get(local_player_get_player_index(local_player_index))->unit_index;
-
-		if (unit_index != NONE)
-		{
-			long weapon_index = unit_inventory_get_weapon(
-				unit_index,
-				unit_get(unit_index)->unit.current_weapon_index);
-			boolean clear_to_default = FALSE;
-
-			if (weapon_index == NONE)
-			{
-				struct unit_datum *unit = unit_get(unit_index);
-
-				if (unit->object.parent_object_index != NONE &&
-					unit->unit.parent_seat_index != NONE)
-				{
-					struct unit_datum *parent = unit_get(
-						unit->object.parent_object_index);
-					struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
-						&unit_definition_get(parent->definition_index)->unit.seats,
-						unit->unit.parent_seat_index,
-						struct unit_seat);
-
-					if (TEST_FLAG(seat->flags, _unit_seat_gunner_bit))
-					{
-						weapon_index = unit_inventory_get_weapon(
-							unit->object.parent_object_index,
-							unit_get(unit->object.parent_object_index)->unit.current_weapon_index);
-					}
-					else
-					{
-						clear_to_default = TRUE;
-					}
-				}
-			}
-
-			if (weapon_index != NONE)
-			{
-				struct weapon_datum *weapon = weapon_get(weapon_index);
-				struct weapon_definition *definition = weapon_definition_get(
-					weapon->definition_index);
-				struct weapon_interface_state weapon_state;
-
-				weapon_build_weapon_interface_state(
-					weapon_index,
-					&weapon_state);
-				if (definition->weapon.interface_definition.hud_interface.index != NONE)
-				{
-					long hud_index =
-						definition->weapon.interface_definition.hud_interface.index;
-
-					hud_update_weapon_local_player(
-						local_player_index,
-						weapon_index,
-						hud_index,
-						&weapon_state);
-				}
-			}
-			else if (!clear_to_default && !unit_get_weapon_count(unit_index))
-			{
-				struct weapon_interface_state weapon_state = { 0 };
-				long hud_index = hud_globals->defaults.default_weapon_hud.index;
-
-				hud_update_weapon_local_player(
-					local_player_index,
-					NONE,
-					hud_index,
-					&weapon_state);
-			}
-
-			get_hud_state(local_player_index)->last_weapon_index = weapon_index;
-		}
+		hud_update_weapon_one(local_player_index);
 	}
 
 	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_weapon.c", 0xD4);
 
 	return;
+}
+
+/* port: the teammate pane's reticle. the state lives on the spare slot, so
+the local player's own reticle is left as the update already set it */
+void hud_weapon_port_update_player(
+	short local_player_index)
+{
+	if (local_player_index < 0 || local_player_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+		return;
+	if (!weapon_hud_globals)
+		return;
+	hud_update_weapon_one(local_player_index);
 }
 
 void hud_render_weapon_interface(

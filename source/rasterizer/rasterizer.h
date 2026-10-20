@@ -748,6 +748,14 @@ void rasterizer_draw_string(
 	point2d *cursor_reference,
 	short height_adjust,
 	char const *string);
+/* port: one string at a scale about a point. the previous scale is put back */
+void rasterizer_draw_string_scaled(
+	rectangle2d const *bounds,
+	rectangle2d const *clip,
+	char const *string,
+	float scale,
+	float anchor_x,
+	float anchor_y);
 
 /* ---------- prototypes/RASTERIZER_MEMORY_POOL.C */
 

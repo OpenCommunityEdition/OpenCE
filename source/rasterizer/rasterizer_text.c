@@ -563,6 +563,28 @@ rasterizer_draw_string(
 	return;
 }
 
+/* port: the practice timer draws at its scale about a point, then the
+previous scale is put back */
+void rasterizer_draw_string_scaled(
+	rectangle2d const *bounds,
+	rectangle2d const *clip,
+	char const *string,
+	float scale,
+	float anchor_x,
+	float anchor_y)
+{
+	real previous_scale = text_scale;
+	real previous_x = text_scale_origin_x;
+	real previous_y = text_scale_origin_y;
+
+	rasterizer_text_set_scale(
+		scale >= 0.5f && scale <= 1.0f ? (real)scale : 1.0f,
+		anchor_x,
+		anchor_y);
+	rasterizer_draw_string(bounds, clip, NULL, 0, string);
+	rasterizer_text_set_scale(previous_scale, previous_x, previous_y);
+}
+
 void
 rasterizer_draw_unicode_string(
 	rectangle2d const *bounds,
