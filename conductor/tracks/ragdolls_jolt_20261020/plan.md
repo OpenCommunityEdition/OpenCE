@@ -63,9 +63,9 @@
 - [x] Task: Particles as rigid bodies 9116affd
     - [x] Write tests: harness tests that point-physics particles that collide with the level spawn debris bodies with the definition's size and lifetime, only with `game.physics_debris` on; the cap hands the oldest back to point physics
     - [x] A `port:` hook in the particle systems' point-physics update; drawing from the results
-- [ ] Task: Garbage objects
-    - [ ] Write tests: harness tests that garbage objects become debris bodies and are drawn from Jolt's pose
-    - [ ] A `port:` hook for garbage
+- [x] Task: Garbage objects fa9b088a
+    - [x] Write tests: harness tests that garbage objects become debris bodies and are drawn from Jolt's pose
+    - [x] A `port:` hook for garbage
 - [ ] Task: Golden frames of debris
     - [ ] Write tests: casings and debris at rest after a burst of fire, with the frame clock
     - [ ] Approve the references
