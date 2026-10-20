@@ -61,9 +61,9 @@
 - [x] Task: The main menu draws 6b1e9ab9
     - [x] Write tests: the main-menu golden frame (approved by you once)
     - [x] Fix what the frame shows wrong
-- [~] Task: Bloodgulch draws
-    - [ ] Write tests: a bloodgulch golden frame from a fixed camera (approved by you once)
-    - [ ] Fix what the frame shows wrong
+- [x] Task: Bloodgulch draws 9ca74bf6
+    - [x] Write tests: a bloodgulch golden frame from a fixed camera (approved by you once)
+    - [x] Fix what the frame shows wrong
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Direct3D 8 on Metal' (Protocol in workflow.md)
 
 ## Phase 5: Parity with the GL build's extras
