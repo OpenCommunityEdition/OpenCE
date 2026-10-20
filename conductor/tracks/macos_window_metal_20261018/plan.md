@@ -78,7 +78,7 @@
     - [x] Draw frame time and fps when on
 - [x] Task: Conductor - User Manual Verification 'Phase 5: Parity with the GL build's extras' (Protocol in workflow.md)
 
-## Phase 6: 4K at 120fps
+## Phase 6: 4K at 120fps [checkpoint: ef38b20e]
 - [x] Task: Answer the hottest imports in the guest 7e8d0dac
     - [x] Write tests: ticks from the guest's counter (CNTVCT_EL0) agree with the host's; errno kept guest-side; exits/s reported lower than the 500k baseline
     - [x] Move host_sdl_ticks and host_errno into the guest runtime
@@ -90,4 +90,4 @@
     - [x] Record the result (p99 ≤ 8.33 ms) in docs/macos_host.md
 - [x] Task: Documentation a779e96f
     - [x] docs/macos_host.md (app, renderer, ring, input, audio), the settings table, tech-stack.md
-- [ ] Task: Conductor - User Manual Verification 'Phase 6: 4K at 120fps' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 6: 4K at 120fps' (Protocol in workflow.md)
