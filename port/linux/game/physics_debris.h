@@ -69,4 +69,8 @@ void physics_debris_result(long id, boolean awake, struct ragdoll_pose const *po
 /* every piece forgotten (the map goes, a saved game loads) */
 void physics_debris_dispose_from_old_map(void);
 
+/* (debug.physics_draw) the body of an id as the host last posed it, and
+whether it is awake; FALSE for an id with no live, posed body */
+boolean physics_debris_posed_body(long id, struct physics_debris_body *body, boolean *awake);
+
 #endif

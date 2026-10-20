@@ -472,6 +472,66 @@ Its size is a literal in the source, so a library is made for each size of
 view. `"ssaa2x"` and the multisampled settings are not drawn by the Metal
 renderer, which logs this and draws without them.
 
+### Physics
+
+With `game.ragdolls` or `game.physics_debris` on, the dead and the debris
+are simulated for show by Jolt Physics (`port/third_party/jolt`) in the
+host. They are cosmetic and each machine's own: the game's own physics
+still decides everything the game plays by, and nothing more is sent over
+the network (`HALO_PORT_NETWORK_VERSION` is unchanged).
+
+Once a tick the guest (`port/linux/game/physics_jolt.c`) writes a batch of
+commands in its own memory and gives it to the host with
+`host_physics_step`, with a buffer for the results: one VM exit a tick.
+`port/macos/include/host_physics.h` lays out the batch and the results.
+The commands:
+
+- the world: cleared on a map change or a saved game's load, and the level,
+  each collision surface of the structure bsp cut into triangles and sent
+  once when it loads, which the host makes Jolt's static mesh;
+- ragdolls (`ragdolls.c`, `ragdoll_bodies.c`): added with each part's shape,
+  mass and joint from the biped's model and collision model, driven by
+  motors toward the death animation's poses, then limp; struck by impulses
+  from the game's damage; a joint broken to tear a limb away
+  (`game.dismemberment`);
+- bodies: debris (`physics_debris.c`), a particle that strikes the level or
+  a garbage object handed over with its definition's size, density,
+  friction and elasticity (when every slot is taken, the oldest particle
+  goes back to the game's own point physics); and kinematic stand-ins moved each tick for the
+  vehicles and the living bipeds, so that the dead and the debris strike
+  them.
+
+The host's bridge (`port/macos/host/physics/physics_bridge.c`) reads every
+command through bounds-checked reads of guest memory and refuses (and logs,
+`HALO_HOST_PHYSICS_LOG` for each step's counts) anything out of range: ids,
+sizes, part counts, triangles, non-finite numbers. It carries out the rest
+on one Jolt world (`physics.cpp`), made when the first batch arrives, steps
+it by the tick's time on the calling thread and three of Jolt's worker
+threads (each island of touching bodies a job; Jolt sorts contacts and
+constraints first, so a run repeats exactly) and writes each ragdoll's parts' poses and each body's
+pose before the import returns. The guest draws from them: a ragdoll's
+parts pose its model's nodes, a piece of debris its particle or object.
+Jolt's world is in metres (`HOST_PHYSICS_METRES_PER_UNIT`, 3.048 to a world
+unit). The settings that keep small, fast pieces such as casings from
+jittering or sinking: a penetration slop of 5 mm, a speculative contact
+distance of 2 cm, the body-pair contact cache off, and an angular damping
+of 2 a second; a piece is at rest once Jolt puts it to sleep, or after half
+a second slower than 0.25 world units a second.
+
+`debug.physics_draw` draws the host's bodies as wireframes over the game,
+with the game's own debug lines (`physics_draw.c`, called from
+`render_debug()`): a ragdoll's parts green while it is awake, red for a
+torn limb and grey asleep; debris yellow awake and grey asleep.
+
+`tools/test_ragdoll_physics.py` builds the bridge natively and tests it
+with the profiles read from the maps
+(`port/macos/tests/host_ragdoll_profiles_test.c`): the stock bipeds' bodies,
+the frag grenade's and the warthog's values, the assault rifle's casing. The asset-free harness tests
+the game's side (`tools/harness/tests/test_ragdolls.py`,
+`test_physics_debris.py`, `test_physics_draw.py`), and
+`tools/test_macos_frames.py` has golden frames of a ragdoll, of a torn
+limb and of casings in flight and at rest.
+
 ### Frame captures
 
 With `HALO_HOST_CAPTURE`, the app draws the guest's window off the screen,

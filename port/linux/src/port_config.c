@@ -642,8 +642,9 @@ static const struct config_setting config_settings[] =
 		"the random numbers start from a fixed seed, for frames captured the\n"
 		"same run to run." },
 	{ "debug.physics_draw", _config_boolean, "false", "HALO_PHYSICS_DRAW", _environment_value, _platform_all,
-		"Draw the physics' bodies (ragdolls' parts, debris and the level's\n"
-		"triangles) as wireframes over the game, for tuning them." },
+		"Draw the physics' bodies (ragdolls' parts and debris, as the host last\n"
+		"posed them) as wireframes over the game, for tuning them: green awake,\n"
+		"red a torn limb, yellow debris, grey asleep. The macOS app only." },
 	{ "debug.null_renderer", _config_boolean, "false", "HALO_NULL_RENDERER", _environment_set_is_true, _platform_all,
 		"Run without a window, drawing nothing." },
 	{ "debug.gl_debug", _config_boolean, "false", "HALO_GL_DEBUG", _environment_set_is_true, _platform_all,

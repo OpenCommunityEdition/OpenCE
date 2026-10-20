@@ -52,6 +52,9 @@ a particle that struck the level made one, and one that is a body moved as
 the host has it, settled once the body sleeps */
 void physics_debris_particle_collided(long particle_index);
 unsigned char physics_debris_particle_update(long particle_index, float dt, unsigned char *settled);
+/* the host's bodies drawn as wireframes (debug.physics_draw,
+port/linux/game/physics_draw.c, render_debug.c) */
+void physics_draw_render(void);
 
 /* the port's menus' screen for one of ui.map's, by name, else the name
 (port/linux/game/menu_tags.c) */

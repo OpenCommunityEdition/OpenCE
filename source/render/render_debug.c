@@ -532,6 +532,8 @@ void render_debug(
 	render_debug_input();
 	render_debug_structure_decals();
 	players_debug_render();
+	/* port: the host's Jolt bodies, with debug.physics_draw */
+	physics_draw_render();
 
 	for (entry_index = 0; entry_index < render_debug_globals.entry_count; entry_index++)
 	{

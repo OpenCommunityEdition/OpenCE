@@ -647,6 +647,21 @@ void physics_debris_result(
 	debris->posed = TRUE;
 }
 
+boolean physics_debris_posed_body(
+	long id,
+	struct physics_debris_body *body,
+	boolean *awake)
+{
+	struct physics_debris const *debris = physics_debris_of_id(id);
+
+	if (!debris || debris->state != _physics_debris_live || !debris->posed)
+		return FALSE;
+	*body = debris->body;
+	body->pose = debris->current;
+	*awake = debris->awake;
+	return TRUE;
+}
+
 void physics_debris_dispose_from_old_map(void)
 {
 	memset(&physics_debris, 0, sizeof(physics_debris));
