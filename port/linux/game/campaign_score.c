@@ -40,11 +40,14 @@ seconds.
 #include "render/render.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "sound/game_sound.h"
 #include "text/draw_string.h"
 #include "text/font_group.h"
 #include "units/units.h"
 
 #include "campaign_score.h"
+
+#include "../src/effect_audio.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -112,8 +115,14 @@ void network_coop_note_score_kill(short player_index, long variant_index, short 
 void network_coop_note_score_won(boolean competitive);
 /* port_config.c's */
 char const *config_string(char const *name);
+/* xbox_files.c's: the data folder, where the medals' voicelines are */
+const char *platform_data_root(void);
 
 /* ---------- globals */
+
+/* a kill within this long of the player's last is part of a multikill (game ticks) */
+#define CAMPAIGN_SCORE_MULTIKILL_TICKS (4 * TICKS_PER_SECOND)
+#define CAMPAIGN_SCORE_MULTIKILL_GAIN 0.8f
 
 static struct campaign_score_kill campaign_score_kills[CAMPAIGN_SCORE_MAXIMUM_KILLS];
 static long campaign_score_kill_count = 0;
@@ -130,6 +139,9 @@ static boolean campaign_score_button_primed = FALSE;
 static boolean campaign_score_button_held = FALSE;
 /* the summary is shown over the level just won, which waits for it */
 static boolean campaign_score_postgame = FALSE;
+/* each player's multikill: the game time of their last kill, and how many in a row */
+static long campaign_score_chain_time[CAMPAIGN_SCORE_MAXIMUM_PLAYERS];
+static short campaign_score_chain_count[CAMPAIGN_SCORE_MAXIMUM_PLAYERS];
 /* whether each player keeps a score of their own in co-op (network.coop_score_type
 "competitive"): the host's choice, which a client is told with the kills */
 static boolean campaign_score_competitive = FALSE;
@@ -533,6 +545,8 @@ void campaign_score_new_map(
 
 	campaign_score_kill_count = 0;
 	campaign_score_postgame = FALSE;
+	memset(campaign_score_chain_time, 0, sizeof(campaign_score_chain_time));
+	memset(campaign_score_chain_count, 0, sizeof(campaign_score_chain_count));
 	campaign_score_full_logged = FALSE;
 	campaign_score_last_time = 0;
 	/* (a level just won, shown now; else nothing) */
@@ -541,6 +555,54 @@ void campaign_score_new_map(
 		memcpy(campaign_score_summary[line], campaign_score_pending[line], CAMPAIGN_SCORE_SUMMARY_LENGTH);
 	campaign_score_pending_lines = 0;
 	campaign_score_button_primed = FALSE;
+
+	return;
+}
+
+/* a player's kill, for their multikill: the second in 4 seconds is a double
+kill, the third a triple kill and the fourth, and any after, a killtacular. The
+voiceline is the sound tag sound\dialog\multiplayer1\double_kill, triple_kill
+or killtacular, if the map has it (Halo's multiplayer maps do), else the WAV
+file of the same name in the data folder (no file, no sound). It plays for the
+machine whose player made the kill. */
+static void campaign_score_multikill(
+	short player_index)
+{
+	long time = game_time_get();
+	short local_player_index;
+	char const *file;
+	char path[512];
+	long sound_index;
+
+	if (time < campaign_score_chain_time[player_index] ||
+		time - campaign_score_chain_time[player_index] > CAMPAIGN_SCORE_MULTIKILL_TICKS)
+		campaign_score_chain_count[player_index] = 0;
+	campaign_score_chain_time[player_index] = time;
+	if (campaign_score_chain_count[player_index] < 100)
+		campaign_score_chain_count[player_index]++;
+	if (campaign_score_chain_count[player_index] < 2 || !campaign_score_enabled())
+		return;
+	file = campaign_score_chain_count[player_index] == 2 ? "double_kill" :
+		(campaign_score_chain_count[player_index] == 3 ? "triple_kill" : "killtacular");
+	snprintf(path, sizeof(path), "sound\\dialog\\multiplayer1\\%s", file);
+	sound_index = tag_loaded('snd!', path);
+	for (local_player_index = local_player_get_next(NONE); local_player_index != NONE;
+		local_player_index = local_player_get_next(local_player_index))
+	{
+		if (local_player_get_player_index(local_player_index) == player_index)
+		{
+			if (sound_index != NONE)
+			{
+				unspatialized_impulse_sound_new(sound_index, 1.0f);
+			}
+			else
+			{
+				snprintf(path, sizeof(path), "%s/%s.wav", platform_data_root(), file);
+				effect_audio_play_file(path, CAMPAIGN_SCORE_MULTIKILL_GAIN);
+			}
+			break;
+		}
+	}
 
 	return;
 }
@@ -570,6 +632,7 @@ static boolean campaign_score_append(
 	if (campaign_score_enabled())
 		platform_log("campaign score: player %d killed %s for %d",
 			(int)player_index, tag_get_name(variant_index), (int)points);
+	campaign_score_multikill(player_index);
 
 	return TRUE;
 }
