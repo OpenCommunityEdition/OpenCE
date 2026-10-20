@@ -73,9 +73,9 @@
 - [x] Task: Post-processing, incl. SMAA 3447cec4
     - [x] Write tests: golden frames with each post pass on; stock frames unchanged with them at defaults
     - [x] xgpu_post.c's passes in MSL, same settings and defaults
-- [ ] Task: The frame-time overlay
-    - [ ] Write tests: the setting exists, off by default, and documented in the settings table
-    - [ ] Draw frame time and fps when on
+- [x] Task: The frame-time overlay 69de6c45
+    - [x] Write tests: the setting exists, off by default, and documented in the settings table
+    - [x] Draw frame time and fps when on
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Parity with the GL build's extras' (Protocol in workflow.md)
 
 ## Phase 6: 4K at 120fps
