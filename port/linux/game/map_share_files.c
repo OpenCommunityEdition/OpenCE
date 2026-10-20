@@ -777,6 +777,7 @@ void map_share_level_name_choose(
 	char digits[MAP_SHARE_NAME_DIGITS + 1];
 	byte hash[MAP_SHARE_HASH_BYTES];
 	long length;
+	char const *prefix;
 
 	globals->chosen_level[0] = 0;
 	if (!level_name || !custom_edition_level_name(level_name) || !custom_edition_map_file_named(level_name, path) ||

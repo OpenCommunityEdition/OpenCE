@@ -1838,6 +1838,9 @@ static void first_person_weapon_update(
 		long sound_definition_index;
 		short animation_update_result;
 		boolean moving;
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+		unsigned animation_sound_role;
+#endif
 
 		model_definition_get(weapon_definition->weapon.interface_definition.first_person_model.index);
 		animation_graph= animation_graph_definition_get(

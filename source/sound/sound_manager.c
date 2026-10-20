@@ -241,7 +241,6 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "tag_files/tag_files.h"
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
-#include "port_config.h"
 #include "../../port/linux/game/performance_options.h"
 #include "performance_sound.h"
 #endif

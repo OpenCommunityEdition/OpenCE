@@ -18,7 +18,7 @@ shield and reticle draw without a second local player. */
 #include "units/units.h"
 #include "evolved_rules.h"
 #include "evolved_views.h"
-#include "port_config.h"
+#include "../src/port_config.h"
 #include <string.h>
 
 /* the drawn body is between ticks; the sight point is the tick's */

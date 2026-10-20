@@ -5,7 +5,7 @@
 #include "rasterizer/rasterizer_text.h"
 #include "render/render.h"
 #include "text/draw_string.h"
-#include "port_config.h"
+#include "../src/port_config.h"
 #include "performance_timer_render.h"
 
 struct performance_timer_layout

@@ -422,6 +422,7 @@ void cinematic_render(
 			long font_index;
 			long help_text_tag_index;
 			real fade_amount;
+			boolean match_clock;
 
 			active_title =
 				&cinematic_globals->queued_titles[title_slot_index];

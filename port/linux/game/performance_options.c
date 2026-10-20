@@ -26,7 +26,7 @@
 #include "performance_timer_schedule.h"
 #include "performance_timer_items.h"
 #include "performance_timer_render.h"
-#include "port_config.h"
+#include "../src/port_config.h"
 
 /* The glowing pads are loaded from the user's evolved map. These stay
 declared here so a missing model keeps the line markers. */
