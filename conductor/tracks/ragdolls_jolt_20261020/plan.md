@@ -3,9 +3,9 @@
 ## Phase 1: Jolt in the host
 - [x] Task: Record C++17 for Jolt in the tech stack 1acd3b7e
     - [x] Update `conductor/tech-stack.md` (macOS Host: Jolt Physics, C++17, behind a C wrapper) before any code
-- [ ] Task: Vendor Jolt Physics
-    - [ ] Write tests: pytest checks `port/third_party/jolt/README.md` names the upstream, commit and checksum, and that the tree matches the checksum
-    - [ ] Copy Jolt unchanged; build it in Nix and `configure.py` as a static library (C++17, single-threaded, `JPH_CROSS_PLATFORM_DETERMINISTIC`, no FMA)
+- [x] Task: Vendor Jolt Physics 4fdca442
+    - [x] Write tests: pytest checks `port/third_party/jolt/README.md` names the upstream, commit and checksum, and that the tree matches the checksum
+    - [x] Copy Jolt unchanged; build it in Nix and `configure.py` as a static library (C++17, single-threaded, `JPH_CROSS_PLATFORM_DETERMINISTIC`, no FMA)
 - [ ] Task: The C wrapper
     - [ ] Write tests: native tests (`host_physics_test.c`) create a world, add a static plane and a box, step it, and see the box come to rest; two runs give identical poses
     - [ ] `port/macos/host/physics/physics.h` and `physics.cpp`: world, static mesh, bodies, ragdolls, impulses, kinematic bodies, step, read poses
