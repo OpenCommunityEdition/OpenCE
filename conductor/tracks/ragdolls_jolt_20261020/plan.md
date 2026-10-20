@@ -75,8 +75,8 @@
 - [x] Task: The benchmark with ragdolls and debris 8b432198
     - [x] Write tests: the benchmark script spawns 30 ragdolls and 200 debris pieces on bloodgulch at 3840×2160 and reports p99 and the physics tick's time
     - [x] Meet p99 ≤ 8.33 ms and ≤ 1 ms a tick on the M1 Max; record the results in `docs/macos_host.md` (recorded; not met: the step's p50 is 0.45 ms but its peak 2.96 ms with about 590 bodies awake, and the frames' p99 is 29 ms, the stock game's drawing of the crowd, 25.4 ms with both settings off)
-- [ ] Task: A network game with the settings on
-    - [ ] Write tests: `tools/test_macos_host.py` plays two copies with `HALO_NET_ONLINE=false` and both settings on; `HALO_PORT_NETWORK_VERSION` is unchanged
+- [x] Task: A network game with the settings on cff44941
+    - [x] Write tests: `tools/test_macos_host.py` plays two copies with `HALO_NET_ONLINE=false` and both settings on; `HALO_PORT_NETWORK_VERSION` is unchanged (the two-copy tests skip here without 127.0.0.2 and 127.0.0.3 on lo0; a hosted copy plays the crowd)
 - [ ] Task: `debug.physics_draw` and documentation
     - [ ] Write tests: the wireframe pass draws only with the setting on
     - [ ] Describe the physics bridge in `docs/macos_host.md`
