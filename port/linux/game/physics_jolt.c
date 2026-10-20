@@ -669,6 +669,13 @@ void physics_jolt_update(
 	long index;
 	long id;
 
+	/* (the reconnect procs run only on a switch from another bsp: a map's
+	first is sent here) */
+	if (physics_jolt_enabled() && physics_jolt_level_bsp_index != global_structure_bsp_index_get() &&
+		global_structure_bsp_index_get() != NONE)
+	{
+		physics_jolt_level_send();
+	}
 	if (!physics_jolt_enabled() || physics_jolt_level_bsp_index == NONE)
 	{
 		ragdolls_deaths_clear();

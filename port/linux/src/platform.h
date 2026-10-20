@@ -178,6 +178,8 @@ void memory_watch_begin_frame(void);
 /* 100 ns intervals since 1601-01-01, as FILETIME uses */
 /* a frame was shown: debug.frame_clock steps the clock (xbox_kernel.c) */
 void platform_clock_frame_shown(void);
+/* the frames shown since the game started (xbox_kernel.c) */
+unsigned long platform_frames_shown(void);
 void platform_unix_time_to_filetime(unsigned long seconds, unsigned long nanoseconds, FILETIME *file_time);
 void platform_filetime_to_unix_time(const FILETIME *file_time, unsigned long *seconds, unsigned long *nanoseconds);
 

@@ -263,3 +263,38 @@ def test_bloodgulch_draws_anti_aliased(tmp_path, anti_aliasing):
     red, green, blue, _ = frame.pixel(150, 320)
     assert green > red and green > blue
     check(frame, f"bloodgulch_{anti_aliasing}", frame_compare.Tolerance(fraction=0.02, largest=255))
+
+
+# the ragdoll scene (debug.network_test_ragdoll): at 40 seconds of frames a
+# frag grenade kills the biped six world units before the camera (a cyborg:
+# bloodgulch has no Grunt), and eight seconds later a Warthog rolls down the
+# slope into its body; the first camera watches the fall, the second, nearer
+# and narrower, the shove
+RAGDOLL_CAMERA = "95.0 -150.0 4.0\n-0.6 0.78 -0.36\n0 0 1\n0.95\n"
+RAGDOLL_SHOVE_CAMERA = "95.0 -150.0 4.0\n-0.6 0.78 -0.233\n0 0 1\n0.5\n"
+
+
+@pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")
+@pytest.mark.parametrize("name, frame, camera", [
+    # (thrown from the grenade's smoke; lying limp on the slope; pushed before
+    # the Warthog's bumper; at rest between its front wheels)
+    ("ragdoll_falling", 2430, RAGDOLL_CAMERA),
+    ("ragdoll_at_rest", 2850, RAGDOLL_CAMERA),
+    ("ragdoll_shoved", 2930, RAGDOLL_SHOVE_CAMERA),
+    ("ragdoll_shoved_at_rest", 3100, RAGDOLL_SHOVE_CAMERA),
+])
+def test_ragdolls_draw_as_approved(tmp_path, name, frame, camera):
+    # game.ragdolls on; the frames above it, with the setting at its default,
+    # are unchanged
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "maps").symlink_to(MAPS)
+    (root / "camera.txt").write_text(camera)
+    frame = capture_game(tmp_path, frame, {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NETWORK_TEST_CAMERA": "1",
+                                           "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+                                           "HALO_RAGDOLLS": "true", "HALO_NETWORK_TEST_RAGDOLL": "40"},
+                         seconds=75, data_root=root)
+    assert (frame.width, frame.height) == GAME_SIZE
+    # (the scene is keyed to frames shown, the physics stepped with the
+    # game's ticks; the smoke and the trees far off move by the game's time)
+    check(frame, name, frame_compare.Tolerance(fraction=0.02, largest=255))

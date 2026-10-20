@@ -709,10 +709,18 @@ static unsigned long long platform_clock_nanoseconds(void)
 	return value;
 }
 
+static unsigned long frames_shown;
+
+unsigned long platform_frames_shown(void)
+{
+	return __atomic_load_n(&frames_shown, __ATOMIC_RELAXED);
+}
+
 void platform_clock_frame_shown(void)
 {
 	unsigned long long now;
 
+	__atomic_add_fetch(&frames_shown, 1, __ATOMIC_RELAXED);
 	if (frame_clock == 0)
 		return;
 	now = platform_real_clock_nanoseconds();

@@ -247,8 +247,9 @@ static void a_valid_batch_is_carried_out(void)
     CHECK(ragdoll && ragdoll[0] == 3 && ragdoll[1] == 2 && ragdoll[2] == 1 && ragdoll[3] == 0);
     pose = body_pose(7);
     CHECK(pose && pose[2] < 1.0f && pose[2] > 0.9f);
-    /* in world units: the box falls to rest on the level, its half extent up */
-    for (i = 0; i < 90; i++) {
+    /* in world units: the box falls to rest on the level, its half extent up
+       (and sleeps after about 100 ticks, at four collision steps a tick) */
+    for (i = 0; i < 120; i++) {
         begin(&writer);
         CHECK(step(bridge, &writer, 1.0f / 30.0f) == 0);
     }

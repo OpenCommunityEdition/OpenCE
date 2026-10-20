@@ -35,6 +35,13 @@ and debug.network_test_pickup (the last player stands on a weapon lying
 about that many seconds in, and a joining machine's player holds the action
 button a second later, to pick it up).
 
+debug.network_test_ragdoll (game.ragdolls' golden frames,
+tools/test_macos_frames.py): that many seconds of frames shown in (a 60th
+of a second each, the frames the captures count), a frag grenade's
+explosion (its detonation effect, damage and all) kills a biped of the
+first player's kind standing six metres before the camera, and eight
+seconds later a vehicle rolls into its body from the side.
+
 debug.network_test_camera holds the view at the debug camera of camera.txt
 in the data root (director_load_camera), for frames captured the same run
 to run.
@@ -65,11 +72,14 @@ Called from the main loop every frame (main.c).
 #include "tag_files/tag_files.h"
 #include "camera/observer.h"
 #include "camera/director.h"
+#include "effects/effects.h"
+#include "physics/collisions.h"
 
 #include "../src/p2p.h" /* port: port/linux/src/p2p.c, p2p_lobby.c */
 #include "network_chat.h"
 #include "network_voice.h"
 #include "halo_keyboard.h"
+#include "ragdolls.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -83,6 +93,8 @@ double config_real(char const *name);
 long config_integer(char const *name);
 int config_write(char const *name, char const *value);
 void platform_log(char const *format, ...);
+/* xbox_kernel.c's */
+unsigned long platform_frames_shown(void);
 /* damage.c's */
 void damage_kill_object_for_player(long object_index, long player_index);
 /* network_distributed.c's */
@@ -139,6 +151,13 @@ static struct
 	boolean browsing;
 	boolean browse_listed;
 	float browse_seconds;
+	/* debug.network_test_ragdoll's: when, how far the scene has gone, its
+	biped, where it stands and the view's right */
+	real ragdoll_time;
+	short ragdoll_stage;
+	long ragdoll_biped_index;
+	real_point3d ragdoll_point;
+	real_vector3d ragdoll_right;
 } network_test;
 
 /* the variant at the index of the list (copied to name), FALSE past its end */
@@ -201,6 +220,8 @@ static void network_test_read_settings(
 	network_test.vehicle_time = (real)config_real("debug.network_test_vehicle");
 	network_test.pickup_time = (real)config_real("debug.network_test_pickup");
 	network_test.chat_time = (real)config_real("debug.network_test_chat");
+	network_test.ragdoll_time = (real)config_real("debug.network_test_ragdoll");
+	network_test.ragdoll_biped_index = NONE;
 	snprintf(network_test.pickup_weapon, sizeof(network_test.pickup_weapon), "%s",
 		config_string("debug.network_test_pickup_weapon"));
 	network_test.camera = config_boolean("debug.network_test_camera") ? TRUE : FALSE;
@@ -610,6 +631,168 @@ static void network_test_vehicle(
 	}
 }
 
+/* debug.network_test_ragdoll's scene, by the game's ticks: two seconds
+before its time a biped of the first player's kind stands on the ground six
+metres before the camera, facing it; at its time, its shield gone and its
+health nearly, a frag grenade goes off at its left foot; eight seconds on,
+the nearest vehicle rolls at its body from the view's right */
+static void network_test_ragdoll(
+	void)
+{
+	/* (by the frames shown, which the macOS app's captures count, not the
+	game's time, which has the map's load in it) */
+	long frame = (long)platform_frames_shown();
+	long start = (long)(network_test.ragdoll_time * 60.0f);
+	struct player_datum *first = NULL;
+	struct data_iterator iterator;
+
+	data_iterator_new(&iterator, player_data);
+	first = (struct player_datum *)data_iterator_next(&iterator);
+	if (network_test.ragdoll_stage == 0 && frame >= start - 2 * 60 &&
+		first && first->unit_index != NONE)
+	{
+		struct observer_result const *camera = observer_get_camera(0);
+		struct object_placement_data data;
+		struct collision_result collision;
+		real_vector3d forward;
+		real_vector3d down;
+		real_point3d above;
+
+		forward = camera->forward;
+		forward.k = 0.0f;
+		normalize3d(&forward);
+		network_test.ragdoll_right.i = forward.j;
+		network_test.ragdoll_right.j = -forward.i;
+		network_test.ragdoll_right.k = 0.0f;
+		point_from_line3d(&camera->position, &forward, 6.0f, &above);
+		above.z += 2.0f;
+		down.i = 0.0f;
+		down.j = 0.0f;
+		down.k = -50.0f;
+		network_test.ragdoll_point = above;
+		if (collision_test_vector(FLAG(_collision_test_structure_bit) | FLAG(_collision_test_front_facing_surfaces_bit),
+			&above, &down, NONE, &collision))
+		{
+			network_test.ragdoll_point = collision.point;
+		}
+		object_placement_data_new(&data, object_get(first->unit_index)->definition_index, NONE);
+		data.position = network_test.ragdoll_point;
+		data.position.z += 0.05f;
+		data.forward.i = -forward.i;
+		data.forward.j = -forward.j;
+		data.forward.k = 0.0f;
+		data.up = *global_up3d;
+		network_test.ragdoll_biped_index = object_new(&data);
+		network_test.ragdoll_stage = 1;
+		platform_log("network test: a biped %lx stands at (%.2f %.2f %.2f)", network_test.ragdoll_biped_index,
+			network_test.ragdoll_point.x, network_test.ragdoll_point.y, network_test.ragdoll_point.z);
+	}
+	if (network_test.ragdoll_stage == 1 && frame >= start)
+	{
+		long projectile_index = tag_loaded(PROJECTILE_DEFINITION_TAG, "weapons\\frag grenade\\frag grenade");
+		long effect_index = projectile_index != NONE ?
+			projectile_definition_get(projectile_index)->projectile.effect.index : NONE;
+		/* (the markers a projectile detonates with, projectiles.c) */
+		char const *marker_names[2];
+		real_point3d points[2];
+		real_vector3d forwards[2];
+		real_vector3d forward;
+
+		network_test.ragdoll_stage = 2;
+		if (network_test.ragdoll_biped_index == NONE || effect_index == NONE)
+		{
+			platform_log("network test: no biped or no frag grenade, for the ragdoll");
+			return;
+		}
+		{
+			struct object_datum *biped = object_get(network_test.ragdoll_biped_index);
+
+			biped->object.shield_vitality = 0.0f;
+			biped->object.body_vitality = 0.05f;
+		}
+		marker_names[0] = "";
+		marker_names[1] = "gravity";
+		/* (between the camera and the biped, which it throws away from the
+		camera) */
+		forward.i = -network_test.ragdoll_right.j;
+		forward.j = network_test.ragdoll_right.i;
+		forward.k = 0.0f;
+		point_from_line3d(&network_test.ragdoll_point, &forward, -0.4f, &points[0]);
+		points[0].z += 0.1f;
+		points[1] = points[0];
+		forwards[0] = *global_up3d;
+		forwards[1] = *global_down3d;
+		effect_new_unattached_from_markers(effect_index, NONE, NULL, 2, marker_names, points, forwards, 0.0f, 0.0f,
+			NULL, NULL, TRUE);
+		platform_log("network test: a frag grenade goes off at (%.2f %.2f %.2f): the biped %s", points[0].x,
+			points[0].y, points[0].z, TEST_FLAG(object_get(network_test.ragdoll_biped_index)->object.damage_flags, _object_dead_bit) ?
+				"dies" : "lives");
+	}
+	if (network_test.ragdoll_stage == 2 && frame >= start + 8 * 60)
+	{
+		struct object_iterator vehicles;
+		struct ragdoll const *ragdoll = network_test.ragdoll_biped_index != NONE ?
+			ragdolls_of_object(network_test.ragdoll_biped_index) : NULL;
+		real_point3d body = ragdoll && ragdoll->posed ? ragdoll->poses[0].position : network_test.ragdoll_point;
+		long vehicle_index = NONE;
+		real nearest = 0.0f;
+
+		network_test.ragdoll_stage = 3;
+		object_iterator_new(&vehicles, _object_mask_vehicle, 0);
+		while (object_iterator_next(&vehicles))
+		{
+			real distance = distance_squared3d(&body, &object_get(vehicles.index)->object.position);
+
+			if (vehicle_index == NONE || distance < nearest)
+			{
+				vehicle_index = vehicles.index;
+				nearest = distance;
+			}
+		}
+		if (vehicle_index == NONE)
+		{
+			platform_log("network test: no vehicle, for the ragdoll");
+			return;
+		}
+		{
+			struct object_datum *vehicle = object_get(vehicle_index);
+			struct collision_result collision;
+			real_point3d start;
+			real_vector3d forward;
+			real_vector3d down;
+
+			/* (from beyond the body, on the ground there, down the slope
+			towards it and the camera) */
+			forward.i = -network_test.ragdoll_right.j;
+			forward.j = network_test.ragdoll_right.i;
+			forward.k = 0.0f;
+			point_from_line3d(&body, &forward, 4.0f, &start);
+			start.z += 10.0f;
+			down.i = 0.0f;
+			down.j = 0.0f;
+			down.k = -50.0f;
+			if (collision_test_vector(FLAG(_collision_test_structure_bit) | FLAG(_collision_test_front_facing_surfaces_bit),
+				&start, &down, NONE, &collision))
+			{
+				start = collision.point;
+			}
+			start.z += 0.6f;
+			vector_from_points3d(&start, &body, &forward);
+			forward.k = 0.0f;
+			normalize3d(&forward);
+			object_set_position(vehicle_index, &start, &forward, global_up3d);
+			/* (about 18 m/s, in world units a tick) */
+			scale_vector3d(&forward, 0.2f, &vehicle->object.translational_velocity);
+			/* (a vehicle at rest runs no physics, so would not move) */
+			SET_FLAG(vehicle->object.flags, _object_at_rest_bit, FALSE);
+			object_activate(vehicle_index);
+			platform_log("network test: vehicle %lx rolls from (%.2f %.2f %.2f) at the body at (%.2f %.2f %.2f)%s",
+				vehicle_index, start.x, start.y, start.z, body.x, body.y, body.z, ragdoll && ragdoll->posed ? ", its ragdoll's" : ragdoll ? ", its ragdoll unposed" :
+				", no ragdoll");
+		}
+	}
+}
+
 /* debug.network_test_name: the name the machine's first player takes (its
 profile's, which it joins with), in ASCII */
 static void network_test_set_name(
@@ -964,6 +1147,12 @@ void network_test_update(
 	{
 		network_test_keyboard_line(game_time_get() - (long)(network_test.chat_time * TICKS_PER_SECOND) -
 			32 * TICKS_PER_SECOND);
+	}
+	/* debug.network_test_ragdoll: the host's scene, by the tick */
+	if (network_test.ragdoll_time > 0.0f && network_test.mode == _network_test_host && game_in_progress() &&
+		!main_menu_loaded)
+	{
+		network_test_ragdoll();
 	}
 	/* the game running: report (from the start of each game: the next
 	game's time starts over) */

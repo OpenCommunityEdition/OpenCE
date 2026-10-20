@@ -73,8 +73,10 @@ physics_bridge *physics_bridge_create(void)
     memset(&settings, 0, sizeof(settings));
     settings.gravity[2] = -9.81f;
     settings.bodies_max = HOST_PHYSICS_RAGDOLLS_MAX * HOST_PHYSICS_PARTS_MAX + HOST_PHYSICS_BODIES_MAX;
-    /* two a tick of the game's 30 */
-    settings.collision_steps = 2;
+    /* four a tick of the game's 30: at two, a vehicle at 27 m/s moved
+       0.45 m a step, more than a limb's thickness, and passed through
+       bodies; at four it moves 0.22 m */
+    settings.collision_steps = 4;
     bridge->world = physics_world_create(&settings);
     if (bridge->world == NULL) {
         free(bridge);
