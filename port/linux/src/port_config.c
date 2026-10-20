@@ -433,6 +433,12 @@ static const struct config_setting config_settings[] =
 		"and _shared resources; any folder, which need not be in the data\n"
 		"folder. Empty uses mcc_maps in the data folder. Windows paths are\n"
 		"easiest in single quotes: 'D:\\Halo\\mcc_maps'." },
+	{ "game.custom_maps_path", _config_string, "\"\"", "HALO_CUSTOM_MAPS", _environment_value, _platform_desktop,
+		"The folder that holds the Custom Edition maps (the game's custom_maps\n"
+		"folder, with its bitmaps.map, sounds.map and loc.map, and the maps\n"
+		"map sharing downloads); any folder, which need not be in the data\n"
+		"folder. Empty uses custom_maps in the data folder. Windows paths are\n"
+		"easiest in single quotes: 'D:\\Halo\\custom_maps'." },
 
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"

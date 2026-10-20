@@ -204,27 +204,64 @@ const char *platform_custom_edition_root(void)
 	return root;
 }
 
-/* The folder game.mcc_map_path names, which d:\mcc_maps stands for; empty when unset
-(d:\mcc_maps is then the usual folder in the data root). Any folder: it is not under the data
-root, as h:\ is not. */
+/* A folder of the data root that a setting moves: d:\mcc_maps (game.mcc_map_path) and
+d:\custom_maps (game.custom_maps_path). Empty when the setting is unset, and the folder is
+the usual one in the data root. A full path may be anywhere, as h:\ is; a relative one is
+in the data root. */
+static const char *platform_relocated_folder(const char *setting, const char *label, char *root, int *found)
+{
+	if (!*found)
+	{
+		size_t length;
+
+		*found = 1;
+		snprintf(root, MAX_PATH, "%s", config_string(setting));
+		length = strlen(root);
+		while (length > 1 && (root[length - 1] == '/' || root[length - 1] == '\\'))
+			root[--length] = '\0';
+		if (root[0] && root[0] != '/' && root[0] != '\\' && root[1] != ':')
+		{
+			char relative[MAX_PATH];
+
+			snprintf(relative, sizeof(relative), "%s", root);
+			snprintf(root, MAX_PATH, "%s/%s", platform_data_root(), relative);
+		}
+		if (root[0])
+			platform_log("%s: using the folder at %s", label, root);
+	}
+	return root;
+}
+
 static const char *platform_mcc_maps_root(void)
 {
 	static char root[MAX_PATH];
 	static int found;
 
-	if (!found)
-	{
-		size_t length;
+	return platform_relocated_folder("game.mcc_map_path", "MCC maps", root, &found);
+}
 
-		found = 1;
-		snprintf(root, sizeof(root), "%s", config_string("game.mcc_map_path"));
-		length = strlen(root);
-		while (length > 1 && (root[length - 1] == '/' || root[length - 1] == '\\'))
-			root[--length] = '\0';
-		if (root[0])
-			platform_log("MCC maps: using the folder at %s", root);
-	}
-	return root;
+static const char *platform_custom_maps_root(void)
+{
+	static char root[MAX_PATH];
+	static int found;
+
+	return platform_relocated_folder("game.custom_maps_path", "Custom Edition maps", root, &found);
+}
+
+/* whether the path (after its drive) starts with the component `folder`; its length, with any
+leading separators, or 0 */
+static unsigned long platform_starts_with_folder(const char *path, const char *folder)
+{
+	const char *name = path;
+	unsigned long index = 0;
+
+	while (*name == '\\' || *name == '/')
+		name++;
+	while (folder[index] && tolower((unsigned char)name[index]) == folder[index])
+		index++;
+	if (folder[index] || (name[index] && name[index] != '\\' && name[index] != '/'))
+		return 0;
+	return (unsigned long)(name - path) + index;
 }
 
 void platform_translate_path(const char *xbox_path, char *host_path, unsigned long host_path_size)
@@ -256,22 +293,23 @@ void platform_translate_path(const char *xbox_path, char *host_path, unsigned lo
 		cursor += 2;
 	}
 
-	/* game.mcc_map_path: d:\mcc_maps (or mcc_maps) names that folder instead. Only the first
-	component is tested, so no Xbox or Custom Edition path is changed. */
-	if (data_drive && platform_mcc_maps_root()[0])
+	/* game.mcc_map_path and game.custom_maps_path: d:\mcc_maps and d:\custom_maps (or the same
+	without the drive) name those folders instead. Only the first component is tested, so no
+	other Xbox path is changed. */
+	if (data_drive)
 	{
-		const char *name = cursor;
-		static const char mcc[] = "mcc_maps";
-		unsigned long index = 0;
+		unsigned long matched;
 
-		while (*name == '\\' || *name == '/')
-			name++;
-		while (index < sizeof(mcc) - 1 && tolower((unsigned char)name[index]) == mcc[index])
-			index++;
-		if (index == sizeof(mcc) - 1 && (!name[index] || name[index] == '\\' || name[index] == '/'))
+		if (platform_mcc_maps_root()[0] && (matched = platform_starts_with_folder(cursor, "mcc_maps")) != 0)
 		{
 			snprintf(resolved, sizeof(resolved), "%s", platform_mcc_maps_root());
-			cursor = name + index;
+			cursor += matched;
+		}
+		else if (platform_custom_maps_root()[0] &&
+			(matched = platform_starts_with_folder(cursor, "custom_maps")) != 0)
+		{
+			snprintf(resolved, sizeof(resolved), "%s", platform_custom_maps_root());
+			cursor += matched;
 		}
 	}
 
