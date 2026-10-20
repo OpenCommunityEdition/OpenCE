@@ -62,6 +62,10 @@ static real_vector3d *scale_vector3d(real_vector3d const *v, real s, real_vector
 	out->i = v->i * s; out->j = v->j * s; out->k = v->k * s; return out;
 }
 
+/* whether a frame between ticks is drawn now, from interpolation's snapshots */
+static boolean interpolating;
+static real_matrix4x3 *render_interpolation_object_node_matrices(long index) { (void)index; return interpolating ? matrices : NULL; }
+
 #include "under_test.inc"
 
 static struct ragdoll_death death_of(long object_index)
@@ -486,6 +490,70 @@ int main(int argc, char **argv)
 		CHECK(ragdolls_stand_in(99, &added) == NONE && !added, "full");
 		ragdolls_dispose_from_old_map();
 		CHECK(ragdolls_stand_in(50, &added) == 1 && added, "gone with the map");
+		return 0;
+	}
+	CASE("drawn")
+	{
+		struct ragdoll_death death = death_of(0);
+		struct ragdoll *ragdoll;
+		real_matrix4x3 const *drawn;
+		real_matrix4x3 game[RAGDOLL_BODY_NODES_MAX];
+		long replaced;
+
+		/* nodes 3 and 4 carried with parts 1 and 2; the game's at a scale */
+		body.node_parts[1] = 1; body.node_parts[2] = 2; body.node_parts[3] = 1; body.node_parts[4] = 2;
+		for (index = 0; index < RAGDOLL_BODY_NODES_MAX; index++)
+			matrices[index].scale = 1.5f;
+		memcpy(game, matrices, sizeof(game));
+		ragdolls_start(&death, &replaced);
+		ragdoll = ragdolls_get(1);
+		/* each part a quarter turn about up (the usual sense) and moved */
+		for (index = 0; index < 3; index++)
+		{
+			ragdoll->poses[index].position.x = 10.0f + index;
+			ragdoll->poses[index].position.y = 20.0f;
+			ragdoll->poses[index].position.z = 30.0f;
+			ragdoll->poses[index].rotation.v.i = ragdoll->poses[index].rotation.v.j = 0.0f;
+			ragdoll->poses[index].rotation.v.k = ragdoll->poses[index].rotation.w = sqrtf(0.5f);
+		}
+		ragdoll->posed = TRUE;
+		drawn = ragdolls_node_matrices(0, matrices);
+		CHECK(drawn != matrices, "drawn from the ragdoll");
+		CHECK(near(drawn[1].forward.i, 0.0f) && near(drawn[1].forward.j, 1.0f) && near(drawn[1].left.i, -1.0f) &&
+			near(drawn[1].up.k, 1.0f), "a part's node turned as its pose: forward %f %f", drawn[1].forward.i,
+			drawn[1].forward.j);
+		CHECK(near(drawn[1].position.x, 11.0f) && near(drawn[1].position.y, 20.0f) && near(drawn[1].scale, 1.5f),
+			"where its pose is, at the game's scale: %f %f %f", drawn[1].position.x, drawn[1].position.y,
+			drawn[1].scale);
+		CHECK(near(drawn[3].position.x, 11.0f) && near(drawn[3].position.y, 22.0f) && near(drawn[3].position.z, 30.0f),
+			"a node carried with its part, two units on: %f %f %f", drawn[3].position.x, drawn[3].position.y,
+			drawn[3].position.z);
+		CHECK(near(drawn[3].forward.j, 1.0f) && near(drawn[3].scale, 1.5f), "turned with it: %f %f",
+			drawn[3].forward.j, drawn[3].scale);
+		CHECK(near(drawn[4].position.x, 12.0f) && near(drawn[4].position.y, 22.0f), "and the other's: %f %f",
+			drawn[4].position.x, drawn[4].position.y);
+		CHECK(memcmp(game, matrices, sizeof(game)) == 0, "the game's own untouched");
+		CHECK(ragdolls_node_matrices(1, matrices) == matrices, "another object as the game has it");
+		interpolating = TRUE;
+		CHECK(ragdolls_node_matrices(0, matrices) == matrices, "a frame between ticks as interpolation has it");
+		return 0;
+	}
+	CASE("drawn unposed")
+	{
+		struct ragdoll_death death = death_of(0);
+		long replaced;
+
+		CHECK(ragdolls_node_matrices(0, matrices) == matrices, "no ragdoll");
+		ragdolls_start(&death, &replaced);
+		CHECK(ragdolls_node_matrices(0, matrices) == matrices, "not yet posed by the host");
+		ragdolls_get(1)->posed = TRUE;
+		CHECK(ragdolls_node_matrices(0, matrices) != matrices, "posed");
+		ragdolls_stop(1);
+		CHECK(ragdolls_node_matrices(0, matrices) == matrices, "stopped");
+		ragdolls_start(&death, &replaced);
+		ragdolls_get(1)->posed = TRUE;
+		ragdolls_dispose_from_old_map();
+		CHECK(ragdolls_node_matrices(0, matrices) == matrices, "gone with the map, or a saved game");
 		return 0;
 	}
 	fprintf(stderr, "unknown case '%s'\n", case_name);

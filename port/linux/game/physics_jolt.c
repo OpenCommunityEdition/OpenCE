@@ -728,6 +728,22 @@ void physics_jolt_dispose_from_old_map(void)
 	physics_jolt_level_bsp_index = NONE;
 }
 
+/* A saved game loaded (a revert, a checkpoint): its objects may take the
+handles the ragdolls' bipeds had, so every ragdoll and stand-in goes, and the
+host's world is made again with the level alone. */
+void physics_jolt_game_state_loaded(void)
+{
+	ragdolls_dispose_from_old_map();
+	if (physics_jolt_level_bsp_index != NONE)
+	{
+		physics_jolt_batch_begin();
+		physics_jolt_command(HOST_PHYSICS_OP_CLEAR, HOST_PHYSICS_CLEAR_WORDS);
+		physics_jolt_batch_send(0.0f);
+		physics_jolt_level_bsp_index = NONE;
+	}
+	physics_jolt_structure_bsp_reconnect();
+}
+
 #else
 
 void physics_jolt_structure_bsp_reconnect(void)
@@ -737,6 +753,11 @@ void physics_jolt_structure_bsp_reconnect(void)
 void physics_jolt_dispose_from_old_map(void)
 {
 	ragdoll_bodies_dispose_from_old_map();
+	ragdolls_dispose_from_old_map();
+}
+
+void physics_jolt_game_state_loaded(void)
+{
 	ragdolls_dispose_from_old_map();
 }
 

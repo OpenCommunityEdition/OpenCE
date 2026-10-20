@@ -149,6 +149,12 @@ void ragdolls_stop(long id);
 /* the ragdoll of an object, or NULL */
 struct ragdoll const *ragdolls_of_object(long object_index);
 
+/* The node matrices an object is drawn with: its ragdoll's, once the host
+has posed it, each node carried with its part as the game's matrices have
+it from that part's node; else the game's, `nodes`. The game's own stay as
+they are, the ragdolls being for show. */
+real_matrix4x3 const *ragdolls_node_matrices(long object_index, real_matrix4x3 const *nodes);
+
 /* the part whose shape's centre is nearest a point */
 short ragdoll_part_nearest(struct ragdoll_body const *body, struct ragdoll_pose const *poses,
 	real_point3d const *point);

@@ -27,17 +27,21 @@ void render_interpolation_first_person(short local_player_index, struct real_mat
 float render_interpolation_game_time_sec(long ticks);
 
 /* the host's physics world for ragdolls and debris (port/linux/game/physics_jolt.c):
-the structure bsp's collision triangles sent when it loads or switches, and
-everything removed with the map, and each tick's ragdolls stepped after the
-objects' update */
+the structure bsp's collision triangles sent when it loads or switches,
+everything removed with the map or a saved game's load, and each tick's
+ragdolls stepped after the objects' update */
 void physics_jolt_structure_bsp_reconnect(void);
 void physics_jolt_dispose_from_old_map(void);
+void physics_jolt_game_state_loaded(void);
 void physics_jolt_update(float seconds);
 /* dead bipeds' ragdolls (port/linux/game/ragdolls.c): the damage done to an
 object, and a unit's death (not a feigned one), with its pose */
 struct damage_data;
 void ragdolls_damage(long object_index, struct damage_data const *damage);
 void ragdolls_unit_died(long unit_index);
+/* the node matrices an object is drawn with: its ragdoll's, else `nodes`
+(render_objects.c, render_interpolation.c) */
+struct real_matrix4x3 const *ragdolls_node_matrices(long object_index, struct real_matrix4x3 const *nodes);
 
 /* the port's menus' screen for one of ui.map's, by name, else the name
 (port/linux/game/menu_tags.c) */

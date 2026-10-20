@@ -44,6 +44,8 @@ static struct
 		boolean seen;
 		long object_index;
 	} stand_ins[RAGDOLL_STAND_INS_MAX];
+	/* each ragdoll's node matrices as drawn (ragdolls_node_matrices) */
+	real_matrix4x3 drawn[RAGDOLLS_MAX][RAGDOLL_BODY_NODES_MAX];
 } ragdolls;
 
 boolean ragdolls_enabled(void)
@@ -301,6 +303,63 @@ struct ragdoll const *ragdolls_of_object(
 			return &ragdolls.active[index];
 	}
 	return NULL;
+}
+
+real_matrix4x3 const *ragdolls_node_matrices(
+	long object_index,
+	real_matrix4x3 const *nodes)
+{
+	struct ragdoll const *ragdoll = ragdolls_of_object(object_index);
+	struct ragdoll_body const *body;
+	real_matrix4x3 *drawn;
+	real_matrix4x3 frames[RAGDOLL_BODY_PARTS_MAX];
+	real_matrix4x3 inverses[RAGDOLL_BODY_PARTS_MAX];
+	short part;
+	short node;
+
+	/* (a frame between ticks is drawn from snapshots this has given already,
+	render_interpolation.c) */
+	if (!nodes || !ragdoll || !ragdoll->posed || render_interpolation_object_node_matrices(object_index))
+		return nodes;
+	body = ragdoll->body;
+	drawn = ragdolls.drawn[ragdoll - ragdolls.active];
+	/* each part's node where the host has it, at the scale the game has it */
+	for (part = 0; part < body->part_count; part++)
+	{
+		struct ragdoll_pose const *pose = &ragdoll->poses[part];
+		real_quaternion game_rotation;
+		short part_node = body->parts[part].node_index;
+
+		game_rotation.v.i = -pose->rotation.v.i;
+		game_rotation.v.j = -pose->rotation.v.j;
+		game_rotation.v.k = -pose->rotation.v.k;
+		game_rotation.w = pose->rotation.w;
+		matrix4x3_rotation_from_quaternion(&frames[part], &game_rotation);
+		frames[part].scale = nodes[part_node].scale;
+		frames[part].position = pose->position;
+		matrix4x3_inverse(&nodes[part_node], &inverses[part]);
+	}
+	/* every node carried with its part's, as the game has it from that node */
+	for (node = 0; node < body->node_count; node++)
+	{
+		real_matrix4x3 from_part;
+
+		part = body->node_parts[node];
+		if (part < 0 || part >= body->part_count)
+		{
+			drawn[node] = nodes[node];
+		}
+		else if (body->parts[part].node_index == node)
+		{
+			drawn[node] = frames[part];
+		}
+		else
+		{
+			matrix4x3_multiply(&inverses[part], &nodes[node], &from_part);
+			matrix4x3_multiply(&frames[part], &from_part, &drawn[node]);
+		}
+	}
+	return drawn;
 }
 
 long ragdolls_start(

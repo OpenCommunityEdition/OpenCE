@@ -15,15 +15,18 @@ from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run
 
 CASES = ["death", "killing hit", "newest hit", "stale hit", "bad numbers", "off", "not biped", "no body", "once",
          "capacity", "pose", "unused at first", "start", "drive then limp", "removed", "nearest part", "corpse push",
-         "killing push", "pushes dropped", "replaced drops", "near", "stand-ins"]
+         "killing push", "pushes dropped", "replaced drops", "near", "stand-ins", "drawn", "drawn unposed"]
 
 FUNCTIONS = ["ragdolls_enabled", "ragdolls_object_is_biped", "ragdoll_pose_transform", "ragdoll_part_nearest",
              "ragdolls_push", "ragdolls_impulses_drop", "ragdolls_damage", "ragdolls_hit_get",
              "ragdolls_unit_died", "ragdolls_death_count", "ragdolls_death_get", "ragdolls_deaths_clear",
-             "ragdoll_pose_from_matrix", "ragdolls_get", "ragdolls_of_object",
+             "ragdoll_pose_from_matrix", "ragdolls_get", "ragdolls_of_object", "ragdolls_node_matrices",
              "ragdolls_start", "ragdolls_action", "ragdolls_stop", "ragdolls_impulse_count", "ragdolls_impulse_get",
              "ragdolls_impulses_clear", "ragdolls_near", "ragdolls_stand_ins_begin", "ragdolls_stand_in",
              "ragdolls_stand_in_unseen", "ragdolls_dispose_from_old_map"]
+
+MATRIX_FUNCTIONS = ["matrix4x3_rotation_to_quaternion", "matrix4x3_rotation_from_quaternion", "matrix4x3_inverse",
+                    "matrix4x3_multiply"]
 
 # a fault in the deaths and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -67,6 +70,13 @@ NEGATIVE_CONTROLS = {
     "limp-every-tick": (("if (ragdoll->limp)\n\t\treturn _ragdoll_action_none;", ""), "drive then limp"),
     "kept-when-gone": (("if (!object_try_and_get_and_verify_type(ragdoll->object_index, _object_mask_biped))\n"
                         "\t\treturn _ragdoll_action_remove;", ""), "removed"),
+    "drawn-the-game's-turn": (("game_rotation.v.k = -pose->rotation.v.k;", "game_rotation.v.k = pose->rotation.v.k;"),
+                              "drawn"),
+    "drawn-unscaled": (("frames[part].scale = nodes[part_node].scale;", ""), "drawn"),
+    "nodes-left-behind": (("matrix4x3_multiply(&frames[part], &from_part, &drawn[node]);", "drawn[node] = nodes[node];"),
+                          "drawn"),
+    "drawn-before-posed": (("!ragdoll || !ragdoll->posed ||", "!ragdoll ||"), "drawn unposed"),
+    "not-interpolated": ((" || render_interpolation_object_node_matrices(object_index))", ")"), "drawn"),
     "oldest-first": (("(ragdolls.hit_count - index) % RAGDOLL_HITS_MAX", "(index - 1) % RAGDOLL_HITS_MAX"), "newest hit"),
 }
 
@@ -88,7 +98,8 @@ def generated(fault=None):
         "static boolean physics_jolt_ragdolls_enabled(void);",
         "static struct ragdoll_body const *ragdoll_body_get(long definition_index);",
         state]) + "\n"
-    code = "\n".join([function(read("source/math/matrix_math.c"), "matrix4x3_rotation_to_quaternion")]
+    matrix_math = read("source/math/matrix_math.c")
+    code = "\n".join([function(matrix_math, name) for name in MATRIX_FUNCTIONS]
                      + [function(ragdolls, name) for name in FUNCTIONS])
     if fault:
         code = mutated(code, *fault)
@@ -124,6 +135,31 @@ def test_the_game_calls_in():
 def test_deaths_go_with_the_map():
     jolt = function(read("port/linux/game/physics_jolt.c"), "physics_jolt_dispose_from_old_map")
     assert "ragdolls_dispose_from_old_map();" in jolt
+
+
+def test_ragdolls_go_with_a_saved_game():
+    """a load (a revert, a checkpoint) removes every ragdoll, and the host's world is made again with the level"""
+    loaded = function(read("port/linux/game/physics_jolt.c"), "physics_jolt_game_state_loaded")
+    assert "ragdolls_dispose_from_old_map();" in loaded
+    assert loaded.index("HOST_PHYSICS_OP_CLEAR") < loaded.index("physics_jolt_structure_bsp_reconnect();")
+    procs = read("source/saved games/game_state.c")
+    procs = procs[procs.index("static game_state_after_load_proc after_load_procs[] ="):]
+    procs = procs[:procs.index("};")]
+    assert re.search(r"/\* port:[^*]*\*/\n\tphysics_jolt_game_state_loaded\n", procs)
+    assert "void physics_jolt_game_state_loaded(void);" in read("port/linux/include/halo_linux_source_fixups.h")
+
+
+def test_drawn_as_the_ragdoll_lies():
+    """render_objects.c swaps in the ragdoll's node matrices (but for the first person's legs), and interpolation's
+    snapshots are taken of them, so a frame between ticks blends the ragdoll's"""
+    listed = function(read("source/render/render_objects.c"), "render_object_list")
+    read_at = listed.index("object_get_node_matrices(object_index);")
+    assert re.search(r"/\* port:[^*]*\*/\n\t\tif \(!legs\)\n\t\t\tnode_matrices = "
+                     r"ragdolls_node_matrices\(object_index, node_matrices\);", listed[read_at:])
+    tick = function(read("port/linux/game/render_interpolation.c"), "render_interpolation_tick")
+    assert "ragdolls_node_matrices(iterator.index, object_get_node_matrices(iterator.index))" in tick
+    assert ("struct real_matrix4x3 const *ragdolls_node_matrices(long object_index, struct real_matrix4x3 const *nodes);"
+            in read("port/linux/include/halo_linux_source_fixups.h"))
 
 
 def test_the_tick_steps_the_ragdolls():

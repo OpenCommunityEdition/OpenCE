@@ -485,6 +485,11 @@ static void render_object_list(
 			first_person_legs_node_matrices(object_index, object_get_node_matrices(object_index)) :
 			object_get_node_matrices(object_index);
 
+		/* port: a dead biped drawn as its ragdoll lies, the game's own node
+		matrices untouched (port/linux/game/ragdolls.c) */
+		if (!legs)
+			node_matrices = ragdolls_node_matrices(object_index, node_matrices);
+
 		if (!object_is_first_person_camera(object_index) || render.camera.mirrored || (legs && node_matrices))
 		{
 			struct render_model_effect model_effect;

@@ -465,9 +465,10 @@ void render_interpolation_tick(void)
 			record->correction = *global_zero_vector3d;
 			record->correction_pending = *global_zero_vector3d;
 		}
+		/* (a dead biped as its ragdoll lies, ragdolls.c) */
 		memcpy(
 			record->nodes + record->latest * record->node_capacity,
-			object_get_node_matrices(iterator.index),
+			ragdolls_node_matrices(iterator.index, object_get_node_matrices(iterator.index)),
 			node_count * sizeof(real_matrix4x3));
 		record->rotations_valid[record->latest] = FALSE;
 		record->object_index = iterator.index;
