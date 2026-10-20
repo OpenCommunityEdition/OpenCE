@@ -3186,6 +3186,7 @@ static boolean map_list_back(struct widget_instance *list, boolean *widget_delet
 static void gametype_setup_begin(void);
 static void gametype_setup_end(void);
 static boolean gametype_setup_apply(void);
+static void gametype_setup_classic(void);
 static void gametype_setup_type(wchar_t *text);
 
 /* ---- the gametype list: its spinner's bank (STANDARD: the built-in ones,
@@ -3636,8 +3637,16 @@ static boolean server_start(void)
 		network_game_server_port_set_cooperative_friendly_fire(multiplayer.cooperative_friendly_fire);
 		network_game_server_port_set_cooperative_player_collisions(!multiplayer.cooperative_no_player_collisions);
 	}
-	else if (!gametype_setup_apply())
-		return campaign_fail();
+	else
+	{
+		/* port: this is a regular game. a copy left from the mode is
+		   replaced when the chosen gametype is a classic one, and the
+		   sheet does not come with it. */
+		if (!multiplayer.evolved)
+			gametype_setup_classic();
+		if (!gametype_setup_apply())
+			return campaign_fail();
+	}
 	return global_network_game_server_get() != NULL;
 }
 
@@ -5823,6 +5832,27 @@ static boolean gametype_options_save(struct widget_instance *widget)
 
 /* ---- Server Setup's options: a copy of the game's gametype (the one chosen
 before), edited by the editor's screens, the game's on START GAME */
+
+/* port: a regular game. a copy left from the mode is replaced when the
+   chosen gametype is a classic one, and the sheet does not come with it. */
+static void gametype_setup_classic(void)
+{
+	struct game_variant chosen;
+
+	evolved_rules_clear_session();
+	if (gametype_edit.setup &&
+		TEST_FLAG(gametype_edit.setup_variant.universal_variant.flags,
+			_game_variant_anniversary_rules_bit) &&
+		player_ui_game_variant_specified(&chosen) &&
+		!TEST_FLAG(chosen.universal_variant.flags, _game_variant_anniversary_rules_bit))
+	{
+		gametype_setup_end();
+		gametype_setup_begin();
+	}
+	if (gametype_edit.setup)
+		SET_FLAG(gametype_edit.setup_variant.universal_variant.flags,
+			_game_variant_anniversary_rules_bit, FALSE);
+}
 
 static void gametype_setup_begin(void)
 {

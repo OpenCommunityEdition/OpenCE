@@ -1,10 +1,11 @@
-/* One local player can watch living teammates in an evolved team game.
-The extra panes are render windows only. They are not local players, so
-input, scoring and the single-player HUD stay with the one player. The
-menu option display.teammate_views is off until chosen. Which pane is the
-local player's is display.teammate_view_slot. A teammate pane borrows a
-spare HUD slot for that one window, then gives it back, so their weapon,
-shield and reticle draw without a second local player. */
+/* One local player can watch teammates in an evolved team game for the
+whole match, including while a teammate is dead. The extra panes are
+render windows only. They are not local players, so input, scoring and
+the single-player HUD stay with the one player. The menu option
+display.teammate_views is off until chosen. Which pane is the local
+player's is this machine's display.teammate_view_slot. A teammate pane
+borrows a spare HUD slot for that one window, then gives it back, so
+their weapon, shield and reticle draw without a second local player. */
 #include "cseries.h"
 #include "game/game.h"
 #include "game/game_engine.h"
@@ -36,23 +37,108 @@ static short view_rendering = 0;
 static boolean view_hiding = FALSE;
 static boolean view_borrowed = FALSE;
 
-/* 2 panes are left and right. 3 give the wide top to either top choice and
-the two bottoms to the bottom choices. 4 are the four corners. */
+/* Two panes are top and bottom. Three are a wide top and two bottoms.
+Four are the corners. The name is this machine's setting, so a bottom
+choice stays on a bottom pane instead of being moved to the top. */
+/* An evolved team game has one team on this display. The other team's
+local player would be looking at this team, and this team at them. */
+static boolean evolved_views_team_screen(void)
+{
+	return evolved_rules_active() && game_in_progress() && game_engine_running() &&
+		game_engine_has_teams();
+}
+
+static long evolved_views_screen_team(void)
+{
+	short slot = local_player_get_next(NONE);
+	struct player_datum *local;
+
+	if (slot == NONE)
+		return NONE;
+	local = player_try_and_get(local_player_get_player_index(slot));
+	if (!local || local->team_index < 0)
+		return NONE;
+	return local->team_index;
+}
+
+static boolean evolved_views_local_on_screen(short local_player_index)
+{
+	struct player_datum *player;
+	long team;
+
+	if (!evolved_views_team_screen())
+		return TRUE;
+	team = evolved_views_screen_team();
+	if (team == NONE)
+		return TRUE;
+	player = player_try_and_get(local_player_get_player_index(local_player_index));
+	if (!player || player->team_index < 0)
+		return FALSE;
+	return player->team_index == team;
+}
+
+short evolved_views_local_count(void)
+{
+	short count = 0;
+	short index = NONE;
+
+	if (!evolved_views_team_screen() || evolved_views_screen_team() == NONE)
+		return local_player_count();
+	while ((index = local_player_get_next(index)) != NONE)
+	{
+		if (evolved_views_local_on_screen(index))
+			count++;
+	}
+	if (count < 1)
+		count = 1;
+	return count;
+}
+
+short evolved_views_next_local(short previous)
+{
+	short index = previous;
+
+	if (!evolved_views_team_screen() || evolved_views_screen_team() == NONE)
+		return local_player_get_next(previous);
+	while ((index = local_player_get_next(index)) != NONE)
+	{
+		if (evolved_views_local_on_screen(index))
+			return index;
+	}
+	return NONE;
+}
+
 static short evolved_views_slot(short count)
 {
 	char const *name = config_string("display.teammate_view_slot");
-	boolean right = !strcmp(name, "top_right") || !strcmp(name, "bottom_right");
-	boolean bottom = !strcmp(name, "bottom_left") || !strcmp(name, "bottom_right");
+	boolean bottom;
 	short slot;
 
+	if (!name)
+		name = "";
+	bottom = !strcmp(name, "bottom") || !strcmp(name, "bottom_left") ||
+		!strcmp(name, "bottom_right");
 	if (count <= 2)
-		slot = right ? 1 : 0;
+		slot = bottom ? 1 : 0;
 	else if (count == 3)
-		slot = bottom ? (right ? 2 : 1) : 0;
+	{
+		if (!strcmp(name, "bottom_left"))
+			slot = 1;
+		else if (bottom)
+			slot = 2;
+		else
+			slot = 0;
+	}
+	else if (!strcmp(name, "top_right"))
+		slot = 1;
+	else if (!strcmp(name, "bottom_left"))
+		slot = 2;
+	else if (bottom)
+		slot = 3;
 	else
-		slot = (short)((bottom ? 2 : 0) + (right ? 1 : 0));
-	if (slot >= count)
 		slot = 0;
+	if (slot >= count)
+		slot = bottom ? (short)(count - 1) : 0;
 	return slot;
 }
 
@@ -70,11 +156,10 @@ static void evolved_views_refresh(void)
 	view_count = 1;
 	local_slot = 0;
 	view_unit[0] = NONE;
-	if (!config_boolean("display.teammate_views") || !evolved_rules_active() ||
-		!game_in_progress() || !game_engine_running() || !game_engine_has_teams() ||
-		local_player_count() != 1 || !player_data || !player_data->valid)
+	if (!config_boolean("display.teammate_views") || !evolved_views_team_screen() ||
+		evolved_views_local_count() != 1 || !player_data || !player_data->valid)
 		return;
-	local_index = local_player_get_player_index(0);
+	local_index = local_player_get_player_index(local_player_get_next(NONE));
 	local = player_try_and_get(local_index);
 	if (!local || local->team_index < 0)
 		return;
@@ -83,13 +168,11 @@ static void evolved_views_refresh(void)
 	while (mate_count < EVOLVED_VIEW_MAXIMUM - 1 &&
 		(player = data_iterator_next(&iterator)) != NULL)
 	{
-		struct object_datum *body;
-
+		/* The other team is never a pane, including another local player.
+		A dead teammate, or one waiting to spawn, keeps the pane. Dropping
+		them would change the split and move this machine's view. */
 		if (iterator.datum_index == local_index || player->quit_out_of_game ||
-			player->team_index != local->team_index || player->unit_index == NONE)
-			continue;
-		body = object_try_and_get(player->unit_index);
-		if (!body || TEST_FLAG(body->object.damage_flags, _object_dead_bit))
+			player->team_index != local->team_index || player->local_player_index != NONE)
 			continue;
 		mates[mate_count++] = player->unit_index;
 	}
@@ -116,8 +199,8 @@ short evolved_views_window_count(void)
 
 boolean evolved_views_is_teammate_window(short window_index)
 {
-	return window_index >= 0 && window_index < view_count &&
-		view_unit[window_index] != NONE;
+	return view_count > 1 && window_index >= 0 && window_index < view_count &&
+		window_index != local_slot;
 }
 
 boolean evolved_views_is_local_window(short window_index)
@@ -143,8 +226,21 @@ boolean evolved_views_camera(short window_index, struct observer_result *result)
 		return FALSE;
 	unit_index = view_unit[window_index];
 	object = object_try_and_get(unit_index);
-	if (!object)
+	/* The pane stays. A body that is gone, or already dead, has no eyes
+	to draw until that player is back. */
+	if (!object || TEST_FLAG(object->object.damage_flags, _object_dead_bit))
 		return FALSE;
+	{
+		long watched = player_index_from_unit_index(unit_index);
+		struct player_datum *watched_player = player_try_and_get(watched);
+		long team = evolved_views_screen_team();
+
+		/* Another local player has their own pane, or none when they are
+		on the other team. This pane is a remote teammate only. */
+		if (!watched_player || watched_player->local_player_index != NONE ||
+			(team != NONE && watched_player->team_index != team))
+			return FALSE;
+	}
 	csmemset(result, 0, sizeof(*result));
 	unit_get_camera_position(unit_index, &result->position);
 	unit_get_looking_vector(unit_index, &forward);

@@ -181,13 +181,15 @@ static const struct config_setting config_settings[] =
 		"PB timer size, 0.5 to 1.0. These preferences do not enable the timer." },
 	{ "display.teammate_views", _config_boolean, "false", "HALO_TEAMMATE_VIEWS", _environment_value, _platform_all,
 		"In an evolved team game, split this screen so one player can see\n"
-		"living teammates from their own eyes, up to four panes. Off leaves the\n"
-		"view as it is. Classic multiplayer is unchanged." },
+		"teammates from their own eyes, up to four panes, for the whole match.\n"
+		"A dead teammate keeps the pane. Off leaves the view as it is. Classic\n"
+		"multiplayer is unchanged." },
 	{ "display.teammate_view_slot", _config_string, "\"top_left\"", "HALO_TEAMMATE_VIEW_SLOT", _environment_value,
 		_platform_all,
-		"Which pane is yours when teammate views are on: \"top_left\", \"top_right\",\n"
-		"\"bottom_left\" or \"bottom_right\". Two panes use the left pair and the\n"
-		"right pair. Three panes give either top choice the wide top pane." },
+		"Which pane is yours when teammate views are on, on this machine:\n"
+		"\"top\", \"bottom\", \"top_left\", \"top_right\", \"bottom_left\" or\n"
+		"\"bottom_right\". Two panes are top and bottom. Three give a wide top\n"
+		"and two bottoms. Four are the corners." },
 	{ "display.scoreboard_team_layout", _config_string, "\"teams\"", "HALO_SCOREBOARD_TEAM_LAYOUT", _environment_value,
 		_platform_all,
 		"How the scoreboard lists a team game's players: \"teams\" in a column for\n"

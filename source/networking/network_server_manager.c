@@ -453,6 +453,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "game/game.h"
 #include "game/game_engine.h"
+#include "../../port/linux/game/evolved_rules.h"
 #include "game/player_queues_new.h"
 #include "game/players.h"
 #include "interface/ui_widget.h"
@@ -3775,6 +3776,8 @@ void network_game_server_change_game_variant(
 
 	csmemcpy(&server->game.variant, variant, sizeof(server->game.variant));
 	network_game_server_variant_options(&server->game.variant, &server->game.variant_options);
+	/* port: a classic gametype ends the mode in the lobby, before the map. */
+	evolved_rules_host_variant(&server->game.variant);
 
 	if (!network_game_server_send_game_data_pregame(server))
 	{

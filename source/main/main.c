@@ -1452,9 +1452,10 @@ short main_get_window_count(
 
 	if (!single_window)
 	{
-		short count = (short)PIN(local_player_count(), 1, MAXIMUM_WINDOWS);
+		short count = (short)PIN(evolved_views_local_count(), 1, MAXIMUM_WINDOWS);
 
-		/* port: one local player, and living teammates beside them */
+		/* port: one local player on this team, and that team's mates.
+		   the other team's local player is not a pane */
 		if (count == 1)
 		{
 			short views = evolved_views_window_count();
@@ -3313,7 +3314,9 @@ static void main_game_render(
 	force_single_screen = game_engine_force_single_screen();
 	last_local_player_index = NONE;
 
-	window_count = PIN(local_player_count(), 1, MAXIMUM_LOCAL_PLAYERS);
+	/* port: an evolved team game draws one team. the other team's local
+	   player is not on this split */
+	window_count = PIN(evolved_views_local_count(), 1, MAXIMUM_LOCAL_PLAYERS);
 	player_window_count = window_count;
 	if (force_single_screen || cinematic_in_progress())
 	{
@@ -3345,12 +3348,17 @@ static void main_game_render(
 		{
 			window->local_player_index = NONE;
 		}
-		else if (evolved_views_is_teammate_window((short)window_index) &&
-			evolved_views_camera((short)window_index, &teammate_view))
+		else if (evolved_views_is_teammate_window((short)window_index))
 		{
-			/* port: the spare slot, so this pane draws that player's HUD */
-			window->local_player_index = evolved_views_hud_slot();
-			observer = &teammate_view;
+			/* port: a dead teammate keeps the pane, so the split and this
+			   machine's choice of pane stay for the match */
+			if (evolved_views_camera((short)window_index, &teammate_view))
+			{
+				window->local_player_index = evolved_views_hud_slot();
+				observer = &teammate_view;
+			}
+			else
+				window->local_player_index = NONE;
 		}
 		else if (evolved_views_is_local_window((short)window_index) ||
 			window_index < window_count)
@@ -3364,7 +3372,7 @@ static void main_game_render(
 				}
 				else
 				{
-					last_local_player_index = local_player_get_next(last_local_player_index);
+					last_local_player_index = evolved_views_next_local(last_local_player_index);
 				}
 			}
 

@@ -543,7 +543,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/evolved_options_edit/op_view_slot_label" type="text" controller="1" width="300" height="22" text="YOUR VIEW" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/multiplayer_setup/evolved_options_edit/comp_view_slot" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="TOP LEFT|TOP RIGHT|BOTTOM LEFT|BOTTOM RIGHT" setting="display.teammate_view_slot" values="top_left|top_right|bottom_left|bottom_right" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+	<widget name="main_menu/settings_select/multiplayer_setup/evolved_options_edit/comp_view_slot" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="TOP|BOTTOM|TOP LEFT|TOP RIGHT|BOTTOM LEFT|BOTTOM RIGHT" setting="display.teammate_view_slot" values="top|bottom|top_left|top_right|bottom_left|bottom_right" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
 		<on event="created" run="port setting load"/>
 		<on event="deleted" run="port setting save"/>
 		<on event="left_mouse" run="mouse spinner 1wide click"/>

@@ -49,6 +49,9 @@ void evolved_rules_reset_editing(void);
 void evolved_rules_commit(void);
 /* A classic mode was chosen. The match that was started stays until then. */
 void evolved_rules_clear_session(void);
+struct game_variant;
+/* The host's match is this variant. A classic one ends the mode. */
+void evolved_rules_host_variant(struct game_variant *variant);
 
 boolean evolved_rules_active(void);
 boolean evolved_rules_random_areas(void);

@@ -27,10 +27,14 @@ a data message an older build ignores. */
 #include "halo_port_limits.h"
 #include "performance_options.h"
 #include "evolved_rules.h"
+#include "networking/network_game_globals.h"
+#include "networking/network_game_manager.h"
 #include "evolved_timer.h"
 
 #include <stdio.h>
 #include <string.h>
+
+struct network_game *network_game_server_get_game(struct network_game_server *server);
 
 #define EVOLVED_RULES_VERSION 3
 #define EVOLVED_RULES_MESSAGE_SIZE 35
@@ -49,9 +53,10 @@ static long evolved_shot_press[EVOLVED_SKIP_SLOTS];
 static long evolved_shot_seen[EVOLVED_SKIP_SLOTS];
 static int evolved_random_percent;
 static int evolved_cheats_written;
-/* set when this match is started, cleared when a classic mode is chosen.
-   the lobby's live variant is still the previous map, so the bit alone
-   is not on yet when the next map loads. */
+/* set when this match is started. cleared when a classic mode is chosen,
+   and when the host's match variant is a classic one. the lobby's live
+   variant is still the previous map, so the bit alone is not on yet when
+   the next map loads. */
 static int evolved_session;
 
 static int evolved_anniversary(void)
@@ -104,6 +109,20 @@ void evolved_rules_commit(void)
 void evolved_rules_clear_session(void)
 {
 	evolved_session = 0;
+}
+
+/* port: the lobby's gametype is a classic one. the sheet from the mode
+   stops with it, including a session the menu had not cleared. */
+void evolved_rules_host_variant(struct game_variant *variant)
+{
+	struct game_variant *live;
+
+	if (variant && TEST_FLAG(variant->universal_variant.flags, _game_variant_anniversary_rules_bit))
+		return;
+	evolved_session = 0;
+	live = game_engine_get_variant();
+	if (live)
+		SET_FLAG(live->universal_variant.flags, _game_variant_anniversary_rules_bit, FALSE);
 }
 
 boolean evolved_rules_active(void)
@@ -166,12 +185,20 @@ void evolved_rules_begin_map(void)
 		evolved_cheats_written = 0;
 	}
 	/* port: the match was started from this mode. stamp the bit the other
-	   checks read, including when the loaded copy never received it. */
+	   checks read, including when the loaded copy never received it.
+	   a classic game this machine is hosting does not keep that session. */
 	if (evolved_session)
 	{
 		struct game_variant *variant = game_engine_get_variant();
+		struct network_game_server *server = global_network_game_server_get();
 
-		if (variant)
+		if (server)
+		{
+			struct network_game *hosted = network_game_server_get_game(server);
+
+			evolved_rules_host_variant(hosted ? &hosted->variant : NULL);
+		}
+		if (evolved_session && variant)
 			SET_FLAG(variant->universal_variant.flags, _game_variant_anniversary_rules_bit, TRUE);
 	}
 	if (!evolved_rules_active())

@@ -1844,8 +1844,8 @@ def _evolved_rule_pages(base: str) -> list:
     lines += _evolved_rule_page(base, "world", "WORLD", world, 30, [
         ("views", "TEAMMATE VIEWS", "display.teammate_views", "OFF|ON", "false|true"),
         ("view_slot", "YOUR VIEW", "display.teammate_view_slot",
-         "TOP LEFT|TOP RIGHT|BOTTOM LEFT|BOTTOM RIGHT",
-         "top_left|top_right|bottom_left|bottom_right"),
+         "TOP|BOTTOM|TOP LEFT|TOP RIGHT|BOTTOM LEFT|BOTTOM RIGHT",
+         "top|bottom|top_left|top_right|bottom_left|bottom_right"),
     ])
     lines += _evolved_rule_page(base, "tuning", "WEAPON TUNING", tuning, 30)
     return lines

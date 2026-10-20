@@ -1240,7 +1240,9 @@ static void interface_splitscreen_render(
 	if (game_engine_force_single_screen() || cinematic_in_progress())
 		return;
 
-	window_count = local_player_count();
+	/* port: the bar is the panes this screen draws. an evolved team game
+	   leaves the other team's local player out */
+	window_count = evolved_views_local_count();
 
 	if (window_count <= 1)
 		return;

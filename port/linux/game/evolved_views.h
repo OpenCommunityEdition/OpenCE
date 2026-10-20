@@ -7,8 +7,15 @@ struct observer_result;
 teammate views are on. */
 short evolved_views_window_count(void);
 
-/* The camera for a teammate pane. The local player's pane is whichever
-region display.teammate_view_slot names. */
+/* Local players this screen draws. An evolved team game draws only the
+first local player's team. */
+short evolved_views_local_count(void);
+
+/* The next local player this screen draws after previous, or NONE. */
+short evolved_views_next_local(short previous);
+
+/* The camera for a teammate pane. The local player's pane is this
+machine's display.teammate_view_slot. */
 boolean evolved_views_camera(short window_index, struct observer_result *result);
 
 /* A pane that shows a teammate, not the local player and not the console. */
