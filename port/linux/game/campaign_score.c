@@ -318,6 +318,18 @@ static long campaign_score_total(
 	return total;
 }
 
+/* the points of all the players' kills together (a co-op team's score) */
+static long campaign_score_team_total(
+	void)
+{
+	long total = 0;
+	long index;
+
+	for (index = 0; index < campaign_score_kill_count; index++)
+		total += campaign_score_kills[index].points;
+	return total;
+}
+
 /* a variant's name as the summary has it: the last of its path, in capitals,
 with spaces for underscores */
 static void campaign_score_variant_name(
@@ -716,7 +728,8 @@ void campaign_score_draw_view(
 	window = render.camera.window_bounds;
 	offset_rectangle2d(&window, (short)-render.camera.viewport_bounds.x0, (short)-render.camera.viewport_bounds.y0);
 	campaign_score_update();
-	snprintf(text, sizeof(text), "SCORE %ld", campaign_score_total((short)player_index));
+	/* (co-op's players share one score: every player's kills added together) */
+	snprintf(text, sizeof(text), "SCORE %ld", campaign_score_team_total());
 	/* (above the match clock) */
 	bounds.x1 = (short)(window.x1 - CAMPAIGN_SCORE_RIGHT_MARGIN);
 	bounds.x0 = (short)(bounds.x1 - 320);
