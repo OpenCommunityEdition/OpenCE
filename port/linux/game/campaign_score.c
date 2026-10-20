@@ -126,6 +126,8 @@ static short campaign_score_summary_lines = 0;
 /* (a button held when the summary came up does not dismiss it: only a new press) */
 static boolean campaign_score_button_primed = FALSE;
 static boolean campaign_score_button_held = FALSE;
+/* the summary is shown over the level just won, which waits for it */
+static boolean campaign_score_postgame = FALSE;
 
 /* the difficulty's share of a point, in tenths: easy, normal, heroic, legendary */
 static short const campaign_score_difficulty_tenths[NUMBER_OF_GAME_DIFFICULTY_LEVELS] = { 5, 10, 20, 50 };
@@ -452,6 +454,7 @@ void campaign_score_new_map(
 	short line;
 
 	campaign_score_kill_count = 0;
+	campaign_score_postgame = FALSE;
 	campaign_score_full_logged = FALSE;
 	campaign_score_last_time = 0;
 	/* (a level just won, shown now; else nothing) */
@@ -560,6 +563,43 @@ static void campaign_score_win_compose(
 	return;
 }
 
+/* the pending summary is shown over the level (in the level itself, which is
+still running): FALSE if there is none to show */
+static boolean campaign_score_postgame_begin(
+	void)
+{
+	short line;
+
+	if (campaign_score_pending_lines <= 0 || !campaign_score_level() || cinematic_in_progress())
+		return FALSE;
+	campaign_score_summary_lines = campaign_score_pending_lines;
+	for (line = 0; line < campaign_score_pending_lines; line++)
+		memcpy(campaign_score_summary[line], campaign_score_pending[line], CAMPAIGN_SCORE_SUMMARY_LENGTH);
+	campaign_score_pending_lines = 0;
+	campaign_score_button_primed = FALSE;
+
+	return TRUE;
+}
+
+boolean campaign_score_postgame_wait(
+	void)
+{
+	if (!campaign_score_postgame)
+	{
+		if (!campaign_score_postgame_begin())
+			return FALSE;
+		campaign_score_postgame = TRUE;
+		return TRUE;
+	}
+	/* (until A or B is pressed: campaign_score_draw) */
+	if (campaign_score_summary_lines > 0 && campaign_score_level())
+		return TRUE;
+	campaign_score_postgame = FALSE;
+	campaign_score_summary_lines = 0;
+
+	return FALSE;
+}
+
 void campaign_score_level_won(
 	void)
 {
@@ -580,6 +620,9 @@ void campaign_score_network_won(
 	if (!campaign_score_level())
 		return;
 	campaign_score_win_compose();
+	/* (shown at once: the host holds the level for its own, then the lobby
+	takes everyone) */
+	campaign_score_postgame_begin();
 
 	return;
 }

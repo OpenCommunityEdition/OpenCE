@@ -26,6 +26,11 @@ void campaign_score_record_kill(
 log and kept for the next level's start */
 void campaign_score_level_won(void);
 
+/* (main.c's main_won_map_private) a single player level was won and the
+game is about to go back to the main menu: TRUE while the level's summary is
+shown over it, until A or B is pressed; the level is left only when FALSE */
+boolean campaign_score_postgame_wait(void);
+
 /* (interface.c's interface_draw_fullscreen_overlays) the last level's summary */
 void campaign_score_draw(void);
 

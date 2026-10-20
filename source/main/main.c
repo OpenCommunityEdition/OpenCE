@@ -2387,6 +2387,10 @@ static void main_won_map_private(
 	{
 		struct network_game *game = network_game_get_game();
 
+		/* port: the level's score is shown over the level first, until A or B is
+		pressed (the clients show theirs as they are told the level is won) */
+		if (campaign_score_postgame_wait())
+			return;
 		main_globals.won_map = FALSE;
 		level = game ? main_get_solo_level_from_name(game->map.name) : NONE;
 		player_profile_save_level_completed(0);
@@ -2394,6 +2398,10 @@ static void main_won_map_private(
 			main_get_solo_level_name((level + 1) % NUMBER_OF_SINGLE_PLAYER_LEVELS) : NULL);
 		return;
 	}
+	/* port: the level's score (display.campaign_score) is shown over the level
+	just won, before the main menu loads, until A or B is pressed */
+	if (campaign_score_postgame_wait())
+		return;
 	main_globals.want_to_be_at_main_menu = TRUE;
 	main_globals.won_map = FALSE;
 	level = main_get_solo_level_from_name(main_globals.soloplayer_map_name);
