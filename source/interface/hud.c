@@ -1408,23 +1408,26 @@ static void temporary_hud_draw(
 
 /* port: the match clock (display.match_timer, off by default: Custom
 Edition's HUD has none), counting up from the game's
-first tick, which the items' respawn periods count from as well
+first tick (the level's start in the campaign), which the items' respawn periods count from as well
 (game_engine_update_item_spawn's game_time_get() % respawn_period): an item
 is back on the map at every multiple of its period on the clock. */
 static boolean hud_match_timer_setting(
 	void)
 {
-	static boolean setting = FALSE;
+	static boolean match_setting = FALSE;
+	static boolean campaign_setting = FALSE;
 	static unsigned long read_at = (unsigned long)-1;
 
 	/* (read again when Settings changes it) */
 	if (read_at != config_changes())
 	{
 		read_at = config_changes();
-		setting = config_boolean("display.match_timer") != 0;
+		match_setting = config_boolean("display.match_timer") != 0;
+		campaign_setting = config_boolean("display.campaign_timer") != 0;
 	}
 
-	return setting;
+	/* (multiplayer has its own setting, the campaign another) */
+	return game_engine_running() ? match_setting : campaign_setting;
 }
 
 static void hud_draw_match_timer(
@@ -1492,8 +1495,9 @@ void hud_draw_screen(
 		if (cinematic_in_progress())
 			coop_skip_vote_draw(render.local_player_index);
 
-		/* port: the match clock, in multiplayer */
-		if (game_engine_running() && !cinematic_in_progress() &&
+		/* port: the match clock in multiplayer and the clock in the campaign (it
+		counts from the level's start), each with its own setting */
+		if (!cinematic_in_progress() &&
 			hud_scripted_globals->show_hud)
 		{
 			hud_draw_match_timer();

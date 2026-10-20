@@ -178,6 +178,10 @@ static const struct config_setting config_settings[] =
 		"from the game's first tick, which the items' respawn periods count from\n"
 		"too: a weapon is back on the map at every multiple of its period on the\n"
 		"clock." },
+	{ "display.campaign_timer", _config_boolean, "false", "HALO_CAMPAIGN_TIMER", _environment_value, _platform_all,
+		"Draw a clock at the bottom right in the campaign (and co-op), counting up\n"
+		"from the level's start. Separate from display.match_timer, which is\n"
+		"multiplayer only." },
 	{ "display.scoreboard_team_layout", _config_string, "\"teams\"", "HALO_SCOREBOARD_TEAM_LAYOUT", _environment_value,
 		_platform_all,
 		"How the scoreboard lists a team game's players: \"teams\" in a column for\n"
