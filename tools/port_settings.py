@@ -220,6 +220,7 @@ _video["categories"] = [
     ("GRAPHICS:", "video_settings/graphics", "The HUD, text, anti-aliasing, shadows and\nlighting."),
     ("FOV AND VIEWMODELS:", "video_settings/fov_viewmodels",
      "The field of view and the first-person\nweapon. Their defaults keep the stock view."),
+    ("PHYSICS:", "video_settings/physics", "Ragdolls and debris, for show only. Their\ndefaults keep the stock game."),
 ]
 SCREENS["video_settings/fov_viewmodels"] = {
     "screen": "fov_viewmodel_settings_screen", "header": _video["header"], "spacing": 30,
@@ -236,6 +237,20 @@ SCREENS["video_settings/fov_viewmodels"] = {
          "Your legs in first person, seen looking down,\nmoving as you run. Your body as others see it.", None),
         ("SHIELD COLOR:", "display.shield_color", [("DEFAULT", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
          "Your shield's flare in an armor color, whatever\nyour armor. Only you see it. Default: its own.", None),
+    ],
+}
+
+# the macOS app's physics (port/linux/game/physics_jolt.c): ragdolls and
+# debris, for show only
+SCREENS["video_settings/physics"] = {
+    "screen": "physics_settings_screen", "header": _video["header"], "spacing": 30,
+    "rows": [
+        ("RAGDOLLS:", "game.ragdolls", ON_OFF,
+         "The dead fall limp, thrown by what killed them,\nand lie where they come to rest.", None),
+        ("PHYSICS DEBRIS:", "game.physics_debris", ON_OFF,
+         "Casings, gibs and broken pieces bounce, roll and\ntumble on the level and off each other.", None),
+        ("DEBRIS LIMIT:", "game.physics_debris_max", [(str(n), str(n)) for n in (64, 128, 256, 512, 1024, 2048)],
+         "The most pieces of debris at once; the oldest\ngoes when another comes.", None),
     ],
 }
 

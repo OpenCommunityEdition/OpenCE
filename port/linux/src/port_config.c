@@ -322,6 +322,21 @@ static const struct config_setting config_settings[] =
 		"as CUSTOM SINGLEPLAYER and CUSTOM MULTIPLAYER. Their tags are checked\n"
 		"as the game's own maps' are before they run; false refuses them\n"
 		"(docs/custom_edition_caches.md)." },
+	{ "game.ragdolls", _config_boolean, "false", "HALO_RAGDOLLS", _environment_value, _platform_all,
+		"The dead fall as ragdolls, their bodies' parts jointed as their models'\n"
+		"bones are and thrown by the shot, blast or melee that killed them, then\n"
+		"lie where they come to rest (the macOS app's physics; elsewhere the\n"
+		"stock game's dying animations). For show only: it changes nothing the\n"
+		"game decides, and each machine of a network game has its own. Applies\n"
+		"from the next death." },
+	{ "game.physics_debris", _config_boolean, "false", "HALO_PHYSICS_DEBRIS", _environment_value, _platform_all,
+		"Shell casings, gibs and broken pieces bounce, roll and tumble on the\n"
+		"level and against each other (the macOS app's physics; elsewhere they\n"
+		"move as the stock game's). For show only. Applies from the next piece\n"
+		"thrown." },
+	{ "game.physics_debris_max", _config_integer, "256", "HALO_PHYSICS_DEBRIS_MAX", _environment_value, _platform_all,
+		"The most pieces of physics debris at once (1 to 2048): the oldest goes\n"
+		"when another comes." },
 	{ "display.viewmodel_shield", _config_boolean, "false", "HALO_VIEWMODEL_SHIELD", _environment_value, _platform_all,
 		"The energy shield's flare on the first-person arms too, as on the body\n"
 		"(the stock game draws it on the body only)." },
@@ -603,6 +618,9 @@ static const struct config_setting config_settings[] =
 		"shown (the real time while none is shown for a tenth of a second), and\n"
 		"the random numbers start from a fixed seed, for frames captured the\n"
 		"same run to run." },
+	{ "debug.physics_draw", _config_boolean, "false", "HALO_PHYSICS_DRAW", _environment_value, _platform_all,
+		"Draw the physics' bodies (ragdolls' parts, debris and the level's\n"
+		"triangles) as wireframes over the game, for tuning them." },
 	{ "debug.null_renderer", _config_boolean, "false", "HALO_NULL_RENDERER", _environment_set_is_true, _platform_all,
 		"Run without a window, drawing nothing." },
 	{ "debug.gl_debug", _config_boolean, "false", "HALO_GL_DEBUG", _environment_set_is_true, _platform_all,
