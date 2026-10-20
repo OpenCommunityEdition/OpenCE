@@ -640,7 +640,12 @@ static boolean particle_update_physics(
 		boolean settled = FALSE;
 		struct point_physics_definition *physics = point_physics_definition_get(definition->physics.index);
 
-		if (particle->object_index == NONE)
+		/* port: a particle that is a debris body takes its position from the host's
+		(port/linux/game/physics_debris.c) */
+		if (physics_debris_particle_update(particle_index, dt, &settled))
+		{
+		}
+		else if (particle->object_index == NONE)
 		{
 			real_vector3d collision_normal;
 			short collision_material_type;
@@ -709,6 +714,10 @@ static boolean particle_update_physics(
 
 					return FALSE;
 				}
+
+				/* port: with game.physics_debris it tumbles on as a body from here
+				(port/linux/game/physics_debris.c) */
+				physics_debris_particle_collided(particle_index);
 			}
 
 			if ((TEST_FLAG(collision_flags, _point_physics_in_air_bit) &&

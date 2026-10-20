@@ -410,6 +410,11 @@ extern "C" uint32_t physics_body_add(physics_world *world, const physics_shape *
     settings.mRestitution = restitution;
     settings.mOverrideMassProperties = EOverrideMassProperties::CalculateInertia;
     settings.mMassPropertiesOverride.mMass = mass;
+    // (a dynamic body is small and fast, a casing thrown from a gun: cast
+    // along its step so that it does not pass through the level's thin
+    // triangles)
+    if (motion == PHYSICS_MOTION_DYNAMIC)
+        settings.mMotionQuality = EMotionQuality::LinearCast;
     Body *body = world->bodies().CreateBody(settings);
     if (body == nullptr)
         return PHYSICS_NONE;

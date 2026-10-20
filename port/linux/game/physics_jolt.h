@@ -20,6 +20,9 @@ boolean physics_jolt_ragdolls_enabled(void);
 /* whether explosions tear ragdolls' limbs off (game.dismemberment, with
 game.ragdolls) */
 boolean physics_jolt_dismemberment_enabled(void);
+/* whether particles and garbage tumble as bodies (game.physics_debris, and
+the host's world) */
+boolean physics_jolt_debris_enabled(void);
 
 /* the level's collision triangles: every vertex of the bsp (x, y, z each, in
 world units) and three vertex indices a triangle, facing out of the level

@@ -8,7 +8,7 @@ argv[1], prints what the test compares, then "ok", and returns 0; else it
 prints what failed and returns 1.
 
 "drop" sends a level (a floor at z 0, 100 units across) and a box, steps the
-world 90 times at 30 a second and checks that the box comes to rest on the
+world 120 times at 30 a second and checks that the box comes to rest on the
 floor; "refusals" sends batches the host must refuse.
 */
 
@@ -22,7 +22,7 @@ floor; "refusals" sends batches the host must refuse.
 
 #define CHECK(condition) do { if (!(condition)) { printf("failed: %s (line %d)\n", #condition, __LINE__); exit(1); } } while (0)
 
-#define STEPS 90
+#define STEPS 120
 #define HALF 0.25f
 
 static unsigned int batch[1024];

@@ -122,6 +122,8 @@ static real_vector3d *scale_vector3d(real_vector3d const *v, real s, real_vector
 /* whether a frame between ticks is drawn now, from interpolation's snapshots */
 static boolean interpolating;
 static real_matrix4x3 *render_interpolation_object_node_matrices(long index) { (void)index; return interpolating ? matrices : NULL; }
+/* (garbage drawn from its body, physics_debris.c: none here) */
+static real_matrix4x3 const *physics_debris_node_matrices(long index, real_matrix4x3 const *nodes) { (void)index; return nodes; }
 
 #include "under_test.inc"
 

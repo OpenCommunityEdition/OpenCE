@@ -251,7 +251,7 @@ SCREENS["video_settings/physics"] = {
          "With ragdolls, blasts tear off the limbs and\nheads they hurt most. Bullets tear nothing.", None),
         ("PHYSICS DEBRIS:", "game.physics_debris", ON_OFF,
          "Casings, gibs and broken pieces bounce, roll and\ntumble on the level and off each other.", None),
-        ("DEBRIS LIMIT:", "game.physics_debris_max", [(str(n), str(n)) for n in (64, 128, 256, 512, 1024, 2048)],
+        ("DEBRIS LIMIT:", "game.physics_debris_max", [(str(n), str(n)) for n in (64, 128, 256, 512, 1024, 2000)],
          "The most pieces of debris at once; the oldest\ngoes when another comes.", None),
     ],
 }

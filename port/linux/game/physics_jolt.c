@@ -29,6 +29,7 @@ enabled.
 #include "tag_files/tag_groups.h"
 #include "units/biped_definitions.h"
 #include "units/bipeds.h"
+#include "physics_debris.h"
 #include "physics_jolt.h"
 #include "ragdoll_bodies.h"
 #include "ragdolls.h"
@@ -68,6 +69,7 @@ static unsigned long physics_jolt_changes = (unsigned long)-1;
 static boolean physics_jolt_on = FALSE;
 static boolean physics_jolt_ragdolls_on = FALSE;
 static boolean physics_jolt_dismemberment_on = FALSE;
+static boolean physics_jolt_debris_on = FALSE;
 static short physics_jolt_level_bsp_index = NONE;
 
 boolean physics_jolt_enabled(void)
@@ -77,7 +79,8 @@ boolean physics_jolt_enabled(void)
 		physics_jolt_changes = config_changes();
 		physics_jolt_ragdolls_on = PHYSICS_JOLT_HOST && config_boolean("game.ragdolls");
 		physics_jolt_dismemberment_on = physics_jolt_ragdolls_on && config_boolean("game.dismemberment");
-		physics_jolt_on = physics_jolt_ragdolls_on || (PHYSICS_JOLT_HOST && config_boolean("game.physics_debris"));
+		physics_jolt_debris_on = PHYSICS_JOLT_HOST && config_boolean("game.physics_debris");
+		physics_jolt_on = physics_jolt_ragdolls_on || physics_jolt_debris_on;
 	}
 	return physics_jolt_on;
 }
@@ -92,6 +95,12 @@ boolean physics_jolt_dismemberment_enabled(void)
 {
 	physics_jolt_enabled();
 	return physics_jolt_dismemberment_on;
+}
+
+boolean physics_jolt_debris_enabled(void)
+{
+	physics_jolt_enabled();
+	return physics_jolt_debris_on;
 }
 
 /* ---------- the level */
@@ -226,6 +235,11 @@ long physics_jolt_level_triangles(
 #define PHYSICS_JOLT_RESULTS_WORDS (HOST_PHYSICS_RESULTS_HEADER_WORDS + \
 	HOST_PHYSICS_RAGDOLLS_MAX * (HOST_PHYSICS_RESULT_RAGDOLL_WORDS + HOST_PHYSICS_PARTS_MAX * HOST_PHYSICS_POSE_WORDS) + \
 	HOST_PHYSICS_BODIES_MAX * HOST_PHYSICS_RESULT_BODY_WORDS)
+
+/* debris takes every body id after the stand-ins' */
+typedef char physics_jolt_debris_first_id_assert[PHYSICS_DEBRIS_FIRST_ID == RAGDOLL_STAND_INS_MAX + 1 ? 1 : -1];
+typedef char physics_jolt_debris_last_id_assert[
+	PHYSICS_DEBRIS_FIRST_ID + PHYSICS_DEBRIS_MAX - 1 == HOST_PHYSICS_BODIES_MAX ? 1 : -1];
 
 static unsigned long physics_jolt_batch[PHYSICS_JOLT_BATCH_WORDS];
 static unsigned long physics_jolt_results[PHYSICS_JOLT_RESULTS_WORDS];
@@ -623,6 +637,57 @@ static void physics_jolt_stand_ins_update(void)
 	}
 }
 
+/* ---------- debris */
+
+/* debris's bodies: each gone piece's removed, then each new one's added, a
+dynamic body thrown as the piece was; a piece is not made a body while the
+batch has no room for it */
+static void physics_jolt_debris_update(void)
+{
+	long id;
+
+	physics_debris_garbage_update();
+	for (id = PHYSICS_DEBRIS_FIRST_ID; id < PHYSICS_DEBRIS_FIRST_ID + PHYSICS_DEBRIS_MAX; id++)
+	{
+		unsigned long *command;
+
+		if (physics_jolt_batch_length + HOST_PHYSICS_BODY_REMOVE_WORDS > PHYSICS_JOLT_BATCH_WORDS)
+			break;
+		if (!physics_debris_remove(id))
+			continue;
+		command = physics_jolt_command(HOST_PHYSICS_OP_BODY_REMOVE, HOST_PHYSICS_BODY_REMOVE_WORDS);
+		command[1] = id;
+	}
+	for (id = PHYSICS_DEBRIS_FIRST_ID; id < PHYSICS_DEBRIS_FIRST_ID + PHYSICS_DEBRIS_MAX; id++)
+	{
+		struct physics_debris_body const *body;
+		unsigned long *command;
+
+		if (physics_jolt_batch_length + HOST_PHYSICS_BODY_ADD_WORDS > PHYSICS_JOLT_BATCH_WORDS)
+			break;
+		body = physics_debris_add(id);
+		if (!body)
+			continue;
+		command = physics_jolt_command(HOST_PHYSICS_OP_BODY_ADD, HOST_PHYSICS_BODY_ADD_WORDS);
+		command[1] = id;
+		command[2] = HOST_PHYSICS_MOTION_DYNAMIC;
+		command[3] = body->shape;
+		command[4] = physics_jolt_word(body->size[0]);
+		command[5] = physics_jolt_word(body->size[1]);
+		command[6] = physics_jolt_word(body->size[2]);
+		command[7] = physics_jolt_word(body->mass);
+		command[8] = physics_jolt_word(body->friction);
+		command[9] = physics_jolt_word(body->restitution);
+		physics_jolt_body_pose_words(&body->pose, command + 10);
+		command[17] = physics_jolt_word(body->velocity.i);
+		command[18] = physics_jolt_word(body->velocity.j);
+		command[19] = physics_jolt_word(body->velocity.k);
+		command[20] = physics_jolt_word(body->angular_velocity.i);
+		command[21] = physics_jolt_word(body->angular_velocity.j);
+		command[22] = physics_jolt_word(body->angular_velocity.k);
+	}
+}
+
 static real physics_jolt_result_real(
 	unsigned long word)
 {
@@ -632,7 +697,21 @@ static real physics_jolt_result_real(
 	return value;
 }
 
-/* each ragdoll's poses from the results, as far as they are whole */
+static void physics_jolt_result_pose(
+	unsigned long const *from,
+	struct ragdoll_pose *pose)
+{
+	pose->position.x = physics_jolt_result_real(from[0]);
+	pose->position.y = physics_jolt_result_real(from[1]);
+	pose->position.z = physics_jolt_result_real(from[2]);
+	pose->rotation.v.i = physics_jolt_result_real(from[3]);
+	pose->rotation.v.j = physics_jolt_result_real(from[4]);
+	pose->rotation.v.k = physics_jolt_result_real(from[5]);
+	pose->rotation.w = physics_jolt_result_real(from[6]);
+}
+
+/* each ragdoll's poses from the results, then each debris body's, as far as
+they are whole */
 static void physics_jolt_results_read(void)
 {
 	unsigned long const *words = physics_jolt_results;
@@ -666,19 +745,22 @@ static void physics_jolt_results_read(void)
 		ragdoll->awake = entry[2] != 0;
 		ragdoll->broken_joints = entry[3];
 		for (part = 0; part < part_count; part++)
-		{
-			struct ragdoll_pose *pose = &ragdoll->poses[part];
-			unsigned long const *from = pose_words + part * HOST_PHYSICS_POSE_WORDS;
-
-			pose->position.x = physics_jolt_result_real(from[0]);
-			pose->position.y = physics_jolt_result_real(from[1]);
-			pose->position.z = physics_jolt_result_real(from[2]);
-			pose->rotation.v.i = physics_jolt_result_real(from[3]);
-			pose->rotation.v.j = physics_jolt_result_real(from[4]);
-			pose->rotation.v.k = physics_jolt_result_real(from[5]);
-			pose->rotation.w = physics_jolt_result_real(from[6]);
-		}
+			physics_jolt_result_pose(pose_words + part * HOST_PHYSICS_POSE_WORDS, &ragdoll->poses[part]);
 		ragdoll->posed = TRUE;
+	}
+	if (index < count)
+		return;
+	count = words[4];
+	for (index = 0; index < count && at + HOST_PHYSICS_RESULT_BODY_WORDS <= length; index++)
+	{
+		unsigned long const *entry = words + at;
+		struct ragdoll_pose pose;
+
+		at += HOST_PHYSICS_RESULT_BODY_WORDS;
+		if (entry[0] < PHYSICS_DEBRIS_FIRST_ID)
+			continue;
+		physics_jolt_result_pose(entry + 2, &pose);
+		physics_debris_result((long)entry[0], entry[1] != 0, &pose);
 	}
 }
 
@@ -734,6 +816,8 @@ void physics_jolt_update(
 		}
 	}
 	physics_jolt_stand_ins_update();
+	if (physics_jolt_debris_enabled())
+		physics_jolt_debris_update();
 	if (physics_jolt_batch_send(seconds) < 0)
 		return;
 	physics_jolt_results_read();
@@ -751,6 +835,7 @@ void physics_jolt_dispose_from_old_map(void)
 {
 	ragdoll_bodies_dispose_from_old_map();
 	ragdolls_dispose_from_old_map();
+	physics_debris_dispose_from_old_map();
 	if (physics_jolt_level_bsp_index == NONE)
 		return;
 	physics_jolt_batch_begin();
@@ -765,6 +850,7 @@ host's world is made again with the level alone. */
 void physics_jolt_game_state_loaded(void)
 {
 	ragdolls_dispose_from_old_map();
+	physics_debris_dispose_from_old_map();
 	if (physics_jolt_level_bsp_index != NONE)
 	{
 		physics_jolt_batch_begin();
@@ -785,11 +871,13 @@ void physics_jolt_dispose_from_old_map(void)
 {
 	ragdoll_bodies_dispose_from_old_map();
 	ragdolls_dispose_from_old_map();
+	physics_debris_dispose_from_old_map();
 }
 
 void physics_jolt_game_state_loaded(void)
 {
 	ragdolls_dispose_from_old_map();
+	physics_debris_dispose_from_old_map();
 }
 
 void physics_jolt_update(

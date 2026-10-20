@@ -340,7 +340,7 @@ static const struct config_setting config_settings[] =
 		"move as the stock game's). For show only. Applies from the next piece\n"
 		"thrown." },
 	{ "game.physics_debris_max", _config_integer, "256", "HALO_PHYSICS_DEBRIS_MAX", _environment_value, _platform_all,
-		"The most pieces of physics debris at once (1 to 2048): the oldest goes\n"
+		"The most pieces of physics debris at once (1 to 2032): the oldest goes\n"
 		"when another comes." },
 	{ "display.viewmodel_shield", _config_boolean, "false", "HALO_VIEWMODEL_SHIELD", _environment_value, _platform_all,
 		"The energy shield's flare on the first-person arms too, as on the body\n"

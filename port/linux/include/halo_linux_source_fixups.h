@@ -47,6 +47,11 @@ node matrices from those drawn (render_objects.c) */
 long ragdolls_piece_count(long object_index);
 struct real_matrix4x3 const *ragdolls_piece_node_matrices(long object_index, struct real_matrix4x3 const *nodes,
 	long piece);
+/* particles as rigid bodies (port/linux/game/physics_debris.c, particles.c):
+a particle that struck the level made one, and one that is a body moved as
+the host has it, settled once the body sleeps */
+void physics_debris_particle_collided(long particle_index);
+unsigned char physics_debris_particle_update(long particle_index, float dt, unsigned char *settled);
 
 /* the port's menus' screen for one of ui.map's, by name, else the name
 (port/linux/game/menu_tags.c) */

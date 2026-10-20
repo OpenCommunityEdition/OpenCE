@@ -84,7 +84,7 @@ NEGATIVE_CONTROLS = {
     "drawn-unscaled": (("frames[part].scale = nodes[part_node].scale;", ""), "drawn"),
     "nodes-left-behind": (("matrix4x3_multiply(&frames[part], &from_part, &drawn[node]);", "drawn[node] = nodes[node];"),
                           "drawn"),
-    "drawn-before-posed": (("!ragdoll || !ragdoll->posed || render_interpolation", "!ragdoll || render_interpolation"),
+    "drawn-before-posed": (("!nodes || !ragdoll->posed || render_interpolation", "!nodes || render_interpolation"),
                            "drawn unposed"),
     "not-interpolated": ((" || render_interpolation_object_node_matrices(object_index))", ")"), "drawn"),
     "always-dismember": (("\tif (!ragdolls_dismemberment_enabled())\n\t\treturn;\n", ""), "tear off"),

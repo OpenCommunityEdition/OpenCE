@@ -36,6 +36,7 @@ other pieces' bones to a point at the stump.
 #include "effects/effects.h"
 #include "physics/collision_model_definitions.h"
 #include "tag_files/tag_groups.h"
+#include "physics_debris.h"
 #include "physics_jolt.h"
 #include "ragdolls.h"
 
@@ -562,9 +563,12 @@ real_matrix4x3 const *ragdolls_node_matrices(
 	short part;
 	short node;
 
+	/* (a piece of garbage that is a debris body, physics_debris.c) */
+	if (!ragdoll)
+		return physics_debris_node_matrices(object_index, nodes);
 	/* (a frame between ticks is drawn from snapshots this has given already,
 	render_interpolation.c) */
-	if (!nodes || !ragdoll || !ragdoll->posed || render_interpolation_object_node_matrices(object_index))
+	if (!nodes || !ragdoll->posed || render_interpolation_object_node_matrices(object_index))
 		return nodes;
 	body = ragdoll->body;
 	drawn = ragdolls.drawn[ragdoll - ragdolls.active];
