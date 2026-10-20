@@ -18,7 +18,7 @@ from harness import CHECK_FAILED, build, function, mutated, read, run, structure
 
 CASES = ["capsule", "real profiles", "clamps", "collided", "off", "not debris", "not twice", "held until posed",
          "moved by the host", "out of the level", "lifetime", "gone before added", "cap", "cap before added", "refused",
-         "ids", "disposed"]
+         "ids", "disposed", "garbage", "garbage without a hull", "garbage not debris", "garbage drawn"]
 
 FUNCTIONS = ["physics_debris_maximum", "physics_debris_table", "physics_debris_handed_back", "physics_debris_of",
              "physics_debris_was_handed_back", "physics_debris_free", "physics_debris_take",
@@ -65,6 +65,20 @@ NEGATIVE_CONTROLS = {
                            "\t\tphysics_debris_free(debris, FALSE);"), "refused"),
     "added-twice": (("if (!debris || debris->state != _physics_debris_new", "if (!debris || debris->state == _physics_debris_free"),
                     "collided"),
+    "attached-garbage": (("object->object.parent_object_index != NONE ||\n\t\t\t", ""), "garbage not debris"),
+    "garbage-twice": (("physics_debris_of(_physics_debris_garbage, iterator.index) ||\n\t\t\t", ""), "garbage"),
+    "garbage-unscaled": (("half_extents.i = PIN(half_extents.i * nodes[0].scale,", "half_extents.i = PIN(half_extents.i,"),
+                         "garbage without a hull"),
+    "garbage-at-its-origin": (("matrix4x3_transform_point(&nodes[0], &center, &frame.position);\n", ""), "garbage"),
+    "garbage-per-tick": (("debris->body.velocity.i = object->object.translational_velocity.i * TICKS_PER_SECOND;",
+                          "debris->body.velocity.i = object->object.translational_velocity.i;"), "garbage"),
+    "garbage-drawn-unposed": (("if (!debris || !debris->posed || debris->drawn_index", "if (!debris || debris->drawn_index"),
+                              "garbage drawn"),
+    "garbage-uninterpolated": (("||\n\t\trender_interpolation_object_node_matrices(object_index))", ")"), "garbage drawn"),
+    "garbage-at-its-centre": (("body.position.z = debris->current.position.z - offset.k;",
+                               "body.position.z = debris->current.position.z;"), "garbage drawn"),
+    "garbage-not-carried": (("matrix4x3_multiply(&carry, &nodes[node], &drawn[node]);", "drawn[node] = body;"),
+                            "garbage drawn"),
 }
 
 
@@ -111,6 +125,15 @@ def test_the_particles_call_in():
     fixups = read("port/linux/include/halo_linux_source_fixups.h")
     assert "void physics_debris_particle_collided(long particle_index);" in fixups
     assert "unsigned char physics_debris_particle_update(long particle_index, float dt, unsigned char *settled);" in fixups
+
+
+def test_the_garbage_calls_in():
+    """each tick's garbage made bodies before the batch's, and a piece drawn from its body where a ragdoll would be"""
+    jolt = read("port/linux/game/physics_jolt.c")
+    update = function(jolt, "physics_jolt_debris_update")
+    assert update.index("physics_debris_garbage_update();") < update.index("physics_debris_add(id)")
+    drawn = function(read("port/linux/game/ragdolls.c"), "ragdolls_node_matrices")
+    assert re.search(r"if \(!ragdoll\)\n\t\treturn physics_debris_node_matrices\(object_index, nodes\);", drawn)
 
 
 def test_the_bodies_go_with_the_map():
