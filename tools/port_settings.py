@@ -111,6 +111,8 @@ SCREENS = {
              "Draw a clock at the bottom right in the campaign,\ncounting up from the start of the level.", None),
             ("CAMPAIGN SCORE:", "display.campaign_score", ON_OFF,
              "Score each enemy killed by its variant; the score\nis drawn above the clock, a level's at the next start.", None),
+            ("GRUNT BIRTHDAY PARTY:", "display.headshot_party", ON_OFF,
+             "A grunt shot dead in the head pops with confetti\nand a sound (party.wav in the data folder).", None),
             ("HDR:", "display.hdr", ON_OFF,
              "Keep the light of explosions, plasma and the sun\npast white, and roll it off instead of clipping.", None),
             ("HDR DISPLAY:", "display.hdr_output", ON_OFF,
@@ -218,12 +220,12 @@ SCREENS = {
 # pending edits, Defaults, OK and Cancel as the other settings screens.
 _video = SCREENS["video_settings"]
 _graphics = {"display.high_res_hud", "display.hud_button_style", "display.high_res_text", "display.anti_aliasing",
-             "display.anisotropic_filtering", "display.shadow_resolution", "display.per_pixel_lighting", "display.match_timer", "display.campaign_timer", "display.campaign_score",
+             "display.anisotropic_filtering", "display.shadow_resolution", "display.per_pixel_lighting", "display.match_timer", "display.campaign_timer", "display.campaign_score", "display.headshot_party",
              "display.model_detail"}
 # (the visual modifiers: a screen of their own, Extra Effects)
 _extra_effects = {"display.overshield_effect", "display.hdr", "display.hdr_output"}
 SCREENS["video_settings/graphics"] = {
-    "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 27, "help_top": 374,
+    "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 25, "help_top": 378,
     "same_place": ["anti_aliasing_android"],
     "rows": [row for row in _video["rows"] if row[1] in _graphics],
 }

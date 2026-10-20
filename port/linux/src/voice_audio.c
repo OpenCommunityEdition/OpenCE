@@ -19,6 +19,7 @@ one's redundancy (Opus's in-band FEC), or by concealment.
 #include "sdl_platform.h"
 #include "port_config.h"
 #include "voice_audio.h"
+#include "effect_audio.h"
 #include "../../third_party/opus/include/opus.h"
 
 #include <SDL3/SDL.h>
@@ -550,4 +551,6 @@ void voice_audio_mix(float *output, unsigned long frames)
 			slot->playing = FALSE;
 	}
 	pthread_mutex_unlock(&voice_lock);
+	/* the sound effects (effect_audio.c) too, in the same place */
+	effect_audio_mix(output, frames);
 }

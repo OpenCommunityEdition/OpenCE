@@ -6,7 +6,7 @@ game has none). Each enemy a player kills is worth points by its actor
 variant: a base by the kind of actor (a grunt, a jackal, an elite, a hunter,
 the Flood's forms, a sentinel) times a rank by the variant's name (minor 1,
 major 1.5, ultra 2, zealot 3, and so on) times the difficulty (easy 0.5,
-normal 1, heroic 2, legendary 5). Marines, crew and the like are
+normal 1, heroic 2, legendary 5), rounded up to a multiple of 5. Marines, crew and the like are
 worth nothing, so friendly fire gains no points.
 
 Only the machine that runs the AI knows the kills: the host of a co-op
@@ -31,6 +31,7 @@ seconds.
 #include "ai/actor_definitions.h"
 #include "ai/actor_types.h"
 #include "cutscene/cinematics.h"
+#include "input/input.h"
 #include "interface/interface.h"
 #include "interface/hud_messaging.h"
 #include "main/console.h"
@@ -61,8 +62,6 @@ enum
 	/* the lines of the summary, and their length */
 	CAMPAIGN_SCORE_SUMMARY_LINES = 14,
 	CAMPAIGN_SCORE_SUMMARY_LENGTH = 56,
-	/* how long it is shown (milliseconds) */
-	CAMPAIGN_SCORE_SUMMARY_MILLISECONDS = 8000,
 	/* draw_string.c's right-justified and centred text (its enum is its own) */
 	_campaign_score_text_right = 1,
 	_campaign_score_text_center = 2,
@@ -72,6 +71,12 @@ enum
 	/* and the score's gap above the clock */
 	CAMPAIGN_SCORE_CLOCK_GAP = 8,
 };
+
+/* the score's colour: a player's name in the chat (network_chat.c's
+chat_color) */
+#define CAMPAIGN_SCORE_BLUE_RED 0.34f
+#define CAMPAIGN_SCORE_BLUE_GREEN 0.51f
+#define CAMPAIGN_SCORE_BLUE_BLUE 0.86f
 
 /* ---------- structures */
 
@@ -95,8 +100,11 @@ struct campaign_score_variant
 /* port_config.c's, cinematics.c's / cseries_windows.c's, tag_files.c's */
 int config_boolean(const char *name);
 unsigned long config_changes(void);
-unsigned long system_milliseconds(void);
+/* input_abstraction.c: how many ticks the keyboard's jump key (A) has been held */
+byte input_abstraction_port_accept(short controller_index);
 char *tag_get_name(long tag_index);
+/* sdl_platform.c's: the log (debug.txt) only, not the console on screen */
+void platform_log(char const *format, ...);
 
 /* ---------- globals */
 
@@ -110,7 +118,9 @@ static char campaign_score_pending[CAMPAIGN_SCORE_SUMMARY_LINES][CAMPAIGN_SCORE_
 static short campaign_score_pending_lines = 0;
 static char campaign_score_summary[CAMPAIGN_SCORE_SUMMARY_LINES][CAMPAIGN_SCORE_SUMMARY_LENGTH];
 static short campaign_score_summary_lines = 0;
-static unsigned long campaign_score_summary_until = 0;
+/* (a button held when the summary came up does not dismiss it: only a new press) */
+static boolean campaign_score_button_primed = FALSE;
+static boolean campaign_score_button_held = FALSE;
 
 /* the difficulty's share of a point, in tenths: easy, normal, heroic, legendary */
 static short const campaign_score_difficulty_tenths[NUMBER_OF_GAME_DIFFICULTY_LEVELS] = { 5, 10, 20, 50 };
@@ -175,6 +185,7 @@ static short campaign_score_variant_points(
 	char lower[128];
 	long base;
 	long tenths = 10;
+	long points;
 	long index;
 
 	if (variant_definition_index == NONE)
@@ -192,9 +203,9 @@ static short campaign_score_variant_points(
 	case _actor_engineer: base = 5; break;
 	case _actor_assassin: base = 30; break;
 	case _actor_combat_form: base = 10; break;
-	case _actor_infection_form: base = 2; break;
-	case _actor_carrier_form: base = 15; break;
-	case _actor_sentinel: base = 10; break;
+	case _actor_infection_form: base = 5; break;
+	case _actor_carrier_form: base = 10; break;
+	case _actor_sentinel: base = 15; break;
 	default: base = 0; break;
 	}
 	if (base == 0)
@@ -214,7 +225,30 @@ static short campaign_score_variant_points(
 			}
 		}
 	}
-	return (short)(base * tenths * campaign_score_difficulty_tenths[campaign_score_difficulty()] / 100);
+	points = base * tenths * campaign_score_difficulty_tenths[campaign_score_difficulty()];
+	/* (up to a multiple of 5: an enemy worth any is worth at least 5) */
+	points = (points + 499) / 500 * 5;
+	return (short)points;
+}
+
+/* whether A or B is down on a controller (or the keyboard's jump key, A) */
+static boolean campaign_score_button_down(
+	void)
+{
+	short controller_index;
+
+	for (controller_index = 0; controller_index < MAXIMUM_GAMEPADS; controller_index++)
+	{
+		struct gamepad_state const *gamepad = input_get_gamepad_state(controller_index);
+
+		if (gamepad &&
+			(gamepad->buttons[FIRST_GAMEPAD_ANALOG_BUTTON + _gamepad_analog_button_a] > 0 ||
+				gamepad->buttons[FIRST_GAMEPAD_ANALOG_BUTTON + _gamepad_analog_button_b] > 0))
+			return TRUE;
+		if (input_abstraction_port_accept(controller_index) > 0)
+			return TRUE;
+	}
+	return FALSE;
 }
 
 /* the kills after the game time are gone: a checkpoint was reverted to */
@@ -391,7 +425,7 @@ void campaign_score_new_map(
 	for (line = 0; line < campaign_score_pending_lines; line++)
 		memcpy(campaign_score_summary[line], campaign_score_pending[line], CAMPAIGN_SCORE_SUMMARY_LENGTH);
 	campaign_score_pending_lines = 0;
-	campaign_score_summary_until = 0;
+	campaign_score_button_primed = FALSE;
 
 	return;
 }
@@ -434,7 +468,7 @@ void campaign_score_record_kill(
 	campaign_score_kills[campaign_score_kill_count].player_index = (short)killing_player_index;
 	campaign_score_kills[campaign_score_kill_count].points = points;
 	campaign_score_kill_count++;
-	console_printf(FALSE, "campaign score: player %ld killed %s for %d",
+	platform_log("campaign score: player %ld killed %s for %d",
 		killing_player_index, tag_get_name(variant_index), (int)points);
 
 	return;
@@ -450,7 +484,7 @@ void campaign_score_level_won(
 	campaign_score_update();
 	campaign_score_pending_lines = campaign_score_compose(campaign_score_pending);
 	for (line = 0; line < campaign_score_pending_lines; line++)
-		console_printf(FALSE, "campaign score: %s", campaign_score_pending[line]);
+		platform_log("campaign score: %s", campaign_score_pending[line]);
 
 	return;
 }
@@ -463,7 +497,6 @@ void campaign_score_draw(
 	short line_height;
 	short clock_height;
 	real_argb_color color;
-	real_argb_color text_color;
 	rectangle2d bounds;
 	rectangle2d window;
 	char text[CAMPAIGN_SCORE_SUMMARY_LENGTH];
@@ -487,30 +520,39 @@ void campaign_score_draw(
 	/* the last level's summary, over this one's start */
 	if (campaign_score_summary_lines > 0 && campaign_score_level())
 	{
-		unsigned long now = system_milliseconds();
+		boolean down = campaign_score_button_down();
+		short top = (short)(window.y0 + (window.y1 - window.y0) / 4);
 
-		if (campaign_score_summary_until == 0)
-			campaign_score_summary_until = now + CAMPAIGN_SCORE_SUMMARY_MILLISECONDS;
-		if ((long)(campaign_score_summary_until - now) > 0)
-		{
-			short top = (short)(window.y0 + (window.y1 - window.y0) / 4);
-
-			color.alpha = 1.0f;
-			color.red = color.green = color.blue = 1.0f;
-			for (line = 0; line < campaign_score_summary_lines; line++)
-			{
-				bounds.x0 = window.x0;
-				bounds.x1 = window.x1;
-				bounds.y0 = (short)(top + line * line_height);
-				bounds.y1 = (short)(bounds.y0 + line_height);
-				color.green = color.blue = line == 0 ? 0.85f : 1.0f;
-				draw_string_set_draw_mode(font_index, NONE, _campaign_score_text_center, 0, &color);
-				rasterizer_draw_string(&bounds, NULL, NULL, 0, campaign_score_summary[line]);
-			}
-		}
-		else
-		{
+		/* (until A or B is pressed anew) */
+		if (!campaign_score_button_primed)
+			campaign_score_button_primed = TRUE;
+		else if (down && !campaign_score_button_held)
 			campaign_score_summary_lines = 0;
+		campaign_score_button_held = down;
+
+		color.alpha = 1.0f;
+		for (line = 0; line < campaign_score_summary_lines; line++)
+		{
+			bounds.x0 = window.x0;
+			bounds.x1 = window.x1;
+			bounds.y0 = (short)(top + line * line_height);
+			bounds.y1 = (short)(bounds.y0 + line_height);
+			/* (the blue of a player's name in the chat, the header paler) */
+			color.red = line == 0 ? 0.60f : CAMPAIGN_SCORE_BLUE_RED;
+			color.green = line == 0 ? 0.74f : CAMPAIGN_SCORE_BLUE_GREEN;
+			color.blue = line == 0 ? 1.0f : CAMPAIGN_SCORE_BLUE_BLUE;
+			draw_string_set_draw_mode(font_index, NONE, _campaign_score_text_center, 0, &color);
+			rasterizer_draw_string(&bounds, NULL, NULL, 0, campaign_score_summary[line]);
+		}
+		if (campaign_score_summary_lines > 0)
+		{
+			bounds.x0 = window.x0;
+			bounds.x1 = window.x1;
+			bounds.y0 = (short)(top + (campaign_score_summary_lines + 1) * line_height);
+			bounds.y1 = (short)(bounds.y0 + line_height);
+			color.red = color.green = color.blue = 0.7f;
+			draw_string_set_draw_mode(font_index, NONE, _campaign_score_text_center, 0, &color);
+			rasterizer_draw_string(&bounds, NULL, NULL, 0, "PRESS A OR B TO CONTINUE");
 		}
 	}
 
@@ -526,11 +568,10 @@ void campaign_score_draw(
 	bounds.x0 = (short)(bounds.x1 - 320);
 	bounds.y1 = (short)(window.y1 - CAMPAIGN_SCORE_BOTTOM_MARGIN - clock_height - CAMPAIGN_SCORE_CLOCK_GAP);
 	bounds.y0 = (short)(bounds.y1 - clock_height);
-	/* (the clock's colour: the HUD's text lifted toward white) */
-	hud_get_text_color(&text_color);
-	color.red = text_color.red + (1.0f - text_color.red) * 0.65f;
-	color.green = text_color.green + (1.0f - text_color.green) * 0.65f;
-	color.blue = text_color.blue + (1.0f - text_color.blue) * 0.65f;
+	/* (the blue of a player's name in the chat, network_chat.c's) */
+	color.red = CAMPAIGN_SCORE_BLUE_RED;
+	color.green = CAMPAIGN_SCORE_BLUE_GREEN;
+	color.blue = CAMPAIGN_SCORE_BLUE_BLUE;
 	color.alpha = 1.0f;
 	draw_string_set_draw_mode(font_index, NONE, _campaign_score_text_right, 0, &color);
 	rasterizer_draw_string(&bounds, NULL, NULL, 0, text);

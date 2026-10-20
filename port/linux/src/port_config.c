@@ -187,11 +187,17 @@ static const struct config_setting config_settings[] =
 		"actor variant (a grunt 10, a jackal 15, an elite 30, a hunter 100, the\n"
 		"Flood's forms and sentinels less), times its rank (a major 1.5, an ultra\n"
 		"2, a zealot 3, and so on by the variant's name), times the difficulty\n"
-		"(easy 0.5, normal 1, heroic 2, legendary 5). The score is drawn above\n"
+		"(easy 0.5, normal 1, heroic 2, legendary 5), each kill rounded up\n"
+		"to a multiple of 5. The score is drawn above\n"
 		"the clock at the bottom right, and a level's totals are shown for a few\n"
 		"seconds over the next level's start. Going back to a checkpoint takes\n"
 		"back the kills after it. Only the host of a co-op game and a single\n"
 		"player see scores." },
+	{ "display.headshot_party", _config_boolean, "false", "HALO_HEADSHOT_PARTY", _environment_value, _platform_all,
+		"A grunt that a player kills with a shot to the head pops with confetti\n"
+		"(drawn on the screen, from where its head was) and plays party.wav, a\n"
+		"WAV file in the data folder (no file, no sound). Campaign only; only a\n"
+		"single player and the host of a co-op game see it." },
 	{ "display.scoreboard_team_layout", _config_string, "\"teams\"", "HALO_SCOREBOARD_TEAM_LAYOUT", _environment_value,
 		_platform_all,
 		"How the scoreboard lists a team game's players: \"teams\" in a column for\n"

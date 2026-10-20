@@ -108,6 +108,7 @@ symbols in this file:
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
 #include "campaign_score.h" /* port: port/linux/game/campaign_score.c */
+#include "headshot_party.h" /* port: port/linux/game/headshot_party.c */
 
 /* ---------- constants */
 
@@ -397,6 +398,8 @@ void interface_draw_fullscreen_overlays(
 	latency_meter_draw();
 	/* port: the campaign's score (display.campaign_score) */
 	campaign_score_draw();
+	/* port: a grunt's headshot party (display.headshot_party) */
+	headshot_party_draw();
 	terminal_draw();
 	main_framerate_render();
 	render_debug_profile();
