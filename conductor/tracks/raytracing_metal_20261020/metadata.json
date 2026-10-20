@@ -1,0 +1,8 @@
+{
+  "track_id": "raytracing_metal_20261020",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-10-20T00:00:00Z",
+  "updated_at": "2026-10-20T00:00:00Z",
+  "description": "Ray-traced sun shadows and ambient occlusion with Metal in the macOS app"
+}
