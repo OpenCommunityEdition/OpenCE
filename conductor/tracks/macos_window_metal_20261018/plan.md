@@ -55,10 +55,10 @@
 - [x] Task: Resources and Xbox texture formats 992de7bd
     - [x] Write tests: each format xbox_textures.c handles maps to a Metal pixel format or conversion, checked by pixel readback
     - [x] Vertex/index buffers, textures, surfaces in d3d8_metal.c
-- [ ] Task: Render states, draws and render targets
-    - [ ] Write tests: harness tests of state → pipeline-key packing; a draw test through the ring
-    - [ ] The rest of D3D8 as d3d8_gl.c implements it, encoded into the ring
-- [ ] Task: The main menu draws
+- [x] Task: Render states, draws and render targets 26404ecb
+    - [x] Write tests: harness tests of state → pipeline-key packing; a draw test through the ring
+    - [x] The rest of D3D8 as d3d8_gl.c implements it, encoded into the ring
+- [~] Task: The main menu draws
     - [ ] Write tests: the main-menu golden frame (approved by you once)
     - [ ] Fix what the frame shows wrong
 - [ ] Task: Bloodgulch draws
