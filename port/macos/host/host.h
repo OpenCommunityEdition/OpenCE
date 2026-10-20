@@ -208,6 +208,17 @@ HALO_HOST_RENDER_LOG each batch's counts too. */
 
 int host_render_submit(unsigned int batch, unsigned int size);
 
+/* ---------- the physics bridge (host_physics.c, host_physics.h)
+
+host_physics_step carries out the guest's batch on the host's Jolt world,
+steps it, and writes the poses into the guest's results buffer. Refusals are
+logged as warnings (the first HOST_PHYSICS_LOGGED_REFUSALS of them), and
+with HALO_HOST_PHYSICS_LOG each step's counts too. */
+
+#define HOST_PHYSICS_LOGGED_REFUSALS 32
+
+int host_physics_step(unsigned int batch, unsigned int size, unsigned int results, unsigned int results_size);
+
 /* ---------- system calls (host_syscall.c) */
 
 /* the Linux errno value of a host (Darwin) one */

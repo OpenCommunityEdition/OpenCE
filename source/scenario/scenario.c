@@ -243,6 +243,8 @@ static scenario_structure_bsp_connection_proc scenario_structure_bsp_reconnect_p
 	players_reconnect_to_structure_bsp,
 	sound_reconnect_to_structure_bsp,
 	object_types_reconnect_to_structure_bsp,
+	/* port: the bsp's collision triangles to the host's physics (port/linux/game/physics_jolt.c) */
+	physics_jolt_structure_bsp_reconnect,
 };
 
 static scenario_structure_bsp_connection_proc scenario_structure_bsp_disconnect_proc_table[] =

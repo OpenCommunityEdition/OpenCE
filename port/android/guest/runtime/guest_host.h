@@ -123,6 +123,13 @@ batch at guest address `batch` (port/macos/host/host_render.c). The number
 of its commands the host refused, or -1 if it refused the batch whole */
 int host_render_submit(unsigned int batch, unsigned int size);
 
+/* the physics bridge (port/macos/include/host_physics.h): the host carries
+out the `size` bytes of batch at guest address `batch`, steps its world and
+writes the poses into the `results_size` bytes at `results`
+(port/macos/host/host_physics.c). The number of commands refused, or -1 if
+it refused the batch whole */
+int host_physics_step(unsigned int batch, unsigned int size, unsigned int results, unsigned int results_size);
+
 /* ---------- Android */
 
 /* the storage directories the port uses, copied into buffer */

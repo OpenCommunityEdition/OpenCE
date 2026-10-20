@@ -26,6 +26,12 @@ void render_interpolation_first_person(short local_player_index, struct real_mat
 	short node_count, struct render_camera const *camera);
 float render_interpolation_game_time_sec(long ticks);
 
+/* the host's physics world for ragdolls and debris (port/linux/game/physics_jolt.c):
+the structure bsp's collision triangles sent when it loads or switches, and
+everything removed with the map */
+void physics_jolt_structure_bsp_reconnect(void);
+void physics_jolt_dispose_from_old_map(void);
+
 /* the port's menus' screen for one of ui.map's, by name, else the name
 (port/linux/game/menu_tags.c) */
 char const *pc_menus_screen(char const *name);

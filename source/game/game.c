@@ -937,6 +937,8 @@ void game_dispose_from_old_map(
 	game_allegiance_dispose_from_old_map();
 	update_server_delete();
 	game_engine_dispose_from_old_map();
+	/* port: the host's ragdolls, debris and level go with the map (port/linux/game/physics_jolt.c) */
+	physics_jolt_dispose_from_old_map();
 	scenario_dispose_from_old_map();
 	game_time_dispose_from_old_map();
 	ui_widgets_close_all();

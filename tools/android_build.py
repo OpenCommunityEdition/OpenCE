@@ -413,6 +413,10 @@ def guest_image_build(n: Writer, sln: Any, config: Dict[str, Any], *, rule_prefi
         f"-iquote {Path(config['game_sources'])}",
         game_defines_and_includes(config), *libc_includes, f"-idirafter {XDK_INCLUDE}",
     ])
+    if "-DHALO_METAL" in defines:
+        # the physics bridge's format (port/macos/include/host_physics.h),
+        # which the port's game units write
+        game_cflags += f" -I{Path('port/macos/include')}"
     for source in game_sources(config):
         cflags = game_cflags
         if source.as_posix() == "source/main/main.c":
