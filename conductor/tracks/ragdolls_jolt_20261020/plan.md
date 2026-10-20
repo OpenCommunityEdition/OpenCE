@@ -36,9 +36,9 @@
 - [x] Task: Forces and collisions 1a5637a1
     - [x] Write tests: native tests that an impulse moves a ragdoll, a kinematic box shoves one aside, and two ragdolls collide; harness tests that later damage and explosions near a corpse queue impulses
     - [x] Damage and explosion impulses; vehicles and living bipeds as kinematic bodies; sleeping
-- [ ] Task: Drawing the ragdoll's pose
-    - [ ] Write tests: harness tests that the node matrices `render_objects.c` draws come from the results for a ragdoll and from the game otherwise; removing the body (garbage, map change, saved game) removes the ragdoll
-    - [ ] A `port:` swap at the node-matrix read in `render_objects.c`
+- [x] Task: Drawing the ragdoll's pose 9e2fa64c
+    - [x] Write tests: harness tests that the node matrices `render_objects.c` draws come from the results for a ragdoll and from the game otherwise; removing the body (garbage, map change, saved game) removes the ragdoll
+    - [x] A `port:` swap at the node-matrix read in `render_objects.c`
 - [ ] Task: Golden frames of ragdolls
     - [ ] Write tests: `tools/test_macos_frames.py` cases with the frame clock: a Grunt killed by a scripted grenade (mid-fall, at rest) and a body shoved by a Warthog; the existing goldens unchanged with the setting off
     - [ ] Tune the overrides until the frames look right; approve the references
