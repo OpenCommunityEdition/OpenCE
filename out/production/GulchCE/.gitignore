@@ -1,0 +1,7 @@
+# Gradle and Android Studio output (the native parts live in build/android)
+.gradle/
+app/build/
+build/
+local.properties
+.idea/
+*.iml

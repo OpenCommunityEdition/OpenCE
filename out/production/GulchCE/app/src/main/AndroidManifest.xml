@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    android:installLocation="auto">
+
+    <uses-feature android:glEsVersion="0x00030000" android:required="true" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
+    <!-- controller rumble -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- system link multiplayer on the local network -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- voice chat's microphone (asked for only when voice chat first talks) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- installing a new version of the game (Updater) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- enableOnBackInvokedCallback: the back button and the back gesture
+         stay KEYCODE_BACK, which SDL passes to the game as B; with
+         predictive back (the default once an app targets Android 16) the
+         system would take them and the game would never see them -->
+    <application
+        android:name=".HaloApplication"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:isGame="true"
+        android:appCategory="game"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
+        android:hardwareAccelerated="true"
+        android:enableOnBackInvokedCallback="false">
+
+        <!-- a game, for the system (isGame and appCategory above; the game
+             modes' configuration) and for launchers that look for this -->
+        <meta-data
+            android:name="android.game_mode_config"
+            android:resource="@xml/game_mode_config" />
+        <meta-data
+            android:name="android.app.category"
+            android:value="game" />
+
+        <!-- checks for the game data (importing it on first run), then
+             starts the game -->
+        <activity
+            android:name=".LauncherActivity"
+            android:exported="true"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode">
+            <meta-data
+                android:name="android.app.category"
+                android:value="game" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <!-- internet play invite links, halo://join/... -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="halo" android:host="join" />
+            </intent-filter>
+        </activity>
+
+        <!-- in a process of its own, with a fresh Java heap (HaloApplication) -->
+        <activity
+            android:name=".HaloActivity"
+            android:process=":game"
+            android:exported="false"
+            android:alwaysRetainTaskState="true"
+            android:launchMode="singleInstance"
+            android:screenOrientation="sensorLandscape"
+            android:resizeableActivity="false"
+            android:preferMinimalPostProcessing="true"
+            android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation">
+            <meta-data
+                android:name="android.app.category"
+                android:value="game" />
+        </activity>
+
+        <!-- the downloaded new version, for the package installer (Updater) -->
+        <provider
+            android:name=".UpdateProvider"
+            android:authorities="com.halo.decomp.update"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
+        <!-- the game started again once a new version is installed -->
+        <receiver
+            android:name=".UpdateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
