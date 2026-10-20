@@ -58,10 +58,10 @@
 - [x] Task: Render states, draws and render targets 26404ecb
     - [x] Write tests: harness tests of state → pipeline-key packing; a draw test through the ring
     - [x] The rest of D3D8 as d3d8_gl.c implements it, encoded into the ring
-- [~] Task: The main menu draws
-    - [ ] Write tests: the main-menu golden frame (approved by you once)
-    - [ ] Fix what the frame shows wrong
-- [ ] Task: Bloodgulch draws
+- [x] Task: The main menu draws 6b1e9ab9
+    - [x] Write tests: the main-menu golden frame (approved by you once)
+    - [x] Fix what the frame shows wrong
+- [~] Task: Bloodgulch draws
     - [ ] Write tests: a bloodgulch golden frame from a fixed camera (approved by you once)
     - [ ] Fix what the frame shows wrong
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Direct3D 8 on Metal' (Protocol in workflow.md)
