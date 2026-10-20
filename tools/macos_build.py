@@ -50,6 +50,17 @@ HOST_FRAMEWORKS = ["Hypervisor"]
 MACOS_MINIMUM = "26.0"
 APP_DIR = PORT_DIR / "app"
 APP_VERSION = "0.1.0"
+# Jolt Physics (port/third_party/jolt), for the ragdolls and the debris: its
+# library without the compute and GPU back ends, built as the wrapper is
+JOLT_DIR = Path("port/third_party/jolt")
+JOLT_DEFINES = ["-DJPH_CROSS_PLATFORM_DETERMINISTIC", "-DNDEBUG"]
+
+
+def jolt_sources() -> List[Path]:
+    skipped = {"CPU", "DX12", "VK", "MTL", "Shaders"}
+    return sorted(source for source in (JOLT_DIR / "Jolt").rglob("*.cpp")
+                  if not skipped.intersection(source.relative_to(JOLT_DIR / "Jolt").parts[:-1])
+                  and "ObjectStream" not in source.parts)
 
 
 def is_macos_host() -> bool:
@@ -57,10 +68,11 @@ def is_macos_host() -> bool:
 
 
 def macos_configure_inputs() -> List[Path]:
-    return [Path(__file__), PORT_DIR / "host", PORT_DIR / "cli", APP_DIR / "Sources" / "OpenCE",
-            APP_DIR / "Sources" / "OpenCEShell", APP_DIR / "Sources" / "OpenCEWindow",
-            APP_DIR / "Sources" / "OpenCEAudio", APP_DIR / "Sources" / "OpenCERender", APP_DIR / "Tests",
-            PORT_DIR / "runtime" / "src", Path("tools/macos_dispatch.py")]
+    inputs = [Path(__file__), PORT_DIR / "host", PORT_DIR / "cli", APP_DIR / "Sources" / "OpenCE",
+              APP_DIR / "Sources" / "OpenCEShell", APP_DIR / "Sources" / "OpenCEWindow",
+              APP_DIR / "Sources" / "OpenCEAudio", APP_DIR / "Sources" / "OpenCERender", APP_DIR / "Tests",
+              PORT_DIR / "runtime" / "src", Path("tools/macos_dispatch.py")]
+    return inputs + [folder for folder in [PORT_DIR / "host" / "physics"] if folder.is_dir()]
 
 
 def generate_macos_build(n: Writer, sln: Any) -> None:
@@ -85,10 +97,12 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     sdl_lib = environment.get("HALO_MACOS_SDL_LIB")
     codesign = environment.get("HALO_MACOS_CODESIGN", "codesign")
     host_cc = environment.get("CC", "cc")
+    host_cxx = environment.get("CXX", "c++")
 
     n.comment("macOS build (ninja macos); see docs/macos_host.md")
     n.variable("macos_guest_cc", guest_cc)
     n.variable("macos_host_cc", host_cc)
+    n.variable("macos_host_cxx", host_cxx)
 
     host_dir = BUILD / "host"
     names_c = host_dir / "host_import_names.c"
@@ -107,6 +121,13 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         name="macos_host_cc",
         command="$macos_host_cc -MMD -MF $out.d $cflags -c $in -o $out",
         description="MACOS HOST CC $out",
+        depfile="$out.d",
+        deps="gcc",
+    )
+    n.rule(
+        name="macos_host_cxx",
+        command="$macos_host_cxx -MMD -MF $out.d $cflags -c $in -o $out",
+        description="MACOS HOST CXX $out",
         depfile="$out.d",
         deps="gcc",
     )
@@ -166,6 +187,22 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         n.build(outputs=obj, rule="macos_host_cc", inputs=source,
                 variables={"cflags": mbedtls_cflags + (" -w" if source.name != "posix_dtls.c" else "")})
         host_objects.append(obj)
+    # Jolt and its C interface (port/macos/host/physics): C++17, without
+    # fused multiply-add, so that every run computes the same results
+    jolt_cflags = " ".join([
+        "-O2", "-g", "-std=c++17", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti",
+        f"-mmacosx-version-min={MACOS_MINIMUM}", f"-I{JOLT_DIR}", *JOLT_DEFINES,
+    ])
+    for source in jolt_sources():
+        relative = source.relative_to(JOLT_DIR).with_suffix("").as_posix().replace("/", "_")
+        obj = host_dir / "obj" / "jolt" / (relative + ".o")
+        n.build(outputs=obj, rule="macos_host_cxx", inputs=source, variables={"cflags": jolt_cflags + " -w"})
+        host_objects.append(obj)
+    physics_cflags = " ".join([jolt_cflags, "-Wall", "-Werror", f"-I{PORT_DIR}/host", f"-I{PORT_DIR}/include"])
+    for source in sorted((PORT_DIR / "host" / "physics").glob("*.cpp")):
+        obj = host_dir / "obj" / "physics" / (source.name + ".o")
+        n.build(outputs=obj, rule="macos_host_cxx", inputs=source, variables={"cflags": physics_cflags})
+        host_objects.append(obj)
     # the host as a library, which the command-line host and the app link
     host_library = BUILD / "libhalo_host.a"
     n.rule(
@@ -183,7 +220,7 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     libraries += f" {runtime_library}"
     if sdl_lib:
         libraries += f" -L{sdl_lib} -Wl,-rpath,{sdl_lib}"
-    libraries += " -lSDL3"
+    libraries += " -lSDL3 -lc++"
     # signed as it is linked, so that no unsigned host is ever left: without
     # the entitlement it cannot create its VM
     n.rule(
@@ -212,7 +249,7 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         linker_flags += f" -Xlinker -framework -Xlinker {name}"
     if sdl_lib:
         linker_flags += f" -Xlinker -L{sdl_lib} -Xlinker -rpath -Xlinker {sdl_lib}"
-    linker_flags += " -Xlinker -lSDL3"
+    linker_flags += " -Xlinker -lSDL3 -Xlinker -lc++"
     swift_package = (f"env -u SDKROOT -u DEVELOPER_DIR -u MACOSX_DEPLOYMENT_TARGET -u CC -u CXX -u LD "
                      f"{swift} %s --quiet --disable-sandbox --package-path {APP_DIR} "
                      f"--scratch-path {swift_build} --cache-path {swift_build}/cache "
