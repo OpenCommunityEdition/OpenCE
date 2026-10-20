@@ -33,9 +33,9 @@
 - [x] Task: Animation, then limp 3d1bd97f
     - [x] Write tests: native tests that the joint motors follow a target pose for the blend time, then release; a ragdoll dropped on a plane rests with its joints inside their limits
     - [x] Motor targets from the death animation's node matrices each tick
-- [ ] Task: Forces and collisions
-    - [ ] Write tests: native tests that an impulse moves a ragdoll, a kinematic box shoves one aside, and two ragdolls collide; harness tests that later damage and explosions near a corpse queue impulses
-    - [ ] Damage and explosion impulses; vehicles and living bipeds as kinematic bodies; sleeping
+- [x] Task: Forces and collisions 1a5637a1
+    - [x] Write tests: native tests that an impulse moves a ragdoll, a kinematic box shoves one aside, and two ragdolls collide; harness tests that later damage and explosions near a corpse queue impulses
+    - [x] Damage and explosion impulses; vehicles and living bipeds as kinematic bodies; sleeping
 - [ ] Task: Drawing the ragdoll's pose
     - [ ] Write tests: harness tests that the node matrices `render_objects.c` draws come from the results for a ragdoll and from the game otherwise; removing the body (garbage, map change, saved game) removes the ragdoll
     - [ ] A `port:` swap at the node-matrix read in `render_objects.c`
