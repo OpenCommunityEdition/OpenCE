@@ -14,12 +14,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run, structure  # noqa: E402
 
 CASES = ["death", "killing hit", "newest hit", "stale hit", "bad numbers", "off", "not biped", "no body", "once",
-         "capacity", "pose", "unused at first", "start", "drive then limp", "removed"]
+         "capacity", "pose", "unused at first", "start", "drive then limp", "removed", "nearest part", "corpse push",
+         "killing push", "pushes dropped", "replaced drops", "near", "stand-ins"]
 
-FUNCTIONS = ["ragdolls_enabled", "ragdolls_object_is_biped", "ragdolls_damage", "ragdolls_hit_get",
+FUNCTIONS = ["ragdolls_enabled", "ragdolls_object_is_biped", "ragdoll_pose_transform", "ragdoll_part_nearest",
+             "ragdolls_push", "ragdolls_impulses_drop", "ragdolls_damage", "ragdolls_hit_get",
              "ragdolls_unit_died", "ragdolls_death_count", "ragdolls_death_get", "ragdolls_deaths_clear",
              "ragdoll_pose_from_matrix", "ragdolls_get", "ragdolls_of_object",
-             "ragdolls_start", "ragdolls_action", "ragdolls_stop", "ragdolls_dispose_from_old_map"]
+             "ragdolls_start", "ragdolls_action", "ragdolls_stop", "ragdolls_impulse_count", "ragdolls_impulse_get",
+             "ragdolls_impulses_clear", "ragdolls_near", "ragdolls_stand_ins_begin", "ragdolls_stand_in",
+             "ragdolls_stand_in_unseen", "ragdolls_dispose_from_old_map"]
 
 # a fault in the deaths and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -30,10 +34,28 @@ NEGATIVE_CONTROLS = {
                          "stale hit"),
     "twice": (("if (ragdolls.deaths[index].object_index == unit_index)\n\t\t\treturn;", ""), "once"),
     "no-capacity": (("if (!body || ragdolls.death_count >= RAGDOLL_DEATHS_MAX)", "if (!body)"), "capacity"),
-    "unscaled": (("(zero_scale + (1.0f - zero_scale) * PIN(damage->scale, 0.0f, 1.0f))", "(zero_scale * 0.0f + 1.0f)"), "killing hit"),
+    "no-acceleration-scale": (("object_definition->object.acceleration_scale;", "(object_definition ? 1.0f : 1.0f);"), "newest hit"),
     "unnormalised": (("scale_vector3d(&hit->direction, 1.0f / length, &hit->direction);", ""), "killing hit"),
-    "no-nan-check": (("if (length > _real_epsilon && hit->speed == hit->speed)", "if (length > _real_epsilon)"),
-                     "bad numbers"),
+    "no-zero-check": (("if (length > _real_epsilon && hit->speed > _real_epsilon)", "if (length > _real_epsilon)"),
+                      "bad numbers"),
+    "unrotated-shape": (("result->x = pose->position.x + point->x + q->w * t.i + (q->v.j * t.k - q->v.k * t.j);",
+                         "result->x = pose->position.x + point->x;"), "nearest part"),
+    "farthest-part": (("distance < nearest_distance", "distance > nearest_distance"), "corpse push"),
+    "no-lift": (("direction.k += RAGDOLL_PUSH_LIFT;", ""), "corpse push"),
+    "no-mass": ((" * ragdoll->body->mass / length", " / length"), "corpse push"),
+    "corpse-not-pushed": (("if (ragdoll)\n\t\tragdolls_push(", "if (FALSE)\n\t\tragdolls_push("), "corpse push"),
+    "whole-killing-push": (("&death->killing_hit, 0.5f", "&death->killing_hit, 1.0f"), "killing push"),
+    "unposed-start": (("ragdoll_pose_from_matrix(&death->nodes[death->body->parts[index].node_index], &ragdoll->poses[index]);",
+                       ";"), "killing push"),
+    "pushes-kept": (("\tragdolls_impulses_drop(id);", ""), "pushes dropped"),
+    "no-push-capacity": ((" || ragdolls.impulse_count >= RAGDOLL_IMPULSES_MAX", ""), "pushes dropped"),
+    "replaced-pushes-kept": (("ragdolls_impulses_drop(chosen + 1);", ""), "replaced drops"),
+    "always-near": (("<= reach * reach", "<= 1e30f"), "near"),
+    "stand-in-twice": (("ragdolls.stand_ins[index].used && ragdolls.stand_ins[index].object_index == object_index",
+                        "FALSE"), "stand-ins"),
+    "never-unseen": ((" || ragdolls.stand_ins[id - 1].seen)", ")"), "stand-ins"),
+    "never-forgotten": (("ragdolls.stand_ins[index].seen = FALSE;", "ragdolls.stand_ins[index].seen = TRUE;"),
+                        "stand-ins"),
     "the-game's-turn": (("pose->rotation.v.i = -pose->rotation.v.i;\n\tpose->rotation.v.j = -pose->rotation.v.j;\n"
                          "\tpose->rotation.v.k = -pose->rotation.v.k;", ""), "pose"),
     "no-identity": (("\t\tpose->rotation.w = 1.0f;", "\t\tpose->rotation.w = 0.0f;"), "pose"),
@@ -58,8 +80,11 @@ def generated(fault=None):
         enum_with(bodies, "RAGDOLL_BODY_PARTS_MAX"), structure(bodies, "ragdoll_part"), structure(bodies, "ragdoll_body"),
         enum_with(header, "RAGDOLL_DEATHS_MAX"), enum_with(header, "_ragdoll_action_none"),
         structure(header, "ragdoll_hit"), structure(header, "ragdoll_death"), structure(header, "ragdoll_pose"),
-        structure(header, "ragdoll"),
+        structure(header, "ragdoll_impulse"), structure(header, "ragdoll"),
         "#define RAGDOLL_DRIVE_FREQUENCY " + re.search(r"#define RAGDOLL_DRIVE_FREQUENCY (\S+)", header)[1],
+        "#define RAGDOLL_STAND_IN_DISTANCE " + re.search(r"#define RAGDOLL_STAND_IN_DISTANCE (\S+)", header)[1],
+        "#define RAGDOLL_PUSH_LIFT " + re.search(r"#define RAGDOLL_PUSH_LIFT (\S+)", header)[1],
+        "struct ragdoll const *ragdolls_of_object(long object_index);",
         "static boolean physics_jolt_ragdolls_enabled(void);",
         "static struct ragdoll_body const *ragdoll_body_get(long definition_index);",
         state]) + "\n"

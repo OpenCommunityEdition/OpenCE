@@ -17,6 +17,7 @@ enum { _object_type_biped = 0, _object_type_vehicle = 1 };
 enum { _object_mask_biped = 1 << _object_type_biped };
 struct _object_datum { short type; };
 struct object_datum { long definition_index; struct _object_datum object; };
+struct object_definition { struct { real acceleration_scale; } object; };
 struct damage_definition { real instantaneous_acceleration, instantaneous_acceleration_zero_scale_factor; };
 struct damage_effect_definition { struct damage_definition damage; };
 struct damage_data { long definition_index; real_point3d origin; real_vector3d direction; real scale; };
@@ -29,6 +30,9 @@ static struct object_datum objects[3] = {{100, {_object_type_biped}}, {101, {_ob
 static real_matrix4x3 matrices[RAGDOLL_BODY_NODES_MAX];
 static struct ragdoll_body body;
 static struct damage_effect_definition grenade = {{6.0f, 0.25f}};
+static struct damage_effect_definition poke = {{0.0f, 0.0f}};
+/* the bipeds': 100's, and 102's half */
+static struct object_definition whole = {{1.0f}}, half = {{0.5f}};
 
 static boolean deleted[3];
 static short const matrix4x3_next[3] = {1, 2, 0};
@@ -49,7 +53,8 @@ static void object_get_velocities(long index, real_vector3d *velocity, real_vect
 	velocity->i = 1.0f + index; velocity->j = 2.0f; velocity->k = -3.0f;
 	angular->i = angular->j = angular->k = 0.0f;
 }
-static struct damage_effect_definition *damage_effect_definition_get(long index) { (void)index; return &grenade; }
+static struct damage_effect_definition *damage_effect_definition_get(long index) { return index == 8 ? &poke : &grenade; }
+static struct object_definition *object_definition_get(long index) { return index == 102 ? &half : &whole; }
 static struct ragdoll_body const *ragdoll_body_get(long definition_index) { return definition_index != 102 ? &body : NULL; }
 static real magnitude3d(real_vector3d const *v) { return sqrtf(v->i * v->i + v->j * v->j + v->k * v->k); }
 static real_vector3d *scale_vector3d(real_vector3d const *v, real s, real_vector3d *out)
@@ -66,6 +71,7 @@ static struct ragdoll_death death_of(long object_index)
 	memset(&death, 0, sizeof(death));
 	death.object_index = object_index;
 	death.body = &body;
+	memcpy(death.nodes, matrices, sizeof(death.nodes));
 	return death;
 }
 
@@ -110,9 +116,23 @@ int main(int argc, char **argv)
 	struct damage_data damage;
 	long index;
 
+	/* three parts along x, at the first three nodes; the middle one's shape
+	half a unit on */
 	body.node_count = 5;
+	body.part_count = 3;
+	body.mass = 80.0f;
+	for (index = 0; index < 3; index++)
+	{
+		body.parts[index].node_index = (short)index;
+		body.parts[index].parent_part_index = (short)(index - 1);
+	}
+	body.parts[1].center.x = 0.5f;
 	for (index = 0; index < RAGDOLL_BODY_NODES_MAX; index++)
+	{
+		matrices[index].scale = 1.0f;
+		matrices[index].forward.i = matrices[index].left.j = matrices[index].up.k = 1.0f;
 		matrices[index].position.x = (real)index;
+	}
 
 	CASE("death")
 	{
@@ -141,8 +161,8 @@ int main(int argc, char **argv)
 		CHECK(death && death->hit, "the hit");
 		CHECK(near(death->killing_hit.direction.j, 0.6f) && near(death->killing_hit.direction.k, 0.8f),
 			"its direction: %f %f", death->killing_hit.direction.j, death->killing_hit.direction.k);
-		/* 6 * (0.25 + 0.75 * 0.5) */
-		CHECK(near(death->killing_hit.speed, 3.75f), "its speed: %f", death->killing_hit.speed);
+		/* all 6 of it at any scale, as damage.c accelerates the biped */
+		CHECK(near(death->killing_hit.speed, 6.0f), "its speed: %f", death->killing_hit.speed);
 		CHECK(death->killing_hit.point.z == 3.0f && death->killing_hit.time == now, "its point");
 		return 0;
 	}
@@ -153,7 +173,8 @@ int main(int argc, char **argv)
 		damage = blast(0.0f, 0.0f, 2.0f, 0.0f);
 		ragdolls_damage(0, &damage);
 		CHECK(ragdolls_hit_get(0) && ragdolls_hit_get(0)->direction.k == 1.0f, "the newer");
-		CHECK(near(ragdolls_hit_get(0)->speed, 1.5f), "at zero scale: %f", ragdolls_hit_get(0)->speed);
+		ragdolls_damage(2, &damage);
+		CHECK(near(ragdolls_hit_get(2)->speed, 3.0f), "the biped's acceleration scale: %f", ragdolls_hit_get(2)->speed);
 		for (index = 0; index < RAGDOLL_HITS_MAX; index++)
 			ragdolls_damage(2, &damage);
 		CHECK(!ragdolls_hit_get(0), "overwritten");
@@ -176,9 +197,10 @@ int main(int argc, char **argv)
 		damage = blast(NAN, 0.0f, 1.0f, 1.0f);
 		ragdolls_damage(0, &damage);
 		CHECK(ragdolls_hit_get(0)->speed == 0.0f && ragdolls_hit_get(0)->direction.i == 0.0f, "a nan direction");
-		damage = blast(0.0f, 0.0f, 1.0f, NAN);
+		damage = blast(0.0f, 0.0f, 1.0f, 1.0f);
+		damage.definition_index = 8;
 		ragdolls_damage(0, &damage);
-		CHECK(ragdolls_hit_get(0)->speed == 0.0f, "a nan scale: %f", ragdolls_hit_get(0)->speed);
+		CHECK(ragdolls_hit_get(0)->speed == 0.0f && ragdolls_hit_get(0)->direction.k == 0.0f, "no acceleration");
 		damage.definition_index = NONE;
 		ragdolls_damage(1, &damage);
 		return 0;
@@ -326,6 +348,144 @@ int main(int argc, char **argv)
 		ragdolls_stop(id);
 		CHECK(!ragdolls_get(id) && !ragdolls_of_object(2), "stopped");
 		CHECK(ragdolls_action(id) == _ragdoll_action_none, "and done");
+		return 0;
+	}
+	CASE("nearest part")
+	{
+		struct ragdoll_pose poses[3];
+		real_point3d point = {1.0f, 0.6f, 0.0f};
+
+		memset(poses, 0, sizeof(poses));
+		poses[0].rotation.w = poses[2].rotation.w = 1.0f;
+		/* the middle part turned a quarter about z: its shape at (1, 0.5) */
+		poses[1].position.x = 1.0f;
+		poses[1].rotation.v.k = poses[1].rotation.w = 0.70710678f;
+		poses[2].position.x = poses[2].position.y = 1.0f;
+		CHECK(ragdoll_part_nearest(&body, poses, &point) == 1, "the turned shape: %d",
+			ragdoll_part_nearest(&body, poses, &point));
+		point.y = 1.0f;
+		CHECK(ragdoll_part_nearest(&body, poses, &point) == 2, "the last");
+		point.x = point.y = -1.0f;
+		CHECK(ragdoll_part_nearest(&body, poses, &point) == 0, "the first");
+		return 0;
+	}
+	CASE("corpse push")
+	{
+		struct ragdoll_death death = death_of(0);
+		struct ragdoll_impulse const *impulse;
+		long replaced;
+		real length = sqrtf(1.0f + RAGDOLL_PUSH_LIFT * RAGDOLL_PUSH_LIFT);
+
+		ragdolls_start(&death, &replaced);
+		CHECK(ragdolls_impulse_count() == 0, "no hit, no push");
+		/* at (1, 2, 3): nearest the middle part's shape, at (1.5, 0, 0) */
+		damage = blast(0.0f, 1.0f, 0.0f, 0.1f);
+		ragdolls_damage(0, &damage);
+		impulse = ragdolls_impulse_get(0);
+		CHECK(ragdolls_impulse_count() == 1 && impulse, "pushed: %ld", ragdolls_impulse_count());
+		CHECK(impulse->id == 1 && impulse->part == 1, "its part: %ld %d", impulse->id, impulse->part);
+		/* lifted, at the hit's speed times the body's mass, all of it */
+		CHECK(near(impulse->impulse.i, 0.0f) && near(impulse->impulse.j, 480.0f / length) &&
+			near(impulse->impulse.k, 480.0f * RAGDOLL_PUSH_LIFT / length), "its impulse: %f %f %f",
+			impulse->impulse.i, impulse->impulse.j, impulse->impulse.k);
+		CHECK(impulse->point.x == 1.0f && impulse->point.z == 3.0f, "where it struck");
+		ragdolls_damage(2, &damage);
+		CHECK(ragdolls_impulse_count() == 1, "not another biped's");
+		ragdolls_impulses_clear();
+		CHECK(ragdolls_impulse_count() == 0 && !ragdolls_impulse_get(0), "cleared");
+		return 0;
+	}
+	CASE("killing push")
+	{
+		struct ragdoll_death const *death;
+		struct ragdoll_impulse const *impulse;
+		long replaced;
+
+		damage = blast(0.0f, 0.0f, -1.0f, 1.0f);
+		ragdolls_damage(0, &damage);
+		ragdolls_unit_died(0);
+		death = ragdolls_death_get(0);
+		ragdolls_start(death, &replaced);
+		CHECK(ragdolls_get(1)->poses[2].position.x == 2.0f && !ragdolls_get(1)->posed, "posed as it died");
+		impulse = ragdolls_impulse_get(0);
+		CHECK(ragdolls_impulse_count() == 1 && impulse->id == 1, "pushed as it starts");
+		/* (down, lifted: (0, 0, -0.55)) half the push: the living biped took
+		the rest */
+		CHECK(near(impulse->impulse.k, -240.0f) && near(impulse->impulse.i, 0.0f), "half: %f", impulse->impulse.k);
+		return 0;
+	}
+	CASE("pushes dropped")
+	{
+		struct ragdoll_death death = death_of(0);
+		long replaced;
+		long id = ragdolls_start(&death, &replaced);
+
+		damage = blast(1.0f, 0.0f, 0.0f, 1.0f);
+		ragdolls_damage(0, &damage);
+		ragdolls_stop(id);
+		CHECK(ragdolls_impulse_count() == 0, "with its ragdoll: %ld", ragdolls_impulse_count());
+		id = ragdolls_start(&death, &replaced);
+		for (index = 0; index < RAGDOLL_IMPULSES_MAX + 4; index++)
+			ragdolls_damage(0, &damage);
+		CHECK(ragdolls_impulse_count() == RAGDOLL_IMPULSES_MAX, "full: %ld", ragdolls_impulse_count());
+		ragdolls_impulses_clear();
+		damage = blast(0.0f, 0.0f, 0.0f, 1.0f);
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_impulse_count() == 0, "no push without a speed");
+		return 0;
+	}
+	CASE("replaced drops")
+	{
+		struct ragdoll_death death;
+		long replaced;
+
+		for (index = 0; index < RAGDOLLS_MAX; index++, now++)
+		{
+			death = death_of(3 + index);
+			ragdolls_start(&death, &replaced);
+		}
+		damage = blast(1.0f, 0.0f, 0.0f, 1.0f);
+		ragdolls_damage(3, &damage);
+		CHECK(ragdolls_impulse_count() == 1 && ragdolls_impulse_get(0)->id == 1, "the oldest pushed");
+		death = death_of(100);
+		CHECK(ragdolls_start(&death, &replaced) == 1 && replaced == 1, "then replaced");
+		CHECK(ragdolls_impulse_count() == 0, "its push dropped: %ld", ragdolls_impulse_count());
+		return 0;
+	}
+	CASE("near")
+	{
+		struct ragdoll_death death = death_of(0);
+		real_point3d point = {3.5f, 0.0f, 0.0f};
+		long replaced;
+
+		CHECK(!ragdolls_near(&point, 1.0f), "no ragdolls");
+		ragdolls_start(&death, &replaced);
+		CHECK(ragdolls_near(&point, 1.0f), "within reach of its first part");
+		point.x = 4.5f;
+		CHECK(!ragdolls_near(&point, 1.0f), "past it");
+		CHECK(ragdolls_near(&point, 2.0f), "a bigger object");
+		return 0;
+	}
+	CASE("stand-ins")
+	{
+		boolean added;
+
+		ragdolls_stand_ins_begin();
+		CHECK(ragdolls_stand_in(50, &added) == 1 && added, "the first, new");
+		CHECK(ragdolls_stand_in(51, &added) == 2 && added, "the second");
+		CHECK(ragdolls_stand_in(50, &added) == 1 && !added, "the first again, this tick");
+		CHECK(!ragdolls_stand_in_unseen(1) && !ragdolls_stand_in_unseen(2), "both seen");
+		ragdolls_stand_ins_begin();
+		CHECK(ragdolls_stand_in(50, &added) == 1 && !added, "next tick, moved");
+		CHECK(ragdolls_stand_in_unseen(2), "the second gone");
+		CHECK(!ragdolls_stand_in_unseen(2) && !ragdolls_stand_in_unseen(0) &&
+			!ragdolls_stand_in_unseen(RAGDOLL_STAND_INS_MAX + 1), "once, and in range");
+		CHECK(ragdolls_stand_in(52, &added) == 2 && added, "its id taken again");
+		for (index = 2; index < RAGDOLL_STAND_INS_MAX; index++)
+			ragdolls_stand_in(60 + index, &added);
+		CHECK(ragdolls_stand_in(99, &added) == NONE && !added, "full");
+		ragdolls_dispose_from_old_map();
+		CHECK(ragdolls_stand_in(50, &added) == 1 && added, "gone with the map");
 		return 0;
 	}
 	fprintf(stderr, "unknown case '%s'\n", case_name);

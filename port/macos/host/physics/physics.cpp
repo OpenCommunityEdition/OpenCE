@@ -57,8 +57,11 @@ constexpr float STEP_MAX = 1.0f;
 constexpr uint32 RAGDOLLS_MAX = 1024;
 // a joint's motor, at most this torque (N m) a kilogram of its part
 constexpr float MOTOR_TORQUE_PER_KILOGRAM = 40.0f;
-// a limp joint's friction, the same way
-constexpr float FRICTION_TORQUE_PER_KILOGRAM = 0.4f;
+// a limp joint's friction, the same way: enough that every stock biped's
+// body comes to rest on flat ground within 8 seconds and sleeps
+// (tools/test_ragdoll_physics.py); at 0.4 a jackal's shield arm and a flood
+// elite's limbs crept on for longer
+constexpr float FRICTION_TORQUE_PER_KILOGRAM = 2.0f;
 // a ragdoll's solver iterations: a chain of joints needs more than Jolt's
 // defaults (10 and 2) to stay within its limits as it hits the ground
 constexpr uint RAGDOLL_VELOCITY_STEPS = 12;

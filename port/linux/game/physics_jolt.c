@@ -20,12 +20,15 @@ enabled.
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "math/real_math.h"
+#include "objects/object_types.h"
 #include "objects/objects.h"
 #include "physics/bsp3d.h"
 #include "physics/collision_bsp.h"
 #include "physics/collision_bsp_definitions.h"
 #include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
+#include "units/biped_definitions.h"
+#include "units/bipeds.h"
 #include "physics_jolt.h"
 #include "ragdoll_bodies.h"
 #include "ragdolls.h"
@@ -57,6 +60,9 @@ enum
 /* a dead body's on the level */
 #define PHYSICS_JOLT_RAGDOLL_FRICTION 0.8f
 #define PHYSICS_JOLT_RAGDOLL_RESTITUTION 0.05f
+/* a stand-in's, where the ragdolls meet it */
+#define PHYSICS_JOLT_STAND_IN_FRICTION 0.6f
+#define PHYSICS_JOLT_STAND_IN_RESTITUTION 0.1f
 
 static unsigned long physics_jolt_changes = (unsigned long)-1;
 static boolean physics_jolt_on = FALSE;
@@ -430,6 +436,174 @@ static void physics_jolt_ragdoll_drive(
 	command[4] = ragdoll->body->part_count;
 }
 
+static void physics_jolt_ragdoll_impulse(
+	struct ragdoll_impulse const *impulse)
+{
+	unsigned long *command = physics_jolt_command(HOST_PHYSICS_OP_RAGDOLL_IMPULSE, HOST_PHYSICS_RAGDOLL_IMPULSE_WORDS);
+
+	if (!command)
+		return;
+	command[1] = impulse->id;
+	command[2] = impulse->part;
+	command[3] = physics_jolt_word(impulse->impulse.i);
+	command[4] = physics_jolt_word(impulse->impulse.j);
+	command[5] = physics_jolt_word(impulse->impulse.k);
+	command[6] = physics_jolt_word(impulse->point.x);
+	command[7] = physics_jolt_word(impulse->point.y);
+	command[8] = physics_jolt_word(impulse->point.z);
+}
+
+/* ---------- stand-ins */
+
+/* A stand-in's shape where its object is now: a vehicle's hull, the box
+of its collision model's first node in that node's frame; a living biped's
+pill (bipeds.c's), standing, a capsule up its frame's x, or a sphere. An AI's
+pill has no height, so its standing height is taken. FALSE if it has none. */
+static boolean physics_jolt_stand_in_shape(
+	long object_index,
+	struct object_datum const *object,
+	unsigned long *shape,
+	real *size,
+	struct ragdoll_pose *pose)
+{
+	if (object->object.type == _object_type_vehicle)
+	{
+		real_matrix4x3 const *node = object_get_node_matrices(object_index);
+		real_point3d center;
+		real_vector3d half_extents;
+
+		if (!ragdoll_hull_get(object->definition_index, &center, &half_extents))
+			return FALSE;
+		ragdoll_pose_from_matrix(node, pose);
+		pose->position.x = node->position.x + node->scale *
+			(node->forward.i * center.x + node->left.i * center.y + node->up.i * center.z);
+		pose->position.y = node->position.y + node->scale *
+			(node->forward.j * center.x + node->left.j * center.y + node->up.j * center.z);
+		pose->position.z = node->position.z + node->scale *
+			(node->forward.k * center.x + node->left.k * center.y + node->up.k * center.z);
+		*shape = HOST_PHYSICS_SHAPE_BOX;
+		size[0] = node->scale * half_extents.i;
+		size[1] = node->scale * half_extents.j;
+		size[2] = node->scale * half_extents.k;
+	}
+	else
+	{
+		struct biped_definition const *definition = biped_definition_get(object->definition_index);
+		real_point3d base;
+		real height;
+		real width;
+
+		biped_get_physics_pill(object_index, &base, &height, &width);
+		if (height <= 0.0f && !TEST_FLAG(definition->biped.flags, _biped_spherical_bit))
+			height = definition->biped.collision_height_standing - 2.0f * width;
+		if (width <= 0.0f)
+			return FALSE;
+		pose->position = base;
+		pose->rotation.v.i = pose->rotation.v.k = 0.0f;
+		pose->rotation.w = 1.0f;
+		pose->rotation.v.j = 0.0f;
+		size[0] = width;
+		size[1] = size[2] = 0.0f;
+		*shape = HOST_PHYSICS_SHAPE_SPHERE;
+		if (height > 0.0f)
+		{
+			/* (x turned up) */
+			pose->position.z += 0.5f * height;
+			pose->rotation.v.j = -0.70710678f;
+			pose->rotation.w = 0.70710678f;
+			size[1] = 0.5f * height;
+			*shape = HOST_PHYSICS_SHAPE_CAPSULE;
+		}
+	}
+	return TRUE;
+}
+
+static void physics_jolt_body_pose_words(
+	struct ragdoll_pose const *pose,
+	unsigned long *words)
+{
+	words[0] = physics_jolt_word(pose->position.x);
+	words[1] = physics_jolt_word(pose->position.y);
+	words[2] = physics_jolt_word(pose->position.z);
+	words[3] = physics_jolt_word(pose->rotation.v.i);
+	words[4] = physics_jolt_word(pose->rotation.v.j);
+	words[5] = physics_jolt_word(pose->rotation.v.k);
+	words[6] = physics_jolt_word(pose->rotation.w);
+}
+
+/* the vehicles and living bipeds near a ragdoll, as kinematic bodies that
+the host moves to them each step: added as they come near, moved, and
+removed as they go (or die, or get in a vehicle) */
+static void physics_jolt_stand_ins_update(void)
+{
+	struct object_iterator iterator;
+	struct object_datum *object;
+	long id;
+
+	ragdolls_stand_ins_begin();
+	object_iterator_new(&iterator, _object_mask_biped | _object_mask_vehicle, 0);
+	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL)
+	{
+		struct ragdoll_pose pose;
+		unsigned long shape;
+		real size[3];
+		unsigned long *command;
+		boolean added;
+
+		if (object->object.parent_object_index != NONE ||
+			(object->object.type == _object_type_biped && TEST_FLAG(object->object.damage_flags, _object_dead_bit)) ||
+			ragdolls_of_object(iterator.index) ||
+			!ragdolls_near(&object->object.bounding_sphere_center, object->object.bounding_sphere_radius) ||
+			!physics_jolt_stand_in_shape(iterator.index, object, &shape, size, &pose))
+		{
+			continue;
+		}
+		id = ragdolls_stand_in(iterator.index, &added);
+		if (id == NONE)
+			continue;
+		if (!added)
+		{
+			command = physics_jolt_command(HOST_PHYSICS_OP_BODY_MOVE, HOST_PHYSICS_BODY_MOVE_WORDS);
+			if (command)
+			{
+				command[1] = id;
+				physics_jolt_body_pose_words(&pose, command + 2);
+			}
+			continue;
+		}
+		command = physics_jolt_command(HOST_PHYSICS_OP_BODY_ADD, HOST_PHYSICS_BODY_ADD_WORDS);
+		if (!command)
+			continue;
+		command[1] = id;
+		command[2] = HOST_PHYSICS_MOTION_KINEMATIC;
+		command[3] = shape;
+		command[4] = physics_jolt_word(size[0]);
+		command[5] = physics_jolt_word(size[1]);
+		command[6] = physics_jolt_word(size[2]);
+		command[7] = physics_jolt_word(1.0f);
+		command[8] = physics_jolt_word(PHYSICS_JOLT_STAND_IN_FRICTION);
+		command[9] = physics_jolt_word(PHYSICS_JOLT_STAND_IN_RESTITUTION);
+		physics_jolt_body_pose_words(&pose, command + 10);
+		/* (the game's velocities are a tick's) */
+		command[17] = physics_jolt_word(object->object.translational_velocity.i * TICKS_PER_SECOND);
+		command[18] = physics_jolt_word(object->object.translational_velocity.j * TICKS_PER_SECOND);
+		command[19] = physics_jolt_word(object->object.translational_velocity.k * TICKS_PER_SECOND);
+		command[20] = physics_jolt_word(object->object.angular_velocity.i * TICKS_PER_SECOND);
+		command[21] = physics_jolt_word(object->object.angular_velocity.j * TICKS_PER_SECOND);
+		command[22] = physics_jolt_word(object->object.angular_velocity.k * TICKS_PER_SECOND);
+	}
+	for (id = 1; id <= RAGDOLL_STAND_INS_MAX; id++)
+	{
+		if (ragdolls_stand_in_unseen(id))
+		{
+			unsigned long *command = physics_jolt_command(HOST_PHYSICS_OP_BODY_REMOVE, HOST_PHYSICS_BODY_REMOVE_WORDS);
+
+			if (command)
+				command[1] = id;
+		}
+	}
+}
+
 static real physics_jolt_result_real(
 	unsigned long word)
 {
@@ -498,12 +672,16 @@ void physics_jolt_update(
 	if (!physics_jolt_enabled() || physics_jolt_level_bsp_index == NONE)
 	{
 		ragdolls_deaths_clear();
+		ragdolls_impulses_clear();
 		return;
 	}
 	physics_jolt_batch_begin();
 	for (index = 0; index < ragdolls_death_count(); index++)
 		physics_jolt_ragdoll_add(ragdolls_death_get(index), index);
 	ragdolls_deaths_clear();
+	for (index = 0; index < ragdolls_impulse_count(); index++)
+		physics_jolt_ragdoll_impulse(ragdolls_impulse_get(index));
+	ragdolls_impulses_clear();
 	for (id = 1; id <= RAGDOLLS_MAX; id++)
 	{
 		switch (ragdolls_action(id))
@@ -524,6 +702,7 @@ void physics_jolt_update(
 			break;
 		}
 	}
+	physics_jolt_stand_ins_update();
 	if (physics_jolt_batch_send(seconds) < 0)
 		return;
 	physics_jolt_results_read();
@@ -566,6 +745,7 @@ void physics_jolt_update(
 {
 	(void)seconds;
 	ragdolls_deaths_clear();
+	ragdolls_impulses_clear();
 }
 
 #endif

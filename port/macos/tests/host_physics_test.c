@@ -336,7 +336,7 @@ static void the_motors_follow_a_target_then_let_go(int limp, float *at_target, f
     /* kicked at the knee, back across the swing (the swing put it at +y) */
     memcpy(at, poses[LEFT_THIGH].position, sizeof(at));
     at[2] -= 0.36f;
-    kick[1] = -6.0f;
+    kick[1] = -15.0f;
     CHECK(physics_ragdoll_add_impulse(world, ragdoll, LEFT_THIGH, kick, at) == 0);
     step_for(world, 0.5f);
     CHECK(physics_ragdoll_get_poses(world, ragdoll, poses, PART_COUNT) == 0);
@@ -461,6 +461,103 @@ static void a_kinematic_body_pushes_debris(void)
     physics_world_destroy(world);
 }
 
+/* a limp ragdoll on the ground, its pelvis after a second */
+static void push_a_ragdoll(float impulse_y, float *pelvis_y)
+{
+    physics_world *world = new_world();
+    physics_pose poses[PART_COUNT];
+    float push[3] = {0, 0, 0}, at[3] = {0, 0, 1.0f};
+    uint32_t ragdoll;
+
+    add_ground(world);
+    ragdoll = add_ragdoll(world, 0.0f);
+    CHECK(physics_ragdoll_go_limp(world, ragdoll) == 0);
+    push[1] = impulse_y;
+    if (impulse_y != 0.0f)
+        CHECK(physics_ragdoll_add_impulse(world, ragdoll, PELVIS, push, at) == 0);
+    step_for(world, 1.0f);
+    CHECK(physics_ragdoll_get_poses(world, ragdoll, poses, PART_COUNT) == 0);
+    *pelvis_y = poses[PELVIS].position[1];
+    physics_world_destroy(world);
+}
+
+static void an_impulse_moves_a_ragdoll(void)
+{
+    float still, pushed;
+
+    push_a_ragdoll(0.0f, &still);
+    push_a_ragdoll(120.0f, &pushed);
+    /* 55 kg given 120 N s: over 2 m/s, slowed by the ground */
+    CHECK(fabsf(still) < 0.2f);
+    CHECK(pushed - still > 0.5f);
+}
+
+static void a_kinematic_box_shoves_a_ragdoll(void)
+{
+    physics_world *world = new_world();
+    physics_shape hull = box_shape(1.0f);
+    physics_pose pose = identity, poses[PART_COUNT];
+    uint32_t vehicle, ragdoll;
+    int step, i;
+
+    add_ground(world);
+    ragdoll = add_ragdoll(world, 0.0f);
+    CHECK(physics_ragdoll_go_limp(world, ragdoll) == 0);
+    /* a vehicle's stand-in, 2 m across, driven through at 4 m/s along x */
+    pose.position[0] = -3.0f;
+    pose.position[2] = 1.0f;
+    vehicle = physics_body_add(world, &hull, &pose, PHYSICS_MOTION_KINEMATIC, 1000.0f, &material);
+    CHECK(vehicle != PHYSICS_NONE);
+    for (step = 0; step < 45; step++) {
+        pose.position[0] += 4.0f / 30.0f;
+        CHECK(physics_body_move(world, vehicle, &pose, 1.0f / 30.0f) == 0);
+        CHECK(physics_world_step(world, 1.0f / 30.0f) == 0);
+    }
+    CHECK(physics_ragdoll_get_poses(world, ragdoll, poses, PART_COUNT) == 0);
+    /* the hull's front at x = 4: every part pushed ahead of it, none inside */
+    for (i = 0; i < PART_COUNT; i++)
+        CHECK(poses[i].position[0] > 2.5f);
+    physics_world_destroy(world);
+}
+
+/* a ragdoll dropped from 2.5 m, onto another or not: its lowest part after
+   a second and a half */
+static float drop_on_a_ragdoll(int with_one_below)
+{
+    physics_world *world = new_world();
+    physics_pose poses[PART_COUNT];
+    uint32_t below = PHYSICS_NONE, above;
+    float lowest = 100.0f;
+    int i;
+
+    add_ground(world);
+    if (with_one_below) {
+        below = add_ragdoll(world, 0.0f);
+        CHECK(physics_ragdoll_go_limp(world, below) == 0);
+        /* lying down first */
+        step_for(world, 3.0f);
+    }
+    above = add_ragdoll(world, 2.5f);
+    CHECK(above != PHYSICS_NONE);
+    CHECK(physics_ragdoll_go_limp(world, above) == 0);
+    step_for(world, 1.5f);
+    CHECK(physics_ragdoll_get_poses(world, above, poses, PART_COUNT) == 0);
+    for (i = 0; i < PART_COUNT; i++)
+        if (poses[i].position[2] < lowest)
+            lowest = poses[i].position[2];
+    physics_world_destroy(world);
+    return lowest;
+}
+
+static void two_ragdolls_collide(void)
+{
+    float alone = drop_on_a_ragdoll(0), on_one = drop_on_a_ragdoll(1);
+
+    /* the upper lands on the lower and is held up by it (about half a metre
+       here: the parts' frames are at their joints) */
+    CHECK(on_one - alone > 0.25f);
+}
+
 int main(int argc, char **argv)
 {
     static const struct {
@@ -476,6 +573,9 @@ int main(int argc, char **argv)
         {"a_broken_joint_lets_a_limb_go", a_broken_joint_lets_a_limb_go},
         {"bad_ragdolls_are_refused", bad_ragdolls_are_refused},
         {"a_kinematic_body_pushes_debris", a_kinematic_body_pushes_debris},
+        {"an_impulse_moves_a_ragdoll", an_impulse_moves_a_ragdoll},
+        {"a_kinematic_box_shoves_a_ragdoll", a_kinematic_box_shoves_a_ragdoll},
+        {"two_ragdolls_collide", two_ragdolls_collide},
     };
     unsigned i;
 

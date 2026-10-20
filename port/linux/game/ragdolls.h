@@ -25,7 +25,20 @@ enum
 	RAGDOLLS_MAX = 32,
 	/* how long the joints' motors follow the death animation, then let go */
 	RAGDOLL_DRIVE_TICKS = 12,
+	/* the pushes queued in a tick; past it a hit pushes nothing */
+	RAGDOLL_IMPULSES_MAX = 32,
+	/* the living bipeds and vehicles near ragdolls that the host's world has
+	as kinematic bodies, for the ragdolls to meet; named to the host by their
+	index plus one */
+	RAGDOLL_STAND_INS_MAX = 16,
 };
+
+/* how near a ragdoll (world units, past the object's bounding sphere) a
+biped or vehicle is given a stand-in */
+#define RAGDOLL_STAND_IN_DISTANCE 3.0f
+/* the lift damage.c gives an acceleration's direction before it pushes an
+object */
+#define RAGDOLL_PUSH_LIFT 0.45f
 
 /* the joints' motors' spring (Hz) while they follow the animation */
 #define RAGDOLL_DRIVE_FREQUENCY 8.0f
@@ -76,6 +89,17 @@ struct ragdoll_death
 	struct ragdoll_hit killing_hit;
 };
 
+/* a push for the host: an impulse (kilograms times world units a second) on
+a ragdoll's part, at a point in the world */
+struct ragdoll_impulse
+{
+	long id;
+	short part;
+	short pad;
+	real_vector3d impulse;
+	real_point3d point;
+};
+
 /* a dead biped's ragdoll, named to the host by its index plus one */
 struct ragdoll
 {
@@ -88,6 +112,7 @@ struct ragdoll
 	boolean posed;
 	boolean awake;
 	unsigned long broken_joints;
+	/* its parts' frames: as the biped died, until the host gives them */
 	struct ragdoll_pose poses[RAGDOLL_BODY_PARTS_MAX];
 };
 
@@ -123,6 +148,25 @@ short ragdolls_action(long id);
 void ragdolls_stop(long id);
 /* the ragdoll of an object, or NULL */
 struct ragdoll const *ragdolls_of_object(long object_index);
+
+/* the part whose shape's centre is nearest a point */
+short ragdoll_part_nearest(struct ragdoll_body const *body, struct ragdoll_pose const *poses,
+	real_point3d const *point);
+
+/* the pushes queued since the last clear: each ragdoll's killing hit as it
+starts, and each later hit on its biped */
+long ragdolls_impulse_count(void);
+struct ragdoll_impulse const *ragdolls_impulse_get(long index);
+void ragdolls_impulses_clear(void);
+
+/* Whether a sphere is near enough a ragdoll to need a stand-in. */
+boolean ragdolls_near(real_point3d const *center, real radius);
+/* A tick's stand-ins: begun, then each object near a ragdoll given its id
+(and whether it is new, for the host to add) or NONE with every one in use;
+then each id not given this tick taken back, for the host to remove. */
+void ragdolls_stand_ins_begin(void);
+long ragdolls_stand_in(long object_index, boolean *added);
+boolean ragdolls_stand_in_unseen(long id);
 
 void ragdolls_dispose_from_old_map(void);
 

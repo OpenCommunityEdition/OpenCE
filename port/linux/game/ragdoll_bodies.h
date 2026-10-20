@@ -73,6 +73,10 @@ boolean ragdoll_body_build(char const *model_name, struct tag_block const *model
 /* the ragdoll of a biped's definition (made once a map, with the embedded
 overrides), or NULL */
 struct ragdoll_body const *ragdoll_body_get(long definition_index);
+/* A vehicle's hull, for the ragdolls to meet: the box of its collision
+model's first node's geometry (its centre and half extents, in the first
+node's frame), made once a map; FALSE if it has none. */
+boolean ragdoll_hull_get(long definition_index, real_point3d *center, real_vector3d *half_extents);
 void ragdoll_bodies_dispose_from_old_map(void);
 
 #endif

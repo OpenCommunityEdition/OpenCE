@@ -5,11 +5,13 @@ Dead bipeds as ragdolls (ragdolls.h). The game calls in when it damages an
 object and when a unit dies; nothing here changes the game's state. Each
 hit on a biped is remembered for the tick, so that a death can carry the
 blow that caused it (the death comes later in the same damage, units.c's
-unit_damage_aftermath); each death of a biped with a body
+unit_damage_aftermath), and a hit on a ragdoll's biped pushes the ragdoll;
+each death of a biped with a body
 (ragdoll_bodies.c) is queued with the biped's node matrices and velocity
 for the physics' next tick to start its ragdoll from. The ragdolls the host
 has are kept here too: when each started, whether its motors still follow
-the animation, and the poses the host last gave.
+the animation, and the poses the host last gave; and the living bipeds and
+vehicles near them, which the host has as kinematic stand-ins.
 */
 
 #include "cseries/cseries.h"
@@ -18,6 +20,7 @@ the animation, and the poses the host last gave.
 #include "game/game_globals.h"
 #include "objects/damage.h"
 #include "objects/damage_effect_definitions.h"
+#include "objects/object_definitions.h"
 #include "objects/object_types.h"
 #include "objects/objects.h"
 #include "tag_files/tag_groups.h"
@@ -33,6 +36,14 @@ static struct
 	long hit_count;
 	struct ragdoll_hit hits[RAGDOLL_HITS_MAX];
 	struct ragdoll active[RAGDOLLS_MAX];
+	long impulse_count;
+	struct ragdoll_impulse impulses[RAGDOLL_IMPULSES_MAX];
+	struct
+	{
+		boolean used;
+		boolean seen;
+		long object_index;
+	} stand_ins[RAGDOLL_STAND_INS_MAX];
 } ragdolls;
 
 boolean ragdolls_enabled(void)
@@ -48,13 +59,100 @@ static boolean ragdolls_object_is_biped(
 	return object->object.type == _object_type_biped;
 }
 
+/* a point in a part's frame, in the world's */
+static void ragdoll_pose_transform(
+	struct ragdoll_pose const *pose,
+	real_point3d const *point,
+	real_point3d *result)
+{
+	real_quaternion const *q = &pose->rotation;
+	real_vector3d t;
+
+	/* (p + 2w(v x p) + v x 2(v x p)) */
+	t.i = 2.0f * (q->v.j * point->z - q->v.k * point->y);
+	t.j = 2.0f * (q->v.k * point->x - q->v.i * point->z);
+	t.k = 2.0f * (q->v.i * point->y - q->v.j * point->x);
+	result->x = pose->position.x + point->x + q->w * t.i + (q->v.j * t.k - q->v.k * t.j);
+	result->y = pose->position.y + point->y + q->w * t.j + (q->v.k * t.i - q->v.i * t.k);
+	result->z = pose->position.z + point->z + q->w * t.k + (q->v.i * t.j - q->v.j * t.i);
+}
+
+short ragdoll_part_nearest(
+	struct ragdoll_body const *body,
+	struct ragdoll_pose const *poses,
+	real_point3d const *point)
+{
+	short nearest = 0;
+	real nearest_distance = 0.0f;
+	short index;
+
+	for (index = 0; index < body->part_count; index++)
+	{
+		real_point3d center;
+		real distance;
+
+		ragdoll_pose_transform(&poses[index], &body->parts[index].center, &center);
+		distance = (center.x - point->x) * (center.x - point->x) + (center.y - point->y) * (center.y - point->y) +
+			(center.z - point->z) * (center.z - point->z);
+		if (index == 0 || distance < nearest_distance)
+		{
+			nearest = index;
+			nearest_distance = distance;
+		}
+	}
+	return nearest;
+}
+
+/* A hit's push on a ragdoll, a share of it: lifted as damage.c lifts it, the
+ragdoll's mass at the hit's speed, on the part nearest where it struck. */
+static void ragdolls_push(
+	long id,
+	struct ragdoll_hit const *hit,
+	real share)
+{
+	struct ragdoll const *ragdoll = &ragdolls.active[id - 1];
+	struct ragdoll_impulse *impulse;
+	real_vector3d direction;
+	real length;
+
+	if (hit->speed <= 0.0f || ragdolls.impulse_count >= RAGDOLL_IMPULSES_MAX)
+		return;
+	direction = hit->direction;
+	direction.k += RAGDOLL_PUSH_LIFT;
+	length = magnitude3d(&direction);
+	if (length <= _real_epsilon)
+		return;
+	impulse = &ragdolls.impulses[ragdolls.impulse_count++];
+	impulse->id = id;
+	impulse->part = ragdoll_part_nearest(ragdoll->body, ragdoll->poses, &hit->point);
+	impulse->pad = 0;
+	scale_vector3d(&direction, share * hit->speed * ragdoll->body->mass / length, &impulse->impulse);
+	impulse->point = hit->point;
+}
+
+/* an id's pushes not yet sent dropped: its ragdoll is gone */
+static void ragdolls_impulses_drop(
+	long id)
+{
+	long kept = 0;
+	long index;
+
+	for (index = 0; index < ragdolls.impulse_count; index++)
+	{
+		if (ragdolls.impulses[index].id != id)
+			ragdolls.impulses[kept++] = ragdolls.impulses[index];
+	}
+	ragdolls.impulse_count = kept;
+}
+
 void ragdolls_damage(
 	long object_index,
 	struct damage_data const *damage)
 {
 	struct damage_effect_definition const *damage_effect;
+	struct object_definition const *object_definition;
 	struct ragdoll_hit *hit;
-	real zero_scale;
+	struct ragdoll const *ragdoll;
 	real length;
 
 	if (!ragdolls_enabled() || object_index == NONE || !ragdolls_object_is_biped(object_index) ||
@@ -63,6 +161,7 @@ void ragdolls_damage(
 		return;
 	}
 	damage_effect = damage_effect_definition_get(damage->definition_index);
+	object_definition = object_definition_get(object_get(object_index)->definition_index);
 	hit = &ragdolls.hits[ragdolls.hit_count % RAGDOLL_HITS_MAX];
 	ragdolls.hit_count++;
 	hit->object_index = object_index;
@@ -70,12 +169,10 @@ void ragdolls_damage(
 	hit->point = damage->origin;
 	hit->direction = damage->direction;
 	length = magnitude3d(&hit->direction);
-	/* (the damage's scale, falling off with an explosion's distance, takes
-	the acceleration from its zero-scale factor to all of it) */
-	zero_scale = damage_effect->damage.instantaneous_acceleration_zero_scale_factor;
-	hit->speed = damage_effect->damage.instantaneous_acceleration *
-		(zero_scale + (1.0f - zero_scale) * PIN(damage->scale, 0.0f, 1.0f));
-	if (length > _real_epsilon && hit->speed == hit->speed)
+	/* (as damage.c's object_damage_aftermath accelerates the object: all of
+	it, however far from an explosion) */
+	hit->speed = damage_effect->damage.instantaneous_acceleration * object_definition->object.acceleration_scale;
+	if (length > _real_epsilon && hit->speed > _real_epsilon)
 	{
 		scale_vector3d(&hit->direction, 1.0f / length, &hit->direction);
 	}
@@ -84,6 +181,10 @@ void ragdolls_damage(
 		hit->direction.i = hit->direction.j = hit->direction.k = 0.0f;
 		hit->speed = 0.0f;
 	}
+	/* a ragdoll's biped hit again: the whole push, as a corpse takes it */
+	ragdoll = ragdolls_of_object(object_index);
+	if (ragdoll)
+		ragdolls_push((long)(ragdoll - ragdolls.active) + 1, hit, 1.0f);
 }
 
 struct ragdoll_hit const *ragdolls_hit_get(
@@ -228,12 +329,19 @@ long ragdolls_start(
 		}
 		*replaced = chosen + 1;
 	}
+	ragdolls_impulses_drop(chosen + 1);
 	ragdoll = &ragdolls.active[chosen];
 	memset(ragdoll, 0, sizeof(*ragdoll));
 	ragdoll->used = TRUE;
 	ragdoll->object_index = death->object_index;
 	ragdoll->body = death->body;
 	ragdoll->start_time = game_time_get();
+	for (index = 0; index < death->body->part_count; index++)
+		ragdoll_pose_from_matrix(&death->nodes[death->body->parts[index].node_index], &ragdoll->poses[index]);
+	/* (the living biped took half the killing push, as biped_accelerate
+	halves it, which its velocity carries; a corpse takes all of it) */
+	if (death->hit)
+		ragdolls_push(chosen + 1, &death->killing_hit, 0.5f);
 	return chosen + 1;
 }
 
@@ -261,11 +369,97 @@ void ragdolls_stop(
 
 	if (ragdoll)
 		ragdoll->used = FALSE;
+	ragdolls_impulses_drop(id);
+}
+
+long ragdolls_impulse_count(void)
+{
+	return ragdolls.impulse_count;
+}
+
+struct ragdoll_impulse const *ragdolls_impulse_get(
+	long index)
+{
+	return index >= 0 && index < ragdolls.impulse_count ? &ragdolls.impulses[index] : NULL;
+}
+
+void ragdolls_impulses_clear(void)
+{
+	ragdolls.impulse_count = 0;
+}
+
+boolean ragdolls_near(
+	real_point3d const *center,
+	real radius)
+{
+	real reach = radius + RAGDOLL_STAND_IN_DISTANCE;
+	long index;
+
+	for (index = 0; index < RAGDOLLS_MAX; index++)
+	{
+		real_point3d const *at = &ragdolls.active[index].poses[0].position;
+		real_vector3d offset;
+
+		if (!ragdolls.active[index].used)
+			continue;
+		offset.i = at->x - center->x;
+		offset.j = at->y - center->y;
+		offset.k = at->z - center->z;
+		if (offset.i * offset.i + offset.j * offset.j + offset.k * offset.k <= reach * reach)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+void ragdolls_stand_ins_begin(void)
+{
+	long index;
+
+	for (index = 0; index < RAGDOLL_STAND_INS_MAX; index++)
+		ragdolls.stand_ins[index].seen = FALSE;
+}
+
+long ragdolls_stand_in(
+	long object_index,
+	boolean *added)
+{
+	long free_index = NONE;
+	long index;
+
+	*added = FALSE;
+	for (index = 0; index < RAGDOLL_STAND_INS_MAX; index++)
+	{
+		if (ragdolls.stand_ins[index].used && ragdolls.stand_ins[index].object_index == object_index)
+		{
+			ragdolls.stand_ins[index].seen = TRUE;
+			return index + 1;
+		}
+		if (!ragdolls.stand_ins[index].used && free_index == NONE)
+			free_index = index;
+	}
+	if (free_index == NONE)
+		return NONE;
+	ragdolls.stand_ins[free_index].used = TRUE;
+	ragdolls.stand_ins[free_index].seen = TRUE;
+	ragdolls.stand_ins[free_index].object_index = object_index;
+	*added = TRUE;
+	return free_index + 1;
+}
+
+boolean ragdolls_stand_in_unseen(
+	long id)
+{
+	if (id < 1 || id > RAGDOLL_STAND_INS_MAX || !ragdolls.stand_ins[id - 1].used || ragdolls.stand_ins[id - 1].seen)
+		return FALSE;
+	ragdolls.stand_ins[id - 1].used = FALSE;
+	return TRUE;
 }
 
 void ragdolls_dispose_from_old_map(void)
 {
 	ragdolls.death_count = 0;
 	ragdolls.hit_count = 0;
+	ragdolls.impulse_count = 0;
 	memset(ragdolls.active, 0, sizeof(ragdolls.active));
+	memset(ragdolls.stand_ins, 0, sizeof(ragdolls.stand_ins));
 }

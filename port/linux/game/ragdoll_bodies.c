@@ -702,7 +702,72 @@ struct ragdoll_body const *ragdoll_body_get(
 	return ragdoll_bodies.made[index] ? &ragdoll_bodies.bodies[index] : NULL;
 }
 
+/* ---------- the hulls of the map's vehicles */
+
+enum
+{
+	RAGDOLL_HULLS_CACHED = 64,
+};
+
+static struct
+{
+	long count;
+	long definition_indices[RAGDOLL_HULLS_CACHED];
+	boolean made[RAGDOLL_HULLS_CACHED];
+	real_point3d centers[RAGDOLL_HULLS_CACHED];
+	real_vector3d half_extents[RAGDOLL_HULLS_CACHED];
+} ragdoll_hulls;
+
+boolean ragdoll_hull_get(
+	long definition_index,
+	real_point3d *center,
+	real_vector3d *half_extents)
+{
+	struct object_definition const *definition;
+	struct collision_model const *collision_model;
+	real_point3d minimum;
+	real_point3d maximum;
+	long index;
+
+	for (index = 0; index < ragdoll_hulls.count; index++)
+	{
+		if (ragdoll_hulls.definition_indices[index] == definition_index)
+			break;
+	}
+	if (index == ragdoll_hulls.count)
+	{
+		if (definition_index == NONE || ragdoll_hulls.count >= RAGDOLL_HULLS_CACHED)
+			return FALSE;
+		ragdoll_hulls.count++;
+		ragdoll_hulls.definition_indices[index] = definition_index;
+		ragdoll_hulls.made[index] = FALSE;
+		definition = object_definition_get(definition_index);
+		if (definition->object.collision_model.index != NONE)
+		{
+			collision_model = collision_model_definition_get(definition->object.collision_model.index);
+			if (collision_model->nodes.count > 0 &&
+				ragdoll_node_bounds(TAG_BLOCK_GET_ELEMENT(&collision_model->nodes, 0, struct collision_node),
+					&minimum, &maximum))
+			{
+				ragdoll_hulls.made[index] = TRUE;
+				ragdoll_hulls.centers[index].x = 0.5f * (minimum.x + maximum.x);
+				ragdoll_hulls.centers[index].y = 0.5f * (minimum.y + maximum.y);
+				ragdoll_hulls.centers[index].z = 0.5f * (minimum.z + maximum.z);
+				ragdoll_hulls.half_extents[index].i = 0.5f * (maximum.x - minimum.x);
+				ragdoll_hulls.half_extents[index].j = 0.5f * (maximum.y - minimum.y);
+				ragdoll_hulls.half_extents[index].k = 0.5f * (maximum.z - minimum.z);
+			}
+		}
+	}
+	if (!ragdoll_hulls.made[index])
+		return FALSE;
+	*center = ragdoll_hulls.centers[index];
+	*half_extents = ragdoll_hulls.half_extents[index];
+	return TRUE;
+}
+
 void ragdoll_bodies_dispose_from_old_map(void)
 {
 	ragdoll_bodies.count = 0;
+	ragdoll_hulls.count = 0;
 }
