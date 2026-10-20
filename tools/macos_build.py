@@ -59,8 +59,7 @@ JOLT_DEFINES = ["-DJPH_CROSS_PLATFORM_DETERMINISTIC", "-DNDEBUG"]
 def jolt_sources() -> List[Path]:
     skipped = {"CPU", "DX12", "VK", "MTL", "Shaders"}
     return sorted(source for source in (JOLT_DIR / "Jolt").rglob("*.cpp")
-                  if not skipped.intersection(source.relative_to(JOLT_DIR / "Jolt").parts[:-1])
-                  and "ObjectStream" not in source.parts)
+                  if not skipped.intersection(source.relative_to(JOLT_DIR / "Jolt").parts[:-1]))
 
 
 def is_macos_host() -> bool:
@@ -193,16 +192,18 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         "-O2", "-g", "-std=c++17", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti",
         f"-mmacosx-version-min={MACOS_MINIMUM}", f"-I{JOLT_DIR}", *JOLT_DEFINES,
     ])
+    physics_objects: List[Path] = []
     for source in jolt_sources():
         relative = source.relative_to(JOLT_DIR).with_suffix("").as_posix().replace("/", "_")
         obj = host_dir / "obj" / "jolt" / (relative + ".o")
         n.build(outputs=obj, rule="macos_host_cxx", inputs=source, variables={"cflags": jolt_cflags + " -w"})
-        host_objects.append(obj)
+        physics_objects.append(obj)
     physics_cflags = " ".join([jolt_cflags, "-Wall", "-Werror", f"-I{PORT_DIR}/host", f"-I{PORT_DIR}/include"])
     for source in sorted((PORT_DIR / "host" / "physics").glob("*.cpp")):
         obj = host_dir / "obj" / "physics" / (source.name + ".o")
         n.build(outputs=obj, rule="macos_host_cxx", inputs=source, variables={"cflags": physics_cflags})
-        host_objects.append(obj)
+        physics_objects.append(obj)
+    host_objects += physics_objects
     # the host as a library, which the command-line host and the app link
     host_library = BUILD / "libhalo_host.a"
     n.rule(
@@ -211,6 +212,8 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         description="MACOS HOST AR $out",
     )
     n.build(outputs=host_library, rule="macos_host_archive", inputs=host_objects)
+    # (and the physics alone, for tools/test_macos_physics.py)
+    n.build(outputs=BUILD / "libhalo_physics.a", rule="macos_host_archive", inputs=physics_objects)
     cli_object = BUILD / "cli" / "obj" / "main.c.o"
     n.build(outputs=cli_object, rule="macos_host_cc", inputs=PORT_DIR / "cli" / "main.c",
             variables={"cflags": host_cflags})
