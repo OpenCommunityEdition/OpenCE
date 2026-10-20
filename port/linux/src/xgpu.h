@@ -319,4 +319,10 @@ up: as it is (SDR), or, with scale more than 0, made linear and scaled by
 it (an HDR display's scRGB framebuffer: scale is its SDR white) */
 BOOL xgpu_post_present(GLuint texture, int x, int y, int width, int height, float scale);
 
+/* Android: a vertex (indices 0) or index (1) buffer resource whose size
+bytes the game wrote once and will not write again, drawn from a GL buffer
+of its own; and the end of one, when the game releases it (d3d8_gl.c) */
+void xgpu_static_buffer_add(const void *resource, unsigned long size, int indices);
+void xgpu_static_buffer_remove(const void *resource, int indices);
+
 #endif

@@ -4928,6 +4928,181 @@ static void index_extent(const WORD *indices, unsigned long count, unsigned long
 	*maximum = high;
 }
 
+#ifdef HALO_ANDROID
+/* ---------- static geometry
+
+Android keeps no mirror of the contiguous window (mirror_range), so every
+draw streams its vertices and indices. The model and BSP buffers made by
+rasterizer_vertex_buffer_new and rasterizer_triangle_buffer_new are written
+once, when they are made, and never again: each gets a GL buffer of its own,
+filled the first time a draw reads it and never written after, so nothing
+tracks writes and no queued draw can read a buffer while it changes. Its
+entry goes when the game releases the resource; the GL buffer is deleted at
+the next Present. */
+
+struct static_buffer
+{
+	unsigned long start;
+	unsigned long size;
+	GLuint buffer;
+	BOOL indices;
+	/* (a value of its own, for index_extent's cache of this range) */
+	unsigned long serial;
+};
+
+static struct
+{
+	/* sorted by start; the ranges are separate allocations */
+	struct static_buffer *entries;
+	unsigned long count;
+	unsigned long capacity;
+	unsigned long serial;
+	GLuint *doomed;
+	unsigned long doomed_count;
+	unsigned long doomed_capacity;
+} static_buffers;
+
+/* the first entry whose start is above address */
+static unsigned long static_buffer_upper(unsigned long address)
+{
+	unsigned long low = 0, high = static_buffers.count;
+
+	while (low < high)
+	{
+		unsigned long middle = (low + high) / 2;
+
+		if (static_buffers.entries[middle].start <= address)
+			low = middle + 1;
+		else
+			high = middle;
+	}
+	return low;
+}
+
+/* the resource's bytes in memory: vertex buffers carry a physical address,
+index buffers a virtual one (d3d8_resources.c) */
+static unsigned long static_buffer_start(const void *resource, BOOL indices)
+{
+	DWORD data = ((const DWORD *)resource)[1];
+
+	return indices ? (unsigned long)data : (unsigned long)PLATFORM_PHYSICAL_TO_VIRTUAL(data);
+}
+
+void xgpu_static_buffer_add(const void *resource, unsigned long size, int indices)
+{
+	unsigned long start, index;
+	struct static_buffer *entry;
+
+	if (!resource || !size)
+		return;
+	start = static_buffer_start(resource, indices != 0);
+	if (!start)
+		return;
+	xgpu_static_buffer_remove(resource, indices);
+	if (static_buffers.count == static_buffers.capacity)
+	{
+		unsigned long capacity = static_buffers.capacity ? static_buffers.capacity * 2 : 256;
+		struct static_buffer *entries = realloc(static_buffers.entries, capacity * sizeof(*entries));
+
+		if (!entries)
+			return;
+		static_buffers.entries = entries;
+		static_buffers.capacity = capacity;
+	}
+	index = static_buffer_upper(start);
+	memmove(&static_buffers.entries[index + 1], &static_buffers.entries[index],
+		(static_buffers.count - index) * sizeof(*entry));
+	static_buffers.count++;
+	entry = &static_buffers.entries[index];
+	entry->start = start;
+	entry->size = size;
+	entry->buffer = 0;
+	entry->indices = indices != 0;
+	entry->serial = ++static_buffers.serial;
+}
+
+void xgpu_static_buffer_remove(const void *resource, int indices)
+{
+	unsigned long start, index;
+	struct static_buffer *entry;
+
+	if (!resource)
+		return;
+	start = static_buffer_start(resource, indices != 0);
+	index = static_buffer_upper(start);
+	if (!index || static_buffers.entries[index - 1].start != start)
+		return;
+	entry = &static_buffers.entries[index - 1];
+	if (entry->buffer)
+	{
+		/* (deleted at Present, from the thread that draws) */
+		if (static_buffers.doomed_count == static_buffers.doomed_capacity)
+		{
+			unsigned long capacity = static_buffers.doomed_capacity ? static_buffers.doomed_capacity * 2 : 64;
+			GLuint *doomed = realloc(static_buffers.doomed, capacity * sizeof(*doomed));
+
+			if (doomed)
+			{
+				static_buffers.doomed = doomed;
+				static_buffers.doomed_capacity = capacity;
+			}
+		}
+		if (static_buffers.doomed_count < static_buffers.doomed_capacity)
+			static_buffers.doomed[static_buffers.doomed_count++] = entry->buffer;
+	}
+	memmove(entry, entry + 1, (static_buffers.count - index) * sizeof(*entry));
+	static_buffers.count--;
+}
+
+/* the GL buffers of released resources, deleted; the state cache forgets
+them, as GL unbinds them and may give their names to new buffers */
+static void static_buffers_collect(void)
+{
+	if (!static_buffers.doomed_count)
+		return;
+	glDeleteBuffers((GLsizei)static_buffers.doomed_count, static_buffers.doomed);
+	static_buffers.doomed_count = 0;
+	xgpu_gl_state_invalidate();
+}
+
+/* as mirror_range, for [address, address + size) inside one static buffer
+of the kind asked for: the GL buffer that holds it (filled now if no draw
+has read it yet), the range's offset in it and the buffer's serial */
+static BOOL static_buffer_range(unsigned long address, unsigned long size, BOOL indices, GLuint *buffer,
+	unsigned long *offset, unsigned long *serial)
+{
+	unsigned long index = static_buffer_upper(address);
+	struct static_buffer *entry;
+
+	if (!index || !size)
+		return FALSE;
+	entry = &static_buffers.entries[index - 1];
+	if (entry->indices != indices || address - entry->start > entry->size || size > entry->size - (address - entry->start))
+		return FALSE;
+	if (!entry->buffer)
+	{
+		glGenBuffers(1, &entry->buffer);
+		if (!entry->buffer)
+			return FALSE;
+		if (indices)
+		{
+			state_element_array_buffer(entry->buffer);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)entry->size, (const void *)entry->start, GL_STATIC_DRAW);
+		}
+		else
+		{
+			state_array_buffer(entry->buffer);
+			glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)entry->size, (const void *)entry->start, GL_STATIC_DRAW);
+		}
+	}
+	*buffer = entry->buffer;
+	*offset = address - entry->start;
+	if (serial)
+		*serial = entry->serial;
+	return TRUE;
+}
+#endif
+
 /* ---------- vertex data */
 
 #ifdef HALO_GLES
@@ -5427,6 +5602,14 @@ static void setup_streams(unsigned long first, unsigned long count)
 		placed[stream] = TRUE;
 		stream_buffers[stream] = 0;
 		base = (unsigned long)PLATFORM_PHYSICAL_TO_VIRTUAL(device.streams[stream].data) + first * stride;
+#ifdef HALO_ANDROID
+		/* (a model's or the BSP's vertices, uploaded once) */
+		if (!stream_has_colors(declaration, stream) &&
+			static_buffer_range(base, bytes, FALSE, &stream_buffers[stream], &stream_offsets[stream], NULL))
+		{
+			continue;
+		}
+#endif
 #ifdef HALO_GLES
 		if (!stream_has_colors(declaration, stream))
 #endif
@@ -5811,6 +5994,15 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 		xgpu_capabilities.base_vertex &&
 #endif
 		mirror_range((unsigned long)index_data, vertex_count * sizeof(WORD), &index_buffer, &index_offset, &generation);
+#ifdef HALO_ANDROID
+	/* (a model's or the BSP's indices, uploaded once: drawn as the mirror's
+	are, their extent cached under the buffer's serial) */
+	if (!mirrored && primitive_type != D3DPT_QUADLIST && xgpu_capabilities.base_vertex)
+	{
+		mirrored = static_buffer_range((unsigned long)index_data, vertex_count * sizeof(WORD), TRUE, &index_buffer,
+			&index_offset, &generation);
+	}
+#endif
 #ifdef HALO_WEB
 	if (!mirrored && primitive_type != D3DPT_QUADLIST &&
 		index_cache_get(index_data, vertex_count, &minimum, &maximum, &index_offset))
@@ -6862,6 +7054,9 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 			glBindBuffer(GL_COPY_READ_BUFFER, 0);
 			glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
 		}
+#ifdef HALO_ANDROID
+		static_buffers_collect();
+#endif
 		host_gl_fence_frame((unsigned int)device.buffer_ring);
 		device.buffer_ring = (device.buffer_ring + 1) % STREAM_BUFFER_RING;
 		host_gl_wait_frame((unsigned int)device.buffer_ring);

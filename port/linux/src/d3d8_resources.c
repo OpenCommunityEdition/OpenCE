@@ -117,6 +117,14 @@ ULONG WINAPI D3DResource_Release(D3DResource *resource)
 	/* resources the game built itself (not D3DCOMMON_D3DCREATED) are never freed here */
 	if (!count && (fields[0] & D3DCOMMON_D3DCREATED))
 	{
+#ifdef HALO_ANDROID
+		/* (no longer drawn from its GL buffer, before its memory is reused) */
+		if ((fields[0] & D3DCOMMON_TYPE_MASK) == D3DCOMMON_TYPE_INDEXBUFFER ||
+			(fields[0] & D3DCOMMON_TYPE_MASK) == D3DCOMMON_TYPE_VERTEXBUFFER)
+		{
+			xgpu_static_buffer_remove(resource, (fields[0] & D3DCOMMON_TYPE_MASK) == D3DCOMMON_TYPE_INDEXBUFFER);
+		}
+#endif
 		if ((fields[0] & D3DCOMMON_TYPE_MASK) == D3DCOMMON_TYPE_INDEXBUFFER)
 			free((void *)fields[1]);
 		else if (fields[1])
