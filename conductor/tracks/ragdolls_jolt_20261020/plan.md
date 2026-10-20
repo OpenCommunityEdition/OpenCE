@@ -23,7 +23,7 @@
     - [x] Entries in `port_config.c`, the settings table in `port/linux/README.md`, `tools/port_settings.py` run again
 - [x] Task: Conductor - User Manual Verification 'Phase 2: The bridge to the guest' (Protocol in workflow.md)
 
-## Phase 3: Ragdolls
+## Phase 3: Ragdolls [checkpoint: e3c09b1c]
 - [x] Task: Bodies from the model c62934cc
     - [x] Write tests: harness tests build a body description (bones, shapes, joints, limits, masses) from a model's nodes and collision model's per-node geometry for a fake biped; overrides from `port/assets/ragdolls/` replace generated values; a biped with no usable data gives none
     - [x] `port/linux/game/ragdoll_bodies.c`, and the override files for the stock species
@@ -42,7 +42,7 @@
 - [x] Task: Golden frames of ragdolls ec4ceb2a
     - [x] Write tests: `tools/test_macos_frames.py` cases with the frame clock: a Grunt killed by a scripted grenade (mid-fall, at rest) and a body shoved by a Warthog; the existing goldens unchanged with the setting off
     - [x] Tune the overrides until the frames look right; approve the references
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Ragdolls' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Ragdolls' (Protocol in workflow.md)
 
 ## Phase 4: Dismemberment
 - [ ] Task: Breakable joints
