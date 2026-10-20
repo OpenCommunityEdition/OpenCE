@@ -15,11 +15,11 @@ void headshot_party_kill(
 	long unit_index,
 	long killing_player_index);
 
-/* (hud.c's hud_draw_screen, in each view) where the parties are on the
-screen of the first local player's view */
-void headshot_party_project(void);
+/* (network_coop.c) the host's party, at a point of the world, on a client */
+void headshot_party_network(real_point3d const *world);
 
-/* (interface.c's interface_draw_fullscreen_overlays) the confetti */
-void headshot_party_draw(void);
+/* (hud.c's hud_draw_screen, in each player's view) the confetti, where the
+parties are in this view */
+void headshot_party_draw_view(void);
 
 #endif

@@ -112,6 +112,7 @@ symbols in this file:
 #include "coop_spectate.h" /* port: port/linux/game/coop_spectate.c */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
+#include "campaign_score.h"
 #include "headshot_party.h" /* port: port/linux/game/headshot_party.c */
 #include "text/font_group.h"
 #include "text/text_group.h"
@@ -1503,9 +1504,8 @@ void hud_draw_screen(
 		if (cinematic_in_progress())
 			coop_skip_vote_draw(render.local_player_index);
 
-		/* port: where a grunt's headshot party is, in this view (the confetti is drawn
-		with the screen's overlays, interface.c) */
-		headshot_party_project();
+		/* port: a grunt's headshot party, in this view */
+		headshot_party_draw_view();
 
 		/* port: the match clock in multiplayer and the clock in the campaign (it
 		counts from the level's start), each with its own setting */
@@ -1513,6 +1513,8 @@ void hud_draw_screen(
 			hud_scripted_globals->show_hud)
 		{
 			hud_draw_match_timer();
+			/* port: the campaign's score, above it (display.campaign_score) */
+			campaign_score_draw_view(player_index);
 		}
 
 		if (!game_time_get_paused() &&

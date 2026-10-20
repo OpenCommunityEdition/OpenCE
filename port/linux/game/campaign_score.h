@@ -26,8 +26,16 @@ void campaign_score_record_kill(
 log and kept for the next level's start */
 void campaign_score_level_won(void);
 
-/* (interface.c's interface_draw_fullscreen_overlays) the score, above the
-match clock at the bottom right, and the last level's summary */
+/* (interface.c's interface_draw_fullscreen_overlays) the last level's summary */
 void campaign_score_draw(void);
+
+/* (hud.c's hud_draw_screen) a player's score, above the match clock at the
+bottom right of the view being drawn */
+void campaign_score_draw_view(long player_index);
+
+/* (network_coop.c) network co-op: the host scores the kills and sends each
+to the clients, and when the level is won */
+void campaign_score_network_kill(short player_index, long variant_index, short points);
+void campaign_score_network_won(void);
 
 #endif

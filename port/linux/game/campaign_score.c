@@ -105,6 +105,11 @@ byte input_abstraction_port_accept(short controller_index);
 char *tag_get_name(long tag_index);
 /* sdl_platform.c's: the log (debug.txt) only, not the console on screen */
 void platform_log(char const *format, ...);
+/* network_coop.c's: co-op is a network game on a campaign level; the host's
+kills and its win are sent to the clients (campaign_score_network_kill, ...) */
+boolean network_coop_active(void);
+void network_coop_note_score_kill(short player_index, long variant_index, short points);
+void network_coop_note_score_won(void);
 
 /* ---------- globals */
 
@@ -459,6 +464,35 @@ void campaign_score_new_map(
 	return;
 }
 
+/* a kill is logged (the host's own, or one it sent): FALSE if the log is full */
+static boolean campaign_score_append(
+	long variant_index,
+	short player_index,
+	short points)
+{
+	campaign_score_update();
+	if (campaign_score_kill_count >= CAMPAIGN_SCORE_MAXIMUM_KILLS)
+	{
+		if (!campaign_score_full_logged)
+		{
+			campaign_score_full_logged = TRUE;
+			console_warning("campaign score: the level's %d kills are logged; no more are scored",
+				(int)CAMPAIGN_SCORE_MAXIMUM_KILLS);
+		}
+		return FALSE;
+	}
+	campaign_score_kills[campaign_score_kill_count].game_time = game_time_get();
+	campaign_score_kills[campaign_score_kill_count].variant_index = variant_index;
+	campaign_score_kills[campaign_score_kill_count].player_index = player_index;
+	campaign_score_kills[campaign_score_kill_count].points = points;
+	campaign_score_kill_count++;
+	if (campaign_score_enabled())
+		platform_log("campaign score: player %d killed %s for %d",
+			(int)player_index, tag_get_name(variant_index), (int)points);
+
+	return TRUE;
+}
+
 void campaign_score_record_kill(
 	long unit_index,
 	long killing_player_index)
@@ -468,7 +502,8 @@ void campaign_score_record_kill(
 	long variant_index;
 	short points;
 
-	if (killing_player_index == NONE || !campaign_score_enabled())
+	/* (a client's kills are the host's, which sends them: the AI is the host's) */
+	if (killing_player_index == NONE || !campaign_score_level() || game_connection() == _game_connection_network_client)
 		return;
 	if (killing_player_index >= CAMPAIGN_SCORE_MAXIMUM_PLAYERS || !player_try_and_get(killing_player_index))
 		return;
@@ -483,38 +518,34 @@ void campaign_score_record_kill(
 	}
 	if (points <= 0)
 	{
-	/* (the AI is the host's: a client's units have no actors) */
-	actor_index = unit->unit.swarm_actor_index != NONE ? unit->unit.swarm_actor_index : unit->unit.actor_index;
-	if (actor_index == NONE)
-		return;
-	variant_index = actor_get(actor_index)->meta.variant_definition_index;
-	points = campaign_score_variant_points(variant_index);
+		actor_index = unit->unit.swarm_actor_index != NONE ? unit->unit.swarm_actor_index : unit->unit.actor_index;
+		if (actor_index == NONE)
+			return;
+		variant_index = actor_get(actor_index)->meta.variant_definition_index;
+		points = campaign_score_variant_points(variant_index);
 	}
 	if (points <= 0)
 		return;
-	campaign_score_update();
-	if (campaign_score_kill_count >= CAMPAIGN_SCORE_MAXIMUM_KILLS)
-	{
-		if (!campaign_score_full_logged)
-		{
-			campaign_score_full_logged = TRUE;
-			console_warning("campaign score: the level's %d kills are logged; no more are scored",
-				(int)CAMPAIGN_SCORE_MAXIMUM_KILLS);
-		}
-		return;
-	}
-	campaign_score_kills[campaign_score_kill_count].game_time = game_time_get();
-	campaign_score_kills[campaign_score_kill_count].variant_index = variant_index;
-	campaign_score_kills[campaign_score_kill_count].player_index = (short)killing_player_index;
-	campaign_score_kills[campaign_score_kill_count].points = points;
-	campaign_score_kill_count++;
-	platform_log("campaign score: player %ld killed %s for %d",
-		killing_player_index, tag_get_name(variant_index), (int)points);
+	if (campaign_score_append(variant_index, (short)killing_player_index, points) && network_coop_active())
+		network_coop_note_score_kill((short)killing_player_index, variant_index, points);
 
 	return;
 }
 
-void campaign_score_level_won(
+/* (network_coop.c) a kill the host scored, on a client */
+void campaign_score_network_kill(
+	short player_index,
+	long variant_index,
+	short points)
+{
+	if (!campaign_score_level() || player_index < 0 || player_index >= CAMPAIGN_SCORE_MAXIMUM_PLAYERS || points <= 0)
+		return;
+	campaign_score_append(variant_index, player_index, points);
+
+	return;
+}
+
+static void campaign_score_win_compose(
 	void)
 {
 	short line;
@@ -529,18 +560,39 @@ void campaign_score_level_won(
 	return;
 }
 
+void campaign_score_level_won(
+	void)
+{
+	if (!campaign_score_level())
+		return;
+	/* (the clients write their own summaries from the kills they were sent) */
+	if (game_connection() == _game_connection_network_server && network_coop_active())
+		network_coop_note_score_won();
+	campaign_score_win_compose();
+
+	return;
+}
+
+/* (network_coop.c) the host won the level, on a client */
+void campaign_score_network_won(
+	void)
+{
+	if (!campaign_score_level())
+		return;
+	campaign_score_win_compose();
+
+	return;
+}
+
 void campaign_score_draw(
 	void)
 {
 	long font_index;
 	struct font_header *font;
 	short line_height;
-	short clock_height;
 	real_argb_color color;
 	rectangle2d bounds;
 	rectangle2d window;
-	char text[CAMPAIGN_SCORE_SUMMARY_LENGTH];
-	long player_index;
 	short line;
 
 	if (cinematic_in_progress() || !game_in_progress())
@@ -553,7 +605,6 @@ void campaign_score_draw(
 	line_height = (short)(font->ascending_height + font->descending_height + font->leading_height);
 	if (line_height <= 0)
 		return;
-	clock_height = (short)(font->ascending_height + font->descending_height);
 	window = render.camera.window_bounds;
 	offset_rectangle2d(&window, (short)-render.camera.viewport_bounds.x0, (short)-render.camera.viewport_bounds.y0);
 
@@ -596,12 +647,32 @@ void campaign_score_draw(
 		}
 	}
 
-	if (!campaign_score_enabled())
+	return;
+}
+
+/* the score, above the match clock at the bottom right of one player's view
+(hud.c's hud_draw_screen, beside the clock) */
+void campaign_score_draw_view(
+	long player_index)
+{
+	long font_index;
+	struct font_header *font;
+	short clock_height;
+	real_argb_color color;
+	rectangle2d bounds;
+	rectangle2d window;
+	char text[CAMPAIGN_SCORE_SUMMARY_LENGTH];
+
+	if (!campaign_score_enabled() || player_index == NONE)
 		return;
+	font_index = hud_get_font_index();
+	if (font_index == NONE)
+		return;
+	font = font_definition_get(font_index);
+	clock_height = (short)(font->ascending_height + font->descending_height);
+	window = render.camera.window_bounds;
+	offset_rectangle2d(&window, (short)-render.camera.viewport_bounds.x0, (short)-render.camera.viewport_bounds.y0);
 	campaign_score_update();
-	player_index = local_player_get_player_index(local_player_get_next(NONE));
-	if (player_index == NONE)
-		return;
 	snprintf(text, sizeof(text), "SCORE %ld", campaign_score_total((short)player_index));
 	/* (above the match clock) */
 	bounds.x1 = (short)(window.x1 - CAMPAIGN_SCORE_RIGHT_MARGIN);

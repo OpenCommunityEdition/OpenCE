@@ -398,8 +398,6 @@ void interface_draw_fullscreen_overlays(
 	latency_meter_draw();
 	/* port: the campaign's score (display.campaign_score) */
 	campaign_score_draw();
-	/* port: a grunt's headshot party (display.headshot_party) */
-	headshot_party_draw();
 	terminal_draw();
 	main_framerate_render();
 	render_debug_profile();

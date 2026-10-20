@@ -3,12 +3,13 @@ HEADSHOT_PARTY.C
 
 A grunt that a player kills with a shot to the head (display.headshot_party,
 off by default: the stock game has none) pops with confetti, and a sound
-plays. The confetti is drawn on the screen, in 2D: pieces thrown up from
-where the grunt's head was, falling with a little gravity, fading out. The
+plays. The confetti is drawn in each player's own view, in 2D: pieces thrown
+up from where the grunt's head was, falling with a little gravity, fading out. The
 sound is party.wav in the data folder (a WAV file; no file, no sound).
 
 Only the machine that runs the AI knows a grunt (the host of a co-op game,
-or a single player), so only it sees the party.
+or a single player): it sends where the head was to the clients of a network
+co-op game (network_coop.c), which start the party on their own screens.
 */
 
 #include "cseries.h"
@@ -52,11 +53,9 @@ enum
 struct party_burst
 {
 	boolean used;
-	boolean placed;
 	unsigned long start;
 	unsigned long seed;
 	real_point3d world;
-	real x, y;
 };
 
 /* ---------- prototypes */
@@ -68,6 +67,9 @@ unsigned long config_changes(void);
 unsigned long system_milliseconds(void);
 const char *platform_data_root(void);
 void draw_quad(rectangle2d *rectangle, pixel32 color);
+/* network_coop.c's: the host's party, for its clients */
+boolean network_coop_active(void);
+void network_coop_note_headshot_party(real_point3d const *world);
 
 /* ---------- globals */
 
@@ -123,20 +125,16 @@ static real party_random(
 
 /* ---------- public code */
 
-void headshot_party_kill(
-	long unit_index,
-	long killing_player_index)
+/* a burst of confetti at a point of the world, and its sound */
+static void party_begin(
+	real_point3d const *world,
+	unsigned long seed)
 {
 	struct party_burst *burst = NULL;
-	unsigned long now;
+	unsigned long now = system_milliseconds();
 	char path[512];
 	long index;
 
-	if (killing_player_index == NONE || !party_enabled())
-		return;
-	if (!player_try_and_get(killing_player_index) || !party_unit_is_grunt(unit_index))
-		return;
-	now = system_milliseconds();
 	/* (a free place, else the oldest) */
 	for (index = 0; index < PARTY_BURSTS; index++)
 	{
@@ -149,51 +147,52 @@ void headshot_party_kill(
 			burst = &party_bursts[index];
 	}
 	burst->used = TRUE;
-	burst->placed = FALSE;
 	burst->start = now;
-	burst->seed = now ^ (unsigned long)(unit_index * 2654435761UL);
-	unit_get_head_position(unit_index, &burst->world);
+	burst->seed = now ^ seed;
+	burst->world = *world;
 	snprintf(path, sizeof(path), "%s/party.wav", platform_data_root());
 	effect_audio_play_file(path, PARTY_GAIN);
 
 	return;
 }
 
-void headshot_party_project(void)
+void headshot_party_kill(
+	long unit_index,
+	long killing_player_index)
 {
-	long index;
+	real_point3d head;
 
-	if (!party_enabled() || render.local_player_index != local_player_get_next(NONE))
+	/* (the AI is the host's; a client is sent the party) */
+	if (killing_player_index == NONE || !party_enabled() || game_connection() == _game_connection_network_client)
 		return;
-	for (index = 0; index < PARTY_BURSTS; index++)
-	{
-		struct party_burst *burst = &party_bursts[index];
-		real_point3d view_position;
-		real_point2d screen_position;
-
-		if (!burst->used)
-			continue;
-		matrix4x3_transform_point(&render.frustum.world_to_view, &burst->world, &view_position);
-		if (render_camera_view_to_screen(&render.camera, &render.frustum, &view_position, &screen_position))
-		{
-			/* (the view's own coordinates, as the HUD's) */
-			burst->x = screen_position.x - (real)render.camera.viewport_bounds.x0;
-			burst->y = screen_position.y - (real)render.camera.viewport_bounds.y0;
-			burst->placed = TRUE;
-		}
-	}
+	if (!player_try_and_get(killing_player_index) || !party_unit_is_grunt(unit_index))
+		return;
+	unit_get_head_position(unit_index, &head);
+	party_begin(&head, (unsigned long)(unit_index * 2654435761UL));
+	if (network_coop_active())
+		network_coop_note_headshot_party(&head);
 
 	return;
 }
 
-void headshot_party_draw(void)
+void headshot_party_network(
+	real_point3d const *world)
+{
+	if (!party_enabled())
+		return;
+	party_begin(world, 0x9E3779B9UL);
+
+	return;
+}
+
+void headshot_party_draw_view(void)
 {
 	unsigned long now = system_milliseconds();
 	rectangle2d window;
 	real scale;
 	long index;
 
-	if (cinematic_in_progress())
+	if (!party_enabled() || cinematic_in_progress())
 		return;
 	window = render.camera.window_bounds;
 	offset_rectangle2d(&window, (short)-render.camera.viewport_bounds.x0, (short)-render.camera.viewport_bounds.y0);
@@ -205,6 +204,9 @@ void headshot_party_draw(void)
 		unsigned long seed;
 		real seconds, fade;
 		long piece;
+		real_point3d view_position;
+		real_point2d screen_position;
+		real origin_x, origin_y;
 
 		if (!burst->used)
 			continue;
@@ -213,8 +215,12 @@ void headshot_party_draw(void)
 			burst->used = FALSE;
 			continue;
 		}
-		if (!burst->placed)
+		matrix4x3_transform_point(&render.frustum.world_to_view, &burst->world, &view_position);
+		if (!render_camera_view_to_screen(&render.camera, &render.frustum, &view_position, &screen_position))
 			continue;
+		/* (the view's own coordinates, as the HUD's) */
+		origin_x = screen_position.x - (real)render.camera.viewport_bounds.x0;
+		origin_y = screen_position.y - (real)render.camera.viewport_bounds.y0;
 		seconds = (real)age / 1000.0f;
 		fade = age + PARTY_FADE_MILLISECONDS > PARTY_LIFE_MILLISECONDS ?
 			(real)(PARTY_LIFE_MILLISECONDS - age) / (real)PARTY_FADE_MILLISECONDS : 1.0f;
@@ -228,8 +234,8 @@ void headshot_party_draw(void)
 			real spin = 6.0f + 10.0f * party_random(&seed);
 			real phase = 6.2831853f * party_random(&seed);
 			real flutter = 0.35f + 0.65f * (real)fabs(cos(seconds * spin + phase));
-			real x = burst->x + (real)cos(angle) * speed * seconds * scale * (1.0f - 0.25f * seconds);
-			real y = burst->y + ((real)sin(angle) * speed * seconds + 0.5f * PARTY_GRAVITY * seconds * seconds) * scale;
+			real x = origin_x + (real)cos(angle) * speed * seconds * scale * (1.0f - 0.25f * seconds);
+			real y = origin_y + ((real)sin(angle) * speed * seconds + 0.5f * PARTY_GRAVITY * seconds * seconds) * scale;
 			real width = MAX(5.0f * scale * flutter, 2.0f);
 			real height = MAX(3.0f * scale, 2.0f);
 			rectangle2d quad;

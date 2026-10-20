@@ -121,6 +121,8 @@ index and tag, since the map placed them at the same index everywhere.
 #include "coop_pickups.h"
 #include "coop_vehicles.h"
 #include "coop_spectate.h"
+#include "campaign_score.h"
+#include "headshot_party.h"
 #include "network_coop.h"
 #include "network_distributed.h"
 
@@ -215,6 +217,12 @@ enum
 	/* a breakable surface broke: value its index, frame its BSP, reals the
 	damage's epicenter */
 	_coop_event_surface_broken,
+	/* the host scored a kill (campaign_score.c): value the player, frame the
+	points, tag_index the variant; or won the level */
+	_coop_event_score_kill,
+	_coop_event_score_won,
+	/* a grunt was shot dead in the head (headshot_party.c): reals the head's place */
+	_coop_event_headshot_party,
 };
 
 /* distributed_coop_event.type of an effect: at a cutscene flag (value), or on
@@ -1881,6 +1889,22 @@ static void client_apply_event(
 				unit_close(event->object_index);
 		}
 		break;
+	case _coop_event_score_kill:
+		campaign_score_network_kill(event->value, event->tag_index, event->frame);
+		break;
+	case _coop_event_score_won:
+		campaign_score_network_won();
+		break;
+	case _coop_event_headshot_party:
+		{
+			real_point3d head;
+
+			head.x = event->reals[0];
+			head.y = event->reals[1];
+			head.z = event->reals[2];
+			headshot_party_network(&head);
+		}
+		break;
 	default:
 		break;
 	}
@@ -2429,6 +2453,38 @@ void network_coop_note_unit_animation(
 	event->tag_index = animation_graph_index;
 	event->value = animation_index;
 	event->interpolate = (byte)interpolate;
+}
+
+void network_coop_note_score_kill(
+	short player_index,
+	long variant_index,
+	short points)
+{
+	struct distributed_coop_event *event = event_new(_coop_event_score_kill);
+
+	if (!event)
+		return;
+	event->value = player_index;
+	event->frame = points;
+	event->tag_index = variant_index;
+}
+
+void network_coop_note_headshot_party(
+	real_point3d const *world)
+{
+	struct distributed_coop_event *event = event_new(_coop_event_headshot_party);
+
+	if (!event)
+		return;
+	event->reals[0] = world->x;
+	event->reals[1] = world->y;
+	event->reals[2] = world->z;
+}
+
+void network_coop_note_score_won(
+	void)
+{
+	event_new(_coop_event_score_won);
 }
 
 void network_coop_note_unit_open(
