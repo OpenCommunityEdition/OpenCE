@@ -340,6 +340,42 @@ static long campaign_score_total(
 	return total;
 }
 
+/* a player's name, in plain letters (PLAYER 1 for one that has left) */
+static void campaign_score_player_name(
+	short player_index,
+	char *name,
+	long size)
+{
+	struct player_datum const *player = player_try_and_get(player_index);
+	long index = 0;
+
+	if (player)
+	{
+		for (; index < (long)NUMBEROF(player->name) && index < size - 1 && player->name[index]; index++)
+			name[index] = (char)(player->name[index] >= 32 && player->name[index] < 127 ? player->name[index] : '?');
+	}
+	name[index] = '\0';
+	if (index == 0)
+		snprintf(name, size, "PLAYER %d", (int)player_index + 1);
+
+	return;
+}
+
+/* how many kills a player has */
+static long campaign_score_kills_of(
+	short player_index)
+{
+	long total = 0;
+	long index;
+
+	for (index = 0; index < campaign_score_kill_count; index++)
+	{
+		if (campaign_score_kills[index].player_index == player_index)
+			total++;
+	}
+	return total;
+}
+
 /* the points of all the players' kills together (a co-op team's score) */
 static long campaign_score_team_total(
 	void)
@@ -440,8 +476,13 @@ static short campaign_score_compose(
 			count < CAMPAIGN_SCORE_SUMMARY_LINES - 6; player_index++)
 		{
 			if (campaign_score_total(player_index) > 0)
-				snprintf(lines[count++], CAMPAIGN_SCORE_SUMMARY_LENGTH, "PLAYER %d  %ld",
-					(int)player_index + 1, campaign_score_total(player_index));
+			{
+				char name[24];
+
+				campaign_score_player_name(player_index, name, sizeof(name));
+				snprintf(lines[count++], CAMPAIGN_SCORE_SUMMARY_LENGTH, "%s  %ld  KILLS %ld",
+					name, campaign_score_total(player_index), campaign_score_kills_of(player_index));
+			}
 		}
 	}
 	if (campaign_score_competitive && players > 1)
