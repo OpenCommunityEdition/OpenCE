@@ -5806,6 +5806,11 @@ static struct gametype_option const gametype_options[] =
 		{ "2", "4", "8", "16", "32" } },
 	{ "coop_player_collisions_spinner", _option_setting, 0, 0, 2, { 0 }, "network.coop_player_collisions",
 		{ "true", "false" } },
+	/* (and the campaign's timer and score, as Video Setup > Graphics has them) */
+	{ "coop_campaign_timer_spinner", _option_setting, 0, 0, 2, { 0 }, "display.campaign_timer",
+		{ "true", "false" } },
+	{ "coop_campaign_score_spinner", _option_setting, 0, 0, 2, { 0 }, "display.campaign_score",
+		{ "true", "false" } },
 	/* map sharing's (Server Setup's MAP SHARING: tools/port_settings.py's
 	MAP_SHARE_SETUP; map_share.c) */
 	{ "map_share_spinner", _option_setting, 0, 0, 2, { 0 }, "network.map_share", { "true", "false" } },

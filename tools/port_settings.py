@@ -1233,7 +1233,7 @@ COOP_ENEMIES_MULTIPLIERS = [2, 4, 8, 16, 32]
 # help of each of them; menu_functions.c's gametype_options give their
 # settings' values)
 COOP_SETUP_SCREENS = [
-    ("coop_options", "CO-OP OPTIONS", "Friendly fire, the enemies and player collisions,\\nfor this game.", [
+    ("coop_options", "CO-OP OPTIONS", "Friendly fire, the enemies, player collisions, the\\ntimer and the score, for this game.", [
         ("coop_friendly_fire", "FRIENDLY FIRE:", ["OFF", "ON", "SHIELD ONLY", "EXPLOSIVES ONLY"], [
             "Players can not be hurt by weapons and explosives\\nfired by the other players.",
             "Players can be hurt by weapons or explosives\\nfired by the other players.",
@@ -1263,6 +1263,15 @@ COOP_SETUP_SCREENS = [
         ("coop_player_collisions", "PLAYER COLLISIONS:", ["ON", "OFF"], [
             "Players bump into each other, as in the campaign.",
             "Players walk through each other, so that no one\\nblocks a doorway. The AI's characters still block.",
+        ]),
+        # (the campaign's HUD: display.campaign_timer and display.campaign_score, as Video Setup > Graphics has them)
+        ("coop_campaign_timer", "CAMPAIGN TIMER:", ["ON", "OFF"], [
+            "Shows the clock in the campaign.",
+            "Hides the clock in the campaign.",
+        ]),
+        ("coop_campaign_score", "CAMPAIGN SCORE:", ["ON", "OFF"], [
+            "Scores each kill and shows the score and the\\nsummary at the end of each level.",
+            "Hides the score and the summary.",
         ]),
     ]),
     ("voice_options", "VOICE AND VOTING", "Voice chat, text chat and votes to kick a player,\\nfor this game.",

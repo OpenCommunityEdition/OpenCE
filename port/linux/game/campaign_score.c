@@ -231,6 +231,35 @@ static short campaign_score_variant_points(
 	return (short)points;
 }
 
+/* a vehicle's worth (the ghost, banshee and wraith), scaled by difficulty
+like an enemy; 0 for any other vehicle */
+static short campaign_score_vehicle_points(
+	long definition_index)
+{
+	char const *name = tag_get_name(definition_index);
+	char lower[128];
+	long base = 0;
+	long index;
+	long points;
+
+	if (name == NULL)
+		return 0;
+	for (index = 0; index < (long)sizeof(lower) - 1 && name[index]; index++)
+		lower[index] = (char)((name[index] >= 'A' && name[index] <= 'Z') ? name[index] + 32 : name[index]);
+	lower[index] = '\0';
+	if (strstr(lower, "ghost"))
+		base = 50;
+	else if (strstr(lower, "banshee"))
+		base = 75;
+	else if (strstr(lower, "wraith"))
+		base = 100;
+	if (base == 0)
+		return 0;
+	points = base * 10 * campaign_score_difficulty_tenths[campaign_score_difficulty()];
+	points = (points + 499) / 500 * 5;
+	return (short)points;
+}
+
 /* whether A or B is down on a controller (or the keyboard's jump key, A) */
 static boolean campaign_score_button_down(
 	void)
@@ -444,12 +473,23 @@ void campaign_score_record_kill(
 	if (killing_player_index >= CAMPAIGN_SCORE_MAXIMUM_PLAYERS || !player_try_and_get(killing_player_index))
 		return;
 	unit = unit_get(unit_index);
+	/* (a destroyed ghost, banshee or wraith is worth its own points) */
+	variant_index = NONE;
+	points = 0;
+	if (unit->object.type == _object_type_vehicle)
+	{
+		variant_index = unit->definition_index;
+		points = campaign_score_vehicle_points(variant_index);
+	}
+	if (points <= 0)
+	{
 	/* (the AI is the host's: a client's units have no actors) */
 	actor_index = unit->unit.swarm_actor_index != NONE ? unit->unit.swarm_actor_index : unit->unit.actor_index;
 	if (actor_index == NONE)
 		return;
 	variant_index = actor_get(actor_index)->meta.variant_definition_index;
 	points = campaign_score_variant_points(variant_index);
+	}
 	if (points <= 0)
 		return;
 	campaign_score_update();
