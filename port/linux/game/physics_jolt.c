@@ -26,6 +26,7 @@ enabled.
 #include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
 #include "physics_jolt.h"
+#include "ragdoll_bodies.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -297,6 +298,7 @@ void physics_jolt_structure_bsp_reconnect(void)
 
 void physics_jolt_dispose_from_old_map(void)
 {
+	ragdoll_bodies_dispose_from_old_map();
 	if (physics_jolt_level_bsp_index == NONE)
 		return;
 	physics_jolt_batch_begin();
@@ -313,6 +315,7 @@ void physics_jolt_structure_bsp_reconnect(void)
 
 void physics_jolt_dispose_from_old_map(void)
 {
+	ragdoll_bodies_dispose_from_old_map();
 }
 
 #endif

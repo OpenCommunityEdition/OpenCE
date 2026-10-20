@@ -1,0 +1,69 @@
+# The stock bipeds' ragdolls: what port/linux/game/ragdoll_bodies.c makes
+# from each model's nodes and collision pieces, adjusted. The format is in
+# that file's comment; the masses are kilograms, the angles degrees, the
+# sizes world units (3.048 metres each). A model without a section is made
+# as it is, weighing a marine's 80 kg.
+
+model characters\cyborg\cyborg
+mass 140
+
+model characters\elite\elite
+mass 130
+
+model characters\elite\elite_special\elite_special
+mass 130
+
+model characters\grunt\grunt
+mass 55
+
+model characters\jackal\jackal
+mass 50
+
+model characters\hunter\hunter
+mass 1100
+# the shield, an arm's slab, swings little
+joint bip01 l forearm: twist -5 5 swing 5 50
+# the spikes are the back's plates
+fold frame spike bottom left
+fold frame spike bottom right
+fold frame spike middle left
+fold frame spike middle right
+fold frame spike top left
+fold frame spike top right
+
+model characters\engineer\engineer
+mass 60
+
+model characters\floodcombat elite\floodcombat elite
+mass 110
+
+model characters\floodcombat_human\floodcombat_human
+mass 70
+
+model characters\flood_captain\flood_captain
+mass 70
+
+model characters\floodcarrier\floodcarrier
+mass 90
+
+model characters\flood_infection\flood_infection
+mass 3
+
+model characters\sentinel\sentinel
+mass 150
+
+# a hologram, and bodies that are not bodies
+model characters\cortana\cortana
+none
+
+model characters\cortana\halo_enhanced\halo_enhanced
+none
+
+model characters\monitor\monitor
+none
+
+model levels\d40\devices\invisible_collision_object\invisible_collision_object
+none
+
+model vehicles\c_dropship\cd_gun\cd_gun
+none
