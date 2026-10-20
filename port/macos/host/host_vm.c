@@ -13,6 +13,9 @@ back. Thus
   is carried out by the host (host_dispatch) and returns after the svc;
 - a guest function the host calls returns to RETURN_ADDRESS, in the
   unmapped first 2 MB, and the instruction abort there ends the call;
+- a write to a page the renderer's write tracking protects (in the VM's
+  stage-2 tables) exits to the host, which makes the page writable and lets
+  the write run again (host_watch.c);
 - any other exception is a crash, which the host reports.
 
 Every host thread that runs guest code has a vCPU of its own (Hypervisor.
@@ -44,6 +47,9 @@ starts this far down (past the 128-byte red zone of Apple's AArch64 ABI) */
 #define EC_SVC64 0x15
 #define EC_HVC64 0x16
 #define EC_INSTRUCTION_ABORT_LOWER 0x20
+#define EC_DATA_ABORT_LOWER 0x24
+/* ESR_ELx.ISS for a data abort: the access was a write */
+#define ISS_WRITE (1u << 6)
 /* CNTKCTL_EL1: EL0 may read the virtual count */
 #define CNTKCTL_EL0VCTEN (1u << 1)
 
@@ -357,6 +363,11 @@ static void vcpu_run(struct vcpu *vcpu)
 		if (vcpu->exit->reason != HV_EXIT_REASON_EXCEPTION)
 			host_fatal("unexpected vCPU exit %u", (unsigned int)vcpu->exit->reason);
 		syndrome = vcpu->exit->exception.syndrome;
+		/* a write to a page the write tracking protects (host_watch.c):
+		the write runs again once the page is writable */
+		if ((syndrome >> 26) == EC_DATA_ABORT_LOWER &&
+			host_watch_fault(vcpu->exit->exception.physical_address, (syndrome & ISS_WRITE) != 0))
+			continue;
 		if ((syndrome >> 26) != EC_HVC64)
 		{
 			/* a fault the VM's own mapping took: the guest reached memory

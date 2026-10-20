@@ -1092,3 +1092,10 @@ void host_memory_watch_begin_frame(void)
 	if (watch_hashing)
 		watch_hash_begin_frame(&page_hashes);
 }
+
+/* (the macOS host's table: here the guest asks for each generation) */
+int host_memory_watch_share(unsigned int table)
+{
+	(void)table;
+	return -1;
+}

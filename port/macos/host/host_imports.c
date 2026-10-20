@@ -13,7 +13,6 @@ gesture insets are absent.
 #include "host.h"
 
 #include <errno.h>
-#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -47,53 +46,6 @@ unsigned int host_get_tp(void)
 void host_set_tp(unsigned int thread)
 {
 	host_vcpu_set_thread_pointer(thread);
-}
-
-/* ---------- memory write tracking (port/linux/src/platform.h)
-
-Not tracked yet: every range reads as written, which is always correct (a
-caller only redoes work), if slower. The guest answers these itself
-(port/android/guest/runtime/guest_memory_watch.c), so they are only the
-imports' stand-ins. */
-
-static atomic_uint watch_serial;
-
-void host_memory_watch_initialize(void)
-{
-}
-
-void host_memory_watch_protect(unsigned int address, unsigned int size)
-{
-	(void)address;
-	(void)size;
-}
-
-unsigned int host_memory_watch_generation(unsigned int address, unsigned int size)
-{
-	(void)address;
-	(void)size;
-	return atomic_fetch_add(&watch_serial, 1) + 1;
-}
-
-unsigned int host_memory_watch_serial(void)
-{
-	return atomic_fetch_add(&watch_serial, 1) + 1;
-}
-
-void host_memory_watch_prepare_write(unsigned int address, unsigned int size)
-{
-	(void)address;
-	(void)size;
-}
-
-void host_memory_watch_forget(unsigned int address, unsigned int size)
-{
-	(void)address;
-	(void)size;
-}
-
-void host_memory_watch_begin_frame(void)
-{
 }
 
 /* ---------- paths: the data folder (HALO_DATA_ROOT, else the current

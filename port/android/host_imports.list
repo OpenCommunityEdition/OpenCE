@@ -65,3 +65,4 @@ host_touch_scene
 host_touch_bindings
 
 host_errno
+host_memory_watch_share

@@ -195,11 +195,13 @@ BLOODGULCH_CAMERA = "95.0 -150.0 4.0\n-0.6 0.8 -0.15\n0 0 1\n1.22\n"
 @pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")
 def test_the_game_answers_its_hottest_imports_itself(tmp_path):
     # Bloodgulch made 500,000 exits a second before the guest kept its own
-    # clock (SDL_GetTicks from CNTVCT_EL0), errno (with each hostposix_*
-    # import's result) and memory's write tracking (untracked in the VM):
-    # now it asks the host for none of them but the clock's calibration,
-    # and makes fewer than a tenth of the exits (about 24,000 a second,
-    # nearly all host_syscall: futexes, sleeps and the like)
+    # clock (SDL_GetTicks from CNTVCT_EL0) and errno (with each hostposix_*
+    # import's result): now it asks the host for neither but the clock's
+    # calibration, and makes fewer than a tenth of the exits (about 24,000 a
+    # second, nearly all host_syscall: futexes, sleeps and the like). Memory's
+    # write tracking (port/macos/host/host_watch.c) is read from the table it
+    # shares, never asked for, and pages are protected again only after the
+    # game writes them
     run = run_game(tmp_path, 1500, {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NET_ONLINE": "false",
                                     "HALO_NET_JOIN_FROM_CLIPBOARD": "false", "HALO_HOST_IMPORT_COUNTS": "1"},
                    seconds=20)
@@ -209,7 +211,12 @@ def test_the_game_answers_its_hottest_imports_itself(tmp_path):
     counts = {name: int(count) for name, count in re.findall(r"halo_host: import (\w+): (\d+)", run.stderr)}
     assert int(rate.group(1)) < 500000 // 10, (rate.group(0), counts)
     assert counts.get("host_sdl_ticks", 0) == 1 and counts.get("host_errno", 0) == 0, counts
-    assert not [name for name in counts if name.startswith("host_memory_watch_")], counts
+    assert counts.get("host_memory_watch_share", 0) == 1, counts
+    assert not counts.get("host_memory_watch_generation") and not counts.get("host_memory_watch_serial"), counts
+    # (contiguous memory freed or made again forgets its pages, about once a
+    # frame of the 1500)
+    assert counts.get("host_memory_watch_forget", 0) < 2 * 1500, counts
+    assert counts.get("host_memory_watch_protect", 0) + counts.get("host_memory_watch_prepare_write", 0) < 1500, counts
 
 
 @pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")

@@ -77,6 +77,9 @@ void host_vm_report_import_counts(void);
 /* the exits from the VM so far, counted with HALO_HOST_IMPORT_COUNTS or
 HALO_HOST_FRAME_LOG set (0 otherwise) */
 unsigned long long host_vm_exit_count(void);
+/* host_watch.c: a write the VM refused at guest address `address`; 1 if it
+was to a page the write tracking protects, and may run again */
+int host_watch_fault(uint64_t address, int write);
 /* HALO_HOST_FRAME_LOG (host_frames.c): whether it is set; the log flushed */
 int host_frames_logging(void);
 void host_frames_close(void);

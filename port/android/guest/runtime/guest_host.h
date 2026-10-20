@@ -48,6 +48,9 @@ void host_memory_watch_prepare_write(unsigned int address, unsigned int size);
 void host_memory_watch_forget(unsigned int address, unsigned int size);
 /* memory_watch_begin_frame (port/linux/src/platform.h) */
 void host_memory_watch_begin_frame(void);
+/* the macOS host's: shares the write-tracking table at guest address `table`
+(struct halo_guest_watch_table); 0, or -1 if the host does not track writes */
+int host_memory_watch_share(unsigned int table);
 
 /* ---------- SDL (guest/runtime/guest_sdl.c)
 

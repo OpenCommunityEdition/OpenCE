@@ -65,4 +65,22 @@ struct halo_guest_boot
 	uint32_t page_size;
 };
 
+/* the macOS host's write tracking (port/macos/host/host_watch.c): a table in
+guest memory that the guest shares with host_memory_watch_share and reads
+without asking the host, which writes it. The host write-protects the pages
+of the window in the VM (in its own page size, 16 KB); the first write to a
+protected page exits to the host, which gives the page a new generation and
+makes it writable again. */
+#define HALO_GUEST_WATCH_PAGE_SIZE 0x4000u
+#define HALO_GUEST_WATCH_PAGE_COUNT (HALO_GUEST_WINDOW_SIZE / HALO_GUEST_WATCH_PAGE_SIZE)
+
+struct halo_guest_watch_table
+{
+	/* the newest generation given to any page */
+	uint32_t serial;
+	uint32_t generation[HALO_GUEST_WATCH_PAGE_COUNT];
+	/* 1 while the page is write-protected */
+	uint8_t protected_page[HALO_GUEST_WATCH_PAGE_COUNT];
+};
+
 #endif
