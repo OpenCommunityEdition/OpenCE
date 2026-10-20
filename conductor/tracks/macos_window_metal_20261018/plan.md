@@ -66,7 +66,7 @@
     - [x] Fix what the frame shows wrong
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Direct3D 8 on Metal' (Protocol in workflow.md)
 
-## Phase 5: Parity with the GL build's extras
+## Phase 5: Parity with the GL build's extras [checkpoint: 617c6341]
 - [x] Task: High-res HUD and text 33fe5b0b
     - [x] Write tests: golden frames with the HUD and text at native resolution
     - [x] hud_hires.c and text_hires.c through the Metal path
@@ -76,7 +76,7 @@
 - [x] Task: The frame-time overlay 69de6c45
     - [x] Write tests: the setting exists, off by default, and documented in the settings table
     - [x] Draw frame time and fps when on
-- [ ] Task: Conductor - User Manual Verification 'Phase 5: Parity with the GL build's extras' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 5: Parity with the GL build's extras' (Protocol in workflow.md)
 
 ## Phase 6: 4K at 120fps
 - [ ] Task: Answer the hottest imports in the guest
