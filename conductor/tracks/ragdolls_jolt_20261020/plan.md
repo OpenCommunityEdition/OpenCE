@@ -59,7 +59,7 @@
     - [x] Tune the thresholds; approve the references
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Dismemberment' (Protocol in workflow.md) 3ff16710
 
-## Phase 5: Debris
+## Phase 5: Debris [checkpoint: abbf7c17]
 - [x] Task: Particles as rigid bodies 9116affd
     - [x] Write tests: harness tests that point-physics particles that collide with the level spawn debris bodies with the definition's size and lifetime, only with `game.physics_debris` on; the cap hands the oldest back to point physics
     - [x] A `port:` hook in the particle systems' point-physics update; drawing from the results
@@ -69,7 +69,7 @@
 - [x] Task: Golden frames of debris f3d302e6
     - [x] Write tests: casings and debris at rest after a burst of fire, with the frame clock
     - [x] Approve the references
-- [ ] Task: Conductor - User Manual Verification 'Phase 5: Debris' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 5: Debris' (Protocol in workflow.md) abbf7c17
 
 ## Phase 6: Performance, network and documentation
 - [ ] Task: The benchmark with ragdolls and debris
