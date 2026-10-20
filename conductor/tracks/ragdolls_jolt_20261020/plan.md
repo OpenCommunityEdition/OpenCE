@@ -54,9 +54,9 @@
 - [x] Task: Drawing the cut 3aa40563
     - [x] Write tests: harness tests that the body's draw collapses the detached bones' vertices and each limb's draw collapses every other bone's; the species' blood effect and decal spawn at the joint
     - [x] Extra draws of the same model from `render_objects.c`'s `port:` swap; the blood effect from the biped's existing effects
-- [ ] Task: Golden frames of dismemberment
-    - [ ] Write tests: an Elite dismembered by a scripted grenade (mid-flight, at rest) and a bullet kill that stays whole, with the frame clock
-    - [ ] Tune the thresholds; approve the references
+- [x] Task: Golden frames of dismemberment e2bc790a
+    - [x] Write tests: an Elite dismembered by a scripted grenade (mid-flight, at rest) and a bullet kill that stays whole, with the frame clock
+    - [x] Tune the thresholds; approve the references
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Dismemberment' (Protocol in workflow.md)
 
 ## Phase 5: Debris
