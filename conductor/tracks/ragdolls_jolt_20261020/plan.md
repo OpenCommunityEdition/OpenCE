@@ -45,9 +45,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Ragdolls' (Protocol in workflow.md)
 
 ## Phase 4: Dismemberment
-- [ ] Task: Breakable joints
-    - [ ] Write tests: harness tests that an explosion's damage and distance against the per-species thresholds choose the joints that break, only for dying or dead bipeds and only with `game.dismemberment` and `game.ragdolls` on; bullets and melee break none
-    - [ ] Per-species breakable joints and thresholds in `port/assets/ragdolls/`; the `game.dismemberment` setting (port_config.c, settings table, port_settings.py)
+- [x] Task: Breakable joints c71f8faf
+    - [x] Write tests: harness tests that an explosion's damage and distance against the per-species thresholds choose the joints that break, only for dying or dead bipeds and only with `game.dismemberment` and `game.ragdolls` on; bullets and melee break none
+    - [x] Per-species breakable joints and thresholds in `port/assets/ragdolls/`; the `game.dismemberment` setting (port_config.c, settings table, port_settings.py)
 - [ ] Task: Limbs as bodies of their own
     - [ ] Write tests: native tests that breaking a joint leaves two bodies, the limb flung by the impulse, both coming to rest with their remaining joints inside their limits
     - [ ] Joint breaking in the C wrapper; the limb's bones reported in the results with their own root
