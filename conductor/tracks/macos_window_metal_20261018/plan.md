@@ -82,10 +82,10 @@
 - [x] Task: Answer the hottest imports in the guest 7e8d0dac
     - [x] Write tests: ticks from the guest's counter (CNTVCT_EL0) agree with the host's; errno kept guest-side; exits/s reported lower than the 500k baseline
     - [x] Move host_sdl_ticks and host_errno into the guest runtime
-- [~] Task: A repeatable benchmark
-    - [ ] Write tests: a pytest run of bloodgulch for 60 s at 3840×2160 logging per-frame times and VM exits per frame, reporting p99
-    - [ ] The frame-time log and the run
-- [ ] Task: Optimise until the target is met
+- [x] Task: A repeatable benchmark 0a25b926
+    - [x] Write tests: a pytest run of bloodgulch for 60 s at 3840×2160 logging per-frame times and VM exits per frame, reporting p99
+    - [x] The frame-time log and the run
+- [~] Task: Optimise until the target is met
     - [ ] Profile with Metal frame capture and Instruments; fix the largest costs one by one, each measured
     - [ ] Record the result (p99 ≤ 8.33 ms) in docs/macos_host.md
 - [ ] Task: Documentation
