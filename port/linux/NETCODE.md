@@ -47,6 +47,13 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
     host's is once that stops, or if they drift apart while it moves;
   - which named objects exist, so scripted creates and deletes match.
 
+  A script waiting for every player inside a trigger brings the others
+  beside a player who arrived, but advances only after their positions
+  are inside the volume. Failed placements retry, rather than closing a
+  one-way door on players left behind. An empty `(players)` list during
+  respawn does not satisfy that wait; empty AI lists keep their original
+  meaning.
+
   Every machine follows the host's structure BSP: a switch is sent at once
   and reliably, and each client's input says which BSP it has loaded.
   Until a client has the host's, the host takes none of its players'

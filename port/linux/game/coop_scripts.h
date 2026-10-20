@@ -16,9 +16,14 @@ Campaign scripts made to work for every player in network co-op
 list as inside once any of it is, because every object in it is a player */
 boolean coop_scripts_any_player_will_do(
 	long object_list_index);
+/* An empty (players) result or failed list allocation cannot advance a
+co-op gate. Does not change valid empty AI lists or non-host behavior. */
+boolean coop_scripts_empty_player_list(
+	long object_list_index);
 /* and when a script waits on it and one player is inside, the players of
 the list outside come beside that one, so a gate (the Maw's lift, the run
-to its bridge, a30's Pelicans) leaves no one behind */
+to its bridge, a30's Pelicans) leaves no one behind. The caller must test
+the volume again: a failed placement leaves the script waiting. */
 void coop_scripts_gather_in_volume(
 	short trigger_volume_index,
 	long object_list_index);
