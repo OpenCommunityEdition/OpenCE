@@ -5,7 +5,8 @@ The campaign's score (display.campaign_score, off by default: the stock
 game has none). Each enemy a player kills is worth points by its actor
 variant: a base by the kind of actor (a grunt, a jackal, an elite, a hunter,
 the Flood's forms, a sentinel) times a rank by the variant's name (minor 1,
-major 1.5, ultra 2, zealot 3, and so on). Marines, crew and the like are
+major 1.5, ultra 2, zealot 3, and so on) times the difficulty (easy 0.5,
+normal 1, heroic 2, legendary 5). Marines, crew and the like are
 worth nothing, so friendly fire gains no points.
 
 Only the machine that runs the AI knows the kills: the host of a co-op
@@ -31,6 +32,7 @@ seconds.
 #include "ai/actor_types.h"
 #include "cutscene/cinematics.h"
 #include "interface/interface.h"
+#include "interface/hud_messaging.h"
 #include "main/console.h"
 #include "objects/objects.h"
 #include "rasterizer/rasterizer.h"
@@ -67,6 +69,8 @@ enum
 	/* the corner's margins, in the HUD's 480 lines (the match clock's) */
 	CAMPAIGN_SCORE_RIGHT_MARGIN = 5,
 	CAMPAIGN_SCORE_BOTTOM_MARGIN = 14,
+	/* and the score's gap above the clock */
+	CAMPAIGN_SCORE_CLOCK_GAP = 8,
 };
 
 /* ---------- structures */
@@ -108,6 +112,11 @@ static char campaign_score_summary[CAMPAIGN_SCORE_SUMMARY_LINES][CAMPAIGN_SCORE_
 static short campaign_score_summary_lines = 0;
 static unsigned long campaign_score_summary_until = 0;
 
+/* the difficulty's share of a point, in tenths: easy, normal, heroic, legendary */
+static short const campaign_score_difficulty_tenths[NUMBER_OF_GAME_DIFFICULTY_LEVELS] = { 5, 10, 20, 50 };
+static char const *const campaign_score_difficulty_names[NUMBER_OF_GAME_DIFFICULTY_LEVELS] =
+	{ "EASY", "NORMAL", "HEROIC", "LEGENDARY" };
+
 /* the rank of a variant by its name's words, tenths of a point per point
 (the first that is in the name) */
 static struct
@@ -145,6 +154,15 @@ static boolean campaign_score_level(
 		return FALSE;
 	scenario = global_scenario_try_and_get();
 	return scenario != NULL && scenario->type == _scenario_type_solo;
+}
+
+/* the difficulty, as an index of the tables above */
+static short campaign_score_difficulty(
+	void)
+{
+	short difficulty = game_difficulty_level_get();
+
+	return PIN(difficulty, 0, NUMBER_OF_GAME_DIFFICULTY_LEVELS - 1);
 }
 
 /* the points a variant is worth (0 for one that is no enemy) */
@@ -196,7 +214,7 @@ static short campaign_score_variant_points(
 			}
 		}
 	}
-	return (short)(base * tenths / 10);
+	return (short)(base * tenths * campaign_score_difficulty_tenths[campaign_score_difficulty()] / 100);
 }
 
 /* the kills after the game time are gone: a checkpoint was reverted to */
@@ -304,7 +322,9 @@ static short campaign_score_compose(
 	if (kills == 0)
 		return 0;
 
-	snprintf(lines[count++], CAMPAIGN_SCORE_SUMMARY_LENGTH, "LEVEL COMPLETE");
+	snprintf(lines[count++], CAMPAIGN_SCORE_SUMMARY_LENGTH, "LEVEL COMPLETE  %s x%.1f",
+		campaign_score_difficulty_names[campaign_score_difficulty()],
+		campaign_score_difficulty_tenths[campaign_score_difficulty()] / 10.0);
 	for (player_index = 0; player_index < CAMPAIGN_SCORE_MAXIMUM_PLAYERS; player_index++)
 	{
 		if (campaign_score_total(player_index) > 0)
@@ -441,7 +461,9 @@ void campaign_score_draw(
 	long font_index;
 	struct font_header *font;
 	short line_height;
+	short clock_height;
 	real_argb_color color;
+	real_argb_color text_color;
 	rectangle2d bounds;
 	rectangle2d window;
 	char text[CAMPAIGN_SCORE_SUMMARY_LENGTH];
@@ -450,13 +472,15 @@ void campaign_score_draw(
 
 	if (cinematic_in_progress() || !game_in_progress())
 		return;
-	font_index = interface_get_tag_index(_interface_font_terminal);
+	/* (the match clock's font: the HUD's) */
+	font_index = hud_get_font_index();
 	if (font_index == NONE)
 		return;
 	font = font_definition_get(font_index);
 	line_height = (short)(font->ascending_height + font->descending_height + font->leading_height);
 	if (line_height <= 0)
 		return;
+	clock_height = (short)(font->ascending_height + font->descending_height);
 	window = render.camera.window_bounds;
 	offset_rectangle2d(&window, (short)-render.camera.viewport_bounds.x0, (short)-render.camera.viewport_bounds.y0);
 
@@ -500,10 +524,14 @@ void campaign_score_draw(
 	/* (above the match clock) */
 	bounds.x1 = (short)(window.x1 - CAMPAIGN_SCORE_RIGHT_MARGIN);
 	bounds.x0 = (short)(bounds.x1 - 320);
-	bounds.y1 = (short)(window.y1 - CAMPAIGN_SCORE_BOTTOM_MARGIN - line_height);
-	bounds.y0 = (short)(bounds.y1 - line_height);
+	bounds.y1 = (short)(window.y1 - CAMPAIGN_SCORE_BOTTOM_MARGIN - clock_height - CAMPAIGN_SCORE_CLOCK_GAP);
+	bounds.y0 = (short)(bounds.y1 - clock_height);
+	/* (the clock's colour: the HUD's text lifted toward white) */
+	hud_get_text_color(&text_color);
+	color.red = text_color.red + (1.0f - text_color.red) * 0.65f;
+	color.green = text_color.green + (1.0f - text_color.green) * 0.65f;
+	color.blue = text_color.blue + (1.0f - text_color.blue) * 0.65f;
 	color.alpha = 1.0f;
-	color.red = color.green = color.blue = 1.0f;
 	draw_string_set_draw_mode(font_index, NONE, _campaign_score_text_right, 0, &color);
 	rasterizer_draw_string(&bounds, NULL, NULL, 0, text);
 
