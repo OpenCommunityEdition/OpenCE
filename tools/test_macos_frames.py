@@ -161,7 +161,10 @@ def test_the_main_menu_draws_at_native_resolution(tmp_path):
     frame = capture_game(tmp_path, 600, size=NATIVE_SIZE)
     assert (frame.width, frame.height) == NATIVE_SIZE
     assert max(frame.pixel(x, 524)[0] for x in range(500, 800)) > 200
-    check(frame, "main_menu_native")
+    # (the ring behind the logo turns by the real time, which a busy machine
+    # moves on by a little at the frame captured: its edges, about 1% of the
+    # frame; the text does not)
+    check(frame, "main_menu_native", frame_compare.Tolerance(fraction=0.02, largest=255))
 
 
 @pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")
