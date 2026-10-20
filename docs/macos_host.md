@@ -480,9 +480,9 @@ shown. At the `PRESENT` that `HALO_HOST_CAPTURE_FRAME` names, the renderer
 waits for the frame's commands and writes the texture to the PNG (8-bit
 RGBA, with ImageIO) before it answers the guest, so a guest may exit at
 once. The app logs what it wrote, or why it could not; a setting it cannot
-read is logged and the window drawn as usual. The capture's size is not yet
-the guest's window size: the game's Direct3D, once written as batches, will
-have to be told it.
+read is logged and the window drawn as usual. While capturing, the
+window's size in pixels (`host_sdl_window_size_in_pixels`) is the capture's,
+so the game draws at that size.
 
 A frame of the game is the same from run to run only if the game's clock
 is: its menus' backgrounds and its ticks follow the time. With
