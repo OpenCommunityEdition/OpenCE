@@ -49,6 +49,9 @@ struct ragdoll_part
 	real twist_max;
 	real swing_normal;
 	real swing_plane;
+	/* the explosion's damage at the part that tears its joint, before each
+	body's own share of chance (ragdolls.c); 0 never */
+	real break_damage;
 };
 
 struct ragdoll_body

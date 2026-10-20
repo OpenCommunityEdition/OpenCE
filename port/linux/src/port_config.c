@@ -329,6 +329,11 @@ static const struct config_setting config_settings[] =
 		"stock game's dying animations). For show only: it changes nothing the\n"
 		"game decides, and each machine of a network game has its own. Applies\n"
 		"from the next death." },
+	{ "game.dismemberment", _config_boolean, "false", "HALO_DISMEMBERMENT", _environment_value, _platform_all,
+		"With game.ragdolls, a grenade's or a rocket's blast that kills a body,\n"
+		"or reaches one dead, tears off the limbs and the head it hurts most,\n"
+		"each falling as a ragdoll of its own. Bullets and melee tear nothing.\n"
+		"For show only, as the ragdolls are. Applies from the next blast." },
 	{ "game.physics_debris", _config_boolean, "false", "HALO_PHYSICS_DEBRIS", _environment_value, _platform_all,
 		"Shell casings, gibs and broken pieces bounce, roll and tumble on the\n"
 		"level and against each other (the macOS app's physics; elsewhere they\n"

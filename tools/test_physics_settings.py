@@ -22,6 +22,7 @@ from tools.test_linux_port import CONFIG_PROGRAM  # noqa: E402
 
 SETTINGS = {
     "game.ragdolls": ("_config_boolean", "false", "HALO_RAGDOLLS"),
+    "game.dismemberment": ("_config_boolean", "false", "HALO_DISMEMBERMENT"),
     "game.physics_debris": ("_config_boolean", "false", "HALO_PHYSICS_DEBRIS"),
     "game.physics_debris_max": ("_config_integer", "256", "HALO_PHYSICS_DEBRIS_MAX"),
     "debug.physics_draw": ("_config_boolean", "false", "HALO_PHYSICS_DRAW"),
@@ -50,7 +51,7 @@ def test_the_physics_screen_lists_them():
     files = port_settings.settings_files()
     assert SCREEN in files
     screen = "\n".join(files[SCREEN])
-    assert set(re.findall(r'setting="([^"]+)"', screen)) == {"game.ragdolls", "game.physics_debris",
+    assert set(re.findall(r'setting="([^"]+)"', screen)) == {"game.ragdolls", "game.dismemberment", "game.physics_debris",
                                                               "game.physics_debris_max"}
     video = "\n".join(files[SCREEN.replace(".physics.xml", ".xml")])
     assert "physics_settings_screen" in video
@@ -88,8 +89,8 @@ def test_they_are_read_from_config_and_environment(tmp_path):
 
     for name, (_, default, _) in SETTINGS.items():
         assert get(name) == default, name
-    (data / "config.toml").write_text("[game]\nragdolls = true\nphysics_debris = true\nphysics_debris_max = 64\n\n"
+    (data / "config.toml").write_text("[game]\nragdolls = true\ndismemberment = true\nphysics_debris = true\nphysics_debris_max = 64\n\n"
                                       "[debug]\nphysics_draw = true\n")
-    assert [get(name) for name in SETTINGS] == ["true", "true", "64", "true"]
+    assert [get(name) for name in SETTINGS] == ["true", "true", "true", "64", "true"]
     assert get("game.ragdolls", HALO_RAGDOLLS="false") == "false"
     assert get("game.physics_debris_max", HALO_PHYSICS_DEBRIS_MAX="512") == "512"

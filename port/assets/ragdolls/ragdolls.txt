@@ -3,21 +3,59 @@
 # that file's comment; the masses are kilograms, the angles degrees, the
 # sizes world units (3.048 metres each). A model without a section is made
 # as it is, weighing a marine's 80 kg.
+#
+# A break's damage is what an explosion must do near a limb to tear it off
+# (game.dismemberment): a frag grenade's 120 all at its centre, less with
+# each unit away, to nothing at 2.5. Hunters, the flood's carriers and
+# infection forms, the engineers and the sentinels tear nothing.
+
+model characters\marine\marine
+break bip01 head: 80
+break bip01 l forearm: 70
+break bip01 r forearm: 70
+break bip01 l calf: 80
+break bip01 r calf: 80
 
 model characters\cyborg\cyborg
 mass 140
+# the armour holds a while
+break bip01 head: 100
+break bip01 l forearm: 90
+break bip01 r forearm: 90
+break bip01 l calf: 100
+break bip01 r calf: 100
 
 model characters\elite\elite
 mass 130
+break bip01 head: 95
+break bip01 l forearm: 85
+break bip01 r forearm: 85
+break bip01 l calf: 95
+break bip01 r calf: 95
 
 model characters\elite\elite_special\elite_special
 mass 130
+break bip01 head: 95
+break bip01 l forearm: 85
+break bip01 r forearm: 85
+break bip01 l calf: 95
+break bip01 r calf: 95
 
 model characters\grunt\grunt
 mass 55
+break bip01 head: 60
+break bip01 l forearm: 55
+break bip01 r forearm: 55
+break bip01 l calf: 60
+break bip01 r calf: 60
 
 model characters\jackal\jackal
 mass 50
+break bip01 head: 60
+break bip01 l forearm: 55
+break bip01 r forearm: 55
+break bip01 l calf: 60
+break bip01 r calf: 60
 
 model characters\hunter\hunter
 mass 1100
@@ -36,9 +74,20 @@ mass 60
 
 model characters\floodcombat elite\floodcombat elite
 mass 110
+# rotten: the flood comes apart easily
+break bip01 head: 60
+break bip01 l forearm: 50
+break bip01 r forearm: 50
+break bip01 l calf: 60
+break bip01 r calf: 60
 
 model characters\floodcombat_human\floodcombat_human
 mass 70
+break bip01 head: 50
+break bip01 l forearm: 40
+break bip01 r forearm: 40
+break bip01 l calf: 50
+break bip01 r calf: 50
 
 model characters\flood_captain\flood_captain
 mass 70

@@ -139,6 +139,9 @@ static char const overrides[] =
 	"box bip01 spine: 0.1 0.1 0.1\n"
 	"sphere bip01 nobody: 1\n"
 	"capsule bip01 l calf: 0.0001 0.1\n"
+	"break bip01 head: 40\n"
+	"break bip01 l calf: 0.5\n"
+	"break bip01 pelvis: 30\n"
 	"mass -5\n"
 	"model test\\b\n"
 	"mass 5\n"
@@ -250,6 +253,9 @@ int main(int argc, char **argv)
 		calf = &body.parts[part_of(3)];
 		CHECK(near_degrees(calf->twist_max, 5) && calf->shape == _ragdoll_shape_capsule && near(calf->size[0], 0.0375f),
 			"the calf's bad lines applied: %g %d %g", calf->twist_max, calf->shape, calf->size[0]);
+		CHECK(near(head->break_damage, 40.0f) && calf->break_damage == 0.0f, "the head's break, not the calf's: %g %g",
+			head->break_damage, calf->break_damage);
+		CHECK(body.parts[0].break_damage == 0.0f && spine->break_damage == 0.0f, "no joint at the root to break");
 		return 0;
 	}
 	/* `none`, and a model the overrides do not name */

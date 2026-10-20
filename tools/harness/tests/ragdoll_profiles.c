@@ -8,7 +8,7 @@ tools/test_ragdoll_profiles.py), built with ragdolls.txt's overrides, and
 printed for the test to check:
 
 	MODEL <name> BODY <parts> <mass>   or   MODEL <name> NONE
-	PART <part> <node> <parent part> <shape> <size x3> <centre x3> <mass> <twist min max> <swing normal plane>
+	PART <part> <node> <parent part> <shape> <size x3> <centre x3> <mass> <twist min max> <swing normal plane> <break damage>
 	NODE <node> <part> */
 struct tag_block { long count; void *address; long definition; };
 #define TAG_BLOCK_GET_ELEMENT(block, index, type) ((type *)(block)->address + (index))
@@ -107,10 +107,10 @@ int main(int argc, char **argv)
 			{
 				struct ragdoll_part const *part = &body.parts[index];
 
-				printf("PART %ld %d %d %d %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", index,
+				printf("PART %ld %d %d %d %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", index,
 					part->node_index, part->parent_part_index, part->shape, part->size[0], part->size[1], part->size[2],
 					part->center.x, part->center.y, part->center.z, part->mass, part->twist_min, part->twist_max,
-					part->swing_normal, part->swing_plane);
+					part->swing_normal, part->swing_plane, part->break_damage);
 			}
 			for (index = 0; index < body.node_count; index++)
 				printf("NODE %ld %d\n", index, body.node_parts[index]);

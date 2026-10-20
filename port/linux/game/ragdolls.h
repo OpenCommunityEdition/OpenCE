@@ -31,6 +31,10 @@ enum
 	as kinematic bodies, for the ragdolls to meet; named to the host by their
 	index plus one */
 	RAGDOLL_STAND_INS_MAX = 16,
+	/* the joints torn in a tick; past it a blast tears no more */
+	RAGDOLL_BREAKS_MAX = 32,
+	/* the joints one blast tears in a body, the worst hurt first */
+	RAGDOLL_BREAKS_PER_HIT = 2,
 };
 
 /* how near a ragdoll (world units, past the object's bounding sphere) a
@@ -66,7 +70,10 @@ struct ragdoll_pose
 
 /* a hit on a biped: the damage's direction (unit length), the speed its
 instantaneous acceleration gives (world units a second, scaled as the
-damage is), and where it struck */
+damage is), and where it struck; and an explosion's, what it does at a
+point (ragdoll_hit_damage_at): a grenade's, a high explosive's or a mounted
+weapon's damage over an area (not melee's, nor a vehicle's collision, which
+damage.c also gives an area) */
 struct ragdoll_hit
 {
 	long object_index;
@@ -74,6 +81,16 @@ struct ragdoll_hit
 	real_vector3d direction;
 	real speed;
 	real_point3d point;
+	boolean explosion;
+	/* whether the damage falls off with the distance */
+	boolean scaled;
+	real_point3d epicenter;
+	/* the damage at the cutoff and at the centre (the mean of its bounds),
+	times the damage's multiplier */
+	real damage_minimum;
+	real damage_maximum;
+	real falloff_radius;
+	real cutoff_radius;
 };
 
 struct ragdoll_death
@@ -100,6 +117,15 @@ struct ragdoll_impulse
 	real_point3d point;
 };
 
+/* a joint for the host to tear: the one between a ragdoll's part and its
+parent part */
+struct ragdoll_break
+{
+	long id;
+	short part;
+	short pad;
+};
+
 /* a dead biped's ragdoll, named to the host by its index plus one */
 struct ragdoll
 {
@@ -118,6 +144,9 @@ struct ragdoll
 
 /* whether a biped dies as a ragdoll (game.ragdolls, and the host's physics) */
 boolean ragdolls_enabled(void);
+/* whether explosions tear ragdolls' joints (game.dismemberment, with
+game.ragdolls) */
+boolean ragdolls_dismemberment_enabled(void);
 
 /* the game's hooks (halo_linux_source_fixups.h): damage done to an object
 (damage.c, object_damage_aftermath), and a unit dying, not feigning
@@ -164,6 +193,23 @@ starts, and each later hit on its biped */
 long ragdolls_impulse_count(void);
 struct ragdoll_impulse const *ragdolls_impulse_get(long index);
 void ragdolls_impulses_clear(void);
+
+/* The damage an explosion's hit does at a point, as damage.c's
+area-of-effect damage works it out, with the mean of the damage's bounds
+for its chance; 0 past the cutoff and for other hits. */
+real ragdoll_hit_damage_at(struct ragdoll_hit const *hit, real_point3d const *point);
+
+/* What of that damage tears a joint at a point: less the farther the point
+is from the explosion, all of it at the epicenter and none at the cutoff, so
+that the limbs nearest a blast go first, though its damage is the same out
+to the falloff. */
+real ragdoll_hit_tearing_at(struct ragdoll_hit const *hit, real_point3d const *point);
+
+/* the joints torn since the last clear: a dying biped's by the explosion
+that killed it, and a ragdoll's by each later one on its biped */
+long ragdolls_break_count(void);
+struct ragdoll_break const *ragdolls_break_get(long index);
+void ragdolls_breaks_clear(void);
 
 /* Whether a sphere is near enough a ragdoll to need a stand-in. */
 boolean ragdolls_near(real_point3d const *center, real radius);

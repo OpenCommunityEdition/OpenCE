@@ -12,6 +12,12 @@ for the physics' next tick to start its ragdoll from. The ragdolls the host
 has are kept here too: when each started, whether its motors still follow
 the animation, and the poses the host last gave; and the living bipeds and
 vehicles near them, which the host has as kinematic stand-ins.
+
+With game.dismemberment an explosion (a grenade's, a high explosive's or a
+mounted weapon's) that kills a biped, or that reaches its ragdoll, tears the
+joints whose parts it hurts past their species' threshold (ragdoll_bodies.c's
+`break` overrides), the parts nearest it the most: the host lets each limb go
+as a ragdoll of its own. Bullets, melee and vehicles tear nothing.
 */
 
 #include "cseries/cseries.h"
@@ -29,6 +35,13 @@ vehicles near them, which the host has as kinematic stand-ins.
 
 #include <string.h>
 
+/* (damage.c's _damage_effect_dont_scale_damage_by_distance_bit) */
+#define RAGDOLL_DAMAGE_EFFECT_UNSCALED_BIT 0
+/* (damage.c's _damage_category_grenade, _highexplosive and _mountedweapon) */
+#define RAGDOLL_DAMAGE_CATEGORY_GRENADE 3
+#define RAGDOLL_DAMAGE_CATEGORY_HIGH_EXPLOSIVE 4
+#define RAGDOLL_DAMAGE_CATEGORY_MOUNTED_WEAPON 8
+
 static struct
 {
 	long death_count;
@@ -38,6 +51,8 @@ static struct
 	struct ragdoll active[RAGDOLLS_MAX];
 	long impulse_count;
 	struct ragdoll_impulse impulses[RAGDOLL_IMPULSES_MAX];
+	long break_count;
+	struct ragdoll_break breaks[RAGDOLL_BREAKS_MAX];
 	struct
 	{
 		boolean used;
@@ -51,6 +66,11 @@ static struct
 boolean ragdolls_enabled(void)
 {
 	return physics_jolt_ragdolls_enabled();
+}
+
+boolean ragdolls_dismemberment_enabled(void)
+{
+	return physics_jolt_dismemberment_enabled();
 }
 
 static boolean ragdolls_object_is_biped(
@@ -132,7 +152,7 @@ static void ragdolls_push(
 	impulse->point = hit->point;
 }
 
-/* an id's pushes not yet sent dropped: its ragdoll is gone */
+/* an id's pushes and tears not yet sent dropped: its ragdoll is gone */
 static void ragdolls_impulses_drop(
 	long id)
 {
@@ -145,6 +165,129 @@ static void ragdolls_impulses_drop(
 			ragdolls.impulses[kept++] = ragdolls.impulses[index];
 	}
 	ragdolls.impulse_count = kept;
+	kept = 0;
+	for (index = 0; index < ragdolls.break_count; index++)
+	{
+		if (ragdolls.breaks[index].id != id)
+			ragdolls.breaks[kept++] = ragdolls.breaks[index];
+	}
+	ragdolls.break_count = kept;
+}
+
+real ragdoll_hit_damage_at(
+	struct ragdoll_hit const *hit,
+	real_point3d const *point)
+{
+	real_vector3d offset;
+	real distance;
+	real scale = 1.0f;
+
+	if (!hit->explosion)
+		return 0.0f;
+	offset.i = point->x - hit->epicenter.x;
+	offset.j = point->y - hit->epicenter.y;
+	offset.k = point->z - hit->epicenter.z;
+	distance = square_root(offset.i * offset.i + offset.j * offset.j + offset.k * offset.k);
+	if (hit->cutoff_radius > hit->falloff_radius)
+	{
+		scale = PIN(1.0f - (distance - hit->falloff_radius) / (hit->cutoff_radius - hit->falloff_radius),
+			0.0f, 1.0f);
+	}
+	/* (damage.c does no damage where the distance's scale is nothing) */
+	if (scale <= 0.0f)
+		return 0.0f;
+	if (!hit->scaled)
+		scale = 1.0f;
+	return (1.0f - scale) * hit->damage_minimum + scale * hit->damage_maximum;
+}
+
+real ragdoll_hit_tearing_at(
+	struct ragdoll_hit const *hit,
+	real_point3d const *point)
+{
+	real_vector3d offset;
+	real closeness = 1.0f;
+
+	offset.i = point->x - hit->epicenter.x;
+	offset.j = point->y - hit->epicenter.y;
+	offset.k = point->z - hit->epicenter.z;
+	if (hit->cutoff_radius > _real_epsilon)
+	{
+		closeness = PIN(1.0f - square_root(offset.i * offset.i + offset.j * offset.j + offset.k * offset.k) /
+			hit->cutoff_radius, 0.0f, 1.0f);
+	}
+	return ragdoll_hit_damage_at(hit, point) * closeness;
+}
+
+/* a body's own share of its species' threshold for a part's joint: a
+quarter either way, the same for the body each time */
+static real ragdoll_break_chance(
+	long object_index,
+	short part)
+{
+	unsigned long hash = ((unsigned long)object_index * 31UL + (unsigned long)part) * 2654435761UL;
+
+	return 0.75f + 0.5f * (real)((hash >> 16) & 0xFFFF) / 65535.0f;
+}
+
+/* A hit's tearing of a ragdoll's joints: each part whose joint can break
+and that the explosion hurts past its threshold, at most
+RAGDOLL_BREAKS_PER_HIT of them, the worst hurt first; none torn already, or
+on a limb torn off already. */
+static void ragdolls_tear(
+	long id,
+	struct ragdoll_hit const *hit)
+{
+	struct ragdoll const *ragdoll = &ragdolls.active[id - 1];
+	struct ragdoll_body const *body = ragdoll->body;
+	unsigned long torn = ragdoll->broken_joints;
+	long index;
+	short count;
+
+	/* (a hit that is no explosion hurts no part: ragdoll_hit_damage_at) */
+	if (!ragdolls_dismemberment_enabled())
+		return;
+	for (index = 0; index < ragdolls.break_count; index++)
+	{
+		if (ragdolls.breaks[index].id == id)
+			torn |= 1UL << ragdolls.breaks[index].part;
+	}
+	for (count = 0; count < RAGDOLL_BREAKS_PER_HIT && ragdolls.break_count < RAGDOLL_BREAKS_MAX; count++)
+	{
+		struct ragdoll_break *tear;
+		short worst = NONE;
+		real worst_share = 1.0f;
+		short part;
+
+		for (part = 1; part < body->part_count; part++)
+		{
+			real_point3d center;
+			real share;
+			short above = part;
+
+			if (body->parts[part].break_damage <= 0.0f)
+				continue;
+			while (above != NONE && !(torn & (1UL << above)))
+				above = body->parts[above].parent_part_index;
+			if (above != NONE)
+				continue;
+			ragdoll_pose_transform(&ragdoll->poses[part], &body->parts[part].center, &center);
+			share = ragdoll_hit_tearing_at(hit, &center) /
+				(body->parts[part].break_damage * ragdoll_break_chance(ragdoll->object_index, part));
+			if (share >= worst_share)
+			{
+				worst = part;
+				worst_share = share;
+			}
+		}
+		if (worst == NONE)
+			break;
+		torn |= 1UL << worst;
+		tear = &ragdolls.breaks[ragdolls.break_count++];
+		tear->id = id;
+		tear->part = worst;
+		tear->pad = 0;
+	}
 }
 
 void ragdolls_damage(
@@ -174,6 +317,17 @@ void ragdolls_damage(
 	/* (as damage.c's object_damage_aftermath accelerates the object: all of
 	it, however far from an explosion) */
 	hit->speed = damage_effect->damage.instantaneous_acceleration * object_definition->object.acceleration_scale;
+	hit->explosion = TEST_FLAG(damage->flags, _damage_area_of_effect_bit) &&
+		(damage_effect->damage.category == RAGDOLL_DAMAGE_CATEGORY_GRENADE ||
+		damage_effect->damage.category == RAGDOLL_DAMAGE_CATEGORY_HIGH_EXPLOSIVE ||
+		damage_effect->damage.category == RAGDOLL_DAMAGE_CATEGORY_MOUNTED_WEAPON);
+	hit->scaled = !TEST_FLAG(damage_effect->flags, RAGDOLL_DAMAGE_EFFECT_UNSCALED_BIT);
+	hit->epicenter = damage->epicenter;
+	hit->damage_minimum = damage_effect->damage.damage_minimum * damage->multiplier;
+	hit->damage_maximum = 0.5f * (damage_effect->damage.damage_lower_bound + damage_effect->damage.damage_upper_bound) *
+		damage->multiplier;
+	hit->falloff_radius = damage_effect->falloff_radius;
+	hit->cutoff_radius = damage_effect->cutoff_radius;
 	if (length > _real_epsilon && hit->speed > _real_epsilon)
 	{
 		scale_vector3d(&hit->direction, 1.0f / length, &hit->direction);
@@ -186,7 +340,10 @@ void ragdolls_damage(
 	/* a ragdoll's biped hit again: the whole push, as a corpse takes it */
 	ragdoll = ragdolls_of_object(object_index);
 	if (ragdoll)
+	{
 		ragdolls_push((long)(ragdoll - ragdolls.active) + 1, hit, 1.0f);
+		ragdolls_tear((long)(ragdoll - ragdolls.active) + 1, hit);
+	}
 }
 
 struct ragdoll_hit const *ragdolls_hit_get(
@@ -400,7 +557,10 @@ long ragdolls_start(
 	/* (the living biped took half the killing push, as biped_accelerate
 	halves it, which its velocity carries; a corpse takes all of it) */
 	if (death->hit)
+	{
 		ragdolls_push(chosen + 1, &death->killing_hit, 0.5f);
+		ragdolls_tear(chosen + 1, &death->killing_hit);
+	}
 	return chosen + 1;
 }
 
@@ -445,6 +605,22 @@ struct ragdoll_impulse const *ragdolls_impulse_get(
 void ragdolls_impulses_clear(void)
 {
 	ragdolls.impulse_count = 0;
+}
+
+long ragdolls_break_count(void)
+{
+	return ragdolls.break_count;
+}
+
+struct ragdoll_break const *ragdolls_break_get(
+	long index)
+{
+	return index >= 0 && index < ragdolls.break_count ? &ragdolls.breaks[index] : NULL;
+}
+
+void ragdolls_breaks_clear(void)
+{
+	ragdolls.break_count = 0;
 }
 
 boolean ragdolls_near(
@@ -519,6 +695,7 @@ void ragdolls_dispose_from_old_map(void)
 	ragdolls.death_count = 0;
 	ragdolls.hit_count = 0;
 	ragdolls.impulse_count = 0;
+	ragdolls.break_count = 0;
 	memset(ragdolls.active, 0, sizeof(ragdolls.active));
 	memset(ragdolls.stand_ins, 0, sizeof(ragdolls.stand_ins));
 }

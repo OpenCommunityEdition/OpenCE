@@ -247,6 +247,8 @@ SCREENS["video_settings/physics"] = {
     "rows": [
         ("RAGDOLLS:", "game.ragdolls", ON_OFF,
          "The dead fall limp, thrown by what killed them,\nand lie where they come to rest.", None),
+        ("DISMEMBERMENT:", "game.dismemberment", ON_OFF,
+         "With ragdolls, blasts tear off the limbs and\nheads they hurt most. Bullets tear nothing.", None),
         ("PHYSICS DEBRIS:", "game.physics_debris", ON_OFF,
          "Casings, gibs and broken pieces bounce, roll and\ntumble on the level and off each other.", None),
         ("DEBRIS LIMIT:", "game.physics_debris_max", [(str(n), str(n)) for n in (64, 128, 256, 512, 1024, 2048)],

@@ -4,8 +4,11 @@
 
 /* Deaths and hits for the ragdolls (ragdolls.c), in a fake world of three
 objects: 0 a biped with a body, 1 a vehicle with a model that would make
-one, 2 a biped whose model has no body, and from 3 on more of the first. A hit is remembered for its tick; a biped's death queues its node
-matrices, velocity and the hit that killed it that tick. */
+one, 2 a biped whose model has no body, and from 3 on more of the first. A
+hit is remembered for its tick; a biped's death queues its node matrices,
+velocity and the hit that killed it that tick; an explosion that kills a
+biped, or reaches its ragdoll, tears the joints it hurts past their
+thresholds. */
 typedef struct { real scale; union { real n[4][3]; struct { real_vector3d forward, left, up; real_point3d position; }; }; }
 	real_matrix4x3;
 typedef struct { real_vector3d v; real w; } real_quaternion;
@@ -18,9 +21,19 @@ enum { _object_mask_biped = 1 << _object_type_biped };
 struct _object_datum { short type; };
 struct object_datum { long definition_index; struct _object_datum object; };
 struct object_definition { struct { real acceleration_scale; } object; };
-struct damage_definition { real instantaneous_acceleration, instantaneous_acceleration_zero_scale_factor; };
-struct damage_effect_definition { struct damage_definition damage; };
-struct damage_data { long definition_index; real_point3d origin; real_vector3d direction; real scale; };
+enum { _damage_area_of_effect_bit = 0 };
+struct damage_definition
+{
+	real instantaneous_acceleration, instantaneous_acceleration_zero_scale_factor;
+	real damage_minimum, damage_lower_bound, damage_upper_bound;
+	short category;
+};
+struct damage_effect_definition { struct damage_definition damage; unsigned long flags; real falloff_radius, cutoff_radius; };
+struct damage_data
+{
+	long definition_index; real_point3d origin; real_vector3d direction; real scale;
+	unsigned long flags; real_point3d epicenter; real multiplier;
+};
 
 #include "config.inc"
 
@@ -29,7 +42,9 @@ static long now = 10;
 static struct object_datum objects[3] = {{100, {_object_type_biped}}, {101, {_object_type_vehicle}}, {102, {_object_type_biped}}};
 static real_matrix4x3 matrices[RAGDOLL_BODY_NODES_MAX];
 static struct ragdoll_body body;
-static struct damage_effect_definition grenade = {{6.0f, 0.25f}};
+/* a grenade's: 10 at its edge, 100 to 140 at its heart, falling off from one
+unit to three */
+static struct damage_effect_definition grenade = {{6.0f, 0.25f, 10.0f, 100.0f, 140.0f, 3}, 0, 1.0f, 3.0f};
 static struct damage_effect_definition poke = {{0.0f, 0.0f}};
 /* the bipeds': 100's, and 102's half */
 static struct object_definition whole = {{1.0f}}, half = {{0.5f}};
@@ -37,7 +52,10 @@ static struct object_definition whole = {{1.0f}}, half = {{0.5f}};
 static boolean deleted[3];
 static short const matrix4x3_next[3] = {1, 2, 0};
 
+static boolean dismember = TRUE;
+
 static boolean physics_jolt_ragdolls_enabled(void) { return enabled; }
+static boolean physics_jolt_dismemberment_enabled(void) { return dismember; }
 static real square_root(real x) { return sqrtf(x); }
 static void *object_try_and_get_and_verify_type(long index, unsigned long mask)
 {
@@ -109,7 +127,30 @@ static struct damage_data blast(real i, real j, real k, real scale)
 	damage.origin.x = 1.0f; damage.origin.y = 2.0f; damage.origin.z = 3.0f;
 	damage.direction.i = i; damage.direction.j = j; damage.direction.k = k;
 	damage.scale = scale;
+	damage.flags = 0;
+	damage.epicenter = damage.origin;
+	damage.multiplier = 1.0f;
 	return damage;
+}
+
+/* a grenade's blast at a point, pushing up */
+static struct damage_data explosion(real x, real y, real z)
+{
+	struct damage_data damage = blast(0.0f, 0.0f, 1.0f, 1.0f);
+
+	damage.flags = FLAG(_damage_area_of_effect_bit);
+	damage.epicenter.x = x; damage.epicenter.y = y; damage.epicenter.z = z;
+	return damage;
+}
+
+/* a fourth part, off the first at node 3; the three below it breakable at
+50 */
+static void breakable(void)
+{
+	body.part_count = 4;
+	body.parts[3].node_index = 3;
+	body.parts[3].parent_part_index = 0;
+	body.parts[1].break_damage = body.parts[2].break_damage = body.parts[3].break_damage = 50.0f;
 }
 
 static boolean near(real a, real b) { return fabsf(a - b) < 1e-4f; }
@@ -554,6 +595,241 @@ int main(int argc, char **argv)
 		ragdolls_get(1)->posed = TRUE;
 		ragdolls_dispose_from_old_map();
 		CHECK(ragdolls_node_matrices(0, matrices) == matrices, "gone with the map, or a saved game");
+		return 0;
+	}
+	CASE("blast's damage")
+	{
+		struct ragdoll_hit const *hit;
+
+		damage = explosion(2.0f, 0.0f, 0.0f);
+		damage.multiplier = 2.0f;
+		ragdolls_damage(0, &damage);
+		hit = ragdolls_hit_get(0);
+		CHECK(hit->explosion && hit->scaled && hit->epicenter.x == 2.0f, "an explosion's, at its epicenter");
+		CHECK(near(hit->damage_minimum, 20.0f) && near(hit->damage_maximum, 240.0f), "its damage, multiplied: %f %f",
+			hit->damage_minimum, hit->damage_maximum);
+		CHECK(hit->falloff_radius == 1.0f && hit->cutoff_radius == 3.0f, "its reach");
+		grenade.flags = 1;
+		ragdolls_damage(0, &damage);
+		CHECK(!ragdolls_hit_get(0)->scaled, "not scaled by distance");
+		damage = blast(1.0f, 0.0f, 0.0f, 1.0f);
+		ragdolls_damage(0, &damage);
+		CHECK(!ragdolls_hit_get(0)->explosion, "a bullet's");
+		damage = explosion(2.0f, 0.0f, 0.0f);
+		grenade.damage.category = 6;
+		ragdolls_damage(0, &damage);
+		CHECK(!ragdolls_hit_get(0)->explosion, "a melee's, though over an area");
+		grenade.damage.category = 4;
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_hit_get(0)->explosion, "a high explosive's");
+		grenade.damage.category = 8;
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_hit_get(0)->explosion, "a mounted weapon's");
+		return 0;
+	}
+	CASE("falloff")
+	{
+		struct ragdoll_hit hit;
+		real_point3d point = {0.0f, 0.0f, 0.0f};
+
+		memset(&hit, 0, sizeof(hit));
+		hit.explosion = hit.scaled = TRUE;
+		hit.damage_minimum = 10.0f;
+		hit.damage_maximum = 120.0f;
+		hit.falloff_radius = 1.0f;
+		hit.cutoff_radius = 3.0f;
+		CHECK(near(ragdoll_hit_damage_at(&hit, &point), 120.0f), "at its heart");
+		point.y = 1.0f;
+		CHECK(near(ragdoll_hit_damage_at(&hit, &point), 120.0f), "out to the falloff");
+		CHECK(near(ragdoll_hit_tearing_at(&hit, &point), 80.0f), "tearing less than it hurts: %f",
+			ragdoll_hit_tearing_at(&hit, &point));
+		point.y = 2.0f;
+		CHECK(near(ragdoll_hit_damage_at(&hit, &point), 65.0f), "half way to the cutoff: %f",
+			ragdoll_hit_damage_at(&hit, &point));
+		point.y = 3.0f;
+		CHECK(ragdoll_hit_damage_at(&hit, &point) == 0.0f, "at the cutoff");
+		point.y = 4.0f;
+		CHECK(ragdoll_hit_damage_at(&hit, &point) == 0.0f, "past it");
+		point.y = 2.0f;
+		hit.scaled = FALSE;
+		CHECK(near(ragdoll_hit_damage_at(&hit, &point), 120.0f), "unscaled within reach");
+		hit.scaled = TRUE;
+		hit.cutoff_radius = 1.0f;
+		point.y = 9.0f;
+		CHECK(near(ragdoll_hit_damage_at(&hit, &point), 120.0f), "no falloff");
+		hit.explosion = FALSE;
+		point.y = 0.0f;
+		CHECK(ragdoll_hit_damage_at(&hit, &point) == 0.0f && ragdoll_hit_tearing_at(&hit, &point) == 0.0f,
+			"no explosion");
+		return 0;
+	}
+	CASE("chance")
+	{
+		real chance = ragdoll_break_chance(0, 1);
+
+		CHECK(chance >= 0.75f && chance <= 1.25f, "within a quarter: %f", chance);
+		CHECK(chance == ragdoll_break_chance(0, 1), "the same each time");
+		CHECK(chance != ragdoll_break_chance(0, 2) && chance != ragdoll_break_chance(5, 1), "a body's and a part's own");
+		for (index = 0; index < 1000; index++)
+		{
+			chance = ragdoll_break_chance(index, (short)(index % 7));
+			CHECK(chance >= 0.75f && chance <= 1.25f, "within a quarter: %f", chance);
+		}
+		return 0;
+	}
+	CASE("torn by a blast")
+	{
+		struct ragdoll_death const *death;
+		long replaced;
+
+		/* at the last part: all three within the falloff, hurt 120 each,
+		torn 100, 120 and 80 as they are near it; the last part's share of its
+		threshold the most, then the middle's */
+		breakable();
+		damage = explosion(2.0f, 0.0f, 0.0f);
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_break_count() == 0, "none for a living biped");
+		ragdolls_unit_died(0);
+		death = ragdolls_death_get(0);
+		CHECK(ragdolls_start(death, &replaced) == 1, "a ragdoll");
+		CHECK(ragdolls_break_count() == RAGDOLL_BREAKS_PER_HIT, "two of three: %ld", ragdolls_break_count());
+		CHECK(ragdolls_break_get(0)->id == 1 && ragdolls_break_get(0)->part == 2, "the worst hurt first: %d",
+			ragdolls_break_get(0)->part);
+		CHECK(ragdolls_break_get(1)->id == 1 && ragdolls_break_get(1)->part == 1, "then the next: %d",
+			ragdolls_break_get(1)->part);
+		CHECK(ragdolls_impulse_count() == 1, "and pushed");
+		ragdolls_breaks_clear();
+		CHECK(ragdolls_break_count() == 0 && !ragdolls_break_get(0), "cleared");
+		return 0;
+	}
+	CASE("past their thresholds")
+	{
+		struct ragdoll_death death = death_of(0);
+		long replaced;
+
+		/* the middle's 50 torn, the last's unbreakable joint and the
+		fourth's 500 not */
+		breakable();
+		body.parts[2].break_damage = 0.0f;
+		body.parts[3].break_damage = 500.0f;
+		ragdolls_start(&death, &replaced);
+		damage = explosion(2.0f, 0.0f, 0.0f);
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_break_count() == 1 && ragdolls_break_get(0)->part == 1, "the middle alone: %ld",
+			ragdolls_break_count());
+		return 0;
+	}
+	CASE("by chance")
+	{
+		struct ragdoll_death death = death_of(0);
+		long replaced;
+
+		/* the first part torn 100, past 96 but not past its share of it,
+		this body's chance for it being 1.059 */
+		breakable();
+		body.parts[1].break_damage = 96.0f;
+		body.parts[2].break_damage = 0.0f;
+		body.parts[3].break_damage = 500.0f;
+		ragdolls_start(&death, &replaced);
+		damage = explosion(2.0f, 0.0f, 0.0f);
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_break_count() == 0, "held by its chance: %ld", ragdolls_break_count());
+		body.parts[1].break_damage = 90.0f;
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_break_count() == 1 && ragdolls_break_get(0)->part == 1, "torn under it: %ld",
+			ragdolls_break_count());
+		return 0;
+	}
+	CASE("bullets tear none")
+	{
+		struct ragdoll_death death = death_of(0);
+		long replaced;
+
+		breakable();
+		ragdolls_start(&death, &replaced);
+		damage = blast(0.0f, 0.0f, 1.0f, 1.0f);
+		damage.origin.x = 2.0f; damage.origin.y = damage.origin.z = 0.0f;
+		damage.epicenter = damage.origin;
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_impulse_count() == 1 && ragdolls_break_count() == 0, "pushed, not torn: %ld",
+			ragdolls_break_count());
+		return 0;
+	}
+	CASE("tear off")
+	{
+		struct ragdoll_death death = death_of(0);
+		long replaced;
+
+		breakable();
+		dismember = FALSE;
+		ragdolls_start(&death, &replaced);
+		damage = explosion(2.0f, 0.0f, 0.0f);
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_impulse_count() == 1 && ragdolls_break_count() == 0, "whole with game.dismemberment off");
+		return 0;
+	}
+	CASE("corpse torn")
+	{
+		struct ragdoll_death death = death_of(0);
+		long replaced;
+
+		breakable();
+		ragdolls_start(&death, &replaced);
+		CHECK(ragdolls_break_count() == 0, "no hit, no tear");
+		/* a unit past the fourth part: it alone, the others too far */
+		damage = explosion(4.0f, 0.0f, 0.0f);
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_break_count() == 1 && ragdolls_break_get(0)->part == 3, "torn by a later blast: %ld %d",
+			ragdolls_break_count(), ragdolls_break_get(0) ? ragdolls_break_get(0)->part : NONE);
+		ragdolls_breaks_clear();
+		damage = explosion(-10.0f, 0.0f, 0.0f);
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_break_count() == 0, "out of its reach");
+		ragdolls_damage(2, &damage);
+		CHECK(ragdolls_break_count() == 0, "not another biped's");
+		return 0;
+	}
+	CASE("torn once")
+	{
+		struct ragdoll_death death = death_of(0);
+		long replaced;
+
+		breakable();
+		body.parts[3].break_damage = 0.0f;
+		ragdolls_start(&death, &replaced);
+		damage = explosion(2.0f, 0.0f, 0.0f);
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_break_count() == 2, "both: %ld", ragdolls_break_count());
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_break_count() == 2, "not again while queued: %ld", ragdolls_break_count());
+		/* the host's: the middle's joint torn, so the last part is on a limb
+		gone already */
+		ragdolls_breaks_clear();
+		ragdolls_get(1)->broken_joints = 1UL << 1;
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_break_count() == 0, "nor on a torn limb: %ld", ragdolls_break_count());
+		return 0;
+	}
+	CASE("breaks dropped")
+	{
+		struct ragdoll_death death = death_of(0);
+		long replaced;
+		long id;
+
+		breakable();
+		id = ragdolls_start(&death, &replaced);
+		damage = explosion(2.0f, 0.0f, 0.0f);
+		ragdolls_damage(0, &damage);
+		ragdolls_stop(id);
+		CHECK(ragdolls_break_count() == 0, "with its ragdoll: %ld", ragdolls_break_count());
+		/* two a ragdoll, more than there is room for */
+		for (index = 0; index < RAGDOLL_BREAKS_MAX / 2 + 4; index++)
+		{
+			death = death_of(3 + index);
+			ragdolls_start(&death, &replaced);
+			ragdolls_damage(3 + index, &damage);
+		}
+		CHECK(ragdolls_break_count() == RAGDOLL_BREAKS_MAX, "full: %ld", ragdolls_break_count());
 		return 0;
 	}
 	fprintf(stderr, "unknown case '%s'\n", case_name);

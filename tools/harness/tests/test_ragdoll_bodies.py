@@ -39,6 +39,9 @@ NEGATIVE_CONTROLS = {
     "no-nan-check": (("if (point->x != point->x || point->y != point->y || point->z != point->z ||",
                       "if ("), "bounds"),
     "no-capacity": (("if (!is_part || body->part_count >= RAGDOLL_BODY_PARTS_MAX)", "if (!is_part)"), "capacity"),
+    "root-breaks": (("if (part->parent_part_index == NONE || !ragdoll_override_number(",
+                     "if (!ragdoll_override_number("), "overrides"),
+    "tiny-breaks": (("changed.break_damage < 1.0f ||", ""), "overrides"),
     "unchecked-joint": (("changed.twist_min > changed.twist_max)\n\t\t\treturn;", "FALSE)\n\t\t\treturn;"),
                         "overrides"),
 }

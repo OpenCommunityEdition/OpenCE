@@ -2,7 +2,9 @@
 damage's instantaneous acceleration as the damage is scaled, its point); a biped with a body that dies queues its node
 matrices, its velocity and the hit that killed it, once and no more than there is room for; nothing with
 game.ragdolls off, for other objects or for bipeds without a body. The game calls in from object_damage_aftermath and
-from unit_died, for a death that is not feigned."""
+from unit_died, for a death that is not feigned. With game.dismemberment an explosion that kills a biped or reaches its
+ragdoll tears the joints it hurts most past their species' thresholds (each body's own share of them), at most two a
+hit, none twice and none on a limb gone already; bullets and melee tear nothing."""
 
 import re
 import sys
@@ -15,14 +17,19 @@ from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run
 
 CASES = ["death", "killing hit", "newest hit", "stale hit", "bad numbers", "off", "not biped", "no body", "once",
          "capacity", "pose", "unused at first", "start", "drive then limp", "removed", "nearest part", "corpse push",
-         "killing push", "pushes dropped", "replaced drops", "near", "stand-ins", "drawn", "drawn unposed"]
+         "killing push", "pushes dropped", "replaced drops", "near", "stand-ins", "drawn", "drawn unposed",
+         "blast's damage", "falloff", "chance", "torn by a blast", "past their thresholds", "by chance", "bullets tear none", "tear off",
+         "corpse torn", "torn once", "breaks dropped"]
 
 FUNCTIONS = ["ragdolls_enabled", "ragdolls_object_is_biped", "ragdoll_pose_transform", "ragdoll_part_nearest",
-             "ragdolls_push", "ragdolls_impulses_drop", "ragdolls_damage", "ragdolls_hit_get",
+             "ragdolls_push", "ragdolls_dismemberment_enabled", "ragdoll_hit_damage_at", "ragdoll_hit_tearing_at",
+             "ragdoll_break_chance",
+             "ragdolls_tear", "ragdolls_impulses_drop", "ragdolls_damage", "ragdolls_hit_get",
              "ragdolls_unit_died", "ragdolls_death_count", "ragdolls_death_get", "ragdolls_deaths_clear",
              "ragdoll_pose_from_matrix", "ragdolls_get", "ragdolls_of_object", "ragdolls_node_matrices",
              "ragdolls_start", "ragdolls_action", "ragdolls_stop", "ragdolls_impulse_count", "ragdolls_impulse_get",
-             "ragdolls_impulses_clear", "ragdolls_near", "ragdolls_stand_ins_begin", "ragdolls_stand_in",
+             "ragdolls_impulses_clear", "ragdolls_break_count", "ragdolls_break_get", "ragdolls_breaks_clear",
+             "ragdolls_near", "ragdolls_stand_ins_begin", "ragdolls_stand_in",
              "ragdolls_stand_in_unseen", "ragdolls_dispose_from_old_map"]
 
 MATRIX_FUNCTIONS = ["matrix4x3_rotation_to_quaternion", "matrix4x3_rotation_from_quaternion", "matrix4x3_inverse",
@@ -46,7 +53,8 @@ NEGATIVE_CONTROLS = {
     "farthest-part": (("distance < nearest_distance", "distance > nearest_distance"), "corpse push"),
     "no-lift": (("direction.k += RAGDOLL_PUSH_LIFT;", ""), "corpse push"),
     "no-mass": ((" * ragdoll->body->mass / length", " / length"), "corpse push"),
-    "corpse-not-pushed": (("if (ragdoll)\n\t\tragdolls_push(", "if (FALSE)\n\t\tragdolls_push("), "corpse push"),
+    "corpse-not-pushed": (("if (ragdoll)\n\t{\n\t\tragdolls_push(", "if (FALSE)\n\t{\n\t\tragdolls_push("),
+                          "corpse push"),
     "whole-killing-push": (("&death->killing_hit, 0.5f", "&death->killing_hit, 1.0f"), "killing push"),
     "unposed-start": (("ragdoll_pose_from_matrix(&death->nodes[death->body->parts[index].node_index], &ragdoll->poses[index]);",
                        ";"), "killing push"),
@@ -77,6 +85,31 @@ NEGATIVE_CONTROLS = {
                           "drawn"),
     "drawn-before-posed": (("!ragdoll || !ragdoll->posed ||", "!ragdoll ||"), "drawn unposed"),
     "not-interpolated": ((" || render_interpolation_object_node_matrices(object_index))", ")"), "drawn"),
+    "always-dismember": (("\tif (!ragdolls_dismemberment_enabled())\n\t\treturn;\n", ""), "tear off"),
+    "bullets-tear": (("\tif (!hit->explosion)\n\t\treturn 0.0f;\n", ""), "bullets tear none"),
+    "every-hit-a-blast": (("hit->explosion = TEST_FLAG(damage->flags, _damage_area_of_effect_bit) &&",
+                           "hit->explosion = TRUE ||"), "bullets tear none"),
+    "melee-explodes": (("TEST_FLAG(damage->flags, _damage_area_of_effect_bit) &&\n\t\t(", "TEST_FLAG(damage->flags, _damage_area_of_effect_bit) ||\n\t\t("),
+                       "blast's damage"),
+    "no-closeness": (("\treturn ragdoll_hit_damage_at(hit, point) * closeness;", "\treturn ragdoll_hit_damage_at(hit, point) + 0.0f * closeness;"),
+                     "falloff"),
+    "unmultiplied": (("damage_effect->damage.damage_minimum * damage->multiplier;", "damage_effect->damage.damage_minimum;"),
+                     "blast's damage"),
+    "no-falloff": (("if (hit->cutoff_radius > hit->falloff_radius)", "if (FALSE)"), "falloff"),
+    "always-scaled": (("\tif (!hit->scaled)\n\t\tscale = 1.0f;\n", ""), "falloff"),
+    "past-the-cutoff": (("\tif (scale <= 0.0f)\n\t\treturn 0.0f;\n", ""), "falloff"),
+    "no-tear-cap": (("count < RAGDOLL_BREAKS_PER_HIT && ", "count >= 0 && "), "torn by a blast"),
+    "no-chance": (("return 0.75f + 0.5f * ", "return 1.0f + 0.0f * "), "chance"),
+    "chance-unused": ((" * ragdoll_break_chance(ragdoll->object_index, part))", ")"), "by chance"),
+    "least-hurt": (("\t\t\t\tworst_share = share;\n", ""), "torn by a blast"),
+    "killing-blast-tears-none": (("\t\tragdolls_tear(chosen + 1, &death->killing_hit);\n", ""), "torn by a blast"),
+    "no-threshold": (("real worst_share = 1.0f;", "real worst_share = 0.0f;"), "past their thresholds"),
+    "unbreakable-breaks": (("\t\t\tif (body->parts[part].break_damage <= 0.0f)\n\t\t\t\tcontinue;\n", ""),
+                           "past their thresholds"),
+    "corpse-not-torn": (("\t\tragdolls_tear((long)(ragdoll - ragdolls.active) + 1, hit);\n", ""), "corpse torn"),
+    "queued-forgotten": (("torn |= 1UL << ragdolls.breaks[index].part;", ";"), "torn once"),
+    "limbs-forgotten": (("above = body->parts[above].parent_part_index;", "above = NONE;"), "torn once"),
+    "breaks-kept": (("\tragdolls.break_count = kept;\n", ""), "breaks dropped"),
     "oldest-first": (("(ragdolls.hit_count - index) % RAGDOLL_HITS_MAX", "(index - 1) % RAGDOLL_HITS_MAX"), "newest hit"),
 }
 
@@ -90,12 +123,16 @@ def generated(fault=None):
         enum_with(bodies, "RAGDOLL_BODY_PARTS_MAX"), structure(bodies, "ragdoll_part"), structure(bodies, "ragdoll_body"),
         enum_with(header, "RAGDOLL_DEATHS_MAX"), enum_with(header, "_ragdoll_action_none"),
         structure(header, "ragdoll_hit"), structure(header, "ragdoll_death"), structure(header, "ragdoll_pose"),
-        structure(header, "ragdoll_impulse"), structure(header, "ragdoll"),
+        structure(header, "ragdoll_impulse"), structure(header, "ragdoll_break"), structure(header, "ragdoll"),
         "#define RAGDOLL_DRIVE_FREQUENCY " + re.search(r"#define RAGDOLL_DRIVE_FREQUENCY (\S+)", header)[1],
         "#define RAGDOLL_STAND_IN_DISTANCE " + re.search(r"#define RAGDOLL_STAND_IN_DISTANCE (\S+)", header)[1],
         "#define RAGDOLL_PUSH_LIFT " + re.search(r"#define RAGDOLL_PUSH_LIFT (\S+)", header)[1],
         "struct ragdoll const *ragdolls_of_object(long object_index);",
         "static boolean physics_jolt_ragdolls_enabled(void);",
+        "static boolean physics_jolt_dismemberment_enabled(void);",
+        "#define RAGDOLL_DAMAGE_EFFECT_UNSCALED_BIT " + re.search(r"#define RAGDOLL_DAMAGE_EFFECT_UNSCALED_BIT (\S+)",
+                                                                  ragdolls)[1],
+        *re.findall(r"#define RAGDOLL_DAMAGE_CATEGORY_\w+ \d+", ragdolls),
         "static struct ragdoll_body const *ragdoll_body_get(long definition_index);",
         state]) + "\n"
     matrix_math = read("source/math/matrix_math.c")

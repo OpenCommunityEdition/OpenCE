@@ -67,6 +67,7 @@ enum
 static unsigned long physics_jolt_changes = (unsigned long)-1;
 static boolean physics_jolt_on = FALSE;
 static boolean physics_jolt_ragdolls_on = FALSE;
+static boolean physics_jolt_dismemberment_on = FALSE;
 static short physics_jolt_level_bsp_index = NONE;
 
 boolean physics_jolt_enabled(void)
@@ -75,6 +76,7 @@ boolean physics_jolt_enabled(void)
 	{
 		physics_jolt_changes = config_changes();
 		physics_jolt_ragdolls_on = PHYSICS_JOLT_HOST && config_boolean("game.ragdolls");
+		physics_jolt_dismemberment_on = physics_jolt_ragdolls_on && config_boolean("game.dismemberment");
 		physics_jolt_on = physics_jolt_ragdolls_on || (PHYSICS_JOLT_HOST && config_boolean("game.physics_debris"));
 	}
 	return physics_jolt_on;
@@ -84,6 +86,12 @@ boolean physics_jolt_ragdolls_enabled(void)
 {
 	physics_jolt_enabled();
 	return physics_jolt_ragdolls_on;
+}
+
+boolean physics_jolt_dismemberment_enabled(void)
+{
+	physics_jolt_enabled();
+	return physics_jolt_dismemberment_on;
 }
 
 /* ---------- the level */
@@ -453,6 +461,17 @@ static void physics_jolt_ragdoll_impulse(
 	command[8] = physics_jolt_word(impulse->point.z);
 }
 
+static void physics_jolt_ragdoll_break(
+	struct ragdoll_break const *tear)
+{
+	unsigned long *command = physics_jolt_command(HOST_PHYSICS_OP_RAGDOLL_BREAK, HOST_PHYSICS_RAGDOLL_BREAK_WORDS);
+
+	if (!command)
+		return;
+	command[1] = tear->id;
+	command[2] = tear->part;
+}
+
 /* ---------- stand-ins */
 
 /* A stand-in's shape where its object is now: a vehicle's hull, the box
@@ -680,12 +699,17 @@ void physics_jolt_update(
 	{
 		ragdolls_deaths_clear();
 		ragdolls_impulses_clear();
+		ragdolls_breaks_clear();
 		return;
 	}
 	physics_jolt_batch_begin();
 	for (index = 0; index < ragdolls_death_count(); index++)
 		physics_jolt_ragdoll_add(ragdolls_death_get(index), index);
 	ragdolls_deaths_clear();
+	/* (torn before the pushes, so that a push flings the limb) */
+	for (index = 0; index < ragdolls_break_count(); index++)
+		physics_jolt_ragdoll_break(ragdolls_break_get(index));
+	ragdolls_breaks_clear();
 	for (index = 0; index < ragdolls_impulse_count(); index++)
 		physics_jolt_ragdoll_impulse(ragdolls_impulse_get(index));
 	ragdolls_impulses_clear();
@@ -774,6 +798,7 @@ void physics_jolt_update(
 	(void)seconds;
 	ragdolls_deaths_clear();
 	ragdolls_impulses_clear();
+	ragdolls_breaks_clear();
 }
 
 #endif

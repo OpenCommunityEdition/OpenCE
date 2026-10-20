@@ -27,6 +27,8 @@ start at a line `model <tag path>`; each line after is one of
 	sphere <node>: <radius>
 	capsule <node>: <radius> <half length>
 	box <node>: <x> <y> <z>  half extents; sizes in world units
+	break <node>: <damage>  an explosion doing this much damage at the
+	                        part tears its joint (game.dismemberment)
 
 `#` starts a comment. Map files are untrusted: every index and count is
 checked, and a model whose nodes are out of order has no ragdoll.
@@ -50,6 +52,8 @@ checked, and a model whose nodes are out of order has no ragdoll.
 #define RAGDOLL_SIZE_MIN 0.01f
 /* a piece longer than this many times its width is a capsule */
 #define RAGDOLL_CAPSULE_LENGTH 1.5f
+/* (a break's override line, among the shapes') */
+#define RAGDOLL_OVERRIDE_BREAK (NONE - 1)
 /* a body's mass without an override (a marine's, kilograms) */
 #define RAGDOLL_MASS_DEFAULT 80.0f
 /* the lightest part, a share of the whole */
@@ -453,7 +457,8 @@ static boolean ragdoll_override_angle(
 	return TRUE;
 }
 
-/* a joint's or a shape's override line, applied to the part of its node */
+/* a joint's, a shape's or a break's override line, applied to the part of
+its node */
 static void ragdoll_override_part(
 	struct ragdoll_body *body,
 	struct tag_block const *model_nodes,
@@ -476,6 +481,8 @@ static void ragdoll_override_part(
 		shape = _ragdoll_shape_capsule;
 	else if (ragdoll_override_word(line, "box", &rest))
 		shape = _ragdoll_shape_box;
+	else if (ragdoll_override_word(line, "break", &rest))
+		shape = RAGDOLL_OVERRIDE_BREAK;
 	else
 		return;
 	node_index = ragdoll_override_node(model_nodes, rest, &text);
@@ -484,7 +491,14 @@ static void ragdoll_override_part(
 		return;
 	part = &body->parts[body->node_parts[node_index]];
 	changed = *part;
-	if (shape == NONE)
+	if (shape == RAGDOLL_OVERRIDE_BREAK)
+	{
+		/* (the root has no joint to tear) */
+		if (part->parent_part_index == NONE || !ragdoll_override_number(&text, &changed.break_damage) ||
+			changed.break_damage < 1.0f || changed.break_damage > 100000.0f)
+			return;
+	}
+	else if (shape == NONE)
 	{
 		while (*text == ' ' || *text == '\t')
 			text++;

@@ -148,7 +148,7 @@ def bodies():
             values = [float(word) for word in words[1:]]
             current[1].append({"node": int(values[1]), "parent": int(values[2]), "shape": SHAPES[int(values[3])],
                                "size": values[4:7], "center": values[7:10], "mass": values[10],
-                               "twist": values[11:13], "swing": values[13:15]})
+                               "twist": values[11:13], "swing": values[13:15], "break": values[15]})
         elif words[0] == "NODE":
             current[2].append(int(words[2]))
     return result
@@ -290,6 +290,31 @@ def test_the_marine():
     assert named["bip01 l calf"]["twist"][1] == pytest.approx(math.radians(5), abs=1e-4)
     # the legs are heavier than the arms
     assert named["bip01 l thigh"]["mass"] > named["bip01 l upperarm"]["mass"]
+
+
+@needs_maps
+def test_breaks_are_their_limbs():
+    """each break names a part of its body, and the limbs a grenade tears are the bodies' that tear"""
+    found = profiles()
+    built = bodies()
+    torn = set()
+    for name, lines in sections().items():
+        for line in lines:
+            if not line.startswith("break "):
+                continue
+            node, damage = line[len("break "):].rsplit(":", 1)
+            model = next(model for model in built if model.lower() == name)
+            nodes = found[model][0]
+            named = {nodes[part["node"]][0].lower(): part for part in built[model][1]}
+            assert node.strip().lower() in named, f"{model}: {node} is no part"
+            assert named[node.strip().lower()]["break"] == pytest.approx(float(damage)), f"{model}: {node}"
+            # (a frag grenade, 120 at its centre, tears it by chance at most 1.25 over)
+            assert 0 < float(damage) <= 120 / 0.75, f"{model}: {node}"
+            torn.add(model)
+    for model in ("characters\\marine\\marine", "characters\\elite\\elite", "characters\\grunt\\grunt"):
+        assert model in torn, model
+    for model in ("characters\\hunter\\hunter", "characters\\sentinel\\sentinel"):
+        assert model not in torn and all(not part["break"] for part in built[model][1]), model
 
 
 @needs_maps
