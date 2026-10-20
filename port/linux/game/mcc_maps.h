@@ -2,7 +2,7 @@
 #ifndef __MCC_MAPS_H
 #define __MCC_MAPS_H
 
-#define MCC_MAPS_DIRECTORY "d:\\mcc_maps\\"
+#define MCC_MAPS_DIRECTORY "\\Download\mcc_maps\\"
 #define MCC_MAPS_LEVEL_PREFIX "mcc_maps\\"
 #define MCC_MAPS_FIRST_DISPLAY_INDEX 0x1000
 #define MCC_MAPS_MAXIMUM 1024
