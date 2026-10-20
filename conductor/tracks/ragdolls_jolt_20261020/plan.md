@@ -6,9 +6,9 @@
 - [x] Task: Vendor Jolt Physics 4fdca442
     - [x] Write tests: pytest checks `port/third_party/jolt/README.md` names the upstream, commit and checksum, and that the tree matches the checksum
     - [x] Copy Jolt unchanged; build it in Nix and `configure.py` as a static library (C++17, single-threaded, `JPH_CROSS_PLATFORM_DETERMINISTIC`, no FMA)
-- [ ] Task: The C wrapper
-    - [ ] Write tests: native tests (`host_physics_test.c`) create a world, add a static plane and a box, step it, and see the box come to rest; two runs give identical poses
-    - [ ] `port/macos/host/physics/physics.h` and `physics.cpp`: world, static mesh, bodies, ragdolls, impulses, kinematic bodies, step, read poses
+- [x] Task: The C wrapper cbd08561
+    - [x] Write tests: native tests (`host_physics_test.c`) create a world, add a static plane and a box, step it, and see the box come to rest; two runs give identical poses
+    - [x] `port/macos/host/physics/physics.h` and `physics.cpp`: world, static mesh, bodies, ragdolls, impulses, kinematic bodies, step, read poses
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Jolt in the host' (Protocol in workflow.md)
 
 ## Phase 2: The bridge to the guest
