@@ -1,6 +1,6 @@
 # Plan: Ragdolls, dismemberment and physics debris with Jolt Physics in the macOS app
 
-## Phase 1: Jolt in the host
+## Phase 1: Jolt in the host [checkpoint: 6a9d4798]
 - [x] Task: Record C++17 for Jolt in the tech stack 1acd3b7e
     - [x] Update `conductor/tech-stack.md` (macOS Host: Jolt Physics, C++17, behind a C wrapper) before any code
 - [x] Task: Vendor Jolt Physics 4fdca442
@@ -9,7 +9,7 @@
 - [x] Task: The C wrapper cbd08561
     - [x] Write tests: native tests (`host_physics_test.c`) create a world, add a static plane and a box, step it, and see the box come to rest; two runs give identical poses
     - [x] `port/macos/host/physics/physics.h` and `physics.cpp`: world, static mesh, bodies, ragdolls, impulses, kinematic bodies, step, read poses
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Jolt in the host' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Jolt in the host' (Protocol in workflow.md)
 
 ## Phase 2: The bridge to the guest
 - [ ] Task: The shared region's format
