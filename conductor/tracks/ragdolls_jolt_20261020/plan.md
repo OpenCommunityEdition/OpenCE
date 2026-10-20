@@ -66,9 +66,9 @@
 - [x] Task: Garbage objects fa9b088a
     - [x] Write tests: harness tests that garbage objects become debris bodies and are drawn from Jolt's pose
     - [x] A `port:` hook for garbage
-- [ ] Task: Golden frames of debris
-    - [ ] Write tests: casings and debris at rest after a burst of fire, with the frame clock
-    - [ ] Approve the references
+- [x] Task: Golden frames of debris f3d302e6
+    - [x] Write tests: casings and debris at rest after a burst of fire, with the frame clock
+    - [x] Approve the references
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Debris' (Protocol in workflow.md)
 
 ## Phase 6: Performance, network and documentation
