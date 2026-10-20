@@ -130,6 +130,8 @@ NEGATIVE_CONTROLS = {
     "no-stump": (("if (above == root)", "if (FALSE)"), "piece draws"),
     "stump-from-the-drawn": (("matrix4x3_inverse(&game[parent_node], &inverse);", "matrix4x3_inverse(&nodes[parent_node], &inverse);"),
                              "piece draws"),
+    "stump-from-interpolation": (("game = (real_matrix4x3 const *)object_header_block_get(object_index,\n\t\t&object_get(object_index)->object.node_matrices);",
+                                  "game = object_get_node_matrices(object_index);"), "piece draws"),
     "stump-one-up": (("\t\t\ttop = above;\n", "\t\t\ttop = 0;\n"), "piece draws"),
     "torn-drawn-whole": (("|| !ragdoll->broken_joints)\n\t\treturn piece == 0 ? nodes : NULL;", "|| TRUE)\n\t\treturn piece == 0 ? nodes : NULL;"),
                          "piece draws"),

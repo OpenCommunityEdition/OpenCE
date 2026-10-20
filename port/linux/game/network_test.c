@@ -40,7 +40,10 @@ tools/test_macos_frames.py): that many seconds of frames shown in (a 60th
 of a second each, the frames the captures count), a frag grenade's
 explosion (its detonation effect, damage and all) kills a biped of the
 first player's kind standing six metres before the camera, and eight
-seconds later a vehicle rolls into its body from the side.
+seconds later a vehicle rolls into its body from the side;
+debug.network_test_ragdoll_bullet kills it with an assault rifle's bullet
+from the camera instead (game.dismemberment's frames: a bullet tears
+nothing).
 
 debug.network_test_camera holds the view at the debug camera of camera.txt
 in the data root (director_load_camera), for frames captured the same run
@@ -154,6 +157,7 @@ static struct
 	/* debug.network_test_ragdoll's: when, how far the scene has gone, its
 	biped, where it stands and the view's right */
 	real ragdoll_time;
+	boolean ragdoll_bullet;
 	short ragdoll_stage;
 	long ragdoll_biped_index;
 	real_point3d ragdoll_point;
@@ -221,6 +225,7 @@ static void network_test_read_settings(
 	network_test.pickup_time = (real)config_real("debug.network_test_pickup");
 	network_test.chat_time = (real)config_real("debug.network_test_chat");
 	network_test.ragdoll_time = (real)config_real("debug.network_test_ragdoll");
+	network_test.ragdoll_bullet = config_boolean("debug.network_test_ragdoll_bullet");
 	network_test.ragdoll_biped_index = NONE;
 	snprintf(network_test.pickup_weapon, sizeof(network_test.pickup_weapon), "%s",
 		config_string("debug.network_test_pickup_weapon"));
@@ -710,6 +715,31 @@ static void network_test_ragdoll(
 			biped->object.shield_vitality = 0.0f;
 			biped->object.body_vitality = 0.05f;
 		}
+		if (network_test.ragdoll_bullet)
+		{
+			/* (an assault rifle's bullet, from the camera into its chest) */
+			long bullet_index = tag_loaded(PROJECTILE_DEFINITION_TAG, "weapons\\assault rifle\\bullet");
+			struct observer_result const *camera = observer_get_camera(0);
+			struct damage_data damage;
+
+			if (bullet_index == NONE || projectile_definition_get(bullet_index)->projectile.impact_damage.index == NONE)
+			{
+				platform_log("network test: no assault rifle bullet, for the ragdoll");
+				return;
+			}
+			damage_data_new(&damage, projectile_definition_get(bullet_index)->projectile.impact_damage.index);
+			damage.origin = camera->position;
+			damage.epicenter = network_test.ragdoll_point;
+			damage.epicenter.z += 0.5f;
+			vector_from_points3d(&damage.origin, &damage.epicenter, &damage.direction);
+			normalize3d(&damage.direction);
+			object_cause_damage(&damage, network_test.ragdoll_biped_index, NONE, NONE, NONE, NULL);
+			platform_log("network test: a bullet strikes (%.2f %.2f %.2f): the biped %s", damage.epicenter.x,
+				damage.epicenter.y, damage.epicenter.z,
+				TEST_FLAG(object_get(network_test.ragdoll_biped_index)->object.damage_flags, _object_dead_bit) ?
+					"dies" : "lives");
+			return;
+		}
 		marker_names[0] = "";
 		marker_names[1] = "gravity";
 		/* (between the camera and the biped, which it throws away from the
@@ -738,6 +768,8 @@ static void network_test_ragdoll(
 		real nearest = 0.0f;
 
 		network_test.ragdoll_stage = 3;
+		if (ragdoll)
+			platform_log("network test: the ragdoll's torn joints %lx", ragdoll->broken_joints);
 		object_iterator_new(&vehicles, _object_mask_vehicle, 0);
 		while (object_iterator_next(&vehicles))
 		{

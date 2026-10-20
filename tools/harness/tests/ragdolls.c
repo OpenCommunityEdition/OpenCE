@@ -18,7 +18,8 @@ struct tag_block { long count; void *address; long definition; };
 #define PIN(n, floor, ceiling) ((n) < (floor) ? (floor) : CEILING((n), (ceiling)))
 enum { _object_type_biped = 0, _object_type_vehicle = 1 };
 enum { _object_mask_biped = 1 << _object_type_biped };
-struct _object_datum { short type; };
+struct object_header_block_reference { unsigned short size, offset; };
+struct _object_datum { short type; struct object_header_block_reference node_matrices; };
 struct object_datum { long definition_index; struct _object_datum object; };
 struct object_definition { struct { real acceleration_scale; struct { long index; } collision_model; } object; };
 struct collision_model { struct { struct { long index; } localized_damage_effect; } resistance; };
@@ -77,7 +78,14 @@ static void *object_try_and_get_and_verify_type(long index, unsigned long mask)
 }
 static long game_time_get(void) { return now; }
 static struct object_datum *object_get(long index) { return &objects[index < 3 ? index : 0]; }
-static real_matrix4x3 *object_get_node_matrices(long index) { (void)index; return matrices; }
+/* while a frame is drawn, interpolation's pose, else the game's */
+static real_matrix4x3 *interpolated;
+static real_matrix4x3 *object_get_node_matrices(long index) { (void)index; return interpolated ? interpolated : matrices; }
+static void *object_header_block_get(long index, struct object_header_block_reference *reference)
+{
+	(void)index; (void)reference;
+	return matrices;
+}
 static void object_get_velocities(long index, real_vector3d *velocity, real_vector3d *angular)
 {
 	velocity->i = 1.0f + index; velocity->j = 2.0f; velocity->k = -3.0f;
@@ -849,6 +857,20 @@ int main(int argc, char **argv)
 		CHECK(piece[2].scale == drawn[2].scale && near(piece[1].position.x, 12.0f) && near(piece[0].position.x, 12.0f) &&
 			piece[1].scale == 0.0f && piece[4].scale == drawn[4].scale, "the last's: the rest at its joint");
 		CHECK(!ragdolls_piece_node_matrices(0, drawn, 3), "no fourth");
+		/* while the frame is drawn, the stumps still from the game's pose, not
+		from the drawn one, where the limbs have flown */
+		{
+			real_matrix4x3 flung[RAGDOLL_BODY_NODES_MAX];
+
+			memcpy(flung, drawn, sizeof(flung));
+			for (index = 1; index < 5; index++)
+				flung[index].position.y += 100.0f;
+			interpolated = flung;
+			piece = ragdolls_piece_node_matrices(0, drawn, 0);
+			interpolated = NULL;
+			CHECK(near(piece[2].position.x, 11.0f) && near(piece[2].position.y, drawn[1].position.y),
+				"the stump as the game has it while drawn: %f %f", piece[2].position.x, piece[2].position.y);
+		}
 		return 0;
 	}
 	CASE("past their thresholds")

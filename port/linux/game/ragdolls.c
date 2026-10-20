@@ -649,7 +649,11 @@ real_matrix4x3 const *ragdolls_piece_node_matrices(
 	}
 	if (piece > 0)
 		return NULL;
-	game = object_get_node_matrices(object_index);
+	/* (as of the last tick: object_get_node_matrices gives the drawn pose
+	while a frame is drawn, render_interpolation.c, the ragdoll's own, and so
+	the torn limb where it lies) */
+	game = (real_matrix4x3 const *)object_header_block_get(object_index,
+		&object_get(object_index)->object.node_matrices);
 	for (node = 0; node < body->node_count; node++)
 	{
 		real_matrix4x3 *drawn = &ragdolls.piece[node];

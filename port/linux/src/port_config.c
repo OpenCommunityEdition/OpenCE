@@ -569,6 +569,9 @@ static const struct config_setting config_settings[] =
 		"second each, as debug.frame_clock steps them): a frag grenade kills a biped\n"
 		"six world units before the camera, and a vehicle rolls into its body eight\n"
 		"seconds later (game.ragdolls' frames); 0 never." },
+	{ "debug.network_test_ragdoll_bullet", _config_boolean, "false", "HALO_NETWORK_TEST_RAGDOLL_BULLET", _environment_value, _platform_all,
+		"network_test_ragdoll's biped killed by an assault rifle's bullet from the\n"
+		"camera instead of the grenade (game.dismemberment's frames: it tears nothing)." },
 	{ "debug.network_test_camera", _config_boolean, "false", "HALO_NETWORK_TEST_CAMERA", _environment_set_is_true,
 		_platform_all,
 		"In a test game, view from the debug camera of camera.txt in the data root\n"

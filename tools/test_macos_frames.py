@@ -89,9 +89,14 @@ def capture_game(tmp_path, frame, settings=None, seconds=30, data_root=None, siz
     return frame_compare.read_png(path)
 
 
-def check(frame, name, tolerance=frame_compare.Tolerance()):
-    """compares `frame` with its reference, or approves it"""
+def check(frame, name, tolerance=frame_compare.Tolerance(), other=None):
+    """compares `frame` with its reference, or approves it; a scene that ends
+    one of two ways has the other's reference as `other`, which matches as
+    well (approved by hand: copied from a failed run's frame)"""
     reference = REFERENCES / f"{name}.png"
+    if other and (REFERENCES / f"{other}.png").is_file() and os.environ.get("HALO_APPROVE_FRAMES") != "1":
+        if frame_compare.compare(frame, frame_compare.read_png(REFERENCES / f"{other}.png"), tolerance).matches:
+            return
     if os.environ.get("HALO_APPROVE_FRAMES") == "1":
         REFERENCES.mkdir(parents=True, exist_ok=True)
         frame_compare.write_png(reference, frame)
@@ -274,6 +279,28 @@ RAGDOLL_CAMERA = "95.0 -150.0 4.0\n-0.6 0.78 -0.36\n0 0 1\n0.95\n"
 RAGDOLL_SHOVE_CAMERA = "95.0 -150.0 4.0\n-0.6 0.78 -0.233\n0 0 1\n0.5\n"
 
 
+# The frames taken in the grenade's smoke. The smoke is drawn from the game's
+# time, which steps with the real time while the map loads (debug.frame_clock's
+# dark steps), so from run to run it lies a little thicker or thinner: up to a
+# quarter of the pixels differ by more than 8, few by more than 64. These
+# frames are checked only for differences above 64, at most 1536 of them (a
+# half per cent); a body lying in another pose made more (1856 in
+# ragdoll_shoved, 2418 in ragdoll_falling).
+RAGDOLL_SMOKE_FRAMES = {"ragdoll_falling", "ragdoll_shoved", "dismemberment_flying"}
+
+# The Warthog that shoves the body is the game's, rolling by the game's ticks,
+# and comes to rest at one of two angles by how many ticks ran while the map
+# loaded; the body lies against it. Each ending is approved: the two differ in
+# 10381 pixels, and a run's frame matches one of them exactly.
+RAGDOLL_OTHER_ENDINGS = {"ragdoll_shoved_at_rest": "ragdoll_shoved_at_rest_other"}
+
+
+def ragdoll_tolerance(name):
+    if name in RAGDOLL_SMOKE_FRAMES:
+        return frame_compare.Tolerance(threshold=64, fraction=0.005, largest=255)
+    return frame_compare.Tolerance(fraction=0.02, largest=255)
+
+
 @pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")
 @pytest.mark.parametrize("name, frame, camera", [
     # (thrown from the grenade's smoke; lying limp on the slope; pushed before
@@ -297,4 +324,35 @@ def test_ragdolls_draw_as_approved(tmp_path, name, frame, camera):
     assert (frame.width, frame.height) == GAME_SIZE
     # (the scene is keyed to frames shown, the physics stepped with the
     # game's ticks; the smoke and the trees far off move by the game's time)
-    check(frame, name, frame_compare.Tolerance(fraction=0.02, largest=255))
+    check(frame, name, ragdoll_tolerance(name), RAGDOLL_OTHER_ENDINGS.get(name))
+
+
+# the same scene with game.dismemberment on: nearer, the grenade tears a
+# forearm and a calf from the cyborg (port/assets/ragdolls/ragdolls.txt), the
+# torso flung up the slope and the limbs left by the blast, each piece drawn
+# with its own bones and its stump closed; and a bullet's kill, which tears
+# nothing, the body whole where it fell
+DISMEMBERMENT_CAMERA = "95.0 -150.0 4.0\n-0.6 0.78 -0.30\n0 0 1\n0.35\n"
+
+
+@pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")
+@pytest.mark.parametrize("name, frame, camera, bullet", [
+    # (the torso in the air above the limbs; at rest, apart, the blood on the
+    # ground; shot, lying whole)
+    ("dismemberment_flying", 2445, DISMEMBERMENT_CAMERA, False),
+    ("dismemberment_at_rest", 2850, DISMEMBERMENT_CAMERA, False),
+    ("dismemberment_bullet_whole", 2850, RAGDOLL_CAMERA, True),
+])
+def test_dismemberment_draws_as_approved(tmp_path, name, frame, camera, bullet):
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "maps").symlink_to(MAPS)
+    (root / "camera.txt").write_text(camera)
+    frame = capture_game(tmp_path, frame, {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NETWORK_TEST_CAMERA": "1",
+                                           "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+                                           "HALO_RAGDOLLS": "true", "HALO_DISMEMBERMENT": "true",
+                                           "HALO_NETWORK_TEST_RAGDOLL": "40",
+                                           "HALO_NETWORK_TEST_RAGDOLL_BULLET": "true" if bullet else "false"},
+                         seconds=75, data_root=root)
+    assert (frame.width, frame.height) == GAME_SIZE
+    check(frame, name, ragdoll_tolerance(name), RAGDOLL_OTHER_ENDINGS.get(name))
