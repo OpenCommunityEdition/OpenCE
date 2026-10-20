@@ -11,7 +11,7 @@
     - [x] `port/macos/host/physics/physics.h` and `physics.cpp`: world, static mesh, bodies, ragdolls, impulses, kinematic bodies, step, read poses
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Jolt in the host' (Protocol in workflow.md)
 
-## Phase 2: The bridge to the guest
+## Phase 2: The bridge to the guest [checkpoint: d0873d8e]
 - [x] Task: The shared region's format d18100b1
     - [x] Write tests: native tests reject bad counts, indices, sizes, non-finite numbers and addresses outside guest memory; valid batches decode intact
     - [x] A shared C header (`port/macos/include/host_physics.h`) for the batch (deaths, impulses, kinematic poses, debris spawns, removals) and the results (bone matrices, debris poses)
@@ -21,7 +21,7 @@
 - [x] Task: The settings 9add27cd
     - [x] Write tests: `game.ragdolls`, `game.physics_debris`, `game.physics_debris_max` and `debug.physics_draw` parse from config and environment, off by default; the settings screen lists them (port_settings.py output)
     - [x] Entries in `port_config.c`, the settings table in `port/linux/README.md`, `tools/port_settings.py` run again
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: The bridge to the guest' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: The bridge to the guest' (Protocol in workflow.md)
 
 ## Phase 3: Ragdolls
 - [ ] Task: Bodies from the model
