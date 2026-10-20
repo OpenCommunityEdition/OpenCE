@@ -44,6 +44,8 @@ starts this far down (past the 128-byte red zone of Apple's AArch64 ABI) */
 #define EC_SVC64 0x15
 #define EC_HVC64 0x16
 #define EC_INSTRUCTION_ABORT_LOWER 0x20
+/* CNTKCTL_EL1: EL0 may read the virtual count */
+#define CNTKCTL_EL0VCTEN (1u << 1)
 
 /* the vectors' hvc numbers */
 enum
@@ -254,6 +256,10 @@ static struct vcpu *vcpu_current(void)
 	set_sys(vcpu, HV_SYS_REG_TPIDR_EL0, 0);
 	/* (no timer interrupts are wanted) */
 	hv_vcpu_set_vtimer_mask(vcpu->id, true);
+	/* the guest reads the virtual count at EL0 (EL0VCTEN), the same on
+	every vCPU: SDL_GetTicks, port/android/guest/runtime/guest_sdl.c */
+	set_sys(vcpu, HV_SYS_REG_CNTKCTL_EL1, CNTKCTL_EL0VCTEN);
+	hv_vcpu_set_vtimer_offset(vcpu->id, 0);
 	pthread_mutex_lock(&vcpu_lock);
 	if (vcpu_count < MAXIMUM_VCPUS)
 		vcpu_ids[vcpu_count++] = vcpu->id;
@@ -311,6 +317,9 @@ static void vcpu_import(struct vcpu *vcpu)
 		host_fatal("the guest called import %u, which this host does not have", index);
 	set_reg(vcpu, HV_REG_X0, call.result_x);
 	set_d(vcpu, 0, call.result_d);
+	/* the errno the import left, as Linux's, which a hostposix_* stub keeps
+	(tools/android_imports.py --svc) */
+	set_reg(vcpu, HV_REG_X1, (uint32_t)host_linux_errno(host_saved_errno));
 }
 
 /* runs the vCPU until the guest function it was set to returns */

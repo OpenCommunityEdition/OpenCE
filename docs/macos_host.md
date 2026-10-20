@@ -518,9 +518,23 @@ made 503 000 exits a second, half of the time of one core:
 | `hostposix_socket_last_error` | 12 000 |
 | `hostposix_socket_recv` | 9 000 |
 
-This is the baseline for the next steps: the renderer's commands go in
-batches, and the time and error calls that run most can be answered in
-the guest.
+The renderer's commands go in batches (one `host_render_submit` a frame,
+or when the ring fills), and the guest now answers the calls that ran most
+itself:
+
+- `SDL_GetTicks` asks the host once, then counts with the guest's own
+  counter (`CNTVCT_EL0`): the host lets the guest read it at EL0
+  (`CNTKCTL_EL1.EL0VCTEN`) and gives every vCPU the same count (a virtual
+  timer offset of 0).
+- A `hostposix_*` import's stub takes its errno back in `w1`, which the
+  host sets at each exit, and stores it in the guest's errno, so no
+  `host_errno` follows the call.
+- The memory watch (which finds the game's writes to buffers the renderer
+  copied) answers in the guest: the Metal renderer copies what each draw
+  uses, so it needs no page protection, only a counter.
+
+The same game then made about 24 000 exits a second, nine in ten of them
+`host_syscall` (futexes, sleeps and the like).
 
 ## Tests
 

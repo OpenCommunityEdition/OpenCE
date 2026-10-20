@@ -8,8 +8,18 @@ musl provides.
 
 #include "guest_host.h"
 
+#include <errno.h>
 #include <math.h>
 #include <string.h>
+
+#ifdef HALO_GUEST_VM
+/* the errno the macOS host left for a hostposix_* import, which its stub
+passes here (tools/android_imports.py --svc) */
+void guest_import_set_errno(int value)
+{
+	errno = value;
+}
+#endif
 
 /* Darwin's combined sine and cosine, which clang substitutes for
 sin()/cos() pairs of the same argument */

@@ -49,6 +49,14 @@ def test_svc_stubs_exit_with_the_import_index(tmp_path):
     text = write_stubs(tmp_path, names, "--svc", "--host-names", str(names_c))
     for index, name in enumerate(names):
         assert stub_body(text, name) == [f"mov w16, #{index}", "svc #0", "ret"]
+    # a hostposix_* stub keeps the errno the host leaves in w1, and the
+    # result in x0 across the call that stores it
+    text = write_stubs(tmp_path, ["host_log", "hostposix_stat"], "--svc", "--host-names", str(names_c))
+    assert stub_body(text, "hostposix_stat") == [
+        "mov w16, #1", "svc #0", "stp x29, x30, [sp, #-32]!", "mov x29, sp", "str x0, [sp, #16]",
+        "mov w0, w1", "bl guest_import_set_errno", "ldr x0, [sp, #16]", "ldp x29, x30, [sp], #32", "ret"]
+    assert stub_body(text, "host_log") == ["mov w16, #0", "svc #0", "ret"]
+    text = write_stubs(tmp_path, names, "--svc", "--host-names", str(names_c))
     # the image still names its imports in order, which the host checks
     # against its own list
     assert '\t.asciz "host_syscall"\n\t.asciz "host_log"\n\t.asciz "hostgl_glClear"' in text
@@ -309,3 +317,16 @@ def test_the_dispatcher_refuses_imports_it_cannot_pass(tmp_path):
                              "--prototypes", str(ROOT / "port/android/guest/runtime/guest_host.h"),
                              str(tmp_path / "out.c"), str(lists[0])], capture_output=True, text=True, cwd=ROOT)
     assert result.returncode != 0 and "host_unknown_function" in result.stderr
+
+
+def test_the_posix_wrappers_leave_errno_to_the_vms_stubs(tmp_path):
+    # in the VM, the hostposix_* stub has set errno already: the wrapper
+    # asks host_errno only elsewhere (the Android app)
+    output, imports = tmp_path / "posix_stubs.c", tmp_path / "posix.list"
+    subprocess.run([sys.executable, str(ROOT / "tools/android_posix_stubs.py"), str(ROOT / "port/linux/src/posix.h"),
+                    str(output), str(imports)], check=True, cwd=ROOT)
+    text = output.read_text()
+    body = text[text.index("int posix_stat(const char *path"):]
+    body = body[:body.index("\n}\n")]
+    assert "\tint host_result = hostposix_stat(path, information);" in body
+    assert "#ifndef HALO_GUEST_VM\n\terrno = host_errno();\n#endif\n\treturn host_result;" in body

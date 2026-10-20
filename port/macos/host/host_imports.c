@@ -52,7 +52,9 @@ void host_set_tp(unsigned int thread)
 /* ---------- memory write tracking (port/linux/src/platform.h)
 
 Not tracked yet: every range reads as written, which is always correct (a
-caller only redoes work), if slower. */
+caller only redoes work), if slower. The guest answers these itself
+(port/android/guest/runtime/guest_memory_watch.c), so they are only the
+imports' stand-ins. */
 
 static atomic_uint watch_serial;
 

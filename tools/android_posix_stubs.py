@@ -6,13 +6,16 @@ layer's only contact with the C library's file system and sockets). Their
 interface is 32-bit clean, so the guest can call them directly, except for
 errno: the host's is not the guest's. Each generated wrapper calls the host
 function through an import named hostposix_<name> and copies the host's
-errno into the guest's afterwards.
+errno into the guest's afterwards. In the macOS host's VM (HALO_GUEST_VM)
+the import's stub has already done so (tools/android_imports.py --svc).
 
 Usage: android_posix_stubs.py posix.h output.c imports.list
 """
 
 import re
 import sys
+
+ERRNO = ["#ifndef HALO_GUEST_VM", "\terrno = host_errno();", "#endif"]
 
 
 def main():
@@ -45,11 +48,11 @@ def main():
         call = f"{host_name}({', '.join(args)})"
         if ret == "void":
             out.append(f"\t{call};")
-            out.append("\terrno = host_errno();")
+            out += ERRNO
         else:
             out.append(f"\t{ret} host_result = {call};")
             out.append("")
-            out.append("\terrno = host_errno();")
+            out += ERRNO
             out.append("\treturn host_result;")
         out.append("}")
         out.append("")

@@ -52,10 +52,62 @@ SDL_Scancode SDL_GetScancodeFromName(const char *name)
 	return (SDL_Scancode)host_sdl_scancode_from_name(name);
 }
 
+#ifdef HALO_GUEST_VM
+/* In the macOS host's VM the guest reads the generic timer's count itself,
+at EL0 (the host sets CNTKCTL_EL1.EL0VCTEN, and gives every vCPU the same
+count): only the first call asks the host, for SDL's milliseconds at a
+count, and each later one is that plus the time since, with no exit. */
+static unsigned long long guest_counter(void)
+{
+	unsigned long long value;
+
+	__asm__ volatile("isb\n\tmrs %0, cntvct_el0" : "=r"(value) : : "memory");
+	return value;
+}
+
+static unsigned long long guest_counter_frequency(void)
+{
+	unsigned long long value;
+
+	__asm__ volatile("mrs %0, cntfrq_el0" : "=r"(value));
+	return value;
+}
+
+Uint64 SDL_GetTicks(void)
+{
+	/* 0, then 1 while a thread calibrates, then 2 */
+	static int calibration;
+	static unsigned long long base_count, base_ticks, frequency;
+	unsigned long long count;
+	int expected = 0;
+
+	if (__atomic_load_n(&calibration, __ATOMIC_ACQUIRE) != 2)
+	{
+		if (__atomic_compare_exchange_n(&calibration, &expected, 1, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+		{
+			base_ticks = (unsigned long long)host_sdl_ticks();
+			base_count = guest_counter();
+			frequency = guest_counter_frequency();
+			if (!frequency)
+				frequency = 24000000;
+			__atomic_store_n(&calibration, 2, __ATOMIC_RELEASE);
+		}
+		else
+		{
+			/* (another thread is calibrating, a single exit to the host) */
+			while (__atomic_load_n(&calibration, __ATOMIC_ACQUIRE) != 2)
+				;
+		}
+	}
+	count = guest_counter() - base_count;
+	return (Uint64)(base_ticks + count / frequency * 1000 + count % frequency * 1000 / frequency);
+}
+#else
 Uint64 SDL_GetTicks(void)
 {
 	return (Uint64)host_sdl_ticks();
 }
+#endif
 
 SDL_ThreadID SDL_GetCurrentThreadID(void)
 {

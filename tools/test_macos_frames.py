@@ -18,6 +18,7 @@ Needs `ninja macos macos_app` in `nix develop`.
 
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -67,17 +68,23 @@ def capture(image, case, tmp_path, frame=1):
     return frame_compare.read_png(path)
 
 
+def run_game(tmp_path, frame, settings=None, seconds=30, data_root=None, size=GAME_SIZE):
+    """runs the app offscreen for `seconds`, capturing its `frame`th PRESENT
+    at `size` to game.png; returns the finished process"""
+    (tmp_path / "home").mkdir()
+    environment = dict(os.environ, HOME=str(tmp_path / "home"), HALO_DATA_ROOT=str(data_root or ROOT / "assets"),
+                       HALO_FRAME_CLOCK="1", HALO_HOST_CAPTURE=str(tmp_path / "game.png"),
+                       HALO_HOST_CAPTURE_FRAME=str(frame), HALO_HOST_CAPTURE_SIZE="%dx%d" % size,
+                       HALO_EXIT_AFTER=str(seconds), **(settings or {}))
+    environment.pop("HALO_HOST_GUEST_IMAGE", None)
+    return subprocess.run([str(APP)], cwd=tmp_path, env=environment, capture_output=True, text=True,
+                          timeout=seconds + 60)
+
+
 def capture_game(tmp_path, frame, settings=None, seconds=30, data_root=None, size=GAME_SIZE):
     """the frame the app drew of the game at its `frame`th PRESENT, at `size`"""
-    (tmp_path / "home").mkdir()
+    run = run_game(tmp_path, frame, settings, seconds, data_root, size)
     path = tmp_path / "game.png"
-    environment = dict(os.environ, HOME=str(tmp_path / "home"), HALO_DATA_ROOT=str(data_root or ROOT / "assets"),
-                       HALO_FRAME_CLOCK="1", HALO_HOST_CAPTURE=str(path), HALO_HOST_CAPTURE_FRAME=str(frame),
-                       HALO_HOST_CAPTURE_SIZE="%dx%d" % size, HALO_EXIT_AFTER=str(seconds),
-                       **(settings or {}))
-    environment.pop("HALO_HOST_GUEST_IMAGE", None)
-    run = subprocess.run([str(APP)], cwd=tmp_path, env=environment, capture_output=True, text=True,
-                         timeout=seconds + 60)
     assert path.is_file(), "no frame was captured: " + run.stdout[-2000:] + run.stderr[-2000:]
     return frame_compare.read_png(path)
 
@@ -180,6 +187,26 @@ def test_the_hud_draws_at_native_resolution(tmp_path):
 # the debug camera of camera.txt (debug.network_test_camera): over the
 # grass from the red base towards the blue, the cliffs on the right
 BLOODGULCH_CAMERA = "95.0 -150.0 4.0\n-0.6 0.8 -0.15\n0 0 1\n1.22\n"
+
+
+@pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")
+def test_the_game_answers_its_hottest_imports_itself(tmp_path):
+    # Bloodgulch made 500,000 exits a second before the guest kept its own
+    # clock (SDL_GetTicks from CNTVCT_EL0), errno (with each hostposix_*
+    # import's result) and memory's write tracking (untracked in the VM):
+    # now it asks the host for none of them but the clock's calibration,
+    # and makes fewer than a tenth of the exits (about 24,000 a second,
+    # nearly all host_syscall: futexes, sleeps and the like)
+    run = run_game(tmp_path, 1500, {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NET_ONLINE": "false",
+                                    "HALO_NET_JOIN_FROM_CLIPBOARD": "false", "HALO_HOST_IMPORT_COUNTS": "1"},
+                   seconds=20)
+    assert run.returncode == 0, run.stderr[-2000:]
+    rate = re.search(r"halo_host: exits: \d+ in [\d.]+ s, (\d+)/s", run.stderr)
+    assert rate, run.stderr[-2000:]
+    counts = {name: int(count) for name, count in re.findall(r"halo_host: import (\w+): (\d+)", run.stderr)}
+    assert int(rate.group(1)) < 500000 // 10, (rate.group(0), counts)
+    assert counts.get("host_sdl_ticks", 0) == 1 and counts.get("host_errno", 0) == 0, counts
+    assert not [name for name in counts if name.startswith("host_memory_watch_")], counts
 
 
 @pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")

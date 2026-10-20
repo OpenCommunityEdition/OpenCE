@@ -3,7 +3,7 @@ VM_RUNTIME.C
 
 A guest program for tools/test_macos_vm.py: the guest runtime's services as
 the macOS host gives them in its VM (threads, their thread pointer, futexes,
-time, files, memory). It runs the case named by argv[1], prints "ok" and
+time, files, memory, the imports it answers itself). It runs the case named by argv[1], prints "ok" and
 returns 0 if it passes; else it prints what failed and returns 1. Some
 cases take a folder of their own as argv[2].
 */
@@ -312,6 +312,47 @@ static void case_sockets(void)
 	CHECK(posix_socket_close(receiver) == 0);
 }
 
+/* ---------- the imports the guest answers itself */
+
+long long host_sdl_ticks(void);
+unsigned long long SDL_GetTicks(void);
+
+/* SDL's milliseconds from the guest's own counter agree with the host's,
+and a hostposix_* import's errno arrives with it (the test counts the
+exits: one host_sdl_ticks to calibrate, and no host_errno) */
+static void case_imports(void)
+{
+	struct posix_file_information information;
+	struct timespec pause = { 0, 30 * 1000 * 1000 };
+	unsigned long long previous = 0;
+	int round, index;
+
+	for (round = 0; round < 2; round++)
+	{
+		long long before = host_sdl_ticks();
+		unsigned long long guest = SDL_GetTicks();
+		long long after = host_sdl_ticks();
+
+		/* (each clock rounds down to its millisecond) */
+		CHECK((long long)guest + 1 >= before && (long long)guest <= after + 1);
+		nanosleep(&pause, NULL);
+	}
+	for (index = 0; index < 100000; index++)
+	{
+		unsigned long long now = SDL_GetTicks();
+
+		CHECK(now >= previous);
+		previous = now;
+	}
+	errno = 0;
+	CHECK(posix_stat("/nonexistent-opence/file", &information) != 0 && errno == ENOENT);
+	errno = 0;
+	CHECK(posix_make_directory("/nonexistent-opence/folder") != 0 && errno == ENOENT);
+	/* an argument past the eighth, on the stack, reaches the host as the
+	caller left it (infinite is 0: with no descriptors and no time, at once) */
+	CHECK(posix_socket_select(NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 0) == 0);
+}
+
 int main(int argc, char **argv)
 {
 	const char *name = argc > 1 ? argv[1] : "";
@@ -330,6 +371,8 @@ int main(int argc, char **argv)
 		case_memory();
 	else if (!strcmp(name, "sockets"))
 		case_sockets();
+	else if (!strcmp(name, "imports"))
+		case_imports();
 	else if (!strcmp(name, "exit"))
 		exit(42);
 	else

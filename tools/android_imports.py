@@ -17,7 +17,11 @@ not part of it).
 With --svc, for the macOS host, which runs the guest in a VM
 (docs/macos_host.md), each stub instead puts the import's index in w16 and
 makes an svc, which the guest's EL1 vector turns into an exit to the host;
-the host returns to the stub's ret. --host-names writes the host's list of
+the host returns to the stub's ret. A hostposix_* stub also keeps the errno
+the host leaves in w1 (as Linux's value): it passes it to
+guest_import_set_errno (port/android/guest/runtime/guest_misc.c), so that
+the wrapper (tools/android_posix_stubs.py) need not ask the host for it with
+an exit of its own. --host-names writes the host's list of
 the names by that index; the host checks it against the image's
 __host_import_names, so that both agree on every index.
 """
@@ -59,7 +63,24 @@ def main():
             "\t.p2align 2",
             f"{name}:",
         ]
-        if svc:
+        if svc and name.startswith("hostposix_"):
+            # (the frame is made after the svc: the host reads the arguments
+            # past the eighth at the caller's sp; the result, in x0, is kept
+            # across the call in the frame; no posix_* function returns a
+            # floating-point value, in d0)
+            out += [
+                f"\tmov w16, #{index}",
+                "\tsvc #0",
+                "\tstp x29, x30, [sp, #-32]!",
+                "\tmov x29, sp",
+                "\tstr x0, [sp, #16]",
+                "\tmov w0, w1",
+                "\tbl guest_import_set_errno",
+                "\tldr x0, [sp, #16]",
+                "\tldp x29, x30, [sp], #32",
+                "\tret",
+            ]
+        elif svc:
             out += [f"\tmov w16, #{index}", "\tsvc #0", "\tret"]
         else:
             out += [

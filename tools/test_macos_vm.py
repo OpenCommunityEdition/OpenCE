@@ -77,6 +77,19 @@ def test_the_thread_pointer_costs_no_exit(image, tmp_path):
     assert counts.get("host_get_tp", 0) == 0 and counts.get("host_set_tp", 0) == 0, counts
 
 
+def test_the_hottest_imports_cost_no_exit(image, tmp_path):
+    # SDL_GetTicks reads the generic timer's count at EL0 and asks the host
+    # once, to calibrate; a hostposix_* stub keeps the errno the host left
+    # in w1, so no host_errno follows each call (the case's own four
+    # host_sdl_ticks compare the clocks)
+    status, stdout, stderr = run_case(image, tmp_path, "imports", environment={"HALO_HOST_IMPORT_COUNTS": "1"})
+    assert (status, stdout.strip()) == (0, "ok"), stdout + stderr
+    counts = import_counts(stderr)
+    assert counts.get("host_sdl_ticks", 0) == 5, counts
+    assert counts.get("hostposix_stat", 0) == 1 and counts.get("hostposix_make_directory", 0) == 1, counts
+    assert counts.get("host_errno", 0) == 0, counts
+
+
 def test_the_hosts_system_calls_natively(tmp_path):
     # port/macos/host/host_syscall.c, built for this Mac with guest memory as
     # a buffer: its errno table, and calls made with Linux's numbers and flags
