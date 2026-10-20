@@ -43,6 +43,13 @@ long first_person_weapon_get_local_index(
 	long weapon_index);
 void first_person_weapon_draw(
 	void);
+/* port: an evolved teammate pane poses this spare slot's first-person
+weapon on that player's unit, then clears it. slot 0 stays the local player */
+void first_person_weapon_observe_unit(
+	short local_player_index,
+	long unit_index);
+void first_person_weapon_observe_clear(
+	short local_player_index);
 short first_person_weapon_get_marker_by_name(
 	long weapon_index,
 	char const *name,

@@ -175,6 +175,15 @@ static const struct config_setting config_settings[] =
 		"from the game's first tick, which the items' respawn periods count from\n"
 		"too: a weapon is back on the map at every multiple of its period on the\n"
 		"clock." },
+	{ "display.teammate_views", _config_boolean, "false", "HALO_TEAMMATE_VIEWS", _environment_value, _platform_all,
+		"In an evolved team game, split this screen so one player can see\n"
+		"living teammates from their own eyes, up to four panes. Off leaves the\n"
+		"view as it is. Classic multiplayer is unchanged." },
+	{ "display.teammate_view_slot", _config_string, "\"top_left\"", "HALO_TEAMMATE_VIEW_SLOT", _environment_value,
+		_platform_all,
+		"Which pane is yours when teammate views are on: \"top_left\", \"top_right\",\n"
+		"\"bottom_left\" or \"bottom_right\". Two panes use the left pair and the\n"
+		"right pair. Three panes give either top choice the wide top pane." },
 	{ "display.scoreboard_team_layout", _config_string, "\"teams\"", "HALO_SCOREBOARD_TEAM_LAYOUT", _environment_value,
 		_platform_all,
 		"How the scoreboard lists a team game's players: \"teams\" in a column for\n"

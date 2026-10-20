@@ -1226,9 +1226,24 @@ boolean mod_bitmaps_read(
 	struct bitmap_data *bitmap,
 	void *buffer)
 {
-	struct mod_bitmap *made = bitmap_of(bitmap);
+	struct mod_bitmap *made;
 	unsigned long size;
 	unsigned long stamp[2];
+	/* The evolved spawn pad's texture is not in the open map. Its pixels
+	were taken from the user's evolved map, and reading them here as the
+	open map's would draw the wrong texels. */
+	{
+		extern boolean performance_spawn_marker_bitmap(struct bitmap_data *bitmap, void *buffer);
+		extern boolean performance_random_area_bitmap(struct bitmap_data *bitmap, void *buffer);
+
+		if (performance_spawn_marker_bitmap(bitmap, buffer) ||
+			performance_random_area_bitmap(bitmap, buffer))
+		{
+			rasterizer_xbox_bitmap_rebuild_hardware_format(bitmap);
+			return TRUE;
+		}
+	}
+	made = bitmap_of(bitmap);
 
 	if (!made)
 	{

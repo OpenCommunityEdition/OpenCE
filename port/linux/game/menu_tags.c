@@ -380,6 +380,10 @@ static char const *const port_function_names[] =
 	"mp profile init indicator opts", "mp profile set ctf rules", "mp profile set koth rules",
 	"mp profile set slayer rules", "mp profile set oddball rules", "mp profile set racing rules",
 	"mp profile set player options", "mp profile set item options", "mp profile set indicator opts",
+	/* (Multiplayer's EVOLVED. A name missing here rejects every port menu.) */
+	"port evolved open", "port evolved choose", "port evolved start",
+	"port evolved prepare", "port evolved leave",
+	"port evolved setup open", "port evolved server open",
 	/* (Settings' OK: the Xbox's fails when the profile has no changes, the
 	settings' screens having written theirs to config.toml) */
 	"player profile save changes",
@@ -416,6 +420,8 @@ static char const *const port_game_data_input_names[] =
 	"port gamepad layout preview",
 	/* (the main menu's Mods) */
 	"port mods update",
+	/* (Evolved's map list, and its setup while a gametype page is open) */
+	"port evolved maps", "port evolved setup", "port evolved server",
 	/* (network co-op's pause menu's FRIENDLY FIRE: its text, ON or OFF) */
 	"port coop friendly fire text",
 };

@@ -72,7 +72,14 @@ their handlers open opens.
 #include "interface/ui_widget.h"
 #include "interface/ui_widget_event_handler_functions.h"
 #include "main/main.h"
+#include "cache/cache_files.h"
+#include "game/game_engine.h"
+#include "evolved_rules.h"
+#include "cache_file_formats.h"
+#include "scenario/scenario_definitions.h"
+#include "game/game_engine_playlist.h"
 #include "networking/network_game_manager.h"
+#include "networking/network_server_manager.h"
 #include "saved games/player_profile.h"
 #include "tag_files/tag_groups.h"
 #include "text/text_group.h"
@@ -2824,6 +2831,9 @@ static struct
 	/* Server Setup's PASSWORD (a public internet game's; empty: none), kept
 	while the game runs, never written down */
 	char game_password[PASSWORD_LENGTH + 1];
+	/* (Evolved's own game. Classic Create Game and Join Game leave it
+	clear, so their gametypes stay this build's.) */
+	boolean evolved;
 } multiplayer = { .maximum_players_index = NUMBEROF(maximum_players) - 1 };
 
 /* ---- a text field (Direct Link's link, the game's name): the keyboard
@@ -2958,6 +2968,8 @@ static void text_field_show(struct widget_instance *value, char const *text, boo
 
 /* ---- the menu */
 
+static void evolved_variant_drop(void);
+
 /* "mp type set mode": the item's (by its name) */
 static void multiplayer_mode_set(struct widget_instance *widget)
 {
@@ -2965,6 +2977,9 @@ static void multiplayer_mode_set(struct widget_instance *widget)
 
 	/* (an instance's name is cut to 31 characters:
 	"multiplayer_type_create_interne") */
+	multiplayer.evolved = FALSE;
+	evolved_rules_clear_session();
+	evolved_variant_drop();
 	multiplayer.mode =
 		strstr(name, "create_inter") ? _multiplayer_mode_host_internet :
 		strstr(name, "create_lan") ? _multiplayer_mode_host_lan :
@@ -3360,10 +3375,12 @@ static char const *const server_settings_gametype_rows[] =
 #define COOPERATIVE_DEFAULT_PLAYERS 16
 /* Server Setup's help for co-op's options' rows (CO-OP OPTIONS, VOICE AND
 VOTING), PASSWORD's and MAP SHARING's (its help_strings, tools/port_settings.py) */
-#define COOPERATIVE_OPTIONS_HELP 12
-#define COOPERATIVE_VOICE_OPTIONS_HELP 13
-#define SERVER_PASSWORD_HELP 14
-#define MAP_SHARE_OPTIONS_HELP 15
+/* (Evolved's help is its label's, 10. The rows after it moved down one
+when that page was added.) */
+#define COOPERATIVE_OPTIONS_HELP 13
+#define COOPERATIVE_VOICE_OPTIONS_HELP 14
+#define SERVER_PASSWORD_HELP 15
+#define MAP_SHARE_OPTIONS_HELP 16
 
 /* co-op's EXTRA ENEMIES' choices (network.coop_enemies_mode's values, as
 gametype_options' coop_extra_enemies_spinner has them, in this order): its
@@ -5260,7 +5277,8 @@ enum
 	_option_short,		/* a short of the options */
 	_option_option_byte,	/* a byte of the options */
 	_option_radar,		/* the options' radar players, and the variant's flag */
-	_option_setting		/* the host's own (config.toml): Server Setup's copy only */
+	_option_setting,	/* the host's own (config.toml): Server Setup's copy only */
+	_option_evolved	/* a byte of the evolved sheet, not the variant */
 };
 
 struct gametype_option
@@ -5278,6 +5296,7 @@ struct gametype_option
 
 #define VARIANT_FIELD(field) (short)offsetof(struct game_variant, field)
 #define OPTIONS_FIELD(field) (short)offsetof(struct game_variant_options, field)
+#define RULES_FIELD(field) (short)offsetof(struct evolved_rules, field)
 #define TIME_LIMITS { 0, 10, 15, 20, 25, 30, 45 }
 
 static struct gametype_option const gametype_options[] =
@@ -5403,6 +5422,30 @@ static struct gametype_option const gametype_options[] =
 	/* vehicle options (the side's set and counts: vehicles_update) */
 	{ "vehicles_respawn_spinner", _option_short, OPTIONS_FIELD(vehicle_respawn_time), 0, 7,
 		{ 0, 30, 60, 90, 120, 180, 300 } },
+	/* evolved sheet (its own pages). Classic screens have none of these names. */
+	{ "comp_flag_pickup", _option_evolved, RULES_FIELD(flag_pickup), 0, 2, { 0, 1 } },
+	{ "comp_ball_pickup", _option_evolved, RULES_FIELD(ball_pickup), 0, 2, { 0, 1 } },
+	{ "comp_hill_order", _option_evolved, RULES_FIELD(hill_order), 0, 2, { 0, 1 } },
+	{ "comp_hill_move", _option_evolved, RULES_FIELD(hill_move_s), 0, 7, { 15, 30, 45, 60, 90, 120, 180 } },
+	{ "comp_fireteams", _option_evolved, RULES_FIELD(fireteams), 0, 2, { 0, 1 } },
+	{ "comp_infinite_ammo", _option_evolved, RULES_FIELD(infinite_ammo), 0, 3, { 0, 1, 2 } },
+	{ "comp_kill_restore", _option_evolved, RULES_FIELD(kill_restores), 0, 2, { 0, 1 } },
+	{ "comp_skip_draw", _option_evolved, RULES_FIELD(skip_draw), 0, 2, { 0, 1 } },
+	{ "comp_move_sounds", _option_evolved, RULES_FIELD(movement_sounds), 0, 2, { 1, 0 } },
+	{ "comp_spawns", _option_evolved, RULES_FIELD(spawns_visible), 0, 2, { 0, 1 } },
+	{ "comp_random_areas", _option_evolved, RULES_FIELD(random_areas), 0, 2, { 0, 1 } },
+	{ "comp_omit_first", _option_evolved, RULES_FIELD(omit_first), 0, 3, { 0, 1, 2 } },
+	{ "comp_item_spawn", _option_evolved, RULES_FIELD(item_spawn_s), 0, 7, { 0, 15, 30, 45, 60, 90, 120 } },
+	{ "comp_camo", _option_evolved, RULES_FIELD(camo), 0, 3, { 0, 1, 2 } },
+	{ "comp_outlines", _option_evolved, RULES_FIELD(outlines), 0, 2, { 0, 1 } },
+	{ "comp_os_visible", _option_evolved, RULES_FIELD(os_visible), 0, 2, { 0, 1 } },
+	{ "comp_os_type", _option_evolved, RULES_FIELD(os_type), 0, 2, { 0, 1 } },
+	{ "comp_friction", _option_evolved, RULES_FIELD(friction), 0, 5, { 0, 1, 2, 3, 4 } },
+	{ "comp_adhesion", _option_evolved, RULES_FIELD(adhesion), 0, 5, { 0, 1, 2, 3, 4 } },
+	{ "comp_aim_delay", _option_evolved, RULES_FIELD(aim_delay), 0, 6, { 0, 1, 2, 3, 5, 8 } },
+	{ "comp_trig_delay", _option_evolved, RULES_FIELD(trig_delay), 0, 6, { 0, 1, 2, 3, 5, 8 } },
+	{ "comp_pistol_spread", _option_evolved, RULES_FIELD(pistol_spread), 0, 4, { 0, 1, 2, 3 } },
+	{ "comp_shotgun_spread", _option_evolved, RULES_FIELD(shotgun_spread), 0, 4, { 0, 1, 2, 3 } },
 };
 
 /* TEXT CHAT's (network.text_chat) OFF, which it shows while the game is
@@ -5466,6 +5509,7 @@ static long gametype_option_value(struct gametype_option const *option, struct g
 	case _option_short: return *(short *)(o + option->offset);
 	case _option_option_byte: return o[option->offset];
 	case _option_radar: return options->radar_players;
+	case _option_evolved: return ((unsigned char *)evolved_rules_editing())[option->offset];
 	}
 	return 0;
 }
@@ -5496,6 +5540,18 @@ static void gametype_option_value_set(struct gametype_option const *option, long
 			variant->universal_variant.flags &= ~FLAG(_game_variant_draw_object_in_motion_sensor_bit);
 		else
 			variant->universal_variant.flags |= FLAG(_game_variant_draw_object_in_motion_sensor_bit);
+		break;
+	case _option_evolved:
+		((unsigned char *)evolved_rules_editing())[option->offset] = (unsigned char)value;
+		/* port: training mode is one switch. the pads, the respawn
+		volumes and the percent are still separate bytes, and they move together. */
+		if (option->offset == RULES_FIELD(spawns_visible) ||
+			option->offset == RULES_FIELD(random_areas))
+		{
+			evolved_rules_editing()->spawns_visible = (unsigned char)value;
+			evolved_rules_editing()->random_areas = (unsigned char)value;
+			evolved_rules_editing()->random_pct = (unsigned char)value;
+		}
 		break;
 	}
 }
@@ -5540,6 +5596,18 @@ static void gametype_options_each(struct widget_instance *list, boolean save)
 
 			if (!option)
 				continue;
+			/* port: evolved has no motion sensor, so those two rows are not
+			   there. friends moves up into the first row. */
+			if (multiplayer.evolved && (option->kind == _option_radar ||
+				!strcmp(option->spinner, "indicator_options_radar display_spinner")))
+			{
+				visible_set(row, FALSE);
+				row->disabled = TRUE;
+				continue;
+			}
+			if (multiplayer.evolved &&
+				!strcmp(option->spinner, "indicator_options_friends_on_screen_spinner"))
+				row->vertical_offset = 73;
 			/* (the host's own settings: Server Setup's alone, their rows
 			hidden in Edit Gametypes', which edits a gametype for any game;
 			written on OK, as the gametype's are kept) */
@@ -6054,6 +6122,477 @@ static void gametype_engine_name(struct widget_instance *text_box)
 		text_box->parameters.text_box.string_list_index = strings[PIN(variant->game_engine_index, 0, 5)];
 }
 
+/* ---- Evolved: its own game on the classic maps and the custom maps.
+Classic Create Game and Join Game do not come here. Its setup edits a copy
+of the gametype (the editor's pages), which a classic profile is not. */
+
+static short evolved_built_rules = -1;
+static boolean evolved_built_teams = TRUE;
+/* port: a page is built again on the way back, which puts its spinners on
+slayer. the match already chose these, so the first update puts them back. */
+static boolean evolved_spinners_ready;
+
+static void evolved_variant_drop(void)
+{
+	evolved_built_rules = -1;
+	gametype_setup_end();
+}
+
+/* the mode's builder, then this game's score. Slayer stays at 50 with its
+death bonus and kill penalty off, which is the sheet this setup opened with. */
+static void evolved_variant_make(short rules, boolean teams)
+{
+	struct game_variant *variant = &gametype_edit.setup_variant;
+	struct game_variant *(*build)(struct game_variant *);
+
+	if (evolved_built_rules == rules)
+	{
+		variant->universal_variant.teams = teams;
+		SET_FLAG(variant->universal_variant.flags, _game_variant_anniversary_rules_bit, TRUE);
+		/* port: no motion sensor. 2 is the indicator page's none. */
+		SET_FLAG(variant->universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, FALSE);
+		variant->universal_variant.goal_radar = 2;
+		gametype_edit.setup = TRUE;
+		evolved_built_teams = teams;
+		return;
+	}
+	if (rules == 1)
+		build = build_game_variant_ctf;
+	else if (rules == 2)
+		build = teams ? build_game_variant_team_oddball : build_game_variant_oddball;
+	else if (rules == 3)
+		build = build_game_variant_crazy_king;
+	else
+		build = teams ? build_game_variant_team_slayer : build_game_variant_slayer;
+	build(variant);
+	game_variant_options_default(variant, &gametype_edit.setup_options);
+	if (rules == 0)
+	{
+		variant->universal_variant.score_to_win = 50;
+		variant->game_engine_variant.slayer.no_death_bonus = TRUE;
+		variant->game_engine_variant.slayer.no_kill_penalty = TRUE;
+	}
+	else if (rules == 1)
+		variant->universal_variant.score_to_win = 3;
+	else
+		variant->universal_variant.score_to_win = 5;
+	variant->universal_variant.teams = teams;
+	SET_FLAG(variant->universal_variant.flags, _game_variant_anniversary_rules_bit, TRUE);
+	/* port: no motion sensor. 2 is the indicator page's none. */
+	SET_FLAG(variant->universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, FALSE);
+	variant->universal_variant.goal_radar = 2;
+	ustrncpy(variant->human_readable_game_description, L"EVOLVED", 8);
+	variant->human_readable_game_description[7] = 0;
+	gametype_edit.setup = TRUE;
+	gametype_edit.vehicle_side = 0;
+	evolved_built_rules = rules;
+	evolved_built_teams = teams;
+	/* port: a new mode starts from the sheet's defaults. Teams alone does not. */
+	evolved_rules_reset_editing();
+}
+
+static void evolved_choices(struct widget_instance *widget, short *rules, boolean *teams)
+{
+	struct widget_instance *screen = widget;
+	struct widget_instance *rules_row;
+	struct widget_instance *teams_row;
+
+	/* port: the rules page is not up (server setup's start). the copy already
+	has the mode, and reading a missing spinner would rebuild slayer. */
+	*rules = evolved_built_rules < 0 ? 0 : evolved_built_rules;
+	*teams = evolved_built_teams;
+	while (screen && screen->parent)
+		screen = screen->parent;
+	rules_row = named(screen, "evolved_rules_spinner", 0);
+	teams_row = named(screen, "evolved_teams_spinner", 0);
+	if (rules_row)
+		*rules = (short)PIN(rules_row->parameters.list.selected_index, 0, 3);
+	if (teams_row)
+		*teams = teams_row->parameters.list.selected_index == 0;
+}
+
+/* the rules page for the mode on the spinner, and the others hidden */
+static void evolved_rules_rows(struct widget_instance *list, short rules)
+{
+	static char const *const rows[] = { "op_slayer_rules", "op_ctf_rules", "op_hill_rules", "op_ball_rules" };
+	short index;
+
+	for (index = 0; index < 4; index++)
+	{
+		struct widget_instance *row = named(list, rows[index], 0);
+
+		visible_set(row, index == rules);
+		if (row && index != rules && list->focused_child == row)
+			focus_row(list, 0);
+	}
+}
+
+/* the same list Create Game uses: the Xbox maps, then custom_maps.
+the chooser shows one kind at a time (0 the Xbox maps, 1 custom_maps). */
+static struct
+{
+	char const *const *levels;
+	short count, xbox_count, kind, first, chosen;
+} evolved_list;
+
+static void evolved_maps_read(void)
+{
+	char const *const *levels = NULL;
+	short count;
+
+	custom_edition_maps_look_again();
+	count = ui_widget_port_multiplayer_maps(&levels, NULL);
+	evolved_list.levels = levels;
+	evolved_list.count = count;
+	evolved_list.xbox_count = (short)MAX(count - custom_edition_maps_count(FALSE), 0);
+}
+
+/* port: the name Create Game shows for this row */
+static void evolved_map_text(short map, wchar_t *text)
+{
+	wchar_t const *name;
+
+	if (map < evolved_list.xbox_count)
+	{
+		string_get("pc\\main_menu\\mp_map_list", map, text);
+		return;
+	}
+	name = custom_edition_maps_name(custom_edition_maps_level_display_index(map));
+	ustrncpy(text, name ? name : L"", ROW_TEXT_LENGTH - 1);
+	text[ROW_TEXT_LENGTH - 1] = 0;
+}
+
+/* port: map_kind_rows_update passes the row within the kind. the name
+lookup wants that row in the combined list create game uses. */
+static void evolved_row_text(short entry, wchar_t *text)
+{
+	evolved_map_text(evolved_list.kind ? (short)(evolved_list.xbox_count + entry) : entry, text);
+}
+
+/* the maps of the kind on the chooser */
+static short evolved_kind_count(void)
+{
+	if (evolved_list.kind)
+		return (short)MAX(evolved_list.count - evolved_list.xbox_count, 0);
+	return evolved_list.xbox_count;
+}
+
+/* a row of the kind on the chooser, in the combined list Create Game uses */
+static short evolved_map_index(short row)
+{
+	short index = (short)(evolved_list.first + row);
+
+	if (evolved_list.kind)
+		index = (short)(evolved_list.xbox_count + index);
+	return index;
+}
+
+/* "port evolved open": this game, not a classic gametype */
+static boolean evolved_open(struct widget_instance *list)
+{
+	struct widget_instance *spinner = named(list, "evolved_kind_spinner", 0);
+
+	multiplayer.evolved = TRUE;
+	evolved_rules_reset_editing();
+	evolved_spinners_ready = FALSE;
+	evolved_maps_read();
+	evolved_list.first = 0;
+	evolved_list.chosen = 0;
+	if (spinner)
+		spinner->parameters.list.selected_index = evolved_list.kind ? 1 : 0;
+	return TRUE;
+}
+
+/* port: the same rows and card as select map. the chooser is the first
+child, so a map row is one past it. the card is that screen's map picture. */
+static void evolved_maps_update(struct widget_instance *list)
+{
+	struct widget_instance *description = list->parameters.list.extended_description;
+	struct widget_instance *spinner = named(list, "evolved_kind_spinner", 0);
+	short kind = spinner ? (short)(spinner->parameters.list.selected_index != 0) : 0;
+	short count, entry, shown;
+
+	if (kind != evolved_list.kind)
+	{
+		evolved_list.kind = kind;
+		evolved_list.first = 0;
+		evolved_list.chosen = 0;
+	}
+	count = evolved_kind_count();
+	entry = map_kind_rows_update(list, &evolved_list.first, count, evolved_row_text);
+	if (entry != NONE)
+		evolved_list.chosen = entry;
+	if (count <= 0)
+	{
+		if (list->focused_child && !strncmp(list->focused_child->name, "list_item_", 10))
+			focus_row(list, 0);
+	}
+	else if (list->focused_child && !list->focused_child->visible)
+		focus_row(list, 1);
+	shown = count > 0 && evolved_list.chosen < count;
+	visible_set(named(description, "mp_map_right_item", 0), shown);
+	map_description_show(description, NONE, shown ?
+		map_kind_display_index(kind ? MAP_KIND_CUSTOM_MULTIPLAYER : MAP_KIND_MULTIPLAYER,
+			evolved_list.chosen) : NONE);
+	profile_name_show(description);
+}
+
+/* "port evolved choose": host this game on the map, then its setup.
+The level name is the one Create Game already starts. */
+static boolean evolved_choose(struct widget_instance *widget)
+{
+	struct widget_instance *row = widget;
+	char const *level;
+	char build[0x20];
+	short map;
+
+	while (row && strncmp(row->name, "list_item_", 10))
+		row = row->parent;
+	if (!multiplayer.evolved)
+		return campaign_fail();
+	/* port: ok is not a row. the row last focused is the one it starts. */
+	if (row)
+		map = evolved_map_index((short)atoi(row->name + 10));
+	else
+		map = evolved_list.kind ? (short)(evolved_list.xbox_count + evolved_list.chosen) :
+			evolved_list.chosen;
+	if (map < 0 || map >= evolved_list.count || !evolved_list.levels)
+		return campaign_fail();
+	level = evolved_list.levels[map];
+	if (!level || !level[0])
+		return campaign_fail();
+	if (!global_network_game_server_get())
+	{
+		multiplayer.mode = config_boolean("network.online") ? _multiplayer_mode_host_internet :
+			_multiplayer_mode_host_lan;
+		if (!multiplayer_player(event_controller(widget, NULL)))
+			return FALSE;
+		p2p_set_hosting_allowed(multiplayer.mode == _multiplayer_mode_host_internet);
+		multiplayer.game_private = !config_boolean("network.host_public");
+		p2p_set_hosting_public(multiplayer.mode == _multiplayer_mode_host_internet && !multiplayer.game_private);
+		if (!ui_widget_port_host(widget, NULL, NULL))
+			return FALSE;
+	}
+	if (!cache_files_map_plays_multiplayer(level, build))
+	{
+		cache_files_show_multiplayer_unavailable(level, build);
+		return FALSE;
+	}
+	main_set_multiplayer_map_name(level);
+	game_engine_override_map_name(level);
+	if (global_network_game_server_get())
+		network_game_server_change_map_name(global_network_game_server_get(), level);
+	evolved_variant_drop();
+	evolved_spinners_ready = FALSE;
+	evolved_variant_make(0, TRUE);
+	return TRUE;
+}
+
+/* the rules and teams spinners, after the page is built again */
+static void evolved_spinners_restore(struct widget_instance *list)
+{
+	struct widget_instance *spinner;
+
+	if (evolved_spinners_ready)
+		return;
+	spinner = named(list, "evolved_rules_spinner", 0);
+	if (spinner)
+		spinner->parameters.list.selected_index = evolved_built_rules < 0 ? 0 : evolved_built_rules;
+	spinner = named(list, "evolved_teams_spinner", 0);
+	if (spinner)
+		spinner->parameters.list.selected_index = evolved_built_teams ? 0 : 1;
+	evolved_spinners_ready = TRUE;
+}
+
+/* "port evolved setup open": the page is new, so its spinners are not
+the mode yet */
+static boolean evolved_setup_open(struct widget_instance *list)
+{
+	evolved_spinners_ready = FALSE;
+	evolved_spinners_restore(list);
+	return TRUE;
+}
+
+/* "port evolved setup": the mode's rules page, and a fresh gametype when
+the mode changes. The pages write this copy, not a saved classic gametype. */
+static void evolved_setup_update(struct widget_instance *list)
+{
+	short rules;
+	boolean teams;
+
+	if (!multiplayer.evolved)
+		return;
+	evolved_spinners_restore(list);
+	evolved_choices(list, &rules, &teams);
+	evolved_variant_make(rules, teams);
+	evolved_rules_rows(list, rules);
+}
+
+/* "port evolved prepare": a page opens onto the copy */
+static boolean evolved_prepare(struct widget_instance *widget)
+{
+	short rules;
+	boolean teams;
+
+	if (!multiplayer.evolved)
+		return campaign_fail();
+	evolved_choices(widget, &rules, &teams);
+	evolved_variant_make(rules, teams);
+	/* port: the next page is built with its spinners on slayer until restored */
+	evolved_spinners_ready = FALSE;
+	return TRUE;
+}
+
+/* "port evolved leave": back to the multiplayer screen drops the copy,
+so Edit Gametypes is a classic profile again */
+static boolean evolved_leave(void)
+{
+	evolved_variant_drop();
+	return TRUE;
+}
+
+/* "port evolved start": the copy, including the pages. Classic gametypes
+are not written. */
+static boolean evolved_start(struct widget_instance *widget)
+{
+	short rules;
+	boolean teams;
+
+	if (!multiplayer.evolved || !gametype_edit.setup)
+		return campaign_fail();
+	if (text_field_editing(NULL))
+		text_field_end(TRUE);
+	evolved_choices(widget, &rules, &teams);
+	evolved_variant_make(rules, teams);
+	/* port: the sheet rides with this match. Dropping the copy does not clear it. */
+	evolved_rules_commit();
+	ui_widget_port_game_variant_set(&gametype_edit.setup_variant, &gametype_edit.setup_options);
+	/* port: the lobby was opened from the previous gametype. the next
+	   round and this machine's own copy both need this one. */
+	game_engine_override_game_variant(&gametype_edit.setup_variant);
+	game_set_game_variant(&gametype_edit.setup_variant);
+	{
+		void *server = global_network_game_server_get();
+		void *client = global_network_game_client_get();
+		struct network_game *hosted = server ? network_game_server_get_game(server) : NULL;
+		struct network_game *local = client ? network_game_client_get_game(client) : NULL;
+
+		if (hosted && local)
+		{
+			local->variant = hosted->variant;
+			local->variant_options = hosted->variant_options;
+		}
+	}
+	evolved_variant_drop();
+	if (!multiplayer.game_name[0] && player_ui_get_active_player_profile_index(0) != NONE)
+	{
+		struct player_profile profile;
+
+		player_ui_get_active_player_profile(0, &profile);
+		ustrncpy(multiplayer.game_name, profile.player_name, NUMBEROF(multiplayer.game_name) - 1);
+	}
+	network_game_server_port_set_settings(multiplayer.game_name,
+		maximum_players[PIN(multiplayer.maximum_players_index, 0, NUMBEROF(maximum_players) - 1)]);
+	/* port: the server page's listing. a classic profile is not written. */
+	p2p_set_hosting_public(multiplayer.mode == _multiplayer_mode_host_internet && !multiplayer.game_private);
+	p2p_set_hosting_password(multiplayer.mode == _multiplayer_mode_host_internet && !multiplayer.game_private ?
+		multiplayer.game_password : NULL);
+	return global_network_game_server_get() != NULL;
+}
+
+/* "port evolved server open": the name, the player count and the listing.
+this is not Server Setup, which would edit a classic gametype. */
+static boolean evolved_server_open(struct widget_instance *list)
+{
+	struct widget_instance *spinner = named(list, "max_players_spinner", 0);
+
+	if (!multiplayer.game_name[0] && player_ui_get_active_player_profile_index(0) != NONE)
+	{
+		struct player_profile profile;
+
+		player_ui_get_active_player_profile(0, &profile);
+		ustrncpy(multiplayer.game_name, profile.player_name, NUMBEROF(multiplayer.game_name) - 1);
+	}
+	if (spinner)
+		spinner->parameters.list.selected_index = PIN(multiplayer.maximum_players_index, 0,
+			NUMBEROF(maximum_players) - 1);
+	if ((spinner = named(list, "listing_spinner", 0)) != NULL)
+		spinner->parameters.list.selected_index = multiplayer.game_private ? 1 : 0;
+	return TRUE;
+}
+
+/* "port evolved server": the same fields Server Setup shows, apart from
+its gametype rows */
+static void evolved_server_update(struct widget_instance *list)
+{
+	struct widget_instance *spinner = named(list, "max_players_spinner", 0);
+	struct widget_instance *row = named(list, "op_server_name", 0);
+	struct widget_instance *listing = named(list, "op_listing", 0);
+	struct widget_instance *help = list->parameters.list.extended_description ?
+		named(list->parameters.list.extended_description, "server_help", 0) : NULL;
+	char text[TEXT_FIELD_LENGTH];
+	boolean internet;
+
+	if (!multiplayer.evolved)
+		return;
+	if (spinner)
+		multiplayer.maximum_players_index = (short)PIN(spinner->parameters.list.selected_index, 0,
+			NUMBEROF(maximum_players) - 1);
+	wide_to_text(multiplayer.game_name, text, sizeof(text));
+	text_field_show(named(list, "server_name_value", 0), text, text_field_editing(row));
+	if (multiplayer.mode != _multiplayer_mode_host_internet)
+		snprintf(text, sizeof(text), "NONE: A LAN GAME");
+	else if (!config_boolean("network.online"))
+		snprintf(text, sizeof(text), "INTERNET PLAY IS OFF (SETTINGS)");
+	else if (!p2p_invite_link(text, sizeof(text)))
+		snprintf(text, sizeof(text), "MADE WHEN THE GAME STARTS");
+	text_field_show(named(list, "invite_value", 0), text, FALSE);
+	internet = multiplayer.mode == _multiplayer_mode_host_internet && config_boolean("network.online") &&
+		config_boolean("network.public_lobby");
+	visible_set(listing, internet);
+	if ((spinner = named(list, "listing_spinner", 0)) != NULL && listing && listing->visible)
+	{
+		boolean public = spinner->parameters.list.selected_index == 0;
+
+		multiplayer.game_private = !public;
+		p2p_set_hosting_public(public);
+	}
+	row = named(list, "op_password", 0);
+	visible_set(row, listing && listing->visible && !multiplayer.game_private);
+	if (row && !row->visible && text_field_editing(row))
+		text_field_end(FALSE);
+	if (row && row->visible)
+	{
+		short index;
+
+		for (index = 0; multiplayer.game_password[index] && index < (short)sizeof(text) - 1; index++)
+			text[index] = '*';
+		text[index] = 0;
+		text_field_show(named(list, "password_value", 0), index ? text : "NONE", text_field_editing(row));
+	}
+	if (!help || !list->focused_child)
+		return;
+	if (!strcmp(list->focused_child->name, "op_server_name"))
+		help->parameters.text_box.string_list_index = 1;
+	else if (!strcmp(list->focused_child->name, "op_max_players"))
+		help->parameters.text_box.string_list_index = 2;
+	else if (!strcmp(list->focused_child->name, "op_invite"))
+		help->parameters.text_box.string_list_index = 3;
+	else if (!strcmp(list->focused_child->name, "op_listing"))
+	{
+		spinner = named(list, "listing_spinner", 0);
+		help->parameters.text_box.string_list_index = spinner && spinner->parameters.list.selected_index == 0 ? 4 : 5;
+	}
+	else if (!strcmp(list->focused_child->name, "op_password"))
+		help->parameters.text_box.string_list_index = 6;
+	else if (!strcmp(list->focused_child->name, "op_map_share"))
+		help->parameters.text_box.string_list_index = 7;
+	else if (!strcmp(list->focused_child->name, "op_game_rules"))
+		help->parameters.text_box.string_list_index = 8;
+	else
+		help->parameters.text_box.string_list_index = 0;
+}
+
 /* ---------- public code */
 
 boolean pc_menu_event_function_invoke(
@@ -6182,6 +6721,34 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "mp profile set game engine"))
 		{
 			return gametype_engine_set(widget);
+		}
+		else if (!strcmp(name, "port evolved open"))
+		{
+			return evolved_open(widget);
+		}
+		else if (!strcmp(name, "port evolved setup open"))
+		{
+			return evolved_setup_open(widget);
+		}
+		else if (!strcmp(name, "port evolved server open"))
+		{
+			return evolved_server_open(widget);
+		}
+		else if (!strcmp(name, "port evolved choose"))
+		{
+			return evolved_choose(widget);
+		}
+		else if (!strcmp(name, "port evolved start"))
+		{
+			return evolved_start(widget);
+		}
+		else if (!strcmp(name, "port evolved prepare"))
+		{
+			return evolved_prepare(widget);
+		}
+		else if (!strcmp(name, "port evolved leave"))
+		{
+			return evolved_leave();
 		}
 		else if (!strncmp(name, "mp profile init ", 16) || !strcmp(name, "mp prof init teamplay options") ||
 			!strcmp(name, "mp prof init vehicle options"))
@@ -6501,6 +7068,12 @@ void pc_menu_game_data_function_invoke(
 		saved_game_list_update(widget);
 	else if (!strcmp(name, "port gamepad layout preview"))
 		profile_gamepad_layout(widget);
+	else if (!strcmp(name, "port evolved maps"))
+		evolved_maps_update(widget);
+	else if (!strcmp(name, "port evolved setup"))
+		evolved_setup_update(widget);
 	else if (!strcmp(name, "port coop friendly fire text"))
 		coop_friendly_fire_text(widget);
+	else if (!strcmp(name, "port evolved server"))
+		evolved_server_update(widget);
 }

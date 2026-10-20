@@ -795,12 +795,16 @@ void map_share_level_name_choose(
 	map_share_hash_digits(hash, digits);
 	if (map_share_name_hashed(name) && !csstrcmp(name + length - MAP_SHARE_NAME_DIGITS, digits))
 		length -= MAP_SHARE_NAME_DIGITS + 1;
-	if (length <= 0 || csstrlen(CUSTOM_EDITION_LEVEL_NAME_PREFIX) + length >= (unsigned long)size ||
-		csstrlen(CUSTOM_EDITION_LEVEL_NAME_PREFIX) + length >= sizeof(globals->chosen_level))
+	/* (an evolved map's name already says its folder. Renaming it
+	custom_maps would load that folder's file of the same name.) */
+	prefix = !_strnicmp(level_name, EVOLVED_LEVEL_NAME_PREFIX, csstrlen(EVOLVED_LEVEL_NAME_PREFIX)) ?
+		EVOLVED_LEVEL_NAME_PREFIX : CUSTOM_EDITION_LEVEL_NAME_PREFIX;
+	if (length <= 0 || csstrlen(prefix) + length >= (unsigned long)size ||
+		csstrlen(prefix) + length >= sizeof(globals->chosen_level))
 	{
 		return;
 	}
-	csprintf(level_name, "%s%.*s", CUSTOM_EDITION_LEVEL_NAME_PREFIX, (int)length, name);
+	csprintf(level_name, "%s%.*s", prefix, (int)length, name);
 	csstrncpy(globals->chosen_level, level_name, sizeof(globals->chosen_level) - 1);
 	globals->chosen_version = map_share_hash_version(hash);
 	error(_error_silent, "map sharing: the game's map is %s (%s, version %08lx)", level_name, path,
