@@ -20,6 +20,7 @@ enabled.
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "math/real_math.h"
+#include "objects/objects.h"
 #include "physics/bsp3d.h"
 #include "physics/collision_bsp.h"
 #include "physics/collision_bsp_definitions.h"
@@ -53,6 +54,9 @@ enum
 
 /* the most points of a surface's ring (collision_bsp_definitions.h) */
 #define PHYSICS_JOLT_RING_MAX 8
+/* a dead body's on the level */
+#define PHYSICS_JOLT_RAGDOLL_FRICTION 0.8f
+#define PHYSICS_JOLT_RAGDOLL_RESTITUTION 0.05f
 
 static unsigned long physics_jolt_changes = (unsigned long)-1;
 static boolean physics_jolt_on = FALSE;
@@ -296,6 +300,235 @@ static void physics_jolt_level_send(void)
 	free(indices);
 }
 
+/* ---------- ragdolls */
+
+/* the arrays a tick's commands name, which the host copies as it reads them:
+each new ragdoll's parts and poses, each driven ragdoll's targets */
+static unsigned long physics_jolt_parts[RAGDOLL_DEATHS_MAX][RAGDOLL_BODY_PARTS_MAX * HOST_PHYSICS_PART_WORDS];
+static unsigned long physics_jolt_poses[RAGDOLL_DEATHS_MAX][RAGDOLL_BODY_PARTS_MAX * HOST_PHYSICS_POSE_WORDS];
+static unsigned long physics_jolt_targets[RAGDOLLS_MAX][RAGDOLL_BODY_PARTS_MAX * HOST_PHYSICS_POSE_WORDS];
+
+static void physics_jolt_pose_words(
+	real_matrix4x3 const *matrix,
+	unsigned long *words)
+{
+	struct ragdoll_pose pose;
+
+	ragdoll_pose_from_matrix(matrix, &pose);
+	words[0] = physics_jolt_word(pose.position.x);
+	words[1] = physics_jolt_word(pose.position.y);
+	words[2] = physics_jolt_word(pose.position.z);
+	words[3] = physics_jolt_word(pose.rotation.v.i);
+	words[4] = physics_jolt_word(pose.rotation.v.j);
+	words[5] = physics_jolt_word(pose.rotation.v.k);
+	words[6] = physics_jolt_word(pose.rotation.w);
+}
+
+/* a body's parts as the host reads them: the twist about the node's x, the
+plane axis its z (the normal its y) */
+static void physics_jolt_part_words(
+	struct ragdoll_part const *part,
+	unsigned long *words)
+{
+	long index;
+
+	memset(words, 0, HOST_PHYSICS_PART_WORDS * sizeof(*words));
+	words[0] = (unsigned long)(long)part->parent_part_index;
+	words[1] = part->shape;
+	for (index = 0; index < 3; index++)
+		words[2 + index] = physics_jolt_word(part->size[index]);
+	words[5] = physics_jolt_word(part->center.x);
+	words[6] = physics_jolt_word(part->center.y);
+	words[7] = physics_jolt_word(part->center.z);
+	words[8] = words[9] = words[10] = physics_jolt_word(0.0f);
+	words[11] = physics_jolt_word(1.0f);
+	words[12] = physics_jolt_word(part->mass);
+	words[13] = physics_jolt_word(1.0f);
+	words[14] = words[15] = words[16] = words[17] = physics_jolt_word(0.0f);
+	words[18] = physics_jolt_word(1.0f);
+	words[19] = physics_jolt_word(part->twist_min);
+	words[20] = physics_jolt_word(part->twist_max);
+	words[21] = physics_jolt_word(part->swing_normal);
+	words[22] = physics_jolt_word(part->swing_plane);
+}
+
+static void physics_jolt_ragdoll_remove(
+	long id)
+{
+	unsigned long *command = physics_jolt_command(HOST_PHYSICS_OP_RAGDOLL_REMOVE, HOST_PHYSICS_RAGDOLL_REMOVE_WORDS);
+
+	if (command)
+		command[1] = id;
+	ragdolls_stop(id);
+}
+
+/* A death's ragdoll, built with its joints at rest in the pose the biped
+died in (the limits centre on it) and placed there, moving as the biped
+was. */
+static void physics_jolt_ragdoll_add(
+	struct ragdoll_death const *death,
+	long death_index)
+{
+	struct ragdoll_body const *body = death->body;
+	unsigned long *parts = physics_jolt_parts[death_index];
+	unsigned long *poses = physics_jolt_poses[death_index];
+	unsigned long *command;
+	long replaced;
+	long id = ragdolls_start(death, &replaced);
+	long index;
+
+	if (id == NONE)
+		return;
+	if (replaced != NONE)
+	{
+		command = physics_jolt_command(HOST_PHYSICS_OP_RAGDOLL_REMOVE, HOST_PHYSICS_RAGDOLL_REMOVE_WORDS);
+		if (command)
+			command[1] = replaced;
+	}
+	for (index = 0; index < body->part_count; index++)
+	{
+		physics_jolt_part_words(&body->parts[index], parts + index * HOST_PHYSICS_PART_WORDS);
+		physics_jolt_pose_words(&death->nodes[body->parts[index].node_index], poses + index * HOST_PHYSICS_POSE_WORDS);
+	}
+	command = physics_jolt_command(HOST_PHYSICS_OP_RAGDOLL_ADD, HOST_PHYSICS_RAGDOLL_ADD_WORDS);
+	if (!command)
+	{
+		ragdolls_stop(id);
+		return;
+	}
+	command[1] = id;
+	command[2] = body->part_count;
+	command[3] = (unsigned long)parts;
+	command[4] = (unsigned long)poses;
+	command[5] = (unsigned long)poses;
+	command[6] = physics_jolt_word(PHYSICS_JOLT_RAGDOLL_FRICTION);
+	command[7] = physics_jolt_word(PHYSICS_JOLT_RAGDOLL_RESTITUTION);
+	/* (the game's velocities are a tick's) */
+	command[8] = physics_jolt_word(death->velocity.i * TICKS_PER_SECOND);
+	command[9] = physics_jolt_word(death->velocity.j * TICKS_PER_SECOND);
+	command[10] = physics_jolt_word(death->velocity.k * TICKS_PER_SECOND);
+}
+
+/* the motors toward the biped's node matrices now: its death animation */
+static void physics_jolt_ragdoll_drive(
+	long id)
+{
+	struct ragdoll const *ragdoll = ragdolls_get(id);
+	unsigned long *targets = physics_jolt_targets[id - 1];
+	real_matrix4x3 const *nodes = object_get_node_matrices(ragdoll->object_index);
+	unsigned long *command;
+	long index;
+
+	for (index = 0; index < ragdoll->body->part_count; index++)
+		physics_jolt_pose_words(&nodes[ragdoll->body->parts[index].node_index], targets + index * HOST_PHYSICS_POSE_WORDS);
+	command = physics_jolt_command(HOST_PHYSICS_OP_RAGDOLL_DRIVE, HOST_PHYSICS_RAGDOLL_DRIVE_WORDS);
+	if (!command)
+		return;
+	command[1] = id;
+	command[2] = physics_jolt_word(RAGDOLL_DRIVE_FREQUENCY);
+	command[3] = (unsigned long)targets;
+	command[4] = ragdoll->body->part_count;
+}
+
+static real physics_jolt_result_real(
+	unsigned long word)
+{
+	real value;
+
+	memcpy(&value, &word, sizeof(value));
+	return value;
+}
+
+/* each ragdoll's poses from the results, as far as they are whole */
+static void physics_jolt_results_read(void)
+{
+	unsigned long const *words = physics_jolt_results;
+	long length;
+	long at = HOST_PHYSICS_RESULTS_HEADER_WORDS;
+	unsigned long count;
+	unsigned long index;
+
+	if (words[0] != HOST_PHYSICS_RESULTS_MAGIC || words[1] != HOST_PHYSICS_VERSION)
+		return;
+	length = (long)(words[2] / 4);
+	if (length < HOST_PHYSICS_RESULTS_HEADER_WORDS || length > PHYSICS_JOLT_RESULTS_WORDS)
+		return;
+	count = words[3];
+	for (index = 0; index < count && at + HOST_PHYSICS_RESULT_RAGDOLL_WORDS <= length; index++)
+	{
+		unsigned long const *entry = words + at;
+		struct ragdoll *ragdoll = ragdolls_get((long)entry[0]);
+		unsigned long part_count = entry[1];
+		unsigned long const *pose_words = entry + HOST_PHYSICS_RESULT_RAGDOLL_WORDS;
+		unsigned long part;
+
+		if (part_count > HOST_PHYSICS_PARTS_MAX ||
+			at + HOST_PHYSICS_RESULT_RAGDOLL_WORDS + (long)part_count * HOST_PHYSICS_POSE_WORDS > length)
+		{
+			return;
+		}
+		at += HOST_PHYSICS_RESULT_RAGDOLL_WORDS + part_count * HOST_PHYSICS_POSE_WORDS;
+		if (!ragdoll || (long)part_count != ragdoll->body->part_count)
+			continue;
+		ragdoll->awake = entry[2] != 0;
+		ragdoll->broken_joints = entry[3];
+		for (part = 0; part < part_count; part++)
+		{
+			struct ragdoll_pose *pose = &ragdoll->poses[part];
+			unsigned long const *from = pose_words + part * HOST_PHYSICS_POSE_WORDS;
+
+			pose->position.x = physics_jolt_result_real(from[0]);
+			pose->position.y = physics_jolt_result_real(from[1]);
+			pose->position.z = physics_jolt_result_real(from[2]);
+			pose->rotation.v.i = physics_jolt_result_real(from[3]);
+			pose->rotation.v.j = physics_jolt_result_real(from[4]);
+			pose->rotation.v.k = physics_jolt_result_real(from[5]);
+			pose->rotation.w = physics_jolt_result_real(from[6]);
+		}
+		ragdoll->posed = TRUE;
+	}
+}
+
+void physics_jolt_update(
+	real seconds)
+{
+	long index;
+	long id;
+
+	if (!physics_jolt_enabled() || physics_jolt_level_bsp_index == NONE)
+	{
+		ragdolls_deaths_clear();
+		return;
+	}
+	physics_jolt_batch_begin();
+	for (index = 0; index < ragdolls_death_count(); index++)
+		physics_jolt_ragdoll_add(ragdolls_death_get(index), index);
+	ragdolls_deaths_clear();
+	for (id = 1; id <= RAGDOLLS_MAX; id++)
+	{
+		switch (ragdolls_action(id))
+		{
+		case _ragdoll_action_drive:
+			physics_jolt_ragdoll_drive(id);
+			break;
+		case _ragdoll_action_limp:
+		{
+			unsigned long *command = physics_jolt_command(HOST_PHYSICS_OP_RAGDOLL_LIMP, HOST_PHYSICS_RAGDOLL_LIMP_WORDS);
+
+			if (command)
+				command[1] = id;
+			break;
+		}
+		case _ragdoll_action_remove:
+			physics_jolt_ragdoll_remove(id);
+			break;
+		}
+	}
+	if (physics_jolt_batch_send(seconds) < 0)
+		return;
+	physics_jolt_results_read();
+}
+
 void physics_jolt_structure_bsp_reconnect(void)
 {
 	if (physics_jolt_enabled())
@@ -326,6 +559,13 @@ void physics_jolt_dispose_from_old_map(void)
 {
 	ragdoll_bodies_dispose_from_old_map();
 	ragdolls_dispose_from_old_map();
+}
+
+void physics_jolt_update(
+	real seconds)
+{
+	(void)seconds;
+	ragdolls_deaths_clear();
 }
 
 #endif

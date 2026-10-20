@@ -20,6 +20,35 @@ enum
 	RAGDOLL_DEATHS_MAX = 16,
 	/* the hits remembered, the newest overwriting the oldest */
 	RAGDOLL_HITS_MAX = 64,
+	/* the ragdolls in the host's world at once; past it the oldest goes back
+	to the stock game's corpse */
+	RAGDOLLS_MAX = 32,
+	/* how long the joints' motors follow the death animation, then let go */
+	RAGDOLL_DRIVE_TICKS = 12,
+};
+
+/* the joints' motors' spring (Hz) while they follow the animation */
+#define RAGDOLL_DRIVE_FREQUENCY 8.0f
+
+/* what a tick does with a ragdoll */
+enum
+{
+	_ragdoll_action_none,
+	/* the motors toward the biped's node matrices now */
+	_ragdoll_action_drive,
+	/* the motors off */
+	_ragdoll_action_limp,
+	/* out of the world: its biped is gone */
+	_ragdoll_action_remove,
+};
+
+/* a part's frame, as the host's world has them: a point, and the rotation
+from the part's frame to the world's as a unit quaternion of the usual sense
+(the game's quaternions turn the other way) */
+struct ragdoll_pose
+{
+	real_point3d position;
+	real_quaternion rotation;
 };
 
 /* a hit on a biped: the damage's direction (unit length), the speed its
@@ -47,6 +76,21 @@ struct ragdoll_death
 	struct ragdoll_hit killing_hit;
 };
 
+/* a dead biped's ragdoll, named to the host by its index plus one */
+struct ragdoll
+{
+	boolean used;
+	long object_index;
+	struct ragdoll_body const *body;
+	long start_time;
+	boolean limp;
+	/* the host's poses for its parts, once it has given them */
+	boolean posed;
+	boolean awake;
+	unsigned long broken_joints;
+	struct ragdoll_pose poses[RAGDOLL_BODY_PARTS_MAX];
+};
+
 /* whether a biped dies as a ragdoll (game.ragdolls, and the host's physics) */
 boolean ragdolls_enabled(void);
 
@@ -63,6 +107,22 @@ void ragdolls_deaths_clear(void);
 
 /* the hit on an object this tick, newest first, or NULL */
 struct ragdoll_hit const *ragdolls_hit_get(long object_index);
+
+/* the rotation of a node matrix */
+void ragdoll_pose_from_matrix(real_matrix4x3 const *matrix, struct ragdoll_pose *pose);
+
+/* A ragdoll for a death: its id, or NONE if its biped has one already. With
+every ragdoll in use the oldest is taken, and its id given in `replaced`
+(else NONE) for the host to remove first. */
+long ragdolls_start(struct ragdoll_death const *death, long *replaced);
+/* the ragdoll of an id, or NULL */
+struct ragdoll *ragdolls_get(long id);
+/* what this tick does with a ragdoll (_ragdoll_action_*), a limp or remove
+taken as done */
+short ragdolls_action(long id);
+void ragdolls_stop(long id);
+/* the ragdoll of an object, or NULL */
+struct ragdoll const *ragdolls_of_object(long object_index);
 
 void ragdolls_dispose_from_old_map(void);
 

@@ -1,16 +1,20 @@
 #include "harness.h"
 #include <math.h>
+#include <string.h>
 
 /* Deaths and hits for the ragdolls (ragdolls.c), in a fake world of three
 objects: 0 a biped with a body, 1 a vehicle with a model that would make
 one, 2 a biped whose model has no body, and from 3 on more of the first. A hit is remembered for its tick; a biped's death queues its node
 matrices, velocity and the hit that killed it that tick. */
-typedef struct { real scale; real_vector3d forward, left, up; real_point3d position; } real_matrix4x3;
+typedef struct { real scale; union { real n[4][3]; struct { real_vector3d forward, left, up; real_point3d position; }; }; }
+	real_matrix4x3;
+typedef struct { real_vector3d v; real w; } real_quaternion;
 struct tag_block { long count; void *address; long definition; };
 #define _real_epsilon 0.0001f
 #define CEILING(n, ceiling) ((n) > (ceiling) ? (ceiling) : (n))
 #define PIN(n, floor, ceiling) ((n) < (floor) ? (floor) : CEILING((n), (ceiling)))
 enum { _object_type_biped = 0, _object_type_vehicle = 1 };
+enum { _object_mask_biped = 1 << _object_type_biped };
 struct _object_datum { short type; };
 struct object_datum { long definition_index; struct _object_datum object; };
 struct damage_definition { real instantaneous_acceleration, instantaneous_acceleration_zero_scale_factor; };
@@ -26,7 +30,17 @@ static real_matrix4x3 matrices[RAGDOLL_BODY_NODES_MAX];
 static struct ragdoll_body body;
 static struct damage_effect_definition grenade = {{6.0f, 0.25f}};
 
+static boolean deleted[3];
+static short const matrix4x3_next[3] = {1, 2, 0};
+
 static boolean physics_jolt_ragdolls_enabled(void) { return enabled; }
+static real square_root(real x) { return sqrtf(x); }
+static void *object_try_and_get_and_verify_type(long index, unsigned long mask)
+{
+	struct object_datum *object = &objects[index < 3 ? index : 0];
+
+	return index >= 0 && !deleted[index < 3 ? index : 0] && (mask & (1u << object->object.type)) ? object : NULL;
+}
 static long game_time_get(void) { return now; }
 static struct object_datum *object_get(long index) { return &objects[index < 3 ? index : 0]; }
 static real_matrix4x3 *object_get_node_matrices(long index) { (void)index; return matrices; }
@@ -44,6 +58,38 @@ static real_vector3d *scale_vector3d(real_vector3d const *v, real s, real_vector
 }
 
 #include "under_test.inc"
+
+static struct ragdoll_death death_of(long object_index)
+{
+	struct ragdoll_death death;
+
+	memset(&death, 0, sizeof(death));
+	death.object_index = object_index;
+	death.body = &body;
+	return death;
+}
+
+static real_matrix4x3 rotation(real_vector3d forward, real_vector3d left, real_vector3d up)
+{
+	real_matrix4x3 matrix;
+
+	memset(&matrix, 0, sizeof(matrix));
+	matrix.scale = 1.0f;
+	matrix.forward = forward;
+	matrix.left = left;
+	matrix.up = up;
+	matrix.position.x = 5.0f;
+	matrix.position.z = -2.0f;
+	return matrix;
+}
+
+static boolean quaternion_is(real_quaternion const *q, real i, real j, real k, real w)
+{
+	real same = fabsf(q->v.i - i) + fabsf(q->v.j - j) + fabsf(q->v.k - k) + fabsf(q->w - w);
+	real opposite = fabsf(q->v.i + i) + fabsf(q->v.j + j) + fabsf(q->v.k + k) + fabsf(q->w + w);
+
+	return same < 1e-4f || opposite < 1e-4f;
+}
 
 static struct damage_data blast(real i, real j, real k, real scale)
 {
@@ -176,6 +222,110 @@ int main(int argc, char **argv)
 		CHECK(ragdolls_death_count() == RAGDOLL_DEATHS_MAX, "full: %ld", ragdolls_death_count());
 		ragdolls_dispose_from_old_map();
 		CHECK(ragdolls_death_count() == 0, "gone with the map");
+		return 0;
+	}
+	CASE("pose")
+	{
+		static real_vector3d const x = {1, 0, 0}, y = {0, 1, 0}, z = {0, 0, 1}, minus_x = {-1, 0, 0},
+			minus_y = {0, -1, 0}, minus_z = {0, 0, -1}, nothing = {0, 0, 0};
+		struct ragdoll_pose pose;
+		real_matrix4x3 matrix;
+
+		/* a quarter turn about z: forward to y */
+		matrix = rotation(y, minus_x, z);
+		ragdoll_pose_from_matrix(&matrix, &pose);
+		CHECK(quaternion_is(&pose.rotation, 0.0f, 0.0f, 0.70710678f, 0.70710678f), "about z: %f %f %f %f",
+			pose.rotation.v.i, pose.rotation.v.j, pose.rotation.v.k, pose.rotation.w);
+		CHECK(pose.position.x == 5.0f && pose.position.z == -2.0f, "its point");
+		/* a half turn about x (no trace) */
+		matrix = rotation(x, minus_y, minus_z);
+		ragdoll_pose_from_matrix(&matrix, &pose);
+		CHECK(quaternion_is(&pose.rotation, 1.0f, 0.0f, 0.0f, 0.0f), "about x: %f %f %f %f",
+			pose.rotation.v.i, pose.rotation.v.j, pose.rotation.v.k, pose.rotation.w);
+		/* a third of a turn about (1, 1, 1): x to y, y to z */
+		matrix = rotation(y, z, x);
+		ragdoll_pose_from_matrix(&matrix, &pose);
+		CHECK(quaternion_is(&pose.rotation, 0.5f, 0.5f, 0.5f, 0.5f), "about the diagonal: %f %f %f %f",
+			pose.rotation.v.i, pose.rotation.v.j, pose.rotation.v.k, pose.rotation.w);
+		/* a broken matrix: no rotation */
+		matrix = rotation(nothing, nothing, nothing);
+		matrix.forward.i = matrix.left.j = matrix.up.k = nanf("");
+		ragdoll_pose_from_matrix(&matrix, &pose);
+		CHECK(quaternion_is(&pose.rotation, 0.0f, 0.0f, 0.0f, 1.0f), "a broken matrix: %f %f %f %f",
+			pose.rotation.v.i, pose.rotation.v.j, pose.rotation.v.k, pose.rotation.w);
+		return 0;
+	}
+	CASE("unused at first")
+	{
+		CHECK(!ragdolls_of_object(0) && !ragdolls_get(1), "no ragdoll of object 0 in a zeroed table");
+		CHECK(ragdolls_action(1) == _ragdoll_action_none, "nothing to do");
+		return 0;
+	}
+	CASE("start")
+	{
+		struct ragdoll_death death = death_of(0);
+		long replaced = 0;
+		long id = ragdolls_start(&death, &replaced);
+
+		CHECK(id == 1 && replaced == NONE, "the first: %ld %ld", id, replaced);
+		CHECK(ragdolls_get(1) && ragdolls_get(1)->object_index == 0 && ragdolls_get(1)->body == &body, "its biped");
+		CHECK(ragdolls_get(1)->start_time == now && !ragdolls_get(1)->limp && !ragdolls_get(1)->posed, "new");
+		CHECK(ragdolls_of_object(0) == ragdolls_get(1), "found by its object");
+		CHECK(ragdolls_start(&death, &replaced) == NONE, "one a biped");
+		CHECK(!ragdolls_get(0) && !ragdolls_get(RAGDOLLS_MAX + 1) && !ragdolls_get(2), "ids out of range or free");
+		for (index = 1; index < RAGDOLLS_MAX; index++)
+		{
+			now++;
+			death = death_of(3 + index);
+			id = ragdolls_start(&death, &replaced);
+			CHECK(id == index + 1 && replaced == NONE, "ragdoll %ld: %ld", index, id);
+		}
+		/* full: the oldest, the first, goes */
+		now++;
+		death = death_of(100);
+		id = ragdolls_start(&death, &replaced);
+		CHECK(id == 1 && replaced == 1, "the oldest replaced: %ld %ld", id, replaced);
+		CHECK(ragdolls_get(1)->object_index == 100 && !ragdolls_of_object(0), "by the newest");
+		now++;
+		death = death_of(101);
+		id = ragdolls_start(&death, &replaced);
+		CHECK(id == 2 && replaced == 2, "then the next oldest: %ld %ld", id, replaced);
+		ragdolls_dispose_from_old_map();
+		CHECK(!ragdolls_get(1) && !ragdolls_of_object(100), "gone with the map");
+		return 0;
+	}
+	CASE("drive then limp")
+	{
+		struct ragdoll_death death = death_of(0);
+		long replaced;
+		long id = ragdolls_start(&death, &replaced);
+		long tick;
+
+		for (tick = 0; tick < RAGDOLL_DRIVE_TICKS; tick++, now++)
+			CHECK(ragdolls_action(id) == _ragdoll_action_drive, "driven at tick %ld", tick);
+		CHECK(ragdolls_action(id) == _ragdoll_action_limp, "then let go");
+		CHECK(ragdolls_get(id)->limp, "limp");
+		for (tick = 0; tick < 3; tick++, now++)
+			CHECK(ragdolls_action(id) == _ragdoll_action_none, "once");
+		return 0;
+	}
+	CASE("removed")
+	{
+		struct ragdoll_death death = death_of(1);
+		long replaced;
+		long id;
+
+		/* (a vehicle's index: no longer a biped) */
+		id = ragdolls_start(&death, &replaced);
+		CHECK(ragdolls_action(id) == _ragdoll_action_remove, "not a biped");
+		death = death_of(2);
+		id = ragdolls_start(&death, &replaced);
+		CHECK(ragdolls_action(id) == _ragdoll_action_drive, "a biped");
+		deleted[2] = TRUE;
+		CHECK(ragdolls_action(id) == _ragdoll_action_remove, "deleted");
+		ragdolls_stop(id);
+		CHECK(!ragdolls_get(id) && !ragdolls_of_object(2), "stopped");
+		CHECK(ragdolls_action(id) == _ragdoll_action_none, "and done");
 		return 0;
 	}
 	fprintf(stderr, "unknown case '%s'\n", case_name);

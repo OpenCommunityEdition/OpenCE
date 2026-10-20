@@ -281,6 +281,83 @@ static void a_driven_ragdoll_holds_its_pose(void)
     physics_world_destroy(world);
 }
 
+/* a * b */
+static void multiply(const float a[4], const float b[4], float out[4])
+{
+    out[0] = a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1];
+    out[1] = a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0];
+    out[2] = a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3];
+    out[3] = a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2];
+}
+
+/* the angle (radians) between a part's rotation from its parent's in two
+   sets of poses */
+static float joint_difference(const physics_pose *a, const physics_pose *b, int part, int parent)
+{
+    float conjugate[4], from_a[4], from_b[4], dot;
+    int i;
+
+    memcpy(conjugate, a[parent].rotation, sizeof(conjugate));
+    conjugate[0] = -conjugate[0], conjugate[1] = -conjugate[1], conjugate[2] = -conjugate[2];
+    multiply(conjugate, a[part].rotation, from_a);
+    memcpy(conjugate, b[parent].rotation, sizeof(conjugate));
+    conjugate[0] = -conjugate[0], conjugate[1] = -conjugate[1], conjugate[2] = -conjugate[2];
+    multiply(conjugate, b[part].rotation, from_b);
+    for (dot = 0.0f, i = 0; i < 4; i++)
+        dot += from_a[i] * from_b[i];
+    dot = fabsf(dot);
+    return 2.0f * acosf(dot > 1.0f ? 1.0f : dot);
+}
+
+/* A ragdoll falling freely (no ground: gravity alone turns no joint),
+   driven toward a pose with the left thigh swung forward. The motors take
+   the thigh there within the blend time and hold it against a kick; let go,
+   the same kick swings it away. */
+static void the_motors_follow_a_target_then_let_go(int limp, float *at_target, float *after_kick)
+{
+    static const float swing[4] = {0.19866933f, 0.0f, 0.0f, 0.98006658f}; /* 0.4 rad about x */
+    physics_world *world = new_world();
+    physics_part parts[PART_COUNT];
+    physics_pose rest[PART_COUNT], target[PART_COUNT], poses[PART_COUNT];
+    float kick[3] = {0, 0, 0}, at[3];
+    uint32_t ragdoll;
+
+    make_ragdoll(parts, rest, 20.0f);
+    memcpy(target, rest, sizeof(target));
+    multiply(swing, rest[LEFT_THIGH].rotation, target[LEFT_THIGH].rotation);
+    ragdoll = physics_ragdoll_add(world, parts, PART_COUNT, rest, rest, &material);
+    CHECK(ragdoll != PHYSICS_NONE);
+    CHECK(physics_ragdoll_drive(world, ragdoll, target, PART_COUNT, 8.0f) == 0);
+    step_for(world, 0.5f);
+    CHECK(physics_ragdoll_get_poses(world, ragdoll, poses, PART_COUNT) == 0);
+    *at_target = joint_difference(poses, target, LEFT_THIGH, PELVIS);
+    if (limp)
+        CHECK(physics_ragdoll_go_limp(world, ragdoll) == 0);
+    /* kicked at the knee, back across the swing (the swing put it at +y) */
+    memcpy(at, poses[LEFT_THIGH].position, sizeof(at));
+    at[2] -= 0.36f;
+    kick[1] = -6.0f;
+    CHECK(physics_ragdoll_add_impulse(world, ragdoll, LEFT_THIGH, kick, at) == 0);
+    step_for(world, 0.5f);
+    CHECK(physics_ragdoll_get_poses(world, ragdoll, poses, PART_COUNT) == 0);
+    *after_kick = joint_difference(poses, target, LEFT_THIGH, PELVIS);
+    physics_world_destroy(world);
+}
+
+static void motors_follow_for_the_blend_then_release(void)
+{
+    float driven_at, driven_after, limp_at, limp_after;
+
+    the_motors_follow_a_target_then_let_go(0, &driven_at, &driven_after);
+    the_motors_follow_a_target_then_let_go(1, &limp_at, &limp_after);
+    /* reached within the blend time (from 0.4 rad away) */
+    CHECK(driven_at < 0.1f);
+    CHECK(limp_at == driven_at);
+    /* held, driven; swung away, limp */
+    CHECK(driven_after < 0.1f);
+    CHECK(limp_after > 0.2f);
+}
+
 static void a_broken_joint_lets_a_limb_go(void)
 {
     physics_world *world = new_world();
@@ -395,6 +472,7 @@ int main(int argc, char **argv)
         {"a_full_world_refuses_bodies", a_full_world_refuses_bodies},
         {"ragdoll_falls_and_keeps_its_limits", ragdoll_falls_and_keeps_its_limits},
         {"a_driven_ragdoll_holds_its_pose", a_driven_ragdoll_holds_its_pose},
+        {"motors_follow_for_the_blend_then_release", motors_follow_for_the_blend_then_release},
         {"a_broken_joint_lets_a_limb_go", a_broken_joint_lets_a_limb_go},
         {"bad_ragdolls_are_refused", bad_ragdolls_are_refused},
         {"a_kinematic_body_pushes_debris", a_kinematic_body_pushes_debris},

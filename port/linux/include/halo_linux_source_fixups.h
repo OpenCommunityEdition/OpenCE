@@ -28,9 +28,11 @@ float render_interpolation_game_time_sec(long ticks);
 
 /* the host's physics world for ragdolls and debris (port/linux/game/physics_jolt.c):
 the structure bsp's collision triangles sent when it loads or switches, and
-everything removed with the map */
+everything removed with the map, and each tick's ragdolls stepped after the
+objects' update */
 void physics_jolt_structure_bsp_reconnect(void);
 void physics_jolt_dispose_from_old_map(void);
+void physics_jolt_update(float seconds);
 /* dead bipeds' ragdolls (port/linux/game/ragdolls.c): the damage done to an
 object, and a unit's death (not a feigned one), with its pose */
 struct damage_data;

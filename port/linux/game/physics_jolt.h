@@ -30,5 +30,8 @@ long physics_jolt_level_triangles(struct collision_bsp const *bsp, real *vertice
 (scenario.c), and everything removed when the map goes */
 void physics_jolt_structure_bsp_reconnect(void);
 void physics_jolt_dispose_from_old_map(void);
+/* the tick's deaths made ragdolls, their motors driven or let go, the world
+stepped and its poses read back (game.c's game_tick, after the objects) */
+void physics_jolt_update(real seconds);
 
 #endif

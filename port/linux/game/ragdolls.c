@@ -7,7 +7,9 @@ hit on a biped is remembered for the tick, so that a death can carry the
 blow that caused it (the death comes later in the same damage, units.c's
 unit_damage_aftermath); each death of a biped with a body
 (ragdoll_bodies.c) is queued with the biped's node matrices and velocity
-for the physics' next tick to start its ragdoll from.
+for the physics' next tick to start its ragdoll from. The ragdolls the host
+has are kept here too: when each started, whether its motors still follow
+the animation, and the poses the host last gave.
 */
 
 #include "cseries/cseries.h"
@@ -30,6 +32,7 @@ static struct
 	struct ragdoll_death deaths[RAGDOLL_DEATHS_MAX];
 	long hit_count;
 	struct ragdoll_hit hits[RAGDOLL_HITS_MAX];
+	struct ragdoll active[RAGDOLLS_MAX];
 } ragdolls;
 
 boolean ragdolls_enabled(void)
@@ -151,8 +154,118 @@ void ragdolls_deaths_clear(void)
 	ragdolls.death_count = 0;
 }
 
+void ragdoll_pose_from_matrix(
+	real_matrix4x3 const *matrix,
+	struct ragdoll_pose *pose)
+{
+	real length;
+
+	pose->position = matrix->position;
+	matrix4x3_rotation_to_quaternion(matrix, &pose->rotation);
+	pose->rotation.v.i = -pose->rotation.v.i;
+	pose->rotation.v.j = -pose->rotation.v.j;
+	pose->rotation.v.k = -pose->rotation.v.k;
+	length = square_root(pose->rotation.v.i * pose->rotation.v.i + pose->rotation.v.j * pose->rotation.v.j +
+		pose->rotation.v.k * pose->rotation.v.k + pose->rotation.w * pose->rotation.w);
+	if (length > _real_epsilon)
+	{
+		pose->rotation.v.i /= length;
+		pose->rotation.v.j /= length;
+		pose->rotation.v.k /= length;
+		pose->rotation.w /= length;
+	}
+	else
+	{
+		pose->rotation.v.i = pose->rotation.v.j = pose->rotation.v.k = 0.0f;
+		pose->rotation.w = 1.0f;
+	}
+}
+
+struct ragdoll *ragdolls_get(
+	long id)
+{
+	return id >= 1 && id <= RAGDOLLS_MAX && ragdolls.active[id - 1].used ? &ragdolls.active[id - 1] : NULL;
+}
+
+struct ragdoll const *ragdolls_of_object(
+	long object_index)
+{
+	long index;
+
+	if (object_index == NONE)
+		return NULL;
+	for (index = 0; index < RAGDOLLS_MAX; index++)
+	{
+		if (ragdolls.active[index].used && ragdolls.active[index].object_index == object_index)
+			return &ragdolls.active[index];
+	}
+	return NULL;
+}
+
+long ragdolls_start(
+	struct ragdoll_death const *death,
+	long *replaced)
+{
+	struct ragdoll *ragdoll;
+	long chosen = NONE;
+	long index;
+
+	*replaced = NONE;
+	if (ragdolls_of_object(death->object_index))
+		return NONE;
+	for (index = 0; index < RAGDOLLS_MAX && chosen == NONE; index++)
+	{
+		if (!ragdolls.active[index].used)
+			chosen = index;
+	}
+	if (chosen == NONE)
+	{
+		chosen = 0;
+		for (index = 1; index < RAGDOLLS_MAX; index++)
+		{
+			if (ragdolls.active[index].start_time < ragdolls.active[chosen].start_time)
+				chosen = index;
+		}
+		*replaced = chosen + 1;
+	}
+	ragdoll = &ragdolls.active[chosen];
+	memset(ragdoll, 0, sizeof(*ragdoll));
+	ragdoll->used = TRUE;
+	ragdoll->object_index = death->object_index;
+	ragdoll->body = death->body;
+	ragdoll->start_time = game_time_get();
+	return chosen + 1;
+}
+
+short ragdolls_action(
+	long id)
+{
+	struct ragdoll *ragdoll = ragdolls_get(id);
+
+	if (!ragdoll)
+		return _ragdoll_action_none;
+	if (!object_try_and_get_and_verify_type(ragdoll->object_index, _object_mask_biped))
+		return _ragdoll_action_remove;
+	if (ragdoll->limp)
+		return _ragdoll_action_none;
+	if (game_time_get() - ragdoll->start_time < RAGDOLL_DRIVE_TICKS)
+		return _ragdoll_action_drive;
+	ragdoll->limp = TRUE;
+	return _ragdoll_action_limp;
+}
+
+void ragdolls_stop(
+	long id)
+{
+	struct ragdoll *ragdoll = ragdolls_get(id);
+
+	if (ragdoll)
+		ragdoll->used = FALSE;
+}
+
 void ragdolls_dispose_from_old_map(void)
 {
 	ragdolls.death_count = 0;
 	ragdolls.hit_count = 0;
+	memset(ragdolls.active, 0, sizeof(ragdolls.active));
 }

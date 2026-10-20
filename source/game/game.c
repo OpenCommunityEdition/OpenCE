@@ -388,6 +388,9 @@ void game_tick(
 		profile_scope(game_tick_hs_section, hs_update();)
 	profile_scope(game_tick_recorded_animations_section, recorded_animations_update();)
 	profile_scope(game_tick_objects_section, objects_update();)
+	/* port: the dead bipeds' ragdolls follow their death animations, then
+	fall (port/linux/game/physics_jolt.c) */
+	physics_jolt_update(seconds_per_tick);
 	profile_scope(game_tick_players_after_section, players_update_after_game();)
 	profile_scope(game_tick_hud_section, hud_update();)
 	profile_scope(game_tick_player_effect_section, player_effect_update();)
