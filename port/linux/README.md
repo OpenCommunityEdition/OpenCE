@@ -469,6 +469,7 @@ the setting for one start of the game. It has priority over the file.
 | `paths.saves` | `""` | `HALO_SAVE_ROOT` | The save root. Refer to "Files and folders". |
 | `game.mcc_map_path` | `""` | `HALO_MCC_MAPS` | The folder that holds the MCC custom maps, their package folders and `_shared` resources (`d:\mcc_maps` of the game). Any folder, in or outside the data root. Empty: `mcc_maps` in the data root. Refer to "MCC map support" in [docs/mcc_maps.md](../../docs/mcc_maps.md). |
 | `game.custom_maps_path` | `""` | `HALO_CUSTOM_MAPS` | The folder that holds the Custom Edition maps (`custom_maps` of the game, with its `bitmaps.map`, `sounds.map`, `loc.map` and the maps map sharing downloads). Any folder, in or outside the data root. Empty: `custom_maps` in the data root. |
+| `game.mods_path` | `""` | `HALO_MODS` | The folder that holds the mods, each a folder with a `mod.toml`, and the Mods menu's `load_order.toml`. Any folder, in or outside the data root; a relative one is in the data root. Empty: `mods` in the data root. Refer to [docs/mods.md](../../docs/mods.md). |
 | `network.address` | `""` | `HALO_NET_ADDRESS` | The IPv4 address of this machine for system link. Refer to "Play on one computer". |
 | `network.broadcast` | `""` | `HALO_NET_BROADCAST` | IPv4 addresses, with commas between them, that get the broadcasts of the game. Empty: 255.255.255.255. |
 | `network.online` | `true` | `HALO_NET_ONLINE` | `true`: internet play. `false`: system link on the local network only. |

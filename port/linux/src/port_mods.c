@@ -910,9 +910,27 @@ static int mod_for_map(const struct port_mod *mod, const char *map_name)
 	return 0;
 }
 
+/* The mods folder: game.mods_path (a full path, or one in the data root), else mods in the data root. */
 static const char *mods_root(char *path, size_t size)
 {
-	snprintf(path, size, "%s/mods", platform_data_root());
+	const char *folder = config_string("game.mods_path");
+	static int logged;
+	size_t length;
+
+	if (!*folder)
+		snprintf(path, size, "%s/mods", platform_data_root());
+	else if (folder[0] == '/' || folder[0] == '\\' || folder[1] == ':')
+		snprintf(path, size, "%s", folder);
+	else
+		snprintf(path, size, "%s/%s", platform_data_root(), folder);
+	length = strlen(path);
+	while (length > 1 && (path[length - 1] == '/' || path[length - 1] == '\\'))
+		path[--length] = '\0';
+	if (*folder && !logged)
+	{
+		logged = 1;
+		platform_log("mods: using the folder at %s", path);
+	}
 	return path;
 }
 

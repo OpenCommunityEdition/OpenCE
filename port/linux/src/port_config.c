@@ -428,17 +428,22 @@ static const struct config_setting config_settings[] =
 		"every map. A downloaded map's scripts may not change the player's\n"
 		"settings or other players' games (debug.txt names what they were\n"
 		"refused)." },
-	{ "game.mcc_map_path", _config_string, "\"\"", "HALO_MCC_MAPS", _environment_value, _platform_desktop,
+	{ "game.mcc_map_path", _config_string, "\"\"", "HALO_MCC_MAPS", _environment_value, _platform_all,
 		"The folder that holds the MCC custom maps and their package folders\n"
 		"and _shared resources; any folder, which need not be in the data\n"
 		"folder. Empty uses mcc_maps in the data folder. Windows paths are\n"
 		"easiest in single quotes: 'D:\\Halo\\mcc_maps'." },
-	{ "game.custom_maps_path", _config_string, "\"\"", "HALO_CUSTOM_MAPS", _environment_value, _platform_desktop,
+	{ "game.custom_maps_path", _config_string, "\"\"", "HALO_CUSTOM_MAPS", _environment_value, _platform_all,
 		"The folder that holds the Custom Edition maps (the game's custom_maps\n"
 		"folder, with its bitmaps.map, sounds.map and loc.map, and the maps\n"
 		"map sharing downloads); any folder, which need not be in the data\n"
 		"folder. Empty uses custom_maps in the data folder. Windows paths are\n"
 		"easiest in single quotes: 'D:\\Halo\\custom_maps'." },
+	{ "game.mods_path", _config_string, "\"\"", "HALO_MODS", _environment_value, _platform_all,
+		"The folder that holds the mods (each a folder with a mod.toml, and\n"
+		"the Mods menu's load_order.toml); any folder, which need not be in\n"
+		"the data folder. Empty uses mods in the data folder. Windows paths are\n"
+		"easiest in single quotes: 'D:\\Halo\\mods'." },
 
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"

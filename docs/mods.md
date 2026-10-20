@@ -144,7 +144,7 @@ game.
 
 ### Getting a mod onto each platform
 
-- **Linux, Windows**: put the mod's folder in `mods/` next to `maps/`.
+- **Linux, Windows**: put the mod's folder in `mods/` next to `maps/`. To keep the mods elsewhere, set `game.mods_path` (`HALO_MODS`) in `config.toml` to that folder.
 - **Android**: put it in `mods/` in the app's data folder,
   `/sdcard/Android/data/com.halo.decomp/files/mods`, for example with
   `adb push hd_audio /sdcard/Android/data/com.halo.decomp/files/mods/`.
