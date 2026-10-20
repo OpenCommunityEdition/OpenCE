@@ -51,9 +51,9 @@
 - [x] Task: Limbs as bodies of their own dcc5e594
     - [x] Write tests: native tests that breaking a joint leaves two bodies, the limb flung by the impulse, both coming to rest with their remaining joints inside their limits
     - [x] Joint breaking in the C wrapper; the limb's bones reported in the results with their own root
-- [ ] Task: Drawing the cut
-    - [ ] Write tests: harness tests that the body's draw collapses the detached bones' vertices and each limb's draw collapses every other bone's; the species' blood effect and decal spawn at the joint
-    - [ ] Extra draws of the same model from `render_objects.c`'s `port:` swap; the blood effect from the biped's existing effects
+- [x] Task: Drawing the cut 3aa40563
+    - [x] Write tests: harness tests that the body's draw collapses the detached bones' vertices and each limb's draw collapses every other bone's; the species' blood effect and decal spawn at the joint
+    - [x] Extra draws of the same model from `render_objects.c`'s `port:` swap; the blood effect from the biped's existing effects
 - [ ] Task: Golden frames of dismemberment
     - [ ] Write tests: an Elite dismembered by a scripted grenade (mid-flight, at rest) and a bullet kill that stays whole, with the frame clock
     - [ ] Tune the thresholds; approve the references
