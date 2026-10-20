@@ -39,9 +39,9 @@
 - [x] Task: Drawing the ragdoll's pose 9e2fa64c
     - [x] Write tests: harness tests that the node matrices `render_objects.c` draws come from the results for a ragdoll and from the game otherwise; removing the body (garbage, map change, saved game) removes the ragdoll
     - [x] A `port:` swap at the node-matrix read in `render_objects.c`
-- [ ] Task: Golden frames of ragdolls
-    - [ ] Write tests: `tools/test_macos_frames.py` cases with the frame clock: a Grunt killed by a scripted grenade (mid-fall, at rest) and a body shoved by a Warthog; the existing goldens unchanged with the setting off
-    - [ ] Tune the overrides until the frames look right; approve the references
+- [x] Task: Golden frames of ragdolls ec4ceb2a
+    - [x] Write tests: `tools/test_macos_frames.py` cases with the frame clock: a Grunt killed by a scripted grenade (mid-fall, at rest) and a body shoved by a Warthog; the existing goldens unchanged with the setting off
+    - [x] Tune the overrides until the frames look right; approve the references
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Ragdolls' (Protocol in workflow.md)
 
 ## Phase 4: Dismemberment
