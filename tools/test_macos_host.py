@@ -134,16 +134,16 @@ def bindable(address):
 HOSTING, JOINING = "127.0.0.2", "127.0.0.3"
 
 
-@pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game data in assets/maps")
-@pytest.mark.skipif(not (bindable(HOSTING) and bindable(JOINING)),
-                    reason=f"needs {HOSTING} and {JOINING} on lo0 (sudo ifconfig lo0 alias <address> up)")
-def test_a_second_copy_joins_the_hosted_game(tmp_path):
+def two_copies(tmp_path, extra=None):
+    """one copy hosting bloodgulch and one joining it, on loopback addresses
+    of their own, with system link only; the output of each"""
     def start(name, test, address, other, exit_after):
         folder = tmp_path / name
         folder.mkdir()
         data_root = game_data(folder)
         environment = host_environment(data_root, folder / "home", exit_after, {
-            "HALO_NETWORK_TEST": test, "HALO_NET_ADDRESS": address, "HALO_NET_BROADCAST": other})
+            "HALO_NETWORK_TEST": test, "HALO_NET_ADDRESS": address, "HALO_NET_BROADCAST": other,
+            "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false", **(extra or {})})
         return subprocess.Popen([str(HOST), str(IMAGE)], cwd=data_root, env=environment, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True)
 
@@ -161,3 +161,60 @@ def test_a_second_copy_joins_the_hosted_game(tmp_path):
         assert "halo_host: guest crash" not in output, output[-4000:]
         # each logs both players: its own and the other machine's
         assert re.search(r"network test: tick \d+ player 1: \(", output), output[-4000:]
+    return host_output, client_output
+
+
+def two_copies_available():
+    return (MAPS / "bloodgulch.map").is_file() and bindable(HOSTING) and bindable(JOINING)
+
+
+TWO_COPIES = pytest.mark.skipif(not two_copies_available(), reason=(
+    f"needs the game data in assets/maps, and {HOSTING} and {JOINING} on lo0 "
+    "(sudo ifconfig lo0 alias <address> up)"))
+# game.ragdolls and game.physics_debris on: each machine's own, cosmetic
+PHYSICS = {"HALO_RAGDOLLS": "true", "HALO_PHYSICS_DEBRIS": "true"}
+
+
+@TWO_COPIES
+def test_a_second_copy_joins_the_hosted_game(tmp_path):
+    two_copies(tmp_path)
+
+
+@TWO_COPIES
+def test_a_second_copy_joins_with_ragdolls_and_debris_on(tmp_path):
+    # (the bodies are each machine's own: nothing more is sent, so the two
+    # play as they do with the settings off)
+    two_copies(tmp_path, PHYSICS)
+
+
+@pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game data in assets/maps")
+def test_a_hosted_game_plays_with_ragdolls_and_debris_on(tmp_path):
+    # (one copy, on 127.0.0.1: debug.network_test_crowd's thirty bipeds shot
+    # dead and two hundred casings thrown, with the host's physics stepping
+    # them, headless)
+    result = run_host(game_data(tmp_path), tmp_path / "home", exit_after=40, timeout=240,
+                      extra={"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NET_ADDRESS": "127.0.0.1",
+                             "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+                             "HALO_NETWORK_TEST_CROWD": "15", "HALO_HOST_PHYSICS_LOG": "1", **PHYSICS})
+    output = result.stdout + result.stderr
+    assert result.returncode == 0, output[-4000:]
+    assert "halo_host: guest crash" not in output, output[-4000:]
+    assert len(re.findall(r"network test: tick \d+ player 0: \(", output)) >= 5, output[-4000:]
+    crowd = re.search(r"the crowd: (\d+) of (\d+) bipeds dead, (\d+) casings thrown", output)
+    assert crowd and crowd[1] == crowd[2] == "30" and crowd[3] == "200", output[-4000:]
+    later = re.search(r"the crowd: (\d+) ragdolls, (\d+) casings left, (\d+) of them Jolt's bodies", output)
+    assert later and int(later[1]) > 0 and int(later[3]) > 0, output[-4000:]
+    steps = re.findall(r"halo_host: physics step: (\d+) refused, (\d+) ragdolls, (\d+) bodies", output)
+    assert steps and max(int(ragdolls) for _, ragdolls, _ in steps) >= 30, output[-4000:]
+    assert all(refused == "0" for refused, _, _ in steps), output[-4000:]
+
+
+def test_the_network_version_is_unchanged():
+    """the settings change nothing the machines send each other: the version is main's"""
+    pattern = r"#define HALO_PORT_NETWORK_VERSION (\d+)"
+    here = re.search(pattern, (ROOT / "port/linux/include/halo_port_limits.h").read_text())[1]
+    main = subprocess.run(["git", "show", "main:port/linux/include/halo_port_limits.h"], cwd=ROOT,
+                          capture_output=True, text=True)
+    if main.returncode != 0:
+        pytest.skip("no main branch to compare with")
+    assert re.search(pattern, main.stdout)[1] == here
