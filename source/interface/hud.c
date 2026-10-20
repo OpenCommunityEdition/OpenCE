@@ -105,6 +105,7 @@ symbols in this file:
 #include "render/render_camera_projection.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h" /* port: the ui map's scenario type */
 #include "sound/game_sound.h"
 #include "tag_files/tag_files.h"
 #include "text/draw_string.h"
@@ -1426,8 +1427,14 @@ static boolean hud_match_timer_setting(
 		campaign_setting = config_boolean("display.campaign_timer") != 0;
 	}
 
-	/* (multiplayer has its own setting, the campaign another) */
-	return game_engine_running() ? match_setting : campaign_setting;
+	/* (multiplayer has its own setting, the campaign another; the main menu's
+	map, ui.map, has the campaign's rules but no clock) */
+	if (game_engine_running())
+		return match_setting;
+	if (global_scenario_try_and_get() == NULL ||
+		global_scenario_try_and_get()->type == _scenario_type_main_menu)
+		return FALSE;
+	return campaign_setting;
 }
 
 static void hud_draw_match_timer(
