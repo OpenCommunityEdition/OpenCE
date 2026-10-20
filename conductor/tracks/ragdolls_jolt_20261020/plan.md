@@ -27,9 +27,9 @@
 - [x] Task: Bodies from the model c62934cc
     - [x] Write tests: harness tests build a body description (bones, shapes, joints, limits, masses) from a model's nodes and collision model's per-node geometry for a fake biped; overrides from `port/assets/ragdolls/` replace generated values; a biped with no usable data gives none
     - [x] `port/linux/game/ragdoll_bodies.c`, and the override files for the stock species
-- [ ] Task: Deaths start ragdolls
-    - [ ] Write tests: harness tests that `unit_died` on a biped queues a death with its pose and the killing damage's direction and strength, only with `game.ragdolls` on
-    - [ ] A `port:` hook in `units.c` / `bipeds.c` calling a port function declared in `halo_linux_source_fixups.h`
+- [x] Task: Deaths start ragdolls 72ea64c7
+    - [x] Write tests: harness tests that `unit_died` on a biped queues a death with its pose and the killing damage's direction and strength, only with `game.ragdolls` on
+    - [x] A `port:` hook in `units.c` / `bipeds.c` calling a port function declared in `halo_linux_source_fixups.h`
 - [ ] Task: Animation, then limp
     - [ ] Write tests: native tests that the joint motors follow a target pose for the blend time, then release; a ragdoll dropped on a plane rests with its joints inside their limits
     - [ ] Motor targets from the death animation's node matrices each tick
