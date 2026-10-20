@@ -30,9 +30,9 @@
 - [x] Task: Deaths start ragdolls 72ea64c7
     - [x] Write tests: harness tests that `unit_died` on a biped queues a death with its pose and the killing damage's direction and strength, only with `game.ragdolls` on
     - [x] A `port:` hook in `units.c` / `bipeds.c` calling a port function declared in `halo_linux_source_fixups.h`
-- [ ] Task: Animation, then limp
-    - [ ] Write tests: native tests that the joint motors follow a target pose for the blend time, then release; a ragdoll dropped on a plane rests with its joints inside their limits
-    - [ ] Motor targets from the death animation's node matrices each tick
+- [x] Task: Animation, then limp 3d1bd97f
+    - [x] Write tests: native tests that the joint motors follow a target pose for the blend time, then release; a ragdoll dropped on a plane rests with its joints inside their limits
+    - [x] Motor targets from the death animation's node matrices each tick
 - [ ] Task: Forces and collisions
     - [ ] Write tests: native tests that an impulse moves a ragdoll, a kinematic box shoves one aside, and two ragdolls collide; harness tests that later damage and explosions near a corpse queue impulses
     - [ ] Damage and explosion impulses; vehicles and living bipeds as kinematic bodies; sleeping
