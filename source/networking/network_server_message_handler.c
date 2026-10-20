@@ -810,8 +810,8 @@ static void evolved_rules_send_settings(
 			network_game_server_send_message_to_client_machine(server, only, message);
 		return;
 	}
-	if (game_in_progress())
-		return;
+	/* port: the menu map's clock is already running in the lobby, and again
+	   when the start is sent. waiting for it to stop dropped the sheet. */
 	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
 	{
 		struct network_game_server_client_machine *machine =
@@ -1159,7 +1159,8 @@ boolean network_game_server_send_game_settings_to_all_machines(
 
 	network_game_settings_update_pending = !result;
 	network_game_settings_update_time = system_milliseconds();
-	/* port: lobby only. An in-progress game already gave this to each machine. */
+	/* port: with the settings. a machine that joins a game in progress is
+	   sent the sheet on its own as well. */
 	evolved_rules_send_settings(server, NULL);
 
 	return result;

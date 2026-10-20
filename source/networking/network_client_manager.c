@@ -930,7 +930,10 @@ void network_game_client_dispose(
 		/* Leaving a lobby can dispose the client without loading a map. */
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
 		if (!global_network_game_server_get())
+		{
 			performance_options_apply_host_flags(0);
+			evolved_rules_clear_session();
+		}
 #endif
 	}
 
@@ -1349,7 +1352,12 @@ boolean network_game_client_game_settings_updated(
 			performance_options_apply_host_flags(performance_variant_get_flags(
 				&network_game_server_get_game(global_network_game_server_get())->variant));
 		else
+		{
 			performance_options_apply_host_flags(performance_variant_get_flags(&client->game.variant));
+			/* port: the host's sheet is this match only while its variant says so. */
+			evolved_rules_observe_match(TEST_FLAG(client->game.variant.universal_variant.flags,
+				_game_variant_anniversary_rules_bit) ? TRUE : FALSE);
+		}
 #endif
 		csmemcpy(
 			&client->game.local_data,

@@ -565,7 +565,18 @@ boolean evolved_rules_take_message(void const *message, long size)
 		return FALSE;
 	csmemcpy(&evolved_live, bytes + 7, sizeof(evolved_live));
 	evolved_training_pair(&evolved_live);
+	/* port: the loaded variant may not have the bit yet. the session is
+	   what makes this match apply the sheet, as it does on the host. */
+	evolved_session = 1;
 	if (game_in_progress())
 		evolved_apply_presentation();
 	return TRUE;
+}
+
+/* port: a classic variant ends the match this machine joined. the host's
+   session belongs to its menu and is not cleared from here. */
+void evolved_rules_observe_match(boolean evolved)
+{
+	if (!evolved)
+		evolved_session = 0;
 }

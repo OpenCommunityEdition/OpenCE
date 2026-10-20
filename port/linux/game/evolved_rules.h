@@ -74,5 +74,7 @@ long evolved_rules_item_period(long period_ticks, long authored_seconds);
 
 boolean evolved_rules_write_message(void *buffer, long buffer_size);
 boolean evolved_rules_take_message(void const *message, long size);
+/* A settings update. A classic variant ends a match this machine joined. */
+void evolved_rules_observe_match(boolean evolved);
 
 #endif
