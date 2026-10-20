@@ -25,7 +25,8 @@ boolean evolved_views_is_teammate_window(short window_index);
 boolean evolved_views_is_local_window(short window_index);
 
 /* Spare local-player slot a teammate pane borrows so the HUD and the
-first-person weapon will draw. The one local player keeps slot 0. */
+first-person weapon will draw. A slot that already has a player is left
+alone. */
 short evolved_views_hud_slot(void);
 
 /* The pane being drawn, so that body is hidden the way a first-person view is. */

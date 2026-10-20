@@ -27,15 +27,27 @@ real_matrix4x3 *render_interpolation_object_node_matrices(long object_index);
 
 #define EVOLVED_VIEW_MAXIMUM 4
 
-/* slot 0 is the real local player */
-#define EVOLVED_VIEWS_HUD_SLOT 1
-
 static long view_unit[EVOLVED_VIEW_MAXIMUM];
 static short view_count = 1;
 static short local_slot = 0;
 static short view_rendering = 0;
+static short view_hud_slot = NONE;
 static boolean view_hiding = FALSE;
 static boolean view_borrowed = FALSE;
+
+/* A pane's HUD needs a local player slot. Slot 1 is the second person
+when two play on this machine, and clearing it drops their listener. */
+static short evolved_views_free_slot(void)
+{
+	short slot;
+
+	for (slot = 0; slot < MAXIMUM_LOCAL_PLAYERS; slot++)
+	{
+		if (local_player_get_player_index(slot) == NONE)
+			return slot;
+	}
+	return NONE;
+}
 
 /* Two panes are top and bottom. Three are a wide top and two bottoms.
 Four are the corners. The name is this machine's setting, so a bottom
@@ -153,8 +165,13 @@ static void evolved_views_refresh(void)
 	short index;
 	short placed;
 
+	/* the pane has the slot until it ends. a refresh here would forget
+	which one and clear a different player. */
+	if (view_borrowed)
+		return;
 	view_count = 1;
 	local_slot = 0;
+	view_hud_slot = NONE;
 	view_unit[0] = NONE;
 	if (!config_boolean("display.teammate_views") || !evolved_views_team_screen() ||
 		evolved_views_local_count() != 1 || !player_data || !player_data->valid)
@@ -177,6 +194,9 @@ static void evolved_views_refresh(void)
 		mates[mate_count++] = player->unit_index;
 	}
 	if (!mate_count)
+		return;
+	view_hud_slot = evolved_views_free_slot();
+	if (view_hud_slot == NONE)
 		return;
 	view_count = (short)(mate_count + 1);
 	local_slot = evolved_views_slot(view_count);
@@ -210,7 +230,7 @@ boolean evolved_views_is_local_window(short window_index)
 
 short evolved_views_hud_slot(void)
 {
-	return EVOLVED_VIEWS_HUD_SLOT;
+	return view_hud_slot;
 }
 
 boolean evolved_views_camera(short window_index, struct observer_result *result)
@@ -273,16 +293,18 @@ void evolved_views_begin(short window_index)
 	if (!evolved_views_is_teammate_window(window_index))
 		return;
 	player_index = player_index_from_unit_index(view_unit[window_index]);
-	if (player_index == NONE)
+	if (player_index == NONE || view_hud_slot == NONE ||
+		local_player_get_player_index(view_hud_slot) != NONE)
 		return;
-	/* the HUD and the first-person weapon look up a local player. slot 1
-	is free while one person plays, and it is put back when the pane ends.
-	the pane's camera stays the unzoomed view, so this slot must not report
-	the teammate's zoom */
-	local_player_set_player_index(EVOLVED_VIEWS_HUD_SLOT, player_index);
-	player_control_new_unit(EVOLVED_VIEWS_HUD_SLOT, NONE);
-	first_person_weapon_observe_unit(EVOLVED_VIEWS_HUD_SLOT, view_unit[window_index]);
-	hud_weapon_port_update_player(EVOLVED_VIEWS_HUD_SLOT);
+	/* the HUD and the first-person weapon look up a local player. an
+	empty slot is borrowed and put back empty. a slot that already has
+	a player is their listener, so it is not cleared. the pane's camera
+	stays the unzoomed view, so this slot must not report the teammate's
+	zoom */
+	local_player_set_player_index(view_hud_slot, player_index);
+	player_control_new_unit(view_hud_slot, NONE);
+	first_person_weapon_observe_unit(view_hud_slot, view_unit[window_index]);
+	hud_weapon_port_update_player(view_hud_slot);
 	view_borrowed = TRUE;
 }
 
@@ -290,9 +312,9 @@ void evolved_views_end(void)
 {
 	if (view_borrowed)
 	{
-		first_person_weapon_observe_clear(EVOLVED_VIEWS_HUD_SLOT);
-		player_control_new_unit(EVOLVED_VIEWS_HUD_SLOT, NONE);
-		local_player_set_player_index(EVOLVED_VIEWS_HUD_SLOT, NONE);
+		first_person_weapon_observe_clear(view_hud_slot);
+		player_control_new_unit(view_hud_slot, NONE);
+		local_player_set_player_index(view_hud_slot, NONE);
 		view_borrowed = FALSE;
 	}
 	view_hiding = FALSE;
