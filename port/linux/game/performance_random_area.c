@@ -1,9 +1,11 @@
-/* An evolved match draws the darker teammate respawn area when the
-matching evolved map places a randoms mesh on the player starts.
-Hang 'em High does. Maps that never place one, Prisoner among them, draw
-nothing here. A classic game draws neither. */
+/* An evolved match draws the darker teammate respawn area from the mesh
+shipped with the game when that map has one. Hang 'em High does. The
+matching evolved map is used when this copy has no mesh for it. Maps that
+never place one, Prisoner among them, draw nothing here. A classic game
+draws neither. */
 
 #include "cseries.h"
+#include "evolved_assets.h"
 #include "bitmaps/bitmap_group.h"
 #include "cache/cache_files.h"
 #include "main/main.h"
@@ -334,45 +336,21 @@ static void area_discard(void)
 	area_offset.x = area_offset.y = area_offset.z = 0.0f;
 }
 
-static int area_load_part(FILE *file, unsigned long file_size, unsigned long vertex_file,
-	unsigned long index_relative, unsigned char const *part)
+static int area_take_part(struct model_vertex_uncompressed *uncompressed, long vertex_count,
+	unsigned short *indices, long triangle_count)
 {
-	struct model_vertex_uncompressed *uncompressed = NULL;
 	struct model_vertex_compressed *compressed = NULL;
-	unsigned short *indices = NULL;
 	struct area_part *slot;
-	long vertex_count = 0;
-	long triangle_count = 0;
 	long index;
-	unsigned long vertex_at;
-	unsigned long index_at;
 	real radius_squared = 0.0f;
 	int loaded = 0;
 
-	if (area_part_count >= AREA_PARTS_MAXIMUM)
-		return 1;
-	if (!area_part_fits(part, &vertex_count, &triangle_count))
-		return 1;
-	if (vertex_file > file_size || index_relative > file_size - vertex_file ||
-		area_u32(part + 0x64) > file_size - vertex_file ||
-		area_u32(part + 0x4C) > file_size - (vertex_file + index_relative))
-		goto done;
-	vertex_at = vertex_file + area_u32(part + 0x64);
-	index_at = vertex_file + index_relative + area_u32(part + 0x4C);
-	if (!area_span(vertex_at, (unsigned long)vertex_count * 0x44UL, file_size) ||
-		!area_span(index_at, (unsigned long)(triangle_count + 2) * 2UL, file_size))
-		goto done;
-	uncompressed = (struct model_vertex_uncompressed *)malloc(
-		(unsigned long)vertex_count * sizeof(*uncompressed));
+	if (!uncompressed || !indices || vertex_count < 3 || triangle_count < 1)
+		return 0;
 	compressed = (struct model_vertex_compressed *)malloc(
 		(unsigned long)vertex_count * sizeof(*compressed));
-	indices = (unsigned short *)malloc((unsigned long)(triangle_count + 2) * sizeof(*indices));
-	if (!uncompressed || !compressed || !indices ||
-		fseek(file, (long)vertex_at, SEEK_SET) != 0 ||
-		fread(uncompressed, sizeof(*uncompressed), (size_t)vertex_count, file) != (size_t)vertex_count ||
-		fseek(file, (long)index_at, SEEK_SET) != 0 ||
-		fread(indices, sizeof(*indices), (size_t)(triangle_count + 2), file) != (size_t)(triangle_count + 2))
-		goto done;
+	if (!compressed)
+		return 0;
 	slot = &area_parts[area_part_count];
 	slot->centroid.x = slot->centroid.y = slot->centroid.z = 0.0f;
 	for (index = 0; index < vertex_count; index++)
@@ -448,8 +426,47 @@ static int area_load_part(FILE *file, unsigned long file_size, unsigned long ver
 	loaded = 1;
 
 done:
-	area_free(uncompressed);
 	area_free(compressed);
+	return loaded;
+}
+
+static int area_load_part(FILE *file, unsigned long file_size, unsigned long vertex_file,
+	unsigned long index_relative, unsigned char const *part)
+{
+	struct model_vertex_uncompressed *uncompressed = NULL;
+	unsigned short *indices = NULL;
+	long vertex_count = 0;
+	long triangle_count = 0;
+	unsigned long vertex_at;
+	unsigned long index_at;
+	int loaded = 0;
+
+	if (area_part_count >= AREA_PARTS_MAXIMUM)
+		return 1;
+	if (!area_part_fits(part, &vertex_count, &triangle_count))
+		return 1;
+	if (vertex_file > file_size || index_relative > file_size - vertex_file ||
+		area_u32(part + 0x64) > file_size - vertex_file ||
+		area_u32(part + 0x4C) > file_size - (vertex_file + index_relative))
+		goto done;
+	vertex_at = vertex_file + area_u32(part + 0x64);
+	index_at = vertex_file + index_relative + area_u32(part + 0x4C);
+	if (!area_span(vertex_at, (unsigned long)vertex_count * 0x44UL, file_size) ||
+		!area_span(index_at, (unsigned long)(triangle_count + 2) * 2UL, file_size))
+		goto done;
+	uncompressed = (struct model_vertex_uncompressed *)malloc(
+		(unsigned long)vertex_count * sizeof(*uncompressed));
+	indices = (unsigned short *)malloc((unsigned long)(triangle_count + 2) * sizeof(*indices));
+	if (!uncompressed || !indices ||
+		fseek(file, (long)vertex_at, SEEK_SET) != 0 ||
+		fread(uncompressed, sizeof(*uncompressed), (size_t)vertex_count, file) != (size_t)vertex_count ||
+		fseek(file, (long)index_at, SEEK_SET) != 0 ||
+		fread(indices, sizeof(*indices), (size_t)(triangle_count + 2), file) != (size_t)(triangle_count + 2))
+		goto done;
+	loaded = area_take_part(uncompressed, vertex_count, indices, triangle_count);
+
+done:
+	area_free(uncompressed);
 	area_free(indices);
 	return loaded;
 }
@@ -515,6 +532,90 @@ static int area_collect(unsigned char const *tag, unsigned long tag_size,
 	return area_place_count > 0 ? 1 : 0;
 }
 
+/* 1 when the mesh shipped for this map is loaded, 0 when this copy has
+none, -1 when that copy is there and cannot be used. */
+static int area_from_pack(char const *leaf)
+{
+	unsigned char const *payload;
+	unsigned long size;
+	unsigned long cursor;
+	unsigned long place_count;
+	unsigned long part_count;
+	unsigned long place_index;
+	unsigned long part_index;
+
+	if (!leaf || !evolved_assets_find(EVOLVED_ASSET_AREA, leaf, &payload, &size))
+		return 0;
+	if (size < 4)
+		return -1;
+	place_count = area_u32(payload);
+	if (place_count < 1 || place_count > AREA_PLACES_MAXIMUM)
+		return -1;
+	cursor = 4;
+	if (size - cursor < place_count * 24UL + 16UL)
+		return -1;
+	for (place_index = 0; place_index < place_count; place_index++)
+	{
+		area_places[place_index].position.x = area_f32(payload + cursor);
+		area_places[place_index].position.y = area_f32(payload + cursor + 4);
+		area_places[place_index].position.z = area_f32(payload + cursor + 8);
+		area_places[place_index].yaw = area_f32(payload + cursor + 12);
+		area_places[place_index].pitch = area_f32(payload + cursor + 16);
+		area_places[place_index].roll = area_f32(payload + cursor + 20);
+		cursor += 24;
+	}
+	area_place_count = (int)place_count;
+	area_node_translation.x = area_f32(payload + cursor);
+	area_node_translation.y = area_f32(payload + cursor + 4);
+	area_node_translation.z = area_f32(payload + cursor + 8);
+	part_count = area_u32(payload + cursor + 12);
+	cursor += 16;
+	if (part_count < 1 || part_count > AREA_PARTS_MAXIMUM)
+		return -1;
+	for (part_index = 0; part_index < part_count; part_index++)
+	{
+		unsigned long vertex_count;
+		unsigned long index_count;
+		unsigned long mesh_bytes;
+		long triangle_count;
+		struct model_vertex_uncompressed *uncompressed;
+		unsigned short *indices;
+		int taken;
+
+		if (size - cursor < 8)
+			return -1;
+		vertex_count = area_u32(payload + cursor);
+		index_count = area_u32(payload + cursor + 4);
+		cursor += 8;
+		triangle_count = (long)index_count - 2;
+		if (vertex_count < 3 || vertex_count > AREA_VERTICES_MAXIMUM ||
+			triangle_count < 1 || triangle_count > AREA_TRIANGLES_MAXIMUM)
+			return -1;
+		mesh_bytes = vertex_count * 0x44UL + index_count * 2UL;
+		if (size - cursor < mesh_bytes)
+			return -1;
+		uncompressed = (struct model_vertex_uncompressed *)malloc(vertex_count * sizeof(*uncompressed));
+		indices = (unsigned short *)malloc(index_count * sizeof(*indices));
+		if (!uncompressed || !indices)
+		{
+			area_free(uncompressed);
+			area_free(indices);
+			return -1;
+		}
+		memcpy(uncompressed, payload + cursor, vertex_count * 0x44UL);
+		memcpy(indices, payload + cursor + vertex_count * 0x44UL, index_count * 2UL);
+		cursor += mesh_bytes;
+		taken = area_take_part(uncompressed, (long)vertex_count, indices, triangle_count);
+		area_free(uncompressed);
+		area_free(indices);
+		if (!taken)
+			return -1;
+	}
+	if (area_part_count < 1)
+		return -1;
+	return 1;
+}
+
 static void area_prepare(void)
 {
 	FILE *file = NULL;
@@ -541,10 +642,20 @@ static void area_prepare(void)
 	long told;
 	int collected;
 	int best_count;
+	int packed;
 	unsigned long best_address;
 
-	if (!area_leaf(leaf, sizeof(leaf)) ||
-		snprintf(path, sizeof(path), "d:\\evolved_maps\\%s.map", leaf) >= (int)sizeof(path))
+	if (!area_leaf(leaf, sizeof(leaf)))
+		goto fail;
+	packed = area_from_pack(leaf);
+	if (packed > 0)
+	{
+		area_state = AREA_STATE_LOADED;
+		return;
+	}
+	if (packed < 0)
+		goto missing;
+	if (snprintf(path, sizeof(path), "d:\\evolved_maps\\%s.map", leaf) >= (int)sizeof(path))
 		goto fail;
 	file = fopen(path, "rb");
 	if (!file)
@@ -651,7 +762,7 @@ missing:
 	if (!area_logged)
 	{
 		area_logged = 1;
-		platform_log("evolved: random areas were not loaded from evolved_maps/%s.map", leaf);
+		platform_log("evolved: random areas were not loaded from the game or evolved_maps/%s.map", leaf);
 	}
 fail:
 	if (file)

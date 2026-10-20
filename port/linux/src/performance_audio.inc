@@ -2,6 +2,7 @@
  * optional recordings in the existing mixer preserves the user's audio toggle,
  * master volume, output device and guest/host audio-thread handoff. */
 #include "performance_audio.h"
+#include "evolved_assets.h"
 #include <stdio.h>
 
 enum
@@ -66,15 +67,49 @@ static unsigned short performance_audio_u16(const unsigned char *value)
 
 /* The importer writes canonical 44-byte PCM WAV headers. Refuse other WAV
  * layouts rather than introducing runtime compressed-audio parsers. */
-static int performance_audio_load_clip(unsigned long index)
+static int performance_audio_take_wav(const unsigned char *file_bytes, unsigned long file_size,
+	struct performance_audio_clip *clip)
+{
+	unsigned long bytes, rate, channels, align;
+
+	if (!file_bytes || file_size < 44 ||
+		memcmp(file_bytes, "RIFF", 4) || memcmp(file_bytes + 8, "WAVEfmt ", 8) ||
+		performance_audio_u32(file_bytes + 16) != 16 ||
+		performance_audio_u16(file_bytes + 20) != WAVE_FORMAT_PCM ||
+		performance_audio_u16(file_bytes + 34) != 16 || memcmp(file_bytes + 36, "data", 4))
+		return 0;
+	channels = performance_audio_u16(file_bytes + 22);
+	rate = performance_audio_u32(file_bytes + 24);
+	align = performance_audio_u16(file_bytes + 32);
+	bytes = performance_audio_u32(file_bytes + 40);
+	if ((channels != 1 && channels != 2) || (rate != 22050 && rate != 44100) ||
+		align != channels * 2 || performance_audio_u32(file_bytes + 28) != rate * align ||
+		!bytes || bytes > PERFORMANCE_AUDIO_MAXIMUM_BYTES || bytes % align ||
+		bytes > rate * align * 4 || performance_audio_u32(file_bytes + 4) != bytes + 36 ||
+		file_size != bytes + 44)
+		return 0;
+	clip->samples = malloc(bytes);
+	if (!clip->samples)
+		return 0;
+	memcpy(clip->samples, file_bytes + 44, bytes);
+	clip->bytes = bytes;
+	clip->sample_rate = rate;
+	clip->channels = (unsigned short)channels;
+	return 1;
+}
+
+static int performance_audio_load_wav(unsigned long index)
 {
 	struct performance_audio_clip *clip = &performance_audio_clips[index];
-	unsigned char header[44];
-	unsigned long bytes, rate, channels, align;
+	unsigned char *file_bytes = NULL;
+	unsigned long file_size;
 	char path[4096];
 	FILE *file;
 	int path_length;
+	int taken = 0;
+	long told;
 	const char *root = platform_data_root();
+
 	if (!root || !root[0])
 		return 0;
 	path_length = snprintf(path, sizeof(path), "%s/sounds/performance/%s.wav", root, performance_audio_cues[index]);
@@ -83,44 +118,43 @@ static int performance_audio_load_clip(unsigned long index)
 	file = fopen(path, "rb");
 	if (!file)
 		return 0;
-	if (fread(header, 1, sizeof(header), file) != sizeof(header) ||
-		memcmp(header, "RIFF", 4) || memcmp(header + 8, "WAVEfmt ", 8) ||
-		performance_audio_u32(header + 16) != 16 ||
-		performance_audio_u16(header + 20) != WAVE_FORMAT_PCM ||
-		performance_audio_u16(header + 34) != 16 || memcmp(header + 36, "data", 4))
-		goto invalid;
-	channels = performance_audio_u16(header + 22);
-	rate = performance_audio_u32(header + 24);
-	align = performance_audio_u16(header + 32);
-	bytes = performance_audio_u32(header + 40);
-	if ((channels != 1 && channels != 2) || (rate != 22050 && rate != 44100) ||
-		align != channels * 2 || performance_audio_u32(header + 28) != rate * align ||
-		!bytes || bytes > PERFORMANCE_AUDIO_MAXIMUM_BYTES || bytes % align ||
-		bytes > rate * align * 4 || performance_audio_u32(header + 4) != bytes + 36)
-		goto invalid;
-	clip->samples = malloc(bytes);
-	if (!clip->samples)
-		goto invalid;
-	if (fread(clip->samples, 1, bytes, file) != bytes || fgetc(file) != EOF)
-	{
-		free(clip->samples);
-		clip->samples = NULL;
-		goto invalid;
-	}
-	fclose(file);
-	clip->bytes = bytes;
-	clip->sample_rate = rate;
-	clip->channels = (unsigned short)channels;
-	return 1;
+	if (fseek(file, 0, SEEK_END) != 0 || (told = ftell(file)) < 44 ||
+		(unsigned long)told > PERFORMANCE_AUDIO_MAXIMUM_BYTES + 44)
+		goto done;
+	file_size = (unsigned long)told;
+	file_bytes = malloc(file_size);
+	if (!file_bytes || fseek(file, 0, SEEK_SET) != 0 ||
+		fread(file_bytes, 1, file_size, file) != file_size)
+		goto done;
+	taken = performance_audio_take_wav(file_bytes, file_size, clip);
 
-invalid:
+done:
+	if (file_bytes)
+		free(file_bytes);
 	fclose(file);
-	return 0;
+	return taken;
 }
 
-/* The spoken cues live in the user's evolved map as Xbox ADPCM. They
-are not shipped with the game. A sounds/performance WAV is preferred when
-the user has imported one. */
+static int performance_audio_load_embedded(unsigned long index)
+{
+	const unsigned char *bytes;
+	unsigned long size;
+
+	if (!evolved_assets_find(EVOLVED_ASSET_SOUND, performance_audio_cues[index], &bytes, &size))
+		return 0;
+	return performance_audio_take_wav(bytes, size, &performance_audio_clips[index]);
+}
+
+static int performance_audio_load_clip(unsigned long index)
+{
+	/* A sounds/performance WAV replaces the recording shipped with the game. */
+	if (performance_audio_load_wav(index))
+		return 1;
+	return performance_audio_load_embedded(index);
+}
+
+/* The spoken cues are shipped with the game. The user's evolved map still
+has them as Xbox ADPCM when that copy is missing. */
 #define PERFORMANCE_AUDIO_TAG_BASE 0x40440000UL
 #define PERFORMANCE_AUDIO_TAG_MAXIMUM 0x1700000UL
 
@@ -334,7 +368,7 @@ int halo_performance_audio_available(void)
 				performance_audio_complete = FALSE;
 		}
 		if (!performance_audio_complete)
-			platform_log("evolved: timer callouts were not loaded from sounds/performance or evolved_maps/prisoner.map");
+			platform_log("evolved: timer callouts were not loaded from the game, sounds/performance, or evolved_maps/prisoner.map");
 	}
 	return performance_audio_complete != FALSE;
 }

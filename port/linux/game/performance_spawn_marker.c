@@ -1,9 +1,10 @@
-/* A classic map has no scenery\spawn_marker_nhe. An evolved match reads
-that pad, and its texture, out of the user's evolved_maps prisoner.map
-and draws it on the player starts. The model stays in that map. It is not
-shipped with the game. Without the file, the line markers remain. */
+/* A classic map has no scenery\spawn_marker_nhe. An evolved match draws
+the pad shipped with the game on the player starts. The user's
+evolved_maps prisoner.map is used when that copy is not in the game.
+Without either, the line markers remain. */
 
 #include "cseries.h"
+#include "evolved_assets.h"
 #include "bitmaps/bitmap_group.h"
 #include "cache/cache_files.h"
 #include "math/real_math.h"
@@ -178,6 +179,159 @@ static void marker_shader_set(long bitmap_tag)
 	memcpy(marker_shader_map + 0x78, &bitmap_tag, sizeof(bitmap_tag));
 }
 
+/* The mesh and the 32-bit texture are already in memory. */
+static int marker_commit(struct model_vertex_uncompressed *uncompressed, long vertex_count,
+	unsigned short *indices, long index_count)
+{
+	struct model_vertex_compressed *compressed = NULL;
+	long triangle_count;
+	long index;
+	long bitmap_tag;
+	short width;
+	short height;
+	short mipmaps;
+	unsigned long pixel_bytes;
+	int ready = 0;
+
+	triangle_count = index_count - 2;
+	width = marker_bitmap.width;
+	height = marker_bitmap.height;
+	mipmaps = marker_bitmap.mipmap_count;
+	pixel_bytes = marker_pixel_span(width, height, mipmaps);
+	if (triangle_count < 1 || vertex_count < 3 || !uncompressed || !indices || !marker_pixels ||
+		marker_bitmap.signature != BITMAP_GROUP_TAG || marker_bitmap.type != 0 ||
+		marker_bitmap.format != 10 || marker_bitmap.depth != 1 ||
+		!marker_power_of_two(width) || !marker_power_of_two(height) ||
+		pixel_bytes == 0 || pixel_bytes > 1024UL * 1024UL ||
+		(unsigned long)marker_bitmap.pixels_size != pixel_bytes ||
+		marker_pixel_bytes != (long)pixel_bytes)
+		return 0;
+	for (index = 0; index < index_count; index++)
+	{
+		if (indices[index] >= (unsigned short)vertex_count)
+			return 0;
+	}
+	compressed = (struct model_vertex_compressed *)malloc(
+		(unsigned long)vertex_count * sizeof(*compressed));
+	if (!compressed)
+		return 0;
+	marker_centroid.x = marker_centroid.y = marker_centroid.z = 0.0f;
+	for (index = 0; index < vertex_count; index++)
+	{
+		uncompressed[index].nodes[0] = 0;
+		uncompressed[index].nodes[1] = 0;
+		uncompressed[index].node_weights[0] = 1.0f;
+		uncompressed[index].node_weights[1] = 0.0f;
+		marker_centroid.x += uncompressed[index].position.x;
+		marker_centroid.y += uncompressed[index].position.y;
+		marker_centroid.z += uncompressed[index].position.z;
+	}
+	marker_centroid.x /= (real)vertex_count;
+	marker_centroid.y /= (real)vertex_count;
+	marker_centroid.z /= (real)vertex_count;
+	/* The mesh is well under a world unit. This only keeps the transparent
+	sort from treating the pad as a point. */
+	marker_radius = 0.5f;
+	rasterizer_geometry_compress_vertices(
+		_rasterizer_vertex_type_model_uncompressed,
+		vertex_count,
+		compressed,
+		vertex_count * (long)sizeof(*compressed),
+		uncompressed,
+		vertex_count * (long)sizeof(*uncompressed));
+	memset(&marker_vertices, 0, sizeof(marker_vertices));
+	memset(&marker_triangles, 0, sizeof(marker_triangles));
+	if (!rasterizer_vertex_buffer_new(&marker_vertices, _rasterizer_vertex_type_model_compressed,
+			vertex_count, compressed, vertex_count * (long)sizeof(*compressed)) ||
+		!rasterizer_triangle_buffer_new(&marker_triangles, _triangle_buffer_type_precompiled_strip,
+			triangle_count, indices))
+		goto done;
+	marker_triangle_count = triangle_count;
+	/* The cache bit is runtime. The file's copy would make the texture
+	cache refuse to load these pixels. */
+	marker_bitmap.flags = (unsigned short)(marker_bitmap.flags & ~(1u << 7) & ~(1u << 6) & ~(1u << 3));
+	marker_bitmap.pixels_offset = 0;
+	marker_bitmap.pixels_size = marker_pixel_bytes;
+	marker_bitmap.tag_index = NONE;
+	marker_bitmap.cache_block_index = NONE;
+	marker_bitmap.hardware_format = NULL;
+	marker_bitmap.base_address = NULL;
+	memset(&marker_bitmap_group, 0, sizeof(marker_bitmap_group));
+	marker_bitmap_group.bitmaps.count = 1;
+	marker_bitmap_group.bitmaps.address = &marker_bitmap;
+	bitmap_tag = cache_files_register_runtime_ui_tag(BITMAP_GROUP_TAG,
+		"scenery\\spawn_marker_nhe\\bitmaps\\spawn_marker_nhe", &marker_bitmap_group);
+	if (bitmap_tag == NONE)
+		goto done;
+	texture_cache_bitmap_new(bitmap_tag, &marker_bitmap);
+	if (marker_bitmap.pixels_size != marker_pixel_bytes || marker_bitmap.pixels_offset != 0)
+		goto done;
+	marker_shader_set(bitmap_tag);
+	ready = 1;
+
+done:
+	marker_free(compressed);
+	return ready;
+}
+
+/* 1 when the pad shipped with the game is ready, 0 when it is absent,
+-1 when that copy is there and cannot be used. */
+static int marker_from_pack(void)
+{
+	unsigned char const *payload;
+	unsigned long size;
+	unsigned long vertex_count;
+	unsigned long index_count;
+	unsigned long pixel_bytes;
+	unsigned long mesh_at;
+	struct model_vertex_uncompressed *uncompressed = NULL;
+	unsigned short *indices = NULL;
+	int ready = 0;
+
+	if (!evolved_assets_find(EVOLVED_ASSET_MARKER, "marker", &payload, &size))
+		return 0;
+	if (size < 12UL + 0x30UL)
+		goto done;
+	vertex_count = marker_u32(payload);
+	index_count = marker_u32(payload + 4);
+	pixel_bytes = marker_u32(payload + 8);
+	if (vertex_count < 3 || vertex_count > MARKER_VERTICES_MAXIMUM ||
+		index_count < 3 || index_count > MARKER_INDICES_MAXIMUM ||
+		pixel_bytes == 0 || pixel_bytes > 1024UL * 1024UL)
+		goto done;
+	mesh_at = 12UL + 0x30UL;
+	if (size < mesh_at + vertex_count * 0x44UL + index_count * 2UL + pixel_bytes)
+		goto done;
+	uncompressed = (struct model_vertex_uncompressed *)malloc(vertex_count * sizeof(*uncompressed));
+	indices = (unsigned short *)malloc(index_count * sizeof(*indices));
+	marker_pixels = (unsigned char *)malloc(pixel_bytes);
+	if (!uncompressed || !indices || !marker_pixels)
+		goto done;
+	memcpy(&marker_bitmap, payload + 12, sizeof(marker_bitmap));
+	memcpy(uncompressed, payload + mesh_at, vertex_count * 0x44UL);
+	memcpy(indices, payload + mesh_at + vertex_count * 0x44UL, index_count * 2UL);
+	memcpy(marker_pixels, payload + mesh_at + vertex_count * 0x44UL + index_count * 2UL, pixel_bytes);
+	marker_pixel_bytes = (long)pixel_bytes;
+	if (marker_commit(uncompressed, (long)vertex_count, indices, (long)index_count))
+		ready = 1;
+
+done:
+	marker_free(uncompressed);
+	marker_free(indices);
+	if (!ready)
+	{
+		marker_free(marker_pixels);
+		marker_pixels = NULL;
+		marker_pixel_bytes = 0;
+		rasterizer_vertex_buffer_delete(&marker_vertices);
+		rasterizer_triangle_buffer_delete(&marker_triangles);
+		memset(&marker_vertices, 0, sizeof(marker_vertices));
+		memset(&marker_triangles, 0, sizeof(marker_triangles));
+		return -1;
+	}
+	return 1;
+}
+
 static void marker_prepare(void)
 {
 	FILE *file = NULL;
@@ -209,7 +363,16 @@ static void marker_prepare(void)
 	long index;
 	long told;
 	int found_part = 0;
+	int packed;
 
+	packed = marker_from_pack();
+	if (packed > 0)
+	{
+		marker_state = MARKER_STATE_READY;
+		return;
+	}
+	if (packed < 0)
+		goto fail;
 	file = fopen("d:\\evolved_maps\\prisoner.map", "rb");
 	if (!file)
 		goto fail;
@@ -413,7 +576,7 @@ fail:
 	if (!marker_logged)
 	{
 		marker_logged = 1;
-		platform_log("evolved: spawn pads were not loaded from evolved_maps/prisoner.map");
+		platform_log("evolved: spawn pads were not loaded from the game or evolved_maps/prisoner.map");
 	}
 }
 
