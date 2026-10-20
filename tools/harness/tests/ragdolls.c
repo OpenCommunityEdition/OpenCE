@@ -8,7 +8,7 @@ one, 2 a biped whose model has no body, and from 3 on more of the first. A
 hit is remembered for its tick; a biped's death queues its node matrices,
 velocity and the hit that killed it that tick; an explosion that kills a
 biped, or reaches its ragdoll, tears the joints it hurts past their
-thresholds. */
+thresholds, and bleeds there; a torn body is drawn a piece at a time. */
 typedef struct { real scale; union { real n[4][3]; struct { real_vector3d forward, left, up; real_point3d position; }; }; }
 	real_matrix4x3;
 typedef struct { real_vector3d v; real w; } real_quaternion;
@@ -20,7 +20,8 @@ enum { _object_type_biped = 0, _object_type_vehicle = 1 };
 enum { _object_mask_biped = 1 << _object_type_biped };
 struct _object_datum { short type; };
 struct object_datum { long definition_index; struct _object_datum object; };
-struct object_definition { struct { real acceleration_scale; } object; };
+struct object_definition { struct { real acceleration_scale; struct { long index; } collision_model; } object; };
+struct collision_model { struct { struct { long index; } localized_damage_effect; } resistance; };
 enum { _damage_area_of_effect_bit = 0 };
 struct damage_definition
 {
@@ -47,7 +48,18 @@ unit to three */
 static struct damage_effect_definition grenade = {{6.0f, 0.25f, 10.0f, 100.0f, 140.0f, 3}, 0, 1.0f, 3.0f};
 static struct damage_effect_definition poke = {{0.0f, 0.0f}};
 /* the bipeds': 100's, and 102's half */
-static struct object_definition whole = {{1.0f}}, half = {{0.5f}};
+static struct object_definition whole = {{1.0f, {5}}}, half = {{0.5f, {-1}}};
+/* the bipeds' collision model, with its blood */
+static struct collision_model flesh = {{{77}}};
+static real_vector3d const zero_vector = {0.0f, 0.0f, 0.0f};
+static real_vector3d const *global_zero_vector3d = &zero_vector;
+
+/* the effects made: how many, and the last one's */
+static long bled_count;
+static long bled_effect, bled_owner;
+static char const *bled_names[8];
+static real_point3d bled_at;
+static real_vector3d bled_normal, bled_gravity;
 
 static boolean deleted[3];
 static short const matrix4x3_next[3] = {1, 2, 0};
@@ -74,6 +86,25 @@ static void object_get_velocities(long index, real_vector3d *velocity, real_vect
 static struct damage_effect_definition *damage_effect_definition_get(long index) { return index == 8 ? &poke : &grenade; }
 static struct object_definition *object_definition_get(long index) { return index == 102 ? &half : &whole; }
 static struct ragdoll_body const *ragdoll_body_get(long definition_index) { return definition_index != 102 ? &body : NULL; }
+static struct collision_model *collision_model_definition_get(long index) { return index == 5 ? &flesh : NULL; }
+static long effect_new_unattached_from_markers(long definition_index, long owner_object_index,
+	real_vector3d const *velocity, short marker_count, char const **marker_names, real_point3d const *marker_points,
+	real_vector3d const *marker_forwards, real scale_a, real scale_b, void const *color, void const *impulse_field,
+	boolean can_be_deterministic)
+{
+	short marker;
+
+	(void)velocity; (void)scale_a; (void)scale_b; (void)color; (void)impulse_field; (void)can_be_deterministic;
+	bled_count++;
+	bled_effect = definition_index;
+	bled_owner = owner_object_index;
+	for (marker = 0; marker < marker_count && marker < 8; marker++)
+		bled_names[marker] = marker_names[marker];
+	bled_at = marker_points[0];
+	bled_normal = marker_forwards[0];
+	bled_gravity = marker_forwards[marker_count - 1];
+	return 1;
+}
 static real magnitude3d(real_vector3d const *v) { return sqrtf(v->i * v->i + v->j * v->j + v->k * v->k); }
 static real_vector3d *scale_vector3d(real_vector3d const *v, real s, real_vector3d *out)
 {
@@ -720,6 +751,104 @@ int main(int argc, char **argv)
 		CHECK(ragdolls_impulse_count() == 1, "and pushed");
 		ragdolls_breaks_clear();
 		CHECK(ragdolls_break_count() == 0 && !ragdolls_break_get(0), "cleared");
+		return 0;
+	}
+	CASE("bleeds")
+	{
+		struct ragdoll_death const *death;
+		long replaced;
+
+		/* as "torn by a blast": the last part, at the blast, bleeds up; then the
+		middle, a unit from it, away from it */
+		breakable();
+		damage = explosion(2.0f, 0.0f, 0.0f);
+		ragdolls_damage(0, &damage);
+		CHECK(bled_count == 0, "none while it lives");
+		ragdolls_unit_died(0);
+		death = ragdolls_death_get(0);
+		ragdolls_start(death, &replaced);
+		CHECK(bled_count == 2, "a joint's blood for each torn: %ld", bled_count);
+		CHECK(bled_effect == 77 && bled_owner == 0, "the biped's own: %ld %ld", bled_effect, bled_owner);
+		CHECK(near(bled_at.x, 1.0f) && near(bled_at.y, 0.0f) && near(bled_at.z, 0.0f), "at the joint: %f %f %f",
+			bled_at.x, bled_at.y, bled_at.z);
+		CHECK(near(bled_normal.i, -1.0f) && near(bled_normal.j, 0.0f) && near(bled_normal.k, 0.0f),
+			"away from the blast: %f %f %f", bled_normal.i, bled_normal.j, bled_normal.k);
+		CHECK(near(bled_gravity.k, -1.0f) && strcmp(bled_names[4], "gravity") == 0 &&
+			strcmp(bled_names[0], "normal") == 0, "its markers named as damage.c's");
+		return 0;
+	}
+	CASE("bloodless")
+	{
+		struct ragdoll_death death = death_of(0);
+		long replaced;
+
+		/* torn, but its collision model has no blood */
+		breakable();
+		flesh.resistance.localized_damage_effect.index = -1;
+		ragdolls_start(&death, &replaced);
+		damage = explosion(2.0f, 0.0f, 0.0f);
+		ragdolls_damage(0, &damage);
+		CHECK(ragdolls_break_count() == 2 && bled_count == 0, "torn without blood: %ld %ld", ragdolls_break_count(),
+			bled_count);
+		return 0;
+	}
+	CASE("piece draws")
+	{
+		struct ragdoll_death death = death_of(0);
+		struct ragdoll *ragdoll;
+		real_matrix4x3 drawn[RAGDOLL_BODY_NODES_MAX];
+		real_matrix4x3 const *piece;
+		long replaced;
+
+		/* a body of four parts (0, its child 1 and grandchild 2 along x, and
+		3 off 0), node 4 moving with part 2; drawn ten units on from where the
+		game has it, each node at its index */
+		breakable();
+		body.node_parts[0] = 0; body.node_parts[1] = 1; body.node_parts[2] = 2; body.node_parts[3] = 3;
+		body.node_parts[4] = 2;
+		memcpy(drawn, matrices, sizeof(drawn));
+		for (index = 0; index < 5; index++)
+			drawn[index].position.x += 10.0f;
+		CHECK(ragdolls_piece_count(0) == 1 && ragdolls_piece_node_matrices(0, drawn, 0) == drawn &&
+			!ragdolls_piece_node_matrices(0, drawn, 1), "no ragdoll: drawn whole");
+		ragdoll = ragdolls_get(ragdolls_start(&death, &replaced));
+		ragdoll->posed = TRUE;
+		CHECK(ragdolls_piece_count(0) == 1 && ragdolls_piece_node_matrices(0, drawn, 0) == drawn &&
+			!ragdolls_piece_node_matrices(0, drawn, 1) && !ragdolls_piece_node_matrices(0, drawn, -1),
+			"untorn: drawn whole");
+		/* the middle's joint torn */
+		ragdoll->broken_joints = 1UL << 1;
+		CHECK(ragdolls_piece_count(0) == 2 && !ragdolls_piece_node_matrices(0, drawn, 2), "two pieces");
+		piece = ragdolls_piece_node_matrices(0, drawn, 0);
+		CHECK(piece != drawn && memcmp(&piece[0], &drawn[0], sizeof(*piece)) == 0 &&
+			memcmp(&piece[3], &drawn[3], sizeof(*piece)) == 0, "the body's own nodes as drawn");
+		for (index = 1; index < 5; index += index == 2 ? 2 : 1)
+		{
+			CHECK(piece[index].scale == 0.0f && near(piece[index].position.x, 11.0f) && piece[index].forward.i == 1.0f,
+				"the limb's node %ld at the body's stump: %f at %f", index, piece[index].scale,
+				piece[index].position.x);
+		}
+		piece = ragdolls_piece_node_matrices(0, drawn, 1);
+		CHECK(memcmp(&piece[1], &drawn[1], sizeof(*piece)) == 0 && memcmp(&piece[2], &drawn[2], sizeof(*piece)) == 0 &&
+			memcmp(&piece[4], &drawn[4], sizeof(*piece)) == 0, "the limb's own nodes as drawn");
+		CHECK(piece[0].scale == 0.0f && near(piece[0].position.x, 11.0f) && piece[3].scale == 0.0f &&
+			near(piece[3].position.x, 11.0f), "the body's at the limb's joint: %f %f", piece[0].position.x,
+			piece[3].position.x);
+		/* and the last part's from it: three pieces, each stump its own */
+		ragdoll->broken_joints |= 1UL << 2;
+		CHECK(ragdolls_piece_count(0) == 3, "three pieces");
+		piece = ragdolls_piece_node_matrices(0, drawn, 0);
+		CHECK(piece[2].scale == 0.0f && near(piece[2].position.x, 11.0f) && near(piece[4].position.x, 11.0f),
+			"the body's stump for both beneath it: %f %f", piece[2].position.x, piece[4].position.x);
+		piece = ragdolls_piece_node_matrices(0, drawn, 1);
+		CHECK(piece[1].scale == drawn[1].scale && piece[2].scale == 0.0f && near(piece[2].position.x, 12.0f) &&
+			near(piece[4].position.x, 12.0f), "the middle's stump for the last: %f", piece[2].position.x);
+		CHECK(piece[0].scale == 0.0f && near(piece[0].position.x, 11.0f), "the body at the middle's joint: %f",
+			piece[0].position.x);
+		piece = ragdolls_piece_node_matrices(0, drawn, 2);
+		CHECK(piece[2].scale == drawn[2].scale && near(piece[1].position.x, 12.0f) && near(piece[0].position.x, 12.0f) &&
+			piece[1].scale == 0.0f && piece[4].scale == drawn[4].scale, "the last's: the rest at its joint");
+		CHECK(!ragdolls_piece_node_matrices(0, drawn, 3), "no fourth");
 		return 0;
 	}
 	CASE("past their thresholds")

@@ -524,6 +524,10 @@ static void render_object_list(
 				struct object_definition *definition =
 					object_definition_get(object->definition_index);
 				real level_of_detail_pixels = object_get_level_of_detail_pixels(object_index);
+				/* port: a torn ragdoll's model drawn once for each piece, the
+				other pieces' bones collapsed (port/linux/game/ragdolls.c) */
+				long piece_count = legs ? 1 : ragdolls_piece_count(object_index);
+				long piece;
 
 				match_assert(
 					"c:\\halo\\SOURCE\\render\\render_objects.c",
@@ -622,10 +626,12 @@ static void render_object_list(
 						}
 					}
 
+					/* port: each piece of a torn ragdoll */
+					for (piece = 0; piece < piece_count; piece++)
 					render_model(
 						definition->object.model.index,
 						level_of_detail_pixels,
-						node_matrices,
+						piece_count > 1 ? ragdolls_piece_node_matrices(object_index, node_matrices, piece) : node_matrices,
 						object->object.region_permutations,
 						object->object.outgoing_change_colors,
 						object->object.outgoing_function_values,
@@ -644,10 +650,12 @@ static void render_object_list(
 				}
 				else
 				{
+					/* port: each piece of a torn ragdoll */
+					for (piece = 0; piece < piece_count; piece++)
 					render_model(
 						definition->object.model.index,
 						level_of_detail_pixels * 0.3f,
-						node_matrices,
+						piece_count > 1 ? ragdolls_piece_node_matrices(object_index, node_matrices, piece) : node_matrices,
 						object->object.region_permutations,
 						object->object.outgoing_change_colors,
 						object->object.outgoing_function_values,

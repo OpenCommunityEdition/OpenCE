@@ -19,21 +19,22 @@ CASES = ["death", "killing hit", "newest hit", "stale hit", "bad numbers", "off"
          "capacity", "pose", "unused at first", "start", "drive then limp", "removed", "nearest part", "corpse push",
          "killing push", "pushes dropped", "replaced drops", "near", "stand-ins", "drawn", "drawn unposed",
          "blast's damage", "falloff", "pieces", "chance", "torn by a blast", "past their thresholds", "by chance", "bullets tear none", "tear off",
-         "corpse torn", "torn once", "breaks dropped"]
+         "corpse torn", "torn once", "breaks dropped", "bleeds", "bloodless", "piece draws"]
 
 FUNCTIONS = ["ragdolls_enabled", "ragdolls_object_is_biped", "ragdoll_pose_transform", "ragdoll_part_nearest",
              "ragdolls_push", "ragdolls_dismemberment_enabled", "ragdoll_hit_damage_at", "ragdoll_hit_tearing_at",
              "ragdoll_break_chance",
-             "ragdolls_tear", "ragdolls_impulses_drop", "ragdolls_damage", "ragdolls_hit_get",
+             "ragdolls_bleed", "ragdolls_tear", "ragdolls_impulses_drop", "ragdolls_damage", "ragdolls_hit_get",
              "ragdolls_unit_died", "ragdolls_death_count", "ragdolls_death_get", "ragdolls_deaths_clear",
              "ragdoll_pose_from_matrix", "ragdolls_get", "ragdolls_of_object", "ragdolls_node_matrices",
+             "ragdoll_part_piece", "ragdolls_piece_count", "ragdolls_piece_node_matrices",
              "ragdolls_start", "ragdolls_action", "ragdolls_stop", "ragdolls_impulse_count", "ragdolls_impulse_get",
-             "ragdolls_impulses_clear", "ragdoll_part_piece", "ragdolls_break_count", "ragdolls_break_get", "ragdolls_breaks_clear",
+             "ragdolls_impulses_clear", "ragdolls_break_count", "ragdolls_break_get", "ragdolls_breaks_clear",
              "ragdolls_near", "ragdolls_stand_ins_begin", "ragdolls_stand_in",
              "ragdolls_stand_in_unseen", "ragdolls_dispose_from_old_map"]
 
 MATRIX_FUNCTIONS = ["matrix4x3_rotation_to_quaternion", "matrix4x3_rotation_from_quaternion", "matrix4x3_inverse",
-                    "matrix4x3_multiply"]
+                    "matrix4x3_multiply", "matrix4x3_transform_point"]
 
 # a fault in the deaths and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -83,7 +84,8 @@ NEGATIVE_CONTROLS = {
     "drawn-unscaled": (("frames[part].scale = nodes[part_node].scale;", ""), "drawn"),
     "nodes-left-behind": (("matrix4x3_multiply(&frames[part], &from_part, &drawn[node]);", "drawn[node] = nodes[node];"),
                           "drawn"),
-    "drawn-before-posed": (("!ragdoll || !ragdoll->posed ||", "!ragdoll ||"), "drawn unposed"),
+    "drawn-before-posed": (("!ragdoll || !ragdoll->posed || render_interpolation", "!ragdoll || render_interpolation"),
+                           "drawn unposed"),
     "not-interpolated": ((" || render_interpolation_object_node_matrices(object_index))", ")"), "drawn"),
     "always-dismember": (("\tif (!ragdolls_dismemberment_enabled())\n\t\treturn;\n", ""), "tear off"),
     "bullets-tear": (("\tif (!hit->explosion)\n\t\treturn 0.0f;\n", ""), "bullets tear none"),
@@ -113,6 +115,25 @@ NEGATIVE_CONTROLS = {
     "queued-forgotten": (("torn |= 1UL << ragdolls.breaks[index].part;", ";"), "torn once"),
     "limbs-forgotten": (("above = body->parts[above].parent_part_index;", "above = NONE;"), "torn once"),
     "breaks-kept": (("\tragdolls.break_count = kept;\n", ""), "breaks dropped"),
+    "bloodless-tears": (("\t\tragdolls_bleed(ragdoll, worst, hit);", "\t\tif (FALSE)\n\t\t\tragdolls_bleed(ragdoll, worst, hit);"),
+                        "bleeds"),
+    "bleeds-at-the-blast": (("marker_points[marker] = ragdoll->poses[part].position;", "marker_points[marker] = hit->epicenter;"),
+                            "bleeds"),
+    "bleeds-toward-the-blast": (("marker_forwards[_effect_vector_normal] = away;",
+                                 "scale_vector3d(&away, -1.0f, &marker_forwards[_effect_vector_normal]);"), "bleeds"),
+    "blood-falls-up": (("marker_forwards[_effect_vector_gravity].k = -1.0f;", "marker_forwards[_effect_vector_gravity].k = 1.0f;"),
+                       "bleeds"),
+    "blood-from-nothing": (("\tif (collision_model->resistance.localized_damage_effect.index == NONE)\n\t\treturn;\n", ""),
+                           "bloodless"),
+    "one-piece": (("broken_joints, part))\n\t\t\tcount++;", "broken_joints, part))\n\t\t\t;"), "piece draws"),
+    "pieces-not-collapsed": (("drawn->scale = 0.0f;", "drawn->scale = nodes[node].scale;"), "piece draws"),
+    "no-stump": (("if (above == root)", "if (FALSE)"), "piece draws"),
+    "stump-from-the-drawn": (("matrix4x3_inverse(&game[parent_node], &inverse);", "matrix4x3_inverse(&nodes[parent_node], &inverse);"),
+                             "piece draws"),
+    "stump-one-up": (("\t\t\ttop = above;\n", "\t\t\ttop = 0;\n"), "piece draws"),
+    "torn-drawn-whole": (("|| !ragdoll->broken_joints)\n\t\treturn piece == 0 ? nodes : NULL;", "|| TRUE)\n\t\treturn piece == 0 ? nodes : NULL;"),
+                         "piece draws"),
+    "pieces-without-end": (("\tif (piece > 0)\n\t\treturn NULL;\n", ""), "piece draws"),
     "oldest-first": (("(ragdolls.hit_count - index) % RAGDOLL_HITS_MAX", "(index - 1) % RAGDOLL_HITS_MAX"), "newest hit"),
 }
 
@@ -135,7 +156,7 @@ def generated(fault=None):
         "static boolean physics_jolt_dismemberment_enabled(void);",
         "#define RAGDOLL_DAMAGE_EFFECT_UNSCALED_BIT " + re.search(r"#define RAGDOLL_DAMAGE_EFFECT_UNSCALED_BIT (\S+)",
                                                                   ragdolls)[1],
-        *re.findall(r"#define RAGDOLL_DAMAGE_CATEGORY_\w+ \d+", ragdolls),
+        *re.findall(r"#define RAGDOLL_DAMAGE_CATEGORY_\w+ \d+", ragdolls), enum_with(ragdolls, "_effect_vector_normal"),
         "static struct ragdoll_body const *ragdoll_body_get(long definition_index);",
         state]) + "\n"
     matrix_math = read("source/math/matrix_math.c")
@@ -200,6 +221,20 @@ def test_drawn_as_the_ragdoll_lies():
     assert "ragdolls_node_matrices(iterator.index, object_get_node_matrices(iterator.index))" in tick
     assert ("struct real_matrix4x3 const *ragdolls_node_matrices(long object_index, struct real_matrix4x3 const *nodes);"
             in read("port/linux/include/halo_linux_source_fixups.h"))
+
+
+def test_drawn_a_piece_at_a_time():
+    """render_objects.c draws a torn ragdoll's model once for each piece, and its shadow too, a whole one (and the
+    first person's legs) once with the matrices as they are"""
+    listed = function(read("source/render/render_objects.c"), "render_object_list")
+    assert re.search(r"/\* port:[^*]*\*/\n\t+long piece_count = legs \? 1 : ragdolls_piece_count\(object_index\);", listed)
+    loops = re.findall(r"/\* port:[^*]*\*/\n\t+for \(piece = 0; piece < piece_count; piece\+\+\)\n\t+render_model\(\n"
+                       r"[^;]*piece_count > 1 \? ragdolls_piece_node_matrices\(object_index, node_matrices, piece\) : "
+                       r"node_matrices,", listed)
+    assert len(loops) == 2 and listed.count("render_model(") == 2
+    fixups = read("port/linux/include/halo_linux_source_fixups.h")
+    assert "long ragdolls_piece_count(long object_index);" in fixups
+    assert "ragdolls_piece_node_matrices(long object_index, struct real_matrix4x3 const *nodes,\n\tlong piece);" in fixups
 
 
 def test_the_tick_steps_the_ragdolls():

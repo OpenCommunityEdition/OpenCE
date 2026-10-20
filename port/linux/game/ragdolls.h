@@ -187,6 +187,14 @@ has posed it, each node carried with its part as the game's matrices have
 it from that part's node; else the game's, `nodes`. The game's own stay as
 they are, the ragdolls being for show. */
 real_matrix4x3 const *ragdolls_node_matrices(long object_index, real_matrix4x3 const *nodes);
+/* The draws of an object's model: one for each piece of its ragdoll as torn
+(the root's first, then each torn part's in order), else one. */
+long ragdolls_piece_count(long object_index);
+/* A piece's draw from `nodes` (the matrices drawn, or interpolation's): the
+piece's own nodes as they are, every other node's vertices at one point, the
+stump where that piece tore from this one or else this piece's own joint;
+`nodes` itself for an object drawn whole; NULL past its pieces. */
+real_matrix4x3 const *ragdolls_piece_node_matrices(long object_index, real_matrix4x3 const *nodes, long piece);
 
 /* the part whose shape's centre is nearest a point */
 short ragdoll_part_nearest(struct ragdoll_body const *body, struct ragdoll_pose const *poses,

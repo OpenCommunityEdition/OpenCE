@@ -17,7 +17,11 @@ With game.dismemberment an explosion (a grenade's, a high explosive's or a
 mounted weapon's) that kills a biped, or that reaches its ragdoll, tears the
 joints whose parts it hurts past their species' threshold (ragdoll_bodies.c's
 `break` overrides), the parts nearest it the most: the host lets each limb go
-as a ragdoll of its own. Bullets, melee and vehicles tear nothing.
+as a ragdoll of its own. Bullets, melee and vehicles tear nothing. The
+biped's own blood (its collision model's localized damage effect, which
+damage.c makes where a hit lands) comes out of the joint as it tears, and a
+torn body is drawn a piece at a time, each draw of the model collapsing the
+other pieces' bones to a point at the stump.
 */
 
 #include "cseries/cseries.h"
@@ -29,6 +33,8 @@ as a ragdoll of its own. Bullets, melee and vehicles tear nothing.
 #include "objects/object_definitions.h"
 #include "objects/object_types.h"
 #include "objects/objects.h"
+#include "effects/effects.h"
+#include "physics/collision_model_definitions.h"
 #include "tag_files/tag_groups.h"
 #include "physics_jolt.h"
 #include "ragdolls.h"
@@ -41,6 +47,17 @@ as a ragdoll of its own. Bullets, melee and vehicles tear nothing.
 #define RAGDOLL_DAMAGE_CATEGORY_GRENADE 3
 #define RAGDOLL_DAMAGE_CATEGORY_HIGH_EXPLOSIVE 4
 #define RAGDOLL_DAMAGE_CATEGORY_MOUNTED_WEAPON 8
+
+/* an effect's markers (as damage.c's and projectiles.c's) */
+enum
+{
+	_effect_vector_normal = 0,
+	_effect_vector_incident,
+	_effect_vector_negative_incident,
+	_effect_vector_reflected,
+	_effect_vector_gravity,
+	NUMBER_OF_EFFECT_MARKERS,
+};
 
 static struct
 {
@@ -61,6 +78,9 @@ static struct
 	} stand_ins[RAGDOLL_STAND_INS_MAX];
 	/* each ragdoll's node matrices as drawn (ragdolls_node_matrices) */
 	real_matrix4x3 drawn[RAGDOLLS_MAX][RAGDOLL_BODY_NODES_MAX];
+	/* one piece's, as drawn (ragdolls_piece_node_matrices); the model's draw
+	takes its own copy */
+	real_matrix4x3 piece[RAGDOLL_BODY_NODES_MAX];
 } ragdolls;
 
 boolean ragdolls_enabled(void)
@@ -234,6 +254,62 @@ static real ragdoll_break_chance(
 and that the explosion hurts past its threshold, at most
 RAGDOLL_BREAKS_PER_HIT of them, the worst hurt first; none torn already, or
 on a limb torn off already. */
+/* the biped's blood where a part's joint tore, as damage.c's
+damage_effect_new_at_location makes a hit's: its collision model's localized
+damage effect, at the joint and facing away from the blast */
+static void ragdolls_bleed(
+	struct ragdoll const *ragdoll,
+	short part,
+	struct ragdoll_hit const *hit)
+{
+	struct object_definition const *definition;
+	struct collision_model const *collision_model;
+	char const *marker_names[NUMBER_OF_EFFECT_MARKERS];
+	real_point3d marker_points[NUMBER_OF_EFFECT_MARKERS];
+	real_vector3d marker_forwards[NUMBER_OF_EFFECT_MARKERS];
+	real_vector3d away;
+	real length;
+	short marker;
+
+	definition = object_definition_get(object_get(ragdoll->object_index)->definition_index);
+	if (definition->object.collision_model.index == NONE)
+		return;
+	collision_model = collision_model_definition_get(definition->object.collision_model.index);
+	if (collision_model->resistance.localized_damage_effect.index == NONE)
+		return;
+	away.i = ragdoll->poses[part].position.x - hit->epicenter.x;
+	away.j = ragdoll->poses[part].position.y - hit->epicenter.y;
+	away.k = ragdoll->poses[part].position.z - hit->epicenter.z;
+	length = magnitude3d(&away);
+	if (length > _real_epsilon)
+	{
+		scale_vector3d(&away, 1.0f / length, &away);
+	}
+	else
+	{
+		away.i = away.j = 0.0f;
+		away.k = 1.0f;
+	}
+	marker_names[_effect_vector_normal] = "normal";
+	marker_names[_effect_vector_incident] = "incident";
+	marker_names[_effect_vector_negative_incident] = "negative incident";
+	marker_names[_effect_vector_reflected] = "reflection";
+	marker_names[_effect_vector_gravity] = "gravity";
+	marker_forwards[_effect_vector_normal] = away;
+	scale_vector3d(&away, -1.0f, &marker_forwards[_effect_vector_incident]);
+	marker_forwards[_effect_vector_negative_incident] = away;
+	scale_vector3d(&away, -1.0f, &marker_forwards[_effect_vector_reflected]);
+	marker_forwards[_effect_vector_gravity].i = 0.0f;
+	marker_forwards[_effect_vector_gravity].j = 0.0f;
+	marker_forwards[_effect_vector_gravity].k = -1.0f;
+	for (marker = 0; marker < NUMBER_OF_EFFECT_MARKERS; marker++)
+		marker_points[marker] = ragdoll->poses[part].position;
+	/* (unattached: the game's node matrices are not where the ragdoll lies) */
+	effect_new_unattached_from_markers(collision_model->resistance.localized_damage_effect.index,
+		ragdoll->object_index, global_zero_vector3d, NUMBER_OF_EFFECT_MARKERS, marker_names, marker_points,
+		marker_forwards, 1.0f, 0.0f, NULL, NULL, FALSE);
+}
+
 static void ragdolls_tear(
 	long id,
 	struct ragdoll_hit const *hit)
@@ -287,6 +363,7 @@ static void ragdolls_tear(
 		tear->id = id;
 		tear->part = worst;
 		tear->pad = 0;
+		ragdolls_bleed(ragdoll, worst, hit);
 	}
 }
 
@@ -528,6 +605,86 @@ real_matrix4x3 const *ragdolls_node_matrices(
 		}
 	}
 	return drawn;
+}
+
+long ragdolls_piece_count(
+	long object_index)
+{
+	struct ragdoll const *ragdoll = ragdolls_of_object(object_index);
+	long count = 1;
+	short part;
+
+	if (!ragdoll || !ragdoll->posed)
+		return 1;
+	for (part = 1; part < ragdoll->body->part_count; part++)
+	{
+		if (TEST_FLAG(ragdoll->broken_joints, part))
+			count++;
+	}
+	return count;
+}
+
+real_matrix4x3 const *ragdolls_piece_node_matrices(
+	long object_index,
+	real_matrix4x3 const *nodes,
+	long piece)
+{
+	struct ragdoll const *ragdoll = ragdolls_of_object(object_index);
+	struct ragdoll_body const *body;
+	real_matrix4x3 const *game;
+	short root = 0;
+	short part;
+	short node;
+
+	if (piece < 0)
+		return NULL;
+	if (!nodes || !ragdoll || !ragdoll->posed || !ragdoll->broken_joints)
+		return piece == 0 ? nodes : NULL;
+	body = ragdoll->body;
+	/* the piece's top part: the root's, else the piece'th torn one */
+	for (part = 1; part < body->part_count && piece > 0; part++)
+	{
+		if (TEST_FLAG(ragdoll->broken_joints, part) && --piece == 0)
+			root = part;
+	}
+	if (piece > 0)
+		return NULL;
+	game = object_get_node_matrices(object_index);
+	for (node = 0; node < body->node_count; node++)
+	{
+		real_matrix4x3 *drawn = &ragdolls.piece[node];
+		short top = body->node_parts[node];
+
+		top = top >= 0 && top < body->part_count ? ragdoll_part_piece(ragdoll, top) : 0;
+		*drawn = nodes[node];
+		if (top == root)
+			continue;
+		/* another piece's node: its vertices drawn at one point (the rotation
+		kept, for their normals), at this piece's own joint, or where a piece
+		beneath this one tore from it, the joint as the game has it from its
+		parent's node */
+		drawn->scale = 0.0f;
+		drawn->position = nodes[body->parts[root].node_index].position;
+		while (top > 0)
+		{
+			short parent = body->parts[top].parent_part_index;
+			short above = ragdoll_part_piece(ragdoll, parent);
+
+			if (above == root)
+			{
+				short parent_node = body->parts[parent].node_index;
+				real_matrix4x3 inverse;
+				real_point3d joint;
+
+				matrix4x3_inverse(&game[parent_node], &inverse);
+				matrix4x3_transform_point(&inverse, &game[body->parts[top].node_index].position, &joint);
+				matrix4x3_transform_point(&nodes[parent_node], &joint, &drawn->position);
+				break;
+			}
+			top = above;
+		}
+	}
+	return ragdolls.piece;
 }
 
 long ragdolls_start(
