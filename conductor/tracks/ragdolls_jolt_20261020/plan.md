@@ -24,9 +24,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: The bridge to the guest' (Protocol in workflow.md)
 
 ## Phase 3: Ragdolls
-- [ ] Task: Bodies from the model
-    - [ ] Write tests: harness tests build a body description (bones, shapes, joints, limits, masses) from a model's nodes and collision model's per-node geometry for a fake biped; overrides from `port/assets/ragdolls/` replace generated values; a biped with no usable data gives none
-    - [ ] `port/linux/game/ragdoll_bodies.c`, and the override files for the stock species
+- [x] Task: Bodies from the model c62934cc
+    - [x] Write tests: harness tests build a body description (bones, shapes, joints, limits, masses) from a model's nodes and collision model's per-node geometry for a fake biped; overrides from `port/assets/ragdolls/` replace generated values; a biped with no usable data gives none
+    - [x] `port/linux/game/ragdoll_bodies.c`, and the override files for the stock species
 - [ ] Task: Deaths start ragdolls
     - [ ] Write tests: harness tests that `unit_died` on a biped queues a death with its pose and the killing damage's direction and strength, only with `game.ragdolls` on
     - [ ] A `port:` hook in `units.c` / `bipeds.c` calling a port function declared in `halo_linux_source_fixups.h`
