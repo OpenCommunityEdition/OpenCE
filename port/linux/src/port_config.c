@@ -81,8 +81,6 @@ Ctrl+D, which moving and crouching would press, from the browser) */
 
 static const struct config_setting config_settings[] =
 {
-	{ "game.mcc_map_path", _config_string, "mcc_maps", "HALO_MCC_MAPS", _environment_value, _platform_desktop,
-		"Where mcc_maps is located;\n" },
 		{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
 		"Where display.mode is empty: start borderless over the whole display;\n"
 		"false starts in a window. F11 switches." },
@@ -430,6 +428,11 @@ static const struct config_setting config_settings[] =
 		"every map. A downloaded map's scripts may not change the player's\n"
 		"settings or other players' games (debug.txt names what they were\n"
 		"refused)." },
+	{ "game.mcc_map_path", _config_string, "\"\"", "HALO_MCC_MAPS", _environment_value, _platform_desktop,
+		"The folder that holds the MCC custom maps and their package folders\n"
+		"and _shared resources; any folder, which need not be in the data\n"
+		"folder. Empty uses mcc_maps in the data folder. Windows paths are\n"
+		"easiest in single quotes: 'D:\\Halo\\mcc_maps'." },
 
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"

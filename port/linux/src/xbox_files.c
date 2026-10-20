@@ -204,17 +204,42 @@ const char *platform_custom_edition_root(void)
 	return root;
 }
 
+/* The folder game.mcc_map_path names, which d:\mcc_maps stands for; empty when unset
+(d:\mcc_maps is then the usual folder in the data root). Any folder: it is not under the data
+root, as h:\ is not. */
+static const char *platform_mcc_maps_root(void)
+{
+	static char root[MAX_PATH];
+	static int found;
+
+	if (!found)
+	{
+		size_t length;
+
+		found = 1;
+		snprintf(root, sizeof(root), "%s", config_string("game.mcc_map_path"));
+		length = strlen(root);
+		while (length > 1 && (root[length - 1] == '/' || root[length - 1] == '\\'))
+			root[--length] = '\0';
+		if (root[0])
+			platform_log("MCC maps: using the folder at %s", root);
+	}
+	return root;
+}
+
 void platform_translate_path(const char *xbox_path, char *host_path, unsigned long host_path_size)
 {
 	char resolved[1024];
 	const char *cursor = xbox_path;
 	unsigned long length;
+	int data_drive = 1;
 
 	snprintf(resolved, sizeof(resolved), "%s", platform_data_root());
 	if (((cursor[0] >= 'a' && cursor[0] <= 'z') || (cursor[0] >= 'A' && cursor[0] <= 'Z')) && cursor[1] == ':')
 	{
 		char drive = (char)(cursor[0] | 0x20);
 
+		data_drive = drive == 'd';
 		if (drive == 'h' && platform_custom_edition_root()[0])
 		{
 			snprintf(resolved, sizeof(resolved), "%s", platform_custom_edition_root());
@@ -229,6 +254,25 @@ void platform_translate_path(const char *xbox_path, char *host_path, unsigned lo
 				posix_make_directory(resolved);
 		}
 		cursor += 2;
+	}
+
+	/* game.mcc_map_path: d:\mcc_maps (or mcc_maps) names that folder instead. Only the first
+	component is tested, so no Xbox or Custom Edition path is changed. */
+	if (data_drive && platform_mcc_maps_root()[0])
+	{
+		const char *name = cursor;
+		static const char mcc[] = "mcc_maps";
+		unsigned long index = 0;
+
+		while (*name == '\\' || *name == '/')
+			name++;
+		while (index < sizeof(mcc) - 1 && tolower((unsigned char)name[index]) == mcc[index])
+			index++;
+		if (index == sizeof(mcc) - 1 && (!name[index] || name[index] == '\\' || name[index] == '/'))
+		{
+			snprintf(resolved, sizeof(resolved), "%s", platform_mcc_maps_root());
+			cursor = name + index;
+		}
 	}
 
 	while (*cursor)

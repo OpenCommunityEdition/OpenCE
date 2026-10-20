@@ -11,6 +11,13 @@ probe or file audit is not proof that a map plays correctly.
 Put the map in the game data root's `mcc_maps` directory, beside `maps` and
 `custom_maps`. For example:
 
+The `game.mcc_map_path` setting (`HALO_MCC_MAPS`; `config.toml`, section `[game]`)
+moves this directory to any folder, for example `D:\Halo\mcc_maps`. Everything
+below, including `_shared` and the package folders, is then read from that
+folder. Empty, the default, keeps `mcc_maps` in the data root. Level identities
+such as `mcc_maps\a10` do not change, so saved games and network matching are
+unaffected. The folder is read at start-up.
+
 ```text
 maps/                 Xbox game data
 custom_maps/          Halo Custom Edition data
