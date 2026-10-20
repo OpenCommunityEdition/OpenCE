@@ -48,9 +48,9 @@
 - [x] Task: Breakable joints c71f8faf
     - [x] Write tests: harness tests that an explosion's damage and distance against the per-species thresholds choose the joints that break, only for dying or dead bipeds and only with `game.dismemberment` and `game.ragdolls` on; bullets and melee break none
     - [x] Per-species breakable joints and thresholds in `port/assets/ragdolls/`; the `game.dismemberment` setting (port_config.c, settings table, port_settings.py)
-- [ ] Task: Limbs as bodies of their own
-    - [ ] Write tests: native tests that breaking a joint leaves two bodies, the limb flung by the impulse, both coming to rest with their remaining joints inside their limits
-    - [ ] Joint breaking in the C wrapper; the limb's bones reported in the results with their own root
+- [x] Task: Limbs as bodies of their own dcc5e594
+    - [x] Write tests: native tests that breaking a joint leaves two bodies, the limb flung by the impulse, both coming to rest with their remaining joints inside their limits
+    - [x] Joint breaking in the C wrapper; the limb's bones reported in the results with their own root
 - [ ] Task: Drawing the cut
     - [ ] Write tests: harness tests that the body's draw collapses the detached bones' vertices and each limb's draw collapses every other bone's; the species' blood effect and decal spawn at the joint
     - [ ] Extra draws of the same model from `render_objects.c`'s `port:` swap; the blood effect from the biped's existing effects
