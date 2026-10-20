@@ -71,7 +71,7 @@
     - [x] Approve the references
 - [x] Task: Conductor - User Manual Verification 'Phase 5: Debris' (Protocol in workflow.md) abbf7c17
 
-## Phase 6: Performance, network and documentation
+## Phase 6: Performance, network and documentation [checkpoint: 38f50f4f]
 - [x] Task: The benchmark with ragdolls and debris 8b432198
     - [x] Write tests: the benchmark script spawns 30 ragdolls and 200 debris pieces on bloodgulch at 3840×2160 and reports p99 and the physics tick's time
     - [x] Meet p99 ≤ 8.33 ms and ≤ 1 ms a tick on the M1 Max; record the results in `docs/macos_host.md` (recorded; not met: the step's p50 is 0.45 ms but its peak 2.96 ms with about 590 bodies awake, and the frames' p99 is 29 ms, the stock game's drawing of the crowd, 25.4 ms with both settings off)
@@ -80,4 +80,4 @@
 - [x] Task: `debug.physics_draw` and documentation 26e68609
     - [x] Write tests: the wireframe pass draws only with the setting on
     - [x] Describe the physics bridge in `docs/macos_host.md`
-- [ ] Task: Conductor - User Manual Verification 'Phase 6: Performance, network and documentation' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 6: Performance, network and documentation' (Protocol in workflow.md) 38f50f4f
