@@ -40,7 +40,7 @@
 - [x] Task: The free camera 2175ae72
     - [x] Write tests: the camera's motion from recorded mouse and keyboard input is exact; the map chosen from the command line or a picker loads
     - [x] Fly camera, the map picker, the frame-time overlay
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Import a map and fly through it' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Import a map and fly through it' (Protocol in workflow.md) (approved by the user 2026-10-21, with the golden frames)
 
 ## Phase 2: Objects, models and animation
 - [x] Task: Typed tags for objects 0489d862
@@ -61,7 +61,7 @@
 - [x] Task: The benchmark f49099b6
     - [x] Write tests: `tools/test_engine_benchmark.py` flies a recorded path over bloodgulch at 3840×2160 for 60 s and reports p50 and p99
     - [x] Meet p99 ≤ 8.33 ms on the M1 Max; record the result in `docs/engine.md`
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Objects, models and animation' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Objects, models and animation' (Protocol in workflow.md) (approved by the user 2026-10-21, with the golden frames)
 
 ## Phase 3: Player movement and collision
 - [x] Task: Reference traces 3732076e
@@ -76,7 +76,7 @@
 - [x] Task: Playing as the player 3abed295
     - [x] Write tests: XCTest that key bindings and mouse look reach the simulation as typed input; the first-person camera follows the biped
     - [x] Input bindings (a setting), mouse sensitivity, first- and third-person cameras, spawning at the scenario's start points
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Player movement and collision' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Player movement and collision' (Protocol in workflow.md) (approved by the user 2026-10-21, with the golden frames)
 
 ## Phase 4: Weapons, damage, grenades and ragdolls
 - [x] Task: Typed tags for weapons and damage ece79a01
@@ -97,7 +97,7 @@
 - [x] Task: Ragdolls, limbs and debris ec1e9e97
     - [x] Write tests: a biped killed by a scripted grenade becomes a ragdoll that follows the death animation, then goes loose (joint damping set), and is still there after 60 s; the corpse cap removes the oldest; strong explosions tear off limbs; casings are rigid bodies
     - [x] Ragdolls from model nodes and collision geometry (as the ragdoll track's generator does, ported to Rust), motors then damping, the corpse cap (a setting), limbs and debris
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Weapons, damage, grenades and ragdolls' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Weapons, damage, grenades and ragdolls' (Protocol in workflow.md) (approved by the user 2026-10-21, with the golden frames)
 
 ## Phase 5: Vehicles
 - [x] Task: Typed tags for vehicles 1ab6b170
@@ -111,7 +111,7 @@
 - [x] Task: Seats, turrets and destruction 5c17d30d
     - [x] Write tests: entering and leaving each seat, the Warthog's turret, passengers firing, a vehicle destroyed by damage
     - [x] Seats, entering and leaving animations, turrets, vehicle damage
-- [ ] Task: Conductor - User Manual Verification 'Phase 5: Vehicles' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 5: Vehicles' (Protocol in workflow.md) (approved by the user 2026-10-21, with the golden frames)
 
 ## Phase 6: Multiplayer
 - [x] Task: Game types 8eb85a2f
@@ -126,7 +126,7 @@
 - [x] Task: The menus 5abf24ce
     - [x] Write tests: XCTest of the menu models (main menu, server list, join by address, host setup, settings for game, controls, video and audio); the settings round-trip through TOML
     - [x] SwiftUI menus over the Metal view, mouse first, Overpass and the OpenCE font; LAN discovery for the server list
-- [ ] Task: Conductor - User Manual Verification 'Phase 6: Multiplayer' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 6: Multiplayer' (Protocol in workflow.md) (approved by the user 2026-10-21, with the golden frames)
 
 ## Phase 7: AI and the campaign
 - [x] Task: HaloScript 93369312
@@ -145,4 +145,4 @@
     - [x] Write tests: a recorded run plays *The Pillar of Autumn* and *Halo* from start to end with no script errors
 - [x] Task: The documentation a790b635
     - [x] `docs/engine.md`: the architecture, the contract, the content format, and how to add an object kind, a weapon behaviour and a script function
-- [ ] Task: Conductor - User Manual Verification 'Phase 7: AI and the campaign' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 7: AI and the campaign' (Protocol in workflow.md) (approved by the user 2026-10-21, with the golden frames)
