@@ -88,9 +88,9 @@
 - [x] Task: Damage, shields and death 858205a2
     - [x] Write tests: damage by hit region, shields recharging after their delay, death, and the damage effects' impulses, against tag values and reference traces
     - [x] Damage, shields, health, death events
-- [ ] Task: Grenades
-    - [ ] Write tests: a thrown frag bounces and detonates on its timer; a plasma grenade sticks to a biped and moves with it
-    - [ ] Throwing, bouncing, sticking, detonation
+- [x] Task: Grenades 6d96214b
+    - [x] Write tests: a thrown frag bounces and detonates on its timer; a plasma grenade sticks to a biped and moves with it
+    - [x] Throwing, bouncing, sticking, detonation
 - [ ] Task: The first-person view and the HUD
     - [ ] Write tests: golden frames of the first-person weapon and the HUD at 16:9, 16:10 and 21:9, anchored to the edges; the motion tracker shows bipeds at their positions
     - [ ] First-person models and animations; the HUD drawn by Metal at native resolution
