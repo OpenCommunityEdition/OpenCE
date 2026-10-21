@@ -6,7 +6,13 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+libm.workspace = true
 thiserror.workspace = true
+opence_sim.workspace = true
+opence_content.workspace = true
+
+[dev-dependencies]
+opence_import.workspace = true
 
 [lints]
 workspace = true

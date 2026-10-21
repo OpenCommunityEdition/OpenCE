@@ -418,6 +418,19 @@ impl Player {
         self.mover.teleport(&mut self.physics, position).is_ok()
     }
 
+    /// Puts it at `position` moving at `velocity` and facing `yaw`
+    /// (radians left from +X), as another machine says it is; false if
+    /// it is seated or cannot stand there.
+    pub(crate) fn correct(&mut self, position: Vec3, velocity: Vec3, yaw: f32) -> bool {
+        if self.seat.is_some() || self.mover.teleport(&mut self.physics, position).is_err() {
+            return false;
+        }
+        // (a teleport stands it still: it keeps moving as it was)
+        self.mover.velocity = velocity;
+        self.yaw = libm::remainderf(yaw, std::f32::consts::TAU);
+        true
+    }
+
     /// Where its object and the camera are now.
     pub(crate) fn pose(&self) -> PlayerPose {
         PlayerPose {

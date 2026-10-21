@@ -8,14 +8,20 @@
 //! [`decode`] refuses a packet whose sizes, counts or indices are out of
 //! bounds, and [`RateLimit`] a peer that sends too much.
 
+pub mod client;
+pub mod host;
 pub mod packet;
 pub mod rate;
 pub mod snapshot;
+pub mod transport;
 mod wire;
 
+pub use client::Client;
+pub use host::Host;
 pub use packet::{decode, encode, InputFrame, Packet, Refusal};
 pub use rate::RateLimit;
 pub use snapshot::{ObjectState, Snapshot, SnapshotDelta};
+pub use transport::{Link, LinkEndpoint, Transport, Udp};
 
 /// The protocol's version: raised with any change to what the machines
 /// send each other or must agree on. Machines of different versions do

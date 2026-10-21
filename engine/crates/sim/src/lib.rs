@@ -470,6 +470,26 @@ impl Simulation {
         moved
     }
 
+    /// Puts player `index` at `position`, moving at `velocity` and facing
+    /// `yaw`, as a network game's host says it is (a prediction
+    /// corrected); false if there is no such player, or it is seated.
+    pub fn correct_player(
+        &mut self,
+        index: usize,
+        position: Vec3,
+        velocity: Vec3,
+        yaw: Radians,
+    ) -> bool {
+        let moved = self
+            .players
+            .get_mut(index)
+            .is_some_and(|player| player.correct(position, velocity, yaw.0));
+        if moved && index == 0 {
+            self.place_player_camera();
+        }
+        moved
+    }
+
     /// The players, the local player first.
     pub fn players(&self) -> &[Player] {
         &self.players
