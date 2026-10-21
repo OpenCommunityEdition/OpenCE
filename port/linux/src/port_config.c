@@ -246,6 +246,14 @@ static const struct config_setting config_settings[] =
 		_environment_value, _platform_all,
 		"The scoreboard panel's colour: \"red, green, blue, alpha\", each 0 to 255\n"
 		"(alpha 0 is see-through, 255 solid)." },
+	{ "display.driver", _config_string, "\"native\"", "HALO_GPU_DRIVER", _environment_value, _platform_all,
+		"Which GL implementation the loader opens, where this build's own can be\n"
+		"swapped for another: \"native\" leaves it alone; a Mesa driver's name\n"
+		"(\"zink\" for OpenGL on Vulkan, \"llvmpipe\" for the processor, \"iris\",\n"
+		"\"radeonsi\", \"d3d12\") is set in MESA_LOADER_DRIVER_OVERRIDE before SDL\n"
+		"starts; \"angle\" asks ANGLE's Vulkan platform, whose GLES libraries must be\n"
+		"beside the game (the APK's lib folder on Android). The log says which was\n"
+		"asked for and the GPU profile says which one ran." },
 	{ "display.gpu_profile", _config_string, "\"auto\"", "HALO_GPU_PROFILE", _environment_value, _platform_all,
 		"Which GPU and driver the renderer tunes itself for: \"auto\" reads the\n"
 		"driver's own name (GL_VENDOR/GL_RENDERER) and the log says which one it\n"
