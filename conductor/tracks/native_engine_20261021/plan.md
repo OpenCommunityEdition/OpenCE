@@ -82,9 +82,9 @@
 - [x] Task: Typed tags for weapons and damage ece79a01
     - [x] Write tests: builders for weapon, projectile, damage effect, equipment and grenade tags import; malformed ones are refused
     - [x] `content` types and importers
-- [ ] Task: Weapons
-    - [ ] Write tests: rate of fire, spread, heat, ammunition and reload times match the tags in simulated ticks; picking up, swapping and dropping
-    - [ ] Weapon systems, triggers, projectiles and hitscan, melee; the registry for weapon behaviours
+- [x] Task: Weapons 8cf477a2
+    - [x] Write tests: rate of fire, spread, heat, ammunition and reload times match the tags in simulated ticks; picking up, swapping and dropping
+    - [x] Weapon systems, triggers, projectiles and hitscan, melee; the registry for weapon behaviours (melee strikes with the damage task, which it needs)
 - [ ] Task: Damage, shields and death
     - [ ] Write tests: damage by hit region, shields recharging after their delay, death, and the damage effects' impulses, against tag values and reference traces
     - [ ] Damage, shields, health, death events
