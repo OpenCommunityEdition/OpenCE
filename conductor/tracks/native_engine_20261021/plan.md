@@ -138,9 +138,9 @@
 - [x] Task: The AI 00724226
     - [x] Write tests: actors in a fake encounter perceive, take firing positions, fire, take cover, flee and use vehicles; chosen encounters on *The Pillar of Autumn* behave like the reference app's (recorded)
     - [x] Encounters, squads, actor types, perception, firing positions, command lists, combat and vehicle use
-- [ ] Task: The campaign's flow
-    - [ ] Write tests: BSP switches, checkpoints saved and loaded in our own format, cutscenes, difficulties
-    - [ ] Campaign flow, saved games, cutscene cameras, the campaign menu
+- [x] Task: The campaign's flow f39344c3
+    - [x] Write tests: BSP switches, checkpoints saved and loaded in our own format, cutscenes, difficulties
+    - [x] Campaign flow, saved games, cutscene cameras, the campaign menu
 - [ ] Task: The first two levels
     - [ ] Write tests: a recorded run plays *The Pillar of Autumn* and *Halo* from start to end with no script errors
 - [ ] Task: The documentation
