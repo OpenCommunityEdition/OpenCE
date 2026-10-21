@@ -13,7 +13,7 @@ pub use bitmap::{
 };
 pub use level::{
     CollisionBsp, CollisionMaterial, EnvironmentVertex, Level, Lightmap, LightmapVertex, Material,
-    Scenario, StructureBsp,
+    PlayerStart, Scenario, StructureBsp,
 };
 pub use shader::{ChicagoMap, EnvironmentShader, Shader, ShaderClass, TransparentChicagoShader};
 

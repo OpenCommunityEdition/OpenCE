@@ -166,6 +166,11 @@ mod tests {
             scenario: Scenario {
                 path: "levels\\test\\box\\box".into(),
                 structure_bsps: vec![bsp.clone()],
+                player_starts: vec![crate::PlayerStart {
+                    position: [1.0, 2.0, 3.0],
+                    facing: 0.5,
+                    structure_bsp: Some(0),
+                }],
             },
             structure_bsps: vec![StructureBsp {
                 path: bsp.path,

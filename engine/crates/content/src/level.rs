@@ -33,12 +33,25 @@ impl Level {
 }
 
 /// A scenario, as far as its structure goes.
-#[derive(Clone, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct Scenario {
     /// Its path.
     pub path: String,
     /// Its structure BSPs.
     pub structure_bsps: Vec<TagRef>,
+    /// Where players start.
+    pub player_starts: Vec<PlayerStart>,
+}
+
+/// A place a player starts, as the scenario gives it.
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct PlayerStart {
+    /// Where its feet are.
+    pub position: [f32; 3],
+    /// The way it faces: radians left from +x.
+    pub facing: f32,
+    /// The structure BSP it is in (none: any).
+    pub structure_bsp: Option<u16>,
 }
 
 /// A structure BSP: the level's fixed geometry, its lightmaps and its

@@ -131,6 +131,16 @@ public final class EngineView: NSView {
         commands.commit()
     }
 
+    /// Has `encode` draw into the next drawable, then presents it.
+    public func render(_ encode: (MTLCommandBuffer, MTLTexture) -> Void) {
+        guard window?.isVisible == true, let queue, metalLayer.drawableSize.width > 0,
+              metalLayer.drawableSize.height > 0, let drawable = metalLayer.nextDrawable(),
+              let commands = queue.makeCommandBuffer() else { return }
+        encode(commands, drawable.texture)
+        commands.present(drawable)
+        commands.commit()
+    }
+
     // ---------- the keyboard and mouse
 
     public override var acceptsFirstResponder: Bool { true }

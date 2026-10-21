@@ -815,7 +815,9 @@ dependencies = [
 name = "opence_ffi"
 version = "0.1.0"
 dependencies = [
+ "libm",
  "opence_content",
+ "opence_import",
  "opence_sim",
  "thiserror",
  "uniffi",

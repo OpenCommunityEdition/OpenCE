@@ -14,7 +14,7 @@ pub mod units;
 
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::SingleThreadedExecutor;
-use glam::{Quat, Vec3};
+pub use glam::{Quat, Vec3};
 
 use hash::WorldHasher;
 use input::{Buttons, InputRecord, TickInput};
@@ -182,6 +182,21 @@ impl Simulation {
             .get_resource::<Camera>()
             .copied()
             .unwrap_or_default()
+    }
+
+    /// Puts the free camera at `free` (a level's start), its pitch kept
+    /// within the limit, and the camera with it.
+    pub fn place_free_camera(&mut self, free: FreeCamera) {
+        let max = FreeCamera::MAX_PITCH.0;
+        let free = FreeCamera {
+            pitch: Radians(free.pitch.0.clamp(-max, max)),
+            ..free
+        };
+        self.world.insert_resource(free);
+        let mut camera = self.camera();
+        camera.transform.position = free.position;
+        camera.transform.rotation = free.rotation();
+        self.world.insert_resource(camera);
     }
 
     /// Adds an object (for tests, until maps spawn them).

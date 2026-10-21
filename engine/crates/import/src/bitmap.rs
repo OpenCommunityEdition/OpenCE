@@ -1,9 +1,8 @@
 //! Bitmaps: a tag's sequences and images, each image's pixels converted
 //! to a texture (`texture.rs`).
 //!
-//! An Xbox cache's pixels are in the file after the tag data, each image's
-//! at its offset into the tag's pixel data. Halo PC's images give their own
-//! offsets into the file, or into `bitmaps.map` when flagged so.
+//! Each image gives its pixels' offset into the file (an Xbox cache's are
+//! after the tag data), or a Halo PC image flagged so into `bitmaps.map`.
 
 use opence_content::{Bitmap, BitmapImage, Pixels, ResourceRange, Sequence, Sprite};
 
@@ -15,7 +14,6 @@ use crate::tags::Element;
 use crate::texture::{self, StoredImage};
 
 pub(crate) const BITMAP_SIZE: usize = 0x6C;
-pub(crate) const PIXEL_DATA_OFFSET: usize = 0x30;
 pub(crate) const SEQUENCES_OFFSET: usize = 0x54;
 pub(crate) const SEQUENCE_SIZE: usize = 0x40;
 pub(crate) const SEQUENCE_SPRITES_OFFSET: usize = 0x34;
@@ -35,18 +33,10 @@ pub(crate) const IN_RESOURCE_MAP_FLAG: u16 = 1 << 8;
 /// Reads a bitmap tag, its sequences, its images and their pixels.
 pub(crate) fn import_bitmap(cache: &Cache, index: usize) -> Result<Bitmap, ImportError> {
     let bitmap = cache.tag(index, BITM, BITMAP_SIZE)?;
-    // (the Xbox's images are at offsets from the pixel data's place in the
-    // file, whatever its size says, as texture_cache_bitmap_new reads them;
-    // Halo PC's give their own)
-    let pixels_base = match cache.header().kind {
-        CacheKind::Xbox => bitmap.u32(PIXEL_DATA_OFFSET + 8, "pixel data")?,
-        CacheKind::CustomEdition => 0,
-    };
-
     let block = bitmap.block(IMAGES_OFFSET, "bitmaps", IMAGE_SIZE, MAX_IMAGES)?;
     let mut images = Vec::with_capacity(block.len());
     for image in block.iter() {
-        images.push(import_image(&image, cache, pixels_base)?);
+        images.push(import_image(&image, cache)?);
     }
 
     let block = bitmap.block(SEQUENCES_OFFSET, "sequences", SEQUENCE_SIZE, MAX_SEQUENCES)?;
@@ -121,11 +111,7 @@ fn import_sequence(sequence: &Element<'_>, images: usize) -> Result<Sequence, Im
     })
 }
 
-fn import_image(
-    image: &Element<'_>,
-    cache: &Cache,
-    pixels_base: u32,
-) -> Result<BitmapImage, ImportError> {
+fn import_image(image: &Element<'_>, cache: &Cache) -> Result<BitmapImage, ImportError> {
     let dimension = |at: usize, field: &str, longest: u16| {
         let value = image.u16(at, field)?;
         if (1..=longest).contains(&value) {
@@ -153,8 +139,9 @@ fn import_image(
     let pixels = if layout == CacheKind::CustomEdition && flags & IN_RESOURCE_MAP_FLAG != 0 {
         Pixels::ResourceMap(ResourceRange { offset, size })
     } else {
-        let at = u64::from(pixels_base) + u64::from(offset);
-        let at = usize::try_from(at).unwrap_or(usize::MAX);
+        // (the stock maps' offsets are into the file, not from the tag's
+        // pixel data, whose offset field a cache does not use)
+        let at = usize::try_from(offset).unwrap_or(usize::MAX);
         let stored = reader::slice(cache.file(), at, size as usize)
             .map_err(|fault| image.fault("pixels", fault))?;
         let stored = StoredImage {

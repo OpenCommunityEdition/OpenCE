@@ -19,8 +19,13 @@ let package = Package(
         .target(name: "OpenCEEngineKit", dependencies: ["OpenCEEngineCore", "opence_ffiFFI"]),
         // the window: its Metal layer, display link, mouse capture and keys
         .target(name: "OpenCEEngineWindow"),
-        .executableTarget(name: "OpenCEEngine", dependencies: ["OpenCEEngineKit", "OpenCEEngineWindow"]),
+        // the renderer: the level's buffers, textures and passes, and frame capture
+        .target(name: "OpenCEEngineRender", dependencies: ["OpenCEEngineCore"]),
+        .executableTarget(name: "OpenCEEngine",
+                          dependencies: ["OpenCEEngineKit", "OpenCEEngineWindow", "OpenCEEngineRender",
+                                         "opence_ffiFFI"]),
         .testTarget(name: "OpenCEEngineTests",
-                    dependencies: ["OpenCEEngineKit", "OpenCEEngineCore", "opence_ffiFFI", "OpenCEEngineWindow"]),
+                    dependencies: ["OpenCEEngineKit", "OpenCEEngineCore", "opence_ffiFFI", "OpenCEEngineWindow",
+                                   "OpenCEEngineRender"]),
     ]
 )

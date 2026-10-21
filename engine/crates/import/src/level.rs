@@ -13,7 +13,7 @@ use opence_content::level::{
 };
 use opence_content::{
     CollisionBsp, CollisionMaterial, EnvironmentVertex, Group, Level, Lightmap, LightmapVertex,
-    Material, Scenario, StructureBsp, TagRef,
+    Material, PlayerStart, Scenario, StructureBsp, TagRef,
 };
 
 use crate::cache::Cache;
@@ -30,6 +30,9 @@ pub(crate) const SCENARIO_SIZE: usize = 0x5B0;
 pub(crate) const SCENARIO_BSPS_OFFSET: usize = 0x5A4;
 pub(crate) const SCENARIO_BSP_SIZE: usize = 0x20;
 const MAX_STRUCTURE_BSPS: usize = 32;
+pub(crate) const SCENARIO_PLAYER_STARTS_OFFSET: usize = 0x354;
+pub(crate) const PLAYER_START_SIZE: usize = 0x34;
+const MAX_PLAYER_STARTS: usize = 256;
 
 pub(crate) const BSP_HEADER_SIZE: usize = 0x18;
 pub(crate) const BSP_HEADER_SIGNATURE_OFFSET: usize = 0x14;
@@ -169,10 +172,22 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     }
     bitmaps.sort_by(|a, b| a.tag.cmp(&b.tag));
 
+    let starts = scenario.block(
+        SCENARIO_PLAYER_STARTS_OFFSET,
+        "player starting locations",
+        PLAYER_START_SIZE,
+        MAX_PLAYER_STARTS,
+    )?;
+    let mut player_starts = Vec::with_capacity(starts.len());
+    for element in starts.iter() {
+        player_starts.push(import_player_start(&element, structure_bsps.len())?);
+    }
+
     let level = Level {
         scenario: Scenario {
             path: scenario.instance().name.clone(),
             structure_bsps: structure_bsp_tags,
+            player_starts,
         },
         structure_bsps,
         shaders,
@@ -181,6 +196,34 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     };
     check_lightmap_pages(&level)?;
     Ok(level)
+}
+
+/// A player starting location: its position, facing and BSP (-1 for any).
+fn import_player_start(element: &Element<'_>, bsps: usize) -> Result<PlayerStart, ImportError> {
+    let mut position = [0.0; 3];
+    for (axis, value) in position.iter_mut().enumerate() {
+        *value = element.f32(axis * 4, "position")?;
+    }
+    let facing = element.f32(0x0C, "facing")?;
+    if !position
+        .iter()
+        .chain([&facing])
+        .all(|value| value.is_finite())
+    {
+        return Err(element.fault("position", "is not finite"));
+    }
+    let structure_bsp = match element.i16(0x12, "structure bsp")? {
+        -1 => None,
+        index if index >= 0 && (index as usize) < bsps => Some(index as u16),
+        index => {
+            return Err(element.fault("structure bsp", format!("is {index}, past the {bsps} BSPs")))
+        }
+    };
+    Ok(PlayerStart {
+        position,
+        facing,
+        structure_bsp,
+    })
 }
 
 /// Each lightmap's page must be in its BSP's lightmap bitmap (when the
@@ -745,7 +788,7 @@ fn import_collision(bsp: &Element<'_>, material_count: usize) -> Result<Collisio
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::bitmap::{IMAGES_OFFSET, IMAGE_SIZE, PIXEL_DATA_OFFSET, SEQUENCES_OFFSET};
+    use crate::bitmap::{IMAGES_OFFSET, IMAGE_SIZE, SEQUENCES_OFFSET};
     use crate::cache::CacheKind;
     use crate::fake::FakeCache;
     use crate::shader::{SCHI, SENV};
@@ -807,10 +850,7 @@ pub(crate) mod tests {
             put(image, 4, &2u16.to_le_bytes());
             put(image, 6, &1u16.to_le_bytes());
             put(image, 8, &1u16.to_le_bytes());
-            let offset = match kind {
-                CacheKind::Xbox => index as u32 * 2,
-                CacheKind::CustomEdition => pixels + index as u32 * 2,
-            };
+            let offset = pixels + index as u32 * 2;
             let offset = if breaks.pixels_past_file {
                 offset + 0x10_0000
             } else {
@@ -826,8 +866,6 @@ pub(crate) mod tests {
         let sequences = fake.add_data(&sequence);
         let mut bitmap = vec![0u8; crate::bitmap::BITMAP_SIZE];
         put(&mut bitmap, 0, &0i16.to_le_bytes());
-        put(&mut bitmap, PIXEL_DATA_OFFSET, &4i32.to_le_bytes());
-        put(&mut bitmap, PIXEL_DATA_OFFSET + 8, &pixels.to_le_bytes());
         block(&mut bitmap, SEQUENCES_OFFSET, 1, sequences);
         block(&mut bitmap, IMAGES_OFFSET, 2, images);
         let bitmap = fake.add_tag(BITM, "levels\\fake\\bitmaps\\lightmap", &bitmap);
@@ -1017,6 +1055,13 @@ pub(crate) mod tests {
         let element = fake.add_data(&element);
         let mut scenario = vec![0u8; SCENARIO_SIZE];
         block(&mut scenario, SCENARIO_BSPS_OFFSET, 1, element);
+        // one player start in the BSP, facing +y
+        let mut start = vec![0u8; PLAYER_START_SIZE];
+        for (at, value) in [(0, 1.0f32), (4, 2.0), (8, 3.0), (0x0C, 1.5)] {
+            put(&mut start, at, &value.to_le_bytes());
+        }
+        let start = fake.add_data(&start);
+        block(&mut scenario, SCENARIO_PLAYER_STARTS_OFFSET, 1, start);
         fake.set_scenario_data(&scenario);
         fake
     }
@@ -1034,6 +1079,14 @@ pub(crate) mod tests {
                 Err(error) => panic!("{kind:?}: {error}"),
             };
             assert_eq!(level.scenario.structure_bsps.len(), 1);
+            assert_eq!(
+                level.scenario.player_starts,
+                [PlayerStart {
+                    position: [1.0, 2.0, 3.0],
+                    facing: 1.5,
+                    structure_bsp: Some(0),
+                }]
+            );
             let bsp = &level.structure_bsps[0];
             assert_eq!(bsp.world_bounds, [[-1.0, 1.0], [-2.0, 2.0], [-3.0, 3.0]]);
             assert_eq!(bsp.surfaces, [[0, 1, 2]]);

@@ -7,14 +7,17 @@
 // crate and physics are the only ones allowed it)
 #![allow(unsafe_code)]
 
+pub mod render_level;
 pub mod snapshot;
 
+use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use opence_sim::clock::Clock;
 use opence_sim::input::{Buttons, TickInput};
 use opence_sim::units::Radians;
-use opence_sim::Simulation;
+use opence_sim::{FreeCamera, Simulation};
+use render_level::{RenderDraw, RenderLevel, RenderMaterial, RenderTexture, VERTEX_STRIDE};
 use snapshot::{CameraSnapshot, SnapshotBuffers, SnapshotWriter};
 
 uniffi::setup_scaffolding!();
@@ -31,6 +34,158 @@ pub enum EngineError {
     /// A call that needs a world came before one was started.
     #[error("no world is running")]
     NoWorld,
+    /// A map could not be loaded.
+    #[error("{message}")]
+    Load {
+        /// Why.
+        message: String,
+    },
+    /// The level has no structure BSP of that index.
+    #[error("the level has no BSP {index}")]
+    NoBsp {
+        /// The index asked for.
+        index: u32,
+    },
+}
+
+/// Where the free camera is put and which way it faces (Z up; a yaw of
+/// zero looks along +X; radians).
+#[derive(Clone, Copy, Debug, Default, PartialEq, uniffi::Record)]
+pub struct CameraPlacement {
+    /// Where, in world units.
+    pub x: f32,
+    /// Where, in world units.
+    pub y: f32,
+    /// Where, in world units.
+    pub z: f32,
+    /// The turn to the left from +X.
+    pub yaw: f32,
+    /// The turn up from level.
+    pub pitch: f32,
+}
+
+/// A level's structure BSP, ready for the GPU: loaded once, through the
+/// cache folder, and read by the app into its buffers and textures.
+#[derive(uniffi::Object)]
+pub struct LevelGeometry {
+    level: RenderLevel,
+}
+
+#[uniffi::export]
+impl LevelGeometry {
+    /// The BSP `bsp` of the map at `map`, its pack kept in `cache_folder`.
+    #[uniffi::constructor]
+    pub fn load(map: String, cache_folder: String, bsp: u32) -> Result<Arc<Self>, EngineError> {
+        let loaded = opence_import::load_level(Path::new(&map), Path::new(&cache_folder)).map_err(
+            |error| EngineError::Load {
+                message: error.to_string(),
+            },
+        )?;
+        let level = RenderLevel::build(&loaded.level, bsp as usize)
+            .ok_or(EngineError::NoBsp { index: bsp })?;
+        Ok(Arc::new(Self { level }))
+    }
+
+    /// The bytes of one vertex.
+    pub fn vertex_stride(&self) -> u32 {
+        VERTEX_STRIDE as u32
+    }
+
+    /// The vertices: position, normal, texture and lightmap coordinates,
+    /// as little-endian floats.
+    pub fn vertices(&self) -> Vec<u8> {
+        self.level.vertices.clone()
+    }
+
+    /// The indices, as little-endian 32-bit integers.
+    pub fn indices(&self) -> Vec<u8> {
+        self.level
+            .indices
+            .iter()
+            .flat_map(|index| index.to_le_bytes())
+            .collect()
+    }
+
+    /// The draws: opaque and alpha-tested, then blended.
+    pub fn draws(&self) -> Vec<RenderDraw> {
+        self.level.draws.clone()
+    }
+
+    /// The materials the draws use.
+    pub fn materials(&self) -> Vec<RenderMaterial> {
+        self.level.materials.clone()
+    }
+
+    /// The textures the materials and lightmaps use.
+    pub fn textures(&self) -> Vec<RenderTexture> {
+        self.level
+            .textures
+            .iter()
+            .map(|(texture, _)| texture.clone())
+            .collect()
+    }
+
+    /// A texture's level's bytes (none for one it does not have).
+    pub fn texture_level(&self, texture: u32, level: u32) -> Vec<u8> {
+        self.level
+            .textures
+            .get(texture as usize)
+            .and_then(|(_, levels)| levels.get(level as usize))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// The BSP's bounds: least and greatest x, then y, then z.
+    pub fn bounds(&self) -> Vec<f32> {
+        self.level.bounds.iter().flatten().copied().collect()
+    }
+
+    /// Where a player would first see the BSP from: its first player
+    /// start, at a standing player's eyes, facing its way; or, if it has
+    /// none, a view over it from its bounds.
+    pub fn start_view(&self) -> CameraPlacement {
+        match self.level.player_start {
+            Some((position, facing)) => player_view(position, facing),
+            None => start_view(self.level.bounds),
+        }
+    }
+}
+
+/// How far a standing player's eyes are above their feet, in world units
+/// (the stock cyborg's camera).
+const EYE_HEIGHT: f32 = 0.62;
+
+/// The view from a player start at `position` facing `facing`.
+fn player_view(position: [f32; 3], facing: f32) -> CameraPlacement {
+    let [x, y, z] = position;
+    CameraPlacement {
+        x,
+        y,
+        z: z + EYE_HEIGHT,
+        yaw: facing,
+        pitch: 0.0,
+    }
+}
+
+/// A view over a BSP of `bounds`: high over one corner, looking at its
+/// middle, a little above its floor.
+fn start_view(bounds: [[f32; 2]; 3]) -> CameraPlacement {
+    let at = |axis: usize, part: f32| {
+        let [least, greatest] = bounds[axis];
+        least + (greatest - least) * part
+    };
+    let (x, y, z) = (at(0, 0.2), at(1, 0.2), at(2, 0.7));
+    let (dx, dy, dz) = (at(0, 0.5) - x, at(1, 0.5) - y, at(2, 0.3) - z);
+    // (libm's, as the simulation's: the camera's start is part of its state)
+    let across = libm::sqrtf(dx * dx + dy * dy);
+    let finite = |value: f32| if value.is_finite() { value } else { 0.0 };
+    CameraPlacement {
+        x: finite(x),
+        y: finite(y),
+        z: finite(z),
+        yaw: finite(libm::atan2f(dy, dx)),
+        pitch: finite(libm::atan2f(dz, across)),
+    }
 }
 
 /// The player's input as the app reads it from the keyboard and mouse.
@@ -119,6 +274,26 @@ impl Engine {
             clock: Clock::default(),
         });
         publish(&mut state, &self.snapshots, 0.0);
+    }
+
+    /// Puts the free camera at `placement`, as if it had always been there
+    /// (no interpolation from where it was).
+    pub fn place_camera(&self, placement: CameraPlacement) -> Result<(), EngineError> {
+        let mut state = self.lock();
+        let running = state.running.as_mut().ok_or(EngineError::NoWorld)?;
+        let finite = |value: f32| if value.is_finite() { value } else { 0.0 };
+        running.simulation.place_free_camera(FreeCamera {
+            position: opence_sim::Vec3::new(
+                finite(placement.x),
+                finite(placement.y),
+                finite(placement.z),
+            ),
+            yaw: Radians(finite(placement.yaw)),
+            pitch: Radians(finite(placement.pitch)),
+        });
+        running.previous_camera = transform(&running.simulation.camera().transform);
+        publish(&mut state, &self.snapshots, 0.0);
+        Ok(())
     }
 
     /// Sets the input the next ticks run with. The turns are used once,
@@ -302,6 +477,52 @@ mod tests {
         .rotation();
         assert!((frame.camera.current.rotation.z - turned.z).abs() < 1e-6);
         assert!(frame.camera.current.position.x > 0.0 && frame.camera.current.position.y > 0.0);
+    }
+
+    #[test]
+    fn a_placed_camera_is_published_without_a_streak() {
+        let engine = Engine::new();
+        let placement = CameraPlacement {
+            x: 10.0,
+            y: -4.0,
+            z: 2.0,
+            yaw: 1.0,
+            pitch: 0.5,
+        };
+        assert_eq!(engine.place_camera(placement), Err(EngineError::NoWorld));
+        engine.start_empty_world();
+        assert_eq!(engine.place_camera(placement), Ok(()));
+        let frame = acquire(&engine);
+        assert_eq!(frame.camera.current.position.x, 10.0);
+        assert_eq!(frame.camera.previous.position.y, -4.0);
+        let _ = engine.step();
+        let frame = acquire(&engine);
+        assert_eq!(frame.camera.current.position.z, 2.0);
+    }
+
+    #[test]
+    fn the_start_view_looks_into_the_bounds() {
+        let view = start_view([[0.0, 100.0], [0.0, 100.0], [0.0, 10.0]]);
+        assert_eq!((view.x, view.y, view.z), (20.0, 20.0, 7.0));
+        assert!((view.yaw - std::f32::consts::FRAC_PI_4).abs() < 1e-6);
+        assert!(view.pitch < 0.0 && view.pitch > -0.2);
+        let nonsense = start_view([[f32::NAN, 1.0], [0.0, f32::INFINITY], [0.0, 0.0]]);
+        assert!([nonsense.x, nonsense.y, nonsense.yaw, nonsense.pitch]
+            .iter()
+            .all(|value| value.is_finite()));
+    }
+
+    #[test]
+    fn a_player_start_is_seen_from_its_eyes() {
+        let view = player_view([1.0, 2.0, 3.0], 0.5);
+        assert_eq!((view.x, view.y, view.z), (1.0, 2.0, 3.0 + EYE_HEIGHT));
+        assert_eq!((view.yaw, view.pitch), (0.5, 0.0));
+    }
+
+    #[test]
+    fn a_missing_map_is_a_load_error() {
+        let result = LevelGeometry::load("/nonexistent/none.map".into(), "/nonexistent".into(), 0);
+        assert!(matches!(result, Err(EngineError::Load { .. })));
     }
 
     #[test]
