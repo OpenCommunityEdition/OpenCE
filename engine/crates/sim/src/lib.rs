@@ -11,6 +11,7 @@ pub mod animation;
 pub mod armory;
 pub mod clock;
 pub mod damage;
+pub mod debris;
 pub mod first_person;
 pub mod hash;
 pub mod hud;
@@ -18,6 +19,7 @@ pub mod input;
 pub mod objects;
 pub mod player;
 pub mod projectile;
+pub mod ragdoll;
 pub mod random;
 pub mod units;
 pub mod weapon;
@@ -166,6 +168,12 @@ pub struct Simulation {
     /// The player's first-person weapon and hands (shown, not the
     /// world's state).
     first_person: first_person::FirstPersonWeapon,
+    /// The dead bipeds' ragdolls, in the player's physics world.
+    ragdolls: ragdoll::Ragdolls,
+    /// The spent casings, in the player's physics world.
+    debris: debris::Debris,
+    /// Detonations to do in the next tick (a script's).
+    queued_detonations: Vec<projectile::Detonation>,
 }
 
 /// An object as the renderer draws it.
@@ -220,6 +228,9 @@ impl Simulation {
             sensor: hud::MotionSensor::default(),
             sensor_settings: None,
             first_person: first_person::FirstPersonWeapon::default(),
+            ragdolls: ragdoll::Ragdolls::default(),
+            debris: debris::Debris::default(),
+            queued_detonations: Vec::new(),
         }
     }
 
@@ -230,6 +241,7 @@ impl Simulation {
         self.impacts.clear();
         self.detonations.clear();
         self.damage.clear();
+        let mut ejections = Vec::new();
         if let Some(player) = self.player.as_mut() {
             // (the dead neither move nor fire, though they still fall)
             let handle = player.handle();
@@ -243,8 +255,10 @@ impl Simulation {
             let pose = player.step(&input);
             self.world.insert_resource(pose);
             let fired = player.step_weapons(&input, &mut self.world);
+            ejections = fired.ejections;
             self.impacts = fired.impacts;
             self.detonations = fired.detonations;
+            self.detonations.append(&mut self.queued_detonations);
             self.damage = damage::apply_impacts(&mut self.world, &self.impacts, Some(handle));
             self.damage.extend(damage::apply_detonations(
                 &mut self.world,
@@ -257,9 +271,45 @@ impl Simulation {
                     .extend(damage::apply_fall(&mut self.world, handle, speed));
             }
         }
+        self.queued_detonations.clear();
         self.schedule.run(&mut self.world);
+        self.update_physics(&ejections);
         self.update_motion_sensor();
         self.update_first_person();
+    }
+
+    /// The physics of the dead and the spent: the ragdolls and this tick's
+    /// casings, stepped once if either moves.
+    fn update_physics(&mut self, ejections: &[debris::Ejection]) {
+        let Some(player) = self.player.as_mut() else {
+            return;
+        };
+        let killed: Vec<ObjectHandle> = self
+            .damage
+            .iter()
+            .filter(|event| event.outcome.killed)
+            .map(|event| event.object)
+            .filter(|&object| {
+                let kinds = self.world.resource::<ObjectTable>();
+                kinds
+                    .entity(object)
+                    .and_then(|entity| self.world.get::<objects::Object>(entity))
+                    .is_some_and(|object| object.kind == ObjectKind::Biped)
+            })
+            .collect();
+        let physics = player.physics_mut();
+        let ragdolls = self
+            .ragdolls
+            .prepare(&mut self.world, physics, &killed, &self.detonations);
+        for ejection in ejections {
+            self.debris.eject(physics, ejection);
+        }
+        if ragdolls || self.debris.moving() {
+            // (a step the physics refuses leaves them where they were)
+            let _ = physics.step(clock::TICK.0);
+            self.ragdolls.settle(&mut self.world, physics);
+            self.debris.settle(physics);
+        }
     }
 
     /// Makes the player: its biped standing at `level`'s player start
@@ -305,6 +355,11 @@ impl Simulation {
                 multiplayer: true,
             });
         self.first_person = first_person::FirstPersonWeapon::new(level);
+        // (the earlier player's physics world took its ragdolls and its
+        // casings with it)
+        self.ragdolls = self.ragdolls.for_level(level);
+        self.debris = self.debris.for_level(level);
+        self.queued_detonations.clear();
         self.place_player_camera();
         self.update_first_person();
         Ok(handle)
@@ -318,6 +373,39 @@ impl Simulation {
     /// Where grenades detonated in the last tick.
     pub fn detonations(&self) -> &[projectile::Detonation] {
         &self.detonations
+    }
+
+    /// Detonates `detonation` in the next tick, as a grenade would (a
+    /// script's explosion); nothing without a player.
+    pub fn detonate(&mut self, detonation: projectile::Detonation) {
+        if self.player.is_some() {
+            self.queued_detonations.push(detonation);
+        }
+    }
+
+    /// The dead bipeds' ragdolls.
+    pub fn ragdolls(&self) -> &ragdoll::Ragdolls {
+        &self.ragdolls
+    }
+
+    /// Sets the most corpses kept; the oldest goes first.
+    pub fn set_corpses(&mut self, corpses: usize) {
+        self.ragdolls.set_corpses(corpses);
+    }
+
+    /// The spent casings.
+    pub fn debris(&self) -> &debris::Debris {
+        &self.debris
+    }
+
+    /// Sets the most casings kept; the oldest goes first.
+    pub fn set_debris(&mut self, pieces: usize) {
+        self.debris.set_cap(pieces);
+    }
+
+    /// Sets whether explosions tear limbs off.
+    pub fn set_dismemberment(&mut self, dismemberment: bool) {
+        self.ragdolls.set_dismemberment(dismemberment);
     }
 
     /// Gives the player `count` grenades of `kind` (0 frag, 1 plasma), up

@@ -35,7 +35,7 @@ pub use shader::{
     ChicagoMap, EnvironmentShader, ModelShaderClass, Shader, ShaderClass, TransparentChicagoShader,
 };
 pub use weapon::{
-    AimAssist, Ammunition, DamageEffect, Effect, Equipment, Grenade, Item, Magazine,
+    AimAssist, Ammunition, DamageEffect, Effect, EffectDebris, Equipment, Grenade, Item, Magazine,
     MaterialResponse, Projectile, Trigger, Weapon,
 };
 

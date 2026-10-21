@@ -387,12 +387,18 @@ fn import_collision_models(
         .collect()
 }
 
-/// The effects `objects`' projectiles detonate with, each once, by path.
+/// The effects `objects`' projectiles detonate with and their weapons'
+/// shots make, each once, by path.
 fn import_effects(cache: &Cache, objects: &[ObjectDefinition]) -> Result<Vec<Effect>, ImportError> {
-    let tags: BTreeSet<&TagRef> = objects
+    let detonations = objects
         .iter()
-        .filter_map(|object| object.projectile.as_ref()?.effect.as_ref())
-        .collect();
+        .filter_map(|object| object.projectile.as_ref()?.effect.as_ref());
+    let shots = objects
+        .iter()
+        .filter_map(|object| object.weapon.as_ref())
+        .flat_map(|weapon| &weapon.triggers)
+        .filter_map(|trigger| trigger.firing_effect.as_ref());
+    let tags: BTreeSet<&TagRef> = detonations.chain(shots).collect();
     let mut effects = Vec::with_capacity(tags.len());
     for tag in tags {
         // (a reference was checked to name a tag of the map when it was read)

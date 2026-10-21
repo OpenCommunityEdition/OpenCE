@@ -36,7 +36,8 @@ pub struct Level {
     pub damage_effects: Vec<DamageEffect>,
     /// Its objects' collision models, by path.
     pub collision_models: Vec<CollisionModel>,
-    /// The effects its projectiles detonate with, by path.
+    /// The effects its projectiles detonate with and its weapons' shots
+    /// make, by path.
     pub effects: Vec<Effect>,
     /// Its units' HUDs, by path.
     pub unit_huds: Vec<UnitHud>,

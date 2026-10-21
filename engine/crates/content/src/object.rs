@@ -84,6 +84,8 @@ pub struct ObjectDefinition {
     pub bounding_radius: f32,
     /// The sphere's centre, from the object's origin.
     pub bounding_offset: [f32; 3],
+    /// How much a damage effect's push moves it.
+    pub acceleration_scale: f32,
     /// The radius it is drawn within (0: the bounding radius).
     pub render_bounding_radius: f32,
     /// Its model.

@@ -13,6 +13,7 @@
 
 mod mesh;
 pub mod movement;
+mod ragdoll;
 mod sys;
 
 use std::ptr::NonNull;
@@ -21,6 +22,7 @@ use glam::{Quat, Vec3};
 
 pub use mesh::LevelMesh;
 pub use movement::{Landing, MovementInput, Mover, MoverSettings};
+pub use ragdoll::{shape_volume, RagdollId, RagdollPart, METRES_PER_UNIT_CUBED, RAGDOLL_PARTS_MAX};
 
 /// Metres in a world unit (port/macos/include/host_physics.h's).
 pub const METRES_PER_UNIT: f32 = 3.048;

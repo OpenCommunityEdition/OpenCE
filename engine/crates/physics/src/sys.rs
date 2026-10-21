@@ -86,6 +86,23 @@ pub struct CharacterState {
     pub ground: i32,
 }
 
+/// The most parts a ragdoll has.
+pub const RAGDOLL_PARTS_MAX: usize = 32;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Part {
+    pub parent: i32,
+    pub shape: Shape,
+    pub mass: f32,
+    pub twist_axis: [f32; 3],
+    pub plane_axis: [f32; 3],
+    pub twist_min: f32,
+    pub twist_max: f32,
+    pub swing_normal: f32,
+    pub swing_plane: f32,
+}
+
 extern "C" {
     pub fn physics_world_create(settings: *const WorldSettings) -> *mut World;
     pub fn physics_world_destroy(world: *mut World);
@@ -172,4 +189,41 @@ extern "C" {
         state: *mut CharacterState,
     ) -> i32;
     pub fn physics_character_set_height(world: *mut World, character: u32, height: f32) -> i32;
+
+    pub fn physics_ragdoll_add(
+        world: *mut World,
+        parts: *const Part,
+        count: u32,
+        rest: *const Pose,
+        pose: *const Pose,
+        material: *const Material,
+    ) -> u32;
+    pub fn physics_ragdoll_remove(world: *mut World, ragdoll: u32);
+    pub fn physics_ragdoll_get_poses(
+        world: *const World,
+        ragdoll: u32,
+        poses: *mut Pose,
+        count: u32,
+    ) -> i32;
+    pub fn physics_ragdoll_drive(
+        world: *mut World,
+        ragdoll: u32,
+        target: *const Pose,
+        count: u32,
+        frequency: f32,
+    ) -> i32;
+    pub fn physics_ragdoll_go_limp(world: *mut World, ragdoll: u32) -> i32;
+    pub fn physics_ragdoll_add_impulse(
+        world: *mut World,
+        ragdoll: u32,
+        part: u32,
+        impulse: *const f32,
+        point: *const f32,
+    ) -> i32;
+    pub fn physics_ragdoll_set_velocity(world: *mut World, ragdoll: u32, linear: *const f32)
+        -> i32;
+    pub fn physics_ragdoll_break_joint(world: *mut World, ragdoll: u32, part: u32) -> i32;
+    pub fn physics_ragdoll_joint_broken(world: *const World, ragdoll: u32, part: u32) -> i32;
+    pub fn physics_ragdoll_active(world: *const World, ragdoll: u32) -> i32;
+    pub fn physics_ragdoll_limit_error(world: *const World, ragdoll: u32) -> f32;
 }

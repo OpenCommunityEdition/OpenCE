@@ -40,6 +40,10 @@ const DAMAGE_PART: usize = 0x1C4;
 pub(crate) const MAGAZINE_SIZE: usize = 0x70;
 pub(crate) const AMMUNITION_SIZE: usize = 0x1C;
 pub(crate) const TRIGGER_SIZE: usize = 0x114;
+/// A trigger's firing effect: its shots, then its effects (firing,
+/// misfiring, empty) and their damage effects, references of 0x10 bytes.
+pub(crate) const FIRING_EFFECT_SIZE: usize = 0x84;
+const MAX_FIRING_EFFECTS: usize = 8;
 pub(crate) const MATERIAL_RESPONSE_SIZE: usize = 0xA0;
 const MAX_MAGAZINES: usize = 2;
 const MAX_AMMUNITION: usize = 8;
@@ -172,6 +176,19 @@ fn import_trigger(trigger: &Element<'_>, magazines: usize) -> Result<Trigger, Im
         heat_generated_per_round: f(0xB8, "heat generated per round")?,
         age_generated_per_round: f(0xBC, "age generated per round")?,
         overloading_time: f(0xC4, "overload time")?,
+        firing_effect: match trigger
+            .block(
+                0x108,
+                "firing effects",
+                FIRING_EFFECT_SIZE,
+                MAX_FIRING_EFFECTS,
+            )?
+            .iter()
+            .next()
+        {
+            Some(effect) => reference(&effect, 0x24, "firing effect", &[EFFE])?,
+            None => None,
+        },
     })
 }
 

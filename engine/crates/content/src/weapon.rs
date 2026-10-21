@@ -233,6 +233,9 @@ pub struct Trigger {
     pub age_generated_per_round: f32,
     /// How long it overloads.
     pub overloading_time: f32,
+    /// The effect a shot makes (the first firing effect's), whose debris
+    /// (spent casings) is thrown out with each.
+    pub firing_effect: Option<TagRef>,
 }
 
 impl Trigger {
@@ -493,4 +496,31 @@ pub struct Effect {
     pub tag: TagRef,
     /// The damage effects (`jpt!`) its events' parts create, in order.
     pub damage: Vec<TagRef>,
+    /// The particles its events emit that are heavy enough to be bodies
+    /// (spent casings and the like), in order.
+    pub debris: Vec<EffectDebris>,
+}
+
+/// An effect's particles heavy enough to be bodies: their point physics
+/// (`pphy`) is dense, so each tumbles and comes to rest as a body would.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct EffectDebris {
+    /// The fewest and most of them an event emits.
+    pub count: [i16; 2],
+    /// Where they leave from, in the effect's frame.
+    pub offset: [f32; 3],
+    /// The way they leave, in the effect's frame: the yaw and pitch.
+    pub direction: [f32; 2],
+    /// The least and most speed they leave at.
+    pub velocity: [f32; 2],
+    /// The cone about their direction they leave within.
+    pub velocity_cone_angle: f32,
+    /// Each one's radius, in world units.
+    pub radius: f32,
+    /// Their density, in grams a millilitre.
+    pub density: f32,
+    /// Their friction on what they touch, 0 to 1.
+    pub friction: f32,
+    /// Their bounce, 0 to 1.
+    pub elasticity: f32,
 }

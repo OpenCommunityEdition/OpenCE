@@ -196,6 +196,7 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
         flags: object.u16(0x02, "flags")?,
         bounding_radius: object.f32(0x04, "bounding radius")?,
         bounding_offset: vector(&object, 0x08, "bounding offset")?,
+        acceleration_scale: object.f32(0x20, "acceleration scale")?,
         render_bounding_radius: object.f32(0x104, "render bounding radius")?,
         model: reference(&object, 0x28, "model", &models)?,
         animation_graph: reference(&object, 0x38, "animation graph", &[ANTR])?,

@@ -20,6 +20,7 @@ use thiserror::Error;
 use crate::armory::{self, Armory, Carried, Inventory, WeaponItem};
 use crate::clock;
 use crate::damage;
+use crate::debris::Ejection;
 use crate::hash::WorldHasher;
 use crate::input::{Buttons, TickInput};
 use crate::objects::{self, Object, ObjectHandle, ObjectSpawn};
@@ -128,6 +129,8 @@ pub(crate) struct Fired {
     pub impacts: Vec<Impact>,
     /// Where its grenades detonated.
     pub detonations: Vec<Detonation>,
+    /// The effects its shots made, which throw out casings.
+    pub ejections: Vec<Ejection>,
 }
 
 /// What the tick's systems need of the player: where its object goes and
@@ -211,6 +214,11 @@ impl Player {
     /// Its biped's object.
     pub fn handle(&self) -> ObjectHandle {
         self.handle
+    }
+
+    /// The physics world the biped moves in, which the ragdolls lie in.
+    pub(crate) fn physics_mut(&mut self) -> &mut PhysicsWorld {
+        &mut self.physics
     }
 
     /// Its biped's tag.
@@ -391,6 +399,15 @@ impl Player {
         };
         let shots = carried.state.step(weapon, controls);
         for shot in shots {
+            if let Some(effect) = weapon
+                .triggers
+                .get(shot.trigger)
+                .and_then(|trigger| trigger.firing_effect.clone())
+            {
+                fired
+                    .ejections
+                    .push(ejection(effect, eyes, aim, self.mover.velocity));
+            }
             let (Some(trigger), Some(Some((tag, projectile)))) = (
                 weapon.triggers.get(shot.trigger),
                 definition.projectiles.get(shot.trigger),
@@ -803,5 +820,20 @@ pub(crate) fn move_player(
     };
     if let Ok(mut transform) = transforms.get_mut(entity) {
         *transform = pose.body;
+    }
+}
+
+/// Where a shot's effect is made, from the eyes and the aim: by the
+/// weapon's ejection port, to the right of and below the view, facing
+/// right and up, as the first-person weapons' markers are (the sim has no
+/// first-person markers to put it at).
+fn ejection(effect: TagRef, eyes: Vec3, aim: Quat, velocity: Vec3) -> Ejection {
+    Ejection {
+        effect,
+        position: eyes + aim * Vec3::new(0.2, -0.08, -0.08),
+        rotation: aim
+            * Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)
+            * Quat::from_rotation_y(-0.5),
+        velocity,
     }
 }
