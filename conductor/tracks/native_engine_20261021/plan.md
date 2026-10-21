@@ -143,6 +143,6 @@
     - [x] Campaign flow, saved games, cutscene cameras, the campaign menu
 - [x] Task: The first two levels e106d2e0
     - [x] Write tests: a recorded run plays *The Pillar of Autumn* and *Halo* from start to end with no script errors
-- [ ] Task: The documentation
-    - [ ] `docs/engine.md`: the architecture, the contract, the content format, and how to add an object kind, a weapon behaviour and a script function
+- [x] Task: The documentation a790b635
+    - [x] `docs/engine.md`: the architecture, the contract, the content format, and how to add an object kind, a weapon behaviour and a script function
 - [ ] Task: Conductor - User Manual Verification 'Phase 7: AI and the campaign' (Protocol in workflow.md)
