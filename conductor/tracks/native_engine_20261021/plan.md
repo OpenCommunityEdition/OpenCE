@@ -46,9 +46,9 @@
 - [x] Task: Typed tags for objects 0489d862
     - [x] Write tests: builders for object, scenery, weapon, vehicle, biped, device, model (gbxmodel and the Xbox model), animation graph and collision model tags import; malformed ones are refused
     - [x] `content` types and importers for the object tags
-- [ ] Task: Objects in the world
-    - [ ] Write tests: the scenario's placements spawn entities with their tag, position, permutation and team; a handle cannot be used after its entity is removed
-    - [ ] Entities, components and typed handles in `sim`; spawning from the scenario; the registry for object kinds
+- [x] Task: Objects in the world 0e056b18
+    - [x] Write tests: the scenario's placements spawn entities with their tag, position, permutation and team; a handle cannot be used after its entity is removed
+    - [x] Entities, components and typed handles in `sim`; spawning from the scenario; the registry for object kinds
 - [ ] Task: Animation
     - [ ] Write tests: node matrices from the animation graph for fixed frames match the reference app's (recorded); blending and overlays; compressed and uncompressed animations
     - [ ] Animation playback and blending in Rust; node matrices into the snapshot
