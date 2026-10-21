@@ -64,9 +64,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Objects, models and animation' (Protocol in workflow.md)
 
 ## Phase 3: Player movement and collision
-- [ ] Task: Reference traces
-    - [ ] Write tests: a recorder in the reference app writes the player's position, velocity and state each tick for scripted inputs (run, jump, crouch, fall, climb a ramp); the files are checked into `engine/tests/traces/`
-    - [ ] The trace recorder (a debug setting of the reference app) and the scripted inputs
+- [x] Task: Reference traces 3732076e
+    - [x] Write tests: a recorder in the reference app writes the player's position, velocity and state each tick for scripted inputs (run, jump, crouch, fall, climb a ramp); the files are checked into `engine/tests/traces/`
+    - [x] The trace recorder (a debug setting of the reference app) and the scripted inputs
 - [ ] Task: Jolt from Rust
     - [ ] Write tests: cargo tests that a world built from an imported collision BSP stops a falling box; rays and shape casts hit the expected surfaces; two runs are identical
     - [ ] `physics`: a safe Rust interface over the C wrapper, the static mesh from the collision BSP, rays and shape casts
