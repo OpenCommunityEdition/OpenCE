@@ -34,9 +34,9 @@
 - [x] Task: The level's renderer 6b3048f2
     - [x] Write tests: golden frames (manual approval) of bloodgulch and a campaign BSP from fixed cameras at 1920×1080, 3440×1440 and 3840×2160
     - [x] Metal pipelines built once at load; the BSP's geometry and lightmaps; materials mapped from the environment, transparent and sky shaders; HDR with EDR or tone-mapping; Hor+ field of view
-- [ ] Task: Temporal anti-aliasing and upscaling
-    - [ ] Write tests: golden frames with MetalFX's temporal scaler (jitter, motion vectors, depth) and in native mode; a still camera converges to a stable image
-    - [ ] MetalFX temporal scaler, the jitter sequence, motion vectors; the video settings (render scale, anti-aliasing mode)
+- [x] Task: Temporal anti-aliasing and upscaling c1625de6
+    - [x] Write tests: golden frames with MetalFX's temporal scaler (jitter, motion vectors, depth) and in native mode; a still camera converges to a stable image
+    - [x] MetalFX temporal scaler, the jitter sequence, motion vectors; the video settings (render scale, anti-aliasing mode)
 - [ ] Task: The free camera
     - [ ] Write tests: the camera's motion from recorded mouse and keyboard input is exact; the map chosen from the command line or a picker loads
     - [ ] Fly camera, the map picker, the frame-time overlay
