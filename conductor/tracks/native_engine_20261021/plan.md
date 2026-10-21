@@ -141,8 +141,8 @@
 - [x] Task: The campaign's flow f39344c3
     - [x] Write tests: BSP switches, checkpoints saved and loaded in our own format, cutscenes, difficulties
     - [x] Campaign flow, saved games, cutscene cameras, the campaign menu
-- [ ] Task: The first two levels
-    - [ ] Write tests: a recorded run plays *The Pillar of Autumn* and *Halo* from start to end with no script errors
+- [x] Task: The first two levels e106d2e0
+    - [x] Write tests: a recorded run plays *The Pillar of Autumn* and *Halo* from start to end with no script errors
 - [ ] Task: The documentation
     - [ ] `docs/engine.md`: the architecture, the contract, the content format, and how to add an object kind, a weapon behaviour and a script function
 - [ ] Task: Conductor - User Manual Verification 'Phase 7: AI and the campaign' (Protocol in workflow.md)
