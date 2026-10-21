@@ -616,7 +616,10 @@ pub(crate) fn short_coordinate(value: i16) -> f32 {
 
 /// The collision BSP's eight blocks, each index in them checked against
 /// the block it indexes.
-fn import_collision(bsp: &Element<'_>, material_count: usize) -> Result<CollisionBsp, ImportError> {
+pub(crate) fn import_collision(
+    bsp: &Element<'_>,
+    material_count: usize,
+) -> Result<CollisionBsp, ImportError> {
     let block = |(at, size, longest): (usize, usize, usize), field: &str| {
         bsp.block(at, field, size, longest)
     };
@@ -796,21 +799,21 @@ pub(crate) mod tests {
 
     const BSP_BASE: u32 = 0x4000_0000;
 
-    fn put(bytes: &mut [u8], at: usize, value: &[u8]) {
+    pub(crate) fn put(bytes: &mut [u8], at: usize, value: &[u8]) {
         bytes[at..at + value.len()].copy_from_slice(value);
     }
 
-    fn block(bytes: &mut [u8], at: usize, count: usize, address: u32) {
+    pub(crate) fn block(bytes: &mut [u8], at: usize, count: usize, address: u32) {
         put(bytes, at, &(count as i32).to_le_bytes());
         put(bytes, at + 4, &address.to_le_bytes());
     }
 
-    fn reference(bytes: &mut [u8], at: usize, group: GroupTag, handle: u32) {
+    pub(crate) fn reference(bytes: &mut [u8], at: usize, group: GroupTag, handle: u32) {
         put(bytes, at, &group.0.to_le_bytes());
         put(bytes, at + 12, &handle.to_le_bytes());
     }
 
-    fn empty(bytes: &mut [u8], at: usize) {
+    pub(crate) fn empty(bytes: &mut [u8], at: usize) {
         reference(bytes, at, GroupTag::NONE, u32::MAX);
     }
 
@@ -1196,7 +1199,7 @@ pub(crate) mod tests {
         }
     }
 
-    fn stock_map(name: &str) -> Option<Cache> {
+    pub(crate) fn stock_map(name: &str) -> Option<Cache> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../assets/maps")
             .join(format!("{name}.map"));

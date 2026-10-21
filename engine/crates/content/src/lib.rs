@@ -5,6 +5,7 @@
 
 pub mod bitmap;
 pub mod level;
+pub mod object;
 pub mod pack;
 pub mod shader;
 
@@ -14,6 +15,13 @@ pub use bitmap::{
 pub use level::{
     CollisionBsp, CollisionMaterial, EnvironmentVertex, Level, Lightmap, LightmapVertex, Material,
     PlayerStart, Scenario, StructureBsp,
+};
+pub use object::{
+    Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, ChangeColor,
+    CollisionModel, CollisionModelMaterial, CollisionNode, CollisionRegion, ColorPermutation,
+    MarkerInstance, Model, ModelGeometry, ModelMarker, ModelNode, ModelPart, ModelPermutation,
+    ModelRegion, ModelShader, ModelVertex, ObjectDefinition, ObjectKind, PathfindingSphere,
+    UnitSeat, WeaponClass, WeaponType,
 };
 pub use shader::{ChicagoMap, EnvironmentShader, Shader, ShaderClass, TransparentChicagoShader};
 

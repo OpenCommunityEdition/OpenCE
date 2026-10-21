@@ -30,6 +30,9 @@ pub struct FakeCache {
     pub bad_handle: Option<usize>,
     /// Whether the names lack their terminators.
     pub unterminated_names: bool,
+    /// Words written into the tag index header (Custom Edition's model
+    /// data), by offset.
+    pub header_fields: Vec<(usize, u32)>,
 }
 
 impl FakeCache {
@@ -50,6 +53,7 @@ impl FakeCache {
             scenario_handle: None,
             bad_handle: None,
             unterminated_names: false,
+            header_fields: Vec::new(),
         }
     }
 
@@ -146,6 +150,9 @@ impl FakeCache {
         tag_data[0..4].copy_from_slice(&instances_address.to_le_bytes());
         tag_data[4..8].copy_from_slice(&scenario.to_le_bytes());
         tag_data[12..16].copy_from_slice(&count.to_le_bytes());
+        for &(at, value) in &self.header_fields {
+            tag_data[at..at + 4].copy_from_slice(&value.to_le_bytes());
+        }
         let signature = self.kind.tag_header_size() - 4;
         tag_data[signature..signature + 4].copy_from_slice(&GroupTag::new(b"tags").0.to_le_bytes());
 
