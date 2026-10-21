@@ -1,17 +1,18 @@
-//! Bitmaps: a tag's sequences and images, with each image's pixels as the
-//! cache stores them (converting them is the native format's work).
+//! Bitmaps: a tag's sequences and images, each image's pixels converted
+//! to a texture (`texture.rs`).
 //!
 //! An Xbox cache's pixels are in the file after the tag data, each image's
 //! at its offset into the tag's pixel data. Halo PC's images give their own
 //! offsets into the file, or into `bitmaps.map` when flagged so.
 
-use opence_content::{Bitmap, BitmapImage, Pixels, Sequence, Sprite};
+use opence_content::{Bitmap, BitmapImage, Pixels, ResourceRange, Sequence, Sprite};
 
 use crate::cache::{Cache, CacheKind};
 use crate::error::ImportError;
 use crate::level::{tag_ref, BITM};
 use crate::reader;
 use crate::tags::Element;
+use crate::texture::{self, StoredImage};
 
 pub(crate) const BITMAP_SIZE: usize = 0x6C;
 pub(crate) const PIXEL_DATA_OFFSET: usize = 0x30;
@@ -142,30 +143,46 @@ fn import_image(
             format!("is {size} bytes, past {MAX_PIXEL_DATA}"),
         ));
     }
-    let resource = cache.header().kind == CacheKind::CustomEdition;
-    let pixels = if resource && flags & IN_RESOURCE_MAP_FLAG != 0 {
-        Pixels::ResourceMap { offset, size }
+    let width = dimension(0x04, "width", LONGEST_DIMENSION)?;
+    let height = dimension(0x06, "height", LONGEST_DIMENSION)?;
+    let depth = dimension(0x08, "depth", LONGEST_DEPTH)?;
+    let kind = image.i16(0x0A, "type")?;
+    let format = image.i16(0x0C, "format")?;
+    let mipmap_count = image.u16(0x14, "mipmap count")?;
+    let layout = cache.header().kind;
+    let pixels = if layout == CacheKind::CustomEdition && flags & IN_RESOURCE_MAP_FLAG != 0 {
+        Pixels::ResourceMap(ResourceRange { offset, size })
     } else {
         let at = u64::from(pixels_base) + u64::from(offset);
         let at = usize::try_from(at).unwrap_or(usize::MAX);
-        Pixels::Here(
-            reader::slice(cache.file(), at, size as usize)
-                .map_err(|fault| image.fault("pixels", fault))?
-                .to_vec(),
+        let stored = reader::slice(cache.file(), at, size as usize)
+            .map_err(|fault| image.fault("pixels", fault))?;
+        let stored = StoredImage {
+            width,
+            height,
+            depth,
+            kind,
+            format,
+            flags,
+            mipmap_count,
+            pixels: stored,
+        };
+        Pixels::Texture(
+            texture::convert(&stored, layout).map_err(|fault| image.fault("pixels", fault))?,
         )
     };
     Ok(BitmapImage {
-        width: dimension(0x04, "width", LONGEST_DIMENSION)?,
-        height: dimension(0x06, "height", LONGEST_DIMENSION)?,
-        depth: dimension(0x08, "depth", LONGEST_DEPTH)?,
-        kind: image.i16(0x0A, "type")?,
-        format: image.i16(0x0C, "format")?,
+        width,
+        height,
+        depth,
+        kind,
+        format,
         flags,
         registration_point: [
             image.i16(0x10, "registration point")?,
             image.i16(0x12, "registration point")?,
         ],
-        mipmap_count: image.u16(0x14, "mipmap count")?,
+        mipmap_count,
         pixels,
     })
 }

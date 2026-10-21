@@ -1,9 +1,11 @@
 //! Shaders: what a surface is drawn with.
 
+use rkyv::{Archive, Deserialize, Serialize};
+
 use crate::{Group, TagRef};
 
 /// A shader.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct Shader {
     /// Its tag.
     pub tag: TagRef,
@@ -14,7 +16,7 @@ pub struct Shader {
 }
 
 /// A shader's class, and that class's fields.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub enum ShaderClass {
     /// The structure's opaque surfaces (`senv`).
     Environment(Box<EnvironmentShader>),
@@ -29,7 +31,7 @@ pub enum ShaderClass {
 }
 
 /// An environment shader (`senv`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct EnvironmentShader {
     /// Its flags (alpha tested, bump map is specular mask).
     pub flags: u16,
@@ -86,7 +88,7 @@ pub struct EnvironmentShader {
 }
 
 /// A transparent chicago shader (`schi`, `scex`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct TransparentChicagoShader {
     /// The numeric counter's limit.
     pub numeric_counter_limit: u8,
@@ -111,7 +113,7 @@ pub struct TransparentChicagoShader {
 }
 
 /// A map of a chicago shader.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct ChicagoMap {
     /// Its flags (unfiltered, alpha replicate, clamped u and v).
     pub flags: u16,

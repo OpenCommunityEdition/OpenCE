@@ -1,9 +1,11 @@
 //! A level: its scenario, its structure BSPs and what they are drawn with.
 
+use rkyv::{Archive, Deserialize, Serialize};
+
 use crate::{Bitmap, Shader, TagRef};
 
 /// Everything a level's structure is drawn and collided with.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct Level {
     /// The scenario.
     pub scenario: Scenario,
@@ -31,7 +33,7 @@ impl Level {
 }
 
 /// A scenario, as far as its structure goes.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
 pub struct Scenario {
     /// Its path.
     pub path: String,
@@ -41,7 +43,7 @@ pub struct Scenario {
 
 /// A structure BSP: the level's fixed geometry, its lightmaps and its
 /// collision.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct StructureBsp {
     /// Its path.
     pub path: String,
@@ -60,7 +62,7 @@ pub struct StructureBsp {
 }
 
 /// What a collision surface is made of.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
 pub struct CollisionMaterial {
     /// The shader drawn there.
     pub shader: Option<TagRef>,
@@ -69,7 +71,7 @@ pub struct CollisionMaterial {
 }
 
 /// The geometry that shares one lightmap page.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct Lightmap {
     /// The page's index in the BSP's lightmap bitmap, if it has one.
     pub bitmap_index: Option<u16>,
@@ -78,7 +80,7 @@ pub struct Lightmap {
 }
 
 /// The triangles of a lightmap page that share a shader.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct Material {
     /// The shader.
     pub shader: Option<TagRef>,
@@ -94,7 +96,7 @@ pub struct Material {
 }
 
 /// A vertex of the structure.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct EnvironmentVertex {
     /// Where it is.
     pub position: [f32; 3],
@@ -110,7 +112,7 @@ pub struct EnvironmentVertex {
 
 /// A vertex's light: where on the lightmap page it is, and the direction
 /// most of its light comes from.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct LightmapVertex {
     /// The incident light's direction.
     pub incident_direction: [f32; 3],
@@ -124,7 +126,7 @@ pub struct LightmapVertex {
 /// 31 bits are a leaf, all ones for none. A 2D node's child, and a 2D
 /// reference's node, are a node if not negative, otherwise a surface in
 /// the low 31 bits. A plane designator's high bit flips the plane.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
 pub struct CollisionBsp {
     /// The 3D nodes.
     pub bsp3d_nodes: Vec<Bsp3dNode>,
@@ -145,7 +147,7 @@ pub struct CollisionBsp {
 }
 
 /// A 3D node of a collision BSP.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
 pub struct Bsp3dNode {
     /// Its plane designator.
     pub plane: i32,
@@ -154,7 +156,7 @@ pub struct Bsp3dNode {
 }
 
 /// A leaf of a collision BSP.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
 pub struct CollisionLeaf {
     /// Its flags.
     pub flags: u16,
@@ -165,7 +167,7 @@ pub struct CollisionLeaf {
 }
 
 /// A 2D reference of a collision BSP: a plane and the 2D tree in it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
 pub struct Bsp2dReference {
     /// Its plane designator.
     pub plane: i32,
@@ -174,7 +176,7 @@ pub struct Bsp2dReference {
 }
 
 /// A 2D node of a collision BSP.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct Bsp2dNode {
     /// Its line: normal, then distance.
     pub plane: [f32; 3],
@@ -183,7 +185,7 @@ pub struct Bsp2dNode {
 }
 
 /// A surface of a collision BSP.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
 pub struct CollisionSurface {
     /// Its plane designator.
     pub plane: i32,
@@ -198,7 +200,7 @@ pub struct CollisionSurface {
 }
 
 /// An edge of a collision BSP.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
 pub struct CollisionEdge {
     /// Its start and end.
     pub vertices: [u32; 2],
@@ -209,7 +211,7 @@ pub struct CollisionEdge {
 }
 
 /// A vertex of a collision BSP.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct CollisionVertex {
     /// Where it is.
     pub point: [f32; 3],

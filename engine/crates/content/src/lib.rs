@@ -5,19 +5,23 @@
 
 pub mod bitmap;
 pub mod level;
+pub mod pack;
 pub mod shader;
 
-pub use bitmap::{Bitmap, BitmapImage, Pixels, Sequence, Sprite};
+pub use bitmap::{
+    Bitmap, BitmapImage, Pixels, ResourceRange, Sequence, Sprite, Texture, TextureFormat,
+};
 pub use level::{
     CollisionBsp, CollisionMaterial, EnvironmentVertex, Level, Lightmap, LightmapVertex, Material,
     Scenario, StructureBsp,
 };
 pub use shader::{ChicagoMap, EnvironmentShader, Shader, ShaderClass, TransparentChicagoShader};
 
+use rkyv::{Archive, Deserialize, Serialize};
 use std::fmt;
 
 /// A tag group's four-character code (`sbsp`), first character first.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Archive, Serialize, Deserialize)]
 pub struct Group(pub [u8; 4]);
 
 impl fmt::Display for Group {
@@ -36,7 +40,7 @@ impl fmt::Debug for Group {
 
 /// A tag, named by its group and path (`bitm`,
 /// `levels\test\bloodgulch\bitmaps\grass`).
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Archive, Serialize, Deserialize)]
 pub struct TagRef {
     /// Its group.
     pub group: Group,

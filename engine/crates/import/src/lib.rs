@@ -8,9 +8,12 @@ pub mod bitmap;
 pub mod cache;
 pub mod error;
 pub mod level;
+pub mod level_cache;
 pub mod reader;
 pub mod shader;
 pub mod tags;
+mod texture;
+mod vector_palette;
 
 #[cfg(test)]
 mod fake;
@@ -18,4 +21,5 @@ mod fake;
 pub use cache::{Cache, CacheHeader, CacheKind};
 pub use error::ImportError;
 pub use level::import_level;
+pub use level_cache::{load_level, LoadError, LoadedFrom, LoadedLevel, IMPORTER_VERSION};
 pub use tags::{Block, Element, GroupTag, Region, TagInstance};

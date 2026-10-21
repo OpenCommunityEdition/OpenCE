@@ -743,13 +743,13 @@ fn import_collision(bsp: &Element<'_>, material_count: usize) -> Result<Collisio
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::bitmap::{IMAGES_OFFSET, IMAGE_SIZE, PIXEL_DATA_OFFSET, SEQUENCES_OFFSET};
     use crate::cache::CacheKind;
     use crate::fake::FakeCache;
     use crate::shader::{SCHI, SENV};
-    use opence_content::{Pixels, ShaderClass};
+    use opence_content::{Pixels, ShaderClass, Texture, TextureFormat};
 
     const BSP_BASE: u32 = 0x4000_0000;
 
@@ -785,7 +785,7 @@ mod tests {
 
     /// What to break in the level.
     #[derive(Default)]
-    struct Breaks {
+    pub(crate) struct Breaks {
         bsp_signature: bool,
         triangle_past_vertices: bool,
         lightmap_page_past_images: bool,
@@ -796,7 +796,7 @@ mod tests {
     /// A level of one BSP: one triangle in one lightmap's one material, an
     /// environment shader, a chicago shader layered on it, a bitmap of
     /// two images for the lightmap and a two-pixel collision BSP.
-    fn level(kind: CacheKind, breaks: &Breaks) -> FakeCache {
+    pub(crate) fn level(kind: CacheKind, breaks: &Breaks) -> FakeCache {
         let mut fake = FakeCache::new(kind);
 
         // the bitmap: two 2x1 A8 images, their pixels in the file
@@ -1075,8 +1075,22 @@ mod tests {
             assert_eq!(bitmap.sequences[0].name, "lightmaps");
             assert_eq!(bitmap.sequences[0].image_count, 2);
             assert_eq!(bitmap.images[1].width, 2);
-            assert_eq!(bitmap.images[0].pixels, Pixels::Here(vec![1, 2]));
-            assert_eq!(bitmap.images[1].pixels, Pixels::Here(vec![3, 4]));
+            // (A8 widened to white with its alpha, and a mipmap made)
+            let texture = |first: u8, second: u8, mip: u8| {
+                Pixels::Texture(Texture {
+                    format: TextureFormat::Rgba8,
+                    width: 2,
+                    height: 1,
+                    depth: 1,
+                    faces: 1,
+                    levels: vec![
+                        vec![255, 255, 255, first, 255, 255, 255, second],
+                        vec![255, 255, 255, mip],
+                    ],
+                })
+            };
+            assert_eq!(bitmap.images[0].pixels, texture(1, 2, 2));
+            assert_eq!(bitmap.images[1].pixels, texture(3, 4, 4));
         }
     }
 
