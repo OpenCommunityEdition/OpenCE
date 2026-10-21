@@ -16,7 +16,11 @@
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
 #include <Jolt/Physics/Collision/GroupFilterTable.h>
+#include <Jolt/Physics/Collision/RayCast.h>
+#include <Jolt/Physics/Collision/ShapeCast.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
@@ -818,4 +822,113 @@ extern "C" float physics_ragdoll_limit_error(const physics_world *world, uint32_
         worst = std::max(worst, angle - 1.0f / std::sqrt(c * c + s * s));
     }
     return worst;
+}
+
+// ---------- casts
+
+namespace {
+
+// a cast's layers (physics_cast_layers), for the broad phase and the bodies
+class CastBroadPhase final : public BroadPhaseLayerFilter {
+public:
+    explicit CastBroadPhase(uint32_t layers) : layers(layers) {}
+    bool ShouldCollide(BroadPhaseLayer layer) const override
+    {
+        return (layers & (layer == BroadPhaseLayer(0) ? PHYSICS_CAST_LEVEL : PHYSICS_CAST_BODIES)) != 0;
+    }
+
+private:
+    uint32_t layers;
+};
+
+class CastObjects final : public ObjectLayerFilter {
+public:
+    explicit CastObjects(uint32_t layers) : layers(layers) {}
+    bool ShouldCollide(ObjectLayer layer) const override
+    {
+        return (layers & (layer == LAYER_STATIC ? PHYSICS_CAST_LEVEL : PHYSICS_CAST_BODIES)) != 0;
+    }
+
+private:
+    uint32_t layers;
+};
+
+bool valid_layers(uint32_t layers)
+{
+    return layers != 0 && (layers & ~uint32_t(PHYSICS_CAST_LEVEL | PHYSICS_CAST_BODIES)) == 0;
+}
+
+void write_hit(const physics_world *world, const BodyID &id, float fraction, RVec3Arg point, Vec3Arg normal,
+               physics_hit *hit)
+{
+    hit->fraction = fraction;
+    hit->point[0] = float(point.GetX());
+    hit->point[1] = float(point.GetY());
+    hit->point[2] = float(point.GetZ());
+    hit->normal[0] = normal.GetX();
+    hit->normal[1] = normal.GetY();
+    hit->normal[2] = normal.GetZ();
+    hit->level = id == world->level ? 1 : 0;
+    hit->body = world->find(id.GetIndexAndSequenceNumber(), KIND_BODY) != nullptr ? id.GetIndexAndSequenceNumber()
+                                                                                    : PHYSICS_NONE;
+}
+
+} // namespace
+
+extern "C" int physics_world_cast_ray(const physics_world *world, const float origin[3], const float direction[3],
+                                      uint32_t layers, physics_hit *hit)
+{
+    if (world == nullptr || origin == nullptr || direction == nullptr || hit == nullptr || !finite(origin, 3)
+        || !finite(direction, 3) || !valid_layers(layers))
+        return -1;
+    RRayCast ray{RVec3(origin[0], origin[1], origin[2]), Vec3(direction[0], direction[1], direction[2])};
+    if (ray.mDirection.LengthSq() == 0.0f)
+        return -1;
+    RayCastResult result;
+    CastBroadPhase broad_phase(layers);
+    CastObjects objects(layers);
+    if (!world->system.GetNarrowPhaseQueryNoLock().CastRay(ray, result, broad_phase, objects))
+        return 0;
+    RVec3 point = ray.GetPointOnRay(result.mFraction);
+    const Body *body = world->system.GetBodyLockInterfaceNoLock().TryGetBody(result.mBodyID);
+    if (body == nullptr)
+        return 0;
+    Vec3 normal = body->GetWorldSpaceSurfaceNormal(result.mSubShapeID2, point);
+    // (a two-sided or back face: the normal toward the ray's start)
+    if (normal.Dot(ray.mDirection) > 0.0f)
+        normal = -normal;
+    write_hit(world, result.mBodyID, result.mFraction, point, normal, hit);
+    return 1;
+}
+
+extern "C" int physics_world_cast_shape(const physics_world *world, const physics_shape *shape,
+                                        const physics_pose *pose, const float direction[3], uint32_t layers,
+                                        physics_hit *hit)
+{
+    RVec3 position;
+    Quat rotation;
+    if (world == nullptr || direction == nullptr || hit == nullptr || !read_pose(pose, position, rotation)
+        || !finite(direction, 3) || !valid_layers(layers))
+        return -1;
+    RefConst<Shape> made = make_shape(shape);
+    if (made == nullptr)
+        return -1;
+    RShapeCast cast = RShapeCast::sFromWorldTransform(made, Vec3::sOne(),
+                                                      RMat44::sRotationTranslation(rotation, position),
+                                                      Vec3(direction[0], direction[1], direction[2]));
+    ShapeCastSettings settings;
+    settings.mBackFaceModeTriangles = EBackFaceMode::CollideWithBackFaces;
+    settings.mReturnDeepestPoint = true;
+    ClosestHitCollisionCollector<CastShapeCollector> collector;
+    CastBroadPhase broad_phase(layers);
+    CastObjects objects(layers);
+    world->system.GetNarrowPhaseQueryNoLock().CastShape(cast, settings, RVec3::sZero(), collector, broad_phase,
+                                                        objects);
+    if (!collector.HadHit())
+        return 0;
+    const ShapeCastResult &result = collector.mHit;
+    Vec3 axis = result.mPenetrationAxis;
+    Vec3 normal = axis.LengthSq() > 0.0f ? -axis.Normalized() : Vec3::sAxisZ();
+    write_hit(world, result.mBodyID2, result.mFraction, RVec3(result.mContactPointOn2), normal, hit);
+    return 1;
 }

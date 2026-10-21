@@ -6,7 +6,15 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+opence_content.workspace = true
+glam.workspace = true
 thiserror.workspace = true
 
 [lints]
 workspace = true
+
+[build-dependencies]
+cc = { version = "1", features = ["parallel"] }
+
+[dev-dependencies]
+opence_import.workspace = true

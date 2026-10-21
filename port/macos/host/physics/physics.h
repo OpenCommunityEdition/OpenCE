@@ -1,6 +1,7 @@
 /*
  * physics.h - the host's physics world, for show only (docs/macos_host.md,
- * "Physics").
+ * "Physics"), and the native engine's (engine/crates/physics, which builds
+ * this file and Jolt into the engine).
  *
  * A C interface to Jolt Physics (port/third_party/jolt), in physics.cpp, so
  * that the rest of the host stays C. A world holds the level's collision
@@ -123,6 +124,36 @@ int physics_body_add_impulse(physics_world *world, uint32_t body, const float im
 int physics_body_set_velocity(physics_world *world, uint32_t body, const float linear[3], const float angular[3]);
 /* 1 awake, 0 asleep, -1 not a body */
 int physics_body_active(const physics_world *world, uint32_t body);
+
+/* ---------- casts (the native engine's: engine/crates/physics) */
+
+/* what a cast may hit */
+enum physics_cast_layers {
+    PHYSICS_CAST_LEVEL = 1,
+    /* ragdoll parts, debris and kinematic bodies */
+    PHYSICS_CAST_BODIES = 2,
+};
+
+typedef struct physics_hit {
+    /* how far along the cast, 0 to 1 (0 for a shape that starts touching) */
+    float fraction;
+    float point[3];
+    /* the surface's, toward the cast's start */
+    float normal[3];
+    /* the body hit: a body's handle, or PHYSICS_NONE for the level's mesh
+       and a ragdoll's part */
+    uint32_t body;
+    /* 1 for the level's mesh */
+    int32_t level;
+} physics_hit;
+
+/* The first surface on the segment from origin to origin + direction.
+   1 hit, 0 none, -1 for arguments refused. */
+int physics_world_cast_ray(const physics_world *world, const float origin[3], const float direction[3],
+                           uint32_t layers, physics_hit *hit);
+/* The first surface a shape meets moved from pose by direction; the same. */
+int physics_world_cast_shape(const physics_world *world, const physics_shape *shape, const physics_pose *pose,
+                             const float direction[3], uint32_t layers, physics_hit *hit);
 
 /* ---------- ragdolls */
 
