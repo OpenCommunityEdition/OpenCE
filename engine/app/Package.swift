@@ -17,7 +17,10 @@ let package = Package(
                 swiftSettings: [.swiftLanguageMode(.v5)]),
         // the app's side of the contract: the engine and its snapshots
         .target(name: "OpenCEEngineKit", dependencies: ["OpenCEEngineCore", "opence_ffiFFI"]),
-        .executableTarget(name: "OpenCEEngine", dependencies: ["OpenCEEngineKit"]),
-        .testTarget(name: "OpenCEEngineTests", dependencies: ["OpenCEEngineKit", "OpenCEEngineCore", "opence_ffiFFI"]),
+        // the window: its Metal layer, display link, mouse capture and keys
+        .target(name: "OpenCEEngineWindow"),
+        .executableTarget(name: "OpenCEEngine", dependencies: ["OpenCEEngineKit", "OpenCEEngineWindow"]),
+        .testTarget(name: "OpenCEEngineTests",
+                    dependencies: ["OpenCEEngineKit", "OpenCEEngineCore", "opence_ffiFFI", "OpenCEEngineWindow"]),
     ]
 )
