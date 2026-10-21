@@ -77,8 +77,9 @@ The desktop also draws at that resolution (platform_screen_mode): render
 targets the size of the screen get that many pixels (screen_scale), and
 viewports, clears and visibility counts are scaled to match, so the game
 still works in its 480 lines; "original" draws 640x480, scaled up at
-presentation. The width and the scale change only between frames, after one
-is presented (halo_screen_commit). */
+presentation. Android draws the same way with display.resolution_scaling =
+"native", and 640x480 with "original" (its default). The width and the
+scale change only between frames, after one is presented (halo_screen_commit). */
 
 #define SCREEN_HEIGHT 480
 #define SCREEN_MAXIMUM_WIDTH 1920
@@ -193,6 +194,26 @@ static void screen_mode_choose(long *width, float scale[2])
 	*width &= ~1L;
 	scale[0] = scale[1] = 1.0f;
 	screen_supersampling = 1.0f;
+	/* display.resolution_scaling = "native" draws at the display's own
+	resolution, as the desktop builds do; "original" (the default) draws
+	the Xbox's 640x480 and the display blit scales it up */
+	if (!strcmp(config_string("display.resolution_scaling"), "native"))
+	{
+		int display_width = 0, display_height = 0;
+
+		platform_video_drawable_size(&display_width, &display_height);
+		if (display_width > 0 && display_height > 0)
+		{
+			long wanted = (SCREEN_HEIGHT * display_width + display_height / 2) / display_height;
+
+			scale[0] = (float)display_width / (float)*width;
+			scale[1] = (float)display_height / (float)SCREEN_HEIGHT;
+			/* a display narrower or wider than the width above: the picture
+			keeps its shape and the display blit letterboxes it */
+			if (*width != wanted && *width != (wanted & ~1L))
+				scale[0] = scale[1] = scale[0] < scale[1] ? scale[0] : scale[1];
+		}
+	}
 #else
 	long display_width, display_height;
 
