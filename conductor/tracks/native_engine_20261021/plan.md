@@ -55,9 +55,9 @@
 - [x] Task: Drawing models 61fe8c9e
     - [x] Write tests: golden frames of bloodgulch's objects and a campaign map's standing bipeds; levels of detail chosen by screen size
     - [x] Skinned models on the GPU, the model shaders as materials, permutations and regions
-- [ ] Task: Skies, fog, decals and effects
-    - [ ] Write tests: golden frames of the sky and fog on two maps; particle systems and effects from scenery, with the frame clock
-    - [ ] Sky, fog, level decals, particles and the effects that scenery plays
+- [x] Task: Skies, fog, decals and effects ebd01c83
+    - [x] Write tests: golden frames of the sky and fog on two maps; particle systems and effects from scenery, with the frame clock
+    - [x] Sky, fog, level decals, particles and the effects that scenery plays
 - [ ] Task: The benchmark
     - [ ] Write tests: `tools/test_engine_benchmark.py` flies a recorded path over bloodgulch at 3840×2160 for 60 s and reports p50 and p99
     - [ ] Meet p99 ≤ 8.33 ms on the M1 Max; record the result in `docs/engine.md`
