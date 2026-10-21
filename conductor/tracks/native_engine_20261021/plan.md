@@ -129,9 +129,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 6: Multiplayer' (Protocol in workflow.md)
 
 ## Phase 7: AI and the campaign
-- [ ] Task: HaloScript
-    - [ ] Write tests: the scenario's compiled script nodes import into a typed tree; the interpreter runs expressions, globals, `sleep`, `sleep_until` and continuous and dormant scripts; an unknown function is reported on import
-    - [ ] `script`: the tree, the interpreter, typed function declarations registered by each system (`source/hs/` as reference)
+- [x] Task: HaloScript 93369312
+    - [x] Write tests: the scenario's compiled script nodes import into a typed tree; the interpreter runs expressions, globals, `sleep`, `sleep_until` and continuous and dormant scripts; an unknown function is reported on import
+    - [x] `script`: the tree, the interpreter, typed function declarations registered by each system (`source/hs/` as reference)
 - [ ] Task: Every scenario's scripts
     - [ ] Write tests: pytest (marked, needs `assets/maps`) imports every stock scenario's scripts and lists the functions still missing; the list shrinks to none by the end of the phase
     - [ ] The script functions the campaign uses, added system by system
