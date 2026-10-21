@@ -7,8 +7,9 @@ The engine is being rebuilt from scratch in Rust and Swift, with no VM, no 32-bi
   - `import`: bounds-checked readers for Xbox and Custom Edition caches, and the `.ocpak` writer.
   - `sim`: the world, using the `bevy_ecs` crate alone (not the Bevy engine), on a fixed 60 Hz tick.
   - `physics`: Jolt, through the existing C wrapper.
-  - `script`: HaloScript.
+  - `script`: HaloScript, run at Halo's 30 Hz on every second simulation tick.
   - `net`: host-authoritative UDP play with prediction.
+  - `campaign`: a mission — the scenario's scripts over the simulation, the AI's actors, the game's flow and saves.
   - `ffi`: the contract with Swift.
 - **The content format:** `.ocpak` files, `rkyv` archives checked with `bytecheck` on every load (they are untrusted).
 - **The contract between Rust and Swift.**
