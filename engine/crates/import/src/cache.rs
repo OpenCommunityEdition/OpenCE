@@ -324,14 +324,25 @@ pub(crate) fn tag_offset(
     address: u32,
     size: usize,
 ) -> Result<usize, Fault> {
+    region_offset(kind.tag_base(), u64::from(tag_data_size), address, size)
+}
+
+/// Where `address` is in bytes whose first is at `base`, if all `size`
+/// bytes from it are within `length`.
+pub(crate) fn region_offset(
+    base: u32,
+    length: u64,
+    address: u32,
+    size: usize,
+) -> Result<usize, Fault> {
     let outside = Fault::OutOfRange {
         at: u64::from(address),
         size: size as u64,
-        length: u64::from(tag_data_size),
+        length,
     };
-    let offset = address.checked_sub(kind.tag_base()).ok_or(outside)?;
+    let offset = address.checked_sub(base).ok_or(outside)?;
     let end = u64::from(offset).checked_add(size as u64).ok_or(outside)?;
-    if end > u64::from(tag_data_size) {
+    if end > length {
         return Err(outside);
     }
     Ok(offset as usize)

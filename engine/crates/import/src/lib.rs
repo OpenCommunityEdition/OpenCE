@@ -4,9 +4,12 @@
 //! A cache is untrusted input. Every read here is checked against what was
 //! read, and a refusal names the tag and the field it is about.
 
+pub mod bitmap;
 pub mod cache;
 pub mod error;
+pub mod level;
 pub mod reader;
+pub mod shader;
 pub mod tags;
 
 #[cfg(test)]
@@ -14,4 +17,5 @@ mod fake;
 
 pub use cache::{Cache, CacheHeader, CacheKind};
 pub use error::ImportError;
-pub use tags::{Block, Element, GroupTag, TagInstance};
+pub use level::import_level;
+pub use tags::{Block, Element, GroupTag, Region, TagInstance};

@@ -88,7 +88,7 @@ pub const NAME_LONGEST: usize = 255;
 /// The most tags a cache holds: a handle's index is 16 bits.
 pub const MAX_TAGS: u32 = 0xFFFF;
 const INDEX_MASK: u32 = 0xFFFF;
-const NO_HANDLE: u32 = u32::MAX;
+pub(crate) const NO_HANDLE: u32 = u32::MAX;
 
 /// A tag block's size: count, address, definition.
 pub const BLOCK_SIZE: usize = 12;
@@ -211,6 +211,14 @@ impl Cache {
             .position(|instance| instance.is(group) && instance.name.eq_ignore_ascii_case(name))
     }
 
+    /// The tag data, as a region its addresses point into.
+    pub fn tag_region(&self) -> Region<'_> {
+        Region {
+            bytes: self.tag_data(),
+            base: self.header().kind.tag_base(),
+        }
+    }
+
     /// A tag's definition, `size` bytes, which must be of `group`.
     pub fn tag(
         &self,
@@ -218,31 +226,81 @@ impl Cache {
         group: GroupTag,
         size: usize,
     ) -> Result<Element<'_>, ImportError> {
+        let address = self.tag_instance(index, group)?.address;
+        self.tag_in(index, group, self.tag_region(), address, size)
+    }
+
+    /// A tag's definition at `address` in `region`, not in the tag data
+    /// (a structure BSP's, in its own part of the file): its blocks and
+    /// data are in that region too.
+    pub fn tag_in<'a>(
+        &'a self,
+        index: usize,
+        group: GroupTag,
+        region: Region<'a>,
+        address: u32,
+        size: usize,
+    ) -> Result<Element<'a>, ImportError> {
+        self.tag_instance(index, group)?;
+        let element = Element {
+            cache: self,
+            tag: index,
+            path: String::new(),
+            bytes: &[],
+            region,
+        };
+        let bytes = region
+            .get(address, size)
+            .map_err(|fault| element.fault("definition", fault))?;
+        Ok(Element { bytes, ..element })
+    }
+
+    fn tag_instance(&self, index: usize, group: GroupTag) -> Result<&TagInstance, ImportError> {
         let instance = self.index.instances.get(index).ok_or_else(|| {
             index_fault(
                 format!("tag {index}"),
                 format!("is past the {} tags", self.index.instances.len()),
             )
         })?;
-        let element = Element {
-            cache: self,
-            tag: index,
-            path: String::new(),
-            bytes: &[],
+        let fault = |field: &str, reason: String| ImportError::Tag {
+            tag: instance.name.clone(),
+            group: instance.group,
+            field: field.to_owned(),
+            reason,
         };
         if !instance.is(group) {
-            return Err(element.fault("group", format!("is not {group}")));
+            return Err(fault("group", format!("is not {group}")));
         }
         if instance.in_resource_map {
-            return Err(element.fault("definition", "is in the resource maps"));
+            return Err(fault("definition", "is in the resource maps".to_owned()));
         }
-        let at = self
-            .tag_offset(instance.address, size)
-            .map_err(|fault| element.fault("definition", fault))?;
-        Ok(Element {
-            bytes: &self.tag_data()[at..at + size],
-            ..element
-        })
+        Ok(instance)
+    }
+}
+
+/// Bytes that addresses point into: the tag data, or a structure BSP's
+/// part of the file, each with the address of its first byte.
+#[derive(Clone, Copy, Debug)]
+pub struct Region<'a> {
+    bytes: &'a [u8],
+    base: u32,
+}
+
+impl<'a> Region<'a> {
+    /// Bytes whose first is at `base`.
+    pub fn new(bytes: &'a [u8], base: u32) -> Self {
+        Self { bytes, base }
+    }
+
+    /// Its bytes.
+    pub fn bytes(&self) -> &'a [u8] {
+        self.bytes
+    }
+
+    /// The `size` bytes at `address`, if all are in it.
+    pub fn get(&self, address: u32, size: usize) -> Result<&'a [u8], Fault> {
+        let at = crate::cache::region_offset(self.base, self.bytes.len() as u64, address, size)?;
+        Ok(&self.bytes[at..at + size])
     }
 }
 
@@ -254,6 +312,7 @@ pub struct Element<'a> {
     tag: usize,
     path: String,
     bytes: &'a [u8],
+    region: Region<'a>,
 }
 
 impl<'a> Element<'a> {
@@ -270,6 +329,11 @@ impl<'a> Element<'a> {
     /// The bytes it is made of.
     pub fn bytes(&self) -> &'a [u8] {
         self.bytes
+    }
+
+    /// The cache it is in.
+    pub fn cache(&self) -> &'a Cache {
+        self.cache
     }
 
     /// A refusal of a field of it.
@@ -289,6 +353,16 @@ impl<'a> Element<'a> {
 
     fn read<T>(&self, field: &str, read: Result<T, Fault>) -> Result<T, ImportError> {
         read.map_err(|fault| self.fault(field, fault))
+    }
+
+    /// A `u8` field.
+    pub fn u8(&self, at: usize, field: &str) -> Result<u8, ImportError> {
+        self.read(field, reader::array::<1>(self.bytes, at).map(|[byte]| byte))
+    }
+
+    /// A string field of at most `longest` bytes before its terminator.
+    pub fn text(&self, at: usize, field: &str, longest: usize) -> Result<&'a str, ImportError> {
+        self.read(field, reader::text(self.bytes, at, longest))
     }
 
     /// A `u16` field.
@@ -343,32 +417,31 @@ impl<'a> Element<'a> {
             .ok_or_else(|| {
                 self.fault(field, format!("has {count} elements, not 0 to {longest}"))
             })?;
-        let start = if count == 0 {
-            0
+        let bytes = if count == 0 {
+            &[]
         } else {
             let size = count
                 .checked_mul(element_size)
                 .ok_or_else(|| self.fault(field, "is too large"))?;
-            self.read(field, self.cache.tag_offset(address, size))?
+            self.read(field, self.region.get(address, size))?
         };
         Ok(Block {
             parent: self.clone(),
             field: field.to_owned(),
             count,
-            start,
+            bytes,
             element_size,
         })
     }
 
-    /// The bytes of a tag data field at `at`, in the tag data, of at most
-    /// `longest` bytes.
+    /// The bytes of a tag data field at `at`, in the element's region,
+    /// of at most `longest` bytes.
     pub fn data(&self, at: usize, field: &str, longest: usize) -> Result<&'a [u8], ImportError> {
         let (size, address) = self.data_size(at, field, longest)?;
         if size == 0 {
             return Ok(&[]);
         }
-        let start = self.read(field, self.cache.tag_offset(address, size))?;
-        Ok(&self.cache.tag_data()[start..start + size])
+        self.read(field, self.region.get(address, size))
     }
 
     /// The bytes of a tag data field at `at` that are in the file, outside
@@ -445,13 +518,13 @@ impl<'a> Element<'a> {
     }
 }
 
-/// A block of a tag: its elements, each checked to be in the tag data.
+/// A block of a tag: its elements, each checked to be in its region.
 #[derive(Clone, Debug)]
 pub struct Block<'a> {
     parent: Element<'a>,
     field: String,
     count: usize,
-    start: usize,
+    bytes: &'a [u8],
     element_size: usize,
 }
 
@@ -469,7 +542,7 @@ impl<'a> Block<'a> {
     /// Element `index`, if there is one.
     pub fn get(&self, index: usize) -> Option<Element<'a>> {
         (index < self.count).then(|| {
-            let at = self.start + index * self.element_size;
+            let at = index * self.element_size;
             let path = if self.parent.path.is_empty() {
                 format!("{}[{index}]", self.field)
             } else {
@@ -480,7 +553,8 @@ impl<'a> Block<'a> {
                 tag: self.parent.tag,
                 path,
                 // (Element::block checked the whole block's range)
-                bytes: &self.parent.cache.tag_data()[at..at + self.element_size],
+                bytes: &self.bytes[at..at + self.element_size],
+                region: self.parent.region,
             }
         })
     }
