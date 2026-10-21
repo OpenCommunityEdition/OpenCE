@@ -1,8 +1,8 @@
 # Plan: A new native engine in Rust and Swift
 
 ## Phase 0: Foundations
-- [ ] Task: Record the new engine in the tech stack and the product guide
-    - [ ] Update `conductor/tech-stack.md` (the `engine/` workspace, bevy_ecs, rkyv, MetalFX, SwiftUI menus, Jolt from Rust, `cargo deny`) and the vision in `conductor/product.md`, before any code
+- [x] Task: Record the new engine in the tech stack and the product guide 876be761
+    - [x] Update `conductor/tech-stack.md` (the `engine/` workspace, bevy_ecs, rkyv, MetalFX, SwiftUI menus, Jolt from Rust, `cargo deny`) and the vision in `conductor/product.md`, before any code
 - [ ] Task: The workspace and its Nix build
     - [ ] Write tests: pytest checks that `nix build .#engine` lays out `OpenCE Engine.app` with the Rust library, and that `cargo deny check` passes
     - [ ] `engine/Cargo.toml` with the crates `content`, `import`, `sim`, `physics`, `script`, `net` and `ffi`; `engine/app/Package.swift`; the flake's `engine` package and dev-shell tools
