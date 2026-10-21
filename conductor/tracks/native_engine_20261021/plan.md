@@ -94,9 +94,9 @@
 - [x] Task: The first-person view and the HUD 5ceb92dc
     - [x] Write tests: golden frames of the first-person weapon and the HUD at 16:9, 16:10 and 21:9, anchored to the edges; the motion tracker shows bipeds at their positions
     - [x] First-person models and animations; the HUD drawn by Metal at native resolution
-- [ ] Task: Ragdolls, limbs and debris
-    - [ ] Write tests: a biped killed by a scripted grenade becomes a ragdoll that follows the death animation, then goes loose (joint damping set), and is still there after 60 s; the corpse cap removes the oldest; strong explosions tear off limbs; casings are rigid bodies
-    - [ ] Ragdolls from model nodes and collision geometry (as the ragdoll track's generator does, ported to Rust), motors then damping, the corpse cap (a setting), limbs and debris
+- [x] Task: Ragdolls, limbs and debris ec1e9e97
+    - [x] Write tests: a biped killed by a scripted grenade becomes a ragdoll that follows the death animation, then goes loose (joint damping set), and is still there after 60 s; the corpse cap removes the oldest; strong explosions tear off limbs; casings are rigid bodies
+    - [x] Ragdolls from model nodes and collision geometry (as the ragdoll track's generator does, ported to Rust), motors then damping, the corpse cap (a setting), limbs and debris
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Weapons, damage, grenades and ragdolls' (Protocol in workflow.md)
 
 ## Phase 5: Vehicles
