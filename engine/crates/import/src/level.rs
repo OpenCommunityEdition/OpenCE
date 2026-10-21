@@ -5,16 +5,17 @@
 //! file, which the scenario's reference to it gives the offset, size and
 //! address of, and every address inside it is relative to that address.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use opence_content::level::{
     Bsp2dNode, Bsp2dReference, Bsp3dNode, CollisionEdge, CollisionLeaf, CollisionSurface,
     CollisionVertex,
 };
 use opence_content::{
-    AnimationGraph, AtmosphericFog, CollisionBsp, CollisionMaterial, EnvironmentVertex, Group,
-    Level, Lightmap, LightmapVertex, Material, Model, ObjectDefinition, ObjectKind,
-    ObjectPlacement, PlacementPermutation, PlayerStart, Scenario, Sky, StructureBsp, TagRef,
+    AnimationGraph, AtmosphericFog, CollisionBsp, CollisionMaterial, DamageEffect,
+    EnvironmentVertex, Globals, Group, Level, Lightmap, LightmapVertex, Material, Model,
+    ObjectDefinition, ObjectKind, ObjectPlacement, PlacementPermutation, PlayerStart, Scenario,
+    Sky, StructureBsp, TagRef,
 };
 
 use crate::cache::Cache;
@@ -158,15 +159,25 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
 
     let placements = import_placements(&scenario)?;
     let globals = crate::globals::import_globals(cache)?;
-    // (the player's bipeds, which no placement names, are imported too)
+    // (the player's bipeds, the grenades and the weapons, which no
+    // placement names, are imported too)
     let players: Vec<TagRef> = [&globals.player_unit, &globals.multiplayer_unit]
         .into_iter()
         .flatten()
+        .chain(
+            globals
+                .grenades
+                .iter()
+                .flat_map(|grenade| [&grenade.item, &grenade.projectile])
+                .flatten(),
+        )
+        .chain(&globals.weapons)
         .filter(|tag| tag_index(cache, tag).is_some())
         .cloned()
         .collect();
     let (objects, mut models, animation_graphs) =
         import_placed_objects(cache, &placements, &players, &mut reached)?;
+    let damage_effects = import_damage_effects(cache, &objects, &globals)?;
     let skies = import_skies(cache, &scenario, &mut models, &mut reached)?;
 
     // (a shader's extra layers are shaders too, reached as each is read)
@@ -221,6 +232,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         resource_bitmaps,
         skies,
         globals,
+        damage_effects,
     };
     check_lightmap_pages(&level)?;
     Ok(level)
@@ -260,15 +272,33 @@ fn import_placed_objects(
     let mut objects = BTreeMap::new();
     let mut models = BTreeMap::new();
     let mut graphs = BTreeMap::new();
-    for tag in placements
+    let mut queue: VecDeque<TagRef> = placements
         .iter()
         .map(|placement| &placement.tag)
         .chain(extra)
-    {
-        if objects.contains_key(tag) {
+        .cloned()
+        .collect();
+    while let Some(tag) = queue.pop_front() {
+        if objects.contains_key(&tag) {
             continue;
         }
-        let object = crate::object::import_object(cache, index(tag)?)?;
+        let object = crate::object::import_object(cache, index(&tag)?)?;
+        // (a weapon's projectiles and the equipment that is its ammunition)
+        if let Some(weapon) = &object.weapon {
+            queue.extend(
+                weapon
+                    .triggers
+                    .iter()
+                    .filter_map(|trigger| trigger.projectile.clone()),
+            );
+            queue.extend(
+                weapon
+                    .magazines
+                    .iter()
+                    .flat_map(|magazine| &magazine.ammunition)
+                    .filter_map(|ammunition| ammunition.equipment.clone()),
+            );
+        }
         if let Some(tag) = object
             .model
             .as_ref()
@@ -294,7 +324,7 @@ fn import_placed_objects(
                 crate::object::import_animation_graph(cache, index(tag)?)?,
             );
         }
-        objects.insert(tag.clone(), object);
+        objects.insert(tag, object);
     }
     Ok((
         objects.into_values().collect(),
@@ -305,6 +335,55 @@ fn import_placed_objects(
 
 /// The scenario's skies, their models added to `models` (kept in order
 /// of their paths) and their models' shaders reached.
+/// Every damage effect `objects` and `globals` do (a weapon's melee, a
+/// projectile's impact and attached detonation, falling), each once, by
+/// path.
+fn import_damage_effects(
+    cache: &Cache,
+    objects: &[ObjectDefinition],
+    globals: &Globals,
+) -> Result<Vec<DamageEffect>, ImportError> {
+    let mut tags = BTreeSet::new();
+    for object in objects {
+        if let Some(weapon) = &object.weapon {
+            tags.extend(
+                [&weapon.melee_damage, &weapon.melee_response]
+                    .into_iter()
+                    .flatten(),
+            );
+        }
+        if let Some(projectile) = &object.projectile {
+            tags.extend(
+                [
+                    &projectile.impact_damage,
+                    &projectile.attached_detonation_damage,
+                ]
+                .into_iter()
+                .flatten(),
+            );
+        }
+    }
+    tags.extend(
+        [
+            &globals.falling.falling_damage,
+            &globals.falling.maximum_distance_damage,
+        ]
+        .into_iter()
+        .flatten(),
+    );
+    let mut effects = Vec::with_capacity(tags.len());
+    for tag in tags {
+        // (a reference was checked to name a tag of the map when it was read)
+        let Some(index) = tag_index(cache, tag) else {
+            continue;
+        };
+        if cache.tags()[index].is(crate::weapon::JPT) {
+            effects.push(crate::weapon::import_damage_effect(cache, index)?);
+        }
+    }
+    Ok(effects)
+}
+
 fn import_skies(
     cache: &Cache,
     scenario: &Element<'_>,
@@ -1368,9 +1447,18 @@ pub(crate) mod tests {
 
     /// An object of `kind` with no model or graph: nothing else to import.
     fn object_tag(fake: &mut FakeCache, group: &[u8; 4], kind: u16, name: &str) -> usize {
-        let mut object = vec![0u8; crate::object::OBJECT_SIZE];
+        // (equipment has its item part and its own after the object's)
+        let (size, references): (usize, &[usize]) = if group == b"eqip" {
+            (crate::weapon::EQUIPMENT_SIZE, &[0x2E8, 0x2F8, 0x310])
+        } else {
+            (crate::object::OBJECT_SIZE, &[])
+        };
+        let mut object = vec![0u8; size];
         put(&mut object, 0, &kind.to_le_bytes());
-        for at in [0x28, 0x38, 0x70, 0x80, 0x90, 0xA0] {
+        for &at in [0x28, 0x38, 0x70, 0x80, 0x90, 0xA0]
+            .iter()
+            .chain(references)
+        {
             empty(&mut object, at);
         }
         let index = fake.add_tag(GroupTag::new(group), name, &object);
@@ -1671,6 +1759,58 @@ pub(crate) mod tests {
             .as_ref()
             .and_then(|tag| level.bitmap(tag))
             .is_some());
+
+        let rifle = &level.globals.weapons[0];
+        assert_eq!(rifle.path, "weapons\\assault rifle\\assault rifle");
+        let Some(rifle) = level
+            .object(rifle)
+            .and_then(|object| object.weapon.as_ref())
+        else {
+            panic!("the assault rifle was not imported");
+        };
+        assert_eq!(rifle.magazines[0].rounds_loaded_maximum, 60);
+        assert_eq!(rifle.magazines[0].rounds_total_maximum, 600);
+        assert_eq!(rifle.triggers[0].initial_rate_of_fire, 15.0);
+        assert_eq!(rifle.triggers[0].magazine, Some(0));
+        let Some(ammunition) = &rifle.magazines[0].ammunition[0].equipment else {
+            panic!("the rifle's magazine names no ammunition");
+        };
+        assert!(level
+            .object(ammunition)
+            .and_then(|o| o.equipment.as_ref())
+            .is_some());
+        let Some(bullet) = rifle.triggers[0]
+            .projectile
+            .as_ref()
+            .and_then(|tag| level.object(tag))
+            .and_then(|object| object.projectile.as_ref())
+        else {
+            panic!("the rifle's bullet was not imported");
+        };
+        // (per second, from the tag's per tick)
+        assert_eq!(bullet.initial_velocity, 324.0);
+        let impact = bullet
+            .impact_damage
+            .as_ref()
+            .and_then(|tag| level.damage_effect(tag));
+        assert_eq!(impact.map(|effect| effect.damage), Some([10.0, 10.0]));
+        let Some(melee) = &rifle.melee_damage else {
+            panic!("the rifle has no melee damage");
+        };
+        assert!(level.damage_effect(melee).is_some());
+
+        assert_eq!(level.globals.grenades.len(), 2);
+        for grenade in &level.globals.grenades {
+            assert_eq!(grenade.maximum_count, 4);
+            let projectile = grenade
+                .projectile
+                .as_ref()
+                .and_then(|tag| level.object(tag));
+            assert!(projectile.and_then(|o| o.projectile.as_ref()).is_some());
+        }
+        let falling = level.globals.falling.falling_damage.as_ref();
+        let falling = falling.and_then(|tag| level.damage_effect(tag));
+        assert_eq!(falling.map(|effect| effect.damage), Some([155.0, 155.0]));
     }
 
     /// Every stock map, in release builds (`cargo test --release -- --ignored`).

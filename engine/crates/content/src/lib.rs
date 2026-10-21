@@ -8,6 +8,7 @@ pub mod level;
 pub mod object;
 pub mod pack;
 pub mod shader;
+pub mod weapon;
 
 pub use bitmap::{
     Bitmap, BitmapImage, Pixels, ResourceRange, Sequence, Sprite, Texture, TextureFormat,
@@ -26,6 +27,10 @@ pub use object::{
 };
 pub use shader::{
     ChicagoMap, EnvironmentShader, ModelShaderClass, Shader, ShaderClass, TransparentChicagoShader,
+};
+pub use weapon::{
+    AimAssist, Ammunition, DamageEffect, Equipment, Grenade, Item, Magazine, MaterialResponse,
+    Projectile, Trigger, Weapon,
 };
 
 use rkyv::{Archive, Deserialize, Serialize};

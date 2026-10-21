@@ -101,7 +101,7 @@ fn kind(value: i16) -> Option<ObjectKind> {
 }
 
 /// An index of `field` into a list of `len`: -1 for none.
-fn optional_index(
+pub(crate) fn optional_index(
     element: &Element<'_>,
     at: usize,
     field: &str,
@@ -114,7 +114,7 @@ fn optional_index(
     }
 }
 
-fn vector<const N: usize>(
+pub(crate) fn vector<const N: usize>(
     element: &Element<'_>,
     at: usize,
     field: &str,
@@ -126,7 +126,7 @@ fn vector<const N: usize>(
     Ok(value)
 }
 
-fn reference(
+pub(crate) fn reference(
     element: &Element<'_>,
     at: usize,
     field: &str,
@@ -204,6 +204,18 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
         change_colors,
         biped: match kind {
             ObjectKind::Biped => Some(import_biped(cache, index)?),
+            _ => None,
+        },
+        weapon: match kind {
+            ObjectKind::Weapon => Some(crate::weapon::import_weapon(cache, index)?),
+            _ => None,
+        },
+        projectile: match kind {
+            ObjectKind::Projectile => Some(crate::weapon::import_projectile(cache, index)?),
+            _ => None,
+        },
+        equipment: match kind {
+            ObjectKind::Equipment => Some(crate::weapon::import_equipment(cache, index)?),
             _ => None,
         },
     })

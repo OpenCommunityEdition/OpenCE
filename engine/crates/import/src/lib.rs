@@ -16,6 +16,7 @@ pub mod shader;
 pub mod tags;
 mod texture;
 mod vector_palette;
+pub mod weapon;
 
 #[cfg(test)]
 mod fake;

@@ -1,12 +1,12 @@
-//! The game's globals (`matg`): the player's speeds, what falling does and
-//! the player's bipeds.
+//! The game's globals (`matg`): the player's speeds, what falling does,
+//! the player's bipeds, the grenades and the weapons.
 //!
 //! The tag gives speeds in world units a second and accelerations in world
 //! units a second each tick (the game's 30); the engine keeps both a
 //! second. Its falling velocities, worked out by the tools that built the
 //! map, are a tick's; the engine keeps them a second.
 
-use opence_content::{FallingDamage, Globals, PlayerPhysics, TagRef};
+use opence_content::{FallingDamage, Globals, Grenade, PlayerPhysics, TagRef};
 
 use crate::cache::Cache;
 use crate::error::ImportError;
@@ -20,6 +20,12 @@ const MULTIPLAYER_INFORMATION_OFFSET: usize = 0x164;
 const MULTIPLAYER_INFORMATION_SIZE: usize = 0xA0;
 const PLAYER_INFORMATION_OFFSET: usize = 0x170;
 const PLAYER_INFORMATION_SIZE: usize = 0xF4;
+const GRENADES_OFFSET: usize = 0x128;
+const GRENADE_SIZE: usize = 0x44;
+const MAX_GRENADES: usize = 4;
+const WEAPON_LIST_OFFSET: usize = 0x14C;
+const WEAPON_SIZE: usize = 0x10;
+const MAX_WEAPONS: usize = 20;
 const FALLING_DAMAGE_OFFSET: usize = 0x188;
 const FALLING_DAMAGE_SIZE: usize = 0x98;
 /// The game's ticks a second, which the tag's rates are of.
@@ -98,6 +104,25 @@ pub fn import_globals(cache: &Cache) -> Result<Globals, ImportError> {
             falling_damage: reference(&falling, 0x10, "falling damage")?,
             maximum_distance_damage: reference(&falling, 0x2C, "maximum falling damage")?,
         };
+    }
+
+    let grenades = globals.block(GRENADES_OFFSET, "grenades", GRENADE_SIZE, MAX_GRENADES)?;
+    for grenade in grenades.iter() {
+        imported.grenades.push(Grenade {
+            maximum_count: grenade.i16(0x0, "maximum count")?,
+            multiplayer_spawn_default: grenade.i16(0x2, "mp spawn default")?,
+            throwing_effect: reference(&grenade, 0x4, "throwing effect")?,
+            hud_interface: reference(&grenade, 0x14, "hud interface")?,
+            item: reference(&grenade, 0x24, "equipment")?,
+            projectile: reference(&grenade, 0x34, "projectile")?,
+        });
+    }
+
+    let weapons = globals.block(WEAPON_LIST_OFFSET, "weapon list", WEAPON_SIZE, MAX_WEAPONS)?;
+    for weapon in weapons.iter() {
+        if let Some(tag) = reference(&weapon, 0x0, "weapon")? {
+            imported.weapons.push(tag);
+        }
     }
     Ok(imported)
 }

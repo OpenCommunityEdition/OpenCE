@@ -2,7 +2,10 @@
 
 use rkyv::{Archive, Deserialize, Serialize};
 
-use crate::{AnimationGraph, Bitmap, Model, ObjectDefinition, ObjectKind, Shader, TagRef};
+use crate::{
+    AnimationGraph, Bitmap, DamageEffect, Grenade, Model, ObjectDefinition, ObjectKind, Shader,
+    TagRef,
+};
 
 /// Everything a level's structure is drawn and collided with.
 #[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
@@ -29,6 +32,8 @@ pub struct Level {
     pub skies: Vec<Sky>,
     /// The game's globals: the player's speeds and falling.
     pub globals: Globals,
+    /// Every damage effect its objects and globals do, by path.
+    pub damage_effects: Vec<DamageEffect>,
 }
 
 /// The game's globals (the `matg` tag) that the simulation reads.
@@ -42,6 +47,11 @@ pub struct Globals {
     pub player_unit: Option<TagRef>,
     /// The player's biped in multiplayer.
     pub multiplayer_unit: Option<TagRef>,
+    /// The grenades, frag then plasma.
+    pub grenades: Vec<Grenade>,
+    /// The weapons a game may give, in the game engine's order (the
+    /// assault rifle first).
+    pub weapons: Vec<TagRef>,
 }
 
 /// How a biped that uses player physics moves. Speeds are in world units a
@@ -132,6 +142,11 @@ impl Level {
     /// An animation graph, by its tag.
     pub fn animation_graph(&self, tag: &TagRef) -> Option<&AnimationGraph> {
         self.animation_graphs.iter().find(|graph| graph.tag == *tag)
+    }
+
+    /// A damage effect, by its tag.
+    pub fn damage_effect(&self, tag: &TagRef) -> Option<&DamageEffect> {
+        self.damage_effects.iter().find(|effect| effect.tag == *tag)
     }
 
     /// A bitmap, by its tag.
