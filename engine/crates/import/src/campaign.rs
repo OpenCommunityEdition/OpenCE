@@ -5,8 +5,9 @@
 //! 31 characters.
 
 use opence_content::{
-    ActorVariant, CameraPoint, Campaign, Command, CommandList, CutsceneFlag, DeviceGroup,
-    Encounter, FiringPosition, Recording, Squad, StartingLocation, TriggerVolume,
+    ActorVariant, BspSwitch, CameraPoint, Campaign, Command, CommandList, CutsceneFlag,
+    DeviceGroup, Encounter, FiringPosition, Recording, SoundLength, Squad, StartingLocation,
+    TriggerVolume,
 };
 
 use crate::cache::Cache;
@@ -19,6 +20,7 @@ const DEVICE_GROUPS: (usize, usize, usize) = (0x288, 0x34, 128);
 const STARTING_PROFILES: (usize, usize, usize) = (0x348, 0x68, 256);
 const TRIGGER_VOLUMES: (usize, usize, usize) = (0x360, 0x60, 256);
 const RECORDINGS: (usize, usize, usize) = (0x36C, 0x40, 1024);
+const BSP_SWITCHES: (usize, usize, usize) = (0x39C, 0x8, 256);
 const ACTOR_PALETTE: (usize, usize, usize) = (0x420, 0x10, 64);
 const ENCOUNTERS: (usize, usize, usize) = (0x42C, 0xB0, 128);
 const COMMAND_LISTS: (usize, usize, usize) = (0x438, 0x60, 256);
@@ -41,6 +43,9 @@ const ACTV: GroupTag = GroupTag::new(b"actv");
 const ACTR: GroupTag = GroupTag::new(b"actr");
 const UNIT: GroupTag = GroupTag::new(b"unit");
 const WEAP: GroupTag = GroupTag::new(b"weap");
+const SND: GroupTag = GroupTag::new(b"snd!");
+// (`sound_definition`'s `longest_permutation_length`)
+const LONGEST_PERMUTATION: usize = 0x84;
 
 /// The parts of an actor variant and an actor read (each tag is longer).
 const ACTOR_VARIANT_SIZE: usize = 0xF0;
@@ -152,7 +157,34 @@ pub(crate) fn scenario_campaign(scenario: &Element<'_>) -> Result<Campaign, Impo
         starting_profiles: each(scenario, STARTING_PROFILES, "starting profiles", |e| {
             name(e, 0)
         })?,
+        bsp_switches: each(scenario, BSP_SWITCHES, "bsp switch trigger volumes", |e| {
+            Ok(BspSwitch {
+                trigger_volume: e.i16(0, "trigger volume")?,
+                source: e.i16(2, "source structure")?,
+                destination: e.i16(4, "destination structure")?,
+                cutscene_flag: e.i16(6, "cutscene flag")?,
+            })
+        })?,
+        sound_lengths: sound_lengths(cache)?,
     })
+}
+
+/// The length of each sound in the map's own tag data (one in the resource
+/// maps has none, and to the scripts has ended at once).
+fn sound_lengths(cache: &Cache) -> Result<Vec<SoundLength>, ImportError> {
+    cache
+        .tags()
+        .iter()
+        .enumerate()
+        .filter(|(_, instance)| instance.group == SND && !instance.in_resource_map)
+        .map(|(index, instance)| {
+            let sound = cache.tag(index, SND, LONGEST_PERMUTATION + 4)?;
+            Ok(SoundLength {
+                path: instance.name.clone(),
+                milliseconds: sound.u32(LONGEST_PERMUTATION, "longest permutation length")?,
+            })
+        })
+        .collect()
 }
 
 /// An actor variant and the parts of its actor its actors fight by

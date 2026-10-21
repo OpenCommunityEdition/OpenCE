@@ -122,6 +122,12 @@ pub(crate) fn move_rides(
 }
 
 impl Rides {
+    /// The player's unit's centre, from its origin, as its body is turned
+    /// (Halo's bounding sphere's centre).
+    pub fn centre(&self) -> Vec3 {
+        self.centre
+    }
+
     /// `level`'s vehicles, for a player whose unit is `unit` and whose
     /// weapons are `armory`'s.
     pub fn for_level(level: &Level, unit: &TagRef, armory: &Armory) -> Rides {

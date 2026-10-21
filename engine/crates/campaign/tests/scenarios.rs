@@ -31,7 +31,7 @@ fn every_campaign_scenarios_scripts_find_their_functions() -> Result<(), Box<dyn
         sim.spawn_player(&level, 0)?;
         let mission = Mission::new(sim, level, Difficulty::Normal);
         let mut scripts = MissionScripts::new(mission);
-        for _ in 0..60 * TICKS_PER_SECOND {
+        for _ in 0..60 * opence_sim::clock::TICKS_PER_SECOND {
             scripts.tick(TickInput::default());
         }
         assert!(

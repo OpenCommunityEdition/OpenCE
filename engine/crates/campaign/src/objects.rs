@@ -85,13 +85,27 @@ impl Mission {
         element(&self.level.scenario.campaign.cutscene_flags, flag)
     }
 
-    fn volume(&self, volume: i32) -> Option<&TriggerVolume> {
+    pub(crate) fn volume(&self, volume: i32) -> Option<&TriggerVolume> {
         element(&self.level.scenario.campaign.trigger_volumes, volume)
     }
 
-    /// Whether an object stands inside a trigger volume.
-    fn inside(&self, volume: &TriggerVolume, handle: ObjectHandle) -> bool {
-        self.position(handle)
+    /// The centre of an object's bounding sphere, which the trigger
+    /// volumes test (`bounding_sphere_center`): a player's unit's from its
+    /// standing pelvis, any other's its bounding offset from its origin.
+    fn centre(&self, handle: ObjectHandle) -> Option<Vec3> {
+        let transform = self.sim.transform(handle)?;
+        let offset = if self.player_of(handle).is_some() {
+            self.sim.rides().centre()
+        } else {
+            self.definition(handle)
+                .map_or(Vec3::ZERO, |d| Vec3::from_array(d.bounding_offset))
+        };
+        Some(transform.position + transform.rotation * offset)
+    }
+
+    /// Whether an object's centre is inside a trigger volume.
+    pub(crate) fn inside(&self, volume: &TriggerVolume, handle: ObjectHandle) -> bool {
+        self.centre(handle)
             .is_some_and(|p| volume.contains(p.to_array()))
     }
 

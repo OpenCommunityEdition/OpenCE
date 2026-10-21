@@ -88,7 +88,7 @@ impl Mission {
         {
             return false;
         }
-        let ends = self.sim.tick().0 + u64::from(frames.saturating_sub(frame));
+        let ends = self.game_tick() + u64::from(frames.saturating_sub(frame));
         self.animations.insert(
             handle,
             Playing {
@@ -125,7 +125,7 @@ impl Mission {
         else {
             return false;
         };
-        let ends = self.sim.tick().0 + u64::try_from(length).unwrap_or(0);
+        let ends = self.game_tick() + u64::try_from(length).unwrap_or(0);
         self.recordings.insert(handle, Playing { ends, delete });
         true
     }
@@ -254,7 +254,7 @@ fn unit_custom_animation_at_frame(mission: &mut Mission, arguments: &[Value]) ->
 
 /// The ticks left of a unit's custom animation or recording.
 fn remaining(mission: &Mission, ends: Option<u64>) -> Value {
-    let tick = mission.sim.tick().0;
+    let tick = mission.game_tick();
     let left = ends.map_or(0, |ends| ends.saturating_sub(tick));
     Value::Short(i16::try_from(left).unwrap_or(i16::MAX))
 }

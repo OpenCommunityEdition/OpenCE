@@ -3,8 +3,6 @@
 //! shows, and the player's input as the scripts test it
 //! (`hs_library_game.c`, `hs_library_hud.c`, `hs_library_player.c`).
 
-use std::sync::Arc;
-
 use opence_script::{Native, Value};
 use opence_sim::input::Buttons;
 use opence_sim::objects::Difficulty;
@@ -105,6 +103,8 @@ pub(crate) const NATIVES: &[(&str, Native<Mission>)] = &[
     ("real_random_range", real_random_range),
     ("not", not),
     ("print", print),
+    ("sound_impulse_start", sound_impulse_start),
+    ("sound_impulse_stop", sound_impulse_stop),
     ("sound_impulse_time", sound_impulse_time),
     ("hud_get_timer_ticks", hud_get_timer_ticks),
     ("hud_set_timer_time", hud_set_timer_time),
@@ -196,7 +196,7 @@ fn game_is_cooperative(mission: &mut Mission, _: &[Value]) -> Value {
 }
 
 fn game_time(mission: &mut Mission, _: &[Value]) -> Value {
-    Value::Long(i32::try_from(mission.sim.tick().0).unwrap_or(i32::MAX))
+    Value::Long(i32::try_from(mission.game_tick()).unwrap_or(i32::MAX))
 }
 
 fn game_speed(mission: &mut Mission, arguments: &[Value]) -> Value {
@@ -214,16 +214,7 @@ fn structure_bsp_index(mission: &mut Mission, _: &[Value]) -> Value {
 }
 
 fn switch_bsp(mission: &mut Mission, arguments: &[Value]) -> Value {
-    let bsp = short(arguments, 0);
-    let level = Arc::clone(&mission.level);
-    // (a structure the level does not have is not switched to)
-    if let Ok(index) = usize::try_from(bsp) {
-        if index == usize::try_from(mission.flow.bsp).unwrap_or(usize::MAX)
-            || mission.sim.switch_bsp(&level, index).is_ok()
-        {
-            mission.flow.bsp = bsp;
-        }
-    }
+    mission.switch_structure(short(arguments, 0));
     Value::Void
 }
 
@@ -255,9 +246,49 @@ fn print(mission: &mut Mission, arguments: &[Value]) -> Value {
     Value::Void
 }
 
-fn sound_impulse_time(_: &mut Mission, _: &[Value]) -> Value {
-    // (the presentation plays sounds; to the scripts each has ended)
-    Value::Long(0)
+/// The sound's path as the mission keys it.
+fn sound_key(arguments: &[Value]) -> Option<String> {
+    match arguments.first() {
+        Some(Value::Tag(Some(tag))) => Some(tag.path.to_ascii_lowercase()),
+        _ => None,
+    }
+}
+
+fn sound_impulse_start(mission: &mut Mission, arguments: &[Value]) -> Value {
+    mission.present("sound_impulse_start", arguments);
+    if let Some(key) = sound_key(arguments) {
+        // (one in the resource maps, of no known length, has ended at once)
+        let milliseconds = mission
+            .level
+            .scenario
+            .campaign
+            .sound_lengths
+            .iter()
+            .find(|sound| sound.path.eq_ignore_ascii_case(&key))
+            .map_or(0, |sound| sound.milliseconds);
+        let ticks = u64::from(milliseconds) * u64::from(opence_script::TICKS_PER_SECOND) / 1000;
+        let ends = mission.game_tick() + ticks;
+        mission.sounds.insert(key, ends);
+    }
+    Value::Void
+}
+
+fn sound_impulse_stop(mission: &mut Mission, arguments: &[Value]) -> Value {
+    mission.present("sound_impulse_stop", arguments);
+    if let Some(key) = sound_key(arguments) {
+        mission.sounds.remove(&key);
+    }
+    Value::Void
+}
+
+/// The game ticks left of a sound the scripts started, as
+/// `scripted_sound_time` counts them; 0 once it has ended or been stopped.
+fn sound_impulse_time(mission: &mut Mission, arguments: &[Value]) -> Value {
+    let tick = mission.game_tick();
+    let left = sound_key(arguments)
+        .and_then(|key| mission.sounds.get(&key))
+        .map_or(0, |ends| ends.saturating_sub(tick));
+    Value::Long(i32::try_from(left).unwrap_or(i32::MAX))
 }
 
 fn hud_get_timer_ticks(mission: &mut Mission, _: &[Value]) -> Value {

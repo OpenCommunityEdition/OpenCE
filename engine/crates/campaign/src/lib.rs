@@ -104,7 +104,15 @@ pub struct Mission {
     saving: Option<usize>,
     saved: Option<usize>,
     reverted: bool,
+    // (each sound the scripts started, by its path in lowercase, and the
+    // game tick it ends on)
+    sounds: BTreeMap<String, u64>,
 }
+
+/// The simulation's ticks a game tick: the scripts, and all they time, run
+/// at the game's 30 ticks a second.
+const SIM_TICKS_PER_GAME_TICK: u64 =
+    (opence_sim::clock::TICKS_PER_SECOND / opence_script::TICKS_PER_SECOND) as u64;
 
 impl Mission {
     /// The mission `level` plays at `difficulty`, over `sim` (its players
@@ -177,6 +185,7 @@ impl Mission {
             saving: None,
             saved: None,
             reverted: false,
+            sounds: BTreeMap::new(),
         };
         let difficulty = match difficulty {
             Difficulty::Easy => 0,
@@ -275,11 +284,12 @@ impl Mission {
     }
 
     /// Runs one tick of the simulation with `input` and then moves on what
-    /// the scripts started: devices toward their positions, recordings and
-    /// animations to their ends, attached objects with their parents, the
-    /// camera and the timers. Objects that cannot be hurt keep their
+    /// the scripts started: attached objects with their parents, and on a
+    /// game tick devices toward their positions, recordings, animations and
+    /// sounds to their ends, the camera and the timers. Objects that cannot be hurt keep their
     /// vitality.
     pub fn step(&mut self, input: TickInput) {
+        let game_tick = self.is_game_tick();
         self.inputs.push(input);
         self.latch(input);
         let input = if self.input_enabled {
@@ -304,7 +314,12 @@ impl Mission {
         for (handle, vitality) in kept {
             self.sim.insert(handle, vitality);
         }
-        let tick = self.sim.tick().0;
+        self.follow_attachments();
+        self.cross_structures();
+        if !game_tick {
+            return;
+        }
+        let tick = self.game_tick();
         devices::advance(self);
         for playing in [&mut self.recordings, &mut self.animations] {
             let ended: Vec<(ObjectHandle, bool)> = playing
@@ -319,7 +334,7 @@ impl Mission {
                 }
             }
         }
-        self.follow_attachments();
+        self.sounds.retain(|_, ends| *ends > tick);
         self.cinematic.advance();
         self.flow.advance();
         if self.flow.saving == 0 {
@@ -433,6 +448,39 @@ impl Mission {
         self.sim.players().iter().map(|p| p.handle()).collect()
     }
 
+    /// Switches the structure when a player stands in one of the
+    /// scenario's switching volumes that leaves the structure loaded
+    /// (`players_update_after_game`'s test; the first player's crossing
+    /// switches it, and one switch a tick).
+    fn cross_structures(&mut self) {
+        let level = Arc::clone(&self.level);
+        let units = self.player_units();
+        let crossed = level.scenario.campaign.bsp_switches.iter().find(|switch| {
+            switch.source == self.flow.bsp
+                && self
+                    .volume(i32::from(switch.trigger_volume))
+                    .is_some_and(|volume| units.iter().any(|&unit| self.inside(volume, unit)))
+        });
+        if let Some(switch) = crossed {
+            self.switch_structure(switch.destination);
+        }
+    }
+
+    /// Loads the level's structure BSP `bsp` for the players and the
+    /// actors to stand on, as `switch_bsp` does; whether it is loaded now
+    /// (a structure the level does not have is not switched to).
+    pub fn switch_structure(&mut self, bsp: i16) -> bool {
+        let level = Arc::clone(&self.level);
+        let Ok(index) = usize::try_from(bsp) else {
+            return false;
+        };
+        if bsp != self.flow.bsp && self.sim.switch_bsp(&level, index).is_err() {
+            return false;
+        }
+        self.flow.bsp = bsp;
+        true
+    }
+
     /// The player whose unit `handle` is.
     fn player_of(&self, handle: ObjectHandle) -> Option<usize> {
         self.sim.players().iter().position(|p| p.handle() == handle)
@@ -496,6 +544,16 @@ impl Mission {
     }
 
     /// Keeps what a script did for the presentation.
+    /// The game ticks run so far.
+    pub fn game_tick(&self) -> u64 {
+        self.sim.tick().0 / SIM_TICKS_PER_GAME_TICK
+    }
+
+    /// Whether the next tick of the simulation is also a game tick's.
+    fn is_game_tick(&self) -> bool {
+        self.sim.tick().0.is_multiple_of(SIM_TICKS_PER_GAME_TICK)
+    }
+
     fn present(&mut self, function: &'static str, arguments: &[Value]) {
         self.events.push(Event {
             function,
@@ -603,7 +661,9 @@ impl MissionScripts {
     }
 
     fn play(&mut self, input: TickInput) {
-        self.runtime.tick(&mut self.mission);
+        if self.mission.is_game_tick() {
+            self.runtime.tick(&mut self.mission);
+        }
         self.mission.deathless = self
             .runtime
             .engine_global("cheat_deathless_player")

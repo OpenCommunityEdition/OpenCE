@@ -93,8 +93,17 @@ fn an_enemy_before_the_player_shoots_it() -> Result<(), Box<dyn Error>> {
             let unit = mission.actors()[index].unit;
             mission.sim_mut().insert(player, sturdy.clone());
             mission.sim_mut().teleport_player(0, at);
+            let structure = mission.flow().bsp;
             let (mut targeted, mut hurt) = (false, false);
-            for _ in 0..150 {
+            // (a teleport into a switching volume loads a structure the
+            // enemy may not stand on, and the others would fall through
+            // it: the structure is put back and that enemy passed over)
+            mission.step(TickInput::default());
+            if mission.flow().bsp != structure {
+                mission.switch_structure(structure);
+                continue;
+            }
+            for _ in 1..150 {
                 mission.step(TickInput::default());
                 targeted |= mission.actors().get(index).and_then(|a| a.target) == Some(player);
                 hurt |= mission

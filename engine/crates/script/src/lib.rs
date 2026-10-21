@@ -263,6 +263,8 @@ pub struct Runtime<W> {
     threads: Vec<Thread>,
     time: u32,
     missing: BTreeSet<Missing>,
+    // (the scripts whose threads ran away or overflowed their stacks)
+    faults: Vec<String>,
     random: u32,
 }
 
@@ -338,6 +340,7 @@ impl<W: World> Runtime<W> {
             threads,
             time: 0,
             missing,
+            faults: Vec::new(),
             random: 0x2545_F491,
         };
         // (in order: a global's first value may be an earlier one's)
@@ -372,6 +375,26 @@ impl<W: World> Runtime<W> {
     /// What the scripts name that the engine does not give them.
     pub fn missing(&self) -> &BTreeSet<Missing> {
         &self.missing
+    }
+
+    /// The scripts whose threads were ended for running away or for
+    /// overflowing their stacks, in the order they were.
+    pub fn faults(&self) -> &[String] {
+        &self.faults
+    }
+
+    /// The conditions the threads asleep in a `sleep_until` wait on: each
+    /// condition's node.
+    pub fn waiting(&self) -> Vec<u32> {
+        self.threads
+            .iter()
+            .filter(|t| t.sleep != Sleep::Done)
+            .flat_map(|t| &t.stack)
+            .filter_map(|frame| match self.resolved.get(frame.node as usize) {
+                Some(Resolved::Form(Form::SleepUntil, arguments)) => arguments.first().copied(),
+                _ => None,
+            })
+            .collect()
     }
 
     /// A scenario's global's value, by its name.
@@ -479,6 +502,9 @@ impl<W: World> Runtime<W> {
             if steps > MAX_STEPS || !self.step(thread, world) {
                 // (a script that runs away, or a stack that overflows, ends
                 // its thread for good)
+                if let Some(script) = self.scripts.scripts.get(script) {
+                    self.faults.push(script.name.clone());
+                }
                 self.threads[thread].stack.clear();
                 self.threads[thread].sleep = Sleep::Done;
                 return;

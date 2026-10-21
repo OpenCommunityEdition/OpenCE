@@ -36,6 +36,36 @@ pub struct Campaign {
     pub conversations: Vec<String>,
     /// Its starting profiles' names.
     pub starting_profiles: Vec<String>,
+    /// The trigger volumes that switch the structure a player stands in.
+    pub bsp_switches: Vec<BspSwitch>,
+    /// The length of each sound of the map, which its scripts wait on.
+    pub sound_lengths: Vec<SoundLength>,
+}
+
+/// How long a sound plays: its longest permutation's length
+/// (`sound_definition`'s `longest_permutation_length`).
+#[derive(Clone, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
+pub struct SoundLength {
+    /// The sound's path.
+    pub path: String,
+    /// Its length in milliseconds.
+    pub milliseconds: u32,
+}
+
+/// A trigger volume that switches the structure when a player enters it
+/// while the structure it leaves is the one loaded
+/// (`scenario_bsp_switch_trigger_volume`). Each index is the game's, `-1`
+/// for none.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
+pub struct BspSwitch {
+    /// The trigger volume.
+    pub trigger_volume: i16,
+    /// The structure it switches from.
+    pub source: i16,
+    /// The structure it switches to.
+    pub destination: i16,
+    /// The cutscene flag the other players are moved to.
+    pub cutscene_flag: i16,
 }
 
 /// A box a script tests objects against.

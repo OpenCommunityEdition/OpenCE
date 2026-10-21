@@ -65,8 +65,6 @@ crate::presents! {
     rasterizer_model_ambient_reflection_tint,
     show_hud_timer,
     sound_class_set_gain,
-    sound_impulse_start,
-    sound_impulse_stop,
     sound_looping_set_alternate,
     sound_looping_start,
     sound_looping_stop,
