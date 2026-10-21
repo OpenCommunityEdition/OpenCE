@@ -264,7 +264,8 @@ One movement of the mouse wheel changes the weapon one time. A second
 movement after a short pause changes it again.
 
 In the menus, the mouse moves a pointer, a blue arrow
-(`port/assets/cursor/menu_cursor.png`) in place of the system's:
+(`port/assets/cursor/menu_cursor.png`) in place of the system's, sized to
+the window as Halo PC's was (32 of the menus' 480 lines tall):
 
 - The item below the pointer gets the focus.
 - A left click selects the item. On a setting with values, a click on the

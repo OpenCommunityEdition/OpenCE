@@ -1007,6 +1007,91 @@ BOOL platform_video_hdr(float *sdr_white, float *headroom)
 }
 #endif
 
+#ifndef HALO_ANDROID
+#ifndef HALO_GLES
+/* ---------- the menus' cursor
+
+The blue arrow the menus show for the mouse, in place of the system's. Halo
+PC drew its cursor in the menus' 640 x 480, so it took the same part of the
+screen at any resolution; this one is made again whenever the window's size
+in pixels changes (menu_cursor_fit, from platform_pump_events). */
+
+/* the arrow's height in the menus' 480 lines (72 pixels at 1080p) */
+#define MENU_CURSOR_HEIGHT 32
+
+static SDL_Surface *menu_cursor_picture;
+static SDL_Cursor *menu_cursor;
+static int menu_cursor_height;
+
+/* the picture at a height, halved first while it is twice that or more (one
+linear scaling to less than half the size skips pixels) */
+static SDL_Surface *menu_cursor_scale(int height)
+{
+	int width = (menu_cursor_picture->w * height + menu_cursor_picture->h / 2) / menu_cursor_picture->h;
+	SDL_Surface *surface = SDL_DuplicateSurface(menu_cursor_picture);
+
+	while (surface && surface->h / 2 >= height)
+	{
+		SDL_Surface *half = SDL_ScaleSurface(surface, surface->w / 2, surface->h / 2, SDL_SCALEMODE_LINEAR);
+
+		SDL_DestroySurface(surface);
+		surface = half;
+	}
+	if (surface && surface->h != height)
+	{
+		SDL_Surface *sized = SDL_ScaleSurface(surface, width > 0 ? width : 1, height, SDL_SCALEMODE_LINEAR);
+
+		SDL_DestroySurface(surface);
+		surface = sized;
+	}
+	return surface;
+}
+
+/* the cursor made for the window's size, when that has changed: its height
+the part of the window the menus' 480 lines take (their 4:3 fits a window of
+another shape), in pixels; where the desktop counts in points (macOS, Wayland
+at a scale) the cursor is that size in points, with the pixels' image as its
+alternate */
+static void menu_cursor_fit(void)
+{
+	int width = 0, height = 0, lines, cursor_height;
+	float density;
+	SDL_Surface *pixels, *points;
+	SDL_Cursor *cursor = NULL;
+
+	if (!menu_cursor_picture || !SDL_GetWindowSizeInPixels(platform_window, &width, &height) ||
+		width <= 0 || height <= 0)
+		return;
+	lines = height < width * 3 / 4 ? height : width * 3 / 4;
+	cursor_height = lines * MENU_CURSOR_HEIGHT / 480;
+	if (cursor_height < 16)
+		cursor_height = 16;
+	if (cursor_height == menu_cursor_height)
+		return;
+	menu_cursor_height = cursor_height;
+	density = SDL_GetWindowPixelDensity(platform_window);
+	pixels = menu_cursor_scale(cursor_height);
+	points = density > 1.0f ? menu_cursor_scale((int)(cursor_height / density + 0.5f)) : pixels;
+	if (pixels && points && (points == pixels || SDL_AddSurfaceAlternateImage(points, pixels)))
+		cursor = SDL_CreateColorCursor(points, 0, 0);
+	if (cursor && SDL_SetCursor(cursor))
+	{
+		SDL_DestroyCursor(menu_cursor);
+		menu_cursor = cursor;
+	}
+	else
+	{
+		platform_log("cannot set the menus' cursor: %s", SDL_GetError());
+		if (cursor)
+			SDL_DestroyCursor(cursor);
+	}
+	if (points != pixels)
+		SDL_DestroySurface(points);
+	SDL_DestroySurface(pixels);
+}
+#endif
+#endif
+
 BOOL platform_video_initialize(unsigned long width, unsigned long height)
 {
 	int version;
@@ -1100,24 +1185,15 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		SDL_DestroySurface(icon);
 	}
 	/* the pointer the menus show (platform_ui_pointer_set_active), in place
-	of the system's: the picture at a quarter of its size at 100% display
-	scale, and the picture itself for the larger scales */
-	if (platform_menu_cursor_size)
+	of the system's, at the window's size */
+	if (platform_menu_cursor_size && !menu_cursor_picture)
 	{
-		SDL_Surface *picture = SDL_LoadPNG_IO(SDL_IOFromConstMem(platform_menu_cursor, platform_menu_cursor_size), true);
-		SDL_Surface *half = picture ? SDL_ScaleSurface(picture, picture->w / 2, picture->h / 2, SDL_SCALEMODE_LINEAR) : NULL;
-		SDL_Surface *quarter = half ? SDL_ScaleSurface(half, half->w / 2, half->h / 2, SDL_SCALEMODE_LINEAR) : NULL;
-		SDL_Cursor *cursor = NULL;
-
-		SDL_SetHint(SDL_HINT_MOUSE_DPI_SCALE_CURSORS, "1");
-		if (quarter && SDL_AddSurfaceAlternateImage(quarter, picture))
-			cursor = SDL_CreateColorCursor(quarter, 0, 0);
-		if (!cursor || !SDL_SetCursor(cursor))
-			platform_log("cannot set the menus' cursor: %s", SDL_GetError());
-		SDL_DestroySurface(quarter);
-		SDL_DestroySurface(half);
-		SDL_DestroySurface(picture);
+		menu_cursor_picture = SDL_LoadPNG_IO(SDL_IOFromConstMem(platform_menu_cursor, platform_menu_cursor_size), true);
+		if (!menu_cursor_picture)
+			platform_log("cannot read the menus' cursor: %s", SDL_GetError());
 	}
+	menu_cursor_height = 0;
+	menu_cursor_fit();
 #endif
 	platform_fullscreen_requested = platform_fullscreen_setting();
 	platform_window_mode = platform_display_mode();
@@ -1893,6 +1969,9 @@ void platform_pump_events(void)
 		return;
 	exit_after_check();
 	platform_show_pending_message();
+#if !defined(HALO_ANDROID) && !defined(HALO_GLES)
+	menu_cursor_fit();
+#endif
 #ifndef HALO_ANDROID
 	updater_poll(platform_window);
 	/* (Settings > Audio's output device, as it changes: dsound_sdl.c) */
