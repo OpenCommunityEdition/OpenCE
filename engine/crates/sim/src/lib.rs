@@ -22,6 +22,7 @@ pub mod projectile;
 pub mod ragdoll;
 pub mod random;
 pub mod units;
+pub mod vehicle;
 pub mod weapon;
 
 use bevy_ecs::prelude::*;

@@ -107,7 +107,7 @@
     - [x] Write tests: the reference app's recorder writes Warthog and Ghost traces for scripted inputs (accelerate, turn, brake, jump a ramp)
 - [ ] Task: Driving and flying
     - [ ] Write tests: Warthog and Ghost traces within tolerance; the Banshee and the Scorpion respond to their tags' values
-    - [ ] Jolt vehicle constraints for wheeled and tracked vehicles; hover and flight from the vehicle tags
+    - [ ] Halo's mass points ported for every vehicle (deviation: not Jolt's vehicle constraints, which cannot match the traces); hover and flight from the vehicle tags
 - [ ] Task: Seats, turrets and destruction
     - [ ] Write tests: entering and leaving each seat, the Warthog's turret, passengers firing, a vehicle destroyed by damage
     - [ ] Seats, entering and leaving animations, turrets, vehicle damage

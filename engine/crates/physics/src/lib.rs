@@ -249,6 +249,19 @@ impl Hit {
     }
 }
 
+/// A sphere's contact with a surface it sinks into.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Contact {
+    /// How far it sinks, along the normal.
+    pub depth: f32,
+    /// The deepest point it meets, in world units.
+    pub point: Vec3,
+    /// The surface's normal, out of the surface.
+    pub normal: Vec3,
+    /// What it touches.
+    pub struck: Struck,
+}
+
 /// A physics world.
 pub struct World {
     raw: NonNull<sys::World>,
@@ -535,6 +548,35 @@ impl World {
             )
         };
         Self::cast_result(result, &hit)
+    }
+
+    /// How far a sphere at `center` sinks into what `layers` hold, if it
+    /// touches at all: the deepest point it meets, the surface's normal
+    /// there (out of the surface, toward the sphere), and the depth along
+    /// it (a vehicle's mass point on the ground).
+    pub fn sphere_contact(
+        &self,
+        center: Vec3,
+        radius: f32,
+        layers: Layers,
+    ) -> Result<Option<Contact>, PhysicsError> {
+        // (a cast too short to move it, so that the hit is what it overlaps
+        // where it is, with the deepest point)
+        let hit = self.cast_shape(
+            Shape::Sphere { radius },
+            Pose::at(center),
+            Vec3::new(0.0, 0.0, -1e-3),
+            layers,
+        )?;
+        Ok(hit.and_then(|hit| {
+            let depth = radius - (center - hit.point).dot(hit.normal);
+            (depth > 0.0).then_some(Contact {
+                depth,
+                point: hit.point,
+                normal: hit.normal,
+                struck: hit.struck,
+            })
+        }))
     }
 
     fn cast_result(result: i32, hit: &sys::Hit) -> Result<Option<Hit>, PhysicsError> {
