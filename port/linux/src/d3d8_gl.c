@@ -5525,6 +5525,33 @@ static BOOL mirror_refresh(unsigned long first, unsigned long last)
 that holds it, the range's offset in that buffer and the newest upload
 generation of its pages (which changes whenever its contents do); FALSE if
 the range is outside the window, spans two segments or is volatile */
+/* display.geometry_cache: whether vertices and indices are kept in the
+mirror's persistent GL buffers, by address, or uploaded as they are drawn.
+Some Android drivers hand back stale or corrupted data from those buffers
+(stretched models, missing surfaces: OpenCE's PR #419), so "auto" bypasses the
+cache there and keeps it on the desktop builds, which have not shown it. The
+streaming path is correct but uploads more. */
+static BOOL geometry_cache_enabled(void)
+{
+	static int enabled = -1;
+	if (enabled < 0)
+	{
+		char const *setting = config_string("display.geometry_cache");
+
+		if (setting && !strcmp(setting, "on"))
+			enabled = 1;
+		else if (setting && !strcmp(setting, "off"))
+			enabled = 0;
+		else
+#ifdef HALO_ANDROID
+			enabled = 0;
+#else
+			enabled = 1;
+#endif
+	}
+	return enabled;
+}
+
 static BOOL mirror_range(unsigned long address, unsigned long size, GLuint *buffer, unsigned long *offset,
 	unsigned long *generation)
 {
@@ -5537,6 +5564,8 @@ static BOOL mirror_range(unsigned long address, unsigned long size, GLuint *buff
 	if (android_geometry_fixes)
 		return FALSE;
 #endif
+	if (!geometry_cache_enabled())
+		return FALSE;
 	if (!size || address < PLATFORM_CONTIGUOUS_BASE || start + size > PLATFORM_CONTIGUOUS_SIZE)
 		return FALSE;
 	segment = start / MIRROR_SEGMENT_SIZE;

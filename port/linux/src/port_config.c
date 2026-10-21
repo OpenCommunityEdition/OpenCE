@@ -246,6 +246,13 @@ static const struct config_setting config_settings[] =
 		_environment_value, _platform_all,
 		"The scoreboard panel's colour: \"red, green, blue, alpha\", each 0 to 255\n"
 		"(alpha 0 is see-through, 255 solid)." },
+	{ "display.geometry_cache", _config_string, "\"auto\"", "HALO_GEOMETRY_CACHE", _environment_value, _platform_all,
+		"Whether vertices and indices are kept in persistent GL buffers, by\n"
+		"address, or uploaded as they are drawn: \"auto\" keeps them on the desktop\n"
+		"builds and bypasses them on Android, whose drivers have handed back stale\n"
+		"or corrupted data (stretched models, missing surfaces, worsening over a\n"
+		"session); \"on\" and \"off\" force either. Bypassing uploads more: the\n"
+		"renderer is correct but may draw slower." },
 	{ "display.driver", _config_string, "\"native\"", "HALO_GPU_DRIVER", _environment_value, _platform_all,
 		"Which GL implementation the loader opens, where this build's own can be\n"
 		"swapped for another: \"native\" leaves it alone; a Mesa driver's name\n"
