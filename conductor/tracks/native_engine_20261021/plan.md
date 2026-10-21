@@ -103,8 +103,8 @@
 - [x] Task: Typed tags for vehicles 1ab6b170
     - [x] Write tests: vehicle tags (physics, seats, turrets, suspension) import; malformed ones are refused
     - [x] `content` types and importers
-- [ ] Task: Reference traces for vehicles
-    - [ ] Write tests: the reference app's recorder writes Warthog and Ghost traces for scripted inputs (accelerate, turn, brake, jump a ramp)
+- [x] Task: Reference traces for vehicles db0692ab
+    - [x] Write tests: the reference app's recorder writes Warthog and Ghost traces for scripted inputs (accelerate, turn, brake, jump a ramp)
 - [ ] Task: Driving and flying
     - [ ] Write tests: Warthog and Ghost traces within tolerance; the Banshee and the Scorpion respond to their tags' values
     - [ ] Jolt vehicle constraints for wheeled and tracked vehicles; hover and flight from the vehicle tags
