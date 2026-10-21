@@ -25,7 +25,6 @@ pub(crate) const MODE: GroupTag = GroupTag::new(b"mode");
 pub(crate) const MOD2: GroupTag = GroupTag::new(b"mod2");
 pub(crate) const ANTR: GroupTag = GroupTag::new(b"antr");
 pub(crate) const COLL: GroupTag = GroupTag::new(b"coll");
-const PHYS: GroupTag = GroupTag::new(b"phys");
 const SHDR: GroupTag = GroupTag::new(b"shdr");
 const EFFE: GroupTag = GroupTag::new(b"effe");
 const BIPD: GroupTag = GroupTag::new(b"bipd");
@@ -201,13 +200,19 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
         model: reference(&object, 0x28, "model", &models)?,
         animation_graph: reference(&object, 0x38, "animation graph", &[ANTR])?,
         collision_model: reference(&object, 0x70, "collision model", &[COLL])?,
-        physics: reference(&object, 0x80, "physics", &[PHYS])?,
+        physics: reference(&object, 0x80, "physics", &[crate::vehicle::PHYS])?,
         modifier_shader: reference(&object, 0x90, "modifier shader", &[SHDR])?,
         creation_effect: reference(&object, 0xA0, "creation effect", &[EFFE])?,
         attachments,
         change_colors,
         unit_hud: match kind {
-            ObjectKind::Biped => unit_hud(cache, index)?,
+            ObjectKind::Biped => unit_hud(cache, index, BIPD, BIPED_SIZE)?,
+            ObjectKind::Vehicle => unit_hud(
+                cache,
+                index,
+                crate::vehicle::VEHI,
+                crate::vehicle::VEHICLE_SIZE,
+            )?,
             _ => None,
         },
         biped: match kind {
@@ -226,13 +231,23 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
             ObjectKind::Equipment => Some(crate::weapon::import_equipment(cache, index)?),
             _ => None,
         },
+        vehicle: match kind {
+            ObjectKind::Vehicle => Some(crate::vehicle::import_vehicle(cache, index)?),
+            _ => None,
+        },
     })
 }
 
-/// A biped's first HUD (its unit part's new HUD interfaces).
-fn unit_hud(cache: &Cache, index: usize) -> Result<Option<TagRef>, ImportError> {
-    let biped = cache.tag(index, BIPD, BIPED_SIZE)?;
-    let huds = biped.block(UNIT_PART + 0x12C, "new hud interfaces", 0x30, 2)?;
+/// A unit's first HUD (its unit part's new HUD interfaces), its tag of
+/// `group` and `size`.
+fn unit_hud(
+    cache: &Cache,
+    index: usize,
+    group: GroupTag,
+    size: usize,
+) -> Result<Option<TagRef>, ImportError> {
+    let unit = cache.tag(index, group, size)?;
+    let huds = unit.block(UNIT_PART + 0x12C, "new hud interfaces", 0x30, 2)?;
     match huds.get(0) {
         Some(hud) => reference(&hud, 0, "unit hud interface", &[UNHI]),
         None => Ok(None),

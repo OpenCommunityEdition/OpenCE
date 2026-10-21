@@ -24,7 +24,7 @@ use rkyv::util::AlignedVec;
 use crate::Level;
 
 /// The version of this format; a pack of another is not read.
-pub const FORMAT_VERSION: u32 = 11;
+pub const FORMAT_VERSION: u32 = 12;
 
 const MAGIC: [u8; 4] = *b"OCPK";
 const HEADER_SIZE: usize = 0x28;
@@ -253,6 +253,7 @@ mod tests {
             }],
             damage_effects: Vec::new(),
             collision_models: Vec::new(),
+            physics: Vec::new(),
             effects: Vec::new(),
             unit_huds: Vec::new(),
             weapon_huds: Vec::new(),

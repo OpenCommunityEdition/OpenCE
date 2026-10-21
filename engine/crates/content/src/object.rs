@@ -3,7 +3,7 @@
 
 use rkyv::{Archive, Deserialize, Serialize};
 
-use crate::{CollisionBsp, Equipment, Projectile, TagRef, Weapon};
+use crate::{CollisionBsp, Equipment, Projectile, TagRef, Vehicle, Weapon};
 
 /// What kind of object a definition is, as its type field and its tag
 /// group say.
@@ -104,7 +104,7 @@ pub struct ObjectDefinition {
     pub attachments: Vec<Attachment>,
     /// Its change colours.
     pub change_colors: Vec<ChangeColor>,
-    /// A unit's HUD (`unhi`).
+    /// A unit's HUD (`unhi`): a biped's or a vehicle's.
     pub unit_hud: Option<TagRef>,
     /// A biped's movement (bipeds only).
     pub biped: Option<Biped>,
@@ -114,6 +114,8 @@ pub struct ObjectDefinition {
     pub projectile: Option<Projectile>,
     /// Equipment's own part (equipment only).
     pub equipment: Option<Equipment>,
+    /// A vehicle's own part and its seats (vehicles only).
+    pub vehicle: Option<Vehicle>,
 }
 
 /// A biped's movement and stance, from the biped part of its tag. Speeds

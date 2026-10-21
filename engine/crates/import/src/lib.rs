@@ -18,6 +18,7 @@ pub mod shader;
 pub mod tags;
 mod texture;
 mod vector_palette;
+pub mod vehicle;
 pub mod weapon;
 
 #[cfg(test)]
@@ -32,3 +33,4 @@ pub use level::import_level;
 pub use level_cache::{load_level, LoadError, LoadedFrom, LoadedLevel, IMPORTER_VERSION};
 pub use object::{import_animation_graph, import_collision_model, import_model, import_object};
 pub use tags::{Block, Element, GroupTag, Region, TagInstance};
+pub use vehicle::{import_physics, import_vehicle};

@@ -4,7 +4,7 @@ use rkyv::{Archive, Deserialize, Serialize};
 
 use crate::{
     AnimationGraph, Bitmap, CollisionModel, DamageEffect, Effect, Grenade, GrenadeHud, HudDigits,
-    HudGlobals, Model, ObjectDefinition, ObjectKind, Shader, TagRef, UnitHud, WeaponHud,
+    HudGlobals, Model, ObjectDefinition, ObjectKind, Physics, Shader, TagRef, UnitHud, WeaponHud,
 };
 
 /// Everything a level's structure is drawn and collided with.
@@ -36,6 +36,8 @@ pub struct Level {
     pub damage_effects: Vec<DamageEffect>,
     /// Its objects' collision models, by path.
     pub collision_models: Vec<CollisionModel>,
+    /// Its objects' physics, by path.
+    pub physics: Vec<Physics>,
     /// The effects its projectiles detonate with and its weapons' shots
     /// make, by path.
     pub effects: Vec<Effect>,

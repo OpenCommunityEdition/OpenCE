@@ -9,6 +9,7 @@ pub mod level;
 pub mod object;
 pub mod pack;
 pub mod shader;
+pub mod vehicle;
 pub mod weapon;
 
 pub use bitmap::{
@@ -33,6 +34,9 @@ pub use object::{
 };
 pub use shader::{
     ChicagoMap, EnvironmentShader, ModelShaderClass, Shader, ShaderClass, TransparentChicagoShader,
+};
+pub use vehicle::{
+    FrictionType, MassPoint, Physics, PoweredMassPoint, Vehicle, VehicleKind, VehicleSeat,
 };
 pub use weapon::{
     AimAssist, Ammunition, DamageEffect, Effect, EffectDebris, Equipment, Grenade, Item, Magazine,

@@ -188,6 +188,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     let effects = import_effects(cache, &objects)?;
     let damage_effects = import_damage_effects(cache, &objects, &globals, &effects)?;
     let collision_models = import_collision_models(cache, &objects)?;
+    let physics = import_physics(cache, &objects)?;
     let skies = import_skies(cache, &scenario, &mut models, &mut reached)?;
 
     // (a shader's extra layers are shaders too, reached as each is read)
@@ -244,6 +245,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         globals,
         damage_effects,
         collision_models,
+        physics,
         effects,
         unit_huds: huds.unit_huds,
         weapon_huds: huds.weapon_huds,
@@ -383,6 +385,28 @@ fn import_collision_models(
                 reason: "is referred to but not in the map".into(),
             })?;
             crate::object::import_collision_model(cache, index)
+        })
+        .collect()
+}
+
+/// The physics of `objects`, each once, by path.
+fn import_physics(
+    cache: &Cache,
+    objects: &[ObjectDefinition],
+) -> Result<Vec<opence_content::Physics>, ImportError> {
+    let tags: BTreeSet<&TagRef> = objects
+        .iter()
+        .filter_map(|object| object.physics.as_ref())
+        .collect();
+    tags.into_iter()
+        .map(|tag| {
+            let index = tag_index(cache, tag).ok_or_else(|| ImportError::Tag {
+                tag: tag.path.clone(),
+                group: GroupTag::new(&tag.group.0),
+                field: "physics".into(),
+                reason: "is referred to but not in the map".into(),
+            })?;
+            crate::vehicle::import_physics(cache, index)
         })
         .collect()
 }
