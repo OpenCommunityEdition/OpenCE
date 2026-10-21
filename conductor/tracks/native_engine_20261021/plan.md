@@ -15,9 +15,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 0: Foundations' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 1: Import a map and fly through it
-- [ ] Task: Bounds-checked cache readers
-    - [ ] Write tests: readers built over fake caches (Xbox and Custom Edition headers, tag index, tag data) read fields and refuse out-of-range offsets, counts and bad tag classes with an error naming the tag and field
-    - [ ] `import`: the cache headers, tag index and the reflexive and data readers; layouts from the decompilation and `docs/custom_edition_caches.md`
+- [x] Task: Bounds-checked cache readers 48d7cd76
+    - [x] Write tests: readers built over fake caches (Xbox and Custom Edition headers, tag index, tag data) read fields and refuse out-of-range offsets, counts and bad tag classes with an error naming the tag and field
+    - [x] `import`: the cache headers, tag index and the reflexive and data readers; layouts from the decompilation and `docs/custom_edition_caches.md`
 - [ ] Task: Typed tags for the level
     - [ ] Write tests: builders for a scenario, a structure BSP (with collision and lightmaps), shaders and bitmaps import into `content`'s types; malformed ones are refused
     - [ ] `content` types and their importers: scenario (BSP list), structure BSP, the shader classes, bitmaps
