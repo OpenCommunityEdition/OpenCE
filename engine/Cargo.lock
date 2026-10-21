@@ -895,6 +895,7 @@ dependencies = [
  "libm",
  "opence_content",
  "opence_import",
+ "opence_physics",
  "thiserror",
 ]
 

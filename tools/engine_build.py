@@ -83,7 +83,8 @@ def swift(command: str, library: Path, out: Path) -> Path:
             "--cache-path", str(scratch / "cache"),
             "--config-path", str(scratch / "config"),
             "--security-path", str(scratch / "security"),
-            "-Xlinker", str(library),
+            # (and the C++ library Jolt, the physics, needs)
+            "-Xlinker", str(library), "-Xlinker", "-lc++",
         ],
         env=environment,
         check=True,

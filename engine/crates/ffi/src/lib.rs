@@ -12,6 +12,7 @@ pub mod render_model;
 pub mod render_sky;
 pub mod snapshot;
 
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -19,7 +20,8 @@ use opence_content::ObjectKind;
 use opence_sim::animation::{self, AnimationPlayer};
 use opence_sim::clock::Clock;
 use opence_sim::input::{Buttons, TickInput};
-use opence_sim::objects::{Appearance, Difficulty, Object, Permutation};
+use opence_sim::objects::{Appearance, Difficulty, Object, ObjectHandle, Permutation};
+use opence_sim::player::View;
 use opence_sim::units::Radians;
 use opence_sim::{FreeCamera, Simulation};
 use render_level::{RenderDraw, RenderLevel, RenderMaterial, RenderTexture, VERTEX_STRIDE};
@@ -310,6 +312,71 @@ struct Running {
     simulation: Simulation,
     previous_camera: snapshot::Transform,
     clock: Clock,
+    /// The level it was started with, if any.
+    level: Option<Arc<opence_content::Level>>,
+}
+
+/// The models and animation graphs objects are drawn and posed with,
+/// shared by every object of a tag.
+#[derive(Default)]
+struct Wardrobe {
+    models: HashMap<usize, Arc<opence_content::Model>>,
+    graphs: HashMap<opence_content::TagRef, Option<Arc<opence_content::AnimationGraph>>>,
+}
+
+impl Wardrobe {
+    /// Gives an object its model and its standing animation, if its tag
+    /// has them.
+    fn dress(
+        &mut self,
+        simulation: &mut Simulation,
+        level: &opence_content::Level,
+        handle: ObjectHandle,
+    ) {
+        let Some(object) = simulation.component::<Object>(handle) else {
+            return;
+        };
+        let Some(definition) = level.object(&object.tag) else {
+            return;
+        };
+        let model = definition
+            .model
+            .as_ref()
+            .and_then(|model| level.model_index(model));
+        if let Some(model) = model {
+            let permutation = simulation
+                .component::<Permutation>(handle)
+                .map(|permutation| permutation.0.region_permutations)
+                .unwrap_or_default();
+            simulation.set_appearance(
+                handle,
+                Appearance {
+                    model: model as u32,
+                    radius_bits: definition.bounding_radius.to_bits(),
+                    regions: region_permutations(&level.models[model], permutation),
+                },
+            );
+        }
+        let Some(graph) = definition.animation_graph.as_ref() else {
+            return;
+        };
+        let graph = self
+            .graphs
+            .entry(graph.clone())
+            .or_insert_with(|| level.animation_graph(graph).cloned().map(Arc::new))
+            .clone();
+        if let Some(graph) = graph {
+            let unit = matches!(object.kind, ObjectKind::Biped | ObjectKind::Vehicle);
+            let animation = animation::standing_animation(&graph, unit);
+            let model = model.map(|model| {
+                self.models
+                    .entry(model)
+                    .or_insert_with(|| Arc::new(level.models[model].clone()))
+                    .clone()
+            });
+            simulation.animate(handle, AnimationPlayer::new(graph, model, animation));
+        }
+    }
 }
 
 struct State {
@@ -350,6 +417,7 @@ impl Engine {
             simulation,
             previous_camera,
             clock: Clock::default(),
+            level: None,
         });
         publish(&mut state, &self.snapshots, 0.0);
     }
@@ -376,47 +444,9 @@ impl Engine {
             .map_err(|_| EngineError::Load {
                 message: "the scenario places more objects than the world holds".into(),
             })?;
-        let models: Vec<Arc<opence_content::Model>> =
-            level.models.iter().cloned().map(Arc::new).collect();
-        let mut graphs = std::collections::HashMap::new();
+        let mut wardrobe = Wardrobe::default();
         for &handle in &handles {
-            let Some(object) = simulation.component::<Object>(handle) else {
-                continue;
-            };
-            let Some(definition) = level.object(&object.tag) else {
-                continue;
-            };
-            let model = definition
-                .model
-                .as_ref()
-                .and_then(|model| level.model_index(model));
-            if let Some(model) = model {
-                let permutation = simulation
-                    .component::<Permutation>(handle)
-                    .map(|permutation| permutation.0.region_permutations)
-                    .unwrap_or_default();
-                simulation.set_appearance(
-                    handle,
-                    Appearance {
-                        model: model as u32,
-                        radius_bits: definition.bounding_radius.to_bits(),
-                        regions: region_permutations(&level.models[model], permutation),
-                    },
-                );
-            }
-            let Some(graph) = definition.animation_graph.as_ref() else {
-                continue;
-            };
-            let graph = graphs
-                .entry(graph.clone())
-                .or_insert_with(|| level.animation_graph(graph).cloned().map(Arc::new))
-                .clone();
-            if let Some(graph) = graph {
-                let unit = matches!(object.kind, ObjectKind::Biped | ObjectKind::Vehicle);
-                let animation = animation::standing_animation(&graph, unit);
-                let model = model.map(|model| models[model].clone());
-                simulation.animate(handle, AnimationPlayer::new(graph, model, animation));
-            }
+            wardrobe.dress(&mut simulation, level, handle);
         }
         let count = handles.len() as u32;
         let mut state = self.lock();
@@ -425,9 +455,58 @@ impl Engine {
             simulation,
             previous_camera,
             clock: Clock::default(),
+            level: Some(geometry.content.clone()),
         });
         publish(&mut state, &self.snapshots, 0.0);
         Ok(count)
+    }
+
+    /// Makes the player at the level's player start `start` (the first is
+    /// 0), drawn and standing, and sees from its eyes; a player there was
+    /// before is removed. Fails without a level, or for a start the
+    /// scenario does not have.
+    pub fn spawn_player(&self, start: u32) -> Result<(), EngineError> {
+        let mut state = self.lock();
+        let running = state.running.as_mut().ok_or(EngineError::NoWorld)?;
+        let level = running.level.clone().ok_or(EngineError::NoWorld)?;
+        let handle = running
+            .simulation
+            .spawn_player(&level, start as usize)
+            .map_err(|error| EngineError::Load {
+                message: error.to_string(),
+            })?;
+        Wardrobe::default().dress(&mut running.simulation, &level, handle);
+        running.previous_camera = transform(&running.simulation.camera().transform);
+        publish(&mut state, &self.snapshots, 0.0);
+        Ok(())
+    }
+
+    /// Sees the player from behind (true) or from its eyes; false without
+    /// a player.
+    pub fn set_third_person(&self, third_person: bool) -> bool {
+        let mut state = self.lock();
+        let Some(running) = state.running.as_mut() else {
+            return false;
+        };
+        let view = if third_person {
+            View::ThirdPerson
+        } else {
+            View::FirstPerson
+        };
+        if !running.simulation.set_player_view(view) {
+            return false;
+        }
+        running.previous_camera = transform(&running.simulation.camera().transform);
+        publish(&mut state, &self.snapshots, 0.0);
+        true
+    }
+
+    /// Whether there is a player, and the camera is its.
+    pub fn playing(&self) -> bool {
+        self.lock()
+            .running
+            .as_ref()
+            .is_some_and(|running| running.simulation.player().is_some())
     }
 
     /// Puts the free camera at `placement`, as if it had always been there
@@ -831,6 +910,48 @@ mod tests {
             check_models(name, &geometry);
             check_started(name, &geometry);
         }
+    }
+
+    #[test]
+    fn the_player_is_spawned_and_played() {
+        let engine = Engine::new();
+        assert_eq!(engine.spawn_player(0), Err(EngineError::NoWorld));
+        engine.start_empty_world();
+        assert_eq!(engine.spawn_player(0), Err(EngineError::NoWorld));
+        assert!(!engine.set_third_person(true));
+        let Some(geometry) = stock("bloodgulch") else {
+            return; // (no game data here)
+        };
+        assert!(engine.start_level(geometry.clone(), 1).is_ok());
+        assert!(!engine.playing());
+        assert!(matches!(
+            engine.spawn_player(u32::MAX),
+            Err(EngineError::Load { .. })
+        ));
+        assert_eq!(engine.spawn_player(0), Ok(()));
+        assert!(engine.playing());
+        let start = geometry.content.scenario.player_starts[0].position;
+        let frame = acquire(&engine);
+        let eyes = frame.camera.current.position;
+        assert!((eyes.x - start[0]).abs() < 1e-3 && (eyes.y - start[1]).abs() < 1e-3);
+        // (seen from its eyes, its own body is not in the snapshot)
+        let count = frame.object_count;
+        assert!(engine.set_third_person(true));
+        assert_eq!(acquire(&engine).object_count, count + 1);
+        assert!(engine.set_third_person(false));
+        engine.set_input(InputState {
+            forward: 127,
+            ..Default::default()
+        });
+        for _ in 0..60 {
+            let _ = engine.step();
+        }
+        let frame = acquire(&engine);
+        let moved = libm::hypotf(
+            frame.camera.current.position.x - eyes.x,
+            frame.camera.current.position.y - eyes.y,
+        );
+        assert!(moved > 1.0, "{moved}");
     }
 
     /// Every stock map (slow: `cargo test --release -- --ignored`).

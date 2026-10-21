@@ -11,6 +11,7 @@ bevy_ecs.workspace = true
 glam.workspace = true
 libm.workspace = true
 opence_content.workspace = true
+opence_physics.workspace = true
 thiserror.workspace = true
 
 [lints]

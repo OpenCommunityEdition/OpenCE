@@ -12,6 +12,7 @@ pub mod clock;
 pub mod hash;
 pub mod input;
 pub mod objects;
+pub mod player;
 pub mod random;
 pub mod units;
 
@@ -26,7 +27,8 @@ use objects::{
     kind_index, Difficulty, Object, ObjectHandle, ObjectKinds, ObjectName, ObjectSpawn,
     ObjectTable, Permutation, TableFull, Team,
 };
-use opence_content::Scenario;
+use opence_content::{Level, ObjectKind, Scenario};
+use player::{Player, PlayerError, PlayerPose, View};
 use units::{Radians, WorldUnits};
 
 /// A position and an orientation in the world, in world units.
@@ -142,6 +144,9 @@ pub enum SimSet {
 pub struct Simulation {
     world: World,
     schedule: Schedule,
+    /// The player, if there is one (its physics world is not `Sync`, so it
+    /// is kept beside the bevy world, not in it).
+    player: Option<Player>,
 }
 
 /// An object as the renderer draws it.
@@ -176,16 +181,90 @@ impl Simulation {
         schedule.configure_sets((SimSet::Input, SimSet::Simulate, SimSet::Finish).chain());
         schedule.add_systems((
             (look_free_camera, remember_transforms).in_set(SimSet::Input),
-            (move_free_camera, animation::play_animations).in_set(SimSet::Simulate),
+            (
+                move_free_camera,
+                player::move_player.before(animation::play_animations),
+                animation::play_animations,
+            )
+                .in_set(SimSet::Simulate),
             (place_camera, advance_tick).chain().in_set(SimSet::Finish),
         ));
-        Self { world, schedule }
+        Self {
+            world,
+            schedule,
+            player: None,
+        }
     }
 
-    /// Runs one tick with `input`.
+    /// Runs one tick with `input`: the player's biped moves first, then
+    /// the world's systems run.
     pub fn step(&mut self, input: TickInput) {
         self.world.insert_resource(CurrentInput(input));
+        if let Some(player) = self.player.as_mut() {
+            let pose = player.step(&input);
+            self.world.insert_resource(pose);
+        }
         self.schedule.run(&mut self.world);
+    }
+
+    /// Makes the player: its biped standing at `level`'s player start
+    /// `start`, moving over that start's structure BSP, the camera at its
+    /// eyes. A player there was before is removed.
+    pub fn spawn_player(
+        &mut self,
+        level: &Level,
+        start: usize,
+    ) -> Result<ObjectHandle, PlayerError> {
+        if let Some(earlier) = self.player.take() {
+            self.remove(earlier.handle());
+            self.world.remove_resource::<PlayerPose>();
+        }
+        let world = &mut self.world;
+        let player = Player::new(level, start, |tag, transform| {
+            objects::spawn(
+                world,
+                ObjectSpawn {
+                    kind: ObjectKind::Biped,
+                    tag,
+                    transform,
+                    name: None,
+                    permutation: None,
+                    team: None,
+                },
+            )
+            .ok()
+        })?;
+        let handle = player.handle();
+        self.player = Some(player);
+        self.place_player_camera();
+        Ok(handle)
+    }
+
+    /// The player, if there is one.
+    pub fn player(&self) -> Option<&Player> {
+        self.player.as_ref()
+    }
+
+    /// Sees from `view`; false without a player.
+    pub fn set_player_view(&mut self, view: View) -> bool {
+        let Some(player) = self.player.as_mut() else {
+            return false;
+        };
+        player.set_view(view);
+        self.place_player_camera();
+        true
+    }
+
+    /// The camera at the player's view now, as if it had always been there.
+    fn place_player_camera(&mut self) {
+        let Some(player) = self.player.as_ref() else {
+            return;
+        };
+        let pose = player.pose();
+        let mut camera = self.camera();
+        camera.transform = pose.camera;
+        self.world.insert_resource(camera);
+        self.world.insert_resource(pose);
     }
 
     /// Runs every tick of a recording.
@@ -279,7 +358,16 @@ impl Simulation {
             .iter(&self.world)
             .collect();
         objects.sort_by_key(|(id, ..)| **id);
+        // (the player's own body is not seen from its eyes)
+        let hidden = self
+            .player
+            .as_ref()
+            .filter(|player| player.view() == View::FirstPerson)
+            .map(|player| ObjectId(player.handle().index));
         for (id, transform, previous, nodes, appearance) in objects {
+            if Some(*id) == hidden {
+                continue;
+            }
             visit(Drawn {
                 id: *id,
                 previous: previous.map_or(transform, |p| &p.0),
@@ -355,7 +443,8 @@ impl Simulation {
 
     /// A hash of the world's state: the tick, the camera, and every
     /// object in the order of their ids: its transform, kind, tag, name,
-    /// permutation, team and animation, and the random seed.
+    /// permutation, team and animation, the random seed, and the player's
+    /// movement and look.
     pub fn world_hash(&mut self) -> u64 {
         let mut hasher = WorldHasher::default();
         hasher.u64(self.tick().0);
@@ -413,6 +502,11 @@ impl Simulation {
                 None => hasher.u64(0),
             }
         }
+        // (nothing for no player, so that a world without one hashes as
+        // it did before there were players)
+        if let Some(player) = self.player.as_ref() {
+            player.hash(&mut hasher);
+        }
         hasher.finish()
     }
 }
@@ -458,9 +552,17 @@ fn move_free_camera(input: Res<CurrentInput>, mut camera: ResMut<FreeCamera>) {
     camera.position += direction * (speed.0 * clock::TICK.0);
 }
 
-fn place_camera(free: Res<FreeCamera>, mut camera: ResMut<Camera>) {
-    camera.transform.position = free.position;
-    camera.transform.rotation = free.rotation();
+fn place_camera(
+    free: Res<FreeCamera>,
+    player: Option<Res<PlayerPose>>,
+    mut camera: ResMut<Camera>,
+) {
+    if let Some(player) = player {
+        camera.transform = player.camera;
+    } else {
+        camera.transform.position = free.position;
+        camera.transform.rotation = free.rotation();
+    }
 }
 
 fn advance_tick(mut tick: ResMut<Tick>) {

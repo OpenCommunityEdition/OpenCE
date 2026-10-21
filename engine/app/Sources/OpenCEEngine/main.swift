@@ -2,10 +2,14 @@
 // stepping the world on the display's frames, and drawing the map --map
 // PATH names (and --bsp N), or the one chosen from the Map menu or the
 // picker, smoothed as --anti-aliasing (temporal, the default, or native)
-// and --render-scale (0.5 to 1) say. The free camera flies with W, A, S,
-// D, Space and Control (Shift faster), turned by the mouse at
-// --mouse-sensitivity radians a count; F3 or --frame-times shows the
-// frame times. --benchmark SECONDS flies the map offscreen at --size
+// and --render-scale (0.5 to 1) say. The player spawns at the scenario's
+// first start and moves with W, A, S and D, jumps with Space and crouches
+// with Control (or the keys of --bindings FILE, or of bindings.json in the
+// app's support folder); V changes the camera between first and third
+// person, and the mouse looks at --mouse-sensitivity radians a count (or
+// the mouseSensitivity default). With --fly, or on a map without a player
+// start, the free camera flies instead: W, A, S, D, Space and Control
+// (Shift faster). F3 or --frame-times shows the frame times. --benchmark SECONDS flies the map offscreen at --size
 // (3840x2160 by default), with no window, and prints the frame times.
 import AppKit
 import Metal
@@ -63,17 +67,42 @@ func videoSettings() -> VideoSettings {
     return settings
 }
 
-/// The mouse's turn per count the arguments give.
-func flyControls() -> FlyControls {
-    var controls = FlyControls()
+/// The mouse's turn per count: the argument's, else the saved setting's,
+/// else the stock one.
+func mouseSensitivity() -> Float {
+    let stock = FlyControls().sensitivity
+    func valid(_ value: Float) -> Bool { value.isFinite && value > 0 && value < 0.1 }
     if let value = argument("--mouse-sensitivity") {
-        guard let sensitivity = Float(value), sensitivity.isFinite, sensitivity > 0, sensitivity < 0.1 else {
+        guard let sensitivity = Float(value), valid(sensitivity) else {
             fail("--mouse-sensitivity is radians a count, above 0 and below 0.1, not \(value)")
         }
-        controls.sensitivity = sensitivity
+        UserDefaults.standard.set(sensitivity, forKey: "mouseSensitivity")
+        return sensitivity
     }
-    controls.invertPitch = CommandLine.arguments.contains("--invert-mouse")
-    return controls
+    let saved = UserDefaults.standard.float(forKey: "mouseSensitivity")
+    return valid(saved) ? saved : stock
+}
+
+/// The free camera's controls the arguments give.
+func flyControls() -> FlyControls {
+    FlyControls(sensitivity: mouseSensitivity(), invertPitch: CommandLine.arguments.contains("--invert-mouse"))
+}
+
+/// The player's controls: --bindings FILE's keys, else those of
+/// bindings.json in the app's support folder, else the stock ones.
+func playControls() -> PlayControls {
+    var bindings = KeyBindings.stock
+    let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+    let saved = support?.appendingPathComponent("OpenCE Engine/bindings.json")
+    if let path = argument("--bindings") ?? saved.flatMap({ FileManager.default.fileExists(atPath: $0.path) ? $0.path : nil }) {
+        do {
+            bindings = try KeyBindings.read(Data(contentsOf: URL(fileURLWithPath: path)))
+        } catch {
+            fail("\(path): \(error)")
+        }
+    }
+    return PlayControls(bindings: bindings, sensitivity: mouseSensitivity(),
+                        invertPitch: CommandLine.arguments.contains("--invert-mouse"))
 }
 
 func fail(_ message: String) -> Never {
@@ -119,6 +148,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let engine = Engine()
     lazy var snapshots = SnapshotReader(engine: engine)
     let controls = flyControls()
+    let play = playControls()
+    var earlierKeys: Set<UInt16> = []
+    var thirdPerson = false
     let settings = videoSettings()
     var controller: EngineWindowController?
     var level: LoadedLevel?
@@ -162,6 +194,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // (the scenario's objects, at Normal, standing still)
         _ = try engine.startLevel(geometry: loaded.geometry, difficulty: 1)
         try engine.placeCamera(placement: loaded.start)
+        // (the player at the first start, unless flying; a map without one
+        // keeps the free camera)
+        if !CommandLine.arguments.contains("--fly") {
+            try? engine.spawnPlayer(start: 0)
+            thirdPerson = false
+        }
         level = loaded
         controller.window.title = "OpenCE Engine — \(URL(fileURLWithPath: map).deletingPathExtension().lastPathComponent)"
     }
@@ -224,7 +262,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // (the keys and mouse fly the camera only while the mouse is captured)
         let mouse = controller.takeMouseMotion()
         let held = controller.capture.captured ? controller.keys.codes : []
-        engine.setInput(input: controls.input(held: held, mouse: mouse))
+        if engine.playing() {
+            if play.togglesView(held: held, earlier: earlierKeys) {
+                thirdPerson.toggle()
+                _ = engine.setThirdPerson(thirdPerson: thirdPerson)
+            }
+            engine.setInput(input: play.input(held: held, mouse: mouse))
+        } else {
+            engine.setInput(input: controls.input(held: held, mouse: mouse))
+        }
+        earlierKeys = held
         _ = try? engine.advance(frameSeconds: seconds)
         if controller.showsFrameTimes {
             // (four times a second, so that it can be read)
