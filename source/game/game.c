@@ -182,6 +182,7 @@ struct game_options;
 #include "units/units.h"
 #include "units/vehicles.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "movement_trace.h" /* port: port/linux/game/movement_trace.c */
 #ifdef HALO_PROFILE
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
@@ -392,6 +393,8 @@ void game_tick(
 	fall (port/linux/game/physics_jolt.c) */
 	physics_jolt_update(seconds_per_tick);
 	profile_scope(game_tick_players_after_section, players_update_after_game();)
+	/* port: debug.movement_trace logs the player's biped */
+	movement_trace_update();
 	profile_scope(game_tick_hud_section, hud_update();)
 	profile_scope(game_tick_player_effect_section, player_effect_update();)
 	/* port: and at its end, before the frame draws the lights */

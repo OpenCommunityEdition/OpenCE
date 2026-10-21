@@ -529,6 +529,10 @@ static const struct config_setting config_settings[] =
 		"Sentry project (port/windows/src/win32_crash.c): \"yes\" sends them, \"no\"\n"
 		"never does, \"ask\" asks at the next crash and writes the answer here." },
 
+	{ "debug.movement_trace", _config_string, "\"\"", "HALO_MOVEMENT_TRACE", _environment_value, _platform_all,
+		"A script of inputs the first player plays, with their biped logged each tick,\n"
+		"for the native engine's reference traces (port/linux/game/movement_trace.c):\n"
+		"run, strafe, jump, runjump, crouch, fall or ramp; empty for none" },
 	{ "debug.network_test", _config_string, "\"\"", "HALO_NETWORK_TEST", _environment_value, _platform_all,
 		"Automated system link sessions for testing (port/linux/game/network_test.c):\n"
 		"\"host:<map>\" hosts a game on that map, \"join\" joins the first game found,\n"

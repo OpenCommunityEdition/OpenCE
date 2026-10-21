@@ -211,6 +211,7 @@ symbols in this file:
 
 #include "real_math.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "movement_trace.h" /* port: port/linux/game/movement_trace.c */
 
 /* ---------- constants */
 
@@ -1599,6 +1600,10 @@ static void get_local_player_input_blob(
 		}
 	}
 
+	/* port: debug.movement_trace's scripted inputs (the native engine's
+	reference traces) */
+	movement_trace_input(local_player_index, &input->throttle, &input->facing_delta,
+		&input->unit_control_flags);
 	player_control_action_test_check_reset_input_blob(input);
 	match_assert_valid_real(
 		"c:\\halo\\SOURCE\\game\\player_control.c",
