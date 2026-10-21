@@ -114,9 +114,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Vehicles' (Protocol in workflow.md)
 
 ## Phase 6: Multiplayer
-- [ ] Task: Game types
-    - [ ] Write tests: Slayer and CTF rules (scores, flag pickup, return and capture, respawn timers, the end of the game) in a simulated world
-    - [ ] Game-type systems, the multiplayer scenario data (spawns, flags, netgame equipment)
+- [x] Task: Game types 8eb85a2f
+    - [x] Write tests: Slayer and CTF rules (scores, flag pickup, return and capture, respawn timers, the end of the game) in a simulated world
+    - [x] Game-type systems, the multiplayer scenario data (spawns, flags, netgame equipment)
 - [ ] Task: The packet format
     - [ ] Write tests: snapshots and inputs encode and decode; delta compression against an acknowledged snapshot; bad sizes, indices and rates are refused; a fuzz target for the decoder
     - [ ] `net`: the protocol and its version, packets, delta compression
