@@ -7,16 +7,19 @@
 //! own types cross into `ffi`, which turns them into the snapshot; Swift
 //! never sees the world.
 
+pub mod animation;
 pub mod clock;
 pub mod hash;
 pub mod input;
 pub mod objects;
+pub mod random;
 pub mod units;
 
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::SingleThreadedExecutor;
 pub use glam::{Quat, Vec3};
 
+use animation::{AnimationPlayer, NodeMatrices};
 use hash::WorldHasher;
 use input::{Buttons, InputRecord, TickInput};
 use objects::{
@@ -151,13 +154,14 @@ impl Simulation {
         world.insert_resource(CurrentInput::default());
         world.insert_resource(ObjectTable::default());
         world.insert_resource(ObjectKinds::default());
+        world.insert_resource(random::RandomSeed::default());
         let mut schedule = Schedule::default();
         // (one thread: systems in parallel would be ordered by chance)
         schedule.set_executor(SingleThreadedExecutor::new());
         schedule.configure_sets((SimSet::Input, SimSet::Simulate, SimSet::Finish).chain());
         schedule.add_systems((
-            look_free_camera.in_set(SimSet::Input),
-            move_free_camera.in_set(SimSet::Simulate),
+            (look_free_camera, remember_transforms).in_set(SimSet::Input),
+            (move_free_camera, animation::play_animations).in_set(SimSet::Simulate),
             (place_camera, advance_tick).chain().in_set(SimSet::Finish),
         ));
         Self { world, schedule }
@@ -221,6 +225,54 @@ impl Simulation {
         objects::spawn_scenario(&mut self.world, scenario, difficulty)
     }
 
+    /// Plays `player` on an object, posing its nodes now; false if `handle`
+    /// is not in the world.
+    pub fn animate(&mut self, handle: ObjectHandle, player: AnimationPlayer) -> bool {
+        let Some(entity) = self
+            .world
+            .get_resource::<ObjectTable>()
+            .and_then(|table| table.entity(handle))
+        else {
+            return false;
+        };
+        let Ok(mut object) = self.world.get_entity_mut(entity) else {
+            return false;
+        };
+        let transform = object.get::<Transform>().copied().unwrap_or_default();
+        let current = player.matrices(&transform);
+        object.insert((
+            player,
+            NodeMatrices {
+                previous: current.clone(),
+                current,
+            },
+        ));
+        true
+    }
+
+    /// Each object as the renderer draws it, in the order of their ids: its
+    /// id, where it was at the tick before the last and at the last, and
+    /// its nodes if it is animated.
+    pub fn visit_drawn(
+        &mut self,
+        mut visit: impl FnMut(ObjectId, &Transform, &Transform, Option<&NodeMatrices>),
+    ) {
+        let mut objects: Vec<_> = self
+            .world
+            .query::<(
+                &ObjectId,
+                &Transform,
+                Option<&PreviousTransform>,
+                Option<&NodeMatrices>,
+            )>()
+            .iter(&self.world)
+            .collect();
+        objects.sort_by_key(|(id, ..)| **id);
+        for (id, transform, previous, nodes) in objects {
+            visit(*id, previous.map_or(transform, |p| &p.0), transform, nodes);
+        }
+    }
+
     /// Removes an object; false if `handle` is not in the world.
     pub fn remove(&mut self, handle: ObjectHandle) -> bool {
         objects::remove(&mut self.world, handle)
@@ -266,11 +318,16 @@ impl Simulation {
 
     /// A hash of the world's state: the tick, the camera, and every
     /// object in the order of their ids: its transform, kind, tag, name,
-    /// permutation and team.
+    /// permutation, team and animation, and the random seed.
     pub fn world_hash(&mut self) -> u64 {
         let mut hasher = WorldHasher::default();
         hasher.u64(self.tick().0);
         self.camera().transform.hash(&mut hasher);
+        hasher.u64(u64::from(
+            self.world
+                .get_resource::<random::RandomSeed>()
+                .map_or(0, |seed| seed.0),
+        ));
         let mut objects: Vec<_> = self
             .world
             .query::<(
@@ -280,11 +337,12 @@ impl Simulation {
                 Option<&ObjectName>,
                 Option<&Permutation>,
                 Option<&Team>,
+                Option<&AnimationPlayer>,
             )>()
             .iter(&self.world)
             .collect();
         objects.sort_by_key(|(id, ..)| **id);
-        for (id, transform, object, name, permutation, team) in objects {
+        for (id, transform, object, name, permutation, team, player) in objects {
             hasher.u64(u64::from(id.0));
             transform.hash(&mut hasher);
             hasher.u64(kind_index(object.kind) as u64);
@@ -310,8 +368,26 @@ impl Simulation {
                 None => hasher.u64(0),
             }
             hasher.u64(team.map_or(u64::MAX, |team| u64::from(team.0)));
+            match player {
+                Some(player) => {
+                    hasher.u64(1 + u64::from(player.state.animation));
+                    hasher.u64(u64::from(player.state.frame));
+                }
+                None => hasher.u64(0),
+            }
         }
         hasher.finish()
+    }
+}
+
+/// Where an object was at the tick before: the renderer interpolates from
+/// it to its [`Transform`].
+#[derive(Component, Clone, Copy, Debug, PartialEq)]
+pub struct PreviousTransform(pub Transform);
+
+fn remember_transforms(mut objects: Query<(&Transform, &mut PreviousTransform)>) {
+    for (transform, mut previous) in &mut objects {
+        previous.0 = *transform;
     }
 }
 
@@ -444,7 +520,7 @@ mod tests {
         // out of order) is what this catches.
         assert_eq!(replayed_hash(&recorded_inputs(3600)), PINNED_HASH);
     }
-    const PINNED_HASH: u64 = 0xbc8b_00f3_898b_e015;
+    const PINNED_HASH: u64 = 0x0101_d70d_de3d_1b7f;
 
     #[test]
     fn one_different_input_changes_the_hash() {

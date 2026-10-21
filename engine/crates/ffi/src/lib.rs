@@ -13,12 +13,13 @@ pub mod snapshot;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use opence_sim::animation;
 use opence_sim::clock::Clock;
 use opence_sim::input::{Buttons, TickInput};
 use opence_sim::units::Radians;
 use opence_sim::{FreeCamera, Simulation};
 use render_level::{RenderDraw, RenderLevel, RenderMaterial, RenderTexture, VERTEX_STRIDE};
-use snapshot::{CameraSnapshot, SnapshotBuffers, SnapshotWriter};
+use snapshot::{CameraSnapshot, NodeSnapshot, ObjectSnapshot, SnapshotBuffers, SnapshotWriter};
 
 uniffi::setup_scaffolding!();
 
@@ -397,6 +398,17 @@ fn transform(from: &opence_sim::Transform) -> snapshot::Transform {
     }
 }
 
+fn node_matrix(from: &animation::NodeMatrix) -> snapshot::NodeMatrix {
+    let vector = |[x, y, z]: [f32; 3]| snapshot::Vec3 { x, y, z };
+    snapshot::NodeMatrix {
+        forward: vector(from.forward),
+        left: vector(from.left),
+        up: vector(from.up),
+        position: vector(from.position),
+        scale: from.scale,
+    }
+}
+
 fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError> {
     let State { running, input, .. } = state;
     let running = running.as_mut().ok_or(EngineError::NoWorld)?;
@@ -418,12 +430,36 @@ fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) {
     let camera = running.simulation.camera();
     let tick = running.simulation.tick().0;
     let previous = running.previous_camera;
+    let simulation = &mut running.simulation;
     writer.publish(buffers, tick, alpha, |frame| {
         frame.camera(CameraSnapshot {
             previous,
             current: transform(&camera.transform),
             vertical_fov_radians: camera.vertical_fov.0,
             reserved: [0; 3],
+        });
+        let mut nodes = Vec::new();
+        simulation.visit_drawn(|id, previous, current, matrices| {
+            nodes.clear();
+            if let Some(matrices) = matrices {
+                nodes.extend(matrices.current.iter().enumerate().map(|(at, current)| {
+                    NodeSnapshot {
+                        previous: node_matrix(matrices.previous.get(at).unwrap_or(current)),
+                        current: node_matrix(current),
+                    }
+                }));
+            }
+            // (a full snapshot draws the objects that fit)
+            let _ = frame.push_animated(
+                ObjectSnapshot {
+                    id: id.0,
+                    model: u32::MAX,
+                    previous: transform(previous),
+                    current: transform(current),
+                    ..Default::default()
+                },
+                &nodes,
+            );
         });
     });
 }

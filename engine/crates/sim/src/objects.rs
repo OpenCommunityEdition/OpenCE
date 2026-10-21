@@ -233,6 +233,7 @@ pub(crate) fn spawn(world: &mut World, spawn: ObjectSpawn) -> Result<ObjectHandl
         handle,
         ObjectId(handle.index),
         spawn.transform,
+        crate::PreviousTransform(spawn.transform),
         Object {
             kind: spawn.kind,
             tag: spawn.tag,

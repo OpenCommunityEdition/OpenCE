@@ -17,6 +17,7 @@ final class ContractTests: XCTestCase {
         let frame = reader.acquire()
         XCTAssertEqual(frame.tick, 2)
         XCTAssertEqual(frame.objects.count, 0)
+        XCTAssertEqual(frame.nodes.count, 0)
         XCTAssertEqual(frame.camera.current.scale, 1)
         XCTAssertGreaterThan(frame.camera.vertical_fov_radians, 1)
     }

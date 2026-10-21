@@ -150,6 +150,8 @@ pub struct Model {
     pub tag: TagRef,
     /// Its flags.
     pub flags: u32,
+    /// The checksum of its nodes, which an animation made for them has.
+    pub node_list_checksum: i32,
     /// The pixel sizes below which each level of detail is drawn, from
     /// super low to super high.
     pub detail_cutoffs: [f32; 5],
@@ -349,8 +351,13 @@ pub struct Animation {
     pub key_frame: i16,
     /// Its second key frame.
     pub second_key_frame: i16,
-    /// The animation played after it, in the graph's.
+    /// The next of its permutations, in the graph's.
     pub next_animation: Option<u16>,
+    /// The first of its permutations, which one is chosen from when it
+    /// ends.
+    pub parent_animation: Option<u16>,
+    /// Where in its permutations' weights its own ends, from 0 to 1.
+    pub normalized_weight: f32,
     /// Its flags (bit 0 compressed, bit 1 world relative, bit 2 at 25 Hz).
     pub flags: u16,
     /// The sound it plays, in the graph's sound references.

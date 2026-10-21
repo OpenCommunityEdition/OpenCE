@@ -376,6 +376,7 @@ pub fn import_model(cache: &Cache, index: usize) -> Result<Model, ImportError> {
     Ok(Model {
         tag: tag_ref(cache, index),
         flags,
+        node_list_checksum: model.i32(4, "node list checksum")?,
         detail_cutoffs,
         base_map_scale: vector(&model, 0x30, "base map scale")?,
         nodes,
@@ -777,6 +778,10 @@ fn import_animation(
         key_frame: animation.i16(0x34, "key frame index")?,
         second_key_frame: animation.i16(0x36, "second key frame index")?,
         next_animation: optional_index(animation, 0x38, "next animation", animations)?,
+        // (worked out when the map was built; a bad one is none, as the
+        // game's permutation choice treats it)
+        parent_animation: index_or_none(animation.i16(0x42, "parent animation")?, animations),
+        normalized_weight: animation.f32(0x44, "normalized weight")?,
         flags,
         sound: optional_index(animation, 0x3C, "sound", sounds)?,
         sound_frame: animation.i16(0x3E, "sound frame index")?,

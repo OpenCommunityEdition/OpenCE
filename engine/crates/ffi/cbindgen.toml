@@ -7,7 +7,7 @@ style = "type"
 cpp_compat = true
 
 [export]
-include = ["FrameSnapshot", "ObjectSnapshot", "CameraSnapshot", "Transform", "Vec3", "Quat"]
+include = ["FrameSnapshot", "ObjectSnapshot", "NodeSnapshot", "NodeMatrix", "CameraSnapshot", "Transform", "Vec3", "Quat"]
 item_types = ["structs", "opaque", "functions", "constants"]
 prefix = "OCE"
 
@@ -20,4 +20,5 @@ parse_deps = false
 [export.rename]
 # (the prefix is added after the rename)
 "MAX_OBJECTS" = "_MAX_OBJECTS"
+"MAX_NODES" = "_MAX_NODES"
 "SNAPSHOT_VERSION" = "_SNAPSHOT_VERSION"

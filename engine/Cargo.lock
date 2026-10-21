@@ -861,6 +861,7 @@ dependencies = [
  "glam 0.34.1",
  "libm",
  "opence_content",
+ "opence_import",
  "thiserror",
 ]
 

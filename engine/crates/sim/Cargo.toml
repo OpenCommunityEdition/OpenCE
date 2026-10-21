@@ -15,3 +15,6 @@ thiserror.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+opence_import.workspace = true
