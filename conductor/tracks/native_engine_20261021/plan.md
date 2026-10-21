@@ -135,9 +135,9 @@
 - [x] Task: Every scenario's scripts 93a84ce8
     - [x] Write tests: pytest (marked, needs `assets/maps`) imports every stock scenario's scripts and lists the functions still missing; the list shrinks to none by the end of the phase
     - [x] The script functions the campaign uses, added system by system
-- [ ] Task: The AI
-    - [ ] Write tests: actors in a fake encounter perceive, take firing positions, fire, take cover, flee and use vehicles; chosen encounters on *The Pillar of Autumn* behave like the reference app's (recorded)
-    - [ ] Encounters, squads, actor types, perception, firing positions, command lists, combat and vehicle use
+- [x] Task: The AI 00724226
+    - [x] Write tests: actors in a fake encounter perceive, take firing positions, fire, take cover, flee and use vehicles; chosen encounters on *The Pillar of Autumn* behave like the reference app's (recorded)
+    - [x] Encounters, squads, actor types, perception, firing positions, command lists, combat and vehicle use
 - [ ] Task: The campaign's flow
     - [ ] Write tests: BSP switches, checkpoints saved and loaded in our own format, cutscenes, difficulties
     - [ ] Campaign flow, saved games, cutscene cameras, the campaign menu
