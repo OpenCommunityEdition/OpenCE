@@ -5,6 +5,8 @@
 
 use std::collections::HashMap;
 
+use crate::render_model::{model_material, RenderModel};
+
 use opence_content::{
     Level, Lightmap, Material, Pixels, ShaderClass, StructureBsp, TagRef, TextureFormat,
 };
@@ -81,6 +83,17 @@ pub struct RenderMaterial {
     pub secondary_detail_map: Option<u32>,
     /// Its scale.
     pub secondary_detail_scale: f32,
+    /// A model shader's multipurpose map: in its red, green, blue and
+    /// alpha, the detail mask's choices, and in its alpha also how much the
+    /// change colour shows (for a model shader whose detail mask uses it).
+    pub multipurpose_map: Option<u32>,
+    /// A model shader's detail mask: 0 none, then which of the
+    /// multipurpose map's channels (or its inverse, odd values from 1)
+    /// mask the detail map.
+    pub detail_mask: u8,
+    /// A model shader's change colour: 0 none, then which of the object's
+    /// four change colours tints it (by the multipurpose map's alpha).
+    pub change_color_source: u8,
 }
 
 /// A draw: a material's triangles.
@@ -145,12 +158,19 @@ pub struct RenderLevel {
     /// The first player start in the BSP (or in any): its position and
     /// facing.
     pub player_start: Option<([f32; 3], f32)>,
+    /// The level's object models' vertices, `MODEL_VERTEX_STRIDE` bytes
+    /// each.
+    pub model_vertices: Vec<u8>,
+    /// Each model triangle's three vertices.
+    pub model_indices: Vec<u32>,
+    /// The level's object models, as `Level::models` orders them.
+    pub models: Vec<RenderModel>,
 }
 
 /// Gathers the level's textures and materials, each once.
-struct Builder<'a> {
+pub(crate) struct Builder<'a> {
     level: &'a Level,
-    out: RenderLevel,
+    pub(crate) out: RenderLevel,
     textures: HashMap<(TagRef, u16), Option<u32>>,
     materials: HashMap<TagRef, Option<u32>>,
 }
@@ -194,6 +214,10 @@ impl RenderLevel {
             }
         }
         builder.out.draws.extend(blended);
+        for model in &level.models {
+            let model = builder.model(model);
+            builder.out.models.push(model);
+        }
         Some(builder.out)
     }
 }
@@ -247,7 +271,7 @@ impl Builder<'_> {
         index
     }
 
-    fn map(&mut self, map: Option<&TagRef>) -> Option<u32> {
+    pub(crate) fn map(&mut self, map: Option<&TagRef>) -> Option<u32> {
         map.and_then(|map| self.texture(map, 0))
     }
 
@@ -258,7 +282,7 @@ impl Builder<'_> {
 
     /// A shader's material, or None for a surface not drawn (one with no
     /// shader: the sky's portals).
-    fn material(&mut self, shader: &TagRef) -> Option<u32> {
+    pub(crate) fn material(&mut self, shader: &TagRef) -> Option<u32> {
         if let Some(&index) = self.materials.get(shader) {
             return index;
         }
@@ -280,6 +304,9 @@ impl Builder<'_> {
                 primary_detail_scale: scale(environment.primary_detail_scale),
                 secondary_detail_map: self.map(environment.secondary_detail_map.as_ref()),
                 secondary_detail_scale: scale(environment.secondary_detail_scale),
+                multipurpose_map: None,
+                detail_mask: 0,
+                change_color_source: 0,
             },
             Some(
                 ShaderClass::TransparentChicago(chicago)
@@ -302,10 +329,14 @@ impl Builder<'_> {
                     primary_detail_scale: 1.0,
                     secondary_detail_map: None,
                     secondary_detail_scale: 1.0,
+                    multipurpose_map: None,
+                    detail_mask: 0,
+                    change_color_source: 0,
                 }
             }
             // (a class not imported yet, or a shader not found: drawn plain
             // and lit, so that the geometry is there)
+            Some(ShaderClass::Model(model)) => model_material(self, model),
             Some(ShaderClass::Other(_)) | None => RenderMaterial {
                 kind: MaterialKind::Opaque,
                 blend: BlendFunction::AlphaBlend,
@@ -318,6 +349,9 @@ impl Builder<'_> {
                 primary_detail_scale: 1.0,
                 secondary_detail_map: None,
                 secondary_detail_scale: 1.0,
+                multipurpose_map: None,
+                detail_mask: 0,
+                change_color_source: 0,
             },
         };
         self.out.materials.push(material);
@@ -388,7 +422,7 @@ impl Builder<'_> {
     }
 }
 
-fn finite(value: f32) -> f32 {
+pub(crate) fn finite(value: f32) -> f32 {
     if value.is_finite() {
         value
     } else {
@@ -397,7 +431,7 @@ fn finite(value: f32) -> f32 {
 }
 
 /// A map's scale: a zero (left unset in the tag) or nonsense is one.
-fn scale(value: f32) -> f32 {
+pub(crate) fn scale(value: f32) -> f32 {
     if value.is_finite() && value != 0.0 {
         value
     } else {
@@ -581,6 +615,9 @@ mod tests {
                     materials,
                 }],
             }],
+            objects: Vec::new(),
+            models: Vec::new(),
+            animation_graphs: Vec::new(),
             shaders: vec![
                 environment("ground", 0),
                 environment("fence", 1),

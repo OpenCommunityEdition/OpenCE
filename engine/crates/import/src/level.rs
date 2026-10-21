@@ -5,16 +5,16 @@
 //! file, which the scenario's reference to it gives the offset, size and
 //! address of, and every address inside it is relative to that address.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use opence_content::level::{
     Bsp2dNode, Bsp2dReference, Bsp3dNode, CollisionEdge, CollisionLeaf, CollisionSurface,
     CollisionVertex,
 };
 use opence_content::{
-    CollisionBsp, CollisionMaterial, EnvironmentVertex, Group, Level, Lightmap, LightmapVertex,
-    Material, ObjectKind, ObjectPlacement, PlacementPermutation, PlayerStart, Scenario,
-    StructureBsp, TagRef,
+    AnimationGraph, CollisionBsp, CollisionMaterial, EnvironmentVertex, Group, Level, Lightmap,
+    LightmapVertex, Material, Model, ObjectDefinition, ObjectKind, ObjectPlacement,
+    PlacementPermutation, PlayerStart, Scenario, StructureBsp, TagRef,
 };
 
 use crate::cache::Cache;
@@ -148,6 +148,10 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         structure_bsps.push(import_structure_bsp(cache, &element, index, &mut reached)?);
     }
 
+    let placements = import_placements(&scenario)?;
+    let (objects, models, animation_graphs) =
+        import_placed_objects(cache, &placements, &mut reached)?;
+
     // (a shader's extra layers are shaders too, reached as each is read)
     let mut shaders = Vec::new();
     let mut imported = BTreeSet::new();
@@ -184,8 +188,6 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         player_starts.push(import_player_start(&element, structure_bsps.len())?);
     }
 
-    let placements = import_placements(&scenario)?;
-
     let level = Level {
         scenario: Scenario {
             path: scenario.instance().name.clone(),
@@ -194,12 +196,86 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
             placements,
         },
         structure_bsps,
+        objects,
+        models,
+        animation_graphs,
         shaders,
         bitmaps,
         resource_bitmaps,
     };
     check_lightmap_pages(&level)?;
     Ok(level)
+}
+
+/// A tag's index, by its reference: the first tag of its group (or one
+/// derived from it) with its path.
+pub(crate) fn tag_index(cache: &Cache, tag: &TagRef) -> Option<usize> {
+    let group = GroupTag::new(&tag.group.0);
+    cache
+        .tags()
+        .iter()
+        .position(|instance| instance.is(group) && instance.name == tag.path)
+}
+
+/// The placed objects' definitions, and the models and animation graphs
+/// they name.
+type PlacedObjects = (Vec<ObjectDefinition>, Vec<Model>, Vec<AnimationGraph>);
+
+/// The definitions of the objects `placements` place, their models (whose
+/// shaders are reached) and their animation graphs, each once, by path.
+fn import_placed_objects(
+    cache: &Cache,
+    placements: &[ObjectPlacement],
+    reached: &mut Reached,
+) -> Result<PlacedObjects, ImportError> {
+    let index = |tag: &TagRef| {
+        tag_index(cache, tag).ok_or_else(|| ImportError::Tag {
+            tag: tag.path.clone(),
+            group: GroupTag::new(&tag.group.0),
+            field: "the tag".into(),
+            reason: "is referred to but not in the map".into(),
+        })
+    };
+    let mut objects = BTreeMap::new();
+    let mut models = BTreeMap::new();
+    let mut graphs = BTreeMap::new();
+    for placement in placements {
+        if objects.contains_key(&placement.tag) {
+            continue;
+        }
+        let object = crate::object::import_object(cache, index(&placement.tag)?)?;
+        if let Some(tag) = object
+            .model
+            .as_ref()
+            .filter(|tag| !models.contains_key(*tag))
+        {
+            let model = crate::object::import_model(cache, index(tag)?)?;
+            for shader in model
+                .shaders
+                .iter()
+                .filter_map(|shader| shader.shader.as_ref())
+            {
+                reached.shaders.insert(index(shader)?);
+            }
+            models.insert(tag.clone(), model);
+        }
+        if let Some(tag) = object
+            .animation_graph
+            .as_ref()
+            .filter(|tag| !graphs.contains_key(*tag))
+        {
+            graphs.insert(
+                tag.clone(),
+                crate::object::import_animation_graph(cache, index(tag)?)?,
+            );
+        }
+        objects.insert(placement.tag.clone(), object);
+    }
+    Ok((
+        objects.into_values().collect(),
+        models.into_values().collect(),
+        graphs.into_values().collect(),
+    ))
 }
 
 /// A player starting location: its position, facing and BSP (-1 for any).
@@ -1177,6 +1253,18 @@ pub(crate) mod tests {
         fake
     }
 
+    /// An object of `kind` with no model or graph: nothing else to import.
+    fn object_tag(fake: &mut FakeCache, group: &[u8; 4], kind: u16, name: &str) -> usize {
+        let mut object = vec![0u8; crate::object::OBJECT_SIZE];
+        put(&mut object, 0, &kind.to_le_bytes());
+        for at in [0x28, 0x38, 0x70, 0x80, 0x90, 0xA0] {
+            empty(&mut object, at);
+        }
+        let index = fake.add_tag(GroupTag::new(group), name, &object);
+        fake.set_parent(index, crate::object::OBJE);
+        index
+    }
+
     /// Two object names; a scenery palette of a rock and an empty entry,
     /// with three placements (the rock, named and colored; one of the
     /// empty entry; one past the palette); and a weapon-less equipment
@@ -1188,7 +1276,7 @@ pub(crate) mod tests {
         let names = fake.add_data(&names);
         block(scenario, SCENARIO_OBJECT_NAMES_OFFSET, 2, names);
 
-        let rock = fake.add_tag(GroupTag::new(b"scen"), "scenery\\rock", &[0u8; 4]);
+        let rock = object_tag(fake, b"scen", 6, "scenery\\rock");
         let mut palette = vec![0u8; PALETTE_ENTRY_SIZE * 2];
         reference(&mut palette, 0, GroupTag::new(b"scen"), fake.handle(rock));
         empty(&mut palette, PALETTE_ENTRY_SIZE);
@@ -1216,7 +1304,7 @@ pub(crate) mod tests {
         let scenery = fake.add_data(&scenery);
         block(scenario, 0x210, 3, scenery);
 
-        let pack = fake.add_tag(GroupTag::new(b"eqip"), "powerups\\pack", &[0u8; 4]);
+        let pack = object_tag(fake, b"eqip", 3, "powerups\\pack");
         let mut palette = vec![0u8; PALETTE_ENTRY_SIZE];
         reference(&mut palette, 0, GroupTag::new(b"eqip"), fake.handle(pack));
         let palette = fake.add_data(&palette);

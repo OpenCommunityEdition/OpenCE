@@ -144,6 +144,21 @@ pub struct Simulation {
     schedule: Schedule,
 }
 
+/// An object as the renderer draws it.
+#[derive(Clone, Copy, Debug)]
+pub struct Drawn<'a> {
+    /// Its id.
+    pub id: ObjectId,
+    /// Where it was at the tick before the last.
+    pub previous: &'a Transform,
+    /// Where it was at the last tick.
+    pub current: &'a Transform,
+    /// Its nodes, if it is animated.
+    pub nodes: Option<&'a NodeMatrices>,
+    /// How it is drawn, if it has been told.
+    pub appearance: Option<&'a objects::Appearance>,
+}
+
 impl Simulation {
     /// A world with nothing in it but the free camera.
     pub fn empty() -> Self {
@@ -250,13 +265,8 @@ impl Simulation {
         true
     }
 
-    /// Each object as the renderer draws it, in the order of their ids: its
-    /// id, where it was at the tick before the last and at the last, and
-    /// its nodes if it is animated.
-    pub fn visit_drawn(
-        &mut self,
-        mut visit: impl FnMut(ObjectId, &Transform, &Transform, Option<&NodeMatrices>),
-    ) {
+    /// Each object as the renderer draws it, in the order of their ids.
+    pub fn visit_drawn(&mut self, mut visit: impl FnMut(Drawn<'_>)) {
         let mut objects: Vec<_> = self
             .world
             .query::<(
@@ -264,13 +274,40 @@ impl Simulation {
                 &Transform,
                 Option<&PreviousTransform>,
                 Option<&NodeMatrices>,
+                Option<&objects::Appearance>,
             )>()
             .iter(&self.world)
             .collect();
         objects.sort_by_key(|(id, ..)| **id);
-        for (id, transform, previous, nodes) in objects {
-            visit(*id, previous.map_or(transform, |p| &p.0), transform, nodes);
+        for (id, transform, previous, nodes, appearance) in objects {
+            visit(Drawn {
+                id: *id,
+                previous: previous.map_or(transform, |p| &p.0),
+                current: transform,
+                nodes,
+                appearance,
+            });
         }
+    }
+
+    /// Sets how an object is drawn; false if `handle` is not in the world.
+    pub fn set_appearance(
+        &mut self,
+        handle: ObjectHandle,
+        appearance: objects::Appearance,
+    ) -> bool {
+        let Some(entity) = self
+            .world
+            .get_resource::<ObjectTable>()
+            .and_then(|table| table.entity(handle))
+        else {
+            return false;
+        };
+        let Ok(mut object) = self.world.get_entity_mut(entity) else {
+            return false;
+        };
+        object.insert(appearance);
+        true
     }
 
     /// Removes an object; false if `handle` is not in the world.

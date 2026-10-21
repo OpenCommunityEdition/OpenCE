@@ -158,6 +158,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let device = controller.window.engineView.device else { fail("no Metal device") }
         let loaded = try LoadedLevel(map: map, bsp: bsp, cacheFolder: cacheFolder(), device: device,
                                      settings: settings)
+        // (the scenario's objects, at Normal, standing still)
+        _ = try engine.startLevel(geometry: loaded.geometry, difficulty: 1)
         try engine.placeCamera(placement: loaded.start)
         level = loaded
         controller.window.title = "OpenCE Engine — \(URL(fileURLWithPath: map).deletingPathExtension().lastPathComponent)"
@@ -238,8 +240,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let frame = snapshots.acquire()
         let camera = ViewCamera(frame.camera, alpha: frame.alpha)
+        let objects = frame.drawnObjects()
         controller.window.engineView.render { commands, target in
-            renderer.encode(into: commands, target: target, camera: camera)
+            renderer.encode(into: commands, target: target, camera: camera, objects: objects)
         }
     }
 }

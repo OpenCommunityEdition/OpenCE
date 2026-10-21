@@ -28,6 +28,7 @@ public func checkSnapshotLayout() throws {
         ("ObjectSnapshot size", layout.objectSize, MemoryLayout<OCEObjectSnapshot>.size),
         ("ObjectSnapshot.current", layout.objectCurrentOffset, MemoryLayout<OCEObjectSnapshot>.offset(of: \.current)),
         ("ObjectSnapshot.first_node", layout.objectFirstNodeOffset, MemoryLayout<OCEObjectSnapshot>.offset(of: \.first_node)),
+        ("ObjectSnapshot.bounding_radius", layout.objectBoundingRadiusOffset, MemoryLayout<OCEObjectSnapshot>.offset(of: \.bounding_radius)),
         ("Transform size", layout.transformSize, MemoryLayout<OCETransform>.size),
         ("NodeSnapshot size", layout.nodeSize, MemoryLayout<OCENodeSnapshot>.size),
     ]

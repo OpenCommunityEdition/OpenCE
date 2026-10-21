@@ -25,8 +25,9 @@ pub enum ShaderClass {
     /// Transparent chicago surfaces with a second set of maps for two
     /// texture stages (`scex`).
     TransparentChicagoExtended(TransparentChicagoShader),
-    /// A class not imported yet (`soso`, `sotr`, `sgla`, `smet`, `spla`,
-    /// `swat`).
+    /// An object's model's surfaces (`soso`).
+    Model(ModelShaderClass),
+    /// A class not imported yet (`sotr`, `sgla`, `smet`, `spla`, `swat`).
     Other(Group),
 }
 
@@ -85,6 +86,36 @@ pub struct EnvironmentShader {
     pub reflection_parallel_brightness: f32,
     /// The reflection's cube map.
     pub reflection_cube_map: Option<TagRef>,
+}
+
+/// A model shader (`soso`): a base map, a multipurpose map whose channels
+/// mask the specular reflection, self-illumination, change colour and
+/// detail, and a detail map.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ModelShaderClass {
+    /// Its flags (detail after reflection, two-sided, not alpha tested,
+    /// alpha-blended decal, true atmospheric fog, disable two-sided culling).
+    pub flags: u16,
+    /// How translucent it is.
+    pub translucency: f32,
+    /// Which of the object's change colours tints it (0: none).
+    pub change_color_source: i16,
+    /// The base map's scale in u and v (0: one).
+    pub map_scale: [f32; 2],
+    /// The base map.
+    pub base_map: Option<TagRef>,
+    /// The multipurpose map.
+    pub multipurpose_map: Option<TagRef>,
+    /// How the detail map combines with the base.
+    pub detail_function: i16,
+    /// Which of the multipurpose map's channels masks the detail map.
+    pub detail_mask: i16,
+    /// The detail map's scale in u, and in v when that is zero.
+    pub detail_map_scale: f32,
+    /// The detail map.
+    pub detail_map: Option<TagRef>,
+    /// The detail map's scale in v (0: as in u).
+    pub detail_map_v_scale: f32,
 }
 
 /// A transparent chicago shader (`schi`, `scex`).

@@ -883,6 +883,38 @@ pub struct AnimationPlayer {
     links: Arc<[AnimationNode]>,
 }
 
+/// The animation an object stands still with: for a unit, its standing
+/// seat's (else its first seat's) unarmed (else first) weapon class's
+/// idle; for anything else, or a unit whose graph has none, the graph's
+/// first.
+pub fn standing_animation(graph: &AnimationGraph, unit: bool) -> u16 {
+    /// `_unit_weapon_class_animation_idle`.
+    const IDLE: usize = 0;
+    let idle = || {
+        let seat = graph
+            .unit_seats
+            .iter()
+            .find(|seat| seat.label == "stand")
+            .or(graph.unit_seats.first())?;
+        let class = seat
+            .weapon_classes
+            .iter()
+            .find(|class| class.label == "unarmed")
+            .or(seat.weapon_classes.first())?;
+        class
+            .animations
+            .get(IDLE)
+            .copied()
+            .flatten()
+            .filter(|&animation| usize::from(animation) < graph.animations.len())
+    };
+    if unit {
+        idle().unwrap_or(0)
+    } else {
+        0
+    }
+}
+
 impl AnimationPlayer {
     /// Plays `animation` of `graph` from its first frame, posing `model`.
     pub fn new(graph: Arc<AnimationGraph>, model: Option<Arc<Model>>, animation: u16) -> Self {
@@ -1043,6 +1075,8 @@ mod tests {
             translation: [1.0, 2.0, 3.0],
             rotation: [0.0, 0.0, 0.6, 0.8],
             distance_from_parent: 0.0,
+            default_inverse_scale: 1.0,
+            default_inverse: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0; 3]],
         };
         Model {
             tag: TagRef {
@@ -1200,6 +1234,41 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_unit_stands_in_its_unarmed_idle() {
+        use opence_content::{UnitSeat, WeaponClass};
+        let class = |label: &str, idle: Option<u16>| WeaponClass {
+            label: label.into(),
+            animations: vec![idle, Some(0)],
+            weapon_types: Vec::new(),
+        };
+        let seat = |label: &str, classes: Vec<WeaponClass>| UnitSeat {
+            label: label.into(),
+            animations: Vec::new(),
+            weapon_classes: classes,
+        };
+        let mut graph = graph(vec![animation(1); 4]);
+        graph.unit_seats = vec![
+            seat("crouch", vec![class("unarmed", Some(1))]),
+            seat(
+                "stand",
+                vec![class("pistol", Some(2)), class("unarmed", Some(3))],
+            ),
+        ];
+        assert_eq!(standing_animation(&graph, true), 3);
+        // (scenery plays its first, whatever seats its graph has)
+        assert_eq!(standing_animation(&graph, false), 0);
+        // (no standing seat: the first; no unarmed class: the first)
+        graph.unit_seats.remove(1);
+        graph.unit_seats[0].weapon_classes[0].label = "rifle".into();
+        assert_eq!(standing_animation(&graph, true), 1);
+        // (an idle past the graph's animations, or none, is its first)
+        graph.unit_seats[0].weapon_classes[0].animations[0] = Some(9);
+        assert_eq!(standing_animation(&graph, true), 0);
+        graph.unit_seats.clear();
+        assert_eq!(standing_animation(&graph, true), 0);
+    }
+
     fn spawned(simulation: &mut crate::Simulation, x: f32) -> Option<crate::objects::ObjectHandle> {
         simulation
             .spawn(crate::objects::ObjectSpawn {
@@ -1277,8 +1346,12 @@ mod tests {
                 }
             }
             let mut drawn = Vec::new();
-            simulation.visit_drawn(|id, _, current, nodes| {
-                drawn.push((id, current.position.x, nodes.map(|n| n.current.len())));
+            simulation.visit_drawn(|object| {
+                drawn.push((
+                    object.id,
+                    object.current.position.x,
+                    object.nodes.map(|n| n.current.len()),
+                ));
             });
             (states, drawn, simulation.world_hash())
         };

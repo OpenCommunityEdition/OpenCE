@@ -8,17 +8,21 @@
 #![allow(unsafe_code)]
 
 pub mod render_level;
+pub mod render_model;
 pub mod snapshot;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use opence_sim::animation;
+use opence_content::ObjectKind;
+use opence_sim::animation::{self, AnimationPlayer};
 use opence_sim::clock::Clock;
 use opence_sim::input::{Buttons, TickInput};
+use opence_sim::objects::{Appearance, Difficulty, Object, Permutation};
 use opence_sim::units::Radians;
 use opence_sim::{FreeCamera, Simulation};
 use render_level::{RenderDraw, RenderLevel, RenderMaterial, RenderTexture, VERTEX_STRIDE};
+use render_model::{RenderModel, MODEL_VERTEX_STRIDE};
 use snapshot::{CameraSnapshot, NodeSnapshot, ObjectSnapshot, SnapshotBuffers, SnapshotWriter};
 
 uniffi::setup_scaffolding!();
@@ -70,6 +74,7 @@ pub struct CameraPlacement {
 #[derive(uniffi::Object)]
 pub struct LevelGeometry {
     level: RenderLevel,
+    content: Arc<opence_content::Level>,
 }
 
 #[uniffi::export]
@@ -84,7 +89,10 @@ impl LevelGeometry {
         )?;
         let level = RenderLevel::build(&loaded.level, bsp as usize)
             .ok_or(EngineError::NoBsp { index: bsp })?;
-        Ok(Arc::new(Self { level }))
+        Ok(Arc::new(Self {
+            level,
+            content: Arc::new(loaded.level),
+        }))
     }
 
     /// The bytes of one vertex.
@@ -136,6 +144,32 @@ impl LevelGeometry {
             .unwrap_or_default()
     }
 
+    /// The bytes of one model vertex.
+    pub fn model_vertex_stride(&self) -> u32 {
+        MODEL_VERTEX_STRIDE as u32
+    }
+
+    /// The object models' vertices: position, normal and texture
+    /// coordinates as little-endian floats, then the two nodes each moves
+    /// with (16-bit) and their weights (floats).
+    pub fn model_vertices(&self) -> Vec<u8> {
+        self.level.model_vertices.clone()
+    }
+
+    /// The object models' indices, as little-endian 32-bit integers.
+    pub fn model_indices(&self) -> Vec<u8> {
+        self.level
+            .model_indices
+            .iter()
+            .flat_map(|index| index.to_le_bytes())
+            .collect()
+    }
+
+    /// The object models, which the snapshot's objects name by index.
+    pub fn models(&self) -> Vec<RenderModel> {
+        self.level.models.clone()
+    }
+
     /// The BSP's bounds: least and greatest x, then y, then z.
     pub fn bounds(&self) -> Vec<f32> {
         self.level.bounds.iter().flatten().copied().collect()
@@ -150,6 +184,18 @@ impl LevelGeometry {
             None => start_view(self.level.bounds),
         }
     }
+}
+
+/// The permutation each region of `model` is drawn with: the placement's,
+/// if the region has it, else its first.
+fn region_permutations(model: &opence_content::Model, placed: [u8; 8]) -> [u8; 8] {
+    let mut regions = [0u8; 8];
+    for (at, region) in model.regions.iter().take(8).enumerate() {
+        if usize::from(placed[at]) < region.permutations.len() {
+            regions[at] = placed[at];
+        }
+    }
+    regions
 }
 
 /// How far a standing player's eyes are above their feet, in world units
@@ -301,6 +347,82 @@ impl Engine {
         publish(&mut state, &self.snapshots, 0.0);
     }
 
+    /// Starts a world of `geometry`'s level: every object its scenario
+    /// places at `difficulty` (0 easy to 3 legendary), each drawn with its
+    /// model and standing still in its idle animation; publishes its first
+    /// snapshot. Returns the objects made.
+    pub fn start_level(
+        &self,
+        geometry: Arc<LevelGeometry>,
+        difficulty: u8,
+    ) -> Result<u32, EngineError> {
+        let level = &geometry.content;
+        let difficulty = match difficulty {
+            0 => Difficulty::Easy,
+            1 => Difficulty::Normal,
+            2 => Difficulty::Hard,
+            _ => Difficulty::Legendary,
+        };
+        let mut simulation = Simulation::empty();
+        let handles = simulation
+            .spawn_scenario(&level.scenario, difficulty)
+            .map_err(|_| EngineError::Load {
+                message: "the scenario places more objects than the world holds".into(),
+            })?;
+        let models: Vec<Arc<opence_content::Model>> =
+            level.models.iter().cloned().map(Arc::new).collect();
+        let mut graphs = std::collections::HashMap::new();
+        for &handle in &handles {
+            let Some(object) = simulation.component::<Object>(handle) else {
+                continue;
+            };
+            let Some(definition) = level.object(&object.tag) else {
+                continue;
+            };
+            let model = definition
+                .model
+                .as_ref()
+                .and_then(|model| level.model_index(model));
+            if let Some(model) = model {
+                let permutation = simulation
+                    .component::<Permutation>(handle)
+                    .map(|permutation| permutation.0.region_permutations)
+                    .unwrap_or_default();
+                simulation.set_appearance(
+                    handle,
+                    Appearance {
+                        model: model as u32,
+                        radius_bits: definition.bounding_radius.to_bits(),
+                        regions: region_permutations(&level.models[model], permutation),
+                    },
+                );
+            }
+            let Some(graph) = definition.animation_graph.as_ref() else {
+                continue;
+            };
+            let graph = graphs
+                .entry(graph.clone())
+                .or_insert_with(|| level.animation_graph(graph).cloned().map(Arc::new))
+                .clone();
+            if let Some(graph) = graph {
+                let unit = matches!(object.kind, ObjectKind::Biped | ObjectKind::Vehicle);
+                let animation = animation::standing_animation(&graph, unit);
+                let model = model.map(|model| models[model].clone());
+                simulation.animate(handle, AnimationPlayer::new(graph, model, animation));
+            }
+        }
+        let count = handles.len() as u32;
+        let mut state = self.lock();
+        let previous_camera = transform(&simulation.camera().transform);
+        state.running = Some(Running {
+            simulation,
+            previous_camera,
+            clock: Clock::default(),
+        });
+        publish(&mut state, &self.snapshots, 0.0);
+        Ok(count)
+    }
+
     /// Puts the free camera at `placement`, as if it had always been there
     /// (no interpolation from where it was).
     pub fn place_camera(&self, placement: CameraPlacement) -> Result<(), EngineError> {
@@ -439,9 +561,9 @@ fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) {
             reserved: [0; 3],
         });
         let mut nodes = Vec::new();
-        simulation.visit_drawn(|id, previous, current, matrices| {
+        simulation.visit_drawn(|object| {
             nodes.clear();
-            if let Some(matrices) = matrices {
+            if let Some(matrices) = object.nodes {
                 nodes.extend(matrices.current.iter().enumerate().map(|(at, current)| {
                     NodeSnapshot {
                         previous: node_matrix(matrices.previous.get(at).unwrap_or(current)),
@@ -452,10 +574,14 @@ fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) {
             // (a full snapshot draws the objects that fit)
             let _ = frame.push_animated(
                 ObjectSnapshot {
-                    id: id.0,
-                    model: u32::MAX,
-                    previous: transform(previous),
-                    current: transform(current),
+                    id: object.id.0,
+                    model: object.appearance.map_or(u32::MAX, |look| look.model),
+                    previous: transform(object.previous),
+                    current: transform(object.current),
+                    bounding_radius: object
+                        .appearance
+                        .map_or(0.0, |look| f32::from_bits(look.radius_bits)),
+                    regions: object.appearance.map_or([0; 8], |look| look.regions),
                     ..Default::default()
                 },
                 &nodes,
@@ -599,5 +725,142 @@ mod tests {
         assert_eq!(tick.forward, -127);
         assert_eq!(tick.yaw, Radians(0.0));
         assert_eq!(tick.pitch, Radians(std::f32::consts::PI));
+    }
+
+    /// A stock map's first BSP and its objects, or None without game data.
+    fn stock(name: &str) -> Option<Arc<LevelGeometry>> {
+        let maps = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps");
+        let map = maps.join(format!("{name}.map"));
+        if !map.exists() {
+            return None;
+        }
+        let cache = std::env::temp_dir().join("opence-ffi-test-cache");
+        let loaded = LevelGeometry::load(map.display().to_string(), cache.display().to_string(), 0);
+        assert!(loaded.is_ok(), "{name}: {:?}", loaded.as_ref().err());
+        loaded.ok()
+    }
+
+    /// A level's models are whole: every node has its default pose, every
+    /// draw's triangles are in the model buffers, and every permutation's
+    /// geometries are the model's.
+    fn check_models(name: &str, geometry: &LevelGeometry) {
+        let level = &geometry.level;
+        assert!(!level.models.is_empty(), "{name} has no models");
+        let vertex_count = (level.model_vertices.len() / MODEL_VERTEX_STRIDE) as u32;
+        assert_eq!(level.model_vertices.len() % MODEL_VERTEX_STRIDE, 0);
+        assert!(level
+            .model_indices
+            .iter()
+            .all(|&index| index < vertex_count));
+        for (number, model) in level.models.iter().enumerate() {
+            let label = &geometry.content.models[number].tag.path;
+            assert_eq!(model.default_inverses.len(), model.node_count as usize * 13);
+            // (each node's scale is one, and its axes are of length one)
+            for node in model.default_inverses.as_chunks::<13>().0 {
+                assert!((node[0] - 1.0).abs() < 0.01, "{name} {label}: {node:?}");
+                let forward = (node[1] * node[1] + node[2] * node[2] + node[3] * node[3]).sqrt();
+                assert!((forward - 1.0).abs() < 0.01, "{name} {label}: {node:?}");
+            }
+            for geometry in &model.geometries {
+                for part in &geometry.parts {
+                    let end = part.first_index + part.index_count;
+                    assert!(end as usize <= level.model_indices.len());
+                    assert!((part.material as usize) < level.materials.len());
+                }
+            }
+            let drawn = model.regions.iter().all(|region| {
+                region.permutations.iter().all(|permutation| {
+                    permutation
+                        .geometries
+                        .iter()
+                        .flatten()
+                        .all(|&index| (index as usize) < model.geometries.len())
+                })
+            });
+            assert!(drawn, "{name} {label}");
+        }
+    }
+
+    /// A level started in the engine publishes its objects with their
+    /// models, and its units with their nodes.
+    fn check_started(name: &str, geometry: &Arc<LevelGeometry>) {
+        let engine = Engine::new();
+        let made = engine.start_level(geometry.clone(), 3);
+        assert!(matches!(made, Ok(count) if count > 0), "{name}: {made:?}");
+        let _ = engine.step();
+        let frame = acquire(&engine);
+        // SAFETY: the snapshot's objects and nodes are valid while it is.
+        let objects =
+            unsafe { std::slice::from_raw_parts(frame.objects, frame.object_count as usize) };
+        let modelled = objects
+            .iter()
+            .filter(|object| (object.model as usize) < geometry.level.models.len())
+            .count();
+        assert!(modelled > 0, "{name}: no object has a model");
+        // (a radius of zero is the tag's: its model's lowest cutoff is
+        // zero too, and it is drawn at its highest level)
+        assert!(
+            objects
+                .iter()
+                .all(|object| object.bounding_radius.is_finite() && object.bounding_radius >= 0.0),
+            "{name}"
+        );
+        // (a campaign level places bipeds; a multiplayer one may place
+        // nothing with more than its one node)
+        let campaign = name.len() == 3;
+        let animated = objects
+            .iter()
+            .filter(|object| object.node_count > 1)
+            .count();
+        assert!(!campaign || animated > 0, "{name}: nothing is animated");
+    }
+
+    #[test]
+    fn blood_gulch_and_the_pillar_of_autumn_draw_their_objects() {
+        for name in ["bloodgulch", "a10"] {
+            let Some(geometry) = stock(name) else {
+                return; // (no game data here)
+            };
+            check_models(name, &geometry);
+            check_started(name, &geometry);
+        }
+    }
+
+    /// Every stock map (slow: `cargo test --release -- --ignored`).
+    #[test]
+    #[ignore]
+    fn every_stock_map_draws_its_objects() {
+        let names = [
+            "a10",
+            "a30",
+            "a50",
+            "b30",
+            "b40",
+            "c10",
+            "c20",
+            "c40",
+            "d20",
+            "d40",
+            "beavercreek",
+            "bloodgulch",
+            "boardingaction",
+            "carousel",
+            "chillout",
+            "damnation",
+            "hangemhigh",
+            "longest",
+            "prisoner",
+            "putput",
+            "ratrace",
+            "sidewinder",
+            "wizard",
+        ];
+        for name in names {
+            let Some(geometry) = stock(name) else {
+                continue;
+            };
+            check_models(name, &geometry);
+            check_started(name, &geometry);
+        }
     }
 }

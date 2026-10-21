@@ -42,6 +42,20 @@ pub struct ObjectName(pub String);
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Permutation(pub PlacementPermutation);
 
+/// How an object is drawn: its model, the radius its level of detail is
+/// chosen by, and the permutation each of its model's regions is drawn
+/// with. The simulation keeps it for the renderer and never reads it.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Appearance {
+    /// Its model's index in the level's models.
+    pub model: u32,
+    /// Its bounding sphere's radius, as bits (so that the component is
+    /// `Eq`, as the others are).
+    pub radius_bits: u32,
+    /// The permutation of each region.
+    pub regions: [u8; 8],
+}
+
 /// The team an object is on (multiplayer).
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Team(pub u16);

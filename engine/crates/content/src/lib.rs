@@ -23,7 +23,9 @@ pub use object::{
     ModelRegion, ModelShader, ModelVertex, ObjectDefinition, ObjectKind, PathfindingSphere,
     UnitSeat, WeaponClass, WeaponType,
 };
-pub use shader::{ChicagoMap, EnvironmentShader, Shader, ShaderClass, TransparentChicagoShader};
+pub use shader::{
+    ChicagoMap, EnvironmentShader, ModelShaderClass, Shader, ShaderClass, TransparentChicagoShader,
+};
 
 use rkyv::{Archive, Deserialize, Serialize};
 use std::fmt;

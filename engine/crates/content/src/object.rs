@@ -186,6 +186,11 @@ pub struct ModelNode {
     pub rotation: [f32; 4],
     /// How far it is from its parent.
     pub distance_from_parent: f32,
+    /// The scale of the inverse of its matrix at the default pose, which
+    /// takes the model's vertices into the node's space.
+    pub default_inverse_scale: f32,
+    /// That inverse's forward, left and up vectors and its position.
+    pub default_inverse: [[f32; 3]; 4],
 }
 
 /// A named place on a model, once in each region and permutation it is in.

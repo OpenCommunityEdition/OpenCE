@@ -2,7 +2,7 @@
 
 use rkyv::{Archive, Deserialize, Serialize};
 
-use crate::{Bitmap, ObjectKind, Shader, TagRef};
+use crate::{AnimationGraph, Bitmap, Model, ObjectDefinition, ObjectKind, Shader, TagRef};
 
 /// Everything a level's structure is drawn and collided with.
 #[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
@@ -11,7 +11,14 @@ pub struct Level {
     pub scenario: Scenario,
     /// Its structure BSPs, in the scenario's order.
     pub structure_bsps: Vec<StructureBsp>,
-    /// Every shader the BSPs use, and the shaders those layer on, by path.
+    /// The definitions of the objects the scenario places, by path.
+    pub objects: Vec<ObjectDefinition>,
+    /// Their models, by path.
+    pub models: Vec<Model>,
+    /// Their animation graphs, by path.
+    pub animation_graphs: Vec<AnimationGraph>,
+    /// Every shader the BSPs and models use, and the shaders those layer
+    /// on, by path.
     pub shaders: Vec<Shader>,
     /// Every bitmap the BSPs and shaders use, by path.
     pub bitmaps: Vec<Bitmap>,
@@ -24,6 +31,21 @@ impl Level {
     /// A shader, by its tag.
     pub fn shader(&self, tag: &TagRef) -> Option<&Shader> {
         self.shaders.iter().find(|shader| shader.tag == *tag)
+    }
+
+    /// An object definition, by its tag.
+    pub fn object(&self, tag: &TagRef) -> Option<&ObjectDefinition> {
+        self.objects.iter().find(|object| object.tag == *tag)
+    }
+
+    /// A model's index in [`Level::models`], by its tag.
+    pub fn model_index(&self, tag: &TagRef) -> Option<usize> {
+        self.models.iter().position(|model| model.tag == *tag)
+    }
+
+    /// An animation graph, by its tag.
+    pub fn animation_graph(&self, tag: &TagRef) -> Option<&AnimationGraph> {
+        self.animation_graphs.iter().find(|graph| graph.tag == *tag)
     }
 
     /// A bitmap, by its tag.

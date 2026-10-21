@@ -256,6 +256,13 @@ pub fn import_model(cache: &Cache, index: usize) -> Result<Model, ImportError> {
             translation: vector(&node, 0x28, "default translation")?,
             rotation: vector(&node, 0x34, "default rotation")?,
             distance_from_parent: node.f32(0x44, "node distance from parent")?,
+            default_inverse_scale: node.f32(0x68, "default inverse matrix")?,
+            default_inverse: [
+                vector(&node, 0x6C, "default inverse matrix")?,
+                vector(&node, 0x78, "default inverse matrix")?,
+                vector(&node, 0x84, "default inverse matrix")?,
+                vector(&node, 0x90, "default inverse matrix")?,
+            ],
         });
     }
 

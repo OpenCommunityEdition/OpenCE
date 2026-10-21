@@ -1,6 +1,7 @@
 import Foundation
 import Metal
 import OpenCEEngineCore
+import OpenCEEngineKit
 import OpenCEEngineRender
 import simd
 import XCTest
@@ -115,6 +116,8 @@ struct StockLevel {
     let queue: MTLCommandQueue
     let geometry: LevelGeometry
     let camera: ViewCamera
+    /// The scenario's objects, standing still after a tick.
+    let objects: [DrawnObject]
 
     init(map: String) throws {
         let mapURL = Self.root.appendingPathComponent("assets/maps/\(map).map")
@@ -132,6 +135,11 @@ struct StockLevel {
         let start = geometry.startView()
         camera = ViewCamera(position: [start.x, start.y, start.z], yaw: start.yaw, pitch: start.pitch,
                             verticalFov: 70 * .pi / 180)
+        let engine = Engine()
+        let reader = SnapshotReader(engine: engine)
+        _ = try engine.startLevel(geometry: geometry, difficulty: 1)
+        _ = try engine.step()
+        objects = reader.acquire().drawnObjects()
     }
 
     func renderer(_ settings: VideoSettings) throws -> LevelRenderer {
@@ -162,7 +170,7 @@ final class GoldenFrameTests: XCTestCase {
             for (width, height) in Self.sizes {
                 let name = "\(map)_\(antiAliasing.rawValue)_\(width)x\(height).png"
                 let frame = try renderer.capture(width: width, height: height, camera: level.camera, frames: frames,
-                                                 queue: level.queue)
+                                                 objects: level.objects, queue: level.queue)
                 try frame.writePNG(to: out.appendingPathComponent(name))
                 check(frame, name: name)
             }
@@ -299,5 +307,48 @@ final class TemporalTests: XCTestCase {
             XCTAssertEqual(motion.y, was.y - uv.y, accuracy: 2e-3, "texel \(x), \(y)")
             XCTAssertGreaterThan(abs(motion.x), 0.01, "texel \(x), \(y) did not move")
         }
+    }
+}
+
+/// The objects' models: placed where the scenario puts them, skinned by
+/// their nodes and drawn at the level of detail their size chooses.
+final class ModelTests: XCTestCase {
+    func testTheGamesMatrixIsAFourByFour() {
+        let matrix = DrawnObject.matrix(forward: [0, 1, 0], left: [-1, 0, 0], up: [0, 0, 1], position: [5, 6, 7],
+                                        scale: 2)
+        let point = matrix * SIMD4<Float>(1, 0, 0, 1)
+        XCTAssertEqual(SIMD3(point.x, point.y, point.z), [5, 8, 7])
+        let along = matrix * SIMD4<Float>(0, 1, 0, 0)
+        XCTAssertEqual(SIMD3(along.x, along.y, along.z), [-2, 0, 0])
+    }
+
+    func testBloodGulchsObjectsAreDrawn() throws {
+        let level = try StockLevel(map: "bloodgulch")
+        XCTAssertFalse(level.objects.isEmpty)
+        for object in level.objects {
+            XCTAssertTrue(object.radius.isFinite)
+            XCTAssertEqual(object.regions.count, 8)
+        }
+        let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
+        XCTAssertGreaterThan(renderer.modelCount, 0)
+        let without = try renderer.capture(width: 640, height: 360, camera: level.camera, queue: level.queue)
+        XCTAssertEqual(renderer.lastModelPartCount, 0)
+        let with = try renderer.capture(width: 640, height: 360, camera: level.camera, objects: level.objects,
+                                        queue: level.queue)
+        XCTAssertGreaterThan(renderer.lastModelPartCount, 0)
+        let difference = try XCTUnwrap(with.difference(from: without))
+        XCTAssertGreaterThan(difference.share, 0, "the objects changed nothing in the frame")
+    }
+
+    func testAnObjectBehindTheCameraIsNotDrawn() throws {
+        let level = try StockLevel(map: "bloodgulch")
+        let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
+        let behind = level.objects.map { object -> DrawnObject in
+            var moved = object
+            moved.center = level.camera.position - level.camera.rotation.act([1, 0, 0]) * (object.radius + 10)
+            return moved
+        }
+        _ = try renderer.capture(width: 640, height: 360, camera: level.camera, objects: behind, queue: level.queue)
+        XCTAssertEqual(renderer.lastModelPartCount, 0)
     }
 }

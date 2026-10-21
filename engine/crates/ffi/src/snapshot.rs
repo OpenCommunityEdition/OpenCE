@@ -18,7 +18,7 @@ pub const MAX_NODES: usize = 16384;
 
 /// Raised with any change to the snapshot's types, so that the app refuses
 /// a library of another layout.
-pub const SNAPSHOT_VERSION: u32 = 2;
+pub const SNAPSHOT_VERSION: u32 = 3;
 
 /// A vector in world units.
 #[repr(C)]
@@ -120,6 +120,11 @@ pub struct ObjectSnapshot {
     pub previous: Transform,
     /// At the last tick.
     pub current: Transform,
+    /// The radius of its bounding sphere, which its model's level of
+    /// detail is chosen by.
+    pub bounding_radius: f32,
+    /// The permutation each of its model's regions is drawn with.
+    pub regions: [u8; 8],
 }
 
 /// One frame of the world.
@@ -177,6 +182,8 @@ pub struct SnapshotLayout {
     pub object_current_offset: u32,
     /// The offset of `ObjectSnapshot::first_node`.
     pub object_first_node_offset: u32,
+    /// The offset of `ObjectSnapshot::bounding_radius`.
+    pub object_bounding_radius_offset: u32,
     /// The size of `Transform`.
     pub transform_size: u32,
     /// The size of `NodeSnapshot`.
@@ -203,6 +210,7 @@ pub fn snapshot_layout() -> SnapshotLayout {
         object_size: n(size_of::<ObjectSnapshot>()),
         object_current_offset: n(offset_of!(ObjectSnapshot, current)),
         object_first_node_offset: n(offset_of!(ObjectSnapshot, first_node)),
+        object_bounding_radius_offset: n(offset_of!(ObjectSnapshot, bounding_radius)),
         transform_size: n(size_of::<Transform>()),
         node_size: n(size_of::<NodeSnapshot>()),
     }
@@ -384,7 +392,9 @@ mod tests {
         assert_eq!(size_of::<Quat>(), 16);
         assert_eq!(size_of::<Transform>(), 32);
         assert_eq!(size_of::<CameraSnapshot>(), 80);
-        assert_eq!(size_of::<ObjectSnapshot>(), 80);
+        assert_eq!(size_of::<ObjectSnapshot>(), 92);
+        assert_eq!(offset_of!(ObjectSnapshot, bounding_radius), 80);
+        assert_eq!(offset_of!(ObjectSnapshot, regions), 84);
         assert_eq!(offset_of!(ObjectSnapshot, first_node), 12);
         assert_eq!(offset_of!(ObjectSnapshot, current), 48);
         assert_eq!(size_of::<NodeMatrix>(), 52);
@@ -397,7 +407,7 @@ mod tests {
         assert_eq!(offset_of!(FrameSnapshot, nodes), 112);
         assert_eq!(size_of::<FrameSnapshot>(), 120);
         assert_eq!(align_of::<FrameSnapshot>(), 8);
-        assert_eq!(SNAPSHOT_VERSION, 2);
+        assert_eq!(SNAPSHOT_VERSION, 3);
     }
 
     #[test]
@@ -406,7 +416,8 @@ mod tests {
         assert_eq!(layout.frame_size, 120);
         assert_eq!(layout.frame_objects_offset, 104);
         assert_eq!(layout.frame_nodes_offset, 112);
-        assert_eq!(layout.object_size, 80);
+        assert_eq!(layout.object_size, 92);
+        assert_eq!(layout.object_bounding_radius_offset, 80);
         assert_eq!(layout.object_first_node_offset, 12);
         assert_eq!(layout.node_size, 104);
         assert_eq!(layout.max_objects, 4096);

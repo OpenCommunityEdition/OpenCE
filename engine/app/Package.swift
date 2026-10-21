@@ -16,7 +16,7 @@ let package = Package(
                 // (as uniffi-bindgen writes it, for Swift 5's checks)
                 swiftSettings: [.swiftLanguageMode(.v5)]),
         // the app's side of the contract: the engine and its snapshots
-        .target(name: "OpenCEEngineKit", dependencies: ["OpenCEEngineCore", "opence_ffiFFI"]),
+        .target(name: "OpenCEEngineKit", dependencies: ["OpenCEEngineCore", "OpenCEEngineRender", "opence_ffiFFI"]),
         // the window: its Metal layer, display link, mouse capture and keys
         .target(name: "OpenCEEngineWindow"),
         // the renderer: the level's buffers, textures and passes, and frame capture

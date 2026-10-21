@@ -24,7 +24,7 @@ use rkyv::util::AlignedVec;
 use crate::Level;
 
 /// The version of this format; a pack of another is not read.
-pub const FORMAT_VERSION: u32 = 3;
+pub const FORMAT_VERSION: u32 = 4;
 
 const MAGIC: [u8; 4] = *b"OCPK";
 const HEADER_SIZE: usize = 0x28;
@@ -198,6 +198,9 @@ mod tests {
                     }],
                 }],
             }],
+            objects: Vec::new(),
+            models: Vec::new(),
+            animation_graphs: Vec::new(),
             shaders: vec![Shader {
                 tag: shader,
                 material_type: 2,

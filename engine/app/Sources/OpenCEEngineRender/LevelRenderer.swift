@@ -63,6 +63,7 @@ public final class LevelRenderer {
     let opaqueDraws: [Draw]
     let blendedDraws: [Draw]
     let textureCount: Int
+    let models: ModelPass
     private let opaque: MTLRenderPipelineState
     private let blended: [MTLRenderPipelineState]
     private let tone: MTLRenderPipelineState
@@ -94,6 +95,12 @@ public final class LevelRenderer {
 
     /// The draws made (opaque and blended), for tests and the app's log.
     public var drawCount: Int { opaqueDraws.count + blendedDraws.count }
+
+    /// The level's render models.
+    public var modelCount: Int { models.models.count }
+
+    /// The objects' parts drawn in the last frame.
+    public var lastModelPartCount: Int { models.lastPartCount }
 
     public init(device: MTLDevice, geometry: LevelGeometry, outputFormat: MTLPixelFormat = .bgra8Unorm,
                 settings: VideoSettings = VideoSettings()) throws {
@@ -208,6 +215,7 @@ public final class LevelRenderer {
         } catch {
             throw LevelRendererError.shaders("\(error)")
         }
+        models = try ModelPass(device: device, library: library, geometry: geometry, textures: textures, white: white)
 
         // reversed depth: nearer is greater
         let write = MTLDepthStencilDescriptor()
@@ -242,8 +250,10 @@ public final class LevelRenderer {
 
     static let blendFunctions: [BlendFunction] = [.alphaBlend, .multiply, .doubleMultiply, .add]
 
-    /// Draws the level from `camera` into `target` (of `outputFormat`).
-    public func encode(into commands: MTLCommandBuffer, target: MTLTexture, camera: ViewCamera) {
+    /// Draws the level and `objects` from `camera` into `target` (of
+    /// `outputFormat`).
+    public func encode(into commands: MTLCommandBuffer, target: MTLTexture, camera: ViewCamera,
+                       objects: [DrawnObject] = []) {
         let aspect = Float(target.width) / Float(max(target.height, 1))
         let viewProjection = camera.viewProjection(aspect: aspect)
         let shown: MTLTexture
@@ -253,7 +263,7 @@ public final class LevelRenderer {
             let jittered = Jitter.apply(jitter, to: viewProjection, width: temporal.inputWidth,
                                         height: temporal.inputHeight)
             drawLevel(into: commands, frame: temporal.color, depth: temporal.depth, keepDepth: true,
-                      viewProjection: jittered, camera: camera)
+                      viewProjection: jittered, camera: camera, objects: objects)
             var uniforms = temporal.motionUniforms(current: viewProjection)
             let motionPass = MTLRenderPassDescriptor()
             motionPass.colorAttachments[0].texture = temporal.motion
@@ -272,7 +282,7 @@ public final class LevelRenderer {
         } else {
             guard let (frame, depth) = targets(width: target.width, height: target.height) else { return }
             drawLevel(into: commands, frame: frame, depth: depth, keepDepth: false, viewProjection: viewProjection,
-                      camera: camera)
+                      camera: camera, objects: objects)
             lastInputSize = (target.width, target.height)
             shown = frame
         }
@@ -289,9 +299,11 @@ public final class LevelRenderer {
         toneEncoder.endEncoding()
     }
 
-    /// The level's opaque then blended draws into `frame`.
+    /// The level's opaque draws and the objects' then the blended ones of
+    /// both into `frame`.
     private func drawLevel(into commands: MTLCommandBuffer, frame: MTLTexture, depth: MTLTexture, keepDepth: Bool,
-                           viewProjection: simd_float4x4, camera: ViewCamera) {
+                           viewProjection: simd_float4x4, camera: ViewCamera, objects: [DrawnObject]) {
+        let prepared = models.prepare(objects, camera: camera, viewportHeight: frame.height, device: device)
         var uniforms = viewProjection
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = frame
@@ -314,6 +326,8 @@ public final class LevelRenderer {
         for draw in opaqueDraws {
             encode(draw, encoder)
         }
+        models.encode(prepared, blendedParts: false, into: encoder)
+        encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setDepthStencilState(depthTest)
         // far to near
         let far = blendedDraws.sorted {
@@ -324,6 +338,7 @@ public final class LevelRenderer {
             encoder.setRenderPipelineState(blended[index])
             encode(draw, encoder)
         }
+        models.encode(prepared, blendedParts: true, into: encoder)
         encoder.endEncoding()
     }
 

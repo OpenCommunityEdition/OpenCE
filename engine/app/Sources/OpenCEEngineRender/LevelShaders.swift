@@ -52,26 +52,21 @@ vertex VertexOut level_vertex(VertexIn in [[stage_in]], constant Frame &frame [[
     return out;
 }
 
-fragment float4 level_fragment(VertexOut in [[stage_in]],
-                               constant Material &material [[buffer(0)]],
-                               texture2d<float> base [[texture(0)]],
-                               texture2d<float> primary [[texture(1)]],
-                               texture2d<float> secondary [[texture(2)]],
-                               texture2d<float> lightmap [[texture(3)]],
-                               sampler wrap [[sampler(0)]],
-                               sampler clamp [[sampler(1)]]) {
+// a surface's base and detail maps, as its material combines them
+float4 surface(float2 texcoord, constant Material &material, texture2d<float> base, texture2d<float> primary,
+               texture2d<float> secondary, sampler wrap) {
     float4 color = float4(1);
     if (material.maps & BASE) {
-        color = base.sample(wrap, in.texcoord * material.base_scale + material.base_offset);
+        color = base.sample(wrap, texcoord * material.base_scale + material.base_offset);
     }
     if (material.alpha_tested != 0 && color.a < 0.5) {
         discard_fragment();
     }
     uint details = material.maps & (PRIMARY | SECONDARY);
     if (details != 0) {
-        float4 first = (details & PRIMARY) ? primary.sample(wrap, in.texcoord * material.primary_scale)
-                                           : secondary.sample(wrap, in.texcoord * material.secondary_scale);
-        float4 second = (details & SECONDARY) ? secondary.sample(wrap, in.texcoord * material.secondary_scale)
+        float4 first = (details & PRIMARY) ? primary.sample(wrap, texcoord * material.primary_scale)
+                                           : secondary.sample(wrap, texcoord * material.secondary_scale);
+        float4 second = (details & SECONDARY) ? secondary.sample(wrap, texcoord * material.secondary_scale)
                                               : first;
         // normal: the secondary map's alpha mixes them; blended: the base's
         float mask = material.environment_kind == 0 ? second.a : color.a;
@@ -83,9 +78,70 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
         default: color.rgb = saturate(color.rgb * 2 * detail); break;
         }
     }
+    return color;
+}
+
+fragment float4 level_fragment(VertexOut in [[stage_in]],
+                               constant Material &material [[buffer(0)]],
+                               texture2d<float> base [[texture(0)]],
+                               texture2d<float> primary [[texture(1)]],
+                               texture2d<float> secondary [[texture(2)]],
+                               texture2d<float> lightmap [[texture(3)]],
+                               sampler wrap [[sampler(0)]],
+                               sampler clamp [[sampler(1)]]) {
+    float4 color = surface(in.texcoord, material, base, primary, secondary, wrap);
     if (material.maps & LIGHTMAP) {
         color.rgb *= lightmap.sample(clamp, in.lightmap).rgb;
     }
+    return color;
+}
+
+struct ModelIn {
+    float3 position [[attribute(0)]];
+    float3 normal [[attribute(1)]];
+    float2 texcoord [[attribute(2)]];
+    ushort2 nodes [[attribute(3)]];
+    float2 weights [[attribute(4)]];
+};
+
+// (as ModelPass's ModelObjectUniforms)
+struct ModelObject {
+    uint first_node;
+    uint node_count;
+};
+
+struct ModelOut {
+    float4 position [[position]];
+    float3 normal;
+    float2 texcoord;
+};
+
+// a model's vertex moved by its two nodes' skin matrices, by their weights
+vertex ModelOut model_vertex(ModelIn in [[stage_in]], constant Frame &frame [[buffer(1)]],
+                             const device float4x4 *skins [[buffer(2)]],
+                             constant ModelObject &object [[buffer(3)]]) {
+    uint last = max(object.node_count, 1u) - 1;
+    float4x4 skin = skins[object.first_node + min(uint(in.nodes.x), last)] * in.weights.x
+                  + skins[object.first_node + min(uint(in.nodes.y), last)] * in.weights.y;
+    ModelOut out;
+    out.position = frame.view_projection * (skin * float4(in.position, 1));
+    out.normal = (skin * float4(in.normal, 0)).xyz;
+    out.texcoord = in.texcoord;
+    return out;
+}
+
+// until the level's lights reach objects: a sky light from above and a
+// little from the side, and some ambient
+fragment float4 model_fragment(ModelOut in [[stage_in]],
+                               constant Material &material [[buffer(0)]],
+                               texture2d<float> base [[texture(0)]],
+                               texture2d<float> primary [[texture(1)]],
+                               texture2d<float> secondary [[texture(2)]],
+                               sampler wrap [[sampler(0)]]) {
+    float4 color = surface(in.texcoord, material, base, primary, secondary, wrap);
+    float3 normal = length_squared(in.normal) > 1e-12 ? normalize(in.normal) : float3(0, 0, 1);
+    float light = 0.45 + 0.65 * saturate(dot(normal, normalize(float3(0.35, 0.25, 0.9))));
+    color.rgb *= light;
     return color;
 }
 

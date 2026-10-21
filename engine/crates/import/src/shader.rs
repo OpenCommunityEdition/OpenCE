@@ -1,8 +1,9 @@
-//! Shaders: the environment and transparent chicago classes, with their
-//! maps; the other classes by group alone, for now.
+//! Shaders: the environment, model and transparent chicago classes, with
+//! their maps; the other classes by group alone, for now.
 
 use opence_content::{
-    ChicagoMap, EnvironmentShader, Group, Shader, ShaderClass, TransparentChicagoShader,
+    ChicagoMap, EnvironmentShader, Group, ModelShaderClass, Shader, ShaderClass,
+    TransparentChicagoShader,
 };
 
 use crate::cache::Cache;
@@ -13,10 +14,13 @@ use crate::tags::{Element, GroupTag};
 pub(crate) const SENV: GroupTag = GroupTag::new(b"senv");
 pub(crate) const SCHI: GroupTag = GroupTag::new(b"schi");
 pub(crate) const SCEX: GroupTag = GroupTag::new(b"scex");
+pub(crate) const SOSO: GroupTag = GroupTag::new(b"soso");
 
 pub(crate) const SHADER_BASE_SIZE: usize = 0x28;
 pub(crate) const MATERIAL_TYPE_OFFSET: usize = 0x22;
 pub(crate) const ENVIRONMENT_SIZE: usize = 0x344;
+/// What of a model shader is read: up to its texture animation.
+pub(crate) const MODEL_SIZE: usize = 0xFC;
 pub(crate) const CHICAGO_SIZE: usize = 0x6C;
 pub(crate) const CHICAGO_EXTENDED_SIZE: usize = 0x78;
 pub(crate) const CHICAGO_EXTRA_LAYERS_OFFSET: usize = 0x48;
@@ -39,6 +43,7 @@ pub(crate) fn import_shader(
         SENV => ENVIRONMENT_SIZE,
         SCHI => CHICAGO_SIZE,
         SCEX => CHICAGO_EXTENDED_SIZE,
+        SOSO => MODEL_SIZE,
         _ => SHADER_BASE_SIZE,
     };
     let shader = cache.tag(index, SHDR, size)?;
@@ -46,6 +51,7 @@ pub(crate) fn import_shader(
         SENV => ShaderClass::Environment(Box::new(environment(&shader, reached)?)),
         SCHI => ShaderClass::TransparentChicago(chicago(&shader, reached, false)?),
         SCEX => ShaderClass::TransparentChicagoExtended(chicago(&shader, reached, true)?),
+        SOSO => ShaderClass::Model(model(&shader, reached)?),
         _ => ShaderClass::Other(Group(group.0.to_be_bytes())),
     };
     Ok(Shader {
@@ -61,6 +67,27 @@ fn color(element: &Element<'_>, at: usize, field: &str) -> Result<[f32; 3], Impo
         element.f32(at + 4, field)?,
         element.f32(at + 8, field)?,
     ])
+}
+
+/// A model shader's fields (`shader_model_properties`, after the shader's
+/// own 0x28 bytes).
+fn model(shader: &Element<'_>, reached: &mut Reached) -> Result<ModelShaderClass, ImportError> {
+    Ok(ModelShaderClass {
+        flags: shader.u16(0x28, "flags")?,
+        translucency: shader.f32(0x38, "translucency")?,
+        change_color_source: shader.i16(0x4C, "change color source")?,
+        map_scale: [
+            shader.f32(0x9C, "map u scale")?,
+            shader.f32(0xA0, "map v scale")?,
+        ],
+        base_map: reached.bitmap(shader, 0xA4, "base map")?,
+        multipurpose_map: reached.bitmap(shader, 0xBC, "multipurpose map")?,
+        detail_function: shader.i16(0xD4, "detail function")?,
+        detail_mask: shader.i16(0xD6, "detail mask")?,
+        detail_map_scale: shader.f32(0xD8, "detail map scale")?,
+        detail_map: reached.bitmap(shader, 0xDC, "detail map")?,
+        detail_map_v_scale: shader.f32(0xEC, "detail map v scale")?,
+    })
 }
 
 fn environment(

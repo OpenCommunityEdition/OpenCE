@@ -98,14 +98,14 @@ extension LevelRenderer {
     /// Draws the level from `camera` at `width` by `height` offscreen
     /// `frames` times (for the temporal history) and reads the last frame
     /// back (the renderer's output format must be bgra8Unorm).
-    public func capture(width: Int, height: Int, camera: ViewCamera, frames: Int = 1,
+    public func capture(width: Int, height: Int, camera: ViewCamera, frames: Int = 1, objects: [DrawnObject] = [],
                         queue: MTLCommandQueue) throws -> CapturedFrame {
         try capture(width: width, height: height, cameras: Array(repeating: camera, count: max(frames, 1)),
-                    queue: queue)
+                    objects: objects, queue: queue)
     }
 
     /// Draws a frame from each of `cameras` in turn and reads the last back.
-    public func capture(width: Int, height: Int, cameras: [ViewCamera],
+    public func capture(width: Int, height: Int, cameras: [ViewCamera], objects: [DrawnObject] = [],
                         queue: MTLCommandQueue) throws -> CapturedFrame {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: outputFormat, width: width,
                                                                   height: height, mipmapped: false)
@@ -115,7 +115,7 @@ extension LevelRenderer {
               let target = device.makeTexture(descriptor: descriptor) else { throw FrameCaptureError.resources }
         for camera in cameras {
             guard let commands = queue.makeCommandBuffer() else { throw FrameCaptureError.resources }
-            encode(into: commands, target: target, camera: camera)
+            encode(into: commands, target: target, camera: camera, objects: objects)
             commands.commit()
             commands.waitUntilCompleted()
         }
