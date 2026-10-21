@@ -35,6 +35,8 @@ pub(crate) const OBJECT_SIZE: usize = 0x17C;
 /// object's and the unit's).
 const BIPED_SIZE: usize = 0x4F4;
 const BIPED_PART: usize = 0x2F0;
+/// Where the unit part starts, after the object's.
+const UNIT_PART: usize = OBJECT_SIZE;
 const NAME_LONGEST: usize = 31;
 
 pub(crate) const MODEL_SIZE: usize = 0xE8;
@@ -247,6 +249,8 @@ fn import_biped(cache: &Cache, index: usize) -> Result<Biped, ImportError> {
         standing_camera_height: f(0x110, "standing camera height")?,
         crouching_camera_height: f(0x114, "crouching camera height")?,
         crouch_transition_time: f(0x118, "crouch transition time")?,
+        // (the unit part's, before the biped's: a second's already)
+        grenade_velocity: biped.f32(UNIT_PART + 0x144, "grenade velocity")?,
         collision_height_standing: f(0x134, "standing collision height")?,
         collision_height_crouching: f(0x138, "crouching collision height")?,
         collision_radius: f(0x13C, "collision radius")?,

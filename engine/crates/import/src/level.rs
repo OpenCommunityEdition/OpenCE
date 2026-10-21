@@ -13,7 +13,7 @@ use opence_content::level::{
 };
 use opence_content::{
     AnimationGraph, AtmosphericFog, CollisionBsp, CollisionMaterial, CollisionModel, DamageEffect,
-    EnvironmentVertex, Globals, Group, Level, Lightmap, LightmapVertex, Material, Model,
+    Effect, EnvironmentVertex, Globals, Group, Level, Lightmap, LightmapVertex, Material, Model,
     ObjectDefinition, ObjectKind, ObjectPlacement, PlacementPermutation, PlayerStart, Scenario,
     Sky, StructureBsp, TagRef,
 };
@@ -177,7 +177,8 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         .collect();
     let (objects, mut models, animation_graphs) =
         import_placed_objects(cache, &placements, &players, &mut reached)?;
-    let damage_effects = import_damage_effects(cache, &objects, &globals)?;
+    let effects = import_effects(cache, &objects)?;
+    let damage_effects = import_damage_effects(cache, &objects, &globals, &effects)?;
     let collision_models = import_collision_models(cache, &objects)?;
     let skies = import_skies(cache, &scenario, &mut models, &mut reached)?;
 
@@ -235,6 +236,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         globals,
         damage_effects,
         collision_models,
+        effects,
     };
     check_lightmap_pages(&level)?;
     Ok(level)
@@ -357,15 +359,32 @@ fn import_collision_models(
         .collect()
 }
 
-/// Every damage effect `objects` and `globals` do (a weapon's melee, a
-/// projectile's impact and attached detonation, falling), each once, by
-/// path.
+/// The effects `objects`' projectiles detonate with, each once, by path.
+fn import_effects(cache: &Cache, objects: &[ObjectDefinition]) -> Result<Vec<Effect>, ImportError> {
+    let tags: BTreeSet<&TagRef> = objects
+        .iter()
+        .filter_map(|object| object.projectile.as_ref()?.effect.as_ref())
+        .collect();
+    let mut effects = Vec::with_capacity(tags.len());
+    for tag in tags {
+        // (a reference was checked to name a tag of the map when it was read)
+        if let Some(index) = tag_index(cache, tag) {
+            effects.push(crate::effect::import_effect(cache, index)?);
+        }
+    }
+    Ok(effects)
+}
+
+/// Every damage effect `objects`, `globals` and `effects` do (a weapon's
+/// melee, a projectile's impact, attached detonation and explosion,
+/// falling), each once, by path.
 fn import_damage_effects(
     cache: &Cache,
     objects: &[ObjectDefinition],
     globals: &Globals,
+    effects: &[Effect],
 ) -> Result<Vec<DamageEffect>, ImportError> {
-    let mut tags = BTreeSet::new();
+    let mut tags: BTreeSet<&TagRef> = effects.iter().flat_map(|effect| &effect.damage).collect();
     for object in objects {
         if let Some(weapon) = &object.weapon {
             tags.extend(

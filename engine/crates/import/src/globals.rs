@@ -74,6 +74,11 @@ pub fn import_globals(cache: &Cache) -> Result<Globals, ImportError> {
             stun_movement_penalty: f(0x80, "stun movement penalty")?,
             stun_turning_penalty: f(0x84, "stun turning penalty")?,
             stun_jumping_penalty: f(0x88, "stun jumping penalty")?,
+            grenade_origin: [
+                f(0x68, "grenade origin")?,
+                f(0x6C, "grenade origin")?,
+                f(0x70, "grenade origin")?,
+            ],
         };
     }
 

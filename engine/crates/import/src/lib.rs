@@ -6,6 +6,7 @@
 
 pub mod bitmap;
 pub mod cache;
+mod effect;
 pub mod error;
 pub mod globals;
 pub mod level;

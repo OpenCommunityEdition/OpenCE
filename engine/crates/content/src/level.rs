@@ -3,7 +3,7 @@
 use rkyv::{Archive, Deserialize, Serialize};
 
 use crate::{
-    AnimationGraph, Bitmap, CollisionModel, DamageEffect, Grenade, Model, ObjectDefinition,
+    AnimationGraph, Bitmap, CollisionModel, DamageEffect, Effect, Grenade, Model, ObjectDefinition,
     ObjectKind, Shader, TagRef,
 };
 
@@ -36,6 +36,8 @@ pub struct Level {
     pub damage_effects: Vec<DamageEffect>,
     /// Its objects' collision models, by path.
     pub collision_models: Vec<CollisionModel>,
+    /// The effects its projectiles detonate with, by path.
+    pub effects: Vec<Effect>,
 }
 
 /// The game's globals (the `matg` tag) that the simulation reads.
@@ -86,6 +88,9 @@ pub struct PlayerPhysics {
     pub stun_turning_penalty: f32,
     /// How much being stunned lowers its jumps.
     pub stun_jumping_penalty: f32,
+    /// Where a grenade is thrown from, from the camera: forward, up and
+    /// left, in world units.
+    pub grenade_origin: [f32; 3],
 }
 
 impl Default for PlayerPhysics {
@@ -106,6 +111,7 @@ impl Default for PlayerPhysics {
             stun_movement_penalty: 0.0,
             stun_turning_penalty: 0.0,
             stun_jumping_penalty: 0.0,
+            grenade_origin: [0.0; 3],
         }
     }
 }
@@ -149,6 +155,11 @@ impl Level {
     /// A damage effect, by its tag.
     pub fn damage_effect(&self, tag: &TagRef) -> Option<&DamageEffect> {
         self.damage_effects.iter().find(|effect| effect.tag == *tag)
+    }
+
+    /// An effect, by its tag.
+    pub fn effect(&self, tag: &TagRef) -> Option<&Effect> {
+        self.effects.iter().find(|effect| effect.tag == *tag)
     }
 
     /// A collision model, by its tag.

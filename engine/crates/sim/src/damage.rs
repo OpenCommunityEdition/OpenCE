@@ -1,7 +1,8 @@
 //! Damage, shields and death (`damage.c`): what a damage effect does to an
 //! object's shield and body by the material it strikes, the stun that
 //! holds its shield back and the recharge after it, headshots, and the
-//! death that follows when its body is spent.
+//! death that follows when its body is spent; and the damage of an
+//! explosion over its radius (`area_of_effect_cause_damage_to_object`).
 //!
 //! Vitality is kept as the game keeps it, as fractions of the collision
 //! model's maximums: 1 is whole, 0 is spent.
@@ -21,7 +22,7 @@ use crate::animation::{
 use crate::clock;
 use crate::hash::WorldHasher;
 use crate::objects::{Object, ObjectHandle, ObjectTable, Team};
-use crate::projectile::Impact;
+use crate::projectile::{Detonation, Impact};
 use crate::random::RandomSeed;
 use crate::Transform;
 
@@ -324,6 +325,9 @@ pub struct Damageable {
     pub pill: Option<(f32, f32)>,
     /// It takes no damage from falls.
     pub immune_to_falling: bool,
+    /// Its bounding sphere's centre, from its root node, which
+    /// explosions reach for.
+    pub centre: Vec3,
     /// Its model's nodes: the name, where it is at the default pose (from
     /// the object's origin), and its collision node.
     pub nodes: Vec<(String, Vec3, Option<usize>)>,
@@ -337,6 +341,9 @@ pub struct DamageTable {
     pub objects: BTreeMap<TagRef, Damageable>,
     /// The damage effects, by their tags.
     pub effects: BTreeMap<TagRef, DamageEffect>,
+    /// The damage each effect (an explosion) does where it is created, by
+    /// the effect's tag.
+    pub explosions: BTreeMap<TagRef, Vec<TagRef>>,
     /// The game is multiplayer.
     pub multiplayer: bool,
     /// The damage of falls.
@@ -414,6 +421,7 @@ impl DamageTable {
                         model,
                         pill,
                         immune_to_falling,
+                        centre: Vec3::from_array(object.bounding_offset),
                         nodes,
                     },
                 ))
@@ -424,9 +432,16 @@ impl DamageTable {
             .iter()
             .map(|effect| (effect.tag.clone(), effect.clone()))
             .collect();
+        let explosions = level
+            .effects
+            .iter()
+            .filter(|effect| !effect.damage.is_empty())
+            .map(|effect| (effect.tag.clone(), effect.damage.clone()))
+            .collect();
         DamageTable {
             objects,
             effects,
+            explosions,
             multiplayer,
             falling: level.globals.falling.clone(),
         }
@@ -725,6 +740,212 @@ pub fn apply_fall(world: &mut World, object: ObjectHandle, speed: f32) -> Option
         effect,
         outcome,
     })
+}
+
+/// How much of an area's damage reaches `distance` from its centre: all
+/// within its inner radius, falling to none at its outer, and all of it
+/// where it does not fall off; none past the outer radius.
+pub fn area_scale(effect: &DamageEffect, distance: f32) -> f32 {
+    let [inner, outer] = effect.radius;
+    if distance > outer {
+        return 0.0;
+    }
+    if effect.flags & DamageEffect::DONT_SCALE_DAMAGE_BY_DISTANCE != 0 {
+        return 1.0;
+    }
+    let span = outer - inner;
+    if span > 0.0 {
+        (1.0 - (distance - inner) / span).clamp(0.0, 1.0)
+    } else {
+        1.0
+    }
+}
+
+/// Whether an explosion at `epicenter` reaches `centre`, by `clear`
+/// (nothing of the level between two points): straight there, or, with a
+/// core, from any of four points around the epicenter across the way to
+/// it, so that a corner does not hide all of a unit.
+/// Where `damageable`'s bounding sphere is centred in the world: its
+/// centre carried by its root node, as posed (`root`) if it is animated,
+/// else at its default pose.
+fn bounding_centre(
+    damageable: &Damageable,
+    transform: &Transform,
+    root: Option<&NodeMatrix>,
+) -> Vec3 {
+    let offset = damageable.centre;
+    if let Some(root) = root {
+        return Vec3::from_array(root.position)
+            + (Vec3::from_array(root.forward) * offset.x
+                + Vec3::from_array(root.left) * offset.y
+                + Vec3::from_array(root.up) * offset.z)
+                * root.scale;
+    }
+    let root = damageable
+        .nodes
+        .first()
+        .map_or(Vec3::ZERO, |(_, position, _)| *position);
+    transform.position + transform.rotation * ((root + offset) * transform.scale)
+}
+
+fn reaches(
+    epicenter: Vec3,
+    centre: Vec3,
+    core: f32,
+    mut clear: impl FnMut(Vec3, Vec3) -> bool,
+) -> bool {
+    if core <= f32::EPSILON {
+        return clear(epicenter, centre);
+    }
+    let towards = (centre - epicenter).normalize_or_zero();
+    let (across, up) = if towards == Vec3::ZERO {
+        (Vec3::X, Vec3::Y)
+    } else {
+        towards.any_orthonormal_pair()
+    };
+    [across, -across, up, -up].into_iter().any(|side| {
+        let from = epicenter + side * core;
+        // (as far as the level lets the point go out)
+        let from = if clear(epicenter, from) {
+            from
+        } else {
+            epicenter
+        };
+        clear(from, centre)
+    })
+}
+
+/// Does each detonation's damage: its effect's damage to every object
+/// within reach of its point, and its stuck damage to what it was stuck
+/// to; what each did. `clear` says whether nothing of the level stands
+/// between two points; `player` is as for [`apply_impacts`].
+pub fn apply_detonations(
+    world: &mut World,
+    detonations: &[Detonation],
+    player: Option<ObjectHandle>,
+    mut clear: impl FnMut(Vec3, Vec3) -> bool,
+) -> Vec<DamageEvent> {
+    let mut events = Vec::new();
+    for detonation in detonations {
+        let owner = detonation.owner;
+        let team = |world: &World, handle: ObjectHandle| {
+            let entity = world.resource::<ObjectTable>().entity(handle)?;
+            world.get::<Team>(entity).map(|team| team.0)
+        };
+        if let (Some(object), Some(effect)) =
+            (detonation.attached, detonation.attached_damage.as_ref())
+        {
+            let friendly = owner != object
+                && team(world, owner).is_some_and(|t| team(world, object) == Some(t));
+            if let Some(outcome) = damage_object(
+                world,
+                object,
+                effect,
+                |_, _, damageable, random, multiplayer| DamageHit {
+                    random,
+                    material: damageable.model.indirect_damage_material,
+                    friendly,
+                    multiplayer,
+                    headshot_kills: multiplayer || Some(object) != player,
+                    ..DamageHit::default()
+                },
+            ) {
+                events.push(DamageEvent {
+                    object,
+                    owner: Some(owner).filter(|owner| *owner != object),
+                    effect: effect.clone(),
+                    outcome,
+                });
+            }
+        }
+        let Some(table) = world.get_resource::<DamageTable>() else {
+            continue;
+        };
+        let Some(damage) = detonation
+            .effect
+            .as_ref()
+            .and_then(|effect| table.explosions.get(effect))
+            .cloned()
+        else {
+            continue;
+        };
+        let posed: Vec<(ObjectHandle, TagRef, Transform, Option<NodeMatrix>)> = world
+            .query::<(&ObjectHandle, &Object, &Transform, Option<&NodeMatrices>)>()
+            .iter(world)
+            .map(|(handle, object, transform, nodes)| {
+                let root = nodes.and_then(|nodes| nodes.current.first()).cloned();
+                (*handle, object.tag.clone(), *transform, root)
+            })
+            .collect();
+        let Some(table) = world.get_resource::<DamageTable>() else {
+            continue;
+        };
+        let mut objects: Vec<(ObjectHandle, Vec3)> = posed
+            .iter()
+            .filter_map(|(handle, tag, transform, root)| {
+                let damageable = table.objects.get(tag)?;
+                Some((
+                    *handle,
+                    bounding_centre(damageable, transform, root.as_ref()),
+                ))
+            })
+            .collect();
+        objects.sort_by_key(|(handle, _)| *handle);
+        for effect in &damage {
+            let Some(definition) = world
+                .get_resource::<DamageTable>()
+                .and_then(|table| table.effects.get(effect))
+                .cloned()
+            else {
+                continue;
+            };
+            for &(object, centre) in &objects {
+                if definition.damage_flags & DamageEffect::DOES_NOT_HURT_OWNER != 0
+                    && object == owner
+                {
+                    continue;
+                }
+                let friendly = object != owner
+                    && team(world, owner).is_some_and(|t| team(world, object) == Some(t));
+                if definition.damage_flags & DamageEffect::DOES_NOT_HURT_FRIENDS != 0 && friendly {
+                    continue;
+                }
+                let scale = area_scale(&definition, detonation.point.distance(centre));
+                if scale <= 0.0
+                    || !reaches(
+                        detonation.point,
+                        centre,
+                        definition.area_of_effect_core_radius,
+                        &mut clear,
+                    )
+                {
+                    continue;
+                }
+                if let Some(outcome) = damage_object(
+                    world,
+                    object,
+                    effect,
+                    |_, _, damageable, random, multiplayer| DamageHit {
+                        scale,
+                        random,
+                        material: damageable.model.indirect_damage_material,
+                        friendly,
+                        multiplayer,
+                        headshot_kills: multiplayer || Some(object) != player,
+                        ..DamageHit::default()
+                    },
+                ) {
+                    events.push(DamageEvent {
+                        object,
+                        owner: Some(owner).filter(|owner| *owner != object),
+                        effect: effect.clone(),
+                        outcome,
+                    });
+                }
+            }
+        }
+    }
+    events
 }
 
 /// `effect` done to `object`, struck as `hit` says (given the world, its
@@ -1071,13 +1292,16 @@ mod tests {
                     model: cyborg(),
                     pill: Some((0.2, 0.7)),
                     immune_to_falling,
+                    centre: Vec3::new(0.0, 0.0, 0.35),
                     nodes: Vec::new(),
                 },
             )]),
             effects: BTreeMap::from([
                 (tag("fall"), fall.clone()),
                 (tag("distance"), bullet(1000.0, 0)),
+                (tag("blast"), blast()),
             ]),
+            explosions: BTreeMap::from([(tag("explosion"), vec![tag("blast")])]),
             multiplayer: true,
             falling: FallingDamage {
                 minimum_damage_velocity: 5.0,
@@ -1115,5 +1339,75 @@ mod tests {
         assert!(event.outcome.killed && event.effect == tag("distance"));
         world.insert_resource(table(true));
         assert_eq!(apply_fall(world, object, 20.0), None);
+        // (an explosion at its feet, behind a wall, then in the open)
+        let mut whole = Vitality::new(&cyborg());
+        whole.shield = 1.0;
+        world.entity_mut(entity(world, object)).insert(whole);
+        let detonation = Detonation {
+            projectile: tag("grenade"),
+            owner: ObjectHandle { index: 99, salt: 1 },
+            point: Vec3::new(1.0, 0.0, 0.1),
+            effect: Some(tag("explosion")),
+            attached: None,
+            attached_damage: None,
+        };
+        let walled =
+            apply_detonations(world, std::slice::from_ref(&detonation), None, |_, _| false);
+        assert!(walled.is_empty(), "{walled:?}");
+        let events = apply_detonations(world, std::slice::from_ref(&detonation), None, |_, _| true);
+        assert_eq!(events.len(), 1, "{events:?}");
+        // (1.03 from its centre, of 0.5 to 2.5: three quarters of 40)
+        let expected = 40.0 * area_scale(&blast(), Vec3::new(1.0, 0.0, -0.25).length()) / 75.0;
+        assert!(
+            (events[0].outcome.shield - expected).abs() < 1e-4,
+            "{events:?}"
+        );
+        let far = Detonation {
+            point: Vec3::new(3.0, 0.0, 0.0),
+            ..detonation
+        };
+        assert!(apply_detonations(world, &[far], None, |_, _| true).is_empty());
+    }
+
+    fn entity(world: &World, object: ObjectHandle) -> Entity {
+        match world.resource::<ObjectTable>().entity(object) {
+            Some(entity) => entity,
+            None => panic!("no entity"),
+        }
+    }
+
+    fn blast() -> DamageEffect {
+        DamageEffect {
+            tag: tag("blast"),
+            radius: [0.5, 2.5],
+            area_of_effect_core_radius: 0.4,
+            damage_minimum: 0.0,
+            ..bullet(40.0, 0)
+        }
+    }
+
+    #[test]
+    fn an_area_falls_off_across_its_radius() {
+        let effect = blast();
+        assert_eq!(area_scale(&effect, 0.2), 1.0);
+        assert!((area_scale(&effect, 1.5) - 0.5).abs() < 1e-6);
+        assert_eq!(area_scale(&effect, 2.6), 0.0);
+        let unscaled = DamageEffect {
+            flags: DamageEffect::DONT_SCALE_DAMAGE_BY_DISTANCE,
+            ..blast()
+        };
+        assert_eq!(area_scale(&unscaled, 2.4), 1.0);
+        assert_eq!(area_scale(&unscaled, 2.6), 0.0);
+    }
+
+    #[test]
+    fn a_core_sees_round_a_corner() {
+        // (a wall across the straight line, but not past its sides)
+        let blocked = |from: Vec3, to: Vec3| {
+            !(from.y.abs() < 0.1 && from.z.abs() < 0.1 && to.x > 0.5) || from == to
+        };
+        let centre = Vec3::new(2.0, 0.0, 0.0);
+        assert!(!reaches(Vec3::ZERO, centre, 0.0, blocked));
+        assert!(reaches(Vec3::ZERO, centre, 0.4, blocked));
     }
 }

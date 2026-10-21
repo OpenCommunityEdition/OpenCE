@@ -23,7 +23,7 @@ use crate::damage;
 use crate::hash::WorldHasher;
 use crate::input::{Buttons, TickInput};
 use crate::objects::{self, Object, ObjectHandle, ObjectSpawn};
-use crate::projectile::{self, Flew, Flight, Impact};
+use crate::projectile::{self, Contact, Detonation, Flew, Flight, Impact};
 use crate::random::RandomSeed;
 use crate::units::Radians;
 use crate::weapon::{secondary, WeaponControls, WeaponState};
@@ -115,6 +115,19 @@ pub struct Player {
     melee_ticks: u32,
     /// The speed of this tick's landing into the ground, if it landed.
     landed: Option<f32>,
+    /// The speed its grenades leave its hand, in world units per second.
+    grenade_velocity: f32,
+    /// Where they leave it, from its eyes (the globals').
+    grenade_origin: Vec3,
+}
+
+/// What a tick of the player's weapons came to.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct Fired {
+    /// Where its projectiles hit.
+    pub impacts: Vec<Impact>,
+    /// Where its grenades detonated.
+    pub detonations: Vec<Detonation>,
 }
 
 /// What the tick's systems need of the player: where its object goes and
@@ -190,6 +203,8 @@ impl Player {
             gravity: -settings.gravity.z,
             melee_ticks: 0,
             landed: None,
+            grenade_velocity: biped.grenade_velocity,
+            grenade_origin: Vec3::from_array(level.globals.player.grenade_origin),
         })
     }
 
@@ -315,33 +330,55 @@ impl Player {
         )
     }
 
+    /// Gives it `count` grenades of `kind` (0 frag, 1 plasma), up to the
+    /// most it carries.
+    pub(crate) fn give_grenades(&mut self, kind: usize, count: i16) {
+        self.inventory.give_grenades(&self.armory, kind, count);
+    }
+
+    /// Whether nothing of the level stands between `from` and `to`.
+    pub(crate) fn level_clear(&self, from: Vec3, to: Vec3) -> bool {
+        let path = to - from;
+        path.length_squared() == 0.0
+            || !matches!(
+                self.physics.cast_ray(from, path, Layers::LEVEL),
+                Ok(Some(_))
+            )
+    }
+
     /// One tick of its weapons, after its move: its projectiles fly on,
-    /// it picks up and changes weapons, and the one in its hands fires.
-    /// Where projectiles hit is returned.
-    pub(crate) fn step_weapons(&mut self, input: &TickInput, world: &mut World) -> Vec<Impact> {
+    /// it picks up and changes weapons, throws a grenade, and the one in
+    /// its hands fires. Where projectiles hit and grenades detonated is
+    /// returned.
+    pub(crate) fn step_weapons(&mut self, input: &TickInput, world: &mut World) -> Fired {
         let buttons = input.buttons;
         let held = std::mem::replace(&mut self.held, buttons);
-        let impacts = self.fly(world);
+        let mut fired = self.fly(world);
         self.pick_up(world, buttons.pressed(held, Buttons::ACTION));
         if buttons.pressed(held, Buttons::SWAP) {
             self.inventory.swap(&self.armory);
         }
+        if buttons.pressed(held, Buttons::SWITCH_GRENADE) {
+            self.inventory.switch_grenade();
+        }
         let (eyes, aim) = self.aim();
-        let mut impacts = impacts;
         self.melee_ticks = self.melee_ticks.saturating_sub(1);
         if buttons.pressed(held, Buttons::MELEE) && self.melee_ticks == 0 {
             if let Some(impact) = self.melee(world, eyes, aim) {
-                impacts.push(impact);
+                fired.impacts.push(impact);
             }
+        }
+        if buttons.pressed(held, Buttons::GRENADE) && self.melee_ticks == 0 {
+            self.throw_grenade(world, eyes, aim);
         }
         // (no firing while the melee recovers)
         let fire = buttons.contains(Buttons::FIRE) && self.melee_ticks == 0;
         let reload = buttons.pressed(held, Buttons::RELOAD);
         let Some(carried) = self.inventory.current_mut() else {
-            return impacts;
+            return fired;
         };
         let Some(definition) = self.armory.get(carried.armory) else {
-            return impacts;
+            return fired;
         };
         let weapon = &definition.weapon;
         let controls = WeaponControls {
@@ -395,36 +432,115 @@ impl Player {
                 ));
             }
         }
-        impacts
+        fired
     }
 
-    /// A tick of its projectiles' flight: those that hit something or are
-    /// spent are removed, with their objects.
-    fn fly(&mut self, world: &mut World) -> Vec<Impact> {
-        let mut impacts = Vec::new();
+    /// Throws a grenade of the kind it has ready, if it has one and the
+    /// weapon in its hands allows it: from its eyes, along its aim.
+    fn throw_grenade(&mut self, world: &mut World, eyes: Vec3, aim: Quat) {
+        let prevented = self
+            .inventory
+            .current()
+            .and_then(|carried| self.armory.get(carried.armory))
+            .is_some_and(|definition| {
+                definition.weapon.flags & Weapon::PREVENTS_GRENADE_THROWING != 0
+            });
+        let kind = self.inventory.grenade;
+        let count = self.inventory.grenades.get(kind).copied().unwrap_or(0);
+        if prevented || count <= 0 {
+            return;
+        }
+        let Some((tag, projectile)) = self
+            .armory
+            .grenade(kind)
+            .and_then(|grenade| grenade.projectile.clone())
+        else {
+            return;
+        };
+        // (the globals' origin: forward, then across and above the aim as
+        // the game takes them, from the world's up)
+        let forward = aim * Vec3::X;
+        let across = Vec3::Z.cross(forward).try_normalize().unwrap_or(Vec3::Z);
+        let above = forward.cross(across).try_normalize().unwrap_or(Vec3::Z);
+        let [ahead, first, second] = self.grenade_origin.to_array();
+        let origin = eyes + forward * ahead + across * first + above * second;
+        let Ok(handle) = objects::spawn(
+            world,
+            ObjectSpawn {
+                kind: ObjectKind::Projectile,
+                tag: tag.clone(),
+                transform: Transform {
+                    position: origin,
+                    rotation: aim,
+                    scale: 1.0,
+                },
+                name: None,
+                permutation: None,
+                team: None,
+            },
+        ) else {
+            return; // (the world holds no more objects)
+        };
+        let mut seed = world.get_resource_or_init::<RandomSeed>();
+        self.flights.push(Flight::thrown(
+            handle,
+            tag,
+            self.handle,
+            &projectile,
+            origin,
+            forward * self.grenade_velocity,
+            self.gravity,
+            &mut seed,
+        ));
+        if let Some(carried) = self.inventory.grenades.get_mut(kind) {
+            *carried -= 1;
+        }
+    }
+
+    /// A tick of its projectiles' flight: those that hit something, are
+    /// spent or detonate are removed, with their objects; those stuck to
+    /// something follow it.
+    fn fly(&mut self, world: &mut World) -> Fired {
+        let mut fired = Fired::default();
         let physics = &self.physics;
+        for flight in &mut self.flights {
+            if let Some(parent) = flight.attachment().and_then(|attached| attached.parent) {
+                flight.follow(frame(world, parent));
+            }
+        }
         let targets = damage::targets(world, self.handle);
+        let frames: Vec<Option<Transform>> = targets
+            .iter()
+            .map(|target| frame(world, target.handle))
+            .collect();
         let mut poses = Vec::with_capacity(self.flights.len());
         self.flights.retain_mut(|flight| {
-            // (the nearer of the level and the bipeds; the biped struck is
-            // kept for the impact)
-            let mut struck = None;
+            // (the nearer of the level and the bipeds)
             let flew = flight.step(|from, path| {
                 let level = physics.cast_ray(from, path, Layers::LEVEL).ok().flatten();
-                struck = None;
                 match damage::first_target(&targets, from, path) {
                     Some((target, fraction, normal))
                         if level.as_ref().is_none_or(|hit| fraction < hit.fraction) =>
                     {
-                        struck = Some(target.handle);
-                        Some(Hit {
-                            fraction,
-                            point: from + path * fraction,
-                            normal,
-                            struck: Struck::Other,
+                        Some(Contact {
+                            hit: Hit {
+                                fraction,
+                                point: from + path * fraction,
+                                normal,
+                                struck: Struck::Other,
+                            },
+                            object: Some(target.handle),
+                            frame: targets
+                                .iter()
+                                .position(|other| other.handle == target.handle)
+                                .and_then(|index| frames.get(index).copied().flatten()),
                         })
                     }
-                    _ => level,
+                    _ => level.map(|hit| Contact {
+                        hit,
+                        object: None,
+                        frame: None,
+                    }),
                 }
             });
             match flew {
@@ -432,9 +548,13 @@ impl Player {
                     poses.push((flight.handle, flight.transform()));
                     true
                 }
-                Flew::Hit(mut impact) => {
-                    impact.object = struck;
-                    impacts.push(impact);
+                Flew::Hit(impact) => {
+                    fired.impacts.push(impact);
+                    objects::remove(world, flight.handle);
+                    false
+                }
+                Flew::Detonated(detonation) => {
+                    fired.detonations.push(detonation);
                     objects::remove(world, flight.handle);
                     false
                 }
@@ -445,7 +565,7 @@ impl Player {
             }
         });
         world.insert_resource(ProjectilePoses(poses));
-        impacts
+        fired
     }
 
     /// Its melee: the nearest biped within reach of its eyes along `aim`,
@@ -624,6 +744,14 @@ impl Player {
             flight.hash(hasher);
         }
     }
+}
+
+/// An object's transform, if it is in the world.
+fn frame(world: &World, handle: ObjectHandle) -> Option<Transform> {
+    let entity = world
+        .get_resource::<crate::objects::ObjectTable>()?
+        .entity(handle)?;
+    world.get::<Transform>(entity).copied()
 }
 
 /// The biped's object: its feet, turned to its facing.

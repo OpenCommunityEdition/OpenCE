@@ -1,6 +1,6 @@
 //! The weapons a player carries: the level's weapons and their
-//! projectiles (the armory), the two a player holds, and the weapons lying
-//! in the world, which keep their rounds.
+//! projectiles (the armory), the two a player holds, its grenades, and the
+//! weapons lying in the world, which keep their rounds.
 
 use bevy_ecs::prelude::*;
 use opence_content::{Level, Projectile, TagRef, Weapon};
@@ -30,10 +30,26 @@ pub struct ArmoryWeapon {
     pub projectiles: Vec<Option<(TagRef, Projectile)>>,
 }
 
-/// Every weapon of the level a player can carry.
+/// The kinds of grenade: frag, then plasma.
+pub const GRENADE_KINDS: usize = 2;
+
+/// A kind of grenade of the level: its globals' entry, and its projectile
+/// if the level has it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ArmoryGrenade {
+    /// The most a player carries.
+    pub maximum: i16,
+    /// How many a player starts with.
+    pub starting: i16,
+    /// Its projectile, if the level has it.
+    pub projectile: Option<(TagRef, Projectile)>,
+}
+
+/// Every weapon of the level a player can carry, and its grenades.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Armory {
     weapons: Vec<ArmoryWeapon>,
+    grenades: Vec<ArmoryGrenade>,
 }
 
 impl Armory {
@@ -61,7 +77,28 @@ impl Armory {
                 })
             })
             .collect();
-        Armory { weapons }
+        let grenades = level
+            .globals
+            .grenades
+            .iter()
+            .take(GRENADE_KINDS)
+            .map(|grenade| ArmoryGrenade {
+                maximum: grenade.maximum_count.max(0),
+                starting: grenade
+                    .multiplayer_spawn_default
+                    .clamp(0, grenade.maximum_count.max(0)),
+                projectile: grenade.projectile.as_ref().and_then(|tag| {
+                    let projectile = level.object(tag)?.projectile.clone()?;
+                    Some((tag.clone(), projectile))
+                }),
+            })
+            .collect();
+        Armory { weapons, grenades }
+    }
+
+    /// The grenade of `kind` (0 frag, 1 plasma).
+    pub fn grenade(&self, kind: usize) -> Option<&ArmoryGrenade> {
+        self.grenades.get(kind)
     }
 
     /// The weapon of `tag`'s place.
@@ -101,6 +138,10 @@ pub struct Inventory {
     pub weapons: Vec<Carried>,
     /// The one in its hands.
     pub current: usize,
+    /// Its grenades of each kind.
+    pub grenades: [i16; GRENADE_KINDS],
+    /// The kind it throws.
+    pub grenade: usize,
 }
 
 impl Inventory {
@@ -117,9 +158,40 @@ impl Inventory {
                 })
             })
             .collect();
+        let mut grenades = [0; GRENADE_KINDS];
+        for (kind, count) in grenades.iter_mut().enumerate() {
+            *count = armory.grenade(kind).map_or(0, |grenade| grenade.starting);
+        }
         Inventory {
             weapons,
             current: 0,
+            grenades,
+            grenade: 0,
+        }
+    }
+
+    /// Readies the next kind of grenade it has any of; false if it has no
+    /// other.
+    pub fn switch_grenade(&mut self) -> bool {
+        let next = (1..GRENADE_KINDS)
+            .map(|step| (self.grenade + step) % GRENADE_KINDS)
+            .find(|&kind| self.grenades[kind] > 0);
+        match next {
+            Some(kind) => {
+                self.grenade = kind;
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Gives it `count` grenades of `kind`, up to the armory's maximum.
+    pub fn give_grenades(&mut self, armory: &Armory, kind: usize, count: i16) {
+        let Some(maximum) = armory.grenade(kind).map(|grenade| grenade.maximum) else {
+            return;
+        };
+        if let Some(carried) = self.grenades.get_mut(kind) {
+            *carried = carried.saturating_add(count).clamp(0, maximum);
         }
     }
 
@@ -170,6 +242,13 @@ impl Inventory {
         for carried in &self.weapons {
             hasher.u64(carried.armory as u64);
             carried.state.hash(hasher);
+        }
+        // (none carried hashes as before grenades)
+        if self.grenades != [0; GRENADE_KINDS] || self.grenade != 0 {
+            for count in self.grenades {
+                hasher.u64(count as u64);
+            }
+            hasher.u64(self.grenade as u64);
         }
     }
 }
@@ -243,8 +322,14 @@ mod tests {
             weapon: rifle(),
             projectiles: vec![None],
         };
+        let grenade = |maximum| ArmoryGrenade {
+            maximum,
+            starting: 2,
+            projectile: None,
+        };
         Armory {
             weapons: vec![weapon("a"), weapon("b"), weapon("c")],
+            grenades: vec![grenade(4), grenade(2)],
         }
     }
 
@@ -274,6 +359,23 @@ mod tests {
         assert!(inventory.carries(1) && inventory.carries(2) && !inventory.carries(0));
         assert_eq!(armory.find(&tag("b")), Some(1));
         assert_eq!(armory.find(&tag("d")), None);
+    }
+
+    #[test]
+    fn grenades_are_given_up_to_their_maximum_and_switched_between() {
+        let armory = armory();
+        let mut inventory = Inventory::default();
+        assert!(!inventory.switch_grenade());
+        inventory.give_grenades(&armory, 1, 5);
+        assert_eq!(inventory.grenades, [0, 2]);
+        assert!(inventory.switch_grenade());
+        assert_eq!(inventory.grenade, 1);
+        assert!(!inventory.switch_grenade());
+        inventory.give_grenades(&armory, 0, 1);
+        assert!(inventory.switch_grenade());
+        assert_eq!(inventory.grenade, 0);
+        inventory.give_grenades(&armory, 2, 1);
+        assert_eq!(inventory.grenades, [1, 2]);
     }
 
     #[test]

@@ -29,8 +29,8 @@ pub use shader::{
     ChicagoMap, EnvironmentShader, ModelShaderClass, Shader, ShaderClass, TransparentChicagoShader,
 };
 pub use weapon::{
-    AimAssist, Ammunition, DamageEffect, Equipment, Grenade, Item, Magazine, MaterialResponse,
-    Projectile, Trigger, Weapon,
+    AimAssist, Ammunition, DamageEffect, Effect, Equipment, Grenade, Item, Magazine,
+    MaterialResponse, Projectile, Trigger, Weapon,
 };
 
 use rkyv::{Archive, Deserialize, Serialize};

@@ -484,3 +484,13 @@ pub struct Grenade {
     /// The projectile it is, thrown.
     pub projectile: Option<TagRef>,
 }
+
+/// An effect (`effe`), as far as the simulation reads it: the damage its
+/// parts do where it is created (a grenade's explosion).
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct Effect {
+    /// Its tag.
+    pub tag: TagRef,
+    /// The damage effects (`jpt!`) its events' parts create, in order.
+    pub damage: Vec<TagRef>,
+}

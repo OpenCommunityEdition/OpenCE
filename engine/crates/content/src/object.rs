@@ -156,6 +156,8 @@ pub struct Biped {
     pub crouching_camera_height: f32,
     /// How long it takes to crouch or stand.
     pub crouch_transition_time: f32,
+    /// How fast it throws a grenade (from its unit part).
+    pub grenade_velocity: f32,
     /// Its height, standing.
     pub collision_height_standing: f32,
     /// Its height, crouching.

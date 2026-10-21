@@ -689,6 +689,7 @@ mod tests {
             globals: Default::default(),
             damage_effects: Vec::new(),
             collision_models: Vec::new(),
+            effects: Vec::new(),
         }
     }
 

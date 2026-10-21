@@ -153,6 +153,8 @@ pub struct Simulation {
     player: Option<Player>,
     /// Where projectiles hit in the last tick.
     impacts: Vec<projectile::Impact>,
+    /// Where grenades detonated in the last tick.
+    detonations: Vec<projectile::Detonation>,
     /// What damage did in the last tick.
     damage: Vec<damage::DamageEvent>,
 }
@@ -204,6 +206,7 @@ impl Simulation {
             schedule,
             player: None,
             impacts: Vec::new(),
+            detonations: Vec::new(),
             damage: Vec::new(),
         }
     }
@@ -213,6 +216,7 @@ impl Simulation {
     pub fn step(&mut self, input: TickInput) {
         self.world.insert_resource(CurrentInput(input));
         self.impacts.clear();
+        self.detonations.clear();
         self.damage.clear();
         if let Some(player) = self.player.as_mut() {
             // (the dead neither move nor fire, though they still fall)
@@ -226,8 +230,16 @@ impl Simulation {
             let input = if dead { TickInput::default() } else { input };
             let pose = player.step(&input);
             self.world.insert_resource(pose);
-            self.impacts = player.step_weapons(&input, &mut self.world);
+            let fired = player.step_weapons(&input, &mut self.world);
+            self.impacts = fired.impacts;
+            self.detonations = fired.detonations;
             self.damage = damage::apply_impacts(&mut self.world, &self.impacts, Some(handle));
+            self.damage.extend(damage::apply_detonations(
+                &mut self.world,
+                &self.detonations,
+                Some(handle),
+                |from, to| player.level_clear(from, to),
+            ));
             if let Some(speed) = player.landed() {
                 self.damage
                     .extend(damage::apply_fall(&mut self.world, handle, speed));
@@ -275,6 +287,21 @@ impl Simulation {
     /// Where projectiles hit in the last tick.
     pub fn impacts(&self) -> &[projectile::Impact] {
         &self.impacts
+    }
+
+    /// Where grenades detonated in the last tick.
+    pub fn detonations(&self) -> &[projectile::Detonation] {
+        &self.detonations
+    }
+
+    /// Gives the player `count` grenades of `kind` (0 frag, 1 plasma), up
+    /// to the most it carries; false without a player.
+    pub fn give_grenades(&mut self, kind: usize, count: i16) -> bool {
+        let Some(player) = self.player.as_mut() else {
+            return false;
+        };
+        player.give_grenades(kind, count);
+        true
     }
 
     /// What damage did in the last tick.
