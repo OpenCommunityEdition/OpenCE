@@ -265,6 +265,36 @@ impl Player {
         })
     }
 
+    /// Stands it again at `level`'s player start `start` (it must be over
+    /// the same structure BSP), facing that start's way, with the starting
+    /// weapons and a new biped `spawn` makes; its earlier biped is left
+    /// where it fell.
+    pub(crate) fn respawn(
+        &mut self,
+        level: &Level,
+        start: usize,
+        spawn: impl FnOnce(TagRef, Transform) -> Option<ObjectHandle>,
+    ) -> Result<(), PlayerError> {
+        let place = level
+            .scenario
+            .player_starts
+            .get(start)
+            .ok_or(PlayerError::NoStart(start))?;
+        self.mover
+            .teleport(&mut self.physics, Vec3::from_array(place.position))?;
+        self.yaw = libm::remainderf(place.facing, std::f32::consts::TAU);
+        self.pitch = 0.0;
+        let body = body_transform(self.mover.position, self.yaw);
+        self.handle = spawn(self.unit.clone(), body).ok_or(PlayerError::TableFull)?;
+        self.inventory = Inventory::starting(level, &self.armory);
+        self.held = Buttons::default();
+        self.melee_ticks = 0;
+        self.landed = None;
+        self.seat = None;
+        self.seat_body = None;
+        Ok(())
+    }
+
     /// Its biped's object.
     pub fn handle(&self) -> ObjectHandle {
         self.handle
@@ -377,6 +407,15 @@ impl Player {
         let _ = self.mover.step(&mut self.physics, &movement);
         self.landed = (airborne && !self.mover.airborne).then_some(self.mover.landing_velocity);
         self.pose()
+    }
+
+    /// Puts its biped at `position`, standing still (a client's
+    /// prediction corrected by the host's); false if the physics refused.
+    pub(crate) fn teleport(&mut self, position: Vec3) -> bool {
+        if self.seat.is_some() {
+            return false;
+        }
+        self.mover.teleport(&mut self.physics, position).is_ok()
     }
 
     /// Where its object and the camera are now.
@@ -666,7 +705,10 @@ impl Player {
                 }
             }
         });
-        world.insert_resource(ProjectilePoses(poses));
+        world
+            .get_resource_or_init::<ProjectilePoses>()
+            .0
+            .extend(poses);
         fired
     }
 
@@ -993,19 +1035,26 @@ pub(crate) fn move_projectiles(
     }
 }
 
-/// Puts the player's object where its step left it, before the animations
-/// pose its nodes from there.
+/// Where each player's object and camera are this tick, the local
+/// player's first.
+#[derive(Resource, Clone, Debug, Default)]
+pub(crate) struct PlayerPoses(pub Vec<PlayerPose>);
+
+/// Puts the players' objects where their steps left them, before the
+/// animations pose their nodes from there.
 pub(crate) fn move_player(
-    pose: Option<Res<PlayerPose>>,
+    poses: Option<Res<PlayerPoses>>,
     table: Res<crate::objects::ObjectTable>,
     mut transforms: Query<&mut Transform>,
 ) {
-    let Some(pose) = pose else { return };
-    let Some(entity) = table.entity(pose.handle) else {
-        return;
-    };
-    if let Ok(mut transform) = transforms.get_mut(entity) {
-        *transform = pose.body;
+    let Some(poses) = poses else { return };
+    for pose in &poses.0 {
+        if let Some(mut transform) = table
+            .entity(pose.handle)
+            .and_then(|entity| transforms.get_mut(entity).ok())
+        {
+            *transform = pose.body;
+        }
     }
 }
 

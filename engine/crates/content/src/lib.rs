@@ -21,9 +21,10 @@ pub use hud::{
     WeaponHudMeter, WeaponHudNumber, WeaponHudState, WeaponHudStatic,
 };
 pub use level::{
-    AtmosphericFog, CollisionBsp, CollisionMaterial, EnvironmentVertex, FallingDamage, Globals,
-    Level, Lightmap, LightmapVertex, Material, ObjectPlacement, PlacementPermutation,
-    PlayerPhysics, PlayerStart, Scenario, Sky, StructureBsp,
+    AtmosphericFog, CollisionBsp, CollisionMaterial, EnvironmentVertex, FallingDamage, GameType,
+    GameTypes, Globals, ItemChoice, Level, Lightmap, LightmapVertex, Material, NetgameEquipment,
+    NetgameFlag, NetgameFlagKind, ObjectPlacement, PlacementPermutation, PlayerPhysics,
+    PlayerStart, Scenario, Sky, StructureBsp,
 };
 pub use object::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, Biped, ChangeColor,

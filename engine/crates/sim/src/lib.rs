@@ -13,6 +13,7 @@ pub mod clock;
 pub mod damage;
 pub mod debris;
 pub mod first_person;
+pub mod game;
 pub mod hash;
 pub mod hud;
 pub mod input;
@@ -37,8 +38,8 @@ use objects::{
     kind_index, Difficulty, Object, ObjectHandle, ObjectKinds, ObjectName, ObjectSpawn,
     ObjectTable, Permutation, TableFull, Team,
 };
-use opence_content::{Level, ObjectKind, Scenario};
-use player::{Player, PlayerError, PlayerPose, View};
+use opence_content::{Level, ObjectKind, Scenario, TagRef};
+use player::{Player, PlayerError, PlayerPoses, View};
 use units::{Radians, WorldUnits};
 
 /// A position and an orientation in the world, in world units.
@@ -154,9 +155,10 @@ pub enum SimSet {
 pub struct Simulation {
     world: World,
     schedule: Schedule,
-    /// The player, if there is one (its physics world is not `Sync`, so it
-    /// is kept beside the bevy world, not in it).
-    player: Option<Player>,
+    /// The players, the local player (the camera's, the HUD's) first
+    /// (their physics worlds are not `Sync`, so they are kept beside the
+    /// bevy world, not in it).
+    players: Vec<Player>,
     /// Where projectiles hit in the last tick.
     impacts: Vec<projectile::Impact>,
     /// Where grenades detonated in the last tick.
@@ -226,7 +228,7 @@ impl Simulation {
         Self {
             world,
             schedule,
-            player: None,
+            players: Vec::new(),
             impacts: Vec::new(),
             detonations: Vec::new(),
             damage: Vec::new(),
@@ -240,51 +242,91 @@ impl Simulation {
         }
     }
 
-    /// Runs one tick with `input`: the player's biped moves first, then
-    /// the world's systems run.
+    /// Runs one tick with `input` for the local player: the player's
+    /// biped moves first, then the world's systems run.
     pub fn step(&mut self, input: TickInput) {
-        self.world.insert_resource(CurrentInput(input));
+        self.step_all(&[input]);
+    }
+
+    /// Runs one tick with each player's input, in the players' order (a
+    /// player past the inputs stands still): their bipeds move and fire,
+    /// the vehicles move, then the world's systems run. The free camera
+    /// takes the first input.
+    pub fn step_all(&mut self, inputs: &[TickInput]) {
+        let first = inputs.first().copied().unwrap_or_default();
+        self.world.insert_resource(CurrentInput(first));
+        self.world
+            .insert_resource(player::ProjectilePoses::default());
         self.impacts.clear();
         self.detonations.clear();
         self.damage.clear();
         let mut ejections = Vec::new();
-        if let Some(player) = self.player.as_mut() {
-            // (the dead neither move nor fire, though they still fall)
-            let handle = player.handle();
-            let dead = self
-                .world
-                .resource::<ObjectTable>()
-                .entity(handle)
-                .and_then(|entity| self.world.get::<damage::Vitality>(entity))
-                .is_some_and(|vitality| vitality.dead);
-            let input = if dead { TickInput::default() } else { input };
-            player.step(&input);
-            // (the action button enters or leaves a seat before it picks
-            // up a weapon)
+        // (the dead neither move nor fire, though they still fall)
+        let inputs: Vec<TickInput> = (0..self.players.len())
+            .map(|index| {
+                let dead = self.players.get(index).is_some_and(|player| {
+                    self.component::<damage::Vitality>(player.handle())
+                        .is_some_and(|vitality| vitality.dead)
+                });
+                match inputs.get(index) {
+                    Some(input) if !dead => *input,
+                    _ => TickInput::default(),
+                }
+            })
+            .collect();
+        let mut actions = Vec::with_capacity(self.players.len());
+        for (player, input) in self.players.iter_mut().zip(&inputs) {
+            player.step(input);
+        }
+        if !self.players.is_empty() {
+            self.rides.adopt(&mut self.world);
+        }
+        // (the action button enters or leaves a seat before it picks up a
+        // weapon; one player at a time, so two do not take one seat)
+        for index in 0..self.players.len() {
+            let taken: Vec<player::Seated> =
+                self.players.iter().filter_map(Player::seated).collect();
+            let (Some(player), Some(input)) = (self.players.get_mut(index), inputs.get(index))
+            else {
+                continue;
+            };
             let action = input
                 .buttons
                 .pressed(player.held_buttons(), Buttons::ACTION);
-            self.rides.adopt(&mut self.world);
-            let seated = self.rides.act(&self.world, player, action);
-            self.rides.step(&mut self.world, player, &input);
-            self.world.insert_resource(player.pose());
-            let arms = self.rides.arms(player.seated(), action && !seated);
-            let fired = player.step_weapons(&input, &mut self.world, arms);
-            ejections = fired.ejections;
-            self.impacts = fired.impacts;
-            self.detonations = fired.detonations;
-            self.detonations.append(&mut self.queued_detonations);
-            self.damage = damage::apply_impacts(&mut self.world, &self.impacts, Some(handle));
-            self.damage.extend(damage::apply_detonations(
+            let seated = self.rides.act(&self.world, player, &taken, action);
+            actions.push(action && !seated);
+        }
+        self.rides.step(&mut self.world, &mut self.players, &inputs);
+        let poses = self.players.iter().map(Player::pose).collect();
+        self.world.insert_resource(PlayerPoses(poses));
+        for ((player, input), pick_up) in self.players.iter_mut().zip(&inputs).zip(actions) {
+            let arms = self.rides.arms(player.seated(), pick_up);
+            let mut fired = player.step_weapons(input, &mut self.world, arms);
+            ejections.append(&mut fired.ejections);
+            let handle = player.handle();
+            let mut damage = damage::apply_impacts(&mut self.world, &fired.impacts, Some(handle));
+            damage.extend(damage::apply_detonations(
                 &mut self.world,
-                &self.detonations,
+                &fired.detonations,
                 Some(handle),
                 |from, to| player.level_clear(from, to),
             ));
             if let Some(speed) = player.landed() {
-                self.damage
-                    .extend(damage::apply_fall(&mut self.world, handle, speed));
+                damage.extend(damage::apply_fall(&mut self.world, handle, speed));
             }
+            self.impacts.append(&mut fired.impacts);
+            self.detonations.append(&mut fired.detonations);
+            self.damage.append(&mut damage);
+        }
+        if let Some(player) = self.players.first() {
+            let queued = std::mem::take(&mut self.queued_detonations);
+            self.damage.extend(damage::apply_detonations(
+                &mut self.world,
+                &queued,
+                Some(player.handle()),
+                |from, to| player.level_clear(from, to),
+            ));
+            self.detonations.extend(queued);
         }
         self.queued_detonations.clear();
         self.schedule.run(&mut self.world);
@@ -296,7 +338,7 @@ impl Simulation {
     /// The physics of the dead and the spent: the ragdolls and this tick's
     /// casings, stepped once if either moves.
     fn update_physics(&mut self, ejections: &[debris::Ejection]) {
-        let Some(player) = self.player.as_mut() else {
+        let Some(player) = self.players.first_mut() else {
             return;
         };
         let killed: Vec<ObjectHandle> = self
@@ -329,37 +371,23 @@ impl Simulation {
 
     /// Makes the player: its biped standing at `level`'s player start
     /// `start`, moving over that start's structure BSP, the camera at its
-    /// eyes. A player there was before is removed.
+    /// eyes. The players there were before are removed.
     pub fn spawn_player(
         &mut self,
         level: &Level,
         start: usize,
     ) -> Result<ObjectHandle, PlayerError> {
-        if let Some(earlier) = self.player.take() {
+        for earlier in std::mem::take(&mut self.players) {
             self.remove(earlier.handle());
-            self.world.remove_resource::<PlayerPose>();
         }
-        let world = &mut self.world;
-        let player = Player::new(level, start, |tag, transform| {
-            objects::spawn(
-                world,
-                ObjectSpawn {
-                    kind: ObjectKind::Biped,
-                    tag,
-                    transform,
-                    name: None,
-                    permutation: None,
-                    team: None,
-                },
-            )
-            .ok()
-        })?;
+        self.world.remove_resource::<PlayerPoses>();
+        let player = self.new_player(level, start, None)?;
         let handle = player.handle();
         // (multiplayer's rules: the scenario does not yet say which it is)
         self.world
             .insert_resource(damage::DamageTable::new(level, true));
         self.rides = seats::Rides::for_level(level, player.unit(), player.armory());
-        self.player = Some(player);
+        self.players.push(player);
         self.sensor = hud::MotionSensor::default();
         self.sensor_settings = level
             .hud_globals
@@ -381,6 +409,86 @@ impl Simulation {
         Ok(handle)
     }
 
+    /// Adds another player, after the local one: its biped standing at
+    /// `level`'s player start `start`, on `team`. Its index among the
+    /// players is returned with its biped.
+    pub fn add_player(
+        &mut self,
+        level: &Level,
+        start: usize,
+        team: Option<u16>,
+    ) -> Result<(usize, ObjectHandle), PlayerError> {
+        let player = self.new_player(level, start, team)?;
+        let handle = player.handle();
+        self.players.push(player);
+        Ok((self.players.len() - 1, handle))
+    }
+
+    /// Stands player `index` again at `level`'s player start `start` with
+    /// a new biped on `team` and its starting weapons; its old biped stays
+    /// where it fell. `None` if there is no such player.
+    pub fn respawn_player(
+        &mut self,
+        index: usize,
+        level: &Level,
+        start: usize,
+        team: Option<u16>,
+    ) -> Option<Result<ObjectHandle, PlayerError>> {
+        let world = &mut self.world;
+        let player = self.players.get_mut(index)?;
+        let respawned = player.respawn(level, start, |tag, transform| {
+            biped(world, tag, transform, team)
+        });
+        let handle = player.handle();
+        if index == 0 && respawned.is_ok() {
+            self.place_player_camera();
+        }
+        Some(respawned.map(|()| handle))
+    }
+
+    /// Takes player `index` out of the game, with its biped; false if
+    /// there is no such player. The local player cannot be removed.
+    pub fn remove_player(&mut self, index: usize) -> bool {
+        if index == 0 || index >= self.players.len() {
+            return false;
+        }
+        let player = self.players.remove(index);
+        self.remove(player.handle());
+        true
+    }
+
+    /// Puts player `index`'s biped at `position`, standing still; false
+    /// if there is no such player, it is seated or the physics refused.
+    pub fn teleport_player(&mut self, index: usize, position: Vec3) -> bool {
+        let moved = self
+            .players
+            .get_mut(index)
+            .is_some_and(|player| player.teleport(position));
+        if moved && index == 0 {
+            self.place_player_camera();
+        }
+        moved
+    }
+
+    /// The players, the local player first.
+    pub fn players(&self) -> &[Player] {
+        &self.players
+    }
+
+    /// A player standing at `level`'s player start `start`, its biped on
+    /// `team`.
+    fn new_player(
+        &mut self,
+        level: &Level,
+        start: usize,
+        team: Option<u16>,
+    ) -> Result<Player, PlayerError> {
+        let world = &mut self.world;
+        Player::new(level, start, |tag, transform| {
+            biped(world, tag, transform, team)
+        })
+    }
+
     /// Where projectiles hit in the last tick.
     pub fn impacts(&self) -> &[projectile::Impact] {
         &self.impacts
@@ -394,7 +502,7 @@ impl Simulation {
     /// Detonates `detonation` in the next tick, as a grenade would (a
     /// script's explosion); nothing without a player.
     pub fn detonate(&mut self, detonation: projectile::Detonation) {
-        if self.player.is_some() {
+        if !self.players.is_empty() {
             self.queued_detonations.push(detonation);
         }
     }
@@ -427,7 +535,7 @@ impl Simulation {
     /// Gives the player `count` grenades of `kind` (0 frag, 1 plasma), up
     /// to the most it carries; false without a player.
     pub fn give_grenades(&mut self, kind: usize, count: i16) -> bool {
-        let Some(player) = self.player.as_mut() else {
+        let Some(player) = self.players.first_mut() else {
             return false;
         };
         player.give_grenades(kind, count);
@@ -442,7 +550,7 @@ impl Simulation {
     /// One tick of the motion sensor: a game tick (of 30 a second) every
     /// other tick, scanning the units other than the player's.
     fn update_motion_sensor(&mut self) {
-        let (Some(player), Some(settings)) = (self.player.as_ref(), self.sensor_settings) else {
+        let (Some(player), Some(settings)) = (self.players.first(), self.sensor_settings) else {
             return;
         };
         let tick = self.world.resource::<Tick>().0;
@@ -515,7 +623,7 @@ impl Simulation {
     /// One tick of the first-person weapon, posed from the camera: shown
     /// only out of a living player's eyes.
     fn update_first_person(&mut self) {
-        let Some(player) = self.player.as_ref() else {
+        let Some(player) = self.players.first() else {
             self.first_person.hide();
             return;
         };
@@ -541,7 +649,7 @@ impl Simulation {
     /// What the HUD shows: the player's shield, health, weapon, grenades
     /// and motion sensor; `None` without a player.
     pub fn hud(&self) -> Option<hud::HudState> {
-        let player = self.player.as_ref()?;
+        let player = self.players.first()?;
         let vitality = self.component::<damage::Vitality>(player.handle());
         let (yaw, _) = player.look();
         let inventory = player.inventory();
@@ -569,9 +677,9 @@ impl Simulation {
         })
     }
 
-    /// The player, if there is one.
+    /// The local player, if there is one.
     pub fn player(&self) -> Option<&Player> {
-        self.player.as_ref()
+        self.players.first()
     }
 
     /// The vehicles in the world, and their seats.
@@ -581,7 +689,7 @@ impl Simulation {
 
     /// Sees from `view`; false without a player.
     pub fn set_player_view(&mut self, view: View) -> bool {
-        let Some(player) = self.player.as_mut() else {
+        let Some(player) = self.players.first_mut() else {
             return false;
         };
         player.set_view(view);
@@ -591,14 +699,15 @@ impl Simulation {
 
     /// The camera at the player's view now, as if it had always been there.
     fn place_player_camera(&mut self) {
-        let Some(player) = self.player.as_ref() else {
+        let Some(player) = self.players.first() else {
             return;
         };
         let pose = player.pose();
         let mut camera = self.camera();
         camera.transform = pose.camera;
         self.world.insert_resource(camera);
-        self.world.insert_resource(pose);
+        let poses = self.players.iter().map(Player::pose).collect();
+        self.world.insert_resource(PlayerPoses(poses));
     }
 
     /// Runs every tick of a recording.
@@ -694,8 +803,8 @@ impl Simulation {
         objects.sort_by_key(|(id, ..)| **id);
         // (the player's own body is not seen from its eyes)
         let hidden = self
-            .player
-            .as_ref()
+            .players
+            .first()
             .filter(|player| player.view() == View::FirstPerson)
             .map(|player| ObjectId(player.handle().index));
         for (id, transform, previous, nodes, appearance) in objects {
@@ -882,12 +991,35 @@ impl Simulation {
         }
         // (nothing for no player, so that a world without one hashes as
         // it did before there were players)
-        if let Some(player) = self.player.as_ref() {
-            player.hash(&mut hasher);
+        if !self.players.is_empty() {
+            for player in &self.players {
+                player.hash(&mut hasher);
+            }
             self.rides.hash(&mut hasher);
         }
         hasher.finish()
     }
+}
+
+/// A player's biped, standing at `transform`, on `team`.
+fn biped(
+    world: &mut World,
+    tag: TagRef,
+    transform: Transform,
+    team: Option<u16>,
+) -> Option<ObjectHandle> {
+    objects::spawn(
+        world,
+        ObjectSpawn {
+            kind: ObjectKind::Biped,
+            tag,
+            transform,
+            name: None,
+            permutation: None,
+            team,
+        },
+    )
+    .ok()
 }
 
 /// Where an object was at the tick before: the renderer interpolates from
@@ -933,10 +1065,10 @@ fn move_free_camera(input: Res<CurrentInput>, mut camera: ResMut<FreeCamera>) {
 
 fn place_camera(
     free: Res<FreeCamera>,
-    player: Option<Res<PlayerPose>>,
+    players: Option<Res<PlayerPoses>>,
     mut camera: ResMut<Camera>,
 ) {
-    if let Some(player) = player {
+    if let Some(player) = players.as_ref().and_then(|players| players.0.first()) {
         camera.transform = player.camera;
     } else {
         camera.transform.position = free.position;

@@ -64,6 +64,8 @@ pub struct Globals {
     pub player_unit: Option<TagRef>,
     /// The player's biped in multiplayer.
     pub multiplayer_unit: Option<TagRef>,
+    /// The weapon that is a team's flag in Capture the Flag.
+    pub multiplayer_flag: Option<TagRef>,
     /// The grenades, frag then plasma.
     pub grenades: Vec<Grenade>,
     /// The weapons a game may give, in the game engine's order (the
@@ -233,6 +235,112 @@ pub struct Scenario {
     pub player_starts: Vec<PlayerStart>,
     /// The objects it places, kind by kind in the scenario's order.
     pub placements: Vec<ObjectPlacement>,
+    /// Its multiplayer flags: the flags' stands, the hills, the race's
+    /// checkpoints, the teleporters.
+    pub netgame_flags: Vec<NetgameFlag>,
+    /// The weapons and equipment a multiplayer game places, and places
+    /// again when they are taken.
+    pub netgame_equipment: Vec<NetgameEquipment>,
+}
+
+/// The game types something in a scenario is for, as Halo gives them: four
+/// entries, each a game type, all of them (12), all but CTF (13) or all but
+/// CTF and Race (14).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Archive, Serialize, Deserialize)]
+pub struct GameTypes(pub [i16; 4]);
+
+/// A multiplayer game type, numbered as Halo numbers its game engines.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum GameType {
+    /// Capture the Flag.
+    CaptureTheFlag = 1,
+    /// Slayer.
+    Slayer = 2,
+    /// Oddball.
+    Oddball = 3,
+    /// King of the Hill.
+    King = 4,
+    /// Race.
+    Race = 5,
+}
+
+impl GameTypes {
+    /// Whether it is for `game` (Halo's `match_game_type`).
+    pub fn matches(&self, game: GameType) -> bool {
+        let game = game as i16;
+        self.0.iter().any(|&entry| match entry {
+            12 => true,
+            13 => game != GameType::CaptureTheFlag as i16,
+            14 => game != GameType::CaptureTheFlag as i16 && game != GameType::Race as i16,
+            entry => entry == game,
+        })
+    }
+}
+
+/// What a multiplayer flag marks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
+pub enum NetgameFlagKind {
+    /// A team's flag stand.
+    CtfFlag,
+    /// Where a team's vehicle stands in CTF.
+    CtfVehicle,
+    /// Where the ball starts.
+    Oddball,
+    /// A checkpoint of the race's track.
+    RaceTrack,
+    /// Where a vehicle stands in Race.
+    RaceVehicle,
+    /// A bank (unused by the stock game types).
+    VegasBank,
+    /// A teleporter's entrance.
+    TeleporterSource,
+    /// A teleporter's exit.
+    TeleporterTarget,
+    /// A corner of a hill.
+    Hill,
+}
+
+/// A multiplayer flag, as the scenario gives it.
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct NetgameFlag {
+    /// What it marks.
+    pub kind: NetgameFlagKind,
+    /// Its team (for a teleporter, its channel; for the race, its order).
+    pub team: u16,
+    /// Where it is.
+    pub position: [f32; 3],
+    /// The way it faces: radians left from +x.
+    pub facing: f32,
+}
+
+/// An item a multiplayer game places, chosen from its item collection
+/// each time.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct NetgameEquipment {
+    /// The game types it is for.
+    pub game_types: GameTypes,
+    /// The team it is for (0: either).
+    pub team: u16,
+    /// Whether it floats where it is placed rather than falling.
+    pub levitate: bool,
+    /// Seconds before it is placed again once taken (none: its collection's,
+    /// or the game's default).
+    pub spawn_seconds: Option<u16>,
+    /// Where it is.
+    pub position: [f32; 3],
+    /// The way it faces: radians left from +x.
+    pub facing: f32,
+    /// The items it is chosen from, each with its weight.
+    pub items: Vec<ItemChoice>,
+}
+
+/// One of the items of an item collection.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ItemChoice {
+    /// The weapon or equipment.
+    pub item: TagRef,
+    /// How likely it is, against the others' weights.
+    pub weight: f32,
 }
 
 /// An object the scenario places.
@@ -284,6 +392,8 @@ pub struct PlayerStart {
     pub team: u16,
     /// The structure BSP it is in (none: any).
     pub structure_bsp: Option<u16>,
+    /// The game types it is for.
+    pub game_types: GameTypes,
 }
 
 /// A structure BSP: the level's fixed geometry, its lightmaps and its

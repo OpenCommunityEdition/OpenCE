@@ -94,6 +94,7 @@ pub fn import_globals(cache: &Cache) -> Result<Globals, ImportError> {
         1,
     )?;
     if let Some(multiplayer) = multiplayer.get(0) {
+        imported.multiplayer_flag = reference(&multiplayer, 0x00, "flag")?;
         imported.multiplayer_unit = reference(&multiplayer, 0x10, "unit")?;
     }
 

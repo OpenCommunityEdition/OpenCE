@@ -12,7 +12,6 @@ use glam::{Quat, Vec3};
 use opence_content::{
     AnimationNode, Level, Model, ObjectKind, Physics, TagRef, Vehicle, VehicleSeat, Weapon,
 };
-use opence_physics::World as PhysicsWorld;
 
 use crate::animation::{
     base_orientations, model_orientations, node_matrices, standing_animation, NodeMatrix,
@@ -299,10 +298,10 @@ impl Rides {
     /// The seat nearest a unit centred at `centre` it can enter, as
     /// `unit_find_nearby_seat` chooses: within reach of its entrance or
     /// its marker, of a vehicle not destroyed, the player's graph having
-    /// its label, and needing no driver (the player is the only rider); a
-    /// driver's seat is kept over another unless that one is half as near
-    /// again.
-    fn nearby_seat(&self, world: &World, centre: Vec3) -> Option<(usize, usize)> {
+    /// its label, not `taken`, and needing no driver unless the vehicle
+    /// has one; a driver's seat is kept over another unless that one is
+    /// half as near again.
+    fn nearby_seat(&self, world: &World, centre: Vec3, taken: &[Seated]) -> Option<(usize, usize)> {
         let mut best: Option<(usize, usize, f32, bool)> = None;
         for (index, ride) in self.rides.iter().enumerate() {
             if destroyed(world, ride.handle) {
@@ -311,8 +310,18 @@ impl Rides {
             let Some(kind) = self.kinds.get(ride.kind) else {
                 continue;
             };
+            let aboard: Vec<&Seated> = taken
+                .iter()
+                .filter(|seated| seated.vehicle == ride.handle)
+                .collect();
+            let driven = aboard
+                .iter()
+                .any(|seated| seated.flags & VehicleSeat::DRIVER != 0);
             for (seat, place) in kind.seats.iter().enumerate() {
-                if !place.fits || place.flags & VehicleSeat::REQUIRES_DRIVER != 0 {
+                if !place.fits
+                    || (place.flags & VehicleSeat::REQUIRES_DRIVER != 0 && !driven)
+                    || aboard.iter().any(|seated| seated.seat == seat)
+                {
                     continue;
                 }
                 let distance = at(&ride.pose, place.entrance)
@@ -336,7 +345,13 @@ impl Rides {
 
     /// With the action button pressed, the player leaves its seat by its
     /// entrance, or enters the nearest it can; whether it did either.
-    pub(crate) fn act(&mut self, world: &World, player: &mut Player, pressed: bool) -> bool {
+    pub(crate) fn act(
+        &mut self,
+        world: &World,
+        player: &mut Player,
+        taken: &[Seated],
+        pressed: bool,
+    ) -> bool {
         if !pressed {
             return false;
         }
@@ -348,7 +363,7 @@ impl Rides {
             return true;
         }
         let centre = player.mover().position + player.pose().body.rotation * self.centre;
-        let Some((index, seat)) = self.nearby_seat(world, centre) else {
+        let Some((index, seat)) = self.nearby_seat(world, centre, taken) else {
             return false;
         };
         let ride = &self.rides[index];
@@ -377,26 +392,41 @@ impl Rides {
     /// moves, driven by the player if it drives it; between, each is put
     /// halfway from its last game tick to this. The player is put in its
     /// seat, or thrown out of a vehicle destroyed or gone.
-    pub(crate) fn step(&mut self, world: &mut World, player: &mut Player, input: &TickInput) {
+    pub(crate) fn step(&mut self, world: &mut World, players: &mut [Player], inputs: &[TickInput]) {
         let tick = world.resource::<crate::Tick>().0;
         let game_tick = tick.is_multiple_of(TICKS_PER_GAME_TICK);
-        let seated = player.seated();
-        let (_, aim) = player.aim();
-        let physics: &PhysicsWorld = player.physics();
+        let riders: Vec<(Option<Seated>, Quat)> = players
+            .iter()
+            .map(|player| (player.seated(), player.aim().1))
+            .collect();
+        let Some(physics) = players.first().map(Player::physics) else {
+            return;
+        };
         let mut poses = Vec::with_capacity(self.rides.len());
         for ride in &mut self.rides {
             let Some(kind) = self.kinds.get(ride.kind) else {
                 continue;
             };
             let dead = destroyed(world, ride.handle);
-            let rider = seated.filter(|seated| seated.vehicle == ride.handle && !dead);
+            let aboard = |seat: u32, not: u32| {
+                riders.iter().enumerate().find(|(_, (seated, _))| {
+                    seated.is_some_and(|seated| {
+                        seated.vehicle == ride.handle
+                            && seated.flags & seat != 0
+                            && seated.flags & not == 0
+                    })
+                })
+            };
+            let driving = aboard(VehicleSeat::DRIVER, 0).filter(|_| !dead);
+            let gunning = aboard(VehicleSeat::GUNNER, VehicleSeat::DRIVER).filter(|_| !dead);
+            let ridden = !dead
+                && riders
+                    .iter()
+                    .any(|(seated, _)| seated.is_some_and(|seated| seated.vehicle == ride.handle));
             if game_tick {
                 ride.previous = (ride.state.origin(&kind.physics), ride.state.rotation());
-                let driver = rider.is_some_and(|seated| seated.flags & VehicleSeat::DRIVER != 0);
-                let gunner = rider.is_some_and(|seated| {
-                    seated.flags & VehicleSeat::GUNNER != 0
-                        && seated.flags & VehicleSeat::DRIVER == 0
-                });
+                let driver = driving.is_some();
+                let gunner = gunning.is_some();
                 for (seat, (power, timing)) in ride
                     .power
                     .iter_mut()
@@ -413,23 +443,23 @@ impl Rides {
                         *power = if on { 1.0 } else { 0.0 };
                     }
                 }
-                let controls = if driver {
-                    VehicleControls {
+                let driven = driving.and_then(|(index, (_, aim))| Some((inputs.get(index)?, aim)));
+                let controls = match driven {
+                    Some((input, aim)) => VehicleControls {
                         throttle: player::throttle(input),
-                        facing: aim * Vec3::X,
+                        facing: *aim * Vec3::X,
                         jump: input.buttons.contains(crate::input::Buttons::JUMP),
                         crouch: input.buttons.contains(crate::input::Buttons::CROUCH),
                         seat_power: ride.power,
                         ai: false,
-                    }
-                } else {
-                    VehicleControls {
+                    },
+                    None => VehicleControls {
                         facing: ride.state.forward,
                         seat_power: ride.power,
                         ..VehicleControls::default()
-                    }
+                    },
                 };
-                if rider.is_some() || !ride.state.at_rest {
+                if ridden || !ride.state.at_rest {
                     let level = VehicleLevel {
                         world: physics,
                         floor: 0.0,
@@ -467,26 +497,29 @@ impl Rides {
             poses.push((ride.handle, ride.pose));
         }
         world.insert_resource(RidePoses(poses));
-        let Some(seated) = seated else {
-            return;
-        };
-        let ride = self.ride(seated.vehicle);
-        match ride {
-            Some(ride) if !destroyed(world, ride.handle) && !destroyed(world, player.handle()) => {
-                let position = self
-                    .seat(seated.vehicle, seated.seat)
-                    .unwrap_or(ride.pose.position);
-                player.place_in_seat(Transform {
-                    position,
-                    ..ride.pose
-                });
-            }
-            _ => {
-                // (thrown out by its entrance, or where it sat)
-                let exit = self
-                    .entrance(seated.vehicle, seated.seat)
-                    .unwrap_or(player.mover().position);
-                player.stand(exit);
+        for player in players.iter_mut() {
+            let Some(seated) = player.seated() else {
+                continue;
+            };
+            match self.ride(seated.vehicle) {
+                Some(ride)
+                    if !destroyed(world, ride.handle) && !destroyed(world, player.handle()) =>
+                {
+                    let position = self
+                        .seat(seated.vehicle, seated.seat)
+                        .unwrap_or(ride.pose.position);
+                    player.place_in_seat(Transform {
+                        position,
+                        ..ride.pose
+                    });
+                }
+                _ => {
+                    // (thrown out by its entrance, or where it sat)
+                    let exit = self
+                        .entrance(seated.vehicle, seated.seat)
+                        .unwrap_or(player.mover().position);
+                    player.stand(exit);
+                }
             }
         }
     }

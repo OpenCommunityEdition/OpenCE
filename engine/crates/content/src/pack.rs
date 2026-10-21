@@ -24,7 +24,7 @@ use rkyv::util::AlignedVec;
 use crate::Level;
 
 /// The version of this format; a pack of another is not read.
-pub const FORMAT_VERSION: u32 = 13;
+pub const FORMAT_VERSION: u32 = 14;
 
 const MAGIC: [u8; 4] = *b"OCPK";
 const HEADER_SIZE: usize = 0x28;
@@ -171,8 +171,16 @@ mod tests {
                     facing: 0.5,
                     team: 1,
                     structure_bsp: Some(0),
+                    game_types: crate::GameTypes([12, 0, 0, 0]),
                 }],
                 placements: Vec::new(),
+                netgame_flags: vec![crate::NetgameFlag {
+                    kind: crate::NetgameFlagKind::CtfFlag,
+                    team: 1,
+                    position: [0.0, 1.0, 2.0],
+                    facing: 0.0,
+                }],
+                netgame_equipment: Vec::new(),
             },
             structure_bsps: vec![StructureBsp {
                 path: bsp.path,

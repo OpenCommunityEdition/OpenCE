@@ -395,6 +395,8 @@ mod tests {
                 placement(ObjectKind::Weapon, "weapons\\pistol\\pistol", 1 << 1),
                 placement(ObjectKind::Machine, "levels\\test\\door", 0),
             ],
+            netgame_flags: Vec::new(),
+            netgame_equipment: Vec::new(),
         }
     }
 

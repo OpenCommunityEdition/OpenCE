@@ -13,7 +13,8 @@ use opence_content::level::{
 };
 use opence_content::{
     AnimationGraph, AtmosphericFog, CollisionBsp, CollisionMaterial, CollisionModel, DamageEffect,
-    Effect, EnvironmentVertex, Globals, Group, Level, Lightmap, LightmapVertex, Material, Model,
+    Effect, EnvironmentVertex, GameTypes, Globals, Group, ItemChoice, Level, Lightmap,
+    LightmapVertex, Material, Model, NetgameEquipment, NetgameFlag, NetgameFlagKind,
     ObjectDefinition, ObjectKind, ObjectPlacement, PlacementPermutation, PlayerStart, Scenario,
     Sky, StructureBsp, TagRef,
 };
@@ -36,6 +37,16 @@ const MAX_STRUCTURE_BSPS: usize = 32;
 pub(crate) const SCENARIO_PLAYER_STARTS_OFFSET: usize = 0x354;
 pub(crate) const PLAYER_START_SIZE: usize = 0x34;
 const MAX_PLAYER_STARTS: usize = 256;
+pub(crate) const SCENARIO_NETGAME_FLAGS_OFFSET: usize = 0x378;
+pub(crate) const NETGAME_FLAG_SIZE: usize = 0x94;
+const MAX_NETGAME_FLAGS: usize = 200;
+pub(crate) const SCENARIO_NETGAME_EQUIPMENT_OFFSET: usize = 0x384;
+pub(crate) const NETGAME_EQUIPMENT_SIZE: usize = 0x90;
+const MAX_NETGAME_EQUIPMENT: usize = 200;
+pub(crate) const ITMC: GroupTag = GroupTag::new(b"itmc");
+pub(crate) const ITEM_COLLECTION_SIZE: usize = 0x5C;
+pub(crate) const ITEM_PERMUTATION_SIZE: usize = 0x54;
+const MAX_ITEM_PERMUTATIONS: usize = 32767;
 pub(crate) const SCENARIO_SKIES_OFFSET: usize = 0x30;
 const SKY_REFERENCE_SIZE: usize = 0x10;
 const MAX_SKIES: usize = 8;
@@ -158,23 +169,36 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     }
 
     let placements = import_placements(&scenario)?;
+    let netgame_flags = import_netgame_flags(&scenario)?;
+    let netgame_equipment = import_netgame_equipment(cache, &scenario)?;
     let globals = crate::globals::import_globals(cache)?;
     // (the player's bipeds, the grenades and the weapons, which no
     // placement names, are imported too)
-    let players: Vec<TagRef> = [&globals.player_unit, &globals.multiplayer_unit]
-        .into_iter()
-        .flatten()
-        .chain(
-            globals
-                .grenades
-                .iter()
-                .flat_map(|grenade| [&grenade.item, &grenade.projectile])
-                .flatten(),
-        )
-        .chain(&globals.weapons)
-        .filter(|tag| tag_index(cache, tag).is_some())
-        .cloned()
-        .collect();
+    let players: Vec<TagRef> = [
+        &globals.player_unit,
+        &globals.multiplayer_unit,
+        &globals.multiplayer_flag,
+    ]
+    .into_iter()
+    .flatten()
+    .chain(
+        globals
+            .grenades
+            .iter()
+            .flat_map(|grenade| [&grenade.item, &grenade.projectile])
+            .flatten(),
+    )
+    .chain(&globals.weapons)
+    // (and the items multiplayer games place)
+    .chain(
+        netgame_equipment
+            .iter()
+            .flat_map(|equipment| &equipment.items)
+            .map(|choice| &choice.item),
+    )
+    .filter(|tag| tag_index(cache, tag).is_some())
+    .cloned()
+    .collect();
     // (the first-person view's hands, which no object names)
     let hands: Vec<TagRef> = globals
         .first_person_hands
@@ -233,6 +257,8 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
             structure_bsps: structure_bsp_tags,
             player_starts,
             placements,
+            netgame_flags,
+            netgame_equipment,
         },
         structure_bsps,
         objects,
@@ -583,7 +609,126 @@ fn import_player_start(element: &Element<'_>, bsps: usize) -> Result<PlayerStart
         facing,
         team,
         structure_bsp,
+        game_types: game_types(element, 0x14)?,
     })
+}
+
+/// The four game types at `at`.
+fn game_types(element: &Element<'_>, at: usize) -> Result<GameTypes, ImportError> {
+    let mut types = [0; 4];
+    for (index, entry) in types.iter_mut().enumerate() {
+        *entry = element.i16(at + index * 2, "game type")?;
+    }
+    Ok(GameTypes(types))
+}
+
+/// A position and a facing, at `at`, both finite.
+fn placed(element: &Element<'_>, at: usize) -> Result<([f32; 3], f32), ImportError> {
+    let mut position = [0.0; 3];
+    for (axis, value) in position.iter_mut().enumerate() {
+        *value = element.f32(at + axis * 4, "position")?;
+    }
+    let facing = element.f32(at + 0x0C, "facing")?;
+    if !position
+        .iter()
+        .chain([&facing])
+        .all(|value| value.is_finite())
+    {
+        return Err(element.fault("position", "is not finite"));
+    }
+    Ok((position, facing))
+}
+
+/// The scenario's multiplayer flags.
+fn import_netgame_flags(scenario: &Element<'_>) -> Result<Vec<NetgameFlag>, ImportError> {
+    let flags = scenario.block(
+        SCENARIO_NETGAME_FLAGS_OFFSET,
+        "netgame flags",
+        NETGAME_FLAG_SIZE,
+        MAX_NETGAME_FLAGS,
+    )?;
+    flags
+        .iter()
+        .map(|element| {
+            let (position, facing) = placed(&element, 0)?;
+            let kind = match element.i16(0x10, "type")? {
+                0 => NetgameFlagKind::CtfFlag,
+                1 => NetgameFlagKind::CtfVehicle,
+                2 => NetgameFlagKind::Oddball,
+                3 => NetgameFlagKind::RaceTrack,
+                4 => NetgameFlagKind::RaceVehicle,
+                5 => NetgameFlagKind::VegasBank,
+                6 => NetgameFlagKind::TeleporterSource,
+                7 => NetgameFlagKind::TeleporterTarget,
+                8 => NetgameFlagKind::Hill,
+                kind => return Err(element.fault("type", format!("is {kind}, not a flag's"))),
+            };
+            Ok(NetgameFlag {
+                kind,
+                team: element.u16(0x12, "team")?,
+                position,
+                facing,
+            })
+        })
+        .collect()
+}
+
+/// The scenario's netgame equipment, each with its item collection's
+/// items. Equipment with no collection places nothing and is left out.
+fn import_netgame_equipment(
+    cache: &Cache,
+    scenario: &Element<'_>,
+) -> Result<Vec<NetgameEquipment>, ImportError> {
+    let equipment = scenario.block(
+        SCENARIO_NETGAME_EQUIPMENT_OFFSET,
+        "netgame equipment",
+        NETGAME_EQUIPMENT_SIZE,
+        MAX_NETGAME_EQUIPMENT,
+    )?;
+    let mut imported = Vec::with_capacity(equipment.len());
+    for element in equipment.iter() {
+        let Some(collection) = element.reference(0x50, "item collection", &[ITMC])? else {
+            continue;
+        };
+        let collection = cache.tag(collection, ITMC, ITEM_COLLECTION_SIZE)?;
+        let mut items = Vec::new();
+        for permutation in collection
+            .block(
+                0,
+                "permutations",
+                ITEM_PERMUTATION_SIZE,
+                MAX_ITEM_PERMUTATIONS,
+            )?
+            .iter()
+        {
+            let weight = permutation.f32(0x20, "weight")?;
+            if !weight.is_finite() || weight < 0.0 {
+                return Err(permutation.fault("weight", format!("is {weight}")));
+            }
+            if let Some(item) = permutation.reference(0x24, "item", &[])? {
+                items.push(ItemChoice {
+                    item: tag_ref(cache, item),
+                    weight,
+                });
+            }
+        }
+        let seconds = |at: usize, element: &Element<'_>| {
+            element
+                .i16(at, "spawn time")
+                .map(|seconds| u16::try_from(seconds).ok().filter(|&seconds| seconds > 0))
+        };
+        let (position, facing) = placed(&element, 0x40)?;
+        imported.push(NetgameEquipment {
+            game_types: game_types(&element, 4)?,
+            team: element.u16(0x0C, "team")?,
+            levitate: element.u32(0, "flags")? & 1 != 0,
+            spawn_seconds: seconds(0x0E, &element)?.or(seconds(0x0C, &collection)?),
+            position,
+            facing,
+            items,
+        });
+    }
+    Ok(imported)
 }
 
 /// Each kind's placements: its block in the scenario (its palette is the
@@ -1618,6 +1763,39 @@ pub(crate) mod tests {
         put(&mut equipment, 4, &1u16.to_le_bytes());
         let equipment = fake.add_data(&equipment);
         block(scenario, 0x258, 1, equipment);
+
+        // a red flag stand, and the pack as netgame equipment for Slayer,
+        // placed again after 45 s
+        let mut flag = vec![0u8; NETGAME_FLAG_SIZE];
+        for (at, value) in [(0, 7.0f32), (4, 8.0), (8, 9.0), (0x0C, 0.25)] {
+            put(&mut flag, at, &value.to_le_bytes());
+        }
+        put(&mut flag, 0x10, &0i16.to_le_bytes());
+        put(&mut flag, 0x12, &0u16.to_le_bytes());
+        let flag = fake.add_data(&flag);
+        block(scenario, SCENARIO_NETGAME_FLAGS_OFFSET, 1, flag);
+        let mut permutation = vec![0u8; ITEM_PERMUTATION_SIZE];
+        put(&mut permutation, 0x20, &2.0f32.to_le_bytes());
+        reference(
+            &mut permutation,
+            0x24,
+            GroupTag::new(b"eqip"),
+            fake.handle(pack),
+        );
+        let permutation = fake.add_data(&permutation);
+        let mut collection = vec![0u8; ITEM_COLLECTION_SIZE];
+        block(&mut collection, 0, 1, permutation);
+        put(&mut collection, 0x0C, &45i16.to_le_bytes());
+        let collection = fake.add_tag(ITMC, "powerups\\packs", &collection);
+        let mut equipment = vec![0u8; NETGAME_EQUIPMENT_SIZE];
+        put(&mut equipment, 0, &1u32.to_le_bytes());
+        put(&mut equipment, 4, &2i16.to_le_bytes());
+        for (at, value) in [(0x40, 1.0f32), (0x44, 2.0), (0x48, 3.0), (0x4C, 0.5)] {
+            put(&mut equipment, at, &value.to_le_bytes());
+        }
+        reference(&mut equipment, 0x50, ITMC, fake.handle(collection));
+        let equipment = fake.add_data(&equipment);
+        block(scenario, SCENARIO_NETGAME_EQUIPMENT_OFFSET, 1, equipment);
     }
 
     fn import(kind: CacheKind, breaks: &Breaks) -> Result<Level, String> {
@@ -1651,8 +1829,38 @@ pub(crate) mod tests {
                     facing: 1.5,
                     team: 2,
                     structure_bsp: Some(0),
+                    game_types: GameTypes::default(),
                 }]
             );
+            assert_eq!(
+                level.scenario.netgame_flags,
+                [NetgameFlag {
+                    kind: NetgameFlagKind::CtfFlag,
+                    team: 0,
+                    position: [7.0, 8.0, 9.0],
+                    facing: 0.25,
+                }]
+            );
+            let pack = TagRef {
+                group: Group(*b"eqip"),
+                path: "powerups\\pack".into(),
+            };
+            assert_eq!(
+                level.scenario.netgame_equipment,
+                [NetgameEquipment {
+                    game_types: GameTypes([2, 0, 0, 0]),
+                    team: 0,
+                    levitate: true,
+                    spawn_seconds: Some(45),
+                    position: [1.0, 2.0, 3.0],
+                    facing: 0.5,
+                    items: vec![ItemChoice {
+                        item: pack.clone(),
+                        weight: 2.0,
+                    }],
+                }]
+            );
+            assert!(level.objects.iter().any(|object| object.tag == pack));
             assert_eq!(
                 level.scenario.placements,
                 [
