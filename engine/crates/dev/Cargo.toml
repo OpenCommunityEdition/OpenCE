@@ -1,0 +1,14 @@
+[package]
+name = "opence_dev"
+description = "The developer's tools: a registry of commands and variables, shared by the shell, the control socket and the test driver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+serde_json = "1"
+
+[lints]
+workspace = true

@@ -853,6 +853,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "opence_dev"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "opence_ffi"
 version = "0.1.0"
 dependencies = [
@@ -906,6 +914,7 @@ version = "0.1.0"
 dependencies = [
  "opence_content",
  "opence_import",
+ "thiserror",
 ]
 
 [[package]]

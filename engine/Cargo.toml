@@ -18,6 +18,7 @@ opence_import = { path = "crates/import" }
 opence_sim = { path = "crates/sim" }
 opence_physics = { path = "crates/physics" }
 opence_script = { path = "crates/script" }
+opence_dev = { path = "crates/dev" }
 opence_net = { path = "crates/net" }
 opence_campaign = { path = "crates/campaign" }
 thiserror = "2"

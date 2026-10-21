@@ -11,12 +11,14 @@
 //! engine's global the scenario names but no system registered is reported
 //! by [`Runtime::missing`], and returns its type's default.
 
+mod console;
 mod value;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use opence_content::{Constant, NodeKind, ScriptKind, Scripts, ValueType};
+use opence_content::{Constant, NodeKind, ScriptKind, Scripts, TagRef, ValueType};
 
+pub use console::{ConsoleError, MAX_DEPTH, MAX_TEXT};
 pub use value::{cast, Value};
 
 /// The game ticks a second (the simulation's).
@@ -50,6 +52,17 @@ pub trait World {
 
     /// Writes a line to the console (`inspect`).
     fn print(&mut self, _text: &str) {}
+
+    /// The index of what a name typed at the console names, of this type
+    /// (an object's name, a trigger volume, an encounter): `-1` for none.
+    fn name_index(&mut self, _value_type: ValueType, _name: &str) -> i32 {
+        -1
+    }
+
+    /// The tag a path typed at the console names, of this type.
+    fn tag_of(&mut self, _value_type: ValueType, _path: &str) -> Option<TagRef> {
+        None
+    }
 }
 
 /// A function a system gives the scripts: it takes its arguments, each
@@ -260,6 +273,8 @@ pub struct Runtime<W> {
     functions: Vec<Function<W>>,
     globals: Vec<Value>,
     externals: Vec<External>,
+    function_names: BTreeMap<String, usize>,
+    external_names: BTreeMap<String, usize>,
     threads: Vec<Thread>,
     time: u32,
     missing: BTreeSet<Missing>,
@@ -337,6 +352,8 @@ impl<W: World> Runtime<W> {
             functions,
             globals,
             externals,
+            function_names: names,
+            external_names,
             threads,
             time: 0,
             missing,
@@ -465,6 +482,55 @@ impl<W: World> Runtime<W> {
             Some(value) if finished => value,
             _ => Value::default_of(self.node_type(root)),
         }
+    }
+
+    /// Evaluates a line typed at the console: the expression, typed by
+    /// the functions it calls and its names looked up in the world, run to
+    /// its end; its value and type. A bare line is a call (`unit_kill
+    /// marine`). The scripts are left as they were.
+    pub fn evaluate_text(
+        &mut self,
+        text: &str,
+        world: &mut W,
+    ) -> Result<(Value, ValueType), ConsoleError> {
+        let names = console::Names {
+            scripts: &self.scripts,
+            functions: &self.functions,
+            function_names: &self.function_names,
+            externals: &self.externals,
+            external_names: &self.external_names,
+        };
+        let nodes = console::compile(text, &names, world)?;
+        let base = self.scripts.nodes.len();
+        let Some(root) = u32::try_from(base + nodes.len() - 1).ok() else {
+            return Err(ConsoleError::Syntax(
+                "the scripts have too many nodes".into(),
+            ));
+        };
+        self.scripts.nodes.extend(nodes);
+        let mut missing = BTreeSet::new();
+        for node in base..self.scripts.nodes.len() {
+            let resolved = resolve(
+                &self.scripts,
+                node,
+                &self.function_names,
+                &self.functions,
+                &self.external_names,
+                &mut missing,
+            );
+            self.resolved.push(resolved);
+        }
+        let result = if missing.is_empty() {
+            let value_type = self.node_type(root);
+            Ok((self.evaluate(root, world), value_type))
+        } else {
+            Err(ConsoleError::Syntax(format!(
+                "cannot evaluate: {missing:?}"
+            )))
+        };
+        self.scripts.nodes.truncate(base);
+        self.resolved.truncate(base);
+        result
     }
 
     fn node_type(&self, node: u32) -> ValueType {
