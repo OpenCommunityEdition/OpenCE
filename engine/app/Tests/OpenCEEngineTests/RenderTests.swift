@@ -352,3 +352,31 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(renderer.lastModelPartCount, 0)
     }
 }
+
+/// The sky's model drawn behind everything at infinity, and its fog over
+/// the level and the objects.
+final class SkyTests: XCTestCase {
+    func testTheFogPlaneMeasuresAlongTheView() {
+        let camera = ViewCamera(position: [10, 0, 0], yaw: 0, pitch: 0, verticalFov: 1)
+        let fog = RenderFog(color: [0.5, 0.6, 0.7], maximumDensity: 0.75, startDistance: 10, endDistance: 110)
+        let frame = FrameUniforms(viewProjection: matrix_identity_float4x4, camera: camera, fog: fog)
+        let amount = { (point: SIMD3<Float>) in
+            min(max(dot(SIMD3(frame.fogPlane.x, frame.fogPlane.y, frame.fogPlane.z), point) + frame.fogPlane.w, 0),
+                1) * frame.fogColor.w
+        }
+        XCTAssertEqual(amount([15, 0, 0]), 0)
+        XCTAssertEqual(amount([70, 40, 0]), 0.375, accuracy: 1e-5)
+        XCTAssertEqual(amount([500, 0, 0]), 0.75, accuracy: 1e-5)
+        let none = FrameUniforms(viewProjection: matrix_identity_float4x4, camera: camera, fog: nil)
+        XCTAssertEqual(none.fogColor.w, 0)
+    }
+
+    func testBloodGulchsSkyIsDrawn() throws {
+        let level = try StockLevel(map: "bloodgulch")
+        let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
+        let fog = try XCTUnwrap(renderer.fog)
+        XCTAssertEqual(fog.color.count, 3)
+        _ = try renderer.capture(width: 640, height: 360, camera: level.camera, queue: level.queue)
+        XCTAssertGreaterThan(renderer.lastSkyPartCount, 0)
+    }
+}

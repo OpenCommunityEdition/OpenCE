@@ -9,6 +9,7 @@
 
 pub mod render_level;
 pub mod render_model;
+pub mod render_sky;
 pub mod snapshot;
 
 use std::path::Path;
@@ -23,6 +24,7 @@ use opence_sim::units::Radians;
 use opence_sim::{FreeCamera, Simulation};
 use render_level::{RenderDraw, RenderLevel, RenderMaterial, RenderTexture, VERTEX_STRIDE};
 use render_model::{RenderModel, MODEL_VERTEX_STRIDE};
+use render_sky::RenderSky;
 use snapshot::{CameraSnapshot, NodeSnapshot, ObjectSnapshot, SnapshotBuffers, SnapshotWriter};
 
 uniffi::setup_scaffolding!();
@@ -168,6 +170,11 @@ impl LevelGeometry {
     /// The object models, which the snapshot's objects name by index.
     pub fn models(&self) -> Vec<RenderModel> {
         self.level.models.clone()
+    }
+
+    /// The level's sky: its model and its fog.
+    pub fn sky(&self) -> Option<RenderSky> {
+        self.level.sky.clone()
     }
 
     /// The BSP's bounds: least and greatest x, then y, then z.

@@ -24,6 +24,32 @@ pub enum MaterialKind {
     AlphaTested,
     /// Blended with what is behind it, after the opaque draws, far to near.
     Blended,
+    /// A shader class not imported yet (or a shader not found): drawn
+    /// opaque, plain and lit, so that the geometry is there, except in the
+    /// sky.
+    Plain,
+}
+
+/// A transparent chicago shader's map: one texture stage, combined with
+/// the result of the stages before it by the stage before's functions.
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
+pub struct RenderChicagoMap {
+    /// Its texture.
+    pub map: Option<u32>,
+    /// How the result so far combines with the next map's colour: 0 the
+    /// result, 1 the next map, 2 multiplied, 3 double-multiplied, 4 added,
+    /// 5 and 6 added signed, 7 and 8 subtracted (from the result, from the
+    /// next map), 9 to 12 blended by the result's or the next map's alpha
+    /// (or its inverse).
+    pub color_function: u8,
+    /// The same for the alpha.
+    pub alpha_function: u8,
+    /// Its alpha replaces its colour.
+    pub alpha_replicate: bool,
+    /// Its scale in u and v.
+    pub scale: Vec<f32>,
+    /// Its offset in u and v.
+    pub offset: Vec<f32>,
 }
 
 /// How a blended material combines with the frame (a chicago shader's
@@ -94,6 +120,17 @@ pub struct RenderMaterial {
     /// A model shader's change colour: 0 none, then which of the object's
     /// four change colours tints it (by the multipurpose map's alpha).
     pub change_color_source: u8,
+    /// A transparent chicago shader's maps, at most four (none for the
+    /// other classes).
+    pub chicago_maps: Vec<RenderChicagoMap>,
+}
+
+/// A chicago map's function, or the result's (0) for one out of range.
+fn chicago_function(function: i16) -> u8 {
+    u8::try_from(function)
+        .ok()
+        .filter(|&function| function <= 12)
+        .unwrap_or(0)
 }
 
 /// A draw: a material's triangles.
@@ -165,6 +202,8 @@ pub struct RenderLevel {
     pub model_indices: Vec<u32>,
     /// The level's object models, as `Level::models` orders them.
     pub models: Vec<RenderModel>,
+    /// The level's sky.
+    pub sky: Option<crate::render_sky::RenderSky>,
 }
 
 /// Gathers the level's textures and materials, each once.
@@ -214,6 +253,7 @@ impl RenderLevel {
             }
         }
         builder.out.draws.extend(blended);
+        builder.out.sky = crate::render_sky::render_sky(level);
         for model in &level.models {
             let model = builder.model(model);
             builder.out.models.push(model);
@@ -307,12 +347,26 @@ impl Builder<'_> {
                 multipurpose_map: None,
                 detail_mask: 0,
                 change_color_source: 0,
+                chicago_maps: Vec::new(),
             },
             Some(
                 ShaderClass::TransparentChicago(chicago)
                 | ShaderClass::TransparentChicagoExtended(chicago),
             ) => {
                 let first = chicago.maps.first();
+                let chicago_maps = chicago
+                    .maps
+                    .iter()
+                    .take(4)
+                    .map(|map| RenderChicagoMap {
+                        map: self.map(map.map.as_ref()),
+                        color_function: chicago_function(map.color_function),
+                        alpha_function: chicago_function(map.alpha_function),
+                        alpha_replicate: map.flags & (1 << 1) != 0,
+                        scale: vec![scale(map.scale[0]), scale(map.scale[1])],
+                        offset: map.offset.iter().map(|&offset| finite(offset)).collect(),
+                    })
+                    .collect();
                 RenderMaterial {
                     kind: MaterialKind::Blended,
                     blend: BlendFunction::from_chicago(chicago.framebuffer_blend_function),
@@ -332,13 +386,14 @@ impl Builder<'_> {
                     multipurpose_map: None,
                     detail_mask: 0,
                     change_color_source: 0,
+                    chicago_maps,
                 }
             }
             // (a class not imported yet, or a shader not found: drawn plain
             // and lit, so that the geometry is there)
             Some(ShaderClass::Model(model)) => model_material(self, model),
             Some(ShaderClass::Other(_)) | None => RenderMaterial {
-                kind: MaterialKind::Opaque,
+                kind: MaterialKind::Plain,
                 blend: BlendFunction::AlphaBlend,
                 environment_kind: 0,
                 detail_function: 0,
@@ -352,6 +407,7 @@ impl Builder<'_> {
                 multipurpose_map: None,
                 detail_mask: 0,
                 change_color_source: 0,
+                chicago_maps: Vec::new(),
             },
         };
         self.out.materials.push(material);
@@ -537,8 +593,8 @@ mod tests {
                 framebuffer_fade_source: 0,
                 extra_layers: Vec::new(),
                 maps: vec![ChicagoMap {
-                    flags: 0,
-                    color_function: 0,
+                    flags: 1 << 1,
+                    color_function: 40,
                     alpha_function: 0,
                     scale: [2.0, 0.0],
                     offset: [0.5, f32::NAN],
@@ -629,6 +685,7 @@ mod tests {
                 bitmap("lightmaps", 2, 1),
             ],
             resource_bitmaps: Vec::new(),
+            skies: Vec::new(),
         }
     }
 
@@ -713,6 +770,11 @@ mod tests {
         assert_eq!(blended.blend, BlendFunction::Add);
         assert_eq!(blended.base_scale, vec![2.0, 1.0]);
         assert_eq!(blended.base_offset, vec![0.5, 0.0]);
+        // its map's stage, its function out of range taken as the result's
+        assert_eq!(blended.chicago_maps.len(), 1);
+        assert_eq!(blended.chicago_maps[0].map, blended.base_map);
+        assert_eq!(blended.chicago_maps[0].color_function, 0);
+        assert!(blended.chicago_maps[0].alpha_replicate);
         let ground = &built.materials[built.draws[0].material as usize];
         assert_eq!(ground.environment_kind, 1);
         assert_eq!(ground.detail_function, 1);

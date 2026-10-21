@@ -55,8 +55,10 @@ final class ModelPass {
         var firstIndex: Int
         var indexCount: Int
         var blended: Bool
+        /// Of a shader class not imported yet (not drawn in the sky).
+        var plain: Bool
         var uniforms: MaterialUniforms
-        /// Base, detail, and two unused.
+        /// Base, detail, and two unused; or a chicago shader's four maps.
         var textures: [MTLTexture]
     }
 
@@ -75,12 +77,17 @@ final class ModelPass {
     let geometries: [[Draw]]
     private let opaque: MTLRenderPipelineState
     private let blended: MTLRenderPipelineState
+    private let skyOpaque: MTLRenderPipelineState
+    private let skyBlended: MTLRenderPipelineState
+    private let skyDepth: MTLDepthStencilState
     /// (one per frame in flight, grown as needed)
     private var skins: [MTLBuffer?] = [nil, nil, nil]
     private var frame = 0
 
     /// The geometries' parts drawn in the last frame, for tests.
     private(set) var lastPartCount = 0
+    /// The sky's parts drawn in the last frame, for tests.
+    private(set) var lastSkyPartCount = 0
 
     init(device: MTLDevice, library: MTLLibrary, geometry: LevelGeometry, textures: [MTLTexture?],
          white: MTLTexture) throws {
@@ -113,14 +120,17 @@ final class ModelPass {
                     let pair = { (values: [Float], fallback: Float) -> SIMD2<Float> in
                         values.count == 2 ? SIMD2(values[0], values[1]) : SIMD2(repeating: fallback)
                     }
-                    let uniforms = MaterialUniforms(
+                    var uniforms = MaterialUniforms(
                         baseScale: pair(material.baseScale, 1), baseOffset: pair(material.baseOffset, 0),
                         primaryScale: material.primaryDetailScale, secondaryScale: 1, maps: bits,
                         detailFunction: UInt32(material.detailFunction), environmentKind: 0,
-                        alphaTested: material.kind == .alphaTested ? 1 : 0)
+                        alphaTested: material.kind == .alphaTested ? 1 : 0,
+                        fogMode: FrameUniforms.fogMode(material.kind == .blended ? .alphaBlend : nil))
+                    let chicagoTextures = uniforms.chicago(material, texture: texture, white: white)
                     draws.append(Draw(firstIndex: Int(part.firstIndex), indexCount: Int(part.indexCount),
-                                      blended: material.kind == .blended, uniforms: uniforms,
-                                      textures: maps.map { $0 ?? white } + [white, white]))
+                                      blended: material.kind == .blended, plain: material.kind == .plain,
+                                      uniforms: uniforms,
+                                      textures: chicagoTextures ?? maps.map { $0 ?? white } + [white, white]))
                 }
                 geometries.append(draws)
             }
@@ -145,10 +155,10 @@ final class ModelPass {
         self.models = models
         self.geometries = geometries
 
-        func pipeline(blended: Bool) throws -> MTLRenderPipelineState {
+        func pipeline(blended: Bool, sky: Bool = false) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
-            descriptor.vertexFunction = library.makeFunction(name: "model_vertex")
-            descriptor.fragmentFunction = library.makeFunction(name: "model_fragment")
+            descriptor.vertexFunction = library.makeFunction(name: sky ? "sky_vertex" : "model_vertex")
+            descriptor.fragmentFunction = library.makeFunction(name: sky ? "sky_fragment" : "model_fragment")
             descriptor.vertexDescriptor = Self.vertexDescriptor(stride: Int(geometry.modelVertexStride()))
             descriptor.colorAttachments[0].pixelFormat = LevelRenderer.frameFormat
             descriptor.depthAttachmentPixelFormat = LevelRenderer.depthFormat
@@ -165,9 +175,20 @@ final class ModelPass {
         do {
             opaque = try pipeline(blended: false)
             blended = try pipeline(blended: true)
+            skyOpaque = try pipeline(blended: false, sky: true)
+            skyBlended = try pipeline(blended: true, sky: true)
         } catch {
             throw LevelRendererError.shaders("\(error)")
         }
+        // the sky is behind everything: drawn first, over the cleared
+        // depth, without writing it
+        let skyDepthDescriptor = MTLDepthStencilDescriptor()
+        skyDepthDescriptor.depthCompareFunction = .always
+        skyDepthDescriptor.isDepthWriteEnabled = false
+        guard let skyDepth = device.makeDepthStencilState(descriptor: skyDepthDescriptor) else {
+            throw LevelRendererError.resources("sky depth state")
+        }
+        self.skyDepth = skyDepth
     }
 
     /// A permutation's geometry at `level`, or the nearest below it, or
@@ -196,24 +217,40 @@ final class ModelPass {
     struct Prepared {
         var skins: MTLBuffer?
         var objects: [(uniforms: ModelObjectUniforms, parts: [Draw])]
+        /// The sky's, if the level has one.
+        var sky: (uniforms: ModelObjectUniforms, parts: [Draw])?
     }
 
-    func prepare(_ objects: [DrawnObject], camera: ViewCamera, viewportHeight: Int, device: MTLDevice) -> Prepared {
+    /// The highest level of detail, which the sky is always drawn at.
+    static let highestLevel = 4
+
+    func prepare(_ objects: [DrawnObject], sky: DrawnObject? = nil, camera: ViewCamera, viewportHeight: Int,
+                 device: MTLDevice) -> Prepared {
         let forward = camera.rotation.act([1, 0, 0])
         var matrices: [simd_float4x4] = []
         var drawn: [(uniforms: ModelObjectUniforms, parts: [Draw])] = []
-        for object in objects where models.indices.contains(object.model) {
+        var skyDrawn: (uniforms: ModelObjectUniforms, parts: [Draw])?
+        let all = (sky.map { [$0] } ?? []) + objects
+        for (index, object) in all.enumerated() where models.indices.contains(object.model) {
+            let isSky = sky != nil && index == 0
             let model = models[object.model]
-            let depth = dot(object.center - camera.position, forward)
-            guard depth > -object.radius else { continue }
-            let pixels = sphereDiameterPixels(depth: depth, radius: object.radius, verticalFov: camera.verticalFov,
-                                              viewportHeight: Float(viewportHeight))
-            guard let level = modelLevelOfDetail(detailCutoffs: model.cutoffs, pixels: pixels) else { continue }
+            let level: Int
+            if isSky {
+                level = Self.highestLevel
+            } else {
+                let depth = dot(object.center - camera.position, forward)
+                guard depth > -object.radius else { continue }
+                let pixels = sphereDiameterPixels(depth: depth, radius: object.radius,
+                                                  verticalFov: camera.verticalFov,
+                                                  viewportHeight: Float(viewportHeight))
+                guard let chosen = modelLevelOfDetail(detailCutoffs: model.cutoffs, pixels: pixels) else { continue }
+                level = Int(chosen)
+            }
             var parts: [Draw] = []
             for (index, region) in model.regions.enumerated() where !region.isEmpty {
                 let chosen = index < object.regions.count ? Int(object.regions[index]) : 0
                 let permutation = region[min(chosen, region.count - 1)]
-                if let geometry = permutation[Int(level)] {
+                if let geometry = permutation[level] {
                     parts += geometries[geometry]
                 }
             }
@@ -227,7 +264,12 @@ final class ModelPass {
                     matrices.append(object.transform)
                 }
             }
-            drawn.append((ModelObjectUniforms(firstNode: UInt32(first), nodeCount: UInt32(nodeCount)), parts))
+            let uniforms = ModelObjectUniforms(firstNode: UInt32(first), nodeCount: UInt32(nodeCount))
+            if isSky {
+                skyDrawn = (uniforms, parts)
+            } else {
+                drawn.append((uniforms, parts))
+            }
         }
         frame = (frame + 1) % skins.count
         let length = max(matrices.count, 1) * MemoryLayout<simd_float4x4>.stride
@@ -240,7 +282,33 @@ final class ModelPass {
             }
         }
         lastPartCount = drawn.reduce(0) { $0 + $1.parts.count }
-        return Prepared(skins: skins[frame], objects: drawn)
+        lastSkyPartCount = skyDrawn?.parts.count ?? 0
+        return Prepared(skins: skins[frame], objects: drawn, sky: skyDrawn)
+    }
+
+    /// The prepared sky, its opaque parts then its blended ones, behind
+    /// everything (the encoder's depth state is left for the caller to set).
+    func encodeSky(_ prepared: Prepared, into encoder: MTLRenderCommandEncoder) {
+        guard let skins = prepared.skins, let (uniforms, parts) = prepared.sky else { return }
+        encoder.setDepthStencilState(skyDepth)
+        encoder.setVertexBuffer(vertices, offset: 0, index: 0)
+        encoder.setVertexBuffer(skins, offset: 0, index: 2)
+        var object = uniforms
+        encoder.setVertexBytes(&object, length: MemoryLayout<ModelObjectUniforms>.stride, index: 3)
+        for blendedParts in [false, true] {
+            encoder.setRenderPipelineState(blendedParts ? skyBlended : skyOpaque)
+            for part in parts where part.blended == blendedParts && !part.plain {
+                encode(part, into: encoder)
+            }
+        }
+    }
+
+    private func encode(_ part: Draw, into encoder: MTLRenderCommandEncoder) {
+        var material = part.uniforms
+        encoder.setFragmentBytes(&material, length: MemoryLayout<MaterialUniforms>.stride, index: 0)
+        encoder.setFragmentTextures(part.textures, range: 0..<part.textures.count)
+        encoder.drawIndexedPrimitives(type: .triangle, indexCount: part.indexCount, indexType: .uint32,
+                                      indexBuffer: indices, indexBufferOffset: part.firstIndex * 4)
     }
 
     /// The prepared objects' opaque and alpha-tested parts, or their
@@ -253,12 +321,8 @@ final class ModelPass {
         for (uniforms, parts) in prepared.objects {
             var object = uniforms
             encoder.setVertexBytes(&object, length: MemoryLayout<ModelObjectUniforms>.stride, index: 3)
-            for part in parts where part.blended == blendedParts {
-                var material = part.uniforms
-                encoder.setFragmentBytes(&material, length: MemoryLayout<MaterialUniforms>.stride, index: 0)
-                encoder.setFragmentTextures(part.textures, range: 0..<part.textures.count)
-                encoder.drawIndexedPrimitives(type: .triangle, indexCount: part.indexCount, indexType: .uint32,
-                                              indexBuffer: indices, indexBufferOffset: part.firstIndex * 4)
+            for part in parts where part.blended == blendedParts && !part.plain {
+                encode(part, into: encoder)
             }
         }
     }

@@ -12,9 +12,9 @@ use opence_content::level::{
     CollisionVertex,
 };
 use opence_content::{
-    AnimationGraph, CollisionBsp, CollisionMaterial, EnvironmentVertex, Group, Level, Lightmap,
-    LightmapVertex, Material, Model, ObjectDefinition, ObjectKind, ObjectPlacement,
-    PlacementPermutation, PlayerStart, Scenario, StructureBsp, TagRef,
+    AnimationGraph, AtmosphericFog, CollisionBsp, CollisionMaterial, EnvironmentVertex, Group,
+    Level, Lightmap, LightmapVertex, Material, Model, ObjectDefinition, ObjectKind,
+    ObjectPlacement, PlacementPermutation, PlayerStart, Scenario, Sky, StructureBsp, TagRef,
 };
 
 use crate::cache::Cache;
@@ -26,6 +26,7 @@ pub(crate) const SCNR: GroupTag = GroupTag::new(b"scnr");
 pub(crate) const SBSP: GroupTag = GroupTag::new(b"sbsp");
 pub(crate) const SHDR: GroupTag = GroupTag::new(b"shdr");
 pub(crate) const BITM: GroupTag = GroupTag::new(b"bitm");
+pub(crate) const SKY: GroupTag = GroupTag::new(b"sky ");
 
 pub(crate) const SCENARIO_SIZE: usize = 0x5B0;
 pub(crate) const SCENARIO_BSPS_OFFSET: usize = 0x5A4;
@@ -34,6 +35,13 @@ const MAX_STRUCTURE_BSPS: usize = 32;
 pub(crate) const SCENARIO_PLAYER_STARTS_OFFSET: usize = 0x354;
 pub(crate) const PLAYER_START_SIZE: usize = 0x34;
 const MAX_PLAYER_STARTS: usize = 256;
+pub(crate) const SCENARIO_SKIES_OFFSET: usize = 0x30;
+const SKY_REFERENCE_SIZE: usize = 0x10;
+const MAX_SKIES: usize = 8;
+/// A sky, as far as its indoor fog's screen.
+pub(crate) const SKY_SIZE: usize = 0xA8;
+const SKY_OUTDOOR_FOG_OFFSET: usize = 0x58;
+const SKY_INDOOR_FOG_OFFSET: usize = 0x78;
 
 pub(crate) const BSP_HEADER_SIZE: usize = 0x18;
 pub(crate) const BSP_HEADER_SIGNATURE_OFFSET: usize = 0x14;
@@ -149,8 +157,9 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     }
 
     let placements = import_placements(&scenario)?;
-    let (objects, models, animation_graphs) =
+    let (objects, mut models, animation_graphs) =
         import_placed_objects(cache, &placements, &mut reached)?;
+    let skies = import_skies(cache, &scenario, &mut models, &mut reached)?;
 
     // (a shader's extra layers are shaders too, reached as each is read)
     let mut shaders = Vec::new();
@@ -202,6 +211,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         shaders,
         bitmaps,
         resource_bitmaps,
+        skies,
     };
     check_lightmap_pages(&level)?;
     Ok(level)
@@ -276,6 +286,77 @@ fn import_placed_objects(
         models.into_values().collect(),
         graphs.into_values().collect(),
     ))
+}
+
+/// The scenario's skies, their models added to `models` (kept in order
+/// of their paths) and their models' shaders reached.
+fn import_skies(
+    cache: &Cache,
+    scenario: &Element<'_>,
+    models: &mut Vec<Model>,
+    reached: &mut Reached,
+) -> Result<Vec<Sky>, ImportError> {
+    let references = scenario.block(
+        SCENARIO_SKIES_OFFSET,
+        "skies",
+        SKY_REFERENCE_SIZE,
+        MAX_SKIES,
+    )?;
+    let mut skies = Vec::with_capacity(references.len());
+    for reference in references.iter() {
+        let Some(index) = reference.reference(0, "sky", &[SKY])? else {
+            continue;
+        };
+        let sky = cache.tag(index, SKY, SKY_SIZE)?;
+        let model_group = match cache.header().kind {
+            crate::cache::CacheKind::Xbox => crate::object::MODE,
+            crate::cache::CacheKind::CustomEdition => crate::object::MOD2,
+        };
+        let model = sky.reference(0x00, "model", &[model_group])?;
+        let model = match model {
+            Some(model_index) => {
+                let tag = tag_ref(cache, model_index);
+                if !models.iter().any(|model| model.tag == tag) {
+                    let model = crate::object::import_model(cache, model_index)?;
+                    for shader in model
+                        .shaders
+                        .iter()
+                        .filter_map(|shader| shader.shader.as_ref())
+                    {
+                        if let Some(shader) = tag_index(cache, shader) {
+                            reached.shaders.insert(shader);
+                        }
+                    }
+                    models.push(model);
+                    models.sort_by(|a, b| a.tag.cmp(&b.tag));
+                }
+                Some(tag)
+            }
+            None => None,
+        };
+        skies.push(Sky {
+            tag: tag_ref(cache, index),
+            model,
+            outdoor_fog: import_fog(&sky, SKY_OUTDOOR_FOG_OFFSET, "outdoor fog")?,
+            indoor_fog: import_fog(&sky, SKY_INDOOR_FOG_OFFSET, "indoor fog")?,
+        });
+    }
+    Ok(skies)
+}
+
+/// A sky's atmospheric fog at `at`: its color, then (past eight unused
+/// bytes) its maximum density, start distance and opaque distance.
+fn import_fog(sky: &Element<'_>, at: usize, field: &str) -> Result<AtmosphericFog, ImportError> {
+    let mut color = [0.0f32; 3];
+    for (channel, value) in color.iter_mut().enumerate() {
+        *value = sky.f32(at + channel * 4, field)?.clamp(0.0, 1.0);
+    }
+    Ok(AtmosphericFog {
+        color,
+        maximum_density: sky.f32(at + 0x14, field)?,
+        start_distance: sky.f32(at + 0x18, field)?,
+        opaque_distance: sky.f32(at + 0x1C, field)?,
+    })
 }
 
 /// A player starting location: its position, facing and BSP (-1 for any).
@@ -1249,6 +1330,23 @@ pub(crate) mod tests {
         let start = fake.add_data(&start);
         block(&mut scenario, SCENARIO_PLAYER_STARTS_OFFSET, 1, start);
         place_objects(&mut fake, &mut scenario);
+        // one sky with no model: grey fog from 10 to 200 units outside
+        let mut sky = vec![0u8; SKY_SIZE];
+        empty(&mut sky, 0x00);
+        let fog = [0.5f32, 0.6, 0.7, 0.0, 0.0, 0.75, 10.0, 200.0];
+        for (at, value) in fog.iter().enumerate() {
+            put(
+                &mut sky,
+                SKY_OUTDOOR_FOG_OFFSET + at * 4,
+                &value.to_le_bytes(),
+            );
+        }
+        empty(&mut sky, 0x98);
+        let sky_tag = fake.add_tag(SKY, "sky\\fake\\fake", &sky);
+        let mut skies = vec![0u8; SKY_REFERENCE_SIZE];
+        reference(&mut skies, 0, SKY, fake.handle(sky_tag));
+        let skies = fake.add_data(&skies);
+        block(&mut scenario, SCENARIO_SKIES_OFFSET, 1, skies);
         fake.set_scenario_data(&scenario);
         fake
     }
@@ -1329,6 +1427,17 @@ pub(crate) mod tests {
                 Err(error) => panic!("{kind:?}: {error}"),
             };
             assert_eq!(level.scenario.structure_bsps.len(), 1);
+            assert_eq!(level.skies.len(), 1);
+            assert_eq!(level.skies[0].model, None);
+            assert_eq!(
+                level.skies[0].outdoor_fog,
+                AtmosphericFog {
+                    color: [0.5, 0.6, 0.7],
+                    maximum_density: 0.75,
+                    start_distance: 10.0,
+                    opaque_distance: 200.0,
+                }
+            );
             assert_eq!(
                 level.scenario.player_starts,
                 [PlayerStart {
@@ -1507,6 +1616,9 @@ pub(crate) mod tests {
             Err(error) => panic!("{error}"),
         };
         assert_eq!(level.structure_bsps.len(), 1);
+        let sky = &level.skies[0];
+        let model = sky.model.as_ref().and_then(|tag| level.model_index(tag));
+        assert!(model.is_some(), "{sky:?}");
         let placed = |kind| {
             level
                 .scenario

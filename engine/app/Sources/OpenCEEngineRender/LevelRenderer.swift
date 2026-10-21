@@ -32,6 +32,69 @@ struct MaterialUniforms {
     var detailFunction: UInt32
     var environmentKind: UInt32
     var alphaTested: UInt32
+    /// How the fog takes the fragment: 0 mixed toward its color, 1 added,
+    /// 2 multiplied, 3 double-multiplied.
+    var fogMode: UInt32 = 0
+    /// A transparent chicago shader's maps (0: not one).
+    var chicagoCount: UInt32 = 0
+    /// Each map's color function, alpha function << 8, alpha replicate << 16.
+    var chicagoFunctions: SIMD4<UInt32> = .zero
+    /// Each map's scale and offset.
+    var chicagoTransforms: (SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>) = (.zero, .zero, .zero, .zero)
+
+    /// `material`'s chicago maps set, and their textures (four, white
+    /// where a map has none), or nil for a material of another class.
+    mutating func chicago(_ material: RenderMaterial, texture: (UInt32?) -> MTLTexture?,
+                          white: MTLTexture) -> [MTLTexture]? {
+        let maps = material.chicagoMaps.prefix(4)
+        guard !maps.isEmpty else { return nil }
+        chicagoCount = UInt32(maps.count)
+        var transforms = [SIMD4<Float>](repeating: .zero, count: 4)
+        var textures = [MTLTexture](repeating: white, count: 4)
+        for (stage, map) in maps.enumerated() {
+            chicagoFunctions[stage] = UInt32(map.colorFunction) | UInt32(map.alphaFunction) << 8
+                | (map.alphaReplicate ? 1 << 16 : 0)
+            let scale = map.scale.count == 2 ? SIMD2(map.scale[0], map.scale[1]) : SIMD2<Float>(1, 1)
+            let offset = map.offset.count == 2 ? SIMD2(map.offset[0], map.offset[1]) : SIMD2<Float>(0, 0)
+            transforms[stage] = SIMD4(lowHalf: scale, highHalf: offset)
+            textures[stage] = texture(map.map) ?? white
+        }
+        chicagoTransforms = (transforms[0], transforms[1], transforms[2], transforms[3])
+        return textures
+    }
+}
+
+/// The shaders' Frame: the view, and the sky's fog as a plane along it.
+public struct FrameUniforms {
+    public var viewProjection: simd_float4x4
+    /// The view's forward over the fog's range, and where it starts.
+    public var fogPlane: SIMD4<Float>
+    /// The fog's color, and its maximum density (0: no fog).
+    public var fogColor: SIMD4<Float>
+
+    /// The frame from `camera`, its fog `fog` (none without a sky).
+    public init(viewProjection: simd_float4x4, camera: ViewCamera, fog: RenderFog?) {
+        self.viewProjection = viewProjection
+        guard let fog, fog.maximumDensity > 0, fog.color.count == 3 else {
+            fogPlane = .zero
+            fogColor = .zero
+            return
+        }
+        let forward = camera.rotation.act([1, 0, 0])
+        let range = max(fog.endDistance - fog.startDistance, 0.0001)
+        fogPlane = SIMD4(forward / range, -(fog.startDistance + dot(camera.position, forward)) / range)
+        fogColor = SIMD4(fog.color[0], fog.color[1], fog.color[2], fog.maximumDensity)
+    }
+
+    /// A blend's fog mode.
+    static func fogMode(_ blend: BlendFunction?) -> UInt32 {
+        switch blend {
+        case .add: 1
+        case .multiply: 2
+        case .doubleMultiply: 3
+        case .alphaBlend, nil: 0
+        }
+    }
 }
 
 /// The map bits of MaterialUniforms.maps.
@@ -43,7 +106,7 @@ enum MapBit {
 }
 
 public final class LevelRenderer {
-    /// What the sky's portals show until the sky is drawn.
+    /// What the sky's portals show where the level has no sky or fog.
     public static let skyColor = MTLClearColor(red: 0.42, green: 0.52, blue: 0.66, alpha: 1)
 
     struct Draw {
@@ -64,6 +127,8 @@ public final class LevelRenderer {
     let blendedDraws: [Draw]
     let textureCount: Int
     let models: ModelPass
+    /// The level's sky (its model is drawn first, at infinity).
+    let sky: RenderSky?
     private let opaque: MTLRenderPipelineState
     private let blended: [MTLRenderPipelineState]
     private let tone: MTLRenderPipelineState
@@ -101,6 +166,12 @@ public final class LevelRenderer {
 
     /// The objects' parts drawn in the last frame.
     public var lastModelPartCount: Int { models.lastPartCount }
+
+    /// The sky's parts drawn in the last frame.
+    public var lastSkyPartCount: Int { models.lastSkyPartCount }
+
+    /// The level's fog (none without a sky), for tests.
+    public var fog: RenderFog? { sky?.fog }
 
     public init(device: MTLDevice, geometry: LevelGeometry, outputFormat: MTLPixelFormat = .bgra8Unorm,
                 settings: VideoSettings = VideoSettings()) throws {
@@ -141,16 +212,18 @@ public final class LevelRenderer {
             let pair = { (values: [Float], fallback: Float) -> SIMD2<Float> in
                 values.count == 2 ? SIMD2(values[0], values[1]) : SIMD2(repeating: fallback)
             }
-            let uniforms = MaterialUniforms(
+            let blend = material.kind == .blended ? material.blend : nil
+            var uniforms = MaterialUniforms(
                 baseScale: pair(material.baseScale, 1), baseOffset: pair(material.baseOffset, 0),
                 primaryScale: material.primaryDetailScale, secondaryScale: material.secondaryDetailScale,
                 maps: bits, detailFunction: UInt32(material.detailFunction),
                 environmentKind: UInt32(material.environmentKind),
-                alphaTested: material.kind == .alphaTested ? 1 : 0)
+                alphaTested: material.kind == .alphaTested ? 1 : 0, fogMode: FrameUniforms.fogMode(blend))
             let center = draw.center.count == 3 ? SIMD3(draw.center[0], draw.center[1], draw.center[2]) : .zero
+            let chicagoTextures = uniforms.chicago(material, texture: texture, white: white)
             let made = Draw(firstIndex: Int(draw.firstIndex), indexCount: Int(draw.indexCount),
-                            blend: material.kind == .blended ? material.blend : nil, uniforms: uniforms,
-                            textures: maps.map { $0 ?? white }, center: center)
+                            blend: blend, uniforms: uniforms,
+                            textures: chicagoTextures ?? maps.map { $0 ?? white }, center: center)
             if made.blend == nil {
                 opaqueDraws.append(made)
             } else {
@@ -216,6 +289,7 @@ public final class LevelRenderer {
             throw LevelRendererError.shaders("\(error)")
         }
         models = try ModelPass(device: device, library: library, geometry: geometry, textures: textures, white: white)
+        sky = geometry.sky()
 
         // reversed depth: nearer is greater
         let write = MTLDepthStencilDescriptor()
@@ -303,13 +377,21 @@ public final class LevelRenderer {
     /// both into `frame`.
     private func drawLevel(into commands: MTLCommandBuffer, frame: MTLTexture, depth: MTLTexture, keepDepth: Bool,
                            viewProjection: simd_float4x4, camera: ViewCamera, objects: [DrawnObject]) {
-        let prepared = models.prepare(objects, camera: camera, viewportHeight: frame.height, device: device)
-        var uniforms = viewProjection
+        let skyObject = sky?.model.map { model in
+            DrawnObject(model: Int(model), transform: simd_float4x4(translation: camera.position),
+                        center: camera.position, radius: 1, regions: [], nodes: [])
+        }
+        let prepared = models.prepare(objects, sky: skyObject, camera: camera, viewportHeight: frame.height,
+                                      device: device)
+        var uniforms = FrameUniforms(viewProjection: viewProjection, camera: camera, fog: sky?.fog)
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = frame
         pass.colorAttachments[0].loadAction = .clear
         pass.colorAttachments[0].storeAction = .store
-        pass.colorAttachments[0].clearColor = Self.skyColor
+        pass.colorAttachments[0].clearColor = uniforms.fogColor.w > 0
+            ? MTLClearColor(red: Double(uniforms.fogColor.x), green: Double(uniforms.fogColor.y),
+                            blue: Double(uniforms.fogColor.z), alpha: 1)
+            : Self.skyColor
         pass.depthAttachment.texture = depth
         pass.depthAttachment.loadAction = .clear
         pass.depthAttachment.storeAction = keepDepth ? .store : .dontCare
@@ -318,9 +400,12 @@ public final class LevelRenderer {
         encoder.label = "level"
         encoder.setCullMode(.none)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
-        encoder.setVertexBytes(&uniforms, length: MemoryLayout<simd_float4x4>.size, index: 1)
+        encoder.setVertexBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
         encoder.setFragmentSamplerState(wrap, index: 0)
         encoder.setFragmentSamplerState(clamp, index: 1)
+        models.encodeSky(prepared, into: encoder)
+        encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setRenderPipelineState(opaque)
         encoder.setDepthStencilState(depthWrite)
         for draw in opaqueDraws {
@@ -473,5 +558,13 @@ public final class LevelRenderer {
         let white: [UInt8] = [255, 255, 255, 255]
         texture.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: white, bytesPerRow: 4)
         return texture
+    }
+}
+
+extension simd_float4x4 {
+    /// A move by `offset`.
+    init(translation offset: SIMD3<Float>) {
+        self = matrix_identity_float4x4
+        columns.3 = SIMD4(offset, 1)
     }
 }

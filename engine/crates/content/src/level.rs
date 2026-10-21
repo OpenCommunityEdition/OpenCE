@@ -25,6 +25,8 @@ pub struct Level {
     /// Bitmaps whose definitions are in Custom Edition's `bitmaps.map`,
     /// not in the map: read with the shared resource maps.
     pub resource_bitmaps: Vec<TagRef>,
+    /// The scenario's skies, in its order (the first is the one outside).
+    pub skies: Vec<Sky>,
 }
 
 impl Level {
@@ -52,6 +54,34 @@ impl Level {
     pub fn bitmap(&self, tag: &TagRef) -> Option<&Bitmap> {
         self.bitmaps.iter().find(|bitmap| bitmap.tag == *tag)
     }
+}
+
+/// A sky: the model drawn behind the level, and the fog of the air
+/// outside and inside.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct Sky {
+    /// Its path.
+    pub tag: TagRef,
+    /// Its model, among the level's models.
+    pub model: Option<TagRef>,
+    /// The fog outside.
+    pub outdoor_fog: AtmosphericFog,
+    /// The fog inside.
+    pub indoor_fog: AtmosphericFog,
+}
+
+/// A sky's fog: from its start distance to its opaque distance, the view
+/// fades to its color, as far as its maximum density.
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct AtmosphericFog {
+    /// Its color.
+    pub color: [f32; 3],
+    /// How much of the view it hides, at most (0: all of it).
+    pub maximum_density: f32,
+    /// Where it starts, in world units.
+    pub start_distance: f32,
+    /// Where it is densest, in world units (0: there is none).
+    pub opaque_distance: f32,
 }
 
 /// A scenario, as far as its structure goes.

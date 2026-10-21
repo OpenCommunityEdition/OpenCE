@@ -13,8 +13,9 @@ pub use bitmap::{
     Bitmap, BitmapImage, Pixels, ResourceRange, Sequence, Sprite, Texture, TextureFormat,
 };
 pub use level::{
-    CollisionBsp, CollisionMaterial, EnvironmentVertex, Level, Lightmap, LightmapVertex, Material,
-    ObjectPlacement, PlacementPermutation, PlayerStart, Scenario, StructureBsp,
+    AtmosphericFog, CollisionBsp, CollisionMaterial, EnvironmentVertex, Level, Lightmap,
+    LightmapVertex, Material, ObjectPlacement, PlacementPermutation, PlayerStart, Scenario, Sky,
+    StructureBsp,
 };
 pub use object::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, ChangeColor,
