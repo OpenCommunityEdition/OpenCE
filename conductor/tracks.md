@@ -11,8 +11,5 @@ This file tracks all major tracks for the project.
 - [x] **Track: Ragdolls, dismemberment and physics debris with Jolt Physics in the macOS app**
   *Link: [./tracks/ragdolls_jolt_20261020/](./tracks/ragdolls_jolt_20261020/)*
 
-- [ ] **Track: Ray-traced sun shadows and ambient occlusion with Metal in the macOS app**
-  *Link: [./tracks/raytracing_metal_20261020/](./tracks/raytracing_metal_20261020/)*
-
 - [x] **Track: A new native engine in Rust and Swift: no 32-bit VM, maps imported to a typed format, a modern Metal renderer, and the game rebuilt in seven milestones**
   *Link: [./tracks/native_engine_20261021/](./tracks/native_engine_20261021/)*
