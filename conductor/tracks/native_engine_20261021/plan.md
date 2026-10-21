@@ -91,9 +91,9 @@
 - [x] Task: Grenades 6d96214b
     - [x] Write tests: a thrown frag bounces and detonates on its timer; a plasma grenade sticks to a biped and moves with it
     - [x] Throwing, bouncing, sticking, detonation
-- [ ] Task: The first-person view and the HUD
-    - [ ] Write tests: golden frames of the first-person weapon and the HUD at 16:9, 16:10 and 21:9, anchored to the edges; the motion tracker shows bipeds at their positions
-    - [ ] First-person models and animations; the HUD drawn by Metal at native resolution
+- [x] Task: The first-person view and the HUD 5ceb92dc
+    - [x] Write tests: golden frames of the first-person weapon and the HUD at 16:9, 16:10 and 21:9, anchored to the edges; the motion tracker shows bipeds at their positions
+    - [x] First-person models and animations; the HUD drawn by Metal at native resolution
 - [ ] Task: Ragdolls, limbs and debris
     - [ ] Write tests: a biped killed by a scripted grenade becomes a ragdoll that follows the death animation, then goes loose (joint damping set), and is still there after 60 s; the corpse cap removes the oldest; strong explosions tear off limbs; casings are rigid bodies
     - [ ] Ragdolls from model nodes and collision geometry (as the ragdoll track's generator does, ported to Rust), motors then damping, the corpse cap (a setting), limbs and debris
