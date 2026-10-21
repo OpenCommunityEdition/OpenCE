@@ -79,9 +79,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Player movement and collision' (Protocol in workflow.md)
 
 ## Phase 4: Weapons, damage, grenades and ragdolls
-- [ ] Task: Typed tags for weapons and damage
-    - [ ] Write tests: builders for weapon, projectile, damage effect, equipment and grenade tags import; malformed ones are refused
-    - [ ] `content` types and importers
+- [x] Task: Typed tags for weapons and damage ece79a01
+    - [x] Write tests: builders for weapon, projectile, damage effect, equipment and grenade tags import; malformed ones are refused
+    - [x] `content` types and importers
 - [ ] Task: Weapons
     - [ ] Write tests: rate of fire, spread, heat, ammunition and reload times match the tags in simulated ticks; picking up, swapping and dropping
     - [ ] Weapon systems, triggers, projectiles and hitscan, melee; the registry for weapon behaviours
