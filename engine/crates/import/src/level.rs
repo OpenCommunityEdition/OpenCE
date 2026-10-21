@@ -169,6 +169,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     }
 
     let placements = import_placements(&scenario)?;
+    let scripts = crate::script::scenario_scripts(&scenario)?;
     let netgame_flags = import_netgame_flags(&scenario)?;
     let netgame_equipment = import_netgame_equipment(cache, &scenario)?;
     let globals = crate::globals::import_globals(cache)?;
@@ -259,6 +260,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
             placements,
             netgame_flags,
             netgame_equipment,
+            scripts,
         },
         structure_bsps,
         objects,

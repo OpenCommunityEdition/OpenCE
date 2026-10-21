@@ -4,7 +4,8 @@ use rkyv::{Archive, Deserialize, Serialize};
 
 use crate::{
     AnimationGraph, Bitmap, CollisionModel, DamageEffect, Effect, Grenade, GrenadeHud, HudDigits,
-    HudGlobals, Model, ObjectDefinition, ObjectKind, Physics, Shader, TagRef, UnitHud, WeaponHud,
+    HudGlobals, Model, ObjectDefinition, ObjectKind, Physics, Scripts, Shader, TagRef, UnitHud,
+    WeaponHud,
 };
 
 /// Everything a level's structure is drawn and collided with.
@@ -241,6 +242,8 @@ pub struct Scenario {
     /// The weapons and equipment a multiplayer game places, and places
     /// again when they are taken.
     pub netgame_equipment: Vec<NetgameEquipment>,
+    /// Its scripts.
+    pub scripts: Scripts,
 }
 
 /// The game types something in a scenario is for, as Halo gives them: four

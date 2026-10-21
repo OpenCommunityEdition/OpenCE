@@ -8,6 +8,7 @@ pub mod hud;
 pub mod level;
 pub mod object;
 pub mod pack;
+pub mod script;
 pub mod shader;
 pub mod vehicle;
 pub mod weapon;
@@ -32,6 +33,10 @@ pub use object::{
     MarkerInstance, Model, ModelGeometry, ModelMarker, ModelNode, ModelPart, ModelPermutation,
     ModelRegion, ModelShader, ModelVertex, ObjectDefinition, ObjectKind, PathfindingSphere,
     UnitSeat, WeaponClass, WeaponType,
+};
+pub use script::{
+    Call, Constant, GlobalRef, Named, NodeKind, Script, ScriptGlobal, ScriptKind, ScriptNode,
+    Scripts, ValueType,
 };
 pub use shader::{
     ChicagoMap, EnvironmentShader, ModelShaderClass, Shader, ShaderClass, TransparentChicagoShader,

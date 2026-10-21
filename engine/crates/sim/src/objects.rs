@@ -397,6 +397,7 @@ mod tests {
             ],
             netgame_flags: Vec::new(),
             netgame_equipment: Vec::new(),
+            scripts: Default::default(),
         }
     }
 

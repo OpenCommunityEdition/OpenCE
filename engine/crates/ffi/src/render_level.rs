@@ -660,6 +660,7 @@ mod tests {
                 placements: Vec::new(),
                 netgame_flags: Vec::new(),
                 netgame_equipment: Vec::new(),
+                scripts: Default::default(),
             },
             structure_bsps: vec![StructureBsp {
                 path: "test".into(),

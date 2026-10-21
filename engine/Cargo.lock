@@ -890,7 +890,8 @@ dependencies = [
 name = "opence_script"
 version = "0.1.0"
 dependencies = [
- "thiserror",
+ "opence_content",
+ "opence_import",
 ]
 
 [[package]]

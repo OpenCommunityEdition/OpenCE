@@ -1,12 +1,16 @@
 [package]
 name = "opence_script"
+description = "HaloScript: a scenario's scripts run as threads on the game's tick"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
 [dependencies]
-thiserror.workspace = true
+opence_content.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+opence_import.workspace = true
