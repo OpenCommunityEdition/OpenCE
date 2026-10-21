@@ -9,7 +9,6 @@ instead of nothing.
 */
 
 #include "gpu_profile.h"
-#include "gl.h"
 #include "platform.h"
 #include "port_config.h"
 
@@ -87,17 +86,14 @@ static long profile_classify(char const *vendor, char const *renderer)
 	return _gpu_profile_generic;
 }
 
-void gpu_profile_initialize(void)
+void gpu_profile_initialize(char const *vendor, char const *renderer, char const *version)
 {
-	char const *vendor, *renderer, *version, *chosen;
+	char const *chosen;
 	long profile;
 
 	if (gpu_profile.initialized)
 		return;
 	gpu_profile.initialized = 1;
-	vendor = (char const *)glGetString(GL_VENDOR);
-	renderer = (char const *)glGetString(GL_RENDERER);
-	version = (char const *)glGetString(GL_VERSION);
 	snprintf(gpu_profile.vendor, sizeof(gpu_profile.vendor), "%s", vendor ? vendor : "?");
 	snprintf(gpu_profile.renderer, sizeof(gpu_profile.renderer), "%s", renderer ? renderer : "?");
 	snprintf(gpu_profile.version, sizeof(gpu_profile.version), "%s", version ? version : "?");
@@ -116,21 +112,15 @@ void gpu_profile_initialize(void)
 
 char const *gpu_profile_name(void)
 {
-	if (!gpu_profile.initialized)
-		gpu_profile_initialize();
-	return profile_names[gpu_profile.profile];
+	return gpu_profile.initialized ? profile_names[gpu_profile.profile] : "unknown";
 }
 
 long gpu_profile_flush_draws(void)
 {
-	if (!gpu_profile.initialized)
-		gpu_profile_initialize();
-	return gpu_profile.flush_draws;
+	return gpu_profile.initialized ? gpu_profile.flush_draws : 0;
 }
 
 int gpu_profile_cpu_visibility(void)
 {
-	if (!gpu_profile.initialized)
-		gpu_profile_initialize();
-	return gpu_profile.cpu_visibility;
+	return gpu_profile.initialized ? gpu_profile.cpu_visibility : 0;
 }
