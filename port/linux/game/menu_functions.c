@@ -3379,12 +3379,10 @@ static char const *const server_settings_gametype_rows[] =
 #define COOPERATIVE_DEFAULT_PLAYERS 16
 /* Server Setup's help for co-op's options' rows (CO-OP OPTIONS, VOICE AND
 VOTING), PASSWORD's and MAP SHARING's (its help_strings, tools/port_settings.py) */
-/* (Hardcore's help is its label's, 10. The rows after it moved down one
-when that page was added.) */
-#define COOPERATIVE_OPTIONS_HELP 13
-#define COOPERATIVE_VOICE_OPTIONS_HELP 14
-#define SERVER_PASSWORD_HELP 15
-#define MAP_SHARE_OPTIONS_HELP 16
+#define COOPERATIVE_OPTIONS_HELP 12
+#define COOPERATIVE_VOICE_OPTIONS_HELP 13
+#define SERVER_PASSWORD_HELP 14
+#define MAP_SHARE_OPTIONS_HELP 15
 
 /* co-op's EXTRA ENEMIES' choices (network.coop_enemies_mode's values, as
 gametype_options' coop_extra_enemies_spinner has them, in this order): its
