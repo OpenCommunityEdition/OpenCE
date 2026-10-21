@@ -24,9 +24,13 @@ public struct DrawnObject {
     /// Its nodes' matrices in the world; with none, every node is where
     /// the object is, at the default pose.
     public var nodes: [simd_float4x4]
+    /// The first-person weapon or hands: drawn over the world, at the
+    /// highest level of detail.
+    public var firstPerson: Bool
 
     public init(model: Int, transform: simd_float4x4, center: SIMD3<Float>, radius: Float, regions: [UInt8],
-                nodes: [simd_float4x4]) {
+                nodes: [simd_float4x4], firstPerson: Bool = false) {
+        self.firstPerson = firstPerson
         self.model = model
         self.transform = transform
         self.center = center
@@ -88,6 +92,8 @@ final class ModelPass {
     private(set) var lastPartCount = 0
     /// The sky's parts drawn in the last frame, for tests.
     private(set) var lastSkyPartCount = 0
+    /// The first-person parts drawn in the last frame, for tests.
+    private(set) var lastFirstPersonPartCount = 0
 
     init(device: MTLDevice, library: MTLLibrary, geometry: LevelGeometry, textures: [MTLTexture?],
          white: MTLTexture) throws {
@@ -219,6 +225,8 @@ final class ModelPass {
         var objects: [(uniforms: ModelObjectUniforms, parts: [Draw])]
         /// The sky's, if the level has one.
         var sky: (uniforms: ModelObjectUniforms, parts: [Draw])?
+        /// The first-person weapon and hands.
+        var firstPerson: [(uniforms: ModelObjectUniforms, parts: [Draw])] = []
     }
 
     /// The highest level of detail, which the sky is always drawn at.
@@ -230,12 +238,13 @@ final class ModelPass {
         var matrices: [simd_float4x4] = []
         var drawn: [(uniforms: ModelObjectUniforms, parts: [Draw])] = []
         var skyDrawn: (uniforms: ModelObjectUniforms, parts: [Draw])?
+        var firstPerson: [(uniforms: ModelObjectUniforms, parts: [Draw])] = []
         let all = (sky.map { [$0] } ?? []) + objects
         for (index, object) in all.enumerated() where models.indices.contains(object.model) {
             let isSky = sky != nil && index == 0
             let model = models[object.model]
             let level: Int
-            if isSky {
+            if isSky || object.firstPerson {
                 level = Self.highestLevel
             } else {
                 let depth = dot(object.center - camera.position, forward)
@@ -267,6 +276,8 @@ final class ModelPass {
             let uniforms = ModelObjectUniforms(firstNode: UInt32(first), nodeCount: UInt32(nodeCount))
             if isSky {
                 skyDrawn = (uniforms, parts)
+            } else if object.firstPerson {
+                firstPerson.append((uniforms, parts))
             } else {
                 drawn.append((uniforms, parts))
             }
@@ -283,7 +294,8 @@ final class ModelPass {
         }
         lastPartCount = drawn.reduce(0) { $0 + $1.parts.count }
         lastSkyPartCount = skyDrawn?.parts.count ?? 0
-        return Prepared(skins: skins[frame], objects: drawn, sky: skyDrawn)
+        lastFirstPersonPartCount = firstPerson.reduce(0) { $0 + $1.parts.count }
+        return Prepared(skins: skins[frame], objects: drawn, sky: skyDrawn, firstPerson: firstPerson)
     }
 
     /// The prepared sky, its opaque parts then its blended ones, behind
@@ -312,13 +324,15 @@ final class ModelPass {
     }
 
     /// The prepared objects' opaque and alpha-tested parts, or their
-    /// blended ones.
-    func encode(_ prepared: Prepared, blendedParts: Bool, into encoder: MTLRenderCommandEncoder) {
-        guard let skins = prepared.skins, !prepared.objects.isEmpty else { return }
+    /// blended ones (or the first-person objects').
+    func encode(_ prepared: Prepared, blendedParts: Bool, firstPerson: Bool = false,
+                into encoder: MTLRenderCommandEncoder) {
+        let objects = firstPerson ? prepared.firstPerson : prepared.objects
+        guard let skins = prepared.skins, !objects.isEmpty else { return }
         encoder.setRenderPipelineState(blendedParts ? blended : opaque)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setVertexBuffer(skins, offset: 0, index: 2)
-        for (uniforms, parts) in prepared.objects {
+        for (uniforms, parts) in objects {
             var object = uniforms
             encoder.setVertexBytes(&object, length: MemoryLayout<ModelObjectUniforms>.stride, index: 3)
             for part in parts where part.blended == blendedParts && !part.plain {

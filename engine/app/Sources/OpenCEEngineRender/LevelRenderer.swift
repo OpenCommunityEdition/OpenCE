@@ -170,6 +170,12 @@ public final class LevelRenderer {
     /// The sky's parts drawn in the last frame.
     public var lastSkyPartCount: Int { models.lastSkyPartCount }
 
+    /// The first-person weapon's and hands' parts drawn in the last frame.
+    public var lastFirstPersonPartCount: Int { models.lastFirstPersonPartCount }
+
+    /// What draws the HUD (without it, the HUD's quads are not drawn).
+    public var hud: HudPass?
+
     /// The level's fog (none without a sky), for tests.
     public var fog: RenderFog? { sky?.fog }
 
@@ -325,9 +331,9 @@ public final class LevelRenderer {
     static let blendFunctions: [BlendFunction] = [.alphaBlend, .multiply, .doubleMultiply, .add]
 
     /// Draws the level and `objects` from `camera` into `target` (of
-    /// `outputFormat`).
+    /// `outputFormat`), and `hudQuads` over them.
     public func encode(into commands: MTLCommandBuffer, target: MTLTexture, camera: ViewCamera,
-                       objects: [DrawnObject] = []) {
+                       objects: [DrawnObject] = [], hudQuads: [HudQuad] = []) {
         let aspect = Float(target.width) / Float(max(target.height, 1))
         let viewProjection = camera.viewProjection(aspect: aspect)
         let shown: MTLTexture
@@ -370,6 +376,7 @@ public final class LevelRenderer {
         toneEncoder.setRenderPipelineState(tone)
         toneEncoder.setFragmentTexture(shown, index: 0)
         toneEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        hud?.encode(hudQuads, width: target.width, height: target.height, into: toneEncoder)
         toneEncoder.endEncoding()
     }
 
@@ -424,6 +431,17 @@ public final class LevelRenderer {
             encode(draw, encoder)
         }
         models.encode(prepared, blendedParts: true, into: encoder)
+        // the first-person weapon and hands over the world: in the nearer
+        // half of the depth range (reversed: 0.5 to 1), which the world
+        // reaches only nearer the eye than twice the near plane
+        if !prepared.firstPerson.isEmpty {
+            encoder.setViewport(MTLViewport(originX: 0, originY: 0, width: Double(frame.width),
+                                            height: Double(frame.height), znear: 0.5, zfar: 1))
+            encoder.setDepthStencilState(depthWrite)
+            models.encode(prepared, blendedParts: false, firstPerson: true, into: encoder)
+            encoder.setDepthStencilState(depthTest)
+            models.encode(prepared, blendedParts: true, firstPerson: true, into: encoder)
+        }
         encoder.endEncoding()
     }
 

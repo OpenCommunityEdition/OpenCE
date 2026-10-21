@@ -796,7 +796,7 @@ pub enum Update {
 }
 
 /// An animation playing: which, and its frame.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct AnimationState {
     /// The animation, in its graph's.
     pub animation: u16,
@@ -1231,6 +1231,7 @@ mod tests {
             animations,
             object_overlays: Vec::new(),
             unit_seats: Vec::new(),
+            first_person_weapon: Vec::new(),
         }
     }
 

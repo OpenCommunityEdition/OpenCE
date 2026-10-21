@@ -3,8 +3,8 @@
 use rkyv::{Archive, Deserialize, Serialize};
 
 use crate::{
-    AnimationGraph, Bitmap, CollisionModel, DamageEffect, Effect, Grenade, Model, ObjectDefinition,
-    ObjectKind, Shader, TagRef,
+    AnimationGraph, Bitmap, CollisionModel, DamageEffect, Effect, Grenade, GrenadeHud, HudDigits,
+    HudGlobals, Model, ObjectDefinition, ObjectKind, Shader, TagRef, UnitHud, WeaponHud,
 };
 
 /// Everything a level's structure is drawn and collided with.
@@ -38,6 +38,16 @@ pub struct Level {
     pub collision_models: Vec<CollisionModel>,
     /// The effects its projectiles detonate with, by path.
     pub effects: Vec<Effect>,
+    /// Its units' HUDs, by path.
+    pub unit_huds: Vec<UnitHud>,
+    /// Its weapons' HUDs, and the HUDs they add to, by path.
+    pub weapon_huds: Vec<WeaponHud>,
+    /// The grenades' HUDs, by path.
+    pub grenade_huds: Vec<GrenadeHud>,
+    /// The digits numbers are drawn with.
+    pub hud_digits: Option<HudDigits>,
+    /// The HUD's globals.
+    pub hud_globals: Option<HudGlobals>,
 }
 
 /// The game's globals (the `matg` tag) that the simulation reads.
@@ -56,6 +66,14 @@ pub struct Globals {
     /// The weapons a game may give, in the game engine's order (the
     /// assault rifle first).
     pub weapons: Vec<TagRef>,
+    /// The HUD's globals (`hudg`).
+    pub hud_globals: Option<TagRef>,
+    /// The digits the HUD's numbers are drawn with (`hud#`).
+    pub hud_digits: Option<TagRef>,
+    /// The motion sensor's blip.
+    pub motion_sensor_blip: Option<TagRef>,
+    /// The first-person view's hands (a `mod2`).
+    pub first_person_hands: Option<TagRef>,
 }
 
 /// How a biped that uses player physics moves. Speeds are in world units a

@@ -29,6 +29,7 @@ const PHYS: GroupTag = GroupTag::new(b"phys");
 const SHDR: GroupTag = GroupTag::new(b"shdr");
 const EFFE: GroupTag = GroupTag::new(b"effe");
 const BIPD: GroupTag = GroupTag::new(b"bipd");
+const UNHI: GroupTag = GroupTag::new(b"unhi");
 
 pub(crate) const OBJECT_SIZE: usize = 0x17C;
 /// A biped's whole definition, and where its own part starts (after the
@@ -204,6 +205,10 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
         creation_effect: reference(&object, 0xA0, "creation effect", &[EFFE])?,
         attachments,
         change_colors,
+        unit_hud: match kind {
+            ObjectKind::Biped => unit_hud(cache, index)?,
+            _ => None,
+        },
         biped: match kind {
             ObjectKind::Biped => Some(import_biped(cache, index)?),
             _ => None,
@@ -221,6 +226,16 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
             _ => None,
         },
     })
+}
+
+/// A biped's first HUD (its unit part's new HUD interfaces).
+fn unit_hud(cache: &Cache, index: usize) -> Result<Option<TagRef>, ImportError> {
+    let biped = cache.tag(index, BIPD, BIPED_SIZE)?;
+    let huds = biped.block(UNIT_PART + 0x12C, "new hud interfaces", 0x30, 2)?;
+    match huds.get(0) {
+        Some(hud) => reference(&hud, 0, "unit hud interface", &[UNHI]),
+        None => Ok(None),
+    }
 }
 
 /// A biped's movement and stance, from its own part of its definition.
@@ -771,6 +786,13 @@ pub fn import_animation_graph(cache: &Cache, index: usize) -> Result<AnimationGr
         });
     }
 
+    // (the hands and weapon the player sees: the first entry's animations)
+    let first_person = graph.block(0x48, "first person weapons", 0x1C, 1)?;
+    let first_person_weapon = match first_person.get(0) {
+        Some(weapon) => animation_list(&weapon, 0x10, "animations", animation_count)?,
+        None => Vec::new(),
+    };
+
     Ok(AnimationGraph {
         tag: tag_ref(cache, index),
         flags: graph.u16(0x64, "flags")?,
@@ -779,6 +801,7 @@ pub fn import_animation_graph(cache: &Cache, index: usize) -> Result<AnimationGr
         animations,
         object_overlays,
         unit_seats,
+        first_person_weapon,
     })
 }
 

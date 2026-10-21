@@ -9,6 +9,7 @@ pub mod cache;
 mod effect;
 pub mod error;
 pub mod globals;
+mod hud;
 pub mod level;
 pub mod level_cache;
 pub mod object;

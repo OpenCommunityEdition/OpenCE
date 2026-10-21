@@ -175,8 +175,16 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         .filter(|tag| tag_index(cache, tag).is_some())
         .cloned()
         .collect();
+    // (the first-person view's hands, which no object names)
+    let hands: Vec<TagRef> = globals
+        .first_person_hands
+        .iter()
+        .filter(|tag| tag_index(cache, tag).is_some())
+        .cloned()
+        .collect();
     let (objects, mut models, animation_graphs) =
-        import_placed_objects(cache, &placements, &players, &mut reached)?;
+        import_placed_objects(cache, &placements, &players, &hands, &mut reached)?;
+    let huds = crate::hud::import_huds(cache, &objects, &globals, &mut reached)?;
     let effects = import_effects(cache, &objects)?;
     let damage_effects = import_damage_effects(cache, &objects, &globals, &effects)?;
     let collision_models = import_collision_models(cache, &objects)?;
@@ -237,6 +245,11 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         damage_effects,
         collision_models,
         effects,
+        unit_huds: huds.unit_huds,
+        weapon_huds: huds.weapon_huds,
+        grenade_huds: huds.grenade_huds,
+        hud_digits: huds.hud_digits,
+        hud_globals: huds.hud_globals,
     };
     check_lightmap_pages(&level)?;
     Ok(level)
@@ -263,6 +276,7 @@ fn import_placed_objects(
     cache: &Cache,
     placements: &[ObjectPlacement],
     extra: &[TagRef],
+    extra_models: &[TagRef],
     reached: &mut Reached,
 ) -> Result<PlacedObjects, ImportError> {
     let index = |tag: &TagRef| {
@@ -276,6 +290,24 @@ fn import_placed_objects(
     let mut objects = BTreeMap::new();
     let mut models = BTreeMap::new();
     let mut graphs = BTreeMap::new();
+    let mut add_model = |models: &mut BTreeMap<TagRef, _>, tag: &TagRef| {
+        if models.contains_key(tag) {
+            return Ok::<_, ImportError>(());
+        }
+        let model = crate::object::import_model(cache, index(tag)?)?;
+        for shader in model
+            .shaders
+            .iter()
+            .filter_map(|shader| shader.shader.as_ref())
+        {
+            reached.shaders.insert(index(shader)?);
+        }
+        models.insert(tag.clone(), model);
+        Ok(())
+    };
+    for tag in extra_models {
+        add_model(&mut models, tag)?;
+    }
     let mut queue: VecDeque<TagRef> = placements
         .iter()
         .map(|placement| &placement.tag)
@@ -303,30 +335,26 @@ fn import_placed_objects(
                     .filter_map(|ammunition| ammunition.equipment.clone()),
             );
         }
-        if let Some(tag) = object
-            .model
-            .as_ref()
-            .filter(|tag| !models.contains_key(*tag))
-        {
-            let model = crate::object::import_model(cache, index(tag)?)?;
-            for shader in model
-                .shaders
-                .iter()
-                .filter_map(|shader| shader.shader.as_ref())
-            {
-                reached.shaders.insert(index(shader)?);
-            }
-            models.insert(tag.clone(), model);
+        // (a weapon's first-person model and animations too)
+        let first_person = object.weapon.as_ref();
+        let object_models = [
+            object.model.as_ref(),
+            first_person.and_then(|weapon| weapon.first_person_model.as_ref()),
+        ];
+        for tag in object_models.into_iter().flatten() {
+            add_model(&mut models, tag)?;
         }
-        if let Some(tag) = object
-            .animation_graph
-            .as_ref()
-            .filter(|tag| !graphs.contains_key(*tag))
-        {
-            graphs.insert(
-                tag.clone(),
-                crate::object::import_animation_graph(cache, index(tag)?)?,
-            );
+        let object_graphs = [
+            object.animation_graph.as_ref(),
+            first_person.and_then(|weapon| weapon.first_person_animations.as_ref()),
+        ];
+        for tag in object_graphs.into_iter().flatten() {
+            if !graphs.contains_key(tag) {
+                graphs.insert(
+                    tag.clone(),
+                    crate::object::import_animation_graph(cache, index(tag)?)?,
+                );
+            }
         }
         objects.insert(tag, object);
     }

@@ -102,6 +102,8 @@ pub struct ObjectDefinition {
     pub attachments: Vec<Attachment>,
     /// Its change colours.
     pub change_colors: Vec<ChangeColor>,
+    /// A unit's HUD (`unhi`).
+    pub unit_hud: Option<TagRef>,
     /// A biped's movement (bipeds only).
     pub biped: Option<Biped>,
     /// A weapon's own part (weapons only).
@@ -393,6 +395,10 @@ pub struct AnimationGraph {
     pub object_overlays: Vec<Option<u16>>,
     /// The animations of a unit, by seat.
     pub unit_seats: Vec<UnitSeat>,
+    /// A first-person weapon's animations, in the game's order (idle,
+    /// posing, fire-1, moving, overlays, ...): the hands and weapon the
+    /// player sees.
+    pub first_person_weapon: Vec<Option<u16>>,
 }
 
 /// A node an animation graph animates.

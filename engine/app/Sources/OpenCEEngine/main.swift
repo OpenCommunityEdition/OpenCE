@@ -33,6 +33,33 @@ do {
     exit(1)
 }
 
+/// The HUD's redraws: in the bundle's resources, or (run from the
+/// package) the repository's port/assets/hud.
+func hudFolder() -> URL? {
+    let bundled = Bundle.main.resourceURL?.appendingPathComponent("hud")
+    let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("port/assets/hud")
+    return [bundled, repository].compactMap { $0 }.first {
+        FileManager.default.fileExists(atPath: $0.appendingPathComponent("layout.json").path)
+    }
+}
+
+/// The HUD's pass for `device`, or nil (logged) without its redraws.
+func hudPass(device: MTLDevice) -> HudPass? {
+    do {
+        guard let folder = hudFolder(), let queue = device.makeCommandQueue() else {
+            FileHandle.standardError.write(Data("OpenCE Engine: no HUD art\n".utf8))
+            return nil
+        }
+        return try HudPass(device: device, art: HudArt.load(folder: folder, device: device, queue: queue),
+                           outputFormat: .bgra8Unorm)
+    } catch {
+        FileHandle.standardError.write(Data("OpenCE Engine: the HUD: \(error)\n".utf8))
+        return nil
+    }
+}
+
 /// The value after `name` among the arguments, or nil.
 func argument(_ name: String) -> String? {
     let arguments = CommandLine.arguments
@@ -110,20 +137,6 @@ func fail(_ message: String) -> Never {
     exit(1)
 }
 
-extension ViewCamera {
-    /// The camera between a snapshot's last two ticks.
-    init(_ snapshot: OCECameraSnapshot, alpha: Float) {
-        func camera(_ transform: OCETransform) -> ViewCamera {
-            let position = transform.position
-            let rotation = transform.rotation
-            return ViewCamera(position: SIMD3(position.x, position.y, position.z),
-                              rotation: simd_quatf(ix: rotation.x, iy: rotation.y, iz: rotation.z, r: rotation.w),
-                              verticalFov: snapshot.vertical_fov_radians)
-        }
-        self = .interpolated(from: camera(snapshot.previous), to: camera(snapshot.current), alpha: alpha)
-    }
-}
-
 /// The app's menu: quit, and full screen (Escape lets the mouse go first).
 @MainActor
 func mainMenu() -> NSMenu {
@@ -154,6 +167,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let settings = videoSettings()
     var controller: EngineWindowController?
     var level: LoadedLevel?
+    /// The HUD's pass, made with the first level.
+    var hud: HudPass?
     var lastFrame: CFTimeInterval?
     var frameTimes = FrameTimes()
     var lastOverlay: CFTimeInterval = 0
@@ -191,6 +206,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let device = controller.window.engineView.device else { fail("no Metal device") }
         let loaded = try LoadedLevel(map: map, bsp: bsp, cacheFolder: cacheFolder(), device: device,
                                      settings: settings)
+        if hud == nil {
+            hud = hudPass(device: device)
+        }
+        loaded.renderer.hud = hud
         // (the scenario's objects, at Normal, standing still)
         _ = try engine.startLevel(geometry: loaded.geometry, difficulty: 1)
         try engine.placeCamera(placement: loaded.start)
@@ -289,8 +308,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let frame = snapshots.acquire()
         let camera = ViewCamera(frame.camera, alpha: frame.alpha)
         let objects = frame.drawnObjects()
+        let (width, height) = controller.window.engineView.sizeInPixels
+        let hudQuads = engine.hud(width: UInt32(width), height: UInt32(height))
         controller.window.engineView.render { commands, target in
-            renderer.encode(into: commands, target: target, camera: camera, objects: objects)
+            renderer.encode(into: commands, target: target, camera: camera, objects: objects, hudQuads: hudQuads)
         }
     }
 }

@@ -18,7 +18,11 @@ pub const MAX_NODES: usize = 16384;
 
 /// Raised with any change to the snapshot's types, so that the app refuses
 /// a library of another layout.
-pub const SNAPSHOT_VERSION: u32 = 3;
+pub const SNAPSHOT_VERSION: u32 = 4;
+
+/// `ObjectSnapshot::flags`: the first-person weapon or hands, posed from
+/// the camera and drawn in front of the world.
+pub const OBJECT_FIRST_PERSON: u16 = 1;
 
 /// A vector in world units.
 #[repr(C)]
@@ -109,7 +113,7 @@ pub struct ObjectSnapshot {
     /// The index of its render model in the map's content, or `u32::MAX`
     /// for none.
     pub model: u32,
-    /// Flags (none yet).
+    /// Flags (`OBJECT_FIRST_PERSON`).
     pub flags: u16,
     /// The number of its nodes in the frame's `nodes`; none if it is not
     /// animated.
@@ -407,7 +411,7 @@ mod tests {
         assert_eq!(offset_of!(FrameSnapshot, nodes), 112);
         assert_eq!(size_of::<FrameSnapshot>(), 120);
         assert_eq!(align_of::<FrameSnapshot>(), 8);
-        assert_eq!(SNAPSHOT_VERSION, 3);
+        assert_eq!(SNAPSHOT_VERSION, 4);
     }
 
     #[test]

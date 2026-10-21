@@ -690,6 +690,11 @@ mod tests {
             damage_effects: Vec::new(),
             collision_models: Vec::new(),
             effects: Vec::new(),
+            unit_huds: Vec::new(),
+            weapon_huds: Vec::new(),
+            grenade_huds: Vec::new(),
+            hud_digits: None,
+            hud_globals: None,
         }
     }
 

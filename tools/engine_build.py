@@ -118,6 +118,8 @@ def bundle(executable: Path, codesign: str, version: str, app: Path) -> None:
     (staging / "Contents" / "MacOS").mkdir(parents=True)
     shutil.copy(executable, staging / "Contents" / "MacOS" / EXECUTABLE)
     (staging / "Contents" / "Info.plist").write_bytes(info_plist(version))
+    # the HUD's redraws (HudPass.swift)
+    shutil.copytree(ROOT / "port" / "assets" / "hud", staging / "Contents" / "Resources" / "hud")
     subprocess.run([codesign, "-s", "-", "-f", str(staging)], check=True)
     shutil.rmtree(app, ignore_errors=True)
     staging.rename(app)

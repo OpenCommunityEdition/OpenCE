@@ -11,7 +11,9 @@ pub mod animation;
 pub mod armory;
 pub mod clock;
 pub mod damage;
+pub mod first_person;
 pub mod hash;
+pub mod hud;
 pub mod input;
 pub mod objects;
 pub mod player;
@@ -157,6 +159,13 @@ pub struct Simulation {
     detonations: Vec<projectile::Detonation>,
     /// What damage did in the last tick.
     damage: Vec<damage::DamageEvent>,
+    /// The player's motion sensor (shown, not the world's state).
+    sensor: hud::MotionSensor,
+    /// Its settings, from the level's HUD globals.
+    sensor_settings: Option<hud::SensorSettings>,
+    /// The player's first-person weapon and hands (shown, not the
+    /// world's state).
+    first_person: first_person::FirstPersonWeapon,
 }
 
 /// An object as the renderer draws it.
@@ -208,6 +217,9 @@ impl Simulation {
             impacts: Vec::new(),
             detonations: Vec::new(),
             damage: Vec::new(),
+            sensor: hud::MotionSensor::default(),
+            sensor_settings: None,
+            first_person: first_person::FirstPersonWeapon::default(),
         }
     }
 
@@ -246,6 +258,8 @@ impl Simulation {
             }
         }
         self.schedule.run(&mut self.world);
+        self.update_motion_sensor();
+        self.update_first_person();
     }
 
     /// Makes the player: its biped standing at `level`'s player start
@@ -280,7 +294,19 @@ impl Simulation {
         self.world
             .insert_resource(damage::DamageTable::new(level, true));
         self.player = Some(player);
+        self.sensor = hud::MotionSensor::default();
+        self.sensor_settings = level
+            .hud_globals
+            .as_ref()
+            .map(|globals| hud::SensorSettings {
+                range: globals.motion_sensor_range,
+                velocity_sensitivity: globals.motion_sensor_velocity_sensitivity,
+                scale: globals.motion_sensor_scale,
+                multiplayer: true,
+            });
+        self.first_person = first_person::FirstPersonWeapon::new(level);
         self.place_player_camera();
+        self.update_first_person();
         Ok(handle)
     }
 
@@ -307,6 +333,136 @@ impl Simulation {
     /// What damage did in the last tick.
     pub fn damage_events(&self) -> &[damage::DamageEvent] {
         &self.damage
+    }
+
+    /// One tick of the motion sensor: a game tick (of 30 a second) every
+    /// other tick, scanning the units other than the player's.
+    fn update_motion_sensor(&mut self) {
+        let (Some(player), Some(settings)) = (self.player.as_ref(), self.sensor_settings) else {
+            return;
+        };
+        let tick = self.world.resource::<Tick>().0;
+        // (the tick has advanced: its first is 1)
+        let ticks_per_game_tick = u64::from(clock::TICKS_PER_SECOND / 30);
+        if !tick.is_multiple_of(ticks_per_game_tick) {
+            return;
+        }
+        let own = player.handle();
+        let viewer = self.world.resource::<Camera>().transform.position;
+        let own_team = self
+            .world
+            .resource::<ObjectTable>()
+            .entity(own)
+            .and_then(|entity| self.world.get::<Team>(entity))
+            .copied();
+        let world = &mut self.world;
+        let sensor = &mut self.sensor;
+        sensor.update(tick / ticks_per_game_tick - 1, || {
+            let mut units = world.query_filtered::<(
+                &ObjectHandle,
+                &Object,
+                &Transform,
+                &PreviousTransform,
+                Option<&Team>,
+                Option<&damage::Vitality>,
+            ), With<objects::Unit>>();
+            let mut contacts: Vec<(ObjectHandle, hud::Contact)> = units
+                .iter(world)
+                .filter(|(handle, _, _, _, _, vitality)| {
+                    **handle != own && !vitality.is_some_and(|vitality| vitality.dead)
+                })
+                .map(|(handle, object, transform, previous, team, _)| {
+                    let vehicle = object.kind == ObjectKind::Vehicle;
+                    let friend = own_team.is_some() && team.copied() == own_team;
+                    let kind = match (vehicle, friend) {
+                        (false, true) => hud::BlipKind::Friend,
+                        (false, false) => hud::BlipKind::Enemy,
+                        (true, true) => hud::BlipKind::VehicleFriend,
+                        (true, false) => hud::BlipKind::VehicleEnemy,
+                    };
+                    // (a game tick is two of ours)
+                    let step =
+                        (transform.position - previous.0.position) * ticks_per_game_tick as f32;
+                    (
+                        *handle,
+                        hud::Contact {
+                            position: transform.position,
+                            speed_squared: step.length_squared(),
+                            firing: false,
+                            camouflaged: false,
+                            kind,
+                            size: if vehicle {
+                                hud::BlipSize::Large
+                            } else {
+                                hud::BlipSize::Medium
+                            },
+                        },
+                    )
+                })
+                .collect();
+            // (the same order on every run)
+            contacts.sort_by_key(|(handle, _)| *handle);
+            let contacts: Vec<hud::Contact> =
+                contacts.into_iter().map(|(_, contact)| contact).collect();
+            hud::scan(viewer, &contacts, &settings)
+        });
+    }
+
+    /// One tick of the first-person weapon, posed from the camera: shown
+    /// only out of a living player's eyes.
+    fn update_first_person(&mut self) {
+        let Some(player) = self.player.as_ref() else {
+            self.first_person.hide();
+            return;
+        };
+        let dead = self
+            .component::<damage::Vitality>(player.handle())
+            .is_some_and(|vitality| vitality.dead);
+        if dead || player.view() != View::FirstPerson {
+            self.first_person.hide();
+            return;
+        }
+        let tick = self.world.resource::<Tick>().0;
+        let camera = self.world.resource::<Camera>().transform;
+        let grenades = player.inventory().grenades.iter().sum();
+        self.first_person
+            .update(tick, player.weapon(), grenades, &camera);
+    }
+
+    /// The player's first-person weapon and hands.
+    pub fn first_person(&self) -> &first_person::FirstPersonWeapon {
+        &self.first_person
+    }
+
+    /// What the HUD shows: the player's shield, health, weapon, grenades
+    /// and motion sensor; `None` without a player.
+    pub fn hud(&self) -> Option<hud::HudState> {
+        let player = self.player.as_ref()?;
+        let vitality = self.component::<damage::Vitality>(player.handle());
+        let (yaw, _) = player.look();
+        let inventory = player.inventory();
+        Some(hud::HudState {
+            unit: player.unit().clone(),
+            shield: vitality.as_ref().map_or(1.0, |vitality| vitality.shield),
+            body: vitality.as_ref().map_or(1.0, |vitality| vitality.body),
+            shield_depleted: vitality
+                .as_ref()
+                .is_some_and(|vitality| vitality.shield_depleted),
+            dead: vitality.as_ref().is_some_and(|vitality| vitality.dead),
+            weapon: player.weapon().map(|(tag, state)| hud::WeaponReadout {
+                weapon: tag.clone(),
+                magazines: state.magazines.iter().map(hud::magazine_count).collect(),
+                heat: state.heat,
+                age: state.age,
+                overheated: state.overheated,
+            }),
+            grenades: inventory.grenades,
+            grenade: inventory.grenade,
+            blips: self
+                .sensor_settings
+                .map(|settings| self.sensor.blips(yaw.0, &settings))
+                .unwrap_or_default(),
+        })
     }
 
     /// The player, if there is one.

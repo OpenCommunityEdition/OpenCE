@@ -4,6 +4,7 @@
 //! one the importer checked.
 
 pub mod bitmap;
+pub mod hud;
 pub mod level;
 pub mod object;
 pub mod pack;
@@ -12,6 +13,11 @@ pub mod weapon;
 
 pub use bitmap::{
     Bitmap, BitmapImage, Pixels, ResourceRange, Sequence, Sprite, Texture, TextureFormat,
+};
+pub use hud::{
+    CrosshairItem, CrosshairKind, GrenadeHud, HudAnchor, HudDigits, HudGlobals, HudMeter,
+    HudNumber, HudPlacement, HudStatic, UnitHud, WeaponHud, WeaponHudCrosshair, WeaponHudElement,
+    WeaponHudMeter, WeaponHudNumber, WeaponHudState, WeaponHudStatic,
 };
 pub use level::{
     AtmosphericFog, CollisionBsp, CollisionMaterial, EnvironmentVertex, FallingDamage, Globals,

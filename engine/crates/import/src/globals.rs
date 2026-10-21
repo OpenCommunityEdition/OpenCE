@@ -1,5 +1,6 @@
 //! The game's globals (`matg`): the player's speeds, what falling does,
-//! the player's bipeds, the grenades and the weapons.
+//! the player's bipeds, the grenades, the weapons, the HUD's tags and the
+//! first-person view's hands.
 //!
 //! The tag gives speeds in world units a second and accelerations in world
 //! units a second each tick (the game's 30); the engine keeps both a
@@ -26,6 +27,10 @@ const MAX_GRENADES: usize = 4;
 const WEAPON_LIST_OFFSET: usize = 0x14C;
 const WEAPON_SIZE: usize = 0x10;
 const MAX_WEAPONS: usize = 20;
+const INTERFACE_OFFSET: usize = 0x140;
+const INTERFACE_SIZE: usize = 0x130;
+const FIRST_PERSON_INTERFACE_OFFSET: usize = 0x17C;
+const FIRST_PERSON_INTERFACE_SIZE: usize = 0xC0;
 const FALLING_DAMAGE_OFFSET: usize = 0x188;
 const FALLING_DAMAGE_SIZE: usize = 0x98;
 /// The game's ticks a second, which the tag's rates are of.
@@ -128,6 +133,23 @@ pub fn import_globals(cache: &Cache) -> Result<Globals, ImportError> {
         if let Some(tag) = reference(&weapon, 0x0, "weapon")? {
             imported.weapons.push(tag);
         }
+    }
+    // (the interface's tags, by the game's interface tag index)
+    let interface = globals.block(INTERFACE_OFFSET, "interface bitmaps", INTERFACE_SIZE, 1)?;
+    if let Some(interface) = interface.get(0) {
+        imported.hud_globals = reference(&interface, 0x60, "hud globals")?;
+        imported.hud_digits = reference(&interface, 0xB0, "hud digits definition")?;
+        imported.motion_sensor_blip = reference(&interface, 0xC0, "motion sensor blip")?;
+    }
+
+    let first_person = globals.block(
+        FIRST_PERSON_INTERFACE_OFFSET,
+        "first person interface",
+        FIRST_PERSON_INTERFACE_SIZE,
+        1,
+    )?;
+    if let Some(first_person) = first_person.get(0) {
+        imported.first_person_hands = reference(&first_person, 0x00, "first person hands")?;
     }
     Ok(imported)
 }

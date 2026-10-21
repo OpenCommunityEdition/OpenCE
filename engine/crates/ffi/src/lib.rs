@@ -7,6 +7,7 @@
 // crate and physics are the only ones allowed it)
 #![allow(unsafe_code)]
 
+pub mod hud;
 pub mod render_level;
 pub mod render_model;
 pub mod render_sky;
@@ -594,6 +595,21 @@ impl Engine {
         Ok(frame.ticks)
     }
 
+    /// The HUD to draw over a window `width` by `height` pixels: nothing
+    /// without a level and a player.
+    pub fn hud(&self, width: u32, height: u32) -> Vec<hud::HudQuad> {
+        let state = self.lock();
+        let Some(running) = &state.running else {
+            return Vec::new();
+        };
+        let (Some(level), Some(readout)) = (&running.level, running.simulation.hud()) else {
+            return Vec::new();
+        };
+        let seconds =
+            running.simulation.tick().0 as f32 / opence_sim::clock::TICKS_PER_SECOND as f32;
+        hud::hud_quads(level, &readout, width, height, seconds)
+    }
+
     /// The address to pass to `opence_snapshot_acquire`, valid while this
     /// engine is alive.
     pub fn snapshot_buffers(&self) -> u64 {
@@ -694,6 +710,33 @@ fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) {
                 &nodes,
             );
         });
+        // (the first-person weapon and hands, from the camera: their ids
+        // from the top, apart from the world's)
+        for (at, model) in simulation.first_person().models().iter().enumerate() {
+            nodes.clear();
+            nodes.extend(
+                model
+                    .current
+                    .iter()
+                    .zip(&model.previous)
+                    .map(|(current, previous)| NodeSnapshot {
+                        previous: node_matrix(previous),
+                        current: node_matrix(current),
+                    }),
+            );
+            let _ = frame.push_animated(
+                ObjectSnapshot {
+                    id: u32::MAX - u32::try_from(at).unwrap_or(0),
+                    model: u32::try_from(model.model).unwrap_or(u32::MAX),
+                    flags: snapshot::OBJECT_FIRST_PERSON,
+                    previous,
+                    current: transform(&camera.transform),
+                    bounding_radius: 1.0,
+                    ..Default::default()
+                },
+                &nodes,
+            );
+        }
     });
 }
 

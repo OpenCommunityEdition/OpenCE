@@ -4,6 +4,20 @@ import OpenCEEngineRender
 import opence_ffiFFI
 import simd
 
+extension ViewCamera {
+    /// The camera between a snapshot's last two ticks.
+    public init(_ snapshot: OCECameraSnapshot, alpha: Float) {
+        func camera(_ transform: OCETransform) -> ViewCamera {
+            let position = transform.position
+            let rotation = transform.rotation
+            return ViewCamera(position: SIMD3(position.x, position.y, position.z),
+                              rotation: simd_quatf(ix: rotation.x, iy: rotation.y, iz: rotation.z, r: rotation.w),
+                              verticalFov: snapshot.vertical_fov_radians)
+        }
+        self = .interpolated(from: camera(snapshot.previous), to: camera(snapshot.current), alpha: alpha)
+    }
+}
+
 extension FrameView {
     /// The objects with a model, between the last two ticks.
     public func drawnObjects() -> [DrawnObject] {
@@ -18,7 +32,8 @@ extension FrameView {
             drawn.append(DrawnObject(model: Int(object.model), transform: transform,
                                      center: SIMD3(transform.columns.3.x, transform.columns.3.y,
                                                    transform.columns.3.z),
-                                     radius: radius, regions: regions, nodes: nodes))
+                                     radius: radius, regions: regions, nodes: nodes,
+                                     firstPerson: object.flags & UInt16(OCE_OBJECT_FIRST_PERSON) != 0))
         }
         return drawn
     }
