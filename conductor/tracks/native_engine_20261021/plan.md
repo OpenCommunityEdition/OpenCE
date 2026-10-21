@@ -24,8 +24,8 @@
 - [x] Task: The native format bb3fc566
     - [x] Write tests: an `.ocpak` round-trips; a truncated or flipped file fails validation, never panicking; the import cache is rebuilt when the importer's version changes
     - [x] rkyv archives with validation; bitmap conversion to BC or RGBA8 with mipmaps; the cache folder
-- [ ] Task: Fuzz the importer
-    - [ ] Write tests: `cargo fuzz` targets for the cache readers and `.ocpak` loading, run for a fixed time in the suite without crashes
+- [x] Task: Fuzz the importer d0abab1f
+    - [x] Write tests: `cargo fuzz` targets for the cache readers and `.ocpak` loading, run for a fixed time in the suite without crashes
 - [ ] Task: Import every map
     - [ ] Write tests: pytest (marked, needs `assets/maps`) imports every stock map and the Custom Edition maps present, and checks the counts of tags, BSPs and bitmaps
 - [ ] Task: The app and window
