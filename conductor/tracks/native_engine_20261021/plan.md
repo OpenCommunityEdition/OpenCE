@@ -123,9 +123,9 @@
 - [x] Task: The host and its clients d832734a
     - [x] Write tests: two copies on loopback aliases play Slayer and CTF for 60 s; a client's predicted player stays within tolerance of the host's after reconciling; a client with 100 ms of added delay and 2% loss still plays
     - [x] UDP sockets, joining and leaving, prediction and reconciliation, interpolation of other players, the host's checks
-- [ ] Task: The menus
-    - [ ] Write tests: XCTest of the menu models (main menu, server list, join by address, host setup, settings for game, controls, video and audio); the settings round-trip through TOML
-    - [ ] SwiftUI menus over the Metal view, mouse first, Overpass and the OpenCE font; LAN discovery for the server list
+- [x] Task: The menus 5abf24ce
+    - [x] Write tests: XCTest of the menu models (main menu, server list, join by address, host setup, settings for game, controls, video and audio); the settings round-trip through TOML
+    - [x] SwiftUI menus over the Metal view, mouse first, Overpass and the OpenCE font; LAN discovery for the server list
 - [ ] Task: Conductor - User Manual Verification 'Phase 6: Multiplayer' (Protocol in workflow.md)
 
 ## Phase 7: AI and the campaign
