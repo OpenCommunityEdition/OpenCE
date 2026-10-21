@@ -27,6 +27,8 @@ libm = "0.2"
 glam = { version = "0.34", default-features = false, features = ["libm"] }
 uniffi = { version = "0.32", default-features = false }
 log = "0.4"
+# (inflates the Xbox caches)
+miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"
