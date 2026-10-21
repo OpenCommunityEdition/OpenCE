@@ -6464,8 +6464,11 @@ static void hardcore_comp_apply(void)
 		gametype_edit.setup_options.radar_players = _radar_players_none;
 	}
 	hardcore_stamp(variant);
+	/* port: the saved game is free for all. a 2v2 is teams, which is
+	   what puts the counters beside the clock. the score stays. */
+	variant->universal_variant.teams = TRUE;
 	hardcore_built_rules = hardcore_rules_for_engine(variant->game_engine_index);
-	hardcore_built_teams = variant->universal_variant.teams ? TRUE : FALSE;
+	hardcore_built_teams = TRUE;
 	hardcore_rules_reset_editing();
 	/* port: comp 2v2 shows the counters and the respawn percent.
 	   training mode stays off, so the pads stay hidden. */
@@ -6549,12 +6552,12 @@ static void hardcore_gametype_card(struct widget_instance *description, short ga
 	visible_set(named(description, "locked_gametype_icon", 0), FALSE);
 	if (gametype == 0)
 	{
-		teams = FALSE;
+		/* port: the saved game is free for all. the match is teams, so
+		   the counters have two scores to draw. */
 		if (hardcore_comp_find(&profile) && playlist_profile_get(profile, &variant))
 		{
 			engine = PIN(variant.game_engine_index, 0, 5);
 			score = variant.universal_variant.score_to_win;
-			teams = variant.universal_variant.teams ? TRUE : FALSE;
 		}
 	}
 	else if (gametype == 2)
