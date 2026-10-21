@@ -116,6 +116,9 @@ static void screen_keyboard_update(void);
 /* the windows' icon, a PNG (tools/embed_assets.py, from port/assets/icon) */
 extern const unsigned int platform_window_icon[];
 extern const unsigned long platform_window_icon_size;
+/* the menus' pointer, a PNG (tools/embed_assets.py, from port/assets/cursor) */
+extern const unsigned int platform_menu_cursor[];
+extern const unsigned long platform_menu_cursor_size;
 #endif
 #endif
 
@@ -1095,6 +1098,25 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		if (!icon || !SDL_SetWindowIcon(platform_window, icon))
 			platform_log("cannot set the window's icon: %s", SDL_GetError());
 		SDL_DestroySurface(icon);
+	}
+	/* the pointer the menus show (platform_ui_pointer_set_active), in place
+	of the system's: the picture at a quarter of its size at 100% display
+	scale, and the picture itself for the larger scales */
+	if (platform_menu_cursor_size)
+	{
+		SDL_Surface *picture = SDL_LoadPNG_IO(SDL_IOFromConstMem(platform_menu_cursor, platform_menu_cursor_size), true);
+		SDL_Surface *half = picture ? SDL_ScaleSurface(picture, picture->w / 2, picture->h / 2, SDL_SCALEMODE_LINEAR) : NULL;
+		SDL_Surface *quarter = half ? SDL_ScaleSurface(half, half->w / 2, half->h / 2, SDL_SCALEMODE_LINEAR) : NULL;
+		SDL_Cursor *cursor = NULL;
+
+		SDL_SetHint(SDL_HINT_MOUSE_DPI_SCALE_CURSORS, "1");
+		if (quarter && SDL_AddSurfaceAlternateImage(quarter, picture))
+			cursor = SDL_CreateColorCursor(quarter, 0, 0);
+		if (!cursor || !SDL_SetCursor(cursor))
+			platform_log("cannot set the menus' cursor: %s", SDL_GetError());
+		SDL_DestroySurface(quarter);
+		SDL_DestroySurface(half);
+		SDL_DestroySurface(picture);
 	}
 #endif
 	platform_fullscreen_requested = platform_fullscreen_setting();
