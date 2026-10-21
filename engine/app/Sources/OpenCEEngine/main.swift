@@ -5,7 +5,8 @@
 // and --render-scale (0.5 to 1) say. The free camera flies with W, A, S,
 // D, Space and Control (Shift faster), turned by the mouse at
 // --mouse-sensitivity radians a count; F3 or --frame-times shows the
-// frame times.
+// frame times. --benchmark SECONDS flies the map offscreen at --size
+// (3840x2160 by default), with no window, and prints the frame times.
 import AppKit
 import Metal
 import OpenCEEngineCore
@@ -245,6 +246,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             renderer.encode(into: commands, target: target, camera: camera, objects: objects)
         }
     }
+}
+
+/// The benchmark (tools/test_engine_benchmark.py): --map drawn offscreen
+/// along the benchmark's path, its frame times printed as JSON.
+func benchmark(seconds: String) -> Never {
+    guard let time = Double(seconds), time.isFinite, time > 0 else { fail("--benchmark is seconds, not \(seconds)") }
+    guard let map = argument("--map") else { fail("--benchmark needs --map") }
+    let size = (argument("--size") ?? "3840x2160").split(separator: "x").compactMap { Int($0) }
+    guard size.count == 2, size.allSatisfy({ (1...16384).contains($0) }) else { fail("--size is WIDTHxHEIGHT") }
+    guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
+        fail("no Metal device")
+    }
+    do {
+        let level = try LoadedLevel(map: map, bsp: argument("--bsp").flatMap { UInt32($0) } ?? 0,
+                                    cacheFolder: argument("--cache") ?? cacheFolder(), device: device,
+                                    settings: videoSettings())
+        let engine = Engine()
+        let snapshots = SnapshotReader(engine: engine)
+        _ = try engine.startLevel(geometry: level.geometry, difficulty: 1)
+        _ = try engine.step()
+        let objects = snapshots.acquire().drawnObjects()
+        let start = level.start
+        let path = BenchmarkPath(centre: SIMD3(start.x, start.y, start.z))
+        let result = try level.renderer.benchmark(width: size[0], height: size[1], path: path, seconds: time,
+                                                  objects: objects, queue: queue)
+        print(result.json)
+        exit(0)
+    } catch {
+        fail("\(map): \(error)")
+    }
+}
+
+if let seconds = argument("--benchmark") {
+    benchmark(seconds: seconds)
 }
 
 let app = NSApplication.shared

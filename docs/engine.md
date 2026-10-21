@@ -53,3 +53,23 @@ These are deferred to a later track:
 
 The importer does not read these tags yet. A map that has them loads and
 draws without them.
+
+## The benchmark
+
+`tools/test_engine_benchmark.py` runs `OpenCEEngine --benchmark 60`. The
+engine flies a fixed path through bloodgulch for 60 seconds: a loop around the
+first player start, rising and falling, looking ahead and down and up. It
+draws offscreen at 3840×2160 with temporal anti-aliasing at full scale, with
+the scenario's objects and the sky. No window opens.
+
+- **Frames in flight:** up to three, as the window has.
+- **Frame time:** the time between the ends of two frames' GPU work. It counts
+  whichever of the CPU and the GPU is slower.
+- **The bar:** p99 must be at most 8.33 ms (120 frames a second).
+
+| Machine | Date | Frames | p50 | p99 |
+| --- | --- | --- | --- | --- |
+| M1 Max | 2026-10-21 | 8235 | 7.28 ms | 7.94 ms |
+
+A frame's own GPU time is 9.10 ms at p50 and 10.10 ms at p99. That is longer
+than the frame time because the GPU overlaps one frame's work with the next.

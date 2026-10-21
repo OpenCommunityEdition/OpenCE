@@ -380,3 +380,24 @@ final class SkyTests: XCTestCase {
         XCTAssertGreaterThan(renderer.lastSkyPartCount, 0)
     }
 }
+
+/// The benchmark's measures: its percentiles and its path.
+final class BenchmarkTests: XCTestCase {
+    func testThePercentilesAreByNearestRank() {
+        let times = (1...100).map(Double.init)
+        XCTAssertEqual(BenchmarkResult.percentile(50, of: times), 50)
+        XCTAssertEqual(BenchmarkResult.percentile(99, of: times), 99)
+        XCTAssertEqual(BenchmarkResult.percentile(100, of: times), 100)
+        XCTAssertEqual(BenchmarkResult.percentile(99, of: [3]), 3)
+        XCTAssertEqual(BenchmarkResult.percentile(99, of: []), 0)
+    }
+
+    func testThePathLoopsBackToItsStart() {
+        let path = BenchmarkPath(centre: [10, 20, 5])
+        let start = path.camera(at: 0)
+        let around = path.camera(at: path.period)
+        XCTAssertLessThan(simd_distance(start.position, around.position), 1e-3)
+        XCTAssertEqual(simd_distance(path.camera(at: 17).position * [1, 1, 0], [10, 20, 0]), path.radius,
+                       accuracy: 1e-3)
+    }
+}
