@@ -532,7 +532,9 @@ static const struct config_setting config_settings[] =
 	{ "debug.movement_trace", _config_string, "\"\"", "HALO_MOVEMENT_TRACE", _environment_value, _platform_all,
 		"A script of inputs the first player plays, with their biped logged each tick,\n"
 		"for the native engine's reference traces (port/linux/game/movement_trace.c):\n"
-		"run, strafe, jump, runjump, crouch, fall or ramp; empty for none" },
+		"run, strafe, jump, runjump, crouch, fall or ramp; warthog_drive, warthog_turn,\n"
+		"warthog_brake, warthog_ramp, ghost_drive, ghost_turn or ghost_brake drive that\n"
+		"vehicle, logged instead; empty for none" },
 	{ "debug.network_test", _config_string, "\"\"", "HALO_NETWORK_TEST", _environment_value, _platform_all,
 		"Automated system link sessions for testing (port/linux/game/network_test.c):\n"
 		"\"host:<map>\" hosts a game on that map, \"join\" joins the first game found,\n"

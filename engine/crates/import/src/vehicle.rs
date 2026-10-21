@@ -435,7 +435,6 @@ mod tests {
         };
 
         let (warthog, warthog_physics) = vehicle("vehicles\\warthog\\warthog")?;
-        eprintln!("warthog: {warthog:?}");
         assert_eq!(warthog.kind, VehicleKind::HumanJeep);
         assert!(warthog.maximum_forward_speed > 0.0 && warthog.wheel_circumference > 0.0);
         assert!(warthog
@@ -447,13 +446,11 @@ mod tests {
             .iter()
             .any(|seat| seat.flags & VehicleSeat::GUNNER != 0));
         let warthog_physics = physics(&warthog_physics)?;
-        eprintln!("warthog physics: {warthog_physics:?}");
         assert_eq!(warthog_physics.powered_mass_points.len(), 2);
         assert!(warthog_physics.mass_points.len() >= 4);
         assert!(warthog_physics.mass > 0.0);
 
         let (ghost, ghost_physics) = vehicle("vehicles\\ghost\\ghost_mp")?;
-        eprintln!("ghost: {ghost:?}");
         assert_eq!(ghost.kind, VehicleKind::AlienScout);
         let ghost_physics = physics(&ghost_physics)?;
         assert!(ghost_physics
@@ -485,7 +482,6 @@ mod tests {
                 }
             }
         }
-        eprintln!("vehicle kinds: {kinds:?}");
         Ok(())
     }
 }

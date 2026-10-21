@@ -1,8 +1,9 @@
 """Records the native engine's reference movement traces: the reference
 game (build/macos/halo_host, `ninja macos`) hosts bloodgulch headless with
 no menus while debug.movement_trace plays each script of inputs, and its
-log's "movement trace:" lines (port/linux/game/movement_trace.c) are written
-to engine/tests/traces/<script>.csv, one row a 30 Hz tick. The home folder
+log's "movement trace:" lines (port/linux/game/movement_trace.c), or a
+vehicle script's "vehicle trace:" lines, are written to
+engine/tests/traces/<script>.csv, one row a 30 Hz tick. The home folder
 is never touched: HOME and XDG_DATA_HOME are in a temporary folder.
 
     python3 tools/engine_movement_traces.py [script ...]
@@ -24,9 +25,14 @@ IMAGE = ROOT / "build" / "macos" / "halo_guest.elf"
 MAPS = ROOT / "assets" / "maps"
 TRACES = ROOT / "engine" / "tests" / "traces"
 SCRIPTS = ("run", "strafe", "jump", "runjump", "crouch", "fall", "ramp")
+VEHICLE_SCRIPTS = ("warthog_drive", "warthog_turn", "warthog_brake", "warthog_ramp", "ghost_drive", "ghost_turn",
+                   "ghost_brake")
 COLUMNS = ("tick", "x", "y", "z", "vx", "vy", "vz", "yaw", "airborne", "airborne_ticks", "crouch", "landing",
            "body", "shield")
+VEHICLE_COLUMNS = ("tick", "x", "y", "z", "vx", "vy", "vz", "forward_i", "forward_j", "forward_k", "up_i", "up_j",
+                   "up_k", "wx", "wy", "wz", "speed", "turn", "airborne_ticks")
 LINE = re.compile(r"movement trace: (\w+) (-?\d+(?: -?[\d.]+(?:e[-+]?\d+)?){13})$")
+VEHICLE_LINE = re.compile(r"vehicle trace: (\w+) (-?\d+(?: -?[\d.]+(?:e[-+]?\d+)?){18})$")
 
 
 def record(script: str, exit_after: int = 45, timeout: int = 240) -> list[list[str]]:
@@ -55,8 +61,9 @@ def record(script: str, exit_after: int = 45, timeout: int = 240) -> list[list[s
         traced = "\n".join(line for line in output.splitlines() if "movement trace" in line or "crash" in line)
         raise RuntimeError(f"{script}: the trace did not finish\n{traced[-4000:]}")
     rows: dict[int, list[str]] = {}
+    pattern = VEHICLE_LINE if script in VEHICLE_SCRIPTS else LINE
     for line in output.splitlines():
-        match = LINE.search(line.strip())
+        match = pattern.search(line.strip())
         if match and match.group(1) == script:
             values = match.group(2).split()
             rows[int(values[0])] = values
@@ -65,7 +72,7 @@ def record(script: str, exit_after: int = 45, timeout: int = 240) -> list[list[s
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("scripts", nargs="*", default=list(SCRIPTS))
+    parser.add_argument("scripts", nargs="*", default=list(SCRIPTS + VEHICLE_SCRIPTS))
     arguments = parser.parse_args()
     if not (HOST.is_file() and IMAGE.is_file()):
         print("needs `ninja macos`", file=sys.stderr)
@@ -74,7 +81,8 @@ def main() -> int:
     for script in arguments.scripts:
         rows = record(script)
         path = TRACES / f"{script}.csv"
-        path.write_text(",".join(COLUMNS) + "\n" + "".join(",".join(row) + "\n" for row in rows))
+        columns = VEHICLE_COLUMNS if script in VEHICLE_SCRIPTS else COLUMNS
+        path.write_text(",".join(columns) + "\n" + "".join(",".join(row) + "\n" for row in rows))
         print(f"{path.relative_to(ROOT)}: {len(rows)} ticks")
     return 0
 
