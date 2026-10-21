@@ -49,9 +49,9 @@
 - [x] Task: Objects in the world 0e056b18
     - [x] Write tests: the scenario's placements spawn entities with their tag, position, permutation and team; a handle cannot be used after its entity is removed
     - [x] Entities, components and typed handles in `sim`; spawning from the scenario; the registry for object kinds
-- [ ] Task: Animation
-    - [ ] Write tests: node matrices from the animation graph for fixed frames match the reference app's (recorded); blending and overlays; compressed and uncompressed animations
-    - [ ] Animation playback and blending in Rust; node matrices into the snapshot
+- [x] Task: Animation 9e57d296
+    - [x] Write tests: node matrices from the animation graph for fixed frames match the reference app's (recorded); blending and overlays; compressed and uncompressed animations
+    - [x] Animation playback and blending in Rust; node matrices into the snapshot
 - [ ] Task: Drawing models
     - [ ] Write tests: golden frames of bloodgulch's objects and a campaign map's standing bipeds; levels of detail chosen by screen size
     - [ ] Skinned models on the GPU, the model shaders as materials, permutations and regions
