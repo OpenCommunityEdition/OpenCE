@@ -11,6 +11,7 @@ public final class EngineView: NSView {
     public let device: MTLDevice?
     private let queue: MTLCommandQueue?
     private var displayLink: CADisplayLink?
+    private let overlay = NSTextField(labelWithString: "")
 
     /// Called on each of the display's frames, while the link runs.
     public var onFrame: ((CADisplayLink) -> Void)?
@@ -33,6 +34,17 @@ public final class EngineView: NSView {
         metalLayer.backgroundColor = NSColor.black.cgColor
         wantsLayer = true
         layerContentsRedrawPolicy = .never
+        overlay.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        overlay.textColor = .white
+        overlay.backgroundColor = NSColor.black.withAlphaComponent(0.55)
+        overlay.drawsBackground = true
+        overlay.isHidden = true
+        overlay.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(overlay)
+        NSLayoutConstraint.activate([
+            overlay.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            overlay.topAnchor.constraint(equalTo: topAnchor, constant: 8),
+        ])
         layout(scale: backingScale)
     }
 
@@ -141,6 +153,19 @@ public final class EngineView: NSView {
         commands.commit()
     }
 
+    // ---------- the frame-time overlay
+
+    /// The overlay's line, or nil to hide it.
+    public var overlayText: String? {
+        get { overlay.isHidden ? nil : overlay.stringValue }
+        set {
+            overlay.isHidden = newValue == nil
+            if let newValue, overlay.stringValue != newValue {
+                overlay.stringValue = newValue
+            }
+        }
+    }
+
     // ---------- the keyboard and mouse
 
     public override var acceptsFirstResponder: Bool { true }
@@ -155,6 +180,12 @@ public final class EngineView: NSView {
 
     public override func keyUp(with event: NSEvent) {
         onKey?(event.keyCode, false)
+    }
+
+    // (Shift, Control and Option come as changes of the flags, not keys)
+    public override func flagsChanged(with event: NSEvent) {
+        guard let flag = ModifierKey.flag(event.keyCode) else { return }
+        onKey?(event.keyCode, event.modifierFlags.contains(flag))
     }
 
     public override func mouseDown(with event: NSEvent) { onClick?() }

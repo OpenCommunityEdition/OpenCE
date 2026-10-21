@@ -228,6 +228,30 @@ impl InputState {
     }
 }
 
+/// The bits of [`InputState::buttons`], as the simulation's `Buttons`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct InputButtons {
+    /// Jump.
+    pub jump: u32,
+    /// Crouch.
+    pub crouch: u32,
+    /// Fire.
+    pub fire: u32,
+    /// Sprint (the free camera's faster speed).
+    pub sprint: u32,
+}
+
+/// The buttons' bits, so that the app need not repeat them.
+#[uniffi::export]
+pub fn input_buttons() -> InputButtons {
+    InputButtons {
+        jump: Buttons::JUMP.0,
+        crouch: Buttons::CROUCH.0,
+        fire: Buttons::FIRE.0,
+        sprint: Buttons::SPRINT.0,
+    }
+}
+
 struct Running {
     simulation: Simulation,
     previous_camera: snapshot::Transform,

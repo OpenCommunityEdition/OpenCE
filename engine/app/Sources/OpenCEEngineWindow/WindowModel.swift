@@ -1,7 +1,8 @@
 // What the engine's window decides, apart from AppKit: its size in pixels,
 // when the mouse is captured, the mouse's raw motion between frames, the
-// keys held, and the display link's rate.
+// keys held, the frame times, and the display link's rate.
 
+import AppKit
 import CoreGraphics
 import QuartzCore
 
@@ -81,6 +82,57 @@ public struct HeldKeys: Equatable, Sendable {
 /// AppKit's key codes the window itself handles.
 public enum KeyCode {
     public static let escape: UInt16 = 53
+    /// F3 shows or hides the frame times.
+    public static let frameTimes: UInt16 = 99
+}
+
+/// The modifier keys held as keys: Shift, Control and Option, left and
+/// right (Command is the menus').
+public enum ModifierKey {
+    /// The flag a modifier's key code sets, or nil for other keys.
+    public static func flag(_ code: UInt16) -> NSEvent.ModifierFlags? {
+        switch code {
+        case 56, 60: .shift
+        case 59, 62: .control
+        case 58, 61: .option
+        default: nil
+        }
+    }
+}
+
+/// The frame times of the last few seconds, for the overlay: the mean and
+/// the slowest frame, in milliseconds.
+public struct FrameTimes: Equatable, Sendable {
+    public let capacity: Int
+    public private(set) var seconds: [Double] = []
+    private var next = 0
+
+    public init(capacity: Int = 240) {
+        self.capacity = max(capacity, 1)
+    }
+
+    public mutating func add(_ frame: Double) {
+        guard frame.isFinite, frame > 0 else { return }
+        if seconds.count < capacity {
+            seconds.append(frame)
+        } else {
+            seconds[next] = frame
+        }
+        next = (next + 1) % capacity
+    }
+
+    public var meanMilliseconds: Double {
+        seconds.isEmpty ? 0 : seconds.reduce(0, +) / Double(seconds.count) * 1000
+    }
+
+    public var slowestMilliseconds: Double { (seconds.max() ?? 0) * 1000 }
+
+    /// The line the overlay shows.
+    public var text: String {
+        guard !seconds.isEmpty else { return "–" }
+        let mean = meanMilliseconds
+        return String(format: "%.2f ms  %.0f fps  slowest %.2f ms", mean, 1000 / mean, slowestMilliseconds)
+    }
 }
 
 public enum FrameRate {

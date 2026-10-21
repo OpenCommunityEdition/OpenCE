@@ -106,6 +106,8 @@ public final class EngineWindowController {
     public let window: EngineWindow
     public private(set) var capture = MouseCapture()
     public private(set) var keys = HeldKeys()
+    /// Whether the frame-time overlay is shown (F3 shows or hides it).
+    public var showsFrameTimes = false
     private var motion = MouseMotion()
     private let pointer: PointerControl
     private let rawMouse: RawMouse
@@ -163,6 +165,10 @@ public final class EngineWindowController {
     private func key(_ code: UInt16, _ down: Bool) {
         if code == KeyCode.escape {
             if down { handle(.escape) }
+            return
+        }
+        if code == KeyCode.frameTimes {
+            if down { showsFrameTimes.toggle() }
             return
         }
         if down { keys.press(code) } else { keys.release(code) }
