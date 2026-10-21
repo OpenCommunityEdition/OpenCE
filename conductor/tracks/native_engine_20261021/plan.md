@@ -100,9 +100,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Weapons, damage, grenades and ragdolls' (Protocol in workflow.md)
 
 ## Phase 5: Vehicles
-- [ ] Task: Typed tags for vehicles
-    - [ ] Write tests: vehicle tags (physics, seats, turrets, suspension) import; malformed ones are refused
-    - [ ] `content` types and importers
+- [x] Task: Typed tags for vehicles 1ab6b170
+    - [x] Write tests: vehicle tags (physics, seats, turrets, suspension) import; malformed ones are refused
+    - [x] `content` types and importers
 - [ ] Task: Reference traces for vehicles
     - [ ] Write tests: the reference app's recorder writes Warthog and Ghost traces for scripted inputs (accelerate, turn, brake, jump a ramp)
 - [ ] Task: Driving and flying
