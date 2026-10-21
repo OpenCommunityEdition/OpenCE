@@ -9,9 +9,9 @@
 - [x] Task: The contract between Rust and Swift ebbafae4
     - [x] Write tests: cargo tests of the snapshot's layout (sizes and offsets fixed, checked against the generated header); an XCTest that loads the library, starts an empty world and reads a snapshot
     - [x] UniFFI calls in `ffi`; the `#[repr(C)]` snapshot types and a cbindgen header; a double-buffered snapshot that Swift reads without copying
-- [ ] Task: The fixed tick and determinism
-    - [ ] Write tests: a world stepped at 60 Hz from recorded inputs gives the same hash on every run; the renderer's interpolation factor is correct across uneven frame times
-    - [ ] The `sim` schedule in a fixed order, the input record, the world hash, and deterministic maths (`libm`, no FMA)
+- [x] Task: The fixed tick and determinism 987d50bd
+    - [x] Write tests: a world stepped at 60 Hz from recorded inputs gives the same hash on every run; the renderer's interpolation factor is correct across uneven frame times
+    - [x] The `sim` schedule in a fixed order, the input record, the world hash, and deterministic maths (`libm`, no FMA)
 - [ ] Task: Conductor - User Manual Verification 'Phase 0: Foundations' (Protocol in workflow.md)
 
 ## Phase 1: Import a map and fly through it
