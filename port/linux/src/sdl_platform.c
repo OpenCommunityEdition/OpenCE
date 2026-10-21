@@ -217,6 +217,44 @@ static void platform_choose_video_driver(void)
 }
 #endif
 
+/* display.driver: the GL implementation the loader opens, when this build's
+own can be swapped for another. Mesa's loader takes a driver's name in
+MESA_LOADER_DRIVER_OVERRIDE (zink: OpenGL on Vulkan; llvmpipe: on the
+processor; iris, radeonsi, d3d12, ...) and reads it before SDL opens libGL.
+ANGLE's GLES libraries must be beside the game (the APK's lib folder on
+Android) and its Vulkan platform is asked for here. Logged, so a bug report
+says which one ran; "native" leaves the loader alone. */
+static void set_environment(char const *name, char const *value)
+{
+#ifdef _WIN32
+	_putenv_s(name, value);
+#else
+	setenv(name, value, 1);
+#endif
+}
+
+static void platform_select_driver(void)
+{
+	static BOOL selected;
+	char const *driver = config_string("display.driver");
+
+	if (selected)
+		return;
+	selected = TRUE;
+
+	if (!driver || !driver[0] || !strcmp(driver, "native") || !strcmp(driver, "auto"))
+		return;
+	if (!strcmp(driver, "angle"))
+	{
+		set_environment("ANGLE_DEFAULT_PLATFORM", "vulkan");
+		platform_log("GPU: display.driver angle: ANGLE's libEGL/libGLESv2 must load (beside "
+			"the game, or the APK's lib folder); its Vulkan platform is asked for");
+		return;
+	}
+	set_environment("MESA_LOADER_DRIVER_OVERRIDE", driver);
+	platform_log("GPU: display.driver %s: MESA_LOADER_DRIVER_OVERRIDE set before SDL", driver);
+}
+
 BOOL platform_sdl_initialize(void)
 {
 	SDL_InitFlags flags = SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_EVENTS;
@@ -237,6 +275,7 @@ BOOL platform_sdl_initialize(void)
 #if defined(__linux__) && !defined(HALO_ARM64_GUEST) && !defined(HALO_ANDROID)
 	platform_choose_video_driver();
 #endif
+	platform_select_driver();
 #ifdef HALO_ANDROID
 	/* landscape only; the back key arrives as a key event (xinput_sdl.c)
 	instead of closing the activity */
