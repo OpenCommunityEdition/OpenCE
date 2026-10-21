@@ -108,9 +108,9 @@
 - [x] Task: Driving and flying b6b47cb7
     - [x] Write tests: Warthog and Ghost traces within tolerance; the Banshee and the Scorpion respond to their tags' values
     - [x] Halo's mass points ported for every vehicle (deviation: not Jolt's vehicle constraints, which cannot match the traces); hover and flight from the vehicle tags
-- [ ] Task: Seats, turrets and destruction
-    - [ ] Write tests: entering and leaving each seat, the Warthog's turret, passengers firing, a vehicle destroyed by damage
-    - [ ] Seats, entering and leaving animations, turrets, vehicle damage
+- [x] Task: Seats, turrets and destruction 5c17d30d
+    - [x] Write tests: entering and leaving each seat, the Warthog's turret, passengers firing, a vehicle destroyed by damage
+    - [x] Seats, entering and leaving animations, turrets, vehicle damage
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Vehicles' (Protocol in workflow.md)
 
 ## Phase 6: Multiplayer
