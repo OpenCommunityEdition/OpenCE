@@ -1,0 +1,43 @@
+# The new engine (conductor/tracks/native_engine_20261021): Rust owns the
+# content, the simulation, the scripts, the physics and the network; the
+# Swift app (engine/app) reaches it only through the ffi crate.
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "CC0-1.0"
+publish = false
+rust-version = "1.98"
+
+[workspace.dependencies]
+opence_content = { path = "crates/content" }
+opence_import = { path = "crates/import" }
+opence_sim = { path = "crates/sim" }
+opence_physics = { path = "crates/physics" }
+opence_script = { path = "crates/script" }
+opence_net = { path = "crates/net" }
+thiserror = "2"
+bevy_ecs = { version = "0.20", default-features = false, features = ["std"] }
+rkyv = { version = "0.8", default-features = false, features = ["std", "bytecheck", "alloc"] }
+libm = "0.2"
+uniffi = { version = "0.32", default-features = false }
+log = "0.4"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+
+[profile.release]
+# a panic must not unwind into Swift
+panic = "abort"
+debug = "line-tables-only"
+
+[profile.dev]
+panic = "abort"

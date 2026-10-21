@@ -48,6 +48,7 @@
         rust
         pkgs.cargo-llvm-cov
         pkgs.rust-cbindgen
+        pkgs.cargo-deny
         pkgs.darwin.sigtool
       ];
       libraries = [ pkgs.sdl3 pkgs.apple-sdk_26 ];
@@ -125,6 +126,32 @@
             cp -R build/macos/OpenCE.app $out/Applications/OpenCE.app
           '';
         };
+        # OpenCE Engine.app, the new engine (engine/, track
+        # native_engine_20261021). Its Swift is Xcode's too, so it builds
+        # without the sandbox as the app does
+        engine = pkgs.stdenv.mkDerivation (buildEnvironment // {
+          pname = "opence-engine";
+          version = self.shortRev or self.dirtyShortRev or "dirty";
+          src = self;
+          nativeBuildInputs = tools ++ [ pkgs.rustPlatform.cargoSetupHook ];
+          buildInputs = libraries;
+          cargoDeps = pkgs.rustPlatform.importCargoLock {
+            lockFile = ./engine/Cargo.lock;
+          };
+          cargoRoot = "engine";
+          buildPhase = ''
+            runHook preBuild
+            python tools/engine_build.py --out build/engine
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/Applications
+            cp -R "build/engine/OpenCE Engine.app" "$out/Applications/OpenCE Engine.app"
+            runHook postInstall
+          '';
+          dontFixup = true;
+        });
         default = host;
       };
 

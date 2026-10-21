@@ -1,0 +1,30 @@
+[package]
+name = "opence_ffi"
+description = "The contract between the engine and the Swift app: UniFFI calls and the per-frame snapshot"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+# rlib for the tests, staticlib for the Swift app
+crate-type = ["rlib", "staticlib"]
+
+[[bin]]
+# writes the Swift bindings; only with --features bindgen, so that the
+# library the app links is built without its dependencies
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+opence_sim.workspace = true
+opence_content.workspace = true
+thiserror.workspace = true
+uniffi.workspace = true
+
+[lints]
+workspace = true

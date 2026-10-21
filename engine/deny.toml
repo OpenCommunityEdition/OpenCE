@@ -1,0 +1,35 @@
+# cargo deny check licenses bans sources (tools/test_engine_build.py):
+# the engine's dependencies come from crates.io, under permissive licences.
+[graph]
+targets = ["aarch64-apple-darwin"]
+all-features = true
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Zlib",
+    "ISC",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "MPL-2.0",
+]
+confidence-threshold = 0.9
+
+[[licenses.clarify]]
+crate = "opence_ffi"
+expression = "CC0-1.0"
+license-files = []
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

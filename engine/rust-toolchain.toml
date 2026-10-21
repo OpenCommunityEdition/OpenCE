@@ -1,0 +1,6 @@
+# (the same toolchain as the repository's, ../rust-toolchain.toml)
+[toolchain]
+channel = "1.98.1"
+components = ["rustfmt", "clippy", "llvm-tools-preview"]
+targets = ["aarch64-apple-darwin", "wasm32-unknown-unknown"]
+profile = "minimal"

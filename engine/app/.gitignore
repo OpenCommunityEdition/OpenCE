@@ -1,0 +1,4 @@
+# written by tools/engine_build.py
+/Sources/OpenCEEngineFFI/
+/Sources/OpenCEEngineCore/
+/.build/
