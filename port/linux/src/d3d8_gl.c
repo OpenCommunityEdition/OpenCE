@@ -2436,6 +2436,8 @@ static void gl_initialize(void)
 		android_render_chip, android_geometry_fixes ? "on" : "off", android_texture_fixes ? "on" : "off");
 #endif
 	glGetIntegerv(GL_MINOR_VERSION, &minor);
+	gpu_profile_initialize((const char *)glGetString(GL_VENDOR),
+		(const char *)glGetString(GL_RENDERER), (const char *)glGetString(GL_VERSION));
 #ifdef HALO_GLES
 	{
 		BOOL es32 = major > 3 || (major == 3 && minor >= 2);
@@ -2553,7 +2555,6 @@ static void gl_initialize(void)
 	{
 		long every = config_integer("debug.gpu_flush_draws");
 
-		gpu_profile_initialize();
 		if (every < 0)
 			every = gpu_profile_flush_draws();
 		if (every > 0)
