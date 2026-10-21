@@ -86,6 +86,23 @@ public enum KeyCode {
     public static let frameTimes: UInt16 = 99
 }
 
+/// The mouse's buttons, held as keys: codes past AppKit's key codes
+/// (which are below 128).
+public enum MouseButton {
+    public static let left: UInt16 = 0x100
+    public static let right: UInt16 = 0x101
+    public static let middle: UInt16 = 0x102
+    /// The buttons past the middle one (the fourth and fifth).
+    public static let fourth: UInt16 = 0x103
+    public static let fifth: UInt16 = 0x104
+    public static let all: [UInt16] = [left, right, middle, fourth, fifth]
+
+    /// The code of AppKit's `buttonNumber` (0 left, 1 right, 2 middle).
+    public static func code(_ buttonNumber: Int) -> UInt16 {
+        0x100 + UInt16(clamping: max(0, min(buttonNumber, 4)))
+    }
+}
+
 /// The modifier keys held as keys: Shift, Control and Option, left and
 /// right (Command is the menus').
 public enum ModifierKey {

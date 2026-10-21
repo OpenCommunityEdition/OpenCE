@@ -18,7 +18,8 @@ public final class EngineView: NSView {
     /// Called when the drawable's size changes, in pixels.
     public var onResize: ((Int, Int) -> Void)?
     var onKey: ((UInt16, Bool) -> Void)?
-    var onClick: (() -> Void)?
+    /// A mouse button pressed or let go, by its code in `MouseButton`.
+    var onMouseButton: ((UInt16, Bool) -> Void)?
     /// AppKit's motion, right and down positive (accelerated: used only
     /// without a raw mouse).
     var onMotion: ((Double, Double) -> Void)?
@@ -188,8 +189,16 @@ public final class EngineView: NSView {
         onKey?(event.keyCode, event.modifierFlags.contains(flag))
     }
 
-    public override func mouseDown(with event: NSEvent) { onClick?() }
-    public override func rightMouseDown(with event: NSEvent) { onClick?() }
+    public override func mouseDown(with event: NSEvent) { onMouseButton?(MouseButton.left, true) }
+    public override func mouseUp(with event: NSEvent) { onMouseButton?(MouseButton.left, false) }
+    public override func rightMouseDown(with event: NSEvent) { onMouseButton?(MouseButton.right, true) }
+    public override func rightMouseUp(with event: NSEvent) { onMouseButton?(MouseButton.right, false) }
+    public override func otherMouseDown(with event: NSEvent) {
+        onMouseButton?(MouseButton.code(event.buttonNumber), true)
+    }
+    public override func otherMouseUp(with event: NSEvent) {
+        onMouseButton?(MouseButton.code(event.buttonNumber), false)
+    }
 
     private func motion(_ event: NSEvent) {
         onMotion?(Double(event.deltaX), Double(event.deltaY))

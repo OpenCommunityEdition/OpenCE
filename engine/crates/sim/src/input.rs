@@ -19,8 +19,28 @@ impl Buttons {
     pub const FIRE: Self = Self(1 << 2);
     /// The free camera's fast move.
     pub const SPRINT: Self = Self(1 << 3);
+    /// Reload the weapon.
+    pub const RELOAD: Self = Self(1 << 4);
+    /// Change to the other weapon carried.
+    pub const SWAP: Self = Self(1 << 5);
+    /// The action: pick up the weapon at the player's feet.
+    pub const ACTION: Self = Self(1 << 6);
+    /// Melee.
+    pub const MELEE: Self = Self(1 << 7);
+    /// Throw a grenade.
+    pub const GRENADE: Self = Self(1 << 8);
+    /// Zoom.
+    pub const ZOOM: Self = Self(1 << 9);
+    /// Change to the other kind of grenade.
+    pub const SWITCH_GRENADE: Self = Self(1 << 10);
     /// Every button the engine knows; others in a recording are refused.
-    pub const ALL: Self = Self(0b1111);
+    pub const ALL: Self = Self(0x7FF);
+
+    /// Whether any of `buttons` is pressed this tick, held now and not
+    /// `earlier`.
+    pub fn pressed(self, earlier: Self, buttons: Self) -> bool {
+        self.0 & !earlier.0 & buttons.0 != 0
+    }
 
     /// Whether every button of `buttons` is held.
     pub fn contains(self, buttons: Self) -> bool {
@@ -221,7 +241,8 @@ mod tests {
         );
 
         let mut bytes = sample().to_bytes();
-        bytes[HEADER_SIZE] = 0xff;
+        // (the first button past the last there is)
+        bytes[HEADER_SIZE..HEADER_SIZE + 4].copy_from_slice(&(Buttons::ALL.0 + 1).to_le_bytes());
         assert!(
             matches!(InputRecord::from_bytes(&bytes), Err(RecordError::Invalid { field, .. }) if field == "buttons of tick 0")
         );

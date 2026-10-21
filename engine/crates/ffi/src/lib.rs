@@ -295,6 +295,20 @@ pub struct InputButtons {
     pub fire: u32,
     /// Sprint (the free camera's faster speed).
     pub sprint: u32,
+    /// Reload.
+    pub reload: u32,
+    /// Change weapons.
+    pub swap: u32,
+    /// The action (pick up a weapon).
+    pub action: u32,
+    /// Melee.
+    pub melee: u32,
+    /// Throw a grenade.
+    pub grenade: u32,
+    /// Zoom.
+    pub zoom: u32,
+    /// Change grenades.
+    pub switch_grenade: u32,
 }
 
 /// The buttons' bits, so that the app need not repeat them.
@@ -305,6 +319,13 @@ pub fn input_buttons() -> InputButtons {
         crouch: Buttons::CROUCH.0,
         fire: Buttons::FIRE.0,
         sprint: Buttons::SPRINT.0,
+        reload: Buttons::RELOAD.0,
+        swap: Buttons::SWAP.0,
+        action: Buttons::ACTION.0,
+        melee: Buttons::MELEE.0,
+        grenade: Buttons::GRENADE.0,
+        zoom: Buttons::ZOOM.0,
+        switch_grenade: Buttons::SWITCH_GRENADE.0,
     }
 }
 

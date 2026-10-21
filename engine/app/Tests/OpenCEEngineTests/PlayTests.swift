@@ -25,11 +25,11 @@ final class PlayControlsTests: XCTestCase {
     }
 
     func testRebindingMovesTheActions() throws {
-        // (E jumps, the arrows move; the rest stay stock)
-        let json = Data(#"{"jump": [14], "forward": [126], "back": [125]}"#.utf8)
+        // (Q jumps, the arrows move; the rest stay stock)
+        let json = Data(#"{"jump": [12], "forward": [126], "back": [125]}"#.utf8)
         let bindings = try KeyBindings.read(json)
         let controls = PlayControls(bindings: bindings)
-        XCTAssertEqual(controls.input(held: [14], mouse: (0, 0)).buttons, inputButtons().jump)
+        XCTAssertEqual(controls.input(held: [12], mouse: (0, 0)).buttons, inputButtons().jump)
         XCTAssertEqual(controls.input(held: [49], mouse: (0, 0)).buttons, 0)
         XCTAssertEqual(controls.input(held: [126], mouse: (0, 0)).forward, 127)
         XCTAssertEqual(controls.input(held: [13], mouse: (0, 0)).forward, 0)
@@ -39,6 +39,22 @@ final class PlayControlsTests: XCTestCase {
             XCTAssertEqual(error as? BindingError, .unknownAction("fly"))
         }
         XCTAssertThrowsError(try KeyBindings.read(Data("not json".utf8)))
+    }
+
+    func testTheWeaponsActionsAreHalosPCs() {
+        let controls = PlayControls()
+        let buttons = inputButtons()
+        // the left mouse button fires, the right throws; R, Tab, E, F, Z, G
+        let cases: [(UInt16, UInt32)] = [
+            (MouseButtonCode.left, buttons.fire), (MouseButtonCode.right, buttons.grenade),
+            (15, buttons.reload), (48, buttons.swap), (14, buttons.action), (3, buttons.melee),
+            (6, buttons.zoom), (5, buttons.switchGrenade),
+        ]
+        for (code, button) in cases {
+            XCTAssertEqual(controls.input(held: [code], mouse: (0, 0)).buttons, button, "\(code)")
+        }
+        XCTAssertEqual([buttons.reload, buttons.swap, buttons.action, buttons.melee, buttons.grenade,
+                        buttons.zoom, buttons.switchGrenade], [16, 32, 64, 128, 256, 512, 1024])
     }
 
     func testTheViewTogglesOncePerPress() {

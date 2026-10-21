@@ -8,13 +8,16 @@
 //! never sees the world.
 
 pub mod animation;
+pub mod armory;
 pub mod clock;
 pub mod hash;
 pub mod input;
 pub mod objects;
 pub mod player;
+pub mod projectile;
 pub mod random;
 pub mod units;
+pub mod weapon;
 
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::SingleThreadedExecutor;
@@ -147,6 +150,8 @@ pub struct Simulation {
     /// The player, if there is one (its physics world is not `Sync`, so it
     /// is kept beside the bevy world, not in it).
     player: Option<Player>,
+    /// Where projectiles hit in the last tick.
+    impacts: Vec<projectile::Impact>,
 }
 
 /// An object as the renderer draws it.
@@ -184,6 +189,7 @@ impl Simulation {
             (
                 move_free_camera,
                 player::move_player.before(animation::play_animations),
+                player::move_projectiles,
                 animation::play_animations,
             )
                 .in_set(SimSet::Simulate),
@@ -193,6 +199,7 @@ impl Simulation {
             world,
             schedule,
             player: None,
+            impacts: Vec::new(),
         }
     }
 
@@ -200,9 +207,11 @@ impl Simulation {
     /// the world's systems run.
     pub fn step(&mut self, input: TickInput) {
         self.world.insert_resource(CurrentInput(input));
+        self.impacts.clear();
         if let Some(player) = self.player.as_mut() {
             let pose = player.step(&input);
             self.world.insert_resource(pose);
+            self.impacts = player.step_weapons(&input, &mut self.world);
         }
         self.schedule.run(&mut self.world);
     }
@@ -238,6 +247,11 @@ impl Simulation {
         self.player = Some(player);
         self.place_player_camera();
         Ok(handle)
+    }
+
+    /// Where projectiles hit in the last tick.
+    pub fn impacts(&self) -> &[projectile::Impact] {
+        &self.impacts
     }
 
     /// The player, if there is one.
@@ -464,11 +478,12 @@ impl Simulation {
                 Option<&Permutation>,
                 Option<&Team>,
                 Option<&AnimationPlayer>,
+                Option<&armory::WeaponItem>,
             )>()
             .iter(&self.world)
             .collect();
         objects.sort_by_key(|(id, ..)| **id);
-        for (id, transform, object, name, permutation, team, player) in objects {
+        for (id, transform, object, name, permutation, team, player, item) in objects {
             hasher.u64(u64::from(id.0));
             transform.hash(&mut hasher);
             hasher.u64(kind_index(object.kind) as u64);
@@ -500,6 +515,12 @@ impl Simulation {
                     hasher.u64(u64::from(player.state.frame));
                 }
                 None => hasher.u64(0),
+            }
+            // (only weapons a player has touched have rounds of their own,
+            // and nothing is hashed for the others, as before there were)
+            if let Some(item) = item {
+                hasher.u64(1);
+                item.0.hash(&mut hasher);
             }
         }
         // (nothing for no player, so that a world without one hashes as

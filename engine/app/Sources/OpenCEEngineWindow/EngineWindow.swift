@@ -120,7 +120,7 @@ public final class EngineWindowController {
         self.rawMouse = rawMouse
         let view = window.engineView
         view.onKey = { [weak self] code, down in self?.key(code, down) }
-        view.onClick = { [weak self] in self?.handle(.click) }
+        view.onMouseButton = { [weak self] code, down in self?.mouseButton(code, down) }
         view.onMotion = { [weak self] dx, dy in
             // (AppKit's motion only without a raw mouse, and down positive)
             guard let self, !self.rawMouse.available else { return }
@@ -174,11 +174,29 @@ public final class EngineWindowController {
         if down { keys.press(code) } else { keys.release(code) }
     }
 
+    /// A mouse button is held as a key while the mouse is captured; a
+    /// press while it is not captures it, and is not the player's.
+    func mouseButton(_ code: UInt16, _ down: Bool) {
+        if down {
+            if capture.captured {
+                keys.press(code)
+            } else {
+                handle(.click)
+            }
+        } else {
+            keys.release(code)
+        }
+    }
+
     func handle(_ event: MouseCapture.Event) {
         if event == .unfocused {
             keys.releaseAll()
         }
         guard capture.handle(event) else { return }
+        if !capture.captured {
+            // (a button let go after the mouse is is not seen)
+            MouseButton.all.forEach { keys.release($0) }
+        }
         // (motion from before the capture changed is not the player's look)
         _ = motion.take()
         pointer.setCaptured(capture.captured, in: window)

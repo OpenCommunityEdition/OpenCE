@@ -177,4 +177,25 @@ final class EngineWindowTests: XCTestCase {
         key(KeyCode.escape, down: true)
         XCTAssertFalse(controller.keys.isHeld(KeyCode.escape))
     }
+
+    func testMouseButtonsAreHeldOnlyWhileCaptured() {
+        let view = controller.window.engineView
+        post(NSWindow.didBecomeKeyNotification)
+        key(KeyCode.escape, down: true)
+        // (the click that captures the mouse again is not the player's)
+        view.mouseDown(with: mouseEvent(.leftMouseDown))
+        XCTAssertTrue(pointer.captured)
+        XCTAssertEqual(controller.keys.codes, [])
+        view.mouseUp(with: mouseEvent(.leftMouseUp))
+        view.mouseDown(with: mouseEvent(.leftMouseDown))
+        view.rightMouseDown(with: mouseEvent(.rightMouseDown))
+        XCTAssertEqual(controller.keys.codes, [MouseButton.left, MouseButton.right])
+        view.mouseUp(with: mouseEvent(.leftMouseUp))
+        XCTAssertEqual(controller.keys.codes, [MouseButton.right])
+        // (let go with the mouse)
+        key(KeyCode.escape, down: true)
+        XCTAssertEqual(controller.keys.codes, [])
+        XCTAssertEqual(MouseButton.code(2), MouseButton.middle)
+        XCTAssertEqual(MouseButton.code(9), MouseButton.fifth)
+    }
 }

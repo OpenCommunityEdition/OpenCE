@@ -2,14 +2,24 @@
 // last frame, as the engine's input, through key bindings the player may
 // change (a JSON file of action names to AppKit key codes). The stock
 // bindings are Halo PC's: W, S, A and D move, Space jumps, Control
-// crouches, and the mouse looks; V changes the camera between first and
-// third person.
+// crouches, the mouse looks, its left button fires and its right throws a
+// grenade; R reloads, Tab changes weapons, E picks up, F strikes, Z zooms
+// and G changes grenades. V changes the camera between first and third
+// person. The mouse's buttons are bound by codes past the keys' (from 256:
+// left, right, middle, fourth, fifth).
 import Foundation
 import OpenCEEngineCore
 
 /// What a key may be bound to.
 public enum PlayAction: String, CaseIterable, Codable, Sendable {
     case forward, back, left, right, jump, crouch, fire, toggleView
+    case reload, swap, action, melee, grenade, zoom, switchGrenade
+}
+
+/// The codes of the mouse's buttons (the window's `MouseButton`).
+public enum MouseButtonCode {
+    public static let left: UInt16 = 0x100
+    public static let right: UInt16 = 0x101
 }
 
 /// Each action's keys (AppKit's key codes, by the key's place).
@@ -28,8 +38,15 @@ public struct KeyBindings: Equatable, Sendable {
         .right: [2], // D
         .jump: [49], // Space
         .crouch: [59, 62], // the Controls
-        .fire: [],
+        .fire: [MouseButtonCode.left],
         .toggleView: [9], // V
+        .reload: [15], // R
+        .swap: [48], // Tab
+        .action: [14], // E
+        .melee: [3], // F
+        .grenade: [MouseButtonCode.right],
+        .zoom: [6], // Z
+        .switchGrenade: [5], // G
     ])
 
     /// Bindings read from JSON (`{"jump": [49], ...}`): the actions it
@@ -94,8 +111,13 @@ public struct PlayControls: Equatable, Sendable {
         }
         let names = inputButtons()
         var buttons: UInt32 = 0
-        for (action, button) in [(PlayAction.jump, names.jump), (.crouch, names.crouch), (.fire, names.fire)]
-            where bindings.holds(action, held) {
+        let actions: [(PlayAction, UInt32)] = [
+            (.jump, names.jump), (.crouch, names.crouch), (.fire, names.fire),
+            (.reload, names.reload), (.swap, names.swap), (.action, names.action),
+            (.melee, names.melee), (.grenade, names.grenade), (.zoom, names.zoom),
+            (.switchGrenade, names.switchGrenade),
+        ]
+        for (action, button) in actions where bindings.holds(action, held) {
             buttons |= button
         }
         // (the mouse right turns right, which is a negative yaw)

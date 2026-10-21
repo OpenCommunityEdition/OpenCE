@@ -4,21 +4,27 @@
 //!
 //! The physics world is not `Sync`, so it lives beside the bevy world, in
 //! [`crate::Simulation`]; each tick moves the biped first, and a system then
-//! puts its object and the camera where the step left them.
+//! puts its object and the camera where the step left them. Its weapons
+//! fire after the move, from where it then looks, and their projectiles
+//! fly through the same physics world.
 
 use bevy_ecs::prelude::*;
 use glam::{Quat, Vec2, Vec3};
-use opence_content::{Biped, Level, TagRef};
+use opence_content::{Biped, Level, ObjectKind, TagRef};
 use opence_physics::{
     Layers, LevelMesh, MovementInput, Mover, MoverSettings, PhysicsError, World as PhysicsWorld,
     WorldSettings,
 };
 use thiserror::Error;
 
+use crate::armory::{self, Armory, Carried, Inventory, WeaponItem};
 use crate::hash::WorldHasher;
 use crate::input::{Buttons, TickInput};
-use crate::objects::ObjectHandle;
+use crate::objects::{self, Object, ObjectHandle, ObjectSpawn};
+use crate::projectile::{self, Flew, Flight, Impact};
+use crate::random::RandomSeed;
 use crate::units::Radians;
+use crate::weapon::{secondary, WeaponControls, WeaponState};
 use crate::{FreeCamera, Transform};
 
 /// Where the player sees from.
@@ -83,6 +89,16 @@ pub struct Player {
     handle: ObjectHandle,
     /// Its biped's tag.
     unit: TagRef,
+    /// The level's weapons.
+    armory: Armory,
+    /// The weapons it carries.
+    inventory: Inventory,
+    /// Its projectiles in flight.
+    flights: Vec<Flight>,
+    /// The buttons held the tick before, for presses.
+    held: Buttons,
+    /// The world's gravity, in world units per second per second.
+    gravity: f32,
 }
 
 /// What the tick's systems need of the player: where its object goes and
@@ -141,6 +157,8 @@ impl Player {
         let yaw = libm::remainderf(place.facing, std::f32::consts::TAU);
         let body = body_transform(mover.position, yaw);
         let handle = spawn(unit.clone(), body).ok_or(PlayerError::TableFull)?;
+        let armory = Armory::new(level);
+        let inventory = Inventory::starting(level, &armory);
         Ok(Player {
             physics,
             mover,
@@ -149,6 +167,11 @@ impl Player {
             view: View::default(),
             handle,
             unit,
+            armory,
+            inventory,
+            flights: Vec::new(),
+            held: Buttons::default(),
+            gravity: -settings.gravity.z,
         })
     }
 
@@ -165,6 +188,27 @@ impl Player {
     /// Its movement: where its feet are, its velocity, its ground.
     pub fn mover(&self) -> &Mover {
         &self.mover
+    }
+
+    /// The level's weapons.
+    pub fn armory(&self) -> &Armory {
+        &self.armory
+    }
+
+    /// The weapons it carries.
+    pub fn inventory(&self) -> &Inventory {
+        &self.inventory
+    }
+
+    /// The tag of the weapon in its hands, and its state.
+    pub fn weapon(&self) -> Option<(&TagRef, &WeaponState)> {
+        let carried = self.inventory.current()?;
+        Some((&self.armory.get(carried.armory)?.tag, &carried.state))
+    }
+
+    /// Its projectiles in flight.
+    pub fn flights(&self) -> &[Flight] {
+        &self.flights
     }
 
     /// Where it sees from.
@@ -238,6 +282,227 @@ impl Player {
         }
     }
 
+    /// Its eyes, and where they look.
+    fn aim(&self) -> (Vec3, Quat) {
+        (
+            self.mover.position + Vec3::Z * self.mover.camera_height(),
+            look_rotation(self.yaw, self.pitch),
+        )
+    }
+
+    /// One tick of its weapons, after its move: its projectiles fly on,
+    /// it picks up and changes weapons, and the one in its hands fires.
+    /// Where projectiles hit is returned.
+    pub(crate) fn step_weapons(&mut self, input: &TickInput, world: &mut World) -> Vec<Impact> {
+        let buttons = input.buttons;
+        let held = std::mem::replace(&mut self.held, buttons);
+        let impacts = self.fly(world);
+        self.pick_up(world, buttons.pressed(held, Buttons::ACTION));
+        if buttons.pressed(held, Buttons::SWAP) {
+            self.inventory.swap(&self.armory);
+        }
+        let fire = buttons.contains(Buttons::FIRE);
+        let reload = buttons.pressed(held, Buttons::RELOAD);
+        let (eyes, aim) = self.aim();
+        let Some(carried) = self.inventory.current_mut() else {
+            return impacts;
+        };
+        let Some(definition) = self.armory.get(carried.armory) else {
+            return impacts;
+        };
+        let weapon = &definition.weapon;
+        let controls = WeaponControls {
+            // (one button: the second trigger only when it follows the first)
+            triggers: [
+                fire,
+                fire && weapon.secondary_trigger_mode == secondary::SLAVED_TO_PRIMARY,
+            ],
+            reload,
+        };
+        let shots = carried.state.step(weapon, controls);
+        for shot in shots {
+            let (Some(trigger), Some(Some((tag, projectile)))) = (
+                weapon.triggers.get(shot.trigger),
+                definition.projectiles.get(shot.trigger),
+            ) else {
+                continue;
+            };
+            let origin = eyes + aim * Vec3::from_array(trigger.first_person_offset);
+            let directions = {
+                let mut seed = world.get_resource_or_init::<RandomSeed>();
+                projectile::shot_directions(trigger, shot.error, aim, &mut seed)
+            };
+            for direction in directions {
+                let transform = Transform {
+                    position: origin,
+                    rotation: Quat::from_rotation_arc(Vec3::X, direction),
+                    scale: 1.0,
+                };
+                let Ok(handle) = objects::spawn(
+                    world,
+                    ObjectSpawn {
+                        kind: ObjectKind::Projectile,
+                        tag: tag.clone(),
+                        transform,
+                        name: None,
+                        permutation: None,
+                        team: None,
+                    },
+                ) else {
+                    break; // (the world holds no more objects)
+                };
+                self.flights.push(Flight::new(
+                    handle,
+                    tag.clone(),
+                    self.handle,
+                    projectile,
+                    origin,
+                    direction,
+                    self.gravity,
+                ));
+            }
+        }
+        impacts
+    }
+
+    /// A tick of its projectiles' flight: those that hit something or are
+    /// spent are removed, with their objects.
+    fn fly(&mut self, world: &mut World) -> Vec<Impact> {
+        let mut impacts = Vec::new();
+        let physics = &self.physics;
+        let mut poses = Vec::with_capacity(self.flights.len());
+        self.flights.retain_mut(|flight| {
+            let flew = flight
+                .step(|from, path| physics.cast_ray(from, path, Layers::LEVEL).ok().flatten());
+            match flew {
+                Flew::On => {
+                    poses.push((flight.handle, flight.transform()));
+                    true
+                }
+                Flew::Hit(impact) => {
+                    impacts.push(impact);
+                    objects::remove(world, flight.handle);
+                    false
+                }
+                Flew::Spent => {
+                    objects::remove(world, flight.handle);
+                    false
+                }
+            }
+        });
+        world.insert_resource(ProjectilePoses(poses));
+        impacts
+    }
+
+    /// Takes the rounds of weapons it walks over that it carries, and
+    /// with `action`, picks up the nearest other, dropping the one in its
+    /// hands if its hands are full.
+    fn pick_up(&mut self, world: &mut World, action: bool) {
+        let feet = self.mover.position;
+        let mut near: Vec<(f32, ObjectHandle, usize, Option<WeaponState>)> = world
+            .query::<(&ObjectHandle, &Transform, &Object, Option<&WeaponItem>)>()
+            .iter(world)
+            .filter(|(_, _, object, _)| object.kind == ObjectKind::Weapon)
+            .filter_map(|(handle, transform, object, item)| {
+                let distance = transform.position.distance(feet);
+                let index = self.armory.find(&object.tag)?;
+                (distance <= armory::PICKUP_RADIUS)
+                    .then(|| (distance, *handle, index, item.map(|item| item.0.clone())))
+            })
+            .collect();
+        // (nearest first; at the same distance, by slot)
+        near.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        for (_, handle, index, item) in &near {
+            let Some(carried) = self
+                .inventory
+                .weapons
+                .iter_mut()
+                .find(|carried| carried.armory == *index)
+            else {
+                continue;
+            };
+            let Some(definition) = self.armory.get(*index) else {
+                continue;
+            };
+            let mut item = match item.clone() {
+                Some(item) => item,
+                None => match WeaponState::new(&definition.weapon) {
+                    Ok(item) => item,
+                    Err(_) => continue,
+                },
+            };
+            if armory::take_rounds(&mut carried.state, &mut item, &definition.weapon) > 0 {
+                if let Some(entity) = world
+                    .get_resource::<objects::ObjectTable>()
+                    .and_then(|table| table.entity(*handle))
+                {
+                    world.entity_mut(entity).insert(WeaponItem(item));
+                }
+            }
+        }
+        if !action {
+            return;
+        }
+        let Some((_, handle, index, item)) = near
+            .into_iter()
+            .find(|(_, _, index, _)| !self.inventory.carries(*index))
+        else {
+            return;
+        };
+        let Some(definition) = self.armory.get(index) else {
+            return;
+        };
+        let state = match item {
+            Some(item) => item,
+            None => match WeaponState::new(&definition.weapon) {
+                Ok(state) => state,
+                Err(_) => return,
+            },
+        };
+        objects::remove(world, handle);
+        let dropped = self.inventory.take(
+            Carried {
+                armory: index,
+                state,
+            },
+            &self.armory,
+        );
+        if let Some(dropped) = dropped {
+            self.drop_weapon(world, dropped);
+        }
+    }
+
+    /// Puts a weapon down at its feet, keeping its rounds.
+    fn drop_weapon(&self, world: &mut World, dropped: Carried) {
+        let Some(definition) = self.armory.get(dropped.armory) else {
+            return;
+        };
+        let transform = Transform {
+            position: self.mover.position,
+            rotation: Quat::from_rotation_z(self.yaw),
+            scale: 1.0,
+        };
+        let spawned = objects::spawn(
+            world,
+            ObjectSpawn {
+                kind: ObjectKind::Weapon,
+                tag: definition.tag.clone(),
+                transform,
+                name: None,
+                permutation: None,
+                team: None,
+            },
+        );
+        if let Ok(handle) = spawned {
+            if let Some(entity) = world
+                .get_resource::<objects::ObjectTable>()
+                .and_then(|table| table.entity(handle))
+            {
+                world.entity_mut(entity).insert(WeaponItem(dropped.state));
+            }
+        }
+    }
+
     /// Its state, for the world's hash.
     pub(crate) fn hash(&self, hasher: &mut WorldHasher) {
         let mover = &self.mover;
@@ -255,6 +520,12 @@ impl Player {
             View::FirstPerson => 0,
             View::ThirdPerson => 1,
         });
+        hasher.u64(u64::from(self.held.0));
+        self.inventory.hash(hasher);
+        hasher.u64(self.flights.len() as u64);
+        for flight in &self.flights {
+            flight.hash(hasher);
+        }
     }
 }
 
@@ -271,6 +542,27 @@ fn body_transform(position: Vec3, yaw: f32) -> Transform {
 /// (the free camera's).
 fn look_rotation(yaw: f32, pitch: f32) -> Quat {
     Quat::from_rotation_z(yaw) * Quat::from_rotation_y(-pitch)
+}
+
+/// Where the player's projectiles' objects go this tick.
+#[derive(Resource, Clone, Debug, Default)]
+pub(crate) struct ProjectilePoses(pub Vec<(ObjectHandle, Transform)>);
+
+/// Puts the player's projectiles' objects where their flight left them.
+pub(crate) fn move_projectiles(
+    poses: Option<Res<ProjectilePoses>>,
+    table: Res<crate::objects::ObjectTable>,
+    mut transforms: Query<&mut Transform>,
+) {
+    let Some(poses) = poses else { return };
+    for (handle, pose) in &poses.0 {
+        if let Some(mut transform) = table
+            .entity(*handle)
+            .and_then(|entity| transforms.get_mut(entity).ok())
+        {
+            *transform = *pose;
+        }
+    }
 }
 
 /// Puts the player's object where its step left it, before the animations
