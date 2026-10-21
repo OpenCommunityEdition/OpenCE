@@ -8,9 +8,11 @@
 #![allow(unsafe_code)]
 
 pub mod hud;
+pub mod network;
 pub mod render_level;
 pub mod render_model;
 pub mod render_sky;
+pub mod settings;
 pub mod snapshot;
 
 use std::collections::HashMap;
@@ -50,6 +52,18 @@ pub enum EngineError {
         /// Why.
         message: String,
     },
+    /// A network game could not be started.
+    #[error("{message}")]
+    Network {
+        /// Why.
+        message: String,
+    },
+    /// The settings could not be read or saved.
+    #[error("{message}")]
+    Settings {
+        /// Why.
+        message: String,
+    },
     /// The level has no structure BSP of that index.
     #[error("the level has no BSP {index}")]
     NoBsp {
@@ -78,6 +92,8 @@ pub struct CameraPlacement {
 /// cache folder, and read by the app into its buffers and textures.
 #[derive(uniffi::Object)]
 pub struct LevelGeometry {
+    /// The map's name (its file's, without .map).
+    name: String,
     level: RenderLevel,
     content: Arc<opence_content::Level>,
 }
@@ -94,10 +110,19 @@ impl LevelGeometry {
         )?;
         let level = RenderLevel::build(&loaded.level, bsp as usize)
             .ok_or(EngineError::NoBsp { index: bsp })?;
+        let name = Path::new(&map)
+            .file_stem()
+            .map_or_else(String::new, |stem| stem.to_string_lossy().into_owned());
         Ok(Arc::new(Self {
+            name,
             level,
             content: Arc::new(loaded.level),
         }))
+    }
+
+    /// The map's name (its file's, without .map).
+    pub fn name(&self) -> String {
+        self.name.clone()
     }
 
     /// The bytes of one vertex.
@@ -336,6 +361,10 @@ struct Running {
     clock: Clock,
     /// The level it was started with, if any.
     level: Option<Arc<opence_content::Level>>,
+    /// The network game it plays, if any.
+    network: Option<network::Network>,
+    /// The players that have been dressed (the network adds them).
+    dressed: usize,
 }
 
 /// The models and animation graphs objects are drawn and posed with,
@@ -440,6 +469,8 @@ impl Engine {
             previous_camera,
             clock: Clock::default(),
             level: None,
+            network: None,
+            dressed: 0,
         });
         publish(&mut state, &self.snapshots, 0.0);
     }
@@ -478,6 +509,8 @@ impl Engine {
             previous_camera,
             clock: Clock::default(),
             level: Some(geometry.content.clone()),
+            network: None,
+            dressed: 0,
         });
         publish(&mut state, &self.snapshots, 0.0);
         Ok(count)
@@ -659,10 +692,18 @@ fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError> {
     let running = running.as_mut().ok_or(EngineError::NoWorld)?;
     for _ in 0..ticks {
         running.previous_camera = transform(&running.simulation.camera().transform);
-        running.simulation.step(input.tick_input());
+        match (&mut running.network, &running.level) {
+            (Some(network), Some(level)) => {
+                network.step(&mut running.simulation, level, input.tick_input());
+            }
+            _ => running.simulation.step(input.tick_input()),
+        }
         // (the mouse's turn is used once)
         input.yaw = 0.0;
         input.pitch = 0.0;
+    }
+    if let (Some(_), Some(level)) = (&running.network, &running.level) {
+        running.dressed = network::dress_players(&mut running.simulation, level, running.dressed);
     }
     Ok(())
 }

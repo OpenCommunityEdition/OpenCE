@@ -10,6 +10,7 @@
 
 pub mod client;
 pub mod host;
+pub mod lan;
 pub mod packet;
 pub mod rate;
 pub mod snapshot;
@@ -18,6 +19,7 @@ mod wire;
 
 pub use client::Client;
 pub use host::Host;
+pub use lan::{Discovery, Server, DEFAULT_PORT};
 pub use packet::{decode, encode, InputFrame, Packet, Refusal};
 pub use rate::RateLimit;
 pub use snapshot::{ObjectState, Snapshot, SnapshotDelta};

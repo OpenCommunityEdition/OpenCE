@@ -24,9 +24,12 @@ bindgen = ["uniffi/cli"]
 opence_sim.workspace = true
 opence_content.workspace = true
 opence_import.workspace = true
+opence_net.workspace = true
 libm.workspace = true
 thiserror.workspace = true
 uniffi.workspace = true
+serde = { version = "1", features = ["derive"] }
+toml = "0.9"
 
 [lints]
 workspace = true

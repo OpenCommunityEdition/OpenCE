@@ -23,8 +23,19 @@ public struct MouseCapture: Equatable, Sendable {
 
     public private(set) var focused = false
     public private(set) var captured = false
+    /// Whether it may capture at all (not while a menu is shown).
+    public private(set) var allowed = true
 
     public init() {}
+
+    /// Allows capturing or not (not: the mouse is let go); true if
+    /// `captured` changed.
+    public mutating func allow(_ allowed: Bool) -> Bool {
+        let before = captured
+        self.allowed = allowed
+        captured = captured && allowed
+        return captured != before
+    }
 
     /// Handles an event; true if `captured` changed.
     public mutating func handle(_ event: Event) -> Bool {
@@ -32,14 +43,14 @@ public struct MouseCapture: Equatable, Sendable {
         switch event {
         case .focused:
             focused = true
-            captured = true
+            captured = allowed
         case .unfocused:
             focused = false
             captured = false
         case .escape:
             captured = false
         case .click:
-            captured = focused
+            captured = focused && allowed
         }
         return captured != before
     }

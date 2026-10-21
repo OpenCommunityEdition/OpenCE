@@ -78,12 +78,13 @@ pub fn players_snapshot(simulation: &Simulation, tick: u32) -> Snapshot {
     Snapshot { tick, objects }
 }
 
-/// A host's game.
+/// A host's game, played in a simulation it is given each tick.
 pub struct Host {
-    simulation: Simulation,
     game: Game,
+    name: String,
     level_name: String,
     game_type: u8,
+    capacity: usize,
     peers: Vec<Peer>,
     history: VecDeque<Snapshot>,
     tick: u32,
@@ -92,16 +93,24 @@ pub struct Host {
 
 impl Host {
     /// Starts a game of `variant` on `level` (called `level_name` to the
-    /// clients), its own player at the first start.
-    pub fn new(level: &Level, level_name: &str, variant: Variant) -> Result<Self, PlayerError> {
-        let mut simulation = Simulation::empty();
-        simulation.spawn_player(level, 0)?;
-        let game = Game::start(&mut simulation, level, variant);
+    /// clients) in `simulation`, its own player at the first start unless
+    /// it has one.
+    pub fn new(
+        simulation: &mut Simulation,
+        level: &Level,
+        level_name: &str,
+        variant: Variant,
+    ) -> Result<Self, PlayerError> {
+        if simulation.players().is_empty() {
+            simulation.spawn_player(level, 0)?;
+        }
+        let game = Game::start(simulation, level, variant);
         Ok(Self {
-            simulation,
             game,
+            name: "Halo".into(),
             level_name: level_name.into(),
             game_type: variant.game_type as u8,
+            capacity: MAX_PLAYERS,
             peers: Vec::new(),
             history: VecDeque::new(),
             tick: 0,
@@ -109,9 +118,16 @@ impl Host {
         })
     }
 
-    /// The game's world.
-    pub fn simulation(&self) -> &Simulation {
-        &self.simulation
+    /// Names the game in its announcements (cut to the longest a name
+    /// may be).
+    pub fn set_name(&mut self, name: &str) {
+        self.name = crate::packet::fit(name, crate::packet::MAX_NAME_BYTES);
+    }
+
+    /// Takes at most `players` players, its own among them (from 1 to
+    /// [`MAX_PLAYERS`]).
+    pub fn set_capacity(&mut self, players: usize) {
+        self.capacity = players.clamp(1, MAX_PLAYERS);
     }
 
     /// The game's rules and scores.
@@ -133,6 +149,7 @@ impl Host {
     /// inputs and its own player's `input`, and sends them its world.
     pub fn step(
         &mut self,
+        simulation: &mut Simulation,
         transport: &mut dyn Transport,
         level: &Level,
         input: TickInput,
@@ -142,11 +159,11 @@ impl Host {
             peer.silent_ticks += 1;
         }
         while let Some((from, bytes)) = transport.receive() {
-            self.receive(transport, level, from, &bytes);
+            self.receive(simulation, transport, level, from, &bytes);
         }
         self.peers.retain(|peer| peer.silent_ticks < TIMEOUT_TICKS);
 
-        let mut inputs = vec![TickInput::default(); self.simulation.players().len()];
+        let mut inputs = vec![TickInput::default(); simulation.players().len()];
         if let Some(first) = inputs.first_mut() {
             *first = input;
         }
@@ -166,11 +183,11 @@ impl Host {
                 *slot = tick_input(&peer.last);
             }
         }
-        self.simulation.step_all(&inputs);
-        let events = self.game.step(&mut self.simulation, level);
+        simulation.step_all(&inputs);
+        let events = self.game.step(simulation, level);
         self.tick += 1;
 
-        let snapshot = players_snapshot(&self.simulation, self.tick);
+        let snapshot = players_snapshot(simulation, self.tick);
         for peer in &self.peers {
             let base = peer
                 .snapshot_ack
@@ -192,6 +209,7 @@ impl Host {
 
     fn receive(
         &mut self,
+        simulation: &mut Simulation,
         transport: &mut dyn Transport,
         level: &Level,
         from: SocketAddr,
@@ -211,11 +229,11 @@ impl Host {
         match (packet, known) {
             (Packet::Discover, _) => {
                 let announce = Packet::Announce {
-                    name: "host".into(),
+                    name: self.name.clone(),
                     level: self.level_name.clone(),
                     game_type: self.game_type,
-                    players: u8::try_from(self.simulation.players().len()).unwrap_or(u8::MAX),
-                    capacity: u8::try_from(MAX_PLAYERS).unwrap_or(u8::MAX),
+                    players: u8::try_from(simulation.players().len()).unwrap_or(u8::MAX),
+                    capacity: u8::try_from(self.capacity).unwrap_or(u8::MAX),
                 };
                 self.send(transport, from, &announce);
             }
@@ -228,17 +246,15 @@ impl Host {
                     self.send(transport, from, &Packet::Refused(Refusal::Over));
                     return;
                 }
-                if self.simulation.players().len() >= MAX_PLAYERS {
+                if simulation.players().len() >= self.capacity {
                     self.send(transport, from, &Packet::Refused(Refusal::Full));
                     return;
                 }
-                let index = self.simulation.players().len();
+                let index = simulation.players().len();
                 let team = u16::try_from(index % 2).unwrap_or(0);
                 let start = index % level.scenario.player_starts.len().max(1);
                 let teams = self.game.rules().variant().teams;
-                let Ok((player, _)) =
-                    self.simulation
-                        .add_player(level, start, teams.then_some(team))
+                let Ok((player, _)) = simulation.add_player(level, start, teams.then_some(team))
                 else {
                     return;
                 };

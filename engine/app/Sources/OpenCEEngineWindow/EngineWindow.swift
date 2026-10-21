@@ -108,6 +108,15 @@ public final class EngineWindowController {
     public private(set) var keys = HeldKeys()
     /// Whether the frame-time overlay is shown (F3 shows or hides it).
     public var showsFrameTimes = false
+    /// Whether the window captures the mouse: not while a menu is over
+    /// it, when the pointer is the menu's.
+    public var capturesMouse: Bool {
+        get { capture.allowed }
+        set {
+            guard capture.allow(newValue) else { return }
+            changedCapture()
+        }
+    }
     private var motion = MouseMotion()
     private let pointer: PointerControl
     private let rawMouse: RawMouse
@@ -193,6 +202,10 @@ public final class EngineWindowController {
             keys.releaseAll()
         }
         guard capture.handle(event) else { return }
+        changedCapture()
+    }
+
+    private func changedCapture() {
         if !capture.captured {
             // (a button let go after the mouse is is not seen)
             MouseButton.all.forEach { keys.release($0) }

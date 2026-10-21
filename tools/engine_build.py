@@ -120,6 +120,11 @@ def bundle(executable: Path, codesign: str, version: str, app: Path) -> None:
     (staging / "Contents" / "Info.plist").write_bytes(info_plist(version))
     # the HUD's redraws (HudPass.swift)
     shutil.copytree(ROOT / "port" / "assets" / "hud", staging / "Contents" / "Resources" / "hud")
+    # the menus' fonts and their licences (MenuFonts.swift): Overpass and OpenCE only
+    fonts = staging / "Contents" / "Resources" / "fonts"
+    fonts.mkdir()
+    for name in ("Overpass-750.ttf", "Overpass-900.ttf", "Overpass-OFL.txt", "OpenCE-Regular.ttf", "OpenCE-OFL.txt"):
+        shutil.copy(ROOT / "port" / "assets" / "fonts" / name, fonts / name)
     subprocess.run([codesign, "-s", "-", "-f", str(staging)], check=True)
     shutil.rmtree(app, ignore_errors=True)
     staging.rename(app)

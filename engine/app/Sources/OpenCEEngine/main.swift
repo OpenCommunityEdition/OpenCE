@@ -1,24 +1,29 @@
 // The app's entry: the engine's window, full screen with --full-screen,
 // stepping the world on the display's frames, and drawing the map --map
-// PATH names (and --bsp N), or the one chosen from the Map menu or the
-// picker, smoothed as --anti-aliasing (temporal, the default, or native)
-// and --render-scale (0.5 to 1) say. The player spawns at the scenario's
-// first start and moves with W, A, S and D, jumps with Space and crouches
-// with Control (or the keys of --bindings FILE, or of bindings.json in the
-// app's support folder); V changes the camera between first and third
-// person, and the mouse looks at --mouse-sensitivity radians a count (or
-// the mouseSensitivity default). With --fly, or on a map without a player
-// start, the free camera flies instead: W, A, S, D, Space and Control
-// (Shift faster). F3 or --frame-times shows the frame times. --benchmark SECONDS flies the map offscreen at --size
-// (3840x2160 by default), with no window, and prints the frame times.
+// PATH names (and --bsp N), or the one chosen from the menus (Play Alone,
+// Join a Game, Join by Address, Host a Game; Game > Main Menu, Command-
+// Escape, shows them again) or the Map menu, smoothed as --anti-aliasing
+// (temporal, the default, or native) and --render-scale (0.5 to 1) say, or
+// as the Video settings do. The player spawns at the scenario's first
+// start and moves with W, A, S and D, jumps with Space and crouches with
+// Control (or the keys of --bindings FILE, of bindings.json in the app's
+// support folder, or of the Controls settings); V changes the camera
+// between first and third person, and the mouse looks at
+// --mouse-sensitivity radians a count (or settings.toml's). With --fly, or
+// on a map without a player start, the free camera flies instead: W, A, S,
+// D, Space and Control (Shift faster). F3 or --frame-times shows the frame
+// times. --benchmark SECONDS flies the map offscreen at --size (3840x2160
+// by default), with no window, and prints the frame times.
 import AppKit
 import Metal
 import OpenCEEngineCore
 import OpenCEEngineKit
+import OpenCEEngineMenu
 import OpenCEEngineRender
 import OpenCEEngineWindow
 import opence_ffiFFI
 import simd
+import SwiftUI
 import UniformTypeIdentifiers
 
 if CommandLine.arguments.contains("--version") {
@@ -76,9 +81,13 @@ func cacheFolder() -> String {
     return folder.path
 }
 
-/// The video settings the arguments give.
-func videoSettings() -> VideoSettings {
+/// The video settings the arguments give, else the saved `options`.
+func videoSettings(_ options: VideoOptions = stockSettings().video) -> VideoSettings {
     var settings = VideoSettings()
+    settings.antiAliasing = AntiAliasing(rawValue: options.antiAliasing) ?? settings.antiAliasing
+    if VideoSettings.renderScales.contains(options.renderScale) {
+        settings.renderScale = options.renderScale
+    }
     if let mode = argument("--anti-aliasing") {
         guard let antiAliasing = AntiAliasing(rawValue: mode) else {
             fail("--anti-aliasing is temporal or native, not \(mode)")
@@ -94,31 +103,32 @@ func videoSettings() -> VideoSettings {
     return settings
 }
 
-/// The mouse's turn per count: the argument's, else the saved setting's,
-/// else the stock one.
-func mouseSensitivity() -> Float {
-    let stock = FlyControls().sensitivity
+/// The mouse's turn per count: the argument's, else the saved setting's.
+func mouseSensitivity(_ controls: ControlSettings) -> Float {
     func valid(_ value: Float) -> Bool { value.isFinite && value > 0 && value < 0.1 }
     if let value = argument("--mouse-sensitivity") {
         guard let sensitivity = Float(value), valid(sensitivity) else {
             fail("--mouse-sensitivity is radians a count, above 0 and below 0.1, not \(value)")
         }
-        UserDefaults.standard.set(sensitivity, forKey: "mouseSensitivity")
         return sensitivity
     }
-    let saved = UserDefaults.standard.float(forKey: "mouseSensitivity")
-    return valid(saved) ? saved : stock
+    return valid(controls.mouseSensitivity) ? controls.mouseSensitivity : FlyControls().sensitivity
 }
 
-/// The free camera's controls the arguments give.
-func flyControls() -> FlyControls {
-    FlyControls(sensitivity: mouseSensitivity(), invertPitch: CommandLine.arguments.contains("--invert-mouse"))
+/// Whether the mouse's up looks down: --invert-mouse, else the setting.
+func invertsMouse(_ controls: ControlSettings) -> Bool {
+    CommandLine.arguments.contains("--invert-mouse") || controls.invertMouse
+}
+
+/// The free camera's controls the arguments give, else the settings.
+func flyControls(_ controls: ControlSettings) -> FlyControls {
+    FlyControls(sensitivity: mouseSensitivity(controls), invertPitch: invertsMouse(controls))
 }
 
 /// The player's controls: --bindings FILE's keys, else those of
-/// bindings.json in the app's support folder, else the stock ones.
-func playControls() -> PlayControls {
-    var bindings = KeyBindings.stock
+/// bindings.json in the app's support folder, else the settings' keys.
+func playControls(_ controls: ControlSettings) -> PlayControls {
+    var bindings = KeyBindings(settings: controls.bindings)
     let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
     let saved = support?.appendingPathComponent("OpenCE Engine/bindings.json")
     if let path = argument("--bindings") ?? saved.flatMap({ FileManager.default.fileExists(atPath: $0.path) ? $0.path : nil }) {
@@ -128,8 +138,8 @@ func playControls() -> PlayControls {
             fail("\(path): \(error)")
         }
     }
-    return PlayControls(bindings: bindings, sensitivity: mouseSensitivity(),
-                        invertPitch: CommandLine.arguments.contains("--invert-mouse"))
+    return PlayControls(bindings: bindings, sensitivity: mouseSensitivity(controls),
+                        invertPitch: invertsMouse(controls))
 }
 
 func fail(_ message: String) -> Never {
@@ -153,6 +163,14 @@ func mainMenu() -> NSMenu {
     fullScreen.keyEquivalentModifierMask = [.command, .control]
     viewItem.submenu = view
     menu.addItem(viewItem)
+    let gameItem = NSMenuItem()
+    let game = NSMenu(title: "Game")
+    let main = game.addItem(withTitle: "Main Menu", action: #selector(AppDelegate.showMenu(_:)), keyEquivalent: "\u{1b}")
+    main.keyEquivalentModifierMask = [.command]
+    let leave = game.addItem(withTitle: "Leave the Game", action: #selector(AppDelegate.leave(_:)), keyEquivalent: "")
+    leave.keyEquivalentModifierMask = []
+    gameItem.submenu = game
+    menu.addItem(gameItem)
     return menu
 }
 
@@ -160,11 +178,13 @@ func mainMenu() -> NSMenu {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let engine = Engine()
     lazy var snapshots = SnapshotReader(engine: engine)
-    let controls = flyControls()
-    let play = playControls()
+    /// The saved settings (settings.toml), which the menus change.
+    let saved = SettingsModel()
+    lazy var controls = flyControls(saved.settings.controls)
+    lazy var play = playControls(saved.settings.controls)
     var earlierKeys: Set<UInt16> = []
     var thirdPerson = false
-    let settings = videoSettings()
+    lazy var settings = videoSettings(saved.settings.video)
     var controller: EngineWindowController?
     var level: LoadedLevel?
     /// The HUD's pass, made with the first level.
@@ -174,13 +194,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var lastOverlay: CFTimeInterval = 0
     let maps = MapLibrary.maps(in: MapLibrary.folders(
         named: argument("--maps"), root: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)))
+    lazy var menu = MenuModel(maps: maps, settings: saved, servers: ServerListModel())
+    /// The menus' view, while they show.
+    var menuView: NSView?
+    /// The network's state last shown in the title.
+    var shownStatus: NetworkStatus = .alone
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = mainMenu()
         NSApp.mainMenu?.addItem(mapMenu())
         engine.startEmptyWorld()
+        MenuFonts.register()
+        menu.actions = self
         let controller = EngineWindowController()
         controller.showsFrameTimes = CommandLine.arguments.contains("--frame-times")
+            || saved.settings.video.showFrameTimes
         self.controller = controller
         if let map = argument("--map") {
             do {
@@ -190,12 +218,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         controller.window.engineView.onFrame = { [weak self] link in self?.frame(link) }
-        controller.show(fullScreen: CommandLine.arguments.contains("--full-screen"))
+        controller.show(fullScreen: CommandLine.arguments.contains("--full-screen") || saved.settings.video.fullScreen)
         controller.window.engineView.startDisplayLink()
         NSApp.activate()
         if level == nil {
-            pick(nil)
+            showMenu(nil)
         }
+    }
+
+    /// Shows the menus over the game (which plays on behind them).
+    @objc func showMenu(_ sender: Any?) {
+        guard let controller, menuView == nil else { return }
+        let view = NSHostingView(rootView: MenuView(model: menu))
+        view.frame = controller.window.engineView.bounds
+        view.autoresizingMask = [.width, .height]
+        controller.window.engineView.addSubview(view)
+        controller.capturesMouse = false
+        menuView = view
+        menu.show(.main)
+    }
+
+    /// Takes the menus away, the settings they changed taken up.
+    func hideMenu() {
+        menu.settings.save()
+        menuView?.removeFromSuperview()
+        menuView = nil
+        controls = flyControls(saved.settings.controls)
+        play = playControls(saved.settings.controls)
+        settings = videoSettings(saved.settings.video)
+        controller?.showsFrameTimes = CommandLine.arguments.contains("--frame-times")
+            || saved.settings.video.showFrameTimes
+        controller?.capturesMouse = true
+    }
+
+    @objc func leave(_ sender: Any?) {
+        engine.leaveGame()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -264,7 +321,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func open(_ map: String) {
         do {
+            engine.leaveGame()
             try load(map: map)
+            if menuView != nil {
+                hideMenu()
+            }
         } catch {
             let alert = NSAlert()
             alert.messageText = "\(URL(fileURLWithPath: map).lastPathComponent) could not be loaded"
@@ -292,6 +353,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         earlierKeys = held
         _ = try? engine.advance(frameSeconds: seconds)
+        showStatus()
         if controller.showsFrameTimes {
             // (four times a second, so that it can be read)
             if link.timestamp - lastOverlay >= 0.25 {
@@ -313,6 +375,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.window.engineView.render { commands, target in
             renderer.encode(into: commands, target: target, camera: camera, objects: objects, hudQuads: hudQuads)
         }
+    }
+}
+
+extension AppDelegate: MenuActions {
+    func playAlone(map: URL) throws {
+        engine.leaveGame()
+        try load(map: map.path)
+        hideMenu()
+    }
+
+    func host(_ setup: HostSetup, map: URL, port: UInt16) throws {
+        engine.leaveGame()
+        hideMenu()
+        try load(map: map.path)
+        guard let level else { return }
+        _ = try engine.hostGame(geometry: level.geometry, kind: setup.kind, port: port, name: setup.name,
+                                maxPlayers: UInt8(setup.maxPlayers))
+    }
+
+    func join(address: String, map: URL, name: String) throws {
+        engine.leaveGame()
+        hideMenu()
+        try load(map: map.path)
+        guard let level else { return }
+        try engine.joinGame(geometry: level.geometry, address: address, name: name)
+    }
+
+    func quit() {
+        NSApp.terminate(nil)
+    }
+
+    /// The network's state in the title; a refusal brings the menus back
+    /// with its reason.
+    func showStatus() {
+        let status = engine.networkStatus()
+        guard status != shownStatus, let controller else { return }
+        shownStatus = status
+        let map = level.map { " — " + URL(fileURLWithPath: $0.map).deletingPathExtension().lastPathComponent } ?? ""
+        let state: String
+        switch status {
+        case .alone: state = ""
+        case let .hosting(port, players): state = " — hosting on port \(port), \(players) playing"
+        case .waiting: state = " — joining…"
+        case let .playing(player): state = " — playing as player \(player + 1)"
+        case let .refused(reason):
+            state = ""
+            engine.leaveGame()
+            showMenu(nil)
+            menu.message = "The host refused: \(reason)."
+        }
+        controller.window.title = "OpenCE Engine\(map)\(state)"
     }
 }
 

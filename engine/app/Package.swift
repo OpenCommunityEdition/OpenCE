@@ -21,11 +21,13 @@ let package = Package(
         .target(name: "OpenCEEngineWindow"),
         // the renderer: the level's buffers, textures and passes, and frame capture
         .target(name: "OpenCEEngineRender", dependencies: ["OpenCEEngineCore"]),
+        // the menus: their models, and their SwiftUI views over the Metal view
+        .target(name: "OpenCEEngineMenu", dependencies: ["OpenCEEngineCore", "OpenCEEngineKit"]),
         .executableTarget(name: "OpenCEEngine",
                           dependencies: ["OpenCEEngineKit", "OpenCEEngineWindow", "OpenCEEngineRender",
-                                         "opence_ffiFFI"]),
+                                         "OpenCEEngineMenu", "opence_ffiFFI"]),
         .testTarget(name: "OpenCEEngineTests",
                     dependencies: ["OpenCEEngineKit", "OpenCEEngineCore", "opence_ffiFFI", "OpenCEEngineWindow",
-                                   "OpenCEEngineRender"]),
+                                   "OpenCEEngineRender", "OpenCEEngineMenu"]),
     ]
 )

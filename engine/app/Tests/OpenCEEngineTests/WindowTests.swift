@@ -47,6 +47,19 @@ final class WindowModelTests: XCTestCase {
         XCTAssertFalse(capture.handle(.click))
     }
 
+    func testAMenuKeepsTheMouseFree() {
+        var capture = MouseCapture()
+        XCTAssertTrue(capture.handle(.focused))
+        XCTAssertTrue(capture.allow(false), "a menu lets it go")
+        XCTAssertFalse(capture.captured)
+        XCTAssertFalse(capture.handle(.click), "a click is the menu's")
+        _ = capture.handle(.unfocused)
+        XCTAssertFalse(capture.handle(.focused), "and the focus does not take it")
+        XCTAssertFalse(capture.allow(true), "allowed again, it waits for a click")
+        XCTAssertTrue(capture.handle(.click))
+        XCTAssertTrue(capture.captured)
+    }
+
     func testRawMotionIsSummedExactlyAndTaken() {
         var motion = MouseMotion()
         for _ in 0..<3 {

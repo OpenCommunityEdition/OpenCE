@@ -1,6 +1,6 @@
 //! A client: it sends its inputs, predicts its own player with them, and
-//! corrects the prediction by the host's snapshots; the other players it
-//! draws between the last two snapshots.
+//! corrects the prediction by the host's snapshots; the other players are
+//! players of its world too, placed between the last two snapshots.
 
 use std::collections::VecDeque;
 use std::net::SocketAddr;
@@ -60,12 +60,14 @@ pub enum Joining {
     Refused(Refusal),
 }
 
-/// A client's game.
+/// A client's game, predicted in a simulation it is given each tick, its
+/// own player the simulation's first.
 pub struct Client {
     host: SocketAddr,
     name: String,
     joining: Joining,
-    simulation: Simulation,
+    /// The other players: their index on the host, and in the simulation.
+    remotes: Vec<(u32, usize)>,
     tick: u32,
     unacked: VecDeque<InputFrame>,
     predicted: VecDeque<Predicted>,
@@ -76,16 +78,23 @@ pub struct Client {
 }
 
 impl Client {
-    /// A client of the host at `host` on `level`, called `name`; its own
-    /// player stands at the first start until the host places it.
-    pub fn new(host: SocketAddr, name: &str, level: &Level) -> Result<Self, PlayerError> {
-        let mut simulation = Simulation::empty();
-        simulation.spawn_player(level, 0)?;
+    /// A client of the host at `host` on `level`, called `name`, playing
+    /// in `simulation`; its own player stands at the first start (unless
+    /// it has one) until the host places it.
+    pub fn new(
+        simulation: &mut Simulation,
+        host: SocketAddr,
+        name: &str,
+        level: &Level,
+    ) -> Result<Self, PlayerError> {
+        if simulation.players().is_empty() {
+            simulation.spawn_player(level, 0)?;
+        }
         Ok(Self {
             host,
             name: name.into(),
             joining: Joining::Waiting,
-            simulation,
+            remotes: Vec::new(),
             tick: 0,
             unacked: VecDeque::new(),
             predicted: VecDeque::new(),
@@ -101,11 +110,6 @@ impl Client {
         self.joining
     }
 
-    /// Its prediction of the world.
-    pub fn simulation(&self) -> &Simulation {
-        &self.simulation
-    }
-
     /// How far its prediction was from the host's at the last snapshot,
     /// before any correction.
     pub fn last_error(&self) -> Option<f32> {
@@ -117,9 +121,10 @@ impl Client {
         self.corrections
     }
 
-    /// The other players where it draws them: between the last two
-    /// snapshots, a snapshot's time behind the host.
-    pub fn others(&self) -> Vec<(usize, [f32; 3])> {
+    /// The other players where it draws them, by their index on the
+    /// host: between the last two snapshots, a snapshot's time behind the
+    /// host, with their velocity and facing.
+    pub fn others(&self) -> Vec<(u32, Vec3, Vec3, f32)> {
         let Joining::Playing { player } = self.joining else {
             return Vec::new();
         };
@@ -138,19 +143,29 @@ impl Client {
             .map(|object| {
                 let from = previous
                     .and_then(|previous| previous.objects.iter().find(|o| o.id == object.id))
-                    .map_or(object.position, |o| o.position);
-                let at = Vec3::from_array(from).lerp(Vec3::from_array(object.position), alpha);
-                (object.id as usize, at.to_array())
+                    .unwrap_or(object);
+                let at =
+                    Vec3::from_array(from.position).lerp(Vec3::from_array(object.position), alpha);
+                let (yaw, to) = (yaw_of(from.rotation), yaw_of(object.rotation));
+                let facing = yaw + turn_between(yaw, to) * alpha;
+                (object.id, at, Vec3::from_array(object.velocity), facing)
             })
             .collect()
     }
 
-    /// One tick with its player's `input`: it reads the host's packets,
-    /// predicts the tick and sends its inputs.
-    pub fn step(&mut self, transport: &mut dyn Transport, input: TickInput) {
+    /// One tick of `simulation` with its player's `input`: it reads the
+    /// host's packets, predicts the tick, places the other players and
+    /// sends its inputs.
+    pub fn step(
+        &mut self,
+        simulation: &mut Simulation,
+        transport: &mut dyn Transport,
+        level: &Level,
+        input: TickInput,
+    ) {
         while let Some((from, bytes)) = transport.receive() {
             if from == self.host {
-                self.receive(&bytes);
+                self.receive(simulation, &bytes);
             }
         }
         self.since_snapshot += 1;
@@ -179,9 +194,11 @@ impl Client {
                 while self.unacked.len() > MAX_INPUT_FRAMES {
                     self.unacked.pop_front();
                 }
-                // (the same input the host will play, as it will read it)
-                self.simulation.step(tick_input(&frame));
-                if let Some(player) = self.simulation.player() {
+                // (the same input the host will play, as it will read it;
+                // the others stand, to be placed)
+                simulation.step(tick_input(&frame));
+                self.place_others(simulation, level);
+                if let Some(player) = simulation.player() {
                     self.predicted.push_back(Predicted {
                         tick: self.tick,
                         position: player.mover().position,
@@ -201,7 +218,25 @@ impl Client {
         }
     }
 
-    fn receive(&mut self, bytes: &[u8]) {
+    /// Puts the other players where it draws them, adding a player to the
+    /// simulation for each it has not seen before.
+    fn place_others(&mut self, simulation: &mut Simulation, level: &Level) {
+        for (id, position, velocity, yaw) in self.others() {
+            let local = match self.remotes.iter().find(|(remote, _)| *remote == id) {
+                Some(&(_, local)) => local,
+                None => {
+                    let Ok((local, _)) = simulation.add_player(level, 0, None) else {
+                        continue;
+                    };
+                    self.remotes.push((id, local));
+                    local
+                }
+            };
+            simulation.correct_player(local, position, velocity, Radians(yaw));
+        }
+    }
+
+    fn receive(&mut self, simulation: &mut Simulation, bytes: &[u8]) {
         let Ok(packet) = decode(bytes) else {
             return;
         };
@@ -233,7 +268,7 @@ impl Client {
                 };
                 if let Some(acked) = input_ack {
                     self.unacked.retain(|frame| frame.tick > acked);
-                    self.reconcile(&snapshot, player, acked);
+                    self.reconcile(simulation, &snapshot, player, acked);
                 }
                 self.snapshots.push_back(snapshot);
                 while self.snapshots.len() > HISTORY {
@@ -249,7 +284,13 @@ impl Client {
     /// it faced after input `acked`, against what it predicted then. The
     /// errors are moved onto where it is now (the inputs since are kept,
     /// not replayed).
-    fn reconcile(&mut self, snapshot: &Snapshot, player: usize, acked: u32) {
+    fn reconcile(
+        &mut self,
+        simulation: &mut Simulation,
+        snapshot: &Snapshot,
+        player: usize,
+        acked: u32,
+    ) {
         let Some(host) = snapshot.objects.iter().find(|o| o.id as usize == player) else {
             return;
         };
@@ -264,17 +305,13 @@ impl Client {
             return;
         }
         let speed = Vec3::from_array(host.velocity) - predicted.velocity;
-        let Some((now, velocity, yaw)) = self
-            .simulation
+        let Some((now, velocity, yaw)) = simulation
             .player()
             .map(|p| (p.mover().position, p.mover().velocity, p.look().0 .0))
         else {
             return;
         };
-        if self
-            .simulation
-            .correct_player(0, now + error, velocity + speed, Radians(yaw + turn))
-        {
+        if simulation.correct_player(0, now + error, velocity + speed, Radians(yaw + turn)) {
             self.corrections += 1;
             for later in &mut self.predicted {
                 later.position += error;
