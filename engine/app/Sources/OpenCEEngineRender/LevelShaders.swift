@@ -103,6 +103,28 @@ vertex ToneOut tone_vertex(uint index [[vertex_id]]) {
     return out;
 }
 
+struct Motion {
+    // the last frame's view-projection times the inverse of this one's
+    float4x4 reprojection;
+    float2 size;
+};
+
+// each texel's move from where it was in the last frame, in uv units:
+// the level is still, so from its depth and the camera's move (the sky,
+// at depth 0, is a direction and turns with the camera)
+fragment float2 motion_fragment(ToneOut in [[stage_in]], depth2d<float> depth [[texture(0)]],
+                                constant Motion &motion [[buffer(0)]]) {
+    uint2 texel = uint2(in.position.xy);
+    float2 uv = (float2(texel) + 0.5) / motion.size;
+    float4 here = float4(uv.x * 2 - 1, 1 - uv.y * 2, depth.read(texel), 1);
+    float4 before = motion.reprojection * here;
+    if (before.w <= 1e-6) {
+        return float2(0);
+    }
+    float2 was = float2(before.x / before.w * 0.5 + 0.5, 0.5 - before.y / before.w * 0.5);
+    return was - uv;
+}
+
 // below 0.8 as it is; above, eased into the last fifth, so that a light
 // brighter than white keeps its shape instead of flattening
 fragment float4 tone_fragment(ToneOut in [[stage_in]], texture2d<float> frame [[texture(0)]]) {

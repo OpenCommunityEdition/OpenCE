@@ -1,6 +1,8 @@
 // The app's entry: the engine's window, full screen with --full-screen,
 // stepping an empty world on the display's frames, and with --map PATH
-// (and --bsp N) drawing that map's structure from the camera.
+// (and --bsp N) drawing that map's structure from the camera, smoothed as
+// --anti-aliasing (temporal, the default, or native) and --render-scale
+// (0.5 to 1) say.
 import AppKit
 import Metal
 import OpenCEEngineCore
@@ -36,6 +38,24 @@ func cacheFolder() -> String {
     let folder = caches.appendingPathComponent("OpenCE Engine", isDirectory: true)
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     return folder.path
+}
+
+/// The video settings the arguments give.
+func videoSettings() -> VideoSettings {
+    var settings = VideoSettings()
+    if let mode = argument("--anti-aliasing") {
+        guard let antiAliasing = AntiAliasing(rawValue: mode) else {
+            fail("--anti-aliasing is temporal or native, not \(mode)")
+        }
+        settings.antiAliasing = antiAliasing
+    }
+    if let scale = argument("--render-scale") {
+        guard let value = Float(scale), VideoSettings.renderScales.contains(value) else {
+            fail("--render-scale is 0.5 to 1, not \(scale)")
+        }
+        settings.renderScale = value
+    }
+    return settings
 }
 
 func fail(_ message: String) -> Never {
@@ -93,7 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let device = controller.window.engineView.device else { fail("no Metal device") }
             do {
                 let geometry = try LevelGeometry.load(map: map, cacheFolder: cacheFolder(), bsp: bsp)
-                renderer = try LevelRenderer(device: device, geometry: geometry)
+                renderer = try LevelRenderer(device: device, geometry: geometry, settings: videoSettings())
                 try engine.placeCamera(placement: geometry.startView())
             } catch {
                 fail("\(map): \(error)")

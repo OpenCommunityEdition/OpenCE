@@ -1,7 +1,10 @@
 // Draws a level's structure BSP: its buffers, textures, samplers and
-// pipelines made once from the engine's LevelGeometry, then each frame two
-// passes, the level into a half-float target and the tone map from it into
-// the target given (the drawable, or a golden frame's texture).
+// pipelines made once from the engine's LevelGeometry, then each frame the
+// level into a half-float target, and the tone map from it into the target
+// given (the drawable, or a golden frame's texture). With temporal
+// anti-aliasing the level is drawn jittered at the render scale, its motion
+// written from its depth, and MetalFX gathers the frames before the tone
+// map (TemporalScaling.swift).
 
 import Metal
 import OpenCEEngineCore
@@ -63,11 +66,28 @@ public final class LevelRenderer {
     private let opaque: MTLRenderPipelineState
     private let blended: [MTLRenderPipelineState]
     private let tone: MTLRenderPipelineState
+    private let motion: MTLRenderPipelineState
     private let depthWrite: MTLDepthStencilState
     private let depthTest: MTLDepthStencilState
     private let wrap: MTLSamplerState
     private let clamp: MTLSamplerState
     private var targets: (frame: MTLTexture, depth: MTLTexture)?
+    private(set) var temporal: TemporalScaling?
+
+    /// How the frame is smoothed and the share of it drawn. A change
+    /// starts the temporal history again.
+    public var settings: VideoSettings {
+        didSet {
+            if settings != oldValue { temporal = nil }
+        }
+    }
+
+    /// Whether this device has MetalFX's temporal scaler (without it,
+    /// temporal anti-aliasing draws as native).
+    public var supportsTemporal: Bool { TemporalScaling.isSupported(device) }
+
+    /// The size the level was last drawn at, before any upscaling.
+    public private(set) var lastInputSize: (width: Int, height: Int) = (0, 0)
 
     public static let frameFormat = MTLPixelFormat.rgba16Float
     public static let depthFormat = MTLPixelFormat.depth32Float
@@ -75,9 +95,11 @@ public final class LevelRenderer {
     /// The draws made (opaque and blended), for tests and the app's log.
     public var drawCount: Int { opaqueDraws.count + blendedDraws.count }
 
-    public init(device: MTLDevice, geometry: LevelGeometry, outputFormat: MTLPixelFormat = .bgra8Unorm) throws {
+    public init(device: MTLDevice, geometry: LevelGeometry, outputFormat: MTLPixelFormat = .bgra8Unorm,
+                settings: VideoSettings = VideoSettings()) throws {
         self.device = device
         self.outputFormat = outputFormat
+        self.settings = settings
         let vertexBytes = geometry.vertices()
         let indexBytes = geometry.indices()
         guard let vertices = Self.buffer(device, vertexBytes), let indices = Self.buffer(device, indexBytes) else {
@@ -178,6 +200,11 @@ public final class LevelRenderer {
             toneDescriptor.fragmentFunction = library.makeFunction(name: "tone_fragment")
             toneDescriptor.colorAttachments[0].pixelFormat = outputFormat
             tone = try device.makeRenderPipelineState(descriptor: toneDescriptor)
+            let motionDescriptor = MTLRenderPipelineDescriptor()
+            motionDescriptor.vertexFunction = library.makeFunction(name: "tone_vertex")
+            motionDescriptor.fragmentFunction = library.makeFunction(name: "motion_fragment")
+            motionDescriptor.colorAttachments[0].pixelFormat = TemporalScaling.motionFormat
+            motion = try device.makeRenderPipelineState(descriptor: motionDescriptor)
         } catch {
             throw LevelRendererError.shaders("\(error)")
         }
@@ -217,9 +244,55 @@ public final class LevelRenderer {
 
     /// Draws the level from `camera` into `target` (of `outputFormat`).
     public func encode(into commands: MTLCommandBuffer, target: MTLTexture, camera: ViewCamera) {
-        guard let (frame, depth) = targets(width: target.width, height: target.height) else { return }
-        var uniforms = camera.viewProjection(aspect: Float(target.width) / Float(max(target.height, 1)))
+        let aspect = Float(target.width) / Float(max(target.height, 1))
+        let viewProjection = camera.viewProjection(aspect: aspect)
+        let shown: MTLTexture
+        if settings.antiAliasing == .temporal, let temporal = temporalScaling(width: target.width,
+                                                                               height: target.height) {
+            let jitter = Jitter.offset(frame: temporal.frame)
+            let jittered = Jitter.apply(jitter, to: viewProjection, width: temporal.inputWidth,
+                                        height: temporal.inputHeight)
+            drawLevel(into: commands, frame: temporal.color, depth: temporal.depth, keepDepth: true,
+                      viewProjection: jittered, camera: camera)
+            var uniforms = temporal.motionUniforms(current: viewProjection)
+            let motionPass = MTLRenderPassDescriptor()
+            motionPass.colorAttachments[0].texture = temporal.motion
+            motionPass.colorAttachments[0].loadAction = .dontCare
+            motionPass.colorAttachments[0].storeAction = .store
+            guard let encoder = commands.makeRenderCommandEncoder(descriptor: motionPass) else { return }
+            encoder.label = "motion"
+            encoder.setRenderPipelineState(motion)
+            encoder.setFragmentTexture(temporal.depth, index: 0)
+            encoder.setFragmentBytes(&uniforms, length: MemoryLayout<MotionUniforms>.stride, index: 0)
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+            encoder.endEncoding()
+            temporal.encode(into: commands, jitter: jitter)
+            lastInputSize = (temporal.inputWidth, temporal.inputHeight)
+            shown = temporal.output
+        } else {
+            guard let (frame, depth) = targets(width: target.width, height: target.height) else { return }
+            drawLevel(into: commands, frame: frame, depth: depth, keepDepth: false, viewProjection: viewProjection,
+                      camera: camera)
+            lastInputSize = (target.width, target.height)
+            shown = frame
+        }
 
+        let tonePass = MTLRenderPassDescriptor()
+        tonePass.colorAttachments[0].texture = target
+        tonePass.colorAttachments[0].loadAction = .dontCare
+        tonePass.colorAttachments[0].storeAction = .store
+        guard let toneEncoder = commands.makeRenderCommandEncoder(descriptor: tonePass) else { return }
+        toneEncoder.label = "tone map"
+        toneEncoder.setRenderPipelineState(tone)
+        toneEncoder.setFragmentTexture(shown, index: 0)
+        toneEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        toneEncoder.endEncoding()
+    }
+
+    /// The level's opaque then blended draws into `frame`.
+    private func drawLevel(into commands: MTLCommandBuffer, frame: MTLTexture, depth: MTLTexture, keepDepth: Bool,
+                           viewProjection: simd_float4x4, camera: ViewCamera) {
+        var uniforms = viewProjection
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = frame
         pass.colorAttachments[0].loadAction = .clear
@@ -227,7 +300,7 @@ public final class LevelRenderer {
         pass.colorAttachments[0].clearColor = Self.skyColor
         pass.depthAttachment.texture = depth
         pass.depthAttachment.loadAction = .clear
-        pass.depthAttachment.storeAction = .dontCare
+        pass.depthAttachment.storeAction = keepDepth ? .store : .dontCare
         pass.depthAttachment.clearDepth = 0
         guard let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else { return }
         encoder.label = "level"
@@ -252,17 +325,27 @@ public final class LevelRenderer {
             encode(draw, encoder)
         }
         encoder.endEncoding()
+    }
 
-        let tonePass = MTLRenderPassDescriptor()
-        tonePass.colorAttachments[0].texture = target
-        tonePass.colorAttachments[0].loadAction = .dontCare
-        tonePass.colorAttachments[0].storeAction = .store
-        guard let toneEncoder = commands.makeRenderCommandEncoder(descriptor: tonePass) else { return }
-        toneEncoder.label = "tone map"
-        toneEncoder.setRenderPipelineState(tone)
-        toneEncoder.setFragmentTexture(frame, index: 0)
-        toneEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
-        toneEncoder.endEncoding()
+    /// The temporal scaler for an output `width` by `height`, made again
+    /// when the size or the render scale changes; nil without MetalFX.
+    private func temporalScaling(width: Int, height: Int) -> TemporalScaling? {
+        guard width > 0, height > 0 else { return nil }
+        let input = settings.inputSize(width: width, height: height)
+        if let temporal, temporal.outputWidth == width, temporal.outputHeight == height,
+           temporal.inputWidth == input.width, temporal.inputHeight == input.height {
+            return temporal
+        }
+        guard supportsTemporal else { return nil }
+        temporal = TemporalScaling(device: device, input: input, output: (width, height))
+        return temporal
+    }
+
+    /// Starts the temporal history again (a cut: the camera moved too far
+    /// for the last frames to be of use).
+    public func resetHistory() {
+        temporal?.frame = 0
+        temporal?.previous = nil
     }
 
     private func encode(_ draw: Draw, _ encoder: MTLRenderCommandEncoder) {

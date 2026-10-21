@@ -95,25 +95,60 @@ public struct CapturedFrame {
 }
 
 extension LevelRenderer {
-    /// Draws the level from `camera` at `width` by `height` offscreen and
-    /// reads the frame back (the renderer's output format must be
-    /// bgra8Unorm).
-    public func capture(width: Int, height: Int, camera: ViewCamera,
+    /// Draws the level from `camera` at `width` by `height` offscreen
+    /// `frames` times (for the temporal history) and reads the last frame
+    /// back (the renderer's output format must be bgra8Unorm).
+    public func capture(width: Int, height: Int, camera: ViewCamera, frames: Int = 1,
+                        queue: MTLCommandQueue) throws -> CapturedFrame {
+        try capture(width: width, height: height, cameras: Array(repeating: camera, count: max(frames, 1)),
+                    queue: queue)
+    }
+
+    /// Draws a frame from each of `cameras` in turn and reads the last back.
+    public func capture(width: Int, height: Int, cameras: [ViewCamera],
                         queue: MTLCommandQueue) throws -> CapturedFrame {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: outputFormat, width: width,
                                                                   height: height, mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .shared
-        guard outputFormat == .bgra8Unorm, let target = device.makeTexture(descriptor: descriptor),
-              let commands = queue.makeCommandBuffer() else { throw FrameCaptureError.resources }
-        encode(into: commands, target: target, camera: camera)
-        commands.commit()
-        commands.waitUntilCompleted()
+        guard outputFormat == .bgra8Unorm, !cameras.isEmpty,
+              let target = device.makeTexture(descriptor: descriptor) else { throw FrameCaptureError.resources }
+        for camera in cameras {
+            guard let commands = queue.makeCommandBuffer() else { throw FrameCaptureError.resources }
+            encode(into: commands, target: target, camera: camera)
+            commands.commit()
+            commands.waitUntilCompleted()
+        }
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
         bytes.withUnsafeMutableBytes { raw in
             guard let base = raw.baseAddress else { return }
             target.getBytes(base, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
         }
         return CapturedFrame(width: width, height: height, bytes: bytes)
+    }
+
+    /// The last temporal frame's motion, in uv units (x right, y down),
+    /// texel by texel from the top row, or nil if the last frame was not
+    /// temporal.
+    public func readMotion(queue: MTLCommandQueue) throws -> (width: Int, height: Int, motion: [SIMD2<Float>])? {
+        guard let temporal else { return nil }
+        let source = temporal.motion
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: source.pixelFormat, width: source.width,
+                                                                  height: source.height, mipmapped: false)
+        descriptor.storageMode = .shared
+        guard let copy = device.makeTexture(descriptor: descriptor), let commands = queue.makeCommandBuffer(),
+              let blit = commands.makeBlitCommandEncoder() else { throw FrameCaptureError.resources }
+        blit.copy(from: source, to: copy)
+        blit.endEncoding()
+        commands.commit()
+        commands.waitUntilCompleted()
+        var halves = [Float16](repeating: 0, count: source.width * source.height * 2)
+        halves.withUnsafeMutableBytes { raw in
+            guard let base = raw.baseAddress else { return }
+            copy.getBytes(base, bytesPerRow: source.width * 4, from: MTLRegionMake2D(0, 0, source.width, source.height),
+                          mipmapLevel: 0)
+        }
+        let motion = stride(from: 0, to: halves.count, by: 2).map { SIMD2(Float(halves[$0]), Float(halves[$0 + 1])) }
+        return (source.width, source.height, motion)
     }
 }
