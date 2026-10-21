@@ -3,9 +3,9 @@
 ## Phase 0: Foundations
 - [x] Task: Record the new engine in the tech stack and the product guide 876be761
     - [x] Update `conductor/tech-stack.md` (the `engine/` workspace, bevy_ecs, rkyv, MetalFX, SwiftUI menus, Jolt from Rust, `cargo deny`) and the vision in `conductor/product.md`, before any code
-- [ ] Task: The workspace and its Nix build
-    - [ ] Write tests: pytest checks that `nix build .#engine` lays out `OpenCE Engine.app` with the Rust library, and that `cargo deny check` passes
-    - [ ] `engine/Cargo.toml` with the crates `content`, `import`, `sim`, `physics`, `script`, `net` and `ffi`; `engine/app/Package.swift`; the flake's `engine` package and dev-shell tools
+- [x] Task: The workspace and its Nix build ac664f6a
+    - [x] Write tests: pytest checks that `nix build .#engine` lays out `OpenCE Engine.app` with the Rust library, and that `cargo deny check` passes
+    - [x] `engine/Cargo.toml` with the crates `content`, `import`, `sim`, `physics`, `script`, `net` and `ffi`; `engine/app/Package.swift`; the flake's `engine` package and dev-shell tools
 - [ ] Task: The contract between Rust and Swift
     - [ ] Write tests: cargo tests of the snapshot's layout (sizes and offsets fixed, checked against the generated header); an XCTest that loads the library, starts an empty world and reads a snapshot
     - [ ] UniFFI calls in `ffi`; the `#[repr(C)]` snapshot types and a cbindgen header; a double-buffered snapshot that Swift reads without copying
