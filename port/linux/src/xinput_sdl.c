@@ -1010,7 +1010,7 @@ static void wheel_update(void)
 /* ---------- SDL gamepads */
 
 /* the SDL gamepads in connection order, at most one per port */
-static int sdl_gamepads(SDL_Gamepad *gamepads[PORT_COUNT])
+int sdl_gamepads(SDL_Gamepad **gamepads)
 {
 	SDL_JoystickID *ids;
 	int count = 0, index, found = 0;
