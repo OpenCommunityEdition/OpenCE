@@ -132,9 +132,9 @@
 - [x] Task: HaloScript 93369312
     - [x] Write tests: the scenario's compiled script nodes import into a typed tree; the interpreter runs expressions, globals, `sleep`, `sleep_until` and continuous and dormant scripts; an unknown function is reported on import
     - [x] `script`: the tree, the interpreter, typed function declarations registered by each system (`source/hs/` as reference)
-- [ ] Task: Every scenario's scripts
-    - [ ] Write tests: pytest (marked, needs `assets/maps`) imports every stock scenario's scripts and lists the functions still missing; the list shrinks to none by the end of the phase
-    - [ ] The script functions the campaign uses, added system by system
+- [x] Task: Every scenario's scripts 93a84ce8
+    - [x] Write tests: pytest (marked, needs `assets/maps`) imports every stock scenario's scripts and lists the functions still missing; the list shrinks to none by the end of the phase
+    - [x] The script functions the campaign uses, added system by system
 - [ ] Task: The AI
     - [ ] Write tests: actors in a fake encounter perceive, take firing positions, fire, take cover, flee and use vehicles; chosen encounters on *The Pillar of Autumn* behave like the reference app's (recorded)
     - [ ] Encounters, squads, actor types, perception, firing positions, command lists, combat and vehicle use
