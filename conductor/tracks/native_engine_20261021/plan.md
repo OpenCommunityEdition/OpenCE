@@ -1,0 +1,148 @@
+# Plan: A new native engine in Rust and Swift
+
+## Phase 0: Foundations
+- [ ] Task: Record the new engine in the tech stack and the product guide
+    - [ ] Update `conductor/tech-stack.md` (the `engine/` workspace, bevy_ecs, rkyv, MetalFX, SwiftUI menus, Jolt from Rust, `cargo deny`) and the vision in `conductor/product.md`, before any code
+- [ ] Task: The workspace and its Nix build
+    - [ ] Write tests: pytest checks that `nix build .#engine` lays out `OpenCE Engine.app` with the Rust library, and that `cargo deny check` passes
+    - [ ] `engine/Cargo.toml` with the crates `content`, `import`, `sim`, `physics`, `script`, `net` and `ffi`; `engine/app/Package.swift`; the flake's `engine` package and dev-shell tools
+- [ ] Task: The contract between Rust and Swift
+    - [ ] Write tests: cargo tests of the snapshot's layout (sizes and offsets fixed, checked against the generated header); an XCTest that loads the library, starts an empty world and reads a snapshot
+    - [ ] UniFFI calls in `ffi`; the `#[repr(C)]` snapshot types and a cbindgen header; a double-buffered snapshot that Swift reads without copying
+- [ ] Task: The fixed tick and determinism
+    - [ ] Write tests: a world stepped at 60 Hz from recorded inputs gives the same hash on every run; the renderer's interpolation factor is correct across uneven frame times
+    - [ ] The `sim` schedule in a fixed order, the input record, the world hash, and deterministic maths (`libm`, no FMA)
+- [ ] Task: Conductor - User Manual Verification 'Phase 0: Foundations' (Protocol in workflow.md)
+
+## Phase 1: Import a map and fly through it
+- [ ] Task: Bounds-checked cache readers
+    - [ ] Write tests: readers built over fake caches (Xbox and Custom Edition headers, tag index, tag data) read fields and refuse out-of-range offsets, counts and bad tag classes with an error naming the tag and field
+    - [ ] `import`: the cache headers, tag index and the reflexive and data readers; layouts from the decompilation and `docs/custom_edition_caches.md`
+- [ ] Task: Typed tags for the level
+    - [ ] Write tests: builders for a scenario, a structure BSP (with collision and lightmaps), shaders and bitmaps import into `content`'s types; malformed ones are refused
+    - [ ] `content` types and their importers: scenario (BSP list), structure BSP, the shader classes, bitmaps
+- [ ] Task: The native format
+    - [ ] Write tests: an `.ocpak` round-trips; a truncated or flipped file fails validation, never panicking; the import cache is rebuilt when the importer's version changes
+    - [ ] rkyv archives with validation; bitmap conversion to BC or RGBA8 with mipmaps; the cache folder
+- [ ] Task: Fuzz the importer
+    - [ ] Write tests: `cargo fuzz` targets for the cache readers and `.ocpak` loading, run for a fixed time in the suite without crashes
+- [ ] Task: Import every map
+    - [ ] Write tests: pytest (marked, needs `assets/maps`) imports every stock map and the Custom Edition maps present, and checks the counts of tags, BSPs and bitmaps
+- [ ] Task: The app and window
+    - [ ] Write tests: XCTest of the window model (full screen, any size, Retina scale), cursor capture on focus and release on Escape or loss of focus, raw mouse deltas without acceleration
+    - [ ] The Swift app: AppKit window with a `CAMetalLayer`, full screen, cursor capture, the display link at the display's rate
+- [ ] Task: The level's renderer
+    - [ ] Write tests: golden frames (manual approval) of bloodgulch and a campaign BSP from fixed cameras at 1920×1080, 3440×1440 and 3840×2160
+    - [ ] Metal pipelines built once at load; the BSP's geometry and lightmaps; materials mapped from the environment, transparent and sky shaders; HDR with EDR or tone-mapping; Hor+ field of view
+- [ ] Task: Temporal anti-aliasing and upscaling
+    - [ ] Write tests: golden frames with MetalFX's temporal scaler (jitter, motion vectors, depth) and in native mode; a still camera converges to a stable image
+    - [ ] MetalFX temporal scaler, the jitter sequence, motion vectors; the video settings (render scale, anti-aliasing mode)
+- [ ] Task: The free camera
+    - [ ] Write tests: the camera's motion from recorded mouse and keyboard input is exact; the map chosen from the command line or a picker loads
+    - [ ] Fly camera, the map picker, the frame-time overlay
+- [ ] Task: Conductor - User Manual Verification 'Phase 1: Import a map and fly through it' (Protocol in workflow.md)
+
+## Phase 2: Objects, models and animation
+- [ ] Task: Typed tags for objects
+    - [ ] Write tests: builders for object, scenery, weapon, vehicle, biped, device, model (gbxmodel and the Xbox model), animation graph and collision model tags import; malformed ones are refused
+    - [ ] `content` types and importers for the object tags
+- [ ] Task: Objects in the world
+    - [ ] Write tests: the scenario's placements spawn entities with their tag, position, permutation and team; a handle cannot be used after its entity is removed
+    - [ ] Entities, components and typed handles in `sim`; spawning from the scenario; the registry for object kinds
+- [ ] Task: Animation
+    - [ ] Write tests: node matrices from the animation graph for fixed frames match the reference app's (recorded); blending and overlays; compressed and uncompressed animations
+    - [ ] Animation playback and blending in Rust; node matrices into the snapshot
+- [ ] Task: Drawing models
+    - [ ] Write tests: golden frames of bloodgulch's objects and a campaign map's standing bipeds; levels of detail chosen by screen size
+    - [ ] Skinned models on the GPU, the model shaders as materials, permutations and regions
+- [ ] Task: Skies, fog, decals and effects
+    - [ ] Write tests: golden frames of the sky and fog on two maps; particle systems and effects from scenery, with the frame clock
+    - [ ] Sky, fog, level decals, particles and the effects that scenery plays
+- [ ] Task: The benchmark
+    - [ ] Write tests: `tools/test_engine_benchmark.py` flies a recorded path over bloodgulch at 3840×2160 for 60 s and reports p50 and p99
+    - [ ] Meet p99 ≤ 8.33 ms on the M1 Max; record the result in `docs/engine.md`
+- [ ] Task: Conductor - User Manual Verification 'Phase 2: Objects, models and animation' (Protocol in workflow.md)
+
+## Phase 3: Player movement and collision
+- [ ] Task: Reference traces
+    - [ ] Write tests: a recorder in the reference app writes the player's position, velocity and state each tick for scripted inputs (run, jump, crouch, fall, climb a ramp); the files are checked into `engine/tests/traces/`
+    - [ ] The trace recorder (a debug setting of the reference app) and the scripted inputs
+- [ ] Task: Jolt from Rust
+    - [ ] Write tests: cargo tests that a world built from an imported collision BSP stops a falling box; rays and shape casts hit the expected surfaces; two runs are identical
+    - [ ] `physics`: a safe Rust interface over the C wrapper, the static mesh from the collision BSP, rays and shape casts
+- [ ] Task: The player's movement
+    - [ ] Write tests: replaying the scripted inputs gives traces within tolerance of the reference app's
+    - [ ] `CharacterVirtual` tuned from the biped tag; walk, run, crouch, jump, step up, slide, fall damage; collision with objects
+- [ ] Task: Playing as the player
+    - [ ] Write tests: XCTest that key bindings and mouse look reach the simulation as typed input; the first-person camera follows the biped
+    - [ ] Input bindings (a setting), mouse sensitivity, first- and third-person cameras, spawning at the scenario's start points
+- [ ] Task: Conductor - User Manual Verification 'Phase 3: Player movement and collision' (Protocol in workflow.md)
+
+## Phase 4: Weapons, damage, grenades and ragdolls
+- [ ] Task: Typed tags for weapons and damage
+    - [ ] Write tests: builders for weapon, projectile, damage effect, equipment and grenade tags import; malformed ones are refused
+    - [ ] `content` types and importers
+- [ ] Task: Weapons
+    - [ ] Write tests: rate of fire, spread, heat, ammunition and reload times match the tags in simulated ticks; picking up, swapping and dropping
+    - [ ] Weapon systems, triggers, projectiles and hitscan, melee; the registry for weapon behaviours
+- [ ] Task: Damage, shields and death
+    - [ ] Write tests: damage by hit region, shields recharging after their delay, death, and the damage effects' impulses, against tag values and reference traces
+    - [ ] Damage, shields, health, death events
+- [ ] Task: Grenades
+    - [ ] Write tests: a thrown frag bounces and detonates on its timer; a plasma grenade sticks to a biped and moves with it
+    - [ ] Throwing, bouncing, sticking, detonation
+- [ ] Task: The first-person view and the HUD
+    - [ ] Write tests: golden frames of the first-person weapon and the HUD at 16:9, 16:10 and 21:9, anchored to the edges; the motion tracker shows bipeds at their positions
+    - [ ] First-person models and animations; the HUD drawn by Metal at native resolution
+- [ ] Task: Ragdolls, limbs and debris
+    - [ ] Write tests: a biped killed by a scripted grenade becomes a ragdoll that follows the death animation, then goes loose (joint damping set), and is still there after 60 s; the corpse cap removes the oldest; strong explosions tear off limbs; casings are rigid bodies
+    - [ ] Ragdolls from model nodes and collision geometry (as the ragdoll track's generator does, ported to Rust), motors then damping, the corpse cap (a setting), limbs and debris
+- [ ] Task: Conductor - User Manual Verification 'Phase 4: Weapons, damage, grenades and ragdolls' (Protocol in workflow.md)
+
+## Phase 5: Vehicles
+- [ ] Task: Typed tags for vehicles
+    - [ ] Write tests: vehicle tags (physics, seats, turrets, suspension) import; malformed ones are refused
+    - [ ] `content` types and importers
+- [ ] Task: Reference traces for vehicles
+    - [ ] Write tests: the reference app's recorder writes Warthog and Ghost traces for scripted inputs (accelerate, turn, brake, jump a ramp)
+- [ ] Task: Driving and flying
+    - [ ] Write tests: Warthog and Ghost traces within tolerance; the Banshee and the Scorpion respond to their tags' values
+    - [ ] Jolt vehicle constraints for wheeled and tracked vehicles; hover and flight from the vehicle tags
+- [ ] Task: Seats, turrets and destruction
+    - [ ] Write tests: entering and leaving each seat, the Warthog's turret, passengers firing, a vehicle destroyed by damage
+    - [ ] Seats, entering and leaving animations, turrets, vehicle damage
+- [ ] Task: Conductor - User Manual Verification 'Phase 5: Vehicles' (Protocol in workflow.md)
+
+## Phase 6: Multiplayer
+- [ ] Task: Game types
+    - [ ] Write tests: Slayer and CTF rules (scores, flag pickup, return and capture, respawn timers, the end of the game) in a simulated world
+    - [ ] Game-type systems, the multiplayer scenario data (spawns, flags, netgame equipment)
+- [ ] Task: The packet format
+    - [ ] Write tests: snapshots and inputs encode and decode; delta compression against an acknowledged snapshot; bad sizes, indices and rates are refused; a fuzz target for the decoder
+    - [ ] `net`: the protocol and its version, packets, delta compression
+- [ ] Task: The host and its clients
+    - [ ] Write tests: two copies on loopback aliases play Slayer and CTF for 60 s; a client's predicted player stays within tolerance of the host's after reconciling; a client with 100 ms of added delay and 2% loss still plays
+    - [ ] UDP sockets, joining and leaving, prediction and reconciliation, interpolation of other players, the host's checks
+- [ ] Task: The menus
+    - [ ] Write tests: XCTest of the menu models (main menu, server list, join by address, host setup, settings for game, controls, video and audio); the settings round-trip through TOML
+    - [ ] SwiftUI menus over the Metal view, mouse first, Overpass and the OpenCE font; LAN discovery for the server list
+- [ ] Task: Conductor - User Manual Verification 'Phase 6: Multiplayer' (Protocol in workflow.md)
+
+## Phase 7: AI and the campaign
+- [ ] Task: HaloScript
+    - [ ] Write tests: the scenario's compiled script nodes import into a typed tree; the interpreter runs expressions, globals, `sleep`, `sleep_until` and continuous and dormant scripts; an unknown function is reported on import
+    - [ ] `script`: the tree, the interpreter, typed function declarations registered by each system (`source/hs/` as reference)
+- [ ] Task: Every scenario's scripts
+    - [ ] Write tests: pytest (marked, needs `assets/maps`) imports every stock scenario's scripts and lists the functions still missing; the list shrinks to none by the end of the phase
+    - [ ] The script functions the campaign uses, added system by system
+- [ ] Task: The AI
+    - [ ] Write tests: actors in a fake encounter perceive, take firing positions, fire, take cover, flee and use vehicles; chosen encounters on *The Pillar of Autumn* behave like the reference app's (recorded)
+    - [ ] Encounters, squads, actor types, perception, firing positions, command lists, combat and vehicle use
+- [ ] Task: The campaign's flow
+    - [ ] Write tests: BSP switches, checkpoints saved and loaded in our own format, cutscenes, difficulties
+    - [ ] Campaign flow, saved games, cutscene cameras, the campaign menu
+- [ ] Task: The first two levels
+    - [ ] Write tests: a recorded run plays *The Pillar of Autumn* and *Halo* from start to end with no script errors
+- [ ] Task: The documentation
+    - [ ] `docs/engine.md`: the architecture, the contract, the content format, and how to add an object kind, a weapon behaviour and a script function
+- [ ] Task: Conductor - User Manual Verification 'Phase 7: AI and the campaign' (Protocol in workflow.md)
