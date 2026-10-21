@@ -34,6 +34,10 @@ void win32_window_borderless_apply(SDL_Window *window);
 #include <dlfcn.h>
 #include <unistd.h>
 #endif
+#ifdef HALO_ANDROID
+#include <errno.h>
+#include <time.h>
+#endif
 
 static SDL_Window *platform_window;
 static SDL_GLContext platform_gl_context;
@@ -1192,11 +1196,10 @@ void platform_video_drawable_size(int *width, int *height)
 	SDL_GetWindowSizeInPixels(platform_window, width, height);
 }
 
-#ifndef HALO_ANDROID
 /* with vsync off, the time between frames display.max_fps asks for (0:
-twice the display's refresh rate), or 0 for no limit. A GPU never left idle
-can hang (Intel's Raptor Lake graphics, whose reset then takes the desktop
-with it); the limit gives it a rest every frame. */
+twice the display's refresh rate), or 0 for no limit. A desktop GPU never
+left idle can hang (Intel's Raptor Lake graphics, whose reset then takes
+the desktop with it); the limit gives it a rest every frame. */
 static Uint64 frame_interval_ns(void)
 {
 	static int vsync;
@@ -1215,15 +1218,21 @@ static Uint64 frame_interval_ns(void)
 	rate = (float)maximum;
 	if (!maximum)
 	{
+#ifdef HALO_ANDROID
+		/* the app passes the display's refresh rate (port/android/host/host_main.c):
+		the guest cannot ask SDL for the display mode */
+		const char *refresh = getenv("HALO_DISPLAY_REFRESH");
+
+		rate = 2.0f * (refresh && atof(refresh) > 0.0f ? (float)atof(refresh) : 60.0f);
+#else
 		SDL_DisplayID display = SDL_GetDisplayForWindow(platform_window);
 		const SDL_DisplayMode *mode = display ? SDL_GetCurrentDisplayMode(display) : NULL;
 
 		rate = 2.0f * (mode && mode->refresh_rate > 0.0f ? mode->refresh_rate : 60.0f);
+#endif
 	}
 	return (Uint64)(1e9f / rate);
 }
-
-#endif
 #ifdef HALO_WEB
 #include "web_shared.h"
 
@@ -1233,13 +1242,33 @@ void web_frame_shown(void);
 void web_js_post(int kind, const char *text);
 #endif
 
+#ifdef HALO_ANDROID
+/* monotonic nanoseconds, and a sleep of that long: the guest's SDL bridge has
+no SDL_GetTicksNS nor SDL_DelayPrecise, so use musl's clocks */
+static Uint64 platform_ticks_ns(void)
+{
+	struct timespec now;
+
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	return (Uint64)now.tv_sec * 1000000000ull + (Uint64)now.tv_nsec;
+}
+
+static void platform_sleep_ns(Uint64 duration)
+{
+	struct timespec request, remaining;
+
+	request.tv_sec = (time_t)(duration / 1000000000ull);
+	request.tv_nsec = (long)(duration % 1000000000ull);
+	while (nanosleep(&request, &remaining) == -1 && errno == EINTR)
+		request = remaining;
+}
+#endif
+
 void platform_video_swap(void)
 {
 	Uint64 swap_start = SDL_GetTicks(), swap_time;
-#ifndef HALO_ANDROID
 	static Uint64 next_frame;
 	Uint64 interval, now;
-#endif
 #ifdef HALO_WINDOWS
 	/* SDL can restore its fullscreen styles on a mode or focus change.
 	Keep borderless on the desktop before the driver presents a frame. */
@@ -1255,19 +1284,25 @@ void platform_video_swap(void)
 #ifdef HALO_WEB
 	web_frame_shown();
 #endif
-#ifndef HALO_ANDROID
 	interval = frame_interval_ns();
 	if (!interval)
 		return;
+#ifdef HALO_ANDROID
+	now = platform_ticks_ns();
+#else
 	now = SDL_GetTicksNS();
+#endif
 	if (next_frame > now)
 	{
+#ifdef HALO_ANDROID
+		platform_sleep_ns(next_frame - now);
+#else
 		SDL_DelayPrecise(next_frame - now);
+#endif
 		now = next_frame;
 	}
 	/* (a frame more than an interval late starts the count again) */
 	next_frame = now - next_frame > interval ? now + interval : next_frame + interval;
-#endif
 }
 
 #if !defined(HALO_ANDROID) && !defined(HALO_WEB)
