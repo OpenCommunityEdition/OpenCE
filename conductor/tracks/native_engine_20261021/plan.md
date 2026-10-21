@@ -21,9 +21,9 @@
 - [x] Task: Typed tags for the level 72f447f8
     - [x] Write tests: builders for a scenario, a structure BSP (with collision and lightmaps), shaders and bitmaps import into `content`'s types; malformed ones are refused
     - [x] `content` types and their importers: scenario (BSP list), structure BSP, the shader classes, bitmaps
-- [ ] Task: The native format
-    - [ ] Write tests: an `.ocpak` round-trips; a truncated or flipped file fails validation, never panicking; the import cache is rebuilt when the importer's version changes
-    - [ ] rkyv archives with validation; bitmap conversion to BC or RGBA8 with mipmaps; the cache folder
+- [x] Task: The native format bb3fc566
+    - [x] Write tests: an `.ocpak` round-trips; a truncated or flipped file fails validation, never panicking; the import cache is rebuilt when the importer's version changes
+    - [x] rkyv archives with validation; bitmap conversion to BC or RGBA8 with mipmaps; the cache folder
 - [ ] Task: Fuzz the importer
     - [ ] Write tests: `cargo fuzz` targets for the cache readers and `.ocpak` loading, run for a fixed time in the suite without crashes
 - [ ] Task: Import every map
