@@ -1018,6 +1018,8 @@ in pixels changes (menu_cursor_fit, from platform_pump_events). */
 
 /* the arrow's height in the menus' 480 lines (72 pixels at 1080p) */
 #define MENU_CURSOR_HEIGHT 32
+/* the arrow's tip in the picture, past its soft edge: the click point */
+#define MENU_CURSOR_TIP 2
 
 static SDL_Surface *menu_cursor_picture;
 static SDL_Cursor *menu_cursor;
@@ -1073,7 +1075,9 @@ static void menu_cursor_fit(void)
 	pixels = menu_cursor_scale(cursor_height);
 	points = density > 1.0f ? menu_cursor_scale((int)(cursor_height / density + 0.5f)) : pixels;
 	if (pixels && points && (points == pixels || SDL_AddSurfaceAlternateImage(points, pixels)))
-		cursor = SDL_CreateColorCursor(points, 0, 0);
+		cursor = SDL_CreateColorCursor(points,
+			(MENU_CURSOR_TIP * points->w + menu_cursor_picture->w / 2) / menu_cursor_picture->w,
+			(MENU_CURSOR_TIP * points->h + menu_cursor_picture->h / 2) / menu_cursor_picture->h);
 	if (cursor && SDL_SetCursor(cursor))
 	{
 		SDL_DestroyCursor(menu_cursor);
