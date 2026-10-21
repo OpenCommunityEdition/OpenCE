@@ -120,9 +120,9 @@
 - [x] Task: The packet format f30b98fd
     - [x] Write tests: snapshots and inputs encode and decode; delta compression against an acknowledged snapshot; bad sizes, indices and rates are refused; a fuzz target for the decoder
     - [x] `net`: the protocol and its version, packets, delta compression
-- [ ] Task: The host and its clients
-    - [ ] Write tests: two copies on loopback aliases play Slayer and CTF for 60 s; a client's predicted player stays within tolerance of the host's after reconciling; a client with 100 ms of added delay and 2% loss still plays
-    - [ ] UDP sockets, joining and leaving, prediction and reconciliation, interpolation of other players, the host's checks
+- [x] Task: The host and its clients d832734a
+    - [x] Write tests: two copies on loopback aliases play Slayer and CTF for 60 s; a client's predicted player stays within tolerance of the host's after reconciling; a client with 100 ms of added delay and 2% loss still plays
+    - [x] UDP sockets, joining and leaving, prediction and reconciliation, interpolation of other players, the host's checks
 - [ ] Task: The menus
     - [ ] Write tests: XCTest of the menu models (main menu, server list, join by address, host setup, settings for game, controls, video and audio); the settings round-trip through TOML
     - [ ] SwiftUI menus over the Metal view, mouse first, Overpass and the OpenCE font; LAN discovery for the server list
