@@ -34,6 +34,19 @@ When the texture cannot be drawn, the sprites are drawn from their bitmap.
 #include "text/draw_string.h"
 #include "hud_button_layout.h"
 #include "scenario/scenario_definitions.h"
+#ifdef HALO_ANDROID
+#include "android_ce_texture_cache.h"
+#endif
+
+static boolean hud_hires_bitmap_resident(struct bitmap_data const *bitmap)
+{
+#ifdef HALO_ANDROID
+	/* CE heap pixels have no Xbox LRU block. Query without touching their age. */
+	if (android_ce_texture_resident(bitmap))
+		return TRUE;
+#endif
+	return bitmap->cache_block_index != NONE;
+}
 
 /* the platform layer's (port/linux/src) */
 void platform_log(char const *format, ...);
@@ -267,7 +280,7 @@ struct bitmap_data const *hud_hires_sprite_bitmap(
 			continue;
 		}
 		/* (checked on its pixels in the texture cache, once they are loaded) */
-		if (sprite_bitmap->cache_block_index == NONE || !sprite_bitmap->base_address)
+		if (!hud_hires_bitmap_resident(sprite_bitmap) || !sprite_bitmap->base_address)
 			break;
 		if (hires_sprite_bitmaps[index].checked_address != sprite_bitmap->base_address ||
 			hires_sprite_bitmaps[index].checked_at != config_changes())
@@ -330,7 +343,7 @@ long hud_hires_asset_stock_custom_edition(
 	{
 		struct bitmap_data *bitmap = hires_bitmaps[index].bitmap;
 
-		if (hires_bitmaps[index].asset == asset && bitmap->cache_block_index != NONE &&
+		if (hires_bitmaps[index].asset == asset && hud_hires_bitmap_resident(bitmap) &&
 			(unsigned long)bitmap->base_address == address && bitmap->width == width && bitmap->height == height)
 		{
 			return hires_bitmaps[index].stock_custom_edition;
@@ -351,7 +364,7 @@ long hud_hires_asset_at(
 	{
 		struct bitmap_data *bitmap = hires_bitmaps[index].bitmap;
 
-		if (bitmap->cache_block_index != NONE &&
+		if (hud_hires_bitmap_resident(bitmap) &&
 			(unsigned long)bitmap->base_address == address &&
 			bitmap->width == width &&
 			bitmap->height == height)
@@ -371,7 +384,7 @@ long hud_hires_upscale_at(unsigned long address, long width, long height)
 	{
 		struct bitmap_data const *bitmap = upscale_bitmaps[index].bitmap;
 
-		if (bitmap->cache_block_index != NONE && (unsigned long)bitmap->base_address == address &&
+		if (hud_hires_bitmap_resident(bitmap) && (unsigned long)bitmap->base_address == address &&
 			bitmap->width == width && bitmap->height == height)
 			return upscale_bitmaps[index].kind;
 	}

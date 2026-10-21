@@ -28,6 +28,9 @@ memory_watch.c detects that by write-protecting the pages.
 #endif
 #include <stdlib.h>
 #include <string.h>
+#ifdef HALO_ANDROID
+#include "../game/android_ce_texture_cache.h"
+#endif
 
 #ifndef GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
 #define GL_COMPRESSED_RGBA_S3TC_DXT1_EXT 0x83f1
@@ -696,6 +699,7 @@ void halo_custom_edition_texels_forget(void)
 	custom_edition_texel_capacity = 0;
 }
 
+
 static void upload(GLuint texture, GLenum target, const struct xgpu_texture_description *description,
 	const unsigned char *base, const D3DCOLOR *palette, unsigned char channel_order)
 {
@@ -861,6 +865,9 @@ struct texture_entry
 	memory watch serial read before it was found: the same while no watched
 	page has been written since (0: never found) */
 	unsigned long watched_serial, watched_generation;
+#ifdef HALO_ANDROID
+	const void *ce_resource;
+#endif
 };
 
 #define TEXTURE_BUCKET_COUNT 4096
@@ -883,6 +890,9 @@ static struct
 	struct texture_entry *entry;
 	unsigned long watch_serial;
 	unsigned long drop_serial;
+#ifdef HALO_ANDROID
+	const void *ce_resource;
+#endif
 } recent_textures[RECENT_TEXTURE_COUNT];
 static unsigned long texture_drop_serial = 1;
 static unsigned long texture_frame = 0;
@@ -929,6 +939,43 @@ static BOOL high_res_hud(void)
 		enabled = config_boolean("display.high_res_hud") != 0;
 	}
 	return enabled;
+}
+
+#ifdef HALO_ANDROID
+void android_ce_texture_gpu_forget(const void *resource)
+{
+	const DWORD *header = resource;
+	struct texture_entry **link = &texture_buckets[bucket_index(header[1], header[3], header[4])];
+
+	while (*link)
+	{
+		struct texture_entry *entry = *link;
+		if (entry->ce_resource == resource)
+		{
+			*link = entry->next;
+			glDeleteTextures(1, &entry->texture);
+			if (entry->hud_upscale)
+				glDeleteTextures(1, &entry->hud_upscale);
+			texture_drop_serial++;
+			free(entry);
+		}
+		else
+			link = &entry->next;
+	}
+	xgpu_gl_state_invalidate();
+}
+#endif
+
+static BOOL texture_entry_pixels_valid(const struct texture_entry *entry)
+{
+#ifdef HALO_ANDROID
+	/* Registration and the allocation-length check at creation admit these
+	 * pixels. Their owner removes the GPU entry before freeing the storage. */
+	if (entry->ce_resource)
+		return entry->size != 0;
+#endif
+	return platform_is_contiguous((void *)entry->address) &&
+		platform_is_contiguous((void *)(entry->address + entry->size - 1));
 }
 
 /* an entry's GL texture and description: its replacement's, if it has one,
@@ -997,8 +1044,7 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 				entry->description.width <= 256 && entry->description.height <= 256 &&
 				kind &&
 				custom_edition_texels_order(entry->address) == _custom_edition_channels_xbox &&
-				platform_is_contiguous((void *)entry->address) &&
-				platform_is_contiguous((void *)(entry->address + entry->size - 1)))
+				texture_entry_pixels_valid(entry))
 			{
 				unsigned long *pixels = malloc(entry->description.width * entry->description.height * 4);
 
@@ -1033,11 +1079,19 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	static int no_cache = -1;
 	unsigned long recent = bucket_index(data, format_word, size_word) % RECENT_TEXTURE_COUNT;
 	unsigned long watch_serial = memory_watch_serial();
+#ifdef HALO_ANDROID
+	unsigned long ce_bytes;
+	const void *ce_pixels = android_ce_texture_pixels(resource, &ce_bytes);
+	const void *ce_resource = ce_pixels ? resource : NULL;
+#endif
 
 	/* (a texture that is not palettized has the one entry, until one is
 	dropped: remembered, a page written since only means checking it) */
 	entry = NULL;
 	if (!palettized && recent_textures[recent].entry && recent_textures[recent].data == data &&
+#ifdef HALO_ANDROID
+		recent_textures[recent].ce_resource == ce_resource &&
+#endif
 		recent_textures[recent].format_word == format_word && recent_textures[recent].size_word == size_word &&
 		recent_textures[recent].drop_serial == texture_drop_serial)
 	{
@@ -1055,6 +1109,10 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		{
 			if (entry->data == data && entry->format_word == format_word && entry->size_word == size_word)
 			{
+#ifdef HALO_ANDROID
+				if (entry->ce_resource != ce_resource)
+					continue;
+#endif
 				if (entry->palette_hash == hash)
 					break;
 				variant_count++;
@@ -1091,6 +1149,15 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		byte counts would not fit in 32 bits) */
 		entry->size = texture_size_supported(&entry->description) ?
 			xgpu_texture_face_size(&entry->description) * (entry->description.cube_map ? 6 : 1) : 0;
+#ifdef HALO_ANDROID
+		entry->ce_resource = ce_resource;
+		if (ce_resource)
+		{
+			entry->address = (unsigned long)ce_pixels;
+			if (entry->size > ce_bytes)
+				entry->size = 0;
+		}
+#endif
 		if (!entry->size)
 		{
 			platform_log("textures: a %lux%lux%lu texture is larger than the device takes; it is not drawn",
@@ -1108,6 +1175,11 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	/* (its pages' newest generation, found again only once a watched page
 	has been written: a large texture's pages, scanned for every draw that
 	bound it, were much of a frame with many objects) */
+#ifdef HALO_ANDROID
+	if (entry->ce_resource)
+		generation = 1; /* Published CE map pixels do not change while resident. */
+	else
+#endif
 	if (entry->watched_serial && entry->watched_serial == watch_serial)
 		generation = entry->watched_generation;
 	else
@@ -1119,8 +1191,15 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	if (!entry->generation || generation > entry->generation || no_cache)
 	{
 		/* protect first, so a write racing with the upload is noticed */
-		memory_watch_protect(entry->address, entry->size);
-		entry->generation = memory_watch_generation(entry->address, entry->size);
+#ifdef HALO_ANDROID
+		if (entry->ce_resource)
+			entry->generation = 1;
+		else
+#endif
+		{
+			memory_watch_protect(entry->address, entry->size);
+			entry->generation = memory_watch_generation(entry->address, entry->size);
+		}
 		if (!entry->generation)
 			entry->generation = 1;
 		/* (which bitmap is here may have changed with the pixels) */
@@ -1142,8 +1221,7 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 			if (entry->override >= 0 && !hud_hires_override_texture(entry->override, &levels))
 				entry->override = -1;
 		}
-		if (entry->override < 0 && entry->size && platform_is_contiguous((void *)entry->address) &&
-			platform_is_contiguous((void *)(entry->address + entry->size - 1)))
+		if (entry->override < 0 && entry->size && texture_entry_pixels_valid(entry))
 		{
 			if (config_boolean("debug.texture_log"))
 			{
@@ -1174,6 +1252,9 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		recent_textures[recent].entry = entry;
 		recent_textures[recent].watch_serial = watch_serial;
 		recent_textures[recent].drop_serial = texture_drop_serial;
+#ifdef HALO_ANDROID
+		recent_textures[recent].ce_resource = ce_resource;
+#endif
 	}
 	return texture_entry_result(entry, target, description);
 }

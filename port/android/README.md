@@ -515,3 +515,21 @@ it does not substitute for device gameplay validation.
   point to an integer in a SIMD register (`fcvtzs s0, s1`, an illegal
   instruction there), so `tools/android_asm_convert.py` writes each as the
   vector form, which leaves the register and the exception flags the same.
+
+## Custom Edition texture storage
+
+Cached Custom Edition textures on Android use stable individual allocations,
+created on demand with a 128 MiB pixel limit and 8,192-entry limit, outside the
+fixed Xbox memory window. This avoids exhausting the old arena with textures
+needed in the same frame and avoids re-uploading surviving textures after
+compaction. Current-frame entries cannot be evicted. Normal GPU caching,
+texture conversion, HUD replacements and the geometry streaming fix remain;
+GL shadow state is refreshed before each draw. Desktop, web and other map
+storage paths retain their established behavior. Fullscreen behavior is unchanged.
+
+Cleanup releases bindings and GPU copies before pixel/header reuse. Map unload,
+cache flush and mod reload release the stored pixels. Diagnostics are limited to
+an unload summary and the first allocation failure per cache lifetime in the
+normal platform log. No test log files, per-frame reports, texture fingerprints
+or uniform readbacks run in the permanent build. The cache can still exhaust
+its limit or system memory; normal fallback handling remains available.
