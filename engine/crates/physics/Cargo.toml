@@ -6,6 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+libm.workspace = true
 opence_content.workspace = true
 glam.workspace = true
 thiserror.workspace = true

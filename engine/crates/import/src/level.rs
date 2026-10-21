@@ -157,8 +157,16 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     }
 
     let placements = import_placements(&scenario)?;
+    let globals = crate::globals::import_globals(cache)?;
+    // (the player's bipeds, which no placement names, are imported too)
+    let players: Vec<TagRef> = [&globals.player_unit, &globals.multiplayer_unit]
+        .into_iter()
+        .flatten()
+        .filter(|tag| tag_index(cache, tag).is_some())
+        .cloned()
+        .collect();
     let (objects, mut models, animation_graphs) =
-        import_placed_objects(cache, &placements, &mut reached)?;
+        import_placed_objects(cache, &placements, &players, &mut reached)?;
     let skies = import_skies(cache, &scenario, &mut models, &mut reached)?;
 
     // (a shader's extra layers are shaders too, reached as each is read)
@@ -212,6 +220,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         bitmaps,
         resource_bitmaps,
         skies,
+        globals,
     };
     check_lightmap_pages(&level)?;
     Ok(level)
@@ -231,11 +240,13 @@ pub(crate) fn tag_index(cache: &Cache, tag: &TagRef) -> Option<usize> {
 /// they name.
 type PlacedObjects = (Vec<ObjectDefinition>, Vec<Model>, Vec<AnimationGraph>);
 
-/// The definitions of the objects `placements` place, their models (whose
-/// shaders are reached) and their animation graphs, each once, by path.
+/// The definitions of the objects `placements` place and of `extra`, their
+/// models (whose shaders are reached) and their animation graphs, each
+/// once, by path.
 fn import_placed_objects(
     cache: &Cache,
     placements: &[ObjectPlacement],
+    extra: &[TagRef],
     reached: &mut Reached,
 ) -> Result<PlacedObjects, ImportError> {
     let index = |tag: &TagRef| {
@@ -249,11 +260,15 @@ fn import_placed_objects(
     let mut objects = BTreeMap::new();
     let mut models = BTreeMap::new();
     let mut graphs = BTreeMap::new();
-    for placement in placements {
-        if objects.contains_key(&placement.tag) {
+    for tag in placements
+        .iter()
+        .map(|placement| &placement.tag)
+        .chain(extra)
+    {
+        if objects.contains_key(tag) {
             continue;
         }
-        let object = crate::object::import_object(cache, index(&placement.tag)?)?;
+        let object = crate::object::import_object(cache, index(tag)?)?;
         if let Some(tag) = object
             .model
             .as_ref()
@@ -279,7 +294,7 @@ fn import_placed_objects(
                 crate::object::import_animation_graph(cache, index(tag)?)?,
             );
         }
-        objects.insert(placement.tag.clone(), object);
+        objects.insert(tag.clone(), object);
     }
     Ok((
         objects.into_values().collect(),

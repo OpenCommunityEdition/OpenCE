@@ -24,7 +24,7 @@ use rkyv::util::AlignedVec;
 use crate::Level;
 
 /// The version of this format; a pack of another is not read.
-pub const FORMAT_VERSION: u32 = 5;
+pub const FORMAT_VERSION: u32 = 6;
 
 const MAGIC: [u8; 4] = *b"OCPK";
 const HEADER_SIZE: usize = 0x28;
@@ -234,6 +234,7 @@ mod tests {
                 }],
             }],
             resource_bitmaps: vec![tag(b"bitm", "ui\\shell\\bitmaps\\cursor")],
+            globals: Default::default(),
             skies: vec![crate::Sky {
                 tag: tag(b"sky ", "sky\\box\\box"),
                 model: Some(tag(b"mod2", "sky\\box\\box")),

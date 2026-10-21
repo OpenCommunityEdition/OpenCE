@@ -12,6 +12,7 @@
 #![allow(unsafe_code)]
 
 mod mesh;
+pub mod movement;
 mod sys;
 
 use std::ptr::NonNull;
@@ -19,6 +20,7 @@ use std::ptr::NonNull;
 use glam::{Quat, Vec3};
 
 pub use mesh::LevelMesh;
+pub use movement::{Landing, MovementInput, Mover, MoverSettings};
 
 /// Metres in a world unit (port/macos/include/host_physics.h's).
 pub const METRES_PER_UNIT: f32 = 3.048;
@@ -537,6 +539,181 @@ impl World {
         match result {
             1 => Ok(Some(Hit::from_raw(hit))),
             0 => Ok(None),
+            _ => Err(PhysicsError::Refused),
+        }
+    }
+}
+
+/// A character: a biped's pill as it walks, the level sliding it along.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CharacterId(u32);
+
+/// A character's pill and how it walks, in world units.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CharacterSettings {
+    /// Its radius.
+    pub radius: f32,
+    /// Its height, from its feet to its top.
+    pub height: f32,
+    /// The steepest ground it stands on (radians).
+    pub maximum_slope: f32,
+    /// The highest ledge it steps up onto.
+    pub step_up: f32,
+    /// How far it follows the floor down as it walks off a step.
+    pub stick_down: f32,
+    /// What it collides with.
+    pub layers: Layers,
+}
+
+/// What holds a character up.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ground {
+    /// Ground it stands on.
+    Standing,
+    /// Ground too steep to stand on: it slides.
+    Steep,
+    /// Ground that touches it without holding it up.
+    Unsupported,
+    /// Nothing.
+    Airborne,
+}
+
+/// A character's state, in world units.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CharacterState {
+    /// Its feet.
+    pub position: Vec3,
+    /// Its velocity, as the collisions left it (units a second).
+    pub velocity: Vec3,
+    /// Its ground's normal (up, airborne).
+    pub ground_normal: Vec3,
+    /// What holds it up.
+    pub ground: Ground,
+}
+
+impl CharacterState {
+    fn from_raw(raw: &sys::CharacterState) -> CharacterState {
+        CharacterState {
+            position: Vec3::from_array(raw.position) / METRES_PER_UNIT,
+            velocity: Vec3::from_array(raw.velocity) / METRES_PER_UNIT,
+            ground_normal: Vec3::from_array(raw.ground_normal),
+            ground: match raw.ground {
+                sys::GROUND_STANDING => Ground::Standing,
+                sys::GROUND_STEEP => Ground::Steep,
+                sys::GROUND_UNSUPPORTED => Ground::Unsupported,
+                _ => Ground::Airborne,
+            },
+        }
+    }
+}
+
+impl World {
+    /// A character with its feet at `position`.
+    pub fn add_character(
+        &mut self,
+        settings: &CharacterSettings,
+        position: Vec3,
+    ) -> Result<CharacterId, PhysicsError> {
+        let raw = sys::CharacterSettings {
+            radius: settings.radius * METRES_PER_UNIT,
+            height: settings.height * METRES_PER_UNIT,
+            maximum_slope: settings.maximum_slope,
+            step_up: settings.step_up * METRES_PER_UNIT,
+            stick_down: settings.stick_down * METRES_PER_UNIT,
+            layers: settings.layers.0,
+        };
+        let position = units_to_metres(position);
+        // SAFETY: the settings and the position are valid for the call.
+        let character =
+            unsafe { sys::physics_character_add(self.raw.as_ptr(), &raw, position.as_ptr()) };
+        if character == sys::NONE {
+            Err(PhysicsError::Body)
+        } else {
+            Ok(CharacterId(character))
+        }
+    }
+
+    /// Removes a character (nothing, if it names none).
+    pub fn remove_character(&mut self, character: CharacterId) {
+        // SAFETY: the world is live; the handle is checked.
+        unsafe { sys::physics_character_remove(self.raw.as_ptr(), character.0) }
+    }
+
+    /// Moves a character at `velocity` (units a second) for `seconds`,
+    /// colliding, stepping up and following the floor.
+    pub fn move_character(
+        &mut self,
+        character: CharacterId,
+        velocity: Vec3,
+        seconds: f32,
+    ) -> Result<CharacterState, PhysicsError> {
+        let velocity = units_to_metres(velocity);
+        let mut state = sys::CharacterState::default();
+        // SAFETY: the velocity and the state are valid for the call.
+        let result = unsafe {
+            sys::physics_character_move(
+                self.raw.as_ptr(),
+                character.0,
+                velocity.as_ptr(),
+                seconds,
+                &mut state,
+            )
+        };
+        if result == 0 {
+            Ok(CharacterState::from_raw(&state))
+        } else {
+            Err(PhysicsError::Refused)
+        }
+    }
+
+    /// Puts a character's feet at `position`, standing still.
+    pub fn set_character_position(
+        &mut self,
+        character: CharacterId,
+        position: Vec3,
+    ) -> Result<(), PhysicsError> {
+        let position = units_to_metres(position);
+        // SAFETY: the position is valid for the call.
+        let result = unsafe {
+            sys::physics_character_set_position(self.raw.as_ptr(), character.0, position.as_ptr())
+        };
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(PhysicsError::Refused)
+        }
+    }
+
+    /// A character's state.
+    pub fn character_state(&self, character: CharacterId) -> Result<CharacterState, PhysicsError> {
+        let mut state = sys::CharacterState::default();
+        // SAFETY: the state is valid for the call.
+        if unsafe { sys::physics_character_get_state(self.raw.as_ptr(), character.0, &mut state) }
+            == 0
+        {
+            Ok(CharacterState::from_raw(&state))
+        } else {
+            Err(PhysicsError::Refused)
+        }
+    }
+
+    /// Changes a character's height (crouching or standing): whether it
+    /// changed (not, beneath a ceiling with no room).
+    pub fn set_character_height(
+        &mut self,
+        character: CharacterId,
+        height: f32,
+    ) -> Result<bool, PhysicsError> {
+        // SAFETY: the world is live; the handle is checked.
+        match unsafe {
+            sys::physics_character_set_height(
+                self.raw.as_ptr(),
+                character.0,
+                height * METRES_PER_UNIT,
+            )
+        } {
+            1 => Ok(true),
+            0 => Ok(false),
             _ => Err(PhysicsError::Refused),
         }
     }

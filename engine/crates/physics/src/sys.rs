@@ -16,6 +16,10 @@ pub const MOTION_DYNAMIC: i32 = 1;
 pub const CAST_LEVEL: u32 = 1;
 pub const CAST_BODIES: u32 = 2;
 
+pub const GROUND_STANDING: i32 = 0;
+pub const GROUND_STEEP: i32 = 1;
+pub const GROUND_UNSUPPORTED: i32 = 2;
+
 /// The world, opaque.
 #[repr(C)]
 pub struct World {
@@ -60,6 +64,26 @@ pub struct Hit {
     pub normal: [f32; 3],
     pub body: u32,
     pub level: i32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CharacterSettings {
+    pub radius: f32,
+    pub height: f32,
+    pub maximum_slope: f32,
+    pub step_up: f32,
+    pub stick_down: f32,
+    pub layers: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CharacterState {
+    pub position: [f32; 3],
+    pub velocity: [f32; 3],
+    pub ground_normal: [f32; 3],
+    pub ground: i32,
 }
 
 extern "C" {
@@ -123,4 +147,29 @@ extern "C" {
         layers: u32,
         hit: *mut Hit,
     ) -> i32;
+
+    pub fn physics_character_add(
+        world: *mut World,
+        settings: *const CharacterSettings,
+        position: *const f32,
+    ) -> u32;
+    pub fn physics_character_remove(world: *mut World, character: u32);
+    pub fn physics_character_move(
+        world: *mut World,
+        character: u32,
+        velocity: *const f32,
+        seconds: f32,
+        state: *mut CharacterState,
+    ) -> i32;
+    pub fn physics_character_set_position(
+        world: *mut World,
+        character: u32,
+        position: *const f32,
+    ) -> i32;
+    pub fn physics_character_get_state(
+        world: *const World,
+        character: u32,
+        state: *mut CharacterState,
+    ) -> i32;
+    pub fn physics_character_set_height(world: *mut World, character: u32, height: f32) -> i32;
 }

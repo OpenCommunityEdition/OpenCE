@@ -102,6 +102,86 @@ pub struct ObjectDefinition {
     pub attachments: Vec<Attachment>,
     /// Its change colours.
     pub change_colors: Vec<ChangeColor>,
+    /// A biped's movement (bipeds only).
+    pub biped: Option<Biped>,
+}
+
+/// A biped's movement and stance, from the biped part of its tag. Speeds
+/// are in world units a second, angles in radians, times in seconds.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct Biped {
+    /// Its flags ([`Biped::USES_PLAYER_PHYSICS`] and the rest).
+    pub flags: u32,
+    /// How fast it turns while moving.
+    pub moving_turning_speed: f32,
+    /// The angle it turns to before its feet follow, standing.
+    pub stationary_turning_threshold: f32,
+    /// The steepest ground it stands on.
+    pub maximum_slope_angle: f32,
+    /// Where going downhill starts to change its speed.
+    pub downhill_falloff_angle: f32,
+    /// Where going downhill changes its speed fully.
+    pub downhill_cutoff_angle: f32,
+    /// Its speed downhill, past the cutoff, as a scale.
+    pub downhill_velocity_scale: f32,
+    /// Where going uphill starts to change its speed.
+    pub uphill_falloff_angle: f32,
+    /// Where going uphill changes its speed fully.
+    pub uphill_cutoff_angle: f32,
+    /// Its speed uphill, past the cutoff, as a scale.
+    pub uphill_velocity_scale: f32,
+    /// Its speed up, jumping.
+    pub jump_velocity: f32,
+    /// The longest it recovers from a soft landing.
+    pub maximum_soft_landing_time: f32,
+    /// The longest it recovers from a hard landing.
+    pub maximum_hard_landing_time: f32,
+    /// The slowest landing that is soft.
+    pub minimum_soft_landing_velocity: f32,
+    /// The slowest landing that is hard.
+    pub minimum_hard_landing_velocity: f32,
+    /// The landing at which a hard landing's recovery is longest.
+    pub maximum_hard_landing_velocity: f32,
+    /// A landing that kills it.
+    pub death_hard_landing_velocity: f32,
+    /// Its camera's height, standing.
+    pub standing_camera_height: f32,
+    /// Its camera's height, crouching.
+    pub crouching_camera_height: f32,
+    /// How long it takes to crouch or stand.
+    pub crouch_transition_time: f32,
+    /// Its height, standing.
+    pub collision_height_standing: f32,
+    /// Its height, crouching.
+    pub collision_height_crouching: f32,
+    /// Its radius.
+    pub collision_radius: f32,
+    /// The cosine of the steepest ground it stands on (worked out by the
+    /// tools that built the map, as the rest below).
+    pub minimum_normal_k: f32,
+    /// The slope at which going downhill starts to change its speed.
+    pub downhill_k0: f32,
+    /// The slope at which going downhill changes its speed fully.
+    pub downhill_k1: f32,
+    /// The slope at which going uphill starts to change its speed.
+    pub uphill_k0: f32,
+    /// The slope at which going uphill changes its speed fully.
+    pub uphill_k1: f32,
+}
+
+impl Biped {
+    /// It moves as a player does, by the globals' speeds.
+    pub const USES_PLAYER_PHYSICS: u32 = 1 << 1;
+    /// It flies.
+    pub const FLYING: u32 = 1 << 2;
+    /// Its collision pill's centre is its origin, not its feet.
+    pub const PILL_CENTERED_AT_ORIGIN: u32 = 1 << 3;
+    /// It is a sphere, not a pill.
+    pub const SPHERICAL: u32 = 1 << 4;
+    /// Falls do not harm it.
+    pub const IMMUNE_TO_FALLING_DAMAGE: u32 = 1 << 7;
+    /// It moves by the old player speeds (the override in the game's code).
+    pub const USES_OLD_PLAYER_PHYSICS: u32 = 1 << 12;
 }
 
 /// Something attached to an object's marker (a light, an effect).

@@ -7,7 +7,7 @@
 //! which the tag index's header gives the offset and size of.
 
 use opence_content::{
-    Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, ChangeColor,
+    Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, Biped, ChangeColor,
     CollisionModel, CollisionModelMaterial, CollisionNode, CollisionRegion, ColorPermutation,
     MarkerInstance, Model, ModelGeometry, ModelMarker, ModelNode, ModelPart, ModelPermutation,
     ModelRegion, ModelShader, ModelVertex, ObjectDefinition, ObjectKind, PathfindingSphere, TagRef,
@@ -28,8 +28,13 @@ pub(crate) const COLL: GroupTag = GroupTag::new(b"coll");
 const PHYS: GroupTag = GroupTag::new(b"phys");
 const SHDR: GroupTag = GroupTag::new(b"shdr");
 const EFFE: GroupTag = GroupTag::new(b"effe");
+const BIPD: GroupTag = GroupTag::new(b"bipd");
 
 pub(crate) const OBJECT_SIZE: usize = 0x17C;
+/// A biped's whole definition, and where its own part starts (after the
+/// object's and the unit's).
+const BIPED_SIZE: usize = 0x4F4;
+const BIPED_PART: usize = 0x2F0;
 const NAME_LONGEST: usize = 31;
 
 pub(crate) const MODEL_SIZE: usize = 0xE8;
@@ -197,6 +202,47 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
         creation_effect: reference(&object, 0xA0, "creation effect", &[EFFE])?,
         attachments,
         change_colors,
+        biped: match kind {
+            ObjectKind::Biped => Some(import_biped(cache, index)?),
+            _ => None,
+        },
+    })
+}
+
+/// A biped's movement and stance, from its own part of its definition.
+fn import_biped(cache: &Cache, index: usize) -> Result<Biped, ImportError> {
+    let biped = cache.tag(index, BIPD, BIPED_SIZE)?;
+    let f = |at: usize, field: &str| biped.f32(BIPED_PART + at, field);
+    Ok(Biped {
+        flags: biped.u32(BIPED_PART + 0x04, "biped flags")?,
+        moving_turning_speed: f(0x00, "moving turning speed")?,
+        stationary_turning_threshold: f(0x08, "stationary turning threshold")?,
+        maximum_slope_angle: f(0x68, "maximum slope angle")?,
+        downhill_falloff_angle: f(0x6C, "downhill falloff angle")?,
+        downhill_cutoff_angle: f(0x70, "downhill cutoff angle")?,
+        downhill_velocity_scale: f(0x74, "downhill velocity scale")?,
+        uphill_falloff_angle: f(0x78, "uphill falloff angle")?,
+        uphill_cutoff_angle: f(0x7C, "uphill cutoff angle")?,
+        uphill_velocity_scale: f(0x80, "uphill velocity scale")?,
+        // (the tools that built the map left it a tick's, of the game's 30)
+        jump_velocity: f(0xC4, "jump velocity")? * 30.0,
+        maximum_soft_landing_time: f(0xE4, "maximum soft landing time")?,
+        maximum_hard_landing_time: f(0xE8, "maximum hard landing time")?,
+        minimum_soft_landing_velocity: f(0xEC, "minimum soft landing velocity")?,
+        minimum_hard_landing_velocity: f(0xF0, "minimum hard landing velocity")?,
+        maximum_hard_landing_velocity: f(0xF4, "maximum hard landing velocity")?,
+        death_hard_landing_velocity: f(0xF8, "death hard landing velocity")?,
+        standing_camera_height: f(0x110, "standing camera height")?,
+        crouching_camera_height: f(0x114, "crouching camera height")?,
+        crouch_transition_time: f(0x118, "crouch transition time")?,
+        collision_height_standing: f(0x134, "standing collision height")?,
+        collision_height_crouching: f(0x138, "crouching collision height")?,
+        collision_radius: f(0x13C, "collision radius")?,
+        minimum_normal_k: f(0x1E0, "minimum normal k")?,
+        downhill_k0: f(0x1E4, "downhill k0")?,
+        downhill_k1: f(0x1E8, "downhill k1")?,
+        uphill_k0: f(0x1EC, "uphill k0")?,
+        uphill_k1: f(0x1F0, "uphill k1")?,
     })
 }
 
@@ -1423,6 +1469,15 @@ mod tests {
             .ok_or("no cyborg")?;
         let object = import_object(&cache, biped)?;
         assert_eq!(object.kind, ObjectKind::Biped);
+        let movement = object.biped.ok_or("no biped part")?;
+        eprintln!("cyborg: {movement:?}");
+        assert!(movement.flags & Biped::USES_PLAYER_PHYSICS != 0);
+        assert!(movement.jump_velocity > 1.0 && movement.jump_velocity < 4.0);
+        assert!(movement.minimum_normal_k > 0.0 && movement.minimum_normal_k < 1.0);
+        let globals = crate::globals::import_globals(&cache)?;
+        eprintln!("globals: {globals:?}");
+        assert!((globals.player.run_acceleration - 0.32 * 30.0).abs() < 0.5);
+        assert!(globals.multiplayer_unit.is_some());
         let graph = cache.find(ANTR, cyborg).ok_or("no cyborg graph")?;
         let graph = import_animation_graph(&cache, graph)?;
         assert_eq!(

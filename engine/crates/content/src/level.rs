@@ -27,6 +27,90 @@ pub struct Level {
     pub resource_bitmaps: Vec<TagRef>,
     /// The scenario's skies, in its order (the first is the one outside).
     pub skies: Vec<Sky>,
+    /// The game's globals: the player's speeds and falling.
+    pub globals: Globals,
+}
+
+/// The game's globals (the `matg` tag) that the simulation reads.
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct Globals {
+    /// The player's speeds.
+    pub player: PlayerPhysics,
+    /// What falling does.
+    pub falling: FallingDamage,
+    /// The player's biped in the campaign.
+    pub player_unit: Option<TagRef>,
+    /// The player's biped in multiplayer.
+    pub multiplayer_unit: Option<TagRef>,
+}
+
+/// How a biped that uses player physics moves. Speeds are in world units a
+/// second, accelerations in world units a second squared.
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct PlayerPhysics {
+    /// Walking (unused by the keyboard: the game walks at a run).
+    pub walking_speed: f32,
+    /// Running forward.
+    pub run_forward: f32,
+    /// Running backward.
+    pub run_backward: f32,
+    /// Running sideways.
+    pub run_sideways: f32,
+    /// How fast it reaches its running speed.
+    pub run_acceleration: f32,
+    /// Crouching, forward.
+    pub sneak_forward: f32,
+    /// Crouching, backward.
+    pub sneak_backward: f32,
+    /// Crouching, sideways.
+    pub sneak_sideways: f32,
+    /// How fast it reaches its crouching speed.
+    pub sneak_acceleration: f32,
+    /// How fast it changes its speed in the air.
+    pub airborne_acceleration: f32,
+    /// How much being stunned slows it.
+    pub stun_movement_penalty: f32,
+    /// How much being stunned slows its turning.
+    pub stun_turning_penalty: f32,
+    /// How much being stunned lowers its jumps.
+    pub stun_jumping_penalty: f32,
+}
+
+impl Default for PlayerPhysics {
+    /// The game's old player speeds (its code's override), for maps
+    /// without globals.
+    fn default() -> Self {
+        Self {
+            walking_speed: 0.512,
+            run_forward: 2.25,
+            run_backward: 2.0,
+            run_sideways: 2.0,
+            run_acceleration: 0.32 * 30.0,
+            sneak_forward: 0.512,
+            sneak_backward: 0.512,
+            sneak_sideways: 0.512,
+            sneak_acceleration: 0.32 * 30.0,
+            airborne_acceleration: 0.32 * 30.0,
+            stun_movement_penalty: 0.0,
+            stun_turning_penalty: 0.0,
+            stun_jumping_penalty: 0.0,
+        }
+    }
+}
+
+/// What a fall does to a biped. Velocities are in world units a second.
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct FallingDamage {
+    /// A landing slower than this does no harm.
+    pub minimum_damage_velocity: f32,
+    /// A landing at this does the falling damage in full.
+    pub maximum_damage_velocity: f32,
+    /// A landing faster than this does the deadly damage.
+    pub maximum_falling_velocity: f32,
+    /// The damage a harmful landing does, scaled.
+    pub falling_damage: Option<TagRef>,
+    /// The damage a deadly landing does.
+    pub maximum_distance_damage: Option<TagRef>,
 }
 
 impl Level {

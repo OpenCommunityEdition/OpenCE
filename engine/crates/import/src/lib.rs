@@ -7,6 +7,7 @@
 pub mod bitmap;
 pub mod cache;
 pub mod error;
+pub mod globals;
 pub mod level;
 pub mod level_cache;
 pub mod object;
@@ -23,6 +24,7 @@ mod fuzz_smoke;
 
 pub use cache::{Cache, CacheHeader, CacheKind};
 pub use error::ImportError;
+pub use globals::import_globals;
 pub use level::import_level;
 pub use level_cache::{load_level, LoadError, LoadedFrom, LoadedLevel, IMPORTER_VERSION};
 pub use object::{import_animation_graph, import_collision_model, import_model, import_object};

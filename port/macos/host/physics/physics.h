@@ -155,6 +155,58 @@ int physics_world_cast_ray(const physics_world *world, const float origin[3], co
 int physics_world_cast_shape(const physics_world *world, const physics_shape *shape, const physics_pose *pose,
                              const float direction[3], uint32_t layers, physics_hit *hit);
 
+/* ---------- characters: a biped's collision as it walks (the native
+   engine's movement sets its velocity; the character slides it along what
+   it meets, steps it up onto ledges and keeps it on the floor) */
+
+typedef struct physics_character_settings {
+    /* its pill: its radius, and its height from its feet to its top */
+    float radius;
+    float height;
+    /* the steepest ground it stands on (radians) */
+    float maximum_slope;
+    /* the highest ledge it steps onto, and how far down it follows the
+       floor as it walks off a step (0 for neither) */
+    float step_up;
+    float stick_down;
+    /* what it collides with (physics_cast_layers) */
+    uint32_t layers;
+} physics_character_settings;
+
+enum physics_ground {
+    PHYSICS_GROUND_STANDING,
+    /* on ground steeper than its maximum slope: sliding */
+    PHYSICS_GROUND_STEEP,
+    /* touching ground that does not hold it up */
+    PHYSICS_GROUND_UNSUPPORTED,
+    PHYSICS_GROUND_AIRBORNE,
+};
+
+typedef struct physics_character_state {
+    /* its feet */
+    float position[3];
+    /* as the collisions left it */
+    float velocity[3];
+    /* its ground's normal (up when airborne) */
+    float ground_normal[3];
+    int32_t ground;
+} physics_character_state;
+
+/* a character with its feet at position, or PHYSICS_NONE */
+uint32_t physics_character_add(physics_world *world, const physics_character_settings *settings,
+                               const float position[3]);
+void physics_character_remove(physics_world *world, uint32_t character);
+/* Moves it at velocity for seconds, colliding; then its state. 0, or -1. */
+int physics_character_move(physics_world *world, uint32_t character, const float velocity[3], float seconds,
+                           physics_character_state *state);
+/* puts its feet at position, as it stands still; 0, or -1 */
+int physics_character_set_position(physics_world *world, uint32_t character, const float position[3]);
+/* its state, unmoved; 0, or -1 */
+int physics_character_get_state(const physics_world *world, uint32_t character, physics_character_state *state);
+/* Its pill's new height (crouching or standing). 1 changed, 0 for no room
+   (standing up beneath a ceiling), -1 refused. */
+int physics_character_set_height(physics_world *world, uint32_t character, float height);
+
 /* ---------- ragdolls */
 
 /* A ragdoll of count parts, built in rest (each part's frame with the

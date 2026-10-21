@@ -873,6 +873,7 @@ version = "0.1.0"
 dependencies = [
  "cc",
  "glam 0.34.1",
+ "libm",
  "opence_content",
  "opence_import",
  "thiserror",

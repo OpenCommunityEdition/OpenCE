@@ -686,6 +686,7 @@ mod tests {
             ],
             resource_bitmaps: Vec::new(),
             skies: Vec::new(),
+            globals: Default::default(),
         }
     }
 

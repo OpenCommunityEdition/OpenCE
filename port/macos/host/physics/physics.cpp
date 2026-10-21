@@ -16,6 +16,7 @@
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Character/CharacterVirtual.h>
 #include <Jolt/Physics/Collision/CastResult.h>
 #include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
 #include <Jolt/Physics/Collision/GroupFilterTable.h>
@@ -121,6 +122,17 @@ struct RagdollSlot {
     // counted up each time the slot is used, so that an old handle names nothing
     uint32 generation = 0;
 };
+
+struct CharacterSlot {
+    Ref<CharacterVirtual> character;
+    float radius = 0.0f;
+    float step_up = 0.0f;
+    float stick_down = 0.0f;
+    uint32_t layers = 0;
+    uint32 generation = 0;
+};
+
+constexpr uint32 CHARACTERS_MAX = 1024;
 
 void trace(const char *format, ...)
 {
@@ -262,6 +274,7 @@ struct physics_world {
     uint32 collision_steps = 1;
     BodyID level;
     std::vector<RagdollSlot> ragdolls;
+    std::vector<CharacterSlot> characters;
 
     BodyInterface &bodies() { return system.GetBodyInterfaceNoLock(); }
     const BodyInterface &bodies() const { return system.GetBodyInterfaceNoLock(); }
@@ -286,6 +299,19 @@ struct physics_world {
     const RagdollSlot *find_ragdoll(uint32_t handle) const
     {
         return const_cast<physics_world *>(this)->find_ragdoll(handle);
+    }
+
+    CharacterSlot *find_character(uint32_t handle)
+    {
+        uint32 index = handle & 0xffff;
+        if (handle == PHYSICS_NONE || index >= characters.size())
+            return nullptr;
+        CharacterSlot &slot = characters[index];
+        return slot.character != nullptr && slot.generation == (handle >> 16) ? &slot : nullptr;
+    }
+    const CharacterSlot *find_character(uint32_t handle) const
+    {
+        return const_cast<physics_world *>(this)->find_character(handle);
     }
 
     uint32 room() const { return bodies_max - std::min(bodies_max, system.GetNumBodies()); }
@@ -327,6 +353,7 @@ extern "C" void physics_world_destroy(physics_world *world)
         if (slot.ragdoll != nullptr)
             slot.ragdoll->RemoveFromPhysicsSystem(false);
     world->ragdolls.clear();
+    world->characters.clear();
     BodyIDVector ids;
     world->system.GetBodies(ids);
     for (const BodyID &id : ids) {
@@ -931,4 +958,159 @@ extern "C" int physics_world_cast_shape(const physics_world *world, const physic
     Vec3 normal = axis.LengthSq() > 0.0f ? -axis.Normalized() : Vec3::sAxisZ();
     write_hit(world, result.mBodyID2, result.mFraction, RVec3(result.mContactPointOn2), normal, hit);
     return 1;
+}
+
+// ---------- characters
+
+namespace {
+
+// A character's pill: Jolt's capsules stand along y, ours along z, with
+// the character's position at its feet.
+RefConst<Shape> character_shape(float radius, float height)
+{
+    if (!positive_size(radius) || !positive_size(height) || !(height > 2.0f * radius))
+        return nullptr;
+    Ref<ShapeSettings> settings = new CapsuleShapeSettings(0.5f * height - radius, radius);
+    settings = new RotatedTranslatedShapeSettings(Vec3(0.0f, 0.0f, 0.5f * height),
+                                                  Quat::sRotation(Vec3::sAxisX(), 0.5f * JPH_PI), settings);
+    ShapeSettings::ShapeResult result = settings->Create();
+    if (result.HasError())
+        return nullptr;
+    return result.Get();
+}
+
+void write_character(const CharacterSlot &slot, physics_character_state *state)
+{
+    RVec3 position = slot.character->GetPosition();
+    Vec3 velocity = slot.character->GetLinearVelocity();
+    CharacterBase::EGroundState ground = slot.character->GetGroundState();
+    Vec3 normal = ground == CharacterBase::EGroundState::InAir ? Vec3::sAxisZ() : slot.character->GetGroundNormal();
+    for (int axis = 0; axis < 3; axis++) {
+        state->position[axis] = float(position[axis]);
+        state->velocity[axis] = velocity[axis];
+        state->ground_normal[axis] = normal[axis];
+    }
+    switch (ground) {
+    case CharacterBase::EGroundState::OnGround:
+        state->ground = PHYSICS_GROUND_STANDING;
+        break;
+    case CharacterBase::EGroundState::OnSteepGround:
+        state->ground = PHYSICS_GROUND_STEEP;
+        break;
+    case CharacterBase::EGroundState::NotSupported:
+        state->ground = PHYSICS_GROUND_UNSUPPORTED;
+        break;
+    default:
+        state->ground = PHYSICS_GROUND_AIRBORNE;
+        break;
+    }
+}
+
+} // namespace
+
+extern "C" uint32_t physics_character_add(physics_world *world, const physics_character_settings *settings,
+                                          const float position[3])
+{
+    if (world == nullptr || settings == nullptr || position == nullptr || !finite(position, 3)
+        || !std::isfinite(settings->maximum_slope) || settings->maximum_slope <= 0.0f
+        || settings->maximum_slope >= 0.5f * JPH_PI || !std::isfinite(settings->step_up)
+        || settings->step_up < 0.0f || settings->step_up > SIZE_MAX_METRES || !std::isfinite(settings->stick_down)
+        || settings->stick_down < 0.0f || settings->stick_down > SIZE_MAX_METRES
+        || !valid_layers(settings->layers))
+        return PHYSICS_NONE;
+    RefConst<Shape> shape = character_shape(settings->radius, settings->height);
+    if (shape == nullptr)
+        return PHYSICS_NONE;
+    uint32 index = 0;
+    while (index < world->characters.size() && world->characters[index].character != nullptr)
+        index++;
+    if (index >= CHARACTERS_MAX)
+        return PHYSICS_NONE;
+    if (index == world->characters.size())
+        world->characters.emplace_back();
+    Ref<CharacterVirtualSettings> made = new CharacterVirtualSettings;
+    made->mShape = shape;
+    made->mUp = Vec3::sAxisZ();
+    made->mMaxSlopeAngle = settings->maximum_slope;
+    // (only contacts below the lower sphere's centre hold it up)
+    made->mSupportingVolume = Plane(Vec3::sAxisZ(), -settings->radius);
+    CharacterSlot &slot = world->characters[index];
+    slot.character = new CharacterVirtual(made, RVec3(position[0], position[1], position[2]), Quat::sIdentity(), 0,
+                                          &world->system);
+    slot.radius = settings->radius;
+    slot.step_up = settings->step_up;
+    slot.stick_down = settings->stick_down;
+    slot.layers = settings->layers;
+    CastBroadPhase broad_phase(slot.layers);
+    CastObjects objects(slot.layers);
+    slot.character->RefreshContacts(broad_phase, objects, BodyFilter(), ShapeFilter(), world->temp_allocator);
+    return index | (slot.generation << 16);
+}
+
+extern "C" void physics_character_remove(physics_world *world, uint32_t character)
+{
+    CharacterSlot *slot = world == nullptr ? nullptr : world->find_character(character);
+    if (slot == nullptr)
+        return;
+    slot->character = nullptr;
+    slot->generation = (slot->generation + 1) & 0xffff;
+}
+
+extern "C" int physics_character_move(physics_world *world, uint32_t character, const float velocity[3],
+                                      float seconds, physics_character_state *state)
+{
+    CharacterSlot *slot = world == nullptr ? nullptr : world->find_character(character);
+    if (slot == nullptr || velocity == nullptr || state == nullptr || !finite(velocity, 3)
+        || !std::isfinite(seconds) || seconds <= 0.0f || seconds > STEP_MAX)
+        return -1;
+    slot->character->SetLinearVelocity(Vec3(velocity[0], velocity[1], velocity[2]));
+    CharacterVirtual::ExtendedUpdateSettings update;
+    update.mStickToFloorStepDown = Vec3(0.0f, 0.0f, -slot->stick_down);
+    update.mWalkStairsStepUp = Vec3(0.0f, 0.0f, slot->step_up);
+    CastBroadPhase broad_phase(slot->layers);
+    CastObjects objects(slot->layers);
+    slot->character->ExtendedUpdate(seconds, world->system.GetGravity(), update, broad_phase, objects, BodyFilter(),
+                                    ShapeFilter(), world->temp_allocator);
+    write_character(*slot, state);
+    return 0;
+}
+
+extern "C" int physics_character_set_position(physics_world *world, uint32_t character, const float position[3])
+{
+    CharacterSlot *slot = world == nullptr ? nullptr : world->find_character(character);
+    if (slot == nullptr || position == nullptr || !finite(position, 3))
+        return -1;
+    slot->character->SetPosition(RVec3(position[0], position[1], position[2]));
+    slot->character->SetLinearVelocity(Vec3::sZero());
+    CastBroadPhase broad_phase(slot->layers);
+    CastObjects objects(slot->layers);
+    slot->character->RefreshContacts(broad_phase, objects, BodyFilter(), ShapeFilter(), world->temp_allocator);
+    return 0;
+}
+
+extern "C" int physics_character_get_state(const physics_world *world, uint32_t character,
+                                           physics_character_state *state)
+{
+    const CharacterSlot *slot = world == nullptr ? nullptr : world->find_character(character);
+    if (slot == nullptr || state == nullptr)
+        return -1;
+    write_character(*slot, state);
+    return 0;
+}
+
+extern "C" int physics_character_set_height(physics_world *world, uint32_t character, float height)
+{
+    CharacterSlot *slot = world == nullptr ? nullptr : world->find_character(character);
+    if (slot == nullptr)
+        return -1;
+    RefConst<Shape> shape = character_shape(slot->radius, height);
+    if (shape == nullptr)
+        return -1;
+    CastBroadPhase broad_phase(slot->layers);
+    CastObjects objects(slot->layers);
+    // (refused where the new pill would overlap the level: no room to stand)
+    return slot->character->SetShape(shape, 1.5f * PENETRATION_SLOP_METRES, broad_phase, objects, BodyFilter(),
+                                     ShapeFilter(), world->temp_allocator)
+               ? 1
+               : 0;
 }
