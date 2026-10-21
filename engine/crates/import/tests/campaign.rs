@@ -120,3 +120,44 @@ fn the_pillar_of_autumn_has_its_encounters() -> Result {
     }
     Ok(())
 }
+
+/// Whether each actor variant reads as one that fights: a unit, a range it
+/// fires at and sees to, and its bounds in order.
+#[test]
+fn every_actor_variant_reads_as_one_that_fights() -> Result {
+    for map in MAPS {
+        let Some(campaign) = campaign(map)? else {
+            continue;
+        };
+        assert_eq!(campaign.actor_variants.len(), campaign.actor_palette.len());
+        for variant in campaign.actor_variants.iter().flatten() {
+            let name = &variant.tag.path;
+            assert!(variant.unit.is_some(), "{map}: {name}'s unit");
+            assert!(
+                (0.0..=1000.0).contains(&variant.firing_range),
+                "{map}: {name}'s firing range {}",
+                variant.firing_range
+            );
+            assert!(
+                (0.0..=1000.0).contains(&variant.vision_distance),
+                "{map}: {name}'s vision {}",
+                variant.vision_distance
+            );
+            assert!(
+                variant.combat_range[0] <= variant.combat_range[1],
+                "{map}: {name}'s combat range {:?}",
+                variant.combat_range
+            );
+            assert!(
+                (0.0..=1.0).contains(&variant.shield_fraction_hide),
+                "{map}: {name}'s hiding {}",
+                variant.shield_fraction_hide
+            );
+            eprintln!(
+                "{map}: {name}: type {}, fires to {:.1}, sees {:.1}, keeps {:?}",
+                variant.kind, variant.firing_range, variant.vision_distance, variant.combat_range
+            );
+        }
+    }
+    Ok(())
+}

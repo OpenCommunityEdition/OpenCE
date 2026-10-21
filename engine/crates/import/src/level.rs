@@ -198,6 +198,15 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
             .flat_map(|equipment| &equipment.items)
             .map(|choice| &choice.item),
     )
+    // (and the units and weapons of the AI's actors)
+    .chain(
+        campaign
+            .actor_variants
+            .iter()
+            .flatten()
+            .flat_map(|variant| [&variant.unit, &variant.weapon])
+            .flatten(),
+    )
     .filter(|tag| tag_index(cache, tag).is_some())
     .cloned()
     .collect();
@@ -467,8 +476,8 @@ fn import_effects(cache: &Cache, objects: &[ObjectDefinition]) -> Result<Vec<Eff
     Ok(effects)
 }
 
-/// Every damage effect `objects`, `globals` and `effects` do (a weapon's
-/// melee, a projectile's impact, attached detonation and explosion,
+/// Every damage effect `objects`, `globals` and `effects` do (a unit's
+/// and a weapon's melee, a projectile's impact, attached detonation and explosion,
 /// falling), each once, by path.
 fn import_damage_effects(
     cache: &Cache,
@@ -478,6 +487,7 @@ fn import_damage_effects(
 ) -> Result<Vec<DamageEffect>, ImportError> {
     let mut tags: BTreeSet<&TagRef> = effects.iter().flat_map(|effect| &effect.damage).collect();
     for object in objects {
+        tags.extend(&object.unit_melee_damage);
         if let Some(weapon) = &object.weapon {
             tags.extend(
                 [&weapon.melee_damage, &weapon.melee_response]

@@ -5,8 +5,8 @@
 //! 31 characters.
 
 use opence_content::{
-    CameraPoint, Campaign, Command, CommandList, CutsceneFlag, DeviceGroup, Encounter,
-    FiringPosition, Recording, Squad, StartingLocation, TriggerVolume,
+    ActorVariant, CameraPoint, Campaign, Command, CommandList, CutsceneFlag, DeviceGroup,
+    Encounter, FiringPosition, Recording, Squad, StartingLocation, TriggerVolume,
 };
 
 use crate::cache::Cache;
@@ -38,6 +38,13 @@ const COMMANDS: (usize, usize, usize) = (0x30, 0x20, 64);
 const POINTS: (usize, usize, usize) = (0x3C, 0x14, 64);
 
 const ACTV: GroupTag = GroupTag::new(b"actv");
+const ACTR: GroupTag = GroupTag::new(b"actr");
+const UNIT: GroupTag = GroupTag::new(b"unit");
+const WEAP: GroupTag = GroupTag::new(b"weap");
+
+/// The parts of an actor variant and an actor read (each tag is longer).
+const ACTOR_VARIANT_SIZE: usize = 0xF0;
+const ACTOR_SIZE: usize = 0x2E8;
 
 /// Each element of the block `(at, size, longest)` of `element`, read.
 fn each<T>(
@@ -119,6 +126,11 @@ pub(crate) fn scenario_campaign(scenario: &Element<'_>) -> Result<Campaign, Impo
             Ok(e.reference(0, "actor variant", &[ACTV])?
                 .map(|index| tag_ref(cache, index)))
         })?,
+        actor_variants: each(scenario, ACTOR_PALETTE, "actor palette", |e| {
+            e.reference(0, "actor variant", &[ACTV])?
+                .map(|index| import_actor_variant(cache, index))
+                .transpose()
+        })?,
         encounters: each(scenario, ENCOUNTERS, "encounters", import_encounter)?,
         command_lists: each(scenario, COMMAND_LISTS, "command lists", |e| {
             Ok(CommandList {
@@ -141,6 +153,47 @@ pub(crate) fn scenario_campaign(scenario: &Element<'_>) -> Result<Campaign, Impo
             name(e, 0)
         })?,
     })
+}
+
+/// An actor variant and the parts of its actor its actors fight by
+/// (`actor_variant_definition`, `actor_definition`).
+fn import_actor_variant(cache: &Cache, index: usize) -> Result<ActorVariant, ImportError> {
+    let variant = cache.tag(index, ACTV, ACTOR_VARIANT_SIZE)?;
+    let pair = |at: usize, field: &str| -> Result<[f32; 2], ImportError> {
+        Ok([variant.f32(at, field)?, variant.f32(at + 4, field)?])
+    };
+    let actor = variant.reference(0x04, "actor", &[ACTR])?;
+    let unit = variant.reference(0x14, "unit", &[UNIT])?;
+    let weapon = variant.reference(0x64, "weapon", &[WEAP])?;
+    let mut imported = ActorVariant {
+        tag: tag_ref(cache, index),
+        unit: unit.map(|index| tag_ref(cache, index)),
+        weapon: weapon.map(|index| tag_ref(cache, index)),
+        kind: 0,
+        vision_distance: 0.0,
+        vision_angle: 0.0,
+        hearing_distance: 0.0,
+        firing_range: variant.f32(0x74, "maximum firing range")?,
+        rate_of_fire: variant.f32(0x78, "rate of fire")?,
+        error_angle: variant.f32(0x7C, "projectile error angle")?,
+        combat_range: pair(0x9C, "combat range")?,
+        burst_duration: pair(0xE0, "burst duration")?,
+        burst_separation: pair(0xE8, "burst separation")?,
+        panic_chance: 0.0,
+        shield_fraction_hide: 0.0,
+        shield_fraction_emerge: 0.0,
+    };
+    if let Some(index) = actor {
+        let actor = cache.tag(index, ACTR, ACTOR_SIZE)?;
+        imported.kind = actor.i16(0x14, "type")?;
+        imported.vision_distance = actor.f32(0x18, "maximum vision distance")?;
+        imported.vision_angle = actor.f32(0x20, "maximum vision angle")?;
+        imported.hearing_distance = actor.f32(0x4C, "hearing distance")?;
+        imported.panic_chance = actor.f32(0x2A0, "panic chance")?;
+        imported.shield_fraction_hide = actor.f32(0x2DC, "shield fraction hide")?;
+        imported.shield_fraction_emerge = actor.f32(0x2E0, "shield fraction emerge")?;
+    }
+    Ok(imported)
 }
 
 fn import_encounter(e: &Element<'_>) -> Result<Encounter, ImportError> {

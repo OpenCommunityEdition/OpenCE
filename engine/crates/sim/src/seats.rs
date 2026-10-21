@@ -399,9 +399,10 @@ impl Rides {
             .iter()
             .map(|player| (player.seated(), player.aim().1))
             .collect();
-        let Some(physics) = players.first().map(Player::physics) else {
+        let Some(guard) = players.first().map(Player::physics) else {
             return;
         };
+        let physics = &*guard;
         let mut poses = Vec::with_capacity(self.rides.len());
         for ride in &mut self.rides {
             let Some(kind) = self.kinds.get(ride.kind) else {
@@ -497,6 +498,8 @@ impl Rides {
             poses.push((ride.handle, ride.pose));
         }
         world.insert_resource(RidePoses(poses));
+        // (each player's seat moves its biped in the world it may share)
+        drop(guard);
         for player in players.iter_mut() {
             let Some(seated) = player.seated() else {
                 continue;

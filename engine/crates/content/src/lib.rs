@@ -18,8 +18,8 @@ pub use bitmap::{
     Bitmap, BitmapImage, Pixels, ResourceRange, Sequence, Sprite, Texture, TextureFormat,
 };
 pub use campaign::{
-    CameraPoint, Campaign, Command, CommandList, CutsceneFlag, DeviceGroup, Encounter,
-    FiringPosition, Recording, Squad, StartingLocation, TriggerVolume,
+    ActorVariant, CameraPoint, Campaign, Command, CommandList, CutsceneFlag, DeviceGroup,
+    Encounter, FiringPosition, Recording, Squad, StartingLocation, TriggerVolume,
 };
 pub use hud::{
     CrosshairItem, CrosshairKind, GrenadeHud, HudAnchor, HudDigits, HudGlobals, HudMeter,

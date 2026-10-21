@@ -15,6 +15,7 @@ use opence_physics::{
     Hit, Layers, LevelMesh, MovementInput, Mover, MoverSettings, PhysicsError, Struck,
     World as PhysicsWorld, WorldSettings,
 };
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use thiserror::Error;
 
 use crate::armory::{self, Armory, ArmoryWeapon, Carried, Inventory, WeaponItem};
@@ -84,6 +85,12 @@ pub enum PlayerError {
     /// The world holds no more objects.
     #[error("the world holds no more objects")]
     TableFull,
+    /// There is no player whose physics world an actor could share.
+    #[error("there is no player to share a physics world with")]
+    NoPlayer,
+    /// The unit is not a biped in the level.
+    #[error("the unit is not a biped in the level")]
+    NotBiped,
     /// The physics refused the level or the biped.
     #[error(transparent)]
     Physics(#[from] PhysicsError),
@@ -91,7 +98,9 @@ pub enum PlayerError {
 
 /// The player: its biped's movement and where it looks.
 pub struct Player {
-    physics: PhysicsWorld,
+    /// The physics world it moves in: its own, or one it shares with the
+    /// AI's actors (a world runs its own threads, too many for one each).
+    physics: SharedPhysics,
     mover: Mover,
     /// The facing: the turn to the left from +X.
     yaw: f32,
@@ -114,6 +123,8 @@ pub struct Player {
     gravity: f32,
     /// The ticks before it can melee again.
     melee_ticks: u32,
+    /// Its biped's own melee damage, struck with when it has no weapon.
+    unit_melee: Option<TagRef>,
     /// The speed of this tick's landing into the ground, if it landed.
     landed: Option<f32>,
     /// The speed its grenades leave its hand, in world units per second.
@@ -194,6 +205,26 @@ pub(crate) struct PlayerPose {
     pub camera: Transform,
 }
 
+/// A physics world more than one player may move in (the sim runs on one
+/// thread; each use locks it for as long as the use lasts).
+pub(crate) type SharedPhysics = Arc<Mutex<PhysicsWorld>>;
+
+/// The world `physics` holds, locked.
+pub(crate) fn lock(physics: &SharedPhysics) -> MutexGuard<'_, PhysicsWorld> {
+    physics.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// A physics world over the collision of `level`'s structure BSP `bsp`.
+pub(crate) fn level_physics(level: &Level, bsp: usize) -> Result<SharedPhysics, PlayerError> {
+    let structure = level
+        .structure_bsps
+        .get(bsp)
+        .ok_or(PlayerError::NoBsp(bsp))?;
+    let mut physics = PhysicsWorld::new(WorldSettings::default())?;
+    physics.set_level(&LevelMesh::from_collision(&structure.collision))?;
+    Ok(Arc::new(Mutex::new(physics)))
+}
+
 /// The player's biped tag in `level`: the campaign's player unit, else
 /// multiplayer's, whichever the level has as a biped.
 fn player_unit(level: &Level) -> Option<(TagRef, Biped)> {
@@ -221,28 +252,49 @@ impl Player {
             .get(start)
             .ok_or(PlayerError::NoStart(start))?;
         let bsp = usize::from(place.structure_bsp.unwrap_or(0));
-        let structure = level
-            .structure_bsps
-            .get(bsp)
-            .ok_or(PlayerError::NoBsp(bsp))?;
-        let (unit, biped) = player_unit(level).ok_or(PlayerError::NoBiped)?;
+        let physics = level_physics(level, bsp)?;
+        let unit = player_unit(level).ok_or(PlayerError::NoBiped)?;
+        let mut player = Player::placed(
+            level,
+            physics,
+            unit,
+            (Vec3::from_array(place.position), place.facing),
+            spawn,
+        )?;
+        player.inventory = Inventory::starting(level, &player.armory);
+        Ok(player)
+    }
+
+    /// A biped of `unit` standing at `place` (its feet and its facing) in
+    /// `physics`, carrying nothing; `spawn` makes its object.
+    pub(crate) fn placed(
+        level: &Level,
+        physics: SharedPhysics,
+        (unit, biped): (TagRef, Biped),
+        place: (Vec3, f32),
+        spawn: impl FnOnce(TagRef, Transform) -> Option<ObjectHandle>,
+    ) -> Result<Player, PlayerError> {
         let settings = WorldSettings::default();
-        let mut physics = PhysicsWorld::new(settings)?;
-        physics.set_level(&LevelMesh::from_collision(&structure.collision))?;
         let mover = Mover::new(
-            &mut physics,
+            &mut lock(&physics),
             MoverSettings {
                 biped,
                 player: level.globals.player,
                 gravity: -settings.gravity.z,
             },
-            Vec3::from_array(place.position),
+            place.0,
         )?;
-        let yaw = libm::remainderf(place.facing, std::f32::consts::TAU);
+        let yaw = libm::remainderf(place.1, std::f32::consts::TAU);
         let body = body_transform(mover.position, yaw);
-        let handle = spawn(unit.clone(), body).ok_or(PlayerError::TableFull)?;
+        let handle = spawn(unit.clone(), body);
+        let Some(handle) = handle else {
+            lock(&physics).remove_character(mover.character());
+            return Err(PlayerError::TableFull);
+        };
         let armory = Armory::new(level);
-        let inventory = Inventory::starting(level, &armory);
+        let unit_melee = level
+            .object(&unit)
+            .and_then(|object| object.unit_melee_damage.clone());
         Ok(Player {
             physics,
             mover,
@@ -252,17 +304,27 @@ impl Player {
             handle,
             unit,
             armory,
-            inventory,
+            inventory: Inventory::default(),
             flights: Vec::new(),
             held: Buttons::default(),
             gravity: -settings.gravity.z,
             melee_ticks: 0,
+            unit_melee,
             landed: None,
             grenade_velocity: biped.grenade_velocity,
             grenade_origin: Vec3::from_array(level.globals.player.grenade_origin),
             seat: None,
             seat_body: None,
         })
+    }
+
+    /// Takes its biped's character out of its physics world (which it may
+    /// share), and its projectiles' objects out of `world`.
+    pub(crate) fn leave(self, world: &mut World) {
+        lock(&self.physics).remove_character(self.mover.character());
+        for flight in &self.flights {
+            objects::remove(world, flight.handle);
+        }
     }
 
     /// Stands it again at `level`'s player start `start` (it must be over
@@ -281,7 +343,7 @@ impl Player {
             .get(start)
             .ok_or(PlayerError::NoStart(start))?;
         self.mover
-            .teleport(&mut self.physics, Vec3::from_array(place.position))?;
+            .teleport(&mut lock(&self.physics), Vec3::from_array(place.position))?;
         self.yaw = libm::remainderf(place.facing, std::f32::consts::TAU);
         self.pitch = 0.0;
         let body = body_transform(self.mover.position, self.yaw);
@@ -301,13 +363,35 @@ impl Player {
     }
 
     /// The physics world the biped moves in.
-    pub(crate) fn physics(&self) -> &PhysicsWorld {
-        &self.physics
+    pub(crate) fn physics(&self) -> MutexGuard<'_, PhysicsWorld> {
+        lock(&self.physics)
     }
 
-    /// The physics world the biped moves in, which the ragdolls lie in.
-    pub(crate) fn physics_mut(&mut self) -> &mut PhysicsWorld {
-        &mut self.physics
+    /// Its physics world, to share with the AI's actors.
+    pub(crate) fn shared_physics(&self) -> SharedPhysics {
+        Arc::clone(&self.physics)
+    }
+
+    /// Puts `weapon` in its hands, full, if the level has it; whether it
+    /// did.
+    pub(crate) fn arm(&mut self, weapon: &TagRef) -> bool {
+        let Some(index) = self.armory.find(weapon) else {
+            return false;
+        };
+        let Some(state) = self
+            .armory
+            .get(index)
+            .and_then(|definition| WeaponState::new(&definition.weapon).ok())
+        else {
+            return false;
+        };
+        let carried = Carried {
+            armory: index,
+            state,
+        };
+        // (a hand already full drops what it held: an actor has one weapon)
+        let _ = self.inventory.take(carried, &self.armory);
+        true
     }
 
     /// Its biped's tag.
@@ -350,6 +434,11 @@ impl Player {
         self.view = view;
     }
 
+    /// Where its eyes are.
+    pub fn eyes(&self) -> Vec3 {
+        self.mover.position + Vec3::Z * self.mover.camera_height()
+    }
+
     /// Its facing and look.
     pub fn look(&self) -> (Radians, Radians) {
         (Radians(self.yaw), Radians(self.pitch))
@@ -374,7 +463,7 @@ impl Player {
     /// Moves it with its seat, its object to `body`.
     pub(crate) fn place_in_seat(&mut self, body: Transform) {
         // (the physics refuses only numbers that are not finite)
-        let _ = self.mover.teleport(&mut self.physics, body.position);
+        let _ = self.mover.teleport(&mut lock(&self.physics), body.position);
         self.seat_body = Some(body);
     }
 
@@ -382,7 +471,7 @@ impl Player {
     pub(crate) fn stand(&mut self, position: Vec3) {
         self.seat = None;
         self.seat_body = None;
-        let _ = self.mover.teleport(&mut self.physics, position);
+        let _ = self.mover.teleport(&mut lock(&self.physics), position);
     }
 
     /// One tick of `input`: the mouse's turn, then the move (a seated
@@ -404,7 +493,7 @@ impl Player {
         // (the physics refuses only numbers that are not finite, which the
         // input never holds: a refused step leaves the biped where it was)
         let airborne = self.mover.airborne;
-        let _ = self.mover.step(&mut self.physics, &movement);
+        let _ = self.mover.step(&mut lock(&self.physics), &movement);
         self.landed = (airborne && !self.mover.airborne).then_some(self.mover.landing_velocity);
         self.pose()
     }
@@ -415,14 +504,21 @@ impl Player {
         if self.seat.is_some() {
             return false;
         }
-        self.mover.teleport(&mut self.physics, position).is_ok()
+        self.mover
+            .teleport(&mut lock(&self.physics), position)
+            .is_ok()
     }
 
     /// Puts it at `position` moving at `velocity` and facing `yaw`
     /// (radians left from +X), as another machine says it is; false if
     /// it is seated or cannot stand there.
     pub(crate) fn correct(&mut self, position: Vec3, velocity: Vec3, yaw: f32) -> bool {
-        if self.seat.is_some() || self.mover.teleport(&mut self.physics, position).is_err() {
+        if self.seat.is_some()
+            || self
+                .mover
+                .teleport(&mut lock(&self.physics), position)
+                .is_err()
+        {
             return false;
         }
         // (a teleport stands it still: it keeps moving as it was)
@@ -451,7 +547,7 @@ impl Player {
             View::ThirdPerson => {
                 let back =
                     rotation * Vec3::new(-FOLLOW_DISTANCE, 0.0, 0.0) + Vec3::Z * FOLLOW_HEIGHT;
-                let reach = match self.physics.cast_ray(eyes, back, Layers::LEVEL) {
+                let reach = match lock(&self.physics).cast_ray(eyes, back, Layers::LEVEL) {
                     Ok(Some(hit)) => (hit.fraction - FOLLOW_MARGIN / back.length()).max(0.0),
                     _ => 1.0,
                 };
@@ -489,7 +585,7 @@ impl Player {
         let path = to - from;
         path.length_squared() == 0.0
             || !matches!(
-                self.physics.cast_ray(from, path, Layers::LEVEL),
+                lock(&self.physics).cast_ray(from, path, Layers::LEVEL),
                 Ok(Some(_))
             )
     }
@@ -652,7 +748,7 @@ impl Player {
     /// something follow it.
     fn fly(&mut self, world: &mut World) -> Fired {
         let mut fired = Fired::default();
-        let physics = &self.physics;
+        let physics = lock(&self.physics);
         for flight in &mut self.flights {
             if let Some(parent) = flight.attachment().and_then(|attached| attached.parent) {
                 flight.follow(frame(world, parent));
@@ -726,16 +822,25 @@ impl Player {
     }
 
     /// Its melee: the nearest biped within reach of its eyes along `aim`,
-    /// before the level, struck with its weapon's melee damage.
+    /// before the level, struck with its weapon's melee damage (or, with
+    /// no weapon, its biped's own).
     fn melee(&mut self, world: &mut World, eyes: Vec3, aim: Quat) -> Option<Impact> {
-        let carried = self.inventory.current()?;
-        let definition = self.armory.get(carried.armory)?;
-        let weapon = &definition.weapon;
-        if weapon.flags & Weapon::PREVENTS_MELEE_ATTACK != 0 {
-            return None;
-        }
+        let carried = self
+            .inventory
+            .current()
+            .and_then(|carried| self.armory.get(carried.armory));
+        let (striker, damage) = match carried {
+            Some(definition) => {
+                let weapon = &definition.weapon;
+                if weapon.flags & Weapon::PREVENTS_MELEE_ATTACK != 0 {
+                    return None;
+                }
+                (definition.tag.clone(), weapon.melee_damage.clone())
+            }
+            None => (self.unit.clone(), self.unit_melee.clone()),
+        };
         self.melee_ticks = MELEE_RECOVERY_TICKS;
-        let damage = weapon.melee_damage.clone()?;
+        let damage = damage?;
         let targets = damage::targets(world, self.handle);
         // (a fan of rays about the aim, the nearest hit taken)
         let mut nearest: Option<(f32, damage::Target, Vec3, Vec3)> = None;
@@ -744,7 +849,7 @@ impl Player {
                 |index: u32| (index as f32 / (MELEE_RAYS - 1) as f32 - 0.5) * 2.0 * MELEE_SPREAD;
             let local = Vec3::new(1.0, across(step % MELEE_RAYS), across(step / MELEE_RAYS));
             let path = aim * local.normalize() * MELEE_RANGE;
-            let reach = match self.physics.cast_ray(eyes, path, Layers::LEVEL) {
+            let reach = match lock(&self.physics).cast_ray(eyes, path, Layers::LEVEL) {
                 Ok(Some(hit)) => hit.fraction,
                 _ => 1.0,
             };
@@ -756,7 +861,7 @@ impl Player {
         }
         let (fraction, target, path, normal) = nearest?;
         Some(Impact {
-            projectile: definition.tag.clone(),
+            projectile: striker,
             owner: self.handle,
             damage: Some(damage),
             point: eyes + path * fraction,

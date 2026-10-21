@@ -215,6 +215,18 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
             )?,
             _ => None,
         },
+        unit_melee_damage: match kind {
+            ObjectKind::Biped => {
+                let unit = cache.tag(index, BIPD, BIPED_SIZE)?;
+                reference(
+                    &unit,
+                    UNIT_PART + 0x10C,
+                    "melee damage",
+                    &[crate::weapon::JPT],
+                )?
+            }
+            _ => None,
+        },
         biped: match kind {
             ObjectKind::Biped => Some(import_biped(cache, index)?),
             _ => None,

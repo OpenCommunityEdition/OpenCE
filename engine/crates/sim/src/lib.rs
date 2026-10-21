@@ -180,6 +180,11 @@ pub struct Simulation {
     queued_detonations: Vec<projectile::Detonation>,
     /// The vehicles, and the seat the player sits in.
     rides: seats::Rides,
+    /// The AI's actors: bipeds moved and fired as the players are, by the
+    /// inputs the AI gives them, in the local player's physics world.
+    actors: Vec<Player>,
+    /// The inputs the actors take on the next tick.
+    actor_inputs: Vec<TickInput>,
 }
 
 /// An object as the renderer draws it.
@@ -239,6 +244,8 @@ impl Simulation {
             debris: debris::Debris::default(),
             queued_detonations: Vec::new(),
             rides: seats::Rides::default(),
+            actors: Vec::new(),
+            actor_inputs: Vec::new(),
         }
     }
 
@@ -253,7 +260,26 @@ impl Simulation {
     /// the vehicles move, then the world's systems run. The free camera
     /// takes the first input.
     pub fn step_all(&mut self, inputs: &[TickInput]) {
+        // (the actors move and fire after the players, as more of them)
+        let humans = self.players.len();
         let first = inputs.first().copied().unwrap_or_default();
+        let mut inputs: Vec<TickInput> = (0..humans)
+            .map(|index| inputs.get(index).copied().unwrap_or_default())
+            .collect();
+        inputs.extend(
+            (0..self.actors.len())
+                .map(|index| self.actor_inputs.get(index).copied().unwrap_or_default()),
+        );
+        self.actor_inputs.clear();
+        self.players.append(&mut self.actors);
+        self.step_everyone(first, &inputs);
+        self.actors = self.players.split_off(humans.min(self.players.len()));
+        self.update_motion_sensor();
+        self.update_first_person();
+    }
+
+    /// One tick of the players and the actors among them.
+    fn step_everyone(&mut self, first: TickInput, inputs: &[TickInput]) {
         self.world.insert_resource(CurrentInput(first));
         self.world
             .insert_resource(player::ProjectilePoses::default());
@@ -331,8 +357,6 @@ impl Simulation {
         self.queued_detonations.clear();
         self.schedule.run(&mut self.world);
         self.update_physics(&ejections);
-        self.update_motion_sensor();
-        self.update_first_person();
     }
 
     /// The physics of the dead and the spent: the ragdolls and this tick's
@@ -354,7 +378,8 @@ impl Simulation {
                     .is_some_and(|object| object.kind == ObjectKind::Biped)
             })
             .collect();
-        let physics = player.physics_mut();
+        let mut physics = player.physics();
+        let physics = &mut *physics;
         let ragdolls = self
             .ragdolls
             .prepare(&mut self.world, physics, &killed, &self.detonations);
@@ -377,8 +402,13 @@ impl Simulation {
         level: &Level,
         start: usize,
     ) -> Result<ObjectHandle, PlayerError> {
+        for earlier in std::mem::take(&mut self.actors) {
+            self.remove(earlier.handle());
+            earlier.leave(&mut self.world);
+        }
         for earlier in std::mem::take(&mut self.players) {
             self.remove(earlier.handle());
+            earlier.leave(&mut self.world);
         }
         self.world.remove_resource::<PlayerPoses>();
         let player = self.new_player(level, start, None)?;
@@ -454,7 +484,78 @@ impl Simulation {
         }
         let player = self.players.remove(index);
         self.remove(player.handle());
+        player.leave(&mut self.world);
         true
+    }
+
+    /// Adds an actor of the AI's: a biped of `unit` with its feet at
+    /// `position`, facing `facing` (radians left from +X), on `team`,
+    /// with `weapon` in its hands if the level has it, in the local
+    /// player's physics world. Its index among the actors is returned
+    /// with its biped.
+    pub fn add_actor(
+        &mut self,
+        level: &Level,
+        unit: &TagRef,
+        weapon: Option<&TagRef>,
+        (position, facing): (Vec3, f32),
+        team: Option<u16>,
+    ) -> Result<(usize, ObjectHandle), PlayerError> {
+        let physics = self
+            .players
+            .first()
+            .map(Player::shared_physics)
+            .ok_or(PlayerError::NoPlayer)?;
+        let body = level
+            .object(unit)
+            .and_then(|object| object.biped)
+            .ok_or(PlayerError::NotBiped)?;
+        let world = &mut self.world;
+        let mut actor = Player::placed(
+            level,
+            physics,
+            (unit.clone(), body),
+            (position, facing),
+            |tag, transform| biped(world, tag, transform, team),
+        )?;
+        if let Some(weapon) = weapon {
+            actor.arm(weapon);
+        }
+        let handle = actor.handle();
+        self.actors.push(actor);
+        Ok((self.actors.len() - 1, handle))
+    }
+
+    /// Takes actor `index` out of the world, with its biped; false if
+    /// there is no such actor. The later actors' indices go down by one.
+    pub fn remove_actor(&mut self, index: usize) -> bool {
+        if index >= self.actors.len() {
+            return false;
+        }
+        let actor = self.actors.remove(index);
+        self.actor_inputs.clear();
+        self.remove(actor.handle());
+        actor.leave(&mut self.world);
+        true
+    }
+
+    /// The AI's actors.
+    pub fn actors(&self) -> &[Player] {
+        &self.actors
+    }
+
+    /// Sets the inputs the actors take on the next tick, in their order
+    /// (an actor past them stands still).
+    pub fn steer_actors(&mut self, inputs: &[TickInput]) {
+        self.actor_inputs = inputs.to_vec();
+    }
+
+    /// Whether nothing of the level stands between `from` and `to`, in
+    /// the local player's physics world (true without a player).
+    pub fn level_clear(&self, from: Vec3, to: Vec3) -> bool {
+        self.players
+            .first()
+            .is_none_or(|player| player.level_clear(from, to))
     }
 
     /// Puts player `index`'s biped at `position`, standing still; false

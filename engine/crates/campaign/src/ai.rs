@@ -1,13 +1,13 @@
 //! What the scripts tell the AI: encounters placed, conversations begun,
-//! command lists given (`hs_library_ai.c`). The AI acts on these orders;
-//! until it has actors, its counts are of none.
+//! command lists given (`hs_library_ai.c`). The actors (`actors.rs`) act
+//! on these orders; the ones they do not yet follow are kept.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use opence_script::{Native, Value};
 use opence_sim::objects::ObjectHandle;
 
-use crate::{boolean, index, Mission};
+use crate::{actors, boolean, index, Mission};
 
 /// An AI reference as a script holds it: an encounter, or one of its
 /// platoons or squads (`ai_index`'s encoding).
@@ -120,6 +120,10 @@ pub(crate) const NATIVES: &[(&str, Native<Mission>)] = &[
     ("ai_conversation_status", ai_conversation_status),
     ("ai_conversation_line", ai_conversation_line),
     ("ai_place", ai_place),
+    ("ai_erase", ai_erase),
+    ("ai_erase_all", ai_erase_all),
+    ("ai_kill", ai_kill),
+    ("ai_kill_silent", ai_kill),
 ];
 
 /// A reference's living actors.
@@ -128,7 +132,7 @@ fn living(mission: &Mission, arguments: &[Value]) -> Vec<ObjectHandle> {
         .ai
         .units(AiReference::of(index(arguments, 0)))
         .into_iter()
-        .filter(|&h| mission.sim.object(h).is_some())
+        .filter(|&h| mission.living(h))
         .collect()
 }
 
@@ -206,9 +210,13 @@ fn ai_command_list_by_unit(mission: &mut Mission, arguments: &[Value]) -> Value 
     Value::Void
 }
 
-fn ai_command_list_status(_: &mut Mission, _: &[Value]) -> Value {
-    // (0: no unit of the list is following one; the AI tells the rest)
-    Value::Short(0)
+fn ai_command_list_status(mission: &mut Mission, arguments: &[Value]) -> Value {
+    // (the number of the units still following a command list)
+    let following = living(mission, arguments)
+        .into_iter()
+        .filter(|unit| mission.ai.command_lists.contains_key(unit))
+        .count();
+    count(following)
 }
 
 fn ai_conversation(mission: &mut Mission, arguments: &[Value]) -> Value {
@@ -239,7 +247,31 @@ fn ai_conversation_line(_: &mut Mission, _: &[Value]) -> Value {
 }
 
 fn ai_place(mission: &mut Mission, arguments: &[Value]) -> Value {
-    mission.ai.placed.push(AiReference::of(index(arguments, 0)));
+    let reference = AiReference::of(index(arguments, 0));
+    mission.ai.placed.push(reference);
+    actors::place(mission, reference);
+    Value::Void
+}
+
+fn ai_erase(mission: &mut Mission, arguments: &[Value]) -> Value {
+    for unit in mission.ai.units(AiReference::of(index(arguments, 0))) {
+        actors::erase(mission, unit);
+    }
+    Value::Void
+}
+
+fn ai_erase_all(mission: &mut Mission, _: &[Value]) -> Value {
+    let units: Vec<ObjectHandle> = mission.actors.iter().map(|a| a.unit).collect();
+    for unit in units {
+        actors::erase(mission, unit);
+    }
+    Value::Void
+}
+
+fn ai_kill(mission: &mut Mission, arguments: &[Value]) -> Value {
+    for unit in living(mission, arguments) {
+        actors::kill(mission, unit);
+    }
     Value::Void
 }
 
@@ -261,11 +293,10 @@ ordered! {
     ai_allow_dormant, ai_attach, ai_attach_free, ai_attack,
     ai_automatic_migration_target, ai_berserk, ai_braindead,
     ai_braindead_by_unit, ai_command_list_advance, ai_conversation_advance,
-    ai_defend, ai_detach, ai_dialogue_triggers, ai_disregard, ai_erase,
-    ai_erase_all, ai_exit_vehicle, ai_follow_distance, ai_follow_target_ai,
+    ai_defend, ai_detach, ai_dialogue_triggers, ai_disregard,
+    ai_exit_vehicle, ai_follow_distance, ai_follow_target_ai,
     ai_follow_target_disable, ai_follow_target_players, ai_force_active,
-    ai_free, ai_free_units, ai_go_to_vehicle, ai_grenades, ai_kill,
-    ai_kill_silent, ai_link_activation, ai_magically_see_encounter,
+    ai_free, ai_free_units, ai_go_to_vehicle, ai_grenades, ai_link_activation, ai_magically_see_encounter,
     ai_magically_see_players, ai_maneuver, ai_maneuver_enable, ai_migrate,
     ai_migrate_and_speak, ai_migrate_by_unit, ai_playfight, ai_prefer_target,
     ai_reconnect, ai_renew, ai_retreat, ai_set_blind, ai_set_deaf,

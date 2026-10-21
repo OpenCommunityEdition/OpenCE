@@ -106,6 +106,9 @@ pub struct ObjectDefinition {
     pub change_colors: Vec<ChangeColor>,
     /// A unit's HUD (`unhi`): a biped's or a vehicle's.
     pub unit_hud: Option<TagRef>,
+    /// The damage a biped's own melee does, without a weapon (the flood's
+    /// forms have one; bipeds only).
+    pub unit_melee_damage: Option<TagRef>,
     /// A biped's movement (bipeds only).
     pub biped: Option<Biped>,
     /// A weapon's own part (weapons only).

@@ -10,6 +10,7 @@
 //! title, a nav point) is kept as an [`Event`] for the presentation to show.
 //! The AI's functions keep what they are told for the AI to act on.
 
+mod actors;
 mod ai;
 mod cinematic;
 mod devices;
@@ -29,6 +30,7 @@ use opence_sim::input::{Buttons, TickInput};
 use opence_sim::objects::{is_placed, placement_spawn, Difficulty, ObjectHandle};
 use opence_sim::{Simulation, Transform, Vec3};
 
+pub use actors::{Actor, ActorState};
 pub use ai::{AiOrders, AiReference};
 pub use cinematic::{CameraShot, Cinematic};
 pub use devices::DeviceState;
@@ -82,6 +84,7 @@ pub struct Mission {
     invulnerable: BTreeSet<ObjectHandle>,
     attachments: Vec<(ObjectHandle, ObjectHandle)>,
     ai: AiOrders,
+    actors: Vec<Actor>,
     cinematic: Cinematic,
     flow: Flow,
     // (the buttons pressed since the scripts last reset them, and the look's
@@ -133,7 +136,7 @@ impl Mission {
                 devices.insert(handle, DeviceState::of(device, &groups));
             }
         }
-        Self {
+        let mut mission = Self {
             sim,
             level,
             difficulty,
@@ -152,6 +155,7 @@ impl Mission {
             invulnerable: BTreeSet::new(),
             attachments: Vec::new(),
             ai: AiOrders::default(),
+            actors: Vec::new(),
             cinematic: Cinematic::default(),
             flow: Flow::default(),
             actions: Buttons::default(),
@@ -161,7 +165,9 @@ impl Mission {
             random: 0x2545_F491,
             events: Vec::new(),
             printed: Vec::new(),
-        }
+        };
+        actors::begin(&mut mission);
+        mission
     }
 
     /// The simulation.
@@ -262,6 +268,7 @@ impl Mission {
                 }
             }
         }
+        actors::think(self);
         self.sim.step(input);
         for (handle, vitality) in kept {
             self.sim.insert(handle, vitality);

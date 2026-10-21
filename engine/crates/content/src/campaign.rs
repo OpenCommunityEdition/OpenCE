@@ -26,6 +26,8 @@ pub struct Campaign {
     pub recordings: Vec<Recording>,
     /// The actor variants its encounters place.
     pub actor_palette: Vec<Option<TagRef>>,
+    /// Each of the palette's actor variants, as its actors fight.
+    pub actor_variants: Vec<Option<ActorVariant>>,
     /// Its encounters.
     pub encounters: Vec<Encounter>,
     /// Its AI command lists.
@@ -149,6 +151,46 @@ pub struct Encounter {
     pub platoons: Vec<String>,
     /// Where its actors stand to fight.
     pub firing_positions: Vec<FiringPosition>,
+}
+
+/// An actor variant (`actv`) and its actor (`actr`): the unit its actors
+/// are, the weapon they carry, and how they see and fight
+/// (`actor_definitions.h`). Angles are in radians, distances in world
+/// units, times in seconds.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ActorVariant {
+    /// The variant.
+    pub tag: TagRef,
+    /// The unit its actors are.
+    pub unit: Option<TagRef>,
+    /// The weapon they carry.
+    pub weapon: Option<TagRef>,
+    /// The actor's type (elite, jackal, grunt, ..., marine, ...).
+    pub kind: i16,
+    /// How far it sees.
+    pub vision_distance: f32,
+    /// The widest angle from where it looks that it sees.
+    pub vision_angle: f32,
+    /// How far it hears.
+    pub hearing_distance: f32,
+    /// The farthest it fires at a target.
+    pub firing_range: f32,
+    /// Its shots a second while it fires.
+    pub rate_of_fire: f32,
+    /// How far from its aim its shots go.
+    pub error_angle: f32,
+    /// The nearest and farthest it keeps from its target.
+    pub combat_range: [f32; 2],
+    /// The shortest and longest bursts it fires.
+    pub burst_duration: [f32; 2],
+    /// The shortest and longest waits between its bursts.
+    pub burst_separation: [f32; 2],
+    /// The chance it panics when a friend is killed.
+    pub panic_chance: f32,
+    /// The fraction of its shield below which it hides.
+    pub shield_fraction_hide: f32,
+    /// The fraction its shield recharges to before it fights again.
+    pub shield_fraction_emerge: f32,
 }
 
 /// A squad of an encounter.
