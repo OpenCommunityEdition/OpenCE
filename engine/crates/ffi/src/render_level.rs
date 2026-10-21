@@ -567,6 +567,7 @@ mod tests {
                 path: "test".into(),
                 structure_bsps: Vec::new(),
                 player_starts: Vec::new(),
+                placements: Vec::new(),
             },
             structure_bsps: vec![StructureBsp {
                 path: "test".into(),

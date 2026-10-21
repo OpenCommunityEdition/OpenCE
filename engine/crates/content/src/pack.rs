@@ -24,7 +24,7 @@ use rkyv::util::AlignedVec;
 use crate::Level;
 
 /// The version of this format; a pack of another is not read.
-pub const FORMAT_VERSION: u32 = 1;
+pub const FORMAT_VERSION: u32 = 2;
 
 const MAGIC: [u8; 4] = *b"OCPK";
 const HEADER_SIZE: usize = 0x28;
@@ -169,8 +169,10 @@ mod tests {
                 player_starts: vec![crate::PlayerStart {
                     position: [1.0, 2.0, 3.0],
                     facing: 0.5,
+                    team: 1,
                     structure_bsp: Some(0),
                 }],
+                placements: Vec::new(),
             },
             structure_bsps: vec![StructureBsp {
                 path: bsp.path,
@@ -293,8 +295,11 @@ mod tests {
     #[test]
     fn other_formats_are_refused() {
         let mut pack = pack();
-        pack[4] = 2;
-        assert_eq!(read_pack(&pack), Err(PackError::FormatVersion(2)));
+        pack[4..8].copy_from_slice(&(FORMAT_VERSION + 1).to_le_bytes());
+        assert_eq!(
+            read_pack(&pack),
+            Err(PackError::FormatVersion(FORMAT_VERSION + 1))
+        );
         assert_eq!(read_pack(b"PNG"), Err(PackError::NotAPack));
     }
 }

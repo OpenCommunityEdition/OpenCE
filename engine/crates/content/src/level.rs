@@ -2,7 +2,7 @@
 
 use rkyv::{Archive, Deserialize, Serialize};
 
-use crate::{Bitmap, Shader, TagRef};
+use crate::{Bitmap, ObjectKind, Shader, TagRef};
 
 /// Everything a level's structure is drawn and collided with.
 #[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
@@ -41,6 +41,46 @@ pub struct Scenario {
     pub structure_bsps: Vec<TagRef>,
     /// Where players start.
     pub player_starts: Vec<PlayerStart>,
+    /// The objects it places, kind by kind in the scenario's order.
+    pub placements: Vec<ObjectPlacement>,
+}
+
+/// An object the scenario places.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ObjectPlacement {
+    /// Its kind: the scenario's block it is in.
+    pub kind: ObjectKind,
+    /// Its object tag, from the kind's palette.
+    pub tag: TagRef,
+    /// Its name, from the scenario's object names.
+    pub name: Option<String>,
+    /// When it is placed: bit 0, not automatically; bits 1 to 3, not on
+    /// easy, normal or hard.
+    pub placement_flags: u16,
+    /// Where it is.
+    pub position: [f32; 3],
+    /// Its yaw, pitch and roll, in radians.
+    pub rotation: [f32; 3],
+    /// The structure BSPs it is in, a bit each.
+    pub structure_bsps: u16,
+    /// Its colors and regions' permutations (scenery, units and weapons).
+    pub permutation: Option<PlacementPermutation>,
+}
+
+impl ObjectPlacement {
+    /// Whether it is placed when the level starts.
+    pub fn is_automatic(&self) -> bool {
+        self.placement_flags & 1 == 0
+    }
+}
+
+/// A placed object's appearance.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
+pub struct PlacementPermutation {
+    /// Its four change colors, each 0xAARRGGBB (zero: the object's own).
+    pub change_colors: [u32; 4],
+    /// The permutation of each of its model's regions.
+    pub region_permutations: [u8; 8],
 }
 
 /// A place a player starts, as the scenario gives it.
@@ -50,6 +90,8 @@ pub struct PlayerStart {
     pub position: [f32; 3],
     /// The way it faces: radians left from +x.
     pub facing: f32,
+    /// The team it is for (multiplayer).
+    pub team: u16,
     /// The structure BSP it is in (none: any).
     pub structure_bsp: Option<u16>,
 }

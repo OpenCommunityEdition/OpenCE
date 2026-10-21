@@ -860,6 +860,7 @@ dependencies = [
  "bevy_ecs",
  "glam 0.34.1",
  "libm",
+ "opence_content",
  "thiserror",
 ]
 

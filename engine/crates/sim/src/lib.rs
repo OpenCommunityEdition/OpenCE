@@ -10,6 +10,7 @@
 pub mod clock;
 pub mod hash;
 pub mod input;
+pub mod objects;
 pub mod units;
 
 use bevy_ecs::prelude::*;
@@ -18,6 +19,11 @@ pub use glam::{Quat, Vec3};
 
 use hash::WorldHasher;
 use input::{Buttons, InputRecord, TickInput};
+use objects::{
+    kind_index, Difficulty, Object, ObjectHandle, ObjectKinds, ObjectName, ObjectSpawn,
+    ObjectTable, Permutation, TableFull, Team,
+};
+use opence_content::Scenario;
 use units::{Radians, WorldUnits};
 
 /// A position and an orientation in the world, in world units.
@@ -143,6 +149,8 @@ impl Simulation {
         world.insert_resource(Camera::default());
         world.insert_resource(FreeCamera::default());
         world.insert_resource(CurrentInput::default());
+        world.insert_resource(ObjectTable::default());
+        world.insert_resource(ObjectKinds::default());
         let mut schedule = Schedule::default();
         // (one thread: systems in parallel would be ordered by chance)
         schedule.set_executor(SingleThreadedExecutor::new());
@@ -199,27 +207,109 @@ impl Simulation {
         self.world.insert_resource(camera);
     }
 
-    /// Adds an object (for tests, until maps spawn them).
-    pub fn spawn_object(&mut self, id: ObjectId, transform: Transform) {
-        self.world.spawn((id, transform));
+    /// Makes an object.
+    pub fn spawn(&mut self, spawn: ObjectSpawn) -> Result<ObjectHandle, TableFull> {
+        objects::spawn(&mut self.world, spawn)
+    }
+
+    /// Makes every object `scenario` places at `difficulty`.
+    pub fn spawn_scenario(
+        &mut self,
+        scenario: &Scenario,
+        difficulty: Difficulty,
+    ) -> Result<Vec<ObjectHandle>, TableFull> {
+        objects::spawn_scenario(&mut self.world, scenario, difficulty)
+    }
+
+    /// Removes an object; false if `handle` is not in the world.
+    pub fn remove(&mut self, handle: ObjectHandle) -> bool {
+        objects::remove(&mut self.world, handle)
+    }
+
+    /// The hooks each kind's objects are made with.
+    pub fn kinds_mut(&mut self) -> Mut<'_, ObjectKinds> {
+        self.world.resource_mut::<ObjectKinds>()
+    }
+
+    /// Every object, by slot.
+    pub fn objects(&mut self) -> Vec<ObjectHandle> {
+        let mut handles: Vec<ObjectHandle> = self
+            .world
+            .query::<&ObjectHandle>()
+            .iter(&self.world)
+            .copied()
+            .collect();
+        handles.sort();
+        handles
+    }
+
+    /// The entity `handle` is, if it is still in the world.
+    fn entity(&self, handle: ObjectHandle) -> Option<EntityRef<'_>> {
+        let entity = self.world.get_resource::<ObjectTable>()?.entity(handle)?;
+        self.world.get_entity(entity).ok()
+    }
+
+    /// One of an object's components, if `handle` is still in the world.
+    pub fn component<C: Component + Clone>(&self, handle: ObjectHandle) -> Option<C> {
+        self.entity(handle)?.get::<C>().cloned()
+    }
+
+    /// What an object is.
+    pub fn object(&self, handle: ObjectHandle) -> Option<Object> {
+        self.component(handle)
+    }
+
+    /// Where an object is.
+    pub fn transform(&self, handle: ObjectHandle) -> Option<Transform> {
+        self.component(handle)
     }
 
     /// A hash of the world's state: the tick, the camera, and every
-    /// object's transform in the order of their ids.
+    /// object in the order of their ids: its transform, kind, tag, name,
+    /// permutation and team.
     pub fn world_hash(&mut self) -> u64 {
         let mut hasher = WorldHasher::default();
         hasher.u64(self.tick().0);
         self.camera().transform.hash(&mut hasher);
-        let mut objects: Vec<(ObjectId, Transform)> = self
+        let mut objects: Vec<_> = self
             .world
-            .query::<(&ObjectId, &Transform)>()
+            .query::<(
+                &ObjectId,
+                &Transform,
+                &Object,
+                Option<&ObjectName>,
+                Option<&Permutation>,
+                Option<&Team>,
+            )>()
             .iter(&self.world)
-            .map(|(id, t)| (*id, *t))
             .collect();
-        objects.sort_by_key(|(id, _)| *id);
-        for (id, transform) in objects {
+        objects.sort_by_key(|(id, ..)| **id);
+        for (id, transform, object, name, permutation, team) in objects {
             hasher.u64(u64::from(id.0));
             transform.hash(&mut hasher);
+            hasher.u64(kind_index(object.kind) as u64);
+            hasher.bytes(&object.tag.group.0);
+            hasher.u64(object.tag.path.len() as u64);
+            hasher.bytes(object.tag.path.as_bytes());
+            // (each absent part hashed as such, so two never run together)
+            match name {
+                Some(name) => {
+                    hasher.u64(1 + name.0.len() as u64);
+                    hasher.bytes(name.0.as_bytes());
+                }
+                None => hasher.u64(0),
+            }
+            match permutation {
+                Some(Permutation(permutation)) => {
+                    hasher.u64(1);
+                    for color in permutation.change_colors {
+                        hasher.u64(u64::from(color));
+                    }
+                    hasher.bytes(&permutation.region_permutations);
+                }
+                None => hasher.u64(0),
+            }
+            hasher.u64(team.map_or(u64::MAX, |team| u64::from(team.0)));
         }
         hasher.finish()
     }
@@ -300,14 +390,22 @@ mod tests {
 
     fn replayed_hash(record: &InputRecord) -> u64 {
         let mut simulation = Simulation::empty();
-        for id in [3, 1, 2] {
-            simulation.spawn_object(
-                ObjectId(id),
-                Transform {
-                    position: Vec3::splat(id as f32),
+        for at in [3, 1, 2] {
+            let spawned = simulation.spawn(objects::ObjectSpawn {
+                kind: opence_content::ObjectKind::Scenery,
+                tag: opence_content::TagRef {
+                    group: opence_content::Group(*b"scen"),
+                    path: format!("scenery\\rock{at}"),
+                },
+                transform: Transform {
+                    position: Vec3::splat(at as f32),
                     ..Default::default()
                 },
-            );
+                name: None,
+                permutation: None,
+                team: Some(at),
+            });
+            assert!(spawned.is_ok());
         }
         simulation.replay(record);
         simulation.world_hash()
@@ -346,7 +444,7 @@ mod tests {
         // out of order) is what this catches.
         assert_eq!(replayed_hash(&recorded_inputs(3600)), PINNED_HASH);
     }
-    const PINNED_HASH: u64 = 0xa426_4986_4ed8_b740;
+    const PINNED_HASH: u64 = 0xbc8b_00f3_898b_e015;
 
     #[test]
     fn one_different_input_changes_the_hash() {
@@ -387,26 +485,40 @@ mod tests {
         assert!(forward.z > 0.999 && forward.z < 1.0, "{forward}");
     }
 
+    fn rock(scale: f32) -> objects::ObjectSpawn {
+        objects::ObjectSpawn {
+            kind: opence_content::ObjectKind::Scenery,
+            tag: opence_content::TagRef {
+                group: opence_content::Group(*b"scen"),
+                path: "scenery\\rock".into(),
+            },
+            transform: Transform {
+                scale,
+                ..Default::default()
+            },
+            name: None,
+            permutation: None,
+            team: None,
+        }
+    }
+
     #[test]
-    fn the_hash_takes_objects_by_id_not_by_spawn_order() {
+    fn the_hash_takes_objects_by_id_not_by_spawn_order() -> Result<(), Box<dyn std::error::Error>> {
+        // (a's slot 0 is taken again after its first object goes, by an
+        // entity made after slot 1's)
         let mut a = Simulation::empty();
+        let first = a.spawn(rock(1.0))?;
+        a.spawn(rock(2.0))?;
+        assert!(a.remove(first));
+        a.spawn(rock(3.0))?;
         let mut b = Simulation::empty();
-        a.spawn_object(ObjectId(1), Transform::default());
-        a.spawn_object(
-            ObjectId(2),
-            Transform {
-                scale: 2.0,
-                ..Default::default()
-            },
-        );
-        b.spawn_object(
-            ObjectId(2),
-            Transform {
-                scale: 2.0,
-                ..Default::default()
-            },
-        );
-        b.spawn_object(ObjectId(1), Transform::default());
+        b.spawn(rock(3.0))?;
+        b.spawn(rock(2.0))?;
         assert_eq!(a.world_hash(), b.world_hash());
+        let mut c = Simulation::empty();
+        c.spawn(rock(2.0))?;
+        c.spawn(rock(3.0))?;
+        assert_ne!(a.world_hash(), c.world_hash());
+        Ok(())
     }
 }

@@ -14,7 +14,7 @@ pub use bitmap::{
 };
 pub use level::{
     CollisionBsp, CollisionMaterial, EnvironmentVertex, Level, Lightmap, LightmapVertex, Material,
-    PlayerStart, Scenario, StructureBsp,
+    ObjectPlacement, PlacementPermutation, PlayerStart, Scenario, StructureBsp,
 };
 pub use object::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, ChangeColor,

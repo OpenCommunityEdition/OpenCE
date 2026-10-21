@@ -13,7 +13,8 @@ use opence_content::level::{
 };
 use opence_content::{
     CollisionBsp, CollisionMaterial, EnvironmentVertex, Group, Level, Lightmap, LightmapVertex,
-    Material, PlayerStart, Scenario, StructureBsp, TagRef,
+    Material, ObjectKind, ObjectPlacement, PlacementPermutation, PlayerStart, Scenario,
+    StructureBsp, TagRef,
 };
 
 use crate::cache::Cache;
@@ -183,11 +184,14 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         player_starts.push(import_player_start(&element, structure_bsps.len())?);
     }
 
+    let placements = import_placements(&scenario)?;
+
     let level = Level {
         scenario: Scenario {
             path: scenario.instance().name.clone(),
             structure_bsps: structure_bsp_tags,
             player_starts,
+            placements,
         },
         structure_bsps,
         shaders,
@@ -212,6 +216,7 @@ fn import_player_start(element: &Element<'_>, bsps: usize) -> Result<PlayerStart
     {
         return Err(element.fault("position", "is not finite"));
     }
+    let team = element.u16(0x10, "team")?;
     let structure_bsp = match element.i16(0x12, "structure bsp")? {
         -1 => None,
         index if index >= 0 && (index as usize) < bsps => Some(index as u16),
@@ -222,8 +227,109 @@ fn import_player_start(element: &Element<'_>, bsps: usize) -> Result<PlayerStart
     Ok(PlayerStart {
         position,
         facing,
+        team,
         structure_bsp,
     })
+}
+
+/// Each kind's placements: its block in the scenario (its palette is the
+/// block after it), the size of a placement, the most a scenario has, and
+/// whether a permutation follows the object's own fields.
+const PLACEMENT_BLOCKS: [(ObjectKind, usize, usize, usize, bool); 9] = [
+    (ObjectKind::Scenery, 0x210, 0x48, 2000, true),
+    (ObjectKind::Biped, 0x228, 0x78, 1024, true),
+    (ObjectKind::Vehicle, 0x240, 0x78, 1024, true),
+    (ObjectKind::Equipment, 0x258, 0x28, 1024, false),
+    (ObjectKind::Weapon, 0x270, 0x5C, 1024, true),
+    (ObjectKind::Machine, 0x294, 0x40, 1024, false),
+    (ObjectKind::Control, 0x2AC, 0x40, 1024, false),
+    (ObjectKind::LightFixture, 0x2C4, 0x58, 1024, false),
+    (ObjectKind::SoundScenery, 0x2DC, 0x28, 1024, false),
+];
+pub(crate) const SCENARIO_OBJECT_NAMES_OFFSET: usize = 0x204;
+pub(crate) const OBJECT_NAME_SIZE: usize = 0x24;
+const MAX_OBJECT_NAMES: usize = 1024;
+pub(crate) const PALETTE_ENTRY_SIZE: usize = 0x30;
+const MAX_PALETTE_ENTRIES: usize = 256;
+/// Where a placement's permutation is: after the object's fields.
+const PLACEMENT_PERMUTATION_OFFSET: usize = 0x28;
+
+/// The objects the scenario places. A placement whose palette entry is
+/// none, past the palette or empty is not placed, as the game skips it; a
+/// name past the names is no name, as the game ignores it.
+fn import_placements(scenario: &Element<'_>) -> Result<Vec<ObjectPlacement>, ImportError> {
+    let cache = scenario.cache();
+    let names = scenario.block(
+        SCENARIO_OBJECT_NAMES_OFFSET,
+        "object names",
+        OBJECT_NAME_SIZE,
+        MAX_OBJECT_NAMES,
+    )?;
+    let names = names
+        .iter()
+        .map(|name| name.text(0, "object name", 32).map(str::to_owned))
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut placements = Vec::new();
+    for (kind, at, size, longest, has_permutation) in PLACEMENT_BLOCKS {
+        let group = GroupTag::new(&kind.group());
+        let palette =
+            scenario.block(at + 12, "palette", PALETTE_ENTRY_SIZE, MAX_PALETTE_ENTRIES)?;
+        let palette = palette
+            .iter()
+            .map(|entry| {
+                entry
+                    .reference(0, "palette entry", &[group])
+                    .map(|index| index.map(|index| tag_ref(cache, index)))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        for element in scenario.block(at, "placements", size, longest)?.iter() {
+            let tag = usize::try_from(element.i16(0, "palette index")?)
+                .ok()
+                .and_then(|index| palette.get(index).cloned().flatten());
+            let Some(tag) = tag else {
+                continue;
+            };
+            let name = usize::try_from(element.i16(2, "name index")?)
+                .ok()
+                .and_then(|index| names.get(index).cloned());
+            let mut position = [0.0; 3];
+            let mut rotation = [0.0; 3];
+            for axis in 0..3 {
+                position[axis] = element.f32(0x08 + axis * 4, "position")?;
+                rotation[axis] = element.f32(0x14 + axis * 4, "rotation")?;
+            }
+            let permutation = if has_permutation {
+                let mut change_colors = [0; 4];
+                for (index, color) in change_colors.iter_mut().enumerate() {
+                    *color =
+                        element.u32(PLACEMENT_PERMUTATION_OFFSET + index * 4, "change color")?;
+                }
+                let mut region_permutations = [0; 8];
+                region_permutations.copy_from_slice(element.slice(
+                    PLACEMENT_PERMUTATION_OFFSET + 0x10,
+                    8,
+                    "region permutations",
+                )?);
+                Some(PlacementPermutation {
+                    change_colors,
+                    region_permutations,
+                })
+            } else {
+                None
+            };
+            placements.push(ObjectPlacement {
+                kind,
+                tag,
+                name,
+                placement_flags: element.u16(4, "placement flags")?,
+                position,
+                rotation,
+                structure_bsps: element.u16(0x20, "structure bsps")?,
+                permutation,
+            });
+        }
+    }
+    Ok(placements)
 }
 
 /// Each lightmap's page must be in its BSP's lightmap bitmap (when the
@@ -1063,10 +1169,63 @@ pub(crate) mod tests {
         for (at, value) in [(0, 1.0f32), (4, 2.0), (8, 3.0), (0x0C, 1.5)] {
             put(&mut start, at, &value.to_le_bytes());
         }
+        put(&mut start, 0x10, &2u16.to_le_bytes());
         let start = fake.add_data(&start);
         block(&mut scenario, SCENARIO_PLAYER_STARTS_OFFSET, 1, start);
+        place_objects(&mut fake, &mut scenario);
         fake.set_scenario_data(&scenario);
         fake
+    }
+
+    /// Two object names; a scenery palette of a rock and an empty entry,
+    /// with three placements (the rock, named and colored; one of the
+    /// empty entry; one past the palette); and a weapon-less equipment
+    /// palette of one, placed once.
+    fn place_objects(fake: &mut FakeCache, scenario: &mut [u8]) {
+        let mut names = vec![0u8; OBJECT_NAME_SIZE * 2];
+        put(&mut names, 0, b"rock");
+        put(&mut names, OBJECT_NAME_SIZE, b"other");
+        let names = fake.add_data(&names);
+        block(scenario, SCENARIO_OBJECT_NAMES_OFFSET, 2, names);
+
+        let rock = fake.add_tag(GroupTag::new(b"scen"), "scenery\\rock", &[0u8; 4]);
+        let mut palette = vec![0u8; PALETTE_ENTRY_SIZE * 2];
+        reference(&mut palette, 0, GroupTag::new(b"scen"), fake.handle(rock));
+        empty(&mut palette, PALETTE_ENTRY_SIZE);
+        let palette = fake.add_data(&palette);
+        block(scenario, 0x210 + 12, 2, palette);
+        let mut scenery = vec![0u8; 0x48 * 3];
+        for (index, placement) in scenery.chunks_mut(0x48).enumerate() {
+            put(placement, 0, &(index as i16).to_le_bytes());
+            put(placement, 2, &(-1i16).to_le_bytes());
+        }
+        put(&mut scenery, 2, &1i16.to_le_bytes());
+        put(&mut scenery, 4, &(1u16 << 2).to_le_bytes());
+        for (at, value) in [
+            (0x08, 4.0f32),
+            (0x0C, 5.0),
+            (0x10, 6.0),
+            (0x14, 0.5),
+            (0x18, -0.25),
+        ] {
+            put(&mut scenery, at, &value.to_le_bytes());
+        }
+        put(&mut scenery, 0x20, &1u16.to_le_bytes());
+        put(&mut scenery, 0x28, &0xFF10_2030u32.to_le_bytes());
+        put(&mut scenery, 0x38, &[0, 3]);
+        let scenery = fake.add_data(&scenery);
+        block(scenario, 0x210, 3, scenery);
+
+        let pack = fake.add_tag(GroupTag::new(b"eqip"), "powerups\\pack", &[0u8; 4]);
+        let mut palette = vec![0u8; PALETTE_ENTRY_SIZE];
+        reference(&mut palette, 0, GroupTag::new(b"eqip"), fake.handle(pack));
+        let palette = fake.add_data(&palette);
+        block(scenario, 0x258 + 12, 1, palette);
+        let mut equipment = vec![0u8; 0x28];
+        put(&mut equipment, 2, &7i16.to_le_bytes());
+        put(&mut equipment, 4, &1u16.to_le_bytes());
+        let equipment = fake.add_data(&equipment);
+        block(scenario, 0x258, 1, equipment);
     }
 
     fn import(kind: CacheKind, breaks: &Breaks) -> Result<Level, String> {
@@ -1087,9 +1246,46 @@ pub(crate) mod tests {
                 [PlayerStart {
                     position: [1.0, 2.0, 3.0],
                     facing: 1.5,
+                    team: 2,
                     structure_bsp: Some(0),
                 }]
             );
+            assert_eq!(
+                level.scenario.placements,
+                [
+                    ObjectPlacement {
+                        kind: ObjectKind::Scenery,
+                        tag: TagRef {
+                            group: Group(*b"scen"),
+                            path: "scenery\\rock".into(),
+                        },
+                        name: Some("other".into()),
+                        placement_flags: 1 << 2,
+                        position: [4.0, 5.0, 6.0],
+                        rotation: [0.5, -0.25, 0.0],
+                        structure_bsps: 1,
+                        permutation: Some(PlacementPermutation {
+                            change_colors: [0xFF10_2030, 0, 0, 0],
+                            region_permutations: [0, 3, 0, 0, 0, 0, 0, 0],
+                        }),
+                    },
+                    ObjectPlacement {
+                        kind: ObjectKind::Equipment,
+                        tag: TagRef {
+                            group: Group(*b"eqip"),
+                            path: "powerups\\pack".into(),
+                        },
+                        name: None,
+                        placement_flags: 1,
+                        position: [0.0; 3],
+                        rotation: [0.0; 3],
+                        structure_bsps: 0,
+                        permutation: None,
+                    },
+                ]
+            );
+            assert!(level.scenario.placements[0].is_automatic());
+            assert!(!level.scenario.placements[1].is_automatic());
             let bsp = &level.structure_bsps[0];
             assert_eq!(bsp.world_bounds, [[-1.0, 1.0], [-2.0, 2.0], [-3.0, 3.0]]);
             assert_eq!(bsp.surfaces, [[0, 1, 2]]);
@@ -1223,6 +1419,25 @@ pub(crate) mod tests {
             Err(error) => panic!("{error}"),
         };
         assert_eq!(level.structure_bsps.len(), 1);
+        let placed = |kind| {
+            level
+                .scenario
+                .placements
+                .iter()
+                .filter(|placement| placement.kind == kind)
+                .count()
+        };
+        // (bipeds, vehicles, ..., scenery at 6, ..., sound scenery)
+        assert_eq!(
+            ObjectKind::ALL.map(placed),
+            [0, 8, 0, 0, 0, 0, 50, 0, 0, 0, 0, 2]
+        );
+        let warthog = &level.scenario.placements[50];
+        assert_eq!(warthog.tag.path, "vehicles\\warthog\\warthog");
+        assert_eq!(warthog.position, [29.137, -90.8342, 0.286439]);
+        assert!(warthog.permutation.is_some());
+        let teams = level.scenario.player_starts.iter().map(|start| start.team);
+        assert_eq!(teams.max(), Some(3));
         let bsp = &level.structure_bsps[0];
         assert_eq!(bsp.lightmaps.len(), 16);
         assert_eq!(bsp.surfaces.len(), 5503);
