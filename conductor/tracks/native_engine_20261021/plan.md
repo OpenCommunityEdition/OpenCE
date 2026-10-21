@@ -85,9 +85,9 @@
 - [x] Task: Weapons 8cf477a2
     - [x] Write tests: rate of fire, spread, heat, ammunition and reload times match the tags in simulated ticks; picking up, swapping and dropping
     - [x] Weapon systems, triggers, projectiles and hitscan, melee; the registry for weapon behaviours (melee strikes with the damage task, which it needs)
-- [ ] Task: Damage, shields and death
-    - [ ] Write tests: damage by hit region, shields recharging after their delay, death, and the damage effects' impulses, against tag values and reference traces
-    - [ ] Damage, shields, health, death events
+- [x] Task: Damage, shields and death 858205a2
+    - [x] Write tests: damage by hit region, shields recharging after their delay, death, and the damage effects' impulses, against tag values and reference traces
+    - [x] Damage, shields, health, death events
 - [ ] Task: Grenades
     - [ ] Write tests: a thrown frag bounces and detonates on its timer; a plasma grenade sticks to a biped and moves with it
     - [ ] Throwing, bouncing, sticking, detonation
