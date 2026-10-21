@@ -18,6 +18,9 @@ final class FakeSource: ServerSource {
 final class FakeActions: MenuActions {
     var done: [String] = []
     var fails = false
+    func playCampaign(map: URL, difficulty: UInt8) throws {
+        done.append("campaign \(map.lastPathComponent) \(difficulty)")
+    }
     func playAlone(map: URL) throws {
         if fails { throw EngineError.Network(message: "no") }
         done.append("alone \(map.lastPathComponent)")
@@ -72,6 +75,20 @@ final class MenuTests: XCTestCase {
         model.show(.solo)
         model.show(.main)
         XCTAssertEqual(model.path, [.main])
+    }
+
+    func testTheCampaignPlaysOnlyItsMissionsAtTheChosenDifficulty() {
+        let settings = SettingsModel(path: folder.appendingPathComponent("settings.toml").path)
+        let missions = ["a30", "bloodgulch", "a10"].map { URL(fileURLWithPath: "/maps/\($0).map") }
+        let model = MenuModel(maps: missions, settings: settings, servers: ServerListModel { _ in FakeSource() })
+        let actions = FakeActions()
+        model.actions = actions
+        XCTAssertEqual(model.missionNames, ["a10", "a30"], "in the campaign's order, multiplayer maps left out")
+        model.difficulty = 3
+        model.playCampaign(mission: "a30")
+        model.playCampaign(mission: "bloodgulch")
+        XCTAssertEqual(actions.done, ["campaign a30.map 3"])
+        XCTAssertEqual(model.message, "There is no mission called bloodgulch.")
     }
 
     func testPlayingAloneLoadsTheMap() {

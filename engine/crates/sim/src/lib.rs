@@ -394,6 +394,33 @@ impl Simulation {
         }
     }
 
+    /// Plays the campaign's rules (after the players are made, which play
+    /// multiplayer's): its headshots, and damage scaled by `values` (the
+    /// globals' difficulty values) at `difficulty`, 0 easy to 3 legendary.
+    pub fn play_campaign(&mut self, values: &[[f32; 4]], difficulty: usize) {
+        if let Some(mut table) = self.world.get_resource_mut::<damage::DamageTable>() {
+            table.multiplayer = false;
+        }
+        self.world
+            .insert_resource(damage::DifficultyScale::new(values, difficulty));
+    }
+
+    /// Moves the players and the actors over `level`'s structure BSP
+    /// `bsp`'s collision; fails, leaving them where they were, for a BSP
+    /// the level does not have.
+    pub fn switch_bsp(&mut self, level: &Level, bsp: usize) -> Result<(), PlayerError> {
+        let structure = level
+            .structure_bsps
+            .get(bsp)
+            .ok_or(PlayerError::NoBsp(bsp))?;
+        let mesh = opence_physics::LevelMesh::from_collision(&structure.collision);
+        // (the actors share the local player's world)
+        for player in &self.players {
+            player.physics().set_level(&mesh)?;
+        }
+        Ok(())
+    }
+
     /// Makes the player: its biped standing at `level`'s player start
     /// `start`, moving over that start's structure BSP, the camera at its
     /// eyes. The players there were before are removed.

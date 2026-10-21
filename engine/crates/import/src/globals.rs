@@ -1,6 +1,6 @@
 //! The game's globals (`matg`): the player's speeds, what falling does,
-//! the player's bipeds, the grenades, the weapons, the HUD's tags and the
-//! first-person view's hands.
+//! the player's bipeds, the campaign's difficulty, the grenades, the
+//! weapons, the HUD's tags and the first-person view's hands.
 //!
 //! The tag gives speeds in world units a second and accelerations in world
 //! units a second each tick (the game's 30); the engine keeps both a
@@ -21,6 +21,10 @@ const MULTIPLAYER_INFORMATION_OFFSET: usize = 0x164;
 const MULTIPLAYER_INFORMATION_SIZE: usize = 0xA0;
 const PLAYER_INFORMATION_OFFSET: usize = 0x170;
 const PLAYER_INFORMATION_SIZE: usize = 0xF4;
+const DIFFICULTY_OFFSET: usize = 0x11C;
+// (36 values at the 4 levels, then padding)
+const DIFFICULTY_SIZE: usize = 0x294;
+const DIFFICULTY_VALUES: usize = 36;
 const GRENADES_OFFSET: usize = 0x128;
 const GRENADE_SIZE: usize = 0x44;
 const MAX_GRENADES: usize = 4;
@@ -115,6 +119,17 @@ pub fn import_globals(cache: &Cache) -> Result<Globals, ImportError> {
             falling_damage: reference(&falling, 0x10, "falling damage")?,
             maximum_distance_damage: reference(&falling, 0x2C, "maximum falling damage")?,
         };
+    }
+
+    let difficulty = globals.block(DIFFICULTY_OFFSET, "difficulty", DIFFICULTY_SIZE, 1)?;
+    if let Some(difficulty) = difficulty.get(0) {
+        for value in 0..DIFFICULTY_VALUES {
+            let mut levels = [0.0; 4];
+            for (level, slot) in levels.iter_mut().enumerate() {
+                *slot = difficulty.f32((value * 4 + level) * 4, "difficulty value")?;
+            }
+            imported.difficulty.push(levels);
+        }
     }
 
     let grenades = globals.block(GRENADES_OFFSET, "grenades", GRENADE_SIZE, MAX_GRENADES)?;

@@ -841,6 +841,7 @@ dependencies = [
  "opence_import",
  "opence_script",
  "opence_sim",
+ "thiserror",
 ]
 
 [[package]]
@@ -856,6 +857,7 @@ name = "opence_ffi"
 version = "0.1.0"
 dependencies = [
  "libm",
+ "opence_campaign",
  "opence_content",
  "opence_import",
  "opence_net",

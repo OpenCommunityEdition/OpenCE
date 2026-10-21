@@ -80,6 +80,10 @@ pub struct Globals {
     pub motion_sensor_blip: Option<TagRef>,
     /// The first-person view's hands (a `mod2`).
     pub first_person_hands: Option<TagRef>,
+    /// The campaign's difficulty values (`game_globals.c`'s order: enemy
+    /// damage, vitality and shield first), each at easy, normal, hard and
+    /// legendary; none if the globals have none.
+    pub difficulty: Vec<[f32; 4]>,
 }
 
 /// How a biped that uses player physics moves. Speeds are in world units a

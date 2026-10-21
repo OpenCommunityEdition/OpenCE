@@ -3,6 +3,8 @@
 //! shows, and the player's input as the scripts test it
 //! (`hs_library_game.c`, `hs_library_hud.c`, `hs_library_player.c`).
 
+use std::sync::Arc;
+
 use opence_script::{Native, Value};
 use opence_sim::input::Buttons;
 use opence_sim::objects::Difficulty;
@@ -153,11 +155,15 @@ fn game_lost(mission: &mut Mission, _: &[Value]) -> Value {
 
 fn game_save(mission: &mut Mission, _: &[Value]) -> Value {
     mission.flow.save();
+    // (the scripts run before the tick's input is played: the save holds
+    // this tick too, so that a load does not ask for it again)
+    mission.saving = Some(mission.inputs.len() + 1);
     Value::Void
 }
 
 fn game_save_cancel(mission: &mut Mission, _: &[Value]) -> Value {
     mission.flow.saving = 0;
+    mission.saving = None;
     Value::Void
 }
 
@@ -166,9 +172,9 @@ fn game_revert(mission: &mut Mission, _: &[Value]) -> Value {
     Value::Void
 }
 
-fn game_reverted(_: &mut Mission, _: &[Value]) -> Value {
-    // (true only in the tick after a revert loads, which is the flow's)
-    Value::Boolean(false)
+fn game_reverted(mission: &mut Mission, _: &[Value]) -> Value {
+    // (true only in the tick after a revert loads)
+    Value::Boolean(mission.reverted)
 }
 
 fn game_saving(mission: &mut Mission, _: &[Value]) -> Value {
@@ -208,7 +214,16 @@ fn structure_bsp_index(mission: &mut Mission, _: &[Value]) -> Value {
 }
 
 fn switch_bsp(mission: &mut Mission, arguments: &[Value]) -> Value {
-    mission.flow.bsp = short(arguments, 0);
+    let bsp = short(arguments, 0);
+    let level = Arc::clone(&mission.level);
+    // (a structure the level does not have is not switched to)
+    if let Ok(index) = usize::try_from(bsp) {
+        if index == usize::try_from(mission.flow.bsp).unwrap_or(usize::MAX)
+            || mission.sim.switch_bsp(&level, index).is_ok()
+        {
+            mission.flow.bsp = bsp;
+        }
+    }
     Value::Void
 }
 

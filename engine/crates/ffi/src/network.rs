@@ -282,6 +282,7 @@ impl Engine {
             level: Some(level),
             network: Some(network),
             dressed,
+            campaign: None,
         });
         publish(&mut state, &self.snapshots, 0.0);
     }

@@ -12,6 +12,7 @@
 
 mod actors;
 mod ai;
+mod checkpoint;
 mod cinematic;
 mod devices;
 mod game;
@@ -32,6 +33,7 @@ use opence_sim::{Simulation, Transform, Vec3};
 
 pub use actors::{Actor, ActorState};
 pub use ai::{AiOrders, AiReference};
+pub use checkpoint::{Checkpoint, CheckpointError, CHECKPOINT_VERSION};
 pub use cinematic::{CameraShot, Cinematic};
 pub use devices::DeviceState;
 pub use game::Flow;
@@ -96,6 +98,12 @@ pub struct Mission {
     random: u32,
     events: Vec<Event>,
     printed: Vec<String>,
+    // (each tick's input from the start; the ticks the save being written
+    // and the last save written cover)
+    inputs: Vec<TickInput>,
+    saving: Option<usize>,
+    saved: Option<usize>,
+    reverted: bool,
 }
 
 impl Mission {
@@ -165,7 +173,29 @@ impl Mission {
             random: 0x2545_F491,
             events: Vec::new(),
             printed: Vec::new(),
+            inputs: Vec::new(),
+            saving: None,
+            saved: None,
+            reverted: false,
         };
+        let difficulty = match difficulty {
+            Difficulty::Easy => 0,
+            Difficulty::Normal => 1,
+            Difficulty::Hard => 2,
+            Difficulty::Legendary => 3,
+        };
+        mission
+            .sim
+            .play_campaign(&mission.level.globals.difficulty, difficulty);
+        // (the structure the first player starts over)
+        mission.flow.bsp = mission
+            .level
+            .scenario
+            .player_starts
+            .first()
+            .and_then(|start| start.structure_bsp)
+            .and_then(|bsp| i16::try_from(bsp).ok())
+            .unwrap_or(0);
         actors::begin(&mut mission);
         mission
     }
@@ -250,6 +280,7 @@ impl Mission {
     /// camera and the timers. Objects that cannot be hurt keep their
     /// vitality.
     pub fn step(&mut self, input: TickInput) {
+        self.inputs.push(input);
         self.latch(input);
         let input = if self.input_enabled {
             input
@@ -291,6 +322,36 @@ impl Mission {
         self.follow_attachments();
         self.cinematic.advance();
         self.flow.advance();
+        if self.flow.saving == 0 {
+            if let Some(ticks) = self.saving.take() {
+                self.saved = Some(ticks);
+            }
+        }
+    }
+
+    /// The saved game of the last save written: the mission's start if
+    /// none has been.
+    pub fn checkpoint(&self) -> Checkpoint {
+        let ticks = self.saved.unwrap_or(0).min(self.inputs.len());
+        Checkpoint {
+            scenario: self.level.scenario.path.clone(),
+            difficulty: self.difficulty,
+            inputs: self.inputs[..ticks].to_vec(),
+        }
+    }
+
+    /// The saved game of every tick played so far.
+    pub fn played(&self) -> Checkpoint {
+        Checkpoint {
+            scenario: self.level.scenario.path.clone(),
+            difficulty: self.difficulty,
+            inputs: self.inputs.clone(),
+        }
+    }
+
+    /// Whether this mission was loaded from a save in the tick before.
+    pub fn reverted(&self) -> bool {
+        self.reverted
     }
 
     fn latch(&mut self, input: TickInput) {
@@ -466,10 +527,15 @@ impl World for Mission {
     }
 }
 
+/// The ticks a dead player lies before the mission reverts to its last
+/// save (Halo's few seconds).
+pub const REVERT_TICKS: u32 = 150;
+
 /// A mission and its scripts, run together.
 pub struct MissionScripts {
     mission: Mission,
     runtime: Runtime<Mission>,
+    dead: u32,
 }
 
 impl MissionScripts {
@@ -477,11 +543,66 @@ impl MissionScripts {
     pub fn new(mut mission: Mission) -> Self {
         let scripts = mission.level.scenario.scripts.clone();
         let runtime = Runtime::new(scripts, registry(), &mut mission);
-        Self { mission, runtime }
+        Self {
+            mission,
+            runtime,
+            dead: 0,
+        }
     }
 
-    /// Runs one tick: the scripts, then the mission with `input`.
+    /// `level`'s mission at `difficulty` from its start: the player at the
+    /// first player start, the scripts not yet run.
+    pub fn start(level: Arc<Level>, difficulty: Difficulty) -> Result<Self, CheckpointError> {
+        let mut sim = Simulation::empty();
+        sim.spawn_player(&level, 0)
+            .map_err(|error| CheckpointError::Start(error.to_string()))?;
+        Ok(Self::new(Mission::new(sim, level, difficulty)))
+    }
+
+    /// `level`'s mission as `checkpoint` saved it: started, and its inputs
+    /// played again. Fails for a save of another scenario.
+    pub fn load(level: Arc<Level>, checkpoint: &Checkpoint) -> Result<Self, CheckpointError> {
+        if checkpoint.scenario != level.scenario.path {
+            return Err(CheckpointError::Scenario(
+                checkpoint.scenario.clone(),
+                level.scenario.path.clone(),
+            ));
+        }
+        let mut loaded = Self::start(level, checkpoint.difficulty)?;
+        for &input in &checkpoint.inputs {
+            loaded.play(input);
+        }
+        Ok(loaded)
+    }
+
+    /// Runs one tick: the scripts, then the mission with `input`. A revert
+    /// the scripts asked for, or a player dead for [`REVERT_TICKS`], loads
+    /// the last save (a mission whose save cannot load goes on).
     pub fn tick(&mut self, input: TickInput) {
+        let reverted = self.mission.reverted;
+        self.play(input);
+        if reverted {
+            self.mission.reverted = false;
+        }
+        let dead = self
+            .mission
+            .sim
+            .players()
+            .first()
+            .is_some_and(|player| !self.mission.living(player.handle()));
+        self.dead = if dead { self.dead + 1 } else { 0 };
+        if self.mission.flow.revert || self.dead >= REVERT_TICKS {
+            self.mission.flow.revert = false;
+            self.dead = 0;
+            let checkpoint = self.mission.checkpoint();
+            if let Ok(loaded) = Self::load(Arc::clone(&self.mission.level), &checkpoint) {
+                *self = loaded;
+                self.mission.reverted = true;
+            }
+        }
+    }
+
+    fn play(&mut self, input: TickInput) {
         self.runtime.tick(&mut self.mission);
         self.mission.deathless = self
             .runtime

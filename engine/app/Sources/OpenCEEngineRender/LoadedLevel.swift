@@ -6,6 +6,8 @@ import OpenCEEngineCore
 
 public struct LoadedLevel {
     public let map: String
+    /// The structure drawn.
+    public let bsp: UInt32
     public let geometry: LevelGeometry
     public let renderer: LevelRenderer
     /// Where the camera starts: the scenario's first player start.
@@ -14,6 +16,7 @@ public struct LoadedLevel {
     public init(map: String, bsp: UInt32 = 0, cacheFolder: String, device: MTLDevice,
                 settings: VideoSettings) throws {
         self.map = map
+        self.bsp = bsp
         geometry = try LevelGeometry.load(map: map, cacheFolder: cacheFolder, bsp: bsp)
         renderer = try LevelRenderer(device: device, geometry: geometry, settings: settings)
         start = geometry.startView()

@@ -13,12 +13,13 @@ public enum SettingsPage: String, CaseIterable, Sendable {
 
 /// A menu screen.
 public enum MenuScreen: Hashable, Sendable {
-    case main, solo, servers, join, host
+    case main, campaign, solo, servers, join, host
     case settings(SettingsPage)
 
     public var title: String {
         switch self {
         case .main: "OpenCE"
+        case .campaign: "Campaign"
         case .solo: "Play Alone"
         case .servers: "Join a Game"
         case .join: "Join by Address"
@@ -31,6 +32,8 @@ public enum MenuScreen: Hashable, Sendable {
 /// What the menus ask the app to do.
 @MainActor
 public protocol MenuActions: AnyObject {
+    /// Plays `map`'s mission at `difficulty` (0 easy to 3 legendary).
+    func playCampaign(map: URL, difficulty: UInt8) throws
     /// Plays `map` alone.
     func playAlone(map: URL) throws
     /// Hosts `setup`'s game on `map`.
@@ -54,6 +57,8 @@ public final class MenuModel {
     public let servers: ServerListModel
     public var host: HostSetup
     public var address = ""
+    /// The campaign's difficulty: 0 easy to 3 legendary.
+    public var difficulty: UInt8 = 1
     /// What went wrong last, shown until the next screen.
     public var message: String?
     /// The address being asked, and for how many more ticks.
@@ -80,6 +85,16 @@ public final class MenuModel {
     /// The maps' names, in order.
     public var mapNames: [String] {
         maps.map { $0.deletingPathExtension().lastPathComponent }
+    }
+
+    /// The campaign's missions, in the order they are played.
+    public static let missions = ["a10", "a30", "a50", "b30", "b40", "c10", "c20", "c40", "d20", "d40"]
+    /// The difficulties, by their number.
+    public static let difficulties = ["Easy", "Normal", "Heroic", "Legendary"]
+
+    /// The missions whose maps are here, in order.
+    public var missionNames: [String] {
+        MenuModel.missions.filter { map(named: $0) != nil }
     }
 
     public func show(_ screen: MenuScreen) {
@@ -110,6 +125,16 @@ public final class MenuModel {
         if path.count > 1 {
             path.removeLast()
         }
+    }
+
+    /// Plays mission `name` at the chosen difficulty.
+    public func playCampaign(mission name: String) {
+        guard MenuModel.missions.contains(name.lowercased()), let map = map(named: name) else {
+            message = "There is no mission called \(name)."
+            return
+        }
+        let difficulty = min(difficulty, 3)
+        perform { try $0.playCampaign(map: map, difficulty: difficulty) }
     }
 
     public func playAlone(map name: String) {

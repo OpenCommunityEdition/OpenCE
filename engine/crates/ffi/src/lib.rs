@@ -7,6 +7,7 @@
 // crate and physics are the only ones allowed it)
 #![allow(unsafe_code)]
 
+pub mod campaign;
 pub mod hud;
 pub mod network;
 pub mod render_level;
@@ -365,6 +366,8 @@ struct Running {
     network: Option<network::Network>,
     /// The players that have been dressed (the network adds them).
     dressed: usize,
+    /// The mission it plays, if any.
+    campaign: Option<campaign::Campaign>,
 }
 
 /// The models and animation graphs objects are drawn and posed with,
@@ -471,6 +474,7 @@ impl Engine {
             level: None,
             network: None,
             dressed: 0,
+            campaign: None,
         });
         publish(&mut state, &self.snapshots, 0.0);
     }
@@ -485,12 +489,7 @@ impl Engine {
         difficulty: u8,
     ) -> Result<u32, EngineError> {
         let level = &geometry.content;
-        let difficulty = match difficulty {
-            0 => Difficulty::Easy,
-            1 => Difficulty::Normal,
-            2 => Difficulty::Hard,
-            _ => Difficulty::Legendary,
-        };
+        let difficulty = self::difficulty(difficulty);
         let mut simulation = Simulation::empty();
         let handles = simulation
             .spawn_scenario(&level.scenario, difficulty)
@@ -511,6 +510,7 @@ impl Engine {
             level: Some(geometry.content.clone()),
             network: None,
             dressed: 0,
+            campaign: None,
         });
         publish(&mut state, &self.snapshots, 0.0);
         Ok(count)
@@ -659,6 +659,16 @@ impl Engine {
     }
 }
 
+/// The difficulty of the app's number for it: 0 easy to 3 legendary.
+fn difficulty(level: u8) -> Difficulty {
+    match level {
+        0 => Difficulty::Easy,
+        1 => Difficulty::Normal,
+        2 => Difficulty::Hard,
+        _ => Difficulty::Legendary,
+    }
+}
+
 fn transform(from: &opence_sim::Transform) -> snapshot::Transform {
     snapshot::Transform {
         position: snapshot::Vec3 {
@@ -691,11 +701,12 @@ fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError> {
     let State { running, input, .. } = state;
     let running = running.as_mut().ok_or(EngineError::NoWorld)?;
     for _ in 0..ticks {
-        running.previous_camera = transform(&running.simulation.camera().transform);
-        match (&mut running.network, &running.level) {
-            (Some(network), Some(level)) => {
+        running.previous_camera = transform(&campaign::camera(running).transform);
+        match (&mut running.network, &running.level, &mut running.campaign) {
+            (Some(network), Some(level), _) => {
                 network.step(&mut running.simulation, level, input.tick_input());
             }
+            (_, _, Some(campaign)) => campaign.step(&mut running.simulation, input.tick_input()),
             _ => running.simulation.step(input.tick_input()),
         }
         // (the mouse's turn is used once)
@@ -705,6 +716,9 @@ fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError> {
     if let (Some(_), Some(level)) = (&running.network, &running.level) {
         running.dressed = network::dress_players(&mut running.simulation, level, running.dressed);
     }
+    if let Some(campaign) = &mut running.campaign {
+        campaign.dress(&mut running.simulation);
+    }
     Ok(())
 }
 
@@ -713,7 +727,12 @@ fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) {
         running, writer, ..
     } = state;
     let Some(running) = running else { return };
-    let camera = running.simulation.camera();
+    let camera = campaign::camera(running);
+    // (a cinematic's camera is not the player's: no weapon in its hands)
+    let cinematic = running
+        .campaign
+        .as_ref()
+        .is_some_and(|campaign| campaign.camera().is_some());
     let tick = running.simulation.tick().0;
     let previous = running.previous_camera;
     let simulation = &mut running.simulation;
@@ -753,7 +772,12 @@ fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) {
         });
         // (the first-person weapon and hands, from the camera: their ids
         // from the top, apart from the world's)
-        for (at, model) in simulation.first_person().models().iter().enumerate() {
+        let first_person = if cinematic {
+            &[][..]
+        } else {
+            simulation.first_person().models()
+        };
+        for (at, model) in first_person.iter().enumerate() {
             nodes.clear();
             nodes.extend(
                 model
@@ -1095,5 +1119,36 @@ mod tests {
             check_models(name, &geometry);
             check_started(name, &geometry);
         }
+    }
+
+    #[test]
+    fn a_mission_plays_its_opening_and_loads_its_save() {
+        let engine = Engine::new();
+        assert!(engine.campaign_state().is_none());
+        assert_eq!(engine.campaign_save(), Err(EngineError::NoWorld));
+        let Some(geometry) = stock("a10") else {
+            return; // (no game data here)
+        };
+        assert_eq!(engine.start_campaign(geometry.clone(), 1), Ok(()));
+        let mut cinematic = false;
+        for _ in 0..20 * opence_sim::clock::TICKS_PER_SECOND {
+            let _ = engine.step();
+            cinematic |= engine.campaign_state().is_some_and(|state| state.cinematic);
+        }
+        assert!(cinematic, "a10's opening cinematic never played");
+        // (every object the scripts made is drawn with its model or none)
+        assert!(acquire(&engine).object_count > 0);
+        let Ok(saved) = engine.campaign_save() else {
+            panic!("no save");
+        };
+        assert_eq!(
+            engine.load_campaign(geometry.clone(), saved.clone()),
+            Ok(())
+        );
+        assert!(engine.campaign_state().is_some());
+        assert!(matches!(
+            engine.load_campaign(geometry, saved[..saved.len() - 1].to_vec()),
+            Err(EngineError::Load { .. })
+        ));
     }
 }

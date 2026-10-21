@@ -129,6 +129,11 @@ pub struct DamageHit {
     /// A headshot kills outright: always, but for a player's biped in the
     /// campaign.
     pub headshot_kills: bool,
+    /// What the difficulty multiplies the victim's maximum body vitality
+    /// by (1 but in the campaign).
+    pub vitality: f32,
+    /// What it multiplies its maximum shield vitality by.
+    pub shield: f32,
 }
 
 impl Default for DamageHit {
@@ -142,6 +147,8 @@ impl Default for DamageHit {
             unsuspecting: false,
             multiplayer: false,
             headshot_kills: true,
+            vitality: 1.0,
+            shield: 1.0,
         }
     }
 }
@@ -205,7 +212,9 @@ pub fn cause_damage(
 
     // (the shield first, leaking a share of the damage through, and less
     // of it the lower it is below its failure threshold)
-    if flags & DamageEffect::SKIPS_SHIELDS == 0 && model.maximum_shield_vitality > 0.0 {
+    let maximum_shield = model.maximum_shield_vitality * hit.shield;
+    let maximum_body = model.maximum_body_vitality * hit.vitality;
+    if flags & DamageEffect::SKIPS_SHIELDS == 0 && maximum_shield > 0.0 {
         let mut shield_damage = 0.0;
         if vitality.shield > 0.0 {
             let leak = material.map_or(0.0, |material| material.shield_leak_percentage);
@@ -221,10 +230,10 @@ pub fn cause_damage(
             total -= shield_damage;
             let multiplier = material.map_or(0.0, |material| material.shield_damage_multiplier);
             let actual = multiplier * shield_damage * modifier(model.shield_material_type);
-            let normalized = actual / model.maximum_shield_vitality;
+            let normalized = actual / maximum_shield;
             if normalized > vitality.shield || effect.side_effect == EMP {
                 // (what the shield could not hold goes on to the body)
-                let excess = actual - model.maximum_shield_vitality * vitality.shield;
+                let excess = actual - maximum_shield * vitality.shield;
                 if excess > 0.0 {
                     total += excess;
                 }
@@ -245,7 +254,7 @@ pub fn cause_damage(
     }
 
     // (then the body)
-    if flags & DamageEffect::ONLY_HURTS_SHIELDS == 0 && model.maximum_body_vitality > 0.0 {
+    if flags & DamageEffect::ONLY_HURTS_SHIELDS == 0 && maximum_body > 0.0 {
         if model.flags & CollisionModel::ONLY_HURT_BY_EXPLOSIVES != 0
             && flags & DamageEffect::DETONATES_EXPLOSIVES == 0
         {
@@ -257,7 +266,7 @@ pub fn cause_damage(
             amount *= 1.0 - model.friendly_damage_resistance;
         }
         let kind = material.map_or(-1, |material| material.material_type);
-        let mut actual = amount / model.maximum_body_vitality * modifier(kind);
+        let mut actual = amount / maximum_body * modifier(kind);
         let head =
             material.is_some_and(|material| material.flags & CollisionModelMaterial::HEAD != 0);
         if actual > 0.0 && head {
@@ -351,6 +360,80 @@ pub struct DamageTable {
     pub multiplayer: bool,
     /// The damage of falls.
     pub falling: FallingDamage,
+}
+
+/// How the campaign's difficulty scales damage (`game_globals.c`): the
+/// globals' difficulty values at the level played. Multiplayer has none.
+#[derive(Resource, Clone, Copy, Debug, PartialEq)]
+pub struct DifficultyScale {
+    /// What the damage of the player's enemies is multiplied by.
+    pub enemy_damage: f32,
+    /// What enemies' maximum body vitality is multiplied by.
+    pub enemy_vitality: f32,
+    /// What enemies' maximum shield vitality is multiplied by.
+    pub enemy_shield: f32,
+    /// What friends' maximum body vitality is multiplied by.
+    pub friend_vitality: f32,
+    /// What friends' maximum shield vitality is multiplied by.
+    pub friend_shield: f32,
+}
+
+/// The player's team and the humans', friends of each other (the
+/// scenario's own allegiances are the AI's, not the damage's).
+const FRIENDLY_TEAMS: [u16; 2] = [1, 2];
+
+impl DifficultyScale {
+    /// The scale of `level` (its globals' values, else none) at `level`,
+    /// 0 easy to 3 legendary.
+    pub fn new(values: &[[f32; 4]], level: usize) -> DifficultyScale {
+        let value = |row: usize| {
+            values
+                .get(row)
+                .and_then(|row| row.get(level.min(3)))
+                .copied()
+                .filter(|value| value.is_finite() && *value > 0.0)
+                .unwrap_or(1.0)
+        };
+        DifficultyScale {
+            enemy_damage: value(0),
+            enemy_vitality: value(1),
+            enemy_shield: value(2),
+            friend_vitality: value(5),
+            friend_shield: value(6),
+        }
+    }
+
+    /// Scales `hit` on `object` by `owner`: an enemy's damage, and the
+    /// victim's vitality as its side's is.
+    fn scale(
+        &self,
+        world: &World,
+        object: ObjectHandle,
+        owner: Option<ObjectHandle>,
+        hit: &mut DamageHit,
+    ) {
+        let team = |handle: ObjectHandle| {
+            let entity = world.resource::<ObjectTable>().entity(handle)?;
+            world.get::<Team>(entity).map(|team| team.0)
+        };
+        if owner
+            .and_then(team)
+            .is_some_and(|team| !FRIENDLY_TEAMS.contains(&team))
+        {
+            hit.scale *= self.enemy_damage;
+        }
+        match team(object) {
+            Some(team) if FRIENDLY_TEAMS.contains(&team) => {
+                hit.vitality *= self.friend_vitality;
+                hit.shield *= self.friend_shield;
+            }
+            Some(_) => {
+                hit.vitality *= self.enemy_vitality;
+                hit.shield *= self.enemy_shield;
+            }
+            None => {}
+        }
+    }
 }
 
 /// The collision model's node for a model's node: by its name, else the
@@ -709,13 +792,13 @@ pub fn apply_impacts(
                 region,
                 friendly,
                 unsuspecting: facing.dot(impact.direction) > 0.0,
-                multiplayer: false,
-                headshot_kills: true,
+                ..DamageHit::default()
             }
         };
         if let Some(outcome) = damage_object(
             world,
             object,
+            owner,
             effect,
             |world, entity, damageable, random, multiplayer| DamageHit {
                 multiplayer,
@@ -761,6 +844,7 @@ pub fn apply_fall(world: &mut World, object: ObjectHandle, speed: f32) -> Option
     let outcome = damage_object(
         world,
         object,
+        None,
         &effect,
         |_, _, damageable, random, multiplayer| DamageHit {
             scale,
@@ -876,6 +960,7 @@ pub fn apply_detonations(
             if let Some(outcome) = damage_object(
                 world,
                 object,
+                Some(owner).filter(|owner| *owner != object),
                 effect,
                 |_, _, damageable, random, multiplayer| DamageHit {
                     random,
@@ -960,6 +1045,7 @@ pub fn apply_detonations(
                 if let Some(outcome) = damage_object(
                     world,
                     object,
+                    Some(owner).filter(|owner| *owner != object),
                     effect,
                     |_, _, damageable, random, multiplayer| DamageHit {
                         scale,
@@ -984,12 +1070,14 @@ pub fn apply_detonations(
     events
 }
 
-/// `effect` done to `object`, struck as `hit` says (given the world, its
-/// entity, what it is, a random draw and whether the game is multiplayer);
+/// `effect` done to `object` by `owner`'s doing, struck as `hit` says
+/// (given the world, its entity, what it is, a random draw and whether the
+/// game is multiplayer), scaled as the campaign's difficulty scales it;
 /// none if it is not damaged.
 fn damage_object(
     world: &mut World,
     object: ObjectHandle,
+    owner: Option<ObjectHandle>,
     effect: &TagRef,
     hit: impl FnOnce(&World, Entity, &Damageable, f32, bool) -> DamageHit,
 ) -> Option<Outcome> {
@@ -999,7 +1087,10 @@ fn damage_object(
     let tag = &world.get::<Object>(entity)?.tag;
     let damageable = table.objects.get(tag)?;
     let definition = table.effects.get(effect)?;
-    let hit = hit(world, entity, damageable, random, table.multiplayer);
+    let mut hit = hit(world, entity, damageable, random, table.multiplayer);
+    if let Some(difficulty) = world.get_resource::<DifficultyScale>() {
+        difficulty.scale(world, object, owner, &mut hit);
+    }
     let mut vitality = world
         .get::<Vitality>(entity)
         .cloned()

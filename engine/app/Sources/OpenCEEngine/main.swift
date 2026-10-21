@@ -1,6 +1,7 @@
 // The app's entry: the engine's window, full screen with --full-screen,
 // stepping the world on the display's frames, and drawing the map --map
-// PATH names (and --bsp N), or the one chosen from the menus (Play Alone,
+// PATH names (and --bsp N), or the one chosen from the menus (Campaign,
+// which plays a mission at a difficulty with its scripts, Play Alone,
 // Join a Game, Join by Address, Host a Game; Game > Main Menu, Command-
 // Escape, shows them again) or the Map menu, smoothed as --anti-aliasing
 // (temporal, the default, or native) and --render-scale (0.5 to 1) say, or
@@ -257,6 +258,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
+    /// Loads `map` and plays its mission at `difficulty`: its scripts run,
+    /// its cinematics hold the camera.
+    func loadCampaign(map: String, difficulty: UInt8) throws {
+        guard let controller else { return }
+        guard let device = controller.window.engineView.device else { fail("no Metal device") }
+        let loaded = try LoadedLevel(map: map, bsp: 0, cacheFolder: cacheFolder(), device: device,
+                                     settings: settings)
+        if hud == nil {
+            hud = hudPass(device: device)
+        }
+        loaded.renderer.hud = hud
+        try engine.startCampaign(geometry: loaded.geometry, difficultyLevel: difficulty)
+        thirdPerson = false
+        level = loaded
+        followStructure()
+        controller.window.title = "OpenCE Engine — \(URL(fileURLWithPath: map).deletingPathExtension().lastPathComponent)"
+    }
+
+    /// Draws the structure the mission plays in, once its scripts switch
+    /// to another (Halo pauses for it too).
+    func followStructure() {
+        guard let state = engine.campaignState(), let level, UInt32(state.bsp) != level.bsp,
+              let device = controller?.window.engineView.device else { return }
+        do {
+            let switched = try LoadedLevel(map: level.map, bsp: UInt32(state.bsp), cacheFolder: cacheFolder(),
+                                           device: device, settings: settings)
+            switched.renderer.hud = hud
+            self.level = switched
+        } catch {
+            fail("\(level.map) structure \(state.bsp): \(error)")
+        }
+    }
+
     /// Loads `map` and puts the camera at its start.
     func load(map: String, bsp: UInt32 = 0) throws {
         guard let controller else { return }
@@ -353,6 +387,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         earlierKeys = held
         _ = try? engine.advance(frameSeconds: seconds)
+        followStructure()
         showStatus()
         if controller.showsFrameTimes {
             // (four times a second, so that it can be read)
@@ -379,6 +414,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate: MenuActions {
+    func playCampaign(map: URL, difficulty: UInt8) throws {
+        engine.leaveGame()
+        try loadCampaign(map: map.path, difficulty: difficulty)
+        hideMenu()
+    }
+
     func playAlone(map: URL) throws {
         engine.leaveGame()
         try load(map: map.path)

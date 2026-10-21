@@ -62,6 +62,7 @@ public struct MenuView: View {
     private var screen: some View {
         switch model.screen {
         case .main: MainScreen(model: model)
+        case .campaign: CampaignScreen(model: model)
         case .solo: SoloScreen(model: model)
         case .servers: ServersScreen(model: model, list: model.servers)
         case .join: JoinScreen(model: model)
@@ -120,12 +121,41 @@ struct MainScreen: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            MenuButton("Campaign") { model.show(.campaign) }
             MenuButton("Play Alone") { model.show(.solo) }
             MenuButton("Join a Game") { model.show(.servers) }
             MenuButton("Join by Address") { model.show(.join) }
             MenuButton("Host a Game") { model.show(.host) }
             MenuButton("Settings") { model.show(.settings(.game)) }
             MenuButton("Quit") { model.quit() }
+        }
+    }
+}
+
+struct CampaignScreen: View {
+    @Bindable var model: MenuModel
+
+    var body: some View {
+        if model.missionNames.isEmpty {
+            Text("No missions: put a10.map and the others in assets/maps.").foregroundStyle(MenuStyle.faint)
+        } else {
+            VStack(alignment: .leading, spacing: 14) {
+                SettingRow(name: "Difficulty") {
+                    Picker("", selection: $model.difficulty) {
+                        ForEach(Array(MenuModel.difficulties.enumerated()), id: \.offset) { index, name in
+                            Text(name).tag(UInt8(index))
+                        }
+                    }
+                    .labelsHidden()
+                }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(model.missionNames, id: \.self) { name in
+                            MenuButton(name) { model.playCampaign(mission: name) }
+                        }
+                    }
+                }
+            }
         }
     }
 }
