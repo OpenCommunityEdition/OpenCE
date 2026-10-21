@@ -1,6 +1,6 @@
 # Plan: A new native engine in Rust and Swift
 
-## Phase 0: Foundations
+## Phase 0: Foundations [checkpoint: f58d2e10]
 - [x] Task: Record the new engine in the tech stack and the product guide 876be761
     - [x] Update `conductor/tech-stack.md` (the `engine/` workspace, bevy_ecs, rkyv, MetalFX, SwiftUI menus, Jolt from Rust, `cargo deny`) and the vision in `conductor/product.md`, before any code
 - [x] Task: The workspace and its Nix build ac664f6a
@@ -12,7 +12,7 @@
 - [x] Task: The fixed tick and determinism 987d50bd
     - [x] Write tests: a world stepped at 60 Hz from recorded inputs gives the same hash on every run; the renderer's interpolation factor is correct across uneven frame times
     - [x] The `sim` schedule in a fixed order, the input record, the world hash, and deterministic maths (`libm`, no FMA)
-- [ ] Task: Conductor - User Manual Verification 'Phase 0: Foundations' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 0: Foundations' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 1: Import a map and fly through it
 - [ ] Task: Bounds-checked cache readers
