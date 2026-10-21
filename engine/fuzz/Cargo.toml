@@ -1,0 +1,44 @@
+# The importer's fuzz targets (cargo fuzz), outside the workspace: they
+# need a nightly compiler. Run them in `nix develop .#fuzz`:
+#   cd engine/fuzz && cargo fuzz run cache_file -- -max_total_time=600
+# The suite runs the same entry points for a fixed time on the stable
+# compiler (crates/import/src/fuzz_smoke.rs).
+[package]
+name = "opence_fuzz"
+version = "0.0.0"
+edition = "2021"
+license = "CC0-1.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
+opence_content = { path = "../crates/content" }
+opence_import = { path = "../crates/import" }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "cache_file"
+path = "fuzz_targets/cache_file.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "xbox_cache"
+path = "fuzz_targets/xbox_cache.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pack"
+path = "fuzz_targets/pack.rs"
+test = false
+doc = false
+bench = false

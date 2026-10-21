@@ -155,13 +155,25 @@
         default = host;
       };
 
-      devShells.${system}.default = pkgs.mkShell (buildEnvironment // {
-        packages = tools;
-        buildInputs = libraries;
-        shellHook = ''
-          echo "OpenCE macOS shell: python configure.py && ninja macos"
-        '';
-      });
+      devShells.${system} = {
+        default = pkgs.mkShell (buildEnvironment // {
+          packages = tools;
+          buildInputs = libraries;
+          shellHook = ''
+            echo "OpenCE macOS shell: python configure.py && ninja macos"
+          '';
+        });
+
+        # the importer's fuzzing (engine/fuzz): cargo fuzz needs a nightly
+        # compiler for libFuzzer's instrumentation
+        fuzz = pkgs.mkShell {
+          packages = [
+            (pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.minimal))
+            pkgs.cargo-fuzz
+          ];
+          buildInputs = libraries;
+        };
+      };
 
       formatter.${system} = pkgs.nixfmt;
     };

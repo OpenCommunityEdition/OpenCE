@@ -17,6 +17,8 @@ mod vector_palette;
 
 #[cfg(test)]
 mod fake;
+#[cfg(test)]
+mod fuzz_smoke;
 
 pub use cache::{Cache, CacheHeader, CacheKind};
 pub use error::ImportError;
