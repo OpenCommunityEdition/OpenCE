@@ -861,6 +861,23 @@ impl Simulation {
         true
     }
 
+    /// Gives an object a component, or replaces the one it has (a script's
+    /// teleport, its scale); false if `handle` is not in the world.
+    pub fn insert<C: Component>(&mut self, handle: ObjectHandle, component: C) -> bool {
+        let Some(entity) = self
+            .world
+            .get_resource::<ObjectTable>()
+            .and_then(|table| table.entity(handle))
+        else {
+            return false;
+        };
+        let Ok(mut object) = self.world.get_entity_mut(entity) else {
+            return false;
+        };
+        object.insert(component);
+        true
+    }
+
     /// Removes an object; false if `handle` is not in the world.
     pub fn remove(&mut self, handle: ObjectHandle) -> bool {
         objects::remove(&mut self.world, handle)

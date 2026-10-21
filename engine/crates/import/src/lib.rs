@@ -6,6 +6,7 @@
 
 pub mod bitmap;
 pub mod cache;
+pub mod campaign;
 mod effect;
 pub mod error;
 pub mod globals;
@@ -28,6 +29,7 @@ mod fake;
 mod fuzz_smoke;
 
 pub use cache::{Cache, CacheHeader, CacheKind};
+pub use campaign::import_campaign;
 pub use error::ImportError;
 pub use globals::import_globals;
 pub use level::import_level;

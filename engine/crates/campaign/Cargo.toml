@@ -1,0 +1,20 @@
+[package]
+name = "opence_campaign"
+description = "A campaign mission: the functions a scenario's scripts call, given by the simulation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+glam.workspace = true
+libm.workspace = true
+opence_content.workspace = true
+opence_script.workspace = true
+opence_sim.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+opence_import.workspace = true

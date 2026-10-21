@@ -874,7 +874,7 @@ impl<W: World> Runtime<W> {
 }
 
 /// The functions the runtime evaluates itself.
-pub const SPECIAL_FORMS: [&str; 23] = [
+pub const SPECIAL_FORMS: [&str; 24] = [
     "begin",
     "begin_random",
     "if",
@@ -898,6 +898,7 @@ pub const SPECIAL_FORMS: [&str; 23] = [
     "wake",
     "inspect",
     "object_to_unit",
+    "unit",
 ];
 
 /// What a node is to the runtime: its value, its global, its script, its
@@ -969,7 +970,7 @@ fn resolve<W>(
                     _ => None,
                 },
                 "inspect" if count == 1 => Some(Form::Inspect),
-                "object_to_unit" if count == 1 => Some(Form::ObjectToUnit),
+                "object_to_unit" | "unit" if count == 1 => Some(Form::ObjectToUnit),
                 _ => None,
             };
             if let Some(form) = form {

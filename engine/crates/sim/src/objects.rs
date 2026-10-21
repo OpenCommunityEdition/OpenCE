@@ -371,6 +371,7 @@ mod tests {
             rotation: [0.0; 3],
             structure_bsps: 1,
             permutation: None,
+            device: None,
         }
     }
 
@@ -398,6 +399,7 @@ mod tests {
             netgame_flags: Vec::new(),
             netgame_equipment: Vec::new(),
             scripts: Default::default(),
+            campaign: Default::default(),
         }
     }
 

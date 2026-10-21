@@ -24,7 +24,7 @@ use rkyv::util::AlignedVec;
 use crate::Level;
 
 /// The version of this format; a pack of another is not read.
-pub const FORMAT_VERSION: u32 = 16;
+pub const FORMAT_VERSION: u32 = 17;
 
 const MAGIC: [u8; 4] = *b"OCPK";
 const HEADER_SIZE: usize = 0x28;
@@ -182,6 +182,7 @@ mod tests {
                 }],
                 netgame_equipment: Vec::new(),
                 scripts: Default::default(),
+                campaign: Default::default(),
             },
             structure_bsps: vec![StructureBsp {
                 path: bsp.path,

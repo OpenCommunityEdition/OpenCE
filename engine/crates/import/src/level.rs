@@ -15,8 +15,8 @@ use opence_content::{
     AnimationGraph, AtmosphericFog, CollisionBsp, CollisionMaterial, CollisionModel, DamageEffect,
     Effect, EnvironmentVertex, GameTypes, Globals, Group, ItemChoice, Level, Lightmap,
     LightmapVertex, Material, Model, NetgameEquipment, NetgameFlag, NetgameFlagKind,
-    ObjectDefinition, ObjectKind, ObjectPlacement, PlacementPermutation, PlayerStart, Scenario,
-    Sky, StructureBsp, TagRef,
+    ObjectDefinition, ObjectKind, ObjectPlacement, PlacementDevice, PlacementPermutation,
+    PlayerStart, Scenario, Sky, StructureBsp, TagRef,
 };
 
 use crate::cache::Cache;
@@ -170,6 +170,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
 
     let placements = import_placements(&scenario)?;
     let scripts = crate::script::scenario_scripts(&scenario)?;
+    let campaign = crate::campaign::scenario_campaign(&scenario)?;
     let netgame_flags = import_netgame_flags(&scenario)?;
     let netgame_equipment = import_netgame_equipment(cache, &scenario)?;
     let globals = crate::globals::import_globals(cache)?;
@@ -261,6 +262,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
             netgame_flags,
             netgame_equipment,
             scripts,
+            campaign,
         },
         structure_bsps,
         objects,
@@ -754,6 +756,8 @@ pub(crate) const PALETTE_ENTRY_SIZE: usize = 0x30;
 const MAX_PALETTE_ENTRIES: usize = 256;
 /// Where a placement's permutation is: after the object's fields.
 const PLACEMENT_PERMUTATION_OFFSET: usize = 0x28;
+/// Where a device's groups and flags are, in the same place.
+const PLACEMENT_DEVICE_OFFSET: usize = 0x28;
 
 /// The objects the scenario places. A placement whose palette entry is
 /// none, past the palette or empty is not placed, as the game skips it; a
@@ -818,6 +822,16 @@ fn import_placements(scenario: &Element<'_>) -> Result<Vec<ObjectPlacement>, Imp
             } else {
                 None
             };
+            let device = if matches!(kind, ObjectKind::Machine | ObjectKind::Control) {
+                Some(PlacementDevice {
+                    power_group: element.i16(PLACEMENT_DEVICE_OFFSET, "power group")?,
+                    position_group: element.i16(PLACEMENT_DEVICE_OFFSET + 2, "position group")?,
+                    flags: element.u32(PLACEMENT_DEVICE_OFFSET + 4, "device flags")?,
+                    kind_flags: element.u32(PLACEMENT_DEVICE_OFFSET + 8, "machine flags")?,
+                })
+            } else {
+                None
+            };
             placements.push(ObjectPlacement {
                 kind,
                 tag,
@@ -827,6 +841,7 @@ fn import_placements(scenario: &Element<'_>) -> Result<Vec<ObjectPlacement>, Imp
                 rotation,
                 structure_bsps: element.u16(0x20, "structure bsps")?,
                 permutation,
+                device,
             });
         }
     }
@@ -1881,6 +1896,7 @@ pub(crate) mod tests {
                             change_colors: [0xFF10_2030, 0, 0, 0],
                             region_permutations: [0, 3, 0, 0, 0, 0, 0, 0],
                         }),
+                        device: None,
                     },
                     ObjectPlacement {
                         kind: ObjectKind::Equipment,
@@ -1894,6 +1910,7 @@ pub(crate) mod tests {
                         rotation: [0.0; 3],
                         structure_bsps: 0,
                         permutation: None,
+                        device: None,
                     },
                 ]
             );

@@ -19,6 +19,7 @@ opence_sim = { path = "crates/sim" }
 opence_physics = { path = "crates/physics" }
 opence_script = { path = "crates/script" }
 opence_net = { path = "crates/net" }
+opence_campaign = { path = "crates/campaign" }
 thiserror = "2"
 bevy_ecs = { version = "0.20", default-features = false, features = ["std"] }
 rkyv = { version = "0.8", default-features = false, features = ["std", "bytecheck", "alloc"] }

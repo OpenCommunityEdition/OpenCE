@@ -4,6 +4,7 @@
 //! one the importer checked.
 
 pub mod bitmap;
+pub mod campaign;
 pub mod hud;
 pub mod level;
 pub mod object;
@@ -16,6 +17,10 @@ pub mod weapon;
 pub use bitmap::{
     Bitmap, BitmapImage, Pixels, ResourceRange, Sequence, Sprite, Texture, TextureFormat,
 };
+pub use campaign::{
+    CameraPoint, Campaign, Command, CommandList, CutsceneFlag, DeviceGroup, Encounter,
+    FiringPosition, Recording, Squad, StartingLocation, TriggerVolume,
+};
 pub use hud::{
     CrosshairItem, CrosshairKind, GrenadeHud, HudAnchor, HudDigits, HudGlobals, HudMeter,
     HudNumber, HudPlacement, HudStatic, UnitHud, WeaponHud, WeaponHudCrosshair, WeaponHudElement,
@@ -24,8 +29,8 @@ pub use hud::{
 pub use level::{
     AtmosphericFog, CollisionBsp, CollisionMaterial, EnvironmentVertex, FallingDamage, GameType,
     GameTypes, Globals, ItemChoice, Level, Lightmap, LightmapVertex, Material, NetgameEquipment,
-    NetgameFlag, NetgameFlagKind, ObjectPlacement, PlacementPermutation, PlayerPhysics,
-    PlayerStart, Scenario, Sky, StructureBsp,
+    NetgameFlag, NetgameFlagKind, ObjectPlacement, PlacementDevice, PlacementPermutation,
+    PlayerPhysics, PlayerStart, Scenario, Sky, StructureBsp,
 };
 pub use object::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, Biped, ChangeColor,

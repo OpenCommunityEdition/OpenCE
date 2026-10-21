@@ -3,9 +3,9 @@
 use rkyv::{Archive, Deserialize, Serialize};
 
 use crate::{
-    AnimationGraph, Bitmap, CollisionModel, DamageEffect, Effect, Grenade, GrenadeHud, HudDigits,
-    HudGlobals, Model, ObjectDefinition, ObjectKind, Physics, Scripts, Shader, TagRef, UnitHud,
-    WeaponHud,
+    AnimationGraph, Bitmap, Campaign, CollisionModel, DamageEffect, Effect, Grenade, GrenadeHud,
+    HudDigits, HudGlobals, Model, ObjectDefinition, ObjectKind, Physics, Scripts, Shader, TagRef,
+    UnitHud, WeaponHud,
 };
 
 /// Everything a level's structure is drawn and collided with.
@@ -244,6 +244,8 @@ pub struct Scenario {
     pub netgame_equipment: Vec<NetgameEquipment>,
     /// Its scripts.
     pub scripts: Scripts,
+    /// What its scripts name and its AI places.
+    pub campaign: Campaign,
 }
 
 /// The game types something in a scenario is for, as Halo gives them: four
@@ -366,6 +368,8 @@ pub struct ObjectPlacement {
     pub structure_bsps: u16,
     /// Its colors and regions' permutations (scenery, units and weapons).
     pub permutation: Option<PlacementPermutation>,
+    /// Its device groups and flags (machines and controls).
+    pub device: Option<PlacementDevice>,
 }
 
 impl ObjectPlacement {
@@ -373,6 +377,23 @@ impl ObjectPlacement {
     pub fn is_automatic(&self) -> bool {
         self.placement_flags & 1 == 0
     }
+}
+
+/// A placed device's groups and flags (`scenario_device_datum`, and a
+/// machine's or a control's own flags after it).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
+pub struct PlacementDevice {
+    /// The device group its power follows, or `-1`.
+    pub power_group: i16,
+    /// The device group its position follows, or `-1`.
+    pub position_group: i16,
+    /// Its flags: bit 0, starts open; 1, starts off; 2, changes only once;
+    /// 3, its position reversed; 4, not usable from any side.
+    pub flags: u32,
+    /// A machine's flags (bit 0, does not operate by itself; 1, one sided;
+    /// 2, never appears locked; 3, opened by a melee attack), or a
+    /// control's.
+    pub kind_flags: u32,
 }
 
 /// A placed object's appearance.

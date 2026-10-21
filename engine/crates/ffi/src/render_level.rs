@@ -661,6 +661,7 @@ mod tests {
                 netgame_flags: Vec::new(),
                 netgame_equipment: Vec::new(),
                 scripts: Default::default(),
+                campaign: Default::default(),
             },
             structure_bsps: vec![StructureBsp {
                 path: "test".into(),
