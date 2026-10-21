@@ -42,6 +42,11 @@ def test_the_bundle_is_signed(app: Path) -> None:
     subprocess.run(["/usr/bin/codesign", "--verify", "--strict", str(app)], check=True)
 
 
+def test_the_swift_contract_tests_pass(app: Path, tmp_path: Path) -> None:
+    # (after the app fixture, which has checked the tools are there)
+    subprocess.run(["python3", str(ROOT / "tools" / "engine_build.py"), "--out", str(tmp_path), "--test"], check=True)
+
+
 def test_the_dependencies_licences_are_permissive() -> None:
     if shutil.which("cargo-deny") is None:
         pytest.skip("needs nix develop's cargo-deny")

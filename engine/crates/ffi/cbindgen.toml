@@ -1,0 +1,23 @@
+# opence_snapshot.h, the snapshot's types for Swift (tools/engine_build.py)
+language = "C"
+include_guard = "OPENCE_SNAPSHOT_H"
+autogen_warning = "/* Written by cbindgen from engine/crates/ffi/src/snapshot.rs; do not edit. */"
+usize_is_size_t = true
+style = "type"
+cpp_compat = true
+
+[export]
+include = ["FrameSnapshot", "ObjectSnapshot", "CameraSnapshot", "Transform", "Vec3", "Quat"]
+item_types = ["structs", "opaque", "functions", "constants"]
+prefix = "OCE"
+
+[const]
+allow_static_const = false
+
+[parse]
+parse_deps = false
+
+[export.rename]
+# (the prefix is added after the rename)
+"MAX_OBJECTS" = "_MAX_OBJECTS"
+"SNAPSHOT_VERSION" = "_SNAPSHOT_VERSION"

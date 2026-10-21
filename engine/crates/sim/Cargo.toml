@@ -1,11 +1,15 @@
 [package]
 name = "opence_sim"
+description = "The simulation: a bevy_ecs world stepped on a fixed tick"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
 [dependencies]
+bevy_ecs.workspace = true
+glam.workspace = true
+libm.workspace = true
 thiserror.workspace = true
 
 [lints]

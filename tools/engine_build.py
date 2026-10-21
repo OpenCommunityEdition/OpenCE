@@ -6,8 +6,8 @@
 The Rust workspace in engine/ is built as a static library (the ffi crate),
 its UniFFI bindings are written into the Swift package in engine/app, Xcode's
 Swift builds the package against the library, and the executable is laid out
-in a bundle signed ad hoc. Run it inside nix develop, or from the flake's
-engine package.
+in a bundle signed ad hoc. With --test, the package's XCTests run instead.
+Run it inside nix develop, or from the flake's engine package.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ APP_NAME = "OpenCE Engine"
 EXECUTABLE = "OpenCEEngine"
 LIBRARY = "libopence_ffi.a"
 FFI_MODULE = "opence_ffiFFI"
+SNAPSHOT_HEADER = "opence_snapshot.h"
 
 
 def cargo(*args: str) -> None:
@@ -38,7 +39,7 @@ def rust_library() -> Path:
 
 
 def swift_bindings(library: Path, out: Path) -> None:
-    """Writes the UniFFI bindings and puts them where Package.swift expects."""
+    """Writes the UniFFI bindings and the snapshot's header where Package.swift expects them."""
     generated = out / "uniffi"
     shutil.rmtree(generated, ignore_errors=True)
     cargo(
@@ -46,20 +47,28 @@ def swift_bindings(library: Path, out: Path) -> None:
         "--bin", "uniffi-bindgen", "--",
         "generate", "--library", str(library), "--language", "swift", "--out-dir", str(generated),
     )
-    ffi = PACKAGE / "Sources" / "OpenCEEngineFFI"
+    ffi = PACKAGE / "Sources" / FFI_MODULE
     core = PACKAGE / "Sources" / "OpenCEEngineCore"
     for folder in (ffi, core):
         shutil.rmtree(folder, ignore_errors=True)
         folder.mkdir(parents=True)
     shutil.copy(generated / f"{FFI_MODULE}.h", ffi / f"{FFI_MODULE}.h")
+    subprocess.run(
+        [
+            "cbindgen", "--quiet", "--config", str(ENGINE / "crates" / "ffi" / "cbindgen.toml"),
+            "--crate", "opence_ffi", "--output", str(ffi / SNAPSHOT_HEADER), str(ENGINE / "crates" / "ffi"),
+        ],
+        check=True,
+    )
     (ffi / "module.modulemap").write_text(
-        f'module {FFI_MODULE} {{\n    header "{FFI_MODULE}.h"\n    export *\n}}\n'
+        f'module {FFI_MODULE} {{\n    header "{FFI_MODULE}.h"\n    header "{SNAPSHOT_HEADER}"\n    export *\n}}\n'
     )
     shutil.copy(generated / "opence_ffi.swift", core / "opence_ffi.swift")
 
 
-def swift_build(library: Path, out: Path) -> Path:
-    """Builds the package with Xcode's Swift (nixpkgs' cannot link against the macOS 26 SDK)."""
+def swift(command: str, library: Path, out: Path) -> Path:
+    """Runs swift build or swift test with Xcode's Swift (nixpkgs' cannot
+    link against the macOS 26 SDK); returns the build folder."""
     scratch = out / "swift"
     environment = {
         key: value
@@ -68,7 +77,7 @@ def swift_build(library: Path, out: Path) -> Path:
     }
     subprocess.run(
         [
-            "/usr/bin/xcrun", "swift", "build", "-c", "release", "--quiet", "--disable-sandbox",
+            "/usr/bin/xcrun", "swift", command, "-c", "release", "--quiet", "--disable-sandbox",
             "--package-path", str(PACKAGE),
             "--scratch-path", str(scratch),
             "--cache-path", str(scratch / "cache"),
@@ -79,7 +88,7 @@ def swift_build(library: Path, out: Path) -> Path:
         env=environment,
         check=True,
     )
-    return scratch / "release" / EXECUTABLE
+    return scratch / "release"
 
 
 def info_plist(version: str) -> bytes:
@@ -120,12 +129,16 @@ def main() -> None:
     # tools/macos_build.py's HALO_MACOS_APP_CODESIGN)
     parser.add_argument("--codesign", default=os.environ.get("HALO_MACOS_APP_CODESIGN", "/usr/bin/codesign"))
     parser.add_argument("--version", default="0.1.0")
+    parser.add_argument("--test", action="store_true", help="run the package's XCTests instead of making the app")
     arguments = parser.parse_args()
     out = arguments.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     library = rust_library()
     swift_bindings(library, out)
-    executable = swift_build(library, out)
+    if arguments.test:
+        swift("test", library, out)
+        return
+    executable = swift("build", library, out) / EXECUTABLE
     bundle(executable, arguments.codesign, arguments.version, out / f"{APP_NAME}.app")
 
 

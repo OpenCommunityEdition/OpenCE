@@ -23,6 +23,8 @@ thiserror = "2"
 bevy_ecs = { version = "0.20", default-features = false, features = ["std"] }
 rkyv = { version = "0.8", default-features = false, features = ["std", "bytecheck", "alloc"] }
 libm = "0.2"
+# (libm: its functions, not the platform's, for determinism)
+glam = { version = "0.34", default-features = false, features = ["libm"] }
 uniffi = { version = "0.32", default-features = false }
 log = "0.4"
 
