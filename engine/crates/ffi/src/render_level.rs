@@ -688,6 +688,7 @@ mod tests {
             skies: Vec::new(),
             globals: Default::default(),
             damage_effects: Vec::new(),
+            collision_models: Vec::new(),
         }
     }
 

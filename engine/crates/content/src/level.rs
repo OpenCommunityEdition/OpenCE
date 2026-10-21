@@ -3,8 +3,8 @@
 use rkyv::{Archive, Deserialize, Serialize};
 
 use crate::{
-    AnimationGraph, Bitmap, DamageEffect, Grenade, Model, ObjectDefinition, ObjectKind, Shader,
-    TagRef,
+    AnimationGraph, Bitmap, CollisionModel, DamageEffect, Grenade, Model, ObjectDefinition,
+    ObjectKind, Shader, TagRef,
 };
 
 /// Everything a level's structure is drawn and collided with.
@@ -34,6 +34,8 @@ pub struct Level {
     pub globals: Globals,
     /// Every damage effect its objects and globals do, by path.
     pub damage_effects: Vec<DamageEffect>,
+    /// Its objects' collision models, by path.
+    pub collision_models: Vec<CollisionModel>,
 }
 
 /// The game's globals (the `matg` tag) that the simulation reads.
@@ -147,6 +149,11 @@ impl Level {
     /// A damage effect, by its tag.
     pub fn damage_effect(&self, tag: &TagRef) -> Option<&DamageEffect> {
         self.damage_effects.iter().find(|effect| effect.tag == *tag)
+    }
+
+    /// A collision model, by its tag.
+    pub fn collision_model(&self, tag: &TagRef) -> Option<&CollisionModel> {
+        self.collision_models.iter().find(|model| model.tag == *tag)
     }
 
     /// A bitmap, by its tag.

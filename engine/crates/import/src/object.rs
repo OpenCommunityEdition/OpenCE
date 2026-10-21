@@ -904,6 +904,8 @@ pub fn import_collision_model(cache: &Cache, index: usize) -> Result<CollisionMo
             .collect::<Result<_, _>>()?;
         regions.push(CollisionRegion {
             name: name(&region)?,
+            flags: region.u32(0x20, "flags")?,
+            damage_threshold: region.f32(0x28, "damage threshold")?,
             permutations,
         });
     }
@@ -950,8 +952,26 @@ pub fn import_collision_model(cache: &Cache, index: usize) -> Result<CollisionMo
     }
     Ok(CollisionModel {
         tag: tag_ref(cache, index),
+        flags: collision.u32(0x00, "flags")?,
+        indirect_damage_material: optional_index(
+            &collision,
+            0x04,
+            "indirect damage material",
+            materials.len(),
+        )?,
         maximum_body_vitality: collision.f32(0x08, "maximum body vitality")?,
+        friendly_damage_resistance: collision.f32(0x44, "friendly damage resistance")?,
+        body_damaged_threshold: collision.f32(0x94, "body damaged threshold")?,
+        body_destroyed_threshold: collision.f32(0xB8, "body destroyed threshold")?,
         maximum_shield_vitality: collision.f32(0xCC, "maximum shield vitality")?,
+        shield_material_type: collision.i16(0xD2, "shield material type")?,
+        shield_failure_function: collision.i16(0xEC, "shield failure function")?,
+        shield_failure_threshold: collision.f32(0xF0, "shield failure threshold")?,
+        failing_shield_leak_fraction: collision.f32(0xF4, "failing shield leak fraction")?,
+        minimum_stun_damage: collision.f32(0x108, "minimum stun damage")?,
+        stun_time: collision.f32(0x10C, "stun time")?,
+        recharge_time: collision.f32(0x110, "recharge time")?,
+        shield_damaged_threshold: collision.f32(0x184, "shield damaged threshold")?,
         materials,
         regions,
         pathfinding_box,
@@ -1398,6 +1418,8 @@ mod tests {
         permutations.extend(named(COLLISION_PERMUTATION_SIZE, "damaged"));
         let permutations = fake.add_data(&permutations);
         let mut collision_region = named(COLLISION_REGION_SIZE, "body");
+        put(&mut collision_region, 0x20, &2u32.to_le_bytes());
+        put(&mut collision_region, 0x28, &50.0f32.to_le_bytes());
         block(&mut collision_region, 0x48, 2, permutations);
         let regions = fake.add_data(&collision_region);
         let mut node = named(COLLISION_NODE_SIZE, "root");
@@ -1408,8 +1430,10 @@ mod tests {
         let spheres = fake.add_data(&sphere);
 
         let mut collision = vec![0u8; COLLISION_MODEL_SIZE];
+        put(&mut collision, 0x04, &shorts(&[-1]));
         put(&mut collision, 0x08, &100.0f32.to_le_bytes());
         put(&mut collision, 0xCC, &75.0f32.to_le_bytes());
+        put(&mut collision, 0x108, &floats(&[5.0, 1.0, 2.0]));
         block(&mut collision, 0x234, 1, materials);
         block(&mut collision, 0x240, 1, regions);
         put(
@@ -1429,6 +1453,18 @@ mod tests {
         let collision = import_collision_model(&cache, index)?;
         assert_eq!(collision.maximum_body_vitality, 100.0);
         assert_eq!(collision.maximum_shield_vitality, 75.0);
+        assert_eq!(collision.indirect_damage_material, None);
+        assert_eq!(
+            (
+                collision.minimum_stun_damage,
+                collision.stun_time,
+                collision.recharge_time
+            ),
+            (5.0, 1.0, 2.0)
+        );
+        assert_eq!(collision.regions[0].flags, 2);
+        assert_eq!(collision.regions[0].damage_threshold, 50.0);
+        assert_eq!(collision.node_material(0), None);
         assert_eq!(collision.materials[0].name, "flesh");
         assert_eq!(collision.materials[0].material_type, 3);
         assert_eq!(collision.materials[0].shield_damage_multiplier, 2.0);

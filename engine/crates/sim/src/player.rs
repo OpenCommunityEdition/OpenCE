@@ -10,14 +10,16 @@
 
 use bevy_ecs::prelude::*;
 use glam::{Quat, Vec2, Vec3};
-use opence_content::{Biped, Level, ObjectKind, TagRef};
+use opence_content::{Biped, Level, ObjectKind, TagRef, Weapon};
 use opence_physics::{
-    Layers, LevelMesh, MovementInput, Mover, MoverSettings, PhysicsError, World as PhysicsWorld,
-    WorldSettings,
+    Hit, Layers, LevelMesh, MovementInput, Mover, MoverSettings, PhysicsError, Struck,
+    World as PhysicsWorld, WorldSettings,
 };
 use thiserror::Error;
 
 use crate::armory::{self, Armory, Carried, Inventory, WeaponItem};
+use crate::clock;
+use crate::damage;
 use crate::hash::WorldHasher;
 use crate::input::{Buttons, TickInput};
 use crate::objects::{self, Object, ObjectHandle, ObjectSpawn};
@@ -26,6 +28,16 @@ use crate::random::RandomSeed;
 use crate::units::Radians;
 use crate::weapon::{secondary, WeaponControls, WeaponState};
 use crate::{FreeCamera, Transform};
+
+/// How far the player's melee reaches from its eyes, in world units.
+pub const MELEE_RANGE: f32 = 0.8;
+/// The rays across and up the melee's fan.
+const MELEE_RAYS: u32 = 5;
+/// How far the fan's outer rays lean from the aim (as the tangent).
+const MELEE_SPREAD: f32 = 0.1;
+/// The ticks after a melee before the next, and before it fires (the
+/// port's: the game waits on the melee animation).
+pub const MELEE_RECOVERY_TICKS: u32 = clock::TICKS_PER_SECOND;
 
 /// Where the player sees from.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -99,6 +111,10 @@ pub struct Player {
     held: Buttons,
     /// The world's gravity, in world units per second per second.
     gravity: f32,
+    /// The ticks before it can melee again.
+    melee_ticks: u32,
+    /// The speed of this tick's landing into the ground, if it landed.
+    landed: Option<f32>,
 }
 
 /// What the tick's systems need of the player: where its object goes and
@@ -172,6 +188,8 @@ impl Player {
             flights: Vec::new(),
             held: Buttons::default(),
             gravity: -settings.gravity.z,
+            melee_ticks: 0,
+            landed: None,
         })
     }
 
@@ -246,7 +264,9 @@ impl Player {
         };
         // (the physics refuses only numbers that are not finite, which the
         // input never holds: a refused step leaves the biped where it was)
+        let airborne = self.mover.airborne;
         let _ = self.mover.step(&mut self.physics, &movement);
+        self.landed = (airborne && !self.mover.airborne).then_some(self.mover.landing_velocity);
         self.pose()
     }
 
@@ -282,6 +302,11 @@ impl Player {
         }
     }
 
+    /// The speed it landed at this tick, into the ground, if it landed.
+    pub fn landed(&self) -> Option<f32> {
+        self.landed
+    }
+
     /// Its eyes, and where they look.
     fn aim(&self) -> (Vec3, Quat) {
         (
@@ -301,9 +326,17 @@ impl Player {
         if buttons.pressed(held, Buttons::SWAP) {
             self.inventory.swap(&self.armory);
         }
-        let fire = buttons.contains(Buttons::FIRE);
-        let reload = buttons.pressed(held, Buttons::RELOAD);
         let (eyes, aim) = self.aim();
+        let mut impacts = impacts;
+        self.melee_ticks = self.melee_ticks.saturating_sub(1);
+        if buttons.pressed(held, Buttons::MELEE) && self.melee_ticks == 0 {
+            if let Some(impact) = self.melee(world, eyes, aim) {
+                impacts.push(impact);
+            }
+        }
+        // (no firing while the melee recovers)
+        let fire = buttons.contains(Buttons::FIRE) && self.melee_ticks == 0;
+        let reload = buttons.pressed(held, Buttons::RELOAD);
         let Some(carried) = self.inventory.current_mut() else {
             return impacts;
         };
@@ -370,16 +403,37 @@ impl Player {
     fn fly(&mut self, world: &mut World) -> Vec<Impact> {
         let mut impacts = Vec::new();
         let physics = &self.physics;
+        let targets = damage::targets(world, self.handle);
         let mut poses = Vec::with_capacity(self.flights.len());
         self.flights.retain_mut(|flight| {
-            let flew = flight
-                .step(|from, path| physics.cast_ray(from, path, Layers::LEVEL).ok().flatten());
+            // (the nearer of the level and the bipeds; the biped struck is
+            // kept for the impact)
+            let mut struck = None;
+            let flew = flight.step(|from, path| {
+                let level = physics.cast_ray(from, path, Layers::LEVEL).ok().flatten();
+                struck = None;
+                match damage::first_target(&targets, from, path) {
+                    Some((target, fraction, normal))
+                        if level.as_ref().is_none_or(|hit| fraction < hit.fraction) =>
+                    {
+                        struck = Some(target.handle);
+                        Some(Hit {
+                            fraction,
+                            point: from + path * fraction,
+                            normal,
+                            struck: Struck::Other,
+                        })
+                    }
+                    _ => level,
+                }
+            });
             match flew {
                 Flew::On => {
                     poses.push((flight.handle, flight.transform()));
                     true
                 }
-                Flew::Hit(impact) => {
+                Flew::Hit(mut impact) => {
+                    impact.object = struck;
                     impacts.push(impact);
                     objects::remove(world, flight.handle);
                     false
@@ -392,6 +446,48 @@ impl Player {
         });
         world.insert_resource(ProjectilePoses(poses));
         impacts
+    }
+
+    /// Its melee: the nearest biped within reach of its eyes along `aim`,
+    /// before the level, struck with its weapon's melee damage.
+    fn melee(&mut self, world: &mut World, eyes: Vec3, aim: Quat) -> Option<Impact> {
+        let carried = self.inventory.current()?;
+        let definition = self.armory.get(carried.armory)?;
+        let weapon = &definition.weapon;
+        if weapon.flags & Weapon::PREVENTS_MELEE_ATTACK != 0 {
+            return None;
+        }
+        self.melee_ticks = MELEE_RECOVERY_TICKS;
+        let damage = weapon.melee_damage.clone()?;
+        let targets = damage::targets(world, self.handle);
+        // (a fan of rays about the aim, the nearest hit taken)
+        let mut nearest: Option<(f32, damage::Target, Vec3, Vec3)> = None;
+        for step in 0..MELEE_RAYS * MELEE_RAYS {
+            let across =
+                |index: u32| (index as f32 / (MELEE_RAYS - 1) as f32 - 0.5) * 2.0 * MELEE_SPREAD;
+            let local = Vec3::new(1.0, across(step % MELEE_RAYS), across(step / MELEE_RAYS));
+            let path = aim * local.normalize() * MELEE_RANGE;
+            let reach = match self.physics.cast_ray(eyes, path, Layers::LEVEL) {
+                Ok(Some(hit)) => hit.fraction,
+                _ => 1.0,
+            };
+            if let Some((target, fraction, normal)) = damage::first_target(&targets, eyes, path) {
+                if fraction < reach && nearest.is_none_or(|(best, ..)| fraction < best) {
+                    nearest = Some((fraction, target, path, normal));
+                }
+            }
+        }
+        let (fraction, target, path, normal) = nearest?;
+        Some(Impact {
+            projectile: definition.tag.clone(),
+            owner: self.handle,
+            damage: Some(damage),
+            point: eyes + path * fraction,
+            normal,
+            direction: path.normalize_or_zero(),
+            struck: Struck::Other,
+            object: Some(target.handle),
+        })
     }
 
     /// Takes the rounds of weapons it walks over that it carries, and
@@ -521,6 +617,7 @@ impl Player {
             View::ThirdPerson => 1,
         });
         hasher.u64(u64::from(self.held.0));
+        hasher.u64(u64::from(self.melee_ticks));
         self.inventory.hash(hasher);
         hasher.u64(self.flights.len() as u64);
         for flight in &self.flights {

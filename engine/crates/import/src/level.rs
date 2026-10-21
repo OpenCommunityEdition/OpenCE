@@ -12,7 +12,7 @@ use opence_content::level::{
     CollisionVertex,
 };
 use opence_content::{
-    AnimationGraph, AtmosphericFog, CollisionBsp, CollisionMaterial, DamageEffect,
+    AnimationGraph, AtmosphericFog, CollisionBsp, CollisionMaterial, CollisionModel, DamageEffect,
     EnvironmentVertex, Globals, Group, Level, Lightmap, LightmapVertex, Material, Model,
     ObjectDefinition, ObjectKind, ObjectPlacement, PlacementPermutation, PlayerStart, Scenario,
     Sky, StructureBsp, TagRef,
@@ -178,6 +178,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     let (objects, mut models, animation_graphs) =
         import_placed_objects(cache, &placements, &players, &mut reached)?;
     let damage_effects = import_damage_effects(cache, &objects, &globals)?;
+    let collision_models = import_collision_models(cache, &objects)?;
     let skies = import_skies(cache, &scenario, &mut models, &mut reached)?;
 
     // (a shader's extra layers are shaders too, reached as each is read)
@@ -233,6 +234,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         skies,
         globals,
         damage_effects,
+        collision_models,
     };
     check_lightmap_pages(&level)?;
     Ok(level)
@@ -333,8 +335,28 @@ fn import_placed_objects(
     ))
 }
 
-/// The scenario's skies, their models added to `models` (kept in order
-/// of their paths) and their models' shaders reached.
+/// The collision models of `objects`, each once, by path.
+fn import_collision_models(
+    cache: &Cache,
+    objects: &[ObjectDefinition],
+) -> Result<Vec<CollisionModel>, ImportError> {
+    let tags: BTreeSet<&TagRef> = objects
+        .iter()
+        .filter_map(|object| object.collision_model.as_ref())
+        .collect();
+    tags.into_iter()
+        .map(|tag| {
+            let index = tag_index(cache, tag).ok_or_else(|| ImportError::Tag {
+                tag: tag.path.clone(),
+                group: GroupTag::new(&tag.group.0),
+                field: "collision model".into(),
+                reason: "is referred to but not in the map".into(),
+            })?;
+            crate::object::import_collision_model(cache, index)
+        })
+        .collect()
+}
+
 /// Every damage effect `objects` and `globals` do (a weapon's melee, a
 /// projectile's impact and attached detonation, falling), each once, by
 /// path.
@@ -1152,7 +1174,7 @@ pub(crate) mod tests {
     use crate::cache::CacheKind;
     use crate::fake::FakeCache;
     use crate::shader::{SCHI, SENV};
-    use opence_content::{Pixels, ShaderClass, Texture, TextureFormat};
+    use opence_content::{CollisionModelMaterial, Pixels, ShaderClass, Texture, TextureFormat};
 
     const BSP_BASE: u32 = 0x4000_0000;
 
@@ -1811,6 +1833,43 @@ pub(crate) mod tests {
         let falling = level.globals.falling.falling_damage.as_ref();
         let falling = falling.and_then(|tag| level.damage_effect(tag));
         assert_eq!(falling.map(|effect| effect.damage), Some([155.0, 155.0]));
+        // (the multiplayer cyborg: its shield, its head, its regions)
+        let Some(cyborg) = level
+            .globals
+            .multiplayer_unit
+            .as_ref()
+            .and_then(|tag| level.object(tag))
+            .and_then(|object| object.collision_model.as_ref())
+            .and_then(|tag| level.collision_model(tag))
+        else {
+            panic!("no cyborg collision model");
+        };
+        eprintln!(
+            "cyborg: body {} shield {} stun {}s recharge {}s, materials {:?}",
+            cyborg.maximum_body_vitality,
+            cyborg.maximum_shield_vitality,
+            cyborg.stun_time,
+            cyborg.recharge_time,
+            cyborg
+                .materials
+                .iter()
+                .map(|material| (&material.name, material.flags))
+                .collect::<Vec<_>>()
+        );
+        assert!(cyborg.maximum_body_vitality > 0.0 && cyborg.maximum_shield_vitality > 0.0);
+        assert!(cyborg.stun_time > 0.0 && cyborg.recharge_time > 0.0);
+        assert!(cyborg
+            .materials
+            .iter()
+            .any(|material| material.flags & CollisionModelMaterial::HEAD != 0));
+        let head = cyborg
+            .nodes
+            .iter()
+            .position(|node| node.name.contains("head"));
+        let Some(material) = head.and_then(|head| cyborg.node_material(head)) else {
+            panic!("the head has no material");
+        };
+        assert!(cyborg.materials[usize::from(material)].flags & CollisionModelMaterial::HEAD != 0);
     }
 
     /// Every stock map, in release builds (`cargo test --release -- --ignored`).

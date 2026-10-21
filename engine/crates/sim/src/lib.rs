@@ -10,6 +10,7 @@
 pub mod animation;
 pub mod armory;
 pub mod clock;
+pub mod damage;
 pub mod hash;
 pub mod input;
 pub mod objects;
@@ -152,6 +153,8 @@ pub struct Simulation {
     player: Option<Player>,
     /// Where projectiles hit in the last tick.
     impacts: Vec<projectile::Impact>,
+    /// What damage did in the last tick.
+    damage: Vec<damage::DamageEvent>,
 }
 
 /// An object as the renderer draws it.
@@ -185,11 +188,12 @@ impl Simulation {
         schedule.set_executor(SingleThreadedExecutor::new());
         schedule.configure_sets((SimSet::Input, SimSet::Simulate, SimSet::Finish).chain());
         schedule.add_systems((
-            (look_free_camera, remember_transforms).in_set(SimSet::Input),
+            (look_free_camera, remember_transforms, damage::give_vitality).in_set(SimSet::Input),
             (
                 move_free_camera,
                 player::move_player.before(animation::play_animations),
                 player::move_projectiles,
+                damage::recover_vitality,
                 animation::play_animations,
             )
                 .in_set(SimSet::Simulate),
@@ -200,6 +204,7 @@ impl Simulation {
             schedule,
             player: None,
             impacts: Vec::new(),
+            damage: Vec::new(),
         }
     }
 
@@ -208,10 +213,25 @@ impl Simulation {
     pub fn step(&mut self, input: TickInput) {
         self.world.insert_resource(CurrentInput(input));
         self.impacts.clear();
+        self.damage.clear();
         if let Some(player) = self.player.as_mut() {
+            // (the dead neither move nor fire, though they still fall)
+            let handle = player.handle();
+            let dead = self
+                .world
+                .resource::<ObjectTable>()
+                .entity(handle)
+                .and_then(|entity| self.world.get::<damage::Vitality>(entity))
+                .is_some_and(|vitality| vitality.dead);
+            let input = if dead { TickInput::default() } else { input };
             let pose = player.step(&input);
             self.world.insert_resource(pose);
             self.impacts = player.step_weapons(&input, &mut self.world);
+            self.damage = damage::apply_impacts(&mut self.world, &self.impacts, Some(handle));
+            if let Some(speed) = player.landed() {
+                self.damage
+                    .extend(damage::apply_fall(&mut self.world, handle, speed));
+            }
         }
         self.schedule.run(&mut self.world);
     }
@@ -244,6 +264,9 @@ impl Simulation {
             .ok()
         })?;
         let handle = player.handle();
+        // (multiplayer's rules: the scenario does not yet say which it is)
+        self.world
+            .insert_resource(damage::DamageTable::new(level, true));
         self.player = Some(player);
         self.place_player_camera();
         Ok(handle)
@@ -252,6 +275,11 @@ impl Simulation {
     /// Where projectiles hit in the last tick.
     pub fn impacts(&self) -> &[projectile::Impact] {
         &self.impacts
+    }
+
+    /// What damage did in the last tick.
+    pub fn damage_events(&self) -> &[damage::DamageEvent] {
+        &self.damage
     }
 
     /// The player, if there is one.
@@ -479,11 +507,12 @@ impl Simulation {
                 Option<&Team>,
                 Option<&AnimationPlayer>,
                 Option<&armory::WeaponItem>,
+                Option<&damage::Vitality>,
             )>()
             .iter(&self.world)
             .collect();
         objects.sort_by_key(|(id, ..)| **id);
-        for (id, transform, object, name, permutation, team, player, item) in objects {
+        for (id, transform, object, name, permutation, team, player, item, vitality) in objects {
             hasher.u64(u64::from(id.0));
             transform.hash(&mut hasher);
             hasher.u64(kind_index(object.kind) as u64);
@@ -521,6 +550,10 @@ impl Simulation {
             if let Some(item) = item {
                 hasher.u64(1);
                 item.0.hash(&mut hasher);
+            }
+            if let Some(vitality) = vitality {
+                hasher.u64(2);
+                vitality.hash(&mut hasher);
             }
         }
         // (nothing for no player, so that a world without one hashes as

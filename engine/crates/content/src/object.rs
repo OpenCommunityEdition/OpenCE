@@ -519,10 +519,39 @@ pub struct WeaponType {
 pub struct CollisionModel {
     /// Its tag.
     pub tag: TagRef,
+    /// How it takes damage ([`CollisionModel::TAKES_SHIELD_FOR_CHILDREN`]
+    /// and the others).
+    pub flags: u32,
+    /// The material that damage without a surface (an explosion's) hits.
+    pub indirect_damage_material: Option<u16>,
     /// The body's vitality.
     pub maximum_body_vitality: f32,
+    /// How much less damage its own side does it.
+    pub friendly_damage_resistance: f32,
+    /// The body's vitality below which it shows its damage.
+    pub body_damaged_threshold: f32,
+    /// The body's vitality below which it is destroyed, not killed (below
+    /// 0, when it is below 0).
+    pub body_destroyed_threshold: f32,
     /// The shield's vitality.
     pub maximum_shield_vitality: f32,
+    /// The physics material of the shield.
+    pub shield_material_type: i16,
+    /// How the shield's failure grows: a transition function (linear,
+    /// early, very early, late, very late, cosine).
+    pub shield_failure_function: i16,
+    /// The shield's vitality below which it starts to fail.
+    pub shield_failure_threshold: f32,
+    /// The most damage that leaks through a failing shield.
+    pub failing_shield_leak_fraction: f32,
+    /// The least damage to the shield that stuns it.
+    pub minimum_stun_damage: f32,
+    /// How long a stunned shield waits to recharge, in seconds.
+    pub stun_time: f32,
+    /// How long the shield takes to recharge fully, in seconds.
+    pub recharge_time: f32,
+    /// The shield's vitality below which it shows its damage.
+    pub shield_damaged_threshold: f32,
     /// What its surfaces are made of.
     pub materials: Vec<CollisionModelMaterial>,
     /// Its regions, each with its permutations' names.
@@ -536,12 +565,43 @@ pub struct CollisionModel {
     pub nodes: Vec<CollisionNode>,
 }
 
+impl CollisionModel {
+    /// Its children's damage goes to its shield.
+    pub const TAKES_SHIELD_FOR_CHILDREN: u32 = 1 << 0;
+    /// Its children's damage goes to its body.
+    pub const TAKES_BODY_FOR_CHILDREN: u32 = 1 << 1;
+    /// Its shield always takes its own side's damage.
+    pub const ALWAYS_SHIELDS_FRIENDLY_DAMAGE: u32 = 1 << 2;
+    /// Only explosions hurt it.
+    pub const ONLY_HURT_BY_EXPLOSIVES: u32 = 1 << 5;
+
+    /// The material of its node `node`: the one most of its first BSP's
+    /// surfaces are made of.
+    pub fn node_material(&self, node: usize) -> Option<u16> {
+        let bsp = self.nodes.get(node)?.bsps.first()?;
+        let mut counts = vec![0u32; self.materials.len()];
+        for surface in &bsp.surfaces {
+            if let Some(count) = surface
+                .material
+                .and_then(|material| counts.get_mut(usize::from(material)))
+            {
+                *count += 1;
+            }
+        }
+        let (most, &count) = counts
+            .iter()
+            .enumerate()
+            .max_by_key(|&(index, count)| (*count, std::cmp::Reverse(index)))?;
+        (count > 0).then_some(most as u16)
+    }
+}
+
 /// What a collision model's surface is made of.
 #[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct CollisionModelMaterial {
     /// Its name.
     pub name: String,
-    /// Its flags (bit 0: the head).
+    /// Its flags ([`CollisionModelMaterial::HEAD`]).
     pub flags: u32,
     /// The physics material type.
     pub material_type: i16,
@@ -553,13 +613,30 @@ pub struct CollisionModelMaterial {
     pub body_damage_multiplier: f32,
 }
 
+impl CollisionModelMaterial {
+    /// It is a head: headshots kill.
+    pub const HEAD: u32 = 1 << 0;
+}
+
 /// A region of a collision model.
 #[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct CollisionRegion {
     /// Its name.
     pub name: String,
+    /// What its destruction does ([`CollisionRegion::FORCES_OBJECT_TO_DIE`]
+    /// and the others).
+    pub flags: u32,
+    /// The damage that destroys it (0: it is not destroyed).
+    pub damage_threshold: f32,
     /// Its permutations' names.
     pub permutations: Vec<String>,
+}
+
+impl CollisionRegion {
+    /// Its destruction kills the object.
+    pub const FORCES_OBJECT_TO_DIE: u32 = 1 << 1;
+    /// It is destroyed when the object dies.
+    pub const DIES_WHEN_OBJECT_DIES: u32 = 1 << 2;
 }
 
 /// A sphere pathfinding keeps out of.

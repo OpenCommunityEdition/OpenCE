@@ -64,6 +64,8 @@ pub struct Impact {
     pub direction: Vec3,
     /// What it hit.
     pub struck: Struck,
+    /// The object it hit, if it hit one.
+    pub object: Option<ObjectHandle>,
 }
 
 /// What a tick of flight came to.
@@ -147,6 +149,7 @@ impl Flight {
                     normal: hit.normal,
                     direction: path.normalize_or_zero(),
                     struck: hit.struck,
+                    object: None,
                 });
             }
         }
