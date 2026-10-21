@@ -52,9 +52,9 @@
 - [x] Task: Animation 9e57d296
     - [x] Write tests: node matrices from the animation graph for fixed frames match the reference app's (recorded); blending and overlays; compressed and uncompressed animations
     - [x] Animation playback and blending in Rust; node matrices into the snapshot
-- [ ] Task: Drawing models
-    - [ ] Write tests: golden frames of bloodgulch's objects and a campaign map's standing bipeds; levels of detail chosen by screen size
-    - [ ] Skinned models on the GPU, the model shaders as materials, permutations and regions
+- [x] Task: Drawing models 61fe8c9e
+    - [x] Write tests: golden frames of bloodgulch's objects and a campaign map's standing bipeds; levels of detail chosen by screen size
+    - [x] Skinned models on the GPU, the model shaders as materials, permutations and regions
 - [ ] Task: Skies, fog, decals and effects
     - [ ] Write tests: golden frames of the sky and fog on two maps; particle systems and effects from scenery, with the frame clock
     - [ ] Sky, fog, level decals, particles and the effects that scenery plays
