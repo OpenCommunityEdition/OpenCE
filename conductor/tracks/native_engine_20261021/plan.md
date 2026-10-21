@@ -26,8 +26,8 @@
     - [x] rkyv archives with validation; bitmap conversion to BC or RGBA8 with mipmaps; the cache folder
 - [x] Task: Fuzz the importer d0abab1f
     - [x] Write tests: `cargo fuzz` targets for the cache readers and `.ocpak` loading, run for a fixed time in the suite without crashes
-- [ ] Task: Import every map
-    - [ ] Write tests: pytest (marked, needs `assets/maps`) imports every stock map and the Custom Edition maps present, and checks the counts of tags, BSPs and bitmaps
+- [x] Task: Import every map 8ccbe7ba
+    - [x] Write tests: pytest (marked, needs `assets/maps`) imports every stock map and the Custom Edition maps present, and checks the counts of tags, BSPs and bitmaps
 - [ ] Task: The app and window
     - [ ] Write tests: XCTest of the window model (full screen, any size, Retina scale), cursor capture on focus and release on Escape or loss of focus, raw mouse deltas without acceleration
     - [ ] The Swift app: AppKit window with a `CAMetalLayer`, full screen, cursor capture, the display link at the display's rate
