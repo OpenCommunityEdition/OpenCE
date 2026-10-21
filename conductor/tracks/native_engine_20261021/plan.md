@@ -58,9 +58,9 @@
 - [x] Task: Skies, fog, decals and effects ebd01c83
     - [x] Write tests: golden frames of the sky and fog on two maps; particle systems and effects from scenery, with the frame clock
     - [x] Sky, fog, level decals, particles and the effects that scenery plays
-- [ ] Task: The benchmark
-    - [ ] Write tests: `tools/test_engine_benchmark.py` flies a recorded path over bloodgulch at 3840×2160 for 60 s and reports p50 and p99
-    - [ ] Meet p99 ≤ 8.33 ms on the M1 Max; record the result in `docs/engine.md`
+- [x] Task: The benchmark f49099b6
+    - [x] Write tests: `tools/test_engine_benchmark.py` flies a recorded path over bloodgulch at 3840×2160 for 60 s and reports p50 and p99
+    - [x] Meet p99 ≤ 8.33 ms on the M1 Max; record the result in `docs/engine.md`
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Objects, models and animation' (Protocol in workflow.md)
 
 ## Phase 3: Player movement and collision
