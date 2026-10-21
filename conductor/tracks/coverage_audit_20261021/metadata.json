@@ -1,0 +1,8 @@
+{
+  "track_id": "coverage_audit_20261021",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-10-21T00:00:00Z",
+  "updated_at": "2026-10-21T00:00:00Z",
+  "description": "Coverage of every map, a cutscene audit against the reference game, the fixes, and a review of the engine"
+}

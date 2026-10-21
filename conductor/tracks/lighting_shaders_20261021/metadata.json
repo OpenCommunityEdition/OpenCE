@@ -1,0 +1,8 @@
+{
+  "track_id": "lighting_shaders_20261021",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-10-21T00:00:00Z",
+  "updated_at": "2026-10-21T00:00:00Z",
+  "description": "Lighting, shaders, decals and effects drawn: a physically based shader model for every Halo shader class, re-baked bounced light with AO and probes, dynamic lights and shadows, lens flares, decals and particles drawn"
+}

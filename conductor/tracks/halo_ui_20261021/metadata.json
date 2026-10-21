@@ -1,0 +1,8 @@
+{
+  "track_id": "halo_ui_20261021",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-10-21T00:00:00Z",
+  "updated_at": "2026-10-21T00:00:00Z",
+  "description": "The Halo UI from the user's ui.map, a launcher with only Play, Settings and Exit, and the Xbox loading screen between campaign maps"
+}

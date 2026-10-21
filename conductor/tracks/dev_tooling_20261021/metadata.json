@@ -1,0 +1,8 @@
+{
+  "track_id": "dev_tooling_20261021",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-10-21T00:00:00Z",
+  "updated_at": "2026-10-21T00:00:00Z",
+  "description": "The developer shell, engine hooks and a test map: a terminal-like overlay, a control socket and the opence tool, debug drawing, live shader reload, a test driver, the devmap, and placement checks against the reference game"
+}

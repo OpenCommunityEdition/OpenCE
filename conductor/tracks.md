@@ -13,3 +13,27 @@ This file tracks all major tracks for the project.
 
 - [x] **Track: A new native engine in Rust and Swift: no 32-bit VM, maps imported to a typed format, a modern Metal renderer, and the game rebuilt in seven milestones**
   *Link: [./tracks/native_engine_20261021/](./tracks/native_engine_20261021/)*
+
+- [ ] **Track: The developer shell, engine hooks and a test map: a terminal-like overlay, a control socket and the opence tool, debug drawing, live shader reload, a test driver, the devmap, and placement checks against the reference game**
+  *Link: [./tracks/dev_tooling_20261021/](./tracks/dev_tooling_20261021/)*
+
+- [ ] **Track: Lighting, shaders, decals and effects drawn: a physically based shader model for every Halo shader class, re-baked bounced light with AO and probes, dynamic lights and shadows, lens flares, decals and particles drawn**
+  *Link: [./tracks/lighting_shaders_20261021/](./tracks/lighting_shaders_20261021/)*
+
+- [ ] **Track: The Halo UI from the user's ui.map, a launcher with only Play, Settings and Exit, and the Xbox loading screen between campaign maps**
+  *Link: [./tracks/halo_ui_20261021/](./tracks/halo_ui_20261021/)*
+
+- [ ] **Track: The complete animation set for bipeds, weapons, the first person, vehicles, AI, devices and cutscenes**
+  *Link: [./tracks/animation_20261021/](./tracks/animation_20261021/)*
+
+- [ ] **Track: Complete physics: objects as mass-point bodies, collisions, forces, grenades, vehicles and devices**
+  *Link: [./tracks/physics_20261021/](./tracks/physics_20261021/)*
+
+- [ ] **Track: The complete particle system: particles and their physics, particle systems, effects, contrails, weather and wind**
+  *Link: [./tracks/particles_20261021/](./tracks/particles_20261021/)*
+
+- [ ] **Track: Sound: every sound tag, looping sounds, music, dialogue, sound environments and the scripts' waits on sounds**
+  *Link: [./tracks/sound_20261021/](./tracks/sound_20261021/)*
+
+- [ ] **Track: Coverage of every map, a cutscene audit against the reference game, the fixes, and a review of the engine**
+  *Link: [./tracks/coverage_audit_20261021/](./tracks/coverage_audit_20261021/)*
