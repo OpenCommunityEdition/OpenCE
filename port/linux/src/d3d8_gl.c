@@ -26,6 +26,7 @@ Conventions carried over from the Xbox:
 #include "halo_ui_pointer.h"
 #include "port_config.h"
 #include "posix.h"
+#include "gpu_profile.h"
 #include "main/console.h"
 #ifdef HALO_ANDROID
 #include "../../android/include/android_render_policy.h"
@@ -2551,10 +2552,10 @@ static void gl_initialize(void)
 	}
 	{
 		long every = config_integer("debug.gpu_flush_draws");
-		const char *renderer = (const char *)glGetString(GL_RENDERER);
 
+		gpu_profile_initialize();
 		if (every < 0)
-			every = renderer && strstr(renderer, "Mesa Intel") ? 3 : 0;
+			every = gpu_profile_flush_draws();
 		if (every > 0)
 		{
 			device.flush_every = (unsigned long)every;
@@ -3166,7 +3167,6 @@ static BOOL visibility_queries_initialize(void)
 
 static void visibility_results_initialize(void)
 {
-	const char *vendor = (const char *)glGetString(GL_VENDOR);
 	GLsizeiptr size = VISIBILITY_BATCH_COUNT * VISIBILITY_TEST_SLOTS * sizeof(GLuint);
 	GLbitfield flags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
 	BOOL success;
@@ -3178,7 +3178,7 @@ static void visibility_results_initialize(void)
 	into the buffer (Mesa's GL thread waits for everything before a
 	glGetQueryObjectuiv, even one into a bound buffer), each batch into its
 	own part, with a fence after the copies. */
-	if (!vendor || strcmp(vendor, "ATI Technologies Inc."))
+	if (!gpu_profile_cpu_visibility())
 	{
 		visibility_readback_gl_ok("before buffer creation");
 		glGenBuffers(1, &device.visibility_buffer);
@@ -3196,7 +3196,7 @@ static void visibility_results_initialize(void)
 		}
 	}
 	else
-		platform_log("GPU: AMD's driver; visibility test queries are read on the CPU");
+		platform_log("GPU: %s; visibility test queries are read on the CPU", gpu_profile_name());
 }
 
 static BOOL visibility_readback_gl_ok(const char *phase)

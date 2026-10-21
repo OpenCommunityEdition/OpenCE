@@ -246,6 +246,14 @@ static const struct config_setting config_settings[] =
 		_environment_value, _platform_all,
 		"The scoreboard panel's colour: \"red, green, blue, alpha\", each 0 to 255\n"
 		"(alpha 0 is see-through, 255 solid)." },
+	{ "display.gpu_profile", _config_string, "\"auto\"", "HALO_GPU_PROFILE", _environment_value, _platform_all,
+		"Which GPU and driver the renderer tunes itself for: \"auto\" reads the\n"
+		"driver's own name (GL_VENDOR/GL_RENDERER) and the log says which one it\n"
+		"chose; \"intel\", \"amd\", \"nvidia\", \"adreno\", \"mali\", \"powervr\",\n"
+		"\"angle\" or \"software\" force one, for a driver that lies about itself\n"
+		"or to try another's settings. The profile only picks the workarounds the\n"
+		"renderer already has (a pipeline flush every so many draws, and reading\n"
+		"the visibility tests' results on the CPU)." },
 	{ "display.anisotropic_filtering", _config_integer, "0", "HALO_ANISOTROPIC_FILTERING", _environment_value,
 		_platform_all,
 		"Sharpen textures seen at a grazing angle (floors, walls, terrain), which\n"
