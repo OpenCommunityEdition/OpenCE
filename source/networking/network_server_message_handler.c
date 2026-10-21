@@ -1481,6 +1481,7 @@ boolean network_game_server_handle_client_message(
 					network_distributed_handle_stream_message(machine_index, message, message_buffer_size);
 				}
 				break;
+			}
 
 			case _message_type_error:
 				if (message_buffer_size >= MINIMUM_TRANSPORT_ERROR_MESSAGE_SIZE)
