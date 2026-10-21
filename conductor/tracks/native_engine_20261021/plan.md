@@ -43,9 +43,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Import a map and fly through it' (Protocol in workflow.md)
 
 ## Phase 2: Objects, models and animation
-- [ ] Task: Typed tags for objects
-    - [ ] Write tests: builders for object, scenery, weapon, vehicle, biped, device, model (gbxmodel and the Xbox model), animation graph and collision model tags import; malformed ones are refused
-    - [ ] `content` types and importers for the object tags
+- [x] Task: Typed tags for objects 0489d862
+    - [x] Write tests: builders for object, scenery, weapon, vehicle, biped, device, model (gbxmodel and the Xbox model), animation graph and collision model tags import; malformed ones are refused
+    - [x] `content` types and importers for the object tags
 - [ ] Task: Objects in the world
     - [ ] Write tests: the scenario's placements spawn entities with their tag, position, permutation and team; a handle cannot be used after its entity is removed
     - [ ] Entities, components and typed handles in `sim`; spawning from the scenario; the registry for object kinds
