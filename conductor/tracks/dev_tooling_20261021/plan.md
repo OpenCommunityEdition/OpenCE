@@ -1,11 +1,12 @@
 # Plan: The developer shell, engine hooks and a test map
 
 ## Phase 1: Commands, variables and the control socket
-- [ ] Task: The registry of commands and variables
-    - [ ] Write tests: commands with typed arguments parse and run, and give errors naming the bad argument; variables keep their type, default and saved value; listeners hear changes; a name that is not a command falls through to HaloScript
-    - [ ] The `opence_dev` crate: the registry, the typed arguments and variables, the HaloScript fall-through to `opence_script`; the FFI calls Swift uses
+- [x] Task: The registry of commands and variables 1ae39b0e
+    - [x] Write tests: commands with typed arguments parse and run, and give errors naming the bad argument; variables keep their type, default and saved value; listeners hear changes; a name that is not a command falls through to HaloScript
+    - [x] The `opence_dev` crate: the registry, the typed arguments and variables, the HaloScript fall-through to `opence_script` (the FFI calls Swift uses moved to the next task, where the engine's context exists)
 - [ ] Task: The first commands
     - [ ] Write tests: each command of the spec's list changes the world as it says, in a headless world over a fake level
+    - [ ] The FFI calls Swift uses: running a line, completion, the variables
     - [ ] `map`, `bsp`, `spawn`, `teleport`, `noclip`, `god`, `give`, `enter`, `kill`, `time`, `pause`, `step`, `objects`, `inspect`, `tags`, `vars`, `set`, `bind`, `exec`, `help`, `quit`
 - [ ] Task: The headless mode and the control socket
     - [ ] Write tests: requests and replies as JSON lines; oversized, deeply nested and too-frequent requests are refused; the socket is created with the user's permissions only; `--headless` runs and draws a frame offscreen on request
