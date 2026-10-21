@@ -70,9 +70,9 @@
 - [x] Task: Jolt from Rust 30743d17
     - [x] Write tests: cargo tests that a world built from an imported collision BSP stops a falling box; rays and shape casts hit the expected surfaces; two runs are identical
     - [x] `physics`: a safe Rust interface over the C wrapper, the static mesh from the collision BSP, rays and shape casts
-- [ ] Task: The player's movement
-    - [ ] Write tests: replaying the scripted inputs gives traces within tolerance of the reference app's
-    - [ ] `CharacterVirtual` tuned from the biped tag; walk, run, crouch, jump, step up, slide, fall damage; collision with objects
+- [x] Task: The player's movement 9de1460d
+    - [x] Write tests: replaying the scripted inputs gives traces within tolerance of the reference app's
+    - [x] `CharacterVirtual` tuned from the biped tag; walk, run, crouch, jump, step up, slide, fall damage; collision with objects
 - [ ] Task: Playing as the player
     - [ ] Write tests: XCTest that key bindings and mouse look reach the simulation as typed input; the first-person camera follows the biped
     - [ ] Input bindings (a setting), mouse sensitivity, first- and third-person cameras, spawning at the scenario's start points
