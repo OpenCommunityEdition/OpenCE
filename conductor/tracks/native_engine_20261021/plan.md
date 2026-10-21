@@ -6,9 +6,9 @@
 - [x] Task: The workspace and its Nix build ac664f6a
     - [x] Write tests: pytest checks that `nix build .#engine` lays out `OpenCE Engine.app` with the Rust library, and that `cargo deny check` passes
     - [x] `engine/Cargo.toml` with the crates `content`, `import`, `sim`, `physics`, `script`, `net` and `ffi`; `engine/app/Package.swift`; the flake's `engine` package and dev-shell tools
-- [ ] Task: The contract between Rust and Swift
-    - [ ] Write tests: cargo tests of the snapshot's layout (sizes and offsets fixed, checked against the generated header); an XCTest that loads the library, starts an empty world and reads a snapshot
-    - [ ] UniFFI calls in `ffi`; the `#[repr(C)]` snapshot types and a cbindgen header; a double-buffered snapshot that Swift reads without copying
+- [x] Task: The contract between Rust and Swift ebbafae4
+    - [x] Write tests: cargo tests of the snapshot's layout (sizes and offsets fixed, checked against the generated header); an XCTest that loads the library, starts an empty world and reads a snapshot
+    - [x] UniFFI calls in `ffi`; the `#[repr(C)]` snapshot types and a cbindgen header; a double-buffered snapshot that Swift reads without copying
 - [ ] Task: The fixed tick and determinism
     - [ ] Write tests: a world stepped at 60 Hz from recorded inputs gives the same hash on every run; the renderer's interpolation factor is correct across uneven frame times
     - [ ] The `sim` schedule in a fixed order, the input record, the world hash, and deterministic maths (`libm`, no FMA)
