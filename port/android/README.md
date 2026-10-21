@@ -220,12 +220,26 @@ get the default values again, delete the file.
 
 The settings are the settings of Linux, without the window, the mouse and
 the paths. Refer to [port/linux/README.md](../linux/README.md#settings).
+Some video settings also apply on Android, with these notes; the first three
+have rows of their own in Video Setup:
+
+- `display.resolution_scaling` (`RESOLUTION` in the menus) is `"original"`
+  (the default) for the Xbox's 640x480 scaled up, or `"native"` for the
+  display's own resolution: sharper, but more work for the GPU, and the
+  display must fit in the GPU's largest render target.
+- `display.max_fps` (`FRAME RATE LIMIT`) limits the frame rate while
+  `display.vsync` is off: `0` (the default) is twice the display's refresh
+  rate, `-1` no limit, or the most frames each second.
+- `display.show_fps` (`SHOW FRAMES`) draws the frame rate at the bottom right
+  of a game, which is the quickest way to see what a device manages; the
+  same setting on the other ports (`port/linux/README.md`).
+
 These settings are only for Android:
 
 | Setting | Function |
 | --- | --- |
 | `input.touch_aim_assist` | `true` (the default): the touch controls' swipe aiming gets the aim assist of a controller (the aim slows over a target and follows a moving one). `false`: none, as with a mouse; the bullets' own autoaim stays. |
-| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The menus take taps in any case. |
+| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller, mouse or keyboard is connected. `"on"`: also shown with one. `"off"`: never shown. A device without a touchscreen never shows them. The menus take taps in any case. |
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
 | `debug.sample_seconds` | Refer to "Find problems". |
 | `debug.memory_watch` | `true` (the default): the app notices the game's writes to textures and vertices by page protection. `false`: it compares page contents once a frame instead, which is slower. Refer to "Limits". |
