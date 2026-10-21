@@ -1,0 +1,35 @@
+# The simulation's maths must give the same bits on every machine: the
+# platform's transcendental functions differ between libms, and a fused
+# multiply-add rounds once where a multiply and an add round twice. Use
+# libm's (or glam's, built on libm). sqrt, floor and the like are exact in
+# IEEE 754 and stay allowed.
+disallowed-methods = [
+    { path = "f32::sin", reason = "use libm::sinf" },
+    { path = "f32::cos", reason = "use libm::cosf" },
+    { path = "f32::tan", reason = "use libm::tanf" },
+    { path = "f32::sin_cos", reason = "use libm::sincosf" },
+    { path = "f32::asin", reason = "use libm::asinf" },
+    { path = "f32::acos", reason = "use libm::acosf" },
+    { path = "f32::atan", reason = "use libm::atanf" },
+    { path = "f32::atan2", reason = "use libm::atan2f" },
+    { path = "f32::exp", reason = "use libm::expf" },
+    { path = "f32::exp2", reason = "use libm::exp2f" },
+    { path = "f32::ln", reason = "use libm::logf" },
+    { path = "f32::log", reason = "use libm" },
+    { path = "f32::log2", reason = "use libm::log2f" },
+    { path = "f32::log10", reason = "use libm::log10f" },
+    { path = "f32::powf", reason = "use libm::powf" },
+    { path = "f32::powi", reason = "use libm::powf" },
+    { path = "f32::cbrt", reason = "use libm::cbrtf" },
+    { path = "f32::hypot", reason = "use libm::hypotf" },
+    { path = "f32::mul_add", reason = "a fused multiply-add rounds differently" },
+    { path = "f64::sin", reason = "use libm::sin" },
+    { path = "f64::cos", reason = "use libm::cos" },
+    { path = "f64::tan", reason = "use libm::tan" },
+    { path = "f64::atan2", reason = "use libm::atan2" },
+    { path = "f64::exp", reason = "use libm::exp" },
+    { path = "f64::ln", reason = "use libm::log" },
+    { path = "f64::powf", reason = "use libm::pow" },
+    { path = "f64::powi", reason = "use libm::pow" },
+    { path = "f64::mul_add", reason = "a fused multiply-add rounds differently" },
+]
