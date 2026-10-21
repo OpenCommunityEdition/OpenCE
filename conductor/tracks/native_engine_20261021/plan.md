@@ -117,9 +117,9 @@
 - [x] Task: Game types 8eb85a2f
     - [x] Write tests: Slayer and CTF rules (scores, flag pickup, return and capture, respawn timers, the end of the game) in a simulated world
     - [x] Game-type systems, the multiplayer scenario data (spawns, flags, netgame equipment)
-- [ ] Task: The packet format
-    - [ ] Write tests: snapshots and inputs encode and decode; delta compression against an acknowledged snapshot; bad sizes, indices and rates are refused; a fuzz target for the decoder
-    - [ ] `net`: the protocol and its version, packets, delta compression
+- [x] Task: The packet format f30b98fd
+    - [x] Write tests: snapshots and inputs encode and decode; delta compression against an acknowledged snapshot; bad sizes, indices and rates are refused; a fuzz target for the decoder
+    - [x] `net`: the protocol and its version, packets, delta compression
 - [ ] Task: The host and its clients
     - [ ] Write tests: two copies on loopback aliases play Slayer and CTF for 60 s; a client's predicted player stays within tolerance of the host's after reconciling; a client with 100 ms of added delay and 2% loss still plays
     - [ ] UDP sockets, joining and leaving, prediction and reconciliation, interpolation of other players, the host's checks
