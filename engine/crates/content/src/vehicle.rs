@@ -95,6 +95,21 @@ pub struct Vehicle {
     pub effect: Option<TagRef>,
     /// Its seats, in the tag's order.
     pub seats: Vec<VehicleSeat>,
+    /// The weapons it is made with (the unit part's initial weapons): the
+    /// first is its gunner's.
+    pub initial_weapons: Vec<TagRef>,
+    /// How its first two seats power up and down (the unit part's powered
+    /// seats: the driver's, then the gunner's).
+    pub powered_seats: Vec<PoweredSeat>,
+}
+
+/// How a seat's power comes and goes (`powered_seat_definition`).
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct PoweredSeat {
+    /// The seconds to full power once ridden.
+    pub powerup_time: f32,
+    /// The seconds to none once left.
+    pub powerdown_time: f32,
 }
 
 impl Vehicle {
@@ -156,10 +171,14 @@ impl VehicleSeat {
     pub const GUNNER: u32 = 1 << 3;
     /// Its camera is behind the vehicle.
     pub const THIRD_PERSON_CAMERA: u32 = 1 << 4;
+    /// Its rider keeps its own weapons and fires them.
+    pub const ALLOWS_WEAPONS: u32 = 1 << 5;
     /// Its camera is behind the vehicle as its rider gets in.
     pub const THIRD_PERSON_ON_ENTER: u32 = 1 << 6;
     /// Its camera is its rider's.
     pub const FIRST_PERSON_CAMERA: u32 = 1 << 7;
+    /// It cannot be entered while no one drives.
+    pub const REQUIRES_DRIVER: u32 = 1 << 9;
     /// Those who do not fight may ride in it.
     pub const ALLOWS_NONCOMBATANTS: u32 = 1 << 10;
 }

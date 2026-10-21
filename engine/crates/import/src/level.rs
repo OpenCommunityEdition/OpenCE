@@ -337,6 +337,10 @@ fn import_placed_objects(
                     .filter_map(|ammunition| ammunition.equipment.clone()),
             );
         }
+        // (a vehicle's guns)
+        if let Some(vehicle) = &object.vehicle {
+            queue.extend(vehicle.initial_weapons.iter().cloned());
+        }
         // (a weapon's first-person model and animations too)
         let first_person = object.weapon.as_ref();
         let object_models = [

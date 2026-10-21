@@ -2,7 +2,8 @@
 //! (`phys`) they move by.
 
 use opence_content::{
-    FrictionType, MassPoint, Physics, PoweredMassPoint, Vehicle, VehicleKind, VehicleSeat,
+    FrictionType, MassPoint, Physics, PoweredMassPoint, PoweredSeat, Vehicle, VehicleKind,
+    VehicleSeat,
 };
 
 use crate::cache::Cache;
@@ -17,11 +18,18 @@ const SND: GroupTag = GroupTag::new(b"snd!");
 const FOOT: GroupTag = GroupTag::new(b"foot");
 const EFFE: GroupTag = GroupTag::new(b"effe");
 const ACTV: GroupTag = GroupTag::new(b"actv");
+const WEAP: GroupTag = GroupTag::new(b"weap");
 
 pub(crate) const VEHICLE_SIZE: usize = 0x3F0;
 const UNIT_PART: usize = OBJECT_SIZE;
 const VEHICLE_PART: usize = 0x2F0;
 pub(crate) const SEAT_SIZE: usize = 0x11C;
+pub(crate) const POWERED_SEAT_SIZE: usize = 0x44;
+pub(crate) const INITIAL_WEAPON_SIZE: usize = 0x24;
+/// The most of each (the unit definition's blocks hold two powered seats
+/// and four initial weapons).
+const MAX_POWERED_SEATS: usize = 2;
+const MAX_INITIAL_WEAPONS: usize = 4;
 const MAX_SEATS: usize = 32;
 const NAME_LONGEST: usize = 31;
 
@@ -53,6 +61,32 @@ pub fn import_vehicle(cache: &Cache, index: usize) -> Result<Vehicle, ImportErro
     for seat in block.iter() {
         seats.push(import_seat(&seat)?);
     }
+    let block = vehicle.block(
+        UNIT_PART + 0x150,
+        "powered seats",
+        POWERED_SEAT_SIZE,
+        MAX_POWERED_SEATS,
+    )?;
+    let mut powered_seats = Vec::with_capacity(block.len());
+    for seat in block.iter() {
+        powered_seats.push(PoweredSeat {
+            powerup_time: seat.f32(0x04, "powerup time")?,
+            powerdown_time: seat.f32(0x08, "powerdown time")?,
+        });
+    }
+    let block = vehicle.block(
+        UNIT_PART + 0x15C,
+        "initial weapons",
+        INITIAL_WEAPON_SIZE,
+        MAX_INITIAL_WEAPONS,
+    )?;
+    let mut initial_weapons = Vec::with_capacity(block.len());
+    for weapon in block.iter() {
+        // (one of no weapon is passed over, as the game does)
+        if let Some(weapon) = reference(&weapon, 0x00, "weapon", &[WEAP])? {
+            initial_weapons.push(weapon);
+        }
+    }
 
     Ok(Vehicle {
         flags: vehicle.u32(VEHICLE_PART, "vehicle flags")?,
@@ -80,6 +114,8 @@ pub fn import_vehicle(cache: &Cache, index: usize) -> Result<Vehicle, ImportErro
         material_effects: reference(&vehicle, 0x3D0, "material effects", &[FOOT])?,
         effect: reference(&vehicle, 0x3E0, "effect", &[EFFE])?,
         seats,
+        initial_weapons,
+        powered_seats,
     })
 }
 
@@ -246,6 +282,9 @@ mod tests {
         put(&mut seat, 0xC8, &floats(&[-1.0, 1.0]));
         empty(&mut seat, 0xF8);
         let seats = fake.add_data(&seat);
+        let mut powered = vec![0u8; POWERED_SEAT_SIZE];
+        put(&mut powered, 0x04, &floats(&[0.5, 2.0]));
+        let powered = fake.add_data(&powered);
 
         let mut vehicle = vec![0u8; VEHICLE_SIZE];
         put(&mut vehicle, 0, &1i16.to_le_bytes());
@@ -253,6 +292,7 @@ mod tests {
             empty(&mut vehicle, at);
         }
         block(&mut vehicle, UNIT_PART + 0x168, 1, seats);
+        block(&mut vehicle, UNIT_PART + 0x150, 1, powered);
         put(
             &mut vehicle,
             VEHICLE_PART,
@@ -302,6 +342,14 @@ mod tests {
             (-1.0, 1.0)
         );
         assert_eq!(seat.built_in_actor, None);
+        assert_eq!(
+            vehicle.powered_seats,
+            [PoweredSeat {
+                powerup_time: 0.5,
+                powerdown_time: 2.0
+            }]
+        );
+        assert!(vehicle.initial_weapons.is_empty());
         Ok(())
     }
 
@@ -445,6 +493,20 @@ mod tests {
             .seats
             .iter()
             .any(|seat| seat.flags & VehicleSeat::GUNNER != 0));
+        // (its gunner's chaingun, and its driver's power)
+        assert_eq!(
+            warthog
+                .initial_weapons
+                .iter()
+                .map(|weapon| weapon.path.as_str())
+                .collect::<Vec<_>>(),
+            ["vehicles\\warthog\\warthog gun"]
+        );
+        assert_eq!(warthog.powered_seats.len(), 1);
+        assert!(warthog
+            .powered_seats
+            .iter()
+            .all(|seat| seat.powerup_time > 0.0 && seat.powerdown_time > 0.0));
         let warthog_physics = physics(&warthog_physics)?;
         assert_eq!(warthog_physics.powered_mass_points.len(), 2);
         assert!(warthog_physics.mass_points.len() >= 4);

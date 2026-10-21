@@ -323,6 +323,9 @@ pub struct Damageable {
     pub model: CollisionModel,
     /// Its pill: the radius and the height standing, if it is a biped.
     pub pill: Option<(f32, f32)>,
+    /// Its sphere's radius about its centre, if it is a vehicle (which
+    /// projectiles strike in place of its collision geometry).
+    pub sphere: Option<f32>,
     /// It takes no damage from falls.
     pub immune_to_falling: bool,
     /// Its bounding sphere's centre, from its root node, which
@@ -366,13 +369,13 @@ fn collision_node(model: &CollisionModel, name: &str) -> Option<usize> {
 }
 
 impl DamageTable {
-    /// `level`'s bipeds and their damage effects; `multiplayer`, if the
-    /// game is.
+    /// `level`'s bipeds and vehicles and their damage effects;
+    /// `multiplayer`, if the game is.
     pub fn new(level: &Level, multiplayer: bool) -> DamageTable {
         let objects = level
             .objects
             .iter()
-            .filter(|object| object.kind == ObjectKind::Biped)
+            .filter(|object| matches!(object.kind, ObjectKind::Biped | ObjectKind::Vehicle))
             .filter_map(|object| {
                 let model = level
                     .collision_model(object.collision_model.as_ref()?)?
@@ -412,6 +415,7 @@ impl DamageTable {
                 let pill = object
                     .biped
                     .map(|biped| (biped.collision_radius, biped.collision_height_standing));
+                let sphere = (object.kind == ObjectKind::Vehicle).then_some(object.bounding_radius);
                 let immune_to_falling = object
                     .biped
                     .is_some_and(|biped| biped.flags & Biped::IMMUNE_TO_FALLING_DAMAGE != 0);
@@ -420,6 +424,7 @@ impl DamageTable {
                     Damageable {
                         model,
                         pill,
+                        sphere,
                         immune_to_falling,
                         centre: Vec3::from_array(object.bounding_offset),
                         nodes,
@@ -588,35 +593,66 @@ impl Target {
     }
 }
 
-/// The objects of the table with pills, but `except`, in the order of their
-/// handles.
+/// The objects of the table with pills or spheres, but `except`, in the
+/// order of their handles: a vehicle's sphere is a pill of no height about
+/// its bounding centre.
 pub fn targets(world: &mut World, except: ObjectHandle) -> Vec<Target> {
     let Some(table) = world.get_resource::<DamageTable>() else {
         return Vec::new();
     };
-    let pills: BTreeMap<TagRef, (f32, f32)> = table
+    let shapes: BTreeMap<TagRef, Shape> = table
         .objects
         .iter()
-        .filter_map(|(tag, damageable)| Some((tag.clone(), damageable.pill?)))
+        .filter_map(|(tag, damageable)| {
+            let shape = match (damageable.pill, damageable.sphere) {
+                (Some(pill), _) => Shape::Pill(pill),
+                (None, Some(radius)) => Shape::Sphere(radius, damageable.centre),
+                (None, None) => return None,
+            };
+            Some((tag.clone(), shape))
+        })
         .collect();
     let mut targets: Vec<Target> = world
         .query::<(&ObjectHandle, &Object, &Transform)>()
         .iter(world)
         .filter(|(handle, ..)| **handle != except)
         .filter_map(|(handle, object, transform)| {
-            let &(radius, height) = pills.get(&object.tag)?;
-            let radius = radius * transform.scale;
-            let height = (height * transform.scale).max(2.0 * radius);
-            Some(Target {
-                handle: *handle,
-                bottom: transform.position + Vec3::Z * radius,
-                top: transform.position + Vec3::Z * (height - radius),
-                radius,
-            })
+            let target = match *shapes.get(&object.tag)? {
+                Shape::Pill((radius, height)) => {
+                    let radius = radius * transform.scale;
+                    let height = (height * transform.scale).max(2.0 * radius);
+                    Target {
+                        handle: *handle,
+                        bottom: transform.position + Vec3::Z * radius,
+                        top: transform.position + Vec3::Z * (height - radius),
+                        radius,
+                    }
+                }
+                Shape::Sphere(radius, centre) => {
+                    let centre =
+                        transform.position + transform.rotation * (centre * transform.scale);
+                    Target {
+                        handle: *handle,
+                        bottom: centre,
+                        top: centre,
+                        radius: radius * transform.scale,
+                    }
+                }
+            };
+            Some(target)
         })
         .collect();
     targets.sort_by_key(|target| target.handle);
     targets
+}
+
+/// What a target is struck as.
+#[derive(Clone, Copy)]
+enum Shape {
+    /// A biped's pill: its radius and height.
+    Pill((f32, f32)),
+    /// A vehicle's sphere: its radius and centre, from its origin.
+    Sphere(f32, Vec3),
 }
 
 /// The first of `targets` a ray from `from` along `path` enters: it, the
@@ -1291,6 +1327,7 @@ mod tests {
                 Damageable {
                     model: cyborg(),
                     pill: Some((0.2, 0.7)),
+                    sphere: None,
                     immune_to_falling,
                     centre: Vec3::new(0.0, 0.0, 0.35),
                     nodes: Vec::new(),

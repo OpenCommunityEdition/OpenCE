@@ -17,7 +17,7 @@ use opence_physics::{
 };
 use thiserror::Error;
 
-use crate::armory::{self, Armory, Carried, Inventory, WeaponItem};
+use crate::armory::{self, Armory, ArmoryWeapon, Carried, Inventory, WeaponItem};
 use crate::clock;
 use crate::damage;
 use crate::debris::Ejection;
@@ -120,6 +120,58 @@ pub struct Player {
     grenade_velocity: f32,
     /// Where they leave it, from its eyes (the globals').
     grenade_origin: Vec3,
+    /// The vehicle's seat it sits in, if it sits in one.
+    seat: Option<Seated>,
+    /// Where its object is while it sits.
+    seat_body: Option<Transform>,
+}
+
+/// A vehicle's seat the player sits in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Seated {
+    /// The vehicle's object.
+    pub vehicle: ObjectHandle,
+    /// The seat, of the vehicle's.
+    pub seat: usize,
+    /// The seat's flags (`VehicleSeat::DRIVER` and the rest).
+    pub flags: u32,
+}
+
+/// What the player fights with this tick.
+pub(crate) enum Arms<'a> {
+    /// Its own weapons, on foot: it picks up the nearest it does not carry
+    /// if `action` (the action button pressed and not taken by a seat).
+    OnFoot {
+        /// Whether it picks up.
+        action: bool,
+    },
+    /// Its own weapons, from a seat that allows them: no picking up, no
+    /// melee and no grenades.
+    Own,
+    /// A vehicle's gun: the armory's weapon `armory`, fired from `muzzle`
+    /// along the player's aim.
+    Mounted {
+        /// The gun's weapon, of the armory's.
+        armory: usize,
+        /// Its state.
+        state: &'a mut WeaponState,
+        /// Where its projectiles leave it.
+        muzzle: Vec3,
+    },
+    /// Nothing: the seat allows no weapons.
+    Unarmed,
+}
+
+/// Who fires a shot, and from where.
+struct Shooter {
+    /// Its object, which its projectiles do not hit.
+    owner: ObjectHandle,
+    eyes: Vec3,
+    aim: Quat,
+    /// Where its projectiles leave, if not from its first-person offset.
+    muzzle: Option<Vec3>,
+    gravity: f32,
+    velocity: Vec3,
 }
 
 /// What a tick of the player's weapons came to.
@@ -208,12 +260,19 @@ impl Player {
             landed: None,
             grenade_velocity: biped.grenade_velocity,
             grenade_origin: Vec3::from_array(level.globals.player.grenade_origin),
+            seat: None,
+            seat_body: None,
         })
     }
 
     /// Its biped's object.
     pub fn handle(&self) -> ObjectHandle {
         self.handle
+    }
+
+    /// The physics world the biped moves in.
+    pub(crate) fn physics(&self) -> &PhysicsWorld {
+        &self.physics
     }
 
     /// The physics world the biped moves in, which the ragdolls lie in.
@@ -266,21 +325,48 @@ impl Player {
         (Radians(self.yaw), Radians(self.pitch))
     }
 
-    /// One tick of `input`: the mouse's turn, then the move.
+    /// The vehicle's seat it sits in, if it sits in one.
+    pub fn seated(&self) -> Option<Seated> {
+        self.seat
+    }
+
+    /// The buttons it held the tick before.
+    pub(crate) fn held_buttons(&self) -> Buttons {
+        self.held
+    }
+
+    /// Sits it in `seat`, its object at `body`.
+    pub(crate) fn sit(&mut self, seat: Seated, body: Transform) {
+        self.seat = Some(seat);
+        self.place_in_seat(body);
+    }
+
+    /// Moves it with its seat, its object to `body`.
+    pub(crate) fn place_in_seat(&mut self, body: Transform) {
+        // (the physics refuses only numbers that are not finite)
+        let _ = self.mover.teleport(&mut self.physics, body.position);
+        self.seat_body = Some(body);
+    }
+
+    /// Stands it up out of its seat at `position`.
+    pub(crate) fn stand(&mut self, position: Vec3) {
+        self.seat = None;
+        self.seat_body = None;
+        let _ = self.mover.teleport(&mut self.physics, position);
+    }
+
+    /// One tick of `input`: the mouse's turn, then the move (a seated
+    /// player only turns; its vehicle moves it).
     pub(crate) fn step(&mut self, input: &TickInput) -> PlayerPose {
         let max = FreeCamera::MAX_PITCH.0;
         self.yaw = libm::remainderf(self.yaw + input.yaw.0, std::f32::consts::TAU);
         self.pitch = (self.pitch + input.pitch.0).clamp(-max, max);
-        let axis = |value: i8| f32::from(value) / 127.0;
-        // (forward and left; no faster on a diagonal)
-        let throttle = Vec2::new(axis(input.forward), -axis(input.right));
-        let throttle = if throttle.length_squared() > 1.0 {
-            throttle.normalize()
-        } else {
-            throttle
-        };
+        if self.seat.is_some() {
+            self.landed = None;
+            return self.pose();
+        }
         let movement = MovementInput {
-            throttle,
+            throttle: throttle(input),
             yaw: self.yaw,
             jump: input.buttons.contains(Buttons::JUMP),
             crouch: input.buttons.contains(Buttons::CROUCH),
@@ -297,7 +383,9 @@ impl Player {
     pub(crate) fn pose(&self) -> PlayerPose {
         PlayerPose {
             handle: self.handle,
-            body: body_transform(self.mover.position, self.yaw),
+            body: self
+                .seat_body
+                .unwrap_or_else(|| body_transform(self.mover.position, self.yaw)),
             camera: self.camera(),
         }
     }
@@ -331,7 +419,7 @@ impl Player {
     }
 
     /// Its eyes, and where they look.
-    fn aim(&self) -> (Vec3, Quat) {
+    pub(crate) fn aim(&self) -> (Vec3, Quat) {
         (
             self.mover.position + Vec3::Z * self.mover.camera_height(),
             look_rotation(self.yaw, self.pitch),
@@ -355,100 +443,93 @@ impl Player {
     }
 
     /// One tick of its weapons, after its move: its projectiles fly on,
-    /// it picks up and changes weapons, throws a grenade, and the one in
-    /// its hands fires. Where projectiles hit and grenades detonated is
-    /// returned.
-    pub(crate) fn step_weapons(&mut self, input: &TickInput, world: &mut World) -> Fired {
+    /// and with `arms` its own weapons (it picks up and changes weapons,
+    /// throws a grenade, and the one in its hands fires) or a vehicle's
+    /// gun fire. Where projectiles hit and grenades detonated is returned.
+    pub(crate) fn step_weapons(
+        &mut self,
+        input: &TickInput,
+        world: &mut World,
+        arms: Arms<'_>,
+    ) -> Fired {
         let buttons = input.buttons;
         let held = std::mem::replace(&mut self.held, buttons);
         let mut fired = self.fly(world);
-        self.pick_up(world, buttons.pressed(held, Buttons::ACTION));
+        let (eyes, aim) = self.aim();
+        self.melee_ticks = self.melee_ticks.saturating_sub(1);
+        let fire = buttons.contains(Buttons::FIRE) && self.melee_ticks == 0;
+        let reload = buttons.pressed(held, Buttons::RELOAD);
+        let shooter = Shooter {
+            owner: self.handle,
+            eyes,
+            aim,
+            muzzle: None,
+            gravity: self.gravity,
+            velocity: self.mover.velocity,
+        };
+        match arms {
+            Arms::Unarmed => return fired,
+            Arms::Mounted {
+                armory,
+                state,
+                muzzle,
+            } => {
+                if let Some(definition) = self.armory.get(armory) {
+                    let controls =
+                        controls(&definition.weapon, buttons.contains(Buttons::FIRE), reload);
+                    let shooter = Shooter {
+                        muzzle: Some(muzzle),
+                        ..shooter
+                    };
+                    shoot(
+                        world,
+                        definition,
+                        state,
+                        controls,
+                        &shooter,
+                        &mut self.flights,
+                        &mut fired,
+                    );
+                }
+                return fired;
+            }
+            Arms::OnFoot { action } => {
+                self.pick_up(world, action);
+                if buttons.pressed(held, Buttons::MELEE) && self.melee_ticks == 0 {
+                    if let Some(impact) = self.melee(world, eyes, aim) {
+                        fired.impacts.push(impact);
+                    }
+                }
+                if buttons.pressed(held, Buttons::GRENADE) && self.melee_ticks == 0 {
+                    self.throw_grenade(world, eyes, aim);
+                }
+            }
+            Arms::Own => {}
+        }
         if buttons.pressed(held, Buttons::SWAP) {
             self.inventory.swap(&self.armory);
         }
         if buttons.pressed(held, Buttons::SWITCH_GRENADE) {
             self.inventory.switch_grenade();
         }
-        let (eyes, aim) = self.aim();
-        self.melee_ticks = self.melee_ticks.saturating_sub(1);
-        if buttons.pressed(held, Buttons::MELEE) && self.melee_ticks == 0 {
-            if let Some(impact) = self.melee(world, eyes, aim) {
-                fired.impacts.push(impact);
-            }
-        }
-        if buttons.pressed(held, Buttons::GRENADE) && self.melee_ticks == 0 {
-            self.throw_grenade(world, eyes, aim);
-        }
         // (no firing while the melee recovers)
-        let fire = buttons.contains(Buttons::FIRE) && self.melee_ticks == 0;
-        let reload = buttons.pressed(held, Buttons::RELOAD);
+        let fire = fire && self.melee_ticks == 0;
         let Some(carried) = self.inventory.current_mut() else {
             return fired;
         };
         let Some(definition) = self.armory.get(carried.armory) else {
             return fired;
         };
-        let weapon = &definition.weapon;
-        let controls = WeaponControls {
-            // (one button: the second trigger only when it follows the first)
-            triggers: [
-                fire,
-                fire && weapon.secondary_trigger_mode == secondary::SLAVED_TO_PRIMARY,
-            ],
-            reload,
-        };
-        let shots = carried.state.step(weapon, controls);
-        for shot in shots {
-            if let Some(effect) = weapon
-                .triggers
-                .get(shot.trigger)
-                .and_then(|trigger| trigger.firing_effect.clone())
-            {
-                fired
-                    .ejections
-                    .push(ejection(effect, eyes, aim, self.mover.velocity));
-            }
-            let (Some(trigger), Some(Some((tag, projectile)))) = (
-                weapon.triggers.get(shot.trigger),
-                definition.projectiles.get(shot.trigger),
-            ) else {
-                continue;
-            };
-            let origin = eyes + aim * Vec3::from_array(trigger.first_person_offset);
-            let directions = {
-                let mut seed = world.get_resource_or_init::<RandomSeed>();
-                projectile::shot_directions(trigger, shot.error, aim, &mut seed)
-            };
-            for direction in directions {
-                let transform = Transform {
-                    position: origin,
-                    rotation: Quat::from_rotation_arc(Vec3::X, direction),
-                    scale: 1.0,
-                };
-                let Ok(handle) = objects::spawn(
-                    world,
-                    ObjectSpawn {
-                        kind: ObjectKind::Projectile,
-                        tag: tag.clone(),
-                        transform,
-                        name: None,
-                        permutation: None,
-                        team: None,
-                    },
-                ) else {
-                    break; // (the world holds no more objects)
-                };
-                self.flights.push(Flight::new(
-                    handle,
-                    tag.clone(),
-                    self.handle,
-                    projectile,
-                    origin,
-                    direction,
-                    self.gravity,
-                ));
-            }
-        }
+        let controls = controls(&definition.weapon, fire, reload);
+        shoot(
+            world,
+            definition,
+            &mut carried.state,
+            controls,
+            &shooter,
+            &mut self.flights,
+            &mut fired,
+        );
         fired
     }
 
@@ -525,7 +606,11 @@ impl Player {
                 flight.follow(frame(world, parent));
             }
         }
-        let targets = damage::targets(world, self.handle);
+        // (not the vehicle it rides)
+        let mut targets = damage::targets(world, self.handle);
+        if let Some(seat) = self.seat {
+            targets.retain(|target| target.handle != seat.vehicle);
+        }
         let frames: Vec<Option<Transform>> = targets
             .iter()
             .map(|target| frame(world, target.handle))
@@ -759,6 +844,107 @@ impl Player {
         hasher.u64(self.flights.len() as u64);
         for flight in &self.flights {
             flight.hash(hasher);
+        }
+        match self.seat {
+            Some(seat) => {
+                hasher.u64(1);
+                hasher.u64(u64::from(seat.vehicle.index));
+                hasher.u64(u64::from(seat.vehicle.salt));
+                hasher.u64(seat.seat as u64);
+            }
+            None => hasher.u64(0),
+        }
+    }
+}
+
+/// The move `input` asks for, forward and left, no faster on a diagonal.
+pub(crate) fn throttle(input: &TickInput) -> Vec2 {
+    let axis = |value: i8| f32::from(value) / 127.0;
+    let throttle = Vec2::new(axis(input.forward), -axis(input.right));
+    if throttle.length_squared() > 1.0 {
+        throttle.normalize()
+    } else {
+        throttle
+    }
+}
+
+/// A weapon's triggers and reload from one fire button: the second
+/// trigger only when it follows the first.
+fn controls(weapon: &Weapon, fire: bool, reload: bool) -> WeaponControls {
+    WeaponControls {
+        triggers: [
+            fire,
+            fire && weapon.secondary_trigger_mode == secondary::SLAVED_TO_PRIMARY,
+        ],
+        reload,
+    }
+}
+
+/// A tick of a weapon of `definition` in `state`: its shots' projectiles
+/// leave the shooter's first-person offset, or its muzzle, along its aim,
+/// and their effects throw out casings.
+fn shoot(
+    world: &mut World,
+    definition: &ArmoryWeapon,
+    state: &mut WeaponState,
+    controls: WeaponControls,
+    shooter: &Shooter,
+    flights: &mut Vec<Flight>,
+    fired: &mut Fired,
+) {
+    let weapon = &definition.weapon;
+    let (eyes, aim) = (shooter.eyes, shooter.aim);
+    for shot in state.step(weapon, controls) {
+        if let Some(effect) = weapon
+            .triggers
+            .get(shot.trigger)
+            .and_then(|trigger| trigger.firing_effect.clone())
+        {
+            fired
+                .ejections
+                .push(ejection(effect, eyes, aim, shooter.velocity));
+        }
+        let (Some(trigger), Some(Some((tag, projectile)))) = (
+            weapon.triggers.get(shot.trigger),
+            definition.projectiles.get(shot.trigger),
+        ) else {
+            continue;
+        };
+        let origin = shooter
+            .muzzle
+            .unwrap_or_else(|| eyes + aim * Vec3::from_array(trigger.first_person_offset));
+        let directions = {
+            let mut seed = world.get_resource_or_init::<RandomSeed>();
+            projectile::shot_directions(trigger, shot.error, aim, &mut seed)
+        };
+        for direction in directions {
+            let transform = Transform {
+                position: origin,
+                rotation: Quat::from_rotation_arc(Vec3::X, direction),
+                scale: 1.0,
+            };
+            let Ok(handle) = objects::spawn(
+                world,
+                ObjectSpawn {
+                    kind: ObjectKind::Projectile,
+                    tag: tag.clone(),
+                    transform,
+                    name: None,
+                    permutation: None,
+                    team: None,
+                },
+            ) else {
+                return; // (the world holds no more objects)
+            };
+            flights.push(Flight::new(
+                handle,
+                tag.clone(),
+                shooter.owner,
+                projectile,
+                origin,
+                direction,
+                shooter.gravity,
+            ));
         }
     }
 }

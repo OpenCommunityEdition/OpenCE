@@ -21,6 +21,7 @@ pub mod player;
 pub mod projectile;
 pub mod ragdoll;
 pub mod random;
+pub mod seats;
 pub mod units;
 pub mod vehicle;
 pub mod weapon;
@@ -175,6 +176,8 @@ pub struct Simulation {
     debris: debris::Debris,
     /// Detonations to do in the next tick (a script's).
     queued_detonations: Vec<projectile::Detonation>,
+    /// The vehicles, and the seat the player sits in.
+    rides: seats::Rides,
 }
 
 /// An object as the renderer draws it.
@@ -213,6 +216,7 @@ impl Simulation {
                 move_free_camera,
                 player::move_player.before(animation::play_animations),
                 player::move_projectiles,
+                seats::move_rides.before(animation::play_animations),
                 damage::recover_vitality,
                 animation::play_animations,
             )
@@ -232,6 +236,7 @@ impl Simulation {
             ragdolls: ragdoll::Ragdolls::default(),
             debris: debris::Debris::default(),
             queued_detonations: Vec::new(),
+            rides: seats::Rides::default(),
         }
     }
 
@@ -253,9 +258,18 @@ impl Simulation {
                 .and_then(|entity| self.world.get::<damage::Vitality>(entity))
                 .is_some_and(|vitality| vitality.dead);
             let input = if dead { TickInput::default() } else { input };
-            let pose = player.step(&input);
-            self.world.insert_resource(pose);
-            let fired = player.step_weapons(&input, &mut self.world);
+            player.step(&input);
+            // (the action button enters or leaves a seat before it picks
+            // up a weapon)
+            let action = input
+                .buttons
+                .pressed(player.held_buttons(), Buttons::ACTION);
+            self.rides.adopt(&mut self.world);
+            let seated = self.rides.act(&self.world, player, action);
+            self.rides.step(&mut self.world, player, &input);
+            self.world.insert_resource(player.pose());
+            let arms = self.rides.arms(player.seated(), action && !seated);
+            let fired = player.step_weapons(&input, &mut self.world, arms);
             ejections = fired.ejections;
             self.impacts = fired.impacts;
             self.detonations = fired.detonations;
@@ -344,6 +358,7 @@ impl Simulation {
         // (multiplayer's rules: the scenario does not yet say which it is)
         self.world
             .insert_resource(damage::DamageTable::new(level, true));
+        self.rides = seats::Rides::for_level(level, player.unit(), player.armory());
         self.player = Some(player);
         self.sensor = hud::MotionSensor::default();
         self.sensor_settings = level
@@ -559,6 +574,11 @@ impl Simulation {
         self.player.as_ref()
     }
 
+    /// The vehicles in the world, and their seats.
+    pub fn rides(&self) -> &seats::Rides {
+        &self.rides
+    }
+
     /// Sees from `view`; false without a player.
     pub fn set_player_view(&mut self, view: View) -> bool {
         let Some(player) = self.player.as_mut() else {
@@ -745,6 +765,38 @@ impl Simulation {
         self.entity(handle)?.get::<C>().cloned()
     }
 
+    /// Kills an object outright, as the scripts' `unit_kill` does: a
+    /// vehicle Halo gives no vitality (each of the stock game's) is
+    /// destroyed only this way. Whether `handle` is in the world.
+    pub fn kill(&mut self, handle: ObjectHandle) -> bool {
+        let Some(entity) = self
+            .world
+            .get_resource::<ObjectTable>()
+            .and_then(|table| table.entity(handle))
+        else {
+            return false;
+        };
+        let vitality = match self.world.get::<damage::Vitality>(entity) {
+            Some(vitality) => damage::Vitality {
+                body: 0.0,
+                shield: 0.0,
+                dead: true,
+                ..vitality.clone()
+            },
+            None => damage::Vitality {
+                body: 0.0,
+                shield: 0.0,
+                stun_ticks: 0,
+                shield_depleted: false,
+                dead: true,
+                region_damage: Vec::new(),
+                regions_destroyed: Vec::new(),
+            },
+        };
+        self.world.entity_mut(entity).insert(vitality);
+        true
+    }
+
     /// What an object is.
     pub fn object(&self, handle: ObjectHandle) -> Option<Object> {
         self.component(handle)
@@ -832,6 +884,7 @@ impl Simulation {
         // it did before there were players)
         if let Some(player) = self.player.as_ref() {
             player.hash(&mut hasher);
+            self.rides.hash(&mut hasher);
         }
         hasher.finish()
     }

@@ -36,7 +36,8 @@ pub use shader::{
     ChicagoMap, EnvironmentShader, ModelShaderClass, Shader, ShaderClass, TransparentChicagoShader,
 };
 pub use vehicle::{
-    FrictionType, MassPoint, Physics, PoweredMassPoint, Vehicle, VehicleKind, VehicleSeat,
+    FrictionType, MassPoint, Physics, PoweredMassPoint, PoweredSeat, Vehicle, VehicleKind,
+    VehicleSeat,
 };
 pub use weapon::{
     AimAssist, Ammunition, DamageEffect, Effect, EffectDebris, Equipment, Grenade, Item, Magazine,
