@@ -73,9 +73,9 @@
 - [x] Task: The player's movement 9de1460d
     - [x] Write tests: replaying the scripted inputs gives traces within tolerance of the reference app's
     - [x] `CharacterVirtual` tuned from the biped tag; walk, run, crouch, jump, step up, slide, fall damage; collision with objects
-- [ ] Task: Playing as the player
-    - [ ] Write tests: XCTest that key bindings and mouse look reach the simulation as typed input; the first-person camera follows the biped
-    - [ ] Input bindings (a setting), mouse sensitivity, first- and third-person cameras, spawning at the scenario's start points
+- [x] Task: Playing as the player 3abed295
+    - [x] Write tests: XCTest that key bindings and mouse look reach the simulation as typed input; the first-person camera follows the biped
+    - [x] Input bindings (a setting), mouse sensitivity, first- and third-person cameras, spawning at the scenario's start points
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Player movement and collision' (Protocol in workflow.md)
 
 ## Phase 4: Weapons, damage, grenades and ragdolls
