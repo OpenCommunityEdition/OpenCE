@@ -44,10 +44,10 @@
 - [x] Task: A level made by the engine 94fe7da8
     - [x] Write tests: the generated plane's collision and render geometry; the player spawns on it; the sky is drawn
     - [x] A builder of `content::Level` values that are not imported from a cache
-- [~] Task: Gathering every object
-    - [ ] Write tests: definitions from several packs are gathered once each by tag path, keeping their own data; the galleries are laid out without overlap
-    - [ ] The galleries with labels; `--map devmap` and `map devmap`
-- [ ] Task: The stations
+- [x] Task: Gathering every object b93bbd80
+    - [x] Write tests: definitions from several packs are gathered once each by tag path, keeping their own data; the galleries are laid out without overlap
+    - [x] The galleries with labels; `--map devmap` and `map devmap`
+- [~] Task: The stations
     - [ ] Write tests: each station's script passes over the user's maps (marked, needs `assets/maps`)
     - [ ] The weapons, vehicles, animation, doors and physics stations
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: The test map' (Protocol in workflow.md) (deferred to the end)
