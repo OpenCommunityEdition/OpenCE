@@ -245,10 +245,10 @@ pub fn grid_bitmap() -> Bitmap {
 /// The grid's shader: an opaque environment shader whose base map is the
 /// grid.
 pub fn grid_shader() -> Shader {
-    Shader {
-        tag: shader_tag(),
-        material_type: MATERIAL_TYPE,
-        class: ShaderClass::Environment(Box::new(EnvironmentShader {
+    Shader::new(
+        shader_tag(),
+        MATERIAL_TYPE,
+        ShaderClass::Environment(Box::new(EnvironmentShader {
             flags: 0,
             kind: 0,
             diffuse_flags: 0,
@@ -276,7 +276,7 @@ pub fn grid_shader() -> Shader {
             reflection_parallel_brightness: 0.0,
             reflection_cube_map: None,
         })),
-    }
+    )
 }
 
 /// The generated sky: no model, the horizon's colour behind everything,

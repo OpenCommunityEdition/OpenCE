@@ -24,7 +24,7 @@ use rkyv::util::AlignedVec;
 use crate::Level;
 
 /// The version of this format; a pack of another is not read.
-pub const FORMAT_VERSION: u32 = 23;
+pub const FORMAT_VERSION: u32 = 24;
 
 const MAGIC: [u8; 4] = *b"OCPK";
 const HEADER_SIZE: usize = 0x28;
@@ -141,8 +141,8 @@ mod tests {
     use super::*;
     use crate::{
         Bitmap, BitmapImage, CollisionBsp, EnvironmentVertex, Group, Lightmap, LightmapVertex,
-        Material, Pixels, Scenario, Shader, ShaderClass, StructureBsp, TagRef, Texture,
-        TextureFormat,
+        Material, Pixels, Scenario, Shader, ShaderClass, StructureBsp, SurfaceMaterial, TagRef,
+        Texture, TextureFormat,
     };
 
     fn tag(group: &[u8; 4], path: &str) -> TagRef {
@@ -211,11 +211,7 @@ mod tests {
             objects: Vec::new(),
             models: Vec::new(),
             animation_graphs: Vec::new(),
-            shaders: vec![Shader {
-                tag: shader,
-                material_type: 2,
-                class: ShaderClass::Other(Group(*b"senv")),
-            }],
+            shaders: vec![Shader::new(shader, 2, ShaderClass::Other(Group(*b"senv")))],
             bitmaps: vec![Bitmap {
                 tag: tag(b"bitm", "levels\\test\\box\\bitmaps\\wall"),
                 kind: 0,
@@ -289,6 +285,32 @@ mod tests {
     fn a_pack_round_trips() {
         assert_eq!(read_pack(&pack()), Ok((HEADER, level())));
         assert_eq!(read_pack_header(&pack()), Ok(HEADER));
+    }
+
+    #[test]
+    fn a_shaders_material_is_in_the_pack() -> Result<(), PackError> {
+        let mut level = level();
+        assert_eq!(
+            level.shaders[0].material,
+            SurfaceMaterial::of(&level.shaders[0].class)
+        );
+        let mut material = SurfaceMaterial::diffuse(
+            Some(tag(b"bitm", "base")),
+            SurfaceMaterial::ALPHA_TESTED | SurfaceMaterial::TWO_SIDED,
+        );
+        material.albedo = [0.5, 0.25, 0.125];
+        material.normal_map = Some(tag(b"bitm", "bump"));
+        material.normal_map_scale = 4.0;
+        material.roughness = 0.3;
+        material.specular = [0.25, 0.5, 1.0];
+        material.specular_grazing = [1.0; 3];
+        material.reflection_map = Some(tag(b"bitm", "cube"));
+        material.emission_map = Some(tag(b"bitm", "glow"));
+        material.emission = [2.0, 0.0, 0.5];
+        level.shaders[0].material = material.clone();
+        let (_, read) = read_pack(&write_pack(&level, HEADER)?)?;
+        assert_eq!(read.shaders[0].material, material);
+        Ok(())
     }
 
     #[test]

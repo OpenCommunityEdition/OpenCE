@@ -2,7 +2,7 @@
 
 use rkyv::{Archive, Deserialize, Serialize};
 
-use crate::{Group, TagRef};
+use crate::{Group, SurfaceMaterial, TagRef};
 
 /// A shader.
 #[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
@@ -13,6 +13,20 @@ pub struct Shader {
     pub material_type: i16,
     /// Its class's fields.
     pub class: ShaderClass,
+    /// What the lighting reads of it ([`SurfaceMaterial::of`] its class).
+    pub material: SurfaceMaterial,
+}
+
+impl Shader {
+    /// A shader of `class`, with its material.
+    pub fn new(tag: TagRef, material_type: i16, class: ShaderClass) -> Self {
+        Self {
+            tag,
+            material_type,
+            material: SurfaceMaterial::of(&class),
+            class,
+        }
+    }
 }
 
 /// A shader's class, and that class's fields.
@@ -116,6 +130,19 @@ pub struct ModelShaderClass {
     pub detail_map: Option<TagRef>,
     /// The detail map's scale in v (0: as in u).
     pub detail_map_v_scale: f32,
+    /// The colour it glows where its multipurpose map says (the top of
+    /// its self-illumination animation's range).
+    pub self_illumination_color: [f32; 3],
+    /// The reflection's brightness looking along the normal.
+    pub perpendicular_brightness: f32,
+    /// The reflection's tint looking along the normal.
+    pub perpendicular_tint_color: [f32; 3],
+    /// The reflection's brightness looking across the surface.
+    pub parallel_brightness: f32,
+    /// The reflection's tint looking across the surface.
+    pub parallel_tint_color: [f32; 3],
+    /// The reflection's cube map.
+    pub reflection_cube_map: Option<TagRef>,
 }
 
 /// A transparent chicago shader (`schi`, `scex`).

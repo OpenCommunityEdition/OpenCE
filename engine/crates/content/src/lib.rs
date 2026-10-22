@@ -8,6 +8,7 @@ pub mod campaign;
 pub mod devmap;
 pub mod hud;
 pub mod level;
+pub mod material;
 pub mod object;
 pub mod pack;
 pub mod script;
@@ -34,6 +35,7 @@ pub use level::{
     NetgameFlag, NetgameFlagKind, ObjectPlacement, PlacementDevice, PlacementPermutation,
     PlayerPhysics, PlayerStart, Scenario, Sky, StructureBsp,
 };
+pub use material::SurfaceMaterial;
 pub use object::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, Biped, ChangeColor,
     CollisionModel, CollisionModelMaterial, CollisionNode, CollisionRegion, ColorPermutation,

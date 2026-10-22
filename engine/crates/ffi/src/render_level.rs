@@ -557,10 +557,10 @@ mod tests {
     }
 
     fn environment(path: &str, flags: u16) -> Shader {
-        Shader {
-            tag: tag(b"senv", path),
-            material_type: 0,
-            class: ShaderClass::Environment(Box::new(EnvironmentShader {
+        Shader::new(
+            tag(b"senv", path),
+            0,
+            ShaderClass::Environment(Box::new(EnvironmentShader {
                 flags,
                 kind: 1,
                 diffuse_flags: 0,
@@ -588,14 +588,14 @@ mod tests {
                 reflection_parallel_brightness: 0.0,
                 reflection_cube_map: None,
             })),
-        }
+        )
     }
 
     fn chicago(path: &str) -> Shader {
-        Shader {
-            tag: tag(b"schi", path),
-            material_type: 0,
-            class: ShaderClass::TransparentChicago(TransparentChicagoShader {
+        Shader::new(
+            tag(b"schi", path),
+            0,
+            ShaderClass::TransparentChicago(TransparentChicagoShader {
                 numeric_counter_limit: 0,
                 flags: 0,
                 first_map_kind: 0,
@@ -616,7 +616,7 @@ mod tests {
                 two_stage_maps: Vec::new(),
                 extra_flags: 0,
             }),
-        }
+        )
     }
 
     fn vertex(x: f32, y: f32) -> EnvironmentVertex {

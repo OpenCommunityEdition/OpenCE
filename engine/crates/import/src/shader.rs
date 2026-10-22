@@ -2,7 +2,7 @@
 //! their maps; the other classes by group alone, for now.
 
 use opence_content::{
-    ChicagoMap, EnvironmentShader, Group, ModelShaderClass, Shader, ShaderClass,
+    ChicagoMap, EnvironmentShader, Group, ModelShaderClass, Shader, ShaderClass, SurfaceMaterial,
     TransparentChicagoShader,
 };
 
@@ -19,8 +19,8 @@ pub(crate) const SOSO: GroupTag = GroupTag::new(b"soso");
 pub(crate) const SHADER_BASE_SIZE: usize = 0x28;
 pub(crate) const MATERIAL_TYPE_OFFSET: usize = 0x22;
 pub(crate) const ENVIRONMENT_SIZE: usize = 0x344;
-/// What of a model shader is read: up to its texture animation.
-pub(crate) const MODEL_SIZE: usize = 0xFC;
+/// What of a model shader is read: up to its reflection's cube map.
+pub(crate) const MODEL_SIZE: usize = 0x174;
 pub(crate) const CHICAGO_SIZE: usize = 0x6C;
 pub(crate) const CHICAGO_EXTENDED_SIZE: usize = 0x78;
 pub(crate) const CHICAGO_EXTRA_LAYERS_OFFSET: usize = 0x48;
@@ -57,6 +57,7 @@ pub(crate) fn import_shader(
     Ok(Shader {
         tag: tag_ref(cache, index),
         material_type: shader.i16(MATERIAL_TYPE_OFFSET, "material type")?,
+        material: SurfaceMaterial::of(&class),
         class,
     })
 }
@@ -70,7 +71,8 @@ fn color(element: &Element<'_>, at: usize, field: &str) -> Result<[f32; 3], Impo
 }
 
 /// A model shader's fields (`shader_model_properties`, after the shader's
-/// own 0x28 bytes).
+/// own 0x28 bytes; the offsets the decompilation's
+/// `rasterizer_xbox_models.c` checks).
 fn model(shader: &Element<'_>, reached: &mut Reached) -> Result<ModelShaderClass, ImportError> {
     Ok(ModelShaderClass {
         flags: shader.u16(0x28, "flags")?,
@@ -87,6 +89,12 @@ fn model(shader: &Element<'_>, reached: &mut Reached) -> Result<ModelShaderClass
         detail_map_scale: shader.f32(0xD8, "detail map scale")?,
         detail_map: reached.bitmap(shader, 0xDC, "detail map")?,
         detail_map_v_scale: shader.f32(0xEC, "detail map v scale")?,
+        self_illumination_color: color(shader, 0x84, "self-illumination upper bound")?,
+        perpendicular_brightness: shader.f32(0x144, "perpendicular brightness")?,
+        perpendicular_tint_color: color(shader, 0x148, "perpendicular tint color")?,
+        parallel_brightness: shader.f32(0x154, "parallel brightness")?,
+        parallel_tint_color: color(shader, 0x158, "parallel tint color")?,
+        reflection_cube_map: reached.bitmap(shader, 0x164, "reflection cube map")?,
     })
 }
 
