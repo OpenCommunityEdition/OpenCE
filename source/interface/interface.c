@@ -1233,6 +1233,7 @@ static void interface_splitscreen_render(
 {
 	rectangle2d bounds;
 	short window_count;
+	short views;
 	/* port: the screen's width, wider than the Xbox's 640 on a wide screen,
 	whose middle the windows split at (compute_window_bounds) */
 	short width = (short)halo_screen_width();
@@ -1240,9 +1241,15 @@ static void interface_splitscreen_render(
 	if (game_engine_force_single_screen() || cinematic_in_progress())
 		return;
 
-	/* port: the bar is the panes this screen draws. a hardcore team game
-	   leaves the other team's local player out */
+	/* port: the bar is the panes this screen draws. a hardcore team
+	   split counts those panes, and a classic split counts local players */
 	window_count = hardcore_views_local_count();
+	if (window_count == 1)
+	{
+		views = hardcore_views_window_count();
+		if (views > 1)
+			window_count = views;
+	}
 
 	if (window_count <= 1)
 		return;
