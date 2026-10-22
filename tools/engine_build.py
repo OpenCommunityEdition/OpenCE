@@ -66,7 +66,7 @@ def swift_bindings(library: Path, out: Path) -> None:
     shutil.copy(generated / "opence_ffi.swift", core / "opence_ffi.swift")
 
 
-def swift(command: str, library: Path, out: Path) -> Path:
+def swift(command: str, library: Path, out: Path, extra: tuple[str, ...] = ()) -> Path:
     """Runs swift build or swift test with Xcode's Swift (nixpkgs' cannot
     link against the macOS 26 SDK); returns the build folder."""
     scratch = out / "swift"
@@ -85,6 +85,7 @@ def swift(command: str, library: Path, out: Path) -> Path:
             "--security-path", str(scratch / "security"),
             # (and the C++ library Jolt, the physics, needs)
             "-Xlinker", str(library), "-Xlinker", "-lc++",
+            *extra,
         ],
         env=environment,
         check=True,
@@ -120,10 +121,12 @@ def bundle(executable: Path, codesign: str, version: str, app: Path) -> None:
     (staging / "Contents" / "Info.plist").write_bytes(info_plist(version))
     # the HUD's redraws (HudPass.swift)
     shutil.copytree(ROOT / "port" / "assets" / "hud", staging / "Contents" / "Resources" / "hud")
-    # the menus' fonts and their licences (MenuFonts.swift): Overpass and OpenCE only
+    # the menus' fonts and the shell's, with their licences (MenuFonts.swift,
+    # TextPass.swift): Overpass and OpenCE only
     fonts = staging / "Contents" / "Resources" / "fonts"
     fonts.mkdir()
-    for name in ("Overpass-750.ttf", "Overpass-900.ttf", "Overpass-OFL.txt", "OpenCE-Regular.ttf", "OpenCE-OFL.txt"):
+    for name in ("Overpass-750.ttf", "Overpass-900.ttf", "Overpass-OFL.txt", "OpenCE-Regular.ttf", "OpenCE-OFL.txt",
+                 "OverpassMono-Regular.ttf", "OverpassMono-OFL.txt"):
         shutil.copy(ROOT / "port" / "assets" / "fonts" / name, fonts / name)
     subprocess.run([codesign, "-s", "-", "-f", str(staging)], check=True)
     shutil.rmtree(app, ignore_errors=True)
@@ -138,13 +141,14 @@ def main() -> None:
     parser.add_argument("--codesign", default=os.environ.get("HALO_MACOS_APP_CODESIGN", "/usr/bin/codesign"))
     parser.add_argument("--version", default="0.1.0")
     parser.add_argument("--test", action="store_true", help="run the package's XCTests instead of making the app")
+    parser.add_argument("--filter", help="with --test, only the tests whose names match this")
     arguments = parser.parse_args()
     out = arguments.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     library = rust_library()
     swift_bindings(library, out)
     if arguments.test:
-        swift("test", library, out)
+        swift("test", library, out, ("--filter", arguments.filter) if arguments.filter else ())
         return
     executable = swift("build", library, out) / EXECUTABLE
     bundle(executable, arguments.codesign, arguments.version, out / f"{APP_NAME}.app")

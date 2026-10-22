@@ -10,6 +10,7 @@ place of the bitmap fonts of the maps (`port/linux/src/text_hires.c`).
 | `Overpass-750.ttf` | `ui\small_ui` | Overpass, weight 750 |
 | `OpenCE-Regular.ttf` | the menus' titles, as pictures (`port/assets/titles`) | OpenCE: Newtown, respaced for this project (`tools/title_font.py`) |
 | `Newtown-Regular.ttf` | (OpenCE's source) | Newtown by Roger White, unmodified |
+| `OverpassMono-Regular.ttf` | the new engine's developer shell and overlays (`engine/app`, `TextPass.swift`) | Overpass Mono, Regular |
 
 The maps' fonts are Interstate (Tobias Frere-Jones, The Font Bureau), a
 commercial typeface that cannot be shipped. Overpass (Red Hat, Delve
@@ -43,3 +44,15 @@ The Overpass files are static instances of Google Fonts' variable Overpass
 
 The builds embed the Overpass files (`tools/embed_assets.py`), and the
 release packages carry `Overpass-OFL.txt`, as the license asks.
+
+Overpass Mono is the monospace face of the same family (Red Hat), under
+the SIL Open Font License 1.1 (`OverpassMono-OFL.txt`, from the family's
+`LICENSE.md`, which also offers it under the LGPL 2.1). The file is
+`overpass-mono-regular.ttf` of Overpass 3.0.5
+(RedHatOfficial/Overpass, as packaged by nixpkgs `overpass-3.0.5`),
+unmodified:
+
+    sha256 971af33fc4ecc1f332899a106a9b3b2520478403ff89c3488871e87ab12caa2f  OverpassMono-Regular.ttf
+
+The new engine's app bundle carries it and its licence
+(`tools/engine_build.py`).
