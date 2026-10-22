@@ -32,16 +32,16 @@
 - [x] Task: Live shader reload c7ccbda5
     - [x] Write tests: an edited source recompiles and swaps; a broken one keeps the old pipeline and reports the error
     - [x] Watching the shader sources in a development build
-- [~] Task: The test driver
-    - [ ] Write tests: `wait`, `wait_until`, `expect` and `frame` in `.ocs` scripts; a failed `expect` reports its line and state
-    - [ ] The script runner, headless and in the window
-- [ ] Task: Profiling marks
-    - [ ] Write tests: nested scopes add up; the trace file is valid
-    - [ ] `profile_scope!`, the Swift equivalent, `stat frame`, the trace writer
+- [x] Task: The test driver 7971f7a5
+    - [x] Write tests: `wait`, `wait_until`, `expect` and `frame` in `.ocs` scripts; a failed `expect` reports its line and state
+    - [x] The script runner, headless and in the window
+- [x] Task: Profiling marks 7971f7a5
+    - [x] Write tests: nested scopes add up; the trace file is valid
+    - [x] `profile_scope!`, the Swift equivalent, `stat frame`, the trace writer
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Hooks' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 4: The test map
-- [ ] Task: A level made by the engine
+- [~] Task: A level made by the engine
     - [ ] Write tests: the generated plane's collision and render geometry; the player spawns on it; the sky is drawn
     - [ ] A builder of `content::Level` values that are not imported from a cache
 - [ ] Task: Gathering every object
