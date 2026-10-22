@@ -107,6 +107,7 @@ symbols in this file:
 #include "units/units.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
+#include "armor_sync.h" /* port: port/linux/game/armor_sync.c */
 
 /* ---------- constants */
 
@@ -392,6 +393,8 @@ void interface_draw_fullscreen_overlays(
 	map_share_render();
 	/* port: a network game's round trip to the host (display.latency_meter) */
 	latency_meter_draw();
+	/* port: the Armor choices sent (port/linux/game/armor_sync.c) */
+	armor_sync_network_update();
 	terminal_draw();
 	main_framerate_render();
 	render_debug_profile();

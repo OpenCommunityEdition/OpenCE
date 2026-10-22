@@ -1,4 +1,4 @@
-version 32
+version 33
 bound CHAT_TEXT_SIZE 64
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
@@ -43,6 +43,8 @@ enum _distributed_actor_super_camouflaged_bit 5
 enum _distributed_message_actor_damage 73
 enum _distributed_message_actor_states 64
 enum _distributed_message_aim_assist_policy 90
+enum _distributed_message_armor 91
+enum _distributed_message_armors 92
 enum _distributed_message_batch 16
 enum _distributed_message_chat_config 89
 enum _distributed_message_chat_down 88
