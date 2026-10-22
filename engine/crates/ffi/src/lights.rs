@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use opence_content::{Level, Light, TagRef};
 use opence_sim::animation::NodeMatrix;
 use opence_sim::damage::transition;
+use opence_sim::effects::FiredPart;
 use opence_sim::seats::{default_pose, marker_matrix};
 use opence_sim::{Quat, Simulation, Vec3};
 
@@ -51,8 +52,6 @@ struct Fading {
 pub(crate) struct Lights {
     carried: BTreeMap<TagRef, Carried>,
     fading: Vec<Fading>,
-    /// The effects made so far.
-    made: u32,
     /// The level's lens flares and widgets.
     pub(crate) camera: crate::camera::CameraLevel,
     /// The widgets the last frame placed, and its BSP.
@@ -263,15 +262,14 @@ impl Lights {
         Self {
             carried,
             fading: Vec::new(),
-            made: 0,
             camera: crate::camera::CameraLevel::new(level),
             sources: crate::camera::CameraSources::default(),
         }
     }
 
-    /// One tick: the effects' lights age, and this tick's effects (the
-    /// shots' and the detonations') light theirs.
-    pub(crate) fn tick(&mut self, level: &Level, simulation: &Simulation) {
+    /// One tick: the effects' lights age, and the light parts effects
+    /// made this tick (`fired`) begin to shine.
+    pub(crate) fn tick(&mut self, level: &Level, fired: &[FiredPart]) {
         self.fading.retain_mut(|fading| {
             fading.age += 1;
             level
@@ -279,34 +277,17 @@ impl Lights {
                 .get(fading.light)
                 .is_some_and(|light| fading.age < ticks(light))
         });
-        let made = simulation
-            .effects()
-            .iter()
-            .map(|effect| (&effect.effect, effect.position, effect.rotation))
-            .chain(simulation.detonations().iter().filter_map(|detonation| {
-                Some((
-                    detonation.effect.as_ref()?,
-                    detonation.point,
-                    Quat::IDENTITY,
-                ))
-            }));
-        for (tag, position, rotation) in made {
-            let Some(effect) = level.effect(tag) else {
+        for part in fired {
+            let Some(light) = level.lights.iter().position(|light| light.tag == part.tag) else {
                 continue;
             };
-            self.made = self.made.wrapping_add(1);
-            for tag in &effect.lights {
-                let Some(light) = level.lights.iter().position(|light| light.tag == *tag) else {
-                    continue;
-                };
-                self.fading.push(Fading {
-                    light,
-                    position,
-                    rotation,
-                    age: 0,
-                    number: self.made,
-                });
-            }
+            self.fading.push(Fading {
+                light,
+                position: part.position,
+                rotation: part.rotation,
+                age: 0,
+                number: part.effect,
+            });
         }
         // (the oldest go first when there are too many)
         let excess = self.fading.len().saturating_sub(MAX_LIGHTS);
@@ -858,7 +839,7 @@ pub(crate) mod tests {
         for _ in 0..5 {
             lights.gather(&level, &mut simulation, &camera, &mut out);
             radii.extend(out.iter().map(|light| (light.source, light.color.x)));
-            lights.tick(&level, &simulation);
+            lights.tick(&level, &[]);
         }
         // (four ticks, dimmer each, the first at full)
         assert_eq!(radii.len(), 4, "{radii:?}");

@@ -283,6 +283,8 @@ impl Engine {
             lit: Vec::new(),
             decals: crate::dynamic_decals::DynamicDecals::new(&level),
             marks: Vec::new(),
+            effects: crate::effects::LevelEffects::new(&level),
+            running_effects: Vec::new(),
             level: Some(level),
             network: Some(network),
             dressed,

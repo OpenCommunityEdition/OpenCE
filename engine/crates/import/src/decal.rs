@@ -155,14 +155,11 @@ mod tests {
         let unused = fake.add_tag(DECA, "decals\\unused", &bytes);
         let cache = Cache::open(fake.build())?;
         let effect = Effect {
-            tag: TagRef {
+            decals: vec![tag_ref(&cache, made)],
+            ..Effect::new(TagRef {
                 group: opence_content::Group(*b"effe"),
                 path: "effects\\impact".into(),
-            },
-            damage: Vec::new(),
-            debris: Vec::new(),
-            lights: Vec::new(),
-            decals: vec![tag_ref(&cache, made)],
+            })
         };
         let palette = [Some(tag_ref(&cache, unused))];
         let mut reached = Reached::default();

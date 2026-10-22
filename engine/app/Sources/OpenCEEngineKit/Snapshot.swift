@@ -43,6 +43,9 @@ public func checkSnapshotLayout() throws {
         ("max_decals", layout.maxDecals, Int(OCE_MAX_DECALS)),
         ("FrameSnapshot.decals", layout.frameDecalsOffset, MemoryLayout<OCEFrameSnapshot>.offset(of: \.decals)),
         ("DecalSnapshot size", layout.decalSize, MemoryLayout<OCEDecalSnapshot>.size),
+        ("max_effects", layout.maxEffects, Int(OCE_MAX_EFFECTS)),
+        ("FrameSnapshot.effects", layout.frameEffectsOffset, MemoryLayout<OCEFrameSnapshot>.offset(of: \.effects)),
+        ("EffectSnapshot size", layout.effectSize, MemoryLayout<OCEEffectSnapshot>.size),
     ]
     for (field, library, header) in checks where Int(library) != header {
         throw SnapshotLayoutMismatch(field: field, library: Int(library), header: header ?? -1)
@@ -73,6 +76,10 @@ public struct FrameView {
     /// The decals laid while the game runs, layer by layer.
     public var decals: UnsafeBufferPointer<OCEDecalSnapshot> {
         UnsafeBufferPointer(start: pointer.pointee.decals, count: Int(pointer.pointee.decal_count))
+    }
+    /// The effects running, oldest first.
+    public var effects: UnsafeBufferPointer<OCEEffectSnapshot> {
+        UnsafeBufferPointer(start: pointer.pointee.effects, count: Int(pointer.pointee.effect_count))
     }
 
     public var debugLines: UnsafeBufferPointer<OCEDebugLine> {

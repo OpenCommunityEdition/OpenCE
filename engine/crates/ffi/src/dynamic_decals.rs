@@ -1,12 +1,14 @@
-//! Decals laid while the game runs: where projectiles strike and grenades
-//! detonate, each effect's decals laid on the level or on the object
-//! struck, fading at the end of their lives and recycled oldest first
+//! Decals laid while the game runs: the decal parts of the effects made
+//! where projectiles strike and grenades detonate, laid on the level or on
+//! the object struck, fading at the end of their lives and recycled oldest first
 //! (`decals.c`'s `decal_new_from_collision` and `decals_update`).
 
 use std::collections::HashMap;
 
-use opence_content::{Bitmap, Level, Projectile, TagRef};
+use opence_content::{Bitmap, Level, TagRef};
+use opence_sim::effects::FiredPart;
 use opence_sim::objects::ObjectHandle;
+use opence_sim::projectile::Impact;
 use opence_sim::{Simulation, Transform, Vec3};
 
 use crate::decals::{first_hit, lay, seed, triangles, Laid, RenderDecal, Triangle};
@@ -77,18 +79,6 @@ pub(crate) fn decal_images(level: &Level) -> Vec<(TagRef, u16)> {
     images
 }
 
-/// The effect a projectile makes where it strikes a surface of
-/// `material` (-1: one not known): its response's, else its detonation's.
-pub(crate) fn response_effect(projectile: &Projectile, material: i16) -> Option<&TagRef> {
-    let response = projectile
-        .material_responses
-        .get(usize::try_from(material).ok()?)?;
-    response
-        .default_effect
-        .as_ref()
-        .or(response.detonation_effect.as_ref())
-}
-
 /// The decals laid while the game runs.
 #[derive(Debug, Default)]
 pub(crate) struct DynamicDecals {
@@ -126,63 +116,76 @@ impl DynamicDecals {
         })
     }
 
-    /// One tick: the decals age, those past their lives go, and this
-    /// tick's impacts and detonations lay theirs on BSP `bsp` and the
-    /// objects they struck.
-    pub(crate) fn tick(&mut self, level: &Level, simulation: &Simulation, bsp: usize) {
+    /// One tick: the decals age, those past their lives go, and the decal
+    /// parts effects made this tick (`fired`) are laid on the surfaces
+    /// their effects were made on, the level's or the objects' struck.
+    pub(crate) fn tick(&mut self, level: &Level, simulation: &Simulation, fired: &[FiredPart]) {
         self.age(|handle| simulation.transform(handle).is_some());
-        for impact in simulation.impacts() {
-            let Some(projectile) = level
-                .object(&impact.projectile)
-                .and_then(|object| object.projectile.as_ref())
-            else {
+        for part in fired {
+            let Some(surface) = part.surface.filter(|_| part.tag.group.0 == *b"deca") else {
                 continue;
             };
-            let point = impact.point.to_array();
-            let normal = impact.normal.to_array();
-            let on = impact
+            let on = surface
                 .object
                 .and_then(|handle| Some((handle, simulation.transform(handle)?)));
-            let material = match (impact.object, &on) {
-                (Some(handle), _) => simulation
-                    .object(handle)
-                    .and_then(|object| level.object(&object.tag)?.collision_model.clone())
-                    .and_then(|model| level.collision_model(&model))
-                    .and_then(|model| model.materials.first())
-                    .map_or(-1, |material| material.material_type),
-                (None, _) => {
-                    let origin = add(point, scale(normal, MATERIAL_REACH));
-                    first_hit(
-                        self.bsp(level, bsp),
-                        origin,
-                        scale(normal, -1.0),
-                        MATERIAL_REACH * 2.0,
-                    )
-                    .map_or(-1, |hit| hit.material)
-                }
-            };
-            if let Some(effect) = response_effect(projectile, material) {
-                let direction = impact.direction.to_array();
-                self.lay_effect(level, effect, point, normal, direction, on);
+            if surface.object.is_some() && on.is_none() {
+                continue;
             }
+            self.lay_decals(
+                level,
+                std::slice::from_ref(&part.tag),
+                surface.point.to_array(),
+                surface.normal.to_array(),
+                surface.direction.to_array(),
+                on,
+            );
         }
-        for detonation in simulation.detonations() {
-            let Some(effect) = detonation.effect.as_ref() else {
-                continue;
-            };
-            let point = detonation.point.to_array();
-            let down = [0.0, 0.0, -1.0];
-            let origin = add(point, [0.0, 0.0, GROUND_ABOVE]);
-            let Some(hit) = first_hit(
-                self.bsp(level, bsp),
-                origin,
-                down,
-                GROUND_ABOVE + GROUND_BELOW,
-            ) else {
-                continue;
-            };
-            self.lay_effect(level, effect, hit.point, hit.normal, down, None);
+    }
+
+    /// The material of the surface `impact` struck on BSP `bsp` (-1: one
+    /// not known): an object's, its collision model's first.
+    pub(crate) fn material(
+        &mut self,
+        level: &Level,
+        simulation: &Simulation,
+        bsp: usize,
+        impact: &Impact,
+    ) -> i16 {
+        if let Some(handle) = impact.object {
+            return simulation
+                .object(handle)
+                .and_then(|object| level.object(&object.tag)?.collision_model.clone())
+                .and_then(|model| level.collision_model(&model))
+                .and_then(|model| model.materials.first())
+                .map_or(-1, |material| material.material_type);
         }
+        let point = impact.point.to_array();
+        let normal = impact.normal.to_array();
+        let origin = add(point, scale(normal, MATERIAL_REACH));
+        first_hit(
+            self.bsp(level, bsp),
+            origin,
+            scale(normal, -1.0),
+            MATERIAL_REACH * 2.0,
+        )
+        .map_or(-1, |hit| hit.material)
+    }
+
+    /// The ground of BSP `bsp` under `point`, and its normal there.
+    pub(crate) fn ground(
+        &mut self,
+        level: &Level,
+        bsp: usize,
+        point: Vec3,
+    ) -> Option<(Vec3, Vec3)> {
+        let origin = add(point.to_array(), [0.0, 0.0, GROUND_ABOVE]);
+        let hit = first_hit(
+            self.bsp(level, bsp),
+            origin,
+            [0.0, 0.0, -1.0],
+            GROUND_ABOVE + GROUND_BELOW,
+        )?;
+        Some((Vec3::from_array(hit.point), Vec3::from_array(hit.normal)))
     }
 
     /// The decals age; those past their lives, and those on objects that
@@ -194,27 +197,24 @@ impl DynamicDecals {
         });
     }
 
-    /// Lays `effect`'s decals at `point` on a surface facing `normal`,
-    /// struck going `velocity`; on the object `on` (with its transform),
-    /// if one was struck.
-    pub(crate) fn lay_effect(
+    /// Lays the decals `tags` (and those they chain to) at `point` on a
+    /// surface facing `normal`, struck going `velocity`; on the object `on`
+    /// (with its transform), if one was struck.
+    pub(crate) fn lay_decals(
         &mut self,
         level: &Level,
-        effect: &TagRef,
+        tags: &[TagRef],
         point: [f32; 3],
         normal: [f32; 3],
         velocity: [f32; 3],
         on: Option<(ObjectHandle, Transform)>,
     ) {
-        let Some(effect) = level.effect(effect) else {
-            return;
-        };
         let pictures = &self.pictures;
         let mut texture =
             |bitmap: &Bitmap, image: u16| pictures.get(&(bitmap.tag.clone(), image)).copied();
         let mut seed = seed(point);
         let mut laid = Vec::new();
-        for decal in effect.decals.iter().filter_map(|tag| level.decal(tag)) {
+        for decal in tags.iter().filter_map(|tag| level.decal(tag)) {
             laid.extend(lay(
                 level,
                 decal,
@@ -351,7 +351,7 @@ pub(crate) fn snapshot(decal: &RenderDecal, surface: u32) -> DecalSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use opence_content::{Decal, Effect, Group, MaterialResponse};
+    use opence_content::{Decal, Group};
     use opence_sim::Quat;
 
     fn tag(group: &[u8; 4], path: &str) -> TagRef {
@@ -381,19 +381,8 @@ mod tests {
         }
     }
 
-    fn effect(path: &str, decals: &[&Decal]) -> Effect {
-        Effect {
-            tag: tag(b"effe", path),
-            damage: Vec::new(),
-            debris: Vec::new(),
-            lights: Vec::new(),
-            decals: decals.iter().map(|decal| decal.tag.clone()).collect(),
-        }
-    }
-
-    /// A level whose effect `hole` lays a decal lasting a second and
-    /// fading over another, and whose effect `chain` lays a decal and the
-    /// one it chains to.
+    /// A level whose decal `hole` lasts a second and fades over another,
+    /// and whose decal `first` chains to `second`.
     fn level() -> Level {
         let mut level = crate::render_level::tests::level();
         let hole = decal("hole", 1.0, 1.0);
@@ -404,19 +393,14 @@ mod tests {
         let mut pictured = decal("pictured", 0.0, 0.0);
         pictured.map = Some(tag(b"bitm", "decals"));
         level.bitmaps = vec![crate::render_level::tests::bitmap("decals", 3, 1)];
-        level.effects = vec![
-            effect("hole", &[&hole]),
-            effect("chain", &[&first]),
-            effect("pictured", &[&pictured]),
-        ];
         level.decals = vec![hole, first, second, pictured];
         level
     }
 
-    fn lay(decals: &mut DynamicDecals, level: &Level, effect: &str) {
-        decals.lay_effect(
+    fn lay(decals: &mut DynamicDecals, level: &Level, decal: &str) {
+        decals.lay_decals(
             level,
-            &tag(b"effe", effect),
+            &[tag(b"deca", decal)],
             [1.0, 2.0, 0.0],
             [0.0, 0.0, 1.0],
             [0.0, 0.0, -1.0],
@@ -428,6 +412,53 @@ mod tests {
         let mut out = Vec::new();
         decals.gather(|_| None, &mut out);
         out
+    }
+
+    fn fired(path: &str, surface: Option<opence_sim::effects::Surface>) -> FiredPart {
+        FiredPart {
+            effect: 1,
+            event: 0,
+            part: 0,
+            tag: tag(b"deca", path),
+            position: Vec3::ZERO,
+            rotation: Quat::IDENTITY,
+            velocity: Vec3::ZERO,
+            on: None,
+            surface,
+        }
+    }
+
+    #[test]
+    fn the_decal_parts_effects_make_on_surfaces_are_laid() {
+        let level = level();
+        let mut decals = DynamicDecals::new(&level);
+        let simulation = Simulation::empty();
+        let surface = opence_sim::effects::Surface {
+            point: Vec3::new(1.0, 2.0, 0.0),
+            normal: Vec3::Z,
+            direction: Vec3::NEG_Z,
+            object: None,
+        };
+        let mut light = fired("hole", Some(surface));
+        light.tag.group = Group(*b"ligh");
+        let gone = opence_sim::effects::Surface {
+            object: Some(ObjectHandle { index: 9, salt: 1 }),
+            ..surface
+        };
+        decals.tick(
+            &level,
+            &simulation,
+            &[
+                fired("hole", Some(surface)),
+                // (made in the air, a light, and on an object gone)
+                fired("hole", None),
+                light,
+                fired("hole", Some(gone)),
+            ],
+        );
+        let laid = gathered(&decals);
+        assert_eq!(laid.len(), 1);
+        assert_eq!(laid[0].center[..3], [1.0, 2.0, 0.0]);
     }
 
     #[test]
@@ -465,7 +496,7 @@ mod tests {
     fn a_decal_without_a_lifetime_stays_and_its_chain_follows_layer_by_layer() {
         let level = level();
         let mut decals = DynamicDecals::new(&level);
-        lay(&mut decals, &level, "chain");
+        lay(&mut decals, &level, "first");
         lay(&mut decals, &level, "nothing");
         for _ in 0..1000 {
             decals.age(|_| true);
@@ -483,7 +514,7 @@ mod tests {
         lay(&mut decals, &level, "hole");
         decals.age(|_| true);
         for _ in 0..MAX_DECALS {
-            lay(&mut decals, &level, "chain");
+            lay(&mut decals, &level, "first");
         }
         assert_eq!(decals.marks.len(), MAX_DECALS);
         // (the hole, the oldest, went first)
@@ -515,9 +546,9 @@ mod tests {
             rotation: Quat::IDENTITY,
             scale: 1.0,
         };
-        decals.lay_effect(
+        decals.lay_decals(
             &level,
-            &tag(b"effe", "hole"),
+            &[tag(b"deca", "hole")],
             [1.0, 2.5, 0.0],
             [0.0, 1.0, 0.0],
             [0.0, -1.0, 0.0],
@@ -543,28 +574,6 @@ mod tests {
         assert!(out.is_empty());
         decals.age(|_| false);
         assert_eq!(decals.marks.len(), 0, "the decal outlived its object");
-    }
-
-    #[test]
-    fn the_effect_struck_is_the_materials_response() {
-        let response = |effect: Option<&str>, detonation: Option<&str>| MaterialResponse {
-            default_effect: effect.map(|path| tag(b"effe", path)),
-            detonation_effect: detonation.map(|path| tag(b"effe", path)),
-            ..MaterialResponse::default()
-        };
-        let projectile = Projectile {
-            material_responses: vec![
-                response(Some("dirt"), None),
-                response(None, Some("boom")),
-                response(None, None),
-            ],
-            ..Projectile::default()
-        };
-        assert_eq!(response_effect(&projectile, 0), Some(&tag(b"effe", "dirt")));
-        assert_eq!(response_effect(&projectile, 1), Some(&tag(b"effe", "boom")));
-        assert_eq!(response_effect(&projectile, 2), None);
-        assert_eq!(response_effect(&projectile, 3), None);
-        assert_eq!(response_effect(&projectile, -1), None);
     }
 
     #[test]

@@ -66,8 +66,8 @@ pub use vehicle::{
     VehicleSeat,
 };
 pub use weapon::{
-    AimAssist, Ammunition, DamageEffect, Effect, EffectDebris, Equipment, Grenade, Item, Magazine,
-    MaterialResponse, Projectile, Trigger, Weapon,
+    AimAssist, Ammunition, DamageEffect, Effect, EffectDebris, EffectEvent, EffectPart, Equipment,
+    Grenade, Item, Magazine, MaterialResponse, Projectile, Trigger, Weapon,
 };
 
 use rkyv::{Archive, Deserialize, Serialize};

@@ -31,9 +31,12 @@ pub const MAX_LIGHTS: usize = 512;
 /// The most dynamic decals one snapshot holds.
 pub const MAX_DECALS: usize = 2048;
 
+/// The most running effects one snapshot holds.
+pub const MAX_EFFECTS: usize = 256;
+
 /// Raised with any change to the snapshot's types, so that the app refuses
 /// a library of another layout.
-pub const SNAPSHOT_VERSION: u32 = 8;
+pub const SNAPSHOT_VERSION: u32 = 9;
 
 /// `ObjectSnapshot::flags`: the first-person weapon or hands, posed from
 /// the camera and drawn in front of the world.
@@ -222,6 +225,19 @@ pub struct DecalSnapshot {
     pub modes: [u32; 4],
 }
 
+/// An effect running: where it is and which of its events it is in.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct EffectSnapshot {
+    /// Where it is, then the seconds it has run.
+    pub position: [f32; 4],
+    /// The way it faces, then 0.
+    pub forward: [f32; 4],
+    /// Its number, its event's index, the slot of the object it is on
+    /// (`u32::MAX`: none) and 1 if its event is skipped.
+    pub ids: [u32; 4],
+}
+
 /// A debug line, drawn after the world.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -296,6 +312,10 @@ pub struct FrameSnapshot {
     /// The dynamic decals, layer by layer and picture by picture, in the
     /// same slot.
     pub decals: *const DecalSnapshot,
+    /// The effects running, oldest first, in the same slot.
+    pub effects: *const EffectSnapshot,
+    /// The number of effects in `effects`.
+    pub effect_count: u32,
 }
 
 /// The sizes and offsets of the snapshot's types, as Rust laid them out;
@@ -358,6 +378,12 @@ pub struct SnapshotLayout {
     pub frame_decals_offset: u32,
     /// The size of `DecalSnapshot`.
     pub decal_size: u32,
+    /// `MAX_EFFECTS`.
+    pub max_effects: u32,
+    /// The offset of `FrameSnapshot::effects`.
+    pub frame_effects_offset: u32,
+    /// The size of `EffectSnapshot`.
+    pub effect_size: u32,
 }
 
 /// The layout of the snapshot's types.
@@ -395,6 +421,9 @@ pub fn snapshot_layout() -> SnapshotLayout {
         max_decals: n(MAX_DECALS),
         frame_decals_offset: n(offset_of!(FrameSnapshot, decals)),
         decal_size: n(size_of::<DecalSnapshot>()),
+        max_effects: n(MAX_EFFECTS),
+        frame_effects_offset: n(offset_of!(FrameSnapshot, effects)),
+        effect_size: n(size_of::<EffectSnapshot>()),
     }
 }
 
@@ -409,6 +438,7 @@ struct Slot {
     debug_labels: [DebugLabel; MAX_DEBUG_LABELS],
     lights: [LightSnapshot; MAX_LIGHTS],
     decals: [DecalSnapshot; MAX_DECALS],
+    effects: [EffectSnapshot; MAX_EFFECTS],
 }
 
 impl Slot {
@@ -424,6 +454,7 @@ impl Slot {
         slot.frame.debug_labels = slot.debug_labels.as_ptr();
         slot.frame.lights = slot.lights.as_ptr();
         slot.frame.decals = slot.decals.as_ptr();
+        slot.frame.effects = slot.effects.as_ptr();
         slot
     }
 }
@@ -543,6 +574,13 @@ impl FrameBuilder<'_> {
         self.slot.frame.decal_count = count as u32;
     }
 
+    /// Adds `effects`, as many as fit.
+    pub fn effects(&mut self, effects: &[EffectSnapshot]) {
+        let count = effects.len().min(MAX_EFFECTS);
+        self.slot.effects[..count].copy_from_slice(&effects[..count]);
+        self.slot.frame.effect_count = count as u32;
+    }
+
     /// Adds `draw`'s lines and labels, as many as fit.
     pub fn debug(&mut self, draw: &opence_dev::draw::DebugDraw) {
         let vector = |[x, y, z]: [f32; 3]| Vec3 { x, y, z };
@@ -600,6 +638,7 @@ impl SnapshotWriter {
         slot.frame.debug_label_count = 0;
         slot.frame.light_count = 0;
         slot.frame.decal_count = 0;
+        slot.frame.effect_count = 0;
         let result = fill(&mut FrameBuilder { slot });
         self.slot = buffers.middle.swap(self.slot | FRESH, Ordering::AcqRel) & INDEX;
         result
@@ -657,7 +696,11 @@ mod tests {
         assert_eq!(offset_of!(FrameSnapshot, decal_count), 148);
         assert_eq!(offset_of!(FrameSnapshot, lights), 152);
         assert_eq!(offset_of!(FrameSnapshot, decals), 160);
-        assert_eq!(size_of::<FrameSnapshot>(), 168);
+        assert_eq!(offset_of!(FrameSnapshot, effects), 168);
+        assert_eq!(offset_of!(FrameSnapshot, effect_count), 176);
+        assert_eq!(size_of::<FrameSnapshot>(), 184);
+        assert_eq!(size_of::<EffectSnapshot>(), 48);
+        assert_eq!(offset_of!(EffectSnapshot, ids), 32);
         assert_eq!(size_of::<DecalSnapshot>(), 128);
         assert_eq!(offset_of!(DecalSnapshot, modes), 112);
         assert_eq!(size_of::<LightSnapshot>(), 88);
@@ -667,13 +710,17 @@ mod tests {
         assert_eq!(size_of::<DebugLine>(), 28);
         assert_eq!(size_of::<DebugLabel>(), 64);
         assert_eq!(offset_of!(DebugLabel, text), 16);
-        assert_eq!(SNAPSHOT_VERSION, 8);
+        assert_eq!(SNAPSHOT_VERSION, 9);
     }
 
     #[test]
     fn the_layout_record_reports_it() {
         let layout = snapshot_layout();
-        assert_eq!(layout.frame_size, 168);
+        assert_eq!(layout.frame_size, 184);
+        assert_eq!(layout.frame_effects_offset, 168);
+        assert_eq!(layout.effect_size, 48);
+        assert_eq!(layout.max_effects, 256);
+        assert_eq!(MAX_EFFECTS, opence_sim::effects::MAX_EFFECTS);
         assert_eq!(layout.frame_decals_offset, 160);
         assert_eq!(layout.decal_size, 128);
         assert_eq!(layout.max_decals, 2048);
@@ -815,6 +862,24 @@ mod tests {
         assert_eq!(unsafe { (*frame.decals).modes[3] }, DECAL_ON_OBJECT);
         writer.publish(&buffers, 2, 0.0, |_| {});
         assert_eq!(read(&buffers).decal_count, 0);
+    }
+
+    #[test]
+    fn the_effects_are_copied_up_to_their_capacity_and_cleared() {
+        let (buffers, mut writer) = SnapshotBuffers::new();
+        let effect = EffectSnapshot {
+            ids: [7, 1, u32::MAX, 0],
+            ..Default::default()
+        };
+        writer.publish(&buffers, 1, 0.0, |frame| {
+            frame.effects(&vec![effect; MAX_EFFECTS + 3]);
+        });
+        let frame = read(&buffers);
+        assert_eq!(frame.effect_count as usize, MAX_EFFECTS);
+        // SAFETY: effects points at effect_count entries in the same slot.
+        assert_eq!(unsafe { (*frame.effects).ids[0] }, 7);
+        writer.publish(&buffers, 2, 0.0, |_| {});
+        assert_eq!(read(&buffers).effect_count, 0);
     }
 
     #[test]

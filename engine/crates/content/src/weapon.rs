@@ -488,8 +488,8 @@ pub struct Grenade {
     pub projectile: Option<TagRef>,
 }
 
-/// An effect (`effe`), as far as the simulation reads it: the damage its
-/// parts do where it is created (a grenade's explosion).
+/// An effect (`effe`): its events, each making its parts in turn, and,
+/// gathered from them, the damage, lights and decals it makes.
 #[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct Effect {
     /// Its tag.
@@ -504,6 +504,90 @@ pub struct Effect {
     /// The decals (`deca`) its events' parts lay where it is made, in
     /// order.
     pub decals: Vec<TagRef>,
+    /// Its flags.
+    pub flags: u32,
+    /// The event a looping effect (one attached to an object) goes back
+    /// to after its last (none: it does not loop).
+    pub loop_start_event: i16,
+    /// The markers its parts are made at, by their `location`.
+    pub locations: Vec<String>,
+    /// Its events, one after another.
+    pub events: Vec<EffectEvent>,
+}
+
+impl Effect {
+    /// It is deleted when what it is attached to stops making it.
+    pub const DELETED_WHEN_INACTIVE: u32 = 1;
+
+    /// An effect named `tag` that makes nothing.
+    pub fn new(tag: TagRef) -> Self {
+        Self {
+            tag,
+            damage: Vec::new(),
+            debris: Vec::new(),
+            lights: Vec::new(),
+            decals: Vec::new(),
+            flags: 0,
+            loop_start_event: -1,
+            locations: Vec::new(),
+            events: Vec::new(),
+        }
+    }
+}
+
+/// One of an effect's events: after its delay its parts are made, and the
+/// next event begins once it has lasted its duration.
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct EffectEvent {
+    /// The chance, 0 to 1, that it is skipped.
+    pub skip_fraction: f32,
+    /// The least and most seconds before it begins.
+    pub delay: [f32; 2],
+    /// The least and most seconds it lasts.
+    pub duration: [f32; 2],
+    /// What it makes when it begins.
+    pub parts: Vec<EffectPart>,
+}
+
+/// Something an event makes: an object, a light, a decal, damage, a sound
+/// or another effect.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct EffectPart {
+    /// Where it may be made: 0 anywhere, 1 in air, 2 in water, 3 in space.
+    pub create_in: i16,
+    /// The game's mode it is made in: 0 either, 1 violent (blood shown),
+    /// 2 not violent.
+    pub create_in_mode: i16,
+    /// The effect's location it is made at (none: the effect's origin).
+    pub location: i16,
+    /// Its flags.
+    pub flags: u16,
+    /// What is made.
+    pub tag: TagRef,
+    /// The least and most speed it leaves at.
+    pub velocity: [f32; 2],
+    /// The cone about the location's forward it leaves within.
+    pub velocity_cone_angle: f32,
+    /// The least and most speed it spins at, radians a second.
+    pub angular_velocity: [f32; 2],
+    /// The least and most its radius is scaled by.
+    pub radius_modifier: [f32; 2],
+}
+
+impl EffectPart {
+    /// It faces down, wherever its location faces (a decal laid on the
+    /// ground).
+    pub const FACE_DOWN: u16 = 1;
+    /// Made in air.
+    pub const IN_AIR: i16 = 1;
+    /// Made in water.
+    pub const IN_WATER: i16 = 2;
+    /// Made in space.
+    pub const IN_SPACE: i16 = 3;
+    /// Made only when blood is shown.
+    pub const VIOLENT: i16 = 1;
+    /// Made only when blood is not shown.
+    pub const NOT_VIOLENT: i16 = 2;
 }
 
 /// An effect's particles heavy enough to be bodies: their point physics

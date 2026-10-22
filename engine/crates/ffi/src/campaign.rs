@@ -212,6 +212,8 @@ impl Engine {
             lit: Vec::new(),
             decals: crate::dynamic_decals::DynamicDecals::new(&geometry.content),
             marks: Vec::new(),
+            effects: crate::effects::LevelEffects::new(&geometry.content),
+            running_effects: Vec::new(),
         };
         running.previous_camera = transform(&camera(&running).transform);
         let mut state = self.lock();

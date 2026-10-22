@@ -1,14 +1,20 @@
-//! Effects (`effe`), as far as the engine reads them: the damage effects,
-//! lights and decals their events' parts create, and the particles they
-//! emit that are heavy enough to be bodies. An effect is 0x40 bytes, its events
-//! (0x44 bytes each) a block at 0x34, an event's parts (0x68 bytes each) a
-//! block at 0x2C and its particles (0xE8 bytes each) one at 0x38, and a
-//! part's tag a reference at 0x18. A particle (`part`, 0x164 bytes) names
+//! Effects (`effe`): their events and the parts each makes, the damage
+//! effects, lights and decals among those parts, and the particles they
+//! emit that are heavy enough to be bodies. An effect is 0x40 bytes: its
+//! flags at 0x00, the event it loops from at 0x04, its locations (0x20
+//! bytes each, a marker's name) a block at 0x28 and its events (0x44 bytes
+//! each) a block at 0x34. An event's skip fraction is at 0x04, its delay
+//! bounds at 0x08 and its duration bounds at 0x10, its parts (0x68 bytes
+//! each) a block at 0x2C and its particles (0xE8 bytes each) one at 0x38.
+//! A part's environment is at 0x00, its mode at 0x02, its location at 0x04,
+//! its flags at 0x06, its tag a reference at 0x18, its velocity bounds at
+//! 0x40, its cone at 0x48, its angular velocity bounds at 0x4C and its
+//! radius modifier bounds at 0x54. A particle (`part`, 0x164 bytes) names
 //! its point physics (`pphy`, 0x40 bytes) at 0x14 and its least radius at
 //! 0x74; the point physics' density is at 0x20, its contact friction at
 //! 0x2C and its elasticity at 0x30.
 
-use opence_content::{Effect, EffectDebris};
+use opence_content::{Effect, EffectDebris, EffectEvent, EffectPart};
 
 use crate::cache::Cache;
 use crate::error::ImportError;
@@ -29,6 +35,9 @@ const MAX_PARTS: usize = 32;
 const PARTICLES_OFFSET: usize = 0x38;
 pub(crate) const PARTICLES_SIZE: usize = 0xE8;
 const MAX_PARTICLES: usize = 32;
+const LOCATIONS_OFFSET: usize = 0x28;
+pub(crate) const LOCATION_SIZE: usize = 0x20;
+const MAX_LOCATIONS: usize = 32;
 const PART: GroupTag = GroupTag::new(b"part");
 pub(crate) const PARTICLE_SIZE: usize = 0x164;
 const PPHY: GroupTag = GroupTag::new(b"pphy");
@@ -46,6 +55,12 @@ pub(crate) fn import_effect(cache: &Cache, index: usize) -> Result<Effect, Impor
     let mut debris = Vec::new();
     let mut lights = Vec::new();
     let mut decals = Vec::new();
+    let mut timeline = Vec::new();
+    let locations = tag
+        .block(LOCATIONS_OFFSET, "locations", LOCATION_SIZE, MAX_LOCATIONS)?
+        .iter()
+        .map(|location| Ok(location.text(0, "marker name", 31)?.to_owned()))
+        .collect::<Result<Vec<String>, ImportError>>()?;
     for event in events.iter() {
         let particles =
             event.block(PARTICLES_OFFSET, "particles", PARTICLES_SIZE, MAX_PARTICLES)?;
@@ -55,19 +70,36 @@ pub(crate) fn import_effect(cache: &Cache, index: usize) -> Result<Effect, Impor
             }
         }
         let parts = event.block(PARTS_OFFSET, "parts", PART_SIZE, MAX_PARTS)?;
+        let mut made = Vec::new();
         for part in parts.iter() {
-            // (a part creates any object or effect; only damage, lights
-            // and decals are read)
-            if let Some(part_index) = part.reference(PART_TAG_OFFSET, "type", &[])? {
-                if cache.tags()[part_index].is(JPT) {
-                    damage.push(tag_ref(cache, part_index));
-                } else if cache.tags()[part_index].is(crate::light::LIGH) {
-                    lights.push(tag_ref(cache, part_index));
-                } else if cache.tags()[part_index].is(crate::decal::DECA) {
-                    decals.push(tag_ref(cache, part_index));
-                }
+            let Some(part_index) = part.reference(PART_TAG_OFFSET, "type", &[])? else {
+                continue;
+            };
+            if cache.tags()[part_index].is(JPT) {
+                damage.push(tag_ref(cache, part_index));
+            } else if cache.tags()[part_index].is(crate::light::LIGH) {
+                lights.push(tag_ref(cache, part_index));
+            } else if cache.tags()[part_index].is(crate::decal::DECA) {
+                decals.push(tag_ref(cache, part_index));
             }
+            made.push(EffectPart {
+                create_in: part.i16(0x00, "create in")?,
+                create_in_mode: part.i16(0x02, "create in mode")?,
+                location: part.i16(0x04, "location")?,
+                flags: part.u16(0x06, "flags")?,
+                tag: tag_ref(cache, part_index),
+                velocity: vector(&part, 0x40, "velocity bounds")?,
+                velocity_cone_angle: part.f32(0x48, "velocity cone angle")?,
+                angular_velocity: vector(&part, 0x4C, "angular velocity bounds")?,
+                radius_modifier: vector(&part, 0x54, "radius modifier bounds")?,
+            });
         }
+        timeline.push(EffectEvent {
+            skip_fraction: event.f32(0x04, "skip fraction")?,
+            delay: vector(&event, 0x08, "delay bounds")?,
+            duration: vector(&event, 0x10, "duration bounds")?,
+            parts: made,
+        });
     }
     Ok(Effect {
         tag: tag_ref(cache, index),
@@ -75,6 +107,10 @@ pub(crate) fn import_effect(cache: &Cache, index: usize) -> Result<Effect, Impor
         debris,
         lights,
         decals,
+        flags: tag.u32(0x00, "flags")?,
+        loop_start_event: tag.i16(0x04, "loop start event")?,
+        locations,
+        events: timeline,
     })
 }
 
@@ -161,12 +197,30 @@ mod tests {
             crate::decal::DECA,
             fake.handle(decal),
         );
+        // (the light is made at the second location, faster than 2 a
+        // second, facing down)
+        let light_part = PART_SIZE * 2;
+        parts[light_part + 0x04..light_part + 0x06].copy_from_slice(&1i16.to_le_bytes());
+        parts[light_part + 0x06..light_part + 0x08].copy_from_slice(&1u16.to_le_bytes());
+        parts[light_part + 0x40..light_part + 0x44].copy_from_slice(&2.0f32.to_le_bytes());
+        parts[light_part + 0x44..light_part + 0x48].copy_from_slice(&3.0f32.to_le_bytes());
         let parts = fake.add_data(&parts);
-        let mut event = vec![0u8; EVENT_SIZE];
+        let mut event = vec![0u8; EVENT_SIZE * 2];
         block(&mut event, PARTS_OFFSET, 4, parts);
+        event[0x04..0x08].copy_from_slice(&0.25f32.to_le_bytes());
+        event[0x08..0x0C].copy_from_slice(&0.5f32.to_le_bytes());
+        event[0x0C..0x10].copy_from_slice(&1.0f32.to_le_bytes());
+        event[0x10..0x14].copy_from_slice(&2.0f32.to_le_bytes());
+        event[0x14..0x18].copy_from_slice(&4.0f32.to_le_bytes());
         let events = fake.add_data(&event);
+        let mut locations = vec![0u8; LOCATION_SIZE * 2];
+        locations[..6].copy_from_slice(b"origin");
+        locations[LOCATION_SIZE..LOCATION_SIZE + 6].copy_from_slice(b"muzzle");
+        let locations = fake.add_data(&locations);
         let mut effect = vec![0u8; EFFECT_SIZE];
-        block(&mut effect, EVENTS_OFFSET, 1, events);
+        effect[0x04..0x06].copy_from_slice(&1i16.to_le_bytes());
+        block(&mut effect, LOCATIONS_OFFSET, 2, locations);
+        block(&mut effect, EVENTS_OFFSET, 2, events);
         let index = fake.add_tag(EFFE, "weapons\\test\\blast", &effect);
         let cache = Cache::open(fake.build())?;
         let effect = import_effect(&cache, index)?;
@@ -177,6 +231,21 @@ mod tests {
         assert_eq!(effect.lights[0].path, "weapons\\test\\flash");
         assert_eq!(effect.decals.len(), 1);
         assert_eq!(effect.decals[0].path, "effects\\decals\\scorch");
+        assert_eq!(effect.loop_start_event, 1);
+        assert_eq!(effect.locations, ["origin", "muzzle"]);
+        assert_eq!(effect.events.len(), 2);
+        let first = &effect.events[0];
+        assert_eq!(first.skip_fraction, 0.25);
+        assert_eq!(first.delay, [0.5, 1.0]);
+        assert_eq!(first.duration, [2.0, 4.0]);
+        assert_eq!(first.parts.len(), 4, "every part with a tag is kept");
+        assert_eq!(first.parts[0].tag.path, "weapons\\test\\smoke");
+        let light = &first.parts[2];
+        assert_eq!(light.tag.group.0, *b"ligh");
+        assert_eq!(light.location, 1);
+        assert_eq!(light.flags, EffectPart::FACE_DOWN);
+        assert_eq!(light.velocity, [2.0, 3.0]);
+        assert!(effect.events[1].parts.is_empty());
         Ok(())
     }
 }

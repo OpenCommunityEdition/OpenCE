@@ -13,6 +13,7 @@ pub mod clock;
 pub mod crates;
 pub mod damage;
 pub mod debris;
+pub mod effects;
 pub mod first_person;
 pub mod functions;
 pub mod game;
@@ -32,7 +33,7 @@ pub mod weapon;
 
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::SingleThreadedExecutor;
-pub use glam::{Quat, Vec3};
+pub use glam::{Mat3, Quat, Vec3};
 
 use animation::{AnimationPlayer, NodeMatrices};
 use hash::WorldHasher;

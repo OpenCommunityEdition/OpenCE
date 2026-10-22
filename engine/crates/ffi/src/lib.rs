@@ -15,6 +15,7 @@ mod debug_scene;
 pub mod decals;
 pub mod devtools;
 mod dynamic_decals;
+mod effects;
 pub mod hud;
 pub mod lights;
 pub mod network;
@@ -593,6 +594,10 @@ pub(crate) struct Running {
     decals: dynamic_decals::DynamicDecals,
     /// The frame's laid decals (kept for their memory).
     marks: Vec<snapshot::DecalSnapshot>,
+    /// The effects shots, impacts, detonations and objects make.
+    effects: effects::LevelEffects,
+    /// The frame's running effects (kept for their memory).
+    running_effects: Vec<snapshot::EffectSnapshot>,
 }
 
 /// The models and animation graphs objects are drawn and posed with,
@@ -727,6 +732,8 @@ impl Engine {
             lit: Vec::new(),
             decals: dynamic_decals::DynamicDecals::default(),
             marks: Vec::new(),
+            effects: effects::LevelEffects::default(),
+            running_effects: Vec::new(),
         });
         publish(&mut state, &self.snapshots, 0.0);
     }
@@ -770,6 +777,8 @@ impl Engine {
             lit: Vec::new(),
             decals: dynamic_decals::DynamicDecals::new(&geometry.content),
             marks: Vec::new(),
+            effects: effects::LevelEffects::new(&geometry.content),
+            running_effects: Vec::new(),
         });
         publish(&mut state, &self.snapshots, 0.0);
         Ok(count)
@@ -1152,12 +1161,16 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
             }
         }
         if let Some(level) = &running.level {
-            running.lights.tick(level, &running.simulation);
             let bsp = running
                 .campaign
                 .as_ref()
                 .map_or(shell.bsp, campaign::Campaign::bsp);
-            running.decals.tick(level, &running.simulation, bsp);
+            running
+                .effects
+                .tick(level, &mut running.simulation, &mut running.decals, bsp);
+            let fired = running.effects.fired();
+            running.lights.tick(level, fired);
+            running.decals.tick(level, &running.simulation, fired);
         }
         // (the mouse's turn is used once)
         input.yaw = 0.0;
@@ -1218,6 +1231,8 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
     running
         .decals
         .gather(|handle| running.simulation.transform(handle), &mut marks);
+    let mut running_effects = std::mem::take(&mut running.running_effects);
+    running.effects.gather(&mut running_effects);
     let simulation = &mut running.simulation;
     writer.publish(buffers, tick, alpha, |frame| {
         frame.camera(CameraSnapshot {
@@ -1293,11 +1308,13 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
         }
         frame.lights(&lit);
         frame.decals(&marks);
+        frame.effects(&running_effects);
         frame.debug(&shell.draw);
         frame.debug(&shell.scene);
     });
     running.lit = lit;
     running.marks = marks;
+    running.running_effects = running_effects;
 }
 
 #[cfg(test)]
