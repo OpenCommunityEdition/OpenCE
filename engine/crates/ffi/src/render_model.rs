@@ -224,6 +224,7 @@ impl Builder<'_> {
                     index_count: (triangles.len() * 3) as u32,
                     material,
                     lightmap: None,
+                    unbaked: false,
                     center: part.centroid.iter().map(|&value| finite(value)).collect(),
                 });
             }

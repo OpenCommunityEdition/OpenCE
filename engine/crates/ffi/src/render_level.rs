@@ -144,6 +144,10 @@ pub struct RenderDraw {
     pub material: u32,
     /// Its lightmap page's texture, if it is lightmapped.
     pub lightmap: Option<u32>,
+    /// Lit from its normals, as the game lights a structure BSP shipped
+    /// with no lightmaps (its `no_lightmap` mode); otherwise it would be
+    /// drawn fullbright.
+    pub unbaked: bool,
     /// The middle of its vertices, for drawing blended ones far to near.
     pub center: Vec<f32>,
 }
@@ -468,11 +472,18 @@ impl Builder<'_> {
                 center[axis] += value / vertex_count as f32;
             }
         }
+        let kind = self
+            .out
+            .materials
+            .get(index as usize)
+            .map(|material| material.kind);
         Some(RenderDraw {
             first_index,
             index_count,
             material: index,
             lightmap: if lit { lightmap } else { None },
+            unbaked: structure.lightmap_bitmap.is_none()
+                && matches!(kind, Some(MaterialKind::Opaque | MaterialKind::AlphaTested)),
             center: center.to_vec(),
         })
     }
@@ -749,6 +760,33 @@ mod tests {
             triangle.iter().map(|index| index % 3).collect::<Vec<_>>(),
             [0, 2, 1]
         );
+    }
+
+    #[test]
+    fn a_bsp_shipped_without_lightmaps_lights_its_opaque_surfaces_from_their_normals() {
+        // with its lightmaps, nothing is lit from its normals
+        assert!(built().draws.iter().all(|draw| !draw.unbaked));
+        let mut level = level();
+        level.structure_bsps[0].lightmap_bitmap = None;
+        let Some(built) = RenderLevel::build(&level, 0) else {
+            panic!("the level has a BSP 0");
+        };
+        let unbaked: Vec<_> = built
+            .draws
+            .iter()
+            .map(|draw| (built.materials[draw.material as usize].kind, draw.unbaked))
+            .collect();
+        // (the chicago glass is drawn unlit, as the game draws it)
+        assert_eq!(
+            unbaked,
+            [
+                (MaterialKind::Opaque, true),
+                (MaterialKind::AlphaTested, true),
+                (MaterialKind::Opaque, true),
+                (MaterialKind::Blended, false),
+            ]
+        );
+        assert!(built.draws.iter().all(|draw| draw.lightmap.is_none()));
     }
 
     #[test]

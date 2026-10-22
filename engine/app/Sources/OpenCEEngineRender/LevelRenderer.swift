@@ -103,6 +103,8 @@ enum MapBit {
     static let primary: UInt32 = 2
     static let secondary: UInt32 = 4
     static let lightmap: UInt32 = 8
+    /// Lit from its normals: a BSP shipped with no lightmaps.
+    static let unbaked: UInt32 = 16
 }
 
 public final class LevelRenderer {
@@ -217,6 +219,9 @@ public final class LevelRenderer {
             for (bit, map) in zip([MapBit.base, MapBit.primary, MapBit.secondary, MapBit.lightmap], maps)
             where map != nil {
                 bits |= bit
+            }
+            if draw.unbaked {
+                bits |= MapBit.unbaked
             }
             let pair = { (values: [Float], fallback: Float) -> SIMD2<Float> in
                 values.count == 2 ? SIMD2(values[0], values[1]) : SIMD2(repeating: fallback)

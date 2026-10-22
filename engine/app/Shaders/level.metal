@@ -54,9 +54,11 @@ constant uint BASE = 1;
 constant uint PRIMARY = 2;
 constant uint SECONDARY = 4;
 constant uint LIGHTMAP = 8;
+constant uint UNBAKED = 16;
 
 struct VertexOut {
     float4 position [[position]];
+    float3 normal;
     float2 texcoord;
     float2 lightmap;
     float fog;
@@ -81,10 +83,22 @@ float4 fogged(float4 color, float fog, constant Frame &frame, constant Material 
 vertex VertexOut level_vertex(VertexIn in [[stage_in]], constant Frame &frame [[buffer(1)]]) {
     VertexOut out;
     out.position = frame.view_projection * float4(in.position, 1);
+    out.normal = in.normal;
     out.texcoord = in.texcoord;
     out.lightmap = in.lightmap;
     out.fog = fog_amount(frame, in.position);
     return out;
+}
+
+// the light on a surface of a BSP shipped with no lightmaps, from its
+// normal: the colors the game's no_lightmap mode gives its vertex shader
+// (a sky above, a ground below, a light from straight up, and ambient)
+float3 unbaked_light(float3 normal) {
+    float3 n = normalize(normal);
+    float3 sky = float3(0.5, 0.6, 0.6);
+    float3 ground = float3(0.1, 0.1, 0.3);
+    float3 overhead = float3(0.9, 0.9, 0.8);
+    return mix(ground, sky, n.z * 0.5 + 0.5) + overhead * saturate(n.z) * 0.5;
 }
 
 // a surface's base and detail maps, as its material combines them
@@ -190,6 +204,8 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
     float4 color = surface(in.texcoord, material, base, primary, secondary, wrap);
     if (material.maps & LIGHTMAP) {
         color.rgb *= lightmap.sample(clamp, in.lightmap).rgb;
+    } else if (material.maps & UNBAKED) {
+        color.rgb *= unbaked_light(in.normal);
     }
     return fogged(color, in.fog, frame, material);
 }
