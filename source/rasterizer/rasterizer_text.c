@@ -254,6 +254,21 @@ static short hires_text_next_font = 0;
 static real text_scale = 1.0f;
 static real text_scale_origin_x = 0.0f;
 static real text_scale_origin_y = 0.0f;
+/* port: a 640x480 menu fitted into one pane (rasterizer_screen_fit_begin) */
+static boolean screen_fit_draw = FALSE;
+static boolean screen_fit_suspended = FALSE;
+static real screen_fit_scale = 1.0f;
+static real screen_fit_origin_x = 0.0f;
+static real screen_fit_origin_y = 0.0f;
+static boolean screen_fit_hits = FALSE;
+static real screen_hit_scale = 1.0f;
+static real screen_hit_origin_x = 0.0f;
+static real screen_hit_origin_y = 0.0f;
+static real screen_hit_pane_x = 0.0f;
+static real screen_hit_pane_y = 0.0f;
+static real screen_hit_ui = 0.0f;
+static real screen_fit_pane_w = 0.0f;
+static real screen_fit_pane_h = 0.0f;
 static pixel32 global_shadow_color = 0;
 static short rasterizer_text_unused = 0;
 static short magic_number= 12;
@@ -799,6 +814,123 @@ void rasterizer_text_set_scale(
 	text_scale = scale > 0.0f ? scale : 1.0f;
 	text_scale_origin_x = origin_x;
 	text_scale_origin_y = origin_y;
+
+	return;
+}
+
+void rasterizer_screen_fit_begin(
+	real scale,
+	real origin_x,
+	real origin_y,
+	real pane_x,
+	real pane_y,
+	real pane_w,
+	real pane_h,
+	real ui_offset)
+{
+	text_scale = scale;
+	text_scale_origin_x = origin_x;
+	text_scale_origin_y = origin_y;
+	screen_fit_draw = TRUE;
+	screen_fit_suspended = FALSE;
+	screen_fit_scale = scale;
+	screen_fit_origin_x = origin_x;
+	screen_fit_origin_y = origin_y;
+	screen_fit_pane_w = pane_w;
+	screen_fit_pane_h = pane_h;
+	screen_fit_hits = TRUE;
+	screen_hit_scale = scale;
+	screen_hit_origin_x = origin_x;
+	screen_hit_origin_y = origin_y;
+	screen_hit_pane_x = pane_x;
+	screen_hit_pane_y = pane_y;
+	screen_hit_ui = ui_offset;
+
+	return;
+}
+
+void rasterizer_screen_fit_end(
+	void)
+{
+	text_scale = 1.0f;
+	text_scale_origin_x = 0.0f;
+	text_scale_origin_y = 0.0f;
+	screen_fit_draw = FALSE;
+	screen_fit_suspended = FALSE;
+
+	return;
+}
+
+void rasterizer_screen_fit_clear(
+	void)
+{
+	rasterizer_screen_fit_end();
+	screen_fit_hits = FALSE;
+
+	return;
+}
+
+void rasterizer_screen_fit_suspend(
+	boolean suspend)
+{
+	screen_fit_suspended = suspend;
+
+	return;
+}
+
+boolean rasterizer_screen_fit_drawing(
+	void)
+{
+	return screen_fit_draw && !screen_fit_suspended;
+}
+
+void rasterizer_screen_fit_pane(
+	short *width,
+	short *height)
+{
+	if (width)
+		*width = (short)screen_fit_pane_w;
+	if (height)
+		*height = (short)screen_fit_pane_h;
+
+	return;
+}
+
+boolean rasterizer_screen_fit_pointer(
+	real *x,
+	real *y)
+{
+	real vx;
+	real vy;
+	real center_x;
+	real center_y;
+
+	if (!x || !y || !screen_fit_hits || !(screen_hit_scale > 0.0f))
+		return FALSE;
+	vx = *x - screen_hit_pane_x + screen_hit_ui;
+	vy = *y - screen_hit_pane_y;
+	center_x = screen_hit_origin_x * (1.0f - screen_hit_scale);
+	center_y = screen_hit_origin_y * (1.0f - screen_hit_scale);
+	*x = (vx - center_x) / screen_hit_scale;
+	*y = (vy - center_y) / screen_hit_scale;
+
+	return TRUE;
+}
+
+void rasterizer_screen_fit_vertices(
+	struct dynamic_screen_vertex *vertices)
+{
+	short vertex_index;
+
+	if (!rasterizer_screen_fit_drawing() || !vertices)
+		return;
+	for (vertex_index = 0; vertex_index < 4; vertex_index++)
+	{
+		vertices[vertex_index].position.x = screen_fit_origin_x +
+			(vertices[vertex_index].position.x - screen_fit_origin_x) * screen_fit_scale;
+		vertices[vertex_index].position.y = screen_fit_origin_y +
+			(vertices[vertex_index].position.y - screen_fit_origin_y) * screen_fit_scale;
+	}
 
 	return;
 }

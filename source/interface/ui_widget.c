@@ -646,7 +646,7 @@ struct widget_instance;
 #include "input/input_abstraction.h"
 #include "interface/attract_mode.h"
 #include "interface/hud.h"
-#include "hardcore_views.h" /* port: a hardcore split picks the pause screen */
+#include "hardcore_views.h" /* port: a hardcore pane fits the pause screen */
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
 #include "bitmaps/bitmap_color_conversion.h"
@@ -6452,7 +6452,16 @@ static struct ui_mouse_target *ui_mouse_target_at(
 	short y)
 {
 	long index;
+	real px = (real)x;
+	real py = (real)y;
 
+	/* port: the menu was fitted into the pane. the pointer is the
+	screen's, so turn it back to the menu's own coordinates */
+	if (rasterizer_screen_fit_pointer(&px, &py))
+	{
+		x = (short)px;
+		y = (short)py;
+	}
 	for (index = ui_mouse_target_count - 1; index >= 0; index--)
 	{
 		rectangle2d const *bounds = &ui_mouse_targets[index].bounds;
@@ -7115,6 +7124,7 @@ static void widget_instance_render_recursive(
 			bounds.x1 >= 640 && bounds.y1 >= 480 &&
 			bitmap->width <= 16 &&
 			halo_screen_width() > 640;
+		boolean pane_dim = FALSE;
 
 		if (use_nifty_plasma_fx)
 		{
@@ -7123,7 +7133,20 @@ static void widget_instance_render_recursive(
 			ui_plasma_effect_color.green = 0.05f;
 			ui_plasma_effect_color.blue = 0.05f;
 		}
-		if (widen_to_screen)
+		/* port: the dim covers this pane. the menu on top of it is scaled */
+		if (widen_to_screen && rasterizer_screen_fit_drawing())
+		{
+			short pane_w;
+			short pane_h;
+
+			pane_dim = TRUE;
+			rasterizer_screen_fit_pane(&pane_w, &pane_h);
+			bounds.x0 = 0;
+			bounds.y0 = 0;
+			bounds.x1 = pane_w;
+			bounds.y1 = pane_h;
+		}
+		else if (widen_to_screen)
 		{
 			long extra = (halo_screen_width() - 640) / 2;
 			bounds.x0 -= (short)extra;
@@ -7142,7 +7165,7 @@ static void widget_instance_render_recursive(
 			clip->y0 += offset.y;
 			clip->y1 += offset.y;
 		}
-		if (widen_to_screen && clip)
+		if (widen_to_screen && clip && !pane_dim)
 		{
 			/* widen the clip by the same amount (it is offset-shifted but
 			 * still 640-wide at the edges) so the dim is not clipped back
@@ -7184,6 +7207,8 @@ static void widget_instance_render_recursive(
 				texels.y1 = (short)((long)(bounds.y1 - bounds.y0) * bitmap->height / frame_height);
 				shown = bounds.x1 > bounds.x0 && bounds.y1 > bounds.y0;
 			}
+			if (pane_dim)
+				rasterizer_screen_fit_suspend(TRUE);
 			if (shown)
 			{
 				draw_bitmap_in_rect(
@@ -7195,6 +7220,8 @@ static void widget_instance_render_recursive(
 					&multitexture_params,
 					FALSE);
 			}
+			if (pane_dim)
+				rasterizer_screen_fit_suspend(FALSE);
 		}
 		if (use_nifty_plasma_fx)
 		{
@@ -7345,6 +7372,61 @@ void render_ui_widgets_postgame(
 	return;
 }
 
+/* port: the single screen menu, shrunk to this pane and centered in it.
+the full screen's centering offset would shove it out of a corner */
+static void hardcore_pause_fit_begin(
+	rectangle2d const *window_bounds,
+	short local_player_index)
+{
+	long pane_w;
+	long pane_h;
+	real sx;
+	real sy;
+	real scale;
+	real center_x;
+	real center_y;
+
+	rasterizer_screen_fit_clear();
+	if (!hardcore_views_split() || local_player_index < 0 ||
+		local_player_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS ||
+		!widget_globals.active_widgets[local_player_index])
+		return;
+	pane_w = window_bounds->x1 - window_bounds->x0;
+	pane_h = window_bounds->y1 - window_bounds->y0;
+	if (pane_w < 1 || pane_h < 1)
+		return;
+	sx = (real)pane_w / 640.0f;
+	sy = (real)pane_h / 480.0f;
+	scale = sx < sy ? sx : sy;
+	if (!(scale > 0.05f && scale < 0.999f))
+		return;
+	center_x = ((real)pane_w - 640.0f * scale) * 0.5f;
+	center_y = ((real)pane_h - 480.0f * scale) * 0.5f;
+	halo_screen_ui_offset(FALSE);
+	rasterizer_screen_fit_begin(
+		scale,
+		center_x / (1.0f - scale),
+		center_y / (1.0f - scale),
+		(real)window_bounds->x0,
+		(real)window_bounds->y0,
+		(real)pane_w,
+		(real)pane_h,
+		(real)((halo_screen_width() - 640) / 2));
+
+	return;
+}
+
+static void hardcore_pause_fit_end(
+	void)
+{
+	if (!rasterizer_screen_fit_drawing())
+		return;
+	rasterizer_screen_fit_end();
+	halo_screen_ui_offset(TRUE);
+
+	return;
+}
+
 /* renders the active widgets for one local player's viewport (or the whole
 screen), noting and settling the first player's tap targets in the frame's
 first render that can, and draws the debug view of the targets and the
@@ -7371,6 +7453,7 @@ void render_ui_widgets(
 			local_player_index,
 			0,
 			MAXIMUM_NUMBER_OF_LOCAL_PLAYERS - 1);
+		hardcore_pause_fit_begin(window_bounds, local_player_index);
 		for (widget_index = 0;
 			widget_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
 			widget_index++)
@@ -7407,10 +7490,20 @@ void render_ui_widgets(
 			{
 				point2d offset;
 
-				bounds.x0 = 0;
-				bounds.y0 = 0;
-				bounds.x1 = window_bounds->x1 - window_bounds->x0;
-				bounds.y1 = window_bounds->y1 - window_bounds->y0;
+				if (rasterizer_screen_fit_drawing())
+				{
+					bounds.x0 = -4096;
+					bounds.y0 = -4096;
+					bounds.x1 = 4096;
+					bounds.y1 = 4096;
+				}
+				else
+				{
+					bounds.x0 = 0;
+					bounds.y0 = 0;
+					bounds.x1 = window_bounds->x1 - window_bounds->x0;
+					bounds.y1 = window_bounds->y1 - window_bounds->y0;
+				}
 				offset.x = 0;
 				offset.y = 0;
 				/* the mouse drives the first player's menus; a widget shown in
@@ -7449,6 +7542,7 @@ void render_ui_widgets(
 				}
 			}
 		}
+		hardcore_pause_fit_end();
 		if (first_players_render && !ui_mouse_targets_settled)
 		{
 			/* fit the legends while the rows are still targets (merging
@@ -8334,19 +8428,11 @@ static boolean ui_check_for_pause_game(
 					if (network_coop_active())
 						widget_name = "ui\\shell\\solo_game\\pause_game\\pause_game";
 					/* port: teammate panes are not local players, so the
-					pause screen would stay the full one. a half pane uses
-					the two-player screen. a corner uses the four-player
-					screen. the wide top of three panes is the two-player one */
+					pause screen would stay the full one. the single
+					screen menu is drawn into this pane, scaled to fit */
 					else if (local_player_count == 1 && panes > 1)
-					{
-						if (panes >= 4 ||
-							(panes == 3 && !hardcore_views_is_local_window(0)))
-							widget_name =
-								"ui\\shell\\multiplayer_game\\pause_game\\4p_pause_game";
-						else
-							widget_name =
-								"ui\\shell\\multiplayer_game\\pause_game\\2p_pause_game";
-					}
+						widget_name =
+							"ui\\shell\\multiplayer_game\\pause_game\\1p_pause_game";
 					else switch (local_player_count)
 					{
 					case 1:

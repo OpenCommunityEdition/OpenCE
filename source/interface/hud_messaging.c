@@ -557,7 +557,7 @@ static void render_state_bitmap(
 		(struct bitmap_data *)bitmap, FALSE, TRUE))
 	{
 		bitmap = hud_hires_sprite_bitmap(bitmap, icon->sequence_index);
-		scale = local_player_count() > 1 ? 0.75f : 1.0f;
+		scale = (local_player_count() > 1 ? 0.75f : 1.0f) * hud_globals_get_scale(FALSE);
 		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0);
 		point.y = (short)(cursor_bounds->y1 - icon->offset.y * scale);
 		hud_draw_bitmap_direct(

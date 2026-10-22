@@ -911,6 +911,33 @@ void rasterizer_text_set_scale(
 	real scale,
 	real origin_x,
 	real origin_y);
+/* port: the 640x480 menus drawn into one pane. quads and text shrink
+about the origin, and the pointer is turned back on the next test */
+void rasterizer_screen_fit_begin(
+	real scale,
+	real origin_x,
+	real origin_y,
+	real pane_x,
+	real pane_y,
+	real pane_w,
+	real pane_h,
+	real ui_offset);
+void rasterizer_screen_fit_pane(
+	short *width,
+	short *height);
+void rasterizer_screen_fit_end(
+	void);
+void rasterizer_screen_fit_clear(
+	void);
+void rasterizer_screen_fit_suspend(
+	boolean suspend);
+boolean rasterizer_screen_fit_drawing(
+	void);
+boolean rasterizer_screen_fit_pointer(
+	real *x,
+	real *y);
+void rasterizer_screen_fit_vertices(
+	struct dynamic_screen_vertex *vertices);
 void rasterizer_text_cache_flush(
 	void);
 void rasterizer_text_cache_dispose(

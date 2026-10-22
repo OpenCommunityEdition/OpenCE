@@ -675,7 +675,7 @@ void hud_render_damage_indicators(
 					theta = _pi;
 					screen_position.y = (real)(
 						render.camera.window_bounds.y0 +
-						definition->top_offset);
+						definition->top_offset * scale);
 					screen_position.x = (real)(
 						(render.camera.viewport_bounds.x0 +
 							render.camera.viewport_bounds.x1) / 2);
@@ -685,7 +685,7 @@ void hud_render_damage_indicators(
 					theta = _pi / 2.0f;
 					screen_position.x = (real)(
 						render.camera.window_bounds.x0 +
-						definition->left_offset);
+						definition->left_offset * scale);
 					screen_position.y = (real)(
 						(render.camera.viewport_bounds.y0 +
 							render.camera.viewport_bounds.y1) / 2);
@@ -695,7 +695,7 @@ void hud_render_damage_indicators(
 					theta = 0.0f;
 					screen_position.y = (real)(
 						render.camera.window_bounds.y1 -
-						definition->bottom_offset);
+						definition->bottom_offset * scale);
 					screen_position.x = (real)(
 						(render.camera.viewport_bounds.x0 +
 							render.camera.viewport_bounds.x1) / 2);
@@ -705,7 +705,7 @@ void hud_render_damage_indicators(
 					theta = 3.0f * _pi / 2.0f;
 					screen_position.x = (real)(
 						render.camera.window_bounds.x1 -
-						definition->right_offset);
+						definition->right_offset * scale);
 					screen_position.y = (real)(
 						(render.camera.viewport_bounds.y0 +
 							render.camera.viewport_bounds.y1) / 2);

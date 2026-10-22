@@ -1066,6 +1066,8 @@ static void crosshairs_draw(
 								(!TEST_FLAG(item->flags, _hud_crosshair_only_on_default_zoom_bit) ||
 									crosshair->states[_crosshair_state_zoom].value.reference_data == 0))
 							{
+								/* port: a real split halves this. a hardcore pane keeps the
+								full screen's field of view (view_fov.c) */
 								real scale = local_player_count() > 1 &&
 									!TEST_FLAG(item->placement.multiplayer_scaling_flags, _hud_dont_scale_size_bit) ?
 									0.5f :
