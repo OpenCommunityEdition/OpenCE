@@ -627,6 +627,8 @@ static const unsigned char custom_edition_channel_sources[NUMBER_OF_CUSTOM_EDITI
 	{ 2, 1, 3, 0 },
 	/* the fill order in color, the shape in alpha */
 	{ 3, 3, 3, 0 },
+	/* Explicit Xbox-order HUD artwork must not be converted per draw. */
+	{ 0, 1, 2, 3 },
 };
 
 struct custom_edition_texels
@@ -638,6 +640,13 @@ struct custom_edition_texels
 static struct custom_edition_texels *custom_edition_texels;
 static unsigned long custom_edition_texel_count;
 static unsigned long custom_edition_texel_capacity;
+
+static int custom_edition_hud_meter_active;
+
+void halo_custom_edition_hud_meter(int active)
+{
+	custom_edition_hud_meter_active = active;
+}
 
 /* the order of the texels at address */
 static unsigned char custom_edition_texels_order(unsigned long address)
@@ -693,6 +702,7 @@ void halo_custom_edition_texels_channels(const void *texels, unsigned char chann
 
 void halo_custom_edition_texels_forget(void)
 {
+	custom_edition_hud_meter_active = 0;
 	free(custom_edition_texels);
 	custom_edition_texels = NULL;
 	custom_edition_texel_count = 0;
@@ -1023,9 +1033,11 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 			long kind = hud_hires_upscale_at(entry->address, entry->description.width, entry->description.height);
 
 			entry->hud_upscale_checked = TRUE;
-			if (entry->size && !entry->description.compressed && entry->target == GL_TEXTURE_2D &&
+			/* Verified stock CE sheets also include compressed and 512-pixel atlases. */
+			if (entry->size && (!entry->description.compressed || kind == 4) && entry->target == GL_TEXTURE_2D &&
 				format_information(entry->description.format).kind != _texel_p8 &&
-				entry->description.width <= 256 && entry->description.height <= 256 &&
+				entry->description.width <= (kind == 4 ? 512 : 256) &&
+				entry->description.height <= (kind == 4 ? 512 : 256) &&
 				kind &&
 				custom_edition_texels_order(entry->address) == _custom_edition_channels_xbox &&
 				texture_entry_pixels_valid(entry))
@@ -1045,6 +1057,11 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 			return entry->hud_upscale;
 		}
 	}
+	/* Mixed-use CE sheets stay raw for ordinary artwork. Only a meter draw
+	reads their alpha as the threshold and red as the shape. Replacements
+	and sheets already converted above keep their existing channel order. */
+	description->ce_meter_channels = custom_edition_hud_meter_active &&
+		custom_edition_texels_order(entry->address) == _custom_edition_channels_xbox;
 	return entry->texture;
 }
 
