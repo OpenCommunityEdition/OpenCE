@@ -7,7 +7,7 @@
 - [x] Task: The material model fc24c8c5
     - [ ] Write tests: the material record's layout in the pack; the conversion of each `senv` and `soso` field; linear and display values
     - [ ] A material record in `content` (albedo, normal, roughness, metalness, emission, AO, flags), written by the importer for every shader
-- [ ] Task: Environment shaders
+- [x] Task: Environment shaders 3347a108
     - [ ] Write tests: detail functions, bump height scale, specular masks and self-illumination functions against values worked by hand from the tag's definitions
     - [ ] `senv` in the importer and the level pass: detail, micro detail, bump, specular, reflection tint, self-illumination
 - [ ] Task: Model shaders
