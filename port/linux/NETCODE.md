@@ -632,11 +632,12 @@ its name alone beside it, has its name given back as the map lists find it.
    host moves stops lying limp (the blast that moved the host's reaches
    only the machines that see the body's player), and one the host has at
    rest is on the ground, so it lies limp again where it stops instead of
-   keeping the pose of its fall in the air. A client puts its copies there, and the difference is
+   keeping the pose of its fall in the air. The picture turns from the
+   previous pose to this one across the frames until the next sample, on
+   the 30 Hz frame as well as between ticks, so a light aimed from it
+   does not snap. A client puts its copies there, and the difference is
    drawn fading over a few ticks (`render_interpolation.c`) instead of a
-   jump, on the 30 Hz frame as well as between ticks. The picture turns
-   from the previous pose to this one across the frames until the next
-   sample, so a light aimed from it does not snap. A vehicle no player drives is carried between those updates along
+   jump. A vehicle no player drives is carried between those updates along
    the positions the host sent, a recording's lifepod as well as a Pelican.
    Its physics velocity swings about that path, so the carry steps from
    one of those positions to the next, and a jump further than a step of
