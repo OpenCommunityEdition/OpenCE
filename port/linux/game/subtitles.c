@@ -1,7 +1,7 @@
 /*
 SUBTITLES.C
 
-Subtitles for sound tags (display.subtitles, on by default; nothing is
+Subtitles for sound tags (display.subtitles, off by default; nothing is
 shown without the file). The file, subtitles.txt next to the maps
 (display.subtitles_file), is plain text, a line for each sound tag:
 

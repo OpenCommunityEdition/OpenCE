@@ -197,7 +197,7 @@ static const struct config_setting config_settings[] =
 		"screen's top right, with bars (the host: its slowest player's), and\n"
 		"\"Connection problem\" when the host has sent nothing for two seconds;\n"
 		"the scoreboard's pings in the same colours, as this machine times them." },
-	{ "display.subtitles", _config_boolean, "true", "HALO_SUBTITLES", _environment_value, _platform_all,
+	{ "display.subtitles", _config_boolean, "false", "HALO_SUBTITLES", _environment_value, _platform_all,
 		"Show subtitles at the bottom of the screen for the sound tags that the\n"
 		"subtitles file names (display.subtitles_file), while they play. Nothing is\n"
 		"shown without the file. Also Video Setup, Extra Effects in the menus." },
