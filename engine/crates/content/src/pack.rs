@@ -24,7 +24,7 @@ use rkyv::util::AlignedVec;
 use crate::Level;
 
 /// The version of this format; a pack of another is not read.
-pub const FORMAT_VERSION: u32 = 28;
+pub const FORMAT_VERSION: u32 = 30;
 
 const MAGIC: [u8; 4] = *b"OCPK";
 const HEADER_SIZE: usize = 0x28;
@@ -163,6 +163,9 @@ mod tests {
             texcoord: [0.5, 0.25],
         };
         Level {
+            glows: Vec::new(),
+            lens_flares: Vec::new(),
+            light_volumes: Vec::new(),
             scenario: Scenario {
                 path: "levels\\test\\box\\box".into(),
                 structure_bsps: vec![bsp.clone()],
@@ -185,6 +188,9 @@ mod tests {
                 campaign: Default::default(),
             },
             structure_bsps: vec![StructureBsp {
+                cluster_skies: Vec::new(),
+                lens_flare_markers: Vec::new(),
+                lens_flares: Vec::new(),
                 path: bsp.path,
                 lightmap_bitmap: None,
                 world_bounds: [[-1.0, 1.0]; 3],
@@ -265,6 +271,7 @@ mod tests {
                     power: 1.0,
                 },
                 lights: vec![crate::SkyLight {
+                    lens_flare: None,
                     flags: 3,
                     color: [1.0, 0.95, 0.8],
                     power: 2.0,

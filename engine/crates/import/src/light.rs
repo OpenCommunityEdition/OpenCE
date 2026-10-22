@@ -11,7 +11,7 @@ use crate::tags::GroupTag;
 pub(crate) const LIGH: GroupTag = GroupTag::new(b"ligh");
 pub(crate) const LIGHT_SIZE: usize = 0x160;
 const BITM: GroupTag = GroupTag::new(b"bitm");
-const LENS: GroupTag = GroupTag::new(b"lens");
+use crate::lens::LENS;
 
 /// A light tag.
 pub(crate) fn import_light(cache: &Cache, index: usize) -> Result<Light, ImportError> {

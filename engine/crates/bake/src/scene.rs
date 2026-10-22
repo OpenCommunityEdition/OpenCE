@@ -449,6 +449,7 @@ mod tests {
     fn the_brightest_light_is_the_sun_and_dark_lights_are_left_out() {
         let mut level = devmap::level(None);
         let light = |power: f32, yaw: f32| SkyLight {
+            lens_flare: None,
             flags: 0,
             color: [1.0, 1.0, 1.0],
             power,

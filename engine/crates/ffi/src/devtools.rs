@@ -140,7 +140,7 @@ impl Default for Shell {
 }
 
 // (the drawing switches the app reads)
-const VARIABLES: [(&str, &str, bool, bool); 9] = [
+const VARIABLES: [(&str, &str, bool, bool); 13] = [
     (
         "render.wireframe",
         "Draws the level and objects as lines.",
@@ -180,11 +180,44 @@ const VARIABLES: [(&str, &str, bool, bool); 9] = [
         true,
     ),
     ("render.lights", "Draws the dynamic lights.", true, true),
+    (
+        "render.exposure",
+        "Adapts the exposure to the brightness of the view.",
+        true,
+        true,
+    ),
+    (
+        "render.bloom",
+        "Spreads the brightest light around it.",
+        true,
+        true,
+    ),
+    (
+        "render.lens_flares",
+        "Draws the lights' and the sky's lens flares.",
+        true,
+        true,
+    ),
+    (
+        "render.glows",
+        "Draws the objects' glows and light volumes.",
+        true,
+        true,
+    ),
 ];
 
 /// What `render.view` can show alone: the frame, or one of the buffers
 /// the screen's passes read or write.
-pub const RENDER_VIEWS: &[&str] = &["frame", "depth", "normals", "ao", "contact", "ssr"];
+pub const RENDER_VIEWS: &[&str] = &[
+    "frame",
+    "depth",
+    "normals",
+    "ao",
+    "contact",
+    "ssr",
+    "luminance",
+    "bloom",
+];
 
 // (the debug drawing's layers: `debug.draw.<layer>`)
 const LAYERS: [(Layer, &str); 9] = [

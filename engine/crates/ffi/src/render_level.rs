@@ -345,6 +345,9 @@ pub struct RenderLevel {
     /// Each of the level's lights' gel, a cube texture (`u32::MAX`: none),
     /// as `Level::lights` orders them.
     pub light_gels: Vec<u32>,
+    /// The textures the camera's sprites draw, as `CameraSprite::image`
+    /// numbers them (`u32::MAX`: one not loaded, drawn as a soft disk).
+    pub camera_textures: Vec<u32>,
 }
 
 /// Gathers the level's textures and materials, each once.
@@ -398,6 +401,10 @@ impl RenderLevel {
         for light in &level.lights {
             let gel = builder.cube_map(light.gel.as_ref()).unwrap_or(u32::MAX);
             builder.out.light_gels.push(gel);
+        }
+        for (bitmap, image) in crate::camera::camera_images(level) {
+            let texture = builder.texture(&bitmap, image, 1).unwrap_or(u32::MAX);
+            builder.out.camera_textures.push(texture);
         }
         for model in &level.models {
             let model = builder.model(model);
@@ -916,6 +923,9 @@ mod tests {
             material(Some(tag(b"senv", "ground")), 3, 100, true),
         ];
         Level {
+            glows: Vec::new(),
+            lens_flares: Vec::new(),
+            light_volumes: Vec::new(),
             scenario: Scenario {
                 path: "test".into(),
                 structure_bsps: Vec::new(),
@@ -927,6 +937,9 @@ mod tests {
                 campaign: Default::default(),
             },
             structure_bsps: vec![StructureBsp {
+                cluster_skies: Vec::new(),
+                lens_flare_markers: Vec::new(),
+                lens_flares: Vec::new(),
                 path: "test".into(),
                 lightmap_bitmap: Some(tag(b"bitm", "lightmaps")),
                 world_bounds: [[-1.0, 1.0], [-2.0, 2.0], [0.0, 3.0]],

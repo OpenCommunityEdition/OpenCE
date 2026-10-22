@@ -110,6 +110,9 @@ pub struct ObjectDefinition {
     pub attachments: Vec<Attachment>,
     /// Its change colours.
     pub change_colors: Vec<ChangeColor>,
+    /// Its widgets (light volumes and glows, among the level's), drawn at
+    /// its markers.
+    pub widgets: Vec<TagRef>,
     /// A unit's HUD (`unhi`): a biped's or a vehicle's.
     pub unit_hud: Option<TagRef>,
     /// The damage a biped's own melee does, without a weapon (the flood's

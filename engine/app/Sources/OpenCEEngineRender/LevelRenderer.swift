@@ -200,6 +200,15 @@ struct MaterialUniforms {
 
 /// The shaders' Frame: the view, the sky's fog as a plane along it, and
 /// the eye.
+/// The tone map's uniforms (as level.metal's Tone).
+struct ToneUniforms {
+    /// The exposure's multiplier, and the bloom's strength.
+    var exposure: Float
+    var bloom: Float
+    /// 0 the frame, 1 its brightness, 2 the bloom alone.
+    var view: UInt32
+}
+
 public struct FrameUniforms {
     public var viewProjection: simd_float4x4
     /// The view's forward over the fog's range, and where it starts.
@@ -410,6 +419,19 @@ public final class LevelRenderer {
     let shadows: ShadowPass
     /// The screen's passes: occlusion, contact shadows, reflections.
     let screen: ScreenPass
+    /// The camera's passes: lens flares, glows, exposure, bloom.
+    let cameraPass: CameraPass
+    /// The frame's lens flares, light volumes and glows (set before each
+    /// frame, as `lights` is).
+    public var sprites = CameraSprites(sprites: [], occluders: [])
+    /// The sprites the last frame drew.
+    public private(set) var lastSpriteCount = 0
+    /// The exposure, in stops darker than the level's own light, adapted
+    /// from frame to frame as `time` goes on (`render.exposure`).
+    public private(set) var exposure: Float = 0
+    /// The exposure's limits in the BSP drawn.
+    public let exposureLimits: [Float]
+    private var exposureTime: Float?
     /// The passes switched on, and the buffer shown (`render.*`).
     public var switches = RenderSwitches()
     /// Whether the sun's shadows are drawn (with a baked sun).
@@ -526,6 +548,9 @@ public final class LevelRenderer {
                                  modelStride: Int(geometry.modelVertexStride()))
         lightPass = try LightPass(device: device, gels: geometry.lightGels().map(cube), whiteCube: whiteCube)
         screen = try ScreenPass(device: device, source: ShaderSources.source(.screen))
+        cameraPass = try CameraPass(device: device, source: ShaderSources.source(.camera),
+                                    images: geometry.cameraTextures().map { texture($0) })
+        exposureLimits = geometry.exposureLimits()
         sky = geometry.sky()
 
         // reversed depth: nearer is greater
@@ -657,6 +682,7 @@ public final class LevelRenderer {
                        objects: [DrawnObject] = [], hudQuads: [HudQuad] = [], debugLines: [DebugSegment] = []) {
         let aspect = Float(target.width) / Float(max(target.height, 1))
         let viewProjection = camera.viewProjection(aspect: aspect)
+        adaptExposure()
         let shown: MTLTexture
         if settings.antiAliasing == .temporal, let temporal = temporalScaling(width: target.width,
                                                                                height: target.height) {
@@ -692,6 +718,15 @@ public final class LevelRenderer {
             shown = frame
         }
 
+        if switches.exposure || switches.view == .luminance {
+            cameraPass.encodeLuminance(into: commands, frame: shown)
+        }
+        let bloom = switches.bloom || switches.view == .bloom
+            ? cameraPass.encodeBloom(into: commands, frame: shown) : nil
+        var toneUniforms = ToneUniforms(exposure: exp2(-exposure),
+                                        bloom: switches.bloom ? CameraPass.bloomStrength : 0,
+                                        view: switches.view == .luminance ? 1 : switches.view == .bloom ? 2 : 0)
+
         let tonePass = MTLRenderPassDescriptor()
         tonePass.colorAttachments[0].texture = target
         tonePass.colorAttachments[0].loadAction = .dontCare
@@ -700,9 +735,26 @@ public final class LevelRenderer {
         toneEncoder.label = "tone map"
         toneEncoder.setRenderPipelineState(tone)
         toneEncoder.setFragmentTexture(shown, index: 0)
+        toneEncoder.setFragmentTexture(bloom ?? cameraPass.blackLevel(), index: 1)
+        toneEncoder.setFragmentBytes(&toneUniforms, length: MemoryLayout<ToneUniforms>.stride, index: 0)
         toneEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         hud?.encode(hudQuads, width: target.width, height: target.height, into: toneEncoder)
         toneEncoder.endEncoding()
+    }
+
+    /// The exposure for this frame: towards the brightness of the frame
+    /// before the last (the last may still be drawing), as far as the time
+    /// since the last frame lets it; none when it is switched off.
+    private func adaptExposure() {
+        defer { exposureTime = time }
+        guard switches.exposure else {
+            exposure = 0
+            return
+        }
+        guard let average = cameraPass.logLuminance(age: 1) else { return }
+        let seconds = exposureTime.map { time - $0 } ?? 0
+        exposure = OpenCEEngineCore.adaptExposure(current: exposure, logLuminance: average, limits: exposureLimits,
+                                                  seconds: seconds)
     }
 
     /// The level's opaque draws and the objects' then the blended ones of
@@ -806,6 +858,9 @@ public final class LevelRenderer {
                                             sunTowards: towards == nil ? .zero : sun.towards, width: frame.width,
                                             height: frame.height, switches: switches)
         screen.encode(into: commands, targets: screenTargets, frame: frame, depth: depth, uniforms: screenUniforms)
+        let cameraFrame = cameraPass.encodeOcclusion(sprites, into: commands, depth: depth,
+                                                     viewProjection: viewProjection, camera: camera)
+        lastSpriteCount = cameraFrame?.spriteCount ?? 0
 
         // applied to the frame, then the blended surfaces over it
         let over = MTLRenderPassDescriptor()
@@ -830,6 +885,12 @@ public final class LevelRenderer {
             encode(draw, animation, blendedEncoder)
         }
         models.encode(prepared, blendedParts: true, animation: animation, into: blendedEncoder)
+        // the lens flares, light volumes and glows, added
+        if let cameraFrame {
+            cameraPass.encodeSprites(cameraFrame, into: blendedEncoder)
+            blendedEncoder.setVertexBuffer(vertices, offset: 0, index: 0)
+            blendedEncoder.setVertexBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
+        }
         // the debug lines, hidden by what is nearer (and the buffers they took back)
         debug.encode(debugLines, viewProjection: viewProjection, into: blendedEncoder)
         if debug.lastDrawn > 0 {

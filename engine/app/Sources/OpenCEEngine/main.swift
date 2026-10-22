@@ -591,6 +591,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         renderer.lights = frame.drawnLights()
         renderer.switches = RenderSwitches(flag: { engine.shellFlag(name: $0) },
                                            value: { engine.shellValue(name: $0) })
+        renderer.sprites = engine.cameraSprites(camera: camera.spriteCamera, flares: renderer.switches.lensFlares,
+                                                widgets: renderer.switches.glows)
         let objects = profiled("objects", engine) { frame.drawnObjects() }
         let hudQuads = profiled("hud", engine) { engine.hud(width: UInt32(width), height: UInt32(height)) }
         let debugLines = frame.debugSegments()

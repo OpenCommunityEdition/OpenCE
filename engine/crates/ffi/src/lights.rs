@@ -53,6 +53,10 @@ pub(crate) struct Lights {
     fading: Vec<Fading>,
     /// The effects made so far.
     made: u32,
+    /// The level's lens flares and widgets.
+    pub(crate) camera: crate::camera::CameraLevel,
+    /// The widgets the last frame placed, and its BSP.
+    pub(crate) sources: crate::camera::CameraSources,
 }
 
 /// An effect's light's `source`: its own range, above the objects'.
@@ -188,8 +192,38 @@ fn shine(
     })
 }
 
+/// The frame of `marker` on `object` (its origin for "" or a marker its
+/// model lacks) at the last tick and the tick before; `rest` is the
+/// model's default pose, for an object that is not animated.
+pub(crate) fn marker_frames(
+    model: Option<&opence_content::Model>,
+    object: &opence_sim::Lit<'_>,
+    rest: &[NodeMatrix],
+    marker: &str,
+) -> (NodeMatrix, NodeMatrix) {
+    let place = |nodes: &[NodeMatrix], transform: &opence_sim::Transform| {
+        let origin = frame(transform.position, transform.rotation);
+        let local = model
+            .filter(|_| !marker.is_empty())
+            .and_then(|model| marker_matrix(model, nodes, marker));
+        match (local, object.nodes.is_some()) {
+            // (an animated object's nodes are in the world)
+            (Some(local), true) => local,
+            (Some(local), false) => origin.multiply(&local),
+            (None, _) => origin,
+        }
+    };
+    match object.nodes {
+        Some(nodes) => (
+            place(&nodes.current, object.current),
+            place(&nodes.previous, object.previous),
+        ),
+        None => (place(rest, object.current), place(rest, object.previous)),
+    }
+}
+
 /// The frame of a point at `position` turned by `rotation`.
-fn frame(position: Vec3, rotation: Quat) -> NodeMatrix {
+pub(crate) fn frame(position: Vec3, rotation: Quat) -> NodeMatrix {
     NodeMatrix {
         forward: (rotation * Vec3::X).to_array(),
         left: (rotation * Vec3::Y).to_array(),
@@ -230,6 +264,8 @@ impl Lights {
             carried,
             fading: Vec::new(),
             made: 0,
+            camera: crate::camera::CameraLevel::new(level),
+            sources: crate::camera::CameraSources::default(),
         }
     }
 
@@ -317,28 +353,7 @@ impl Lights {
                 let (matrix, previous) = if first_person {
                     (place(camera), camera.position)
                 } else {
-                    let marker = |nodes: &[NodeMatrix], transform: &opence_sim::Transform| {
-                        let local = model
-                            .as_ref()
-                            .filter(|_| !attached.marker.is_empty())
-                            .and_then(|model| marker_matrix(model, nodes, &attached.marker));
-                        match (local, object.nodes.is_some()) {
-                            // (an animated object's nodes are in the world)
-                            (Some(local), true) => local,
-                            (Some(local), false) => place(transform).multiply(&local),
-                            (None, _) => place(transform),
-                        }
-                    };
-                    let (current, earlier) = match object.nodes {
-                        Some(nodes) => (
-                            marker(&nodes.current, object.current),
-                            marker(&nodes.previous, object.previous),
-                        ),
-                        None => (
-                            marker(&rest, object.current),
-                            marker(&rest, object.previous),
-                        ),
-                    };
+                    let (current, earlier) = marker_frames(model, &object, &rest, &attached.marker);
                     (current, Vec3::from_array(earlier.position))
                 };
                 let source = (object.id.0 << 3 | (at as u32 & 7)) & !EFFECT_SOURCE;
@@ -617,11 +632,11 @@ pub unsafe extern "C" fn opence_shadowed_lights(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use opence_content::Group;
 
-    fn light(flags: u32) -> Light {
+    pub(crate) fn light(flags: u32) -> Light {
         Light {
             tag: TagRef {
                 group: Group(*b"ligh"),

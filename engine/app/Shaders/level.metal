@@ -1154,9 +1154,29 @@ fragment float2 motion_fragment(ToneOut in [[stage_in]], depth2d<float> depth [[
 
 // below 0.8 as it is; above, eased into the last fifth, so that a light
 // brighter than white keeps its shape instead of flattening
-fragment float4 tone_fragment(ToneOut in [[stage_in]], texture2d<float> frame [[texture(0)]]) {
+// (as LevelRenderer's ToneUniforms)
+struct Tone {
+    // the exposure's multiplier, and the bloom's strength
+    float exposure;
+    float bloom;
+    // 0 the frame, 1 its brightness, 2 the bloom alone
+    uint view;
+};
+
+fragment float4 tone_fragment(ToneOut in [[stage_in]], texture2d<float> frame [[texture(0)]],
+                              texture2d<float> bloom [[texture(1)]], constant Tone &tone [[buffer(0)]]) {
     constexpr sampler nearest(filter::nearest, address::clamp_to_edge);
+    constexpr sampler linear(filter::linear, address::clamp_to_edge);
+    float3 bloomed = max(bloom.sample(linear, in.texcoord).rgb, 0);
+    if (tone.view == 2) {
+        return float4(bloomed, 1);
+    }
     float3 color = max(frame.sample(nearest, in.texcoord).rgb, 0);
+    if (tone.view == 1) {
+        float brightness = dot(color, float3(0.2126, 0.7152, 0.0722)) * tone.exposure;
+        return float4(float3(saturate(log2(max(brightness, 1e-4)) / 8 + 0.5)), 1);
+    }
+    color = color * tone.exposure + bloomed * tone.bloom;
     float3 over = max(color - 0.8, 0);
     float3 eased = 0.8 + 0.2 * (1 - exp(-over / 0.2));
     return float4(select(color, eased, color > 0.8), 1);

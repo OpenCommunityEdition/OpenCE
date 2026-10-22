@@ -11,6 +11,7 @@ mod effect;
 pub mod error;
 pub mod globals;
 mod hud;
+mod lens;
 pub mod level;
 pub mod level_cache;
 mod light;

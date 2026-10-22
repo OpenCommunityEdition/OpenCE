@@ -3,9 +3,9 @@
 use rkyv::{Archive, Deserialize, Serialize};
 
 use crate::{
-    AnimationGraph, Bitmap, Campaign, CollisionModel, DamageEffect, Effect, Grenade, GrenadeHud,
-    HudDigits, HudGlobals, Light, Model, ObjectDefinition, ObjectKind, Physics, Scripts, Shader,
-    TagRef, UnitHud, WeaponHud,
+    AnimationGraph, Bitmap, Campaign, CollisionModel, DamageEffect, Effect, Glow, Grenade,
+    GrenadeHud, HudDigits, HudGlobals, LensFlare, LensFlareMarker, Light, LightVolume, Model,
+    ObjectDefinition, ObjectKind, Physics, Scripts, Shader, TagRef, UnitHud, WeaponHud,
 };
 
 /// Everything a level's structure is drawn and collided with.
@@ -44,6 +44,12 @@ pub struct Level {
     pub effects: Vec<Effect>,
     /// The lights its objects carry and its effects make, by path.
     pub lights: Vec<Light>,
+    /// The lens flares its BSPs, lights and skies have, by path.
+    pub lens_flares: Vec<LensFlare>,
+    /// The light volumes its objects carry, by path.
+    pub light_volumes: Vec<LightVolume>,
+    /// The glows its objects carry, by path.
+    pub glows: Vec<Glow>,
     /// Its units' HUDs, by path.
     pub unit_huds: Vec<UnitHud>,
     /// Its weapons' HUDs, and the HUDs they add to, by path.
@@ -206,6 +212,11 @@ impl Level {
     pub fn bitmap(&self, tag: &TagRef) -> Option<&Bitmap> {
         self.bitmaps.iter().find(|bitmap| bitmap.tag == *tag)
     }
+
+    /// A lens flare, by its tag.
+    pub fn lens_flare(&self, tag: &TagRef) -> Option<&LensFlare> {
+        self.lens_flares.iter().find(|flare| flare.tag == *tag)
+    }
 }
 
 /// A sky: the model drawn behind the level, and the fog of the air
@@ -238,8 +249,10 @@ pub struct SkyAmbient {
 }
 
 /// A light of a sky: far away, so its light comes from one direction.
-#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
 pub struct SkyLight {
+    /// Its lens flare, drawn where it is seen.
+    pub lens_flare: Option<TagRef>,
     /// Its flags: 0 affects exteriors, 1 affects interiors.
     pub flags: u32,
     /// Its colour.
@@ -507,6 +520,13 @@ pub struct StructureBsp {
     pub surfaces: Vec<[u16; 3]>,
     /// Its geometry, grouped by lightmap page.
     pub lightmaps: Vec<Lightmap>,
+    /// The lens flares its markers use.
+    pub lens_flares: Vec<Option<TagRef>>,
+    /// Its lens flares, placed.
+    pub lens_flare_markers: Vec<LensFlareMarker>,
+    /// Each of its clusters' sky, an index into the scenario's skies
+    /// (none: the cluster sees no sky).
+    pub cluster_skies: Vec<Option<u16>>,
 }
 
 /// What a collision surface is made of.

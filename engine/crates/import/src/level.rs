@@ -13,10 +13,11 @@ use opence_content::level::{
 };
 use opence_content::{
     AnimationGraph, AtmosphericFog, CollisionBsp, CollisionMaterial, CollisionModel, DamageEffect,
-    Effect, EnvironmentVertex, GameTypes, Globals, Group, ItemChoice, Level, Light, Lightmap,
-    LightmapVertex, Material, Model, NetgameEquipment, NetgameFlag, NetgameFlagKind,
-    ObjectDefinition, ObjectKind, ObjectPlacement, PlacementDevice, PlacementPermutation,
-    PlayerStart, Scenario, Sky, SkyAmbient, SkyLight, StructureBsp, TagRef,
+    Effect, EnvironmentVertex, GameTypes, Globals, Glow, Group, ItemChoice, LensFlare,
+    LensFlareMarker, Level, Light, LightVolume, Lightmap, LightmapVertex, Material, Model,
+    NetgameEquipment, NetgameFlag, NetgameFlagKind, ObjectDefinition, ObjectKind, ObjectPlacement,
+    PlacementDevice, PlacementPermutation, PlayerStart, Scenario, Sky, SkyAmbient, SkyLight,
+    StructureBsp, TagRef,
 };
 
 use crate::cache::Cache;
@@ -28,6 +29,18 @@ pub(crate) const SCNR: GroupTag = GroupTag::new(b"scnr");
 pub(crate) const SBSP: GroupTag = GroupTag::new(b"sbsp");
 pub(crate) const SHDR: GroupTag = GroupTag::new(b"shdr");
 pub(crate) const BITM: GroupTag = GroupTag::new(b"bitm");
+/// A BSP's lens flares (`structure_bsp.lens_flares`) and the markers
+/// that place them.
+const BSP_LENS_FLARES_OFFSET: usize = 0x11C;
+const BSP_LENS_FLARE_SIZE: usize = 0x10;
+const MAX_BSP_LENS_FLARES: usize = 256;
+const BSP_LENS_FLARE_MARKERS_OFFSET: usize = 0x128;
+const BSP_LENS_FLARE_MARKER_SIZE: usize = 0x10;
+const MAX_BSP_LENS_FLARE_MARKERS: usize = 65536;
+/// A BSP's clusters (`structure_cluster`), of which only the sky is read.
+const BSP_CLUSTERS_OFFSET: usize = 0x134;
+const BSP_CLUSTER_SIZE: usize = 0x68;
+const MAX_BSP_CLUSTERS: usize = 8192;
 pub(crate) const SKY: GroupTag = GroupTag::new(b"sky ");
 
 pub(crate) const SCENARIO_SIZE: usize = 0x5B0;
@@ -231,6 +244,8 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     let collision_models = import_collision_models(cache, &objects)?;
     let physics = import_physics(cache, &objects)?;
     let skies = import_skies(cache, &scenario, &mut models, &mut reached)?;
+    let lens_flares = import_lens_flares(cache, &structure_bsps, &skies, &lights, &mut reached)?;
+    let (light_volumes, glows) = import_widgets(cache, &objects, &mut reached)?;
 
     // (a shader's extra layers are shaders too, reached as each is read)
     let mut shaders = Vec::new();
@@ -269,6 +284,9 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     }
 
     let level = Level {
+        glows,
+        lens_flares,
+        light_volumes,
         scenario: Scenario {
             path: scenario.instance().name.clone(),
             structure_bsps: structure_bsp_tags,
@@ -505,6 +523,57 @@ fn import_lights(
     Ok(lights)
 }
 
+/// Every lens flare the BSPs' markers, the skies' lights and `lights`
+/// use, each once, by path; their bitmaps reached.
+fn import_lens_flares(
+    cache: &Cache,
+    structure_bsps: &[StructureBsp],
+    skies: &[Sky],
+    lights: &[Light],
+    reached: &mut Reached,
+) -> Result<Vec<LensFlare>, ImportError> {
+    let tags: BTreeSet<&TagRef> = structure_bsps
+        .iter()
+        .flat_map(|bsp| bsp.lens_flares.iter().flatten())
+        .chain(
+            skies
+                .iter()
+                .flat_map(|sky| &sky.lights)
+                .flat_map(|light| &light.lens_flare),
+        )
+        .chain(lights.iter().flat_map(|light| &light.lens_flare))
+        .collect();
+    let mut flares = Vec::with_capacity(tags.len());
+    for tag in tags {
+        if let Some(index) = tag_index(cache, tag) {
+            flares.push(crate::lens::import_lens_flare(cache, index, reached)?);
+        }
+    }
+    Ok(flares)
+}
+
+/// The light volumes and glows `objects` carry, each once, by path;
+/// their bitmaps reached.
+fn import_widgets(
+    cache: &Cache,
+    objects: &[ObjectDefinition],
+    reached: &mut Reached,
+) -> Result<(Vec<LightVolume>, Vec<Glow>), ImportError> {
+    let tags: BTreeSet<&TagRef> = objects.iter().flat_map(|object| &object.widgets).collect();
+    let (mut volumes, mut glows) = (Vec::new(), Vec::new());
+    for tag in tags {
+        let Some(index) = tag_index(cache, tag) else {
+            continue;
+        };
+        match &tag.group.0 {
+            b"mgs2" => volumes.push(crate::lens::import_light_volume(cache, index, reached)?),
+            b"glw!" => glows.push(crate::lens::import_glow(cache, index, reached)?),
+            _ => {}
+        }
+    }
+    Ok((volumes, glows))
+}
+
 /// Every damage effect `objects`, `globals` and `effects` do (a unit's
 /// and a weapon's melee, a projectile's impact, attached detonation and explosion,
 /// falling), each once, by path.
@@ -632,6 +701,7 @@ fn import_sky_lights(sky: &Element<'_>) -> Result<Vec<SkyLight>, ImportError> {
     let mut lights = Vec::with_capacity(block.len());
     for light in block.iter() {
         lights.push(SkyLight {
+            lens_flare: crate::object::reference(&light, 0x00, "lens flare", &[crate::lens::LENS])?,
             flags: light.u32(0x4C, "flags")?,
             color: [
                 light.f32(0x50, "color")?,
@@ -1066,7 +1136,49 @@ fn import_structure_bsp(
         });
     }
 
+    let flares_block = bsp.block(
+        BSP_LENS_FLARES_OFFSET,
+        "lens flares",
+        BSP_LENS_FLARE_SIZE,
+        MAX_BSP_LENS_FLARES,
+    )?;
+    let mut lens_flares = Vec::with_capacity(flares_block.len());
+    for flare in flares_block.iter() {
+        lens_flares.push(crate::object::reference(
+            &flare,
+            0,
+            "lens",
+            &[crate::lens::LENS],
+        )?);
+    }
+    let markers_block = bsp.block(
+        BSP_LENS_FLARE_MARKERS_OFFSET,
+        "lens flare markers",
+        BSP_LENS_FLARE_MARKER_SIZE,
+        MAX_BSP_LENS_FLARE_MARKERS,
+    )?;
+    let mut lens_flare_markers = Vec::with_capacity(markers_block.len());
+    for marker in markers_block.iter() {
+        if let Some(marker) = import_lens_flare_marker(&marker, lens_flares.len())? {
+            lens_flare_markers.push(marker);
+        }
+    }
+
+    let clusters_block = bsp.block(
+        BSP_CLUSTERS_OFFSET,
+        "clusters",
+        BSP_CLUSTER_SIZE,
+        MAX_BSP_CLUSTERS,
+    )?;
+    let mut cluster_skies = Vec::with_capacity(clusters_block.len());
+    for cluster in clusters_block.iter() {
+        cluster_skies.push(u16::try_from(cluster.i16(0, "sky")?).ok());
+    }
+
     Ok(StructureBsp {
+        cluster_skies,
+        lens_flare_markers,
+        lens_flares,
         path: bsp.instance().name.clone(),
         lightmap_bitmap,
         world_bounds,
@@ -1075,6 +1187,39 @@ fn import_structure_bsp(
         surfaces,
         lightmaps,
     })
+}
+
+/// A lens flare placed in a BSP: its position, its direction (each
+/// component a signed byte, the normal times 127) and its flare, which
+/// must be one of the BSP's (`rasterizer_lens_flare_submit_for_cluster`);
+/// `None` for one that is not, or is not finite.
+fn import_lens_flare_marker(
+    marker: &Element<'_>,
+    flares: usize,
+) -> Result<Option<LensFlareMarker>, ImportError> {
+    let mut position = [0.0f32; 3];
+    for (axis, value) in position.iter_mut().enumerate() {
+        *value = marker.f32(axis * 4, "position")?;
+    }
+    let mut direction = [0.0f32; 3];
+    for (axis, value) in direction.iter_mut().enumerate() {
+        *value = f32::from(marker.u8(0x0C + axis, "direction")? as i8) / 127.0;
+    }
+    let lens_flare = marker.u8(0x0F, "lens flare index")?;
+    let length = direction.iter().map(|v| v * v).sum::<f32>().sqrt();
+    if usize::from(lens_flare) >= flares || !position.iter().all(|v| v.is_finite()) {
+        return Ok(None);
+    }
+    let direction = if length > 0.0 {
+        direction.map(|v| v / length)
+    } else {
+        [0.0, 0.0, 1.0]
+    };
+    Ok(Some(LensFlareMarker {
+        position,
+        direction,
+        lens_flare,
+    }))
 }
 
 fn count(
@@ -1741,8 +1886,32 @@ pub(crate) mod tests {
         put(&mut lightmap, 0, &page.to_le_bytes());
         block(&mut lightmap, MATERIALS_OFFSET, 1, materials);
         let lightmaps = bsp.add(&lightmap);
+        // (one lens flare, with no tag, and two markers: one of it, and one
+        // of a flare the BSP has not)
+        let mut flare = vec![0u8; BSP_LENS_FLARE_SIZE];
+        empty(&mut flare, 0);
+        let flares = bsp.add(&flare);
+        let mut markers = Vec::new();
+        for (position, direction, index) in [
+            ([1.0f32, 2.0, 3.0], [0u8, 0, 127], 0u8),
+            ([0.0; 3], [0; 3], 3),
+        ] {
+            for value in position {
+                markers.extend_from_slice(&value.to_le_bytes());
+            }
+            markers.extend_from_slice(&direction);
+            markers.push(index);
+        }
+        let markers = bsp.add(&markers);
+        // two clusters: one sees the first sky, the other none
+        let mut clusters = vec![0u8; BSP_CLUSTER_SIZE * 2];
+        clusters[BSP_CLUSTER_SIZE..BSP_CLUSTER_SIZE + 2].copy_from_slice(&(-1i16).to_le_bytes());
+        let clusters = bsp.add(&clusters);
 
         let structure_bsp = &mut bsp.0[structure..structure + STRUCTURE_BSP_SIZE];
+        block(structure_bsp, BSP_LENS_FLARES_OFFSET, 1, flares);
+        block(structure_bsp, BSP_LENS_FLARE_MARKERS_OFFSET, 2, markers);
+        block(structure_bsp, BSP_CLUSTERS_OFFSET, 2, clusters);
         reference(structure_bsp, LIGHTMAP_BITMAP_OFFSET, BITM, bitmap_handle);
         block(
             structure_bsp,
@@ -1800,7 +1969,11 @@ pub(crate) mod tests {
         {
             put(&mut sky, 0x38 + at * 4, &value.to_le_bytes());
         }
+        let mut flare = vec![0u8; crate::lens::LENS_FLARE_SIZE];
+        empty(&mut flare, 0x20);
+        let flare = fake.add_tag(crate::lens::LENS, "sky\\fake\\sun", &flare);
         let mut light = vec![0u8; SKY_LIGHT_SIZE];
+        reference(&mut light, 0x00, crate::lens::LENS, fake.handle(flare));
         put(&mut light, 0x4C, &3u32.to_le_bytes());
         for (at, value) in [1.0f32, 0.9, 0.8, 4.0, 50.0].iter().enumerate() {
             put(&mut light, 0x50 + at * 4, &value.to_le_bytes());
@@ -1956,9 +2129,16 @@ pub(crate) mod tests {
                 }
             );
             assert_eq!(level.skies[0].outdoor_ambient.power, 2.0);
+            // (the sky's flare is imported once, with the level)
+            assert_eq!(level.lens_flares.len(), 1);
+            assert_eq!(level.lens_flares[0].tag.path, "sky\\fake\\sun");
             assert_eq!(
                 level.skies[0].lights,
                 [SkyLight {
+                    lens_flare: Some(TagRef {
+                        group: Group(*b"lens"),
+                        path: "sky\\fake\\sun".into(),
+                    }),
                     flags: 3,
                     color: [1.0, 0.9, 0.8],
                     power: 4.0,
@@ -2048,6 +2228,16 @@ pub(crate) mod tests {
             let bsp = &level.structure_bsps[0];
             assert_eq!(bsp.world_bounds, [[-1.0, 1.0], [-2.0, 2.0], [-3.0, 3.0]]);
             assert_eq!(bsp.surfaces, [[0, 1, 2]]);
+            assert_eq!(bsp.lens_flares, [None]);
+            assert_eq!(bsp.cluster_skies, [Some(0), None]);
+            assert_eq!(
+                bsp.lens_flare_markers,
+                [opence_content::LensFlareMarker {
+                    position: [1.0, 2.0, 3.0],
+                    direction: [0.0, 0.0, 1.0],
+                    lens_flare: 0,
+                }]
+            );
             assert_eq!(bsp.collision.bsp3d_nodes[0].children, [-1, HIGH_BIT]);
             assert_eq!(bsp.collision.planes[0], [0.0, 0.0, 1.0, 0.0]);
             assert_eq!(bsp.collision.edges[0].surfaces, [Some(0), None]);

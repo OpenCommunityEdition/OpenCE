@@ -541,6 +541,7 @@ mod tests {
         physics: bool,
     ) -> ObjectDefinition {
         ObjectDefinition {
+            widgets: Vec::new(),
             tag: tag(&kind.group(), path),
             kind,
             flags: 0,

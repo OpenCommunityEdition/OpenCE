@@ -106,6 +106,9 @@ pub fn plane(half_size: f32, cells: u16) -> StructureBsp {
         vertices.len()
     ];
     StructureBsp {
+        cluster_skies: Vec::new(),
+        lens_flare_markers: Vec::new(),
+        lens_flares: Vec::new(),
         path: BSP_PATH.into(),
         lightmap_bitmap: None,
         world_bounds: [[-half_size, half_size], [-half_size, half_size], [0.0, 0.0]],
@@ -307,6 +310,7 @@ pub fn generated_sky() -> Sky {
         },
         // (a sun high in the south-west, its light white)
         lights: vec![crate::SkyLight {
+            lens_flare: None,
             flags: 0b11,
             color: [1.0; 3],
             power: 1.0,
@@ -831,6 +835,9 @@ pub fn level(donor: Option<&Level>) -> Level {
     let mut level = match donor {
         Some(donor) => donor.clone(),
         None => Level {
+            glows: Vec::new(),
+            lens_flares: Vec::new(),
+            light_volumes: Vec::new(),
             scenario: scenario(),
             structure_bsps: Vec::new(),
             objects: Vec::new(),
@@ -1119,6 +1126,7 @@ mod tests {
 
     fn object(kind: ObjectKind, path: &str, radius: f32) -> ObjectDefinition {
         ObjectDefinition {
+            widgets: Vec::new(),
             tag: tag(&kind.group(), path),
             kind,
             flags: 0,

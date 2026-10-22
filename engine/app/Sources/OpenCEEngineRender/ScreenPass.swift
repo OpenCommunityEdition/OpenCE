@@ -12,6 +12,9 @@ import simd
 /// What `render.view` shows: the frame, or one buffer alone.
 public enum RenderView: String, CaseIterable, Sendable {
     case frame, depth, normals, ao, contact, ssr
+    /// The brightness the exposure adapts to, and the bloom (drawn by the
+    /// tone map).
+    case luminance, bloom
 
     var index: UInt32 { UInt32(Self.allCases.firstIndex(of: self) ?? 0) }
 }
@@ -23,6 +26,10 @@ public struct RenderSwitches: Equatable, Sendable {
     public var contactShadows = true
     public var sunShadows = true
     public var lights = true
+    public var exposure = true
+    public var bloom = true
+    public var lensFlares = true
+    public var glows = true
     public var view = RenderView.frame
 
     public init() {}
@@ -35,6 +42,10 @@ public struct RenderSwitches: Equatable, Sendable {
         contactShadows = flag("render.contact_shadows")
         sunShadows = flag("render.sun_shadows")
         lights = flag("render.lights")
+        exposure = flag("render.exposure")
+        bloom = flag("render.bloom")
+        lensFlares = flag("render.lens_flares")
+        glows = flag("render.glows")
         view = RenderView(rawValue: value("render.view")) ?? .frame
     }
 }
@@ -229,7 +240,7 @@ final class ScreenPass {
     /// Draws the buffer `render.view` asks for over the frame (its last
     /// draw), if it is not the frame.
     func view(_ targets: Targets, uniforms: ScreenUniforms, into encoder: MTLRenderCommandEncoder) {
-        guard uniforms.passes.w != RenderView.frame.index else { return }
+        guard uniforms.passes.w != RenderView.frame.index, uniforms.passes.w <= RenderView.ssr.index else { return }
         var uniforms = uniforms
         encoder.setRenderPipelineState(pipelines.view)
         bind(targets, &uniforms, into: encoder)

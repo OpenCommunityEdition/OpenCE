@@ -25,7 +25,7 @@ final class ShaderTests: XCTestCase {
         XCTAssertEqual(ShaderSources.folder(), checkout)
         let functions: [Shader: String] = [.level: "level_fragment", .hud: "hud_vertex", .text: "text_fragment",
                                            .debug: "debug_vertex", .screen: "screen_occlusion",
-                                           .bake: "bake_irradiance"]
+                                           .bake: "bake_irradiance", .camera: "camera_occlusion"]
         for shader in Shader.allCases {
             let source = try ShaderSources.source(shader)
             XCTAssertTrue(source.contains(try XCTUnwrap(functions[shader])), shader.file)
@@ -144,6 +144,8 @@ final class ShaderTests: XCTestCase {
     func testTheLevelsShadersReloadIntoTheLevelAndItsObjects() throws {
         let level = try StockLevel(map: "bloodgulch")
         let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
+        // (no bloom from the level's light over the tone map's magenta)
+        renderer.switches.bloom = false
         let before = try renderer.capture(width: 160, height: 90, camera: level.camera, queue: level.queue)
         let source = try ShaderSources.source(.level)
         // (the tone map writing magenta: every pixel)

@@ -7,6 +7,7 @@ pub mod bitmap;
 pub mod campaign;
 pub mod devmap;
 pub mod hud;
+pub mod lens;
 pub mod level;
 pub mod light;
 pub mod material;
@@ -29,6 +30,9 @@ pub use hud::{
     CrosshairItem, CrosshairKind, GrenadeHud, HudAnchor, HudDigits, HudGlobals, HudMeter,
     HudNumber, HudPlacement, HudStatic, UnitHud, WeaponHud, WeaponHudCrosshair, WeaponHudElement,
     WeaponHudMeter, WeaponHudNumber, WeaponHudState, WeaponHudStatic,
+};
+pub use lens::{
+    Glow, LensFlare, LensFlareMarker, LensFlareReflection, LightVolume, LightVolumeFrame,
 };
 pub use level::{
     AtmosphericFog, CollisionBsp, CollisionMaterial, EnvironmentVertex, FallingDamage, GameType,

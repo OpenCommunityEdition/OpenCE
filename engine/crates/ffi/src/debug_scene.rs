@@ -212,6 +212,9 @@ pub(crate) mod tests {
     /// A level with nothing in it but a few shapes.
     pub(crate) fn level() -> Level {
         let mut level = Level {
+            glows: Vec::new(),
+            lens_flares: Vec::new(),
+            light_volumes: Vec::new(),
             scenario: Scenario {
                 path: "test".into(),
                 structure_bsps: Vec::new(),
@@ -243,6 +246,9 @@ pub(crate) mod tests {
             hud_globals: None,
         };
         let mut structure = StructureBsp {
+            cluster_skies: Vec::new(),
+            lens_flare_markers: Vec::new(),
+            lens_flares: Vec::new(),
             path: "test".into(),
             lightmap_bitmap: None,
             world_bounds: [[0.0; 2]; 3],
@@ -368,6 +374,7 @@ pub(crate) mod tests {
         path: &str,
     ) -> opence_content::ObjectDefinition {
         opence_content::ObjectDefinition {
+            widgets: Vec::new(),
             tag: opence_content::TagRef {
                 group: opence_content::Group(kind.group()),
                 path: path.into(),

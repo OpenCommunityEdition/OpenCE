@@ -238,6 +238,16 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
         });
     }
 
+    // (the widgets the engine draws: light volumes and glows)
+    let widgets_block = object.block(0x14C, "widgets", 0x20, 4)?;
+    let mut widgets = Vec::with_capacity(widgets_block.len());
+    for widget in widgets_block.iter() {
+        widgets.extend(
+            reference(&widget, 0, "type", &[])?
+                .filter(|tag| matches!(&tag.group.0, b"mgs2" | b"glw!")),
+        );
+    }
+
     let functions_block = object.block(0x158, "functions", FUNCTION_SIZE, MAX_FUNCTIONS)?;
     let mut functions = Vec::with_capacity(functions_block.len());
     for function in functions_block.iter() {
@@ -267,6 +277,7 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
     }
 
     Ok(ObjectDefinition {
+        widgets,
         tag: tag_ref(cache, index),
         kind,
         flags: object.u16(0x02, "flags")?,

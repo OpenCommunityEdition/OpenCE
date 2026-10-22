@@ -8,6 +8,7 @@
 #![allow(unsafe_code)]
 
 pub mod bake;
+pub mod camera;
 pub mod campaign;
 pub mod control;
 mod debug_scene;
@@ -327,6 +328,21 @@ impl LevelGeometry {
     /// snapshot's lights give (`u32::MAX`: none).
     pub fn light_gels(&self) -> Vec<u32> {
         self.level.light_gels.clone()
+    }
+
+    /// The textures the camera's sprites draw, by `CameraSprite::image`.
+    pub fn camera_textures(&self) -> Vec<u32> {
+        self.level.camera_textures.clone()
+    }
+
+    /// The exposure's limits in the BSP, least and greatest, in stops
+    /// (`adapt_exposure`).
+    pub fn exposure_limits(&self) -> Vec<f32> {
+        self.content
+            .structure_bsps
+            .get(self.bsp)
+            .map_or(camera::INTERIOR_EXPOSURE, camera::exposure_limits)
+            .to_vec()
     }
 
     /// The BSP's bounds: least and greatest x, then y, then z.
@@ -893,6 +909,35 @@ impl Engine {
         hud::hud_quads(level, &readout, width, height, seconds)
     }
 
+    /// What the camera sees of lights from `camera` this frame: the lens
+    /// flares (when `flares`) and the light volumes and glows (when
+    /// `widgets`), as sprites, with the disks the flares are tested with.
+    pub fn camera_sprites(
+        &self,
+        camera: camera::SpriteCamera,
+        flares: bool,
+        widgets: bool,
+    ) -> camera::CameraSprites {
+        let state = self.lock();
+        let Some(running) = &state.running else {
+            return camera::CameraSprites::default();
+        };
+        let Some(level) = &running.level else {
+            return camera::CameraSprites::default();
+        };
+        let seconds =
+            running.simulation.tick().0 as f32 / opence_sim::clock::TICKS_PER_SECOND as f32;
+        running.lights.camera.sprites(
+            level,
+            &running.lights.sources,
+            &running.lit,
+            &camera,
+            seconds,
+            flares,
+            widgets,
+        )
+    }
+
     /// Runs a line of the developer shell: commands split by `;`, each a
     /// command, a variable, or HaloScript for the running mission; then
     /// publishes the world as the line left it.
@@ -1113,11 +1158,11 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
     } = state;
     let Some(running) = running else { return };
     let camera = campaign::camera(running);
+    let bsp = running
+        .campaign
+        .as_ref()
+        .map_or(shell.bsp, campaign::Campaign::bsp);
     if shell.scene.any_world_layer() {
-        let bsp = running
-            .campaign
-            .as_ref()
-            .map_or(shell.bsp, campaign::Campaign::bsp);
         debug_scene::fill(
             &mut shell.scene,
             running.level.as_deref(),
@@ -1139,6 +1184,10 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
         running
             .lights
             .gather(level, &mut running.simulation, &camera.transform, &mut lit);
+        let lights = &mut running.lights;
+        lights
+            .camera
+            .gather(level, &mut running.simulation, bsp, &mut lights.sources);
     }
     let simulation = &mut running.simulation;
     writer.publish(buffers, tick, alpha, |frame| {
