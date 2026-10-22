@@ -1,6 +1,6 @@
 # Plan: The developer shell, engine hooks and a test map
 
-## Phase 1: Commands, variables and the control socket
+## Phase 1: Commands, variables and the control socket [checkpoint: 2fa9bbf2]
 - [x] Task: The registry of commands and variables 1ae39b0e
     - [x] Write tests: commands with typed arguments parse and run, and give errors naming the bad argument; variables keep their type, default and saved value; listeners hear changes; a name that is not a command falls through to HaloScript
     - [x] The `opence_dev` crate: the registry, the typed arguments and variables, the HaloScript fall-through to `opence_script` (the FFI calls Swift uses moved to the next task, where the engine's context exists)
