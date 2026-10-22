@@ -58,9 +58,9 @@
 - [x] Task: Dynamic decals 8d9da30a
     - [x] Write tests: lifetime, fade, size range, chained decals and recycling at the limit
     - [x] Deferred decals on the level and objects, placed by impacts and explosions
-- [ ] Task: Effects
-    - [ ] Write tests: an effect's events and parts fire at their times and markers; impacts choose the effect by material
-    - [ ] The effect system in `sim`: triggers from weapons, projectiles, explosions, scenery and vehicles; the effect parts in the snapshot
+- [x] Task: Effects 5fd90923
+    - [x] Write tests: an effect's events and parts fire at their times and markers; impacts choose the effect by material
+    - [x] The effect system in `sim`: triggers from weapons, projectiles, explosions, scenery and vehicles; the effect parts in the snapshot
 - [ ] Task: Particles, contrails, weather and detail objects drawn
     - [ ] Write tests: particle sequences, colours, sizes and blend modes; simple motion by velocity and gravity; weather and detail object placements import
     - [ ] The particle, contrail, weather and detail object passes
