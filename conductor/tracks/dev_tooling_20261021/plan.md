@@ -29,10 +29,10 @@
 - [x] Task: Debug drawing d66e7195
     - [x] Write tests: shapes with lifetimes expire on time; the layers switch; nothing is drawn or allocated when they are off
     - [x] The immediate-mode API in Rust, the snapshot's debug buffer, the Metal pass; the collision, body, AI, trigger, marker, light and sound layers
-- [~] Task: Live shader reload
-    - [ ] Write tests: an edited source recompiles and swaps; a broken one keeps the old pipeline and reports the error
-    - [ ] Watching the shader sources in a development build
-- [ ] Task: The test driver
+- [x] Task: Live shader reload c7ccbda5
+    - [x] Write tests: an edited source recompiles and swaps; a broken one keeps the old pipeline and reports the error
+    - [x] Watching the shader sources in a development build
+- [~] Task: The test driver
     - [ ] Write tests: `wait`, `wait_until`, `expect` and `frame` in `.ocs` scripts; a failed `expect` reports its line and state
     - [ ] The script runner, headless and in the window
 - [ ] Task: Profiling marks
