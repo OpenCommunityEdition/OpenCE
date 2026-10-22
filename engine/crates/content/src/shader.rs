@@ -149,6 +149,8 @@ pub struct TextureAnimation {
     pub period: f32,
     /// How far it scrolls, in map widths.
     pub scale: f32,
+    /// Where in its period it starts (0 for environment shaders).
+    pub phase: f32,
 }
 
 /// A model shader (`soso`): a base map, a multipurpose map whose channels
@@ -182,6 +184,25 @@ pub struct ModelShaderClass {
     /// The colour it glows where its multipurpose map says (the top of
     /// its self-illumination animation's range).
     pub self_illumination_color: [f32; 3],
+    /// The bottom of its self-illumination animation's range.
+    pub self_illumination_lower: [f32; 3],
+    /// Its self-illumination flags (bit 0: no random phase).
+    pub self_illumination_flags: u16,
+    /// Which of the object's change colours tints its self-illumination
+    /// (0: none).
+    pub self_illumination_color_source: i16,
+    /// The periodic function that animates its self-illumination.
+    pub self_illumination_function: i16,
+    /// That function's period in seconds.
+    pub self_illumination_period: f32,
+    /// The maps' scrolling in u.
+    pub u_animation: TextureAnimation,
+    /// The maps' scrolling in v.
+    pub v_animation: TextureAnimation,
+    /// The distance at which the reflection is at full strength.
+    pub reflection_falloff_distance: f32,
+    /// The distance beyond which there is no reflection (0: always).
+    pub reflection_cutoff_distance: f32,
     /// The reflection's brightness looking along the normal.
     pub perpendicular_brightness: f32,
     /// The reflection's tint looking along the normal.

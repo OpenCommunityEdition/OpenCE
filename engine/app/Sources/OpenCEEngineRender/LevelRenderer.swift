@@ -62,6 +62,34 @@ struct MaterialUniforms {
     /// The micro detail function, the specular flags, the reflection's
     /// kind and the EnvironmentBit maps (0: not an environment shader).
     var environment: SIMD4<UInt32> = .zero
+    /// A model shader's ModelBit flags, its detail mask, its change
+    /// colour's source and its self-illumination colour's (0: not a model
+    /// shader). Its reflection's tints and brightnesses are in
+    /// `specularPerpendicular` and `specularParallel`, its falloff and
+    /// cutoff distances in `environmentScales`.
+    var model: SIMD4<UInt32> = .zero
+
+    /// `material`'s model shader parameters set (if it is a model shader),
+    /// and its multipurpose map and an unused map's textures and its
+    /// reflection cube, white where it has none.
+    mutating func model(_ material: RenderMaterial, texture: (UInt32?) -> MTLTexture?,
+                        cube: (UInt32?) -> MTLTexture?, white: MTLTexture,
+                        whiteCube: MTLTexture) -> (maps: [MTLTexture], cube: MTLTexture) {
+        guard let shader = material.model else { return ([white, white], whiteCube) }
+        func four(_ values: [Float]) -> SIMD4<Float> {
+            values.count == 4 ? SIMD4(values[0], values[1], values[2], values[3]) : .zero
+        }
+        let reflection = cube(shader.reflectionMap)
+        var bits = ModelBit.present
+        if reflection != nil { bits |= ModelBit.reflection }
+        if shader.detailAfterReflection { bits |= ModelBit.detailAfterReflection }
+        specularPerpendicular = four(shader.perpendicular)
+        specularParallel = four(shader.parallel)
+        environmentScales = SIMD4(shader.reflectionFalloffDistance, shader.reflectionCutoffDistance, 0, 0)
+        model = SIMD4(bits, UInt32(material.detailMask), UInt32(material.changeColorSource),
+                      UInt32(shader.selfIlluminationColorSource))
+        return ([texture(material.multipurposeMap) ?? white, white], reflection ?? whiteCube)
+    }
 
     /// `environment`'s parameters set, and its four maps' textures (micro
     /// detail, bump or specular mask, self-illumination, the cube), white
@@ -195,6 +223,15 @@ enum EnvironmentBit {
     /// The self-illumination map sampled without filtering.
     static let unfiltered: UInt32 = 32
     static let reflection: UInt32 = 64
+}
+
+/// The model fragment shader's MODEL bits (MaterialUniforms' `model.x`).
+enum ModelBit {
+    /// A model shader: lit as the model combiner lights it.
+    static let present: UInt32 = 1
+    static let reflection: UInt32 = 2
+    /// The detail map applies to the lit and reflected colour.
+    static let detailAfterReflection: UInt32 = 4
 }
 
 public final class LevelRenderer {
@@ -370,7 +407,8 @@ public final class LevelRenderer {
         (opaque, blended, tone, motion) = try Self.pipelines(device: device, library: library,
                                                               stride: vertexStride, outputFormat: outputFormat)
         debug = try DebugPass(device: device, colorFormat: Self.frameFormat, depthFormat: Self.depthFormat)
-        models = try ModelPass(device: device, library: library, geometry: geometry, textures: textures, white: white)
+        models = try ModelPass(device: device, library: library, geometry: geometry, textures: textures, white: white,
+                               whiteCube: whiteCube)
         sky = geometry.sky()
 
         // reversed depth: nearer is greater
@@ -578,7 +616,7 @@ public final class LevelRenderer {
         for draw in opaqueDraws {
             encode(draw, animation, encoder)
         }
-        models.encode(prepared, blendedParts: false, into: encoder)
+        models.encode(prepared, blendedParts: false, animation: animation, into: encoder)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setDepthStencilState(depthTest)
         // far to near
@@ -590,7 +628,7 @@ public final class LevelRenderer {
             encoder.setRenderPipelineState(blended[index])
             encode(draw, animation, encoder)
         }
-        models.encode(prepared, blendedParts: true, into: encoder)
+        models.encode(prepared, blendedParts: true, animation: animation, into: encoder)
         // the debug lines, hidden by what is nearer (and the buffers they took back)
         debug.encode(debugLines, viewProjection: viewProjection, into: encoder)
         if debug.lastDrawn > 0 {
@@ -604,9 +642,9 @@ public final class LevelRenderer {
             encoder.setViewport(MTLViewport(originX: 0, originY: 0, width: Double(frame.width),
                                             height: Double(frame.height), znear: 0.5, zfar: 1))
             encoder.setDepthStencilState(depthWrite)
-            models.encode(prepared, blendedParts: false, firstPerson: true, into: encoder)
+            models.encode(prepared, blendedParts: false, firstPerson: true, animation: animation, into: encoder)
             encoder.setDepthStencilState(depthTest)
-            models.encode(prepared, blendedParts: true, firstPerson: true, into: encoder)
+            models.encode(prepared, blendedParts: true, firstPerson: true, animation: animation, into: encoder)
         }
         encoder.endEncoding()
     }

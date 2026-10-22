@@ -268,7 +268,7 @@ fn chicago(shader: &TransparentChicagoShader) -> SurfaceMaterial {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChicagoMap, Group};
+    use crate::{ChicagoMap, Group, TextureAnimation};
 
     fn tag(group: &[u8; 4], path: &str) -> TagRef {
         TagRef {
@@ -329,6 +329,15 @@ mod tests {
             detail_map: None,
             detail_map_v_scale: 0.0,
             self_illumination_color: [0.0; 3],
+            self_illumination_lower: [0.0; 3],
+            self_illumination_flags: 0,
+            self_illumination_color_source: 0,
+            self_illumination_function: 0,
+            self_illumination_period: 0.0,
+            u_animation: TextureAnimation::default(),
+            v_animation: TextureAnimation::default(),
+            reflection_falloff_distance: 0.0,
+            reflection_cutoff_distance: 0.0,
             perpendicular_brightness: 0.25,
             perpendicular_tint_color: [1.0; 3],
             parallel_brightness: 1.0,

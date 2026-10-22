@@ -90,6 +90,15 @@ fn model(shader: &Element<'_>, reached: &mut Reached) -> Result<ModelShaderClass
         detail_map: reached.bitmap(shader, 0xDC, "detail map")?,
         detail_map_v_scale: shader.f32(0xEC, "detail map v scale")?,
         self_illumination_color: color(shader, 0x84, "self-illumination upper bound")?,
+        self_illumination_lower: color(shader, 0x78, "self-illumination lower bound")?,
+        self_illumination_flags: shader.u16(0x6C, "self-illumination flags")?,
+        self_illumination_color_source: shader.i16(0x70, "self-illumination color source")?,
+        self_illumination_function: shader.i16(0x72, "self-illumination function")?,
+        self_illumination_period: shader.f32(0x74, "self-illumination period")?,
+        u_animation: model_texture_animation(shader, 0xFC, "u animation")?,
+        v_animation: model_texture_animation(shader, 0x110, "v animation")?,
+        reflection_falloff_distance: shader.f32(0x13C, "reflection falloff distance")?,
+        reflection_cutoff_distance: shader.f32(0x140, "reflection cutoff distance")?,
         perpendicular_brightness: shader.f32(0x144, "perpendicular brightness")?,
         perpendicular_tint_color: color(shader, 0x148, "perpendicular tint color")?,
         parallel_brightness: shader.f32(0x154, "parallel brightness")?,
@@ -168,6 +177,23 @@ fn texture_animation(
         function: shader.i16(at, field)?,
         period: shader.f32(at + 4, field)?,
         scale: shader.f32(at + 8, field)?,
+        phase: 0.0,
+    })
+}
+
+/// A model shader's scrolling (`shader_texture_animation_function`): an
+/// object function that scales it (not read: objects have none yet), a
+/// periodic function, a period, a phase and a scale.
+fn model_texture_animation(
+    shader: &Element<'_>,
+    at: usize,
+    field: &str,
+) -> Result<TextureAnimation, ImportError> {
+    Ok(TextureAnimation {
+        function: shader.i16(at + 2, field)?,
+        period: shader.f32(at + 4, field)?,
+        phase: shader.f32(at + 8, field)?,
+        scale: shader.f32(at + 0xC, field)?,
     })
 }
 

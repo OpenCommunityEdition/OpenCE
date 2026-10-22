@@ -4,10 +4,12 @@
 //! material of its model shader; and the regions' permutations and levels
 //! of detail that choose which parts are drawn.
 
-use opence_content::{Model, ModelShaderClass, ModelVertex};
+use opence_content::{AnimatedColor, EnvironmentAnimation, Model, ModelShaderClass, ModelVertex};
+use opence_sim::periodic::function;
 
 use crate::render_level::{
     finite, scale, BlendFunction, Builder, MaterialKind, RenderDraw, RenderMaterial,
+    RenderModelShader,
 };
 
 /// The bytes of one model vertex, little-endian: position and normal (three
@@ -178,6 +180,50 @@ pub(crate) fn model_material(
         change_color_source: shader.change_color_source.clamp(0, 4) as u8,
         chicago_maps: Vec::new(),
         environment: None,
+        model: Some(RenderModelShader {
+            reflection_map: builder.cube_map(shader.reflection_cube_map.as_ref()),
+            detail_after_reflection: shader.flags & 1 != 0,
+            self_illumination_color_source: shader.self_illumination_color_source.clamp(0, 4) as u8,
+            perpendicular: tinted(
+                shader.perpendicular_tint_color,
+                shader.perpendicular_brightness,
+            ),
+            parallel: tinted(shader.parallel_tint_color, shader.parallel_brightness),
+            reflection_falloff_distance: finite(shader.reflection_falloff_distance).max(0.0),
+            reflection_cutoff_distance: finite(shader.reflection_cutoff_distance).max(0.0),
+        }),
+    }
+}
+
+/// A tint's red, green and blue, then a brightness, each finite.
+fn tinted(tint: [f32; 3], brightness: f32) -> Vec<f32> {
+    let mut out: Vec<f32> = tint.iter().map(|&channel| finite(channel)).collect();
+    out.push(finite(brightness).max(0.0));
+    out
+}
+
+/// A model shader's animation, in the environment shaders' terms: its
+/// self-illumination swept from the lower bound to the upper as the
+/// primary colour (with no per-object phase yet: the original offsets each
+/// object's by its identifier unless the shader says not to), and its
+/// maps' scrolling in u and v.
+pub(crate) fn model_animation(shader: &ModelShaderClass) -> EnvironmentAnimation {
+    let still = AnimatedColor {
+        function: function::ZERO,
+        ..AnimatedColor::default()
+    };
+    EnvironmentAnimation {
+        primary: AnimatedColor {
+            on_color: shader.self_illumination_color,
+            off_color: shader.self_illumination_lower,
+            function: shader.self_illumination_function,
+            period: shader.self_illumination_period,
+            phase: 0.0,
+        },
+        secondary: still.clone(),
+        plasma: still,
+        u: shader.u_animation.clone(),
+        v: shader.v_animation.clone(),
     }
 }
 

@@ -27,10 +27,15 @@ public struct DrawnObject {
     /// The first-person weapon or hands: drawn over the world, at the
     /// highest level of detail.
     public var firstPerson: Bool
+    /// Its four change colours (`0xFFRRGGBB`), which its model shaders'
+    /// multipurpose maps and self-illumination take.
+    public var changeColors: [UInt32]
 
     public init(model: Int, transform: simd_float4x4, center: SIMD3<Float>, radius: Float, regions: [UInt8],
-                nodes: [simd_float4x4], firstPerson: Bool = false) {
+                nodes: [simd_float4x4], firstPerson: Bool = false,
+                changeColors: [UInt32] = [0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF]) {
         self.firstPerson = firstPerson
+        self.changeColors = changeColors
         self.model = model
         self.transform = transform
         self.center = center
@@ -45,6 +50,16 @@ public struct DrawnObject {
                               position: SIMD3<Float>, scale: Float) -> simd_float4x4 {
         simd_float4x4(columns: (SIMD4(forward * scale, 0), SIMD4(left * scale, 0), SIMD4(up * scale, 0),
                                 SIMD4(position, 1)))
+    }
+
+    /// Its change colours as the model fragment shader's four colours
+    /// (white for any it lacks).
+    public var changeColorUniforms: [SIMD4<Float>] {
+        (0..<4).map { index in
+            let packed = index < changeColors.count ? changeColors[index] : 0xFFFF_FFFF
+            let channel = { (shift: UInt32) in Float((packed >> shift) & 0xFF) / 255 }
+            return SIMD4(channel(16), channel(8), channel(0), 1)
+        }
     }
 }
 
@@ -61,8 +76,11 @@ final class ModelPass {
         var blended: Bool
         /// Of a shader class not imported yet (not drawn in the sky).
         var plain: Bool
+        /// Its material, whose animation it takes each frame.
+        var material: Int
         var uniforms: MaterialUniforms
-        /// Base, detail, and two unused; or a chicago shader's four maps.
+        /// Base, detail, multipurpose, one unused and the reflection's
+        /// cube; or a chicago shader's four maps and the cube.
         var textures: [MTLTexture]
     }
 
@@ -97,7 +115,7 @@ final class ModelPass {
     private(set) var lastFirstPersonPartCount = 0
 
     init(device: MTLDevice, library: MTLLibrary, geometry: LevelGeometry, textures: [MTLTexture?],
-         white: MTLTexture) throws {
+         white: MTLTexture, whiteCube: MTLTexture) throws {
         guard let vertices = LevelRenderer.buffer(device, geometry.modelVertices()),
               let indices = LevelRenderer.buffer(device, geometry.modelIndices()) else {
             throw LevelRendererError.resources("model buffers")
@@ -108,6 +126,11 @@ final class ModelPass {
         let materials = geometry.materials()
         func texture(_ index: UInt32?) -> MTLTexture? {
             index.flatMap { Int($0) < textures.count ? textures[Int($0)] : nil }
+                .flatMap { $0.textureType == .type2D ? $0 : nil }
+        }
+        func cube(_ index: UInt32?) -> MTLTexture? {
+            index.flatMap { Int($0) < textures.count ? textures[Int($0)] : nil }
+                .flatMap { $0.textureType == .typeCube ? $0 : nil }
         }
         let rendered = geometry.models()
         var geometries: [[Draw]] = []
@@ -134,10 +157,13 @@ final class ModelPass {
                         alphaTested: material.kind == .alphaTested ? 1 : 0,
                         fogMode: FrameUniforms.fogMode(material.kind == .blended ? .alphaBlend : nil))
                     let chicagoTextures = uniforms.chicago(material, texture: texture, white: white)
+                    let shaded = uniforms.model(material, texture: texture, cube: cube, white: white,
+                                                whiteCube: whiteCube)
                     draws.append(Draw(firstIndex: Int(part.firstIndex), indexCount: Int(part.indexCount),
                                       blended: material.kind == .blended, plain: material.kind == .plain,
-                                      uniforms: uniforms,
-                                      textures: chicagoTextures ?? maps.map { $0 ?? white } + [white, white]))
+                                      material: Int(part.material), uniforms: uniforms,
+                                      textures: (chicagoTextures ?? maps.map { $0 ?? white } + shaded.maps)
+                                          + [shaded.cube]))
                 }
                 geometries.append(draws)
             }
@@ -245,12 +271,15 @@ final class ModelPass {
     /// What to draw of each object: its model's parts and its nodes' skin
     /// matrices, from `camera` in a view `viewportHeight` pixels high.
     struct Prepared {
+        /// An object's skin matrices' place, its parts and its change
+        /// colours.
+        typealias Object = (uniforms: ModelObjectUniforms, parts: [Draw], colors: [SIMD4<Float>])
         var skins: MTLBuffer?
-        var objects: [(uniforms: ModelObjectUniforms, parts: [Draw])]
+        var objects: [Object]
         /// The sky's, if the level has one.
-        var sky: (uniforms: ModelObjectUniforms, parts: [Draw])?
+        var sky: Object?
         /// The first-person weapon and hands.
-        var firstPerson: [(uniforms: ModelObjectUniforms, parts: [Draw])] = []
+        var firstPerson: [Object] = []
     }
 
     /// The highest level of detail, which the sky is always drawn at.
@@ -260,9 +289,9 @@ final class ModelPass {
                  device: MTLDevice) -> Prepared {
         let forward = camera.rotation.act([1, 0, 0])
         var matrices: [simd_float4x4] = []
-        var drawn: [(uniforms: ModelObjectUniforms, parts: [Draw])] = []
-        var skyDrawn: (uniforms: ModelObjectUniforms, parts: [Draw])?
-        var firstPerson: [(uniforms: ModelObjectUniforms, parts: [Draw])] = []
+        var drawn: [Prepared.Object] = []
+        var skyDrawn: Prepared.Object?
+        var firstPerson: [Prepared.Object] = []
         let all = (sky.map { [$0] } ?? []) + objects
         for (index, object) in all.enumerated() where models.indices.contains(object.model) {
             let isSky = sky != nil && index == 0
@@ -298,12 +327,13 @@ final class ModelPass {
                 }
             }
             let uniforms = ModelObjectUniforms(firstNode: UInt32(first), nodeCount: UInt32(nodeCount))
+            let colors = object.changeColorUniforms
             if isSky {
-                skyDrawn = (uniforms, parts)
+                skyDrawn = (uniforms, parts, colors)
             } else if object.firstPerson {
-                firstPerson.append((uniforms, parts))
+                firstPerson.append((uniforms, parts, colors))
             } else {
-                drawn.append((uniforms, parts))
+                drawn.append((uniforms, parts, colors))
             }
         }
         frame = (frame + 1) % skins.count
@@ -325,7 +355,7 @@ final class ModelPass {
     /// The prepared sky, its opaque parts then its blended ones, behind
     /// everything (the encoder's depth state is left for the caller to set).
     func encodeSky(_ prepared: Prepared, into encoder: MTLRenderCommandEncoder) {
-        guard let skins = prepared.skins, let (uniforms, parts) = prepared.sky else { return }
+        guard let skins = prepared.skins, let (uniforms, parts, _) = prepared.sky else { return }
         encoder.setDepthStencilState(skyDepth)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setVertexBuffer(skins, offset: 0, index: 2)
@@ -334,13 +364,14 @@ final class ModelPass {
         for blendedParts in [false, true] {
             encoder.setRenderPipelineState(blendedParts ? skyBlended : skyOpaque)
             for part in parts where part.blended == blendedParts && !part.plain {
-                encode(part, into: encoder)
+                encode(part, animation: [], into: encoder)
             }
         }
     }
 
-    private func encode(_ part: Draw, into encoder: MTLRenderCommandEncoder) {
+    private func encode(_ part: Draw, animation: [Float], into encoder: MTLRenderCommandEncoder) {
         var material = part.uniforms
+        material.animate(animation, material: part.material)
         encoder.setFragmentBytes(&material, length: MemoryLayout<MaterialUniforms>.stride, index: 0)
         encoder.setFragmentTextures(part.textures, range: 0..<part.textures.count)
         encoder.drawIndexedPrimitives(type: .triangle, indexCount: part.indexCount, indexType: .uint32,
@@ -348,19 +379,23 @@ final class ModelPass {
     }
 
     /// The prepared objects' opaque and alpha-tested parts, or their
-    /// blended ones (or the first-person objects').
-    func encode(_ prepared: Prepared, blendedParts: Bool, firstPerson: Bool = false,
+    /// blended ones (or the first-person objects'), their materials
+    /// animated by `animation` (the level's for every material).
+    func encode(_ prepared: Prepared, blendedParts: Bool, firstPerson: Bool = false, animation: [Float] = [],
                 into encoder: MTLRenderCommandEncoder) {
         let objects = firstPerson ? prepared.firstPerson : prepared.objects
         guard let skins = prepared.skins, !objects.isEmpty else { return }
         encoder.setRenderPipelineState(blendedParts ? blended : opaque)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setVertexBuffer(skins, offset: 0, index: 2)
-        for (uniforms, parts) in objects {
+        for (uniforms, parts, colors) in objects {
             var object = uniforms
             encoder.setVertexBytes(&object, length: MemoryLayout<ModelObjectUniforms>.stride, index: 3)
+            colors.withUnsafeBytes { raw in
+                if let base = raw.baseAddress { encoder.setFragmentBytes(base, length: raw.count, index: 2) }
+            }
             for part in parts where part.blended == blendedParts && !part.plain {
-                encode(part, into: encoder)
+                encode(part, animation: animation, into: encoder)
             }
         }
     }

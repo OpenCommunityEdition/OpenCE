@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use crate::render_model::{model_material, RenderModel};
+use crate::render_model::{model_animation, model_material, RenderModel};
 
 use opence_content::{
     EnvironmentAnimation, EnvironmentShader, Level, Lightmap, Material, Pixels, ShaderClass,
@@ -115,9 +115,10 @@ pub struct RenderMaterial {
     pub secondary_detail_map: Option<u32>,
     /// Its scale.
     pub secondary_detail_scale: f32,
-    /// A model shader's multipurpose map: in its red, green, blue and
-    /// alpha, the detail mask's choices, and in its alpha also how much the
-    /// change colour shows (for a model shader whose detail mask uses it).
+    /// A model shader's multipurpose map: in its red the reflection's mask,
+    /// in its green the self-illumination's, in its blue the change
+    /// colour's and in its alpha an auxiliary mask, any of which the
+    /// detail mask may choose.
     pub multipurpose_map: Option<u32>,
     /// A model shader's detail mask: 0 none, then which of the
     /// multipurpose map's channels (or its inverse, odd values from 1)
@@ -133,6 +134,32 @@ pub struct RenderMaterial {
     /// self-illumination, specular and reflection (None for the other
     /// classes).
     pub environment: Option<RenderEnvironment>,
+    /// A model shader's self-illumination and reflection (None for the
+    /// other classes).
+    pub model: Option<RenderModelShader>,
+}
+
+/// What a model shader adds to its base and detail maps, as the original's
+/// model combiner adds it. Colours are in display values, as the tag gives
+/// them.
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
+pub struct RenderModelShader {
+    /// The reflection's cube map texture.
+    pub reflection_map: Option<u32>,
+    /// The detail map applies after the reflection is added (flag bit 0),
+    /// not to the base map before it is lit.
+    pub detail_after_reflection: bool,
+    /// Which of the object's change colours tints the self-illumination
+    /// (0: none).
+    pub self_illumination_color_source: u8,
+    /// The reflection's tint and brightness looking along the normal.
+    pub perpendicular: Vec<f32>,
+    /// The reflection's tint and brightness looking across the surface.
+    pub parallel: Vec<f32>,
+    /// The distance at which the reflection is at full strength.
+    pub reflection_falloff_distance: f32,
+    /// The distance beyond which there is none (0: it never fades).
+    pub reflection_cutoff_distance: f32,
 }
 
 /// What an environment shader adds to its base and detail maps. Colours
@@ -389,7 +416,7 @@ impl Builder<'_> {
         map.and_then(|map| self.texture(map, 0, 1))
     }
 
-    fn cube_map(&mut self, map: Option<&TagRef>) -> Option<u32> {
+    pub(crate) fn cube_map(&mut self, map: Option<&TagRef>) -> Option<u32> {
         map.and_then(|map| self.texture(map, 0, 6))
     }
 
@@ -438,6 +465,7 @@ impl Builder<'_> {
         let class = self.level.shader(shader).map(|shader| &shader.class);
         let animation = match class {
             Some(ShaderClass::Environment(environment)) => Some(environment.animation.clone()),
+            Some(ShaderClass::Model(model)) => Some(model_animation(model)),
             _ => None,
         };
         let material = match class {
@@ -462,6 +490,7 @@ impl Builder<'_> {
                 change_color_source: 0,
                 chicago_maps: Vec::new(),
                 environment: Some(self.environment(environment)),
+                model: None,
             },
             Some(
                 ShaderClass::TransparentChicago(chicago)
@@ -502,6 +531,7 @@ impl Builder<'_> {
                     change_color_source: 0,
                     chicago_maps,
                     environment: None,
+                    model: None,
                 }
             }
             // (a class not imported yet, or a shader not found: drawn plain
@@ -524,6 +554,7 @@ impl Builder<'_> {
                 change_color_source: 0,
                 chicago_maps: Vec::new(),
                 environment: None,
+                model: None,
             },
         };
         self.out.materials.push(material);
@@ -634,8 +665,12 @@ impl RenderLevel {
                 )
             };
             let scroll = |scroll: &opence_content::TextureAnimation| {
-                let value =
-                    opence_sim::periodic::animate(scroll.function, seconds, scroll.period, 0.0);
+                let value = opence_sim::periodic::animate(
+                    scroll.function,
+                    seconds,
+                    scroll.period,
+                    scroll.phase,
+                );
                 finite(value * finite(scroll.scale))
             };
             let (primary, _) = swept(&animation.primary);
@@ -1089,6 +1124,7 @@ mod tests {
                 function: function::ONE,
                 period: 2.0,
                 scale: 0.5,
+                phase: 0.0,
             };
         }
         level.shaders[0] = shader;
@@ -1134,6 +1170,76 @@ mod tests {
         // the other classes have none
         assert!(built.materials[built.draws[3].material as usize]
             .environment
+            .is_none());
+    }
+
+    #[test]
+    fn a_model_shader_carries_its_reflection_and_animates_its_self_illumination() {
+        use opence_content::{ModelShaderClass, TextureAnimation};
+        use opence_sim::periodic::function;
+        let mut level = lit_level(0);
+        level.shaders[0].class = ShaderClass::Model(ModelShaderClass {
+            flags: 1 | 1 << 2,
+            translucency: 0.0,
+            change_color_source: 7,
+            map_scale: [0.0; 2],
+            base_map: Some(tag(b"bitm", "ground")),
+            multipurpose_map: Some(tag(b"bitm", "detail")),
+            detail_function: 1,
+            detail_mask: 3,
+            detail_map_scale: 0.0,
+            detail_map: None,
+            detail_map_v_scale: 0.0,
+            self_illumination_color: [1.0, 0.0, 0.0],
+            self_illumination_lower: [0.0, 0.0, 1.0],
+            self_illumination_flags: 0,
+            self_illumination_color_source: 2,
+            self_illumination_function: function::ONE,
+            self_illumination_period: 1.0,
+            u_animation: TextureAnimation {
+                function: function::ONE,
+                period: 2.0,
+                scale: 0.25,
+                phase: 0.5,
+            },
+            v_animation: TextureAnimation::default(),
+            reflection_falloff_distance: f32::NAN,
+            reflection_cutoff_distance: 3.0,
+            perpendicular_brightness: 0.5,
+            perpendicular_tint_color: [1.0, f32::INFINITY, 0.0],
+            parallel_brightness: -1.0,
+            parallel_tint_color: [0.25; 3],
+            reflection_cube_map: Some(tag(b"bitm", "sky cube")),
+        });
+        let Some(built) = RenderLevel::build(&level, 0) else {
+            panic!("the level has a BSP 0");
+        };
+        let index = built.draws[0].material as usize;
+        let material = &built.materials[index];
+        assert_eq!(material.kind, MaterialKind::Opaque);
+        assert_eq!(material.change_color_source, 4);
+        assert_eq!(material.detail_mask, 3);
+        let Some(model) = material.model.as_ref() else {
+            panic!("a model shader has its model parameters");
+        };
+        assert!(model.detail_after_reflection);
+        assert_eq!(model.self_illumination_color_source, 2);
+        assert_eq!(model.perpendicular, vec![1.0, 0.0, 0.0, 0.5]);
+        assert_eq!(model.parallel, vec![0.25, 0.25, 0.25, 0.0]);
+        assert_eq!(model.reflection_falloff_distance, 0.0);
+        assert_eq!(model.reflection_cutoff_distance, 3.0);
+        let Some(cube) = model.reflection_map else {
+            panic!("the cube map is a texture");
+        };
+        assert_eq!(built.textures[cube as usize].0.faces, 6);
+        // the self-illumination at its upper bound (the function is one),
+        // and the scroll's phase counted
+        let animation = built.animation(0.0);
+        let at = index * ANIMATION_FLOATS;
+        assert_eq!(&animation[at..at + 3], &[1.0, 0.0, 0.0]);
+        assert_eq!(animation[at + 8], 0.25);
+        assert!(built.materials[built.draws[3].material as usize]
+            .model
             .is_none());
     }
 

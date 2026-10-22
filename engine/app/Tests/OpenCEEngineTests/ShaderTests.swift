@@ -1,6 +1,7 @@
 import Foundation
 import Metal
 import OpenCEEngineRender
+import simd
 import XCTest
 
 /// The shaders' sources (engine/app/Shaders), the watcher noticing edits,
@@ -30,6 +31,18 @@ final class ShaderTests: XCTestCase {
         }
         XCTAssertThrowsError(try ShaderSources.source(.level, in: nil))
         XCTAssertThrowsError(try ShaderSources.source(.level, in: try folder()))
+    }
+
+    /// An object's change colours reach the model shader as colours, white
+    /// for those the snapshot lacks.
+    func testChangeColoursAreUnpackedForTheModelShader() {
+        let object = DrawnObject(model: 0, transform: matrix_identity_float4x4, center: .zero, radius: 1,
+                                 regions: [], nodes: [], changeColors: [0xFFFF_0000, 0xFF00_80FF])
+        XCTAssertEqual(object.changeColorUniforms, [SIMD4(1, 0, 0, 1), SIMD4(0, Float(0x80) / 255, 1, 1),
+                                                    SIMD4(1, 1, 1, 1), SIMD4(1, 1, 1, 1)])
+        let plain = DrawnObject(model: 0, transform: matrix_identity_float4x4, center: .zero, radius: 1,
+                                regions: [], nodes: [])
+        XCTAssertEqual(plain.changeColorUniforms, Array(repeating: SIMD4<Float>(1, 1, 1, 1), count: 4))
     }
 
     func testTheWatcherNoticesEditedFiles() throws {

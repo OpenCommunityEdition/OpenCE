@@ -78,7 +78,17 @@ struct Material {
     // the micro detail function, the specular flags, the reflection's
     // kind and the ENVIRONMENT bits (0: not an environment shader)
     uint4 environment;
+    // a model shader's MODEL bits, its detail mask, its change colour's
+    // source and its self-illumination colour's (0: not a model shader);
+    // its reflection's tint and brightness along the normal and across it
+    // are specular_perpendicular and specular_parallel, its reflection's
+    // falloff and cutoff distances environment_scales.xy
+    uint4 model;
 };
+
+constant uint MODEL = 1;
+constant uint MODEL_REFLECTION = 2;
+constant uint DETAIL_AFTER_REFLECTION = 4;
 
 constant uint ENVIRONMENT = 1;
 constant uint MICRO = 2;
@@ -390,6 +400,7 @@ struct ModelObject {
 
 struct ModelOut {
     float4 position [[position]];
+    float3 world;
     float3 normal;
     float2 texcoord;
     float fog;
@@ -403,6 +414,7 @@ ModelOut skinned(ModelIn in, constant Frame &frame, const device float4x4 *skins
     float4 world = skin * float4(in.position, 1);
     ModelOut out;
     out.position = frame.view_projection * world;
+    out.world = world.xyz;
     out.normal = (skin * float4(in.normal, 0)).xyz;
     out.texcoord = in.texcoord;
     out.fog = fog_amount(frame, world.xyz);
@@ -440,24 +452,95 @@ fragment float4 sky_fragment(ModelOut in [[stage_in]],
     return surface(in.texcoord, material, base, primary, secondary, wrap, 0);
 }
 
+// a multipurpose map's channel the detail mask chooses (1-2 red, 3-4
+// green, 5-6 blue, 7-8 alpha; odd ones inverted), one for none
+float detail_mask(uint mask, float4 multipurpose) {
+    if (mask == 0 || mask > 8) {
+        return 1;
+    }
+    float channel = multipurpose[(mask - 1) / 2];
+    return (mask & 1) ? 1 - channel : channel;
+}
+
 // until the level's lights reach objects: a sky light from above and a
-// little from the side, and some ambient
+// little from the side, and some ambient; then the model combiner's
+// self-illumination, change colour, reflection and detail
 fragment float4 model_fragment(ModelOut in [[stage_in]],
                                constant Material &material [[buffer(0)]],
                                constant Frame &frame [[buffer(1)]],
+                               constant float4 *change_colors [[buffer(2)]],
                                texture2d<float> base [[texture(0)]],
                                texture2d<float> primary [[texture(1)]],
                                texture2d<float> secondary [[texture(2)]],
                                texture2d<float> fourth [[texture(3)]],
-                               sampler wrap [[sampler(0)]]) {
+                               texturecube<float> reflection [[texture(4)]],
+                               sampler wrap [[sampler(0)]],
+                               sampler clamp [[sampler(1)]]) {
     if (material.chicago_count != 0) {
         array<texture2d<float>, 4> maps = {base, primary, secondary, fourth};
         return fogged(chicago(in.texcoord, material, maps, wrap, frame.eye.w), in.fog, frame, material);
     }
-    float4 color = surface(in.texcoord, material, base, primary, secondary, wrap, frame.eye.w);
-    float3 normal = length_squared(in.normal) > 1e-12 ? normalize(in.normal) : float3(0, 0, 1);
-    float light = 0.45 + 0.65 * saturate(dot(normal, normalize(float3(0.35, 0.25, 0.9))));
-    color.rgb *= light;
+    float3 normal = direction(in.normal, float3(0, 0, 1));
+    float3 light = float3(0.45 + 0.65 * saturate(dot(normal, normalize(float3(0.35, 0.25, 0.9)))));
+    uint bits = material.model.x;
+    if (!(bits & MODEL)) {
+        float4 color = surface(in.texcoord, material, base, primary, secondary, wrap, frame.eye.w);
+        color.rgb *= light;
+        return fogged(color, in.fog, frame, material);
+    }
+    float lod = frame.eye.w;
+    // the maps scrolled as the shader animates them
+    float2 texcoord = in.texcoord + material.animation[2].xy;
+    float4 color = float4(1);
+    if (material.maps & BASE) {
+        color = base.sample(wrap, texcoord * material.base_scale + material.base_offset, bias(lod));
+    }
+    if (material.alpha_tested != 0 && color.a < 0.5) {
+        discard_fragment();
+    }
+    // the multipurpose map: red the reflection's mask, green the
+    // self-illumination's, blue the change colour's, alpha auxiliary
+    float4 multipurpose = secondary.sample(wrap, texcoord * material.base_scale + material.base_offset, bias(lod));
+    float3 self_color = material.animation[0].rgb;
+    uint self_source = material.model.w;
+    if (self_source >= 1 && self_source <= 4) {
+        self_color *= change_colors[self_source - 1].rgb;
+    }
+    light += multipurpose.g * self_color;
+    uint change_source = material.model.z;
+    if (change_source >= 1 && change_source <= 4) {
+        light *= mix(float3(1), change_colors[change_source - 1].rgb, multipurpose.b);
+    }
+    // the detail map, toward its neutral value where the mask hides it
+    float neutral = material.detail_function == 1 ? 1.0 : 0.5;
+    float3 detail = float3(neutral);
+    if (material.maps & PRIMARY) {
+        float3 sampled = primary.sample(wrap, texcoord * material.primary_scale, bias(lod)).rgb;
+        detail = mix(detail, sampled, detail_mask(material.model.y, multipurpose));
+    }
+    // the cube map's reflection, by the fresnel term between its tints,
+    // faded in from its cutoff distance to its falloff distance
+    float3 reflected = float3(0);
+    if (bits & MODEL_REFLECTION) {
+        float3 toward = frame.eye.xyz - in.world;
+        float3 eye = direction(toward, normal);
+        float along = saturate(dot(normal, eye));
+        float fresnel = along * along;
+        float4 tint = mix(material.specular_parallel, material.specular_perpendicular, fresnel);
+        float falloff = material.environment_scales.x;
+        float cutoff = material.environment_scales.y;
+        float fraction = 1;
+        if (cutoff > 0 && falloff != cutoff) {
+            fraction = saturate((length(toward) - cutoff) / (falloff - cutoff));
+        }
+        reflected = reflection.sample(clamp, reflect(-eye, normal)).rgb * tint.rgb
+                  * (multipurpose.r * tint.a * fraction);
+    }
+    if (bits & DETAIL_AFTER_REFLECTION) {
+        color.rgb = detailed(material.detail_function, color.rgb * light + reflected, detail);
+    } else {
+        color.rgb = detailed(material.detail_function, color.rgb, detail) * light + reflected;
+    }
     return fogged(color, in.fog, frame, material);
 }
 

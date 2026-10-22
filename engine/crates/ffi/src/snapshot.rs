@@ -27,7 +27,7 @@ pub const DEBUG_LABEL_BYTES: usize = 48;
 
 /// Raised with any change to the snapshot's types, so that the app refuses
 /// a library of another layout.
-pub const SNAPSHOT_VERSION: u32 = 5;
+pub const SNAPSHOT_VERSION: u32 = 6;
 
 /// `ObjectSnapshot::flags`: the first-person weapon or hands, posed from
 /// the camera and drawn in front of the world.
@@ -138,6 +138,8 @@ pub struct ObjectSnapshot {
     pub bounding_radius: f32,
     /// The permutation each of its model's regions is drawn with.
     pub regions: [u8; 8],
+    /// Its four change colours, as `0xFFRRGGBB`.
+    pub change_colors: [u32; 4],
 }
 
 /// A debug line, drawn after the world.
@@ -506,9 +508,10 @@ mod tests {
         assert_eq!(size_of::<Quat>(), 16);
         assert_eq!(size_of::<Transform>(), 32);
         assert_eq!(size_of::<CameraSnapshot>(), 80);
-        assert_eq!(size_of::<ObjectSnapshot>(), 92);
+        assert_eq!(size_of::<ObjectSnapshot>(), 108);
         assert_eq!(offset_of!(ObjectSnapshot, bounding_radius), 80);
         assert_eq!(offset_of!(ObjectSnapshot, regions), 84);
+        assert_eq!(offset_of!(ObjectSnapshot, change_colors), 92);
         assert_eq!(offset_of!(ObjectSnapshot, first_node), 12);
         assert_eq!(offset_of!(ObjectSnapshot, current), 48);
         assert_eq!(size_of::<NodeMatrix>(), 52);
@@ -528,7 +531,7 @@ mod tests {
         assert_eq!(size_of::<DebugLine>(), 28);
         assert_eq!(size_of::<DebugLabel>(), 64);
         assert_eq!(offset_of!(DebugLabel, text), 16);
-        assert_eq!(SNAPSHOT_VERSION, 5);
+        assert_eq!(SNAPSHOT_VERSION, 6);
     }
 
     #[test]
@@ -543,7 +546,7 @@ mod tests {
         assert_eq!(layout.max_debug_labels, 256);
         assert_eq!(layout.frame_objects_offset, 104);
         assert_eq!(layout.frame_nodes_offset, 112);
-        assert_eq!(layout.object_size, 92);
+        assert_eq!(layout.object_size, 108);
         assert_eq!(layout.object_bounding_radius_offset, 80);
         assert_eq!(layout.object_first_node_offset, 12);
         assert_eq!(layout.node_size, 104);

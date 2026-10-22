@@ -56,6 +56,8 @@ pub struct Appearance {
     pub radius_bits: u32,
     /// The permutation of each region.
     pub regions: [u8; 8],
+    /// Its four change colours, as `0xFFRRGGBB`.
+    pub change_colors: [u32; 4],
 }
 
 /// The team an object is on (multiplayer).

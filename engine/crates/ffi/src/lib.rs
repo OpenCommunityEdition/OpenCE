@@ -347,6 +347,69 @@ fn region_permutations(model: &opence_content::Model, placed: [u8; 8]) -> [u8; 8
     regions
 }
 
+/// An object's four change colours, as `0xFFRRGGBB`, as the original's
+/// `object_choose_random_change_colors` chooses them: each starts as its
+/// placement's (white where that is zero), and one its definition gives
+/// takes the first of its permutations whose weight reaches a value
+/// hashed from the object's position, at a point between the
+/// permutation's bounds hashed from its height. The colours the
+/// original then scales or darkens by the object's functions are left as
+/// chosen: objects have no functions yet.
+fn change_colors(
+    definitions: &[opence_content::ChangeColor],
+    placed: [u32; 4],
+    position: [f32; 3],
+) -> [u32; 4] {
+    let [x, y, z] = position;
+    let mut colors = [0u32; 4];
+    for (index, color) in colors.iter_mut().enumerate() {
+        let mut rgb = if placed[index] == 0 {
+            [1.0; 3]
+        } else {
+            unpack_rgb(placed[index])
+        };
+        if let Some(definition) = definitions.get(index) {
+            let cc = index as f32;
+            let weight = libm::fmodf(
+                libm::fabsf(x * 315.893_13 + y * 587.129_46 + z * 744.124_15 + cc * 431.128_94),
+                1.0,
+            );
+            if let Some(permutation) = definition
+                .permutations
+                .iter()
+                .find(|permutation| weight <= permutation.weight)
+            {
+                let along = libm::fmodf(libm::fabsf(y) + cc * 0.712_11, 1.0);
+                for (channel, value) in rgb.iter_mut().enumerate() {
+                    *value = permutation.lower[channel]
+                        + (permutation.upper[channel] - permutation.lower[channel]) * along;
+                }
+            }
+        }
+        *color = pack_rgb(rgb);
+    }
+    colors
+}
+
+/// `0x__RRGGBB` as red, green and blue from 0 to 1.
+fn unpack_rgb(color: u32) -> [f32; 3] {
+    let channel = |shift: u32| f32::from(((color >> shift) & 0xFF) as u8) / 255.0;
+    [channel(16), channel(8), channel(0)]
+}
+
+/// Red, green and blue, clamped to 0 to 1, as `0xFFRRGGBB`.
+fn pack_rgb(rgb: [f32; 3]) -> u32 {
+    let channel = |value: f32| {
+        let value = if value.is_nan() {
+            0.0
+        } else {
+            value.clamp(0.0, 1.0)
+        };
+        libm::roundf(value * 255.0) as u32
+    };
+    0xFF00_0000 | channel(rgb[0]) << 16 | channel(rgb[1]) << 8 | channel(rgb[2])
+}
+
 /// How far a standing player's eyes are above their feet, in world units
 /// (the stock cyborg's camera).
 const EYE_HEIGHT: f32 = 0.62;
@@ -515,12 +578,20 @@ impl Wardrobe {
                 .component::<Permutation>(handle)
                 .map(|permutation| permutation.0.region_permutations)
                 .unwrap_or_default();
+            let placed = simulation
+                .component::<Permutation>(handle)
+                .map(|permutation| permutation.0.change_colors)
+                .unwrap_or_default();
+            let position = simulation
+                .transform(handle)
+                .map_or([0.0; 3], |transform| transform.position.to_array());
             simulation.set_appearance(
                 handle,
                 Appearance {
                     model: model as u32,
                     radius_bits: definition.bounding_radius.to_bits(),
                     regions: region_permutations(&level.models[model], permutation),
+                    change_colors: change_colors(&definition.change_colors, placed, position),
                 },
             );
         }
@@ -1060,6 +1131,9 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
                         .appearance
                         .map_or(0.0, |look| f32::from_bits(look.radius_bits)),
                     regions: object.appearance.map_or([0; 8], |look| look.regions),
+                    change_colors: object
+                        .appearance
+                        .map_or([0xFFFF_FFFF; 4], |look| look.change_colors),
                     ..Default::default()
                 },
                 &nodes,
@@ -1089,6 +1163,9 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
                     id: u32::MAX - u32::try_from(at).unwrap_or(0),
                     model: u32::try_from(model.model).unwrap_or(u32::MAX),
                     flags: snapshot::OBJECT_FIRST_PERSON,
+                    // (white: the original takes the weapon's and the
+                    // unit's, which are white until players have colours)
+                    change_colors: [0xFFFF_FFFF; 4],
                     previous,
                     current: transform(&camera.transform),
                     bounding_radius: 1.0,
@@ -1105,6 +1182,47 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn change_colors_are_chosen_from_the_position_as_the_originals() {
+        use opence_content::{ChangeColor, ColorPermutation};
+        let color = |permutations: Vec<ColorPermutation>| ChangeColor {
+            darken_by: 0,
+            scale_by: 0,
+            scale_flags: 0,
+            lower: [0.0; 3],
+            upper: [0.0; 3],
+            permutations,
+        };
+        let permutation = |weight, upper| ColorPermutation {
+            weight,
+            lower: [0.0; 3],
+            upper,
+        };
+        let definitions = [
+            color(vec![
+                permutation(0.4, [1.0, 0.0, 0.0]),
+                permutation(1.0, [0.0, 1.0, 0.0]),
+            ]),
+            color(vec![
+                permutation(0.4, [1.0, 0.0, 0.0]),
+                permutation(1.0, [0.0, 0.0, 2.0]),
+            ]),
+        ];
+        let colors = change_colors(&definitions, [0, 0, 0, 0x0010_2030], [1.0, 2.25, 3.0]);
+        // the first: weight 0.307 takes the first permutation, a quarter
+        // of the way along (|y| = 2.25)
+        assert_eq!(colors[0], 0xFF40_0000);
+        // the second: weight 0.436 takes the second, 0.962 along, clamped
+        assert_eq!(colors[1], 0xFF00_00FF);
+        // the others have no definition: the placement's, white for none
+        assert_eq!(colors[2], 0xFFFF_FFFF);
+        assert_eq!(colors[3], 0xFF10_2030);
+        let unreached = [color(vec![permutation(0.1, [1.0, 0.0, 0.0])])];
+        let colors = change_colors(&unreached, [0x0000_8000, 0, 0, 0], [1.0, 2.25, 3.0]);
+        assert_eq!(colors[0], 0xFF00_8000);
+        assert_eq!(pack_rgb([f32::NAN, -1.0, 0.5]), 0xFF00_0080);
+    }
 
     #[test]
     fn the_version_is_the_crates() {
