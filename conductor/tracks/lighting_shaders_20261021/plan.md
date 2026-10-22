@@ -52,9 +52,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Dynamic lighting' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 4: Decals and effects drawn
-- [ ] Task: Level decals
-    - [ ] Write tests: the scenario's decal placements import with their shader and layer
-    - [ ] Level decals drawn in their layers
+- [x] Task: Level decals 0d2368c6
+    - [x] Write tests: the scenario's decal placements import with their shader and layer
+    - [x] Level decals drawn in their layers
 - [ ] Task: Dynamic decals
     - [ ] Write tests: lifetime, fade, size range, chained decals and recycling at the limit
     - [ ] Deferred decals on the level and objects, placed by impacts and explosions
