@@ -1,0 +1,22 @@
+[package]
+name = "opence_cli"
+description = "The opence tool: the developer shell of a running engine, over its control socket"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "opence"
+path = "src/main.rs"
+
+[dependencies]
+opence_dev.workspace = true
+serde_json = "1"
+rustyline = { version = "17", default-features = false, features = ["with-file-history", "derive"] }
+
+[dev-dependencies]
+opence_ffi = { path = "../ffi" }
+
+[lints]
+workspace = true
