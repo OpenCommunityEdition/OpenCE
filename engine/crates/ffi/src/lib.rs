@@ -16,6 +16,7 @@ pub mod network;
 pub mod render_level;
 pub mod render_model;
 pub mod render_sky;
+pub mod script;
 pub mod settings;
 pub mod snapshot;
 
@@ -359,7 +360,7 @@ pub fn input_buttons() -> InputButtons {
     }
 }
 
-struct Running {
+pub(crate) struct Running {
     simulation: Simulation,
     previous_camera: snapshot::Transform,
     clock: Clock,
@@ -634,19 +635,41 @@ impl Engine {
         Ok(tick)
     }
 
+    /// Opens a profiling scope `name` on the calling thread, which
+    /// [`Engine::profile_end`] closes: false (and nothing kept) unless
+    /// `stat frame` or a trace is on.
+    pub fn profile_begin(&self, name: String) -> bool {
+        opence_dev::profile::profiler().begin(&name)
+    }
+
+    /// Closes the calling thread's last profiling scope.
+    pub fn profile_end(&self) {
+        opence_dev::profile::profiler().end();
+    }
+
     /// Adds a displayed frame's time: runs the ticks it covers and
     /// publishes a snapshot with the interpolation factor between the last
     /// two. Returns the ticks run.
     pub fn advance(&self, frame_seconds: f64) -> Result<u32, EngineError> {
+        let mut registry = self.lock_registry();
         let mut state = self.lock();
+        // (a frame is its advance and the app's drawing after it)
+        end_profiled_frame(&mut state);
+        opence_dev::profile_scope!("advance");
         let scale = if state.shell.paused {
             0.0
         } else {
             state.shell.time_scale
         };
-        let running = state.running.as_mut().ok_or(EngineError::NoWorld)?;
-        let frame = running.clock.advance(frame_seconds * scale);
-        run_ticks(&mut state, frame.ticks)?;
+        let mut frame = None;
+        if let Some(running) = state.running.as_mut() {
+            let advanced = running.clock.advance(frame_seconds * scale);
+            run_ticks(&mut state, advanced.ticks)?;
+            frame = Some(advanced);
+        }
+        // (a script in the window runs a line a frame, with or without a world)
+        script::poll_window(&mut registry, &mut state, &self.control);
+        let frame = frame.ok_or(EngineError::NoWorld)?;
         publish(&mut state, &self.snapshots, frame.alpha);
         Ok(frame.ticks)
     }
@@ -754,13 +777,13 @@ impl Engine {
 }
 
 impl Engine {
-    fn lock_registry(&self) -> MutexGuard<'_, opence_dev::Registry<State>> {
+    pub(crate) fn lock_registry(&self) -> MutexGuard<'_, opence_dev::Registry<State>> {
         self.registry
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    fn lock(&self) -> MutexGuard<'_, State> {
+    pub(crate) fn lock(&self) -> MutexGuard<'_, State> {
         // (a panic aborts, so the lock is never poisoned by one)
         self.state
             .lock()
@@ -806,7 +829,21 @@ fn node_matrix(from: &animation::NodeMatrix) -> snapshot::NodeMatrix {
     }
 }
 
-fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError> {
+/// Ends the profiler's frame, writing the trace it finished, if it did.
+fn end_profiled_frame(state: &mut State) {
+    let Some(spans) = opence_dev::profile::profiler().frame_end() else {
+        return;
+    };
+    let path = state.shell.trace.take().unwrap_or_default();
+    let (level, text) = match devtools::write_trace(&path, &spans) {
+        Ok(text) => (opence_dev::logbook::Level::Info, text),
+        Err(error) => (opence_dev::logbook::Level::Error, error.to_string()),
+    };
+    opence_dev::logbook::record(level, "profile", &text);
+}
+
+pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError> {
+    opence_dev::profile_scope!("ticks");
     let State {
         running,
         input,
@@ -815,6 +852,7 @@ fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError> {
     } = state;
     let running = running.as_mut().ok_or(EngineError::NoWorld)?;
     for _ in 0..ticks {
+        opence_dev::profile_scope!("tick");
         running.previous_camera = transform(&campaign::camera(running).transform);
         match (&mut running.network, &running.level, &mut running.campaign) {
             (Some(network), Some(level), _) => {
@@ -837,7 +875,8 @@ fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError> {
     Ok(())
 }
 
-fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) {
+pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) {
+    opence_dev::profile_scope!("publish");
     let State {
         running,
         writer,

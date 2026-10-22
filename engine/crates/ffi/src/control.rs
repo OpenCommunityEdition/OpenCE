@@ -34,6 +34,9 @@ pub const FRAME_TIMEOUT: Duration = Duration::from_secs(30);
 /// The smallest and largest frame, in pixels on a side.
 pub const FRAME_SIZES: std::ops::RangeInclusive<u32> = 16..=8192;
 
+/// How often a script looks whether the app has served its line.
+const SERVE_POLL: Duration = Duration::from_millis(5);
+
 /// How often `subscribe log` looks for new lines.
 const LOG_POLL: Duration = Duration::from_millis(50);
 
@@ -107,6 +110,9 @@ pub(crate) struct Control {
     finished: Mutex<HashMap<u64, Option<String>>>,
     drawn: Condvar,
     next_frame: AtomicU64,
+    /// The times the app has served the queues (taken the actions, acted
+    /// on them, then taken the frames).
+    served: AtomicU64,
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -131,8 +137,13 @@ impl Control {
         self.drawn.notify_all();
     }
 
-    /// Queues a frame and waits for the app to draw it.
-    fn draw(&self, path: String, width: u32, height: u32) -> Result<(), String> {
+    /// Queues an action for the app.
+    pub(crate) fn queue_action(&self, action: ShellAction) {
+        lock(&self.actions).push(action);
+    }
+
+    /// Queues a frame for the app to draw; its id.
+    pub(crate) fn queue_frame(&self, path: String, width: u32, height: u32) -> u64 {
         let id = self.next_frame.fetch_add(1, Ordering::Relaxed) + 1;
         lock(&self.frames).push(FrameRequest {
             id,
@@ -140,6 +151,50 @@ impl Control {
             width,
             height,
         });
+        id
+    }
+
+    /// A queued frame's answer, once the app has given it (`Some(error)`
+    /// if it could not draw it).
+    pub(crate) fn take_finished(&self, id: u64) -> Option<Option<String>> {
+        lock(&self.finished).remove(&id)
+    }
+
+    /// Forgets a queued frame (the app must not draw it later).
+    pub(crate) fn forget_frame(&self, id: u64) {
+        lock(&self.frames).retain(|frame| frame.id != id);
+        lock(&self.finished).remove(&id);
+    }
+
+    /// Waits until the app has taken the queued actions and acted on them.
+    pub(crate) fn wait_served(&self) -> Result<(), String> {
+        let deadline = Instant::now() + FRAME_TIMEOUT;
+        let late = || {
+            format!(
+                "the app did not act on the line in {} seconds",
+                FRAME_TIMEOUT.as_secs()
+            )
+        };
+        while !lock(&self.actions).is_empty() {
+            if Instant::now() >= deadline || self.stopped() {
+                return Err(late());
+            }
+            std::thread::sleep(SERVE_POLL);
+        }
+        // (taken; acted on once the app next takes the frames)
+        let taken = self.served.load(Ordering::Acquire);
+        while self.served.load(Ordering::Acquire) == taken {
+            if Instant::now() >= deadline || self.stopped() {
+                return Err(late());
+            }
+            std::thread::sleep(SERVE_POLL);
+        }
+        Ok(())
+    }
+
+    /// Queues a frame and waits for the app to draw it.
+    pub(crate) fn draw(&self, path: String, width: u32, height: u32) -> Result<(), String> {
+        let id = self.queue_frame(path, width, height);
         let deadline = Instant::now() + FRAME_TIMEOUT;
         let mut finished = lock(&self.finished);
         loop {
@@ -214,6 +269,7 @@ impl Engine {
     /// The frames the socket asked for since the app last asked: each to be
     /// drawn and answered with [`Engine::finish_frame`].
     pub fn control_frame_requests(&self) -> Vec<FrameRequest> {
+        self.control.served.fetch_add(1, Ordering::AcqRel);
         std::mem::take(&mut *lock(&self.control.frames))
     }
 
@@ -371,7 +427,7 @@ fn answer(engine: &Engine, control: &Control, request: Request) -> String {
             );
             found
         }),
-        "script" => return script(engine, control, &fields),
+        "script" => return script(engine, &fields),
         "log" => log(&fields),
         "frame" | "screenshot" => frame(engine, control, &fields),
         other => Err(format!(
@@ -433,32 +489,22 @@ fn objects(
     Ok(objects)
 }
 
-/// Runs a script's lines in turn (blank lines and `#` comments skipped),
-/// stopping at the first that fails.
-fn script(engine: &Engine, control: &Control, fields: &Map<String, Value>) -> String {
+/// Runs a script (`opence_dev::script`), its frames written in `folder`
+/// if it is given: its reply's `results` are its lines', in turn.
+fn script(engine: &Engine, fields: &Map<String, Value>) -> String {
     let source = match text(fields, "text") {
         Ok(source) => source,
         Err(error) => return refusal(&error),
     };
-    let mut results = Vec::new();
-    let mut all = true;
-    for (number, line) in source.lines().enumerate() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        let (ok, mut fields) = command(engine, control, line);
-        fields.insert("line".into(), json!(number + 1));
-        fields.insert("ok".into(), Value::Bool(ok));
-        results.push(Value::Object(fields));
-        if !ok {
-            all = false;
-            break;
-        }
-    }
-    let mut fields = Map::new();
-    fields.insert("results".into(), Value::Array(results));
-    reply(all, fields)
+    let folder = match fields.get("folder") {
+        None => None,
+        Some(_) => match text(fields, "folder") {
+            Ok(folder) => Some(std::path::PathBuf::from(folder)),
+            Err(error) => return refusal(&error),
+        },
+    };
+    let (ok, fields) = crate::script::over_socket(engine, source, folder);
+    reply(ok, fields)
 }
 
 fn log_json(entry: LogEntry) -> Value {
@@ -581,30 +627,35 @@ impl Engine {
 
     /// The world's state for the socket's `state`.
     fn control_state(&self) -> Map<String, Value> {
-        let state = self.lock();
-        let running = state.running.as_ref();
-        let player = running.and_then(|running| {
-            let handle = running.simulation.player()?.handle();
-            let at = running.simulation.transform(handle)?;
-            Some(json!([at.position.x, at.position.y, at.position.z]))
-        });
-        let mut fields = Map::new();
-        fields.insert("playing".into(), Value::Bool(running.is_some()));
-        fields.insert(
-            "level".into(),
-            Value::Bool(running.is_some_and(|running| running.level.is_some())),
-        );
-        fields.insert(
-            "mission".into(),
-            Value::Bool(running.is_some_and(|running| running.campaign.is_some())),
-        );
-        fields.insert("paused".into(), Value::Bool(state.shell.paused));
-        fields.insert("time_scale".into(), json!(state.shell.time_scale));
-        fields.insert(
-            "tick".into(),
-            json!(running.map_or(0, |running| running.simulation.tick().0)),
-        );
-        fields.insert("player".into(), player.unwrap_or(Value::Null));
-        fields
+        state_fields(&self.lock())
     }
+}
+
+/// The world's state: whether it plays, its level and mission, its time
+/// and the player's place.
+pub(crate) fn state_fields(state: &crate::State) -> Map<String, Value> {
+    let running = state.running.as_ref();
+    let player = running.and_then(|running| {
+        let handle = running.simulation.player()?.handle();
+        let at = running.simulation.transform(handle)?;
+        Some(json!([at.position.x, at.position.y, at.position.z]))
+    });
+    let mut fields = Map::new();
+    fields.insert("playing".into(), Value::Bool(running.is_some()));
+    fields.insert(
+        "level".into(),
+        Value::Bool(running.is_some_and(|running| running.level.is_some())),
+    );
+    fields.insert(
+        "mission".into(),
+        Value::Bool(running.is_some_and(|running| running.campaign.is_some())),
+    );
+    fields.insert("paused".into(), Value::Bool(state.shell.paused));
+    fields.insert("time_scale".into(), json!(state.shell.time_scale));
+    fields.insert(
+        "tick".into(),
+        json!(running.map_or(0, |running| running.simulation.tick().0)),
+    );
+    fields.insert("player".into(), player.unwrap_or(Value::Null));
+    fields
 }

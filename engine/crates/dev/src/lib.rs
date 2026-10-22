@@ -14,6 +14,8 @@
 pub mod control;
 pub mod draw;
 pub mod logbook;
+pub mod profile;
+pub mod script;
 mod words;
 
 use std::collections::BTreeMap;

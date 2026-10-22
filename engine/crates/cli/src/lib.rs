@@ -183,7 +183,12 @@ pub fn watch(
             last = entry["sequence"].as_u64().unwrap_or(last);
         }
     }
-    connection.ask(&json!({"request": "subscribe", "topic": "log"}))?;
+    // (from the backlog's last line, so none written in between is lost)
+    let mut subscribe = json!({"request": "subscribe", "topic": "log"});
+    if last > 0 {
+        subscribe["since"] = json!(last);
+    }
+    connection.ask(&subscribe)?;
     let mut written = 0;
     while limit.is_none_or(|limit| written < limit) {
         let line = match connection.read() {
@@ -204,8 +209,17 @@ pub fn watch(
 
 /// Runs a script's lines in order, writing each one's result; stops at,
 /// and fails with, the first that fails.
-pub fn script(connection: &mut Connection, text: &str, out: &mut impl Write) -> Result<(), Error> {
-    let reply = connection.request(&json!({"request": "script", "text": text}))?;
+pub fn script(
+    connection: &mut Connection,
+    text: &str,
+    folder: Option<&Path>,
+    out: &mut impl Write,
+) -> Result<(), Error> {
+    let mut request = json!({"request": "script", "text": text});
+    if let Some(folder) = folder {
+        request["folder"] = json!(folder.to_string_lossy());
+    }
+    let reply = connection.request(&request)?;
     let results = reply["results"].as_array().cloned().unwrap_or_default();
     for result in &results {
         let line = result["line"].as_u64().unwrap_or(0);
@@ -217,20 +231,24 @@ pub fn script(connection: &mut Connection, text: &str, out: &mut impl Write) -> 
         writeln!(out, "{line:>4} {mark} {text}")?;
     }
     if reply["ok"] == true {
-        Ok(())
-    } else {
-        let failed = results.last().map_or_else(
-            || reply["error"].as_str().unwrap_or("refused").to_owned(),
-            |result| {
-                format!(
-                    "line {}: {}",
-                    result["line"],
-                    result["error"].as_str().unwrap_or("failed")
-                )
-            },
-        );
-        Err(Error::Refused(failed))
+        return Ok(());
     }
+    let failure = &reply["failure"];
+    if let Some(expression) = failure["expression"].as_str() {
+        let value = failure["value"].as_str().unwrap_or("(none)");
+        writeln!(out, "     {expression} was {value}")?;
+    }
+    if failure["state"].is_object() {
+        writeln!(out, "     state: {}", failure["state"])?;
+    }
+    let reason = failure["reason"]
+        .as_str()
+        .or_else(|| reply["error"].as_str())
+        .unwrap_or("refused");
+    Err(Error::Refused(match failure["line"].as_u64() {
+        Some(line) if line > 0 => format!("line {line}: {reason}"),
+        _ => reason.to_owned(),
+    }))
 }
 
 /// The engine's completions of `line`.

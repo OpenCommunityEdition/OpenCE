@@ -516,7 +516,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = try? engine.advance(frameSeconds: seconds)
         followStructure()
         showStatus()
-        shell?.update(seconds: seconds, now: link.timestamp)
+        profiled("shell", engine) { shell?.update(seconds: seconds, now: link.timestamp) }
         reloadShaders(now: link.timestamp)
         if controller.showsFrameTimes {
             // (four times a second, so that it can be read)
@@ -545,10 +545,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
-        let frame = snapshots.acquire()
+        let frame = profiled("snapshot", engine) { snapshots.acquire() }
         let camera = ViewCamera(frame.camera, alpha: frame.alpha)
-        let objects = frame.drawnObjects()
-        let hudQuads = engine.hud(width: UInt32(width), height: UInt32(height))
+        let objects = profiled("objects", engine) { frame.drawnObjects() }
+        let hudQuads = profiled("hud", engine) { engine.hud(width: UInt32(width), height: UInt32(height)) }
         let debugLines = frame.debugSegments()
         // (the labels under the shell)
         var labels: [TextItem] = []
@@ -559,9 +559,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                       cellHeight: textPass.atlas.cellHeight)
         }
         controller.window.engineView.render { commands, target in
-            renderer.encode(into: commands, target: target, camera: camera, objects: objects, hudQuads: hudQuads,
-                            debugLines: debugLines)
-            self.textPass?.encode(labels + text, into: commands, target: target)
+            profiled("encode", self.engine) {
+                renderer.encode(into: commands, target: target, camera: camera, objects: objects,
+                                hudQuads: hudQuads, debugLines: debugLines)
+            }
+            profiled("text", self.engine) { self.textPass?.encode(labels + text, into: commands, target: target) }
         }
     }
 }

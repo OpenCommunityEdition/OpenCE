@@ -111,7 +111,20 @@ fn start(arguments: &[String]) -> Result<(), Error> {
                 .first()
                 .ok_or_else(|| Error::Usage("script needs a file".into()))?;
             let text = std::fs::read_to_string(file)?;
-            script(&mut Connection::connect(&socket)?, &text, &mut out)
+            // (its frames beside it, in <name>-frames)
+            let path = std::path::absolute(file)?;
+            let stem = path
+                .file_stem()
+                .map_or_else(|| "script".into(), |stem| stem.to_string_lossy());
+            let folder = path
+                .parent()
+                .map(|parent| parent.join(format!("{stem}-frames")));
+            script(
+                &mut Connection::connect(&socket)?,
+                &text,
+                folder.as_deref(),
+                &mut out,
+            )
         }
         "shell" => {
             let mut connection = Connection::connect(&socket)?;

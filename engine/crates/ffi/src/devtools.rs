@@ -108,6 +108,11 @@ pub(crate) struct Shell {
     pub scene: DebugDraw,
     /// The structure BSP the world plays in (without a mission).
     pub bsp: usize,
+    /// Where the trace being taken is written.
+    pub trace: Option<PathBuf>,
+    /// The script running in the window (`script`), and how the last ended.
+    pub script: Option<crate::script::Session>,
+    pub script_status: String,
 }
 
 impl Default for Shell {
@@ -121,6 +126,9 @@ impl Default for Shell {
             draw: DebugDraw::new(),
             scene: DebugDraw::new(),
             bsp: 0,
+            trace: None,
+            script: None,
+            script_status: String::new(),
         }
     }
 }
@@ -365,6 +373,30 @@ pub(crate) fn registry() -> Registry<State> {
         "Removes the shapes the commands and systems drew.",
         &[],
         debug_clear,
+    );
+    registry.command(
+        "stat",
+        "Measures each frame's scopes and shows the last frame's; `stat frame off` stops.",
+        &[
+            Param::required("what", ArgKind::Enum(&["frame"])),
+            Param::optional("switch", ArgKind::Bool),
+        ],
+        stat,
+    );
+    registry.command(
+        "trace",
+        "Writes the next frames' scopes as a Chrome trace (Perfetto reads it); `trace stop` writes it now.",
+        &[
+            Param::required("file", ArgKind::String),
+            Param::optional("frames", ArgKind::Int),
+        ],
+        trace,
+    );
+    registry.command(
+        "script",
+        "Runs a test script (.ocs) in the window, its frames in <name>-frames; `stop` stops it.",
+        &[Param::optional("file", ArgKind::Rest)],
+        script,
     );
     registry.fallback(halo_script);
     registry
@@ -1149,7 +1181,7 @@ fn debug_clear(state: &mut State, _: &Args) -> Result<Output, CommandError> {
 }
 
 /// HaloScript, run by the mission's scripts.
-fn halo_script(state: &mut State, text: &str) -> Result<Output, CommandError> {
+pub(crate) fn halo_script(state: &mut State, text: &str) -> Result<Output, CommandError> {
     let running = running(state)?;
     let Running {
         campaign,
@@ -1177,5 +1209,86 @@ fn halo_script(state: &mut State, text: &str) -> Result<Output, CommandError> {
     Ok(Output::with_data(
         shown.clone(),
         json!({ "value": shown, "type": format!("{value_type:?}") }),
+    ))
+}
+
+fn script(state: &mut State, args: &Args) -> Result<Output, CommandError> {
+    let argument = args.string_or("file", "")?;
+    crate::script::command(state, argument.trim())
+        .map(Output::text)
+        .map_err(CommandError::Failed)
+}
+
+fn stat(_: &mut State, args: &Args) -> Result<Output, CommandError> {
+    let profiler = opence_dev::profile::profiler();
+    if !args.bool_or("switch", true)? {
+        profiler.measure(false);
+        return Ok(Output::text("frames are not measured"));
+    }
+    if !profiler.measuring() {
+        profiler.measure(true);
+        return Ok(Output::text(
+            "frames are measured from the next: `stat frame` shows the last",
+        ));
+    }
+    let lines: Vec<Data> = profiler
+        .last_summary()
+        .iter()
+        .map(|line| {
+            json!({
+                "name": line.name,
+                "depth": line.depth,
+                "count": line.count,
+                "total": line.total,
+                "own": line.own,
+            })
+        })
+        .collect();
+    Ok(Output::with_data(profiler.report(), Data::Array(lines)))
+}
+
+fn trace(state: &mut State, args: &Args) -> Result<Output, CommandError> {
+    let profiler = opence_dev::profile::profiler();
+    let file = args.string("file")?;
+    if file == "stop" {
+        let Some(spans) = profiler.stop_trace() else {
+            return Err(CommandError::Failed("no trace is taken".into()));
+        };
+        let path = state.shell.trace.take().unwrap_or_default();
+        return write_trace(&path, &spans).map(Output::text);
+    }
+    let frames = args.int_or("frames", 300)?;
+    let max = i64::from(opence_dev::profile::MAX_TRACE_FRAMES);
+    if !(1..=max).contains(&frames) {
+        return Err(CommandError::Failed(format!(
+            "a trace takes 1 to {max} frames, not {frames}"
+        )));
+    }
+    let path = PathBuf::from(file);
+    if path.extension().is_none_or(|extension| extension != "json") {
+        return Err(CommandError::Failed("a trace is written as .json".into()));
+    }
+    let frames = u32::try_from(frames).unwrap_or(1);
+    profiler.start_trace(frames);
+    let text = format!(
+        "the next {frames} frames are traced into {}",
+        path.display()
+    );
+    state.shell.trace = Some(path);
+    Ok(Output::text(text))
+}
+
+/// Writes a trace's scopes to `path`.
+pub(crate) fn write_trace(
+    path: &Path,
+    spans: &[opence_dev::profile::Span],
+) -> Result<String, CommandError> {
+    let trace = opence_dev::profile::chrome_trace(spans);
+    std::fs::write(path, trace.to_string())
+        .map_err(|error| CommandError::Failed(format!("{}: {error}", path.display())))?;
+    Ok(format!(
+        "{} scopes were traced into {}",
+        spans.len(),
+        path.display()
     ))
 }

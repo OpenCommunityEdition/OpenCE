@@ -217,3 +217,78 @@ fn bloodgulch() -> Option<Arc<opence_ffi::LevelGeometry>> {
     )
     .ok()
 }
+
+/// A thread standing in for the app: it takes the actions and writes each
+/// frame asked for (its size as text), until `done`.
+fn app(engine: &Arc<Engine>, done: &Arc<AtomicBool>) -> std::thread::JoinHandle<Vec<String>> {
+    let engine = Arc::clone(engine);
+    let done = Arc::clone(done);
+    std::thread::spawn(move || {
+        let mut actions = Vec::new();
+        while !done.load(Ordering::Acquire) {
+            for action in engine.take_control_actions() {
+                actions.push(format!("{action:?}"));
+            }
+            for frame in engine.control_frame_requests() {
+                let size = format!("{}x{}", frame.width, frame.height);
+                let written = std::fs::write(&frame.path, size);
+                engine.finish_frame(frame.id, written.err().map(|error| error.to_string()));
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        actions
+    })
+}
+
+#[test]
+fn scripts_wait_expect_and_take_frames() -> Result {
+    let engine = Running::start("e")?;
+    let folder = engine.socket.parent().ok_or("no folder")?.to_path_buf();
+    let done = Arc::new(AtomicBool::new(false));
+    let thread = app(&engine.engine, &done);
+
+    let good = folder.join("good.ocs");
+    std::fs::write(
+        &good,
+        "wait 5\nexpect tick == 5\nwait_until tick >= 9\nquit\nexpect playing\n",
+    )?;
+    let ran = engine.opence(&["script", &good.to_string_lossy()])?;
+    assert!(ran.status.success(), "{ran:?}");
+    assert_eq!(text(&ran).lines().count(), 5);
+
+    // a failure: its line, the expression's value and the state
+    let bad = folder.join("bad.ocs");
+    std::fs::write(&bad, "wait 1\nexpect tick == 0\n")?;
+    let failed = engine.opence(&["script", &bad.to_string_lossy()])?;
+    assert_eq!(failed.status.code(), Some(1));
+    let out = text(&failed);
+    assert!(out.contains("tick == 0 was 10"), "{out}");
+    assert!(out.contains("state: {"), "{out}");
+    assert!(String::from_utf8_lossy(&failed.stderr).contains("line 2"));
+    // (the script ran its world paused, and left it running)
+    let mut connection = Connection::connect(&engine.socket)?;
+    let state = connection.ask(&serde_json::json!({"request": "state"}))?;
+    assert_eq!(state["paused"], false);
+
+    // a frame needs a level
+    let framed = folder.join("framed.ocs");
+    std::fs::write(&framed, "frame start\n")?;
+    assert_eq!(
+        engine
+            .opence(&["script", &framed.to_string_lossy()])?
+            .status
+            .code(),
+        Some(1)
+    );
+    if let Some(level) = bloodgulch() {
+        engine.engine.start_level(level, 1)?;
+        let drawn = engine.opence(&["script", &framed.to_string_lossy()])?;
+        assert!(drawn.status.success(), "{drawn:?}");
+        let png = folder.join("framed-frames").join("start.png");
+        assert_eq!(std::fs::read_to_string(png)?, "1280x720");
+    }
+    done.store(true, Ordering::Release);
+    let actions = thread.join().map_err(|_| "the app's thread panicked")?;
+    assert_eq!(actions, ["Quit"]);
+    Ok(())
+}

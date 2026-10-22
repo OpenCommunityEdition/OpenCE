@@ -422,3 +422,101 @@ fn the_world_layers_over_bloodgulch() -> Result {
     assert_eq!(debug_lines(&engine), 0);
     Ok(())
 }
+
+#[test]
+fn scripts_run_headless() -> Result {
+    let engine = Engine::new();
+    // (no world: a wait cannot run)
+    let report = engine.run_script("wait 2\n".into());
+    assert!(!report.ok);
+    assert!(report.text.contains("no world"), "{}", report.text);
+
+    engine.start_empty_world();
+    let report = engine.run_script(
+        "# a test\nstep 2\nwait 10\nexpect tick == 12\nwait_until tick >= 40\nframe start\nexpect playing\n"
+            .into(),
+    );
+    assert!(report.ok, "{}", report.text);
+    assert_eq!(report.frames, ["start"]);
+    assert_eq!(report.lines, 6);
+
+    // a failing expect: its line, its value, and the world's state
+    let report = engine.run_script("step 1\nexpect tick == 3\nstep 5\n".into());
+    assert!(!report.ok);
+    let failure = report.failure.ok_or("no failure")?;
+    assert_eq!(failure.line, 2);
+    assert_eq!(failure.expression.as_deref(), Some("tick == 3"));
+    assert!(failure.value.is_some());
+    let state: serde_json::Value = serde_json::from_str(&failure.state)?;
+    assert_eq!(state["playing"], true);
+
+    // a timeout, a line that needs the app, a script in a script, a bad line
+    let timed = engine.run_script("wait_until tick < 0 5\n".into());
+    assert!(!timed.ok && timed.text.contains("line 1"), "{}", timed.text);
+    assert!(!engine.run_script("quit\n".into()).ok);
+    assert!(!engine.run_script("script other.ocs\n".into()).ok);
+    let unread = engine.run_script("wait forever\n".into());
+    assert_eq!(unread.failure.map(|failure| failure.line), Some(1));
+    // (values: variables, the world's (step paused it), HaloScript; a command is not one)
+    assert!(
+        engine
+            .run_script("expect paused == true\nexpect objects >= 0\n".into())
+            .ok
+    );
+    assert!(
+        engine
+            .run_script("expect render.wireframe == false\n".into())
+            .ok
+    );
+    assert!(!engine.run_script("expect step == 1\n".into()).ok);
+    assert!(!engine.run_script("expect player.alive\n".into()).ok);
+    Ok(())
+}
+
+#[test]
+fn scripts_run_in_the_window() -> Result {
+    let engine = Engine::new();
+    engine.start_empty_world();
+    let folder = std::env::temp_dir().join(format!("opence_scripts_{}", std::process::id()));
+    std::fs::create_dir_all(&folder)?;
+    let file = folder.join("walk.ocs");
+    run(&engine, "pause")?;
+    std::fs::write(&file, "wait 3\nexpect tick == 3\n")?;
+    refused(&engine, "script nowhere.ocs")?;
+    assert!(run(&engine, "script")?.text.contains("no script"));
+    run(&engine, &format!("script {}", file.display()))?;
+    assert!(run(&engine, "script")?.text.contains("at line"));
+    // (each frame runs a line; paused, the waits tick the world)
+    for _ in 0..10 {
+        engine.advance(1.0 / 30.0)?;
+    }
+    let status = run(&engine, "script")?.text;
+    assert!(status.contains("passed"), "{status}");
+
+    std::fs::write(&file, "wait 1000\n")?;
+    run(&engine, &format!("script {}", file.display()))?;
+    assert_eq!(run(&engine, "script stop")?.text, "the script stopped");
+    assert_eq!(run(&engine, "script stop")?.text, "no script runs");
+    std::fs::write(&file, "expect tick == -1\n")?;
+    run(&engine, &format!("script {}", file.display()))?;
+    engine.advance(1.0 / 30.0)?;
+    assert!(run(&engine, "script")?.text.contains("line 1"));
+    std::fs::remove_dir_all(&folder)?;
+    Ok(())
+}
+
+#[test]
+fn scripts_over_bloodgulch() -> Result {
+    let Some(level) = bloodgulch() else {
+        return Ok(());
+    };
+    let engine = Engine::new();
+    engine.start_level(level, 2)?;
+    engine.spawn_player(0)?;
+    let report = engine.run_script(
+        "expect level\nexpect player.alive\nexpect objects > 0\nwait 30\nexpect player.z > -1000\n"
+            .into(),
+    );
+    assert!(report.ok, "{}", report.text);
+    Ok(())
+}
