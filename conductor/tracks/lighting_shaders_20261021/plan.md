@@ -34,9 +34,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: The bake' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 3: Dynamic lighting
-- [ ] Task: Objects lit by the world
-    - [ ] Write tests: probe interpolation at a point; the nearest reflection probe; the fake light is gone
-    - [ ] Objects lit by probes, the sun and reflection probes
+- [x] Task: Objects lit by the world a9649dfd
+    - [x] Write tests: probe interpolation at a point; the nearest reflection probe; the fake light is gone
+    - [x] Objects lit by probes, the sun and reflection probes
 - [ ] Task: Sun shadows
     - [ ] Write tests: cascade splits and their stable snapping
     - [ ] Cascaded shadow maps for objects, matched to the baked shadows
