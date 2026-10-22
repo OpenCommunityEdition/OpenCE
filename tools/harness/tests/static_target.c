@@ -22,6 +22,7 @@ static real object_get_maximum_shield_vitality(long object_index,boolean ignore_
 {
  (void)ignore_difficulty;return objects[object_index].shield;
 }
+struct damage_data { long owner_object_index; };
 #include "under_test.inc"
 int main(int argc,char **argv)
 {
@@ -35,6 +36,13 @@ int main(int argc,char **argv)
   CHECK(!static_target(2),"scenery damage cannot break");
   CHECK(!static_target(4),"a unit, whose state the host sends");
   CHECK(!static_target(NONE),"no object");
+ } else CASE("damage") {
+  /* a tripmine's own explosion (its owner the tripmine), and a player's grenade's (the grenade, no static target) */
+  struct damage_data tripmine={1},grenade={4},none={NONE},light={0};
+  CHECK(static_target_damage(&tripmine),"a shield scenery's own damage");
+  CHECK(static_target_damage(&light),"a destructible scenery's own damage");
+  CHECK(!static_target_damage(&grenade),"what a unit or projectile owns");
+  CHECK(!static_target_damage(&none),"damage with no owner object");
  } else return 2;
  return 0;
 }

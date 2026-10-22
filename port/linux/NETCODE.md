@@ -244,7 +244,10 @@ then deals the players' hits of them no damage); version 34 takes clients'
 hits on, and sends the host's damage to, the map's scenery and devices
 whose shield is all damage can break (Rat Race's energy shields, a Custom
 Edition map's tripmines), which version 17 left out as having no body to
-destroy, and has every machine run those shields' stun and recharge itself.
+destroy, and has every machine run those shields' stun and recharge itself;
+and the host deals what such an object deals itself (its shield or body
+breaking: a tripmine a client's player threw going off under the host's
+vehicle), which a client no longer reports and the host took from no one.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

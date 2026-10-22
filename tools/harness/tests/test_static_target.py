@@ -9,13 +9,14 @@ from harness import CHECK_FAILED, build, function, mutated, read, run
 
 
 def generated(fault=None):
-    code = function(read('port/linux/game/network_damage.c'), 'static_target')
+    source = read('port/linux/game/network_damage.c')
+    code = function(source, 'static_target') + '\n' + function(source, 'static_target_damage')
     if fault:
         code = mutated(code, *fault)
     return (('under_test.inc', code),)
 
 
-@pytest.mark.parametrize('case', ['body', 'shield', 'neither'])
+@pytest.mark.parametrize('case', ['body', 'shield', 'neither', 'damage'])
 def test_case(case):
     status, output = run(build('static_target', generated()), case)
     assert status == 0, output
@@ -26,6 +27,7 @@ def test_case(case):
     (('||\n\t\t\tobject_get_maximum_shield_vitality(object_index, TRUE) > 0.0f', ''), 'shield'),
     (('STATIC_TARGET_TYPES)', 'STATIC_TARGET_TYPES | _object_mask_unit)'), 'neither'),
     (('object_get_maximum_body_vitality(object_index, TRUE) > 0.0f ||', ''), 'body'),
+    (('damage->owner_object_index != NONE && static_target(damage->owner_object_index)', 'FALSE'), 'damage'),
 ])
 def test_negative_control(fault, case):
     status, output = run(build('static_target', generated(fault)), case)

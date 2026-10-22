@@ -41,6 +41,9 @@ being hit looks and feels like on the clients).
   breaks and plays its effects as the host's did. Their shields' stun and
   recharge each machine runs itself (damage.c's objects_update_shields), as
   the host sends no state of them: the same damage, and the same recharge.
+  What one of them deals itself, its shield or body breaking (a tripmine
+  going off), the host deals whoever owns it, and no client reports: a
+  client's player's tripmine is set off where the host has it.
 */
 
 #include "cseries.h"
@@ -519,6 +522,16 @@ boolean network_damage_static_target(
 	return static_target(object_index);
 }
 
+/* whether the damage is a static target's own (an effect of its shield or
+body breaking: a map's tripmine going off), which the host deals whoever its
+owner is: a client's player's tripmine is set off where the host has it (a
+vehicle running over it), so their machine has no hit of it to report */
+static boolean static_target_damage(
+	struct damage_data const *damage)
+{
+	return damage->owner_object_index != NONE && static_target(damage->owner_object_index);
+}
+
 /* ---------- object_cause_damage (damage.c) */
 
 /* whether the damage is a weapon's own at the unit that fires it (weapons.c:
@@ -664,8 +677,9 @@ boolean network_damage_deals(
 
 			damage_replay_player_effect(unit->unit.player_index, &effect, 0.0f);
 		}
-		/* a hit of this machine's own player's, on the host's object */
-		if (distributed_player_is_local(damage->owner_player_index) &&
+		/* a hit of this machine's own player's, on the host's object (not a
+		static target's own damage, which the host deals: static_target_damage) */
+		if (distributed_player_is_local(damage->owner_player_index) && !static_target_damage(damage) &&
 			(network_objects_client_has(object_index) || static_target(object_index)) &&
 			damage_report_count < MAXIMUM_HIT_REPORTS_PER_TICK)
 		{
@@ -690,9 +704,11 @@ boolean network_damage_deals(
 		return FALSE;
 	}
 	/* (a client's player's, whose machine reports it; but one whose machine
-	has left deals it here: their grenades and rockets still in flight) */
+	has left deals it here: their grenades and rockets still in flight; and
+	a static target's own, which no machine reports: static_target_damage) */
 	if (game_connection() == _game_connection_network_server && !damage_dealing_report &&
-		damage->owner_player_index != NONE && !distributed_player_is_local(damage->owner_player_index))
+		damage->owner_player_index != NONE && !distributed_player_is_local(damage->owner_player_index) &&
+		!static_target_damage(damage))
 	{
 		struct player_datum *owner = player_try_and_get(damage->owner_player_index);
 
