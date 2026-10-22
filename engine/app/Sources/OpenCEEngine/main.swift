@@ -16,7 +16,8 @@
 // times. --benchmark SECONDS flies the map offscreen at --size (3840x2160
 // by default), with no window, and prints the frame times. --headless runs
 // the world with no window, answering the control socket (Control.swift);
-// --control (or --socket PATH) opens the socket beside the window.
+// --control (or --socket PATH) opens the socket beside the window. ~ (the
+// key left of 1) opens the developer shell over the game.
 import AppKit
 import Metal
 import OpenCEEngineCore
@@ -204,6 +205,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var shownStatus: NetworkStatus = .alone
     /// The control socket's servant, with --control or --socket.
     var servant: ControlServant?
+    /// The developer shell (~), and the pass that draws its text.
+    var shell: ShellOverlay?
+    var textPass: TextPass?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = mainMenu()
@@ -222,6 +226,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 fail("\(map): \(error)")
             }
         }
+        startShell(view: controller.window.engineView)
         if CommandLine.arguments.contains("--control") || argument("--socket") != nil {
             startControl(device: controller.window.engineView.device)
         }
@@ -290,6 +295,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                        settings: settings)
         switched.renderer.hud = hud
         self.level = switched
+    }
+
+    /// The developer shell: ~ opens it over the game, which keeps playing;
+    /// while open it has the keys and the pointer, not the player.
+    func startShell(view: EngineView) {
+        guard let device = view.device, let font = GlyphAtlas.url() else {
+            appLog("warn", "the shell has no font")
+            return
+        }
+        do {
+            let atlas = try GlyphAtlas(url: font, scale: Double(view.window?.backingScaleFactor ?? 2), device: device)
+            textPass = try TextPass(device: device, atlas: atlas, outputFormat: .bgra8Unorm)
+        } catch {
+            appLog("error", "the shell's text: \(error)")
+            return
+        }
+        let shell = ShellOverlay(engine: engine, pasteboard: SystemPasteboard(), historyFile: ShellHistory.file)
+        shell.onOutput = { [weak self] output in
+            guard let self else { return }
+            if !performAction(output.action, loadMap: commandLoad, reloadBsp: reloadStructure) {
+                NSApp.terminate(nil)
+            }
+        }
+        shell.onOpenChanged = { [weak self] open in
+            guard let self, let controller else { return }
+            if open {
+                controller.releaseKeys()
+                controller.capturesMouse = false
+            } else if menuView == nil {
+                controller.capturesMouse = true
+            }
+        }
+        view.keyFilter = { [weak shell] event in
+            guard let shell else { return false }
+            if event.type == .keyUp || (event.isARepeat && !shell.isOpen) {
+                return shell.isOpen
+            }
+            guard let key = ShellKey(event) else { return shell.isOpen }
+            return shell.handle(key) || shell.isOpen
+        }
+        view.pointerFilter = { [weak shell] phase, x, y in
+            guard let shell else { return false }
+            switch phase {
+            case .down: return shell.pointer(.down, x: x, y: y)
+            case .dragged: return shell.pointer(.dragged, x: x, y: y)
+            case .up: return shell.pointer(.up, x: x, y: y)
+            }
+        }
+        view.scrollFilter = { [weak self, weak shell] delta, precise in
+            guard let self, let shell, let textPass else { return false }
+            // (a wheel's lines as three of the shell's rows)
+            let cell = Double(ShellMetrics(atlas: textPass.atlas).cellHeight)
+            return shell.scrollWheel(pixels: precise ? delta : delta * 3 * cell)
+        }
+        self.shell = shell
+    }
+
+    /// What the shell draws over a frame `width` by `height` pixels.
+    func shellItems(width: Int, height: Int) -> [TextItem] {
+        guard let shell, shell.isVisible, let textPass else { return [] }
+        return shell.items(width: width, height: height, metrics: ShellMetrics(atlas: textPass.atlas))
     }
 
     @objc func leave(_ sender: Any?) {
@@ -433,6 +499,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = try? engine.advance(frameSeconds: seconds)
         followStructure()
         showStatus()
+        shell?.update(seconds: seconds, now: link.timestamp)
         if controller.showsFrameTimes {
             // (four times a second, so that it can be read)
             if link.timestamp - lastOverlay >= 0.25 {
@@ -442,18 +509,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             controller.window.engineView.overlayText = nil
         }
+        let (width, height) = controller.window.engineView.sizeInPixels
+        let text = shellItems(width: width, height: height)
         guard let renderer = level?.renderer else {
-            controller.window.engineView.clear()
+            guard let textPass, !text.isEmpty else {
+                controller.window.engineView.clear()
+                return
+            }
+            controller.window.engineView.render { commands, target in
+                let pass = MTLRenderPassDescriptor()
+                pass.colorAttachments[0].texture = target
+                pass.colorAttachments[0].loadAction = .clear
+                pass.colorAttachments[0].storeAction = .store
+                pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+                commands.makeRenderCommandEncoder(descriptor: pass)?.endEncoding()
+                textPass.encode(text, into: commands, target: target)
+            }
             return
         }
         let frame = snapshots.acquire()
         let camera = ViewCamera(frame.camera, alpha: frame.alpha)
         let objects = frame.drawnObjects()
-        let (width, height) = controller.window.engineView.sizeInPixels
         let hudQuads = engine.hud(width: UInt32(width), height: UInt32(height))
         controller.window.engineView.render { commands, target in
             renderer.encode(into: commands, target: target, camera: camera, objects: objects, hudQuads: hudQuads)
+            self.textPass?.encode(text, into: commands, target: target)
         }
+    }
+}
+
+/// The shell's copying and pasting, with the system's clipboard.
+final class SystemPasteboard: ShellPasteboard {
+    func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    func paste() -> String? {
+        NSPasteboard.general.string(forType: .string)
+    }
+}
+
+extension ShellKey {
+    /// The shell's key for an AppKit key press.
+    init?(_ event: NSEvent) {
+        let flags = event.modifierFlags
+        var modifiers: Modifiers = []
+        if flags.contains(.shift) { modifiers.insert(.shift) }
+        if flags.contains(.control) { modifiers.insert(.control) }
+        if flags.contains(.option) { modifiers.insert(.option) }
+        if flags.contains(.command) { modifiers.insert(.command) }
+        self.init(code: event.keyCode, characters: event.characters ?? "",
+                  ignoringModifiers: event.charactersIgnoringModifiers ?? "", modifiers: modifiers)
     }
 }
 

@@ -159,6 +159,11 @@ public final class EngineWindowController {
         window.engineView.clear()
     }
 
+    /// Lets every key go (the developer shell opening takes the keys).
+    public func releaseKeys() {
+        keys.releaseAll()
+    }
+
     /// The mouse's raw motion since the last call (nothing while it is not
     /// captured).
     public func takeMouseMotion() -> (dx: Double, dy: Double) {

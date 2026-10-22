@@ -23,6 +23,19 @@ public final class EngineView: NSView {
     /// AppKit's motion, right and down positive (accelerated: used only
     /// without a raw mouse).
     var onMotion: ((Double, Double) -> Void)?
+    /// The keys' events before the engine has them (repeats too), true
+    /// for one taken: the developer shell's typing.
+    public var keyFilter: ((NSEvent) -> Bool)?
+    /// The left button's press, drag and release, in pixels from the top
+    /// left, before the engine has them: true for one taken.
+    public var pointerFilter: ((PointerPhase, Double, Double) -> Bool)?
+    /// The wheel's motion up, in pixels (true for precise motion, as a
+    /// trackpad's; else in lines), true when taken.
+    public var scrollFilter: ((Double, Bool) -> Bool)?
+
+    public enum PointerPhase: Sendable {
+        case down, dragged, up
+    }
 
     public init(frame: NSRect, device: MTLDevice? = MTLCreateSystemDefaultDevice()) {
         self.device = device
@@ -174,12 +187,18 @@ public final class EngineView: NSView {
 
     // (not passed on to super: the engine has the keys, and AppKit would beep)
     public override func keyDown(with event: NSEvent) {
+        if keyFilter?(event) == true {
+            return
+        }
         if !event.isARepeat {
             onKey?(event.keyCode, true)
         }
     }
 
     public override func keyUp(with event: NSEvent) {
+        if keyFilter?(event) == true {
+            return
+        }
         onKey?(event.keyCode, false)
     }
 
@@ -189,8 +208,26 @@ public final class EngineView: NSView {
         onKey?(event.keyCode, event.modifierFlags.contains(flag))
     }
 
-    public override func mouseDown(with event: NSEvent) { onMouseButton?(MouseButton.left, true) }
-    public override func mouseUp(with event: NSEvent) { onMouseButton?(MouseButton.left, false) }
+    /// `event`'s place in pixels from the top left.
+    private func pixels(_ event: NSEvent) -> (Double, Double) {
+        let point = convert(event.locationInWindow, from: nil)
+        return (Double(point.x * backingScale), Double((bounds.height - point.y) * backingScale))
+    }
+
+    private func pointer(_ phase: PointerPhase, _ event: NSEvent) -> Bool {
+        guard let pointerFilter else { return false }
+        let (x, y) = pixels(event)
+        return pointerFilter(phase, x, y)
+    }
+
+    public override func mouseDown(with event: NSEvent) {
+        if !pointer(.down, event) { onMouseButton?(MouseButton.left, true) }
+    }
+    public override func mouseUp(with event: NSEvent) {
+        // (the engine has its release too, so that no button stays held)
+        _ = pointer(.up, event)
+        onMouseButton?(MouseButton.left, false)
+    }
     public override func rightMouseDown(with event: NSEvent) { onMouseButton?(MouseButton.right, true) }
     public override func rightMouseUp(with event: NSEvent) { onMouseButton?(MouseButton.right, false) }
     public override func otherMouseDown(with event: NSEvent) {
@@ -205,7 +242,15 @@ public final class EngineView: NSView {
     }
 
     public override func mouseMoved(with event: NSEvent) { motion(event) }
-    public override func mouseDragged(with event: NSEvent) { motion(event) }
+    public override func mouseDragged(with event: NSEvent) {
+        if !pointer(.dragged, event) { motion(event) }
+    }
+
+    public override func scrollWheel(with event: NSEvent) {
+        let precise = event.hasPreciseScrollingDeltas
+        let delta = Double(event.scrollingDeltaY) * (precise ? Double(backingScale) : 1)
+        _ = scrollFilter?(delta, precise)
+    }
     public override func rightMouseDragged(with event: NSEvent) { motion(event) }
     public override func otherMouseDragged(with event: NSEvent) { motion(event) }
 }
