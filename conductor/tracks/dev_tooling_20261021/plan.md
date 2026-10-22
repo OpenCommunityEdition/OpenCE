@@ -40,7 +40,7 @@
     - [x] `profile_scope!`, the Swift equivalent, `stat frame`, the trace writer
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Hooks' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 4: The test map
+## Phase 4: The test map [checkpoint: 3d6df48a]
 - [x] Task: A level made by the engine 94fe7da8
     - [x] Write tests: the generated plane's collision and render geometry; the player spawns on it; the sky is drawn
     - [x] A builder of `content::Level` values that are not imported from a cache
