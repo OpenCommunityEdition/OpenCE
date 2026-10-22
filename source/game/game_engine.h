@@ -94,11 +94,27 @@ struct ctf_variant
 	long single_flag_time;
 };
 
+/* port: optional Slayer rules in its existing engine-variant space. */
+struct infection_options
+{
+	byte infection_enabled;
+	byte infection_initial_zombies;
+	byte infection_speed_percent;
+	byte infection_damage_percent;
+	short infection_respawn_seconds;
+	short infection_countdown_seconds;
+	byte infection_zombie_shields;
+	byte reserved[3];
+};
+
 struct slayer_variant
 {
 	boolean no_death_bonus;
 	boolean no_kill_penalty;
 	boolean kill_in_order;
+	/* port: marker distinguishes legacy Slayer variants from Infection. */
+	unsigned long infection_signature;
+	struct infection_options infection;
 };
 
 struct king_variant
@@ -146,6 +162,8 @@ struct game_variant
 	union game_engine_variant game_engine_variant;
 	word flags;
 };
+
+typedef char verify_game_engine_variant_size[sizeof(union game_engine_variant) == 0x18 ? 1 : -1];
 
 typedef char verify_game_variant_size[sizeof(struct game_variant) == 0x68 ? 1 : -1];
 
@@ -239,6 +257,9 @@ struct game_variant_options
 };
 
 typedef char verify_game_variant_options_size[sizeof(struct game_variant_options) == 0x1C ? 1 : -1];
+
+/* port: Infection humans use the ordinary spawn equipment. */
+void game_engine_default_postspawn_player_update(long player_index);
 
 struct game_engine
 {

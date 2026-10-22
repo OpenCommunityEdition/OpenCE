@@ -41,6 +41,7 @@ being hit looks and feels like on the clients).
 */
 
 #include "cseries.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "cseries/errors.h"
 #include "game/game.h"
 #include "game/game_globals.h"
@@ -1870,6 +1871,12 @@ static boolean distributed_report_valid(
 	{
 		return FALSE;
 	}
+	/* Infection's exposed-rider exception never authorizes a hull, hidden
+	   seat, long-range or obstructed hit, including a forged remote report. */
+	if (melee && infection_unit_is_zombie(distributed_living_unit(player)) &&
+		target->object.parent_object_index != NONE && target->object.type == _object_type_biped &&
+		!infection_melee_rider_visible(distributed_living_unit(player), report->object_index, &report->damage.direction))
+		return FALSE;
 	if (collision && !distributed_player_drove_into(player_index, &report->damage.epicenter, &report->target_position,
 		target->object.bounding_sphere_radius, ticks))
 	{
@@ -1941,7 +1948,7 @@ static boolean distributed_report_valid(
 	{
 		normalize3d(&damage->direction);
 	}
-	damage->multiplier = 1.0f;
+	damage->multiplier = melee ? infection_melee_multiplier(distributed_living_unit(player)) : 1.0f;
 	damage->owner_player_index = DATUM_INDEX_NEW(player_index, player->identifier);
 	damage->owner_team_index = (short)player->team_index;
 	/* (the players' traits' multipliers go by the object) */

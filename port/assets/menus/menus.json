@@ -24,6 +24,7 @@
   "ce/main_menu.profile_manager.xml",
   "ce/main_menu.quit_select.xml",
   "ce/main_menu.settings_select.multiplayer_setup.indicator_options_edit.xml",
+  "ce/main_menu.settings_select.multiplayer_setup.infection_options_edit.port.xml",
   "ce/main_menu.settings_select.multiplayer_setup.item_options_edit.port.xml",
   "ce/main_menu.settings_select.multiplayer_setup.item_options_edit.xml",
   "ce/main_menu.settings_select.multiplayer_setup.name_edit.xml",

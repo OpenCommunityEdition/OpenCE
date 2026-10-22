@@ -66,6 +66,7 @@ their handlers open opens.
 */
 
 #include "cseries.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "input/input.h"
 #include "interface/event_manager.h"
 #include "interface/player_ui.h"
@@ -5260,6 +5261,8 @@ enum
 	_option_short,		/* a short of the options */
 	_option_option_byte,	/* a byte of the options */
 	_option_radar,		/* the options' radar players, and the variant's flag */
+	_option_infection_byte,
+	_option_infection_short,
 	_option_setting		/* the host's own (config.toml): Server Setup's copy only */
 };
 
@@ -5277,11 +5280,20 @@ struct gametype_option
 };
 
 #define VARIANT_FIELD(field) (short)offsetof(struct game_variant, field)
+#define INFECTION_FIELD(field) (short)offsetof(struct infection_options, field)
 #define OPTIONS_FIELD(field) (short)offsetof(struct game_variant_options, field)
 #define TIME_LIMITS { 0, 10, 15, 20, 25, 30, 45 }
 
 static struct gametype_option const gametype_options[] =
 {
+	{ "infection_enabled_spinner", _option_infection_byte, INFECTION_FIELD(infection_enabled), 0, 2, { 0, 1 } },
+	{ "infection_initial_zombies_spinner", _option_infection_byte, INFECTION_FIELD(infection_initial_zombies), 0, 6, { 1, 2, 3, 4, 8, 16 } },
+	{ "infection_speed_percent_spinner", _option_infection_byte, INFECTION_FIELD(infection_speed_percent), 0, 8, { 100, 110, 115, 125, 150, 180, 190, 200 } },
+	{ "infection_damage_percent_spinner", _option_infection_byte, INFECTION_FIELD(infection_damage_percent), 0, 4, { 100, 150, 200, 250 } },
+	{ "infection_respawn_seconds_spinner", _option_infection_short, INFECTION_FIELD(infection_respawn_seconds), 0, 5, { 1, 2, 3, 5, 10 } },
+	{ "infection_countdown_seconds_spinner", _option_infection_short, INFECTION_FIELD(infection_countdown_seconds), 0, 4, { 0, 3, 5, 10 } },
+	{ "infection_zombie_shields_spinner", _option_infection_byte, INFECTION_FIELD(infection_zombie_shields), 0, 2, { 0, 1 } },
+	{ "infection_time_limit_spinner", _option_short, OPTIONS_FIELD(time_limit), 0, 6, { 0, 1, 3, 5, 10, 15 } },
 	/* player options */
 	{ "number_of_lives_spinner", _option_long, VARIANT_FIELD(universal_variant.lives), 0, 4, { 0, 1, 3, 5 } },
 	{ "maximum_health_spinner", _option_health, 0, 0, 6, { 5, 10, 15, 20, 30, 40 } },
@@ -5459,6 +5471,8 @@ static long gametype_option_value(struct gametype_option const *option, struct g
 
 	switch (option->kind)
 	{
+	case _option_infection_byte: return ((byte const *)infection_options_get(variant))[option->offset];
+	case _option_infection_short: return *(short const *)((byte const *)infection_options_get(variant) + option->offset);
 	case _option_long: return *(long *)(v + option->offset);
 	case _option_byte: return v[option->offset] != 0;
 	case _option_flag: return (variant->universal_variant.flags & option->argument) != 0;
@@ -5478,6 +5492,17 @@ static void gametype_option_value_set(struct gametype_option const *option, long
 
 	switch (option->kind)
 	{
+	case _option_infection_byte:
+	case _option_infection_short:
+	{
+		byte *infection = (byte *)infection_options_edit(variant);
+		if (infection)
+		{
+			if (option->kind == _option_infection_byte) infection[option->offset] = (byte)value;
+			else *(short *)(infection + option->offset) = (short)value;
+		}
+		break;
+	}
 	case _option_long: *(long *)(v + option->offset) = value; break;
 	case _option_byte: v[option->offset] = (byte)value; break;
 	case _option_flag:
@@ -5566,6 +5591,11 @@ static void gametype_options_each(struct widget_instance *list, boolean save)
 			{
 				short index = (short)PIN(spinner->parameters.list.selected_index, 0, option->count - 1);
 
+				/* Infection owns these values. The Slayer screen underneath
+				   it still has the old spinners when returning from its child. */
+				if (infection_options_get(variant)->infection_enabled &&
+					(!strcmp(option->spinner, "time_limit_spinner") || !strcmp(option->spinner, "team_play_spinner")))
+					continue;
 				gametype_option_value_set(option, option->values[index], variant, options);
 			}
 			else
@@ -5735,6 +5765,11 @@ static boolean gametype_options_init(struct widget_instance *list)
 	if (!edit_variant())
 		return campaign_fail();
 	gametype_options_each(list, FALSE);
+	if (!infection_options_get(edit_variant())->infection_enabled && !edit_options()->time_limit)
+	{
+		struct widget_instance *spinner = named(list, "infection_time_limit_spinner", 0);
+		if (spinner) spinner->parameters.list.selected_index = 3;
+	}
 	if (named(list, "op_team", 0))
 		vehicles_show(list);
 	return TRUE;
@@ -5750,6 +5785,14 @@ static boolean gametype_options_save(struct widget_instance *widget)
 	if (named(list, "op_team", 0))
 		vehicles_keep(list);
 	gametype_options_each(list, TRUE);
+	if (infection_options_get(edit_variant())->infection_enabled && edit_variant()->game_engine_index == game_engine_slayer)
+	{
+		edit_variant()->universal_variant.teams = TRUE;
+		edit_variant()->universal_variant.lives = 0;
+		edit_variant()->universal_variant.odd_man_out = FALSE;
+	}
+	if (infection_options_get(edit_variant())->infection_enabled)
+		edit_options()->auto_team_balance = FALSE;
 	return TRUE;
 }
 

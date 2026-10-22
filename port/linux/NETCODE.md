@@ -163,6 +163,20 @@ lockstep netcode was removed, set to play it): it tells the player why.
 
 ## Versions
 
+Infection uses protocol version 36: Slayer's existing 24-byte engine-variant union
+contains an `INF1` marker and 12 bytes of optional rules. The full variant
+(104 bytes), shared options (28 bytes) and settings packet retain their
+upstream layouts. Legacy Slayer variants have no marker and stay disabled.
+The reliable game-state channel carries `distributed_infection_state` only
+when enabled: identities, roles, scores, phase, round/revision and winner.
+Clients validate the complete snapshot before applying it; the host owns
+conversion, equipment and victory. Remote skull damage uses the original
+hit validation and recomputes the eligible zombie's multiplier on the host.
+Version 36 retains upstream 32's aim-assist agreement and rejects earlier
+development builds through 35,
+whose options and game-state agreements differ, even in ordinary modes.
+
+
 The native builds' network code has a version, an unsigned 16-bit number
 (`HALO_PORT_NETWORK_VERSION` in `port/linux/include/halo_port_limits.h`),
 raised with any change to what the machines send each other. A host puts it

@@ -537,6 +537,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "cseries_windows.h"
 #include "errors.h"
 #include "aim_assist.h"
@@ -1166,7 +1167,9 @@ static void game_engine_generate_title_string(
 	if (game_variant_options_get()->time_limit > 0 &&
 		game_engine_globals.postgame_state == game_engine_mode_active)
 	{
-		long left = game_variant_options_get()->time_limit * 60L * TICKS_PER_SECOND - game_time_get();
+		/* port: infection time starts after the countdown */
+		long left = infection_enabled() ? infection_remaining_ticks() :
+			game_variant_options_get()->time_limit * 60L * TICKS_PER_SECOND - game_time_get();
 		wchar_t time_string[32];
 
 		ticks_to_unicode_time_string(MAX(left, 0), NUMBEROF(time_string), time_string);
@@ -5097,7 +5100,8 @@ void game_engine_player_killed(
 	moves the dead to the other team when his is two or more bigger (his
 	next unit is the other team's, which the clients take it from:
 	network_player_attach_unit) */
-	if (global_variant.universal_variant.teams && game_variant_options_get()->auto_team_balance &&
+	/* port: Infection assigns roles instead of using automatic team balancing. */
+	if (!infection_enabled() && global_variant.universal_variant.teams && game_variant_options_get()->auto_team_balance &&
 		!network_game_distributed_client() && VALID_INDEX(dead_player->team_index, 2) && !dead_player->quit_out_of_game)
 	{
 		struct data_iterator iterator;
@@ -5127,6 +5131,9 @@ void game_engine_player_killed(
 
 	/* port: the gametype's friendly fire penalty: the team killer's next
 	respawn later (the dead's own, if he has one waiting) */
+	/* port: Infection supplies the base timer, before the native penalty. */
+	if (infection_enabled())
+		dead_player->respawn_timer = infection_options_get(game_engine_get_variant())->infection_respawn_seconds * TICKS_PER_SECOND;
 	{
 		long dead_absolute = DATUM_INDEX_TO_ABSOLUTE_INDEX(dead_player_index);
 
@@ -5143,7 +5150,8 @@ void game_engine_player_killed(
 		}
 	}
 
-	dead_player->respawn_timer = MAX(dead_player->respawn_timer, 90);
+	if (!infection_enabled())
+		dead_player->respawn_timer = MAX(dead_player->respawn_timer, 90);
 	dead_player = player_get(dead_player_index);
 
 	if (!dead_player->quit_out_of_game)
@@ -5622,6 +5630,10 @@ boolean game_engine_should_end_game(
 	void)
 {
 	boolean should_end_game = FALSE;
+
+	/* port: infection ends on its authoritative round conditions */
+	if (infection_enabled())
+		return FALSE;
 
 	if (game_engine && !multiple_teams_alive())
 		should_end_game = TRUE;
@@ -7408,7 +7420,8 @@ static void game_engine_predict_resources(
 	object_definition_predict(list_index_to_weapon_definition_index(_weapon_list_frag_grenade));
 	object_definition_predict(list_index_to_weapon_definition_index(_weapon_list_plasma_grenade));
 
-	if (global_variant.game_engine_index == game_engine_oddball)
+	/* port: infection equips the same skull under Slayer */
+	if (global_variant.game_engine_index == game_engine_oddball || infection_enabled())
 		object_definition_predict(list_index_to_weapon_definition_index(_weapon_list_ball));
 
 	if (global_variant.game_engine_index == game_engine_ctf)
@@ -7446,6 +7459,17 @@ void game_engine_initialize(
 		game_engine_variant_cleanup(&global_variant);
 		/* port: the cleaned variant's (the one given may be any number) */
 		game_engine = game_engines[global_variant.game_engine_index];
+		/* port: Slayer retains its ID and saved variant ABI */
+		if (infection_enabled())
+		{
+			/* port: deaths always respawn; old Slayer traits cannot grant
+			   infinite zombie grenades or invisibility. */
+			global_variant.universal_variant.lives = 0;
+			global_variant.universal_variant.odd_man_out = FALSE;
+			SET_FLAG(global_variant.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
+			SET_FLAG(global_variant.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
+			game_engine = infection_engine_get();
+		}
 	}
 
 	return;
@@ -9153,6 +9177,19 @@ static void game_engine_give_loadout(
 void game_engine_postspawn_player_update(
 	long player_index)
 {
+	/* port: expose the ordinary spawn equipment to infection humans. */
+	if (!game_engine)
+		return;
+	if (game_engine->player_update)
+		game_engine->player_update(player_index);
+	else
+		game_engine_default_postspawn_player_update(player_index);
+}
+
+/* port: shared normal loadout, without re-entering the engine callback. */
+void game_engine_default_postspawn_player_update(
+	long player_index)
+{
 	struct player_datum *player;
 	long unit_index;
 	struct game_globals_grenade *fragmentation_grenade;
@@ -9162,12 +9199,6 @@ void game_engine_postspawn_player_update(
 
 	if (!game_engine)
 		return;
-
-	if (game_engine->player_update)
-	{
-		game_engine->player_update(player_index);
-		return;
-	}
 
 	player = player_get(player_index);
 	unit_index = player->unit_index;
@@ -9635,7 +9666,8 @@ long game_engine_write_network_state(
 	switch (game_engine_get_type())
 	{
 	case game_engine_ctf: written = game_engine_ctf_write_network_state(buffer, size); break;
-	case game_engine_slayer: written = game_engine_slayer_write_network_state(buffer, size); break;
+	/* port: infection has its own replicated round state */
+	case game_engine_slayer: written = infection_enabled() ? infection_write_network_state(buffer, size) : game_engine_slayer_write_network_state(buffer, size); break;
 	case game_engine_oddball: written = game_engine_oddball_write_network_state(buffer, size); break;
 	case game_engine_king: written = game_engine_king_write_network_state(buffer, size); break;
 	case game_engine_race: written = game_engine_race_write_network_state(buffer, size); break;
@@ -9662,7 +9694,8 @@ void game_engine_read_network_state(
 	switch (game_engine_get_type())
 	{
 	case game_engine_ctf: read = game_engine_ctf_read_network_state(buffer, size, first); break;
-	case game_engine_slayer: read = game_engine_slayer_read_network_state(buffer, size, first); break;
+	/* port: validate the infection snapshot before accepting postgame */
+	case game_engine_slayer: read = infection_enabled() ? infection_read_network_state(buffer, size, first) : game_engine_slayer_read_network_state(buffer, size, first); break;
 	case game_engine_oddball: read = game_engine_oddball_read_network_state(buffer, size, first); break;
 	case game_engine_king: read = game_engine_king_read_network_state(buffer, size, first); break;
 	case game_engine_race: read = game_engine_race_read_network_state(buffer, size, first); break;

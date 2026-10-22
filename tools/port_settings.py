@@ -646,6 +646,8 @@ MT = "main_menu/multiplayer_type_select"
 # and their helps after the five of its own (its helps are the rows' values'
 # in turn: menu_functions.c's gametype_option_help)
 SLAYER_EDIT = "main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit"
+INFECTION_EDIT = "main_menu/settings_select/multiplayer_setup/infection_options_edit"
+INFECTION_CHILD = f'<child widget="{INFECTION_EDIT}/open_infection" x="54" y="253"/>'
 PLAYER_EDIT = "main_menu/settings_select/multiplayer_setup/player_options_edit"
 AIM_ASSIST_HELP = [
     "Players keep their current mouse aim assist setting.",
@@ -768,6 +770,8 @@ WIDGET_PATCHES = {
     # (the main menu's MODS, before Quit: _mods)
     "main_menu/main_menu_select_list": {"insert_before": {"main_menu/main_menu_item_quit_game": [
         f'<child widget="main_menu/main_menu_item_mods" x="{MODS_ITEM_PLACE[0]}" y="{MODS_ITEM_PLACE[1]}"/>']}},
+
+    f"{SLAYER_EDIT}/slayer_options_menu": {"children": [INFECTION_CHILD]},
     f"{PLAYER_EDIT}/player_options_menu": {"insert_before": {
         f"{PLAYER_EDIT}/player_button_bar": [
             f'<child widget="{PLAYER_EDIT}/op_aim_assist" x="54" y="313"/>']}},
@@ -1668,6 +1672,7 @@ def multiplayer_files() -> dict:
     head = ['<?xml version="1.0" encoding="UTF-8"?>',
             "<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->", "<menus>"]
     return {
+        INFECTION_EDIT.replace("/", ".") + ".port.xml": head + _infection_options() + ["</menus>", ""],
         f"{MT}/join_game".replace("/", ".") + ".port.xml": head + _join_game_extras() + ["</menus>", ""],
         f"{MT}/server_settings".replace("/", ".") + ".xml": head + _server_settings() + ["</menus>", ""],
         f"{MT}/lobby".replace("/", ".") + ".xml": head + _lobby() + ["</menus>", ""],
@@ -1844,3 +1849,69 @@ def _mods() -> list:
     lines += _button(f"{base}/button_ok", 1, ['<on event="a" run="port mods save" back="true"/>',
                                               '<on event="start" run="port mods save" back="true"/>'])
     return lines
+
+def _infection_options() -> list:
+    rows = [
+        ("infection_enabled", "INFECTION:", ["OFF", "ON"], ["Classic Slayer.", "Human deaths join the zombies. Forces team play."]),
+        ("infection_initial_zombies", "INITIAL ZOMBIES:", [str(n) for n in (1, 2, 3, 4, 8, 16)],
+         ["At least one human is left at the start."] * 6),
+        ("infection_speed_percent", "ZOMBIE SPEED:", [f"{n}%" for n in (100, 110, 115, 125, 150, 180, 190, 200)],
+         ["Zombies carry only a skull and fight on foot."] * 8),
+        ("infection_damage_percent", "SKULL DAMAGE:", [f"{n}%" for n in (100, 150, 200, 250)],
+         ["Multiplier for zombie skull melee damage."] * 4),
+        ("infection_respawn_seconds", "RESPAWN:", [f"{n} SEC" for n in (1, 2, 3, 5, 10)],
+         ["Dead zombies return on the zombie team."] * 5),
+        ("infection_countdown_seconds", "COUNTDOWN:", [f"{n} SEC" for n in (0, 3, 5, 10)],
+         ["The round waits for two players before counting down."] * 4),
+        ("infection_zombie_shields", "ZOMBIE SHIELDS:", ["OFF", "ON"],
+         ["Zombies have no energy shields or shield recharge.", "Zombies use normal energy shields."]),
+        ("infection_time_limit", "ROUND TIME:", ["UNLIMITED", "1 MIN", "3 MIN", "5 MIN", "10 MIN", "15 MIN"],
+         ["Humans win if any remain when the round time ends."] * 6),
+    ]
+    lines = _setup_option_screen(INFECTION_EDIT, "infection", rows)
+    anchor = f'\t\t<child widget="{INFECTION_EDIT}/infection_button_bar" y="414"/>'
+    lines = [line.replace("port setup options init", "mp profile init slayer rules")
+             .replace("port setup options save", "mp profile set slayer rules")
+             .replace(f'bitmap="{INFECTION_EDIT}/header_infection"',
+                      'type="text" text="INFECTION OPTIONS" font="ui\\large_ui" color="#FFFFFFFF" text_y="14"')
+             for line in lines]
+    lines += _widget(f"{INFECTION_EDIT}/open_infection", [("type", "text"), ("width", 512), ("height", 28),
+                      ("bitmap", "bitmaps/option_bkds"), ("text", "INFECTION OPTIONS"),
+                      ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)],
+                     [f'<on event="a" run="mp profile set slayer rules" open="{INFECTION_EDIT}/infection_screen"/>',
+                      f'<on event="start" run="mp profile set slayer rules" open="{INFECTION_EDIT}/infection_screen"/>',
+                      '<on event="left_mouse" run="mouse emit accept event"/>'])
+    return lines
+
+
+def write_infection_menus(root):
+    """Regenerate this port-only addition using the checked-in PC screen.
+
+    The full ce_menus generator applies the same WIDGET_PATCHES entry when
+    the PC tag sources are available. No art or proprietary tags are needed.
+    """
+    import json
+    base = root / "port/assets/menus"
+    filename = INFECTION_EDIT.replace("/", ".") + ".port.xml"
+    (base / "ce" / filename).write_text("\n".join(multiplayer_files()[filename]), encoding="utf-8")
+    path = base / "ce" / (SLAYER_EDIT.replace("/", ".") + ".xml")
+    text = path.read_text(encoding="utf-8")
+    if INFECTION_CHILD not in text:
+        anchor = f'\t\t<child widget="{SLAYER_EDIT}/slayer_button_bar" y="414"/>'
+        assert text.count(anchor) == 1
+        text = text.replace(anchor, "\t\t" + INFECTION_CHILD + "\n" + anchor)
+    path.write_text(text, encoding="utf-8")
+    path = base / "menus.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    files = set(manifest["files"]) | {"ce/" + filename}
+    manifest["files"] = sorted(f for f in files if f.endswith(".xml")) + sorted(f for f in files if not f.endswith(".xml"))
+    path.write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8")
+
+
+if __name__ == "__main__":
+    import argparse
+    from pathlib import Path
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--infection-only", action="store_true", required=True)
+    parser.parse_args()
+    write_infection_menus(Path(__file__).resolve().parents[1])

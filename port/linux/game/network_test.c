@@ -51,6 +51,7 @@ Called from the main loop every frame (main.c).
 */
 
 #include "cseries.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "main/main.h"
 #include "bink/bink_playback.h"
 #include "interface/player_ui.h"
@@ -1528,12 +1529,25 @@ void network_test_update(
 				{
 					network_game_server_change_map_name(global_network_game_server_get(), path);
 					/* the variant, as picking the game settings does */
-					variant = *game_engine_get_variant_by_name(&variant, variant_name);
+					variant = *game_engine_get_variant_by_name(&variant,
+						!strcmp(variant_name, "infection") ? "slayer" : variant_name);
+					if (!strcmp(variant_name, "infection"))
+					{
+						variant.universal_variant.teams = TRUE;
+						infection_options_edit(&variant)->infection_enabled = TRUE;
+					}
 					platform_log("network test: game %d, %s", network_test.variant_index + 1, variant_name);
 					/* debug.network_test_score: a short game, to test the next */
 					if (network_test.score_to_win > 0)
 						variant.universal_variant.score_to_win = network_test.score_to_win;
 					player_ui_set_game_variant(&variant);
+					if (!strcmp(variant_name, "infection"))
+					{
+						struct game_variant_options options = *player_ui_get_game_variant_options();
+						options.time_limit = 1;
+						options.auto_team_balance = FALSE;
+						player_ui_set_game_variant_options(&options);
+					}
 					network_game_server_change_game_variant(global_network_game_server_get(), &variant);
 				}
 				network_test.map_set = TRUE;

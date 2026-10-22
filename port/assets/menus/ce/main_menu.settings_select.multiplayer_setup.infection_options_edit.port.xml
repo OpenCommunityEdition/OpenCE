@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/header_infection"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_menu"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/header_infection" controller="1" left="35" top="11" width="363" height="59" type="text" text="INFECTION OPTIONS" font="ui\large_ui" color="#FFFFFFFF" text_y="14">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_help" type="text" controller="1" left="68" top="341" width="482" height="79" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/cap_infection" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_help">
+		<data input="game settings lists text update"/>
+		<on event="created" run="mp profile init slayer rules"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_enabled" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_initial_zombies" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_speed_percent" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_damage_percent" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_respawn_seconds" x="54" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_countdown_seconds" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_zombie_shields" x="54" y="253"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_time_limit" x="54" y="283"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mp profile set slayer rules" back="true"/>
+		<on event="start" run="mp profile set slayer rules" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_enabled" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_enabled_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_enabled_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_enabled_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_enabled_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_enabled" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_enabled">
+		<string text="OFF"/>
+		<string text="ON"/>
+	</strings>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_initial_zombies" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_initial_zombies_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_initial_zombies_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_initial_zombies_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_initial_zombies_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_initial_zombies" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_initial_zombies">
+		<string text="1"/>
+		<string text="2"/>
+		<string text="3"/>
+		<string text="4"/>
+		<string text="8"/>
+		<string text="16"/>
+	</strings>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_speed_percent" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_speed_percent_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_speed_percent_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_speed_percent_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_speed_percent_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_speed_percent" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_speed_percent">
+		<string text="100%"/>
+		<string text="110%"/>
+		<string text="115%"/>
+		<string text="125%"/>
+		<string text="150%"/>
+		<string text="180%"/>
+		<string text="190%"/>
+		<string text="200%"/>
+	</strings>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_damage_percent" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_damage_percent_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_damage_percent_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_damage_percent_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_damage_percent_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_damage_percent" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_damage_percent">
+		<string text="100%"/>
+		<string text="150%"/>
+		<string text="200%"/>
+		<string text="250%"/>
+	</strings>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_respawn_seconds" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_respawn_seconds_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_respawn_seconds_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_respawn_seconds_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_respawn_seconds_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_respawn_seconds" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_respawn_seconds">
+		<string text="1 SEC"/>
+		<string text="2 SEC"/>
+		<string text="3 SEC"/>
+		<string text="5 SEC"/>
+		<string text="10 SEC"/>
+	</strings>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_countdown_seconds" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_countdown_seconds_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_countdown_seconds_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_countdown_seconds_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_countdown_seconds_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_countdown_seconds" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_countdown_seconds">
+		<string text="0 SEC"/>
+		<string text="3 SEC"/>
+		<string text="5 SEC"/>
+		<string text="10 SEC"/>
+	</strings>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_zombie_shields" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_zombie_shields_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_zombie_shields_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_zombie_shields_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_zombie_shields_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_zombie_shields" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_zombie_shields">
+		<string text="OFF"/>
+		<string text="ON"/>
+	</strings>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/op_infection_time_limit" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_time_limit_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_time_limit_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_time_limit_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_time_limit_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_time_limit" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/settings_select/multiplayer_setup/infection_options_edit/var_infection_time_limit">
+		<string text="UNLIMITED"/>
+		<string text="1 MIN"/>
+		<string text="3 MIN"/>
+		<string text="5 MIN"/>
+		<string text="10 MIN"/>
+		<string text="15 MIN"/>
+	</strings>
+	<strings name="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_labels">
+		<string text="INFECTION:"/>
+		<string text="INITIAL ZOMBIES:"/>
+		<string text="ZOMBIE SPEED:"/>
+		<string text="SKULL DAMAGE:"/>
+		<string text="RESPAWN:"/>
+		<string text="COUNTDOWN:"/>
+		<string text="ZOMBIE SHIELDS:"/>
+		<string text="ROUND TIME:"/>
+	</strings>
+	<strings name="main_menu/settings_select/multiplayer_setup/infection_options_edit/cap_infection">
+		<string text="Classic Slayer."/>
+		<string text="Human deaths join the zombies. Forces team play."/>
+		<string text="At least one human is left at the start."/>
+		<string text="At least one human is left at the start."/>
+		<string text="At least one human is left at the start."/>
+		<string text="At least one human is left at the start."/>
+		<string text="At least one human is left at the start."/>
+		<string text="At least one human is left at the start."/>
+		<string text="Zombies carry only a skull and fight on foot."/>
+		<string text="Zombies carry only a skull and fight on foot."/>
+		<string text="Zombies carry only a skull and fight on foot."/>
+		<string text="Zombies carry only a skull and fight on foot."/>
+		<string text="Zombies carry only a skull and fight on foot."/>
+		<string text="Zombies carry only a skull and fight on foot."/>
+		<string text="Zombies carry only a skull and fight on foot."/>
+		<string text="Zombies carry only a skull and fight on foot."/>
+		<string text="Multiplier for zombie skull melee damage."/>
+		<string text="Multiplier for zombie skull melee damage."/>
+		<string text="Multiplier for zombie skull melee damage."/>
+		<string text="Multiplier for zombie skull melee damage."/>
+		<string text="Dead zombies return on the zombie team."/>
+		<string text="Dead zombies return on the zombie team."/>
+		<string text="Dead zombies return on the zombie team."/>
+		<string text="Dead zombies return on the zombie team."/>
+		<string text="Dead zombies return on the zombie team."/>
+		<string text="The round waits for two players before counting down."/>
+		<string text="The round waits for two players before counting down."/>
+		<string text="The round waits for two players before counting down."/>
+		<string text="The round waits for two players before counting down."/>
+		<string text="Zombies have no energy shields or shield recharge."/>
+		<string text="Zombies use normal energy shields."/>
+		<string text="Humans win if any remain when the round time ends."/>
+		<string text="Humans win if any remain when the round time ends."/>
+		<string text="Humans win if any remain when the round time ends."/>
+		<string text="Humans win if any remain when the round time ends."/>
+		<string text="Humans win if any remain when the round time ends."/>
+		<string text="Humans win if any remain when the round time ends."/>
+	</strings>
+	<widget name="main_menu/settings_select/multiplayer_setup/infection_options_edit/open_infection" type="text" width="512" height="28" bitmap="bitmaps/option_bkds" text="INFECTION OPTIONS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+		<on event="a" run="mp profile set slayer rules" open="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_screen"/>
+		<on event="start" run="mp profile set slayer rules" open="main_menu/settings_select/multiplayer_setup/infection_options_edit/infection_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+</menus>
