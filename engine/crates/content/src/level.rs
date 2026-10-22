@@ -364,7 +364,8 @@ pub struct ObjectPlacement {
     /// When it is placed: bit 0, not automatically; bits 1 to 3, not on
     /// easy, normal or hard.
     pub placement_flags: u16,
-    /// Where it is.
+    /// Where it is (an item that neither levitates nor is made at rest
+    /// raised 5 cm, as the game places it).
     pub position: [f32; 3],
     /// Its yaw, pitch and roll, in radians.
     pub rotation: [f32; 3],
@@ -529,6 +530,33 @@ pub struct CollisionBsp {
     pub vertices: Vec<CollisionVertex>,
 }
 
+/// How deep [`CollisionBsp::leaf_at`] goes before it takes a point to be
+/// in solid (`MAXIMUM_BSP3D_TRAVERSAL_DEPTH`).
+pub const MAXIMUM_BSP3D_DEPTH: usize = 128;
+
+impl CollisionBsp {
+    /// The leaf `point` is in, or none if it is in solid (or the tree is
+    /// broken: a node that is not one, or one too deep), as the game tests
+    /// it (`bsp3d_test_point`): a point on a plane is in front of it.
+    pub fn leaf_at(&self, point: [f32; 3]) -> Option<u32> {
+        let mut node = 0i32;
+        for _ in 0..MAXIMUM_BSP3D_DEPTH {
+            let this = self.bsp3d_nodes.get(usize::try_from(node).ok()?)?;
+            let index = usize::try_from(this.plane & i32::MAX).ok()?;
+            let [i, j, k, d] = *self.planes.get(index)?;
+            let mut distance = i * point[0] + j * point[1] + k * point[2] - d;
+            if this.plane < 0 {
+                distance = -distance;
+            }
+            node = this.children[usize::from(distance >= 0.0)];
+            if node < 0 {
+                return (node != -1).then_some((node & i32::MAX) as u32);
+            }
+        }
+        None
+    }
+}
+
 /// A 3D node of a collision BSP.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
 pub struct Bsp3dNode {
@@ -600,4 +628,55 @@ pub struct CollisionVertex {
     pub point: [f32; 3],
     /// One of its edges.
     pub first_edge: u32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A plane z = 1 with the leaf above it; below is solid.
+    fn floor() -> CollisionBsp {
+        CollisionBsp {
+            bsp3d_nodes: vec![Bsp3dNode {
+                plane: 0,
+                children: [-1, i32::MIN | 3],
+            }],
+            planes: vec![[0.0, 0.0, 1.0, 1.0]],
+            ..CollisionBsp::default()
+        }
+    }
+
+    #[test]
+    fn a_point_is_in_the_leaf_in_front_of_its_planes() {
+        let floor = floor();
+        assert_eq!(floor.leaf_at([5.0, -2.0, 1.5]), Some(3));
+        // (on the plane is in front)
+        assert_eq!(floor.leaf_at([0.0, 0.0, 1.0]), Some(3));
+        assert_eq!(floor.leaf_at([0.0, 0.0, 0.5]), None);
+        // a flipped designator turns the plane round
+        let ceiling = CollisionBsp {
+            bsp3d_nodes: vec![Bsp3dNode {
+                plane: i32::MIN,
+                ..floor.bsp3d_nodes[0]
+            }],
+            ..floor
+        };
+        assert_eq!(ceiling.leaf_at([0.0, 0.0, 0.5]), Some(3));
+        assert_eq!(ceiling.leaf_at([0.0, 0.0, 1.5]), None);
+    }
+
+    #[test]
+    fn a_broken_tree_is_solid() {
+        // no nodes, a plane it does not have, a node that is not one, and
+        // a loop deeper than the game goes
+        assert_eq!(CollisionBsp::default().leaf_at([0.0; 3]), None);
+        let mut floor = floor();
+        floor.planes.clear();
+        assert_eq!(floor.leaf_at([0.0, 0.0, 2.0]), None);
+        let mut floor = self::floor();
+        floor.bsp3d_nodes[0].children[1] = 7;
+        assert_eq!(floor.leaf_at([0.0, 0.0, 2.0]), None);
+        floor.bsp3d_nodes[0].children[1] = 0;
+        assert_eq!(floor.leaf_at([0.0, 0.0, 2.0]), None);
+    }
 }

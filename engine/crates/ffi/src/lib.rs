@@ -101,6 +101,8 @@ pub struct LevelGeometry {
     /// The map's name (its file's, without .map).
     name: String,
     level: RenderLevel,
+    /// The structure BSP drawn, and its scenery placed.
+    bsp: usize,
     content: Arc<opence_content::Level>,
 }
 
@@ -134,6 +136,7 @@ impl LevelGeometry {
         Ok(Arc::new(Self {
             name,
             level,
+            bsp: bsp as usize,
             content: Arc::new(loaded.level),
         }))
     }
@@ -158,6 +161,7 @@ impl LevelGeometry {
         Ok(Arc::new(Self {
             name: opence_content::devmap::NAME.into(),
             level: render,
+            bsp: 0,
             content: Arc::new(level),
         }))
     }
@@ -216,6 +220,7 @@ impl LevelGeometry {
         Ok(Arc::new(Self {
             name: opence_content::devmap::NAME.into(),
             level: render,
+            bsp: 0,
             content: Arc::new(level),
         }))
     }
@@ -594,7 +599,9 @@ impl Engine {
     }
 
     /// Starts a world of `geometry`'s level: every object its scenario
-    /// places at `difficulty` (0 easy to 3 legendary), each drawn with its
+    /// places in its structure BSP (at any `difficulty`, 0 easy to 3
+    /// legendary, as the game reads none of the placements' flags for
+    /// them), each drawn with its
     /// model and standing still in its idle animation; publishes its first
     /// snapshot. Returns the objects made.
     pub fn start_level(
@@ -603,10 +610,11 @@ impl Engine {
         difficulty: u8,
     ) -> Result<u32, EngineError> {
         let level = &geometry.content;
-        let difficulty = self::difficulty(difficulty);
+        // (the game places a level's objects at every difficulty alike)
+        let _ = difficulty;
         let mut simulation = Simulation::empty();
         let handles = simulation
-            .spawn_scenario(&level.scenario, difficulty)
+            .spawn_scenario(level, geometry.bsp)
             .map_err(|_| EngineError::Load {
                 message: "the scenario places more objects than the world holds".into(),
             })?;

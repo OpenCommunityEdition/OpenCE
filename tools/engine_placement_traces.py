@@ -3,7 +3,9 @@ placement checks: the reference game (build/macos/halo_host, `ninja macos`)
 hosts each stock map headless with no menus (a campaign map as co-op)
 while debug.placement_trace logs every object its scenario places
 (port/linux/game/placement_trace.c), and the "placement trace:" lines are
-written to build/placement_traces/<map>.csv, a row an object. The traces are
+written to build/placement_traces/<map>.csv, a row an object, with the
+structure BSP the game was in at the end (a mission's scripts may have
+switched it, placing that BSP's scenery) in <map>.bsp. The traces are
 made from the game's data, so they are never committed. The home folder is
 never touched: HOME and XDG_DATA_HOME are in a temporary folder.
 
@@ -74,11 +76,13 @@ def parse(output: str, scenario: str) -> tuple[list[list[str]], dict[str, int]]:
     raise ValueError("the trace did not finish")
 
 
-def write(path: Path, rows: list[list[str]]) -> None:
-    """A trace's rows as a CSV file (the tags quoted: some have spaces)."""
+def write(path: Path, rows: list[list[str]], bsp: int = 0) -> None:
+    """A trace's rows as a CSV file (the tags quoted: some have spaces), and
+    the structure BSP it ended in beside it, in a .bsp file."""
     def cell(value: str) -> str:
         return '"' + value.replace('"', '""') + '"' if any(c in value for c in ',"') else value
     path.write_text(",".join(COLUMNS) + "\n" + "".join(",".join(cell(value) for value in row) + "\n" for row in rows))
+    path.with_suffix(".bsp").write_text(f"{bsp}\n")
 
 
 def record(name: str, exit_after: int = 60, timeout: int = 300) -> tuple[list[list[str]], dict[str, int]]:
@@ -133,7 +137,7 @@ def main() -> int:
             continue
         rows, end = record(name)
         path = TRACES / f"{name}.csv"
-        write(path, rows)
+        write(path, rows, end["bsp"])
         print(f"{path.relative_to(ROOT)}: {len(rows)} objects (bsp {end['bsp']}, difficulty {end['difficulty']})")
     return 0
 

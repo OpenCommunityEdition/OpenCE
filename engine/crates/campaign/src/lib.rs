@@ -28,7 +28,7 @@ use opence_content::{AnimationGraph, Level, ObjectDefinition, ValueType};
 use opence_script::{Native, Registry, Runtime, Value, World};
 use opence_sim::damage::Vitality;
 use opence_sim::input::{Buttons, TickInput};
-use opence_sim::objects::{is_placed, placement_spawn, Difficulty, ObjectHandle};
+use opence_sim::objects::{level_placements, Difficulty, ObjectHandle};
 use opence_sim::{Simulation, Transform, Vec3};
 
 pub use actors::{Actor, ActorState};
@@ -138,11 +138,10 @@ impl Mission {
             .collect();
         let mut named = vec![None; placements.len()];
         let mut devices = BTreeMap::new();
-        for (index, placement) in level.scenario.placements.iter().enumerate() {
-            if !is_placed(placement, difficulty) || !placement.is_automatic() {
-                continue;
-            }
-            let Ok(handle) = sim.spawn(placement_spawn(placement)) else {
+        // (a mission starts in its first structure BSP)
+        for (index, spawn) in level_placements(&level, 0) {
+            let placement = &level.scenario.placements[index];
+            let Ok(handle) = sim.spawn(spawn) else {
                 break; // (the table is full; Halo stops placing there too)
             };
             if let Some(name) = placements.iter().position(|&p| p == Some(index)) {
@@ -467,15 +466,30 @@ impl Mission {
     }
 
     /// Loads the level's structure BSP `bsp` for the players and the
-    /// actors to stand on, as `switch_bsp` does; whether it is loaded now
+    /// actors to stand on, and its scenery, as `switch_bsp` does; whether
+    /// it is loaded now
     /// (a structure the level does not have is not switched to).
     pub fn switch_structure(&mut self, bsp: i16) -> bool {
         let level = Arc::clone(&self.level);
         let Ok(index) = usize::try_from(bsp) else {
             return false;
         };
-        if bsp != self.flow.bsp && self.sim.switch_bsp(&level, index).is_err() {
+        if bsp == self.flow.bsp {
+            return true;
+        }
+        if self.sim.switch_bsp(&level, index).is_err() {
             return false;
+        }
+        // (its scenery in place of the old one's; the table full, Halo
+        // stops placing there too)
+        let made = self
+            .sim
+            .place_structure_bsp(&level, index)
+            .unwrap_or_default();
+        for (placement, handle) in made {
+            if let Some(name) = self.placements.iter().position(|&p| p == Some(placement)) {
+                self.named[name] = Some(handle);
+            }
         }
         self.flow.bsp = bsp;
         true

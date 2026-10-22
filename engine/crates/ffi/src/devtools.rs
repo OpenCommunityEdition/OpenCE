@@ -203,7 +203,7 @@ pub(crate) fn registry() -> Registry<State> {
     );
     registry.command(
         "bsp",
-        "Moves the world to the level's structure BSP.",
+        "Moves the world to the level's structure BSP, with its scenery.",
         &[Param::required("index", ArgKind::Int)],
         bsp,
     );
@@ -578,6 +578,14 @@ fn bsp(state: &mut State, args: &Args) -> Result<Output, CommandError> {
         .simulation
         .switch_bsp(&level, bsp)
         .map_err(|error| failed(error.to_string()))?;
+    // (its scenery in place of the old one's, as the game switches)
+    let made = running
+        .simulation
+        .place_structure_bsp(&level, bsp)
+        .map_err(|_| failed("the world holds no more objects"))?;
+    for (_, handle) in made {
+        Wardrobe::default().dress(&mut running.simulation, &level, handle);
+    }
     state.shell.bsp = bsp;
     let bsp = u32::try_from(bsp).unwrap_or(0);
     state.shell.action = ShellAction::ReloadBsp { bsp };

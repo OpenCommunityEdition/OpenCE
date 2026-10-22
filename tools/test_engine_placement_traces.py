@@ -61,9 +61,10 @@ def test_the_maps_games_and_scenarios() -> None:
 def test_a_written_trace_reads_back(tmp_path: Path) -> None:
     rows, _ = traces.parse(LOG.replace("big tree", 'big, "tree"'), "levels\\test\\wizard\\wizard")
     path = tmp_path / "wizard.csv"
-    traces.write(path, rows)
+    traces.write(path, rows, 3)
     with path.open() as file:
         read = list(csv.DictReader(file))
+    assert (tmp_path / "wizard.bsp").read_text() == "3\n"
     assert list(read[0]) == list(traces.COLUMNS)
     assert read[0]["tag"] == 'scenery\\big, "tree"\\big, "tree"' and read[1]["parent"] == "12"
 

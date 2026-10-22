@@ -36,10 +36,10 @@ use animation::{AnimationPlayer, NodeMatrices};
 use hash::WorldHasher;
 use input::{Buttons, InputRecord, TickInput};
 use objects::{
-    kind_index, Difficulty, Object, ObjectHandle, ObjectKinds, ObjectName, ObjectSpawn,
-    ObjectTable, Permutation, TableFull, Team,
+    kind_index, Object, ObjectHandle, ObjectKinds, ObjectName, ObjectSpawn, ObjectTable,
+    Permutation, TableFull, Team,
 };
-use opence_content::{Level, ObjectKind, Scenario, TagRef};
+use opence_content::{Level, ObjectKind, TagRef};
 use player::{Player, PlayerError, PlayerPoses, View};
 use units::{Radians, WorldUnits};
 
@@ -989,13 +989,25 @@ impl Simulation {
         objects::spawn(&mut self.world, spawn)
     }
 
-    /// Makes every object `scenario` places at `difficulty`.
+    /// Makes every object the game places as `level` starts in its
+    /// structure BSP `structure_bsp` ([`objects::level_placements`]).
     pub fn spawn_scenario(
         &mut self,
-        scenario: &Scenario,
-        difficulty: Difficulty,
+        level: &Level,
+        structure_bsp: usize,
     ) -> Result<Vec<ObjectHandle>, TableFull> {
-        objects::spawn_scenario(&mut self.world, scenario, difficulty)
+        objects::spawn_scenario(&mut self.world, level, structure_bsp)
+    }
+
+    /// Moves the objects to `level`'s structure BSP `structure_bsp`, as the
+    /// game does as it switches to it ([`objects::switch_structure_bsp`]):
+    /// the objects made, each with its placement's index.
+    pub fn place_structure_bsp(
+        &mut self,
+        level: &Level,
+        structure_bsp: usize,
+    ) -> Result<Vec<(usize, ObjectHandle)>, TableFull> {
+        objects::switch_structure_bsp(&mut self.world, level, structure_bsp)
     }
 
     /// Plays `player` on an object, posing its nodes now; false if `handle`

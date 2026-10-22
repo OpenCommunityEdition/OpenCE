@@ -9,7 +9,9 @@ use std::collections::BTreeSet;
 
 use bevy_ecs::prelude::*;
 use glam::{Mat3, Quat, Vec3};
-use opence_content::{ObjectKind, ObjectPlacement, PlacementPermutation, Scenario, TagRef};
+use opence_content::{
+    CollisionBsp, Level, ObjectKind, ObjectPlacement, PlacementPermutation, TagRef,
+};
 
 use crate::{ObjectId, Transform};
 
@@ -89,7 +91,7 @@ pub struct ObjectSpawn {
     pub team: Option<u16>,
 }
 
-/// The game's difficulties, which a placement may be left out of.
+/// The game's difficulties.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Difficulty {
     /// Easy.
@@ -98,7 +100,7 @@ pub enum Difficulty {
     Normal,
     /// Heroic.
     Hard,
-    /// Legendary: every placement is in it.
+    /// Legendary.
     Legendary,
 }
 
@@ -277,15 +279,104 @@ pub(crate) fn remove(world: &mut World, handle: ObjectHandle) -> bool {
     world.despawn(entity)
 }
 
-/// Whether `placement` is placed when a level starts at `difficulty`.
-pub fn is_placed(placement: &ObjectPlacement, difficulty: Difficulty) -> bool {
-    let left_out = match difficulty {
-        Difficulty::Easy => 1 << 1,
-        Difficulty::Normal => 1 << 2,
-        Difficulty::Hard => 1 << 3,
-        Difficulty::Legendary => 0,
+/// Whether `placement` is placed when a level starts: it is placed
+/// automatically. (The game reads none of the flags that would leave it
+/// out of a difficulty.)
+pub fn is_placed(placement: &ObjectPlacement) -> bool {
+    placement.is_automatic()
+}
+
+/// Whether the game places `kind` as each structure BSP is loaded, only if
+/// it is in that BSP, and removes it (unless it is named) as the BSP is
+/// let go of (`_object_mask_remove_on_bsp_switch`).
+pub fn placed_by_structure_bsp(kind: ObjectKind) -> bool {
+    matches!(kind, ObjectKind::Scenery | ObjectKind::LightFixture)
+}
+
+/// Whether `placement` is in the structure BSP `bsp`, as the game tests it
+/// (`object_types_place_objects`): its origin, or its bounding sphere's
+/// centre, is in one of the BSP's leaves.
+fn in_structure_bsp(level: &Level, bsp: &CollisionBsp, placement: &ObjectPlacement) -> bool {
+    let offset = level
+        .object(&placement.tag)
+        .map_or([0.0; 3], |object| object.bounding_offset);
+    let centre = rotation_from_angles(placement.rotation) * Vec3::from_array(offset)
+        + Vec3::from_array(placement.position);
+    bsp.leaf_at(placement.position).is_some() || bsp.leaf_at(centre.to_array()).is_some()
+}
+
+/// The scenery and light fixtures the game places as `level`'s structure
+/// BSP `structure_bsp` is loaded, each with its placement's index, in the
+/// scenario's order: those placed automatically that are in it (none if
+/// the level has no such BSP).
+fn structure_bsp_placements(level: &Level, structure_bsp: usize) -> Vec<usize> {
+    let Some(bsp) = level.structure_bsps.get(structure_bsp) else {
+        return Vec::new();
     };
-    placement.is_automatic() && placement.placement_flags & left_out == 0
+    let placements = &level.scenario.placements;
+    (0..placements.len())
+        .filter(|&index| {
+            let placement = &placements[index];
+            placed_by_structure_bsp(placement.kind)
+                && is_placed(placement)
+                && in_structure_bsp(level, &bsp.collision, placement)
+        })
+        .collect()
+}
+
+/// The placement `index` of `level` made an object to spawn: a vehicle
+/// with physics is raised half its bounding radius (`vehicle_new`; the
+/// importer has raised weapons and equipment).
+fn level_spawn(level: &Level, index: usize) -> ObjectSpawn {
+    let placement = &level.scenario.placements[index];
+    let mut spawn = placement_spawn(placement);
+    if placement.kind == ObjectKind::Vehicle {
+        if let Some(object) = level.object(&placement.tag) {
+            if object.physics.is_some() {
+                spawn.transform.position.z += object.bounding_radius * 0.5;
+            }
+        }
+    }
+    spawn
+}
+
+/// The placements in `order` whose names are not in `names` (the names of
+/// objects there are, which those placed are added to), each made an
+/// object to spawn (`object_new_from_scenario`).
+fn unnamed_yet<'a>(
+    level: &'a Level,
+    order: impl IntoIterator<Item = usize>,
+    names: &mut BTreeSet<&'a str>,
+) -> Vec<(usize, ObjectSpawn)> {
+    order
+        .into_iter()
+        .filter(|&index| match &level.scenario.placements[index].name {
+            Some(name) => names.insert(name.as_str()),
+            None => true,
+        })
+        .map(|index| (index, level_spawn(level, index)))
+        .collect()
+}
+
+/// The objects the game places as `level` starts in its structure BSP
+/// `structure_bsp`, each with its placement's index, in the order it places
+/// them: the placements of each kind in the game's order
+/// (`object_types_place_all`), then the scenery and light fixtures in the
+/// BSP (`object_types_place_objects`). A placement not placed
+/// automatically, or named as one already placed, is left out.
+pub fn level_placements(level: &Level, structure_bsp: usize) -> Vec<(usize, ObjectSpawn)> {
+    let placements = &level.scenario.placements;
+    let mut order: Vec<usize> = (0..placements.len())
+        .filter(|&index| {
+            !placed_by_structure_bsp(placements[index].kind) && is_placed(&placements[index])
+        })
+        .collect();
+    order.sort_by_key(|&index| {
+        let kind = placements[index].kind;
+        ObjectKind::ALL.iter().position(|&each| each == kind)
+    });
+    order.extend(structure_bsp_placements(level, structure_bsp));
+    unnamed_yet(level, order, &mut BTreeSet::new())
 }
 
 /// The orientation of a yaw, pitch and roll, as the game builds it
@@ -331,25 +422,60 @@ pub fn placement_spawn(placement: &ObjectPlacement) -> ObjectSpawn {
     }
 }
 
-/// Makes every object `scenario` places at `difficulty`, in its order.
+/// Makes every object the game places as `level` starts in its structure
+/// BSP `structure_bsp` ([`level_placements`]).
 pub(crate) fn spawn_scenario(
     world: &mut World,
-    scenario: &Scenario,
-    difficulty: Difficulty,
+    level: &Level,
+    structure_bsp: usize,
 ) -> Result<Vec<ObjectHandle>, TableFull> {
-    scenario
-        .placements
-        .iter()
-        .filter(|placement| is_placed(placement, difficulty))
-        .map(|placement| spawn(world, placement_spawn(placement)))
+    level_placements(level, structure_bsp)
+        .into_iter()
+        .map(|(_, made)| spawn(world, made))
         .collect()
+}
+
+/// Moves the objects to `level`'s structure BSP `structure_bsp`, as the
+/// game does as it switches to it: every scenery and light fixture not
+/// named is removed (`object_types_disconnect_from_structure_bsp`), then
+/// those in the new BSP are placed, but for those named as an object there
+/// is. The objects made, each with its placement's index.
+pub(crate) fn switch_structure_bsp(
+    world: &mut World,
+    level: &Level,
+    structure_bsp: usize,
+) -> Result<Vec<(usize, ObjectHandle)>, TableFull> {
+    let mut removed = Vec::new();
+    let mut named = BTreeSet::new();
+    let mut objects = world.query::<(&ObjectHandle, &Object, Option<&ObjectName>)>();
+    for (&handle, object, name) in objects.iter(world) {
+        match name {
+            Some(name) => {
+                named.insert(name.0.clone());
+            }
+            None if placed_by_structure_bsp(object.kind) => removed.push(handle),
+            None => {}
+        }
+    }
+    for handle in removed {
+        remove(world, handle);
+    }
+    let mut names = named.iter().map(String::as_str).collect();
+    unnamed_yet(
+        level,
+        structure_bsp_placements(level, structure_bsp),
+        &mut names,
+    )
+    .into_iter()
+    .map(|(index, made)| Ok((index, spawn(world, made)?)))
+    .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use std::error::Error;
 
-    use opence_content::Group;
+    use opence_content::{Group, ObjectDefinition, Scenario};
 
     use super::*;
     use crate::Simulation;
@@ -403,13 +529,72 @@ mod tests {
         }
     }
 
+    /// A definition of `kind` at `path`, its bounding sphere of `radius`
+    /// at `offset`, with physics if `physics`.
+    fn definition(
+        kind: ObjectKind,
+        path: &str,
+        radius: f32,
+        offset: [f32; 3],
+        physics: bool,
+    ) -> ObjectDefinition {
+        ObjectDefinition {
+            tag: tag(&kind.group(), path),
+            kind,
+            flags: 0,
+            bounding_radius: radius,
+            bounding_offset: offset,
+            acceleration_scale: 1.0,
+            render_bounding_radius: radius,
+            model: None,
+            animation_graph: None,
+            collision_model: None,
+            physics: physics.then(|| tag(b"phys", path)),
+            modifier_shader: None,
+            creation_effect: None,
+            attachments: Vec::new(),
+            change_colors: Vec::new(),
+            unit_hud: None,
+            unit_melee_damage: None,
+            biped: None,
+            weapon: None,
+            projectile: None,
+            equipment: None,
+            vehicle: None,
+        }
+    }
+
+    /// The devmap's plane with `scenario`, the warthog's definition (a
+    /// vehicle with physics, its bounding radius 2) and the rock's (its
+    /// bounding sphere 6 above its origin).
+    fn level(scenario: Scenario) -> Level {
+        let mut level = opence_content::devmap::level(None);
+        level.scenario = scenario;
+        level.objects.push(definition(
+            ObjectKind::Vehicle,
+            "vehicles\\warthog\\warthog",
+            2.0,
+            [0.0; 3],
+            true,
+        ));
+        level.objects.push(definition(
+            ObjectKind::Scenery,
+            "scenery\\rock",
+            1.0,
+            [0.0, 0.0, 6.0],
+            false,
+        ));
+        level
+    }
+
     #[test]
     fn the_scenarios_placements_spawn_with_their_tag_position_and_permutation(
     ) -> Result<(), Box<dyn Error>> {
         let mut simulation = Simulation::empty();
-        let scenario = scenario();
-        let handles = simulation.spawn_scenario(&scenario, Difficulty::Normal)?;
-        // (the rock is not placed automatically)
+        let level = level(scenario());
+        let handles = simulation.spawn_scenario(&level, 0)?;
+        // (the rock is not placed automatically; the pistol is placed at
+        // every difficulty, as the game reads none of those flags)
         assert_eq!(handles.len(), 3);
         assert_eq!(simulation.objects(), handles);
         let hog = handles[0];
@@ -421,7 +606,8 @@ mod tests {
             })
         );
         let transform = simulation.transform(hog).ok_or("no transform")?;
-        assert_eq!(transform.position, Vec3::new(4.0, 5.0, 6.0));
+        // (raised half its bounding radius, as it has physics)
+        assert_eq!(transform.position, Vec3::new(4.0, 5.0, 7.0));
         // (a quarter turn left: forward is +y)
         assert!((transform.rotation * Vec3::X - Vec3::Y).length() < 1e-6);
         assert_eq!(
@@ -430,7 +616,7 @@ mod tests {
         );
         assert_eq!(
             simulation.component::<Permutation>(hog),
-            scenario.placements[0].permutation.map(Permutation)
+            level.scenario.placements[0].permutation.map(Permutation)
         );
         assert_eq!(simulation.component::<Team>(hog), None);
         // each kind's own components
@@ -438,11 +624,105 @@ mod tests {
         assert_eq!(simulation.component::<Item>(handles[1]), Some(Item));
         assert_eq!(simulation.component::<Device>(handles[2]), Some(Device));
         assert_eq!(simulation.component::<Unit>(handles[2]), None);
-
-        // the pistol is left out of easy
-        let mut easy = Simulation::empty();
-        assert_eq!(easy.spawn_scenario(&scenario, Difficulty::Easy)?.len(), 2);
         Ok(())
+    }
+
+    #[test]
+    fn scenery_is_placed_after_the_rest_and_only_in_the_bsp() {
+        let rock = |z: f32| ObjectPlacement {
+            position: [1.0, 2.0, z],
+            ..placement(ObjectKind::Scenery, "scenery\\rock", 0)
+        };
+        let lamp = |z: f32| ObjectPlacement {
+            position: [1.0, 2.0, z],
+            ..placement(ObjectKind::LightFixture, "scenery\\lamp", 0)
+        };
+        let mut scenario = scenario();
+        scenario.placements = vec![
+            rock(3.0),
+            // (under the plane, in no leaf, its bounding sphere too)
+            rock(-30.0),
+            // (under the plane, its bounding sphere above it)
+            rock(-3.0),
+            // (under the plane, with no bounding offset)
+            lamp(-3.0),
+            lamp(3.0),
+            placement(ObjectKind::Biped, "characters\\cyborg\\cyborg", 0),
+        ];
+        let level = level(scenario);
+        let placed: Vec<usize> = level_placements(&level, 0)
+            .into_iter()
+            .map(|(index, _)| index)
+            .collect();
+        assert_eq!(placed, [5, 0, 2, 4]);
+        // with no such structure BSP, none of them
+        let placed: Vec<usize> = level_placements(&level, 1)
+            .into_iter()
+            .map(|(index, _)| index)
+            .collect();
+        assert_eq!(placed, [5]);
+    }
+
+    #[test]
+    fn a_switch_moves_the_scenery_to_the_new_bsp() -> Result<(), Box<dyn Error>> {
+        let rock = |z: f32, name: Option<&str>| ObjectPlacement {
+            position: [0.0, 0.0, z],
+            name: name.map(Into::into),
+            ..placement(ObjectKind::Scenery, "scenery\\rock", 0)
+        };
+        let mut scenario = scenario();
+        scenario.placements = vec![
+            // (above the plane: in the first BSP only)
+            rock(3.0, None),
+            rock(3.0, Some("kept")),
+            // (well under it: in the second only)
+            rock(-30.0, None),
+            rock(-30.0, Some("kept")),
+            rock(-30.0, Some("new")),
+            placement(ObjectKind::Weapon, "weapons\\pistol\\pistol", 0),
+        ];
+        let mut level = level(scenario);
+        // (the second: the plane turned over, its leaf below it)
+        let mut under = opence_content::devmap::plane(10.0, 1);
+        under.collision.planes[0] = [0.0, 0.0, -1.0, 0.0];
+        level.structure_bsps.push(under);
+
+        let mut simulation = Simulation::empty();
+        let first = simulation.spawn_scenario(&level, 0)?;
+        assert_eq!(first.len(), 3);
+        let made = simulation.place_structure_bsp(&level, 1)?;
+        let indices: Vec<usize> = made.iter().map(|&(index, _)| index).collect();
+        // (the unnamed rock of the first is gone; "kept" stays as it was)
+        assert_eq!(indices, [2, 4]);
+        assert_eq!(simulation.objects().len(), 4);
+        assert!(simulation.object(first[1]).is_none());
+        assert!(simulation.object(first[0]).is_some());
+        // no such BSP: the unnamed scenery goes, none is made
+        assert!(simulation.place_structure_bsp(&level, 9)?.is_empty());
+        assert_eq!(simulation.objects().len(), 3);
+        Ok(())
+    }
+
+    #[test]
+    fn a_name_is_placed_once() {
+        let named = |kind, path| ObjectPlacement {
+            name: Some("thing".into()),
+            ..placement(kind, path, 0)
+        };
+        let mut scenario = scenario();
+        scenario.placements = vec![
+            named(ObjectKind::Scenery, "scenery\\rock"),
+            named(ObjectKind::Weapon, "weapons\\pistol\\pistol"),
+            named(ObjectKind::Weapon, "weapons\\rifle\\rifle"),
+            placement(ObjectKind::Weapon, "weapons\\rifle\\rifle", 0),
+        ];
+        let level = level(scenario);
+        let placed: Vec<usize> = level_placements(&level, 0)
+            .into_iter()
+            .map(|(index, _)| index)
+            .collect();
+        // (the weapons first: the rock's name is taken)
+        assert_eq!(placed, [1, 3]);
     }
 
     #[test]

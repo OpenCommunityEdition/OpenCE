@@ -9,7 +9,6 @@ use opence_net::client::Joining;
 use opence_net::{Client, Discovery, Host, Refusal, Udp, DEFAULT_PORT};
 use opence_sim::game::Variant;
 use opence_sim::input::TickInput;
-use opence_sim::objects::Difficulty;
 use opence_sim::Simulation;
 
 use crate::{publish, transform, Engine, EngineError, LevelGeometry, Running, Wardrobe};
@@ -130,11 +129,12 @@ pub(crate) fn resolve(text: &str) -> Result<SocketAddr, EngineError> {
         .ok_or_else(|| network_error(format!("{text} has no address")))
 }
 
-/// A world of `level` with its scenario's objects (at Normal), dressed.
+/// A world of `level` with the objects its scenario places in its first
+/// structure BSP, dressed.
 fn scenario_world(level: &Level) -> Result<Simulation, EngineError> {
     let mut simulation = Simulation::empty();
     let handles = simulation
-        .spawn_scenario(&level.scenario, Difficulty::Normal)
+        .spawn_scenario(level, 0)
         .map_err(|_| EngineError::Load {
             message: "the scenario places more objects than the world holds".into(),
         })?;

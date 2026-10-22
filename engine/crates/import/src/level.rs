@@ -768,6 +768,14 @@ const MAX_PALETTE_ENTRIES: usize = 256;
 const PLACEMENT_PERMUTATION_OFFSET: usize = 0x28;
 /// Where a device's groups and flags are, in the same place.
 const PLACEMENT_DEVICE_OFFSET: usize = 0x28;
+/// Where a placed equipment's flags are (bit 0, it levitates), and a
+/// placed weapon's (bit 0, it is made at rest).
+const EQUIPMENT_FLAGS_OFFSET: usize = 0x22;
+const WEAPON_FLAGS_OFFSET: usize = 0x4C;
+/// How far the game raises an item that neither levitates nor is made at
+/// rest, as it places it (`equipment_place`, `weapon_place`), so that it
+/// falls to the ground.
+const ITEM_RAISED: f32 = 0.05;
 
 /// The objects the scenario places. A placement whose palette entry is
 /// none, past the palette or empty is not placed, as the game skips it; a
@@ -812,6 +820,14 @@ fn import_placements(scenario: &Element<'_>) -> Result<Vec<ObjectPlacement>, Imp
             for axis in 0..3 {
                 position[axis] = element.f32(0x08 + axis * 4, "position")?;
                 rotation[axis] = element.f32(0x14 + axis * 4, "rotation")?;
+            }
+            let resting = match kind {
+                ObjectKind::Equipment => Some(element.u16(EQUIPMENT_FLAGS_OFFSET, "flags")?),
+                ObjectKind::Weapon => Some(element.u16(WEAPON_FLAGS_OFFSET, "flags")?),
+                _ => None,
+            };
+            if resting.is_some_and(|flags| flags & 1 == 0) {
+                position[2] += ITEM_RAISED;
             }
             let permutation = if has_permutation {
                 let mut change_colors = [0; 4];
@@ -1916,7 +1932,8 @@ pub(crate) mod tests {
                         },
                         name: None,
                         placement_flags: 1,
-                        position: [0.0; 3],
+                        // (an item not at rest is raised)
+                        position: [0.0, 0.0, ITEM_RAISED],
                         rotation: [0.0; 3],
                         structure_bsps: 0,
                         permutation: None,
