@@ -486,6 +486,9 @@ static void render_object_list(
 		real_matrix4x3 const *node_matrices = legs ?
 			first_person_legs_node_matrices(object_index, object_get_node_matrices(object_index)) :
 			object_get_node_matrices(object_index);
+		/* port: a child copies this object's modifier, and that child is
+		drawn after the block below. The values have to still be here. */
+		real shown_functions[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS];
 
 		if (!object_is_first_person_camera(object_index) || render.camera.mirrored || (legs && node_matrices))
 		{
@@ -529,8 +532,6 @@ static void render_object_list(
 
 				if (!data->shadow)
 				{
-					real shown_functions[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS];
-
 					/* port: the tick's functions, moved into this frame, so a
 					charge clicks with the picture instead of once a tick */
 					object_function_values_for_render(object_index, shown_functions);
