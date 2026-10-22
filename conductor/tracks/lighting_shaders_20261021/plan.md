@@ -25,9 +25,9 @@
 - [x] Task: The path tracer f6c668b6
     - [x] Write tests: a closed box with one emitter converges to the known irradiance; a sky dome gives the expected AO on a plane
     - [x] A Metal compute path tracer over the hierarchy, with next-event estimation and bounced light
-- [~] Task: The outputs
-    - [ ] Write tests: the directional lightmap's layout and atlas; the probe grid covers the BSP's volume; reflection probe placement per cluster; the cache key changes with the importer's and baker's versions
-    - [ ] Directional lightmaps with AO, irradiance probes, reflection probes; written to the cache; background baking with the stock lightmaps as fallback
+- [x] Task: The outputs 58a2519e
+    - [x] Write tests: the directional lightmap's layout and atlas; the probe grid covers the BSP's volume; reflection probe placement per cluster; the cache key changes with the importer's and baker's versions
+    - [x] Directional lightmaps with AO, irradiance probes, reflection probes; written to the cache; background baking with the stock lightmaps as fallback
 - [ ] Task: The mood check
     - [ ] Write tests: each cluster's mean brightness and colour against the stock lightmap, within the set limits (marked, needs `assets/maps`)
     - [ ] Tune the bake's sky and emitter scales until every stock BSP passes
