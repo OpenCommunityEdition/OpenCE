@@ -101,6 +101,10 @@ fn the_app_does_what_the_engine_cannot() -> Result {
     // (the action is the line's only)
     assert_eq!(run(&engine, "help map")?.action, ShellAction::None);
     refused(&engine, "map test -1")?;
+    // (the test map is made, so it needs no file)
+    let made = run(&engine, "map devmap")?;
+    let path = folder.join("devmap.map").to_string_lossy().into_owned();
+    assert_eq!(made.action, ShellAction::LoadMap { path, bsp: 0 });
     std::fs::remove_dir_all(&folder)?;
     Ok(())
 }

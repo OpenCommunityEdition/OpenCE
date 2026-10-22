@@ -196,8 +196,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var lastFrame: CFTimeInterval?
     var frameTimes = FrameTimes()
     var lastOverlay: CFTimeInterval = 0
-    let maps = MapLibrary.maps(in: MapLibrary.folders(
-        named: argument("--maps"), root: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)))
+    let folders = MapLibrary.folders(
+        named: argument("--maps"), root: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+    lazy var maps = MapLibrary.maps(in: folders)
     lazy var menu = MenuModel(maps: maps, settings: saved, servers: ServerListModel())
     /// The menus' view, while they show.
     var menuView: NSView?
@@ -222,9 +223,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.showsFrameTimes = CommandLine.arguments.contains("--frame-times")
             || saved.settings.video.showFrameTimes
         self.controller = controller
+        if let folder = folders.first {
+            engine.setMapsFolder(folder: folder.path)
+        }
         if let map = argument("--map") {
             do {
-                try load(map: map, bsp: argument("--bsp").flatMap { UInt32($0) } ?? 0)
+                try load(map: MapLibrary.path(of: map, folders: folders), bsp: argument("--bsp").flatMap { UInt32($0) } ?? 0)
             } catch {
                 fail("\(map): \(error)")
             }

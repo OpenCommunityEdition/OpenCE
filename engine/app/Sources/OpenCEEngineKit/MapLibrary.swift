@@ -27,6 +27,19 @@ public enum MapLibrary {
         return ["maps", "custom_maps"].map { root.appendingPathComponent("assets/\($0)", isDirectory: true) }
     }
 
+    /// The test map's name: the engine makes it, gathering every map of
+    /// the first folder.
+    public static let testMap = "devmap"
+
+    /// The path `--map` loads: the test map's in the first of `folders`
+    /// (no file is there; the engine knows the name), any other as given.
+    public static func path(of map: String, folders: [URL]) -> String {
+        guard map == testMap, let folder = folders.first else {
+            return map
+        }
+        return folder.appendingPathComponent("\(testMap).map").path
+    }
+
     /// The levels of all `folders`, in order.
     public static func maps(in folders: [URL]) -> [URL] {
         folders.flatMap { maps(in: $0) }

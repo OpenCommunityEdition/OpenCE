@@ -39,11 +39,14 @@ pub enum Layer {
     Lights,
     /// The sound emitters.
     Sounds,
+    /// The test map's galleries' headings and objects' names (on unless
+    /// switched off).
+    Labels,
 }
 
 impl Layer {
     /// Every layer, in order.
-    pub const ALL: [Layer; 8] = [
+    pub const ALL: [Layer; 9] = [
         Layer::General,
         Layer::Collision,
         Layer::Bodies,
@@ -52,6 +55,7 @@ impl Layer {
         Layer::Markers,
         Layer::Lights,
         Layer::Sounds,
+        Layer::Labels,
     ];
 
     /// Its name, as its `debug.draw.<name>` variable has it.
@@ -65,6 +69,7 @@ impl Layer {
             Layer::Markers => "markers",
             Layer::Lights => "lights",
             Layer::Sounds => "sounds",
+            Layer::Labels => "labels",
         }
     }
 
@@ -84,6 +89,7 @@ impl Layer {
             Layer::Markers => Color(0xffff40ff),
             Layer::Lights => Color(0xfff0c0ff),
             Layer::Sounds => Color(0xc080ffff),
+            Layer::Labels => Color(0xf0f0e0ff),
         }
     }
 
@@ -152,10 +158,10 @@ impl Default for DebugDraw {
 }
 
 impl DebugDraw {
-    /// Nothing drawn, the general layer on and the others off.
+    /// Nothing drawn, the general and labels layers on and the others off.
     pub fn new() -> Self {
         Self {
-            on: Layer::General.bit(),
+            on: Layer::General.bit() | Layer::Labels.bit(),
             now: 0,
             lines: Vec::new(),
             labels: Vec::new(),
@@ -377,7 +383,9 @@ mod tests {
     #[test]
     fn layers_switch() {
         let mut draw = DebugDraw::new();
-        assert!(draw.is_on(Layer::General) && !draw.any_world_layer());
+        assert!(draw.is_on(Layer::General) && draw.is_on(Layer::Labels));
+        draw.set_layer(Layer::Labels, false);
+        assert!(!draw.any_world_layer());
         draw.line(Layer::Collision, O, X, Color::WHITE, 5);
         assert!(draw.lines().is_empty());
         draw.set_layer(Layer::Collision, true);
@@ -400,6 +408,7 @@ mod tests {
     fn nothing_is_allocated_when_off() {
         let mut draw = DebugDraw::new();
         draw.set_layer(Layer::General, false);
+        draw.set_layer(Layer::Labels, false);
         for layer in Layer::ALL {
             draw.line(layer, O, X, Color::WHITE, 5);
             draw.bounds(layer, O, X, Color::WHITE, 5);

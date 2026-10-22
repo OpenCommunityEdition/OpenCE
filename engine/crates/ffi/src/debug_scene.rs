@@ -1,7 +1,7 @@
 //! The debug drawing's world layers: what the level and the world hold,
 //! drawn again at each publish while a layer is on.
 
-use opence_content::Level;
+use opence_content::{devmap, Level};
 use opence_dev::draw::{Color, DebugDraw, Layer, MAX_LINES};
 use opence_sim::{Simulation, Vec3};
 
@@ -13,6 +13,12 @@ const FIRING_POSITION_RADIUS: f32 = 0.25;
 
 /// The length of an object's axes.
 const AXES_LENGTH: f32 = 0.5;
+
+/// How far from the camera the test map's objects are named.
+pub const LABEL_REACH: f32 = 25.0;
+
+/// How far above an object's slot its name is.
+const LABEL_LIFT: f32 = 0.3;
 
 /// What the world layers that are on show, from `camera`, into `scene`
 /// (emptied first; a shape lasts one tick).
@@ -33,6 +39,9 @@ pub(crate) fn fill(
         }
         if scene.is_on(Layer::Ai) {
             ai(scene, level);
+        }
+        if scene.is_on(Layer::Labels) && level.scenario.path == devmap::NAME {
+            labels(scene, level, camera);
         }
     }
     if scene.is_on(Layer::Markers) || scene.is_on(Layer::Bodies) {
@@ -110,6 +119,53 @@ fn ai(scene: &mut DebugDraw, level: &Level) {
     for list in &campaign.command_lists {
         for pair in list.points.windows(2) {
             scene.line(Layer::Ai, pair[0], pair[1], Color::WHITE, 1);
+        }
+    }
+}
+
+/// The test map's galleries: each one's heading, and near the camera, each
+/// object's slot outlined on the floor (its rack, bay or pedestal) and
+/// named above it, nearest first.
+fn labels(scene: &mut DebugDraw, level: &Level, camera: Vec3) {
+    let color = Layer::Labels.color();
+    for (heading, at) in devmap::headings(&level.scenario.placements) {
+        scene.text(Layer::Labels, at, heading, color, 1);
+    }
+    let mut near: Vec<(f32, &opence_content::ObjectPlacement)> = level
+        .scenario
+        .placements
+        .iter()
+        .map(|placement| {
+            (
+                Vec3::from(placement.position).distance_squared(camera),
+                placement,
+            )
+        })
+        .filter(|(distance, _)| *distance <= LABEL_REACH * LABEL_REACH)
+        .collect();
+    near.sort_by(|a, b| a.0.total_cmp(&b.0));
+    for (_, placement) in near {
+        let Some(object) = level.object(&placement.tag) else {
+            continue;
+        };
+        let radius = object.bounding_radius.max(devmap::MIN_SLOT_RADIUS);
+        let [x, y, z] = placement.position;
+        // (the slot's middle: the origin less its sphere's offset, turned to face the start)
+        let (middle_x, middle_y) = (x - object.bounding_offset[0], y - object.bounding_offset[1]);
+        let corners = [
+            [middle_x - radius, middle_y - radius, 0.01],
+            [middle_x + radius, middle_y - radius, 0.01],
+            [middle_x + radius, middle_y + radius, 0.01],
+            [middle_x - radius, middle_y + radius, 0.01],
+        ];
+        for at in 0..4 {
+            scene.line(Layer::Labels, corners[at], corners[(at + 1) % 4], color, 1);
+        }
+        let name = placement.tag.path.rsplit('\\').next().unwrap_or("");
+        let top = z.max(0.0) + 2.0 * radius + LABEL_LIFT;
+        scene.text(Layer::Labels, [middle_x, middle_y, top], name, color, 1);
+        if scene.labels().len() >= opence_dev::draw::MAX_LABELS {
+            return;
         }
     }
 }
@@ -263,6 +319,79 @@ mod tests {
         scene.set_layer(Layer::General, false);
         scene.set_layer(layer, true);
         scene
+    }
+
+    #[test]
+    fn the_test_maps_galleries_are_labelled_near_the_camera() {
+        let mut level = opence_content::devmap::level(None);
+        let near = test_object(opence_content::ObjectKind::Weapon, r"weapons\rifle\rifle");
+        let mut far = test_object(opence_content::ObjectKind::Scenery, r"scenery\far");
+        far.bounding_radius = 1.0;
+        level.objects = vec![near, far];
+        level.scenario.placements = devmap::galleries(&level.objects).placements;
+        level.scenario.placements[1].position = [200.0, 0.0, 0.0];
+        let mut scene = scene(Layer::Labels);
+        let camera = Vec3::from(level.scenario.placements[0].position);
+        fill(
+            &mut scene,
+            Some(&level),
+            0,
+            &mut Simulation::empty(),
+            camera,
+        );
+        let texts: Vec<&str> = scene
+            .labels()
+            .iter()
+            .map(|label| label.text.as_str())
+            .collect();
+        assert_eq!(texts, vec!["weapons", "scenery", "rifle"]);
+        // (its slot, outlined on the floor)
+        assert_eq!(scene.lines().len(), 4);
+        assert!(scene.labels()[2].at[2] > 0.5);
+
+        // another map's placements are not named
+        level.scenario.path = "other".into();
+        fill(
+            &mut scene,
+            Some(&level),
+            0,
+            &mut Simulation::empty(),
+            camera,
+        );
+        assert!(scene.labels().is_empty());
+    }
+
+    fn test_object(
+        kind: opence_content::ObjectKind,
+        path: &str,
+    ) -> opence_content::ObjectDefinition {
+        opence_content::ObjectDefinition {
+            tag: opence_content::TagRef {
+                group: opence_content::Group(kind.group()),
+                path: path.into(),
+            },
+            kind,
+            flags: 0,
+            bounding_radius: 0.25,
+            bounding_offset: [0.0, 0.0, 0.1],
+            acceleration_scale: 1.0,
+            render_bounding_radius: 0.25,
+            model: None,
+            animation_graph: None,
+            collision_model: None,
+            physics: None,
+            modifier_shader: None,
+            creation_effect: None,
+            attachments: Vec::new(),
+            change_colors: Vec::new(),
+            unit_hud: None,
+            unit_melee_damage: None,
+            biped: None,
+            weapon: None,
+            projectile: None,
+            equipment: None,
+            vehicle: None,
+        }
     }
 
     #[test]

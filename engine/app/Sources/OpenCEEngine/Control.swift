@@ -144,7 +144,9 @@ func headless() -> Never {
         renderer: { level?.renderer })
     if let map = argument("--map") {
         do {
-            try servant.loadMap(map, argument("--bsp").flatMap { UInt32($0) } ?? 0)
+            let folders = MapLibrary.folders(named: argument("--maps"),
+                                             root: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+            try servant.loadMap(MapLibrary.path(of: map, folders: folders), argument("--bsp").flatMap { UInt32($0) } ?? 0)
         } catch {
             fail("\(map): \(error)")
         }

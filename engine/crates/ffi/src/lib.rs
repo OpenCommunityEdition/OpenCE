@@ -108,6 +108,18 @@ impl LevelGeometry {
     /// The BSP `bsp` of the map at `map`, its pack kept in `cache_folder`.
     #[uniffi::constructor]
     pub fn load(map: String, cache_folder: String, bsp: u32) -> Result<Arc<Self>, EngineError> {
+        let path = Path::new(&map);
+        if !path.exists()
+            && path.file_stem().and_then(|stem| stem.to_str()) == Some(opence_content::devmap::NAME)
+        {
+            if bsp != 0 {
+                return Err(EngineError::NoBsp { index: bsp });
+            }
+            let folder = path
+                .parent()
+                .map_or_else(String::new, |folder| folder.to_string_lossy().into_owned());
+            return Self::devmap_gathered(folder, cache_folder);
+        }
         let loaded = opence_import::load_level(Path::new(&map), Path::new(&cache_folder)).map_err(
             |error| EngineError::Load {
                 message: error.to_string(),
@@ -141,6 +153,64 @@ impl LevelGeometry {
             })
             .transpose()?;
         let level = opence_content::devmap::level(donor.as_ref());
+        let render = RenderLevel::build(&level, 0).ok_or(EngineError::NoBsp { index: 0 })?;
+        Ok(Arc::new(Self {
+            name: opence_content::devmap::NAME.into(),
+            level: render,
+            content: Arc::new(level),
+        }))
+    }
+
+    /// The test map with its galleries: every object of every map in
+    /// `maps_folder` (in name order; a map that does not load is left out)
+    /// stood in rows by kind, on a plane made large enough to hold them.
+    /// `map devmap` and `--map devmap` load it.
+    #[uniffi::constructor]
+    pub fn devmap_gathered(
+        maps_folder: String,
+        cache_folder: String,
+    ) -> Result<Arc<Self>, EngineError> {
+        let folder = if maps_folder.is_empty() {
+            Path::new(".")
+        } else {
+            Path::new(&maps_folder)
+        };
+        let mut maps: Vec<_> = std::fs::read_dir(folder)
+            .map_err(|error| EngineError::Load {
+                message: format!("{}: {error}", folder.display()),
+            })?
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| path.extension().is_some_and(|extension| extension == "map"))
+            .collect();
+        maps.sort();
+        let levels: Vec<_> = maps
+            .iter()
+            .filter_map(
+                |map| match opence_import::load_level(map, Path::new(&cache_folder)) {
+                    Ok(loaded) => Some(loaded.level),
+                    Err(error) => {
+                        let text = format!("{} left out: {error}", map.display());
+                        opence_dev::logbook::record(
+                            opence_dev::logbook::Level::Warn,
+                            "devmap",
+                            &text,
+                        );
+                        None
+                    }
+                },
+            )
+            .collect();
+        let (level, galleries) =
+            opence_content::devmap::gallery_level(&levels).ok_or_else(|| EngineError::Load {
+                message: format!("no map in {} loaded", folder.display()),
+            })?;
+        if !galleries.left_out.is_empty() {
+            let text = format!(
+                "{} objects too wide for a gallery",
+                galleries.left_out.len()
+            );
+            opence_dev::logbook::record(opence_dev::logbook::Level::Info, "devmap", &text);
+        }
         let render = RenderLevel::build(&level, 0).ok_or(EngineError::NoBsp { index: 0 })?;
         Ok(Arc::new(Self {
             name: opence_content::devmap::NAME.into(),

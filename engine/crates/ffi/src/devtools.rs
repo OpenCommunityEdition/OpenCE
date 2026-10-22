@@ -152,7 +152,7 @@ const VARIABLES: [(&str, &str, bool, bool); 4] = [
 ];
 
 // (the debug drawing's layers: `debug.draw.<layer>`)
-const LAYERS: [(Layer, &str); 8] = [
+const LAYERS: [(Layer, &str); 9] = [
     (
         Layer::General,
         "Draws the shapes the commands and systems draw.",
@@ -167,6 +167,10 @@ const LAYERS: [(Layer, &str); 8] = [
     (Layer::Markers, "Draws the objects' axes."),
     (Layer::Lights, "Draws the lights."),
     (Layer::Sounds, "Draws the sounds."),
+    (
+        Layer::Labels,
+        "Draws the test map's gallery headings and object names.",
+    ),
 ];
 
 /// The prefix of the debug drawing's variables.
@@ -527,7 +531,11 @@ fn map(state: &mut State, args: &Args) -> Result<Output, CommandError> {
     let bsp = args.int_or("bsp", 0)?;
     let bsp = u32::try_from(bsp).map_err(|_| failed(format!("no structure BSP {bsp}")))?;
     let path = map_path(state.shell.maps_folder.as_deref(), name);
-    if !path.is_file() {
+    // (the test map is made, not read: its galleries gather every map)
+    let made = path.file_stem().and_then(|stem| stem.to_str())
+        == Some(opence_content::devmap::NAME)
+        && !path.exists();
+    if !made && !path.is_file() {
         return Err(failed(format!("no map at {}", path.display())));
     }
     let path = path.to_string_lossy().into_owned();

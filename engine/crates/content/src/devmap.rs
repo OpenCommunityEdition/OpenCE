@@ -3,15 +3,21 @@
 //! world unit, with a player start at its middle. Its sky is another
 //! level's, when it is made over one, or a generated one: a fog that fades
 //! the plane into a blue horizon.
+//!
+//! Made over every map's level ([`gathered`]), it holds each definition
+//! the maps have, once, and shows each object in a gallery of its kind
+//! ([`galleries`]), in rows in front of the start.
 
 use crate::level::{
     Bsp2dReference, Bsp3dNode, CollisionEdge, CollisionLeaf, CollisionMaterial, CollisionSurface,
     CollisionVertex, EnvironmentVertex, Lightmap, LightmapVertex, Material,
 };
+use std::collections::HashSet;
+
 use crate::{
     AtmosphericFog, Bitmap, BitmapImage, CollisionBsp, EnvironmentShader, GameTypes, Globals,
-    Group, Level, Pixels, PlayerStart, Scenario, Shader, ShaderClass, Sky, StructureBsp, TagRef,
-    Texture, TextureFormat,
+    Group, Level, ObjectDefinition, ObjectKind, ObjectPlacement, Pixels, PlayerStart, Scenario,
+    Shader, ShaderClass, Sky, StructureBsp, TagRef, Texture, TextureFormat,
 };
 
 /// The map's name: `--map devmap`, `map devmap`.
@@ -314,6 +320,222 @@ fn scenario() -> Scenario {
     }
 }
 
+/// Adds to `into` each of `from` whose tag it does not hold yet.
+fn merge<T: Clone>(into: &mut Vec<T>, from: &[T], tag: impl Fn(&T) -> &TagRef) {
+    let mut held: HashSet<TagRef> = into.iter().map(|item| tag(item).clone()).collect();
+    for item in from {
+        if held.insert(tag(item).clone()) {
+            into.push(item.clone());
+        }
+    }
+}
+
+/// One level holding every definition of `levels`, each once: a tag the
+/// levels share is the first's, with its own data. The globals, the HUD's
+/// globals and the skies are the first level's that has a player's biped
+/// (or the first's); the scenario and BSPs are theirs too, for
+/// [`level`] to replace.
+pub fn gathered(levels: &[Level]) -> Option<Level> {
+    let base = levels
+        .iter()
+        .position(|level| {
+            level.globals.player_unit.is_some() || level.globals.multiplayer_unit.is_some()
+        })
+        .unwrap_or(0);
+    let mut gathered = levels.get(base)?.clone();
+    for (at, level) in levels.iter().enumerate() {
+        if at == base {
+            continue;
+        }
+        merge(&mut gathered.objects, &level.objects, |item| &item.tag);
+        merge(&mut gathered.models, &level.models, |item| &item.tag);
+        merge(
+            &mut gathered.animation_graphs,
+            &level.animation_graphs,
+            |item| &item.tag,
+        );
+        merge(&mut gathered.shaders, &level.shaders, |item| &item.tag);
+        merge(&mut gathered.bitmaps, &level.bitmaps, |item| &item.tag);
+        merge(
+            &mut gathered.resource_bitmaps,
+            &level.resource_bitmaps,
+            |item| item,
+        );
+        merge(
+            &mut gathered.damage_effects,
+            &level.damage_effects,
+            |item| &item.tag,
+        );
+        merge(
+            &mut gathered.collision_models,
+            &level.collision_models,
+            |item| &item.tag,
+        );
+        merge(&mut gathered.physics, &level.physics, |item| &item.tag);
+        merge(&mut gathered.effects, &level.effects, |item| &item.tag);
+        merge(&mut gathered.unit_huds, &level.unit_huds, |item| &item.tag);
+        merge(&mut gathered.weapon_huds, &level.weapon_huds, |item| {
+            &item.tag
+        });
+        merge(&mut gathered.grenade_huds, &level.grenade_huds, |item| {
+            &item.tag
+        });
+        if gathered.hud_digits.is_none() {
+            gathered.hud_digits.clone_from(&level.hud_digits);
+        }
+        if gathered.hud_globals.is_none() {
+            gathered.hud_globals.clone_from(&level.hud_globals);
+        }
+    }
+    Some(gathered)
+}
+
+/// The galleries, in order from the start: each one's heading and the
+/// kinds it shows. (Placeholders and sound scenery are not seen.)
+pub const GALLERIES: [(&str, &[ObjectKind]); 7] = [
+    ("weapons", &[ObjectKind::Weapon]),
+    ("vehicles", &[ObjectKind::Vehicle]),
+    ("bipeds", &[ObjectKind::Biped]),
+    (
+        "devices",
+        &[
+            ObjectKind::Machine,
+            ObjectKind::Control,
+            ObjectKind::LightFixture,
+        ],
+    ),
+    ("scenery", &[ObjectKind::Scenery, ObjectKind::Garbage]),
+    ("equipment", &[ObjectKind::Equipment]),
+    ("projectiles", &[ObjectKind::Projectile]),
+];
+
+/// How far in front of the start the first gallery's first row is.
+pub const GALLERY_START: f32 = 6.0;
+/// The space kept clear at the plane's edges.
+pub const GALLERY_EDGE: f32 = 2.0;
+/// The space between two objects' slots, and between two rows.
+pub const SLOT_MARGIN: f32 = 1.0;
+/// The space between two galleries.
+pub const GALLERY_GAP: f32 = 4.0;
+/// The smallest radius a slot is given.
+pub const MIN_SLOT_RADIUS: f32 = 0.25;
+/// The height of a gallery's heading.
+pub const HEADING_HEIGHT: f32 = 3.0;
+
+/// The galleries laid out: the placements, where each gallery's heading
+/// is, and how large the plane must be to hold them.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Galleries {
+    /// One placement of each object shown, named by its tag's path.
+    pub placements: Vec<ObjectPlacement>,
+    /// Each gallery that shows something: its heading and where it is.
+    pub headings: Vec<(&'static str, [f32; 3])>,
+    /// Half the side of a plane that holds them all.
+    pub half_size: f32,
+    /// The objects too wide for a row, which are not shown.
+    pub left_out: Vec<TagRef>,
+}
+
+/// A slot's radius: the object's bounding sphere's.
+fn slot_radius(object: &ObjectDefinition) -> f32 {
+    if object.bounding_radius.is_finite() {
+        object.bounding_radius.max(MIN_SLOT_RADIUS)
+    } else {
+        MIN_SLOT_RADIUS
+    }
+}
+
+/// Lays out `objects` in their galleries, on a plane of at least
+/// `HALF_SIZE`: each gallery's objects in rows across the plane (along y),
+/// the rows and galleries one after another away from the start (along
+/// +x), each object in a slot of its bounding sphere's width, in its tag's
+/// order, facing the start. Weapons, vehicles, equipment and projectiles
+/// rest on their spheres; the others stand at their origins.
+pub fn galleries(objects: &[ObjectDefinition]) -> Galleries {
+    let half_width = HALF_SIZE - GALLERY_EDGE;
+    let mut placements = Vec::new();
+    let mut left_out = Vec::new();
+    let mut row_x = GALLERY_START;
+    for (_, kinds) in GALLERIES {
+        let mut shown: Vec<&ObjectDefinition> = objects
+            .iter()
+            .filter(|object| kinds.contains(&object.kind))
+            .collect();
+        shown.sort_by(|a, b| a.tag.cmp(&b.tag));
+        let mut y = -half_width;
+        let mut depth: f32 = 0.0;
+        for object in shown {
+            let radius = slot_radius(object);
+            if 2.0 * radius > 2.0 * half_width {
+                left_out.push(object.tag.clone());
+                continue;
+            }
+            if y + 2.0 * radius > half_width {
+                row_x += depth + SLOT_MARGIN;
+                y = -half_width;
+                depth = 0.0;
+            }
+            let finite = object.bounding_offset.iter().all(|value| value.is_finite());
+            let [offset_x, offset_y, offset_z] = if finite {
+                object.bounding_offset
+            } else {
+                [0.0; 3]
+            };
+            // (turned half round to face the start, the sphere's offset from
+            // the origin is reversed: the origin is the slot's middle plus it)
+            let center = [row_x + radius, y + radius];
+            let resting = matches!(
+                object.kind,
+                ObjectKind::Weapon
+                    | ObjectKind::Vehicle
+                    | ObjectKind::Equipment
+                    | ObjectKind::Projectile
+            );
+            let z = if resting {
+                (radius - offset_z).max(0.0)
+            } else {
+                0.0
+            };
+            placements.push(ObjectPlacement {
+                kind: object.kind,
+                tag: object.tag.clone(),
+                name: Some(object.tag.path.clone()),
+                placement_flags: 0,
+                position: [center[0] + offset_x, center[1] + offset_y, z],
+                rotation: [core::f32::consts::PI, 0.0, 0.0],
+                structure_bsps: 1,
+                permutation: None,
+                device: None,
+            });
+            y += 2.0 * radius + SLOT_MARGIN;
+            depth = depth.max(2.0 * radius);
+        }
+        row_x += depth + GALLERY_GAP;
+    }
+    Galleries {
+        headings: headings(&placements),
+        placements,
+        half_size: HALF_SIZE.max(row_x + GALLERY_EDGE),
+        left_out,
+    }
+}
+
+/// Each gallery's heading that `placements` show something of, over the
+/// middle of its first row (its objects nearest the start).
+pub fn headings(placements: &[ObjectPlacement]) -> Vec<(&'static str, [f32; 3])> {
+    GALLERIES
+        .iter()
+        .filter_map(|(heading, kinds)| {
+            let nearest = placements
+                .iter()
+                .filter(|placement| kinds.contains(&placement.kind))
+                .map(|placement| placement.position[0])
+                .reduce(f32::min)?;
+            Some((*heading, [nearest, 0.0, HEADING_HEIGHT]))
+        })
+        .collect()
+}
+
 /// The devmap: the plane and its player start. Made over `donor`, it has
 /// the donor's definitions (its objects, its globals and the player's
 /// biped, its HUD) and the donor's sky; without one, it has nothing but
@@ -355,6 +577,22 @@ pub fn level(donor: Option<&Level>) -> Level {
     level.bitmaps.retain(|bitmap| bitmap.tag != bitmap_tag());
     level.bitmaps.push(grid_bitmap());
     level
+}
+
+/// The devmap made over every one of `levels` ([`gathered`]), with each
+/// object they define in its gallery, on a plane large enough for them.
+/// None if there are no levels.
+pub fn gallery_level(levels: &[Level]) -> Option<(Level, Galleries)> {
+    let mut level = level(Some(&gathered(levels)?));
+    let laid_out = galleries(&level.objects);
+    level.scenario.placements.clone_from(&laid_out.placements);
+    if laid_out.half_size > HALF_SIZE {
+        // (as many cells to the unit as the plane of `HALF_SIZE` has)
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let cells = (f32::from(CELLS) * laid_out.half_size / HALF_SIZE).ceil() as u16;
+        level.structure_bsps = vec![plane(laid_out.half_size, cells)];
+    }
+    Some((level, laid_out))
 }
 
 #[cfg(test)]
@@ -494,6 +732,216 @@ mod tests {
                 .filter(|bitmap| bitmap.tag == bitmap_tag())
                 .count(),
             1
+        );
+    }
+
+    fn object(kind: ObjectKind, path: &str, radius: f32) -> ObjectDefinition {
+        ObjectDefinition {
+            tag: tag(&kind.group(), path),
+            kind,
+            flags: 0,
+            bounding_radius: radius,
+            bounding_offset: [0.0, 0.0, 0.0],
+            acceleration_scale: 1.0,
+            render_bounding_radius: radius,
+            model: None,
+            animation_graph: None,
+            collision_model: None,
+            physics: None,
+            modifier_shader: None,
+            creation_effect: None,
+            attachments: Vec::new(),
+            change_colors: Vec::new(),
+            unit_hud: None,
+            unit_melee_damage: None,
+            biped: None,
+            weapon: None,
+            projectile: None,
+            equipment: None,
+            vehicle: None,
+        }
+    }
+
+    #[test]
+    fn definitions_are_gathered_once_each_keeping_their_own_data() {
+        assert!(gathered(&[]).is_none());
+        let mut first = level(None);
+        first.scenario.path = "first".into();
+        first.objects = vec![object(ObjectKind::Weapon, "rifle", 0.5)];
+        let mut second = level(None);
+        second.scenario.path = "second".into();
+        second.globals.player_unit = Some(tag(b"bipd", "cyborg"));
+        second.objects = vec![
+            object(ObjectKind::Weapon, "rifle", 9.0),
+            object(ObjectKind::Vehicle, "hog", 3.0),
+        ];
+        let mut third = level(None);
+        third.objects = vec![
+            object(ObjectKind::Weapon, "rifle", 7.0),
+            object(ObjectKind::Biped, "elite", 1.0),
+            object(ObjectKind::Vehicle, "hog", 4.0),
+        ];
+        let mut digits_bitmap = grid_bitmap();
+        digits_bitmap.tag = tag(b"bitm", "digits");
+        third.bitmaps.push(digits_bitmap);
+        third.resource_bitmaps = vec![tag(b"bitm", "far")];
+        let all = gathered(&[first, second, third]).unwrap_or_else(|| panic!("none gathered"));
+        // (the base is the level with a player's biped)
+        assert_eq!(all.scenario.path, "second");
+        assert_eq!(all.globals.player_unit, Some(tag(b"bipd", "cyborg")));
+        let radii: Vec<(&str, f32)> = all
+            .objects
+            .iter()
+            .map(|object| (object.tag.path.as_str(), object.bounding_radius))
+            .collect();
+        assert_eq!(radii, vec![("rifle", 9.0), ("hog", 3.0), ("elite", 1.0)]);
+        assert_eq!(
+            all.bitmaps
+                .iter()
+                .filter(|bitmap| bitmap.tag == bitmap_tag())
+                .count(),
+            1
+        );
+        assert!(all.bitmap(&tag(b"bitm", "digits")).is_some());
+        assert_eq!(all.resource_bitmaps, vec![tag(b"bitm", "far")]);
+    }
+
+    #[test]
+    fn without_a_player_the_first_level_is_the_base() {
+        let mut first = level(None);
+        first.scenario.path = "first".into();
+        let gathered = gathered(&[first, level(None)]).unwrap_or_else(|| panic!("none"));
+        assert_eq!(gathered.scenario.path, "first");
+    }
+
+    /// Whether the slots of `galleries` (their bounding circles, centred
+    /// where the layout put them) overlap, or leave the plane.
+    fn check_layout(objects: &[ObjectDefinition], laid_out: &Galleries) {
+        let circle = |placement: &ObjectPlacement| {
+            let object = objects
+                .iter()
+                .find(|object| object.tag == placement.tag)
+                .unwrap_or_else(|| panic!("{:?} is not defined", placement.tag));
+            let radius = slot_radius(object);
+            // (the layout's offset, taken back)
+            let [x, y, _] = placement.position;
+            (
+                [x - object.bounding_offset[0], y - object.bounding_offset[1]],
+                radius,
+            )
+        };
+        let circles: Vec<_> = laid_out.placements.iter().map(circle).collect();
+        let edge = laid_out.half_size - GALLERY_EDGE + 1e-3;
+        for (at, ([x, y], radius)) in circles.iter().enumerate() {
+            assert!(
+                x - radius >= GALLERY_START - 1e-3,
+                "{at} is behind the start"
+            );
+            assert!(
+                x + radius <= edge && y + radius <= edge && y - radius >= -edge,
+                "{at} is off the plane"
+            );
+            for ([other_x, other_y], other_radius) in &circles[at + 1..] {
+                let (dx, dy) = (x - other_x, y - other_y);
+                let apart = radius + other_radius + SLOT_MARGIN - 1e-3;
+                assert!(dx * dx + dy * dy >= apart * apart, "{at} overlaps");
+            }
+        }
+    }
+
+    #[test]
+    fn the_galleries_hold_each_object_without_overlap() {
+        let mut objects = Vec::new();
+        for at in 0..60 {
+            let radius = 0.1 + (at % 7) as f32 * 0.6;
+            objects.push(object(
+                ObjectKind::Weapon,
+                &format!("weapon {at:02}"),
+                radius,
+            ));
+            objects.push(object(
+                ObjectKind::Scenery,
+                &format!("tree {at:02}"),
+                radius * 2.0,
+            ));
+        }
+        let mut offset = object(ObjectKind::Vehicle, "offset", 2.0);
+        offset.bounding_offset = [0.5, -0.25, 1.0];
+        objects.push(offset);
+        objects.push(object(ObjectKind::Machine, "door", 1.5));
+        objects.push(object(ObjectKind::Placeholder, "unseen", 1.0));
+        objects.push(object(ObjectKind::Scenery, "too wide", 100.0));
+        objects.push(object(ObjectKind::Projectile, "odd", f32::NAN));
+        let laid_out = galleries(&objects);
+        assert_eq!(laid_out.placements.len(), 60 * 2 + 3);
+        assert_eq!(laid_out.left_out, vec![tag(b"scen", "too wide")]);
+        assert!(laid_out.half_size > HALF_SIZE, "{}", laid_out.half_size);
+        check_layout(&objects, &laid_out);
+        // the galleries in their order, each heading where its first row is
+        let names: Vec<&str> = laid_out.headings.iter().map(|(name, _)| *name).collect();
+        assert_eq!(
+            names,
+            vec!["weapons", "vehicles", "devices", "scenery", "projectiles"]
+        );
+        let first_weapon = &laid_out.placements[0];
+        assert_eq!(first_weapon.name.as_deref(), Some("weapon 00"));
+        assert_eq!(
+            laid_out.headings[0].1,
+            [first_weapon.position[0], 0.0, HEADING_HEIGHT]
+        );
+        assert_eq!(headings(&[]), Vec::new());
+        let vehicle = laid_out
+            .placements
+            .iter()
+            .find(|placement| placement.kind == ObjectKind::Vehicle)
+            .unwrap_or_else(|| panic!("no vehicle"));
+        // (resting on its sphere, lifted by its offset's height)
+        assert!((vehicle.position[2] - 1.0).abs() < 1e-6);
+        assert!((vehicle.rotation[0] - core::f32::consts::PI).abs() < 1e-6);
+        let door = laid_out
+            .placements
+            .iter()
+            .find(|placement| placement.kind == ObjectKind::Machine)
+            .unwrap_or_else(|| panic!("no door"));
+        assert_eq!(door.position[2], 0.0);
+        assert!(laid_out.headings[1].1[0] > laid_out.headings[0].1[0]);
+    }
+
+    #[test]
+    fn a_few_objects_fit_the_smallest_plane() {
+        let objects = vec![object(ObjectKind::Biped, "elite", 0.8)];
+        let laid_out = galleries(&objects);
+        assert_eq!(laid_out.half_size, HALF_SIZE);
+        assert_eq!(laid_out.headings.len(), 1);
+        check_layout(&objects, &laid_out);
+    }
+
+    #[test]
+    fn the_gallery_level_places_its_objects_on_a_plane_that_holds_them() {
+        assert!(gallery_level(&[]).is_none());
+        let mut small = level(None);
+        small.objects = vec![object(ObjectKind::Weapon, "rifle", 0.5)];
+        let (made, laid_out) = gallery_level(&[small]).unwrap_or_else(|| panic!("none"));
+        assert_eq!(made.scenario.placements, laid_out.placements);
+        assert_eq!(
+            made.structure_bsps[0].world_bounds[0],
+            [-HALF_SIZE, HALF_SIZE]
+        );
+
+        let mut large = level(None);
+        large.objects = (0..40)
+            .map(|at| object(ObjectKind::Scenery, &format!("rock {at}"), 10.0))
+            .collect();
+        let (made, laid_out) = gallery_level(&[large]).unwrap_or_else(|| panic!("none"));
+        assert_eq!(made.scenario.placements.len(), 40);
+        let half = laid_out.half_size;
+        assert!(half > HALF_SIZE);
+        assert_eq!(made.structure_bsps[0].world_bounds[0], [-half, half]);
+        assert!(
+            made.structure_bsps[0].lightmaps[0].materials[0]
+                .vertices
+                .len()
+                > 33 * 33
         );
     }
 }

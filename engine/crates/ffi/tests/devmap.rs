@@ -1,11 +1,12 @@
 //! The test map, `devmap`: its plane drawn with the grid under its sky,
-//! and, made over bloodgulch, the player standing on it (that part passes
-//! without assets/maps/bloodgulch.map).
+//! and, made over bloodgulch, the player standing on it; its galleries,
+//! made over every map of a folder (the parts that need assets/maps pass
+//! without it).
 
 use std::path::Path;
 
 use opence_ffi::render_level::MaterialKind;
-use opence_ffi::{Engine, LevelGeometry};
+use opence_ffi::{Engine, EngineError, LevelGeometry};
 
 type Result = std::result::Result<(), Box<dyn std::error::Error>>;
 
@@ -79,5 +80,65 @@ fn the_player_stands_on_the_plane() -> Result {
     let inspected: serde_json::Value = serde_json::from_str(&inspected.json)?;
     let height = inspected["position"][2].as_f64().ok_or("no height")?;
     assert!(height.abs() < 0.1, "stands at {height}");
+    Ok(())
+}
+
+fn folder(name: &str) -> std::io::Result<std::path::PathBuf> {
+    let folder = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    let _ = std::fs::remove_dir_all(&folder);
+    std::fs::create_dir_all(&folder)?;
+    Ok(folder)
+}
+
+#[test]
+fn galleries_need_a_map_that_loads() -> Result {
+    let folder = folder("devmap_none")?;
+    let maps = folder.to_string_lossy().into_owned();
+    assert!(LevelGeometry::devmap_gathered(maps.clone(), cache()?).is_err());
+    std::fs::write(folder.join("junk.map"), b"not a map")?;
+    std::fs::write(folder.join("notes.txt"), b"not a map either")?;
+    assert!(LevelGeometry::devmap_gathered(maps, cache()?).is_err());
+    assert!(LevelGeometry::devmap_gathered("/nowhere/at/all".into(), cache()?).is_err());
+    // (load sends a missing devmap.map to them, with its one structure)
+    let named = folder.join("devmap.map").to_string_lossy().into_owned();
+    assert!(matches!(
+        LevelGeometry::load(named.clone(), cache()?, 1),
+        Err(EngineError::NoBsp { index: 1 })
+    ));
+    assert!(matches!(
+        LevelGeometry::load(named, cache()?, 0),
+        Err(EngineError::Load { .. })
+    ));
+    Ok(())
+}
+
+#[test]
+fn the_galleries_hold_every_maps_objects() -> Result {
+    let maps = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps");
+    let names = ["bloodgulch.map", "wizard.map"];
+    if !names.iter().all(|name| maps.join(name).exists()) {
+        return Ok(()); // (no game data here)
+    }
+    let folder = folder("devmap_galleries")?;
+    for name in names {
+        std::os::unix::fs::symlink(maps.join(name).canonicalize()?, folder.join(name))?;
+    }
+    std::fs::write(folder.join("junk.map"), b"left out")?;
+    let gathered = folder.join("devmap.map").to_string_lossy().into_owned();
+    let geometry = LevelGeometry::load(gathered, cache()?, 0)?;
+    assert_eq!(geometry.name(), "devmap");
+    // (a plane larger than the bare one, to hold them)
+    let bounds = geometry.bounds();
+    assert!(bounds[1] >= 80.0, "{bounds:?}");
+    let engine = Engine::new();
+    let spawned = engine.start_level(geometry, 1)?;
+    assert!(spawned > 50, "{spawned} spawned");
+    engine.spawn_player(0)?;
+    engine.advance(1.0 / 30.0)?;
+    // the warthog stands in the vehicles' gallery, named by its tag
+    let output = engine.run_command("objects warthog".into());
+    assert!(output.ok, "{}", output.text);
+    let found: serde_json::Value = serde_json::from_str(&output.json)?;
+    assert!(!found.as_array().ok_or("no list")?.is_empty());
     Ok(())
 }
