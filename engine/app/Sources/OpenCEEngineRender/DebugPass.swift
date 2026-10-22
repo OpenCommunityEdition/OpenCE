@@ -39,49 +39,41 @@ public func debugColor(_ packed: UInt32) -> SIMD4<Float> {
 
 /// Draws debug lines into the level's frame.
 public final class DebugPass {
-    static let source = """
-    #include <metal_stdlib>
-    using namespace metal;
-
-    struct DebugVarying {
-        float4 position [[position]];
-        float4 color;
-    };
-
-    // (a vertex is its point and its packed colour's bits)
-    vertex DebugVarying debug_vertex(uint vertex_id [[vertex_id]], const device float4 *vertices [[buffer(0)]],
-                                     constant float4x4 &view_projection [[buffer(1)]]) {
-        float4 vertex_in = vertices[vertex_id];
-        uint packed = as_type<uint>(vertex_in.w);
-        DebugVarying out;
-        out.position = view_projection * float4(vertex_in.xyz, 1);
-        out.color = float4((packed >> 24) & 0xff, (packed >> 16) & 0xff, (packed >> 8) & 0xff, packed & 0xff) / 255.0;
-        return out;
-    }
-
-    fragment float4 debug_fragment(DebugVarying in [[stage_in]]) {
-        return float4(in.color.rgb, 1);
-    }
-    """
-
-    private let pipeline: MTLRenderPipelineState
+    private var pipeline: MTLRenderPipelineState
+    private let colorFormat: MTLPixelFormat
+    private let depthFormat: MTLPixelFormat
     private var buffers: [MTLBuffer?] = [nil, nil, nil]
     private var frame = 0
     /// The lines drawn in the last frame, for tests.
     public private(set) var lastDrawn = 0
 
-    public init(device: MTLDevice, colorFormat: MTLPixelFormat, depthFormat: MTLPixelFormat) throws {
+    public init(device: MTLDevice, colorFormat: MTLPixelFormat, depthFormat: MTLPixelFormat,
+                source: String? = nil) throws {
+        self.colorFormat = colorFormat
+        self.depthFormat = depthFormat
+        pipeline = try Self.pipeline(device: device, source: source ?? ShaderSources.source(.debug),
+                                     colorFormat: colorFormat, depthFormat: depthFormat)
+    }
+
+    private static func pipeline(device: MTLDevice, source: String, colorFormat: MTLPixelFormat,
+                                 depthFormat: MTLPixelFormat) throws -> MTLRenderPipelineState {
         do {
-            let library = try device.makeLibrary(source: Self.source, options: nil)
+            let library = try device.makeLibrary(source: source, options: nil)
             let descriptor = MTLRenderPipelineDescriptor()
-            descriptor.vertexFunction = library.makeFunction(name: "debug_vertex")
-            descriptor.fragmentFunction = library.makeFunction(name: "debug_fragment")
+            descriptor.vertexFunction = try library.required("debug_vertex")
+            descriptor.fragmentFunction = try library.required("debug_fragment")
             descriptor.colorAttachments[0].pixelFormat = colorFormat
             descriptor.depthAttachmentPixelFormat = depthFormat
-            pipeline = try device.makeRenderPipelineState(descriptor: descriptor)
+            return try device.makeRenderPipelineState(descriptor: descriptor)
         } catch {
             throw LevelRendererError.shaders("debug: \(error)")
         }
+    }
+
+    /// Compiles `source` again; the pipeline is replaced only if it builds.
+    public func reloadShaders(source: String) throws {
+        pipeline = try Self.pipeline(device: pipeline.device, source: source, colorFormat: colorFormat,
+                                     depthFormat: depthFormat)
     }
 
     /// The vertices of `segments`: each end's point, its colour's bits last.

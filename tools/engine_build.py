@@ -121,6 +121,8 @@ def bundle(executable: Path, codesign: str, version: str, app: Path) -> None:
     (staging / "Contents" / "Info.plist").write_bytes(info_plist(version))
     # the HUD's redraws (HudPass.swift)
     shutil.copytree(ROOT / "port" / "assets" / "hud", staging / "Contents" / "Resources" / "hud")
+    # the renderer's shaders, compiled at run time (ShaderSources.swift)
+    shutil.copytree(ROOT / "engine" / "app" / "Shaders", staging / "Contents" / "Resources" / "shaders")
     # the menus' fonts and the shell's, with their licences (MenuFonts.swift,
     # TextPass.swift): Overpass and OpenCE only
     fonts = staging / "Contents" / "Resources" / "fonts"

@@ -154,71 +154,9 @@ struct HudInstance {
 }
 
 public final class HudPass {
-    static let source = """
-    #include <metal_stdlib>
-    using namespace metal;
-
-    struct HudInstance {
-        float4 rect;
-        float4 uv;
-        float4 color;
-        float4 min_color;
-        float4 max_color;
-        float4 empty_color;
-        float4 parameters;
-    };
-
-    struct HudVarying {
-        float4 position [[position]];
-        float2 uv;
-        uint instance [[flat]];
-    };
-
-    vertex HudVarying hud_vertex(uint vertex_id [[vertex_id]], uint instance [[instance_id]],
-                                 const device HudInstance *instances [[buffer(0)]]) {
-        // (two triangles: 0 1 2, 2 1 3 of the corners left top, right top,
-        // left bottom, right bottom)
-        const uint corners[6] = {0, 1, 2, 2, 1, 3};
-        uint corner = corners[vertex_id];
-        HudInstance quad = instances[instance];
-        bool right = (corner & 1) != 0, bottom = (corner & 2) != 0;
-        HudVarying out;
-        out.position = float4(right ? quad.rect.z : quad.rect.x, bottom ? quad.rect.w : quad.rect.y, 0, 1);
-        out.uv = float2(right ? quad.uv.z : quad.uv.x, bottom ? quad.uv.w : quad.uv.y);
-        out.instance = instance;
-        return out;
-    }
-
-    // premultiplied out
-    fragment float4 hud_fragment(HudVarying in [[stage_in]], texture2d<float> art [[texture(0)]],
-                                 sampler linear [[sampler(0)]],
-                                 const device HudInstance *instances [[buffer(0)]]) {
-        HudInstance quad = instances[in.instance];
-        float4 texel = art.sample(linear, in.uv);
-        float threshold = quad.parameters.x;
-        float kind = quad.parameters.y;
-        if (kind == 2.0 && threshold >= 0.0) {
-            float along = texel.b;
-            uint2 size = uint2(art.get_width(), art.get_height());
-            uint2 pixel = uint2(clamp(floor(in.uv * float2(size)), float2(0), float2(size) - 1));
-            float segment = art.read(pixel).r;
-            if (segment > 0.0) along = segment;
-            float4 colour = along <= threshold ? mix(quad.min_color, quad.max_color, threshold) : quad.empty_color;
-            float alpha = colour.a * texel.g * quad.color.a;
-            return float4(colour.rgb * alpha, alpha);
-        }
-        // (the game's "alpha multiply add", one and one less the source's
-        // alpha: the colour's alpha darkens what is behind but doesn't fade
-        // the colour, so a crosshair of no alpha is added to the frame)
-        if (kind == 1.0) {
-            return float4(texel.rgb * quad.color.rgb, texel.a * quad.color.a);
-        }
-        return float4(texel.rgb * texel.a * quad.color.rgb, texel.a * quad.color.a);
-    }
-    """
-
     let art: HudArt
-    private let pipeline: MTLRenderPipelineState
+    private var pipeline: MTLRenderPipelineState
+    private let outputFormat: MTLPixelFormat
     private let sampler: MTLSamplerState
     /// (one per frame in flight, grown as needed)
     private var buffers: [MTLBuffer?] = [nil, nil, nil]
@@ -229,24 +167,12 @@ public final class HudPass {
     public private(set) var lastDrawn = 0
     public private(set) var lastMissing: Set<String> = []
 
-    public init(device: MTLDevice, art: HudArt, outputFormat: MTLPixelFormat) throws {
+    public init(device: MTLDevice, art: HudArt, outputFormat: MTLPixelFormat,
+                source: String? = nil) throws {
         self.art = art
-        do {
-            let library = try device.makeLibrary(source: Self.source, options: nil)
-            let descriptor = MTLRenderPipelineDescriptor()
-            descriptor.vertexFunction = library.makeFunction(name: "hud_vertex")
-            descriptor.fragmentFunction = library.makeFunction(name: "hud_fragment")
-            let color = descriptor.colorAttachments[0]!
-            color.pixelFormat = outputFormat
-            color.isBlendingEnabled = true
-            color.sourceRGBBlendFactor = .one
-            color.destinationRGBBlendFactor = .oneMinusSourceAlpha
-            color.sourceAlphaBlendFactor = .one
-            color.destinationAlphaBlendFactor = .oneMinusSourceAlpha
-            pipeline = try device.makeRenderPipelineState(descriptor: descriptor)
-        } catch {
-            throw LevelRendererError.shaders("HUD: \(error)")
-        }
+        self.outputFormat = outputFormat
+        pipeline = try Self.pipeline(device: device, source: source ?? ShaderSources.source(.hud),
+                                     outputFormat: outputFormat)
         let samplerDescriptor = MTLSamplerDescriptor()
         samplerDescriptor.minFilter = .linear
         samplerDescriptor.magFilter = .linear
@@ -257,6 +183,31 @@ public final class HudPass {
             throw LevelRendererError.resources("HUD sampler")
         }
         self.sampler = sampler
+    }
+
+    private static func pipeline(device: MTLDevice, source: String,
+                                 outputFormat: MTLPixelFormat) throws -> MTLRenderPipelineState {
+        do {
+            let library = try device.makeLibrary(source: source, options: nil)
+            let descriptor = MTLRenderPipelineDescriptor()
+            descriptor.vertexFunction = try library.required("hud_vertex")
+            descriptor.fragmentFunction = try library.required("hud_fragment")
+            guard let color = descriptor.colorAttachments[0] else { throw LevelRendererError.shaders("attachment") }
+            color.pixelFormat = outputFormat
+            color.isBlendingEnabled = true
+            color.sourceRGBBlendFactor = .one
+            color.destinationRGBBlendFactor = .oneMinusSourceAlpha
+            color.sourceAlphaBlendFactor = .one
+            color.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+            return try device.makeRenderPipelineState(descriptor: descriptor)
+        } catch {
+            throw LevelRendererError.shaders("HUD: \(error)")
+        }
+    }
+
+    /// Compiles `source` again; the pipeline is replaced only if it builds.
+    public func reloadShaders(source: String) throws {
+        pipeline = try Self.pipeline(device: pipeline.device, source: source, outputFormat: outputFormat)
     }
 
     static func color(_ argb: UInt32) -> SIMD4<Float> {

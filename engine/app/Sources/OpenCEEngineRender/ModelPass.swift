@@ -79,10 +79,11 @@ final class ModelPass {
     let indices: MTLBuffer
     let models: [Model]
     let geometries: [[Draw]]
-    private let opaque: MTLRenderPipelineState
-    private let blended: MTLRenderPipelineState
-    private let skyOpaque: MTLRenderPipelineState
-    private let skyBlended: MTLRenderPipelineState
+    private var opaque: MTLRenderPipelineState
+    private var blended: MTLRenderPipelineState
+    private var skyOpaque: MTLRenderPipelineState
+    private var skyBlended: MTLRenderPipelineState
+    private let vertexStride: Int
     private let skyDepth: MTLDepthStencilState
     /// (one per frame in flight, grown as needed)
     private var skins: [MTLBuffer?] = [nil, nil, nil]
@@ -161,11 +162,34 @@ final class ModelPass {
         self.models = models
         self.geometries = geometries
 
+        vertexStride = Int(geometry.modelVertexStride())
+        let made = try Self.pipelines(device: device, library: library, stride: vertexStride)
+        (opaque, blended, skyOpaque, skyBlended) = (made.opaque, made.blended, made.skyOpaque, made.skyBlended)
+        // the sky is behind everything: drawn first, over the cleared
+        // depth, without writing it
+        let skyDepthDescriptor = MTLDepthStencilDescriptor()
+        skyDepthDescriptor.depthCompareFunction = .always
+        skyDepthDescriptor.isDepthWriteEnabled = false
+        guard let skyDepth = device.makeDepthStencilState(descriptor: skyDepthDescriptor) else {
+            throw LevelRendererError.resources("sky depth state")
+        }
+        self.skyDepth = skyDepth
+    }
+
+    /// The objects' and the sky's pipelines.
+    struct Pipelines {
+        var opaque: MTLRenderPipelineState
+        var blended: MTLRenderPipelineState
+        var skyOpaque: MTLRenderPipelineState
+        var skyBlended: MTLRenderPipelineState
+    }
+
+    private static func pipelines(device: MTLDevice, library: MTLLibrary, stride: Int) throws -> Pipelines {
         func pipeline(blended: Bool, sky: Bool = false) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
-            descriptor.vertexFunction = library.makeFunction(name: sky ? "sky_vertex" : "model_vertex")
-            descriptor.fragmentFunction = library.makeFunction(name: sky ? "sky_fragment" : "model_fragment")
-            descriptor.vertexDescriptor = Self.vertexDescriptor(stride: Int(geometry.modelVertexStride()))
+            descriptor.vertexFunction = try library.required(sky ? "sky_vertex" : "model_vertex")
+            descriptor.fragmentFunction = try library.required(sky ? "sky_fragment" : "model_fragment")
+            descriptor.vertexDescriptor = Self.vertexDescriptor(stride: stride)
             descriptor.colorAttachments[0].pixelFormat = LevelRenderer.frameFormat
             descriptor.depthAttachmentPixelFormat = LevelRenderer.depthFormat
             if blended {
@@ -179,22 +203,22 @@ final class ModelPass {
             return try device.makeRenderPipelineState(descriptor: descriptor)
         }
         do {
-            opaque = try pipeline(blended: false)
-            blended = try pipeline(blended: true)
-            skyOpaque = try pipeline(blended: false, sky: true)
-            skyBlended = try pipeline(blended: true, sky: true)
+            return Pipelines(opaque: try pipeline(blended: false), blended: try pipeline(blended: true),
+                             skyOpaque: try pipeline(blended: false, sky: true),
+                             skyBlended: try pipeline(blended: true, sky: true))
         } catch {
             throw LevelRendererError.shaders("\(error)")
         }
-        // the sky is behind everything: drawn first, over the cleared
-        // depth, without writing it
-        let skyDepthDescriptor = MTLDepthStencilDescriptor()
-        skyDepthDescriptor.depthCompareFunction = .always
-        skyDepthDescriptor.isDepthWriteEnabled = false
-        guard let skyDepth = device.makeDepthStencilState(descriptor: skyDepthDescriptor) else {
-            throw LevelRendererError.resources("sky depth state")
-        }
-        self.skyDepth = skyDepth
+    }
+
+    /// The pipelines from a library compiled again (not yet used).
+    func pipelines(library: MTLLibrary) throws -> Pipelines {
+        try Self.pipelines(device: library.device, library: library, stride: vertexStride)
+    }
+
+    func use(_ pipelines: Pipelines) {
+        (opaque, blended, skyOpaque, skyBlended) = (pipelines.opaque, pipelines.blended, pipelines.skyOpaque,
+                                                    pipelines.skyBlended)
     }
 
     /// A permutation's geometry at `level`, or the nearest below it, or

@@ -188,69 +188,21 @@ struct TextInstance {
 
 /// Draws text items over a finished frame.
 public final class TextPass {
-    static let source = """
-    #include <metal_stdlib>
-    using namespace metal;
-
-    struct TextInstance {
-        float4 rect;
-        float4 uv;
-        float4 color;
-    };
-
-    struct TextVarying {
-        float4 position [[position]];
-        float2 uv;
-        float4 color [[flat]];
-    };
-
-    vertex TextVarying text_vertex(uint vertex_id [[vertex_id]], uint instance [[instance_id]],
-                                   const device TextInstance *instances [[buffer(0)]]) {
-        const uint corners[6] = {0, 1, 2, 2, 1, 3};
-        uint corner = corners[vertex_id];
-        TextInstance quad = instances[instance];
-        bool right = (corner & 1) != 0, bottom = (corner & 2) != 0;
-        TextVarying out;
-        out.position = float4(right ? quad.rect.z : quad.rect.x, bottom ? quad.rect.w : quad.rect.y, 0, 1);
-        out.uv = float2(right ? quad.uv.z : quad.uv.x, bottom ? quad.uv.w : quad.uv.y);
-        out.color = quad.color;
-        return out;
-    }
-
-    // premultiplied out
-    fragment float4 text_fragment(TextVarying in [[stage_in]], texture2d<float> atlas [[texture(0)]],
-                                  sampler nearest [[sampler(0)]]) {
-        float alpha = atlas.sample(nearest, in.uv).r * in.color.a;
-        return float4(in.color.rgb * alpha, alpha);
-    }
-    """
-
     public let atlas: GlyphAtlas
-    private let pipeline: MTLRenderPipelineState
+    private var pipeline: MTLRenderPipelineState
+    private let outputFormat: MTLPixelFormat
     private let sampler: MTLSamplerState
     private var buffers: [MTLBuffer?] = [nil, nil, nil]
     private var frame = 0
     /// The quads drawn in the last frame, for tests.
     public private(set) var lastDrawn = 0
 
-    public init(device: MTLDevice, atlas: GlyphAtlas, outputFormat: MTLPixelFormat) throws {
+    public init(device: MTLDevice, atlas: GlyphAtlas, outputFormat: MTLPixelFormat,
+                source: String? = nil) throws {
         self.atlas = atlas
-        do {
-            let library = try device.makeLibrary(source: Self.source, options: nil)
-            let descriptor = MTLRenderPipelineDescriptor()
-            descriptor.vertexFunction = library.makeFunction(name: "text_vertex")
-            descriptor.fragmentFunction = library.makeFunction(name: "text_fragment")
-            guard let color = descriptor.colorAttachments[0] else { throw TextError.resources("attachment") }
-            color.pixelFormat = outputFormat
-            color.isBlendingEnabled = true
-            color.sourceRGBBlendFactor = .one
-            color.destinationRGBBlendFactor = .oneMinusSourceAlpha
-            color.sourceAlphaBlendFactor = .one
-            color.destinationAlphaBlendFactor = .oneMinusSourceAlpha
-            pipeline = try device.makeRenderPipelineState(descriptor: descriptor)
-        } catch {
-            throw TextError.resources("\(error)")
-        }
+        self.outputFormat = outputFormat
+        pipeline = try Self.pipeline(device: device, source: source ?? ShaderSources.source(.text),
+                                     outputFormat: outputFormat)
         let samplerDescriptor = MTLSamplerDescriptor()
         samplerDescriptor.minFilter = .nearest
         samplerDescriptor.magFilter = .nearest
@@ -260,6 +212,31 @@ public final class TextPass {
             throw TextError.resources("sampler")
         }
         self.sampler = sampler
+    }
+
+    private static func pipeline(device: MTLDevice, source: String,
+                                 outputFormat: MTLPixelFormat) throws -> MTLRenderPipelineState {
+        do {
+            let library = try device.makeLibrary(source: source, options: nil)
+            let descriptor = MTLRenderPipelineDescriptor()
+            descriptor.vertexFunction = try library.required("text_vertex")
+            descriptor.fragmentFunction = try library.required("text_fragment")
+            guard let color = descriptor.colorAttachments[0] else { throw TextError.resources("attachment") }
+            color.pixelFormat = outputFormat
+            color.isBlendingEnabled = true
+            color.sourceRGBBlendFactor = .one
+            color.destinationRGBBlendFactor = .oneMinusSourceAlpha
+            color.sourceAlphaBlendFactor = .one
+            color.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+            return try device.makeRenderPipelineState(descriptor: descriptor)
+        } catch {
+            throw TextError.resources("\(error)")
+        }
+    }
+
+    /// Compiles `source` again; the pipeline is replaced only if it builds.
+    public func reloadShaders(source: String) throws {
+        pipeline = try Self.pipeline(device: pipeline.device, source: source, outputFormat: outputFormat)
     }
 
     /// The quads of `items` over a target `width` by `height`.

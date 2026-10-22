@@ -1,5 +1,6 @@
-// The level's Metal shaders, compiled from source once when a level
-// loads (swift build does not compile .metal files).
+// The level's and its objects' Metal shaders (LevelRenderer.swift,
+// ModelPass.swift), compiled from source when a level loads, and again
+// when this file changes in a development build (ShaderSources.swift).
 //
 // A surface is its base map, its detail maps combined as its environment
 // shader says, times its lightmap page: as the stock game draws it, in
@@ -9,7 +10,6 @@
 // distance along the view, as the game's vertex shaders' fog constants
 // do; the sky itself is drawn first, at infinity, unfogged.
 
-let levelShaderSource = """
 #include <metal_stdlib>
 using namespace metal;
 
@@ -326,4 +326,3 @@ fragment float4 tone_fragment(ToneOut in [[stage_in]], texture2d<float> frame [[
     float3 eased = 0.8 + 0.2 * (1 - exp(-over / 0.2));
     return float4(select(color, eased, color > 0.8), 1);
 }
-"""

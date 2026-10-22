@@ -129,10 +129,11 @@ public final class LevelRenderer {
     let models: ModelPass
     /// The level's sky (its model is drawn first, at infinity).
     let sky: RenderSky?
-    private let opaque: MTLRenderPipelineState
-    private let blended: [MTLRenderPipelineState]
-    private let tone: MTLRenderPipelineState
-    private let motion: MTLRenderPipelineState
+    private var opaque: MTLRenderPipelineState
+    private var blended: [MTLRenderPipelineState]
+    private var tone: MTLRenderPipelineState
+    private var motion: MTLRenderPipelineState
+    private let vertexStride: Int
     private let depthWrite: MTLDepthStencilState
     private let depthTest: MTLDepthStencilState
     private let wrap: MTLSamplerState
@@ -182,7 +183,7 @@ public final class LevelRenderer {
     public var fog: RenderFog? { sky?.fog }
 
     public init(device: MTLDevice, geometry: LevelGeometry, outputFormat: MTLPixelFormat = .bgra8Unorm,
-                settings: VideoSettings = VideoSettings()) throws {
+                settings: VideoSettings = VideoSettings(), source: String? = nil) throws {
         self.device = device
         self.outputFormat = outputFormat
         self.settings = settings
@@ -241,61 +242,10 @@ public final class LevelRenderer {
         self.opaqueDraws = opaqueDraws
         self.blendedDraws = blendedDraws
 
-        let library: MTLLibrary
-        do {
-            library = try device.makeLibrary(source: levelShaderSource, options: nil)
-        } catch {
-            throw LevelRendererError.shaders("\(error)")
-        }
-        let stride = Int(geometry.vertexStride())
-        func pipeline(_ blend: BlendFunction?) throws -> MTLRenderPipelineState {
-            let descriptor = MTLRenderPipelineDescriptor()
-            descriptor.vertexFunction = library.makeFunction(name: "level_vertex")
-            descriptor.fragmentFunction = library.makeFunction(name: "level_fragment")
-            descriptor.vertexDescriptor = Self.vertexDescriptor(stride: stride)
-            descriptor.colorAttachments[0].pixelFormat = Self.frameFormat
-            descriptor.depthAttachmentPixelFormat = Self.depthFormat
-            if let blend {
-                let color = descriptor.colorAttachments[0]!
-                color.isBlendingEnabled = true
-                color.rgbBlendOperation = .add
-                color.alphaBlendOperation = .add
-                // (the frame's alpha is not shown: kept at one)
-                color.sourceAlphaBlendFactor = .zero
-                color.destinationAlphaBlendFactor = .one
-                switch blend {
-                case .alphaBlend:
-                    color.sourceRGBBlendFactor = .sourceAlpha
-                    color.destinationRGBBlendFactor = .oneMinusSourceAlpha
-                case .multiply:
-                    color.sourceRGBBlendFactor = .destinationColor
-                    color.destinationRGBBlendFactor = .zero
-                case .doubleMultiply:
-                    color.sourceRGBBlendFactor = .destinationColor
-                    color.destinationRGBBlendFactor = .sourceColor
-                case .add:
-                    color.sourceRGBBlendFactor = .one
-                    color.destinationRGBBlendFactor = .one
-                }
-            }
-            return try device.makeRenderPipelineState(descriptor: descriptor)
-        }
-        do {
-            opaque = try pipeline(nil)
-            blended = try Self.blendFunctions.map { try pipeline($0) }
-            let toneDescriptor = MTLRenderPipelineDescriptor()
-            toneDescriptor.vertexFunction = library.makeFunction(name: "tone_vertex")
-            toneDescriptor.fragmentFunction = library.makeFunction(name: "tone_fragment")
-            toneDescriptor.colorAttachments[0].pixelFormat = outputFormat
-            tone = try device.makeRenderPipelineState(descriptor: toneDescriptor)
-            let motionDescriptor = MTLRenderPipelineDescriptor()
-            motionDescriptor.vertexFunction = library.makeFunction(name: "tone_vertex")
-            motionDescriptor.fragmentFunction = library.makeFunction(name: "motion_fragment")
-            motionDescriptor.colorAttachments[0].pixelFormat = TemporalScaling.motionFormat
-            motion = try device.makeRenderPipelineState(descriptor: motionDescriptor)
-        } catch {
-            throw LevelRendererError.shaders("\(error)")
-        }
+        let library = try Self.library(device: device, source: source ?? ShaderSources.source(.level))
+        vertexStride = Int(geometry.vertexStride())
+        (opaque, blended, tone, motion) = try Self.pipelines(device: device, library: library,
+                                                              stride: vertexStride, outputFormat: outputFormat)
         debug = try DebugPass(device: device, colorFormat: Self.frameFormat, depthFormat: Self.depthFormat)
         models = try ModelPass(device: device, library: library, geometry: geometry, textures: textures, white: white)
         sky = geometry.sky()
@@ -329,6 +279,78 @@ public final class LevelRenderer {
         self.depthTest = depthTest
         self.wrap = wrap
         self.clamp = clamp
+    }
+
+    private static func library(device: MTLDevice, source: String) throws -> MTLLibrary {
+        do {
+            return try device.makeLibrary(source: source, options: nil)
+        } catch {
+            throw LevelRendererError.shaders("\(error)")
+        }
+    }
+
+    private static func pipelines(device: MTLDevice, library: MTLLibrary, stride: Int, outputFormat: MTLPixelFormat)
+        throws -> (MTLRenderPipelineState, [MTLRenderPipelineState], MTLRenderPipelineState, MTLRenderPipelineState) {
+        func pipeline(_ blend: BlendFunction?) throws -> MTLRenderPipelineState {
+            let descriptor = MTLRenderPipelineDescriptor()
+            descriptor.vertexFunction = try library.required("level_vertex")
+            descriptor.fragmentFunction = try library.required("level_fragment")
+            descriptor.vertexDescriptor = Self.vertexDescriptor(stride: stride)
+            descriptor.colorAttachments[0].pixelFormat = Self.frameFormat
+            descriptor.depthAttachmentPixelFormat = Self.depthFormat
+            if let blend {
+                let color = descriptor.colorAttachments[0]!
+                color.isBlendingEnabled = true
+                color.rgbBlendOperation = .add
+                color.alphaBlendOperation = .add
+                // (the frame's alpha is not shown: kept at one)
+                color.sourceAlphaBlendFactor = .zero
+                color.destinationAlphaBlendFactor = .one
+                switch blend {
+                case .alphaBlend:
+                    color.sourceRGBBlendFactor = .sourceAlpha
+                    color.destinationRGBBlendFactor = .oneMinusSourceAlpha
+                case .multiply:
+                    color.sourceRGBBlendFactor = .destinationColor
+                    color.destinationRGBBlendFactor = .zero
+                case .doubleMultiply:
+                    color.sourceRGBBlendFactor = .destinationColor
+                    color.destinationRGBBlendFactor = .sourceColor
+                case .add:
+                    color.sourceRGBBlendFactor = .one
+                    color.destinationRGBBlendFactor = .one
+                }
+            }
+            return try device.makeRenderPipelineState(descriptor: descriptor)
+        }
+        do {
+            let opaque = try pipeline(nil)
+            let blended = try Self.blendFunctions.map { try pipeline($0) }
+            let toneDescriptor = MTLRenderPipelineDescriptor()
+            toneDescriptor.vertexFunction = try library.required("tone_vertex")
+            toneDescriptor.fragmentFunction = try library.required("tone_fragment")
+            toneDescriptor.colorAttachments[0].pixelFormat = outputFormat
+            let tone = try device.makeRenderPipelineState(descriptor: toneDescriptor)
+            let motionDescriptor = MTLRenderPipelineDescriptor()
+            motionDescriptor.vertexFunction = try library.required("tone_vertex")
+            motionDescriptor.fragmentFunction = try library.required("motion_fragment")
+            motionDescriptor.colorAttachments[0].pixelFormat = TemporalScaling.motionFormat
+            let motion = try device.makeRenderPipelineState(descriptor: motionDescriptor)
+            return (opaque, blended, tone, motion)
+        } catch {
+            throw LevelRendererError.shaders("\(error)")
+        }
+    }
+
+    /// Compiles the level's shaders from `source` again, for the level and
+    /// its objects; the pipelines are replaced only if they all build.
+    public func reloadShaders(source: String) throws {
+        let library = try Self.library(device: device, source: source)
+        let level = try Self.pipelines(device: device, library: library, stride: vertexStride,
+                                       outputFormat: outputFormat)
+        let objects = try models.pipelines(library: library)
+        (opaque, blended, tone, motion) = level
+        models.use(objects)
     }
 
     static let blendFunctions: [BlendFunction] = [.alphaBlend, .multiply, .doubleMultiply, .add]

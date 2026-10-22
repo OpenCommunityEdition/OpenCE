@@ -208,6 +208,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The developer shell (~), and the pass that draws its text.
     var shell: ShellOverlay?
     var textPass: TextPass?
+    /// The shaders' watcher, in a build run from the checkout.
+    let shaders = ShaderReloader()
+    var lastShaderPoll: CFTimeInterval = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = mainMenu()
@@ -474,6 +477,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Compiles the shaders edited in the checkout again, once a second;
+    /// the shell shows what was reloaded and why a shader was not.
+    private func reloadShaders(now: CFTimeInterval) {
+        guard let shaders, now - lastShaderPoll >= 1 else { return }
+        lastShaderPoll = now
+        for reload in shaders.poll(level: level?.renderer, hud: hud, text: textPass) {
+            if let error = reload.error {
+                engineLog(level: "error", target: "shaders", text: "\(reload.shader.file) kept its old pipelines: \(error)")
+            } else {
+                engineLog(level: "info", target: "shaders", text: "\(reload.shader.file) reloaded")
+            }
+        }
+    }
+
     private func frame(_ link: CADisplayLink) {
         guard let controller else { return }
         let seconds = lastFrame.map { link.timestamp - $0 } ?? 0
@@ -500,6 +517,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         followStructure()
         showStatus()
         shell?.update(seconds: seconds, now: link.timestamp)
+        reloadShaders(now: link.timestamp)
         if controller.showsFrameTimes {
             // (four times a second, so that it can be read)
             if link.timestamp - lastOverlay >= 0.25 {
