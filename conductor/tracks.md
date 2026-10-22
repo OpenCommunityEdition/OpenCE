@@ -14,7 +14,7 @@ This file tracks all major tracks for the project.
 - [x] **Track: A new native engine in Rust and Swift: no 32-bit VM, maps imported to a typed format, a modern Metal renderer, and the game rebuilt in seven milestones**
   *Link: [./tracks/native_engine_20261021/](./tracks/native_engine_20261021/)*
 
-- [~] **Track: The developer shell, engine hooks and a test map: a terminal-like overlay, a control socket and the opence tool, debug drawing, live shader reload, a test driver, the devmap, and placement checks against the reference game**
+- [x] **Track: The developer shell, engine hooks and a test map: a terminal-like overlay, a control socket and the opence tool, debug drawing, live shader reload, a test driver, the devmap, and placement checks against the reference game**
   *Link: [./tracks/dev_tooling_20261021/](./tracks/dev_tooling_20261021/)*
 
 - [ ] **Track: Lighting, shaders, decals and effects drawn: a physically based shader model for every Halo shader class, re-baked bounced light with AO and probes, dynamic lights and shadows, lens flares, decals and particles drawn**
