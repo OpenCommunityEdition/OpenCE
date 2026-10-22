@@ -16,11 +16,12 @@ use opence_content::level::Level;
 use opence_content::pack::FORMAT_VERSION;
 
 use crate::chart::{Atlas, BakePoint, Chart};
+use crate::mood::{self, PageMood};
 use crate::probe::{self, ProbeGrid, REFLECTION_SIZE};
 use crate::scene::Scene;
 
 /// The baker's version: raised with any change to what it makes.
-pub const BAKE_VERSION: u32 = 1;
+pub const BAKE_VERSION: u32 = 3;
 /// The cache file's first eight bytes.
 pub const MAGIC: [u8; 8] = *b"OCEBAKE\0";
 
@@ -63,6 +64,9 @@ pub struct BakePlan {
     pub settings: BakeSettings,
     /// The cache key.
     pub key: u64,
+    /// Each chart's stock page's mean light under it, if it has one the
+    /// bake can read (for the mood check).
+    pub stock: Vec<Option<[f32; 3]>>,
 }
 
 /// A baked page: its texels' light, row by row from the top.
@@ -85,6 +89,9 @@ pub struct BakedPage {
 pub struct BakedLighting {
     /// The key it was baked for.
     pub key: u64,
+    /// The scale its light was given to keep the stock pages' brightness
+    /// ([`BakePlan::exposure`]).
+    pub exposure: f32,
     /// The lightmap pages.
     pub pages: Vec<BakedPage>,
     /// The irradiance probes' grid.
@@ -108,6 +115,11 @@ impl BakePlan {
         let grid = ProbeGrid::covering(scene.bounds);
         let reflections = probe::reflection_probes(&scene);
         let key = key(&scene, &atlas, &grid, &settings);
+        let stock = atlas
+            .charts
+            .iter()
+            .map(|chart| mood::stock_light(level, bsp, chart))
+            .collect();
         Some(Self {
             scene,
             atlas,
@@ -115,7 +127,32 @@ impl BakePlan {
             reflections,
             settings,
             key,
+            stock,
         })
+    }
+
+    /// Each baked page of `light` against its stock page, for the pages
+    /// with a stock page to compare with.
+    pub fn moods(&self, light: &BakedLighting) -> Vec<PageMood> {
+        let mut moods = Vec::new();
+        for ((chart, stock), page) in self.atlas.charts.iter().zip(&self.stock).zip(&light.pages) {
+            if let (Some(stock), Some(baked)) = (stock, mood::baked_light(chart, page)) {
+                moods.push(PageMood {
+                    page: chart.page,
+                    stock: *stock,
+                    baked,
+                    texels: mood::covered(chart),
+                });
+            }
+        }
+        moods
+    }
+
+    /// The scale [`Self::finish`] gives the tracer's light, so that the
+    /// baked pages keep their stock pages' brightness
+    /// ([`mood::fitted_exposure`]).
+    pub fn exposure(&self, irradiance: &[[f32; 4]]) -> f32 {
+        mood::fitted_exposure(&self.atlas.charts, &self.stock, irradiance)
     }
 
     /// The probes' points, six to a probe.
@@ -131,8 +168,9 @@ impl BakePlan {
     /// The baked light from the tracer's results: for the atlas's points,
     /// each its irradiance and occlusion and its direction and
     /// directionality; for the probes' points, each its irradiance and
-    /// occlusion; for the reflection points, each its radiance. A result
-    /// that is missing is dark.
+    /// occlusion; for the reflection points, each its radiance. Each is
+    /// scaled by the BSP's [`Self::exposure`]. A result that is missing is
+    /// dark.
     pub fn finish(
         &self,
         irradiance: &[[f32; 4]],
@@ -140,6 +178,18 @@ impl BakePlan {
         probes: &[[f32; 4]],
         radiance: &[[f32; 4]],
     ) -> BakedLighting {
+        let exposure = self.exposure(irradiance);
+        let exposed = |light: &[[f32; 4]]| -> Vec<[f32; 4]> {
+            light
+                .iter()
+                .map(|&[r, g, b, a]| [r * exposure, g * exposure, b * exposure, a])
+                .collect()
+        };
+        let (irradiance, probes, radiance) = (
+            &exposed(irradiance)[..],
+            &exposed(probes)[..],
+            &exposed(radiance)[..],
+        );
         let pages = self
             .atlas
             .charts
@@ -162,6 +212,7 @@ impl BakePlan {
         }
         BakedLighting {
             key: self.key,
+            exposure,
             pages,
             grid: self.grid,
             probes: probe_light,
@@ -344,6 +395,7 @@ impl BakedLighting {
         bytes.extend_from_slice(&MAGIC);
         put_u32(&mut bytes, BAKE_VERSION);
         bytes.extend_from_slice(&self.key.to_le_bytes());
+        bytes.extend_from_slice(&self.exposure.to_le_bytes());
         put_u32(&mut bytes, self.pages.len() as u32);
         for page in &self.pages {
             for value in [page.page, page.width, page.height] {
@@ -385,6 +437,7 @@ impl BakedLighting {
                 .try_into()
                 .map_err(|_| CacheError::Truncated)?,
         );
+        let exposure = reader.f32()?;
         let page_count = reader.u32()?;
         let mut pages = Vec::new();
         for _ in 0..page_count {
@@ -435,6 +488,7 @@ impl BakedLighting {
         }
         Ok(Self {
             key,
+            exposure,
             pages,
             grid,
             probes,
@@ -502,6 +556,43 @@ mod tests {
     fn devmap_plan(settings: BakeSettings) -> BakePlan {
         let level = opence_content::devmap::level(None);
         BakePlan::of(&level, 0, settings).unwrap_or_else(|| panic!("no BSP"))
+    }
+
+    #[test]
+    fn pages_are_compared_with_their_stock_pages() {
+        let mut plan = devmap_plan(BakeSettings::default());
+        assert!(plan.stock.is_empty());
+        let light = plan.finish(&[], &[], &[], &[]);
+        assert!(plan.moods(&light).is_empty());
+        // two charts of one texel each, the second with no stock page
+        for page in 0..2 {
+            plan.atlas.charts.push(Chart {
+                page,
+                width: 1,
+                height: 1,
+                texels: vec![page],
+            });
+        }
+        plan.stock = vec![Some([0.25; 3]), None];
+        let pi = std::f32::consts::PI;
+        let light = plan.finish(&[[pi, pi, pi, 1.0], [pi; 4]], &[], &[], &[]);
+        let moods = plan.moods(&light);
+        assert_eq!(moods.len(), 1);
+        assert_eq!(
+            (moods[0].page, moods[0].stock, moods[0].texels),
+            (0, [0.25; 3], 1)
+        );
+        // (the light of pi shows as 1, so the exposure brings it down to
+        // the stock page's quarter, and the light is kept so exposed)
+        assert!((moods[0].baked[0] - 0.25).abs() < 1e-3, "{:?}", moods[0]);
+        assert!(
+            light.exposure > 0.0 && light.exposure < 1.0,
+            "{}",
+            light.exposure
+        );
+        let back =
+            BakedLighting::decode(&light.encode()).unwrap_or_else(|error| panic!("{error:?}"));
+        assert_eq!(back.exposure, light.exposure);
     }
 
     #[test]

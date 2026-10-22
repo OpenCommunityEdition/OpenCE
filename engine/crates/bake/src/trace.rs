@@ -8,6 +8,13 @@
 //! (Russian roulette ends the path). The sky's lights are sampled directly
 //! at every point on the path (next-event estimation), within the cone
 //! each covers, so that their shadows are soft by their size.
+//!
+//! The glowing surfaces are sampled directly too: at each point one
+//! emitter is chosen by its power and a point on it evenly by area. A
+//! glowing surface is then found both ways, by a sample towards it and by
+//! a path that meets it, and each way's light is weighted by the power
+//! heuristic (multiple importance sampling), so that a small bright lamp
+//! is found by its samples and a broad dim one by the paths.
 
 use crate::bvh::{Bvh, Hit, Ray};
 use crate::scene::Scene;
@@ -111,7 +118,8 @@ impl Tracer<'_> {
                 direction,
                 t_max: RAY_LENGTH,
             };
-            let (radiance, first) = self.radiance(&ray, random);
+            let cosine = dot(normal, direction) * core::f32::consts::FRAC_1_PI;
+            let (radiance, first) = self.radiance(&ray, Some(cosine), random);
             if first.is_none_or(|t| t > self.occlusion_distance) {
                 open += 1;
             }
@@ -156,7 +164,9 @@ impl Tracer<'_> {
         };
         let mut total = [0.0f64; 3];
         for _ in 0..samples {
-            let (radiance, _) = self.radiance(&ray, random);
+            // (nothing samples the emitters from the probe: what it sees
+            // of them, it takes whole)
+            let (radiance, _) = self.radiance(&ray, None, random);
             for (sum, channel) in total.iter_mut().zip(radiance) {
                 *sum += f64::from(channel);
             }
@@ -164,9 +174,9 @@ impl Tracer<'_> {
         total.map(|sum| (sum / f64::from(samples)) as f32)
     }
 
-    /// The sky's lights on a surface at `origin` facing `normal`: each
-    /// light's sampled direction and the light it gives there (zero when
-    /// shadowed).
+    /// The sky's lights on a surface at `origin` facing `normal`, and one
+    /// sampled emitter's: each light's sampled direction and the light it
+    /// gives there (left out when shadowed).
     fn direct(
         &self,
         origin: [f32; 3],
@@ -190,25 +200,118 @@ impl Tracer<'_> {
             }
             lights.push((towards, scale(light.irradiance, facing)));
         }
+        if let Some(emitted) = self.emitter(origin, normal, random) {
+            lights.push(emitted);
+        }
         lights
     }
 
+    /// The light of a point on an emitter, chosen by the emitters' power,
+    /// on a surface at `origin` facing `normal`: its direction and its
+    /// irradiance there, weighted against a path's finding it. None when
+    /// there are no emitters, or the point is behind the surface or
+    /// shadowed.
+    fn emitter(
+        &self,
+        origin: [f32; 3],
+        normal: [f32; 3],
+        random: &mut Random,
+    ) -> Option<([f32; 3], [f32; 3])> {
+        let emitters = &self.scene.emitters;
+        let pick = random.next_f32();
+        let index = emitters
+            .partition_point(|emitter| emitter.cumulative <= pick)
+            .min(emitters.len().checked_sub(1)?);
+        let emitter = emitters.get(index)?;
+        let (u, v) = (random.next_f32(), random.next_f32());
+        let root = u.sqrt();
+        let [a, b, c] = emitter.corners;
+        let point = add(
+            add(scale(a, 1.0 - root), scale(b, root * (1.0 - v))),
+            scale(c, root * v),
+        );
+        let to = sub(point, origin);
+        let distance_squared = dot(to, to);
+        let distance = distance_squared.sqrt();
+        if distance.is_nan() || distance <= 0.0 {
+            return None;
+        }
+        let towards = scale(to, 1.0 / distance);
+        let facing = dot(normal, towards);
+        let surface = normalize(cross(sub(b, a), sub(c, a)));
+        let cosine = dot(surface, towards).abs();
+        if facing <= 0.0 || cosine <= 0.0 {
+            return None;
+        }
+        // (the chance of the direction, per unit solid angle: per unit of
+        // area, then over the area the solid angle there spans)
+        let density = luminance(emitter.emission) / self.scene.emitter_power;
+        let chosen = density * distance_squared / cosine;
+        let weight = power_heuristic(chosen, facing * core::f32::consts::FRAC_1_PI);
+        let reach = distance * (1.0 - 1e-4) - SURFACE_OFFSET;
+        let ray = Ray {
+            origin,
+            direction: towards,
+            t_max: reach,
+        };
+        if !(chosen > 0.0 && chosen.is_finite()) || (reach > 0.0 && self.blocked(&ray, random)) {
+            return None;
+        }
+        Some((towards, scale(emitter.emission, facing * weight / chosen)))
+    }
+
+    /// The light a path takes from a glowing surface of `material` it met
+    /// `distance` along a ray whose direction is `cosine` to the surface:
+    /// all of it when nothing sampled the emitters at the ray's start
+    /// (`density` None), else weighted against those samples (`density`
+    /// the chance of the ray's direction there, per unit solid angle).
+    fn seen(
+        &self,
+        material: &crate::scene::BakeMaterial,
+        distance: f32,
+        cosine: f32,
+        density: Option<f32>,
+    ) -> [f32; 3] {
+        let Some(density) = density else {
+            return material.emission;
+        };
+        let cosine = cosine.abs();
+        let sampled = if cosine > 0.0 {
+            self.scene.emitter_density(material) * distance * distance / cosine
+        } else {
+            f32::INFINITY
+        };
+        scale(material.emission, power_heuristic(density, sampled))
+    }
+
     /// The light coming back along `ray`, and how far it went to the first
-    /// surface it met (None: it left the level).
-    fn radiance(&self, ray: &Ray, random: &mut Random) -> ([f32; 3], Option<f32>) {
+    /// surface it met (None: it left the level). `density` is the chance
+    /// of the ray's direction per unit solid angle where it starts, if
+    /// the emitters were sampled there.
+    fn radiance(
+        &self,
+        ray: &Ray,
+        density: Option<f32>,
+        random: &mut Random,
+    ) -> ([f32; 3], Option<f32>) {
         let mut ray = *ray;
+        let mut density = density;
         let mut light = [0.0f32; 3];
         let mut throughput = [1.0f32; 3];
         let mut first = None;
         for bounce in 0..MAX_BOUNCES {
-            let Some((hit, point, normal, material)) = self.meet(&ray, random) else {
+            let mut glow = [0.0f32; 3];
+            let met = self.meet(&ray, random, Some((&mut glow, density)));
+            light = add(light, mul(throughput, glow));
+            let Some((hit, point, normal, material)) = met else {
                 light = add(light, mul(throughput, self.scene.sky));
                 break;
             };
             if bounce == 0 {
                 first = Some(hit.t);
             }
-            light = add(light, mul(throughput, material.emission));
+            let emission = self.seen(material, hit.t, dot(normal, ray.direction), density);
+            light = add(light, mul(throughput, emission));
             let origin = add(point, scale(normal, SURFACE_OFFSET));
             // (a Lambertian surface: radiance is albedo over pi times its
             // irradiance; the next ray's cosine sampling cancels the pi)
@@ -227,9 +330,11 @@ impl Tracer<'_> {
             if throughput.iter().all(|channel| *channel <= 0.0) {
                 break;
             }
+            let direction = cosine_direction(normal, random);
+            density = Some(dot(normal, direction) * core::f32::consts::FRAC_1_PI);
             ray = Ray {
                 origin,
-                direction: cosine_direction(normal, random),
+                direction,
                 t_max: RAY_LENGTH,
             };
         }
@@ -238,11 +343,15 @@ impl Tracer<'_> {
 
     /// The first solid surface `ray` meets: the hit, the point, the
     /// normal facing back along the ray, and its material. A ray passes
-    /// through an alpha-tested surface by the share of it that is open.
+    /// through an alpha-tested surface by the share of it that is open,
+    /// and through a glowing transparent one, whose light it adds to
+    /// `glow` (weighted as [`Tracer::seen`] says, by the density given
+    /// with it), when given.
     fn meet(
         &self,
         ray: &Ray,
         random: &mut Random,
+        mut glow: Option<(&mut [f32; 3], Option<f32>)>,
     ) -> Option<(Hit, [f32; 3], [f32; 3], &crate::scene::BakeMaterial)> {
         let mut ray = *ray;
         let mut travelled = 0.0;
@@ -263,6 +372,10 @@ impl Tracer<'_> {
                 return Some((hit, point, normal, material));
             }
             travelled += hit.t;
+            if let Some((glow, density)) = glow.as_mut() {
+                let cosine = dot(normal, ray.direction);
+                **glow = add(**glow, self.seen(material, travelled, cosine, *density));
+            }
             ray.origin = add(point, scale(ray.direction, SURFACE_OFFSET));
             ray.t_max -= hit.t;
         }
@@ -270,9 +383,10 @@ impl Tracer<'_> {
     }
 
     /// Whether `ray` is stopped before it leaves the level (passing
-    /// through alpha-tested surfaces by their open share).
+    /// through alpha-tested surfaces by their open share, and through
+    /// transparent ones).
     fn blocked(&self, ray: &Ray, random: &mut Random) -> bool {
-        self.meet(ray, random).is_some()
+        self.meet(ray, random, None).is_some()
     }
 }
 
@@ -358,16 +472,33 @@ fn scale(a: [f32; 3], by: f32) -> [f32; 3] {
     a.map(|axis| axis * by)
 }
 
-fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
+pub(crate) fn sub(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    std::array::from_fn(|axis| a[axis] - b[axis])
+}
+
+pub(crate) fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
-fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+pub(crate) fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
     [
         a[1] * b[2] - a[2] * b[1],
         a[2] * b[0] - a[0] * b[2],
         a[0] * b[1] - a[1] * b[0],
     ]
+}
+
+/// The power heuristic's weight for a sample drawn with the density
+/// `chosen`, when `other` could have drawn it too.
+fn power_heuristic(chosen: f32, other: f32) -> f32 {
+    let (a, b) = (chosen * chosen, other * other);
+    if a + b > 0.0 && (a + b).is_finite() {
+        a / (a + b)
+    } else if chosen.is_infinite() {
+        1.0
+    } else {
+        0.0
+    }
 }
 
 fn normalize(a: [f32; 3]) -> [f32; 3] {

@@ -6,6 +6,7 @@
 
 use std::sync::Arc;
 
+use opence_bake::mood::BspMood;
 use opence_bake::output::BAKE_VERSION;
 use opence_bake::{
     chart, layout, BakePlan, BakeSettings, BakedLighting, Bvh, Random, Scene, Tracer,
@@ -104,6 +105,11 @@ impl BakeScene {
         self.scene.light_bytes()
     }
 
+    /// The glowing triangles, 64 bytes each.
+    pub fn emitter_bytes(&self) -> Vec<u8> {
+        self.scene.emitter_bytes()
+    }
+
     /// The sky dome's light: red, green and blue, linear.
     pub fn sky(&self) -> Vec<f32> {
         self.scene.sky.to_vec()
@@ -176,6 +182,43 @@ pub struct BakedLightPage {
     /// Its texels' light direction (`0.5 + 0.5 * direction`) and
     /// directionality: four bytes each.
     pub directions: Vec<u8>,
+}
+
+/// A baked page's light against its stock page's (the mood check).
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
+pub struct BakeMood {
+    /// The page, in the BSP's lightmaps.
+    pub page: u32,
+    /// The stock page's mean light: red, green, blue, as stored.
+    pub stock: Vec<f32>,
+    /// The baked page's, as the level shader reads it.
+    pub baked: Vec<f32>,
+    /// How many texels were compared.
+    pub texels: u32,
+    /// The baked brightness over the stock (each from the dark floor).
+    pub ratio: f32,
+    /// The most a channel's share of the colour differs by.
+    pub hue_difference: f32,
+    /// Whether it keeps within the limits every stock BSP keeps.
+    pub within: bool,
+}
+
+/// A BSP's baked light against its stock lightmaps', its pages taken
+/// together (the mood check).
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
+pub struct BakeBspMood {
+    /// The stock pages' light, weighted by their texels.
+    pub stock: Vec<f32>,
+    /// The baked pages', as the level shader reads them.
+    pub baked: Vec<f32>,
+    /// The baked brightness over the stock (each from the dark floor).
+    pub ratio: f32,
+    /// The most a channel's share of the colour differs by.
+    pub hue_difference: f32,
+    /// The share of the texels on pages outside the limits.
+    pub failing: f32,
+    /// Whether the BSP keeps its mood.
+    pub within: bool,
 }
 
 /// A BSP's baked light.
@@ -277,6 +320,43 @@ impl LevelBake {
         })
     }
 
+    /// Each baked page of `light` against its stock page, for the pages
+    /// that have one.
+    pub fn moods(&self, light: Arc<BakedLight>) -> Vec<BakeMood> {
+        self.plan
+            .moods(&light.light)
+            .iter()
+            .map(|mood| BakeMood {
+                page: mood.page,
+                stock: mood.stock.to_vec(),
+                baked: mood.baked.to_vec(),
+                texels: mood.texels,
+                ratio: mood.ratio(),
+                hue_difference: mood.hue_difference(),
+                within: mood.within(&opence_bake::mood::LIMITS),
+            })
+            .collect()
+    }
+
+    /// The BSP's pages of `light` taken together against its stock pages
+    /// (None if no page has a stock page).
+    pub fn bsp_mood(&self, light: Arc<BakedLight>) -> Option<BakeBspMood> {
+        let limits = opence_bake::mood::LIMITS;
+        BspMood::of(&self.plan.moods(&light.light), &limits).map(|mood| BakeBspMood {
+            stock: mood.whole.stock.to_vec(),
+            baked: mood.whole.baked.to_vec(),
+            ratio: mood.whole.ratio(),
+            hue_difference: mood.whole.hue_difference(),
+            failing: mood.failing,
+            within: mood.within(&limits),
+        })
+    }
+
+    /// The BSP, in the level's.
+    pub fn bsp(&self) -> u32 {
+        self.bsp as u32
+    }
+
     /// The light kept in a cache file, if it is whole and baked for this
     /// plan.
     pub fn read(&self, bytes: Vec<u8>) -> Option<Arc<BakedLight>> {
@@ -292,6 +372,11 @@ impl BakedLight {
     /// The cache file.
     pub fn encode(&self) -> Vec<u8> {
         self.light.encode()
+    }
+
+    /// The scale the light was given to keep the stock pages' brightness.
+    pub fn exposure(&self) -> f32 {
+        self.light.exposure
     }
 
     /// The baked lightmap pages.
@@ -367,6 +452,20 @@ impl LevelGeometry {
     /// The bake of this level's BSP, at the default settings; or, when
     /// `quick`, at few samples (for tests).
     pub fn bake_plan(&self, quick: bool) -> Result<Arc<LevelBake>, EngineError> {
+        self.bake_plan_of(self.bsp, quick)
+    }
+
+    /// The bakes of every BSP of the level, as `bake_plan`'s.
+    pub fn bake_plans(&self, quick: bool) -> Vec<Arc<LevelBake>> {
+        (0..self.content.structure_bsps.len())
+            .filter_map(|bsp| self.bake_plan_of(bsp, quick).ok())
+            .collect()
+    }
+}
+
+impl LevelGeometry {
+    /// The bake of the level's BSP `bsp`.
+    fn bake_plan_of(&self, bsp: usize, quick: bool) -> Result<Arc<LevelBake>, EngineError> {
         let settings = if quick {
             BakeSettings {
                 lightmap_samples: 4,
@@ -377,7 +476,6 @@ impl LevelGeometry {
         } else {
             BakeSettings::default()
         };
-        let bsp = self.bsp;
         let plan = BakePlan::of(&self.content, bsp, settings)
             .ok_or(EngineError::NoBsp { index: bsp as u32 })?;
         let scene = BakeScene::new(plan.scene.clone());
@@ -485,5 +583,12 @@ mod tests {
         // another plan's file is not this one's
         assert!(full.read(file).is_none());
         assert!(bake.read(vec![1, 2, 3]).is_none());
+        // the devmap has no stock pages to compare with, and one BSP
+        assert!(bake.moods(Arc::clone(&light)).is_empty());
+        assert!(bake.bsp_mood(Arc::clone(&light)).is_none());
+        assert_eq!(bake.bsp(), 0);
+        let plans = geometry.bake_plans(true);
+        assert_eq!(plans.len(), 1);
+        assert_eq!(plans[0].cache_file_name(), bake.cache_file_name());
     }
 }

@@ -155,4 +155,56 @@ final class BakeTests: XCTestCase {
         let frame = try renderer.capture(width: 320, height: 180, camera: level.camera, queue: level.queue)
         XCTAssertGreaterThan(frame.distinctColors, 64)
     }
+
+    /// The mood check (needs assets/maps): every stock BSP keeps its
+    /// stock lightmaps' mood. Its pages taken together keep the stock
+    /// pages' brightness and colour within the bake's limits, and at most
+    /// a share of its texels lie on pages outside them (the original's
+    /// radiosity was tuned page by page; the bake lights from the tags).
+    func testEveryStockBspKeepsItsMood() throws {
+        let maps = StockLevel.root.appendingPathComponent("assets/maps")
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: maps.path)) ?? [])
+            .filter { $0.hasSuffix(".map") && $0 != "ui.map" }.map { String($0.dropLast(4)) }.sorted()
+        guard !names.isEmpty else { throw XCTSkip("no assets/maps") }
+        guard let device = MTLCreateSystemDefaultDevice() else { throw XCTSkip("no Metal device") }
+        let tracer = try PathTracer(device: device)
+        let cache = StockLevel.root.appendingPathComponent("build/engine/cache")
+        try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+        // BSPs whose colour the tags do not give: longest's stock light is
+        // blue where its near-white hallway lights outweigh the blue ones,
+        // and d20's second BSP greener than its stock. Each is just over
+        // the colour limit.
+        let known: Set<String> = ["d20 bsp 1", "longest bsp 0"]
+        var report: [String] = []
+        var outside: [String] = []
+        for name in names {
+            let geometry = try LevelGeometry.load(map: maps.appendingPathComponent("\(name).map").path,
+                                                  cacheFolder: cache.path, bsp: 0)
+            for bake in geometry.bakePlans(quick: true) {
+                let light = try LightBaker.bake(bake, tracer: tracer)
+                let moods = bake.moods(light: light)
+                // (weighted by texels: a page's share of the BSP)
+                let texels = Float(moods.reduce(0) { $0 + Int($1.texels) })
+                let mean = { (key: KeyPath<BakeMood, [Float]>) -> [Float] in
+                    (0..<3).map { channel in
+                        moods.reduce(0) { $0 + $1[keyPath: key][channel] * Float($1.texels) } / max(texels, 1)
+                    }
+                }
+                let failing = Float(moods.filter { !$0.within }.reduce(0) { $0 + Int($1.texels) }) / max(texels, 1)
+                let line = String(format: "%@ bsp %d: %d pages, exposure %.2f, failing %.2f, stock %.3f %.3f %.3f, baked %.3f %.3f %.3f",
+                                  name, bake.bsp(), moods.count, light.exposure(), failing,
+                                  mean(\.stock)[0], mean(\.stock)[1], mean(\.stock)[2],
+                                  mean(\.baked)[0], mean(\.baked)[1], mean(\.baked)[2])
+                report.append(line)
+                guard let bsp = bake.bspMood(light: light) else { continue }
+                if !bsp.within && !known.contains("\(name) bsp \(bake.bsp())") {
+                    outside.append(String(format: "%@ bsp %d: ratio %.2f, hue %.3f, failing %.2f", name,
+                                          bake.bsp(), bsp.ratio, bsp.hueDifference, bsp.failing))
+                }
+            }
+        }
+        print(report.joined(separator: "\n"))
+        print("outside the limits:\n" + outside.joined(separator: "\n"))
+        XCTAssertTrue(outside.isEmpty, "\(outside.count) BSPs outside the limits")
+    }
 }

@@ -14,9 +14,10 @@ pub struct Expected {
     pub occlusion: f32,
 }
 
-/// The layouts by name: `furnace`, `open`, `wall`, `sun`, `roof` and
-/// `screen`.
-pub const NAMES: [&str; 6] = ["furnace", "open", "wall", "sun", "roof", "screen"];
+/// The layouts by name.
+pub const NAMES: [&str; 8] = [
+    "furnace", "open", "wall", "sun", "roof", "screen", "lamp", "bulb",
+];
 
 /// The occlusion distance the layouts are traced with.
 pub const OCCLUSION_DISTANCE: f32 = 10.0;
@@ -96,6 +97,37 @@ pub fn layout(name: &str) -> Option<(Scene, Expected)> {
                 occlusion: 0.75,
             },
         ),
+        // a transparent roof that glows 1, under a sky of 1: the rays
+        // pass it, taking its light, so pi times 2, and nothing near
+        "lamp" => {
+            let mut lamp = material(0.0, 1.0, 0.0);
+            lamp.opaque = false;
+            (
+                scene(
+                    quad([-1e3, -1e3, 1.0], [2e3, 0.0, 0.0], [0.0, 2e3, 0.0]),
+                    vec![lamp],
+                    1.0,
+                ),
+                Expected {
+                    irradiance: 2.0 * pi,
+                    occlusion: 1.0,
+                },
+            )
+        }
+        // a black square a hundredth across, a unit above, glowing ten
+        // thousand: its light is its radiance times its solid angle,
+        // 1e4 * 1e-4 (a path would find it once in thirty thousand)
+        "bulb" => (
+            scene(
+                quad([-0.005, -0.005, 1.0], [0.01, 0.0, 0.0], [0.0, 0.01, 0.0]),
+                vec![material(0.0, 1e4, 1.0)],
+                0.0,
+            ),
+            Expected {
+                irradiance: 1.0,
+                occlusion: 1.0,
+            },
+        ),
         _ => return None,
     })
 }
@@ -135,14 +167,18 @@ pub fn scene(triangles: Vec<SceneTriangle>, materials: Vec<BakeMaterial>, sky: f
     if triangles.is_empty() {
         bounds = [[0.0; 3]; 2];
     }
-    Scene {
+    let mut scene = Scene {
         triangles,
         materials,
         lights: Vec::new(),
         sky: [sky; 3],
         indoor: [0.0; 3],
         bounds,
-    }
+        emitters: Vec::new(),
+        emitter_power: 0.0,
+    };
+    scene.find_emitters();
+    scene
 }
 
 /// The two triangles of the rectangle from `corner` along `u` and `v`, of

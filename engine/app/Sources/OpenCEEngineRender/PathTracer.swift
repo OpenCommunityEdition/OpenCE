@@ -61,7 +61,8 @@ public final class PathTracer {
         var seed: UInt32
         var occlusionDistance: Float
         var pointCount: UInt32
-        var pad: (UInt32, UInt32, UInt32) = (0, 0, 0)
+        var emitterCount: UInt32
+        var pad: (UInt32, UInt32) = (0, 0)
     }
 
     public init(device: MTLDevice, source: String? = nil) throws {
@@ -150,6 +151,8 @@ public final class PathTracer {
         let materials = try buffer(Array(scene.materialBytes()))
         let lightBytes = Array(scene.lightBytes())
         let lights = try buffer(lightBytes)
+        let emitterBytes = Array(scene.emitterBytes())
+        let emitters = try buffer(emitterBytes)
         let sky = scene.sky()
         let pipeline = kernel == .irradiance ? pipeline : radiancePipeline
         var first = [SIMD4<Float>]()
@@ -164,7 +167,8 @@ public final class PathTracer {
             var parameters = Parameters(sky: (sky[0], sky[1], sky[2]), lightCount: UInt32(lightBytes.count / 32),
                                         triangleCount: scene.triangleCount(), samples: samples,
                                         seed: seed &+ UInt32(truncatingIfNeeded: start) &* 0x9E37_79B9,
-                                        occlusionDistance: occlusionDistance, pointCount: UInt32(size))
+                                        occlusionDistance: occlusionDistance, pointCount: UInt32(size),
+                                        emitterCount: UInt32(emitterBytes.count / 64))
             let pointBuffer = try buffer(Array(points[(start * 32)..<((start + size) * 32)]))
             let length = size * MemoryLayout<SIMD4<Float>>.stride
             guard let results = device.makeBuffer(length: length, options: .storageModeShared),
@@ -182,6 +186,7 @@ public final class PathTracer {
             encoder.setBuffer(pointBuffer, offset: 0, index: 5)
             encoder.setBuffer(results, offset: 0, index: 6)
             encoder.setBuffer(directions, offset: 0, index: 7)
+            encoder.setBuffer(emitters, offset: 0, index: 8)
             let width = min(pipeline.maxTotalThreadsPerThreadgroup, 64)
             encoder.dispatchThreads(MTLSize(width: size, height: 1, depth: 1),
                                     threadsPerThreadgroup: MTLSize(width: width, height: 1, depth: 1))

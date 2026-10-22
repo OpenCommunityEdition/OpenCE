@@ -17,10 +17,12 @@
 //! - [`probe`] places the irradiance and reflection probes.
 //! - [`output`] makes the baked light from the tracer's results, and
 //!   keeps it in a cache file.
+//! - [`mood`] checks the baked light against the stock lightmaps'.
 
 pub mod bvh;
 pub mod chart;
 pub mod layout;
+pub mod mood;
 pub mod output;
 pub mod probe;
 pub mod scene;
@@ -29,6 +31,7 @@ pub mod trace;
 
 pub use bvh::{Bvh, BvhNode, BvhTriangle, Hit, Ray};
 pub use chart::{Atlas, BakePoint, Chart};
+pub use mood::PageMood;
 pub use output::{BakePlan, BakeSettings, BakedLighting, BakedPage};
 pub use probe::ProbeGrid;
 pub use scene::{BakeMaterial, DirectionalLight, Scene};

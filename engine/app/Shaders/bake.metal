@@ -4,7 +4,9 @@
 // point by the cosine; one that leaves the level sees the sky's dome, one
 // that meets a surface takes its emission and, by its albedo, the light it
 // receives in turn; the sky's lights are sampled at every point of the
-// path within their cones. Compiled with safe maths: the hierarchy's slab
+// path within their cones, and one glowing surface's point by the
+// emitters' power, weighted against the paths that meet it (the power
+// heuristic). Compiled with safe maths: the hierarchy's slab
 // test relies on infinities.
 #include <metal_stdlib>
 using namespace metal;
@@ -40,6 +42,18 @@ struct BakeMaterial {
     packed_float3 albedo;
     float coverage;
     packed_float3 emission;
+    float density;
+};
+
+// opence_bake's Scene::emitter_bytes
+struct BakeEmitter {
+    packed_float3 a;
+    float cumulative;
+    packed_float3 b;
+    float area;
+    packed_float3 c;
+    float density;
+    packed_float3 emission;
     float pad;
 };
 
@@ -60,7 +74,7 @@ struct BakeParameters {
     uint seed;
     float occlusion_distance;
     uint point_count;
-    uint pad0;
+    uint emitter_count;
     uint pad1;
     uint pad2;
 };
@@ -78,6 +92,7 @@ struct BakeScene {
     device const BakeTriangle *triangles;
     device const BakeMaterial *materials;
     device const BakeLight *lights;
+    device const BakeEmitter *emitters;
     constant BakeParameters *parameters;
 };
 
@@ -131,6 +146,31 @@ static float3 bake_cone_direction(float3 axis, float cos_half_angle, thread uint
 
 static float bake_luminance(float3 color) {
     return dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+}
+
+// The power heuristic's weight for a sample drawn with the density
+// `chosen`, when `other` could have drawn it too.
+static float bake_power_heuristic(float chosen, float other) {
+    float a = chosen * chosen;
+    float b = other * other;
+    if (a + b > 0.0f && isfinite(a + b)) {
+        return a / (a + b);
+    }
+    return isinf(chosen) ? 1.0f : 0.0f;
+}
+
+// The light a path takes from a glowing surface of `material` met
+// `distance` along a ray `cosine` to it: all of it when nothing sampled the
+// emitters at the ray's start (`density` below 0), else weighted against
+// those samples (trace.rs's Tracer::seen).
+static float3 bake_seen(BakeMaterial material, float distance, float cosine, float density) {
+    float3 emission = float3(material.emission);
+    if (density < 0.0f) {
+        return emission;
+    }
+    cosine = abs(cosine);
+    float sampled = cosine > 0.0f ? material.density * distance * distance / cosine : INFINITY;
+    return emission * bake_power_heuristic(density, sampled);
 }
 
 // Where a ray enters a node's bounds before t_max, if it does (slab test;
@@ -226,11 +266,12 @@ static bool bake_nearest(BakeScene scene, float3 origin, float3 direction, float
 
 // The first solid surface the ray meets: how far, the point, the normal
 // facing back along the ray and the material. A ray passes through an
-// alpha-tested surface by the share of it that is open.
-static bool bake_meet(BakeScene scene, float3 origin, float3 direction, thread uint &state,
+// alpha-tested surface by the share of it that is open, and through a
+// glowing transparent one, whose light it adds to `glow` (weighted by
+// bake_seen with `density`) when given.
+static bool bake_meet(BakeScene scene, float3 origin, float3 direction, float t_max, thread uint &state,
                       thread float &distance, thread float3 &point, thread float3 &normal,
-                      thread BakeMaterial &material) {
-    float t_max = RAY_LENGTH;
+                      thread BakeMaterial &material, thread float3 *glow, float density) {
     float travelled = 0.0f;
     for (uint pass = 0; pass < MAX_PASSES; pass++) {
         float t;
@@ -252,10 +293,77 @@ static bool bake_meet(BakeScene scene, float3 origin, float3 direction, thread u
             return true;
         }
         travelled += t;
+        if (glow) {
+            *glow += bake_seen(material, travelled, dot(normal, direction), density);
+        }
         origin = point + direction * SURFACE_OFFSET;
         t_max -= t;
     }
     return false;
+}
+
+// The light of a point on an emitter chosen by the emitters' power, on a
+// surface at `origin` facing `normal`, weighted against a path's finding it
+// (trace.rs's Tracer::emitter), added with its direction to `weighted`.
+static float3 bake_emitter(BakeScene scene, float3 origin, float3 normal, thread uint &state,
+                           thread float3 *weighted) {
+    uint count = scene.parameters->emitter_count;
+    float pick = bake_random(state);
+    if (count == 0) {
+        return float3(0.0f);
+    }
+    // (the first whose cumulative share is above the pick)
+    uint low = 0;
+    uint high = count;
+    while (low < high) {
+        uint middle = (low + high) / 2;
+        if (scene.emitters[middle].cumulative <= pick) {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+    BakeEmitter emitter = scene.emitters[min(low, count - 1)];
+    float u = bake_random(state);
+    float v = bake_random(state);
+    float root = sqrt(u);
+    float3 a = float3(emitter.a);
+    float3 b = float3(emitter.b);
+    float3 c = float3(emitter.c);
+    float3 to = a * (1.0f - root) + b * (root * (1.0f - v)) + c * (root * v) - origin;
+    float distance_squared = dot(to, to);
+    float distance = sqrt(distance_squared);
+    if (!(distance > 0.0f)) {
+        return float3(0.0f);
+    }
+    float3 towards = to / distance;
+    float facing = dot(normal, towards);
+    float3 surface = cross(b - a, c - a);
+    float length_squared = dot(surface, surface);
+    float cosine = length_squared > 0.0f ? abs(dot(surface * rsqrt(length_squared), towards)) : 0.0f;
+    if (facing <= 0.0f || cosine <= 0.0f) {
+        return float3(0.0f);
+    }
+    float chosen = emitter.density * distance_squared / cosine;
+    float weight = bake_power_heuristic(chosen, facing * M_1_PI_F);
+    float reach = distance * (1.0f - 1e-4f) - SURFACE_OFFSET;
+    if (!(chosen > 0.0f && isfinite(chosen))) {
+        return float3(0.0f);
+    }
+    if (reach > 0.0f) {
+        float hit_distance;
+        float3 point, hit_normal;
+        BakeMaterial material;
+        if (bake_meet(scene, origin, towards, reach, state, hit_distance, point, hit_normal, material, nullptr,
+                      -1.0f)) {
+            return float3(0.0f);
+        }
+    }
+    float3 given = float3(emitter.emission) * (facing * weight / chosen);
+    if (weighted) {
+        *weighted += towards * bake_luminance(given);
+    }
+    return given;
 }
 
 // The sky's lights on a surface at `origin` facing `normal`, each added
@@ -274,7 +382,8 @@ static float3 bake_direct(BakeScene scene, float3 origin, float3 normal, thread 
         float distance;
         float3 point, hit_normal;
         BakeMaterial material;
-        if (bake_meet(scene, origin, towards, state, distance, point, hit_normal, material)) {
+        if (bake_meet(scene, origin, towards, RAY_LENGTH, state, distance, point, hit_normal, material, nullptr,
+                      -1.0f)) {
             continue;
         }
         float3 given = irradiance * facing;
@@ -283,12 +392,15 @@ static float3 bake_direct(BakeScene scene, float3 origin, float3 normal, thread 
             *weighted += towards * bake_luminance(given);
         }
     }
+    total += bake_emitter(scene, origin, normal, state, weighted);
     return total;
 }
 
 // The light coming back along a ray, and how far it went to the first
-// surface (RAY_LENGTH when it left the level).
-static float3 bake_radiance(BakeScene scene, float3 origin, float3 direction, thread uint &state,
+// surface (RAY_LENGTH when it left the level). `density` is the chance of
+// the ray's direction per unit solid angle where it starts, if the emitters
+// were sampled there (else below 0).
+static float3 bake_radiance(BakeScene scene, float3 origin, float3 direction, float density, thread uint &state,
                             thread float &first) {
     float3 light = float3(0.0f);
     float3 throughput = float3(1.0f);
@@ -297,14 +409,18 @@ static float3 bake_radiance(BakeScene scene, float3 origin, float3 direction, th
         float distance;
         float3 point, normal;
         BakeMaterial material;
-        if (!bake_meet(scene, origin, direction, state, distance, point, normal, material)) {
+        float3 glow = float3(0.0f);
+        bool met = bake_meet(scene, origin, direction, RAY_LENGTH, state, distance, point, normal, material, &glow,
+                             density);
+        light += throughput * glow;
+        if (!met) {
             light += throughput * float3(scene.parameters->sky);
             break;
         }
         if (bounce == 0) {
             first = distance;
         }
-        light += throughput * float3(material.emission);
+        light += throughput * bake_seen(material, distance, dot(normal, direction), density);
         origin = point + normal * SURFACE_OFFSET;
         float3 albedo = float3(material.albedo);
         light += throughput * albedo * M_1_PI_F * bake_direct(scene, origin, normal, state, nullptr);
@@ -320,6 +436,7 @@ static float3 bake_radiance(BakeScene scene, float3 origin, float3 direction, th
             break;
         }
         direction = bake_cosine_direction(normal, state);
+        density = dot(normal, direction) * M_1_PI_F;
     }
     return light;
 }
@@ -335,11 +452,12 @@ kernel void bake_irradiance(device const BakeNode *nodes [[buffer(0)]],
                             device const BakePoint *points [[buffer(5)]],
                             device float4 *irradiance [[buffer(6)]],
                             device float4 *directions [[buffer(7)]],
+                            device const BakeEmitter *emitters [[buffer(8)]],
                             uint index [[thread_position_in_grid]]) {
     if (index >= parameters.point_count) {
         return;
     }
-    BakeScene scene = {nodes, triangles, materials, lights, &parameters};
+    BakeScene scene = {nodes, triangles, materials, lights, emitters, &parameters};
     BakePoint sample_point = points[index];
     float3 normal = float3(sample_point.normal);
     float3 origin = float3(sample_point.position) + normal * SURFACE_OFFSET;
@@ -352,7 +470,7 @@ kernel void bake_irradiance(device const BakeNode *nodes [[buffer(0)]],
         total += bake_direct(scene, origin, normal, state, &weighted);
         float3 direction = bake_cosine_direction(normal, state);
         float first;
-        float3 radiance = bake_radiance(scene, origin, direction, state, first);
+        float3 radiance = bake_radiance(scene, origin, direction, dot(normal, direction) * M_1_PI_F, state, first);
         if (first > parameters.occlusion_distance) {
             open++;
         }
@@ -382,11 +500,12 @@ kernel void bake_radiance_along(device const BakeNode *nodes [[buffer(0)]],
                                 device const BakePoint *points [[buffer(5)]],
                                 device float4 *radiance [[buffer(6)]],
                                 device float4 *directions [[buffer(7)]],
+                                device const BakeEmitter *emitters [[buffer(8)]],
                                 uint index [[thread_position_in_grid]]) {
     if (index >= parameters.point_count) {
         return;
     }
-    BakeScene scene = {nodes, triangles, materials, lights, &parameters};
+    BakeScene scene = {nodes, triangles, materials, lights, emitters, &parameters};
     BakePoint sample_point = points[index];
     float3 origin = float3(sample_point.position);
     float3 direction = float3(sample_point.normal);
@@ -395,7 +514,9 @@ kernel void bake_radiance_along(device const BakeNode *nodes [[buffer(0)]],
     uint samples = max(parameters.samples, 1u);
     for (uint sample = 0; sample < samples; sample++) {
         float first;
-        total += bake_radiance(scene, origin, direction, state, first);
+        // (nothing samples the emitters from the probe: what it sees of
+        // them, it takes whole)
+        total += bake_radiance(scene, origin, direction, -1.0f, state, first);
     }
     radiance[index] = float4(total / float(samples), 1.0f);
 }

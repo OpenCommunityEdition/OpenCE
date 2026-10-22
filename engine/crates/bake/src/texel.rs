@@ -1,8 +1,10 @@
 //! A texture's texels decoded, for a material's mean colour.
 //!
 //! The bake needs only how much light a surface reflects on average, so it
-//! decodes a texture's smallest level (a few texels, already the mean of
-//! the largest) rather than every level.
+//! decodes a texture's smallest whole level (a few texels, already the
+//! mean of the largest) rather than every level. A compressed texture's
+//! levels below one block are not kept in the maps (their bytes are
+//! zero), so the smallest level it reads is a block or larger.
 
 use opence_content::material::linear;
 use opence_content::{Texture, TextureFormat};
@@ -10,11 +12,16 @@ use opence_content::{Texture, TextureFormat};
 /// A texel: red, green, blue and alpha, as stored (display values).
 pub type Texel = [u8; 4];
 
-/// The mean colour of `texture`'s first face at its smallest level: red,
+/// The mean colour of `texture`'s first face at its smallest level of a
+/// block or more (any level for an uncompressed format): red,
 /// green and blue linear, alpha as stored, each 0 to 1. None if its bytes
 /// are too few for its size.
 pub fn mean_color(texture: &Texture) -> Option<[f32; 4]> {
-    let level = texture.levels.len().checked_sub(1)?;
+    let whole = |level: &usize| {
+        let [width, height, _] = texture.level_size(*level);
+        texture.format == TextureFormat::Rgba8 || (width >= 4 && height >= 4)
+    };
+    let level = (0..texture.levels.len()).rev().find(whole).unwrap_or(0);
     let [width, height, _] = texture.level_size(level);
     let texels = decode(texture.format, width, height, texture.levels.get(level)?)?;
     let mut sum = [0.0f64; 4];
@@ -232,5 +239,20 @@ mod tests {
             mean_color(&texture(TextureFormat::Rgba8, 2, 1, Vec::new())),
             None
         );
+    }
+
+    #[test]
+    fn a_compressed_texture_s_mean_skips_its_unkept_levels() {
+        // a white 4x4 block, then the 2x2 and 1x1 levels as the maps keep
+        // them: zero
+        let mut white = vec![0xFF, 0xFF, 0xFF, 0xFF];
+        white.extend_from_slice(&0u32.to_le_bytes());
+        let mean = mean_color(&texture(
+            TextureFormat::Bc1,
+            4,
+            4,
+            vec![white, vec![0; 8], vec![0; 8]],
+        ));
+        assert_eq!(mean, Some([1.0; 4]));
     }
 }

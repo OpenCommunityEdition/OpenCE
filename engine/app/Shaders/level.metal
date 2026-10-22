@@ -288,10 +288,18 @@ float3 self_illumination(float4 map, constant Material &material) {
     return map.r * material.animation[0].rgb + map.g * material.animation[1].rgb + map.b * plasma;
 }
 
+// the bake's irradiance as the stock lightmaps hold their light: over pi
+// (the light a white surface sends back, linear), as a display value by
+// the sRGB curve carried on past 1 (opence_bake::mood::shown)
+float3 baked_shown(float3 irradiance) {
+    float3 linear = max(irradiance, 0) / M_PI_F;
+    return select(1.055 * pow(linear, 1.0 / 2.4) - 0.055, linear * 12.92, linear <= 0.0031308);
+}
+
 // the light on a surface facing `normal` at `world` from the baked
 // probes around it: each holds the irradiance from the six axes (an
-// ambient cube), weighed by how much the normal faces each, as outgoing
-// light (over pi) for the lightmaps' multiply
+// ambient cube), weighed by how much the normal faces each, shown as the
+// lightmaps' light is (baked_shown)
 float3 probe_light(constant Frame &frame, float3 world, float3 normal, sampler clamp,
                    texture3d<float> px, texture3d<float> nx, texture3d<float> py,
                    texture3d<float> ny, texture3d<float> pz, texture3d<float> nz) {
@@ -301,7 +309,7 @@ float3 probe_light(constant Frame &frame, float3 world, float3 normal, sampler c
     float3 x = n.x >= 0 ? px.sample(clamp, at).rgb : nx.sample(clamp, at).rgb;
     float3 y = n.y >= 0 ? py.sample(clamp, at).rgb : ny.sample(clamp, at).rgb;
     float3 z = n.z >= 0 ? pz.sample(clamp, at).rgb : nz.sample(clamp, at).rgb;
-    return (weight.x * x + weight.y * y + weight.z * z) / M_PI_F;
+    return baked_shown(weight.x * x + weight.y * y + weight.z * z);
 }
 
 fragment float4 level_fragment(VertexOut in [[stage_in]],
@@ -361,8 +369,7 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
     float3 incident_light = in.incident;
     if (material.maps & LIGHTMAP) {
         if (material.maps & BAKED) {
-            // (irradiance: over pi, the light a white surface sends back)
-            lightmapped = lightmap.sample(clamp, in.lightmap).rgb / M_PI_F;
+            lightmapped = baked_shown(lightmap.sample(clamp, in.lightmap).rgb);
             float4 baked = baked_directions.sample(clamp, in.lightmap);
             incident_light = (baked.xyz * 2 - 1) * baked.w;
         } else {
