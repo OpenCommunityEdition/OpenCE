@@ -29,10 +29,13 @@ boolean hardcore_views_is_local_window(short window_index);
 split-screen font and line spacing. */
 boolean hardcore_views_split(void);
 
-/* Spare local-player slot a teammate pane borrows so the HUD and the
+/* Spare local-player slot this teammate pane borrows so the HUD and the
 first-person weapon will draw. A slot that already has a player is left
-alone. */
-short hardcore_views_hud_slot(void);
+alone. Each pane keeps its own slot, so the weapon animation continues. */
+short hardcore_views_hud_slot(short window_index);
+
+/* Once a tick, advance the weapons those panes are holding. */
+void hardcore_views_weapons_tick(void);
 
 /* The pane being drawn, so that body is hidden the way a first-person view is. */
 void hardcore_views_begin(short window_index);

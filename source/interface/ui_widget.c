@@ -646,6 +646,7 @@ struct widget_instance;
 #include "input/input_abstraction.h"
 #include "interface/attract_mode.h"
 #include "interface/hud.h"
+#include "hardcore_views.h" /* port: a hardcore split picks the pause screen */
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
 #include "bitmaps/bitmap_color_conversion.h"
@@ -2561,12 +2562,38 @@ static struct widget_instance *widget_instance_find_by_tag_index_recursive(
 	return result;
 }
 
+/* port: leaving a row clears the child it was passing events to. the
+lobby's split rows are that way: once a bottom button has had the focus,
+left and right never reach the spinner, and only the pointer can move it.
+a row that only passes events gets that child back */
+static void widget_instance_refocus_passthrough(
+	struct widget_instance *widget)
+{
+	struct ui_widget_definition *definition;
+	struct widget_instance *child;
+
+	if (!widget || widget->focused_child || widget_instance_can_handle_events(widget))
+		return;
+	definition = ui_widget_definition_get(widget->definition_tag_index);
+	if (!TEST_FLAG(definition->flags, _widget_pass_unhandled_events_to_children_bit))
+		return;
+	for (child = widget->child; child; child = child->next)
+	{
+		if (widget_instance_can_handle_events(child))
+		{
+			widget->focused_child = child;
+			return;
+		}
+	}
+}
+
 static void widget_instance_give_focus_directly(
 	struct widget_instance *widget,
 	struct widget_instance *new_focus)
 {
 	struct widget_instance *focused_child =
 		widget_instance_get_topmost_parent(widget)->focused_child;
+	struct widget_instance *leaf;
 
 	if (new_focus->disabled == TRUE)
 	{
@@ -2596,6 +2623,7 @@ static void widget_instance_give_focus_directly(
 		if (substitute)
 			new_focus = substitute;
 	}
+	leaf = new_focus;
 	if (focused_child)
 	{
 		if (new_focus &&
@@ -2603,6 +2631,7 @@ static void widget_instance_give_focus_directly(
 			focused_child->parent)
 		{
 			new_focus->parent->focused_child = new_focus;
+			widget_instance_refocus_passthrough(leaf);
 
 			return;
 		}
@@ -2617,6 +2646,7 @@ static void widget_instance_give_focus_directly(
 		new_focus->parent->focused_child = new_focus;
 		new_focus = new_focus->parent;
 	}
+	widget_instance_refocus_passthrough(leaf);
 
 	return;
 }
@@ -8298,10 +8328,25 @@ static boolean ui_check_for_pause_game(
 					short machine_index =
 						network_game_client_get_machine_index(client);
 					char const *widget_name;
+					short panes = hardcore_views_window_count();
 
 					/* port: a campaign map has only the campaign's pause screen */
 					if (network_coop_active())
 						widget_name = "ui\\shell\\solo_game\\pause_game\\pause_game";
+					/* port: teammate panes are not local players, so the
+					pause screen would stay the full one. a half pane uses
+					the two-player screen. a corner uses the four-player
+					screen. the wide top of three panes is the two-player one */
+					else if (local_player_count == 1 && panes > 1)
+					{
+						if (panes >= 4 ||
+							(panes == 3 && !hardcore_views_is_local_window(0)))
+							widget_name =
+								"ui\\shell\\multiplayer_game\\pause_game\\4p_pause_game";
+						else
+							widget_name =
+								"ui\\shell\\multiplayer_game\\pause_game\\2p_pause_game";
+					}
 					else switch (local_player_count)
 					{
 					case 1:

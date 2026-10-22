@@ -48,6 +48,10 @@ weapon on that player's unit, then clears it. slot 0 stays the local player */
 void first_person_weapon_observe_unit(
 	short local_player_index,
 	long unit_index);
+/* port: one tick of that spare slot's weapon, without making the slot a player */
+void first_person_weapon_observe_tick(
+	short local_player_index,
+	long unit_index);
 void first_person_weapon_observe_clear(
 	short local_player_index);
 short first_person_weapon_get_marker_by_name(

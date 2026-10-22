@@ -3354,7 +3354,7 @@ static void main_game_render(
 			   the split and this machine's choice of pane stay for the match */
 			if (hardcore_views_camera((short)window_index, &teammate_view))
 			{
-				window->local_player_index = hardcore_views_hud_slot();
+				window->local_player_index = hardcore_views_hud_slot((short)window_index);
 				observer = &teammate_view;
 			}
 			else
