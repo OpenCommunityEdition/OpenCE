@@ -67,6 +67,8 @@ public struct DrawnObject {
 struct ModelObjectUniforms {
     var firstNode: UInt32
     var nodeCount: UInt32
+    /// The reflection probe nearest the object, -1 for none.
+    var reflectionProbe: Int32 = -1
 }
 
 final class ModelPass {
@@ -289,6 +291,23 @@ final class ModelPass {
         var firstPerson: [Object] = []
     }
 
+    /// The bake's reflection probes' positions (none until the bake).
+    var reflectionProbes: [SIMD3<Float>] = []
+
+    /// The reflection probe nearest `point`, -1 for none.
+    func nearestReflection(_ point: SIMD3<Float>) -> Int32 {
+        var nearest: Int32 = -1
+        var best = Float.infinity
+        for (index, probe) in reflectionProbes.enumerated() {
+            let distance = distance_squared(probe, point)
+            if distance < best {
+                best = distance
+                nearest = Int32(index)
+            }
+        }
+        return nearest
+    }
+
     /// The highest level of detail, which the sky is always drawn at.
     static let highestLevel = 4
 
@@ -333,7 +352,8 @@ final class ModelPass {
                     matrices.append(object.transform)
                 }
             }
-            let uniforms = ModelObjectUniforms(firstNode: UInt32(first), nodeCount: UInt32(nodeCount))
+            let uniforms = ModelObjectUniforms(firstNode: UInt32(first), nodeCount: UInt32(nodeCount),
+                                               reflectionProbe: isSky ? -1 : nearestReflection(object.center))
             let colors = object.changeColorUniforms
             if isSky {
                 skyDrawn = (uniforms, parts, colors)
@@ -400,6 +420,7 @@ final class ModelPass {
         for (uniforms, parts, colors) in objects {
             var object = uniforms
             encoder.setVertexBytes(&object, length: MemoryLayout<ModelObjectUniforms>.stride, index: 3)
+            encoder.setFragmentBytes(&object, length: MemoryLayout<ModelObjectUniforms>.stride, index: 3)
             colors.withUnsafeBytes { raw in
                 if let base = raw.baseAddress { encoder.setFragmentBytes(base, length: raw.count, index: 2) }
             }

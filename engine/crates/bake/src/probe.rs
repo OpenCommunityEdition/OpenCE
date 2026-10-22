@@ -111,6 +111,73 @@ impl ProbeGrid {
     }
 }
 
+/// The light at `point` on a surface facing `normal` (unit) from the
+/// probes of `grid` (`probes` as [`crate::output::BakedLighting::probes`]
+/// holds them): red, green and blue, and the sun's visibility. Each axis's
+/// light is interpolated between the eight probes around the point
+/// (clamped to the grid, as the renderer's 3D textures sample them) and
+/// the six are weighed by how much the normal faces each (an ambient
+/// cube). Dark when the grid or the probes are missing.
+pub fn light_at(grid: &ProbeGrid, probes: &[u16], point: [f32; 3], normal: [f32; 3]) -> [f32; 4] {
+    let count = grid.len();
+    if count == 0 || probes.len() != count * AXES.len() * 4 || grid.spacing <= 0.0 {
+        return [0.0; 4];
+    }
+    let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
+    let n = if length > 0.0 {
+        normal.map(|value| value / length)
+    } else {
+        [0.0, 0.0, 1.0]
+    };
+    // (each axis's lower probe, and how far the point is towards the next)
+    let cell: [(usize, usize, f32); 3] = std::array::from_fn(|axis| {
+        let last = grid.counts[axis].max(1) - 1;
+        let at = ((point[axis] - grid.origin[axis]) / grid.spacing).clamp(0.0, last as f32);
+        let low = (at.floor() as u32).min(last);
+        (low as usize, (low + 1).min(last) as usize, at - low as f32)
+    });
+    let [nx, ny, _] = grid.counts.map(|count| count.max(1) as usize);
+    let mut light = [0.0f32; 4];
+    for (axis, weight) in n.iter().map(|value| value * value).enumerate() {
+        let side = axis * 2 + usize::from(n[axis] < 0.0);
+        for corner in 0..8 {
+            let pick = |along: usize| {
+                let (low, high, t) = cell[along];
+                if corner >> along & 1 == 1 {
+                    (high, t)
+                } else {
+                    (low, 1.0 - t)
+                }
+            };
+            let ((x, wx), (y, wy), (z, wz)) = (pick(0), pick(1), pick(2));
+            let share = weight * wx * wy * wz;
+            if share == 0.0 {
+                continue;
+            }
+            let at = (side * count + x + nx * (y + ny * z)) * 4;
+            for (channel, total) in light.iter_mut().enumerate() {
+                *total += share * crate::output::from_half(probes[at + channel]);
+            }
+        }
+    }
+    light
+}
+
+/// The reflection probe of `reflections` nearest `point`, if there are
+/// any.
+pub fn nearest_reflection(reflections: &[[f32; 3]], point: [f32; 3]) -> Option<usize> {
+    let distance = |probe: &[f32; 3]| -> f32 {
+        (0..3)
+            .map(|axis| (probe[axis] - point[axis]) * (probe[axis] - point[axis]))
+            .sum()
+    };
+    reflections
+        .iter()
+        .enumerate()
+        .min_by(|(_, a), (_, b)| distance(a).total_cmp(&distance(b)))
+        .map(|(index, _)| index)
+}
+
 /// Where the reflection probes go: the middles of the cells of a coarse
 /// grid over `scene` that hold a triangle's middle, at most
 /// [`MAX_REFLECTIONS`] (the cells grow until they fit).
@@ -194,6 +261,54 @@ pub fn reflection_points(probes: &[[f32; 3]]) -> Vec<BakePoint> {
 mod tests {
     use super::*;
     use crate::layout;
+
+    #[test]
+    fn the_light_between_probes_is_interpolated_and_weighed_by_the_normal() {
+        use crate::output::half;
+        let grid = ProbeGrid {
+            origin: [0.0; 3],
+            spacing: 2.0,
+            counts: [2, 1, 1],
+        };
+        // (+x lit 1 at the first probe and 3 at the second; -z lit 2, its
+        // sun seen half; the other axes dark)
+        let mut probes = vec![0u16; grid.len() * 6 * 4];
+        let mut set = |axis: usize, index: usize, light: [f32; 4]| {
+            for (channel, value) in light.into_iter().enumerate() {
+                probes[(axis * grid.len() + index) * 4 + channel] = half(value);
+            }
+        };
+        set(0, 0, [1.0, 1.0, 1.0, 1.0]);
+        set(0, 1, [3.0, 3.0, 3.0, 1.0]);
+        set(5, 0, [2.0, 0.0, 0.0, 0.5]);
+        set(5, 1, [2.0, 0.0, 0.0, 0.5]);
+        let at = |point, normal| light_at(&grid, &probes, point, normal);
+        assert_eq!(at([0.0; 3], [1.0, 0.0, 0.0]), [1.0, 1.0, 1.0, 1.0]);
+        assert_eq!(at([1.0, 0.0, 0.0], [2.0, 0.0, 0.0]), [2.0, 2.0, 2.0, 1.0]);
+        // (outside the grid: its nearest probes)
+        assert_eq!(at([9.0, -4.0, 7.0], [1.0, 0.0, 0.0]), [3.0, 3.0, 3.0, 1.0]);
+        assert_eq!(at([-9.0, 0.0, 0.0], [0.0, 0.0, -1.0]), [2.0, 0.0, 0.0, 0.5]);
+        // (facing +x and -z alike: half of each)
+        let s = core::f32::consts::FRAC_1_SQRT_2;
+        let light = at([0.0; 3], [s, 0.0, -s]);
+        for (got, want) in light.iter().zip([1.5, 0.5, 0.5, 0.75]) {
+            assert!((got - want).abs() < 1e-3, "{light:?}");
+        }
+        // (facing a dark axis, or no probes)
+        assert_eq!(at([0.0; 3], [0.0, 1.0, 0.0]), [0.0; 4]);
+        assert_eq!(light_at(&grid, &[], [0.0; 3], [1.0, 0.0, 0.0]), [0.0; 4]);
+        // (no normal: facing up)
+        assert_eq!(at([0.0; 3], [0.0; 3]), [0.0; 4]);
+    }
+
+    #[test]
+    fn the_nearest_reflection_probe_is_found() {
+        let probes = [[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 5.0]];
+        assert_eq!(nearest_reflection(&probes, [1.0, 1.0, 1.0]), Some(0));
+        assert_eq!(nearest_reflection(&probes, [7.0, -3.0, 0.0]), Some(1));
+        assert_eq!(nearest_reflection(&probes, [0.0, 50.0, 0.0]), Some(2));
+        assert_eq!(nearest_reflection(&[], [0.0; 3]), None);
+    }
 
     #[test]
     fn the_grid_covers_the_bounds() {

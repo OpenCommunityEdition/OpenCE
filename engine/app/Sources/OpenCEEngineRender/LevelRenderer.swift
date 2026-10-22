@@ -213,6 +213,11 @@ public struct FrameUniforms {
     /// How many probes each way, and 1 when there are baked probes (0:
     /// the unbaked surfaces are lit from their normals alone).
     public var probeCounts: SIMD4<Float> = .zero
+    /// The way to the bake's sun, and 1 when there is one (0: none).
+    public var sunTowards: SIMD4<Float> = .zero
+    /// The sun's irradiance, which the probes leave out for the objects
+    /// to add where the probes see it.
+    public var sunColor: SIMD4<Float> = .zero
 
     /// The frame from `camera`, its fog `fog` (none without a sky), its
     /// maps sampled `mipBias` levels sharper (negative) than its size's.
@@ -323,6 +328,11 @@ public final class LevelRenderer {
     private var probes: [MTLTexture]
     /// The baked probes' grid, for the frame's uniforms.
     private var probeGrid: (origin: SIMD4<Float>, counts: SIMD4<Float>) = (.zero, .zero)
+    /// The bake's sun for the frame's uniforms (none until the bake).
+    private var sun: (towards: SIMD4<Float>, color: SIMD4<Float>) = (.zero, .zero)
+    /// The bake's reflection probes' radiance, a cube each: one of zero
+    /// and unused until the bake is drawn with.
+    private var reflections: MTLTexture
     /// Whether the bake's light is drawn.
     public private(set) var baked = false
     private let white: MTLTexture
@@ -415,6 +425,10 @@ public final class LevelRenderer {
         }
         self.white = white
         probes = Array(repeating: whiteVolume, count: 6)
+        guard let darkCubes = Self.cubeArray(device, size: 1, count: 1, bytes: Array(repeating: 0, count: 48)) else {
+            throw LevelRendererError.resources("reflection probes")
+        }
+        reflections = darkCubes
         let materials = geometry.materials()
         func texture(_ index: UInt32?) -> MTLTexture? {
             index.flatMap { Int($0) < textures.count ? textures[Int($0)] : nil }
@@ -672,6 +686,8 @@ public final class LevelRenderer {
         var uniforms = FrameUniforms(viewProjection: viewProjection, camera: camera, fog: sky?.fog, mipBias: mipBias)
         uniforms.probeOrigin = probeGrid.origin
         uniforms.probeCounts = probeGrid.counts
+        uniforms.sunTowards = sun.towards
+        uniforms.sunColor = sun.color
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = frame
         pass.colorAttachments[0].loadAction = .clear
@@ -694,6 +710,7 @@ public final class LevelRenderer {
         encoder.setFragmentSamplerState(clamp, index: 1)
         encoder.setFragmentSamplerState(nearest, index: 2)
         encoder.setFragmentTextures(probes, range: 9..<15)
+        encoder.setFragmentTexture(reflections, index: 15)
         models.encodeSky(prepared, into: encoder)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setRenderPipelineState(opaque)
@@ -779,6 +796,23 @@ public final class LevelRenderer {
             probeGrid = (SIMD4(origin[0], origin[1], origin[2], 1 / max(light.probeSpacing(), 1e-3)),
                          SIMD4(Float(counts[0]), Float(counts[1]), Float(counts[2]), 1))
         }
+        let towards = light.sunTowards(), color = light.sunIrradiance()
+        if towards.count == 3, color.count == 3 {
+            sun = (SIMD4(towards[0], towards[1], towards[2], 1), SIMD4(color[0], color[1], color[2], 0))
+        }
+        let size = Int(light.reflectionSize())
+        let positions = light.reflectionPositions()
+        let probeCount = positions.count / 3
+        if probeCount > 0 {
+            guard let cubes = Self.cubeArray(device, size: size, count: probeCount,
+                                             bytes: Array(light.reflectionBytes())) else {
+                throw LevelRendererError.resources("baked reflection probes")
+            }
+            reflections = cubes
+            models.reflectionProbes = (0..<probeCount).map {
+                SIMD3(positions[$0 * 3], positions[$0 * 3 + 1], positions[$0 * 3 + 2])
+            }
+        }
         func bake(_ draw: inout Draw) {
             guard let page = draw.lightmapPage.flatMap({ pages[$0] }), draw.uniforms.maps & MapBit.lightmap != 0,
                   draw.uniforms.chicagoCount == 0, draw.uniforms.transparent.x == 0 else { return }
@@ -823,6 +857,27 @@ public final class LevelRenderer {
         guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
         texture.replace(region: MTLRegionMake3D(0, 0, 0, counts[0], counts[1], counts[2]), mipmapLevel: 0, slice: 0,
                         withBytes: bytes, bytesPerRow: counts[0] * 8, bytesPerImage: counts[0] * counts[1] * 8)
+        return texture
+    }
+
+    /// `count` cubes of `size` texels each way from `bytes`: four half
+    /// floats a texel, cube by cube, face by face, rows from the top.
+    static func cubeArray(_ device: MTLDevice, size: Int, count: Int, bytes: [UInt8]) -> MTLTexture? {
+        let face = size * size * 8
+        guard size > 0, count > 0, bytes.count == count * 6 * face else { return nil }
+        let descriptor = MTLTextureDescriptor()
+        descriptor.textureType = .typeCubeArray
+        descriptor.pixelFormat = .rgba16Float
+        (descriptor.width, descriptor.height, descriptor.arrayLength) = (size, size, count)
+        descriptor.usage = .shaderRead
+        guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
+        bytes.withUnsafeBytes { raw in
+            guard let base = raw.baseAddress else { return }
+            for slice in 0..<(count * 6) {
+                texture.replace(region: MTLRegionMake2D(0, 0, size, size), mipmapLevel: 0, slice: slice,
+                                withBytes: base + slice * face, bytesPerRow: size * 8, bytesPerImage: face)
+            }
+        }
         return texture
     }
 

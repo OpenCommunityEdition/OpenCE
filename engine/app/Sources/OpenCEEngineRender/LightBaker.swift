@@ -34,8 +34,10 @@ public enum LightBaker {
         let (irradiance, directions) = try tracer.run(.irradiance, scene, points: Array(bake.lightmapPointBytes()),
                                                       samples: bake.lightmapSamples(), seed: 1,
                                                       occlusionDistance: distance)
+        // (the probes leave the sun out: the renderer adds it, shadowed)
         let (probes, _) = try tracer.run(.irradiance, scene, points: Array(bake.probePointBytes()),
-                                         samples: bake.probeSamples(), seed: 2, occlusionDistance: distance)
+                                         samples: bake.probeSamples(), seed: 2, occlusionDistance: distance,
+                                         sun: scene.sunLight())
         let (radiance, _) = try tracer.run(.radiance, scene, points: Array(bake.reflectionPointBytes()),
                                            samples: bake.reflectionSamples(), seed: 3, occlusionDistance: 0)
         return bake.finish(irradiance: bytes(irradiance), directions: bytes(directions), probes: bytes(probes),

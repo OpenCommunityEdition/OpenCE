@@ -231,10 +231,17 @@ impl Scene {
 
     /// The brightest of the sky's lights: the sun (or the moon).
     pub fn sun(&self) -> Option<&DirectionalLight> {
-        self.lights.iter().max_by(|a, b| {
-            let brightness = |light: &DirectionalLight| light.irradiance.iter().sum::<f32>();
-            brightness(a).total_cmp(&brightness(b))
-        })
+        self.lights.get(self.sun_index()?)
+    }
+
+    /// The sun's index in [`Self::lights`].
+    pub fn sun_index(&self) -> Option<usize> {
+        let brightness = |light: &DirectionalLight| light.irradiance.iter().sum::<f32>();
+        self.lights
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| brightness(a).total_cmp(&brightness(b)))
+            .map(|(index, _)| index)
     }
 
     /// The materials as the GPU reads them: each its albedo and

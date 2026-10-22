@@ -32,7 +32,7 @@ pub mod trace;
 pub use bvh::{Bvh, BvhNode, BvhTriangle, Hit, Ray};
 pub use chart::{Atlas, BakePoint, Chart};
 pub use mood::PageMood;
-pub use output::{BakePlan, BakeSettings, BakedLighting, BakedPage};
+pub use output::{BakePlan, BakeSettings, BakedLighting, BakedPage, BakedSun};
 pub use probe::ProbeGrid;
 pub use scene::{BakeMaterial, DirectionalLight, Scene};
 pub use trace::{Irradiance, Random, Tracer};

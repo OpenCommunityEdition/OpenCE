@@ -102,15 +102,55 @@ impl Tracer<'_> {
         samples: u32,
         random: &mut Random,
     ) -> Irradiance {
+        self.light(point, normal, samples, None, random)
+    }
+
+    /// The light at an irradiance probe's `point` from the axis `normal`
+    /// (unit), from `samples` paths, without the sky's light `sun` arriving
+    /// straight from it: the renderer adds that itself, shadowed by its
+    /// shadow maps. Its `occlusion` is the share of rays towards the sun
+    /// that reach it (whichever way the axis faces), by which the renderer
+    /// dims the sun when it has no shadow maps there.
+    pub fn probe(
+        &self,
+        point: [f32; 3],
+        normal: [f32; 3],
+        samples: u32,
+        sun: usize,
+        random: &mut Random,
+    ) -> Irradiance {
+        self.light(point, normal, samples, Some(sun), random)
+    }
+
+    /// [`Self::irradiance`], or [`Self::probe`] with `sun`.
+    fn light(
+        &self,
+        point: [f32; 3],
+        normal: [f32; 3],
+        samples: u32,
+        sun: Option<usize>,
+        random: &mut Random,
+    ) -> Irradiance {
         let origin = add(point, scale(normal, SURFACE_OFFSET));
         let mut total = [0.0f64; 3];
         let mut weighted = [0.0f32; 3];
         let mut open = 0u32;
+        let mut seen = 0u32;
         let samples = samples.max(1);
         for _ in 0..samples {
-            let direct = self.direct(origin, normal, random);
+            let direct = self.direct(origin, normal, sun, random);
             for (towards, irradiance) in direct {
                 accumulate(&mut total, &mut weighted, towards, irradiance);
+            }
+            if let Some(light) = sun.and_then(|sun| self.scene.lights.get(sun)) {
+                let ray = Ray {
+                    origin,
+                    direction: cone_direction(light.towards, light.cos_half_angle, random),
+                    t_max: RAY_LENGTH,
+                };
+                if !self.blocked(&ray, random) {
+                    seen += 1;
+                }
             }
             let direction = cosine_direction(normal, random);
             let ray = Ray {
@@ -142,7 +182,7 @@ impl Tracer<'_> {
             } else {
                 0.0
             },
-            occlusion: open as f32 / samples as f32,
+            occlusion: if sun.is_some() { seen } else { open } as f32 / samples as f32,
         }
     }
 
@@ -174,17 +214,21 @@ impl Tracer<'_> {
         total.map(|sum| (sum / f64::from(samples)) as f32)
     }
 
-    /// The sky's lights on a surface at `origin` facing `normal`, and one
-    /// sampled emitter's: each light's sampled direction and the light it
-    /// gives there (left out when shadowed).
+    /// The sky's lights on a surface at `origin` facing `normal` (but the
+    /// light `apart`), and one sampled emitter's: each light's sampled
+    /// direction and the light it gives there (left out when shadowed).
     fn direct(
         &self,
         origin: [f32; 3],
         normal: [f32; 3],
+        apart: Option<usize>,
         random: &mut Random,
     ) -> Vec<([f32; 3], [f32; 3])> {
         let mut lights = Vec::with_capacity(self.scene.lights.len());
-        for light in &self.scene.lights {
+        for (index, light) in self.scene.lights.iter().enumerate() {
+            if apart == Some(index) {
+                continue;
+            }
             let towards = cone_direction(light.towards, light.cos_half_angle, random);
             let facing = dot(normal, towards);
             if facing <= 0.0 || light.irradiance.iter().all(|channel| *channel <= 0.0) {
@@ -316,7 +360,7 @@ impl Tracer<'_> {
             // (a Lambertian surface: radiance is albedo over pi times its
             // irradiance; the next ray's cosine sampling cancels the pi)
             let reflected = scale(material.albedo, core::f32::consts::FRAC_1_PI);
-            for (_, irradiance) in self.direct(origin, normal, random) {
+            for (_, irradiance) in self.direct(origin, normal, None, random) {
                 light = add(light, mul(throughput, mul(reflected, irradiance)));
             }
             throughput = mul(throughput, material.albedo);
@@ -586,6 +630,44 @@ mod tests {
         let (mut below, _) = layout("sun").unwrap_or_else(|| panic!("no sun"));
         below.lights[0].towards = [0.0, 0.0, -1.0];
         assert_eq!(trace(&below, [0.0, 0.0, 1.0]).irradiance, [0.0; 3]);
+    }
+
+    #[test]
+    fn a_probe_leaves_the_sun_out_and_sees_whether_it_is_shadowed() {
+        let probe = |name: &str, normal: [f32; 3]| {
+            let (scene, _) = layout(name).unwrap_or_else(|| panic!("no layout {name}"));
+            let bvh = Bvh::build(&scene.triangles);
+            Tracer {
+                scene: &scene,
+                bvh: &bvh,
+                occlusion_distance: OCCLUSION_DISTANCE,
+            }
+            .probe([0.0; 3], normal, 1024, 0, &mut Random::new(5))
+        };
+        // (in the open the sun is seen from every axis, and gives nothing)
+        for normal in [[0.0, 0.0, 1.0], [0.0, 0.0, -1.0], [-1.0, 0.0, 0.0]] {
+            let open = probe("sun", normal);
+            assert_eq!(open.irradiance, [0.0; 3], "{normal:?}");
+            assert_eq!(open.occlusion, 1.0);
+        }
+        // (under the roof it is not seen)
+        assert_eq!(probe("roof", [0.0, 0.0, 1.0]).occlusion, 0.0);
+        // (its light off the floor is kept)
+        let floor = quad([-1e3, -1e3, -1.0], [2e3, 0.0, 0.0], [0.0, 2e3, 0.0]);
+        let mut lit = scene(floor, vec![material(0.5, 0.0, 1.0)], 0.0);
+        let (sun, _) = layout("sun").unwrap_or_else(|| panic!("no sun"));
+        lit.lights = sun.lights;
+        let bvh = Bvh::build(&lit.triangles);
+        let tracer = Tracer {
+            scene: &lit,
+            bvh: &bvh,
+            occlusion_distance: OCCLUSION_DISTANCE,
+        };
+        let down = [0.0, 0.0, -1.0];
+        let probed = tracer.probe([0.0; 3], down, 2048, 0, &mut Random::new(9));
+        let whole = tracer.irradiance([0.0; 3], down, 2048, &mut Random::new(9));
+        assert!(probed.irradiance[0] > 0.1, "{probed:?}");
+        assert!((probed.irradiance[0] - whole.irradiance[0]).abs() < whole.irradiance[0] * 0.08);
     }
 
     #[test]

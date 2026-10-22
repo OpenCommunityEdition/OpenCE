@@ -43,6 +43,10 @@ struct Frame {
     // many probes each way, and 1 when there are baked probes
     float4 probe_origin;
     float4 probe_counts;
+    // the way to the bake's sun, and 1 when there is one; its irradiance
+    // (the probes leave its direct light out for the objects to add)
+    float4 sun_towards;
+    float4 sun_color;
 };
 
 // (as LevelRenderer's MaterialUniforms)
@@ -296,20 +300,43 @@ float3 baked_shown(float3 irradiance) {
     return select(1.055 * pow(linear, 1.0 / 2.4) - 0.055, linear * 12.92, linear <= 0.0031308);
 }
 
-// the light on a surface facing `normal` at `world` from the baked
-// probes around it: each holds the irradiance from the six axes (an
-// ambient cube), weighed by how much the normal faces each, shown as the
-// lightmaps' light is (baked_shown)
-float3 probe_light(constant Frame &frame, float3 world, float3 normal, sampler clamp,
-                   texture3d<float> px, texture3d<float> nx, texture3d<float> py,
-                   texture3d<float> ny, texture3d<float> pz, texture3d<float> nz) {
+// the baked probes' ambient cube at `world` for a surface facing
+// `normal`: the irradiance from the six axes, weighed by how much the
+// normal faces each, and the share of the sun the probes see
+float4 probe_cube(constant Frame &frame, float3 world, float3 normal, sampler clamp,
+                  texture3d<float> px, texture3d<float> nx, texture3d<float> py,
+                  texture3d<float> ny, texture3d<float> pz, texture3d<float> nz) {
     float3 n = direction(normal, float3(0, 0, 1));
     float3 at = ((world - frame.probe_origin.xyz) * frame.probe_origin.w + 0.5) / frame.probe_counts.xyz;
     float3 weight = n * n;
-    float3 x = n.x >= 0 ? px.sample(clamp, at).rgb : nx.sample(clamp, at).rgb;
-    float3 y = n.y >= 0 ? py.sample(clamp, at).rgb : ny.sample(clamp, at).rgb;
-    float3 z = n.z >= 0 ? pz.sample(clamp, at).rgb : nz.sample(clamp, at).rgb;
-    return baked_shown(weight.x * x + weight.y * y + weight.z * z);
+    float4 x = n.x >= 0 ? px.sample(clamp, at) : nx.sample(clamp, at);
+    float4 y = n.y >= 0 ? py.sample(clamp, at) : ny.sample(clamp, at);
+    float4 z = n.z >= 0 ? pz.sample(clamp, at) : nz.sample(clamp, at);
+    return weight.x * x + weight.y * y + weight.z * z;
+}
+
+// the light on a surface facing `normal` at `world` from the baked
+// probes around it, shown as the lightmaps' light is (baked_shown)
+float3 probe_light(constant Frame &frame, float3 world, float3 normal, sampler clamp,
+                   texture3d<float> px, texture3d<float> nx, texture3d<float> py,
+                   texture3d<float> ny, texture3d<float> pz, texture3d<float> nz) {
+    return baked_shown(probe_cube(frame, world, normal, clamp, px, nx, py, ny, pz, nz).rgb);
+}
+
+// the light on an object's surface: the probes' (the world's light
+// bounced to it, and the sky's), and the sun's where the probes see it,
+// shown as the lightmaps' light is; without a bake the probes are white
+// and there is no sun, an even light
+float3 object_light(constant Frame &frame, float3 world, float3 normal, sampler clamp,
+                    texture3d<float> px, texture3d<float> nx, texture3d<float> py,
+                    texture3d<float> ny, texture3d<float> pz, texture3d<float> nz) {
+    float3 n = direction(normal, float3(0, 0, 1));
+    float4 cube = probe_cube(frame, world, n, clamp, px, nx, py, ny, pz, nz);
+    float3 irradiance = cube.rgb;
+    if (frame.sun_towards.w > 0) {
+        irradiance += frame.sun_color.rgb * saturate(dot(n, frame.sun_towards.xyz)) * saturate(cube.w);
+    }
+    return baked_shown(irradiance);
 }
 
 fragment float4 level_fragment(VertexOut in [[stage_in]],
@@ -456,6 +483,8 @@ struct ModelIn {
 struct ModelObject {
     uint first_node;
     uint node_count;
+    // the reflection probe nearest the object, -1 for none
+    int reflection_probe;
 };
 
 struct ModelOut {
@@ -522,18 +551,26 @@ float detail_mask(uint mask, float4 multipurpose) {
     return (mask & 1) ? 1 - channel : channel;
 }
 
-// until the level's lights reach objects: a sky light from above and a
-// little from the side, and some ambient; then the model combiner's
-// self-illumination, change colour, reflection and detail
+// lit by the world (object_light), then the model combiner's
+// self-illumination, change colour, reflection (its cube by the light of
+// the nearest reflection probe) and detail
 fragment float4 model_fragment(ModelOut in [[stage_in]],
                                constant Material &material [[buffer(0)]],
                                constant Frame &frame [[buffer(1)]],
                                constant float4 *change_colors [[buffer(2)]],
+                               constant ModelObject &object [[buffer(3)]],
                                texture2d<float> base [[texture(0)]],
                                texture2d<float> primary [[texture(1)]],
                                texture2d<float> secondary [[texture(2)]],
                                texture2d<float> fourth [[texture(3)]],
                                texturecube<float> reflection [[texture(4)]],
+                               texture3d<float> probe_px [[texture(9)]],
+                               texture3d<float> probe_nx [[texture(10)]],
+                               texture3d<float> probe_py [[texture(11)]],
+                               texture3d<float> probe_ny [[texture(12)]],
+                               texture3d<float> probe_pz [[texture(13)]],
+                               texture3d<float> probe_nz [[texture(14)]],
+                               texturecube_array<float> reflections [[texture(15)]],
                                sampler wrap [[sampler(0)]],
                                sampler clamp [[sampler(1)]]) {
     if (material.chicago_count != 0) {
@@ -541,7 +578,8 @@ fragment float4 model_fragment(ModelOut in [[stage_in]],
         return fogged(chicago(in.texcoord, material, maps, wrap, frame.eye.w), in.fog, frame, material);
     }
     float3 normal = direction(in.normal, float3(0, 0, 1));
-    float3 light = float3(0.45 + 0.65 * saturate(dot(normal, normalize(float3(0.35, 0.25, 0.9)))));
+    float3 light = object_light(frame, in.world, normal, clamp, probe_px, probe_nx, probe_py, probe_ny,
+                                probe_pz, probe_nz);
     uint bits = material.model.x;
     if (!(bits & MODEL)) {
         float4 color = surface(in.texcoord, material, base, primary, secondary, wrap, frame.eye.w);
@@ -593,8 +631,15 @@ fragment float4 model_fragment(ModelOut in [[stage_in]],
         if (cutoff > 0 && falloff != cutoff) {
             fraction = saturate((length(toward) - cutoff) / (falloff - cutoff));
         }
-        reflected = reflection.sample(clamp, reflect(-eye, normal)).rgb * tint.rgb
+        float3 toward_reflected = reflect(-eye, normal);
+        reflected = reflection.sample(clamp, toward_reflected).rgb * tint.rgb
                   * (multipurpose.r * tint.a * fraction);
+        // the radiance the probe sees that way, shown as a white surface
+        // lit by it would be (pi times it is the irradiance of that)
+        if (object.reflection_probe >= 0) {
+            float3 radiance = reflections.sample(clamp, toward_reflected, uint(object.reflection_probe)).rgb;
+            reflected *= baked_shown(radiance * M_PI_F);
+        }
     }
     if (bits & DETAIL_AFTER_REFLECTION) {
         color.rgb = detailed(material.detail_function, color.rgb * light + reflected, detail);

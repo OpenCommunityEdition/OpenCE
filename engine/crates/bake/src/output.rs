@@ -11,6 +11,11 @@
 //! The light is kept as half floats: a page's texel holds its irradiance
 //! and occlusion, and a second texel the direction its light comes from
 //! (by eight bits, as `0.5 + 0.5 * direction`) and how much of it does.
+//!
+//! The probes light what moves, which the sun's shadow maps shadow, so
+//! they leave out the sun's light arriving straight at them (its light off
+//! the level is kept) and hold instead how much of the sun each sees; the
+//! sun is kept beside them, for the renderer to add.
 
 use opence_content::level::Level;
 use opence_content::pack::FORMAT_VERSION;
@@ -21,7 +26,7 @@ use crate::probe::{self, ProbeGrid, REFLECTION_SIZE};
 use crate::scene::Scene;
 
 /// The baker's version: raised with any change to what it makes.
-pub const BAKE_VERSION: u32 = 3;
+pub const BAKE_VERSION: u32 = 4;
 /// The cache file's first eight bytes.
 pub const MAGIC: [u8; 8] = *b"OCEBAKE\0";
 
@@ -84,6 +89,16 @@ pub struct BakedPage {
     pub directions: Vec<u8>,
 }
 
+/// The sun of a BSP's baked light.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BakedSun {
+    /// The direction towards it (unit).
+    pub towards: [f32; 3],
+    /// Its light on a surface facing it, scaled by the bake's exposure as
+    /// the probes' light is.
+    pub irradiance: [f32; 3],
+}
+
 /// A BSP's baked light.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BakedLighting {
@@ -98,8 +113,11 @@ pub struct BakedLighting {
     pub grid: ProbeGrid,
     /// The probes' light from each axis, axis by axis (in
     /// [`probe::AXES`]'s order), then probe by probe: four half floats
-    /// each, the irradiance and occlusion.
+    /// each, the irradiance without the sun's direct light and the share
+    /// of the sun seen ([`crate::trace::Tracer::probe`]).
     pub probes: Vec<u16>,
+    /// The sun the probes leave out, if the sky has one.
+    pub sun: Option<BakedSun>,
     /// Where the reflection probes are.
     pub reflections: Vec<[f32; 3]>,
     /// Their faces' radiance: probe by probe, face by face, texel by
@@ -216,6 +234,10 @@ impl BakePlan {
             pages,
             grid: self.grid,
             probes: probe_light,
+            sun: self.scene.sun().map(|sun| BakedSun {
+                towards: sun.towards,
+                irradiance: sun.irradiance.map(|channel| channel * exposure),
+            }),
             reflections: self.reflections.clone(),
             radiance: radiance_light,
         }
@@ -413,6 +435,12 @@ impl BakedLighting {
             put_u32(&mut bytes, count);
         }
         put_halves(&mut bytes, &self.probes);
+        put_u32(&mut bytes, u32::from(self.sun.is_some()));
+        if let Some(sun) = self.sun {
+            for value in sun.towards.iter().chain(&sun.irradiance) {
+                bytes.extend_from_slice(&value.to_le_bytes());
+            }
+        }
         put_u32(&mut bytes, self.reflections.len() as u32);
         for value in self.reflections.iter().flatten() {
             bytes.extend_from_slice(&value.to_le_bytes());
@@ -473,6 +501,14 @@ impl BakedLighting {
         {
             return Err(CacheError::Truncated);
         }
+        let sun = match reader.u32()? {
+            0 => None,
+            1 => Some(BakedSun {
+                towards: [reader.f32()?, reader.f32()?, reader.f32()?],
+                irradiance: [reader.f32()?, reader.f32()?, reader.f32()?],
+            }),
+            _ => return Err(CacheError::Truncated),
+        };
         let reflection_count = reader.u32()? as usize;
         if reflection_count > probe::MAX_REFLECTIONS {
             return Err(CacheError::Truncated);
@@ -492,6 +528,7 @@ impl BakedLighting {
             pages,
             grid,
             probes,
+            sun,
             reflections,
             radiance,
         })
@@ -661,6 +698,12 @@ mod tests {
         assert!(!plan.atlas.points.is_empty());
         let lit = |count: usize, value: f32| vec![[value, value * 2.0, value * 3.0, 0.5]; count];
         let points = plan.atlas.points.len();
+        // (a sun, brighter than the devmap's, to keep beside the probes)
+        plan.scene.lights.push(crate::scene::DirectionalLight {
+            towards: [0.0, 0.6, 0.8],
+            irradiance: [200.0, 100.0, 50.0],
+            cos_half_angle: 0.9999,
+        });
         let baked = plan.finish(
             &lit(points, 1.0),
             &vec![[0.0, 0.0, 1.0, 0.75]; points],
@@ -691,6 +734,12 @@ mod tests {
         assert_eq!(from_half(baked.probes[1]), 0.5);
         assert_eq!(from_half(baked.radiance[2]), 12.0);
         assert_eq!(from_half(baked.radiance[3]), 1.0);
+        let sun = baked.sun.unwrap_or_else(|| panic!("no sun"));
+        assert_eq!(sun.towards, [0.0, 0.6, 0.8]);
+        assert_eq!(
+            sun.irradiance,
+            [200.0, 100.0, 50.0].map(|c| c * baked.exposure)
+        );
         let bytes = baked.encode();
         assert_eq!(BakedLighting::decode(&bytes), Ok(baked.clone()));
         // a broken file is refused, whatever its length
@@ -709,6 +758,22 @@ mod tests {
         assert!(CacheError::Version(99).to_string().contains("99"));
         assert!(!CacheError::Magic.to_string().is_empty());
         assert!(!CacheError::Truncated.to_string().is_empty());
+        // (and without a sun, or with a broken flag)
+        let sunless = BakedLighting {
+            sun: None,
+            ..baked.clone()
+        };
+        let sunless_bytes = sunless.encode();
+        assert_eq!(BakedLighting::decode(&sunless_bytes), Ok(sunless));
+        // (the flag, then the reflection probes' count and places, then
+        // their radiance's count and halves)
+        let flag = sunless_bytes.len()
+            - 4
+            - (4 + baked.reflections.len() * 12)
+            - (4 + baked.radiance.len() * 2);
+        let mut broken = sunless_bytes.clone();
+        broken[flag] = 2;
+        assert_eq!(BakedLighting::decode(&broken), Err(CacheError::Truncated));
         // missing results are dark
         let dark = plan.finish(&[], &[], &[], &[]);
         assert!(dark.probes.iter().all(|half| *half == 0));

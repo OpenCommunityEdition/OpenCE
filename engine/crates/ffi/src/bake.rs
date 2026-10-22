@@ -148,12 +148,50 @@ impl BakeScene {
             samples,
             &mut Random::new(seed),
         );
-        BakeSample {
-            irradiance: result.irradiance.to_vec(),
-            direction: result.direction.to_vec(),
-            directionality: result.directionality,
-            occlusion: result.occlusion,
-        }
+        sample(result)
+    }
+
+    /// The light at an irradiance probe's `point` from the axis `normal`,
+    /// by the CPU's tracer, without the sky's light `sun` arriving straight
+    /// from it: its `occlusion` is the share of the sun seen.
+    pub fn reference_probe(
+        &self,
+        point: Vec<f32>,
+        normal: Vec<f32>,
+        samples: u32,
+        seed: u64,
+        sun: u32,
+    ) -> BakeSample {
+        let three =
+            |values: &[f32]| std::array::from_fn(|axis| values.get(axis).copied().unwrap_or(0.0));
+        let tracer = Tracer {
+            scene: &self.scene,
+            bvh: &self.bvh,
+            occlusion_distance: 0.0,
+        };
+        sample(tracer.probe(
+            three(&point),
+            three(&normal),
+            samples,
+            sun as usize,
+            &mut Random::new(seed),
+        ))
+    }
+
+    /// The sky's brightest light (the sun), which the probes leave out: its
+    /// index in `light_bytes`.
+    pub fn sun_light(&self) -> Option<u32> {
+        self.scene.sun_index().map(|index| index as u32)
+    }
+}
+
+/// A tracer's result as the app reads it.
+fn sample(result: opence_bake::trace::Irradiance) -> BakeSample {
+    BakeSample {
+        irradiance: result.irradiance.to_vec(),
+        direction: result.direction.to_vec(),
+        directionality: result.directionality,
+        occlusion: result.occlusion,
     }
 }
 
@@ -422,6 +460,47 @@ impl BakedLight {
         )
     }
 
+    /// The direction towards the sun the probes leave out (empty without
+    /// one).
+    pub fn sun_towards(&self) -> Vec<f32> {
+        self.light
+            .sun
+            .map(|sun| sun.towards.to_vec())
+            .unwrap_or_default()
+    }
+
+    /// The sun's light on a surface facing it, exposed as the probes'
+    /// light is (empty without one).
+    pub fn sun_irradiance(&self) -> Vec<f32> {
+        self.light
+            .sun
+            .map(|sun| sun.irradiance.to_vec())
+            .unwrap_or_default()
+    }
+
+    /// The probes' light at `point` on a surface facing `normal`: red,
+    /// green and blue (without the sun's direct light), and the share of
+    /// the sun seen. The renderer's model shader samples the same.
+    pub fn light_at(&self, point: Vec<f32>, normal: Vec<f32>) -> Vec<f32> {
+        let three =
+            |values: &[f32]| std::array::from_fn(|axis| values.get(axis).copied().unwrap_or(0.0));
+        opence_bake::probe::light_at(
+            &self.light.grid,
+            &self.light.probes,
+            three(&point),
+            three(&normal),
+        )
+        .to_vec()
+    }
+
+    /// The reflection probe nearest `point` (an index into
+    /// `reflection_positions`' probes), if there are any.
+    pub fn nearest_reflection(&self, point: Vec<f32>) -> Option<u32> {
+        let three: [f32; 3] = std::array::from_fn(|axis| point.get(axis).copied().unwrap_or(0.0));
+        opence_bake::probe::nearest_reflection(&self.light.reflections, three)
+            .map(|index| index as u32)
+    }
+
     /// The reflection probes' positions: x, y and z each.
     pub fn reflection_positions(&self) -> Vec<f32> {
         self.light.reflections.iter().flatten().copied().collect()
@@ -569,7 +648,22 @@ mod tests {
         assert!(light.probe_bytes(6).is_empty());
         assert_eq!(light.probe_origin().len(), 3);
         assert!(light.probe_spacing() >= 1.0);
+        // (every probe lit 1 from every axis, its sun seen whole)
+        let origin = light.probe_origin();
+        assert_eq!(
+            light.light_at(origin.clone(), vec![0.0, 0.0, 1.0]),
+            [1.0; 4]
+        );
+        let sun = bake.scene().sun_light().unwrap_or_else(|| panic!("no sun"));
+        assert_eq!(light.sun_towards().len(), 3);
+        assert_eq!(light.sun_irradiance().len(), 3);
+        let reference =
+            bake.scene()
+                .reference_probe(origin.clone(), vec![0.0, 0.0, 1.0], 8, 1, sun);
+        assert!((0.0..=1.0).contains(&reference.occlusion));
         let positions = light.reflection_positions();
+        let first = positions[..3].to_vec();
+        assert_eq!(light.nearest_reflection(first), Some(0));
         let size = light.reflection_size() as usize;
         assert_eq!(
             light.reflection_bytes().len(),

@@ -75,7 +75,9 @@ struct BakeParameters {
     float occlusion_distance;
     uint point_count;
     uint emitter_count;
-    uint pad1;
+    // the sky's light the probes leave out, plus one (0: none): opence_bake's
+    // Tracer::probe
+    uint sun;
     uint pad2;
 };
 
@@ -366,12 +368,16 @@ static float3 bake_emitter(BakeScene scene, float3 origin, float3 normal, thread
     return given;
 }
 
-// The sky's lights on a surface at `origin` facing `normal`, each added
-// with its sampled direction weighted by its brightness when given.
-static float3 bake_direct(BakeScene scene, float3 origin, float3 normal, thread uint &state,
+// The sky's lights on a surface at `origin` facing `normal` (but the light
+// `apart`, plus one: 0 leaves none out), each added with its sampled
+// direction weighted by its brightness when given.
+static float3 bake_direct(BakeScene scene, float3 origin, float3 normal, uint apart, thread uint &state,
                           thread float3 *weighted) {
     float3 total = float3(0.0f);
     for (uint index = 0; index < scene.parameters->light_count; index++) {
+        if (index + 1 == apart) {
+            continue;
+        }
         BakeLight light = scene.lights[index];
         float3 towards = bake_cone_direction(float3(light.towards), light.cos_half_angle, state);
         float facing = dot(normal, towards);
@@ -423,7 +429,7 @@ static float3 bake_radiance(BakeScene scene, float3 origin, float3 direction, fl
         light += throughput * bake_seen(material, distance, dot(normal, direction), density);
         origin = point + normal * SURFACE_OFFSET;
         float3 albedo = float3(material.albedo);
-        light += throughput * albedo * M_1_PI_F * bake_direct(scene, origin, normal, state, nullptr);
+        light += throughput * albedo * M_1_PI_F * bake_direct(scene, origin, normal, 0, state, nullptr);
         throughput *= albedo;
         if (bounce >= SURE_BOUNCES) {
             float survive = min(max(max(throughput.x, throughput.y), throughput.z), 1.0f);
@@ -443,7 +449,8 @@ static float3 bake_radiance(BakeScene scene, float3 origin, float3 direction, fl
 
 // Each point's light: irradiance (red, green, blue) and the open share of
 // its hemisphere, and the direction most of the light comes from with how
-// much of it does.
+// much of it does. With a sun, a probe's light: without the sun's direct
+// light, and the share of the sun seen in place of the open share.
 kernel void bake_irradiance(device const BakeNode *nodes [[buffer(0)]],
                             device const BakeTriangle *triangles [[buffer(1)]],
                             device const BakeMaterial *materials [[buffer(2)]],
@@ -465,9 +472,22 @@ kernel void bake_irradiance(device const BakeNode *nodes [[buffer(0)]],
     float3 total = float3(0.0f);
     float3 weighted = float3(0.0f);
     uint open = 0;
+    uint seen = 0;
+    uint sun = min(parameters.sun, parameters.light_count);
     uint samples = max(parameters.samples, 1u);
     for (uint sample = 0; sample < samples; sample++) {
-        total += bake_direct(scene, origin, normal, state, &weighted);
+        total += bake_direct(scene, origin, normal, sun, state, &weighted);
+        if (sun > 0) {
+            BakeLight light = scene.lights[sun - 1];
+            float3 towards = bake_cone_direction(float3(light.towards), light.cos_half_angle, state);
+            float distance;
+            float3 point, hit_normal;
+            BakeMaterial material;
+            if (!bake_meet(scene, origin, towards, RAY_LENGTH, state, distance, point, hit_normal, material,
+                           nullptr, -1.0f)) {
+                seen++;
+            }
+        }
         float3 direction = bake_cosine_direction(normal, state);
         float first;
         float3 radiance = bake_radiance(scene, origin, direction, dot(normal, direction) * M_1_PI_F, state, first);
@@ -479,7 +499,8 @@ kernel void bake_irradiance(device const BakeNode *nodes [[buffer(0)]],
         weighted += direction * bake_luminance(light);
     }
     float length_squared = dot(weighted, weighted);
-    irradiance[index] = float4(total / float(samples), float(open) / float(samples));
+    // (a probe's share of the sun seen, in place of its occlusion)
+    irradiance[index] = float4(total / float(samples), float(sun > 0 ? seen : open) / float(samples));
     // (how much of the light comes from its direction: the length of the
     // weighted directions over the light's brightness)
     float brightness = bake_luminance(total);
