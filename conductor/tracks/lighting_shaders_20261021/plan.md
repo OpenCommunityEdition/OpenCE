@@ -22,10 +22,10 @@
 - [x] Task: The bake's inputs 2756e640
     - [x] Write tests: sky lights, ambient colours, shader radiosity properties and the sun read from the tags into the bake's scene
     - [x] The bake scene: the BSP's triangles in a bounding-volume hierarchy, the materials, the lights
-- [ ] Task: The path tracer
-    - [ ] Write tests: a closed box with one emitter converges to the known irradiance; a sky dome gives the expected AO on a plane
-    - [ ] A Metal compute path tracer over the hierarchy, with next-event estimation and bounced light
-- [ ] Task: The outputs
+- [x] Task: The path tracer f6c668b6
+    - [x] Write tests: a closed box with one emitter converges to the known irradiance; a sky dome gives the expected AO on a plane
+    - [x] A Metal compute path tracer over the hierarchy, with next-event estimation and bounced light
+- [~] Task: The outputs
     - [ ] Write tests: the directional lightmap's layout and atlas; the probe grid covers the BSP's volume; reflection probe placement per cluster; the cache key changes with the importer's and baker's versions
     - [ ] Directional lightmaps with AO, irradiance probes, reflection probes; written to the cache; background baking with the stock lightmaps as fallback
 - [ ] Task: The mood check
