@@ -7197,6 +7197,12 @@ static void widget_instance_render_recursive(
 			boolean stretched = custom_edition_picture &&
 				custom_edition_maps_campaign_level(widget->animation.current_frame_index) == NONE;
 
+			/* port: the gradient is 512 tall and a screen samples its top
+			480, line and all. the pane's own height would keep that line
+			low and cut the blue short of the view */
+			if (pane_dim)
+				texels = definition->bounds;
+
 			if (pc_menu_frame_placement(bitmap, &frame_x, &frame_y, &frame_width, &frame_height))
 			{
 				bounds.x0 += frame_x;
