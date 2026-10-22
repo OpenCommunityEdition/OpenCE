@@ -915,6 +915,22 @@ static unsigned long palette_hash(const D3DCOLOR *palette)
 	return hash ? hash : 1;
 }
 
+/* display.high_res_hud, read again only when a setting changes: it is asked
+at every bind, and config_boolean takes the settings' lock and looks the name
+up among them all */
+static BOOL high_res_hud(void)
+{
+	static unsigned long read_at = (unsigned long)-1;
+	static BOOL enabled;
+
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		enabled = config_boolean("display.high_res_hud") != 0;
+	}
+	return enabled;
+}
+
 /* an entry's GL texture and description: its replacement's, if it has one,
 with the bitmap's own size (which its coordinates are in) */
 static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
@@ -969,7 +985,7 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 	}
 	/* These sheets keep the map's art and coordinates. Decode through the
 	 * normal format reader; the HUD module owns only the interpolation. */
-	if (config_boolean("display.high_res_hud"))
+	if (high_res_hud())
 	{
 		if (!entry->hud_upscale_checked)
 		{

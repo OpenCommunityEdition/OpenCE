@@ -592,6 +592,9 @@ vertices. */
 
 #ifndef HALO_GLES
 #define VISIBILITY_BATCH_COUNT 3
+/* what a test's place in the buffer holds until the GPU copies its count
+there: more than any test covers (8K with 4x MSAA has 133 million samples) */
+#define VISIBILITY_UNCOPIED 0xFFFFFFFFUL
 /* a frame's tests: their queries (kept until every count is read), the slot
 and area of each, and (once the frame is presented) the fence its copies
 wait on */
@@ -2545,7 +2548,7 @@ static void visibility_results_initialize(void)
 {
 	const char *vendor = (const char *)glGetString(GL_VENDOR);
 	GLsizeiptr size = VISIBILITY_BATCH_COUNT * VISIBILITY_TEST_SLOTS * sizeof(GLuint);
-	GLbitfield flags = GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+	GLbitfield flags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
 	BOOL success;
 
 	device.visibility_logging = config_boolean("debug.gl_debug");
@@ -6415,20 +6418,90 @@ static void write_screenshot(struct render_target_entry *target)
 }
 
 #ifndef HALO_GLES
+/* the counts read from each query, as with AMD's driver, once a batch's
+copies into the buffer have failed: a batch that fails is not used again,
+and with the buffer the readback would stop once all of them had. The
+batches still waiting keep their queries and are read from them. */
+static void visibility_fall_back_to_queries(void)
+{
+	unsigned long i;
+
+	for (i = 0; i < VISIBILITY_BATCH_COUNT; i++)
+	{
+		if (device.visibility_batches[i].fence)
+			glDeleteSync(device.visibility_batches[i].fence);
+		device.visibility_batches[i].fence = NULL;
+	}
+	device.visibility_mapped = NULL;
+	platform_log("GPU: visibility test counts read from each query from now on");
+}
+
+/* this frame's batch sent, before the swap. A copy into the buffer right
+after each test stopped the GPU until that test's draws were through,
+hundreds of times a frame in The Library; the GPU copies a batch's counts
+when its frame is presented, over the CPU's VISIBILITY_UNCOPIED, with a
+fence after the copies. Nothing here waits for an answer from the driver:
+with a threaded driver (NVIDIA's) any such call waits until its thread has
+carried out the whole frame queued before it, and here, before the swap,
+that held the frame back every time. GL errors are asked for with
+debug.gl_debug; the swap, next, sends the commands to the GPU. */
+static void visibility_send_batch(void)
+{
+	struct visibility_batch *batch;
+	unsigned long i;
+
+	if (device.visibility_unavailable || device.visibility_batch >= VISIBILITY_BATCH_COUNT)
+		return;
+	batch = &device.visibility_batches[device.visibility_batch];
+	if (!batch->count)
+		return;
+	if (device.visibility_mapped)
+	{
+		volatile GLuint *counts = device.visibility_mapped + device.visibility_batch * VISIBILITY_TEST_SLOTS;
+
+		if (device.visibility_logging)
+			visibility_readback_gl_ok("before query copies");
+		/* (the coherent mapping makes these writes visible to the copies
+		sent after them; a place that still holds VISIBILITY_UNCOPIED
+		once the fence has passed is a copy that failed) */
+		for (i = 0; i < batch->count; i++)
+			counts[i] = VISIBILITY_UNCOPIED;
+		for (i = 0; i < batch->count; i++)
+			glGetQueryBufferObjectuiv(batch->queries[i], device.visibility_buffer, GL_QUERY_RESULT,
+				(GLintptr)((device.visibility_batch * VISIBILITY_TEST_SLOTS + i) * sizeof(GLuint)));
+		batch->fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+		if (!batch->fence || (device.visibility_logging && !visibility_readback_gl_ok("query copies")))
+		{
+			batch->failed = TRUE;
+			device.visibility_stats.failures++;
+			if (batch->fence)
+				glDeleteSync(batch->fence);
+			batch->fence = NULL;
+			platform_log("GPU: visibility test batch %lu dropped: its counts could not be copied",
+				device.visibility_batch);
+			visibility_fall_back_to_queries();
+		}
+	}
+	batch->sealed = TRUE;
+	batch->serial = ++device.visibility_serial;
+	batch->frame = device.frame;
+	device.visibility_batch = VISIBILITY_BATCH_COUNT;
+	device.visibility_stats.submitted++;
+}
+
 /* the counts of earlier frames' tests, read into their slots oldest batch
-first, and this frame's batch sent. A copy into the buffer right after each
-test stopped the GPU until that test's draws were through, hundreds of times
-a frame in The Library; the GPU copies a batch's counts when its frame is
-presented, and the CPU reads them once the fence after the copies has
-passed, a frame or more later. With AMD's driver the CPU reads each query
-once it says it is available. A batch is not reused until all its counts
-have been read. */
+first once the fence after their copies has passed, after the swap, when
+the driver has the least queued before the question; with AMD's driver the
+CPU reads each query once it says it is available. A batch is not reused
+until all its counts have been read; one the GPU is late with is waited for
+at the next presents, however long (its slots keep their earlier counts
+meanwhile, and with every batch waiting, tests are dropped). */
 static void visibility_read_batch(void)
 {
 	struct visibility_batch *batch;
 	unsigned long i, oldest, pending = 0, oldest_age = 0;
 	GLint binding = 0;
-	BOOL bound = TRUE;
+	BOOL bound = TRUE, fall_back = FALSE;
 
 	if (device.visibility_unavailable)
 		return;
@@ -6456,17 +6529,21 @@ static void visibility_read_batch(void)
 		if (oldest == VISIBILITY_BATCH_COUNT)
 			break;
 		batch = &device.visibility_batches[oldest];
-		if (device.visibility_mapped)
+		/* (the batch this present sent: looked for from the next one) */
+		if (batch->frame == device.frame)
+			break;
+		if (device.visibility_mapped && batch->fence)
 		{
-			GLenum status = glClientWaitSync(batch->fence, 0, 0);
-			BOOL success = visibility_readback_gl_ok("copy completion");
+			/* (the flush makes sure the fence reaches the GPU without
+			counting on the swap's; after the swap it has nothing to send) */
+			GLenum status = glClientWaitSync(batch->fence, GL_SYNC_FLUSH_COMMANDS_BIT, 0);
 
-			if (success && status == GL_TIMEOUT_EXPIRED)
+			if (status == GL_TIMEOUT_EXPIRED)
 			{
 				device.visibility_stats.unavailable++;
 				break;
 			}
-			if (!success || (status != GL_ALREADY_SIGNALED && status != GL_CONDITION_SATISFIED))
+			if (status != GL_ALREADY_SIGNALED && status != GL_CONDITION_SATISFIED)
 			{
 				batch->failed = TRUE;
 				device.visibility_stats.failures++;
@@ -6475,7 +6552,10 @@ static void visibility_read_batch(void)
 			glDeleteSync(batch->fence);
 			batch->fence = NULL;
 			if (batch->failed)
-				continue;
+			{
+				fall_back = TRUE;
+				break;
+			}
 		}
 		while (batch->read < batch->count)
 		{
@@ -6484,7 +6564,15 @@ static void visibility_read_batch(void)
 			float area = batch->areas[test];
 
 			if (device.visibility_mapped)
+			{
 				samples = device.visibility_mapped[oldest * VISIBILITY_TEST_SLOTS + test];
+				if (samples == VISIBILITY_UNCOPIED)
+				{
+					batch->failed = TRUE;
+					device.visibility_stats.failures++;
+					break;
+				}
+			}
 			else
 			{
 				glGetQueryObjectuiv(batch->queries[test], GL_QUERY_RESULT_AVAILABLE, &available);
@@ -6517,7 +6605,12 @@ static void visibility_read_batch(void)
 		{
 			/* (its slots keep their earlier counts, and its queries, whose
 			state is unknown, are not used again) */
-			platform_log("GPU: visibility test batch %lu dropped: its queries could not be read", oldest);
+			platform_log("GPU: visibility test batch %lu dropped: its counts could not be read", oldest);
+			if (device.visibility_mapped)
+			{
+				fall_back = TRUE;
+				break;
+			}
 			continue;
 		}
 		if (batch->read < batch->count)
@@ -6531,42 +6624,10 @@ static void visibility_read_batch(void)
 		glBindBuffer(GL_QUERY_BUFFER, (GLuint)binding);
 		visibility_readback_gl_ok("restore query buffer");
 	}
-	if (device.visibility_batch < VISIBILITY_BATCH_COUNT)
-	{
-		batch = &device.visibility_batches[device.visibility_batch];
-		if (batch->count)
-		{
-			if (device.visibility_mapped)
-			{
-				BOOL success;
-
-				visibility_readback_gl_ok("before query copies");
-				for (i = 0; i < batch->count; i++)
-					glGetQueryBufferObjectuiv(batch->queries[i], device.visibility_buffer, GL_QUERY_RESULT,
-						(GLintptr)((device.visibility_batch * VISIBILITY_TEST_SLOTS + i) * sizeof(GLuint)));
-				batch->fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-				success = visibility_readback_gl_ok("query copies");
-				if (!success || !batch->fence)
-				{
-					batch->failed = TRUE;
-					device.visibility_stats.failures++;
-					if (batch->fence)
-						glDeleteSync(batch->fence);
-					batch->fence = NULL;
-					platform_log("GPU: visibility test batch %lu dropped: its counts could not be copied",
-						device.visibility_batch);
-				}
-			}
-			batch->sealed = TRUE;
-			batch->serial = ++device.visibility_serial;
-			batch->frame = device.frame;
-			device.visibility_batch = VISIBILITY_BATCH_COUNT;
-			device.visibility_stats.submitted++;
-			/* (sent to the GPU now, whether or not presenting flushes: the
-			counts are first looked for at the next present) */
-			glFlush();
-		}
-	}
+	/* (after the reads from the buffer: those from each query unbind it
+	first, from the next present) */
+	if (fall_back)
+		visibility_fall_back_to_queries();
 	for (i = 0; i < VISIBILITY_BATCH_COUNT; i++)
 	{
 		batch = &device.visibility_batches[i];
@@ -6709,7 +6770,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 				back_buffer->target.texture);
 		render_target_resolve(&back_buffer->target);
 #ifndef HALO_GLES
-		visibility_read_batch();
+		visibility_send_batch();
 #endif
 		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
 			write_screenshot(back_buffer);
@@ -6748,6 +6809,9 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		}
 		glBindVertexArray(device.vertex_array);
 		platform_video_swap();
+#ifndef HALO_GLES
+		visibility_read_batch();
+#endif
 		xgpu_gl_state_invalidate();
 		memory_watch_begin_frame();
 		xgpu_texture_cache_begin_frame();
