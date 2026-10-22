@@ -1776,8 +1776,9 @@ def _mods() -> list:
     lobby's frame, the mod chosen: its name, what is wrong with it, whether it
     is on and its priority, and what its mod.toml says. A turns the mod chosen
     on or off, left and right (and MOVE UP and MOVE DOWN, for the mouse) move
-    it; OK keeps it all (load_order.toml) and plays them, Cancel forgets it
-    (menu_functions.c)"""
+    it; MUTATORS shows the mutators in the rows instead (and MODS the mods
+    again); OK keeps it all (load_order.toml, game.mutators) and plays them,
+    Cancel forgets it (menu_functions.c)"""
     base = MODS
     lines = _widget("main_menu/main_menu_item_mods",
                     [("type", "text"), ("width", 256), ("height", 33), ("bitmap", "main_menu/menu_mods")],
@@ -1834,13 +1835,18 @@ def _mods() -> list:
     lines += _widget(f"{base}/button_bar",
                      [("type", "column_list"), ("width", 640), ("height", 28),
                       ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
-                     [f'<child widget="{base}/button_up" y="1"/>', f'<child widget="{base}/button_down" x="130" y="1"/>',
-                      f'<child widget="{base}/button_ok" x="380" y="1"/>',
-                      '<child widget="common_button_cancel" x="510" y="1"/>'])
+                     [f'<child widget="{base}/button_up" y="1"/>', f'<child widget="{base}/button_down" x="128" y="1"/>',
+                      f'<child widget="{base}/button_mutators" x="256" y="1"/>',
+                      f'<child widget="{base}/button_ok" x="384" y="1"/>',
+                      '<child widget="common_button_cancel" x="512" y="1"/>'])
     lines += _text_button(f"{base}/button_up", "MOVE UP", ['<on event="a" run="port mods move up"/>',
                                                           '<on event="start" run="port mods move up"/>'])
     lines += _text_button(f"{base}/button_down", "MOVE DOWN", ['<on event="a" run="port mods move down"/>',
                                                               '<on event="start" run="port mods move down"/>'])
+    # (the rows the mutators', and the mods' again: the button says which
+    # it shows next, as menu_functions.c's mods_update sets it)
+    lines += _text_button(f"{base}/button_mutators", "MUTATORS", ['<on event="a" run="port mods switch"/>',
+                                                                 '<on event="start" run="port mods switch"/>'])
     lines += _button(f"{base}/button_ok", 1, ['<on event="a" run="port mods save" back="true"/>',
                                               '<on event="start" run="port mods save" back="true"/>'])
     return lines

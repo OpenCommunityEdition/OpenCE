@@ -2220,7 +2220,10 @@ resource pack list is, the one that plays over the others at the top (the
 load order upside down: the mod loaded last first), turned on or off and
 moved up or down there, and in the frame beside them the mod chosen's
 details; OK keeps it (port/linux/src/port_mods.c's load_order.toml) and
-plays them on the map now (mods.c), Cancel forgets it */
+plays them on the map now (mods.c), Cancel forgets it. MUTATORS shows the
+mutators in the rows instead (port/linux/src/port_mutators.c), in the order
+they are found, and MODS the mods again: each turned on or off there, kept
+by OK (game.mutators) as the mods are, and played from the next game */
 
 #define MOD_ROWS 11
 #define MOD_DETAILS_LENGTH 1024
@@ -2266,6 +2269,16 @@ int port_mods_save(void);
 void port_mods_revert(void);
 /* (mods.c) */
 void mods_apply(void);
+/* (port/linux/src/port_mutators.c, port_mutators.h's) */
+long port_mutators_scan(void);
+long port_mutators_count(void);
+char const *port_mutators_name(long index);
+int port_mutators_on(long index);
+int port_mutators_status(long index, char *text, unsigned long size);
+int port_mutators_details(long index, char *text, unsigned long size);
+void port_mutators_turn(long index, int on);
+int port_mutators_save(void);
+void port_mutators_revert(void);
 
 static struct
 {
@@ -2284,7 +2297,31 @@ static struct
 	char shown[128];
 	long row_mods[MOD_ROWS];
 	long row_fonts[MOD_ROWS];
+	/* whether the rows are the mutators' (MUTATORS), not the mods' */
+	boolean mutators;
 } mods_screen;
+
+/* the list's: the mods', or the mutators' (whose status is _port_mod_fine
+or _port_mod_unplayable) */
+static long mods_list_count(void)
+{
+	return mods_screen.mutators ? port_mutators_count() : port_mods_count();
+}
+
+static char const *mods_list_name(long index)
+{
+	return mods_screen.mutators ? port_mutators_name(index) : port_mods_name(index);
+}
+
+static int mods_list_on(long index)
+{
+	return mods_screen.mutators ? port_mutators_on(index) : port_mods_on(index);
+}
+
+static int mods_list_status(long index, char *text, unsigned long size)
+{
+	return mods_screen.mutators ? port_mutators_status(index, text, size) : port_mods_status(index, text, size);
+}
 
 /* the row (op_mod_<n>) a widget is or is in, else NULL */
 static struct widget_instance *mod_row(struct widget_instance *widget)
@@ -2302,15 +2339,18 @@ static short mod_row_place(struct widget_instance *row)
 {
 	short place = row ? (short)(mods_screen.first + atoi(row->name + 7) - 1) : NONE;
 
-	return place >= 0 && place < port_mods_count() ? place : NONE;
+	return place >= 0 && place < mods_list_count() ? place : NONE;
 }
 
 /* the mod at a place on the list (its place in the load order counted from
 the end), else NONE */
 static long mod_at_place(short place)
 {
-	long count = port_mods_count();
+	long count = mods_list_count();
 
+	/* (the mutators in the order they are found) */
+	if (mods_screen.mutators)
+		return place >= 0 && place < count ? place : NONE;
 	return place >= 0 && place < count ? port_mods_at(count - 1 - place) : NONE;
 }
 
@@ -2463,6 +2503,8 @@ static boolean mods_screen_reset(void)
 	short index;
 
 	port_mods_revert();
+	port_mutators_revert();
+	mods_screen.mutators = FALSE;
 	mods_screen.first = 0;
 	mods_screen.chosen = 0;
 	mods_screen.shown[0] = 0;
@@ -2485,8 +2527,33 @@ static boolean mods_toggle(struct widget_instance *widget)
 
 	if (place == NONE)
 		return FALSE;
-	if (port_mods_status(mod, NULL, 0) != _port_mod_unplayable)
+	if (mods_list_status(mod, NULL, 0) == _port_mod_unplayable)
+		return TRUE;
+	if (mods_screen.mutators)
+		port_mutators_turn(mod, !port_mutators_on(mod));
+	else
 		port_mods_turn(mod, !port_mods_on(mod));
+	return TRUE;
+}
+
+/* "port mods switch" (MUTATORS, and MODS): the rows the mutators', or the
+mods' again, from the top; what each has turned on or moved stays until
+OK or Cancel */
+static boolean mods_switch(struct widget_instance *widget)
+{
+	struct widget_instance *list = widget;
+	short index;
+
+	mods_screen.mutators = !mods_screen.mutators;
+	mods_screen.first = 0;
+	mods_screen.chosen = 0;
+	mods_screen.shown[0] = 0;
+	for (index = 0; index < MOD_ROWS; index++)
+		mods_screen.row_mods[index] = NONE;
+	while (list && strcmp(list->name, "mods_list"))
+		list = list->parent;
+	if (list)
+		focus_row(list, mods_list_count() ? 0 : NONE);
 	return TRUE;
 }
 
@@ -2501,8 +2568,8 @@ static boolean mods_move(struct widget_instance *widget, short places)
 	short place = row ? mod_row_place(row) : mods_screen.chosen;
 	short moved;
 
-	/* (no mods: nothing to move) */
-	if (!count)
+	/* (no mods: nothing to move; the mutators have no order) */
+	if (!count || mods_screen.mutators)
 		return TRUE;
 	if (place == NONE || place >= count)
 		return FALSE;
@@ -2534,8 +2601,8 @@ static void mods_details_show(struct widget_instance *details, short place, shor
 	char shown[sizeof(mods_screen.shown)];
 
 	/* (wrapped again only when what they show, or its fonts, change) */
-	snprintf(shown, sizeof(shown), "%ld %d %d %d %d %ld %d %ld %d", mod, port_mods_status(mod, NULL, 0),
-		port_mods_on(mod), place, count, mods_screen.fonts[_mod_details_name],
+	snprintf(shown, sizeof(shown), "%d %ld %d %d %d %d %ld %d %ld %d", mods_screen.mutators, mod,
+		mods_list_status(mod, NULL, 0), mods_list_on(mod), place, count, mods_screen.fonts[_mod_details_name],
 		mods_screen.widths[_mod_details_name], mods_screen.fonts[_mod_details_text],
 		mods_screen.widths[_mod_details_text]);
 	if (!strcmp(shown, mods_screen.shown))
@@ -2544,12 +2611,14 @@ static void mods_details_show(struct widget_instance *details, short place, shor
 	if (mod < 0)
 	{
 		/* (no mods: where they go) */
-		mods_wide_text(count ? "" : "No mods", wide, NUMBEROF(wide));
+		mods_wide_text(count ? "" : mods_screen.mutators ? "No mutators" : "No mods", wide, NUMBEROF(wide));
 		text_set_length(named(details, "mod_details_name", 0), wide, NUMBEROF(wide));
 		text[0] = 0;
 		if (!count)
 		{
-			mods_wrap("Each mod is a folder of its own in the mods folder, beside the maps folder.", text,
+			mods_wrap(mods_screen.mutators ?
+				"Each mutator is a folder of its own in the mutators folder, beside the maps folder." :
+				"Each mod is a folder of its own in the mods folder, beside the maps folder.", text,
 				sizeof(text), _mod_details_text, MOD_DETAILS_LINES, 0);
 		}
 		mods_wide_text(text, wide, NUMBEROF(wide));
@@ -2557,9 +2626,9 @@ static void mods_details_show(struct widget_instance *details, short place, shor
 		visible_set(icon, FALSE);
 		return;
 	}
-	status = port_mods_status(mod, problem, sizeof(problem));
+	status = mods_list_status(mod, problem, sizeof(problem));
 	text[0] = 0;
-	mods_wrap(port_mods_name(mod), text, sizeof(text), _mod_details_name, 2, 0);
+	mods_wrap(mods_list_name(mod), text, sizeof(text), _mod_details_name, 2, 0);
 	mods_wide_text(text, wide, NUMBEROF(wide));
 	text_set_length(named(details, "mod_details_name", 0), wide, NUMBEROF(wide));
 	visible_set(icon, status != _port_mod_fine);
@@ -2576,11 +2645,22 @@ static void mods_details_show(struct widget_instance *details, short place, shor
 		line = mods_wrap(problem, text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
 		line = mods_wrap(" ", text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
 	}
-	snprintf(about, sizeof(about), "%s\nPriority: %d of %d", status == _port_mod_unplayable ? "Cannot be played" :
-		port_mods_on(mod) ? "On" : "Off", place + 1, count);
+	if (mods_screen.mutators)
+	{
+		snprintf(about, sizeof(about), "%s", status == _port_mod_unplayable ? "Cannot be played" :
+			port_mutators_on(mod) ? "On" : "Off");
+	}
+	else
+	{
+		snprintf(about, sizeof(about), "%s\nPriority: %d of %d", status == _port_mod_unplayable ? "Cannot be played" :
+			port_mods_on(mod) ? "On" : "Off", place + 1, count);
+	}
 	line = mods_wrap(about, text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
 	line = mods_wrap(" ", text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
-	port_mods_details(mod, about, sizeof(about));
+	if (mods_screen.mutators)
+		port_mutators_details(mod, about, sizeof(about));
+	else
+		port_mods_details(mod, about, sizeof(about));
 	mods_wrap(about, text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
 	mods_wide_text(text, wide, NUMBEROF(wide));
 	text_set_length(named(details, "mod_details_text", 0), wide, NUMBEROF(wide));
@@ -2595,7 +2675,7 @@ static void mods_update(struct widget_instance *list)
 {
 	struct widget_instance *row;
 	struct widget_instance *focused = mod_row(list->focused_child);
-	short count = (short)port_mods_count();
+	short count = (short)mods_list_count();
 	short focused_index = focused ? (short)(atoi(focused->name + 7) - 1) : NONE;
 
 	if (focused_index == MOD_ROWS - 1 && mods_screen.first + MOD_ROWS < count && list_scrolls_at_end())
@@ -2634,12 +2714,12 @@ static void mods_update(struct widget_instance *list)
 			continue;
 		}
 		mod = mod_at_place(place);
-		status = port_mods_status(mod, NULL, 0);
+		status = mods_list_status(mod, NULL, 0);
 		row_index = (short)PIN(atoi(row->name + 7) - 1, 0, MOD_ROWS - 1);
 		if (mods_screen.row_mods[row_index] != mod ||
 			mods_screen.row_fonts[row_index] != mods_screen.fonts[_mod_row_name])
 		{
-			char const *name = port_mods_name(mod);
+			char const *name = mods_list_name(mod);
 			char shortened[MOD_DETAILS_LENGTH];
 			wchar_t wide[ROW_TEXT_LENGTH];
 
@@ -2652,13 +2732,15 @@ static void mods_update(struct widget_instance *list)
 			mods_screen.row_mods[row_index] = mod;
 			mods_screen.row_fonts[row_index] = mods_screen.fonts[_mod_row_name];
 		}
-		text_set(named(row, "mod_state", 0), port_mods_on(mod) ? L"ON" : L"OFF");
+		text_set(named(row, "mod_state", 0), mods_list_on(mod) ? L"ON" : L"OFF");
 		icon = named(row, "mod_status", 0);
 		visible_set(icon, status != _port_mod_fine);
 		if (icon)
 			icon->animation.current_frame_index = status == _port_mod_out_of_order ? 1 : 2;
 	}
 	mods_details_show(list->parameters.list.extended_description, count ? mods_screen.chosen : NONE, count);
+	/* (the button to the other list) */
+	text_set(named(list, "button_mutators", 0), mods_screen.mutators ? L"MODS" : L"MUTATORS");
 }
 
 /* "port mods save" (OK): kept, and played at once (port_mods_save keeps
@@ -2666,6 +2748,7 @@ what it cannot write until the game quits) */
 static boolean mods_save(void)
 {
 	port_mods_save();
+	port_mutators_save();
 	mods_apply();
 	return TRUE;
 }
@@ -6298,7 +6381,14 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "port mods init") || !strcmp(name, "port mods close"))
 		{
+			/* (the mutators folder found again as the screen opens) */
+			if (!strcmp(name, "port mods init"))
+				port_mutators_scan();
 			return mods_screen_reset();
+		}
+		else if (!strcmp(name, "port mods switch"))
+		{
+			return mods_switch(widget);
 		}
 		else if (!strcmp(name, "port mods toggle"))
 		{

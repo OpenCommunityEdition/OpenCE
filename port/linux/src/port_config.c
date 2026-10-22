@@ -442,6 +442,11 @@ static const struct config_setting config_settings[] =
 		"every map. A downloaded map's scripts may not change the player's\n"
 		"settings or other players' games (debug.txt names what they were\n"
 		"refused)." },
+	{ "game.mutators", _config_string, "\"\"", "HALO_MUTATORS", _environment_value, _platform_all,
+		"The mutators played in the games you host or play alone: their ids\n"
+		"(big_head), separated by commas; empty plays none, the stock game. A\n"
+		"game you join plays its host's. The Mods menu's MUTATORS sets this\n"
+		"(docs/mutators.md)." },
 
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"
