@@ -1026,10 +1026,12 @@ static long hud_digits_check(
 	return given_back;
 }
 
-/* Gives the HUD's placements their scales back. */
-static void hud_placements_unscale(
+/* Gives the HUD's placements their scales back, then scales those that
+draw the mods' bitmaps now played. */
+static long hud_placements_rescale(
 	void)
 {
+	struct custom_edition_hud_walk walk;
 	long index;
 
 	for (index = mod_bitmaps_globals.scale_count - 1; index >= 0; index--)
@@ -1038,18 +1040,6 @@ static void hud_placements_unscale(
 		mod_bitmaps_globals.scales[index].scale[1] = mod_bitmaps_globals.scales[index].original[1];
 	}
 	mod_bitmaps_globals.scale_count = 0;
-
-	return;
-}
-
-/* Gives the HUD's placements their scales back, then scales those that
-draw the mods' bitmaps now played. */
-static long hud_placements_rescale(
-	void)
-{
-	struct custom_edition_hud_walk walk;
-
-	hud_placements_unscale();
 	walk.block_elements = hud_block_elements;
 	walk.placement = hud_placement_scale;
 	walk.context = NULL;
@@ -1199,42 +1189,6 @@ long mod_bitmaps_update(
 	}
 
 	return played_count;
-}
-
-/* (mods.c, before the mods' unit HUDs change: a placement's scale is
-remembered where it is in the tag, which is about to hold another HUD) */
-void mod_bitmaps_hud_unscale(
-	void)
-{
-	if (mods_map_loaded() && mod_bitmaps_globals.overrides)
-		hud_placements_unscale();
-
-	return;
-}
-
-/* (mods.c, after the mods' unit HUDs were changed, or not) */
-void mod_bitmaps_hud_rescale(
-	boolean huds_changed,
-	boolean at_load)
-{
-	/* (no bitmap was ever played: no placement is scaled, none to scale) */
-	if (!mods_map_loaded() || !mod_bitmaps_globals.overrides)
-	{
-		return;
-	}
-	if (huds_changed)
-	{
-		/* the bitmaps the new HUD draws that it cannot draw at the map's
-		size go, and no texture holds a bitmap while one does */
-		if (!at_load)
-			texture_cache_flush();
-		hud_bitmaps_check();
-	}
-	if (hud_placements_rescale() && huds_changed)
-		error(_error_silent, "mods: %ld HUD placements scaled to draw larger bitmaps at the map's size",
-			mod_bitmaps_globals.scale_count);
-
-	return;
 }
 
 /* (once the texture cache is closed: no block holds a bitmap) */

@@ -3,8 +3,7 @@ MODS.C
 
 Mods: tag files played over a map's tags on this machine, as a resource
 pack is: a map's sounds (mod_sounds.c), bitmaps (mod_bitmaps.c), text
-(mod_strings.c), unit HUDs (mod_unit_huds.c) and models (mod_models.c) from
-Halo PC tag files, as the
+(mod_strings.c) and models (mod_models.c) from Halo PC tag files, as the
 Halo Editing Kit and Invader write them, in the mods of the mods folder that
 are on, in their load order (port/linux/src/port_mods.c; the main menu's
 Mods chooses: menu_functions.c; the mod.toml files: docs/mods.md). Nothing a
@@ -67,7 +66,6 @@ static struct
 	boolean say;
 	/* how many of the map's strings, bitmaps, sounds and models the mods play */
 	long string_count;
-	long unit_hud_count;
 	long bitmap_count;
 	long sound_count;
 	long model_count;
@@ -82,16 +80,8 @@ static void mods_update(
 	boolean remove_all,
 	boolean at_load)
 {
-	boolean huds_changed;
-
 	mods_globals.string_count = mod_strings_update(remove_all, at_load);
-	/* (the bitmaps scale the HUD's placements for theirs, in the tags the
-	HUDs are played in: those scales are given back while the HUDs change,
-	and made again after the bitmaps) */
-	mod_bitmaps_hud_unscale();
-	mods_globals.unit_hud_count = mod_unit_huds_update(remove_all, at_load, &huds_changed);
 	mods_globals.bitmap_count = mod_bitmaps_update(remove_all, at_load);
-	mod_bitmaps_hud_rescale(huds_changed, at_load);
 	mods_globals.sound_count = mod_sounds_update(remove_all, at_load);
 	mods_globals.model_count = mod_models_update(remove_all, at_load);
 
@@ -277,7 +267,6 @@ static void mods_let_go(
 {
 	mod_sounds_tags_unloaded();
 	mod_bitmaps_tags_unloaded();
-	mod_unit_huds_tags_unloaded(give_back);
 	mod_models_tags_unloaded(give_back);
 	mod_strings_tags_unloaded();
 	mods_globals.map_loaded = FALSE;
@@ -285,7 +274,6 @@ static void mods_let_go(
 	mods_globals.map_name[0] = 0;
 	mods_globals.kept_bytes = 0;
 	mods_globals.string_count = 0;
-	mods_globals.unit_hud_count = 0;
 	mods_globals.bitmap_count = 0;
 	mods_globals.sound_count = 0;
 	mods_globals.model_count = 0;
@@ -398,9 +386,9 @@ void mods_list(
 	{
 		if (mods_globals.enabled)
 		{
-			console_printf(FALSE, "mods: on %s, %ld string lists, %ld unit HUDs, %ld bitmaps, %ld sounds and %ld models are theirs (%lu KB kept)",
-				mods_globals.map_name, mods_globals.string_count, mods_globals.unit_hud_count, mods_globals.bitmap_count,
-				mods_globals.sound_count, mods_globals.model_count, mods_globals.kept_bytes / 1024);
+			console_printf(FALSE, "mods: on %s, %ld string lists, %ld bitmaps, %ld sounds and %ld models are theirs (%lu KB kept)",
+				mods_globals.map_name, mods_globals.string_count, mods_globals.bitmap_count, mods_globals.sound_count,
+				mods_globals.model_count, mods_globals.kept_bytes / 1024);
 		}
 		else
 		{
