@@ -208,6 +208,11 @@ public struct FrameUniforms {
     /// The camera's position (the reflections' and highlights' eye), and
     /// the mipmap bias.
     public var eye: SIMD4<Float> = .zero
+    /// The baked probe grid's first probe, and one over its spacing.
+    public var probeOrigin: SIMD4<Float> = .zero
+    /// How many probes each way, and 1 when there are baked probes (0:
+    /// the unbaked surfaces are lit from their normals alone).
+    public var probeCounts: SIMD4<Float> = .zero
 
     /// The frame from `camera`, its fog `fog` (none without a sky), its
     /// maps sampled `mipBias` levels sharper (negative) than its size's.
@@ -255,8 +260,12 @@ enum MapBit {
     static let primary: UInt32 = 2
     static let secondary: UInt32 = 4
     static let lightmap: UInt32 = 8
-    /// Lit from its normals: a BSP shipped with no lightmaps.
+    /// Lit from its normals: a BSP shipped with no lightmaps (or from the
+    /// baked probes, once there are some).
     static let unbaked: UInt32 = 16
+    /// The lightmap is the bake's: irradiance, and its direction in
+    /// texture 8.
+    static let baked: UInt32 = 32
 }
 
 /// The bits of MaterialUniforms.environment.w.
@@ -292,20 +301,31 @@ public final class LevelRenderer {
         var blend: BlendFunction?
         var uniforms: MaterialUniforms
         /// Base, primary detail, secondary detail, lightmap, micro detail,
-        /// bump or specular mask, self-illumination and the reflection's
-        /// cube (a chicago shader's four maps, then white).
+        /// bump or specular mask, self-illumination, the reflection's cube
+        /// (a chicago shader's four maps, then white) and the baked
+        /// light's directions.
         var textures: [MTLTexture]
         var center: SIMD3<Float>
         /// Its material, whose animation it takes each frame.
         var material: Int
+        /// Its page in the BSP's lightmaps, when it is drawn with one.
+        var lightmapPage: UInt32?
     }
 
     public let device: MTLDevice
     public let outputFormat: MTLPixelFormat
     let vertices: MTLBuffer
     let indices: MTLBuffer
-    let opaqueDraws: [Draw]
-    let blendedDraws: [Draw]
+    private(set) var opaqueDraws: [Draw]
+    private(set) var blendedDraws: [Draw]
+    /// The baked probes' light from each axis (+x, -x, +y, -y, +z, -z):
+    /// white and unused until the bake is drawn with.
+    private var probes: [MTLTexture]
+    /// The baked probes' grid, for the frame's uniforms.
+    private var probeGrid: (origin: SIMD4<Float>, counts: SIMD4<Float>) = (.zero, .zero)
+    /// Whether the bake's light is drawn.
+    public private(set) var baked = false
+    private let white: MTLTexture
     let textureCount: Int
     let models: ModelPass
     /// The level's sky (its model is drawn first, at infinity).
@@ -389,9 +409,12 @@ public final class LevelRenderer {
             Self.texture(device, texture) { level in geometry.textureLevel(texture: UInt32(index), level: level) }
         }
         textureCount = textures.compactMap { $0 }.count
-        guard let white = Self.white(device), let whiteCube = Self.white(device, cube: true) else {
+        guard let white = Self.white(device), let whiteCube = Self.white(device, cube: true),
+              let whiteVolume = Self.whiteVolume(device) else {
             throw LevelRendererError.resources("textures")
         }
+        self.white = white
+        probes = Array(repeating: whiteVolume, count: 6)
         let materials = geometry.materials()
         func texture(_ index: UInt32?) -> MTLTexture? {
             index.flatMap { Int($0) < textures.count ? textures[Int($0)] : nil }
@@ -442,8 +465,8 @@ public final class LevelRenderer {
                 } ?? [white, white, white, whiteCube]
             }
             let made = Draw(firstIndex: Int(draw.firstIndex), indexCount: Int(draw.indexCount),
-                            blend: blend, uniforms: uniforms, textures: bound, center: center,
-                            material: Int(draw.material))
+                            blend: blend, uniforms: uniforms, textures: bound + [white], center: center,
+                            material: Int(draw.material), lightmapPage: draw.lightmapPage)
             if made.blend == nil {
                 opaqueDraws.append(made)
             } else {
@@ -647,6 +670,8 @@ public final class LevelRenderer {
                                       device: device)
         let animation = geometry.materialAnimation(seconds: time)
         var uniforms = FrameUniforms(viewProjection: viewProjection, camera: camera, fog: sky?.fog, mipBias: mipBias)
+        uniforms.probeOrigin = probeGrid.origin
+        uniforms.probeCounts = probeGrid.counts
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = frame
         pass.colorAttachments[0].loadAction = .clear
@@ -668,6 +693,7 @@ public final class LevelRenderer {
         encoder.setFragmentSamplerState(wrap, index: 0)
         encoder.setFragmentSamplerState(clamp, index: 1)
         encoder.setFragmentSamplerState(nearest, index: 2)
+        encoder.setFragmentTextures(probes, range: 9..<15)
         models.encodeSky(prepared, into: encoder)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setRenderPipelineState(opaque)
@@ -720,6 +746,89 @@ public final class LevelRenderer {
         guard supportsTemporal else { return nil }
         temporal = TemporalScaling(device: device, input: input, output: (width, height))
         return temporal
+    }
+
+    /// Draws with `light`, the BSP's baked light: each lightmapped draw
+    /// takes its page's baked irradiance and directions, and the surfaces
+    /// without lightmaps (and, later, the objects) take the probes'.
+    /// Pages the bake lacks keep their stock lightmaps.
+    public func useBakedLighting(_ light: BakedLight) throws {
+        var pages: [UInt32: (irradiance: MTLTexture, directions: MTLTexture)] = [:]
+        for page in light.pages() {
+            let width = Int(page.width), height = Int(page.height)
+            guard width > 0, height > 0, page.irradiance.count == width * height * 8,
+                  page.directions.count == width * height * 4,
+                  let irradiance = Self.texture2D(device, .rgba16Float, width, height, Array(page.irradiance), 8),
+                  let directions = Self.texture2D(device, .rgba8Unorm, width, height, Array(page.directions), 4)
+            else {
+                throw LevelRendererError.resources("baked lightmap \(page.page)")
+            }
+            pages[page.page] = (irradiance, directions)
+        }
+        let counts = light.probeCounts().map(Int.init)
+        let origin = light.probeOrigin()
+        var volumes: [MTLTexture] = []
+        if counts.count == 3, origin.count == 3, counts.allSatisfy({ $0 > 0 }) {
+            for axis in 0..<6 {
+                guard let volume = Self.volume(device, counts, Array(light.probeBytes(axis: UInt32(axis)))) else {
+                    throw LevelRendererError.resources("baked probes")
+                }
+                volumes.append(volume)
+            }
+            probes = volumes
+            probeGrid = (SIMD4(origin[0], origin[1], origin[2], 1 / max(light.probeSpacing(), 1e-3)),
+                         SIMD4(Float(counts[0]), Float(counts[1]), Float(counts[2]), 1))
+        }
+        func bake(_ draw: inout Draw) {
+            guard let page = draw.lightmapPage.flatMap({ pages[$0] }), draw.uniforms.maps & MapBit.lightmap != 0,
+                  draw.uniforms.chicagoCount == 0, draw.uniforms.transparent.x == 0 else { return }
+            draw.textures[3] = page.irradiance
+            draw.textures[8] = page.directions
+            draw.uniforms.maps |= MapBit.baked
+        }
+        for index in opaqueDraws.indices {
+            bake(&opaqueDraws[index])
+        }
+        for index in blendedDraws.indices {
+            bake(&blendedDraws[index])
+        }
+        baked = true
+    }
+
+    /// How many draws take the bake's lightmaps.
+    public var bakedDrawCount: Int {
+        (opaqueDraws + blendedDraws).filter { $0.uniforms.maps & MapBit.baked != 0 }.count
+    }
+
+    /// A shared 2D texture of `bytes`, `texel` bytes a texel.
+    static func texture2D(_ device: MTLDevice, _ format: MTLPixelFormat, _ width: Int, _ height: Int,
+                          _ bytes: [UInt8], _ texel: Int) -> MTLTexture? {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: width, height: height,
+                                                                  mipmapped: false)
+        descriptor.usage = .shaderRead
+        guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
+        texture.replace(region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: bytes,
+                        bytesPerRow: width * texel)
+        return texture
+    }
+
+    /// A half-float RGBA volume `counts` texels each way, of `bytes`.
+    static func volume(_ device: MTLDevice, _ counts: [Int], _ bytes: [UInt8]) -> MTLTexture? {
+        guard counts.count == 3, bytes.count == counts.reduce(1, *) * 8 else { return nil }
+        let descriptor = MTLTextureDescriptor()
+        descriptor.textureType = .type3D
+        descriptor.pixelFormat = .rgba16Float
+        (descriptor.width, descriptor.height, descriptor.depth) = (counts[0], counts[1], counts[2])
+        descriptor.usage = .shaderRead
+        guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
+        texture.replace(region: MTLRegionMake3D(0, 0, 0, counts[0], counts[1], counts[2]), mipmapLevel: 0, slice: 0,
+                        withBytes: bytes, bytesPerRow: counts[0] * 8, bytesPerImage: counts[0] * counts[1] * 8)
+        return texture
+    }
+
+    /// A white volume of one texel.
+    static func whiteVolume(_ device: MTLDevice) -> MTLTexture? {
+        volume(device, [1, 1, 1], [0x00, 0x3c, 0x00, 0x3c, 0x00, 0x3c, 0x00, 0x3c])
     }
 
     /// Starts the temporal history again (a cut: the camera moved too far

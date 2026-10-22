@@ -269,6 +269,9 @@ pub struct RenderDraw {
     pub material: u32,
     /// Its lightmap page's texture, if it is lightmapped.
     pub lightmap: Option<u32>,
+    /// Its lightmap page, in the BSP's lightmaps, if it is lightmapped
+    /// (the page its baked light is in, when the light is baked again).
+    pub lightmap_page: Option<u32>,
     /// Lit from its normals, as the game lights a structure BSP shipped
     /// with no lightmaps (its `no_lightmap` mode); otherwise it would be
     /// drawn fullbright.
@@ -373,10 +376,10 @@ impl RenderLevel {
             materials: HashMap::new(),
         };
         let mut blended = Vec::new();
-        for lightmap in &structure.lightmaps {
+        for (number, lightmap) in structure.lightmaps.iter().enumerate() {
             let page = builder.lightmap_texture(structure, lightmap);
             for material in &lightmap.materials {
-                let Some(draw) = builder.draw(structure, material, page) else {
+                let Some(draw) = builder.draw(structure, material, page, number as u32) else {
                     continue;
                 };
                 let kind = builder.out.materials[draw.material as usize].kind;
@@ -596,6 +599,7 @@ impl Builder<'_> {
         structure: &StructureBsp,
         material: &Material,
         lightmap: Option<u32>,
+        page: u32,
     ) -> Option<RenderDraw> {
         let index = self.material(material.shader.as_ref()?)?;
         let first = usize::try_from(material.first_surface).ok()?;
@@ -655,6 +659,7 @@ impl Builder<'_> {
             index_count,
             material: index,
             lightmap: if lit { lightmap } else { None },
+            lightmap_page: (lit && lightmap.is_some()).then_some(page),
             unbaked: structure.lightmap_bitmap.is_none()
                 && matches!(kind, Some(MaterialKind::Opaque | MaterialKind::AlphaTested)),
             center: center.to_vec(),
@@ -1054,6 +1059,8 @@ mod tests {
         assert_eq!(fence.lightmap, None);
         // (the page's texture is the first made)
         assert_eq!(built.draws[0].lightmap, Some(0));
+        assert_eq!(built.draws[0].lightmap_page, Some(0));
+        assert_eq!(fence.lightmap_page, None);
         let middle = [2.0 / 3.0, 2.0 / 3.0, 1.0];
         assert!(fence
             .center

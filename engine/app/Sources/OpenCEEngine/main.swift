@@ -190,7 +190,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var thirdPerson = false
     lazy var settings = videoSettings(saved.settings.video)
     var controller: EngineWindowController?
-    var level: LoadedLevel?
+    var level: LoadedLevel? {
+        didSet { bakeLevel() }
+    }
+    /// The bakes running (their cache files' names).
+    var baking: Set<String> = []
     /// The HUD's pass, made with the first level.
     var hud: HudPass?
     var lastFrame: CFTimeInterval?
@@ -308,6 +312,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                        settings: settings)
         switched.renderer.hud = hud
         self.level = switched
+    }
+
+    /// Bakes the light of the structure drawn when the cache lacks it,
+    /// and draws with it once done if that structure is still drawn.
+    func bakeLevel() {
+        guard let level, !level.renderer.baked, let bake = level.bake,
+              let device = controller?.window.engineView.device else { return }
+        let name = bake.cacheFileName()
+        guard !baking.contains(name) else { return }
+        baking.insert(name)
+        let started = CACurrentMediaTime()
+        appLog("info", "baking \(name)")
+        LightBaker.bakeInBackground(bake, folder: cacheFolder(), device: device) { [weak self] result in
+            guard let self else { return }
+            baking.remove(name)
+            do {
+                let light = try result.get()
+                appLog("info", String(format: "baked %@ in %.1f s", name, CACurrentMediaTime() - started))
+                if let current = self.level, current.bake?.cacheFileName() == name, !current.renderer.baked {
+                    try current.renderer.useBakedLighting(light)
+                }
+            } catch {
+                appLog("warn", "the bake of \(name): \(error)")
+            }
+        }
     }
 
     /// The developer shell: ~ opens it over the game, which keeps playing;

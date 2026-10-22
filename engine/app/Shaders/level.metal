@@ -39,6 +39,10 @@ struct Frame {
     // the camera's position, and the mipmap bias: how many levels sharper
     // than its own size a frame drawn small for the temporal scaler samples
     float4 eye;
+    // the baked probe grid's first probe and one over its spacing; how
+    // many probes each way, and 1 when there are baked probes
+    float4 probe_origin;
+    float4 probe_counts;
 };
 
 // (as LevelRenderer's MaterialUniforms)
@@ -119,6 +123,7 @@ constant uint PRIMARY = 2;
 constant uint SECONDARY = 4;
 constant uint LIGHTMAP = 8;
 constant uint UNBAKED = 16;
+constant uint BAKED = 32;
 
 struct VertexOut {
     float4 position [[position]];
@@ -283,6 +288,22 @@ float3 self_illumination(float4 map, constant Material &material) {
     return map.r * material.animation[0].rgb + map.g * material.animation[1].rgb + map.b * plasma;
 }
 
+// the light on a surface facing `normal` at `world` from the baked
+// probes around it: each holds the irradiance from the six axes (an
+// ambient cube), weighed by how much the normal faces each, as outgoing
+// light (over pi) for the lightmaps' multiply
+float3 probe_light(constant Frame &frame, float3 world, float3 normal, sampler clamp,
+                   texture3d<float> px, texture3d<float> nx, texture3d<float> py,
+                   texture3d<float> ny, texture3d<float> pz, texture3d<float> nz) {
+    float3 n = direction(normal, float3(0, 0, 1));
+    float3 at = ((world - frame.probe_origin.xyz) * frame.probe_origin.w + 0.5) / frame.probe_counts.xyz;
+    float3 weight = n * n;
+    float3 x = n.x >= 0 ? px.sample(clamp, at).rgb : nx.sample(clamp, at).rgb;
+    float3 y = n.y >= 0 ? py.sample(clamp, at).rgb : ny.sample(clamp, at).rgb;
+    float3 z = n.z >= 0 ? pz.sample(clamp, at).rgb : nz.sample(clamp, at).rgb;
+    return (weight.x * x + weight.y * y + weight.z * z) / M_PI_F;
+}
+
 fragment float4 level_fragment(VertexOut in [[stage_in]],
                                constant Material &material [[buffer(0)]],
                                constant Frame &frame [[buffer(1)]],
@@ -294,6 +315,13 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
                                texture2d<float> bump [[texture(5)]],
                                texture2d<float> glow [[texture(6)]],
                                texturecube<float> reflection [[texture(7)]],
+                               texture2d<float> baked_directions [[texture(8)]],
+                               texture3d<float> probe_px [[texture(9)]],
+                               texture3d<float> probe_nx [[texture(10)]],
+                               texture3d<float> probe_py [[texture(11)]],
+                               texture3d<float> probe_ny [[texture(12)]],
+                               texture3d<float> probe_pz [[texture(13)]],
+                               texture3d<float> probe_nz [[texture(14)]],
                                sampler wrap [[sampler(0)]],
                                sampler clamp [[sampler(1)]],
                                sampler nearest [[sampler(2)]]) {
@@ -328,11 +356,24 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
     }
     float3 light = float3(1);
     float3 lightmapped = float3(1);
+    // the light's direction, as long as its share of the light (the
+    // stock lightmaps' from the vertices, the bake's from its texels)
+    float3 incident_light = in.incident;
     if (material.maps & LIGHTMAP) {
-        lightmapped = lightmap.sample(clamp, in.lightmap).rgb;
+        if (material.maps & BAKED) {
+            // (irradiance: over pi, the light a white surface sends back)
+            lightmapped = lightmap.sample(clamp, in.lightmap).rgb / M_PI_F;
+            float4 baked = baked_directions.sample(clamp, in.lightmap);
+            incident_light = (baked.xyz * 2 - 1) * baked.w;
+        } else {
+            lightmapped = lightmap.sample(clamp, in.lightmap).rgb;
+        }
         light = lightmapped;
     } else if (material.maps & UNBAKED) {
-        lightmapped = unbaked_light(in.normal);
+        lightmapped = frame.probe_counts.w > 0
+            ? probe_light(frame, in.world, in.normal, clamp, probe_px, probe_nx, probe_py, probe_ny, probe_pz,
+                          probe_nz)
+            : unbaked_light(in.normal);
         light = lightmapped;
     }
     if (!(bits & ENVIRONMENT)) {
@@ -341,8 +382,8 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
     }
     // the bump's shading: toward the light by as much as the light has a
     // direction, flat where it has none
-    float directed = saturate(length(in.incident));
-    float3 incident = direction(in.incident, normal);
+    float directed = saturate(length(incident_light));
+    float3 incident = direction(incident_light, normal);
     float shading = (1 - directed) + directed * saturate(dot(bumped, incident));
     light = light * shading * material.material_color.rgb;
     if (bits & SELF_ILLUMINATION) {

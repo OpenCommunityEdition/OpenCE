@@ -325,7 +325,8 @@ static float3 bake_radiance(BakeScene scene, float3 origin, float3 direction, th
 }
 
 // Each point's light: irradiance (red, green, blue) and the open share of
-// its hemisphere, and the direction most of the light comes from.
+// its hemisphere, and the direction most of the light comes from with how
+// much of it does.
 kernel void bake_irradiance(device const BakeNode *nodes [[buffer(0)]],
                             device const BakeTriangle *triangles [[buffer(1)]],
                             device const BakeMaterial *materials [[buffer(2)]],
@@ -361,5 +362,40 @@ kernel void bake_irradiance(device const BakeNode *nodes [[buffer(0)]],
     }
     float length_squared = dot(weighted, weighted);
     irradiance[index] = float4(total / float(samples), float(open) / float(samples));
-    directions[index] = float4(length_squared > 0.0f ? weighted * rsqrt(length_squared) : float3(0.0f), 0.0f);
+    // (how much of the light comes from its direction: the length of the
+    // weighted directions over the light's brightness)
+    float brightness = bake_luminance(total);
+    float directionality = brightness > 0.0f ? min(sqrt(length_squared) / brightness, 1.0f) : 0.0f;
+    directions[index] = float4(length_squared > 0.0f ? weighted * rsqrt(length_squared) : float3(0.0f),
+                               directionality);
+}
+
+// The light seen from each point looking along its "normal": the mean of
+// the paths' radiance, for the reflection probes' texels (trace.rs's
+// Tracer::radiance_along). The same buffers as bake_irradiance; the
+// directions are not written.
+kernel void bake_radiance_along(device const BakeNode *nodes [[buffer(0)]],
+                                device const BakeTriangle *triangles [[buffer(1)]],
+                                device const BakeMaterial *materials [[buffer(2)]],
+                                device const BakeLight *lights [[buffer(3)]],
+                                constant BakeParameters &parameters [[buffer(4)]],
+                                device const BakePoint *points [[buffer(5)]],
+                                device float4 *radiance [[buffer(6)]],
+                                device float4 *directions [[buffer(7)]],
+                                uint index [[thread_position_in_grid]]) {
+    if (index >= parameters.point_count) {
+        return;
+    }
+    BakeScene scene = {nodes, triangles, materials, lights, &parameters};
+    BakePoint sample_point = points[index];
+    float3 origin = float3(sample_point.position);
+    float3 direction = float3(sample_point.normal);
+    uint state = bake_hash(index ^ bake_hash(parameters.seed));
+    float3 total = float3(0.0f);
+    uint samples = max(parameters.samples, 1u);
+    for (uint sample = 0; sample < samples; sample++) {
+        float first;
+        total += bake_radiance(scene, origin, direction, state, first);
+    }
+    radiance[index] = float4(total / float(samples), 1.0f);
 }

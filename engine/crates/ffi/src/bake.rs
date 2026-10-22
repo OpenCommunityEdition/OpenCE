@@ -1,10 +1,15 @@
 //! The bake's scene, for the app's path tracer (OpenCEEngineRender's
 //! PathTracer): a BSP's hierarchy, materials and lights as the GPU reads
-//! them, and the CPU's reference tracer to check the GPU's against.
+//! them, and the CPU's reference tracer to check the GPU's against; and
+//! a level's bake: the points to trace, and the light they make, kept in
+//! the cache folder.
 
 use std::sync::Arc;
 
-use opence_bake::{layout, Bvh, Random, Scene, Tracer};
+use opence_bake::output::BAKE_VERSION;
+use opence_bake::{
+    chart, layout, BakePlan, BakeSettings, BakedLighting, Bvh, Random, Scene, Tracer,
+};
 
 use crate::{EngineError, LevelGeometry};
 
@@ -22,6 +27,8 @@ pub struct BakeSample {
     pub irradiance: Vec<f32>,
     /// The direction most of it comes from (unit, or zeros).
     pub direction: Vec<f32>,
+    /// How much of the light comes from that direction, 0 to 1.
+    pub directionality: f32,
     /// The open share of the hemisphere.
     pub occlusion: f32,
 }
@@ -138,8 +145,212 @@ impl BakeScene {
         BakeSample {
             irradiance: result.irradiance.to_vec(),
             direction: result.direction.to_vec(),
+            directionality: result.directionality,
             occlusion: result.occlusion,
         }
+    }
+}
+
+/// A level's BSP, ready to bake: the points the app's path tracer
+/// traces, and how.
+#[derive(uniffi::Object)]
+pub struct LevelBake {
+    plan: BakePlan,
+    scene: Arc<BakeScene>,
+    name: String,
+    bsp: usize,
+}
+
+/// A baked lightmap page.
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
+pub struct BakedLightPage {
+    /// The page, in the BSP's lightmaps (as a draw's `lightmap_page`).
+    pub page: u32,
+    /// Its width.
+    pub width: u32,
+    /// Its height.
+    pub height: u32,
+    /// Its texels' irradiance and occlusion: four half floats each, rows
+    /// from the top.
+    pub irradiance: Vec<u8>,
+    /// Its texels' light direction (`0.5 + 0.5 * direction`) and
+    /// directionality: four bytes each.
+    pub directions: Vec<u8>,
+}
+
+/// A BSP's baked light.
+#[derive(uniffi::Object)]
+pub struct BakedLight {
+    light: BakedLighting,
+}
+
+/// Float4s from `bytes`, little-endian.
+fn float4s(bytes: &[u8]) -> Vec<[f32; 4]> {
+    bytes
+        .as_chunks::<16>()
+        .0
+        .iter()
+        .map(|chunk| {
+            std::array::from_fn(|lane| {
+                let at = lane * 4;
+                f32::from_le_bytes([chunk[at], chunk[at + 1], chunk[at + 2], chunk[at + 3]])
+            })
+        })
+        .collect()
+}
+
+/// Half floats as little-endian bytes.
+fn half_bytes(halves: &[u16]) -> Vec<u8> {
+    halves.iter().flat_map(|half| half.to_le_bytes()).collect()
+}
+
+#[uniffi::export]
+impl LevelBake {
+    /// The scene to trace.
+    pub fn scene(&self) -> Arc<BakeScene> {
+        Arc::clone(&self.scene)
+    }
+
+    /// The lightmap texels' points, 32 bytes each.
+    pub fn lightmap_point_bytes(&self) -> Vec<u8> {
+        self.plan.atlas.point_bytes()
+    }
+
+    /// The probes' points (six axes each), 32 bytes each.
+    pub fn probe_point_bytes(&self) -> Vec<u8> {
+        chart::point_bytes(&self.plan.probe_points())
+    }
+
+    /// The reflection probes' texels' points (each looking along its
+    /// normal), 32 bytes each.
+    pub fn reflection_point_bytes(&self) -> Vec<u8> {
+        chart::point_bytes(&self.plan.reflection_points())
+    }
+
+    /// Paths for each lightmap texel.
+    pub fn lightmap_samples(&self) -> u32 {
+        self.plan.settings.lightmap_samples
+    }
+
+    /// Paths for each probe's axis.
+    pub fn probe_samples(&self) -> u32 {
+        self.plan.settings.probe_samples
+    }
+
+    /// Paths for each reflection texel.
+    pub fn reflection_samples(&self) -> u32 {
+        self.plan.settings.reflection_samples
+    }
+
+    /// How far an occluder counts for the ambient occlusion.
+    pub fn occlusion_distance(&self) -> f32 {
+        self.plan.settings.occlusion_distance
+    }
+
+    /// The cache file's name: the map's, the BSP's and the bake's key.
+    pub fn cache_file_name(&self) -> String {
+        BakedLighting::file_name(&self.name, self.bsp, self.plan.key)
+    }
+
+    /// The baker's version.
+    pub fn version(&self) -> u32 {
+        BAKE_VERSION
+    }
+
+    /// The light from the tracer's results, each a float4 (16 bytes): the
+    /// lightmap texels' irradiance and their directions, the probes'
+    /// irradiance and the reflection texels' radiance.
+    pub fn finish(
+        &self,
+        irradiance: Vec<u8>,
+        directions: Vec<u8>,
+        probes: Vec<u8>,
+        radiance: Vec<u8>,
+    ) -> Arc<BakedLight> {
+        Arc::new(BakedLight {
+            light: self.plan.finish(
+                &float4s(&irradiance),
+                &float4s(&directions),
+                &float4s(&probes),
+                &float4s(&radiance),
+            ),
+        })
+    }
+
+    /// The light kept in a cache file, if it is whole and baked for this
+    /// plan.
+    pub fn read(&self, bytes: Vec<u8>) -> Option<Arc<BakedLight>> {
+        BakedLighting::decode(&bytes)
+            .ok()
+            .filter(|light| light.key == self.plan.key)
+            .map(|light| Arc::new(BakedLight { light }))
+    }
+}
+
+#[uniffi::export]
+impl BakedLight {
+    /// The cache file.
+    pub fn encode(&self) -> Vec<u8> {
+        self.light.encode()
+    }
+
+    /// The baked lightmap pages.
+    pub fn pages(&self) -> Vec<BakedLightPage> {
+        self.light
+            .pages
+            .iter()
+            .map(|page| BakedLightPage {
+                page: page.page,
+                width: page.width,
+                height: page.height,
+                irradiance: half_bytes(&page.irradiance),
+                directions: page.directions.clone(),
+            })
+            .collect()
+    }
+
+    /// The probe grid's first probe: x, y and z.
+    pub fn probe_origin(&self) -> Vec<f32> {
+        self.light.grid.origin.to_vec()
+    }
+
+    /// The distance between probes.
+    pub fn probe_spacing(&self) -> f32 {
+        self.light.grid.spacing
+    }
+
+    /// How many probes each way.
+    pub fn probe_counts(&self) -> Vec<u32> {
+        self.light.grid.counts.to_vec()
+    }
+
+    /// The probes' light from the axis `axis` (+x, -x, +y, -y, +z, -z):
+    /// four half floats a probe, x fastest, as a 3D texture's texels.
+    pub fn probe_bytes(&self, axis: u32) -> Vec<u8> {
+        let size = self.light.grid.len() * 4;
+        let start = axis as usize * size;
+        half_bytes(
+            self.light
+                .probes
+                .get(start..start + size)
+                .unwrap_or_default(),
+        )
+    }
+
+    /// The reflection probes' positions: x, y and z each.
+    pub fn reflection_positions(&self) -> Vec<f32> {
+        self.light.reflections.iter().flatten().copied().collect()
+    }
+
+    /// A reflection probe's faces' size, each way.
+    pub fn reflection_size(&self) -> u32 {
+        opence_bake::probe::REFLECTION_SIZE
+    }
+
+    /// The reflection probes' faces: four half floats a texel, probe by
+    /// probe, face by face (+x, -x, +y, -y, +z, -z), rows from the top.
+    pub fn reflection_bytes(&self) -> Vec<u8> {
+        half_bytes(&self.light.radiance)
     }
 }
 
@@ -151,6 +362,31 @@ impl LevelGeometry {
         Scene::of(&self.content, bsp)
             .map(BakeScene::new)
             .ok_or(EngineError::NoBsp { index: bsp as u32 })
+    }
+
+    /// The bake of this level's BSP, at the default settings; or, when
+    /// `quick`, at few samples (for tests).
+    pub fn bake_plan(&self, quick: bool) -> Result<Arc<LevelBake>, EngineError> {
+        let settings = if quick {
+            BakeSettings {
+                lightmap_samples: 4,
+                probe_samples: 4,
+                reflection_samples: 1,
+                ..BakeSettings::default()
+            }
+        } else {
+            BakeSettings::default()
+        };
+        let bsp = self.bsp;
+        let plan = BakePlan::of(&self.content, bsp, settings)
+            .ok_or(EngineError::NoBsp { index: bsp as u32 })?;
+        let scene = BakeScene::new(plan.scene.clone());
+        Ok(Arc::new(LevelBake {
+            plan,
+            scene,
+            name: self.name.clone(),
+            bsp,
+        }))
     }
 }
 
@@ -193,5 +429,61 @@ mod tests {
             .unwrap_or_else(|error| panic!("{error}"));
         assert!(scene.triangle_count() > 0);
         assert!(!scene.light_bytes().is_empty());
+    }
+
+    #[test]
+    fn a_level_is_baked_and_kept() {
+        let geometry =
+            LevelGeometry::devmap(None, String::new()).unwrap_or_else(|error| panic!("{error}"));
+        let bake = geometry
+            .bake_plan(true)
+            .unwrap_or_else(|error| panic!("{error}"));
+        assert_eq!(bake.lightmap_samples(), 4);
+        assert!(bake.probe_samples() > 0 && bake.reflection_samples() > 0);
+        assert!(bake.occlusion_distance() > 0.0);
+        assert_eq!(bake.version(), BAKE_VERSION);
+        assert!(bake.scene().triangle_count() > 0);
+        // (the devmap has no stock pages: its light is the probes')
+        assert!(bake.lightmap_point_bytes().is_empty());
+        let probes = bake.probe_point_bytes();
+        let reflections = bake.reflection_point_bytes();
+        assert_eq!(probes.len() % (32 * 6), 0);
+        assert!(!reflections.is_empty());
+        let full = geometry
+            .bake_plan(false)
+            .unwrap_or_else(|error| panic!("{error}"));
+        assert_ne!(full.cache_file_name(), bake.cache_file_name());
+        assert!(bake.cache_file_name().starts_with("devmap.bsp0."));
+        let lit = |count: usize, value: f32| -> Vec<u8> {
+            (0..count * 4).flat_map(|_| value.to_le_bytes()).collect()
+        };
+        let light = bake.finish(
+            Vec::new(),
+            Vec::new(),
+            lit(probes.len() / 32, 1.0),
+            lit(reflections.len() / 32, 2.0),
+        );
+        assert!(light.pages().is_empty());
+        let counts = light.probe_counts();
+        let probe_count = counts.iter().product::<u32>() as usize;
+        assert_eq!(light.probe_bytes(0).len(), probe_count * 8);
+        assert_eq!(light.probe_bytes(5)[..2], [0x00, 0x3c]);
+        assert!(light.probe_bytes(6).is_empty());
+        assert_eq!(light.probe_origin().len(), 3);
+        assert!(light.probe_spacing() >= 1.0);
+        let positions = light.reflection_positions();
+        let size = light.reflection_size() as usize;
+        assert_eq!(
+            light.reflection_bytes().len(),
+            positions.len() / 3 * 6 * size * size * 8
+        );
+        let file = light.encode();
+        let back = bake
+            .read(file.clone())
+            .unwrap_or_else(|| panic!("not read back"));
+        assert_eq!(back.encode(), file);
+        // another plan's file is not this one's
+        assert!(full.read(file).is_none());
+        assert!(bake.read(vec![1, 2, 3]).is_none());
     }
 }

@@ -13,13 +13,23 @@
 //!   as the GPU's path tracer reads it.
 //! - [`layout`] holds scenes whose light is known, to check tracers by.
 //! - [`trace`] is the path tracer: the light arriving at a point.
+//! - [`chart`] lays the lightmap pages' texels out as points to bake.
+//! - [`probe`] places the irradiance and reflection probes.
+//! - [`output`] makes the baked light from the tracer's results, and
+//!   keeps it in a cache file.
 
 pub mod bvh;
+pub mod chart;
 pub mod layout;
+pub mod output;
+pub mod probe;
 pub mod scene;
 pub mod texel;
 pub mod trace;
 
 pub use bvh::{Bvh, BvhNode, BvhTriangle, Hit, Ray};
+pub use chart::{Atlas, BakePoint, Chart};
+pub use output::{BakePlan, BakeSettings, BakedLighting, BakedPage};
+pub use probe::ProbeGrid;
 pub use scene::{BakeMaterial, DirectionalLight, Scene};
 pub use trace::{Irradiance, Random, Tracer};

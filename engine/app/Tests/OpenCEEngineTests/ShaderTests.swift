@@ -29,6 +29,9 @@ final class ShaderTests: XCTestCase {
             let source = try ShaderSources.source(shader)
             XCTAssertTrue(source.contains(try XCTUnwrap(functions[shader])), shader.file)
         }
+        for function in ["bake_radiance_along", "probe_light"] {
+            XCTAssertTrue(try ShaderSources.source(function == "probe_light" ? .level : .bake).contains(function))
+        }
         XCTAssertThrowsError(try ShaderSources.source(.level, in: nil))
         XCTAssertThrowsError(try ShaderSources.source(.level, in: try folder()))
     }

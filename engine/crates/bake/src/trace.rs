@@ -33,6 +33,9 @@ pub struct Irradiance {
     /// The direction most of that light comes from (unit, or zero when
     /// there is none): what a normal map is lit by.
     pub direction: [f32; 3],
+    /// How much of the light comes from that direction: 1 all of it (the
+    /// sun alone), 2/3 an even sky, 0 none (or no light).
+    pub directionality: f32,
     /// The share of the hemisphere, by cosine, open to the sky within the
     /// occlusion distance (1: open).
     pub occlusion: f32,
@@ -118,6 +121,7 @@ impl Tracer<'_> {
         }
         let count = f64::from(samples);
         let length = dot(weighted, weighted).sqrt();
+        let brightness = luminance(total.map(|sum| sum as f32));
         Irradiance {
             irradiance: total.map(|sum| (sum / count) as f32),
             direction: if length > 0.0 {
@@ -125,8 +129,39 @@ impl Tracer<'_> {
             } else {
                 [0.0; 3]
             },
+            directionality: if brightness > 0.0 {
+                (length / brightness).min(1.0)
+            } else {
+                0.0
+            },
             occlusion: open as f32 / samples as f32,
         }
+    }
+
+    /// The light seen from `point` looking along `direction` (unit): the
+    /// mean of `samples` paths' radiance (what a reflection probe's texel
+    /// holds).
+    pub fn radiance_along(
+        &self,
+        point: [f32; 3],
+        direction: [f32; 3],
+        samples: u32,
+        random: &mut Random,
+    ) -> [f32; 3] {
+        let samples = samples.max(1);
+        let ray = Ray {
+            origin: point,
+            direction,
+            t_max: RAY_LENGTH,
+        };
+        let mut total = [0.0f64; 3];
+        for _ in 0..samples {
+            let (radiance, _) = self.radiance(&ray, random);
+            for (sum, channel) in total.iter_mut().zip(radiance) {
+                *sum += f64::from(channel);
+            }
+        }
+        total.map(|sum| (sum / f64::from(samples)) as f32)
     }
 
     /// The sky's lights on a surface at `origin` facing `normal`: each
@@ -347,7 +382,7 @@ fn normalize(a: [f32; 3]) -> [f32; 3] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::{layout, material, quad, scene, OCCLUSION_DISTANCE};
+    use crate::layout::{self, layout, material, quad, scene, OCCLUSION_DISTANCE};
     use crate::scene::DirectionalLight;
 
     fn trace(scene: &Scene, normal: [f32; 3]) -> Irradiance {
@@ -384,6 +419,26 @@ mod tests {
     }
 
     #[test]
+    fn the_light_along_a_ray_is_the_sky_or_the_surface_it_meets() {
+        let pi = core::f32::consts::PI;
+        let (open, _) = layout::layout("open").unwrap_or_else(|| panic!("no open"));
+        let (furnace, expected) = layout::layout("furnace").unwrap_or_else(|| panic!("no furnace"));
+        let mut random = Random::new(3);
+        for (scene, radiance) in [(&open, 2.0), (&furnace, expected.irradiance / pi)] {
+            let bvh = Bvh::build(&scene.triangles);
+            let tracer = Tracer {
+                scene,
+                bvh: &bvh,
+                occlusion_distance: layout::OCCLUSION_DISTANCE,
+            };
+            let seen = tracer.radiance_along([0.0; 3], [0.0, 0.6, 0.8], 512, &mut random);
+            for channel in seen {
+                assert!((channel - radiance).abs() < radiance * 0.06, "{seen:?}");
+            }
+        }
+    }
+
+    #[test]
     fn the_light_s_direction_is_where_it_comes_from() {
         assert!(traced("open").0.direction[2] > 0.95);
         // (from the open side, away from the wall)
@@ -391,6 +446,11 @@ mod tests {
         let half = core::f32::consts::FRAC_1_SQRT_2;
         assert!(dot(traced("sun").0.direction, [half, 0.0, half]) > 0.99);
         assert_eq!(traced("roof").0.direction, [0.0; 3]);
+        // an even sky's directions average to two thirds of one; the sun's
+        // are all one; no light has none
+        assert!((traced("open").0.directionality - 2.0 / 3.0).abs() < 0.03);
+        assert!(traced("sun").0.directionality > 0.99);
+        assert_eq!(traced("roof").0.directionality, 0.0);
         // a light below the surface gives nothing
         let (mut below, _) = layout("sun").unwrap_or_else(|| panic!("no sun"));
         below.lights[0].towards = [0.0, 0.0, -1.0];
