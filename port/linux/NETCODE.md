@@ -47,6 +47,11 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
     host's is once that stops, or if they drift apart while it moves;
   - which named objects exist, so scripted creates and deletes match.
 
+  Script actions naming player0 also reach the players beyond player1.
+  They use the same reverse datum order as the script's `(players)` list,
+  skipping players without units, so a scripted BSP transition does not
+  leave the extra players in the unloaded part of the level.
+
   Every machine follows the host's structure BSP: a switch is sent at once
   and reliably, and each client's input says which BSP it has loaded.
   Until a client has the host's, the host takes none of its players'
@@ -233,7 +238,9 @@ from, so that a second copy of the game on one computer, on a port of its
 own, plays too; version 32 sends the host's mouse aim assist policy
 (distributed message 90, `network_aim_assist.c`), which a client must not
 ignore, and has a client's input say whether its player plays co-op with
-friendly fire.
+friendly fire; version 33 sends with the game's settings whether co-op's
+players hurt their AI allies (Server Setup's ALLY FRIENDLY FIRE: the host
+then deals the players' hits of them no damage).
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

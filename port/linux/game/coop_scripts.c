@@ -141,22 +141,29 @@ static short players_following(
 {
 	struct data_iterator iterator;
 	struct player_datum *player;
-	short position = 0;
+	long players[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+	short player_count = 0;
+	short position;
 	short count = 0;
 
 	if (unit_index == NONE || !coop_scripts_host())
 		return 0;
-	/* (in the order (players) lists them: player0 is the first with a unit) */
+	/* hs_players adds each unit to the head of a reference list. Its
+	player0 is the LAST live unit in datum order, not the first. Keep that
+	same order here, including gaps left by dead or disconnected players. */
 	data_iterator_new(&iterator, player_data);
 	while ((player = data_iterator_next(&iterator)) != NULL)
 	{
-		if (player->unit_index == NONE)
-			continue;
-		if (position == 0 && player->unit_index != unit_index)
-			return 0;
-		if (position >= NAMED_PLAYERS && count < maximum_count)
-			unit_indices[count++] = player->unit_index;
-		position++;
+		if (player->unit_index != NONE && player_count < NUMBEROF(players))
+			players[player_count++] = player->unit_index;
+	}
+	if (player_count == 0 || players[player_count - 1] != unit_index)
+		return 0;
+	for (position = player_count - NAMED_PLAYERS - 1;
+		position >= 0 && count < maximum_count;
+		position--)
+	{
+		unit_indices[count++] = players[position];
 	}
 	return count;
 }
