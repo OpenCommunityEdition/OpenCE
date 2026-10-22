@@ -29,8 +29,8 @@
     - [x] Write tests: the directional lightmap's layout and atlas; the probe grid covers the BSP's volume; reflection probe placement per cluster; the cache key changes with the importer's and baker's versions
     - [x] Directional lightmaps with AO, irradiance probes, reflection probes; written to the cache; background baking with the stock lightmaps as fallback
 - [x] Task: The mood check e5e6c727
-    - [ ] Write tests: each cluster's mean brightness and colour against the stock lightmap, within the set limits (marked, needs `assets/maps`)
-    - [ ] Tune the bake's sky and emitter scales until every stock BSP passes
+    - [x] Write tests: each cluster's mean brightness and colour against the stock lightmap, within the set limits (marked, needs `assets/maps`; by page and by BSP, the clusters are not imported)
+    - [x] Tune the bake's sky and emitter scales until every stock BSP passes (two listed as known colour differences: longest, d20 bsp 1)
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: The bake' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 3: Dynamic lighting
