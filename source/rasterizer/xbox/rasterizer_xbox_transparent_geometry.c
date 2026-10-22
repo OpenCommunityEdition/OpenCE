@@ -1492,6 +1492,9 @@ void rasterizer_transparent_geometry_group_draw(
 								continue;
 
 							rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_ACCEPT);
+							/* port: these pixels are the gun, and it wrote this
+							depth. The charge stays behind the body. The other
+							pass draws it over the world. */
 						}
 						else
 						{

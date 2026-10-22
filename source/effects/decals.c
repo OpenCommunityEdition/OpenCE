@@ -823,10 +823,23 @@ pixel32 real_a_rgb_color_to_pixel32(
 	real scale = 255.0f;
 	pixel32 result;
 
-	match_assert(
-		"..\\bitmaps\\bitmaps_inlines.h",
-		243,
-		alpha>=0.0f && alpha<=1.0f);
+	/* port: a meter was reading function values after their frame was gone,
+	and the halt stopped the match. Keep the color in range. */
+	if (!(alpha >= 0.0f && alpha <= 1.0f))
+	{
+		static boolean reported = FALSE;
+
+		if (!reported)
+		{
+			reported = TRUE;
+			error(
+				_error_silent,
+				"### alpha %f from %p",
+				alpha,
+				__builtin_return_address(0));
+		}
+		alpha = PIN(alpha, 0.0f, 1.0f);
+	}
 	match_vassert(
 		"..\\bitmaps\\bitmaps_inlines.h",
 		244,

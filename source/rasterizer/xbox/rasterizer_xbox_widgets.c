@@ -85,6 +85,8 @@ symbols in this file:
 #include "rasterizer/rasterizer_widgets.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_console_vars.h"
+#include "interface/first_person_weapons.h"
+#include "render/render.h"
 
 /* ---------- constants */
 
@@ -316,6 +318,15 @@ void _rasterizer_widget_submit(
 			camera_to_centroid.j = centroid->y - global_window_parameters.camera.position.y;
 			camera_to_centroid.k = centroid->z - global_window_parameters.camera.position.z;
 			group->geometry_flags = 0;
+			/* port: the local weapon's volume is sorted with the viewmodel
+			(bit 7, the first-person geometry flag) so the near plane that
+			fits the gun also fits the charge */
+			{
+				long local_index = first_person_weapon_get_local_index(object_index);
+
+				if (local_index != NONE && local_index == render.local_player_index)
+					group->geometry_flags = FLAG(7);
+			}
 			group->object_index = 0;
 			group->source_object_index = 0;
 			group->shader = NULL;
