@@ -19,9 +19,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Why some maps are flat, and the shader model' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 2: The bake
-- [ ] Task: The bake's inputs
-    - [ ] Write tests: sky lights, ambient colours, shader radiosity properties and the sun read from the tags into the bake's scene
-    - [ ] The bake scene: the BSP's triangles in a bounding-volume hierarchy, the materials, the lights
+- [x] Task: The bake's inputs 2756e640
+    - [x] Write tests: sky lights, ambient colours, shader radiosity properties and the sun read from the tags into the bake's scene
+    - [x] The bake scene: the BSP's triangles in a bounding-volume hierarchy, the materials, the lights
 - [ ] Task: The path tracer
     - [ ] Write tests: a closed box with one emitter converges to the known irradiance; a sky dome gives the expected AO on a plane
     - [ ] A Metal compute path tracer over the hierarchy, with next-event estimation and bounced light
