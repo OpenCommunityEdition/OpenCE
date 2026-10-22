@@ -16,6 +16,9 @@ that folder, unless a line names the tag itself or a longer folder. Lines
 that are empty or start with "#", "//" or ";" are ignored. The file is read
 again when the setting changes (and at every start).
 
+Only on single player maps (scenario type "solo": the campaign, alone or in
+co-op); the main menu and multiplayer maps have none.
+
 A sound is shown when it is started (sound_manager.c's sound_new_impulse,
 which every sound that plays at a listener goes through: the AI's speech,
 scripted and cutscene dialogue, effects) and is heard: its line stays for
@@ -31,6 +34,8 @@ letterbox's bar.
 #include "interface/interface.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
 #include "tag_files/tag_files.h"
 #include "text/draw_string.h"
 #include "text/font_group.h"
@@ -169,9 +174,14 @@ static unsigned long subtitle_hash(
 static void subtitle_unload(
 	void)
 {
-	free(subtitle_globals.buffer);
-	free(subtitle_globals.entries);
-	free(subtitle_globals.table);
+	/* (the game's memory checks refuse a free of nothing, as the C library's
+	does not) */
+	if (subtitle_globals.buffer)
+		free(subtitle_globals.buffer);
+	if (subtitle_globals.entries)
+		free(subtitle_globals.entries);
+	if (subtitle_globals.table)
+		free(subtitle_globals.table);
 	subtitle_globals.buffer = NULL;
 	subtitle_globals.entries = NULL;
 	subtitle_globals.table = NULL;
@@ -435,6 +445,17 @@ static char const *subtitle_find(
 	return best != NONE ? subtitle_globals.entries[best].text : NULL;
 }
 
+/* whether the map is a single player one (a campaign level, played alone or
+in co-op, the Custom Edition ones too): there are no subtitles in the main
+menu's or a multiplayer map */
+static boolean subtitles_map_allowed(
+	void)
+{
+	struct scenario *scenario = global_scenario_try_and_get();
+
+	return scenario && scenario->type == _scenario_type_solo;
+}
+
 /* ---------- public code */
 
 boolean subtitles_enabled(
@@ -463,7 +484,7 @@ void subtitles_sound_started(
 	long end;
 	long index;
 
-	if (!subtitles_enabled())
+	if (!subtitles_enabled() || !subtitles_map_allowed())
 		return;
 	text = subtitle_find(tag_get_name(definition_index));
 	if (!text)
@@ -512,7 +533,7 @@ void subtitles_draw(
 
 	if (!subtitle_globals.active_count)
 		return;
-	if (!game_in_progress() || !subtitles_enabled())
+	if (!game_in_progress() || !subtitles_enabled() || !subtitles_map_allowed())
 	{
 		subtitle_globals.active_count = 0;
 		return;
