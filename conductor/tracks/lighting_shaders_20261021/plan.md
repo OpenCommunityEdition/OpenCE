@@ -46,9 +46,9 @@
 - [x] Task: Screen-space effects fa7a6a1c
     - [x] Write tests: each pass can be switched off and shown alone from the shell
     - [x] GTAO, screen-space reflections, contact shadows
-- [ ] Task: The camera
-    - [ ] Write tests: exposure adapts within the limits; `lens` tag fields; the occlusion test of a flare behind a wall
-    - [ ] Auto exposure, bloom, lens flares, glows and light volumes
+- [x] Task: The camera da2a42c5
+    - [x] Write tests: exposure adapts within the limits; `lens` tag fields; the occlusion test of a flare behind a wall
+    - [x] Auto exposure, bloom, lens flares, glows and light volumes
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Dynamic lighting' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 4: Decals and effects drawn
