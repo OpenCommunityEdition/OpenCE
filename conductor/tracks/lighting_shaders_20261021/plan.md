@@ -4,7 +4,7 @@
 - [x] Task: Find why some maps are drawn flat fbf93785
     - [ ] Write tests: every stock BSP's lightmap pages import with non-zero texels, and each lit surface has a lightmap index and coordinates (marked, needs `assets/maps`)
     - [ ] Fix the cause in the importer (lightmap page formats, missing pages, surfaces without lightmap coordinates) or the renderer
-- [ ] Task: The material model
+- [x] Task: The material model fc24c8c5
     - [ ] Write tests: the material record's layout in the pack; the conversion of each `senv` and `soso` field; linear and display values
     - [ ] A material record in `content` (albedo, normal, roughness, metalness, emission, AO, flags), written by the importer for every shader
 - [ ] Task: Environment shaders
