@@ -363,6 +363,50 @@ static boolean new_particle_is_visible(
 	return FALSE;
 }
 
+/* port: the picture is drawn more than once a tick. A flash's sprite
+changes once a tick, so the cel is held and its edge cuts. */
+boolean particle_sprite_blend(
+	long particle_index,
+	short *next_frame_index,
+	real *weight)
+{
+	struct particle_datum *particle = particle_get(particle_index);
+	struct particle_definition *definition = particle_definition_get(particle->definition_index);
+	struct bitmap_group *bitmap = bitmap_group_get(definition->bitmap.index);
+	struct bitmap_group_sequence *sequence;
+	short next;
+	real weight_value;
+
+	if (particle->frame_index < 0 || particle->sequence_index < 0 || !bitmap ||
+		particle->sequence_index >= bitmap->sequences.count)
+	{
+		return FALSE;
+	}
+	sequence = TAG_BLOCK_GET_ELEMENT(
+		&bitmap->sequences,
+		particle->sequence_index,
+		struct bitmap_group_sequence);
+	if (TEST_FLAG(particle->flags, _particle_datum_animates_backwards_bit))
+		next = (short)(particle->frame_index - 1);
+	else
+		next = (short)(particle->frame_index + 1);
+	if (next < 0 || next >= sequence->sprites.count)
+		return FALSE;
+	if (TEST_FLAG(definition->flags, _particle_definition_animate_once_per_frame_bit))
+		weight_value = game_time_get_tick_fraction();
+	else if (particle->frame_span > 0.0f && particle->frame_time >= 0.0f)
+		weight_value = particle->frame_time / particle->frame_span;
+	else
+		return FALSE;
+	if (!(weight_value > 0.0f))
+		return FALSE;
+	if (weight_value > 1.0f)
+		weight_value = 1.0f;
+	*next_frame_index = next;
+	*weight = weight_value;
+	return TRUE;
+}
+
 real particle_get_radius(
 	long particle_index)
 {

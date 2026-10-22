@@ -125,6 +125,8 @@ symbols in this file:
 #include "units/units.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
+#include <math.h>
+
 /* ---------- constants */
 
 enum
@@ -675,6 +677,107 @@ short hud_get_nav_point_render_type(
 	return render_type;
 }
 
+/* port: a marker on something that moves is placed once a tick, so it
+steps across the picture. Ease it toward that place each frame. */
+struct nav_point_drawn
+{
+	short local_player_index;
+	boolean valid;
+	unsigned long used;
+	real_point3d position;
+};
+
+static struct nav_point_drawn nav_point_drawn_points[48];
+
+static void nav_point_ease(
+	short local_player_index,
+	real_point3d *position)
+{
+	static long eased_tick = NONE;
+	static real eased_fraction = 0.0f;
+	static real eased_alpha = 0.5f;
+	static unsigned long ease_stamp = 0;
+	long tick = game_time_get();
+	real fraction = game_time_get_tick_fraction();
+	long index;
+	long best = NONE;
+	real best_distance = 64.0f;
+	struct nav_point_drawn *drawn;
+	real_vector3d step;
+	real length_squared;
+	real alpha;
+
+	if (tick != eased_tick || fraction != eased_fraction)
+	{
+		real dt;
+
+		if (eased_tick == NONE || tick < eased_tick)
+			dt = 1.0f / 60.0f;
+		else
+			dt = ((real)(tick - eased_tick) + (fraction - eased_fraction)) / (real)TICKS_PER_SECOND;
+		if (!(dt > 0.0f && dt < 0.1f))
+			dt = 1.0f / 60.0f;
+		eased_alpha = 1.0f - (real)exp((double)(-dt / 0.04f));
+		eased_tick = tick;
+		eased_fraction = fraction;
+		ease_stamp++;
+	}
+	for (index = 0; index < (long)NUMBEROF(nav_point_drawn_points); index++)
+	{
+		real distance;
+
+		drawn = &nav_point_drawn_points[index];
+		if (!drawn->valid || drawn->used == ease_stamp ||
+			drawn->local_player_index != local_player_index)
+			continue;
+		step.i = position->x - drawn->position.x;
+		step.j = position->y - drawn->position.y;
+		step.k = position->z - drawn->position.z;
+		distance = step.i * step.i + step.j * step.j + step.k * step.k;
+		if (distance < best_distance)
+		{
+			best_distance = distance;
+			best = index;
+		}
+	}
+	if (best == NONE)
+	{
+		for (index = 0; index < (long)NUMBEROF(nav_point_drawn_points); index++)
+		{
+			if (!nav_point_drawn_points[index].valid)
+			{
+				best = index;
+				break;
+			}
+		}
+		if (best == NONE)
+			best = 0;
+		drawn = &nav_point_drawn_points[best];
+		drawn->valid = TRUE;
+		drawn->used = ease_stamp;
+		drawn->local_player_index = local_player_index;
+		drawn->position = *position;
+		return;
+	}
+	drawn = &nav_point_drawn_points[best];
+	drawn->used = ease_stamp;
+	step.i = position->x - drawn->position.x;
+	step.j = position->y - drawn->position.y;
+	step.k = position->z - drawn->position.z;
+	length_squared = step.i * step.i + step.j * step.j + step.k * step.k;
+	if (!(length_squared <= 64.0f))
+	{
+		drawn->position = *position;
+		*position = drawn->position;
+		return;
+	}
+	alpha = eased_alpha;
+	drawn->position.x += step.i * alpha;
+	drawn->position.y += step.j * alpha;
+	drawn->position.z += step.k * alpha;
+	*position = drawn->position;
+}
+
 void custom_render_nav_point(
 	short local_player_index,
 	real_point3d const *position_pointer,
@@ -694,12 +797,14 @@ void custom_render_nav_point(
 	memset(stack_buffer, 0x62, sizeof(stack_buffer));
 	arrow = TAG_BLOCK_GET_ELEMENT(&hud_globals->waypoint.arrows, nav_index, struct hud_waypoint_arrow);
 	position = *position_pointer;
+	/* port: a marker on something that moves is placed once a tick */
+	nav_point_ease(local_player_index, &position);
 
 	{
 		real_point3d cam_pos;
 
 		unit_get_camera_position(local_player_get_player_index(local_player_index) == NONE ? NONE : player_get(local_player_get_player_index(local_player_index))->unit_index, &cam_pos);
-		distance = distance3d(&cam_pos, position_pointer);
+		distance = distance3d(&cam_pos, &position);
 	}
 
 	if (distance > 15.f)

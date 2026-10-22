@@ -15,6 +15,8 @@ struct real_matrix4x3;
 int halo_interpolation_enabled(void);
 float game_time_get_tick_fraction(void);
 void render_interpolation_tick(void);
+/* after the tick's netcode moves, so the picture blends the pose it left */
+void render_interpolation_pose_tick(void);
 void render_interpolation_reset(void);
 void render_interpolation_frame_begin(void);
 void render_interpolation_frame_end(void);

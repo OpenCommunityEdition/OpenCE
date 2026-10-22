@@ -172,6 +172,12 @@ void particles_stop_on_first_person_weapon(
 	short local_player_index);
 real particle_get_radius(
 	long particle_index);
+/* port: how far this frame is toward the particle's next sprite, so a
+muzzle flash's cel is not held for the whole tick and then cut */
+boolean particle_sprite_blend(
+	long particle_index,
+	short *next_frame_index,
+	real *weight);
 boolean valid_real_argb_color(
 	real_argb_color const *color);
 void particles_disconnect_from_structure_bsp(
