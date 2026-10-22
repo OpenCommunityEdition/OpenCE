@@ -385,6 +385,192 @@ float3 object_light(constant Frame &frame, float3 world, float3 normal, sampler 
     return baked_shown(irradiance);
 }
 
+// (as LightPass's GPULight) a dynamic light: the flashlight's, a shot's,
+// an effect's, the scenery's
+struct DynamicLight {
+    // where it is, and how far its light reaches
+    float4 position_radius;
+    // the way it faces, and the cosine its cone ends at (a spot's)
+    float4 forward_cutoff;
+    // its gel's up, and the cosine its cone starts to fall off at
+    float4 up_falloff;
+    // its colour (linear), and how far its highlights reach
+    float4 color_specular;
+    // its flags, its gel's slot and its shadow's cube (none: all ones)
+    uint4 flags;
+};
+
+// (as LightPass's LightClusterUniforms) the view the cells cut
+struct LightCluster {
+    // the eye, and the number of lights
+    float4 eye_count;
+    float4 forward;
+    float4 left;
+    float4 up;
+    // the tangents of half the fields of view across and up, and the
+    // cells' nearest and farthest depths
+    float4 tangents;
+};
+
+constant uint LIGHT_SPOT = 1;
+constant uint LIGHT_NO_SPECULAR = 2;
+constant uint CLUSTER_X = 16;
+constant uint CLUSTER_Y = 9;
+constant uint CLUSTER_Z = 24;
+constant uint NO_LIGHT = 0xFFFFFFFF;
+// (as LightPass.shadowNear) the nearest depth of a light's shadow cube
+constant float LIGHT_SHADOW_NEAR = 0.05;
+
+// a display value's light (the sRGB curve undone, carried on past 1),
+// and back: the dynamic lights are added to the baked light between them
+float3 to_linear(float3 shown) {
+    shown = max(shown, 0);
+    return select(pow((shown + 0.055) / 1.055, 2.4), shown / 12.92, shown <= 0.04045);
+}
+
+float3 to_shown(float3 linear) {
+    linear = max(linear, 0);
+    return select(1.055 * pow(linear, 1.0 / 2.4) - 0.055, linear * 12.92, linear <= 0.0031308);
+}
+
+// the lights' bindings, which the level's and the objects' shaders take
+#define DYNAMIC_LIGHT_ARGUMENTS \
+    constant DynamicLight *lights [[buffer(5)]], \
+    constant uint2 *light_cells [[buffer(6)]], \
+    constant ushort *light_indices [[buffer(7)]], \
+    constant LightCluster &cluster [[buffer(8)]], \
+    array<texturecube<float>, 8> gels [[texture(18)]], \
+    depthcube_array<float> light_shadows [[texture(26)]]
+#define DYNAMIC_LIGHTS lights, light_cells, light_indices, cluster, gels, light_shadows
+
+// the cell `world` is in (as lights.rs cuts them; NO_LIGHT outside them)
+uint light_cell(constant LightCluster &cluster, float3 world) {
+    float3 v = world - cluster.eye_count.xyz;
+    float x = dot(v, cluster.forward.xyz);
+    if (x <= 0) {
+        return NO_LIGHT;
+    }
+    float across = (-dot(v, cluster.left.xyz) / x) / cluster.tangents.x;
+    float down = (-dot(v, cluster.up.xyz) / x) / cluster.tangents.y;
+    uint column = uint(clamp(floor((across + 1) * 0.5 * float(CLUSTER_X)), 0.0, float(CLUSTER_X - 1)));
+    uint row = uint(clamp(floor((down + 1) * 0.5 * float(CLUSTER_Y)), 0.0, float(CLUSTER_Y - 1)));
+    uint slice = 0;
+    if (x > cluster.tangents.z) {
+        float ratio = log(x / cluster.tangents.z) / log(cluster.tangents.w / cluster.tangents.z);
+        if (ratio >= 1) {
+            return NO_LIGHT;
+        }
+        slice = min(uint(ratio * float(CLUSTER_Z)), CLUSTER_Z - 1);
+    }
+    return (slice * CLUSTER_Y + row) * CLUSTER_X + column;
+}
+
+// a light's gel the way `direction` leaves it (in its frame)
+float3 gel_color(array<texturecube<float>, 8> gels, uint slot, float3 direction) {
+    constexpr sampler gel(filter::linear, mip_filter::linear);
+    switch (slot) {
+    case 0: return gels[0].sample(gel, direction).rgb;
+    case 1: return gels[1].sample(gel, direction).rgb;
+    case 2: return gels[2].sample(gel, direction).rgb;
+    case 3: return gels[3].sample(gel, direction).rgb;
+    case 4: return gels[4].sample(gel, direction).rgb;
+    case 5: return gels[5].sample(gel, direction).rgb;
+    case 6: return gels[6].sample(gel, direction).rgb;
+    case 7: return gels[7].sample(gel, direction).rgb;
+    default: return float3(1);
+    }
+}
+
+// how much of a light reaches the point `from_light` away from it, by its
+// shadow cube `cube` (drawn as LightPass.faceMatrix draws it)
+float light_seen(depthcube_array<float> shadows, uint cube, float3 from_light, float far) {
+    constexpr sampler compare(filter::linear, compare_func::less_equal);
+    float near = LIGHT_SHADOW_NEAR;
+    far = max(far, near * 2);
+    float3 extent = abs(from_light);
+    float major = max(max(extent.x, extent.y), extent.z);
+    if (major <= near) {
+        return 1;
+    }
+    float depth = far / (far - near) - near * far / ((far - near) * major);
+    return shadows.sample_compare(compare, from_light, cube, depth);
+}
+
+// the dynamic lights at `world` on a surface facing `normal`: the light a
+// white surface sends back (linear), and the highlights toward `eye`
+// (none with an exponent of 0)
+struct DynamicLit {
+    float3 diffuse;
+    float3 specular;
+};
+
+float square(float x) {
+    return x * x;
+}
+
+DynamicLit dynamic_light(constant DynamicLight *lights, constant uint2 *light_cells,
+                         constant ushort *light_indices, constant LightCluster &cluster,
+                         array<texturecube<float>, 8> gels, depthcube_array<float> light_shadows,
+                         float3 world, float3 normal, float3 eye, float exponent) {
+    DynamicLit lit = {float3(0), float3(0)};
+    uint count = uint(cluster.eye_count.w);
+    if (count == 0) {
+        return lit;
+    }
+    uint cell = light_cell(cluster, world);
+    if (cell == NO_LIGHT) {
+        return lit;
+    }
+    uint2 range = light_cells[cell];
+    for (uint i = 0; i < range.y; i++) {
+        uint index = light_indices[range.x + i];
+        if (index >= count) {
+            continue;
+        }
+        DynamicLight light = lights[index];
+        float3 to = light.position_radius.xyz - world;
+        float distance = length(to);
+        float radius = light.position_radius.w;
+        float reach = max(radius, light.color_specular.w);
+        if (distance >= reach || distance < 1e-4) {
+            continue;
+        }
+        float3 l = to / distance;
+        float facing = saturate(dot(normal, l));
+        if (facing <= 0) {
+            continue;
+        }
+        float3 color = light.color_specular.rgb;
+        if (light.flags.x & LIGHT_SPOT) {
+            float along = dot(-l, light.forward_cutoff.xyz);
+            float width = max(light.up_falloff.w - light.forward_cutoff.w, 1e-4);
+            float cone = saturate((along - light.forward_cutoff.w) / width);
+            color *= cone * cone * (3 - 2 * cone);
+        }
+        if (light.flags.y != NO_LIGHT) {
+            float3 forward = light.forward_cutoff.xyz;
+            float3 up = light.up_falloff.xyz;
+            float3 away = -l;
+            color *= gel_color(gels, light.flags.y, float3(dot(away, forward), dot(away, cross(up, forward)),
+                                                           dot(away, up)));
+        }
+        if (light.flags.z != NO_LIGHT) {
+            color *= light_seen(light_shadows, light.flags.z, world + normal * 0.02 - light.position_radius.xyz,
+                                reach);
+        }
+        if (distance < radius) {
+            lit.diffuse += color * facing * square(saturate(1 - square(distance / radius)));
+        }
+        float specular_radius = light.color_specular.w;
+        if (exponent > 0 && !(light.flags.x & LIGHT_NO_SPECULAR) && distance < specular_radius) {
+            float3 half_way = normalize(l + eye);
+            lit.specular += color * pow(saturate(dot(normal, half_way)), exponent) * facing
+                          * square(saturate(1 - square(distance / specular_radius)));
+        }
+    }
+    return lit;
+}
+
 fragment float4 level_fragment(VertexOut in [[stage_in]],
                                constant Material &material [[buffer(0)]],
                                constant Frame &frame [[buffer(1)]],
@@ -406,6 +592,7 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
                                depth2d_array<float> level_shadows [[texture(16)]],
                                depth2d_array<float> shadows_map [[texture(17)]],
                                constant Shadows &shadows [[buffer(4)]],
+                               DYNAMIC_LIGHT_ARGUMENTS,
                                sampler wrap [[sampler(0)]],
                                sampler clamp [[sampler(1)]],
                                sampler nearest [[sampler(2)]]) {
@@ -470,16 +657,21 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
             : unbaked_light(in.normal);
         light = lightmapped;
     }
+    float3 eye = direction(frame.eye.xyz - in.world, normal);
     if (!(bits & ENVIRONMENT)) {
-        color.rgb *= light;
+        DynamicLit lit = dynamic_light(DYNAMIC_LIGHTS, in.world, normal, eye, 0);
+        color.rgb *= to_shown(to_linear(light) + lit.diffuse);
         return fogged(color, in.fog, frame, material);
     }
+    uint flags = material.environment.y;
+    DynamicLit lit = dynamic_light(DYNAMIC_LIGHTS, in.world, bumped, eye,
+                                   material.specular_perpendicular.w > 0 ? ((flags & EXTRA_SHINY) ? 64.0 : 16.0) : 0);
     // the bump's shading: toward the light by as much as the light has a
     // direction, flat where it has none
     float directed = saturate(length(incident_light));
     float3 incident = direction(incident_light, normal);
     float shading = (1 - directed) + directed * saturate(dot(bumped, incident));
-    light = light * shading * material.material_color.rgb;
+    light = to_shown(to_linear(light * shading) + lit.diffuse) * material.material_color.rgb;
     if (bits & SELF_ILLUMINATION) {
         float2 at = texcoord * material.environment_scales.z;
         float4 map = (bits & UNFILTERED) ? glow.sample(nearest, at, bias(lod)) : glow.sample(wrap, at, bias(lod));
@@ -499,15 +691,19 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
         mask = (material.maps & BASE) ? base.sample(wrap, texcoord * material.base_scale + material.base_offset, bias(lod)).a
                                       : 1.0;
     }
-    float3 eye = direction(frame.eye.xyz - in.world, normal);
     float3 facing = (material.environment.z == 1) ? normal : bumped;
     float along = saturate(dot(facing, eye));
     float fresnel = along * along;
     float3 tint = mix(material.specular_parallel.rgb, material.specular_perpendicular.rgb, fresnel);
 
+    // the dynamic lights' highlights
+    if (material.specular_perpendicular.w > 0) {
+        float3 specular = lit.specular * tint * material.specular_perpendicular.w * mask;
+        color.rgb = to_shown(to_linear(color.rgb) + ((flags & OVERBRIGHT) ? 2 * specular : specular));
+    }
+
     // the lightmap's highlight: its light, from its incident direction,
     // reflected toward the eye
-    uint flags = material.environment.y;
     if (material.specular_perpendicular.w > 0 && directed > 0) {
         float exponent = (flags & EXTRA_SHINY) ? 64.0 : 16.0;
         // (Toksvig's correction: a highlight as broad as the normals the
@@ -668,6 +864,7 @@ fragment float4 model_fragment(ModelOut in [[stage_in]],
                                texturecube_array<float> reflections [[texture(15)]],
                                depth2d_array<float> shadows_map [[texture(17)]],
                                constant Shadows &shadows [[buffer(4)]],
+                               DYNAMIC_LIGHT_ARGUMENTS,
                                sampler wrap [[sampler(0)]],
                                sampler clamp [[sampler(1)]]) {
     if (material.chicago_count != 0) {
@@ -677,6 +874,8 @@ fragment float4 model_fragment(ModelOut in [[stage_in]],
     float3 normal = direction(in.normal, float3(0, 0, 1));
     float3 light = object_light(frame, in.world, normal, clamp, probe_px, probe_nx, probe_py, probe_ny,
                                 probe_pz, probe_nz, shadows, shadows_map);
+    DynamicLit lit = dynamic_light(DYNAMIC_LIGHTS, in.world, normal, float3(0, 0, 1), 0);
+    light = to_shown(to_linear(light) + lit.diffuse);
     uint bits = material.model.x;
     if (!(bits & MODEL)) {
         float4 color = surface(in.texcoord, material, base, primary, secondary, wrap, frame.eye.w);

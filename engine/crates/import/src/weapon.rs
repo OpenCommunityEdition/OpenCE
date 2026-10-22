@@ -30,6 +30,8 @@ const ITEM_PART: usize = OBJECT_SIZE;
 const ITEM_SIZE: usize = 0x18C;
 /// Where a weapon's or a piece of equipment's own part starts.
 const ITEM_END: usize = ITEM_PART + ITEM_SIZE;
+/// Where a weapon's own fields start.
+pub(crate) const WEAPON_PART: usize = ITEM_END;
 pub(crate) const WEAPON_SIZE: usize = ITEM_END + 0x200;
 pub(crate) const EQUIPMENT_SIZE: usize = ITEM_END + 0x18;
 const PROJECTILE_PART: usize = OBJECT_SIZE;

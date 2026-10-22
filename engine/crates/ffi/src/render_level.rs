@@ -342,6 +342,9 @@ pub struct RenderLevel {
     pub sky: Option<crate::render_sky::RenderSky>,
     /// Each material's animation, if it is an environment shader's.
     pub animations: Vec<Option<EnvironmentAnimation>>,
+    /// Each of the level's lights' gel, a cube texture (`u32::MAX`: none),
+    /// as `Level::lights` orders them.
+    pub light_gels: Vec<u32>,
 }
 
 /// Gathers the level's textures and materials, each once.
@@ -392,6 +395,10 @@ impl RenderLevel {
         }
         builder.out.draws.extend(blended);
         builder.out.sky = crate::render_sky::render_sky(level);
+        for light in &level.lights {
+            let gel = builder.cube_map(light.gel.as_ref()).unwrap_or(u32::MAX);
+            builder.out.light_gels.push(gel);
+        }
         for model in &level.models {
             let model = builder.model(model);
             builder.out.models.push(model);
@@ -951,6 +958,7 @@ mod tests {
             collision_models: Vec::new(),
             physics: Vec::new(),
             effects: Vec::new(),
+            lights: Vec::new(),
             unit_huds: Vec::new(),
             weapon_huds: Vec::new(),
             grenade_huds: Vec::new(),
@@ -1117,6 +1125,38 @@ mod tests {
             texture.levels = vec![vec![0x40; 4 * 4 * 4 * 6]];
         }
         cube
+    }
+
+    #[test]
+    fn each_light_names_its_gel_cube() {
+        let mut level = level();
+        level.bitmaps.push(cube("gel"));
+        let light = |gel: Option<TagRef>| opence_content::Light {
+            tag: tag(b"ligh", "flashlight"),
+            flags: opence_content::Light::DYNAMIC,
+            radius: 4.0,
+            radius_modifier: [1.0, 1.0],
+            falloff_angle: 0.5,
+            cutoff_angle: 0.6,
+            lens_flare_radius: 0.0,
+            cosine_falloff_angle: 0.0,
+            cosine_cutoff_angle: 0.0,
+            specular_radius_multiplier: 1.0,
+            sine_cutoff_angle: 0.0,
+            color_flags: 0,
+            color_lower: [1.0; 4],
+            color_upper: [1.0; 4],
+            gel,
+            lens_flare: None,
+            duration: 0.0,
+            falloff_function: 0,
+        };
+        level.lights = vec![light(Some(tag(b"bitm", "gel"))), light(None)];
+        let built = RenderLevel::build(&level, 0).unwrap_or_default();
+        assert_eq!(built.light_gels.len(), 2);
+        let gel = built.light_gels[0];
+        assert_eq!(built.textures[gel as usize].0.faces, 6);
+        assert_eq!(built.light_gels[1], u32::MAX);
     }
 
     /// The level, its ground shader bumped, self-illuminated, reflecting

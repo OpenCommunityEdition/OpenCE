@@ -554,6 +554,8 @@ mod tests {
             physics: physics.then(|| tag(b"phys", path)),
             modifier_shader: None,
             creation_effect: None,
+            function_modes: Default::default(),
+            functions: Vec::new(),
             attachments: Vec::new(),
             change_colors: Vec::new(),
             unit_hud: None,

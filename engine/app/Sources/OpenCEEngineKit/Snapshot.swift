@@ -37,6 +37,9 @@ public func checkSnapshotLayout() throws {
          MemoryLayout<OCEFrameSnapshot>.offset(of: \.debug_labels)),
         ("DebugLine size", layout.debugLineSize, MemoryLayout<OCEDebugLine>.size),
         ("DebugLabel size", layout.debugLabelSize, MemoryLayout<OCEDebugLabel>.size),
+        ("max_lights", layout.maxLights, Int(OCE_MAX_LIGHTS)),
+        ("FrameSnapshot.lights", layout.frameLightsOffset, MemoryLayout<OCEFrameSnapshot>.offset(of: \.lights)),
+        ("LightSnapshot size", layout.lightSize, MemoryLayout<OCELightSnapshot>.size),
     ]
     for (field, library, header) in checks where Int(library) != header {
         throw SnapshotLayoutMismatch(field: field, library: Int(library), header: header ?? -1)
@@ -60,6 +63,11 @@ public struct FrameView {
         UnsafeBufferPointer(start: pointer.pointee.nodes, count: Int(pointer.pointee.node_count))
     }
     /// The debug lines.
+    /// The dynamic lights (the flashlight, the shots', the effects').
+    public var lights: UnsafeBufferPointer<OCELightSnapshot> {
+        UnsafeBufferPointer(start: pointer.pointee.lights, count: Int(pointer.pointee.light_count))
+    }
+
     public var debugLines: UnsafeBufferPointer<OCEDebugLine> {
         UnsafeBufferPointer(start: pointer.pointee.debug_lines, count: Int(pointer.pointee.debug_line_count))
     }

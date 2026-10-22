@@ -14,6 +14,7 @@ pub mod crates;
 pub mod damage;
 pub mod debris;
 pub mod first_person;
+pub mod functions;
 pub mod game;
 pub mod hash;
 pub mod hud;
@@ -182,6 +183,8 @@ pub struct Simulation {
     crates: crates::Crates,
     /// Detonations to do in the next tick (a script's).
     queued_detonations: Vec<projectile::Detonation>,
+    /// The effects the players' shots made this tick.
+    effects: Vec<debris::Ejection>,
     /// The vehicles, and the seat the player sits in.
     rides: seats::Rides,
     /// The AI's actors: bipeds moved and fired as the players are, by the
@@ -204,6 +207,25 @@ pub struct Drawn<'a> {
     pub nodes: Option<&'a NodeMatrices>,
     /// How it is drawn, if it has been told.
     pub appearance: Option<&'a objects::Appearance>,
+}
+
+/// An object that may carry lights, as [`Simulation::visit_lit`] gives
+/// it.
+pub struct Lit<'a> {
+    /// Its id.
+    pub id: ObjectId,
+    /// Its tag.
+    pub tag: &'a TagRef,
+    /// Where it was at the tick before the last.
+    pub previous: &'a Transform,
+    /// Where it was at the last tick.
+    pub current: &'a Transform,
+    /// Its nodes, if it is animated.
+    pub nodes: Option<&'a NodeMatrices>,
+    /// Its functions' values, if it has any.
+    pub functions: Option<&'a functions::FunctionValues>,
+    /// It is the body the player sees through.
+    pub viewer: bool,
 }
 
 impl Simulation {
@@ -248,6 +270,7 @@ impl Simulation {
             debris: debris::Debris::default(),
             crates: crates::Crates::default(),
             queued_detonations: Vec::new(),
+            effects: Vec::new(),
             rides: seats::Rides::default(),
             actors: Vec::new(),
             actor_inputs: Vec::new(),
@@ -324,6 +347,10 @@ impl Simulation {
             let action = input
                 .buttons
                 .pressed(player.held_buttons(), Buttons::ACTION);
+            let flashlight = input
+                .buttons
+                .pressed(player.held_buttons(), Buttons::FLASHLIGHT);
+            step_flashlight(&mut self.world, player, flashlight);
             let seated = self.rides.act(&self.world, player, &taken, action);
             actions.push(action && !seated);
         }
@@ -361,7 +388,9 @@ impl Simulation {
         }
         self.queued_detonations.clear();
         self.schedule.run(&mut self.world);
+        functions::update(&mut self.world);
         self.update_physics(&ejections);
+        self.effects = ejections;
     }
 
     /// The physics of the dead and the spent: the ragdolls and this tick's
@@ -449,6 +478,8 @@ impl Simulation {
         // (multiplayer's rules: the scenario does not yet say which it is)
         self.world
             .insert_resource(damage::DamageTable::new(level, true));
+        self.world
+            .insert_resource(functions::FunctionTable::new(level));
         self.rides = seats::Rides::for_level(level, player.unit(), player.armory());
         self.players.push(player);
         self.sensor = hud::MotionSensor::default();
@@ -652,6 +683,12 @@ impl Simulation {
     /// Where grenades detonated in the last tick.
     pub fn detonations(&self) -> &[projectile::Detonation] {
         &self.detonations
+    }
+
+    /// The effects the players' shots made this tick (their weapons'
+    /// firing effects, at their muzzles).
+    pub fn effects(&self) -> &[debris::Ejection] {
+        &self.effects
     }
 
     /// Detonates `detonation` in the next tick, as a grenade would (a
@@ -1070,6 +1107,41 @@ impl Simulation {
         }
     }
 
+    /// Every object, in the order of their ids, with what its lights need:
+    /// the player's own body too, whose lights (its flashlight) light the
+    /// view though the body is not drawn.
+    pub fn visit_lit(&mut self, mut visit: impl FnMut(Lit<'_>)) {
+        let mut objects: Vec<_> = self
+            .world
+            .query::<(
+                &ObjectId,
+                &objects::Object,
+                &Transform,
+                Option<&PreviousTransform>,
+                Option<&NodeMatrices>,
+                Option<&functions::FunctionValues>,
+            )>()
+            .iter(&self.world)
+            .collect();
+        objects.sort_by_key(|(id, ..)| **id);
+        let viewer = self
+            .players
+            .first()
+            .filter(|player| player.view() == View::FirstPerson)
+            .map(|player| ObjectId(player.handle().index));
+        for (id, object, transform, previous, nodes, functions) in objects {
+            visit(Lit {
+                id: *id,
+                tag: &object.tag,
+                previous: previous.map_or(transform, |p| &p.0),
+                current: transform,
+                nodes,
+                functions,
+                viewer: Some(*id) == viewer,
+            });
+        }
+    }
+
     /// Sets how an object is drawn; false if `handle` is not in the world.
     pub fn set_appearance(
         &mut self,
@@ -1344,6 +1416,28 @@ fn place_camera(
 
 fn advance_tick(mut tick: ResMut<Tick>) {
     tick.0 += 1;
+}
+
+/// One tick of `player`'s unit's flashlight: switched when `pressed`.
+fn step_flashlight(world: &mut World, player: &Player, pressed: bool) {
+    let Some(entity) = world
+        .get_resource::<ObjectTable>()
+        .and_then(|table| table.entity(player.handle()))
+    else {
+        return;
+    };
+    let Ok(mut unit) = world.get_entity_mut(entity) else {
+        return;
+    };
+    let dead = unit
+        .get::<damage::Vitality>()
+        .is_some_and(|vitality| vitality.dead);
+    let mut light = unit
+        .get::<functions::IntegratedLight>()
+        .copied()
+        .unwrap_or_default();
+    light.step(pressed, player.seated().is_some(), dead);
+    unit.insert(light);
 }
 
 #[cfg(test)]

@@ -4,7 +4,7 @@
 // bindings are Halo PC's: W, S, A and D move, Space jumps, Control
 // crouches, the mouse looks, its left button fires and its right throws a
 // grenade; R reloads, Tab changes weapons, E picks up, F strikes, Z zooms
-// and G changes grenades. V changes the camera between first and third
+// G changes grenades and Q the flashlight. V changes the camera between first and third
 // person. The mouse's buttons are bound by codes past the keys' (from 256:
 // left, right, middle, fourth, fifth).
 import Foundation
@@ -13,7 +13,7 @@ import OpenCEEngineCore
 /// What a key may be bound to.
 public enum PlayAction: String, CaseIterable, Codable, Sendable {
     case forward, back, left, right, jump, crouch, fire, toggleView
-    case reload, swap, action, melee, grenade, zoom, switchGrenade
+    case reload, swap, action, melee, grenade, zoom, switchGrenade, flashlight
 }
 
 /// The codes of the mouse's buttons (the window's `MouseButton`).
@@ -47,6 +47,7 @@ public struct KeyBindings: Equatable, Sendable {
         .grenade: [MouseButtonCode.right],
         .zoom: [6], // Z
         .switchGrenade: [5], // G
+        .flashlight: [12], // Q
     ])
 
     /// Bindings read from JSON (`{"jump": [49], ...}`): the actions it
@@ -115,7 +116,7 @@ public struct PlayControls: Equatable, Sendable {
             (.jump, names.jump), (.crouch, names.crouch), (.fire, names.fire),
             (.reload, names.reload), (.swap, names.swap), (.action, names.action),
             (.melee, names.melee), (.grenade, names.grenade), (.zoom, names.zoom),
-            (.switchGrenade, names.switchGrenade),
+            (.switchGrenade, names.switchGrenade), (.flashlight, names.flashlight),
         ]
         for (action, button) in actions where bindings.holds(action, held) {
             buttons |= button

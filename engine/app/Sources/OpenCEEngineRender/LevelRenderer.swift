@@ -8,6 +8,7 @@
 
 import Metal
 import OpenCEEngineCore
+import opence_ffiFFI
 import simd
 
 public enum LevelRendererError: Error, CustomStringConvertible {
@@ -345,6 +346,15 @@ public final class LevelRenderer {
     /// The game's time in seconds, which the shaders' animations follow
     /// (set before each frame; 0 draws them as at the start).
     public var time: Float = 0
+    /// The frame's dynamic lights, already between their ticks (set
+    /// before each frame, as `time` is).
+    public var lights: [OCELightSnapshot] = []
+    /// The dynamic lights' cells, gels and shadows.
+    let lightPass: LightPass
+    /// How many dynamic lights the last frame drew, and how many cast
+    /// shadows.
+    public var lightsDrawn: Int { lightPass.lastLightCount }
+    public var lightShadowsDrawn: Int { lightPass.lastShadowCount }
     private var opaque: MTLRenderPipelineState
     private var blended: [MTLRenderPipelineState]
     private var tone: MTLRenderPipelineState
@@ -507,6 +517,7 @@ public final class LevelRenderer {
                                whiteCube: whiteCube)
         shadows = try ShadowPass(device: device, library: library, levelStride: vertexStride,
                                  modelStride: Int(geometry.modelVertexStride()))
+        lightPass = try LightPass(device: device, gels: geometry.lightGels().map(cube), whiteCube: whiteCube)
         sky = geometry.sky()
 
         // reversed depth: nearer is greater
@@ -710,6 +721,13 @@ public final class LevelRenderer {
                            self.models.encodeShadowCasters(prepared, casting, into: encoder)
                        })
         var shadowUniforms = shadows.uniforms
+        let lightFrame = lightPass.prepare(lights, camera: camera,
+                                           aspect: Float(frame.width) / Float(max(frame.height, 1)))
+        let casting = shadows.pipelines
+        lightPass.encodeShadows(lightFrame, into: commands, wrap: wrap) { encoder in
+            self.encodeShadowCasters(encoder, casting.level)
+            self.models.encodeShadowCasters(prepared, casting.model, into: encoder)
+        }
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = frame
         pass.colorAttachments[0].loadAction = .clear
@@ -736,6 +754,7 @@ public final class LevelRenderer {
         encoder.setFragmentTexture(shadows.levelMaps, index: 16)
         encoder.setFragmentTexture(shadows.maps, index: 17)
         encoder.setFragmentBytes(&shadowUniforms, length: MemoryLayout<ShadowUniforms>.stride, index: 4)
+        lightPass.bind(lightFrame, into: encoder)
         models.encodeSky(prepared, into: encoder)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setRenderPipelineState(opaque)

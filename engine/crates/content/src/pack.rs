@@ -277,6 +277,7 @@ mod tests {
             collision_models: Vec::new(),
             physics: Vec::new(),
             effects: Vec::new(),
+            lights: Vec::new(),
             unit_huds: Vec::new(),
             weapon_huds: Vec::new(),
             grenade_huds: Vec::new(),

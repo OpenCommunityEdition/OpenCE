@@ -648,7 +648,7 @@ fn destroyed(world: &World, handle: ObjectHandle) -> bool {
 }
 
 /// A model's nodes at its default pose, from its origin.
-fn default_pose(model: &Model) -> Vec<NodeMatrix> {
+pub fn default_pose(model: &Model) -> Vec<NodeMatrix> {
     let links: Vec<AnimationNode> = model
         .nodes
         .iter()
@@ -666,7 +666,7 @@ fn default_pose(model: &Model) -> Vec<NodeMatrix> {
 
 /// The matrix of `model`'s marker `name` (its first instance), from its
 /// origin, with its nodes at `matrices`.
-fn marker_matrix(model: &Model, matrices: &[NodeMatrix], name: &str) -> Option<NodeMatrix> {
+pub fn marker_matrix(model: &Model, matrices: &[NodeMatrix], name: &str) -> Option<NodeMatrix> {
     let marker = model
         .markers
         .iter()

@@ -33,8 +33,10 @@ impl Buttons {
     pub const ZOOM: Self = Self(1 << 9);
     /// Change to the other kind of grenade.
     pub const SWITCH_GRENADE: Self = Self(1 << 10);
+    /// Switch the flashlight on or off.
+    pub const FLASHLIGHT: Self = Self(1 << 11);
     /// Every button the engine knows; others in a recording are refused.
-    pub const ALL: Self = Self(0x7FF);
+    pub const ALL: Self = Self(0xFFF);
 
     /// Whether any of `buttons` is pressed this tick, held now and not
     /// `earlier`.

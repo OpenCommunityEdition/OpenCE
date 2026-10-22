@@ -44,6 +44,7 @@ pub(crate) fn import_effect(cache: &Cache, index: usize) -> Result<Effect, Impor
     let events = tag.block(EVENTS_OFFSET, "events", EVENT_SIZE, MAX_EVENTS)?;
     let mut damage = Vec::new();
     let mut debris = Vec::new();
+    let mut lights = Vec::new();
     for event in events.iter() {
         let particles =
             event.block(PARTICLES_OFFSET, "particles", PARTICLES_SIZE, MAX_PARTICLES)?;
@@ -54,10 +55,13 @@ pub(crate) fn import_effect(cache: &Cache, index: usize) -> Result<Effect, Impor
         }
         let parts = event.block(PARTS_OFFSET, "parts", PART_SIZE, MAX_PARTS)?;
         for part in parts.iter() {
-            // (a part creates any object or effect; only damage is read)
+            // (a part creates any object or effect; only damage and
+            // lights are read)
             if let Some(part_index) = part.reference(PART_TAG_OFFSET, "type", &[])? {
                 if cache.tags()[part_index].is(JPT) {
                     damage.push(tag_ref(cache, part_index));
+                } else if cache.tags()[part_index].is(crate::light::LIGH) {
+                    lights.push(tag_ref(cache, part_index));
                 }
             }
         }
@@ -66,6 +70,7 @@ pub(crate) fn import_effect(cache: &Cache, index: usize) -> Result<Effect, Impor
         tag: tag_ref(cache, index),
         damage,
         debris,
+        lights,
     })
 }
 
@@ -113,7 +118,7 @@ mod tests {
     use std::error::Error;
 
     #[test]
-    fn an_effect_names_the_damage_its_parts_create() -> Result<(), Box<dyn Error>> {
+    fn an_effect_names_the_damage_and_lights_its_parts_create() -> Result<(), Box<dyn Error>> {
         let mut fake = FakeCache::new(CacheKind::CustomEdition);
         let damage = fake.add_tag(
             JPT,
@@ -121,17 +126,28 @@ mod tests {
             &vec![0u8; DAMAGE_EFFECT_SIZE],
         );
         let other = fake.add_tag(EFFE, "weapons\\test\\smoke", &[0u8; EFFECT_SIZE]);
-        let mut parts = vec![0u8; PART_SIZE * 2];
+        let mut parts = vec![0u8; PART_SIZE * 3];
         reference(&mut parts, PART_TAG_OFFSET, EFFE, fake.handle(other));
+        let light = fake.add_tag(
+            crate::light::LIGH,
+            "weapons\\test\\flash",
+            &vec![0u8; crate::light::LIGHT_SIZE],
+        );
         reference(
             &mut parts,
             PART_SIZE + PART_TAG_OFFSET,
             JPT,
             fake.handle(damage),
         );
+        reference(
+            &mut parts,
+            PART_SIZE * 2 + PART_TAG_OFFSET,
+            crate::light::LIGH,
+            fake.handle(light),
+        );
         let parts = fake.add_data(&parts);
         let mut event = vec![0u8; EVENT_SIZE];
-        block(&mut event, PARTS_OFFSET, 2, parts);
+        block(&mut event, PARTS_OFFSET, 3, parts);
         let events = fake.add_data(&event);
         let mut effect = vec![0u8; EFFECT_SIZE];
         block(&mut effect, EVENTS_OFFSET, 1, events);
@@ -141,6 +157,8 @@ mod tests {
         assert_eq!(effect.tag.path, "weapons\\test\\blast");
         assert_eq!(effect.damage.len(), 1);
         assert_eq!(effect.damage[0].group.0, *b"jpt!");
+        assert_eq!(effect.lights.len(), 1);
+        assert_eq!(effect.lights[0].path, "weapons\\test\\flash");
         Ok(())
     }
 }

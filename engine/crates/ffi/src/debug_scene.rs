@@ -202,14 +202,15 @@ fn objects(scene: &mut DebugDraw, simulation: &mut Simulation) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use opence_content::campaign::{CommandList, Encounter, FiringPosition, TriggerVolume};
     use opence_content::level::{
         CollisionBsp, CollisionEdge, CollisionVertex, Scenario, StructureBsp,
     };
 
-    fn level() -> Level {
+    /// A level with nothing in it but a few shapes.
+    pub(crate) fn level() -> Level {
         let mut level = Level {
             scenario: Scenario {
                 path: "test".into(),
@@ -234,6 +235,7 @@ mod tests {
             collision_models: Vec::new(),
             physics: Vec::new(),
             effects: Vec::new(),
+            lights: Vec::new(),
             unit_huds: Vec::new(),
             weapon_huds: Vec::new(),
             grenade_huds: Vec::new(),
@@ -382,6 +384,8 @@ mod tests {
             physics: None,
             modifier_shader: None,
             creation_effect: None,
+            function_modes: Default::default(),
+            functions: Vec::new(),
             attachments: Vec::new(),
             change_colors: Vec::new(),
             unit_hud: None,

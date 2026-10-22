@@ -7,7 +7,7 @@ style = "type"
 cpp_compat = true
 
 [export]
-include = ["FrameSnapshot", "ObjectSnapshot", "NodeSnapshot", "NodeMatrix", "CameraSnapshot", "Transform", "Vec3", "Quat"]
+include = ["FrameSnapshot", "ObjectSnapshot", "NodeSnapshot", "NodeMatrix", "CameraSnapshot", "Transform", "Vec3", "Quat", "LightSnapshot", "ClusterView"]
 item_types = ["structs", "opaque", "functions", "constants"]
 prefix = "OCE"
 
@@ -23,3 +23,12 @@ parse_deps = false
 "MAX_NODES" = "_MAX_NODES"
 "SNAPSHOT_VERSION" = "_SNAPSHOT_VERSION"
 "OBJECT_FIRST_PERSON" = "_OBJECT_FIRST_PERSON"
+"MAX_LIGHTS" = "_MAX_LIGHTS"
+"LIGHT_SPOT" = "_LIGHT_SPOT"
+"LIGHT_NO_SPECULAR" = "_LIGHT_NO_SPECULAR"
+"LIGHT_FIRST_PERSON" = "_LIGHT_FIRST_PERSON"
+"CLUSTER_X" = "_CLUSTER_X"
+"CLUSTER_Y" = "_CLUSTER_Y"
+"CLUSTER_Z" = "_CLUSTER_Z"
+"CLUSTER_CELLS" = "_CLUSTER_CELLS"
+"MAX_CLUSTER_INDICES" = "_MAX_CLUSTER_INDICES"

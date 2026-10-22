@@ -8,6 +8,7 @@ pub mod campaign;
 pub mod devmap;
 pub mod hud;
 pub mod level;
+pub mod light;
 pub mod material;
 pub mod object;
 pub mod pack;
@@ -35,6 +36,7 @@ pub use level::{
     NetgameFlag, NetgameFlagKind, ObjectPlacement, PlacementDevice, PlacementPermutation,
     PlayerPhysics, PlayerStart, Scenario, Sky, SkyAmbient, SkyLight, StructureBsp,
 };
+pub use light::{FunctionModes, Light, ObjectFunction};
 pub use material::SurfaceMaterial;
 pub use object::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, Biped, ChangeColor,

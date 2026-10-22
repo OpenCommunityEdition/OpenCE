@@ -13,7 +13,7 @@ use opence_content::level::{
 };
 use opence_content::{
     AnimationGraph, AtmosphericFog, CollisionBsp, CollisionMaterial, CollisionModel, DamageEffect,
-    Effect, EnvironmentVertex, GameTypes, Globals, Group, ItemChoice, Level, Lightmap,
+    Effect, EnvironmentVertex, GameTypes, Globals, Group, ItemChoice, Level, Light, Lightmap,
     LightmapVertex, Material, Model, NetgameEquipment, NetgameFlag, NetgameFlagKind,
     ObjectDefinition, ObjectKind, ObjectPlacement, PlacementDevice, PlacementPermutation,
     PlayerStart, Scenario, Sky, SkyAmbient, SkyLight, StructureBsp, TagRef,
@@ -227,6 +227,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     let huds = crate::hud::import_huds(cache, &objects, &globals, &mut reached)?;
     let effects = import_effects(cache, &objects)?;
     let damage_effects = import_damage_effects(cache, &objects, &globals, &effects)?;
+    let lights = import_lights(cache, &objects, &effects)?;
     let collision_models = import_collision_models(cache, &objects)?;
     let physics = import_physics(cache, &objects)?;
     let skies = import_skies(cache, &scenario, &mut models, &mut reached)?;
@@ -291,6 +292,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         collision_models,
         physics,
         effects,
+        lights,
         unit_huds: huds.unit_huds,
         weapon_huds: huds.weapon_huds,
         grenade_huds: huds.grenade_huds,
@@ -479,6 +481,28 @@ fn import_effects(cache: &Cache, objects: &[ObjectDefinition]) -> Result<Vec<Eff
         }
     }
     Ok(effects)
+}
+
+/// Every light `objects` carry and `effects` make, each once, by path.
+fn import_lights(
+    cache: &Cache,
+    objects: &[ObjectDefinition],
+    effects: &[Effect],
+) -> Result<Vec<Light>, ImportError> {
+    let attached = objects
+        .iter()
+        .flat_map(|object| &object.attachments)
+        .filter_map(|attachment| attachment.tag.as_ref())
+        .filter(|tag| tag.group.0 == *b"ligh");
+    let made = effects.iter().flat_map(|effect| &effect.lights);
+    let tags: BTreeSet<&TagRef> = attached.chain(made).collect();
+    let mut lights = Vec::with_capacity(tags.len());
+    for tag in tags {
+        if let Some(index) = tag_index(cache, tag) {
+            lights.push(crate::light::import_light(cache, index)?);
+        }
+    }
+    Ok(lights)
 }
 
 /// Every damage effect `objects`, `globals` and `effects` do (a unit's

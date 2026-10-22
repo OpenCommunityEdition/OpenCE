@@ -20,7 +20,7 @@ let package = Package(
         // the window: its Metal layer, display link, mouse capture and keys
         .target(name: "OpenCEEngineWindow"),
         // the renderer: the level's buffers, textures and passes, and frame capture
-        .target(name: "OpenCEEngineRender", dependencies: ["OpenCEEngineCore"]),
+        .target(name: "OpenCEEngineRender", dependencies: ["OpenCEEngineCore", "opence_ffiFFI"]),
         // the menus: their models, and their SwiftUI views over the Metal view
         .target(name: "OpenCEEngineMenu", dependencies: ["OpenCEEngineCore", "OpenCEEngineKit"]),
         .executableTarget(name: "OpenCEEngine",

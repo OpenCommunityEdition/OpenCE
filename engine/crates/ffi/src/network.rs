@@ -279,6 +279,8 @@ impl Engine {
             simulation,
             previous_camera,
             clock: opence_sim::clock::Clock::default(),
+            lights: crate::lights::Lights::new(&level),
+            lit: Vec::new(),
             level: Some(level),
             network: Some(network),
             dressed,

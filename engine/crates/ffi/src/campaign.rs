@@ -208,6 +208,8 @@ impl Engine {
             network: None,
             dressed: 0,
             campaign: Some(campaign),
+            lights: crate::lights::Lights::new(&geometry.content),
+            lit: Vec::new(),
         };
         running.previous_camera = transform(&camera(&running).transform);
         let mut state = self.lock();

@@ -13,6 +13,7 @@ pub mod control;
 mod debug_scene;
 pub mod devtools;
 pub mod hud;
+pub mod lights;
 pub mod network;
 pub mod render_level;
 pub mod render_model;
@@ -322,6 +323,12 @@ impl LevelGeometry {
         self.level.sky.clone()
     }
 
+    /// Each of the level's lights' gel, a cube texture, by the index the
+    /// snapshot's lights give (`u32::MAX`: none).
+    pub fn light_gels(&self) -> Vec<u32> {
+        self.level.light_gels.clone()
+    }
+
     /// The BSP's bounds: least and greatest x, then y, then z.
     pub fn bounds(&self) -> Vec<f32> {
         self.level.bounds.iter().flatten().copied().collect()
@@ -515,6 +522,8 @@ pub struct InputButtons {
     pub zoom: u32,
     /// Change grenades.
     pub switch_grenade: u32,
+    /// The flashlight.
+    pub flashlight: u32,
 }
 
 /// The buttons' bits, so that the app need not repeat them.
@@ -532,6 +541,7 @@ pub fn input_buttons() -> InputButtons {
         grenade: Buttons::GRENADE.0,
         zoom: Buttons::ZOOM.0,
         switch_grenade: Buttons::SWITCH_GRENADE.0,
+        flashlight: Buttons::FLASHLIGHT.0,
     }
 }
 
@@ -547,6 +557,10 @@ pub(crate) struct Running {
     dressed: usize,
     /// The mission it plays, if any.
     campaign: Option<campaign::Campaign>,
+    /// The lights objects carry and effects make.
+    lights: lights::Lights,
+    /// The frame's lights (kept for their memory).
+    lit: Vec<snapshot::LightSnapshot>,
 }
 
 /// The models and animation graphs objects are drawn and posed with,
@@ -677,6 +691,8 @@ impl Engine {
             network: None,
             dressed: 0,
             campaign: None,
+            lights: lights::Lights::default(),
+            lit: Vec::new(),
         });
         publish(&mut state, &self.snapshots, 0.0);
     }
@@ -716,6 +732,8 @@ impl Engine {
             network: None,
             dressed: 0,
             campaign: None,
+            lights: lights::Lights::new(&geometry.content),
+            lit: Vec::new(),
         });
         publish(&mut state, &self.snapshots, 0.0);
         Ok(count)
@@ -1060,6 +1078,9 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
                 }
             }
         }
+        if let Some(level) = &running.level {
+            running.lights.tick(level, &running.simulation);
+        }
         // (the mouse's turn is used once)
         input.yaw = 0.0;
         input.pitch = 0.0;
@@ -1104,6 +1125,13 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
         .is_some_and(|campaign| campaign.camera().is_some());
     let tick = running.simulation.tick().0;
     let previous = running.previous_camera;
+    let mut lit = std::mem::take(&mut running.lit);
+    lit.clear();
+    if let Some(level) = &running.level {
+        running
+            .lights
+            .gather(level, &mut running.simulation, &camera.transform, &mut lit);
+    }
     let simulation = &mut running.simulation;
     writer.publish(buffers, tick, alpha, |frame| {
         frame.camera(CameraSnapshot {
@@ -1177,9 +1205,11 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
                 &nodes,
             );
         }
+        frame.lights(&lit);
         frame.debug(&shell.draw);
         frame.debug(&shell.scene);
     });
+    running.lit = lit;
 }
 
 #[cfg(test)]
@@ -1543,6 +1573,73 @@ mod tests {
             frame.camera.current.position.y - eyes.y,
         );
         assert!(moved > 1.0, "{moved}");
+    }
+
+    #[test]
+    fn the_flashlight_and_the_shots_light_the_frame() {
+        let Some(geometry) = stock("bloodgulch") else {
+            return; // (no game data here)
+        };
+        let engine = Engine::new();
+        assert!(engine.start_level(geometry, 1).is_ok());
+        assert_eq!(engine.spawn_player(0), Ok(()));
+        let lights = |engine: &Engine| {
+            let frame = acquire(engine);
+            // SAFETY: the snapshot holds `light_count` lights.
+            unsafe { std::slice::from_raw_parts(frame.lights, frame.light_count as usize) }.to_vec()
+        };
+        let _ = engine.step();
+        let dark = lights(&engine);
+        assert!(dark
+            .iter()
+            .all(|light| light.flags & snapshot::LIGHT_FIRST_PERSON == 0));
+        let press = |buttons: u32| {
+            engine.set_input(InputState {
+                buttons,
+                ..Default::default()
+            });
+            let _ = engine.step();
+        };
+        press(Buttons::FLASHLIGHT.0);
+        press(0);
+        for _ in 0..10 {
+            let _ = engine.step();
+        }
+        let lit = lights(&engine);
+        let flashlight = lit
+            .iter()
+            .find(|light| light.flags & snapshot::LIGHT_FIRST_PERSON != 0);
+        let Some(flashlight) = flashlight else {
+            panic!("no flashlight: {lit:?}");
+        };
+        let eyes = acquire(&engine).camera.current.position;
+        assert!((flashlight.position.z - eyes.z).abs() < 1e-3);
+        assert!(flashlight.flags & snapshot::LIGHT_SPOT != 0);
+        // (a grenade's explosion lights the frame, and its light fades)
+        for _ in 0..60 {
+            let _ = engine.step();
+        }
+        let given = engine
+            .lock()
+            .running
+            .as_mut()
+            .is_some_and(|running| running.simulation.give_grenades(0, 1));
+        assert!(given);
+        press(Buttons::GRENADE.0);
+        let mut shone = Vec::new();
+        for _ in 0..240 {
+            press(0);
+            let effects: Vec<f32> = lights(&engine)
+                .iter()
+                .filter(|light| light.source & (1 << 31) != 0)
+                .map(|light| light.color.x + light.color.y + light.color.z)
+                .collect();
+            if let Some(&brightest) = effects.iter().max_by(|a, b| a.total_cmp(b)) {
+                shone.push(brightest);
+            }
+        }
+        assert!(shone.len() > 10, "no explosion lit the frame: {shone:?}");
+        assert!(shone.last() < shone.first(), "{shone:?}");
     }
 
     /// Every stock map (slow: `cargo test --release -- --ignored`).

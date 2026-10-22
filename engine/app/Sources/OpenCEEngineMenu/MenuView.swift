@@ -387,6 +387,7 @@ extension PlayAction {
         case .grenade: "Throw a grenade"
         case .zoom: "Zoom"
         case .switchGrenade: "Switch grenades"
+        case .flashlight: "Flashlight"
         }
     }
 }

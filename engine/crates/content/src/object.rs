@@ -3,7 +3,9 @@
 
 use rkyv::{Archive, Deserialize, Serialize};
 
-use crate::{CollisionBsp, Equipment, Projectile, TagRef, Vehicle, Weapon};
+use crate::{
+    CollisionBsp, Equipment, FunctionModes, ObjectFunction, Projectile, TagRef, Vehicle, Weapon,
+};
 
 /// What kind of object a definition is, as its type field and its tag
 /// group say.
@@ -100,6 +102,10 @@ pub struct ObjectDefinition {
     pub modifier_shader: Option<TagRef>,
     /// The effect played where it is created.
     pub creation_effect: Option<TagRef>,
+    /// Where its incoming values come from.
+    pub function_modes: FunctionModes,
+    /// Its functions (the first four are computed).
+    pub functions: Vec<ObjectFunction>,
     /// What is attached to its markers.
     pub attachments: Vec<Attachment>,
     /// Its change colours.
@@ -208,6 +214,12 @@ pub struct Attachment {
     pub tag: Option<TagRef>,
     /// The marker it is attached to.
     pub marker: String,
+    /// The outgoing function (1 to 4, A to D) a light's intensity is
+    /// (0: none, which is 1).
+    pub primary_scale: i16,
+    /// The change colour (1 to 4, A to D) a light's colour is scaled by
+    /// (0: none, which is white).
+    pub change_color: i16,
 }
 
 /// A change colour: the colours an object of the definition may be

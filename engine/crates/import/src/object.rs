@@ -9,9 +9,9 @@
 use opence_content::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, Biped, ChangeColor,
     CollisionModel, CollisionModelMaterial, CollisionNode, CollisionRegion, ColorPermutation,
-    MarkerInstance, Model, ModelGeometry, ModelMarker, ModelNode, ModelPart, ModelPermutation,
-    ModelRegion, ModelShader, ModelVertex, ObjectDefinition, ObjectKind, PathfindingSphere, TagRef,
-    UnitSeat, WeaponClass, WeaponType,
+    FunctionModes, MarkerInstance, Model, ModelGeometry, ModelMarker, ModelNode, ModelPart,
+    ModelPermutation, ModelRegion, ModelShader, ModelVertex, ObjectDefinition, ObjectFunction,
+    ObjectKind, PathfindingSphere, TagRef, UnitSeat, WeaponClass, WeaponType,
 };
 
 use crate::cache::{Cache, CacheKind};
@@ -143,6 +143,75 @@ fn name(element: &Element<'_>) -> Result<String, ImportError> {
     Ok(element.text(0, "name", NAME_LONGEST)?.to_owned())
 }
 
+const FUNCTION_SIZE: usize = 0x168;
+const MAX_FUNCTIONS: usize = 4;
+
+/// One of an object's functions.
+fn import_function(function: &Element<'_>) -> Result<ObjectFunction, ImportError> {
+    Ok(ObjectFunction {
+        flags: function.u32(0x00, "flags")?,
+        one_over_period: function.f32(0x144, "one over period")?,
+        scale_period_by: function.i16(0x08, "scale period by")?,
+        function: function.i16(0x0A, "function")?,
+        scale_function_by: function.i16(0x0C, "scale function by")?,
+        wobble_function: function.i16(0x0E, "wobble function")?,
+        wobble_period: function.f32(0x10, "wobble period")?,
+        wobble_magnitude: function.f32(0x14, "wobble magnitude")?,
+        square_wave_threshold: function.f32(0x18, "square wave threshold")?,
+        step_count: function.i16(0x1C, "step count")?,
+        map_to: function.i16(0x1E, "map to")?,
+        sawtooth_count: function.i16(0x20, "sawtooth count")?,
+        add: function.i16(0x22, "add")?,
+        scale_result_by: function.i16(0x24, "scale result by")?,
+        bounds_mode: function.i16(0x26, "bounds mode")?,
+        bounds: vector(function, 0x28, "bounds")?,
+        turn_off_with: function.i16(0x36, "turn off with")?,
+        scale_by: function.f32(0x38, "scale by")?,
+        reciprocal_bounds_range: function.f32(0x138, "reciprocal bounds range")?,
+        reciprocal_sawtooth_count: function.f32(0x13C, "reciprocal sawtooth count")?,
+        reciprocal_step_count: function.f32(0x140, "reciprocal step count")?,
+    })
+}
+
+/// The four modes at `at` of `element`.
+fn modes(element: &Element<'_>, at: usize) -> Result<[i16; 4], ImportError> {
+    let mut modes = [0; 4];
+    for (i, mode) in modes.iter_mut().enumerate() {
+        *mode = element.i16(at + i * 2, "export to functions")?;
+    }
+    Ok(modes)
+}
+
+/// Where an object's incoming values come from, for each part it has.
+fn function_modes(
+    cache: &Cache,
+    index: usize,
+    kind: ObjectKind,
+    object: &Element<'_>,
+) -> Result<FunctionModes, ImportError> {
+    let mut function_modes = FunctionModes {
+        object: modes(object, 0x108)?,
+        ..FunctionModes::default()
+    };
+    match kind {
+        ObjectKind::Biped => {
+            let biped = cache.tag(index, BIPD, BIPED_SIZE)?;
+            function_modes.unit = modes(&biped, UNIT_PART + 0x1C)?;
+            function_modes.biped = modes(&biped, BIPED_PART + 0x1C)?;
+        }
+        ObjectKind::Vehicle => {
+            let vehicle = cache.tag(index, crate::vehicle::VEHI, crate::vehicle::VEHICLE_SIZE)?;
+            function_modes.unit = modes(&vehicle, UNIT_PART + 0x1C)?;
+        }
+        ObjectKind::Weapon => {
+            let weapon = cache.tag(index, crate::weapon::WEAP, crate::weapon::WEAPON_SIZE)?;
+            function_modes.weapon = modes(&weapon, crate::weapon::WEAPON_PART + 0x28)?;
+        }
+        _ => {}
+    }
+    Ok(function_modes)
+}
+
 /// An object's definition: what every kind has, its kind checked against
 /// its group.
 pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, ImportError> {
@@ -164,7 +233,15 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
         attachments.push(Attachment {
             tag: reference(&attachment, 0, "type", &[])?,
             marker: attachment.text(0x10, "marker", NAME_LONGEST)?.to_owned(),
+            primary_scale: attachment.i16(0x30, "primary scale")?,
+            change_color: attachment.i16(0x34, "change color")?,
         });
+    }
+
+    let functions_block = object.block(0x158, "functions", FUNCTION_SIZE, MAX_FUNCTIONS)?;
+    let mut functions = Vec::with_capacity(functions_block.len());
+    for function in functions_block.iter() {
+        functions.push(import_function(&function)?);
     }
 
     let colors = object.block(0x164, "change colors", 0x2C, 4)?;
@@ -203,6 +280,8 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
         physics: reference(&object, 0x80, "physics", &[crate::vehicle::PHYS])?,
         modifier_shader: reference(&object, 0x90, "modifier shader", &[SHDR])?,
         creation_effect: reference(&object, 0xA0, "creation effect", &[EFFE])?,
+        function_modes: function_modes(cache, index, kind, &object)?,
+        functions,
         attachments,
         change_colors,
         unit_hud: match kind {
@@ -1323,7 +1402,15 @@ mod tests {
         let mut attachment = vec![0u8; 0x48];
         empty(&mut attachment, 0);
         put(&mut attachment, 0x10, b"smoke");
+        put(&mut attachment, 0x30, &shorts(&[3, 0, 2]));
         let attachments = fake.add_data(&attachment);
+        let mut function = vec![0u8; FUNCTION_SIZE];
+        put(&mut function, 0, &ObjectFunction::INVERT.to_le_bytes());
+        put(&mut function, 0x08, &shorts(&[1, 4]));
+        put(&mut function, 0x28, &floats(&[0.25, 0.75]));
+        put(&mut function, 0x36, &(-1i16).to_le_bytes());
+        put(&mut function, 0x144, &0.5f32.to_le_bytes());
+        let functions = fake.add_data(&function);
 
         let mut object = vec![0u8; OBJECT_SIZE];
         put(&mut object, 0, &kind.to_le_bytes());
@@ -1333,7 +1420,9 @@ mod tests {
             empty(&mut object, at);
         }
         put(&mut object, 0x104, &3.0f32.to_le_bytes());
+        put(&mut object, 0x108, &shorts(&[1, 0, 18, 5]));
         block(&mut object, 0x140, 1, attachments);
+        block(&mut object, 0x158, 1, functions);
         block(&mut object, 0x164, 1, colors);
         let index = fake.add_tag(GroupTag::new(b"scen"), "scenery\\rock\\rock", &object);
         fake.set_parent(index, OBJE);
@@ -1354,6 +1443,16 @@ mod tests {
         );
         assert_eq!(object.animation_graph, None);
         assert_eq!(object.attachments[0].marker, "smoke");
+        assert_eq!(object.attachments[0].primary_scale, 3);
+        assert_eq!(object.attachments[0].change_color, 2);
+        assert_eq!(object.function_modes.object, [1, 0, 18, 5]);
+        assert_eq!(object.function_modes.unit, [0; 4]);
+        let function = &object.functions[0];
+        assert_eq!(function.flags, ObjectFunction::INVERT);
+        assert_eq!([function.scale_period_by, function.function], [1, 4]);
+        assert_eq!(function.bounds, [0.25, 0.75]);
+        assert_eq!(function.turn_off_with, -1);
+        assert_eq!(function.one_over_period, 0.5);
         let color = &object.change_colors[0];
         assert_eq!([color.darken_by, color.scale_by], [1, 2]);
         assert_eq!(color.permutations[0].weight, 1.0);

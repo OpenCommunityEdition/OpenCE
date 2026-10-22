@@ -25,9 +25,12 @@ pub const MAX_DEBUG_LABELS: usize = opence_dev::draw::MAX_LABELS;
 /// The bytes of a debug label's text, its end padded with zeros.
 pub const DEBUG_LABEL_BYTES: usize = 48;
 
+/// The most dynamic lights one snapshot holds.
+pub const MAX_LIGHTS: usize = 512;
+
 /// Raised with any change to the snapshot's types, so that the app refuses
 /// a library of another layout.
-pub const SNAPSHOT_VERSION: u32 = 6;
+pub const SNAPSHOT_VERSION: u32 = 7;
 
 /// `ObjectSnapshot::flags`: the first-person weapon or hands, posed from
 /// the camera and drawn in front of the world.
@@ -142,6 +145,47 @@ pub struct ObjectSnapshot {
     pub change_colors: [u32; 4],
 }
 
+/// `LightSnapshot::flags`: it is a cone (else it shines all round).
+pub const LIGHT_SPOT: u32 = 1;
+/// `LightSnapshot::flags`: it makes no highlights.
+pub const LIGHT_NO_SPECULAR: u32 = 1 << 1;
+/// `LightSnapshot::flags`: it is the first-person view's flashlight, at
+/// the camera.
+pub const LIGHT_FIRST_PERSON: u32 = 1 << 2;
+
+/// A dynamic light: a weapon's, a projectile's, an effect's, the
+/// flashlight, a piece of scenery's.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct LightSnapshot {
+    /// Where it is at the last tick.
+    pub position: Vec3,
+    /// How far it reaches.
+    pub radius: f32,
+    /// Where it was at the tick before the last.
+    pub previous: Vec3,
+    /// The cosine of the angle from `forward` its cone ends at.
+    pub cosine_cutoff: f32,
+    /// The way it faces (its gel's x).
+    pub forward: Vec3,
+    /// The cosine of the angle from `forward` its cone starts to fall off
+    /// at.
+    pub cosine_falloff: f32,
+    /// Its gel's up.
+    pub up: Vec3,
+    /// How much farther than its radius its highlights reach.
+    pub specular_radius: f32,
+    /// Its colour, linear.
+    pub color: Vec3,
+    /// Flags (`LIGHT_SPOT` and the rest).
+    pub flags: u32,
+    /// Its tag's index in the map's lights, which its gel is found by.
+    pub light: u32,
+    /// What made it, the same from frame to frame (its object's id and
+    /// attachment, or its effect's number), which keeps its shadow.
+    pub source: u32,
+}
+
 /// A debug line, drawn after the world.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -207,6 +251,12 @@ pub struct FrameSnapshot {
     pub debug_lines: *const DebugLine,
     /// The debug labels, in the same slot.
     pub debug_labels: *const DebugLabel,
+    /// The number of lights in `lights`.
+    pub light_count: u32,
+    /// (zero)
+    pub reserved: u32,
+    /// The dynamic lights, in the same slot.
+    pub lights: *const LightSnapshot,
 }
 
 /// The sizes and offsets of the snapshot's types, as Rust laid them out;
@@ -257,6 +307,12 @@ pub struct SnapshotLayout {
     pub debug_line_size: u32,
     /// The size of `DebugLabel`.
     pub debug_label_size: u32,
+    /// `MAX_LIGHTS`.
+    pub max_lights: u32,
+    /// The offset of `FrameSnapshot::lights`.
+    pub frame_lights_offset: u32,
+    /// The size of `LightSnapshot`.
+    pub light_size: u32,
 }
 
 /// The layout of the snapshot's types.
@@ -288,6 +344,9 @@ pub fn snapshot_layout() -> SnapshotLayout {
         frame_debug_labels_offset: n(offset_of!(FrameSnapshot, debug_labels)),
         debug_line_size: n(size_of::<DebugLine>()),
         debug_label_size: n(size_of::<DebugLabel>()),
+        max_lights: n(MAX_LIGHTS),
+        frame_lights_offset: n(offset_of!(FrameSnapshot, lights)),
+        light_size: n(size_of::<LightSnapshot>()),
     }
 }
 
@@ -300,6 +359,7 @@ struct Slot {
     nodes: [NodeSnapshot; MAX_NODES],
     debug_lines: [DebugLine; MAX_DEBUG_LINES],
     debug_labels: [DebugLabel; MAX_DEBUG_LABELS],
+    lights: [LightSnapshot; MAX_LIGHTS],
 }
 
 impl Slot {
@@ -313,6 +373,7 @@ impl Slot {
         slot.frame.nodes = slot.nodes.as_ptr();
         slot.frame.debug_lines = slot.debug_lines.as_ptr();
         slot.frame.debug_labels = slot.debug_labels.as_ptr();
+        slot.frame.lights = slot.lights.as_ptr();
         slot
     }
 }
@@ -418,6 +479,13 @@ impl FrameBuilder<'_> {
         Ok(())
     }
 
+    /// Adds `lights`, as many as fit.
+    pub fn lights(&mut self, lights: &[LightSnapshot]) {
+        let count = lights.len().min(MAX_LIGHTS);
+        self.slot.lights[..count].copy_from_slice(&lights[..count]);
+        self.slot.frame.light_count = count as u32;
+    }
+
     /// Adds `draw`'s lines and labels, as many as fit.
     pub fn debug(&mut self, draw: &opence_dev::draw::DebugDraw) {
         let vector = |[x, y, z]: [f32; 3]| Vec3 { x, y, z };
@@ -473,6 +541,7 @@ impl SnapshotWriter {
         slot.frame.node_count = 0;
         slot.frame.debug_line_count = 0;
         slot.frame.debug_label_count = 0;
+        slot.frame.light_count = 0;
         let result = fill(&mut FrameBuilder { slot });
         self.slot = buffers.middle.swap(self.slot | FRESH, Ordering::AcqRel) & INDEX;
         result
@@ -526,18 +595,26 @@ mod tests {
         assert_eq!(offset_of!(FrameSnapshot, debug_label_count), 124);
         assert_eq!(offset_of!(FrameSnapshot, debug_lines), 128);
         assert_eq!(offset_of!(FrameSnapshot, debug_labels), 136);
-        assert_eq!(size_of::<FrameSnapshot>(), 144);
+        assert_eq!(offset_of!(FrameSnapshot, light_count), 144);
+        assert_eq!(offset_of!(FrameSnapshot, lights), 152);
+        assert_eq!(size_of::<FrameSnapshot>(), 160);
+        assert_eq!(size_of::<LightSnapshot>(), 88);
+        assert_eq!(offset_of!(LightSnapshot, color), 64);
+        assert_eq!(offset_of!(LightSnapshot, source), 84);
         assert_eq!(align_of::<FrameSnapshot>(), 8);
         assert_eq!(size_of::<DebugLine>(), 28);
         assert_eq!(size_of::<DebugLabel>(), 64);
         assert_eq!(offset_of!(DebugLabel, text), 16);
-        assert_eq!(SNAPSHOT_VERSION, 6);
+        assert_eq!(SNAPSHOT_VERSION, 7);
     }
 
     #[test]
     fn the_layout_record_reports_it() {
         let layout = snapshot_layout();
-        assert_eq!(layout.frame_size, 144);
+        assert_eq!(layout.frame_size, 160);
+        assert_eq!(layout.frame_lights_offset, 152);
+        assert_eq!(layout.light_size, 88);
+        assert_eq!(layout.max_lights, 512);
         assert_eq!(layout.frame_debug_lines_offset, 128);
         assert_eq!(layout.frame_debug_labels_offset, 136);
         assert_eq!(layout.debug_line_size, 28);
@@ -690,6 +767,24 @@ mod tests {
         writer.publish(&buffers, 2, 0.0, |_| ());
         let frame = read(&buffers);
         assert_eq!((frame.debug_line_count, frame.debug_label_count), (0, 0));
+    }
+
+    #[test]
+    fn the_lights_are_copied_up_to_their_capacity() {
+        let (buffers, mut writer) = SnapshotBuffers::new();
+        let light = |radius| LightSnapshot {
+            radius,
+            ..Default::default()
+        };
+        writer.publish(&buffers, 1, 0.0, |frame| {
+            frame.lights(&vec![light(2.0); MAX_LIGHTS + 3]);
+        });
+        let frame = read(&buffers);
+        assert_eq!(frame.light_count as usize, MAX_LIGHTS);
+        // SAFETY: lights points at light_count entries in the same slot.
+        assert_eq!(unsafe { (*frame.lights).radius }, 2.0);
+        writer.publish(&buffers, 2, 0.0, |_| ());
+        assert_eq!(read(&buffers).light_count, 0);
     }
 
     #[test]

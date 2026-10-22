@@ -13,6 +13,7 @@ pub mod globals;
 mod hud;
 pub mod level;
 pub mod level_cache;
+mod light;
 pub mod object;
 pub mod reader;
 pub mod script;

@@ -45,7 +45,7 @@ final class ShadowPass {
     }
 
     private let device: MTLDevice
-    private var pipelines: Pipelines
+    private(set) var pipelines: Pipelines
     private let depthState: MTLDepthStencilState
     /// The level's casters alone, then the level's and the objects' (made
     /// with the first sun; one texel until then).

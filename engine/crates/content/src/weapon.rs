@@ -499,6 +499,8 @@ pub struct Effect {
     /// The particles its events emit that are heavy enough to be bodies
     /// (spent casings and the like), in order.
     pub debris: Vec<EffectDebris>,
+    /// The lights (`ligh`) its events' parts create, in order.
+    pub lights: Vec<TagRef>,
 }
 
 /// An effect's particles heavy enough to be bodies: their point physics

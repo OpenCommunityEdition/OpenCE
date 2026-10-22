@@ -89,6 +89,7 @@ final class ControlServant {
         let camera = ViewCamera(frame.camera, alpha: frame.alpha)
         // (the game's time, at its 60 ticks a second, for the shaders' animations)
         renderer.time = Float((Double(frame.tick) + Double(frame.alpha)) / 60)
+        renderer.lights = frame.drawnLights()
         let width = Int(request.width), height = Int(request.height)
         do {
             let captured = try renderer.capture(width: width, height: height, camera: camera,

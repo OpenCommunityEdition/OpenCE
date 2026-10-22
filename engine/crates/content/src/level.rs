@@ -4,8 +4,8 @@ use rkyv::{Archive, Deserialize, Serialize};
 
 use crate::{
     AnimationGraph, Bitmap, Campaign, CollisionModel, DamageEffect, Effect, Grenade, GrenadeHud,
-    HudDigits, HudGlobals, Model, ObjectDefinition, ObjectKind, Physics, Scripts, Shader, TagRef,
-    UnitHud, WeaponHud,
+    HudDigits, HudGlobals, Light, Model, ObjectDefinition, ObjectKind, Physics, Scripts, Shader,
+    TagRef, UnitHud, WeaponHud,
 };
 
 /// Everything a level's structure is drawn and collided with.
@@ -42,6 +42,8 @@ pub struct Level {
     /// The effects its projectiles detonate with and its weapons' shots
     /// make, by path.
     pub effects: Vec<Effect>,
+    /// The lights its objects carry and its effects make, by path.
+    pub lights: Vec<Light>,
     /// Its units' HUDs, by path.
     pub unit_huds: Vec<UnitHud>,
     /// Its weapons' HUDs, and the HUDs they add to, by path.
@@ -188,6 +190,11 @@ impl Level {
     /// An effect, by its tag.
     pub fn effect(&self, tag: &TagRef) -> Option<&Effect> {
         self.effects.iter().find(|effect| effect.tag == *tag)
+    }
+
+    /// A light, by its tag.
+    pub fn light(&self, tag: &TagRef) -> Option<&Light> {
+        self.lights.iter().find(|light| light.tag == *tag)
     }
 
     /// A collision model, by its tag.

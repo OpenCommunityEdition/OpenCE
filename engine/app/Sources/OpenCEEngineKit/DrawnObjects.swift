@@ -41,6 +41,17 @@ extension FrameView {
         return drawn
     }
 
+    /// The dynamic lights, each where it is between the last two ticks.
+    public func drawnLights() -> [OCELightSnapshot] {
+        let alpha = min(max(alpha.isFinite ? alpha : 1, 0), 1)
+        return lights.map { light in
+            var drawn = light
+            let at = simd_mix(Self.vector(light.previous), Self.vector(light.position), SIMD3(repeating: alpha))
+            drawn.position = OCEVec3(x: at.x, y: at.y, z: at.z)
+            return drawn
+        }
+    }
+
     static func vector(_ value: OCEVec3) -> SIMD3<Float> { SIMD3(value.x, value.y, value.z) }
 
     /// A transform's matrix, `alpha` of the way from `from` to `to`.
