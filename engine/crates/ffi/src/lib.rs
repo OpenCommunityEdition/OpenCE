@@ -125,6 +125,30 @@ impl LevelGeometry {
         }))
     }
 
+    /// The test map, `devmap`: the engine's plane, made over the level of
+    /// the map at `donor` (its pack kept in `cache_folder`) for its
+    /// definitions and its sky, or, without one, with nothing on it under
+    /// a generated sky.
+    #[uniffi::constructor]
+    pub fn devmap(donor: Option<String>, cache_folder: String) -> Result<Arc<Self>, EngineError> {
+        let donor = donor
+            .map(|map| {
+                opence_import::load_level(Path::new(&map), Path::new(&cache_folder))
+                    .map(|loaded| loaded.level)
+                    .map_err(|error| EngineError::Load {
+                        message: error.to_string(),
+                    })
+            })
+            .transpose()?;
+        let level = opence_content::devmap::level(donor.as_ref());
+        let render = RenderLevel::build(&level, 0).ok_or(EngineError::NoBsp { index: 0 })?;
+        Ok(Arc::new(Self {
+            name: opence_content::devmap::NAME.into(),
+            level: render,
+            content: Arc::new(level),
+        }))
+    }
+
     /// The map's name (its file's, without .map).
     pub fn name(&self) -> String {
         self.name.clone()

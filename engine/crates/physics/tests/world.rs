@@ -347,3 +347,34 @@ fn bloodgulchs_ground_is_under_the_trace_start() -> Result<(), Box<dyn Error>> {
     assert!(hit.normal.z > 0.7, "the ground's normal {}", hit.normal);
     Ok(())
 }
+
+#[test]
+fn the_devmaps_plane_is_solid_to_its_edges() -> Result<(), PhysicsError> {
+    let plane = opence_content::devmap::plane(80.0, 32);
+    let mesh = LevelMesh::from_collision(&plane.collision);
+    assert_eq!(mesh.triangles.len(), 2);
+    let mut world = World::new(WorldSettings::default())?;
+    world.set_level(&mesh)?;
+    for (x, y) in [(0.0, 0.0), (79.5, -79.5), (-40.0, 60.0)] {
+        let hit = world
+            .cast_ray(Vec3::new(x, y, 2.0), Vec3::new(0.0, 0.0, -4.0), Layers::ALL)?
+            .ok_or(PhysicsError::Refused)?;
+        assert_eq!(hit.struck, Struck::Level);
+        assert!(
+            hit.point.abs_diff_eq(Vec3::new(x, y, 0.0), 1e-3),
+            "{}",
+            hit.point
+        );
+        assert!(hit.normal.abs_diff_eq(Vec3::Z, 1e-4), "{}", hit.normal);
+    }
+    // (past its edge, nothing)
+    assert_eq!(
+        world.cast_ray(
+            Vec3::new(81.0, 0.0, 2.0),
+            Vec3::new(0.0, 0.0, -4.0),
+            Layers::ALL
+        )?,
+        None
+    );
+    Ok(())
+}

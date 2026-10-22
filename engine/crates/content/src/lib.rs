@@ -5,6 +5,7 @@
 
 pub mod bitmap;
 pub mod campaign;
+pub mod devmap;
 pub mod hud;
 pub mod level;
 pub mod object;
