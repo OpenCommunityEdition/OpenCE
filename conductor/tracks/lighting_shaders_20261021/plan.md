@@ -18,7 +18,7 @@
     - [ ] `sotr`, `sgla`, `smet`, `spla`, `swat`, lit `schi`/`scex`; the transparent passes on models and the level
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Why some maps are flat, and the shader model' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 2: The bake
+## Phase 2: The bake [checkpoint: 4959ec66]
 - [x] Task: The bake's inputs 2756e640
     - [x] Write tests: sky lights, ambient colours, shader radiosity properties and the sun read from the tags into the bake's scene
     - [x] The bake scene: the BSP's triangles in a bounding-volume hierarchy, the materials, the lights
