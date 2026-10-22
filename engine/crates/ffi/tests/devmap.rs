@@ -21,15 +21,15 @@ fn the_plane_is_drawn_with_the_grid_under_a_generated_sky() -> Result {
     let geometry = LevelGeometry::devmap(None, cache()?)?;
     assert_eq!(geometry.name(), "devmap");
     let draws = geometry.draws();
-    assert_eq!(draws.len(), 1);
+    // (the plane, then the ramps and the slope)
+    assert_eq!(draws.len(), 2);
     let material = &geometry.materials()[draws[0].material as usize];
     assert_eq!(material.kind, MaterialKind::Opaque);
     let texture = material.base_map.ok_or("no grid")?;
     assert_eq!(geometry.textures()[texture as usize].width, 64);
     assert!(!geometry.texture_level(texture, 6).is_empty());
-    assert_eq!(geometry.bounds(), vec![-80.0, 80.0, -80.0, 80.0, 0.0, 0.0]);
-    let indices = geometry.indices().len() / 4;
-    assert_eq!(indices, 32 * 32 * 6);
+    assert_eq!(geometry.bounds(), vec![-80.0, 80.0, -80.0, 80.0, 0.0, 8.0]);
+    assert_eq!(draws[0].index_count, 32 * 32 * 6);
     // the sky: no model, its fog the horizon behind the plane
     let sky = geometry.sky().ok_or("no sky")?;
     assert_eq!(sky.model, None);

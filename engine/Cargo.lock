@@ -902,6 +902,7 @@ dependencies = [
 name = "opence_content"
 version = "0.1.0"
 dependencies = [
+ "libm",
  "rkyv",
  "thiserror",
 ]

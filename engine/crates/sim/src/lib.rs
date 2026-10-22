@@ -10,6 +10,7 @@
 pub mod animation;
 pub mod armory;
 pub mod clock;
+pub mod crates;
 pub mod damage;
 pub mod debris;
 pub mod first_person;
@@ -176,6 +177,8 @@ pub struct Simulation {
     ragdolls: ragdoll::Ragdolls,
     /// The spent casings, in the player's physics world.
     debris: debris::Debris,
+    /// The physics station's crates, in the player's physics world.
+    crates: crates::Crates,
     /// Detonations to do in the next tick (a script's).
     queued_detonations: Vec<projectile::Detonation>,
     /// The vehicles, and the seat the player sits in.
@@ -242,6 +245,7 @@ impl Simulation {
             first_person: first_person::FirstPersonWeapon::default(),
             ragdolls: ragdoll::Ragdolls::default(),
             debris: debris::Debris::default(),
+            crates: crates::Crates::default(),
             queued_detonations: Vec::new(),
             rides: seats::Rides::default(),
             actors: Vec::new(),
@@ -386,11 +390,12 @@ impl Simulation {
         for ejection in ejections {
             self.debris.eject(physics, ejection);
         }
-        if ragdolls || self.debris.moving() {
+        if ragdolls || self.debris.moving() || self.crates.moving() {
             // (a step the physics refuses leaves them where they were)
             let _ = physics.step(clock::TICK.0);
             self.ragdolls.settle(&mut self.world, physics);
             self.debris.settle(physics);
+            self.crates.settle(physics);
         }
     }
 
@@ -460,6 +465,7 @@ impl Simulation {
         // casings with it)
         self.ragdolls = self.ragdolls.for_level(level);
         self.debris = self.debris.for_level(level);
+        self.crates.forget();
         self.queued_detonations.clear();
         self.place_player_camera();
         self.update_first_person();
@@ -668,6 +674,32 @@ impl Simulation {
     /// The spent casings.
     pub fn debris(&self) -> &debris::Debris {
         &self.debris
+    }
+
+    /// The crates dropped.
+    pub fn crates(&self) -> &crates::Crates {
+        &self.crates
+    }
+
+    /// Drops a crate of `half_extents` at `position`, turned by
+    /// `rotation`, into the player's physics world; false without a
+    /// player, past the most crates, or for a size the physics refuses.
+    pub fn drop_crate(&mut self, position: Vec3, rotation: Quat, half_extents: Vec3) -> bool {
+        let Some(player) = self.players.first() else {
+            return false;
+        };
+        let mut physics = player.physics();
+        self.crates
+            .drop_crate(&mut physics, position, rotation, half_extents)
+    }
+
+    /// Removes every crate.
+    pub fn clear_crates(&mut self) {
+        let Some(player) = self.players.first() else {
+            return;
+        };
+        let mut physics = player.physics();
+        self.crates.clear(&mut physics);
     }
 
     /// Sets the most casings kept; the oldest goes first.

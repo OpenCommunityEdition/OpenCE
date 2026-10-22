@@ -1,0 +1,1019 @@
+//! The test map's stations (`station <name> [filter]`): tests the engine
+//! runs by itself on the test map, each from its spot behind the start
+//! (`opence_content::devmap::STATIONS`). A station drives the player as a
+//! person at the keyboard would, for as many ticks as it needs, and writes
+//! what it measured into the world (debug text) and into its results,
+//! which `station` alone shows.
+//!
+//! - `weapons`: fires each weapon at three targets for a few seconds: its
+//!   shots, the damage they did, its heat.
+//! - `vehicles`: drives each vehicle round the course and over its ramps:
+//!   its lap time, top speed and how high it went.
+//! - `animation`: plays each animation of a biped's graph in turn, named.
+//! - `doors`: moves every device through its positions, back and forth.
+//! - `physics`: drops a pile of crates onto the slope, until they lie
+//!   still.
+//!
+//! The filter keeps the weapons, vehicles, animations or devices whose
+//! name has it in it.
+
+use std::sync::Arc;
+
+use opence_content::devmap::{self, Station};
+use opence_content::{Level, ObjectKind, TagRef};
+use opence_dev::draw::{Color, DebugDraw, Layer};
+use opence_dev::{Args, CommandError, Data, Output};
+use opence_sim::animation::{AnimationPlayer, AnimationState};
+use opence_sim::clock::TICKS_PER_SECOND;
+use opence_sim::input::{Buttons, TickInput};
+use opence_sim::objects::{ObjectHandle, ObjectSpawn};
+use opence_sim::units::Radians;
+use opence_sim::{Quat, Simulation, Transform, Vec3};
+use serde_json::json;
+
+use crate::{State, Wardrobe};
+
+/// The most the player turns in a tick, in radians.
+const TURN_MAX: f32 = 0.25;
+/// The ticks a weapon is given to be ready before it fires.
+const READY_TICKS: u32 = 45;
+/// The ticks a weapon fires for.
+const FIRE_TICKS: u32 = 3 * TICKS_PER_SECOND;
+/// The ticks after a weapon stops, for its last shots to land.
+const PAUSE_TICKS: u32 = TICKS_PER_SECOND;
+/// The ticks the trigger is held for before it is let go for one (a
+/// weapon that fires once a pull fires again).
+const HOLD_TICKS: u32 = 8;
+/// Where the weapons' targets stand.
+const TARGETS: [[f32; 2]; 3] = [[-20.0, -18.0], [-20.0, -15.0], [-20.0, -12.0]];
+/// How high on a target the weapons aim.
+const CHEST: f32 = 0.45;
+/// The longest a lap may take.
+const LAP_TICKS: u32 = 40 * TICKS_PER_SECOND;
+/// How near a corner of the course a vehicle has reached it.
+const ARRIVED: f32 = 6.0;
+/// The longest the player may take to leave a vehicle.
+const LEAVE_TICKS: u32 = 3 * TICKS_PER_SECOND;
+/// Where the animation station's biped stands.
+const DUMMY: [f32; 2] = [-14.0, -62.0];
+/// The fewest and the most ticks an animation is shown for.
+const ANIMATION_TICKS: [u32; 2] = [TICKS_PER_SECOND / 2, 10 * TICKS_PER_SECOND];
+/// The animations' frames a second.
+const FRAMES_PER_SECOND: u32 = 30;
+/// Where the devices stand in a row, along y.
+const DEVICES_X: f32 = -18.0;
+/// The ticks a device takes to go from closed to open and back.
+const DEVICE_CYCLE_TICKS: u32 = 4 * TICKS_PER_SECOND;
+/// How many times the devices go back and forth.
+const DEVICE_CYCLES: u32 = 2;
+/// The crates dropped.
+const CRATES: usize = 12;
+/// Half a crate's size.
+const CRATE_HALF: f32 = 0.5;
+/// The longest the crates may take to lie still.
+const SETTLE_TICKS: u32 = 30 * TICKS_PER_SECOND;
+
+/// A station running.
+#[derive(Debug)]
+pub(crate) struct Run {
+    station: &'static Station,
+    /// The level it runs on: another level stops it.
+    level: Arc<Level>,
+    drive: Drive,
+    /// The ticks it has run.
+    ticks: u32,
+    /// What it measured, one entry for each thing it tested.
+    results: Vec<Data>,
+    /// What it is doing, or how it ended.
+    status: String,
+    done: bool,
+}
+
+#[derive(Debug)]
+enum Drive {
+    Weapons(Weapons),
+    Vehicles(Vehicles),
+    Animation(Animations),
+    Doors(Doors),
+    Physics(Physics),
+}
+
+impl Run {
+    /// The input for the next tick: the station's, while it runs.
+    pub(crate) fn input(&mut self, simulation: &Simulation) -> Option<TickInput> {
+        if self.done {
+            return None;
+        }
+        Some(match &mut self.drive {
+            Drive::Weapons(weapons) => weapons.input(simulation),
+            Drive::Vehicles(vehicles) => vehicles.input(simulation),
+            Drive::Animation(_) | Drive::Doors(_) | Drive::Physics(_) => {
+                face(simulation, self.station.facing)
+            }
+        })
+    }
+
+    /// After a tick: what the tick did, and the station's next step.
+    pub(crate) fn after_tick(
+        &mut self,
+        simulation: &mut Simulation,
+        level: &Arc<Level>,
+        draw: &mut DebugDraw,
+    ) {
+        if self.done {
+            return;
+        }
+        if !Arc::ptr_eq(level, &self.level) || simulation.player().is_none() {
+            self.finish("stopped: the world changed");
+            return;
+        }
+        self.ticks = self.ticks.saturating_add(1);
+        let mut report = Report {
+            results: &mut self.results,
+            draw,
+            status: None,
+        };
+        let finished = match &mut self.drive {
+            Drive::Weapons(weapons) => weapons.after_tick(simulation, level, &mut report),
+            Drive::Vehicles(vehicles) => vehicles.after_tick(simulation, level, &mut report),
+            Drive::Animation(animations) => animations.after_tick(simulation, &mut report),
+            Drive::Doors(doors) => doors.after_tick(simulation, &mut report),
+            Drive::Physics(physics) => physics.after_tick(simulation, &mut report),
+        };
+        if let Some(status) = report.status {
+            self.status = status;
+        }
+        if finished {
+            let tested = self.results.len();
+            self.finish(&format!("done: {tested} tested"));
+        }
+    }
+
+    fn finish(&mut self, status: &str) {
+        self.done = true;
+        self.status = format!("{} {status}", self.station.name);
+        opence_dev::logbook::record(opence_dev::logbook::Level::Info, "station", &self.status);
+    }
+
+    /// What it measured, and whether it is done.
+    fn summary(&self) -> Data {
+        json!({
+            "station": self.station.name,
+            "done": self.done,
+            "ticks": self.ticks,
+            "status": self.status,
+            "results": self.results,
+        })
+    }
+}
+
+/// What a tick's step reports: results, shapes, its status.
+struct Report<'a> {
+    results: &'a mut Vec<Data>,
+    draw: &'a mut DebugDraw,
+    status: Option<String>,
+}
+
+impl Report<'_> {
+    fn label(&mut self, at: Vec3, text: &str, ticks: u32) {
+        self.draw
+            .text(Layer::General, at.to_array(), text, Color::YELLOW, ticks);
+    }
+}
+
+/// `station [name] [filter]`: alone, the stations and the one running;
+/// `station stop` stops it.
+pub(crate) fn command(state: &mut State, args: &Args) -> Result<Output, CommandError> {
+    let name = args.string_or("name", "")?.to_owned();
+    let filter = args.string_or("filter", "")?.to_lowercase();
+    if name.is_empty() {
+        let running = state.shell.station.as_ref().map(Run::summary);
+        let mut text = devmap::STATIONS
+            .iter()
+            .map(|station| format!("{:<10} {}", station.name, station.help))
+            .collect::<Vec<_>>()
+            .join("\n");
+        if let Some(run) = &state.shell.station {
+            text.push_str(&format!("\n{} ({} ticks)", run.status, run.ticks));
+        }
+        let names: Vec<&str> = devmap::STATIONS
+            .iter()
+            .map(|station| station.name)
+            .collect();
+        return Ok(Output::with_data(
+            text,
+            json!({ "stations": names, "run": running }),
+        ));
+    }
+    if name == "stop" {
+        return match state.shell.station.take() {
+            Some(run) => Ok(Output::with_data(
+                format!("stopped {}", run.station.name),
+                run.summary(),
+            )),
+            None => Err(failed("no station is running")),
+        };
+    }
+    let station = devmap::station(&name).ok_or_else(|| {
+        let names: Vec<&str> = devmap::STATIONS
+            .iter()
+            .map(|station| station.name)
+            .collect();
+        failed(format!(
+            "no station `{name}`: there are {}",
+            names.join(", ")
+        ))
+    })?;
+    let running = state
+        .running
+        .as_mut()
+        .ok_or_else(|| failed("no world is running"))?;
+    let level = running
+        .level
+        .clone()
+        .ok_or_else(|| failed("the world has no level"))?;
+    if level.scenario.path != devmap::NAME {
+        return Err(failed("the stations are on the test map: `map devmap`"));
+    }
+    if running.network.is_some() || running.campaign.is_some() {
+        return Err(failed("a station runs without a network game or a mission"));
+    }
+    let simulation = &mut running.simulation;
+    let player = simulation
+        .player()
+        .ok_or_else(|| failed("there is no player"))?;
+    if player.seated().is_some() {
+        return Err(failed("the player is seated: leave the vehicle first"));
+    }
+    let [x, y] = station.at;
+    if !simulation.teleport_player(0, Vec3::new(x, y, 0.1)) {
+        return Err(failed("the player could not be moved to the station"));
+    }
+    let drive = match station.name {
+        "weapons" => Drive::Weapons(Weapons::new(simulation, &level, &filter)),
+        "vehicles" => Drive::Vehicles(Vehicles::new(&level, &filter)),
+        "animation" => Drive::Animation(Animations::new(simulation, &level, &filter)),
+        "doors" => Drive::Doors(Doors::new(simulation, &level, &filter)),
+        _ => Drive::Physics(Physics::new(simulation)),
+    };
+    let count = drive.count();
+    let run = Run {
+        station,
+        level,
+        drive,
+        ticks: 0,
+        results: Vec::new(),
+        status: format!("{} running: {count} to test", station.name),
+        done: false,
+    };
+    let text = run.status.clone();
+    let data = run.summary();
+    state.shell.station = Some(run);
+    Ok(Output::with_data(text, data))
+}
+
+fn failed(text: impl Into<String>) -> CommandError {
+    CommandError::Failed(text.into())
+}
+
+impl Drive {
+    /// How many things it tests.
+    fn count(&self) -> usize {
+        match self {
+            Drive::Weapons(weapons) => weapons.weapons.len(),
+            Drive::Vehicles(vehicles) => vehicles.vehicles.len(),
+            Drive::Animation(animations) => animations.animations.len(),
+            Drive::Doors(doors) => doors.devices.len(),
+            Drive::Physics(_) => CRATES,
+        }
+    }
+}
+
+/// The last part of a tag's path: its name.
+fn short(tag: &TagRef) -> &str {
+    tag.path.rsplit('\\').next().unwrap_or(&tag.path)
+}
+
+/// The level's definitions of `kinds` whose path has `filter` in it.
+fn definitions(level: &Level, kinds: &[ObjectKind], filter: &str) -> Vec<TagRef> {
+    level
+        .objects
+        .iter()
+        .filter(|object| kinds.contains(&object.kind))
+        .filter(|object| object.tag.path.to_lowercase().contains(filter))
+        .map(|object| object.tag.clone())
+        .collect()
+}
+
+/// Makes an object of `tag` at `position` facing `yaw`, dressed.
+fn place(
+    simulation: &mut Simulation,
+    level: &Level,
+    tag: &TagRef,
+    position: Vec3,
+    yaw: f32,
+) -> Option<ObjectHandle> {
+    let kind = level.object(tag)?.kind;
+    let handle = simulation
+        .spawn(ObjectSpawn {
+            kind,
+            tag: tag.clone(),
+            transform: Transform {
+                position,
+                rotation: Quat::from_rotation_z(yaw),
+                scale: 1.0,
+            },
+            name: None,
+            permutation: None,
+            team: None,
+        })
+        .ok()?;
+    Wardrobe::default().dress(simulation, level, handle);
+    Some(handle)
+}
+
+/// The player's own biped's tag.
+fn player_biped(simulation: &Simulation) -> Option<TagRef> {
+    let handle = simulation.player()?.handle();
+    Some(simulation.object(handle)?.tag)
+}
+
+/// The turn toward `yaw` and `pitch` from where the player looks, at most
+/// [`TURN_MAX`] a tick.
+fn turn_toward(simulation: &Simulation, yaw: f32, pitch: f32) -> (Radians, Radians) {
+    let Some(player) = simulation.player() else {
+        return (Radians(0.0), Radians(0.0));
+    };
+    let (Radians(now_yaw), Radians(now_pitch)) = player.look();
+    let yaw = libm::remainderf(yaw - now_yaw, std::f32::consts::TAU).clamp(-TURN_MAX, TURN_MAX);
+    let pitch = (pitch - now_pitch).clamp(-TURN_MAX, TURN_MAX);
+    (Radians(yaw), Radians(pitch))
+}
+
+/// Standing still, turning to face `yaw`, looking level.
+fn face(simulation: &Simulation, yaw: f32) -> TickInput {
+    let (yaw, pitch) = turn_toward(simulation, yaw, 0.0);
+    TickInput {
+        yaw,
+        pitch,
+        ..TickInput::default()
+    }
+}
+
+/// The yaw and pitch from `from` to `to`.
+fn angles_to(from: Vec3, to: Vec3) -> (f32, f32) {
+    let way = to - from;
+    let flat = libm::hypotf(way.x, way.y);
+    (libm::atan2f(way.y, way.x), libm::atan2f(way.z, flat))
+}
+
+/// The weapons station: each weapon given, aimed at the targets and fired.
+#[derive(Debug)]
+struct Weapons {
+    weapons: Vec<TagRef>,
+    at: usize,
+    phase: WeaponPhase,
+    phase_ticks: u32,
+    target: Option<TagRef>,
+    targets: Vec<ObjectHandle>,
+    tally: Tally,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WeaponPhase {
+    Arm,
+    Ready,
+    Fire,
+    Pause,
+}
+
+/// What a weapon did.
+#[derive(Clone, Copy, Debug, Default)]
+struct Tally {
+    /// The ticks it fired in.
+    shots: u32,
+    damage: f32,
+    heat: f32,
+    kills: u32,
+}
+
+impl Weapons {
+    fn new(simulation: &Simulation, level: &Level, filter: &str) -> Weapons {
+        Weapons {
+            weapons: definitions(level, &[ObjectKind::Weapon], filter),
+            at: 0,
+            phase: WeaponPhase::Arm,
+            phase_ticks: 0,
+            target: player_biped(simulation),
+            targets: Vec::new(),
+            tally: Tally::default(),
+        }
+    }
+
+    fn aim(simulation: &Simulation) -> (f32, f32) {
+        let eyes = simulation
+            .player()
+            .map_or(Vec3::ZERO, |player| player.eyes());
+        let [x, y] = TARGETS[1];
+        angles_to(eyes, Vec3::new(x, y, CHEST))
+    }
+
+    fn input(&self, simulation: &Simulation) -> TickInput {
+        let (yaw, pitch) = Weapons::aim(simulation);
+        let (yaw, pitch) = turn_toward(simulation, yaw, pitch);
+        let firing =
+            self.phase == WeaponPhase::Fire && !self.phase_ticks.is_multiple_of(HOLD_TICKS + 1);
+        TickInput {
+            buttons: if firing { Buttons::FIRE } else { Buttons(0) },
+            yaw,
+            pitch,
+            ..TickInput::default()
+        }
+    }
+
+    fn after_tick(
+        &mut self,
+        simulation: &mut Simulation,
+        level: &Level,
+        report: &mut Report<'_>,
+    ) -> bool {
+        self.phase_ticks += 1;
+        if matches!(self.phase, WeaponPhase::Fire | WeaponPhase::Pause) {
+            self.count(simulation);
+        }
+        match self.phase {
+            WeaponPhase::Arm => return self.arm(simulation, level, report),
+            WeaponPhase::Ready if self.phase_ticks >= READY_TICKS => {
+                self.next(WeaponPhase::Fire);
+            }
+            WeaponPhase::Fire if self.phase_ticks >= FIRE_TICKS => {
+                self.next(WeaponPhase::Pause);
+            }
+            WeaponPhase::Pause if self.phase_ticks >= PAUSE_TICKS => {
+                self.record(report);
+                self.at += 1;
+                self.next(WeaponPhase::Arm);
+            }
+            _ => {}
+        }
+        false
+    }
+
+    fn next(&mut self, phase: WeaponPhase) {
+        self.phase = phase;
+        self.phase_ticks = 0;
+    }
+
+    /// Arms the next weapon that can be carried, with fresh targets; true
+    /// when there are none left.
+    fn arm(&mut self, simulation: &mut Simulation, level: &Level, report: &mut Report<'_>) -> bool {
+        for target in self.targets.drain(..) {
+            simulation.remove(target);
+        }
+        while let Some(weapon) = self.weapons.get(self.at) {
+            if simulation.give_weapon(weapon) {
+                if let Some(tag) = &self.target {
+                    for [x, y] in TARGETS {
+                        let at = Vec3::new(x, y, 0.0);
+                        if let Some(handle) = place(simulation, level, tag, at, 0.0) {
+                            self.targets.push(handle);
+                        }
+                    }
+                }
+                self.tally = Tally::default();
+                report.status = Some(format!(
+                    "weapons: {} ({}/{})",
+                    short(weapon),
+                    self.at + 1,
+                    self.weapons.len()
+                ));
+                self.next(WeaponPhase::Ready);
+                return false;
+            }
+            report.results.push(json!({
+                "weapon": weapon.path,
+                "error": "the player cannot carry it",
+            }));
+            self.at += 1;
+        }
+        true
+    }
+
+    /// The tick's shot, damage and heat.
+    fn count(&mut self, simulation: &Simulation) {
+        let Some(player) = simulation.player() else {
+            return;
+        };
+        let own = player.handle();
+        if let Some((_, state)) = player.weapon() {
+            if self.phase == WeaponPhase::Fire
+                && state.triggers.iter().any(|trigger| trigger.idle_ticks == 0)
+            {
+                self.tally.shots += 1;
+            }
+            self.tally.heat = self.tally.heat.max(state.heat);
+        }
+        for event in simulation.damage_events() {
+            if event.owner == Some(own) && event.object != own {
+                self.tally.damage += event.outcome.shield + event.outcome.body;
+                self.tally.kills += u32::from(event.outcome.killed);
+            }
+        }
+    }
+
+    fn record(&mut self, report: &mut Report<'_>) {
+        let Some(weapon) = self.weapons.get(self.at) else {
+            return;
+        };
+        let Tally {
+            shots,
+            damage,
+            heat,
+            kills,
+        } = self.tally;
+        let seconds = FIRE_TICKS as f32 / TICKS_PER_SECOND as f32;
+        let [x, y] = TARGETS[1];
+        report.label(
+            Vec3::new(x, y, 1.2),
+            &format!(
+                "{}: {shots} shots, {damage:.2} damage, heat {heat:.2}, {kills} killed",
+                short(weapon)
+            ),
+            3 * TICKS_PER_SECOND,
+        );
+        report.results.push(json!({
+            "weapon": weapon.path,
+            "shots": shots,
+            "shots_a_second": shots as f32 / seconds,
+            "damage": damage,
+            "heat": heat,
+            "kills": kills,
+        }));
+    }
+}
+
+/// The vehicles station: each vehicle driven round the course.
+#[derive(Debug)]
+struct Vehicles {
+    vehicles: Vec<TagRef>,
+    at: usize,
+    phase: VehiclePhase,
+    phase_ticks: u32,
+    vehicle: Option<ObjectHandle>,
+    /// The corner of the course it drives to next, from the second.
+    corner: usize,
+    last: Option<Vec3>,
+    top_speed: f32,
+    top_height: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum VehiclePhase {
+    Board,
+    Drive,
+    Leave,
+}
+
+impl Vehicles {
+    fn new(level: &Level, filter: &str) -> Vehicles {
+        Vehicles {
+            vehicles: definitions(level, &[ObjectKind::Vehicle], filter),
+            at: 0,
+            phase: VehiclePhase::Board,
+            phase_ticks: 0,
+            vehicle: None,
+            corner: 1,
+            last: None,
+            top_speed: 0.0,
+            top_height: 0.0,
+        }
+    }
+
+    /// The corner driven to: the course's next, then its first again.
+    fn goal(&self) -> Vec3 {
+        let [x, y] = devmap::COURSE[self.corner % devmap::COURSE.len()];
+        Vec3::new(x, y, 0.0)
+    }
+
+    fn input(&self, simulation: &Simulation) -> TickInput {
+        let at = self
+            .vehicle
+            .and_then(|vehicle| simulation.transform(vehicle))
+            .map_or(Vec3::ZERO, |transform| transform.position);
+        match self.phase {
+            VehiclePhase::Drive => {
+                let (yaw, _) = angles_to(at, self.goal());
+                let (yaw, pitch) = turn_toward(simulation, yaw, -0.1);
+                TickInput {
+                    forward: 127,
+                    yaw,
+                    pitch,
+                    ..TickInput::default()
+                }
+            }
+            VehiclePhase::Leave => TickInput {
+                buttons: Buttons::ACTION,
+                ..TickInput::default()
+            },
+            VehiclePhase::Board => TickInput::default(),
+        }
+    }
+
+    fn next(&mut self, phase: VehiclePhase) {
+        self.phase = phase;
+        self.phase_ticks = 0;
+    }
+
+    fn after_tick(
+        &mut self,
+        simulation: &mut Simulation,
+        level: &Level,
+        report: &mut Report<'_>,
+    ) -> bool {
+        self.phase_ticks += 1;
+        match self.phase {
+            VehiclePhase::Board => return self.board(simulation, level, report),
+            VehiclePhase::Drive => self.drive(simulation, report),
+            VehiclePhase::Leave => {
+                let seated = simulation
+                    .player()
+                    .is_some_and(|player| player.seated().is_some());
+                if !seated {
+                    if let Some(vehicle) = self.vehicle.take() {
+                        simulation.remove(vehicle);
+                    }
+                    self.at += 1;
+                    self.next(VehiclePhase::Board);
+                } else if self.phase_ticks >= LEAVE_TICKS {
+                    report.status = Some("vehicles: the player could not leave".into());
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Places the next vehicle at the course's start, and on the tick
+    /// after (when the world has taken it as a vehicle) seats the player
+    /// in it; true when there are none left.
+    fn board(
+        &mut self,
+        simulation: &mut Simulation,
+        level: &Level,
+        report: &mut Report<'_>,
+    ) -> bool {
+        let [x, y] = devmap::COURSE[0];
+        let start = Vec3::new(x, y, 0.3);
+        let facing = devmap::station("vehicles").map_or(0.0, |station| station.facing);
+        while let Some(tag) = self.vehicles.get(self.at) {
+            match self.vehicle.take() {
+                None => {
+                    if let Some(vehicle) = place(simulation, level, tag, start, facing) {
+                        self.vehicle = Some(vehicle);
+                        return false;
+                    }
+                }
+                Some(vehicle) if simulation.enter_vehicle(vehicle, 0) => {
+                    self.vehicle = Some(vehicle);
+                    self.corner = 1;
+                    self.last = None;
+                    self.top_speed = 0.0;
+                    self.top_height = 0.0;
+                    report.status = Some(format!(
+                        "vehicles: {} ({}/{})",
+                        short(tag),
+                        self.at + 1,
+                        self.vehicles.len()
+                    ));
+                    self.next(VehiclePhase::Drive);
+                    return false;
+                }
+                Some(vehicle) => {
+                    simulation.remove(vehicle);
+                }
+            }
+            report.results.push(json!({
+                "vehicle": tag.path,
+                "error": "the player cannot drive it",
+            }));
+            self.at += 1;
+        }
+        true
+    }
+
+    fn drive(&mut self, simulation: &Simulation, report: &mut Report<'_>) {
+        let Some(at) = self
+            .vehicle
+            .and_then(|vehicle| simulation.transform(vehicle))
+            .map(|transform| transform.position)
+        else {
+            self.lap(report, "the vehicle went");
+            return;
+        };
+        if let Some(last) = self.last {
+            self.top_speed = self
+                .top_speed
+                .max(at.distance(last) * TICKS_PER_SECOND as f32);
+        }
+        self.last = Some(at);
+        self.top_height = self.top_height.max(at.z);
+        let goal = self.goal();
+        report.draw.line(
+            Layer::General,
+            at.to_array(),
+            goal.to_array(),
+            Color::GREEN,
+            1,
+        );
+        if libm::hypotf(goal.x - at.x, goal.y - at.y) < ARRIVED {
+            self.corner += 1;
+            if self.corner > devmap::COURSE.len() {
+                self.lap(report, "");
+                return;
+            }
+        }
+        if self.phase_ticks >= LAP_TICKS {
+            self.lap(report, "the lap took too long");
+        }
+    }
+
+    fn lap(&mut self, report: &mut Report<'_>, error: &str) {
+        let Some(tag) = self.vehicles.get(self.at) else {
+            return;
+        };
+        let seconds = self.phase_ticks as f32 / TICKS_PER_SECOND as f32;
+        let mut result = json!({
+            "vehicle": tag.path,
+            "lap_seconds": seconds,
+            "corners": self.corner - 1,
+            "top_speed": self.top_speed,
+            "top_height": self.top_height,
+        });
+        let text = if error.is_empty() {
+            format!(
+                "{}: lap {seconds:.1} s, top speed {:.1}, {:.2} high",
+                short(tag),
+                self.top_speed,
+                self.top_height
+            )
+        } else {
+            result["error"] = json!(error);
+            format!("{}: {error}", short(tag))
+        };
+        let [x, y] = devmap::COURSE[0];
+        report.label(Vec3::new(x, y, 2.0), &text, 3 * TICKS_PER_SECOND);
+        report.results.push(result);
+        self.next(VehiclePhase::Leave);
+    }
+}
+
+/// The animation station: a biped's animations, each in turn.
+#[derive(Debug)]
+struct Animations {
+    biped: Option<ObjectHandle>,
+    player: Option<AnimationPlayer>,
+    /// The animations shown, by their index in the graph.
+    animations: Vec<u16>,
+    at: usize,
+    shown: u32,
+}
+
+impl Animations {
+    fn new(simulation: &mut Simulation, level: &Level, filter: &str) -> Animations {
+        let [x, y] = DUMMY;
+        let biped = player_biped(simulation)
+            .and_then(|tag| place(simulation, level, &tag, Vec3::new(x, y, 0.0), 0.0));
+        let player = biped.and_then(|biped| simulation.component::<AnimationPlayer>(biped));
+        let animations = player
+            .as_ref()
+            .map(|player| {
+                (0..player.graph.animations.len())
+                    .filter_map(|index| u16::try_from(index).ok())
+                    .filter(|&index| {
+                        player.graph.animations[usize::from(index)]
+                            .name
+                            .to_lowercase()
+                            .contains(filter)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Animations {
+            biped,
+            player,
+            animations,
+            at: 0,
+            shown: 0,
+        }
+    }
+
+    fn after_tick(&mut self, simulation: &mut Simulation, report: &mut Report<'_>) -> bool {
+        let (Some(biped), Some(player)) = (self.biped, &mut self.player) else {
+            return true;
+        };
+        let Some(&index) = self.animations.get(self.at) else {
+            return true;
+        };
+        let Some(animation) = player.graph.animations.get(usize::from(index)) else {
+            return true;
+        };
+        let frames = u32::from(animation.frame_count.max(1));
+        let ticks = (frames * TICKS_PER_SECOND / FRAMES_PER_SECOND)
+            .clamp(ANIMATION_TICKS[0], ANIMATION_TICKS[1]);
+        let frame = (self.shown * FRAMES_PER_SECOND / TICKS_PER_SECOND).min(frames - 1);
+        player.state = AnimationState {
+            animation: index,
+            frame: u16::try_from(frame).unwrap_or(0),
+        };
+        let name = animation.name.clone();
+        simulation.animate(biped, player.clone());
+        if self.shown == 0 {
+            let [x, y] = DUMMY;
+            let text = format!("{}/{} {name}", self.at + 1, self.animations.len());
+            report.label(Vec3::new(x, y, 1.0), &text, ticks);
+            report.status = Some(format!("animation: {text}"));
+        }
+        self.shown += 1;
+        if self.shown >= ticks {
+            report.results.push(json!({
+                "index": index,
+                "name": name,
+                "frames": frames,
+            }));
+            self.at += 1;
+            self.shown = 0;
+        }
+        self.at >= self.animations.len()
+    }
+}
+
+/// The doors station: every device, moved through its positions.
+#[derive(Debug)]
+struct Doors {
+    devices: Vec<Device>,
+    ticks: u32,
+}
+
+#[derive(Debug)]
+struct Device {
+    tag: TagRef,
+    handle: ObjectHandle,
+    player: AnimationPlayer,
+    animation: u16,
+    frames: u16,
+}
+
+impl Doors {
+    fn new(simulation: &mut Simulation, level: &Level, filter: &str) -> Doors {
+        let tags = definitions(level, &[ObjectKind::Machine, ObjectKind::Control], filter);
+        let spacing = |tag: &TagRef| {
+            level.object(tag).map_or(2.0, |object| {
+                (2.0 * object.bounding_radius).clamp(2.0, 12.0)
+            })
+        };
+        // (in a row along y, centred on the station)
+        let length: f32 = tags.iter().map(spacing).sum();
+        let mut y = devmap::station("doors").map_or(0.0, |station| station.at[1]) - 0.5 * length;
+        let mut devices = Vec::new();
+        for tag in tags {
+            let width = spacing(&tag);
+            let at = Vec3::new(DEVICES_X, y + 0.5 * width, 0.0);
+            y += width;
+            let Some(handle) = place(simulation, level, &tag, at, 0.0) else {
+                continue;
+            };
+            let Some(player) = simulation.component::<AnimationPlayer>(handle) else {
+                continue;
+            };
+            let animations = &player.graph.animations;
+            let animation = animations
+                .iter()
+                .position(|animation| animation.name.contains("position"))
+                .unwrap_or(0);
+            let Some(frames) = animations
+                .get(animation)
+                .map(|animation| animation.frame_count)
+            else {
+                continue;
+            };
+            devices.push(Device {
+                tag,
+                handle,
+                animation: u16::try_from(animation).unwrap_or(0),
+                frames,
+                player,
+            });
+        }
+        Doors { devices, ticks: 0 }
+    }
+
+    fn after_tick(&mut self, simulation: &mut Simulation, report: &mut Report<'_>) -> bool {
+        // (closed to open and back: 0 to 1 to 0)
+        let along = (self.ticks % DEVICE_CYCLE_TICKS) as f32 / DEVICE_CYCLE_TICKS as f32;
+        let position = 1.0 - (2.0 * along - 1.0).abs();
+        for device in &mut self.devices {
+            let last = f32::from(device.frames.saturating_sub(1));
+            device.player.state = AnimationState {
+                animation: device.animation,
+                frame: libm::roundf(position * last) as u16,
+            };
+            simulation.animate(device.handle, device.player.clone());
+            if self.ticks.is_multiple_of(TICKS_PER_SECOND) {
+                let at = simulation
+                    .transform(device.handle)
+                    .map_or(Vec3::ZERO, |transform| transform.position);
+                let text = format!("{} {position:.2}", short(&device.tag));
+                report.label(at + Vec3::Z * 2.0, &text, TICKS_PER_SECOND);
+            }
+        }
+        self.ticks += 1;
+        if self.ticks < DEVICE_CYCLES * DEVICE_CYCLE_TICKS && !self.devices.is_empty() {
+            return false;
+        }
+        for device in &self.devices {
+            let name = device
+                .player
+                .graph
+                .animations
+                .get(usize::from(device.animation))
+                .map_or("", |animation| animation.name.as_str());
+            report.results.push(json!({
+                "device": device.tag.path,
+                "animation": name,
+                "frames": device.frames,
+            }));
+        }
+        true
+    }
+}
+
+/// The physics station: crates dropped onto the slope.
+#[derive(Debug)]
+struct Physics {
+    ticks: u32,
+}
+
+impl Physics {
+    fn new(simulation: &mut Simulation) -> Physics {
+        simulation.clear_crates();
+        let slope = devmap::SLOPE;
+        let half = Vec3::splat(CRATE_HALF);
+        for at in 0..CRATES {
+            // (a loose pile over the slope's upper half, each turned)
+            let row = (at / 4) as f32;
+            let column = (at % 4) as f32;
+            let along = 0.55 * slope.length + 2.0 * row;
+            let across = 2.5 * (column - 1.5);
+            let position = Vec3::new(
+                slope.foot[0] + slope.rising[0] * along - slope.rising[1] * across,
+                slope.foot[1] + slope.rising[1] * along + slope.rising[0] * across,
+                slope.height + 3.0 + 1.5 * row + 0.5 * column,
+            );
+            let turn = Quat::from_rotation_z(0.4 * at as f32) * Quat::from_rotation_x(0.3 * row);
+            simulation.drop_crate(position, turn, half);
+        }
+        Physics { ticks: 0 }
+    }
+
+    fn after_tick(&mut self, simulation: &Simulation, report: &mut Report<'_>) -> bool {
+        self.ticks += 1;
+        let crates = simulation.crates();
+        for one in crates.all() {
+            let rotation = one.pose.rotation;
+            let axes = [Vec3::X, Vec3::Y, Vec3::Z].map(|axis| (rotation * axis).to_array());
+            let color = if one.resting() {
+                Color::GREEN
+            } else {
+                Color::YELLOW
+            };
+            report.draw.oriented_box(
+                Layer::General,
+                one.pose.position.to_array(),
+                axes,
+                one.half_extents.to_array(),
+                color,
+                1,
+            );
+        }
+        let settled = !crates.moving();
+        if !settled && self.ticks < SETTLE_TICKS {
+            return false;
+        }
+        let seconds = self.ticks as f32 / TICKS_PER_SECOND as f32;
+        for one in crates.all() {
+            report.results.push(json!({
+                "position": one.pose.position.to_array(),
+                "resting": one.resting(),
+            }));
+        }
+        let text = if settled {
+            format!("{} crates still after {seconds:.1} s", crates.all().len())
+        } else {
+            format!("the crates still move after {seconds:.1} s")
+        };
+        let [x, y] = devmap::SLOPE.foot;
+        report.label(Vec3::new(x, y, 3.0), &text, 5 * TICKS_PER_SECOND);
+        report.status = Some(format!("physics: {text}"));
+        true
+    }
+}

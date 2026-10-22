@@ -19,6 +19,7 @@ pub mod render_sky;
 pub mod script;
 pub mod settings;
 pub mod snapshot;
+mod stations;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -953,7 +954,17 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
                 network.step(&mut running.simulation, level, input.tick_input());
             }
             (_, _, Some(campaign)) => campaign.step(&mut running.simulation, input.tick_input()),
-            _ => running.simulation.step(input.tick_input()),
+            _ => {
+                let tick = shell
+                    .station
+                    .as_mut()
+                    .and_then(|run| run.input(&running.simulation))
+                    .unwrap_or_else(|| input.tick_input());
+                running.simulation.step(tick);
+                if let (Some(run), Some(level)) = (&mut shell.station, &running.level) {
+                    run.after_tick(&mut running.simulation, level, &mut shell.draw);
+                }
+            }
         }
         // (the mouse's turn is used once)
         input.yaw = 0.0;

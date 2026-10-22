@@ -113,6 +113,8 @@ pub(crate) struct Shell {
     /// The script running in the window (`script`), and how the last ended.
     pub script: Option<crate::script::Session>,
     pub script_status: String,
+    /// The test map's station running (`station`).
+    pub(crate) station: Option<crate::stations::Run>,
 }
 
 impl Default for Shell {
@@ -129,6 +131,7 @@ impl Default for Shell {
             trace: None,
             script: None,
             script_status: String::new(),
+            station: None,
         }
     }
 }
@@ -401,6 +404,15 @@ pub(crate) fn registry() -> Registry<State> {
         "Runs a test script (.ocs) in the window, its frames in <name>-frames; `stop` stops it.",
         &[Param::optional("file", ArgKind::Rest)],
         script,
+    );
+    registry.command(
+        "station",
+        "Runs one of the test map's stations (weapons, vehicles, animation, doors, physics), those whose name has the filter; alone, the stations and the one running; `stop` stops it.",
+        &[
+            Param::optional("name", ArgKind::String),
+            Param::optional("filter", ArgKind::Rest),
+        ],
+        crate::stations::command,
     );
     registry.fallback(halo_script);
     registry

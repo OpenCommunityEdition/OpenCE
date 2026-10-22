@@ -111,6 +111,8 @@ impl Color {
     pub const GREEN: Color = Color(0x00ff00ff);
     /// Blue.
     pub const BLUE: Color = Color(0x0000ffff);
+    /// Yellow.
+    pub const YELLOW: Color = Color(0xffff00ff);
 }
 
 /// A line to draw.
