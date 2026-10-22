@@ -58,6 +58,20 @@ impl Campaign {
         std::mem::swap(self.scripts.mission_mut().sim_mut(), simulation);
     }
 
+    /// Evaluates console text with the mission's scripts over
+    /// `simulation`, the world it plays.
+    pub(crate) fn evaluate(
+        &mut self,
+        simulation: &mut Simulation,
+        text: &str,
+    ) -> Result<(opence_script::Value, opence_content::ValueType), opence_script::ConsoleError>
+    {
+        std::mem::swap(self.scripts.mission_mut().sim_mut(), simulation);
+        let result = self.scripts.evaluate(text);
+        std::mem::swap(self.scripts.mission_mut().sim_mut(), simulation);
+        result
+    }
+
     /// Gives each object not yet drawn or posed its model and animation
     /// (those the scripts made, and all of a world a revert loaded).
     pub(crate) fn dress(&mut self, simulation: &mut Simulation) {

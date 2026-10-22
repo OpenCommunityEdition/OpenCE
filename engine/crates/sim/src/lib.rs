@@ -690,6 +690,62 @@ impl Simulation {
         true
     }
 
+    /// Puts `weapon` in the player's hands, full, if the level has it
+    /// (dropping what a full hand held); false without a player or for a
+    /// weapon the level does not have.
+    pub fn give_weapon(&mut self, weapon: &TagRef) -> bool {
+        let given = self
+            .players
+            .first_mut()
+            .is_some_and(|player| player.arm(weapon));
+        if given {
+            self.update_first_person();
+        }
+        given
+    }
+
+    /// Sits the player in seat `seat` of the vehicle `vehicle` at once;
+    /// false without a player, for an object that is not a vehicle that
+    /// can be ridden, or for a seat it does not have.
+    pub fn enter_vehicle(&mut self, vehicle: ObjectHandle, seat: usize) -> bool {
+        let Some(player) = self.players.first_mut() else {
+            return false;
+        };
+        self.rides.seat_player(&self.world, player, vehicle, seat)
+    }
+
+    /// Makes the player fly through the level where it looks (true), or
+    /// fall back into it; false without a player, or while it is seated.
+    pub fn set_noclip(&mut self, noclip: bool) -> bool {
+        let Some(player) = self.players.first_mut() else {
+            return false;
+        };
+        if player.seated().is_some() {
+            return false;
+        }
+        player.set_noclip(noclip);
+        true
+    }
+
+    /// Makes an object take no damage (true), or take it again; false if
+    /// `handle` is not in the world.
+    pub fn set_invulnerable(&mut self, handle: ObjectHandle, invulnerable: bool) -> bool {
+        let Some(entity) = self
+            .world
+            .get_resource::<ObjectTable>()
+            .and_then(|table| table.entity(handle))
+        else {
+            return false;
+        };
+        let mut entity = self.world.entity_mut(entity);
+        if invulnerable {
+            entity.insert(damage::Invulnerable);
+        } else {
+            entity.remove::<damage::Invulnerable>();
+        }
+        true
+    }
+
     /// What damage did in the last tick.
     pub fn damage_events(&self) -> &[damage::DamageEvent] {
         &self.damage

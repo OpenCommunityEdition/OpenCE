@@ -11,6 +11,8 @@
 //! - anything else, or anything in parentheses, is HaloScript, given to
 //!   the fall-through (the running mission's scripts).
 
+pub mod control;
+pub mod logbook;
 mod words;
 
 use std::collections::BTreeMap;
@@ -599,7 +601,13 @@ impl<C> Registry<C> {
         Ok(())
     }
 
-    fn set_text(&mut self, context: &mut C, name: &str, text: &str) -> Result<(), CommandError> {
+    /// Sets a variable from text, read as its kind.
+    pub fn set_text(
+        &mut self,
+        context: &mut C,
+        name: &str,
+        text: &str,
+    ) -> Result<(), CommandError> {
         let variable = self
             .variables
             .get(name)
@@ -613,6 +621,11 @@ impl<C> Registry<C> {
                 given: text.to_owned(),
             })?;
         self.set(context, name, value)
+    }
+
+    /// A variable's help and its default.
+    pub fn describe(&self, name: &str) -> Option<(&'static str, &VarValue)> {
+        self.variables.get(name).map(|v| (v.help, &v.default))
     }
 
     /// The saved variables that are not at their default, as text.

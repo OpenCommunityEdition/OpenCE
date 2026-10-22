@@ -135,6 +135,9 @@ pub struct Player {
     seat: Option<Seated>,
     /// Where its object is while it sits.
     seat_body: Option<Transform>,
+    /// It flies where it looks, through the level, as the shell's
+    /// `noclip` makes it.
+    noclip: bool,
 }
 
 /// A vehicle's seat the player sits in.
@@ -315,6 +318,7 @@ impl Player {
             grenade_origin: Vec3::from_array(level.globals.player.grenade_origin),
             seat: None,
             seat_body: None,
+            noclip: false,
         })
     }
 
@@ -484,6 +488,10 @@ impl Player {
             self.landed = None;
             return self.pose();
         }
+        if self.noclip {
+            self.fly_through(input);
+            return self.pose();
+        }
         let movement = MovementInput {
             throttle: throttle(input),
             yaw: self.yaw,
@@ -496,6 +504,40 @@ impl Player {
         let _ = self.mover.step(&mut lock(&self.physics), &movement);
         self.landed = (airborne && !self.mover.airborne).then_some(self.mover.landing_velocity);
         self.pose()
+    }
+
+    /// Whether it flies through the level.
+    pub fn noclip(&self) -> bool {
+        self.noclip
+    }
+
+    /// Flies through the level (true), or falls back into it where it is.
+    pub(crate) fn set_noclip(&mut self, noclip: bool) {
+        if self.noclip && !noclip {
+            // (the physics refuses only numbers that are not finite)
+            let _ = self
+                .mover
+                .teleport(&mut lock(&self.physics), self.mover.position);
+        }
+        self.noclip = noclip;
+        self.mover.velocity = Vec3::ZERO;
+    }
+
+    /// One tick of flight: along the look, to the sides and up, at the
+    /// free camera's speeds; the physics is not asked.
+    fn fly_through(&mut self, input: &TickInput) {
+        let rotation = look_rotation(self.yaw, self.pitch);
+        let axis = |value: i8| f32::from(value) / 127.0;
+        let direction = rotation * Vec3::new(axis(input.forward), -axis(input.right), 0.0)
+            + Vec3::Z * axis(input.up);
+        let speed = if input.buttons.contains(Buttons::SPRINT) {
+            FreeCamera::SPRINT_SPEED.0
+        } else {
+            FreeCamera::SPEED.0
+        };
+        self.mover.position += direction * (speed / clock::TICKS_PER_SECOND as f32);
+        self.mover.airborne = true;
+        self.landed = None;
     }
 
     /// Puts its biped at `position`, standing still (a client's

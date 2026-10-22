@@ -47,6 +47,10 @@ pub fn transition(function: i16, v: f32) -> f32 {
     }
 }
 
+/// An object no damage harms (the shell's `god`).
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Invulnerable;
+
 /// An object's shield and body, and the damage to its regions.
 #[derive(Component, Clone, Debug, PartialEq)]
 pub struct Vitality {
@@ -1082,6 +1086,9 @@ fn damage_object(
     hit: impl FnOnce(&World, Entity, &Damageable, f32, bool) -> DamageHit,
 ) -> Option<Outcome> {
     let entity = world.resource::<ObjectTable>().entity(object)?;
+    if world.get::<Invulnerable>(entity).is_some() {
+        return Some(Outcome::default());
+    }
     let random = world.get_resource_or_init::<RandomSeed>().next_real();
     let table = world.get_resource::<DamageTable>()?;
     let tag = &world.get::<Object>(entity)?.tag;

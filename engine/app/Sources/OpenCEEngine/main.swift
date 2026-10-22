@@ -14,7 +14,9 @@
 // on a map without a player start, the free camera flies instead: W, A, S,
 // D, Space and Control (Shift faster). F3 or --frame-times shows the frame
 // times. --benchmark SECONDS flies the map offscreen at --size (3840x2160
-// by default), with no window, and prints the frame times.
+// by default), with no window, and prints the frame times. --headless runs
+// the world with no window, answering the control socket (Control.swift);
+// --control (or --socket PATH) opens the socket beside the window.
 import AppKit
 import Metal
 import OpenCEEngineCore
@@ -200,6 +202,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var menuView: NSView?
     /// The network's state last shown in the title.
     var shownStatus: NetworkStatus = .alone
+    /// The control socket's servant, with --control or --socket.
+    var servant: ControlServant?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = mainMenu()
@@ -217,6 +221,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } catch {
                 fail("\(map): \(error)")
             }
+        }
+        if CommandLine.arguments.contains("--control") || argument("--socket") != nil {
+            startControl(device: controller.window.engineView.device)
         }
         controller.window.engineView.onFrame = { [weak self] link in self?.frame(link) }
         controller.show(fullScreen: CommandLine.arguments.contains("--full-screen") || saved.settings.video.fullScreen)
@@ -250,6 +257,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller?.showsFrameTimes = CommandLine.arguments.contains("--frame-times")
             || saved.settings.video.showFrameTimes
         controller?.capturesMouse = true
+    }
+
+    /// Opens the control socket: its maps loaded and frames drawn here.
+    func startControl(device: MTLDevice?) {
+        guard let device, let queue = device.makeCommandQueue() else { fail("no Metal device") }
+        servant = ControlServant(
+            engine: engine, device: device, queue: queue, snapshots: snapshots,
+            loadMap: { [weak self] path, bsp in try self?.commandLoad(map: path, bsp: bsp) },
+            reloadBsp: { [weak self] bsp in try self?.reloadStructure(bsp) },
+            renderer: { [weak self] in self?.level?.renderer })
+        do {
+            appLog("info", "control socket: \(try engine.startControl(path: argument("--socket")))")
+        } catch {
+            fail("the control socket: \(error)")
+        }
+    }
+
+    /// A command's `map`: leaves the game and loads it, the menus put away.
+    func commandLoad(map: String, bsp: UInt32) throws {
+        engine.leaveGame()
+        try load(map: map, bsp: bsp)
+        if menuView != nil {
+            hideMenu()
+        }
+    }
+
+    /// A command's `bsp`: draws another structure of the level loaded.
+    func reloadStructure(_ bsp: UInt32) throws {
+        guard let level, let device = controller?.window.engineView.device else { return }
+        let switched = try LoadedLevel(map: level.map, bsp: bsp, cacheFolder: cacheFolder(), device: device,
+                                       settings: settings)
+        switched.renderer.hud = hud
+        self.level = switched
     }
 
     @objc func leave(_ sender: Any?) {
@@ -386,6 +426,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             engine.setInput(input: controls.input(held: held, mouse: mouse))
         }
         earlierKeys = held
+        if let servant, !servant.serve() {
+            NSApp.terminate(nil)
+            return
+        }
         _ = try? engine.advance(frameSeconds: seconds)
         followStructure()
         showStatus()
@@ -502,6 +546,10 @@ func benchmark(seconds: String) -> Never {
 
 if let seconds = argument("--benchmark") {
     benchmark(seconds: seconds)
+}
+
+if CommandLine.arguments.contains("--headless") {
+    headless()
 }
 
 let app = NSApplication.shared

@@ -681,6 +681,16 @@ impl MissionScripts {
         &mut self.mission
     }
 
+    /// Evaluates text typed at the console against the mission and its
+    /// scripts.
+    pub fn evaluate(
+        &mut self,
+        text: &str,
+    ) -> Result<(opence_script::Value, opence_content::ValueType), opence_script::ConsoleError>
+    {
+        self.runtime.evaluate_text(text, &mut self.mission)
+    }
+
     /// The scripts running.
     pub fn runtime(&self) -> &Runtime<Mission> {
         &self.runtime

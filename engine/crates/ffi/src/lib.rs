@@ -8,6 +8,8 @@
 #![allow(unsafe_code)]
 
 pub mod campaign;
+pub mod control;
+pub mod devtools;
 pub mod hud;
 pub mod network;
 pub mod render_level;
@@ -437,13 +439,23 @@ struct State {
     running: Option<Running>,
     writer: SnapshotWriter,
     input: InputState,
+    shell: devtools::Shell,
 }
 
 /// The engine: one per app.
 #[derive(uniffi::Object)]
 pub struct Engine {
+    // (always locked before the state)
+    registry: Mutex<opence_dev::Registry<State>>,
     state: Mutex<State>,
     snapshots: Arc<SnapshotBuffers>,
+    control: Arc<control::Control>,
+}
+
+impl Drop for Engine {
+    fn drop(&mut self) {
+        self.control.stop();
+    }
 }
 
 #[uniffi::export]
@@ -452,13 +464,18 @@ impl Engine {
     #[uniffi::constructor]
     pub fn new() -> Arc<Self> {
         let (buffers, writer) = SnapshotBuffers::new();
+        // (the log book is the process's: a second engine finds it set)
+        opence_dev::logbook::install();
         Arc::new(Self {
+            registry: Mutex::new(devtools::registry()),
             state: Mutex::new(State {
                 running: None,
                 writer,
                 input: InputState::default(),
+                shell: devtools::Shell::default(),
             }),
             snapshots: Arc::new(buffers),
+            control: Arc::default(),
         })
     }
 
@@ -621,8 +638,13 @@ impl Engine {
     /// two. Returns the ticks run.
     pub fn advance(&self, frame_seconds: f64) -> Result<u32, EngineError> {
         let mut state = self.lock();
+        let scale = if state.shell.paused {
+            0.0
+        } else {
+            state.shell.time_scale
+        };
         let running = state.running.as_mut().ok_or(EngineError::NoWorld)?;
-        let frame = running.clock.advance(frame_seconds);
+        let frame = running.clock.advance(frame_seconds * scale);
         run_ticks(&mut state, frame.ticks)?;
         publish(&mut state, &self.snapshots, frame.alpha);
         Ok(frame.ticks)
@@ -643,6 +665,86 @@ impl Engine {
         hud::hud_quads(level, &readout, width, height, seconds)
     }
 
+    /// Runs a line of the developer shell: commands split by `;`, each a
+    /// command, a variable, or HaloScript for the running mission; then
+    /// publishes the world as the line left it.
+    pub fn run_command(&self, line: String) -> devtools::ShellOutput {
+        let mut registry = self.lock_registry();
+        let mut state = self.lock();
+        let output = devtools::run(&mut registry, &mut state, &line);
+        publish(&mut state, &self.snapshots, 1.0);
+        output
+    }
+
+    /// Runs the command bound to `key`, if one is.
+    pub fn press_key(&self, key: String) -> devtools::ShellOutput {
+        let line = self.lock_registry().binding(&key).map(str::to_owned);
+        match line {
+            Some(line) => self.run_command(line),
+            None => devtools::ShellOutput {
+                ok: true,
+                json: "null".into(),
+                ..Default::default()
+            },
+        }
+    }
+
+    /// The watch line's values (empty when nothing is watched).
+    pub fn watch_values(&self) -> Vec<devtools::WatchValue> {
+        let registry = self.lock_registry();
+        let mut state = self.lock();
+        devtools::watch_values(&registry, &mut state)
+    }
+
+    /// The ways `line` could go on: whole lines, in order.
+    pub fn complete_command(&self, line: String) -> Vec<String> {
+        self.lock_registry().complete(&line)
+    }
+
+    /// The shell's variables.
+    pub fn shell_variables(&self) -> Vec<devtools::ShellVariable> {
+        devtools::variables(&self.lock_registry())
+    }
+
+    /// A shell variable as a boolean (false if it is not one).
+    pub fn shell_flag(&self, name: String) -> bool {
+        self.lock_registry().get_bool(&name)
+    }
+
+    /// Sets a shell variable from text read as its kind.
+    pub fn set_shell_variable(&self, name: String, value: String) -> Result<(), EngineError> {
+        let mut registry = self.lock_registry();
+        let mut state = self.lock();
+        registry
+            .set_text(&mut state, &name, &value)
+            .map_err(|error| EngineError::Load {
+                message: error.to_string(),
+            })
+    }
+
+    /// The saved shell variables not at their default, as text, for the
+    /// settings file.
+    pub fn saved_shell_variables(&self) -> HashMap<String, String> {
+        self.lock_registry().saved().into_iter().collect()
+    }
+
+    /// Sets the saved shell variables from the settings file; returns the
+    /// names it refused.
+    pub fn load_shell_variables(&self, saved: HashMap<String, String>) -> Vec<String> {
+        self.lock_registry()
+            .load_saved(&saved.into_iter().collect())
+    }
+
+    /// Where `map` finds a map by its name.
+    pub fn set_maps_folder(&self, folder: String) {
+        self.lock().shell.maps_folder = Some(folder.into());
+    }
+
+    /// Whether the shell paused the world.
+    pub fn paused(&self) -> bool {
+        self.lock().shell.paused
+    }
+
     /// The address to pass to `opence_snapshot_acquire`, valid while this
     /// engine is alive.
     pub fn snapshot_buffers(&self) -> u64 {
@@ -651,6 +753,12 @@ impl Engine {
 }
 
 impl Engine {
+    fn lock_registry(&self) -> MutexGuard<'_, opence_dev::Registry<State>> {
+        self.registry
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     fn lock(&self) -> MutexGuard<'_, State> {
         // (a panic aborts, so the lock is never poisoned by one)
         self.state

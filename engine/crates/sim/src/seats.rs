@@ -394,6 +394,41 @@ impl Rides {
         true
     }
 
+    /// Sits `player` in seat `seat` of the vehicle `handle` at once, as
+    /// the shell's `enter` does, wherever it stands; false for an object
+    /// that is not a ride, a destroyed one, or a seat it does not have.
+    pub(crate) fn seat_player(
+        &self,
+        world: &World,
+        player: &mut Player,
+        handle: ObjectHandle,
+        seat: usize,
+    ) -> bool {
+        let Some(ride) = self.rides.iter().find(|ride| ride.handle == handle) else {
+            return false;
+        };
+        let place = self
+            .kinds
+            .get(ride.kind)
+            .and_then(|kind| kind.seats.get(seat));
+        let Some(place) = place.filter(|_| !destroyed(world, handle)) else {
+            return false;
+        };
+        player.set_noclip(false);
+        player.sit(
+            Seated {
+                vehicle: handle,
+                seat,
+                flags: place.flags,
+            },
+            Transform {
+                position: at(&ride.pose, place.marker),
+                ..ride.pose
+            },
+        );
+        true
+    }
+
     /// One tick of the vehicles: on a game tick, each powers its seats and
     /// moves, driven by the player if it drives it; between, each is put
     /// halfway from its last game tick to this. The player is put in its
