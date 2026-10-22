@@ -2519,11 +2519,11 @@ result_complete:
 
 A network game on a campaign map with no game engine is co-op. Players
 spawn on the host and respawn beside each other, as in local co-op
-(players_respawn_coop). When everyone is dead, local co-op reverts to the
-last checkpoint (game_state_revert), but every machine would have to do
-that in step. Instead the players respawn where they were at the last
-checkpoint (main_save_map_private records it), or at the map's start if
-that was on another BSP. */
+(players_respawn_coop). When everyone is dead, the host's team-wipe policy
+chooses a checkpoint revert or position-only respawn. The latter uses
+positions main_save_map_private recorded, or the map's start if that was
+on another BSP. A changed roster or missing checkpoint also uses this
+position-only path. */
 
 static boolean players_coop_room_to_spawn(
 	void);
