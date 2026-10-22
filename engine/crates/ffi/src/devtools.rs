@@ -115,6 +115,8 @@ pub(crate) struct Shell {
     pub script_status: String,
     /// The test map's station running (`station`).
     pub(crate) station: Option<crate::stations::Run>,
+    /// The frames `frame` asked for, for the app to draw: path, width, height.
+    pub(crate) frames: Vec<(String, u32, u32)>,
 }
 
 impl Default for Shell {
@@ -132,6 +134,7 @@ impl Default for Shell {
             script: None,
             script_status: String::new(),
             station: None,
+            frames: Vec::new(),
         }
     }
 }
@@ -312,6 +315,16 @@ pub(crate) fn registry() -> Registry<State> {
         "Takes an expression off the watch line (or all of them).",
         &[Param::optional("expression", ArgKind::Rest)],
         unwatch,
+    );
+    registry.command(
+        "frame",
+        "Draws the next frame to a PNG (relative paths from the working folder), 1280 by 720 unless told.",
+        &[
+            Param::required("path", ArgKind::String),
+            Param::optional("width", ArgKind::Int),
+            Param::optional("height", ArgKind::Int),
+        ],
+        frame,
     );
     registry.command("clear", "Clears the shell's scrollback.", &[], clear);
     registry.command("quit", "Quits.", &[], quit);
@@ -1111,6 +1124,31 @@ fn unwatch(state: &mut State, args: &Args) -> Result<Output, CommandError> {
 }
 
 /// (the app clears its scrollback when the data says so)
+fn frame(state: &mut State, args: &Args) -> Result<Output, CommandError> {
+    let path = Path::new(args.string("path")?);
+    let path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map_err(|error| failed(error.to_string()))?
+            .join(path)
+    };
+    let mut fields = serde_json::Map::new();
+    fields.insert("path".into(), json!(path.to_string_lossy()));
+    for name in ["width", "height"] {
+        if args.has(name) {
+            fields.insert(name.into(), json!(args.int(name)?));
+        }
+    }
+    let (path, width, height) = crate::control::frame_target(&fields).map_err(failed)?;
+    level(running(state)?)?;
+    state.shell.frames.push((path.clone(), width, height));
+    Ok(Output::with_data(
+        format!("drawing {path} ({width} by {height})"),
+        json!({ "path": path, "width": width, "height": height }),
+    ))
+}
+
 fn clear(_: &mut State, _: &Args) -> Result<Output, CommandError> {
     Ok(Output::with_data("", json!({ "clear": true })))
 }

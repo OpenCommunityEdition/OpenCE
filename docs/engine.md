@@ -246,3 +246,152 @@ the scenario's objects and the sky. No window opens.
 
 A frame's own GPU time is 9.10 ms at p50 and 10.10 ms at p99. That is longer
 than the frame time because the GPU overlaps one frame's work with the next.
+
+## The developer tools
+
+The engine's tools reach into a running world: a shell in the game, the
+same commands over a local socket, debug drawing, a test driver and a
+generated test map. They are made in `opence_dev` (the registry, the
+socket's limits, the scripts, the profiler, the debug shapes) and
+`opence_ffi` (the engine's own commands, in `devtools.rs`), and drawn by
+the app.
+
+### The shell
+
+`~` (the key left of 1) slides the shell down over the game. The world
+keeps running unless it is paused, and keys go to the shell while it is
+open. The prompt has line editing (word jumps, kill and yank), history
+kept between runs in `shell_history.txt` in the app's support folder
+(Up, Down, Control-R), Tab completion of commands, variables, tag paths,
+objects and HaloScript's functions and globals, and scrollback with the
+wheel. The engine's log, Rust's and Swift's, streams into it. Text is
+drawn in Overpass Mono from a glyph atlas at the display's scale.
+
+A line that is not a command is HaloScript, run against the mission:
+`(ai_place x30_marines)` works as `spawn` does. `watch <expression>` puts
+a variable or an expression on a line that stays on screen when the shell
+is closed.
+
+### Commands and variables
+
+Every crate adds to the registry; `help [name]` lists them and their
+arguments, and `vars [filter]` the variables.
+
+| Command | Does |
+| --- | --- |
+| `map <name> [bsp]`, `bsp <index>` | Loads a map, or moves to a structure BSP with its scenery |
+| `spawn <tag> [count]`, `kill [object\|all]` | Makes or kills objects |
+| `teleport <x y z>\|<object>`, `noclip`, `god` | Moves and protects the player |
+| `give <weapon>`, `enter <vehicle> [seat]` | Arms the player, seats them |
+| `time <scale>`, `pause`, `step [ticks]` | The world's clock |
+| `objects [filter]`, `inspect <id>`, `tags [filter]` | The world's objects and the level's tags |
+| `frame <path> [width] [height]` | Saves the next frame to a PNG (1280 by 720 unless told; a relative path is the working folder's) |
+| `log [filter]` | `render=debug,warn` sets the levels kept; alone, the last lines |
+| `watch`, `unwatch` | The watch line |
+| `debug_line`, `debug_box`, `debug_sphere`, `debug_text`, `debug_clear` | Shapes, each for some ticks |
+| `stat frame [off]`, `trace <frames>\|stop` | The profiler's breakdown, and a Chrome trace for Perfetto |
+| `script <file>\|stop` | Runs a test script in the window |
+| `station [name]\|stop` | Runs a test map station |
+| `set`, `vars`, `bind`, `unbind`, `exec`, `help`, `clear`, `quit` | The registry's own |
+
+Variables are typed (bool, int, float, text, a choice) and some are saved
+to the settings. The drawing switches are `render.wireframe`,
+`render.lightmaps`, `render.objects` and `render.hud`; the debug layers
+are `debug.draw.<layer>`.
+
+### The socket and `opence`
+
+With `--control` (beside the window) or `--headless` (with no window), the
+engine listens on a Unix socket, `opence/control.sock` in the user's
+runtime folder (`XDG_RUNTIME_DIR`, else `TMPDIR`), or at
+`OPENCE_CONTROL_SOCKET`. The folder is the user's alone, and the engine
+never listens on a network address. A request is one JSON line, a command
+line or a structured request (`state`, `objects`, `frame`, `subscribe
+log`), and each reply is one JSON line carrying the text the shell shows
+and the same result as data. A request is at most 64 KiB and 16 levels
+deep, a connection may send 200 a second (400 at once), and eight
+connections are served.
+
+```sh
+opence run 'spawn warthog 2'          # one line (--json for the data)
+opence state                          # the world's state
+opence frame out.png --size 1920x1080 # the view, drawn offscreen
+opence watch                          # the log as it is written
+opence script check.ocs               # a script, stopping at a failure
+opence shell                          # an interactive shell, completed by the engine
+```
+
+It exits 0 when everything worked, 1 when the engine refused something
+and 2 when it could not reach the engine. `--headless` takes `--map`,
+`--bsp`, `--maps`, `--cache` and `--tick-rate`, and draws a frame only
+when one is asked for.
+
+### Debug drawing
+
+Any system calls the immediate-mode shapes (a line, a box, a sphere, text
+in the world, each for some ticks); the renderer draws them after the
+world. The layers are switched with `debug.draw.<layer>`: `general` (the
+commands' and systems' shapes), `collision` (the level's near the camera),
+`bodies`, `ai` (firing positions and paths), `triggers`, `markers`,
+`lights`, `sounds` and `labels` (the test map's headings). When every
+layer is off, nothing is kept or drawn.
+
+A build run from the checkout watches `engine/app/Shaders`: an edited
+shader is compiled again while the game runs, and one that fails keeps the
+old pipeline and prints the error to the shell.
+
+### The test driver
+
+A command script (`.ocs`) is a list of shell lines with four of its own:
+
+| Line | Does |
+| --- | --- |
+| `wait <ticks>` | Lets the world run |
+| `wait_until <expression> [timeout]` | Lets it run until the expression holds (ten seconds without a timeout) |
+| `expect <expression>` | Fails unless the expression holds |
+| `frame <name>` | Takes a frame |
+
+An expression is a value (a variable, the world's state, HaloScript),
+compared or not with `==`, `!=`, `<`, `<=`, `>` or `>=`. A failure stops
+the script and reports its line, its expression and the state. A script
+runs headless as fast as the world ticks (`opence script`), or in the
+window at its pace (`script`).
+
+### The test map
+
+`devmap` (`--map devmap`, `map devmap`) is made by the engine: a flat
+plane with collision, a grid and a sky, and galleries of every object
+definition in the user's maps, each placed once from the map that holds
+it, with a label: weapons on racks, vehicles in bays, bipeds on pedestals,
+devices, scenery, equipment and projectiles. The menus do not offer it.
+
+Its stations run a test on the spot, from a pad or `station <name>`:
+`weapons` fires each weapon at targets and shows its shots, damage and
+heat; `vehicles` drives a course with corners and ramps; `animation` plays
+each of a biped's animations with its name; `doors` cycles every device;
+`physics` drops a pile of crates on a slope. Their results are data, so
+`ffi/tests/stations.rs` checks them.
+
+### Placement checks
+
+`tools/engine_placement_traces.py` runs the reference app headless on each
+stock map and records its objects after spawning (tag, position, rotation,
+permutation, BSP and parent) in `build/placement_traces`, never committed,
+with the structure BSP each run ended in. `ffi/tests/placements.rs` starts
+each map in the engine, switches to that BSP as the mission's scripts did,
+and requires each object's place within 1 mm and its facing within 0.01°.
+
+The engine places objects as the reference's `object_types.c` does:
+
+- the kinds other than scenery and light fixtures first, in type order;
+- then the scenery and lights whose origin, or bounding offset, is in a
+  leaf of the structure BSP;
+- a name already placed is skipped, and placements that are not automatic
+  are left out; the difficulty bits are never read;
+- a vehicle with physics is raised by half its bounding radius, and an
+  item not at rest or levitating by 0.05;
+- missions start in BSP 0, and a switch removes the unnamed scenery and
+  lights and places the new BSP's, but not a named one that is there.
+
+Multiplayer vehicles are left out of the comparison, because the
+gametype, not the scenario, decides which are made.

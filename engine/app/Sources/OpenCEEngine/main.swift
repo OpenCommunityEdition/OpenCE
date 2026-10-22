@@ -204,7 +204,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var menuView: NSView?
     /// The network's state last shown in the title.
     var shownStatus: NetworkStatus = .alone
-    /// The control socket's servant, with --control or --socket.
+    /// Draws the frames asked for (the shell's `frame`, a window script's,
+    /// the control socket's) and acts on the socket's actions.
     var servant: ControlServant?
     /// The developer shell (~), and the pass that draws its text.
     var shell: ShellOverlay?
@@ -234,8 +235,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         startShell(view: controller.window.engineView)
+        startServant(device: controller.window.engineView.device)
         if CommandLine.arguments.contains("--control") || argument("--socket") != nil {
-            startControl(device: controller.window.engineView.device)
+            startControl()
         }
         controller.window.engineView.onFrame = { [weak self] link in self?.frame(link) }
         controller.show(fullScreen: CommandLine.arguments.contains("--full-screen") || saved.settings.video.fullScreen)
@@ -271,14 +273,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller?.capturesMouse = true
     }
 
-    /// Opens the control socket: its maps loaded and frames drawn here.
-    func startControl(device: MTLDevice?) {
+    /// Makes the servant that draws the frames asked for here.
+    func startServant(device: MTLDevice?) {
         guard let device, let queue = device.makeCommandQueue() else { fail("no Metal device") }
         servant = ControlServant(
             engine: engine, device: device, queue: queue, snapshots: snapshots,
             loadMap: { [weak self] path, bsp in try self?.commandLoad(map: path, bsp: bsp) },
             reloadBsp: { [weak self] bsp in try self?.reloadStructure(bsp) },
             renderer: { [weak self] in self?.level?.renderer })
+    }
+
+    /// Opens the control socket (with --control or --socket).
+    func startControl() {
         do {
             appLog("info", "control socket: \(try engine.startControl(path: argument("--socket")))")
         } catch {

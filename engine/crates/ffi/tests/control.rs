@@ -173,6 +173,51 @@ fn frames_are_drawn_by_the_app() -> Result {
     Ok(())
 }
 
+#[test]
+fn the_shells_frame_is_queued_for_the_app() -> Result {
+    let folder = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("shell_frame");
+    std::fs::create_dir_all(&folder)?;
+    let png = folder.join("shot.png");
+    let engine = Engine::new();
+    let line = format!("frame {} 64 32", png.display());
+
+    // refused: no level, a bad name, a bad size, no folder
+    engine.start_empty_world();
+    assert!(!engine.run_command(line.clone()).ok);
+    for bad in [
+        format!("frame {}", folder.join("shot.jpg").display()),
+        format!("frame {} 4 4", png.display()),
+        "frame /no/such/folder/shot.png".to_owned(),
+    ] {
+        assert!(!engine.run_command(bad.clone()).ok, "{bad}");
+    }
+    assert!(engine.control_frame_requests().is_empty());
+
+    let Some(level) = bloodgulch() else {
+        return Ok(());
+    };
+    engine.start_level(level, 2)?;
+    let output = engine.run_command(line);
+    assert!(output.ok, "{}", output.text);
+    let frames = engine.control_frame_requests();
+    let frame = frames.first().ok_or("no frame queued")?;
+    assert_eq!(
+        (frame.path.as_str(), frame.width, frame.height),
+        (png.to_str().ok_or("path")?, 64, 32)
+    );
+    // (its answer goes to the log; a relative path is the working folder's)
+    engine.finish_frame(frame.id, Some("drawn badly".into()));
+    assert!(engine.run_command("frame shot.png".into()).ok);
+    let relative = engine.control_frame_requests();
+    let cwd = std::env::current_dir()?.join("shot.png");
+    assert_eq!(
+        relative.first().map(|frame| frame.path.clone()),
+        Some(cwd.to_string_lossy().into_owned())
+    );
+    std::fs::remove_dir_all(&folder)?;
+    Ok(())
+}
+
 fn bloodgulch() -> Option<Arc<opence_ffi::LevelGeometry>> {
     let maps = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps");
     let map = maps.join("bloodgulch.map");

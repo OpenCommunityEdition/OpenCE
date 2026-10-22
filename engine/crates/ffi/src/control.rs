@@ -10,7 +10,7 @@
 //! [`Engine::control_frame_requests`], and answers each frame with
 //! [`Engine::finish_frame`].
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
@@ -108,6 +108,8 @@ pub(crate) struct Control {
     actions: Mutex<Vec<ShellAction>>,
     frames: Mutex<Vec<FrameRequest>>,
     finished: Mutex<HashMap<u64, Option<String>>>,
+    /// The frames the shell queued, whose answers nobody waits for.
+    unclaimed: Mutex<HashSet<u64>>,
     drawn: Condvar,
     next_frame: AtomicU64,
     /// The times the app has served the queues (taken the actions, acted
@@ -151,6 +153,14 @@ impl Control {
             width,
             height,
         });
+        id
+    }
+
+    /// Queues a frame no one waits for (the shell's `frame`): its answer
+    /// goes to the log.
+    pub(crate) fn queue_unclaimed_frame(&self, path: String, width: u32, height: u32) -> u64 {
+        let id = self.queue_frame(path, width, height);
+        lock(&self.unclaimed).insert(id);
         id
     }
 
@@ -275,6 +285,13 @@ impl Engine {
 
     /// Answers a frame request: `error` if it could not be drawn.
     pub fn finish_frame(&self, id: u64, error: Option<String>) {
+        if lock(&self.control.unclaimed).remove(&id) {
+            match error {
+                Some(error) => logbook::record(Level::Warn, "frame", &error),
+                None => logbook::record(Level::Info, "frame", &format!("frame {id} drawn")),
+            };
+            return;
+        }
         lock(&self.control.finished).insert(id, error);
         self.control.drawn.notify_all();
     }
@@ -535,7 +552,7 @@ fn log(fields: &Map<String, Value>) -> Result<Map<String, Value>, String> {
 
 /// A frame request's checks: an absolute `.png` path in a folder that is
 /// there, and a size in [`FRAME_SIZES`].
-fn frame_target(fields: &Map<String, Value>) -> Result<(String, u32, u32), String> {
+pub(crate) fn frame_target(fields: &Map<String, Value>) -> Result<(String, u32, u32), String> {
     let path = text(fields, "path")?;
     let file = Path::new(path);
     let png = file

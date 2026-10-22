@@ -799,6 +799,9 @@ impl Engine {
         let mut registry = self.lock_registry();
         let mut state = self.lock();
         let output = devtools::run(&mut registry, &mut state, &line);
+        for (path, width, height) in std::mem::take(&mut state.shell.frames) {
+            self.control.queue_unclaimed_frame(path, width, height);
+        }
         publish(&mut state, &self.snapshots, 1.0);
         output
     }
