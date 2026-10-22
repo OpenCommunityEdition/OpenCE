@@ -233,7 +233,9 @@ from, so that a second copy of the game on one computer, on a port of its
 own, plays too; version 32 sends the host's mouse aim assist policy
 (distributed message 90, `network_aim_assist.c`), which a client must not
 ignore, and has a client's input say whether its player plays co-op with
-friendly fire.
+friendly fire; version 33 sends the host's mutators (distributed message
+91, `network_mutators.c`, `docs/mutators.md`) to each client as it is
+ready, which the client plays instead of its own.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

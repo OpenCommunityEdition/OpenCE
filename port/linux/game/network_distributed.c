@@ -78,6 +78,8 @@ machine (their datum identifiers need not be).
 #include "network_distributed.h"
 #include "network_voice.h"
 #include "network_aim_assist.h"
+#include "network_mutators.h"
+#include "mutators.h"
 #include "map_share.h"
 #include "latency_meter.h"
 #include "profile_sections.h"
@@ -3801,6 +3803,8 @@ void network_distributed_new_game(
 	network_coop_new_game();
 	network_aim_assist_reset();
 	network_votekick_new_game();
+	/* (a client's wait for the host's: network_mutators.c) */
+	mutators_new_game();
 }
 
 /* after each tick (game_time.c) */
@@ -4476,6 +4480,11 @@ void network_distributed_handle_message(
 		network_aim_assist_handle_message(machine_index, message, size);
 		return;
 	}
+	if (network_mutators_handles_message(message, size))
+	{
+		network_mutators_handle_message(machine_index, message, size);
+		return;
+	}
 	if (network_voice_handles_message(message, size))
 	{
 		network_voice_handle_message(machine_index, message, size);
@@ -4799,6 +4808,8 @@ void network_distributed_handle_message(
 		/* (its count 1: the client asks again, having failed to make one of
 		the host's objects) */
 		network_aim_assist_send_policy(machine_index);
+		/* (before the objects, which the client makes playing them) */
+		network_mutators_send(machine_index);
 		network_objects_client_asked(machine_index, header.count != 0);
 		/* (a machine new at its index, which may have joined the game in
 		progress: every player's statistics and the game type's state, after

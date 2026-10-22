@@ -138,6 +138,10 @@ enum
 	client, reliably, when it is ready and when the policy changes */
 	_distributed_message_aim_assist_policy = 90,
 
+	/* the host's mutators (network_mutators.c): each effect's and
+	parameter's key and value, to each client, reliably, when it is ready */
+	_distributed_message_mutators = 91,
+
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
 

@@ -60,6 +60,8 @@ OBJECTS.C
 void object_bounds_cache_update(long object_index, real_point3d const *center, real radius);
 /* port: port/linux/game/first_person_legs.c's */
 void first_person_legs_reset(void);
+/* port: port/linux/game/mutator_big_head.c's */
+real mutator_big_head_bounding_radius(long object_index, real bounding_radius);
 
 /* ---------- constants */
 
@@ -2953,6 +2955,9 @@ void object_compute_node_matrices(
 	{
 		object->object.bounding_sphere_radius *= object->object.scale;
 	}
+	/* port: grown to hold a head the big head mutator scaled */
+	object->object.bounding_sphere_radius = mutator_big_head_bounding_radius(object_index,
+		object->object.bounding_sphere_radius);
 	/* port: (and in the packed copy collision reads: object_bounds_cache.c) */
 	object_bounds_cache_update(object_index, &object->object.bounding_sphere_center, object->object.bounding_sphere_radius);
 
