@@ -57,8 +57,8 @@
     - [x] Write tests: the recorder's output format; a small map's trace is complete
     - [x] `tools/engine_placement_traces.py`, using the reference app headless
 - [x] Task: Comparing and fixing placements 238ad5be
-    - [ ] Write tests: the engine's world after spawning matches each stock map's trace (marked, needs `assets/maps`)
-    - [ ] Find and fix the causes of the mismatches in the importer and the simulation
-- [ ] Task: The documentation
-    - [ ] `docs/engine.md`: the shell, the commands and variables, the socket and `opence`, debug drawing, the test driver, the test map
+    - [x] Write tests: the engine's world after spawning matches each stock map's trace (marked, needs `assets/maps`)
+    - [x] Find and fix the causes of the mismatches in the importer and the simulation
+- [x] Task: The documentation 3ec72c52
+    - [x] `docs/engine.md`: the shell, the commands and variables, the socket and `opence`, debug drawing, the test driver, the test map
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Placement checks' (Protocol in workflow.md) (deferred to the end)
