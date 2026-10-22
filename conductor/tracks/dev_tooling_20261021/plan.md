@@ -26,10 +26,10 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: The shell overlay' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 3: Hooks
-- [~] Task: Debug drawing
-    - [ ] Write tests: shapes with lifetimes expire on time; the layers switch; nothing is drawn or allocated when they are off
-    - [ ] The immediate-mode API in Rust, the snapshot's debug buffer, the Metal pass; the collision, body, AI, trigger, marker, light and sound layers
-- [ ] Task: Live shader reload
+- [x] Task: Debug drawing d66e7195
+    - [x] Write tests: shapes with lifetimes expire on time; the layers switch; nothing is drawn or allocated when they are off
+    - [x] The immediate-mode API in Rust, the snapshot's debug buffer, the Metal pass; the collision, body, AI, trigger, marker, light and sound layers
+- [~] Task: Live shader reload
     - [ ] Write tests: an edited source recompiles and swaps; a broken one keeps the old pipeline and reports the error
     - [ ] Watching the shader sources in a development build
 - [ ] Task: The test driver
