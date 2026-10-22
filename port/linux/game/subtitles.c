@@ -1,9 +1,10 @@
 /*
 SUBTITLES.C
 
-Subtitles for sound tags (display.subtitles, off by default; nothing is
-shown without the file). The file, subtitles.txt next to the maps
-(display.subtitles_file), is plain text, a line for each sound tag:
+Subtitles for sound tags (display.subtitles, off by default). They are lines
+of plain text, one for each sound tag. The game has its own built in
+(port/assets/subtitles/subtitles.txt, embedded by tools/embed_assets.py); a
+subtitles.txt next to the maps (display.subtitles_file) replaces them whole:
 
 	"sound/dialog/a10/a10_chief_get_down" - "Chief, get down!"
 	sound\dialog\a10\cortana_01 = Chief, I need you on the bridge.
@@ -94,6 +95,11 @@ struct active_subtitle
 };
 
 /* ---------- prototypes */
+
+/* the subtitles built into the game (tools/embed_assets.py, from
+port/assets/subtitles/subtitles.txt; size 0: none) */
+extern const unsigned int subtitles_embedded[];
+extern const unsigned long subtitles_embedded_size;
 
 /* port_config.c's, cseries_windows.c's, cinematics.c's */
 int config_boolean(const char *name);
@@ -222,6 +228,44 @@ static void subtitle_table_add(
 	return;
 }
 
+/* the text's typographic punctuation made plain, in place (the fonts have no
+characters for the UTF-8 dashes, quotes and ellipsis of text written in a
+word processor, which would be drawn as three characters each) */
+static void subtitle_simplify_text(
+	char *text)
+{
+	unsigned char *source = (unsigned char *)text;
+	char *destination = text;
+
+	while (*source)
+	{
+		if (source[0] == 0xE2 && source[1] == 0x80 && (source[2] & 0xC0) == 0x80)
+		{
+			unsigned char code = source[2];
+			char const *replacement = NULL;
+
+			if (code >= 0x90 && code <= 0x95)
+				replacement = "-";
+			else if (code >= 0x98 && code <= 0x9A)
+				replacement = "'";
+			else if (code >= 0x9C && code <= 0x9E)
+				replacement = "\"";
+			else if (code == 0xA6)
+				replacement = "...";
+			if (replacement)
+			{
+				while (*replacement)
+					*destination++ = *replacement++;
+				source += 3;
+				continue;
+			}
+		}
+		*destination++ = (char)*source++;
+	}
+	*destination = 0;
+	return;
+}
+
 /* one line of the file, in place: the entry it makes, if any */
 static void subtitle_parse_line(
 	char *line,
@@ -301,6 +345,7 @@ static void subtitle_parse_line(
 		}
 		*destination = 0;
 	}
+	subtitle_simplify_text(text);
 	length = subtitle_normalize_path(path);
 	if (length > 0 && path[length - 1] == '*')
 	{
@@ -320,7 +365,7 @@ static void subtitle_parse_line(
 static void subtitle_load(
 	char const *name)
 {
-	FILE *file;
+	FILE *file = NULL;
 	long size;
 	long lines = 1;
 	long index;
@@ -328,27 +373,39 @@ static void subtitle_load(
 	char *scan;
 
 	subtitle_unload();
-	if (!name || !*name)
-		return;
-	file = fopen(name, "rb");
-	if (!file)
-		return;
-	fseek(file, 0, SEEK_END);
-	size = ftell(file);
-	fseek(file, 0, SEEK_SET);
-	if (size <= 0 || size > MAXIMUM_SUBTITLES_FILE_SIZE)
+	if (name && *name)
+		file = fopen(name, "rb");
+	if (file)
 	{
+		/* (the player's own file, in place of the game's) */
+		fseek(file, 0, SEEK_END);
+		size = ftell(file);
+		fseek(file, 0, SEEK_SET);
+		if (size <= 0 || size > MAXIMUM_SUBTITLES_FILE_SIZE)
+		{
+			fclose(file);
+			return;
+		}
+		subtitle_globals.buffer = (char *)malloc((size_t)size + 1);
+		if (!subtitle_globals.buffer || fread(subtitle_globals.buffer, 1, (size_t)size, file) != (size_t)size)
+		{
+			fclose(file);
+			subtitle_unload();
+			return;
+		}
 		fclose(file);
-		return;
 	}
-	subtitle_globals.buffer = (char *)malloc((size_t)size + 1);
-	if (!subtitle_globals.buffer || fread(subtitle_globals.buffer, 1, (size_t)size, file) != (size_t)size)
+	else
 	{
-		fclose(file);
-		subtitle_unload();
-		return;
+		/* the subtitles built into the game */
+		size = (long)subtitles_embedded_size;
+		if (size <= 0 || size > MAXIMUM_SUBTITLES_FILE_SIZE)
+			return;
+		subtitle_globals.buffer = (char *)malloc((size_t)size + 1);
+		if (!subtitle_globals.buffer)
+			return;
+		memcpy(subtitle_globals.buffer, subtitles_embedded, (size_t)size);
 	}
-	fclose(file);
 	subtitle_globals.buffer[size] = 0;
 	/* (a UTF-8 byte order mark) */
 	line = subtitle_globals.buffer;

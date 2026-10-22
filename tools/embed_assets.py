@@ -4,8 +4,9 @@ tools/hud_assets.py), the menus' titles (port/assets/titles, made by
 tools/title_assets.py), their controller button icons (port/assets/buttons,
 made by tools/button_assets.py), the fonts the text is drawn with
 (port/assets/fonts), the menus' files (port/assets/menus, made by
-tools/ce_menus.py) and SMAA's shader and lookup textures
-(port/third_party/smaa) in the game as C data:
+tools/ce_menus.py), the subtitles (port/assets/subtitles/subtitles.txt) and
+SMAA's shader and lookup textures (port/third_party/smaa) in the game as C
+data:
 
     python tools/embed_assets.py OUTPUT.c
 
@@ -48,6 +49,9 @@ MENU_LIST = MENU_ASSETS / "menus.json"
 SMAA_ASSETS = Path("port/third_party/smaa")
 SMAA_FILES = (("SMAA.hlsl", "xgpu_smaa_shader"), ("area_tex.zlib", "xgpu_smaa_area_texture"),
               ("search_tex.zlib", "xgpu_smaa_search_texture"))
+# the subtitles of the sound tags, the game's own (port/linux/game/subtitles.c
+# reads subtitles.txt next to the maps instead, where there is one)
+SUBTITLES = Path("port/assets/subtitles/subtitles.txt")
 # the desktop windows' icon (tools/app_icon.py; port/linux/src/sdl_platform.c)
 WINDOW_ICON = Path("port/assets/icon/opence-icon-256.png")
 # the pointer the menus show in place of the system's (port/linux/src/sdl_platform.c)
@@ -94,6 +98,7 @@ def hud_asset_inputs() -> List[Path]:
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
             *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files()),
             *(SMAA_ASSETS / name for name, _ in smaa_files()),
+            *([SUBTITLES] if (ROOT / SUBTITLES).is_file() else []),
             *([WINDOW_ICON] if (ROOT / WINDOW_ICON).is_file() else []),
             *([MENU_CURSOR] if (ROOT / MENU_CURSOR).is_file() else [])]
 
@@ -109,6 +114,8 @@ def hud_configure_inputs() -> List[Path]:
             inputs += [folder, listing]
     if (ROOT / SMAA_ASSETS).is_dir():
         inputs.append(SMAA_ASSETS)
+    if (ROOT / SUBTITLES.parent).is_dir():
+        inputs.append(SUBTITLES.parent)
     return inputs
 
 
@@ -232,6 +239,14 @@ def main() -> None:
         lines.append("\t{ 0 },")
     lines.append("};")
     lines.append(f"const unsigned int menu_files_embedded_count = {len(menus)};")
+    lines.append("")
+    # the subtitles, text (port/linux/game/subtitles.c; of size 0 where the
+    # checkout has none). On every platform, the OpenGL ES ones too
+    data = (ROOT / SUBTITLES).read_bytes() if (ROOT / SUBTITLES).is_file() else b""
+    lines.append("const unsigned int subtitles_embedded[] = {")
+    lines.extend(words(data) if data else ["\t0,"])
+    lines.append("};")
+    lines.append(f"const unsigned long subtitles_embedded_size = {len(data)};")
     lines.append("")
     # SMAA's shader, as text a GLSL compiler takes (ASCII, ending in a NUL),
     # and its lookup textures (xgpu_post.c); each of size 0 that the

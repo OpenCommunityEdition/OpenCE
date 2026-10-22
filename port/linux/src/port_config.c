@@ -199,11 +199,12 @@ static const struct config_setting config_settings[] =
 		"the scoreboard's pings in the same colours, as this machine times them." },
 	{ "display.subtitles", _config_boolean, "false", "HALO_SUBTITLES", _environment_value, _platform_all,
 		"Show subtitles at the bottom of the screen for the sound tags that the\n"
-		"subtitles file names (display.subtitles_file), while they play. Nothing is\n"
-		"shown without the file. Also Video Setup, Extra Effects in the menus." },
+		"subtitles name (built into the game, or display.subtitles_file), while they\n"
+		"play. Also Video Setup, Extra Effects in the menus." },
 	{ "display.subtitles_file", _config_string, "\"subtitles.txt\"", "HALO_SUBTITLES_FILE", _environment_value,
 		_platform_all,
-		"The subtitles: a text file with a line for each sound tag, the tag's path\n"
+		"Your own subtitles, in place of the game's built-in ones: a text file with a\n"
+		"line for each sound tag, the tag's path\n"
 		"and the text, such as  \"sound/a10/a10\" - \"Chief, get down!\"  (a path\n"
 		"ending in /* is every tag below it; \\n starts a new line; # starts a\n"
 		"comment). Read again when the settings change." },
