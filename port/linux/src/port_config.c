@@ -535,6 +535,9 @@ static const struct config_setting config_settings[] =
 		"run, strafe, jump, runjump, crouch, fall or ramp; warthog_drive, warthog_turn,\n"
 		"warthog_brake, warthog_ramp, ghost_drive, ghost_turn or ghost_brake drive that\n"
 		"vehicle, logged instead; empty for none" },
+	{ "debug.placement_trace", _config_boolean, "false", "HALO_PLACEMENT_TRACE", _environment_value, _platform_all,
+		"Log each object the scenario places as it is made, for the native engine's\n"
+		"placement checks (port/linux/game/placement_trace.c)" },
 	{ "debug.network_test", _config_string, "\"\"", "HALO_NETWORK_TEST", _environment_value, _platform_all,
 		"Automated system link sessions for testing (port/linux/game/network_test.c):\n"
 		"\"host:<map>\" hosts a game on that map, \"join\" joins the first game found,\n"

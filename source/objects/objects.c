@@ -57,6 +57,7 @@ OBJECTS.C
 void object_bounds_cache_update(long object_index, real_point3d const *center, real radius);
 /* port: port/linux/game/first_person_legs.c's */
 void first_person_legs_reset(void);
+#include "placement_trace.h" /* port: port/linux/game/placement_trace.c */
 
 /* ---------- constants */
 
@@ -3958,6 +3959,8 @@ long object_new_from_scenario(
 					{
 						object_name_list_new(result, scenario_object->name_index);
 					}
+					/* port: debug.placement_trace logs it */
+					placement_trace_placed(result, scenario_object);
 				}
 			}
 		}
