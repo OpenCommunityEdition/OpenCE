@@ -52,7 +52,7 @@
     - [x] The weapons, vehicles, animation, doors and physics stations
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: The test map' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 5: Placement checks
+## Phase 5: Placement checks [checkpoint: 8b23535d]
 - [x] Task: Recording the reference game's placements d2f2db02
     - [x] Write tests: the recorder's output format; a small map's trace is complete
     - [x] `tools/engine_placement_traces.py`, using the reference app headless
