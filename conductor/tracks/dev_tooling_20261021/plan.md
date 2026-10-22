@@ -17,12 +17,12 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Commands, variables and the control socket' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 2: The shell overlay
-- [ ] Task: Monospace text
-    - [ ] Write tests: the glyph atlas at scales 1 and 2; the font's licence and checksum are present
-    - [ ] Overpass Mono in `port/assets/fonts` with its licence; a glyph atlas and text pass in the renderer
-- [ ] Task: The terminal
-    - [ ] Write tests: XCTest of line editing, history search, completion candidates, scrollback, selection and copy, coloured output
-    - [ ] The overlay: opening with `~`, input capture, the log stream and its filter, the watch line
+- [x] Task: Monospace text ae764736
+    - [x] Write tests: the glyph atlas at scales 1 and 2; the font's licence and checksum are present
+    - [x] Overpass Mono in `port/assets/fonts` with its licence; a glyph atlas and text pass in the renderer
+- [x] Task: The terminal acd64406
+    - [x] Write tests: XCTest of line editing, history search, completion candidates, scrollback, selection and copy, coloured output
+    - [x] The overlay: opening with `~`, input capture, the log stream and its filter, the watch line
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: The shell overlay' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 3: Hooks
