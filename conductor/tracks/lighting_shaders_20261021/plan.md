@@ -10,10 +10,10 @@
 - [x] Task: Environment shaders 3347a108
     - [ ] Write tests: detail functions, bump height scale, specular masks and self-illumination functions against values worked by hand from the tag's definitions
     - [ ] `senv` in the importer and the level pass: detail, micro detail, bump, specular, reflection tint, self-illumination
-- [ ] Task: Model shaders
+- [x] Task: Model shaders 9c06ee24
     - [ ] Write tests: the Xbox multipurpose channel order; change colours from the object's functions
     - [ ] `soso` in the importer and the object pass; the change colours in the snapshot
-- [ ] Task: Every shader class
+- [~] Task: Every shader class
     - [ ] Write tests: a count of shaders with no material in each stock map is zero (marked, needs `assets/maps`); each blend mode's pipeline state
     - [ ] `sotr`, `sgla`, `smet`, `spla`, `swat`, lit `schi`/`scex`; the transparent passes on models and the level
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Why some maps are flat, and the shader model' (Protocol in workflow.md) (deferred to the end)
