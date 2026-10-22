@@ -23,6 +23,22 @@ static real object_get_maximum_shield_vitality(long object_index,boolean ignore_
  (void)ignore_difficulty;return objects[object_index].shield;
 }
 struct damage_data { long owner_object_index; };
+/* where each object is, and its size (static_target_near) */
+static real_point3d origins[] = { { 0, 0, 0 }, { 10, 0, 0 }, { 10.5f, 0, 0 }, { 13, 0, 0 }, { 10.1f, 0, 0 } };
+struct object_datum { struct { real bounding_sphere_radius; } object; };
+static struct object_datum datums[5] = { { { 0.2f } }, { { 0.2f } }, { { 0.2f } }, { { 0.2f } }, { { 0.5f } } };
+#define object_get(index) (&datums[index])
+static void object_get_origin(long object_index,real_point3d *origin){*origin=origins[object_index];}
+struct object_iterator { long index; long next; unsigned long mask; };
+static void object_iterator_new(struct object_iterator *iterator,unsigned long mask,byte flags)
+{
+ (void)flags;iterator->next=0;iterator->mask=mask;iterator->index=NONE;
+}
+static void *object_iterator_next(struct object_iterator *iterator)
+{
+ while(iterator->next<5){long index=iterator->next++;if(objects[index].mask&iterator->mask){iterator->index=index;return &datums[index];}}
+ return NULL;
+}
 #include "under_test.inc"
 int main(int argc,char **argv)
 {
@@ -43,6 +59,14 @@ int main(int argc,char **argv)
   CHECK(static_target_damage(&light),"a destructible scenery's own damage");
   CHECK(!static_target_damage(&grenade),"what a unit or projectile owns");
   CHECK(!static_target_damage(&none),"damage with no owner object");
+ } else CASE("near") {
+  /* another machine's copy of a tripmine (object 1, a shield) where this machine has it, and not too far */
+  real_point3d at={10.3f,0,0},away={11.6f,0,0},nothing={30,0,0};
+  CHECK(static_target_near(&at,1.0f)==1,"the nearest static target, %ld",static_target_near(&at,1.0f));
+  CHECK(static_target_near(&away,1.0f)==NONE,"no unit, nothing damage cannot break, none farther");
+  CHECK(static_target_near(&nothing,1.0f)==NONE,"none within reach");
+  CHECK(static_target_near(&at,0.0f)==NONE,"its size and the reach only");
+  { real_point3d between={12,0,0}; CHECK(static_target_near(&between,2.0f)==3,"the nearer of two, %ld",static_target_near(&between,2.0f)); }
  } else return 2;
  return 0;
 }

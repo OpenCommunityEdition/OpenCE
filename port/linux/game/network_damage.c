@@ -43,7 +43,10 @@ being hit looks and feels like on the clients).
   the host sends no state of them: the same damage, and the same recharge.
   What one of them deals itself, its shield or body breaking (a tripmine
   going off), the host deals whoever owns it, and no client reports: a
-  client's player's tripmine is set off where the host has it.
+  client's player's tripmine is set off where the host has it. One made in
+  the game (a tripmine a grenade's effect places) is at an index of its own
+  on each machine: a machine given another's index of one takes its own
+  nearest where the other had it (static_target_near).
 */
 
 #include "cseries.h"
@@ -222,6 +225,10 @@ from the target */
 #define REPORT_TARGET_TOLERANCE 3.0f
 #define REPORT_TARGET_LEAD_TICKS 15.0f
 #define REPORT_IMPACT_TOLERANCE 2.0f
+/* ... and how far beyond its size a static target made in the game may be
+from where another machine had its own copy (a tripmine: the same grenade's
+landing on each machine, static_target_near) */
+#define STATIC_TARGET_MATCH_TOLERANCE 1.0f
 /* ... and from where the host had a player's unit or vehicle then (with how
 far it moves in a few ticks: a client's copy runs a little ahead of the
 host's word on it), and further for a vehicle's (its size, and as far as a
@@ -1329,6 +1336,41 @@ static real distributed_distance_squared(
 	return dx * dx + dy * dy + dz * dz;
 }
 
+/* this machine's static target nearest the point where another machine had
+one, within its size and the reach of the point, else NONE. A static target
+made in the game (a tripmine a grenade's effect places) is at an index of
+its own on each machine, as the map's are not, so another machine's index of
+it names no such object here */
+static long static_target_near(
+	real_point3d const *point,
+	real reach)
+{
+	struct object_iterator iterator;
+	long nearest = NONE;
+	real nearest_distance = 0.0f;
+
+	object_iterator_new(&iterator, STATIC_TARGET_TYPES, 0);
+	while (object_iterator_next(&iterator))
+	{
+		real_point3d origin;
+		real distance;
+		real limit;
+
+		if (!static_target(iterator.index))
+			continue;
+		object_get_origin(iterator.index, &origin);
+		distance = distributed_distance_squared(point, &origin);
+		limit = object_get(iterator.index)->object.bounding_sphere_radius + reach;
+		if (distance <= limit * limit && (nearest == NONE || distance < nearest_distance))
+		{
+			nearest = iterator.index;
+			nearest_distance = distance;
+		}
+	}
+
+	return nearest;
+}
+
 /* where each player's unit and vehicle are this tick (and whether they
 drive it), noted; and every few ticks where their unit is */
 static void distributed_note_targets(
@@ -1990,8 +2032,26 @@ void network_damage_handle_reports(
 	for (index = 0; index < count; index++)
 	{
 		struct distributed_hit_report const *report = &reports[index];
+		struct distributed_hit_report found;
 		struct damage_data damage;
 
+		/* (a hit on the client's copy of a static target made in the game,
+		at an index of its own there: the host's where the client had it) */
+		if (distributed_object_index_valid(report->object_index) &&
+			distributed_point_valid(&report->target_position, REPORT_WORLD_BOUND) &&
+			!object_try_and_get_and_verify_type(report->object_index,
+				_object_mask_biped | _object_mask_vehicle | _object_mask_weapon | _object_mask_equipment) &&
+			!static_target(report->object_index))
+		{
+			long object_index = static_target_near(&report->target_position, STATIC_TARGET_MATCH_TOLERANCE);
+
+			if (object_index != NONE)
+			{
+				found = *report;
+				found.object_index = object_index;
+				report = &found;
+			}
+		}
 		if (!distributed_report_valid(machine_index, report, &damage))
 		{
 			damage_rejected_reports++;
@@ -2283,14 +2343,32 @@ void network_damage_handle_events(
 			}
 			break;
 		case _damage_event_static:
-			if (distributed_object_index_valid(event->object_index) && static_target(event->object_index) &&
-				distributed_damage_indices_valid(event->object_index, event->node_index, event->region_index,
+		{
+			long object_index = event->object_index;
+
+			/* (one made in the game, at an index of its own here: this machine's
+			copy at the damage, within its reach, an explosion's its radius) */
+			if (distributed_object_index_valid(object_index) && !static_target(object_index) &&
+				!object_try_and_get_and_verify_type(object_index, _object_mask_all))
+			{
+				real reach = REPORT_IMPACT_TOLERANCE;
+
+				if (TEST_FLAG(damage.flags, _damage_area_of_effect_bit) &&
+					tag_index_is_group(damage.definition_index, DAMAGE_EFFECT_DEFINITION_TAG))
+				{
+					reach += damage_effect_definition_get(damage.definition_index)->cutoff_radius;
+				}
+				object_index = static_target_near(&damage.origin, reach);
+			}
+			if (distributed_object_index_valid(object_index) && static_target(object_index) &&
+				distributed_damage_indices_valid(object_index, event->node_index, event->region_index,
 					event->material_index))
 			{
-				damage_replay_static(event->object_index, &damage, event->node_index, event->region_index,
+				damage_replay_static(object_index, &damage, event->node_index, event->region_index,
 					event->material_index);
 			}
 			break;
+		}
 		}
 	}
 }
