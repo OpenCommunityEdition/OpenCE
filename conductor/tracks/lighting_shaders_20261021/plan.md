@@ -41,11 +41,11 @@
     - [x] Write tests: cascade splits and their stable snapping
     - [x] Cascaded shadow maps for objects, matched to the baked shadows
 - [x] Task: Dynamic lights 2c8c92a7
-    - [ ] Write tests: `ligh` tag fields and functions; cluster culling assigns each light to the right cells; the shadowed lights are the nearest
-    - [ ] Lights from weapons, projectiles, effects, the flashlight and scenery in the snapshot; clustered shading; spot and cube shadows
-- [ ] Task: Screen-space effects
-    - [ ] Write tests: each pass can be switched off and shown alone from the shell
-    - [ ] GTAO, screen-space reflections, contact shadows
+    - [x] Write tests: `ligh` tag fields and functions; cluster culling assigns each light to the right cells; the shadowed lights are the nearest
+    - [x] Lights from weapons, projectiles, effects, the flashlight and scenery in the snapshot; clustered shading; spot and cube shadows
+- [x] Task: Screen-space effects fa7a6a1c
+    - [x] Write tests: each pass can be switched off and shown alone from the shell
+    - [x] GTAO, screen-space reflections, contact shadows
 - [ ] Task: The camera
     - [ ] Write tests: exposure adapts within the limits; `lens` tag fields; the occlusion test of a flare behind a wall
     - [ ] Auto exposure, bloom, lens flares, glows and light volumes
