@@ -37,10 +37,10 @@
 - [x] Task: Objects lit by the world a9649dfd
     - [x] Write tests: probe interpolation at a point; the nearest reflection probe; the fake light is gone
     - [x] Objects lit by probes, the sun and reflection probes
-- [ ] Task: Sun shadows
-    - [ ] Write tests: cascade splits and their stable snapping
-    - [ ] Cascaded shadow maps for objects, matched to the baked shadows
-- [ ] Task: Dynamic lights
+- [x] Task: Sun shadows 3970a29c
+    - [x] Write tests: cascade splits and their stable snapping
+    - [x] Cascaded shadow maps for objects, matched to the baked shadows
+- [~] Task: Dynamic lights
     - [ ] Write tests: `ligh` tag fields and functions; cluster culling assigns each light to the right cells; the shadowed lights are the nearest
     - [ ] Lights from weapons, projectiles, effects, the flashlight and scenery in the snapshot; clustered shading; spot and cube shadows
 - [ ] Task: Screen-space effects
