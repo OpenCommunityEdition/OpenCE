@@ -2366,7 +2366,8 @@ void network_chat_draw(
 		edge = window.y1 - 9 * line_height;
 	}
 	right = (short)MAX(window.x0 + window_width * CHAT_COLUMN_PERCENT / 100, left + 8 * line_height);
-	rows = local_player_count() > 1 ? CHAT_LINES_SHOWN_SPLIT : CHAT_LINES_SHOWN;
+	/* A hardcore pane shows as many lines as a local split. */
+	rows = hud_split_screen() ? CHAT_LINES_SHOWN_SPLIT : CHAT_LINES_SHOWN;
 	if (touch)
 	{
 		/* (the touch controls' stick and buttons are at the bottom left: the

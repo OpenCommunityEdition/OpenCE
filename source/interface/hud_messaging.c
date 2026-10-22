@@ -146,7 +146,6 @@ symbols in this file:
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
-#include "hardcore_views.h" /* port: teammate panes use the split-screen font */
 
 #include <stddef.h>
 
@@ -557,7 +556,7 @@ static void render_state_bitmap(
 		(struct bitmap_data *)bitmap, FALSE, TRUE))
 	{
 		bitmap = hud_hires_sprite_bitmap(bitmap, icon->sequence_index);
-		scale = (local_player_count() > 1 ? 0.75f : 1.0f) * hud_globals_get_scale(FALSE);
+		scale = (hud_split_screen() ? 0.75f : 1.0f) * hud_globals_get_scale(FALSE);
 		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0);
 		point.y = (short)(cursor_bounds->y1 - icon->offset.y * scale);
 		hud_draw_bitmap_direct(
@@ -1214,7 +1213,7 @@ void scripted_hud_messages_clear(
 long hud_get_font_index(
 	void)
 {
-	if ((local_player_count() > 1 || hardcore_views_split()) &&
+	if (hud_split_screen() &&
 		hud_msg_def->multi_player_font.index != NONE)
 	{
 		return hud_msg_def->multi_player_font.index;
@@ -1384,8 +1383,7 @@ static void hud_messaging_draw(
 		game_engine_hud_draw_messages(local_player_get_player_index(local_player_index)))
 	{
 		long font_index = hud_get_font_index();
-		boolean split_screen = local_player_count() > 1 ||
-			hardcore_views_split();
+		boolean split_screen = hud_split_screen();
 		point2d screen_point;
 		struct font_header *font;
 		short line_top;

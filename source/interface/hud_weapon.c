@@ -614,7 +614,7 @@ static void render_grenade_hud(
 		draw_flags,
 		_hud_draw_disabled_bit,
 		unit->unit.grenade_counts[unit->unit.current_grenade_index] == 0);
-	SET_FLAG(draw_flags, _hud_draw_in_multiplayer_bit, local_player_count() > 1);
+	SET_FLAG(draw_flags, _hud_draw_in_multiplayer_bit, hud_split_screen());
 
 	if (TEST_FLAG(draw_flags, _hud_draw_flashing_bit))
 	{
@@ -680,7 +680,7 @@ static void render_grenade_hud(
 			overlay_flags,
 			hud_state->last_grenade_flash_time,
 			draw_flags,
-			local_player_count() > 1);
+			hud_split_screen());
 	}
 
 finished:
@@ -994,8 +994,8 @@ static void crosshairs_draw(
 		struct weapon_hud_interface_definition *root_definition = weapon_hud_interface_definition_get(hud_index);
 		short map_type_flags = global_scenario_get()->type != _scenario_type_main_menu;
 
-		SET_FLAG(map_type_flags, 1, local_player_count() == 1);
-		SET_FLAG(map_type_flags, 2, local_player_count() > 1);
+		SET_FLAG(map_type_flags, 1, !hud_split_screen());
+		SET_FLAG(map_type_flags, 2, hud_split_screen());
 		if (unit_index != NONE)
 		{
 			struct unit_datum *unit = unit_get(unit_index);
@@ -1031,7 +1031,7 @@ static void crosshairs_draw(
 			{
 				struct weapon_hud_interface_definition *definition = weapon_hud_hierarchy[definition_index];
 				struct hud_absolute_placement_definition absolute_placement = { _hud_anchor_center };
-				boolean in_multiplayer = local_player_count() > 1;
+				boolean in_multiplayer = hud_split_screen();
 				short crosshair_index;
 
 				for (crosshair_index = 0;
@@ -1066,9 +1066,7 @@ static void crosshairs_draw(
 								(!TEST_FLAG(item->flags, _hud_crosshair_only_on_default_zoom_bit) ||
 									crosshair->states[_crosshair_state_zoom].value.reference_data == 0))
 							{
-								/* port: a real split halves this. a hardcore pane keeps the
-								full screen's field of view (view_fov.c) */
-								real scale = local_player_count() > 1 &&
+								real scale = hud_split_screen() &&
 									!TEST_FLAG(item->placement.multiplayer_scaling_flags, _hud_dont_scale_size_bit) ?
 									0.5f :
 									1.0f;
@@ -1438,7 +1436,7 @@ static void render_weapon_hud(
 		SET_FLAG(
 			flags,
 			_hud_draw_in_multiplayer_bit,
-			local_player_count() > 1);
+			hud_split_screen());
 		state_flags[0] = flags;
 
 		flags = state_flags[1];
@@ -1451,7 +1449,7 @@ static void render_weapon_hud(
 		SET_FLAG(
 			flags,
 			_hud_draw_in_multiplayer_bit,
-			local_player_count() > 1);
+			hud_split_screen());
 		state_flags[1] = flags;
 
 		flags = state_flags[2];
@@ -1463,7 +1461,7 @@ static void render_weapon_hud(
 		SET_FLAG(
 			flags,
 			_hud_draw_in_multiplayer_bit,
-			local_player_count() > 1);
+			hud_split_screen());
 		state_flags[2] = flags;
 
 		flags = state_flags[3];
@@ -1482,7 +1480,7 @@ static void render_weapon_hud(
 		SET_FLAG(
 			flags,
 			_hud_draw_in_multiplayer_bit,
-			local_player_count() > 1);
+			hud_split_screen());
 		state_flags[3] = flags;
 
 		/* port: a weapon of one magazine has no secondary ammunition, so
@@ -1501,7 +1499,7 @@ static void render_weapon_hud(
 			SET_FLAG(
 				flags,
 				_hud_draw_in_multiplayer_bit,
-				local_player_count() > 1);
+				hud_split_screen());
 			state_flags[4] = flags;
 
 			flags = state_flags[5];
@@ -1514,12 +1512,12 @@ static void render_weapon_hud(
 			SET_FLAG(
 				flags,
 				_hud_draw_in_multiplayer_bit,
-				local_player_count() > 1);
+				hud_split_screen());
 			state_flags[5] = flags;
 		}
 		else
 		{
-			state_flags[4] = local_player_count() > 1 ? FLAG(_hud_draw_in_multiplayer_bit) : 0;
+			state_flags[4] = hud_split_screen() ? FLAG(_hud_draw_in_multiplayer_bit) : 0;
 			state_flags[5] = state_flags[4];
 		}
 
@@ -1740,8 +1738,8 @@ static void render_weapon_hud(
 	}
 
 	map_type_flags = global_scenario_get()->type != _scenario_type_main_menu;
-	SET_FLAG(map_type_flags, 1, local_player_count() == 1);
-	SET_FLAG(map_type_flags, 2, local_player_count() > 1);
+	SET_FLAG(map_type_flags, 1, !hud_split_screen());
+	SET_FLAG(map_type_flags, 2, hud_split_screen());
 
 	for (element_index = 0;
 		element_index < definition->statics.count;
@@ -1909,7 +1907,7 @@ static void render_weapon_hud(
 				overlay_flags[state_index],
 				hud_state->last_weapon_flash_time[state_index],
 				state_flags[state_index],
-				local_player_count() > 1);
+				hud_split_screen());
 		}
 	}
 

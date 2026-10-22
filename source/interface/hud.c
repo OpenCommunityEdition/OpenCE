@@ -92,6 +92,7 @@ symbols in this file:
 #include "interface/hud_messaging.h"
 #include "interface/hud_unit.h"
 #include "interface/hud_weapon.h"
+#include "interface/hud_draw.h"
 #include "interface/interface.h"
 #include "interface/motion_sensor.h"
 #include "interface/weapon_hud_interface_definition.h"

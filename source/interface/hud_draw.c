@@ -108,7 +108,7 @@ symbols in this file:
 #include "cache_file_formats.h" /* port: port/linux/game/cache_file_formats.c */
 #include "custom_edition_cache.h"
 #include "view_fov.h" /* port: port/linux/game/view_fov.c */
-#include "hardcore_views.h" /* port: a hardcore pane scales the single screen hud */
+#include "hardcore_views.h" /* port: a hardcore pane uses the local splitscreen hud */
 
 /* ---------- constants */
 
@@ -429,38 +429,6 @@ static void hud_draw_multitexture_overlay(
 
 /* port: a hud bitmap's bad sequence or sprite was reported (once) */
 static boolean hud_bad_bitmap_reported = FALSE;
-/* a hardcore pane's share of the screen, 1 on one screen. a crosshair
-and a zoomed scope do not take it */
-static short hud_zoomed_layout_depth;
-static boolean hud_placing_crosshair;
-
-static real hardcore_hud_pane_scale(void)
-{
-	long pane_w;
-	long pane_h;
-	long screen_w;
-	long screen_h;
-	real sx;
-	real sy;
-
-	if (!hardcore_views_split() || hud_zoomed_layout_depth || hud_placing_crosshair)
-		return 1.0f;
-	pane_w = render.camera.viewport_bounds.x1 - render.camera.viewport_bounds.x0;
-	pane_h = render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0;
-	screen_w = rasterizer_globals.reserved04.screen_bounds.x1 -
-		rasterizer_globals.reserved04.screen_bounds.x0;
-	screen_h = rasterizer_globals.reserved04.screen_bounds.y1 -
-		rasterizer_globals.reserved04.screen_bounds.y0;
-	if (pane_w < 1 || pane_h < 1 || screen_w < 1 || screen_h < 1)
-		return 1.0f;
-	sx = (real)pane_w / (real)screen_w;
-	sy = (real)pane_h / (real)screen_h;
-	if (sx > sy)
-		sx = sy;
-	if (!(sx > 0.05f && sx < 4.0f))
-		return 1.0f;
-	return sx;
-}
 
 /* ---------- public code */
 
@@ -473,15 +441,19 @@ __attribute__((noinline)) long get_return_eip(
 	return (long)(__INTPTR_TYPE__)__builtin_return_address(1);
 }
 
+/* port: a hardcore team pane is one local split. the elements, the safe
+frame and the crosshair scale are that split's */
+boolean hud_split_screen(
+	void)
+{
+	return local_player_count() > 1 || hardcore_views_split();
+}
+
 real hud_globals_get_scale(
 	boolean in_multiplayer)
 {
 	(void)in_multiplayer;
-	/* port: the pause menu fits its pane on its own */
-	if (rasterizer_screen_fit_drawing())
-		return 1.0f;
-	/* port: the single screen hud, shrunk to this pane */
-	return hardcore_hud_pane_scale();
+	return 1.0f;
 }
 
 void hud_retrieve_bitmap_and_bounding_rect(
@@ -716,7 +688,7 @@ static void hud_draw_multitexture_overlay(
 	parameters.map_scale[0].j = 1.0f;
 	parameters.map_scale[0].i = 1.0f;
 	parameters.meter_parameters = NULL;
-	parameters.point_sampled = local_player_count() == 1 && !hardcore_views_split();
+	parameters.point_sampled = !hud_split_screen();
 	parameters.map[0] = bitmap_group_get_bitmap_from_sequence(
 		overlay->map[0].index,
 		0,
@@ -1452,7 +1424,6 @@ void hud_zoomed_layout_begin(
 	long width;
 	short inset;
 
-	hud_zoomed_layout_depth++;
 	width = render.camera.window_bounds.x1 - render.camera.window_bounds.x0;
 	inset = (short)((width - width * 640 / halo_screen_width()) / 2);
 
@@ -1464,8 +1435,6 @@ void hud_zoomed_layout_begin(
 void hud_zoomed_layout_end(
 	rectangle2d const *saved_window_bounds)
 {
-	if (hud_zoomed_layout_depth > 0)
-		hud_zoomed_layout_depth--;
 	render.camera.window_bounds = *saved_window_bounds;
 }
 
@@ -1555,8 +1524,6 @@ void hud_draw_static_element(
 				clip = &default_clip;
 
 			xy_scale = static_element->placement.scale;
-			xy_scale.i *= hardcore_hud_pane_scale();
-			xy_scale.j *= hardcore_hud_pane_scale();
 
 			hud_calculate_point(
 				render.local_player_index,
@@ -1665,8 +1632,7 @@ static void hud_draw_bitmap_internal(
 	parameters.map_scale[0].j = 1.0f;
 	parameters.map_scale[0].i = 1.0f;
 	parameters.meter_parameters = meter_parameters;
-	parameters.point_sampled = meter_parameters && local_player_count()==1 &&
-		!hardcore_views_split();
+	parameters.point_sampled = meter_parameters && !hud_split_screen();
 	parameters.framebuffer_blend_function =
 		_shader_framebuffer_blend_function_alpha_multiply_add;
 	parameters.map[0] = (struct bitmap_data *)bitmap;
@@ -1716,14 +1682,9 @@ static void hud_draw_bitmap_with_meter(
 		clip = &default_clip;
 	}
 
-	/* port: the picture shrinks with its offset. a crosshair keeps the
-	field of view scale instead (view_fov.c) */
-	if (!is_crosshair_bitmap)
-		scale *= hardcore_hud_pane_scale();
 	xy_scale.i = placement->scale.i*scale;
 	xy_scale.j = placement->scale.j*scale;
 
-	hud_placing_crosshair = is_crosshair_bitmap;
 	hud_calculate_point(
 		render.local_player_index,
 		absolute_placement,
@@ -1734,7 +1695,6 @@ static void hud_draw_bitmap_with_meter(
 			_hud_dont_scale_offset_bit),
 		0.0f,
 		&point);
-	hud_placing_crosshair = FALSE;
 	/* port: the crosshairs_draw scope moves only the weapon's reticle */
 	if (is_crosshair_bitmap)
 		passenger_camera_reticle_offset(&point);

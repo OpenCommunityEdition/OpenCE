@@ -156,61 +156,14 @@ real render_fov_authored_vertical(short local_player_index)
 	return authored_vertical[local_player_index];
 }
 
-/* (how a hardcore pane's shape compares with the full screen: wider on
-two panes, squarer on a corner. 1 is the full screen) */
-static real hardcore_split_aspect_ratio(void)
-{
-	long pane_w;
-	long pane_h;
-	long screen_w;
-	long screen_h;
-	real pane_aspect;
-	real screen_aspect;
-
-	if (!hardcore_views_split())
-		return 1.0f;
-	pane_w = render.camera.viewport_bounds.x1 - render.camera.viewport_bounds.x0;
-	pane_h = render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0;
-	screen_w = rasterizer_globals.reserved04.screen_bounds.x1 -
-		rasterizer_globals.reserved04.screen_bounds.x0;
-	screen_h = rasterizer_globals.reserved04.screen_bounds.y1 -
-		rasterizer_globals.reserved04.screen_bounds.y0;
-	if (pane_w < 1 || pane_h < 1 || screen_w < 1 || screen_h < 1)
-		return 1.0f;
-	pane_aspect = (real)pane_w / (real)pane_h;
-	screen_aspect = (real)screen_w / (real)screen_h;
-	if (!(screen_aspect > 0.01f))
-		return 1.0f;
-	return pane_aspect / screen_aspect;
-}
-
 real render_fov_reticle_scale(short local_player_index)
 {
-	real scale = 1.0f;
-	real split;
-	long pane_h;
-	long screen_h;
-
 	if (local_player_index >= 0 && local_player_index < MAXIMUM_LOCAL_PLAYERS &&
 		reticle_scales[local_player_index] != 0.0f)
 	{
-		scale = reticle_scales[local_player_index];
+		return reticle_scales[local_player_index];
 	}
-	/* (the crosshair keeps the full screen's field of view. a half-height
-	pane is half as tall, and a wider pane grows the weapon to match) */
-	if (hardcore_views_split())
-	{
-		pane_h = render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0;
-		screen_h = rasterizer_globals.reserved04.screen_bounds.y1 -
-			rasterizer_globals.reserved04.screen_bounds.y0;
-		if (pane_h > 0 && screen_h > 0)
-		{
-			split = hardcore_split_aspect_ratio() * ((real)pane_h / (real)screen_h);
-			if (split > 0.05f && split < 20.0f)
-				scale *= split;
-		}
-	}
-	return scale;
+	return 1.0f;
 }
 
 /* ---------- the first-person weapon's */
@@ -250,20 +203,11 @@ void viewmodel_projection_begin(void)
 		return;
 	projection_applied = FALSE;
 	/* (display.viewmodel_fov's angle; by default the view's own, from before
-	display.fov widened it. a hardcore split keeps that full-screen angle:
-	the pane is wider, or squarer, and the gun is not) */
+	display.fov widened it. a split keeps that pane's camera, so the gun
+	and the shot share one aim) */
 	angle = viewmodel_vertical();
 	if (!angle)
 		angle = render_fov_authored_vertical(render.local_player_index);
-	if (!angle && hardcore_views_split())
-		angle = render.camera.vertical_field_of_view;
-	if (angle && hardcore_views_split())
-	{
-		real ratio = hardcore_split_aspect_ratio();
-
-		if (ratio > 0.01f && angle > 0.0f && angle < _pi)
-			angle = 2.0f * atanf(tanf(angle * 0.5f) / ratio);
-	}
 	if (!angle || render.local_player_index < 0 || render.local_player_index >= MAXIMUM_LOCAL_PLAYERS ||
 		global_window_parameters.rasterizer_target != _rasterizer_target_render_primary ||
 		cinematic_in_progress() || (director_camera_scripted && *director_camera_scripted) ||
