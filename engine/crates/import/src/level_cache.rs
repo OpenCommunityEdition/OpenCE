@@ -14,7 +14,7 @@ use crate::{import_level, Cache, ImportError};
 /// The importer's version, which a pack records: raise it with any change
 /// to what the importer writes, so that packs written before are imported
 /// again.
-pub const IMPORTER_VERSION: u32 = 22;
+pub const IMPORTER_VERSION: u32 = 23;
 
 /// Why a map could not be loaded.
 #[derive(Debug, thiserror::Error)]

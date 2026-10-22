@@ -501,6 +501,9 @@ pub struct Effect {
     pub debris: Vec<EffectDebris>,
     /// The lights (`ligh`) its events' parts create, in order.
     pub lights: Vec<TagRef>,
+    /// The decals (`deca`) its events' parts lay where it is made, in
+    /// order.
+    pub decals: Vec<TagRef>,
 }
 
 /// An effect's particles heavy enough to be bodies: their point physics

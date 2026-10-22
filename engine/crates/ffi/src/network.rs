@@ -281,6 +281,8 @@ impl Engine {
             clock: opence_sim::clock::Clock::default(),
             lights: crate::lights::Lights::new(&level),
             lit: Vec::new(),
+            decals: crate::dynamic_decals::DynamicDecals::new(&level),
+            marks: Vec::new(),
             level: Some(level),
             network: Some(network),
             dressed,

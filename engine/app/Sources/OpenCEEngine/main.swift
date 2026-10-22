@@ -589,6 +589,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // (the game's time, at its 60 ticks a second, for the shaders' animations)
         renderer.time = Float((Double(frame.tick) + Double(frame.alpha)) / 60)
         renderer.lights = frame.drawnLights()
+        renderer.laidDecals = Array(frame.decals)
         renderer.switches = RenderSwitches(flag: { engine.shellFlag(name: $0) },
                                            value: { engine.shellValue(name: $0) })
         renderer.sprites = engine.cameraSprites(camera: camera.spriteCamera, flares: renderer.switches.lensFlares,

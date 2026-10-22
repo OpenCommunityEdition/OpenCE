@@ -350,6 +350,9 @@ pub struct RenderLevel {
     pub camera_textures: Vec<u32>,
     /// The decals the BSP lays when it is loaded, layer by layer.
     pub decals: Vec<crate::decals::RenderDecal>,
+    /// The textures the decals laid while the game runs draw, as the
+    /// snapshot's decal pictures number them (`u32::MAX`: one not loaded).
+    pub decal_textures: Vec<u32>,
 }
 
 /// Gathers the level's textures and materials, each once.
@@ -407,6 +410,10 @@ impl RenderLevel {
         for (bitmap, image) in crate::camera::camera_images(level) {
             let texture = builder.texture(&bitmap, image, 1).unwrap_or(u32::MAX);
             builder.out.camera_textures.push(texture);
+        }
+        for (bitmap, image) in crate::dynamic_decals::decal_images(level) {
+            let texture = builder.texture(&bitmap, image, 1).unwrap_or(u32::MAX);
+            builder.out.decal_textures.push(texture);
         }
         builder.out.decals = crate::decals::level_decals(level, structure, &mut |bitmap, image| {
             builder.texture(&bitmap.tag, image, 1)

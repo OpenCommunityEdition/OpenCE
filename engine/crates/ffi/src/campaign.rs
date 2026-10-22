@@ -210,6 +210,8 @@ impl Engine {
             campaign: Some(campaign),
             lights: crate::lights::Lights::new(&geometry.content),
             lit: Vec::new(),
+            decals: crate::dynamic_decals::DynamicDecals::new(&geometry.content),
+            marks: Vec::new(),
         };
         running.previous_camera = transform(&camera(&running).transform);
         let mut state = self.lock();

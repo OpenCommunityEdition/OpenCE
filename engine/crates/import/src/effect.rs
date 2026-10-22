@@ -1,6 +1,6 @@
-//! Effects (`effe`), as far as the simulation reads them: the damage
-//! effects their events' parts create, and the particles they emit that
-//! are heavy enough to be bodies. An effect is 0x40 bytes, its events
+//! Effects (`effe`), as far as the engine reads them: the damage effects,
+//! lights and decals their events' parts create, and the particles they
+//! emit that are heavy enough to be bodies. An effect is 0x40 bytes, its events
 //! (0x44 bytes each) a block at 0x34, an event's parts (0x68 bytes each) a
 //! block at 0x2C and its particles (0xE8 bytes each) one at 0x38, and a
 //! part's tag a reference at 0x18. A particle (`part`, 0x164 bytes) names
@@ -45,6 +45,7 @@ pub(crate) fn import_effect(cache: &Cache, index: usize) -> Result<Effect, Impor
     let mut damage = Vec::new();
     let mut debris = Vec::new();
     let mut lights = Vec::new();
+    let mut decals = Vec::new();
     for event in events.iter() {
         let particles =
             event.block(PARTICLES_OFFSET, "particles", PARTICLES_SIZE, MAX_PARTICLES)?;
@@ -55,13 +56,15 @@ pub(crate) fn import_effect(cache: &Cache, index: usize) -> Result<Effect, Impor
         }
         let parts = event.block(PARTS_OFFSET, "parts", PART_SIZE, MAX_PARTS)?;
         for part in parts.iter() {
-            // (a part creates any object or effect; only damage and
-            // lights are read)
+            // (a part creates any object or effect; only damage, lights
+            // and decals are read)
             if let Some(part_index) = part.reference(PART_TAG_OFFSET, "type", &[])? {
                 if cache.tags()[part_index].is(JPT) {
                     damage.push(tag_ref(cache, part_index));
                 } else if cache.tags()[part_index].is(crate::light::LIGH) {
                     lights.push(tag_ref(cache, part_index));
+                } else if cache.tags()[part_index].is(crate::decal::DECA) {
+                    decals.push(tag_ref(cache, part_index));
                 }
             }
         }
@@ -71,6 +74,7 @@ pub(crate) fn import_effect(cache: &Cache, index: usize) -> Result<Effect, Impor
         damage,
         debris,
         lights,
+        decals,
     })
 }
 
@@ -118,7 +122,8 @@ mod tests {
     use std::error::Error;
 
     #[test]
-    fn an_effect_names_the_damage_and_lights_its_parts_create() -> Result<(), Box<dyn Error>> {
+    fn an_effect_names_the_damage_lights_and_decals_its_parts_create() -> Result<(), Box<dyn Error>>
+    {
         let mut fake = FakeCache::new(CacheKind::CustomEdition);
         let damage = fake.add_tag(
             JPT,
@@ -126,7 +131,7 @@ mod tests {
             &vec![0u8; DAMAGE_EFFECT_SIZE],
         );
         let other = fake.add_tag(EFFE, "weapons\\test\\smoke", &[0u8; EFFECT_SIZE]);
-        let mut parts = vec![0u8; PART_SIZE * 3];
+        let mut parts = vec![0u8; PART_SIZE * 4];
         reference(&mut parts, PART_TAG_OFFSET, EFFE, fake.handle(other));
         let light = fake.add_tag(
             crate::light::LIGH,
@@ -145,9 +150,20 @@ mod tests {
             crate::light::LIGH,
             fake.handle(light),
         );
+        let decal = fake.add_tag(
+            crate::decal::DECA,
+            "effects\\decals\\scorch",
+            &vec![0u8; crate::decal::DECAL_SIZE],
+        );
+        reference(
+            &mut parts,
+            PART_SIZE * 3 + PART_TAG_OFFSET,
+            crate::decal::DECA,
+            fake.handle(decal),
+        );
         let parts = fake.add_data(&parts);
         let mut event = vec![0u8; EVENT_SIZE];
-        block(&mut event, PARTS_OFFSET, 3, parts);
+        block(&mut event, PARTS_OFFSET, 4, parts);
         let events = fake.add_data(&event);
         let mut effect = vec![0u8; EFFECT_SIZE];
         block(&mut effect, EVENTS_OFFSET, 1, events);
@@ -159,6 +175,8 @@ mod tests {
         assert_eq!(effect.damage[0].group.0, *b"jpt!");
         assert_eq!(effect.lights.len(), 1);
         assert_eq!(effect.lights[0].path, "weapons\\test\\flash");
+        assert_eq!(effect.decals.len(), 1);
+        assert_eq!(effect.decals[0].path, "effects\\decals\\scorch");
         Ok(())
     }
 }

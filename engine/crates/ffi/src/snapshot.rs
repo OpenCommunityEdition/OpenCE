@@ -28,9 +28,12 @@ pub const DEBUG_LABEL_BYTES: usize = 48;
 /// The most dynamic lights one snapshot holds.
 pub const MAX_LIGHTS: usize = 512;
 
+/// The most dynamic decals one snapshot holds.
+pub const MAX_DECALS: usize = 2048;
+
 /// Raised with any change to the snapshot's types, so that the app refuses
 /// a library of another layout.
-pub const SNAPSHOT_VERSION: u32 = 7;
+pub const SNAPSHOT_VERSION: u32 = 8;
 
 /// `ObjectSnapshot::flags`: the first-person weapon or hands, posed from
 /// the camera and drawn in front of the world.
@@ -186,6 +189,39 @@ pub struct LightSnapshot {
     pub source: u32,
 }
 
+/// `DecalSnapshot::modes`' picture when it has none: drawn as its colour.
+pub const DECAL_NO_PICTURE: u32 = u32::MAX;
+/// `DecalSnapshot::modes`' surface: the level's.
+pub const DECAL_ON_LEVEL: u32 = 1;
+/// `DecalSnapshot::modes`' surface: an object's.
+pub const DECAL_ON_OBJECT: u32 = 2;
+
+/// A dynamic decal: a mark an impact or an explosion left, laid as the
+/// level's decals are (laid out as the app's decal shader reads it).
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DecalSnapshot {
+    /// Its centre, then how far above and below its surface it reaches.
+    pub center: [f32; 4],
+    /// The way it faces forward on its surface, then its least reach that
+    /// way.
+    pub forward: [f32; 4],
+    /// The way to its left, then its least reach that way.
+    pub left: [f32; 4],
+    /// Its surface's normal, then 0.
+    pub up: [f32; 4],
+    /// Its greatest reach forward and left, then 0, 0.
+    pub reach: [f32; 4],
+    /// Its picture's texture coordinates: u0, v0, u1, v1.
+    pub uv: [f32; 4],
+    /// Its colour, linear, then its opacity.
+    pub color: [f32; 4],
+    /// Its framebuffer blend function, its layer, its picture (an index in
+    /// the level's decal pictures, or `DECAL_NO_PICTURE`) and the surface
+    /// it is laid on (`DECAL_ON_LEVEL` or `DECAL_ON_OBJECT`).
+    pub modes: [u32; 4],
+}
+
 /// A debug line, drawn after the world.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -253,10 +289,13 @@ pub struct FrameSnapshot {
     pub debug_labels: *const DebugLabel,
     /// The number of lights in `lights`.
     pub light_count: u32,
-    /// (zero)
-    pub reserved: u32,
+    /// The number of decals in `decals`.
+    pub decal_count: u32,
     /// The dynamic lights, in the same slot.
     pub lights: *const LightSnapshot,
+    /// The dynamic decals, layer by layer and picture by picture, in the
+    /// same slot.
+    pub decals: *const DecalSnapshot,
 }
 
 /// The sizes and offsets of the snapshot's types, as Rust laid them out;
@@ -313,6 +352,12 @@ pub struct SnapshotLayout {
     pub frame_lights_offset: u32,
     /// The size of `LightSnapshot`.
     pub light_size: u32,
+    /// `MAX_DECALS`.
+    pub max_decals: u32,
+    /// The offset of `FrameSnapshot::decals`.
+    pub frame_decals_offset: u32,
+    /// The size of `DecalSnapshot`.
+    pub decal_size: u32,
 }
 
 /// The layout of the snapshot's types.
@@ -347,6 +392,9 @@ pub fn snapshot_layout() -> SnapshotLayout {
         max_lights: n(MAX_LIGHTS),
         frame_lights_offset: n(offset_of!(FrameSnapshot, lights)),
         light_size: n(size_of::<LightSnapshot>()),
+        max_decals: n(MAX_DECALS),
+        frame_decals_offset: n(offset_of!(FrameSnapshot, decals)),
+        decal_size: n(size_of::<DecalSnapshot>()),
     }
 }
 
@@ -360,6 +408,7 @@ struct Slot {
     debug_lines: [DebugLine; MAX_DEBUG_LINES],
     debug_labels: [DebugLabel; MAX_DEBUG_LABELS],
     lights: [LightSnapshot; MAX_LIGHTS],
+    decals: [DecalSnapshot; MAX_DECALS],
 }
 
 impl Slot {
@@ -374,6 +423,7 @@ impl Slot {
         slot.frame.debug_lines = slot.debug_lines.as_ptr();
         slot.frame.debug_labels = slot.debug_labels.as_ptr();
         slot.frame.lights = slot.lights.as_ptr();
+        slot.frame.decals = slot.decals.as_ptr();
         slot
     }
 }
@@ -486,6 +536,13 @@ impl FrameBuilder<'_> {
         self.slot.frame.light_count = count as u32;
     }
 
+    /// Adds `decals`, as many as fit.
+    pub fn decals(&mut self, decals: &[DecalSnapshot]) {
+        let count = decals.len().min(MAX_DECALS);
+        self.slot.decals[..count].copy_from_slice(&decals[..count]);
+        self.slot.frame.decal_count = count as u32;
+    }
+
     /// Adds `draw`'s lines and labels, as many as fit.
     pub fn debug(&mut self, draw: &opence_dev::draw::DebugDraw) {
         let vector = |[x, y, z]: [f32; 3]| Vec3 { x, y, z };
@@ -542,6 +599,7 @@ impl SnapshotWriter {
         slot.frame.debug_line_count = 0;
         slot.frame.debug_label_count = 0;
         slot.frame.light_count = 0;
+        slot.frame.decal_count = 0;
         let result = fill(&mut FrameBuilder { slot });
         self.slot = buffers.middle.swap(self.slot | FRESH, Ordering::AcqRel) & INDEX;
         result
@@ -596,8 +654,12 @@ mod tests {
         assert_eq!(offset_of!(FrameSnapshot, debug_lines), 128);
         assert_eq!(offset_of!(FrameSnapshot, debug_labels), 136);
         assert_eq!(offset_of!(FrameSnapshot, light_count), 144);
+        assert_eq!(offset_of!(FrameSnapshot, decal_count), 148);
         assert_eq!(offset_of!(FrameSnapshot, lights), 152);
-        assert_eq!(size_of::<FrameSnapshot>(), 160);
+        assert_eq!(offset_of!(FrameSnapshot, decals), 160);
+        assert_eq!(size_of::<FrameSnapshot>(), 168);
+        assert_eq!(size_of::<DecalSnapshot>(), 128);
+        assert_eq!(offset_of!(DecalSnapshot, modes), 112);
         assert_eq!(size_of::<LightSnapshot>(), 88);
         assert_eq!(offset_of!(LightSnapshot, color), 64);
         assert_eq!(offset_of!(LightSnapshot, source), 84);
@@ -605,13 +667,16 @@ mod tests {
         assert_eq!(size_of::<DebugLine>(), 28);
         assert_eq!(size_of::<DebugLabel>(), 64);
         assert_eq!(offset_of!(DebugLabel, text), 16);
-        assert_eq!(SNAPSHOT_VERSION, 7);
+        assert_eq!(SNAPSHOT_VERSION, 8);
     }
 
     #[test]
     fn the_layout_record_reports_it() {
         let layout = snapshot_layout();
-        assert_eq!(layout.frame_size, 160);
+        assert_eq!(layout.frame_size, 168);
+        assert_eq!(layout.frame_decals_offset, 160);
+        assert_eq!(layout.decal_size, 128);
+        assert_eq!(layout.max_decals, 2048);
         assert_eq!(layout.frame_lights_offset, 152);
         assert_eq!(layout.light_size, 88);
         assert_eq!(layout.max_lights, 512);
@@ -732,6 +797,24 @@ mod tests {
         assert_eq!(ranges, vec![(0, 2), (2, 0), (2, 1)]);
         let xs: Vec<f32> = nodes(frame).iter().map(|n| n.current.position.x).collect();
         assert_eq!(xs, vec![1.0, 2.0, 3.0]);
+    }
+
+    #[test]
+    fn the_decals_are_copied_up_to_their_capacity_and_cleared() {
+        let (buffers, mut writer) = SnapshotBuffers::new();
+        let decal = DecalSnapshot {
+            modes: [1, 0, DECAL_NO_PICTURE, DECAL_ON_OBJECT],
+            ..Default::default()
+        };
+        writer.publish(&buffers, 1, 0.0, |frame| {
+            frame.decals(&vec![decal; MAX_DECALS + 3]);
+        });
+        let frame = read(&buffers);
+        assert_eq!(frame.decal_count as usize, MAX_DECALS);
+        // SAFETY: decals points at decal_count entries in the same slot.
+        assert_eq!(unsafe { (*frame.decals).modes[3] }, DECAL_ON_OBJECT);
+        writer.publish(&buffers, 2, 0.0, |_| {});
+        assert_eq!(read(&buffers).decal_count, 0);
     }
 
     #[test]

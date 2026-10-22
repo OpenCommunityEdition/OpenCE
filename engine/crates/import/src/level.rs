@@ -247,7 +247,13 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     let lens_flares = import_lens_flares(cache, &structure_bsps, &skies, &lights, &mut reached)?;
     let (light_volumes, glows) = import_widgets(cache, &objects, &mut reached)?;
     let decal_palette = crate::decal::decal_palette(&scenario)?;
-    let decals = crate::decal::import_decals(cache, &decal_palette, &structure_bsps, &mut reached)?;
+    let decals = crate::decal::import_decals(
+        cache,
+        &decal_palette,
+        &structure_bsps,
+        &effects,
+        &mut reached,
+    )?;
 
     // (a shader's extra layers are shaders too, reached as each is read)
     let mut shaders = Vec::new();
@@ -483,18 +489,30 @@ fn import_physics(
         .collect()
 }
 
-/// The effects `objects`' projectiles detonate with and their weapons'
-/// shots make, each once, by path.
+/// The effects `objects`' projectiles detonate with and make where they
+/// strike, and their weapons' shots make, each once, by path.
 fn import_effects(cache: &Cache, objects: &[ObjectDefinition]) -> Result<Vec<Effect>, ImportError> {
     let detonations = objects
         .iter()
         .filter_map(|object| object.projectile.as_ref()?.effect.as_ref());
+    let strikes = objects
+        .iter()
+        .filter_map(|object| object.projectile.as_ref())
+        .flat_map(|projectile| &projectile.material_responses)
+        .flat_map(|response| {
+            [
+                &response.default_effect,
+                &response.potential_effect,
+                &response.detonation_effect,
+            ]
+        })
+        .flatten();
     let shots = objects
         .iter()
         .filter_map(|object| object.weapon.as_ref())
         .flat_map(|weapon| &weapon.triggers)
         .filter_map(|trigger| trigger.firing_effect.as_ref());
-    let tags: BTreeSet<&TagRef> = detonations.chain(shots).collect();
+    let tags: BTreeSet<&TagRef> = detonations.chain(strikes).chain(shots).collect();
     let mut effects = Vec::with_capacity(tags.len());
     for tag in tags {
         // (a reference was checked to name a tag of the map when it was read)

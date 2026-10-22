@@ -155,6 +155,16 @@ pub(crate) struct Basis {
     pub up: Vector,
 }
 
+/// A decal laid, and how long it lasts.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Laid {
+    pub decal: RenderDecal,
+    /// The seconds it lasts before it fades (0: until it is recycled).
+    pub lifetime: f32,
+    /// The seconds it fades over, at the end of its life.
+    pub decay: f32,
+}
+
 /// What a decal shares with the one it hands its geometry on to.
 #[derive(Clone, Copy, Debug)]
 struct Geometry {
@@ -174,7 +184,7 @@ pub(crate) fn lay(
     velocity: Vector,
     seed: &mut RandomSeed,
     texture: &mut dyn FnMut(&Bitmap, u16) -> Option<u32>,
-) -> Vec<RenderDecal> {
+) -> Vec<Laid> {
     let mut laid = Vec::new();
     let mut inherited: Option<Geometry> = None;
     let mut current = Some(decal);
@@ -200,8 +210,8 @@ pub(crate) fn lay(
             }
         };
         let (extent, uv, image) = extent(decal, bitmap, geometry.sequence, geometry.radius);
-        let _lifetime = range(seed, decal.lifetime);
-        let _decay = range(seed, decal.decay_time);
+        let lifetime = range(seed, decal.lifetime);
+        let decay = range(seed, decal.decay_time);
         let intensity = range(seed, decal.intensity);
         let t = seed.next_real();
         let color = crate::lights::interpolate(
@@ -223,7 +233,7 @@ pub(crate) fn lay(
         let reach = extent
             .iter()
             .fold(0.0f32, |reach, value| reach.max(value.abs()));
-        laid.push(RenderDecal {
+        let decal_laid = RenderDecal {
             x: centre[0],
             y: centre[1],
             z: centre[2],
@@ -252,6 +262,11 @@ pub(crate) fn lay(
             alpha: intensity,
             blend: u32::try_from(decal.framebuffer_blend_function).unwrap_or(0),
             layer: u32::try_from(decal.layer).unwrap_or(0),
+        };
+        laid.push(Laid {
+            decal: decal_laid,
+            lifetime,
+            decay,
         });
         inherited = (decal.flags & Decal::GEOMETRY_INHERITED != 0).then_some(geometry);
         current = decal.next.as_ref().and_then(|next| level.decal(next));
@@ -350,19 +365,36 @@ fn extent(
     )
 }
 
-/// A triangle of the BSP, with its front's normal.
-struct Triangle {
+/// A triangle of the BSP, with its front's normal and what it is made
+/// of.
+#[derive(Debug)]
+pub(crate) struct Triangle {
     corners: [Vector; 3],
     normal: Vector,
     least: Vector,
     greatest: Vector,
+    pub(crate) material: i16,
+}
+
+/// Where a ray met the BSP: the point, the surface's normal there, and
+/// its shader's material type (-1: none).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Hit {
+    pub point: Vector,
+    pub normal: Vector,
+    pub material: i16,
 }
 
 /// The BSP's drawn triangles, each facing the way its vertices' normals
 /// do, sorted by their least x.
-fn triangles(structure: &StructureBsp) -> Vec<Triangle> {
+pub(crate) fn triangles(level: &Level, structure: &StructureBsp) -> Vec<Triangle> {
     let mut triangles = Vec::new();
     for material in structure.lightmaps.iter().flat_map(|page| &page.materials) {
+        let kind = material
+            .shader
+            .as_ref()
+            .and_then(|shader| level.shader(shader))
+            .map_or(-1, |shader| shader.material_type);
         let first = material.first_surface as usize;
         let count = material.surface_count as usize;
         for surface in structure.surfaces.iter().skip(first).take(count) {
@@ -393,6 +425,7 @@ fn triangles(structure: &StructureBsp) -> Vec<Triangle> {
                 normal,
                 least,
                 greatest,
+                material: kind,
             });
         }
     }
@@ -427,35 +460,38 @@ fn hit(triangle: &Triangle, origin: Vector, direction: Vector) -> Option<f32> {
     Some(dot(e2, q) * inverse)
 }
 
-/// Where each of `rays` (an origin and a unit direction, `RAY_LENGTH`
-/// long) first meets a front of the BSP, and that surface's normal.
-fn cast(structure: &StructureBsp, rays: &[(Vector, Vector)]) -> Vec<Option<(Vector, Vector)>> {
-    let triangles = triangles(structure);
-    rays.iter()
-        .map(|&(origin, direction)| {
-            let end = add(origin, scale(direction, RAY_LENGTH));
-            let least = [0, 1, 2].map(|axis| origin[axis].min(end[axis]));
-            let greatest = [0, 1, 2].map(|axis| origin[axis].max(end[axis]));
-            // (the triangles are sorted by their least x: none past the
-            // ray's greatest x can meet it)
-            let past = triangles.partition_point(|triangle| triangle.least[0] <= greatest[0]);
-            triangles[..past]
-                .iter()
-                .filter(|triangle| {
-                    (0..3).all(|axis| {
-                        triangle.least[axis] <= greatest[axis]
-                            && triangle.greatest[axis] >= least[axis]
-                    })
-                })
-                .filter_map(|triangle| {
-                    hit(triangle, origin, direction)
-                        .filter(|t| (0.0..=RAY_LENGTH).contains(t))
-                        .map(|t| (t, triangle.normal))
-                })
-                .min_by(|a, b| a.0.total_cmp(&b.0))
-                .map(|(t, normal)| (add(origin, scale(direction, t)), normal))
+/// Where a ray from `origin` along the unit `direction` first meets a
+/// front of `triangles` within `length`, if it does.
+pub(crate) fn first_hit(
+    triangles: &[Triangle],
+    origin: Vector,
+    direction: Vector,
+    length: f32,
+) -> Option<Hit> {
+    let end = add(origin, scale(direction, length));
+    let least = [0, 1, 2].map(|axis| origin[axis].min(end[axis]));
+    let greatest = [0, 1, 2].map(|axis| origin[axis].max(end[axis]));
+    // (the triangles are sorted by their least x: none past the ray's
+    // greatest x can meet it)
+    let past = triangles.partition_point(|triangle| triangle.least[0] <= greatest[0]);
+    triangles[..past]
+        .iter()
+        .filter(|triangle| {
+            (0..3).all(|axis| {
+                triangle.least[axis] <= greatest[axis] && triangle.greatest[axis] >= least[axis]
+            })
         })
-        .collect()
+        .filter_map(|triangle| {
+            hit(triangle, origin, direction)
+                .filter(|t| (0.0..=length).contains(t))
+                .map(|t| (t, triangle))
+        })
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(t, triangle)| Hit {
+            point: add(origin, scale(direction, t)),
+            normal: triangle.normal,
+            material: triangle.material,
+        })
 }
 
 /// The decals the level's BSP `structure` lays when it is loaded, layer by
@@ -471,9 +507,9 @@ pub(crate) fn level_decals(
         .iter()
         .map(|decal| (decal.position, runtime_direction(decal.yaw, decal.pitch)))
         .collect();
-    let hits = cast(structure, &rays);
+    let triangles = triangles(level, structure);
     let mut laid = Vec::new();
-    for ((runtime, &(origin, direction)), hit) in structure.decals.iter().zip(&rays).zip(hits) {
+    for (runtime, &(origin, direction)) in structure.decals.iter().zip(&rays) {
         let Some(decal) = level
             .scenario
             .decal_palette
@@ -488,11 +524,18 @@ pub(crate) fn level_decals(
         }
         // (a decal whose ray meets nothing is laid where it starts,
         // facing back along it)
-        let (position, normal) = hit.unwrap_or((origin, scale(direction, -1.0)));
+        let (position, normal) = first_hit(&triangles, origin, direction, RAY_LENGTH)
+            .map_or((origin, scale(direction, -1.0)), |hit| {
+                (hit.point, hit.normal)
+            });
         let mut seed = seed(runtime.position);
-        laid.extend(lay(
-            level, decal, position, normal, direction, &mut seed, texture,
-        ));
+        laid.extend(
+            lay(
+                level, decal, position, normal, direction, &mut seed, texture,
+            )
+            .into_iter()
+            .map(|laid| laid.decal),
+        );
     }
     laid.sort_by_key(|decal| decal.layer);
     laid
@@ -704,7 +747,8 @@ mod tests {
         );
         // (forward is -bitangent: n × (n × v), against the throw's
         // horizontal)
-        assert!(near(laid[0].forward_x, 1.0) && near(laid[0].forward_y, 0.0));
+        let aimed = &laid[0].decal;
+        assert!(near(aimed.forward_x, 1.0) && near(aimed.forward_y, 0.0));
         let mut random = before;
         let turned = lay(
             &level,

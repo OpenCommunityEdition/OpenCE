@@ -358,6 +358,11 @@ public final class LevelRenderer {
     /// The frame's dynamic lights, already between their ticks (set
     /// before each frame, as `time` is).
     public var lights: [OCELightSnapshot] = []
+    /// The frame's decals laid while the game runs (set before each frame,
+    /// as `time` is).
+    public var laidDecals: [OCEDecalSnapshot] = []
+    /// The laid decals drawn in the last frame.
+    public var laidDecalsDrawn: Int { decals.laidCount }
     /// The dynamic lights' cells, gels and shadows.
     let lightPass: LightPass
     /// How many dynamic lights the last frame drew, and how many cast
@@ -554,7 +559,7 @@ public final class LevelRenderer {
         cameraPass = try CameraPass(device: device, source: ShaderSources.source(.camera),
                                     images: geometry.cameraTextures().map { texture($0) })
         decals = try DecalPass(device: device, source: ShaderSources.source(.decal), decals: geometry.decals(),
-                               texture: { texture($0) })
+                               texture: { texture($0) }, pictures: geometry.decalTextures().map { texture($0) })
         exposureLimits = geometry.exposureLimits()
         sky = geometry.sky()
 
@@ -862,7 +867,7 @@ public final class LevelRenderer {
         guard let screenTargets else { return }
         if switches.decals {
             decals.encode(into: commands, frame: frame, depth: depth, surface: screenTargets.surface,
-                          viewProjection: viewProjection, eye: camera.position)
+                          viewProjection: viewProjection, eye: camera.position, laid: laidDecals)
         }
         let screenUniforms = ScreenUniforms(viewProjection: viewProjection, eye: camera.position,
                                             sunTowards: towards == nil ? .zero : sun.towards, width: frame.width,

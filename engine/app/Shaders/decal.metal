@@ -1,6 +1,6 @@
-// The decals laid on the level (DecalPass.swift): each a box about its
-// surface, drawn by its back faces, projecting its picture onto the level
-// surfaces inside it that face its way, blended with the frame as its
+// The decals (DecalPass.swift): each a box about its surface, drawn by its
+// back faces, projecting its picture onto the surfaces of its kind (the
+// level's or the objects') inside it that face its way, blended with the frame as its
 // framebuffer blend function says (read from the frame: Apple GPUs blend
 // in the shader).
 
@@ -23,11 +23,11 @@ struct Decal {
     float4 reach;    // the greatest reach along forward and left, then 0, 0
     float4 uv;       // u0, v0, u1, v1
     float4 color;    // linear rgb, and its brightness
-    uint4 modes;     // its blend function, its layer, whether it has a picture
+    uint4 modes;     // its blend function, its layer, its picture (NO_PICTURE: none),
+                     // the kind of surface it is laid on (level.metal's surface.w)
 };
 
-// (level.metal's Opaque surface.w)
-constant float SURFACE_LEVEL = 1;
+constant uint NO_PICTURE = 0xFFFFFFFF;
 constant uint LAYER_ALPHA_TESTED = 3;
 // a surface turned further than this from the decal's up is not drawn on
 constant float LEAST_FACING = 0.3;
@@ -103,7 +103,7 @@ fragment float4 decal_fragment(DecalVertex in [[stage_in]], float4 dst [[color(0
     const device Decal &decal = decals[in.decal];
     uint2 pixel = uint2(in.position.xy);
     float4 surface = surfaces.read(pixel);
-    if (surface.w != SURFACE_LEVEL || dot(surface.xyz, decal.up.xyz) < LEAST_FACING) {
+    if (surface.w != float(decal.modes.w) || dot(surface.xyz, decal.up.xyz) < LEAST_FACING) {
         discard_fragment();
     }
     float z = depth.read(pixel);
@@ -118,7 +118,7 @@ fragment float4 decal_fragment(DecalVertex in [[stage_in]], float4 dst [[color(0
     float2 t = float2((local.x - decal.forward.w) / max(decal.reach.x - decal.forward.w, 1e-6),
                       (local.y - decal.left.w) / max(decal.reach.y - decal.left.w, 1e-6));
     float2 uv = mix(decal.uv.xy, decal.uv.zw, t);
-    float4 texel = decal.modes.z != 0 ? picture.sample(linear, uv) : float4(1);
+    float4 texel = decal.modes.z != NO_PICTURE ? picture.sample(linear, uv) : float4(1);
     if (decal.modes.y == LAYER_ALPHA_TESTED && texel.a < 0.5) {
         discard_fragment();
     }

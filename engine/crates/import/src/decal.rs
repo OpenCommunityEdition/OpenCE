@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use opence_content::{Decal, LevelDecal, StructureBsp, TagRef};
+use opence_content::{Decal, Effect, LevelDecal, StructureBsp, TagRef};
 
 use crate::cache::Cache;
 use crate::error::ImportError;
@@ -111,12 +111,15 @@ pub(crate) fn import_decals(
     cache: &Cache,
     palette: &[Option<TagRef>],
     structure_bsps: &[StructureBsp],
+    effects: &[Effect],
     reached: &mut Reached,
 ) -> Result<Vec<Decal>, ImportError> {
     let mut decals: Vec<Decal> = Vec::new();
     let mut imported: BTreeSet<TagRef> = BTreeSet::new();
     let used = structure_bsps.iter().any(|bsp| !bsp.decals.is_empty());
-    for start in palette.iter().flatten().filter(|_| used) {
+    let laid = palette.iter().flatten().filter(|_| used);
+    let made = effects.iter().flat_map(|effect| &effect.decals);
+    for start in laid.chain(made) {
         let mut tag = Some(start.clone());
         for _ in 0..MAX_CHAIN {
             let Some(current) = tag.take() else { break };
@@ -133,4 +136,40 @@ pub(crate) fn import_decals(
     }
     decals.sort_by(|a, b| a.tag.path.cmp(&b.tag.path));
     Ok(decals)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cache::CacheKind;
+    use crate::fake::FakeCache;
+    use std::error::Error;
+
+    #[test]
+    fn the_decals_effects_lay_are_imported_without_a_bsp_using_any() -> Result<(), Box<dyn Error>> {
+        let mut fake = FakeCache::new(CacheKind::CustomEdition);
+        let mut bytes = [0u8; DECAL_SIZE];
+        crate::level::tests::empty(&mut bytes, 0x08);
+        crate::level::tests::empty(&mut bytes, 0xD8);
+        let made = fake.add_tag(DECA, "effects\\decals\\bullet", &bytes);
+        let unused = fake.add_tag(DECA, "decals\\unused", &bytes);
+        let cache = Cache::open(fake.build())?;
+        let effect = Effect {
+            tag: TagRef {
+                group: opence_content::Group(*b"effe"),
+                path: "effects\\impact".into(),
+            },
+            damage: Vec::new(),
+            debris: Vec::new(),
+            lights: Vec::new(),
+            decals: vec![tag_ref(&cache, made)],
+        };
+        let palette = [Some(tag_ref(&cache, unused))];
+        let mut reached = Reached::default();
+        let decals = import_decals(&cache, &palette, &[], &[effect], &mut reached)?;
+        let paths: Vec<&str> = decals.iter().map(|d| d.tag.path.as_str()).collect();
+        // (no BSP lays the palette's)
+        assert_eq!(paths, ["effects\\decals\\bullet"]);
+        Ok(())
+    }
 }

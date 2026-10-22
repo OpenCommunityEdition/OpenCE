@@ -2,6 +2,7 @@ import Foundation
 import Metal
 import OpenCEEngineCore
 import OpenCEEngineRender
+import opence_ffiFFI
 import simd
 import XCTest
 
@@ -47,8 +48,8 @@ final class DecalTests: XCTestCase {
 
     /// The frame's red at its centre and corner after `decals` are laid on
     /// a grey wall whose surfaces are `kind` (1: the level's).
-    private func lay(_ decals: [RenderDecal], kind: Float = 1, eye: SIMD3<Float> = .zero) throws
-        -> (centre: Float, corner: Float) {
+    private func lay(_ decals: [RenderDecal], laid: [OCEDecalSnapshot] = [], kind: Float = 1,
+                     eye: SIMD3<Float> = .zero) throws -> (centre: Float, corner: Float) {
         let device = try XCTUnwrap(MTLCreateSystemDefaultDevice(), "no Metal device")
         let queue = try XCTUnwrap(device.makeCommandQueue())
         let pass = try DecalPass(device: device, source: try ShaderSources.source(.decal), decals: decals,
@@ -76,7 +77,8 @@ final class DecalTests: XCTestCase {
         clear.depthAttachment.clearDepth = Double(wall.z / wall.w)
         try XCTUnwrap(commands.makeRenderCommandEncoder(descriptor: clear)).endEncoding()
         pass.encode(into: commands, frame: frame, depth: depth, surface: surface, viewProjection: viewProjection,
-                    eye: eye)
+                    eye: eye, laid: laid)
+        XCTAssertEqual(pass.laidCount, laid.count)
         commands.commit()
         commands.waitUntilCompleted()
         let pixels = try reds(frame, queue: queue)
@@ -105,6 +107,37 @@ final class DecalTests: XCTestCase {
         let away = try lay([decal(blend: 1, red: 0.5, facing: 1)])
         XCTAssertEqual(away.centre, 0.5, "a decal was laid on a surface facing away from it")
         XCTAssertEqual(try lay([]).centre, 0.5)
+    }
+
+    /// The decal `decal(blend:red:)` makes, as the snapshot gives it, laid
+    /// on surfaces of `kind`.
+    private func laid(blend: UInt32, red: Float, kind: UInt32) -> OCEDecalSnapshot {
+        let decal = decal(blend: blend, red: red)
+        return OCEDecalSnapshot(center: (decal.x, decal.y, decal.z, decal.depth),
+                                forward: (decal.forwardX, decal.forwardY, decal.forwardZ, decal.forwardLeast),
+                                left: (decal.leftX, decal.leftY, decal.leftZ, decal.leftLeast),
+                                up: (decal.upX, decal.upY, decal.upZ, 0),
+                                reach: (decal.forwardGreatest, decal.leftGreatest, 0, 0),
+                                uv: (decal.u0, decal.v0, decal.u1, decal.v1),
+                                color: (decal.red, decal.green, decal.blue, decal.alpha),
+                                modes: (blend, 0, UInt32(OCE_DECAL_NO_PICTURE), kind))
+    }
+
+    func testTheSnapshotsDecalsAreLaidOnTheSurfacesTheyWereLaidOn() throws {
+        let onObject = laid(blend: 1, red: 0.5, kind: UInt32(OCE_DECAL_ON_OBJECT))
+        let onLevel = laid(blend: 1, red: 0.5, kind: UInt32(OCE_DECAL_ON_LEVEL))
+        XCTAssertEqual(try lay([], laid: [onObject], kind: 2).centre, 0.25, accuracy: 0.01,
+                       "a decal was not laid on its object")
+        XCTAssertEqual(try lay([], laid: [onObject]).centre, 0.5, "an object's decal was laid on the level")
+        XCTAssertEqual(try lay([], laid: [onLevel]).centre, 0.25, accuracy: 0.01,
+                       "a decal was not laid on the level")
+        // (the level's own and the snapshot's, the snapshot's over them)
+        let both = try lay([decal(blend: 1, red: 0.5)], laid: [laid(blend: 3, red: 0.25, kind: 1)])
+        XCTAssertEqual(both.centre, 0.5, accuracy: 0.01, "the snapshot's decals were not laid after the level's")
+        // (a picture that is not loaded draws as its colour)
+        var unknown = onLevel
+        unknown.modes.2 = 7
+        XCTAssertEqual(try lay([], laid: [unknown]).centre, 0.25, accuracy: 0.01)
     }
 
     func testTheSwitchIsReadFromTheShell() {
