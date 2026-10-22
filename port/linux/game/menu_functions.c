@@ -4770,11 +4770,20 @@ static struct widget_instance *focused_leaf(struct widget_instance *widget)
 	return widget;
 }
 
-/* "port lobby open" (the lobby made, or come back to): no player being added */
+/* "port lobby open" (the lobby made, or come back to): no player being added.
+the split rows stay hidden until the lobby knows the game is hardcore. */
 static boolean lobby_join_reset(void)
 {
 	lobby_join.adding = FALSE;
 	lobby_join.controller = NONE;
+	return TRUE;
+}
+
+static boolean lobby_open(struct widget_instance *screen)
+{
+	lobby_join_reset();
+	visible_set(named(screen, "lobby_views", 0), FALSE);
+	visible_set(named(screen, "lobby_view_slot", 0), FALSE);
 	return TRUE;
 }
 
@@ -4880,7 +4889,13 @@ static void lobby_join_help(struct widget_instance *list)
 	wchar_t const *text = L"";
 	short controller;
 
-	if (lobby_join.adding)
+	/* the split rows are this machine's, so the line says so while one is chosen */
+	if (list->focused_child && (!strcmp(list->focused_child->name, "lobby_views") ||
+		!strcmp(list->focused_child->name, "lobby_view_slot")))
+	{
+		text = L"This machine only.";
+	}
+	else if (lobby_join.adding)
 	{
 		text = L"New player: press START.";
 	}
@@ -5017,6 +5032,61 @@ void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d c
 	}
 }
 
+/* the variant the host sent. classic games do not carry the hardcore bit.
+the host's lobby can still be holding the game from before those rules
+were chosen, so the game this machine is hosting counts, and so does
+having opened the mode here. */
+static boolean lobby_is_hardcore(struct network_game *game)
+{
+	void *server = global_network_game_server_get();
+	struct network_game *hosted = server ? network_game_server_get_game(server) : NULL;
+
+	if (hosted && TEST_FLAG(hosted->variant.universal_variant.flags,
+		_game_variant_anniversary_rules_bit))
+	{
+		/* the rest of the lobby reads the client's copy */
+		if (game)
+			game->variant = hosted->variant;
+		return TRUE;
+	}
+	if (server && multiplayer.hardcore)
+		return TRUE;
+	return game && TEST_FLAG(game->variant.universal_variant.flags,
+		_game_variant_anniversary_rules_bit) ? TRUE : FALSE;
+}
+
+/* teammate views are this machine's. a hardcore lobby shows the rows for
+whoever is waiting, and writes a change as they make it so the match uses
+it. the host's choice does not leave the host. */
+static void lobby_views_apply(struct widget_instance *list, boolean hardcore)
+{
+	struct widget_instance *views = named(list, "lobby_views", 0);
+	struct widget_instance *slot = named(list, "lobby_view_slot", 0);
+	struct widget_instance *spinner;
+
+	visible_set(views, hardcore);
+	visible_set(slot, hardcore);
+	/* the lobby row's bar is its second frame. the list does not switch a
+	three-frame picture, so the focused row is set here. */
+	if (views)
+		views->animation.current_frame_index = hardcore && list->focused_child == views ? 1 : 0;
+	if (slot)
+		slot->animation.current_frame_index = hardcore && list->focused_child == slot ? 1 : 0;
+	if (!hardcore)
+	{
+		if (list->focused_child && (!strcmp(list->focused_child->name, "lobby_views") ||
+			!strcmp(list->focused_child->name, "lobby_view_slot")))
+			focus_row(list, NONE);
+		return;
+	}
+	spinner = named(views, "lobby_views_spinner", 0);
+	if (spinner)
+		setting_save(spinner);
+	spinner = named(slot, "lobby_view_slot_spinner", 0);
+	if (spinner)
+		setting_save(spinner);
+}
+
 /* "port lobby update" */
 static void lobby_update(struct widget_instance *list)
 {
@@ -5026,6 +5096,9 @@ static void lobby_update(struct widget_instance *list)
 	short state_data, state = client ? network_game_client_get_state(client, &state_data) : NONE;
 	wchar_t text[LOBBY_TEXT_LENGTH];
 	short index;
+	boolean hardcore = lobby_is_hardcore(game);
+	/* the last two player rows are the split choices */
+	short rows = hardcore ? (short)(LOBBY_ROWS - 2) : LOBBY_ROWS;
 
 	lobby_player_count = 0;
 	for (index = 0; game && state >= _client_state_pregame && index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; index++)
@@ -5033,16 +5106,16 @@ static void lobby_update(struct widget_instance *list)
 		if (network_player_is_valid(&game->players[index]))
 			lobby_players[lobby_player_count++] = &game->players[index];
 	}
-	list_scroll(list, &multiplayer.lobby_first, lobby_player_count, LOBBY_ROWS);
-	if (multiplayer.lobby_first > MAX(0, lobby_player_count - LOBBY_ROWS))
-		multiplayer.lobby_first = (short)MAX(0, lobby_player_count - LOBBY_ROWS);
-	rows_update(list, (short)MIN(lobby_player_count, LOBBY_ROWS), lobby_row_text);
+	list_scroll(list, &multiplayer.lobby_first, lobby_player_count, rows);
+	if (multiplayer.lobby_first > MAX(0, lobby_player_count - rows))
+		multiplayer.lobby_first = (short)MAX(0, lobby_player_count - rows);
+	rows_update(list, (short)MIN(lobby_player_count, rows), lobby_row_text);
 	/* (the rows' players, for their speaker icons) */
 	{
 		struct widget_instance *row = list->child;
 
 		lobby_icons.count = 0;
-		for (index = 0; row && index < MIN(lobby_player_count, LOBBY_ROWS); row = row->next, index++)
+		for (index = 0; row && index < MIN(lobby_player_count, rows); row = row->next, index++)
 		{
 			if (strncmp(row->name, "list_item_", 10))
 				break;
@@ -5052,6 +5125,10 @@ static void lobby_update(struct widget_instance *list)
 		}
 		lobby_icons.updated_at = system_milliseconds();
 	}
+	lobby_views_apply(list, hardcore);
+	/* a player row the split choices took over cannot keep the focus */
+	if (hardcore && focused_row(list) >= rows)
+		focus_row(list, (short)(rows - 1));
 	lobby_join_help(list);
 	visible_set(named(list, "lobby_button_team", 0), game && game->variant.universal_variant.teams);
 	/* (the buttons' focus, off Switch Team when it is hidden) */
@@ -7247,7 +7324,7 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "port lobby open"))
 		{
-			return lobby_join_reset();
+			return lobby_open(widget);
 		}
 		else if (!strcmp(name, "port lobby add player"))
 		{

@@ -1354,10 +1354,46 @@ SETUP_OPTION_SCREENS = [
 ]
 
 
+def _lobby_local_row(base: str, key: str, label: str, setting: str, strings: str, values: str) -> list:
+    """one lobby row of this machine's config. a hardcore lobby shows it
+    for the host and for each client, and the value stays on that machine."""
+    wide = _choice_wide(strings)
+    # the options page puts a short value at 320 and a long one at 286, in a
+    # 512-wide row. the lobby row is 390, so both move left by that difference
+    # and the values stay in the same column, inside the row's bar.
+    spin_x = (286 if wide else 320) - (512 - 390)
+    lines = _widget(f"{base}/{key}", [("width", 390), ("height", 28),
+                                      ("flags", "pass_unhandled_to_focused_child"),
+                                      ("bitmap", "bitmaps/sel_list_item_bkd"), ("color", "#FF2896FF")],
+                    [f'<child widget="{base}/{key}_label"/>',
+                     f'<child widget="{base}/{key}_spinner" x="{spin_x}" y="1"/>'])
+    lines += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1),
+                                             ("width", spin_x + (-13 if wide else -6) - 8), ("height", 22),
+                                             ("text", label),
+                                             ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
+                                             ("text_x", 13), ("text_y", 4)], [])
+    lines += _widget(f"{base}/{key}_spinner", [("type", "spinner"), ("left", None if wide else 3), ("top", 2),
+                                               ("width", 206 if wide else 147), ("height", 20),
+                                               ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                                               ("strings", strings), ("setting", setting), ("values", values),
+                                               ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center"),
+                                               ("text_y", 4 if wide else 1),
+                                               ("header_bitmap", "bitmaps/arrow_sm_left"),
+                                               ("footer_bitmap", "bitmaps/arrow_sm_right"),
+                                               ("header_bounds", "7 -13 19 -7" if wide else "7 -6 19 0"),
+                                               ("footer_bounds", "7 208 19 214" if wide else "7 150 19 156")],
+                     ['<on event="created" run="port setting load"/>',
+                      '<on event="deleted" run="port setting save"/>',
+                      '<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+    return lines
+
+
 def _lobby() -> list:
     """the lobby the host's and the joining players wait in (the Xbox's
     pregame's functions, which need no widget of theirs): up to the port's
-    128 players, scrolling; the game's map and gametype; the countdown"""
+    128 players, scrolling; the game's map and gametype; the countdown.
+    A hardcore game also has this machine's teammate views and which pane
+    is yours. Those stay on this machine."""
     base = f"{MT}/lobby"
     # (split screen: another controller's START joins it, its B leaves alone:
     # menu_functions.c's lobby_join. After a game it is the only screen,
@@ -1390,6 +1426,10 @@ def _lobby() -> list:
                                             ("description", f"{base}/lobby_desc")],
                      ['<data input="net splitscreen prejoin players"/>', '<data input="port lobby update"/>',
                       *rows,
+                      # (hardcore only: menu_functions.c shows these and gives
+                      # them the last two player rows. a classic lobby hides them)
+                      f'<child widget="{base}/lobby_views" x="20" y="343"/>',
+                      f'<child widget="{base}/lobby_view_slot" x="20" y="373"/>',
                       f'<child widget="{base}/lobby_button_bar" y="414"/>'])
     for index in range(11):
         lines += _widget(f"{base}/list_item_{index}",
@@ -1399,6 +1439,11 @@ def _lobby() -> list:
                          ['<on event="left right" run="swap player team"/>',
                           '<child widget="main_menu/new_select/list_item_text" x="25"/>',
                           '<child widget="main_menu/new_select/list_item_arrows"/>'])
+    lines += _lobby_local_row(base, "lobby_views", "SPLIT SCREEN", "display.teammate_views",
+                              "OFF|ON", "false|true")
+    lines += _lobby_local_row(base, "lobby_view_slot", "YOUR VIEW", "display.teammate_view_slot",
+                              "TOP|BOTTOM|TOP LEFT|TOP RIGHT|BOTTOM LEFT|BOTTOM RIGHT",
+                              "top|bottom|top_left|top_right|bottom_left|bottom_right")
     lines += _widget(f"{base}/lobby_desc", [("width", 640), ("height", 480)],
                      ['<child widget="main_menu/current_profile_name"/>',
                       f'<child widget="{base}/lobby_right_item" x="22" y="2"/>'])
