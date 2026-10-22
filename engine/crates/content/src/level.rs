@@ -213,6 +213,63 @@ pub struct Sky {
     pub outdoor_fog: AtmosphericFog,
     /// The fog inside.
     pub indoor_fog: AtmosphericFog,
+    /// The light that fills the level's insides, everywhere.
+    pub indoor_ambient: SkyAmbient,
+    /// The light the sky gives, from every direction it is seen in.
+    pub outdoor_ambient: SkyAmbient,
+    /// Its lights: the sun, and any others far away.
+    pub lights: Vec<SkyLight>,
+}
+
+/// A sky's ambient light: its colour and power.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct SkyAmbient {
+    /// Its colour.
+    pub color: [f32; 3],
+    /// Its power.
+    pub power: f32,
+}
+
+/// A light of a sky: far away, so its light comes from one direction.
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct SkyLight {
+    /// Its flags: 0 affects exteriors, 1 affects interiors.
+    pub flags: u32,
+    /// Its colour.
+    pub color: [f32; 3],
+    /// Its power.
+    pub power: f32,
+    /// How far its lens flare's occlusion test reaches.
+    pub test_distance: f32,
+    /// Where it is: yaw and pitch, in radians.
+    pub direction: [f32; 2],
+    /// How wide it looks, in radians (its shadows' softness).
+    pub diameter: f32,
+}
+
+impl SkyLight {
+    /// The unit vector towards it (`vector3d_from_euler_angles2d`).
+    pub fn towards(&self) -> [f32; 3] {
+        let [yaw, pitch] = self
+            .direction
+            .map(|angle| if angle.is_finite() { angle } else { 0.0 });
+        [
+            libm::cosf(yaw) * libm::cosf(pitch),
+            libm::sinf(yaw) * libm::cosf(pitch),
+            libm::sinf(pitch),
+        ]
+    }
+
+    /// Its colour times its power: the light it gives.
+    pub fn radiance(&self) -> [f32; 3] {
+        let power = if self.power.is_finite() {
+            self.power.max(0.0)
+        } else {
+            0.0
+        };
+        self.color
+            .map(|channel| crate::material::linear(channel) * power)
+    }
 }
 
 /// A sky's fog: from its start distance to its opaque distance, the view

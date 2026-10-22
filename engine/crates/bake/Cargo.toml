@@ -1,0 +1,17 @@
+[package]
+name = "opence_bake"
+description = "The level's light baked again: its scene, a hierarchy of its triangles and a path tracer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+libm.workspace = true
+opence_content.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+opence_import.workspace = true

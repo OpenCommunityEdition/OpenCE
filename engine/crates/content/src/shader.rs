@@ -15,6 +15,28 @@ pub struct Shader {
     pub class: ShaderClass,
     /// What the lighting reads of it ([`SurfaceMaterial::of`] its class).
     pub material: SurfaceMaterial,
+    /// The light it gives and passes, as the original's radiosity took it.
+    pub radiosity: ShaderRadiosity,
+}
+
+/// What every shader says of its part in the original's radiosity (the
+/// shader's own first 0x28 bytes).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ShaderRadiosity {
+    /// Its flags: 0 simple parameterization, 1 ignore normals, 2
+    /// transparent lit.
+    pub flags: u16,
+    /// How much light it gives (0: none).
+    pub power: f32,
+    /// The colour of the light it gives.
+    pub color: [f32; 3],
+    /// The tint of the light passing through it.
+    pub tint: [f32; 3],
+}
+
+impl ShaderRadiosity {
+    /// The flag that it lets light through, tinted.
+    pub const TRANSPARENT_LIT: u16 = 1 << 2;
 }
 
 impl Shader {
@@ -25,6 +47,7 @@ impl Shader {
             material_type,
             material: SurfaceMaterial::of(&class),
             class,
+            radiosity: ShaderRadiosity::default(),
         }
     }
 }

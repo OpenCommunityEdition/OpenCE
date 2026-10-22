@@ -13,6 +13,7 @@ publish = false
 rust-version = "1.98"
 
 [workspace.dependencies]
+opence_bake = { path = "crates/bake" }
 opence_content = { path = "crates/content" }
 opence_import = { path = "crates/import" }
 opence_sim = { path = "crates/sim" }

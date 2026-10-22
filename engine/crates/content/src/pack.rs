@@ -24,7 +24,7 @@ use rkyv::util::AlignedVec;
 use crate::Level;
 
 /// The version of this format; a pack of another is not read.
-pub const FORMAT_VERSION: u32 = 27;
+pub const FORMAT_VERSION: u32 = 28;
 
 const MAGIC: [u8; 4] = *b"OCPK";
 const HEADER_SIZE: usize = 0x28;
@@ -256,6 +256,22 @@ mod tests {
                     start_distance: 0.0,
                     opaque_distance: 0.0,
                 },
+                indoor_ambient: crate::SkyAmbient {
+                    color: [0.1, 0.1, 0.12],
+                    power: 0.5,
+                },
+                outdoor_ambient: crate::SkyAmbient {
+                    color: [0.4, 0.5, 0.6],
+                    power: 1.0,
+                },
+                lights: vec![crate::SkyLight {
+                    flags: 3,
+                    color: [1.0, 0.95, 0.8],
+                    power: 2.0,
+                    test_distance: 100.0,
+                    direction: [0.5, 1.0],
+                    diameter: 0.02,
+                }],
             }],
             damage_effects: Vec::new(),
             collision_models: Vec::new(),

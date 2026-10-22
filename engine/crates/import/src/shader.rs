@@ -3,7 +3,7 @@
 use opence_content::{
     AnimatedColor, ChicagoMap, EnvironmentAnimation, EnvironmentShader, GenericMap, GenericStage,
     GlassShader, Group, MeterShader, ModelShaderClass, PlasmaNoise, PlasmaShader, Shader,
-    ShaderClass, SurfaceMaterial, TextureAnimation, TransparentChicagoShader,
+    ShaderClass, ShaderRadiosity, SurfaceMaterial, TextureAnimation, TransparentChicagoShader,
     TransparentGenericShader, WaterShader,
 };
 
@@ -85,6 +85,12 @@ pub(crate) fn import_shader(
         material_type: shader.i16(MATERIAL_TYPE_OFFSET, "material type")?,
         material: SurfaceMaterial::of(&class),
         class,
+        radiosity: ShaderRadiosity {
+            flags: shader.u16(0x00, "flags")?,
+            power: shader.f32(0x04, "power")?,
+            color: color(&shader, 0x08, "color of emitted light")?,
+            tint: color(&shader, 0x14, "tint color")?,
+        },
     })
 }
 
@@ -490,6 +496,9 @@ mod tests {
             let stages = fake.add_data(&stage);
             bytes[0x29] = 0b101;
             put(bytes, 0x2C, &3i16.to_le_bytes());
+            // it emits light for the radiosity: power 2, orange, tinted
+            put(bytes, 0, &4u16.to_le_bytes());
+            f32s(bytes, 4, &[2.0, 1.0, 0.5, 0.0, 0.25, 0.5, 0.75]);
             block(bytes, 0x54, 1, maps);
             block(bytes, 0x60, 1, stages);
         });
@@ -498,6 +507,15 @@ mod tests {
         };
         assert_eq!(generic.flags, 0b101);
         assert_eq!(generic.framebuffer_blend_function, 3);
+        assert_eq!(
+            shader.radiosity,
+            ShaderRadiosity {
+                flags: ShaderRadiosity::TRANSPARENT_LIT,
+                power: 2.0,
+                color: [1.0, 0.5, 0.0],
+                tint: [0.25, 0.5, 0.75],
+            }
+        );
         assert_eq!(
             generic.maps,
             [GenericMap {

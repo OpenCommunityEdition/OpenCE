@@ -33,7 +33,7 @@ pub use level::{
     AtmosphericFog, CollisionBsp, CollisionMaterial, EnvironmentVertex, FallingDamage, GameType,
     GameTypes, Globals, ItemChoice, Level, Lightmap, LightmapVertex, Material, NetgameEquipment,
     NetgameFlag, NetgameFlagKind, ObjectPlacement, PlacementDevice, PlacementPermutation,
-    PlayerPhysics, PlayerStart, Scenario, Sky, StructureBsp,
+    PlayerPhysics, PlayerStart, Scenario, Sky, SkyAmbient, SkyLight, StructureBsp,
 };
 pub use material::SurfaceMaterial;
 pub use object::{
@@ -50,7 +50,8 @@ pub use script::{
 pub use shader::{
     AnimatedColor, ChicagoMap, EnvironmentAnimation, EnvironmentShader, GenericMap, GenericStage,
     GlassShader, MeterShader, ModelShaderClass, PlasmaNoise, PlasmaShader, Shader, ShaderClass,
-    TextureAnimation, TransparentChicagoShader, TransparentGenericShader, WaterShader,
+    ShaderRadiosity, TextureAnimation, TransparentChicagoShader, TransparentGenericShader,
+    WaterShader,
 };
 pub use vehicle::{
     FrictionType, MassPoint, Physics, PoweredMassPoint, PoweredSeat, Vehicle, VehicleKind,

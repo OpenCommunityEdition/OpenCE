@@ -16,7 +16,7 @@ use opence_content::{
     Effect, EnvironmentVertex, GameTypes, Globals, Group, ItemChoice, Level, Lightmap,
     LightmapVertex, Material, Model, NetgameEquipment, NetgameFlag, NetgameFlagKind,
     ObjectDefinition, ObjectKind, ObjectPlacement, PlacementDevice, PlacementPermutation,
-    PlayerStart, Scenario, Sky, StructureBsp, TagRef,
+    PlayerStart, Scenario, Sky, SkyAmbient, SkyLight, StructureBsp, TagRef,
 };
 
 use crate::cache::Cache;
@@ -51,7 +51,12 @@ pub(crate) const SCENARIO_SKIES_OFFSET: usize = 0x30;
 const SKY_REFERENCE_SIZE: usize = 0x10;
 const MAX_SKIES: usize = 8;
 /// A sky, as far as its indoor fog's screen.
-pub(crate) const SKY_SIZE: usize = 0xA8;
+pub(crate) const SKY_SIZE: usize = 0xD0;
+const SKY_INDOOR_AMBIENT_OFFSET: usize = 0x38;
+const SKY_OUTDOOR_AMBIENT_OFFSET: usize = 0x48;
+pub(crate) const SKY_LIGHTS_OFFSET: usize = 0xC4;
+pub(crate) const SKY_LIGHT_SIZE: usize = 0x74;
+const MAX_SKY_LIGHTS: usize = 8;
 const SKY_OUTDOOR_FOG_OFFSET: usize = 0x58;
 const SKY_INDOOR_FOG_OFFSET: usize = 0x78;
 
@@ -576,9 +581,46 @@ fn import_skies(
             model,
             outdoor_fog: import_fog(&sky, SKY_OUTDOOR_FOG_OFFSET, "outdoor fog")?,
             indoor_fog: import_fog(&sky, SKY_INDOOR_FOG_OFFSET, "indoor fog")?,
+            indoor_ambient: import_ambient(&sky, SKY_INDOOR_AMBIENT_OFFSET, "indoor ambient")?,
+            outdoor_ambient: import_ambient(&sky, SKY_OUTDOOR_AMBIENT_OFFSET, "outdoor ambient")?,
+            lights: import_sky_lights(&sky)?,
         });
     }
     Ok(skies)
+}
+
+/// A sky's ambient radiosity at `at`: its colour, then its power.
+fn import_ambient(sky: &Element<'_>, at: usize, field: &str) -> Result<SkyAmbient, ImportError> {
+    Ok(SkyAmbient {
+        color: [
+            sky.f32(at, field)?,
+            sky.f32(at + 4, field)?,
+            sky.f32(at + 8, field)?,
+        ],
+        power: sky.f32(at + 0xC, field)?,
+    })
+}
+
+/// A sky's lights (`sky_light`: its lens flare and marker, then its
+/// flags, colour, power, test distance, direction and diameter).
+fn import_sky_lights(sky: &Element<'_>) -> Result<Vec<SkyLight>, ImportError> {
+    let block = sky.block(SKY_LIGHTS_OFFSET, "lights", SKY_LIGHT_SIZE, MAX_SKY_LIGHTS)?;
+    let mut lights = Vec::with_capacity(block.len());
+    for light in block.iter() {
+        lights.push(SkyLight {
+            flags: light.u32(0x4C, "flags")?,
+            color: [
+                light.f32(0x50, "color")?,
+                light.f32(0x54, "color")?,
+                light.f32(0x58, "color")?,
+            ],
+            power: light.f32(0x5C, "power")?,
+            test_distance: light.f32(0x60, "test distance")?,
+            direction: [light.f32(0x68, "direction")?, light.f32(0x6C, "direction")?],
+            diameter: light.f32(0x70, "diameter")?,
+        });
+    }
+    Ok(lights)
 }
 
 /// A sky's atmospheric fog at `at`: its color, then (past eight unused
@@ -1727,6 +1769,23 @@ pub(crate) mod tests {
             );
         }
         empty(&mut sky, 0x98);
+        // a dim blue indoor ambient, a brighter outdoor one, and one sun
+        for (at, value) in [0.1f32, 0.1, 0.2, 0.5, 0.4, 0.5, 0.6, 2.0]
+            .iter()
+            .enumerate()
+        {
+            put(&mut sky, 0x38 + at * 4, &value.to_le_bytes());
+        }
+        let mut light = vec![0u8; SKY_LIGHT_SIZE];
+        put(&mut light, 0x4C, &3u32.to_le_bytes());
+        for (at, value) in [1.0f32, 0.9, 0.8, 4.0, 50.0].iter().enumerate() {
+            put(&mut light, 0x50 + at * 4, &value.to_le_bytes());
+        }
+        for (at, value) in [0.25f32, 1.0, 0.03].iter().enumerate() {
+            put(&mut light, 0x68 + at * 4, &value.to_le_bytes());
+        }
+        let light = fake.add_data(&light);
+        block(&mut sky, SKY_LIGHTS_OFFSET, 1, light);
         let sky_tag = fake.add_tag(SKY, "sky\\fake\\fake", &sky);
         let mut skies = vec![0u8; SKY_REFERENCE_SIZE];
         reference(&mut skies, 0, SKY, fake.handle(sky_tag));
@@ -1864,6 +1923,25 @@ pub(crate) mod tests {
                     start_distance: 10.0,
                     opaque_distance: 200.0,
                 }
+            );
+            assert_eq!(
+                level.skies[0].indoor_ambient,
+                SkyAmbient {
+                    color: [0.1, 0.1, 0.2],
+                    power: 0.5,
+                }
+            );
+            assert_eq!(level.skies[0].outdoor_ambient.power, 2.0);
+            assert_eq!(
+                level.skies[0].lights,
+                [SkyLight {
+                    flags: 3,
+                    color: [1.0, 0.9, 0.8],
+                    power: 4.0,
+                    test_distance: 50.0,
+                    direction: [0.25, 1.0],
+                    diameter: 0.03,
+                }]
             );
             assert_eq!(
                 level.scenario.player_starts,
@@ -2079,6 +2157,14 @@ pub(crate) mod tests {
         let sky = &level.skies[0];
         let model = sky.model.as_ref().and_then(|tag| level.model_index(tag));
         assert!(model.is_some(), "{sky:?}");
+        // a sun above the horizon, and a lit outdoors
+        let sun = sky
+            .lights
+            .iter()
+            .map(|light| light.towards()[2])
+            .fold(-1.0, f32::max);
+        assert!(sun > 0.0, "{:?}", sky.lights);
+        assert!(sky.outdoor_ambient.power > 0.0, "{:?}", sky.outdoor_ambient);
         let placed = |kind| {
             level
                 .scenario

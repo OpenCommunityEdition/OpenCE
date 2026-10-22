@@ -300,6 +300,20 @@ pub fn generated_sky() -> Sky {
             start_distance: 0.0,
             opaque_distance: 0.0,
         },
+        indoor_ambient: crate::SkyAmbient::default(),
+        outdoor_ambient: crate::SkyAmbient {
+            color: HORIZON,
+            power: 0.5,
+        },
+        // (a sun high in the south-west, its light white)
+        lights: vec![crate::SkyLight {
+            flags: 0b11,
+            color: [1.0; 3],
+            power: 1.0,
+            test_distance: 0.0,
+            direction: [3.9, 0.9],
+            diameter: 0.01,
+        }],
     }
 }
 
