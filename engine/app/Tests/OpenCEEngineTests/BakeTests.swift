@@ -230,6 +230,60 @@ final class BakeTests: XCTestCase {
         XCTAssertLessThan(darkened, lit * 0.5, "the objects kept a light of their own")
     }
 
+    /// The sun's shadows: an object darkens the ground under it, and the
+    /// level's own shadows, which its lightmaps hold, are not drawn again.
+    func testObjectsCastTheSunsShadowsOnTheLevelAndTheLevelsAreNotDoubled() throws {
+        let level = try StockLevel(map: "bloodgulch")
+        let bake = try level.geometry.bakePlan(quick: true)
+        func even(_ points: Data, _ value: Float) -> Data {
+            let floats = [Float](repeating: value, count: points.count / 32 * 4)
+            return floats.withUnsafeBytes { Data($0) }
+        }
+        let light = bake.finish(irradiance: even(bake.lightmapPointBytes(), 1),
+                                directions: even(bake.lightmapPointBytes(), 0),
+                                probes: even(bake.probePointBytes(), 0.5),
+                                radiance: even(bake.reflectionPointBytes(), 0))
+        XCTAssertEqual(light.sunTowards().count, 3, "Blood Gulch has a sun")
+        let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
+        try renderer.useBakedLighting(light)
+        // (above the largest object, looking down on it and the ground around)
+        let object = try XCTUnwrap(level.objects.max { $0.radius < $1.radius })
+        let camera = ViewCamera(position: object.center + SIMD3(0, 0, object.radius * 5 + 2), yaw: 0, pitch: -1.45,
+                                verticalFov: 70 * .pi / 180)
+        func capture(objects: Bool, shadows: Bool) throws -> CapturedFrame {
+            renderer.sunShadows = shadows
+            return try renderer.capture(width: 320, height: 180, camera: camera,
+                                        objects: objects ? level.objects : [], queue: level.queue)
+        }
+        let bare = try capture(objects: false, shadows: false)
+        let bareShadowed = try capture(objects: false, shadows: true)
+        let unshadowed = try capture(objects: true, shadows: false)
+        let shadowed = try capture(objects: true, shadows: true)
+        XCTAssertTrue(renderer.sunShadowsDrawn)
+        XCTAssertGreaterThan(renderer.sunShadowMapWidth, 1, "the maps were made")
+        func apart(_ a: CapturedFrame, _ b: CapturedFrame, x: Int, y: Int) -> Int {
+            let (first, second) = (a.rgb(x: x, y: y), b.rgb(x: x, y: y))
+            return (0..<3).map { Int(first[$0]) - Int(second[$0]) }.max { abs($0) < abs($1) } ?? 0
+        }
+        var doubled = 0, ground = 0, darkened = 0
+        for y in 0..<bare.height {
+            for x in 0..<bare.width {
+                if abs(apart(bareShadowed, bare, x: x, y: y)) > 8 {
+                    doubled += 1
+                }
+                // (the ground: where the objects are not)
+                guard abs(apart(unshadowed, bare, x: x, y: y)) <= 2 else { continue }
+                ground += 1
+                if apart(shadowed, unshadowed, x: x, y: y) < -8 {
+                    darkened += 1
+                }
+            }
+        }
+        XCTAssertLessThan(doubled, bare.width * bare.height / 100, "the level's own shadows were drawn again")
+        XCTAssertGreaterThan(ground, bare.width * bare.height / 2)
+        XCTAssertGreaterThan(darkened, 20, "the object cast no shadow")
+    }
+
     /// The mood check (needs assets/maps): every stock BSP keeps its
     /// stock lightmaps' mood. Its pages taken together keep the stock
     /// pages' brightness and colour within the bake's limits, and at most

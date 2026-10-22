@@ -323,18 +323,64 @@ float3 probe_light(constant Frame &frame, float3 world, float3 normal, sampler c
     return baked_shown(probe_cube(frame, world, normal, clamp, px, nx, py, ny, pz, nz).rgb);
 }
 
+// (as LevelRenderer's ShadowUniforms) the sun's cascaded shadow maps
+struct Shadows {
+    // world to each cascade's map: x and y across it, depth from the sun
+    float4x4 cascades[4];
+    // where each cascade ends, ahead of the camera
+    float4 far;
+    // the view's forward, and 1 when the sun's shadows are drawn
+    float4 forward;
+    // the width of a texel of each cascade, in world units
+    float4 texel;
+};
+
+// how much of the sun reaches `world` on a surface facing `normal` in the
+// shadow maps `map` (four taps of their filtered comparison), and how far
+// a cascade holds it (zero past the last, fading out over its last tenth)
+float2 sun_seen(constant Shadows &shadows, constant Frame &frame, float3 world, float3 normal,
+                depth2d_array<float> map) {
+    if (shadows.forward.w <= 0) {
+        return float2(1, 0);
+    }
+    float ahead = dot(world - frame.eye.xyz, shadows.forward.xyz);
+    uint index = 0;
+    while (index < 4 && ahead >= shadows.far[index]) {
+        index++;
+    }
+    if (index >= 4 || ahead < 0) {
+        return float2(1, 0);
+    }
+    constexpr sampler compare(filter::linear, address::clamp_to_edge, compare_func::less_equal);
+    // (pushed off the surface by a texel and a half, so that it does not
+    // shadow itself)
+    float4 at = shadows.cascades[index] * float4(world + normal * (shadows.texel[index] * 1.5), 1);
+    float2 uv = float2(at.x * 0.5 + 0.5, 0.5 - at.y * 0.5);
+    float2 texel = float2(0.5 / float(max(map.get_width(), 1u)));
+    float seen = 0;
+    for (int tap = 0; tap < 4; tap++) {
+        float2 offset = float2((tap & 1) ? texel.x : -texel.x, (tap & 2) ? texel.y : -texel.y);
+        seen += map.sample_compare(compare, uv + offset, index, at.z);
+    }
+    float last = shadows.far[3];
+    return float2(seen * 0.25, saturate((last - ahead) / max(last * 0.1, 1e-4)));
+}
+
 // the light on an object's surface: the probes' (the world's light
-// bounced to it, and the sky's), and the sun's where the probes see it,
-// shown as the lightmaps' light is; without a bake the probes are white
-// and there is no sun, an even light
+// bounced to it, and the sky's), and the sun's where the shadow maps (or,
+// beyond them, the probes) see it, shown as the lightmaps' light is;
+// without a bake the probes are white and there is no sun, an even light
 float3 object_light(constant Frame &frame, float3 world, float3 normal, sampler clamp,
                     texture3d<float> px, texture3d<float> nx, texture3d<float> py,
-                    texture3d<float> ny, texture3d<float> pz, texture3d<float> nz) {
+                    texture3d<float> ny, texture3d<float> pz, texture3d<float> nz,
+                    constant Shadows &shadows, depth2d_array<float> shadow_map) {
     float3 n = direction(normal, float3(0, 0, 1));
     float4 cube = probe_cube(frame, world, n, clamp, px, nx, py, ny, pz, nz);
     float3 irradiance = cube.rgb;
     if (frame.sun_towards.w > 0) {
-        irradiance += frame.sun_color.rgb * saturate(dot(n, frame.sun_towards.xyz)) * saturate(cube.w);
+        float facing = saturate(dot(n, frame.sun_towards.xyz));
+        float2 seen = facing > 0 ? sun_seen(shadows, frame, world, n, shadow_map) : float2(0);
+        irradiance += frame.sun_color.rgb * facing * mix(saturate(cube.w), seen.x, seen.y);
     }
     return baked_shown(irradiance);
 }
@@ -357,6 +403,9 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
                                texture3d<float> probe_ny [[texture(12)]],
                                texture3d<float> probe_pz [[texture(13)]],
                                texture3d<float> probe_nz [[texture(14)]],
+                               depth2d_array<float> level_shadows [[texture(16)]],
+                               depth2d_array<float> shadows_map [[texture(17)]],
+                               constant Shadows &shadows [[buffer(4)]],
                                sampler wrap [[sampler(0)]],
                                sampler clamp [[sampler(1)]],
                                sampler nearest [[sampler(2)]]) {
@@ -396,7 +445,18 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
     float3 incident_light = in.incident;
     if (material.maps & LIGHTMAP) {
         if (material.maps & BAKED) {
-            lightmapped = baked_shown(lightmap.sample(clamp, in.lightmap).rgb);
+            float3 irradiance = lightmap.sample(clamp, in.lightmap).rgb;
+            // the objects' shadows: the sun's light taken out where the
+            // level's own surfaces let it through (as the bake saw) but an
+            // object stops it
+            float facing = saturate(dot(normal, frame.sun_towards.xyz));
+            if (frame.sun_towards.w > 0 && shadows.forward.w > 0 && facing > 0) {
+                float2 open = sun_seen(shadows, frame, in.world, normal, level_shadows);
+                float2 seen = sun_seen(shadows, frame, in.world, normal, shadows_map);
+                float hidden = max(open.x - seen.x, 0.0) * seen.y;
+                irradiance = max(irradiance - frame.sun_color.rgb * facing * hidden, float3(0));
+            }
+            lightmapped = baked_shown(irradiance);
             float4 baked = baked_directions.sample(clamp, in.lightmap);
             incident_light = (baked.xyz * 2 - 1) * baked.w;
         } else {
@@ -526,6 +586,41 @@ vertex ModelOut sky_vertex(ModelIn in [[stage_in]], constant Frame &frame [[buff
     return out;
 }
 
+// the sun's shadow casters: the level's surfaces and the objects' parts,
+// their depth from the sun in a cascade's map (`light`), the alpha-tested
+// ones cut out by their base maps
+struct ShadowOut {
+    float4 position [[position]];
+    float2 texcoord;
+};
+
+vertex ShadowOut shadow_level_vertex(VertexIn in [[stage_in]], constant float4x4 &light [[buffer(1)]]) {
+    ShadowOut out;
+    out.position = light * float4(in.position, 1);
+    out.texcoord = in.texcoord;
+    return out;
+}
+
+vertex ShadowOut shadow_model_vertex(ModelIn in [[stage_in]], constant float4x4 &light [[buffer(1)]],
+                                     const device float4x4 *skins [[buffer(2)]],
+                                     constant ModelObject &object [[buffer(3)]]) {
+    uint last = max(object.node_count, 1u) - 1;
+    float4x4 skin = skins[object.first_node + min(uint(in.nodes.x), last)] * in.weights.x
+                  + skins[object.first_node + min(uint(in.nodes.y), last)] * in.weights.y;
+    ShadowOut out;
+    out.position = light * (skin * float4(in.position, 1));
+    out.texcoord = in.texcoord;
+    return out;
+}
+
+fragment void shadow_cutout_fragment(ShadowOut in [[stage_in]], constant Material &material [[buffer(0)]],
+                                     texture2d<float> base [[texture(0)]], sampler wrap [[sampler(0)]]) {
+    if ((material.maps & BASE)
+        && base.sample(wrap, in.texcoord * material.base_scale + material.base_offset).a < 0.5) {
+        discard_fragment();
+    }
+}
+
 // the sky as its maps are: it lights itself
 fragment float4 sky_fragment(ModelOut in [[stage_in]],
                              constant Material &material [[buffer(0)]],
@@ -571,6 +666,8 @@ fragment float4 model_fragment(ModelOut in [[stage_in]],
                                texture3d<float> probe_pz [[texture(13)]],
                                texture3d<float> probe_nz [[texture(14)]],
                                texturecube_array<float> reflections [[texture(15)]],
+                               depth2d_array<float> shadows_map [[texture(17)]],
+                               constant Shadows &shadows [[buffer(4)]],
                                sampler wrap [[sampler(0)]],
                                sampler clamp [[sampler(1)]]) {
     if (material.chicago_count != 0) {
@@ -579,7 +676,7 @@ fragment float4 model_fragment(ModelOut in [[stage_in]],
     }
     float3 normal = direction(in.normal, float3(0, 0, 1));
     float3 light = object_light(frame, in.world, normal, clamp, probe_px, probe_nx, probe_py, probe_ny,
-                                probe_pz, probe_nz);
+                                probe_pz, probe_nz, shadows, shadows_map);
     uint bits = material.model.x;
     if (!(bits & MODEL)) {
         float4 color = surface(in.texcoord, material, base, primary, secondary, wrap, frame.eye.w);

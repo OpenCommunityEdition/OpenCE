@@ -396,6 +396,14 @@ public final class LevelRenderer {
     public var hud: HudPass?
     /// The debug lines' pass.
     public let debug: DebugPass
+    /// The sun's shadow maps.
+    let shadows: ShadowPass
+    /// Whether the sun's shadows are drawn (with a baked sun).
+    public var sunShadows = true
+    /// Whether the last frame drew the sun's shadows, and the width of
+    /// their maps in texels.
+    public var sunShadowsDrawn: Bool { shadows.uniforms.forward.w > 0 }
+    public var sunShadowMapWidth: Int { shadows.maps.width }
 
     /// The level's fog (none without a sky), for tests.
     public var fog: RenderFog? { sky?.fog }
@@ -497,6 +505,8 @@ public final class LevelRenderer {
         debug = try DebugPass(device: device, colorFormat: Self.frameFormat, depthFormat: Self.depthFormat)
         models = try ModelPass(device: device, library: library, geometry: geometry, textures: textures, white: white,
                                whiteCube: whiteCube)
+        shadows = try ShadowPass(device: device, library: library, levelStride: vertexStride,
+                                 modelStride: Int(geometry.modelVertexStride()))
         sky = geometry.sky()
 
         // reversed depth: nearer is greater
@@ -584,8 +594,11 @@ public final class LevelRenderer {
         let level = try Self.pipelines(device: device, library: library, stride: vertexStride,
                                        outputFormat: outputFormat)
         let objects = try models.pipelines(library: library)
+        let casting = try ShadowPass.pipelines(device: device, library: library, levelStride: vertexStride,
+                                               modelStride: Int(geometry.modelVertexStride()))
         (opaque, blended, tone, motion) = level
         models.use(objects)
+        shadows.use(casting)
     }
 
     static let blendFunctions: [BlendFunction] = [.alphaBlend, .multiply, .doubleMultiply, .add, .tintAndAdd]
@@ -688,6 +701,15 @@ public final class LevelRenderer {
         uniforms.probeCounts = probeGrid.counts
         uniforms.sunTowards = sun.towards
         uniforms.sunColor = sun.color
+        let towards = sunShadows && sun.towards.w > 0
+            ? SIMD3(sun.towards.x, sun.towards.y, sun.towards.z) : nil
+        shadows.encode(into: commands, camera: camera, aspect: Float(frame.width) / Float(max(frame.height, 1)),
+                       towards: towards, wrap: wrap,
+                       level: { encoder, casting in self.encodeShadowCasters(encoder, casting) },
+                       objects: { encoder, casting in
+                           self.models.encodeShadowCasters(prepared, casting, into: encoder)
+                       })
+        var shadowUniforms = shadows.uniforms
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = frame
         pass.colorAttachments[0].loadAction = .clear
@@ -711,6 +733,9 @@ public final class LevelRenderer {
         encoder.setFragmentSamplerState(nearest, index: 2)
         encoder.setFragmentTextures(probes, range: 9..<15)
         encoder.setFragmentTexture(reflections, index: 15)
+        encoder.setFragmentTexture(shadows.levelMaps, index: 16)
+        encoder.setFragmentTexture(shadows.maps, index: 17)
+        encoder.setFragmentBytes(&shadowUniforms, length: MemoryLayout<ShadowUniforms>.stride, index: 4)
         models.encodeSky(prepared, into: encoder)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setRenderPipelineState(opaque)
@@ -891,6 +916,28 @@ public final class LevelRenderer {
     public func resetHistory() {
         temporal?.frame = 0
         temporal?.previous = nil
+    }
+
+    /// The level's opaque and alpha-tested surfaces, as the sun's
+    /// shadows' casters.
+    private func encodeShadowCasters(_ encoder: MTLRenderCommandEncoder, _ casting: ShadowPass.Casting) {
+        encoder.setVertexBuffer(vertices, offset: 0, index: 0)
+        var current: MTLRenderPipelineState?
+        for draw in opaqueDraws {
+            let cutout = draw.uniforms.alphaTested != 0
+            let pipeline = cutout ? casting.cutout : casting.depth
+            if current !== pipeline {
+                encoder.setRenderPipelineState(pipeline)
+                current = pipeline
+            }
+            if cutout {
+                var material = draw.uniforms
+                encoder.setFragmentBytes(&material, length: MemoryLayout<MaterialUniforms>.stride, index: 0)
+                encoder.setFragmentTexture(draw.textures.first, index: 0)
+            }
+            encoder.drawIndexedPrimitives(type: .triangle, indexCount: draw.indexCount, indexType: .uint32,
+                                          indexBuffer: indices, indexBufferOffset: draw.firstIndex * 4)
+        }
     }
 
     private func encode(_ draw: Draw, _ animation: [Float], _ encoder: MTLRenderCommandEncoder) {

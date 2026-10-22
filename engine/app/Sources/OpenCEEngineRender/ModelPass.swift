@@ -289,6 +289,9 @@ final class ModelPass {
         var sky: Object?
         /// The first-person weapon and hands.
         var firstPerson: [Object] = []
+        /// Those behind the camera near enough to cast the sun's shadows
+        /// into the view.
+        var shadowCasters: [Object] = []
     }
 
     /// The bake's reflection probes' positions (none until the bake).
@@ -318,16 +321,23 @@ final class ModelPass {
         var drawn: [Prepared.Object] = []
         var skyDrawn: Prepared.Object?
         var firstPerson: [Prepared.Object] = []
+        var shadowCasters: [Prepared.Object] = []
         let all = (sky.map { [$0] } ?? []) + objects
         for (index, object) in all.enumerated() where models.indices.contains(object.model) {
             let isSky = sky != nil && index == 0
             let model = models[object.model]
             let level: Int
+            var behind = false
             if isSky || object.firstPerson {
                 level = Self.highestLevel
             } else {
                 let depth = dot(object.center - camera.position, forward)
-                guard depth > -object.radius else { continue }
+                behind = depth <= -object.radius
+                if behind {
+                    guard distance(object.center, camera.position) < ShadowPass.distance + object.radius else {
+                        continue
+                    }
+                }
                 let pixels = sphereDiameterPixels(depth: depth, radius: object.radius,
                                                   verticalFov: camera.verticalFov,
                                                   viewportHeight: Float(viewportHeight))
@@ -359,6 +369,8 @@ final class ModelPass {
                 skyDrawn = (uniforms, parts, colors)
             } else if object.firstPerson {
                 firstPerson.append((uniforms, parts, colors))
+            } else if behind {
+                shadowCasters.append((uniforms, parts, colors))
             } else {
                 drawn.append((uniforms, parts, colors))
             }
@@ -376,7 +388,8 @@ final class ModelPass {
         lastPartCount = drawn.reduce(0) { $0 + $1.parts.count }
         lastSkyPartCount = skyDrawn?.parts.count ?? 0
         lastFirstPersonPartCount = firstPerson.reduce(0) { $0 + $1.parts.count }
-        return Prepared(skins: skins[frame], objects: drawn, sky: skyDrawn, firstPerson: firstPerson)
+        return Prepared(skins: skins[frame], objects: drawn, sky: skyDrawn, firstPerson: firstPerson,
+                        shadowCasters: shadowCasters)
     }
 
     /// The prepared sky, its opaque parts then its blended ones, behind
@@ -404,6 +417,35 @@ final class ModelPass {
         encoder.setFragmentTextures(part.textures, range: 0..<part.textures.count)
         encoder.drawIndexedPrimitives(type: .triangle, indexCount: part.indexCount, indexType: .uint32,
                                       indexBuffer: indices, indexBufferOffset: part.firstIndex * 4)
+    }
+
+    /// The prepared objects' opaque and alpha-tested parts (those in view
+    /// and those behind it), as the sun's shadows' casters.
+    func encodeShadowCasters(_ prepared: Prepared, _ casting: ShadowPass.Casting,
+                             into encoder: MTLRenderCommandEncoder) {
+        guard let skins = prepared.skins else { return }
+        encoder.setVertexBuffer(vertices, offset: 0, index: 0)
+        encoder.setVertexBuffer(skins, offset: 0, index: 2)
+        var current: MTLRenderPipelineState?
+        for (uniforms, parts, _) in prepared.objects + prepared.shadowCasters {
+            var object = uniforms
+            encoder.setVertexBytes(&object, length: MemoryLayout<ModelObjectUniforms>.stride, index: 3)
+            for part in parts where !part.blended && !part.plain {
+                let cutout = part.uniforms.alphaTested != 0
+                let pipeline = cutout ? casting.cutout : casting.depth
+                if current !== pipeline {
+                    encoder.setRenderPipelineState(pipeline)
+                    current = pipeline
+                }
+                if cutout {
+                    var material = part.uniforms
+                    encoder.setFragmentBytes(&material, length: MemoryLayout<MaterialUniforms>.stride, index: 0)
+                    encoder.setFragmentTexture(part.textures.first, index: 0)
+                }
+                encoder.drawIndexedPrimitives(type: .triangle, indexCount: part.indexCount, indexType: .uint32,
+                                              indexBuffer: indices, indexBufferOffset: part.firstIndex * 4)
+            }
+        }
     }
 
     /// The prepared objects' opaque and alpha-tested parts, or their
