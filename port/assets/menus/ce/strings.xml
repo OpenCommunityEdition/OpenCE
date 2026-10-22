@@ -375,6 +375,7 @@
 		<string text="Host a game on the Internet:\nplayers join by its invite\nlink or Discord."/>
 		<string text="Host a game on your LAN\nonly." map="4"/>
 		<string text="Play the campaign with a\nfriend in split screen:\nplayer 2 on a gamepad."/>
+		<string text="A hardcore mode for\ncompetitive gameplay on the\nclassic and custom maps."/>
 		<string text="Set all the attributes for your \nmultiplayer gametypes and\nkeep them for future use." map="5"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/multiplayer_options" map="ui\shell\main_menu\multiplayer_type_select\multiplayer_options">

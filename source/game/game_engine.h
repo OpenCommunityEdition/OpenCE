@@ -28,6 +28,9 @@ enum
 	_game_variant_always_invisible_bit,
 	/* (the starting equipment: generic, else the map's) */
 	_game_variant_generic_starting_equipment_bit,
+	/* port: Anniversary rules. This bit already rides in the variant the
+	network sends, so the layout stays 0x68. */
+	_game_variant_anniversary_rules_bit,
 };
 
 enum game_engine_type

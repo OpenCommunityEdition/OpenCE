@@ -70,16 +70,32 @@ LEFT_OUT = {
     "ui\\shell\\main_menu\\multiplayer_type_select\\checking_updates_screen_join",
 }
 # children moved: (parent, child) to (x, y); the main menu's Quit a row below
-# Mods, which takes Credits' place; Multiplayer's Edit Gametypes and divider
-# below Co-op, keeping its 32-unit highlight inside the description panel's
-# bottom curve (port_settings.WIDGET_PATCHES)
+# Mods, which takes Credits' place; Multiplayer's rows tightened so Hardcore
+# fits below the line and above Edit Gametypes
+# (port_settings.WIDGET_PATCHES)
 CHILD_OFFSETS = {
     ("ui\\shell\\main_menu\\main_menu_select_list", "ui\\shell\\main_menu\\main_menu_item_quit_game"):
         port_settings.QUIT_ITEM_PLACE,
     ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
-     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_gametypes_item"): (0, 358),
+     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_join_item"): (-32, 78),
+    ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
+     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_join_internet_item"): (0, 106),
+    ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
+     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_join_lan_item"): (0, 134),
+    ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
+     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_join_direct_item"): (0, 162),
+    ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
+     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_create_item"): (-32, 190),
+    ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
+     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_create_internet_item"): (0, 218),
+    ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
+     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_create_lan_item"): (0, 246),
+    ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
+     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_gametypes_item"): (0, 351),
+    ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
+     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_button_bar"): (0, 414),
     ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_screen",
-     "ui\\shell\\main_menu\\blueline"): (64, 349),
+     "ui\\shell\\main_menu\\blueline"): (64, 314),
     # the browser's rows up under the column titles, into the place of the
     # scroll up button (hidden: the list does not scroll)
     **{("ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\join_game_items_list",

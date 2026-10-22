@@ -6036,6 +6036,29 @@ short ui_widget_port_gametypes(
 				*last_used = index;
 		}
 	}
+	{
+		short kept = 0;
+		short mapped = 0;
+		boolean dropped = FALSE;
+
+		/* port: comp 2v2 is a hardcore game. a classic list does not offer it. */
+		for (index = 0; index < (short)count; index++)
+		{
+			wchar_t *name = saved_game_file_get_display_name(indices[index]);
+
+			if (name && !ustrcmp(name, L"Comp 2v2"))
+			{
+				if (index == *last_used)
+					dropped = TRUE;
+				continue;
+			}
+			if (index == *last_used)
+				mapped = kept;
+			indices[kept++] = indices[index];
+		}
+		count = (word)kept;
+		*last_used = dropped || !count ? 0 : mapped;
+	}
 	return (short)count;
 }
 

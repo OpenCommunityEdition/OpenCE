@@ -82,6 +82,9 @@ symbols in this file:
 #include "cutscene/cinematics.h"
 #include "devices/device_controls.h"
 #include "game/game_engine.h"
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+#include "../../port/linux/game/performance_options.h"
+#endif
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "interface/hud.h"
@@ -89,6 +92,7 @@ symbols in this file:
 #include "interface/hud_messaging.h"
 #include "interface/hud_unit.h"
 #include "interface/hud_weapon.h"
+#include "interface/hud_draw.h"
 #include "interface/interface.h"
 #include "interface/motion_sensor.h"
 #include "interface/weapon_hud_interface_definition.h"
@@ -109,6 +113,8 @@ symbols in this file:
 #include "text/draw_string.h"
 #include "coop_spectate.h" /* port: port/linux/game/coop_spectate.c */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "hardcore_rules.h" /* port: a hardcore match draws its own clock */
+#include "hardcore_views.h" /* port: a teammate pane draws that player's HUD */
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
 #include "text/font_group.h"
 #include "text/text_group.h"
@@ -1429,7 +1435,9 @@ static void hud_draw_match_timer(
 	rectangle2d bounds;
 	struct font_header *font;
 
-	if (!hud_match_timer_setting() || font_index == NONE)
+	/* a hardcore match draws its own clock. this one would sit on it
+	when the setting is on */
+	if (hardcore_rules_active() || !hud_match_timer_setting() || font_index == NONE)
 		return;
 	ticks_to_unicode_time_string(game_time_get(), NUMBEROF(time_string), time_string);
 	/* (a time under a minute is drawn with no minutes digit, which a clock
@@ -1463,11 +1471,20 @@ void hud_draw_screen(
 {
 	long player_index = local_player_get_player_index(render.local_player_index);
 	director_perspective perspective = director_get_perspective(render.local_player_index);
+	/* port: the spare slot has no director, so the first-person test would
+	skip their weapon, shield and reticle. their sounds stay off this machine */
+	boolean teammate_pane = hardcore_views_is_teammate_window((short)render.window_index);
 
 	rasterizer_hud_begin();
 	if (player_index != NONE)
 	{
 		struct player_datum *player = player_get(player_index);
+		struct object_datum *body = player->unit_index == NONE
+			? NULL
+			: object_try_and_get(player->unit_index);
+		/* port: a teammate's corpse is the death camera, not their weapon */
+		boolean unit_dead = !body ||
+			TEST_FLAG(body->object.damage_flags, _object_dead_bit);
 
 		if ((!game_engine_running() || game_engine_display_team_indicators()) &&
 			!cinematic_in_progress())
@@ -1500,31 +1517,49 @@ void hud_draw_screen(
 
 		if (hud_scripted_globals->show_hud)
 		{
-			if (perspective != _director_perspective_neutral &&
-				perspective != _director_perspective_scripted &&
-				player->unit_index != NONE)
+			if ((teammate_pane ||
+				(perspective != _director_perspective_neutral &&
+					perspective != _director_perspective_scripted)) &&
+				player->unit_index != NONE &&
+				!(teammate_pane && unit_dead))
 			{
 				hud_render_weapon_interface(player);
-				hud_show_action_response(player_index);
-				hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
+				if (!teammate_pane)
+				{
+					hud_show_action_response(player_index);
+					hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
+				}
 				hud_render_unit_interface(player);
-				hud_render_nav_points(render.local_player_index);
-				hud_render_damage_indicators(render.local_player_index);
+				if (!teammate_pane)
+				{
+					hud_render_nav_points(render.local_player_index);
+					hud_render_damage_indicators(render.local_player_index);
+				}
 			}
-			else
+			else if (!(teammate_pane && unit_dead && player->unit_index != NONE))
 			{
 				hud_show_action_response(player_index);
-				hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
+				if (!teammate_pane)
+					hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
 			}
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+			performance_options_render();
+#endif
 		}
-		else
+		else if (!teammate_pane)
 		{
 			hud_play_unit_sounds(player, FALSE);
 		}
 
-		hud_messaging_update(render.local_player_index);
-		/* port: network games' text chat, the lines this view's player hears */
-		network_chat_draw(render.local_player_index);
+		/* port: messages and chat stay on the local pane. a dead
+		teammate pane still draws that player's respawn line */
+		if (!teammate_pane)
+		{
+			hud_messaging_update(render.local_player_index);
+			network_chat_draw(render.local_player_index);
+		}
+		else if (player->unit_index == NONE)
+			hud_messaging_draw_state(render.local_player_index);
 	}
 
 	rasterizer_hud_end();

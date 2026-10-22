@@ -453,6 +453,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "game/game.h"
 #include "game/game_engine.h"
+#include "../../port/linux/game/hardcore_rules.h"
 #include "game/player_queues_new.h"
 #include "game/players.h"
 #include "interface/ui_widget.h"
@@ -465,6 +466,7 @@ symbols in this file:
 #include "networking/network_game_protocol.h"
 #include "networking/network_game_ui.h"
 #include "networking/network_messages.h"
+#include "networking/network_performance_protocol.h"
 #include "networking/network_server_manager.h"
 #include "networking/network_server_manager_internal.h"
 #include "networking/network_server_message_handler.h"
@@ -870,6 +872,29 @@ static boolean network_game_server_map_pending[MAXIMUM_NETWORK_MACHINE_COUNT];
 put back when the download is done (they spawn then, not before) */
 static struct network_player network_game_server_held_players[MAXIMUM_NETWORK_PLAYER_COUNT];
 static long network_game_server_held_player_count;
+
+/* port: a joining machine's practice capability belongs to its connection
+slot. a reused slot starts clear, so the last machine's answer does not stay. */
+static byte network_game_server_performance_capabilities[MAXIMUM_NETWORK_MACHINE_COUNT];
+
+void network_game_server_performance_capability(
+	struct network_game_server_client_machine *machine,
+	unsigned flags)
+{
+	if (machine && VALID_INDEX(machine->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT))
+		network_game_server_performance_capabilities[machine->machine_index] =
+			(byte)(flags & NETWORK_PERFORMANCE_SUPPORTED_FLAGS);
+}
+
+boolean network_game_server_performance_supported(
+	struct network_game_server_client_machine *machine,
+	unsigned flags)
+{
+	unsigned supported = machine && VALID_INDEX(machine->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT)
+		? network_game_server_performance_capabilities[machine->machine_index] : 0;
+	return network_performance_can_join(flags, supported);
+}
+
 enum
 {
 	NETWORK_GAME_SERVER_PLAYERLESS_MACHINE_TIMEOUT = 15 * MILLISECONDS_PER_SECOND,
@@ -1299,6 +1324,7 @@ struct network_game_server *network_game_server_create(
 			{
 				server->client_machines[i].connection = NULL;
 				server->client_machines[i].last_received_update_sequence_number = 0;
+				network_game_server_performance_capabilities[i] = 0;
 				server->client_machines[i].last_heard_time = 0;
 				server->client_machines[i].machine_index = NONE;
 				server->client_machines[i].flags = 0;
@@ -3750,6 +3776,8 @@ void network_game_server_change_game_variant(
 
 	csmemcpy(&server->game.variant, variant, sizeof(server->game.variant));
 	network_game_server_variant_options(&server->game.variant, &server->game.variant_options);
+	/* port: a classic gametype ends the mode in the lobby, before the map. */
+	hardcore_rules_host_variant(&server->game.variant);
 
 	if (!network_game_server_send_game_data_pregame(server))
 	{
@@ -3835,6 +3863,7 @@ boolean network_game_server_remove_client_machine_from_game(
 			}
 			server->client_machines[i].connection = NULL;
 			server->client_machines[i].last_received_update_sequence_number = 0;
+			network_game_server_performance_capabilities[i] = 0;
 			server->client_machines[i].last_heard_time = 0;
 			server->client_machines[i].machine_index = NONE;
 			server->client_machines[i].flags = 0;
@@ -4674,6 +4703,7 @@ static boolean network_game_server_add_new_client(
 					else
 					{
 						server->client_machines[i].connection = new_connection;
+						network_game_server_performance_capabilities[i] = 0;
 						network_game_invalidate_machine(&server->game, i);
 						server->client_machines[i].machine_index = (short)i;
 						server->client_machines[i].flags =
@@ -4694,6 +4724,7 @@ static boolean network_game_server_add_new_client(
 							/* port: the caller closes the connection: the slot
 							must not keep it */
 							server->client_machines[i].connection = NULL;
+							network_game_server_performance_capabilities[i] = 0;
 							server->client_machines[i].last_heard_time = 0;
 							server->client_machines[i].machine_index = NONE;
 							server->client_machines[i].flags = 0;

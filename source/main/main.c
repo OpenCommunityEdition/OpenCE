@@ -382,17 +382,15 @@ symbols in this file:
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "network_voice.h" /* port: port/linux/game/network_voice.c */
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
-#include "network_aim_assist.h" /* port: port/linux/game/network_aim_assist.c */
 #include "map_share.h" /* port: port/linux/game/map_share.c */
+#include "network_aim_assist.h" /* port: port/linux/game/network_aim_assist.c */
 #include "profile_sections.h" /* port: port/linux/include/profile_sections.h */
 #ifdef HALO_PROFILE
 #include "profile_trace.h" /* port: port/linux/src/profile_trace.c */
 #endif
-#ifdef HALO_WEB
-#include <emscripten.h> /* port: the browser runs the main loop (port/web/README.md) */
-#endif
 #include "camera/director.h"
 #include "camera/observer.h"
+#include "hardcore_views.h" /* port: teammate panes in a hardcore team game */
 #include "cutscene/cinematics.h"
 #include "effects/player_effects.h"
 #include "physics/collision_usage.h"
@@ -1452,7 +1450,22 @@ short main_get_window_count(
 {
 	boolean single_window = game_engine_force_single_screen() || cinematic_in_progress();
 
-	return single_window ? 1 : PIN(local_player_count(), 1, MAXIMUM_WINDOWS);
+	if (!single_window)
+	{
+		short count = (short)PIN(hardcore_views_local_count(), 1, MAXIMUM_WINDOWS);
+
+		/* port: one local player on this team, and that team's mates.
+		   the other team's local player is not a pane */
+		if (count == 1)
+		{
+			short views = hardcore_views_window_count();
+
+			if (views > 1)
+				return views;
+		}
+		return count;
+	}
+	return 1;
 }
 
 #ifdef HALO_PROFILE
@@ -3301,16 +3314,28 @@ static void main_game_render(
 	force_single_screen = game_engine_force_single_screen();
 	last_local_player_index = NONE;
 
-	window_count = PIN(local_player_count(), 1, MAXIMUM_LOCAL_PLAYERS);
+	/* port: a hardcore team game draws one team. the other team's local
+	   player is not on this split */
+	window_count = PIN(hardcore_views_local_count(), 1, MAXIMUM_LOCAL_PLAYERS);
 	player_window_count = window_count;
 	if (force_single_screen || cinematic_in_progress())
 	{
 		window_count = 1;
 		player_window_count = 1;
 	}
+	/* port: teammate panes share this screen. they are not local players */
+	else if (window_count == 1)
+	{
+		short views = hardcore_views_window_count();
+
+		if (views > 1)
+			player_window_count = views;
+	}
 
 	for (window_index = 0; window_index < player_window_count; window_index++)
 	{
+		struct observer_result teammate_view;
+
 		window = &global_screenshot_count.windows[window_index];
 		observer = NULL;
 
@@ -3323,7 +3348,20 @@ static void main_game_render(
 		{
 			window->local_player_index = NONE;
 		}
-		else if (window_index < window_count)
+		else if (hardcore_views_is_teammate_window((short)window_index))
+		{
+			/* port: a dead teammate keeps the pane on the death camera, so
+			   the split and this machine's choice of pane stay for the match */
+			if (hardcore_views_camera((short)window_index, &teammate_view))
+			{
+				window->local_player_index = hardcore_views_hud_slot((short)window_index);
+				observer = &teammate_view;
+			}
+			else
+				window->local_player_index = NONE;
+		}
+		else if (hardcore_views_is_local_window((short)window_index) ||
+			window_index < window_count)
 		{
 			if (!rasterizer_debug_options.force_all_player_views_to_default_player ||
 				last_local_player_index == NONE)
@@ -3334,7 +3372,7 @@ static void main_game_render(
 				}
 				else
 				{
-					last_local_player_index = local_player_get_next(last_local_player_index);
+					last_local_player_index = hardcore_views_next_local(last_local_player_index);
 				}
 			}
 

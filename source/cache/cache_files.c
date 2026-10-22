@@ -272,13 +272,65 @@ static char const *data_00316820[] =
 	NULL
 };
 
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+enum
+{
+	RUNTIME_UI_TAG_INDEX_BITS = 7,
+	MAXIMUM_RUNTIME_UI_TAGS = 1 << RUNTIME_UI_TAG_INDEX_BITS,
+	RUNTIME_UI_TAG_MAGIC = 0x50420000,
+	RUNTIME_UI_TAG_INDEX_BIT = 0x8000,
+	RUNTIME_UI_TAG_GENERATION_MASK = (1 << (15 - RUNTIME_UI_TAG_INDEX_BITS)) - 1
+};
+
+/* port: native tags live outside the cache table. every runtime index has
+a negative signed low word, which cannot identify a stock cache tag.
+keeping a generation across unloads rejects an id from the preceding ui map */
+static struct cache_file_tag_instance runtime_ui_tags[MAXIMUM_RUNTIME_UI_TAGS];
+static short runtime_ui_tag_count;
+static unsigned short runtime_ui_tag_generation;
+#endif
+
 /* ---------- private code */
+
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+static struct cache_file_tag_instance *cache_runtime_ui_tag_instance(
+	long tag_index)
+{
+	unsigned long index = (unsigned long)tag_index;
+	unsigned long slot = index & (MAXIMUM_RUNTIME_UI_TAGS - 1);
+
+	if (!cache_file_globals.tags_loaded ||
+		(index & 0xFFFF8000) != (RUNTIME_UI_TAG_MAGIC | RUNTIME_UI_TAG_INDEX_BIT) ||
+		slot >= (unsigned long)runtime_ui_tag_count ||
+		runtime_ui_tags[slot].tag_index != tag_index)
+	{
+		return NULL;
+	}
+	return &runtime_ui_tags[slot];
+}
+
+static void cache_runtime_ui_tags_clear(
+	void)
+{
+	csmemset(runtime_ui_tags, 0, sizeof(runtime_ui_tags));
+	runtime_ui_tag_count = 0;
+	runtime_ui_tag_generation =
+		(runtime_ui_tag_generation + 1) & RUNTIME_UI_TAG_GENERATION_MASK;
+}
+#endif
 
 static struct cache_file_tag_instance *cache_get_tag_instance(
 	long tag_index)
 {
 	short absolute_index;
 	struct cache_file_tag_instance *tag_instance;
+
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+	/* port: a runtime tag is not in the map's table */
+	tag_instance = cache_runtime_ui_tag_instance(tag_index);
+	if (tag_instance)
+		return tag_instance;
+#endif
 
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\cache_files.c",
@@ -541,6 +593,53 @@ static boolean cache_file_structure_bsp_reference_verify(
 
 /* ---------- public code */
 
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+long cache_files_register_runtime_ui_tag(
+	long group_tag,
+	char const *name,
+	void *definition)
+{
+	long index;
+	struct cache_file_tag_instance *instance;
+
+	if (!cache_file_globals.tags_loaded || !global_tag_instances ||
+		(group_tag != 'DeLa' && group_tag != 'ustr' && group_tag != 'bitm') ||
+		!name || !name[0] || !definition)
+	{
+		return NONE;
+	}
+	for (index = 0; index < runtime_ui_tag_count; index++)
+	{
+		instance = &runtime_ui_tags[index];
+		if (instance->base_address == definition ||
+			(instance->group_tag == group_tag && !_stricmp(instance->name, name)))
+		{
+			return instance->group_tag == group_tag &&
+				!csstrcmp(instance->name, name) && instance->base_address == definition ?
+				instance->tag_index : NONE;
+		}
+	}
+	/* port: never hide an existing map tag, including a case variant of its name */
+	for (index = 0; index < cache_file_globals.tag_header->tag_count; index++)
+	{
+		instance = &global_tag_instances[index];
+		if (instance->group_tag == group_tag && !_stricmp(instance->name, name))
+			return NONE;
+	}
+	if (runtime_ui_tag_count == MAXIMUM_RUNTIME_UI_TAGS)
+		return NONE;
+	instance = &runtime_ui_tags[runtime_ui_tag_count];
+	instance->group_tag = group_tag;
+	instance->parent_group_tags[0] = instance->parent_group_tags[1] = NONE;
+	instance->tag_index = RUNTIME_UI_TAG_MAGIC | RUNTIME_UI_TAG_INDEX_BIT |
+		(runtime_ui_tag_generation << RUNTIME_UI_TAG_INDEX_BITS) | runtime_ui_tag_count;
+	instance->name = (char *)name;
+	instance->base_address = definition;
+	runtime_ui_tag_count++;
+	return instance->tag_index;
+}
+#endif
+
 char const *cache_files_map_directory(
 	void)
 {
@@ -624,6 +723,10 @@ void scenario_tags_unload(
 		custom_edition_cache_tags_unload();
 	else
 		tags_header_deregister_vertex_and_index_buffers(cache_file_globals.tag_header);
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+	/* port: the runtime tags borrow names and definitions that die with the map */
+	cache_runtime_ui_tags_clear();
+#endif
 	cache_file_globals.tags_loaded = FALSE;
 	global_tag_instances = NULL;
 	global_tag_count = 0;
@@ -692,6 +795,17 @@ long tag_loaded(
 
 	if (cache_file_globals.tags_loaded)
 	{
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+		/* port: a runtime tag is found by its exact name before the map's table */
+		for (absolute_index = 0; absolute_index < runtime_ui_tag_count; absolute_index++)
+		{
+			if (group_tag == runtime_ui_tags[absolute_index].group_tag &&
+				!csstrcmp(name, runtime_ui_tags[absolute_index].name))
+			{
+				return runtime_ui_tags[absolute_index].tag_index;
+			}
+		}
+#endif
 		match_assert(
 			"c:\\halo\\SOURCE\\cache\\cache_files.c",
 			346,
@@ -1552,6 +1666,13 @@ boolean tag_index_is_group(
 {
 	short absolute_index = (short)tag_index;
 	struct cache_file_tag_instance *tag_instance;
+
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+	/* port: a runtime index's low word is negative, so the map walk below misses it */
+	tag_instance = cache_runtime_ui_tag_instance(tag_index);
+	if (tag_instance)
+		return tag_instance->group_tag == group_tag;
+#endif
 
 	if (tag_index == NONE || !cache_file_globals.tags_loaded || !global_tag_instances ||
 		absolute_index < 0 || absolute_index >= global_tag_count)

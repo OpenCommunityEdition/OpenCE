@@ -108,6 +108,7 @@ symbols in this file:
 #include "cache_file_formats.h" /* port: port/linux/game/cache_file_formats.c */
 #include "custom_edition_cache.h"
 #include "view_fov.h" /* port: port/linux/game/view_fov.c */
+#include "hardcore_views.h" /* port: a hardcore pane uses the local splitscreen hud */
 
 /* ---------- constants */
 
@@ -440,9 +441,18 @@ __attribute__((noinline)) long get_return_eip(
 	return (long)(__INTPTR_TYPE__)__builtin_return_address(1);
 }
 
+/* port: a hardcore team pane is one local split. the elements, the safe
+frame and the crosshair scale are that split's */
+boolean hud_split_screen(
+	void)
+{
+	return local_player_count() > 1 || hardcore_views_split();
+}
+
 real hud_globals_get_scale(
 	boolean in_multiplayer)
 {
+	(void)in_multiplayer;
 	return 1.0f;
 }
 
@@ -678,7 +688,7 @@ static void hud_draw_multitexture_overlay(
 	parameters.map_scale[0].j = 1.0f;
 	parameters.map_scale[0].i = 1.0f;
 	parameters.meter_parameters = NULL;
-	parameters.point_sampled = local_player_count() == 1;
+	parameters.point_sampled = !hud_split_screen();
 	parameters.map[0] = bitmap_group_get_bitmap_from_sequence(
 		overlay->map[0].index,
 		0,
@@ -1411,8 +1421,11 @@ split screen window its share) */
 void hud_zoomed_layout_begin(
 	rectangle2d *saved_window_bounds)
 {
-	long width = render.camera.window_bounds.x1 - render.camera.window_bounds.x0;
-	short inset = (short)((width - width * 640 / halo_screen_width()) / 2);
+	long width;
+	short inset;
+
+	width = render.camera.window_bounds.x1 - render.camera.window_bounds.x0;
+	inset = (short)((width - width * 640 / halo_screen_width()) / 2);
 
 	*saved_window_bounds = render.camera.window_bounds;
 	render.camera.window_bounds.x0 += inset;
@@ -1619,7 +1632,7 @@ static void hud_draw_bitmap_internal(
 	parameters.map_scale[0].j = 1.0f;
 	parameters.map_scale[0].i = 1.0f;
 	parameters.meter_parameters = meter_parameters;
-	parameters.point_sampled = meter_parameters && local_player_count()==1;
+	parameters.point_sampled = meter_parameters && !hud_split_screen();
 	parameters.framebuffer_blend_function =
 		_shader_framebuffer_blend_function_alpha_multiply_add;
 	parameters.map[0] = (struct bitmap_data *)bitmap;

@@ -245,6 +245,7 @@ symbols in this file:
 #include "game.h"
 #include "game/game_globals.h"
 #include "game_engine.h"
+#include "hardcore_rules.h" /* port: hardcore manual pickup and fireteams */
 #include "input.h"
 #include "interface/hud.h"
 #include "interface/hud_messaging.h"
@@ -1311,6 +1312,11 @@ long find_best_starting_location_index(
 		starting_location_rating = game_engine_get_starting_location_rating(
 			player_index,
 			starting_location);
+		/* port: hardcore fireteams bias the rating. The random draw stays. */
+		starting_location_rating = hardcore_rules_spawn_rating(
+			player_index,
+			&starting_location->position,
+			starting_location_rating);
 		starting_location_rating *= (real)pow(
 			(double)real_random_range(0.0f, 1.0f),
 			0.5);
@@ -3731,6 +3737,10 @@ boolean unit_should_autopick_weapon(
 	weapon_definition = weapon_definition_get(weapon->definition_index);
 	weapon_count = unit_get_weapon_count(unit_index);
 
+	/* port: a hardcore flag or ball waits for the pickup button. */
+	if (hardcore_rules_manual_pickup(weapon_index))
+		return FALSE;
+
 	if ((unit_approve_weapon_pickup(unit_index, weapon_index) &&
 		TEST_FLAG(weapon_definition->weapon.flags, _weapon_doesnt_count_toward_maximum_bit)) ||
 		weapon_count == 0 ||
@@ -4350,6 +4360,16 @@ static void player_examine_nearby_item(
 					weapon_get(weapon_item_index)->definition_index, 0);
 				player_control_unzoom(player->unit_index);
 			}
+		}
+		else if (hardcore_rules_manual_pickup(weapon_item_index) &&
+			unit_approve_weapon_pickup(player->unit_index, weapon_item_index))
+		{
+			/* port: the button, where a classic flag would have been taken already. */
+			player_set_action_result(
+				player_index,
+				_player_action_result_add_weapon_to_inventory,
+				weapon_item_index,
+				NONE);
 		}
 		else if (!current_weapon_does_not_count &&
 			unit_approve_weapon_swap(player->unit_index, weapon_item_index))

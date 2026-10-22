@@ -2362,3 +2362,13 @@ HRESULT WINAPI IDirectSoundBuffer_SetCurrentPosition(LPDIRECTSOUNDBUFFER buffer,
 HRESULT WINAPI IDirectSoundBuffer_SetLoopRegion(LPDIRECTSOUNDBUFFER buffer, DWORD loop_start, DWORD loop_length) { (void)buffer; (void)loop_start; (void)loop_length; return DS_OK; }
 HRESULT WINAPI IDirectSoundBuffer_SetPitch(LPDIRECTSOUNDBUFFER buffer, LONG pitch) { (void)buffer; (void)pitch; return DS_OK; }
 HRESULT WINAPI IDirectSoundBuffer_SetVolume(LPDIRECTSOUNDBUFFER buffer, LONG volume) { (void)buffer; (void)volume; return DS_OK; }
+
+static float audio_setting_volume(const char *name)
+{
+	double value = config_real(name);
+
+	/* Manual config edits can bypass the settings page's range checks. */
+	return !(value >= 0.0) ? 0.0f : value > 1.0 ? 1.0f : (float)value;
+}
+
+#include "performance_audio.inc"

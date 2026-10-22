@@ -748,6 +748,14 @@ void rasterizer_draw_string(
 	point2d *cursor_reference,
 	short height_adjust,
 	char const *string);
+/* port: one string at a scale about a point. the previous scale is put back */
+void rasterizer_draw_string_scaled(
+	rectangle2d const *bounds,
+	rectangle2d const *clip,
+	char const *string,
+	float scale,
+	float anchor_x,
+	float anchor_y);
 
 /* ---------- prototypes/RASTERIZER_MEMORY_POOL.C */
 
@@ -903,6 +911,33 @@ void rasterizer_text_set_scale(
 	real scale,
 	real origin_x,
 	real origin_y);
+/* port: the 640x480 menus drawn into one pane. quads and text shrink
+about the origin, and the pointer is turned back on the next test */
+void rasterizer_screen_fit_begin(
+	real scale,
+	real origin_x,
+	real origin_y,
+	real pane_x,
+	real pane_y,
+	real pane_w,
+	real pane_h,
+	real ui_offset);
+void rasterizer_screen_fit_pane(
+	short *width,
+	short *height);
+void rasterizer_screen_fit_end(
+	void);
+void rasterizer_screen_fit_clear(
+	void);
+void rasterizer_screen_fit_suspend(
+	boolean suspend);
+boolean rasterizer_screen_fit_drawing(
+	void);
+boolean rasterizer_screen_fit_pointer(
+	real *x,
+	real *y);
+void rasterizer_screen_fit_vertices(
+	struct dynamic_screen_vertex *vertices);
 void rasterizer_text_cache_flush(
 	void);
 void rasterizer_text_cache_dispose(

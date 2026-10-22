@@ -1629,7 +1629,18 @@ void rasterizer_psuedo_dynamic_screen_quad_draw(
 	struct rasterizer_dynamic_screen_geometry_parameters *parameters,
 	struct dynamic_screen_vertex *vertices)
 {
-	_rasterizer_psuedo_dynamic_screen_quad_draw(parameters, vertices);
+	struct dynamic_screen_vertex fitted[4];
+	struct dynamic_screen_vertex *draw = vertices;
+	short vertex_index;
+
+	if (rasterizer_screen_fit_drawing())
+	{
+		for (vertex_index = 0; vertex_index < 4; vertex_index++)
+			fitted[vertex_index] = vertices[vertex_index];
+		rasterizer_screen_fit_vertices(fitted);
+		draw = fitted;
+	}
+	_rasterizer_psuedo_dynamic_screen_quad_draw(parameters, draw);
 	return;
 }
 

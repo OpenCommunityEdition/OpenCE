@@ -82,6 +82,10 @@ static void draw_string_set_draw_mode(long font_index, short style, short justif
 }
 static void rasterizer_text_set_shadow_color(pixel32 color) { shadow = color; }
 static short halo_screen_width(void) { return 640; }
+/* cinematic_render skips a hardcore map's clock titles; these titles are not one */
+struct font_header { short ascending_height; short descending_height; short leading_height; };
+#define font_definition_get(index) ((struct font_header *)0)
+static boolean custom_edition_cache_is_hardcore(void) { return FALSE; }
 #define rasterizer_draw_unicode_string(bounds, style, color, flags, string) (draws++, drawn_shadow = shadow)
 
 #include "under_test.inc"

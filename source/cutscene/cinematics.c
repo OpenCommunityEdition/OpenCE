@@ -76,6 +76,9 @@ symbols in this file:
 #include "text/text_group.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
+/* port: the loaded map came from hardcore_maps (custom_edition_cache.c) */
+boolean custom_edition_cache_is_hardcore(void);
+
 /* ---------- constants */
 
 enum
@@ -265,8 +268,59 @@ void cinematic_set_title_delayed(
 	real delay)
 {
 	short title_slot_index;
+	struct scenario_cutscene_title *incoming = NULL;
+	boolean replaced = FALSE;
 
 	network_coop_note_title(title_index, delay);
+	/* port: these maps queue a new chapter title for each second, ten,
+	and minute. four slots then fill, so later digits never replace the
+	ones on screen. a title in the same band (s_, t_, or m_) takes that
+	slot, and any older copy of that band is dropped. */
+	if (custom_edition_cache_is_hardcore() &&
+		title_index >= 0 &&
+		title_index < global_scenario_get()->cutscene_chapter_titles.count)
+	{
+		incoming = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->cutscene_chapter_titles,
+			title_index,
+			struct scenario_cutscene_title);
+	}
+	if (incoming && incoming->name[1] == '_' &&
+		(incoming->name[0] == 's' || incoming->name[0] == 't' ||
+			incoming->name[0] == 'm'))
+	{
+		for (title_slot_index = 0;
+			title_slot_index < MAXIMUM_QUEUED_CINEMATIC_TITLES;
+			title_slot_index++)
+		{
+			struct cinematic_title *slot =
+				&cinematic_globals->queued_titles[title_slot_index];
+			struct scenario_cutscene_title *queued;
+
+			if (slot->title_index == NONE)
+				continue;
+			queued = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->cutscene_chapter_titles,
+				slot->title_index,
+				struct scenario_cutscene_title);
+			if (queued->name[1] != '_' || queued->name[0] != incoming->name[0])
+				continue;
+			if (!replaced)
+			{
+				slot->title_index = title_index;
+				slot->time = (short)-fast_ftol(delay * TICKS_PER_SECOND);
+				replaced = TRUE;
+			}
+			else
+			{
+				slot->title_index = NONE;
+				slot->time = NONE;
+			}
+		}
+		if (replaced)
+			return;
+	}
+
 	for (title_slot_index = 0;
 		title_slot_index < MAXIMUM_QUEUED_CINEMATIC_TITLES &&
 		cinematic_globals->queued_titles[title_slot_index].title_index != NONE;
@@ -368,6 +422,7 @@ void cinematic_render(
 			long font_index;
 			long help_text_tag_index;
 			real fade_amount;
+			boolean match_clock;
 
 			active_title =
 				&cinematic_globals->queued_titles[title_slot_index];
@@ -425,12 +480,22 @@ void cinematic_render(
 				fade_amount = PIN(fade_amount, 0.0f, 1.0f);
 			}
 
+			/* port: a hardcore map's s_, t_ and m_ titles are the pieces
+			of its match clock. the clock is one time, drawn with the
+			overlays, so these titles are not drawn on top of it. their
+			time still goes on, as a title under a menu does */
+			match_clock = custom_edition_cache_is_hardcore() &&
+				title->name[1]=='_' &&
+				(title->name[0]=='s' || title->name[0]=='t' ||
+					title->name[0]=='m');
+
 			/* port: not drawn over a menu, as the letterbox is not (the
 			fullscreen overlays come after the players' windows and their
 			menus); the title's time goes on as before */
-			if (!ui_widgets_active())
+			if (!ui_widgets_active() && !match_clock)
 			{
 				real_argb_color text_color;
+				long shadow_alpha;
 
 				pixel32_to_real_argb_color(
 					title->foreground_color,

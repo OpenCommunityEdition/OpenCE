@@ -233,6 +233,8 @@ symbols in this file:
 #include "units/units.h"
 
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+#include "performance_sound.h"
+#include "hardcore_rules.h" /* port: hardcore draw skip, spread and shot delay */
 #include "bitmaps/bitmap_group.h"
 #include "cache/texture_cache.h"
 #include "effects/contrail_definitions.h"
@@ -673,8 +675,21 @@ void weapon_ready(
 	weapon_reset(weapon_index);
 	weapon_set_state(weapon_index, _weapon_state_ready, TRUE);
 	first_person_weapon_message_from_weapon(weapon_index, _first_person_weapon_message_ready);
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+	{
+		unsigned previous_sound_role = performance_sound_push(_performance_sound_weapon_ready);
+
+		/* Keep the ready effect, including visuals and deferred events. */
+#endif
 	weapon_effect_new(weapon_index, weapon_definition->weapon.ready_effect.index, 0.f, 0.f);
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+		performance_sound_pop(previous_sound_role);
+	}
+#endif
 	weapon->weapon.state_timer = weapon_get_first_person_animation_time(weapon_index, 0, _first_person_weapon_animation_ready, NONE);
+	/* port: the first ready of a new unit can be immediate in a hardcore game. */
+	if (hardcore_rules_skip_consume(weapon_get_owner_object_index(weapon_index)))
+		weapon->weapon.state_timer = 0;
 
 	return;
 }
@@ -2589,6 +2604,8 @@ static void trigger_create_projectiles(
 						trigger->error;
 
 					error= (1.0f-fraction)*trigger_definition->projectile_error_angle_lower_bound + fraction*trigger_definition->projectile_error_angle_upper_bound;
+					/* port: hardcore pistol and shotgun spread, once for the shot. */
+					error= hardcore_rules_spread(weapon->definition_index, error);
 				}
 
 				if (!TEST_FLAG(trigger_definition->flags, _weapon_trigger_use_error_when_unzoomed_bit) ||
@@ -2609,6 +2626,19 @@ static void trigger_create_projectiles(
 				normalize3d(perpendicular3d(&data.forward, &data.up));
 				projectile_distribute(&data.forward, &data.up, trigger_definition->projectile_distribution_function, trigger_definition->projectile_distribution_angle, projectile_index, projectile_count);
 				scale_vector3d(&data.forward, velocity, &data.translational_velocity);
+				/* port: Anniversary copies the shooter's whole velocity when
+				the projectile's combine bit (4) is set. projectile_new still
+				adds the muzzle speed along the aim. */
+				if (game_engine_running() &&
+					TEST_FLAG(game_engine_get_variant()->universal_variant.flags, _game_variant_anniversary_rules_bit) &&
+					owner_object_index!=NONE)
+				{
+					struct projectile_definition const *projectile_definition=
+						projectile_definition_get(projectile_definition_index);
+
+					if (projectile_definition && TEST_FLAG(projectile_definition->projectile.flags, 4))
+						object_get_velocities(owner_object_index, &data.translational_velocity, NULL);
+				}
 
 				inside_bsp= unit && unit->unit.player_index!=NONE;
 				if (inside_bsp)
@@ -2929,6 +2959,10 @@ static void weapon_trigger_begin_firing(
 	{
 		return;
 	}
+
+	/* port: hardcore aim and trigger delay. The shot waits, and the round stays. */
+	if (hardcore_rules_shot_blocked(weapon_index))
+		return;
 
 	if (trigger_definition->magazine_index!=NONE)
 	{
@@ -3305,6 +3339,10 @@ boolean weapon_update(
 		{
 			SET_FLAG(trigger->flags, _weapon_trigger_released_since_last_shot_bit, TRUE);
 		}
+		/* port: the delay is one hold. a tick that cannot fire yet still
+		counts, or the next shot of the same hold waits again. */
+		else
+			hardcore_rules_shot_blocked(weapon_index);
 
 		if (trigger->ejection_port_position>0.0f)
 		{

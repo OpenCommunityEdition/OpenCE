@@ -707,6 +707,11 @@ short network_objects_damage_animation(long unit_index, short type, short animat
 void network_actors_note_user_animation(long unit_index, long animation_graph_index, short animation_index,
 	boolean interpolate);
 
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+#include "performance_sound.h"
+#include "hardcore_rules.h" /* port: hardcore skip of the first weapon draw */
+#endif
+
 /* ---------- constants */
 
 enum
@@ -2511,6 +2516,9 @@ boolean unit_new(
 	struct unit_definition *unit_definition =
 		unit_definition_get(unit->definition_index);
 	result = FALSE;
+
+	/* port: remembered off the unit, so a hardcore game can skip one draw. */
+	hardcore_rules_skip_arm(unit_index);
 
 	if (unit_definition->object.animation_graph.index!=NONE)
 	{
@@ -10138,6 +10146,14 @@ static short unit_animation_update(
 	struct animation_state *animation)
 {
 	long sound_index;
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+	struct unit_datum *unit = unit_get(unit_index);
+	/* Actions 3/4 are ready/put-away. Other animations can play concurrently. */
+	unsigned animation_sound_role =
+		animation==&unit->unit.animation.action_animation &&
+		(unit->unit.animation.action==3 || unit->unit.animation.action==4) ?
+			_performance_sound_weapon_ready : _performance_sound_normal;
+#endif
 	short result = animation_update_internal(
 		1,
 		animation_graph_index,
@@ -10146,6 +10162,9 @@ static short unit_animation_update(
 
 	if (sound_index!=NONE)
 	{
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+		unsigned previous_sound_role = performance_sound_push(animation_sound_role);
+#endif
 		object_impulse_sound_new(
 			unit_index,
 			sound_index,
@@ -10153,6 +10172,9 @@ static short unit_animation_update(
 			global_origin3d,
 			global_forward3d,
 			1.f);
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+		performance_sound_pop(previous_sound_role);
+#endif
 	}
 
 	return result;

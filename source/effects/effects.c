@@ -172,6 +172,9 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include "units/bipeds.h"
 #include "units/units.h"
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+#include "performance_sound.h"
+#endif
 #undef real_local_random
 
 /* ---------- constants */
@@ -629,6 +632,9 @@ void effects_initialize(
 void effects_initialize_for_new_map(
 	void)
 {
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+	performance_sound_reset(_performance_sound_effect);
+#endif
 	data_make_valid(effect_data);
 	data_make_valid(effect_location_data);
 
@@ -638,6 +644,9 @@ void effects_initialize_for_new_map(
 void effects_dispose_from_old_map(
 	void)
 {
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+	performance_sound_reset(_performance_sound_effect);
+#endif
 	data_make_invalid(effect_data);
 	data_make_invalid(effect_location_data);
 
@@ -689,6 +698,9 @@ void effect_delete(
 		}
 
 		datum_delete(effect_data, effect_index);
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+		performance_sound_forget(_performance_sound_effect, effect_index);
+#endif
 	}
 
 	return;
@@ -1545,6 +1557,11 @@ static long effect_allocate(
 				effect->local_player_index = NONE;
 				effect->header.flags = 0;
 
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+				/* Capture before the caller's immediate effect_update(0), and
+				 * retain it for later events without changing saved effect data. */
+				performance_sound_capture(_performance_sound_effect, effect_index);
+#endif
 				effect_set_event(effect_index, 0);
 			}
 		}
@@ -2361,7 +2378,16 @@ static void effect_update(
 			short next_event_index;
 
 			if (!TEST_FLAG(flags, _effect_invisible_bit))
+			{
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+				unsigned previous_sound_role = performance_sound_push(
+					performance_sound_role(_performance_sound_effect, effect_index));
+#endif
 				effect_generate_particles(effect);
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+				performance_sound_pop(previous_sound_role);
+#endif
+			}
 
 			if (!event_completed)
 				continue;
@@ -2460,7 +2486,16 @@ static void effect_update(
 			}
 
 			if (!TEST_FLAG(effect->header.flags, _effect_invisible_bit))
+			{
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+				unsigned previous_sound_role = performance_sound_push(
+					performance_sound_role(_performance_sound_effect, effect_index));
+#endif
 				effect_generate_parts(effect);
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+				performance_sound_pop(previous_sound_role);
+#endif
+			}
 		}
 	}
 

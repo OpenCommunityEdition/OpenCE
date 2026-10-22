@@ -374,6 +374,12 @@ symbols in this file:
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 #include "game/game_engine.h"
+#include "game/performance_variant.h"
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+#include "../../port/linux/game/performance_options.h"
+#include "hardcore_rules.h" /* port: hardcore rules from the host */
+#include "performance_audio.h"
+#endif
 #include "game/local_players.h"
 #include "game/player_queues_new.h"
 #include "game/players.h"
@@ -389,7 +395,9 @@ symbols in this file:
 #include "networking/network_game_manager.h"
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
+#include "networking/network_performance_protocol.h"
 #include "networking/network_server_manager.h"
+#include "networking/network_server_manager_internal.h"
 #include "text/unicode.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
@@ -919,6 +927,14 @@ void network_game_client_dispose(
 			network_game_client_dont_use_directly_in_use);
 
 		network_game_client_dont_use_directly_in_use = FALSE;
+		/* Leaving a lobby can dispose the client without loading a map. */
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+		if (!global_network_game_server_get())
+		{
+			performance_options_apply_host_flags(0);
+			hardcore_rules_clear_session();
+		}
+#endif
 	}
 
 	network_event("network client disposed");
@@ -1328,6 +1344,21 @@ boolean network_game_client_game_settings_updated(
 
 		csmemcpy(&previous_game, &client->game, sizeof(client->game));
 		csmemcpy(&client->game, message_packet, sizeof(client->game));
+		/* The settings precede begin-game on the same reliable stream, for
+		 * both lobby starts and joins in progress. The host's local client
+		 * must not overwrite its own newer authoritative state. */
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+		if (global_network_game_server_get())
+			performance_options_apply_host_flags(performance_variant_get_flags(
+				&network_game_server_get_game(global_network_game_server_get())->variant));
+		else
+		{
+			performance_options_apply_host_flags(performance_variant_get_flags(&client->game.variant));
+			/* port: the host's sheet is this match only while its variant says so. */
+			hardcore_rules_observe_match(TEST_FLAG(client->game.variant.universal_variant.flags,
+				_game_variant_anniversary_rules_bit) ? TRUE : FALSE);
+		}
+#endif
 		csmemcpy(
 			&client->game.local_data,
 			&previous_game.local_data,
@@ -2267,6 +2298,10 @@ void network_game_client_reset(
 	/* port: no start put off */
 	network_game_client_start_pending = FALSE;
 	network_game_client_incompatibility_told = FALSE;
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+	if (!global_network_game_server_get())
+		performance_options_apply_host_flags(0);
+#endif
 	csmemset(network_game_client_add_player_requested, 0, sizeof(network_game_client_add_player_requested));
 
 	return;
@@ -2608,6 +2643,7 @@ static boolean network_game_client_process_messages(
 	boolean budgeted)
 {
 	boolean success = TRUE;
+	boolean reliable;
 	word message_packet_size;
 	struct transport_address source_address;
 	word message_packet[MAXIMUM_NETWORK_MESSAGE_SIZE / sizeof(word)];
@@ -2615,12 +2651,38 @@ static boolean network_game_client_process_messages(
 
 	message_packet_size = sizeof(message_packet);
 
-	while (success && network_connection_read(
+	while (success && network_connection_read_with_transport(
 		client->connection,
 		message_packet,
 		&message_packet_size,
-		&source_address))
+		&source_address,
+		&reliable))
 	{
+		unsigned performance_flags;
+
+		/* Only the established host's reliable stream may change options.
+		 * UDP and client-originated controls never reach this branch. */
+		if (reliable && network_performance_decode((byte const *)message_packet,
+			message_packet_size, NETWORK_PERFORMANCE_SETTINGS, &performance_flags))
+		{
+			if (!global_network_game_server_get() &&
+				client->state >= _network_game_client_state_pregame)
+			{
+				performance_variant_set_flags(&client->game.variant, performance_flags);
+				performance_variant_set_flags(game_engine_get_variant(), performance_flags);
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+				performance_options_apply_host_flags(performance_flags);
+#endif
+			}
+			message_packet_size = sizeof(message_packet);
+			continue;
+		}
+		/* port: hardcore rules. An older build ignores this in the lobby. */
+		if (reliable && hardcore_rules_take_message(message_packet, message_packet_size))
+		{
+			message_packet_size = sizeof(message_packet);
+			continue;
+		}
 		if (!(success = network_game_client_handle_message(
 			client,
 			message_packet,
@@ -2846,6 +2908,27 @@ static boolean network_game_client_idle_joining(
 			{
 				struct message_client_join_game_request join_game_request;
 				message_header *message;
+				word capability[NETWORK_PERFORMANCE_MESSAGE_SIZE / sizeof(word)];
+				unsigned supported = NETWORK_PERFORMANCE_SUPPORTED_FLAGS & ~_performance_option_timer_audio;
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+				if (halo_performance_audio_available()) supported |= _performance_option_timer_audio;
+#endif
+
+				/* Earlier hosts reject unknown capability bits. Announce each
+				 * supported generation first: timer/markers, then timer audio,
+				 * then event-specific sound rules. Each host retains the newest
+				 * capability it understands before the reliable join request. */
+				network_performance_encode((byte *)capability, NETWORK_PERFORMANCE_CAPABILITY, 3);
+				if (!network_game_client_write(client->connection, capability, sizeof(capability), NULL, 1))
+					return FALSE;
+				network_performance_encode((byte *)capability, NETWORK_PERFORMANCE_CAPABILITY,
+					supported & 7);
+				if (!network_game_client_write(client->connection, capability, sizeof(capability), NULL, 1))
+					return FALSE;
+				network_performance_encode((byte *)capability, NETWORK_PERFORMANCE_CAPABILITY,
+					supported);
+				if (!network_game_client_write(client->connection, capability, sizeof(capability), NULL, 1))
+					return FALSE;
 
 				csmemset(&join_game_request, 0, sizeof(join_game_request));
 				network_game_generate_local_machine_name(join_game_request.machine_name);
@@ -3156,7 +3239,8 @@ boolean network_game_client_advertised_game_compatible(
 	theirs = network_game_client_advertised_versions[game_index].version;
 	distributed = (network_game_client_advertised_versions[game_index].flags &
 		HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG) != 0;
-	if (theirs == ours && distributed)
+	if (network_performance_version_compatible(theirs,
+		network_game_client_advertised_versions[game_index].flags, ours) && distributed)
 	{
 		network_event("joining a host of network version %u", theirs);
 		return TRUE;

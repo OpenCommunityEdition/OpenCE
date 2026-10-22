@@ -175,6 +175,21 @@ static const struct config_setting config_settings[] =
 		"from the game's first tick, which the items' respawn periods count from\n"
 		"too: a weapon is back on the map at every multiple of its period on the\n"
 		"clock." },
+	{ "display.timer_position", _config_integer, "0", NULL, _environment_value, _platform_all,
+		"PB timer position: 0 is top center, 1 bottom center, 2 bottom right." },
+	{ "display.timer_scale", _config_real, "1.0", NULL, _environment_value, _platform_all,
+		"PB timer size, 0.5 to 1.0. These preferences do not enable the timer." },
+	{ "display.teammate_views", _config_boolean, "false", "HALO_TEAMMATE_VIEWS", _environment_value, _platform_all,
+		"In a hardcore team game, split this screen so one player can see\n"
+		"teammates from their own eyes, up to four panes, for the whole match.\n"
+		"A dead teammate keeps the pane. Off leaves the view as it is. Classic\n"
+		"multiplayer is unchanged." },
+	{ "display.teammate_view_slot", _config_string, "\"top_left\"", "HALO_TEAMMATE_VIEW_SLOT", _environment_value,
+		_platform_all,
+		"Which pane is yours when teammate views are on, on this machine:\n"
+		"\"top\", \"bottom\", \"top_left\", \"top_right\", \"bottom_left\" or\n"
+		"\"bottom_right\". Two panes are top and bottom. Three give a wide top\n"
+		"and two bottoms. Four are the corners." },
 	{ "display.scoreboard_team_layout", _config_string, "\"teams\"", "HALO_SCOREBOARD_TEAM_LAYOUT", _environment_value,
 		_platform_all,
 		"How the scoreboard lists a team game's players: \"teams\" in a column for\n"
@@ -247,6 +262,17 @@ static const struct config_setting config_settings[] =
 	{ "audio.effects_volume", _config_real, "1.0", "HALO_EFFECTS_VOLUME", _environment_value, _platform_all,
 		"The volume of every other sound (effects and speech), 0.0 to 1.0 (of\n"
 		"audio.volume)." },
+	{ "audio.timer_volume", _config_real, "1.0", NULL, _environment_value, _platform_all,
+		"Optional Performance Build timer recordings volume, 0.0 to 1.0." },
+	{ "audio.timer_countdown", _config_boolean, "true", NULL, _environment_value, _platform_all,
+		"Play countdown announcements when the host enables PB Timer Sounds." },
+	{ "audio.timer_beeps", _config_boolean, "true", NULL, _environment_value, _platform_all,
+		"Play countdown beeps when the host enables PB Timer Sounds." },
+	{ "audio.timer_minutes", _config_boolean, "true", NULL, _environment_value, _platform_all,
+		"Announce elapsed minutes when the host enables PB Timer Sounds." },
+	{ "audio.timer_items", _config_boolean, "false", NULL, _environment_value, _platform_all,
+		"Announce scheduled rockets and powerups on supported maps when the\n"
+		"host enables PB Timer Sounds. Off preserves the existing timer audio." },
 	{ "audio.buffer_frames", _config_integer, "512", "HALO_AUDIO_BUFFER_FRAMES", _environment_value,
 		_platform_desktop,
 		"The audio device's buffer, in sample frames at 48 kHz (64 to 8192): larger\n"

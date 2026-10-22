@@ -344,6 +344,24 @@
 	<bitmap name="main_menu/multiplayer_type_select/server_settings/voice_options/header_voice_options">
 		<frame png="ce/port/main_menu/multiplayer_type_select/server_settings/voice_options/header_voice_options.png" width="512" height="64"/>
 	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_hardcore">
+		<frame png="ce/port/main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_hardcore.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_extras">
+		<frame png="ce/port/main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_extras.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_match">
+		<frame png="ce/port/main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_match.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_server">
+		<frame png="ce/port/main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_server.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_tuning">
+		<frame png="ce/port/main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_tuning.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_world">
+		<frame png="ce/port/main_menu/settings_select/multiplayer_setup/hardcore_options_edit/header_world.png" width="512" height="64"/>
+	</bitmap>
 	<bitmap name="pause/pausebox_left">
 		<frame png="ce/port/pause/pausebox_left__0.png" width="16" height="256"/>
 		<frame png="ce/port/pause/pausebox_left__1.png" width="16" height="256"/>

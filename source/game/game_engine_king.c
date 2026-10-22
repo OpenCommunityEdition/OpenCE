@@ -101,6 +101,7 @@ symbols in this file:
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "units/units.h"
+#include "hardcore_rules.h" /* port: hardcore hill order and period */
 
 /* ---------- constants */
 
@@ -438,7 +439,9 @@ static boolean king_engine_initialize_for_new_map(
 	}
 
 	king_globals.hill_id = 0;
-	king_globals.hill_timer = HILL_MOVE_TIME;
+	/* port: a hardcore hill can stay up for a chosen number of seconds. */
+	king_globals.hill_timer = hardcore_rules_active() ?
+		hardcore_rules_hill_move_ticks() : HILL_MOVE_TIME;
 	king_globals.hill_previous_controller = NONE;
 	king_globals.hill_state = king_hill_uncontrolled;
 	find_hill();
@@ -788,7 +791,8 @@ static void king_engine_update(
 		game_engine_get_variant()->game_engine_variant.king.moving_hill &&
 		--king_globals.hill_timer == 0)
 	{
-		king_globals.hill_timer = HILL_MOVE_TIME;
+		king_globals.hill_timer = hardcore_rules_active() ?
+			hardcore_rules_hill_move_ticks() : HILL_MOVE_TIME;
 		king_globals.hill_id = find_next_hill(king_globals.hill_id);
 		find_hill();
 		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
@@ -1073,8 +1077,27 @@ static long find_next_hill(
 	/* port: with no other hill (a map with one), the same hill. January left
 	it unset, and king_engine_update could loop looking for a hill */
 	long next_hill_id = hill_id;
-	short start_index = random_range(0, king_engine_num_hills);
+	short start_index;
 	short i;
+
+	/* port: ordered hills walk the list. random_range would be a draw the
+	other machines do not make. */
+	if (hardcore_rules_hill_ordered() && king_engine_num_hills > 0)
+	{
+		short next = 0;
+
+		for (i = 0; i < king_engine_num_hills; i++)
+		{
+			if (king_engine_hills[i] == hill_id)
+			{
+				next = (short)((i + 1) % king_engine_num_hills);
+				break;
+			}
+		}
+		return king_engine_hills[next];
+	}
+
+	start_index = random_range(0, king_engine_num_hills);
 
 	for (i = 0; i < king_engine_num_hills; i++)
 	{

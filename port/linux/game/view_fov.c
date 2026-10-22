@@ -25,6 +25,7 @@ that draw the first-person weapon (rasterizer and render sources).
 #include "render/render_cameras_internal.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
+#include "hardcore_views.h"
 
 #include <math.h>
 
@@ -157,12 +158,12 @@ real render_fov_authored_vertical(short local_player_index)
 
 real render_fov_reticle_scale(short local_player_index)
 {
-	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS ||
-		reticle_scales[local_player_index] == 0.0f)
+	if (local_player_index >= 0 && local_player_index < MAXIMUM_LOCAL_PLAYERS &&
+		reticle_scales[local_player_index] != 0.0f)
 	{
-		return 1.0f;
+		return reticle_scales[local_player_index];
 	}
-	return reticle_scales[local_player_index];
+	return 1.0f;
 }
 
 /* ---------- the first-person weapon's */
@@ -202,16 +203,17 @@ void viewmodel_projection_begin(void)
 		return;
 	projection_applied = FALSE;
 	/* (display.viewmodel_fov's angle; by default the view's own, from before
-	display.fov widened it: arms and a gun right against the camera stretch
-	at a wide angle) */
+	display.fov widened it. a split keeps that pane's camera, so the gun
+	and the shot share one aim) */
 	angle = viewmodel_vertical();
 	if (!angle)
 		angle = render_fov_authored_vertical(render.local_player_index);
 	if (!angle || render.local_player_index < 0 || render.local_player_index >= MAXIMUM_LOCAL_PLAYERS ||
 		global_window_parameters.rasterizer_target != _rasterizer_target_render_primary ||
 		cinematic_in_progress() || (director_camera_scripted && *director_camera_scripted) ||
-		director_get_perspective(render.local_player_index) != _director_perspective_first_person ||
-		director_inhibited_facing(render.local_player_index))
+		(!hardcore_views_is_teammate_window((short)render.window_index) &&
+			(director_get_perspective(render.local_player_index) != _director_perspective_first_person ||
+			director_inhibited_facing(render.local_player_index))))
 	{
 		return;
 	}

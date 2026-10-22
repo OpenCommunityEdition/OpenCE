@@ -105,6 +105,12 @@ void observer_update(
 
 struct observer_result const *observer_get_camera(
 	short local_player_index);
+
+/* port: a slot with no player hears a hardcore teammate. NULL clears
+the cluster, so the sound test stops using the last place. */
+void observer_port_set_result(
+	short local_player_index,
+	struct observer_result const *result);
 boolean observer_command_has_finished(
 	short local_player_index);
 

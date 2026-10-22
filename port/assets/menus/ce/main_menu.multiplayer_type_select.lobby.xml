@@ -31,6 +31,8 @@
 		<child widget="main_menu/multiplayer_type_select/lobby/list_item_8" x="20" y="313"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/list_item_9" x="20" y="343"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/list_item_10" x="20" y="373"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_views" x="20" y="343"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_view_slot" x="20" y="373"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/lobby_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/lobby/list_item_0" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd_top" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
@@ -87,6 +89,28 @@
 		<on event="left right" run="swap player team"/>
 		<child widget="main_menu/new_select/list_item_text" x="25"/>
 		<child widget="main_menu/new_select/list_item_arrows"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_views" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_views_label"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_views_spinner" x="198" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_views_label" type="text" controller="1" width="184" height="22" text="SPLIT SCREEN" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_views_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|ON" setting="display.teammate_views" values="false|true" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+		<on event="deleted" run="port setting save"/>
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_view_slot" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_view_slot_label"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_view_slot_spinner" x="164" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_view_slot_label" type="text" controller="1" width="143" height="22" text="YOUR VIEW" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_view_slot_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="TOP|BOTTOM|TOP LEFT|TOP RIGHT|BOTTOM LEFT|BOTTOM RIGHT" setting="display.teammate_view_slot" values="top|bottom|top_left|top_right|bottom_left|bottom_right" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="created" run="port setting load"/>
+		<on event="deleted" run="port setting save"/>
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/lobby/lobby_desc" width="640" height="480">
 		<child widget="main_menu/current_profile_name"/>

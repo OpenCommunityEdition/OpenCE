@@ -79,6 +79,8 @@ struct custom_edition_cache_globals
 	/* the Halo PC behaviours the loaded map relies on (enum
 	custom_edition_behaviour, flags) */
 	uint32_t behaviours;
+	/* the map was opened from hardcore_maps, until its file is closed */
+	boolean hardcore;
 	/* the tag cache and the bytes of it the loaded tags use */
 	uint8_t *tag_cache;
 	uint32_t loaded_bytes;
@@ -268,6 +270,9 @@ static boolean custom_edition_map_named(
 	char hashed[MAP_PATH_SIZE];
 	short folder;
 
+	/* (a hardcore map's file is only in hardcore_maps) */
+	if (map_name && !_strnicmp(map_name, HARDCORE_LEVEL_NAME_PREFIX, csstrlen(HARDCORE_LEVEL_NAME_PREFIX)))
+		return maps_folder_has(HARDCORE_MAP_DIRECTORY, name, MAP_FILE_EXTENSION, path);
 	for (folder = 0; folder < NUMBER_OF_MAPS_FOLDERS; folder++)
 	{
 		if (maps_folder_has(maps_folder(folder), name, MAP_FILE_EXTENSION, path))
@@ -539,6 +544,7 @@ static void custom_edition_cache_files_close(
 	}
 	custom_edition_file_close(&globals->map);
 	globals->map_path[0] = 0;
+	globals->hardcore = FALSE;
 
 	return;
 }
@@ -843,7 +849,8 @@ boolean custom_edition_level_name(
 	char const *level_name)
 {
 	return level_name &&
-		!_strnicmp(level_name, CUSTOM_EDITION_LEVEL_NAME_PREFIX, csstrlen(CUSTOM_EDITION_LEVEL_NAME_PREFIX));
+		(!_strnicmp(level_name, CUSTOM_EDITION_LEVEL_NAME_PREFIX, csstrlen(CUSTOM_EDITION_LEVEL_NAME_PREFIX)) ||
+		!_strnicmp(level_name, HARDCORE_LEVEL_NAME_PREFIX, csstrlen(HARDCORE_LEVEL_NAME_PREFIX)));
 }
 
 boolean custom_edition_map_file_path(
@@ -874,6 +881,12 @@ boolean custom_edition_map_find_version(
 	boolean found = FALSE;
 	short folder;
 
+	/* (a hardcore map is only in hardcore_maps) */
+	if (level_name && !_strnicmp(level_name, HARDCORE_LEVEL_NAME_PREFIX, csstrlen(HARDCORE_LEVEL_NAME_PREFIX)))
+	{
+		return maps_folder_has(HARDCORE_MAP_DIRECTORY, name, MAP_FILE_EXTENSION, path) &&
+			map_share_map_version(path, &found_version) && found_version == version;
+	}
 	for (folder = 0; folder < NUMBER_OF_MAPS_FOLDERS; folder++)
 	{
 		if (maps_folder_has(maps_folder(folder), name, MAP_FILE_EXTENSION, path) &&
@@ -1004,11 +1017,15 @@ boolean custom_edition_cache_present(
 			error(_error_silent, "custom edition: '%s' is another version of the host's map (the host's %08lx)", path,
 				version);
 			snprintf(message, message_size,
-				"Your %.64s.map is a different version from the host's. Copy the host's into custom_maps.", name);
+				"Your %.64s.map is a different version from the host's. Copy the host's into %s.", name,
+				level_name && !_strnicmp(level_name, HARDCORE_LEVEL_NAME_PREFIX,
+					csstrlen(HARDCORE_LEVEL_NAME_PREFIX)) ? "hardcore_maps" : "custom_maps");
 			return FALSE;
 		}
-		snprintf(message, message_size, "You don't have the map %.*s.map. If you have it, copy it into custom_maps.",
-			(int)MIN(64, map_share_name_base_length(name)), name);
+		snprintf(message, message_size, "You don't have the map %.*s.map. If you have it, copy it into %s.",
+			(int)MIN(64, map_share_name_base_length(name)), name,
+			level_name && !_strnicmp(level_name, HARDCORE_LEVEL_NAME_PREFIX,
+				csstrlen(HARDCORE_LEVEL_NAME_PREFIX)) ? "hardcore_maps" : "custom_maps");
 		return FALSE;
 	}
 	if (!halo_custom_edition_tag_cache())
@@ -1077,7 +1094,9 @@ boolean custom_edition_cache_campaign(
 {
 	struct cache_file_identity identity;
 
+	/* (a Halo PC cache is a hardcore map, listed on that screen) */
 	return custom_edition_cache_identify(map_name, &identity) &&
+		identity.version == CACHE_FILE_VERSION_CUSTOM_EDITION &&
 		identity.scenario_type == _scenario_type_solo;
 }
 
@@ -1086,7 +1105,9 @@ boolean custom_edition_cache_multiplayer(
 {
 	struct cache_file_identity identity;
 
+	/* (a Halo PC cache is a hardcore map, listed on that screen) */
 	return custom_edition_cache_identify(map_name, &identity) &&
+		identity.version == CACHE_FILE_VERSION_CUSTOM_EDITION &&
 		identity.scenario_type == _scenario_type_multiplayer;
 }
 
@@ -1103,16 +1124,21 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 	short type;
 
 	assert(!globals->tags_loaded);
+	globals->hardcore = map_name &&
+		!_strnicmp(map_name, HARDCORE_LEVEL_NAME_PREFIX, csstrlen(HARDCORE_LEVEL_NAME_PREFIX));
 	if (!tag_cache)
 	{
 		error(_error_silent, "custom edition: cannot load the map '%s': %s", map_name,
 			custom_edition_unavailable_reason());
+		globals->hardcore = FALSE;
 		return NULL;
 	}
 	if (!custom_edition_map_path(map_name, path) || !custom_edition_file_open(&globals->map, path))
 	{
-		error(_error_silent, "custom edition: cannot open the map '%s' (it is looked for in the custom_maps folder)",
-			map_name);
+		error(_error_silent, "custom edition: cannot open the map '%s' (it is looked for in the %s folder)",
+			map_name, map_name && !_strnicmp(map_name, HARDCORE_LEVEL_NAME_PREFIX,
+				csstrlen(HARDCORE_LEVEL_NAME_PREFIX)) ? "hardcore_maps" : "custom_maps");
+		globals->hardcore = FALSE;
 		return NULL;
 	}
 	strcpy(globals->map_path, path);
@@ -1253,6 +1279,12 @@ boolean custom_edition_cache_relies_on(
 	return custom_edition_cache_globals.tags_loaded &&
 		behaviour >= 0 && behaviour < NUMBER_OF_CUSTOM_EDITION_BEHAVIOURS &&
 		((custom_edition_cache_globals.behaviours >> behaviour) & 1);
+}
+
+boolean custom_edition_cache_is_hardcore(
+	void)
+{
+	return custom_edition_cache_globals.hardcore;
 }
 
 void custom_edition_cache_tags_unload(

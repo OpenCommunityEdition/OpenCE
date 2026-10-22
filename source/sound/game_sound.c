@@ -115,6 +115,7 @@ symbols in this file:
 #include "structures/structure_bsp_definitions.h"
 #include "structures/structures.h"
 #include "units/units.h"
+#include "hardcore_views.h" /* port: a teammate pane is in the audible set */
 
 /* ---------- constants */
 
@@ -1066,7 +1067,11 @@ static void compute_combined_pas(
 		local_player_index < MAXIMUM_LOCAL_PLAYERS;
 		local_player_index++)
 	{
-		if (local_player_get_player_index(local_player_index) != NONE)
+		/* port: a hardcore teammate's slot has no player. the audible set
+		is still that view, or a looping sound over there never starts */
+		if (local_player_get_player_index(local_player_index) != NONE ||
+			(hardcore_views_split() &&
+				observer_get_camera(local_player_index)->location.cluster_index != NONE))
 		{
 			struct observer_result const *camera = observer_get_camera(local_player_index);
 

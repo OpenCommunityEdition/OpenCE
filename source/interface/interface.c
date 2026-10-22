@@ -107,6 +107,8 @@ symbols in this file:
 #include "units/units.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
+#include "hardcore_timer.h" /* port: port/linux/game/hardcore_timer.c */
+#include "hardcore_views.h" /* port: a teammate pane still gets the weapon mask */
 
 /* ---------- constants */
 
@@ -386,6 +388,8 @@ void interface_draw_fullscreen_overlays(
 	void)
 {
 	cinematic_render();
+	/* port: a hardcore match's clock. a classic game does not draw it */
+	hardcore_timer_render();
 	interface_splitscreen_render();
 	hud_render_timer();
 	/* port: a map's download (port/linux/game/map_share.c) */
@@ -461,8 +465,9 @@ static long interface_get_weapon_hud_index(
 
 		if (hud_scripted_globals &&
 			hud_scripted_globals->show_hud &&
-			perspective != _director_perspective_neutral &&
-			perspective != _director_perspective_scripted &&
+			(hardcore_views_is_teammate_window((short)render.window_index) ||
+				(perspective != _director_perspective_neutral &&
+					perspective != _director_perspective_scripted)) &&
 			player->unit_index != NONE)
 		{
 			long weapon_index = unit_inventory_get_weapon(
@@ -1228,6 +1233,7 @@ static void interface_splitscreen_render(
 {
 	rectangle2d bounds;
 	short window_count;
+	short views;
 	/* port: the screen's width, wider than the Xbox's 640 on a wide screen,
 	whose middle the windows split at (compute_window_bounds) */
 	short width = (short)halo_screen_width();
@@ -1235,7 +1241,15 @@ static void interface_splitscreen_render(
 	if (game_engine_force_single_screen() || cinematic_in_progress())
 		return;
 
-	window_count = local_player_count();
+	/* port: the bar is the panes this screen draws. a hardcore team
+	   split counts those panes, and a classic split counts local players */
+	window_count = hardcore_views_local_count();
+	if (window_count == 1)
+	{
+		views = hardcore_views_window_count();
+		if (views > 1)
+			window_count = views;
+	}
 
 	if (window_count <= 1)
 		return;

@@ -58,6 +58,9 @@ struct weapon_hud_overlay_definition;
 
 long get_return_eip(
 	void);
+/* port: local splitscreen, or a hardcore team pane */
+boolean hud_split_screen(
+	void);
 real hud_globals_get_scale(
 	boolean in_multiplayer);
 void hud_retrieve_bitmap_and_bounding_rect(

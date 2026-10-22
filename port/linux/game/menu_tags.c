@@ -380,6 +380,10 @@ static char const *const port_function_names[] =
 	"mp profile init indicator opts", "mp profile set ctf rules", "mp profile set koth rules",
 	"mp profile set slayer rules", "mp profile set oddball rules", "mp profile set racing rules",
 	"mp profile set player options", "mp profile set item options", "mp profile set indicator opts",
+	/* (Multiplayer's HARDCORE. A name missing here rejects every port menu.) */
+	"port hardcore open", "port hardcore choose", "port hardcore start",
+	"port hardcore prepare", "port hardcore leave",
+	"port hardcore setup open", "port hardcore server open",
 	/* (Settings' OK: the Xbox's fails when the profile has no changes, the
 	settings' screens having written theirs to config.toml) */
 	"player profile save changes",
@@ -416,6 +420,8 @@ static char const *const port_game_data_input_names[] =
 	"port gamepad layout preview",
 	/* (the main menu's Mods) */
 	"port mods update",
+	/* (Hardcore's map list, and its setup while a gametype page is open) */
+	"port hardcore maps", "port hardcore setup", "port hardcore server",
 	/* (network co-op's pause menu's FRIENDLY FIRE: its text, ON or OFF) */
 	"port coop friendly fire text",
 };

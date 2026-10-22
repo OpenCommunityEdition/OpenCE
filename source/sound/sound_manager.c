@@ -233,6 +233,7 @@ symbols in this file:
 #include "game_sound.h"
 #include "sound_preferences.h"
 #include "camera/observer.h"
+#include "hardcore_views.h" /* port: a teammate pane hears from its own camera */
 #include "effects/player_effects.h"
 #include "game/game.h"
 #include "game/game_globals.h"
@@ -240,6 +241,10 @@ symbols in this file:
 #include "render/render_debug.h"
 #include "scenario/scenario.h"
 #include "tag_files/tag_files.h"
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+#include "../../port/linux/game/performance_options.h"
+#include "performance_sound.h"
+#endif
 
 #include <math.h>
 #include <stdio.h>
@@ -876,6 +881,10 @@ boolean sound_scripted_dialog_is_playing(
 void sound_initialize_for_new_map(
 	void)
 {
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+	performance_sound_reset(_performance_sound_voice);
+	performance_sound_pop(_performance_sound_normal);
+#endif
 	return;
 }
 
@@ -1166,6 +1175,9 @@ static void sound_delete(
 		0x4CF,
 		sound_get(sound_index)->playing_channel_index==NONE);
 	datum_delete(sound_data, sound_index);
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+	performance_sound_forget(_performance_sound_voice, sound_index);
+#endif
 
 	return;
 }
@@ -1606,6 +1618,9 @@ static long update_potentially_audible_looping_sound(
 			{
 				struct sound_datum *sound = sound_get(sound_index);
 
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+				performance_sound_record(_performance_sound_voice, sound_index, _performance_sound_normal);
+#endif
 				sound->listener_index = listener_index;
 				sound->definition_index = definition_index;
 				sound->playing_channel_index = NONE;
@@ -2358,6 +2373,20 @@ static void update_channel_for_impulse_sound(
 		definition->one_gain_modifier,
 		scale);
 
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+	{
+		unsigned long flags = performance_options_get_flags();
+		unsigned silent_roles = 0;
+		if (flags & _performance_option_silent_movement)
+			silent_roles |= _performance_sound_movement;
+		if (flags & _performance_option_silent_weapon_ready)
+			silent_roles |= _performance_sound_weapon_ready;
+		/* Silence this occurrence only, after authored scale modifiers. The
+		 * channel, samples, RNG and callbacks continue on their stock path. */
+		gain *= performance_sound_gain(channel->sound_index, silent_roles);
+	}
+#endif
+
 	if (sound->playing_channel_index == NONE)
 	{
 		struct platform_sound_channel_properties properties;
@@ -2530,6 +2559,9 @@ long sound_new_impulse(
 										definition->one_pitch_modifier,
 										source->scale);
 									sound->flags = 0;
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+									performance_sound_capture_voice(sound_index, definition_index);
+#endif
 									sound->source_identifier = source_identifier;
 									sound->source = *source;
 									sound->track_proc = track_proc;
@@ -3956,7 +3988,49 @@ static void refresh_listener(
 		}
 		else
 		{
-			listener->valid = FALSE;
+			struct observer_result teammate_camera;
+			static boolean spare_listener[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+
+			/* port: the pane hears what is around that teammate. an empty
+			slot stays on the local listener, so a sound fading out still
+			has one and does not become a second place to hear from */
+			if (hardcore_views_listener(local_player_index, &teammate_camera))
+			{
+				spare_listener[local_player_index] = TRUE;
+				listener->valid = TRUE;
+				listener->underwater = scenario_location_underwater(
+					&teammate_camera.location,
+					&teammate_camera.position,
+					NULL);
+				matrix4x3_from_point_and_vectors(
+					&listener->matrix,
+					&teammate_camera.position,
+					&teammate_camera.forward,
+					&teammate_camera.up);
+				listener->velocity = *global_zero_vector3d;
+				/* port: the wall and distance test reads the observer, not
+				this listener. an empty slot's observer is nowhere, which
+				muffles every sound it is given */
+				observer_port_set_result(local_player_index, &teammate_camera);
+			}
+			else if (spare_listener[local_player_index] && listener_get(0)->valid)
+			{
+				struct sound_listener *local_listener = listener_get(0);
+
+				listener->valid = TRUE;
+				listener->underwater = local_listener->underwater;
+				listener->matrix = local_listener->matrix;
+				listener->velocity = local_listener->velocity;
+				observer_port_set_result(local_player_index, observer_get_camera(0));
+			}
+			else if (spare_listener[local_player_index])
+			{
+				listener->valid = TRUE;
+			}
+			else
+			{
+				listener->valid = FALSE;
+			}
 		}
 	}
 

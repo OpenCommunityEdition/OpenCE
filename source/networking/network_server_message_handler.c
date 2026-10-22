@@ -253,12 +253,15 @@ symbols in this file:
 #include "bungie_net/network/transport_endpoint_winsock.h"
 #include "game/game.h"
 #include "game/game_engine.h"
+#include "game/performance_variant.h"
 #include "game/players.h"
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
+#include "networking/network_performance_protocol.h"
+#include "hardcore_rules.h" /* port: hardcore rules beside the variant */
 #include "networking/network_server_manager_internal.h"
 #include "networking/network_server_message_handler.h"
 #include "text/unicode.h"
@@ -784,6 +787,43 @@ boolean network_game_server_send_message_to_client_machine(
 	return network_game_server_write(connection, buffer, size, NULL, 1);
 }
 
+/* port: the hardcore sheet is not in the variant. Old builds ignore this
+data message while they are still in the lobby. */
+static void hardcore_rules_send_settings(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *only)
+{
+	unsigned char message[40];
+	struct network_game *game = network_game_server_get_game(server);
+	struct game_variant const *variant = game ? &game->variant : NULL;
+	long index;
+
+	/* port: the engine's variant is still the map already loaded. the
+	   lobby's copy is the one this match will start. */
+	if (!server || !variant || !TEST_FLAG(variant->universal_variant.flags, _game_variant_anniversary_rules_bit))
+		return;
+	if (!hardcore_rules_write_message(message, (long)sizeof(message)))
+		return;
+	if (only)
+	{
+		if (!network_game_server_client_machine_is_local(server, only))
+			network_game_server_send_message_to_client_machine(server, only, message);
+		return;
+	}
+	/* port: the menu map's clock is already running in the lobby, and again
+	   when the start is sent. waiting for it to stop dropped the sheet. */
+	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
+	{
+		struct network_game_server_client_machine *machine =
+			network_game_server_get_client_machine_at_index(server, index);
+
+		if (!network_game_server_client_machine_is_joined_to_game(server, machine) ||
+			network_game_server_client_machine_is_local(server, machine))
+			continue;
+		network_game_server_send_message_to_client_machine(server, machine, message);
+	}
+}
+
 boolean network_game_server_send_game_settings_to_client_machine(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *machine,
@@ -807,6 +847,8 @@ boolean network_game_server_send_game_settings_to_client_machine(
 		if (!encoded_message || !network_game_server_send_message_to_client_machine(server, machine, encoded_message))
 			return FALSE;
 	}
+	/* port: the joining machine gets the hardcore sheet with the variant. */
+	hardcore_rules_send_settings(server, machine);
 	return TRUE;
 }
 
@@ -1117,6 +1159,9 @@ boolean network_game_server_send_game_settings_to_all_machines(
 
 	network_game_settings_update_pending = !result;
 	network_game_settings_update_time = system_milliseconds();
+	/* port: with the settings. a machine that joins a game in progress is
+	   sent the sheet on its own as well. */
+	hardcore_rules_send_settings(server, NULL);
 
 	return result;
 }
@@ -1382,6 +1427,19 @@ boolean network_game_server_handle_client_message(
 				break;
 
 			case _message_type_data:
+			{
+				unsigned performance_flags;
+
+				/* This handler reads the client's reliable connection only.
+				 * Capability is allowed before joining; no client may send
+				 * host settings or change its capability after admission. */
+				if (!network_game_server_client_machine_is_joined_to_game(server, machine) &&
+					network_performance_decode((byte const *)message, message_buffer_size,
+						NETWORK_PERFORMANCE_CAPABILITY, &performance_flags))
+				{
+					network_game_server_performance_capability(machine, performance_flags);
+					break;
+				}
 				/* the distributed netcode's messages (port/linux/NETCODE.md) */
 				/* (port: voice chat's from any machine that joined, in the
 				lobby too: network_voice.c) */
@@ -1423,6 +1481,7 @@ boolean network_game_server_handle_client_message(
 					network_distributed_handle_stream_message(machine_index, message, message_buffer_size);
 				}
 				break;
+			}
 
 			case _message_type_error:
 				if (message_buffer_size >= MINIMUM_TRANSPORT_ERROR_MESSAGE_SIZE)
@@ -1783,10 +1842,14 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			/* the native builds' network version and netcode (a client
 			refuses a host of another version, or of the lockstep netcode
 			older builds had: network_client_manager.c) */
-			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(HALO_PORT_NETWORK_VERSION & 0xFF);
-			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(HALO_PORT_NETWORK_VERSION >> 8);
+			{
+				unsigned version = network_performance_advertised_version(
+					performance_variant_get_flags(&game->variant), HALO_PORT_NETWORK_VERSION);
+				advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(version & 0xFF);
+				advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(version >> 8);
+			}
 			advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] =
-				HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG;
+				HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG | NETWORK_PERFORMANCE_ADVERTISED_FLAG;
 			if (network_game_server_get_state(server, NULL) != _network_game_server_state_pregame ||
 				network_game_server_game_is_loading(server))
 			{
@@ -1955,6 +2018,20 @@ static boolean network_game_server_handle_message_client_join_game_request(
 			the countdown for ever */
 			boolean full = network_game_server_get_state(server, NULL) == _network_game_server_state_pregame &&
 				!network_game_has_free_player_slot(network_game_server_get_game(server));
+
+			/* Discovery prevents stock clients joining an enabled session;
+			 * enforce it here too for stale advertisements and direct joins. */
+			if (!network_game_server_performance_supported(server_client_machine,
+				performance_variant_get_flags(&network_game_server_get_game(server)->variant)))
+			{
+				struct message_server_machine_rejected rejection = { _rejection_code_version_too_old };
+				void *reply = create_network_game_message(_message_server_machine_rejected, &rejection, sizeof(rejection));
+
+				network_event("refusing client: this match enables practice options; an updated client with practice support is required");
+				if (reply)
+					network_game_server_send_message_to_client_machine(server, server_client_machine, reply);
+				return FALSE;
+			}
 
 			/* port: its hardware id, as it tells it: hex only (anything else
 			left out), no more than its field; the host logs it, and refuses

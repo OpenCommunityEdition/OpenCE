@@ -210,8 +210,8 @@ symbols in this file:
 #include "units/vehicles.h"
 
 #include "real_math.h"
-#include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c; after the limit2d alias above */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "hardcore_rules.h" /* port: hardcore magnetism scales */
 
 /* ---------- constants */
 
@@ -896,6 +896,16 @@ short player_control_get_zoom_level(
 	return zoom_level;
 }
 
+/* port: the slot does not control the unit. the scope and the hidden
+gun read this while the pane draws, and the pane clears it after */
+void player_control_port_set_zoom_level(
+	short local_player_index,
+	short zoom_level)
+{
+	if (local_player_index >= 0 && local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+		player_control_get(local_player_index)->zoom_level = zoom_level;
+}
+
 real player_control_get_autoaim_level(
 	short local_player_index)
 {
@@ -1309,9 +1319,9 @@ static void get_local_player_input_blob(
 						{
 							real game_speed = game_time_get_speed();
 							real input_scale = 1.f - control->magnetism_level *
-								PIN(constants->magnetism_friction, 0.f, 1.f);
+								hardcore_rules_friction(PIN(constants->magnetism_friction, 0.f, 1.f));
 							real magnetism_scale = control->magnetism_level *
-								PIN(constants->magnetism_adhesion, 0.f, 1.f);
+								hardcore_rules_adhesion(PIN(constants->magnetism_adhesion, 0.f, 1.f));
 
 							if (game_players_are_double_speed())
 							{

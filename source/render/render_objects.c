@@ -107,6 +107,7 @@ symbols in this file:
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
 #include "camera/director.h"
+#include "hardcore_views.h" /* port: hide the teammate whose eyes this pane uses */
 #include "cutscene/cinematics.h"
 #include "tag_files/tag_files.h"
 #include "saved games/game_state.h"
@@ -407,7 +408,13 @@ void render_object_shadows(
 static boolean object_is_first_person_camera(
 	long object_index)
 {
-	long unit_index = (local_player_get_player_index(render.local_player_index) == NONE)
+	long unit_index;
+
+	/* port: that teammate's body stays out of their pane, as yours does */
+	if (hardcore_views_hides_unit(object_index))
+		return TRUE;
+
+	unit_index = (local_player_get_player_index(render.local_player_index) == NONE)
 		? NONE
 		: player_get(local_player_get_player_index(render.local_player_index))->unit_index;
 

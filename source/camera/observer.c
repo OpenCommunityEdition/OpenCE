@@ -412,6 +412,25 @@ struct observer_result const *observer_get_camera(
 	return result;
 }
 
+void observer_port_set_result(
+	short local_player_index,
+	struct observer_result const *result)
+{
+	struct observer *observer;
+
+	if (local_player_index < 0 || local_player_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS ||
+		local_player_get_player_index(local_player_index) != NONE)
+		return;
+	observer = observer_get(local_player_index);
+	if (result)
+		observer->result = *result;
+	else
+	{
+		observer->result.location.cluster_index = NONE;
+		observer->result.location.leaf_index = NONE;
+	}
+}
+
 boolean observer_command_has_finished(
 	short local_player_index)
 {

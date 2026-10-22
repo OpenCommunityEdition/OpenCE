@@ -274,6 +274,10 @@ long player_control_get_unit_index(
 	short local_player_index);
 short player_control_get_zoom_level(
 	short local_player_index);
+/* port: a hardcore teammate pane reports that unit's zoom */
+void player_control_port_set_zoom_level(
+	short local_player_index,
+	short zoom_level);
 real player_control_get_autoaim_level(
 	short local_player_index);
 void players_unzoom_all(
