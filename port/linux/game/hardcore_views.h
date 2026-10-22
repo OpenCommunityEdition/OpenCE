@@ -37,6 +37,10 @@ short hardcore_views_hud_slot(short window_index);
 /* Once a tick, advance the weapons those panes are holding. */
 void hardcore_views_weapons_tick(void);
 
+/* The camera a spare listener uses, so that pane hears the world.
+A slot that already has a player is left alone. */
+boolean hardcore_views_listener(short slot, struct observer_result *camera);
+
 /* The pane being drawn, so that body is hidden the way a first-person view is. */
 void hardcore_views_begin(short window_index);
 void hardcore_views_end(void);

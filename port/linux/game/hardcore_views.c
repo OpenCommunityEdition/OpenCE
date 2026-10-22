@@ -19,6 +19,7 @@ slot is a local player only while that pane is drawn. */
 #include "objects/objects.h"
 #include "physics/collision_usage.h"
 #include "physics/collisions.h"
+#include "scenario/scenario.h"
 #include "units/units.h"
 #include "hardcore_rules.h"
 #include "hardcore_views.h"
@@ -381,6 +382,25 @@ short hardcore_views_hud_slot(short window_index)
 	return view_hud_slot[window_index];
 }
 
+boolean hardcore_views_listener(short slot, struct observer_result *camera)
+{
+	short window;
+
+	if (!camera || slot < 0 || slot >= MAXIMUM_LOCAL_PLAYERS ||
+		local_player_get_player_index(slot) != NONE)
+		return FALSE;
+	hardcore_views_refresh();
+	if (!hardcore_views_team_screen())
+		return FALSE;
+	for (window = 0; window < view_count && window < HARDCORE_VIEW_MAXIMUM; window++)
+	{
+		if (window == local_slot || view_hud_slot[window] != slot)
+			continue;
+		return hardcore_views_camera(window, camera);
+	}
+	return FALSE;
+}
+
 /* the next living teammate after the body this pane is on, or the first
 one. dead_camera does this once its switch time runs out. */
 static long hardcore_views_next_body(long dead_player, long current_body)
@@ -641,6 +661,9 @@ boolean hardcore_views_camera(short window_index, struct observer_result *result
 		player's own zoom does not */
 		result->field_of_view = DEGREES_TO_RADIANS(80.0f);
 		hardcore_views_smooth(window_index, result);
+		/* the listener and the wall test need the cluster this view is in.
+		the pose above leaves that at the zero cluster */
+		scenario_location_from_point(&result->location, &result->position);
 		return TRUE;
 	}
 	/* not spawned yet: the pane stays empty until they are alive.
@@ -652,7 +675,10 @@ boolean hardcore_views_camera(short window_index, struct observer_result *result
 		hardcore_views_smooth_drop(window_index);
 		return FALSE;
 	}
-	return hardcore_views_death_camera(window_index, player_index, player, result);
+	if (!hardcore_views_death_camera(window_index, player_index, player, result))
+		return FALSE;
+	scenario_location_from_point(&result->location, &result->position);
+	return TRUE;
 }
 
 void hardcore_views_begin(short window_index)

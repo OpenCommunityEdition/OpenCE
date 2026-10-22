@@ -233,6 +233,7 @@ symbols in this file:
 #include "game_sound.h"
 #include "sound_preferences.h"
 #include "camera/observer.h"
+#include "hardcore_views.h" /* port: a teammate pane hears from its own camera */
 #include "effects/player_effects.h"
 #include "game/game.h"
 #include "game/game_globals.h"
@@ -3987,7 +3988,49 @@ static void refresh_listener(
 		}
 		else
 		{
-			listener->valid = FALSE;
+			struct observer_result teammate_camera;
+			static boolean spare_listener[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+
+			/* port: the pane hears what is around that teammate. an empty
+			slot stays on the local listener, so a sound fading out still
+			has one and does not become a second place to hear from */
+			if (hardcore_views_listener(local_player_index, &teammate_camera))
+			{
+				spare_listener[local_player_index] = TRUE;
+				listener->valid = TRUE;
+				listener->underwater = scenario_location_underwater(
+					&teammate_camera.location,
+					&teammate_camera.position,
+					NULL);
+				matrix4x3_from_point_and_vectors(
+					&listener->matrix,
+					&teammate_camera.position,
+					&teammate_camera.forward,
+					&teammate_camera.up);
+				listener->velocity = *global_zero_vector3d;
+				/* port: the wall and distance test reads the observer, not
+				this listener. an empty slot's observer is nowhere, which
+				muffles every sound it is given */
+				observer_port_set_result(local_player_index, &teammate_camera);
+			}
+			else if (spare_listener[local_player_index] && listener_get(0)->valid)
+			{
+				struct sound_listener *local_listener = listener_get(0);
+
+				listener->valid = TRUE;
+				listener->underwater = local_listener->underwater;
+				listener->matrix = local_listener->matrix;
+				listener->velocity = local_listener->velocity;
+				observer_port_set_result(local_player_index, observer_get_camera(0));
+			}
+			else if (spare_listener[local_player_index])
+			{
+				listener->valid = TRUE;
+			}
+			else
+			{
+				listener->valid = FALSE;
+			}
 		}
 	}
 
