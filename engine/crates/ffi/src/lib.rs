@@ -16,6 +16,7 @@ pub mod network;
 pub mod render_level;
 pub mod render_model;
 pub mod render_sky;
+pub mod render_transparent;
 pub mod script;
 pub mod settings;
 pub mod snapshot;

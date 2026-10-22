@@ -11,7 +11,10 @@
 
 use rkyv::{Archive, Deserialize, Serialize};
 
-use crate::{EnvironmentShader, ModelShaderClass, ShaderClass, TagRef, TransparentChicagoShader};
+use crate::{
+    EnvironmentShader, GlassShader, ModelShaderClass, PlasmaShader, ShaderClass, TagRef,
+    TransparentChicagoShader, TransparentGenericShader, WaterShader,
+};
 
 /// A surface's material.
 #[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
@@ -85,8 +88,16 @@ impl SurfaceMaterial {
             ShaderClass::Model(shader) => model(shader),
             ShaderClass::TransparentChicago(shader)
             | ShaderClass::TransparentChicagoExtended(shader) => chicago(shader),
-            // (classes not imported yet are transparent effects: glass,
-            // meters, plasma, water and the generic transparent shader)
+            ShaderClass::TransparentGeneric(shader) => generic(shader),
+            ShaderClass::Glass(shader) => glass(shader),
+            ShaderClass::Meter(shader) => Self::diffuse(
+                shader.map.clone(),
+                Self::BLENDED | Self::UNLIT | // (a meter's flags: 0 decal, 1 two-sided)
+                chicago_flags((shader.flags & 0b11) << 1),
+            ),
+            ShaderClass::Plasma(shader) => plasma(shader),
+            ShaderClass::Water(shader) => water(shader),
+            // (a group that is not a shader's is drawn as a plain effect)
             ShaderClass::Other(_) => Self::diffuse(None, Self::BLENDED | Self::UNLIT),
         }
     }
@@ -250,25 +261,89 @@ fn model(shader: &ModelShaderClass) -> SurfaceMaterial {
     }
 }
 
-fn chicago(shader: &TransparentChicagoShader) -> SurfaceMaterial {
-    // (the chicago flags: 0 alpha tested, 1 decal, 2 two-sided)
-    let mut flags = SurfaceMaterial::BLENDED | SurfaceMaterial::UNLIT;
+/// The material flags of a transparent shader's flags: 0 alpha tested, 1
+/// decal, 2 two-sided.
+fn chicago_flags(flags: u16) -> u16 {
+    let mut material = 0;
     for (bit, flag) in [
         (0, SurfaceMaterial::ALPHA_TESTED),
         (1, SurfaceMaterial::DECAL),
         (2, SurfaceMaterial::TWO_SIDED),
     ] {
-        if shader.flags & (1 << bit) != 0 {
-            flags |= flag;
+        if flags & (1 << bit) != 0 {
+            material |= flag;
         }
     }
-    SurfaceMaterial::diffuse(shader.maps.first().and_then(|map| map.map.clone()), flags)
+    material
+}
+
+fn chicago(shader: &TransparentChicagoShader) -> SurfaceMaterial {
+    // (the chicago flags: 0 alpha tested, 1 decal, 2 two-sided)
+    SurfaceMaterial::diffuse(
+        shader.maps.first().and_then(|map| map.map.clone()),
+        SurfaceMaterial::BLENDED | SurfaceMaterial::UNLIT | chicago_flags(u16::from(shader.flags)),
+    )
+}
+
+fn generic(shader: &TransparentGenericShader) -> SurfaceMaterial {
+    // (as a chicago shader's flags)
+    SurfaceMaterial::diffuse(
+        shader.maps.first().and_then(|map| map.map.clone()),
+        SurfaceMaterial::BLENDED | SurfaceMaterial::UNLIT | chicago_flags(u16::from(shader.flags)),
+    )
+}
+
+/// A reflection's colour given as alpha (brightness), red, green, blue.
+fn reflection_color(argb: [f32; 4]) -> [f32; 3] {
+    scaled([argb[1], argb[2], argb[3]], argb[0])
+}
+
+fn glass(shader: &GlassShader) -> SurfaceMaterial {
+    // (the glass flags: 0 alpha tested, 1 decal, 2 two-sided)
+    let mut material = SurfaceMaterial::diffuse(
+        shader.diffuse_map.clone(),
+        SurfaceMaterial::BLENDED | chicago_flags(shader.flags & 0b111),
+    );
+    material.normal_map = shader.bump_map.clone();
+    material.normal_map_scale = map_scale(shader.bump_map_scale);
+    material.reflection_map = shader.reflection_map.clone();
+    material.specular = reflection_color(shader.perpendicular_color);
+    material.specular_grazing = reflection_color(shader.parallel_color);
+    material.roughness = if shader.reflection_kind == 0 && shader.bump_map.is_some() {
+        BUMPED_ROUGHNESS
+    } else {
+        FLAT_ROUGHNESS
+    };
+    material
+}
+
+fn plasma(shader: &PlasmaShader) -> SurfaceMaterial {
+    let mut material = SurfaceMaterial::diffuse(
+        shader.primary_animation.map.clone(),
+        SurfaceMaterial::BLENDED | SurfaceMaterial::UNLIT,
+    );
+    material.emission_map = shader.secondary_animation.map.clone();
+    material.emission = scaled(shader.parallel_color, shader.parallel_alpha);
+    material
+}
+
+fn water(shader: &WaterShader) -> SurfaceMaterial {
+    let mut material = SurfaceMaterial::diffuse(
+        shader.base_map.clone(),
+        SurfaceMaterial::BLENDED | SurfaceMaterial::UNLIT,
+    );
+    material.normal_map = shader.ripple_maps.clone();
+    material.reflection_map = shader.reflection_map.clone();
+    material.specular = reflection_color(shader.perpendicular_tint);
+    material.specular_grazing = reflection_color(shader.parallel_tint);
+    material.roughness = FLAT_ROUGHNESS;
+    material
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChicagoMap, Group, TextureAnimation};
+    use crate::{ChicagoMap, GenericMap, Group, MeterShader, PlasmaNoise, TextureAnimation};
 
     fn tag(group: &[u8; 4], path: &str) -> TagRef {
         TagRef {
@@ -484,5 +559,138 @@ mod tests {
             SurfaceMaterial::BLENDED | SurfaceMaterial::UNLIT
         );
         assert_eq!(other.albedo_map, None);
+    }
+
+    #[test]
+    fn a_generic_shader_is_drawn_as_a_chicago_shader() {
+        let generic = TransparentGenericShader {
+            flags: 0b101,
+            first_map_kind: 0,
+            framebuffer_blend_function: 0,
+            framebuffer_fade_mode: 0,
+            extra_layers: Vec::new(),
+            maps: vec![GenericMap {
+                flags: 0,
+                scale: [1.0; 2],
+                offset: [0.0; 2],
+                rotation: 0.0,
+                map: Some(tag(b"bitm", "first")),
+            }],
+            stages: Vec::new(),
+        };
+        let material = SurfaceMaterial::of(&ShaderClass::TransparentGeneric(generic));
+        assert_eq!(material.albedo_map, Some(tag(b"bitm", "first")));
+        assert_eq!(
+            material.flags,
+            SurfaceMaterial::BLENDED
+                | SurfaceMaterial::UNLIT
+                | SurfaceMaterial::ALPHA_TESTED
+                | SurfaceMaterial::TWO_SIDED
+        );
+    }
+
+    #[test]
+    fn glass_reflects_and_is_lit() {
+        let mut shader = GlassShader {
+            flags: 0b100,
+            tint_color: [1.0; 3],
+            tint_map_scale: 0.0,
+            tint_map: None,
+            reflection_kind: 0,
+            perpendicular_color: [0.5, 1.0, 1.0, 1.0],
+            parallel_color: [1.0, 1.0, 0.0, 0.0],
+            reflection_map: Some(tag(b"bitm", "cube")),
+            bump_map_scale: 0.0,
+            bump_map: Some(tag(b"bitm", "bump")),
+            diffuse_map_scale: 0.0,
+            diffuse_map: Some(tag(b"bitm", "diffuse")),
+            diffuse_detail_map_scale: 0.0,
+            diffuse_detail_map: None,
+        };
+        let material = SurfaceMaterial::of(&ShaderClass::Glass(Box::new(shader.clone())));
+        assert_eq!(material.albedo_map, Some(tag(b"bitm", "diffuse")));
+        assert_eq!(material.normal_map, Some(tag(b"bitm", "bump")));
+        assert_eq!(material.normal_map_scale, 1.0);
+        assert_eq!(material.reflection_map, Some(tag(b"bitm", "cube")));
+        assert_eq!(
+            material.flags,
+            SurfaceMaterial::BLENDED | SurfaceMaterial::TWO_SIDED
+        );
+        assert!(!material.has(SurfaceMaterial::UNLIT));
+        assert!(material.specular.iter().all(|&channel| close(channel, 0.5)));
+        assert_eq!(material.specular_grazing, [linear(1.0), 0.0, 0.0]);
+        assert_eq!(material.roughness, BUMPED_ROUGHNESS);
+        shader.reflection_kind = 1;
+        let flat = SurfaceMaterial::of(&ShaderClass::Glass(Box::new(shader)));
+        assert_eq!(flat.roughness, FLAT_ROUGHNESS);
+    }
+
+    #[test]
+    fn meters_plasma_and_water_are_blended_and_unlit() {
+        let meter = MeterShader {
+            flags: 0b11,
+            map: Some(tag(b"bitm", "bar")),
+            gradient_min_color: [0.0; 3],
+            gradient_max_color: [1.0; 3],
+            background_color: [0.0; 3],
+            flash_color: [0.0; 3],
+            tint_color: [1.0; 3],
+            meter_transparency: 1.0,
+            background_transparency: 0.0,
+            value_source: 0,
+        };
+        let bar = SurfaceMaterial::of(&ShaderClass::Meter(meter));
+        assert_eq!(bar.albedo_map, Some(tag(b"bitm", "bar")));
+        // (a meter's flags: 0 decal, 1 two-sided)
+        assert_eq!(
+            bar.flags,
+            SurfaceMaterial::BLENDED
+                | SurfaceMaterial::UNLIT
+                | SurfaceMaterial::DECAL
+                | SurfaceMaterial::TWO_SIDED
+        );
+
+        let noise = |map: &str| PlasmaNoise {
+            period: 1.0,
+            direction: [1.0, 0.0, 0.0],
+            scale: 1.0,
+            map: Some(tag(b"bitm", map)),
+        };
+        let plasma = PlasmaShader {
+            intensity_source: 0,
+            intensity_exponent: 1.0,
+            offset_amount: 0.0,
+            perpendicular_alpha: 0.0,
+            perpendicular_color: [0.0; 3],
+            parallel_alpha: 0.5,
+            parallel_color: [1.0, 1.0, 0.0],
+            color_source: 0,
+            primary_animation: noise("first"),
+            secondary_animation: noise("second"),
+        };
+        let glow = SurfaceMaterial::of(&ShaderClass::Plasma(plasma));
+        assert_eq!(glow.albedo_map, Some(tag(b"bitm", "first")));
+        assert_eq!(glow.emission_map, Some(tag(b"bitm", "second")));
+        assert!(close(glow.emission[0], 0.5) && glow.emission[2] == 0.0);
+        assert!(glow.has(SurfaceMaterial::BLENDED) && glow.has(SurfaceMaterial::UNLIT));
+
+        let water = WaterShader {
+            flags: 0,
+            base_map: Some(tag(b"bitm", "base")),
+            perpendicular_tint: [1.0, 0.0, 0.0, 1.0],
+            parallel_tint: [1.0; 4],
+            reflection_map: Some(tag(b"bitm", "sky")),
+            ripple_angle: 0.0,
+            ripple_velocity: 0.0,
+            ripple_scale: 0.0,
+            ripple_maps: Some(tag(b"bitm", "ripples")),
+        };
+        let surface = SurfaceMaterial::of(&ShaderClass::Water(water));
+        assert_eq!(surface.albedo_map, Some(tag(b"bitm", "base")));
+        assert_eq!(surface.normal_map, Some(tag(b"bitm", "ripples")));
+        assert_eq!(surface.reflection_map, Some(tag(b"bitm", "sky")));
+        assert_eq!(surface.specular, [0.0, 0.0, linear(1.0)]);
+        assert_eq!(surface.roughness, FLAT_ROUGHNESS);
+        assert!(surface.has(SurfaceMaterial::UNLIT));
     }
 }

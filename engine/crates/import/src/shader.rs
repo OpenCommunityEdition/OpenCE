@@ -1,9 +1,10 @@
-//! Shaders: the environment, model and transparent chicago classes, with
-//! their maps; the other classes by group alone, for now.
+//! Shaders of every class, with their maps.
 
 use opence_content::{
-    AnimatedColor, ChicagoMap, EnvironmentAnimation, EnvironmentShader, Group, ModelShaderClass,
-    Shader, ShaderClass, SurfaceMaterial, TextureAnimation, TransparentChicagoShader,
+    AnimatedColor, ChicagoMap, EnvironmentAnimation, EnvironmentShader, GenericMap, GenericStage,
+    GlassShader, Group, MeterShader, ModelShaderClass, PlasmaNoise, PlasmaShader, Shader,
+    ShaderClass, SurfaceMaterial, TextureAnimation, TransparentChicagoShader,
+    TransparentGenericShader, WaterShader,
 };
 
 use crate::cache::Cache;
@@ -15,6 +16,11 @@ pub(crate) const SENV: GroupTag = GroupTag::new(b"senv");
 pub(crate) const SCHI: GroupTag = GroupTag::new(b"schi");
 pub(crate) const SCEX: GroupTag = GroupTag::new(b"scex");
 pub(crate) const SOSO: GroupTag = GroupTag::new(b"soso");
+pub(crate) const SOTR: GroupTag = GroupTag::new(b"sotr");
+pub(crate) const SGLA: GroupTag = GroupTag::new(b"sgla");
+pub(crate) const SMET: GroupTag = GroupTag::new(b"smet");
+pub(crate) const SPLA: GroupTag = GroupTag::new(b"spla");
+pub(crate) const SWAT: GroupTag = GroupTag::new(b"swat");
 
 pub(crate) const SHADER_BASE_SIZE: usize = 0x28;
 pub(crate) const MATERIAL_TYPE_OFFSET: usize = 0x22;
@@ -29,6 +35,16 @@ pub(crate) const CHICAGO_TWO_STAGE_MAPS_OFFSET: usize = 0x60;
 pub(crate) const CHICAGO_EXTRA_FLAGS_OFFSET: usize = 0x6C;
 pub(crate) const CHICAGO_MAP_SIZE: usize = 0xDC;
 pub(crate) const CHICAGO_MAP_BITMAP_OFFSET: usize = 0x6C;
+/// What of each class is read (the offsets the decompilation's
+/// rasterizer checks).
+pub(crate) const GENERIC_SIZE: usize = 0x6C;
+pub(crate) const GENERIC_MAP_SIZE: usize = 0x64;
+pub(crate) const GENERIC_STAGE_SIZE: usize = 0x70;
+pub(crate) const GLASS_SIZE: usize = 0x17C;
+pub(crate) const METER_SIZE: usize = 0xE4;
+pub(crate) const PLASMA_SIZE: usize = 0x12C;
+pub(crate) const WATER_SIZE: usize = 0xE4;
+const MAX_GENERIC_STAGES: usize = 7;
 const MAX_CHICAGO_MAPS: usize = 4;
 const MAX_EXTRA_LAYERS: usize = 4;
 
@@ -44,6 +60,11 @@ pub(crate) fn import_shader(
         SCHI => CHICAGO_SIZE,
         SCEX => CHICAGO_EXTENDED_SIZE,
         SOSO => MODEL_SIZE,
+        SOTR => GENERIC_SIZE,
+        SGLA => GLASS_SIZE,
+        SMET => METER_SIZE,
+        SPLA => PLASMA_SIZE,
+        SWAT => WATER_SIZE,
         _ => SHADER_BASE_SIZE,
     };
     let shader = cache.tag(index, SHDR, size)?;
@@ -52,6 +73,11 @@ pub(crate) fn import_shader(
         SCHI => ShaderClass::TransparentChicago(chicago(&shader, reached, false)?),
         SCEX => ShaderClass::TransparentChicagoExtended(chicago(&shader, reached, true)?),
         SOSO => ShaderClass::Model(model(&shader, reached)?),
+        SOTR => ShaderClass::TransparentGeneric(generic(&shader, reached)?),
+        SGLA => ShaderClass::Glass(Box::new(glass(&shader, reached)?)),
+        SMET => ShaderClass::Meter(meter(&shader, reached)?),
+        SPLA => ShaderClass::Plasma(plasma(&shader, reached)?),
+        SWAT => ShaderClass::Water(water(&shader, reached)?),
         _ => ShaderClass::Other(Group(group.0.to_be_bytes())),
     };
     Ok(Shader {
@@ -197,11 +223,19 @@ fn model_texture_animation(
     })
 }
 
-fn chicago(
+fn argb(element: &Element<'_>, at: usize, field: &str) -> Result<[f32; 4], ImportError> {
+    Ok([
+        element.f32(at, field)?,
+        element.f32(at + 4, field)?,
+        element.f32(at + 8, field)?,
+        element.f32(at + 12, field)?,
+    ])
+}
+
+fn extra_layers(
     shader: &Element<'_>,
     reached: &mut Reached,
-    extended: bool,
-) -> Result<TransparentChicagoShader, ImportError> {
+) -> Result<Vec<opence_content::TagRef>, ImportError> {
     let layers = shader.block(
         CHICAGO_EXTRA_LAYERS_OFFSET,
         "extra layers",
@@ -214,6 +248,134 @@ fn chicago(
             extra_layers.push(tag);
         }
     }
+    Ok(extra_layers)
+}
+
+/// A transparent generic shader (`shader_transparent_generic`).
+fn generic(
+    shader: &Element<'_>,
+    reached: &mut Reached,
+) -> Result<TransparentGenericShader, ImportError> {
+    let block = shader.block(0x54, "maps", GENERIC_MAP_SIZE, MAX_CHICAGO_MAPS)?;
+    let mut maps = Vec::with_capacity(block.len());
+    for map in block.iter() {
+        maps.push(GenericMap {
+            flags: map.u16(0, "flags")?,
+            scale: [map.f32(4, "map u-scale")?, map.f32(8, "map v-scale")?],
+            offset: [
+                map.f32(0xC, "map u-offset")?,
+                map.f32(0x10, "map v-offset")?,
+            ],
+            rotation: map.f32(0x14, "map rotation")?,
+            map: reached.bitmap(&map, 0x1C, "map")?,
+        });
+    }
+    let block = shader.block(0x60, "stages", GENERIC_STAGE_SIZE, MAX_GENERIC_STAGES)?;
+    let mut stages = Vec::with_capacity(block.len());
+    for stage in block.iter() {
+        stages.push(GenericStage {
+            flags: stage.u16(0, "flags")?,
+            color0: argb(&stage, 0xC, "color0")?,
+            color1: argb(&stage, 0x1C, "color1")?,
+        });
+    }
+    Ok(TransparentGenericShader {
+        flags: shader.u8(0x29, "flags")?,
+        first_map_kind: shader.i16(0x2A, "first map type")?,
+        framebuffer_blend_function: shader.i16(0x2C, "framebuffer blend function")?,
+        framebuffer_fade_mode: shader.i16(0x2E, "framebuffer fade mode")?,
+        extra_layers: extra_layers(shader, reached)?,
+        maps,
+        stages,
+    })
+}
+
+/// A glass shader (`shader_transparent_glass`).
+fn glass(shader: &Element<'_>, reached: &mut Reached) -> Result<GlassShader, ImportError> {
+    Ok(GlassShader {
+        flags: shader.u16(0x28, "flags")?,
+        tint_color: color(shader, 0x54, "background tint color")?,
+        tint_map_scale: shader.f32(0x60, "background tint map scale")?,
+        tint_map: reached.bitmap(shader, 0x64, "background tint map")?,
+        reflection_kind: shader.i16(0x8A, "reflection type")?,
+        perpendicular_color: argb(shader, 0x8C, "perpendicular color")?,
+        parallel_color: argb(shader, 0x9C, "parallel color")?,
+        reflection_map: reached.bitmap(shader, 0xAC, "reflection map")?,
+        bump_map_scale: shader.f32(0xBC, "bump map scale")?,
+        bump_map: reached.bitmap(shader, 0xC0, "bump map")?,
+        diffuse_map_scale: shader.f32(0x154, "diffuse map scale")?,
+        diffuse_map: reached.bitmap(shader, 0x158, "diffuse map")?,
+        diffuse_detail_map_scale: shader.f32(0x168, "diffuse detail map scale")?,
+        diffuse_detail_map: reached.bitmap(shader, 0x16C, "diffuse detail map")?,
+    })
+}
+
+/// A meter shader (`shader_transparent_meter`).
+fn meter(shader: &Element<'_>, reached: &mut Reached) -> Result<MeterShader, ImportError> {
+    Ok(MeterShader {
+        flags: shader.u16(0x28, "flags")?,
+        map: reached.bitmap(shader, 0x4C, "map")?,
+        gradient_min_color: color(shader, 0x7C, "gradient min color")?,
+        gradient_max_color: color(shader, 0x88, "gradient max color")?,
+        background_color: color(shader, 0x94, "background color")?,
+        flash_color: color(shader, 0xA0, "flash color")?,
+        tint_color: color(shader, 0xAC, "tint color")?,
+        meter_transparency: shader.f32(0xB8, "meter transparency")?,
+        background_transparency: shader.f32(0xBC, "background transparency")?,
+        value_source: shader.i16(0xDC, "value source")?,
+    })
+}
+
+fn plasma_noise(
+    shader: &Element<'_>,
+    at: usize,
+    reached: &mut Reached,
+) -> Result<PlasmaNoise, ImportError> {
+    Ok(PlasmaNoise {
+        period: shader.f32(at, "noise map animation period")?,
+        direction: color(shader, at + 4, "noise map animation direction")?,
+        scale: shader.f32(at + 0x10, "noise map scale")?,
+        map: reached.bitmap(shader, at + 0x14, "noise map")?,
+    })
+}
+
+/// A plasma shader (`shader_transparent_plasma`).
+fn plasma(shader: &Element<'_>, reached: &mut Reached) -> Result<PlasmaShader, ImportError> {
+    Ok(PlasmaShader {
+        intensity_source: shader.i16(0x2C, "intensity source")?,
+        intensity_exponent: shader.f32(0x30, "intensity exponent")?,
+        offset_amount: shader.f32(0x38, "offset amount")?,
+        perpendicular_alpha: shader.f32(0x60, "perpendicular alpha")?,
+        perpendicular_color: color(shader, 0x64, "perpendicular tint color")?,
+        parallel_alpha: shader.f32(0x70, "parallel alpha")?,
+        parallel_color: color(shader, 0x74, "parallel tint color")?,
+        color_source: shader.i16(0x80, "tint color source")?,
+        primary_animation: plasma_noise(shader, 0xC0, reached)?,
+        secondary_animation: plasma_noise(shader, 0x108, reached)?,
+    })
+}
+
+/// A water shader (`shader_transparent_water`).
+fn water(shader: &Element<'_>, reached: &mut Reached) -> Result<WaterShader, ImportError> {
+    Ok(WaterShader {
+        flags: shader.u16(0x28, "flags")?,
+        base_map: reached.bitmap(shader, 0x4C, "base map")?,
+        perpendicular_tint: argb(shader, 0x6C, "view perpendicular tint")?,
+        parallel_tint: argb(shader, 0x7C, "view parallel tint")?,
+        reflection_map: reached.bitmap(shader, 0x9C, "reflection map")?,
+        ripple_angle: shader.f32(0xBC, "ripple animation angle")?,
+        ripple_velocity: shader.f32(0xC0, "ripple animation velocity")?,
+        ripple_scale: shader.f32(0xC4, "ripple scale")?,
+        ripple_maps: reached.bitmap(shader, 0xC8, "ripple maps")?,
+    })
+}
+
+fn chicago(
+    shader: &Element<'_>,
+    reached: &mut Reached,
+    extended: bool,
+) -> Result<TransparentChicagoShader, ImportError> {
+    let extra_layers = extra_layers(shader, reached)?;
     let maps = chicago_maps(shader, CHICAGO_MAPS_OFFSET, "maps", reached)?;
     let (two_stage_maps, extra_flags) = if extended {
         (
@@ -266,4 +428,221 @@ fn chicago_maps(
         });
     }
     Ok(maps)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cache::CacheKind;
+    use crate::fake::FakeCache;
+    use crate::level::tests::{block, empty, put, reference};
+    use crate::level::BITM;
+
+    fn f32s(bytes: &mut [u8], at: usize, values: &[f32]) {
+        for (index, value) in values.iter().enumerate() {
+            put(bytes, at + index * 4, &value.to_le_bytes());
+        }
+    }
+
+    /// A cache of one bitmap and one shader of `group`, made by `fill`
+    /// (given the bitmap's handle), imported.
+    fn imported(
+        group: GroupTag,
+        size: usize,
+        fill: impl Fn(&mut FakeCache, &mut Vec<u8>, u32),
+    ) -> (Shader, Reached) {
+        let mut fake = FakeCache::new(CacheKind::Xbox);
+        let bitmap = fake.add_tag(BITM, "fake\\bitmap", &[0; 4]);
+        let handle = fake.handle(bitmap);
+        let mut bytes = vec![0u8; size];
+        fill(&mut fake, &mut bytes, handle);
+        let shader = fake.add_tag(group, "fake\\shader", &bytes);
+        fake.set_parent(shader, SHDR);
+        let cache = match Cache::open(fake.build()) {
+            Ok(cache) => cache,
+            Err(error) => panic!("{error}"),
+        };
+        let mut reached = Reached::default();
+        match import_shader(&cache, shader, &mut reached) {
+            Ok(shader) => (shader, reached),
+            Err(error) => panic!("{error}"),
+        }
+    }
+
+    fn bitmap() -> Option<opence_content::TagRef> {
+        Some(opence_content::TagRef {
+            group: Group(*b"bitm"),
+            path: "fake\\bitmap".to_owned(),
+        })
+    }
+
+    #[test]
+    fn a_generic_shader_reads_its_maps_and_stages() {
+        let (shader, reached) = imported(SOTR, GENERIC_SIZE, |fake, bytes, handle| {
+            let mut map = vec![0u8; GENERIC_MAP_SIZE];
+            put(&mut map, 0, &1u16.to_le_bytes());
+            f32s(&mut map, 4, &[2.0, 3.0, 0.25, 0.5, 90.0]);
+            reference(&mut map, 0x1C, BITM, handle);
+            let maps = fake.add_data(&map);
+            let mut stage = vec![0u8; GENERIC_STAGE_SIZE];
+            f32s(&mut stage, 0xC, &[1.0, 0.5, 0.25, 0.125]);
+            f32s(&mut stage, 0x1C, &[0.0, 1.0, 1.0, 1.0]);
+            let stages = fake.add_data(&stage);
+            bytes[0x29] = 0b101;
+            put(bytes, 0x2C, &3i16.to_le_bytes());
+            block(bytes, 0x54, 1, maps);
+            block(bytes, 0x60, 1, stages);
+        });
+        let ShaderClass::TransparentGeneric(generic) = &shader.class else {
+            panic!("{:?}", shader.class)
+        };
+        assert_eq!(generic.flags, 0b101);
+        assert_eq!(generic.framebuffer_blend_function, 3);
+        assert_eq!(
+            generic.maps,
+            [GenericMap {
+                flags: 1,
+                scale: [2.0, 3.0],
+                offset: [0.25, 0.5],
+                rotation: 90.0,
+                map: bitmap(),
+            }]
+        );
+        assert_eq!(generic.stages[0].color0, [1.0, 0.5, 0.25, 0.125]);
+        assert_eq!(generic.stages[0].color1, [0.0, 1.0, 1.0, 1.0]);
+        assert_eq!(shader.material.albedo_map, bitmap());
+        assert_eq!(reached.bitmaps.len(), 1);
+    }
+
+    #[test]
+    fn glass_reads_its_tint_reflection_bump_and_diffuse() {
+        let (shader, _) = imported(SGLA, GLASS_SIZE, |_, bytes, handle| {
+            put(bytes, 0x28, &4u16.to_le_bytes());
+            f32s(bytes, 0x54, &[0.5, 0.25, 1.0, 2.0]);
+            empty(bytes, 0x64);
+            put(bytes, 0x8A, &1i16.to_le_bytes());
+            f32s(bytes, 0x8C, &[1.0, 0.5, 0.5, 0.5, 0.25, 1.0, 1.0, 1.0]);
+            reference(bytes, 0xAC, BITM, handle);
+            f32s(bytes, 0xBC, &[3.0]);
+            reference(bytes, 0xC0, BITM, handle);
+            f32s(bytes, 0x154, &[4.0]);
+            reference(bytes, 0x158, BITM, handle);
+            f32s(bytes, 0x168, &[5.0]);
+            empty(bytes, 0x16C);
+        });
+        let ShaderClass::Glass(glass) = &shader.class else {
+            panic!("{:?}", shader.class)
+        };
+        assert_eq!(glass.flags, 4);
+        assert_eq!(glass.tint_color, [0.5, 0.25, 1.0]);
+        assert_eq!(glass.tint_map_scale, 2.0);
+        assert_eq!(glass.tint_map, None);
+        assert_eq!(glass.reflection_kind, 1);
+        assert_eq!(glass.perpendicular_color, [1.0, 0.5, 0.5, 0.5]);
+        assert_eq!(glass.parallel_color, [0.25, 1.0, 1.0, 1.0]);
+        assert_eq!(glass.reflection_map, bitmap());
+        assert_eq!(
+            (glass.bump_map_scale, glass.bump_map.clone()),
+            (3.0, bitmap())
+        );
+        assert_eq!(
+            (glass.diffuse_map_scale, glass.diffuse_map.clone()),
+            (4.0, bitmap())
+        );
+        assert_eq!(
+            (
+                glass.diffuse_detail_map_scale,
+                glass.diffuse_detail_map.clone()
+            ),
+            (5.0, None)
+        );
+    }
+
+    #[test]
+    fn meters_plasma_and_water_read_their_fields() {
+        let (shader, _) = imported(SMET, METER_SIZE, |_, bytes, handle| {
+            put(bytes, 0x28, &3u16.to_le_bytes());
+            reference(bytes, 0x4C, BITM, handle);
+            f32s(bytes, 0x7C, &[0.0, 0.0, 1.0, 1.0, 0.0, 0.0]);
+            f32s(bytes, 0xAC, &[0.5, 0.5, 0.5, 0.75, 0.25]);
+            put(bytes, 0xDC, &2i16.to_le_bytes());
+        });
+        let ShaderClass::Meter(meter) = &shader.class else {
+            panic!("{:?}", shader.class)
+        };
+        assert_eq!((meter.flags, meter.map.clone()), (3, bitmap()));
+        assert_eq!(meter.gradient_min_color, [0.0, 0.0, 1.0]);
+        assert_eq!(meter.gradient_max_color, [1.0, 0.0, 0.0]);
+        assert_eq!(meter.tint_color, [0.5; 3]);
+        assert_eq!(
+            (meter.meter_transparency, meter.background_transparency),
+            (0.75, 0.25)
+        );
+        assert_eq!(meter.value_source, 2);
+
+        let (shader, reached) = imported(SPLA, PLASMA_SIZE, |_, bytes, handle| {
+            put(bytes, 0x2C, &1i16.to_le_bytes());
+            f32s(bytes, 0x30, &[2.0]);
+            f32s(bytes, 0x60, &[0.25, 1.0, 0.0, 0.0, 0.5, 0.0, 1.0, 0.0]);
+            f32s(bytes, 0xC0, &[3.0, 1.0, 0.0, 0.0, 4.0]);
+            reference(bytes, 0xD4, BITM, handle);
+            f32s(bytes, 0x108, &[5.0, 0.0, 1.0, 0.0, 6.0]);
+            empty(bytes, 0x11C);
+        });
+        let ShaderClass::Plasma(plasma) = &shader.class else {
+            panic!("{:?}", shader.class)
+        };
+        assert_eq!(
+            (plasma.intensity_source, plasma.intensity_exponent),
+            (1, 2.0)
+        );
+        assert_eq!(plasma.perpendicular_alpha, 0.25);
+        assert_eq!(plasma.perpendicular_color, [1.0, 0.0, 0.0]);
+        assert_eq!(plasma.parallel_alpha, 0.5);
+        assert_eq!(plasma.parallel_color, [0.0, 1.0, 0.0]);
+        assert_eq!(
+            plasma.primary_animation,
+            PlasmaNoise {
+                period: 3.0,
+                direction: [1.0, 0.0, 0.0],
+                scale: 4.0,
+                map: bitmap()
+            }
+        );
+        assert_eq!(
+            plasma.secondary_animation,
+            PlasmaNoise {
+                period: 5.0,
+                direction: [0.0, 1.0, 0.0],
+                scale: 6.0,
+                map: None
+            }
+        );
+        assert_eq!(reached.bitmaps.len(), 1);
+
+        let (shader, _) = imported(SWAT, WATER_SIZE, |_, bytes, handle| {
+            put(bytes, 0x28, &2u16.to_le_bytes());
+            reference(bytes, 0x4C, BITM, handle);
+            f32s(bytes, 0x6C, &[1.0, 0.0, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0]);
+            reference(bytes, 0x9C, BITM, handle);
+            f32s(bytes, 0xBC, &[45.0, 2.0, 8.0]);
+            reference(bytes, 0xC8, BITM, handle);
+        });
+        let ShaderClass::Water(water) = &shader.class else {
+            panic!("{:?}", shader.class)
+        };
+        assert_eq!((water.flags, water.base_map.clone()), (2, bitmap()));
+        assert_eq!(water.perpendicular_tint, [1.0, 0.0, 0.5, 1.0]);
+        assert_eq!(water.parallel_tint, [0.5, 1.0, 1.0, 1.0]);
+        assert_eq!(water.reflection_map, bitmap());
+        assert_eq!(
+            (
+                water.ripple_angle,
+                water.ripple_velocity,
+                water.ripple_scale
+            ),
+            (45.0, 2.0, 8.0)
+        );
+        assert_eq!(water.ripple_maps, bitmap());
+    }
 }

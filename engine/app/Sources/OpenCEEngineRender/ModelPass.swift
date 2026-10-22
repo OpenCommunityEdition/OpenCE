@@ -74,6 +74,8 @@ final class ModelPass {
         var firstIndex: Int
         var indexCount: Int
         var blended: Bool
+        /// How it blends with the frame (when blended).
+        var blend: BlendFunction
         /// Of a shader class not imported yet (not drawn in the sky).
         var plain: Bool
         /// Its material, whose animation it takes each frame.
@@ -98,7 +100,8 @@ final class ModelPass {
     let models: [Model]
     let geometries: [[Draw]]
     private var opaque: MTLRenderPipelineState
-    private var blended: MTLRenderPipelineState
+    /// One for each of LevelRenderer's blend functions.
+    private var blended: [MTLRenderPipelineState]
     private var skyOpaque: MTLRenderPipelineState
     private var skyBlended: MTLRenderPipelineState
     private let vertexStride: Int
@@ -155,15 +158,21 @@ final class ModelPass {
                         primaryScale: material.primaryDetailScale, secondaryScale: 1, maps: bits,
                         detailFunction: UInt32(material.detailFunction), environmentKind: 0,
                         alphaTested: material.kind == .alphaTested ? 1 : 0,
-                        fogMode: FrameUniforms.fogMode(material.kind == .blended ? .alphaBlend : nil))
-                    let chicagoTextures = uniforms.chicago(material, texture: texture, white: white)
-                    let shaded = uniforms.model(material, texture: texture, cube: cube, white: white,
-                                                whiteCube: whiteCube)
+                        fogMode: FrameUniforms.fogMode(material.kind == .blended ? material.blend : nil))
+                    let bound: [MTLTexture]
+                    if let transparent = uniforms.transparent(material, texture: texture, cube: cube, white: white,
+                                                              whiteCube: whiteCube) {
+                        bound = transparent.maps + [transparent.cube]
+                    } else {
+                        let chicagoTextures = uniforms.chicago(material, texture: texture, white: white)
+                        let shaded = uniforms.model(material, texture: texture, cube: cube, white: white,
+                                                    whiteCube: whiteCube)
+                        bound = (chicagoTextures ?? maps.map { $0 ?? white } + shaded.maps) + [shaded.cube]
+                    }
                     draws.append(Draw(firstIndex: Int(part.firstIndex), indexCount: Int(part.indexCount),
-                                      blended: material.kind == .blended, plain: material.kind == .plain,
-                                      material: Int(part.material), uniforms: uniforms,
-                                      textures: (chicagoTextures ?? maps.map { $0 ?? white } + shaded.maps)
-                                          + [shaded.cube]))
+                                      blended: material.kind == .blended, blend: material.blend,
+                                      plain: material.kind == .plain, material: Int(part.material),
+                                      uniforms: uniforms, textures: bound))
                 }
                 geometries.append(draws)
             }
@@ -205,33 +214,31 @@ final class ModelPass {
     /// The objects' and the sky's pipelines.
     struct Pipelines {
         var opaque: MTLRenderPipelineState
-        var blended: MTLRenderPipelineState
+        /// One for each of LevelRenderer's blend functions.
+        var blended: [MTLRenderPipelineState]
         var skyOpaque: MTLRenderPipelineState
         var skyBlended: MTLRenderPipelineState
     }
 
     private static func pipelines(device: MTLDevice, library: MTLLibrary, stride: Int) throws -> Pipelines {
-        func pipeline(blended: Bool, sky: Bool = false) throws -> MTLRenderPipelineState {
+        func pipeline(_ blend: BlendFunction?, sky: Bool = false) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
             descriptor.vertexFunction = try library.required(sky ? "sky_vertex" : "model_vertex")
-            descriptor.fragmentFunction = try library.required(sky ? "sky_fragment" : "model_fragment")
+            descriptor.fragmentFunction = try library.required(
+                sky ? "sky_fragment" : blend == .tintAndAdd ? "model_transparent_fragment" : "model_fragment")
             descriptor.vertexDescriptor = Self.vertexDescriptor(stride: stride)
             descriptor.colorAttachments[0].pixelFormat = LevelRenderer.frameFormat
             descriptor.depthAttachmentPixelFormat = LevelRenderer.depthFormat
-            if blended {
-                let color = descriptor.colorAttachments[0]!
-                color.isBlendingEnabled = true
-                color.sourceRGBBlendFactor = .sourceAlpha
-                color.destinationRGBBlendFactor = .oneMinusSourceAlpha
-                color.sourceAlphaBlendFactor = .zero
-                color.destinationAlphaBlendFactor = .one
+            if let blend {
+                LevelRenderer.blending(descriptor.colorAttachments[0], blend)
             }
             return try device.makeRenderPipelineState(descriptor: descriptor)
         }
         do {
-            return Pipelines(opaque: try pipeline(blended: false), blended: try pipeline(blended: true),
-                             skyOpaque: try pipeline(blended: false, sky: true),
-                             skyBlended: try pipeline(blended: true, sky: true))
+            return Pipelines(opaque: try pipeline(nil),
+                             blended: try LevelRenderer.blendFunctions.map { try pipeline($0) },
+                             skyOpaque: try pipeline(nil, sky: true),
+                             skyBlended: try pipeline(.alphaBlend, sky: true))
         } catch {
             throw LevelRendererError.shaders("\(error)")
         }
@@ -363,7 +370,8 @@ final class ModelPass {
         encoder.setVertexBytes(&object, length: MemoryLayout<ModelObjectUniforms>.stride, index: 3)
         for blendedParts in [false, true] {
             encoder.setRenderPipelineState(blendedParts ? skyBlended : skyOpaque)
-            for part in parts where part.blended == blendedParts && !part.plain {
+            // (the sky's transparent parts are drawn as its others are)
+            for part in parts where part.blended == blendedParts && !part.plain && part.blend != .tintAndAdd {
                 encode(part, animation: [], into: encoder)
             }
         }
@@ -385,7 +393,8 @@ final class ModelPass {
                 into encoder: MTLRenderCommandEncoder) {
         let objects = firstPerson ? prepared.firstPerson : prepared.objects
         guard let skins = prepared.skins, !objects.isEmpty else { return }
-        encoder.setRenderPipelineState(blendedParts ? blended : opaque)
+        var pipeline = blendedParts ? nil : opaque
+        encoder.setRenderPipelineState(opaque)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setVertexBuffer(skins, offset: 0, index: 2)
         for (uniforms, parts, colors) in objects {
@@ -395,6 +404,13 @@ final class ModelPass {
                 if let base = raw.baseAddress { encoder.setFragmentBytes(base, length: raw.count, index: 2) }
             }
             for part in parts where part.blended == blendedParts && !part.plain {
+                if blendedParts {
+                    let index = LevelRenderer.blendFunctions.firstIndex(of: part.blend) ?? 0
+                    if pipeline !== blended[index] {
+                        pipeline = blended[index]
+                        encoder.setRenderPipelineState(blended[index])
+                    }
+                }
                 encode(part, animation: animation, into: encoder)
             }
         }

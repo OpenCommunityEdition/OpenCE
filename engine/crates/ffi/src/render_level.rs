@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 
 use crate::render_model::{model_animation, model_material, RenderModel};
+use crate::render_transparent::{plasma_animation, RenderTransparent};
 
 use opence_content::{
     EnvironmentAnimation, EnvironmentShader, Level, Lightmap, Material, Pixels, ShaderClass,
@@ -70,10 +71,13 @@ pub enum BlendFunction {
     DoubleMultiply,
     /// The frame plus the material.
     Add,
+    /// The frame times the material's second colour, plus its first (a
+    /// dual-source blend: glass, meters, plasma and water).
+    TintAndAdd,
 }
 
 impl BlendFunction {
-    fn from_chicago(function: i16) -> Self {
+    pub(crate) fn from_chicago(function: i16) -> Self {
         // (subtract, the component minimum and maximum and alpha-multiply
         // add are drawn as the nearest of these)
         match function {
@@ -137,6 +141,37 @@ pub struct RenderMaterial {
     /// A model shader's self-illumination and reflection (None for the
     /// other classes).
     pub model: Option<RenderModelShader>,
+    /// A glass, meter, plasma or water shader's parameters (None for the
+    /// other classes).
+    pub transparent: Option<RenderTransparent>,
+}
+
+impl RenderMaterial {
+    /// A material drawn opaque, plain and lit, with no maps: what a
+    /// surface with a shader not found is drawn as, so that the geometry
+    /// is there.
+    pub(crate) fn plain() -> Self {
+        Self {
+            kind: MaterialKind::Plain,
+            blend: BlendFunction::AlphaBlend,
+            environment_kind: 0,
+            detail_function: 0,
+            base_map: None,
+            base_scale: vec![1.0, 1.0],
+            base_offset: vec![0.0, 0.0],
+            primary_detail_map: None,
+            primary_detail_scale: 1.0,
+            secondary_detail_map: None,
+            secondary_detail_scale: 1.0,
+            multipurpose_map: None,
+            detail_mask: 0,
+            change_color_source: 0,
+            chicago_maps: Vec::new(),
+            environment: None,
+            model: None,
+            transparent: None,
+        }
+    }
 }
 
 /// What a model shader adds to its base and detail maps, as the original's
@@ -466,6 +501,7 @@ impl Builder<'_> {
         let animation = match class {
             Some(ShaderClass::Environment(environment)) => Some(environment.animation.clone()),
             Some(ShaderClass::Model(model)) => Some(model_animation(model)),
+            Some(ShaderClass::Plasma(plasma)) => Some(plasma_animation(plasma)),
             _ => None,
         };
         let material = match class {
@@ -491,6 +527,7 @@ impl Builder<'_> {
                 chicago_maps: Vec::new(),
                 environment: Some(self.environment(environment)),
                 model: None,
+                transparent: None,
             },
             Some(
                 ShaderClass::TransparentChicago(chicago)
@@ -532,30 +569,18 @@ impl Builder<'_> {
                     chicago_maps,
                     environment: None,
                     model: None,
+                    transparent: None,
                 }
             }
-            // (a class not imported yet, or a shader not found: drawn plain
-            // and lit, so that the geometry is there)
             Some(ShaderClass::Model(model)) => model_material(self, model),
-            Some(ShaderClass::Other(_)) | None => RenderMaterial {
-                kind: MaterialKind::Plain,
-                blend: BlendFunction::AlphaBlend,
-                environment_kind: 0,
-                detail_function: 0,
-                base_map: None,
-                base_scale: vec![1.0, 1.0],
-                base_offset: vec![0.0, 0.0],
-                primary_detail_map: None,
-                primary_detail_scale: 1.0,
-                secondary_detail_map: None,
-                secondary_detail_scale: 1.0,
-                multipurpose_map: None,
-                detail_mask: 0,
-                change_color_source: 0,
-                chicago_maps: Vec::new(),
-                environment: None,
-                model: None,
-            },
+            Some(ShaderClass::TransparentGeneric(generic)) => self.generic(generic),
+            Some(ShaderClass::Glass(glass)) => self.glass(glass),
+            Some(ShaderClass::Meter(meter)) => self.meter(meter),
+            Some(ShaderClass::Plasma(plasma)) => self.plasma(plasma),
+            Some(ShaderClass::Water(water)) => self.water(water),
+            // (a group that is not a shader's, or a shader not found: drawn
+            // plain and lit, so that the geometry is there)
+            Some(ShaderClass::Other(_)) | None => RenderMaterial::plain(),
         };
         self.out.materials.push(material);
         self.out.animations.push(animation);
@@ -720,6 +745,7 @@ pub(crate) fn scale(value: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::render_transparent::TransparentClass;
     use opence_content::{
         Bitmap, BitmapImage, ChicagoMap, CollisionBsp, EnvironmentShader, EnvironmentVertex, Group,
         LightmapVertex, Scenario, Shader, Texture, TransparentChicagoShader,
@@ -1287,5 +1313,207 @@ mod tests {
         assert!(animation[glass * ANIMATION_FLOATS..][..ANIMATION_FLOATS]
             .iter()
             .all(|&value| value == 0.0));
+    }
+
+    /// The level with its ground's first draw drawn with `shader` instead.
+    fn with_shader(shader: Shader) -> RenderLevel {
+        let mut level = level();
+        let path = shader.tag.clone();
+        level.shaders.push(shader);
+        level.structure_bsps[0].lightmaps[0].materials[1].shader = Some(path);
+        match RenderLevel::build(&level, 0) {
+            Some(built) => built,
+            None => panic!("the level has a BSP 0"),
+        }
+    }
+
+    /// The material drawn by the ground's first draw (the level's second
+    /// material: the chicago glass is the first).
+    fn second(built: &RenderLevel) -> &RenderMaterial {
+        &built.materials[1]
+    }
+
+    fn generic_map(map: &str) -> opence_content::GenericMap {
+        opence_content::GenericMap {
+            flags: 0,
+            scale: [2.0, 0.0],
+            offset: [0.25, f32::NAN],
+            rotation: 0.0,
+            map: Some(tag(b"bitm", map)),
+        }
+    }
+
+    #[test]
+    fn a_generic_shaders_maps_multiply_and_blend_as_it_says() {
+        let built = with_shader(Shader::new(
+            tag(b"sotr", "generic"),
+            0,
+            ShaderClass::TransparentGeneric(opence_content::TransparentGenericShader {
+                flags: 0,
+                first_map_kind: 0,
+                framebuffer_blend_function: 1,
+                framebuffer_fade_mode: 0,
+                extra_layers: Vec::new(),
+                maps: vec![generic_map("ground"), generic_map("missing")],
+                stages: Vec::new(),
+            }),
+        ));
+        let material = second(&built);
+        assert_eq!(material.kind, MaterialKind::Blended);
+        assert_eq!(material.blend, BlendFunction::Multiply);
+        assert_eq!(material.chicago_maps.len(), 2);
+        let first = &material.chicago_maps[0];
+        assert!(first.map.is_some());
+        assert!(material.chicago_maps[1].map.is_none());
+        assert_eq!((first.color_function, first.alpha_function), (2, 2));
+        assert_eq!(first.scale, [2.0, 1.0]);
+        assert_eq!(first.offset, [0.25, 0.0]);
+        assert_eq!(material.base_map, first.map);
+        assert!(material.transparent.is_none());
+    }
+
+    #[test]
+    fn glass_tints_the_frame_and_adds_its_reflection() {
+        let built = with_shader(Shader::new(
+            tag(b"sgla", "glass"),
+            0,
+            ShaderClass::Glass(Box::new(opence_content::GlassShader {
+                flags: 1 << 3,
+                tint_color: [0.5, 0.25, 1.0],
+                tint_map_scale: 0.0,
+                tint_map: None,
+                reflection_kind: 0,
+                perpendicular_color: [0.5, 0.1, 0.2, 0.3],
+                parallel_color: [1.0, 0.4, 0.5, f32::NAN],
+                // (a two-dimensional bitmap is not a cube)
+                reflection_map: Some(tag(b"bitm", "ground")),
+                bump_map_scale: 4.0,
+                bump_map: Some(tag(b"bitm", "detail")),
+                diffuse_map_scale: 2.0,
+                diffuse_map: Some(tag(b"bitm", "ground")),
+                diffuse_detail_map_scale: 0.0,
+                diffuse_detail_map: None,
+            })),
+        ));
+        let material = second(&built);
+        assert_eq!(material.kind, MaterialKind::Blended);
+        assert_eq!(material.blend, BlendFunction::TintAndAdd);
+        let Some(glass) = &material.transparent else {
+            panic!("glass is transparent")
+        };
+        assert_eq!(glass.class, TransparentClass::Glass);
+        assert_eq!(glass.flags, 8);
+        assert_eq!(glass.maps.len(), 4);
+        assert!(glass.maps[0].map.is_some() && glass.maps[2].map.is_some());
+        assert!(glass.maps[1].map.is_none() && glass.maps[3].map.is_none());
+        assert_eq!(glass.maps[0].scale, [2.0, 2.0]);
+        assert_eq!(glass.maps[1].scale, [1.0, 1.0]);
+        assert_eq!(glass.reflection_map, None);
+        assert_eq!(glass.tint, [0.5, 0.25, 1.0, 1.0]);
+        assert_eq!(glass.perpendicular, [0.1, 0.2, 0.3, 0.5]);
+        assert_eq!(glass.parallel, [0.4, 0.5, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn meters_and_water_are_tinted_and_added() {
+        let meter = with_shader(Shader::new(
+            tag(b"smet", "meter"),
+            0,
+            ShaderClass::Meter(opence_content::MeterShader {
+                flags: 0x103,
+                map: Some(tag(b"bitm", "ground")),
+                gradient_min_color: [1.0, 0.0, 0.0],
+                gradient_max_color: [0.0, 1.0, 0.0],
+                background_color: [0.0; 3],
+                flash_color: [0.0; 3],
+                tint_color: [1.0, 1.0, 0.5],
+                meter_transparency: 0.75,
+                background_transparency: 0.25,
+                value_source: 0,
+            }),
+        ));
+        let Some(bar) = &second(&meter).transparent else {
+            panic!("a meter is transparent")
+        };
+        assert_eq!(bar.class, TransparentClass::Meter);
+        assert_eq!(bar.flags, 3);
+        assert_eq!(bar.perpendicular, [1.0, 0.0, 0.0, 0.75]);
+        assert_eq!(bar.parallel, [0.0, 1.0, 0.0, 0.25]);
+        assert_eq!(bar.tint, [1.0, 1.0, 0.5, 1.0]);
+
+        let water = with_shader(Shader::new(
+            tag(b"swat", "water"),
+            0,
+            ShaderClass::Water(opence_content::WaterShader {
+                flags: 3,
+                base_map: Some(tag(b"bitm", "ground")),
+                perpendicular_tint: [0.2, 0.0, 0.5, 1.0],
+                parallel_tint: [1.0, 1.0, 1.0, 1.0],
+                reflection_map: None,
+                ripple_angle: 0.0,
+                ripple_velocity: 0.0,
+                ripple_scale: 0.0,
+                ripple_maps: None,
+            }),
+        ));
+        let material = second(&water);
+        assert_eq!(material.blend, BlendFunction::TintAndAdd);
+        let Some(surface) = &material.transparent else {
+            panic!("water is transparent")
+        };
+        assert_eq!(surface.class, TransparentClass::Water);
+        assert_eq!(surface.flags, 3);
+        assert_eq!(surface.maps.len(), 1);
+        assert!(surface.maps[0].map.is_some());
+        assert_eq!(surface.perpendicular, [0.0, 0.5, 1.0, 0.2]);
+    }
+
+    #[test]
+    fn plasma_glows_and_its_noise_scrolls_along_its_directions() {
+        let noise = |direction: [f32; 3], period: f32| opence_content::PlasmaNoise {
+            period,
+            direction,
+            scale: 0.0,
+            map: Some(tag(b"bitm", "detail")),
+        };
+        let built = with_shader(Shader::new(
+            tag(b"spla", "plasma"),
+            0,
+            ShaderClass::Plasma(opence_content::PlasmaShader {
+                intensity_source: 0,
+                intensity_exponent: 1.0,
+                offset_amount: 0.0,
+                perpendicular_alpha: 0.5,
+                perpendicular_color: [0.0, 0.0, 1.0],
+                parallel_alpha: 1.0,
+                parallel_color: [1.0, 0.0, 0.0],
+                color_source: 0,
+                primary_animation: noise([1.0, 2.0, 0.0], 4.0),
+                secondary_animation: noise([-1.0, 0.0, 0.0], f32::NAN),
+            }),
+        ));
+        let index = built
+            .materials
+            .iter()
+            .position(|material| material.transparent.is_some());
+        let Some(index) = index else {
+            panic!("plasma is transparent")
+        };
+        let Some(plasma) = &built.materials[index].transparent else {
+            unreachable!()
+        };
+        assert_eq!(plasma.class, TransparentClass::Plasma);
+        assert_eq!(plasma.maps.len(), 2);
+        assert_eq!(plasma.perpendicular, [0.0, 0.0, 1.0, 0.5]);
+        assert_eq!(plasma.parallel, [1.0, 0.0, 0.0, 1.0]);
+        let floats = built.animation(1.0);
+        let at = index * ANIMATION_FLOATS;
+        let slid =
+            opence_sim::periodic::animate(opence_sim::periodic::function::SLIDE, 1.0, 4.0, 0.0);
+        assert!((floats[at] - slid).abs() < 1e-5, "{floats:?}");
+        assert!((floats[at + 1] - 2.0 * slid).abs() < 1e-5);
+        // (a period that is not a number is none)
+        assert!(floats[at + 4] <= 0.0 && floats[at + 4].is_finite());
+        assert_eq!(floats[at + 3], 0.0);
     }
 }

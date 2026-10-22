@@ -33,7 +33,7 @@ struct MaterialUniforms {
     var environmentKind: UInt32
     var alphaTested: UInt32
     /// How the fog takes the fragment: 0 mixed toward its color, 1 added,
-    /// 2 multiplied, 3 double-multiplied.
+    /// 2 multiplied, 3 double-multiplied, 4 tinted and added.
     var fogMode: UInt32 = 0
     /// A transparent chicago shader's maps (0: not one).
     var chicagoCount: UInt32 = 0
@@ -68,6 +68,41 @@ struct MaterialUniforms {
     /// `specularPerpendicular` and `specularParallel`, its falloff and
     /// cutoff distances in `environmentScales`.
     var model: SIMD4<UInt32> = .zero
+    /// A glass, meter, plasma or water shader's TransparentClassCode, its
+    /// flags and which of its maps it has (0: none of them). Its tint is
+    /// `materialColor`, its colours `specularPerpendicular` and
+    /// `specularParallel`, its maps' scales and offsets `chicagoTransforms`.
+    var transparent: SIMD4<UInt32> = .zero
+
+    /// `material`'s glass, meter, plasma or water parameters set, and its
+    /// four maps' textures and its reflection cube (white where it has
+    /// none), or nil for a material of another class.
+    mutating func transparent(_ material: RenderMaterial, texture: (UInt32?) -> MTLTexture?,
+                              cube: (UInt32?) -> MTLTexture?, white: MTLTexture,
+                              whiteCube: MTLTexture) -> (maps: [MTLTexture], cube: MTLTexture)? {
+        guard let shader = material.transparent else { return nil }
+        func four(_ values: [Float]) -> SIMD4<Float> {
+            values.count == 4 ? SIMD4(values[0], values[1], values[2], values[3]) : .zero
+        }
+        var transforms = [SIMD4<Float>](repeating: SIMD4(1, 1, 0, 0), count: 4)
+        var textures = [MTLTexture](repeating: white, count: 4)
+        var present: UInt32 = 0
+        for (slot, map) in shader.maps.prefix(4).enumerated() {
+            let scale = map.scale.count == 2 ? SIMD2(map.scale[0], map.scale[1]) : SIMD2<Float>(1, 1)
+            let offset = map.offset.count == 2 ? SIMD2(map.offset[0], map.offset[1]) : SIMD2<Float>(0, 0)
+            transforms[slot] = SIMD4(lowHalf: scale, highHalf: offset)
+            if let made = texture(map.map) {
+                textures[slot] = made
+                present |= 1 << slot
+            }
+        }
+        chicagoTransforms = (transforms[0], transforms[1], transforms[2], transforms[3])
+        materialColor = four(shader.tint)
+        specularPerpendicular = four(shader.perpendicular)
+        specularParallel = four(shader.parallel)
+        transparent = SIMD4(TransparentClassCode.of(shader.class), UInt32(shader.flags), present, 0)
+        return (textures, cube(shader.reflectionMap) ?? whiteCube)
+    }
 
     /// `material`'s model shader parameters set (if it is a model shader),
     /// and its multipurpose map and an unused map's textures and its
@@ -196,7 +231,20 @@ public struct FrameUniforms {
         case .add: 1
         case .multiply: 2
         case .doubleMultiply: 3
+        case .tintAndAdd: 4
         case .alphaBlend, nil: 0
+        }
+    }
+}
+
+/// The transparent classes' codes (MaterialUniforms' `transparent.x`).
+enum TransparentClassCode {
+    static func of(_ transparentClass: TransparentClass) -> UInt32 {
+        switch transparentClass {
+        case .glass: 1
+        case .meter: 2
+        case .plasma: 3
+        case .water: 4
         }
     }
 }
@@ -382,7 +430,10 @@ public final class LevelRenderer {
                 alphaTested: material.kind == .alphaTested ? 1 : 0, fogMode: FrameUniforms.fogMode(blend))
             let center = draw.center.count == 3 ? SIMD3(draw.center[0], draw.center[1], draw.center[2]) : .zero
             var bound: [MTLTexture]
-            if let chicago = uniforms.chicago(material, texture: texture, white: white) {
+            if let shaded = uniforms.transparent(material, texture: texture, cube: cube, white: white,
+                                                 whiteCube: whiteCube) {
+                bound = shaded.maps + [white, white, white, shaded.cube]
+            } else if let chicago = uniforms.chicago(material, texture: texture, white: white) {
                 bound = chicago + [white, white, white, whiteCube]
             } else {
                 bound = maps.map { $0 ?? white }
@@ -460,32 +511,13 @@ public final class LevelRenderer {
         func pipeline(_ blend: BlendFunction?) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
             descriptor.vertexFunction = try library.required("level_vertex")
-            descriptor.fragmentFunction = try library.required("level_fragment")
+            descriptor.fragmentFunction = try library.required(blend == .tintAndAdd ? "transparent_fragment"
+                                                                                    : "level_fragment")
             descriptor.vertexDescriptor = Self.vertexDescriptor(stride: stride)
             descriptor.colorAttachments[0].pixelFormat = Self.frameFormat
             descriptor.depthAttachmentPixelFormat = Self.depthFormat
             if let blend {
-                let color = descriptor.colorAttachments[0]!
-                color.isBlendingEnabled = true
-                color.rgbBlendOperation = .add
-                color.alphaBlendOperation = .add
-                // (the frame's alpha is not shown: kept at one)
-                color.sourceAlphaBlendFactor = .zero
-                color.destinationAlphaBlendFactor = .one
-                switch blend {
-                case .alphaBlend:
-                    color.sourceRGBBlendFactor = .sourceAlpha
-                    color.destinationRGBBlendFactor = .oneMinusSourceAlpha
-                case .multiply:
-                    color.sourceRGBBlendFactor = .destinationColor
-                    color.destinationRGBBlendFactor = .zero
-                case .doubleMultiply:
-                    color.sourceRGBBlendFactor = .destinationColor
-                    color.destinationRGBBlendFactor = .sourceColor
-                case .add:
-                    color.sourceRGBBlendFactor = .one
-                    color.destinationRGBBlendFactor = .one
-                }
+                Self.blending(descriptor.colorAttachments[0], blend)
             }
             return try device.makeRenderPipelineState(descriptor: descriptor)
         }
@@ -519,7 +551,34 @@ public final class LevelRenderer {
         models.use(objects)
     }
 
-    static let blendFunctions: [BlendFunction] = [.alphaBlend, .multiply, .doubleMultiply, .add]
+    static let blendFunctions: [BlendFunction] = [.alphaBlend, .multiply, .doubleMultiply, .add, .tintAndAdd]
+
+    /// `color` blended with the frame as `blend` blends.
+    static func blending(_ color: MTLRenderPipelineColorAttachmentDescriptor, _ blend: BlendFunction) {
+        color.isBlendingEnabled = true
+        color.rgbBlendOperation = .add
+        color.alphaBlendOperation = .add
+        // (the frame's alpha is not shown: kept at one)
+        color.sourceAlphaBlendFactor = .zero
+        color.destinationAlphaBlendFactor = .one
+        switch blend {
+        case .alphaBlend:
+            color.sourceRGBBlendFactor = .sourceAlpha
+            color.destinationRGBBlendFactor = .oneMinusSourceAlpha
+        case .multiply:
+            color.sourceRGBBlendFactor = .destinationColor
+            color.destinationRGBBlendFactor = .zero
+        case .doubleMultiply:
+            color.sourceRGBBlendFactor = .destinationColor
+            color.destinationRGBBlendFactor = .sourceColor
+        case .add:
+            color.sourceRGBBlendFactor = .one
+            color.destinationRGBBlendFactor = .one
+        case .tintAndAdd:
+            color.sourceRGBBlendFactor = .one
+            color.destinationRGBBlendFactor = .source1Color
+        }
+    }
 
     /// Draws the level and `objects` from `camera` into `target` (of
     /// `outputFormat`), `debugLines` in the world, and `hudQuads` over them.

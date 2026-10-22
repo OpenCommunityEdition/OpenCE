@@ -48,8 +48,9 @@ pub use script::{
     Scripts, ValueType,
 };
 pub use shader::{
-    AnimatedColor, ChicagoMap, EnvironmentAnimation, EnvironmentShader, ModelShaderClass, Shader,
-    ShaderClass, TextureAnimation, TransparentChicagoShader,
+    AnimatedColor, ChicagoMap, EnvironmentAnimation, EnvironmentShader, GenericMap, GenericStage,
+    GlassShader, MeterShader, ModelShaderClass, PlasmaNoise, PlasmaShader, Shader, ShaderClass,
+    TextureAnimation, TransparentChicagoShader, TransparentGenericShader, WaterShader,
 };
 pub use vehicle::{
     FrictionType, MassPoint, Physics, PoweredMassPoint, PoweredSeat, Vehicle, VehicleKind,

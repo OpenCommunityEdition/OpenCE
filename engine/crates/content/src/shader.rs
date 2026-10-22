@@ -41,7 +41,18 @@ pub enum ShaderClass {
     TransparentChicagoExtended(TransparentChicagoShader),
     /// An object's model's surfaces (`soso`).
     Model(ModelShaderClass),
-    /// A class not imported yet (`sotr`, `sgla`, `smet`, `spla`, `swat`).
+    /// Transparent surfaces drawn by the programmable combiner's stages
+    /// (`sotr`).
+    TransparentGeneric(TransparentGenericShader),
+    /// Glass: a tint, a reflection and a diffuse map (`sgla`).
+    Glass(Box<GlassShader>),
+    /// A meter's bar (`smet`).
+    Meter(MeterShader),
+    /// Plasma energy: shields and the like (`spla`).
+    Plasma(PlasmaShader),
+    /// Water: a tint, a reflection and ripples (`swat`).
+    Water(WaterShader),
+    /// A group that is not a shader class.
     Other(Group),
 }
 
@@ -213,6 +224,182 @@ pub struct ModelShaderClass {
     pub parallel_tint_color: [f32; 3],
     /// The reflection's cube map.
     pub reflection_cube_map: Option<TagRef>,
+}
+
+/// A transparent generic shader (`sotr`): its maps, combined by its
+/// stages.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct TransparentGenericShader {
+    /// Its flags (as a chicago shader's: alpha tested, decal, two-sided,
+    /// first map in screen space).
+    pub flags: u8,
+    /// How the first map is projected (2D, cube map, ...).
+    pub first_map_kind: i16,
+    /// How it blends with the frame buffer (as a chicago shader's).
+    pub framebuffer_blend_function: i16,
+    /// How it fades.
+    pub framebuffer_fade_mode: i16,
+    /// The shaders drawn over it.
+    pub extra_layers: Vec<TagRef>,
+    /// Its maps, at most four.
+    pub maps: Vec<GenericMap>,
+    /// Its stages' constant colours, at most seven.
+    pub stages: Vec<GenericStage>,
+}
+
+/// A map of a transparent generic shader.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct GenericMap {
+    /// Its flags (unfiltered, clamped u, clamped v).
+    pub flags: u16,
+    /// Its scale in u and v.
+    pub scale: [f32; 2],
+    /// Its offset in u and v.
+    pub offset: [f32; 2],
+    /// Its rotation.
+    pub rotation: f32,
+    /// The bitmap.
+    pub map: Option<TagRef>,
+}
+
+/// A stage of a transparent generic shader: its two constant colours
+/// (alpha, red, green, blue, as the tag has them).
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct GenericStage {
+    /// Its flags.
+    pub flags: u16,
+    /// The first constant colour.
+    pub color0: [f32; 4],
+    /// The second.
+    pub color1: [f32; 4],
+}
+
+/// A glass shader (`sgla`): the frame behind it tinted, then a cube map's
+/// reflection added, then a diffuse map blended over.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct GlassShader {
+    /// Its flags (alpha tested, decal, two-sided, bump map is the
+    /// specular mask).
+    pub flags: u16,
+    /// The colour the frame behind it is multiplied by.
+    pub tint_color: [f32; 3],
+    /// The tint map's scale.
+    pub tint_map_scale: f32,
+    /// The tint map.
+    pub tint_map: Option<TagRef>,
+    /// The reflection's kind: 0 bumped cube map, 1 flat cube map, 2
+    /// dynamic mirror.
+    pub reflection_kind: i16,
+    /// The reflection's colour and brightness looking along the normal
+    /// (alpha, red, green, blue).
+    pub perpendicular_color: [f32; 4],
+    /// The same looking across the surface.
+    pub parallel_color: [f32; 4],
+    /// The reflection's cube map.
+    pub reflection_map: Option<TagRef>,
+    /// The bump map's scale.
+    pub bump_map_scale: f32,
+    /// The bump map.
+    pub bump_map: Option<TagRef>,
+    /// The diffuse map's scale.
+    pub diffuse_map_scale: f32,
+    /// The diffuse map.
+    pub diffuse_map: Option<TagRef>,
+    /// The diffuse detail map's scale.
+    pub diffuse_detail_map_scale: f32,
+    /// The diffuse detail map.
+    pub diffuse_detail_map: Option<TagRef>,
+}
+
+/// A meter shader (`smet`): a bar filled to a value, whose map's alpha is
+/// where along the bar each texel is.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct MeterShader {
+    /// Its flags (decal, two-sided, flash colour is negative, tint mode
+    /// 2, unfiltered).
+    pub flags: u16,
+    /// The map.
+    pub map: Option<TagRef>,
+    /// The bar's colour at its start.
+    pub gradient_min_color: [f32; 3],
+    /// Its colour at its end.
+    pub gradient_max_color: [f32; 3],
+    /// The colour beyond the value.
+    pub background_color: [f32; 3],
+    /// The colour it flashes.
+    pub flash_color: [f32; 3],
+    /// The colour the whole is multiplied by.
+    pub tint_color: [f32; 3],
+    /// The bar's opacity (tint mode 2).
+    pub meter_transparency: f32,
+    /// The background's opacity (tint mode 2).
+    pub background_transparency: f32,
+    /// Which of the object's functions is the value (0: none, full).
+    pub value_source: i16,
+}
+
+/// A plasma shader (`spla`): two scrolling noise maps whose difference
+/// glows, brighter across the surface than along its normal.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct PlasmaShader {
+    /// Which of the object's functions is its intensity (0: always full).
+    pub intensity_source: i16,
+    /// The exponent of its intensity.
+    pub intensity_exponent: f32,
+    /// How far it is pushed out along the normal.
+    pub offset_amount: f32,
+    /// Its opacity looking along the normal.
+    pub perpendicular_alpha: f32,
+    /// Its colour looking along the normal.
+    pub perpendicular_color: [f32; 3],
+    /// Its opacity looking across the surface.
+    pub parallel_alpha: f32,
+    /// Its colour looking across the surface.
+    pub parallel_color: [f32; 3],
+    /// Which of the object's change colours tints it (0: none).
+    pub color_source: i16,
+    /// The first noise map's period, direction and scale.
+    pub primary_animation: PlasmaNoise,
+    /// The second's.
+    pub secondary_animation: PlasmaNoise,
+}
+
+/// A plasma shader's noise map and its scrolling.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct PlasmaNoise {
+    /// The seconds it takes to scroll once.
+    pub period: f32,
+    /// The direction it scrolls in.
+    pub direction: [f32; 3],
+    /// Its scale.
+    pub scale: f32,
+    /// The map.
+    pub map: Option<TagRef>,
+}
+
+/// A water shader (`swat`).
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct WaterShader {
+    /// Its flags (the base map's alpha masks the reflection, its colour
+    /// tints what is behind, atmospheric fog, drawn before the fog).
+    pub flags: u16,
+    /// The base map.
+    pub base_map: Option<TagRef>,
+    /// The reflection's tint looking along the normal (alpha, red,
+    /// green, blue).
+    pub perpendicular_tint: [f32; 4],
+    /// The same looking across the surface.
+    pub parallel_tint: [f32; 4],
+    /// The reflection's cube map.
+    pub reflection_map: Option<TagRef>,
+    /// The direction the ripples move in, in degrees.
+    pub ripple_angle: f32,
+    /// How fast they move.
+    pub ripple_velocity: f32,
+    /// Their scale.
+    pub ripple_scale: f32,
+    /// The ripples' maps.
+    pub ripple_maps: Option<TagRef>,
 }
 
 /// A transparent chicago shader (`schi`, `scex`).

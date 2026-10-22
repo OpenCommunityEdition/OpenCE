@@ -52,7 +52,8 @@ struct Material {
     uint environment_kind;
     uint alpha_tested;
     // 0 mixed toward the fog's color, 1 added (faded out), 2 multiplied
-    // (faded to white), 3 double-multiplied (faded to grey)
+    // (faded to white), 3 double-multiplied (faded to grey), 4 tinted and
+    // added (the colour faded out, the tint to white)
     uint fog_mode;
     // a transparent chicago shader's maps (0: not one), each one's color
     // function, alpha function << 8 and alpha replicate << 16, and its
@@ -84,7 +85,18 @@ struct Material {
     // are specular_perpendicular and specular_parallel, its reflection's
     // falloff and cutoff distances environment_scales.xy
     uint4 model;
+    // a glass, meter, plasma or water shader's class (TRANSPARENT_*), its
+    // flags and its TRANSPARENT_MAP bits (0: none of them); its tint is
+    // material_color, its colours along the normal and across it
+    // specular_perpendicular and specular_parallel, its maps' scales and
+    // offsets chicago_transforms
+    uint4 transparent;
 };
+
+constant uint TRANSPARENT_GLASS = 1;
+constant uint TRANSPARENT_METER = 2;
+constant uint TRANSPARENT_PLASMA = 3;
+constant uint TRANSPARENT_WATER = 4;
 
 constant uint MODEL = 1;
 constant uint MODEL_REFLECTION = 2;
@@ -128,7 +140,7 @@ float fog_amount(constant Frame &frame, float3 world) {
 // a fragment's color behind `fog` of the fog, as its blend takes it
 float4 fogged(float4 color, float fog, constant Frame &frame, constant Material &material) {
     switch (material.fog_mode) {
-    case 1: color.rgb *= 1 - fog; break;
+    case 1: case 4: color.rgb *= 1 - fog; break;
     case 2: color.rgb = mix(color.rgb, float3(1), fog); break;
     case 3: color.rgb = mix(color.rgb, float3(0.5), fog); break;
     default: color.rgb = mix(color.rgb, frame.fog_color.rgb, fog); break;
@@ -542,6 +554,120 @@ fragment float4 model_fragment(ModelOut in [[stage_in]],
         color.rgb = detailed(material.detail_function, color.rgb, detail) * light + reflected;
     }
     return fogged(color, in.fog, frame, material);
+}
+
+// a transparent shader's output: what is added to the frame, and what
+// the frame is multiplied by first (the blend's second source)
+struct Tinted {
+    float4 color [[color(0), index(0)]];
+    float4 tint [[color(0), index(1)]];
+};
+
+// one of a transparent shader's maps, at its slot's scale and offset
+float4 transparent_map(texture2d<float> map, uint slot, float2 texcoord, constant Material &material,
+                       sampler wrap, float lod, float4 otherwise) {
+    if (!((material.transparent.z >> slot) & 1)) {
+        return otherwise;
+    }
+    float4 transform = material.chicago_transforms[slot];
+    return map.sample(wrap, texcoord * transform.xy + transform.zw, bias(lod));
+}
+
+// glass, a meter, plasma or water, as the original's passes for it
+// combine: the frame behind tinted, then a reflection or a glow added
+Tinted transparent(float2 texcoord, float3 normal, float3 world, float fog, constant Frame &frame,
+                   constant Material &material, array<texture2d<float>, 4> maps, texturecube<float> cube,
+                   sampler wrap, sampler clamp) {
+    float lod = frame.eye.w;
+    float3 eye = direction(frame.eye.xyz - world, normal);
+    // (both faces drawn: the normal toward the eye)
+    float3 n = dot(normal, eye) < 0 ? -normal : normal;
+    float facing = saturate(dot(n, eye));
+    float4 fresnel = mix(material.specular_parallel, material.specular_perpendicular, facing);
+    float3 reflected = cube.sample(clamp, reflect(-eye, n)).rgb;
+    uint flags = material.transparent.y;
+    Tinted out;
+    out.color = float4(0, 0, 0, 1);
+    out.tint = float4(1);
+    switch (material.transparent.x) {
+    case TRANSPARENT_GLASS: {
+        // the diffuse map over; under it the frame tinted and the reflection
+        float4 diffuse = transparent_map(maps[0], 0, texcoord, material, wrap, lod, float4(0));
+        float4 detail = transparent_map(maps[3], 3, texcoord, material, wrap, lod, float4(0.5));
+        diffuse.rgb = saturate(diffuse.rgb * 2 * detail.rgb);
+        float3 tint = material.material_color.rgb
+                    * transparent_map(maps[1], 1, texcoord, material, wrap, lod, float4(1)).rgb;
+        float mask = 1;
+        if (flags & 8) {
+            mask = transparent_map(maps[2], 2, texcoord, material, wrap, lod, float4(1)).a;
+        }
+        float under = 1 - diffuse.a;
+        out.tint.rgb = tint * under;
+        out.color.rgb = reflected * fresnel.rgb * fresnel.a * mask * under + diffuse.rgb * diffuse.a;
+        break;
+    }
+    case TRANSPARENT_METER: {
+        // (at its full value: the objects' functions do not reach it yet)
+        float4 map = transparent_map(maps[0], 0, texcoord, material, wrap, lod, float4(1));
+        float3 gradient = mix(material.specular_perpendicular.rgb, material.specular_parallel.rgb, map.a);
+        out.color.rgb = gradient * material.material_color.rgb * map.rgb * material.specular_perpendicular.a;
+        break;
+    }
+    case TRANSPARENT_PLASMA: {
+        // its two noise maps scrolled along their directions, their
+        // difference's nearness to zero the glow
+        float4 first = transparent_map(maps[0], 0, texcoord + material.animation[0].xy, material, wrap, lod,
+                                       float4(0.5));
+        float4 second = transparent_map(maps[1], 1, texcoord + material.animation[1].xy, material, wrap, lod,
+                                        float4(0.5));
+        float intensity = (material.transparent.z & 3) ? saturate(1 - 2 * abs(first.a - second.a)) : 0.5;
+        out.color.rgb = fresnel.rgb * fresnel.a * intensity;
+        break;
+    }
+    case TRANSPARENT_WATER: {
+        float4 base = transparent_map(maps[0], 0, texcoord, material, wrap, lod, float4(1));
+        if (flags & 2) {
+            out.tint.rgb = base.rgb;
+        }
+        float mask = (flags & 1) ? base.a : 1;
+        out.color.rgb = reflected * fresnel.rgb * fresnel.a * mask;
+        break;
+    }
+    default: break;
+    }
+    out.color.rgb *= 1 - fog;
+    out.tint.rgb = mix(out.tint.rgb, float3(1), fog);
+    return out;
+}
+
+fragment Tinted transparent_fragment(VertexOut in [[stage_in]],
+                                     constant Material &material [[buffer(0)]],
+                                     constant Frame &frame [[buffer(1)]],
+                                     texture2d<float> first [[texture(0)]],
+                                     texture2d<float> second [[texture(1)]],
+                                     texture2d<float> third [[texture(2)]],
+                                     texture2d<float> fourth [[texture(3)]],
+                                     texturecube<float> reflection [[texture(7)]],
+                                     sampler wrap [[sampler(0)]],
+                                     sampler clamp [[sampler(1)]]) {
+    array<texture2d<float>, 4> maps = {first, second, third, fourth};
+    return transparent(in.texcoord, direction(in.normal, float3(0, 0, 1)), in.world, in.fog, frame, material,
+                       maps, reflection, wrap, clamp);
+}
+
+fragment Tinted model_transparent_fragment(ModelOut in [[stage_in]],
+                                           constant Material &material [[buffer(0)]],
+                                           constant Frame &frame [[buffer(1)]],
+                                           texture2d<float> first [[texture(0)]],
+                                           texture2d<float> second [[texture(1)]],
+                                           texture2d<float> third [[texture(2)]],
+                                           texture2d<float> fourth [[texture(3)]],
+                                           texturecube<float> reflection [[texture(4)]],
+                                           sampler wrap [[sampler(0)]],
+                                           sampler clamp [[sampler(1)]]) {
+    array<texture2d<float>, 4> maps = {first, second, third, fourth};
+    return transparent(in.texcoord, direction(in.normal, float3(0, 0, 1)), in.world, in.fog, frame, material,
+                       maps, reflection, wrap, clamp);
 }
 
 struct ToneOut {

@@ -192,6 +192,7 @@ pub(crate) fn model_material(
             reflection_falloff_distance: finite(shader.reflection_falloff_distance).max(0.0),
             reflection_cutoff_distance: finite(shader.reflection_cutoff_distance).max(0.0),
         }),
+        transparent: None,
     }
 }
 
