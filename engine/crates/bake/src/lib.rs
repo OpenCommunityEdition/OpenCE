@@ -11,10 +11,15 @@
 //!   sky's lights.
 //! - [`bvh`] puts the triangles in a bounding-volume hierarchy, flattened
 //!   as the GPU's path tracer reads it.
+//! - [`layout`] holds scenes whose light is known, to check tracers by.
+//! - [`trace`] is the path tracer: the light arriving at a point.
 
 pub mod bvh;
+pub mod layout;
 pub mod scene;
 pub mod texel;
+pub mod trace;
 
 pub use bvh::{Bvh, BvhNode, BvhTriangle, Hit, Ray};
 pub use scene::{BakeMaterial, DirectionalLight, Scene};
+pub use trace::{Irradiance, Random, Tracer};

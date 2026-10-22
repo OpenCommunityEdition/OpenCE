@@ -13,6 +13,8 @@ public enum Shader: String, CaseIterable, Sendable {
     case hud
     case text
     case debug
+    /// The bake's path tracer (PathTracer, compiled for each bake).
+    case bake
 
     public var file: String { "\(rawValue).metal" }
 }
@@ -124,6 +126,7 @@ public final class ShaderReloader {
             case .debug: reload = level.map { pass in { try pass.debug.reloadShaders(source: $0) } }
             case .hud: reload = hud.map { pass in { try pass.reloadShaders(source: $0) } }
             case .text: reload = text.map { pass in { try pass.reloadShaders(source: $0) } }
+            case .bake: reload = nil
             }
             guard let reload else { continue }
             do {

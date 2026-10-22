@@ -123,6 +123,28 @@ impl Scene {
         })
     }
 
+    /// The materials as the GPU reads them: each its albedo and
+    /// coverage, then its emission and a word of padding, little-endian.
+    pub fn material_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(self.materials.len() * 32);
+        for material in &self.materials {
+            put_words(&mut bytes, material.albedo, material.coverage);
+            put_words(&mut bytes, material.emission, 0.0);
+        }
+        bytes
+    }
+
+    /// The lights as the GPU reads them: each the way towards it and its
+    /// cone's cosine, then its irradiance and a word of padding.
+    pub fn light_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(self.lights.len() * 32);
+        for light in &self.lights {
+            put_words(&mut bytes, light.towards, light.cos_half_angle);
+            put_words(&mut bytes, light.irradiance, 0.0);
+        }
+        bytes
+    }
+
     /// The sky's lights and ambient colours.
     fn light_by(&mut self, sky: &Sky) {
         let ambient = |color: [f32; 3], power: f32| {
@@ -228,6 +250,13 @@ fn bake_material(level: &Level, tag: Option<&TagRef>) -> BakeMaterial {
             shader.class,
             ShaderClass::Environment(_) | ShaderClass::Model(_)
         ),
+    }
+}
+
+/// Three floats and a fourth, little-endian.
+fn put_words(bytes: &mut Vec<u8>, three: [f32; 3], fourth: f32) {
+    for value in three.into_iter().chain([fourth]) {
+        bytes.extend_from_slice(&value.to_le_bytes());
     }
 }
 
@@ -386,5 +415,24 @@ mod tests {
         level.structure_bsps[0].lightmaps.clear();
         let scene = Scene::of(&level, 0).unwrap_or_else(|| panic!("no BSP"));
         assert_eq!(scene.bounds, [[0.0; 3]; 2]);
+    }
+
+    #[test]
+    fn materials_and_lights_are_laid_out_for_the_gpu() {
+        let (_, scene) = devmap_scene();
+        let materials = scene.material_bytes();
+        assert_eq!(materials.len(), scene.materials.len() * 32);
+        let word = |bytes: &[u8], at: usize| {
+            f32::from_le_bytes([bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]])
+        };
+        assert_eq!(word(&materials, 0), scene.materials[0].albedo[0]);
+        assert_eq!(word(&materials, 12), scene.materials[0].coverage);
+        assert_eq!(word(&materials, 16), scene.materials[0].emission[0]);
+        let lights = scene.light_bytes();
+        assert_eq!(lights.len(), scene.lights.len() * 32);
+        assert!(!lights.is_empty());
+        assert_eq!(word(&lights, 8), scene.lights[0].towards[2]);
+        assert_eq!(word(&lights, 12), scene.lights[0].cos_half_angle);
+        assert_eq!(word(&lights, 20), scene.lights[0].irradiance[1]);
     }
 }

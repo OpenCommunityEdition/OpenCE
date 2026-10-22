@@ -22,6 +22,7 @@ bindgen = ["uniffi/cli"]
 
 [dependencies]
 opence_sim.workspace = true
+opence_bake.workspace = true
 opence_campaign.workspace = true
 opence_content.workspace = true
 opence_import.workspace = true

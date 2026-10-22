@@ -931,6 +931,7 @@ name = "opence_ffi"
 version = "0.1.0"
 dependencies = [
  "libm",
+ "opence_bake",
  "opence_campaign",
  "opence_content",
  "opence_dev",

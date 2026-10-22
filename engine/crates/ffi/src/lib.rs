@@ -7,6 +7,7 @@
 // crate and physics are the only ones allowed it)
 #![allow(unsafe_code)]
 
+pub mod bake;
 pub mod campaign;
 pub mod control;
 mod debug_scene;
