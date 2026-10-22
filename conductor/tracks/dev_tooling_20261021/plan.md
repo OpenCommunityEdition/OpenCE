@@ -56,7 +56,7 @@
 - [x] Task: Recording the reference game's placements d2f2db02
     - [x] Write tests: the recorder's output format; a small map's trace is complete
     - [x] `tools/engine_placement_traces.py`, using the reference app headless
-- [~] Task: Comparing and fixing placements
+- [x] Task: Comparing and fixing placements 238ad5be
     - [ ] Write tests: the engine's world after spawning matches each stock map's trace (marked, needs `assets/maps`)
     - [ ] Find and fix the causes of the mismatches in the importer and the simulation
 - [ ] Task: The documentation
