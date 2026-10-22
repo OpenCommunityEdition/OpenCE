@@ -376,7 +376,12 @@ pub fn summary(spans: &[Span]) -> Vec<Line> {
             open.clear();
             thread = span.thread;
         }
-        while open.last().is_some_and(|(end, ..)| *end < span.end()) {
+        // (a scope inside fewer scopes than are open, or one that ends
+        // after an open one, is not inside it: scopes of no length that
+        // start together are told apart by their depth)
+        while open.len() > span.depth as usize
+            || open.last().is_some_and(|(end, ..)| *end < span.end())
+        {
             open.pop();
         }
         let mut path = open
