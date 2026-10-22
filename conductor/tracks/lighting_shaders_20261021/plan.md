@@ -33,7 +33,7 @@
     - [x] Tune the bake's sky and emitter scales until every stock BSP passes (two listed as known colour differences: longest, d20 bsp 1)
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: The bake' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 3: Dynamic lighting
+## Phase 3: Dynamic lighting [checkpoint: 1a0e5786]
 - [x] Task: Objects lit by the world a9649dfd
     - [x] Write tests: probe interpolation at a point; the nearest reflection probe; the fake light is gone
     - [x] Objects lit by probes, the sun and reflection probes
