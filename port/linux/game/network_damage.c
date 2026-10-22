@@ -34,10 +34,13 @@ being hit looks and feels like on the clients).
 - The damage to a unit goes to the machines of the players it concerns
   (the unit's, its riders', the damage's owner's) and those sent the
   unit's player this tick, which see it; a killing blow to all.
-- Scenery and devices that can be destroyed (lights, panels) are the
-  map's, at the same index on every machine. A client reports its hits on
-  them like any other, and every client deals the host's damage to its own
-  copy, which breaks and plays its effects as the host's did.
+- Scenery and devices that can be destroyed (lights, panels), or whose
+  shields can be broken (energy shields, a map's tripmines), are the map's,
+  at the same index on every machine. A client reports its hits on them like
+  any other, and every client deals the host's damage to its own copy, which
+  breaks and plays its effects as the host's did. Their shields' stun and
+  recharge each machine runs itself (damage.c's objects_update_shields), as
+  the host sends no state of them: the same damage, and the same recharge.
 */
 
 #include "cseries.h"
@@ -499,12 +502,21 @@ static boolean distributed_damage_to_data(
 	return TRUE;
 }
 
-/* whether the object is scenery or a device that damage can destroy */
+/* whether the object is scenery or a device that damage can destroy, or
+whose shield it can break (a shield that is all the object is: Rat Race's
+energy shields, a map's tripmines) */
 static boolean static_target(
 	long object_index)
 {
 	return object_try_and_get_and_verify_type(object_index, STATIC_TARGET_TYPES) &&
-		object_get_maximum_body_vitality(object_index, TRUE) > 0.0f;
+		(object_get_maximum_body_vitality(object_index, TRUE) > 0.0f ||
+			object_get_maximum_shield_vitality(object_index, TRUE) > 0.0f);
+}
+
+boolean network_damage_static_target(
+	long object_index)
+{
+	return static_target(object_index);
 }
 
 /* ---------- object_cause_damage (damage.c) */
