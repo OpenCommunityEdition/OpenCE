@@ -74,7 +74,7 @@ fn ticks(light: &Light) -> u32 {
 /// Linear from a colour `0` (at 0) to `1` (at `t` 1), by hue, saturation
 /// and value if `flags` say so, the long way round the hues for
 /// `Light::MORE_COLORS`.
-fn interpolate(flags: u32, lower: [f32; 3], upper: [f32; 3], t: f32) -> [f32; 3] {
+pub(crate) fn interpolate(flags: u32, lower: [f32; 3], upper: [f32; 3], t: f32) -> [f32; 3] {
     if flags & Light::HSV == 0 {
         return [0, 1, 2].map(|i| lower[i] + (upper[i] - lower[i]) * t);
     }

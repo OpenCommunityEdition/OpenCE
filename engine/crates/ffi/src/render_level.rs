@@ -348,6 +348,8 @@ pub struct RenderLevel {
     /// The textures the camera's sprites draw, as `CameraSprite::image`
     /// numbers them (`u32::MAX`: one not loaded, drawn as a soft disk).
     pub camera_textures: Vec<u32>,
+    /// The decals the BSP lays when it is loaded, layer by layer.
+    pub decals: Vec<crate::decals::RenderDecal>,
 }
 
 /// Gathers the level's textures and materials, each once.
@@ -406,6 +408,9 @@ impl RenderLevel {
             let texture = builder.texture(&bitmap, image, 1).unwrap_or(u32::MAX);
             builder.out.camera_textures.push(texture);
         }
+        builder.out.decals = crate::decals::level_decals(level, structure, &mut |bitmap, image| {
+            builder.texture(&bitmap.tag, image, 1)
+        });
         for model in &level.models {
             let model = builder.model(model);
             builder.out.models.push(model);
@@ -762,7 +767,7 @@ pub(crate) fn scale(value: f32) -> f32 {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::render_transparent::TransparentClass;
     use opence_content::{
@@ -777,7 +782,7 @@ mod tests {
         }
     }
 
-    fn bitmap(path: &str, images: usize, levels: usize) -> Bitmap {
+    pub(crate) fn bitmap(path: &str, images: usize, levels: usize) -> Bitmap {
         let texture = Texture {
             format: TextureFormat::Rgba8,
             width: 4,
@@ -913,7 +918,7 @@ mod tests {
     /// A BSP of one lightmap page: a chicago triangle, a ground triangle,
     /// a sky portal, a cutout triangle (unlit), and a triangle past its
     /// vertices beside a whole one.
-    fn level() -> Level {
+    pub(crate) fn level() -> Level {
         let materials = vec![
             material(Some(tag(b"schi", "glass")), 0, 1, true),
             material(Some(tag(b"senv", "ground")), 0, 1, true),
@@ -924,6 +929,7 @@ mod tests {
         ];
         Level {
             glows: Vec::new(),
+            decals: Vec::new(),
             lens_flares: Vec::new(),
             light_volumes: Vec::new(),
             scenario: Scenario {
@@ -935,9 +941,11 @@ mod tests {
                 netgame_equipment: Vec::new(),
                 scripts: Default::default(),
                 campaign: Default::default(),
+                decal_palette: Vec::new(),
             },
             structure_bsps: vec![StructureBsp {
                 cluster_skies: Vec::new(),
+                decals: Vec::new(),
                 lens_flare_markers: Vec::new(),
                 lens_flares: Vec::new(),
                 path: "test".into(),

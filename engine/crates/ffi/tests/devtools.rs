@@ -173,7 +173,7 @@ fn variables_completion_and_bindings() -> Result {
         ("true", "false")
     );
     assert_eq!(engine.complete_command("nocl".into()), ["noclip"]);
-    assert_eq!(engine.complete_command("ren".into()).len(), 14);
+    assert_eq!(engine.complete_command("ren".into()).len(), 15);
     run(&engine, "bind f5 pause")?;
     engine.start_empty_world();
     assert!(engine.press_key("f5".into()).ok);

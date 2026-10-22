@@ -107,6 +107,7 @@ pub fn plane(half_size: f32, cells: u16) -> StructureBsp {
     ];
     StructureBsp {
         cluster_skies: Vec::new(),
+        decals: Vec::new(),
         lens_flare_markers: Vec::new(),
         lens_flares: Vec::new(),
         path: BSP_PATH.into(),
@@ -342,6 +343,7 @@ fn scenario() -> Scenario {
         netgame_equipment: Vec::new(),
         scripts: Default::default(),
         campaign: Default::default(),
+        decal_palette: Vec::new(),
     }
 }
 
@@ -836,6 +838,7 @@ pub fn level(donor: Option<&Level>) -> Level {
         Some(donor) => donor.clone(),
         None => Level {
             glows: Vec::new(),
+            decals: Vec::new(),
             lens_flares: Vec::new(),
             light_volumes: Vec::new(),
             scenario: scenario(),

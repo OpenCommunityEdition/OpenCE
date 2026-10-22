@@ -246,6 +246,8 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     let skies = import_skies(cache, &scenario, &mut models, &mut reached)?;
     let lens_flares = import_lens_flares(cache, &structure_bsps, &skies, &lights, &mut reached)?;
     let (light_volumes, glows) = import_widgets(cache, &objects, &mut reached)?;
+    let decal_palette = crate::decal::decal_palette(&scenario)?;
+    let decals = crate::decal::import_decals(cache, &decal_palette, &structure_bsps, &mut reached)?;
 
     // (a shader's extra layers are shaders too, reached as each is read)
     let mut shaders = Vec::new();
@@ -284,6 +286,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     }
 
     let level = Level {
+        decals,
         glows,
         lens_flares,
         light_volumes,
@@ -296,6 +299,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
             netgame_equipment,
             scripts,
             campaign,
+            decal_palette,
         },
         structure_bsps,
         objects,
@@ -1175,8 +1179,11 @@ fn import_structure_bsp(
         cluster_skies.push(u16::try_from(cluster.i16(0, "sky")?).ok());
     }
 
+    let decals = crate::decal::runtime_decals(&bsp)?;
+
     Ok(StructureBsp {
         cluster_skies,
+        decals,
         lens_flare_markers,
         lens_flares,
         path: bsp.instance().name.clone(),
@@ -1907,11 +1914,24 @@ pub(crate) mod tests {
         let mut clusters = vec![0u8; BSP_CLUSTER_SIZE * 2];
         clusters[BSP_CLUSTER_SIZE..BSP_CLUSTER_SIZE + 2].copy_from_slice(&(-1i16).to_le_bytes());
         let clusters = bsp.add(&clusters);
+        // one runtime decal a unit above the floor, looking down
+        let mut decal = Vec::new();
+        for value in [0.5f32, -0.5, 1.0] {
+            decal.extend_from_slice(&value.to_le_bytes());
+        }
+        decal.extend_from_slice(&[0, 0, 0, (-127i8) as u8]);
+        let runtime_decals = bsp.add(&decal);
 
         let structure_bsp = &mut bsp.0[structure..structure + STRUCTURE_BSP_SIZE];
         block(structure_bsp, BSP_LENS_FLARES_OFFSET, 1, flares);
         block(structure_bsp, BSP_LENS_FLARE_MARKERS_OFFSET, 2, markers);
         block(structure_bsp, BSP_CLUSTERS_OFFSET, 2, clusters);
+        block(
+            structure_bsp,
+            crate::decal::BSP_RUNTIME_DECALS_OFFSET,
+            1,
+            runtime_decals,
+        );
         reference(structure_bsp, LIGHTMAP_BITMAP_OFFSET, BITM, bitmap_handle);
         block(
             structure_bsp,
@@ -1988,6 +2008,30 @@ pub(crate) mod tests {
         reference(&mut skies, 0, SKY, fake.handle(sky_tag));
         let skies = fake.add_data(&skies);
         block(&mut scenario, SCENARIO_SKIES_OFFSET, 1, skies);
+        // a scorch that chains to a second, lighter one, in the palette
+        let mut scorch = vec![0u8; crate::decal::DECAL_SIZE];
+        empty(&mut scorch, 0x08);
+        put(&mut scorch, 0x00, &(1u16 << 8).to_le_bytes());
+        put(&mut scorch, 0x04, &1i16.to_le_bytes());
+        put(&mut scorch, 0xC0, &3i16.to_le_bytes());
+        reference(&mut scorch, 0xD8, BITM, bitmap_handle);
+        let glow = fake.add_tag(crate::decal::DECA, "decals\\fake\\glow", &scorch);
+        put(&mut scorch, 0x04, &0i16.to_le_bytes());
+        put(&mut scorch, 0xC0, &1i16.to_le_bytes());
+        for (at, value) in [0.25f32, 0.5].iter().enumerate() {
+            put(&mut scorch, 0x18 + at * 4, &value.to_le_bytes());
+        }
+        reference(&mut scorch, 0x08, crate::decal::DECA, fake.handle(glow));
+        let scorch = fake.add_tag(crate::decal::DECA, "decals\\fake\\scorch", &scorch);
+        let mut palette = vec![0u8; crate::decal::DECAL_PALETTE_SIZE];
+        reference(&mut palette, 0, crate::decal::DECA, fake.handle(scorch));
+        let palette = fake.add_data(&palette);
+        block(
+            &mut scenario,
+            crate::decal::SCENARIO_DECAL_PALETTE_OFFSET,
+            1,
+            palette,
+        );
         fake.set_scenario_data(&scenario);
         fake
     }
@@ -2230,6 +2274,42 @@ pub(crate) mod tests {
             assert_eq!(bsp.surfaces, [[0, 1, 2]]);
             assert_eq!(bsp.lens_flares, [None]);
             assert_eq!(bsp.cluster_skies, [Some(0), None]);
+            assert_eq!(
+                bsp.decals,
+                [opence_content::LevelDecal {
+                    position: [0.5, -0.5, 1.0],
+                    palette_index: 0,
+                    yaw: 0,
+                    pitch: -127,
+                }]
+            );
+            // (the palette's decal and the one it chains to, by path, each
+            // with its picture, blend and layer)
+            let scorch = TagRef {
+                group: Group(*b"deca"),
+                path: "decals\\fake\\scorch".into(),
+            };
+            assert_eq!(level.scenario.decal_palette, [Some(scorch.clone())]);
+            let paths: Vec<&str> = level.decals.iter().map(|d| d.tag.path.as_str()).collect();
+            assert_eq!(paths, ["decals\\fake\\glow", "decals\\fake\\scorch"]);
+            let (glow, scorch_decal) = (&level.decals[0], &level.decals[1]);
+            assert_eq!(scorch_decal.next.as_ref(), Some(&glow.tag));
+            assert_eq!(glow.next, None);
+            assert_eq!(
+                (scorch_decal.layer, scorch_decal.framebuffer_blend_function),
+                (opence_content::Decal::PRIMARY, 1)
+            );
+            assert_eq!(
+                (glow.layer, glow.framebuffer_blend_function),
+                (opence_content::Decal::SECONDARY, 3)
+            );
+            assert_eq!(scorch_decal.radius, [0.25, 0.5]);
+            assert_eq!(glow.flags, opence_content::Decal::PRESERVE_ASPECT);
+            assert!(scorch_decal.map.is_some());
+            assert!(level
+                .bitmaps
+                .iter()
+                .any(|bitmap| Some(&bitmap.tag) == scorch_decal.map.as_ref()));
             assert_eq!(
                 bsp.lens_flare_markers,
                 [opence_content::LensFlareMarker {

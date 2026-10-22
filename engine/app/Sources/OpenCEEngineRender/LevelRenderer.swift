@@ -421,11 +421,14 @@ public final class LevelRenderer {
     let screen: ScreenPass
     /// The camera's passes: lens flares, glows, exposure, bloom.
     let cameraPass: CameraPass
+    let decals: DecalPass
     /// The frame's lens flares, light volumes and glows (set before each
     /// frame, as `lights` is).
     public var sprites = CameraSprites(sprites: [], occluders: [])
     /// The sprites the last frame drew.
     public private(set) var lastSpriteCount = 0
+    /// The decals the level lays.
+    public var decalCount: Int { decals.count }
     /// The exposure, in stops darker than the level's own light, adapted
     /// from frame to frame as `time` goes on (`render.exposure`).
     public private(set) var exposure: Float = 0
@@ -550,6 +553,8 @@ public final class LevelRenderer {
         screen = try ScreenPass(device: device, source: ShaderSources.source(.screen))
         cameraPass = try CameraPass(device: device, source: ShaderSources.source(.camera),
                                     images: geometry.cameraTextures().map { texture($0) })
+        decals = try DecalPass(device: device, source: ShaderSources.source(.decal), decals: geometry.decals(),
+                               texture: { texture($0) })
         exposureLimits = geometry.exposureLimits()
         sky = geometry.sky()
 
@@ -852,8 +857,13 @@ public final class LevelRenderer {
         }
         encoder.endEncoding()
 
-        // occlusion and reflections from what the opaque pass left
+        // the decals on the level's surfaces, then occlusion and
+        // reflections from what the opaque pass left
         guard let screenTargets else { return }
+        if switches.decals {
+            decals.encode(into: commands, frame: frame, depth: depth, surface: screenTargets.surface,
+                          viewProjection: viewProjection, eye: camera.position)
+        }
         let screenUniforms = ScreenUniforms(viewProjection: viewProjection, eye: camera.position,
                                             sunTowards: towards == nil ? .zero : sun.towards, width: frame.width,
                                             height: frame.height, switches: switches)

@@ -7,6 +7,7 @@
 pub mod bitmap;
 pub mod cache;
 pub mod campaign;
+mod decal;
 mod effect;
 pub mod error;
 pub mod globals;

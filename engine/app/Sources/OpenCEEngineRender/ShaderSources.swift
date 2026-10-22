@@ -17,6 +17,8 @@ public enum Shader: String, CaseIterable, Sendable {
     case screen
     /// The camera's passes: lens flares, glows, exposure, bloom.
     case camera
+    /// The decals laid on the level.
+    case decal
     /// The bake's path tracer (PathTracer, compiled for each bake).
     case bake
 
@@ -130,6 +132,7 @@ public final class ShaderReloader {
             case .debug: reload = level.map { pass in { try pass.debug.reloadShaders(source: $0) } }
             case .screen: reload = level.map { pass in { try pass.screen.reloadShaders(source: $0) } }
             case .camera: reload = level.map { pass in { try pass.cameraPass.reloadShaders(source: $0) } }
+            case .decal: reload = level.map { pass in { try pass.decals.reloadShaders(source: $0) } }
             case .hud: reload = hud.map { pass in { try pass.reloadShaders(source: $0) } }
             case .text: reload = text.map { pass in { try pass.reloadShaders(source: $0) } }
             case .bake: reload = nil

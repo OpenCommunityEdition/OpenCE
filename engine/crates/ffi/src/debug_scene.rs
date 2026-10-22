@@ -213,6 +213,7 @@ pub(crate) mod tests {
     pub(crate) fn level() -> Level {
         let mut level = Level {
             glows: Vec::new(),
+            decals: Vec::new(),
             lens_flares: Vec::new(),
             light_volumes: Vec::new(),
             scenario: Scenario {
@@ -224,6 +225,7 @@ pub(crate) mod tests {
                 netgame_equipment: Vec::new(),
                 scripts: Default::default(),
                 campaign: Default::default(),
+                decal_palette: Vec::new(),
             },
             structure_bsps: Vec::new(),
             objects: Vec::new(),
@@ -247,6 +249,7 @@ pub(crate) mod tests {
         };
         let mut structure = StructureBsp {
             cluster_skies: Vec::new(),
+            decals: Vec::new(),
             lens_flare_markers: Vec::new(),
             lens_flares: Vec::new(),
             path: "test".into(),

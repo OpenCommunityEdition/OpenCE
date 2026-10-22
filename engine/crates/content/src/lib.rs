@@ -5,6 +5,7 @@
 
 pub mod bitmap;
 pub mod campaign;
+pub mod decal;
 pub mod devmap;
 pub mod hud;
 pub mod lens;
@@ -26,6 +27,7 @@ pub use campaign::{
     DeviceGroup, Encounter, FiringPosition, Recording, SoundLength, Squad, StartingLocation,
     TriggerVolume,
 };
+pub use decal::{Decal, LevelDecal};
 pub use hud::{
     CrosshairItem, CrosshairKind, GrenadeHud, HudAnchor, HudDigits, HudGlobals, HudMeter,
     HudNumber, HudPlacement, HudStatic, UnitHud, WeaponHud, WeaponHudCrosshair, WeaponHudElement,

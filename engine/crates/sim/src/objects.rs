@@ -528,6 +528,7 @@ mod tests {
             netgame_equipment: Vec::new(),
             scripts: Default::default(),
             campaign: Default::default(),
+            decal_palette: Vec::new(),
         }
     }
 

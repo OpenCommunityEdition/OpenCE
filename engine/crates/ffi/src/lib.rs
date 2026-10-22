@@ -12,6 +12,7 @@ pub mod camera;
 pub mod campaign;
 pub mod control;
 mod debug_scene;
+pub mod decals;
 pub mod devtools;
 pub mod hud;
 pub mod lights;
@@ -333,6 +334,11 @@ impl LevelGeometry {
     /// The textures the camera's sprites draw, by `CameraSprite::image`.
     pub fn camera_textures(&self) -> Vec<u32> {
         self.level.camera_textures.clone()
+    }
+
+    /// The decals the BSP lays when it is loaded, layer by layer.
+    pub fn decals(&self) -> Vec<decals::RenderDecal> {
+        self.level.decals.clone()
     }
 
     /// The exposure's limits in the BSP, least and greatest, in stops

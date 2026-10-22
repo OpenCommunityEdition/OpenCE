@@ -140,7 +140,7 @@ impl Default for Shell {
 }
 
 // (the drawing switches the app reads)
-const VARIABLES: [(&str, &str, bool, bool); 13] = [
+const VARIABLES: [(&str, &str, bool, bool); 14] = [
     (
         "render.wireframe",
         "Draws the level and objects as lines.",
@@ -201,6 +201,12 @@ const VARIABLES: [(&str, &str, bool, bool); 13] = [
     (
         "render.glows",
         "Draws the objects' glows and light volumes.",
+        true,
+        true,
+    ),
+    (
+        "render.decals",
+        "Draws the decals laid on the level.",
         true,
         true,
     ),

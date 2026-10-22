@@ -3,9 +3,9 @@
 use rkyv::{Archive, Deserialize, Serialize};
 
 use crate::{
-    AnimationGraph, Bitmap, Campaign, CollisionModel, DamageEffect, Effect, Glow, Grenade,
-    GrenadeHud, HudDigits, HudGlobals, LensFlare, LensFlareMarker, Light, LightVolume, Model,
-    ObjectDefinition, ObjectKind, Physics, Scripts, Shader, TagRef, UnitHud, WeaponHud,
+    AnimationGraph, Bitmap, Campaign, CollisionModel, DamageEffect, Decal, Effect, Glow, Grenade,
+    GrenadeHud, HudDigits, HudGlobals, LensFlare, LensFlareMarker, LevelDecal, Light, LightVolume,
+    Model, ObjectDefinition, ObjectKind, Physics, Scripts, Shader, TagRef, UnitHud, WeaponHud,
 };
 
 /// Everything a level's structure is drawn and collided with.
@@ -50,6 +50,8 @@ pub struct Level {
     pub light_volumes: Vec<LightVolume>,
     /// The glows its objects carry, by path.
     pub glows: Vec<Glow>,
+    /// The decals its BSPs place, and the decals they chain to, by path.
+    pub decals: Vec<Decal>,
     /// Its units' HUDs, by path.
     pub unit_huds: Vec<UnitHud>,
     /// Its weapons' HUDs, and the HUDs they add to, by path.
@@ -217,6 +219,11 @@ impl Level {
     pub fn lens_flare(&self, tag: &TagRef) -> Option<&LensFlare> {
         self.lens_flares.iter().find(|flare| flare.tag == *tag)
     }
+
+    /// A decal, by its tag.
+    pub fn decal(&self, tag: &TagRef) -> Option<&Decal> {
+        self.decals.iter().find(|decal| decal.tag == *tag)
+    }
 }
 
 /// A sky: the model drawn behind the level, and the fog of the air
@@ -327,6 +334,8 @@ pub struct Scenario {
     pub scripts: Scripts,
     /// What its scripts name and its AI places.
     pub campaign: Campaign,
+    /// The decals its BSPs' runtime decals place.
+    pub decal_palette: Vec<Option<TagRef>>,
 }
 
 /// The game types something in a scenario is for, as Halo gives them: four
@@ -527,6 +536,8 @@ pub struct StructureBsp {
     /// Each of its clusters' sky, an index into the scenario's skies
     /// (none: the cluster sees no sky).
     pub cluster_skies: Vec<Option<u16>>,
+    /// The decals laid on it when the level is loaded.
+    pub decals: Vec<LevelDecal>,
 }
 
 /// What a collision surface is made of.
