@@ -9,6 +9,7 @@
 
 pub mod campaign;
 pub mod control;
+mod debug_scene;
 pub mod devtools;
 pub mod hud;
 pub mod network;
@@ -806,7 +807,12 @@ fn node_matrix(from: &animation::NodeMatrix) -> snapshot::NodeMatrix {
 }
 
 fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError> {
-    let State { running, input, .. } = state;
+    let State {
+        running,
+        input,
+        shell,
+        ..
+    } = state;
     let running = running.as_mut().ok_or(EngineError::NoWorld)?;
     for _ in 0..ticks {
         running.previous_camera = transform(&campaign::camera(running).transform);
@@ -820,6 +826,7 @@ fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError> {
         // (the mouse's turn is used once)
         input.yaw = 0.0;
         input.pitch = 0.0;
+        shell.draw.advance(running.simulation.tick().0);
     }
     if let (Some(_), Some(level)) = (&running.network, &running.level) {
         running.dressed = network::dress_players(&mut running.simulation, level, running.dressed);
@@ -832,10 +839,26 @@ fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError> {
 
 fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) {
     let State {
-        running, writer, ..
+        running,
+        writer,
+        shell,
+        ..
     } = state;
     let Some(running) = running else { return };
     let camera = campaign::camera(running);
+    if shell.scene.any_world_layer() {
+        let bsp = running
+            .campaign
+            .as_ref()
+            .map_or(shell.bsp, campaign::Campaign::bsp);
+        debug_scene::fill(
+            &mut shell.scene,
+            running.level.as_deref(),
+            bsp,
+            &mut running.simulation,
+            camera.transform.position,
+        );
+    }
     // (a cinematic's camera is not the player's: no weapon in its hands)
     let cinematic = running
         .campaign
@@ -910,6 +933,8 @@ fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) {
                 &nodes,
             );
         }
+        frame.debug(&shell.draw);
+        frame.debug(&shell.scene);
     });
 }
 
@@ -949,6 +974,50 @@ mod tests {
         }
     }
     type FrameSnapshotRef = snapshot::FrameSnapshot;
+
+    #[test]
+    fn the_debug_shapes_reach_the_snapshot_and_expire() {
+        let engine = Engine::new();
+        engine.start_empty_world();
+        assert!(engine.run_command("debug_line 0 0 0 1 2 3 2".into()).ok);
+        let frame = acquire(&engine);
+        assert_eq!(frame.debug_line_count, 1);
+        // SAFETY: the frame holds a line at its lines' address.
+        let line = unsafe { *frame.debug_lines };
+        assert_eq!((line.to.x, line.to.y, line.to.z), (1.0, 2.0, 3.0));
+        for _ in 0..2 {
+            assert!(engine.step().is_ok());
+        }
+        assert_eq!(acquire(&engine).debug_line_count, 0);
+
+        assert!(engine.run_command("debug_sphere 0 0 0 1".into()).ok);
+        assert!(acquire(&engine).debug_line_count > 1);
+        assert!(!engine.run_command("debug_sphere 0 0 0 -1".into()).ok);
+        assert!(!engine.run_command("debug_line 0 0 0 1 nan 3".into()).ok);
+        assert!(engine.run_command("debug_text 1 2 3 hello there".into()).ok);
+        let frame = acquire(&engine);
+        assert_eq!(frame.debug_label_count, 1);
+        // SAFETY: the frame holds a label at its labels' address.
+        let label = unsafe { *frame.debug_labels };
+        assert!(label.text.starts_with(b"hello there\0"));
+        assert!(engine.run_command("debug_box 1 1 1 0 0 0 5".into()).ok);
+        assert!(engine.run_command("debug_clear".into()).ok);
+        let frame = acquire(&engine);
+        assert_eq!((frame.debug_line_count, frame.debug_label_count), (0, 0));
+
+        // (a layer switched off draws nothing, and its variable says so)
+        assert!(engine.run_command("set debug.draw.general false".into()).ok);
+        assert!(engine.run_command("debug_line 0 0 0 1 1 1".into()).ok);
+        assert_eq!(acquire(&engine).debug_line_count, 0);
+        assert!(engine.run_command("set debug.draw.markers true".into()).ok);
+        assert!(
+            engine
+                .run_command("set debug.draw.collision true".into())
+                .ok
+        );
+        assert!(engine.step().is_ok());
+        assert_eq!(acquire(&engine).debug_line_count, 0);
+    }
 
     #[test]
     fn advancing_runs_whole_ticks_and_publishes_alpha() {

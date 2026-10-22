@@ -16,9 +16,18 @@ pub const MAX_OBJECTS: usize = 4096;
 /// The most animated nodes one snapshot holds, for all its objects.
 pub const MAX_NODES: usize = 16384;
 
+/// The most debug lines one snapshot holds.
+pub const MAX_DEBUG_LINES: usize = opence_dev::draw::MAX_LINES;
+
+/// The most debug labels one snapshot holds.
+pub const MAX_DEBUG_LABELS: usize = opence_dev::draw::MAX_LABELS;
+
+/// The bytes of a debug label's text, its end padded with zeros.
+pub const DEBUG_LABEL_BYTES: usize = 48;
+
 /// Raised with any change to the snapshot's types, so that the app refuses
 /// a library of another layout.
-pub const SNAPSHOT_VERSION: u32 = 4;
+pub const SNAPSHOT_VERSION: u32 = 5;
 
 /// `ObjectSnapshot::flags`: the first-person weapon or hands, posed from
 /// the camera and drawn in front of the world.
@@ -131,6 +140,40 @@ pub struct ObjectSnapshot {
     pub regions: [u8; 8],
 }
 
+/// A debug line, drawn after the world.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DebugLine {
+    /// Its start.
+    pub from: Vec3,
+    /// Its end.
+    pub to: Vec3,
+    /// Its colour: red, green, blue and alpha a byte each from the top.
+    pub color: u32,
+}
+
+/// A debug label at a point, drawn after the world.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DebugLabel {
+    /// Where it is.
+    pub at: Vec3,
+    /// Its colour, as a line's.
+    pub color: u32,
+    /// Its text in UTF-8, its end padded with zeros.
+    pub text: [u8; DEBUG_LABEL_BYTES],
+}
+
+impl Default for DebugLabel {
+    fn default() -> Self {
+        Self {
+            at: Vec3::default(),
+            color: 0,
+            text: [0; DEBUG_LABEL_BYTES],
+        }
+    }
+}
+
 /// One frame of the world.
 #[repr(C)]
 #[derive(Debug)]
@@ -154,6 +197,14 @@ pub struct FrameSnapshot {
     /// The animated objects' nodes: `node_count` of them, each object's
     /// together, in the same slot.
     pub nodes: *const NodeSnapshot,
+    /// The number of lines in `debug_lines`.
+    pub debug_line_count: u32,
+    /// The number of labels in `debug_labels`.
+    pub debug_label_count: u32,
+    /// The debug lines, in the same slot.
+    pub debug_lines: *const DebugLine,
+    /// The debug labels, in the same slot.
+    pub debug_labels: *const DebugLabel,
 }
 
 /// The sizes and offsets of the snapshot's types, as Rust laid them out;
@@ -192,6 +243,18 @@ pub struct SnapshotLayout {
     pub transform_size: u32,
     /// The size of `NodeSnapshot`.
     pub node_size: u32,
+    /// `MAX_DEBUG_LINES`.
+    pub max_debug_lines: u32,
+    /// `MAX_DEBUG_LABELS`.
+    pub max_debug_labels: u32,
+    /// The offset of `FrameSnapshot::debug_lines`.
+    pub frame_debug_lines_offset: u32,
+    /// The offset of `FrameSnapshot::debug_labels`.
+    pub frame_debug_labels_offset: u32,
+    /// The size of `DebugLine`.
+    pub debug_line_size: u32,
+    /// The size of `DebugLabel`.
+    pub debug_label_size: u32,
 }
 
 /// The layout of the snapshot's types.
@@ -217,6 +280,12 @@ pub fn snapshot_layout() -> SnapshotLayout {
         object_bounding_radius_offset: n(offset_of!(ObjectSnapshot, bounding_radius)),
         transform_size: n(size_of::<Transform>()),
         node_size: n(size_of::<NodeSnapshot>()),
+        max_debug_lines: n(MAX_DEBUG_LINES),
+        max_debug_labels: n(MAX_DEBUG_LABELS),
+        frame_debug_lines_offset: n(offset_of!(FrameSnapshot, debug_lines)),
+        frame_debug_labels_offset: n(offset_of!(FrameSnapshot, debug_labels)),
+        debug_line_size: n(size_of::<DebugLine>()),
+        debug_label_size: n(size_of::<DebugLabel>()),
     }
 }
 
@@ -227,6 +296,8 @@ struct Slot {
     frame: FrameSnapshot,
     objects: [ObjectSnapshot; MAX_OBJECTS],
     nodes: [NodeSnapshot; MAX_NODES],
+    debug_lines: [DebugLine; MAX_DEBUG_LINES],
+    debug_labels: [DebugLabel; MAX_DEBUG_LABELS],
 }
 
 impl Slot {
@@ -238,6 +309,8 @@ impl Slot {
         // (the slot is boxed and never moves, so the pointer stays valid)
         slot.frame.objects = slot.objects.as_ptr();
         slot.frame.nodes = slot.nodes.as_ptr();
+        slot.frame.debug_lines = slot.debug_lines.as_ptr();
+        slot.frame.debug_labels = slot.debug_labels.as_ptr();
         slot
     }
 }
@@ -342,6 +415,41 @@ impl FrameBuilder<'_> {
         self.slot.frame.node_count += u32::from(node_count);
         Ok(())
     }
+
+    /// Adds `draw`'s lines and labels, as many as fit.
+    pub fn debug(&mut self, draw: &opence_dev::draw::DebugDraw) {
+        let vector = |[x, y, z]: [f32; 3]| Vec3 { x, y, z };
+        let frame = &mut self.slot.frame;
+        for line in draw.lines() {
+            let at = frame.debug_line_count as usize;
+            if at >= MAX_DEBUG_LINES {
+                break;
+            }
+            self.slot.debug_lines[at] = DebugLine {
+                from: vector(line.from),
+                to: vector(line.to),
+                color: line.color.0,
+            };
+            frame.debug_line_count += 1;
+        }
+        for label in draw.labels() {
+            let at = frame.debug_label_count as usize;
+            if at >= MAX_DEBUG_LABELS {
+                break;
+            }
+            let mut text = [0; DEBUG_LABEL_BYTES];
+            // (the store cuts labels shorter than this, at a character)
+            let bytes = label.text.as_bytes();
+            let length = bytes.len().min(DEBUG_LABEL_BYTES - 1);
+            text[..length].copy_from_slice(&bytes[..length]);
+            self.slot.debug_labels[at] = DebugLabel {
+                at: vector(label.at),
+                color: label.color.0,
+                text,
+            };
+            frame.debug_label_count += 1;
+        }
+    }
 }
 
 impl SnapshotWriter {
@@ -361,6 +469,8 @@ impl SnapshotWriter {
         slot.frame.alpha = alpha;
         slot.frame.object_count = 0;
         slot.frame.node_count = 0;
+        slot.frame.debug_line_count = 0;
+        slot.frame.debug_label_count = 0;
         let result = fill(&mut FrameBuilder { slot });
         self.slot = buffers.middle.swap(self.slot | FRESH, Ordering::AcqRel) & INDEX;
         result
@@ -409,15 +519,28 @@ mod tests {
         assert_eq!(offset_of!(FrameSnapshot, node_count), 20);
         assert_eq!(offset_of!(FrameSnapshot, objects), 104);
         assert_eq!(offset_of!(FrameSnapshot, nodes), 112);
-        assert_eq!(size_of::<FrameSnapshot>(), 120);
+        assert_eq!(offset_of!(FrameSnapshot, debug_line_count), 120);
+        assert_eq!(offset_of!(FrameSnapshot, debug_label_count), 124);
+        assert_eq!(offset_of!(FrameSnapshot, debug_lines), 128);
+        assert_eq!(offset_of!(FrameSnapshot, debug_labels), 136);
+        assert_eq!(size_of::<FrameSnapshot>(), 144);
         assert_eq!(align_of::<FrameSnapshot>(), 8);
-        assert_eq!(SNAPSHOT_VERSION, 4);
+        assert_eq!(size_of::<DebugLine>(), 28);
+        assert_eq!(size_of::<DebugLabel>(), 64);
+        assert_eq!(offset_of!(DebugLabel, text), 16);
+        assert_eq!(SNAPSHOT_VERSION, 5);
     }
 
     #[test]
     fn the_layout_record_reports_it() {
         let layout = snapshot_layout();
-        assert_eq!(layout.frame_size, 120);
+        assert_eq!(layout.frame_size, 144);
+        assert_eq!(layout.frame_debug_lines_offset, 128);
+        assert_eq!(layout.frame_debug_labels_offset, 136);
+        assert_eq!(layout.debug_line_size, 28);
+        assert_eq!(layout.debug_label_size, 64);
+        assert_eq!(layout.max_debug_lines, 32768);
+        assert_eq!(layout.max_debug_labels, 256);
         assert_eq!(layout.frame_objects_offset, 104);
         assert_eq!(layout.frame_nodes_offset, 112);
         assert_eq!(layout.object_size, 92);
@@ -529,6 +652,41 @@ mod tests {
         assert_eq!(ranges, vec![(0, 2), (2, 0), (2, 1)]);
         let xs: Vec<f32> = nodes(frame).iter().map(|n| n.current.position.x).collect();
         assert_eq!(xs, vec![1.0, 2.0, 3.0]);
+    }
+
+    #[test]
+    fn the_debug_shapes_are_copied_and_cleared() {
+        use opence_dev::draw::{Color, DebugDraw, Layer};
+        let (buffers, mut writer) = SnapshotBuffers::new();
+        let mut draw = DebugDraw::new();
+        draw.line(
+            Layer::General,
+            [1.0, 2.0, 3.0],
+            [4.0, 5.0, 6.0],
+            Color::RED,
+            1,
+        );
+        draw.text(Layer::General, [7.0, 8.0, 9.0], "warthog", Color::GREEN, 1);
+        writer.publish(&buffers, 1, 0.0, |frame| frame.debug(&draw));
+        let frame = read(&buffers);
+        assert_eq!((frame.debug_line_count, frame.debug_label_count), (1, 1));
+        // SAFETY: the pointers point at the counts' entries in the slot.
+        let (line, label) = unsafe { (*frame.debug_lines, *frame.debug_labels) };
+        assert_eq!(
+            line.to,
+            Vec3 {
+                x: 4.0,
+                y: 5.0,
+                z: 6.0
+            }
+        );
+        assert_eq!(line.color, Color::RED.0);
+        assert_eq!(&label.text[..8], b"warthog\0");
+        assert_eq!(label.at.z, 9.0);
+        // (the next frame starts without them)
+        writer.publish(&buffers, 2, 0.0, |_| ());
+        let frame = read(&buffers);
+        assert_eq!((frame.debug_line_count, frame.debug_label_count), (0, 0));
     }
 
     #[test]

@@ -92,7 +92,7 @@ final class ControlServant {
             let captured = try renderer.capture(width: width, height: height, camera: camera,
                                                 objects: frame.drawnObjects(),
                                                 hudQuads: engine.hud(width: request.width, height: request.height),
-                                                queue: queue)
+                                                debugLines: frame.debugSegments(), queue: queue)
             try captured.writePNG(to: URL(fileURLWithPath: request.path))
             return nil
         } catch {

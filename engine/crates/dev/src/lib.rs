@@ -12,6 +12,7 @@
 //!   the fall-through (the running mission's scripts).
 
 pub mod control;
+pub mod draw;
 pub mod logbook;
 mod words;
 

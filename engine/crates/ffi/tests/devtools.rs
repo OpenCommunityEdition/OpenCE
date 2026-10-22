@@ -352,7 +352,10 @@ fn the_watch_line_and_clear() -> Result {
     // (HaloScript without a mission says why)
     run(&engine, "watch (+ 1 2)")?;
     assert!(!engine.watch_values()[2].ok);
-    assert_eq!(json(&run(&engine, "watch")?)?.as_array().map(Vec::len), Some(3));
+    assert_eq!(
+        json(&run(&engine, "watch")?)?.as_array().map(Vec::len),
+        Some(3)
+    );
 
     run(&engine, "unwatch noclip")?;
     assert!(refused(&engine, "unwatch noclip")?.contains("not watched"));
@@ -383,5 +386,39 @@ fn the_watch_line_runs_halo_script_in_a_mission() -> Result {
     run(&engine, "watch (+ 1 2)")?;
     let values = engine.watch_values();
     assert_eq!((values[0].ok, values[0].value.as_str()), (true, "3"));
+    Ok(())
+}
+
+/// The lines the newest frame holds (read as the app reads it).
+#[allow(unsafe_code)]
+fn debug_lines(engine: &Engine) -> u32 {
+    let buffers = engine.snapshot_buffers() as *const opence_ffi::snapshot::SnapshotBuffers;
+    // SAFETY: the engine is alive and this test is its only reader.
+    unsafe { (*opence_ffi::snapshot::opence_snapshot_acquire(buffers)).debug_line_count }
+}
+
+#[test]
+fn the_world_layers_over_bloodgulch() -> Result {
+    let Some(level) = bloodgulch() else {
+        return Ok(());
+    };
+    let engine = Engine::new();
+    engine.start_level(level, 2)?;
+    engine.spawn_player(0)?;
+    engine.step()?;
+    assert_eq!(debug_lines(&engine), 0);
+    let mut seen = 0;
+    for layer in ["collision", "markers", "bodies"] {
+        run(&engine, &format!("set debug.draw.{layer} true"))?;
+        engine.step()?;
+        let lines = debug_lines(&engine);
+        assert!(lines > seen, "{layer}: {lines} lines");
+        seen = lines;
+    }
+    for layer in ["collision", "markers", "bodies"] {
+        run(&engine, &format!("set debug.draw.{layer} false"))?;
+    }
+    engine.step()?;
+    assert_eq!(debug_lines(&engine), 0);
     Ok(())
 }

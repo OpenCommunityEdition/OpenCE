@@ -31,6 +31,12 @@ public func checkSnapshotLayout() throws {
         ("ObjectSnapshot.bounding_radius", layout.objectBoundingRadiusOffset, MemoryLayout<OCEObjectSnapshot>.offset(of: \.bounding_radius)),
         ("Transform size", layout.transformSize, MemoryLayout<OCETransform>.size),
         ("NodeSnapshot size", layout.nodeSize, MemoryLayout<OCENodeSnapshot>.size),
+        ("FrameSnapshot.debug_lines", layout.frameDebugLinesOffset,
+         MemoryLayout<OCEFrameSnapshot>.offset(of: \.debug_lines)),
+        ("FrameSnapshot.debug_labels", layout.frameDebugLabelsOffset,
+         MemoryLayout<OCEFrameSnapshot>.offset(of: \.debug_labels)),
+        ("DebugLine size", layout.debugLineSize, MemoryLayout<OCEDebugLine>.size),
+        ("DebugLabel size", layout.debugLabelSize, MemoryLayout<OCEDebugLabel>.size),
     ]
     for (field, library, header) in checks where Int(library) != header {
         throw SnapshotLayoutMismatch(field: field, library: Int(library), header: header ?? -1)
@@ -52,6 +58,14 @@ public struct FrameView {
     /// `first_node`.
     public var nodes: UnsafeBufferPointer<OCENodeSnapshot> {
         UnsafeBufferPointer(start: pointer.pointee.nodes, count: Int(pointer.pointee.node_count))
+    }
+    /// The debug lines.
+    public var debugLines: UnsafeBufferPointer<OCEDebugLine> {
+        UnsafeBufferPointer(start: pointer.pointee.debug_lines, count: Int(pointer.pointee.debug_line_count))
+    }
+    /// The debug labels.
+    public var debugLabels: UnsafeBufferPointer<OCEDebugLabel> {
+        UnsafeBufferPointer(start: pointer.pointee.debug_labels, count: Int(pointer.pointee.debug_label_count))
     }
     /// One object's nodes.
     public func nodes(of object: OCEObjectSnapshot) -> UnsafeBufferPointer<OCENodeSnapshot> {

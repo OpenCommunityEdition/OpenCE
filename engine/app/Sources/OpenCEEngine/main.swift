@@ -531,9 +531,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let camera = ViewCamera(frame.camera, alpha: frame.alpha)
         let objects = frame.drawnObjects()
         let hudQuads = engine.hud(width: UInt32(width), height: UInt32(height))
+        let debugLines = frame.debugSegments()
+        // (the labels under the shell)
+        var labels: [TextItem] = []
+        if let textPass, frame.debugLabels.count > 0 {
+            labels = DebugPass.labels(frame.debugMarks(),
+                                      viewProjection: camera.viewProjection(aspect: Float(width) / Float(max(height, 1))),
+                                      width: width, height: height, cellWidth: textPass.atlas.cellWidth,
+                                      cellHeight: textPass.atlas.cellHeight)
+        }
         controller.window.engineView.render { commands, target in
-            renderer.encode(into: commands, target: target, camera: camera, objects: objects, hudQuads: hudQuads)
-            self.textPass?.encode(text, into: commands, target: target)
+            renderer.encode(into: commands, target: target, camera: camera, objects: objects, hudQuads: hudQuads,
+                            debugLines: debugLines)
+            self.textPass?.encode(labels + text, into: commands, target: target)
         }
     }
 }

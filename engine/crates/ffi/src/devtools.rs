@@ -6,6 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use opence_content::{Group, ObjectKind, TagRef};
+use opence_dev::draw::{Color, DebugDraw, Layer};
 use opence_dev::{ArgKind, Args, CommandError, Data, Output, Param, Registry, VarKind, VarValue};
 use opence_sim::damage::{Invulnerable, Vitality};
 use opence_sim::objects::{ObjectHandle, ObjectName, ObjectSpawn};
@@ -101,6 +102,12 @@ pub(crate) struct Shell {
     pub action: ShellAction,
     /// The watch line's expressions: variables or HaloScript.
     pub watches: Vec<String>,
+    /// The shapes the commands and systems draw.
+    pub draw: DebugDraw,
+    /// The world layers' shapes, drawn again at each publish.
+    pub scene: DebugDraw,
+    /// The structure BSP the world plays in (without a mission).
+    pub bsp: usize,
 }
 
 impl Default for Shell {
@@ -111,12 +118,15 @@ impl Default for Shell {
             maps_folder: None,
             action: ShellAction::None,
             watches: Vec::new(),
+            draw: DebugDraw::new(),
+            scene: DebugDraw::new(),
+            bsp: 0,
         }
     }
 }
 
-// (the drawing and debugging switches the app reads)
-const VARIABLES: [(&str, &str, bool, bool); 6] = [
+// (the drawing switches the app reads)
+const VARIABLES: [(&str, &str, bool, bool); 4] = [
     (
         "render.wireframe",
         "Draws the level and objects as lines.",
@@ -131,19 +141,38 @@ const VARIABLES: [(&str, &str, bool, bool); 6] = [
     ),
     ("render.objects", "Draws the objects.", true, false),
     ("render.hud", "Draws the HUD.", true, true),
-    (
-        "debug.draw.collision",
-        "Draws the level's collision.",
-        false,
-        false,
-    ),
-    (
-        "debug.draw.markers",
-        "Draws the objects' markers.",
-        false,
-        false,
-    ),
 ];
+
+// (the debug drawing's layers: `debug.draw.<layer>`)
+const LAYERS: [(Layer, &str); 8] = [
+    (
+        Layer::General,
+        "Draws the shapes the commands and systems draw.",
+    ),
+    (
+        Layer::Collision,
+        "Draws the level's collision near the camera.",
+    ),
+    (Layer::Bodies, "Draws the objects' bounding spheres."),
+    (Layer::Ai, "Draws the AI's firing positions and paths."),
+    (Layer::Triggers, "Draws the trigger volumes."),
+    (Layer::Markers, "Draws the objects' axes."),
+    (Layer::Lights, "Draws the lights."),
+    (Layer::Sounds, "Draws the sounds."),
+];
+
+/// The prefix of the debug drawing's variables.
+const DRAW_PREFIX: &str = "debug.draw.";
+
+/// Turns a layer on or off when its variable changes.
+fn draw_layer(state: &mut State, name: &str, value: &VarValue) {
+    let Some(layer) = name.strip_prefix(DRAW_PREFIX).and_then(Layer::named) else {
+        return;
+    };
+    let on = matches!(value, VarValue::Bool(true));
+    state.shell.draw.set_layer(layer, on);
+    state.shell.scene.set_layer(layer, on);
+}
 
 /// The registry with the engine's commands and variables.
 pub(crate) fn registry() -> Registry<State> {
@@ -274,6 +303,69 @@ pub(crate) fn registry() -> Registry<State> {
     for (name, help, default, saved) in VARIABLES {
         registry.variable(name, help, VarKind::Bool, VarValue::Bool(default), saved);
     }
+    for (layer, help) in LAYERS {
+        let name = format!("{DRAW_PREFIX}{}", layer.name());
+        let on = DebugDraw::new().is_on(layer);
+        registry.variable(&name, help, VarKind::Bool, VarValue::Bool(on), false);
+    }
+    registry.listen(draw_layer);
+    registry.command(
+        "debug_line",
+        "Draws a line from x y z to x y z, for some ticks (one second).",
+        &[
+            Param::required("x0", ArgKind::Float),
+            Param::required("y0", ArgKind::Float),
+            Param::required("z0", ArgKind::Float),
+            Param::required("x1", ArgKind::Float),
+            Param::required("y1", ArgKind::Float),
+            Param::required("z1", ArgKind::Float),
+            Param::optional("ticks", ArgKind::Int),
+        ],
+        debug_line,
+    );
+    registry.command(
+        "debug_box",
+        "Draws a box from x y z to x y z, for some ticks (one second).",
+        &[
+            Param::required("x0", ArgKind::Float),
+            Param::required("y0", ArgKind::Float),
+            Param::required("z0", ArgKind::Float),
+            Param::required("x1", ArgKind::Float),
+            Param::required("y1", ArgKind::Float),
+            Param::required("z1", ArgKind::Float),
+            Param::optional("ticks", ArgKind::Int),
+        ],
+        debug_box,
+    );
+    registry.command(
+        "debug_sphere",
+        "Draws a sphere at x y z of a radius, for some ticks (one second).",
+        &[
+            Param::required("x", ArgKind::Float),
+            Param::required("y", ArgKind::Float),
+            Param::required("z", ArgKind::Float),
+            Param::required("radius", ArgKind::Float),
+            Param::optional("ticks", ArgKind::Int),
+        ],
+        debug_sphere,
+    );
+    registry.command(
+        "debug_text",
+        "Draws text at x y z, for a second.",
+        &[
+            Param::required("x", ArgKind::Float),
+            Param::required("y", ArgKind::Float),
+            Param::required("z", ArgKind::Float),
+            Param::required("text", ArgKind::Rest),
+        ],
+        debug_text,
+    );
+    registry.command(
+        "debug_clear",
+        "Removes the shapes the commands and systems drew.",
+        &[],
+        debug_clear,
+    );
     registry.fallback(halo_script);
     registry
 }
@@ -434,6 +526,7 @@ fn bsp(state: &mut State, args: &Args) -> Result<Output, CommandError> {
         .simulation
         .switch_bsp(&level, bsp)
         .map_err(|error| failed(error.to_string()))?;
+    state.shell.bsp = bsp;
     let bsp = u32::try_from(bsp).unwrap_or(0);
     state.shell.action = ShellAction::ReloadBsp { bsp };
     Ok(Output::with_data(
@@ -965,6 +1058,94 @@ fn clear(_: &mut State, _: &Args) -> Result<Output, CommandError> {
 fn quit(state: &mut State, _: &Args) -> Result<Output, CommandError> {
     state.shell.action = ShellAction::Quit;
     Ok(Output::text("quitting"))
+}
+
+/// The ticks a debug shape lasts unless told (a second).
+const DEBUG_TICKS: i64 = 30;
+
+/// The most ticks a debug shape lasts (ten minutes).
+const MAX_DEBUG_TICKS: i64 = 18_000;
+
+fn point(args: &Args, names: [&str; 3]) -> Result<[f32; 3], CommandError> {
+    let mut point = [0.0; 3];
+    for (at, name) in point.iter_mut().zip(names) {
+        #[allow(clippy::cast_possible_truncation)]
+        let value = args.float(name)? as f32;
+        if !value.is_finite() {
+            return Err(failed(format!("{name} is not a number")));
+        }
+        *at = value;
+    }
+    Ok(point)
+}
+
+fn debug_ticks(args: &Args) -> Result<u32, CommandError> {
+    let ticks = args.int_or("ticks", DEBUG_TICKS)?;
+    u32::try_from(ticks.clamp(1, MAX_DEBUG_TICKS)).map_err(|_| failed("too many ticks"))
+}
+
+fn drawn(state: &State, what: &str) -> Output {
+    Output::with_data(
+        format!("{what} drawn"),
+        json!({ "lines": state.shell.draw.lines().len(), "labels": state.shell.draw.labels().len() }),
+    )
+}
+
+fn debug_line(state: &mut State, args: &Args) -> Result<Output, CommandError> {
+    let from = point(args, ["x0", "y0", "z0"])?;
+    let to = point(args, ["x1", "y1", "z1"])?;
+    let ticks = debug_ticks(args)?;
+    state
+        .shell
+        .draw
+        .line(Layer::General, from, to, Color::WHITE, ticks);
+    Ok(drawn(state, "line"))
+}
+
+fn debug_box(state: &mut State, args: &Args) -> Result<Output, CommandError> {
+    let from = point(args, ["x0", "y0", "z0"])?;
+    let to = point(args, ["x1", "y1", "z1"])?;
+    let min = [from[0].min(to[0]), from[1].min(to[1]), from[2].min(to[2])];
+    let max = [from[0].max(to[0]), from[1].max(to[1]), from[2].max(to[2])];
+    let ticks = debug_ticks(args)?;
+    state
+        .shell
+        .draw
+        .bounds(Layer::General, min, max, Color::WHITE, ticks);
+    Ok(drawn(state, "box"))
+}
+
+fn debug_sphere(state: &mut State, args: &Args) -> Result<Output, CommandError> {
+    let center = point(args, ["x", "y", "z"])?;
+    #[allow(clippy::cast_possible_truncation)]
+    let radius = args.float("radius")? as f32;
+    if !(radius.is_finite() && radius > 0.0) {
+        return Err(failed("the radius must be above 0"));
+    }
+    let ticks = debug_ticks(args)?;
+    state
+        .shell
+        .draw
+        .sphere(Layer::General, center, radius, Color::WHITE, ticks);
+    Ok(drawn(state, "sphere"))
+}
+
+fn debug_text(state: &mut State, args: &Args) -> Result<Output, CommandError> {
+    let at = point(args, ["x", "y", "z"])?;
+    let text = args.string("text")?;
+    state.shell.draw.text(
+        Layer::General,
+        at,
+        text,
+        Color::WHITE,
+        u32::try_from(DEBUG_TICKS).unwrap_or(1),
+    );
+    Ok(drawn(state, "text"))
+}
+
+fn debug_clear(state: &mut State, _: &Args) -> Result<Output, CommandError> {
+    state.shell.draw.clear();
+    Ok(drawn(state, "nothing"))
 }
 
 /// HaloScript, run by the mission's scripts.

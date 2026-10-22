@@ -175,6 +175,8 @@ public final class LevelRenderer {
 
     /// What draws the HUD (without it, the HUD's quads are not drawn).
     public var hud: HudPass?
+    /// The debug lines' pass.
+    public let debug: DebugPass
 
     /// The level's fog (none without a sky), for tests.
     public var fog: RenderFog? { sky?.fog }
@@ -294,6 +296,7 @@ public final class LevelRenderer {
         } catch {
             throw LevelRendererError.shaders("\(error)")
         }
+        debug = try DebugPass(device: device, colorFormat: Self.frameFormat, depthFormat: Self.depthFormat)
         models = try ModelPass(device: device, library: library, geometry: geometry, textures: textures, white: white)
         sky = geometry.sky()
 
@@ -331,9 +334,9 @@ public final class LevelRenderer {
     static let blendFunctions: [BlendFunction] = [.alphaBlend, .multiply, .doubleMultiply, .add]
 
     /// Draws the level and `objects` from `camera` into `target` (of
-    /// `outputFormat`), and `hudQuads` over them.
+    /// `outputFormat`), `debugLines` in the world, and `hudQuads` over them.
     public func encode(into commands: MTLCommandBuffer, target: MTLTexture, camera: ViewCamera,
-                       objects: [DrawnObject] = [], hudQuads: [HudQuad] = []) {
+                       objects: [DrawnObject] = [], hudQuads: [HudQuad] = [], debugLines: [DebugSegment] = []) {
         let aspect = Float(target.width) / Float(max(target.height, 1))
         let viewProjection = camera.viewProjection(aspect: aspect)
         let shown: MTLTexture
@@ -343,7 +346,7 @@ public final class LevelRenderer {
             let jittered = Jitter.apply(jitter, to: viewProjection, width: temporal.inputWidth,
                                         height: temporal.inputHeight)
             drawLevel(into: commands, frame: temporal.color, depth: temporal.depth, keepDepth: true,
-                      viewProjection: jittered, camera: camera, objects: objects)
+                      viewProjection: jittered, camera: camera, objects: objects, debugLines: debugLines)
             var uniforms = temporal.motionUniforms(current: viewProjection)
             let motionPass = MTLRenderPassDescriptor()
             motionPass.colorAttachments[0].texture = temporal.motion
@@ -362,7 +365,7 @@ public final class LevelRenderer {
         } else {
             guard let (frame, depth) = targets(width: target.width, height: target.height) else { return }
             drawLevel(into: commands, frame: frame, depth: depth, keepDepth: false, viewProjection: viewProjection,
-                      camera: camera, objects: objects)
+                      camera: camera, objects: objects, debugLines: debugLines)
             lastInputSize = (target.width, target.height)
             shown = frame
         }
@@ -383,7 +386,8 @@ public final class LevelRenderer {
     /// The level's opaque draws and the objects' then the blended ones of
     /// both into `frame`.
     private func drawLevel(into commands: MTLCommandBuffer, frame: MTLTexture, depth: MTLTexture, keepDepth: Bool,
-                           viewProjection: simd_float4x4, camera: ViewCamera, objects: [DrawnObject]) {
+                           viewProjection: simd_float4x4, camera: ViewCamera, objects: [DrawnObject],
+                           debugLines: [DebugSegment]) {
         let skyObject = sky?.model.map { model in
             DrawnObject(model: Int(model), transform: simd_float4x4(translation: camera.position),
                         center: camera.position, radius: 1, regions: [], nodes: [])
@@ -431,6 +435,12 @@ public final class LevelRenderer {
             encode(draw, encoder)
         }
         models.encode(prepared, blendedParts: true, into: encoder)
+        // the debug lines, hidden by what is nearer (and the buffers they took back)
+        debug.encode(debugLines, viewProjection: viewProjection, into: encoder)
+        if debug.lastDrawn > 0 {
+            encoder.setVertexBuffer(vertices, offset: 0, index: 0)
+            encoder.setVertexBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
+        }
         // the first-person weapon and hands over the world: in the nearer
         // half of the depth range (reversed: 0.5 to 1), which the world
         // reaches only nearer the eye than twice the near plane

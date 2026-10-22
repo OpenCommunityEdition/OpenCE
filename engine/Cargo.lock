@@ -910,6 +910,7 @@ dependencies = [
 name = "opence_dev"
 version = "0.1.0"
 dependencies = [
+ "libm",
  "log",
  "serde_json",
  "thiserror",

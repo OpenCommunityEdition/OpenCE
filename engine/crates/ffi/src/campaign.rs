@@ -105,6 +105,11 @@ impl Campaign {
         })
     }
 
+    /// The structure the mission plays in.
+    pub(crate) fn bsp(&self) -> usize {
+        usize::try_from(self.scripts.mission().flow().bsp).unwrap_or(0)
+    }
+
     fn state(&self) -> CampaignState {
         let mission = self.scripts.mission();
         let flow = mission.flow();
