@@ -40,7 +40,7 @@
 - [x] Task: Sun shadows 3970a29c
     - [x] Write tests: cascade splits and their stable snapping
     - [x] Cascaded shadow maps for objects, matched to the baked shadows
-- [~] Task: Dynamic lights
+- [x] Task: Dynamic lights 2c8c92a7
     - [ ] Write tests: `ligh` tag fields and functions; cluster culling assigns each light to the right cells; the shadowed lights are the nearest
     - [ ] Lights from weapons, projectiles, effects, the flashlight and scenery in the snapshot; clustered shading; spot and cube shadows
 - [ ] Task: Screen-space effects
