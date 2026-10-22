@@ -240,7 +240,18 @@ own, plays too; version 32 sends the host's mouse aim assist policy
 ignore, and has a client's input say whether its player plays co-op with
 friendly fire; version 33 sends with the game's settings whether co-op's
 players hurt their AI allies (Server Setup's ALLY FRIENDLY FIRE: the host
-then deals the players' hits of them no damage).
+then deals the players' hits of them no damage); version 34 takes clients'
+hits on, and sends the host's damage to, the map's scenery and devices
+whose shield is all damage can break (Rat Race's energy shields, a Custom
+Edition map's tripmines), which version 17 left out as having no body to
+destroy, and has every machine run those shields' stun and recharge itself;
+and the host deals what such an object deals itself (its shield or body
+breaking: a tripmine a client's player threw going off under the host's
+vehicle), which a client no longer reports and the host took from no one.
+One made in the game, a tripmine, is at an index of its own on each machine:
+the host takes a client's hit on its copy as one on the host's nearest where
+the client had it, and a client the host's damage to one as damage to its
+own copy nearest the damage.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
