@@ -619,6 +619,31 @@ static boolean hardcore_views_death_camera(
 	return TRUE;
 }
 
+/* the stock unzoomed view, narrowed by this unit's zoom the way a
+local scope is. display.fov still applies on top */
+static real hardcore_views_field_of_view(
+	long unit_index)
+{
+	real field_of_view;
+	short zoom_level;
+	real magnification;
+	real zoomed;
+
+	field_of_view = DEGREES_TO_RADIANS(80.0f);
+	if (unit_index == NONE)
+		return field_of_view;
+	zoom_level = unit_get_zoom_level(unit_index);
+	if (zoom_level == NONE)
+		return field_of_view;
+	magnification = unit_get_zoom_magnification(unit_index, zoom_level);
+	if (!(magnification > 0.0f) || magnification == 1.0f)
+		return field_of_view;
+	zoomed = field_of_view / magnification;
+	if (zoomed > _pi / 100.0f && zoomed < _pi - _pi / 100.0f)
+		return zoomed;
+	return field_of_view;
+}
+
 boolean hardcore_views_camera(short window_index, struct observer_result *result)
 {
 	long player_index;
@@ -657,9 +682,7 @@ boolean hardcore_views_camera(short window_index, struct observer_result *result
 			forward = object->object.forward;
 		result->forward = forward;
 		observer_up_from_forward(&result->forward, &result->up);
-		/* the stock unzoomed view. display.fov still applies, and the local
-		player's own zoom does not */
-		result->field_of_view = DEGREES_TO_RADIANS(80.0f);
+		result->field_of_view = hardcore_views_field_of_view(unit_index);
 		hardcore_views_smooth(window_index, result);
 		/* the listener and the wall test need the cluster this view is in.
 		the pose above leaves that at the zero cluster */
@@ -700,9 +723,9 @@ void hardcore_views_begin(short window_index)
 	/* the HUD and the first-person weapon look up a local player. the
 	slot is one only while this pane draws, and it is not a listener.
 	the weapon pose stays on the slot, so the next frame continues it.
-	the pane's camera stays the unzoomed view, so this slot must not
-	report the teammate's zoom. a dead body stays visible: the death
-	camera is looking at it, and it has no first-person weapon */
+	the slot reports the teammate's zoom so the scope is drawn and the
+	gun is put away. a dead body stays visible: the death camera is
+	looking at it, and it has no first-person weapon */
 	local_player_set_player_index(slot, player_index);
 	player_control_new_unit(slot, NONE);
 	unit_index = view_unit[window_index];
@@ -710,6 +733,7 @@ void hardcore_views_begin(short window_index)
 		first_person_weapon_observe_clear(slot);
 	else
 	{
+		player_control_port_set_zoom_level(slot, unit_get_zoom_level(unit_index));
 		first_person_weapon_observe_unit(slot, unit_index);
 		hud_weapon_port_update_player(slot);
 		view_hiding = TRUE;

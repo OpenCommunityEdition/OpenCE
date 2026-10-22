@@ -896,6 +896,16 @@ short player_control_get_zoom_level(
 	return zoom_level;
 }
 
+/* port: the slot does not control the unit. the scope and the hidden
+gun read this while the pane draws, and the pane clears it after */
+void player_control_port_set_zoom_level(
+	short local_player_index,
+	short zoom_level)
+{
+	if (local_player_index >= 0 && local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+		player_control_get(local_player_index)->zoom_level = zoom_level;
+}
+
 real player_control_get_autoaim_level(
 	short local_player_index)
 {
