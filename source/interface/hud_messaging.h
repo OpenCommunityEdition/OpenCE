@@ -94,6 +94,8 @@ void hud_broadcast_team_message(
 	wchar_t const *message);
 void hud_messaging_update(
 	short local_player_index);
+void hud_messaging_draw_state(
+	short local_player_index);
 void hud_set_state_message(
 	short local_player_index,
 	short message_index);

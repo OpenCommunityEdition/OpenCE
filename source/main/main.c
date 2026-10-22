@@ -3350,8 +3350,8 @@ static void main_game_render(
 		}
 		else if (hardcore_views_is_teammate_window((short)window_index))
 		{
-			/* port: a dead teammate keeps the pane, so the split and this
-			   machine's choice of pane stay for the match */
+			/* port: a dead teammate keeps the pane on the death camera, so
+			   the split and this machine's choice of pane stay for the match */
 			if (hardcore_views_camera((short)window_index, &teammate_view))
 			{
 				window->local_player_index = hardcore_views_hud_slot();

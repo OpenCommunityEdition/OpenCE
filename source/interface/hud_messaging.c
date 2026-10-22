@@ -146,6 +146,7 @@ symbols in this file:
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "hardcore_views.h" /* port: teammate panes use the split-screen font */
 
 #include <stddef.h>
 
@@ -1213,7 +1214,7 @@ void scripted_hud_messages_clear(
 long hud_get_font_index(
 	void)
 {
-	if (local_player_count() > 1 &&
+	if ((local_player_count() > 1 || hardcore_views_split()) &&
 		hud_msg_def->multi_player_font.index != NONE)
 	{
 		return hud_msg_def->multi_player_font.index;
@@ -1374,15 +1375,17 @@ static long compare_messages(
 	return difference;
 }
 
-void hud_messaging_update(
-	short local_player_index)
+static void hud_messaging_draw(
+	short local_player_index,
+	boolean state_only)
 {
 	if (!cinematic_in_progress() &&
 		local_player_index != NONE &&
 		game_engine_hud_draw_messages(local_player_get_player_index(local_player_index)))
 	{
 		long font_index = hud_get_font_index();
-		boolean split_screen = local_player_count() > 1;
+		boolean split_screen = local_player_count() > 1 ||
+			hardcore_views_split();
 		point2d screen_point;
 		struct font_header *font;
 		short line_top;
@@ -1400,7 +1403,7 @@ void hud_messaging_update(
 			&hud_msg_def->absolute_placement,
 			&hud_msg_def->placement,
 			NULL,
-			local_player_count() > 1,
+			split_screen,
 			0.0f,
 			&screen_point);
 		line_top = screen_point.y;
@@ -1418,13 +1421,20 @@ void hud_messaging_update(
 		}
 		first_line_height = line_height;
 		datum = &hud_messaging_globals->message_data[render.local_player_index];
-		maximum_message_count = 4 - (local_player_count() > 1);
+		maximum_message_count = (short)(4 - split_screen);
 		objective_active = hud_messaging_globals->objective.message &&
 			hud_messaging_globals->objective.uptime;
 		help_active = hud_scripted_globals->show_hud_help_text &&
 			hud_messaging_globals->help_message;
 		state_active = datum->state_message.valid &&
 			(datum->state_message.state_message || datum->state_message.message_buffer[0]);
+		/* port: a dead teammate pane draws only the respawn line. the
+		objective timer and this machine's messages stay on its pane */
+		if (state_only)
+		{
+			objective_active = FALSE;
+			help_active = FALSE;
+		}
 
 		if (objective_active || help_active || state_active)
 		{
@@ -1835,6 +1845,8 @@ void hud_messaging_update(
 			maximum_message_count--;
 		}
 
+		if (!state_only)
+		{
 		qsort(
 			datum->messages,
 			NUMBEROF(datum->messages),
@@ -1941,7 +1953,21 @@ void hud_messaging_update(
 			if (!message->valid)
 				message->time = NONE;
 		}
+		}
 	}
 
 	return;
+}
+
+void hud_messaging_update(
+	short local_player_index)
+{
+	hud_messaging_draw(local_player_index, FALSE);
+}
+
+/* port: the respawn line on a dead teammate's pane */
+void hud_messaging_draw_state(
+	short local_player_index)
+{
+	hud_messaging_draw(local_player_index, TRUE);
 }

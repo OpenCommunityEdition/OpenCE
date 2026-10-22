@@ -1478,6 +1478,12 @@ void hud_draw_screen(
 	if (player_index != NONE)
 	{
 		struct player_datum *player = player_get(player_index);
+		struct object_datum *body = player->unit_index == NONE
+			? NULL
+			: object_try_and_get(player->unit_index);
+		/* port: a teammate's corpse is the death camera, not their weapon */
+		boolean unit_dead = !body ||
+			TEST_FLAG(body->object.damage_flags, _object_dead_bit);
 
 		if ((!game_engine_running() || game_engine_display_team_indicators()) &&
 			!cinematic_in_progress())
@@ -1513,7 +1519,8 @@ void hud_draw_screen(
 			if ((teammate_pane ||
 				(perspective != _director_perspective_neutral &&
 					perspective != _director_perspective_scripted)) &&
-				player->unit_index != NONE)
+				player->unit_index != NONE &&
+				!(teammate_pane && unit_dead))
 			{
 				hud_render_weapon_interface(player);
 				if (!teammate_pane)
@@ -1528,10 +1535,11 @@ void hud_draw_screen(
 					hud_render_damage_indicators(render.local_player_index);
 				}
 			}
-			else
+			else if (!(teammate_pane && unit_dead && player->unit_index != NONE))
 			{
 				hud_show_action_response(player_index);
-				hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
+				if (!teammate_pane)
+					hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
 			}
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
 			performance_options_render();
@@ -1542,12 +1550,15 @@ void hud_draw_screen(
 			hud_play_unit_sounds(player, FALSE);
 		}
 
-		/* port: messages and chat stay on the local pane */
+		/* port: messages and chat stay on the local pane. a dead
+		teammate pane still draws that player's respawn line */
 		if (!teammate_pane)
 		{
 			hud_messaging_update(render.local_player_index);
 			network_chat_draw(render.local_player_index);
 		}
+		else if (player->unit_index == NONE)
+			hud_messaging_draw_state(render.local_player_index);
 	}
 
 	rasterizer_hud_end();

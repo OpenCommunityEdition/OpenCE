@@ -650,8 +650,8 @@ void render_frame(
 		{
 			/* port: before the local-player branch. the pane borrows a HUD
 			slot, so local_player_index is set, and this still has to run.
-			a dead teammate, or the single postgame window, has none: that
-			pane stays clear. a camera at the origin is not an empty pane */
+			a player who has left, or the single postgame window, has none:
+			that pane stays clear. a dead teammate keeps the death camera */
 			hardcore_views_begin((short)window_index);
 			render_player_frame(window, NULL);
 			hardcore_views_end();
