@@ -55,9 +55,9 @@
 - [x] Task: Level decals 0d2368c6
     - [x] Write tests: the scenario's decal placements import with their shader and layer
     - [x] Level decals drawn in their layers
-- [ ] Task: Dynamic decals
-    - [ ] Write tests: lifetime, fade, size range, chained decals and recycling at the limit
-    - [ ] Deferred decals on the level and objects, placed by impacts and explosions
+- [x] Task: Dynamic decals 8d9da30a
+    - [x] Write tests: lifetime, fade, size range, chained decals and recycling at the limit
+    - [x] Deferred decals on the level and objects, placed by impacts and explosions
 - [ ] Task: Effects
     - [ ] Write tests: an effect's events and parts fire at their times and markers; impacts choose the effect by material
     - [ ] The effect system in `sim`: triggers from weapons, projectiles, explosions, scenery and vehicles; the effect parts in the snapshot
