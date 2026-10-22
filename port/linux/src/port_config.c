@@ -197,6 +197,16 @@ static const struct config_setting config_settings[] =
 		"screen's top right, with bars (the host: its slowest player's), and\n"
 		"\"Connection problem\" when the host has sent nothing for two seconds;\n"
 		"the scoreboard's pings in the same colours, as this machine times them." },
+	{ "display.subtitles", _config_boolean, "true", "HALO_SUBTITLES", _environment_value, _platform_all,
+		"Show subtitles at the bottom of the screen for the sound tags that the\n"
+		"subtitles file names (display.subtitles_file), while they play. Nothing is\n"
+		"shown without the file. Also Video Setup, Extra Effects in the menus." },
+	{ "display.subtitles_file", _config_string, "\"subtitles.txt\"", "HALO_SUBTITLES_FILE", _environment_value,
+		_platform_all,
+		"The subtitles: a text file with a line for each sound tag, the tag's path\n"
+		"and the text, such as  \"sound/a10/a10\" - \"Chief, get down!\"  (a path\n"
+		"ending in /* is every tag below it; \\n starts a new line; # starts a\n"
+		"comment). Read again when the settings change." },
 	{ "display.per_pixel_lighting", _config_boolean, "false", "HALO_PER_PIXEL_LIGHTING", _environment_value,
 		_platform_all,
 		"Light the models (characters, weapons, vehicles, scenery) for each\n"

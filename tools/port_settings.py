@@ -118,6 +118,8 @@ SCREENS = {
              "Keep the light of explosions, plasma and the sun\npast white, and roll it off instead of clipping.", None),
             ("HDR DISPLAY:", "display.hdr_output", ON_OFF,
              "With HDR, on an HDR display, show that light\nbrighter than white. From the next start.", "desktop"),
+            ("SUBTITLES:", "display.subtitles", ON_OFF,
+             "Subtitles at the bottom of the screen for the\nsound tags named in subtitles.txt. Off: none.", None),
         ],
     },
     "mouse_settings": {
@@ -225,7 +227,7 @@ _graphics = {"display.high_res_hud", "display.hud_button_style", "display.high_r
              "display.model_detail"}
 # (the visual modifiers: a screen of their own, Extra Effects)
 _extra_effects = {"display.shield_glow", "display.shield_glow_intensity",
-                  "display.overshield_effect", "display.hdr", "display.hdr_output"}
+                  "display.overshield_effect", "display.hdr", "display.hdr_output", "display.subtitles"}
 SCREENS["video_settings/graphics"] = {
     "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 30,
     "same_place": ["anti_aliasing_android"],
@@ -241,7 +243,7 @@ _video["categories"] = [
     ("FOV AND VIEWMODELS:", "video_settings/fov_viewmodels",
      "The field of view and the first-person\nweapon. Their defaults keep the stock view."),
     ("EXTRA EFFECTS:", "video_settings/extra_effects",
-     "Visual modifiers the stock game does not\nhave, such as the shield glow."),
+     "Visual modifiers the stock game does not\nhave, such as the shield glow and subtitles."),
 ]
 SCREENS["video_settings/fov_viewmodels"] = {
     "screen": "fov_viewmodel_settings_screen", "header": _video["header"], "spacing": 30,
