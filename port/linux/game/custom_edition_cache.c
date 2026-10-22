@@ -596,6 +596,14 @@ static void custom_edition_behaviours_log(
 	{
 		if (!((behaviours >> behaviour) & 1))
 			continue;
+		if (behaviour == _custom_edition_behaviour_gearbox_meters ||
+			behaviour == _custom_edition_behaviour_old_widescreen_fix)
+		{
+			error(_error_silent,
+				"custom edition: relies on Halo PC's %s (Chimera's map list), partially supported (HUD tint/warning placement)",
+				custom_edition_behaviour_name(behaviour));
+			continue;
+		}
 		error(
 			_error_silent,
 			(FOLLOWED_BEHAVIOURS >> behaviour) & 1 ?
@@ -742,7 +750,7 @@ static boolean custom_edition_cache_tags_convert(
 
 	return custom_edition_cache_tags_validate(tag_cache, report) &&
 		custom_edition_bitmaps_verify(tag_cache, loaded_bytes) &&
-		custom_edition_reordered_bitmaps_find(tag_cache, loaded_bytes) &&
+		custom_edition_reordered_bitmaps_find(tag_cache, loaded_bytes, custom_edition_cache_globals.behaviours) &&
 		custom_edition_scripts_convert(tag_cache, loaded_bytes) &&
 		custom_edition_cache_models_convert(tag_cache, report);
 }
@@ -1271,6 +1279,12 @@ void custom_edition_cache_tags_unload(
 	custom_edition_cache_globals.loaded_bytes = 0;
 
 	return;
+}
+
+struct resource_map const *custom_edition_cache_bitmap_resources(void)
+{
+	return custom_edition_cache_tags_loaded() ?
+		custom_edition_cache_globals.resource_maps[_resource_map_bitmaps] : NULL;
 }
 
 void custom_edition_cache_read(

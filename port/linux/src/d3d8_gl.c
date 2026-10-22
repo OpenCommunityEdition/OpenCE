@@ -3883,6 +3883,7 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 			{
 				key->coverage_alpha = description.hires_coverage != FALSE;
 				key->point_threshold = description.hires_point_threshold != FALSE;
+				key->ce_meter_channels = description.ce_meter_channels != FALSE;
 			}
 			key->sampler_type[stage] = gl_target == GL_TEXTURE_CUBE_MAP ? _xgpu_sampler_cube :
 				gl_target == GL_TEXTURE_3D ? _xgpu_sampler_3d : _xgpu_sampler_2d;
