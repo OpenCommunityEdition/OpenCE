@@ -1,7 +1,7 @@
 # Plan: Lighting, shaders, decals and effects drawn
 
 ## Phase 1: Why some maps are flat, and the shader model
-- [ ] Task: Find why some maps are drawn flat
+- [x] Task: Find why some maps are drawn flat fbf93785
     - [ ] Write tests: every stock BSP's lightmap pages import with non-zero texels, and each lit surface has a lightmap index and coordinates (marked, needs `assets/maps`)
     - [ ] Fix the cause in the importer (lightmap page formats, missing pages, surfaces without lightmap coordinates) or the renderer
 - [ ] Task: The material model
