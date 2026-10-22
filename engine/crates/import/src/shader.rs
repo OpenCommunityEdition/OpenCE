@@ -2,8 +2,8 @@
 //! their maps; the other classes by group alone, for now.
 
 use opence_content::{
-    ChicagoMap, EnvironmentShader, Group, ModelShaderClass, Shader, ShaderClass, SurfaceMaterial,
-    TransparentChicagoShader,
+    AnimatedColor, ChicagoMap, EnvironmentAnimation, EnvironmentShader, Group, ModelShaderClass,
+    Shader, ShaderClass, SurfaceMaterial, TextureAnimation, TransparentChicagoShader,
 };
 
 use crate::cache::Cache;
@@ -118,8 +118,10 @@ fn environment(
         material_color: color(shader, 0x10C, "material color")?,
         bump_scale: shader.f32(0x124, "bump map scale")?,
         bump_map: reached.bitmap(shader, 0x128, "bump map")?,
+        self_illumination_flags: shader.u16(0x180, "self-illumination flags")?,
         self_illumination_scale: shader.f32(0x250, "self-illumination map scale")?,
         self_illumination_map: reached.bitmap(shader, 0x254, "self-illumination map")?,
+        specular_flags: shader.u16(0x27C, "specular flags")?,
         specular_brightness: shader.f32(0x290, "specular brightness")?,
         specular_perpendicular_color: color(shader, 0x2A8, "specular perpendicular color")?,
         specular_parallel_color: color(shader, 0x2B4, "specular parallel color")?,
@@ -130,6 +132,42 @@ fn environment(
             .f32(0x2F4, "reflection perpendicular brightness")?,
         reflection_parallel_brightness: shader.f32(0x2F8, "reflection parallel brightness")?,
         reflection_cube_map: reached.bitmap(shader, 0x324, "reflection cube map")?,
+        animation: EnvironmentAnimation {
+            primary: animated_color(shader, 0x19C, "primary")?,
+            secondary: animated_color(shader, 0x1D8, "secondary")?,
+            plasma: animated_color(shader, 0x214, "plasma")?,
+            u: texture_animation(shader, 0x150, "u animation")?,
+            v: texture_animation(shader, 0x15C, "v animation")?,
+        },
+    })
+}
+
+/// A self-illumination colour: on and off colours, then a function, a
+/// period and a phase.
+fn animated_color(
+    shader: &Element<'_>,
+    at: usize,
+    field: &str,
+) -> Result<AnimatedColor, ImportError> {
+    Ok(AnimatedColor {
+        on_color: color(shader, at, field)?,
+        off_color: color(shader, at + 0xC, field)?,
+        function: shader.i16(at + 0x18, field)?,
+        period: shader.f32(at + 0x1C, field)?,
+        phase: shader.f32(at + 0x20, field)?,
+    })
+}
+
+/// A map's scrolling: a function, a period and a scale.
+fn texture_animation(
+    shader: &Element<'_>,
+    at: usize,
+    field: &str,
+) -> Result<TextureAnimation, ImportError> {
+    Ok(TextureAnimation {
+        function: shader.i16(at, field)?,
+        period: shader.f32(at + 4, field)?,
+        scale: shader.f32(at + 8, field)?,
     })
 }
 

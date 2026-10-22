@@ -264,8 +264,10 @@ pub fn grid_shader() -> Shader {
             material_color: [1.0; 3],
             bump_scale: 0.0,
             bump_map: None,
+            self_illumination_flags: 0,
             self_illumination_scale: 0.0,
             self_illumination_map: None,
+            specular_flags: 0,
             specular_brightness: 0.0,
             specular_perpendicular_color: [0.0; 3],
             specular_parallel_color: [0.0; 3],
@@ -275,6 +277,7 @@ pub fn grid_shader() -> Shader {
             reflection_perpendicular_brightness: 0.0,
             reflection_parallel_brightness: 0.0,
             reflection_cube_map: None,
+            animation: crate::EnvironmentAnimation::default(),
         })),
     )
 }

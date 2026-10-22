@@ -87,6 +87,8 @@ final class ControlServant {
         guard let renderer = renderer() else { return "no level is loaded" }
         let frame = snapshots.acquire()
         let camera = ViewCamera(frame.camera, alpha: frame.alpha)
+        // (the game's time, at its 60 ticks a second, for the shaders' animations)
+        renderer.time = Float((Double(frame.tick) + Double(frame.alpha)) / 60)
         let width = Int(request.width), height = Int(request.height)
         do {
             let captured = try renderer.capture(width: width, height: height, camera: camera,

@@ -19,6 +19,7 @@ pub mod hash;
 pub mod hud;
 pub mod input;
 pub mod objects;
+pub mod periodic;
 pub mod player;
 pub mod projectile;
 pub mod ragdoll;

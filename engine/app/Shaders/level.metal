@@ -2,10 +2,14 @@
 // ModelPass.swift), compiled from source when a level loads, and again
 // when this file changes in a development build (ShaderSources.swift).
 //
-// A surface is its base map, its detail maps combined as its environment
-// shader says, times its lightmap page: as the stock game draws it, in
-// display values (the game's pipeline was not linear), into a
-// half-float target that the tone map then brings into the drawable.
+// A surface is its base map, its detail and micro detail maps combined as
+// its environment shader says, times its light: the lightmap page, bumped
+// by its bump map toward the light's incident direction, times its
+// material colour, plus its self-illumination; then its specular
+// highlight and its cube map's reflection added, as the stock game's
+// combiners draw them, in display values (the game's pipeline was not
+// linear), into a half-float target that the tone map then brings into
+// the drawable.
 // The sky's atmospheric fog mixes each surface toward its color by its
 // distance along the view, as the game's vertex shaders' fog constants
 // do; the sky itself is drawn first, at infinity, unfogged.
@@ -18,6 +22,11 @@ struct VertexIn {
     float3 normal [[attribute(1)]];
     float2 texcoord [[attribute(2)]];
     float2 lightmap [[attribute(3)]];
+    float3 tangent [[attribute(4)]];
+    float3 binormal [[attribute(5)]];
+    // toward the light that reaches it, its length how much of the light
+    // comes from there (zero: unlit, or no direction)
+    float3 incident [[attribute(6)]];
 };
 
 // (as LevelRenderer's FrameUniforms)
@@ -27,6 +36,9 @@ struct Frame {
     float4 fog_plane;
     // the fog's color, and its maximum density
     float4 fog_color;
+    // the camera's position, and the mipmap bias: how many levels sharper
+    // than its own size a frame drawn small for the temporal scaler samples
+    float4 eye;
 };
 
 // (as LevelRenderer's MaterialUniforms)
@@ -48,7 +60,37 @@ struct Material {
     uint chicago_count;
     uint4 chicago_functions;
     float4 chicago_transforms[4];
+    // this frame's animation: the primary self-illumination colour and
+    // the plasma's value, the secondary colour, the maps' scroll in u, v
+    float4 animation[3];
+    // an environment shader's material colour, its plasma's colours
+    float4 material_color;
+    float4 plasma_on;
+    float4 plasma_off;
+    // the specular colour along the normal and the brightness; across it
+    // and the lightmap's brightness scale
+    float4 specular_perpendicular;
+    float4 specular_parallel;
+    // the micro detail's, bump map's and self-illumination's scales, the
+    // reflection's brightness along the normal; then across it
+    float4 environment_scales;
+    float4 reflection_parallel;
+    // the micro detail function, the specular flags, the reflection's
+    // kind and the ENVIRONMENT bits (0: not an environment shader)
+    uint4 environment;
 };
+
+constant uint ENVIRONMENT = 1;
+constant uint MICRO = 2;
+constant uint BUMP = 4;
+constant uint SPECULAR_MASK = 8;
+constant uint SELF_ILLUMINATION = 16;
+constant uint UNFILTERED = 32;
+constant uint REFLECTION = 64;
+
+constant uint OVERBRIGHT = 1;
+constant uint EXTRA_SHINY = 2;
+constant uint LIGHTMAP_IS_SPECULAR = 4;
 
 constant uint BASE = 1;
 constant uint PRIMARY = 2;
@@ -58,7 +100,11 @@ constant uint UNBAKED = 16;
 
 struct VertexOut {
     float4 position [[position]];
+    float3 world;
     float3 normal;
+    float3 tangent;
+    float3 binormal;
+    float3 incident;
     float2 texcoord;
     float2 lightmap;
     float fog;
@@ -83,7 +129,11 @@ float4 fogged(float4 color, float fog, constant Frame &frame, constant Material 
 vertex VertexOut level_vertex(VertexIn in [[stage_in]], constant Frame &frame [[buffer(1)]]) {
     VertexOut out;
     out.position = frame.view_projection * float4(in.position, 1);
+    out.world = in.position;
     out.normal = in.normal;
+    out.tangent = in.tangent;
+    out.binormal = in.binormal;
+    out.incident = in.incident;
     out.texcoord = in.texcoord;
     out.lightmap = in.lightmap;
     out.fog = fog_amount(frame, in.position);
@@ -101,31 +151,37 @@ float3 unbaked_light(float3 normal) {
     return mix(ground, sky, n.z * 0.5 + 0.5) + overhead * saturate(n.z) * 0.5;
 }
 
-// a surface's base and detail maps, as its material combines them
+// a colour and a detail map's, as a detail function combines them:
+// double-biased multiply, multiply or double-biased add
+float3 detailed(uint function, float3 color, float3 detail) {
+    switch (function) {
+    case 1: return color * detail;
+    case 2: return saturate(color + 2 * detail - 1);
+    default: return saturate(color * 2 * detail);
+    }
+}
+
+// a surface's base and detail maps, as its material combines them, their
+// mipmaps chosen `lod` levels sharper than the drawn size's
 float4 surface(float2 texcoord, constant Material &material, texture2d<float> base, texture2d<float> primary,
-               texture2d<float> secondary, sampler wrap) {
+               texture2d<float> secondary, sampler wrap, float lod) {
     float4 color = float4(1);
     if (material.maps & BASE) {
-        color = base.sample(wrap, texcoord * material.base_scale + material.base_offset);
+        color = base.sample(wrap, texcoord * material.base_scale + material.base_offset, bias(lod));
     }
     if (material.alpha_tested != 0 && color.a < 0.5) {
         discard_fragment();
     }
     uint details = material.maps & (PRIMARY | SECONDARY);
     if (details != 0) {
-        float4 first = (details & PRIMARY) ? primary.sample(wrap, texcoord * material.primary_scale)
-                                           : secondary.sample(wrap, texcoord * material.secondary_scale);
-        float4 second = (details & SECONDARY) ? secondary.sample(wrap, texcoord * material.secondary_scale)
+        float4 first = (details & PRIMARY) ? primary.sample(wrap, texcoord * material.primary_scale, bias(lod))
+                                           : secondary.sample(wrap, texcoord * material.secondary_scale, bias(lod));
+        float4 second = (details & SECONDARY) ? secondary.sample(wrap, texcoord * material.secondary_scale, bias(lod))
                                               : first;
-        // normal: the secondary map's alpha mixes them; blended: the base's
+        // normal: the secondary map's alpha mixes them; blended: the
+        // base's; either way, at one the primary
         float mask = material.environment_kind == 0 ? second.a : color.a;
-        float3 detail = material.environment_kind == 0 ? mix(first.rgb, second.rgb, mask)
-                                                       : mix(second.rgb, first.rgb, mask);
-        switch (material.detail_function) {
-        case 1: color.rgb *= detail; break;
-        case 2: color.rgb = saturate(color.rgb + 2 * detail - 1); break;
-        default: color.rgb = saturate(color.rgb * 2 * detail); break;
-        }
+        color.rgb = detailed(material.detail_function, color.rgb, mix(second.rgb, first.rgb, mask));
     }
     return color;
 }
@@ -165,11 +221,12 @@ float chicago_alpha(uint function, float current, float next) {
 
 // a transparent chicago shader's maps, each stage's result combined with
 // the next map by the stage's functions
-float4 chicago(float2 texcoord, constant Material &material, array<texture2d<float>, 4> maps, sampler wrap) {
+float4 chicago(float2 texcoord, constant Material &material, array<texture2d<float>, 4> maps, sampler wrap,
+               float lod) {
     float4 current = float4(1);
     for (uint stage = 0; stage < min(material.chicago_count, 4u); stage++) {
         float4 transform = material.chicago_transforms[stage];
-        float4 next = maps[stage].sample(wrap, texcoord * transform.xy + transform.zw);
+        float4 next = maps[stage].sample(wrap, texcoord * transform.xy + transform.zw, bias(lod));
         if ((material.chicago_functions[stage] >> 16) & 1) {
             next.rgb = next.a;
         }
@@ -187,6 +244,23 @@ float4 chicago(float2 texcoord, constant Material &material, array<texture2d<flo
     return current;
 }
 
+// a vector's direction, or `otherwise` for one of no length
+float3 direction(float3 v, float3 otherwise) {
+    return length_squared(v) > 1e-12 ? normalize(v) : otherwise;
+}
+
+// the self-illumination map's light: its red channel the primary colour,
+// its green the secondary, its blue the plasma's, where its alpha is near
+// the plasma's value (a band that moves with it)
+float3 self_illumination(float4 map, constant Material &material) {
+    float s = max(0.5 - abs(map.a - material.animation[0].w), 0.0);
+    float y = min(4 * s * s, 1.0);
+    float x = y * y;
+    float band = (2 * x - 1) * (2 * x - 1);
+    float3 plasma = material.plasma_on.rgb * band + material.plasma_off.rgb;
+    return map.r * material.animation[0].rgb + map.g * material.animation[1].rgb + map.b * plasma;
+}
+
 fragment float4 level_fragment(VertexOut in [[stage_in]],
                                constant Material &material [[buffer(0)]],
                                constant Frame &frame [[buffer(1)]],
@@ -194,18 +268,108 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
                                texture2d<float> primary [[texture(1)]],
                                texture2d<float> secondary [[texture(2)]],
                                texture2d<float> lightmap [[texture(3)]],
+                               texture2d<float> micro [[texture(4)]],
+                               texture2d<float> bump [[texture(5)]],
+                               texture2d<float> glow [[texture(6)]],
+                               texturecube<float> reflection [[texture(7)]],
                                sampler wrap [[sampler(0)]],
-                               sampler clamp [[sampler(1)]]) {
+                               sampler clamp [[sampler(1)]],
+                               sampler nearest [[sampler(2)]]) {
     if (material.chicago_count != 0) {
         // (unlit, as the game draws them)
         array<texture2d<float>, 4> maps = {base, primary, secondary, lightmap};
-        return fogged(chicago(in.texcoord, material, maps, wrap), in.fog, frame, material);
+        return fogged(chicago(in.texcoord, material, maps, wrap, frame.eye.w), in.fog, frame, material);
     }
-    float4 color = surface(in.texcoord, material, base, primary, secondary, wrap);
+    uint bits = material.environment.w;
+    // the maps scrolled as the shader animates them
+    float2 texcoord = in.texcoord + material.animation[2].xy;
+    float lod = frame.eye.w;
+    float4 color = surface(texcoord, material, base, primary, secondary, wrap, lod);
+    if (bits & MICRO) {
+        float4 detail = micro.sample(wrap, texcoord * material.environment_scales.x, bias(lod));
+        color.rgb = detailed(material.environment.x, color.rgb, detail.rgb);
+    }
+    float3 normal = direction(in.normal, float3(0, 0, 1));
+    // the bumped normal, from the bump map in the surface's frame
+    float3 bumped = normal;
+    float4 bump_texel = float4(0.5, 0.5, 1, 1);
+    // how far the bump map's mipmaps averaged its normals apart: one where
+    // they agree, less where a minified map holds several directions
+    float agreement = 1;
+    if (bits & (BUMP | SPECULAR_MASK)) {
+        bump_texel = bump.sample(wrap, texcoord * material.environment_scales.y, bias(lod));
+    }
+    if (bits & BUMP) {
+        float3 n = bump_texel.xyz * 2 - 1;
+        agreement = saturate(length(n));
+        bumped = direction(in.tangent * n.x + in.binormal * n.y + normal * n.z, normal);
+    }
+    float3 light = float3(1);
+    float3 lightmapped = float3(1);
     if (material.maps & LIGHTMAP) {
-        color.rgb *= lightmap.sample(clamp, in.lightmap).rgb;
+        lightmapped = lightmap.sample(clamp, in.lightmap).rgb;
+        light = lightmapped;
     } else if (material.maps & UNBAKED) {
-        color.rgb *= unbaked_light(in.normal);
+        lightmapped = unbaked_light(in.normal);
+        light = lightmapped;
+    }
+    if (!(bits & ENVIRONMENT)) {
+        color.rgb *= light;
+        return fogged(color, in.fog, frame, material);
+    }
+    // the bump's shading: toward the light by as much as the light has a
+    // direction, flat where it has none
+    float directed = saturate(length(in.incident));
+    float3 incident = direction(in.incident, normal);
+    float shading = (1 - directed) + directed * saturate(dot(bumped, incident));
+    light = light * shading * material.material_color.rgb;
+    if (bits & SELF_ILLUMINATION) {
+        float2 at = texcoord * material.environment_scales.z;
+        float4 map = (bits & UNFILTERED) ? glow.sample(nearest, at, bias(lod)) : glow.sample(wrap, at, bias(lod));
+        light += self_illumination(map, material);
+    }
+    color.rgb *= light;
+
+    // the specular mask: the bump map's alpha where it is one, else the
+    // base map's alpha (normal and blended-base-specular) or the bump
+    // map's (blended)
+    float mask;
+    if (bits & SPECULAR_MASK) {
+        mask = bump_texel.a;
+    } else if (material.environment_kind == 1) {
+        mask = (bits & BUMP) ? bump_texel.a : 1.0;
+    } else {
+        mask = (material.maps & BASE) ? base.sample(wrap, texcoord * material.base_scale + material.base_offset, bias(lod)).a
+                                      : 1.0;
+    }
+    float3 eye = direction(frame.eye.xyz - in.world, normal);
+    float3 facing = (material.environment.z == 1) ? normal : bumped;
+    float along = saturate(dot(facing, eye));
+    float fresnel = along * along;
+    float3 tint = mix(material.specular_parallel.rgb, material.specular_perpendicular.rgb, fresnel);
+
+    // the lightmap's highlight: its light, from its incident direction,
+    // reflected toward the eye
+    uint flags = material.environment.y;
+    if (material.specular_perpendicular.w > 0 && directed > 0) {
+        float exponent = (flags & EXTRA_SHINY) ? 64.0 : 16.0;
+        // (Toksvig's correction: a highlight as broad as the normals the
+        // texel averages, so a distant bumped surface does not sparkle)
+        exponent *= agreement / max(agreement + exponent * (1 - agreement), 1e-4);
+        float highlight = pow(saturate(dot(reflect(-eye, bumped), incident)), exponent) * directed;
+        float3 specular = highlight * tint * material.specular_perpendicular.w * mask;
+        specular *= (flags & LIGHTMAP_IS_SPECULAR) ? lightmapped : float3(dot(lightmapped, float3(1.0 / 3)));
+        color.rgb += (flags & OVERBRIGHT) ? 2 * specular : specular;
+    }
+
+    // the cube map's reflection, brighter across the surface than along it,
+    // dimmed by the lightmap's darkness as far as its scale says
+    if (bits & REFLECTION) {
+        float3 reflected = reflection.sample(clamp, reflect(-eye, facing)).rgb;
+        float brightness = mix(material.reflection_parallel.x, material.environment_scales.w, fresnel);
+        float unmasked = saturate(material.specular_parallel.w);
+        float lit = mix(dot(lightmapped, float3(1.0 / 3)), 1.0, unmasked);
+        color.rgb += reflected * tint * brightness * mask * lit;
     }
     return fogged(color, in.fog, frame, material);
 }
@@ -271,9 +435,9 @@ fragment float4 sky_fragment(ModelOut in [[stage_in]],
                              sampler wrap [[sampler(0)]]) {
     if (material.chicago_count != 0) {
         array<texture2d<float>, 4> maps = {base, primary, secondary, fourth};
-        return chicago(in.texcoord, material, maps, wrap);
+        return chicago(in.texcoord, material, maps, wrap, 0);
     }
-    return surface(in.texcoord, material, base, primary, secondary, wrap);
+    return surface(in.texcoord, material, base, primary, secondary, wrap, 0);
 }
 
 // until the level's lights reach objects: a sky light from above and a
@@ -288,9 +452,9 @@ fragment float4 model_fragment(ModelOut in [[stage_in]],
                                sampler wrap [[sampler(0)]]) {
     if (material.chicago_count != 0) {
         array<texture2d<float>, 4> maps = {base, primary, secondary, fourth};
-        return fogged(chicago(in.texcoord, material, maps, wrap), in.fog, frame, material);
+        return fogged(chicago(in.texcoord, material, maps, wrap, frame.eye.w), in.fog, frame, material);
     }
-    float4 color = surface(in.texcoord, material, base, primary, secondary, wrap);
+    float4 color = surface(in.texcoord, material, base, primary, secondary, wrap, frame.eye.w);
     float3 normal = length_squared(in.normal) > 1e-12 ? normalize(in.normal) : float3(0, 0, 1);
     float light = 0.45 + 0.65 * saturate(dot(normal, normalize(float3(0.35, 0.25, 0.9))));
     color.rgb *= light;

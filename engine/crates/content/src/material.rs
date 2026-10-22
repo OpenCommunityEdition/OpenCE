@@ -179,9 +179,17 @@ fn environment(shader: &EnvironmentShader) -> SurfaceMaterial {
     };
     SurfaceMaterial {
         albedo_map: shader.base_map.clone(),
-        // (the material colour is the radiosity's, not the diffuse map's
-        // tint)
-        albedo: [1.0; 3],
+        // (the original's final combiner multiplies the lightmap by the
+        // material colour before the base map multiplies the frame)
+        albedo: if shader
+            .material_color
+            .iter()
+            .all(|channel| channel.is_finite())
+        {
+            linear_color(shader.material_color)
+        } else {
+            [1.0; 3]
+        },
         normal_map: shader.bump_map.clone(),
         normal_map_scale: map_scale(shader.bump_scale),
         roughness,
@@ -290,8 +298,10 @@ mod tests {
             material_color: [0.5; 3],
             bump_scale: 0.0,
             bump_map: None,
+            self_illumination_flags: 0,
             self_illumination_scale: 0.0,
             self_illumination_map: None,
+            specular_flags: 0,
             specular_brightness: 1.0,
             specular_perpendicular_color: [1.0, 0.5, 0.0],
             specular_parallel_color: [1.0; 3],
@@ -301,6 +311,7 @@ mod tests {
             reflection_perpendicular_brightness: 0.5,
             reflection_parallel_brightness: 1.0,
             reflection_cube_map: None,
+            animation: crate::EnvironmentAnimation::default(),
         }
     }
 
@@ -344,11 +355,23 @@ mod tests {
     }
 
     #[test]
+    fn an_environment_shader_with_a_broken_material_colour_is_white() {
+        let mut shader = environment_shader();
+        shader.material_color = [f32::NAN, 0.5, 0.5];
+        let material = SurfaceMaterial::of(&ShaderClass::Environment(Box::new(shader)));
+        assert_eq!(material.albedo, [1.0; 3]);
+    }
+
+    #[test]
     fn an_environment_shader_without_a_reflection_is_diffuse() {
         let material =
             SurfaceMaterial::of(&ShaderClass::Environment(Box::new(environment_shader())));
         assert_eq!(material.albedo_map, Some(tag(b"bitm", "base")));
-        assert_eq!(material.albedo, [1.0; 3]);
+        // (the material colour, 0.5 for display, in linear)
+        assert!(material
+            .albedo
+            .iter()
+            .all(|&channel| close(channel, 0.214_041)));
         assert_eq!(material.roughness, 1.0);
         assert_eq!(material.specular, [0.0; 3]);
         assert_eq!(material.normal_map_scale, 1.0);

@@ -78,10 +78,14 @@ pub struct EnvironmentShader {
     pub bump_scale: f32,
     /// The bump map.
     pub bump_map: Option<TagRef>,
+    /// The self-illumination flags (unfiltered).
+    pub self_illumination_flags: u16,
     /// The self-illumination map's scale.
     pub self_illumination_scale: f32,
     /// The self-illumination map.
     pub self_illumination_map: Option<TagRef>,
+    /// The specular flags (overbright, extra shiny, lightmap is specular).
+    pub specular_flags: u16,
     /// The specular brightness.
     pub specular_brightness: f32,
     /// The specular colour, looking along the normal.
@@ -100,6 +104,51 @@ pub struct EnvironmentShader {
     pub reflection_parallel_brightness: f32,
     /// The reflection's cube map.
     pub reflection_cube_map: Option<TagRef>,
+    /// The self-illumination's colours and the base map's scrolling.
+    pub animation: EnvironmentAnimation,
+}
+
+/// What animates an environment shader: the self-illumination map's three
+/// channels, each a colour between two that a periodic function sweeps,
+/// and the maps' scrolling in u and v.
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct EnvironmentAnimation {
+    /// The red channel's colour.
+    pub primary: AnimatedColor,
+    /// The green channel's colour.
+    pub secondary: AnimatedColor,
+    /// The blue channel's colour, banded by the alpha channel.
+    pub plasma: AnimatedColor,
+    /// The scrolling in u.
+    pub u: TextureAnimation,
+    /// The scrolling in v.
+    pub v: TextureAnimation,
+}
+
+/// A colour swept from `off_color` to `on_color` by a periodic function.
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct AnimatedColor {
+    /// The colour at one.
+    pub on_color: [f32; 3],
+    /// The colour at zero.
+    pub off_color: [f32; 3],
+    /// The periodic function (`opence_sim::periodic::function`).
+    pub function: i16,
+    /// Its period in seconds.
+    pub period: f32,
+    /// Its phase in seconds.
+    pub phase: f32,
+}
+
+/// A map's scrolling: a periodic function over a period, times a scale.
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct TextureAnimation {
+    /// The periodic function.
+    pub function: i16,
+    /// Its period in seconds.
+    pub period: f32,
+    /// How far it scrolls, in map widths.
+    pub scale: f32,
 }
 
 /// A model shader (`soso`): a base map, a multipurpose map whose channels

@@ -557,6 +557,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let frame = profiled("snapshot", engine) { snapshots.acquire() }
         let camera = ViewCamera(frame.camera, alpha: frame.alpha)
+        // (the game's time, at its 60 ticks a second, for the shaders' animations)
+        renderer.time = Float((Double(frame.tick) + Double(frame.alpha)) / 60)
         let objects = profiled("objects", engine) { frame.drawnObjects() }
         let hudQuads = profiled("hud", engine) { engine.hud(width: UInt32(width), height: UInt32(height)) }
         let debugLines = frame.debugSegments()

@@ -177,6 +177,7 @@ pub(crate) fn model_material(
         detail_mask: shader.detail_mask.clamp(0, 9) as u8,
         change_color_source: shader.change_color_source.clamp(0, 4) as u8,
         chicago_maps: Vec::new(),
+        environment: None,
     }
 }
 

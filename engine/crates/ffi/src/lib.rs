@@ -236,7 +236,8 @@ impl LevelGeometry {
     }
 
     /// The vertices: position, normal, texture and lightmap coordinates,
-    /// as little-endian floats.
+    /// tangent, binormal and incident light direction, as little-endian
+    /// floats.
     pub fn vertices(&self) -> Vec<u8> {
         self.level.vertices.clone()
     }
@@ -258,6 +259,14 @@ impl LevelGeometry {
     /// The materials the draws use.
     pub fn materials(&self) -> Vec<RenderMaterial> {
         self.level.materials.clone()
+    }
+
+    /// Every material's animation at `seconds` of game time, twelve floats
+    /// each: the self-illumination's primary colour and plasma value, its
+    /// secondary colour and a zero, then the maps' offset in u and v and
+    /// two zeros.
+    pub fn material_animation(&self, seconds: f32) -> Vec<f32> {
+        self.level.animation(seconds)
     }
 
     /// The textures the materials and lightmaps use.

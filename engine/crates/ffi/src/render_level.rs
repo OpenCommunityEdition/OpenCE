@@ -8,12 +8,18 @@ use std::collections::HashMap;
 use crate::render_model::{model_material, RenderModel};
 
 use opence_content::{
-    Level, Lightmap, Material, Pixels, ShaderClass, StructureBsp, TagRef, TextureFormat,
+    EnvironmentAnimation, EnvironmentShader, Level, Lightmap, Material, Pixels, ShaderClass,
+    StructureBsp, TagRef, TextureFormat,
 };
 
 /// The bytes of one vertex: position, normal (three floats each), texture
-/// coordinates and lightmap coordinates (two each), little-endian.
-pub const VERTEX_STRIDE: usize = 40;
+/// coordinates and lightmap coordinates (two each), then tangent, binormal
+/// and the incident light's direction (three each), little-endian.
+pub const VERTEX_STRIDE: usize = 76;
+
+/// The floats each material's animation takes in
+/// [`RenderLevel::animation`].
+pub const ANIMATION_FLOATS: usize = 12;
 
 /// How a material is drawn.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
@@ -123,6 +129,63 @@ pub struct RenderMaterial {
     /// A transparent chicago shader's maps, at most four (none for the
     /// other classes).
     pub chicago_maps: Vec<RenderChicagoMap>,
+    /// An environment shader's lighting: its micro detail, bump,
+    /// self-illumination, specular and reflection (None for the other
+    /// classes).
+    pub environment: Option<RenderEnvironment>,
+}
+
+/// What an environment shader adds to its base and detail maps. Colours
+/// are in display values, as the tag gives them.
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
+pub struct RenderEnvironment {
+    /// The micro detail map.
+    pub micro_detail_map: Option<u32>,
+    /// Its scale.
+    pub micro_detail_scale: f32,
+    /// How it combines, as the detail function.
+    pub micro_detail_function: u8,
+    /// The bump map (a normal map), unless it is the specular mask.
+    pub bump_map: Option<u32>,
+    /// Its scale.
+    pub bump_scale: f32,
+    /// The bump map's alpha masks the specular instead of bumping.
+    pub bump_is_specular_mask: bool,
+    /// The bump map that masks the specular, if it does.
+    pub specular_mask_map: Option<u32>,
+    /// The colour the light is multiplied by.
+    pub material_color: Vec<f32>,
+    /// The self-illumination map: its red, green and blue channels show
+    /// the primary, secondary and plasma colours.
+    pub self_illumination_map: Option<u32>,
+    /// Its scale.
+    pub self_illumination_scale: f32,
+    /// Sampled without filtering.
+    pub self_illumination_unfiltered: bool,
+    /// The plasma's colour where its band is, and where it is not.
+    pub plasma_on_color: Vec<f32>,
+    /// (as the plasma's on colour)
+    pub plasma_off_color: Vec<f32>,
+    /// The specular flags: 1 overbright, 2 extra shiny, 4 the lightmap's
+    /// brightness is specular.
+    pub specular_flags: u8,
+    /// The specular brightness.
+    pub specular_brightness: f32,
+    /// The specular colour, looking along the normal.
+    pub specular_perpendicular_color: Vec<f32>,
+    /// The specular colour, looking across it.
+    pub specular_parallel_color: Vec<f32>,
+    /// The reflection's cube map texture.
+    pub reflection_map: Option<u32>,
+    /// The reflection's kind: 0 bumped cube map, 1 flat cube map, 2
+    /// bumped radiosity.
+    pub reflection_kind: u8,
+    /// How much the lightmap's brightness masks the reflection.
+    pub lightmap_brightness_scale: f32,
+    /// The reflection's brightness, looking along the normal.
+    pub reflection_perpendicular_brightness: f32,
+    /// The reflection's brightness, looking across it.
+    pub reflection_parallel_brightness: f32,
 }
 
 /// A chicago map's function, or the result's (0) for one out of range.
@@ -165,9 +228,13 @@ pub enum RenderTextureFormat {
     Rgba8,
 }
 
-/// A 2D texture's description; its levels' bytes are fetched one by one.
+/// A 2D or cube texture's description; its levels' bytes are fetched one
+/// by one.
 #[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
 pub struct RenderTexture {
+    /// 1 for a 2D texture, 6 for a cube, each level holding its faces in
+    /// turn (+x, -x, +y, -y, +z, -z).
+    pub faces: u32,
     /// Its format.
     pub format: RenderTextureFormat,
     /// The first level's width.
@@ -208,13 +275,15 @@ pub struct RenderLevel {
     pub models: Vec<RenderModel>,
     /// The level's sky.
     pub sky: Option<crate::render_sky::RenderSky>,
+    /// Each material's animation, if it is an environment shader's.
+    pub animations: Vec<Option<EnvironmentAnimation>>,
 }
 
 /// Gathers the level's textures and materials, each once.
 pub(crate) struct Builder<'a> {
     level: &'a Level,
     pub(crate) out: RenderLevel,
-    textures: HashMap<(TagRef, u16), Option<u32>>,
+    textures: HashMap<(TagRef, u16, u8), Option<u32>>,
     materials: HashMap<TagRef, Option<u32>>,
 }
 
@@ -267,10 +336,10 @@ impl RenderLevel {
 }
 
 impl Builder<'_> {
-    /// A bitmap's image as a texture, if it is a 2D texture whose levels
-    /// are all there.
-    fn texture(&mut self, bitmap: &TagRef, image: u16) -> Option<u32> {
-        let key = (bitmap.clone(), image);
+    /// A bitmap's image as a texture, if it is a 2D texture (or a cube,
+    /// for `faces` 6) whose levels are all there.
+    fn texture(&mut self, bitmap: &TagRef, image: u16, faces: u8) -> Option<u32> {
+        let key = (bitmap.clone(), image, faces);
         if let Some(&index) = self.textures.get(&key) {
             return index;
         }
@@ -284,7 +353,7 @@ impl Builder<'_> {
             })
             .filter(|texture| {
                 texture.depth == 1
-                    && texture.faces == 1
+                    && texture.faces == faces
                     && !texture.levels.is_empty()
                     && texture
                         .levels
@@ -300,6 +369,7 @@ impl Builder<'_> {
                 TextureFormat::Rgba8 => RenderTextureFormat::Rgba8,
             };
             let description = RenderTexture {
+                faces: u32::from(faces),
                 format,
                 width: u32::from(texture.width),
                 height: u32::from(texture.height),
@@ -316,12 +386,47 @@ impl Builder<'_> {
     }
 
     pub(crate) fn map(&mut self, map: Option<&TagRef>) -> Option<u32> {
-        map.and_then(|map| self.texture(map, 0))
+        map.and_then(|map| self.texture(map, 0, 1))
+    }
+
+    fn cube_map(&mut self, map: Option<&TagRef>) -> Option<u32> {
+        map.and_then(|map| self.texture(map, 0, 6))
+    }
+
+    /// An environment shader's lighting.
+    fn environment(&mut self, shader: &EnvironmentShader) -> RenderEnvironment {
+        let specular_mask = shader.flags & (1 << 1) != 0;
+        let bump = self.map(shader.bump_map.as_ref());
+        RenderEnvironment {
+            micro_detail_map: self.map(shader.micro_detail_map.as_ref()),
+            micro_detail_scale: scale(shader.micro_detail_scale),
+            micro_detail_function: shader.micro_detail_function.clamp(0, 2) as u8,
+            bump_map: if specular_mask { None } else { bump },
+            bump_scale: scale(shader.bump_scale),
+            bump_is_specular_mask: specular_mask,
+            specular_mask_map: if specular_mask { bump } else { None },
+            material_color: color(shader.material_color, 1.0),
+            self_illumination_map: self.map(shader.self_illumination_map.as_ref()),
+            self_illumination_scale: scale(shader.self_illumination_scale),
+            self_illumination_unfiltered: shader.self_illumination_flags & 1 != 0,
+            plasma_on_color: color(shader.animation.plasma.on_color, 0.0),
+            plasma_off_color: color(shader.animation.plasma.off_color, 0.0),
+            specular_flags: (shader.specular_flags & 7) as u8,
+            specular_brightness: finite(shader.specular_brightness).max(0.0),
+            specular_perpendicular_color: color(shader.specular_perpendicular_color, 0.0),
+            specular_parallel_color: color(shader.specular_parallel_color, 0.0),
+            reflection_map: self.cube_map(shader.reflection_cube_map.as_ref()),
+            reflection_kind: shader.reflection_kind.clamp(0, 2) as u8,
+            lightmap_brightness_scale: finite(shader.lightmap_brightness_scale).max(0.0),
+            reflection_perpendicular_brightness: finite(shader.reflection_perpendicular_brightness)
+                .max(0.0),
+            reflection_parallel_brightness: finite(shader.reflection_parallel_brightness).max(0.0),
+        }
     }
 
     fn lightmap_texture(&mut self, structure: &StructureBsp, lightmap: &Lightmap) -> Option<u32> {
         let bitmap = structure.lightmap_bitmap.as_ref()?;
-        self.texture(bitmap, lightmap.bitmap_index?)
+        self.texture(bitmap, lightmap.bitmap_index?, 1)
     }
 
     /// A shader's material, or None for a surface not drawn (one with no
@@ -331,6 +436,10 @@ impl Builder<'_> {
             return index;
         }
         let class = self.level.shader(shader).map(|shader| &shader.class);
+        let animation = match class {
+            Some(ShaderClass::Environment(environment)) => Some(environment.animation.clone()),
+            _ => None,
+        };
         let material = match class {
             Some(ShaderClass::Environment(environment)) => RenderMaterial {
                 kind: if environment.flags & 1 != 0 {
@@ -352,6 +461,7 @@ impl Builder<'_> {
                 detail_mask: 0,
                 change_color_source: 0,
                 chicago_maps: Vec::new(),
+                environment: Some(self.environment(environment)),
             },
             Some(
                 ShaderClass::TransparentChicago(chicago)
@@ -391,6 +501,7 @@ impl Builder<'_> {
                     detail_mask: 0,
                     change_color_source: 0,
                     chicago_maps,
+                    environment: None,
                 }
             }
             // (a class not imported yet, or a shader not found: drawn plain
@@ -412,9 +523,11 @@ impl Builder<'_> {
                 detail_mask: 0,
                 change_color_source: 0,
                 chicago_maps: Vec::new(),
+                environment: None,
             },
         };
         self.out.materials.push(material);
+        self.out.animations.push(animation);
         let index = Some(self.out.materials.len() as u32 - 1);
         self.materials.insert(shader.clone(), index);
         index
@@ -454,17 +567,21 @@ impl Builder<'_> {
         let lit = material.lightmap_vertices.len() == vertex_count;
         let mut center = [0.0f32; 3];
         for (number, vertex) in material.vertices.iter().enumerate() {
-            let light = if lit {
-                material.lightmap_vertices[number].texcoord
+            let (light, incident) = if lit {
+                let light = &material.lightmap_vertices[number];
+                (light.texcoord, light.incident_direction)
             } else {
-                [0.0, 0.0]
+                ([0.0, 0.0], [0.0; 3])
             };
             let floats = vertex
                 .position
                 .iter()
                 .chain(&vertex.normal)
                 .chain(&vertex.texcoord)
-                .chain(&light);
+                .chain(&light)
+                .chain(&vertex.tangent)
+                .chain(&vertex.binormal)
+                .chain(&incident);
             for &value in floats {
                 self.out.vertices.extend_from_slice(&value.to_le_bytes());
             }
@@ -487,6 +604,65 @@ impl Builder<'_> {
             center: center.to_vec(),
         })
     }
+}
+
+impl RenderLevel {
+    /// Every material's animation at `seconds` of game time,
+    /// [`ANIMATION_FLOATS`] each: the primary colour and the plasma's
+    /// value, the secondary colour and a zero, and the maps' offset in u
+    /// and v and two zeros (all zeros for a material that does not
+    /// animate).
+    pub fn animation(&self, seconds: f32) -> Vec<f32> {
+        let mut out = Vec::with_capacity(self.materials.len() * ANIMATION_FLOATS);
+        for index in 0..self.materials.len() {
+            let Some(Some(animation)) = self.animations.get(index) else {
+                out.extend([0.0; ANIMATION_FLOATS]);
+                continue;
+            };
+            let swept = |color: &opence_content::AnimatedColor| {
+                let value = opence_sim::periodic::animate(
+                    color.function,
+                    seconds,
+                    color.period,
+                    color.phase,
+                );
+                let on = self::color(color.on_color, 0.0);
+                let off = self::color(color.off_color, 0.0);
+                (
+                    [0, 1, 2].map(|at| off[at] * (1.0 - value) + on[at] * value),
+                    value,
+                )
+            };
+            let scroll = |scroll: &opence_content::TextureAnimation| {
+                let value =
+                    opence_sim::periodic::animate(scroll.function, seconds, scroll.period, 0.0);
+                finite(value * finite(scroll.scale))
+            };
+            let (primary, _) = swept(&animation.primary);
+            let (secondary, _) = swept(&animation.secondary);
+            let (_, plasma) = swept(&animation.plasma);
+            out.extend(primary);
+            out.push(plasma);
+            out.extend(secondary);
+            out.push(0.0);
+            out.extend([scroll(&animation.u), scroll(&animation.v), 0.0, 0.0]);
+        }
+        out
+    }
+}
+
+/// A colour's channels, each finite (else `otherwise`).
+fn color(color: [f32; 3], otherwise: f32) -> Vec<f32> {
+    color
+        .iter()
+        .map(|&channel| {
+            if channel.is_finite() {
+                channel
+            } else {
+                otherwise
+            }
+        })
+        .collect()
 }
 
 pub(crate) fn finite(value: f32) -> f32 {
@@ -576,8 +752,10 @@ mod tests {
                 material_color: [1.0; 3],
                 bump_scale: 0.0,
                 bump_map: None,
+                self_illumination_flags: 0,
                 self_illumination_scale: 0.0,
                 self_illumination_map: None,
+                specular_flags: 0,
                 specular_brightness: 0.0,
                 specular_perpendicular_color: [0.0; 3],
                 specular_parallel_color: [0.0; 3],
@@ -587,6 +765,7 @@ mod tests {
                 reflection_perpendicular_brightness: 0.0,
                 reflection_parallel_brightness: 0.0,
                 reflection_cube_map: None,
+                animation: opence_content::EnvironmentAnimation::default(),
             })),
         )
     }
@@ -790,7 +969,7 @@ mod tests {
     }
 
     #[test]
-    fn vertices_carry_position_normal_and_both_coordinates() {
+    fn vertices_carry_position_normal_both_coordinates_the_frame_and_the_light() {
         let built = built();
         let float = |vertex: usize, at: usize| {
             let start = vertex * VERTEX_STRIDE + at * 4;
@@ -800,8 +979,15 @@ mod tests {
         };
         // the first vertex drawn (the chicago's, in the page's order): its
         // second vertex, at (2, 0, 1)
-        let floats: Vec<f32> = (0..10).map(|at| float(1, at)).collect();
-        assert_eq!(floats, [2.0, 0.0, 1.0, 0.0, 0.0, 1.0, 2.0, 0.0, 1.0, 0.25]);
+        let floats: Vec<f32> = (0..19).map(|at| float(1, at)).collect();
+        assert_eq!(
+            floats,
+            [
+                2.0, 0.0, 1.0, 0.0, 0.0, 1.0, 2.0, 0.0, 1.0, 0.25, // (then the tangent frame)
+                1.0, 0.0, 0.0, 0.0, 1.0, 0.0, // (and the incident light)
+                0.0, 0.0, 1.0,
+            ]
+        );
         // the unlit cutout's have no lightmap coordinates, nor its draw a page
         let fence = &built.draws[1];
         assert_eq!(fence.lightmap, None);
@@ -854,5 +1040,146 @@ mod tests {
         let ground = &built.materials[built.draws[0].material as usize];
         assert_eq!(ground.base_map, None);
         assert!(ground.primary_detail_map.is_some());
+    }
+
+    fn cube(path: &str) -> Bitmap {
+        let mut cube = bitmap(path, 1, 1);
+        if let Pixels::Texture(texture) = &mut cube.images[0].pixels {
+            texture.faces = 6;
+            texture.levels = vec![vec![0x40; 4 * 4 * 4 * 6]];
+        }
+        cube
+    }
+
+    /// The level, its ground shader bumped, self-illuminated, reflecting
+    /// and animated.
+    fn lit_level(flags: u16) -> Level {
+        use opence_content::{AnimatedColor, TextureAnimation};
+        use opence_sim::periodic::function;
+        let mut level = level();
+        level.bitmaps.push(cube("sky cube"));
+        let mut shader = environment("ground", flags);
+        if let ShaderClass::Environment(environment) = &mut shader.class {
+            environment.bump_map = Some(tag(b"bitm", "detail"));
+            environment.bump_scale = 4.0;
+            environment.self_illumination_map = Some(tag(b"bitm", "detail"));
+            environment.self_illumination_flags = 1;
+            environment.specular_flags = 0xFF;
+            environment.specular_brightness = f32::NAN;
+            environment.reflection_cube_map = Some(tag(b"bitm", "sky cube"));
+            environment.reflection_kind = 9;
+            environment.material_color = [0.5, f32::INFINITY, 1.0];
+            environment.animation.primary = AnimatedColor {
+                on_color: [1.0, 0.0, 0.0],
+                off_color: [0.0, 0.0, 1.0],
+                function: function::ONE,
+                period: 1.0,
+                phase: 0.0,
+            };
+            environment.animation.secondary = AnimatedColor {
+                on_color: [1.0, 1.0, 1.0],
+                off_color: [0.0, 0.5, 0.0],
+                function: function::ZERO,
+                period: 0.0,
+                phase: 0.0,
+            };
+            environment.animation.plasma.function = function::ONE;
+            environment.animation.plasma.on_color = [0.25, f32::NAN, 1.0];
+            environment.animation.u = TextureAnimation {
+                function: function::ONE,
+                period: 2.0,
+                scale: 0.5,
+            };
+        }
+        level.shaders[0] = shader;
+        level
+    }
+
+    fn lit(flags: u16) -> (RenderLevel, RenderEnvironment) {
+        let Some(built) = RenderLevel::build(&lit_level(flags), 0) else {
+            panic!("the level has a BSP 0");
+        };
+        let ground = built.materials[built.draws[0].material as usize].clone();
+        let Some(environment) = ground.environment else {
+            panic!("the ground is an environment shader");
+        };
+        (built, environment)
+    }
+
+    #[test]
+    fn an_environment_shader_carries_its_bump_self_illumination_and_reflection() {
+        let (built, environment) = lit(0);
+        assert!(environment.bump_map.is_some());
+        assert_eq!(environment.bump_scale, 4.0);
+        assert!(!environment.bump_is_specular_mask);
+        assert_eq!(environment.specular_mask_map, None);
+        assert_eq!(environment.self_illumination_map, environment.bump_map);
+        assert!(environment.self_illumination_unfiltered);
+        assert_eq!(environment.plasma_on_color, vec![0.25, 0.0, 1.0]);
+        assert_eq!(environment.plasma_off_color, vec![0.0; 3]);
+        assert_eq!(environment.specular_flags, 7);
+        assert_eq!(environment.specular_brightness, 0.0);
+        assert_eq!(environment.reflection_kind, 2);
+        assert_eq!(environment.material_color, vec![0.5, 1.0, 1.0]);
+        // the cube is a texture of six faces, made apart from the 2D maps
+        let Some(cube) = environment.reflection_map else {
+            panic!("the cube map is a texture");
+        };
+        assert_eq!(built.textures[cube as usize].0.faces, 6);
+        assert!(built
+            .textures
+            .iter()
+            .enumerate()
+            .all(|(index, (texture, _))| (texture.faces == 6) == (index as u32 == cube)));
+        // the other classes have none
+        assert!(built.materials[built.draws[3].material as usize]
+            .environment
+            .is_none());
+    }
+
+    #[test]
+    fn a_bump_map_that_is_the_specular_mask_does_not_bump() {
+        let (_, environment) = lit(1 << 1);
+        assert_eq!(environment.bump_map, None);
+        assert!(environment.bump_is_specular_mask);
+        assert!(environment.specular_mask_map.is_some());
+    }
+
+    #[test]
+    fn a_cube_is_not_a_2d_map_nor_a_2d_map_a_cube() {
+        let mut level = lit_level(0);
+        if let ShaderClass::Environment(environment) = &mut level.shaders[0].class {
+            environment.base_map = Some(tag(b"bitm", "sky cube"));
+            environment.reflection_cube_map = Some(tag(b"bitm", "ground"));
+        }
+        let Some(built) = RenderLevel::build(&level, 0) else {
+            panic!("the level has a BSP 0");
+        };
+        let ground = &built.materials[built.draws[0].material as usize];
+        assert_eq!(ground.base_map, None);
+        assert_eq!(
+            ground.environment.as_ref().map(|lit| lit.reflection_map),
+            Some(None)
+        );
+    }
+
+    #[test]
+    fn materials_animate_their_self_illumination_and_scrolling() {
+        let (built, _) = lit(0);
+        let animation = built.animation(3.25);
+        assert_eq!(animation.len(), built.materials.len() * ANIMATION_FLOATS);
+        let ground = built.draws[0].material as usize;
+        let floats = &animation[ground * ANIMATION_FLOATS..][..ANIMATION_FLOATS];
+        // primary on (its function one), plasma one, secondary off (zero),
+        // scrolled half a map in u (one times its scale) and none in v
+        assert_eq!(
+            floats,
+            [1.0, 0.0, 0.0, 1.0, 0.0, 0.5, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0]
+        );
+        // a material that does not animate is all zeros
+        let glass = built.draws[3].material as usize;
+        assert!(animation[glass * ANIMATION_FLOATS..][..ANIMATION_FLOATS]
+            .iter()
+            .all(|&value| value == 0.0));
     }
 }

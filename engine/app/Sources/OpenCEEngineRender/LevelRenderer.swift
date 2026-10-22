@@ -41,6 +41,76 @@ struct MaterialUniforms {
     var chicagoFunctions: SIMD4<UInt32> = .zero
     /// Each map's scale and offset.
     var chicagoTransforms: (SIMD4<Float>, SIMD4<Float>, SIMD4<Float>, SIMD4<Float>) = (.zero, .zero, .zero, .zero)
+    /// This frame's animation (RenderLevel's `ANIMATION_FLOATS`): the
+    /// primary self-illumination colour and the plasma's value, the
+    /// secondary colour, and the maps' scrolling in u and v.
+    var animation: (SIMD4<Float>, SIMD4<Float>, SIMD4<Float>) = (.zero, .zero, .zero)
+    /// An environment shader's material colour (white: none).
+    var materialColor: SIMD4<Float> = .one
+    /// The plasma's colours, where its band is and is not.
+    var plasmaOn: SIMD4<Float> = .zero
+    var plasmaOff: SIMD4<Float> = .zero
+    /// The specular colour along the normal, and the specular brightness.
+    var specularPerpendicular: SIMD4<Float> = .zero
+    /// The specular colour across it, and the lightmap's brightness scale.
+    var specularParallel: SIMD4<Float> = .zero
+    /// The micro detail's and bump map's and self-illumination's scales,
+    /// and the reflection's brightness along the normal.
+    var environmentScales: SIMD4<Float> = .one
+    /// The reflection's brightness across the normal, then unused.
+    var reflectionParallel: SIMD4<Float> = .zero
+    /// The micro detail function, the specular flags, the reflection's
+    /// kind and the EnvironmentBit maps (0: not an environment shader).
+    var environment: SIMD4<UInt32> = .zero
+
+    /// `environment`'s parameters set, and its four maps' textures (micro
+    /// detail, bump or specular mask, self-illumination, the cube), white
+    /// where it has none.
+    mutating func environment(_ environment: RenderEnvironment, texture: (UInt32?) -> MTLTexture?,
+                              cube: (UInt32?) -> MTLTexture?, white: MTLTexture,
+                              whiteCube: MTLTexture) -> [MTLTexture] {
+        func rgb(_ values: [Float], _ fallback: Float) -> SIMD3<Float> {
+            values.count == 3 ? SIMD3(values[0], values[1], values[2]) : SIMD3(repeating: fallback)
+        }
+        // (a scale of zero is one)
+        func scale(_ value: Float) -> Float { value.isFinite && value != 0 ? value : 1 }
+        let micro = texture(environment.microDetailMap)
+        let bump = texture(environment.bumpMap)
+        let mask = texture(environment.specularMaskMap)
+        let glow = texture(environment.selfIlluminationMap)
+        let reflection = cube(environment.reflectionMap)
+        var bits = EnvironmentBit.present
+        if micro != nil { bits |= EnvironmentBit.micro }
+        if bump != nil { bits |= EnvironmentBit.bump }
+        if mask != nil { bits |= EnvironmentBit.specularMask }
+        if glow != nil { bits |= EnvironmentBit.selfIllumination }
+        if environment.selfIlluminationUnfiltered { bits |= EnvironmentBit.unfiltered }
+        if reflection != nil { bits |= EnvironmentBit.reflection }
+        materialColor = SIMD4(rgb(environment.materialColor, 1), 1)
+        plasmaOn = SIMD4(rgb(environment.plasmaOnColor, 0), 0)
+        plasmaOff = SIMD4(rgb(environment.plasmaOffColor, 0), 0)
+        specularPerpendicular = SIMD4(rgb(environment.specularPerpendicularColor, 0),
+                                      environment.specularBrightness)
+        specularParallel = SIMD4(rgb(environment.specularParallelColor, 0), environment.lightmapBrightnessScale)
+        environmentScales = SIMD4(scale(environment.microDetailScale), scale(environment.bumpScale),
+                                  scale(environment.selfIlluminationScale),
+                                  environment.reflectionPerpendicularBrightness)
+        reflectionParallel = SIMD4(environment.reflectionParallelBrightness, 0, 0, 0)
+        self.environment = SIMD4(UInt32(environment.microDetailFunction), UInt32(environment.specularFlags),
+                                 UInt32(environment.reflectionKind), bits)
+        return [micro ?? white, bump ?? mask ?? white, glow ?? white, reflection ?? whiteCube]
+    }
+
+    /// This frame's animation from `floats`, the level's for every
+    /// material, at `material`'s.
+    mutating func animate(_ floats: [Float], material: Int) {
+        let at = material * 12
+        guard material >= 0, at + 12 <= floats.count else { return }
+        func four(_ from: Int) -> SIMD4<Float> {
+            SIMD4(floats[at + from], floats[at + from + 1], floats[at + from + 2], floats[at + from + 3])
+        }
+        animation = (four(0), four(4), four(8))
+    }
 
     /// `material`'s chicago maps set, and their textures (four, white
     /// where a map has none), or nil for a material of another class.
@@ -64,17 +134,23 @@ struct MaterialUniforms {
     }
 }
 
-/// The shaders' Frame: the view, and the sky's fog as a plane along it.
+/// The shaders' Frame: the view, the sky's fog as a plane along it, and
+/// the eye.
 public struct FrameUniforms {
     public var viewProjection: simd_float4x4
     /// The view's forward over the fog's range, and where it starts.
     public var fogPlane: SIMD4<Float>
     /// The fog's color, and its maximum density (0: no fog).
     public var fogColor: SIMD4<Float>
+    /// The camera's position (the reflections' and highlights' eye), and
+    /// the mipmap bias.
+    public var eye: SIMD4<Float> = .zero
 
-    /// The frame from `camera`, its fog `fog` (none without a sky).
-    public init(viewProjection: simd_float4x4, camera: ViewCamera, fog: RenderFog?) {
+    /// The frame from `camera`, its fog `fog` (none without a sky), its
+    /// maps sampled `mipBias` levels sharper (negative) than its size's.
+    public init(viewProjection: simd_float4x4, camera: ViewCamera, fog: RenderFog?, mipBias: Float = 0) {
         self.viewProjection = viewProjection
+        eye = SIMD4(camera.position, mipBias)
         guard let fog, fog.maximumDensity > 0, fog.color.count == 3 else {
             fogPlane = .zero
             fogColor = .zero
@@ -107,6 +183,20 @@ enum MapBit {
     static let unbaked: UInt32 = 16
 }
 
+/// The bits of MaterialUniforms.environment.w.
+enum EnvironmentBit {
+    /// An environment shader: lit as its combiners light it.
+    static let present: UInt32 = 1
+    static let micro: UInt32 = 2
+    static let bump: UInt32 = 4
+    /// The bump map's slot holds the specular mask instead.
+    static let specularMask: UInt32 = 8
+    static let selfIllumination: UInt32 = 16
+    /// The self-illumination map sampled without filtering.
+    static let unfiltered: UInt32 = 32
+    static let reflection: UInt32 = 64
+}
+
 public final class LevelRenderer {
     /// What the sky's portals show where the level has no sky or fog.
     public static let skyColor = MTLClearColor(red: 0.42, green: 0.52, blue: 0.66, alpha: 1)
@@ -116,9 +206,13 @@ public final class LevelRenderer {
         var indexCount: Int
         var blend: BlendFunction?
         var uniforms: MaterialUniforms
-        /// Base, primary detail, secondary detail and lightmap.
+        /// Base, primary detail, secondary detail, lightmap, micro detail,
+        /// bump or specular mask, self-illumination and the reflection's
+        /// cube (a chicago shader's four maps, then white).
         var textures: [MTLTexture]
         var center: SIMD3<Float>
+        /// Its material, whose animation it takes each frame.
+        var material: Int
     }
 
     public let device: MTLDevice
@@ -131,6 +225,11 @@ public final class LevelRenderer {
     let models: ModelPass
     /// The level's sky (its model is drawn first, at infinity).
     let sky: RenderSky?
+    /// The level, for its materials' animation each frame.
+    private let geometry: LevelGeometry
+    /// The game's time in seconds, which the shaders' animations follow
+    /// (set before each frame; 0 draws them as at the start).
+    public var time: Float = 0
     private var opaque: MTLRenderPipelineState
     private var blended: [MTLRenderPipelineState]
     private var tone: MTLRenderPipelineState
@@ -140,6 +239,8 @@ public final class LevelRenderer {
     private let depthTest: MTLDepthStencilState
     private let wrap: MTLSamplerState
     private let clamp: MTLSamplerState
+    /// Wrapped and unfiltered, for the self-illumination maps that ask.
+    private let nearest: MTLSamplerState
     private var targets: (frame: MTLTexture, depth: MTLTexture)?
     private(set) var temporal: TemporalScaling?
 
@@ -196,15 +297,24 @@ public final class LevelRenderer {
         }
         self.vertices = vertices
         self.indices = indices
+        self.geometry = geometry
 
-        let textures = geometry.textures().enumerated().map { index, texture in
+        let descriptions = geometry.textures()
+        let textures = descriptions.enumerated().map { index, texture in
             Self.texture(device, texture) { level in geometry.textureLevel(texture: UInt32(index), level: level) }
         }
         textureCount = textures.compactMap { $0 }.count
-        guard let white = Self.white(device) else { throw LevelRendererError.resources("textures") }
+        guard let white = Self.white(device), let whiteCube = Self.white(device, cube: true) else {
+            throw LevelRendererError.resources("textures")
+        }
         let materials = geometry.materials()
         func texture(_ index: UInt32?) -> MTLTexture? {
             index.flatMap { Int($0) < textures.count ? textures[Int($0)] : nil }
+                .flatMap { $0.textureType == .type2D ? $0 : nil }
+        }
+        func cube(_ index: UInt32?) -> MTLTexture? {
+            index.flatMap { Int($0) < textures.count ? textures[Int($0)] : nil }
+                .flatMap { $0.textureType == .typeCube ? $0 : nil }
         }
         var opaqueDraws: [Draw] = []
         var blendedDraws: [Draw] = []
@@ -234,10 +344,18 @@ public final class LevelRenderer {
                 environmentKind: UInt32(material.environmentKind),
                 alphaTested: material.kind == .alphaTested ? 1 : 0, fogMode: FrameUniforms.fogMode(blend))
             let center = draw.center.count == 3 ? SIMD3(draw.center[0], draw.center[1], draw.center[2]) : .zero
-            let chicagoTextures = uniforms.chicago(material, texture: texture, white: white)
+            var bound: [MTLTexture]
+            if let chicago = uniforms.chicago(material, texture: texture, white: white) {
+                bound = chicago + [white, white, white, whiteCube]
+            } else {
+                bound = maps.map { $0 ?? white }
+                bound += material.environment.map {
+                    uniforms.environment($0, texture: texture, cube: cube, white: white, whiteCube: whiteCube)
+                } ?? [white, white, white, whiteCube]
+            }
             let made = Draw(firstIndex: Int(draw.firstIndex), indexCount: Int(draw.indexCount),
-                            blend: blend, uniforms: uniforms,
-                            textures: chicagoTextures ?? maps.map { $0 ?? white }, center: center)
+                            blend: blend, uniforms: uniforms, textures: bound, center: center,
+                            material: Int(draw.material))
             if made.blend == nil {
                 opaqueDraws.append(made)
             } else {
@@ -274,16 +392,21 @@ public final class LevelRenderer {
         clampDescriptor.magFilter = .linear
         clampDescriptor.sAddressMode = .clampToEdge
         clampDescriptor.tAddressMode = .clampToEdge
+        let nearestDescriptor = MTLSamplerDescriptor()
+        nearestDescriptor.sAddressMode = .repeat
+        nearestDescriptor.tAddressMode = .repeat
         guard let depthWrite = device.makeDepthStencilState(descriptor: write),
               let depthTest = device.makeDepthStencilState(descriptor: test),
               let wrap = device.makeSamplerState(descriptor: wrapDescriptor),
-              let clamp = device.makeSamplerState(descriptor: clampDescriptor) else {
+              let clamp = device.makeSamplerState(descriptor: clampDescriptor),
+              let nearest = device.makeSamplerState(descriptor: nearestDescriptor) else {
             throw LevelRendererError.resources("depth and sampler states")
         }
         self.depthWrite = depthWrite
         self.depthTest = depthTest
         self.wrap = wrap
         self.clamp = clamp
+        self.nearest = nearest
     }
 
     private static func library(device: MTLDevice, source: String) throws -> MTLLibrary {
@@ -372,8 +495,12 @@ public final class LevelRenderer {
             let jitter = Jitter.offset(frame: temporal.frame)
             let jittered = Jitter.apply(jitter, to: viewProjection, width: temporal.inputWidth,
                                         height: temporal.inputHeight)
+            // (the scaler's input samples its maps as the output would, as
+            // MetalFX asks: log2 of the scale, a level sharper at half)
+            let mipBias = log2(Float(temporal.inputWidth) / Float(max(target.width, 1)))
             drawLevel(into: commands, frame: temporal.color, depth: temporal.depth, keepDepth: true,
-                      viewProjection: jittered, camera: camera, objects: objects, debugLines: debugLines)
+                      viewProjection: jittered, camera: camera, objects: objects, debugLines: debugLines,
+                      mipBias: mipBias)
             var uniforms = temporal.motionUniforms(current: viewProjection)
             let motionPass = MTLRenderPassDescriptor()
             motionPass.colorAttachments[0].texture = temporal.motion
@@ -414,14 +541,15 @@ public final class LevelRenderer {
     /// both into `frame`.
     private func drawLevel(into commands: MTLCommandBuffer, frame: MTLTexture, depth: MTLTexture, keepDepth: Bool,
                            viewProjection: simd_float4x4, camera: ViewCamera, objects: [DrawnObject],
-                           debugLines: [DebugSegment]) {
+                           debugLines: [DebugSegment], mipBias: Float = 0) {
         let skyObject = sky?.model.map { model in
             DrawnObject(model: Int(model), transform: simd_float4x4(translation: camera.position),
                         center: camera.position, radius: 1, regions: [], nodes: [])
         }
         let prepared = models.prepare(objects, sky: skyObject, camera: camera, viewportHeight: frame.height,
                                       device: device)
-        var uniforms = FrameUniforms(viewProjection: viewProjection, camera: camera, fog: sky?.fog)
+        let animation = geometry.materialAnimation(seconds: time)
+        var uniforms = FrameUniforms(viewProjection: viewProjection, camera: camera, fog: sky?.fog, mipBias: mipBias)
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = frame
         pass.colorAttachments[0].loadAction = .clear
@@ -442,12 +570,13 @@ public final class LevelRenderer {
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
         encoder.setFragmentSamplerState(wrap, index: 0)
         encoder.setFragmentSamplerState(clamp, index: 1)
+        encoder.setFragmentSamplerState(nearest, index: 2)
         models.encodeSky(prepared, into: encoder)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setRenderPipelineState(opaque)
         encoder.setDepthStencilState(depthWrite)
         for draw in opaqueDraws {
-            encode(draw, encoder)
+            encode(draw, animation, encoder)
         }
         models.encode(prepared, blendedParts: false, into: encoder)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
@@ -459,7 +588,7 @@ public final class LevelRenderer {
         for draw in far {
             guard let blend = draw.blend, let index = Self.blendFunctions.firstIndex(of: blend) else { continue }
             encoder.setRenderPipelineState(blended[index])
-            encode(draw, encoder)
+            encode(draw, animation, encoder)
         }
         models.encode(prepared, blendedParts: true, into: encoder)
         // the debug lines, hidden by what is nearer (and the buffers they took back)
@@ -503,8 +632,9 @@ public final class LevelRenderer {
         temporal?.previous = nil
     }
 
-    private func encode(_ draw: Draw, _ encoder: MTLRenderCommandEncoder) {
+    private func encode(_ draw: Draw, _ animation: [Float], _ encoder: MTLRenderCommandEncoder) {
         var uniforms = draw.uniforms
+        uniforms.animate(animation, material: draw.material)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<MaterialUniforms>.stride, index: 0)
         encoder.setFragmentTextures(draw.textures, range: 0..<draw.textures.count)
         encoder.drawIndexedPrimitives(type: .triangle, indexCount: draw.indexCount, indexType: .uint32,
@@ -544,7 +674,10 @@ public final class LevelRenderer {
 
     static func vertexDescriptor(stride: Int) -> MTLVertexDescriptor {
         let descriptor = MTLVertexDescriptor()
-        let attributes: [(MTLVertexFormat, Int)] = [(.float3, 0), (.float3, 12), (.float2, 24), (.float2, 32)]
+        // position, normal, texcoord, lightmap texcoord, tangent, binormal
+        // and the incident light (RenderLevel's VERTEX_STRIDE)
+        let attributes: [(MTLVertexFormat, Int)] = [(.float3, 0), (.float3, 12), (.float2, 24), (.float2, 32),
+                                                    (.float3, 40), (.float3, 52), (.float3, 64)]
         for (index, (format, offset)) in attributes.enumerated() {
             descriptor.attributes[index].format = format
             descriptor.attributes[index].offset = offset
@@ -579,11 +712,16 @@ public final class LevelRenderer {
         if texture.format != .rgba8, !device.supportsBCTextureCompression { return nil }
         let width = Int(texture.width)
         let height = Int(texture.height)
-        guard width > 0, height > 0, texture.levelCount > 0 else { return nil }
+        let faces = Int(texture.faces)
+        guard width > 0, height > 0, texture.levelCount > 0, faces == 1 || (faces == 6 && width == height) else {
+            return nil
+        }
         let fullChain = Int(log2(Double(max(width, height)))) + 1
         let levels = min(Int(texture.levelCount), fullChain)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: width,
-                                                                  height: height, mipmapped: levels > 1)
+        let descriptor = faces == 6
+            ? MTLTextureDescriptor.textureCubeDescriptor(pixelFormat: format, size: width, mipmapped: levels > 1)
+            : MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: width, height: height,
+                                                       mipmapped: levels > 1)
         descriptor.mipmapLevelCount = levels
         descriptor.usage = .shaderRead
         descriptor.storageMode = .shared
@@ -593,25 +731,36 @@ public final class LevelRenderer {
             let levelHeight = max(height >> level, 1)
             let (rowBytes, rows) = layout(texture.format, width: levelWidth, height: levelHeight)
             let data = bytes(UInt32(level))
-            guard data.count >= rowBytes * rows else { return nil }
+            let faceBytes = rowBytes * rows
+            guard data.count >= faceBytes * faces else { return nil }
             data.withUnsafeBytes { raw in
                 guard let base = raw.baseAddress else { return }
-                made.replace(region: MTLRegionMake2D(0, 0, levelWidth, levelHeight), mipmapLevel: level,
-                             withBytes: base, bytesPerRow: rowBytes)
+                // (a cube's faces in turn, +x, -x, +y, -y, +z, -z: Metal's slices)
+                for face in 0..<faces {
+                    made.replace(region: MTLRegionMake2D(0, 0, levelWidth, levelHeight), mipmapLevel: level,
+                                 slice: face, withBytes: base + face * faceBytes, bytesPerRow: rowBytes,
+                                 bytesPerImage: faceBytes)
+                }
             }
         }
         return made
     }
 
-    /// One white texel, bound where a map is missing.
-    static func white(_ device: MTLDevice) -> MTLTexture? {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: 1, height: 1,
-                                                                  mipmapped: false)
+    /// One white texel (on each face of a cube), bound where a map is
+    /// missing.
+    static func white(_ device: MTLDevice, cube: Bool = false) -> MTLTexture? {
+        let descriptor = cube
+            ? MTLTextureDescriptor.textureCubeDescriptor(pixelFormat: .rgba8Unorm, size: 1, mipmapped: false)
+            : MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: 1, height: 1,
+                                                       mipmapped: false)
         descriptor.usage = .shaderRead
         descriptor.storageMode = .shared
         guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
         let white: [UInt8] = [255, 255, 255, 255]
-        texture.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: white, bytesPerRow: 4)
+        for face in 0..<(cube ? 6 : 1) {
+            texture.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, slice: face, withBytes: white,
+                            bytesPerRow: 4, bytesPerImage: 4)
+        }
         return texture
     }
 }
