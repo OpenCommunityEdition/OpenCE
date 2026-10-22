@@ -75,6 +75,8 @@ void hardcore_rules_defaults(struct hardcore_rules *rules)
 	/* training mode stays off. the pads and the volumes wait for that
 	   switch. comp 2v2 turns the percent on by itself. */
 	rules->team_scores = 1;
+	/* fading is the stock drain. constant holds the extra shield. */
+	rules->os_type = 1;
 }
 
 /* the menu's one switch for the pads and the volumes. an older sheet may
