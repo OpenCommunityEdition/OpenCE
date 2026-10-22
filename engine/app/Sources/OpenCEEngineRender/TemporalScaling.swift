@@ -125,8 +125,8 @@ final class TemporalScaling {
             made.storageMode = .private
             return device.makeTexture(descriptor: made)
         }
-        guard let color = texture(LevelRenderer.frameFormat, input, scaler.colorTextureUsage.union(.renderTarget)),
-              let depth = texture(LevelRenderer.depthFormat, input, scaler.depthTextureUsage.union(.renderTarget)),
+        guard let color = texture(LevelRenderer.frameFormat, input, scaler.colorTextureUsage.union([.renderTarget, .shaderRead])),
+              let depth = texture(LevelRenderer.depthFormat, input, scaler.depthTextureUsage.union([.renderTarget, .shaderRead])),
               let motion = texture(Self.motionFormat, input, scaler.motionTextureUsage.union(.renderTarget)),
               let out = texture(LevelRenderer.frameFormat, output, scaler.outputTextureUsage.union(.shaderRead))
         else { return nil }

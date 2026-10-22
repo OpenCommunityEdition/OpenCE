@@ -942,6 +942,14 @@ impl Engine {
         self.lock_registry().get_bool(&name)
     }
 
+    /// A shell variable's value as text (empty if there is none).
+    pub fn shell_value(&self, name: String) -> String {
+        self.lock_registry()
+            .get(&name)
+            .map(ToString::to_string)
+            .unwrap_or_default()
+    }
+
     /// Sets a shell variable from text read as its kind.
     pub fn set_shell_variable(&self, name: String, value: String) -> Result<(), EngineError> {
         let mut registry = self.lock_registry();

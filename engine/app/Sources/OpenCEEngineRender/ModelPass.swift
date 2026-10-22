@@ -234,6 +234,10 @@ final class ModelPass {
             if let blend {
                 LevelRenderer.blending(descriptor.colorAttachments[0], blend)
             }
+            // (the opaque pass's surfaces, which the sky leaves alone)
+            if sky || blend == nil {
+                ScreenPass.attachments(descriptor, written: !sky)
+            }
             return try device.makeRenderPipelineState(descriptor: descriptor)
         }
         do {

@@ -589,6 +589,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // (the game's time, at its 60 ticks a second, for the shaders' animations)
         renderer.time = Float((Double(frame.tick) + Double(frame.alpha)) / 60)
         renderer.lights = frame.drawnLights()
+        renderer.switches = RenderSwitches(flag: { engine.shellFlag(name: $0) },
+                                           value: { engine.shellValue(name: $0) })
         let objects = profiled("objects", engine) { frame.drawnObjects() }
         let hudQuads = profiled("hud", engine) { engine.hud(width: UInt32(width), height: UInt32(height)) }
         let debugLines = frame.debugSegments()

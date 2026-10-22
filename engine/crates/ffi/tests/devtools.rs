@@ -110,6 +110,39 @@ fn the_app_does_what_the_engine_cannot() -> Result {
 }
 
 #[test]
+fn the_screen_passes_can_be_switched_off_and_shown_alone() -> Result {
+    let engine = Engine::new();
+    for name in [
+        "render.gtao",
+        "render.ssr",
+        "render.contact_shadows",
+        "render.sun_shadows",
+        "render.lights",
+    ] {
+        assert!(engine.shell_flag(name.into()), "{name} is on by default");
+        run(&engine, &format!("{name} off"))?;
+        assert!(!engine.shell_flag(name.into()), "{name} stayed on");
+        assert_eq!(
+            engine.saved_shell_variables().get(name).map(String::as_str),
+            Some("false"),
+            "{name} is kept between runs"
+        );
+    }
+    assert_eq!(engine.shell_value("render.view".into()), "frame");
+    for view in ["depth", "normals", "ao", "contact", "ssr", "frame"] {
+        run(&engine, &format!("render.view {view}"))?;
+        assert_eq!(engine.shell_value("render.view".into()), view);
+    }
+    refused(&engine, "render.view albedo")?;
+    assert_eq!(engine.shell_value("render.view".into()), "frame");
+    assert_eq!(engine.shell_value("no.such.variable".into()), "");
+    // (the view is not kept between runs)
+    run(&engine, "render.view ao")?;
+    assert!(!engine.saved_shell_variables().contains_key("render.view"));
+    Ok(())
+}
+
+#[test]
 fn variables_completion_and_bindings() -> Result {
     let engine = Engine::new();
     assert!(!engine.shell_flag("render.wireframe".into()));
@@ -140,7 +173,7 @@ fn variables_completion_and_bindings() -> Result {
         ("true", "false")
     );
     assert_eq!(engine.complete_command("nocl".into()), ["noclip"]);
-    assert_eq!(engine.complete_command("ren".into()).len(), 4);
+    assert_eq!(engine.complete_command("ren".into()).len(), 10);
     run(&engine, "bind f5 pause")?;
     engine.start_empty_world();
     assert!(engine.press_key("f5".into()).ok);

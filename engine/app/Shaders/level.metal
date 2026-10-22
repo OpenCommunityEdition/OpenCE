@@ -157,6 +157,42 @@ float4 fogged(float4 color, float fog, constant Frame &frame, constant Material 
     return color;
 }
 
+// what the opaque passes write beside the colour, for the screen's passes
+// (screen.metal): the surface's shading normal and what it is, the
+// reflection it added and the sun's share of its light, and the weight a
+// reflection takes on it (the colour the cube map was multiplied by)
+struct Opaque {
+    float4 color [[color(0)]];
+    float4 surface [[color(1)]];
+    float4 reflection [[color(2)]];
+    float4 reflectance [[color(3)]];
+};
+
+// (Opaque's surface.w: what the screen's passes take it for)
+constant float SURFACE_LEVEL = 1;
+constant float SURFACE_OBJECT = 2;
+// (unlit, or the first-person weapon in the nearer half of the depth
+// range: left as drawn)
+constant float SURFACE_KEPT = 3;
+
+Opaque opaque(float4 color, float4 position, float kind, float3 normal, float sun, float3 reflected,
+              float3 weight, float fog) {
+    Opaque out;
+    out.color = color;
+    // (what the fog hides of the reflection, the screen's passes do not
+    // bring back)
+    float seen = 1 - saturate(fog);
+    out.surface = float4(normal, position.z > 0.5 ? SURFACE_KEPT : kind);
+    out.reflection = float4(reflected * seen, saturate(sun));
+    out.reflectance = float4(weight * seen, 1);
+    return out;
+}
+
+// the share of `irradiance` the sun's `sun` is
+float sun_share(float3 sun, float3 irradiance) {
+    return saturate(dot(sun, float3(1.0 / 3)) / max(dot(irradiance, float3(1.0 / 3)), 1e-4));
+}
+
 vertex VertexOut level_vertex(VertexIn in [[stage_in]], constant Frame &frame [[buffer(1)]]) {
     VertexOut out;
     out.position = frame.view_projection * float4(in.position, 1);
@@ -370,19 +406,22 @@ float2 sun_seen(constant Shadows &shadows, constant Frame &frame, float3 world, 
 // bounced to it, and the sky's), and the sun's where the shadow maps (or,
 // beyond them, the probes) see it, shown as the lightmaps' light is;
 // without a bake the probes are white and there is no sun, an even light
-float3 object_light(constant Frame &frame, float3 world, float3 normal, sampler clamp,
+// (w: the sun's share of it)
+float4 object_light(constant Frame &frame, float3 world, float3 normal, sampler clamp,
                     texture3d<float> px, texture3d<float> nx, texture3d<float> py,
                     texture3d<float> ny, texture3d<float> pz, texture3d<float> nz,
                     constant Shadows &shadows, depth2d_array<float> shadow_map) {
     float3 n = direction(normal, float3(0, 0, 1));
     float4 cube = probe_cube(frame, world, n, clamp, px, nx, py, ny, pz, nz);
     float3 irradiance = cube.rgb;
+    float3 sun = float3(0);
     if (frame.sun_towards.w > 0) {
         float facing = saturate(dot(n, frame.sun_towards.xyz));
         float2 seen = facing > 0 ? sun_seen(shadows, frame, world, n, shadow_map) : float2(0);
-        irradiance += frame.sun_color.rgb * facing * mix(saturate(cube.w), seen.x, seen.y);
+        sun = frame.sun_color.rgb * facing * mix(saturate(cube.w), seen.x, seen.y);
+        irradiance += sun;
     }
-    return baked_shown(irradiance);
+    return float4(baked_shown(irradiance), sun_share(sun, irradiance));
 }
 
 // (as LightPass's GPULight) a dynamic light: the flashlight's, a shot's,
@@ -571,7 +610,7 @@ DynamicLit dynamic_light(constant DynamicLight *lights, constant uint2 *light_ce
     return lit;
 }
 
-fragment float4 level_fragment(VertexOut in [[stage_in]],
+fragment Opaque level_fragment(VertexOut in [[stage_in]],
                                constant Material &material [[buffer(0)]],
                                constant Frame &frame [[buffer(1)]],
                                texture2d<float> base [[texture(0)]],
@@ -599,7 +638,8 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
     if (material.chicago_count != 0) {
         // (unlit, as the game draws them)
         array<texture2d<float>, 4> maps = {base, primary, secondary, lightmap};
-        return fogged(chicago(in.texcoord, material, maps, wrap, frame.eye.w), in.fog, frame, material);
+        return opaque(fogged(chicago(in.texcoord, material, maps, wrap, frame.eye.w), in.fog, frame, material),
+                      in.position, SURFACE_KEPT, float3(0), 0, float3(0), float3(0), in.fog);
     }
     uint bits = material.environment.w;
     // the maps scrolled as the shader animates them
@@ -630,6 +670,8 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
     // the light's direction, as long as its share of the light (the
     // stock lightmaps' from the vertices, the bake's from its texels)
     float3 incident_light = in.incident;
+    // (the sun's share of the light, where the bake knows the sun)
+    float sun = 0;
     if (material.maps & LIGHTMAP) {
         if (material.maps & BAKED) {
             float3 irradiance = lightmap.sample(clamp, in.lightmap).rgb;
@@ -642,6 +684,7 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
                 float2 seen = sun_seen(shadows, frame, in.world, normal, shadows_map);
                 float hidden = max(open.x - seen.x, 0.0) * seen.y;
                 irradiance = max(irradiance - frame.sun_color.rgb * facing * hidden, float3(0));
+                sun = sun_share(frame.sun_color.rgb * facing * (seen.y > 0 ? seen.x : open.x), irradiance);
             }
             lightmapped = baked_shown(irradiance);
             float4 baked = baked_directions.sample(clamp, in.lightmap);
@@ -661,7 +704,8 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
     if (!(bits & ENVIRONMENT)) {
         DynamicLit lit = dynamic_light(DYNAMIC_LIGHTS, in.world, normal, eye, 0);
         color.rgb *= to_shown(to_linear(light) + lit.diffuse);
-        return fogged(color, in.fog, frame, material);
+        return opaque(fogged(color, in.fog, frame, material), in.position, SURFACE_LEVEL, normal, sun, float3(0),
+                      float3(0), in.fog);
     }
     uint flags = material.environment.y;
     DynamicLit lit = dynamic_light(DYNAMIC_LIGHTS, in.world, bumped, eye,
@@ -717,14 +761,18 @@ fragment float4 level_fragment(VertexOut in [[stage_in]],
 
     // the cube map's reflection, brighter across the surface than along it,
     // dimmed by the lightmap's darkness as far as its scale says
+    float3 reflected = float3(0);
+    float3 weight = float3(0);
     if (bits & REFLECTION) {
-        float3 reflected = reflection.sample(clamp, reflect(-eye, facing)).rgb;
         float brightness = mix(material.reflection_parallel.x, material.environment_scales.w, fresnel);
         float unmasked = saturate(material.specular_parallel.w);
         float lit = mix(dot(lightmapped, float3(1.0 / 3)), 1.0, unmasked);
-        color.rgb += reflected * tint * brightness * mask * lit;
+        weight = tint * brightness * mask * lit;
+        reflected = reflection.sample(clamp, reflect(-eye, facing)).rgb * weight;
+        color.rgb += reflected;
     }
-    return fogged(color, in.fog, frame, material);
+    return opaque(fogged(color, in.fog, frame, material), in.position, SURFACE_LEVEL, bumped, sun, reflected, weight,
+                  in.fog);
 }
 
 struct ModelIn {
@@ -845,7 +893,7 @@ float detail_mask(uint mask, float4 multipurpose) {
 // lit by the world (object_light), then the model combiner's
 // self-illumination, change colour, reflection (its cube by the light of
 // the nearest reflection probe) and detail
-fragment float4 model_fragment(ModelOut in [[stage_in]],
+fragment Opaque model_fragment(ModelOut in [[stage_in]],
                                constant Material &material [[buffer(0)]],
                                constant Frame &frame [[buffer(1)]],
                                constant float4 *change_colors [[buffer(2)]],
@@ -869,18 +917,21 @@ fragment float4 model_fragment(ModelOut in [[stage_in]],
                                sampler clamp [[sampler(1)]]) {
     if (material.chicago_count != 0) {
         array<texture2d<float>, 4> maps = {base, primary, secondary, fourth};
-        return fogged(chicago(in.texcoord, material, maps, wrap, frame.eye.w), in.fog, frame, material);
+        return opaque(fogged(chicago(in.texcoord, material, maps, wrap, frame.eye.w), in.fog, frame, material),
+                      in.position, SURFACE_KEPT, float3(0), 0, float3(0), float3(0), in.fog);
     }
     float3 normal = direction(in.normal, float3(0, 0, 1));
-    float3 light = object_light(frame, in.world, normal, clamp, probe_px, probe_nx, probe_py, probe_ny,
-                                probe_pz, probe_nz, shadows, shadows_map);
+    float4 world_light = object_light(frame, in.world, normal, clamp, probe_px, probe_nx, probe_py, probe_ny,
+                                      probe_pz, probe_nz, shadows, shadows_map);
+    float3 light = world_light.rgb;
     DynamicLit lit = dynamic_light(DYNAMIC_LIGHTS, in.world, normal, float3(0, 0, 1), 0);
     light = to_shown(to_linear(light) + lit.diffuse);
     uint bits = material.model.x;
     if (!(bits & MODEL)) {
         float4 color = surface(in.texcoord, material, base, primary, secondary, wrap, frame.eye.w);
         color.rgb *= light;
-        return fogged(color, in.fog, frame, material);
+        return opaque(fogged(color, in.fog, frame, material), in.position, SURFACE_OBJECT, normal, world_light.w,
+                      float3(0), float3(0), in.fog);
     }
     float lod = frame.eye.w;
     // the maps scrolled as the shader animates them
@@ -915,6 +966,7 @@ fragment float4 model_fragment(ModelOut in [[stage_in]],
     // the cube map's reflection, by the fresnel term between its tints,
     // faded in from its cutoff distance to its falloff distance
     float3 reflected = float3(0);
+    float3 weight = float3(0);
     if (bits & MODEL_REFLECTION) {
         float3 toward = frame.eye.xyz - in.world;
         float3 eye = direction(toward, normal);
@@ -928,8 +980,8 @@ fragment float4 model_fragment(ModelOut in [[stage_in]],
             fraction = saturate((length(toward) - cutoff) / (falloff - cutoff));
         }
         float3 toward_reflected = reflect(-eye, normal);
-        reflected = reflection.sample(clamp, toward_reflected).rgb * tint.rgb
-                  * (multipurpose.r * tint.a * fraction);
+        weight = tint.rgb * (multipurpose.r * tint.a * fraction);
+        reflected = reflection.sample(clamp, toward_reflected).rgb * weight;
         // the radiance the probe sees that way, shown as a white surface
         // lit by it would be (pi times it is the irradiance of that)
         if (object.reflection_probe >= 0) {
@@ -937,12 +989,17 @@ fragment float4 model_fragment(ModelOut in [[stage_in]],
             reflected *= baked_shown(radiance * M_PI_F);
         }
     }
+    // (what the reflection adds after the detail map, which scales it)
+    float3 detail_scale = float3(1);
     if (bits & DETAIL_AFTER_REFLECTION) {
-        color.rgb = detailed(material.detail_function, color.rgb * light + reflected, detail);
+        float3 before = color.rgb * light;
+        color.rgb = detailed(material.detail_function, before + reflected, detail);
+        detail_scale = color.rgb / max(before + reflected, float3(1e-4));
     } else {
         color.rgb = detailed(material.detail_function, color.rgb, detail) * light + reflected;
     }
-    return fogged(color, in.fog, frame, material);
+    return opaque(fogged(color, in.fog, frame, material), in.position, SURFACE_OBJECT, normal, world_light.w,
+                  reflected * detail_scale, weight * detail_scale, in.fog);
 }
 
 // a transparent shader's output: what is added to the frame, and what

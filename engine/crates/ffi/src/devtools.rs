@@ -140,7 +140,7 @@ impl Default for Shell {
 }
 
 // (the drawing switches the app reads)
-const VARIABLES: [(&str, &str, bool, bool); 4] = [
+const VARIABLES: [(&str, &str, bool, bool); 9] = [
     (
         "render.wireframe",
         "Draws the level and objects as lines.",
@@ -155,7 +155,36 @@ const VARIABLES: [(&str, &str, bool, bool); 4] = [
     ),
     ("render.objects", "Draws the objects.", true, false),
     ("render.hud", "Draws the HUD.", true, true),
+    (
+        "render.gtao",
+        "Darkens the light objects keep from the level and each other (ambient occlusion).",
+        true,
+        true,
+    ),
+    (
+        "render.ssr",
+        "Reflects what is on the screen over the reflection probes.",
+        true,
+        true,
+    ),
+    (
+        "render.contact_shadows",
+        "Draws the small shadows of the sun the shadow maps are too coarse for.",
+        true,
+        true,
+    ),
+    (
+        "render.sun_shadows",
+        "Draws the sun's shadows of objects.",
+        true,
+        true,
+    ),
+    ("render.lights", "Draws the dynamic lights.", true, true),
 ];
+
+/// What `render.view` can show alone: the frame, or one of the buffers
+/// the screen's passes read or write.
+pub const RENDER_VIEWS: &[&str] = &["frame", "depth", "normals", "ao", "contact", "ssr"];
 
 // (the debug drawing's layers: `debug.draw.<layer>`)
 const LAYERS: [(Layer, &str); 9] = [
@@ -331,6 +360,13 @@ pub(crate) fn registry() -> Registry<State> {
     for (name, help, default, saved) in VARIABLES {
         registry.variable(name, help, VarKind::Bool, VarValue::Bool(default), saved);
     }
+    registry.variable(
+        "render.view",
+        "Shows one buffer alone (frame shows the frame).",
+        VarKind::Enum(RENDER_VIEWS),
+        VarValue::String("frame".into()),
+        false,
+    );
     for (layer, help) in LAYERS {
         let name = format!("{DRAW_PREFIX}{}", layer.name());
         let on = DebugDraw::new().is_on(layer);

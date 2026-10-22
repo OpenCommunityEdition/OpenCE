@@ -24,7 +24,8 @@ final class ShaderTests: XCTestCase {
         let checkout = try XCTUnwrap(ShaderSources.checkout, "no engine/app/Shaders")
         XCTAssertEqual(ShaderSources.folder(), checkout)
         let functions: [Shader: String] = [.level: "level_fragment", .hud: "hud_vertex", .text: "text_fragment",
-                                           .debug: "debug_vertex", .bake: "bake_irradiance"]
+                                           .debug: "debug_vertex", .screen: "screen_occlusion",
+                                           .bake: "bake_irradiance"]
         for shader in Shader.allCases {
             let source = try ShaderSources.source(shader)
             XCTAssertTrue(source.contains(try XCTUnwrap(functions[shader])), shader.file)

@@ -408,8 +408,15 @@ public final class LevelRenderer {
     public let debug: DebugPass
     /// The sun's shadow maps.
     let shadows: ShadowPass
+    /// The screen's passes: occlusion, contact shadows, reflections.
+    let screen: ScreenPass
+    /// The passes switched on, and the buffer shown (`render.*`).
+    public var switches = RenderSwitches()
     /// Whether the sun's shadows are drawn (with a baked sun).
-    public var sunShadows = true
+    public var sunShadows: Bool {
+        get { switches.sunShadows }
+        set { switches.sunShadows = newValue }
+    }
     /// Whether the last frame drew the sun's shadows, and the width of
     /// their maps in texels.
     public var sunShadowsDrawn: Bool { shadows.uniforms.forward.w > 0 }
@@ -518,6 +525,7 @@ public final class LevelRenderer {
         shadows = try ShadowPass(device: device, library: library, levelStride: vertexStride,
                                  modelStride: Int(geometry.modelVertexStride()))
         lightPass = try LightPass(device: device, gels: geometry.lightGels().map(cube), whiteCube: whiteCube)
+        screen = try ScreenPass(device: device, source: ShaderSources.source(.screen))
         sky = geometry.sky()
 
         // reversed depth: nearer is greater
@@ -576,6 +584,8 @@ public final class LevelRenderer {
             descriptor.depthAttachmentPixelFormat = Self.depthFormat
             if let blend {
                 Self.blending(descriptor.colorAttachments[0], blend)
+            } else {
+                ScreenPass.attachments(descriptor, written: true)
             }
             return try device.makeRenderPipelineState(descriptor: descriptor)
         }
@@ -721,13 +731,39 @@ public final class LevelRenderer {
                            self.models.encodeShadowCasters(prepared, casting, into: encoder)
                        })
         var shadowUniforms = shadows.uniforms
-        let lightFrame = lightPass.prepare(lights, camera: camera,
+        let lightFrame = lightPass.prepare(switches.lights ? lights : [], camera: camera,
                                            aspect: Float(frame.width) / Float(max(frame.height, 1)))
         let casting = shadows.pipelines
         lightPass.encodeShadows(lightFrame, into: commands, wrap: wrap) { encoder in
             self.encodeShadowCasters(encoder, casting.level)
             self.models.encodeShadowCasters(prepared, casting.model, into: encoder)
         }
+        let screenTargets = screen.targets(width: frame.width, height: frame.height)
+        let fullViewport = MTLViewport(originX: 0, originY: 0, width: Double(frame.width),
+                                       height: Double(frame.height), znear: 0, zfar: 1)
+        // the first-person weapon and hands over the world: in the nearer
+        // half of the depth range (reversed: 0.5 to 1), which the world
+        // reaches only nearer the eye than twice the near plane
+        let nearViewport = MTLViewport(originX: 0, originY: 0, width: Double(frame.width),
+                                       height: Double(frame.height), znear: 0.5, zfar: 1)
+        func bind(_ encoder: MTLRenderCommandEncoder) {
+            encoder.setCullMode(.none)
+            encoder.setVertexBuffer(vertices, offset: 0, index: 0)
+            encoder.setVertexBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
+            encoder.setFragmentBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
+            encoder.setFragmentSamplerState(wrap, index: 0)
+            encoder.setFragmentSamplerState(clamp, index: 1)
+            encoder.setFragmentSamplerState(nearest, index: 2)
+            encoder.setFragmentTextures(probes, range: 9..<15)
+            encoder.setFragmentTexture(reflections, index: 15)
+            encoder.setFragmentTexture(shadows.levelMaps, index: 16)
+            encoder.setFragmentTexture(shadows.maps, index: 17)
+            encoder.setFragmentBytes(&shadowUniforms, length: MemoryLayout<ShadowUniforms>.stride, index: 4)
+            lightPass.bind(lightFrame, into: encoder)
+        }
+
+        // the opaque surfaces, with their normals and reflections for the
+        // screen's passes
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = frame
         pass.colorAttachments[0].loadAction = .clear
@@ -736,25 +772,19 @@ public final class LevelRenderer {
             ? MTLClearColor(red: Double(uniforms.fogColor.x), green: Double(uniforms.fogColor.y),
                             blue: Double(uniforms.fogColor.z), alpha: 1)
             : Self.skyColor
+        for (index, texture) in (screenTargets?.attachments ?? []).enumerated() {
+            pass.colorAttachments[index + 1].texture = texture
+            pass.colorAttachments[index + 1].loadAction = .clear
+            pass.colorAttachments[index + 1].storeAction = .store
+            pass.colorAttachments[index + 1].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        }
         pass.depthAttachment.texture = depth
         pass.depthAttachment.loadAction = .clear
-        pass.depthAttachment.storeAction = keepDepth ? .store : .dontCare
+        pass.depthAttachment.storeAction = .store
         pass.depthAttachment.clearDepth = 0
-        guard let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else { return }
-        encoder.label = "level"
-        encoder.setCullMode(.none)
-        encoder.setVertexBuffer(vertices, offset: 0, index: 0)
-        encoder.setVertexBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
-        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
-        encoder.setFragmentSamplerState(wrap, index: 0)
-        encoder.setFragmentSamplerState(clamp, index: 1)
-        encoder.setFragmentSamplerState(nearest, index: 2)
-        encoder.setFragmentTextures(probes, range: 9..<15)
-        encoder.setFragmentTexture(reflections, index: 15)
-        encoder.setFragmentTexture(shadows.levelMaps, index: 16)
-        encoder.setFragmentTexture(shadows.maps, index: 17)
-        encoder.setFragmentBytes(&shadowUniforms, length: MemoryLayout<ShadowUniforms>.stride, index: 4)
-        lightPass.bind(lightFrame, into: encoder)
+        guard screenTargets != nil, let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else { return }
+        encoder.label = "level opaque"
+        bind(encoder)
         models.encodeSky(prepared, into: encoder)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setRenderPipelineState(opaque)
@@ -763,36 +793,58 @@ public final class LevelRenderer {
             encode(draw, animation, encoder)
         }
         models.encode(prepared, blendedParts: false, animation: animation, into: encoder)
-        encoder.setVertexBuffer(vertices, offset: 0, index: 0)
-        encoder.setDepthStencilState(depthTest)
+        if !prepared.firstPerson.isEmpty {
+            encoder.setViewport(nearViewport)
+            encoder.setDepthStencilState(depthWrite)
+            models.encode(prepared, blendedParts: false, firstPerson: true, animation: animation, into: encoder)
+        }
+        encoder.endEncoding()
+
+        // occlusion and reflections from what the opaque pass left
+        guard let screenTargets else { return }
+        let screenUniforms = ScreenUniforms(viewProjection: viewProjection, eye: camera.position,
+                                            sunTowards: towards == nil ? .zero : sun.towards, width: frame.width,
+                                            height: frame.height, switches: switches)
+        screen.encode(into: commands, targets: screenTargets, frame: frame, depth: depth, uniforms: screenUniforms)
+
+        // applied to the frame, then the blended surfaces over it
+        let over = MTLRenderPassDescriptor()
+        over.colorAttachments[0].texture = frame
+        over.colorAttachments[0].loadAction = .load
+        over.colorAttachments[0].storeAction = .store
+        over.depthAttachment.texture = depth
+        over.depthAttachment.loadAction = .load
+        over.depthAttachment.storeAction = keepDepth ? .store : .dontCare
+        guard let blendedEncoder = commands.makeRenderCommandEncoder(descriptor: over) else { return }
+        blendedEncoder.label = "level blended"
+        screen.resolve(screenTargets, uniforms: screenUniforms, into: blendedEncoder)
+        bind(blendedEncoder)
+        blendedEncoder.setDepthStencilState(depthTest)
         // far to near
         let far = blendedDraws.sorted {
             distance_squared($0.center, camera.position) > distance_squared($1.center, camera.position)
         }
         for draw in far {
             guard let blend = draw.blend, let index = Self.blendFunctions.firstIndex(of: blend) else { continue }
-            encoder.setRenderPipelineState(blended[index])
-            encode(draw, animation, encoder)
+            blendedEncoder.setRenderPipelineState(blended[index])
+            encode(draw, animation, blendedEncoder)
         }
-        models.encode(prepared, blendedParts: true, animation: animation, into: encoder)
+        models.encode(prepared, blendedParts: true, animation: animation, into: blendedEncoder)
         // the debug lines, hidden by what is nearer (and the buffers they took back)
-        debug.encode(debugLines, viewProjection: viewProjection, into: encoder)
+        debug.encode(debugLines, viewProjection: viewProjection, into: blendedEncoder)
         if debug.lastDrawn > 0 {
-            encoder.setVertexBuffer(vertices, offset: 0, index: 0)
-            encoder.setVertexBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
+            blendedEncoder.setVertexBuffer(vertices, offset: 0, index: 0)
+            blendedEncoder.setVertexBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
         }
-        // the first-person weapon and hands over the world: in the nearer
-        // half of the depth range (reversed: 0.5 to 1), which the world
-        // reaches only nearer the eye than twice the near plane
         if !prepared.firstPerson.isEmpty {
-            encoder.setViewport(MTLViewport(originX: 0, originY: 0, width: Double(frame.width),
-                                            height: Double(frame.height), znear: 0.5, zfar: 1))
-            encoder.setDepthStencilState(depthWrite)
-            models.encode(prepared, blendedParts: false, firstPerson: true, animation: animation, into: encoder)
-            encoder.setDepthStencilState(depthTest)
-            models.encode(prepared, blendedParts: true, firstPerson: true, animation: animation, into: encoder)
+            blendedEncoder.setViewport(nearViewport)
+            blendedEncoder.setDepthStencilState(depthTest)
+            models.encode(prepared, blendedParts: true, firstPerson: true, animation: animation,
+                          into: blendedEncoder)
+            blendedEncoder.setViewport(fullViewport)
         }
-        encoder.endEncoding()
+        screen.view(screenTargets, uniforms: screenUniforms, into: blendedEncoder)
+        blendedEncoder.endEncoding()
     }
 
     /// The temporal scaler for an output `width` by `height`, made again
@@ -981,7 +1033,7 @@ public final class LevelRenderer {
         frame.storageMode = .private
         let depth = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: Self.depthFormat, width: width,
                                                              height: height, mipmapped: false)
-        depth.usage = .renderTarget
+        depth.usage = [.renderTarget, .shaderRead]
         depth.storageMode = .private
         guard let frameTexture = device.makeTexture(descriptor: frame),
               let depthTexture = device.makeTexture(descriptor: depth) else { return nil }
