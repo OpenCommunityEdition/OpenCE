@@ -1,0 +1,13 @@
+[package]
+name = "opence_ui"
+description = "The shell's widgets: the tree of a ui.map's widget definitions, their focus, their events and their text"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+opence_content.workspace = true
+
+[lints]
+workspace = true

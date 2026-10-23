@@ -335,7 +335,9 @@ pub struct WidgetText {
 /// A list widget's header, footer and flags.
 #[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
 pub struct WidgetList {
-    /// Its flags (bit 0: its items wrap; bit 1: interactive).
+    /// Its flags (bit 0: its items are made by code; bit 1: its items
+    /// are made from its text's string list, one each; bit 2: one tooltip
+    /// entry only; bit 3: one preview box, not scrolled).
     pub flags: u32,
     /// The bitmap above the list.
     pub header: Option<TagRef>,
@@ -354,7 +356,8 @@ pub struct ConditionalWidget {
     pub widget: Option<TagRef>,
     /// Its name.
     pub name: String,
-    /// Its flags (bit 0: loads it if the condition holds).
+    /// Its flags (bit 0: it is loaded when the event handler's function
+    /// fails).
     pub flags: u32,
     /// The controller it listens to.
     pub controller: i16,

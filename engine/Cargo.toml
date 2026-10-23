@@ -22,6 +22,7 @@ opence_script = { path = "crates/script" }
 opence_dev = { path = "crates/dev" }
 opence_net = { path = "crates/net" }
 opence_campaign = { path = "crates/campaign" }
+opence_ui = { path = "crates/ui" }
 thiserror = "2"
 bevy_ecs = { version = "0.20", default-features = false, features = ["std"] }
 rkyv = { version = "0.8", default-features = false, features = ["std", "bytecheck", "alloc"] }
