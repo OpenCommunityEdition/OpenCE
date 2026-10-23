@@ -13,9 +13,9 @@
 - [x] Task: The widget tree 882708ba
     - [x] Write tests: navigation and focus links; handlers fire their functions; conditional widgets; list items from data; spinners; formatted text
     - [x] `opence_ui` crate: the tree, the handlers, the UI functions wired to the engine, the unwired list
-- [ ] Task: Drawing the UI
-    - [ ] Write tests: the 640×480 layout scaled to the window; the UI pass's frame time
-    - [ ] The UI pass, the background scene with the new lighting, widget animation
+- [x] Task: Drawing the UI 50f43aa3
+    - [x] Write tests: the 640×480 layout scaled to the window; the UI pass's frame time
+    - [x] The UI pass, the background scene with the new lighting, widget animation
 - [ ] Task: Keyboard and mouse
     - [ ] Write tests: keys to the pad's buttons; hover focus, click, wheel and right-click by the widgets' bounds
     - [ ] Input to the widget tree; UI sounds
