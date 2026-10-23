@@ -4,9 +4,9 @@
 - [x] Task: The UI pack b30af7b9
     - [x] Write tests: `ui.map` imports; widget definitions, children, handlers, string lists, fonts and the UI scenario are read; bad references are refused; a fuzz target for the UI pack
     - [x] The importer's UI path and the typed UI content
-- [ ] Task: Fonts
-    - [ ] Write tests: each glyph's metrics and kerning; the distance field matches the glyph's coverage
-    - [ ] Font tags with signed distance fields built at import
+- [x] Task: Fonts d6bb0b83
+    - [x] Write tests: each glyph's metrics and kerning; the distance field matches the glyph's coverage
+    - [x] Font tags with signed distance fields built at import
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Importing the UI' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 2: The widget system
