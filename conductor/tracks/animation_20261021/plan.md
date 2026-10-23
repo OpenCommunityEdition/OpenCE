@@ -13,9 +13,9 @@
 - [x] Task: Biped states e327e6b2
     - [x] Write tests: each state of the spec's list chosen from the unit's state, against the reference traces
     - [x] The biped animation state machine
-- [ ] Task: Weapons and the first person
-    - [ ] Write tests: each weapon state and the first-person states against the reference traces
-    - [ ] Weapon animations and the first-person arms
+- [x] Task: Weapons and the first person b46112c9
+    - [x] Write tests: each weapon state and the first-person states against the reference traces
+    - [x] Weapon animations and the first-person arms
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Bipeds, weapons and the first person' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 3: Vehicles, AI, devices and cutscenes
