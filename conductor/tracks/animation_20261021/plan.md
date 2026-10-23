@@ -10,9 +10,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: The graph and the frames' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 2: Bipeds, weapons and the first person
-- [ ] Task: Biped states
-    - [ ] Write tests: each state of the spec's list chosen from the unit's state, against the reference traces
-    - [ ] The biped animation state machine
+- [x] Task: Biped states e327e6b2
+    - [x] Write tests: each state of the spec's list chosen from the unit's state, against the reference traces
+    - [x] The biped animation state machine
 - [ ] Task: Weapons and the first person
     - [ ] Write tests: each weapon state and the first-person states against the reference traces
     - [ ] Weapon animations and the first-person arms
