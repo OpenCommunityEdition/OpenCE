@@ -22,9 +22,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: The widget system' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 3: The screens and the launcher
-- [ ] Task: Every screen reached
-    - [ ] Write tests: a scripted walk through every screen, headless (marked, needs `assets/maps`)
-    - [ ] Campaign, multiplayer, settings, profiles, pause and post-game screens wired; the engine's own menus removed
+- [x] Task: Every screen reached 71f38fa5
+    - [x] Write tests: a scripted walk through every screen, headless (marked, needs `assets/maps`)
+    - [x] Campaign, multiplayer, settings, profiles, pause and post-game screens wired; the engine's own menus removed
 - [ ] Task: The launcher
     - [ ] Write tests: XCTest of the launcher's three choices and its settings
     - [ ] Play, Settings and Exit only
