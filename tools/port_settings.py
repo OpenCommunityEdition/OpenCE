@@ -120,7 +120,7 @@ SCREENS = {
              "On an HDR display (Windows HDR on), show that\nlight truly brighter. From the next start.", "desktop"),
             ("PAPER WHITE:", "display.hdr_paper_white",
              [("AUTO", "0"), ("80", "80"), ("100", "100"), ("120", "120"), ("160", "160"), ("200", "200"),
-              ("250", "250"), ("300", "300"), ("400", "400")],
+              ("203", "203"), ("250", "250"), ("300", "300"), ("400", "400")],
              "With HDR Display, how bright white is, in nits.\nAuto: Windows' SDR content brightness.", "desktop"),
             ("PEAK BRIGHTNESS:", "display.hdr_peak_brightness",
              [("AUTO", "0"), ("400", "400"), ("600", "600"), ("800", "800"), ("1000", "1000"), ("1500", "1500"),
