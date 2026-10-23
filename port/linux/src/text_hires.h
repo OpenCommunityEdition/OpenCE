@@ -66,6 +66,11 @@ HUD's small font, as the subtitles are, in a font tag of their own (the text
 drawn meanwhile has its fonts apart from the rest of the text's) */
 void text_hires_force(int on);
 int text_hires_forced(void);
+/* while forced, the small font's advance for a character, in units of the 480
+lines, with its capitals cap_height units tall (as a font tag's text is sized);
+0 if it has none or the high-res text is not on (the layout of the subtitles
+is the glyphs' own, not the font tag's character widths) */
+float text_hires_forced_advance(unsigned long code, float cap_height);
 /* whether the font has a glyph for the character (it draws a string only
 if it has all of its characters) */
 int text_hires_covers(long font, unsigned long code);

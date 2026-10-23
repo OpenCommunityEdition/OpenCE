@@ -403,7 +403,7 @@ rasterizer_draw_character(
 {
 	/* port: a CJK character's cell (font_group.c) has no pixels of the font
 	tag's to cache; only the high-res text draws it */
-	if (font_character->pixels_offset == -1)
+	if (font_character->pixels_offset == -1 || font_character->hardware_character_index == -2)
 		return;
 
 	/* port: the string's characters so far drawn before a character is
@@ -717,7 +717,7 @@ rasterizer_draw_character_with_dropshadow(
 {
 	/* port: a CJK character's cell (font_group.c) has no pixels of the font
 	tag's to cache; only the high-res text draws it */
-	if (font_character->pixels_offset == -1)
+	if (font_character->pixels_offset == -1 || font_character->hardware_character_index == -2)
 		return;
 
 	/* port: the string's characters so far drawn before a character is

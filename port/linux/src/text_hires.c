@@ -173,6 +173,40 @@ int text_hires_cjk_covers(unsigned long code)
 		stbtt_FindGlyphIndex(&fallback_info, (int)code) != 0;
 }
 
+float text_hires_forced_advance(unsigned long code, float cap_height)
+{
+	static stbtt_fontinfo small_info;
+	static int small_state;     /* 0: not looked for, 1: found, -1: none */
+	int x0, y0, x1, y1, glyph, advance = 0, bearing = 0;
+
+	if (!forced_text || !placeholder_data || cap_height <= 0.0f || !text_hires_enabled())
+		return 0.0f;
+	if (!small_state)
+	{
+		unsigned int index;
+
+		small_state = -1;
+		for (index = 0; index < text_hires_embedded_count; index++)
+		{
+			const unsigned char *data = (const unsigned char *)text_hires_embedded[index].data;
+
+			if (text_hires_embedded[index].tag && !names_differ(text_hires_embedded[index].tag, "ui\\small_ui") &&
+				stbtt_InitFont(&small_info, data, stbtt_GetFontOffsetForIndex(data, 0)))
+			{
+				small_state = 1;
+				break;
+			}
+		}
+	}
+	if (small_state < 0 || !stbtt_GetCodepointBox(&small_info, 'H', &x0, &y0, &x1, &y1) || y1 <= y0)
+		return 0.0f;
+	glyph = stbtt_FindGlyphIndex(&small_info, (int)code);
+	if (!glyph)
+		return 0.0f;
+	stbtt_GetGlyphHMetrics(&small_info, glyph, &advance, &bearing);
+	return advance * cap_height / (float)(y1 - y0);
+}
+
 /* the em of a fallback glyph, in its cell: Noto's ideographs fill most of the
 em, and the cell is the text's line */
 #define FALLBACK_EM 0.92f
