@@ -10,9 +10,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Importing the UI' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 2: The widget system
-- [ ] Task: The widget tree
-    - [ ] Write tests: navigation and focus links; handlers fire their functions; conditional widgets; list items from data; spinners; formatted text
-    - [ ] `opence_ui` crate: the tree, the handlers, the UI functions wired to the engine, the unwired list
+- [x] Task: The widget tree 882708ba
+    - [x] Write tests: navigation and focus links; handlers fire their functions; conditional widgets; list items from data; spinners; formatted text
+    - [x] `opence_ui` crate: the tree, the handlers, the UI functions wired to the engine, the unwired list
 - [ ] Task: Drawing the UI
     - [ ] Write tests: the 640×480 layout scaled to the window; the UI pass's frame time
     - [ ] The UI pass, the background scene with the new lighting, widget animation
