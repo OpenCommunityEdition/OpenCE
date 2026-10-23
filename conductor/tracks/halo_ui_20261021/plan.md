@@ -1,6 +1,6 @@
 # Plan: The Halo UI, the launcher and the Xbox loading screen
 
-## Phase 1: Importing the UI
+## Phase 1: Importing the UI [checkpoint: d1c810f4]
 - [x] Task: The UI pack b30af7b9
     - [x] Write tests: `ui.map` imports; widget definitions, children, handlers, string lists, fonts and the UI scenario are read; bad references are refused; a fuzz target for the UI pack
     - [x] The importer's UI path and the typed UI content
