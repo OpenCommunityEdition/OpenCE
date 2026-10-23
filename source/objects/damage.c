@@ -103,6 +103,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "damage.h"
+#include "game_modes.h" /* port: port/linux/game/game_modes.c */
 #include "ai/ai.h"
 #include "cseries/errors.h"
 #include "effects/effects.h"
@@ -1122,11 +1123,14 @@ static void object_damage_aftermath(
 				being_damaged_flags,
 				_object_being_damaged_body_depleted_bit))
 		{
+			/* port: whether it is a melee's (Gun Game's demotion: game_modes.c) */
+			game_modes_kill_by_melee(damage_effect->damage.category == _damage_category_melee);
 			game_statistics_record_kill(
 				object_index,
 				damage->owner_player_index,
 				damage->owner_object_index,
 				damage->owner_team_index);
+			game_modes_kill_by_melee(FALSE);
 		}
 	}
 	else if (game_engine_can_score())
@@ -1235,7 +1239,14 @@ static void object_damage_body(
 	{
 		if (damage_amount > 0.f && TEST_FLAG(damage_material->flags, _damage_material_head_bit))
 		{
-			if (TEST_FLAG(damage_definition->flags, _damage_can_cause_headshots_bit))
+			/* port: SWAT's headshots, a shot of any weapon's (game_modes.c) */
+			if (TEST_FLAG(damage_definition->flags, _damage_can_cause_headshots_bit) ||
+				game_modes_headshot_kills(object_index,
+					damage_definition->category == _damage_category_bullet ||
+					damage_definition->category == _damage_category_sniper ||
+					damage_definition->category == _damage_category_plasma ||
+					damage_definition->category == _damage_category_needle ||
+					damage_definition->category == _damage_category_shotgun))
 			{
 				if (game_engine_running() ||
 					object->object.type != _object_type_biped ||

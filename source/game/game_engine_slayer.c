@@ -402,6 +402,14 @@ static void slayer_engine_adjust_score(
 	return;
 }
 
+/* port: slayer_engine_adjust_score, for port/linux/game/gun_game.c */
+void game_engine_slayer_adjust_score(
+	long player_index,
+	long score_delta)
+{
+	slayer_engine_adjust_score(player_index, score_delta);
+}
+
 static void find_next_target(
 	long player_index)
 {
