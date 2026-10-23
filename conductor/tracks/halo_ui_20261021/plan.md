@@ -21,14 +21,14 @@
     - [x] Input to the widget tree; UI sounds
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: The widget system' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 3: The screens and the launcher
+## Phase 3: The screens and the launcher [checkpoint: f570a440]
 - [x] Task: Every screen reached 71f38fa5
     - [x] Write tests: a scripted walk through every screen, headless (marked, needs `assets/maps`)
     - [x] Campaign, multiplayer, settings, profiles, pause and post-game screens wired; the engine's own menus removed
 - [x] Task: The launcher d2346075
     - [x] Write tests: XCTest of the launcher's three choices and its settings
     - [x] Play, Settings and Exit only
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: The screens and the launcher' (Protocol in workflow.md) (deferred to the end)
+- [ ] Task: Conductor - User Manual Verification 'Phase 3: The screens and the launcher' (Protocol in workflow.md) (deferred to the end) (deferred to the end)
 
 ## Phase 4: The loading screen
 - [ ] Task: The chant
