@@ -289,6 +289,7 @@ enum
 	_xgpu_tone_mapping_neutral,
 	_xgpu_tone_mapping_aces,
 	_xgpu_tone_mapping_reinhard,
+	_xgpu_tone_mapping_gt7,
 	NUMBER_OF_XGPU_TONE_MAPPINGS
 };
 
@@ -300,6 +301,8 @@ struct xgpu_tone_mapping
 	/* the brightest value the curve gives, in the display's whites: 1.0 for
 	SDR, an HDR display's headroom */
 	float peak;
+	/* with an HDR display, paper white in GT7's units (100 nits); 0 for SDR */
+	float paper;
 };
 
 /* the tone mapping and presentation programs made now; FALSE if they
@@ -318,5 +321,12 @@ y, width, height (the window's, row 0 at the bottom), turned the right way
 up: as it is (SDR), or, with scale more than 0, made linear and scaled by
 it (an HDR display's scRGB framebuffer: scale is its SDR white) */
 BOOL xgpu_post_present(GLuint texture, int x, int y, int width, int height, float scale);
+
+/* fills the corners x0, y0 to x1, y1 of the window (row 0 at the bottom)
+with color, as it is (an HDR display's scRGB framebuffer: linear, 1.0 at 80
+nits), or only the ring ring[0], ring[1] (its centre in the window), from
+radius ring[3] to ring[2]; ring[2] 0 for the whole rectangle. FALSE if its
+program does not build. */
+BOOL xgpu_post_fill(const GLint corners[4], const float color[3], const float ring[4]);
 
 #endif
