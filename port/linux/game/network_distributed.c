@@ -2014,11 +2014,22 @@ static void distributed_correct_own_unit(
 
 	/* (co-op: the host has its player in a BSP this machine hasn't loaded
 	yet, the switch still on its way. Moved there, it would fall with no
-	floor under it, so it stays on the floor it has until the BSP loads.) */
-	if (network_coop_active() && scenario_leaf_index_from_point(&state->position) == NONE &&
-		scenario_leaf_index_from_point(&object_get(unit_index)->object.position) != NONE)
+	floor under it, so it stays on the floor it has until the BSP loads.
+	Tested at the unit's middle, not its feet: a teleport can leave the feet
+	a hair below the floor's plane, which is outside the BSP.) */
+	if (network_coop_active())
 	{
-		return;
+		struct object_datum *object = object_get(unit_index);
+		real_point3d host_middle;
+
+		host_middle.x = state->position.x + object->object.bounding_sphere_center.x - object->object.position.x;
+		host_middle.y = state->position.y + object->object.bounding_sphere_center.y - object->object.position.y;
+		host_middle.z = state->position.z + object->object.bounding_sphere_center.z - object->object.position.z;
+		if (scenario_leaf_index_from_point(&host_middle) == NONE &&
+			scenario_leaf_index_from_point(&object->object.bounding_sphere_center) != NONE)
+		{
+			return;
+		}
 	}
 	if (TEST_FLAG(state->flags, _distributed_unit_predicted_bit) &&
 		local_player_index >= 0 && local_player_index < MAXIMUM_LOCAL_PLAYERS)
