@@ -197,6 +197,7 @@ struct reordered_bitmap
 struct custom_edition_bitmaps_globals
 {
 	struct reordered_bitmap *reordered_bitmaps;
+	unsigned long behaviours;
 	long reordered_bitmap_count;
 	long reordered_bitmap_capacity;
 };
@@ -394,7 +395,9 @@ static boolean reordered_bitmap_mark(
 
 	if (index != NONE)
 	{
-		if (globals->reordered_bitmaps[index].channel_order != channel_order)
+		if (globals->reordered_bitmaps[index].channel_order != channel_order &&
+			!(globals->reordered_bitmaps[index].channel_order == _custom_edition_channels_hud_meter_xbox &&
+				channel_order == NONE))
 		{
 			globals->reordered_bitmaps[index].drawn_otherwise = TRUE;
 		}
@@ -477,8 +480,16 @@ static boolean meter_bitmaps_mark(
 	struct tag_view const *view,
 	struct meter_hud_element_definition const *meter)
 {
+	short order = _custom_edition_channels_hud_meter;
+
+	/* Open v1.1 changed this shared weapon sheet to Xbox channel order.
+	Keep the explicit identity even when static elements use it too. */
+	if ((custom_edition_bitmaps_globals.behaviours & (1UL << _custom_edition_behaviour_xbox_ammo_meter_channels)) &&
+		!strcmp(view_tag_name(view, DATUM_INDEX_TO_ABSOLUTE_INDEX(meter->meter_bitmap.index)),
+			"bourrin\\hud\\v3\\bitmaps\\all icons wips"))
+		order = _custom_edition_channels_hud_meter_xbox;
 	return reordered_bitmaps_mark(view, meter->meter_bitmap.index, meter->sequence_index,
-		_custom_edition_channels_hud_meter);
+		order);
 }
 
 /* the bitmaps a HUD static element draws as they are */
@@ -776,10 +787,12 @@ boolean custom_edition_bitmaps_verify(
 
 boolean custom_edition_reordered_bitmaps_find(
 	byte *tag_cache,
-	unsigned long loaded_bytes)
+	unsigned long loaded_bytes,
+	unsigned long behaviours)
 {
 	struct tag_view view;
 
+	custom_edition_bitmaps_globals.behaviours = behaviours;
 	view.tag_cache = tag_cache;
 	view.loaded_bytes = loaded_bytes;
 
@@ -824,6 +837,7 @@ void custom_edition_bitmaps_dispose(
 	globals->reordered_bitmaps = NULL;
 	globals->reordered_bitmap_count = 0;
 	globals->reordered_bitmap_capacity = 0;
+	globals->behaviours = 0;
 	/* the pixels it was told of are the texture cache's to reuse */
 	halo_custom_edition_texels_forget();
 

@@ -2071,6 +2071,16 @@ boolean network_coop_player_collisions(
 	return !TEST_FLAG(game->cooperative_flags, _network_game_cooperative_no_player_collisions_bit);
 }
 
+boolean network_coop_ally_friendly_fire(
+	void)
+{
+	struct network_game *game;
+
+	if (!network_coop_active() || !(game = network_game_get_game()))
+		return TRUE;
+	return !TEST_FLAG(game->cooperative_flags, _network_game_cooperative_no_ally_friendly_fire_bit);
+}
+
 boolean network_coop_own_friendly_fire(
 	void)
 {

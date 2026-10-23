@@ -89,9 +89,9 @@
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/help_strings">
 		<string text=""/>
-		<string text="The overshield rises up the body as it charges\nand stays lit, in its own color. Off: stock."/>
-		<string text="Shields light their surroundings as they flare,\nin the shield's own color."/>
-		<string text="Light Show: the shield glow three times as far,\nat full from a third of the flare."/>
+		<string text="The overshield rises up the body and stays lit,\nin its own color. Online: the host's choice."/>
+		<string text="Shields light their surroundings as they flare.\nOnline: the host's choice."/>
+		<string text="Light Show: three times as far, at full from a\nthird of the flare. Online: the host's choice."/>
 		<string text="Keep the light of explosions, plasma and the sun\npast white, and roll it off instead of clipping."/>
 		<string text="With HDR, on an HDR display, show that light\nbrighter than white. From the next start."/>
 	</strings>

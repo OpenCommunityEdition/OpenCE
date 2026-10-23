@@ -1,0 +1,317 @@
+{
+ "assets": [
+  {
+   "name": "ce_hud_unit_meters",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_meters",
+   "bitmap": 0,
+   "scale": 4,
+   "format": "a8r8g8b8",
+   "ce_only": true,
+   "cells": [
+    {
+     "source": "hud_unit_meters__0",
+     "from": [
+      20,
+      288,
+      958,
+      505
+     ],
+     "to": [
+      23.0,
+      136.0,
+      257.5,
+      190.25
+     ],
+     "alignment": {
+      "anchor": "top_right",
+      "xbox_sprite": [
+       122,
+       34
+      ],
+      "ce_sprite": [
+       262,
+       132
+      ],
+      "pixels_per_xbox_texel": 8,
+      "ce_resolution": 2
+     }
+    },
+    {
+     "source": "hud_unit_meters__0",
+     "from": [
+      1141,
+      16,
+      1904,
+      129
+     ],
+     "to": [
+      271.0,
+      2.0,
+      366.0,
+      16.0
+     ]
+    },
+    {
+     "source": "hud_unit_meters__0",
+     "from": [
+      714,
+      527,
+      1403,
+      625
+     ],
+     "to": [
+      84.5,
+      199.75,
+      256.75,
+      224.25
+     ],
+     "alignment": {
+      "anchor": "top_right",
+      "xbox_sprite": [
+       176,
+       65
+      ],
+      "ce_sprite": [
+       258,
+       198
+      ],
+      "pixels_per_xbox_texel": 8,
+      "ce_resolution": 2
+     }
+    },
+    {
+     "source": "hud_unit_meters__0",
+     "from": [
+      68,
+      527,
+      684,
+      577
+     ],
+     "to": [
+      389.0,
+      1.0,
+      466.0,
+      7.0
+     ]
+    },
+    {
+     "source": "hud_unit_meters__0",
+     "from": [
+      132,
+      648,
+      923,
+      688
+     ],
+     "to": [
+      33.0,
+      251.0,
+      237.0,
+      262.0
+     ]
+    },
+    {
+     "source": "hud_unit_meters__0",
+     "from": [
+      1085,
+      400,
+      1803,
+      416
+     ],
+     "to": [
+      271.0,
+      67.0,
+      364.0,
+      71.0
+     ]
+    },
+    {
+     "source": "hud_unit_meters__0",
+     "from": [
+      5,
+      95,
+      799,
+      193
+     ],
+     "to": [
+      15.0,
+      84.0,
+      169.0,
+      103.0
+     ]
+    },
+    {
+     "source": "hud_unit_meters__0",
+     "from": [
+      981,
+      279,
+      1670,
+      377
+     ],
+     "to": [
+      14.0,
+      3.0,
+      153.0,
+      22.0
+     ]
+    }
+   ],
+   "width": 512,
+   "height": 512,
+   "size": 262144,
+   "crc": 3491893663,
+   "coverage": true,
+   "point_threshold": true
+  },
+  {
+   "name": "ce_hud_ammo_meters",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_meters",
+   "bitmap": 0,
+   "scale": 4,
+   "format": "a8r8g8b8",
+   "ce_only": true,
+   "cells": [
+    {
+     "source": "hud_ammo_meters__0",
+     "from": [
+      0,
+      504,
+      830,
+      616
+     ],
+     "to": [
+      2.0,
+      122.0,
+      208.0,
+      151.0
+     ]
+    },
+    {
+     "source": "hud_ammo_meters__0",
+     "from": [
+      7,
+      11,
+      898,
+      208
+     ],
+     "to": [
+      1.0,
+      2.0,
+      225.0,
+      51.0
+     ]
+    },
+    {
+     "source": "hud_ammo_meters__0",
+     "from": [
+      1048,
+      224,
+      1903,
+      352
+     ],
+     "to": [
+      268.0,
+      54.0,
+      469.0,
+      86.0
+     ]
+    },
+    {
+     "source": "hud_ammo_meters__0",
+     "from": [
+      848,
+      504,
+      1672,
+      592
+     ],
+     "to": [
+      211.0,
+      122.0,
+      417.0,
+      145.0
+     ]
+    },
+    {
+     "source": "hud_ammo_meters__0",
+     "from": [
+      872,
+      368,
+      1740,
+      488
+     ],
+     "to": [
+      216.0,
+      89.0,
+      434.0,
+      120.0
+     ]
+    },
+    {
+     "source": "hud_ammo_meters__0",
+     "from": [
+      4,
+      368,
+      855,
+      484
+     ],
+     "to": [
+      2.0,
+      89.0,
+      214.0,
+      119.0
+     ]
+    },
+    {
+     "source": "hud_ammo_meters__0",
+     "from": [
+      920,
+      8,
+      1756,
+      168
+     ],
+     "to": [
+      245.0,
+      2.0,
+      431.0,
+      41.0
+     ]
+    },
+    {
+     "source": "hud_ammo_meters__0",
+     "from": [
+      14,
+      224,
+      887,
+      352
+     ],
+     "to": [
+      2.0,
+      54.0,
+      219.0,
+      87.0
+     ]
+    },
+    {
+     "source": "hud_ammo_meters__0",
+     "from": [
+      18,
+      632,
+      835,
+      664
+     ],
+     "to": [
+      2.0,
+      153.0,
+      187.0,
+      162.0
+     ]
+    }
+   ],
+   "width": 512,
+   "height": 512,
+   "size": 1048576,
+   "crc": 1316117604,
+   "coverage": true,
+   "point_threshold": true
+  }
+ ]
+}

@@ -473,7 +473,7 @@ cache failure mechanism remains unconfirmed.
 The Android-only guard in `mirror_range` uses the existing streaming
 fallback. Streamed upload methods, frame fences, shaders, texture caching
 and CPU write tracking are unchanged. Desktop and web retain their cache.
-Xbox, Custom Edition and MCC maps keep their existing loaders and resource
+Xbox and Custom Edition maps keep their existing loaders and resource
 paths. `tools/test_android_mirror_uploads.py` checks the bypass with large
 and reused ranges, frame-counter rollover and desktop/web cache controls;
 it does not substitute for device gameplay validation.
@@ -515,21 +515,3 @@ it does not substitute for device gameplay validation.
   point to an integer in a SIMD register (`fcvtzs s0, s1`, an illegal
   instruction there), so `tools/android_asm_convert.py` writes each as the
   vector form, which leaves the register and the exception flags the same.
-
-## Custom Edition texture storage
-
-Cached Custom Edition textures on Android use stable individual allocations,
-created on demand with a 128 MiB pixel limit and 8,192-entry limit, outside the
-fixed Xbox memory window. This avoids exhausting the old arena with textures
-needed in the same frame and avoids re-uploading surviving textures after
-compaction. Current-frame entries cannot be evicted. Normal GPU caching,
-texture conversion, HUD replacements and the geometry streaming fix remain;
-GL shadow state is refreshed before each draw. Desktop, web and other map
-storage paths retain their established behavior. Fullscreen behavior is unchanged.
-
-Cleanup releases bindings and GPU copies before pixel/header reuse. Map unload,
-cache flush and mod reload release the stored pixels. Diagnostics are limited to
-an unload summary and the first allocation failure per cache lifetime in the
-normal platform log. No test log files, per-frame reports, texture fingerprints
-or uniform readbacks run in the permanent build. The cache can still exhaust
-its limit or system memory; normal fallback handling remains available.

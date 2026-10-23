@@ -228,6 +228,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "ai/ai.h"
@@ -1552,6 +1553,8 @@ void network_player_attach_unit(
 	unit->object.owner_team_index = (short)player->team_index;
 	unit->unit.player_index = player_index;
 	player->unit_index = unit_index;
+	/* port: Infection's role, which may have come before the unit */
+	infection_reconcile_player(player_index);
 	unit_set_actively_controlled(unit_index, TRUE);
 	if (player->local_player_index != NONE)
 		player_control_new_unit(player->local_player_index, unit_index);
@@ -4931,8 +4934,10 @@ void players_update_before_game(
 						unit_get(player->unit_index)->unit.current_weapon_index);
 					if (weapon_index != NONE && weapon_must_be_readied(weapon_index))
 					{
-						if (TEST_FLAG(action->control_flags, _unit_control_weapon_primary_trigger_bit) ||
-							TEST_FLAG(action->control_flags, _unit_control_weapon_secondary_trigger_bit))
+						/* port: (an Infection zombie keeps its skull: infection.c) */
+						if ((TEST_FLAG(action->control_flags, _unit_control_weapon_primary_trigger_bit) ||
+							TEST_FLAG(action->control_flags, _unit_control_weapon_secondary_trigger_bit)) &&
+							infection_allow_weapon_drop(player->unit_index, weapon_index))
 						{
 							unit_drop_current_weapon(player->unit_index, TRUE);
 						}

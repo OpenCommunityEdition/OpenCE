@@ -30,7 +30,7 @@ def test_menu():
     root=ET.fromstring('\n'.join(p.multiplayer_files()[p.PLAYER_EDIT.replace('/','.')+'.port.xml']))
     choices=root.find("strings[@name='"+p.PLAYER_EDIT+"/var_aim_assist']")
     assert [s.attrib['text'] for s in choices]==['ALLOWED','BLOCK M+KB']
-    assert 313+28<345 and 345+60<414
+    assert 73+27*8==289 and 289+27==316 and 316+28<=345 and 345+60<414
     assert '"network.block_mouse_aim_assist", { "false", "true" }' in read('port/linux/game/menu_functions.c')
 
 

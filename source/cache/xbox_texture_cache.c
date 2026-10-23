@@ -1052,7 +1052,7 @@ void *_texture_cache_bitmap_get_hardware_format(
 		load || !block);
 #ifdef HALO_ANDROID
 	/* port: CE's frame working set is not bounded by the Xbox texture arena.
-	 * Keep dynamic textures and both other map families on their own paths. */
+	 * Keep dynamic textures and Xbox maps on their own paths. */
 	if (custom_edition_cache_tags_loaded() &&
 		TEST_FLAG(bitmap->flags, _bitmap_cached_bit))
 	{

@@ -78,6 +78,7 @@ machine (their datum identifiers need not be).
 #include "network_distributed.h"
 #include "network_voice.h"
 #include "network_aim_assist.h"
+#include "network_shield_effects.h"
 #include "map_share.h"
 #include "latency_meter.h"
 #include "profile_sections.h"
@@ -2013,11 +2014,22 @@ static void distributed_correct_own_unit(
 
 	/* (co-op: the host has its player in a BSP this machine hasn't loaded
 	yet, the switch still on its way. Moved there, it would fall with no
-	floor under it, so it stays on the floor it has until the BSP loads.) */
-	if (network_coop_active() && scenario_leaf_index_from_point(&state->position) == NONE &&
-		scenario_leaf_index_from_point(&object_get(unit_index)->object.position) != NONE)
+	floor under it, so it stays on the floor it has until the BSP loads.
+	Tested at the unit's middle, not its feet: a teleport can leave the feet
+	a hair below the floor's plane, which is outside the BSP.) */
+	if (network_coop_active())
 	{
-		return;
+		struct object_datum *object = object_get(unit_index);
+		real_point3d host_middle;
+
+		host_middle.x = state->position.x + object->object.bounding_sphere_center.x - object->object.position.x;
+		host_middle.y = state->position.y + object->object.bounding_sphere_center.y - object->object.position.y;
+		host_middle.z = state->position.z + object->object.bounding_sphere_center.z - object->object.position.z;
+		if (scenario_leaf_index_from_point(&host_middle) == NONE &&
+			scenario_leaf_index_from_point(&object->object.bounding_sphere_center) != NONE)
+		{
+			return;
+		}
 	}
 	if (TEST_FLAG(state->flags, _distributed_unit_predicted_bit) &&
 		local_player_index >= 0 && local_player_index < MAXIMUM_LOCAL_PLAYERS)
@@ -3800,6 +3812,7 @@ void network_distributed_new_game(
 	network_actors_new_game();
 	network_coop_new_game();
 	network_aim_assist_reset();
+	network_shield_effects_reset();
 	network_votekick_new_game();
 }
 
@@ -4476,6 +4489,11 @@ void network_distributed_handle_message(
 		network_aim_assist_handle_message(machine_index, message, size);
 		return;
 	}
+	if (network_shield_effects_handles_message(message, size))
+	{
+		network_shield_effects_handle_message(machine_index, message, size);
+		return;
+	}
 	if (network_voice_handles_message(message, size))
 	{
 		network_voice_handle_message(machine_index, message, size);
@@ -4799,6 +4817,7 @@ void network_distributed_handle_message(
 		/* (its count 1: the client asks again, having failed to make one of
 		the host's objects) */
 		network_aim_assist_send_policy(machine_index);
+		network_shield_effects_send(machine_index);
 		network_objects_client_asked(machine_index, header.count != 0);
 		/* (a machine new at its index, which may have joined the game in
 		progress: every player's statistics and the game type's state, after

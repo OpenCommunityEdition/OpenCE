@@ -57,6 +57,9 @@ Custom Edition map is loaded. */
 boolean custom_edition_cache_stock_tag(
 	long tag_index);
 
+/* Borrowed until map unload; reads remain bounds checked by the source. */
+struct resource_map const *custom_edition_cache_bitmap_resources(void);
+
 /* When `header` (CACHE_FILE_HEADER_BYTES bytes, with `build` its build
 string field) is a Custom Edition cache header that reached the Xbox loader,
 logs why the file at `path` cannot run and returns TRUE: the map is refused,
@@ -221,7 +224,8 @@ FALSE after logging why it cannot. custom_edition_bitmaps_dispose forgets
 them either way. */
 boolean custom_edition_reordered_bitmaps_find(
 	byte *tag_cache,
-	unsigned long loaded_bytes);
+	unsigned long loaded_bytes,
+	unsigned long behaviours);
 /* As custom_edition_reordered_bitmaps_find, in the loaded map's tags, which
 the validator has checked: for the bitmaps of mods (mod_bitmaps.c), Halo
 PC's on any map. FALSE after logging why it cannot. */
