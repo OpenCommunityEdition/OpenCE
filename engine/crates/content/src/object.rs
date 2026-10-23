@@ -465,21 +465,21 @@ pub struct ObjectOverlay {
     pub mode: i16,
 }
 
-/// How far an aiming or looking animation turns: the yaw and pitch at its
-/// edges (radians) and the frames that span each side.
+/// How far an aiming or looking animation turns: the yaw and pitch each of
+/// its frames turns (radians), and the frames on each side of its centre.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
 pub struct ScreenBounds {
-    /// The yaw at the left edge (negative).
+    /// The yaw of each frame to the left.
     pub negative_yaw: f32,
-    /// The yaw at the right edge.
+    /// The yaw of each frame to the right.
     pub positive_yaw: f32,
     /// The frames from the centre to the left edge.
     pub negative_yaw_frames: i16,
     /// The frames from the centre to the right edge.
     pub positive_yaw_frames: i16,
-    /// The pitch at the bottom edge (negative).
+    /// The pitch of each frame down.
     pub negative_pitch: f32,
-    /// The pitch at the top edge.
+    /// The pitch of each frame up.
     pub positive_pitch: f32,
     /// The frames from the centre to the bottom edge.
     pub negative_pitch_frames: i16,

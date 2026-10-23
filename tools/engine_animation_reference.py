@@ -47,7 +47,8 @@ ANIMATION_FUNCTIONS = [
         "animation_get_keyframe_scale", "animation_frame_data_offset", "animation_data_contains",
         "animation_node_flag_count", "animation_frame_valid", "animation_data_error",
         "animation_set_rest_orientations", "animation_get_node_orientations", "replacement_animation_apply",
-        "overlay_animation_apply", "interpolate_node_orientations",
+        "overlay_animation_apply", "overlay_animation_apply_scaled", "overlay_animation_apply_continuous",
+        "aiming_screen_apply", "interpolate_node_orientations",
         "animation_graph_node_matrices_from_orientations"]),
 ]
 
@@ -80,6 +81,7 @@ typedef int boolean;
 #define PIN(n, floor, ceiling) ((n)<(floor) ? (floor) : CEILING((n), (ceiling)))
 #define VALID_INDEX(index, count) ((index)>=0 && (index)<(count))
 #define match_assert(file, line, condition) ((void)0)
+#define match_vassert(file, line, condition, message) ((void)0)
 #define fast_ftol(value) ((long)(value))
 #define model_data_report_once(definition) 0
 #define error(...) ((void)0)
@@ -430,6 +432,69 @@ int main(void)
 		}
 	}
 
+	/* overlays at a weight, between frames, and over an aiming screen */
+	{
+		struct animation *both[2];
+		char const *names[2] = { "uncompressed", "compressed" };
+		real const scales[] = { 0.f, 0.25f, 0.5f, 1.f };
+		real const frames[] = { -0.5f, 0.f, 0.25f, 1.5f, 2.75f, 3.f, 3.5f, 8.125f, 9.f, 9.5f, 10.f, 12.f };
+		real const angles[] = { -1.2f, -0.45f, -0.3f, -0.1f, 0.f, 0.05f, 0.3f, 0.42f, 1.f };
+		/* a 3 by 3 screen on the compressed animation's 10 frames, 2 by 2
+		on the uncompressed one's 4 */
+		struct animation_aiming_screen_bounds screens[2] = {
+			{ 0.3f, 0.3f, 0, 1, 0.25f, 0.25f, 0, 1 },
+			{ 0.3f, 0.4f, 1, 1, 0.2f, 0.35f, 1, 1 } };
+		int which, index, other_index;
+
+		both[0] = &uncompressed;
+		both[1] = &compressed;
+		for (which = 0; which<2; which++)
+		{
+			struct animation *animation = both[which];
+
+			animation->type = _animation_overlay;
+			for (frame = -1; frame<=animation->frame_count; frame++)
+			{
+				for (index = 0; index<(int)(sizeof(scales)/sizeof(scales[0])); index++)
+				{
+					real_orientation nodes[NODE_COUNT];
+
+					memcpy(nodes, pose, sizeof(nodes));
+					overlay_animation_apply_scaled(animation, frame, scales[index], nodes);
+					printf("scaled %s a %d %08x", names[which], frame, *(unsigned int *)&scales[index]);
+					print_orientations(nodes, NODE_COUNT);
+				}
+			}
+			for (index = 0; index<(int)(sizeof(frames)/sizeof(frames[0])); index++)
+			{
+				real_orientation nodes[NODE_COUNT];
+
+				memcpy(nodes, pose, sizeof(nodes));
+				overlay_animation_apply_continuous(animation, frames[index], nodes);
+				printf("continuous %s a %08x", names[which], *(unsigned int *)&frames[index]);
+				print_orientations(nodes, NODE_COUNT);
+			}
+			for (index = 0; index<(int)(sizeof(angles)/sizeof(angles[0])); index++)
+			{
+				for (other_index = 0; other_index<(int)(sizeof(angles)/sizeof(angles[0])); other_index++)
+				{
+					struct animation_aiming_screen_bounds const *bounds = &screens[which];
+					real_orientation nodes[NODE_COUNT];
+
+					memcpy(nodes, pose, sizeof(nodes));
+					aiming_screen_apply(animation, bounds, angles[index], angles[other_index], nodes);
+					printf("aiming %s a %08x %08x %08x %08x %d %d %08x %08x %d %d", names[which],
+						*(unsigned int *)&angles[index], *(unsigned int *)&angles[other_index],
+						*(unsigned int *)&bounds->negative_yaw_delta, *(unsigned int *)&bounds->positive_yaw_delta,
+						bounds->negative_yaw_frame_count, bounds->positive_yaw_frame_count,
+						*(unsigned int *)&bounds->negative_pitch_delta, *(unsigned int *)&bounds->positive_pitch_delta,
+						bounds->negative_pitch_frame_count, bounds->positive_pitch_frame_count);
+					print_orientations(nodes, NODE_COUNT);
+				}
+			}
+		}
+	}
+
 	for (frame = 0; frame<4; frame++)
 	{
 		real_orientation target[NODE_COUNT];
@@ -493,7 +558,8 @@ def source_file():
     types += [structure(animations_c, name) for name in
               ("compressed_animation_header", "compressed_quaternion_8byte", "compressed_quaternion_6byte",
                "animation_graph_node")]
-    types += [structure(definitions_h, "animation"), structure(model_definitions_h, "model_node"),
+    types += [structure(definitions_h, "animation"), structure(definitions_h, "animation_aiming_screen_bounds"),
+              structure(model_definitions_h, "model_node"),
               structure(model_definitions_h, "model")]
     types.append("struct animation_graph { struct tag_block nodes; };\n"
                   "static struct animation_graph fake_graph;\n"

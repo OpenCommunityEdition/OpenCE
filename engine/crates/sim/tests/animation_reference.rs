@@ -6,10 +6,11 @@
 use std::collections::HashMap;
 use std::error::Error;
 
-use opence_content::{Animation, AnimationKind, AnimationNode};
+use opence_content::{Animation, AnimationKind, AnimationNode, ScreenBounds};
 use opence_sim::animation::{
-    apply_overlay, apply_replacement, base_orientations, interpolate_orientations, node_matrices,
-    NodeMatrix, Orientation,
+    apply_aiming_screen, apply_overlay, apply_overlay_continuous, apply_overlay_scaled,
+    apply_replacement, base_orientations, interpolate_orientations, node_matrices, NodeMatrix,
+    Orientation,
 };
 
 const REFERENCE: &str = include_str!("animation_reference.txt");
@@ -21,6 +22,10 @@ fn words(fields: &[&str]) -> Result<Vec<u32>> {
         .iter()
         .map(|word| u32::from_str_radix(word, 16))
         .collect::<std::result::Result<_, _>>()?)
+}
+
+fn real(field: &str) -> Result<f32> {
+    Ok(f32::from_bits(u32::from_str_radix(field, 16)?))
 }
 
 fn hex(text: Option<&&str>) -> Result<Vec<u8>> {
@@ -199,6 +204,48 @@ fn the_engines_animation_is_the_games() -> Result<()> {
                 check(line, &orientation_bits(&nodes), &words(&rest[3..])?)?;
                 checked += 1;
             }
+            "scaled" | "continuous" | "aiming" => {
+                let mut animation = named(rest[0])?;
+                let mut nodes = pose(rest[1])?;
+                animation.kind = AnimationKind::Overlay;
+                let values = match record {
+                    "scaled" => {
+                        apply_overlay_scaled(
+                            &animation,
+                            rest[2].parse()?,
+                            real(rest[3])?,
+                            &mut nodes,
+                        );
+                        4
+                    }
+                    "continuous" => {
+                        apply_overlay_continuous(&animation, real(rest[2])?, &mut nodes);
+                        3
+                    }
+                    _ => {
+                        let bounds = ScreenBounds {
+                            negative_yaw: real(rest[4])?,
+                            positive_yaw: real(rest[5])?,
+                            negative_yaw_frames: rest[6].parse()?,
+                            positive_yaw_frames: rest[7].parse()?,
+                            negative_pitch: real(rest[8])?,
+                            positive_pitch: real(rest[9])?,
+                            negative_pitch_frames: rest[10].parse()?,
+                            positive_pitch_frames: rest[11].parse()?,
+                        };
+                        apply_aiming_screen(
+                            &animation,
+                            &bounds,
+                            real(rest[2])?,
+                            real(rest[3])?,
+                            &mut nodes,
+                        );
+                        12
+                    }
+                };
+                check(line, &orientation_bits(&nodes), &words(&rest[values..])?)?;
+                checked += 1;
+            }
             "blend" => {
                 let original = pose(rest[0])?;
                 let mut target = pose(rest[1])?;
@@ -244,6 +291,6 @@ fn the_engines_animation_is_the_games() -> Result<()> {
     }
     // (every line the reference has was checked: a reference cut short
     // would not pass)
-    assert_eq!(checked, 54 + 18 + 18 + 4 + 1);
+    assert_eq!(checked, 54 + 18 + 18 + 72 + 24 + 162 + 4 + 1);
     Ok(())
 }
