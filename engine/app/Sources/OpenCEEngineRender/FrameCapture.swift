@@ -100,15 +100,15 @@ extension LevelRenderer {
     /// `frames` times (for the temporal history) and reads the last frame
     /// back (the renderer's output format must be bgra8Unorm).
     public func capture(width: Int, height: Int, camera: ViewCamera, frames: Int = 1, objects: [DrawnObject] = [],
-                        hudQuads: [HudQuad] = [], debugLines: [DebugSegment] = [],
+                        hudQuads: [HudQuad] = [], uiQuads: [UiQuad] = [], debugLines: [DebugSegment] = [],
                         queue: MTLCommandQueue) throws -> CapturedFrame {
         try capture(width: width, height: height, cameras: Array(repeating: camera, count: max(frames, 1)),
-                    objects: objects, hudQuads: hudQuads, debugLines: debugLines, queue: queue)
+                    objects: objects, hudQuads: hudQuads, uiQuads: uiQuads, debugLines: debugLines, queue: queue)
     }
 
     /// Draws a frame from each of `cameras` in turn and reads the last back.
     public func capture(width: Int, height: Int, cameras: [ViewCamera], objects: [DrawnObject] = [],
-                        hudQuads: [HudQuad] = [], debugLines: [DebugSegment] = [],
+                        hudQuads: [HudQuad] = [], uiQuads: [UiQuad] = [], debugLines: [DebugSegment] = [],
                         queue: MTLCommandQueue) throws -> CapturedFrame {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: outputFormat, width: width,
                                                                   height: height, mipmapped: false)
@@ -119,7 +119,7 @@ extension LevelRenderer {
         for camera in cameras {
             guard let commands = queue.makeCommandBuffer() else { throw FrameCaptureError.resources }
             encode(into: commands, target: target, camera: camera, objects: objects, hudQuads: hudQuads,
-                   debugLines: debugLines)
+                   uiQuads: uiQuads, debugLines: debugLines)
             commands.commit()
             commands.waitUntilCompleted()
         }

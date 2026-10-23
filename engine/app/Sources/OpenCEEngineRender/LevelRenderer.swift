@@ -420,6 +420,10 @@ public final class LevelRenderer {
 
     /// What draws the HUD (without it, the HUD's quads are not drawn).
     public var hud: HudPass?
+    /// What draws the Halo UI (without it, the UI's quads are not drawn).
+    public var ui: UiPass?
+    /// The level's textures, by their index (nil: not made).
+    let levelTextures: [MTLTexture?]
     /// The debug lines' pass.
     public let debug: DebugPass
     /// The sun's shadow maps.
@@ -477,6 +481,7 @@ public final class LevelRenderer {
             Self.texture(device, texture) { level in geometry.textureLevel(texture: UInt32(index), level: level) }
         }
         textureCount = textures.compactMap { $0 }.count
+        levelTextures = textures
         guard let white = Self.white(device), let whiteCube = Self.white(device, cube: true),
               let whiteVolume = Self.whiteVolume(device) else {
             throw LevelRendererError.resources("textures")
@@ -693,9 +698,11 @@ public final class LevelRenderer {
     }
 
     /// Draws the level and `objects` from `camera` into `target` (of
-    /// `outputFormat`), `debugLines` in the world, and `hudQuads` over them.
+    /// `outputFormat`), `debugLines` in the world, and `hudQuads` and
+    /// `uiQuads` over them.
     public func encode(into commands: MTLCommandBuffer, target: MTLTexture, camera: ViewCamera,
-                       objects: [DrawnObject] = [], hudQuads: [HudQuad] = [], debugLines: [DebugSegment] = []) {
+                       objects: [DrawnObject] = [], hudQuads: [HudQuad] = [], uiQuads: [UiQuad] = [],
+                       debugLines: [DebugSegment] = []) {
         let aspect = Float(target.width) / Float(max(target.height, 1))
         let viewProjection = camera.viewProjection(aspect: aspect)
         adaptExposure()
@@ -755,6 +762,7 @@ public final class LevelRenderer {
         toneEncoder.setFragmentBytes(&toneUniforms, length: MemoryLayout<ToneUniforms>.stride, index: 0)
         toneEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         hud?.encode(hudQuads, width: target.width, height: target.height, into: toneEncoder)
+        ui?.encode(uiQuads, textures: levelTextures, width: target.width, height: target.height, into: toneEncoder)
         toneEncoder.endEncoding()
     }
 

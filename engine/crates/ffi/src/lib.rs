@@ -29,6 +29,7 @@ pub mod script;
 pub mod settings;
 pub mod snapshot;
 mod stations;
+pub mod ui;
 
 use std::collections::HashMap;
 use std::path::Path;

@@ -359,6 +359,9 @@ pub struct RenderLevel {
     pub particle_textures: Vec<u32>,
     /// The BSP's detail objects, drawn as the snapshot's particles are.
     pub detail_objects: Vec<crate::snapshot::ParticleSnapshot>,
+    /// The textures of the images the UI's widgets draw, by bitmap and
+    /// image.
+    pub ui_textures: HashMap<(TagRef, u16), u32>,
 }
 
 /// Gathers the level's textures and materials, each once.
@@ -424,6 +427,11 @@ impl RenderLevel {
         for (bitmap, image) in crate::particles::particle_images(level) {
             let texture = builder.texture(&bitmap, image, 1).unwrap_or(u32::MAX);
             builder.out.particle_textures.push(texture);
+        }
+        for (bitmap, image) in crate::ui::ui_images(level) {
+            if let Some(texture) = builder.texture(&bitmap, image, 1) {
+                builder.out.ui_textures.insert((bitmap, image), texture);
+            }
         }
         builder.out.detail_objects = crate::particles::detail_objects(level, structure);
         builder.out.decals = crate::decals::level_decals(level, structure, &mut |bitmap, image| {

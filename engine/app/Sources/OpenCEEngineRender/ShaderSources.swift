@@ -11,6 +11,8 @@ public enum Shader: String, CaseIterable, Sendable {
     /// The level's surfaces, the objects, the sky, the tone map.
     case level
     case hud
+    /// The Halo UI's widgets and text.
+    case ui
     case text
     case debug
     /// The screen's passes: occlusion, reflections, their resolve.
@@ -137,6 +139,7 @@ public final class ShaderReloader {
             case .decal: reload = level.map { pass in { try pass.decals.reloadShaders(source: $0) } }
             case .particle: reload = level.map { pass in { try pass.particles.reloadShaders(source: $0) } }
             case .hud: reload = hud.map { pass in { try pass.reloadShaders(source: $0) } }
+            case .ui: reload = level?.ui.map { pass in { try pass.reloadShaders(source: $0) } }
             case .text: reload = text.map { pass in { try pass.reloadShaders(source: $0) } }
             case .bake: reload = nil
             }

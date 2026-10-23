@@ -13,12 +13,17 @@
 //! The widgets live in an arena and are named by [`Id`]; a widget closed is
 //! gone, and its id names nothing again.
 
+mod draw;
 mod names;
 
 use std::collections::BTreeMap;
 
 use opence_content::{ChildWidget, EventHandler, TagRef, Ui, Widget, WidgetKind};
 
+pub use draw::{
+    frame_count, layout_text, sequence_image, Bitmaps, DrawItem, GlyphQuad, Layout, Quad,
+    FLAT_FILL_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH, TEXT_FLASHING, UI_WHITE,
+};
 pub use names::{
     data_input_name, function_name, DATA_INPUT_NAMES, FUNCTION_NAMES, LIST_GOTO_NEXT_ITEM,
     LIST_GOTO_PREVIOUS_ITEM, REPLACEMENT_NAMES,

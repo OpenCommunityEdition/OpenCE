@@ -939,6 +939,7 @@ dependencies = [
  "opence_net",
  "opence_script",
  "opence_sim",
+ "opence_ui",
  "serde",
  "serde_json",
  "thiserror",
@@ -1004,6 +1005,7 @@ dependencies = [
 name = "opence_ui"
 version = "0.1.0"
 dependencies = [
+ "libm",
  "opence_content",
 ]
 
