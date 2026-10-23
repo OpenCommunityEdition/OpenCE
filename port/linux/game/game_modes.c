@@ -316,6 +316,9 @@ boolean game_modes_variant_is_opence(
 	struct game_variant const *variant,
 	struct game_variant_options const *options)
 {
+	/* (CTF/Slayer, a game engine of OpenCE's own, is OpenCE's too) */
+	if (variant && variant->game_engine_index == game_engine_ctf_slayer)
+		return TRUE;
 	return options && (options->hardcore || game_modes_variant_mode(variant, options) != _game_mode_none);
 }
 

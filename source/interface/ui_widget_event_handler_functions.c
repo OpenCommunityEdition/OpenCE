@@ -6040,19 +6040,13 @@ short ui_widget_port_gametypes(
 		for (index = 0; profile_index != NONE && index < (short)count; index++)
 		{
 			if (indices[index] == profile_index)
-				*last_used = index + 1;
+				*last_used = index;
 		}
 	}
-	/* port: insert CTF/Slayer at the top of the gametypes list */
+	/* port: CTF/Slayer, after the built-in gametypes (the Select Gametype
+	screen lists it in OpenCE's bank: game_modes_variant_is_opence) */
 	if (count < (word)maximum)
-	{
-		for (index = (short)count; index > 0; index--)
-			indices[index] = indices[index - 1];
-		indices[0] = CTF_SLAYER_PLAYLIST_PROFILE_INDEX;
-		count++;
-	}
-	else
-		*last_used = (short)MAX(*last_used - 1, 0);
+		indices[count++] = CTF_SLAYER_PLAYLIST_PROFILE_INDEX;
 	return (short)count;
 }
 
