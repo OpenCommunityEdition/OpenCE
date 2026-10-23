@@ -1,9 +1,9 @@
 # Plan: Sound
 
 ## Phase 1: Sounds and their formats
-- [ ] Task: Sound tags and decoding
-    - [ ] Write tests: `snd!` fields; Xbox ADPCM, Ogg Vorbis and PCM decode to known samples; every sound of every stock map decodes (marked, needs `assets/maps`)
-    - [ ] The typed tags and the decoders, decoded into the cache
+- [x] Task: Sound tags and decoding 934b28e4
+    - [x] Write tests: `snd!` fields; Xbox ADPCM, Ogg Vorbis and PCM decode to known samples; every sound of every stock map decodes (marked, needs `assets/maps`)
+    - [x] The typed tags and the decoders, decoded into the cache
 - [ ] Task: The mixer
     - [ ] Write tests: permutation choice, pitch ranges, gains by class, distance attenuation, 128 voices under 2 ms
     - [ ] `opence_audio`: the mixer and voices on Core Audio
