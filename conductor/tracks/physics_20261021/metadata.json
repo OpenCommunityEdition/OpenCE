@@ -1,8 +1,8 @@
 {
   "track_id": "physics_20261021",
   "type": "feature",
-  "status": "new",
+  "status": "approved",
   "created_at": "2026-10-21T00:00:00Z",
-  "updated_at": "2026-10-21T00:00:00Z",
+  "updated_at": "2026-10-23T00:00:00Z",
   "description": "Complete physics: objects as mass-point bodies, collisions, forces, grenades, vehicles and devices"
 }
