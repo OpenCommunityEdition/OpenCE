@@ -22,12 +22,12 @@
 - [x] Task: Vehicles and seats 9f50ea51
     - [x] Write tests: entering, leaving, boarding and ejection by seat; the vehicles' own animations
     - [x] Seat animations and vehicle animations
-- [ ] Task: AI
-    - [ ] Write tests: each behaviour's animation request, by actor type
-    - [ ] AI animation requests and overlays
-- [ ] Task: Devices and cutscenes
-    - [ ] Write tests: devices by their functions; custom animations relative to the cutscene flags; the camera's tracks
-    - [ ] Device animation; cutscene animation and camera
+- [x] Task: AI 6edd6b85
+    - [x] Write tests: each behaviour's animation request, by actor type
+    - [x] AI animation requests and overlays
+- [x] Task: Devices and cutscenes 6edd6b85
+    - [x] Write tests: devices by their functions; custom animations relative to the cutscene flags; the camera's tracks
+    - [x] Device animation; cutscene animation and camera
 - [ ] Task: The animation station and the documentation
     - [ ] Write tests: `station animation` plays every animation of a graph
     - [ ] `docs/engine.md`: the graph and the blender
