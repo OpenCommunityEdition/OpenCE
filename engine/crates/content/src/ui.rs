@@ -525,3 +525,112 @@ pub struct VirtualKey {
     /// Its bitmaps: unselected, selected, active and sticky.
     pub bitmaps: [Option<TagRef>; 4],
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Group;
+
+    fn glyph(character: u8, advance: i16, size: [i16; 2]) -> Glyph {
+        Glyph {
+            character: u16::from(character),
+            advance,
+            size,
+            origin: [0, size[1]],
+            distance: Vec::new(),
+        }
+    }
+
+    /// A font of 'A' (advance 7), 'i' (advance 3) and a space (advance 4,
+    /// empty), with 'a' sent to 'A'.
+    fn font() -> Font {
+        Font {
+            tag: TagRef {
+                group: Group(*b"font"),
+                path: "ui\\fonts\\small".into(),
+            },
+            flags: 0,
+            ascent: 12,
+            descent: 4,
+            leading_height: 2,
+            leading_width: 1,
+            styles: [None, None, None, None],
+            glyphs: vec![
+                glyph(b'A', 7, [6, 9]),
+                glyph(b'i', 3, [2, 9]),
+                glyph(b' ', 4, [0, 0]),
+            ],
+            characters: vec![
+                (u16::from(b' '), 2),
+                (u16::from(b'A'), 0),
+                (u16::from(b'a'), 0),
+                (u16::from(b'i'), 1),
+            ],
+        }
+    }
+
+    #[test]
+    fn each_character_finds_its_glyph() {
+        let font = font();
+        let advance = |character: u8| font.glyph(u16::from(character)).map(|glyph| glyph.advance);
+        assert_eq!(advance(b'A'), Some(7));
+        assert_eq!(advance(b'a'), Some(7), "the table's 'a'");
+        assert_eq!(advance(b'i'), Some(3));
+        assert_eq!(advance(b'z'), None);
+    }
+
+    /// A line is its glyphs' advances, each with the font's leading width:
+    /// a font tag has no kerning pairs, so a pair is spaced as its glyphs
+    /// are alone.
+    #[test]
+    fn a_line_is_its_advances_without_kerning() {
+        let font = font();
+        assert_eq!(font.width(""), 0);
+        assert_eq!(font.width("A"), 8);
+        assert_eq!(font.width("Ai"), 8 + 4);
+        assert_eq!(font.width("iA"), font.width("Ai"), "no pair is kerned");
+        assert_eq!(font.width("A i"), 8 + 5 + 4);
+        assert_eq!(
+            font.width("Az"),
+            8,
+            "a character with no glyph advances nothing"
+        );
+        assert_eq!(font.line_height(), 18);
+    }
+
+    #[test]
+    fn a_distance_field_is_padded_around_its_glyph() {
+        let padding = usize::try_from(Font::PADDING).unwrap_or_default();
+        assert_eq!(
+            glyph(b'A', 7, [6, 9]).field_size(),
+            [6 + 2 * padding, 9 + 2 * padding]
+        );
+        assert_eq!(
+            glyph(b' ', 4, [0, 0]).field_size(),
+            [2 * padding, 2 * padding]
+        );
+        assert_eq!(
+            glyph(b' ', 4, [-2, 0]).field_size(),
+            [2 * padding, 2 * padding]
+        );
+    }
+
+    #[test]
+    fn the_ui_finds_its_tags() {
+        let font = font();
+        let tag = font.tag.clone();
+        let ui = Ui {
+            fonts: vec![font],
+            ..Ui::default()
+        };
+        assert!(ui.font(&tag).is_some());
+        let missing = TagRef {
+            group: Group(*b"font"),
+            path: "ui\\fonts\\large".into(),
+        };
+        assert!(ui.font(&missing).is_none());
+        assert!(ui.widget(&tag).is_none());
+        assert!(ui.string_list(&tag).is_none());
+        assert!(ui.collection(&tag).is_none());
+    }
+}

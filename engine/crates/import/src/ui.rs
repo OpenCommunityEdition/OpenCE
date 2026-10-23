@@ -807,6 +807,84 @@ pub(crate) mod tests {
         assert!(distance_field(&[], [0, 0]).iter().all(|&texel| texel == 1));
     }
 
+    /// Over coverages of every size up to 12 by 12, a field is inside
+    /// (128 or more) exactly where its coverage is, outside all around its
+    /// padding, and deeper the further a texel is from the edge.
+    #[test]
+    fn a_distance_field_is_inside_exactly_where_its_glyph_covers() {
+        let mut state = 0x0F0E_7A11u32;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        let padding = Font::PADDING as usize;
+        for _ in 0..400 {
+            let width = (next() % 13) as usize;
+            let height = (next() % 13) as usize;
+            let coverage: Vec<u8> = (0..width * height).map(|_| next() as u8).collect();
+            let field = distance_field(&coverage, [width as i16, height as i16]);
+            let field_width = width + 2 * padding;
+            assert_eq!(field.len(), field_width * (height + 2 * padding));
+            for (index, &texel) in field.iter().enumerate() {
+                let (x, y) = (index % field_width, index / field_width);
+                let covered = x >= padding
+                    && y >= padding
+                    && x - padding < width
+                    && y - padding < height
+                    && coverage[(y - padding) * width + x - padding] >= 128;
+                assert_eq!(texel >= 128, covered, "({x}, {y}) of {width}×{height}");
+            }
+            // (the corner is as far from any coverage as the field reaches)
+            assert_eq!(field[0], 1);
+        }
+    }
+
+    /// `ui.map`'s fonts: every glyph's field is its padded size, outside on
+    /// its border, and inside somewhere if it has any coverage; every
+    /// character maps to a glyph of the font; no advance is negative.
+    #[test]
+    fn the_shells_fonts_have_their_distance_fields() -> Result<(), Box<dyn Error>> {
+        let Some(cache) = crate::level::tests::stock_map("ui") else {
+            return Ok(());
+        };
+        let ui = import_ui_tags(&cache)?;
+        assert!(!ui.fonts.is_empty());
+        for font in &ui.fonts {
+            assert!(font.line_height() > 0, "{}", font.tag.path);
+            for &(_, glyph) in &font.characters {
+                assert!((glyph as usize) < font.glyphs.len(), "{}", font.tag.path);
+            }
+            for glyph in &font.glyphs {
+                let [width, height] = glyph.field_size();
+                assert_eq!(glyph.distance.len(), width * height, "{}", font.tag.path);
+                assert!(glyph.advance >= 0, "{}: {}", font.tag.path, glyph.character);
+                for x in 0..width {
+                    assert!(
+                        glyph.distance[x] < 128 && glyph.distance[(height - 1) * width + x] < 128
+                    );
+                }
+                for y in 0..height {
+                    assert!(
+                        glyph.distance[y * width] < 128
+                            && glyph.distance[y * width + width - 1] < 128
+                    );
+                }
+            }
+            let inked = font
+                .glyphs
+                .iter()
+                .filter(|glyph| glyph.distance.iter().any(|&texel| texel >= 128));
+            assert!(
+                inked.count() > font.glyphs.len() / 2,
+                "{}: mostly empty glyphs",
+                font.tag.path
+            );
+        }
+        Ok(())
+    }
+
     /// `ui.map`'s shell: every widget, list and font, each widget's
     /// children and the widgets its handlers open found among them.
     #[test]
