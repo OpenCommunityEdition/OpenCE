@@ -138,7 +138,7 @@ static void reset(void)
 int main(int argc, char **argv)
 {
 	char const *case_name = argv[1];
-	long unit = OBJECT(1), first = OBJECT(2);
+	long unit = OBJECT(1), first = OBJECT(2), second = OBJECT(3);
 	short index;
 
 	reset();
@@ -159,6 +159,25 @@ int main(int argc, char **argv)
 		CHECK(units[1].unit.grenade_counts[0] == 3 && weapons[2].weapon.magazines[0].rounds_total == 100 &&
 			weapons[2].weapon.magazines[0].rounds_loaded == 10, "unit-late: its grenades or rounds not given");
 		CHECK(!kept(unit) && objects_client_retried_inventory_count == 0, "unit-late: kept once applied");
+	}
+	/* its unit here, one of its weapons not: what is here is given at once,
+	the rest once it comes */
+	CASE("weapon-late")
+	{
+		arrive(unit, _object_type_biped);
+		arrive(first, _object_type_weapon);
+		receive(carrying(unit, first, second, 2));
+		CHECK(held(unit, 0) == first && held(unit, 1) == NONE, "weapon-late: what is here not given at once");
+		CHECK(kept(unit), "weapon-late: not kept for the weapon to come");
+		now++;
+		distributed_client_apply_retried_inventories();
+		CHECK(kept(unit) && held(unit, 1) == NONE, "weapon-late: applied before its weapon came");
+		arrive(second, _object_type_weapon);
+		now++;
+		distributed_client_apply_retried_inventories();
+		CHECK(held(unit, 1) == second && weapons[3].weapon.magazines[0].rounds_total == 200,
+			"weapon-late: the weapon not given once it came");
+		CHECK(!kept(unit), "weapon-late: kept once applied");
 	}
 	/* a unit's newer inventory takes its older one's place */
 	CASE("newest")
