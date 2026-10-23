@@ -49,9 +49,10 @@ pub use material::SurfaceMaterial;
 pub use object::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, Biped, ChangeColor,
     CollisionModel, CollisionModelMaterial, CollisionNode, CollisionRegion, ColorPermutation,
-    MarkerInstance, Model, ModelGeometry, ModelMarker, ModelNode, ModelPart, ModelPermutation,
-    ModelRegion, ModelShader, ModelVertex, ObjectDefinition, ObjectKind, PathfindingSphere,
-    UnitSeat, WeaponClass, WeaponType,
+    IkPoint, MarkerInstance, Model, ModelGeometry, ModelMarker, ModelNode, ModelPart,
+    ModelPermutation, ModelRegion, ModelShader, ModelVertex, ObjectDefinition, ObjectKind,
+    ObjectOverlay, PathfindingSphere, ScreenBounds, Suspension, UnitSeat, VehicleAnimations,
+    WeaponClass, WeaponType,
 };
 pub use particle::{
     Contrail, ContrailState, DetailObject, DetailObjectCollection, DetailObjectType,

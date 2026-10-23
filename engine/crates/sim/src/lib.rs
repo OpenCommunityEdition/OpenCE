@@ -8,6 +8,7 @@
 //! never sees the world.
 
 pub mod animation;
+pub mod animation_graph;
 pub mod armory;
 pub mod clock;
 pub mod crates;

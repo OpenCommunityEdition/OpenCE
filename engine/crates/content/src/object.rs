@@ -414,13 +414,111 @@ pub struct AnimationGraph {
     /// Its animations.
     pub animations: Vec<Animation>,
     /// The animations an object plays over its others.
-    pub object_overlays: Vec<Option<u16>>,
+    pub object_overlays: Vec<ObjectOverlay>,
     /// The animations of a unit, by seat.
     pub unit_seats: Vec<UnitSeat>,
+    /// A weapon's own animations, in the game's order (idle, ready,
+    /// put-away, reload-1, ...).
+    pub weapon: Vec<Option<u16>>,
+    /// A vehicle's own animations: its overlays and its suspension.
+    pub vehicle: Option<VehicleAnimations>,
+    /// A device's animations, in the game's order (position, power).
+    pub device: Vec<Option<u16>>,
+    /// A unit's damage animations, by
+    /// [`AnimationGraph::damage_index`].
+    pub unit_damage: Vec<Option<u16>>,
     /// A first-person weapon's animations, in the game's order (idle,
     /// posing, fire-1, moving, overlays, ...): the hands and weapon the
     /// player sees.
     pub first_person_weapon: Vec<Option<u16>>,
+    /// The sounds its animations play (none for an empty reference).
+    pub sound_references: Vec<Option<TagRef>>,
+}
+
+impl AnimationGraph {
+    /// How many damage animations a graph may have: four kinds (soft and
+    /// hard ping, soft and hard kill), four directions and eleven parts.
+    pub const DAMAGE_ANIMATIONS: usize = 4 * 4 * 11;
+
+    /// Where a damage animation is in [`AnimationGraph::unit_damage`]
+    /// (`build_damage_animation_index`): none for a kind, direction or part
+    /// out of range.
+    pub fn damage_index(kind: usize, direction: usize, part: usize) -> Option<usize> {
+        (kind < 4 && direction < 4 && part < 11).then_some((kind * 4 + direction) * 11 + part)
+    }
+
+    /// The animation an index of the graph names, if it has it.
+    pub fn animation(&self, index: Option<u16>) -> Option<&Animation> {
+        self.animations.get(usize::from(index?))
+    }
+}
+
+/// An animation an object plays over its others, driven by one of its
+/// functions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
+pub struct ObjectOverlay {
+    /// The animation.
+    pub animation: Option<u16>,
+    /// The object's function that drives it.
+    pub function: i16,
+    /// Whether the function picks its frame (0) or scales it (1).
+    pub mode: i16,
+}
+
+/// How far an aiming or looking animation turns: the yaw and pitch at its
+/// edges (radians) and the frames that span each side.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ScreenBounds {
+    /// The yaw at the left edge (negative).
+    pub negative_yaw: f32,
+    /// The yaw at the right edge.
+    pub positive_yaw: f32,
+    /// The frames from the centre to the left edge.
+    pub negative_yaw_frames: i16,
+    /// The frames from the centre to the right edge.
+    pub positive_yaw_frames: i16,
+    /// The pitch at the bottom edge (negative).
+    pub negative_pitch: f32,
+    /// The pitch at the top edge.
+    pub positive_pitch: f32,
+    /// The frames from the centre to the bottom edge.
+    pub negative_pitch_frames: i16,
+    /// The frames from the centre to the top edge.
+    pub positive_pitch_frames: i16,
+}
+
+/// A marker a unit's hand is drawn to, on what it holds or rides.
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct IkPoint {
+    /// The unit's marker (`left hand`).
+    pub marker: String,
+    /// The marker of the weapon or vehicle it is drawn to.
+    pub attached_to: String,
+}
+
+/// A vehicle's animations.
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct VehicleAnimations {
+    /// How far its steering animation turns.
+    pub steering_bounds: ScreenBounds,
+    /// Its overlays, in the game's order (steering, roll, throttle,
+    /// velocity, braking, ground-speed, occupied, unoccupied).
+    pub animations: Vec<Option<u16>>,
+    /// Its wheels' suspension.
+    pub suspensions: Vec<Suspension>,
+}
+
+/// A wheel's suspension: the overlay a mass point's compression plays.
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct Suspension {
+    /// The vehicle's mass point.
+    pub mass_point: i16,
+    /// The overlay.
+    pub animation: Option<u16>,
+    /// The compression at the overlay's first frame.
+    pub full_extension: f32,
+    /// The compression at its last.
+    pub full_compression: f32,
 }
 
 /// A node an animation graph animates.
@@ -513,29 +611,41 @@ impl Animation {
 }
 
 /// The animations of a unit in one kind of seat.
-#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
 pub struct UnitSeat {
     /// Its label (`stand`, `warthog-driver`).
     pub label: String,
+    /// How far its looking animation turns.
+    pub looking_bounds: ScreenBounds,
     /// Its animations, in the game's order for a seat.
     pub animations: Vec<Option<u16>>,
+    /// The markers its hands are drawn to.
+    pub ik_points: Vec<IkPoint>,
     /// Its animations with each class of weapon.
     pub weapon_classes: Vec<WeaponClass>,
 }
 
 /// A unit's animations with a class of weapon (`pistol`, `rifle`).
-#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
 pub struct WeaponClass {
     /// Its label.
     pub label: String,
+    /// The weapon's marker the unit holds.
+    pub grip_marker: String,
+    /// The unit's marker that holds it.
+    pub hand_marker: String,
+    /// How far its aiming animations turn.
+    pub aiming_bounds: ScreenBounds,
     /// Its animations, in the game's order for a weapon.
     pub animations: Vec<Option<u16>>,
+    /// The markers the unit's hands are drawn to.
+    pub ik_points: Vec<IkPoint>,
     /// Its animations with each type of the class.
     pub weapon_types: Vec<WeaponType>,
 }
 
 /// A unit's animations with a type of weapon of a class.
-#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
 pub struct WeaponType {
     /// Its label.
     pub label: String,

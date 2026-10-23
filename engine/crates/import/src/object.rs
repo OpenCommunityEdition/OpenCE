@@ -9,9 +9,10 @@
 use opence_content::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, Biped, ChangeColor,
     CollisionModel, CollisionModelMaterial, CollisionNode, CollisionRegion, ColorPermutation,
-    FunctionModes, MarkerInstance, Model, ModelGeometry, ModelMarker, ModelNode, ModelPart,
-    ModelPermutation, ModelRegion, ModelShader, ModelVertex, ObjectDefinition, ObjectFunction,
-    ObjectKind, PathfindingSphere, TagRef, UnitSeat, WeaponClass, WeaponType,
+    FunctionModes, IkPoint, MarkerInstance, Model, ModelGeometry, ModelMarker, ModelNode,
+    ModelPart, ModelPermutation, ModelRegion, ModelShader, ModelVertex, ObjectDefinition,
+    ObjectFunction, ObjectKind, ObjectOverlay, PathfindingSphere, ScreenBounds, Suspension, TagRef,
+    UnitSeat, VehicleAnimations, WeaponClass, WeaponType,
 };
 
 use crate::cache::{Cache, CacheKind};
@@ -83,6 +84,11 @@ pub(crate) const ANIMATION_NODE_SIZE: usize = 0x40;
 pub(crate) const ANIMATION_SIZE: usize = 0xB4;
 const MAX_ANIMATIONS: usize = 256;
 const MAX_FRAMES: u16 = 2048;
+const IK_POINT_SIZE: usize = 0x40;
+const MAX_IK_POINTS: usize = 4;
+const VEHICLE_ANIMATIONS_SIZE: usize = 0x74;
+const SUSPENSION_SIZE: usize = 0x14;
+const SND: GroupTag = GroupTag::new(b"snd!");
 const MAX_SEATS: usize = 64;
 const MAX_ANIMATION_DATA: usize = 0x0400_0000;
 
@@ -835,6 +841,36 @@ fn animation_list(
         .collect()
 }
 
+/// How far an aiming, looking or steering animation turns.
+fn screen_bounds(element: &Element<'_>, at: usize) -> Result<ScreenBounds, ImportError> {
+    Ok(ScreenBounds {
+        negative_yaw: element.f32(at, "negative yaw delta")?,
+        positive_yaw: element.f32(at + 4, "positive yaw delta")?,
+        negative_yaw_frames: element.i16(at + 8, "negative yaw frame count")?,
+        positive_yaw_frames: element.i16(at + 10, "positive yaw frame count")?,
+        negative_pitch: element.f32(at + 12, "negative pitch delta")?,
+        positive_pitch: element.f32(at + 16, "positive pitch delta")?,
+        negative_pitch_frames: element.i16(at + 20, "negative pitch frame count")?,
+        positive_pitch_frames: element.i16(at + 22, "positive pitch frame count")?,
+    })
+}
+
+/// The markers a unit's hands are drawn to.
+fn ik_points(element: &Element<'_>, at: usize) -> Result<Vec<IkPoint>, ImportError> {
+    let block = element.block(at, "ik points", IK_POINT_SIZE, MAX_IK_POINTS)?;
+    block
+        .iter()
+        .map(|point| {
+            Ok(IkPoint {
+                marker: point.text(0, "marker", NAME_LONGEST)?.to_owned(),
+                attached_to: point
+                    .text(0x20, "attach to marker", NAME_LONGEST)?
+                    .to_owned(),
+            })
+        })
+        .collect()
+}
+
 fn index_or_none(value: i16, len: usize) -> Option<u16> {
     u16::try_from(value)
         .ok()
@@ -863,18 +899,20 @@ pub fn import_animation_graph(cache: &Cache, index: usize) -> Result<AnimationGr
 
     let animations_block = graph.block(0x74, "animations", ANIMATION_SIZE, MAX_ANIMATIONS)?;
     let animation_count = animations_block.len();
-    let sounds = graph
-        .block(0x54, "sound references", 0x14, MAX_ANIMATIONS)?
-        .len();
+    let sounds = graph.block(0x54, "sound references", 0x14, MAX_ANIMATIONS)?;
     let mut animations = Vec::with_capacity(animation_count);
     for animation in animations_block.iter() {
-        animations.push(import_animation(&animation, animation_count, sounds)?);
+        animations.push(import_animation(&animation, animation_count, sounds.len())?);
     }
 
     let overlays_block = graph.block(0x00, "object overlays", OVERLAY_SIZE, MAX_ANIMATIONS)?;
     let mut object_overlays = Vec::with_capacity(overlays_block.len());
     for overlay in overlays_block.iter() {
-        object_overlays.push(index_or_none(overlay.i16(0, "animation")?, animation_count));
+        object_overlays.push(ObjectOverlay {
+            animation: index_or_none(overlay.i16(0, "animation")?, animation_count),
+            function: overlay.i16(2, "function")?,
+            mode: overlay.i16(4, "function controls")?,
+        });
     }
 
     let seats_block = graph.block(0x0C, "units", UNIT_SEAT_SIZE, MAX_SEATS)?;
@@ -893,16 +931,57 @@ pub fn import_animation_graph(cache: &Cache, index: usize) -> Result<AnimationGr
             }
             weapon_classes.push(WeaponClass {
                 label: class.text(0, "label", NAME_LONGEST)?.to_owned(),
+                grip_marker: class.text(0x20, "grip marker", NAME_LONGEST)?.to_owned(),
+                hand_marker: class.text(0x40, "hand marker", NAME_LONGEST)?.to_owned(),
+                aiming_bounds: screen_bounds(&class, 0x60)?,
                 animations: animation_list(&class, 0x98, "animations", animation_count)?,
+                ik_points: ik_points(&class, 0xA4)?,
                 weapon_types,
             });
         }
         unit_seats.push(UnitSeat {
             label: seat.text(0, "label", NAME_LONGEST)?.to_owned(),
+            looking_bounds: screen_bounds(&seat, 0x20)?,
             animations: animation_list(&seat, 0x40, "animations", animation_count)?,
+            ik_points: ik_points(&seat, 0x4C)?,
             weapon_classes,
         });
     }
+
+    // (a weapon's, a vehicle's and a device's own animations: each block
+    // has at most one entry, as the game reads only the first)
+    let weapon = match graph.block(0x18, "weapons", 0x1C, 1)?.get(0) {
+        Some(entry) => animation_list(&entry, 0x10, "animations", animation_count)?,
+        None => Vec::new(),
+    };
+    let vehicle = match graph
+        .block(0x24, "vehicles", VEHICLE_ANIMATIONS_SIZE, 1)?
+        .get(0)
+    {
+        Some(entry) => {
+            let block = entry.block(0x68, "suspension animations", SUSPENSION_SIZE, MAX_SEATS)?;
+            let mut suspensions = Vec::with_capacity(block.len());
+            for suspension in block.iter() {
+                suspensions.push(Suspension {
+                    mass_point: suspension.i16(0, "mass point index")?,
+                    animation: index_or_none(suspension.i16(2, "animation")?, animation_count),
+                    full_extension: suspension.f32(4, "full extension ground depth")?,
+                    full_compression: suspension.f32(8, "full compression ground depth")?,
+                });
+            }
+            Some(VehicleAnimations {
+                steering_bounds: screen_bounds(&entry, 0)?,
+                animations: animation_list(&entry, 0x5C, "animations", animation_count)?,
+                suspensions,
+            })
+        }
+        None => None,
+    };
+    let device = match graph.block(0x30, "devices", 0x60, 1)?.get(0) {
+        Some(entry) => animation_list(&entry, 0x54, "animations", animation_count)?,
+        None => Vec::new(),
+    };
+    let unit_damage = animation_list(&graph, 0x3C, "unit damage", animation_count)?;
 
     // (the hands and weapon the player sees: the first entry's animations)
     let first_person = graph.block(0x48, "first person weapons", 0x1C, 1)?;
@@ -910,6 +989,10 @@ pub fn import_animation_graph(cache: &Cache, index: usize) -> Result<AnimationGr
         Some(weapon) => animation_list(&weapon, 0x10, "animations", animation_count)?,
         None => Vec::new(),
     };
+    let mut sound_references = Vec::with_capacity(sounds.len());
+    for sound in sounds.iter() {
+        sound_references.push(reference(&sound, 0, "sound", &[SND])?);
+    }
 
     Ok(AnimationGraph {
         tag: tag_ref(cache, index),
@@ -919,7 +1002,12 @@ pub fn import_animation_graph(cache: &Cache, index: usize) -> Result<AnimationGr
         animations,
         object_overlays,
         unit_seats,
+        weapon,
+        vehicle,
+        device,
+        unit_damage,
         first_person_weapon,
+        sound_references,
     })
 }
 
@@ -1517,19 +1605,72 @@ mod tests {
             .iter()
             .flat_map(|animation| {
                 let mut overlay = vec![0u8; OVERLAY_SIZE];
-                put(&mut overlay, 0, &animation.to_le_bytes());
+                put(&mut overlay, 0, &shorts(&[*animation, 3, 1]));
                 overlay
             })
             .collect();
         let overlays = fake.add_data(&overlays);
+        let bounds = |bytes: &mut Vec<u8>, at: usize| {
+            put(bytes, at, &floats(&[-1.0, 1.5]));
+            put(bytes, at + 8, &shorts(&[4, 5]));
+            put(bytes, at + 12, &floats(&[-0.5, 0.75]));
+            put(bytes, at + 20, &shorts(&[2, 3]));
+        };
+        let mut ik_point = named(IK_POINT_SIZE, "left hand");
+        put(&mut ik_point, 0x20, b"left grip");
+        let ik_points = fake.add_data(&ik_point);
+        let type_animations = fake.add_data(&shorts(&[1]));
+        let mut weapon_type = named(WEAPON_TYPE_SIZE, "plasma");
+        block(&mut weapon_type, 0x30, 1, type_animations);
+        let weapon_types = fake.add_data(&weapon_type);
+        let class_animations = fake.add_data(&shorts(&[1, 0]));
+        let mut class = named(WEAPON_CLASS_SIZE, "rifle");
+        put(&mut class, 0x20, b"primary trigger");
+        put(&mut class, 0x40, b"right hand");
+        bounds(&mut class, 0x60);
+        block(&mut class, 0x98, 2, class_animations);
+        block(&mut class, 0xA4, 1, ik_points);
+        block(&mut class, 0xB0, 1, weapon_types);
+        let classes = fake.add_data(&class);
         let seat_animations = fake.add_data(&shorts(&[0, -1, 9]));
         let mut seat = named(UNIT_SEAT_SIZE, "driver");
+        bounds(&mut seat, 0x20);
         block(&mut seat, 0x40, 3, seat_animations);
+        block(&mut seat, 0x4C, 1, ik_points);
+        block(&mut seat, 0x58, 1, classes);
         let seats = fake.add_data(&seat);
+
+        let own_animations = fake.add_data(&shorts(&[0, 1, -1]));
+        let mut weapon = vec![0u8; 0x1C];
+        block(&mut weapon, 0x10, 3, own_animations);
+        let weapons = fake.add_data(&weapon);
+        let mut suspension = vec![0u8; SUSPENSION_SIZE];
+        put(&mut suspension, 0, &shorts(&[2, 1]));
+        put(&mut suspension, 4, &floats(&[0.1, 0.4]));
+        let suspensions = fake.add_data(&suspension);
+        let mut vehicle = vec![0u8; VEHICLE_ANIMATIONS_SIZE];
+        bounds(&mut vehicle, 0);
+        block(&mut vehicle, 0x5C, 3, own_animations);
+        block(&mut vehicle, 0x68, 1, suspensions);
+        let vehicles = fake.add_data(&vehicle);
+        let mut device = vec![0u8; 0x60];
+        block(&mut device, 0x54, 3, own_animations);
+        let devices = fake.add_data(&device);
+        let damage = fake.add_data(&shorts(&[1, -1]));
+        let sound = fake.add_tag(GroupTag::new(b"snd!"), "sound\\step", &[0u8; 0x10]);
+        let mut sounds = vec![0u8; 0x28];
+        reference(&mut sounds, 0, SND, fake.handle(sound));
+        empty(&mut sounds, 0x14);
+        let sounds = fake.add_data(&sounds);
 
         let mut graph = vec![0u8; ANIMATION_GRAPH_SIZE];
         block(&mut graph, 0x00, 2, overlays);
         block(&mut graph, 0x0C, 1, seats);
+        block(&mut graph, 0x18, 1, weapons);
+        block(&mut graph, 0x24, 1, vehicles);
+        block(&mut graph, 0x30, 1, devices);
+        block(&mut graph, 0x3C, 2, damage);
+        block(&mut graph, 0x54, 2, sounds);
         put(&mut graph, 0x60, &0.5f32.to_le_bytes());
         block(&mut graph, 0x68, 1, nodes);
         block(&mut graph, 0x74, 2, animations);
@@ -1544,9 +1685,70 @@ mod tests {
         assert_eq!(graph.limp_body_node_radius, 0.5);
         assert_eq!(graph.nodes[0].name, "root");
         assert_eq!(graph.nodes[0].parent, None);
-        assert_eq!(graph.object_overlays, [Some(1), None]);
-        assert_eq!(graph.unit_seats[0].label, "driver");
-        assert_eq!(graph.unit_seats[0].animations, [Some(0), None, None]);
+        let overlay = |animation| ObjectOverlay {
+            animation,
+            function: 3,
+            mode: 1,
+        };
+        assert_eq!(graph.object_overlays, [overlay(Some(1)), overlay(None)]);
+        let bounds = ScreenBounds {
+            negative_yaw: -1.0,
+            positive_yaw: 1.5,
+            negative_yaw_frames: 4,
+            positive_yaw_frames: 5,
+            negative_pitch: -0.5,
+            positive_pitch: 0.75,
+            negative_pitch_frames: 2,
+            positive_pitch_frames: 3,
+        };
+        let hand = IkPoint {
+            marker: "left hand".into(),
+            attached_to: "left grip".into(),
+        };
+        let seat = &graph.unit_seats[0];
+        assert_eq!(seat.label, "driver");
+        assert_eq!(seat.animations, [Some(0), None, None]);
+        assert_eq!(seat.looking_bounds, bounds);
+        assert_eq!(seat.ik_points, std::slice::from_ref(&hand));
+        let class = &seat.weapon_classes[0];
+        assert_eq!(
+            (
+                class.label.as_str(),
+                class.grip_marker.as_str(),
+                class.hand_marker.as_str()
+            ),
+            ("rifle", "primary trigger", "right hand")
+        );
+        assert_eq!(class.aiming_bounds, bounds);
+        assert_eq!(class.animations, [Some(1), Some(0)]);
+        assert_eq!(class.ik_points, [hand]);
+        assert_eq!(class.weapon_types[0].label, "plasma");
+        assert_eq!(class.weapon_types[0].animations, [Some(1)]);
+        assert_eq!(graph.weapon, [Some(0), Some(1), None]);
+        let vehicle = graph.vehicle.as_ref().ok_or("no vehicle block")?;
+        assert_eq!(vehicle.steering_bounds, bounds);
+        assert_eq!(vehicle.animations, [Some(0), Some(1), None]);
+        assert_eq!(
+            vehicle.suspensions,
+            [Suspension {
+                mass_point: 2,
+                animation: Some(1),
+                full_extension: 0.1,
+                full_compression: 0.4,
+            }]
+        );
+        assert_eq!(graph.device, [Some(0), Some(1), None]);
+        assert_eq!(graph.unit_damage, [Some(1), None]);
+        assert_eq!(
+            graph.sound_references,
+            [
+                Some(TagRef {
+                    group: opence_content::Group(*b"snd!"),
+                    path: "sound\\step".into()
+                }),
+                None
+            ]
+        );
         let [idle, aim] = graph.animations.as_slice() else {
             panic!("{} animations", graph.animations.len());
         };
@@ -1693,6 +1895,25 @@ mod tests {
         assert!(globals.multiplayer_unit.is_some());
         let graph = cache.find(ANTR, cyborg).ok_or("no cyborg graph")?;
         let graph = import_animation_graph(&cache, graph)?;
+        let stand = graph
+            .unit_seats
+            .iter()
+            .find(|seat| seat.label == "stand")
+            .ok_or("no stand seat")?;
+        let classes: Vec<_> = stand
+            .weapon_classes
+            .iter()
+            .map(|c| c.label.as_str())
+            .collect();
+        assert_eq!(
+            classes,
+            ["rifle", "pistol", "missile", "support", "unarmed"]
+        );
+        assert_eq!(stand.weapon_classes[4].weapon_types[0].label, "");
+        assert_eq!(
+            (graph.unit_damage.len(), graph.sound_references.len()),
+            (176, 23)
+        );
         assert_eq!(
             (
                 graph.object_overlays.len(),

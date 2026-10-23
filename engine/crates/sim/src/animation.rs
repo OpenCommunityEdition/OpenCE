@@ -1031,9 +1031,23 @@ pub(crate) fn play_animations(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use opence_content::{Group, ModelNode, TagRef};
+
+    /// An animation named `name` of `node_count` nodes and one frame.
+    pub(crate) fn animation_named(name: &str, node_count: u16) -> Animation {
+        Animation {
+            name: name.into(),
+            node_count,
+            ..animation(1)
+        }
+    }
+
+    /// A graph of `animations` alone.
+    pub(crate) fn graph_of(animations: Vec<Animation>) -> AnimationGraph {
+        graph(animations)
+    }
 
     fn animation(frame_count: u16) -> Animation {
         Animation {
@@ -1231,7 +1245,12 @@ mod tests {
             animations,
             object_overlays: Vec::new(),
             unit_seats: Vec::new(),
+            weapon: Vec::new(),
+            vehicle: None,
+            device: Vec::new(),
+            unit_damage: Vec::new(),
             first_person_weapon: Vec::new(),
+            sound_references: Vec::new(),
         }
     }
 
@@ -1241,12 +1260,12 @@ mod tests {
         let class = |label: &str, idle: Option<u16>| WeaponClass {
             label: label.into(),
             animations: vec![idle, Some(0)],
-            weapon_types: Vec::new(),
+            ..WeaponClass::default()
         };
         let seat = |label: &str, classes: Vec<WeaponClass>| UnitSeat {
             label: label.into(),
-            animations: Vec::new(),
             weapon_classes: classes,
+            ..UnitSeat::default()
         };
         let mut graph = graph(vec![animation(1); 4]);
         graph.unit_seats = vec![

@@ -415,7 +415,12 @@ mod tests {
             animations: Vec::new(),
             object_overlays: Vec::new(),
             unit_seats: Vec::new(),
+            weapon: Vec::new(),
+            vehicle: None,
+            device: Vec::new(),
+            unit_damage: Vec::new(),
             first_person_weapon: Vec::new(),
+            sound_references: Vec::new(),
         }
     }
 
