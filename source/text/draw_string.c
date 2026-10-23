@@ -794,7 +794,12 @@ static word parse_unicode_string(
 		state->result = _parsed_end_of_line;
 		break;
 	default:
-		state->result = _parsed_character;
+		/* port: a line breaks after a space, and between the characters of
+		Chinese, Japanese and Korean (the characters of a string drawn as
+		wide characters, as parse_string's patterns have it) */
+		state->result = (character == ' ' || (character >= 0x2E80 && character <= 0x9FFF) ||
+			(character >= 0xAC00 && character <= 0xD7AF) || (character >= 0xFF00 && character <= 0xFFEF)) ?
+			_parsed_end_of_word : _parsed_character;
 		break;
 	}
 
@@ -1323,6 +1328,13 @@ void draw_unicode_string(
 						{
 							segment_end_index = break_string_index;
 							line_width = break_line_width;
+							wrapped = TRUE;
+						}
+						else if (line_width > 0)
+						{
+							/* port: a word longer than the line breaks before
+							the character that does not fit, not after it,
+							where it was cut by the box */
 							wrapped = TRUE;
 						}
 						done = TRUE;

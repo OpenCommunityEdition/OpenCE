@@ -815,7 +815,6 @@ void subtitles_draw(
 		wchar_t wide[MAXIMUM_SUBTITLE_CHARACTERS + 1];
 		short height;
 		short margin;
-		short tries;
 		real alpha;
 
 		if (active->start_tick > now)
@@ -828,24 +827,11 @@ void subtitles_draw(
 		measure.y1 = (short)(screen.y1 - screen.y0);
 		draw_string_set_draw_mode(font_index, NONE, _subtitle_text_center, _subtitle_wrap_flags, &color);
 		subtitle_widen(active->text, wide, MAXIMUM_SUBTITLE_CHARACTERS + 1);
-		/* a line that fills the width reaches the box's edge, and the text
-		is cut there (the last characters of a line wrapped where they
-		just fit): the box is narrowed by a line's height until the text
-		stays inside it */
 		margin = 0;
 		text_hires_force(1);
-		for (tries = 0; ; tries++)
-		{
-			measure.x0 = (short)(left + margin);
-			measure.x1 = (short)(right - margin);
-			draw_unicode_string_compute_bounds(&measure, wide, &text_bounds, &cursor_bounds);
-			if (text_bounds.x1 < text_bounds.x0 || tries >= 8 ||
-				(text_bounds.x0 > measure.x0 && text_bounds.x1 < measure.x1))
-			{
-				break;
-			}
-			margin = (short)(margin + line_height);
-		}
+		measure.x0 = left;
+		measure.x1 = right;
+		draw_unicode_string_compute_bounds(&measure, wide, &text_bounds, &cursor_bounds);
 		text_hires_force(0);
 		if (text_bounds.x1 < text_bounds.x0)
 			continue;

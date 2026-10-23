@@ -904,7 +904,7 @@ static long font_character_ink(
 	long ink = 0;
 
 	/* (a CJK character's cell, font_group.c's, has no pixels) */
-	if (font_character->pixels_offset == -1)
+	if (font_character->pixels_offset == -1 || font_character->hardware_character_index == -2)
 		return 0;
 
 	for (row = MAX(y0, 0); row < MIN(y1, font_character->bitmap_height); row++)

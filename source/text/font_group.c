@@ -82,6 +82,8 @@ struct font_character *font_get_character_by_ascii_code(
 				(SYNTHETIC_CHARACTER_COUNT - 1)];
 			*synthetic = *(struct synthetic_font_character *)character;
 			synthetic->character_width = (short)(advance + 0.5f);
+			/* (its box the glyph's cell, which the line breaks and clips by) */
+			synthetic->bitmap_width = synthetic->character_width;
 			synthetic->hardware_character_index = -2;
 
 			return (struct font_character *)synthetic;
