@@ -123,10 +123,6 @@ SCREENS = {
              "Keep the light of explosions, plasma and the sun\npast white, and roll it off instead of clipping.", None),
             ("HDR DISPLAY:", "display.hdr_output", ON_OFF,
              "With HDR, on an HDR display, show that light\nbrighter than white. From the next start.", "desktop"),
-            ("SUBTITLES:", "display.subtitles", ON_OFF,
-             "Subtitles at the bottom of the screen for the\nsound tags named in subtitles.txt. Off: none.", None),
-            ("SUBTITLE LANGUAGE:", "display.subtitles_language", SUBTITLE_LANGUAGES,
-             "The subtitles' language. A line a language\nlacks is shown in English. From subtitles_<language>.txt.", None),
         ],
     },
     "mouse_settings": {
@@ -147,7 +143,8 @@ SCREENS = {
     "audio_settings": {
         "screen": "audio_settings_screen",
         "header": ("header_profile_audio_settings", f"{PE}/audio_settings/header_profile_audio_settings"),
-        "spacing": 30,
+        # (ten places, with the categories)
+        "spacing": 27,
         # (the devices, desktop only, first: Android's rows from the top)
         "platform_places": True,
         "rows": [
@@ -234,8 +231,7 @@ _graphics = {"display.high_res_hud", "display.hud_button_style", "display.high_r
              "display.model_detail"}
 # (the visual modifiers: a screen of their own, Extra Effects)
 _extra_effects = {"display.shield_glow", "display.shield_glow_intensity",
-                  "display.overshield_effect", "display.hdr", "display.hdr_output", "display.subtitles",
-                  "display.subtitles_language"}
+                  "display.overshield_effect", "display.hdr", "display.hdr_output"}
 SCREENS["video_settings/graphics"] = {
     "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 30,
     "same_place": ["anti_aliasing_android"],
@@ -251,7 +247,7 @@ _video["categories"] = [
     ("FOV AND VIEWMODELS:", "video_settings/fov_viewmodels",
      "The field of view and the first-person\nweapon. Their defaults keep the stock view."),
     ("EXTRA EFFECTS:", "video_settings/extra_effects",
-     "Visual modifiers the stock game does not\nhave, such as the shield glow and subtitles."),
+     "Visual modifiers the stock game does not\nhave, such as the shield glow."),
 ]
 SCREENS["video_settings/fov_viewmodels"] = {
     "screen": "fov_viewmodel_settings_screen", "header": _video["header"], "spacing": 30,
@@ -290,9 +286,21 @@ _audio["rows"] = [row for row in _audio["rows"] if row[1] not in _processing]
 
 # (voice chat stays on Audio Setup; the text chat's rows are the multiplayer
 # HUD's, on Network Setup)
+# (the subtitles, a screen of their own: Sound Setup's places are all taken)
+SCREENS["audio_settings/subtitles"] = {
+    "screen": "subtitles_settings_screen", "header": _audio["header"], "spacing": 30,
+    "rows": [
+        ("SUBTITLES:", "display.subtitles", ON_OFF,
+         "Subtitles at the bottom of the screen for the\nsound tags named in subtitles.txt. Off: none.", None),
+        ("SUBTITLE LANGUAGE:", "display.subtitles_language", SUBTITLE_LANGUAGES,
+         "The subtitles' language. A line a language\nlacks is shown in English. From subtitles_<language>.txt.", None),
+    ],
+}
 _audio["categories"] = [
     ("SOUND PROCESSING:", "audio_settings/sound_processing",
      "The reverb, and how sounds are converted to the\noutput's rate."),
+    ("SUBTITLES:", "audio_settings/subtitles",
+     "Subtitles at the bottom of the screen for the\nsound tags named in subtitles.txt, and their language."),
 ]
 
 # Network Setup's map sharing (port/linux/game/map_share.c): this machine's

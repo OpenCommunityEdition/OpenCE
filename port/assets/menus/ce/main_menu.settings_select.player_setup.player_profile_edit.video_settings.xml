@@ -175,6 +175,6 @@
 		<string text="In first person, turn the view the moment the\nmouse moves, not up to two ticks later."/>
 		<string text="The HUD, text, anti-aliasing, shadows,\nlighting and HDR."/>
 		<string text="The field of view and the first-person\nweapon. Their defaults keep the stock view."/>
-		<string text="Visual modifiers the stock game does not\nhave, such as the shield glow and subtitles."/>
+		<string text="Visual modifiers the stock game does not\nhave, such as the shield glow."/>
 	</strings>
 </menus>
