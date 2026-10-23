@@ -4,7 +4,7 @@ import Metal
 import OpenCEEngineCore
 import OpenCEEngineKit
 import OpenCEEngineMenu
-import OpenCEEngineRender
+@testable import OpenCEEngineRender
 import XCTest
 
 /// The loading screen between missions: its model's stages, its pass's
@@ -218,5 +218,41 @@ final class LoadingTests: XCTestCase {
     func testTheLoadReportsItsProgress() {
         XCTAssertLessThan(LoadedLevel.importedProgress, LoadedLevel.drawnProgress)
         XCTAssertLessThan(LoadedLevel.drawnProgress, 1)
+    }
+
+    /// The screen half way through a load, its trail built up over a
+    /// second of frames: a golden frame written to build/engine/golden and
+    /// compared with the approved one in assets/golden/engine if it is
+    /// there (it holds nothing of the game's: the field is white, as
+    /// loading.tga is not read).
+    func testTheGoldenFrameOfTheScreen() throws {
+        let device = try device()
+        let queue = try XCTUnwrap(device.makeCommandQueue())
+        let screen = LoadingScreenModel(enabled: true)
+        let pass = try LoadingPass(device: device, mask: screen.maskPixels(), outputFormat: .bgra8Unorm)
+        let (width, height) = (1280, 720)
+        let target = try target(device, width: width, height: height)
+        screen.setProgress(progress: 0)
+        screen.setProgress(progress: 0.5)
+        for _ in 0..<60 {
+            let commands = try XCTUnwrap(queue.makeCommandBuffer())
+            pass.encode(screen.update(seconds: 1.0 / 60), into: commands, target: target, clear: true)
+            commands.commit()
+            commands.waitUntilCompleted()
+        }
+        let drawn = CapturedFrame(width: width, height: height, bytes: pixels(target))
+        XCTAssertGreaterThan(drawn.distinctColors, 16, "the band and its trail")
+
+        let out = StockLevel.root.appendingPathComponent("build/engine/golden")
+        try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+        let name = "loading_screen_\(width)x\(height).png"
+        try drawn.writePNG(to: out.appendingPathComponent(name))
+        let approved = StockLevel.root.appendingPathComponent("assets/golden/engine/\(name)")
+        if let approvedFrame = CapturedFrame.readPNG(at: approved) {
+            let difference = try XCTUnwrap(drawn.difference(from: approvedFrame))
+            XCTAssertLessThan(difference.share, 0.005, "\(name) differs from the approved frame")
+        } else {
+            print("golden frame \(name): none approved yet (assets/golden/engine)")
+        }
     }
 }

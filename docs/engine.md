@@ -318,6 +318,92 @@ These are not done yet:
 - detail objects are blended and not sorted;
 - particles are drawn after the first-person weapon, so they can draw over it.
 
+## The Halo UI
+
+The menus are the game's own: the widget definitions, bitmaps, fonts and
+strings of the player's `ui.map` (and the pause menu every map carries),
+imported into the cache as the levels are. Nothing from `ui.map` is
+shipped. Fonts get a signed distance field each at import, so text stays
+sharp at any window size.
+
+`crates/ui` (`opence_ui`) is the widget code (`source/interface/ui_widget.c`):
+
+- one tree of widgets for each local player, in an arena named by `Id`,
+  with the history of screens each came from;
+- focus moved through children and list items, and the handlers' functions
+  run; the ones that reach the game (start a level, set the difficulty,
+  host or join) are the `Host`'s, and the ones the engine has no use for
+  return `Outcome::Unwired`;
+- `draw.rs` lays each screen out at the game's 640×480 and scales it to the
+  window; `pointer.rs` maps keys to the pad's buttons and gives the mouse
+  hover, click, the wheel and right-click (back). There is no gamepad.
+
+`OpenCEEngineMenu` holds the app's side: `HaloMenu` (the actions the
+widgets run, and the next mission after each), the settings, the fonts and
+the server list.
+
+### The launcher
+
+The window before the game has three choices: **Play**, **Settings** and
+**Exit**. Its settings are only what must be set before the game starts:
+the data folders, the display and the window mode. Every other setting is
+in the game's own menus.
+
+### The loading screen
+
+`crates/ui/src/loading.rs` is `source/interface/progress_bar.c`: a band of
+light pans across the screen as the map loads, its last frames left in a
+fading trail, while the chant's four voices swell with the progress. The
+game stepped it at 30 frames a second; here a frame of any length moves it
+as many thirtieths of a second would (a frame over 0.25 s counts as 0.25 s).
+
+It goes through four stages:
+
+1. **Loading:** the map loads on another thread (16 MB of stack), and the
+   loader reports its progress.
+2. **Settling:** the map is ready, and the light finishes its sweep, for 3 s
+   at most. Any key skips it.
+3. **Crossfade:** the screen fades over the mission's frames for 0.5 s.
+4. **Done:** the mission shows alone.
+
+The world is held until the screen is done. With `ui.loading_screen` off,
+the screen is plain: no light and no chant, and it fades as soon as the map
+is ready. `ui.map` has no `loading.tga`, so the light pans over a white
+field.
+
+The chant is a tone of 511 blocks of Xbox ADPCM that the game carries in
+its executable. The engine ships none of it. `ChantPlayer` looks for the
+player's `default.xbe` beside each data folder. `opence_ui::chant` finds
+the tone among the executable's sections by the shape of its blocks, and
+knows it by its SHA-256. It decodes the tone into the cache's `chant.wav`
+once. Each voice plays it at its own pitch. Without the executable the
+screen is silent.
+
+So that the first frame of a mission is no longer than the rest,
+`LoadedLevel` draws one frame from the start camera at the window's size on
+the loader's thread. That makes the size's targets and the temporal scaler
+before the mission shows. `TransitionTests` draws a10, loads a30 behind the
+screen, fades into it and draws a30, pacing each frame to 1/60 s. It fails
+if any frame takes over 33 ms; the worst so far is 14.2 ms. It needs
+`assets/maps`.
+
+### Golden frames
+
+`UiTests` writes the main menu at 1920×1080
+(`build/engine/golden/ui_main_menu_1920x1080.png`), and `LoadingTests`
+writes the loading screen half-way through its load at 1280×720
+(`loading_screen_1280x720.png`). Each is compared with an approved frame in
+`assets/golden/engine` when there is one. They are made from the player's
+maps, so none is committed.
+
+These are not done yet:
+
+- fonts have no kerning, and text does not wrap;
+- UI sounds are queued but not played;
+- generated list items draw no background;
+- profile editing and the controller settings are unwired;
+- co-op, split-screen and the demos are disabled.
+
 ## The benchmark
 
 `tools/test_engine_benchmark.py` runs `OpenCEEngine --benchmark 60`. The

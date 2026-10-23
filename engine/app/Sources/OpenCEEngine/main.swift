@@ -574,7 +574,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wonMission = nil
         inShellScene = false
         level = nil
-        let job = LevelJob(map: map, cacheFolder: cacheFolder(), device: device, settings: settings)
+        let size = controller?.window.engineView.metalLayer.drawableSize ?? .zero
+        let job = LevelJob(map: map, cacheFolder: cacheFolder(), device: device, settings: settings,
+                           width: Int(size.width), height: Int(size.height))
         Task { @MainActor [weak self] in
             let result = await Task.detached { job.run { screen.setProgress(progress: $0) } }.value
             guard let self, self.loadingScreen === screen else { return }
@@ -857,6 +859,10 @@ struct LevelJob: @unchecked Sendable {
     let cacheFolder: String
     let device: MTLDevice
     let settings: VideoSettings
+    /// The size the level will be shown at, its first frame drawn there
+    /// ahead of time.
+    let width: Int
+    let height: Int
 
     struct Loaded: @unchecked Sendable {
         let level: LoadedLevel
@@ -865,7 +871,7 @@ struct LevelJob: @unchecked Sendable {
     func run(progress: @escaping (Float) -> Void) -> Result<Loaded, Error> {
         Result {
             Loaded(level: try LoadedLevel(map: map, bsp: 0, cacheFolder: cacheFolder, device: device,
-                                          settings: settings, progress: progress))
+                                          settings: settings, prepare: (width, height), progress: progress))
         }
     }
 }
