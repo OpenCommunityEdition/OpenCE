@@ -17,7 +17,7 @@ This file tracks all major tracks for the project.
 - [x] **Track: The developer shell, engine hooks and a test map: a terminal-like overlay, a control socket and the opence tool, debug drawing, live shader reload, a test driver, the devmap, and placement checks against the reference game**
   *Link: [./tracks/dev_tooling_20261021/](./tracks/dev_tooling_20261021/)*
 
-- [~] **Track: Lighting, shaders, decals and effects drawn: a physically based shader model for every Halo shader class, re-baked bounced light with AO and probes, dynamic lights and shadows, lens flares, decals and particles drawn**
+- [x] **Track: Lighting, shaders, decals and effects drawn: a physically based shader model for every Halo shader class, re-baked bounced light with AO and probes, dynamic lights and shadows, lens flares, decals and particles drawn**
   *Link: [./tracks/lighting_shaders_20261021/](./tracks/lighting_shaders_20261021/)*
 
 - [~] **Track: The Halo UI from the user's ui.map, a launcher with only Play, Settings and Exit, and the Xbox loading screen between campaign maps**
