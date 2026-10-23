@@ -4,7 +4,13 @@ SUBTITLES.C
 Subtitles for sound tags (display.subtitles, off by default). They are lines
 of plain text, one for each sound tag. The game has its own built in
 (port/assets/subtitles/subtitles.txt, embedded by tools/embed_assets.py); a
-subtitles.txt next to the maps (display.subtitles_file) replaces them whole:
+subtitles.txt next to the maps (display.subtitles_file) replaces them whole.
+The subtitles are in the language display.subtitles_language names: English
+is subtitles.txt, and each other language has a file of its own, such as
+subtitles_french.txt, built in (port/assets/subtitles) or next to the maps
+(which replaces it). A line a language lacks is shown in English. The text is
+UTF-8, drawn as wide characters in the HUD font, which has Latin letters
+with accents and no Chinese, Japanese or Korean characters. A line:
 
 	"sound/dialog/a10/a10_chief_get_down" - "Chief, get down!"
 	sound\dialog\a10\cortana_01 = Chief, I need you on the bridge.
@@ -63,6 +69,8 @@ enum
 	MAXIMUM_SUBTITLE_WAIT_TICKS = 30 * 30,
 	/* the text's width as a share of the screen's, a line's padding and the
 	gap between lines (the HUD's 480 lines) */
+	/* the longest line drawn, in characters */
+	MAXIMUM_SUBTITLE_CHARACTERS = 1023,
 	SUBTITLE_PADDING = 5,
 	SUBTITLE_GAP = 4,
 	/* draw_string.c's centred text and its flags (wrap in the bounds, and
@@ -97,9 +105,11 @@ struct active_subtitle
 /* ---------- prototypes */
 
 /* the subtitles built into the game (tools/embed_assets.py, from
-port/assets/subtitles/subtitles.txt; size 0: none) */
-extern const unsigned int subtitles_embedded[];
-extern const unsigned long subtitles_embedded_size;
+port/assets/subtitles: subtitles.txt, subtitles_french.txt and so on), by
+language (subtitle_languages); size 0 where a language has none */
+extern const unsigned int *const subtitles_embedded_data[];
+extern const unsigned long subtitles_embedded_sizes[];
+extern const unsigned long subtitles_embedded_count;
 
 /* port_config.c's, cseries_windows.c's, cinematics.c's */
 int config_boolean(const char *name);
@@ -361,56 +371,165 @@ static void subtitle_parse_line(
 	return;
 }
 
-/* the file read again, its lines made into entries and the table */
-static void subtitle_load(
-	char const *name)
+/* the subtitle languages, in the order of the setting's choices and of
+tools/embed_assets.py's SUBTITLE_LANGUAGES: display.subtitles_language's word
+for each, which also names its file (subtitles_french.txt; English is
+subtitles.txt) */
+static char const *const subtitle_languages[] =
 {
+	"english", "french", "german", "italian", "chinese", "chinese_simple", "japanese", "korean",
+	"spanish_latam", "spanish", "portuguese",
+};
+
+/* the language display.subtitles_language names (English where it names none) */
+static long subtitle_language_index(
+	void)
+{
+	char const *word = config_string("display.subtitles_language");
+	long index;
+
+	for (index = 0; index < (long)(sizeof(subtitle_languages) / sizeof(subtitle_languages[0])); index++)
+	{
+		if (!strcmp(word, subtitle_languages[index]))
+			return index;
+	}
+	return 0;
+}
+
+/* the name of a language's file: the base name for English, else with the
+language's word before the extension ("subtitles.txt": "subtitles_french.txt") */
+static void subtitle_language_file_name(
+	char const *base_name,
+	long language,
+	char *name,
+	long size)
+{
+	char const *extension = strrchr(base_name, '.');
+	char const *slash = strrchr(base_name, '/');
+	char const *backslash = strrchr(base_name, '\\');
+	long stem;
+
+	if (backslash && (!slash || backslash > slash))
+		slash = backslash;
+	if (!extension || (slash && extension < slash))
+		extension = base_name + strlen(base_name);
+	stem = (long)(extension - base_name);
+	if (language <= 0)
+		snprintf(name, (size_t)size, "%s", base_name);
+	else
+		snprintf(name, (size_t)size, "%.*s_%s%s", (int)stem, base_name, subtitle_languages[language], extension);
+	return;
+}
+
+/* a language's subtitles read whole (a NUL after them, no byte order mark):
+the player's file, else the game's own built-in text; NULL, size 0, for
+neither */
+static char *subtitle_read_layer(
+	char const *base_name,
+	long language,
+	long *size)
+{
+	char name[512];
 	FILE *file = NULL;
+	char *data = NULL;
+
+	*size = 0;
+	if (base_name && *base_name)
+	{
+		subtitle_language_file_name(base_name, language, name, sizeof(name));
+		file = fopen(name, "rb");
+	}
+	if (file)
+	{
+		/* (the player's own file, in place of the game's) */
+		long length;
+
+		fseek(file, 0, SEEK_END);
+		length = ftell(file);
+		fseek(file, 0, SEEK_SET);
+		if (length > 0 && length <= MAXIMUM_SUBTITLES_FILE_SIZE)
+		{
+			data = (char *)malloc((size_t)length + 1);
+			if (data && fread(data, 1, (size_t)length, file) == (size_t)length)
+			{
+				*size = length;
+			}
+			else
+			{
+				if (data)
+					free(data);
+				data = NULL;
+			}
+		}
+		fclose(file);
+	}
+	else if (language < (long)subtitles_embedded_count && subtitles_embedded_data[language] &&
+		subtitles_embedded_sizes[language] > 0 && subtitles_embedded_sizes[language] <= MAXIMUM_SUBTITLES_FILE_SIZE)
+	{
+		/* the subtitles built into the game */
+		long length = (long)subtitles_embedded_sizes[language];
+
+		data = (char *)malloc((size_t)length + 1);
+		if (data)
+		{
+			memcpy(data, subtitles_embedded_data[language], (size_t)length);
+			*size = length;
+		}
+	}
+	if (data)
+	{
+		data[*size] = 0;
+		/* (a UTF-8 byte order mark) */
+		if (*size >= 3 && (unsigned char)data[0] == 0xEF && (unsigned char)data[1] == 0xBB &&
+			(unsigned char)data[2] == 0xBF)
+		{
+			memmove(data, data + 3, (size_t)(*size - 3 + 1));
+			*size -= 3;
+		}
+	}
+	return data;
+}
+
+/* the subtitles read again: English, then the language's own over it (a
+line it lacks stays English), made into entries and the table */
+static void subtitle_load(
+	char const *name,
+	long language)
+{
 	long size;
+	long english_size = 0;
+	long language_size = 0;
 	long lines = 1;
 	long index;
+	char *english;
+	char *translated = NULL;
 	char *line;
 	char *scan;
 
 	subtitle_unload();
-	if (name && *name)
-		file = fopen(name, "rb");
-	if (file)
+	english = subtitle_read_layer(name, 0, &english_size);
+	if (language > 0)
+		translated = subtitle_read_layer(name, language, &language_size);
+	if (!english && !translated)
+		return;
+	size = english_size + language_size + 1;
+	subtitle_globals.buffer = (char *)malloc((size_t)size + 1);
+	if (subtitle_globals.buffer)
 	{
-		/* (the player's own file, in place of the game's) */
-		fseek(file, 0, SEEK_END);
-		size = ftell(file);
-		fseek(file, 0, SEEK_SET);
-		if (size <= 0 || size > MAXIMUM_SUBTITLES_FILE_SIZE)
-		{
-			fclose(file);
-			return;
-		}
-		subtitle_globals.buffer = (char *)malloc((size_t)size + 1);
-		if (!subtitle_globals.buffer || fread(subtitle_globals.buffer, 1, (size_t)size, file) != (size_t)size)
-		{
-			fclose(file);
-			subtitle_unload();
-			return;
-		}
-		fclose(file);
+		if (english)
+			memcpy(subtitle_globals.buffer, english, (size_t)english_size);
+		subtitle_globals.buffer[english_size] = '\n';
+		if (translated)
+			memcpy(subtitle_globals.buffer + english_size + 1, translated, (size_t)language_size);
+		subtitle_globals.buffer[size] = 0;
 	}
-	else
-	{
-		/* the subtitles built into the game */
-		size = (long)subtitles_embedded_size;
-		if (size <= 0 || size > MAXIMUM_SUBTITLES_FILE_SIZE)
-			return;
-		subtitle_globals.buffer = (char *)malloc((size_t)size + 1);
-		if (!subtitle_globals.buffer)
-			return;
-		memcpy(subtitle_globals.buffer, subtitles_embedded, (size_t)size);
-	}
-	subtitle_globals.buffer[size] = 0;
-	/* (a UTF-8 byte order mark) */
+	if (english)
+		free(english);
+	if (translated)
+		free(translated);
+	if (!subtitle_globals.buffer)
+		return;
 	line = subtitle_globals.buffer;
-	if ((unsigned char)line[0] == 0xEF && (unsigned char)line[1] == 0xBB && (unsigned char)line[2] == 0xBF)
-		line += 3;
 	for (scan = line; *scan; scan++)
 	{
 		if (*scan == '\n')
@@ -502,6 +621,59 @@ static char const *subtitle_find(
 	return best != NONE ? subtitle_globals.entries[best].text : NULL;
 }
 
+/* UTF-8 text as the wide characters the game draws (what does not fit a
+16-bit character, or is not UTF-8, becomes "?") */
+static void subtitle_widen(
+	char const *text,
+	wchar_t *wide,
+	long capacity)
+{
+	unsigned char const *source = (unsigned char const *)text;
+	long count = 0;
+
+	while (*source && count < capacity - 1)
+	{
+		unsigned long code;
+		long extra;
+		unsigned char first = *source++;
+
+		if (first < 0x80)
+		{
+			code = first;
+			extra = 0;
+		}
+		else if ((first & 0xE0) == 0xC0)
+		{
+			code = first & 0x1F;
+			extra = 1;
+		}
+		else if ((first & 0xF0) == 0xE0)
+		{
+			code = first & 0x0F;
+			extra = 2;
+		}
+		else if ((first & 0xF8) == 0xF0)
+		{
+			code = first & 0x07;
+			extra = 3;
+		}
+		else
+		{
+			wide[count++] = (wchar_t)'?';
+			continue;
+		}
+		while (extra > 0 && (*source & 0xC0) == 0x80)
+		{
+			code = (code << 6) | (*source & 0x3F);
+			source++;
+			extra--;
+		}
+		wide[count++] = (extra > 0 || code > 0xFFFF) ? (wchar_t)'?' : (wchar_t)code;
+	}
+	wide[count] = 0;
+	return;
+}
+
 /* whether the map is a single player one (a campaign level, played alone or
 in co-op, the Custom Edition ones too): there are no subtitles in the main
 menu's or a multiplayer map */
@@ -523,7 +695,7 @@ boolean subtitles_enabled(
 		subtitle_globals.changes = config_changes();
 		subtitle_globals.enabled = config_boolean("display.subtitles") != 0;
 		if (subtitle_globals.enabled)
-			subtitle_load(config_string("display.subtitles_file"));
+			subtitle_load(config_string("display.subtitles_file"), subtitle_language_index());
 		else
 			subtitle_unload();
 	}
@@ -636,6 +808,7 @@ void subtitles_draw(
 		rectangle2d cursor_bounds;
 		rectangle2d bounds;
 		rectangle2d background;
+		wchar_t wide[MAXIMUM_SUBTITLE_CHARACTERS + 1];
 		short height;
 		real alpha;
 
@@ -650,7 +823,8 @@ void subtitles_draw(
 		measure.y0 = 0;
 		measure.y1 = (short)(screen.y1 - screen.y0);
 		draw_string_set_draw_mode(font_index, NONE, _subtitle_text_center, _subtitle_wrap_flags, &color);
-		draw_string_compute_bounds(&measure, active->text, &text_bounds, &cursor_bounds);
+		subtitle_widen(active->text, wide, MAXIMUM_SUBTITLE_CHARACTERS + 1);
+		draw_unicode_string_compute_bounds(&measure, wide, &text_bounds, &cursor_bounds);
 		if (text_bounds.x1 < text_bounds.x0)
 			continue;
 		height = (short)(text_bounds.y1 - text_bounds.y0);
@@ -675,10 +849,10 @@ void subtitles_draw(
 			shadow.red = shadow.green = shadow.blue = 0.0f;
 			offset_rectangle2d(&shadow_bounds, 1, 1);
 			draw_string_set_draw_mode(font_index, NONE, _subtitle_text_center, _subtitle_wrap_flags, &shadow);
-			rasterizer_draw_string(&shadow_bounds, NULL, NULL, 0, active->text);
+			rasterizer_draw_unicode_string(&shadow_bounds, NULL, NULL, 0, wide);
 		}
 		draw_string_set_draw_mode(font_index, NONE, _subtitle_text_center, _subtitle_wrap_flags, &color);
-		rasterizer_draw_string(&bounds, NULL, NULL, 0, active->text);
+		rasterizer_draw_unicode_string(&bounds, NULL, NULL, 0, wide);
 
 		bottom = (short)(background.y0 - SUBTITLE_GAP);
 	}

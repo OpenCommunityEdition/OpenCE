@@ -208,6 +208,13 @@ static const struct config_setting config_settings[] =
 		"and the text, such as  \"sound/a10/a10\" - \"Chief, get down!\"  (a path\n"
 		"ending in /* is every tag below it; \\n starts a new line; # starts a\n"
 		"comment). Read again when the settings change." },
+	{ "display.subtitles_language", _config_string, "\"english\"", "HALO_SUBTITLES_LANGUAGE", _environment_value,
+		_platform_all,
+		"The subtitles' language: \"english\", \"french\", \"german\", \"italian\",\n"
+		"\"chinese\", \"chinese_simple\", \"japanese\", \"korean\", \"spanish_latam\",\n"
+		"\"spanish\" or \"portuguese\". Its lines are in subtitles_<language>.txt (next\n"
+		"to the maps, or built into the game); a line it lacks is shown in English.\n"
+		"Also Video Setup, Extra Effects in the menus." },
 	{ "display.per_pixel_lighting", _config_boolean, "false", "HALO_PER_PIXEL_LIGHTING", _environment_value,
 		_platform_all,
 		"Light the models (characters, weapons, vehicles, scenery) for each\n"

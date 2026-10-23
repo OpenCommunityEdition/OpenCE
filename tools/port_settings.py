@@ -33,6 +33,11 @@ SHIELD_COLORS = ["white", "black", "red", "blue", "gray", "yellow", "green", "pi
                  "orange", "teal", "sage", "brown", "tan", "maroon", "salmon"]
 SENSITIVITIES = [(f"{value:g}", f"{value:g}") for value in (0.1, 0.15, 0.25, 0.4, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4)]
 VOLUMES = [(str(step), f"{step / 10:g}") for step in range(11)]
+# the subtitles' languages (port/linux/game/subtitles.c, tools/embed_assets.py)
+SUBTITLE_LANGUAGES = [("ENGLISH", "english"), ("FRENCH", "french"), ("GERMAN", "german"), ("ITALIAN", "italian"),
+                      ("CHINESE", "chinese"), ("CHINESE (SIMPLE)", "chinese_simple"), ("JAPANESE", "japanese"),
+                      ("KOREAN", "korean"), ("SPANISH (LATAM)", "spanish_latam"), ("SPANISH", "spanish"),
+                      ("PORTUGUESE", "portuguese")]
 
 # each screen: its folder below PE, its screen's widget (the name the profile
 # menu opens), its header (widget, bitmap), the row spacing, and its rows:
@@ -120,6 +125,8 @@ SCREENS = {
              "With HDR, on an HDR display, show that light\nbrighter than white. From the next start.", "desktop"),
             ("SUBTITLES:", "display.subtitles", ON_OFF,
              "Subtitles at the bottom of the screen for the\nsound tags named in subtitles.txt. Off: none.", None),
+            ("SUBTITLE LANGUAGE:", "display.subtitles_language", SUBTITLE_LANGUAGES,
+             "The subtitles' language. A line a language\nlacks is shown in English. From subtitles_<language>.txt.", None),
         ],
     },
     "mouse_settings": {
@@ -227,7 +234,8 @@ _graphics = {"display.high_res_hud", "display.hud_button_style", "display.high_r
              "display.model_detail"}
 # (the visual modifiers: a screen of their own, Extra Effects)
 _extra_effects = {"display.shield_glow", "display.shield_glow_intensity",
-                  "display.overshield_effect", "display.hdr", "display.hdr_output", "display.subtitles"}
+                  "display.overshield_effect", "display.hdr", "display.hdr_output", "display.subtitles",
+                  "display.subtitles_language"}
 SCREENS["video_settings/graphics"] = {
     "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 30,
     "same_place": ["anti_aliasing_android"],
@@ -366,7 +374,7 @@ CONTROL_ROWS = 7
 
 # the settings whose rows have the wider spinner (a device's name)
 WIDE_SETTINGS = {"audio.output_device", "audio.input_device", "streamer.slurs", "streamer.swearing",
-                 "streamer.insults"}
+                 "streamer.insults", "display.subtitles_language"}
 
 # the host's voice chat and vote kicks, on Teamplay Options
 # (_teamplay_options_extras): each row's key, its label, its choices' words
