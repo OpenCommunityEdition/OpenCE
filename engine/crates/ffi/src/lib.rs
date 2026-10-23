@@ -30,6 +30,7 @@ pub mod settings;
 pub mod snapshot;
 mod stations;
 pub mod ui;
+mod ui_host;
 
 use std::collections::HashMap;
 use std::path::Path;

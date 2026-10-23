@@ -1,9 +1,10 @@
 // The app's entry: the engine's window, full screen with --full-screen,
 // stepping the world on the display's frames, and drawing the map --map
-// PATH names (and --bsp N), or the one chosen from the menus (Campaign,
-// which plays a mission at a difficulty with its scripts, Play Alone,
-// Join a Game, Join by Address, Host a Game; Game > Main Menu, Command-
-// Escape, shows them again) or the Map menu, smoothed as --anti-aliasing
+// PATH names (and --bsp N), or the one chosen from Halo's menus (ui.map's
+// main menu over its scene: the campaign, which plays a mission at a
+// difficulty with its scripts, and multiplayer's server list and hosting;
+// Escape in a game opens its pause menu, Game > Main Menu, Command-Escape,
+// goes back to the main menu) or the Map menu, smoothed as --anti-aliasing
 // (temporal, the default, or native) and --render-scale (0.5 to 1) say, or
 // as the Video settings do. The player spawns at the scenario's first
 // start and moves with W, A, S and D, jumps with Space and crouches with
@@ -204,9 +205,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let folders = MapLibrary.folders(
         named: argument("--maps"), root: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
     lazy var maps = MapLibrary.maps(in: folders)
-    lazy var menu = MenuModel(maps: maps, settings: saved, servers: ServerListModel())
-    /// The menus' view, while they show.
-    var menuView: NSView?
+    lazy var menu = HaloMenu(maps: maps, settings: saved, servers: ServerListModel())
+    /// Whether the level drawn is the main menu's scene, not a game.
+    var inShellScene = false
+    /// The mission played last, for its pause menu's restart.
+    var lastCampaign: (map: String, difficulty: UInt8)?
     /// The network's state last shown in the title.
     var shownStatus: NetworkStatus = .alone
     /// Draws the frames asked for (the shell's `frame`, a window script's,
@@ -223,8 +226,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = mainMenu()
         NSApp.mainMenu?.addItem(mapMenu())
         engine.startEmptyWorld()
-        MenuFonts.register()
         menu.actions = self
+        menu.onMessage = { [weak self] text in self?.showMessage(text) }
+        menu.onClosed = { [weak self] in self?.hideMenu() }
         let controller = EngineWindowController()
         controller.showsFrameTimes = CommandLine.arguments.contains("--frame-times")
             || saved.settings.video.showFrameTimes
@@ -253,23 +257,65 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Shows the menus over the game (which plays on behind them).
+    /// Leaves any game for the main menu, over ui.map's scene.
     @objc func showMenu(_ sender: Any?) {
-        guard let controller, menuView == nil else { return }
-        let view = NSHostingView(rootView: MenuView(model: menu))
-        view.frame = controller.window.engineView.bounds
-        view.autoresizingMask = [.width, .height]
-        controller.window.engineView.addSubview(view)
+        engine.leaveGame()
+        lastCampaign = nil
+        guard let ui = menu.map(named: "ui") else {
+            showMessage("There is no ui.map in the maps folder, so there are no menus: choose a map from the Map menu.")
+            return
+        }
+        do {
+            try load(map: ui.path, player: false)
+            inShellScene = true
+            openMenu(widget: mainMenuWidget())
+        } catch {
+            showMessage("ui.map could not be loaded: \(error)")
+        }
+    }
+
+    /// Opens `widget` of the level's own menus over it, the pointer the
+    /// menu's.
+    func openMenu(widget: String) {
+        guard let level, let controller, let device = controller.window.engineView.device else { return }
+        let halo = Menu(geometry: level.geometry)
+        guard menu.show(halo, widget: widget) else {
+            appLog("warn", "\(level.map) has no \(widget)")
+            return
+        }
+        do {
+            level.renderer.ui = try UiPass(device: device, atlas: halo.glyphAtlas(), outputFormat: .bgra8Unorm)
+        } catch {
+            appLog("error", "the menu's pass: \(error)")
+        }
+        controller.releaseKeys()
         controller.capturesMouse = false
-        menuView = view
-        menu.show(.main)
+    }
+
+    /// The game's pause menu (the world holds while it is open, unless the
+    /// game is a network one).
+    func pause() {
+        openMenu(widget: pauseMenuWidget(multiplayer: engine.networkStatus() != .alone))
+    }
+
+    /// Whether the world holds: a game alone with its pause menu open.
+    var holdsWorld: Bool {
+        menu.isOpen && !inShellScene && engine.networkStatus() == .alone
+    }
+
+    /// Shows what went wrong, over the window.
+    func showMessage(_ text: String) {
+        appLog("warn", text)
+        guard let window = controller?.window else { return }
+        let alert = NSAlert()
+        alert.messageText = text
+        alert.beginSheetModal(for: window)
     }
 
     /// Takes the menus away, the settings they changed taken up.
     func hideMenu() {
-        menu.settings.save()
-        menuView?.removeFromSuperview()
-        menuView = nil
+        menu.close()
+        inShellScene = false
         controls = flyControls(saved.settings.controls)
         play = playControls(saved.settings.controls)
         settings = videoSettings(saved.settings.video)
@@ -301,7 +347,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func commandLoad(map: String, bsp: UInt32) throws {
         engine.leaveGame()
         try load(map: map, bsp: bsp)
-        if menuView != nil {
+        if menu.isOpen {
             hideMenu()
         }
     }
@@ -366,28 +412,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if open {
                 controller.releaseKeys()
                 controller.capturesMouse = false
-            } else if menuView == nil {
+            } else if !menu.isOpen {
                 controller.capturesMouse = true
             }
         }
-        view.keyFilter = { [weak shell] event in
-            guard let shell else { return false }
-            if event.type == .keyUp || (event.isARepeat && !shell.isOpen) {
-                return shell.isOpen
+        view.keyFilter = { [weak self, weak shell] event in
+            guard let self, let shell else { return false }
+            if shell.isOpen || event.keyCode == ShellKey.toggleCode {
+                if event.type == .keyUp || (event.isARepeat && !shell.isOpen) {
+                    return shell.isOpen
+                }
+                guard let key = ShellKey(event) else { return shell.isOpen }
+                return shell.handle(key) || shell.isOpen
             }
-            guard let key = ShellKey(event) else { return shell.isOpen }
-            return shell.handle(key) || shell.isOpen
+            // (the menu has the keys while it is open; Escape in a game opens its pause menu)
+            if menu.isOpen {
+                if event.type == .keyDown {
+                    _ = menu.key(code: event.keyCode)
+                }
+                return true
+            }
+            if event.type == .keyDown, !event.isARepeat, event.keyCode == KeyCode.escape, level != nil {
+                pause()
+                return true
+            }
+            return false
         }
-        view.pointerFilter = { [weak shell] phase, x, y in
-            guard let shell else { return false }
-            switch phase {
-            case .down: return shell.pointer(.down, x: x, y: y)
-            case .dragged: return shell.pointer(.dragged, x: x, y: y)
-            case .up: return shell.pointer(.up, x: x, y: y)
+        view.pointerFilter = { [weak self, weak shell] phase, x, y in
+            guard let self, let shell else { return false }
+            if shell.isOpen {
+                switch phase {
+                case .down: return shell.pointer(.down, x: x, y: y)
+                case .dragged: return shell.pointer(.dragged, x: x, y: y)
+                case .up: return shell.pointer(.up, x: x, y: y)
+                case .moved, .rightDown: return true
+                }
             }
+            guard menu.isOpen, let halo = menu.menu, let controller else { return false }
+            let (width, height) = controller.window.engineView.sizeInPixels
+            let (w, h) = (UInt32(width), UInt32(height))
+            switch phase {
+            case .moved, .dragged: halo.pointerMoved(x: Float(x), y: Float(y), width: w, height: h)
+            case .down: halo.click(x: Float(x), y: Float(y), width: w, height: h, right: false)
+            case .rightDown: halo.click(x: Float(x), y: Float(y), width: w, height: h, right: true)
+            case .up: break
+            }
+            return true
         }
         view.scrollFilter = { [weak self, weak shell] delta, precise in
             guard let self, let shell, let textPass else { return false }
+            if !shell.isOpen, menu.isOpen, let halo = menu.menu {
+                // (a notch a step; a trackpad's pixels in steps of a row)
+                let steps = precise ? delta / 40 : delta
+                if steps.rounded(.towardZero) != 0 {
+                    halo.wheel(steps: Int32(steps.rounded(.towardZero)))
+                }
+                return true
+            }
             // (a wheel's lines as three of the shell's rows)
             let cell = Double(ShellMetrics(atlas: textPass.atlas).cellHeight)
             return shell.scrollWheel(pixels: precise ? delta : delta * 3 * cell)
@@ -402,7 +483,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func leave(_ sender: Any?) {
-        engine.leaveGame()
+        showMenu(nil)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -419,6 +500,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         loaded.renderer.hud = hud
         try engine.startCampaign(geometry: loaded.geometry, difficultyLevel: difficulty)
+        lastCampaign = (map, difficulty)
         thirdPerson = false
         level = loaded
         followStructure()
@@ -440,8 +522,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Loads `map` and puts the camera at its start.
-    func load(map: String, bsp: UInt32 = 0) throws {
+    /// Loads `map` and puts the camera at its start (and the player, with
+    /// `player`).
+    func load(map: String, bsp: UInt32 = 0, player: Bool = true) throws {
         guard let controller else { return }
         guard let device = controller.window.engineView.device else { fail("no Metal device") }
         let loaded = try LoadedLevel(map: map, bsp: bsp, cacheFolder: cacheFolder(), device: device,
@@ -455,7 +538,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         try engine.placeCamera(placement: loaded.start)
         // (the player at the first start, unless flying; a map without one
         // keeps the free camera)
-        if !CommandLine.arguments.contains("--fly") {
+        if player, !CommandLine.arguments.contains("--fly") {
             try? engine.spawnPlayer(start: 0)
             thirdPerson = false
         }
@@ -506,7 +589,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             engine.leaveGame()
             try load(map: map)
-            if menuView != nil {
+            if menu.isOpen {
                 hideMenu()
             }
         } catch {
@@ -553,7 +636,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
-        _ = try? engine.advance(frameSeconds: seconds)
+        menu.update(now: link.timestamp)
+        if !holdsWorld {
+            _ = try? engine.advance(frameSeconds: seconds)
+        }
         followStructure()
         showStatus()
         profiled("shell", engine) { shell?.update(seconds: seconds, now: link.timestamp) }
@@ -599,6 +685,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let objects = profiled("objects", engine) { frame.drawnObjects() }
         let hudQuads = profiled("hud", engine) { engine.hud(width: UInt32(width), height: UInt32(height)) }
         let debugLines = frame.debugSegments()
+        let uiQuads = profiled("ui", engine) { menu.menu?.draw(width: UInt32(width), height: UInt32(height)) ?? [] }
         // (the labels under the shell)
         var labels: [TextItem] = []
         if let textPass, frame.debugLabels.count > 0 {
@@ -610,7 +697,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.window.engineView.render { commands, target in
             profiled("encode", self.engine) {
                 renderer.encode(into: commands, target: target, camera: camera, objects: objects,
-                                hudQuads: hudQuads, debugLines: debugLines)
+                                hudQuads: inShellScene ? [] : hudQuads, uiQuads: uiQuads, debugLines: debugLines)
             }
             profiled("text", self.engine) { self.textPass?.encode(labels + text, into: commands, target: target) }
         }
@@ -643,22 +730,16 @@ extension ShellKey {
     }
 }
 
-extension AppDelegate: MenuActions {
+extension AppDelegate: GameActions {
     func playCampaign(map: URL, difficulty: UInt8) throws {
+        hideMenu()
         engine.leaveGame()
         try loadCampaign(map: map.path, difficulty: difficulty)
-        hideMenu()
-    }
-
-    func playAlone(map: URL) throws {
-        engine.leaveGame()
-        try load(map: map.path)
-        hideMenu()
     }
 
     func host(_ setup: HostSetup, map: URL, port: UInt16) throws {
-        engine.leaveGame()
         hideMenu()
+        engine.leaveGame()
         try load(map: map.path)
         guard let level else { return }
         _ = try engine.hostGame(geometry: level.geometry, kind: setup.kind, port: port, name: setup.name,
@@ -666,11 +747,30 @@ extension AppDelegate: MenuActions {
     }
 
     func join(address: String, map: URL, name: String) throws {
-        engine.leaveGame()
         hideMenu()
+        engine.leaveGame()
         try load(map: map.path)
         guard let level else { return }
         try engine.joinGame(geometry: level.geometry, address: address, name: name)
+    }
+
+    func restartCheckpoint() throws {
+        guard let level else { return }
+        let save = try engine.campaignSave()
+        hideMenu()
+        try engine.loadCampaign(geometry: level.geometry, bytes: save)
+        followStructure()
+    }
+
+    func restartLevel() throws {
+        guard let lastCampaign else { return }
+        hideMenu()
+        try loadCampaign(map: lastCampaign.map, difficulty: lastCampaign.difficulty)
+    }
+
+    func returnToMainMenu() {
+        hideMenu()
+        showMenu(nil)
     }
 
     func quit() {
@@ -692,9 +792,8 @@ extension AppDelegate: MenuActions {
         case let .playing(player): state = " — playing as player \(player + 1)"
         case let .refused(reason):
             state = ""
-            engine.leaveGame()
             showMenu(nil)
-            menu.message = "The host refused: \(reason)."
+            showMessage("The host refused: \(reason).")
         }
         controller.window.title = "OpenCE Engine\(map)\(state)"
     }

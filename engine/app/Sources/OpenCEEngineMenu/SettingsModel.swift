@@ -131,3 +131,10 @@ public final class SettingsModel {
 func clamped(_ value: Float, _ range: ClosedRange<Float>) -> Float {
     value.isFinite ? min(max(value, range.lowerBound), range.upperBound) : range.lowerBound
 }
+
+/// A page of the settings.
+public enum SettingsPage: String, CaseIterable, Sendable {
+    case game, controls, video, audio
+
+    public var title: String { rawValue.capitalized }
+}

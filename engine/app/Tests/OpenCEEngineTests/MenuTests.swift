@@ -1,6 +1,6 @@
-// The menus' models: the screens and the way back, the server list, an
-// address typed to join, the host's setup, and the settings, which go
-// through the engine's TOML and back.
+// The menus' controller: the Halo menu's lists filled from the maps and
+// the servers, its keys, and what it asks done; the host's setup; and the
+// settings, which go through the engine's TOML and back.
 import Foundation
 import OpenCEEngineCore
 import OpenCEEngineKit
@@ -15,15 +15,12 @@ final class FakeSource: ServerSource {
 
 /// What the menus asked of the app.
 @MainActor
-final class FakeActions: MenuActions {
+final class FakeActions: GameActions {
     var done: [String] = []
     var fails = false
     func playCampaign(map: URL, difficulty: UInt8) throws {
-        done.append("campaign \(map.lastPathComponent) \(difficulty)")
-    }
-    func playAlone(map: URL) throws {
         if fails { throw EngineError.Network(message: "no") }
-        done.append("alone \(map.lastPathComponent)")
+        done.append("campaign \(map.lastPathComponent) \(difficulty)")
     }
     func host(_ setup: HostSetup, map: URL, port: UInt16) throws {
         done.append("host \(map.lastPathComponent) \(setup.kind.setting) \(setup.maxPlayers) \(setup.name) \(port)")
@@ -31,7 +28,49 @@ final class FakeActions: MenuActions {
     func join(address: String, map: URL, name: String) throws {
         done.append("join \(address) \(map.lastPathComponent) \(name)")
     }
+    func restartCheckpoint() throws { done.append("checkpoint") }
+    func restartLevel() throws { done.append("restart") }
+    func returnToMainMenu() { done.append("main menu") }
     func quit() { done.append("quit") }
+}
+
+/// A menu that records what it is given and asks what a test says.
+final class FakeMenu: MenuProtocol, @unchecked Sendable {
+    var widgets: Set<String> = ["main"]
+    var opened: [String] = []
+    var open = false
+    var levels: [MenuEntry] = []
+    var maps: [MenuEntry] = []
+    var servers: [String] = []
+    var profile = ""
+    var keys: [MenuKey] = []
+    var asks: [MenuAction] = []
+    var now: UInt64 = 0
+
+    func click(x: Float, y: Float, width: UInt32, height: UInt32, right: Bool) {}
+    func draw(width: UInt32, height: UInt32) -> [UiQuad] { [] }
+    func glyphAtlas() -> UiGlyphAtlas { UiGlyphAtlas(width: 0, height: 0, texels: Data()) }
+    func isOpen() -> Bool { open }
+    func key(key: MenuKey) { keys.append(key) }
+    func `open`(widget: String) -> Bool {
+        opened.append(widget)
+        open = widgets.contains(widget)
+        return open
+    }
+    func pointerMoved(x: Float, y: Float, width: UInt32, height: UInt32) {}
+    func screen() -> String? { open ? opened.last : nil }
+    func setLevels(levels: [MenuEntry]) { self.levels = levels }
+    func setMaps(maps: [MenuEntry]) { self.maps = maps }
+    func setProfile(profile: String) { self.profile = profile }
+    func setServers(servers: [String]) { self.servers = servers }
+    func takeActions() -> [MenuAction] {
+        defer { asks = [] }
+        return asks
+    }
+    func takeSounds() -> [String] { [] }
+    func targets(width: UInt32, height: UInt32) -> [MenuPoint] { [] }
+    func update(nowMs: UInt64) { now = nowMs }
+    func wheel(steps: Int32) {}
 }
 
 func server(_ name: String, _ address: String, level: String = "bloodgulch", players: UInt8 = 1,
@@ -41,7 +80,7 @@ func server(_ name: String, _ address: String, level: String = "bloodgulch", pla
 
 @MainActor
 final class MenuTests: XCTestCase {
-    let maps = ["bloodgulch", "boardingaction", "hangemhigh"].map { URL(fileURLWithPath: "/maps/\($0).map") }
+    let maps = ["a30", "bloodgulch", "a10", "boardingaction", "ui"].map { URL(fileURLWithPath: "/maps/\($0).map") }
     var folder: URL!
 
     override func setUp() async throws {
@@ -52,153 +91,110 @@ final class MenuTests: XCTestCase {
         try? FileManager.default.removeItem(at: folder)
     }
 
-    func menu(source: FakeSource = FakeSource()) -> (MenuModel, FakeActions) {
+    func menu(source: FakeSource = FakeSource()) -> (HaloMenu, FakeMenu, FakeActions, [String]) {
         let settings = SettingsModel(path: folder.appendingPathComponent("settings.toml").path)
-        let model = MenuModel(maps: maps, settings: settings, servers: ServerListModel { _ in source })
+        let halo = HaloMenu(maps: maps, settings: settings, servers: ServerListModel { _ in source })
         let actions = FakeActions()
-        model.actions = actions
-        return (model, actions)
+        halo.actions = actions
+        let fake = FakeMenu()
+        XCTAssertTrue(halo.show(fake, widget: "main"))
+        return (halo, fake, actions, [])
     }
 
-    func testTheScreensGoForwardAndBack() {
-        let (model, _) = menu()
-        XCTAssertEqual(model.screen, .main)
-        model.show(.host)
-        XCTAssertEqual(model.path, [.main, .host])
-        model.back()
-        model.show(.settings(.game))
-        model.show(.settings(.video))
-        XCTAssertEqual(model.path, [.main, .settings(.video)], "one settings page in place of another")
-        model.back()
-        model.back()
-        XCTAssertEqual(model.path, [.main], "never past the main menu")
-        model.show(.solo)
-        model.show(.main)
-        XCTAssertEqual(model.path, [.main])
+    func testTheListsAreTheMissionsInOrderAndTheOtherMaps() {
+        let (halo, fake, _, _) = menu()
+        XCTAssertEqual(fake.levels, [MenuEntry(map: "a10", name: "The Pillar of Autumn"), MenuEntry(map: "a30", name: "Halo")])
+        XCTAssertEqual(fake.maps.map(\.map), ["bloodgulch", "boardingaction"], "no missions, no ui")
+        XCTAssertEqual(fake.profile, "Spartan")
+        XCTAssertTrue(halo.isOpen)
+        XCTAssertFalse(halo.show(FakeMenu(), widget: "nowhere"))
+        XCTAssertNil(halo.menu, "a widget not there opens nothing")
     }
 
-    func testTheCampaignPlaysOnlyItsMissionsAtTheChosenDifficulty() {
-        let settings = SettingsModel(path: folder.appendingPathComponent("settings.toml").path)
-        let missions = ["a30", "bloodgulch", "a10"].map { URL(fileURLWithPath: "/maps/\($0).map") }
-        let model = MenuModel(maps: missions, settings: settings, servers: ServerListModel { _ in FakeSource() })
-        let actions = FakeActions()
-        model.actions = actions
-        XCTAssertEqual(model.missionNames, ["a10", "a30"], "in the campaign's order, multiplayer maps left out")
-        model.difficulty = 3
-        model.playCampaign(mission: "a30")
-        model.playCampaign(mission: "bloodgulch")
-        XCTAssertEqual(actions.done, ["campaign a30.map 3"])
-        XCTAssertEqual(model.message, "There is no mission called bloodgulch.")
+    func testTheKeysAreTheMenusOnly() {
+        let (halo, fake, _, _) = menu()
+        for code: UInt16 in [126, 125, 36, 53, 0, 122, 12] {
+            _ = halo.key(code: code)
+        }
+        XCTAssertEqual(fake.keys, [.up, .down, .return, .escape, .a, .f1], "Q (12) is not the menu's")
+        XCTAssertNil(HaloMenu.key(50))
     }
 
-    func testPlayingAloneLoadsTheMap() {
-        let (model, actions) = menu()
-        model.playAlone(map: "HangEmHigh")
-        model.playAlone(map: "nowhere")
-        XCTAssertEqual(actions.done, ["alone hangemhigh.map"])
-        XCTAssertEqual(model.message, "There is no map called nowhere.")
+    func testTheMissionsPlayAndAMissingOneIsSaid() {
+        let (halo, fake, actions, _) = menu()
+        var said: [String] = []
+        halo.onMessage = { said.append($0) }
+        fake.asks = [.playCampaign(map: "a30", difficulty: 9), .playCampaign(map: "d40", difficulty: 1)]
+        halo.update(now: 0)
+        XCTAssertEqual(actions.done, ["campaign a30.map 3"], "the difficulty kept to legendary")
+        XCTAssertEqual(said, ["There is no mission called d40."])
         actions.fails = true
-        model.playAlone(map: "bloodgulch")
-        XCTAssertNotNil(model.message, "the app's error is shown")
+        fake.asks = [.playCampaign(map: "a10", difficulty: 0)]
+        halo.update(now: 1)
+        XCTAssertEqual(said.count, 2, "the app's error is said")
+        XCTAssertEqual(fake.now, 1000)
     }
 
     func testTheServerListIsSortedAndJoinsGamesWithRoomOnMapsItHas() {
         let source = FakeSource()
-        let (model, actions) = menu(source: source)
-        model.show(.servers)
+        let (halo, fake, actions, _) = menu(source: source)
+        var said: [String] = []
+        halo.onMessage = { said.append($0) }
         source.answers = [server("zeta", "10.0.0.2:2302"), server("Alpha", "10.0.0.3:2302", players: 16),
                           server("beta", "10.0.0.4:2302", level: "levels\\test\\icefields\\icefields")]
-        model.tick()
-        XCTAssertEqual(model.servers.servers.map(\.name), ["Alpha", "beta", "zeta"])
-        XCTAssertEqual(gameTypeTitle(model.servers.servers[0].gameType), "Slayer")
-        model.servers.selected = "10.0.0.2:2302"
-        XCTAssertEqual(model.servers.chosen?.name, "zeta")
-        model.join(model.servers.servers[0])
-        XCTAssertEqual(model.message, "Alpha is full.")
-        model.join(model.servers.servers[1])
-        XCTAssertEqual(model.message, "beta plays icefields, which is not in your maps.")
-        model.join(model.servers.servers[2])
+        halo.update(now: 0)
+        XCTAssertEqual(fake.servers, ["Alpha  bloodgulch  16/16", "beta  icefields  1/16", "zeta  bloodgulch  1/16"])
+        fake.asks = [.joinServer(index: 0), .joinServer(index: 1), .joinServer(index: 2), .joinServer(index: 7)]
+        halo.update(now: 0.1)
+        XCTAssertEqual(said, ["Alpha is full.", "beta plays icefields, which is not in your maps."])
         XCTAssertEqual(actions.done, ["join 10.0.0.2:2302 bloodgulch.map Spartan"])
         source.answers = []
-        model.tick()
-        XCTAssertNil(model.servers.selected, "a game gone is not chosen")
+        halo.update(now: 0.2)
+        XCTAssertEqual(fake.servers.count, 3, "taken only each quarter second")
+        halo.update(now: 0.4)
+        XCTAssertEqual(fake.servers, [])
     }
 
-    func testAddressesAreParsed() {
-        XCTAssertEqual(JoinAddress.parse("192.168.1.20"), JoinAddress(host: "192.168.1.20", port: 2302))
-        XCTAssertEqual(JoinAddress.parse(" halo.example:2303 "), JoinAddress(host: "halo.example", port: 2303))
-        XCTAssertEqual(JoinAddress.parse("[::1]:2400"), JoinAddress(host: "::1", port: 2400))
-        XCTAssertEqual(JoinAddress.parse("fe80::1"), JoinAddress(host: "fe80::1", port: 2302))
-        XCTAssertEqual(JoinAddress.parse("[::1]")?.text, "[::1]:2302")
-        XCTAssertEqual(JoinAddress.parse("10.0.0.1")?.text, "10.0.0.1:2302")
-        for bad in ["", ":2302", "host:0", "host:65536", "host:x", "a b", "[::1", "[::1]2302", "host:２３"] {
-            XCTAssertNil(JoinAddress.parse(bad), bad)
-        }
+    func testHostingSavesTheMapAndThePauseMenusChoicesAreDone() throws {
+        let (halo, fake, actions, _) = menu()
+        fake.asks = [.hostGame(map: "boardingaction"), .restartCheckpoint, .restartLevel, .returnToMainMenu,
+                     .leaveGame, .quit]
+        halo.update(now: 0)
+        let setup = HostSetup(game: halo.settings.settings.game)
+        XCTAssertEqual(actions.done, ["host boardingaction.map \(setup.kind.setting) \(setup.maxPlayers) \(setup.name) 2302",
+                                      "checkpoint", "restart", "main menu", "main menu", "quit"])
+        XCTAssertEqual(loadSettings(path: halo.settings.path).game.map, "boardingaction")
     }
 
-    func testJoiningByAddressAsksAndJoinsWhenItAnswers() {
-        let source = FakeSource()
-        var asked: [[String]] = []
-        let settings = SettingsModel(path: folder.appendingPathComponent("settings.toml").path)
-        let model = MenuModel(maps: maps, settings: settings, servers: ServerListModel { asked.append($0); return source })
-        let actions = FakeActions()
-        model.actions = actions
-        model.address = "nonsense:"
-        model.joinAddress()
-        XCTAssertEqual(model.message, "nonsense: is not an address.")
-        model.address = "10.0.0.9"
-        model.joinAddress()
-        XCTAssertEqual(asked, [["10.0.0.9:2302"]])
-        model.tick()
-        XCTAssertNotNil(model.asking)
-        source.answers = [server("Gulch", "10.0.0.9:2302")]
-        model.tick()
-        XCTAssertNil(model.asking)
-        XCTAssertEqual(actions.done, ["join 10.0.0.9:2302 bloodgulch.map Spartan"])
-
-        source.answers = []
-        model.joinAddress()
-        for _ in 0..<MenuModel.askTicks {
-            model.tick()
-        }
-        XCTAssertEqual(model.message, "No game answered at 10.0.0.9:2302.")
+    func testAMenuThatClosesItselfIsPutAway() {
+        let (halo, fake, _, _) = menu()
+        var closed = 0
+        halo.onClosed = { closed += 1 }
+        halo.update(now: 0)
+        XCTAssertEqual(closed, 0)
+        fake.open = false
+        halo.update(now: 0.016)
+        XCTAssertEqual(closed, 1)
+        XCTAssertNil(halo.menu)
+        halo.update(now: 0.032)
+        XCTAssertEqual(closed, 1)
     }
 
-    func testTheHostSetupIsKeptInRangeAndSaved() throws {
-        let (model, actions) = menu()
-        XCTAssertEqual(model.host.map, "bloodgulch")
-        model.host.maxPlayers = 40
-        XCTAssertEqual(model.host.maxPlayers, 16)
-        model.host.maxPlayers = 1
-        XCTAssertEqual(model.host.maxPlayers, 2)
-        model.host.name = String(repeating: "é", count: 20)
-        XCTAssertEqual(model.host.name.utf8.count, 32, "cut at a character")
-        model.host.kind = .captureTheFlag
-        model.host.map = "boardingaction"
-        model.host.maxPlayers = 8
-        model.startHosting()
-        XCTAssertEqual(actions.done, ["host boardingaction.map ctf 8 \(model.host.name) 2302"])
-        let saved = loadSettings(path: model.settings.path)
-        XCTAssertEqual(saved.game.gameType, "ctf")
-        XCTAssertEqual(saved.game.map, "boardingaction")
-        XCTAssertEqual(saved.game.maxPlayers, 8)
-        XCTAssertEqual(HostSetup(game: saved.game), model.host)
-    }
-
-    func testAMapNotThereIsReplacedByTheFirst() {
+    func testTheHostSetupIsKeptInRange() {
+        var setup = HostSetup(game: stockSettings().game)
+        setup.maxPlayers = 40
+        XCTAssertEqual(setup.maxPlayers, 16)
+        setup.maxPlayers = 1
+        XCTAssertEqual(setup.maxPlayers, 2)
+        setup.name = String(repeating: "é", count: 20)
+        XCTAssertEqual(setup.name.utf8.count, 32, "cut at a character")
         var game = stockSettings().game
-        game.map = "gone"
-        XCTAssertEqual(HostSetup(game: game).map, "gone")
-        let settings = SettingsModel(settings: Settings(game: game, controls: stockSettings().controls,
-                                                       video: stockSettings().video, audio: stockSettings().audio),
-                                     path: folder.appendingPathComponent("s.toml").path)
-        let model = MenuModel(maps: maps, settings: settings, servers: ServerListModel { _ in FakeSource() })
-        XCTAssertEqual(model.host.map, "bloodgulch")
+        setup.write(into: &game)
+        XCTAssertEqual(HostSetup(game: game), setup)
     }
 
     func testSettingsAreClampedAndBindingsMove() {
-        let (model, _) = menu()
-        let settings = model.settings
+        let settings = SettingsModel(path: folder.appendingPathComponent("settings.toml").path)
         settings.mouseSensitivity = 5
         XCTAssertEqual(settings.mouseSensitivity, SettingsModel.mouseSensitivity.upperBound)
         settings.renderScale = 0.1
@@ -219,8 +215,7 @@ final class MenuTests: XCTestCase {
     }
 
     func testTheSettingsGoThroughTomlAndBack() throws {
-        let (model, _) = menu()
-        let settings = model.settings
+        let settings = SettingsModel(path: folder.appendingPathComponent("settings.toml").path)
         settings.playerName = "Chief"
         settings.mouseSensitivity = 0.003
         settings.settings.controls.invertMouse = true
@@ -233,9 +228,7 @@ final class MenuTests: XCTestCase {
         XCTAssertTrue(text.contains("player_name = \"Chief\""), text)
         XCTAssertEqual(try settingsFromToml(text: text), settings.settings)
 
-        model.show(.settings(.controls))
-        model.back()
-        XCTAssertTrue(FileManager.default.fileExists(atPath: settings.path), "saved on the way out")
+        settings.save()
         let loaded = SettingsModel(path: settings.path)
         XCTAssertEqual(loaded.settings, settings.settings)
         XCTAssertEqual(loaded.bindings.keys[.melee], [8])
@@ -247,12 +240,5 @@ final class MenuTests: XCTestCase {
         XCTAssertTrue(MenuFonts.register())
         XCTAssertEqual(MenuFonts.names.count, 3)
         XCTAssertTrue(MenuFonts.names.values.contains { $0.hasPrefix("Overpass") }, "\(MenuFonts.names)")
-    }
-
-    func testQuitSavesAndQuits() {
-        let (model, actions) = menu()
-        model.quit()
-        XCTAssertEqual(actions.done, ["quit"])
-        XCTAssertTrue(FileManager.default.fileExists(atPath: model.settings.path))
     }
 }

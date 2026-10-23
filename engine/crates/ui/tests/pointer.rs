@@ -453,3 +453,55 @@ fn a_lists_items_step_it_to_them_and_a_keys_icon_presses_its_button() {
     shell.wheel(&ui, &mut host, -1);
     assert_eq!(focused(&shell), Some(cells[2]));
 }
+
+/// A 4-way screen: panels that each take the events, and a label.
+fn four_way_ui() -> Ui {
+    let mut screen = widget("screen", WidgetKind::Container);
+    screen.flags = Widget::PASS_UNHANDLED_EVENTS_TO_FOCUSED_CHILD
+        | Widget::DONT_FOCUS_A_SPECIFIC_CHILD_WIDGET
+        | Widget::PASS_UNHANDLED_EVENTS_TO_ALL_CHILDREN;
+    screen.children = vec![
+        child("left", [0, 0]),
+        child("right", [200, 0]),
+        child("label", [0, 100]),
+    ];
+    let mut left = widget("left", WidgetKind::Container);
+    left.handlers = vec![handler(
+        EventHandler::A_BUTTON,
+        EventHandler::RUN_FUNCTION,
+        41,
+        None,
+    )];
+    let mut right = widget("right", WidgetKind::Container);
+    right.handlers = vec![handler(
+        EventHandler::A_BUTTON,
+        EventHandler::RUN_FUNCTION,
+        42,
+        None,
+    )];
+    let mut widgets = vec![screen, left, right, widget("label", WidgetKind::TextBox)];
+    widgets.sort_by(|a, b| a.tag.cmp(&b.tag));
+    Ui {
+        widgets,
+        ..Ui::default()
+    }
+}
+
+#[test]
+fn a_panel_of_a_screen_passing_its_events_to_all_is_clicked() {
+    let ui = four_way_ui();
+    let mut host = Recorder::default();
+    let mut shell = Shell::new();
+    if shell.open(&ui, &mut host, &tag("screen"), 0).is_none() {
+        panic!("the screen did not open");
+    }
+    let kinds: Vec<TargetKind> = shell
+        .targets(&ui)
+        .iter()
+        .map(|target| target.kind)
+        .collect();
+    // the label has no handlers: it is not one
+    assert_eq!(kinds, [TargetKind::Item, TargetKind::Item]);
+    shell.click(&ui, &mut host, [270.0, 20.0], MouseButton::Left);
+    assert!(host.functions.contains(&42), "{:?}", host.functions);
+}

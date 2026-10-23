@@ -187,7 +187,8 @@ impl Shell {
     }
 
     /// Whether the d-pad moves the focus to `id`: an item of a column list,
-    /// or a child its parent tabs through.
+    /// or a child its parent tabs through; or a panel with handlers whose
+    /// parent passes its events to all its children.
     fn is_item(&self, ui: &Ui, id: Id) -> bool {
         let Some(instance) = self.get(id) else {
             return false;
@@ -208,6 +209,16 @@ impl Shell {
         let Some(parent_definition) = ui.widgets.get(parent.definition) else {
             return false;
         };
+        let has_handlers = || {
+            ui.widgets
+                .get(instance.definition)
+                .is_some_and(|definition| !definition.handlers.is_empty())
+        };
+        // a panel among several that each take the events (the 4-way
+        // screens' quarters) is clicked as an item
+        if parent_definition.flags & Widget::PASS_UNHANDLED_EVENTS_TO_ALL_CHILDREN != 0 {
+            return has_handlers();
+        }
         if parent_definition.flags
             & (Widget::DPAD_UP_DOWN_TABS_THRU_CHILDREN | Widget::DPAD_LEFT_RIGHT_TABS_THRU_CHILDREN)
             == 0

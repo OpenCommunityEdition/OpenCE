@@ -26,15 +26,16 @@ public final class EngineView: NSView {
     /// The keys' events before the engine has them (repeats too), true
     /// for one taken: the developer shell's typing.
     public var keyFilter: ((NSEvent) -> Bool)?
-    /// The left button's press, drag and release, in pixels from the top
-    /// left, before the engine has them: true for one taken.
+    /// The left button's press, drag and release, the pointer's moves
+    /// with no button held, and the right button's press, in pixels from
+    /// the top left, before the engine has them: true for one taken.
     public var pointerFilter: ((PointerPhase, Double, Double) -> Bool)?
     /// The wheel's motion up, in pixels (true for precise motion, as a
     /// trackpad's; else in lines), true when taken.
     public var scrollFilter: ((Double, Bool) -> Bool)?
 
     public enum PointerPhase: Sendable {
-        case down, dragged, up
+        case down, dragged, up, moved, rightDown
     }
 
     public init(frame: NSRect, device: MTLDevice? = MTLCreateSystemDefaultDevice()) {
@@ -228,7 +229,9 @@ public final class EngineView: NSView {
         _ = pointer(.up, event)
         onMouseButton?(MouseButton.left, false)
     }
-    public override func rightMouseDown(with event: NSEvent) { onMouseButton?(MouseButton.right, true) }
+    public override func rightMouseDown(with event: NSEvent) {
+        if !pointer(.rightDown, event) { onMouseButton?(MouseButton.right, true) }
+    }
     public override func rightMouseUp(with event: NSEvent) { onMouseButton?(MouseButton.right, false) }
     public override func otherMouseDown(with event: NSEvent) {
         onMouseButton?(MouseButton.code(event.buttonNumber), true)
@@ -241,7 +244,9 @@ public final class EngineView: NSView {
         onMotion?(Double(event.deltaX), Double(event.deltaY))
     }
 
-    public override func mouseMoved(with event: NSEvent) { motion(event) }
+    public override func mouseMoved(with event: NSEvent) {
+        if !pointer(.moved, event) { motion(event) }
+    }
     public override func mouseDragged(with event: NSEvent) {
         if !pointer(.dragged, event) { motion(event) }
     }

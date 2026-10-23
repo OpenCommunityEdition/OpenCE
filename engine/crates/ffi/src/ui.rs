@@ -7,12 +7,20 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use opence_content::{Level, TagRef};
-use opence_ui::{DrawItem, Feedback, Host, Key, Layout, MouseButton, Shell, NONE};
+use opence_ui::{DrawItem, Key, Layout, MouseButton, Shell, NONE};
 
+use crate::ui_host::MenuHost;
+pub use crate::ui_host::{MenuAction, MenuEntry};
 use crate::LevelGeometry;
 
 /// The game's main menu in `ui.map`.
 pub const MAIN_MENU: &str = "ui\\shell\\main_menu\\main_menu";
+
+/// The campaign's pause menu.
+pub const PAUSE_MENU: &str = "ui\\shell\\solo_game\\pause_game\\pause_game";
+
+/// A network game's, for one player.
+pub const PAUSE_MENU_MULTIPLAYER: &str = "ui\\shell\\multiplayer_game\\pause_game\\1p_pause_game";
 
 /// The width of the glyph atlas, in texels.
 pub const ATLAS_WIDTH: u32 = 1024;
@@ -21,6 +29,17 @@ pub const ATLAS_WIDTH: u32 = 1024;
 #[uniffi::export]
 pub fn main_menu_widget() -> String {
     MAIN_MENU.into()
+}
+
+/// The tag path of a mission's pause menu: a network game's, or the
+/// campaign's.
+#[uniffi::export]
+pub fn pause_menu_widget(multiplayer: bool) -> String {
+    if multiplayer {
+        PAUSE_MENU_MULTIPLAYER.into()
+    } else {
+        PAUSE_MENU.into()
+    }
 }
 
 /// One quad of the UI: a bitmap's image from the level's textures, or a
@@ -279,26 +298,21 @@ impl From<MenuKey> for Key {
     }
 }
 
-/// The shell's host in the app: it keeps the sounds the widgets play, by
-/// their tag paths, for the app to play.
-#[derive(Debug, Default)]
-struct Sounds(Vec<String>);
-
-impl Host for Sounds {
-    fn sound(&mut self, sound: &TagRef) {
-        self.0.push(sound.path.clone());
-    }
-
-    fn feedback(&mut self, feedback: Feedback) {
-        self.0.push(feedback.sound().into());
-    }
-}
-
-/// The shell and the sounds it has played since the app last took them.
+/// The shell and its host, which keeps what the widgets played and asked
+/// for since the app last took them.
 #[derive(Debug, Default)]
 struct State {
     shell: Shell,
-    sounds: Sounds,
+    host: MenuHost,
+}
+
+/// A point in the window, in pixels.
+#[derive(Clone, Copy, Debug, PartialEq, uniffi::Record)]
+pub struct MenuPoint {
+    /// Across, from the left.
+    pub x: f32,
+    /// Down, from the top.
+    pub y: f32,
 }
 
 /// The shell: the UI's widgets loaded from a level (`ui.map`'s, or a
@@ -335,7 +349,7 @@ impl Menu {
         let state = &mut *self.lock();
         state
             .shell
-            .open(&level.ui, &mut state.sounds, &tag, NONE)
+            .open(&level.ui, &mut state.host, &tag, NONE)
             .is_some()
     }
 
@@ -344,7 +358,7 @@ impl Menu {
         let state = &mut *self.lock();
         state
             .shell
-            .update(&self.geometry.content.ui, &mut state.sounds, now_ms);
+            .update(&self.geometry.content.ui, &mut state.host, now_ms);
     }
 
     /// Whether a screen is open.
@@ -366,7 +380,7 @@ impl Menu {
         let state = &mut *self.lock();
         state
             .shell
-            .key(&self.geometry.content.ui, &mut state.sounds, key.into());
+            .key(&self.geometry.content.ui, &mut state.host, key.into());
     }
 
     /// The pointer moved to `x`, `y` in a window `width` by `height`
@@ -376,7 +390,7 @@ impl Menu {
         let state = &mut *self.lock();
         state
             .shell
-            .hover(&self.geometry.content.ui, &mut state.sounds, point);
+            .hover(&self.geometry.content.ui, &mut state.host, point);
     }
 
     /// A click at `x`, `y` in a window `width` by `height` pixels: the
@@ -391,7 +405,7 @@ impl Menu {
         let state = &mut *self.lock();
         state
             .shell
-            .click(&self.geometry.content.ui, &mut state.sounds, point, button);
+            .click(&self.geometry.content.ui, &mut state.host, point, button);
     }
 
     /// The wheel turned `steps` notches, away from the user positive.
@@ -399,13 +413,63 @@ impl Menu {
         let state = &mut *self.lock();
         state
             .shell
-            .wheel(&self.geometry.content.ui, &mut state.sounds, steps);
+            .wheel(&self.geometry.content.ui, &mut state.host, steps);
     }
 
     /// The tag paths of the sounds the widgets played since the last call,
     /// in order.
     pub fn take_sounds(&self) -> Vec<String> {
-        std::mem::take(&mut self.lock().sounds.0)
+        std::mem::take(&mut self.lock().host.sounds)
+    }
+
+    /// What the menus asked of the engine since the last call, in order.
+    pub fn take_actions(&self) -> Vec<MenuAction> {
+        std::mem::take(&mut self.lock().host.actions)
+    }
+
+    /// The tag path of the screen open, if one is.
+    pub fn screen(&self) -> Option<String> {
+        let state = self.lock();
+        let root = state.shell.root(0)?;
+        state
+            .shell
+            .definition(&self.geometry.content.ui, root)
+            .map(|definition| definition.tag.path.clone())
+    }
+
+    /// The middles of what the pointer can act on, in a window `width` by
+    /// `height` pixels, in the order they are drawn.
+    pub fn targets(&self, width: u32, height: u32) -> Vec<MenuPoint> {
+        let layout = Layout::for_window(width as f32, height as f32);
+        let targets = self.lock().shell.targets(&self.geometry.content.ui);
+        targets
+            .iter()
+            .map(|target| {
+                let [top, left, bottom, right] = target.bounds.map(f32::from);
+                let [x, y] = layout.to_window([(left + right) * 0.5, (top + bottom) * 0.5]);
+                MenuPoint { x, y }
+            })
+            .collect()
+    }
+
+    /// The campaign's missions the menus list, in order.
+    pub fn set_levels(&self, levels: Vec<MenuEntry>) {
+        self.lock().host.levels = levels;
+    }
+
+    /// The multiplayer maps they list.
+    pub fn set_maps(&self, maps: Vec<MenuEntry>) {
+        self.lock().host.maps = maps;
+    }
+
+    /// The servers found, by name.
+    pub fn set_servers(&self, servers: Vec<String>) {
+        self.lock().host.servers = servers;
+    }
+
+    /// The player's name.
+    pub fn set_profile(&self, profile: String) {
+        self.lock().host.profile = profile;
     }
 
     /// The glyph atlas the glyph quads sample.
@@ -607,9 +671,5 @@ mod tests {
         assert_eq!(shells[0], Key::Up);
         assert_eq!(shells[6], Key::KeypadEnter);
         assert_eq!(shells[16], Key::D);
-        let mut sounds = Sounds::default();
-        sounds.feedback(Feedback::Cursor);
-        sounds.sound(&tag(b"snd!", "sound\\click"));
-        assert_eq!(sounds.0, ["sound\\sfx\\ui\\cursor", "sound\\click"]);
     }
 }
