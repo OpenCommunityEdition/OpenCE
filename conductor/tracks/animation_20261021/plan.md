@@ -4,9 +4,9 @@
 - [x] Task: The full graph f8a0b81d
     - [x] Write tests: every block of `antr` imports; inheritance; the fallbacks for a missing animation; frame events
     - [x] The typed graph in `content` and its import
-- [ ] Task: The blender
-    - [ ] Write tests: base, overlay and replacement; the transition blend; aim limits; against the reference traces (marked, needs `assets/maps`)
-    - [ ] The pose blender in `sim`, with the overlays in Halo's order
+- [x] Task: The blender 0d718fe9
+    - [x] Write tests: base, overlay and replacement; the transition blend; aim limits; against the reference traces (marked, needs `assets/maps`)
+    - [x] The pose blender in `sim`, with the overlays in Halo's order
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: The graph and the frames' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 2: Bipeds, weapons and the first person
