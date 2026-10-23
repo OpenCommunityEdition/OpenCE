@@ -1466,6 +1466,18 @@ void draw_unicode_string_compute_bounds(
 	rectangle2d *text_bounds,
 	rectangle2d *cursor_bounds)
 {
+	draw_unicode_string_compute_bounds_spaced(bounds, string, 0, text_bounds, cursor_bounds);
+
+	return;
+}
+
+void draw_unicode_string_compute_bounds_spaced(
+	rectangle2d const *bounds,
+	wchar_t const *string,
+	short height_adjust,
+	rectangle2d *text_bounds,
+	rectangle2d *cursor_bounds)
+{
 	point2d cursor;
 
 	text_bounds_globals.bounds.y0 = SHORT_MAX;
@@ -1476,7 +1488,7 @@ void draw_unicode_string_compute_bounds(
 	text_bounds_globals.last_font_header = styled_font_get(
 		font_drawing_globals.current_font_index,
 		font_drawing_globals.current_style);
-	draw_unicode_string(text_bounds_draw_character, bounds, &cursor, NULL, 0, string);
+	draw_unicode_string(text_bounds_draw_character, bounds, &cursor, NULL, height_adjust, string);
 
 	cursor_bounds->x0 = cursor.x;
 	cursor_bounds->x1 = (short)(cursor.x + 1);

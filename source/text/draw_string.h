@@ -95,6 +95,14 @@ void draw_unicode_string_compute_bounds(
 	wchar_t const *string,
 	rectangle2d *text_bounds,
 	rectangle2d *cursor_bounds);
+/* port: the same for a string drawn with height_adjust added to the height
+of its lines (rasterizer_draw_unicode_string's) */
+void draw_unicode_string_compute_bounds_spaced(
+	rectangle2d const *bounds,
+	wchar_t const *string,
+	short height_adjust,
+	rectangle2d *text_bounds,
+	rectangle2d *cursor_bounds);
 /* port: the middle of the string's capitals as it is drawn in the bounds,
 in the draw mode's font (draw_string_set_draw_mode) */
 short draw_unicode_string_capital_middle(

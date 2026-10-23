@@ -72,6 +72,10 @@ enum
 	/* the longest line drawn, in characters */
 	MAXIMUM_SUBTITLE_CHARACTERS = 1023,
 	SUBTITLE_PADDING = 5,
+	/* (added to the height of a line, whose glyphs are taller than the font tag's) */
+	SUBTITLE_LINE_SPACING = 4,
+	/* (the glyphs of the HUD font rise above the font tag's line) */
+	SUBTITLE_TOP_PADDING = 9,
 	SUBTITLE_GAP = 4,
 	/* draw_string.c's centred text and its flags (wrap in the bounds, and
 	past their bottom); its enums are its own */
@@ -831,7 +835,7 @@ void subtitles_draw(
 		text_hires_force(1);
 		measure.x0 = left;
 		measure.x1 = right;
-		draw_unicode_string_compute_bounds(&measure, wide, &text_bounds, &cursor_bounds);
+		draw_unicode_string_compute_bounds_spaced(&measure, wide, SUBTITLE_LINE_SPACING, &text_bounds, &cursor_bounds);
 		text_hires_force(0);
 		if (text_bounds.x1 < text_bounds.x0)
 			continue;
@@ -845,7 +849,7 @@ void subtitles_draw(
 		bounds.y0 = (short)(bounds.y1 - height);
 		background.x0 = (short)(text_bounds.x0 - SUBTITLE_PADDING);
 		background.x1 = (short)(text_bounds.x1 + SUBTITLE_PADDING);
-		background.y0 = (short)(bounds.y0 - SUBTITLE_PADDING / 2);
+		background.y0 = (short)(bounds.y0 - SUBTITLE_TOP_PADDING);
 		background.y1 = (short)(bounds.y1 + SUBTITLE_PADDING / 2);
 		draw_quad(&background, subtitle_pixel(0.0f, 0.0f, 0.0f, SUBTITLE_BACKGROUND_ALPHA * alpha));
 
@@ -858,11 +862,11 @@ void subtitles_draw(
 			offset_rectangle2d(&shadow_bounds, 1, 1);
 			text_hires_force(1);
 			draw_string_set_draw_mode(font_index, NONE, _subtitle_text_center, _subtitle_wrap_flags, &shadow);
-			rasterizer_draw_unicode_string(&shadow_bounds, NULL, NULL, 0, wide);
+			rasterizer_draw_unicode_string(&shadow_bounds, NULL, NULL, SUBTITLE_LINE_SPACING, wide);
 		}
 		text_hires_force(1);
 		draw_string_set_draw_mode(font_index, NONE, _subtitle_text_center, _subtitle_wrap_flags, &color);
-		rasterizer_draw_unicode_string(&bounds, NULL, NULL, 0, wide);
+		rasterizer_draw_unicode_string(&bounds, NULL, NULL, SUBTITLE_LINE_SPACING, wide);
 		text_hires_force(0);
 
 		bottom = (short)(background.y0 - SUBTITLE_GAP);
