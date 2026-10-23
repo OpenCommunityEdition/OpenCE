@@ -1,0 +1,8 @@
+{
+  "track_id": "ai_decisions_20261023",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-10-23T00:00:00Z",
+  "updated_at": "2026-10-23T00:00:00Z",
+  "description": "Decision models for the Covenant: a commander layer over Halo's AI with local models such as kev-4b, host-only and recorded"
+}
