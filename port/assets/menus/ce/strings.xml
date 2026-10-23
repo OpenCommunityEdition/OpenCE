@@ -592,6 +592,12 @@
 		<string text="When you suicide, you must wait fifteen seconds \nbefore you can respawn. This will give you an idea of \nwhat eternity is like." map="27"/>
 		<string text="Players keep their current mouse aim assist setting."/>
 		<string text="Disable mouse aim assist for mouse/keyboard players.\nController and touch aim assist are unchanged."/>
+		<string text="Everyone sees the stock game's shields and\novershield, whatever their own settings."/>
+		<string text="Everyone's shields light their surroundings as\nthey flare."/>
+		<string text="Everyone's shields light their surroundings as\nthey flare, three times as far (Light Show)."/>
+		<string text="For everyone, the overshield rises up the body\nand stays lit, in its own color."/>
+		<string text="For everyone, shields light their surroundings,\nand the overshield rises and stays lit."/>
+		<string text="For everyone, Light Show's shield glow, and the\novershield rising and staying lit."/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/player_options_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\player_options_labels">
 		<string text="NUMBER OF LIVES:" map="0"/>
@@ -603,6 +609,7 @@
 		<string text="INVISIBLE PLAYERS:" map="6"/>
 		<string text="SUICIDE PENALTY:" map="7"/>
 		<string text="AIM ASSIST:"/>
+		<string text="SHIELD EFFECTS:"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_invisible_players" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\var_invisible_players">
 		<string text="YES" map="0"/>

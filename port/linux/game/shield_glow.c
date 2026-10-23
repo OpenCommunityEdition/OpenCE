@@ -35,6 +35,7 @@ machines.
 #include "camera/observer.h"
 #include "game/players.h"
 #include "objects/object_lights.h"
+#include "network_shield_effects.h"
 
 #include <math.h>
 #include <string.h>
@@ -92,13 +93,22 @@ static unsigned long shield_glow_frame = 0;
 static real shield_glow_scale = 1.f;
 
 /* display.shield_glow, and its intensity (display.shield_glow_intensity):
-"default", or "light_show", three times as bright and as far */
+"default", or "light_show", three times as bright and as far; in a network
+game, the host's (network_shield_effects.c) */
 static boolean shield_glow_enabled(
 	void)
 {
 	static unsigned long changes = (unsigned long)-1;
 	static boolean enabled = FALSE;
+	short effects = network_shield_effects();
 
+	if (effects != NONE)
+	{
+		changes = (unsigned long)-1;
+		shield_glow_scale = effects == _shield_effects_light_show ||
+			effects == _shield_effects_light_show_overshield ? 3.f : 1.f;
+		return effects != _shield_effects_stock && effects != _shield_effects_overshield;
+	}
 	if (changes != config_changes())
 	{
 		char const *intensity = config_string("display.shield_glow_intensity");
