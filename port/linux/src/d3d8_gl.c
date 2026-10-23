@@ -4950,6 +4950,9 @@ struct static_buffer
 	unsigned long start;
 	unsigned long size;
 	GLuint buffer;
+	/* (GL had no storage for it: it streams, as before, and is not tried
+	again) */
+	BOOL failed;
 	/* (a value of its own, for index_extent's cache of this range) */
 	unsigned long serial;
 };
@@ -5065,6 +5068,7 @@ static void static_buffer_note(struct static_buffer_list *list, unsigned long st
 	entry->start = start;
 	entry->size = size;
 	entry->buffer = 0;
+	entry->failed = FALSE;
 	entry->serial = ++static_buffers.serial;
 }
 
@@ -5150,9 +5154,19 @@ static BOOL static_buffer_range(unsigned long address, unsigned long size, BOOL 
 		return FALSE;
 	if (!entry->buffer)
 	{
+		int pending;
+
+		if (entry->failed)
+			return FALSE;
 		glGenBuffers(1, &entry->buffer);
 		if (!entry->buffer)
+		{
+			entry->failed = TRUE;
 			return FALSE;
+		}
+		/* (the errors already queued, so that the upload's own are read) */
+		for (pending = 0; pending < 8 && glGetError() != GL_NO_ERROR; pending++)
+			;
 		if (indices)
 		{
 			state_element_array_buffer(entry->buffer);
@@ -5162,6 +5176,18 @@ static BOOL static_buffer_range(unsigned long address, unsigned long size, BOOL 
 		{
 			state_array_buffer(entry->buffer);
 			glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)entry->size, (const void *)entry->start, GL_STATIC_DRAW);
+		}
+		if (glGetError() != GL_NO_ERROR)
+		{
+			/* (no storage, GL_OUT_OF_MEMORY: the buffer goes, unbinding
+			itself, and the range streams from now on) */
+			platform_log("GPU: no storage for %lu bytes of static %s; they are streamed", entry->size,
+				indices ? "indices" : "vertices");
+			glDeleteBuffers(1, &entry->buffer);
+			entry->buffer = 0;
+			entry->failed = TRUE;
+			xgpu_gl_state_invalidate();
+			return FALSE;
 		}
 	}
 	*buffer = entry->buffer;
