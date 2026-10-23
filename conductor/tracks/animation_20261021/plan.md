@@ -1,6 +1,6 @@
 # Plan: The complete animation set
 
-## Phase 1: The graph and the frames
+## Phase 1: The graph and the frames [checkpoint: fba329d3]
 - [x] Task: The full graph f8a0b81d
     - [x] Write tests: every block of `antr` imports; inheritance; the fallbacks for a missing animation; frame events
     - [x] The typed graph in `content` and its import
