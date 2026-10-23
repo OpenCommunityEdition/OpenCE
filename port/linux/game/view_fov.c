@@ -231,7 +231,11 @@ void viewmodel_projection_begin(void)
 	render_camera_build_frustum(&global_window_parameters.camera, &rasterizer_bounds,
 		&global_window_parameters.frustum, TRUE);
 	projection_applied = TRUE;
-	rasterizer_set_frustum_z(0.0f, 0.0f);
+	/* the gun sits closer than the world's near plane. A glow on it was
+	cut down to a sliver until this plane matches the weapon's. */
+	rasterizer_set_frustum_z(
+		rasterizer_globals.first_person_weapon_near_clip_distance,
+		rasterizer_globals.first_person_weapon_far_clip_distance);
 }
 
 void viewmodel_projection_end(void)
