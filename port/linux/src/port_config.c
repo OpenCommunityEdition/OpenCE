@@ -197,6 +197,11 @@ static const struct config_setting config_settings[] =
 		"screen's top right, with bars (the host: its slowest player's), and\n"
 		"\"Connection problem\" when the host has sent nothing for two seconds;\n"
 		"the scoreboard's pings in the same colours, as this machine times them." },
+	{ "display.stats_log", _config_boolean, "false", "HALO_STATS_LOG", _environment_value, _platform_all,
+		"A line a second in the log with the frame rate, the mode, the map, the\n"
+		"renderer and the size of the 3D view, so a graphics bug's report or two\n"
+		"builds compared say which of them was running and at what frame rate.\n"
+		"Nothing is sent anywhere; off by default." },
 	{ "display.per_pixel_lighting", _config_boolean, "false", "HALO_PER_PIXEL_LIGHTING", _environment_value,
 		_platform_all,
 		"Light the models (characters, weapons, vehicles, scenery) for each\n"
