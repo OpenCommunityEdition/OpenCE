@@ -9,7 +9,7 @@
     - [x] Font tags with signed distance fields built at import
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Importing the UI' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 2: The widget system
+## Phase 2: The widget system [checkpoint: 952b38d0]
 - [x] Task: The widget tree 882708ba
     - [x] Write tests: navigation and focus links; handlers fire their functions; conditional widgets; list items from data; spinners; formatted text
     - [x] `opence_ui` crate: the tree, the handlers, the UI functions wired to the engine, the unwired list
