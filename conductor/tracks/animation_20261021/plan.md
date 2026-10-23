@@ -28,7 +28,7 @@
 - [x] Task: Devices and cutscenes 6edd6b85
     - [x] Write tests: devices by their functions; custom animations relative to the cutscene flags; the camera's tracks
     - [x] Device animation; cutscene animation and camera
-- [ ] Task: The animation station and the documentation
-    - [ ] Write tests: `station animation` plays every animation of a graph
-    - [ ] `docs/engine.md`: the graph and the blender
+- [x] Task: The animation station and the documentation a39b3a10
+    - [x] Write tests: `station animation` plays every animation of a graph
+    - [x] `docs/engine.md`: the graph and the blender
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Vehicles, AI, devices and cutscenes' (Protocol in workflow.md) (deferred to the end)
