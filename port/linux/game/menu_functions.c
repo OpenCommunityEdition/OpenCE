@@ -2788,7 +2788,7 @@ void platform_text_field(int typing, int password);
 int config_boolean(char const *name);
 void ui_widget_port_post_button(short controller_index, short button_index);
 
-static wchar_t const *const engine_names[] = { L"", L"CTF", L"SLAYER", L"ODDBALL", L"KING OF THE HILL", L"RACE" };
+static wchar_t const *const engine_names[] = { L"", L"CTF", L"SLAYER", L"ODDBALL", L"KING OF THE HILL", L"RACE", L"", L"", L"", L"", L"CTF/SLAYER" };
 static short const maximum_players[] = { 2, 4, 8, 12, 16, 24, 32, 48, 64, 96, 128 };
 
 static struct
@@ -3233,7 +3233,7 @@ static void gametype_rules_text(long profile_index, wchar_t *text, short size)
 		return;
 	if (!playlist_profile_get_options(profile_index, &options))
 		game_variant_options_default(&variant, &options);
-	engine = PIN(variant.game_engine_index, 0, 5);
+	engine = PIN(variant.game_engine_index, 0, 10);
 	kind = game_modes_variant_kind_name(&variant, &options);
 	switch (game_modes_variant_mode(&variant, &options))
 	{
@@ -3356,10 +3356,10 @@ static void gametype_list_update(struct widget_instance *list)
 		text_set(named(description, "gametype_right_name", 0), text);
 		if (playlist_profile_get(multiplayer.gametypes[multiplayer.bank[multiplayer.gametype_chosen]], &variant))
 		{
-			long engine = PIN(variant.game_engine_index, 0, 5);
+			long engine = PIN(variant.game_engine_index, 0, 10);
 
 			if ((widget = named(description, "gametype_right_pic", 0)) != NULL)
-				widget->animation.current_frame_index = (short)engine;
+				widget->animation.current_frame_index = (short)(engine == 10 ? 1 : engine);
 			gametype_rules_text(multiplayer.gametypes[multiplayer.bank[multiplayer.gametype_chosen]], text,
 				NUMBEROF(text));
 			text_set(named(description, "gametype_right_data", 0), text);
@@ -3908,7 +3908,7 @@ static short campaign_level_of(char const *map_name)
 CO-OP for one with none (network co-op: ui_widget_port_cooperative_level_choose) */
 static wchar_t const *game_type_name(long engine_type)
 {
-	return engine_type == 0 ? L"CO-OP" : engine_names[PIN(engine_type, 0, 5)];
+	return engine_type == 0 ? L"CO-OP" : engine_names[PIN(engine_type, 0, 10)];
 }
 
 /* a map's name as the menus show it (a campaign level's too, hosted as
@@ -5106,7 +5106,7 @@ static void lobby_update(struct widget_instance *list)
 		ustrncpy(gametype, game->variant.human_readable_game_description, NUMBEROF(gametype) - 1);
 		gametype[NUMBEROF(gametype) - 1] = 0;
 		usnprintf(text, NUMBEROF(text) - 1, L"%s\r\n%s\r\n%d of %d players\r\n\r\n%s", gametype,
-			kind ? kind : engine_names[PIN(game->variant.game_engine_index, 0, 5)], lobby_player_count,
+			kind ? kind : engine_names[PIN(game->variant.game_engine_index, 0, 10)], lobby_player_count,
 			game->maximum_players,
 			seconds > 0 ? L"Starting in:" : game->machine_count < 2 ? L"Waiting for players" : L"");
 		text[NUMBEROF(text) - 1] = 0;
@@ -5401,6 +5401,8 @@ static struct gametype_option const gametype_options[] =
 		{ 1, 0 } },
 	{ "captures_to_win_spinner", _option_long, VARIANT_FIELD(universal_variant.score_to_win), 0, 5,
 		{ 1, 3, 5, 10, 15 } },
+	{ "kills_per_capture_spinner", _option_long, VARIANT_FIELD(game_engine_variant.ctf.points_per_capture), 0, 10,
+		{ 5, 10, 15, 20, 25, 30, 40, 50, 75, 100 } },
 	{ "time_limit_spinner", _option_short, OPTIONS_FIELD(time_limit), 0, 7, TIME_LIMITS },
 	/* king of the hill */
 	{ "koth_moving_hill_spinner", _option_byte, VARIANT_FIELD(game_engine_variant.king.moving_hill), 0, 2, { 1, 0 } },
@@ -5885,7 +5887,7 @@ static void gametype_setup_type(wchar_t *text)
 	name[NUMBEROF(name) - 1] = 0;
 	kind = game_modes_variant_kind_name(&gametype_edit.setup_variant, &gametype_edit.setup_options);
 	usnprintf(text, ROW_TEXT_LENGTH - 1, L"%s (%s%s)", name,
-		kind ? kind : engine_names[PIN(gametype_edit.setup_variant.game_engine_index, 0, 5)],
+		kind ? kind : engine_names[PIN(gametype_edit.setup_variant.game_engine_index, 0, 10)],
 		gametype_edit.setup_variant.universal_variant.teams ? L", TEAMS" : L"");
 	text[ROW_TEXT_LENGTH - 1] = 0;
 }
@@ -5954,10 +5956,10 @@ static void gametype_edit_list_update(struct widget_instance *list)
 		text_set(named(description, "gametype_right_name", 0), text);
 		if (playlist_profile_get(profile_index, &variant))
 		{
-			long engine = PIN(variant.game_engine_index, 0, 5);
+			long engine = PIN(variant.game_engine_index, 0, 10);
 
 			if ((widget = named(description, "gametype_right_pic", 0)) != NULL)
-				widget->animation.current_frame_index = (short)engine;
+				widget->animation.current_frame_index = (short)(engine == 10 ? 1 : engine);
 			gametype_rules_text(profile_index, text, NUMBEROF(text));
 			text_set(named(description, "gametype_right_data", 0), text);
 		}
@@ -6133,9 +6135,9 @@ static char const *const engine_items[] =
 {
 	/* (the type list's rows, in order: game_engine_ctf and so on) */
 	"gametype_select_ctf_item", "gametype_select_koth_item", "gametype_select_slayer_item",
-	"gametype_select_oddball_item", "gametype_select_race_item"
+	"gametype_select_oddball_item", "gametype_select_race_item", "gametype_select_ctfs_item"
 };
-static long const engine_of_item[] = { 1, 4, 2, 3, 5 };
+static long const engine_of_item[] = { 1, 4, 2, 3, 5, 10 };
 
 /* "mp profile init game engine": the gametype's type focused */
 static boolean gametype_engine_init(struct widget_instance *list)
@@ -6166,9 +6168,21 @@ static boolean gametype_engine_set(struct widget_instance *item)
 	{
 		if (!strcmp(item->name, engine_items[index]))
 		{
-			if (variant->game_engine_index != engine_of_item[index])
+			boolean changed = variant->game_engine_index != engine_of_item[index];
+
+			if (changed)
 				csmemset(&variant->game_engine_variant, 0, sizeof(variant->game_engine_variant));
 			variant->game_engine_index = engine_of_item[index];
+			if (variant->game_engine_index == game_engine_ctf_slayer)
+			{
+				/* ctf/slayer: ctf's rules, scored by kills and captures (the
+				limit is in captures, each worth the capture points) */
+				if (changed)
+					variant->universal_variant.score_to_win = 4;
+				if (changed || variant->game_engine_variant.ctf.points_per_capture <= 0)
+					variant->game_engine_variant.ctf.points_per_capture = 25;
+				variant->universal_variant.teams = 1;
+			}
 			return TRUE;
 		}
 	}
@@ -6180,11 +6194,11 @@ ui\multiplayer_game_text, as the Xbox's: capture the flag 3, slayer 4,
 oddball 5, king of the hill 6, race 7, unknown 8) */
 static void gametype_engine_name(struct widget_instance *text_box)
 {
-	static short const strings[] = { 8, 3, 4, 5, 6, 7 };
+	static short const strings[] = { 8, 3, 4, 5, 6, 7, 8, 8, 8, 8, 3 };
 	struct game_variant *variant = edit_variant();
 
 	if (variant)
-		text_box->parameters.text_box.string_list_index = strings[PIN(variant->game_engine_index, 0, 5)];
+		text_box->parameters.text_box.string_list_index = strings[PIN(variant->game_engine_index, 0, 10)];
 }
 
 /* ---------- public code */

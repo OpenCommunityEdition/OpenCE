@@ -306,6 +306,8 @@ wchar_t const *game_modes_variant_kind_name(
 		return L"HARDCORE KING";
 	case game_engine_race:
 		return L"HARDCORE RACE";
+	case game_engine_ctf_slayer:
+		return L"HARDCORE CTF/SLAYER";
 	}
 	return NULL;
 }
