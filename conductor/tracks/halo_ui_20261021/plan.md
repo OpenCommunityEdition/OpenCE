@@ -25,9 +25,9 @@
 - [x] Task: Every screen reached 71f38fa5
     - [x] Write tests: a scripted walk through every screen, headless (marked, needs `assets/maps`)
     - [x] Campaign, multiplayer, settings, profiles, pause and post-game screens wired; the engine's own menus removed
-- [ ] Task: The launcher
-    - [ ] Write tests: XCTest of the launcher's three choices and its settings
-    - [ ] Play, Settings and Exit only
+- [x] Task: The launcher d2346075
+    - [x] Write tests: XCTest of the launcher's three choices and its settings
+    - [x] Play, Settings and Exit only
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: The screens and the launcher' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 4: The loading screen
