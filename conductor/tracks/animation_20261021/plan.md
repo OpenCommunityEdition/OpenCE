@@ -9,7 +9,7 @@
     - [x] The pose blender in `sim`, with the overlays in Halo's order
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: The graph and the frames' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 2: Bipeds, weapons and the first person
+## Phase 2: Bipeds, weapons and the first person [checkpoint: 89c991f7]
 - [x] Task: Biped states e327e6b2
     - [x] Write tests: each state of the spec's list chosen from the unit's state, against the reference traces
     - [x] The biped animation state machine
