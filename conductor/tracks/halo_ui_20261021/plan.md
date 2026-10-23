@@ -34,9 +34,9 @@
 - [x] Task: The chant 85cf1883
     - [x] Write tests: the tone is found in an XBE by its section and decoded; without an XBE nothing plays
     - [x] Reading and decoding the compressed tone from the user's `default.xbe`, into the cache only
-- [ ] Task: The screen
-    - [ ] Write tests: the panning light's timing and the fade against the behaviour of `progress_bar.c`; skipping only once the map is ready
-    - [ ] The loading screen pass; background loading and import of the next map; the fade into the next mission; `ui.loading_screen`
+- [x] Task: The screen 72ee6af2
+    - [x] Write tests: the panning light's timing and the fade against the behaviour of `progress_bar.c`; skipping only once the map is ready
+    - [x] The loading screen pass; background loading and import of the next map; the fade into the next mission; `ui.loading_screen`
 - [ ] Task: Transitions
     - [ ] Write tests: no frame over 33 ms from the end of a10 to the first frame of a30 (marked, needs `assets/maps`)
     - [ ] `docs/engine.md`: the UI, the launcher and the loading screen; golden frames of the screens
