@@ -422,6 +422,8 @@ static char const *const port_game_data_input_names[] =
 	"port coop friendly fire text",
 	/* (the gametype editor's description, with OPENCE OPTIONS' row) */
 	"port playlist edit desc",
+	/* (HDR Calibration's patterns, drawn by the renderer) */
+	"port hdr calibration",
 };
 
 static struct

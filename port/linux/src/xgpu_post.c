@@ -29,6 +29,10 @@ linear light (a power of 2.2), scales them by the exposure, brings what is
 past white into the display's range with its curve, and encodes them again.
 The default curve, "gt7", is Polyphony Digital's GT7 tone mapping operator
 (port/third_party/gt7_tone_mapping, MIT licensed), in GLSL here.
+
+The HDR calibration screen's patterns are drawn here too, into
+display.hdr_output's window after the back buffer: rectangles and rings of
+one colour each, in scRGB, which may be far brighter than the menus' white.
 */
 
 #include "xgpu.h"
@@ -57,6 +61,7 @@ enum
 	_post_program_smaa_blend,
 	_post_program_tone_map,
 	_post_program_present,
+	_post_program_fill,
 	NUMBER_OF_POST_PROGRAMS
 };
 
@@ -66,6 +71,7 @@ enum
 	_post_set_fxaa,
 	_post_set_smaa,
 	_post_set_hdr,
+	_post_set_fill,
 	NUMBER_OF_POST_SETS
 };
 
@@ -74,10 +80,12 @@ static struct
 	GLuint vertex_shader;
 	GLuint programs[NUMBER_OF_POST_PROGRAMS];
 	/* each program's metrics uniform, FXAA's bounds, the tone mapping's
-	settings, and the presentation's rectangle and scale */
+	settings, the presentation's rectangle and scale, and the fill's colour
+	and ring */
 	GLint metrics[NUMBER_OF_POST_PROGRAMS];
 	GLint bounds;
 	GLint tone, rectangle, scale;
+	GLint fill_color, fill_ring;
 	/* each set's programs or textures could not be made */
 	BOOL failed[NUMBER_OF_POST_SETS];
 	/* the size of the textures below, and color's internal format */
@@ -381,6 +389,24 @@ static const char present_source[] =
 	"\tresult = vec4(scale > 0.0 ? pow(color, vec3(2.2)) * scale : min(color, vec3(1.0)), 1.0);\n"
 	"}\n";
 
+/* the viewport in one colour, or only a ring of it */
+static const char fill_source[] =
+	"/* linear (scRGB) */\n"
+	"uniform vec4 color;\n"
+	"/* the ring's centre, and its outer and inner radius, in the window's\n"
+	"pixels; an outer radius of 0: the whole viewport */\n"
+	"uniform vec4 ring;\n"
+	"out vec4 result;\n"
+	"\n"
+	"void main()\n"
+	"{\n"
+	"\tfloat from_centre = distance(gl_FragCoord.xy, ring.xy);\n"
+	"\n"
+	"\tif (ring.z > 0.0 && (from_centre > ring.z || from_centre < ring.w))\n"
+	"\t\tdiscard;\n"
+	"\tresult = vec4(color.rgb, 1.0);\n"
+	"}\n";
+
 #ifndef HALO_GLES
 /* the main functions of SMAA's passes, after SMAA.hlsl; its vertex
 functions' offsets are found for each pixel */
@@ -434,7 +460,7 @@ static GLuint program_build(int which)
 	static const char *const names[NUMBER_OF_POST_PROGRAMS] =
 	{
 		"FXAA", "SMAA edge detection", "SMAA blending weight", "SMAA neighborhood blending",
-		"HDR tone mapping", "HDR presentation"
+		"HDR tone mapping", "HDR presentation", "HDR calibration"
 	};
 	static const struct
 	{
@@ -468,6 +494,10 @@ static GLuint program_build(int which)
 	else if (which == _post_program_present)
 	{
 		xgpu_text_append(&text, "%s", present_source);
+	}
+	else if (which == _post_program_fill)
+	{
+		xgpu_text_append(&text, "%s", fill_source);
 	}
 #ifndef HALO_GLES
 	else if (xgpu_smaa_shader_size)
@@ -510,6 +540,11 @@ static GLuint program_build(int which)
 	{
 		post.rectangle = glGetUniformLocation(program, "rectangle");
 		post.scale = glGetUniformLocation(program, "scale");
+	}
+	else if (which == _post_program_fill)
+	{
+		post.fill_color = glGetUniformLocation(program, "color");
+		post.fill_ring = glGetUniformLocation(program, "ring");
 	}
 	return program;
 }
@@ -812,6 +847,29 @@ BOOL xgpu_post_present(GLuint texture, int x, int y, int width, int height, floa
 	glUseProgram(post.programs[_post_program_present]);
 	glUniform4fv(post.rectangle, 1, rectangle);
 	glUniform1f(post.scale, scale);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+	return TRUE;
+}
+
+BOOL xgpu_post_fill(const GLint corners[4], const float color[3], const float ring[4])
+{
+	float values[4];
+
+	if (!programs_prepare(_post_set_fill, _post_program_fill, _post_program_fill))
+		return FALSE;
+	if (corners[2] <= corners[0] || corners[3] <= corners[1])
+		return TRUE;
+	pass_state();
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(corners[0], corners[1], corners[2] - corners[0], corners[3] - corners[1]);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glUseProgram(post.programs[_post_program_fill]);
+	values[0] = color[0];
+	values[1] = color[1];
+	values[2] = color[2];
+	values[3] = 1.0f;
+	glUniform4fv(post.fill_color, 1, values);
+	glUniform4fv(post.fill_ring, 1, ring);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	return TRUE;
 }

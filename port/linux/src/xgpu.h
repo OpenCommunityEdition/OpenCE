@@ -322,4 +322,11 @@ up: as it is (SDR), or, with scale more than 0, made linear and scaled by
 it (an HDR display's scRGB framebuffer: scale is its SDR white) */
 BOOL xgpu_post_present(GLuint texture, int x, int y, int width, int height, float scale);
 
+/* fills the corners x0, y0 to x1, y1 of the window (row 0 at the bottom)
+with color, as it is (an HDR display's scRGB framebuffer: linear, 1.0 at 80
+nits), or only the ring ring[0], ring[1] (its centre in the window), from
+radius ring[3] to ring[2]; ring[2] 0 for the whole rectangle. FALSE if its
+program does not build. */
+BOOL xgpu_post_fill(const GLint corners[4], const float color[3], const float ring[4]);
+
 #endif
