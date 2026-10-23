@@ -142,11 +142,11 @@ enum
 	/* ... those of the kinds the host has, made since the last tick, checked
 	(more, and all of them are) */
 	MAXIMUM_CLIENT_NEW_OBJECTS = 1024,
-	/* ... the host's inventories it could not apply yet, one for each unit
-	that carries anything (a vehicle is a unit) the stream has not brought:
-	most of them while it joins, few after. Room for as many as there are
-	players; past that the oldest goes, and its unit waits for the host's
-	next inventory of it */
+	/* ... the host's inventories it could not apply in full yet, one for
+	each unit that carries anything (a vehicle is a unit, its weapons are
+	objects) whose objects the stream has not brought: most of them while
+	it joins, few after. Room for as many as there are players; past that
+	the oldest goes, and its unit waits for the host's next inventory of it */
 	MAXIMUM_CLIENT_RETRIED_INVENTORIES = MAXIMUM_TRACKED_PLAYERS,
 	MAXIMUM_ENTRIES_PER_MESSAGE = 64,
 	/* the objects the host has at the same indices everywhere */
@@ -476,13 +476,14 @@ static struct distributed_picked_up_weapon
 	long definition_index;
 	long time;
 } objects_client_picked_up_weapons[MAXIMUM_LOCAL_PLAYERS];
-/* ... the host's inventories that named a unit not here yet. An inventory
-goes as a datagram, and units are made on the stream, which can trail it, so
-a player just spawned can be told what it carries before its unit is here,
-and would carry nothing until the host's next inventory of it, a second
-later. Each is kept, the newest of its unit's, and applied once, the tick
-its unit is here; let go of once three of the host's refreshes pass without
-a newer (the host has stopped sending it) */
+/* ... the host's inventories that named a unit or a weapon not here yet. An
+inventory goes as a datagram, and units and weapons are made on the stream,
+which can trail it, so a player just spawned can be told what it carries
+before its unit or its weapons are here, and would carry nothing until the
+host's next inventory of it, a second later. Each is kept, the newest of its
+unit's, and applied once, the tick all it names is here; let go of once
+three of the host's refreshes pass without a newer (the host has stopped
+sending it) */
 static struct distributed_retried_inventory
 {
 	struct distributed_inventory inventory;
@@ -2865,15 +2866,34 @@ static boolean distributed_client_own_settled(
 	return game_time_get() - time > (long)ceil(round_trip) + INVENTORY_INTERVAL_TICKS + OWN_INVENTORY_MARGIN_TICKS;
 }
 
-/* whether the unit an inventory names is here */
+/* whether the weapon the host has in a slot is here (none always is) */
+static boolean distributed_client_weapon_here(
+	long weapon_index)
+{
+	return weapon_index == NONE ||
+		(network_objects_client_has(weapon_index) && object_try_and_get_and_verify_type(weapon_index, _object_mask_weapon));
+}
+
+/* whether the unit an inventory names and every weapon it names are here */
 static boolean distributed_client_inventory_whole(
 	struct distributed_inventory const *inventory)
 {
-	return network_objects_client_has(inventory->unit_index) &&
-		object_try_and_get_and_verify_type(inventory->unit_index, _object_mask_unit);
+	short weapon_slot;
+
+	if (!network_objects_client_has(inventory->unit_index) ||
+		!object_try_and_get_and_verify_type(inventory->unit_index, _object_mask_unit))
+	{
+		return FALSE;
+	}
+	for (weapon_slot = 0; weapon_slot < MAXIMUM_WEAPONS_PER_UNIT; weapon_slot++)
+	{
+		if (!distributed_client_weapon_here(inventory->weapon_indices[weapon_slot]))
+			return FALSE;
+	}
+	return TRUE;
 }
 
-/* the inventory kept to apply once its unit is here, the newest of its
+/* the inventory kept to apply once all it names is here, the newest of its
 unit's (in its entry, else a new one, else the oldest's) */
 static void distributed_client_retry_inventory(
 	struct distributed_inventory const *inventory)
@@ -2929,8 +2949,8 @@ static void distributed_client_apply_inventory(
 	boolean local;
 	short weapon_slot;
 
-	/* (now if its unit is here, else once it is: the newest of the unit's
-	is the one kept) */
+	/* (what is here of it now, and the rest once it is: the newest of the
+	unit's is the one kept) */
 	if (distributed_client_inventory_whole(inventory))
 		distributed_client_forget_retried_inventory(inventory->unit_index);
 	else
@@ -2966,11 +2986,8 @@ static void distributed_client_apply_inventory(
 		if (weapon_index == wanted_index)
 			continue;
 		/* (not here yet: as it is, until it is) */
-		if (wanted_index != NONE &&
-			(!network_objects_client_has(wanted_index) || !object_try_and_get_and_verify_type(wanted_index, _object_mask_weapon)))
-		{
+		if (!distributed_client_weapon_here(wanted_index))
 			continue;
-		}
 		if (weapon_index != NONE)
 			unit_network_drop_weapon(inventory->unit_index, weapon_slot);
 		if (wanted_index != NONE)
@@ -3370,8 +3387,8 @@ static void distributed_client_carry_unsteered_vehicles(
 	}
 }
 
-/* the kept inventories whose unit has come: applied once, as if they had
-come now */
+/* the kept inventories all of whose unit and weapons have come: applied once,
+as if they had come now */
 static void distributed_client_apply_retried_inventories(
 	void)
 {

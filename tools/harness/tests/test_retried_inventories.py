@@ -1,4 +1,4 @@
-"""A client's inventories from the host whose unit has not come yet: kept, and applied once it has."""
+"""A client's inventories from the host whose unit or weapons have not come yet: kept, and applied once they have."""
 import re
 import sys
 from pathlib import Path
@@ -8,10 +8,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, enum_with, function, mutated, read, run, structure
 
-CASES = ['unit-late', 'newest', 'full', 'forget', 'expiry']
+CASES = ['unit-late', 'weapon-late', 'newest', 'full', 'forget', 'expiry']
 CONTROLS = [
     ('else\n\t\tdistributed_client_retry_inventory(inventory);', 'else\n\t\t(void)0;', 'unit-late'),
     ('distributed_client_apply_inventory(&inventory);', '(void)inventory;', 'unit-late'),
+    ('if (!distributed_client_weapon_here(inventory->weapon_indices[weapon_slot]))', 'if (FALSE)', 'weapon-late'),
     ('if (objects_client_retried_inventories[index].inventory.unit_index == inventory->unit_index)', 'if (FALSE)',
      'newest'),
     ('.time < objects_client_retried_inventories[oldest].time', '.time > objects_client_retried_inventories[oldest].time',
@@ -57,6 +58,7 @@ def generated(fault=None):
                     'objects_client_own_inventories[MAXIMUM_LOCAL_PLAYERS];'),
         declaration(network, 'static struct distributed_retried_inventory\n',
                     'static short objects_client_retried_inventory_count;'),
+        function(network, 'distributed_client_weapon_here'),
         function(network, 'distributed_client_inventory_whole'),
         function(network, 'distributed_client_retry_inventory'),
         function(network, 'distributed_client_forget_retried_inventory'),
