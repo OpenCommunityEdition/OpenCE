@@ -647,6 +647,10 @@ MT = "main_menu/multiplayer_type_select"
 # in turn: menu_functions.c's gametype_option_help)
 SLAYER_EDIT = "main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit"
 PLAYER_EDIT = "main_menu/settings_select/multiplayer_setup/player_options_edit"
+# the vehicle sets' PC set (game_engine.h's VARIANT_VEHICLE_SET_PC), between
+# GUN TURRETS and CUSTOM (menu_functions.c's VEHICLE_PRESET_PC), and its help
+# among the sets' (its rows' values' in turn: gametype_option_help)
+VEHICLE_EDIT = "main_menu/settings_select/multiplayer_setup/vehicle_options_edit"
 AIM_ASSIST_HELP = [
     "Players keep their current mouse aim assist setting.",
     "Disable mouse aim assist for mouse/keyboard players.\\nController and touch aim assist are unchanged.",
@@ -660,6 +664,10 @@ STRING_INSERTS = {
     f"{TEAMPLAY_EDIT}/teamplay_options_labels": [(3, [label for _, label, *_ in TEAMPLAY_ROWS])],
     f"{TEAMPLAY_EDIT}/cap_teamplay_options": [(10, [text for *_, helps in TEAMPLAY_ROWS for text in helps])],
     f"{SLAYER_EDIT}/var_kills_to_win": [(5, ["75", "100", "150", "200", "250", "500"])],
+    f"{VEHICLE_EDIT}/var_vehicle_set": [(8, ["PC"])],
+    f"{VEHICLE_EDIT}/cap_vehicle_options": [(17, [
+        "Every vehicle the map places will spawn, as in\\nHalo PC.",
+    ])],
     f"{SLAYER_EDIT}/cap_slayer": [(11, [
         "Seventy-five kills to win. Settle in for a long\\nfight.",
         "A hundred kills to win. Made for big games.",
