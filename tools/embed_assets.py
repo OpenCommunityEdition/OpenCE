@@ -68,8 +68,8 @@ def font_files() -> List[str]:
     """The font files fonts.json uses, each once."""
     if not (ROOT / FONT_LIST).is_file():
         return []
-    fonts = json.loads((ROOT / FONT_LIST).read_text())["fonts"]
-    return sorted({font["file"] for font in fonts})
+    listed = json.loads((ROOT / FONT_LIST).read_text())
+    return sorted({font["file"] for font in listed["fonts"] + listed.get("fallbacks", [])})
 
 
 def textures() -> List[tuple]:
@@ -232,6 +232,20 @@ def main() -> None:
         lines.append("\t{ 0 },")
     lines.append("};")
     lines.append(f"const unsigned int text_hires_embedded_count = {len(fonts)};")
+    lines.append("")
+    # the fonts of the characters those lack, a font for each subtitle
+    # language that needs one (text_hires.h)
+    fallbacks = json.loads((ROOT / FONT_LIST).read_text()).get("fallbacks", []) if files else []
+    lines.append("const struct text_hires_fallback text_hires_fallbacks[] =")
+    lines.append("{")
+    for font in fallbacks:
+        index = files.index(font["file"])
+        size = (ROOT / FONT_ASSETS / font["file"]).stat().st_size
+        lines.append(f'\t{{ "{font["language"]}", "{font["file"]}", font{index}, {size} }},')
+    if not fallbacks:
+        lines.append("\t{ 0 },")
+    lines.append("};")
+    lines.append(f"const unsigned int text_hires_fallbacks_count = {len(fallbacks)};")
     lines.append("")
     # the menus' files (menu_files.h)
     lines.append('#include "menu_files.h"')

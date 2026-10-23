@@ -25,6 +25,20 @@ struct text_hires_embedded
 extern const struct text_hires_embedded text_hires_embedded[];
 extern const unsigned int text_hires_embedded_count;
 
+/* an embedded font of the characters that the fonts above lack (Chinese,
+Japanese and Korean), and the subtitles' language (display.subtitles_language)
+that it draws them for (fonts.json's fallbacks) */
+struct text_hires_fallback
+{
+	const char *language;
+	const char *file;
+	const unsigned int *data;
+	unsigned int size;
+};
+
+extern const struct text_hires_fallback text_hires_fallbacks[];
+extern const unsigned int text_hires_fallbacks_count;
+
 /* a glyph: its quad, in units of the 480 lines from the pen on the baseline,
 its texels in the atlas, in texels of the atlas's placeholder bitmap, and
 the font's advance for it, in units */
@@ -53,6 +67,14 @@ int text_hires_covers(long font, unsigned long code);
 /* the glyph of a character (rasterized into the atlas if it is not yet);
 0 if it has none */
 int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *glyph);
+/* the same, for a character the font lacks, that the language's fallback font
+draws in a cell of cell units (its width and height; 0 for a character
+that the font has) */
+int text_hires_glyph_cell(long font, unsigned long code, float cell, struct text_hires_glyph *glyph);
+/* whether the fallback font of the subtitles' language has a glyph for the
+character, which the font tags, without one, are given a cell for
+(font_group.c); 0 while high-res text is off or its atlas is not there */
+int text_hires_cjk_covers(unsigned long code);
 /* the atlas's placeholder: the D3D texture of the bitmap the game binds,
 and its size; NULL forgets it */
 void text_hires_register_atlas(const unsigned long *texture, unsigned long width, unsigned long height);

@@ -1238,9 +1238,16 @@ sound/dialog/b30/* - "(radio chatter)"
   lacks is shown in English. Only the English subtitles are built in now.
 - The files are UTF-8, and the text is drawn in the HUD font (Overpass),
   which has the Latin letters of French, German, Italian, Spanish and
-  Portuguese with their accents but no Chinese, Japanese or Korean
-  characters: those are drawn as empty boxes until the game has a font for
-  them.
+  Portuguese with their accents. The Chinese, Japanese and Korean characters
+  are drawn from Noto Sans CJK (`port/assets/fonts`, SIL Open Font License),
+  a subset of the forms of the language's region: Traditional Chinese,
+  Simplified Chinese, Japanese or Korean, from `display.subtitles_language`.
+  The subset has the commonly used characters (the first levels of Big5,
+  GB 2312 and JIS X 0208, and the Hangul of KS X 1001) and the kana and
+  punctuation; a rarer character is left out. It needs
+  `display.high_res_text` (on by default), and a line of them is wrapped
+  only where the text has a space: write a space in a long line where it may
+  break.
 - The file is read when the game starts, and again when a setting changes.
   They are off until `display.subtitles` is `true` (Video Setup, Extra
   Effects), and only on single player maps.

@@ -528,6 +528,10 @@ static void bitmap_draw_character(
 			((color & 0xFF) >> 3));
 	}
 
+	/* port: a CJK character's cell (font_group.c) has no pixels */
+	if (character->pixels_offset == -1)
+		return;
+
 	if (dy <= 0)
 		return;
 
