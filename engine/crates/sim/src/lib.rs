@@ -1173,6 +1173,28 @@ impl Simulation {
         ai_impulse::impulse_animation(&player.graph, class, impulse)
     }
 
+    /// What each animated object's animation did in the last tick that is
+    /// heard: the sounds it reached and the feet it put down, by object.
+    pub fn animation_events(&mut self) -> Vec<animation::AnimationEvent> {
+        let mut events: Vec<_> = self
+            .world
+            .query::<(&ObjectHandle, &Object, &Transform, &AnimationPlayer)>()
+            .iter(&self.world)
+            .filter(|(.., player)| player.sound().is_some() || player.foot().is_some())
+            .map(
+                |(handle, object, transform, player)| animation::AnimationEvent {
+                    object: *handle,
+                    tag: object.tag.clone(),
+                    position: transform.position,
+                    sound: player.sound().cloned(),
+                    foot: player.foot(),
+                },
+            )
+            .collect();
+        events.sort_by_key(|event| event.object);
+        events
+    }
+
     /// Each object as the renderer draws it, in the order of their ids.
     pub fn visit_drawn(&mut self, mut visit: impl FnMut(Drawn<'_>)) {
         let mut objects: Vec<_> = self

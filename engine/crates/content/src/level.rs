@@ -79,6 +79,8 @@ pub struct Level {
     pub sounds: Vec<crate::Sound>,
     /// Its looping sounds.
     pub looping_sounds: Vec<crate::LoopingSound>,
+    /// Its material effects (`foot`): what footsteps make.
+    pub material_effects: Vec<crate::MaterialEffects>,
 }
 
 /// The game's globals (the `matg` tag) that the simulation reads.
@@ -198,6 +200,13 @@ pub struct FallingDamage {
 }
 
 impl Level {
+    /// Material effects, by their tag.
+    pub fn material_effects(&self, tag: &TagRef) -> Option<&crate::MaterialEffects> {
+        self.material_effects
+            .iter()
+            .find(|effects| effects.tag == *tag)
+    }
+
     /// A shader, by its tag.
     pub fn shader(&self, tag: &TagRef) -> Option<&Shader> {
         self.shaders.iter().find(|shader| shader.tag == *tag)

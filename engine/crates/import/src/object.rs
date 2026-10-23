@@ -329,6 +329,18 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
             }
             _ => None,
         },
+        material_effects: match kind {
+            ObjectKind::Biped => {
+                let biped = cache.tag(index, BIPD, BIPED_SIZE)?;
+                reference(
+                    &biped,
+                    BIPED_PART + 0x9C,
+                    "material effects",
+                    &[crate::sound::FOOT],
+                )?
+            }
+            _ => None,
+        },
         biped: match kind {
             ObjectKind::Biped => Some(import_biped(cache, index)?),
             _ => None,

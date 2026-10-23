@@ -216,6 +216,8 @@ impl Engine {
             particles: crate::particles::LevelParticles::new(&geometry.content),
             particle_rows: Vec::new(),
             running_effects: Vec::new(),
+            heard: Vec::new(),
+            stepped: Vec::new(),
         };
         running.previous_camera = transform(&camera(&running).transform);
         let mut state = self.lock();

@@ -178,6 +178,18 @@ impl DynamicDecals {
         bsp: usize,
         point: Vec3,
     ) -> Option<(Vec3, Vec3)> {
+        self.ground_material(level, bsp, point)
+            .map(|(point, normal, _)| (point, normal))
+    }
+
+    /// The ground of BSP `bsp` under `point`, its normal there, and its
+    /// material type (-1: none).
+    pub(crate) fn ground_material(
+        &mut self,
+        level: &Level,
+        bsp: usize,
+        point: Vec3,
+    ) -> Option<(Vec3, Vec3, i16)> {
         let origin = add(point.to_array(), [0.0, 0.0, GROUND_ABOVE]);
         let hit = first_hit(
             self.bsp(level, bsp),
@@ -185,7 +197,11 @@ impl DynamicDecals {
             [0.0, 0.0, -1.0],
             GROUND_ABOVE + GROUND_BELOW,
         )?;
-        Some((Vec3::from_array(hit.point), Vec3::from_array(hit.normal)))
+        Some((
+            Vec3::from_array(hit.point),
+            Vec3::from_array(hit.normal),
+            hit.material,
+        ))
     }
 
     /// The decals age; those past their lives, and those on objects that

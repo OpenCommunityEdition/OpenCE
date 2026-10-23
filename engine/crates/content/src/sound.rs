@@ -223,3 +223,45 @@ impl LoopingSound {
     /// It stops the music that is playing.
     pub const STOPS_MUSIC: u32 = 1 << 2;
 }
+
+/// What a footstep, a slide or a landing makes on each material
+/// (`material_effects`, the `foot` tag): by its event, the effect and the
+/// sound of each of the game's materials.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct MaterialEffects {
+    /// Its tag.
+    pub tag: TagRef,
+    /// Its events ([`MaterialEffects::WALK`] and the rest), each by
+    /// material type.
+    pub events: Vec<Vec<MaterialEffect>>,
+}
+
+/// What an event makes on one material.
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct MaterialEffect {
+    /// The effect it starts.
+    pub effect: Option<TagRef>,
+    /// The sound it plays.
+    pub sound: Option<TagRef>,
+}
+
+impl MaterialEffects {
+    /// A step, walking (crouched).
+    pub const WALK: usize = 0;
+    /// A step, running (standing).
+    pub const RUN: usize = 1;
+    /// A slide.
+    pub const SLIDING: usize = 2;
+    /// A shuffle of the feet, standing still.
+    pub const SHUFFLE: usize = 3;
+    /// A jump.
+    pub const JUMP: usize = 4;
+    /// A landing from a jump.
+    pub const JUMP_LAND: usize = 5;
+
+    /// What `event` makes on material `material` (a negative one: none).
+    pub fn of(&self, event: usize, material: i16) -> Option<&MaterialEffect> {
+        let material = usize::try_from(material).ok()?;
+        self.events.get(event)?.get(material)
+    }
+}

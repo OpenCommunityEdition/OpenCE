@@ -30,6 +30,7 @@ pub mod render_transparent;
 pub mod script;
 pub mod settings;
 pub mod snapshot;
+mod sound_events;
 mod stations;
 pub mod ui;
 mod ui_host;
@@ -632,6 +633,10 @@ pub(crate) struct Running {
     particles: particles::LevelParticles,
     /// The frame's particles (kept for their memory).
     particle_rows: Vec<snapshot::ParticleSnapshot>,
+    /// The sounds the ticks made, to be played after them.
+    heard: Vec<sound_events::Heard>,
+    /// The footsteps' effects (kept for their memory).
+    stepped: Vec<sound_events::Stepped>,
 }
 
 /// The models and animation graphs objects are drawn and posed with,
@@ -771,6 +776,8 @@ impl Engine {
             marks: Vec::new(),
             effects: effects::LevelEffects::default(),
             running_effects: Vec::new(),
+            heard: Vec::new(),
+            stepped: Vec::new(),
             particles: particles::LevelParticles::default(),
             particle_rows: Vec::new(),
         });
@@ -819,6 +826,8 @@ impl Engine {
             marks: Vec::new(),
             effects: effects::LevelEffects::new(&geometry.content),
             running_effects: Vec::new(),
+            heard: Vec::new(),
+            stepped: Vec::new(),
             particles: particles::LevelParticles::new(&geometry.content),
             particle_rows: Vec::new(),
         });
@@ -960,9 +969,19 @@ impl Engine {
             run_ticks(&mut state, advanced.ticks)?;
             frame = Some(advanced);
         }
-        if let (Some(running), Some(advanced)) = (state.running.as_ref(), frame.as_ref()) {
+        if let (Some(running), Some(advanced)) = (state.running.as_mut(), frame.as_ref()) {
+            let heard = std::mem::take(&mut running.heard);
             if let Some(player) = audio::lock(&self.audio).as_mut() {
                 player.set_listener(audio::listener(&running.simulation.camera().transform));
+                for sound in &heard {
+                    if let Some(index) = player.sound_index(&sound.tag.path) {
+                        let source = opence_audio::Source {
+                            position: Some(sound.position.to_array()),
+                            ..opence_audio::Source::default()
+                        };
+                        player.impulse(index, &source);
+                    }
+                }
                 let ticks = i32::try_from(advanced.ticks).unwrap_or(i32::MAX);
                 player.advance((frame_seconds * scale * 1000.0) as f32, ticks);
             }
@@ -1251,6 +1270,24 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
             let fired = running.effects.fired();
             running.lights.tick(level, fired);
             running.decals.tick(level, &running.simulation, fired);
+            let events = running.simulation.animation_events();
+            let camera = running.simulation.camera().transform.position;
+            let decals = &mut running.decals;
+            running.stepped.clear();
+            sound_events::gather(
+                level,
+                fired,
+                &events,
+                camera,
+                |point| decals.ground_material(level, bsp, point),
+                &mut running.heard,
+                &mut running.stepped,
+            );
+            for step in &running.stepped {
+                running
+                    .effects
+                    .start(level, &step.effect, step.point, step.normal);
+            }
             running.particles.tick(
                 level,
                 &mut running.simulation,

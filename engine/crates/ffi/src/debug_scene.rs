@@ -253,6 +253,7 @@ pub(crate) mod tests {
             ui: Default::default(),
             sounds: Vec::new(),
             looping_sounds: Vec::new(),
+            material_effects: Vec::new(),
         };
         let mut structure = StructureBsp {
             cluster_skies: Vec::new(),
@@ -383,7 +384,7 @@ pub(crate) mod tests {
         assert!(scene.labels().is_empty());
     }
 
-    fn test_object(
+    pub(crate) fn test_object(
         kind: opence_content::ObjectKind,
         path: &str,
     ) -> opence_content::ObjectDefinition {
@@ -410,6 +411,7 @@ pub(crate) mod tests {
             attachments: Vec::new(),
             change_colors: Vec::new(),
             unit_hud: None,
+            material_effects: None,
             unit_melee_damage: None,
             biped: None,
             weapon: None,

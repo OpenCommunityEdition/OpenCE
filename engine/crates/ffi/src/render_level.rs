@@ -1022,6 +1022,7 @@ pub(crate) mod tests {
             ui: Default::default(),
             sounds: Vec::new(),
             looping_sounds: Vec::new(),
+            material_effects: Vec::new(),
         }
     }
 

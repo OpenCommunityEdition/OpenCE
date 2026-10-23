@@ -15,7 +15,7 @@ use crate::tags::{Element, GroupTag};
 pub(crate) const VEHI: GroupTag = GroupTag::new(b"vehi");
 pub(crate) const PHYS: GroupTag = GroupTag::new(b"phys");
 const SND: GroupTag = GroupTag::new(b"snd!");
-const FOOT: GroupTag = GroupTag::new(b"foot");
+use crate::sound::FOOT;
 const EFFE: GroupTag = GroupTag::new(b"effe");
 const ACTV: GroupTag = GroupTag::new(b"actv");
 const WEAP: GroupTag = GroupTag::new(b"weap");

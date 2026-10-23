@@ -1333,6 +1333,7 @@ mod tests {
             functions: Vec::new(),
             change_colors: Vec::new(),
             unit_hud: None,
+            material_effects: None,
             unit_melee_damage: None,
             biped: None,
             weapon: None,

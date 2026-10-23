@@ -118,6 +118,9 @@ pub struct ObjectDefinition {
     /// The damage a biped's own melee does, without a weapon (the flood's
     /// forms have one; bipeds only).
     pub unit_melee_damage: Option<TagRef>,
+    /// The effects and sounds of a biped's footsteps (`foot`), by the
+    /// ground's material (bipeds only).
+    pub material_effects: Option<TagRef>,
     /// A biped's movement (bipeds only).
     pub biped: Option<Biped>,
     /// A weapon's own part (weapons only).

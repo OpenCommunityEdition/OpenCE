@@ -2,8 +2,8 @@
 //! the file, outside the tag data, and are copied as they are encoded.
 
 use opence_content::{
-    LoopingSound, LoopingSoundDetail, LoopingSoundTrack, Sound, SoundCompression, SoundModifiers,
-    SoundPermutation, SoundPitchRange,
+    LoopingSound, LoopingSoundDetail, LoopingSoundTrack, MaterialEffect, MaterialEffects, Sound,
+    SoundCompression, SoundModifiers, SoundPermutation, SoundPitchRange,
 };
 
 use crate::cache::{Cache, CacheKind};
@@ -14,6 +14,13 @@ use crate::tags::{Element, GroupTag};
 
 pub(crate) const SND: GroupTag = GroupTag::new(b"snd!");
 pub(crate) const LSND: GroupTag = GroupTag::new(b"lsnd");
+pub(crate) const FOOT: GroupTag = GroupTag::new(b"foot");
+const EFFE: GroupTag = GroupTag::new(b"effe");
+pub(crate) const MATERIAL_EFFECTS_SIZE: usize = 0x0C;
+pub(crate) const MATERIAL_EVENT_SIZE: usize = 0x1C;
+pub(crate) const MATERIAL_SIZE: usize = 0x30;
+const MAX_MATERIAL_EVENTS: usize = 13;
+const MAX_MATERIALS: usize = 33;
 pub(crate) const SOUND_SIZE: usize = 0xA4;
 pub(crate) const PITCH_RANGES_OFFSET: usize = 0x98;
 pub(crate) const PITCH_RANGE_SIZE: usize = 0x48;
@@ -228,6 +235,39 @@ pub(crate) fn import_sounds(cache: &Cache) -> Result<(Vec<Sound>, Vec<LoopingSou
     Ok((sounds, looping))
 }
 
+/// The material effects (`foot`) of tag `index`.
+fn import_material_effect_tag(cache: &Cache, index: usize) -> Result<MaterialEffects, ImportError> {
+    let tag = cache.tag(index, FOOT, MATERIAL_EFFECTS_SIZE)?;
+    let block = tag.block(0, "effects", MATERIAL_EVENT_SIZE, MAX_MATERIAL_EVENTS)?;
+    let mut events = Vec::with_capacity(block.len());
+    for event in block.iter() {
+        let materials = event.block(0, "materials", MATERIAL_SIZE, MAX_MATERIALS)?;
+        let mut made = Vec::with_capacity(materials.len());
+        for material in materials.iter() {
+            made.push(MaterialEffect {
+                effect: reference(&material, 0x00, "effect", &[EFFE])?,
+                sound: reference(&material, 0x10, "sound", &[SND])?,
+            });
+        }
+        events.push(made);
+    }
+    Ok(MaterialEffects {
+        tag: tag_ref(cache, index),
+        events,
+    })
+}
+
+/// Every material effects tag in the map.
+pub(crate) fn import_material_effects(cache: &Cache) -> Result<Vec<MaterialEffects>, ImportError> {
+    let mut effects = Vec::new();
+    for (index, instance) in cache.tags().iter().enumerate() {
+        if instance.group == FOOT && !instance.in_resource_map {
+            effects.push(import_material_effect_tag(cache, index)?);
+        }
+    }
+    Ok(effects)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -340,6 +380,48 @@ mod tests {
         assert!(import_sound(&cache, index).is_err());
         let (cache, index) = sound_cache(0, NO_PERMUTATION)?;
         assert_eq!(import_sound(&cache, index)?.sample_rate, 22_050);
+        Ok(())
+    }
+
+    #[test]
+    fn material_effects_have_each_events_materials() -> Result {
+        let mut fake = FakeCache::new(CacheKind::Xbox);
+        let mut sound = vec![0u8; SOUND_SIZE];
+        empty(&mut sound, 0x70);
+        let step = fake.add_tag(SND, "sound\\step", &sound);
+        let handle = fake.handle(step);
+        // (the run's second material, dirt, plays the step; the first
+        // makes nothing)
+        let mut materials = vec![0u8; 2 * MATERIAL_SIZE];
+        for at in [0x00, 0x10, MATERIAL_SIZE] {
+            empty(&mut materials, at);
+        }
+        put_reference(&mut materials, MATERIAL_SIZE + 0x10, SND, handle);
+        let materials = fake.add_data(&materials);
+        let mut events = vec![0u8; 2 * MATERIAL_EVENT_SIZE];
+        block(&mut events, MATERIAL_EVENT_SIZE, 2, materials);
+        let events = fake.add_data(&events);
+        let mut foot = vec![0u8; MATERIAL_EFFECTS_SIZE];
+        block(&mut foot, 0, 2, events);
+        fake.add_tag(FOOT, "effects\\material effects\\cyborg", &foot);
+        let cache = Cache::open(fake.build())?;
+
+        let effects = import_material_effects(&cache)?;
+        let effects = effects.first().ok_or("no material effects")?;
+        assert_eq!(effects.events.len(), 2);
+        assert!(effects.events[MaterialEffects::WALK].is_empty());
+        let dirt = effects.of(MaterialEffects::RUN, 1).ok_or("no dirt")?;
+        assert_eq!(dirt.effect, None);
+        assert_eq!(
+            dirt.sound.as_ref().map(|sound| sound.path.as_str()),
+            Some("sound\\step")
+        );
+        assert_eq!(
+            effects.of(MaterialEffects::RUN, 0),
+            Some(&MaterialEffect::default())
+        );
+        assert_eq!(effects.of(MaterialEffects::RUN, -1), None);
+        assert_eq!(effects.of(MaterialEffects::RUN, 2), None);
         Ok(())
     }
 

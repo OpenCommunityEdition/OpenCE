@@ -287,6 +287,8 @@ impl Engine {
             particles: crate::particles::LevelParticles::new(&level),
             particle_rows: Vec::new(),
             running_effects: Vec::new(),
+            heard: Vec::new(),
+            stepped: Vec::new(),
             level: Some(level),
             network: Some(network),
             dressed,

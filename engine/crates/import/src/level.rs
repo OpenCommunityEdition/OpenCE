@@ -242,6 +242,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         import_placed_objects(cache, &placements, &players, &hands, &mut reached)?;
     let huds = crate::hud::import_huds(cache, &objects, &globals, &mut reached)?;
     let (sounds, looping_sounds) = crate::sound::import_sounds(cache)?;
+    let material_effects = crate::sound::import_material_effects(cache)?;
     let effects = import_effects(cache, &objects)?;
     let damage_effects = import_damage_effects(cache, &objects, &globals, &effects)?;
     let lights = import_lights(cache, &objects, &effects)?;
@@ -347,6 +348,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         ui,
         sounds,
         looping_sounds,
+        material_effects,
     };
     check_lightmap_pages(&level)?;
     Ok(level)

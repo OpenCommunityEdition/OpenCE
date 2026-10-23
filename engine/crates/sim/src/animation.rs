@@ -15,7 +15,7 @@ use std::sync::Arc;
 use bevy_ecs::prelude::*;
 use glam::Vec3;
 use opence_content::{
-    Animation, AnimationGraph, AnimationKind, AnimationNode, Model, ScreenBounds,
+    Animation, AnimationGraph, AnimationKind, AnimationNode, Model, ScreenBounds, TagRef,
 };
 
 use crate::device_animation::{apply_device_overlays, DevicePose};
@@ -1279,6 +1279,35 @@ pub struct AnimationPlayer {
     blend: Option<Blend>,
     /// The animation it goes back to when the one playing ends.
     then: Option<u16>,
+    /// The sound its animation reached in the last tick, in the graph's
+    /// sound references.
+    sound: Option<u16>,
+    /// The foot its animation put down in the last tick.
+    foot: Option<Foot>,
+}
+
+/// What an object's animation did in a tick that is heard.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AnimationEvent {
+    /// The object.
+    pub object: crate::objects::ObjectHandle,
+    /// Its definition's tag.
+    pub tag: TagRef,
+    /// Where it is.
+    pub position: Vec3,
+    /// The sound its animation reached.
+    pub sound: Option<TagRef>,
+    /// The foot its animation put down.
+    pub foot: Option<Foot>,
+}
+
+/// A foot an animation puts down at its foot frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Foot {
+    /// The left, at its left foot frame (the contact point 0).
+    Left,
+    /// The right, at its right foot frame (the contact point 1).
+    Right,
 }
 
 /// A blend from a pose into the animation playing
@@ -1353,6 +1382,8 @@ impl AnimationPlayer {
             links,
             blend: None,
             then: None,
+            sound: None,
+            foot: None,
         }
     }
 
@@ -1429,6 +1460,8 @@ impl AnimationPlayer {
     /// Moves to the next frame: the blend goes on, and an animation that
     /// ended goes back to the one it interrupted.
     fn step(&mut self, random: impl FnOnce() -> f32) {
+        self.sound = self.sound_at_frame();
+        self.foot = self.foot_at_frame();
         let update = advance(&self.graph.animations, &mut self.state, random);
         if let Some(blend) = &mut self.blend {
             blend.frame += 1;
@@ -1450,6 +1483,56 @@ impl AnimationPlayer {
                 });
             }
         }
+    }
+
+    /// The sound the animation plays at the frame it is at: its sound, at
+    /// its sound frame (`animation_update_internal`); none for a sound the
+    /// graph does not have.
+    fn sound_at_frame(&self) -> Option<u16> {
+        let animation = self
+            .graph
+            .animations
+            .get(usize::from(self.state.animation))?;
+        let sound = animation.sound?;
+        let at = i32::from(animation.sound_frame) == i32::from(self.state.frame);
+        let known = self
+            .graph
+            .sound_references
+            .get(usize::from(sound))
+            .is_some_and(Option::is_some);
+        (at && known).then_some(sound)
+    }
+
+    /// The foot the animation puts down at the frame it is at (`bipeds.c`
+    /// makes a footstep there, for an animation it moves by).
+    fn foot_at_frame(&self) -> Option<Foot> {
+        let animation = self
+            .graph
+            .animations
+            .get(usize::from(self.state.animation))?;
+        let frame = i32::from(self.state.frame);
+        if i32::from(animation.left_foot_frame) == frame {
+            Some(Foot::Left)
+        } else if i32::from(animation.right_foot_frame) == frame {
+            Some(Foot::Right)
+        } else {
+            None
+        }
+    }
+
+    /// The foot its animation put down in the last tick.
+    pub fn foot(&self) -> Option<Foot> {
+        self.foot
+    }
+
+    /// The sound its animation reached in the last tick: one of its graph's
+    /// [`sound_references`](AnimationGraph::sound_references).
+    pub fn sound(&self) -> Option<&TagRef> {
+        let sound = self.sound?;
+        self.graph
+            .sound_references
+            .get(usize::from(sound))?
+            .as_ref()
     }
 
     /// The nodes the animation moves, each with its links.
@@ -1880,6 +1963,63 @@ pub(crate) mod tests {
                 child.position[2]
             ]
         );
+    }
+
+    #[test]
+    fn an_animation_is_heard_at_its_sound_and_foot_frames() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let mut walk = animation(4);
+        walk.loop_frame = 1;
+        walk.left_foot_frame = 0;
+        walk.right_foot_frame = 2;
+        walk.sound = Some(0);
+        walk.sound_frame = 1;
+        // (a sound the graph does not have is not heard)
+        let mut silent = walk.clone();
+        silent.sound = Some(1);
+        silent.left_foot_frame = -1;
+        silent.right_foot_frame = -1;
+        let mut graph = graph(vec![walk, silent]);
+        let step = TagRef {
+            group: Group(*b"snd!"),
+            path: "step".into(),
+        };
+        graph.sound_references = vec![Some(step.clone()), None];
+        let graph = Arc::new(graph);
+        let mut simulation = crate::Simulation::empty();
+        let walker = spawned(&mut simulation, 1.0).ok_or("spawned")?;
+        let quiet = spawned(&mut simulation, 2.0).ok_or("spawned")?;
+        assert!(simulation.animate(walker, AnimationPlayer::new(graph.clone(), None, 0)));
+        assert!(simulation.animate(quiet, AnimationPlayer::new(graph, None, 1)));
+        let mut heard = Vec::new();
+        for _ in 0..6 {
+            simulation.step(crate::input::TickInput::default());
+            heard.push(
+                simulation
+                    .animation_events()
+                    .into_iter()
+                    .map(|event| {
+                        assert_eq!(event.object, walker);
+                        assert_eq!(event.position.x, 1.0);
+                        (event.sound.map(|sound| sound.path), event.foot)
+                    })
+                    .collect::<Vec<_>>(),
+            );
+        }
+        let sound = || Some("step".to_owned());
+        // frames 0, 1, 2, 3, then the loop's 1 and 2
+        assert_eq!(
+            heard,
+            vec![
+                vec![(None, Some(Foot::Left))],
+                vec![(sound(), None)],
+                vec![(None, Some(Foot::Right))],
+                vec![],
+                vec![(sound(), None)],
+                vec![(None, Some(Foot::Right))],
+            ]
+        );
+        Ok(())
     }
 
     #[test]

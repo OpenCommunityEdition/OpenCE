@@ -89,6 +89,13 @@ impl LevelEffects {
         self.effects.fired()
     }
 
+    /// Starts the effect `tag` at `point` on a surface facing `normal`
+    /// (a footstep's), if the level has it.
+    pub(crate) fn start(&mut self, level: &Level, tag: &TagRef, point: Vec3, normal: Vec3) {
+        let origin = opence_sim::effects::Origin::at(point, opence_sim::effects::facing(normal));
+        self.effects.start(level, tag, origin);
+    }
+
     /// One tick, after the simulation's: this tick's shots, impacts (by
     /// the materials `decals` finds on BSP `bsp`) and detonations make
     /// their effects, objects start those they carry, and every effect
@@ -262,6 +269,7 @@ mod tests {
             functions: Vec::new(),
             change_colors: Vec::new(),
             unit_hud: None,
+            material_effects: None,
             unit_melee_damage: None,
             biped: None,
             weapon: None,

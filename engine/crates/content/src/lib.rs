@@ -71,8 +71,8 @@ pub use shader::{
     WaterShader,
 };
 pub use sound::{
-    LoopingSound, LoopingSoundDetail, LoopingSoundTrack, Sound, SoundCompression, SoundModifiers,
-    SoundPermutation, SoundPitchRange,
+    LoopingSound, LoopingSoundDetail, LoopingSoundTrack, MaterialEffect, MaterialEffects, Sound,
+    SoundCompression, SoundModifiers, SoundPermutation, SoundPitchRange,
 };
 pub use ui::{
     ChildWidget, ColorTable, ConditionalWidget, EventHandler, Font, Glyph, StringList,
