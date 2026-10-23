@@ -677,7 +677,7 @@ struct gl_device
 	unsigned long stream_offset;
 	GLuint index_buffer;
 	unsigned long index_offset;
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 	/* (web_chunk_get) the room in the stream and index buffers, the draws
 	made so far, and the count at each buffer's latest write */
 	unsigned long stream_capacity;
@@ -4342,7 +4342,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		stats.immediate_draws++;
 	else
 		stats.draws++;
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 	device.draw_serial++;
 #endif
 	draw_flush();
@@ -4930,7 +4930,7 @@ static void index_extent(const WORD *indices, unsigned long count, unsigned long
 
 /* ---------- vertex data */
 
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 /* port: WebGL on Metal (Chrome's and Safari's ANGLE) waits for the GPU to
 finish everything queued before it writes a buffer that a queued draw reads
 (without its shadow buffers, which Chrome leaves off): a glBufferSubData
@@ -4939,7 +4939,11 @@ some 2000 a frame, the frame rate a few frames each second. So each draw's
 uploads go into a buffer of their own that no queued draw reads, taken from
 pools of a few sizes, one set for each frame of the ring: a buffer is
 written again only STREAM_BUFFER_RING frames on, when the GPU is done with
-it. */
+it. Android does the same: on Snapdragon, vertices and indices written
+(unsynchronized) into the frame's one stream buffer, which draws earlier
+in the frame read, were sometimes drawn wrong, as long spikes, and
+glBufferSubData into that buffer made the driver copy all of it each
+time. */
 #define WEB_CHUNK_SHIFT 12 /* 4 KB */
 #define WEB_CHUNK_CLASSES 14 /* to 32 MB */
 
@@ -5011,7 +5015,7 @@ between two of them would leave the attributes already pointed at the
 buffer reading its new, empty storage. */
 static void stream_reserve(unsigned long size)
 {
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 	/* (a new buffer when a draw since the latest write may read this one) */
 	if (size && (device.stream_offset + size > device.stream_capacity ||
 		(device.stream_offset && device.stream_serial != device.draw_serial)))
@@ -5052,12 +5056,15 @@ static unsigned long stream_upload(const void *data, unsigned long size)
 	stream_reserve(size);
 	offset = device.stream_offset;
 	state_array_buffer(device.stream_buffer);
-#ifdef HALO_GLES
+#ifdef HALO_WEB
 	host_gl_buffer_write(GL_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
+#elif defined(HALO_GLES)
+	/* (into a pooled buffer that no queued draw reads, web_chunk_get) */
+	glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offset, (GLsizeiptr)length, data);
 #else
 	buffer_upload(GL_ARRAY_BUFFER, offset, length, data);
 #endif
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 	device.stream_serial = device.draw_serial;
 #endif
 	device.stream_offset += size;
@@ -5115,7 +5122,7 @@ static unsigned long index_upload(const void *data, unsigned long size)
 	unsigned long length = size;
 
 	size = (size + 15) & ~15UL;
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 	/* (as stream_reserve) */
 	if (device.index_offset + size > device.index_capacity ||
 		(device.index_offset && device.index_serial != device.draw_serial))
@@ -5133,12 +5140,15 @@ static unsigned long index_upload(const void *data, unsigned long size)
 	}
 #endif
 	offset = device.index_offset;
-#ifdef HALO_GLES
+#ifdef HALO_WEB
 	host_gl_buffer_write(GL_ELEMENT_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
+#elif defined(HALO_GLES)
+	/* (into a pooled buffer that no queued draw reads, web_chunk_get) */
+	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, (GLintptr)offset, (GLsizeiptr)length, data);
 #else
 	buffer_upload(GL_ELEMENT_ARRAY_BUFFER, offset, length, data);
 #endif
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 	device.index_serial = device.draw_serial;
 #endif
 	device.index_offset += size;
@@ -6875,9 +6885,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		device.index_buffer = device.index_buffers[device.buffer_ring];
 		device.stream_offset = 0;
 		device.index_offset = 0;
-#ifdef HALO_WEB
 		web_chunks_begin_frame();
-#endif
 #else
 		device.stream_offset = STREAM_BUFFER_SIZE; /* orphan next frame */
 		device.index_offset = INDEX_BUFFER_SIZE;
