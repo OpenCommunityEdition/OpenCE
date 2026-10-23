@@ -30,7 +30,7 @@
     - [x] Play, Settings and Exit only
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: The screens and the launcher' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 4: The loading screen
+## Phase 4: The loading screen [checkpoint: b6a1f1f9]
 - [x] Task: The chant 85cf1883
     - [x] Write tests: the tone is found in an XBE by its section and decoded; without an XBE nothing plays
     - [x] Reading and decoding the compressed tone from the user's `default.xbe`, into the cache only
