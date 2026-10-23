@@ -18,6 +18,7 @@ use opence_content::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Model, ScreenBounds,
 };
 
+use crate::device_animation::{apply_device_overlays, DevicePose};
 use crate::objects::ObjectTable;
 use crate::random::RandomSeed;
 use crate::seats::VehicleMotions;
@@ -1274,7 +1275,25 @@ pub struct AnimationPlayer {
     /// The nodes' links: the graph's, or the model's when the graph has
     /// none of its own (a vehicle's or scenery's).
     links: Arc<[AnimationNode]>,
+    /// The pose it blends from into its animation.
+    blend: Option<Blend>,
+    /// The animation it goes back to when the one playing ends.
+    then: Option<u16>,
 }
+
+/// A blend from a pose into the animation playing
+/// (`object_start_interpolation`): the pose, and the frame of the blend
+/// and its length.
+#[derive(Clone, Debug)]
+struct Blend {
+    from: Vec<Orientation>,
+    frame: u16,
+    frames: u16,
+}
+
+/// The frames a unit blends back into what it did over when an impulse
+/// ends.
+const RESUME_FRAMES: u16 = 6;
 
 /// The animation an object stands still with: for a unit, its standing
 /// seat's (else its first seat's) unarmed (else first) weapon class's
@@ -1332,6 +1351,104 @@ impl AnimationPlayer {
                 frame: 0,
             },
             links,
+            blend: None,
+            then: None,
+        }
+    }
+
+    /// Starts the animation at `frame` instead, if it has that frame
+    /// (`unit_custom_animation_at_frame`); false, and from its first, if
+    /// not.
+    pub fn start_at(&mut self, frame: u16) -> bool {
+        let frames = self
+            .graph
+            .animations
+            .get(usize::from(self.state.animation))
+            .map_or(0, |a| a.frame_count);
+        let valid = frame < frames;
+        if valid {
+            self.state.frame = frame;
+        }
+        valid
+    }
+
+    /// Blends into the animation from `from` (another player's pose of the
+    /// same nodes) over `frames` frames (`object_start_interpolation`).
+    pub fn blend_from(&mut self, from: Vec<Orientation>, frames: u16) {
+        if from.len() == self.links.len().min(MAX_NODES) && frames > 0 {
+            self.blend = Some(Blend {
+                from,
+                frame: 0,
+                frames,
+            });
+        }
+    }
+
+    /// Plays `animation` from its first frame, blending into it from the
+    /// pose now over `frames` frames (none for a cut); at its end the
+    /// animation playing now plays again, from its first frame, if
+    /// `resume`.
+    pub fn play(&mut self, animation: u16, frames: u16, resume: bool) {
+        let from = self.blended_pose();
+        if resume {
+            self.then = Some(self.then.unwrap_or(self.state.animation));
+        } else {
+            self.then = None;
+        }
+        self.state = AnimationState {
+            animation,
+            frame: 0,
+        };
+        self.blend = (frames > 0).then_some(Blend {
+            from,
+            frame: 0,
+            frames,
+        });
+    }
+
+    /// Whether an animation played to its end goes back to another (an
+    /// impulse is playing).
+    pub fn resumes(&self) -> bool {
+        self.then.is_some()
+    }
+
+    /// The pose with the blend into the animation applied.
+    pub fn blended_pose(&self) -> Vec<Orientation> {
+        let mut nodes = self.pose();
+        if let Some(blend) = &self.blend {
+            interpolate_orientations(
+                &blend.from,
+                &mut nodes,
+                i16::try_from(blend.frame).unwrap_or(i16::MAX),
+                i16::try_from(blend.frames).unwrap_or(i16::MAX),
+            );
+        }
+        nodes
+    }
+
+    /// Moves to the next frame: the blend goes on, and an animation that
+    /// ended goes back to the one it interrupted.
+    fn step(&mut self, random: impl FnOnce() -> f32) {
+        let update = advance(&self.graph.animations, &mut self.state, random);
+        if let Some(blend) = &mut self.blend {
+            blend.frame += 1;
+            if blend.frame + 1 >= blend.frames {
+                self.blend = None;
+            }
+        }
+        if matches!(update, Update::Restarted | Update::Looped) {
+            if let Some(then) = self.then.take() {
+                let from = self.blended_pose();
+                self.state = AnimationState {
+                    animation: then,
+                    frame: 0,
+                };
+                self.blend = Some(Blend {
+                    from,
+                    frame: 0,
+                    frames: RESUME_FRAMES,
+                });
+            }
         }
     }
 
@@ -1370,7 +1487,7 @@ impl AnimationPlayer {
 
     /// The nodes' matrices in the world, for an object at `transform`.
     pub fn matrices(&self, transform: &Transform) -> Vec<NodeMatrix> {
-        node_matrices(&self.links, &self.pose(), &root_matrix(transform))
+        node_matrices(&self.links, &self.blended_pose(), &root_matrix(transform))
     }
 }
 
@@ -1407,7 +1524,12 @@ pub(crate) fn play_animations(
     motions: Option<Res<VehicleMotions>>,
     table: Option<Res<ObjectTable>>,
     order: Query<(Entity, &ObjectId), With<AnimationPlayer>>,
-    mut players: Query<(&Transform, &mut AnimationPlayer, &mut NodeMatrices)>,
+    mut players: Query<(
+        &Transform,
+        &mut AnimationPlayer,
+        &mut NodeMatrices,
+        Option<&DevicePose>,
+    )>,
 ) {
     let mut entities: Vec<(Entity, ObjectId)> =
         order.iter().map(|(entity, id)| (entity, *id)).collect();
@@ -1422,16 +1544,14 @@ pub(crate) fn play_animations(
         _ => Vec::new(),
     };
     for (entity, _) in entities {
-        let Ok((transform, mut player, mut matrices)) = players.get_mut(entity) else {
+        let Ok((transform, mut player, mut matrices, device)) = players.get_mut(entity) else {
             continue;
         };
         let player = &mut *player;
-        advance(&player.graph.animations, &mut player.state, || {
-            seed.next_real()
-        });
+        player.step(|| seed.next_real());
         let current = match motions.iter().find(|(vehicle, _)| *vehicle == entity) {
             Some((_, motion)) => {
-                let mut nodes = player.pose();
+                let mut nodes = player.blended_pose();
                 let model_nodes = player
                     .model
                     .as_ref()
@@ -1439,7 +1559,15 @@ pub(crate) fn play_animations(
                 apply_vehicle_overlays(&player.graph, model_nodes, motion, &mut nodes);
                 node_matrices(&player.links, &nodes, &root_matrix(transform))
             }
-            None => player.matrices(transform),
+            None => match device {
+                // (a device's position and power overlays over its animation)
+                Some(pose) => {
+                    let mut nodes = player.blended_pose();
+                    apply_device_overlays(&player.graph, pose, &mut nodes);
+                    node_matrices(&player.links, &nodes, &root_matrix(transform))
+                }
+                None => player.matrices(transform),
+            },
         };
         matrices.previous = std::mem::replace(&mut matrices.current, current);
     }

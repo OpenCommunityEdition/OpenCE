@@ -7,6 +7,7 @@
 //! own types cross into `ffi`, which turns them into the snapshot; Swift
 //! never sees the world.
 
+pub mod ai_impulse;
 pub mod animation;
 pub mod animation_blend;
 pub mod animation_graph;
@@ -15,6 +16,7 @@ pub mod clock;
 pub mod crates;
 pub mod damage;
 pub mod debris;
+pub mod device_animation;
 pub mod effects;
 pub mod first_person;
 pub mod first_person_states;
@@ -1084,6 +1086,91 @@ impl Simulation {
             },
         ));
         true
+    }
+
+    /// Poses a device by its position and power, and sets what it exports
+    /// into its functions; false if `handle` is not in the world.
+    pub fn pose_device(
+        &mut self,
+        handle: ObjectHandle,
+        pose: device_animation::DevicePose,
+    ) -> bool {
+        let Some(entity) = self
+            .world
+            .get_resource::<ObjectTable>()
+            .and_then(|table| table.entity(handle))
+        else {
+            return false;
+        };
+        let Ok(mut object) = self.world.get_entity_mut(entity) else {
+            return false;
+        };
+        object.insert(pose);
+        true
+    }
+
+    /// Starts the AI's `impulse` on a unit standing on its own feet, blending
+    /// into it, if it may play one now and its graph has it for the
+    /// weapon it holds (`unit_start_animation_impulse`); the impulse's
+    /// frames, after which the unit goes back to what it did.
+    pub fn start_animation_impulse(
+        &mut self,
+        handle: ObjectHandle,
+        impulse: ai_impulse::AnimationImpulse,
+    ) -> Option<u16> {
+        let entity = self.world.get_resource::<ObjectTable>()?.entity(handle)?;
+        let dead = self
+            .world
+            .get::<damage::Vitality>(entity)
+            .is_some_and(|vitality| vitality.dead);
+        let player = self.world.get::<AnimationPlayer>(entity)?;
+        let state = if dead {
+            unit_states::UnitState::Dying
+        } else if player.resumes() {
+            unit_states::UnitState::AiImpulse
+        } else {
+            unit_states::UnitState::Idle
+        };
+        if !ai_impulse::can_play(state, None, impulse) {
+            return None;
+        }
+        let graph = std::sync::Arc::clone(&player.graph);
+        let first = self.impulse_animation(handle, impulse)?;
+        let random = self
+            .world
+            .get_resource_mut::<random::RandomSeed>()?
+            .next_real();
+        let animation =
+            animation::choose_permutation(&graph.animations, Some(first), random).unwrap_or(first);
+        let frames = graph.animations.get(usize::from(animation))?.frame_count;
+        self.world.get_mut::<AnimationPlayer>(entity)?.play(
+            animation,
+            impulse.interpolation_frames(),
+            true,
+        );
+        Some(frames)
+    }
+
+    /// Whether unit `handle`'s graph has an animation for `impulse` in the
+    /// class it now plays.
+    pub fn has_animation_impulse(
+        &self,
+        handle: ObjectHandle,
+        impulse: ai_impulse::AnimationImpulse,
+    ) -> bool {
+        self.impulse_animation(handle, impulse).is_some()
+    }
+
+    /// The first animation of `impulse` in the class unit `handle` plays.
+    fn impulse_animation(
+        &self,
+        handle: ObjectHandle,
+        impulse: ai_impulse::AnimationImpulse,
+    ) -> Option<u16> {
+        let entity = self.world.get_resource::<ObjectTable>()?.entity(handle)?;
+        let player = self.world.get::<AnimationPlayer>(entity)?;
+        let class = ai_impulse::class_of(&player.graph, player.state.animation)?;
+        ai_impulse::impulse_animation(&player.graph, class, impulse)
     }
 
     /// Each object as the renderer draws it, in the order of their ids.

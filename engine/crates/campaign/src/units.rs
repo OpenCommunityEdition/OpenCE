@@ -9,7 +9,7 @@ use opence_sim::animation::AnimationPlayer;
 use opence_sim::damage::Vitality;
 use opence_sim::objects::ObjectHandle;
 
-use crate::{arg, boolean, element, index, real, short, text, Mission, Playing};
+use crate::{boolean, element, index, real, short, tag, text, Mission, Playing};
 
 pub(crate) const NATIVES: &[(&str, Native<Mission>)] = &[
     ("unit_get_health", unit_get_health),
@@ -51,15 +51,22 @@ pub(crate) const NATIVES: &[(&str, Native<Mission>)] = &[
     ("vehicle_unload", vehicle_unload),
 ];
 
+/// The frames a custom animation asked to interpolate blends in over, from
+/// the pose before it (`object_start_interpolation(unit_index, 6)`).
+const INTERPOLATION_FRAMES: u16 = 6;
+
 impl Mission {
     /// Plays animation `name` of the graph `graph` on an object from
-    /// `frame`, until its last frame; whether there is such an animation.
+    /// `frame` (from its first if it has no such frame), until its last
+    /// frame, blending in from the pose before it if `interpolate`; whether
+    /// there is such an animation.
     pub fn play_animation(
         &mut self,
         handle: ObjectHandle,
         graph: &TagRef,
         name: &str,
         frame: u16,
+        interpolate: bool,
     ) -> bool {
         let Some(place) = self
             .level
@@ -82,13 +89,17 @@ impl Mission {
             return false;
         };
         let model = self.model(handle);
-        if !self
-            .sim
-            .animate(handle, AnimationPlayer::new(graph, model, animation))
-        {
+        let mut player = AnimationPlayer::new(graph, model, animation);
+        let first = if player.start_at(frame) { frame } else { 0 };
+        if interpolate {
+            if let Some(now) = self.sim.component::<AnimationPlayer>(handle) {
+                player.blend_from(now.blended_pose(), INTERPOLATION_FRAMES);
+            }
+        }
+        if !self.sim.animate(handle, player) {
             return false;
         }
-        let ends = self.game_tick() + u64::from(frames.saturating_sub(frame));
+        let ends = self.game_tick() + u64::from(frames.saturating_sub(first));
         self.animations.insert(
             handle,
             Playing {
@@ -143,13 +154,6 @@ impl Mission {
 
 fn unit(mission: &Mission, arguments: &[Value]) -> Option<ObjectHandle> {
     mission.handle(index(arguments, 0))
-}
-
-fn tag(arguments: &[Value], at: usize) -> Option<&TagRef> {
-    match arg(arguments, at) {
-        Value::Tag(tag) => tag.as_ref(),
-        _ => None,
-    }
 }
 
 fn unit_get_health(mission: &mut Mission, arguments: &[Value]) -> Value {
@@ -223,7 +227,7 @@ fn unit_solo_player_integrated_night_vision_is_active(_: &mut Mission, _: &[Valu
 fn custom_animation(mission: &mut Mission, arguments: &[Value]) -> Value {
     let started = match (unit(mission, arguments), tag(arguments, 1).cloned()) {
         (Some(handle), Some(graph)) => {
-            mission.play_animation(handle, &graph, text(arguments, 2), 0)
+            mission.play_animation(handle, &graph, text(arguments, 2), 0, boolean(arguments, 3))
         }
         _ => false,
     };
@@ -236,7 +240,8 @@ fn custom_animation_list(mission: &mut Mission, arguments: &[Value]) -> Value {
     };
     let mut started = false;
     for handle in mission.list(index(arguments, 0)) {
-        started |= mission.play_animation(handle, &graph, text(arguments, 2), 0);
+        started |=
+            mission.play_animation(handle, &graph, text(arguments, 2), 0, boolean(arguments, 3));
     }
     Value::Boolean(started)
 }
@@ -245,7 +250,8 @@ fn unit_custom_animation_at_frame(mission: &mut Mission, arguments: &[Value]) ->
     let frame = u16::try_from(short(arguments, 4)).unwrap_or(0);
     let started = match (unit(mission, arguments), tag(arguments, 1).cloned()) {
         (Some(handle), Some(graph)) => {
-            mission.play_animation(handle, &graph, text(arguments, 2), frame)
+            let interpolate = boolean(arguments, 3);
+            mission.play_animation(handle, &graph, text(arguments, 2), frame, interpolate)
         }
         _ => false,
     };
@@ -275,7 +281,7 @@ fn unit_stop_custom_animation(mission: &mut Mission, arguments: &[Value]) -> Val
 
 fn scenery_animation_start(mission: &mut Mission, arguments: &[Value]) -> Value {
     if let (Some(handle), Some(graph)) = (unit(mission, arguments), tag(arguments, 1).cloned()) {
-        mission.play_animation(handle, &graph, text(arguments, 2), 0);
+        mission.play_animation(handle, &graph, text(arguments, 2), 0, false);
     }
     Value::Void
 }
@@ -283,7 +289,7 @@ fn scenery_animation_start(mission: &mut Mission, arguments: &[Value]) -> Value 
 fn scenery_animation_start_at_frame(mission: &mut Mission, arguments: &[Value]) -> Value {
     let frame = u16::try_from(short(arguments, 3)).unwrap_or(0);
     if let (Some(handle), Some(graph)) = (unit(mission, arguments), tag(arguments, 1).cloned()) {
-        mission.play_animation(handle, &graph, text(arguments, 2), frame);
+        mission.play_animation(handle, &graph, text(arguments, 2), frame, false);
     }
     Value::Void
 }

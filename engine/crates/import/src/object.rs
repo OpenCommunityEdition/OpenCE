@@ -9,10 +9,10 @@
 use opence_content::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Attachment, Biped, ChangeColor,
     CollisionModel, CollisionModelMaterial, CollisionNode, CollisionRegion, ColorPermutation,
-    FunctionModes, IkPoint, MarkerInstance, Model, ModelGeometry, ModelMarker, ModelNode,
-    ModelPart, ModelPermutation, ModelRegion, ModelShader, ModelVertex, ObjectDefinition,
-    ObjectFunction, ObjectKind, ObjectOverlay, PathfindingSphere, ScreenBounds, Suspension, TagRef,
-    UnitSeat, VehicleAnimations, WeaponClass, WeaponType,
+    Device, FunctionModes, IkPoint, Machine, MarkerInstance, Model, ModelGeometry, ModelMarker,
+    ModelNode, ModelPart, ModelPermutation, ModelRegion, ModelShader, ModelVertex,
+    ObjectDefinition, ObjectFunction, ObjectKind, ObjectOverlay, PathfindingSphere, ScreenBounds,
+    Suspension, TagRef, UnitSeat, VehicleAnimations, WeaponClass, WeaponType,
 };
 
 use crate::cache::{Cache, CacheKind};
@@ -29,6 +29,8 @@ pub(crate) const COLL: GroupTag = GroupTag::new(b"coll");
 const SHDR: GroupTag = GroupTag::new(b"shdr");
 const EFFE: GroupTag = GroupTag::new(b"effe");
 const BIPD: GroupTag = GroupTag::new(b"bipd");
+const DEVI: GroupTag = GroupTag::new(b"devi");
+const MACH: GroupTag = GroupTag::new(b"mach");
 const UNHI: GroupTag = GroupTag::new(b"unhi");
 
 pub(crate) const OBJECT_SIZE: usize = 0x17C;
@@ -38,6 +40,10 @@ const BIPED_SIZE: usize = 0x4F4;
 const BIPED_PART: usize = 0x2F0;
 /// Where the unit part starts, after the object's.
 const UNIT_PART: usize = OBJECT_SIZE;
+/// A device's part follows the object's; a machine's follows it.
+const DEVICE_PART: usize = OBJECT_SIZE;
+const DEVICE_END: usize = DEVICE_PART + 0x114;
+const MACHINE_SIZE: usize = DEVICE_END + 0x94;
 const NAME_LONGEST: usize = 31;
 
 pub(crate) const MODEL_SIZE: usize = 0xE8;
@@ -343,6 +349,55 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
             ObjectKind::Vehicle => Some(crate::vehicle::import_vehicle(cache, index)?),
             _ => None,
         },
+        device: match kind {
+            ObjectKind::Machine | ObjectKind::Control | ObjectKind::LightFixture => {
+                Some(import_device(cache, index, kind)?)
+            }
+            _ => None,
+        },
+    })
+}
+
+/// A device's own part (`_device_definition`, after the object's), and a
+/// machine's after it.
+fn import_device(cache: &Cache, index: usize, kind: ObjectKind) -> Result<Device, ImportError> {
+    let tag = cache.tag(index, DEVI, DEVICE_END)?;
+    let at = |offset: usize| DEVICE_PART + offset;
+    let f = |offset: usize, field: &str| tag.f32(at(offset), field);
+    let effect = |offset: usize, field: &str| reference(&tag, at(offset), field, &[]);
+    let machine = match kind {
+        ObjectKind::Machine => {
+            let machine = cache.tag(index, MACH, MACHINE_SIZE)?;
+            Some(Machine {
+                machine_type: machine.i16(DEVICE_END, "type")?,
+                flags: machine.u16(DEVICE_END + 0x2, "flags")?,
+                door_open_ticks: machine.i32(DEVICE_END + 0x90, "door open ticks")?,
+                elevator_node: machine.i16(DEVICE_END + 0x5A, "elevator node")?,
+            })
+        }
+        _ => None,
+    };
+    Ok(Device {
+        flags: tag.u32(at(0x0), "flags")?,
+        function_modes: modes(&tag, at(0x1C))?,
+        start_effects: [
+            effect(0x24, "positive start effect")?,
+            effect(0x34, "negative start effect")?,
+        ],
+        stop_effects: [
+            effect(0x44, "positive stop effect")?,
+            effect(0x54, "negative stop effect")?,
+        ],
+        delay_effect: effect(0x90, "delay effect")?,
+        automatic_activation_radius: f(0xA0, "automatic activation radius")?,
+        maximum_power_acceleration: f(0xF8, "maximum power acceleration")?,
+        maximum_power_velocity: f(0xFC, "maximum power velocity")?,
+        depowered_position_acceleration: f(0x100, "depowered position acceleration")?,
+        depowered_position_velocity: f(0x104, "depowered position velocity")?,
+        powered_position_acceleration: f(0x108, "powered position acceleration")?,
+        powered_position_velocity: f(0x10C, "powered position velocity")?,
+        delay_ticks: f(0x110, "delay ticks")?,
+        machine,
     })
 }
 

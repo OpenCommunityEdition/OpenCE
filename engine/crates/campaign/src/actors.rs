@@ -8,7 +8,9 @@
 
 use std::sync::Arc;
 
+use glam::Vec2;
 use opence_content::{ActorVariant, Encounter, Level};
+use opence_sim::ai_impulse::{choose_dive, choose_surprise, AnimationImpulse, Escape};
 use opence_sim::damage::Vitality;
 use opence_sim::input::{Buttons, TickInput};
 use opence_sim::objects::{Difficulty, ObjectHandle, Team};
@@ -53,7 +55,7 @@ const AWARENESS: f32 = 2.0;
 const NOT_INITIALLY_CREATED: u32 = 1;
 
 /// The game's teams (`game_team`).
-const PLAYER_TEAM: u16 = 1;
+pub(crate) const PLAYER_TEAM: u16 = 1;
 const HUMAN_TEAM: u16 = 2;
 const COVENANT_TEAM: u16 = 3;
 const FLOOD_TEAM: u16 = 4;
@@ -65,6 +67,9 @@ const GO_TO: i16 = 1;
 const GO_TO_AND_FACE: i16 = 2;
 /// A command step's wait when it has just begun.
 const FRESH: u16 = u16::MAX;
+/// How near (in world units, across the ground) an enemy's grenade lands
+/// before an actor dives from it.
+const DIVE_RADIUS: f32 = 3.0;
 
 /// What an actor is doing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -103,15 +108,74 @@ pub struct Actor {
     wait: u16,
     panic: u16,
     repick: u16,
+    /// The ticks left of the impulse it plays, and the way it faces.
+    impulse: Option<(u16, Vec2)>,
+    /// It has gone berserk, and charges until it dies.
+    berserk: bool,
+    /// Its body when it last thought.
+    body: f32,
+}
+
+/// What startles an actor as it thinks.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Reaction {
+    /// It saw an enemy near, the way to which is given.
+    Surprise(Vec2),
+    /// It goes berserk.
+    Berserk,
+    /// It dives from a grenade the way given.
+    Dive(Vec2),
+}
+
+/// What an actor senses as it thinks: its state before and now, how far
+/// its target is, its body before and now, and the way across the ground
+/// to an enemy's grenade near it.
+#[derive(Clone, Copy, Debug)]
+struct Senses {
+    was: ActorState,
+    now: ActorState,
+    berserk: bool,
+    target: Option<Vec2>,
+    body: [f32; 2],
+    grenade: Option<Vec2>,
+}
+
+/// How an actor of `definition` reacts to what it senses: it dives from a
+/// grenade first, goes berserk (always while it fights if its variant
+/// says so, else when its target comes within its berserk distance or a
+/// wound costs it its berserk damage and leaves it below the threshold),
+/// else starts at an enemy that surprises it within its surprise distance
+/// as it first sees one.
+fn react(definition: &ActorVariant, senses: Senses) -> Option<Reaction> {
+    if let Some(way) = senses.grenade.filter(|_| !senses.berserk) {
+        return Some(Reaction::Dive(-way.normalize_or(Vec2::X)));
+    }
+    let distance = senses.target.map_or(f32::INFINITY, Vec2::length);
+    let [amount, threshold] = definition.berserk_damage;
+    let wound = senses.body[0] - senses.body[1];
+    let berserk = senses.now == ActorState::Fighting
+        && !senses.berserk
+        && (definition.actor_flags & ActorVariant::ALWAYS_BERSERK_IN_ATTACKING_MODE != 0
+            || distance < definition.berserk_distance
+            || (amount > 0.0 && wound >= amount && senses.body[1] < threshold));
+    if berserk {
+        return Some(Reaction::Berserk);
+    }
+    let seen = senses.was == ActorState::Idle
+        && matches!(senses.now, ActorState::Fighting | ActorState::Hiding);
+    senses
+        .target
+        .filter(|_| seen && distance < definition.surprise_distance)
+        .map(Reaction::Surprise)
 }
 
 /// What an actor knows of the others: their units, teams, eyes and
 /// whether they live.
-struct Other {
-    unit: ObjectHandle,
-    team: u16,
-    eyes: Vec3,
-    alive: bool,
+pub(crate) struct Other {
+    pub(crate) unit: ObjectHandle,
+    pub(crate) team: u16,
+    pub(crate) eyes: Vec3,
+    pub(crate) alive: bool,
 }
 
 /// The team an encounter's actors are on: its own, or the one its actors'
@@ -161,7 +225,7 @@ impl Mission {
 
     /// Whether teams `a` and `b` fight: they differ, and neither the game
     /// (the player and the humans) nor the scripts made them allies.
-    fn enemies(&self, a: u16, b: u16) -> bool {
+    pub(crate) fn enemies(&self, a: u16, b: u16) -> bool {
         let allied = |a: u16, b: u16| {
             matches!((a, b), (PLAYER_TEAM | HUMAN_TEAM, PLAYER_TEAM | HUMAN_TEAM))
                 || self
@@ -296,6 +360,9 @@ fn place_squad(mission: &mut Mission, level: &Level, encounter: &Encounter, (e, 
             wait: 0,
             panic: 0,
             repick: 0,
+            impulse: None,
+            berserk: false,
+            body: 1.0,
         });
         mission.ai.actors.entry(reference).or_default().push(handle);
         if let Ok(platoon) = u8::try_from(squad.platoon) {
@@ -350,7 +417,7 @@ pub(crate) fn think(mission: &mut Mission) {
 }
 
 /// The players and the actors, as each actor sees them.
-fn others(mission: &Mission) -> Vec<Other> {
+pub(crate) fn others(mission: &Mission) -> Vec<Other> {
     let players = mission.sim.players().iter().map(|player| {
         let team = mission
             .sim
@@ -563,10 +630,11 @@ fn think_one(mission: &mut Mission, level: &Level, others: &[Other], index: usiz
         (None, seen) => seen,
     };
     let target_eyes = target.and_then(|t| others.iter().find(|o| o.unit == t).map(|o| o.eyes));
-    let shield = mission
+    let (shield, body) = mission
         .sim
         .component::<Vitality>(unit)
-        .map_or(1.0, |vitality| vitality.shield);
+        .map_or((1.0, 1.0), |vitality| (vitality.shield, vitality.body));
+    let grenade = grenade_near(mission, others, team, feet);
     let actor = &mut mission.actors[index];
     actor.target = target;
     let hide = definition.shield_fraction_hide;
@@ -589,7 +657,34 @@ fn think_one(mission: &mut Mission, level: &Level, others: &[Other], index: usiz
         actor.goal = None;
         actor.repick = 0;
     }
+    let was = actor.state;
     actor.state = state;
+
+    // (an impulse it plays holds it, turning only the way it plays to)
+    if let Some((ticks, way)) = actor.impulse {
+        actor.impulse = ticks.checked_sub(1).filter(|&t| t > 0).map(|t| (t, way));
+        actor.body = body;
+        let d_yaw = turn(yaw, libm::atan2f(way.y, way.x));
+        return TickInput {
+            yaw: Radians(d_yaw.clamp(-TURN, TURN)),
+            ..TickInput::default()
+        };
+    }
+    let senses = Senses {
+        was,
+        now: state,
+        berserk: actor.berserk,
+        target: target_eyes.map(|at| (at - eyes).truncate()),
+        body: [actor.body, body],
+        grenade,
+    };
+    actor.body = body;
+    if let Some(reaction) = react(definition, senses) {
+        if start_reaction(mission, definition, index, yaw, reaction) {
+            return TickInput::default();
+        }
+    }
+    let berserk = mission.actors[index].berserk;
 
     let mut input = TickInput::default();
     let mut facing = None;
@@ -602,7 +697,8 @@ fn think_one(mission: &mut Mission, level: &Level, others: &[Other], index: usiz
             let actor = &mut mission.actors[index];
             actor.repick = actor.repick.saturating_sub(1);
             // (one that charges follows its target every tick)
-            let charging = definition.firing_range <= 0.0 && state == ActorState::Fighting;
+            let charging =
+                (definition.firing_range <= 0.0 || berserk) && state == ActorState::Fighting;
             if actor.goal.is_none() || actor.repick == 0 || charging {
                 let goal = pick_goal(mission, level, definition, (index, feet), at);
                 let actor = &mut mission.actors[index];
@@ -630,7 +726,7 @@ fn think_one(mission: &mut Mission, level: &Level, others: &[Other], index: usiz
     let firing = state == ActorState::Fighting
         && target_eyes.is_some_and(|at| {
             let distance = eyes.distance(at);
-            (distance < definition.firing_range || distance < MELEE)
+            (distance < definition.firing_range && !berserk || distance < MELEE)
                 && mission.sim.level_clear(eyes, at)
                 && !friend_between(mission, others, (unit, team), eyes, at)
         });
@@ -649,6 +745,70 @@ fn think_one(mission: &mut Mission, level: &Level, others: &[Other], index: usiz
         }
     }
     input
+}
+
+/// Starts the impulse `reaction` asks of actor `index`, facing `yaw`:
+/// whether it plays one (a unit whose graph has none of it carries on,
+/// though one surprised may still panic and one berserk still charges).
+fn start_reaction(
+    mission: &mut Mission,
+    definition: &ActorVariant,
+    index: usize,
+    yaw: f32,
+    reaction: Reaction,
+) -> bool {
+    let unit = mission.actors[index].unit;
+    let facing = Vec2::new(libm::cosf(yaw), libm::sinf(yaw));
+    let (impulse, way) = match reaction {
+        Reaction::Surprise(way) => {
+            if definition.actor_flags & ActorVariant::PANIC_ON_SURPRISE != 0 {
+                mission.actors[index].panic = PANIC_TICKS;
+            }
+            choose_surprise(Some(way), facing)
+        }
+        Reaction::Berserk => {
+            mission.actors[index].berserk = true;
+            (AnimationImpulse::Berserk, facing)
+        }
+        Reaction::Dive(away) => {
+            let sim = &mission.sim;
+            let dive = choose_dive(facing, Escape::Forward, away, |impulse| {
+                sim.has_animation_impulse(unit, impulse)
+            });
+            let Some(dive) = dive else {
+                return false;
+            };
+            dive
+        }
+    };
+    match mission.sim.start_animation_impulse(unit, impulse) {
+        Some(frames) if frames > 0 => {
+            mission.actors[index].impulse = Some((frames, way));
+            true
+        }
+        _ => false,
+    }
+}
+
+/// The way across the ground from `feet` to the nearest grenade an enemy
+/// of `team` threw that flies within the dive radius of it.
+fn grenade_near(mission: &Mission, others: &[Other], team: u16, feet: Vec3) -> Option<Vec2> {
+    mission
+        .sim
+        .players()
+        .iter()
+        .chain(mission.sim.actors())
+        .flat_map(|player| player.flights())
+        .filter(|flight| flight.fuse.is_some())
+        .filter(|flight| {
+            others
+                .iter()
+                .find(|other| other.unit == flight.owner)
+                .is_some_and(|other| mission.enemies(team, other.team))
+        })
+        .map(|flight| (flight.position - feet).truncate())
+        .filter(|way| way.length() < DIVE_RADIUS)
+        .min_by(|a, b| a.length().total_cmp(&b.length()))
 }
 
 /// Whether a living friend of `team` (other than `unit`) stands within
@@ -813,6 +973,130 @@ mod tests {
         assert_eq!(throttle(0.0, Vec3::Y), (0, -127));
         let (forward, right) = throttle(std::f32::consts::FRAC_PI_2, Vec3::Y);
         assert_eq!((forward, right), (127, 0));
+    }
+
+    /// An actor variant with the given flags, surprise distance, berserk
+    /// damage and berserk distance (a grunt, an elite and so on).
+    fn variant_of(flags: u32, surprise: f32, damage: [f32; 2], distance: f32) -> ActorVariant {
+        ActorVariant {
+            tag: opence_content::TagRef {
+                group: opence_content::Group(*b"actv"),
+                path: String::new(),
+            },
+            unit: None,
+            weapon: None,
+            kind: 0,
+            vision_distance: 20.0,
+            vision_angle: 1.0,
+            hearing_distance: 10.0,
+            firing_range: 15.0,
+            rate_of_fire: 1.0,
+            error_angle: 0.0,
+            combat_range: [2.0, 10.0],
+            burst_duration: [1.0, 1.0],
+            burst_separation: [1.0, 1.0],
+            panic_chance: 0.0,
+            shield_fraction_hide: 0.0,
+            shield_fraction_emerge: 0.0,
+            actor_flags: flags,
+            surprise_distance: surprise,
+            berserk_damage: damage,
+            berserk_distance: distance,
+        }
+    }
+
+    fn senses(was: ActorState, now: ActorState, target: Option<Vec2>) -> Senses {
+        Senses {
+            was,
+            now,
+            berserk: false,
+            target,
+            body: [1.0, 1.0],
+            grenade: None,
+        }
+    }
+
+    #[test]
+    fn a_grunt_is_surprised_by_an_enemy_near_as_it_first_sees_one() {
+        let grunt = variant_of(ActorVariant::PANIC_ON_SURPRISE, 4.0, [0.0, 0.0], 0.0);
+        let near = Some(Vec2::new(2.0, 0.0));
+        let sees = senses(ActorState::Idle, ActorState::Fighting, near);
+        assert_eq!(
+            react(&grunt, sees),
+            Some(Reaction::Surprise(Vec2::new(2.0, 0.0)))
+        );
+        // (one far, or one it already fought, does not surprise it)
+        let far = senses(
+            ActorState::Idle,
+            ActorState::Fighting,
+            Some(Vec2::new(9.0, 0.0)),
+        );
+        assert_eq!(react(&grunt, far), None);
+        let fought = senses(ActorState::Fighting, ActorState::Fighting, near);
+        assert_eq!(react(&grunt, fought), None);
+        // (one seen from cover surprises it too)
+        let hiding = senses(ActorState::Idle, ActorState::Hiding, near);
+        assert!(matches!(react(&grunt, hiding), Some(Reaction::Surprise(_))));
+    }
+
+    #[test]
+    fn an_elite_goes_berserk_when_wounded_or_near() {
+        let elite = variant_of(0, 0.0, [0.3, 0.5], 1.5);
+        let mut wounded = senses(
+            ActorState::Fighting,
+            ActorState::Fighting,
+            Some(Vec2::X * 8.0),
+        );
+        wounded.body = [0.8, 0.4];
+        assert_eq!(react(&elite, wounded), Some(Reaction::Berserk));
+        // (a small wound, or one that leaves it above the threshold, does not)
+        wounded.body = [0.6, 0.4];
+        assert_eq!(react(&elite, wounded), None);
+        wounded.body = [1.0, 0.6];
+        assert_eq!(react(&elite, wounded), None);
+        let near = senses(ActorState::Fighting, ActorState::Fighting, Some(Vec2::X));
+        assert_eq!(react(&elite, near), Some(Reaction::Berserk));
+        // (it goes berserk once, and only as it fights)
+        let mut again = near;
+        again.berserk = true;
+        assert_eq!(react(&elite, again), None);
+        let fleeing = senses(ActorState::Fighting, ActorState::Fleeing, Some(Vec2::X));
+        assert_eq!(react(&elite, fleeing), None);
+    }
+
+    #[test]
+    fn a_flood_form_is_always_berserk_as_it_fights() {
+        let flood = variant_of(
+            ActorVariant::ALWAYS_BERSERK_IN_ATTACKING_MODE,
+            0.0,
+            [0.0, 0.0],
+            0.0,
+        );
+        let far = senses(
+            ActorState::Fighting,
+            ActorState::Fighting,
+            Some(Vec2::X * 30.0),
+        );
+        assert_eq!(react(&flood, far), Some(Reaction::Berserk));
+        let idle = senses(ActorState::Idle, ActorState::Idle, None);
+        assert_eq!(react(&flood, idle), None);
+    }
+
+    #[test]
+    fn a_marine_dives_away_from_a_grenade_before_anything_else() {
+        let marine = variant_of(ActorVariant::PANIC_ON_SURPRISE, 4.0, [0.0, 0.0], 5.0);
+        let mut grenade = senses(ActorState::Idle, ActorState::Fighting, Some(Vec2::X));
+        grenade.grenade = Some(Vec2::new(0.0, 2.0));
+        assert_eq!(
+            react(&marine, grenade),
+            Some(Reaction::Dive(Vec2::new(0.0, -1.0)))
+        );
+        // (one berserk does not dive)
+        grenade.berserk = true;
+        assert!(matches!(
+            react(&marine, grenade),
+            Some(Reaction::Surprise(_))
+        ));
     }
 
     #[test]

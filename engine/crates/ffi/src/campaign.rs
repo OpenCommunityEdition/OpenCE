@@ -7,7 +7,7 @@ use std::sync::Arc;
 use opence_campaign::{Checkpoint, MissionScripts};
 use opence_sim::animation::AnimationPlayer;
 use opence_sim::input::TickInput;
-use opence_sim::objects::{rotation_from_angles, Appearance};
+use opence_sim::objects::Appearance;
 use opence_sim::units::Radians;
 use opence_sim::{Camera, Simulation, Transform};
 
@@ -89,12 +89,12 @@ impl Campaign {
     /// its horizontal field of view made the camera's vertical one at 4:3
     /// (Hor+ widens it again).
     pub(crate) fn camera(&self) -> Option<Camera> {
-        let (position, angles, horizontal) = self.scripts.mission().cinematic_camera()?;
+        let (position, rotation, horizontal) = self.scripts.mission().cinematic_camera()?;
         let vertical = 2.0 * libm::atanf(libm::tanf(horizontal * 0.5) * 0.75);
         Some(Camera {
             transform: Transform {
                 position,
-                rotation: rotation_from_angles(angles),
+                rotation,
                 scale: 1.0,
             },
             vertical_fov: Radians(if vertical.is_finite() && vertical > 0.0 {

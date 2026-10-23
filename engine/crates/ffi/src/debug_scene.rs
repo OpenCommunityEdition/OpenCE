@@ -414,6 +414,7 @@ pub(crate) mod tests {
             projectile: None,
             equipment: None,
             vehicle: None,
+            device: None,
         }
     }
 

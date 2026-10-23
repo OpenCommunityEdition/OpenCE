@@ -59,11 +59,12 @@ impl Mission {
             .get((*self.placements.get(name)?)?)?;
         let spawn = placement_spawn(placement);
         let device = placement.device;
+        let definition = self.level.objects.iter().find(|d| d.tag == placement.tag);
         let handle = self.sim.spawn(spawn).ok()?;
         self.named[name] = Some(handle);
         if let Some(device) = device {
-            self.devices
-                .insert(handle, crate::DeviceState::of(&device, &self.groups));
+            let state = crate::DeviceState::of(&device, &self.groups).defined_by(definition);
+            self.devices.insert(handle, state);
         }
         Some(handle)
     }

@@ -128,6 +128,75 @@ pub struct ObjectDefinition {
     pub equipment: Option<Equipment>,
     /// A vehicle's own part and its seats (vehicles only).
     pub vehicle: Option<Vehicle>,
+    /// A device's own part (machines, controls and light fixtures only).
+    pub device: Option<Device>,
+}
+
+/// A device's own part of its definition (`_device_definition`): how its
+/// power and position move, in fractions a tick as the cache bakes them,
+/// what it exports to its functions and the effects it plays.
+#[derive(Clone, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct Device {
+    /// Its flags ([`Device::POSITION_LOOPS`] and the other).
+    pub flags: u32,
+    /// What it exports into each incoming value (`_device_function_*`: 0
+    /// none, 1 power, 2 change in power, 3 position, 4 change in position,
+    /// 5 locked, 6 delay).
+    pub function_modes: [i16; 4],
+    /// The effects it plays as its position starts moving up and down.
+    pub start_effects: [Option<TagRef>; 2],
+    /// The effects it plays as its position stops moving up and down.
+    pub stop_effects: [Option<TagRef>; 2],
+    /// The effect it plays as its delay begins.
+    pub delay_effect: Option<TagRef>,
+    /// How near a biped opens a door by itself (0: its bounding radius).
+    pub automatic_activation_radius: f32,
+    /// How much its power's speed changes in a tick.
+    pub maximum_power_acceleration: f32,
+    /// Its power's top speed, a tick.
+    pub maximum_power_velocity: f32,
+    /// How much its position's speed changes in a tick, without power.
+    pub depowered_position_acceleration: f32,
+    /// Its position's top speed, a tick, without power.
+    pub depowered_position_velocity: f32,
+    /// How much its position's speed changes in a tick, powered.
+    pub powered_position_acceleration: f32,
+    /// Its position's top speed, a tick, powered.
+    pub powered_position_velocity: f32,
+    /// The ticks it waits, closed, before it opens.
+    pub delay_ticks: f32,
+    /// A machine's own part (machines only).
+    pub machine: Option<Machine>,
+}
+
+impl Device {
+    /// Its position wraps from open back to closed.
+    pub const POSITION_LOOPS: u32 = 1 << 0;
+    /// Its position animation is posed by whole frames.
+    pub const POSITION_NOT_INTERPOLATED: u32 = 1 << 1;
+}
+
+/// A machine's own part of its definition (`_machine_definition`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Archive, Serialize, Deserialize)]
+pub struct Machine {
+    /// Its type: [`Machine::DOOR`], 1 a platform (it moves only as told),
+    /// or [`Machine::GEAR`].
+    pub machine_type: i16,
+    /// Its flags (bit 0 a pathfinding obstacle, 1 not one when open, 2 an
+    /// elevator).
+    pub flags: u16,
+    /// The ticks a door stays open before it closes by itself.
+    pub door_open_ticks: i32,
+    /// The node an elevator carries its riders by, or `-1`.
+    pub elevator_node: i16,
+}
+
+impl Machine {
+    /// A door: it opens as a biped comes near, and closes again.
+    pub const DOOR: i16 = 0;
+    /// A gear: it turns without end, by its power (the decompilation's
+    /// `_machine_type_platform`).
+    pub const GEAR: i16 = 2;
 }
 
 /// A biped's movement and stance, from the biped part of its tag. Speeds

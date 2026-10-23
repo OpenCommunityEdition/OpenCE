@@ -10,7 +10,7 @@ use ValueType::*;
 pub(crate) type Signature = (&'static str, ValueType, &'static [ValueType]);
 
 /// Every function the stock scenarios call, by name.
-pub(crate) const SIGNATURES: [Signature; 269] = [
+pub(crate) const SIGNATURES: [Signature; 270] = [
     (
         "activate_team_nav_point_flag",
         Void,
@@ -102,6 +102,7 @@ pub(crate) const SIGNATURES: [Signature; 269] = [
     ("breakable_surfaces_reset", Void, &[]),
     ("camera_control", Void, &[Boolean]),
     ("camera_set", Void, &[CutsceneCameraPoint, Short]),
+    ("camera_set_animation", Void, &[AnimationGraph, String]),
     ("camera_set_dead", Void, &[Unit]),
     ("camera_set_first_person", Void, &[Unit]),
     (

@@ -24,7 +24,7 @@ mod units;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-use opence_content::{AnimationGraph, Level, ObjectDefinition, ValueType};
+use opence_content::{AnimationGraph, Level, ObjectDefinition, TagRef, ValueType};
 use opence_script::{Native, Registry, Runtime, Value, World};
 use opence_sim::damage::Vitality;
 use opence_sim::input::{Buttons, TickInput};
@@ -148,7 +148,11 @@ impl Mission {
                 named[name] = Some(handle);
             }
             if let Some(device) = &placement.device {
-                devices.insert(handle, DeviceState::of(device, &groups));
+                let definition = level.objects.iter().find(|d| d.tag == placement.tag);
+                devices.insert(
+                    handle,
+                    DeviceState::of(device, &groups).defined_by(definition),
+                );
             }
         }
         let mut mission = Self {
@@ -237,9 +241,22 @@ impl Mission {
             .filter(|&h| self.sim.object(h).is_some())
     }
 
+    /// Calls the native function `name` with `arguments`, as a script
+    /// would; none if there is no such native.
+    pub fn call(&mut self, name: &str, arguments: &[Value]) -> Option<Value> {
+        let (_, native) = natives().find(|(n, _)| *n == name)?;
+        Some(native(self, arguments))
+    }
+
     /// A device's state.
     pub fn device(&self, handle: ObjectHandle) -> Option<&DeviceState> {
         self.devices.get(&handle)
+    }
+
+    /// Every device in the world and its state, in the order of their
+    /// handles.
+    pub fn devices(&self) -> impl Iterator<Item = (ObjectHandle, &DeviceState)> {
+        self.devices.iter().map(|(&handle, state)| (handle, state))
     }
 
     /// A device group's value.
@@ -398,7 +415,7 @@ impl Mission {
     // (objects and lists, as the scripts hold them)
 
     /// The index a script holds `handle` by.
-    fn index_of(&mut self, handle: ObjectHandle) -> i32 {
+    pub fn index_of(&mut self, handle: ObjectHandle) -> i32 {
         if let Some(&index) = self.indices.get(&handle) {
             return index;
         }
@@ -510,7 +527,14 @@ impl Mission {
     fn place(&mut self, handle: ObjectHandle, transform: Transform) {
         match self.player_of(handle) {
             Some(player) => {
-                self.sim.teleport_player(player, transform.position);
+                // The object is where it was put at once, as a script's next
+                // call (a custom animation at the flag) expects.
+                if self.sim.teleport_player(player, transform.position) {
+                    if let Some(mut now) = self.sim.transform(handle) {
+                        now.position = transform.position;
+                        self.sim.insert(handle, now);
+                    }
+                }
             }
             None => {
                 self.sim.insert(handle, transform);
@@ -793,6 +817,13 @@ fn short(arguments: &[Value], at: usize) -> i16 {
     }
 }
 
+fn tag(arguments: &[Value], at: usize) -> Option<&TagRef> {
+    match arg(arguments, at) {
+        Value::Tag(tag) => tag.as_ref(),
+        _ => None,
+    }
+}
+
 fn text(arguments: &[Value], at: usize) -> &str {
     match arg(arguments, at) {
         Value::String(text) => text,
@@ -857,7 +888,7 @@ mod tests {
             kind_flags: 0,
         };
         let state = DeviceState::of(&device, &[0.5, 0.0]);
-        assert_eq!((state.position, state.power), (0.5, 0.0));
+        assert_eq!((state.position(), state.power()), (0.5, 0.0));
         let open = PlacementDevice {
             power_group: -1,
             position_group: -1,
@@ -865,6 +896,6 @@ mod tests {
             kind_flags: 0,
         };
         let state = DeviceState::of(&open, &[]);
-        assert_eq!((state.position, state.power), (1.0, 1.0));
+        assert_eq!((state.position(), state.power()), (1.0, 1.0));
     }
 }

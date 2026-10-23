@@ -708,6 +708,7 @@ mod tests {
             projectile: None,
             equipment: None,
             vehicle: None,
+            device: None,
         };
         let contrails = import_contrails(&cache, &[carrier], &mut reached)?;
         assert_eq!(contrails.len(), 1);

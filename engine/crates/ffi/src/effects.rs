@@ -268,6 +268,7 @@ mod tests {
             projectile: None,
             equipment: None,
             vehicle: None,
+            device: None,
             attachments: vec![
                 Attachment {
                     tag: Some(tag(b"effe", "smoke")),

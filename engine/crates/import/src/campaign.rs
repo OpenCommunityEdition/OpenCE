@@ -49,7 +49,7 @@ const LONGEST_PERMUTATION: usize = 0x84;
 
 /// The parts of an actor variant and an actor read (each tag is longer).
 const ACTOR_VARIANT_SIZE: usize = 0xF0;
-const ACTOR_SIZE: usize = 0x2E8;
+const ACTOR_SIZE: usize = 0x3A4;
 
 /// Each element of the block `(at, size, longest)` of `element`, read.
 fn each<T>(
@@ -214,6 +214,10 @@ fn import_actor_variant(cache: &Cache, index: usize) -> Result<ActorVariant, Imp
         panic_chance: 0.0,
         shield_fraction_hide: 0.0,
         shield_fraction_emerge: 0.0,
+        actor_flags: 0,
+        surprise_distance: 0.0,
+        berserk_damage: [0.0; 2],
+        berserk_distance: 0.0,
     };
     if let Some(index) = actor {
         let actor = cache.tag(index, ACTR, ACTOR_SIZE)?;
@@ -224,6 +228,13 @@ fn import_actor_variant(cache: &Cache, index: usize) -> Result<ActorVariant, Imp
         imported.panic_chance = actor.f32(0x2A0, "panic chance")?;
         imported.shield_fraction_hide = actor.f32(0x2DC, "shield fraction hide")?;
         imported.shield_fraction_emerge = actor.f32(0x2E0, "shield fraction emerge")?;
+        imported.actor_flags = actor.u32(0, "flags")?;
+        imported.surprise_distance = actor.f32(0x2B0, "surprise distance")?;
+        imported.berserk_damage = [
+            actor.f32(0x398, "damage berserk amount")?,
+            actor.f32(0x39C, "damage berserk threshold")?,
+        ];
+        imported.berserk_distance = actor.f32(0x3A0, "proximity berserk distance")?;
     }
     Ok(imported)
 }

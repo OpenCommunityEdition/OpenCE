@@ -11,6 +11,7 @@ use opence_content::{FunctionModes, Level, ObjectFunction, ObjectKind, TagRef};
 
 use crate::armory::WeaponItem;
 use crate::damage::{transition, Vitality};
+use crate::device_animation::DevicePose;
 use crate::objects::Object;
 use crate::periodic::evaluate;
 use crate::{ObjectId, Tick};
@@ -306,9 +307,10 @@ pub fn update(world: &mut World) {
         Option<&Vitality>,
         Option<&IntegratedLight>,
         Option<&WeaponItem>,
+        Option<&DevicePose>,
         Option<&mut FunctionValues>,
     )>();
-    for (entity, id, object, vitality, light, item, values) in objects.iter_mut(world) {
+    for (entity, id, object, vitality, light, item, device, values) in objects.iter_mut(world) {
         let Some(functions) = table.0.get(&object.tag) else {
             continue;
         };
@@ -328,7 +330,16 @@ pub fn update(world: &mut World) {
                 })
             }),
         };
-        let incoming = incoming(&functions.modes, &exported);
+        let mut incoming = incoming(&functions.modes, &exported);
+        // (a device's own values, by its definition's modes)
+        for (value, exported) in incoming
+            .iter_mut()
+            .zip(device.map_or([None; 4], |d| d.exports))
+        {
+            if let Some(exported) = exported {
+                *value = exported;
+            }
+        }
         let previous = values.as_ref().map_or([0.0; 4], |values| values.outgoing);
         let (outgoing, active) = compute(&functions.functions, incoming, previous, id.0, tick);
         let computed = FunctionValues {

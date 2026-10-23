@@ -221,6 +221,23 @@ pub struct ActorVariant {
     pub shield_fraction_hide: f32,
     /// The fraction its shield recharges to before it fights again.
     pub shield_fraction_emerge: f32,
+    /// The actor's flags (`_actor_definition_*_bit`:
+    /// [`ActorVariant::PANIC_ON_SURPRISE`] and the rest).
+    pub actor_flags: u32,
+    /// How near an enemy must be when it is first seen to surprise it.
+    pub surprise_distance: f32,
+    /// The damage in a moment, and the vitality below which, that send it
+    /// berserk.
+    pub berserk_damage: [f32; 2],
+    /// How near an enemy sends it berserk.
+    pub berserk_distance: f32,
+}
+
+impl ActorVariant {
+    /// The actor panics when it is surprised.
+    pub const PANIC_ON_SURPRISE: u32 = 1 << 10;
+    /// The actor goes berserk whenever it attacks.
+    pub const ALWAYS_BERSERK_IN_ATTACKING_MODE: u32 = 1 << 17;
 }
 
 /// A squad of an encounter.
