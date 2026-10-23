@@ -19,9 +19,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Bipeds, weapons and the first person' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 3: Vehicles, AI, devices and cutscenes
-- [ ] Task: Vehicles and seats
-    - [ ] Write tests: entering, leaving, boarding and ejection by seat; the vehicles' own animations
-    - [ ] Seat animations and vehicle animations
+- [x] Task: Vehicles and seats 9f50ea51
+    - [x] Write tests: entering, leaving, boarding and ejection by seat; the vehicles' own animations
+    - [x] Seat animations and vehicle animations
 - [ ] Task: AI
     - [ ] Write tests: each behaviour's animation request, by actor type
     - [ ] AI animation requests and overlays
