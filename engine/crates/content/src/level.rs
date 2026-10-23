@@ -141,6 +141,13 @@ pub struct PlayerPhysics {
     /// Where a grenade is thrown from, from the camera: forward, up and
     /// left, in world units.
     pub grenade_origin: [f32; 3],
+    /// The fewest seconds the first-person weapon is held still before it
+    /// is shown off.
+    pub first_person_idle_lower: f32,
+    /// The most.
+    pub first_person_idle_upper: f32,
+    /// The part of those times it is not.
+    pub first_person_idle_skip_fraction: f32,
 }
 
 impl Default for PlayerPhysics {
@@ -162,6 +169,10 @@ impl Default for PlayerPhysics {
             stun_turning_penalty: 0.0,
             stun_jumping_penalty: 0.0,
             grenade_origin: [0.0; 3],
+            // (without globals, never shown off)
+            first_person_idle_lower: 0.0,
+            first_person_idle_upper: 0.0,
+            first_person_idle_skip_fraction: 1.0,
         }
     }
 }

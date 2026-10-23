@@ -88,6 +88,9 @@ pub fn import_globals(cache: &Cache) -> Result<Globals, ImportError> {
                 f(0x6C, "grenade origin")?,
                 f(0x70, "grenade origin")?,
             ],
+            first_person_idle_lower: f(0x9C, "first person idle time lower bound")?,
+            first_person_idle_upper: f(0xA0, "first person idle time upper bound")?,
+            first_person_idle_skip_fraction: f(0xA4, "first person idle skip fraction")?,
         };
     }
 

@@ -853,9 +853,51 @@ pub fn apply_overlay_scaled(
 /// it is the last, which blends toward the first. A compressed animation's
 /// rotations are its frame's, without the fraction, as the game reads them.
 pub fn apply_overlay_continuous(animation: &Animation, real_frame: f32, nodes: &mut [Orientation]) {
+    let Some(values) = continuous_values(animation, real_frame) else {
+        return;
+    };
+    for (orientation, value) in nodes.iter_mut().zip(&values) {
+        add_overlay(orientation, value);
+    }
+}
+
+/// An overlay animation between two of its frames, by `scale` from none (0)
+/// to all of it (1) (`overlay_animation_apply_continuous_scaled`): as
+/// [`apply_overlay_continuous`], each rotation blended from none.
+pub fn apply_overlay_continuous_scaled(
+    animation: &Animation,
+    real_frame: f32,
+    scale: f32,
+    nodes: &mut [Orientation],
+) {
+    let Some(values) = continuous_values(animation, real_frame) else {
+        return;
+    };
+    let inverse = 1.0 - scale;
+    for (orientation, value) in nodes.iter_mut().zip(&values) {
+        if let Some(rotation) = value.rotation {
+            let rotation = quaternions_interpolate(IDENTITY, rotation, scale);
+            orientation.rotation = quaternions_multiply(rotation, orientation.rotation);
+        }
+        if let Some([x, y, z]) = value.translation {
+            orientation.translation[0] += x * scale;
+            orientation.translation[1] += y * scale;
+            orientation.translation[2] += z * scale;
+        }
+        if let Some(value) = value.scale {
+            orientation.scale *= value * scale + inverse;
+        }
+    }
+}
+
+/// An overlay's values between two of its frames, at `real_frame`: past the
+/// last frame they are the last's, which blends toward the first; a
+/// compressed animation's rotations are its frame's, without the fraction,
+/// as the game reads them.
+fn continuous_values(animation: &Animation, real_frame: f32) -> Option<[NodeValues; MAX_NODES]> {
     let frame_count = animation.frame_count as i16;
     if frame_count <= 0 {
-        return;
+        return None;
     }
     let mut real_frame = real_frame;
     let mut fraction = real_frame % 1.0;
@@ -874,47 +916,41 @@ pub fn apply_overlay_continuous(animation: &Animation, real_frame: f32, nodes: &
         || !frame_valid(animation, frame, false)
         || !frame_valid(animation, next_frame, false)
     {
-        return;
+        return None;
     }
-    let Some(values) = frame_values(animation, frame, f32::from(frame), real_frame, true) else {
-        return;
-    };
+    let values = frame_values(animation, frame, f32::from(frame), real_frame, true)?;
     if animation.is_compressed() {
-        for (orientation, value) in nodes.iter_mut().zip(&values) {
-            add_overlay(orientation, value);
-        }
-        return;
+        return Some(values);
     }
-    let Some(next_values) = frame_values(
+    let next_values = frame_values(
         animation,
         next_frame,
         f32::from(next_frame),
         f32::from(next_frame),
         true,
-    ) else {
-        return;
-    };
+    )?;
     let inverse = 1.0 - fraction;
-    for ((orientation, this), next) in nodes.iter_mut().zip(&values).zip(&next_values) {
-        let blended = NodeValues {
-            rotation: this
+    let mut blended = values;
+    for (value, next) in blended.iter_mut().zip(&next_values) {
+        *value = NodeValues {
+            rotation: value
                 .rotation
                 .zip(next.rotation)
                 .map(|(a, b)| quaternions_interpolate(a, b, fraction)),
-            translation: this.translation.zip(next.translation).map(|(a, b)| {
+            translation: value.translation.zip(next.translation).map(|(a, b)| {
                 [
                     inverse * a[0] + fraction * b[0],
                     inverse * a[1] + fraction * b[1],
                     inverse * a[2] + fraction * b[2],
                 ]
             }),
-            scale: this
+            scale: value
                 .scale
                 .zip(next.scale)
                 .map(|(a, b)| (1.0 - fraction) * a + b * fraction),
         };
-        add_overlay(orientation, &blended);
     }
+    Some(blended)
 }
 
 /// Which frames of one side of an aiming screen hold `angle`, and how far

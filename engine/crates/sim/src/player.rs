@@ -127,6 +127,9 @@ pub struct Player {
     unit_melee: Option<TagRef>,
     /// The speed of this tick's landing into the ground, if it landed.
     landed: Option<f32>,
+    /// This tick's throttle: forward, left (what the first-person weapon
+    /// sways after).
+    throttle: Vec2,
     /// The speed its grenades leave its hand, in world units per second.
     grenade_velocity: f32,
     /// Where they leave it, from its eyes (the globals').
@@ -314,6 +317,7 @@ impl Player {
             melee_ticks: 0,
             unit_melee,
             landed: None,
+            throttle: Vec2::ZERO,
             grenade_velocity: biped.grenade_velocity,
             grenade_origin: Vec3::from_array(level.globals.player.grenade_origin),
             seat: None,
@@ -484,6 +488,7 @@ impl Player {
         let max = FreeCamera::MAX_PITCH.0;
         self.yaw = libm::remainderf(self.yaw + input.yaw.0, std::f32::consts::TAU);
         self.pitch = (self.pitch + input.pitch.0).clamp(-max, max);
+        self.throttle = throttle(input);
         if self.seat.is_some() {
             self.landed = None;
             return self.pose();
@@ -601,6 +606,11 @@ impl Player {
             rotation,
             scale: 1.0,
         }
+    }
+
+    /// This tick's throttle: forward, left.
+    pub fn throttle(&self) -> Vec2 {
+        self.throttle
     }
 
     /// The speed it landed at this tick, into the ground, if it landed.

@@ -64,8 +64,16 @@ fn the_rifle_and_hands_are_drawn_at_the_camera() -> Result<(), Box<dyn Error>> {
             );
         }
     }
-    assert_eq!(simulation.first_person().state(), FirstPersonState::Idle);
+    assert!(held_still(&simulation));
     Ok(())
+}
+
+/// Whether the weapon is held: still, or shown off.
+fn held_still(simulation: &Simulation) -> bool {
+    matches!(
+        simulation.first_person().state(),
+        Some(FirstPersonState::Idle | FirstPersonState::Posing)
+    )
 }
 
 #[test]
@@ -79,25 +87,25 @@ fn the_rifle_fires_and_reloads_in_its_animations() -> Result<(), Box<dyn Error>>
     for _ in 0..120 {
         simulation.step(TickInput::default());
     }
-    assert_eq!(simulation.first_person().state(), FirstPersonState::Idle);
+    assert!(held_still(&simulation));
     let mut fired = false;
     for _ in 0..30 {
         simulation.step(held(Buttons::FIRE));
-        fired |= simulation.first_person().state() == FirstPersonState::Fire;
+        fired |= simulation.first_person().state() == Some(FirstPersonState::PrimaryFire);
     }
     assert!(fired);
     let mut reloaded = false;
     simulation.step(held(Buttons::RELOAD));
     for _ in 0..30 {
         simulation.step(TickInput::default());
-        reloaded |= simulation.first_person().state() == FirstPersonState::ReloadFull;
+        reloaded |= simulation.first_person().state() == Some(FirstPersonState::ReloadWhileFull);
     }
     assert!(reloaded);
     // (the reload ends, and the rifle is held again)
     for _ in 0..600 {
         simulation.step(TickInput::default());
     }
-    assert_eq!(simulation.first_person().state(), FirstPersonState::Idle);
+    assert!(held_still(&simulation));
     Ok(())
 }
 

@@ -17,6 +17,7 @@ pub mod damage;
 pub mod debris;
 pub mod effects;
 pub mod first_person;
+pub mod first_person_states;
 pub mod functions;
 pub mod game;
 pub mod hash;
@@ -915,8 +916,15 @@ impl Simulation {
         let tick = self.world.resource::<Tick>().0;
         let camera = self.world.resource::<Camera>().transform;
         let grenades = player.inventory().grenades.iter().sum();
+        let throttle = player.throttle();
+        let (yaw, pitch) = player.look();
+        let holder = first_person::Holder {
+            throttle: [throttle.x, throttle.y],
+            airborne: player.mover().airborne,
+            look: [yaw.0, pitch.0],
+        };
         self.first_person
-            .update(tick, player.weapon(), grenades, &camera);
+            .update(tick, player.weapon(), grenades, &holder, &camera);
     }
 
     /// The player's first-person weapon and hands.
