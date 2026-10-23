@@ -2,20 +2,20 @@
 
 ## Phase 1: Why some maps are flat, and the shader model [checkpoint: 0a6c7464]
 - [x] Task: Find why some maps are drawn flat fbf93785
-    - [ ] Write tests: every stock BSP's lightmap pages import with non-zero texels, and each lit surface has a lightmap index and coordinates (marked, needs `assets/maps`)
-    - [ ] Fix the cause in the importer (lightmap page formats, missing pages, surfaces without lightmap coordinates) or the renderer
+    - [x] Write tests: every stock BSP's lightmap pages import with non-zero texels, and each lit surface has a lightmap index and coordinates (marked, needs `assets/maps`)
+    - [x] Fix the cause in the importer (lightmap page formats, missing pages, surfaces without lightmap coordinates) or the renderer
 - [x] Task: The material model fc24c8c5
-    - [ ] Write tests: the material record's layout in the pack; the conversion of each `senv` and `soso` field; linear and display values
-    - [ ] A material record in `content` (albedo, normal, roughness, metalness, emission, AO, flags), written by the importer for every shader
+    - [x] Write tests: the material record's layout in the pack; the conversion of each `senv` and `soso` field; linear and display values
+    - [x] A material record in `content` (albedo, normal, roughness, metalness, emission, AO, flags), written by the importer for every shader
 - [x] Task: Environment shaders 3347a108
-    - [ ] Write tests: detail functions, bump height scale, specular masks and self-illumination functions against values worked by hand from the tag's definitions
-    - [ ] `senv` in the importer and the level pass: detail, micro detail, bump, specular, reflection tint, self-illumination
+    - [x] Write tests: detail functions, bump height scale, specular masks and self-illumination functions against values worked by hand from the tag's definitions
+    - [x] `senv` in the importer and the level pass: detail, micro detail, bump, specular, reflection tint, self-illumination
 - [x] Task: Model shaders 9c06ee24
-    - [ ] Write tests: the Xbox multipurpose channel order; change colours from the object's functions
-    - [ ] `soso` in the importer and the object pass; the change colours in the snapshot
+    - [x] Write tests: the Xbox multipurpose channel order; change colours from the object's functions
+    - [x] `soso` in the importer and the object pass; the change colours in the snapshot
 - [x] Task: Every shader class 296098f6
-    - [ ] Write tests: a count of shaders with no material in each stock map is zero (marked, needs `assets/maps`); each blend mode's pipeline state
-    - [ ] `sotr`, `sgla`, `smet`, `spla`, `swat`, lit `schi`/`scex`; the transparent passes on models and the level
+    - [x] Write tests: a count of shaders with no material in each stock map is zero (marked, needs `assets/maps`); each blend mode's pipeline state
+    - [x] `sotr`, `sgla`, `smet`, `spla`, `swat`, lit `schi`/`scex`; the transparent passes on models and the level
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Why some maps are flat, and the shader model' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 2: The bake [checkpoint: 4959ec66]
@@ -64,7 +64,8 @@
 - [x] Task: Particles, contrails, weather and detail objects drawn 793366fb
     - [x] Write tests: particle sequences, colours, sizes and blend modes; simple motion by velocity and gravity; weather and detail object placements import
     - [x] The particle, contrail, weather and detail object passes
-- [ ] Task: The golden frames and the benchmark
-    - [ ] Golden frames in bloodgulch, a10, a30 and b30 at 3840×2160; the benchmark at most 8.33 ms p99
-    - [ ] `docs/engine.md`: the material model, the bake, the passes and their switches
+- [x] Task: The golden frames and the benchmark 5c993461 (the benchmark is above its bar: p99 14.19 ms; docs/engine.md)
+    - [x] Golden frames in bloodgulch, a10, a30 and b30 at 3840×2160 (awaiting approval)
+    - [ ] The benchmark at most 8.33 ms p99: not met, p99 14.19 ms (MetalFX alone takes 6.4 ms at 4K and full scale)
+    - [x] `docs/engine.md`: the material model, the bake, the passes and their switches
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Decals and effects drawn' (Protocol in workflow.md) (deferred to the end)
