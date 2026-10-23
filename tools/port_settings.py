@@ -118,6 +118,9 @@ SCREENS = {
              "Let explosions, plasma and the sun shine brighter\nthan white, then fit them to the screen.", None),
             ("HDR DISPLAY:", "display.hdr_output", ON_OFF,
              "On an HDR display (Windows HDR on), show that\nlight truly brighter. From the next start.", "desktop"),
+            ("TONE CURVE:", "display.hdr_tone_mapping",
+             [("GT7", "gt7"), ("NEUTRAL", "neutral"), ("ACES", "aces"), ("REINHARD", "reinhard")],
+             "GT7: bright light turns white, as on film. Neutral:\nas drawn. ACES: more contrast. Reinhard: softer.", None),
             ("PAPER WHITE:", "display.hdr_paper_white",
              [("AUTO", "0"), ("80", "80"), ("100", "100"), ("120", "120"), ("160", "160"), ("200", "200"),
               ("203", "203"), ("250", "250"), ("300", "300"), ("400", "400")],
@@ -233,7 +236,7 @@ _graphics = {"display.high_res_hud", "display.hud_button_style", "display.high_r
              "display.model_detail"}
 # (the visual modifiers: a screen of their own, Extra Effects)
 _extra_effects = {"display.shield_glow", "display.shield_glow_intensity",
-                  "display.overshield_effect", "display.hdr", "display.hdr_output", "display.hdr_paper_white",
+                  "display.overshield_effect", "display.hdr", "display.hdr_output", "display.hdr_tone_mapping", "display.hdr_paper_white",
                   "display.hdr_peak_brightness"}
 SCREENS["video_settings/graphics"] = {
     "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 30,
