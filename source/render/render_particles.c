@@ -162,8 +162,11 @@ void render_particles(
 			boolean owned_by_local_player =
 				particle->local_player_index == local_player_index;
 
+			/* port: particle_drawn holds back a particle until a tick's
+			update has passed, as the Xbox's frame a tick did */
 			/* port: not the first-person weapon's with it hidden (view_fov.c) */
-			if (render_location_visible(&particle->location) &&
+			if (particle_drawn(particle_index) &&
+				render_location_visible(&particle->location) &&
 				viewmodel_draws_geometry(owned_by_local_player &&
 					TEST_FLAG(particle->flags, _particle_datum_dont_draw_third_person_bit)) &&
 				(!TEST_FLAG(
