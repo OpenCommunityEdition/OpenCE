@@ -28,6 +28,9 @@ memory_watch.c detects that by write-protecting the pages.
 #endif
 #include <stdlib.h>
 #include <string.h>
+#ifdef HALO_ANDROID
+#include "../game/android_ce_texture_cache.h"
+#endif
 
 #ifndef GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
 #define GL_COMPRESSED_RGBA_S3TC_DXT1_EXT 0x83f1
@@ -547,6 +550,224 @@ static void dxt_decode_level(unsigned char kind, const unsigned char *source, un
 		}
 	}
 }
+
+#ifdef HALO_ANDROID
+/* ---------- DXT1 as ASTC 4x4, for ES drivers with ASTC and no S3TC
+
+A DXT1 block is two 565 colors and a 2-bit index for each texel, which an
+ASTC 4x4 block holds nearly as it is: the colors as its endpoints, the
+indices as its weights. So DXT1 needs no encoder here, only its bits moved,
+and takes 8 bits a texel on the GPU instead of the 32 it is decoded to
+(display.dxt1_astc). DXT3 and DXT5, whose alpha does not fit beside the
+colors, are still decoded. A block is one of three kinds:
+- four colors (c0 > c1): RGB endpoints of 8 bits and 2-bit weights, 0, 21,
+  43 and 64 sixty-fourths of the way (DXT's thirds within a 64th);
+- three colors, none transparent: RGB endpoints of 8 bits and weights of
+  0, 32 and 64 (exact);
+- three colors and transparent texels: two planes, the colors' weights and
+  alpha's (0 or 255), with RGBA endpoints of 7 bits, as many as the block
+  has room for; a transparent texel takes the darker color, where DXT's is
+  black.
+(The layout: the Khronos Data Format Specification's "ASTC" chapter.) */
+
+#define GL_COMPRESSED_RGBA_ASTC_4x4_KHR 0x93b0
+
+/* a field's bits written into the block from the bit given, lowest first;
+or for weights (reversed), down from the block's top */
+static void astc_bits(unsigned char block[16], unsigned long position, unsigned long count, unsigned long value,
+	BOOL reversed)
+{
+	unsigned long bit;
+
+	for (bit = 0; bit < count; bit++)
+	{
+		unsigned long at = reversed ? 127 - (position + bit) : position + bit;
+
+		if ((value >> bit) & 1)
+			block[at >> 3] |= (unsigned char)(1 << (at & 7));
+	}
+}
+
+/* five trits from their 8 bits, as the specification unpacks them */
+static void astc_trits_unpacked(unsigned long bits, unsigned char trits[5])
+{
+	unsigned long c;
+
+	if (((bits >> 2) & 7) == 7)
+	{
+		c = (((bits >> 5) & 7) << 2) | (bits & 3);
+		trits[4] = 2;
+		trits[3] = 2;
+	}
+	else
+	{
+		c = bits & 0x1f;
+		if (((bits >> 5) & 3) == 3)
+		{
+			trits[4] = 2;
+			trits[3] = (unsigned char)((bits >> 7) & 1);
+		}
+		else
+		{
+			trits[4] = (unsigned char)((bits >> 7) & 1);
+			trits[3] = (unsigned char)((bits >> 5) & 3);
+		}
+	}
+	if ((c & 3) == 3)
+	{
+		trits[2] = 2;
+		trits[1] = (unsigned char)((c >> 4) & 1);
+		trits[0] = (unsigned char)((((c >> 3) & 1) << 1) | ((c >> 2) & 1 & ~(c >> 3)));
+	}
+	else if (((c >> 2) & 3) == 3)
+	{
+		trits[2] = 2;
+		trits[1] = 2;
+		trits[0] = (unsigned char)(c & 3);
+	}
+	else
+	{
+		trits[2] = (unsigned char)((c >> 4) & 1);
+		trits[1] = (unsigned char)((c >> 2) & 3);
+		trits[0] = (unsigned char)((((c >> 1) & 1) << 1) | (c & 1 & ~(c >> 1)));
+	}
+}
+
+/* the weights (0 to 2, count of them) as trits, packed five to 8 bits, the
+last group with only the bits its trits need, from the block's top */
+static void astc_trit_weights(unsigned char block[16], const unsigned char *weights, unsigned long count)
+{
+	static unsigned char packed[243];
+	static BOOL made;
+	unsigned long group, position = 0;
+
+	if (!made)
+	{
+		static BOOL filled[243];
+		unsigned long bits;
+
+		/* (the smallest bits for each five, so that a last group's unused
+		trits, zero, need no bits) */
+		for (bits = 0; bits < 256; bits++)
+		{
+			unsigned char trits[5];
+			unsigned long index;
+
+			astc_trits_unpacked(bits, trits);
+			index = trits[0] + 3 * trits[1] + 9 * trits[2] + 27 * trits[3] + 81 * trits[4];
+			if (!filled[index])
+			{
+				filled[index] = TRUE;
+				packed[index] = (unsigned char)bits;
+			}
+		}
+		made = TRUE;
+	}
+	for (group = 0; group < count; group += 5)
+	{
+		static const unsigned char group_bits[6] = { 0, 2, 4, 5, 7, 8 };
+		unsigned long index = 0, scale = 1, trit, in_group = count - group < 5 ? count - group : 5;
+
+		for (trit = 0; trit < in_group; trit++, scale *= 3)
+			index += weights[group + trit] * scale;
+		astc_bits(block, position, group_bits[in_group], packed[index], TRUE);
+		position += group_bits[in_group];
+	}
+}
+
+/* one DXT1 block as ASTC 4x4 */
+static void dxt1_astc_block(const unsigned char *source, unsigned char block[16])
+{
+	unsigned long c0 = source[0] | (source[1] << 8), c1 = source[2] | (source[3] << 8);
+	unsigned long indices = source[4] | (source[5] << 8) | ((unsigned long)source[6] << 16) |
+		((unsigned long)source[7] << 24);
+	unsigned long endpoints[2][3], sums[2], channel, texel;
+	unsigned char weights[32];
+	BOOL four = c0 > c1, transparent = FALSE, swap;
+	unsigned long bits = 8, maximum = four ? 3 : 2;
+
+	/* (each index's weight from the first color: DXT's order is c0, c1,
+	then the colors between) */
+	static const unsigned char four_weights[4] = { 0, 3, 1, 2 }, three_weights[4] = { 0, 2, 1, 0 };
+
+	memset(block, 0, 16);
+	for (texel = 0; texel < 16; texel++)
+		transparent |= !four && ((indices >> (texel * 2)) & 3) == 3;
+	if (transparent)
+		bits = 7;
+	endpoints[0][0] = expand5(c0 >> 11);
+	endpoints[0][1] = expand6((c0 >> 5) & 0x3f);
+	endpoints[0][2] = expand5(c0 & 0x1f);
+	endpoints[1][0] = expand5(c1 >> 11);
+	endpoints[1][1] = expand6((c1 >> 5) & 0x3f);
+	endpoints[1][2] = expand5(c1 & 0x1f);
+	for (texel = 0; texel < 2; texel++)
+	{
+		sums[texel] = 0;
+		for (channel = 0; channel < 3; channel++)
+		{
+			/* (7 bits: the nearest the decoder's bit replication gives) */
+			if (bits == 7)
+				endpoints[texel][channel] = ((endpoints[texel][channel] >> 1) << 1) | (endpoints[texel][channel] >> 7);
+			sums[texel] += endpoints[texel][channel];
+		}
+	}
+	/* (the decoder swaps the endpoints, and blends blue into the others,
+	where the second's sum is less: the lesser comes first here instead) */
+	swap = sums[1] < sums[0];
+	for (texel = 0; texel < 16; texel++)
+	{
+		unsigned long index = (indices >> (texel * 2)) & 3;
+		unsigned char weight = four ? four_weights[index] : three_weights[index];
+
+		if (!four && index == 3)
+			weight = 0;
+		else if (swap)
+			weight = (unsigned char)(maximum - weight);
+		if (transparent)
+		{
+			weights[texel * 2] = weight;
+			weights[texel * 2 + 1] = index != 3 ? 2 : 0;
+		}
+		else
+			weights[texel] = weight;
+	}
+	/* the block mode (a 4x4 grid; 2-bit weights, trits, or trits on two
+	planes), one partition, and its color endpoint mode (RGB direct, or
+	RGBA direct) */
+	astc_bits(block, 0, 11, four ? 0x042 : transparent ? 0x451 : 0x051, FALSE);
+	astc_bits(block, 13, 4, transparent ? 12 : 8, FALSE);
+	for (channel = 0; channel < 3; channel++)
+	{
+		astc_bits(block, 17 + channel * 2 * bits, bits, endpoints[swap][channel] >> (8 - bits), FALSE);
+		astc_bits(block, 17 + (channel * 2 + 1) * bits, bits, endpoints[!swap][channel] >> (8 - bits), FALSE);
+	}
+	if (transparent)
+	{
+		/* (alpha 0 at the first endpoint and 255 at the second, and on the
+		second plane: the color component selector, below the weights) */
+		astc_bits(block, 17 + 7 * bits, bits, 0x7f, FALSE);
+		astc_bits(block, 128 - 52 - 2, 2, 3, FALSE);
+		astc_trit_weights(block, weights, 32);
+	}
+	else if (four)
+	{
+		for (texel = 0; texel < 16; texel++)
+			astc_bits(block, texel * 2, 2, weights[texel], TRUE);
+	}
+	else
+		astc_trit_weights(block, weights, 16);
+}
+
+static void dxt1_astc_level(const unsigned char *source, unsigned long width, unsigned long height,
+	unsigned char *blocks)
+{
+	unsigned long block, count = ((width + 3) / 4) * ((height + 3) / 4);
+
+	for (block = 0; block < count; block++)
+		dxt1_astc_block(source + block * 8, blocks + block * 16);
+}
+#endif
 #endif
 
 static GLenum compressed_format(unsigned char kind)
@@ -624,6 +845,8 @@ static const unsigned char custom_edition_channel_sources[NUMBER_OF_CUSTOM_EDITI
 	{ 2, 1, 3, 0 },
 	/* the fill order in color, the shape in alpha */
 	{ 3, 3, 3, 0 },
+	/* Explicit Xbox-order HUD artwork must not be converted per draw. */
+	{ 0, 1, 2, 3 },
 };
 
 struct custom_edition_texels
@@ -635,6 +858,13 @@ struct custom_edition_texels
 static struct custom_edition_texels *custom_edition_texels;
 static unsigned long custom_edition_texel_count;
 static unsigned long custom_edition_texel_capacity;
+
+static int custom_edition_hud_meter_active;
+
+void halo_custom_edition_hud_meter(int active)
+{
+	custom_edition_hud_meter_active = active;
+}
 
 /* the order of the texels at address */
 static unsigned char custom_edition_texels_order(unsigned long address)
@@ -690,11 +920,13 @@ void halo_custom_edition_texels_channels(const void *texels, unsigned char chann
 
 void halo_custom_edition_texels_forget(void)
 {
+	custom_edition_hud_meter_active = 0;
 	free(custom_edition_texels);
 	custom_edition_texels = NULL;
 	custom_edition_texel_count = 0;
 	custom_edition_texel_capacity = 0;
 }
+
 
 static void upload(GLuint texture, GLenum target, const struct xgpu_texture_description *description,
 	const unsigned char *base, const D3DCOLOR *palette, unsigned char channel_order)
@@ -705,10 +937,26 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 	unsigned long largest = description->width * description->height * description->depth;
 	BOOL decode_compressed = FALSE;
 	unsigned long *converted;
+	unsigned char *astc = NULL;
 	unsigned long face, level;
 
 #ifdef HALO_GLES
 	decode_compressed = description->compressed && !xgpu_capabilities.s3tc;
+#endif
+#ifdef HALO_ANDROID
+	/* (DXT1 as ASTC 4x4, its bits moved instead of decoded: dxt1_astc_block) */
+	if (decode_compressed && information.kind == _texel_dxt1 && target != GL_TEXTURE_3D &&
+		xgpu_capabilities.astc && config_boolean("display.dxt1_astc"))
+	{
+		astc = malloc(((description->width + 3) / 4) * ((description->height + 3) / 4) * 16);
+		if (!astc)
+		{
+			platform_log("textures: no memory to convert a %lux%lux%lu texture; it is not drawn",
+				description->width, description->height, description->depth);
+			return;
+		}
+		decode_compressed = FALSE;
+	}
 #endif
 #ifdef HALO_WEB
 	/* WebGL's S3TC takes 2D textures whose sides are multiples of 4; and a
@@ -773,7 +1021,15 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 			GLsizei height = (GLsizei)level_dimension(description->height, level);
 			GLsizei depth = (GLsizei)level_dimension(description->depth, level);
 
-			if (description->compressed && !decode_compressed)
+			if (astc)
+			{
+#ifdef HALO_ANDROID
+				dxt1_astc_level(source, (unsigned long)width, (unsigned long)height, astc);
+				glCompressedTexImage2D(image_target, (GLint)level, GL_COMPRESSED_RGBA_ASTC_4x4_KHR, width, height, 0,
+					(GLsizei)(((width + 3) / 4) * ((height + 3) / 4) * 16), astc);
+#endif
+			}
+			else if (description->compressed && !decode_compressed)
 			{
 				if (target == GL_TEXTURE_3D)
 					glCompressedTexImage3D(image_target, (GLint)level, compressed_format(information.kind), width, height, depth, 0,
@@ -836,6 +1092,7 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 		}
 	}
 	free(converted);
+	free(astc);
 	texture_dump(target, description);
 }
 
@@ -861,6 +1118,9 @@ struct texture_entry
 	memory watch serial read before it was found: the same while no watched
 	page has been written since (0: never found) */
 	unsigned long watched_serial, watched_generation;
+#ifdef HALO_ANDROID
+	const void *ce_resource;
+#endif
 };
 
 #define TEXTURE_BUCKET_COUNT 4096
@@ -883,6 +1143,9 @@ static struct
 	struct texture_entry *entry;
 	unsigned long watch_serial;
 	unsigned long drop_serial;
+#ifdef HALO_ANDROID
+	const void *ce_resource;
+#endif
 } recent_textures[RECENT_TEXTURE_COUNT];
 static unsigned long texture_drop_serial = 1;
 static unsigned long texture_frame = 0;
@@ -915,6 +1178,42 @@ static unsigned long palette_hash(const D3DCOLOR *palette)
 	return hash ? hash : 1;
 }
 
+#ifdef HALO_ANDROID
+void android_ce_texture_gpu_forget(const void *resource)
+{
+	const DWORD *header = resource;
+	struct texture_entry **link = &texture_buckets[bucket_index(header[1], header[3], header[4])];
+
+	while (*link)
+	{
+		struct texture_entry *entry = *link;
+		if (entry->ce_resource == resource)
+		{
+			*link = entry->next;
+			glDeleteTextures(1, &entry->texture);
+			if (entry->hud_upscale)
+				glDeleteTextures(1, &entry->hud_upscale);
+			texture_drop_serial++;
+			free(entry);
+		}
+		else
+			link = &entry->next;
+	}
+	xgpu_gl_state_invalidate();
+}
+#endif
+
+static BOOL texture_entry_pixels_valid(const struct texture_entry *entry)
+{
+#ifdef HALO_ANDROID
+	/* Registration and the allocation-length check at creation admit these
+	 * pixels. Their owner removes the GPU entry before freeing the storage. */
+	if (entry->ce_resource)
+		return entry->size != 0;
+#endif
+	return platform_is_contiguous((void *)entry->address) &&
+		platform_is_contiguous((void *)(entry->address + entry->size - 1));
+}
 /* display.high_res_hud, read again only when a setting changes: it is asked
 at every bind, and config_boolean takes the settings' lock and looks the name
 up among them all */
@@ -992,13 +1291,14 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 			long kind = hud_hires_upscale_at(entry->address, entry->description.width, entry->description.height);
 
 			entry->hud_upscale_checked = TRUE;
-			if (entry->size && !entry->description.compressed && entry->target == GL_TEXTURE_2D &&
+			/* Verified stock CE sheets also include compressed and 512-pixel atlases. */
+			if (entry->size && (!entry->description.compressed || kind == 4) && entry->target == GL_TEXTURE_2D &&
 				format_information(entry->description.format).kind != _texel_p8 &&
-				entry->description.width <= 256 && entry->description.height <= 256 &&
+				entry->description.width <= (kind == 4 ? 512 : 256) &&
+				entry->description.height <= (kind == 4 ? 512 : 256) &&
 				kind &&
 				custom_edition_texels_order(entry->address) == _custom_edition_channels_xbox &&
-				platform_is_contiguous((void *)entry->address) &&
-				platform_is_contiguous((void *)(entry->address + entry->size - 1)))
+				texture_entry_pixels_valid(entry))
 			{
 				unsigned long *pixels = malloc(entry->description.width * entry->description.height * 4);
 
@@ -1015,6 +1315,11 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 			return entry->hud_upscale;
 		}
 	}
+	/* Mixed-use CE sheets stay raw for ordinary artwork. Only a meter draw
+	reads their alpha as the threshold and red as the shape. Replacements
+	and sheets already converted above keep their existing channel order. */
+	description->ce_meter_channels = custom_edition_hud_meter_active &&
+		custom_edition_texels_order(entry->address) == _custom_edition_channels_xbox;
 	return entry->texture;
 }
 
@@ -1033,11 +1338,19 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	static int no_cache = -1;
 	unsigned long recent = bucket_index(data, format_word, size_word) % RECENT_TEXTURE_COUNT;
 	unsigned long watch_serial = memory_watch_serial();
+#ifdef HALO_ANDROID
+	unsigned long ce_bytes;
+	const void *ce_pixels = android_ce_texture_pixels(resource, &ce_bytes);
+	const void *ce_resource = ce_pixels ? resource : NULL;
+#endif
 
 	/* (a texture that is not palettized has the one entry, until one is
 	dropped: remembered, a page written since only means checking it) */
 	entry = NULL;
 	if (!palettized && recent_textures[recent].entry && recent_textures[recent].data == data &&
+#ifdef HALO_ANDROID
+		recent_textures[recent].ce_resource == ce_resource &&
+#endif
 		recent_textures[recent].format_word == format_word && recent_textures[recent].size_word == size_word &&
 		recent_textures[recent].drop_serial == texture_drop_serial)
 	{
@@ -1055,6 +1368,10 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		{
 			if (entry->data == data && entry->format_word == format_word && entry->size_word == size_word)
 			{
+#ifdef HALO_ANDROID
+				if (entry->ce_resource != ce_resource)
+					continue;
+#endif
 				if (entry->palette_hash == hash)
 					break;
 				variant_count++;
@@ -1091,6 +1408,15 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		byte counts would not fit in 32 bits) */
 		entry->size = texture_size_supported(&entry->description) ?
 			xgpu_texture_face_size(&entry->description) * (entry->description.cube_map ? 6 : 1) : 0;
+#ifdef HALO_ANDROID
+		entry->ce_resource = ce_resource;
+		if (ce_resource)
+		{
+			entry->address = (unsigned long)ce_pixels;
+			if (entry->size > ce_bytes)
+				entry->size = 0;
+		}
+#endif
 		if (!entry->size)
 		{
 			platform_log("textures: a %lux%lux%lu texture is larger than the device takes; it is not drawn",
@@ -1108,6 +1434,11 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	/* (its pages' newest generation, found again only once a watched page
 	has been written: a large texture's pages, scanned for every draw that
 	bound it, were much of a frame with many objects) */
+#ifdef HALO_ANDROID
+	if (entry->ce_resource)
+		generation = 1; /* Published CE map pixels do not change while resident. */
+	else
+#endif
 	if (entry->watched_serial && entry->watched_serial == watch_serial)
 		generation = entry->watched_generation;
 	else
@@ -1119,8 +1450,15 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	if (!entry->generation || generation > entry->generation || no_cache)
 	{
 		/* protect first, so a write racing with the upload is noticed */
-		memory_watch_protect(entry->address, entry->size);
-		entry->generation = memory_watch_generation(entry->address, entry->size);
+#ifdef HALO_ANDROID
+		if (entry->ce_resource)
+			entry->generation = 1;
+		else
+#endif
+		{
+			memory_watch_protect(entry->address, entry->size);
+			entry->generation = memory_watch_generation(entry->address, entry->size);
+		}
 		if (!entry->generation)
 			entry->generation = 1;
 		/* (which bitmap is here may have changed with the pixels) */
@@ -1142,8 +1480,7 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 			if (entry->override >= 0 && !hud_hires_override_texture(entry->override, &levels))
 				entry->override = -1;
 		}
-		if (entry->override < 0 && entry->size && platform_is_contiguous((void *)entry->address) &&
-			platform_is_contiguous((void *)(entry->address + entry->size - 1)))
+		if (entry->override < 0 && entry->size && texture_entry_pixels_valid(entry))
 		{
 			if (config_boolean("debug.texture_log"))
 			{
@@ -1174,6 +1511,9 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		recent_textures[recent].entry = entry;
 		recent_textures[recent].watch_serial = watch_serial;
 		recent_textures[recent].drop_serial = texture_drop_serial;
+#ifdef HALO_ANDROID
+		recent_textures[recent].ce_resource = ce_resource;
+#endif
 	}
 	return texture_entry_result(entry, target, description);
 }

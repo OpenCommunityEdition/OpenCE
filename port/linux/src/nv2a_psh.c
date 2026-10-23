@@ -389,6 +389,8 @@ static void texture_stage(struct xgpu_text *text, const struct nv2a_pixel_shader
 		xgpu_text_append(text, "\tt%d = ", stage);
 		sample(text, key, stage, coordinates);
 		xgpu_text_append(text, ";\n");
+		if (stage == 0 && key->ce_meter_channels)
+			xgpu_text_append(text, "\tt0 = t0.aaar;\n");
 		if (stage == 0 && key->point_threshold && key->sampler_type[stage] == _xgpu_sampler_2d)
 		{
 			/* IDs must not be averaged with another segment or corrupted by

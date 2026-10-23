@@ -1220,6 +1220,13 @@ long scenario_tags_load(
 
 				menu_tags_loaded(cache_file_globals.header.name);
 			}
+			/* port: register CE HUD bitmaps before mods replace their tags
+			(port/linux/game/hud_hires_tags.c), as for Xbox maps below. */
+			{
+				extern void hud_hires_tags_loaded(long scenario_index);
+
+				hud_hires_tags_loaded(cache_file_globals.tag_header->scenario_tag_index);
+			}
 			/* (and the mods' tags, as below) */
 			{
 				extern void mods_tags_loaded(char const *map_name);

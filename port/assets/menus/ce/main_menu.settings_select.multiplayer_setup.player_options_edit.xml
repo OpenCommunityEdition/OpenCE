@@ -71,14 +71,15 @@
 		<data input="game settings lists text update"/>
 		<on event="created" run="mp profile init player opts"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_number_of_lives" x="54" y="73"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_maximum_health" x="54" y="103"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_shields" x="54" y="133"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_respawn_time" x="54" y="163"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_respawn_time_growth" x="54" y="193"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_odd_man_out" x="54" y="223"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_invisible_players" x="54" y="253"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_suicide_penalty" x="54" y="283"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_aim_assist" x="54" y="313"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_maximum_health" x="54" y="100"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_shields" x="54" y="127"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_respawn_time" x="54" y="154"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_respawn_time_growth" x="54" y="181"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_odd_man_out" x="54" y="208"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_invisible_players" x="54" y="235"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_suicide_penalty" x="54" y="262"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_aim_assist" x="54" y="289"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/op_shield_effects" x="54" y="316"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/player_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/player_options_edit/player_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">

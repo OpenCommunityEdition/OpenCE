@@ -85,6 +85,10 @@ void network_game_server_port_set_cooperative_friendly_fire(
 PLAYER COLLISIONS), kept for the levels after */
 void network_game_server_port_set_cooperative_player_collisions(
 	boolean player_collisions);
+/* port: whether co-op's players hurt their AI allies (Server Setup's ALLY
+FRIENDLY FIRE), kept for the levels after */
+void network_game_server_port_set_cooperative_ally_friendly_fire(
+	boolean ally_friendly_fire);
 boolean network_game_server_ban_player(
 	char const *text);
 /* port: the host's kick command: as the ban command, but nothing kept (no

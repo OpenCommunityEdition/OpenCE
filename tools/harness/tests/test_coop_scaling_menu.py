@@ -5,12 +5,14 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from harness import CHECK_FAILED, build, function, mutated, read, run
+from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run
 
 
 def generated(fault=None):
     source = read('port/linux/game/menu_functions.c')
-    code = function(source, 'gametype_option_help')
+    # (OPENCE OPTIONS' rows name the modes: game_engine.h)
+    code = enum_with(read('source/game/game_engine.h'), '_game_mode_none = 0') + '\n' + \
+        function(source, 'gametype_option_help')
     if fault:
         code = mutated(code, *fault)
     return (('under_test.inc', code),)
