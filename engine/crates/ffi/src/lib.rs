@@ -7,6 +7,7 @@
 // crate and physics are the only ones allowed it)
 #![allow(unsafe_code)]
 
+pub mod audio;
 pub mod bake;
 pub mod camera;
 pub mod campaign;
@@ -719,6 +720,8 @@ pub struct Engine {
     state: Mutex<State>,
     snapshots: Arc<SnapshotBuffers>,
     control: Arc<control::Control>,
+    /// The level's sounds (locked alone, by the app's audio thread too).
+    audio: audio::SharedPlayer,
 }
 
 impl Drop for Engine {
@@ -745,6 +748,7 @@ impl Engine {
             }),
             snapshots: Arc::new(buffers),
             control: Arc::default(),
+            audio: audio::SharedPlayer::default(),
         })
     }
 
@@ -771,6 +775,7 @@ impl Engine {
             particle_rows: Vec::new(),
         });
         publish(&mut state, &self.snapshots, 0.0);
+        *audio::lock(&self.audio) = None;
     }
 
     /// Starts a world of `geometry`'s level: every object its scenario
@@ -818,6 +823,8 @@ impl Engine {
             particle_rows: Vec::new(),
         });
         publish(&mut state, &self.snapshots, 0.0);
+        let bank: Arc<dyn opence_audio::SoundBank> = geometry.content.clone();
+        *audio::lock(&self.audio) = Some(opence_audio::SoundPlayer::new(bank));
         Ok(count)
     }
 
@@ -953,11 +960,47 @@ impl Engine {
             run_ticks(&mut state, advanced.ticks)?;
             frame = Some(advanced);
         }
+        if let (Some(running), Some(advanced)) = (state.running.as_ref(), frame.as_ref()) {
+            if let Some(player) = audio::lock(&self.audio).as_mut() {
+                player.set_listener(audio::listener(&running.simulation.camera().transform));
+                let ticks = i32::try_from(advanced.ticks).unwrap_or(i32::MAX);
+                player.advance((frame_seconds * scale * 1000.0) as f32, ticks);
+            }
+        }
         // (a script in the window runs a line a frame, with or without a world)
         script::poll_window(&mut registry, &mut state, &self.control);
         let frame = frame.ok_or(EngineError::NoWorld)?;
         publish(&mut state, &self.snapshots, frame.alpha);
         Ok(frame.ticks)
+    }
+
+    /// Where the app's audio comes from: the level's sounds, mixed.
+    pub fn audio_output(&self) -> Arc<audio::AudioOutput> {
+        audio::AudioOutput::new(self.audio.clone())
+    }
+
+    /// Plays the level's sound of the tag at `path` once, heard everywhere
+    /// alike at `gain`; whether it plays.
+    pub fn play_sound(&self, path: String, gain: f32) -> bool {
+        let mut player = audio::lock(&self.audio);
+        let Some(player) = player.as_mut() else {
+            return false;
+        };
+        let Some(index) = player.sound_index(&path) else {
+            return false;
+        };
+        let source = opence_audio::Source {
+            gain: gain.clamp(0.0, 1.0),
+            ..opence_audio::Source::default()
+        };
+        player.impulse(index, &source).is_some()
+    }
+
+    /// Sets the settings' effects and music volumes, 0 to 1.
+    pub fn set_volumes(&self, effects: f32, music: f32) {
+        if let Some(player) = audio::lock(&self.audio).as_mut() {
+            player.set_volumes(effects, music);
+        }
     }
 
     /// The HUD to draw over a window `width` by `height` pixels: nothing

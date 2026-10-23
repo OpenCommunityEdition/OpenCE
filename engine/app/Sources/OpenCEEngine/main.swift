@@ -236,6 +236,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var loadingPass: LoadingPass?
     lazy var chant = ChantPlayer(wave: ChantPlayer.wave(executables: ChantPlayer.executables(folders: folders, root: root),
                                                         cacheFolder: cacheFolder()))
+    /// The level's sounds, heard from the first level on.
+    lazy var sound = SoundOutput(output: engine.audioOutput())
     /// Where the loading screen was at the last frame.
     var lastLoadingStage: LoadingStage = .done
     /// The mission that was won, so that the next is loaded once.
@@ -635,6 +637,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         loaded.renderer.hud = hud
         // (the scenario's objects, at Normal, standing still)
         _ = try engine.startLevel(geometry: loaded.geometry, difficulty: 1)
+        let audio = saved.settings.audio
+        engine.setVolumes(effects: audio.master * audio.effects, music: audio.master * audio.music)
+        _ = sound
         try engine.placeCamera(placement: loaded.start)
         // (the player at the first start, unless flying; a map without one
         // keeps the free camera)
