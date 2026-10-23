@@ -142,6 +142,12 @@ enum
 	/* ... those of the kinds the host has, made since the last tick, checked
 	(more, and all of them are) */
 	MAXIMUM_CLIENT_NEW_OBJECTS = 1024,
+	/* ... the host's inventories it could not apply yet, one for each unit
+	that carries anything (a vehicle is a unit) the stream has not brought:
+	most of them while it joins, few after. Room for as many as there are
+	players; past that the oldest goes, and its unit waits for the host's
+	next inventory of it */
+	MAXIMUM_CLIENT_RETRIED_INVENTORIES = MAXIMUM_TRACKED_PLAYERS,
 	MAXIMUM_ENTRIES_PER_MESSAGE = 64,
 	/* the objects the host has at the same indices everywhere */
 	NETWORKED_OBJECT_TYPES =
@@ -470,6 +476,19 @@ static struct distributed_picked_up_weapon
 	long definition_index;
 	long time;
 } objects_client_picked_up_weapons[MAXIMUM_LOCAL_PLAYERS];
+/* ... the host's inventories that named a unit not here yet. An inventory
+goes as a datagram, and units are made on the stream, which can trail it, so
+a player just spawned can be told what it carries before its unit is here,
+and would carry nothing until the host's next inventory of it, a second
+later. Each is kept, the newest of its unit's, and applied once, the tick
+its unit is here; let go of once three of the host's refreshes pass without
+a newer (the host has stopped sending it) */
+static struct distributed_retried_inventory
+{
+	struct distributed_inventory inventory;
+	long time;
+} objects_client_retried_inventories[MAXIMUM_CLIENT_RETRIED_INVENTORIES];
+static short objects_client_retried_inventory_count;
 /* ... whether it failed to make one of the host's objects since it last
 asked for them (it says so when it asks again) */
 static boolean objects_client_ask_again;
@@ -2846,6 +2865,61 @@ static boolean distributed_client_own_settled(
 	return game_time_get() - time > (long)ceil(round_trip) + INVENTORY_INTERVAL_TICKS + OWN_INVENTORY_MARGIN_TICKS;
 }
 
+/* whether the unit an inventory names is here */
+static boolean distributed_client_inventory_whole(
+	struct distributed_inventory const *inventory)
+{
+	return network_objects_client_has(inventory->unit_index) &&
+		object_try_and_get_and_verify_type(inventory->unit_index, _object_mask_unit);
+}
+
+/* the inventory kept to apply once its unit is here, the newest of its
+unit's (in its entry, else a new one, else the oldest's) */
+static void distributed_client_retry_inventory(
+	struct distributed_inventory const *inventory)
+{
+	struct distributed_retried_inventory *retried = NULL;
+	short index;
+
+	for (index = 0; !retried && index < objects_client_retried_inventory_count; index++)
+	{
+		if (objects_client_retried_inventories[index].inventory.unit_index == inventory->unit_index)
+			retried = &objects_client_retried_inventories[index];
+	}
+	if (!retried && objects_client_retried_inventory_count < MAXIMUM_CLIENT_RETRIED_INVENTORIES)
+		retried = &objects_client_retried_inventories[objects_client_retried_inventory_count++];
+	if (!retried)
+	{
+		short oldest = 0;
+
+		for (index = 1; index < objects_client_retried_inventory_count; index++)
+		{
+			if (objects_client_retried_inventories[index].time < objects_client_retried_inventories[oldest].time)
+				oldest = index;
+		}
+		retried = &objects_client_retried_inventories[oldest];
+	}
+	retried->inventory = *inventory;
+	retried->time = game_time_get();
+}
+
+/* the unit's kept inventory, if it has one, kept no more */
+static void distributed_client_forget_retried_inventory(
+	long unit_index)
+{
+	short index;
+
+	for (index = 0; index < objects_client_retried_inventory_count; index++)
+	{
+		if (objects_client_retried_inventories[index].inventory.unit_index == unit_index)
+		{
+			objects_client_retried_inventories[index] =
+				objects_client_retried_inventories[--objects_client_retried_inventory_count];
+			return;
+		}
+	}
+}
+
 /* the unit carries what the host's does */
 static void distributed_client_apply_inventory(
 	struct distributed_inventory const *inventory)
@@ -2855,6 +2929,12 @@ static void distributed_client_apply_inventory(
 	boolean local;
 	short weapon_slot;
 
+	/* (now if its unit is here, else once it is: the newest of the unit's
+	is the one kept) */
+	if (distributed_client_inventory_whole(inventory))
+		distributed_client_forget_retried_inventory(inventory->unit_index);
+	else
+		distributed_client_retry_inventory(inventory);
 	if (!network_objects_client_has(inventory->unit_index) ||
 		!object_try_and_get_and_verify_type(inventory->unit_index, _object_mask_unit))
 	{
@@ -3290,6 +3370,35 @@ static void distributed_client_carry_unsteered_vehicles(
 	}
 }
 
+/* the kept inventories whose unit has come: applied once, as if they had
+come now */
+static void distributed_client_apply_retried_inventories(
+	void)
+{
+	short index = 0;
+
+	while (index < objects_client_retried_inventory_count)
+	{
+		struct distributed_retried_inventory *retried = &objects_client_retried_inventories[index];
+
+		if (game_time_get() - retried->time >= EMPTY_INVENTORY_TICKS)
+		{
+			*retried = objects_client_retried_inventories[--objects_client_retried_inventory_count];
+		}
+		else if (distributed_client_inventory_whole(&retried->inventory))
+		{
+			struct distributed_inventory inventory = retried->inventory;
+
+			*retried = objects_client_retried_inventories[--objects_client_retried_inventory_count];
+			distributed_client_apply_inventory(&inventory);
+		}
+		else
+		{
+			index++;
+		}
+	}
+}
+
 void network_objects_client_tick(
 	void)
 {
@@ -3309,6 +3418,7 @@ void network_objects_client_tick(
 			(word)sizeof(message), _distributed_to_host_reliably);
 		objects_client_ask_again = FALSE;
 	}
+	distributed_client_apply_retried_inventories();
 	if (objects_client_synchronized)
 		distributed_client_remove_own_objects();
 	/* (too many to look at one by one later: all of them) */
@@ -3373,6 +3483,7 @@ void network_objects_new_game(
 	objects_client_creating = FALSE;
 	objects_client_deleting = FALSE;
 	objects_client_new_object_count = 0;
+	objects_client_retried_inventory_count = 0;
 	objects_client_check_all = TRUE;
 	objects_client_local_free_index = LOCAL_OBJECTS_FIRST_INDEX;
 	objects_client_object_count = NONE;
