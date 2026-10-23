@@ -16,9 +16,9 @@
 - [x] Task: Drawing the UI 50f43aa3
     - [x] Write tests: the 640×480 layout scaled to the window; the UI pass's frame time
     - [x] The UI pass, the background scene with the new lighting, widget animation
-- [ ] Task: Keyboard and mouse
-    - [ ] Write tests: keys to the pad's buttons; hover focus, click, wheel and right-click by the widgets' bounds
-    - [ ] Input to the widget tree; UI sounds
+- [x] Task: Keyboard and mouse d72f23da
+    - [x] Write tests: keys to the pad's buttons; hover focus, click, wheel and right-click by the widgets' bounds
+    - [x] Input to the widget tree; UI sounds
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: The widget system' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 3: The screens and the launcher
