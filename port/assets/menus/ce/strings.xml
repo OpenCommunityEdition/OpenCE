@@ -782,7 +782,7 @@
 		<string text="Sometimes you have to kill. \nNow is one of those times. \nWhack or be whacked.\nCurrent Rules:" map="2"/>
 		<string text="Become one with the ball. And \nkeep the ball away from every-\none else while you're at it.\nCurrent Rules:" map="3"/>
 		<string text="Complete the required number \nof laps before your opponents, \nblowing away the competition.\nCurrent Rules:" map="4"/>
-		<string text="Capture the flag, but every kill\nscores a point and every capture\nscores more. Score limit is in captures.\nCurrent Rules:" map="5"/>
+		<string text="Capture the flag, but every \nkill scores a point and each \ncapture scores even more.\nCurrent Rules:"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_options" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\game_type_select\gametype_select_list_options">
 		<string text="CAPTURE THE FLAG" map="0"/>

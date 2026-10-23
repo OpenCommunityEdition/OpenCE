@@ -167,6 +167,10 @@ short ui_widget_spinner_own_item_count(
 short ui_widget_spinner_extra_description(
 	struct widget_instance *spinner,
 	short item_index);
+/* port: a text box's string list index of the port's own text in place of
+its string list's (ui_widget.c): CTF/Slayer's name, which the Custom
+Edition's ui\multiplayer_game_text has none of */
+#define UI_WIDGET_PORT_STRING_CTF_SLAYER_NAME 0x7100
 void ui_widget_delete(
 	struct widget_instance *widget);
 void ui_widgets_close_all(

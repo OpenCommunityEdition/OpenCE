@@ -6191,10 +6191,11 @@ static boolean gametype_engine_set(struct widget_instance *item)
 
 /* "mp edit profile set rule text": the gametype's type (its string in
 ui\multiplayer_game_text, as the Xbox's: capture the flag 3, slayer 4,
-oddball 5, king of the hill 6, race 7, unknown 8) */
+oddball 5, king of the hill 6, race 7, unknown 8; CTF/Slayer, which it has
+none of, the port's own: UI_WIDGET_PORT_STRING_CTF_SLAYER_NAME) */
 static void gametype_engine_name(struct widget_instance *text_box)
 {
-	static short const strings[] = { 8, 3, 4, 5, 6, 7, 8, 8, 8, 8, 3 };
+	static short const strings[] = { 8, 3, 4, 5, 6, 7, 8, 8, 8, 8, UI_WIDGET_PORT_STRING_CTF_SLAYER_NAME };
 	struct game_variant *variant = edit_variant();
 
 	if (variant)
