@@ -683,6 +683,9 @@ pub fn gathered(levels: &[Level]) -> Option<Level> {
         if gathered.hud_globals.is_none() {
             gathered.hud_globals.clone_from(&level.hud_globals);
         }
+        if gathered.ui.widgets.is_empty() {
+            gathered.ui.clone_from(&level.ui);
+        }
     }
     Some(gathered)
 }
@@ -869,6 +872,7 @@ pub fn level(donor: Option<&Level>) -> Level {
             grenade_huds: Vec::new(),
             hud_digits: None,
             hud_globals: None,
+            ui: Default::default(),
         },
     };
     level.scenario = scenario();

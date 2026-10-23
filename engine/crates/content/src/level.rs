@@ -71,6 +71,9 @@ pub struct Level {
     pub hud_digits: Option<HudDigits>,
     /// The HUD's globals.
     pub hud_globals: Option<HudGlobals>,
+    /// Its UI's tags: the shell's in `ui.map`, the pause menu's and the
+    /// dialogs' in the others.
+    pub ui: crate::Ui,
 }
 
 /// The game's globals (the `matg` tag) that the simulation reads.

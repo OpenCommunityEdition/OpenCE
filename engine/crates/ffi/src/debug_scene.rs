@@ -250,6 +250,7 @@ pub(crate) mod tests {
             grenade_huds: Vec::new(),
             hud_digits: None,
             hud_globals: None,
+            ui: Default::default(),
         };
         let mut structure = StructureBsp {
             cluster_skies: Vec::new(),

@@ -24,7 +24,7 @@ use rkyv::util::AlignedVec;
 use crate::Level;
 
 /// The version of this format; a pack of another is not read.
-pub const FORMAT_VERSION: u32 = 34;
+pub const FORMAT_VERSION: u32 = 35;
 
 const MAGIC: [u8; 4] = *b"OCPK";
 const HEADER_SIZE: usize = 0x28;
@@ -301,6 +301,7 @@ mod tests {
             grenade_huds: Vec::new(),
             hud_digits: None,
             hud_globals: None,
+            ui: Default::default(),
         }
     }
 

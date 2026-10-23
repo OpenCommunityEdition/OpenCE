@@ -17,6 +17,7 @@ pub mod pack;
 pub mod particle;
 pub mod script;
 pub mod shader;
+pub mod ui;
 pub mod vehicle;
 pub mod weapon;
 
@@ -66,6 +67,11 @@ pub use shader::{
     GlassShader, MeterShader, ModelShaderClass, PlasmaNoise, PlasmaShader, Shader, ShaderClass,
     ShaderRadiosity, TextureAnimation, TransparentChicagoShader, TransparentGenericShader,
     WaterShader,
+};
+pub use ui::{
+    ChildWidget, ColorTable, ConditionalWidget, EventHandler, Font, Glyph, StringList,
+    TextReplacement, Ui, VirtualKey, VirtualKeyboard, Widget, WidgetCollection, WidgetKind,
+    WidgetList, WidgetText,
 };
 pub use vehicle::{
     FrictionType, MassPoint, Physics, PoweredMassPoint, PoweredSeat, Vehicle, VehicleKind,

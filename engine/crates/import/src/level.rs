@@ -266,6 +266,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         &structure_bsps,
         &mut reached,
     )?;
+    let ui = crate::ui::import_ui(cache, &mut reached)?;
 
     // (a shader's extra layers are shaders too, reached as each is read)
     let mut shaders = Vec::new();
@@ -342,6 +343,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         grenade_huds: huds.grenade_huds,
         hud_digits: huds.hud_digits,
         hud_globals: huds.hud_globals,
+        ui,
     };
     check_lightmap_pages(&level)?;
     Ok(level)
@@ -2703,7 +2705,6 @@ pub(crate) mod tests {
             .filter_map(|entry| entry.ok())
             .filter_map(|entry| entry.file_name().into_string().ok())
             .filter_map(|name| name.strip_suffix(".map").map(str::to_owned))
-            .filter(|name| name != "ui")
             .collect();
         names.sort();
         let mut failures = Vec::new();

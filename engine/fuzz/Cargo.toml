@@ -42,3 +42,10 @@ path = "fuzz_targets/pack.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "ui"
+path = "fuzz_targets/ui.rs"
+test = false
+doc = false
+bench = false

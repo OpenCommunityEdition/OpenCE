@@ -8,7 +8,9 @@ use std::time::{Duration, Instant};
 use opence_content::pack::{self, PackHeader};
 
 use crate::cache::{CacheKind, HEADER_SIZE};
+use crate::fake::FakeCache;
 use crate::level::tests::{level, Breaks};
+use crate::ui::tests::{add_font, add_shell};
 use crate::{import_level, Cache};
 
 /// xorshift64*: a fixed seed, so that a failure is found again.
@@ -74,6 +76,13 @@ fn mutate(random: &mut Random, bytes: &mut Vec<u8>, from: usize) {
 pub(crate) fn import_file(file: &[u8]) {
     if let Ok(cache) = Cache::open(file.to_vec()) {
         let _ = import_level(&cache);
+    }
+}
+
+/// The UI fuzz target's entry: a cache file's UI tags, read or refused.
+pub(crate) fn import_ui_file(file: &[u8]) {
+    if let Ok(cache) = Cache::open(file.to_vec()) {
+        let _ = crate::ui::import_ui_tags(&cache);
     }
 }
 
@@ -174,4 +183,18 @@ fn mutated_packs_are_read_or_refused() {
         let _ = pack::read_pack(&mutated);
     });
     println!("{cases} packs");
+}
+
+#[test]
+fn mutated_ui_tags_are_read_or_refused() {
+    let mut fake = FakeCache::new(CacheKind::CustomEdition);
+    add_shell(&mut fake);
+    add_font(&mut fake, false);
+    let file = fake.build();
+    let cases = fuzz(0x0C0C_0004, |random| {
+        let mut mutated = file.clone();
+        mutate(random, &mut mutated, HEADER_SIZE);
+        import_ui_file(&mutated);
+    });
+    println!("{cases} UI caches");
 }

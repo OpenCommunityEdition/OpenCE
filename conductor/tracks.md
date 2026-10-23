@@ -20,7 +20,7 @@ This file tracks all major tracks for the project.
 - [~] **Track: Lighting, shaders, decals and effects drawn: a physically based shader model for every Halo shader class, re-baked bounced light with AO and probes, dynamic lights and shadows, lens flares, decals and particles drawn**
   *Link: [./tracks/lighting_shaders_20261021/](./tracks/lighting_shaders_20261021/)*
 
-- [ ] **Track: The Halo UI from the user's ui.map, a launcher with only Play, Settings and Exit, and the Xbox loading screen between campaign maps**
+- [~] **Track: The Halo UI from the user's ui.map, a launcher with only Play, Settings and Exit, and the Xbox loading screen between campaign maps**
   *Link: [./tracks/halo_ui_20261021/](./tracks/halo_ui_20261021/)*
 
 - [ ] **Track: The complete animation set for bipeds, weapons, the first person, vehicles, AI, devices and cutscenes**

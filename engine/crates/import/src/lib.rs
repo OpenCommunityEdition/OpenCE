@@ -23,6 +23,7 @@ pub mod script;
 pub mod shader;
 pub mod tags;
 mod texture;
+pub mod ui;
 mod vector_palette;
 pub mod vehicle;
 pub mod weapon;
