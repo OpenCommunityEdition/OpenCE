@@ -83,6 +83,9 @@ pub struct VideoOptions {
     pub full_screen: bool,
     /// Whether the frame times are shown.
     pub show_frame_times: bool,
+    /// The screen the game opens on (0 the main one; one not there is the
+    /// main one).
+    pub display: u32,
 }
 
 impl Default for VideoOptions {
@@ -92,6 +95,7 @@ impl Default for VideoOptions {
             render_scale: 1.0,
             full_screen: false,
             show_frame_times: false,
+            display: 0,
         }
     }
 }
@@ -118,6 +122,34 @@ impl Default for AudioSettings {
     }
 }
 
+/// Where the game's data is: two absolute folders, each empty for the
+/// checkout's `assets/maps` and `assets/custom_maps`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, uniffi::Record)]
+#[serde(default)]
+pub struct DataSettings {
+    /// The Xbox maps (and the Xbox's `default.xbe`, for the chant).
+    pub maps_folder: String,
+    /// Custom Edition maps.
+    pub custom_maps_folder: String,
+}
+
+/// The game's own screens.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, uniffi::Record)]
+#[serde(default)]
+pub struct UiOptions {
+    /// Whether the Xbox loading screen plays between missions (else a
+    /// plain fade).
+    pub loading_screen: bool,
+}
+
+impl Default for UiOptions {
+    fn default() -> Self {
+        Self {
+            loading_screen: true,
+        }
+    }
+}
+
 /// Every setting.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, uniffi::Record)]
 #[serde(default)]
@@ -130,6 +162,10 @@ pub struct Settings {
     pub video: VideoOptions,
     /// The sound.
     pub audio: AudioSettings,
+    /// The data folders.
+    pub data: DataSettings,
+    /// The game's screens.
+    pub ui: UiOptions,
 }
 
 /// `value` if it is finite and in `range`, else `stock`.
@@ -160,7 +196,16 @@ impl Settings {
             controls,
             video,
             audio,
+            data,
+            ui,
         } = self;
+        let absolute = |folder: String| {
+            if Path::new(&folder).is_absolute() {
+                folder
+            } else {
+                String::new()
+            }
+        };
         let one_of = |value: String, allowed: &[&str], stock: String| {
             if allowed.contains(&value.as_str()) {
                 value
@@ -212,12 +257,18 @@ impl Settings {
                 render_scale: within(video.render_scale, 0.5..=1.0, stock.video.render_scale),
                 full_screen: video.full_screen,
                 show_frame_times: video.show_frame_times,
+                display: video.display,
             },
             audio: AudioSettings {
                 master: within(audio.master, 0.0..=1.0, stock.audio.master),
                 effects: within(audio.effects, 0.0..=1.0, stock.audio.effects),
                 music: within(audio.music, 0.0..=1.0, stock.audio.music),
             },
+            data: DataSettings {
+                maps_folder: absolute(data.maps_folder),
+                custom_maps_folder: absolute(data.custom_maps_folder),
+            },
+            ui,
         }
     }
 }

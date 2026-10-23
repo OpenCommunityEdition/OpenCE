@@ -66,3 +66,30 @@ fn settings_are_saved_and_loaded() -> Result {
     assert_eq!(load_settings(path), settings);
     Ok(())
 }
+
+#[test]
+fn the_launchers_settings_are_kept() -> Result {
+    let stock = stock_settings();
+    assert_eq!(stock.data.maps_folder, "", "the checkout's assets/maps");
+    assert_eq!(stock.video.display, 0);
+    assert!(stock.ui.loading_screen, "on by default");
+    let mut settings = stock.clone();
+    settings.data.maps_folder = "/Volumes/Halo/maps".into();
+    settings.data.custom_maps_folder = "/Volumes/Halo/custom_maps".into();
+    settings.video.display = 1;
+    settings.video.full_screen = true;
+    settings.ui.loading_screen = false;
+    assert_eq!(
+        settings_from_toml(settings_to_toml(settings.clone())?)?,
+        settings
+    );
+    let read = settings_from_toml(
+        "[data]\nmaps_folder = \"relative/maps\"\n[video]\ndisplay = 99\n".into(),
+    )?;
+    assert_eq!(read.data, stock.data, "a folder must be absolute");
+    assert_eq!(
+        read.video.display, 99,
+        "a display not there is the app's to replace"
+    );
+    Ok(())
+}

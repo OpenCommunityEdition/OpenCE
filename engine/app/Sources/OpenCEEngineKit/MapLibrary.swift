@@ -1,7 +1,8 @@
 // The maps the app offers: the .map files of the data folders (assets/maps
-// and assets/custom_maps, or the folder --maps names), without the shared
-// resource maps, which are not levels.
+// and assets/custom_maps, the settings' folders, or the folder --maps
+// names), without the shared resource maps, which are not levels.
 import Foundation
+import OpenCEEngineCore
 
 public enum MapLibrary {
     /// The shared resource maps of Custom Edition's folders.
@@ -25,6 +26,14 @@ public enum MapLibrary {
             return [URL(fileURLWithPath: named, isDirectory: true)]
         }
         return ["maps", "custom_maps"].map { root.appendingPathComponent("assets/\($0)", isDirectory: true) }
+    }
+
+    /// The folders the settings name, each empty one the data root's
+    /// under `root`.
+    public static func folders(data: DataSettings, root: URL) -> [URL] {
+        zip([data.mapsFolder, data.customMapsFolder], folders(named: nil, root: root)).map { set, stock in
+            set.isEmpty ? stock : URL(fileURLWithPath: set, isDirectory: true)
+        }
     }
 
     /// The test map's name: the engine makes it, gathering every map of

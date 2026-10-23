@@ -1,4 +1,7 @@
-// The app's entry: the engine's window, full screen with --full-screen,
+// The app's entry: the launcher (Play, Settings and Exit; its settings the
+// data folders, the display and the window mode), skipped with --map,
+// --control, --socket or --no-launcher; then the engine's window, full
+// screen with --full-screen or the setting,
 // stepping the world on the display's frames, and drawing the map --map
 // PATH names (and --bsp N), or the one chosen from Halo's menus (ui.map's
 // main menu over its scene: the campaign, which plays a mission at a
@@ -202,8 +205,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var lastFrame: CFTimeInterval?
     var frameTimes = FrameTimes()
     var lastOverlay: CFTimeInterval = 0
-    let folders = MapLibrary.folders(
-        named: argument("--maps"), root: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+    let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    /// The data folders: --maps's, else the settings' (read once the
+    /// launcher has closed).
+    lazy var folders = argument("--maps") != nil ? MapLibrary.folders(named: argument("--maps"), root: root)
+        : MapLibrary.folders(data: saved.settings.data, root: root)
     lazy var maps = MapLibrary.maps(in: folders)
     lazy var menu = HaloMenu(maps: maps, settings: saved, servers: ServerListModel())
     /// Whether the level drawn is the main menu's scene, not a game.
@@ -222,8 +228,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let shaders = ShaderReloader()
     var lastShaderPoll: CFTimeInterval = 0
 
+    /// The launcher's window, while it shows.
+    var launcher: NSWindow?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = mainMenu()
+        let skips = ["--map", "--control", "--socket", "--no-launcher"]
+        if skips.contains(where: CommandLine.arguments.contains) {
+            startGame()
+        } else {
+            showLauncher()
+        }
+        NSApp.activate()
+    }
+
+    /// The launcher: Play starts the game on its main menu, Exit quits.
+    func showLauncher() {
+        MenuFonts.register()
+        let model = LauncherModel(settings: saved, displays: NSScreen.screens.map(\.localizedName), root: root)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 380),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.title = "OpenCE"
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: LauncherView(model: model))
+        model.onPlay = { [weak self] in
+            self?.launcher?.orderOut(nil)
+            self?.launcher = nil
+            self?.startGame()
+        }
+        model.onExit = { NSApp.terminate(nil) }
+        launcher = window
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    /// The game: its window on the display set, on the map --map names or
+    /// on the main menu.
+    func startGame() {
         NSApp.mainMenu?.addItem(mapMenu())
         engine.startEmptyWorld()
         menu.actions = self
@@ -249,9 +290,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             startControl()
         }
         controller.window.engineView.onFrame = { [weak self] link in self?.frame(link) }
-        controller.show(fullScreen: CommandLine.arguments.contains("--full-screen") || saved.settings.video.fullScreen)
+        let screens = NSScreen.screens
+        let display = Int(saved.settings.video.display)
+        controller.show(fullScreen: CommandLine.arguments.contains("--full-screen") || saved.settings.video.fullScreen,
+                        on: screens.indices.contains(display) ? screens[display] : nil)
         controller.window.engineView.startDisplayLink()
-        NSApp.activate()
         if level == nil {
             showMenu(nil)
         }

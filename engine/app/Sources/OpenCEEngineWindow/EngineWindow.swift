@@ -149,9 +149,15 @@ public final class EngineWindowController {
         observers.forEach(NotificationCenter.default.removeObserver)
     }
 
-    /// Puts the window in front, centred, and full screen with `fullScreen`.
-    public func show(fullScreen: Bool) {
+    /// Puts the window in front, centred on `screen` (the main one by
+    /// default), and full screen with `fullScreen`.
+    public func show(fullScreen: Bool, on screen: NSScreen? = nil) {
         window.center()
+        if let screen {
+            let area = screen.visibleFrame
+            let size = window.frame.size
+            window.setFrameOrigin(NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2))
+        }
         window.makeKeyAndOrderFront(nil)
         if fullScreen, !window.styleMask.contains(.fullScreen) {
             window.toggleFullScreen(nil)
