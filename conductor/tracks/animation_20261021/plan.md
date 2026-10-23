@@ -18,7 +18,7 @@
     - [x] Weapon animations and the first-person arms
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Bipeds, weapons and the first person' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 3: Vehicles, AI, devices and cutscenes
+## Phase 3: Vehicles, AI, devices and cutscenes [checkpoint: 929ad889]
 - [x] Task: Vehicles and seats 9f50ea51
     - [x] Write tests: entering, leaving, boarding and ejection by seat; the vehicles' own animations
     - [x] Seat animations and vehicle animations
