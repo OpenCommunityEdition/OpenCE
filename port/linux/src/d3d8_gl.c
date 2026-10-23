@@ -383,6 +383,10 @@ static struct
 	pixels are linear, in scRGB's units, the desktop's white sdr_white */
 	BOOL float_window;
 	float sdr_white;
+	/* display.hdr_paper_white and display.hdr_peak_brightness, in nits: 0
+	for Windows' own (its SDR content brightness, and its HDR calibration's
+	peak, as SDL reports them) */
+	int paper_white, peak_brightness;
 #ifdef HALO_GLES
 	/* the most samples a pixel of a GL_RGBA16F renderbuffer */
 	GLint maximum_samples;
@@ -1766,7 +1770,8 @@ static BOOL bind_targets(BOOL *has_depth)
 
 /* ---------- display.hdr */
 
-static const char *const tone_mapping_names[NUMBER_OF_XGPU_TONE_MAPPINGS] = { "neutral", "aces", "reinhard" };
+static const char *const tone_mapping_names[NUMBER_OF_XGPU_TONE_MAPPINGS] =
+	{ "neutral", "aces", "reinhard", "gt7" };
 
 /* display.hdr's settings, if they have changed: the back buffer's entries
 are made again in the format it takes (what they held is lost, and a frame
@@ -1797,12 +1802,19 @@ static void hdr_read(void)
 #endif
 		hdr.sdr_white = 1.0f;
 		hdr.tone_mapping.peak = 1.0f;
+		hdr.tone_mapping.paper = 0.0f;
 	}
 	hdr.read = TRUE;
 	hdr.read_at = config_changes();
 	curve = config_string("display.hdr_tone_mapping");
 	exposure = config_real("display.hdr_exposure");
 	wanted = config_boolean("display.hdr");
+	hdr.paper_white = config_integer("display.hdr_paper_white");
+	hdr.paper_white = hdr.paper_white <= 0 ? 0 : hdr.paper_white < 80 ? 80 : hdr.paper_white > 1000 ? 1000 :
+		hdr.paper_white;
+	hdr.peak_brightness = config_integer("display.hdr_peak_brightness");
+	hdr.peak_brightness = hdr.peak_brightness <= 0 ? 0 : hdr.peak_brightness < 250 ? 250 :
+		hdr.peak_brightness > 10000 ? 10000 : hdr.peak_brightness;
 	for (value = NUMBER_OF_XGPU_TONE_MAPPINGS - 1; value > 0 && strcmp(curve, tone_mapping_names[value]); value--)
 	{
 	}
@@ -2321,9 +2333,28 @@ long halo_screen_commit(void)
 #ifndef HALO_ANDROID
 	if (hdr.float_window)
 	{
-		float headroom;
+		float sdr_white, headroom, paper, peak;
+		BOOL on = platform_video_hdr(&sdr_white, &headroom);
 
-		hdr.tone_mapping.peak = platform_video_hdr(&hdr.sdr_white, &headroom) ? headroom : 1.0f;
+		/* (in nits: scRGB's 1.0 is 80) */
+		paper = hdr.paper_white ? (float)hdr.paper_white : sdr_white * 80.0f;
+		peak = hdr.peak_brightness ? (float)hdr.peak_brightness : headroom * sdr_white * 80.0f;
+		if (!on)
+		{
+			paper = sdr_white * 80.0f;
+			peak = paper;
+		}
+		if (peak < paper)
+			peak = paper;
+		if (paper != hdr.sdr_white * 80.0f || peak / paper != hdr.tone_mapping.peak)
+		{
+			if (on)
+				platform_log("HDR: the display's paper white %.0f nits%s, peak %.0f nits%s", paper,
+					hdr.paper_white ? "" : " (Windows')", peak, hdr.peak_brightness ? "" : " (Windows')");
+		}
+		hdr.sdr_white = paper / 80.0f;
+		hdr.tone_mapping.peak = peak / paper;
+		hdr.tone_mapping.paper = on ? paper / 100.0f : 0.0f;
 	}
 #endif
 	/* display.shadow_resolution, if it has changed: the maps' entries at

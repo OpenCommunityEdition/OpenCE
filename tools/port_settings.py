@@ -115,9 +115,17 @@ SCREENS = {
             ("MATCH TIMER:", "display.match_timer", ON_OFF,
              "Draw a clock at the bottom right in multiplayer,\ncounting up from the start of the game.", None),
             ("HDR:", "display.hdr", ON_OFF,
-             "Keep the light of explosions, plasma and the sun\npast white, and roll it off instead of clipping.", None),
+             "Let explosions, plasma and the sun shine brighter\nthan white, then fit them to the screen.", None),
             ("HDR DISPLAY:", "display.hdr_output", ON_OFF,
-             "With HDR, on an HDR display, show that light\nbrighter than white. From the next start.", "desktop"),
+             "On an HDR display (Windows HDR on), show that\nlight truly brighter. From the next start.", "desktop"),
+            ("PAPER WHITE:", "display.hdr_paper_white",
+             [("AUTO", "0"), ("80", "80"), ("100", "100"), ("120", "120"), ("160", "160"), ("200", "200"),
+              ("250", "250"), ("300", "300"), ("400", "400")],
+             "With HDR Display, how bright white is, in nits.\nAuto: Windows' SDR content brightness.", "desktop"),
+            ("PEAK BRIGHTNESS:", "display.hdr_peak_brightness",
+             [("AUTO", "0"), ("400", "400"), ("600", "600"), ("800", "800"), ("1000", "1000"), ("1500", "1500"),
+              ("2000", "2000"), ("4000", "4000"), ("10000", "10000")],
+             "With HDR Display, your display's brightest, in\nnits. Auto: Windows' HDR calibration.", "desktop"),
         ],
     },
     "mouse_settings": {
@@ -225,7 +233,8 @@ _graphics = {"display.high_res_hud", "display.hud_button_style", "display.high_r
              "display.model_detail"}
 # (the visual modifiers: a screen of their own, Extra Effects)
 _extra_effects = {"display.shield_glow", "display.shield_glow_intensity",
-                  "display.overshield_effect", "display.hdr", "display.hdr_output"}
+                  "display.overshield_effect", "display.hdr", "display.hdr_output", "display.hdr_paper_white",
+                  "display.hdr_peak_brightness"}
 SCREENS["video_settings/graphics"] = {
     "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 30,
     "same_place": ["anti_aliasing_android"],
