@@ -29,6 +29,7 @@ pub mod projectile;
 pub mod ragdoll;
 pub mod random;
 pub mod seats;
+pub mod unit_states;
 pub mod units;
 pub mod vehicle;
 pub mod weapon;
