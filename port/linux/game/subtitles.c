@@ -39,6 +39,7 @@ letterbox's bar.
 #include "cutscene/cinematics.h"
 #include "game/game.h"
 #include "interface/interface.h"
+#include "interface/ui_widget.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "scenario/scenario.h"
@@ -775,6 +776,11 @@ void subtitles_draw(
 		subtitle_globals.active_count = 0;
 		return;
 	}
+	/* (the lines are hidden while the pause menu, or any other menu, is open
+	or the game's time is stopped, and come back, with the time they have
+	left, when it closes: the lines' time is the game's) */
+	if (ui_widgets_active() || game_time_get_paused())
+		return;
 	now = game_time_get();
 	/* (lines that have ended, or that wait beyond reason: the clock went back) */
 	for (index = 0; index < subtitle_globals.active_count; index++)
