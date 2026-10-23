@@ -1238,6 +1238,44 @@ static void set_local_player_controls_from_player_profile(
 			preferences.game_control_to_xbox_buttons[10] = _gamepad_binary_button_left_thumb;
 			preferences.game_control_to_xbox_buttons[11] = _gamepad_binary_button_right_thumb;
 			break;
+
+		/* port: Fishsticks: zoom on the left trigger, melee on the right
+		thumbstick's button, the grenade thrown with the right bumper (the
+		Duke's black), crouch on B, and the grenades switched with the pad's left
+		direction (which then does not move: input_abstraction_update); the rest
+		as the standard layout */
+		case _button_preset_fishsticks:
+			preferences.game_control_to_xbox_buttons[0] = _gamepad_analog_button_a;
+			preferences.game_control_to_xbox_buttons[1] = _gamepad_binary_button_dpad_left;
+			preferences.game_control_to_xbox_buttons[2] = _gamepad_analog_button_x;
+			preferences.game_control_to_xbox_buttons[3] = _gamepad_analog_button_y;
+			preferences.game_control_to_xbox_buttons[4] = _gamepad_binary_button_right_thumb;
+			preferences.game_control_to_xbox_buttons[5] = _gamepad_analog_button_white;
+			preferences.game_control_to_xbox_buttons[6] = _gamepad_analog_button_black;
+			preferences.game_control_to_xbox_buttons[7] = _gamepad_analog_button_right_trigger;
+			preferences.game_control_to_xbox_buttons[8] = _gamepad_binary_button_start;
+			preferences.game_control_to_xbox_buttons[9] = _gamepad_binary_button_back;
+			preferences.game_control_to_xbox_buttons[10] = _gamepad_analog_button_b;
+			preferences.game_control_to_xbox_buttons[11] = _gamepad_analog_button_left_trigger;
+			break;
+
+		/* port: Recon: the standard layout with action and reload on the right
+		bumper (the Duke's black) and the grenades switched with the left (its
+		white), which put the flashlight on X, where action was */
+		case _button_preset_recon:
+			preferences.game_control_to_xbox_buttons[0] = _gamepad_analog_button_a;
+			preferences.game_control_to_xbox_buttons[1] = _gamepad_analog_button_white;
+			preferences.game_control_to_xbox_buttons[2] = _gamepad_analog_button_black;
+			preferences.game_control_to_xbox_buttons[3] = _gamepad_analog_button_y;
+			preferences.game_control_to_xbox_buttons[4] = _gamepad_analog_button_b;
+			preferences.game_control_to_xbox_buttons[5] = _gamepad_analog_button_x;
+			preferences.game_control_to_xbox_buttons[6] = _gamepad_analog_button_left_trigger;
+			preferences.game_control_to_xbox_buttons[7] = _gamepad_analog_button_right_trigger;
+			preferences.game_control_to_xbox_buttons[8] = _gamepad_binary_button_start;
+			preferences.game_control_to_xbox_buttons[9] = _gamepad_binary_button_back;
+			preferences.game_control_to_xbox_buttons[10] = _gamepad_binary_button_left_thumb;
+			preferences.game_control_to_xbox_buttons[11] = _gamepad_binary_button_right_thumb;
+			break;
 	}
 
 	preferences.invert_look = controls->invert_look;
