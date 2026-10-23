@@ -14,7 +14,8 @@
 // on a map without a player start, the free camera flies instead: W, A, S,
 // D, Space and Control (Shift faster). F3 or --frame-times shows the frame
 // times. --benchmark SECONDS flies the map offscreen at --size (3840x2160
-// by default), with no window, and prints the frame times. --headless runs
+// by default), with no window, and prints the frame times (--off with the
+// render switches it draws without, e.g. render.gtao,render.ssr). --headless runs
 // the world with no window, answering the control socket (Control.swift);
 // --control (or --socket PATH) opens the socket beside the window. ~ (the
 // key left of 1) opens the developer shell over the game.
@@ -713,6 +714,9 @@ func benchmark(seconds: String) -> Never {
         let level = try LoadedLevel(map: map, bsp: argument("--bsp").flatMap { UInt32($0) } ?? 0,
                                     cacheFolder: argument("--cache") ?? cacheFolder(), device: device,
                                     settings: videoSettings())
+        // (the switches named by --off off, the rest as they start)
+        let off = Set((argument("--off") ?? "").split(separator: ",").map(String.init))
+        level.renderer.switches = RenderSwitches(flag: { !off.contains($0) }, value: { _ in "" })
         let engine = Engine()
         let snapshots = SnapshotReader(engine: engine)
         _ = try engine.startLevel(geometry: level.geometry, difficulty: 1)

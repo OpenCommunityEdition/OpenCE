@@ -282,9 +282,9 @@ A frame is drawn in this order. Each switch is a shell variable
 | --- | --- | --- |
 | Sun shadows | Cascaded shadow maps for objects, matched to the baked shadows; spot and cube shadows for the nearest dynamic lights | `render.sun_shadows` |
 | Sky | The first sky, unlit, at the far plane | |
-| Level and objects, opaque | Baked light, or probes and the sun for objects; clustered dynamic lights from weapons, projectiles, effects, the flashlight and scenery | `render.lightmaps`, `render.objects`, `render.wireframe` |
+| Level and objects, opaque | Baked light, or probes and the sun for objects; clustered dynamic lights from weapons, projectiles, effects, the flashlight and scenery | `render.lightmaps`, `render.lights`, `render.objects`, `render.wireframe` |
 | Decals | The scenario's decals and those that shots and explosions lay, deferred onto the level and objects | `render.decals` |
-| Screen-space effects | Ambient occlusion (GTAO), reflections over the reflection probes, contact shadows | `render.gtao`, `render.ssr`, `render.contact_shadows` |
+| Screen-space effects | Ambient occlusion (GTAO) and contact shadows, at half resolution by default, brought up with depth weights; reflections over the reflection probes | `render.gtao`, `render.ssr`, `render.contact_shadows`, `render.ao_quality` (`half`, `full`) |
 | Blended | The level's transparent surfaces, the models' blended parts, glows and light volumes, the first-person weapon | `render.glows` |
 | Particles | Particles, contrails, weather and detail objects, blended in the shader by each one's blend function | `render.particles` |
 | Temporal | MetalFX's temporal scaler, from the motion vectors | |
@@ -334,9 +334,30 @@ the scenario's objects and the sky. No window opens.
 | Machine | Date | Frames | p50 | p99 |
 | --- | --- | --- | --- | --- |
 | M1 Max | 2026-10-21 | 8235 | 7.28 ms | 7.94 ms |
+| M1 Max | 2026-10-23 | 5416 | 11.78 ms | 14.19 ms |
 
-A frame's own GPU time is 9.10 ms at p50 and 10.10 ms at p99. That is longer
-than the frame time because the GPU overlaps one frame's work with the next.
+The first row was taken before the screen-space effects, the lights, the
+exposure, bloom, decals and particles were drawn. The second has them all on,
+as they start, and is **above the bar**. Its frame's own GPU time is 13.97 ms
+at p50 and 17.06 ms at p99; the GPU overlaps one frame's work with the next.
+
+Where a frame's GPU time goes, from a Metal System Trace of the second row:
+
+| Work | ms per frame |
+| --- | --- |
+| MetalFX temporal anti-aliasing (its three passes) | 6.4 |
+| The screen pass (occlusion, contact shadows, reflections, the resolve) | 2.9 |
+| The level's opaque draws | 1.7 |
+| The level's blended draws | 0.95 |
+| Decals | 0.5 |
+| Luminance and bloom | 0.5 |
+| Tone map, motion | 0.75 |
+
+MetalFX alone at 3840×2160 and full scale is most of the budget. With every
+switch off (`--off render.gtao,render.ssr,render.contact_shadows,render.sun_shadows,render.lights,render.exposure,render.bloom,render.lens_flares,render.glows,render.decals,render.particles`)
+p99 is still 9.1 ms. With every effect on, a lower render scale (which
+MetalFX brings up to the window's size) comes near the bar: p99 is 10.54 ms
+at `--render-scale 0.75` and 8.34 ms at 0.5 (12-second runs).
 
 ## The developer tools
 

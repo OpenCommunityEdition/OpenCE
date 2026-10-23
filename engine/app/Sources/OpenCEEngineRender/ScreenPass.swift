@@ -4,7 +4,8 @@
 // through the depth; then a resolve that applies them to the frame, and a
 // view that shows one buffer alone. Each can be switched off from the
 // shell (`render.gtao`, `render.ssr`, `render.contact_shadows`) and shown
-// alone (`render.view`).
+// alone (`render.view`); the occlusion is found at half resolution unless
+// `render.ao_quality` is full.
 
 import Metal
 import simd
@@ -32,6 +33,9 @@ public struct RenderSwitches: Equatable, Sendable {
     public var glows = true
     public var decals = true
     public var particles = true
+    /// The occlusion and contact shadows found at half resolution and
+    /// brought up to the frame's (`render.ao_quality` half).
+    public var halfOcclusion = true
     public var view = RenderView.frame
 
     public init() {}
@@ -50,6 +54,7 @@ public struct RenderSwitches: Equatable, Sendable {
         glows = flag("render.glows")
         decals = flag("render.decals")
         particles = flag("render.particles")
+        halfOcclusion = value("render.ao_quality") != "full"
         view = RenderView(rawValue: value("render.view")) ?? .frame
     }
 }
@@ -62,6 +67,8 @@ struct ScreenUniforms {
     var sun: SIMD4<Float>
     var size: SIMD4<Float>
     var passes: SIMD4<UInt32>
+    /// The occlusion's resolution (0 full, 1 half).
+    var quality: SIMD4<UInt32>
 
     init(viewProjection: simd_float4x4, eye: SIMD3<Float>, sunTowards: SIMD4<Float>, width: Int, height: Int,
          switches: RenderSwitches) {
@@ -75,6 +82,7 @@ struct ScreenUniforms {
         size = SIMD4(Float(width), Float(height), 0, length(up) * Float(height) / 2)
         passes = SIMD4(switches.gtao ? 1 : 0, switches.contactShadows ? 1 : 0, switches.ssr ? 1 : 0,
                        switches.view.index)
+        quality = SIMD4(switches.halfOcclusion ? 1 : 0, 0, 0, 0)
     }
 }
 
@@ -90,6 +98,9 @@ final class ScreenPass {
         var reflectance: MTLTexture
         /// The occlusion (r), the contact shadow (g) and the depth's shade (b).
         var occlusion: MTLTexture
+        /// The occlusion at half resolution: as `occlusion`, with the
+        /// distance ahead (b) and whether the texel was screened (a).
+        var halfOcclusion: MTLTexture
         /// The traced reflection (rgb) and its trust (a).
         var reflected: MTLTexture
         var attachments: [MTLTexture] { [surface, reflection, reflectance] }
@@ -97,6 +108,7 @@ final class ScreenPass {
 
     struct Pipelines {
         var occlusion: MTLComputePipelineState
+        var halfOcclusion: MTLComputePipelineState
         var reflection: MTLComputePipelineState
         var resolve: MTLRenderPipelineState
         var view: MTLRenderPipelineState
@@ -132,6 +144,8 @@ final class ScreenPass {
             }
             return Pipelines(
                 occlusion: try device.makeComputePipelineState(function: try library.required("screen_occlusion")),
+                halfOcclusion: try device.makeComputePipelineState(
+                    function: try library.required("screen_occlusion_half")),
                 reflection: try device.makeComputePipelineState(function: try library.required("screen_reflection")),
                 resolve: try full("screen_resolve"), view: try full("screen_view"))
         } catch let error as LevelRendererError {
@@ -163,9 +177,10 @@ final class ScreenPass {
             return targets
         }
         guard width > 0, height > 0 else { return nil }
-        func texture(_ format: MTLPixelFormat, _ usage: MTLTextureUsage) -> MTLTexture? {
-            let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: width,
-                                                                      height: height, mipmapped: false)
+        func texture(_ format: MTLPixelFormat, _ usage: MTLTextureUsage, halved: Bool = false) -> MTLTexture? {
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: format, width: halved ? (width + 1) / 2 : width,
+                height: halved ? (height + 1) / 2 : height, mipmapped: false)
             descriptor.usage = usage
             descriptor.storageMode = .private
             return device.makeTexture(descriptor: descriptor)
@@ -175,9 +190,10 @@ final class ScreenPass {
               let reflection = texture(Self.attachmentFormats[1], attached),
               let reflectance = texture(Self.attachmentFormats[2], attached),
               let occlusion = texture(.rgba16Float, [.shaderRead, .shaderWrite]),
+              let halfOcclusion = texture(.rgba16Float, [.shaderRead, .shaderWrite], halved: true),
               let reflected = texture(.rgba16Float, [.shaderRead, .shaderWrite]) else { return nil }
         targets = Targets(surface: surface, reflection: reflection, reflectance: reflectance, occlusion: occlusion,
-                          reflected: reflected)
+                          halfOcclusion: halfOcclusion, reflected: reflected)
         return targets
     }
 
@@ -185,7 +201,6 @@ final class ScreenPass {
     /// its depth (each pass only when it is on or shown).
     func encode(into commands: MTLCommandBuffer, targets: Targets, frame: MTLTexture, depth: MTLTexture,
                 uniforms: ScreenUniforms) {
-        var uniforms = uniforms
         let occlusionNeeded = uniforms.passes.x != 0 || uniforms.passes.y != 0
             || [RenderView.depth, .ao, .contact].map(\.index).contains(uniforms.passes.w)
         let reflectionNeeded = uniforms.passes.z != 0 || uniforms.passes.w == RenderView.ssr.index
@@ -199,11 +214,21 @@ final class ScreenPass {
             var computed = uniforms
             if uniforms.passes.w == RenderView.ao.index { computed.passes.x = 1 }
             if uniforms.passes.w == RenderView.contact.index { computed.passes.y = 1 }
-            encoder.setComputePipelineState(pipelines.occlusion)
             encoder.setTexture(depth, index: 0)
             encoder.setTexture(targets.surface, index: 1)
-            encoder.setTexture(targets.occlusion, index: 2)
             encoder.setBytes(&computed, length: MemoryLayout<ScreenUniforms>.stride, index: 0)
+            if computed.quality.x != 0 {
+                // (found at half resolution first, then brought up)
+                let half = targets.halfOcclusion
+                encoder.setComputePipelineState(pipelines.halfOcclusion)
+                encoder.setTexture(half, index: 2)
+                encoder.dispatchThreadgroups(MTLSize(width: (half.width + 7) / 8, height: (half.height + 7) / 8,
+                                                     depth: 1), threadsPerThreadgroup: threads)
+                encoder.memoryBarrier(resources: [half])
+            }
+            encoder.setComputePipelineState(pipelines.occlusion)
+            encoder.setTexture(targets.occlusion, index: 2)
+            encoder.setTexture(targets.halfOcclusion, index: 3)
             encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threads)
         }
         if reflectionNeeded {

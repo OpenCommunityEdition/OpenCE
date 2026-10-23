@@ -7,7 +7,8 @@ import XCTest
 
 /// The screen's passes (ScreenPass.swift and Shaders/screen.metal): the
 /// ambient occlusion and the contact shadows darken the ground by an
-/// object, and each pass can be switched off and shown alone.
+/// object, each pass can be switched off and shown alone, and the
+/// occlusion found at half resolution.
 final class ScreenTests: XCTestCase {
     func testEachPassChangesTheFrameAndCanBeShownAlone() throws {
         let level = try StockLevel(map: "bloodgulch")
@@ -48,7 +49,7 @@ final class ScreenTests: XCTestCase {
         let frame = try capture()
         let none = try capture { $0.gtao = false; $0.contactShadows = false; $0.ssr = false }
         XCTAssertGreaterThan(differing(frame, none), 50, "the passes changed nothing")
-        XCTAssertGreaterThan(differing(try capture { $0.gtao = false }, frame), 20, "the occlusion did nothing")
+        XCTAssertGreaterThan(differing(try capture { $0.gtao = false }, frame), 10, "the occlusion did nothing")
         XCTAssertGreaterThan(differing(try capture { $0.contactShadows = false }, frame), 0,
                              "the contact shadows did nothing")
         XCTAssertEqual(differing(try capture(), frame), 0, "a switch stayed off")
@@ -66,5 +67,18 @@ final class ScreenTests: XCTestCase {
         XCTAssertGreaterThan(Int(normals[2]), Int(normals[1]), "the ground's normals are not up")
         // (shown alone, a pass switched off is still computed)
         XCTAssertEqual(differing(try capture { $0.gtao = false; $0.view = .ao }, try XCTUnwrap(views[.ao])), 0)
+        // the occlusion found at full resolution is close to the half's
+        // brought up, but not the same
+        let full = try capture { $0.halfOcclusion = false; $0.view = .ao }
+        let apart = differing(full, try XCTUnwrap(views[.ao]))
+        XCTAssertGreaterThan(apart, 0, "the occlusion's resolution changed nothing")
+        XCTAssertLessThan(apart, frame.width * frame.height / 4, "the half occlusion is far from the full")
+    }
+
+    func testTheOcclusionsResolutionIsReadFromTheShell() {
+        XCTAssertTrue(RenderSwitches().halfOcclusion)
+        XCTAssertTrue(RenderSwitches(flag: { _ in true }, value: { _ in "half" }).halfOcclusion)
+        XCTAssertFalse(RenderSwitches(flag: { _ in true },
+                                      value: { $0 == "render.ao_quality" ? "full" : "" }).halfOcclusion)
     }
 }

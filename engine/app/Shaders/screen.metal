@@ -30,6 +30,8 @@ struct Screen {
     float4 size;
     // the passes on (gtao, contact shadows, reflections) and the view shown
     uint4 passes;
+    // the occlusion's resolution (0 full, 1 half)
+    uint4 quality;
 };
 
 constant uint VIEW_DEPTH = 1;
@@ -44,9 +46,9 @@ constant float OCCLUSION_RADIUS = 0.3;
 constant float CONTACT_LENGTH = 0.15;
 // how thick a surface in the depth is taken to be behind its front
 constant float CONTACT_THICKNESS = 0.08;
-constant uint SLICES = 4;
-constant uint SLICE_STEPS = 6;
-constant uint CONTACT_STEPS = 12;
+constant uint SLICES = 2;
+constant uint SLICE_STEPS = 4;
+constant uint CONTACT_STEPS = 8;
 constant uint REFLECTION_STEPS = 32;
 
 // a value in 0..1 that changes from texel to texel without a pattern the
@@ -70,25 +72,10 @@ bool screened(float kind, float depth) {
     return (kind == SURFACE_LEVEL || kind == SURFACE_OBJECT) && depth > 0 && depth <= 0.5;
 }
 
-// each texel's ambient occlusion (r), contact shadow (g) and a shade of
-// its depth for the views (b)
-kernel void screen_occlusion(depth2d<float> depth [[texture(0)]],
-                             texture2d<float> surface [[texture(1)]],
-                             texture2d<float, access::write> out [[texture(2)]],
-                             constant Screen &screen [[buffer(0)]],
-                             uint2 texel [[thread_position_in_grid]]) {
-    uint2 size = uint2(screen.size.xy);
-    if (texel.x >= size.x || texel.y >= size.y) {
-        return;
-    }
-    float d = depth.read(texel);
-    float4 here = surface.read(texel);
-    float ahead = d > 0 ? screen.eye.w / d : INFINITY;
-    float shade = d > 0 ? exp(-ahead / 20) : 0;
-    if (!screened(here.w, d)) {
-        out.write(float4(1, 0, shade, 1), texel);
-        return;
-    }
+// a texel's ambient occlusion (r) and contact shadow (g), for one that is
+// screened at depth `d`, `ahead` of the eye
+float2 occlusion_at(depth2d<float> depth, texture2d<float> surface, constant Screen &screen, uint2 texel,
+                    float d, float4 here, float ahead) {
     float2 uv = (float2(texel) + 0.5) / screen.size.xy;
     float3 position = world_at(screen, uv, d);
     float3 normal = normalize(here.xyz);
@@ -159,7 +146,84 @@ kernel void screen_occlusion(depth2d<float> depth [[texture(0)]],
             }
         }
     }
-    out.write(float4(ao, contact, shade, 1), texel);
+    return float2(ao, contact);
+}
+
+// the occlusion at half the resolution (`render.ao_quality` half): each
+// texel's of the even rows and columns, with its distance ahead (b) and
+// whether it is screened (a)
+kernel void screen_occlusion_half(depth2d<float> depth [[texture(0)]],
+                                  texture2d<float> surface [[texture(1)]],
+                                  texture2d<float, access::write> out [[texture(2)]],
+                                  constant Screen &screen [[buffer(0)]],
+                                  uint2 coarse [[thread_position_in_grid]]) {
+    uint2 size = uint2(screen.size.xy);
+    if (coarse.x >= (size.x + 1) / 2 || coarse.y >= (size.y + 1) / 2) {
+        return;
+    }
+    uint2 texel = min(coarse * 2, size - 1);
+    float d = depth.read(texel);
+    float4 here = surface.read(texel);
+    float ahead = d > 0 ? screen.eye.w / d : 65000.0;
+    if (!screened(here.w, d)) {
+        out.write(float4(1, 0, ahead, 0), coarse);
+        return;
+    }
+    out.write(float4(occlusion_at(depth, surface, screen, texel, d, here, ahead), ahead, 1), coarse);
+}
+
+// each texel's ambient occlusion (r), contact shadow (g) and a shade of
+// its depth for the views (b): computed here, or taken from the half
+// resolution's four nearest of about the same depth
+kernel void screen_occlusion(depth2d<float> depth [[texture(0)]],
+                             texture2d<float> surface [[texture(1)]],
+                             texture2d<float, access::write> out [[texture(2)]],
+                             texture2d<float> half_occlusion [[texture(3)]],
+                             constant Screen &screen [[buffer(0)]],
+                             uint2 texel [[thread_position_in_grid]]) {
+    uint2 size = uint2(screen.size.xy);
+    if (texel.x >= size.x || texel.y >= size.y) {
+        return;
+    }
+    float d = depth.read(texel);
+    float4 here = surface.read(texel);
+    float ahead = d > 0 ? screen.eye.w / d : INFINITY;
+    float shade = d > 0 ? exp(-ahead / 20) : 0;
+    if (!screened(here.w, d)) {
+        out.write(float4(1, 0, shade, 1), texel);
+        return;
+    }
+    if (screen.quality.x == 0) {
+        out.write(float4(occlusion_at(depth, surface, screen, texel, d, here, ahead), shade, 1), texel);
+        return;
+    }
+    // (bilinear weights, each scaled down as its depth differs from this
+    // texel's, so that an edge does not bleed across)
+    float2 at = float2(texel) * 0.5;
+    int2 base = int2(floor(at));
+    float2 f = at - float2(base);
+    int2 last = int2(half_occlusion.get_width(), half_occlusion.get_height()) - 1;
+    float2 sum = 0;
+    float total = 0;
+    float nearest = INFINITY;
+    float2 fallback = float2(1, 0);
+    for (int y = 0; y <= 1; y++) {
+        for (int x = 0; x <= 1; x++) {
+            float4 c = half_occlusion.read(uint2(clamp(base + int2(x, y), int2(0), last)));
+            if (c.a == 0) {
+                continue;
+            }
+            float differs = abs(c.b - ahead) / ahead;
+            if (differs < nearest) {
+                nearest = differs;
+                fallback = c.rg;
+            }
+            float w = (x == 0 ? 1 - f.x : f.x) * (y == 0 ? 1 - f.y : f.y) * saturate(1 - differs * 20);
+            sum += c.rg * w;
+            total += w;
+        }
+    }
+    out.write(float4(total > 1e-4 ? sum / total : fallback, shade, 1), texel);
 }
 
 // each reflecting texel's reflection traced through the depth: the colour

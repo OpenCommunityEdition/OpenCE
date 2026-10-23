@@ -139,6 +139,18 @@ fn the_screen_passes_can_be_switched_off_and_shown_alone() -> Result {
     // (the view is not kept between runs)
     run(&engine, "render.view ao")?;
     assert!(!engine.saved_shell_variables().contains_key("render.view"));
+    // (the occlusion's resolution is half unless told, and kept)
+    assert_eq!(engine.shell_value("render.ao_quality".into()), "half");
+    run(&engine, "render.ao_quality full")?;
+    assert_eq!(engine.shell_value("render.ao_quality".into()), "full");
+    assert_eq!(
+        engine
+            .saved_shell_variables()
+            .get("render.ao_quality")
+            .map(String::as_str),
+        Some("full")
+    );
+    refused(&engine, "render.ao_quality quarter")?;
     Ok(())
 }
 
@@ -173,7 +185,7 @@ fn variables_completion_and_bindings() -> Result {
         ("true", "false")
     );
     assert_eq!(engine.complete_command("nocl".into()), ["noclip"]);
-    assert_eq!(engine.complete_command("ren".into()).len(), 16);
+    assert_eq!(engine.complete_command("ren".into()).len(), 17);
     run(&engine, "bind f5 pause")?;
     engine.start_empty_world();
     assert!(engine.press_key("f5".into()).ok);

@@ -231,6 +231,11 @@ pub const RENDER_VIEWS: &[&str] = &[
     "bloom",
 ];
 
+/// The resolutions the ambient occlusion and contact shadows can be
+/// computed at (`render.ao_quality`): half, upsampled by depth, fits the
+/// frame's budget at 4K; full is sharper.
+pub const AO_QUALITIES: &[&str] = &["half", "full"];
+
 // (the debug drawing's layers: `debug.draw.<layer>`)
 const LAYERS: [(Layer, &str); 9] = [
     (
@@ -411,6 +416,13 @@ pub(crate) fn registry() -> Registry<State> {
         VarKind::Enum(RENDER_VIEWS),
         VarValue::String("frame".into()),
         false,
+    );
+    registry.variable(
+        "render.ao_quality",
+        "The resolution of the ambient occlusion and contact shadows (half or full).",
+        VarKind::Enum(AO_QUALITIES),
+        VarValue::String("half".into()),
+        true,
     );
     for (layer, help) in LAYERS {
         let name = format!("{DRAW_PREFIX}{}", layer.name());
