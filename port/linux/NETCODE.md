@@ -258,7 +258,11 @@ bytes where they were 0x1C, and the game settings record 16 bytes longer; and
 in an Infection game the host sends its round in the game type's state
 (`struct distributed_infection_state`: each player's role and score, the
 round's phase and winner) in place of Slayer's, which each client checks whole
-before taking it.
+before taking it. Then version 36 sends the host's shield effects (distributed
+message 91, `network_shield_effects.c`: the shield glow, its Light Show reach
+and the overshield effect, Server Setup's SHIELD EFFECTS), which every client
+draws in place of its player's own, so that a build that would draw its own
+cannot join.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

@@ -1,4 +1,4 @@
-version 35
+version 36
 bound CHAT_TEXT_SIZE 64
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
@@ -86,6 +86,7 @@ enum _distributed_message_player_inputs 14
 enum _distributed_message_player_prediction 1
 enum _distributed_message_player_statistics 3
 enum _distributed_message_relayed_actions 15
+enum _distributed_message_shield_effects 91
 enum _distributed_message_structure_bsp 65
 enum _distributed_message_unit_states 2
 enum _distributed_message_vehicle_prediction 12

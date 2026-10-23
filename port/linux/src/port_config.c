@@ -304,6 +304,12 @@ static const struct config_setting config_settings[] =
 		"Moving the mouse forward looks down." },
 	{ "network.block_mouse_aim_assist", _config_boolean, "false", "HALO_NET_BLOCK_MOUSE_AIM_ASSIST", _environment_value,
 		_platform_all, "Host: disable optional mouse magnetism for mouse/keyboard players. Controllers and touch keep their own assist." },
+	{ "network.shield_effects", _config_string, "\"stock\"", "HALO_NET_SHIELD_EFFECTS", _environment_value, _platform_all,
+		"Host: the shield effects every player of a network game sees, whatever\n"
+		"their own: \"stock\", \"glow\", \"light_show\", \"overshield\",\n"
+		"\"glow_overshield\" or \"light_show_overshield\" (display.shield_glow,\n"
+		"its light_show intensity, display.overshield_effect). SHIELD EFFECTS\n"
+		"in Server Setup > Player Options writes its choice here." },
 	{ "input.mouse_aim_assist", _config_boolean, "false", "HALO_MOUSE_AIM_ASSIST", _environment_value, _platform_desktop,
 		"Magnetism while aiming with the mouse, as with a controller: the view\n"
 		"slowed and dragged along by a target. The last of the mouse and the\n"
@@ -420,13 +426,18 @@ static const struct config_setting config_settings[] =
 		"it charges (2 seconds, 3 from a shield that was down) and staying lit,\n"
 		"its energy slower, in its own color (the powerup's), on the first-person\n"
 		"arms too with viewmodel_shield; a hit on it plays what the projectile\n"
-		"plays on an Elite's shield. Only what is drawn and heard changes." },
+		"plays on an Elite's shield. Only what is drawn and heard changes.\n"
+		"Offline only: in a network game, the host's network.shield_effects\n"
+		"decides." },
 	{ "display.shield_glow", _config_boolean, "false", "HALO_SHIELD_GLOW", _environment_value, _platform_all,
 		"Energy shields light what is around them as they flare, as plasma\n"
-		"does, in the shield's own color." },
+		"does, in the shield's own color. Offline only: in a network game, the\n"
+		"host's network.shield_effects decides." },
 	{ "display.shield_glow_intensity", _config_string, "\"default\"", "HALO_SHIELD_GLOW_INTENSITY", _environment_value, _platform_all,
 		"How far the shield glow reaches: \"default\" or \"light_show\" (three\n"
-		"times as far, and at full strength from a third of the flare)." },
+		"times as far, and at full strength from a third of the flare).\n"
+		"Offline only: in a network game, the host's network.shield_effects\n"
+		"decides." },
 	{ "display.shield_color", _config_string, "\"default\"", "HALO_SHIELD_COLOR", _environment_value, _platform_all,
 		"Your energy shield's color, as this machine draws it: \"default\" (the\n"
 		"shield's own) or a multiplayer armor color: white, black, red, blue,\n"
@@ -1534,6 +1545,8 @@ static const struct
 	{ "network.voice_mode", { "off", "team_proximity", "team_enemy_proximity", "team_global",
 		"team_global_enemy_proximity", NULL }, NULL },
 	{ "network.coop_friendly_fire", { "off", "on", "shields_only", "explosives_only", NULL }, NULL },
+	{ "network.shield_effects", { "stock", "glow", "light_show", "overshield", "glow_overshield",
+		"light_show_overshield", NULL }, NULL },
 	{ "network.coop_enemies_mode", { "none", "per_player", "multiplier", NULL }, NULL },
 	{ "streamer.slurs", { "off", "severe", "strong", "mild", NULL }, NULL },
 	{ "streamer.swearing", { "off", "severe", "strong", "mild", NULL }, NULL },
