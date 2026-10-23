@@ -324,5 +324,13 @@ bytes the game wrote once and will not write again, drawn from a GL buffer
 of its own; and the end of one, when the game releases it (d3d8_gl.c) */
 void xgpu_static_buffer_add(const void *resource, unsigned long size, int indices);
 void xgpu_static_buffer_remove(const void *resource, int indices);
+/* Android: an Xbox map's count vertex (indices 0) or index (1) buffers,
+stride bytes apart, whose data lie from the first of them to end and are
+not written while they are registered; and their end (d3d8_gl.c) */
+void xgpu_static_buffers_add(const void *buffers, long count, unsigned long stride, int indices, const void *end);
+void xgpu_static_buffers_remove(const void *buffers, long count, unsigned long stride, int indices);
+/* Android: size bytes of vertices or indices from start, as above */
+void xgpu_static_range_add(const void *start, unsigned long size, int indices);
+void xgpu_static_range_remove(const void *start, int indices);
 
 #endif
