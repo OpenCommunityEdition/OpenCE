@@ -31,6 +31,8 @@ libm = "0.2"
 glam = { version = "0.34", default-features = false, features = ["libm"] }
 uniffi = { version = "0.32", default-features = false }
 log = "0.4"
+# (checks the chant found in the player's default.xbe)
+sha2 = { version = "0.10", default-features = false }
 # (inflates the Xbox caches)
 miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
 

@@ -18,6 +18,7 @@ mod dynamic_decals;
 mod effects;
 pub mod hud;
 pub mod lights;
+pub mod loading;
 pub mod network;
 mod particles;
 pub mod render_level;
