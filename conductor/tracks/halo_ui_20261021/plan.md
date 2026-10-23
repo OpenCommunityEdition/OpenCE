@@ -28,7 +28,7 @@
 - [x] Task: The launcher d2346075
     - [x] Write tests: XCTest of the launcher's three choices and its settings
     - [x] Play, Settings and Exit only
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: The screens and the launcher' (Protocol in workflow.md) (deferred to the end) (deferred to the end)
+- [ ] Task: Conductor - User Manual Verification 'Phase 3: The screens and the launcher' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 4: The loading screen
 - [x] Task: The chant 85cf1883
@@ -37,7 +37,7 @@
 - [x] Task: The screen 72ee6af2
     - [x] Write tests: the panning light's timing and the fade against the behaviour of `progress_bar.c`; skipping only once the map is ready
     - [x] The loading screen pass; background loading and import of the next map; the fade into the next mission; `ui.loading_screen`
-- [ ] Task: Transitions
-    - [ ] Write tests: no frame over 33 ms from the end of a10 to the first frame of a30 (marked, needs `assets/maps`)
-    - [ ] `docs/engine.md`: the UI, the launcher and the loading screen; golden frames of the screens
+- [x] Task: Transitions eaee433f
+    - [x] Write tests: no frame over 33 ms from the end of a10 to the first frame of a30 (marked, needs `assets/maps`)
+    - [x] `docs/engine.md`: the UI, the launcher and the loading screen; golden frames of the screens
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: The loading screen' (Protocol in workflow.md) (deferred to the end)
