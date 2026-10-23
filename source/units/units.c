@@ -644,6 +644,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "units.h"
 
 #include "bipeds.h"
@@ -2156,6 +2157,10 @@ boolean unit_add_grenade_to_inventory(
 	boolean result = FALSE;
 	static boolean grenade_type_reported = FALSE;
 
+	/* port: an Infection zombie takes no grenades */
+	if (infection_unit_is_zombie(unit_index))
+		return FALSE;
+
 	match_assert(
 		"c:\\halo\\SOURCE\\units\\units.c",
 		7282,
@@ -2219,6 +2224,9 @@ boolean unit_add_equipment_to_inventory(
 		7330,
 		equipment_definition->equipment.powerup_type!=_equipment_powerup_grenade);
 
+	/* port: nor powerups */
+	if (infection_unit_is_zombie(unit_index))
+		return FALSE;
 	if (unit->unit.equipment_object_index!=NONE && replace==TRUE)
 	{
 		object_delete(unit->unit.equipment_object_index);
@@ -3054,6 +3062,9 @@ boolean unit_enter_seat(
 {
 	boolean result = FALSE;
 
+	/* port: and fights on foot */
+	if (infection_unit_is_zombie(unit_index))
+		return FALSE;
 	if (unit_can_enter_seat(unit_index, target_unit_index, seat_index, NULL))
 	{
 		struct unit_datum *unit = unit_get(unit_index);
@@ -7749,8 +7760,13 @@ boolean unit_drop_selected_weapon(
 		TEST_FLAG(weapon_definition_get(weapon_get(weapon_index)->definition_index)->weapon.flags,
 			_weapon_doesnt_count_toward_maximum_bit))
 	{
+		/* port: (an Infection zombie keeps its skull: infection.c) */
+		if (!infection_allow_weapon_drop(unit_index, unit_get_current_weapon_index(unit_index)))
+			return FALSE;
 		return unit_drop_current_weapon(unit_index, TRUE);
 	}
+	if (!infection_allow_weapon_drop(unit_index, weapon_index))
+		return FALSE;
 	unit_drop_item(unit_index, weapon_index);
 	unit->unit.weapon_object_indices[slot] = NONE;
 	unit->unit.desired_weapon_index = unit->unit.current_weapon_index!=NONE ?
@@ -9087,8 +9103,11 @@ void unit_cause_player_melee_damage(
 						long hit_object_index = collision.object_index;
 						struct object_datum *hit_object = object_get(hit_object_index);
 
+						/* port: (an Infection zombie's skull hits a rider in an open
+						seat itself: infection.c) */
 						if (hit_object->object.type!=_object_type_weapon &&
-							hit_object->object.parent_object_index!=NONE)
+							hit_object->object.parent_object_index!=NONE &&
+							!infection_melee_rider_target(unit_index, hit_object_index))
 						{
 							hit_object_index = hit_object->object.parent_object_index;
 							hit_object = object_get(hit_object_index);
@@ -9198,6 +9217,9 @@ void unit_cause_player_melee_damage(
 			struct damage_data damage_data;
 
 			damage_data_new(&damage_data, melee_damage_effect_index);
+			/* port: an Infection zombie's skull's (a client's report the host
+			works out again: network_damage.c) */
+			damage_data.multiplier = infection_melee_multiplier(unit_index);
 			SET_FLAG(damage_data.flags, _damage_area_of_effect_bit, TRUE);
 			damage_data.location = unit->object.location;
 			damage_data.owner_object_index = unit_index;

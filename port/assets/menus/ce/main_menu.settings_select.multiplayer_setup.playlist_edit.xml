@@ -3,6 +3,7 @@
 <menus>
 	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/edit_playlist_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_list_extended_desc">
 		<data input="playlist settings menu update desc"/>
+		<data input="port playlist edit desc"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_name_list_item"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_game_type_item"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_player_opts_item"/>
@@ -10,6 +11,7 @@
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_vehicles_list_item"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_indicators_item"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_team_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_opence_item"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_edit_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">

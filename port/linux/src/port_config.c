@@ -192,6 +192,10 @@ static const struct config_setting config_settings[] =
 		"Sharpen textures seen at a grazing angle (floors, walls, terrain), which\n"
 		"the Xbox did not: 2, 4, 8 or 16 times; 0 filters as the Xbox did. 4 keeps\n"
 		"most of 16's sharpness at less cost on slower GPUs." },
+	{ "display.dxt1_astc", _config_boolean, "true", "HALO_DXT1_ASTC", _environment_value, _platform_android,
+		"On a GPU without DXT textures (Mali), give it the DXT1 textures as ASTC,\n"
+		"which holds them nearly as they are in a quarter of the memory of the\n"
+		"32-bit texels they are otherwise decoded to; false decodes them." },
 	{ "display.latency_meter", _config_boolean, "false", "HALO_LATENCY_METER", _environment_value, _platform_all,
 		"In a network game, your round trip to the host in milliseconds at the\n"
 		"screen's top right, with bars (the host: its slowest player's), and\n"
@@ -300,6 +304,12 @@ static const struct config_setting config_settings[] =
 		"Moving the mouse forward looks down." },
 	{ "network.block_mouse_aim_assist", _config_boolean, "false", "HALO_NET_BLOCK_MOUSE_AIM_ASSIST", _environment_value,
 		_platform_all, "Host: disable optional mouse magnetism for mouse/keyboard players. Controllers and touch keep their own assist." },
+	{ "network.shield_effects", _config_string, "\"stock\"", "HALO_NET_SHIELD_EFFECTS", _environment_value, _platform_all,
+		"Host: the shield effects every player of a network game sees, whatever\n"
+		"their own: \"stock\", \"glow\", \"light_show\", \"overshield\",\n"
+		"\"glow_overshield\" or \"light_show_overshield\" (display.shield_glow,\n"
+		"its light_show intensity, display.overshield_effect). SHIELD EFFECTS\n"
+		"in Server Setup > Player Options writes its choice here." },
 	{ "input.mouse_aim_assist", _config_boolean, "false", "HALO_MOUSE_AIM_ASSIST", _environment_value, _platform_desktop,
 		"Magnetism while aiming with the mouse, as with a controller: the view\n"
 		"slowed and dragged along by a target. The last of the mouse and the\n"
@@ -416,13 +426,18 @@ static const struct config_setting config_settings[] =
 		"it charges (2 seconds, 3 from a shield that was down) and staying lit,\n"
 		"its energy slower, in its own color (the powerup's), on the first-person\n"
 		"arms too with viewmodel_shield; a hit on it plays what the projectile\n"
-		"plays on an Elite's shield. Only what is drawn and heard changes." },
+		"plays on an Elite's shield. Only what is drawn and heard changes.\n"
+		"Offline only: in a network game, the host's network.shield_effects\n"
+		"decides." },
 	{ "display.shield_glow", _config_boolean, "false", "HALO_SHIELD_GLOW", _environment_value, _platform_all,
 		"Energy shields light what is around them as they flare, as plasma\n"
-		"does, in the shield's own color." },
+		"does, in the shield's own color. Offline only: in a network game, the\n"
+		"host's network.shield_effects decides." },
 	{ "display.shield_glow_intensity", _config_string, "\"default\"", "HALO_SHIELD_GLOW_INTENSITY", _environment_value, _platform_all,
 		"How far the shield glow reaches: \"default\" or \"light_show\" (three\n"
-		"times as far, and at full strength from a third of the flare)." },
+		"times as far, and at full strength from a third of the flare).\n"
+		"Offline only: in a network game, the host's network.shield_effects\n"
+		"decides." },
 	{ "display.shield_color", _config_string, "\"default\"", "HALO_SHIELD_COLOR", _environment_value, _platform_all,
 		"Your energy shield's color, as this machine draws it: \"default\" (the\n"
 		"shield's own) or a multiplayer armor color: white, black, red, blue,\n"
@@ -553,7 +568,14 @@ static const struct config_setting config_settings[] =
 		"Whether the players of an online co-op game hurt each other: \"off\",\n"
 		"\"on\", \"shields_only\" or \"explosives_only\" (FRIENDLY FIRE in\n"
 		"co-op's Server Setup > Co-op Options writes its choice here). Their AI\n"
-		"allies they always can, as in the campaign." },
+		"allies they hurt as network.coop_ally_friendly_fire says." },
+	{ "network.coop_ally_friendly_fire", _config_boolean, "true", "HALO_NET_COOP_ALLY_FRIENDLY_FIRE",
+		_environment_value, _platform_all,
+		"Whether the players of an online co-op game hurt their AI allies (the\n"
+		"Marines, Captain Keyes, the Sentinels while they are allies), as in the\n"
+		"campaign; false, the players' weapons, grenades and vehicles do them\n"
+		"no harm. ALLY FRIENDLY FIRE in co-op's Server Setup > Co-op Options\n"
+		"writes its choice here." },
 	{ "network.coop_own_friendly_fire", _config_boolean, "true", "HALO_NET_COOP_OWN_FRIENDLY_FIRE",
 		_environment_value, _platform_all,
 		"Whether this machine's players hurt, and are hurt by, the other players\n"
@@ -1523,6 +1545,8 @@ static const struct
 	{ "network.voice_mode", { "off", "team_proximity", "team_enemy_proximity", "team_global",
 		"team_global_enemy_proximity", NULL }, NULL },
 	{ "network.coop_friendly_fire", { "off", "on", "shields_only", "explosives_only", NULL }, NULL },
+	{ "network.shield_effects", { "stock", "glow", "light_show", "overshield", "glow_overshield",
+		"light_show_overshield", NULL }, NULL },
 	{ "network.coop_enemies_mode", { "none", "per_player", "multiplier", NULL }, NULL },
 	{ "streamer.slurs", { "off", "severe", "strong", "mild", NULL }, NULL },
 	{ "streamer.swearing", { "off", "severe", "strong", "mild", NULL }, NULL },

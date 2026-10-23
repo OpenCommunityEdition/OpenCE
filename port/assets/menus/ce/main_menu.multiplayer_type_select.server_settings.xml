@@ -241,6 +241,7 @@
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_multiplier" x="54" y="193"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_per_player" x="54" y="223"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_player_collisions" x="54" y="253"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_ally_friendly_fire" x="54" y="283"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -355,6 +356,19 @@
 		<string text="ON"/>
 		<string text="OFF"/>
 	</strings>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_ally_friendly_fire" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_ally_friendly_fire_label"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_ally_friendly_fire_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_ally_friendly_fire_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_ally_friendly_fire_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_ally_friendly_fire" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_ally_friendly_fire">
+		<string text="ON"/>
+		<string text="OFF"/>
+	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels">
 		<string text="FRIENDLY FIRE:"/>
 		<string text="EXTRA ENEMIES:"/>
@@ -363,6 +377,7 @@
 		<string text="MULTIPLIER:"/>
 		<string text="PER PLAYER:"/>
 		<string text="PLAYER COLLISIONS:"/>
+		<string text="ALLY FRIENDLY FIRE:"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/cap_coop_options">
 		<string text="Players can not be hurt by weapons and explosives\nfired by the other players."/>
@@ -390,6 +405,8 @@
 		<string text="For each player past the first, options set to Per\nPlayer get this much more (100%: as many again)."/>
 		<string text="Players bump into each other, as in the campaign."/>
 		<string text="Players walk through each other, so that no one\nblocks a doorway. The AI's characters still block."/>
+		<string text="Players can hurt and kill their AI allies, as in\nthe campaign."/>
+		<string text="Players can not hurt their AI allies, so that no\none can kill Keyes or the Marines a level needs."/>
 	</strings>
 	<widget name="main_menu/multiplayer_type_select/server_settings/voice_options/voice_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
 		<child widget="main_menu/multiplayer_type_select/server_settings/voice_options/header_voice_options"/>
