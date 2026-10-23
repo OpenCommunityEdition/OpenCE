@@ -1,6 +1,6 @@
 # Plan: Sound
 
-## Phase 1: Sounds and their formats
+## Phase 1: Sounds and their formats [checkpoint: 3a736947]
 - [x] Task: Sound tags and decoding 934b28e4
     - [x] Write tests: `snd!` fields; Xbox ADPCM, Ogg Vorbis and PCM decode to known samples; every sound of every stock map decodes (marked, needs `assets/maps`)
     - [x] The typed tags and the decoders, decoded into the cache
