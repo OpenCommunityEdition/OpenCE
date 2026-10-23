@@ -103,33 +103,11 @@ boolean coop_scripts_any_player_will_do(
 	return any;
 }
 
-void coop_scripts_gather_in_volume(
-	short trigger_volume_index,
+boolean coop_scripts_empty_player_list(
 	long object_list_index)
 {
-	long reference_index;
-	long object_index;
-	long inside_index = NONE;
-
-	for (object_index = object_list_get_first(object_list_index, &reference_index);
-		object_index != NONE && inside_index == NONE;
-		object_index = object_list_get_next(object_list_index, &reference_index))
-	{
-		if (scenario_trigger_volume_test_object(trigger_volume_index, object_index))
-			inside_index = object_index;
-	}
-	if (inside_index == NONE)
-		return;
-	for (object_index = object_list_get_first(object_list_index, &reference_index);
-		object_index != NONE;
-		object_index = object_list_get_next(object_list_index, &reference_index))
-	{
-		if (!scenario_trigger_volume_test_object(trigger_volume_index, object_index))
-		{
-			player_teleport(player_index_from_unit_index(object_index), inside_index,
-				&object_get(inside_index)->object.bounding_sphere_center);
-		}
-	}
+	return coop_scripts_host() && (object_list_index == NONE ||
+		(object_list_is_players(object_list_index) && object_list_count(object_list_index) == 0));
 }
 
 /* the units of the players following player0, if `unit_index` is
@@ -226,6 +204,70 @@ static boolean teleport_to(
 		biped_fix_ignore_players(FALSE);
 
 	return arrived;
+}
+
+/* A placement may fail after moving the unit, or find free ground outside
+this volume. Restore that unit before retrying; never move the loaded BSP.
+The second attempt uses the same crowd fallback as scripted teleports. */
+static void gather_player_in_volume(
+	short trigger_volume_index,
+	long unit_index,
+	long anchor_index,
+	real_point3d const *destination)
+{
+	long player_index = player_index_from_unit_index(unit_index);
+	real_point3d original;
+	real_point3d placed;
+	short attempt;
+
+	if (player_index == NONE)
+		return;
+	object_get_origin(unit_index, &original);
+	for (attempt = 0; attempt < 2; attempt++)
+	{
+		boolean arrived = teleport_to(player_index, anchor_index, destination, attempt != 0);
+
+		if (arrived && scenario_trigger_volume_test_object(trigger_volume_index, unit_index) &&
+			!player_position_switches_bsp(object_get_origin(unit_index, &placed)))
+		{
+			return;
+		}
+		/* This was the unit's valid position at entry, on the same tick. */
+		object_set_position(unit_index, &original, NULL, NULL);
+	}
+}
+
+void coop_scripts_gather_in_volume(
+	short trigger_volume_index,
+	long object_list_index)
+{
+	long reference_index;
+	long object_index;
+	long inside_index = NONE;
+	real_point3d destination;
+
+	if (!coop_scripts_host())
+		return;
+	for (object_index = object_list_get_first(object_list_index, &reference_index);
+		object_index != NONE;
+		object_index = object_list_get_next(object_list_index, &reference_index))
+	{
+		if (scenario_trigger_volume_test_object(trigger_volume_index, object_index) &&
+			!player_position_switches_bsp(object_get_origin(object_index, &destination)))
+		{
+			inside_index = object_index;
+			break;
+		}
+	}
+	if (inside_index == NONE)
+		return;
+	for (object_index = object_list_get_first(object_list_index, &reference_index);
+		object_index != NONE;
+		object_index = object_list_get_next(object_list_index, &reference_index))
+	{
+		if (!scenario_trigger_volume_test_object(trigger_volume_index, object_index))
+			gather_player_in_volume(trigger_volume_index, object_index, inside_index, &destination);
+	}
 }
 
 boolean coop_scripts_unit_near(

@@ -3572,6 +3572,8 @@ static struct custom_edition_behaviour_map
 } const custom_edition_behaviour_maps[] =
 {
 #include "custom_edition_behaviours.inc"
+	/* Locally verified HUD data; not part of Chimera's generated list. */
+	{ "bigass_open_v1.1", 0xD2BC19F7, BEHAVIOUR(hud_number_scale) | BEHAVIOUR(xbox_ammo_meter_channels) },
 };
 
 #undef BEHAVIOUR
@@ -3590,6 +3592,7 @@ static char const *const custom_edition_behaviour_names[NUMBER_OF_CUSTOM_EDITION
 	"old_widescreen_fix",
 	"gearbox_shader_environment_types",
 	"block_multitexture_overlays",
+	"xbox_ammo_meter_channels",
 };
 
 /* the behaviours the map named `map_name` relies on, found as Chimera finds

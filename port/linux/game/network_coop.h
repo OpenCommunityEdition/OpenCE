@@ -48,6 +48,10 @@ boolean network_coop_active(void);
 /* whether the players collide with each other: FALSE in a co-op game whose
 host set Server Setup's PLAYER COLLISIONS off (bipeds.c, collisions.c) */
 boolean network_coop_player_collisions(void);
+/* whether the players hurt their AI allies: FALSE in a co-op game whose host
+set Server Setup's ALLY FRIENDLY FIRE off (game_engine.c's
+game_engine_friendly_damage) */
+boolean network_coop_ally_friendly_fire(void);
 /* whether this machine's players play with friendly fire between players
 (network.coop_own_friendly_fire: the pause menu's FRIENDLY FIRE) */
 boolean network_coop_own_friendly_fire(void);

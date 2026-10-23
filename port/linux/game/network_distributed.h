@@ -137,10 +137,12 @@ enum
 	/* the host's mouse aim assist policy (network_aim_assist.c), to every
 	client, reliably, when it is ready and when the policy changes */
 	_distributed_message_aim_assist_policy = 90,
-
+	/* the host's shield effects (network_shield_effects.c), to every client,
+	reliably, when it is ready and when they change */
+	_distributed_message_shield_effects = 91,
 	/* the host's mutators (network_mutators.c): each effect's and
 	parameter's key and value, to each client, reliably, when it is ready */
-	_distributed_message_mutators = 91,
+	_distributed_message_mutators = 92,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };

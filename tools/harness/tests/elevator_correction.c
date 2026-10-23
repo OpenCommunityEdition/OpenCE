@@ -10,7 +10,7 @@ struct player_datum { short local_player_index; };
 struct distributed_unit_state { real_point3d position; unsigned flags; word predicted_time; };
 struct fake_object {
     long mask;
-    struct { real_point3d position; } object;
+    struct { real_point3d position, bounding_sphere_center; } object;
     struct { unsigned flags; long support_surface_index, elevator_object_index; char elevator_ticks; } biped;
 };
 #define biped_datum fake_object

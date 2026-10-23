@@ -77,7 +77,7 @@ def test_message_id():
     messages = {name: int(value) for name, value in network_format.items().items()
                 if name.startswith('enum _distributed_message_')}
     assert len(set(messages.values())) == len(messages), messages
-    assert messages['enum _distributed_message_mutators'] == 91
+    assert messages['enum _distributed_message_mutators'] == 92
 
 
 def test_menu():

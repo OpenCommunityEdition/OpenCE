@@ -4526,6 +4526,18 @@ void network_game_server_port_set_cooperative_player_collisions(
 		network_event("network_game_server_port_set_cooperative_player_collisions() failed to send updated game settings to clients");
 }
 
+void network_game_server_port_set_cooperative_ally_friendly_fire(
+	boolean ally_friendly_fire)
+{
+	struct network_game_server *server = global_network_game_server_get();
+
+	if (!server)
+		return;
+	SET_FLAG(server->game.cooperative_flags, _network_game_cooperative_no_ally_friendly_fire_bit, !ally_friendly_fire);
+	if (server->state == _network_game_server_state_pregame && !network_game_server_send_game_data_pregame(server))
+		network_event("network_game_server_port_set_cooperative_ally_friendly_fire() failed to send updated game settings to clients");
+}
+
 /* port: a game a host runs afresh. A machine that asked to join as the last
 game ended, before the server switched to the pregame, is left waiting behind
 the one it holds (server->queued_player): the server refuses every later join

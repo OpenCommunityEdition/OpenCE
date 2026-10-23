@@ -19,7 +19,7 @@ OBJECT_LISTS.H
 struct object_list_header_datum
 {
 	short identifier;
-	word pad;
+	word flags; /* port: provenance, using the original unused word */
 	short reference_count;
 	short count;
 	long first_reference_index;
@@ -32,6 +32,9 @@ void object_lists_dispose(void);
 void object_lists_initialize_for_new_map(void);
 void object_lists_dispose_from_old_map(void);
 long object_list_new(void);
+/* port: distinguish an empty (players) result from an empty AI list. */
+void object_list_mark_players(long list_index);
+boolean object_list_is_players(long list_index);
 void object_list_delete(long list_index);
 void object_list_add(long object_list_index, long object_index);
 long object_list_get_first(
