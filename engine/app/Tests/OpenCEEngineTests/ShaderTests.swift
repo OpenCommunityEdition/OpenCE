@@ -27,7 +27,7 @@ final class ShaderTests: XCTestCase {
                                            .debug: "debug_vertex", .screen: "screen_occlusion",
                                            .bake: "bake_irradiance", .camera: "camera_occlusion",
                                            .decal: "decal_fragment", .particle: "particle_fragment",
-                                           .ui: "ui_fragment"]
+                                           .ui: "ui_fragment", .loading: "loading_light"]
         for shader in Shader.allCases {
             let source = try ShaderSources.source(shader)
             XCTAssertTrue(source.contains(try XCTUnwrap(functions[shader])), shader.file)

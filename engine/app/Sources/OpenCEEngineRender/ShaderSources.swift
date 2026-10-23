@@ -13,6 +13,8 @@ public enum Shader: String, CaseIterable, Sendable {
     case hud
     /// The Halo UI's widgets and text.
     case ui
+    /// The loading screen between missions.
+    case loading
     case text
     case debug
     /// The screen's passes: occlusion, reflections, their resolve.
@@ -127,7 +129,8 @@ public final class ShaderReloader {
 
     /// Compiles each shader that changed into the passes given (one that
     /// is nil is skipped: it reads the new source when it is made).
-    public func poll(level: LevelRenderer?, hud: HudPass?, text: TextPass?) -> [Reload] {
+    public func poll(level: LevelRenderer?, hud: HudPass?, text: TextPass?,
+                     loading: LoadingPass? = nil) -> [Reload] {
         var out: [Reload] = []
         for shader in watcher.changed() {
             let reload: ((String) throws -> Void)?
@@ -141,6 +144,7 @@ public final class ShaderReloader {
             case .hud: reload = hud.map { pass in { try pass.reloadShaders(source: $0) } }
             case .ui: reload = level?.ui.map { pass in { try pass.reloadShaders(source: $0) } }
             case .text: reload = text.map { pass in { try pass.reloadShaders(source: $0) } }
+            case .loading: reload = loading.map { pass in { try pass.reloadShaders(source: $0) } }
             case .bake: reload = nil
             }
             guard let reload else { continue }

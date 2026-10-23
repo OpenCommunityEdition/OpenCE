@@ -18,15 +18,24 @@ public struct LoadedLevel {
     public let bake: LevelBake?
 
     public init(map: String, bsp: UInt32 = 0, cacheFolder: String, device: MTLDevice,
-                settings: VideoSettings) throws {
+                settings: VideoSettings, progress: ((Float) -> Void)? = nil) throws {
         self.map = map
         self.bsp = bsp
+        progress?(0)
         geometry = try LevelGeometry.load(map: map, cacheFolder: cacheFolder, bsp: bsp)
+        progress?(Self.importedProgress)
         renderer = try LevelRenderer(device: device, geometry: geometry, settings: settings)
+        progress?(Self.drawnProgress)
         start = geometry.startView()
         bake = try? geometry.bakePlan(quick: false)
         if let bake, let light = LightBaker.cached(bake, folder: cacheFolder) {
             try renderer.useBakedLighting(light)
         }
+        progress?(1)
     }
+
+    /// How far a load has come once the map is imported (the longest part
+    /// the first time), and once its buffers and textures are made.
+    public static let importedProgress: Float = 0.5
+    public static let drawnProgress: Float = 0.9
 }

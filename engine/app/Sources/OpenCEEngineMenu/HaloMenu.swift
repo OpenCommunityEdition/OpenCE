@@ -27,11 +27,24 @@ public protocol GameActions: AnyObject {
 public final class HaloMenu {
     /// The campaign's missions, in the order they are played, with their
     /// titles.
-    public static let missions: [(map: String, title: String)] = [
+    public nonisolated static let missions: [(map: String, title: String)] = [
         ("a10", "The Pillar of Autumn"), ("a30", "Halo"), ("a50", "The Truth and Reconciliation"),
         ("b30", "The Silent Cartographer"), ("b40", "Assault on the Control Room"), ("c10", "343 Guilty Spark"),
         ("c20", "The Library"), ("c40", "Two Betrayals"), ("d20", "Keyes"), ("d40", "The Maw"),
     ]
+
+    /// The mission after `map` among `maps` (the next of the campaign's
+    /// whose file is there), or nil after the last.
+    public nonisolated static func nextMission(after map: String, in maps: [URL]) -> URL? {
+        let name = URL(fileURLWithPath: map).deletingPathExtension().lastPathComponent.lowercased()
+        guard let index = missions.firstIndex(where: { $0.map == name }) else { return nil }
+        for mission in missions[(index + 1)...] {
+            if let file = maps.first(where: { $0.deletingPathExtension().lastPathComponent.lowercased() == mission.map }) {
+                return file
+            }
+        }
+        return nil
+    }
     /// The maps that are not multiplayer levels: the missions' and the
     /// shell's own.
     public static let notMultiplayer: Set<String> = Set(missions.map(\.map)).union(["ui"])

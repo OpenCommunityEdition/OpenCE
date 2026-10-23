@@ -230,6 +230,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// The launcher's window, while it shows.
     var launcher: NSWindow?
+    /// The loading screen between missions, while it shows, its pass and
+    /// its chant (made with the first).
+    var loadingScreen: LoadingScreenModel?
+    var loadingPass: LoadingPass?
+    lazy var chant = ChantPlayer(wave: ChantPlayer.wave(executables: ChantPlayer.executables(folders: folders, root: root),
+                                                        cacheFolder: cacheFolder()))
+    /// Where the loading screen was at the last frame.
+    var lastLoadingStage: LoadingStage = .done
+    /// The mission that was won, so that the next is loaded once.
+    var wonMission: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = mainMenu()
@@ -343,7 +353,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Whether the world holds: a game alone with its pause menu open.
     var holdsWorld: Bool {
-        menu.isOpen && !inShellScene && engine.networkStatus() == .alone
+        (menu.isOpen && !inShellScene && engine.networkStatus() == .alone) || loadingHolds
+    }
+
+    /// Whether the loading screen hides the mission (it starts with the fade).
+    var loadingHolds: Bool {
+        loadingScreen != nil && (lastLoadingStage == .loading || lastLoadingStage == .settling)
     }
 
     /// Shows what went wrong, over the window.
@@ -468,6 +483,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let key = ShellKey(event) else { return shell.isOpen }
                 return shell.handle(key) || shell.isOpen
             }
+            // (a key skips the loading screen once the map is ready; it has the keys until it fades)
+            if let loadingScreen, lastLoadingStage == .loading || lastLoadingStage == .settling {
+                if event.type == .keyDown, !event.isARepeat {
+                    _ = loadingScreen.skip()
+                }
+                return true
+            }
             // (the menu has the keys while it is open; Escape in a game opens its pause menu)
             if menu.isOpen {
                 if event.type == .keyDown {
@@ -538,6 +560,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let device = controller.window.engineView.device else { fail("no Metal device") }
         let loaded = try LoadedLevel(map: map, bsp: 0, cacheFolder: cacheFolder(), device: device,
                                      settings: settings)
+        try startCampaign(loaded, map: map, difficulty: difficulty)
+    }
+
+    /// Loads `map` behind the loading screen, then plays its mission at
+    /// `difficulty`; a map that cannot be loaded brings the main menu back.
+    func loadCampaignBehindScreen(map: String, difficulty: UInt8) {
+        guard let device = controller?.window.engineView.device else { fail("no Metal device") }
+        let screen = LoadingScreenModel(enabled: saved.settings.ui.loadingScreen)
+        loadingPass?.reset()
+        loadingScreen = screen
+        lastLoadingStage = .loading
+        wonMission = nil
+        inShellScene = false
+        level = nil
+        let job = LevelJob(map: map, cacheFolder: cacheFolder(), device: device, settings: settings)
+        Task { @MainActor [weak self] in
+            let result = await Task.detached { job.run { screen.setProgress(progress: $0) } }.value
+            guard let self, self.loadingScreen === screen else { return }
+            do {
+                try self.startCampaign(try result.get().level, map: map, difficulty: difficulty)
+                screen.setReady()
+            } catch {
+                self.loadingScreen = nil
+                self.chant.stop()
+                self.showMenu(nil)
+                self.showMessage("\(URL(fileURLWithPath: map).lastPathComponent) could not be loaded: \(error)")
+            }
+        }
+    }
+
+    /// Plays the mission of `loaded`, the level of `map`, at `difficulty`.
+    func startCampaign(_ loaded: LoadedLevel, map: String, difficulty: UInt8) throws {
+        guard let controller, let device = controller.window.engineView.device else { return }
         if hud == nil {
             hud = hudPass(device: device)
         }
@@ -648,13 +703,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func reloadShaders(now: CFTimeInterval) {
         guard let shaders, now - lastShaderPoll >= 1 else { return }
         lastShaderPoll = now
-        for reload in shaders.poll(level: level?.renderer, hud: hud, text: textPass) {
+        for reload in shaders.poll(level: level?.renderer, hud: hud, text: textPass, loading: loadingPass) {
             if let error = reload.error {
                 engineLog(level: "error", target: "shaders", text: "\(reload.shader.file) kept its old pipelines: \(error)")
             } else {
                 engineLog(level: "info", target: "shaders", text: "\(reload.shader.file) reloaded")
             }
         }
+    }
+
+    /// The loading screen's frame `seconds` after the last, its chant
+    /// played; nil once it is done (it is then let go).
+    private func updateLoadingScreen(seconds: Double) -> LoadingView? {
+        guard let loadingScreen, let device = controller?.window.engineView.device else { return nil }
+        if loadingPass == nil {
+            do {
+                loadingPass = try LoadingPass(device: device, mask: loadingScreen.maskPixels(), outputFormat: .bgra8Unorm)
+            } catch {
+                appLog("error", "the loading screen's pass: \(error)")
+            }
+        }
+        let view = loadingScreen.update(seconds: Float(seconds))
+        lastLoadingStage = view.stage
+        chant.apply(view)
+        if view.stage == .done {
+            self.loadingScreen = nil
+            loadingPass?.reset()
+            return nil
+        }
+        return view
+    }
+
+    /// Loads the next mission once the one played is won.
+    private func nextMissionIfWon() {
+        guard loadingScreen == nil, !inShellScene, let level, let lastCampaign, level.map == lastCampaign.map,
+              wonMission != level.map, engine.campaignState()?.won == true else { return }
+        wonMission = level.map
+        guard let next = HaloMenu.nextMission(after: level.map, in: maps) else {
+            showMenu(nil)
+            return
+        }
+        engine.leaveGame()
+        loadCampaignBehindScreen(map: next.path, difficulty: lastCampaign.difficulty)
     }
 
     private func frame(_ link: CADisplayLink) {
@@ -680,10 +770,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         menu.update(now: link.timestamp)
+        let loading = updateLoadingScreen(seconds: seconds)
         if !holdsWorld {
             _ = try? engine.advance(frameSeconds: seconds)
         }
         followStructure()
+        nextMissionIfWon()
         showStatus()
         profiled("shell", engine) { shell?.update(seconds: seconds, now: link.timestamp) }
         reloadShaders(now: link.timestamp)
@@ -699,6 +791,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let (width, height) = controller.window.engineView.sizeInPixels
         let text = shellItems(width: width, height: height)
         guard let renderer = level?.renderer else {
+            if let loading, let loadingPass {
+                controller.window.engineView.render { commands, target in
+                    loadingPass.encode(loading, into: commands, target: target, clear: true)
+                    self.textPass?.encode(text, into: commands, target: target)
+                }
+                return
+            }
             guard let textPass, !text.isEmpty else {
                 controller.window.engineView.clear()
                 return
@@ -742,7 +841,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 renderer.encode(into: commands, target: target, camera: camera, objects: objects,
                                 hudQuads: inShellScene ? [] : hudQuads, uiQuads: uiQuads, debugLines: debugLines)
             }
+            if let loading, let loadingPass = self.loadingPass {
+                loadingPass.encode(loading, into: commands, target: target, clear: false)
+            }
             profiled("text", self.engine) { self.textPass?.encode(labels + text, into: commands, target: target) }
+        }
+    }
+}
+
+/// A level loaded off the main thread, for the loading screen (Metal's
+/// devices make their buffers and textures on any thread; the level is
+/// handed to the main thread whole and used only there).
+struct LevelJob: @unchecked Sendable {
+    let map: String
+    let cacheFolder: String
+    let device: MTLDevice
+    let settings: VideoSettings
+
+    struct Loaded: @unchecked Sendable {
+        let level: LoadedLevel
+    }
+
+    func run(progress: @escaping (Float) -> Void) -> Result<Loaded, Error> {
+        Result {
+            Loaded(level: try LoadedLevel(map: map, bsp: 0, cacheFolder: cacheFolder, device: device,
+                                          settings: settings, progress: progress))
         }
     }
 }
@@ -777,7 +900,7 @@ extension AppDelegate: GameActions {
     func playCampaign(map: URL, difficulty: UInt8) throws {
         hideMenu()
         engine.leaveGame()
-        try loadCampaign(map: map.path, difficulty: difficulty)
+        loadCampaignBehindScreen(map: map.path, difficulty: difficulty)
     }
 
     func host(_ setup: HostSetup, map: URL, port: UInt16) throws {
@@ -808,7 +931,8 @@ extension AppDelegate: GameActions {
     func restartLevel() throws {
         guard let lastCampaign else { return }
         hideMenu()
-        try loadCampaign(map: lastCampaign.map, difficulty: lastCampaign.difficulty)
+        engine.leaveGame()
+        loadCampaignBehindScreen(map: lastCampaign.map, difficulty: lastCampaign.difficulty)
     }
 
     func returnToMainMenu() {

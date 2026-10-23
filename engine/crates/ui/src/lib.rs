@@ -15,6 +15,7 @@
 
 pub mod chant;
 mod draw;
+pub mod loading;
 mod names;
 mod pointer;
 
