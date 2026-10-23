@@ -30,6 +30,8 @@ EXECUTABLE = "OpenCEEngine"
 LIBRARY = "libopence_ffi.a"
 FFI_MODULE = "opence_ffiFFI"
 SNAPSHOT_HEADER = "opence_snapshot.h"
+# where macOS mounts the Metal toolchain Xcode downloads
+CRYPTEXES = "/private/var/run/com.apple.security.cryptexd/mnt"
 
 
 def cargo(*args: str) -> None:
@@ -78,19 +80,34 @@ def xcode_environment() -> dict[str, str]:
     }
 
 
+def metal_compiler(environment: dict[str, str]) -> list[str]:
+    """The command that compiles a shader. xcrun finds the Metal toolchain
+    only for the user who downloaded it, not for nix's build users, so
+    without it the toolchain's mounted copy is used with the SDK's root."""
+    command = ["/usr/bin/xcrun", "-sdk", "macosx", "metal"]
+    found = subprocess.run([*command, "--version"], env=environment, capture_output=True, text=True)
+    if found.returncode == 0:
+        return command
+    mounted = sorted(Path(CRYPTEXES).glob("com.apple.MobileAsset.MetalToolchain-*/Metal.xctoolchain/usr/bin/metal"))
+    if not mounted:
+        raise SystemExit("Xcode's Metal toolchain is not installed: xcodebuild -downloadComponent MetalToolchain")
+    sdk = subprocess.run(["/usr/bin/xcrun", "-sdk", "macosx", "--show-sdk-path"], env=environment,
+                         capture_output=True, text=True, check=True).stdout.strip()
+    return [str(mounted[-1]), "-isysroot", sdk]
+
+
 def check_shaders(out: Path) -> None:
     """Compiles each of the renderer's shaders as the app will at run time
     (ShaderSources.swift), failing on the first that has an error."""
     folder = out / "shaders"
     folder.mkdir(parents=True, exist_ok=True)
     environment = xcode_environment()
+    compiler = metal_compiler(environment)
     for shader in sorted((PACKAGE / "Shaders").glob("*.metal")):
         made = subprocess.run(
-            ["/usr/bin/xcrun", "-sdk", "macosx", "metal", "-c", str(shader), "-o", str(folder / f"{shader.stem}.air")],
+            [*compiler, "-c", str(shader), "-o", str(folder / f"{shader.stem}.air")],
             env=environment, capture_output=True, text=True,
         )
-        if "missing Metal Toolchain" in made.stderr:
-            raise SystemExit("Xcode's Metal toolchain is not installed: xcodebuild -downloadComponent MetalToolchain")
         if made.returncode != 0:
             raise SystemExit(f"{shader.name} does not compile:\n{made.stderr}")
 
