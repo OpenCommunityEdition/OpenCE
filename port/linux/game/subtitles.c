@@ -71,11 +71,11 @@ enum
 	gap between lines (the HUD's 480 lines) */
 	/* the longest line drawn, in characters */
 	MAXIMUM_SUBTITLE_CHARACTERS = 1023,
-	SUBTITLE_PADDING = 5,
+	SUBTITLE_PADDING = 7,
 	/* (added to the height of a line, whose glyphs are taller than the font tag's) */
 	SUBTITLE_LINE_SPACING = 4,
 	/* (the glyphs of the HUD font rise above the font tag's line) */
-	SUBTITLE_TOP_PADDING = 9,
+	SUBTITLE_TOP_PADDING = 7,
 	SUBTITLE_GAP = 4,
 	/* draw_string.c's centred text and its flags (wrap in the bounds, and
 	past their bottom); its enums are its own */
