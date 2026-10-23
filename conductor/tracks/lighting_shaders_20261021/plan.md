@@ -61,9 +61,9 @@
 - [x] Task: Effects 5fd90923
     - [x] Write tests: an effect's events and parts fire at their times and markers; impacts choose the effect by material
     - [x] The effect system in `sim`: triggers from weapons, projectiles, explosions, scenery and vehicles; the effect parts in the snapshot
-- [ ] Task: Particles, contrails, weather and detail objects drawn
-    - [ ] Write tests: particle sequences, colours, sizes and blend modes; simple motion by velocity and gravity; weather and detail object placements import
-    - [ ] The particle, contrail, weather and detail object passes
+- [x] Task: Particles, contrails, weather and detail objects drawn 793366fb
+    - [x] Write tests: particle sequences, colours, sizes and blend modes; simple motion by velocity and gravity; weather and detail object placements import
+    - [x] The particle, contrail, weather and detail object passes
 - [ ] Task: The golden frames and the benchmark
     - [ ] Golden frames in bloodgulch, a10, a30 and b30 at 3840×2160; the benchmark at most 8.33 ms p99
     - [ ] `docs/engine.md`: the material model, the bake, the passes and their switches
