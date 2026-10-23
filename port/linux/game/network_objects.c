@@ -2252,7 +2252,7 @@ static boolean distributed_client_change_valid(
 	/* (a flag's or ball's team names the game type's flag or ball: an index
 	of its arrays; weapon_is_flag's bit) */
 	if (type == _object_type_weapon && ((weapon_definition_get(change->definition_index)->weapon.flags >> 3) & 1))
-		team_count = game_engine_get_variant()->game_engine_index == game_engine_ctf ? CTF_FLAG_TEAMS : ODDBALL_TEAMS;
+		team_count = GAME_ENGINE_TYPE_IS_CTF(game_engine_get_variant()->game_engine_index) ? CTF_FLAG_TEAMS : ODDBALL_TEAMS;
 	if (change->owner_team_index != NONE && (change->owner_team_index < 0 || change->owner_team_index >= team_count))
 		return FALSE;
 	/* (a flag or ball of no team would index the game type's arrays at -1) */

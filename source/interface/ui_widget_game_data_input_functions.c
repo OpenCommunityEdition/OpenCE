@@ -1112,6 +1112,7 @@ static void server_list_menu_update(
 
 				switch (server->engine_type)
 				{
+				case game_engine_ctf_slayer:
 				case game_engine_ctf:
 					game_type_bitmap->animation.current_frame_index =
 						_multiplayer_game_bitmap_ctf;
@@ -1178,6 +1179,7 @@ static void server_list_menu_update(
 
 				switch (server->engine_type)
 				{
+				case game_engine_ctf_slayer:
 				case game_engine_ctf:
 					ruleset_text->parameters.text_box.string_list_index =
 						_multiplayer_game_text_string_capture_the_flag;
@@ -1241,6 +1243,7 @@ static void server_list_menu_update(
 
 				switch (server->engine_type)
 				{
+				case game_engine_ctf_slayer:
 				case game_engine_ctf:
 					score_limit_type_text->parameters.text_box.string_list_index =
 						_multiplayer_game_text_string_captures;
@@ -2513,6 +2516,7 @@ static void multiplayer_game_set_text_box_for_game_ruleset(
 	{
 		switch (game->variant.game_engine_index)
 		{
+		case game_engine_ctf_slayer:
 		case game_engine_ctf:
 			if (game->variant.game_engine_variant.ctf.assault == TRUE)
 			{
@@ -2648,6 +2652,7 @@ static void multiplayer_game_set_text_box_for_score_limit_type(
 	{
 		switch (game->variant.game_engine_index)
 		{
+		case game_engine_ctf_slayer:
 		case game_engine_ctf:
 			widget->parameters.text_box.string_list_index =
 				_multiplayer_game_text_string_captures;
@@ -2787,6 +2792,7 @@ static void multiplayer_game_set_bitmap_for_ruleset(
 	{
 		switch (game->variant.game_engine_index)
 		{
+		case game_engine_ctf_slayer:
 		case game_engine_ctf:
 			widget->animation.current_frame_index = _multiplayer_game_bitmap_ctf;
 			break;
@@ -2862,6 +2868,7 @@ static void multiplayer_edit_profile_set_ruleset_textbox_string_index(
 	{
 		switch (profile->game_engine_index)
 		{
+		case game_engine_ctf_slayer:
 		case game_engine_ctf:
 			widget->parameters.text_box.string_list_index =
 				_multiplayer_game_text_string_capture_the_flag;
@@ -3358,6 +3365,7 @@ static void mutliplayer_settings_select_list_update_displayed_items(
 
 				switch (profile->engine_type)
 				{
+				case game_engine_ctf_slayer:
 				case game_engine_ctf:
 					icon->animation.current_frame_index = _multiplayer_game_bitmap_ctf;
 					break;
@@ -3391,6 +3399,7 @@ static void mutliplayer_settings_select_list_update_displayed_items(
 
 			switch (profile->engine_type)
 			{
+			case game_engine_ctf_slayer:
 			case game_engine_ctf:
 				icon->animation.current_frame_index = _multiplayer_game_bitmap_ctf;
 				if (descriptions_tag_index != NONE && label_box->parameters.text_box.text)
