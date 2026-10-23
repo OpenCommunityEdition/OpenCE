@@ -51,7 +51,7 @@
     - [x] Auto exposure, bloom, lens flares, glows and light volumes
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Dynamic lighting' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 4: Decals and effects drawn
+## Phase 4: Decals and effects drawn [checkpoint: 2206385c]
 - [x] Task: Level decals 0d2368c6
     - [x] Write tests: the scenario's decal placements import with their shader and layer
     - [x] Level decals drawn in their layers
