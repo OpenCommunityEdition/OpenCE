@@ -318,6 +318,57 @@ These are not done yet:
 - detail objects are blended and not sorted;
 - particles are drawn after the first-person weapon, so they can draw over it.
 
+## Animation
+
+### The graph
+
+An animation graph (`antr`) is imported whole into `content`: its nodes,
+its animations with their frame data, and the lists that name them by
+seat, weapon class, weapon type, weapon, vehicle and device. Halo's graphs
+inherit nothing from one another (the inheritance block came with Halo 2),
+so a missing animation falls back only within its own graph, as
+`sim/src/animation_graph.rs` finds it: by the unit's seat, then its weapon
+class, then its weapon type, each list's entry checked against the graph.
+With `game.enhanced_animations` a reload a weapon type lacks is borrowed
+from the standing seat's same class and type. An animation is refused, and
+the pose left as it was, when it has no frames, is of another kind than
+asked, or moves other nodes than the model has.
+
+An animation's frames are read as the game reads them
+(`model_animations.c`): a base frame into each node's orientation (a
+rotation, a translation and a scale), then replacement and overlay
+animations over it. Every offset and count comes from the map and is
+checked, so a broken animation draws the rest pose and never reads past
+its data.
+
+### The blender
+
+`sim/src/animation_blend.rs` builds an object's pose in the order
+`object_get_node_orientations` takes it:
+
+1. the base animation's frame;
+2. the graph's object overlays, by the object's functions;
+3. a unit's layers, in `unit_preprocess_node_orientations`'s order: the
+   aiming and looking screens, the action and ping animations, a
+   vehicle's steering, throttle, wheels and suspension
+   (`vehicle_animation.rs`), a device's position and power
+   (`device_animation.rs`);
+4. the blend from the last pose, over the frames a change asked for;
+5. the nodes' matrices, from the root's transform down.
+
+What a unit plays is chosen by `unit_states.rs` (the biped's state, by its
+seat and weapon class), `first_person_states.rs` (the first-person arms
+and weapon), `seats.rs` (entering, riding and leaving) and
+`ai_impulse.rs` (an actor's alerts, dives, evades and berserk). A
+cutscene's `custom_animation` starts at a frame (or the first) and may
+blend in from the pose before it. The scripts' camera follows the root
+node of a one-node graph's animation, at the frame its timer has reached
+(`camera_set_animation`).
+
+The test map's `animation` station plays every animation of the player
+biped's graph in turn, named; `ffi/tests/stations.rs` checks that each
+one plays.
+
 ## The Halo UI
 
 The menus are the game's own: the widget definitions, bitmaps, fonts and

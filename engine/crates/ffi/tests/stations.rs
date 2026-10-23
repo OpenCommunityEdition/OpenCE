@@ -3,6 +3,7 @@
 //! assets/maps).
 
 use std::path::Path;
+use std::sync::Arc;
 
 use opence_ffi::{Engine, LevelGeometry};
 use serde_json::Value;
@@ -45,14 +46,15 @@ fn number(value: &Value, name: &str) -> f64 {
     value[name].as_f64().unwrap_or(f64::NAN)
 }
 
-#[test]
-fn the_stations_run_and_measure() -> Result {
+/// An engine on the galleries made over bloodgulch and wizard, its player
+/// spawned, in a folder of `name`; none where there is no game data.
+fn galleries(name: &str) -> Result<Option<Arc<Engine>>> {
     let maps = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps");
     let names = ["bloodgulch.map", "wizard.map"];
     if !names.iter().all(|name| maps.join(name).exists()) {
-        return Ok(()); // (no game data here)
+        return Ok(None);
     }
-    let folder = folder("stations_galleries")?;
+    let folder = folder(name)?;
     for name in names {
         std::os::unix::fs::symlink(maps.join(name).canonicalize()?, folder.join(name))?;
     }
@@ -63,6 +65,41 @@ fn the_stations_run_and_measure() -> Result {
     engine.start_level(geometry, 1)?;
     engine.spawn_player(0)?;
     engine.advance(1.0 / 30.0)?;
+    Ok(Some(engine))
+}
+
+#[test]
+fn the_animation_station_plays_every_animation_of_the_graph() -> Result {
+    let Some(engine) = galleries("stations_animation")? else {
+        return Ok(()); // (no game data here)
+    };
+    // with no filter, the status counts the whole graph: "animation: 1/N name"
+    run(&engine, "station animation")?;
+    engine.advance(1.0 / 30.0)?;
+    let shown = run(&engine, "station")?;
+    let status = shown["run"]["status"].as_str().unwrap_or("").to_owned();
+    let count: usize = status
+        .split_once('/')
+        .and_then(|(_, rest)| rest.split_whitespace().next())
+        .ok_or_else(|| format!("no count in {status}"))?
+        .parse()?;
+    assert!(count > 100, "{status}");
+    run(&engine, "station stop")?;
+
+    let played = station(&engine, "station animation", 1200)?;
+    assert_eq!(played.len(), count);
+    for (at, animation) in played.iter().enumerate() {
+        assert_eq!(animation["index"].as_u64(), Some(u64::try_from(at)?));
+        assert!(number(animation, "frames") >= 1.0, "{animation}");
+    }
+    Ok(())
+}
+
+#[test]
+fn the_stations_run_and_measure() -> Result {
+    let Some(engine) = galleries("stations_galleries")? else {
+        return Ok(()); // (no game data here)
+    };
 
     // listed, none running; a name that is not one is refused
     let listed = run(&engine, "station")?;
