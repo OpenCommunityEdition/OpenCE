@@ -45,6 +45,7 @@ from below its lowest node to above its highest.
 #include "effects/particles.h"
 #include "sound/sound_definitions.h"
 #include "objects/light_definitions.h"
+#include "network_shield_effects.h"
 
 /* port/linux/game/view_fov.c */
 boolean viewmodel_shield_is_visible(void);
@@ -117,12 +118,20 @@ static short overshield_effect_next_model = 0;
 int config_boolean(const char *name);
 unsigned long config_changes(void);
 
+/* display.overshield_effect; in a network game, the host's
+(network_shield_effects.c) */
 static boolean overshield_effect_enabled(
 	void)
 {
 	static unsigned long changes = (unsigned long)-1;
 	static boolean enabled = FALSE;
+	short effects = network_shield_effects();
 
+	if (effects != NONE)
+	{
+		changes = (unsigned long)-1;
+		return effects >= _shield_effects_overshield;
+	}
 	if (changes != config_changes())
 	{
 		changes = config_changes();

@@ -252,6 +252,8 @@ enum custom_edition_channel_order
 	where this build's meters take the fill order from color and discard
 	what has no alpha */
 	_custom_edition_channels_hud_meter,
+	/* Authored Xbox-order meters, including sheets also used as artwork. */
+	_custom_edition_channels_hud_meter_xbox,
 
 	NUMBER_OF_CUSTOM_EDITION_CHANNEL_ORDERS
 };
@@ -281,6 +283,8 @@ enum custom_edition_behaviour
 	_custom_edition_behaviour_gearbox_shader_environment_types,
 	/* HUD multitexture overlays are not drawn (hud_draw.c) */
 	_custom_edition_behaviour_block_multitexture_overlays,
+	/* Bigass Open's ammo sheet has fill in color and shape in alpha. */
+	_custom_edition_behaviour_xbox_ammo_meter_channels,
 
 	NUMBER_OF_CUSTOM_EDITION_BEHAVIOURS
 };
