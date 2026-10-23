@@ -873,6 +873,8 @@ pub fn level(donor: Option<&Level>) -> Level {
             hud_digits: None,
             hud_globals: None,
             ui: Default::default(),
+            sounds: Vec::new(),
+            looping_sounds: Vec::new(),
         },
     };
     level.scenario = scenario();

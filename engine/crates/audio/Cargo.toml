@@ -1,0 +1,19 @@
+[package]
+name = "opence_audio"
+description = "The sounds: their decoders, the game's sound classes, and the mixer the app's Core Audio output pulls from"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+libm.workspace = true
+lewton.workspace = true
+opence_content.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+opence_import.workspace = true
+
+[lints]
+workspace = true

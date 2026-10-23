@@ -23,6 +23,7 @@ opence_dev = { path = "crates/dev" }
 opence_net = { path = "crates/net" }
 opence_campaign = { path = "crates/campaign" }
 opence_ui = { path = "crates/ui" }
+opence_audio = { path = "crates/audio" }
 thiserror = "2"
 bevy_ecs = { version = "0.20", default-features = false, features = ["std"] }
 rkyv = { version = "0.8", default-features = false, features = ["std", "bytecheck", "alloc"] }
@@ -33,6 +34,8 @@ uniffi = { version = "0.32", default-features = false }
 log = "0.4"
 # (checks the chant found in the player's default.xbe)
 sha2 = { version = "0.10", default-features = false }
+# (decodes Custom Edition's Ogg Vorbis sounds)
+lewton = { version = "0.10", default-features = false, features = ["ogg"] }
 # (inflates the Xbox caches)
 miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
 

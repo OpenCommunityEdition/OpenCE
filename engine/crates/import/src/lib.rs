@@ -21,6 +21,7 @@ mod particle;
 pub mod reader;
 pub mod script;
 pub mod shader;
+pub mod sound;
 pub mod tags;
 mod texture;
 pub mod ui;

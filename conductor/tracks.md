@@ -32,7 +32,7 @@ This file tracks all major tracks for the project.
 - [ ] **Track: The complete particle system: particles and their physics, particle systems, effects, contrails, weather and wind**
   *Link: [./tracks/particles_20261021/](./tracks/particles_20261021/)*
 
-- [ ] **Track: Sound: every sound tag, looping sounds, music, dialogue, sound environments and the scripts' waits on sounds**
+- [~] **Track: Sound: every sound tag, looping sounds, music, dialogue, sound environments and the scripts' waits on sounds**
   *Link: [./tracks/sound_20261021/](./tracks/sound_20261021/)*
 
 - [ ] **Track: Coverage of every map, a cutscene audit against the reference game, the fixes, and a review of the engine**

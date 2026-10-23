@@ -74,6 +74,11 @@ pub struct Level {
     /// Its UI's tags: the shell's in `ui.map`, the pause menu's and the
     /// dialogs' in the others.
     pub ui: crate::Ui,
+    /// Its sounds, their samples as the map encodes them (Custom
+    /// Edition's in `sounds.map` are not here).
+    pub sounds: Vec<crate::Sound>,
+    /// Its looping sounds.
+    pub looping_sounds: Vec<crate::LoopingSound>,
 }
 
 /// The game's globals (the `matg` tag) that the simulation reads.

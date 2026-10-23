@@ -1020,6 +1020,8 @@ pub(crate) mod tests {
             hud_digits: None,
             hud_globals: None,
             ui: Default::default(),
+            sounds: Vec::new(),
+            looping_sounds: Vec::new(),
         }
     }
 
