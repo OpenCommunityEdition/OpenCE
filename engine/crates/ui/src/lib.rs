@@ -15,6 +15,7 @@
 
 mod draw;
 mod names;
+mod pointer;
 
 use std::collections::BTreeMap;
 
@@ -27,6 +28,9 @@ pub use draw::{
 pub use names::{
     data_input_name, function_name, DATA_INPUT_NAMES, FUNCTION_NAMES, LIST_GOTO_NEXT_ITEM,
     LIST_GOTO_PREVIOUS_ITEM, REPLACEMENT_NAMES,
+};
+pub use pointer::{
+    key_button, key_input, Key, MouseButton, Target, TargetKind, MAXIMUM_WHEEL_STEPS,
 };
 
 /// No player, no controller, no index.

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use opence_content::{Level, TagRef};
-use opence_ui::{DrawItem, Layout, NoHost, Shell, NONE};
+use opence_ui::{DrawItem, Feedback, Host, Key, Layout, MouseButton, Shell, NONE};
 
 use crate::LevelGeometry;
 
@@ -214,13 +214,100 @@ pub(crate) fn quads(
         .collect()
 }
 
+/// A key the menus take: the arrows the d-pad; Space, Return and the
+/// keypad's Enter A; Escape and Backspace B; Delete and E X; Tab Y; F1
+/// Back; W, A, S and D the left stick.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum MenuKey {
+    /// Up.
+    Up,
+    /// Down.
+    Down,
+    /// Left.
+    Left,
+    /// Right.
+    Right,
+    /// Space.
+    Space,
+    /// Return.
+    Return,
+    /// The keypad's Enter.
+    KeypadEnter,
+    /// Escape.
+    Escape,
+    /// Backspace.
+    Backspace,
+    /// Delete.
+    Delete,
+    /// E.
+    E,
+    /// Tab.
+    Tab,
+    /// F1.
+    F1,
+    /// W.
+    W,
+    /// A.
+    A,
+    /// S.
+    S,
+    /// D.
+    D,
+}
+
+impl From<MenuKey> for Key {
+    fn from(key: MenuKey) -> Self {
+        match key {
+            MenuKey::Up => Key::Up,
+            MenuKey::Down => Key::Down,
+            MenuKey::Left => Key::Left,
+            MenuKey::Right => Key::Right,
+            MenuKey::Space => Key::Space,
+            MenuKey::Return => Key::Return,
+            MenuKey::KeypadEnter => Key::KeypadEnter,
+            MenuKey::Escape => Key::Escape,
+            MenuKey::Backspace => Key::Backspace,
+            MenuKey::Delete => Key::Delete,
+            MenuKey::E => Key::E,
+            MenuKey::Tab => Key::Tab,
+            MenuKey::F1 => Key::F1,
+            MenuKey::W => Key::W,
+            MenuKey::A => Key::A,
+            MenuKey::S => Key::S,
+            MenuKey::D => Key::D,
+        }
+    }
+}
+
+/// The shell's host in the app: it keeps the sounds the widgets play, by
+/// their tag paths, for the app to play.
+#[derive(Debug, Default)]
+struct Sounds(Vec<String>);
+
+impl Host for Sounds {
+    fn sound(&mut self, sound: &TagRef) {
+        self.0.push(sound.path.clone());
+    }
+
+    fn feedback(&mut self, feedback: Feedback) {
+        self.0.push(feedback.sound().into());
+    }
+}
+
+/// The shell and the sounds it has played since the app last took them.
+#[derive(Debug, Default)]
+struct State {
+    shell: Shell,
+    sounds: Sounds,
+}
+
 /// The shell: the UI's widgets loaded from a level (`ui.map`'s, or a
 /// mission's pause menu), driven by the app's input and clock.
 #[derive(uniffi::Object)]
 pub struct Menu {
     geometry: Arc<LevelGeometry>,
     atlas: GlyphAtlas,
-    shell: Mutex<Shell>,
+    state: Mutex<State>,
 }
 
 #[uniffi::export]
@@ -233,7 +320,7 @@ impl Menu {
         Arc::new(Self {
             geometry,
             atlas,
-            shell: Mutex::new(Shell::new()),
+            state: Mutex::new(State::default()),
         })
     }
 
@@ -245,20 +332,24 @@ impl Menu {
             group: opence_content::Group(*b"DeLa"),
             path: widget,
         };
-        self.lock()
-            .open(&level.ui, &mut NoHost, &tag, NONE)
+        let state = &mut *self.lock();
+        state
+            .shell
+            .open(&level.ui, &mut state.sounds, &tag, NONE)
             .is_some()
     }
 
     /// Runs the widgets' timers and fades to `now_ms`, the app's clock.
     pub fn update(&self, now_ms: u64) {
-        self.lock()
-            .update(&self.geometry.content.ui, &mut NoHost, now_ms);
+        let state = &mut *self.lock();
+        state
+            .shell
+            .update(&self.geometry.content.ui, &mut state.sounds, now_ms);
     }
 
     /// Whether a screen is open.
     pub fn is_open(&self) -> bool {
-        self.lock().root(0).is_some()
+        self.lock().shell.root(0).is_some()
     }
 
     /// The quads to draw over a window `width` by `height` pixels, in
@@ -266,8 +357,55 @@ impl Menu {
     pub fn draw(&self, width: u32, height: u32) -> Vec<UiQuad> {
         let level = &self.geometry.content;
         let layout = Layout::for_window(width as f32, height as f32);
-        let items = self.lock().draw(&level.ui, level.as_ref(), &layout);
+        let items = self.lock().shell.draw(&level.ui, level.as_ref(), &layout);
         quads(&items, &self.geometry.level.ui_textures, &self.atlas)
+    }
+
+    /// `key` pressed.
+    pub fn key(&self, key: MenuKey) {
+        let state = &mut *self.lock();
+        state
+            .shell
+            .key(&self.geometry.content.ui, &mut state.sounds, key.into());
+    }
+
+    /// The pointer moved to `x`, `y` in a window `width` by `height`
+    /// pixels: the item under it takes the focus.
+    pub fn pointer_moved(&self, x: f32, y: f32, width: u32, height: u32) {
+        let point = Layout::for_window(width as f32, height as f32).to_screen([x, y]);
+        let state = &mut *self.lock();
+        state
+            .shell
+            .hover(&self.geometry.content.ui, &mut state.sounds, point);
+    }
+
+    /// A click at `x`, `y` in a window `width` by `height` pixels: the
+    /// right button's goes back.
+    pub fn click(&self, x: f32, y: f32, width: u32, height: u32, right: bool) {
+        let point = Layout::for_window(width as f32, height as f32).to_screen([x, y]);
+        let button = if right {
+            MouseButton::Right
+        } else {
+            MouseButton::Left
+        };
+        let state = &mut *self.lock();
+        state
+            .shell
+            .click(&self.geometry.content.ui, &mut state.sounds, point, button);
+    }
+
+    /// The wheel turned `steps` notches, away from the user positive.
+    pub fn wheel(&self, steps: i32) {
+        let state = &mut *self.lock();
+        state
+            .shell
+            .wheel(&self.geometry.content.ui, &mut state.sounds, steps);
+    }
+
+    /// The tag paths of the sounds the widgets played since the last call,
+    /// in order.
+    pub fn take_sounds(&self) -> Vec<String> {
+        std::mem::take(&mut self.lock().sounds.0)
     }
 
     /// The glyph atlas the glyph quads sample.
@@ -277,8 +415,8 @@ impl Menu {
 }
 
 impl Menu {
-    fn lock(&self) -> MutexGuard<'_, Shell> {
-        self.shell
+    fn lock(&self) -> MutexGuard<'_, State> {
+        self.state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
@@ -428,5 +566,50 @@ mod tests {
         assert_eq!([backgrounds[0].left, backgrounds[0].bottom], [0.0, 960.0]);
         assert!(menu.glyph_atlas().height > 0);
         assert_eq!(main_menu_widget(), MAIN_MENU);
+        // the screen has no items: the input reaches it and changes nothing
+        menu.key(MenuKey::Down);
+        menu.pointer_moved(640.0, 480.0, 1280, 960);
+        menu.click(640.0, 480.0, 1280, 960, false);
+        menu.wheel(1);
+        assert!(menu.is_open());
+        assert_eq!(menu.take_sounds(), Vec::<String>::new());
+        // B with no screen to go back to goes back to the main menu, with
+        // the sound of going back
+        menu.click(0.0, 0.0, 1280, 960, true);
+        assert!(menu
+            .take_sounds()
+            .iter()
+            .all(|sound| sound.starts_with("sound\\")));
+    }
+
+    #[test]
+    fn every_key_is_the_shells() {
+        let keys = [
+            MenuKey::Up,
+            MenuKey::Down,
+            MenuKey::Left,
+            MenuKey::Right,
+            MenuKey::Space,
+            MenuKey::Return,
+            MenuKey::KeypadEnter,
+            MenuKey::Escape,
+            MenuKey::Backspace,
+            MenuKey::Delete,
+            MenuKey::E,
+            MenuKey::Tab,
+            MenuKey::F1,
+            MenuKey::W,
+            MenuKey::A,
+            MenuKey::S,
+            MenuKey::D,
+        ];
+        let shells: Vec<Key> = keys.into_iter().map(Key::from).collect();
+        assert_eq!(shells[0], Key::Up);
+        assert_eq!(shells[6], Key::KeypadEnter);
+        assert_eq!(shells[16], Key::D);
+        let mut sounds = Sounds::default();
+        sounds.feedback(Feedback::Cursor);
+        sounds.sound(&tag(b"snd!", "sound\\click"));
+        assert_eq!(sounds.0, ["sound\\sfx\\ui\\cursor", "sound\\click"]);
     }
 }

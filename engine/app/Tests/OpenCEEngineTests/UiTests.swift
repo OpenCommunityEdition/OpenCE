@@ -72,6 +72,31 @@ final class UiTests: XCTestCase {
         }
     }
 
+    /// The keys and the pointer move the main menu's focus, with the
+    /// cursor's sound.
+    func testTheKeysAndThePointerMoveTheFocus() throws {
+        let level = try UiLevel()
+        let cursor = "sound\\sfx\\ui\\cursor"
+        _ = level.menu.takeSounds()
+        level.menu.key(key: .down)
+        XCTAssertEqual(level.menu.takeSounds(), [cursor])
+        level.menu.key(key: .up)
+        XCTAssertEqual(level.menu.takeSounds(), [cursor])
+        // somewhere on the screen an item other than the focused one is
+        var moved = false
+        for y in stride(from: 0, to: 1080, by: 20) where !moved {
+            for x in stride(from: 0, to: 1920, by: 40) {
+                level.menu.pointerMoved(x: Float(x), y: Float(y), width: 1920, height: 1080)
+                if level.menu.takeSounds().contains(cursor) {
+                    moved = true
+                    break
+                }
+            }
+        }
+        XCTAssertTrue(moved, "no item under the pointer took the focus")
+        XCTAssertTrue(level.menu.isOpen())
+    }
+
     /// The menu's update, its quads and their pass over a 4K frame: under a
     /// millisecond on the CPU and on the GPU, on average.
     func testTheUiPassTakesUnderAMillisecondAt4K() throws {
