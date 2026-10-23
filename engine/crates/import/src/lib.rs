@@ -17,6 +17,7 @@ pub mod level;
 pub mod level_cache;
 mod light;
 pub mod object;
+mod particle;
 pub mod reader;
 pub mod script;
 pub mod shader;

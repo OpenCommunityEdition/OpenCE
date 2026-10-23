@@ -206,7 +206,9 @@ final class GoldenFrameTests: XCTestCase {
     }
 
     func testBloodGulch() throws { try render(map: "bloodgulch") }
-    func testTheMawsFirstBsp() throws { try render(map: "a30") }
+    func testPillarOfAutumnsFirstBsp() throws { try render(map: "a10") }
+    func testHalosFirstBsp() throws { try render(map: "a30") }
+    func testSilentCartographersFirstBsp() throws { try render(map: "b30") }
 }
 
 /// MetalFX's temporal scaler on Blood Gulch: a still camera settles, the

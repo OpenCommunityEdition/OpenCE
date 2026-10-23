@@ -41,6 +41,9 @@ const MAX_BSP_LENS_FLARE_MARKERS: usize = 65536;
 const BSP_CLUSTERS_OFFSET: usize = 0x134;
 const BSP_CLUSTER_SIZE: usize = 0x68;
 const MAX_BSP_CLUSTERS: usize = 8192;
+/// A BSP's leaves (`structure_leaf`): each one's cluster.
+const BSP_LEAVES_OFFSET: usize = 0xE0;
+const BSP_LEAF_SIZE: usize = 0x10;
 pub(crate) const SKY: GroupTag = GroupTag::new(b"sky ");
 
 pub(crate) const SCENARIO_SIZE: usize = 0x5B0;
@@ -254,6 +257,15 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         &effects,
         &mut reached,
     )?;
+    let particles = crate::particle::import_particles(cache, &effects, &mut reached)?;
+    let contrails = crate::particle::import_contrails(cache, &objects, &mut reached)?;
+    let weather = crate::particle::import_weather(cache, &structure_bsps, &mut reached)?;
+    let detail_object_collections = crate::particle::import_detail_object_collections(
+        cache,
+        &scenario,
+        &structure_bsps,
+        &mut reached,
+    )?;
 
     // (a shader's extra layers are shaders too, reached as each is read)
     let mut shaders = Vec::new();
@@ -293,6 +305,10 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
 
     let level = Level {
         decals,
+        particles,
+        contrails,
+        weather,
+        detail_object_collections,
         glows,
         lens_flares,
         light_volumes,
@@ -1193,14 +1209,29 @@ fn import_structure_bsp(
         MAX_BSP_CLUSTERS,
     )?;
     let mut cluster_skies = Vec::with_capacity(clusters_block.len());
+    let mut cluster_weather = Vec::with_capacity(clusters_block.len());
     for cluster in clusters_block.iter() {
         cluster_skies.push(u16::try_from(cluster.i16(0, "sky")?).ok());
+        cluster_weather.push(u16::try_from(cluster.i16(0x08, "weather")?).ok());
+    }
+
+    let leaves_block = bsp.block(BSP_LEAVES_OFFSET, "leaves", BSP_LEAF_SIZE, LEAVES.2)?;
+    let mut leaf_clusters = Vec::with_capacity(leaves_block.len());
+    for leaf in leaves_block.iter() {
+        let cluster = u16::try_from(leaf.i16(0x08, "cluster")?).ok();
+        leaf_clusters.push(cluster.filter(|&index| usize::from(index) < cluster_skies.len()));
     }
 
     let decals = crate::decal::runtime_decals(&bsp)?;
+    let weather_palette = crate::particle::weather_palette(&bsp)?;
+    let detail_objects = crate::particle::detail_objects(&bsp)?;
 
     Ok(StructureBsp {
         cluster_skies,
+        cluster_weather,
+        leaf_clusters,
+        weather_palette,
+        detail_objects,
         decals,
         lens_flare_markers,
         lens_flares,
@@ -2453,6 +2484,60 @@ pub(crate) mod tests {
         match Cache::open(file) {
             Ok(cache) => Some(cache),
             Err(error) => panic!("{name}: {error}"),
+        }
+    }
+
+    #[test]
+    fn the_stock_maps_sprites_import_when_the_maps_are_here() {
+        for name in ["bloodgulch", "c10"] {
+            let Some(cache) = stock_map(name) else {
+                continue;
+            };
+            let level = match import_level(&cache) {
+                Ok(level) => level,
+                Err(error) => panic!("{name}: {error}"),
+            };
+            assert!(!level.particles.is_empty(), "{name}");
+            for effect in &level.effects {
+                for particles in effect.events.iter().flat_map(|event| &event.particles) {
+                    assert!(level.particle(&particles.particle).is_some(), "{name}");
+                }
+            }
+            for bsp in &level.structure_bsps {
+                assert_eq!(bsp.cluster_weather.len(), bsp.cluster_skies.len());
+                // (the collision BSP's leaves are the structure's)
+                assert_eq!(
+                    bsp.leaf_clusters.len(),
+                    bsp.collision.leaves.len(),
+                    "{name}"
+                );
+                assert!(bsp.leaf_clusters.iter().any(Option::is_some), "{name}");
+                for weather in bsp.cluster_weather.iter().flatten() {
+                    assert!(usize::from(*weather) < bsp.weather_palette.len(), "{name}");
+                }
+                // (each stands within its BSP, by a cell, on a layer the
+                // palette has)
+                for object in &bsp.detail_objects {
+                    for (axis, bounds) in bsp.world_bounds.iter().enumerate() {
+                        let at = object.position[axis];
+                        assert!(
+                            at >= bounds[0] - 8.0 && at <= bounds[1] + 8.0,
+                            "{name}: {object:?} {:?}",
+                            bsp.world_bounds
+                        );
+                    }
+                    let collection = level
+                        .detail_object_collections
+                        .get(usize::from(object.collection));
+                    assert!(matches!(collection, Some(Some(_))), "{name}: {object:?}");
+                }
+            }
+            if name == "c10" {
+                // (the swamp's grass and its bugs and rain)
+                assert!(!level.structure_bsps[0].detail_objects.is_empty());
+                assert_eq!(level.weather.len(), 1);
+                assert!(!level.weather[0].types.is_empty());
+            }
         }
     }
 

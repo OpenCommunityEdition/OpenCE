@@ -547,6 +547,8 @@ pub struct EffectEvent {
     pub duration: [f32; 2],
     /// What it makes when it begins.
     pub parts: Vec<EffectPart>,
+    /// The particles it emits over its duration.
+    pub particles: Vec<crate::EffectParticles>,
 }
 
 /// Something an event makes: an object, a light, a decal, damage, a sound

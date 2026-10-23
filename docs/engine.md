@@ -216,16 +216,107 @@ not counted twice:
 - **Blending on models:** model parts are blended with alpha blending only.
   The level's transparent surfaces have every blend mode.
 
-### Not yet drawn
+### The material model
 
-These are deferred to a later track:
+The importer writes one material record (`content/src/material.rs`) for every
+shader of every class. It is the only record the lighting reads, and its
+colours are linear.
 
-- Decals on the level (the scenario's decal palette);
-- Particle systems and effects (`effe`, `pctl`, `part`), including the effects
-  that scenery plays.
+| Field | From |
+| --- | --- |
+| Albedo map and colour | The shader's base or diffuse map, and its tint |
+| Normal map and scale | The bump map's heights, with the bump map's scale |
+| Roughness | The kind of reflection: bumped cube map 0.3, flat cube map 0.15, the radiosity reflection 0.6, none 1 |
+| Specular at normal and at grazing incidence | The reflection's perpendicular and parallel brightness and tint. A tinted specular stands in for metalness |
+| Reflection map | The cube map the game reflected |
+| Emission map and colour | The self-illumination map and colour (black: none) |
+| Flags | Alpha tested, blended, two sided, decal, unlit |
 
-The importer does not read these tags yet. A map that has them loads and
-draws without them.
+The game's shaders are not physically based. The record keeps what each one
+shows: environment (`senv`) and model (`soso`) shaders are lit and reflect;
+transparent ones (`schi`, `scex`, `sotr`, `sgla`, `smet`, `spla`, `swat`) keep
+their blend modes. A model shader's multipurpose map is read in the Xbox's
+channel order, and its change colours come from the object's functions in
+the snapshot.
+
+### The bake
+
+The engine bakes each structure BSP's light itself; the stock lightmaps are
+only a fallback.
+
+1. **The scene** (`crates/bake`): the BSP's triangles in a bounding-volume
+   hierarchy, their materials, the sky's lights, the sun and the shaders'
+   radiosity emitters.
+2. **The tracer** (`PathTracer.swift`): a Metal compute path tracer over the
+   hierarchy, with next-event estimation and bounced light. It traces 64 paths
+   for each lightmap texel, 256 for each probe axis and 16 for each reflection
+   probe texel. A CPU tracer checks it in the tests.
+3. **The outputs:**
+   - directional lightmaps with ambient occlusion, as half floats, with a
+     second texel for the light's direction;
+   - an irradiance probe grid over the BSP's volume, for what moves;
+   - a reflection probe for each cluster.
+
+   The probes leave out the sun's direct light and keep how much of the sun
+   each sees, because the shadow maps draw the sun on objects.
+4. **The cache:** the result is written to the cache folder. Its name is a key
+   of the importer's and the baker's versions (`FORMAT_VERSION`,
+   `BAKE_VERSION`), the settings and the scene, so a changed level or baker
+   bakes again.
+5. **In the background** (`LightBaker.swift`): the app bakes a level that is
+   not cached while it draws the stock lightmaps, and switches over when the
+   bake is done.
+
+**The mood check** (`BakeTests.swift`, which needs `assets/maps`): each page's and
+BSP's mean brightness and colour must stay within set limits of the stock
+lightmaps. Two are listed as known colour differences: longest, and d20's
+second BSP.
+
+### The passes
+
+A frame is drawn in this order. Each switch is a shell variable
+(`set render.bloom 0`). `render.view` shows one buffer alone: `frame`, `depth`,
+`normals`, `ao`, `contact`, `ssr`, `luminance` or `bloom`.
+
+| Pass | Does | Switch |
+| --- | --- | --- |
+| Sun shadows | Cascaded shadow maps for objects, matched to the baked shadows; spot and cube shadows for the nearest dynamic lights | `render.sun_shadows` |
+| Sky | The first sky, unlit, at the far plane | |
+| Level and objects, opaque | Baked light, or probes and the sun for objects; clustered dynamic lights from weapons, projectiles, effects, the flashlight and scenery | `render.lightmaps`, `render.objects`, `render.wireframe` |
+| Decals | The scenario's decals and those that shots and explosions lay, deferred onto the level and objects | `render.decals` |
+| Screen-space effects | Ambient occlusion (GTAO), reflections over the reflection probes, contact shadows | `render.gtao`, `render.ssr`, `render.contact_shadows` |
+| Blended | The level's transparent surfaces, the models' blended parts, glows and light volumes, the first-person weapon | `render.glows` |
+| Particles | Particles, contrails, weather and detail objects, blended in the shader by each one's blend function | `render.particles` |
+| Temporal | MetalFX's temporal scaler, from the motion vectors | |
+| Camera | Auto exposure, bloom and lens flares | `render.exposure`, `render.bloom`, `render.lens_flares` |
+| Tone map and HUD | To the display, then the HUD over it | `render.hud` |
+
+### Effects and particles
+
+- **Effects** (`effe`) run in `sim` (`crates/sim/src/effects.rs`). Weapons,
+  projectiles, explosions, scenery and vehicles start them; an impact picks its
+  effect by the material it strikes. Each event fires its parts (lights,
+  decals, particles, contrails) at its time.
+- **Particles** (`part`) follow their sequence, colour and size over their
+  lives, and move by their velocity and gravity. They are drawn as quads
+  facing the screen.
+- **Contrails** (`cont`) are strips of points. Each segment is a quad along it
+  that turns to face the camera.
+- **Weather** (`rain`) falls in a box around the camera, in the clusters that have it.
+- **Detail objects** (`dobc`) are placed by the importer and drawn with the
+  frame's particles.
+
+The snapshot carries up to 2048 particles a frame.
+
+These are not done yet:
+
+- particle systems (`pctl`);
+- particles start at the effect's origin, not at its markers;
+- contrails do not take on the velocity of what leaves them;
+- particles do not collide;
+- weather ignores its polyhedra and its height fades;
+- detail objects are blended and not sorted;
+- particles are drawn after the first-person weapon, so they can draw over it.
 
 ## The benchmark
 
@@ -295,9 +386,8 @@ arguments, and `vars [filter]` the variables.
 | `set`, `vars`, `bind`, `unbind`, `exec`, `help`, `clear`, `quit` | The registry's own |
 
 Variables are typed (bool, int, float, text, a choice) and some are saved
-to the settings. The drawing switches are `render.wireframe`,
-`render.lightmaps`, `render.objects` and `render.hud`; the debug layers
-are `debug.draw.<layer>`.
+to the settings. The drawing switches are listed in "The
+passes" above; the debug layers are `debug.draw.<layer>`.
 
 ### The socket and `opence`
 

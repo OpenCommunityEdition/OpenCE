@@ -14,6 +14,7 @@ pub mod light;
 pub mod material;
 pub mod object;
 pub mod pack;
+pub mod particle;
 pub mod script;
 pub mod shader;
 pub mod vehicle;
@@ -50,6 +51,11 @@ pub use object::{
     MarkerInstance, Model, ModelGeometry, ModelMarker, ModelNode, ModelPart, ModelPermutation,
     ModelRegion, ModelShader, ModelVertex, ObjectDefinition, ObjectKind, PathfindingSphere,
     UnitSeat, WeaponClass, WeaponType,
+};
+pub use particle::{
+    Contrail, ContrailState, DetailObject, DetailObjectCollection, DetailObjectType,
+    EffectParticles, Particle, PointPhysics, SpriteShader, WeatherPalette, WeatherParticleType,
+    WeatherSystem,
 };
 pub use script::{
     Call, Constant, GlobalRef, Named, NodeKind, Script, ScriptGlobal, ScriptKind, ScriptNode,

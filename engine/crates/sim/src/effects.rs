@@ -485,6 +485,7 @@ mod tests {
             delay: [delay, delay],
             duration: [duration, duration],
             parts,
+            particles: Vec::new(),
         }
     }
 

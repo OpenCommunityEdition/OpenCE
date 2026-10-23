@@ -159,8 +159,13 @@
         default = pkgs.mkShell (buildEnvironment // {
           packages = tools;
           buildInputs = libraries;
+          # (the engine's shaders compile with Xcode's Metal toolchain, an
+          # Xcode component nixpkgs cannot carry: tools/engine_build.py)
           shellHook = ''
             echo "OpenCE macOS shell: python configure.py && ninja macos"
+            if ! env -u SDKROOT -u DEVELOPER_DIR /usr/bin/xcrun -sdk macosx metal --version >/dev/null 2>&1; then
+              echo "Xcode's Metal toolchain is missing: xcodebuild -downloadComponent MetalToolchain"
+            fi
           '';
         });
 

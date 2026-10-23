@@ -361,6 +361,8 @@ public final class LevelRenderer {
     /// The frame's decals laid while the game runs (set before each frame,
     /// as `time` is).
     public var laidDecals: [OCEDecalSnapshot] = []
+    /// The frame's particles, contrails and weather (the snapshot's).
+    public var laidParticles: [OCEParticleSnapshot] = []
     /// The laid decals drawn in the last frame.
     public var laidDecalsDrawn: Int { decals.laidCount }
     /// The dynamic lights' cells, gels and shadows.
@@ -427,6 +429,7 @@ public final class LevelRenderer {
     /// The camera's passes: lens flares, glows, exposure, bloom.
     let cameraPass: CameraPass
     let decals: DecalPass
+    let particles: ParticlePass
     /// The frame's lens flares, light volumes and glows (set before each
     /// frame, as `lights` is).
     public var sprites = CameraSprites(sprites: [], occluders: [])
@@ -560,6 +563,9 @@ public final class LevelRenderer {
                                     images: geometry.cameraTextures().map { texture($0) })
         decals = try DecalPass(device: device, source: ShaderSources.source(.decal), decals: geometry.decals(),
                                texture: { texture($0) }, pictures: geometry.decalTextures().map { texture($0) })
+        let details = geometry.detailObjects().withUnsafeBytes { Array($0.bindMemory(to: OCEParticleSnapshot.self)) }
+        particles = try ParticlePass(device: device, source: ShaderSources.source(.particle),
+                                     pictures: geometry.particleTextures().map { texture($0) }, details: details)
         exposureLimits = geometry.exposureLimits()
         sky = geometry.sky()
 
@@ -921,6 +927,11 @@ public final class LevelRenderer {
         }
         screen.view(screenTargets, uniforms: screenUniforms, into: blendedEncoder)
         blendedEncoder.endEncoding()
+        if switches.particles {
+            particles.encode(into: commands, frame: frame, depth: depth, worldToClip: viewProjection,
+                             eye: camera.position, right: camera.rotation.act([0, -1, 0]),
+                             up: camera.rotation.act([0, 0, 1]), sprites: laidParticles)
+        }
     }
 
     /// The temporal scaler for an output `width` by `height`, made again

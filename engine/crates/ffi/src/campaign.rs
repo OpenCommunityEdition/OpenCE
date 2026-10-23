@@ -213,6 +213,8 @@ impl Engine {
             decals: crate::dynamic_decals::DynamicDecals::new(&geometry.content),
             marks: Vec::new(),
             effects: crate::effects::LevelEffects::new(&geometry.content),
+            particles: crate::particles::LevelParticles::new(&geometry.content),
+            particle_rows: Vec::new(),
             running_effects: Vec::new(),
         };
         running.previous_camera = transform(&camera(&running).transform);

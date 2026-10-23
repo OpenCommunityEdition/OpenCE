@@ -6,7 +6,10 @@
 The Rust workspace in engine/ is built as a static library (the ffi crate),
 its UniFFI bindings are written into the Swift package in engine/app, Xcode's
 Swift builds the package against the library, and the executable is laid out
-in a bundle signed ad hoc. With --test, the package's XCTests run instead.
+in a bundle signed ad hoc. The shaders are compiled first with Xcode's Metal
+toolchain (xcodebuild -downloadComponent MetalToolchain), so that an error in
+one stops the build rather than the app's start. With --test, the package's
+XCTests run instead.
 Run it inside nix develop, or from the flake's engine package.
 """
 
@@ -66,15 +69,37 @@ def swift_bindings(library: Path, out: Path) -> None:
     shutil.copy(generated / "opence_ffi.swift", core / "opence_ffi.swift")
 
 
-def swift(command: str, library: Path, out: Path, extra: tuple[str, ...] = ()) -> Path:
-    """Runs swift build or swift test with Xcode's Swift (nixpkgs' cannot
-    link against the macOS 26 SDK); returns the build folder."""
-    scratch = out / "swift"
-    environment = {
+def xcode_environment() -> dict[str, str]:
+    """The environment without nix develop's SDK and compilers, for Xcode's tools."""
+    return {
         key: value
         for key, value in os.environ.items()
         if key not in ("SDKROOT", "DEVELOPER_DIR", "MACOSX_DEPLOYMENT_TARGET", "CC", "CXX", "LD")
     }
+
+
+def check_shaders(out: Path) -> None:
+    """Compiles each of the renderer's shaders as the app will at run time
+    (ShaderSources.swift), failing on the first that has an error."""
+    folder = out / "shaders"
+    folder.mkdir(parents=True, exist_ok=True)
+    environment = xcode_environment()
+    for shader in sorted((PACKAGE / "Shaders").glob("*.metal")):
+        made = subprocess.run(
+            ["/usr/bin/xcrun", "-sdk", "macosx", "metal", "-c", str(shader), "-o", str(folder / f"{shader.stem}.air")],
+            env=environment, capture_output=True, text=True,
+        )
+        if "missing Metal Toolchain" in made.stderr:
+            raise SystemExit("Xcode's Metal toolchain is not installed: xcodebuild -downloadComponent MetalToolchain")
+        if made.returncode != 0:
+            raise SystemExit(f"{shader.name} does not compile:\n{made.stderr}")
+
+
+def swift(command: str, library: Path, out: Path, extra: tuple[str, ...] = ()) -> Path:
+    """Runs swift build or swift test with Xcode's Swift (nixpkgs' cannot
+    link against the macOS 26 SDK); returns the build folder."""
+    scratch = out / "swift"
+    environment = xcode_environment()
     subprocess.run(
         [
             "/usr/bin/xcrun", "swift", command, "-c", "release", "--quiet", "--disable-sandbox",
@@ -147,6 +172,7 @@ def main() -> None:
     arguments = parser.parse_args()
     out = arguments.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
+    check_shaders(out)
     library = rust_library()
     swift_bindings(library, out)
     if arguments.test:

@@ -34,9 +34,13 @@ pub const MAX_DECALS: usize = 2048;
 /// The most running effects one snapshot holds.
 pub const MAX_EFFECTS: usize = 256;
 
+/// The most particles one snapshot holds (the effects', the contrails' and
+/// the weather's).
+pub const MAX_PARTICLES: usize = 2048;
+
 /// Raised with any change to the snapshot's types, so that the app refuses
 /// a library of another layout.
-pub const SNAPSHOT_VERSION: u32 = 9;
+pub const SNAPSHOT_VERSION: u32 = 10;
 
 /// `ObjectSnapshot::flags`: the first-person weapon or hands, posed from
 /// the camera and drawn in front of the world.
@@ -238,6 +242,39 @@ pub struct EffectSnapshot {
     pub ids: [u32; 4],
 }
 
+/// `ParticleSnapshot::modes`' picture when it has none: drawn as its
+/// colour.
+pub const PARTICLE_NO_PICTURE: u32 = u32::MAX;
+/// `ParticleSnapshot::modes`' facing: the screen, turned by its rotation.
+pub const PARTICLE_FACING_SCREEN: u32 = 0;
+/// `ParticleSnapshot::modes`' facing: the camera, about its axis.
+pub const PARTICLE_FACING_AXIS: u32 = 1;
+/// `ParticleSnapshot::modes`' facing: a strip from its position to its
+/// axis' point, facing the camera (a contrail's).
+pub const PARTICLE_FACING_SEGMENT: u32 = 2;
+
+/// A sprite: a particle, a piece of a contrail, a weather particle or a
+/// detail object (laid out as the app's particle shader reads it).
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ParticleSnapshot {
+    /// Its centre, then its half width.
+    pub position: [f32; 4],
+    /// Its axis (`PARTICLE_FACING_AXIS`) or its strip's end
+    /// (`PARTICLE_FACING_SEGMENT`), then its rotation, radians.
+    pub axis: [f32; 4],
+    /// Its colour: red, green, blue and opacity.
+    pub color: [f32; 4],
+    /// Its picture's corners: u and v of the first, then of the second.
+    pub uv: [f32; 4],
+    /// Its half height, the distances it fades out between from the
+    /// camera (both 0: it does not), then 0.
+    pub shape: [f32; 4],
+    /// Its picture (among the level's particle pictures, or
+    /// `PARTICLE_NO_PICTURE`), its blend function, its facing, then 0.
+    pub modes: [u32; 4],
+}
+
 /// A debug line, drawn after the world.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -316,6 +353,10 @@ pub struct FrameSnapshot {
     pub effects: *const EffectSnapshot,
     /// The number of effects in `effects`.
     pub effect_count: u32,
+    /// The number of particles in `particles`.
+    pub particle_count: u32,
+    /// The particles, contrails and weather, in the same slot.
+    pub particles: *const ParticleSnapshot,
 }
 
 /// The sizes and offsets of the snapshot's types, as Rust laid them out;
@@ -384,6 +425,12 @@ pub struct SnapshotLayout {
     pub frame_effects_offset: u32,
     /// The size of `EffectSnapshot`.
     pub effect_size: u32,
+    /// `MAX_PARTICLES`.
+    pub max_particles: u32,
+    /// The offset of `FrameSnapshot::particles`.
+    pub frame_particles_offset: u32,
+    /// The size of `ParticleSnapshot`.
+    pub particle_size: u32,
 }
 
 /// The layout of the snapshot's types.
@@ -424,6 +471,9 @@ pub fn snapshot_layout() -> SnapshotLayout {
         max_effects: n(MAX_EFFECTS),
         frame_effects_offset: n(offset_of!(FrameSnapshot, effects)),
         effect_size: n(size_of::<EffectSnapshot>()),
+        max_particles: n(MAX_PARTICLES),
+        frame_particles_offset: n(offset_of!(FrameSnapshot, particles)),
+        particle_size: n(size_of::<ParticleSnapshot>()),
     }
 }
 
@@ -439,6 +489,7 @@ struct Slot {
     lights: [LightSnapshot; MAX_LIGHTS],
     decals: [DecalSnapshot; MAX_DECALS],
     effects: [EffectSnapshot; MAX_EFFECTS],
+    particles: [ParticleSnapshot; MAX_PARTICLES],
 }
 
 impl Slot {
@@ -455,6 +506,7 @@ impl Slot {
         slot.frame.lights = slot.lights.as_ptr();
         slot.frame.decals = slot.decals.as_ptr();
         slot.frame.effects = slot.effects.as_ptr();
+        slot.frame.particles = slot.particles.as_ptr();
         slot
     }
 }
@@ -581,6 +633,13 @@ impl FrameBuilder<'_> {
         self.slot.frame.effect_count = count as u32;
     }
 
+    /// Adds `particles`, as many as fit.
+    pub fn particles(&mut self, particles: &[ParticleSnapshot]) {
+        let count = particles.len().min(MAX_PARTICLES);
+        self.slot.particles[..count].copy_from_slice(&particles[..count]);
+        self.slot.frame.particle_count = count as u32;
+    }
+
     /// Adds `draw`'s lines and labels, as many as fit.
     pub fn debug(&mut self, draw: &opence_dev::draw::DebugDraw) {
         let vector = |[x, y, z]: [f32; 3]| Vec3 { x, y, z };
@@ -639,6 +698,7 @@ impl SnapshotWriter {
         slot.frame.light_count = 0;
         slot.frame.decal_count = 0;
         slot.frame.effect_count = 0;
+        slot.frame.particle_count = 0;
         let result = fill(&mut FrameBuilder { slot });
         self.slot = buffers.middle.swap(self.slot | FRESH, Ordering::AcqRel) & INDEX;
         result
@@ -698,7 +758,11 @@ mod tests {
         assert_eq!(offset_of!(FrameSnapshot, decals), 160);
         assert_eq!(offset_of!(FrameSnapshot, effects), 168);
         assert_eq!(offset_of!(FrameSnapshot, effect_count), 176);
-        assert_eq!(size_of::<FrameSnapshot>(), 184);
+        assert_eq!(offset_of!(FrameSnapshot, particle_count), 180);
+        assert_eq!(offset_of!(FrameSnapshot, particles), 184);
+        assert_eq!(size_of::<FrameSnapshot>(), 192);
+        assert_eq!(size_of::<ParticleSnapshot>(), 96);
+        assert_eq!(offset_of!(ParticleSnapshot, modes), 80);
         assert_eq!(size_of::<EffectSnapshot>(), 48);
         assert_eq!(offset_of!(EffectSnapshot, ids), 32);
         assert_eq!(size_of::<DecalSnapshot>(), 128);
@@ -710,13 +774,16 @@ mod tests {
         assert_eq!(size_of::<DebugLine>(), 28);
         assert_eq!(size_of::<DebugLabel>(), 64);
         assert_eq!(offset_of!(DebugLabel, text), 16);
-        assert_eq!(SNAPSHOT_VERSION, 9);
+        assert_eq!(SNAPSHOT_VERSION, 10);
     }
 
     #[test]
     fn the_layout_record_reports_it() {
         let layout = snapshot_layout();
-        assert_eq!(layout.frame_size, 184);
+        assert_eq!(layout.frame_size, 192);
+        assert_eq!(layout.frame_particles_offset, 184);
+        assert_eq!(layout.particle_size, 96);
+        assert_eq!(layout.max_particles, 2048);
         assert_eq!(layout.frame_effects_offset, 168);
         assert_eq!(layout.effect_size, 48);
         assert_eq!(layout.max_effects, 256);
@@ -880,6 +947,27 @@ mod tests {
         assert_eq!(unsafe { (*frame.effects).ids[0] }, 7);
         writer.publish(&buffers, 2, 0.0, |_| {});
         assert_eq!(read(&buffers).effect_count, 0);
+    }
+
+    #[test]
+    fn the_particles_are_copied_up_to_their_capacity_and_cleared() {
+        let (buffers, mut writer) = SnapshotBuffers::new();
+        let particle = ParticleSnapshot {
+            modes: [3, 0, PARTICLE_FACING_SEGMENT, 0],
+            ..Default::default()
+        };
+        writer.publish(&buffers, 1, 0.0, |frame| {
+            frame.particles(&vec![particle; MAX_PARTICLES + 3]);
+        });
+        let frame = read(&buffers);
+        assert_eq!(frame.particle_count as usize, MAX_PARTICLES);
+        // SAFETY: particles points at particle_count entries in the same slot.
+        assert_eq!(
+            unsafe { (*frame.particles).modes[2] },
+            PARTICLE_FACING_SEGMENT
+        );
+        writer.publish(&buffers, 2, 0.0, |_| {});
+        assert_eq!(read(&buffers).particle_count, 0);
     }
 
     #[test]

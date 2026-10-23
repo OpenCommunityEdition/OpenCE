@@ -31,6 +31,7 @@ public struct RenderSwitches: Equatable, Sendable {
     public var lensFlares = true
     public var glows = true
     public var decals = true
+    public var particles = true
     public var view = RenderView.frame
 
     public init() {}
@@ -48,6 +49,7 @@ public struct RenderSwitches: Equatable, Sendable {
         lensFlares = flag("render.lens_flares")
         glows = flag("render.glows")
         decals = flag("render.decals")
+        particles = flag("render.particles")
         view = RenderView(rawValue: value("render.view")) ?? .frame
     }
 }

@@ -284,6 +284,8 @@ impl Engine {
             decals: crate::dynamic_decals::DynamicDecals::new(&level),
             marks: Vec::new(),
             effects: crate::effects::LevelEffects::new(&level),
+            particles: crate::particles::LevelParticles::new(&level),
+            particle_rows: Vec::new(),
             running_effects: Vec::new(),
             level: Some(level),
             network: Some(network),

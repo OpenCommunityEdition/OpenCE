@@ -79,6 +79,11 @@ impl LevelEffects {
         }
     }
 
+    /// The effects running.
+    pub(crate) fn running(&self) -> &[opence_sim::effects::Running] {
+        self.effects.running()
+    }
+
     /// The parts made in the last tick.
     pub(crate) fn fired(&self) -> &[FiredPart] {
         self.effects.fired()
@@ -233,6 +238,7 @@ mod tests {
                     angular_velocity: [0.0, 0.0],
                     radius_modifier: [1.0, 1.0],
                 }],
+                particles: Vec::new(),
             }],
             locations: vec![String::new()],
             ..Effect::new(tag(b"effe", "smoke"))

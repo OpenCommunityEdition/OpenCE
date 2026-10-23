@@ -52,6 +52,15 @@ pub struct Level {
     pub glows: Vec<Glow>,
     /// The decals its BSPs place, and the decals they chain to, by path.
     pub decals: Vec<Decal>,
+    /// The particles its effects emit, by path.
+    pub particles: Vec<crate::Particle>,
+    /// The contrails its objects trail, by path.
+    pub contrails: Vec<crate::Contrail>,
+    /// The weather its BSPs have, by path.
+    pub weather: Vec<crate::WeatherSystem>,
+    /// Its detail object collections, as its scenario's palette orders
+    /// them (none: an entry naming none).
+    pub detail_object_collections: Vec<Option<crate::DetailObjectCollection>>,
     /// Its units' HUDs, by path.
     pub unit_huds: Vec<UnitHud>,
     /// Its weapons' HUDs, and the HUDs they add to, by path.
@@ -193,6 +202,21 @@ impl Level {
     /// A damage effect, by its tag.
     pub fn damage_effect(&self, tag: &TagRef) -> Option<&DamageEffect> {
         self.damage_effects.iter().find(|effect| effect.tag == *tag)
+    }
+
+    /// A particle, by its tag.
+    pub fn particle(&self, tag: &TagRef) -> Option<&crate::Particle> {
+        self.particles.iter().find(|particle| particle.tag == *tag)
+    }
+
+    /// A contrail, by its tag.
+    pub fn contrail(&self, tag: &TagRef) -> Option<&crate::Contrail> {
+        self.contrails.iter().find(|contrail| contrail.tag == *tag)
+    }
+
+    /// Weather, by its tag.
+    pub fn weather_system(&self, tag: &TagRef) -> Option<&crate::WeatherSystem> {
+        self.weather.iter().find(|weather| weather.tag == *tag)
     }
 
     /// An effect, by its tag.
@@ -538,6 +562,15 @@ pub struct StructureBsp {
     pub cluster_skies: Vec<Option<u16>>,
     /// The decals laid on it when the level is loaded.
     pub decals: Vec<LevelDecal>,
+    /// Its weather palette.
+    pub weather_palette: Vec<crate::WeatherPalette>,
+    /// Each cluster's weather, an index in its palette.
+    pub cluster_weather: Vec<Option<u16>>,
+    /// Each of its leaves' cluster (as its collision BSP numbers its
+    /// leaves; none: a leaf of no cluster).
+    pub leaf_clusters: Vec<Option<u16>>,
+    /// The detail objects on its ground.
+    pub detail_objects: Vec<crate::DetailObject>,
 }
 
 /// What a collision surface is made of.

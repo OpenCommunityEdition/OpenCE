@@ -19,6 +19,7 @@ mod effects;
 pub mod hud;
 pub mod lights;
 pub mod network;
+mod particles;
 pub mod render_level;
 pub mod render_model;
 pub mod render_shadow;
@@ -343,6 +344,31 @@ impl LevelGeometry {
         self.level.decals.clone()
     }
 
+    /// The textures the snapshot's particles draw, by their picture.
+    pub fn particle_textures(&self) -> Vec<u32> {
+        self.level.particle_textures.clone()
+    }
+
+    /// The BSP's detail objects, as the snapshot's particles are laid out
+    /// (`ParticleSnapshot`'s bytes, one after another).
+    pub fn detail_objects(&self) -> Vec<u8> {
+        self.level
+            .detail_objects
+            .iter()
+            .flat_map(|row| {
+                let words: [[u32; 4]; 6] = [
+                    row.position.map(f32::to_bits),
+                    row.axis.map(f32::to_bits),
+                    row.color.map(f32::to_bits),
+                    row.uv.map(f32::to_bits),
+                    row.shape.map(f32::to_bits),
+                    row.modes,
+                ];
+                words.into_iter().flatten().flat_map(u32::to_ne_bytes)
+            })
+            .collect()
+    }
+
     /// The textures the snapshot's decals draw, by their picture.
     pub fn decal_textures(&self) -> Vec<u32> {
         self.level.decal_textures.clone()
@@ -598,6 +624,10 @@ pub(crate) struct Running {
     effects: effects::LevelEffects,
     /// The frame's running effects (kept for their memory).
     running_effects: Vec<snapshot::EffectSnapshot>,
+    /// The particles, contrails and weather.
+    particles: particles::LevelParticles,
+    /// The frame's particles (kept for their memory).
+    particle_rows: Vec<snapshot::ParticleSnapshot>,
 }
 
 /// The models and animation graphs objects are drawn and posed with,
@@ -734,6 +764,8 @@ impl Engine {
             marks: Vec::new(),
             effects: effects::LevelEffects::default(),
             running_effects: Vec::new(),
+            particles: particles::LevelParticles::default(),
+            particle_rows: Vec::new(),
         });
         publish(&mut state, &self.snapshots, 0.0);
     }
@@ -779,6 +811,8 @@ impl Engine {
             marks: Vec::new(),
             effects: effects::LevelEffects::new(&geometry.content),
             running_effects: Vec::new(),
+            particles: particles::LevelParticles::new(&geometry.content),
+            particle_rows: Vec::new(),
         });
         publish(&mut state, &self.snapshots, 0.0);
         Ok(count)
@@ -1171,6 +1205,12 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
             let fired = running.effects.fired();
             running.lights.tick(level, fired);
             running.decals.tick(level, &running.simulation, fired);
+            running.particles.tick(
+                level,
+                &mut running.simulation,
+                running.effects.running(),
+                bsp,
+            );
         }
         // (the mouse's turn is used once)
         input.yaw = 0.0;
@@ -1233,6 +1273,14 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
         .gather(|handle| running.simulation.transform(handle), &mut marks);
     let mut running_effects = std::mem::take(&mut running.running_effects);
     running.effects.gather(&mut running_effects);
+    let mut particle_rows = std::mem::take(&mut running.particle_rows);
+    particle_rows.clear();
+    running.particles.camera = camera.transform.position;
+    if let Some(level) = &running.level {
+        running
+            .particles
+            .gather(level, camera.transform.position, &mut particle_rows);
+    }
     let simulation = &mut running.simulation;
     writer.publish(buffers, tick, alpha, |frame| {
         frame.camera(CameraSnapshot {
@@ -1309,12 +1357,14 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
         frame.lights(&lit);
         frame.decals(&marks);
         frame.effects(&running_effects);
+        frame.particles(&particle_rows);
         frame.debug(&shell.draw);
         frame.debug(&shell.scene);
     });
     running.lit = lit;
     running.marks = marks;
     running.running_effects = running_effects;
+    running.particle_rows = particle_rows;
 }
 
 #[cfg(test)]

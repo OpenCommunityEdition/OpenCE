@@ -353,6 +353,12 @@ pub struct RenderLevel {
     /// The textures the decals laid while the game runs draw, as the
     /// snapshot's decal pictures number them (`u32::MAX`: one not loaded).
     pub decal_textures: Vec<u32>,
+    /// The textures the particles, contrails, weather and detail objects
+    /// draw, as the snapshot's particle pictures number them (`u32::MAX`:
+    /// one not loaded).
+    pub particle_textures: Vec<u32>,
+    /// The BSP's detail objects, drawn as the snapshot's particles are.
+    pub detail_objects: Vec<crate::snapshot::ParticleSnapshot>,
 }
 
 /// Gathers the level's textures and materials, each once.
@@ -415,6 +421,11 @@ impl RenderLevel {
             let texture = builder.texture(&bitmap, image, 1).unwrap_or(u32::MAX);
             builder.out.decal_textures.push(texture);
         }
+        for (bitmap, image) in crate::particles::particle_images(level) {
+            let texture = builder.texture(&bitmap, image, 1).unwrap_or(u32::MAX);
+            builder.out.particle_textures.push(texture);
+        }
+        builder.out.detail_objects = crate::particles::detail_objects(level, structure);
         builder.out.decals = crate::decals::level_decals(level, structure, &mut |bitmap, image| {
             builder.texture(&bitmap.tag, image, 1)
         });
@@ -952,6 +963,10 @@ pub(crate) mod tests {
             },
             structure_bsps: vec![StructureBsp {
                 cluster_skies: Vec::new(),
+                weather_palette: Vec::new(),
+                cluster_weather: Vec::new(),
+                leaf_clusters: Vec::new(),
+                detail_objects: Vec::new(),
                 decals: Vec::new(),
                 lens_flare_markers: Vec::new(),
                 lens_flares: Vec::new(),
@@ -986,6 +1001,10 @@ pub(crate) mod tests {
             collision_models: Vec::new(),
             physics: Vec::new(),
             effects: Vec::new(),
+            particles: Vec::new(),
+            contrails: Vec::new(),
+            weather: Vec::new(),
+            detail_object_collections: Vec::new(),
             lights: Vec::new(),
             unit_huds: Vec::new(),
             weapon_huds: Vec::new(),

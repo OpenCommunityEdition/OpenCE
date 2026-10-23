@@ -240,6 +240,10 @@ pub(crate) mod tests {
             collision_models: Vec::new(),
             physics: Vec::new(),
             effects: Vec::new(),
+            particles: Vec::new(),
+            contrails: Vec::new(),
+            weather: Vec::new(),
+            detail_object_collections: Vec::new(),
             lights: Vec::new(),
             unit_huds: Vec::new(),
             weapon_huds: Vec::new(),
@@ -249,6 +253,10 @@ pub(crate) mod tests {
         };
         let mut structure = StructureBsp {
             cluster_skies: Vec::new(),
+            weather_palette: Vec::new(),
+            cluster_weather: Vec::new(),
+            leaf_clusters: Vec::new(),
+            detail_objects: Vec::new(),
             decals: Vec::new(),
             lens_flare_markers: Vec::new(),
             lens_flares: Vec::new(),

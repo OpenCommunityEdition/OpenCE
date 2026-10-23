@@ -20,6 +20,7 @@ use crate::cache::Cache;
 use crate::error::ImportError;
 use crate::level::tag_ref;
 use crate::object::vector;
+use crate::particle::{PART, PARTICLE_SIZE, POINT_PHYSICS_SIZE, PPHY};
 use crate::tags::{Element, GroupTag};
 use crate::weapon::JPT;
 
@@ -32,16 +33,12 @@ const PARTS_OFFSET: usize = 0x2C;
 const PART_TAG_OFFSET: usize = 0x18;
 const MAX_EVENTS: usize = 32;
 const MAX_PARTS: usize = 32;
-const PARTICLES_OFFSET: usize = 0x38;
+pub(crate) const PARTICLES_OFFSET: usize = 0x38;
 pub(crate) const PARTICLES_SIZE: usize = 0xE8;
-const MAX_PARTICLES: usize = 32;
+pub(crate) const MAX_PARTICLES: usize = 32;
 const LOCATIONS_OFFSET: usize = 0x28;
 pub(crate) const LOCATION_SIZE: usize = 0x20;
 const MAX_LOCATIONS: usize = 32;
-const PART: GroupTag = GroupTag::new(b"part");
-pub(crate) const PARTICLE_SIZE: usize = 0x164;
-const PPHY: GroupTag = GroupTag::new(b"pphy");
-pub(crate) const POINT_PHYSICS_SIZE: usize = 0x40;
 /// The least density a particle is a body at, grams a millilitre (the
 /// C port's `PHYSICS_DEBRIS_DENSITY_MIN`: lighter ones are smoke and
 /// sparks).
@@ -95,6 +92,7 @@ pub(crate) fn import_effect(cache: &Cache, index: usize) -> Result<Effect, Impor
             });
         }
         timeline.push(EffectEvent {
+            particles: crate::particle::effect_particles(&event)?,
             skip_fraction: event.f32(0x04, "skip fraction")?,
             delay: vector(&event, 0x08, "delay bounds")?,
             duration: vector(&event, 0x10, "duration bounds")?,
