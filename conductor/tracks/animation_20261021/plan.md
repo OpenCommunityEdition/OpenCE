@@ -1,9 +1,9 @@
 # Plan: The complete animation set
 
 ## Phase 1: The graph and the frames
-- [ ] Task: The full graph
-    - [ ] Write tests: every block of `antr` imports; inheritance; the fallbacks for a missing animation; frame events
-    - [ ] The typed graph in `content` and its import
+- [x] Task: The full graph f8a0b81d
+    - [x] Write tests: every block of `antr` imports; inheritance; the fallbacks for a missing animation; frame events
+    - [x] The typed graph in `content` and its import
 - [ ] Task: The blender
     - [ ] Write tests: base, overlay and replacement; the transition blend; aim limits; against the reference traces (marked, needs `assets/maps`)
     - [ ] The pose blender in `sim`, with the overlays in Halo's order
