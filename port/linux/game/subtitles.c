@@ -111,6 +111,10 @@ extern const unsigned int *const subtitles_embedded_data[];
 extern const unsigned long subtitles_embedded_sizes[];
 extern const unsigned long subtitles_embedded_count;
 
+/* port/linux/src/text_hires.c: the subtitles' font tag has no font of its
+own, so its text is drawn with the HUD's, which the CJK fallback also needs */
+extern void text_hires_force(int on);
+
 /* port_config.c's, cseries_windows.c's, cinematics.c's */
 int config_boolean(const char *name);
 const char *config_string(const char *name);
@@ -848,11 +852,14 @@ void subtitles_draw(
 
 			shadow.red = shadow.green = shadow.blue = 0.0f;
 			offset_rectangle2d(&shadow_bounds, 1, 1);
+			text_hires_force(1);
 			draw_string_set_draw_mode(font_index, NONE, _subtitle_text_center, _subtitle_wrap_flags, &shadow);
 			rasterizer_draw_unicode_string(&shadow_bounds, NULL, NULL, 0, wide);
 		}
+		text_hires_force(1);
 		draw_string_set_draw_mode(font_index, NONE, _subtitle_text_center, _subtitle_wrap_flags, &color);
 		rasterizer_draw_unicode_string(&bounds, NULL, NULL, 0, wide);
+		text_hires_force(0);
 
 		bottom = (short)(background.y0 - SUBTITLE_GAP);
 	}

@@ -61,6 +61,11 @@ tag's letter_widths (TEXT_HIRES_FIT_LETTERS of them, 0 for a letter the tag
 has not), its glyphs rasterized with oversample times the display's pixels
 (for text drawn scaled up); -1 if none, or display.high_res_text is off */
 long text_hires_font(char const *tag_name, float cap_height, short const *letter_widths, float oversample);
+/* while on, a font tag that no font stands for (fonts.json) is drawn with the
+HUD's small font, as the subtitles are, in a font tag of their own (the text
+drawn meanwhile has its fonts apart from the rest of the text's) */
+void text_hires_force(int on);
+int text_hires_forced(void);
 /* whether the font has a glyph for the character (it draws a string only
 if it has all of its characters) */
 int text_hires_covers(long font, unsigned long code);

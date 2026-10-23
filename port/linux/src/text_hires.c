@@ -52,7 +52,20 @@ static struct
 	float narrowing;
 	/* how many times the display's pixels its glyphs are rasterized with */
 	float oversample;
+	/* made while text_hires_force was on */
+	int forced;
 } fonts[MAXIMUM_FONTS];
+static int forced_text;
+
+void text_hires_force(int on)
+{
+	forced_text = on != 0;
+}
+
+int text_hires_forced(void)
+{
+	return forced_text;
+}
 static long font_count;
 
 static struct
@@ -191,6 +204,7 @@ long text_hires_font(char const *tag_name, float cap_height, short const *letter
 	long letters_width = 0;
 	int x0, y0, x1, y1;
 	int letter;
+	int use_small;
 
 	if (!text_hires_enabled() || !tag_name || cap_height <= 0.0f || !letter_widths)
 		return -1;
@@ -202,7 +216,8 @@ long text_hires_font(char const *tag_name, float cap_height, short const *letter
 	for (font = 0; font < font_count; font++)
 	{
 		if (!names_differ(fonts[font].tag, tag_name) && fonts[font].cap_height == cap_height &&
-			fonts[font].letters_width == letters_width && fonts[font].oversample == oversample)
+			fonts[font].letters_width == letters_width && fonts[font].oversample == oversample &&
+			fonts[font].forced == forced_text)
 		{
 			return fonts[font].scale > 0.0f ? font : -1;
 		}
@@ -216,13 +231,24 @@ long text_hires_font(char const *tag_name, float cap_height, short const *letter
 	fonts[font].scale = 0.0f;
 	fonts[font].narrowing = 1.0f;
 	fonts[font].oversample = oversample;
+	fonts[font].forced = forced_text;
+	/* (a tag no font stands for, drawn with the small font while forced) */
+	for (index = 0; index < text_hires_embedded_count; index++)
+	{
+		if (text_hires_embedded[index].tag && !names_differ(text_hires_embedded[index].tag, tag_name))
+			break;
+	}
+	use_small = forced_text && index == text_hires_embedded_count;
 	for (index = 0; index < text_hires_embedded_count; index++)
 	{
 		const struct text_hires_embedded *embedded = &text_hires_embedded[index];
 		const unsigned char *data = (const unsigned char *)embedded->data;
 
-		if (!embedded->tag || names_differ(embedded->tag, tag_name))
+		if (!embedded->tag ||
+			(use_small ? names_differ(embedded->tag, "ui\\small_ui") : names_differ(embedded->tag, tag_name)))
+		{
 			continue;
+		}
 		if (!stbtt_InitFont(&fonts[font].info, data, stbtt_GetFontOffsetForIndex(data, 0)) ||
 			!stbtt_GetCodepointBox(&fonts[font].info, 'H', &x0, &y0, &x1, &y1) || y1 <= y0)
 		{

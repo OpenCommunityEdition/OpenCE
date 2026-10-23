@@ -94,6 +94,7 @@ long text_hires_font(char const *tag_name, float cap_height, short const *letter
 int text_hires_covers(long font, unsigned long code);
 int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *glyph);
 int text_hires_glyph_cell(long font, unsigned long code, float cell, struct text_hires_glyph *glyph);
+int text_hires_forced(void);
 void text_hires_register_atlas(unsigned long const *texture, unsigned long width, unsigned long height);
 
 /* ---------- constants */
@@ -248,6 +249,7 @@ static struct
 {
 	struct font_header *font;
 	real oversample;
+	int forced;
 	long hires_font;
 } hires_text_fonts[MAXIMUM_HIRES_TEXT_FONTS];
 static short hires_text_next_font = 0;
@@ -841,7 +843,8 @@ static long hires_text_font_get(
 	font = font_definition_get(font_index);
 	for (font_slot = 0; font_slot < MAXIMUM_HIRES_TEXT_FONTS; font_slot++)
 	{
-		if (hires_text_fonts[font_slot].font == font && hires_text_fonts[font_slot].oversample == oversample)
+		if (hires_text_fonts[font_slot].font == font && hires_text_fonts[font_slot].oversample == oversample &&
+			hires_text_fonts[font_slot].forced == text_hires_forced())
 			return hires_text_fonts[font_slot].hires_font;
 	}
 	/* (A to Z, then a to z; none where the tag has not the letter) */
@@ -879,6 +882,7 @@ static long hires_text_font_get(
 		hires_font = NONE;
 	hires_text_fonts[hires_text_next_font].font = font;
 	hires_text_fonts[hires_text_next_font].oversample = oversample;
+	hires_text_fonts[hires_text_next_font].forced = text_hires_forced();
 	hires_text_fonts[hires_text_next_font].hires_font = hires_font;
 	hires_text_next_font = (short)((hires_text_next_font + 1) % MAXIMUM_HIRES_TEXT_FONTS);
 
