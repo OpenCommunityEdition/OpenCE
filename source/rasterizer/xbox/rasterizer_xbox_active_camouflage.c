@@ -250,6 +250,16 @@ typedef char verify_transparent_geometry_group_animation_offset[
 
 /* ---------- prototypes */
 
+static void rasterizer_active_camouflage_stencil(
+	unsigned long function,
+	unsigned long reference,
+	unsigned long mask,
+	unsigned long write_mask,
+	unsigned long pass);
+static void rasterizer_active_camouflage_first_person_depth(
+	struct transparent_geometry_group *group,
+	boolean partial);
+
 /* ---------- globals */
 
 
@@ -506,6 +516,7 @@ void rasterizer_active_camouflage_draw(
 		global_window_parameters.rasterizer_target==_rasterizer_target_render_primary)
 	{
 		struct shader_model_definition *model;
+		boolean first_person;
 
 		model = (struct shader_model_definition *)shader_get_and_verify_type(
 			group->shader,
@@ -520,16 +531,22 @@ void rasterizer_active_camouflage_draw(
 			165,
 			!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_no_queue_bit));
 
-		if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_first_person_bit))
+		first_person = TEST_FLAG(group->geometry_flags, _rasterizer_geometry_first_person_bit);
+		if (first_person)
 		{
 			rasterizer_set_frustum_z(
 				rasterizer_globals.first_person_weapon_near_clip_distance,
 				rasterizer_globals.first_person_weapon_far_clip_distance);
 		}
 
-		if (group->effect.intensity==1.0f)
+		/* port: a cloaked viewmodel is not drawn in the opaque pass, so the
+		wall is already in the depth buffer. Lay its depth down before the
+		refraction, and before a partial cloak's lit model. */
+		if (group->effect.intensity==1.0f ||
+			(first_person && group->node_matrices && group->node_matrix_count))
 		{
-			/* fully cloaked: lay down depth only, alpha tested against the base map */
+			/* depth only, alpha tested against the base map. A partial cloak uses
+			the same depth so the lit model is not cut by the wall. */
 			rasterizer_set_texture(
 				0,
 				0,
@@ -645,12 +662,18 @@ void rasterizer_active_camouflage_draw(
 				0);
 			rasterizer_set_pixel_shader(&pixel_shader);
 
-			rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
+			if (first_person)
+				rasterizer_active_camouflage_first_person_depth(
+					group,
+					group->effect.intensity < 1.0f);
+			else
+				rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
 		}
 		/* port: not when its node matrices did not fit in the rasterizer's
 		memory pool (rasterizer_memory_alloc_const returned NULL): the model
 		would be skinned from a NULL pointer. The distortion is still drawn. */
-		else if (group->node_matrices && group->node_matrix_count)
+		if (group->effect.intensity < 1.0f &&
+			group->node_matrices && group->node_matrix_count)
 		{
 			/* partially cloaked: draw the model normally underneath the distortion */
 			struct rasterizer_model_begin_parameters parameters;
@@ -911,3 +934,135 @@ void rasterizer_active_camouflage_draw(
 }
 
 /* ---------- private code */
+
+static void rasterizer_active_camouflage_stencil(
+	unsigned long function,
+	unsigned long reference,
+	unsigned long mask,
+	unsigned long write_mask,
+	unsigned long pass)
+{
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_STENCILENABLE,
+		TRUE);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_STENCILFAIL,
+		D3DSTENCILOP_KEEP);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_STENCILZFAIL,
+		D3DSTENCILOP_KEEP);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_STENCILPASS,
+		pass);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_STENCILFUNC,
+		function);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_STENCILREF,
+		reference);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_STENCILMASK,
+		mask);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_STENCILWRITEMASK,
+		write_mask);
+}
+
+static void rasterizer_active_camouflage_first_person_depth(
+	struct transparent_geometry_group *group,
+	boolean partial)
+{
+	/* port: the viewmodel near plane is closer than the world's, so a wall
+	that is still farther away wins the depth test and cuts the cloak. Take
+	the silhouette without testing the world, then keep one surface of the
+	weapon. Bit 0 claims the pixel. Bit 2 marks a partial-cloak pixel whose
+	lit depth is already as far as it may go. Bit 1 belongs to decals. */
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_ZFUNC,
+		D3DCMP_ALWAYS);
+	rasterizer_active_camouflage_stencil(
+		D3DCMP_EQUAL,
+		0,
+		partial ? 5UL : 1UL,
+		1,
+		D3DSTENCILOP_INVERT);
+	rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
+
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_ZFUNC,
+		partial ? D3DCMP_GREATEREQUAL : D3DCMP_LESSEQUAL);
+	if (partial)
+	{
+		rasterizer_active_camouflage_stencil(
+			D3DCMP_EQUAL,
+			1,
+			5,
+			0,
+			D3DSTENCILOP_KEEP);
+	}
+	else
+	{
+		rasterizer_active_camouflage_stencil(
+			D3DCMP_NOTEQUAL,
+			0,
+			1,
+			0,
+			D3DSTENCILOP_KEEP);
+	}
+	rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
+
+	if (partial)
+	{
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_ZENABLE,
+			FALSE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_COLORWRITEENABLE,
+			0);
+		rasterizer_active_camouflage_stencil(
+			D3DCMP_EQUAL,
+			1,
+			5,
+			4,
+			D3DSTENCILOP_INVERT);
+		rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_ZENABLE,
+			TRUE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_ZWRITEENABLE,
+			TRUE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_COLORWRITEENABLE,
+			D3DCOLORWRITEENABLE_RED |
+			D3DCOLORWRITEENABLE_GREEN |
+			D3DCOLORWRITEENABLE_BLUE);
+	}
+
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_STENCILENABLE,
+		FALSE);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_ZFUNC,
+		D3DCMP_LESSEQUAL);
+	/* the stencil-mode cache still names whatever the previous pass left.
+	NONE reapplies that disabled test when the cache disagrees. */
+	rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_NONE);
+}
