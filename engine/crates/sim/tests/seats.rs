@@ -6,9 +6,11 @@
 
 use std::error::Error;
 use std::path::Path;
+use std::sync::Arc;
 
 use opence_content::{Level, ObjectKind, VehicleSeat};
 use opence_import::{import_level, Cache};
+use opence_sim::animation::{self, AnimationPlayer};
 use opence_sim::input::{Buttons, TickInput};
 use opence_sim::objects::{ObjectHandle, ObjectSpawn};
 use opence_sim::units::Radians;
@@ -327,5 +329,88 @@ fn a_warthog_destroyed_under_its_driver_throws_it_out() -> Result {
     assert!(simulation.kill(warthog));
     simulation.step(TickInput::default());
     assert_eq!(seated(&simulation), None, "the wreck kept its driver");
+    Ok(())
+}
+
+/// The node matrices of the drawn object standing at `position`.
+fn nodes_at(simulation: &mut Simulation, position: Vec3) -> Vec<[f32; 3]> {
+    let mut found = Vec::new();
+    simulation.visit_drawn(|drawn| {
+        if drawn.current.position.distance(position) < 1.0e-4 {
+            if let Some(nodes) = drawn.nodes {
+                found = nodes.current.iter().map(|node| node.forward).collect();
+            }
+        }
+    });
+    found
+}
+
+#[test]
+fn a_driven_warthog_rides_its_suspension_and_turns_its_wheels() -> Result {
+    let Some(level) = bloodgulch()? else {
+        return Ok(());
+    };
+    let flags = seat_flags(&level)?;
+    let driver = seat_with(&flags, VehicleSeat::DRIVER, 0)?;
+    let (mut simulation, warthog) = beside_a_warthog(&level)?;
+    // (animated as the app animates it)
+    let tag = level
+        .objects
+        .iter()
+        .find(|object| object.tag.path.eq_ignore_ascii_case(WARTHOG))
+        .map(|object| object.tag.clone())
+        .ok_or("no warthog")?;
+    let definition = level.object(&tag).ok_or("no definition")?;
+    let graph = definition.animation_graph.as_ref().ok_or("no graph")?;
+    let graph = Arc::new(level.animation_graph(graph).ok_or("no graph")?.clone());
+    let model = definition
+        .model
+        .as_ref()
+        .and_then(|model| level.model_index(model))
+        .map(|model| Arc::new(level.models[model].clone()));
+    let standing = animation::standing_animation(&graph, true);
+    assert!(simulation.animate(warthog, AnimationPlayer::new(graph, model, standing)));
+    // (standing on the ground, its wheels touch it)
+    let resting = simulation
+        .rides()
+        .ride(warthog)
+        .ok_or("no ride")?
+        .suspension;
+    assert!(
+        resting.iter().any(|&shift| shift != 0),
+        "a Warthog on the ground has no suspension: {resting:?}"
+    );
+    enter(&mut simulation, warthog, driver)?;
+    let position = simulation.transform(warthog).ok_or("no warthog")?.position;
+    let still = nodes_at(&mut simulation, position);
+    assert!(!still.is_empty(), "the Warthog has no nodes");
+    let mut moved = false;
+    for _ in 0..2 * clock::TICKS_PER_SECOND {
+        simulation.step(TickInput {
+            forward: 127,
+            ..TickInput::default()
+        });
+        let position = simulation.transform(warthog).ok_or("no warthog")?.position;
+        let rotation = simulation.transform(warthog).ok_or("no warthog")?.rotation;
+        // (the nodes relative to the body: its wheels turn and its springs
+        // work as it drives)
+        let driving = nodes_at(&mut simulation, position);
+        let local = |nodes: &[[f32; 3]]| -> Vec<Vec3> {
+            nodes
+                .iter()
+                .map(|&forward| rotation.inverse() * Vec3::from_array(forward))
+                .collect()
+        };
+        let before: Vec<Vec3> = still.iter().map(|&f| Vec3::from_array(f)).collect();
+        if local(&driving)
+            .iter()
+            .zip(&before)
+            .any(|(now, then)| now.distance(*then) > 0.1)
+        {
+            moved = true;
+            break;
+        }
+    }
+    assert!(moved, "the Warthog's nodes never moved as it drove");
     Ok(())
 }

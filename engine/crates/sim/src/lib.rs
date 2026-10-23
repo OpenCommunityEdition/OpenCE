@@ -33,6 +33,7 @@ pub mod seats;
 pub mod unit_states;
 pub mod units;
 pub mod vehicle;
+pub mod vehicle_animation;
 pub mod weapon;
 
 use bevy_ecs::prelude::*;

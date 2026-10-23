@@ -10,8 +10,10 @@
 use bevy_ecs::prelude::*;
 use glam::{Quat, Vec3};
 use opence_content::{
-    AnimationNode, Level, Model, ObjectKind, Physics, TagRef, Vehicle, VehicleSeat, Weapon,
+    AnimationNode, Level, Model, ObjectKind, Physics, TagRef, Vehicle, VehicleAnimations,
+    VehicleSeat, Weapon,
 };
+use opence_physics::Layers;
 
 use crate::animation::{
     base_orientations, model_orientations, node_matrices, standing_animation, NodeMatrix,
@@ -25,6 +27,7 @@ use crate::input::TickInput;
 use crate::objects::{Object, ObjectHandle, ObjectTable};
 use crate::player::{self, Arms, Player, Seated};
 use crate::vehicle::{self, VehicleControls, VehicleLevel, VehicleState};
+use crate::vehicle_animation::{self, VehicleMotion, SUSPENSIONS};
 use crate::weapon::WeaponState;
 use crate::Transform;
 
@@ -68,6 +71,8 @@ struct RideKind {
     /// Its gun: the armory's weapon, its definition, and its muzzle from
     /// its origin.
     turret: Option<(usize, Weapon, Vec3)>,
+    /// Its graph's vehicle animations: its overlays and suspensions.
+    animations: Option<VehicleAnimations>,
 }
 
 /// A vehicle in the world.
@@ -87,6 +92,8 @@ pub struct Ride {
     previous: (Vec3, Quat),
     /// Where its object was put this tick.
     pub pose: Transform,
+    /// Each suspension's travel, 0 (extended) to 255 (compressed).
+    pub suspension: [u8; SUSPENSIONS],
 }
 
 /// The level's vehicles, and the vehicles in the world.
@@ -102,6 +109,10 @@ pub struct Rides {
 /// Where the vehicles' objects go this tick.
 #[derive(Resource, Clone, Debug, Default)]
 pub(crate) struct RidePoses(pub Vec<(ObjectHandle, Transform)>);
+
+/// What the vehicles' overlays are posed by this tick.
+#[derive(Resource, Clone, Debug, Default)]
+pub(crate) struct VehicleMotions(pub Vec<(ObjectHandle, VehicleMotion)>);
 
 /// Puts the vehicles' objects where their movement left them, before the
 /// animations pose their nodes from there.
@@ -218,12 +229,18 @@ impl Rides {
                             .map_or(gunner, |matrix| Vec3::from_array(matrix.position));
                         (index, weapon, muzzle)
                     });
+                let animations = object
+                    .animation_graph
+                    .as_ref()
+                    .and_then(|tag| level.animation_graph(tag))
+                    .and_then(|graph| graph.vehicle.clone());
                 Some(RideKind {
                     tag: object.tag.clone(),
                     vehicle,
                     physics,
                     seats,
                     turret,
+                    animations,
                 })
             })
             .collect();
@@ -296,6 +313,7 @@ impl Rides {
                 power: [0.0; 2],
                 turret,
                 pose: transform,
+                suspension: [0; SUSPENSIONS],
             });
         }
         self.rides.sort_by_key(|ride| ride.handle);
@@ -445,6 +463,7 @@ impl Rides {
         };
         let physics = &*guard;
         let mut poses = Vec::with_capacity(self.rides.len());
+        let mut motions = Vec::with_capacity(self.rides.len());
         for ride in &mut self.rides {
             let Some(kind) = self.kinds.get(ride.kind) else {
                 continue;
@@ -521,7 +540,38 @@ impl Rides {
                         ride.state = before;
                     }
                 }
+                if let Some(animations) = &kind.animations {
+                    // (the ground below each wheel, a cast the physics
+                    // refuses finding none)
+                    vehicle_animation::update_suspension(
+                        animations,
+                        &kind.physics,
+                        ride.state.origin(&kind.physics),
+                        ride.state.forward,
+                        ride.state.up,
+                        &mut ride.suspension,
+                        |start, vector| match physics.cast_ray(start, vector, Layers::LEVEL) {
+                            Ok(Some(hit)) => hit.fraction,
+                            _ => 1.0,
+                        },
+                    );
+                }
             }
+            motions.push((
+                ride.handle,
+                VehicleMotion {
+                    turn: ride.state.turn,
+                    speed: ride.state.speed,
+                    wheel: ride.state.wheel,
+                    velocity: ride.state.velocity,
+                    forward: ride.state.forward,
+                    up: ride.state.up,
+                    suspension: ride.suspension,
+                    maximum_forward_speed: kind.vehicle.maximum_forward_speed,
+                    maximum_reverse_speed: kind.vehicle.maximum_reverse_speed,
+                    wheel_circumference: kind.vehicle.wheel_circumference,
+                },
+            ));
             let current = (ride.state.origin(&kind.physics), ride.state.rotation());
             let (position, rotation) = if game_tick {
                 (
@@ -539,6 +589,7 @@ impl Rides {
             poses.push((ride.handle, ride.pose));
         }
         world.insert_resource(RidePoses(poses));
+        world.insert_resource(VehicleMotions(motions));
         // (each player's seat moves its biped in the world it may share)
         drop(guard);
         for player in players.iter_mut() {

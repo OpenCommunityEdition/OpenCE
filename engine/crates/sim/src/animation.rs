@@ -18,7 +18,10 @@ use opence_content::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Model, ScreenBounds,
 };
 
+use crate::objects::ObjectTable;
 use crate::random::RandomSeed;
+use crate::seats::VehicleMotions;
+use crate::vehicle_animation::{apply_vehicle_overlays, VehicleMotion};
 use crate::{ObjectId, Transform};
 
 /// The most nodes an animation moves, or a model has.
@@ -153,6 +156,18 @@ impl NodeMatrix {
                     + point[1] * self.left[column]
                     + point[2] * self.up[column])
                 + self.position[column];
+        }
+        result
+    }
+
+    /// Where it turns `vector`, without its scale or position
+    /// (`matrix4x3_transform_normal`).
+    pub fn transform_vector(&self, vector: [f32; 3]) -> [f32; 3] {
+        let mut result = [0.0; 3];
+        for (column, value) in result.iter_mut().enumerate() {
+            *value = vector[0] * self.forward[column]
+                + vector[1] * self.left[column]
+                + vector[2] * self.up[column];
         }
         result
     }
@@ -1389,12 +1404,23 @@ pub struct NodeMatrices {
 /// order on every machine.
 pub(crate) fn play_animations(
     mut seed: ResMut<RandomSeed>,
+    motions: Option<Res<VehicleMotions>>,
+    table: Option<Res<ObjectTable>>,
     order: Query<(Entity, &ObjectId), With<AnimationPlayer>>,
     mut players: Query<(&Transform, &mut AnimationPlayer, &mut NodeMatrices)>,
 ) {
     let mut entities: Vec<(Entity, ObjectId)> =
         order.iter().map(|(entity, id)| (entity, *id)).collect();
     entities.sort_by_key(|(_, id)| *id);
+    // (a vehicle's overlays over its animation, by its movement)
+    let motions: Vec<(Entity, &VehicleMotion)> = match (&motions, &table) {
+        (Some(motions), Some(table)) => motions
+            .0
+            .iter()
+            .filter_map(|(handle, motion)| Some((table.entity(*handle)?, motion)))
+            .collect(),
+        _ => Vec::new(),
+    };
     for (entity, _) in entities {
         let Ok((transform, mut player, mut matrices)) = players.get_mut(entity) else {
             continue;
@@ -1403,7 +1429,18 @@ pub(crate) fn play_animations(
         advance(&player.graph.animations, &mut player.state, || {
             seed.next_real()
         });
-        let current = player.matrices(transform);
+        let current = match motions.iter().find(|(vehicle, _)| *vehicle == entity) {
+            Some((_, motion)) => {
+                let mut nodes = player.pose();
+                let model_nodes = player
+                    .model
+                    .as_ref()
+                    .map_or(nodes.len(), |model| model.nodes.len());
+                apply_vehicle_overlays(&player.graph, model_nodes, motion, &mut nodes);
+                node_matrices(&player.links, &nodes, &root_matrix(transform))
+            }
+            None => player.matrices(transform),
+        };
         matrices.previous = std::mem::replace(&mut matrices.current, current);
     }
 }
