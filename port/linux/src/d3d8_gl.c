@@ -26,6 +26,9 @@ Conventions carried over from the Xbox:
 #include "halo_ui_pointer.h"
 #include "port_config.h"
 #include "main/console.h"
+#ifdef HALO_ANDROID
+#include "../../android/include/android_render_policy.h"
+#endif
 
 #include <SDL3/SDL.h>
 
@@ -1861,6 +1864,10 @@ static void gl_initialize(void)
 	int index;
 
 	glGetIntegerv(GL_MAJOR_VERSION, &major);
+#ifdef HALO_ANDROID
+	platform_log("Android render policy: chip=%d geometry=%s CE textures=%s per-draw refresh=off",
+		android_render_chip, android_geometry_fixes ? "on" : "off", android_texture_fixes ? "on" : "off");
+#endif
 	glGetIntegerv(GL_MINOR_VERSION, &minor);
 #ifdef HALO_GLES
 	{
@@ -4269,10 +4276,6 @@ static struct program_entry *prepare_draw(BOOL immediate)
 				skip++;
 		}
 	}
-#ifdef HALO_ANDROID
-	/* Refresh GL shadow state before binding this draw, without reloading pixels. */
-	xgpu_gl_state_invalidate();
-#endif
 	memset(&key, 0, sizeof(key));
 	memcpy(key.combiner_state, D3D__RenderState, sizeof(key.combiner_state));
 	/* constants are uniforms, not part of the program */
@@ -4834,9 +4837,9 @@ static BOOL mirror_range(unsigned long address, unsigned long size, GLuint *buff
 	BOOL present = TRUE;
 
 #ifdef HALO_ANDROID
-	/* Persistent geometry caching causes corruption on affected Android
-	devices. Use current vertex/index bytes through the streaming path. */
-	return FALSE;
+	/* Affected and unknown chips use static buffers or current CPU bytes. */
+	if (android_geometry_fixes)
+		return FALSE;
 #endif
 	if (!size || address < PLATFORM_CONTIGUOUS_BASE || start + size > PLATFORM_CONTIGUOUS_SIZE)
 		return FALSE;
@@ -4931,8 +4934,8 @@ static void index_extent(const WORD *indices, unsigned long count, unsigned long
 #ifdef HALO_ANDROID
 /* ---------- static geometry
 
-Android keeps no mirror of the contiguous window (mirror_range), so every
-draw streams its vertices and indices. Geometry the game writes once and
+When Android's geometry fixes are enabled, mirror_range declines the
+contiguous window, so draws stream their vertices and indices. Geometry the game writes once and
 never again gets GL buffers of its own instead, filled the first time a draw
 reads it and never written after, so nothing tracks writes and no queued
 draw can read a buffer while it changes:
@@ -5036,7 +5039,7 @@ static void static_buffer_note(struct static_buffer_list *list, unsigned long st
 	unsigned long index;
 	struct static_buffer *entry;
 
-	if (!start || !size)
+	if (!android_geometry_fixes || !start || !size)
 		return;
 	static_buffer_forget(list, start);
 	index = static_buffer_upper(list, start);
@@ -5147,7 +5150,7 @@ static BOOL static_buffer_range(unsigned long address, unsigned long size, BOOL 
 	unsigned long index = static_buffer_upper(list, address);
 	struct static_buffer *entry;
 
-	if (!index || !size)
+	if (!android_geometry_fixes || !index || !size)
 		return FALSE;
 	entry = &list->entries[index - 1];
 	if (address - entry->start > entry->size || size > entry->size - (address - entry->start))
@@ -5217,6 +5220,15 @@ time. */
 #define WEB_CHUNK_SHIFT 12 /* 4 KB */
 #define WEB_CHUNK_CLASSES 14 /* to 32 MB */
 
+static BOOL stream_uses_chunks(void)
+{
+#ifdef HALO_ANDROID
+	return android_geometry_fixes;
+#else
+	return TRUE;
+#endif
+}
+
 static struct web_chunks
 {
 	GLuint *buffers;
@@ -5269,6 +5281,8 @@ static void web_chunks_begin_frame(void)
 {
 	int indices, chunk_class;
 
+	if (!stream_uses_chunks())
+		return;
 	for (indices = 0; indices < 2; indices++)
 	{
 		for (chunk_class = 0; chunk_class < WEB_CHUNK_CLASSES; chunk_class++)
@@ -5287,13 +5301,17 @@ static void stream_reserve(unsigned long size)
 {
 #ifdef HALO_GLES
 	/* (a new buffer when a draw since the latest write may read this one) */
-	if (size && (device.stream_offset + size > device.stream_capacity ||
-		(device.stream_offset && device.stream_serial != device.draw_serial)))
+	if (stream_uses_chunks())
 	{
-		device.stream_buffer = web_chunk_get(0, size, &device.stream_capacity);
-		device.stream_offset = 0;
+		if (size && (device.stream_offset + size > device.stream_capacity ||
+			(device.stream_offset && device.stream_serial != device.draw_serial)))
+		{
+			device.stream_buffer = web_chunk_get(0, size, &device.stream_capacity);
+			device.stream_offset = 0;
+		}
+		return;
 	}
-#else
+#endif
 	if (device.stream_offset + size > STREAM_BUFFER_SIZE)
 	{
 		/* orphan the buffer and start again */
@@ -5301,7 +5319,6 @@ static void stream_reserve(unsigned long size)
 		glBufferData(GL_ARRAY_BUFFER, STREAM_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
 		device.stream_offset = 0;
 	}
-#endif
 }
 
 static unsigned long stream_upload(const void *data, unsigned long size);
@@ -5330,7 +5347,10 @@ static unsigned long stream_upload(const void *data, unsigned long size)
 	host_gl_buffer_write(GL_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
 #elif defined(HALO_GLES)
 	/* (into a pooled buffer that no queued draw reads, web_chunk_get) */
-	glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offset, (GLsizeiptr)length, data);
+	if (stream_uses_chunks())
+		glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offset, (GLsizeiptr)length, data);
+	else
+		host_gl_buffer_write(GL_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
 #else
 	buffer_upload(GL_ARRAY_BUFFER, offset, length, data);
 #endif
@@ -5394,27 +5414,35 @@ static unsigned long index_upload(const void *data, unsigned long size)
 	size = (size + 15) & ~15UL;
 #ifdef HALO_GLES
 	/* (as stream_reserve) */
-	if (device.index_offset + size > device.index_capacity ||
-		(device.index_offset && device.index_serial != device.draw_serial))
+	if (stream_uses_chunks())
 	{
-		device.index_buffer = web_chunk_get(1, size, &device.index_capacity);
-		device.index_offset = 0;
+		if (device.index_offset + size > device.index_capacity ||
+			(device.index_offset && device.index_serial != device.draw_serial))
+		{
+			device.index_buffer = web_chunk_get(1, size, &device.index_capacity);
+			device.index_offset = 0;
+		}
+		state_element_array_buffer(device.index_buffer);
 	}
-	state_element_array_buffer(device.index_buffer);
-#else
-	state_element_array_buffer(device.index_buffer);
-	if (device.index_offset + size > INDEX_BUFFER_SIZE)
-	{
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
-		device.index_offset = 0;
-	}
+	else
 #endif
+	{
+		state_element_array_buffer(device.index_buffer);
+		if (device.index_offset + size > INDEX_BUFFER_SIZE)
+		{
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
+			device.index_offset = 0;
+		}
+	}
 	offset = device.index_offset;
 #ifdef HALO_WEB
 	host_gl_buffer_write(GL_ELEMENT_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
 #elif defined(HALO_GLES)
 	/* (into a pooled buffer that no queued draw reads, web_chunk_get) */
-	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, (GLintptr)offset, (GLsizeiptr)length, data);
+	if (stream_uses_chunks())
+		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, (GLintptr)offset, (GLsizeiptr)length, data);
+	else
+		host_gl_buffer_write(GL_ELEMENT_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
 #else
 	buffer_upload(GL_ELEMENT_ARRAY_BUFFER, offset, length, data);
 #endif

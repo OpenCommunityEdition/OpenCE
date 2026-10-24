@@ -20,7 +20,7 @@ def between(text, start, end):
     return text[first:text.index(end, first)]
 
 
-def compile_test(directory, source, include, name):
+def compile_test(directory, source, include, name, defines=()):
     compiler = shutil.which(os.environ.get("CC", "clang"))
     if not compiler:
         pytest.skip("clang required")
@@ -30,7 +30,7 @@ def compile_test(directory, source, include, name):
     target = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if os.name == "nt" else ["-m32"]
     executable = work / ("test.exe" if os.name == "nt" else "test")
     result = subprocess.run(
-        [compiler, *target, "-std=gnu89", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function",
+        [compiler, *target, *defines, "-std=gnu89", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function",
          "-Wno-unused-parameter", "-O2", "-I", str(work), str(ROOT / source), "-o", str(executable)],
         capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -50,16 +50,19 @@ def programs(tmp_path_factory):
                                ("static_geometry.inc", static), "static"),
         "pooled": compile_test(directory, "port/android/tests/pooled_upload_test.c",
                                ("pooled_upload.inc", pooled), "pooled"),
+        "web": compile_test(directory, "port/android/tests/pooled_upload_test.c",
+                            ("pooled_upload.inc", pooled), "web", ["-DHALO_WEB=1"]),
     }
 
 
-@pytest.mark.parametrize("case", ["reuse", "reload", "address_reuse", "allocation_failure", "regions"])
+@pytest.mark.parametrize("case", ["reuse", "reload", "address_reuse", "allocation_failure", "regions", "disabled"])
 def test_static_geometry(programs, case):
     result = subprocess.run([str(programs["static"]), case], capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-@pytest.mark.parametrize("case", ["frames", "large"])
-def test_pooled_uploads(programs, case):
-    result = subprocess.run([str(programs["pooled"]), case], capture_output=True, text=True, timeout=15)
+@pytest.mark.parametrize("variant,case", [("pooled", "frames"), ("pooled", "large"),
+                                          ("pooled", "disabled"), ("web", "frames"), ("web", "large")])
+def test_pooled_uploads(programs, variant, case):
+    result = subprocess.run([str(programs[variant]), case], capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr

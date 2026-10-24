@@ -16,7 +16,10 @@ typedef long GLintptr;
 #define TRUE 1
 #define FALSE 0
 #define HALO_GLES 1
+#ifndef HALO_WEB
 #define HALO_ANDROID 1
+#endif
+static int android_geometry_fixes = 1;
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
 #define GL_STREAM_DRAW 0x88E0
@@ -172,6 +175,29 @@ int main(int argc, char **argv)
 	}
 	device.stream_buffer = device.stream_buffers[0];
 	device.index_buffer = device.index_buffers[0];
+	if (!strcmp(argv[1], "disabled"))
+	{
+		android_geometry_fixes = 0;
+		CHECK(!stream_uses_chunks());
+		stream_reserve(64);
+		CHECK(stream_upload(bytes, 32) == 0);
+		device.draw_serial++;
+		CHECK(stream_upload(bytes, 32) == 32);
+		CHECK(index_upload(bytes, 32) == 0);
+		device.draw_serial++;
+		CHECK(index_upload(bytes, 32) == 32);
+		device.stream_offset = STREAM_BUFFER_SIZE - 16;
+		stream_reserve(64);
+		CHECK(stream_upload(bytes, 64) == 0);
+		device.index_offset = INDEX_BUFFER_SIZE - 16;
+		CHECK(index_upload(bytes, 64) == 0);
+		CHECK(device.stream_buffer == 1 && device.index_buffer == 10);
+		CHECK(!created && !subdata && unsynchronized == 6);
+		present();
+		CHECK(!created && device.stream_buffer == 2 && device.index_buffer == 11);
+		CHECK(!device.stream_offset && !device.index_offset);
+		return 0;
+	}
 	if (!strcmp(argv[1], "frames"))
 	{
 		/* frames of different sizes and draws: the pools grow, then are reused */
@@ -182,7 +208,11 @@ int main(int argc, char **argv)
 			present();
 		}
 		CHECK(writes_into_read == 0);
+		#ifdef HALO_WEB
+		CHECK(subdata == 0 && unsynchronized > 0);
+#else
 		CHECK(unsynchronized == 0 && subdata > 0);
+#endif
 		/* (reused: far fewer buffers than draws) */
 		CHECK(created < 1200);
 		fprintf(stderr, "subdata=%d created=%d\n", subdata, created);
@@ -195,7 +225,10 @@ int main(int argc, char **argv)
 		draw(1, 5000000, 3000000);
 		present();
 		draw(1, 64, 64);
-		CHECK(writes_into_read == 0 && unsynchronized == 0);
+		CHECK(writes_into_read == 0);
+#ifndef HALO_WEB
+		CHECK(unsynchronized == 0);
+#endif
 		return 0;
 	}
 	return 2;

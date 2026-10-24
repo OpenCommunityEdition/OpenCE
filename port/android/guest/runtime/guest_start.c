@@ -11,6 +11,7 @@ page size), runs the image's constructors and calls the game's main().
 #include "libc.h"
 #include "guest_host.h"
 #include "halo_android_abi.h"
+#include "android_render_policy.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -59,6 +60,7 @@ void __guest_start(const struct halo_guest_boot *boot)
 	libc.auxv = (size_t *)"\0\0\0\0\0\0\0";
 	__environ = (char **)boot->environment;
 	__guest_thread_initialize_main();
+	android_render_policy_initialize();
 
 	for (constructor = __guest_init_start; constructor < __guest_init_end; constructor++)
 		(*constructor)();
