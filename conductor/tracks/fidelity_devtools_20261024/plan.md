@@ -21,9 +21,9 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Thermals and idling 2af3aeb
     - [x] Write tests: the frame cap holds; the app is idle when unfocused or minimised; frames in flight stay bounded
     - [x] Frame cap by default, idle when unfocused, CAMetalDisplayLink pacing
-- [~] Task: GPU and CPU timings, and the hitch log
-    - [ ] Write tests: every pass reports a GPU time; the CPU spans nest; a forced compile, upload or allocation is logged with its cause
-    - [ ] Counter sample buffers, CPU spans, the hitch log, perf.log
+- [x] Task: GPU and CPU timings, and the hitch log de38ff7
+    - [x] Write tests: every pass reports a GPU time; the CPU spans nest; a forced compile, upload or allocation is logged with its cause
+    - [x] Counter sample buffers, CPU spans, the hitch log, perf.log
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Stop the heat, see the cost' (Protocol in workflow.md)
 
 ## Phase 3: Developer tools in game
