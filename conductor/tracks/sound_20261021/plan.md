@@ -22,7 +22,7 @@
 - [x] Task: Music and dialogue bf9e1ea1
     - [ ] Write tests: music starts, stops and alternates; dialogue rules; conversations
     - [ ] Music and dialogue
-- [ ] Task: Script timing
+- [x] Task: Script timing 172f552d
     - [ ] Write tests: waits on sounds against the reference game's timing in a10 and a30 (marked, needs `assets/maps`)
     - [ ] `sound_impulse_time` and the waits; the settings' volume controls; `docs/engine.md`: sound
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Music, dialogue and scripts' (Protocol in workflow.md) (deferred to the end)
