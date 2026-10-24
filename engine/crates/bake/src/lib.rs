@@ -19,6 +19,7 @@
 //! - [`output`] makes the baked light from the tracer's results, and
 //!   keeps it in a cache file.
 //! - [`mood`] checks the baked light against the stock lightmaps'.
+//! - [`seam`] finds the lightmap seams, stitches them and measures them.
 
 pub mod bvh;
 pub mod chart;
@@ -28,6 +29,7 @@ pub mod mood;
 pub mod output;
 pub mod probe;
 pub mod scene;
+pub mod seam;
 pub mod texel;
 pub mod trace;
 

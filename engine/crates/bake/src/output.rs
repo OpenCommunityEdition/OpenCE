@@ -22,12 +22,13 @@ use opence_content::pack::FORMAT_VERSION;
 
 use crate::chart::{Atlas, BakePoint, Chart};
 use crate::filter;
-use crate::mood::{self, PageMood};
+use crate::mood::{self, PageMood, StockPage};
 use crate::probe::{self, ProbeGrid, REFLECTION_SIZE};
 use crate::scene::Scene;
+use crate::seam::{self, Seam, SeamStep};
 
 /// The baker's version: raised with any change to what it makes.
-pub const BAKE_VERSION: u32 = 6;
+pub const BAKE_VERSION: u32 = 7;
 /// The cache file's first eight bytes.
 pub const MAGIC: [u8; 8] = *b"OCEBAKE\0";
 
@@ -73,6 +74,11 @@ pub struct BakePlan {
     /// Each chart's stock page's mean light under it, if it has one the
     /// bake can read (for the mood check).
     pub stock: Vec<Option<[f32; 3]>>,
+    /// The lightmap seams, which the bake stitches ([`seam::stitch`]).
+    pub seams: Vec<Seam>,
+    /// Each seam's step on the stock pages, if they can be read (for the
+    /// seam check).
+    pub stock_seams: Vec<Option<f32>>,
 }
 
 /// A baked page: its texels' light, row by row from the top.
@@ -134,11 +140,19 @@ impl BakePlan {
         let grid = ProbeGrid::covering(scene.bounds);
         let reflections = probe::reflection_probes(&scene);
         let key = key(&scene, &atlas, &grid, &settings);
+        let pages: Vec<Option<StockPage>> = atlas
+            .charts
+            .iter()
+            .map(|chart| StockPage::of(level, bsp, chart.page as usize))
+            .collect();
         let stock = atlas
             .charts
             .iter()
-            .map(|chart| mood::stock_light(level, bsp, chart))
+            .zip(&pages)
+            .map(|(chart, page)| mood::stock_mean(chart, page.as_ref()?))
             .collect();
+        let seams = Seam::find(&level.structure_bsps[bsp], &atlas);
+        let stock_seams = seam::stock_steps(&atlas, &seams, &pages);
         Some(Self {
             scene,
             atlas,
@@ -147,7 +161,15 @@ impl BakePlan {
             settings,
             key,
             stock,
+            seams,
+            stock_seams,
         })
+    }
+
+    /// The step in light across each seam on `light`'s pages and on the
+    /// stock pages.
+    pub fn seams(&self, light: &BakedLighting) -> Vec<SeamStep> {
+        SeamStep::measure(&self.atlas, &self.seams, &light.pages, &self.stock_seams)
     }
 
     /// Each baked page of `light` against its stock page, for the pages
@@ -188,9 +210,9 @@ impl BakePlan {
     /// each its irradiance and occlusion and its direction and
     /// directionality; for the probes' points, each its irradiance and
     /// occlusion; for the reflection points, each its radiance. The atlas's
-    /// fireflies are held down ([`filter::hold_fireflies`]), then each is
-    /// scaled by the BSP's [`Self::exposure`]. A result that is missing is
-    /// dark.
+    /// fireflies are held down ([`filter::hold_fireflies`]) and its seams
+    /// stitched ([`seam::stitch`]), then each is scaled by the BSP's
+    /// [`Self::exposure`]. A result that is missing is dark.
     pub fn finish(
         &self,
         irradiance: &[[f32; 4]],
@@ -199,6 +221,7 @@ impl BakePlan {
         radiance: &[[f32; 4]],
     ) -> BakedLighting {
         let held = filter::hold_fireflies(&self.atlas, irradiance);
+        let held = seam::stitch(&self.atlas, &self.seams, &held);
         let exposure = self.exposure(&held);
         let exposed = |light: &[[f32; 4]]| -> Vec<[f32; 4]> {
             light

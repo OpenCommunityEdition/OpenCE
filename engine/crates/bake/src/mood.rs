@@ -101,23 +101,59 @@ fn shares(color: [f32; 3]) -> [f32; 3] {
 /// the same place on the stock page), as stored. None if the page has no
 /// stock image the bake can decode, or the chart covers nothing.
 pub fn stock_light(level: &Level, bsp: usize, chart: &Chart) -> Option<[f32; 3]> {
-    let structure = level.structure_bsps.get(bsp)?;
-    let index = structure.lightmaps.get(chart.page as usize)?.bitmap_index?;
-    let bitmap = level.bitmap(structure.lightmap_bitmap.as_ref()?)?;
-    let image = bitmap.images.get(usize::from(index))?;
-    let Pixels::Texture(texture) = &image.pixels else {
-        return None;
-    };
-    let [width, height, _] = texture.level_size(0);
-    let texels = texel::decode(texture.format, width, height, texture.levels.first()?)?;
+    stock_mean(chart, &StockPage::of(level, bsp, chart.page as usize)?)
+}
+
+/// The mean of `stock` under `chart`'s covered texels, as stored ([`stock_light`]).
+pub fn stock_mean(chart: &Chart, stock: &StockPage) -> Option<[f32; 3]> {
     let stock_at = |x: u32, y: u32| {
-        let sx = (u64::from(x) * u64::from(width) / u64::from(chart.width.max(1))) as usize;
-        let sy = (u64::from(y) * u64::from(height) / u64::from(chart.height.max(1))) as usize;
-        texels
-            .get(sy * width as usize + sx)
-            .map(|texel| [0, 1, 2].map(|channel| f32::from(texel[channel]) / 255.0))
+        let sx = u64::from(x) * u64::from(stock.width) / u64::from(chart.width.max(1));
+        let sy = u64::from(y) * u64::from(stock.height) / u64::from(chart.height.max(1));
+        stock.light(sx as u32, sy as u32)
     };
     mean_over(chart, stock_at, |light| light)
+}
+
+/// A stock lightmap page, decoded.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StockPage {
+    /// Its width.
+    pub width: u32,
+    /// Its height.
+    pub height: u32,
+    /// Its texels, row by row from the top.
+    pub texels: Vec<texel::Texel>,
+}
+
+impl StockPage {
+    /// The stock page `page` of `level`'s BSP `bsp`. None if it has no
+    /// image the bake can decode.
+    pub fn of(level: &Level, bsp: usize, page: usize) -> Option<Self> {
+        let structure = level.structure_bsps.get(bsp)?;
+        let index = structure.lightmaps.get(page)?.bitmap_index?;
+        let bitmap = level.bitmap(structure.lightmap_bitmap.as_ref()?)?;
+        let image = bitmap.images.get(usize::from(index))?;
+        let Pixels::Texture(texture) = &image.pixels else {
+            return None;
+        };
+        let [width, height, _] = texture.level_size(0);
+        let texels = texel::decode(texture.format, width, height, texture.levels.first()?)?;
+        Some(Self {
+            width,
+            height,
+            texels,
+        })
+    }
+
+    /// The texel at `x`, `y`'s light, as stored (0 to 1).
+    pub fn light(&self, x: u32, y: u32) -> Option<[f32; 3]> {
+        if x >= self.width {
+            return None;
+        }
+        self.texels
+            .get(y as usize * self.width as usize + x as usize)
+            .map(|texel| [0, 1, 2].map(|channel| f32::from(texel[channel]) / 255.0))
+    }
 }
 
 /// The baked light as the level shader shows it: the irradiance over pi
@@ -145,7 +181,9 @@ pub fn baked_light(chart: &Chart, page: &BakedPage) -> Option<[f32; 3]> {
         let texel = page.irradiance.get(at..at + 3)?;
         Some([0, 1, 2].map(|channel| finite(from_half(texel[channel]))))
     };
-    mean_over(chart, light_at, |light| light.map(|channel| shown(channel).min(1.0)))
+    mean_over(chart, light_at, |light| {
+        light.map(|channel| shown(channel).min(1.0))
+    })
 }
 
 /// The most squares of texels ([`BLOCK`]) [`fitted_exposure`] reads
@@ -189,7 +227,10 @@ pub fn fitted_exposure(
             Some([0, 1, 2].map(|channel| finite(light[channel])))
         };
         let chart_squares = squares_of(chart, light_at);
-        let count: u64 = chart_squares.iter().map(|(_, count)| u64::from(*count)).sum();
+        let count: u64 = chart_squares
+            .iter()
+            .map(|(_, count)| u64::from(*count))
+            .sum();
         target += f64::from(brightness(*stock)) * count as f64;
         texels += count;
         squares.extend(chart_squares);

@@ -259,6 +259,22 @@ pub struct BakeBspMood {
     pub within: bool,
 }
 
+/// The step in light across a lightmap seam (the seam check).
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
+pub struct BakeSeam {
+    /// Its two ends in the level: x, y, z, x, y, z.
+    pub ends: Vec<f32>,
+    /// The way the surface faces.
+    pub normal: Vec<f32>,
+    /// Its length in the level.
+    pub length: f32,
+    /// The mean step in brightness across it on the baked pages, as the
+    /// level shader shows them (0 to 1).
+    pub baked: Option<f32>,
+    /// The same on the stock pages, as stored.
+    pub stock: Option<f32>,
+}
+
 /// A BSP's baked light.
 #[derive(uniffi::Object)]
 pub struct BakedLight {
@@ -388,6 +404,22 @@ impl LevelBake {
             failing: mood.failing,
             within: mood.within(&limits),
         })
+    }
+
+    /// The step in light across each lightmap seam on `light`'s pages and
+    /// on the stock pages.
+    pub fn seams(&self, light: Arc<BakedLight>) -> Vec<BakeSeam> {
+        self.plan
+            .seams(&light.light)
+            .iter()
+            .map(|step| BakeSeam {
+                ends: step.seam.ends.concat(),
+                normal: step.seam.normal.to_vec(),
+                length: step.length,
+                baked: step.baked,
+                stock: step.stock,
+            })
+            .collect()
     }
 
     /// The BSP, in the level's.
@@ -680,6 +712,7 @@ mod tests {
         // the devmap has no stock pages to compare with, and one BSP
         assert!(bake.moods(Arc::clone(&light)).is_empty());
         assert!(bake.bsp_mood(Arc::clone(&light)).is_none());
+        assert!(bake.seams(Arc::clone(&light)).iter().all(|seam| seam.stock.is_none()));
         assert_eq!(bake.bsp(), 0);
         let plans = geometry.bake_plans(true);
         assert_eq!(plans.len(), 1);
