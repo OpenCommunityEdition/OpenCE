@@ -1,0 +1,8 @@
+{
+  "track_id": "placed_lights_20261025",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-10-25T00:00:00Z",
+  "updated_at": "2026-10-25T00:00:00Z",
+  "description": "Placed lights: a LightSource component with Baked, Stationary and Movable mobility, ambient as probe overrides, placement from the dev panel, and a per-map overlay, before the atmosphere track"
+}

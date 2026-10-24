@@ -38,6 +38,9 @@ This file tracks all major tracks for the project.
 - [ ] **Track: Coverage of every map, a cutscene audit against the reference game, the fixes, and a review of the engine**
   *Link: [./tracks/coverage_audit_20261021/](./tracks/coverage_audit_20261021/)*
 
+- [ ] **Track: Placed lights: one light component with Baked, Stationary and Movable mobility, ambient as probe overrides, placed from the dev panel and kept in a per-map overlay**
+  *Link: [./tracks/placed_lights_20261025/](./tracks/placed_lights_20261025/)*
+
 - [ ] **Track: Modern lighting and atmosphere: a procedural sky blended with the original, a day-night cycle, volumetric fog and clouds, contact shadows and occlusion, emissive area lights, reflections and glass**
   *Link: [./tracks/atmosphere_20261023/](./tracks/atmosphere_20261023/)*
 
