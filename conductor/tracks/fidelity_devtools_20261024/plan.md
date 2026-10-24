@@ -98,16 +98,27 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
     - [ ] The fixes
 - [ ] Task: Conductor - User Manual Verification 'Phase 8: Particles and effects' (Protocol in workflow.md)
 
-## Phase 9: UI and HUD
-- [ ] Task: The main menu
-    - [ ] Write tests: every main-menu item can be reached by keyboard and mouse and selected; input reaches it at once
+## Phase 9: The HUD
+The menus and the rest of the UI are left to the UI rewrite's own track.
+- [ ] Task: The HUD
+    - [ ] Write tests: no two HUD elements overlap at any supported resolution; the HUD reacts to ammo, shields, grenades and prompts
     - [ ] The fixes
-- [ ] Task: Overlaps and the HUD
-    - [ ] Write tests: no two UI or HUD elements overlap at any supported resolution; the HUD reacts to ammo, shields, grenades and prompts
-    - [ ] The fixes
-- [ ] Task: Conductor - User Manual Verification 'Phase 9: UI and HUD' (Protocol in workflow.md)
+- [ ] Task: Conductor - User Manual Verification 'Phase 9: The HUD' (Protocol in workflow.md)
 
-## Phase 10: Performance
+## Phase 10: Lightmap resolution and interiors
+Found in play: shadows on the far hills break into large blocky triangles across the cliffs and ground, and the bunker interiors are lit coarsely, with leaks and blotches on the walls.
+- [ ] Task: Measure the lightmaps' density
+    - [ ] Write tests: a sweep of each surface's world size per lightmap texel on Blood Gulch and devgulch, the far hills and the bunker interiors, against the stock lightmaps'
+    - [ ] The sweep, and the causes listed in docs/engine.md
+- [ ] Task: Shadows on the far hills
+    - [ ] Write tests: on the far hills' views, a shadow edge crosses the triangles' edges without stepping more often than on the stock pages; no texel larger than the stock's
+    - [ ] The fixes
+- [ ] Task: The bunker interiors
+    - [ ] Write tests: no light leaks (texels on the inside lit by the sun through a wall); a flat wall's texels vary no more than the stock's; golden frames of each bunker's interior
+    - [ ] The fixes
+- [ ] Task: Conductor - User Manual Verification 'Phase 10: Lightmap resolution and interiors' (Protocol in workflow.md)
+
+## Phase 11: Performance
 - [ ] Task: The benchmark paths
     - [ ] Write tests: a path replays the same camera and inputs; the report has mean, p99, p99.9, hitches and pacing; a regression over 5% fails
     - [ ] devgulch, Blood Gulch, and 16 players on Blood Gulch
@@ -120,9 +131,9 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [ ] Task: Upscaling and the parallel simulation
     - [ ] Write tests: MetalFX golden frames at 0.67; dynamic resolution holds the target; replay hash unchanged in parallel
     - [ ] MetalFX, dynamic resolution, the ECS in parallel
-- [x] Task: Conductor - User Manual Verification 'Phase 10: Performance' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 11: Performance' (Protocol in workflow.md)
 
-## Phase 11: Tiers and graphics settings
+## Phase 12: Tiers and graphics settings
 - [ ] Task: Quality tiers
     - [ ] Write tests: each GPU family picks its tier; an 8 GB budget fits at Low
     - [ ] The tier table and its detection
@@ -132,7 +143,7 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [ ] Task: Meeting the targets
     - [ ] Write tests: each path at Ultra on the M1 Max meets 8.33 ms p99
     - [ ] The last fixes; docs/engine.md updated
-- [x] Task: Conductor - User Manual Verification 'Phase 11: Tiers and graphics settings' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 12: Tiers and graphics settings' (Protocol in workflow.md)
 
 ## Wrap-up
 - [ ] Retire performance_20261023 into this track (marked merged in tracks.md, its folder archived)
