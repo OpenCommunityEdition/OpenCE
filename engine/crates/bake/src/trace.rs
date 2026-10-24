@@ -41,6 +41,10 @@ const MAX_BOUNCES: u32 = 16;
 /// to be stopped.
 const MAX_PASSES: u32 = 8;
 
+/// What a ray meets: the hit, the point, the normal facing back along the
+/// ray, whether it met the front, and the material.
+type Met<'a> = (Hit, [f32; 3], [f32; 3], bool, &'a crate::scene::BakeMaterial);
+
 /// The light arriving at a point, from the hemisphere about its normal.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Irradiance {
@@ -431,7 +435,7 @@ impl Tracer<'_> {
         ray: &Ray,
         random: &mut Random,
         mut glow: Option<(&mut [f32; 3], Option<f32>)>,
-    ) -> Option<(Hit, [f32; 3], [f32; 3], bool, &crate::scene::BakeMaterial)> {
+    ) -> Option<Met<'_>> {
         let mut ray = *ray;
         let mut travelled = 0.0;
         for _ in 0..MAX_PASSES {
@@ -768,7 +772,7 @@ mod tests {
             assert_eq!(point.irradiance[0], if x < 0.0 { 2.0 } else { 0.0 }, "{x}");
             // (the share of a unit disc at x on the side x < 0)
             let h = (-x).clamp(-1.0, 1.0);
-            let share = 0.5 + (h * (1.0 - h * h).sqrt() + h.asin()) / core::f32::consts::PI;
+            let share = 0.5 + (h * (1.0 - h * h).sqrt() + libm::asinf(h)) / core::f32::consts::PI;
             let light = spread.irradiance[0];
             assert!((light - 2.0 * share).abs() < 0.06, "{x}: {light} for {share}");
             assert!(light <= last + 0.04, "{x}: {light} after {last}");

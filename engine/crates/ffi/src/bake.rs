@@ -286,9 +286,11 @@ pub struct BakeEdgeSteps {
     pub hard: u32,
     /// The mean step (0 to 1).
     pub mean: f32,
-    /// The same on the stock pages, as stored.
+    /// How many pairs of neighbours the stock pages have, as stored.
     pub stock_pairs: u32,
+    /// How many of them step hard.
     pub stock_hard: u32,
+    /// Their mean step.
     pub stock_mean: f32,
 }
 
@@ -743,7 +745,10 @@ mod tests {
         // the devmap has no stock pages to compare with, and one BSP
         assert!(bake.moods(Arc::clone(&light)).is_empty());
         assert!(bake.bsp_mood(Arc::clone(&light)).is_none());
-        assert!(bake.seams(Arc::clone(&light)).iter().all(|seam| seam.stock.is_none()));
+        assert!(bake
+            .seams(Arc::clone(&light))
+            .iter()
+            .all(|seam| seam.stock.is_none()));
         assert_eq!(bake.bsp(), 0);
         let plans = geometry.bake_plans(true);
         assert_eq!(plans.len(), 1);
