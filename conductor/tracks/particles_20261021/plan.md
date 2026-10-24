@@ -1,10 +1,10 @@
 # Plan: The complete particle system
 
 ## Phase 1: Particles and their physics
-- [ ] Task: Particle tags in full
-    - [ ] Write tests: every field of `part` and `pphy` imports; colour and size over life
-    - [ ] The typed tags
-- [ ] Task: Particle physics
+- [x] Task: Particle tags in full 9bbfbb5c
+    - [x] Write tests: every field of `part` and `pphy` imports; colour and size over life
+    - [x] The typed tags
+- [~] Task: Particle physics
     - [ ] Write tests: gravity, drag and wind; bounce, slide, stop and die on collision; effects on collision
     - [ ] The update on the CPU and on the GPU, with the collision queries
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Particles and their physics' (Protocol in workflow.md) (deferred to the end)
