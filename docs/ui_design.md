@@ -164,8 +164,10 @@ the loading sweep with the cloud, and the one easing curve they share.
 
 Everything in it is our own drawing. The logo, the mission pictures, the
 figures and the loading picture are marked placeholders; nothing from
-`ui.map` or the executable is in the artifact. Michroma stands in for OpenCE
-there, because the artifact loads its fonts from Google Fonts.
+`ui.map` or the executable is in the artifact. Its titles are set in OpenCE,
+uploaded to the artifact with its licence (`port/assets/fonts/OpenCE-OFL.txt`);
+its body text is Overpass from Google Fonts, the same face as the files the
+builds embed.
 
 Choices the mockups make, for review:
 
