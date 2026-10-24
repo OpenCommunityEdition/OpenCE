@@ -40,11 +40,11 @@ pub use lens::{
     Glow, LensFlare, LensFlareMarker, LensFlareReflection, LightVolume, LightVolumeFrame,
 };
 pub use level::{
-    AtmosphericFog, CollisionBsp, CollisionMaterial, EnvironmentVertex, FallingDamage, GameType,
-    GameTypes, Globals, ItemChoice, Level, Lightmap, LightmapVertex, Material, NetgameEquipment,
-    NetgameFlag, NetgameFlagKind, ObjectPlacement, PlacementDevice, PlacementPermutation,
-    PlayerPhysics, PlayerStart, Scenario, Sky, SkyAmbient, SkyLight, StructureBsp,
-    MAXIMUM_CLUSTER_SOUND_DISTANCE,
+    AtmosphericFog, BspWater, ClusterWater, CollisionBsp, CollisionMaterial, EnvironmentVertex,
+    FallingDamage, GameType, GameTypes, Globals, ItemChoice, Level, Lightmap, LightmapVertex,
+    Material, NetgameEquipment, NetgameFlag, NetgameFlagKind, ObjectPlacement, PlacementDevice,
+    PlacementPermutation, PlayerPhysics, PlayerStart, Scenario, Sky, SkyAmbient, SkyLight,
+    StructureBsp, MAXIMUM_CLUSTER_SOUND_DISTANCE,
 };
 pub use light::{FunctionModes, Light, ObjectFunction};
 pub use material::SurfaceMaterial;

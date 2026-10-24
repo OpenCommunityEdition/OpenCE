@@ -24,6 +24,7 @@ use crate::damage;
 use crate::debris::Ejection;
 use crate::hash::WorldHasher;
 use crate::input::{Buttons, TickInput};
+use crate::item_physics;
 use crate::objects::{self, Object, ObjectHandle, ObjectSpawn};
 use crate::projectile::{self, Contact, Detonation, Flew, Flight, Impact};
 use crate::random::RandomSeed;
@@ -1028,7 +1029,12 @@ impl Player {
                 .get_resource::<objects::ObjectTable>()
                 .and_then(|table| table.entity(handle))
             {
-                world.entity_mut(entity).insert(WeaponItem(dropped.state));
+                // (it falls from the hands with the biped's speed)
+                let velocity = self.mover.velocity / crate::vehicle::GAME_TICKS_PER_SECOND as f32;
+                world.entity_mut(entity).insert((
+                    WeaponItem(dropped.state),
+                    item_physics::Lying::new(definition.weapon.item.clone(), &transform, velocity),
+                ));
             }
         }
     }

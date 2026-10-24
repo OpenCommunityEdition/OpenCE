@@ -11,6 +11,7 @@ use opence_import::{import_level, Cache};
 use opence_physics::Struck;
 use opence_sim::armory::WeaponItem;
 use opence_sim::input::{Buttons, TickInput};
+use opence_sim::item_physics::Lying;
 use opence_sim::objects::ObjectSpawn;
 use opence_sim::units::Radians;
 use opence_sim::{Simulation, Transform};
@@ -261,5 +262,19 @@ fn weapons_are_picked_up_dropped_and_their_rounds_taken() -> Result<(), Box<dyn 
         simulation.step(held(Buttons::ACTION));
     }
     assert!(path(&simulation).contains("shotgun"));
+    // (dropped, it falls to the ground and lies still on it)
+    for _ in 0..120 {
+        simulation.step(TickInput::default());
+    }
+    let lying = simulation
+        .component::<Lying>(dropped[0])
+        .ok_or("the dropped rifle does not lie about")?;
+    assert!(lying.motion.at_rest);
+    let position = simulation
+        .component::<Transform>(dropped[0])
+        .ok_or("no transform")?
+        .position;
+    assert!((position.z - feet.z).abs() < 0.25, "{position} {feet}");
+    assert_eq!(position, lying.motion.position);
     Ok(())
 }

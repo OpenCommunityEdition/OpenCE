@@ -12,12 +12,12 @@ use opence_content::level::{
     CollisionVertex,
 };
 use opence_content::{
-    AnimationGraph, AtmosphericFog, CollisionBsp, CollisionMaterial, CollisionModel, DamageEffect,
-    Effect, EnvironmentVertex, GameTypes, Globals, Glow, Group, ItemChoice, LensFlare,
-    LensFlareMarker, Level, Light, LightVolume, Lightmap, LightmapVertex, Material, Model,
-    NetgameEquipment, NetgameFlag, NetgameFlagKind, ObjectDefinition, ObjectKind, ObjectPlacement,
-    PlacementDevice, PlacementPermutation, PlayerStart, Scenario, Sky, SkyAmbient, SkyLight,
-    StructureBsp, TagRef,
+    AnimationGraph, AtmosphericFog, ClusterWater, CollisionBsp, CollisionMaterial, CollisionModel,
+    DamageEffect, Effect, EnvironmentVertex, GameTypes, Globals, Glow, Group, ItemChoice,
+    LensFlare, LensFlareMarker, Level, Light, LightVolume, Lightmap, LightmapVertex, Material,
+    Model, NetgameEquipment, NetgameFlag, NetgameFlagKind, ObjectDefinition, ObjectKind,
+    ObjectPlacement, PlacementDevice, PlacementPermutation, PlayerStart, Scenario, Sky, SkyAmbient,
+    SkyLight, StructureBsp, TagRef,
 };
 
 use crate::cache::Cache;
@@ -60,6 +60,24 @@ const SOUND_ENVIRONMENT_SIZE: usize = 0x48;
 /// A BSP's leaves (`structure_leaf`): each one's cluster.
 const BSP_LEAVES_OFFSET: usize = 0xE0;
 const BSP_LEAF_SIZE: usize = 0x10;
+/// A BSP's fog planes (`structure_fog_plane`: its region an `i16` at 0,
+/// its plane from 4), fog regions (`structure_fog_region`: its palette
+/// entry an `i16` at 0x24) and fog palette (`structure_fog_palette_entry`:
+/// its fog at 0x20), which say where the water is.
+const BSP_FOG_PLANES_OFFSET: usize = 0x178;
+const BSP_FOG_PLANE_SIZE: usize = 0x20;
+const BSP_FOG_REGIONS_OFFSET: usize = 0x184;
+const BSP_FOG_REGION_SIZE: usize = 0x28;
+const BSP_FOG_PALETTE_OFFSET: usize = 0x190;
+const BSP_FOG_PALETTE_SIZE: usize = 0x88;
+const MAX_BSP_FOGS: usize = 32768;
+/// The vehicles' floor and ceiling (`structure_bsp.vehicle_floor`).
+const BSP_VEHICLE_FLOOR_OFFSET: usize = 0x10;
+const BSP_VEHICLE_CEILING_OFFSET: usize = 0x14;
+const FOG: GroupTag = GroupTag::new(b"fog ");
+/// A fog (`fog_definition`): its flags a byte at 0 (the first: it is
+/// water) and its plane distance at 0x74.
+const FOG_SIZE: usize = 0x114;
 pub(crate) const SKY: GroupTag = GroupTag::new(b"sky ");
 
 pub(crate) const SCENARIO_SIZE: usize = 0x5B0;
@@ -1236,7 +1254,10 @@ fn import_structure_bsp(
     let background_sounds = import_background_sounds(&bsp)?;
     let sound_environments = import_sound_environments(cache, &bsp)?;
     let mut cluster_sounds = Vec::with_capacity(clusters_block.len());
+    let mut cluster_water = Vec::with_capacity(clusters_block.len());
+    let fogs = Fogs::read(cache, &bsp)?;
     for cluster in clusters_block.iter() {
+        cluster_water.push(fogs.water(cluster.i16(0x02, "fog")?)?);
         cluster_skies.push(u16::try_from(cluster.i16(0, "sky")?).ok());
         cluster_weather.push(u16::try_from(cluster.i16(0x08, "weather")?).ok());
         let within = |index: i16, count: usize| {
@@ -1278,6 +1299,9 @@ fn import_structure_bsp(
     let detail_objects = crate::particle::detail_objects(&bsp)?;
 
     Ok(StructureBsp {
+        cluster_water,
+        vehicle_floor: bsp.f32(BSP_VEHICLE_FLOOR_OFFSET, "vehicle floor")?,
+        vehicle_ceiling: bsp.f32(BSP_VEHICLE_CEILING_OFFSET, "vehicle ceiling")?,
         cluster_skies,
         cluster_weather,
         leaf_clusters,
@@ -1315,6 +1339,96 @@ fn import_background_sounds(bsp: &Element<'_>) -> Result<Vec<Option<TagRef>>, Im
             crate::object::reference(&entry, 0x20, "background sound", &[crate::sound::LSND])
         })
         .collect()
+}
+
+/// A BSP's fog planes, regions and palette, from which each cluster's
+/// water is found.
+struct Fogs<'a> {
+    cache: &'a Cache,
+    planes: Block<'a>,
+    regions: Block<'a>,
+    palette: Block<'a>,
+}
+
+impl<'a> Fogs<'a> {
+    fn read(cache: &'a Cache, bsp: &Element<'a>) -> Result<Self, ImportError> {
+        Ok(Self {
+            cache,
+            planes: bsp.block(
+                BSP_FOG_PLANES_OFFSET,
+                "fog planes",
+                BSP_FOG_PLANE_SIZE,
+                MAX_BSP_FOGS,
+            )?,
+            regions: bsp.block(
+                BSP_FOG_REGIONS_OFFSET,
+                "fog regions",
+                BSP_FOG_REGION_SIZE,
+                MAX_BSP_FOGS,
+            )?,
+            palette: bsp.block(
+                BSP_FOG_PALETTE_OFFSET,
+                "fog palette",
+                BSP_FOG_PALETTE_SIZE,
+                MAX_BSP_FOGS,
+            )?,
+        })
+    }
+
+    /// The water of a cluster whose fog reference is `reference`
+    /// (`scenario_location_water_depth`): with its top bit set, a fog
+    /// plane, whose region's fog is the water; without, a region, wholly
+    /// under water. None where the reference is none, names what the map
+    /// does not have, or names a fog that is not water.
+    fn water(&self, reference: i16) -> Result<Option<ClusterWater>, ImportError> {
+        if reference == -1 {
+            return Ok(None);
+        }
+        let index = usize::from(reference.cast_unsigned() & 0x7FFF);
+        let (region, plane) = if reference < 0 {
+            let Some(plane) = self.planes.get(index) else {
+                return Ok(None);
+            };
+            let mut values = [0.0f32; 4];
+            for (slot, value) in values.iter_mut().enumerate() {
+                *value = plane.f32(4 + 4 * slot, "fog plane")?;
+            }
+            if !values.iter().all(|value| value.is_finite()) {
+                return Ok(None);
+            }
+            (plane.i16(0, "fog plane region")?, Some(values))
+        } else {
+            (reference, None)
+        };
+        let Some(region) = usize::try_from(region)
+            .ok()
+            .and_then(|region| self.regions.get(region))
+        else {
+            return Ok(None);
+        };
+        let Some(entry) = usize::try_from(region.i16(0x24, "fog palette index")?)
+            .ok()
+            .and_then(|entry| self.palette.get(entry))
+        else {
+            return Ok(None);
+        };
+        let Some(index) = entry.reference(0x20, "fog", &[FOG])? else {
+            return Ok(None);
+        };
+        let fog = self.cache.tag(index, FOG, FOG_SIZE)?;
+        if fog.u8(0, "fog flags")? & 1 == 0 {
+            return Ok(None);
+        }
+        let plane_distance = fog.f32(0x74, "fog plane distance")?;
+        Ok(Some(ClusterWater {
+            plane,
+            plane_distance: if plane_distance.is_finite() {
+                plane_distance
+            } else {
+                0.0
+            },
+        }))
+    }
 }
 
 /// The environments of a BSP's sound environment palette, `None` for an
@@ -2072,7 +2186,39 @@ pub(crate) mod tests {
         put(&mut clusters, 6, &1i16.to_le_bytes());
         put(&mut clusters, BSP_CLUSTER_SIZE + 4, &3i16.to_le_bytes());
         put(&mut clusters, BSP_CLUSTER_SIZE + 6, &0i16.to_le_bytes());
+        // the first lies under the one fog plane's water; the second is in
+        // the second fog region, whose fog is not water
+        put(&mut clusters, 2, &(i16::MIN).to_le_bytes());
+        put(&mut clusters, BSP_CLUSTER_SIZE + 2, &1i16.to_le_bytes());
         let clusters = bsp.add(&clusters);
+        let mut fog_plane = vec![0u8; BSP_FOG_PLANE_SIZE];
+        for (at, value) in [0.0f32, 0.0, 1.0, 2.0].iter().enumerate() {
+            put(&mut fog_plane, 4 + at * 4, &value.to_le_bytes());
+        }
+        let fog_planes = bsp.add(&fog_plane);
+        let mut fog_regions = vec![0u8; BSP_FOG_REGION_SIZE * 2];
+        put(
+            &mut fog_regions,
+            BSP_FOG_REGION_SIZE + 0x24,
+            &1i16.to_le_bytes(),
+        );
+        let fog_regions = bsp.add(&fog_regions);
+        let mut water = vec![0u8; FOG_SIZE];
+        water[0] = 1;
+        put(&mut water, 0x74, &0.25f32.to_le_bytes());
+        let water = fake.add_tag(FOG, "fog\\fake\\water", &water);
+        let mut mist = vec![0u8; FOG_SIZE];
+        put(&mut mist, 0x74, &9.0f32.to_le_bytes());
+        let mist = fake.add_tag(FOG, "fog\\fake\\mist", &mist);
+        let mut fog_palette = vec![0u8; BSP_FOG_PALETTE_SIZE * 2];
+        reference(&mut fog_palette, 0x20, FOG, fake.handle(water));
+        reference(
+            &mut fog_palette,
+            BSP_FOG_PALETTE_SIZE + 0x20,
+            FOG,
+            fake.handle(mist),
+        );
+        let fog_palette = bsp.add(&fog_palette);
         let wind = fake.add_tag(
             crate::sound::LSND,
             "sound\\fake\\wind",
@@ -2105,6 +2251,19 @@ pub(crate) mod tests {
         block(structure_bsp, BSP_LENS_FLARES_OFFSET, 1, flares);
         block(structure_bsp, BSP_LENS_FLARE_MARKERS_OFFSET, 2, markers);
         block(structure_bsp, BSP_CLUSTERS_OFFSET, 2, clusters);
+        block(structure_bsp, BSP_FOG_PLANES_OFFSET, 1, fog_planes);
+        block(structure_bsp, BSP_FOG_REGIONS_OFFSET, 2, fog_regions);
+        block(structure_bsp, BSP_FOG_PALETTE_OFFSET, 2, fog_palette);
+        put(
+            structure_bsp,
+            BSP_VEHICLE_FLOOR_OFFSET,
+            &(-5.0f32).to_le_bytes(),
+        );
+        put(
+            structure_bsp,
+            BSP_VEHICLE_CEILING_OFFSET,
+            &40.0f32.to_le_bytes(),
+        );
         block(
             structure_bsp,
             BSP_BACKGROUND_SOUNDS_OFFSET,
@@ -2511,6 +2670,17 @@ pub(crate) mod tests {
             );
             assert_eq!(bsp.cluster_sound_distances, [42]);
             assert_eq!(
+                bsp.cluster_water,
+                [
+                    Some(ClusterWater {
+                        plane: Some([0.0, 0.0, 1.0, 2.0]),
+                        plane_distance: 0.25,
+                    }),
+                    None
+                ]
+            );
+            assert_eq!((bsp.vehicle_floor, bsp.vehicle_ceiling), (-5.0, 40.0));
+            assert_eq!(
                 bsp.decals,
                 [opence_content::LevelDecal {
                     position: [0.5, -0.5, 1.0],
@@ -2690,6 +2860,14 @@ pub(crate) mod tests {
                     assert!(level.particle(&particles.particle).is_some(), "{name}");
                 }
             }
+            // (the swamp of *343 Guilty Spark* lies under water)
+            if name == "c10" {
+                let wet = level
+                    .structure_bsps
+                    .iter()
+                    .flat_map(|bsp| bsp.cluster_water.iter());
+                assert!(wet.flatten().count() > 0, "{name}");
+            }
             for bsp in &level.structure_bsps {
                 assert_eq!(bsp.cluster_weather.len(), bsp.cluster_skies.len());
                 // (the collision BSP's leaves are the structure's)
@@ -2699,6 +2877,7 @@ pub(crate) mod tests {
                     "{name}"
                 );
                 assert!(bsp.leaf_clusters.iter().any(Option::is_some), "{name}");
+                assert_eq!(bsp.cluster_water.len(), bsp.cluster_skies.len());
                 for weather in bsp.cluster_weather.iter().flatten() {
                     assert!(usize::from(*weather) < bsp.weather_palette.len(), "{name}");
                 }

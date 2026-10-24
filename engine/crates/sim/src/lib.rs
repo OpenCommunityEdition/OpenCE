@@ -25,6 +25,7 @@ pub mod game;
 pub mod hash;
 pub mod hud;
 pub mod input;
+pub mod item_physics;
 pub mod objects;
 pub mod periodic;
 pub mod player;
@@ -191,6 +192,8 @@ pub struct Simulation {
     crates: crates::Crates,
     /// Detonations to do in the next tick (a script's).
     queued_detonations: Vec<projectile::Detonation>,
+    /// What the items lying about met this tick.
+    item_impacts: Vec<item_physics::Impact>,
     /// The effects the players' shots made this tick.
     effects: Vec<debris::Ejection>,
     /// The vehicles, and the seat the player sits in.
@@ -278,6 +281,7 @@ impl Simulation {
             debris: debris::Debris::default(),
             crates: crates::Crates::default(),
             queued_detonations: Vec::new(),
+            item_impacts: Vec::new(),
             effects: Vec::new(),
             rides: seats::Rides::default(),
             actors: Vec::new(),
@@ -401,9 +405,11 @@ impl Simulation {
         self.effects = ejections;
     }
 
-    /// The physics of the dead and the spent: the ragdolls and this tick's
+    /// The physics of the dead, the spent and the dropped: the items lying
+    /// about, a game tick every other tick; the ragdolls and this tick's
     /// casings, stepped once if either moves.
     fn update_physics(&mut self, ejections: &[debris::Ejection]) {
+        let tick = self.tick().0;
         let Some(player) = self.players.first_mut() else {
             return;
         };
@@ -428,6 +434,13 @@ impl Simulation {
         for ejection in ejections {
             self.debris.eject(physics, ejection);
         }
+        // (items move a game tick, of 30 a second, every other tick)
+        let game_ticks = u64::from(clock::TICKS_PER_SECOND / vehicle::GAME_TICKS_PER_SECOND);
+        self.item_impacts = if tick.is_multiple_of(game_ticks) {
+            item_physics::step_lying(&mut self.world, physics)
+        } else {
+            Vec::new()
+        };
         if ragdolls || self.debris.moving() || self.crates.moving() {
             // (a step the physics refuses leaves them where they were)
             let _ = physics.step(clock::TICK.0);
@@ -461,6 +474,7 @@ impl Simulation {
         for player in &self.players {
             player.physics().set_level(&mesh)?;
         }
+        self.rides.set_bsp(level, bsp);
         Ok(())
     }
 
@@ -489,6 +503,13 @@ impl Simulation {
         self.world
             .insert_resource(functions::FunctionTable::new(level));
         self.rides = seats::Rides::for_level(level, player.unit(), player.armory());
+        let bsp = level
+            .scenario
+            .player_starts
+            .get(start)
+            .and_then(|start| start.structure_bsp)
+            .unwrap_or(0);
+        self.rides.set_bsp(level, usize::from(bsp));
         self.players.push(player);
         self.sensor = hud::MotionSensor::default();
         self.sensor_settings = level
@@ -686,6 +707,11 @@ impl Simulation {
     /// Where projectiles hit in the last tick.
     pub fn impacts(&self) -> &[projectile::Impact] {
         &self.impacts
+    }
+
+    /// What the items lying about met in the last tick.
+    pub fn item_impacts(&self) -> &[item_physics::Impact] {
+        &self.item_impacts
     }
 
     /// Where grenades detonated in the last tick.

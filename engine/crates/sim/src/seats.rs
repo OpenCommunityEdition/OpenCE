@@ -10,7 +10,7 @@
 use bevy_ecs::prelude::*;
 use glam::{Quat, Vec3};
 use opence_content::{
-    AnimationNode, Level, Model, ObjectKind, Physics, TagRef, Vehicle, VehicleAnimations,
+    AnimationNode, BspWater, Level, Model, ObjectKind, Physics, TagRef, Vehicle, VehicleAnimations,
     VehicleSeat, Weapon,
 };
 use opence_physics::Layers;
@@ -104,6 +104,11 @@ pub struct Rides {
     /// The player's unit's centre, from its origin: its bounding offset
     /// from its standing pelvis.
     centre: Vec3,
+    // (the current structure BSP's water, and its vehicles' floor and
+    // ceiling)
+    water: Option<BspWater>,
+    floor: f32,
+    ceiling: f32,
 }
 
 /// Where the vehicles' objects go this tick.
@@ -137,6 +142,15 @@ impl Rides {
     /// (Halo's bounding sphere's centre).
     pub fn centre(&self) -> Vec3 {
         self.centre
+    }
+
+    /// Moves the vehicles into `level`'s structure BSP `bsp`: its water,
+    /// and the floor and ceiling its flyers keep between.
+    pub fn set_bsp(&mut self, level: &Level, bsp: usize) {
+        let structure = level.structure_bsps.get(bsp);
+        self.water = structure.map(|structure| structure.water());
+        self.floor = structure.map_or(0.0, |structure| structure.vehicle_floor);
+        self.ceiling = structure.map_or(0.0, |structure| structure.vehicle_ceiling);
     }
 
     /// `level`'s vehicles, for a player whose unit is `unit` and whose
@@ -248,6 +262,7 @@ impl Rides {
             kinds,
             rides: Vec::new(),
             centre: Vec3::from_array(centre),
+            ..Rides::default()
         }
     }
 
@@ -523,8 +538,9 @@ impl Rides {
                 if ridden || !ride.state.at_rest {
                     let level = VehicleLevel {
                         world: physics,
-                        floor: 0.0,
-                        ceiling: 0.0,
+                        floor: self.floor,
+                        ceiling: self.ceiling,
+                        water: self.water.as_ref(),
                     };
                     // (a step the physics refuses leaves it where it was)
                     let before = ride.state.clone();

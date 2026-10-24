@@ -610,6 +610,74 @@ pub struct StructureBsp {
     /// first: the low seven bits the distance, 127 for 256 world units
     /// (`sound_cluster_data`).
     pub cluster_sound_distances: Vec<u8>,
+    /// Each of its clusters' water (none: the cluster is dry).
+    pub cluster_water: Vec<Option<ClusterWater>>,
+    /// The height flyers are pushed up from below (0: none).
+    pub vehicle_floor: f32,
+    /// The height flyers are pushed down from above (0: none).
+    pub vehicle_ceiling: f32,
+}
+
+/// A cluster's water: the fog plane its surface lies on, if it has one,
+/// and how far below the plane the water begins (the fog's plane
+/// distance).
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ClusterWater {
+    /// The surface's plane: its normal and its distance from the origin
+    /// (none: the whole cluster is under water).
+    pub plane: Option<[f32; 4]>,
+    /// How far below the plane the water begins.
+    pub plane_distance: f32,
+}
+
+impl ClusterWater {
+    /// How deep under this water `point` is, in its cluster.
+    pub fn depth(&self, point: [f32; 3]) -> f32 {
+        match self.plane {
+            Some([i, j, k, d]) => {
+                -(i * point[0] + j * point[1] + k * point[2] - d + self.plane_distance)
+            }
+            None => f32::MAX,
+        }
+    }
+}
+
+/// A structure BSP's water: its collision's leaves, their clusters and the
+/// clusters' water (a copy, for the vehicles that float in it).
+#[derive(Clone, Debug, PartialEq)]
+pub struct BspWater {
+    /// The BSP's collision.
+    pub collision: CollisionBsp,
+    /// Each of its leaves' cluster.
+    pub leaf_clusters: Vec<Option<u16>>,
+    /// Each of its clusters' water.
+    pub cluster_water: Vec<Option<ClusterWater>>,
+}
+
+impl BspWater {
+    /// How deep under water `point` is, as [`StructureBsp::water_depth`]
+    /// counts it.
+    pub fn depth(&self, point: [f32; 3]) -> f32 {
+        water_depth(
+            &self.collision,
+            &self.leaf_clusters,
+            &self.cluster_water,
+            point,
+        )
+    }
+}
+
+fn water_depth(
+    collision: &CollisionBsp,
+    leaf_clusters: &[Option<u16>],
+    cluster_water: &[Option<ClusterWater>],
+    point: [f32; 3],
+) -> f32 {
+    let water = collision
+        .leaf_at(point)
+        .and_then(|leaf| *leaf_clusters.get(leaf as usize)?)
+        .and_then(|cluster| *cluster_water.get(usize::from(cluster))?);
+    water.map_or(f32::MIN, |water| water.depth(point))
 }
 
 /// How far sound travels between two clusters, in world units, that is
@@ -617,6 +685,34 @@ pub struct StructureBsp {
 pub const MAXIMUM_CLUSTER_SOUND_DISTANCE: f32 = 256.0;
 
 impl StructureBsp {
+    /// The cluster `point` is in (none: outside the level).
+    pub fn cluster_at(&self, point: [f32; 3]) -> Option<u16> {
+        let leaf = self.collision.leaf_at(point)?;
+        *self.leaf_clusters.get(leaf as usize)?
+    }
+
+    /// How deep under water `point` is (`scenario_location_water_depth`):
+    /// below a cluster's surface, positive; above it, negative; `f32::MAX`
+    /// in a cluster wholly under water, and `f32::MIN` where there is no
+    /// water.
+    pub fn water_depth(&self, point: [f32; 3]) -> f32 {
+        water_depth(
+            &self.collision,
+            &self.leaf_clusters,
+            &self.cluster_water,
+            point,
+        )
+    }
+
+    /// Its water, apart from the rest of it, for what floats in it.
+    pub fn water(&self) -> BspWater {
+        BspWater {
+            collision: self.collision.clone(),
+            leaf_clusters: self.leaf_clusters.clone(),
+            cluster_water: self.cluster_water.clone(),
+        }
+    }
+
     /// How far sound travels from cluster `from` to cluster `to`, in
     /// world units: none within a cluster, and
     /// [`MAXIMUM_CLUSTER_SOUND_DISTANCE`] between clusters it has no
@@ -908,5 +1004,32 @@ mod tests {
         assert_eq!(floor.leaf_at([0.0, 0.0, 2.0]), None);
         floor.bsp3d_nodes[0].children[1] = 0;
         assert_eq!(floor.leaf_at([0.0, 0.0, 2.0]), None);
+    }
+
+    #[test]
+    fn water_is_as_deep_as_a_point_is_below_its_clusters_surface() {
+        let mut bsp = crate::devmap::level(None).structure_bsps.remove(0);
+        bsp.collision = floor();
+        bsp.leaf_clusters = vec![None, None, None, Some(0)];
+        // (no water yet, and outside the level none either)
+        assert_eq!(bsp.water_depth([0.0, 0.0, 2.0]), f32::MIN);
+        assert_eq!(bsp.water_depth([0.0, 0.0, 0.0]), f32::MIN);
+        // a surface at z = 3, the water beginning a half below it
+        bsp.cluster_water = vec![Some(ClusterWater {
+            plane: Some([0.0, 0.0, 1.0, 3.0]),
+            plane_distance: 0.5,
+        })];
+        assert!((bsp.water_depth([0.0, 0.0, 2.0]) - 0.5).abs() < 1e-6);
+        assert!((bsp.water_depth([0.0, 0.0, 4.0]) + 1.5).abs() < 1e-6);
+        assert_eq!(bsp.cluster_at([0.0, 0.0, 2.0]), Some(0));
+        // a cluster wholly under water
+        bsp.cluster_water = vec![Some(ClusterWater {
+            plane: None,
+            plane_distance: 0.0,
+        })];
+        assert_eq!(bsp.water_depth([0.0, 0.0, 2.0]), f32::MAX);
+        // a leaf of no cluster is dry
+        bsp.leaf_clusters = vec![None; 4];
+        assert_eq!(bsp.water_depth([0.0, 0.0, 2.0]), f32::MIN);
     }
 }

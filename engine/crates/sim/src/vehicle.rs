@@ -7,12 +7,13 @@
 //!
 //! A vehicle steps at the game's 30 Hz, on every other engine tick, and
 //! everything here is in the tags' units: world units a game tick and world
-//! units a game tick a tick. Water is not felt (no boat floats yet), the
-//! ground's materials do not scale its friction, and the level is the only
-//! thing a vehicle runs into.
+//! units a game tick a tick. Water holds up, drags and lifts the mass
+//! points under it (a boat floats, and rights itself); the ground's
+//! materials do not scale its friction, and the level is the only thing a
+//! vehicle runs into.
 
 use glam::{Mat3, Quat, Vec2, Vec3};
-use opence_content::{FrictionType, Physics, PoweredMassPoint, Vehicle, VehicleKind};
+use opence_content::{BspWater, FrictionType, Physics, PoweredMassPoint, Vehicle, VehicleKind};
 use opence_physics::{Layers, PhysicsError, World};
 
 /// The game's ticks a second, which a vehicle steps at.
@@ -27,6 +28,7 @@ const STOP_TICKS: u8 = 15;
 /// A mass point's flags, as it left the last tick.
 const POINT_AT_REST: u8 = 1 << 0;
 const POINT_ON_GROUND: u8 = 1 << 1;
+const POINT_IN_WATER: u8 = 1 << 3;
 const POINT_ANTIGRAVING: u8 = 1 << 4;
 
 /// Below these, squared, a mass point or a vehicle is at rest.
@@ -79,6 +81,11 @@ pub struct VehicleState {
     pub at_rest: bool,
     /// Whether any of its mass points is on the ground.
     pub on_ground: bool,
+    /// Whether any of its mass points is in water (Halo's on media).
+    pub in_water: bool,
+    /// Whether all of its mass points are under water (wholly under
+    /// media).
+    pub under_water: bool,
     /// Whether it is braking.
     pub brake: bool,
     /// Each mass point's flags, as it left the last tick.
@@ -108,6 +115,8 @@ impl VehicleState {
             stop_time: 0,
             at_rest: false,
             on_ground: false,
+            in_water: false,
+            under_water: false,
             brake: false,
             points: vec![0; physics.mass_points.len()],
         }
@@ -163,6 +172,17 @@ pub struct VehicleLevel<'a> {
     pub floor: f32,
     /// The height flyers are pushed down from above (0: none).
     pub ceiling: f32,
+    /// Its water (none: it has none).
+    pub water: Option<&'a BspWater>,
+}
+
+impl VehicleLevel<'_> {
+    /// How deep under water `point` is (as `scenario_location_water_depth`
+    /// counts it: positive under the surface).
+    fn water_depth(&self, point: Vec3) -> f32 {
+        self.water
+            .map_or(f32::MIN, |water| water.depth(point.to_array()))
+    }
 }
 
 /// What a controller sets each powered mass point to push with (in the C,
@@ -171,6 +191,8 @@ pub struct VehicleLevel<'a> {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 struct Powered {
     ground_friction_velocity: f32,
+    water_friction_velocity: f32,
+    water_lift: f32,
     air_friction_velocity: f32,
     air_lift: f32,
     thrust_fraction: f32,
@@ -266,24 +288,15 @@ pub fn game_tick(
 
     if !state.at_rest {
         match vehicle.kind {
-            VehicleKind::HumanJeep => jeep(state, vehicle, physics, level.world)?,
-            VehicleKind::HumanTank => tank(state, vehicle, physics, level.world)?,
-            VehicleKind::AlienScout => {
-                scout(state, vehicle, physics, controls, steering, level.world)?
-            }
-            VehicleKind::AlienFighter => fighter(state, vehicle, physics, controls, level.world)?,
-            // (a boat floats, which nothing does yet; a plane and a turret
-            // are left to the mass points alone)
-            VehicleKind::HumanBoat | VehicleKind::HumanPlane | VehicleKind::Turret => {
+            VehicleKind::HumanJeep => jeep(state, vehicle, physics, level)?,
+            VehicleKind::HumanTank => tank(state, vehicle, physics, level)?,
+            VehicleKind::HumanBoat => boat(state, physics, level)?,
+            VehicleKind::AlienScout => scout(state, vehicle, physics, controls, steering, level)?,
+            VehicleKind::AlienFighter => fighter(state, vehicle, physics, controls, level)?,
+            // (a plane and a turret are left to the mass points alone)
+            VehicleKind::HumanPlane | VehicleKind::Turret => {
                 let mut powered = [Powered::identity(); 32];
-                physics_update(
-                    state,
-                    physics,
-                    &mut powered,
-                    Vec3::ZERO,
-                    Vec3::ZERO,
-                    level.world,
-                )?;
+                physics_update(state, physics, &mut powered, Vec3::ZERO, Vec3::ZERO, level)?;
             }
         }
         compute_airborne_ticks(state, physics);
@@ -507,7 +520,7 @@ fn jeep(
     state: &mut VehicleState,
     vehicle: &Vehicle,
     physics: &Physics,
-    world: &World,
+    level: VehicleLevel<'_>,
 ) -> Result<(), PhysicsError> {
     state.wheel = roll(state.wheel, state.speed, vehicle.wheel_circumference);
     let mut powered = [Powered::identity(); 32];
@@ -528,14 +541,14 @@ fn jeep(
             libm::cosf(-state.turn * 0.5),
         );
     }
-    physics_update(state, physics, &mut powered, Vec3::ZERO, Vec3::ZERO, world)
+    physics_update(state, physics, &mut powered, Vec3::ZERO, Vec3::ZERO, level)
 }
 
 fn tank(
     state: &mut VehicleState,
     vehicle: &Vehicle,
     physics: &Physics,
-    world: &World,
+    level: VehicleLevel<'_>,
 ) -> Result<(), PhysicsError> {
     let left = state.speed - state.turn;
     let right = state.speed + state.turn;
@@ -546,7 +559,66 @@ fn tank(
         powered[0].ground_friction_velocity = left;
         powered[1].ground_friction_velocity = right;
     }
-    physics_update(state, physics, &mut powered, Vec3::ZERO, Vec3::ZERO, world)
+    physics_update(state, physics, &mut powered, Vec3::ZERO, Vec3::ZERO, level)
+}
+
+/// The fastest a boat rights itself, in radians a game tick a tick
+/// (`VEHICLE_ANGULAR_ACCELERATION`).
+const BOAT_RIGHTING: f32 = 0.013962634;
+
+fn boat(
+    state: &mut VehicleState,
+    physics: &Physics,
+    level: VehicleLevel<'_>,
+) -> Result<(), PhysicsError> {
+    let mut powered = [Powered::identity(); 32];
+    if physics.powered_mass_points.len() != 3 {
+        return physics_update(state, physics, &mut powered, Vec3::ZERO, Vec3::ZERO, level);
+    }
+    // (the rudder turns less the faster it goes)
+    let speed = libm::sqrtf(state.velocity.dot(state.velocity)) * 2.5;
+    let angle = (1.0 - speed.min(1.0)) * (state.turn * 0.5);
+    powered[0].water_friction_velocity = state.speed;
+    powered[0].water_lift = 0.003;
+    powered[0].rotation = Quat::from_xyzw(0.0, 0.0, libm::sinf(angle), libm::cosf(angle));
+    powered[1].water_lift = 0.003;
+    powered[2].water_lift = 0.005;
+
+    // (rolled back upright about its forward axis, leant into its slide)
+    let (forward, up) = (state.forward, state.up);
+    let (length, upright) = normalize(forward * -forward.z + Vec3::Z);
+    let torque = if length != 0.0 {
+        let cross = up.cross(forward);
+        let spin = forward.cross(state.velocity).dot(Vec3::Z) * 2.0 * std::f32::consts::PI;
+        let upright = rotate(upright, forward, spin);
+        let mut angle = angle_between(upright, up);
+        if cross.dot(upright) > 0.0 {
+            angle = -angle;
+        }
+        let dot = state.angular_velocity.dot(forward);
+        let wanted = libm::sqrtf(angle.abs() * 2.0 * BOAT_RIGHTING) * sign(angle) - dot;
+        forward * (wanted.clamp(-BOAT_RIGHTING, BOAT_RIGHTING) * physics.xx_moment)
+    } else {
+        Vec3::ZERO
+    };
+    physics_update(state, physics, &mut powered, Vec3::ZERO, torque, level)
+}
+
+/// The angle between two vectors (`angle_between_vectors3d`, through the
+/// cosine of twice the angle).
+fn angle_between(a: Vec3, b: Vec3) -> f32 {
+    let squares = a.dot(a) * b.dot(b);
+    if squares == 0.0 {
+        return 0.0;
+    }
+    let ab = a.dot(b);
+    let c = (2.0 * ab * ab / squares - 1.0).clamp(-1.0, 1.0);
+    let angle = libm::acosf(c) * 0.5;
+    if ab < 0.0 {
+        std::f32::consts::PI - angle
+    } else {
+        angle
+    }
 }
 
 fn scout(
@@ -555,7 +627,7 @@ fn scout(
     physics: &Physics,
     controls: &VehicleControls,
     steering: f32,
-    world: &World,
+    level: VehicleLevel<'_>,
 ) -> Result<(), PhysicsError> {
     let antigrav = controls.seat_power[0];
     let mut powered = [Powered::identity(); 32];
@@ -568,7 +640,7 @@ fn scout(
     let mut force = Vec3::ZERO;
     let mut torque = Vec3::ZERO;
     // (out of the water, and not upside down)
-    if up.z > -0.2 {
+    if level.water_depth(state.position) < 0.5 && up.z > -0.2 {
         let frame = frame(forward, up);
         if hover > 0.0 {
             let local = frame.transpose() * state.velocity;
@@ -643,7 +715,7 @@ fn scout(
         force *= antigrav;
         torque *= antigrav;
     }
-    physics_update(state, physics, &mut powered, force, torque, world)?;
+    physics_update(state, physics, &mut powered, force, torque, level)?;
 
     let maximum = state.up.z.max(0.4);
     let (mut held, mut pushed) = (0usize, 0usize);
@@ -670,7 +742,7 @@ fn fighter(
     vehicle: &Vehicle,
     physics: &Physics,
     controls: &VehicleControls,
-    world: &World,
+    level: VehicleLevel<'_>,
 ) -> Result<(), PhysicsError> {
     let power = controls.seat_power[0];
     let fastest = vehicle.maximum_forward_speed;
@@ -744,7 +816,7 @@ fn fighter(
     for point in powered.iter_mut().take(2) {
         point.antigrav_fraction = power;
     }
-    physics_update(state, physics, &mut powered, force, torque, world)
+    physics_update(state, physics, &mut powered, force, torque, level)
 }
 
 /// A rotation's axis and angle, the angle at most a half turn.
@@ -831,14 +903,16 @@ fn compute_new(
     state: &mut VehicleState,
     physics: &Physics,
     powered: &[Powered; 32],
-    world: &World,
+    level: VehicleLevel<'_>,
     points: &mut Vec<Point>,
 ) -> Result<(Vec3, Vec3), PhysicsError> {
+    let world = level.world;
     let frame = frame(state.forward, state.up);
     let com = Vec3::from_array(physics.center_of_mass);
     // (gravity on the whole, at its centre of mass)
     let mut total_force = Vec3::new(0.0, 0.0, -physics.mass * physics.gravity_scale * GRAVITY);
     let mut total_torque = Vec3::ZERO;
+    let mut submerged = 0usize;
     points.clear();
     for (index, point) in physics.mass_points.iter().enumerate() {
         let pushed = point.powered_mass_point.and_then(|index| {
@@ -901,9 +975,55 @@ fn compute_new(
             flags |= POINT_ON_GROUND;
         }
 
+        let mut push = Vec3::ZERO;
+        let mut water_pressure = Vec3::ZERO;
+        let mut water_friction = Vec3::ZERO;
+        let water_depth = level.water_depth(position);
+        if water_depth > 0.0 {
+            let fraction = if water_depth < physics.water_depth {
+                water_depth / physics.water_depth
+            } else {
+                1.0
+            };
+            if point.density > 0.0 && physics.water_depth > 0.0 {
+                water_pressure.z = mass / point.density
+                    * physics.water_density
+                    * fraction
+                    * (physics.gravity_scale * GRAVITY);
+            }
+            let water_scale = -mass * physics.water_friction;
+            let mut friction = velocity * water_scale;
+            if let Some((definition, powered)) = pushed {
+                if definition.flags & PoweredMassPoint::WATER_FRICTION != 0
+                    && powered.water_friction_velocity != 0.0
+                {
+                    friction = (velocity - forward * powered.water_friction_velocity) * water_scale;
+                }
+            }
+            water_friction = friction_evaluate(
+                friction,
+                point.friction_type,
+                point.friction_parallel_scale,
+                point.friction_perpendicular_scale,
+                forward,
+                up,
+            );
+            if let Some((definition, powered)) = pushed {
+                if definition.flags & PoweredMassPoint::WATER_LIFT != 0 && powered.water_lift != 0.0
+                {
+                    push += up
+                        * (forward.dot(velocity).abs()
+                            * powered.water_lift
+                            * physics.mass
+                            * fraction);
+                }
+            }
+            flags |= POINT_IN_WATER;
+            submerged += 1;
+        }
+
         let air_scale = -mass * physics.air_friction;
         let mut air = velocity * air_scale;
-        let mut push = Vec3::ZERO;
         if let Some((definition, powered)) = pushed {
             if definition.flags & PoweredMassPoint::AIR_FRICTION != 0
                 && powered.air_friction_velocity != 0.0
@@ -959,7 +1079,8 @@ fn compute_new(
             }
         }
 
-        let force = normal_force + ground_friction + air_friction + push;
+        let force =
+            normal_force + ground_friction + water_pressure + water_friction + air_friction + push;
         total_force += force;
         total_torque += radius.cross(force);
         if let Some(slot) = state.points.get_mut(index) {
@@ -967,6 +1088,8 @@ fn compute_new(
         }
         points.push(Point { position });
     }
+    state.in_water = submerged > 0;
+    state.under_water = submerged > 0 && submerged == physics.mass_points.len();
     Ok((total_force, total_torque))
 }
 
@@ -978,10 +1101,11 @@ fn physics_update(
     powered: &mut [Powered; 32],
     magic_force: Vec3,
     magic_torque: Vec3,
-    world: &World,
+    level: VehicleLevel<'_>,
 ) -> Result<(), PhysicsError> {
+    let world = level.world;
     let mut points = Vec::with_capacity(physics.mass_points.len());
-    let (force, torque) = compute_new(state, physics, powered, world, &mut points)?;
+    let (force, torque) = compute_new(state, physics, powered, level, &mut points)?;
     let force = force + magic_force;
     let torque = torque + magic_torque;
 
@@ -1156,5 +1280,208 @@ mod tests {
         assert!((roll(1.0, 0.5, 1.2) - 0.3).abs() < 1e-6);
         assert!((roll(0.1, -0.3, 1.2) - 1.0).abs() < 1e-6);
         assert_eq!(roll(0.5, 0.25, 0.0), 0.5);
+    }
+
+    #[test]
+    fn the_angle_between_two_vectors_runs_to_a_half_turn() {
+        use std::f32::consts::{FRAC_PI_2, PI};
+        assert!(angle_between(Vec3::X, Vec3::X).abs() < 1e-3);
+        assert!((angle_between(Vec3::X, Vec3::Y * 2.0) - FRAC_PI_2).abs() < 1e-3);
+        assert!((angle_between(Vec3::X, -Vec3::X) - PI).abs() < 1e-3);
+        assert_eq!(angle_between(Vec3::ZERO, Vec3::X), 0.0);
+    }
+
+    /// Water whose surface is at z = 0 everywhere: one leaf, one cluster.
+    fn sea() -> BspWater {
+        use opence_content::level::Bsp3dNode;
+        use opence_content::{ClusterWater, CollisionBsp};
+        BspWater {
+            collision: CollisionBsp {
+                bsp3d_nodes: vec![Bsp3dNode {
+                    plane: 0,
+                    children: [i32::MIN, i32::MIN],
+                }],
+                planes: vec![[0.0, 0.0, 1.0, 0.0]],
+                ..CollisionBsp::default()
+            },
+            leaf_clusters: vec![Some(0)],
+            cluster_water: vec![Some(ClusterWater {
+                plane: Some([0.0, 0.0, 1.0, 0.0]),
+                plane_distance: 0.0,
+            })],
+        }
+    }
+
+    /// A body of `points` mass points (each `density`, powered by the
+    /// powered mass point of its index), spread across its left axis.
+    fn floater(points: usize, density: f32) -> Physics {
+        use opence_content::{Group, MassPoint, TagRef};
+        let powered = PoweredMassPoint {
+            name: String::new(),
+            flags: PoweredMassPoint::WATER_FRICTION | PoweredMassPoint::WATER_LIFT,
+            antigrav_strength: 0.0,
+            antigrav_offset: 0.0,
+            antigrav_height: 0.0,
+            antigrav_damp_fraction: 0.0,
+            antigrav_normal_k1: 0.0,
+            antigrav_normal_k0: 0.0,
+        };
+        let mass = 1.0 / points as f32;
+        Physics {
+            tag: TagRef {
+                group: Group(*b"phys"),
+                path: String::new(),
+            },
+            radius: 1.0,
+            moment_scale: 1.0,
+            mass: 1.0,
+            center_of_mass: [0.0; 3],
+            density,
+            gravity_scale: 1.0,
+            ground_friction: 0.2,
+            ground_depth: 0.15,
+            ground_damp_fraction: 0.05,
+            ground_normal_k1: 0.7,
+            ground_normal_k0: 0.5,
+            water_friction: 0.05,
+            water_depth: 0.25,
+            water_density: 1.0,
+            air_friction: 0.001,
+            xx_moment: 1.0,
+            yy_moment: 1.0,
+            zz_moment: 1.0,
+            inertial_matrix: Some([[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]; 2]),
+            powered_mass_points: vec![powered; points],
+            mass_points: (0..points)
+                .map(|index| MassPoint {
+                    name: String::new(),
+                    powered_mass_point: u16::try_from(index).ok(),
+                    model_node: None,
+                    flags: 0,
+                    relative_mass: mass,
+                    mass,
+                    relative_density: density,
+                    density,
+                    position: [0.0, index as f32 - (points as f32 - 1.0) * 0.5, 0.0],
+                    forward: [1.0, 0.0, 0.0],
+                    up: [0.0, 0.0, 1.0],
+                    friction_type: FrictionType::Point,
+                    friction_parallel_scale: 1.0,
+                    friction_perpendicular_scale: 1.0,
+                    radius: 0.1,
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn what_is_lighter_than_water_floats_and_what_is_heavier_sinks() -> Result<(), PhysicsError> {
+        let world = World::new(opence_physics::WorldSettings::default())?;
+        let water = sea();
+        let level = VehicleLevel {
+            world: &world,
+            floor: 0.0,
+            ceiling: 0.0,
+            water: Some(&water),
+        };
+        let light = floater(1, 0.5);
+        let mut state = VehicleState::placed(&light, Vec3::new(0.0, 0.0, -2.0), Vec3::X, Vec3::Z);
+        for _ in 0..600 {
+            let mut powered = [Powered::identity(); 32];
+            physics_update(
+                &mut state,
+                &light,
+                &mut powered,
+                Vec3::ZERO,
+                Vec3::ZERO,
+                level,
+            )?;
+        }
+        // (held where the water's pressure meets its weight: half its
+        // floating depth under)
+        assert!(state.in_water && state.under_water);
+        assert!(
+            (state.position.z + 0.125).abs() < 0.05,
+            "{}",
+            state.position.z
+        );
+        assert!(state.points.iter().all(|flags| flags & POINT_IN_WATER != 0));
+
+        let heavy = floater(1, 2.0);
+        let mut state = VehicleState::placed(&heavy, Vec3::new(0.0, 0.0, -2.0), Vec3::X, Vec3::Z);
+        for _ in 0..60 {
+            let mut powered = [Powered::identity(); 32];
+            physics_update(
+                &mut state,
+                &heavy,
+                &mut powered,
+                Vec3::ZERO,
+                Vec3::ZERO,
+                level,
+            )?;
+        }
+        assert!(state.position.z < -2.0, "{}", state.position.z);
+
+        // (and out of water nothing holds it up)
+        let dry = VehicleLevel {
+            water: None,
+            ..level
+        };
+        let mut state = VehicleState::placed(&light, Vec3::new(0.0, 0.0, -2.0), Vec3::X, Vec3::Z);
+        let mut powered = [Powered::identity(); 32];
+        physics_update(
+            &mut state,
+            &light,
+            &mut powered,
+            Vec3::ZERO,
+            Vec3::ZERO,
+            dry,
+        )?;
+        assert!(!state.in_water && state.velocity.z < 0.0);
+        Ok(())
+    }
+
+    #[test]
+    fn a_boat_rights_itself_and_its_rudder_turns_it() -> Result<(), PhysicsError> {
+        let world = World::new(opence_physics::WorldSettings::default())?;
+        let water = sea();
+        let level = VehicleLevel {
+            world: &world,
+            floor: 0.0,
+            ceiling: 0.0,
+            water: Some(&water),
+        };
+        let boat_physics = floater(3, 0.5);
+        // (rolled most of a quarter turn onto its side)
+        let rolled = Vec3::new(0.0, -libm::sinf(1.2), libm::cosf(1.2));
+        let mut state = VehicleState::placed(&boat_physics, Vec3::ZERO, Vec3::X, rolled);
+        for _ in 0..300 {
+            boat(&mut state, &boat_physics, level)?;
+        }
+        assert!(state.up.z > 0.98, "{}", state.up);
+
+        // (driven ahead with the rudder over, it turns)
+        state.speed = 0.1;
+        state.turn = 0.5;
+        let start = state.forward;
+        for _ in 0..120 {
+            boat(&mut state, &boat_physics, level)?;
+        }
+        assert!(
+            state.velocity.dot(state.forward) > 0.0,
+            "{}",
+            state.velocity
+        );
+        assert!(state.forward.dot(start) < 0.99, "{}", state.forward);
+
+        // (and a boat without its three powered mass points only floats)
+        let raft = floater(2, 0.5);
+        let mut state = VehicleState::placed(&raft, Vec3::ZERO, Vec3::X, Vec3::Z);
+        state.speed = 0.1;
+        for _ in 0..30 {
+            boat(&mut state, &raft, level)?;
+        }
+        assert!(state.velocity.x.abs() < 1e-3, "{}", state.velocity);
+        Ok(())
     }
 }

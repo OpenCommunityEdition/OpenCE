@@ -140,6 +140,7 @@ fn replay(
         world,
         floor: 0.0,
         ceiling: 0.0,
+        water: None,
     };
     for (tick, row) in rows.iter().enumerate().skip(1) {
         let mut controls = controls(script, tick);
@@ -236,6 +237,7 @@ fn the_ghost_drives_as_halos_did() -> Result {
         world: &world,
         floor: 0.0,
         ceiling: 0.0,
+        water: None,
     };
     for tick in 1..rows.len() {
         game_tick(
@@ -264,6 +266,7 @@ fn set_down(
         world,
         floor: 0.0,
         ceiling: 0.0,
+        water: None,
     };
     let still = VehicleControls {
         facing: forward,
@@ -289,6 +292,7 @@ fn the_scorpion_answers_its_controls_as_its_tag_says() -> Result {
         world: &world,
         floor: 0.0,
         ceiling: 0.0,
+        water: None,
     };
     // (forward: its acceleration a tick, to its fastest, the way it faces)
     let drive = VehicleControls {
@@ -341,6 +345,7 @@ fn the_banshee_answers_its_controls_as_its_tag_says() -> Result {
         world: &world,
         floor: 0.0,
         ceiling: 0.0,
+        water: None,
     };
     let mut state = VehicleState::placed(physics, Vec3::ZERO, Vec3::X, Vec3::Z);
     let fly = VehicleControls {
