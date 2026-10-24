@@ -165,8 +165,8 @@ was made: filtered, and the redesign adds no detail to it. The mission
 pictures and the other content bitmaps are the same. It
 is never shipped or committed. The artifact's boards show the logo the
 user supplied to it, kept in that private artifact only; it is not in the
-repository. Before the UI is imported, the launcher shows the OpenCE
-wordmark (OpenCE, `title`, `blue` gradient).
+repository. The logo is on the main menu only: the launcher shows no logo
+and no artwork backdrop, only the palette's colours and shading.
 
 ## The loading screen
 
@@ -306,3 +306,9 @@ Pause: multiplayer keeps its capsules: it has no right pane for a divider.
 In version 31 the user replaced the logo with a 1024×256 picture whose
 art fills its left 640 px; the boards crop to that art (2340×936 on the
 main menu, its middle still at y 675, and 560×224 on the launcher).
+
+### Round 5 (2026-10-24, artifact version 32)
+
+| Board | Comment | Change |
+| --- | --- | --- |
+| Launcher | No backdrop, keep to colours and shading; remove the logo | Every launcher board loses the stars, planet and nebula for a shaded gradient of the palette's blues (a soft `#1D6AB4` glow at the top, `#041327` deepening to near black); Play drops the logo and the Ready panel is centred alone right of the rail |

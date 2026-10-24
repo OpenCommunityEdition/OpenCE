@@ -8,7 +8,7 @@ definitions. It stays faithful to the original: the same screens in the
 same flow, each doing what the original's did, in the original's design
 language (its palette, panel shapes, type hierarchy and feel) and with its
 sounds. It is a modern rendering of the original, not a new identity.
-The Halo logo stays. The launcher grows into a richer pre-game window in
+The Halo logo stays on the main menu. The launcher grows into a richer pre-game window in
 the same language. The loading screen is the Xbox's, recreated natively
 in HD and completed. Every screen is designed first in a Claude design
 artifact (static mockups, a clickable prototype and motion studies) and
@@ -68,9 +68,8 @@ built only once the user approves it.
    titles were drawn in) and body text in Overpass, at the design's sizes,
    drawn from signed-distance-field atlases built from the font files.
 9. The Halo logo is drawn from the user's `ui.map` logo bitmap at run time,
-   on the main menu and on the launcher once the UI is imported. It is
-   never shipped or committed. Before the import, the launcher shows the
-   OpenCE wordmark.
+   on the main menu. It is never shipped or committed. The launcher shows
+   no logo.
 10. 4K native and widescreen: the screens are designed at 3840×2160 across
     the full 16:9 width. Other windows scale by height; wider and narrower
     ones move the anchored parts. The background scene fills the window.
@@ -80,8 +79,8 @@ built only once the user approves it.
 12. Every screen can be navigated with the keyboard and the mouse.
 
 ### The launcher
-13. A pre-game window in the same design language, with the Halo logo (as
-    in item 9) over an artwork backdrop (our own art). It holds:
+13. A pre-game window in the same design language, with no logo and no
+    artwork backdrop: only the palette's colours and shading. It holds:
     - Play, Settings, Exit;
     - a map library: the campaign, multiplayer and Custom Edition maps,
       their import status, and Import;
