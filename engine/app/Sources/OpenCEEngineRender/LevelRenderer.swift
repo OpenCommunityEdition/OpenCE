@@ -656,7 +656,15 @@ public final class LevelRenderer {
 
     /// Compiles the level's shaders from `source` again, for the level and
     /// its objects; the pipelines are replaced only if they all build.
+    /// Times the renderer's CPU work as scopes nested in the app's (the
+    /// engine's profiler, in the app).
+    public var scopes: ScopeTimer?
+
     public func reloadShaders(source: String) throws {
+        try HitchLog.shared.note(.compile, "level shaders") { try compileShaders(source: source) }
+    }
+
+    private func compileShaders(source: String) throws {
         let library = try Self.library(device: device, source: source)
         let level = try Self.pipelines(device: device, library: library, stride: vertexStride,
                                        outputFormat: outputFormat)
@@ -715,16 +723,17 @@ public final class LevelRenderer {
             // (the scaler's input samples its maps as the output would, as
             // MetalFX asks: log2 of the scale, a level sharper at half)
             let mipBias = log2(Float(temporal.inputWidth) / Float(max(target.width, 1)))
-            drawLevel(into: commands, frame: temporal.color, depth: temporal.depth, keepDepth: true,
-                      viewProjection: jittered, camera: camera, objects: objects, debugLines: debugLines,
-                      mipBias: mipBias)
+            profiled("level", scopes) {
+                drawLevel(into: commands, frame: temporal.color, depth: temporal.depth, keepDepth: true,
+                          viewProjection: jittered, camera: camera, objects: objects, debugLines: debugLines,
+                          mipBias: mipBias)
+            }
             var uniforms = temporal.motionUniforms(current: viewProjection)
             let motionPass = MTLRenderPassDescriptor()
             motionPass.colorAttachments[0].texture = temporal.motion
             motionPass.colorAttachments[0].loadAction = .dontCare
             motionPass.colorAttachments[0].storeAction = .store
-            guard let encoder = commands.makeRenderCommandEncoder(descriptor: motionPass) else { return }
-            encoder.label = "motion"
+            guard let encoder = commands.timedRenderEncoder("motion", descriptor: motionPass) else { return }
             encoder.setRenderPipelineState(motion)
             encoder.setFragmentTexture(temporal.depth, index: 0)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<MotionUniforms>.stride, index: 0)
@@ -735,8 +744,10 @@ public final class LevelRenderer {
             shown = temporal.output
         } else {
             guard let (frame, depth) = targets(width: target.width, height: target.height) else { return }
-            drawLevel(into: commands, frame: frame, depth: depth, keepDepth: false, viewProjection: viewProjection,
-                      camera: camera, objects: objects, debugLines: debugLines)
+            profiled("level", scopes) {
+                drawLevel(into: commands, frame: frame, depth: depth, keepDepth: false,
+                          viewProjection: viewProjection, camera: camera, objects: objects, debugLines: debugLines)
+            }
             lastInputSize = (target.width, target.height)
             shown = frame
         }
@@ -754,8 +765,7 @@ public final class LevelRenderer {
         tonePass.colorAttachments[0].texture = target
         tonePass.colorAttachments[0].loadAction = .dontCare
         tonePass.colorAttachments[0].storeAction = .store
-        guard let toneEncoder = commands.makeRenderCommandEncoder(descriptor: tonePass) else { return }
-        toneEncoder.label = "tone map"
+        guard let toneEncoder = commands.timedRenderEncoder("tone map", descriptor: tonePass) else { return }
         toneEncoder.setRenderPipelineState(tone)
         toneEncoder.setFragmentTexture(shown, index: 0)
         toneEncoder.setFragmentTexture(bloom ?? cameraPass.blackLevel(), index: 1)
@@ -800,19 +810,24 @@ public final class LevelRenderer {
         uniforms.sunColor = sun.color
         let towards = sunShadows && sun.towards.w > 0
             ? SIMD3(sun.towards.x, sun.towards.y, sun.towards.z) : nil
-        shadows.encode(into: commands, camera: camera, aspect: Float(frame.width) / Float(max(frame.height, 1)),
-                       towards: towards, wrap: wrap,
-                       level: { encoder, casting in self.encodeShadowCasters(encoder, casting) },
-                       objects: { encoder, casting in
-                           self.models.encodeShadowCasters(prepared, casting, into: encoder)
-                       })
+        profiled("shadows", scopes) {
+            shadows.encode(into: commands, camera: camera, aspect: Float(frame.width) / Float(max(frame.height, 1)),
+                           towards: towards, wrap: wrap,
+                           level: { encoder, casting in self.encodeShadowCasters(encoder, casting) },
+                           objects: { encoder, casting in
+                               self.models.encodeShadowCasters(prepared, casting, into: encoder)
+                           })
+        }
         var shadowUniforms = shadows.uniforms
-        let lightFrame = lightPass.prepare(switches.lights ? lights : [], camera: camera,
-                                           aspect: Float(frame.width) / Float(max(frame.height, 1)))
-        let casting = shadows.pipelines
-        lightPass.encodeShadows(lightFrame, into: commands, wrap: wrap) { encoder in
-            self.encodeShadowCasters(encoder, casting.level)
-            self.models.encodeShadowCasters(prepared, casting.model, into: encoder)
+        let lightFrame = profiled("lights", scopes) {
+            let lightFrame = lightPass.prepare(switches.lights ? lights : [], camera: camera,
+                                               aspect: Float(frame.width) / Float(max(frame.height, 1)))
+            let casting = shadows.pipelines
+            lightPass.encodeShadows(lightFrame, into: commands, wrap: wrap) { encoder in
+                self.encodeShadowCasters(encoder, casting.level)
+                self.models.encodeShadowCasters(prepared, casting.model, into: encoder)
+            }
+            return lightFrame
         }
         let screenTargets = screen.targets(width: frame.width, height: frame.height)
         let fullViewport = MTLViewport(originX: 0, originY: 0, width: Double(frame.width),
@@ -858,8 +873,8 @@ public final class LevelRenderer {
         pass.depthAttachment.loadAction = .clear
         pass.depthAttachment.storeAction = .store
         pass.depthAttachment.clearDepth = 0
-        guard screenTargets != nil, let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else { return }
-        encoder.label = "level opaque"
+        guard screenTargets != nil,
+              let encoder = commands.timedRenderEncoder("level opaque", descriptor: pass) else { return }
         bind(encoder)
         models.encodeSky(prepared, into: encoder)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
@@ -886,9 +901,11 @@ public final class LevelRenderer {
         let screenUniforms = ScreenUniforms(viewProjection: viewProjection, eye: camera.position,
                                             sunTowards: towards == nil ? .zero : sun.towards, width: frame.width,
                                             height: frame.height, switches: switches)
-        screen.encode(into: commands, targets: screenTargets, frame: frame, depth: depth, uniforms: screenUniforms)
-        let cameraFrame = cameraPass.encodeOcclusion(sprites, into: commands, depth: depth,
-                                                     viewProjection: viewProjection, camera: camera)
+        let cameraFrame = profiled("screen", scopes) {
+            screen.encode(into: commands, targets: screenTargets, frame: frame, depth: depth, uniforms: screenUniforms)
+            return cameraPass.encodeOcclusion(sprites, into: commands, depth: depth,
+                                              viewProjection: viewProjection, camera: camera)
+        }
         lastSpriteCount = cameraFrame?.spriteCount ?? 0
 
         // applied to the frame, then the blended surfaces over it
@@ -899,8 +916,7 @@ public final class LevelRenderer {
         over.depthAttachment.texture = depth
         over.depthAttachment.loadAction = .load
         over.depthAttachment.storeAction = keepDepth ? .store : .dontCare
-        guard let blendedEncoder = commands.makeRenderCommandEncoder(descriptor: over) else { return }
-        blendedEncoder.label = "level blended"
+        guard let blendedEncoder = commands.timedRenderEncoder("level blended", descriptor: over) else { return }
         screen.resolve(screenTargets, uniforms: screenUniforms, into: blendedEncoder)
         bind(blendedEncoder)
         blendedEncoder.setDepthStencilState(depthTest)
@@ -936,12 +952,15 @@ public final class LevelRenderer {
         screen.view(screenTargets, uniforms: screenUniforms, into: blendedEncoder)
         blendedEncoder.endEncoding()
         if switches.particles {
-            particles.encode(into: commands, frame: frame, depth: depth, worldToClip: viewProjection,
-                             eye: camera.position, right: camera.rotation.act([0, -1, 0]),
-                             up: camera.rotation.act([0, 0, 1]), sprites: laidParticles,
-                             lighting: ParticleLighting(probes: probes, probeOrigin: uniforms.probeOrigin,
-                                                        probeCounts: uniforms.probeCounts,
-                                                        sunTowards: uniforms.sunTowards, sunColor: uniforms.sunColor))
+            profiled("particles", scopes) {
+                particles.encode(into: commands, frame: frame, depth: depth, worldToClip: viewProjection,
+                                 eye: camera.position, right: camera.rotation.act([0, -1, 0]),
+                                 up: camera.rotation.act([0, 0, 1]), sprites: laidParticles,
+                                 lighting: ParticleLighting(probes: probes, probeOrigin: uniforms.probeOrigin,
+                                                            probeCounts: uniforms.probeCounts,
+                                                            sunTowards: uniforms.sunTowards,
+                                                            sunColor: uniforms.sunColor))
+            }
         }
     }
 
@@ -955,7 +974,9 @@ public final class LevelRenderer {
             return temporal
         }
         guard supportsTemporal else { return nil }
-        temporal = TemporalScaling(device: device, input: input, output: (width, height))
+        temporal = HitchLog.shared.note(.allocation, "temporal scaler \(width)×\(height)") {
+            TemporalScaling(device: device, input: input, output: (width, height))
+        }
         return temporal
     }
 
@@ -964,6 +985,10 @@ public final class LevelRenderer {
     /// without lightmaps (and, later, the objects) take the probes'.
     /// Pages the bake lacks keep their stock lightmaps.
     public func useBakedLighting(_ light: BakedLight) throws {
+        try HitchLog.shared.note(.upload, "baked light") { try uploadBakedLighting(light) }
+    }
+
+    private func uploadBakedLighting(_ light: BakedLight) throws {
         var pages: [UInt32: (irradiance: MTLTexture, directions: MTLTexture)] = [:]
         for page in light.pages() {
             let width = Int(page.width), height = Int(page.height)
@@ -1133,8 +1158,11 @@ public final class LevelRenderer {
                                                              height: height, mipmapped: false)
         depth.usage = [.renderTarget, .shaderRead]
         depth.storageMode = .private
-        guard let frameTexture = device.makeTexture(descriptor: frame),
-              let depthTexture = device.makeTexture(descriptor: depth) else { return nil }
+        guard let (frameTexture, depthTexture) = HitchLog.shared.note(.allocation, "frame targets \(width)×\(height)", {
+            device.makeTexture(descriptor: frame).flatMap { made in
+                device.makeTexture(descriptor: depth).map { (made, $0) }
+            }
+        }) else { return nil }
         targets = (frameTexture, depthTexture)
         return targets
     }

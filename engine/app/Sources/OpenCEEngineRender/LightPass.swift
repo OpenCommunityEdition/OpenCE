@@ -195,11 +195,16 @@ final class LightPass {
                             flags: SIMD4(light.flags, slot, shadowOf[index] ?? UInt32.max, 0))
         }
         lastShadowCount = frame.shadowed.count
-        guard let lightBuffer = device.makeBuffer(bytes: records, length: records.count * MemoryLayout<GPULight>.stride,
-                                                  options: .storageModeShared),
-              let cellBuffer = device.makeBuffer(bytes: cells, length: cells.count * 4, options: .storageModeShared),
-              let indexBuffer = device.makeBuffer(bytes: indices, length: max(Int(written), 1) * 2,
-                                                  options: .storageModeShared) else {
+        // (made each frame: Phase 10 keeps them)
+        guard let (lightBuffer, cellBuffer, indexBuffer) = HitchLog.shared.note(.allocation, "light lists", {
+            () -> (MTLBuffer, MTLBuffer, MTLBuffer)? in
+            guard let lights = device.makeBuffer(bytes: records, length: records.count * MemoryLayout<GPULight>.stride,
+                                                 options: .storageModeShared),
+                  let cells = device.makeBuffer(bytes: cells, length: cells.count * 4, options: .storageModeShared),
+                  let indices = device.makeBuffer(bytes: indices, length: max(Int(written), 1) * 2,
+                                                  options: .storageModeShared) else { return nil }
+            return (lights, cells, indices)
+        }) else {
             return frame
         }
         frame.lights = lightBuffer
@@ -235,8 +240,8 @@ final class LightPass {
                 pass.depthAttachment.loadAction = .clear
                 pass.depthAttachment.storeAction = .store
                 pass.depthAttachment.clearDepth = 1
-                guard let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else { continue }
-                encoder.label = "light shadows \(cube).\(face)"
+                guard let encoder = commands.timedRenderEncoder("light shadows \(cube).\(face)", descriptor: pass)
+                else { continue }
                 encoder.setCullMode(.none)
                 encoder.setDepthStencilState(depthState)
                 encoder.setDepthBias(1, slopeScale: 2, clamp: 0.01)

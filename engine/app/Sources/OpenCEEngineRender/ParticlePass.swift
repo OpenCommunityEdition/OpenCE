@@ -136,13 +136,17 @@ public final class ParticlePass {
         guard !rows.isEmpty else { return }
         let size = rows.count * MemoryLayout<OCEParticleSnapshot>.stride
         if buffers.count < Self.framesInFlight {
-            guard let buffer = device.makeBuffer(length: max(size, 4096), options: .storageModeShared) else { return }
+            guard let buffer = HitchLog.shared.note(.allocation, "particles \(size) bytes", {
+                device.makeBuffer(length: max(size, 4096), options: .storageModeShared)
+            }) else { return }
             buffers.append(buffer)
             slot = buffers.count - 1
         } else {
             slot = (slot + 1) % Self.framesInFlight
             if buffers[slot].length < size {
-                guard let buffer = device.makeBuffer(length: size * 2, options: .storageModeShared) else { return }
+                guard let buffer = HitchLog.shared.note(.allocation, "particles \(size) bytes", {
+                    device.makeBuffer(length: size * 2, options: .storageModeShared)
+                }) else { return }
                 buffers[slot] = buffer
             }
         }
@@ -164,8 +168,7 @@ public final class ParticlePass {
         pass.depthAttachment.texture = depth
         pass.depthAttachment.loadAction = .load
         pass.depthAttachment.storeAction = .store
-        guard let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else { return }
-        encoder.label = "Particles"
+        guard let encoder = commands.timedRenderEncoder("particles", descriptor: pass) else { return }
         encoder.setRenderPipelineState(pipeline)
         encoder.setDepthStencilState(depthState)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Frame>.stride, index: 0)

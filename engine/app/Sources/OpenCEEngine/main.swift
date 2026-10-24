@@ -205,6 +205,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let level, let failure = level.bakeFailure {
                 appLog("warn", "the bake of \(level.map) structure \(level.bsp): \(failure); drawn with its lightmaps")
             }
+            // (its scopes in the engine's profiler; its hitches counted from its start)
+            level?.renderer.scopes = engine
+            if level?.map != oldValue?.map || level?.bsp != oldValue?.bsp {
+                HitchLog.shared.reset()
+            }
         }
     }
     /// The HUD's pass, made with the first level.
@@ -212,6 +217,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var lastFrame: CFTimeInterval?
     var frameTimes = FrameTimes()
     var lastOverlay: CFTimeInterval = 0
+    /// A line a second of the frames' times and hitches (perf.log, beside the settings).
+    lazy var perfLog: PerfLog? = {
+        GpuTimings.shared.enabled = true
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        return support.flatMap { PerfLog(url: $0.appendingPathComponent("OpenCE Engine/perf.log")) }
+    }()
     let root = MapLibrary.dataRoot
     /// The data folders: --maps's, else the settings' (read once the
     /// launcher has closed).
@@ -779,6 +790,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let seconds = tick.resumed ? 0 : lastFrame.map { tick.timestamp - $0 } ?? 0
         lastFrame = tick.timestamp
         frameTimes.add(seconds)
+        // (hitches count only while a level plays, not while one loads)
+        HitchLog.shared.playing = level != nil && loadingScreen == nil
+        perfLog?.frame(cpuMilliseconds: seconds * 1000, now: tick.timestamp, gpu: GpuTimings.shared.lastFrame,
+                       hitches: HitchLog.shared.take)
         // (the keys and mouse fly the camera only while the mouse is captured)
         let mouse = controller.takeMouseMotion()
         let held = controller.capture.captured ? controller.keys.codes : []
@@ -809,7 +824,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if controller.showsFrameTimes {
             // (four times a second, so that it can be read)
             if tick.timestamp - lastOverlay >= 0.25 {
+                let gpu = GpuTimings.shared.lastFrame.reduce(0) { $0 + $1.milliseconds }
                 controller.window.engineView.overlayText = frameTimes.text
+                    + (gpu > 0 ? String(format: "  gpu %.2f ms", gpu) : "")
                 lastOverlay = tick.timestamp
             }
         } else {
@@ -835,7 +852,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 pass.colorAttachments[0].loadAction = .clear
                 pass.colorAttachments[0].storeAction = .store
                 pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
-                commands.makeRenderCommandEncoder(descriptor: pass)?.endEncoding()
+                commands.timedRenderEncoder("clear", descriptor: pass)?.endEncoding()
                 textPass.encode(text, into: commands, target: target)
             }
             return

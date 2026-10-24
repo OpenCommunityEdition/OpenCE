@@ -198,8 +198,7 @@ public final class CameraPass {
         var uniforms = CameraUniforms(worldToClip: viewProjection, right: SIMD4(right, 0), up: SIMD4(up, 0),
                                       size: SIMD4(Float(depth.width), Float(depth.height), 0, 0),
                                       counts: SIMD4(UInt32(occluderCount), 0, 0, 0))
-        if occluderCount > 0, let encoder = commands.makeComputeCommandEncoder() {
-            encoder.label = "flare occlusion"
+        if occluderCount > 0, let encoder = commands.timedComputeEncoder("flare occlusion") {
             encoder.setComputePipelineState(pipelines.occlusion)
             encoder.setBuffer(occluders[slot], offset: 0, index: 0)
             encoder.setBuffer(seen[slot], offset: 0, index: 1)
@@ -237,10 +236,9 @@ public final class CameraPass {
 
     /// Averages the log2 brightness of `frame` into the next slot.
     public func encodeLuminance(into commands: MTLCommandBuffer, frame: MTLTexture) {
-        guard let encoder = commands.makeComputeCommandEncoder() else { return }
+        guard let encoder = commands.timedComputeEncoder("luminance") else { return }
         var slot = UInt32(luminanceCount % Self.slots)
         luminanceCount += 1
-        encoder.label = "luminance"
         encoder.setComputePipelineState(pipelines.luminance)
         encoder.setTexture(frame, index: 0)
         encoder.setBuffer(luminance, offset: 0, index: 0)
@@ -270,8 +268,11 @@ public final class CameraPass {
         descriptor.mipmapLevelCount = min(Self.bloomLevels, descriptor.mipmapLevelCount)
         descriptor.usage = [.shaderRead, .shaderWrite]
         descriptor.storageMode = .private
-        guard let down = device.makeTexture(descriptor: descriptor),
-              let up = device.makeTexture(descriptor: descriptor) else { return nil }
+        guard let (down, up) = HitchLog.shared.note(.allocation, "bloom targets \(half.0)×\(half.1)", {
+            device.makeTexture(descriptor: descriptor).flatMap { down in
+                device.makeTexture(descriptor: descriptor).map { (down, $0) }
+            }
+        }) else { return nil }
         func levels(_ texture: MTLTexture) -> [MTLTexture] {
             (0..<texture.mipmapLevelCount).compactMap {
                 texture.makeTextureView(pixelFormat: .rgba16Float, textureType: .type2D, levels: $0..<($0 + 1),
@@ -287,8 +288,7 @@ public final class CameraPass {
     public func encodeBloom(into commands: MTLCommandBuffer, frame: MTLTexture) -> MTLTexture? {
         guard let bloom = bloomTargets(width: frame.width, height: frame.height),
               bloom.downLevels.count == bloom.upLevels.count, !bloom.downLevels.isEmpty,
-              let encoder = commands.makeComputeCommandEncoder() else { return nil }
-        encoder.label = "bloom"
+              let encoder = commands.timedComputeEncoder("bloom") else { return nil }
         let threads = MTLSize(width: 8, height: 8, depth: 1)
         func groups(_ texture: MTLTexture) -> MTLSize {
             MTLSize(width: (texture.width + 7) / 8, height: (texture.height + 7) / 8, depth: 1)
@@ -322,9 +322,11 @@ public final class CameraPass {
         if let black { return black }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: 1, height: 1,
                                                                   mipmapped: false)
-        black = device.makeTexture(descriptor: descriptor)
-        black?.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: [UInt16](repeating: 0, count: 4),
-                       bytesPerRow: 8)
+        HitchLog.shared.note(.upload, "black level") {
+            black = device.makeTexture(descriptor: descriptor)
+            black?.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0,
+                           withBytes: [UInt16](repeating: 0, count: 4), bytesPerRow: 8)
+        }
         return black
     }
 }

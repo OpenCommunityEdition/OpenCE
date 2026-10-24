@@ -280,7 +280,9 @@ public final class TextPass {
         frame = (frame + 1) % buffers.count
         let length = quads.count * MemoryLayout<TextInstance>.stride
         if (buffers[frame]?.length ?? 0) < length {
-            buffers[frame] = commands.device.makeBuffer(length: max(length, 64 * 1024), options: .storageModeShared)
+            buffers[frame] = HitchLog.shared.note(.allocation, "text quads \(length) bytes") {
+                commands.device.makeBuffer(length: max(length, 64 * 1024), options: .storageModeShared)
+            }
         }
         guard let buffer = buffers[frame] else { return }
         quads.withUnsafeBytes { raw in
@@ -290,8 +292,7 @@ public final class TextPass {
         pass.colorAttachments[0].texture = target
         pass.colorAttachments[0].loadAction = .load
         pass.colorAttachments[0].storeAction = .store
-        guard let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else { return }
-        encoder.label = "text"
+        guard let encoder = commands.timedRenderEncoder("text", descriptor: pass) else { return }
         encoder.setRenderPipelineState(pipeline)
         encoder.setVertexBuffer(buffer, offset: 0, index: 0)
         encoder.setFragmentTexture(atlas.texture, index: 0)

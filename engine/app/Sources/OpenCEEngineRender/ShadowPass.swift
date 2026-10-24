@@ -163,8 +163,8 @@ final class ShadowPass {
                 pass.depthAttachment.loadAction = clear ? .clear : .load
                 pass.depthAttachment.storeAction = .store
                 pass.depthAttachment.clearDepth = 1
-                guard let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else { continue }
-                encoder.label = "\(label) shadows \(slice)"
+                guard let encoder = commands.timedRenderEncoder("\(label) shadows \(slice)", descriptor: pass)
+                else { continue }
                 encoder.setCullMode(.none)
                 encoder.setDepthStencilState(depthState)
                 // (and pushed back a little more where the surface slopes
@@ -178,8 +178,7 @@ final class ShadowPass {
             }
         }
         draw(into: levelMaps, clear: true, label: "level", casting: pipelines.level, casters: level)
-        guard let blit = commands.makeBlitCommandEncoder() else { return }
-        blit.label = "shadows copied"
+        guard let blit = commands.timedBlitEncoder("shadows copied") else { return }
         blit.copy(from: levelMaps, to: maps)
         blit.endEncoding()
         draw(into: maps, clear: false, label: "object", casting: pipelines.model, casters: objects)

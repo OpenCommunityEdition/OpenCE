@@ -140,7 +140,9 @@ public final class DecalPass {
         guard count > 0 else { return nil }
         if laidBuffers.count < Self.inFlight {
             let length = Int(OCE_MAX_DECALS) * MemoryLayout<OCEDecalSnapshot>.stride
-            guard let made = device.makeBuffer(length: length, options: .storageModeShared) else { return nil }
+            guard let made = HitchLog.shared.note(.allocation, "decals", {
+                device.makeBuffer(length: length, options: .storageModeShared)
+            }) else { return nil }
             laidBuffers.append(made)
         }
         let buffer = laidBuffers[nextBuffer % laidBuffers.count]
@@ -177,8 +179,7 @@ public final class DecalPass {
         pass.colorAttachments[0].texture = frame
         pass.colorAttachments[0].loadAction = .load
         pass.colorAttachments[0].storeAction = .store
-        guard let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else { return }
-        encoder.label = "decals"
+        guard let encoder = commands.timedRenderEncoder("decals", descriptor: pass) else { return }
         var uniforms = DecalFrameUniforms(clipToWorld: viewProjection.inverse, worldToClip: viewProjection,
                                           eye: SIMD4(eye, 1),
                                           size: SIMD4(Float(frame.width), Float(frame.height), 0, 0))

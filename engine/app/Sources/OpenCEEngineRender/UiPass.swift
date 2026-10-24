@@ -134,7 +134,9 @@ public final class UiPass {
         frame = (frame + 1) % buffers.count
         let length = instances.count * MemoryLayout<UiInstance>.stride
         if (buffers[frame]?.length ?? 0) < length {
-            buffers[frame] = encoder.device.makeBuffer(length: max(length, 16 * 1024), options: .storageModeShared)
+            buffers[frame] = HitchLog.shared.note(.allocation, "UI quads \(length) bytes") {
+                encoder.device.makeBuffer(length: max(length, 16 * 1024), options: .storageModeShared)
+            }
         }
         guard let buffer = buffers[frame] else { return }
         instances.withUnsafeBytes { raw in

@@ -650,6 +650,43 @@ p99 is still 9.1 ms. With every effect on, a lower render scale (which
 MetalFX brings up to the window's size) comes near the bar: p99 is 10.54 ms
 at `--render-scale 0.75` and 8.34 ms at 0.5 (12-second runs).
 
+### Timings and hitches
+
+The app measures each frame itself, with no trace running:
+
+- **GPU time per pass.** Every encoder of play is made through
+  `timedRenderEncoder`, `timedComputeEncoder` or `timedBlitEncoder`
+  (`GpuTimings.swift`). They name the encoder and sample the GPU's
+  timestamps into a counter sample buffer: at the start and end of the
+  vertex and fragment stages for a render pass, of the encoder for the
+  others. Apple's GPUs sample only at stage boundaries. The times are read
+  when the command buffer completes. Four command buffers can be timed at
+  once, with up to 256 passes each. A test fails if an encoder is made
+  directly, except by the captures, the HUD's loader and the path tracer,
+  which are not part of play. MetalFX encodes its own passes, which are not
+  timed.
+- **CPU scopes.** `profiled(name, timer)` marks a scope in the engine's
+  profiler (`stat frame`, `trace`). The app marks shell, snapshot,
+  objects, hud, ui, encode and text. Inside encode, the renderer marks
+  level, and inside that shadows, lights, screen and particles. Each is
+  nested in the scope that encloses it.
+- **The hitch log.** Each place the renderer compiles a pipeline, uploads
+  a texture or allocates a buffer or target is wrapped in
+  `HitchLog.shared.note(kind, cause)`. It is timed only while a level
+  plays, not while one loads. Hitches are kept by kind and cause, and
+  counted again from each level's start. Phase 10 removes those that happen
+  in play. The light lists are still allocated each frame, and a change of
+  window size makes the temporal scaler again (about 0.6 s, its first
+  time).
+- **perf.log** (Application Support/OpenCE Engine/perf.log, started again at
+  each launch) has a line a second. Each line gives the frames' mean and
+  longest CPU time, the last frame's GPU time with its five costliest
+  passes (a light's faces added together), and that second's hitches:
+
+  `12.0 s  cpu 8.31 mean 12.40 max (60 frames)  gpu 6.20: level opaque 2.10, …  hitches: allocation light lists 60× 0.02 (longest 0.05)`
+
+The frame-time overlay adds the last frame's GPU time.
+
 ## The developer tools
 
 The engine's tools reach into a running world: a shell in the game, the

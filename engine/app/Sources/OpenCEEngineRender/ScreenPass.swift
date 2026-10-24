@@ -192,7 +192,9 @@ final class ScreenPass {
                 height: halved ? (height + 1) / 2 : height, mipmapped: false)
             descriptor.usage = usage
             descriptor.storageMode = .private
-            return device.makeTexture(descriptor: descriptor)
+            return HitchLog.shared.note(.allocation, "screen targets \(width)×\(height)") {
+                device.makeTexture(descriptor: descriptor)
+            }
         }
         let attached: MTLTextureUsage = [.renderTarget, .shaderRead]
         guard let surface = texture(Self.attachmentFormats[0], attached),
@@ -214,8 +216,7 @@ final class ScreenPass {
             || [RenderView.depth, .ao, .contact].map(\.index).contains(uniforms.passes.w)
         let reflectionNeeded = uniforms.passes.z != 0 || uniforms.passes.w == RenderView.ssr.index
         guard occlusionNeeded || reflectionNeeded,
-              let encoder = commands.makeComputeCommandEncoder() else { return }
-        encoder.label = "screen"
+              let encoder = commands.timedComputeEncoder("screen") else { return }
         let threads = MTLSize(width: 8, height: 8, depth: 1)
         let groups = MTLSize(width: (frame.width + 7) / 8, height: (frame.height + 7) / 8, depth: 1)
         if occlusionNeeded {

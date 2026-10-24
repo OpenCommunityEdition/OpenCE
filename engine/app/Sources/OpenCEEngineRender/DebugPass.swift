@@ -98,7 +98,9 @@ public final class DebugPass {
         frame = (frame + 1) % buffers.count
         let length = vertices.count * MemoryLayout<SIMD4<Float>>.stride
         if (buffers[frame]?.length ?? 0) < length {
-            buffers[frame] = encoder.device.makeBuffer(length: max(length, 64 * 1024), options: .storageModeShared)
+            buffers[frame] = HitchLog.shared.note(.allocation, "debug lines \(length) bytes") {
+                encoder.device.makeBuffer(length: max(length, 64 * 1024), options: .storageModeShared)
+            }
         }
         guard let buffer = buffers[frame] else { return }
         vertices.withUnsafeBytes { raw in

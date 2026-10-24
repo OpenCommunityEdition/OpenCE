@@ -382,7 +382,9 @@ final class ModelPass {
         frame = (frame + 1) % skins.count
         let length = max(matrices.count, 1) * MemoryLayout<simd_float4x4>.stride
         if (skins[frame]?.length ?? 0) < length {
-            skins[frame] = device.makeBuffer(length: max(length, 64 * 1024), options: .storageModeShared)
+            skins[frame] = HitchLog.shared.note(.allocation, "skins \(length) bytes") {
+                device.makeBuffer(length: max(length, 64 * 1024), options: .storageModeShared)
+            }
         }
         if let buffer = skins[frame], !matrices.isEmpty {
             matrices.withUnsafeBytes { raw in

@@ -1,5 +1,6 @@
 import OpenCEEngineCore
 import OpenCEEngineKit
+import OpenCEEngineRender
 import XCTest
 
 /// The app's profiling marks: scopes opened and closed around their work,

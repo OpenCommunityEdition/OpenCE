@@ -146,8 +146,7 @@ public final class LoadingPass {
         draw.colorAttachments[0].loadAction = .clear
         draw.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
         draw.colorAttachments[0].storeAction = .store
-        if let encoder = commands.makeRenderCommandEncoder(descriptor: draw) {
-            encoder.label = "loading screen"
+        if let encoder = commands.timedRenderEncoder("loading screen", descriptor: draw) {
             encoder.setVertexBytes(&uniforms, length: MemoryLayout<LoadingUniforms>.stride, index: 0)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<LoadingUniforms>.stride, index: 0)
             encoder.setFragmentSamplerState(linear, index: 0)
@@ -170,10 +169,10 @@ public final class LoadingPass {
         over.colorAttachments[0].loadAction = clear ? .clear : .load
         over.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
         over.colorAttachments[0].storeAction = .store
-        guard view.screenAlpha > 0 || clear, let encoder = commands.makeRenderCommandEncoder(descriptor: over) else {
+        guard view.screenAlpha > 0 || clear,
+              let encoder = commands.timedRenderEncoder("loading screen over the frame", descriptor: over) else {
             return
         }
-        encoder.label = "loading screen over the frame"
         encoder.setRenderPipelineState(composite)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<LoadingUniforms>.stride, index: 0)
         encoder.setFragmentSamplerState(linear, index: 0)

@@ -1,6 +1,6 @@
-// The app's profiling marks: its scopes go into the engine's profiler, with
-// the engine's own, while `stat frame` or `trace` measures.
-import OpenCEEngineCore
+// The app's profiling marks: its scopes go into the engine's profiler
+// (OpenCEEngineKit makes the engine a ScopeTimer), with the engine's own,
+// while `stat frame` or `trace` measures; the renderer's nest in the app's.
 
 /// What times named scopes: the engine's profiler.
 public protocol ScopeTimer: AnyObject {
@@ -9,8 +9,6 @@ public protocol ScopeTimer: AnyObject {
     /// Closes the innermost scope opened.
     func profileEnd()
 }
-
-extension Engine: ScopeTimer {}
 
 /// Runs `body`, timed as the scope `name` when `timer` measures.
 @inlinable
