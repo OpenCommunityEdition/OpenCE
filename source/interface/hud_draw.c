@@ -804,14 +804,11 @@ static void hud_draw_multitexture_overlay(
 		{
 		case _hud_multitexture_overlay_effector_source_player_pitch:
 			{
-				long unit_index = local_player_get_player_index(local_player_index) == NONE ?
-					NONE :
-					player_get(local_player_get_player_index(local_player_index))->unit_index;
-				real_vector3d direction;
+				/* port: the scope's ticks follow the view. The unit's aim
+				changes once a tick, so the ticks stepped across the picture. */
 				real_euler_angles2d angles;
 
-				unit_get_aiming_vector(unit_index, &direction);
-				euler_angles2d_from_vector3d(&angles, &direction);
+				euler_angles2d_from_vector3d(&angles, &render.camera.forward);
 				source_value = angles.pitch;
 			}
 			break;
