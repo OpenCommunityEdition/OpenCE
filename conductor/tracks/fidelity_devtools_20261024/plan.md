@@ -42,7 +42,7 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
     - [x] GPU picking ID buffer; SwiftUI panel overlays
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Developer tools in game' (Protocol in workflow.md)
 
-## Phase 4: Lighting and shaders
+## Phase 4: Lighting and shaders [checkpoint: bd7eb7a]
 - [x] Task: Collect the problems 56a8d15
     - [x] On devgulch's shader surfaces and Blood Gulch, with the stock view, view modes and inspector, list each problem with its cause in docs/engine.md
 - [x] Task: Exposure and tone mapping matched to the original d54fa7a
@@ -57,10 +57,10 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Shadow edges 0b80026
     - [x] Write tests: neighbouring texels of one surface step hard no more often than on the stock pages (`ShadowEdgeTests`)
     - [x] Each texel's paths start over its footprint
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Lighting and shaders' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Lighting and shaders' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 5: Picking up, vehicles and responsiveness
-- [ ] Task: Picking up
+- [~] Task: Picking up
     - [ ] Write tests: walking over a weapon or holding the action button picks it up or swaps; ammo and grenades are taken as in the original
     - [ ] The fix
 - [ ] Task: Vehicles
