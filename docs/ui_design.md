@@ -149,6 +149,31 @@ Faithful to the Xbox's, completed:
 
 It plays on every campaign transition and on loading a saved game.
 
+## The design artifact
+
+The mockups are a private Claude design artifact,
+<https://claude.ai/artifact/MqqSyPQ8J4pcW7i9LwRbk1>: one canvas with a row
+each for the launcher (launcher, map library, settings), the campaign (main
+menu, profiles, load level, difficulty, loading), multiplayer (multiplayer,
+system link games, select teams, pause, carnage report) and settings
+(settings, player setup, campaign pause, the tokens). The boards link to each
+other in the game's order, so the canvas also plays as a prototype.
+
+Everything in it is our own drawing. The logo, the mission pictures, the
+figures and the loading picture are marked placeholders; nothing from
+`ui.map` or the executable is in the artifact. Michroma stands in for OpenCE
+there, because the artifact loads its fonts from Google Fonts.
+
+Choices the mockups make, for review:
+
+- The main menu's "Game demos" is "Quit", which returns to the launcher.
+- Multiplayer has no split screen; internet play joins system link.
+- Settings keeps the Xbox's player and multiplayer setup and adds video,
+  audio and controls below a separator.
+- "Controller setup" is "Controls", for keyboard and mouse.
+- The launcher is a rail (play, map library, profiles, multiplayer,
+  settings and updates, exit) beside a "ready" panel.
+
 ## Feedback rounds
 
 (Recorded as the user reviews the artifact.)
