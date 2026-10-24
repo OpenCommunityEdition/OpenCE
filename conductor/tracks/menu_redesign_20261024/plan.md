@@ -6,7 +6,7 @@
     - [x] The capture command; the palette sampled from the captures into a local swatch file
 - [x] Task: The design reference c82db598
     - [x] `docs/ui_design.md`: the palette, panel and frame shapes, bevels, spacing, the type scale (OpenCE and Overpass sizes matched to the original's), focus and selection, motion curves, sounds
-- [~] Task: Static mockups
+- [~] Task: Static mockups 0df3b584
     - [x] A private Claude design artifact with every screen in the spec, drawn from the reference with our own art and a marked logo placeholder
     - [ ] Rounds of the user's feedback, recorded in the artifact and in `docs/ui_design.md`
 - [ ] Task: The clickable prototype and motion studies
