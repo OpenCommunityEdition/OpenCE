@@ -1,6 +1,6 @@
 # Plan: The complete particle system
 
-## Phase 1: Particles and their physics
+## Phase 1: Particles and their physics [checkpoint: 7a7810a8]
 - [x] Task: Particle tags in full 9bbfbb5c
     - [x] Write tests: every field of `part` and `pphy` imports; colour and size over life
     - [x] The typed tags
