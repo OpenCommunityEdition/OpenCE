@@ -26,3 +26,6 @@
     - [ ] Write tests: waits on sounds against the reference game's timing in a10 and a30 (marked, needs `assets/maps`)
     - [ ] `sound_impulse_time` and the waits; the settings' volume controls; `docs/engine.md`: sound
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Music, dialogue and scripts' (Protocol in workflow.md) (deferred to the end)
+
+## Phase: Review Fixes
+- [x] Task: Apply review suggestions eeb2ba13
