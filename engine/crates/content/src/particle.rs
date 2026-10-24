@@ -298,6 +298,9 @@ pub struct Contrail {
     pub tag: TagRef,
     /// Its flags.
     pub flags: u16,
+    /// Which of its values its attachment's function scales, by the
+    /// `SCALE_` bits.
+    pub scale_flags: u16,
     /// Points made a second.
     pub point_generation_rate: f32,
     /// The least and most speed its points leave at.
@@ -306,12 +309,15 @@ pub struct Contrail {
     pub velocity_cone_angle: f32,
     /// The part of the object's velocity they keep.
     pub inherited_velocity_fraction: f32,
-    /// How the strip faces: 0 the camera, about its line, and the rest.
+    /// How the strip lies: 0 vertical, 1 horizontal, 2 media, 3 ground,
+    /// 4 facing the viewer.
     pub render_type: i16,
     /// How many times its picture repeats across and along the strip.
     pub texture_repeats: [f32; 2],
     /// How fast its picture slides across and along, repeats a second.
     pub texture_animation: [f32; 2],
+    /// The frames of its picture's sequence a second.
+    pub frames_per_second: f32,
     /// Its picture.
     pub bitmap: Option<TagRef>,
     /// The first of its bitmap's sequences, and how many there are.
@@ -320,6 +326,45 @@ pub struct Contrail {
     pub shader: SpriteShader,
     /// What its points become as they age, one after another.
     pub states: Vec<ContrailState>,
+}
+
+impl Contrail {
+    /// Its first point is not faded out.
+    pub const FIRST_POINT_UNFADED: u16 = 1 << 0;
+    /// Its last point is not faded out.
+    pub const LAST_POINT_UNFADED: u16 = 1 << 1;
+    /// Its strip fades slowly as it turns edge on.
+    pub const FADES_SLOWLY: u16 = 1 << 6;
+
+    /// A strip standing up through its points.
+    pub const VERTICAL: i16 = 0;
+    /// A strip lying flat through its points.
+    pub const HORIZONTAL: i16 = 1;
+    /// A strip on the surface of water.
+    pub const MEDIA: i16 = 2;
+    /// A strip on the ground.
+    pub const GROUND: i16 = 3;
+    /// A strip turned to the viewer about its line.
+    pub const VIEWER_FACING: i16 = 4;
+
+    /// The bit of `scale_flags` scaling its point rate.
+    pub const SCALE_RATE: u32 = 0;
+    /// The bits scaling its points' least speed, and the rest of it.
+    pub const SCALE_VELOCITY: u32 = 1;
+    /// The bit scaling its cone.
+    pub const SCALE_CONE_ANGLE: u32 = 3;
+    /// The bit scaling the object's velocity its points keep.
+    pub const SCALE_INHERITED_VELOCITY: u32 = 4;
+    /// The bit scaling its frames a second.
+    pub const SCALE_ANIMATION_RATE: u32 = 5;
+    /// The bit scaling its picture's repeats across.
+    pub const SCALE_REPEATS_U: u32 = 6;
+    /// The bit scaling its picture's repeats along.
+    pub const SCALE_REPEATS_V: u32 = 7;
+    /// The bit scaling its picture's slide across.
+    pub const SCALE_ANIMATION_U: u32 = 8;
+    /// The bit scaling its picture's slide along.
+    pub const SCALE_ANIMATION_V: u32 = 9;
 }
 
 /// One of a contrail's point states.
@@ -333,6 +378,21 @@ pub struct ContrailState {
     pub width: f32,
     /// The colours it is between, alpha, red, green, blue.
     pub color: [[f32; 4]; 2],
+    /// How its points move.
+    pub physics: Option<PointPhysics>,
+    /// Which of its values a point's density scales, by the `SCALE_` bits.
+    pub scale_flags: u32,
+}
+
+impl ContrailState {
+    /// The bits scaling its least seconds, and the rest of them.
+    pub const SCALE_DURATION: u32 = 0;
+    /// The bits scaling its least seconds becoming the next, and the rest.
+    pub const SCALE_TRANSITION: u32 = 2;
+    /// The bit scaling its width.
+    pub const SCALE_WIDTH: u32 = 4;
+    /// The bit taking its colour between its two by the density.
+    pub const SCALE_COLOR: u32 = 5;
 }
 
 /// A particle system (`pctl`): kinds of particle an effect or an object

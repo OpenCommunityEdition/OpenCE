@@ -252,26 +252,38 @@ pub const PARTICLE_FACING_AXIS: u32 = 1;
 /// `ParticleSnapshot::modes`' facing: a strip from its position to its
 /// axis' point, facing the camera (a contrail's).
 pub const PARTICLE_FACING_SEGMENT: u32 = 2;
+/// `ParticleSnapshot::modes`' facing: a quad between four corners, the
+/// near edge's (its position's and axis' points) and the far edge's (its
+/// shape's point, then the `w`s of its position, axis and shape), coloured
+/// from its colour at the near edge to the packed colour of its modes at
+/// the far (a contrail's piece between two of its points).
+pub const PARTICLE_FACING_QUAD: u32 = 3;
 
 /// A sprite: a particle, a piece of a contrail, a weather particle or a
 /// detail object (laid out as the app's particle shader reads it).
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ParticleSnapshot {
-    /// Its centre, then its half width.
+    /// Its centre, then its half width (for `PARTICLE_FACING_QUAD`, its
+    /// near edge's first corner and the far edge's second corner's x).
     pub position: [f32; 4],
     /// Its axis (`PARTICLE_FACING_AXIS`) or its strip's end
-    /// (`PARTICLE_FACING_SEGMENT`), then its rotation, radians.
+    /// (`PARTICLE_FACING_SEGMENT`), then its rotation, radians (for
+    /// `PARTICLE_FACING_QUAD`, its near edge's second corner and the far
+    /// edge's second corner's y).
     pub axis: [f32; 4],
     /// Its colour: red, green, blue and opacity.
     pub color: [f32; 4],
     /// Its picture's corners: u and v of the first, then of the second.
     pub uv: [f32; 4],
     /// Its half height, the distances it fades out between from the
-    /// camera (both 0: it does not), then 0.
+    /// camera (both 0: it does not), then 0 (for `PARTICLE_FACING_QUAD`,
+    /// its far edge's first corner and the far edge's second corner's z).
     pub shape: [f32; 4],
     /// Its picture (among the level's particle pictures, or
-    /// `PARTICLE_NO_PICTURE`), its blend function, its facing, then 0.
+    /// `PARTICLE_NO_PICTURE`), its blend function, its facing, then 0
+    /// (for `PARTICLE_FACING_QUAD`, its far edge's colour, a byte each of
+    /// red, green, blue and opacity from the lowest).
     pub modes: [u32; 4],
 }
 

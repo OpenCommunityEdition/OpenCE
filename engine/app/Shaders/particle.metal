@@ -1,7 +1,8 @@
 // The particles, contrails, weather and detail objects (ParticlePass.swift):
-// each row a quad facing the screen, standing on its axis, or spanning a
-// strip's segment, blended with the frame as its framebuffer blend
-// function says (read from the frame: Apple GPUs blend in the shader).
+// each row a quad facing the screen, standing on its axis, spanning a
+// strip's segment, or between four corners (a contrail's piece), blended
+// with the frame as its framebuffer blend function says (read from the
+// frame: Apple GPUs blend in the shader).
 
 #include <metal_stdlib>
 using namespace metal;
@@ -15,6 +16,8 @@ struct ParticleFrame {
 
 // (as snapshot.rs's ParticleSnapshot)
 struct Particle {
+    // (facing 3, a quad: position, axis and shape's xyz are three corners,
+    // their ws the fourth; modes.w the far corners' colour, packed)
     float4 position;   // xyz, then the half width
     float4 axis;       // the axis or the segment's end; w the screen turn
     float4 color;      // rgba
@@ -41,6 +44,18 @@ vertex ParticleVertex particle_vertex(uint vid [[vertex_id]], uint instance [[in
                                       constant uint &first [[buffer(2)]]) {
     Particle p = particles[first + instance];
     float2 c = corners[vid];
+    if (p.modes.z == 3) {
+        // A quad: the near edge's two corners, then the far edge's.
+        float3 far = float3(p.position.w, p.axis.w, p.shape.w);
+        float3 world = c.x < 0 ? (c.y < 0 ? p.position.xyz : p.axis.xyz)
+                               : (c.y < 0 ? p.shape.xyz : far);
+        ParticleVertex out;
+        out.position = frame.worldToClip * float4(world, 1);
+        out.uv = float2(c.x < 0 ? p.uv.x : p.uv.z, c.y < 0 ? p.uv.y : p.uv.w);
+        out.color = c.x < 0 ? p.color : unpack_unorm4x8_to_float(p.modes.w);
+        out.blend = p.modes.y;
+        return out;
+    }
     float3 centre = p.position.xyz;
     float3 side;
     float3 up;

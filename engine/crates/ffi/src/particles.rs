@@ -3,25 +3,23 @@
 //! that fills a box about the camera where its cluster has some, and the
 //! detail objects (grass and the like) a BSP scatters over its ground.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use opence_content::{
     EffectParticles, Level, Particle, PointPhysics, StructureBsp, TagRef, WeatherParticleType,
 };
 use opence_sim::effects::{FiredPart, Running};
-use opence_sim::objects::ObjectHandle;
 use opence_sim::particle_collision::PointHit;
 use opence_sim::point_physics;
-use opence_sim::seats::default_pose;
 use opence_sim::{Simulation, Vec3};
 
-use crate::lights::marker_frames;
-
+mod contrails;
 mod systems;
 use crate::snapshot::{
     ParticleSnapshot, MAX_PARTICLES, PARTICLE_FACING_AXIS, PARTICLE_FACING_SCREEN,
-    PARTICLE_FACING_SEGMENT, PARTICLE_NO_PICTURE,
+    PARTICLE_NO_PICTURE,
 };
+use contrails::Contrails;
 
 /// A tick, in seconds.
 const TICK: f32 = 1.0 / 30.0;
@@ -37,8 +35,6 @@ const SETTLES_ON: f32 = 0.8;
 const MAX_LIVE: usize = 1024;
 /// The most weather particles of one kind.
 const MAX_WEATHER: usize = 384;
-/// The most points one contrail keeps.
-const MAX_TRAIL_POINTS: usize = 64;
 
 /// A small random sequence (xorshift), the particles' own, so that they
 /// take nothing from the simulation's.
@@ -826,231 +822,6 @@ impl Weather {
     }
 }
 
-/// A point of a contrail.
-#[derive(Clone, Debug, PartialEq)]
-struct TrailPoint {
-    position: Vec3,
-    velocity: Vec3,
-    age: f32,
-    /// Where it lies between its states' two colours.
-    shade: f32,
-}
-
-/// A contrail an object trails.
-#[derive(Clone, Debug, PartialEq)]
-struct Trail {
-    /// Its index in the level's contrails.
-    contrail: usize,
-    points: Vec<TrailPoint>,
-    /// The points owed, by its rate, not yet made.
-    owed: f32,
-    /// Its object still carries it.
-    carried: bool,
-}
-
-/// What a contrail's point of `age` is: its width and its colour (none:
-/// it has outlived its states).
-fn trail_state(
-    states: &[opence_content::ContrailState],
-    age: f32,
-    shade: f32,
-) -> Option<(f32, [f32; 4])> {
-    let mut start = 0.0;
-    for (index, state) in states.iter().enumerate() {
-        let duration = (state.duration[0] + state.duration[1]) * 0.5;
-        let transition = (state.transition[0] + state.transition[1]) * 0.5;
-        let color = mix(rgba(state.color[0]), rgba(state.color[1]), shade);
-        if age < start + duration {
-            return Some((state.width, color));
-        }
-        if age < start + duration + transition {
-            let t = (age - start - duration) / transition.max(1e-6);
-            let Some(next) = states.get(index + 1) else {
-                let mut faded = color;
-                faded[3] *= 1.0 - t;
-                return Some((state.width, faded));
-            };
-            let to = mix(rgba(next.color[0]), rgba(next.color[1]), shade);
-            return Some((
-                state.width + (next.width - state.width) * t,
-                mix(color, to, t),
-            ));
-        }
-        start += duration + transition;
-    }
-    None
-}
-
-/// A contrail an object definition carries: its attachment's slot, its
-/// index in the level's contrails, and the marker it leaves from.
-type CarriedContrail = (usize, usize, String);
-
-/// The contrails objects carry, and those they trail.
-#[derive(Clone, Debug, Default)]
-struct Contrails {
-    /// Each object definition's contrails, and the model their markers
-    /// are on.
-    carried: BTreeMap<TagRef, (Vec<CarriedContrail>, Option<usize>)>,
-    /// Each object's trails, by its slot and the attachment's.
-    trails: HashMap<(ObjectHandle, usize), Trail>,
-}
-
-impl Contrails {
-    fn new(level: &Level) -> Self {
-        let mut carried = BTreeMap::new();
-        for object in &level.objects {
-            let contrails: Vec<_> = object
-                .attachments
-                .iter()
-                .enumerate()
-                .filter_map(|(slot, attachment)| {
-                    let tag = attachment.tag.as_ref()?;
-                    let index = level.contrails.iter().position(|c| &c.tag == tag)?;
-                    Some((slot, index, attachment.marker.clone()))
-                })
-                .collect();
-            if contrails.is_empty() {
-                continue;
-            }
-            let model = object
-                .model
-                .as_ref()
-                .and_then(|model| level.model_index(model));
-            carried.insert(object.tag.clone(), (contrails, model));
-        }
-        Self {
-            carried,
-            trails: HashMap::new(),
-        }
-    }
-
-    fn tick(&mut self, level: &Level, simulation: &mut Simulation, random: &mut Random) {
-        if self.carried.is_empty() {
-            return;
-        }
-        for trail in self.trails.values_mut() {
-            trail.carried = false;
-        }
-        let handles: HashMap<u32, ObjectHandle> = simulation
-            .objects()
-            .into_iter()
-            .map(|handle| (handle.index, handle))
-            .collect();
-        let carried = &self.carried;
-        let trails = &mut self.trails;
-        simulation.visit_lit(|object| {
-            let Some((contrails, model)) = carried.get(object.tag) else {
-                return;
-            };
-            let Some(&handle) = handles.get(&object.id.0) else {
-                return;
-            };
-            let model = model.and_then(|index| level.models.get(index));
-            let rest = match (object.nodes, model) {
-                (None, Some(model)) => default_pose(model),
-                _ => Vec::new(),
-            };
-            for (slot, index, marker) in contrails {
-                let Some(contrail) = level.contrails.get(*index) else {
-                    continue;
-                };
-                let (current, _) = marker_frames(model, &object, &rest, marker);
-                let trail = trails.entry((handle, *slot)).or_insert_with(|| Trail {
-                    contrail: *index,
-                    points: Vec::new(),
-                    owed: 0.0,
-                    carried: true,
-                });
-                trail.carried = true;
-                trail.owed += contrail.point_generation_rate.max(0.0) * TICK;
-                let forward = Vec3::from_array(current.forward);
-                while trail.owed >= 1.0 {
-                    trail.owed -= 1.0;
-                    let direction = random.within(forward, contrail.velocity_cone_angle);
-                    trail.points.push(TrailPoint {
-                        position: Vec3::from_array(current.position),
-                        velocity: direction * random.between(contrail.velocity),
-                        age: 0.0,
-                        shade: random.next(),
-                    });
-                    if trail.points.len() > MAX_TRAIL_POINTS {
-                        trail.points.remove(0);
-                    }
-                }
-            }
-        });
-        self.trails.retain(|_, trail| {
-            let Some(contrail) = level.contrails.get(trail.contrail) else {
-                return false;
-            };
-            for point in &mut trail.points {
-                point.position += point.velocity * TICK;
-                point.age += TICK;
-            }
-            trail
-                .points
-                .retain(|point| trail_state(&contrail.states, point.age, point.shade).is_some());
-            trail.carried || !trail.points.is_empty()
-        });
-    }
-
-    fn gather(
-        &self,
-        level: &Level,
-        pictures: &Pictures,
-        seconds: f32,
-        out: &mut Vec<ParticleSnapshot>,
-    ) {
-        let mut trails: Vec<_> = self.trails.iter().collect();
-        trails.sort_by_key(|((handle, slot), _)| (handle.index, *slot));
-        for (_, trail) in trails {
-            let Some(contrail) = level.contrails.get(trail.contrail) else {
-                continue;
-            };
-            let frame = pictures.frame(
-                level,
-                contrail.bitmap.as_ref(),
-                i32::from(contrail.sequences[0]),
-                0,
-            );
-            let count = trail.points.len();
-            for (index, pair) in trail.points.windows(2).enumerate() {
-                if out.len() >= MAX_PARTICLES {
-                    return;
-                }
-                let [from, to] = [&pair[0], &pair[1]];
-                let Some((width, color)) = trail_state(&contrail.states, from.age, from.shade)
-                else {
-                    continue;
-                };
-                // (its picture repeats along the trail, and slides)
-                let along = contrail.texture_repeats[1].max(1.0) / count.max(1) as f32;
-                let slide = contrail.texture_animation[1] * seconds;
-                let v0 = index as f32 * along + slide;
-                let [u0, _, u1, _] = frame.uv;
-                out.push(ParticleSnapshot {
-                    position: [
-                        from.position.x,
-                        from.position.y,
-                        from.position.z,
-                        width * 0.5,
-                    ],
-                    axis: [to.position.x, to.position.y, to.position.z, 0.0],
-                    color,
-                    uv: [u0, v0, u1, v0 + along],
-                    shape: [width * 0.5, 0.0, 0.0, 0.0],
-                    modes: [
-                        frame.picture,
-                        blend(contrail.shader.framebuffer_blend_function),
-                        PARTICLE_FACING_SEGMENT,
-                        0,
-                    ],
-                });
-            }
-        }
-    }
-}
-
 /// The particles, contrails and weather while the game runs.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct LevelParticles {
@@ -1143,7 +914,8 @@ impl LevelParticles {
             self.weather
                 .tick(level, structure, self.camera, &mut self.random);
         }
-        self.contrails.tick(level, simulation, &mut self.random);
+        self.contrails
+            .tick(level, simulation, self.weather.wind, &mut self.random);
         self.systems
             .tick(level, simulation, fired, &mut self.random);
     }
@@ -1221,8 +993,7 @@ impl LevelParticles {
             out.extend(live.snapshot(level, &self.pictures));
         }
         self.systems.gather(level, &self.pictures, out);
-        self.contrails
-            .gather(level, &self.pictures, self.seconds, out);
+        self.contrails.gather(level, &self.pictures, camera, out);
         self.weather.gather(level, &self.pictures, camera, out);
     }
 }
@@ -1277,8 +1048,8 @@ pub(crate) fn detail_objects(level: &Level, structure: &StructureBsp) -> Vec<Par
 mod tests {
     use super::*;
     use opence_content::{
-        Contrail, ContrailState, DetailObject, DetailObjectCollection, DetailObjectType, Effect,
-        EffectEvent, Group, Sequence, Sprite, SpriteShader, WeatherPalette, WeatherSystem,
+        DetailObject, DetailObjectCollection, DetailObjectType, Effect, EffectEvent, Group,
+        Sequence, Sprite, SpriteShader, WeatherPalette, WeatherSystem,
     };
     use opence_sim::effects::Origin;
     use opence_sim::Quat;
@@ -1732,124 +1503,6 @@ mod tests {
             (wrapped - Vec3::new(-1.5, 1.5, 0.25)).length() < 1e-5,
             "{wrapped}"
         );
-    }
-
-    #[test]
-    fn a_contrails_points_age_through_its_states_and_fade() {
-        let white = [[1.0, 1.0, 1.0, 1.0]; 2];
-        let states = [
-            ContrailState {
-                duration: [1.0, 1.0],
-                transition: [1.0, 1.0],
-                width: 1.0,
-                color: white,
-            },
-            ContrailState {
-                duration: [1.0, 1.0],
-                transition: [1.0, 1.0],
-                width: 3.0,
-                color: white,
-            },
-        ];
-        assert_eq!(trail_state(&states, 0.5, 0.0), Some((1.0, [1.0; 4])));
-        assert_eq!(trail_state(&states, 1.5, 0.0), Some((2.0, [1.0; 4])));
-        let Some((width, color)) = trail_state(&states, 3.5, 0.0) else {
-            panic!("it is fading");
-        };
-        assert_eq!(width, 3.0);
-        assert!((color[3] - 0.5).abs() < 1e-5);
-        assert_eq!(trail_state(&states, 4.5, 0.0), None);
-    }
-
-    #[test]
-    fn an_object_trails_its_contrail_as_strips_between_its_points() {
-        use opence_content::object::Attachment;
-        use opence_content::ObjectKind;
-        use opence_sim::objects::ObjectSpawn;
-        use opence_sim::Transform;
-        let mut level = level(EffectParticles::START, 1);
-        level.contrails.push(Contrail {
-            tag: tag(b"cont", "trail"),
-            flags: 0,
-            point_generation_rate: 30.0,
-            velocity: [0.0, 0.0],
-            velocity_cone_angle: 0.0,
-            inherited_velocity_fraction: 0.0,
-            render_type: 0,
-            texture_repeats: [1.0, 1.0],
-            texture_animation: [0.0, 0.0],
-            bitmap: Some(tag(b"bitm", "sheet")),
-            sequences: [0, 1],
-            shader: SpriteShader::default(),
-            states: vec![ContrailState {
-                duration: [1.0, 1.0],
-                transition: [0.0, 0.0],
-                width: 0.5,
-                color: [[1.0, 1.0, 0.0, 0.0]; 2],
-            }],
-        });
-        level.objects.push(opence_content::ObjectDefinition {
-            widgets: Vec::new(),
-            tag: tag(b"proj", "rocket"),
-            kind: ObjectKind::Scenery,
-            flags: 0,
-            bounding_radius: 1.0,
-            bounding_offset: [0.0, 0.0, 0.0],
-            acceleration_scale: 1.0,
-            render_bounding_radius: 1.0,
-            model: None,
-            animation_graph: None,
-            collision_model: None,
-            physics: None,
-            modifier_shader: None,
-            creation_effect: None,
-            function_modes: Default::default(),
-            functions: Vec::new(),
-            change_colors: Vec::new(),
-            unit_hud: None,
-            material_effects: None,
-            unit_melee_damage: None,
-            biped: None,
-            weapon: None,
-            projectile: None,
-            equipment: None,
-            vehicle: None,
-            device: None,
-            attachments: vec![Attachment {
-                tag: Some(tag(b"cont", "trail")),
-                marker: String::new(),
-                primary_scale: 0,
-                change_color: 0,
-            }],
-        });
-        let mut particles = LevelParticles::new(&level);
-        assert_eq!(particles.contrails.carried.len(), 1);
-        let mut simulation = Simulation::empty();
-        let spawned = simulation.spawn(ObjectSpawn {
-            kind: ObjectKind::Scenery,
-            tag: tag(b"proj", "rocket"),
-            transform: Transform::default(),
-            name: None,
-            permutation: None,
-            team: None,
-        });
-        let Ok(handle) = spawned else {
-            panic!("the rocket was not made");
-        };
-        for _ in 0..3 {
-            particles.tick(&level, &mut simulation, (&[], &[]), 0);
-        }
-        let mut out = Vec::new();
-        particles.gather(&level, Vec3::ZERO, &mut out);
-        assert_eq!(out.len(), 2, "three points, two strips: {out:?}");
-        assert_eq!(out[0].modes[2], PARTICLE_FACING_SEGMENT);
-        assert_eq!(out[0].color, [1.0, 0.0, 0.0, 1.0]);
-        assert_eq!(out[0].position[3], 0.25);
-        assert!(simulation.remove(handle));
-        for _ in 0..31 {
-            particles.tick(&level, &mut simulation, (&[], &[]), 0);
-        }
-        assert!(particles.contrails.trails.is_empty(), "its points died");
     }
 
     #[test]

@@ -111,6 +111,20 @@ final class ParticleTests: XCTestCase {
         XCTAssertEqual(try draw([endOn]).centre, 0.25, accuracy: 0.01, "a strip seen end on was drawn")
     }
 
+    func testQuadsSpanTheirFourCornersBetweenTheirTwoColours() throws {
+        // (a contrail's piece: its near edge, then its far, across the view)
+        var quad = sprite(facing: UInt32(OCE_PARTICLE_FACING_QUAD))
+        quad.position = (10, -4, -4, 10)
+        quad.axis = (10, -4, 4, 4)
+        quad.shape = (10, 4, -4, 4)
+        quad.modes.3 = 0xFFFF_FFFF
+        XCTAssertEqual(try draw([quad]).centre, 1.25, accuracy: 0.01, "a quad was not drawn")
+        // (its far edge black, it adds half its white at its middle: the
+        // colours are mixed along it, linearly while both are opaque)
+        quad.modes.3 = 0xFF00_0000
+        XCTAssertEqual(try draw([quad]).centre, 0.75, accuracy: 0.03, "the colours were not mixed")
+    }
+
     func testSpritesFadeWithDistance() throws {
         XCTAssertEqual(try draw([sprite(fade: (2, 5))]).centre, 0.25, accuracy: 0.01, "a sprite past its fade drew")
         XCTAssertEqual(try draw([sprite(fade: (5, 15))]).centre, 0.75, accuracy: 0.01, "half faded")

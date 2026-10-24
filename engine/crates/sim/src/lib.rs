@@ -241,6 +241,8 @@ pub struct Lit<'a> {
     pub nodes: Option<&'a NodeMatrices>,
     /// Its functions' values, if it has any.
     pub functions: Option<&'a functions::FunctionValues>,
+    /// How it is drawn, if that has been set.
+    pub appearance: Option<&'a objects::Appearance>,
     /// It is the body the player sees through.
     pub viewer: bool,
 }
@@ -1326,6 +1328,7 @@ impl Simulation {
                 Option<&PreviousTransform>,
                 Option<&NodeMatrices>,
                 Option<&functions::FunctionValues>,
+                Option<&objects::Appearance>,
             )>()
             .iter(&self.world)
             .collect();
@@ -1335,7 +1338,7 @@ impl Simulation {
             .first()
             .filter(|player| player.view() == View::FirstPerson)
             .map(|player| ObjectId(player.handle().index));
-        for (id, object, transform, previous, nodes, functions) in objects {
+        for (id, object, transform, previous, nodes, functions, appearance) in objects {
             visit(Lit {
                 id: *id,
                 tag: &object.tag,
@@ -1343,6 +1346,7 @@ impl Simulation {
                 current: transform,
                 nodes,
                 functions,
+                appearance,
                 viewer: Some(*id) == viewer,
             });
         }

@@ -381,11 +381,14 @@ fn import_contrail(
                 argb(&state, 0x44, "color lower bound")?,
                 argb(&state, 0x54, "color upper bound")?,
             ],
+            physics: point_physics(cache, &state, 0x10)?,
+            scale_flags: state.u32(0x64, "scale flags")?,
         });
     }
     Ok(Contrail {
         tag: tag_ref(cache, index),
         flags: tag.u16(0x00, "flags")?,
+        scale_flags: tag.u16(0x02, "scale flags")?,
         point_generation_rate: tag.f32(0x04, "point generation rate")?,
         velocity: vector(&tag, 0x08, "point velocity")?,
         velocity_cone_angle: tag.f32(0x10, "point velocity cone angle")?,
@@ -393,6 +396,7 @@ fn import_contrail(
         render_type: tag.i16(0x18, "render type")?,
         texture_repeats: vector(&tag, 0x1C, "texture repeats")?,
         texture_animation: vector(&tag, 0x24, "texture animation")?,
+        frames_per_second: tag.f32(0x2C, "animation rate")?,
         bitmap: reached.bitmap(&tag, 0x30, "bitmap")?,
         sequences: [
             tag.i16(0x40, "sequence index")?,
@@ -962,11 +966,14 @@ mod tests {
             0x40,
             &[0.2, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0],
         );
+        empty(&mut state, 0x10);
+        put(&mut state, 0x64, &0x30u32.to_le_bytes());
         let state = fake.add_data(&state);
         let mut contrail = [0u8; CONTRAIL_SIZE];
         floats(&mut contrail, 0x04, &[30.0, 1.0, 2.0, 0.1, 0.5]);
+        put(&mut contrail, 0x02, &0x0101u16.to_le_bytes());
         put(&mut contrail, 0x18, &2i16.to_le_bytes());
-        floats(&mut contrail, 0x1C, &[1.0, 4.0, 0.0, 2.0]);
+        floats(&mut contrail, 0x1C, &[1.0, 4.0, 0.0, 2.0, 12.0]);
         empty(&mut contrail, 0x30);
         put(&mut contrail, 0x40, &[1, 0, 2, 0]);
         put(&mut contrail, 0xAC, &[0, 0, 3, 0, 1, 0]);
@@ -1075,11 +1082,15 @@ mod tests {
         assert_eq!(trail.render_type, 2);
         assert_eq!(trail.texture_repeats, [1.0, 4.0]);
         assert_eq!(trail.texture_animation, [0.0, 2.0]);
+        assert_eq!(trail.frames_per_second, 12.0);
+        assert_eq!(trail.scale_flags, 0x0101);
         assert_eq!(trail.sequences, [1, 2]);
         assert_eq!(trail.shader.framebuffer_blend_function, 3);
         assert_eq!(trail.states.len(), 1);
         assert_eq!(trail.states[0].duration, [1.0, 2.0]);
         assert_eq!(trail.states[0].width, 0.2);
+        assert_eq!(trail.states[0].physics, None);
+        assert_eq!(trail.states[0].scale_flags, 0x30);
         assert_eq!(
             trail.states[0].color,
             [[1.0, 1.0, 0.0, 0.0], [1.0, 0.0, 1.0, 0.0]]
