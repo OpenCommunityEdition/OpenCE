@@ -23,6 +23,7 @@
 
 pub mod bvh;
 pub mod chart;
+pub mod edge;
 pub mod filter;
 pub mod layout;
 pub mod mood;

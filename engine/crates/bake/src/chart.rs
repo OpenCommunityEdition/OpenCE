@@ -20,6 +20,10 @@ pub const MAX_PAGE_SIZE: u32 = 2048;
 pub const DILATION: u32 = 2;
 /// A texel no point lights.
 pub const EMPTY: u32 = u32::MAX;
+/// The widest a point's footprint is taken to be (world units), so that a
+/// triangle squeezed to a sliver on the page does not spread one texel's
+/// light across the level.
+pub const MAX_FOOTPRINT: f32 = 1.0;
 
 /// A point on a surface to bake the light at.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -28,6 +32,13 @@ pub struct BakePoint {
     pub position: [f32; 3],
     /// The way it faces (unit).
     pub normal: [f32; 3],
+    /// How far about it on its surface the texel it lights reaches: the
+    /// side of a texel there (world units, at most [`MAX_FOOTPRINT`]). The
+    /// tracers start each of its paths at a point within this distance, so
+    /// that a texel holds the light over the surface it covers rather than
+    /// at its centre, and a shadow's edge falls across texels smoothly
+    /// instead of in steps. 0: a point (a probe's).
+    pub footprint: f32,
 }
 
 /// One baked lightmap page: which point lights each texel.
@@ -132,6 +143,7 @@ impl Atlas {
             return;
         }
         let area = edge(at[0], at[1], at[2]);
+        let footprint = footprint(&corners, area);
         let mut claimed = false;
         if area.abs() > f32::EPSILON {
             let low = |axis: usize| at.iter().map(|p| p[axis]).fold(f32::INFINITY, f32::min);
@@ -149,7 +161,7 @@ impl Atlas {
                         edge(at[0], at[1], p) / area,
                     ];
                     if weights.iter().all(|weight| *weight >= -1e-5) {
-                        claimed |= self.claim(chart, x as u32, y as u32, &corners, weights);
+                        claimed |= self.claim(chart, x as u32, y as u32, &corners, weights, footprint);
                     }
                 }
             }
@@ -158,13 +170,13 @@ impl Atlas {
             let middle = |axis: usize| (at[0][axis] + at[1][axis] + at[2][axis]) / 3.0;
             let (x, y) = (libm::roundf(middle(0)), libm::roundf(middle(1)));
             if (0.0..width).contains(&x) && (0.0..height).contains(&y) {
-                self.claim(chart, x as u32, y as u32, &corners, [1.0 / 3.0; 3]);
+                self.claim(chart, x as u32, y as u32, &corners, [1.0 / 3.0; 3], footprint);
             }
         }
     }
 
-    /// Gives the texel at `x`, `y` a point at `weights` between `corners`,
-    /// if it has none; whether it did.
+    /// Gives the texel at `x`, `y` a point at `weights` between `corners`
+    /// reaching `footprint` about it, if it has none; whether it did.
     fn claim(
         &mut self,
         chart: &mut Chart,
@@ -172,6 +184,7 @@ impl Atlas {
         y: u32,
         corners: &[Corner; 3],
         weights: [f32; 3],
+        footprint: f32,
     ) -> bool {
         let index = y as usize * chart.width as usize + x as usize;
         match chart.texels.get_mut(index) {
@@ -196,6 +209,7 @@ impl Atlas {
                 self.points.push(BakePoint {
                     position: blend(|corner| corner.position),
                     normal,
+                    footprint,
                 });
                 true
             }
@@ -203,8 +217,8 @@ impl Atlas {
         }
     }
 
-    /// The points as the GPU reads them: each its position and a word of
-    /// padding, then its normal and a word of padding, little-endian.
+    /// The points as the GPU reads them: each its position and its
+    /// footprint, then its normal and a word of padding, little-endian.
     pub fn point_bytes(&self) -> Vec<u8> {
         point_bytes(&self.points)
     }
@@ -269,6 +283,27 @@ struct Corner {
     texcoord: [f32; 2],
 }
 
+/// The side of a texel on the surface of `corners`' triangle, whose area
+/// on the page is half `area` texels (0 if either area is nothing).
+fn footprint(corners: &[Corner; 3], area: f32) -> f32 {
+    let [a, b, c] = corners.map(|corner| corner.position);
+    let ab: [f32; 3] = std::array::from_fn(|axis| b[axis] - a[axis]);
+    let ac: [f32; 3] = std::array::from_fn(|axis| c[axis] - a[axis]);
+    let cross = [
+        ab[1] * ac[2] - ab[2] * ac[1],
+        ab[2] * ac[0] - ab[0] * ac[2],
+        ab[0] * ac[1] - ab[1] * ac[0],
+    ];
+    // (both areas doubled)
+    let world = cross.iter().map(|v| v * v).sum::<f32>().sqrt();
+    let side = (world / area.abs()).sqrt();
+    if side.is_finite() {
+        side.min(MAX_FOOTPRINT)
+    } else {
+        0.0
+    }
+}
+
 /// Twice the signed area of the triangle `a`, `b`, `p`.
 fn edge(a: [f32; 2], b: [f32; 2], p: [f32; 2]) -> f32 {
     (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
@@ -288,7 +323,7 @@ pub fn page_size(level: &Level, structure: &StructureBsp, page: usize) -> Option
 pub fn point_bytes(points: &[BakePoint]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(points.len() * 32);
     for point in points {
-        for (three, fourth) in [(point.position, 0.0f32), (point.normal, 0.0)] {
+        for (three, fourth) in [(point.position, point.footprint), (point.normal, 0.0)] {
             for value in three.into_iter().chain([fourth]) {
                 bytes.extend_from_slice(&value.to_le_bytes());
             }
@@ -360,10 +395,18 @@ mod tests {
                         "{point:?}"
                     );
                     assert_eq!(point.normal, [0.0, 0.0, 1.0]);
+                    // (a texel is a unit square of the surface)
+                    assert!((point.footprint - 1.0).abs() < 1e-4, "{point:?}");
                 }
             }
         }
-        assert_eq!(atlas.point_bytes().len(), 36 * 32);
+        let bytes = atlas.point_bytes();
+        assert_eq!(bytes.len(), 36 * 32);
+        // (the footprint in the position's fourth word)
+        let mut word = [0; 4];
+        word.copy_from_slice(&bytes[12..16]);
+        let fourth = f32::from_le_bytes(word);
+        assert!((fourth - 1.0).abs() < 1e-4);
         let lit: Vec<f32> = chart.fill(&[1.0; 36], 0.0);
         assert_eq!(lit.iter().filter(|value| **value == 1.0).count(), 64 - 6);
     }
@@ -387,6 +430,7 @@ mod tests {
                 BakePoint {
                     position: [-1.0; 3],
                     normal: [0.0; 3],
+                    footprint: 0.0,
                 }
             )[20 * 32 + 20]
                 .position,

@@ -104,7 +104,11 @@ impl ProbeGrid {
         for index in 0..self.len() {
             let position = self.position(index);
             for normal in AXES {
-                points.push(BakePoint { position, normal });
+                points.push(BakePoint {
+                    position,
+                    normal,
+                    footprint: 0.0,
+                });
             }
         }
         points
@@ -249,6 +253,7 @@ pub fn reflection_points(probes: &[[f32; 3]]) -> Vec<BakePoint> {
                     points.push(BakePoint {
                         position: *position,
                         normal: cube_direction(face, x, y, size),
+                        footprint: 0.0,
                     });
                 }
             }

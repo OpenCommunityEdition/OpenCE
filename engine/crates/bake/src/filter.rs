@@ -112,7 +112,11 @@ mod tests {
             }],
             points: normals
                 .iter()
-                .map(|&normal| BakePoint { position: [0.0; 3], normal })
+                .map(|&normal| BakePoint {
+                    position: [0.0; 3],
+                    normal,
+                    footprint: 0.0,
+                })
                 .collect(),
         }
     }

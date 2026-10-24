@@ -21,6 +21,7 @@ use opence_content::level::Level;
 use opence_content::pack::FORMAT_VERSION;
 
 use crate::chart::{Atlas, BakePoint, Chart};
+use crate::edge::EdgeSteps;
 use crate::filter;
 use crate::mood::{self, PageMood, StockPage};
 use crate::probe::{self, ProbeGrid, REFLECTION_SIZE};
@@ -28,7 +29,7 @@ use crate::scene::Scene;
 use crate::seam::{self, Seam, SeamStep};
 
 /// The baker's version: raised with any change to what it makes.
-pub const BAKE_VERSION: u32 = 7;
+pub const BAKE_VERSION: u32 = 8;
 /// The cache file's first eight bytes.
 pub const MAGIC: [u8; 8] = *b"OCEBAKE\0";
 
@@ -79,6 +80,9 @@ pub struct BakePlan {
     /// Each seam's step on the stock pages, if they can be read (for the
     /// seam check).
     pub stock_seams: Vec<Option<f32>>,
+    /// The steps between neighbouring texels on the stock pages (for the
+    /// edge check).
+    pub stock_edges: EdgeSteps,
 }
 
 /// A baked page: its texels' light, row by row from the top.
@@ -153,6 +157,7 @@ impl BakePlan {
             .collect();
         let seams = Seam::find(&level.structure_bsps[bsp], &atlas);
         let stock_seams = seam::stock_steps(&atlas, &seams, &pages);
+        let stock_edges = EdgeSteps::stock(&atlas, &pages);
         Some(Self {
             scene,
             atlas,
@@ -163,7 +168,14 @@ impl BakePlan {
             stock,
             seams,
             stock_seams,
+            stock_edges,
         })
+    }
+
+    /// The steps between neighbouring texels on `light`'s pages and on the
+    /// stock pages.
+    pub fn edges(&self, light: &BakedLighting) -> (EdgeSteps, EdgeSteps) {
+        (EdgeSteps::baked(&self.atlas, &light.pages), self.stock_edges)
     }
 
     /// The step in light across each seam on `light`'s pages and on the

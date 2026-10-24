@@ -275,6 +275,23 @@ pub struct BakeSeam {
     pub stock: Option<f32>,
 }
 
+/// The steps in light between neighbouring texels of one surface (the
+/// edge check): a shadow's edge drawn texel by texel has many hard ones.
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
+pub struct BakeEdgeSteps {
+    /// How many pairs of neighbours the baked pages have.
+    pub pairs: u32,
+    /// How many of them step by more than a quarter of the range in
+    /// brightness, as the level shader shows them.
+    pub hard: u32,
+    /// The mean step (0 to 1).
+    pub mean: f32,
+    /// The same on the stock pages, as stored.
+    pub stock_pairs: u32,
+    pub stock_hard: u32,
+    pub stock_mean: f32,
+}
+
 /// A BSP's baked light.
 #[derive(uniffi::Object)]
 pub struct BakedLight {
@@ -420,6 +437,20 @@ impl LevelBake {
                 stock: step.stock,
             })
             .collect()
+    }
+
+    /// The steps between neighbouring texels on `light`'s pages and on the
+    /// stock pages.
+    pub fn edges(&self, light: Arc<BakedLight>) -> BakeEdgeSteps {
+        let (baked, stock) = self.plan.edges(&light.light);
+        BakeEdgeSteps {
+            pairs: baked.pairs,
+            hard: baked.hard,
+            mean: baked.mean,
+            stock_pairs: stock.pairs,
+            stock_hard: stock.hard,
+            stock_mean: stock.mean,
+        }
     }
 
     /// The BSP, in the level's.

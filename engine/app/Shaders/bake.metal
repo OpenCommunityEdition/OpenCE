@@ -12,6 +12,10 @@
 using namespace metal;
 
 constant float SURFACE_OFFSET = 1e-3;
+// trace.rs's SPREAD_SHORT_OF
+constant float SPREAD_SHORT_OF = 0.9f;
+// trace.rs's SPREAD_RADIUS
+constant float SPREAD_RADIUS = 1.0f;
 constant float RAY_LENGTH = 1.0e5;
 constant uint SURE_BOUNCES = 2;
 constant uint MAX_BOUNCES = 16;
@@ -81,10 +85,11 @@ struct BakeParameters {
     uint pad2;
 };
 
-// PathTracer.swift's BakePoint
+// PathTracer.swift's BakePoint (chart.rs's, with its footprint: 0 for a
+// point)
 struct BakePoint {
     packed_float3 position;
-    float pad0;
+    float footprint;
     packed_float3 normal;
     float pad1;
 };
@@ -459,6 +464,28 @@ static float3 bake_radiance(BakeScene scene, float3 origin, float3 direction, fl
     return light;
 }
 
+// A point within `footprint` of `centre` across the surface facing
+// `normal`, evenly over the disc, short of anything between them
+// (trace.rs's Tracer::spread).
+static float3 bake_spread(BakeScene scene, float3 centre, float3 normal, float footprint, thread uint &state) {
+    if (!(footprint > 0.0f)) {
+        return centre;
+    }
+    float u = bake_random(state);
+    float v = bake_random(state);
+    float reach = footprint * SPREAD_RADIUS * sqrt(u);
+    float angle = 2.0f * M_PI_F * v;
+    float3 tangent, bitangent;
+    bake_basis(normal, tangent, bitangent);
+    float3 direction = tangent * cos(angle) + bitangent * sin(angle);
+    float t;
+    uint hit;
+    if (bake_nearest(scene, centre, direction, reach, t, hit)) {
+        reach = t * SPREAD_SHORT_OF;
+    }
+    return centre + direction * reach;
+}
+
 // Each point's light: irradiance (red, green, blue) and the open share of
 // its hemisphere, and the direction most of the light comes from with how
 // much of it does. With a sun, a probe's light: without the sun's direct
@@ -479,7 +506,7 @@ kernel void bake_irradiance(device const BakeNode *nodes [[buffer(0)]],
     BakeScene scene = {nodes, triangles, materials, lights, emitters, &parameters};
     BakePoint sample_point = points[index];
     float3 normal = float3(sample_point.normal);
-    float3 origin = float3(sample_point.position) + normal * SURFACE_OFFSET;
+    float3 centre = float3(sample_point.position) + normal * SURFACE_OFFSET;
     uint state = bake_hash(index ^ bake_hash(parameters.seed));
     float3 total = float3(0.0f);
     float3 weighted = float3(0.0f);
@@ -488,6 +515,7 @@ kernel void bake_irradiance(device const BakeNode *nodes [[buffer(0)]],
     uint sun = min(parameters.sun, parameters.light_count);
     uint samples = max(parameters.samples, 1u);
     for (uint sample = 0; sample < samples; sample++) {
+        float3 origin = bake_spread(scene, centre, normal, sample_point.footprint, state);
         total += bake_direct(scene, origin, normal, sun, state, &weighted);
         if (sun > 0) {
             BakeLight light = scene.lights[sun - 1];

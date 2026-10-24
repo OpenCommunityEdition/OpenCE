@@ -22,6 +22,15 @@ use crate::scene::Scene;
 /// How far from a surface a ray starts, so that it does not meet the
 /// surface it leaves (world units: about three millimetres).
 pub const SURFACE_OFFSET: f32 = 1e-3;
+/// How far towards a surface in the way a path's start is moved across a
+/// texel's footprint (the share of the distance to it).
+pub const SPREAD_SHORT_OF: f32 = 0.9;
+/// The radius of the disc a texel's paths start in, in its footprints: a
+/// texel's side, reaching the middles of the texels beside it, so that a
+/// shadow's edge falls over two texels, nearer the stock pages' softness
+/// than a disc only as large as the texel (2.13% of Blood Gulch's
+/// neighbours step hard against 2.26%, `ShadowEdgeTests`).
+pub const SPREAD_RADIUS: f32 = 1.0;
 /// How far a ray goes.
 pub const RAY_LENGTH: f32 = 1.0e5;
 /// The bounces after which Russian roulette may end a path.
@@ -102,7 +111,22 @@ impl Tracer<'_> {
         samples: u32,
         random: &mut Random,
     ) -> Irradiance {
-        self.light(point, normal, samples, None, random)
+        self.light(point, normal, 0.0, samples, None, random)
+    }
+
+    /// [`Self::irradiance`] over the surface within `footprint` of `point`
+    /// (a lightmap texel's, [`crate::chart::BakePoint::footprint`]): each
+    /// path starts at a point of the disc [`SPREAD_RADIUS`] footprints wide
+    /// about it.
+    pub fn irradiance_over(
+        &self,
+        point: [f32; 3],
+        normal: [f32; 3],
+        footprint: f32,
+        samples: u32,
+        random: &mut Random,
+    ) -> Irradiance {
+        self.light(point, normal, footprint, samples, None, random)
     }
 
     /// The light at an irradiance probe's `point` from the axis `normal`
@@ -119,25 +143,27 @@ impl Tracer<'_> {
         sun: usize,
         random: &mut Random,
     ) -> Irradiance {
-        self.light(point, normal, samples, Some(sun), random)
+        self.light(point, normal, 0.0, samples, Some(sun), random)
     }
 
-    /// [`Self::irradiance`], or [`Self::probe`] with `sun`.
+    /// [`Self::irradiance_over`], or [`Self::probe`] with `sun`.
     fn light(
         &self,
         point: [f32; 3],
         normal: [f32; 3],
+        footprint: f32,
         samples: u32,
         sun: Option<usize>,
         random: &mut Random,
     ) -> Irradiance {
-        let origin = add(point, scale(normal, SURFACE_OFFSET));
+        let centre = add(point, scale(normal, SURFACE_OFFSET));
         let mut total = [0.0f64; 3];
         let mut weighted = [0.0f32; 3];
         let mut open = 0u32;
         let mut seen = 0u32;
         let samples = samples.max(1);
         for _ in 0..samples {
+            let origin = self.spread(centre, normal, footprint, random);
             let direct = self.direct(origin, normal, sun, random);
             for (towards, irradiance) in direct {
                 accumulate(&mut total, &mut weighted, towards, irradiance);
@@ -437,6 +463,39 @@ impl Tracer<'_> {
         None
     }
 
+    /// A point within `footprint` of `centre` across the surface facing
+    /// `normal`, evenly over the disc: short of anything between them (a
+    /// wall at a corner), so that no path starts behind it.
+    fn spread(
+        &self,
+        centre: [f32; 3],
+        normal: [f32; 3],
+        footprint: f32,
+        random: &mut Random,
+    ) -> [f32; 3] {
+        if footprint.is_nan() || footprint <= 0.0 {
+            return centre;
+        }
+        let (u, v) = (random.next_f32(), random.next_f32());
+        let reach = footprint * SPREAD_RADIUS * u.sqrt();
+        let angle = 2.0 * core::f32::consts::PI * v;
+        let [tangent, bitangent] = basis(normal);
+        let direction = add(
+            scale(tangent, libm::cosf(angle)),
+            scale(bitangent, libm::sinf(angle)),
+        );
+        let ray = Ray {
+            origin: centre,
+            direction,
+            t_max: reach,
+        };
+        let reach = match self.bvh.nearest(&ray) {
+            Some(hit) => hit.t * SPREAD_SHORT_OF,
+            None => reach,
+        };
+        add(centre, scale(direction, reach))
+    }
+
     /// Whether `ray` is stopped before it leaves the level (passing
     /// through alpha-tested surfaces by their open share, and through
     /// transparent ones).
@@ -679,6 +738,73 @@ mod tests {
         let whole = tracer.irradiance([0.0; 3], down, 2048, &mut Random::new(9));
         assert!(probed.irradiance[0] > 0.1, "{probed:?}");
         assert!((probed.irradiance[0] - whole.irradiance[0]).abs() < whole.irradiance[0] * 0.08);
+    }
+
+    #[test]
+    fn a_texel_s_footprint_spreads_a_shadow_s_edge_across_it() {
+        // a black roof over x > 0 under a sun of 2 straight above: a point
+        // takes all of the sun or none of it, and one with a footprint takes
+        // the share of its disc out from under the roof
+        let roof = quad([0.0, -1e3, 1.0], [1e3, 0.0, 0.0], [0.0, 2e3, 0.0]);
+        let mut shaded = scene(roof, vec![material(0.0, 0.0, 1.0)], 0.0);
+        shaded.lights.push(DirectionalLight {
+            towards: [0.0, 0.0, 1.0],
+            irradiance: [2.0; 3],
+            cos_half_angle: 1.0,
+        });
+        let bvh = Bvh::build(&shaded.triangles);
+        let tracer = Tracer {
+            scene: &shaded,
+            bvh: &bvh,
+            occlusion_distance: OCCLUSION_DISTANCE,
+        };
+        let up = [0.0, 0.0, 1.0];
+        let mut between = 0;
+        let mut last = f32::INFINITY;
+        for step in -6..=6 {
+            let x = step as f32 * 0.25 + 0.01;
+            let point = tracer.irradiance([x, 0.0, 0.0], up, 64, &mut Random::new(3));
+            let spread = tracer.irradiance_over([x, 0.0, 0.0], up, 1.0, 4096, &mut Random::new(3));
+            assert_eq!(point.irradiance[0], if x < 0.0 { 2.0 } else { 0.0 }, "{x}");
+            // (the share of a unit disc at x on the side x < 0)
+            let h = (-x).clamp(-1.0, 1.0);
+            let share = 0.5 + (h * (1.0 - h * h).sqrt() + h.asin()) / core::f32::consts::PI;
+            let light = spread.irradiance[0];
+            assert!((light - 2.0 * share).abs() < 0.06, "{x}: {light} for {share}");
+            assert!(light <= last + 0.04, "{x}: {light} after {last}");
+            if light > 0.1 && light < 1.9 {
+                between += 1;
+            }
+            last = light;
+        }
+        assert!(between >= 7, "{between} steps between lit and shadowed");
+    }
+
+    #[test]
+    fn a_footprint_stops_short_of_a_wall() {
+        // a wall at x = 0.5 beside a point with a footprint of 1
+        let wall = quad([0.5, -1e3, -1e3], [0.0, 2e3, 0.0], [0.0, 0.0, 2e3]);
+        let walled = scene(wall, vec![material(0.5, 0.0, 1.0)], 1.0);
+        let bvh = Bvh::build(&walled.triangles);
+        let tracer = Tracer {
+            scene: &walled,
+            bvh: &bvh,
+            occlusion_distance: OCCLUSION_DISTANCE,
+        };
+        let mut random = Random::new(11);
+        let mut nearest = f32::INFINITY;
+        for _ in 0..4096 {
+            let start = tracer.spread([0.0; 3], [0.0, 0.0, 1.0], 1.0, &mut random);
+            assert!(start[0] < 0.5, "{start:?}");
+            assert!(dot(start, start) <= SPREAD_RADIUS * SPREAD_RADIUS + 1e-4, "{start:?}");
+            assert_eq!(start[2], 0.0);
+            nearest = nearest.min(0.5 - start[0]);
+        }
+        assert!(nearest < 0.06, "{nearest}");
+        // (no footprint: the point itself, without a draw)
+        let mut untouched = Random::new(11);
+        assert_eq!(tracer.spread([1.0; 3], [0.0, 0.0, 1.0], 0.0, &mut untouched), [1.0; 3]);
+        assert_eq!(untouched.next_u32(), Random::new(11).next_u32());
     }
 
     #[test]
