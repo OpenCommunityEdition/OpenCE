@@ -307,8 +307,9 @@ In version 31 the user replaced the logo with a 1024×256 picture whose
 art fills its left 640 px; the boards crop to that art (2340×936 on the
 main menu, its middle still at y 675, and 560×224 on the launcher).
 
-### Round 5 (2026-10-24, artifact version 32)
+### Round 5 (2026-10-24, artifact versions 32 and 33)
 
 | Board | Comment | Change |
 | --- | --- | --- |
 | Launcher | No backdrop, keep to colours and shading; remove the logo | Every launcher board loses the stars, planet and nebula for a shaded gradient of the palette's blues (a soft `#1D6AB4` glow at the top, `#041327` deepening to near black); Play drops the logo and the Ready panel is centred alone right of the rail |
+| Launcher | Play seems to do the same thing twice: here, then again on the main menu to continue the latest save | Version 33: the Ready panel no longer names a campaign or save. Play only starts the game at the main menu, where Campaign picks up the latest save; a line under Play says so |
