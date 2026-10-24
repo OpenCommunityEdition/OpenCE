@@ -66,9 +66,9 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Vehicles 675acc9
     - [x] Write tests: entering gives the vehicle camera and hides the first-person weapon; driver, gunner and passenger seats as in the original; exiting restores first person
     - [x] The fix
-- [~] Task: Responsiveness
-    - [ ] Write tests: positions between ticks interpolate; the camera takes the latest input; input-to-photon latency under two frames plus one tick; the replay hash is unchanged
-    - [ ] Tick interpolation and the latency fixes
+- [x] Task: Responsiveness a9d3702
+    - [x] Write tests: positions between ticks interpolate; the camera takes the latest input; input-to-photon latency under two frames plus one tick; the replay hash is unchanged
+    - [x] Tick interpolation and the latency fixes
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Picking up, vehicles and responsiveness' (Protocol in workflow.md)
 
 ## Phase 6: Animation
