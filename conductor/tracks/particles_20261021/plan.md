@@ -4,13 +4,13 @@
 - [x] Task: Particle tags in full 9bbfbb5c
     - [x] Write tests: every field of `part` and `pphy` imports; colour and size over life
     - [x] The typed tags
-- [~] Task: Particle physics
-    - [ ] Write tests: gravity, drag and wind; bounce, slide, stop and die on collision; effects on collision
-    - [ ] The update on the CPU and on the GPU, with the collision queries
+- [x] Task: Particle physics 6ed8e519
+    - [x] Write tests: gravity, drag and wind; bounce, slide, stop and die on collision; effects on collision
+    - [x] The update on the CPU, with the collision queries (no GPU update: the CPU's is the original's, per particle, and fits the budget)
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Particles and their physics' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 2: Systems, effects and contrails
-- [ ] Task: Particle systems
+- [~] Task: Particle systems
     - [ ] Write tests: emitters, rates and their functions, states and transitions, attachment to markers
     - [ ] `pctl` in full
 - [ ] Task: Effects' particle parts
