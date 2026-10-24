@@ -45,11 +45,11 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 ## Phase 4: Lighting and shaders
 - [x] Task: Collect the problems 56a8d15
     - [x] On devgulch's shader surfaces and Blood Gulch, with the stock view, view modes and inspector, list each problem with its cause in docs/engine.md
-- [ ] Task: Exposure and tone mapping matched to the original
-    - [ ] Write tests: mean and peak brightness stay within tolerance of the stock view's; the ring and bright textures are not clipped
-    - [ ] The fix
+- [x] Task: Exposure and tone mapping matched to the original d54fa7a
+    - [x] Write tests: mean and peak brightness stay within tolerance of the stock view's; the ring and bright textures are not clipped
+    - [x] The fix
 - [ ] Task: Black artifacts, flicker and blotchy emissives
-    - [ ] Write tests: no NaN or black pixels on every shader class; the same frame twice gives the same image; emissive golden frames
+    - [ ] Write tests: no NaN or black pixels on every shader class; the same frame twice gives the same image; emissive golden frames; ExposureTests' start view held to 10% of stock's mean
     - [ ] The fixes
 - [ ] Task: Seams
     - [ ] Write tests: no lightmap or texture seams on the seam views' golden frames
