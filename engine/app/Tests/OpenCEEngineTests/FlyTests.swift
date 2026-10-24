@@ -201,6 +201,24 @@ final class MapLibraryTests: XCTestCase {
         XCTAssertEqual(MapLibrary.path(of: "devmap", folders: []), "devmap")
     }
 
+    /// An app opened from build/engine (whose working folder is /) finds
+    /// the checkout's assets/maps; OPENCE_ROOT overrides it.
+    func testTheDataRootIsFoundAboveTheApp() throws {
+        let checkout = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let bundle = checkout.appendingPathComponent("build/engine/OpenCE Engine.app")
+        try FileManager.default.createDirectory(at: checkout.appendingPathComponent("assets/maps"),
+                                                withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: checkout) }
+        let slash = URL(fileURLWithPath: "/")
+        XCTAssertEqual(MapLibrary.dataRoot(environment: [:], current: slash, bundle: bundle).standardizedFileURL.path,
+                       checkout.standardizedFileURL.path)
+        XCTAssertEqual(MapLibrary.dataRoot(environment: [:], current: checkout, bundle: slash).path, checkout.path)
+        XCTAssertEqual(MapLibrary.dataRoot(environment: ["OPENCE_ROOT": "/games/halo"], current: checkout,
+                                           bundle: bundle).path, "/games/halo")
+        XCTAssertEqual(MapLibrary.dataRoot(environment: [:], current: slash, bundle: slash).path, "/")
+    }
+
     /// The map the picker lists, or the command line names, loads with its
     /// start view (skipped without assets/maps).
     func testAListedMapLoads() throws {

@@ -206,7 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var lastFrame: CFTimeInterval?
     var frameTimes = FrameTimes()
     var lastOverlay: CFTimeInterval = 0
-    let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    let root = MapLibrary.dataRoot
     /// The data folders: --maps's, else the settings' (read once the
     /// launcher has closed).
     lazy var folders = argument("--maps") != nil ? MapLibrary.folders(named: argument("--maps"), root: root)
@@ -1015,7 +1015,7 @@ func benchmark(seconds: String) -> Never {
 /// shell, and the pause menus of a10 and bloodgulch, drawn headless into
 /// --capture-ui's folder (assets/ui_reference when it names none).
 func captureUi() -> Never {
-    let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    let root = MapLibrary.dataRoot
     let named = argument("--capture-ui").flatMap { $0.hasPrefix("--") ? nil : $0 }
     let folder = named.map { URL(fileURLWithPath: $0, relativeTo: root) } ?? UiCapture.defaultFolder(root: root)
     let maps = URL(fileURLWithPath: argument("--maps") ?? "assets/maps", relativeTo: root)

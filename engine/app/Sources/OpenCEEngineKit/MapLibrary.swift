@@ -19,6 +19,36 @@ public enum MapLibrary {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
 
+    /// The data root, the folder holding assets/maps: OPENCE_ROOT if set,
+    /// else the first of `current` and the folders above `bundle` that
+    /// has assets/maps (so an app opened from build/engine finds the
+    /// checkout's), else `current`.
+    public static func dataRoot(environment: [String: String], current: URL, bundle: URL) -> URL {
+        if let set = environment["OPENCE_ROOT"], !set.isEmpty {
+            return URL(fileURLWithPath: set, isDirectory: true)
+        }
+        var above: [URL] = []
+        var folder = bundle.standardizedFileURL
+        while folder.path != "/" {
+            folder = folder.deletingLastPathComponent()
+            above.append(folder)
+        }
+        let found = ([current] + above).first { candidate in
+            var directory: ObjCBool = false
+            return FileManager.default.fileExists(atPath: candidate.appendingPathComponent("assets/maps").path,
+                                                  isDirectory: &directory) && directory.boolValue
+        }
+        return found ?? current
+    }
+
+    /// The data root of this process (`dataRoot` with its environment,
+    /// working folder and bundle).
+    public static var dataRoot: URL {
+        dataRoot(environment: ProcessInfo.processInfo.environment,
+                 current: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true),
+                 bundle: Bundle.main.bundleURL)
+    }
+
     /// The folders searched: `named` alone if given, otherwise the data
     /// root's maps and custom_maps under `root`.
     public static func folders(named: String?, root: URL) -> [URL] {
