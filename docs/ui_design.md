@@ -8,8 +8,11 @@ committed), with `palette.json` sampled from them. The mockups, the
 clickable prototype and the motion studies are in the private design
 artifact; each round of feedback is recorded at the end of this file.
 
-Sizes are in the menus' own 640×480 units. The layout scales them by the
-window's height / 480 (see Widescreen).
+Sizes are pixels of a 3840×2160 frame: the menus are designed natively at
+4K and laid out across the whole 16:9 width. Other windows scale the frame
+by their height / 2160 (see Layout). The original's widgets sit on a
+640×480 grid; the redesign reads `ui.map` for which widgets a screen has
+and what they do, not for where they sit or how large they are.
 
 ## Palette
 
@@ -35,49 +38,66 @@ colour, and keycaps replace them (see Hints).
 
 ## Shapes
 
-- **Rules:** 1 unit, `line`. One runs the full width under the title,
-  at y 44. The footer's rule is at y 408. Separators between groups of
-  items are 160 units long and start at the list's x.
-- **The focus capsule** (lists): 230×24, at x 34. Its left end is
-  rounded (radius 12) and its right end is square. A 2-unit `blue` stroke
-  runs on the top, left and bottom, with no stroke on the right. Its fill
-  is `ink`, and the text in it is `silver`.
-- **Panels** (pause, pregame, dialogs): radius 8, a 2-unit `blue`
-  stroke, and a `panel` fill. A header strip inside is 18 units, set off
-  by a 1-unit `line` rule. A panel's focus capsule is rounded at both
-  ends (radius 10) and inset 6 units.
-- **Arrows** (option values): filled triangles, 5×7, in `blue`, 6 units
+Strokes are 9 px, hairlines 3 px (2 px for the faintest lines), so they
+stay crisp at 4K rather than scaled up from a smaller frame.
+
+- **Rules:** 6 px, `line`. One runs the full width under the title, at
+  y 198. The footer band is y 1836–1998, with a 6 px rule on top.
+  Separators between groups of items are 720 px long and start at the
+  list's text.
+- **The focus tab** (lists): 1035×108, at x 231. Its left end is rounded
+  (radius 54) and it is open on the right. A 9 px `blue` stroke runs on
+  the top, left and bottom, and the tab fades out over its last half. Its
+  fill is `ink`, and the text in it is `silver`.
+- **Panels** (pause, dialogs): radius 36, a 9 px `blue` stroke, and a
+  `panel` fill. A header strip inside is set off by a 3 px `line` rule. A
+  panel's focus capsule is rounded at both ends (radius 54) and inset
+  27 px.
+- **Cards** (profiles, missions): radius 42, a 9 px `line` stroke at
+  rest and `glow` when focused, 72 px apart.
+- **Arrows** (option values): filled triangles, 21×30, in `blue`, 24 px
   either side of the value.
 - **The bevel:** the original's strokes are lighter on their inner edge.
-  We draw it as a 1-unit inner stroke of `blue` at 35% alpha.
+  We draw it as a 6 px inner stroke of `glow` at 35% alpha.
 
-## Layout (4:3)
+## Layout
+
+The reference frame is 3840×2160 with a 240 px gutter on each side.
 
 | Part | Where |
 | --- | --- |
-| Title | x 40, baseline 38, `title` size |
-| List | x 42, the first row at y 58, rows every 25 units |
-| Description | x 340–600, y 58, `caption` |
-| Footer band | y 408–444, hints right-aligned to x 600 |
-| Main menu items | centred, the first at y 205, rows every 28 units |
-| Version | bottom right, 8 units in from each edge, Overpass 600 at 8 units, `version`: "OpenCE 0.1.0 · ae46318" |
+| Title | x 240, top 42, `title` size |
+| List | x 231, the first row at y 243, rows every 114 px |
+| Details (description, options, emblem) | x 1680 to the right gutter (3600), from y 264 |
+| Cards | A row centred between the gutters from y 300: five missions 612 px wide, or the profiles 750 px wide |
+| Footer band | y 1836–1998, hints right-aligned to the right gutter |
+| Main menu items | centred, the first at y 1185, rows every 144 px |
+| Version | bottom right, 48 px in and 36 px up, Overpass 600 at 36 px, `version`: "OpenCE 0.1.0 · ae46318" |
 
-**Widescreen:** the scene fills the window. The title, list and
-description keep their places relative to a centred 4:3 column. The
-rules, the scrim and the footer band stretch to the window's full width.
-Hints anchor to the column's right edge. Panels stay centred. The main
-menu's logo and items stay centred.
+**Other windows:** the frame scales by the window's height / 2160, so a
+1080p window draws everything at half size and a 1440p one at two thirds.
+At 16:9 the layout is the reference. The title and list anchor to the left
+gutter, the details and hints to the right one; the scene, rules, scrim
+and footer band span the full width; panels, the main menu and its logo
+stay centred. A wider window (16:10 to 21:9) adds room between the
+anchored parts. A narrower one (down to 4:3) narrows the details to the
+space from 120 px past the list to the right gutter, and the card row
+shows as many cards as fit, scrolling to the focused one.
 
 ## Type
 
 | Role | Face | Size | Case, tracking |
 | --- | --- | --- | --- |
-| `title` (screen titles) | OpenCE | 30 | Upper case, as set |
-| `menu` (main menu items) | Overpass 900 | 24 | Upper case |
-| `item` (list items, buttons) | Overpass 900 | 15 | Upper case, +0.02 em |
-| `value` (option values, names) | Overpass 750 | 15 | As written |
-| `caption` (descriptions, hints) | Overpass 750 | 11 | As written |
-| `hint` (footer) | Overpass 900 | 13 | Upper case |
+| `title` (screen titles) | OpenCE | 126 | Upper case, as set |
+| `menu` (main menu items) | Overpass 900 | 108 | Upper case |
+| `item` (list items, buttons) | Overpass 900 | 66 | Upper case, +0.03 em |
+| `value` (option values, names) | Overpass 750 | 45 | As written |
+| `body` (descriptions) | Overpass 750 | 51 | As written |
+| `caption` (picture labels, small print) | Overpass 750 | 39 | As written |
+| `hint` (footer) | Overpass 900 | 57 | Upper case |
+| `label` (column headers) | Overpass 900 | 39 | Upper case, +0.1 em |
+
+Sizes are pixels of the 3840×2160 frame.
 
 The original's titles are drawn in a face OpenCE (Newtown, respaced)
 stands in for. Its body text is Interstate, and Overpass follows the same
@@ -89,7 +109,7 @@ vertical gradient from `glow` at the top to `blue` at the baseline.
 | State | Lists | The main menu |
 | --- | --- | --- |
 | At rest | `blue` text | `blue` text at 80% |
-| Focused | The tab or capsule, `silver` text; a list's tab, open on the right, fades out over its last half | `white` text, an 8-unit `glow` halo |
+| Focused | The tab or capsule, `silver` text; a list's tab, open on the right, fades out over its last half | `white` text, a 42 px `glow` halo |
 | Hovered (mouse) | The same as focused: the mouse moves focus | The same |
 | Pressed | The capsule's fill lifts to `deep` for 80 ms | The halo flashes to 100% |
 | Disabled | `muted` text, never focused | `muted` |
@@ -97,8 +117,8 @@ vertical gradient from `glow` at the top to `blue` at the baseline.
 ## Hints
 
 The pad's coloured buttons become keycaps, because the app is keyboard
-and mouse only. Each keycap is a rounded rectangle of radius 3, 15 units
-high, with a 1-unit `blue` stroke and a `deep` fill. Its label is set in
+and mouse only. Each keycap is a rounded rectangle of radius 15, 72 px
+high, with a 3 px `blue` stroke and a `deep` fill. Its label is set in
 `hint` `silver`, followed by `=ACTION` in `hint` `blue`. The keycaps
 are:
 
@@ -115,10 +135,10 @@ Clicking a hint does what its key does.
 | --- | --- | --- |
 | Focus moving between items | 120 ms | `cubic-bezier(0.2, 0.0, 0.0, 1.0)` (it slides) |
 | Hover in and out | 90 ms | ease out |
-| A screen opening | 220 ms | 40 ms fade of the scrim, then the title and list slide 12 units from the right, 30 ms apart |
+| A screen opening | 220 ms | 40 ms fade of the scrim, then the title and list slide 54 px from the right, 30 ms apart |
 | Back | 180 ms | The reverse, sliding to the right |
-| Scrolling | 160 ms a row | ease out, and the list's edges fade over 12 units |
-| The loading sweep | the load's own progress | linear, the cloud noise drifting 8 units a second |
+| Scrolling | 160 ms a row | ease out, and the list's edges fade over 84 px |
+| The loading sweep | the load's own progress | linear, the cloud noise drifting 36 px a second |
 
 The motion is independent of the frame rate: each value is a function of
 the time since its change.
@@ -132,7 +152,10 @@ focus moves.
 ## The logo
 
 The Halo logo is drawn from the user's `ui.map` at run time, where the
-original placed it: centred at y 112 on the main menu, 520 units wide. It
+original placed it: centred on the main menu, its middle at y 675, 2340 px
+wide. Its bitmap is the original's size, so it is drawn larger than it
+was made: filtered, and the redesign adds no detail to it. The mission
+pictures and the other content bitmaps are the same. It
 is never shipped or committed. The artifact shows a marked placeholder
 in its place. Before the UI is imported, the launcher shows the OpenCE
 wordmark (OpenCE, `title`, `blue` gradient).
@@ -144,13 +167,14 @@ between two:
 
 - **Original** (the default): the Xbox's screen 1:1, as
   `engine/crates/ui/src/loading.rs` draws it from `progress_bar.c`. A band
-  of light 128 units wide pans 768 units across the map's picture over the
-  load, leaving a trail at alpha 0.9 (until the load passes 0.9), enlarged
+  of light 128 of the screen's 640 units wide (768 px of the 4K frame)
+  pans 768 units across the map's picture over the load, leaving a trail
+  at alpha 0.9 (until the load passes 0.9), enlarged
   by 1/128 a frame and blurred by 0.1 texel. The light eases 0.2 of the way
   to the progress each 30 Hz step, with a 0.05 wobble, settles for up to
   3 s once the map is ready, and crossfades into the mission over 0.5 s.
-- **OpenCE**: black; our own hand-drawn 320×240 picture, centred; the
-  cloud noise drifting over it; a progress sweep under it: a 1-unit
+- **OpenCE**: black; our own hand-drawn 1440×1080 picture, centred; the
+  cloud noise drifting over it; a progress sweep under it: a 9 px
   `line` track with a `blue` fill and a `glow` leading edge.
 
 Either plays on every campaign transition and on loading a saved game.
@@ -217,3 +241,15 @@ Choices the mockups make, for review:
 
 The original loading screen is the default, as a departure from the stock
 game is a setting that defaults to stock.
+
+### Round 2 (2026-10-24, artifact version 23)
+
+| Board | Comment | Change |
+| --- | --- | --- |
+| Every menu screen | Why such a small resolution? Make it 4K native | Every in-game board is 3840×2160 and laid out across the whole 16:9 width: no 4:3 column, a 240 px gutter, lists left and details right; sizes are restated in 4K pixels with thinner hairlines; the load level row holds five missions. Other windows scale by height |
+
+The 640×480 grid came from `ui.map`: the first boards placed every widget
+where its tag puts it, at 1.5× (1280×720) in a centred 4:3 column. Phase 2
+draws panels and text as vectors and from SDF atlases, so nothing ties the
+layout to that grid. The launcher is a SwiftUI window measured in points,
+already sharp at any scale, and is unchanged.

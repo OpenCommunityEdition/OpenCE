@@ -16,7 +16,7 @@
 
 ## Phase 2: Drawing the menus in the new language
 - [ ] Task: Fonts from the font files
-    - [ ] Write tests: SDF atlases built from OpenCE and Overpass; metrics and kerning; layout widths for the same strings match the old layout within the design's tolerance
+    - [ ] Write tests: SDF atlases built from OpenCE and Overpass; metrics and kerning; metrics at the design's 4K sizes, and the same widths at every scale (height / 2160)
     - [ ] The atlas build (at app build time); text drawn from the atlases instead of the font tags
 - [ ] Task: Vector panels and frames
     - [ ] Write tests: each widget type's shapes from the design (backgrounds, frames, highlights, arrows); content bitmaps kept
@@ -24,7 +24,7 @@
 - [ ] Task: The logo
     - [ ] Write tests: the logo bitmap is found in the UI pack and placed where the original placed it; the wordmark shows without it
 - [ ] Task: Widescreen layout
-    - [ ] Write tests: anchors, columns and stretching per screen at 4:3, 16:9, 16:10 and 21:9; hit boxes follow the layout
+    - [ ] Write tests: the 3840×2160 reference layout at 16:9; anchors, columns and stretching per screen at 4:3, 16:10 and 21:9; 1080p, 1440p and 4K windows; hit boxes follow the layout
 - [ ] Task: Colour and motion
     - [ ] Write tests: the palette is applied; focus, transitions and scrolling ease over time, independent of the frame rate
 - [ ] Task: Golden frames of every screen against the mockups; frame time under 1 ms at 4K

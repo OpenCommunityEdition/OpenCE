@@ -62,9 +62,13 @@ the user approves it.
 9. Colour and motion: the original's palette, with focus and hover eased
    in and out, transitions between screens and smooth scrolling. Sounds
    still come from the widgets' tags.
-10. Widescreen: the screens are laid out across the full width by layout
-    rules (anchors, columns and stretching from the design). The
-    background scene fills the window.
+10. 4K native and widescreen: the screens are designed at 3840×2160 and
+    laid out across the full 16:9 width by layout rules (anchors, columns
+    and stretching from the design), not on the original's 640×480 grid.
+    Other windows scale by height; wider and narrower ones move the
+    anchored parts. The background scene fills the window. Content
+    bitmaps from `ui.map` (the logo, mission pictures) are filtered up to
+    their new size.
 11. Every screen can be navigated with the keyboard and the mouse.
 
 ### The launcher
