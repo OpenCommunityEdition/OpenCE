@@ -59,7 +59,7 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
     - [x] Each texel's paths start over its footprint
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Lighting and shaders' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
-## Phase 5: Picking up, vehicles and responsiveness
+## Phase 5: Picking up, vehicles and responsiveness [checkpoint: 4ef9f36]
 - [x] Task: Picking up d2efbc5
     - [x] Write tests: walking over a weapon or holding the action button picks it up or swaps; ammo and grenades are taken as in the original
     - [x] The fix
@@ -69,10 +69,10 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Responsiveness a9d3702
     - [x] Write tests: positions between ticks interpolate; the camera takes the latest input; input-to-photon latency under two frames plus one tick; the replay hash is unchanged
     - [x] Tick interpolation and the latency fixes
-- [ ] Task: Conductor - User Manual Verification 'Phase 5: Picking up, vehicles and responsiveness' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 5: Picking up, vehicles and responsiveness' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 6: Animation
-- [ ] Task: The animation stands
+- [~] Task: The animation stands
     - [ ] Write tests: each stand plays every animation of its graph; none fails to resolve
     - [ ] The fixes
 - [ ] Task: Vehicle and weapon animation
