@@ -10,10 +10,10 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Objects as bodies' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 2: Forces and grenades
-- [ ] Task: Forces
-    - [ ] Write tests: explosion force by distance; impacts; vehicles and players pushing objects; bipeds thrown before ragdolls
-    - [ ] Forces from damage, impacts and contacts
-- [ ] Task: Grenades
+- [x] Task: Forces 0928583d
+    - [x] Write tests: explosion force by distance; impacts; vehicles and players pushing objects; bipeds thrown before ragdolls
+    - [x] Forces from damage, impacts and contacts
+- [~] Task: Grenades
     - [ ] Write tests: the frag's bounces and the plasma's sticking against the reference traces
     - [ ] Grenade projectile physics
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Forces and grenades' (Protocol in workflow.md) (deferred to the end)
