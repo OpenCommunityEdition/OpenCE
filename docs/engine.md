@@ -369,6 +369,73 @@ The test map's `animation` station plays every animation of the player
 biped's graph in turn, named; `ffi/tests/stations.rs` checks that each
 one plays.
 
+## Sound
+
+The `audio` crate plays a level's sounds; nothing of Bungie's audio is
+shipped, and every sound is read from the player's maps. A sound's
+permutations are decoded on their first play and kept: Xbox ADPCM (the
+stock maps'), 16-bit PCM and Ogg Vorbis (Custom Edition's). What plays each
+time is chosen as `sound_definitions.c` chooses it (`audio/src/choice.rs`):
+the pitch range nearest the sound's pitch, a permutation of it not repeated
+until every other has played, and the gain and pitch its scale gives. The
+51 sound classes (`classes.rs`) limit how many of a sound play at once and
+set its priority, its distances and how much reverb it takes.
+
+The mixer (`mixer.rs`) resamples each voice to 48 kHz at its pitch,
+attenuates it by its distance, pans it with equal power as the port's
+DirectSound voices are panned, bends it by its motion (Doppler), delays it
+by the speed of sound and muffles it by what stands between it and the
+listener. The voices in the world are sent on to the room's reverb
+(`reverb.rs`), a Schroeder and Moorer reverb standing in for the Xbox's
+I3DL2 one. The app's Core Audio node pulls the mix on its own thread,
+behind a lock of its own (`ffi/src/audio.rs`), so that a tick never waits
+for it.
+
+### The world's sounds
+
+A tick queues the sounds it makes (`ffi/src/sound_events.rs`): its
+effects' sound parts, the sounds its animations reach, and its footsteps,
+by the material underfoot. They are played after the tick. Around the
+camera (`ffi/src/sound_world.rs`), the objects' looping sounds and the
+rooms' backgrounds are refreshed each frame, each heard through the walls
+between it and the camera, and the room's sound environment is glided to.
+A looping sound (`audio/src/player/looping.rs`) plays its tracks' starts,
+loops and stops, switches to their alternates, and plays its details now
+and again around its source; it stops when a frame does not refresh it.
+
+### Music and dialogue
+
+The scripts' sounds are kept by the mission (`campaign/src/sounds.rs`) and
+played by the app after the ticks (`ffi/src/campaign.rs`):
+
+- `sound_impulse_start` starts an impulse from an object, or heard
+  everywhere alike, and starting one again stops the first. It ends, for
+  the scripts, after its longest permutation, counted in game ticks as
+  `scripted_sound_time` counts it, so `sound_impulse_time` and the waits on
+  it last as the original's do. `sound_impulse_stop` stops it.
+- `sound_looping_start` starts the music, which the app refreshes each
+  frame until `sound_looping_stop`; `sound_looping_set_alternate` switches
+  its tracks to their alternates.
+- `sound_class_set_gain` fades a class over the ticks given.
+
+A revert to the last save silences the impulses started before it.
+
+While a line of the scripted dialogue plays (classes 44, 46 and 47), every
+other sound glides down to 70% of its gain, and back after it.
+Conversations (`campaign/src/conversations.rs`, `ai_conversation`) speak
+their lines in turn as `ai_conversation.c` does: each line waits for the
+dialogue before it and a pause, or for `ai_conversation_advance` where it
+is marked to, and plays from its participant's object, or heard everywhere
+for the participants the original plays unspatialized. A participant's
+speaker is found by its object's name, and a line's variant by the
+original's rules.
+
+The settings' master, effects and music volumes are applied by the app
+(`setVolumes`). `campaign/tests/sounds.rs` checks, on *The Pillar of
+Autumn* and *Halo*, that every sound the scripts start or wait on has its
+length, that a wait lasts its longest permutation to the tick, and that
+the music loops until it is stopped.
+
 ## The Halo UI
 
 The menus are the game's own: the widget definitions, bitmaps, fonts and
