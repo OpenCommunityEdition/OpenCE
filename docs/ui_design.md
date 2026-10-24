@@ -26,7 +26,7 @@ window's height / 480 (see Widescreen).
 | `silver` | `#CBCBCB` | The focused item's text, values |
 | `white` | `#F2F6FA` | The main menu's focused item |
 | `muted` | `#7D8A99` | Descriptions, disabled items |
-| `version` | `#FF8000` | The version text on the main menu |
+| `version` | `#F2F6FA` at 38% | The version and the build's hash, on the main menu and the launcher |
 
 The palette is the original's (sampled shares: the navies make up about 75% of
 what the menus draw, and `blue` about 3%). Do not add new hues. Warning
@@ -60,7 +60,7 @@ colour, and keycaps replace them (see Hints).
 | Description | x 340–600, y 58, `caption` |
 | Footer band | y 408–444, hints right-aligned to x 600 |
 | Main menu items | centred, the first at y 205, rows every 28 units |
-| Version | right-aligned to x 600, baseline 438, `caption`, `version` |
+| Version | bottom right, 8 units in from each edge, Overpass 600 at 8 units, `version`: "OpenCE 0.1.0 · ae46318" |
 
 **Widescreen:** the scene fills the window. The title, list and
 description keep their places relative to a centred 4:3 column. The
@@ -89,7 +89,7 @@ vertical gradient from `glow` at the top to `blue` at the baseline.
 | State | Lists | The main menu |
 | --- | --- | --- |
 | At rest | `blue` text | `blue` text at 80% |
-| Focused | The capsule, `silver` text | `white` text, an 8-unit `glow` halo |
+| Focused | The tab or capsule, `silver` text; a list's tab, open on the right, fades out over its last half | `white` text, an 8-unit `glow` halo |
 | Hovered (mouse) | The same as focused: the mouse moves focus | The same |
 | Pressed | The capsule's fill lifts to `deep` for 80 ms | The halo flashes to 100% |
 | Disabled | `muted` text, never focused | `muted` |
@@ -139,24 +139,32 @@ wordmark (OpenCE, `title`, `blue` gradient).
 
 ## The loading screen
 
-Faithful to the Xbox's, completed:
+A setting, `loading_screen`, in the launcher's Interface section, chooses
+between two:
 
-- black;
-- our own hand-drawn 320×240 picture, centred;
-- the cloud noise drifting over it;
-- a progress sweep under it: a 1-unit `line` track with a `blue` fill
-  and a `glow` leading edge.
+- **Original** (the default): the Xbox's screen 1:1, as
+  `engine/crates/ui/src/loading.rs` draws it from `progress_bar.c`. A band
+  of light 128 units wide pans 768 units across the map's picture over the
+  load, leaving a trail at alpha 0.9 (until the load passes 0.9), enlarged
+  by 1/128 a frame and blurred by 0.1 texel. The light eases 0.2 of the way
+  to the progress each 30 Hz step, with a 0.05 wobble, settles for up to
+  3 s once the map is ready, and crossfades into the mission over 0.5 s.
+- **OpenCE**: black; our own hand-drawn 320×240 picture, centred; the
+  cloud noise drifting over it; a progress sweep under it: a 1-unit
+  `line` track with a `blue` fill and a `glow` leading edge.
 
-It plays on every campaign transition and on loading a saved game.
+Either plays on every campaign transition and on loading a saved game.
+The engine's `loading_screen` is a boolean today; it becomes the choice of
+the two in Phase 2.
 
 ## The design artifact
 
 The mockups are a private Claude design artifact,
 <https://claude.ai/artifact/MqqSyPQ8J4pcW7i9LwRbk1>: one canvas with a row
-each for the launcher (launcher, map library, settings), the campaign (main
-menu, profiles, load level, difficulty, loading), multiplayer (multiplayer,
-system link games, select teams, pause, carnage report) and settings
-(settings, player setup, campaign pause, the tokens). The boards link to each
+each for the launcher (play, map library, server browser, lobby,
+settings), the campaign (main menu, profiles, load level, difficulty, the
+original loading screen and OpenCE's), a multiplayer game (pause, carnage
+report) and settings (settings, player setup, campaign pause, the tokens). The boards link to each
 other in the game's order, so the canvas also plays as a prototype: hover focuses as the arrow keys
 would, and the keycaps in each footer are links. A last row holds the
 motion studies: focus, hover, open and back, scrolling with the edge fade,
@@ -171,14 +179,41 @@ builds embed.
 
 Choices the mockups make, for review:
 
-- The main menu's "Game demos" is "Quit", which returns to the launcher.
-- Multiplayer has no split screen; internet play joins system link.
-- Settings keeps the Xbox's player and multiplayer setup and adds video,
-  audio and controls below a separator.
-- "Controller setup" is "Controls", for keyboard and mouse.
-- The launcher is a rail (play, map library, profiles, multiplayer,
-  settings and updates, exit) beside a "ready" panel.
+- The main menu is Campaign, Settings and Quit; "Game demos" is "Quit",
+  which returns to the launcher.
+- Multiplayer is the launcher's: its server browser lists local network
+  and internet games together, and its lobby is the Xbox's "select teams".
+  No split screen.
+- The in-game settings keep player setup and add video, audio and controls
+  below a separator, with the basics only; every setting is in the
+  launcher's.
+- "Controller setup" is "Controls", for the mouse and the keyboard.
+- The launcher is a rail (play, map library, multiplayer, settings, exit)
+  beside its page; lists read top to bottom, grouped by section.
 
 ## Feedback rounds
 
-(Recorded as the user reviews the artifact.)
+### Round 1 (2026-10-24, artifact version 22)
+
+| Board | Comment | Change |
+| --- | --- | --- |
+| Launcher | The wordmark: remove | The rail starts with its list |
+| Launcher | The footer should go; the version small and faint white at the bottom right, with the hash | No footer; `version` is faint white with the build's hash, on the launcher and the main menu |
+| Launcher | Display: not needed | Dropped from the ready panel |
+| Launcher | Join a game: move to the multiplayer screen | Joining is the server browser's |
+| Launcher | Continue campaign: not here, the main menu does that | Dropped; the ready panel's one action is Play |
+| Map library | Split maps by kind (campaign, multiplayer, custom, misc) and start a new game from here | One list in four sections; Enter or New game starts the map: a campaign map asks the difficulty, a multiplayer map opens a lobby |
+| Map library, settings | The same for settings and updates | Settings is one list in sections, the focused setting explained beside it; updates are its last section |
+| Settings (launcher) | A list grouped by section, read top to bottom | As above: display, graphics, interface, audio, mouse and keyboard, profiles, data folders, version and updates |
+| Main menu | The version bottom right, small, faint white, with the hash | As the launcher's |
+| Main menu | No multiplayer here: it is found and joined in the launcher | Multiplayer left the main menu; the multiplayer screens moved to the launcher (server browser, lobby) |
+| System link games | Not system link: a server browser | The launcher's server browser: local network, internet and recent games, with create, direct connect and edit gametypes |
+| Player setup | Controls are the mouse's and the keyboard's options | Controls lists the mouse's options and each action's key |
+| Player setup | No mention of the Xbox | Its description is rewritten |
+| Settings (in game) | Video: resolutions and basics only; the launcher has the full set | Resolution, window mode and brightness, and a link to the launcher's settings |
+| The tokens | The tab's hard cut-off | The tab fades out to the right, everywhere it is drawn |
+| Campaign pause | Connect the menu and the objectives | One panel: the menu, a rule, the objectives, the keys along the bottom |
+| Loading | Keep it, and add the Xbox's screen wipe 1:1 as a setting | The loading screen setting: Original (the default, 1:1) or OpenCE's |
+
+The original loading screen is the default, as a departure from the stock
+game is a setting that defaults to stock.
