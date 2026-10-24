@@ -9,7 +9,7 @@
     - [x] `opence_audio`: the mixer and voices on Core Audio
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Sounds and their formats' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 2: The world's sounds
+## Phase 2: The world's sounds [checkpoint: b1d38d4c]
 - [x] Task: Events 1eb03eda
     - [ ] Write tests: footsteps, impacts, weapons, vehicles and animation events start their sounds
     - [ ] Sounds from the simulation's events in the snapshot
