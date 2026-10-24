@@ -22,10 +22,10 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Systems, effects and contrails' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 3: Weather, lighting and limits
-- [ ] Task: Weather and wind
+- [x] Task: Weather and wind 61fe864e
     - [ ] Write tests: density by the weather palette; wind by the wind palette; fade near the camera
     - [ ] `rain` and `wind` in full
-- [ ] Task: Lighting and limits
+- [~] Task: Lighting and limits
     - [ ] Write tests: lit particles take probes and lights; recycling at the limit; the budget
     - [ ] Particle lighting, emitted lights, limits and the setting
 - [ ] Task: The particle station and the documentation
