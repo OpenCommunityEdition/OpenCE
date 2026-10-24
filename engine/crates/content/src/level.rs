@@ -599,6 +599,45 @@ pub struct StructureBsp {
     pub leaf_clusters: Vec<Option<u16>>,
     /// The detail objects on its ground.
     pub detail_objects: Vec<crate::DetailObject>,
+    /// Its background sounds' palette: looping sounds.
+    pub background_sounds: Vec<Option<TagRef>>,
+    /// Its sound environments' palette.
+    pub sound_environments: Vec<Option<crate::SoundEnvironment>>,
+    /// What each of its clusters is heard with.
+    pub cluster_sounds: Vec<crate::ClusterSound>,
+    /// How far sound travels between each two of its clusters, a byte for
+    /// each pair (the first's index the lower), the first cluster's pairs
+    /// first: the low seven bits the distance, 127 for 256 world units
+    /// (`sound_cluster_data`).
+    pub cluster_sound_distances: Vec<u8>,
+}
+
+/// How far sound travels between two clusters, in world units, that is
+/// as far as is heard through them.
+pub const MAXIMUM_CLUSTER_SOUND_DISTANCE: f32 = 256.0;
+
+impl StructureBsp {
+    /// How far sound travels from cluster `from` to cluster `to`, in
+    /// world units: none within a cluster, and
+    /// [`MAXIMUM_CLUSTER_SOUND_DISTANCE`] between clusters it has no
+    /// distance for (`structure_bsp_get_cluster_encoded_sound_distance`).
+    pub fn cluster_sound_distance(&self, from: u16, to: u16) -> f32 {
+        if from == to {
+            return 0.0;
+        }
+        let (row, column) = (usize::from(from.min(to)), usize::from(from.max(to)));
+        let count = self.cluster_sounds.len().max(self.cluster_skies.len());
+        let encoded = (column < count)
+            .then(|| {
+                (row * (count - 1) + column)
+                    .checked_sub(row * (row + 1) / 2 + 1)
+                    .and_then(|offset| self.cluster_sound_distances.get(offset))
+            })
+            .flatten()
+            .copied()
+            .unwrap_or(u8::MAX);
+        f32::from(encoded & 0x7F) * (MAXIMUM_CLUSTER_SOUND_DISTANCE / 127.0)
+    }
 }
 
 /// What a collision surface is made of.
@@ -789,6 +828,41 @@ pub struct CollisionVertex {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sound_travels_between_clusters_by_the_bsps_pairwise_distances() {
+        let mut bsp = crate::devmap::level(None).structure_bsps.remove(0);
+        bsp.cluster_sounds = vec![crate::ClusterSound::default(); 4];
+        // (0,1) (0,2) (0,3) (1,2) (1,3) (2,3); (1,3) is missing, (2,3) has
+        // the high bit set
+        bsp.cluster_sound_distances = vec![127, 0, 2, 3, 0xFF, 0x80 | 127];
+        let step = MAXIMUM_CLUSTER_SOUND_DISTANCE / 127.0;
+        assert_eq!(bsp.cluster_sound_distance(2, 2), 0.0);
+        assert_eq!(
+            bsp.cluster_sound_distance(0, 1),
+            MAXIMUM_CLUSTER_SOUND_DISTANCE
+        );
+        assert_eq!(bsp.cluster_sound_distance(3, 0), 2.0 * step);
+        assert_eq!(bsp.cluster_sound_distance(1, 2), 3.0 * step);
+        assert_eq!(
+            bsp.cluster_sound_distance(1, 3),
+            MAXIMUM_CLUSTER_SOUND_DISTANCE
+        );
+        assert_eq!(
+            bsp.cluster_sound_distance(2, 3),
+            MAXIMUM_CLUSTER_SOUND_DISTANCE
+        );
+        // (past the clusters, or past the distances read)
+        assert_eq!(
+            bsp.cluster_sound_distance(0, 9),
+            MAXIMUM_CLUSTER_SOUND_DISTANCE
+        );
+        bsp.cluster_sound_distances.truncate(2);
+        assert_eq!(
+            bsp.cluster_sound_distance(0, 3),
+            MAXIMUM_CLUSTER_SOUND_DISTANCE
+        );
+    }
 
     /// A plane z = 1 with the leaf above it; below is solid.
     fn floor() -> CollisionBsp {

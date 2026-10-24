@@ -204,6 +204,29 @@ impl DynamicDecals {
         ))
     }
 
+    /// Whether nothing of BSP `bsp` stands between `from` and `to`.
+    pub(crate) fn clear_between(
+        &mut self,
+        level: &Level,
+        bsp: usize,
+        from: Vec3,
+        to: Vec3,
+    ) -> bool {
+        let path = to - from;
+        let length = path.length();
+        if length <= f32::EPSILON || !length.is_finite() {
+            return true;
+        }
+        let direction = path / length;
+        first_hit(
+            self.bsp(level, bsp),
+            from.to_array(),
+            direction.to_array(),
+            length,
+        )
+        .is_none()
+    }
+
     /// The decals age; those past their lives, and those on objects that
     /// are gone (by `exists`), are removed.
     fn age(&mut self, exists: impl Fn(ObjectHandle) -> bool) {

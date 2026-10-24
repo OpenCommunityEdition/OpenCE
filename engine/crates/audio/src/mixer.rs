@@ -1,11 +1,14 @@
 //! The mixer: voices of decoded samples, each resampled to the output's
 //! rate at its pitch, attenuated by its distance from the listener and
 //! panned to its side of them as DirectSound's 3D voices are (the port's
-//! `dsound_sdl.c`), summed into 48 kHz stereo.
+//! `dsound_sdl.c`), bent by their motion (Doppler), muffled by what stands
+//! between them and the listener, summed into 48 kHz stereo; the voices in
+//! the world are sent on to the room's reverb.
 
 use std::collections::VecDeque;
 use std::sync::Arc;
 
+use crate::reverb::{Environment, Reverb};
 use crate::Decoded;
 
 /// The rate the mixer writes, a second.
@@ -22,6 +25,14 @@ pub const TRAVEL_DELAY_THRESHOLD_MS: f32 = 250.0;
 /// DirectSound's rolloff factor, which the game sets to 1.
 const ROLLOFF: f32 = 1.0;
 
+/// The speed of sound, in world units a second.
+pub const SPEED_OF_SOUND: f32 = 1000.0 / MILLISECONDS_PER_WORLD_UNIT;
+
+/// The cutoffs, in hertz, of the lowpass of a voice neither obstructed nor
+/// occluded, and of one wholly so.
+const CLEAR_CUTOFF: f32 = 20_000.0;
+const MUFFLED_CUTOFF: f32 = 1_000.0;
+
 /// Where the listener is, and which way they face. Positions are in world
 /// units; the vectors need not be of unit length.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -32,6 +43,8 @@ pub struct Listener {
     pub forward: [f32; 3],
     /// Their up.
     pub up: [f32; 3],
+    /// Their velocity, in world units a second.
+    pub velocity: [f32; 3],
 }
 
 impl Default for Listener {
@@ -40,6 +53,7 @@ impl Default for Listener {
             position: [0.0; 3],
             forward: [1.0, 0.0, 0.0],
             up: [0.0, 0.0, 1.0],
+            velocity: [0.0; 3],
         }
     }
 }
@@ -74,6 +88,27 @@ pub struct VoiceProperties {
     pub pitch: f32,
     /// Where it plays from.
     pub placement: Placement,
+    /// The velocity of what makes it, in world units a second, which bends
+    /// its pitch as it nears or leaves the listener.
+    pub velocity: [f32; 3],
+    /// How much of its direct path is blocked, 0 to 1: it is muffled.
+    pub obstruction: f32,
+    /// How much it is shut away (behind a wall, in another room), 0 to 1:
+    /// it is muffled and quieter, its reverb too.
+    pub occlusion: f32,
+}
+
+impl Default for VoiceProperties {
+    fn default() -> Self {
+        Self {
+            gain: 1.0,
+            pitch: 1.0,
+            placement: Placement::Flat { pan: 0.0 },
+            velocity: [0.0; 3],
+            obstruction: 0.0,
+            occlusion: 0.0,
+        }
+    }
 }
 
 /// A voice a sound plays on, to change or stop it. Stale once it ends.
@@ -98,6 +133,8 @@ struct Voice {
     gains: [f32; 2],
     /// It has been mixed once (its gains do not ramp in from silence).
     started: bool,
+    /// Its lowpass's state, to the left and right.
+    lowpass: [f32; 2],
 }
 
 /// The mixer, which the app's audio output pulls from.
@@ -107,6 +144,10 @@ pub struct Mixer {
     generations: Vec<u32>,
     listener: Listener,
     master_gain: f32,
+    reverb: Reverb,
+    /// What the voices in the world send to the reverb, kept between
+    /// buffers.
+    send: Vec<f32>,
 }
 
 /// The gain at `distance` of a voice whose minimum and maximum distances
@@ -186,6 +227,32 @@ pub fn placement_gains(listener: &Listener, placement: Placement) -> [f32; 2] {
     }
 }
 
+/// The factor a voice's pitch is bent by as it and the listener move
+/// (DirectSound's Doppler at a factor of 1): above 1 as they near each
+/// other. Their speeds along the line between them are held to half that
+/// of sound.
+pub fn doppler(listener: &Listener, position: [f32; 3], velocity: [f32; 3]) -> f32 {
+    let toward = normalize(sub(listener.position, position));
+    if toward == [0.0; 3] {
+        return 1.0;
+    }
+    let limit = SPEED_OF_SOUND * 0.5;
+    let source = dot(velocity, toward).clamp(-limit, limit);
+    let heard = dot(listener.velocity, toward).clamp(-limit, limit);
+    (SPEED_OF_SOUND - heard) / (SPEED_OF_SOUND - source)
+}
+
+/// The one-pole lowpass coefficient that muffles a voice obstructed or
+/// occluded by `amount`, 0 to 1; `None` for one not muffled.
+fn lowpass_coefficient(amount: f32) -> Option<f32> {
+    let amount = amount.clamp(0.0, 1.0);
+    if amount <= 0.0 {
+        return None;
+    }
+    let cutoff = CLEAR_CUTOFF * libm::powf(MUFFLED_CUTOFF / CLEAR_CUTOFF, amount);
+    Some(1.0 - libm::expf(-2.0 * core::f32::consts::PI * cutoff / OUTPUT_RATE as f32))
+}
+
 /// The milliseconds a sound `distance` world units away is heard after it
 /// is made, or 0 if it is near enough to be heard at once.
 pub fn travel_delay_ms(distance: f32) -> f32 {
@@ -255,6 +322,7 @@ impl Mixer {
                 delay,
                 gains: [0.0; 2],
                 started: false,
+                lowpass: [0.0; 2],
             });
         }
         VoiceId {
@@ -284,6 +352,36 @@ impl Mixer {
         if let Some(voice) = self.voice_mut(id) {
             voice.properties = properties;
         }
+    }
+
+    /// What a voice plays at.
+    pub fn properties(&self, id: VoiceId) -> Option<VoiceProperties> {
+        usize::try_from(id.index)
+            .ok()
+            .and_then(|i| self.voices.get(i))
+            .and_then(Option::as_ref)
+            .filter(|v| v.generation == id.generation)
+            .map(|v| v.properties)
+    }
+
+    /// Drops the samples queued after those the voice plays.
+    pub fn truncate(&mut self, id: VoiceId) {
+        if let Some(voice) = self.voice_mut(id) {
+            voice.queue.truncate(1);
+        }
+    }
+
+    /// Sets the room the listener is in, whose reverb the voices in the
+    /// world ring with; `None` for none.
+    pub fn set_environment(&mut self, environment: Option<Environment>) {
+        if self.reverb.environment() != environment.as_ref() {
+            self.reverb.set_environment(environment);
+        }
+    }
+
+    /// The room the listener is in.
+    pub fn environment(&self) -> Option<&Environment> {
+        self.reverb.environment()
     }
 
     /// Queues samples to play after those the voice plays.
@@ -337,11 +435,29 @@ impl Mixer {
         output.fill(0.0);
         let frames = output.len() / 2;
         let mut ended = Vec::new();
+        let reverberant = self
+            .reverb
+            .environment()
+            .is_some_and(Environment::is_audible);
+        if reverberant {
+            self.send.clear();
+            self.send.resize(frames * 2, 0.0);
+        }
         for index in 0..self.voices.len() {
             let Some(Some(voice)) = self.voices.get_mut(index) else {
                 continue;
             };
-            let done = mix_voice(voice, &self.listener, self.master_gain, output, frames);
+            let send = (reverberant
+                && matches!(voice.properties.placement, Placement::World { .. }))
+            .then_some(self.send.as_mut_slice());
+            let done = mix_voice(
+                voice,
+                &self.listener,
+                self.master_gain,
+                output,
+                send,
+                frames,
+            );
             if done {
                 ended.push(VoiceId {
                     index: u32::try_from(index).unwrap_or(u32::MAX),
@@ -350,16 +466,21 @@ impl Mixer {
                 self.end(index);
             }
         }
+        if reverberant {
+            self.reverb.process(&self.send, output);
+        }
         ended
     }
 }
 
-/// Mixes a voice into the frames; whether it has ended.
+/// Mixes a voice into the frames, and into the reverb's `send` if it has
+/// one; whether it has ended.
 fn mix_voice(
     voice: &mut Voice,
     listener: &Listener,
     master_gain: f32,
     output: &mut [f32],
+    mut send: Option<&mut [f32]>,
     frames: usize,
 ) -> bool {
     let skip = usize::try_from(voice.delay)
@@ -369,7 +490,14 @@ fn mix_voice(
     if skip == frames {
         return false;
     }
-    let gain = voice.properties.gain.max(0.0) * master_gain;
+    let properties = voice.properties;
+    let occlusion = properties.occlusion.clamp(0.0, 1.0);
+    let gain = properties.gain.max(0.0) * master_gain * (1.0 - 0.5 * occlusion);
+    let bend = match properties.placement {
+        Placement::World { position, .. } => doppler(listener, position, properties.velocity),
+        Placement::Flat { .. } => 1.0,
+    };
+    let lowpass = lowpass_coefficient(properties.obstruction.max(occlusion));
     let target = placement_gains(listener, voice.properties.placement).map(|g| g * gain);
     let from = if voice.started { voice.gains } else { target };
     voice.started = true;
@@ -383,7 +511,7 @@ fn mix_voice(
         };
         let length = samples.frames();
         let channels = usize::from(samples.channels.max(1));
-        let step = f64::from(samples.sample_rate) * f64::from(voice.properties.pitch.max(0.0))
+        let step = f64::from(samples.sample_rate) * f64::from((properties.pitch * bend).max(0.0))
             / f64::from(OUTPUT_RATE);
         while frame < frames {
             let whole = voice.cursor as usize;
@@ -398,21 +526,34 @@ fn mix_voice(
                     .get(at * channels + channel.min(channels - 1))
                     .map_or(0.0, |s| f32::from(*s) / 32768.0)
             };
-            let left = read(whole, 0) + (read(next, 0) - read(whole, 0)) * fraction;
-            let right = read(whole, 1) + (read(next, 1) - read(whole, 1)) * fraction;
+            let mut left = read(whole, 0) + (read(next, 0) - read(whole, 0)) * fraction;
+            let mut right = read(whole, 1) + (read(next, 1) - read(whole, 1)) * fraction;
+            if let Some(coefficient) = lowpass {
+                voice.lowpass[0] += coefficient * (left - voice.lowpass[0]);
+                voice.lowpass[1] += coefficient * (right - voice.lowpass[1]);
+                left = voice.lowpass[0];
+                right = voice.lowpass[1];
+            }
             let t = (frame - skip) as f32 * ramp;
             let gain_left = from[0] + (target[0] - from[0]) * t;
             let gain_right = from[1] + (target[1] - from[1]) * t;
-            if channels == 1 {
-                if let Some(out) = output.get_mut(frame * 2..frame * 2 + 2) {
-                    out[0] += left * gain_left;
-                    out[1] += left * gain_right;
-                }
-            } else if let Some(out) = output.get_mut(frame * 2..frame * 2 + 2) {
+            let mixed = if channels == 1 {
+                [left * gain_left, left * gain_right]
+            } else {
                 // a stereo sound keeps its sides, at the louder side's gain
                 let both = gain_left.max(gain_right);
-                out[0] += left * both;
-                out[1] += right * both;
+                [left * both, right * both]
+            };
+            if let Some(out) = output.get_mut(frame * 2..frame * 2 + 2) {
+                out[0] += mixed[0];
+                out[1] += mixed[1];
+            }
+            if let Some(out) = send
+                .as_deref_mut()
+                .and_then(|send| send.get_mut(frame * 2..frame * 2 + 2))
+            {
+                out[0] += mixed[0];
+                out[1] += mixed[1];
             }
             voice.cursor += step;
             frame += 1;
@@ -443,8 +584,7 @@ mod tests {
     fn flat(gain: f32) -> VoiceProperties {
         VoiceProperties {
             gain,
-            pitch: 1.0,
-            placement: Placement::Flat { pan: 0.0 },
+            ..VoiceProperties::default()
         }
     }
 
@@ -486,6 +626,130 @@ mod tests {
         assert!(near[0] > near[1] && near[0] < near[1] * 1.5);
         let overhead = placement_gains(&listener, world([0.0, 0.0, 5.0]));
         assert!((overhead[0] - overhead[1]).abs() < 1e-5);
+    }
+
+    #[test]
+    fn a_voice_nearing_the_listener_is_bent_up_and_one_leaving_down() {
+        let listener = Listener::default();
+        let ahead = [10.0, 0.0, 0.0];
+        assert!((doppler(&listener, ahead, [0.0; 3]) - 1.0).abs() < 1e-6);
+        let nearing = doppler(&listener, ahead, [-SPEED_OF_SOUND * 0.25, 0.0, 0.0]);
+        assert!((nearing - 1.0 / 0.75).abs() < 1e-5, "{nearing}");
+        let leaving = doppler(&listener, ahead, [SPEED_OF_SOUND * 0.25, 0.0, 0.0]);
+        assert!((leaving - 1.0 / 1.25).abs() < 1e-5, "{leaving}");
+        // held to half the speed of sound
+        let fast = doppler(&listener, ahead, [-SPEED_OF_SOUND * 4.0, 0.0, 0.0]);
+        assert!((fast - 2.0).abs() < 1e-5, "{fast}");
+        // the listener moving toward it
+        let moving = Listener {
+            velocity: [SPEED_OF_SOUND * 0.25, 0.0, 0.0],
+            ..listener
+        };
+        assert!((doppler(&moving, ahead, [0.0; 3]) - 1.25).abs() < 1e-5);
+        // across the line between them, and on the listener, it is not bent
+        assert!((doppler(&listener, ahead, [0.0, 100.0, 0.0]) - 1.0).abs() < 1e-6);
+        assert!((doppler(&listener, [0.0; 3], [100.0, 0.0, 0.0]) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn an_occluded_voice_is_muffled_and_quieter() {
+        assert_eq!(lowpass_coefficient(0.0), None);
+        let clear = lowpass_coefficient(0.01).unwrap_or(0.0);
+        let muffled = lowpass_coefficient(1.0).unwrap_or(1.0);
+        assert!(clear > 0.9 && muffled < 0.15, "{clear} {muffled}");
+        // a tone at the highest frequency, alternating in sign
+        let buzz = || {
+            Arc::new(Decoded {
+                sample_rate: OUTPUT_RATE,
+                channels: 1,
+                samples: (0..4800)
+                    .map(|i| if i % 2 == 0 { 16384 } else { -16384 })
+                    .collect(),
+            })
+        };
+        let energy = |properties: VoiceProperties| {
+            let mut mixer = Mixer::new();
+            mixer.play(buzz(), properties, 0.0);
+            let mut output = vec![0.0; 2048];
+            mixer.mix(&mut output);
+            output.iter().map(|sample| sample * sample).sum::<f32>()
+        };
+        let open = energy(flat(1.0));
+        let obstructed = energy(VoiceProperties {
+            obstruction: 1.0,
+            ..flat(1.0)
+        });
+        let occluded = energy(VoiceProperties {
+            occlusion: 1.0,
+            ..flat(1.0)
+        });
+        assert!(obstructed < open * 0.05, "{obstructed} {open}");
+        assert!(occluded < obstructed, "{occluded} {obstructed}");
+    }
+
+    #[test]
+    fn a_truncated_voice_finishes_what_it_plays_and_no_more(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut mixer = Mixer::new();
+        let voice = mixer.play(tone(480, 8192, 1), flat(1.0), 0.0);
+        mixer.queue(voice, tone(480, 8192, 1));
+        mixer.queue(voice, tone(480, 8192, 1));
+        assert_eq!(mixer.queued(voice), 3);
+        mixer.truncate(voice);
+        assert_eq!(mixer.queued(voice), 1);
+        let properties = mixer.properties(voice).ok_or("no voice")?;
+        assert!((properties.gain - 1.0).abs() < 1e-6);
+        let mut output = vec![0.0; 960 * 2];
+        mixer.mix(&mut output);
+        assert!(!mixer.is_playing(voice));
+        assert_eq!(mixer.properties(voice), None);
+        Ok(())
+    }
+
+    #[test]
+    fn world_voices_ring_on_in_the_environment() {
+        let room = Environment {
+            room_intensity: 1.0,
+            room_intensity_hf: 1.0,
+            room_rolloff: 0.0,
+            decay_time: 1.5,
+            decay_hf_ratio: 0.8,
+            reflections_intensity: 0.5,
+            reflections_delay: 0.01,
+            reverb_intensity: 0.5,
+            reverb_delay: 0.02,
+            diffusion: 1.0,
+            density: 1.0,
+            hf_reference: 5000.0,
+        };
+        let tail = |environment: Option<Environment>, placement| {
+            let mut mixer = Mixer::new();
+            mixer.set_environment(environment);
+            mixer.set_environment(environment);
+            assert_eq!(mixer.environment().copied(), environment);
+            mixer.play(
+                tone(480, 16384, 1),
+                VoiceProperties {
+                    placement,
+                    ..flat(1.0)
+                },
+                0.0,
+            );
+            let mut output = vec![0.0; 960 * 2];
+            // (the late reverb comes after its delay and a comb's length)
+            for _ in 0..4 {
+                mixer.mix(&mut output);
+            }
+            output.iter().map(|sample| sample.abs()).sum::<f32>()
+        };
+        let world = Placement::World {
+            position: [1.0, 0.0, 0.0],
+            distance: [1.0, 10.0],
+        };
+        assert!(tail(Some(room), world) > 1.0);
+        assert!(tail(None, world).abs() < 1e-6);
+        // a flat voice (the interface, the music) is not in the room
+        assert!(tail(Some(room), Placement::Flat { pan: 0.0 }).abs() < 1e-6);
     }
 
     #[test]
@@ -592,6 +856,7 @@ mod tests {
                         position: [libm::cosf(angle) * 10.0, libm::sinf(angle) * 10.0, 0.0],
                         distance: [1.0, 50.0],
                     },
+                    ..VoiceProperties::default()
                 },
                 0.0,
             );

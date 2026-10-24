@@ -44,6 +44,7 @@ pub use level::{
     GameTypes, Globals, ItemChoice, Level, Lightmap, LightmapVertex, Material, NetgameEquipment,
     NetgameFlag, NetgameFlagKind, ObjectPlacement, PlacementDevice, PlacementPermutation,
     PlayerPhysics, PlayerStart, Scenario, Sky, SkyAmbient, SkyLight, StructureBsp,
+    MAXIMUM_CLUSTER_SOUND_DISTANCE,
 };
 pub use light::{FunctionModes, Light, ObjectFunction};
 pub use material::SurfaceMaterial;
@@ -71,8 +72,9 @@ pub use shader::{
     WaterShader,
 };
 pub use sound::{
-    LoopingSound, LoopingSoundDetail, LoopingSoundTrack, MaterialEffect, MaterialEffects, Sound,
-    SoundCompression, SoundModifiers, SoundPermutation, SoundPitchRange,
+    ClusterSound, LoopingSound, LoopingSoundDetail, LoopingSoundTrack, MaterialEffect,
+    MaterialEffects, Sound, SoundCompression, SoundEnvironment, SoundModifiers, SoundPermutation,
+    SoundPitchRange,
 };
 pub use ui::{
     ChildWidget, ColorTable, ConditionalWidget, EventHandler, Font, Glyph, StringList,

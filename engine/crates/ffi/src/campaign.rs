@@ -218,6 +218,8 @@ impl Engine {
             running_effects: Vec::new(),
             heard: Vec::new(),
             stepped: Vec::new(),
+            sound_world: crate::sound_world::SoundWorld::new(&geometry.content),
+            loops: Vec::new(),
         };
         running.previous_camera = transform(&camera(&running).transform);
         let mut state = self.lock();

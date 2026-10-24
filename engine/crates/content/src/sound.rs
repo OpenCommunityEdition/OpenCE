@@ -224,6 +224,32 @@ impl LoopingSound {
     pub const STOPS_MUSIC: u32 = 1 << 2;
 }
 
+/// A sound environment (`sound_environment`, the `snde` tag): the reverb of
+/// the clusters it is given to.
+#[derive(Clone, Copy, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct SoundEnvironment {
+    /// Which of two environments the listener's clusters give is heard:
+    /// the higher.
+    pub priority: i16,
+    /// Its values, in the tag's order: room intensity, room intensity at
+    /// high frequencies, room rolloff, decay time, decay's high-frequency
+    /// ratio, reflections' intensity, reflections' delay, reverb
+    /// intensity, reverb delay, diffusion, density and the high-frequency
+    /// reference.
+    pub values: [f32; 12],
+}
+
+/// What a BSP's cluster is heard with: indices into its background sounds
+/// and sound environments.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Archive, Serialize, Deserialize)]
+pub struct ClusterSound {
+    /// Its background sound, a looping sound played while the listener is
+    /// in the cluster.
+    pub background: Option<u16>,
+    /// Its sound environment.
+    pub environment: Option<u16>,
+}
+
 /// What a footstep, a slide or a landing makes on each material
 /// (`material_effects`, the `foot` tag): by its event, the effect and the
 /// sound of each of the game's materials.

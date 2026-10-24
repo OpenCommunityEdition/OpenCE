@@ -1,12 +1,15 @@
 //! The sounds a level plays (`sound_new_impulse`): a sound's permutation is
 //! chosen, its samples decoded on its first play and kept, and a voice of
-//! the mixer started at the gain and pitch the original gives it.
+//! the mixer started at the gain and pitch the original gives it. The
+//! looping sounds are in [`looping`].
+
+mod looping;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use libm::sqrtf;
-use opence_content::{Level, Sound};
+use opence_content::{Level, LoopingSound, Sound};
 
 use crate::choice::{
     next_permutation, pitch_range, scale_random_value, scale_value, LocalRandom, Promoted,
@@ -30,11 +33,20 @@ const LINKED_LIMIT: usize = 64;
 pub trait SoundBank: Send + Sync {
     /// The sounds, by index.
     fn sounds(&self) -> &[Sound];
+
+    /// The looping sounds, by index.
+    fn looping_sounds(&self) -> &[LoopingSound] {
+        &[]
+    }
 }
 
 impl SoundBank for Level {
     fn sounds(&self) -> &[Sound] {
         &self.sounds
+    }
+
+    fn looping_sounds(&self) -> &[LoopingSound] {
+        &self.looping_sounds
     }
 }
 
@@ -54,6 +66,12 @@ pub struct Source {
     /// Its scale, 0 to 1, between the sound's zero and one modifiers (a
     /// footstep's speed, an impact's force).
     pub scale: f32,
+    /// Its velocity, in world units a second.
+    pub velocity: [f32; 3],
+    /// How much of its direct path to the listener is blocked, 0 to 1.
+    pub obstruction: f32,
+    /// How much it is shut away from the listener, 0 to 1.
+    pub occlusion: f32,
 }
 
 impl Default for Source {
@@ -62,6 +80,9 @@ impl Default for Source {
             position: None,
             gain: 1.0,
             scale: 0.0,
+            velocity: [0.0; 3],
+            obstruction: 0.0,
+            occlusion: 0.0,
         }
     }
 }
@@ -70,6 +91,10 @@ impl Default for Source {
 pub struct SoundPlayer {
     bank: Arc<dyn SoundBank>,
     paths: HashMap<String, usize>,
+    looping_paths: HashMap<String, usize>,
+    loops: HashMap<u64, looping::Loop>,
+    /// The voices of loops that ended or changed, fading out.
+    retired: Vec<looping::Component>,
     decoded: HashMap<(usize, usize, u16), Option<Arc<Decoded>>>,
     ranges: HashMap<(usize, usize), RangeState>,
     promotions: HashMap<usize, Promotion>,
@@ -91,9 +116,18 @@ impl SoundPlayer {
             .enumerate()
             .map(|(index, sound)| (sound.tag.path.clone(), index))
             .collect();
+        let looping_paths = bank
+            .looping_sounds()
+            .iter()
+            .enumerate()
+            .map(|(index, sound)| (sound.tag.path.clone(), index))
+            .collect();
         Self {
             bank,
             paths,
+            looping_paths,
+            loops: HashMap::new(),
+            retired: Vec::new(),
             decoded: HashMap::new(),
             ranges: HashMap::new(),
             promotions: HashMap::new(),
@@ -288,6 +322,9 @@ impl SoundPlayer {
                 },
                 None => Placement::Flat { pan: 0.0 },
             },
+            velocity: source.velocity,
+            obstruction: source.obstruction,
+            occlusion: source.occlusion,
         };
         let delay = if position.is_some() {
             travel_delay_ms(distance)
@@ -350,7 +387,7 @@ mod tests {
     };
     use std::error::Error;
 
-    fn permutation(value: i16, frames: usize, next: Option<u16>) -> SoundPermutation {
+    pub(super) fn permutation(value: i16, frames: usize, next: Option<u16>) -> SoundPermutation {
         SoundPermutation {
             name: String::new(),
             skip_fraction: 0.0,
@@ -364,7 +401,7 @@ mod tests {
         }
     }
 
-    fn sound(path: &str, flags: u32, permutations: Vec<SoundPermutation>) -> Sound {
+    pub(super) fn sound(path: &str, flags: u32, permutations: Vec<SoundPermutation>) -> Sound {
         let one = SoundModifiers {
             skip_fraction: 0.0,
             gain: 1.0,

@@ -24,7 +24,7 @@ use rkyv::util::AlignedVec;
 use crate::Level;
 
 /// The version of this format; a pack of another is not read.
-pub const FORMAT_VERSION: u32 = 40;
+pub const FORMAT_VERSION: u32 = 41;
 
 const MAGIC: [u8; 4] = *b"OCPK";
 const HEADER_SIZE: usize = 0x28;
@@ -199,6 +199,10 @@ mod tests {
                 cluster_weather: Vec::new(),
                 leaf_clusters: Vec::new(),
                 detail_objects: Vec::new(),
+                background_sounds: Vec::new(),
+                sound_environments: Vec::new(),
+                cluster_sounds: Vec::new(),
+                cluster_sound_distances: Vec::new(),
                 decals: Vec::new(),
                 lens_flare_markers: Vec::new(),
                 lens_flares: Vec::new(),

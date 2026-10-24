@@ -41,6 +41,22 @@ const MAX_BSP_LENS_FLARE_MARKERS: usize = 65536;
 const BSP_CLUSTERS_OFFSET: usize = 0x134;
 const BSP_CLUSTER_SIZE: usize = 0x68;
 const MAX_BSP_CLUSTERS: usize = 8192;
+/// `structure_bsp.background_sound_palette`: each entry's looping sound is
+/// at +0x20.
+const BSP_BACKGROUND_SOUNDS_OFFSET: usize = 0x1FC;
+const BSP_BACKGROUND_SOUND_SIZE: usize = 0x74;
+const MAX_BSP_BACKGROUND_SOUNDS: usize = 64;
+/// `structure_bsp.sound_environment_palette`: each entry's environment
+/// (`snde`) is at +0x20.
+const BSP_SOUND_ENVIRONMENTS_OFFSET: usize = 0x208;
+const BSP_SOUND_ENVIRONMENT_SIZE: usize = 0x50;
+const MAX_BSP_SOUND_ENVIRONMENTS: usize = 64;
+/// `structure_bsp.sound_pas_data`: a byte for each pair of clusters.
+const BSP_SOUND_CLUSTER_DATA_OFFSET: usize = 0x214;
+const SNDE: GroupTag = GroupTag::new(b"snde");
+/// A sound environment: its priority (an `i16` at 4) and twelve values
+/// from 8.
+const SOUND_ENVIRONMENT_SIZE: usize = 0x48;
 /// A BSP's leaves (`structure_leaf`): each one's cluster.
 const BSP_LEAVES_OFFSET: usize = 0xE0;
 const BSP_LEAF_SIZE: usize = 0x10;
@@ -1217,10 +1233,38 @@ fn import_structure_bsp(
     )?;
     let mut cluster_skies = Vec::with_capacity(clusters_block.len());
     let mut cluster_weather = Vec::with_capacity(clusters_block.len());
+    let background_sounds = import_background_sounds(&bsp)?;
+    let sound_environments = import_sound_environments(cache, &bsp)?;
+    let mut cluster_sounds = Vec::with_capacity(clusters_block.len());
     for cluster in clusters_block.iter() {
         cluster_skies.push(u16::try_from(cluster.i16(0, "sky")?).ok());
         cluster_weather.push(u16::try_from(cluster.i16(0x08, "weather")?).ok());
+        let within = |index: i16, count: usize| {
+            u16::try_from(index)
+                .ok()
+                .filter(|&index| usize::from(index) < count)
+        };
+        cluster_sounds.push(opence_content::ClusterSound {
+            background: within(
+                cluster.i16(0x04, "background sound")?,
+                background_sounds.len(),
+            ),
+            environment: within(
+                cluster.i16(0x06, "sound environment")?,
+                sound_environments.len(),
+            ),
+        });
     }
+    let pairs = clusters_block.len() * clusters_block.len().saturating_sub(1) / 2;
+    let cluster_sound_distances = bsp
+        .data(
+            BSP_SOUND_CLUSTER_DATA_OFFSET,
+            "sound cluster data",
+            MAX_BSP_CLUSTERS * (MAX_BSP_CLUSTERS - 1) / 2,
+        )?
+        .get(..pairs)
+        .map(<[u8]>::to_vec)
+        .unwrap_or_default();
 
     let leaves_block = bsp.block(BSP_LEAVES_OFFSET, "leaves", BSP_LEAF_SIZE, LEAVES.2)?;
     let mut leaf_clusters = Vec::with_capacity(leaves_block.len());
@@ -1239,6 +1283,10 @@ fn import_structure_bsp(
         leaf_clusters,
         weather_palette,
         detail_objects,
+        background_sounds,
+        sound_environments,
+        cluster_sounds,
+        cluster_sound_distances,
         decals,
         lens_flare_markers,
         lens_flares,
@@ -1250,6 +1298,54 @@ fn import_structure_bsp(
         surfaces,
         lightmaps,
     })
+}
+
+/// The looping sounds of a BSP's background sound palette, `None` for an
+/// entry that names none.
+fn import_background_sounds(bsp: &Element<'_>) -> Result<Vec<Option<TagRef>>, ImportError> {
+    let palette = bsp.block(
+        BSP_BACKGROUND_SOUNDS_OFFSET,
+        "background sounds",
+        BSP_BACKGROUND_SOUND_SIZE,
+        MAX_BSP_BACKGROUND_SOUNDS,
+    )?;
+    palette
+        .iter()
+        .map(|entry| {
+            crate::object::reference(&entry, 0x20, "background sound", &[crate::sound::LSND])
+        })
+        .collect()
+}
+
+/// The environments of a BSP's sound environment palette, `None` for an
+/// entry that names none.
+fn import_sound_environments(
+    cache: &Cache,
+    bsp: &Element<'_>,
+) -> Result<Vec<Option<opence_content::SoundEnvironment>>, ImportError> {
+    let palette = bsp.block(
+        BSP_SOUND_ENVIRONMENTS_OFFSET,
+        "sound environments",
+        BSP_SOUND_ENVIRONMENT_SIZE,
+        MAX_BSP_SOUND_ENVIRONMENTS,
+    )?;
+    let mut environments = Vec::with_capacity(palette.len());
+    for entry in palette.iter() {
+        let Some(index) = entry.reference(0x20, "sound environment", &[SNDE])? else {
+            environments.push(None);
+            continue;
+        };
+        let environment = cache.tag(index, SNDE, SOUND_ENVIRONMENT_SIZE)?;
+        let mut values = [0.0; 12];
+        for (slot, value) in values.iter_mut().enumerate() {
+            *value = environment.f32(8 + 4 * slot, "sound environment")?;
+        }
+        environments.push(Some(opence_content::SoundEnvironment {
+            priority: environment.i16(4, "priority")?,
+            values,
+        }));
+    }
+    Ok(environments)
 }
 
 /// A lens flare placed in a BSP: its position, its direction (each
@@ -1969,7 +2065,34 @@ pub(crate) mod tests {
         // two clusters: one sees the first sky, the other none
         let mut clusters = vec![0u8; BSP_CLUSTER_SIZE * 2];
         clusters[BSP_CLUSTER_SIZE..BSP_CLUSTER_SIZE + 2].copy_from_slice(&(-1i16).to_le_bytes());
+        // the first hums the one background sound and is heard in the
+        // second, empty, environment; the second names a background past
+        // the palette, and the first environment
+        put(&mut clusters, 4, &0i16.to_le_bytes());
+        put(&mut clusters, 6, &1i16.to_le_bytes());
+        put(&mut clusters, BSP_CLUSTER_SIZE + 4, &3i16.to_le_bytes());
+        put(&mut clusters, BSP_CLUSTER_SIZE + 6, &0i16.to_le_bytes());
         let clusters = bsp.add(&clusters);
+        let wind = fake.add_tag(
+            crate::sound::LSND,
+            "sound\\fake\\wind",
+            &[0u8; crate::sound::LOOPING_SOUND_SIZE],
+        );
+        let mut background = vec![0u8; BSP_BACKGROUND_SOUND_SIZE];
+        reference(&mut background, 0x20, crate::sound::LSND, fake.handle(wind));
+        let background_sounds = bsp.add(&background);
+        let mut hall = vec![0u8; SOUND_ENVIRONMENT_SIZE];
+        put(&mut hall, 4, &2i16.to_le_bytes());
+        for slot in 0..12 {
+            put(&mut hall, 8 + 4 * slot, &(slot as f32 * 0.5).to_le_bytes());
+        }
+        let hall = fake.add_tag(SNDE, "sound\\fake\\hall", &hall);
+        let mut environments = vec![0u8; BSP_SOUND_ENVIRONMENT_SIZE * 2];
+        reference(&mut environments, 0x20, SNDE, fake.handle(hall));
+        empty(&mut environments, BSP_SOUND_ENVIRONMENT_SIZE + 0x20);
+        let sound_environments = bsp.add(&environments);
+        // (the two clusters' one distance)
+        let sound_distances = bsp.add(&[42]);
         // one runtime decal a unit above the floor, looking down
         let mut decal = Vec::new();
         for value in [0.5f32, -0.5, 1.0] {
@@ -1982,6 +2105,28 @@ pub(crate) mod tests {
         block(structure_bsp, BSP_LENS_FLARES_OFFSET, 1, flares);
         block(structure_bsp, BSP_LENS_FLARE_MARKERS_OFFSET, 2, markers);
         block(structure_bsp, BSP_CLUSTERS_OFFSET, 2, clusters);
+        block(
+            structure_bsp,
+            BSP_BACKGROUND_SOUNDS_OFFSET,
+            1,
+            background_sounds,
+        );
+        block(
+            structure_bsp,
+            BSP_SOUND_ENVIRONMENTS_OFFSET,
+            2,
+            sound_environments,
+        );
+        put(
+            structure_bsp,
+            BSP_SOUND_CLUSTER_DATA_OFFSET,
+            &1i32.to_le_bytes(),
+        );
+        put(
+            structure_bsp,
+            BSP_SOUND_CLUSTER_DATA_OFFSET + 12,
+            &sound_distances.to_le_bytes(),
+        );
         block(
             structure_bsp,
             crate::decal::BSP_RUNTIME_DECALS_OFFSET,
@@ -2330,6 +2475,41 @@ pub(crate) mod tests {
             assert_eq!(bsp.surfaces, [[0, 1, 2]]);
             assert_eq!(bsp.lens_flares, [None]);
             assert_eq!(bsp.cluster_skies, [Some(0), None]);
+            assert_eq!(
+                bsp.background_sounds,
+                [Some(TagRef {
+                    group: Group(*b"lsnd"),
+                    path: "sound\\fake\\wind".into(),
+                })]
+            );
+            let mut hall = [0.0; 12];
+            for (slot, value) in hall.iter_mut().enumerate() {
+                *value = slot as f32 * 0.5;
+            }
+            assert_eq!(
+                bsp.sound_environments,
+                [
+                    Some(opence_content::SoundEnvironment {
+                        priority: 2,
+                        values: hall,
+                    }),
+                    None
+                ]
+            );
+            assert_eq!(
+                bsp.cluster_sounds,
+                [
+                    opence_content::ClusterSound {
+                        background: Some(0),
+                        environment: Some(1),
+                    },
+                    opence_content::ClusterSound {
+                        background: None,
+                        environment: Some(0),
+                    },
+                ]
+            );
+            assert_eq!(bsp.cluster_sound_distances, [42]);
             assert_eq!(
                 bsp.decals,
                 [opence_content::LevelDecal {

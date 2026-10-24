@@ -16,15 +16,16 @@ pub(crate) fn lock(player: &SharedPlayer) -> MutexGuard<'_, Option<SoundPlayer>>
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-/// The listener of a camera at `transform`: it looks down its +x and its
-/// up is its +z, as the game's are.
-pub(crate) fn listener(transform: &opence_sim::Transform) -> Listener {
+/// The listener of a camera at `transform`, moving at `velocity`: it looks
+/// down its +x and its up is its +z, as the game's are.
+pub(crate) fn listener(transform: &opence_sim::Transform, velocity: opence_sim::Vec3) -> Listener {
     let forward = transform.rotation * opence_sim::Vec3::X;
     let up = transform.rotation * opence_sim::Vec3::Z;
     Listener {
         position: transform.position.to_array(),
         forward: forward.to_array(),
         up: up.to_array(),
+        velocity: velocity.to_array(),
     }
 }
 
@@ -78,8 +79,9 @@ mod tests {
     #[test]
     fn a_camera_looks_down_its_x() {
         let transform = opence_sim::Transform::default();
-        let listener = listener(&transform);
+        let listener = listener(&transform, opence_sim::Vec3::X);
         assert_eq!(listener.forward, [1.0, 0.0, 0.0]);
         assert_eq!(listener.up, [0.0, 0.0, 1.0]);
+        assert_eq!(listener.velocity, [1.0, 0.0, 0.0]);
     }
 }

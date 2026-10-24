@@ -31,6 +31,7 @@ pub mod script;
 pub mod settings;
 pub mod snapshot;
 mod sound_events;
+mod sound_world;
 mod stations;
 pub mod ui;
 mod ui_host;
@@ -637,6 +638,10 @@ pub(crate) struct Running {
     heard: Vec<sound_events::Heard>,
     /// The footsteps' effects (kept for their memory).
     stepped: Vec<sound_events::Stepped>,
+    /// The looping sounds and the reverb around the camera.
+    sound_world: sound_world::SoundWorld,
+    /// The frame's looping sounds (kept for their memory).
+    loops: Vec<sound_world::Looping>,
 }
 
 /// The models and animation graphs objects are drawn and posed with,
@@ -780,6 +785,8 @@ impl Engine {
             stepped: Vec::new(),
             particles: particles::LevelParticles::default(),
             particle_rows: Vec::new(),
+            sound_world: sound_world::SoundWorld::default(),
+            loops: Vec::new(),
         });
         publish(&mut state, &self.snapshots, 0.0);
         *audio::lock(&self.audio) = None;
@@ -830,6 +837,8 @@ impl Engine {
             stepped: Vec::new(),
             particles: particles::LevelParticles::new(&geometry.content),
             particle_rows: Vec::new(),
+            sound_world: sound_world::SoundWorld::new(&geometry.content),
+            loops: Vec::new(),
         });
         publish(&mut state, &self.snapshots, 0.0);
         let bank: Arc<dyn opence_audio::SoundBank> = geometry.content.clone();
@@ -969,10 +978,34 @@ impl Engine {
             run_ticks(&mut state, advanced.ticks)?;
             frame = Some(advanced);
         }
+        let shell_bsp = state.shell.bsp;
         if let (Some(running), Some(advanced)) = (state.running.as_mut(), frame.as_ref()) {
             let heard = std::mem::take(&mut running.heard);
+            let camera = running.simulation.camera().transform;
+            if let Some(level) = running.level.clone() {
+                let bsp = running
+                    .campaign
+                    .as_ref()
+                    .map_or(shell_bsp, campaign::Campaign::bsp);
+                let decals = &mut running.decals;
+                running.sound_world.update(
+                    level.structure_bsps.get(bsp),
+                    &mut running.simulation,
+                    camera.position,
+                    advanced.ticks,
+                    |from, to| decals.clear_between(&level, bsp, from, to),
+                    &mut running.loops,
+                );
+            }
             if let Some(player) = audio::lock(&self.audio).as_mut() {
-                player.set_listener(audio::listener(&running.simulation.camera().transform));
+                player.set_listener(audio::listener(
+                    &camera,
+                    running.sound_world.listener_velocity(),
+                ));
+                let environment = *running.sound_world.environment();
+                player
+                    .mixer()
+                    .set_environment(environment.is_audible().then_some(environment));
                 for sound in &heard {
                     if let Some(index) = player.sound_index(&sound.tag.path) {
                         let source = opence_audio::Source {
@@ -984,6 +1017,19 @@ impl Engine {
                 }
                 let ticks = i32::try_from(advanced.ticks).unwrap_or(i32::MAX);
                 player.advance((frame_seconds * scale * 1000.0) as f32, ticks);
+                for looping in &running.loops {
+                    if let Some(index) = player.looping_index(&looping.tag.path) {
+                        let source = opence_audio::Source {
+                            position: looping.position.map(|at| at.to_array()),
+                            velocity: looping.velocity.to_array(),
+                            obstruction: looping.obstruction,
+                            occlusion: looping.occlusion,
+                            ..opence_audio::Source::default()
+                        };
+                        player.refresh_looping(looping.key, index, &source, false);
+                    }
+                }
+                player.update_loops();
             }
         }
         // (a script in the window runs a line a frame, with or without a world)

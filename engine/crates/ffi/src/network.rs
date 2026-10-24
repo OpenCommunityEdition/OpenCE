@@ -289,6 +289,8 @@ impl Engine {
             running_effects: Vec::new(),
             heard: Vec::new(),
             stepped: Vec::new(),
+            sound_world: crate::sound_world::SoundWorld::new(&level),
+            loops: Vec::new(),
             level: Some(level),
             network: Some(network),
             dressed,
