@@ -21,7 +21,7 @@
     - [x] `cont` in full
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Systems, effects and contrails' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 3: Weather, lighting and limits
+## Phase 3: Weather, lighting and limits [checkpoint: a40b225e]
 - [x] Task: Weather and wind 61fe864e
     - [x] Write tests: density by the weather palette; wind by the wind palette; fade near the camera
     - [x] `rain` and `wind` in full
