@@ -1,0 +1,154 @@
+# The menus' design language
+
+The tokens the redesigned menus, launcher and loading screen are built
+from (track `menu_redesign_20261024`). They are measured from the Xbox
+menus as the user's own `ui.map` draws them: `OpenCEEngine --capture-ui`
+writes every screen to `assets/ui_reference/` (gitignored, never
+committed), with `palette.json` sampled from them. The mockups, the
+clickable prototype and the motion studies are in the private design
+artifact; each round of feedback is recorded at the end of this file.
+
+Sizes are in the menus' own 640×480 units. The layout scales them by the
+window's height / 480 (see Widescreen).
+
+## Palette
+
+| Token | Colour | Where the original uses it |
+| --- | --- | --- |
+| `ink` | `#020B24` | The deepest panel fill, the focus capsule's fill |
+| `navy` | `#041327` | The sub-screens' scrim over the scene (about 70% opaque) |
+| `panel` | `#06101C` | Panels' fill (pause, pregame), about 85% opaque |
+| `band` | `#050407` | The footer band, about 60% opaque |
+| `deep` | `#0A223B` | Panel insets, list rows |
+| `line` | `#1D6AB4` | Rules, separators, panel strokes at rest |
+| `blue` | `#2796FE` | Items at rest, titles, focused strokes, arrows |
+| `glow` | `#6FC0FF` | The main menu's focused item's halo |
+| `silver` | `#CBCBCB` | The focused item's text, values |
+| `white` | `#F2F6FA` | The main menu's focused item |
+| `muted` | `#7D8A99` | Descriptions, disabled items |
+| `version` | `#FF8000` | The version text on the main menu |
+
+The palette is the original's (sampled shares: the navies make up about 75% of
+what the menus draw, and `blue` about 3%). Do not add new hues. Warning
+and error dialogs use the same blues. The Xbox drew its pad buttons in
+colour, and keycaps replace them (see Hints).
+
+## Shapes
+
+- **Rules:** 1 unit, `line`. One runs the full width under the title,
+  at y 44. The footer's rule is at y 408. Separators between groups of
+  items are 160 units long and start at the list's x.
+- **The focus capsule** (lists): 230×24, at x 34. Its left end is
+  rounded (radius 12) and its right end is square. A 2-unit `blue` stroke
+  runs on the top, left and bottom, with no stroke on the right. Its fill
+  is `ink`, and the text in it is `silver`.
+- **Panels** (pause, pregame, dialogs): radius 8, a 2-unit `blue`
+  stroke, and a `panel` fill. A header strip inside is 18 units, set off
+  by a 1-unit `line` rule. A panel's focus capsule is rounded at both
+  ends (radius 10) and inset 6 units.
+- **Arrows** (option values): filled triangles, 5×7, in `blue`, 6 units
+  either side of the value.
+- **The bevel:** the original's strokes are lighter on their inner edge.
+  We draw it as a 1-unit inner stroke of `blue` at 35% alpha.
+
+## Layout (4:3)
+
+| Part | Where |
+| --- | --- |
+| Title | x 40, baseline 38, `title` size |
+| List | x 42, the first row at y 58, rows every 25 units |
+| Description | x 340–600, y 58, `caption` |
+| Footer band | y 408–444, hints right-aligned to x 600 |
+| Main menu items | centred, the first at y 205, rows every 28 units |
+| Version | right-aligned to x 600, baseline 438, `caption`, `version` |
+
+**Widescreen:** the scene fills the window. The title, list and
+description keep their places relative to a centred 4:3 column. The
+rules, the scrim and the footer band stretch to the window's full width.
+Hints anchor to the column's right edge. Panels stay centred. The main
+menu's logo and items stay centred.
+
+## Type
+
+| Role | Face | Size | Case, tracking |
+| --- | --- | --- | --- |
+| `title` (screen titles) | OpenCE | 30 | Upper case, as set |
+| `menu` (main menu items) | Overpass 900 | 24 | Upper case |
+| `item` (list items, buttons) | Overpass 900 | 15 | Upper case, +0.02 em |
+| `value` (option values, names) | Overpass 750 | 15 | As written |
+| `caption` (descriptions, hints) | Overpass 750 | 11 | As written |
+| `hint` (footer) | Overpass 900 | 13 | Upper case |
+
+The original's titles are drawn in a face OpenCE (Newtown, respaced)
+stands in for. Its body text is Interstate, and Overpass follows the same
+road-sign alphabet (`port/assets/fonts/README.md`). Titles carry a
+vertical gradient from `glow` at the top to `blue` at the baseline.
+
+## Focus and selection
+
+| State | Lists | The main menu |
+| --- | --- | --- |
+| At rest | `blue` text | `blue` text at 80% |
+| Focused | The capsule, `silver` text | `white` text, an 8-unit `glow` halo |
+| Hovered (mouse) | The same as focused: the mouse moves focus | The same |
+| Pressed | The capsule's fill lifts to `deep` for 80 ms | The halo flashes to 100% |
+| Disabled | `muted` text, never focused | `muted` |
+
+## Hints
+
+The pad's coloured buttons become keycaps, because the app is keyboard
+and mouse only. Each keycap is a rounded rectangle of radius 3, 15 units
+high, with a 1-unit `blue` stroke and a `deep` fill. Its label is set in
+`hint` `silver`, followed by `=ACTION` in `hint` `blue`. The keycaps
+are:
+
+- `Enter` for A
+- `Esc` for B
+- `Tab` for Y, which the original used for "create" and "delete"
+- `Space` for X
+
+Clicking a hint does what its key does.
+
+## Motion
+
+| What | Duration | Curve |
+| --- | --- | --- |
+| Focus moving between items | 120 ms | `cubic-bezier(0.2, 0.0, 0.0, 1.0)` (it slides) |
+| Hover in and out | 90 ms | ease out |
+| A screen opening | 220 ms | 40 ms fade of the scrim, then the title and list slide 12 units from the right, 30 ms apart |
+| Back | 180 ms | The reverse, sliding to the right |
+| Scrolling | 160 ms a row | ease out, and the list's edges fade over 12 units |
+| The loading sweep | the load's own progress | linear, the cloud noise drifting 8 units a second |
+
+The motion is independent of the frame rate: each value is a function of
+the time since its change.
+
+## Sounds
+
+The sounds still come from the widgets' tags in `ui.map`: cursor, forward,
+back and error. The redesign adds none. Hover plays the cursor sound when
+focus moves.
+
+## The logo
+
+The Halo logo is drawn from the user's `ui.map` at run time, where the
+original placed it: centred at y 112 on the main menu, 520 units wide. It
+is never shipped or committed. The artifact shows a marked placeholder
+in its place. Before the UI is imported, the launcher shows the OpenCE
+wordmark (OpenCE, `title`, `blue` gradient).
+
+## The loading screen
+
+Faithful to the Xbox's, completed:
+
+- black;
+- our own hand-drawn 320×240 picture, centred;
+- the cloud noise drifting over it;
+- a progress sweep under it: a 1-unit `line` track with a `blue` fill
+  and a `glow` leading edge.
+
+It plays on every campaign transition and on loading a saved game.
+
+## Feedback rounds
+
+(Recorded as the user reviews the artifact.)
