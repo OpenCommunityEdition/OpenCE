@@ -497,13 +497,21 @@ impl<'a> Compressed<'a> {
         };
         // (the frames are the game's shorts)
         let (this_frame, next_frame) = (i32::from(this_frame as i16), i32::from(next_frame as i16));
-        if real_frame == this_frame as f32 {
-            Some((channel.finish)(this))
-        } else {
-            let fraction = (real_frame - this_frame as f32) / (next_frame - this_frame) as f32;
-            Some((channel.blend)(this, next, fraction))
+        match keyframe_fraction(real_frame, this_frame, next_frame) {
+            Some(fraction) => Some((channel.blend)(this, next, fraction)),
+            None => Some((channel.finish)(this)),
         }
     }
+}
+
+/// How far `real_frame` is from the keyframe at `this_frame` to the one at
+/// `next_frame`; none at `this_frame` itself, or where a map's frame
+/// indices out of order put the next keyframe at or before this one (whose
+/// fraction would be infinite or negative), or for a frame that is not a
+/// number (a tag's speed of 0 divided into a vehicle standing still).
+fn keyframe_fraction(real_frame: f32, this_frame: i32, next_frame: i32) -> Option<f32> {
+    (real_frame.is_finite() && real_frame != this_frame as f32 && next_frame > this_frame)
+        .then(|| (real_frame - this_frame as f32) / (next_frame - this_frame) as f32)
 }
 
 /// The keyframe whose frames hold `target`, with one after it
@@ -1760,6 +1768,15 @@ pub(crate) mod tests {
         let mut nodes = [expected; 2];
         base_orientations(None, &animation(0), 0, &mut nodes);
         assert_eq!(nodes, [Orientation::REST; 2]);
+    }
+
+    #[test]
+    fn a_frame_between_keyframes_is_their_fraction_unless_they_are_out_of_order() {
+        assert_eq!(keyframe_fraction(3.0, 2, 6), Some(0.25));
+        assert_eq!(keyframe_fraction(2.0, 2, 6), None);
+        assert_eq!(keyframe_fraction(3.0, 2, 2), None);
+        assert_eq!(keyframe_fraction(3.0, 4, 2), None);
+        assert_eq!(keyframe_fraction(f32::NAN, 0, 2), None);
     }
 
     #[test]

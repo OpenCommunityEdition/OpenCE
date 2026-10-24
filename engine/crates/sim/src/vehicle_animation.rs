@@ -158,6 +158,13 @@ pub fn vehicle_overlay_frames<'a>(
             frames.push((overlay, suspension_fraction(travel) * last_frame(overlay)));
         }
     }
+    // (a tag's speed of 0 divided into a vehicle standing still is not a
+    // number; it rests at the first frame)
+    for (_, frame) in &mut frames {
+        if frame.is_nan() {
+            *frame = 0.0;
+        }
+    }
     frames
 }
 
@@ -500,6 +507,17 @@ mod tests {
             .map(|(_, frame)| frame)
             .collect();
         assert_eq!(frames, vec![5.0, 7.5, 10.0, 0.0, 10.0]);
+        // (a tag's speeds of 0, standing still: no frame is not a number)
+        let still = VehicleMotion {
+            speed: 0.0,
+            velocity: Vec3::ZERO,
+            maximum_forward_speed: 0.0,
+            maximum_reverse_speed: 0.0,
+            ..motion
+        };
+        assert!(vehicle_overlay_frames(&graph, 1, &still)
+            .iter()
+            .all(|(_, frame)| !frame.is_nan()));
         // (too few nodes in the model: none fit)
         assert!(vehicle_overlay_frames(&graph, 0, &motion).is_empty());
         // (no vehicle block: nothing)
