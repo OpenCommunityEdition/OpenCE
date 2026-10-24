@@ -1,4 +1,4 @@
-version 38
+version 39
 bound CHAT_TEXT_SIZE 64
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
@@ -14,6 +14,7 @@ bound MAP_SHARE_HASH_BYTES 32
 bound MAXIMUM_DEVICE_GROUPS 1024
 bound MAXIMUM_DEVICE_STATES_PER_MESSAGE 64
 bound MAXIMUM_ENTRIES_PER_MESSAGE 64
+bound MAXIMUM_MUTATOR_KEYS 32
 bound MAXIMUM_OBJECT_LOOKS_PER_MESSAGE 64
 bound MAXIMUM_OBJECT_NAMES_PER_SCENARIO 0x200
 bound MAXIMUM_OBJECT_TRANSFORMS_PER_MESSAGE 64
@@ -23,6 +24,7 @@ bound MAXIMUM_QUEUED_EVENTS 128
 bound MAXIMUM_REGIONS_PER_OBJECT 8
 bound MAXIMUM_STATISTICS_PER_MESSAGE 64
 bound MAXIMUM_WEAPONS_PER_UNIT 4
+bound MUTATOR_KEY_LENGTH 32
 bound NUMBER_OF_ANGLES enum f0ce7d0319b6
 bound NUMBER_OF_OBJECT_CHANGE_COLORS enum b00724872e2d
 bound NUMBER_OF_PLAYER_POWERUPS enum 43075f42087c
@@ -76,6 +78,7 @@ enum _distributed_message_map_share_offer 84
 enum _distributed_message_map_share_progress 86
 enum _distributed_message_map_share_request 83
 enum _distributed_message_map_share_sources 85
+enum _distributed_message_mutators 112
 enum _distributed_message_notice 17
 enum _distributed_message_object_changes 5
 enum _distributed_message_object_states 6
@@ -273,6 +276,8 @@ struct distributed_map_share_progress 2c3831013302
 struct distributed_map_share_request 3cdcbc8c3a49
 struct distributed_map_share_source 940f8a4c9849
 struct distributed_message_header 0e026a4933a1
+struct distributed_mutator_entry 1977cdd280fe
+struct distributed_mutators_message 63b6304230c4
 struct distributed_object_change 343e570cfa1d
 struct distributed_object_change_message 4c3679cd4dae
 struct distributed_object_state 1b656bbda892
