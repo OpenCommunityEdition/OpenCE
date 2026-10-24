@@ -345,9 +345,16 @@ pub(crate) fn command(state: &mut State, args: &Args) -> Result<Output, CommandE
 
 /// The stations of `level`: devmap's on devmap, otherwise devgulch's.
 fn stations(level: Option<&Level>) -> &'static [Station] {
-    match level {
-        Some(level) if level.scenario.path == devmap::NAME => &devmap::STATIONS,
-        _ => &devgulch::STATIONS,
+    of_map(level.map_or(devgulch::NAME, |level| level.scenario.path.as_str()))
+}
+
+/// The stations of the map named `map`: devmap's on devmap, otherwise
+/// devgulch's.
+pub(crate) fn of_map(map: &str) -> &'static [Station] {
+    if map == devmap::NAME {
+        &devmap::STATIONS
+    } else {
+        &devgulch::STATIONS
     }
 }
 

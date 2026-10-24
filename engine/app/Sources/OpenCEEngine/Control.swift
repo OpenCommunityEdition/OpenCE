@@ -138,7 +138,7 @@ func headless() -> Never {
             engine.leaveGame()
             _ = try engine.startLevel(geometry: loaded.geometry, difficulty: 1)
             try engine.placeCamera(placement: loaded.start)
-            if !CommandLine.arguments.contains("--fly") {
+            if !launchArguments.contains("--fly") {
                 try? engine.spawnPlayer(start: 0)
             }
             level = loaded

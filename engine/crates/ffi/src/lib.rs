@@ -62,6 +62,27 @@ pub fn engine_version() -> String {
     env!("CARGO_PKG_VERSION").to_owned()
 }
 
+/// A station of a test map, as the launcher's Developer tab lists it.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct TestStation {
+    /// Its name: `station <name>`.
+    pub name: String,
+    /// What it tests.
+    pub help: String,
+}
+
+/// The stations of the test map named `map` (devgulch's, but on devmap).
+#[uniffi::export]
+pub fn test_stations(map: String) -> Vec<TestStation> {
+    stations::of_map(&map)
+        .iter()
+        .map(|station| TestStation {
+            name: station.name.into(),
+            help: station.help.into(),
+        })
+        .collect()
+}
+
 /// What a call to the engine can fail with.
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum EngineError {
@@ -1599,6 +1620,27 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_test_stations_are_devgulchs_but_on_devmap() {
+        let names = |map: &str| -> Vec<String> {
+            test_stations(map.into())
+                .into_iter()
+                .map(|station| station.name)
+                .collect()
+        };
+        assert_eq!(names("devgulch").len(), 9);
+        assert_eq!(
+            names("devgulch").first().map(String::as_str),
+            Some("weapons")
+        );
+        assert!(names("devmap").contains(&"doors".to_owned()));
+        assert!(!names("devgulch").contains(&"doors".to_owned()));
+        assert_eq!(names("bloodgulch"), names("devgulch"));
+        assert!(test_stations("devgulch".into())
+            .iter()
+            .all(|station| !station.help.is_empty()));
+    }
 
     #[test]
     fn change_colors_are_chosen_from_the_position_as_the_originals() {

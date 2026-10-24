@@ -1,6 +1,7 @@
-// The launcher: the window before the game, with Play, Settings and Exit
-// only. Its settings are what must be set before the game starts: the data
-// folders, the display and the window mode; the rest is the game's menus.
+// The launcher: the window before the game, with Play, Settings,
+// Developer and Exit only. Its settings are what must be set before the
+// game starts: the data folders, the display and the window mode; the rest
+// is the game's menus. Developer starts a test map (DeveloperTab.swift).
 import AppKit
 import Foundation
 import OpenCEEngineCore
@@ -9,7 +10,7 @@ import SwiftUI
 
 /// What the launcher offers.
 public enum LauncherChoice: String, CaseIterable, Sendable {
-    case play, settings, exit
+    case play, settings, developer, exit
 
     public var title: String { rawValue.capitalized }
 }
@@ -36,13 +37,22 @@ public final class LauncherModel {
     public let root: URL
     /// Whether the settings show.
     public var showsSettings = false
+    /// Whether the Developer tab shows.
+    public var showsDeveloper = false
+    /// The Developer tab's launch.
+    public let developer: DeveloperModel
     public var onPlay: (() -> Void)?
+    /// Starts the game with the Developer tab's arguments.
+    public var onLaunch: (([String]) -> Void)?
     public var onExit: (() -> Void)?
 
-    public init(settings: SettingsModel, displays: [String], root: URL) {
+    /// `variables` are the shell's, whose drawing switches the Developer
+    /// tab sets.
+    public init(settings: SettingsModel, displays: [String], root: URL, variables: [ShellVariable] = []) {
         self.settings = settings
         self.displays = displays.isEmpty ? ["Main Display"] : displays
         self.root = root
+        developer = DeveloperModel(variables: variables, root: root)
     }
 
     public func choose(_ choice: LauncherChoice) {
@@ -52,10 +62,18 @@ public final class LauncherModel {
             onPlay?()
         case .settings:
             showsSettings = true
+        case .developer:
+            showsDeveloper = true
         case .exit:
             settings.save()
             onExit?()
         }
+    }
+
+    /// Starts the game with the Developer tab's `arguments`.
+    public func launch(_ arguments: [String]) {
+        settings.save()
+        onLaunch?(arguments)
     }
 
     /// The folders the game reads its maps from.
@@ -110,8 +128,8 @@ public final class LauncherModel {
     }
 }
 
-/// The launcher's window: the three choices, and the settings in their
-/// place when Settings is chosen.
+/// The launcher's window: the four choices, and the settings or the
+/// Developer tab in their place when chosen.
 public struct LauncherView: View {
     @Bindable var model: LauncherModel
 
@@ -124,6 +142,9 @@ public struct LauncherView: View {
             Text("OpenCE").font(MenuFonts.title(44))
             if model.showsSettings {
                 LauncherSettings(model: model)
+            } else if model.showsDeveloper {
+                DeveloperTab(model: model.developer, onLaunch: { model.launch($0) },
+                             onDone: { model.showsDeveloper = false })
             } else {
                 ForEach(LauncherChoice.allCases, id: \.self) { choice in
                     Button(choice.title) { model.choose(choice) }

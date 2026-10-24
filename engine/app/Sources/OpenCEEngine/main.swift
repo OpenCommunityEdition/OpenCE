@@ -75,9 +75,13 @@ func hudPass(device: MTLDevice) -> HudPass? {
     }
 }
 
+/// The game's arguments: the command line's, then the launcher's
+/// Developer tab's.
+nonisolated(unsafe) var launchArguments = CommandLine.arguments
+
 /// The value after `name` among the arguments, or nil.
 func argument(_ name: String) -> String? {
-    let arguments = CommandLine.arguments
+    let arguments = launchArguments
     guard let index = arguments.firstIndex(of: name), index + 1 < arguments.count else { return nil }
     return arguments[index + 1]
 }
@@ -247,7 +251,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = mainMenu()
         let skips = ["--map", "--control", "--socket", "--no-launcher"]
-        if skips.contains(where: CommandLine.arguments.contains) {
+        if skips.contains(where: launchArguments.contains) {
             startGame()
         } else {
             showLauncher()
@@ -258,13 +262,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The launcher: Play starts the game on its main menu, Exit quits.
     func showLauncher() {
         MenuFonts.register()
-        let model = LauncherModel(settings: saved, displays: NSScreen.screens.map(\.localizedName), root: root)
+        let model = LauncherModel(settings: saved, displays: NSScreen.screens.map(\.localizedName), root: root,
+                                  variables: engine.shellVariables())
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 380),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "OpenCE"
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: LauncherView(model: model))
         model.onPlay = { [weak self] in
+            self?.launcher?.orderOut(nil)
+            self?.launcher = nil
+            self?.startGame()
+        }
+        model.onLaunch = { [weak self] arguments in
+            launchArguments += arguments
             self?.launcher?.orderOut(nil)
             self?.launcher = nil
             self?.startGame()
@@ -284,7 +295,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.onMessage = { [weak self] text in self?.showMessage(text) }
         menu.onClosed = { [weak self] in self?.hideMenu() }
         let controller = EngineWindowController()
-        controller.showsFrameTimes = CommandLine.arguments.contains("--frame-times")
+        controller.showsFrameTimes = launchArguments.contains("--frame-times")
             || saved.settings.video.showFrameTimes
         self.controller = controller
         if let folder = folders.first {
@@ -296,20 +307,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } catch {
                 fail("\(map): \(error)")
             }
+            if let launch = DeveloperLaunch(arguments: launchArguments) {
+                startDeveloper(launch)
+            }
         }
         startShell(view: controller.window.engineView)
         startServant(device: controller.window.engineView.device)
-        if CommandLine.arguments.contains("--control") || argument("--socket") != nil {
+        if launchArguments.contains("--control") || argument("--socket") != nil {
             startControl()
         }
         controller.window.engineView.onFrame = { [weak self] link in self?.frame(link) }
         let screens = NSScreen.screens
         let display = Int(saved.settings.video.display)
-        controller.show(fullScreen: CommandLine.arguments.contains("--full-screen") || saved.settings.video.fullScreen,
+        controller.show(fullScreen: launchArguments.contains("--full-screen") || saved.settings.video.fullScreen,
                         on: screens.indices.contains(display) ? screens[display] : nil)
         controller.window.engineView.startDisplayLink()
         if level == nil {
             showMenu(nil)
+        }
+    }
+
+    /// The Developer tab's launch, once its level is loaded: the switches
+    /// and the view set, the station started and the first frame captured.
+    func startDeveloper(_ launch: DeveloperLaunch) {
+        for (name, value) in launch.settings {
+            do {
+                try engine.setShellVariable(name: name, value: value)
+            } catch {
+                appLog("warn", "\(name) \(value): \(error)")
+            }
+        }
+        if let capture = launch.capture {
+            try? FileManager.default.createDirectory(at: URL(fileURLWithPath: capture).deletingLastPathComponent(),
+                                                     withIntermediateDirectories: true)
+        }
+        for line in launch.commands {
+            appLog("info", "\(line): \(engine.runCommand(line: line).text)")
         }
     }
 
@@ -380,7 +413,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controls = flyControls(saved.settings.controls)
         play = playControls(saved.settings.controls)
         settings = videoSettings(saved.settings.video)
-        controller?.showsFrameTimes = CommandLine.arguments.contains("--frame-times")
+        controller?.showsFrameTimes = launchArguments.contains("--frame-times")
             || saved.settings.video.showFrameTimes
         controller?.capturesMouse = true
     }
@@ -644,7 +677,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         try engine.placeCamera(placement: loaded.start)
         // (the player at the first start, unless flying; a map without one
         // keeps the free camera)
-        if player, !CommandLine.arguments.contains("--fly") {
+        if player, !launchArguments.contains("--fly") {
             try? engine.spawnPlayer(start: 0)
             thirdPerson = false
         }

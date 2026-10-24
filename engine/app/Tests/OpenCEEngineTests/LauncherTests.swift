@@ -1,4 +1,4 @@
-// The launcher: its three choices, and its settings (the data folders, the
+// The launcher: its four choices, and its settings (the data folders, the
 // display and the window mode), kept in range and saved.
 import AppKit
 import Foundation
@@ -25,8 +25,8 @@ final class LauncherTests: XCTestCase {
         return LauncherModel(settings: settings, displays: displays, root: folder)
     }
 
-    func testThereArePlaySettingsAndExitOnly() {
-        XCTAssertEqual(LauncherChoice.allCases.map(\.title), ["Play", "Settings", "Exit"])
+    func testThereArePlaySettingsDeveloperAndExitOnly() {
+        XCTAssertEqual(LauncherChoice.allCases.map(\.title), ["Play", "Settings", "Developer", "Exit"])
     }
 
     func testPlayAndExitSaveAndSettingsShowsThem() {
