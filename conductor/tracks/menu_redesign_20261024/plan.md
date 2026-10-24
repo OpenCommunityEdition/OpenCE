@@ -4,8 +4,8 @@
 - [x] Task: Reference captures of the original ba7d643e
     - [x] Write tests: `OpenCEEngine --capture-ui` walks every screen headless and writes PNGs to `assets/ui_reference/` (gitignored); a test that the folder is ignored
     - [x] The capture command; the palette sampled from the captures into a local swatch file
-- [ ] Task: The design reference
-    - [ ] `docs/ui_design.md`: the palette, panel and frame shapes, bevels, spacing, the type scale (OpenCE and Overpass sizes matched to the original's), focus and selection, motion curves, sounds
+- [x] Task: The design reference c82db598
+    - [x] `docs/ui_design.md`: the palette, panel and frame shapes, bevels, spacing, the type scale (OpenCE and Overpass sizes matched to the original's), focus and selection, motion curves, sounds
 - [ ] Task: Static mockups
     - [ ] A private Claude design artifact with every screen in the spec, drawn from the reference with our own art and a marked logo placeholder
     - [ ] Rounds of the user's feedback, recorded in the artifact and in `docs/ui_design.md`
