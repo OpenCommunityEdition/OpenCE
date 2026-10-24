@@ -28,6 +28,6 @@
 - [x] Task: Lighting and limits d6cdc29e
     - [x] Write tests: lit particles take probes and lights; recycling at the limit; the budget
     - [x] Particle lighting, emitted lights, limits and the setting
-- [~] Task: The particle station and the documentation
-    - [ ] `station particles`; `docs/engine.md`: particles
+- [x] Task: The particle station and the documentation a1b009d2
+    - [x] `station particles`; `docs/engine.md`: particles
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Weather, lighting and limits' (Protocol in workflow.md) (deferred to the end)
