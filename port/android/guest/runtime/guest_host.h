@@ -134,6 +134,11 @@ void host_touch_look_read(float *delta);
 void host_touch_rumble(unsigned int low, unsigned int high);
 /* tells the overlay when to show: touch_input.c's _touch_scene_* */
 void host_touch_scene(int scene);
+void host_touch_weapon_slots(const int *slots);
+int host_touch_weapon_request(void);
+int host_touch_hud_active(void);
+int host_touch_layout_request(void);
+int host_touch_layout_take_choice(void);
 /* the game control on each of the 16 controller buttons (touch_game.c),
 for the overlay's labels */
 void host_touch_bindings(const int *controls);

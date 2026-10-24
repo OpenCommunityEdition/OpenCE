@@ -146,6 +146,23 @@ on-screen keyboard, tap a key to press it, "B =BACK" to cancel and
 
 ### Touch controls
 
+On Android with touch controls, choosing a campaign difficulty opens a visual
+Classic/Modern chooser before the map is loaded. The game stays in the menu
+until one of the two layouts is selected; Back and outside taps cannot dismiss
+this start-game choice. Each preview uses the saved button layout. There is no
+Keep button. Options > Touch interface opens the same chooser during play,
+where Back can close it without changing the layout. Controller-only play and
+other platforms keep their usual launch flow.
+
+Options > Touch interface selects Classic (the original button labels and
+weapon-cycle button) or Modern (action icons and two weapon slots). Classic
+keeps the original radar position and supports cycling through the inventory
+on custom maps with more than two weapons. Each interface saves its own layout,
+sensitivity and General options. Layout imports, exports and Reset apply to the
+selected interface; layout files do not change the interface selection. New
+installations start in Classic; existing saved layouts remain in Modern.
+
+
 In a game, the app shows touch controls over the picture. They are a
 controller for player 1. With the default buttons of the profile:
 

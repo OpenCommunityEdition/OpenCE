@@ -945,6 +945,75 @@ static void unit_align_facing(
 	long unit_index,
 	real_vector2d const *alignment_vector);
 
+/* Android's modern HUD treats its two lower frames as the active quick slots
+ * whenever the local player really has a third or fourth weapon. This applies
+ * equally to multiplayer custom content and to campaign glitches/mods. Normal
+ * two-weapon campaign and multiplayer keep Halo's original behaviour. */
+#if defined(HALO_ANDROID)
+extern int host_touch_hud_active(void);
+extern void host_touch_weapon_display_order(int order[4]);
+#endif
+
+static boolean touch_android_backpack_gate(long unit_index)
+{
+#if defined(HALO_ANDROID)
+	struct unit_datum *unit;
+
+	if (!host_touch_hud_active() || player_control_get_unit_index(0) != unit_index)
+		return FALSE;
+	unit = unit_get(unit_index);
+	return unit &&
+		(unit->unit.weapon_object_indices[2] != NONE ||
+		 unit->unit.weapon_object_indices[3] != NONE);
+#else
+	(void)unit_index;
+	return FALSE;
+#endif
+}
+
+static boolean touch_android_weapon_slot_is_quick(long unit_index, short slot)
+{
+#if defined(HALO_ANDROID)
+	int order[4] = {0, 1, 2, 3};
+
+	if (!touch_android_backpack_gate(unit_index))
+		return TRUE;
+	host_touch_weapon_display_order(order);
+	return slot == order[0] || slot == order[1];
+#else
+	(void)unit_index;
+	(void)slot;
+	return TRUE;
+#endif
+}
+
+static short touch_android_quick_fallback(long unit_index, short preferred)
+{
+#if defined(HALO_ANDROID)
+	int order[4] = {0, 1, 2, 3};
+	struct unit_datum *unit = unit_get(unit_index);
+	int i;
+
+	if (!touch_android_backpack_gate(unit_index))
+		return preferred;
+	host_touch_weapon_display_order(order);
+	if (preferred >= 0 && preferred < MAXIMUM_WEAPONS_PER_UNIT &&
+		(preferred == order[0] || preferred == order[1]) &&
+		unit->unit.weapon_object_indices[preferred] != NONE)
+		return preferred;
+	for (i = 0; i < 2; i++)
+	{
+		short slot = (short)order[i];
+		if (slot >= 0 && slot < MAXIMUM_WEAPONS_PER_UNIT &&
+			unit->unit.weapon_object_indices[slot] != NONE)
+			return slot;
+	}
+	return NONE;
+#else
+	(void)unit_index;
+	return preferred;
+#endif
+}
 static short unit_weapon_next_index(long unit_index, short current_index, short delta);
 static void unit_ready_desired_weapon(
 	long unit_index,
@@ -2108,7 +2177,9 @@ short unit_inventory_get_must_be_readied_weapon(
 	{
 		long weapon_index = unit->unit.weapon_object_indices[index];
 
-		if (weapon_index!=NONE && weapon_must_be_readied(weapon_index))
+		if (weapon_index!=NONE &&
+			touch_android_weapon_slot_is_quick(unit_index, index) &&
+			weapon_must_be_readied(weapon_index))
 		{
 			must_be_readied_weapon_index = index;
 			break;
@@ -7651,8 +7722,25 @@ static void unit_ready_desired_weapon(
 {
 	struct unit_datum *unit = unit_get(unit_index);
 	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
-	long desired_weapon_index = unit_get_desired_weapon_index(unit_index);
-	long current_weapon_index = unit_get_current_weapon_index(unit_index);
+	long desired_weapon_index;
+	long current_weapon_index;
+
+	/* Final gate for the Android quick-slot/backpack split. If custom content
+	 * or a campaign glitch supplies more than two weapons, only the two frames
+	 * currently promoted as quick slots may reach the ready transition. */
+	if (touch_android_backpack_gate(unit_index) &&
+		unit->unit.desired_weapon_index != NONE &&
+		!touch_android_weapon_slot_is_quick(unit_index, unit->unit.desired_weapon_index))
+	{
+		short quick_slot = touch_android_quick_fallback(
+			unit_index, unit->unit.current_weapon_index);
+
+		unit->unit.desired_weapon_index = quick_slot;
+		player_control_set_desired_weapon(unit_index, quick_slot);
+	}
+
+	desired_weapon_index = unit_get_desired_weapon_index(unit_index);
+	current_weapon_index = unit_get_current_weapon_index(unit_index);
 
 	if (current_weapon_index!=NONE && weapon_put_away(current_weapon_index, immediate))
 	{
@@ -7863,7 +7951,9 @@ static short unit_weapon_next_index(
 	{
 		long current_weapon_index = unit->unit.weapon_object_indices[inventory_index];
 
-		if (current_weapon_index != NONE && unit_can_use_weapon(unit_index, current_weapon_index))
+		if (current_weapon_index != NONE &&
+			touch_android_weapon_slot_is_quick(unit_index, inventory_index) &&
+			unit_can_use_weapon(unit_index, current_weapon_index))
 		{
 			if (delta ||
 				selected_weapon_index == NONE ||

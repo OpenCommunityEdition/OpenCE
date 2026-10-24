@@ -652,7 +652,12 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         description="ANDROID GRADLE $out",
         pool="console",
     )
+    # Java and resources must also rebuild the APK when native code is unchanged.
+    gradle_inputs = sorted((PORT_DIR / "app" / "src").rglob("*"))
+    gradle_inputs = [path for path in gradle_inputs if path.is_file()]
+    gradle_inputs += [PORT_DIR / "build.gradle", PORT_DIR / "app" / "build.gradle",
+                      PORT_DIR / "settings.gradle", PORT_DIR / "gradle.properties"]
     n.build(outputs=apk, rule="android_gradle", inputs=[libmain, staged_sdl, staged_image, staged_brokers],
-            implicit=[sdl_android_mouse_listener])
+            implicit=[sdl_android_mouse_listener] + gradle_inputs)
     n.build(outputs="android_apk", rule="phony", inputs=apk)
     n.newline()

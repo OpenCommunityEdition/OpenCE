@@ -822,6 +822,25 @@ static void campaign_start(char const *map_name, short difficulty, short control
 	ui_play_audio_feedback_sound(SOUND_FORWARD);
 }
 
+#ifdef HALO_ANDROID
+int host_touch_layout_request(void);
+int host_touch_layout_take_choice(void);
+static boolean touch_campaign_pending;
+static char touch_campaign_map[256];
+static short touch_campaign_difficulty;
+static short touch_campaign_controller;
+
+/* Called on the game thread by the normal input loop, even in menus. */
+void menu_functions_touch_layout_update(void)
+{
+    if (touch_campaign_pending && host_touch_layout_take_choice())
+    {
+        touch_campaign_pending = FALSE;
+        campaign_start(touch_campaign_map, touch_campaign_difficulty, touch_campaign_controller);
+    }
+}
+#endif
+
 static boolean campaign_fail(void)
 {
 	ui_play_audio_feedback_sound(SOUND_ERROR);
@@ -1274,6 +1293,18 @@ static boolean difficulty_start(short difficulty, short controller)
 	/* (a campaign level, or a Custom Edition campaign map) */
 	if (!custom_edition_maps_level_campaign(map_name))
 		map_name = main_get_solo_level_name(0);
+#ifdef HALO_ANDROID
+    if (touch_campaign_pending) return TRUE;
+    if (strlen(map_name) >= sizeof(touch_campaign_map)) return campaign_fail();
+    if (host_touch_layout_request())
+    {
+        strcpy(touch_campaign_map, map_name);
+        touch_campaign_difficulty = PIN(difficulty, 0, 3);
+        touch_campaign_controller = controller;
+        touch_campaign_pending = TRUE;
+        return TRUE;
+    }
+#endif
 	campaign_start(map_name, PIN(difficulty, 0, 3), controller);
 	return TRUE;
 }
@@ -6551,7 +6582,11 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "set difficulty"))
 		{
-			main_set_difficulty(PIN(difficulty_shown(widget), 0, 3));
+#ifdef HALO_ANDROID
+            return difficulty_start(difficulty_shown(widget), controller);
+#else
+            main_set_difficulty(PIN(difficulty_shown(widget), 0, 3));
+#endif
 		}
 		else if (!strcmp(name, "load game menu init"))
 		{

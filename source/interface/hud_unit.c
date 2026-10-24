@@ -1153,6 +1153,46 @@ void hud_render_unit_interface(
 					short motion_sensor_left = NONE;
 
 					absolute_placement.corner = _hud_anchor_bottom_left;
+#ifdef HALO_ANDROID
+                    /* The radar is relocated only while the Android touch HUD
+                     * is actually visible. Keep the original tag untouched so
+                     * connecting a gamepad restores the default placement. */
+                    extern int host_touch_hud_active(void);
+                    int touch_radar = host_touch_hud_active() && local_player_count() == 1;
+                    struct static_hud_element_definition touch_background;
+                    struct static_hud_element_definition touch_foreground;
+                    struct hud_placement_definition touch_blips;
+                    const struct static_hud_element_definition *sensor_background =
+                        &hud_definition->motion_sensor.background;
+                    const struct static_hud_element_definition *sensor_foreground =
+                        &hud_definition->motion_sensor.foreground;
+                    const struct hud_placement_definition *sensor_blips =
+                        &hud_definition->blip_placement;
+                    if (touch_radar)
+                    {
+                        point2d old_corner;
+                        real scale = hud_globals_get_scale(FALSE);
+                        real dx, dy;
+                        hud_calculate_point(local_player_index, &absolute_placement,
+                            &hud_definition->blip_placement, NULL, FALSE, 0.0f, &old_corner);
+                        /* Viewport-relative pixels: directly under Halo's
+                         * original top-left ammo indicator. */
+                        dx = (render.camera.window_bounds.x1 - render.camera.window_bounds.x0) * 0.075f - old_corner.x;
+                        dy = (render.camera.window_bounds.y1 - render.camera.window_bounds.y0) * 0.300f - old_corner.y;
+                        touch_background = hud_definition->motion_sensor.background;
+                        touch_foreground = hud_definition->motion_sensor.foreground;
+                        touch_blips = hud_definition->blip_placement;
+                        touch_background.placement.offset.x += (short)(dx / scale);
+                        touch_background.placement.offset.y -= (short)(dy / scale);
+                        touch_foreground.placement.offset.x += (short)(dx / scale);
+                        touch_foreground.placement.offset.y -= (short)(dy / scale);
+                        touch_blips.offset.x += (short)(dx / scale);
+                        touch_blips.offset.y -= (short)(dy / scale);
+                        sensor_background = &touch_background;
+                        sensor_foreground = &touch_foreground;
+                        sensor_blips = &touch_blips;
+                    }
+#endif
 					SET_FLAG(
 						draw_flags,
 						_hud_draw_in_multiplayer_bit,
@@ -1181,7 +1221,11 @@ void hud_render_unit_interface(
 						hud_draw_static_element(
 							local_player_index,
 							&absolute_placement,
-							&hud_definition->motion_sensor.background,
+							#ifdef HALO_ANDROID
+                            sensor_background,
+#else
+                            &hud_definition->motion_sensor.background,
+#endif
 							draw_flags,
 							NONE);
 						/* port: where it is (the text chat goes above it) */
@@ -1192,7 +1236,11 @@ void hud_render_unit_interface(
 						hud_draw_static_element(
 							local_player_index,
 							&absolute_placement,
-							&hud_definition->motion_sensor.foreground,
+							#ifdef HALO_ANDROID
+                            sensor_foreground,
+#else
+                            &hud_definition->motion_sensor.foreground,
+#endif
 							draw_flags,
 							NONE);
 					}
@@ -1200,8 +1248,12 @@ void hud_render_unit_interface(
 					hud_calculate_point(
 						local_player_index,
 						&absolute_placement,
-						&hud_definition->blip_placement,
-						NULL,
+						#ifdef HALO_ANDROID
+                        sensor_blips,
+#else
+                        &hud_definition->blip_placement,
+#endif
+                        NULL,
 						local_player_count() > 1,
 						0.0f,
 						&corner);
