@@ -13,8 +13,8 @@ pub mod camera;
 pub mod campaign;
 pub mod control;
 mod debug_scene;
-pub mod dev_state;
 pub mod decals;
+pub mod dev_state;
 pub mod devtools;
 mod dynamic_decals;
 mod effects;
@@ -799,6 +799,9 @@ struct State {
     writer: SnapshotWriter,
     input: InputState,
     shell: devtools::Shell,
+    /// The engine's sound player, for the shell's inspector and audio view
+    /// (locked after the state).
+    audio: audio::SharedPlayer,
 }
 
 /// The engine: one per app.
@@ -827,6 +830,7 @@ impl Engine {
         let (buffers, writer) = SnapshotBuffers::new();
         // (the log book is the process's: a second engine finds it set)
         opence_dev::logbook::install();
+        let audio = audio::SharedPlayer::default();
         Arc::new(Self {
             registry: Mutex::new(devtools::registry()),
             state: Mutex::new(State {
@@ -834,10 +838,11 @@ impl Engine {
                 writer,
                 input: InputState::default(),
                 shell: devtools::Shell::default(),
+                audio: Arc::clone(&audio),
             }),
             snapshots: Arc::new(buffers),
             control: Arc::default(),
-            audio: audio::SharedPlayer::default(),
+            audio,
         })
     }
 
@@ -1142,6 +1147,39 @@ impl Engine {
             ..opence_audio::Source::default()
         };
         player.impulse(index, &source).is_some()
+    }
+
+    /// The dev panel's audio view: each sound class's voices playing, and
+    /// its sounds culled and failed since the level started; none without
+    /// a level.
+    pub fn audio_census(&self) -> Vec<audio::SoundClassCount> {
+        audio::lock(&self.audio)
+            .as_mut()
+            .map_or_else(Vec::new, audio::census)
+    }
+
+    /// Measures each frame's scopes for the dev panel's timings, or stops
+    /// (as `stat frame` and `stat frame off` do).
+    pub fn measure_frames(&self, on: bool) {
+        opence_dev::profile::profiler().measure(on);
+    }
+
+    /// The last measured frame's scopes, in the order first seen; none
+    /// while frames are not measured.
+    pub fn frame_scopes(&self) -> Vec<devtools::ScopeTime> {
+        #[allow(clippy::cast_precision_loss)]
+        let milliseconds = |nanoseconds: u64| nanoseconds as f64 / 1e6;
+        opence_dev::profile::profiler()
+            .last_summary()
+            .into_iter()
+            .map(|line| devtools::ScopeTime {
+                name: line.name,
+                depth: line.depth,
+                count: line.count,
+                milliseconds: milliseconds(line.total),
+                own_milliseconds: milliseconds(line.own),
+            })
+            .collect()
     }
 
     /// Sets the settings' effects and music volumes, 0 to 1.

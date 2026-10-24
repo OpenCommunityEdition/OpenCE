@@ -11,7 +11,8 @@ use std::sync::Arc;
 use libm::{cosf, sinf};
 use opence_content::{LoopingSound, LoopingSoundDetail, LoopingSoundTrack, TagRef};
 
-use super::{distance_between, SoundPlayer, Source};
+use super::{distance_between, SoundPlayer, Source, UNSPATIALIZED_CLASS};
+use crate::census::{Dropped, Playing};
 use crate::choice::{next_permutation, pitch_range, scale_value};
 use crate::decode::Decoded;
 use crate::mixer::{Placement, VoiceId, VoiceProperties};
@@ -552,6 +553,7 @@ impl SoundPlayer {
         };
         let pitch = self.random.between(sound.random_pitch_bounds);
         let Some(range) = pitch_range(sound, pitch, None) else {
+            self.census.dropped(sound.class, Dropped::Failed);
             return false;
         };
         component.pitch = pitch;
@@ -570,6 +572,7 @@ impl SoundPlayer {
         }
         let mut queue = queue.into_iter();
         let Some(first) = queue.next() else {
+            self.census.dropped(sound.class, Dropped::Failed);
             return false;
         };
         let voice = self.mixer.play(
@@ -584,6 +587,14 @@ impl SoundPlayer {
             self.mixer.queue(voice, samples);
         }
         component.voice = Some(voice);
+        self.census.played(Playing {
+            voice,
+            sound: component.gain_sound,
+            class: sound.class,
+            position: (sound.class != UNSPATIALIZED_CLASS)
+                .then_some(source.position)
+                .flatten(),
+        });
         true
     }
 
@@ -805,6 +816,8 @@ mod tests {
         }
         // half a second of a tenth-second sound: it went on looping
         assert_eq!(player.mixer().voice_count(), 1);
+        // (one voice in the census, though it played five times)
+        assert_eq!(player.census().playing().len(), 1);
         // not refreshed, a track with no stop fades out over its second
         step(&mut player, 50.0, None);
         assert_eq!(player.looping_count(), 1);
@@ -816,6 +829,7 @@ mod tests {
         step(&mut player, 600.0, None);
         assert_eq!(player.looping_count(), 0);
         assert_eq!(player.mixer().voice_count(), 0);
+        assert!(player.census().playing().is_empty());
         Ok(())
     }
 

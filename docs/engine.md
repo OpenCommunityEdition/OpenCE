@@ -823,6 +823,29 @@ objects and the surfaces the probes light; `tune.emissive` scales the
 level's and the models' self-illumination. Particles are lit as they
 are.
 
+### The dev panel
+
+`dev.panel` shows the dev panel over the game's right side
+(`DevPanel.swift`), with the mouse free while it shows. It is read again
+four times a second:
+
+- **Object.** A click in the frame inspects the object under the cursor,
+  as `inspect object=<id>` gives it: its tag, kind and place, its shader
+  and permutation, its animation, its motion and physics, the light it
+  casts and the sounds it plays. The pick (`PickPass.swift`) draws the
+  last frame's objects again, each as its snapshot id, into a target of
+  one pixel through the view narrowed to the cursor's pixel. The level's
+  surfaces are drawn as no object, so that a wall hides what is behind it;
+  the sky and the first-person weapon are not drawn. The object is
+  inspected again as it plays, until it is gone; a new level forgets it.
+- **Frame.** The GPU's passes, from the timestamp counters. The CPU's
+  scopes, the engine's and the app's: the panel measures frames while it
+  shows (`measure_frames`, as `stat frame` does), and turns that off as
+  it closes. The hitches since the level started.
+- **Sounds.** The voices playing in each sound class, and the sounds
+  culled (skipped, out of hearing or silent) and those with nothing to
+  play since the level started (`audio_census`).
+
 ### Debug drawing
 
 Any system calls the immediate-mode shapes (a line, a box, a sphere, text

@@ -11,6 +11,7 @@ use std::sync::Arc;
 use libm::sqrtf;
 use opence_content::{Level, LoopingSound, Sound};
 
+use crate::census::{Census, Dropped, Playing};
 use crate::choice::{
     next_permutation, pitch_range, scale_random_value, scale_value, LocalRandom, Promoted,
     Promotion, RangeState,
@@ -113,6 +114,7 @@ pub struct SoundPlayer {
     dialogue: Vec<VoiceId>,
     time_ms: f32,
     mixer: Mixer,
+    census: Census,
 }
 
 impl SoundPlayer {
@@ -147,12 +149,27 @@ impl SoundPlayer {
             dialogue: Vec::new(),
             time_ms: 0.0,
             mixer: Mixer::new(),
+            census: Census::default(),
         }
     }
 
     /// The index of the sound of the tag at `path`.
     pub fn sound_index(&self, path: &str) -> Option<usize> {
         self.paths.get(path).copied()
+    }
+
+    /// The tag path of sound `index`.
+    pub fn sound_path(&self, index: usize) -> Option<&str> {
+        self.bank
+            .sounds()
+            .get(index)
+            .map(|sound| sound.tag.path.as_str())
+    }
+
+    /// The voices playing and the sounds culled and failed, by class.
+    pub fn census(&mut self) -> &Census {
+        self.census.prune(&self.mixer);
+        &self.census
     }
 
     /// The mixer.
@@ -191,6 +208,7 @@ impl SoundPlayer {
         self.classes.update(ticks);
         let mixer = &self.mixer;
         self.dialogue.retain(|&voice| mixer.is_playing(voice));
+        self.census.prune(mixer);
         for _ in 0..ticks.clamp(0, 200) {
             self.nondialog_gain = if self.dialogue.is_empty() {
                 (self.nondialog_gain + RECOVER_STEP).min(1.0)
@@ -250,9 +268,38 @@ impl SoundPlayer {
     fn impulse_at(&mut self, index: usize, source: &Source, depth: u8) -> Option<VoiceId> {
         let bank = Arc::clone(&self.bank);
         let sound = bank.sounds().get(index)?;
+        match self.try_impulse(index, source, depth) {
+            Ok(voice) => {
+                self.census.played(Playing {
+                    voice,
+                    sound: index,
+                    class: sound.class,
+                    position: (sound.class != UNSPATIALIZED_CLASS)
+                        .then_some(source.position)
+                        .flatten(),
+                });
+                Some(voice)
+            }
+            Err(why) => {
+                self.census.dropped(sound.class, why);
+                None
+            }
+        }
+    }
+
+    /// Plays sound `index` once (a promotion's sound in its place, its
+    /// linked permutations after it), or why it did not.
+    fn try_impulse(
+        &mut self,
+        index: usize,
+        source: &Source,
+        depth: u8,
+    ) -> Result<VoiceId, Dropped> {
+        let bank = Arc::clone(&self.bank);
+        let sound = bank.sounds().get(index).ok_or(Dropped::Failed)?;
         let scale = source.scale.clamp(0.0, 1.0);
         if scale == 0.0 && sound.zero.gain == 0.0 {
-            return None;
+            return Err(Dropped::Culled);
         }
         let [minimum, maximum] = Self::distances(sound);
         let position = if sound.class == UNSPATIALIZED_CLASS {
@@ -264,7 +311,7 @@ impl SoundPlayer {
             distance_between(position, self.mixer.listener().position)
         });
         if distance >= maximum {
-            return None;
+            return Err(Dropped::Culled);
         }
         let skip = scale_value(
             sound.skip_fraction,
@@ -273,7 +320,7 @@ impl SoundPlayer {
             scale,
         );
         if skip > 0.0 && self.random.next_real() <= skip {
-            return None;
+            return Err(Dropped::Culled);
         }
         if sound.promotion_count > 0 {
             #[allow(clippy::cast_precision_loss)]
@@ -289,9 +336,9 @@ impl SoundPlayer {
                 promotion.is_some(),
             );
             match (played, promotion) {
-                (Promoted::Skip, _) => return None,
+                (Promoted::Skip, _) => return Err(Dropped::Culled),
                 (Promoted::Promote, Some(promoted)) if depth < 4 && promoted != index => {
-                    return self.impulse_at(promoted, source, depth + 1);
+                    return self.try_impulse(promoted, source, depth + 1);
                 }
                 _ => {}
             }
@@ -304,7 +351,7 @@ impl SoundPlayer {
             sound.one.pitch,
             scale,
         );
-        let range = pitch_range(sound, pitch, None)?;
+        let range = pitch_range(sound, pitch, None).ok_or(Dropped::Failed)?;
         let mut chain = Vec::new();
         let mut current = None;
         while chain.len() < LINKED_LIMIT {
@@ -328,9 +375,12 @@ impl SoundPlayer {
                 break;
             }
         }
-        let first = *chain.first()?;
-        let pitch_range = sound.pitch_ranges.get(range)?;
-        let permutation = pitch_range.permutations.get(usize::from(first))?;
+        let first = *chain.first().ok_or(Dropped::Failed)?;
+        let pitch_range = sound.pitch_ranges.get(range).ok_or(Dropped::Failed)?;
+        let permutation = pitch_range
+            .permutations
+            .get(usize::from(first))
+            .ok_or(Dropped::Failed)?;
 
         let fade = 1.0;
         let gain = scale_value(
@@ -358,7 +408,7 @@ impl SoundPlayer {
         } else {
             0.0
         };
-        let samples = self.samples(index, range, first)?;
+        let samples = self.samples(index, range, first).ok_or(Dropped::Failed)?;
         let voice = self.mixer.play(samples, properties, delay);
         for &next in chain.iter().skip(1) {
             if let Some(samples) = self.samples(index, range, next) {
@@ -368,7 +418,7 @@ impl SoundPlayer {
         if DIALOG_CLASSES.contains(&sound.class) {
             self.dialogue.push(voice);
         }
-        Some(voice)
+        Ok(voice)
     }
 
     /// The decoded samples of a permutation, decoded on its first play.
@@ -412,6 +462,7 @@ fn distance_between(a: [f32; 3], b: [f32; 3]) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::census::ClassCount;
     use opence_content::{
         Group, SoundCompression, SoundModifiers, SoundPermutation, SoundPitchRange, TagRef,
     };
@@ -505,6 +556,64 @@ mod tests {
         };
         assert!(player.impulse(0, &near).is_some());
         assert!(player.impulse(7, &near).is_none());
+    }
+
+    #[test]
+    fn the_census_counts_the_voices_and_the_sounds_dropped_by_class() -> Result<(), Box<dyn Error>>
+    {
+        let mut nothing = sound("nothing", 0, Vec::new());
+        nothing.pitch_ranges.clear();
+        nothing.class = 5;
+        let mut player = player(vec![
+            sound("a", 0, vec![permutation(16384, 480, None)]),
+            nothing,
+        ]);
+        let near = Source {
+            position: Some([5.0, 0.0, 0.0]),
+            ..Source::default()
+        };
+        let voice = player.impulse(0, &near).ok_or("no voice")?;
+        let far = Source {
+            position: Some([50.0, 0.0, 0.0]),
+            ..Source::default()
+        };
+        assert!(player.impulse(0, &far).is_none());
+        assert!(player.impulse(1, &near).is_none());
+        let census = player.census();
+        assert_eq!(census.playing().len(), 1);
+        assert_eq!(census.playing()[0].voice, voice);
+        assert_eq!(census.playing()[0].position, Some([5.0, 0.0, 0.0]));
+        let counts = census.counts();
+        assert_eq!(
+            counts,
+            vec![
+                ClassCount {
+                    class: 0,
+                    playing: 1,
+                    culled: 1,
+                    failed: 0
+                },
+                ClassCount {
+                    class: 5,
+                    playing: 0,
+                    culled: 0,
+                    failed: 1
+                },
+            ]
+        );
+        // (the voice ends, and the census forgets it; the drops stay)
+        peak(&mut player, 4800);
+        let counts = player.census().counts();
+        assert_eq!(
+            counts[0],
+            ClassCount {
+                class: 0,
+                playing: 0,
+                culled: 1,
+                failed: 0
+            }
+        );
+        Ok(())
     }
 
     #[test]

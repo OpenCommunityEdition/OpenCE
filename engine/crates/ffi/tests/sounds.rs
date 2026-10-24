@@ -15,6 +15,7 @@ fn a_level_sound_reaches_the_output() -> Result {
     let engine = Engine::new();
     let output = engine.audio_output();
     assert!(!engine.play_sound("anything".into(), 1.0));
+    assert!(engine.audio_census().is_empty());
     assert!(output.pull(128).iter().all(|sample| *sample == 0.0));
 
     let map = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/bloodgulch.map");
@@ -49,6 +50,14 @@ fn a_level_sound_reaches_the_output() -> Result {
         "{}",
         sound.tag.path
     );
+    // (the audio view counts it by its class)
+    let class = opence_audio::class(i32::from(sound.class)).name;
+    let census = engine.audio_census();
+    let counted = census
+        .iter()
+        .find(|count| count.class == class)
+        .ok_or("not counted")?;
+    assert!(counted.playing >= 1, "{census:?}");
     let mut heard = false;
     for _ in 0..40 {
         heard |= output.pull(1024).iter().any(|sample| *sample != 0.0);

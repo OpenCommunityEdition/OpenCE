@@ -59,7 +59,7 @@ pub(crate) struct Lights {
 }
 
 /// An effect's light's `source`: its own range, above the objects'.
-const EFFECT_SOURCE: u32 = 1 << 31;
+pub(crate) const EFFECT_SOURCE: u32 = 1 << 31;
 
 /// The ticks a light lasts: its duration, at least one.
 fn ticks(light: &Light) -> u32 {

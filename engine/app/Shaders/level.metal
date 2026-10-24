@@ -907,6 +907,12 @@ fragment void shadow_cutout_fragment(ShadowOut in [[stage_in]], constant Materia
     }
 }
 
+// the dev panel's pick: the id of what is drawn at the cursor's pixel
+// (`id`), the level's surfaces hiding the objects behind them
+fragment uint pick_fragment(ShadowOut in [[stage_in]], constant uint &id [[buffer(1)]]) {
+    return id;
+}
+
 // the sky as its maps are: it lights itself
 fragment float4 sky_fragment(ModelOut in [[stage_in]],
                              constant Material &material [[buffer(0)]],

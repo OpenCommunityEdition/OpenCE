@@ -91,5 +91,20 @@ fn frames_are_measured_and_traced() -> Result {
     assert!(traced(&file)?.iter().any(|name| name == "advance"));
     // (nothing measured now: a scope is not taken)
     assert!(!engine.profile_begin("render".into()));
+
+    // the dev panel's timings: measured, the last frame's scopes, then none
+    assert!(engine.frame_scopes().is_empty());
+    engine.measure_frames(true);
+    frames(&engine, 2)?;
+    let scopes = engine.frame_scopes();
+    let advance = scopes
+        .iter()
+        .find(|scope| scope.name == "advance")
+        .ok_or("no advance")?;
+    assert_eq!(advance.depth, 0);
+    assert!(advance.milliseconds >= advance.own_milliseconds, "{advance:?}");
+    assert!(scopes.iter().any(|scope| scope.name == "tick" && scope.depth > 0));
+    engine.measure_frames(false);
+    assert!(engine.frame_scopes().is_empty());
     Ok(())
 }

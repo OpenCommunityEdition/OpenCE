@@ -36,7 +36,7 @@ extension FrameView {
                                      firstPerson: object.flags & UInt16(OCE_OBJECT_FIRST_PERSON) != 0,
                                      changeColors: withUnsafeBytes(of: object.change_colors) {
                                          Array($0.bindMemory(to: UInt32.self))
-                                     }))
+                                     }, id: object.id))
         }
         return drawn
     }

@@ -211,6 +211,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             level?.renderer.scopes = engine
             if level?.map != oldValue?.map || level?.bsp != oldValue?.bsp {
                 HitchLog.shared.reset()
+                devPanel.reset()
             }
         }
     }
@@ -241,6 +242,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Draws the frames asked for (the shell's `frame`, a window script's,
     /// the control socket's) and acts on the socket's actions.
     var servant: ControlServant?
+    /// The dev panel (`dev.panel`), and the view that hosts it over the
+    /// game's while it shows.
+    lazy var devPanel = DevPanelModel(sources: .engine(engine))
+    var devPanelHost: NSView?
     /// The developer shell (~), and the pass that draws its text.
     var shell: ShellOverlay?
     var textPass: TextPass?
@@ -426,6 +431,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.beginSheetModal(for: window)
     }
 
+    /// Shows or hides the dev panel over the game's right side: the mouse
+    /// free while it shows (a click inspects), the frames' scopes measured.
+    func showDevPanel(_ shown: Bool) {
+        guard let controller, shown != (devPanelHost != nil) else { return }
+        let view = controller.window.engineView
+        engine.measureFrames(on: shown)
+        if shown {
+            let host = NSHostingView(rootView: DevPanelView(model: devPanel))
+            host.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(host)
+            NSLayoutConstraint.activate([
+                host.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                host.topAnchor.constraint(equalTo: view.topAnchor),
+                host.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+                host.widthAnchor.constraint(equalToConstant: 340),
+            ])
+            devPanelHost = host
+            controller.capturesMouse = false
+        } else {
+            devPanelHost?.removeFromSuperview()
+            devPanelHost = nil
+            if !menu.isOpen, shell?.isOpen != true {
+                controller.capturesMouse = true
+            }
+        }
+    }
+
     /// Takes the menus away, the settings they changed taken up.
     func hideMenu() {
         menu.close()
@@ -435,7 +467,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings = videoSettings(saved.settings.video)
         controller?.showsFrameTimes = launchArguments.contains("--frame-times")
             || saved.settings.video.showFrameTimes
-        controller?.capturesMouse = true
+        // (the dev panel keeps the mouse free)
+        controller?.capturesMouse = devPanelHost == nil
     }
 
     /// Makes the servant that draws the frames asked for here.
@@ -501,7 +534,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if open {
                 controller.releaseKeys()
                 controller.capturesMouse = false
-            } else if !menu.isOpen {
+            } else if !menu.isOpen, devPanelHost == nil {
                 controller.capturesMouse = true
             }
         }
@@ -543,6 +576,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case .up: return shell.pointer(.up, x: x, y: y)
                 case .moved, .rightDown: return true
                 }
+            }
+            // (a click in the frame while the dev panel shows inspects what is under it)
+            if devPanelHost != nil, !menu.isOpen, let controller {
+                if phase == .down, let renderer = level?.renderer {
+                    let (width, height) = controller.window.engineView.sizeInPixels
+                    devPanel.pick(renderer.pick(x: Int(x), y: Int(y), width: width, height: height))
+                }
+                return true
             }
             guard menu.isOpen, let halo = menu.menu, let controller else { return false }
             let (width, height) = controller.window.engineView.sizeInPixels
@@ -850,6 +891,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let (width, height) = controller.window.engineView.sizeInPixels
         let text = shellItems(width: width, height: height)
         guard let renderer = level?.renderer else {
+            showDevPanel(false)
             if let loading, let loadingPass {
                 controller.window.engineView.render { commands, target in
                     loadingPass.encode(loading, into: commands, target: target, clear: true)
@@ -883,6 +925,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                   value: { engine.shellValue(name: $0) })
         renderer.switches = devState.switches
         renderer.tuning = devState.tuning
+        showDevPanel(devState.panel)
+        if devState.panel {
+            devPanel.update(now: tick.timestamp)
+        }
         renderer.sprites = engine.cameraSprites(camera: camera.spriteCamera, flares: renderer.switches.lensFlares,
                                                 widgets: renderer.switches.glows)
         let objects = profiled("objects", engine) { frame.drawnObjects() }

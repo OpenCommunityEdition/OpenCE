@@ -8,12 +8,17 @@ use std::path::{Path, PathBuf};
 use opence_content::{Group, ObjectKind, TagRef};
 use opence_dev::draw::{Color, DebugDraw, Layer};
 use opence_dev::{ArgKind, Args, CommandError, Data, Output, Param, Registry, VarKind, VarValue};
+use opence_sim::animation::AnimationPlayer;
 use opence_sim::damage::{Invulnerable, Vitality};
-use opence_sim::objects::{ObjectHandle, ObjectName, ObjectSpawn};
-use opence_sim::{Quat, Transform, Vec3};
+use opence_sim::functions::IntegratedLight;
+use opence_sim::item_physics::Lying;
+use opence_sim::objects::{Appearance, ObjectHandle, ObjectName, ObjectSpawn};
+use opence_sim::{PreviousTransform, Quat, Transform, Vec3};
 use serde_json::json;
 
-use crate::{campaign, run_ticks, transform, Running, State, Wardrobe};
+use crate::lights::EFFECT_SOURCE;
+use crate::sound_world::BACKGROUND_KEY;
+use crate::{audio, campaign, run_ticks, transform, Running, State, Wardrobe};
 
 /// What the app must do after a line: what the engine cannot do alone.
 #[derive(Clone, Debug, Default, PartialEq, uniffi::Enum)]
@@ -48,6 +53,22 @@ pub struct ShellOutput {
     pub json: String,
     /// What the app must do.
     pub action: ShellAction,
+}
+
+/// A scope's line in the last measured frame, for the dev panel's
+/// timings: a scope under the same parents, summed.
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
+pub struct ScopeTime {
+    /// The scope.
+    pub name: String,
+    /// How many scopes it is inside of.
+    pub depth: u32,
+    /// How many times it ran in the frame.
+    pub count: u32,
+    /// Its time, in milliseconds.
+    pub milliseconds: f64,
+    /// Its time less its scopes' (directly inside it), in milliseconds.
+    pub own_milliseconds: f64,
 }
 
 /// A variable of the shell, for the app's settings and drawing.
@@ -1108,6 +1129,7 @@ fn objects(state: &mut State, args: &Args) -> Result<Output, CommandError> {
 
 fn inspect(state: &mut State, args: &Args) -> Result<Output, CommandError> {
     let id = args.int("object")?;
+    let audio = std::sync::Arc::clone(&state.audio);
     let running = running(state)?;
     let handle = object_of(running, id)?;
     let (text, mut data) = row(running, handle).ok_or_else(|| failed(format!("no object {id}")))?;
@@ -1139,7 +1161,179 @@ fn inspect(state: &mut State, args: &Args) -> Result<Output, CommandError> {
         let rotation = at.rotation;
         data["rotation"] = json!([rotation.x, rotation.y, rotation.z, rotation.w]);
     }
+    shading(running, handle, &mut lines, &mut data);
+    motion(running, handle, &mut lines, &mut data);
+    lighting(running, handle, &mut lines, &mut data);
+    sounding(running, handle, &audio, &mut lines, &mut data);
     Ok(Output::with_data(lines.join("\n"), data))
+}
+
+/// An object's bounding radius, as it is drawn.
+fn radius_of(running: &Running, handle: ObjectHandle) -> f32 {
+    running
+        .simulation
+        .component::<Appearance>(handle)
+        .map_or(0.0, |appearance| f32::from_bits(appearance.radius_bits))
+}
+
+/// An object's model and its shaders, and the animation it plays.
+fn shading(running: &Running, handle: ObjectHandle, lines: &mut Vec<String>, data: &mut Data) {
+    let model = running
+        .simulation
+        .component::<Appearance>(handle)
+        .zip(running.level.as_ref())
+        .and_then(|(appearance, level)| level.models.get(appearance.model as usize));
+    if let Some(model) = model {
+        let shaders: Vec<&str> = model
+            .shaders
+            .iter()
+            .filter_map(|shader| shader.shader.as_ref().map(|tag| tag.path.as_str()))
+            .collect();
+        lines.push(format!("  model {}", model.tag.path));
+        for shader in &shaders {
+            lines.push(format!("  shader {shader}"));
+        }
+        data["model"] = json!(model.tag.path);
+        data["shaders"] = json!(shaders);
+    }
+    if let Some(player) = running.simulation.component::<AnimationPlayer>(handle) {
+        let state = player.state;
+        let animation = player.graph.animations.get(usize::from(state.animation));
+        let name = animation.map_or("", |animation| animation.name.as_str());
+        let frames = animation.map_or(0, |animation| animation.frame_count);
+        lines.push(format!(
+            "  animation {name} frame {}/{frames} ({})",
+            state.frame, player.graph.tag.path
+        ));
+        data["animation"] = json!({
+            "graph": player.graph.tag.path,
+            "name": name,
+            "index": state.animation,
+            "frame": state.frame,
+            "frames": frames,
+        });
+    }
+}
+
+/// How an object moves: its velocity over the last tick, and an item's
+/// rest.
+fn motion(running: &Running, handle: ObjectHandle, lines: &mut Vec<String>, data: &mut Data) {
+    let previous = running.simulation.component::<PreviousTransform>(handle);
+    if let Some((now, PreviousTransform(then))) = running.simulation.transform(handle).zip(previous)
+    {
+        let velocity = (now.position - then.position) * opence_sim::clock::TICKS_PER_SECOND as f32;
+        lines.push(format!(
+            "  velocity ({:.2} {:.2} {:.2}) {:.2}/s",
+            velocity.x,
+            velocity.y,
+            velocity.z,
+            velocity.length()
+        ));
+        data["velocity"] = json!([velocity.x, velocity.y, velocity.z]);
+    }
+    if let Some(lying) = running.simulation.component::<Lying>(handle) {
+        let motion = &lying.motion;
+        lines.push(format!(
+            "  item {}{}",
+            if motion.at_rest { "at rest" } else { "moving" },
+            if motion.rest.is_some() {
+                " on a surface"
+            } else {
+                ""
+            }
+        ));
+        data["item"] = json!({ "at_rest": motion.at_rest, "resting_on": motion.rest.is_some() });
+    }
+}
+
+/// The lights that reach an object in the last frame (its own among
+/// them), and its flashlight.
+fn lighting(running: &Running, handle: ObjectHandle, lines: &mut Vec<String>, data: &mut Data) {
+    let Some(at) = running.simulation.transform(handle) else {
+        return;
+    };
+    let radius = radius_of(running, handle);
+    let mut lights = Vec::new();
+    for light in &running.lit {
+        let position = Vec3::new(light.position.x, light.position.y, light.position.z);
+        let distance = position.distance(at.position);
+        if distance > light.radius + radius {
+            continue;
+        }
+        let own = light.source & EFFECT_SOURCE == 0 && light.source >> 3 == handle.index;
+        lines.push(format!(
+            "  light {} at {distance:.2} reach {:.2} colour ({:.2} {:.2} {:.2}){}",
+            light.light,
+            light.radius,
+            light.color.x,
+            light.color.y,
+            light.color.z,
+            if own { " (its own)" } else { "" }
+        ));
+        lights.push(json!({
+            "light": light.light,
+            "distance": distance,
+            "radius": light.radius,
+            "color": [light.color.x, light.color.y, light.color.z],
+            "own": own,
+        }));
+    }
+    data["lights"] = Data::Array(lights);
+    if let Some(flashlight) = running.simulation.component::<IntegratedLight>(handle) {
+        lines.push(format!(
+            "  flashlight {} power {:.2} battery {:.2}",
+            if flashlight.on { "on" } else { "off" },
+            flashlight.power,
+            flashlight.battery
+        ));
+        data["flashlight"] = json!({
+            "on": flashlight.on,
+            "power": flashlight.power,
+            "battery": flashlight.battery,
+        });
+    }
+}
+
+/// The sounds an object plays: its looping sounds, and the voices playing
+/// within its bounding sphere.
+fn sounding(
+    running: &Running,
+    handle: ObjectHandle,
+    audio: &audio::SharedPlayer,
+    lines: &mut Vec<String>,
+    data: &mut Data,
+) {
+    let mut sounds = Vec::new();
+    for looping in &running.loops {
+        if looping.key != BACKGROUND_KEY && looping.key >> 8 == u64::from(handle.index) {
+            lines.push(format!("  looping {}", looping.tag.path));
+            sounds.push(json!({ "tag": looping.tag.path, "looping": true }));
+        }
+    }
+    let at = running.simulation.transform(handle);
+    // (at least a metre about it: a small object's sounds play from its
+    // origin, or from a marker just off it)
+    let reach = radius_of(running, handle).max(1.0);
+    if let (Some(at), Some(player)) = (at, audio::lock(audio).as_mut()) {
+        let near: Vec<usize> = player
+            .census()
+            .playing()
+            .iter()
+            .filter(|playing| {
+                playing.position.is_some_and(|position| {
+                    Vec3::from_array(position).distance(at.position) <= reach
+                })
+            })
+            .map(|playing| playing.sound)
+            .collect();
+        for sound in near {
+            if let Some(path) = player.sound_path(sound) {
+                lines.push(format!("  playing {path}"));
+                sounds.push(json!({ "tag": path, "looping": false }));
+            }
+        }
+    }
+    data["sounds"] = Data::Array(sounds);
 }
 
 fn tags(state: &mut State, args: &Args) -> Result<Output, CommandError> {

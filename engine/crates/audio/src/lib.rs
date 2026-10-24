@@ -2,6 +2,7 @@
 //! sound classes ([`classes`]), the mixer the app's Core Audio output
 //! pulls from, and the rooms' reverb ([`reverb`]).
 
+pub mod census;
 pub mod choice;
 pub mod classes;
 pub mod decode;
@@ -9,6 +10,7 @@ pub mod mixer;
 pub mod player;
 pub mod reverb;
 
+pub use census::{Census, ClassCount, Dropped, Playing};
 pub use choice::{
     limit_pitch, next_permutation, pitch_range, scale_random_value, scale_value, LocalRandom,
     Promoted, Promotion, RangeState,

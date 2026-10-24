@@ -29,6 +29,35 @@ pub(crate) fn listener(transform: &opence_sim::Transform, velocity: opence_sim::
     }
 }
 
+/// One sound class in the dev panel's audio view.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct SoundClassCount {
+    /// The class's name.
+    pub class: String,
+    /// Its voices playing.
+    pub playing: u32,
+    /// Its sounds culled (skipped, out of hearing or silent) since the
+    /// level started.
+    pub culled: u32,
+    /// Its sounds with nothing to play since the level started.
+    pub failed: u32,
+}
+
+/// The player's census, by class name.
+pub(crate) fn census(player: &mut SoundPlayer) -> Vec<SoundClassCount> {
+    player
+        .census()
+        .counts()
+        .into_iter()
+        .map(|count| SoundClassCount {
+            class: opence_audio::class(i32::from(count.class)).name.to_owned(),
+            playing: count.playing,
+            culled: count.culled,
+            failed: count.failed,
+        })
+        .collect()
+}
+
 /// Where the app's audio comes from.
 #[derive(uniffi::Object)]
 pub struct AudioOutput {

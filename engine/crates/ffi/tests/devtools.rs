@@ -129,7 +129,9 @@ fn the_screen_passes_can_be_switched_off_and_shown_alone() -> Result {
         );
     }
     assert_eq!(engine.shell_value("render.view".into()), "frame");
-    for view in ["depth", "normals", "ao", "contact", "ssr", "albedo", "light", "stock", "frame"] {
+    for view in [
+        "depth", "normals", "ao", "contact", "ssr", "albedo", "light", "stock", "frame",
+    ] {
         run(&engine, &format!("render.view {view}"))?;
         assert_eq!(engine.shell_value("render.view".into()), view);
     }
@@ -269,6 +271,17 @@ fn over_bloodgulch() -> Result {
     let warthog = made[0];
     let inspected = json(&run(&engine, &format!("inspect {warthog}"))?)?;
     assert_eq!(inspected["kind"], "vehicle");
+    // (what it is drawn and posed with, how it moves, what lights and
+    // sounds reach it)
+    assert!(inspected["model"]
+        .as_str()
+        .is_some_and(|model| !model.is_empty()));
+    assert!(inspected["shaders"]
+        .as_array()
+        .is_some_and(|shaders| !shaders.is_empty()));
+    assert!(inspected["animation"]["graph"].is_string());
+    assert!(inspected["lights"].is_array());
+    assert!(inspected["sounds"].is_array());
     refused(&engine, "spawn nothing_like_it")?;
     refused(&engine, "spawn warthog 1000")?;
     refused(&engine, "inspect 99999")?;
@@ -288,24 +301,41 @@ fn over_bloodgulch() -> Result {
         true
     );
     run(&engine, "god")?;
-    assert!(json(&run(&engine, &format!("inspect {player_id}"))?)?
-        .get("invulnerable")
-        .is_none());
+    let cyborg = json(&run(&engine, &format!("inspect {player_id}"))?)?;
+    assert!(cyborg.get("invulnerable").is_none());
+    // (standing still, on the stand animation, the flashlight off)
+    assert!(cyborg["animation"]["name"]
+        .as_str()
+        .is_some_and(|name| !name.is_empty()));
+    let speed = cyborg["velocity"]
+        .as_array()
+        .map(|velocity| {
+            velocity
+                .iter()
+                .filter_map(serde_json::Value::as_f64)
+                .map(|v| v * v)
+                .sum::<f64>()
+        })
+        .ok_or("no velocity")?;
+    assert!(speed < 0.01, "{speed}");
 
-    // noclip: flies up through the ground with the jump button held
+    // noclip: flies up, held up
     run(&engine, "noclip on")?;
     let start = json(&run(&engine, &format!("inspect {player_id}"))?)?["position"][2]
         .as_f64()
         .ok_or("no height")?;
     engine.set_input(opence_ffi::InputState {
-        buttons: opence_ffi::input_buttons().jump,
+        up: 127,
         ..Default::default()
     });
     run(&engine, "step 30")?;
-    let risen = json(&run(&engine, &format!("inspect {player_id}"))?)?["position"][2]
-        .as_f64()
-        .ok_or("no height")?;
+    let flying = json(&run(&engine, &format!("inspect {player_id}"))?)?;
+    let risen = flying["position"][2].as_f64().ok_or("no height")?;
     assert!(risen > start + 1.0, "{start} to {risen}");
+    // (the inspector's velocity: up, as it flies; its flashlight, off)
+    let rising = flying["velocity"][2].as_f64().ok_or("no velocity")?;
+    assert!(rising > 0.5, "{rising}");
+    assert_eq!(flying["flashlight"]["on"], false);
     engine.set_input(opence_ffi::InputState::default());
     run(&engine, "noclip off")?;
 

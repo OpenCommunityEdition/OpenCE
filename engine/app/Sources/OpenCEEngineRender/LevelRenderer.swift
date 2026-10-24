@@ -441,6 +441,11 @@ public final class LevelRenderer {
     public let debug: DebugPass
     /// The sun's shadow maps.
     let shadows: ShadowPass
+    /// The dev panel's pick of the object under the cursor.
+    private let picking: PickPass
+    /// The last frame's objects and camera, and its width over its height,
+    /// which a pick draws again.
+    private var lastDrawn: (prepared: ModelPass.Prepared, camera: ViewCamera, aspect: Float)?
     /// The screen's passes: occlusion, contact shadows, reflections.
     let screen: ScreenPass
     /// The camera's passes: lens flares, glows, exposure, bloom.
@@ -577,6 +582,8 @@ public final class LevelRenderer {
                                whiteCube: whiteCube)
         shadows = try ShadowPass(device: device, library: library, levelStride: vertexStride,
                                  modelStride: Int(geometry.modelVertexStride()))
+        picking = try PickPass(device: device, library: library, levelStride: vertexStride,
+                               modelStride: Int(geometry.modelVertexStride()))
         lightPass = try LightPass(device: device, gels: geometry.lightGels().map(cube), whiteCube: whiteCube)
         screen = try ScreenPass(device: device, source: ShaderSources.source(.screen))
         cameraPass = try CameraPass(device: device, source: ShaderSources.source(.camera),
@@ -686,9 +693,12 @@ public final class LevelRenderer {
         let objects = try models.pipelines(library: library)
         let casting = try ShadowPass.pipelines(device: device, library: library, levelStride: vertexStride,
                                                modelStride: Int(geometry.modelVertexStride()))
+        let pick = try PickPass.pipelines(device: device, library: library, levelStride: vertexStride,
+                                          modelStride: Int(geometry.modelVertexStride()))
         (opaque, blended, tone, motion) = level
         models.use(objects)
         shadows.use(casting)
+        picking.use(pick)
     }
 
     static let blendFunctions: [BlendFunction] = [.alphaBlend, .multiply, .doubleMultiply, .add, .tintAndAdd]
@@ -820,6 +830,7 @@ public final class LevelRenderer {
         }
         let prepared = models.prepare(switches.objects ? objects : [], sky: skyObject, camera: camera, viewportHeight: frame.height,
                                       device: device)
+        lastDrawn = (prepared, camera, Float(frame.width) / Float(max(frame.height, 1)))
         let animation = geometry.materialAnimation(seconds: time)
         var uniforms = FrameUniforms(viewProjection: viewProjection, camera: camera, fog: sky?.fog, mipBias: mipBias)
         uniforms.probeOrigin = probeGrid.origin
@@ -1145,6 +1156,24 @@ public final class LevelRenderer {
     public func resetHistory() {
         temporal?.frame = 0
         temporal?.previous = nil
+    }
+
+    /// The id of the object drawn at pixel (`x`, `y`) from the top left
+    /// of the last frame, `width` by `height`, nil for none: its objects
+    /// in view drawn again, the level's surfaces hiding them.
+    public func pick(x: Int, y: Int, width: Int, height: Int) -> UInt32? {
+        guard let (prepared, camera, aspect) = lastDrawn, (0..<width).contains(x), (0..<height).contains(y) else {
+            return nil
+        }
+        let matrix = PickPass.narrowing(x: x, y: y, width: width, height: height)
+            * camera.viewProjection(aspect: aspect)
+        return picking.pick(matrix: matrix, level: { encoder in
+            encoder.setVertexBuffer(self.vertices, offset: 0, index: 0)
+            for draw in self.opaqueDraws {
+                encoder.drawIndexedPrimitives(type: .triangle, indexCount: draw.indexCount, indexType: .uint32,
+                                              indexBuffer: self.indices, indexBufferOffset: draw.firstIndex * 4)
+            }
+        }, objects: { encoder in self.models.encodePick(prepared, into: encoder) })
     }
 
     /// The level's opaque and alpha-tested surfaces, as the sun's

@@ -11,6 +11,9 @@ import simd
 
 /// An object to draw, between its last two ticks.
 public struct DrawnObject {
+    /// Its id in the snapshot (`UInt32.max` for none), which a pick
+    /// returns.
+    public var id: UInt32
     /// Its render model, among the level's.
     public var model: Int
     /// Where it is in the world.
@@ -33,7 +36,9 @@ public struct DrawnObject {
 
     public init(model: Int, transform: simd_float4x4, center: SIMD3<Float>, radius: Float, regions: [UInt8],
                 nodes: [simd_float4x4], firstPerson: Bool = false,
-                changeColors: [UInt32] = [0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF]) {
+                changeColors: [UInt32] = [0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF],
+                id: UInt32 = .max) {
+        self.id = id
         self.firstPerson = firstPerson
         self.changeColors = changeColors
         self.model = model
@@ -289,6 +294,8 @@ final class ModelPass {
         typealias Object = (uniforms: ModelObjectUniforms, parts: [Draw], colors: [SIMD4<Float>])
         var skins: MTLBuffer?
         var objects: [Object]
+        /// Each of `objects`' ids.
+        var ids: [UInt32] = []
         /// The sky's, if the level has one.
         var sky: Object?
         /// The first-person weapon and hands.
@@ -323,6 +330,7 @@ final class ModelPass {
         let forward = camera.rotation.act([1, 0, 0])
         var matrices: [simd_float4x4] = []
         var drawn: [Prepared.Object] = []
+        var ids: [UInt32] = []
         var skyDrawn: Prepared.Object?
         var firstPerson: [Prepared.Object] = []
         var shadowCasters: [Prepared.Object] = []
@@ -377,6 +385,7 @@ final class ModelPass {
                 shadowCasters.append((uniforms, parts, colors))
             } else {
                 drawn.append((uniforms, parts, colors))
+                ids.append(object.id)
             }
         }
         frame = (frame + 1) % skins.count
@@ -394,7 +403,7 @@ final class ModelPass {
         lastPartCount = drawn.reduce(0) { $0 + $1.parts.count }
         lastSkyPartCount = skyDrawn?.parts.count ?? 0
         lastFirstPersonPartCount = firstPerson.reduce(0) { $0 + $1.parts.count }
-        return Prepared(skins: skins[frame], objects: drawn, sky: skyDrawn, firstPerson: firstPerson,
+        return Prepared(skins: skins[frame], objects: drawn, ids: ids, sky: skyDrawn, firstPerson: firstPerson,
                         shadowCasters: shadowCasters)
     }
 
@@ -448,6 +457,24 @@ final class ModelPass {
                     encoder.setFragmentBytes(&material, length: MemoryLayout<MaterialUniforms>.stride, index: 0)
                     encoder.setFragmentTexture(part.textures.first, index: 0)
                 }
+                encoder.drawIndexedPrimitives(type: .triangle, indexCount: part.indexCount, indexType: .uint32,
+                                              indexBuffer: indices, indexBufferOffset: part.firstIndex * 4)
+            }
+        }
+    }
+
+    /// The prepared objects in view, each part but the blended ones drawn
+    /// with its object's id, for the pick (its pipeline and matrix bound).
+    func encodePick(_ prepared: Prepared, into encoder: MTLRenderCommandEncoder) {
+        guard let skins = prepared.skins else { return }
+        encoder.setVertexBuffer(vertices, offset: 0, index: 0)
+        encoder.setVertexBuffer(skins, offset: 0, index: 2)
+        for ((uniforms, parts, _), id) in zip(prepared.objects, prepared.ids) {
+            var object = uniforms
+            var picked = id
+            encoder.setVertexBytes(&object, length: MemoryLayout<ModelObjectUniforms>.stride, index: 3)
+            encoder.setFragmentBytes(&picked, length: MemoryLayout<UInt32>.stride, index: 1)
+            for part in parts where !part.blended && !part.plain {
                 encoder.drawIndexedPrimitives(type: .triangle, indexCount: part.indexCount, indexType: .uint32,
                                               indexBuffer: indices, indexBufferOffset: part.firstIndex * 4)
             }
