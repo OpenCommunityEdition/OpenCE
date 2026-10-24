@@ -22,10 +22,10 @@
 - [x] Task: Vehicles 7affe693
     - [x] Write tests: each manoeuvre of the spec against the reference traces (by property: no reference traces exist)
     - [x] The fixes to the vehicle model; entering from where the player stands; flipping back over
-- [ ] Task: Devices carrying objects
-    - [ ] Write tests: a lift carries a crate and a player; a door pushes a body
-    - [ ] Moving device collision
-- [ ] Task: Determinism and the station
+- [x] Task: Devices carrying objects 1e150faf
+    - [x] Write tests: a lift carries a crate and a player; a door pushes a body
+    - [x] Moving device collision
+- [~] Task: Determinism and the station
     - [ ] Write tests: two simulations with the same inputs agree; `station physics` is stable; 500 bodies in under 2 ms
     - [ ] The particle collision hook; `docs/engine.md`: physics
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Vehicles and devices' (Protocol in workflow.md) (deferred to the end)
