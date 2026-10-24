@@ -31,3 +31,6 @@
 - [x] Task: The particle station and the documentation a1b009d2
     - [x] `station particles`; `docs/engine.md`: particles
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Weather, lighting and limits' (Protocol in workflow.md) (deferred to the end)
+
+## Phase: Review Fixes
+- [x] Task: Apply review suggestions 3d3d7073
