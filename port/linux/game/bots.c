@@ -43,9 +43,12 @@ What a bot does each tick, in a player's terms:
   as they go and on with jumps; an item it finds no way to is left be a
   while. Bots in each other's way give way by their order.
 
-Skill (bots.skill): easy, normal, heroic, legendary - how soon it reacts,
-how far and how wide it sees, how large its aim error is and how fast that
-settles, how fast it turns, how tight its shots must be before it fires.
+Skill (bots.skill): recruit, easy, normal, heroic, veteran, legendary - how
+soon it reacts, how far and how wide it sees, how large its aim error is and
+how fast that settles, how fast it turns, how tight its shots must be before
+it fires, its bursts and its grenades. easy, normal, heroic and legendary
+are the levels the bots always had; recruit (for new players) is below
+easy, and veteran is halfway from heroic to legendary.
 
 The simulation: a bot decides from the game state at the tick and its own
 random numbers (seeded per bot and game), and its path searches run in the
@@ -111,11 +114,14 @@ void platform_log(char const *format, ...);
 /* the items a bot remembers it found no way to, at once */
 #define BOTS_UNREACHABLE_ITEMS 8
 
+/* bots.skill's levels, from the weakest */
 enum
 {
-	_bots_skill_easy = 0,
+	_bots_skill_recruit = 0,
+	_bots_skill_easy,
 	_bots_skill_normal,
 	_bots_skill_heroic,
+	_bots_skill_veteran,
 	_bots_skill_legendary,
 	NUMBER_OF_BOTS_SKILLS,
 };
@@ -159,11 +165,16 @@ struct bots_skill_definition
 	short pause_ticks;
 };
 
+/* the levels: easy, normal, heroic and legendary are the bots' first levels
+as they were; recruit is below easy, and veteran halfway from heroic to
+legendary in every number */
 static struct bots_skill_definition const bots_skills[NUMBER_OF_BOTS_SKILLS] =
 {
+	{ "recruit", 1.4f, 16.0f, 80.0f, 22.0f, 2.5f, 5.0f, 2.6f, 0.0f, 0.0f, 0.0f, 4, 24 },
 	{ "easy", 0.75f, 22.0f, 100.0f, 12.0f, 1.4f, 8.0f, 2.2f, 0.3f, 0.04f, 0.00f, 6, 14 },
 	{ "normal", 0.45f, 32.0f, 120.0f, 7.0f, 0.9f, 13.0f, 1.8f, 0.7f, 0.10f, 0.05f, 9, 9 },
 	{ "heroic", 0.30f, 42.0f, 140.0f, 4.0f, 0.6f, 20.0f, 1.5f, 0.8f, 0.16f, 0.15f, 12, 6 },
+	{ "veteran", 0.24f, 48.0f, 150.0f, 3.1f, 0.48f, 25.0f, 1.4f, 0.9f, 0.19f, 0.20f, 14, 5 },
 	{ "legendary", 0.18f, 55.0f, 160.0f, 2.2f, 0.35f, 30.0f, 1.25f, 1.0f, 0.22f, 0.25f, 16, 4 },
 };
 
