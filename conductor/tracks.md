@@ -29,7 +29,7 @@ This file tracks all major tracks for the project.
 - [x] **Track: Complete physics: objects as mass-point bodies, collisions, forces, grenades, vehicles and devices**
   *Link: [./tracks/physics_20261021/](./tracks/physics_20261021/)*
 
-- [~] **Track: The complete particle system: particles and their physics, particle systems, effects, contrails, weather and wind**
+- [x] **Track: The complete particle system: particles and their physics, particle systems, effects, contrails, weather and wind**
   *Link: [./tracks/particles_20261021/](./tracks/particles_20261021/)*
 
 - [x] **Track: Sound: every sound tag, looping sounds, music, dialogue, sound environments and the scripts' waits on sounds**
