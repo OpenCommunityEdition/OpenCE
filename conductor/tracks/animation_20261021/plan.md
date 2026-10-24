@@ -32,3 +32,6 @@
     - [x] Write tests: `station animation` plays every animation of a graph
     - [x] `docs/engine.md`: the graph and the blender
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Vehicles, AI, devices and cutscenes' (Protocol in workflow.md) (deferred to the end)
+
+## Phase: Review Fixes
+- [x] Task: Apply review suggestions 700c2086
