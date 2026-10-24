@@ -10,13 +10,13 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Particles and their physics' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 2: Systems, effects and contrails
-- [~] Task: Particle systems
+- [x] Task: Particle systems 36abd8c0
     - [ ] Write tests: emitters, rates and their functions, states and transitions, attachment to markers
     - [ ] `pctl` in full
-- [ ] Task: Effects' particle parts
+- [x] Task: Effects' particle parts 36abd8c0
     - [ ] Write tests: counts, cones, inherited velocity, scaled-by functions
     - [ ] The effect parts in full
-- [ ] Task: Contrails
+- [~] Task: Contrails
     - [ ] Write tests: point lifetimes, shapes, scroll, colours over life
     - [ ] `cont` in full
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Systems, effects and contrails' (Protocol in workflow.md) (deferred to the end)
