@@ -63,10 +63,10 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Picking up d2efbc5
     - [x] Write tests: walking over a weapon or holding the action button picks it up or swaps; ammo and grenades are taken as in the original
     - [x] The fix
-- [~] Task: Vehicles
-    - [ ] Write tests: entering gives the vehicle camera and hides the first-person weapon; driver, gunner and passenger seats as in the original; exiting restores first person
-    - [ ] The fix
-- [ ] Task: Responsiveness
+- [x] Task: Vehicles 675acc9
+    - [x] Write tests: entering gives the vehicle camera and hides the first-person weapon; driver, gunner and passenger seats as in the original; exiting restores first person
+    - [x] The fix
+- [~] Task: Responsiveness
     - [ ] Write tests: positions between ticks interpolate; the camera takes the latest input; input-to-photon latency under two frames plus one tick; the replay hash is unchanged
     - [ ] Tick interpolation and the latency fixes
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Picking up, vehicles and responsiveness' (Protocol in workflow.md)
