@@ -1355,7 +1355,7 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
             running.particles.tick(
                 level,
                 &mut running.simulation,
-                running.effects.running(),
+                (running.effects.running(), running.effects.fired()),
                 bsp,
             );
             // (what the particles made starts at the next tick's effects)

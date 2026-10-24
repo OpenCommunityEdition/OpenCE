@@ -298,6 +298,8 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     )?;
     let particles = crate::particle::import_particles(cache, &effects, &mut reached)?;
     let contrails = crate::particle::import_contrails(cache, &objects, &mut reached)?;
+    let particle_systems =
+        crate::particle::import_particle_systems(cache, &effects, &objects, &mut reached)?;
     let weather = crate::particle::import_weather(cache, &structure_bsps, &mut reached)?;
     let detail_object_collections = crate::particle::import_detail_object_collections(
         cache,
@@ -347,6 +349,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         decals,
         particles,
         contrails,
+        particle_systems,
         weather,
         detail_object_collections,
         glows,

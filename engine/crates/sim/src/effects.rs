@@ -54,6 +54,11 @@ pub struct Origin {
     pub on: Option<(ObjectHandle, String)>,
     /// The surface it was made on, if any.
     pub surface: Option<Surface>,
+    /// Its scales A and B, each 0 to 1, which scale what its parts say
+    /// they scale by.
+    pub scale: [f32; 2],
+    /// Its colour, red, green and blue, which tints parts tinted by it.
+    pub color: [f32; 3],
 }
 
 impl Origin {
@@ -65,6 +70,8 @@ impl Origin {
             velocity: Vec3::ZERO,
             on: None,
             surface: None,
+            scale: [1.0; 2],
+            color: [1.0; 3],
         }
     }
 }

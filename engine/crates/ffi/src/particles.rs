@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use opence_content::{
     EffectParticles, Level, Particle, PointPhysics, StructureBsp, TagRef, WeatherParticleType,
 };
-use opence_sim::effects::Running;
+use opence_sim::effects::{FiredPart, Running};
 use opence_sim::objects::ObjectHandle;
 use opence_sim::particle_collision::PointHit;
 use opence_sim::point_physics;
@@ -16,6 +16,8 @@ use opence_sim::seats::default_pose;
 use opence_sim::{Simulation, Vec3};
 
 use crate::lights::marker_frames;
+
+mod systems;
 use crate::snapshot::{
     ParticleSnapshot, MAX_PARTICLES, PARTICLE_FACING_AXIS, PARTICLE_FACING_SCREEN,
     PARTICLE_FACING_SEGMENT, PARTICLE_NO_PICTURE,
@@ -90,6 +92,61 @@ impl Random {
         let side = axis.any_orthonormal_vector();
         let other = axis.cross(side);
         axis * cos + (side * libm::cosf(around) + other * libm::sinf(around)) * sin
+    }
+
+    /// `axis` turned by `angle` about a random axis, as the original turns
+    /// an emitter's way within its cone.
+    fn tilted(&mut self, axis: Vec3, angle: f32) -> Vec3 {
+        let axis = axis.normalize_or(Vec3::X);
+        if angle == 0.0 {
+            return axis;
+        }
+        let about = self.direction();
+        let (sin, cos) = (libm::sinf(angle), libm::cosf(angle));
+        axis * cos + about.cross(axis) * sin + about * about.dot(axis) * (1.0 - cos)
+    }
+}
+
+/// An emitter's particles may be made: in air (no effect is under water)
+/// and by a violent effect (an effect is nonviolent only on a corpse,
+/// which effects here are not told of).
+fn made_here(emitter: &EffectParticles) -> bool {
+    !matches!(
+        emitter.environment,
+        EffectParticles::IN_WATER | EffectParticles::IN_VACUUM
+    ) && emitter.disposition != EffectParticles::NONVIOLENT
+}
+
+/// An effect's scales A and B and the values an emitter scales by them,
+/// as the original's `effect_scale`.
+#[derive(Clone, Copy)]
+struct Scaled {
+    /// The values scale A and scale B scale, each a mask of the emitter's
+    /// bits.
+    scales: [u32; 2],
+    /// The effect's scales A and B.
+    by: [f32; 2],
+}
+
+impl Scaled {
+    /// Some scale scales the value `bit`.
+    fn scales(self, bit: u32) -> bool {
+        self.scales.iter().any(|mask| mask & bit != 0)
+    }
+
+    /// `value` scaled by the scales that scale `bit`.
+    fn value(self, value: f32, bit: u32) -> f32 {
+        self.scales
+            .iter()
+            .zip(self.by)
+            .filter(|(mask, _)| *mask & bit != 0)
+            .fold(value, |value, (_, by)| value * by)
+    }
+
+    /// A value between `bounds`: the least scaled by `bit`'s scales and
+    /// what is above it by the next bit's.
+    fn between(self, random: &mut Random, [least, most]: [f32; 2], bit: u32) -> f32 {
+        self.value(least, bit) + random.next() * self.value(most - least, bit << 1)
     }
 }
 
@@ -222,6 +279,7 @@ fn sprite_bitmaps(level: &Level) -> Vec<&TagRef> {
         .iter()
         .filter_map(|particle| particle.bitmap.as_ref())
         .chain(level.contrails.iter().filter_map(|c| c.bitmap.as_ref()))
+        .chain(systems::Systems::bitmaps(level))
         .chain(
             level
                 .weather
@@ -361,26 +419,63 @@ impl Live {
         effect: &Running,
     ) -> Self {
         let origin = &effect.origin;
+        let scaled = Scaled {
+            scales: emitter.scales,
+            by: origin.scale,
+        };
         let forward = origin.rotation * facing(emitter.direction);
-        let direction = random.within(forward, emitter.velocity_cone_angle);
-        let spread = random.direction() * random.between(emitter.distribution_radius);
+        let speed = scaled.between(random, emitter.velocity, EffectParticles::SCALES_VELOCITY);
+        let cone = scaled.value(
+            emitter.velocity_cone_angle,
+            EffectParticles::SCALES_VELOCITY_CONE,
+        );
+        let tilt = cone * random.next();
+        let direction = random.tilted(forward, tilt);
+        let reach = scaled.between(
+            random,
+            emitter.distribution_radius,
+            EffectParticles::SCALES_DISTRIBUTION_RADIUS,
+        );
+        let spread = random.direction() * reach;
         let position =
             origin.position + origin.rotation * Vec3::from_array(emitter.offset) + spread;
-        let tint = mix(rgba(emitter.tint[0]), rgba(emitter.tint[1]), random.next());
+        let attached = emitter.flags & EffectParticles::STAY_ATTACHED != 0;
+        let mut velocity = direction * speed;
+        if !attached {
+            velocity += origin.velocity;
+        }
+        let radius = scaled.between(random, emitter.radius, EffectParticles::SCALES_RADIUS);
+        let spin = scaled.between(
+            random,
+            emitter.angular_velocity,
+            EffectParticles::SCALES_ANGULAR_VELOCITY,
+        );
+        let rotation = if emitter.flags & EffectParticles::RANDOM_ROTATION != 0 {
+            std::f32::consts::TAU * random.next()
+        } else {
+            0.0
+        };
+        let along = if scaled.scales(EffectParticles::SCALES_TINT) {
+            scaled.value(1.0, EffectParticles::SCALES_TINT)
+        } else {
+            random.next()
+        };
+        let mut color = mix(rgba(emitter.tint[0]), rgba(emitter.tint[1]), along);
+        if emitter.flags & EffectParticles::TINT_FROM_CHANGE_COLOR != 0 {
+            for (channel, by) in color.iter_mut().zip(origin.color) {
+                *channel *= by;
+            }
+        }
         Self {
             particle: index,
             position,
-            velocity: direction * random.between(emitter.velocity),
+            velocity,
             age: 0.0,
             life: random.between(particle.lifespan).max(TICK),
-            radius: random.between(emitter.radius).max(0.0),
-            rotation: if emitter.flags & EffectParticles::RANDOM_ROTATION != 0 {
-                std::f32::consts::TAU * random.next()
-            } else {
-                0.0
-            },
-            spin: random.between(emitter.angular_velocity),
-            color: tint,
+            radius: radius.max(0.0),
+            rotation,
+            spin,
+            color,
             sequence: i32::from(particle.first_sequence)
                 + random.below(i32::from(particle.initial_sequences)),
             frame_span: (particle.fps[1] > 0.0)
@@ -389,8 +484,7 @@ impl Live {
                 .map(|fps| 1.0 / fps),
             frame: 0.0,
             at_rest: false,
-            anchor: (emitter.flags & EffectParticles::STAY_ATTACHED != 0)
-                .then_some((effect.number, origin.position)),
+            anchor: attached.then_some((effect.number, origin.position)),
         }
     }
 
@@ -971,6 +1065,8 @@ pub(crate) struct LevelParticles {
     emitted: HashMap<(u32, usize, usize), (u16, u16)>,
     weather: Weather,
     contrails: Contrails,
+    /// The particle systems running.
+    systems: systems::Systems,
     random: Random,
     /// The camera at the last frame, which the weather is about.
     pub(crate) camera: Vec3,
@@ -989,19 +1085,22 @@ impl LevelParticles {
                 .map(|(index, particle)| (particle.tag.clone(), index))
                 .collect(),
             contrails: Contrails::new(level),
+            systems: systems::Systems::new(level),
             ..Self::default()
         }
     }
 
     /// One tick, after the effects': the running effects emit, the
     /// particles move, meeting the world of `simulation`, the weather about
-    /// the camera on BSP `bsp` drifts, and the objects trail their
-    /// contrails. What the particles made is in [`LevelParticles::events`].
+    /// the camera on BSP `bsp` drifts, the objects trail their contrails,
+    /// and the particle systems the effects' parts `fired` made, and those
+    /// the objects carry, run. What the particles made is in
+    /// [`LevelParticles::events`].
     pub(crate) fn tick(
         &mut self,
         level: &Level,
         simulation: &mut Simulation,
-        running: &[Running],
+        (running, fired): (&[Running], &[FiredPart]),
         bsp: usize,
     ) {
         self.seconds += TICK;
@@ -1045,6 +1144,8 @@ impl LevelParticles {
                 .tick(level, structure, self.camera, &mut self.random);
         }
         self.contrails.tick(level, simulation, &mut self.random);
+        self.systems
+            .tick(level, simulation, fired, &mut self.random);
     }
 
     /// What the particles made in the last tick.
@@ -1073,16 +1174,23 @@ impl LevelParticles {
                 let Some(&particle) = self.particles.get(&emitter.particle) else {
                     continue;
                 };
+                if !made_here(emitter) {
+                    continue;
+                }
                 let key = (effect.number, effect.event, index);
                 seen.insert(key);
                 let random = &mut self.random;
                 let (total, done) = self.emitted.entry(key).or_insert_with(|| {
-                    let [least, most] = emitter.count.map(|n| n.max(0));
-                    let count = least + random.below(i32::from(most - least) + 1) as i16;
-                    (count.max(0) as u16, 0)
+                    let scaled = Scaled {
+                        scales: emitter.scales,
+                        by: effect.origin.scale,
+                    };
+                    let bounds = emitter.count.map(f32::from);
+                    let count = scaled.between(random, bounds, EffectParticles::SCALES_COUNT);
+                    (count.clamp(0.0, f32::from(u8::MAX)) as u16, 0)
                 });
                 let target = ((f32::from(*total) * emitted_share(emitter.distribution, fraction))
-                    .round() as u16)
+                    as u16)
                     .min(*total);
                 while *done < target {
                     *done += 1;
@@ -1102,8 +1210,8 @@ impl LevelParticles {
         self.emitted.retain(|key, _| seen.contains(key));
     }
 
-    /// The frame's particles: the effects', the contrails', then the
-    /// weather's about `camera`.
+    /// The frame's particles: the effects', the particle systems', the
+    /// contrails', then the weather's about `camera`.
     pub(crate) fn gather(&self, level: &Level, camera: Vec3, out: &mut Vec<ParticleSnapshot>) {
         out.clear();
         for live in &self.live {
@@ -1112,6 +1220,7 @@ impl LevelParticles {
             }
             out.extend(live.snapshot(level, &self.pictures));
         }
+        self.systems.gather(level, &self.pictures, out);
         self.contrails
             .gather(level, &self.pictures, self.seconds, out);
         self.weather.gather(level, &self.pictures, camera, out);
@@ -1196,6 +1305,10 @@ mod tests {
             angular_velocity: [0.0, 0.0],
             radius: [0.5, 0.5],
             tint: [[0.0; 4], [0.0; 4]],
+            environment: 0,
+            disposition: 0,
+            camera_mode: 0,
+            scales: [0, 0],
         }
     }
 
@@ -1435,10 +1548,10 @@ mod tests {
         let mut particles = LevelParticles::new(&level);
         let mut simulation = Simulation::empty();
         let effect = [running(0, 30)];
-        particles.tick(&level, &mut simulation, &effect, 0);
+        particles.tick(&level, &mut simulation, (&effect, &[]), 0);
         assert_eq!(particles.live.len(), 3);
         // (emitted once, though the effect runs on)
-        particles.tick(&level, &mut simulation, &[running(1, 30)], 0);
+        particles.tick(&level, &mut simulation, (&[running(1, 30)], &[]), 0);
         assert_eq!(particles.live.len(), 3);
         let mut out = Vec::new();
         particles.gather(&level, Vec3::ZERO, &mut out);
@@ -1454,11 +1567,11 @@ mod tests {
         assert_eq!(first.modes[2], PARTICLE_FACING_SCREEN);
         assert!(first.modes[0] < 2, "{first:?}");
         for _ in 0..27 {
-            particles.tick(&level, &mut simulation, &[], 0);
+            particles.tick(&level, &mut simulation, (&[], &[]), 0);
         }
         particles.gather(&level, Vec3::ZERO, &mut out);
         assert!(out[0].color[3] < 0.5, "it fades out: {:?}", out[0]);
-        particles.tick(&level, &mut simulation, &[], 0);
+        particles.tick(&level, &mut simulation, (&[], &[]), 0);
         assert!(particles.live.is_empty(), "it dies at a second");
         assert!(particles.emitted.is_empty());
     }
@@ -1468,14 +1581,14 @@ mod tests {
         let level = level(EffectParticles::CONSTANT, 10);
         let mut particles = LevelParticles::new(&level);
         let mut simulation = Simulation::empty();
-        particles.tick(&level, &mut simulation, &[running(4, 10)], 0);
+        particles.tick(&level, &mut simulation, (&[running(4, 10)], &[]), 0);
         assert_eq!(particles.live.len(), 5);
-        particles.tick(&level, &mut simulation, &[running(9, 10)], 0);
+        particles.tick(&level, &mut simulation, (&[running(9, 10)], &[]), 0);
         assert_eq!(particles.live.len(), 10);
         let mut skipped = running(0, 10);
         skipped.number = 2;
         skipped.skipped = true;
-        particles.tick(&level, &mut simulation, &[skipped], 0);
+        particles.tick(&level, &mut simulation, (&[skipped], &[]), 0);
         assert_eq!(particles.live.len(), 10);
     }
 
@@ -1487,10 +1600,10 @@ mod tests {
         event.particles[0].velocity = [0.0, 0.0];
         let mut particles = LevelParticles::new(&level);
         let mut simulation = Simulation::empty();
-        particles.tick(&level, &mut simulation, &[running(0, 30)], 0);
+        particles.tick(&level, &mut simulation, (&[running(0, 30)], &[]), 0);
         let mut moved = running(1, 30);
         moved.origin.position += Vec3::new(0.0, 0.0, 5.0);
-        particles.tick(&level, &mut simulation, &[moved], 0);
+        particles.tick(&level, &mut simulation, (&[moved], &[]), 0);
         assert_eq!(particles.live[0].position, Vec3::new(1.0, 2.0, 8.0));
     }
 
@@ -1593,7 +1706,7 @@ mod tests {
         let mut particles = LevelParticles::new(&level);
         particles.camera = camera;
         let mut simulation = Simulation::empty();
-        particles.tick(&level, &mut simulation, &[], 0);
+        particles.tick(&level, &mut simulation, (&[], &[]), 0);
         assert_eq!(particles.weather.drops[0].len(), 64);
         let mut out = Vec::new();
         particles.gather(&level, camera, &mut out);
@@ -1607,7 +1720,7 @@ mod tests {
         // (somewhere with none, it stops)
         let mut dry = level.clone();
         dry.structure_bsps[0].cluster_weather = vec![None];
-        particles.tick(&dry, &mut simulation, &[], 0);
+        particles.tick(&dry, &mut simulation, (&[], &[]), 0);
         particles.gather(&dry, camera, &mut out);
         assert!(out.is_empty());
     }
@@ -1724,7 +1837,7 @@ mod tests {
             panic!("the rocket was not made");
         };
         for _ in 0..3 {
-            particles.tick(&level, &mut simulation, &[], 0);
+            particles.tick(&level, &mut simulation, (&[], &[]), 0);
         }
         let mut out = Vec::new();
         particles.gather(&level, Vec3::ZERO, &mut out);
@@ -1734,7 +1847,7 @@ mod tests {
         assert_eq!(out[0].position[3], 0.25);
         assert!(simulation.remove(handle));
         for _ in 0..31 {
-            particles.tick(&level, &mut simulation, &[], 0);
+            particles.tick(&level, &mut simulation, (&[], &[]), 0);
         }
         assert!(particles.contrails.trails.is_empty(), "its points died");
     }
@@ -1790,5 +1903,140 @@ mod tests {
             assert!(random.below(3) < 3);
         }
         assert_eq!(random.within(Vec3::Y, 0.0), Vec3::Y);
+    }
+
+    /// `level`'s effect `sparks` emits `emitter` alone.
+    fn emits(level: &mut Level, emitter: EffectParticles) {
+        let Some(event) = level
+            .effects
+            .iter_mut()
+            .find(|effect| effect.tag.path == "sparks")
+            .and_then(|effect| effect.events.first_mut())
+        else {
+            panic!("the level has no sparks");
+        };
+        event.particles = vec![emitter];
+    }
+
+    /// The particles an effect at rest emitting `emitter` once makes, at
+    /// scales `scale` and moving at `velocity`.
+    fn emitted(emitter: EffectParticles, scale: [f32; 2], velocity: Vec3) -> Vec<Live> {
+        let mut level = level(EffectParticles::START, 1);
+        emits(&mut level, emitter);
+        let mut particles = LevelParticles::new(&level);
+        let mut effect = running(0, 30);
+        effect.origin.scale = scale;
+        effect.origin.velocity = velocity;
+        particles.tick(&level, &mut Simulation::empty(), (&[effect], &[]), 0);
+        particles.live
+    }
+
+    #[test]
+    fn an_effects_scales_scale_the_counts_its_emitters_say() {
+        let mut many = emitter(EffectParticles::START, 0);
+        many.count = [8, 8];
+        assert_eq!(emitted(many.clone(), [0.5, 0.25], Vec3::ZERO).len(), 8);
+        many.scales = [EffectParticles::SCALES_COUNT, 0];
+        assert_eq!(emitted(many.clone(), [0.5, 0.25], Vec3::ZERO).len(), 4);
+        many.scales = [EffectParticles::SCALES_COUNT, EffectParticles::SCALES_COUNT];
+        assert_eq!(emitted(many.clone(), [0.5, 0.25], Vec3::ZERO).len(), 1);
+        // (a count is the fewest and a random share of the rest, short of
+        // the most)
+        many.count = [2, 6];
+        many.scales = [0, 0];
+        for _ in 0..8 {
+            let made = emitted(many.clone(), [1.0; 2], Vec3::ZERO).len();
+            assert!((2..6).contains(&made), "{made}");
+        }
+    }
+
+    #[test]
+    fn particles_take_the_effects_velocity_unless_they_stay_with_it() {
+        let moving = Vec3::new(0.0, 0.0, 3.0);
+        let free = emitted(emitter(EffectParticles::START, 1), [1.0; 2], moving);
+        assert_eq!(free[0].velocity, Vec3::new(2.0, 0.0, 3.0));
+        let mut stays = emitter(EffectParticles::START, 1);
+        stays.flags = EffectParticles::STAY_ATTACHED;
+        let held = emitted(stays, [1.0; 2], moving);
+        assert_eq!(held[0].velocity, Vec3::new(2.0, 0.0, 0.0));
+        // and a scaled speed is the scaled least and the rest scaled by
+        // its own bit
+        let mut quick = emitter(EffectParticles::START, 1);
+        quick.velocity = [2.0, 6.0];
+        quick.scales = [
+            EffectParticles::SCALES_VELOCITY | EffectParticles::SCALES_VELOCITY_DELTA,
+            0,
+        ];
+        let slow = emitted(quick, [0.0, 1.0], Vec3::ZERO);
+        assert_eq!(slow[0].velocity, Vec3::ZERO);
+    }
+
+    #[test]
+    fn particles_leave_within_their_cone_and_are_sized_and_tinted_by_the_scales() {
+        let mut wide = emitter(EffectParticles::START, 16);
+        wide.velocity_cone_angle = 0.4;
+        wide.radius = [1.0, 3.0];
+        wide.tint = [[1.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]];
+        wide.scales = [
+            EffectParticles::SCALES_RADIUS | EffectParticles::SCALES_TINT,
+            0,
+        ];
+        let made = emitted(wide.clone(), [0.25, 1.0], Vec3::ZERO);
+        assert_eq!(made.len(), 16);
+        for one in &made {
+            let way = one.velocity.normalize_or(Vec3::ZERO);
+            assert!(way.x >= libm::cosf(0.4) - 1e-4, "{way}");
+            // the least radius scaled, the rest not
+            assert!((0.25..2.25).contains(&one.radius), "{}", one.radius);
+            // a quarter of the way from black to white
+            assert!((one.color[0] - 0.25).abs() < 1e-4, "{:?}", one.color);
+        }
+        wide.velocity_cone_angle = 0.0;
+        let straight = emitted(wide, [1.0; 2], Vec3::ZERO);
+        assert!(straight
+            .iter()
+            .all(|one| one.velocity == Vec3::new(2.0, 0.0, 0.0)));
+    }
+
+    #[test]
+    fn particles_are_tinted_by_the_effects_colour_when_they_say_so() {
+        let mut tinted = emitter(EffectParticles::START, 1);
+        tinted.flags = EffectParticles::TINT_FROM_CHANGE_COLOR;
+        let mut level = level(EffectParticles::START, 1);
+        emits(&mut level, tinted);
+        let mut particles = LevelParticles::new(&level);
+        let mut effect = running(0, 30);
+        effect.origin.color = [0.5, 0.25, 1.0];
+        particles.tick(&level, &mut Simulation::empty(), (&[effect], &[]), 0);
+        assert_eq!(particles.live[0].color, [0.5, 0.25, 1.0, 1.0]);
+    }
+
+    #[test]
+    fn particles_for_water_or_a_vacuum_or_nonviolence_are_not_made() {
+        for (environment, disposition) in [
+            (EffectParticles::IN_WATER, 0),
+            (EffectParticles::IN_VACUUM, 0),
+            (0, EffectParticles::NONVIOLENT),
+        ] {
+            let mut kept = emitter(EffectParticles::START, 3);
+            kept.environment = environment;
+            kept.disposition = disposition;
+            assert!(emitted(kept, [1.0; 2], Vec3::ZERO).is_empty());
+        }
+        let mut airy = emitter(EffectParticles::START, 3);
+        airy.environment = EffectParticles::IN_AIR;
+        airy.disposition = EffectParticles::VIOLENT;
+        assert_eq!(emitted(airy, [1.0; 2], Vec3::ZERO).len(), 3);
+    }
+
+    #[test]
+    fn a_tilted_way_turns_no_further_than_its_angle() {
+        let mut random = Random::default();
+        for _ in 0..100 {
+            let way = random.tilted(Vec3::Z, 0.3);
+            assert!((way.length() - 1.0).abs() < 1e-4);
+            assert!(way.z >= libm::cosf(0.3) - 1e-4, "{way}");
+        }
+        assert_eq!(random.tilted(Vec3::X, 0.0), Vec3::X);
     }
 }

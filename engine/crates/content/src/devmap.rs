@@ -855,6 +855,7 @@ pub fn level(donor: Option<&Level>) -> Level {
             decals: Vec::new(),
             particles: Vec::new(),
             contrails: Vec::new(),
+            particle_systems: Vec::new(),
             weather: Vec::new(),
             detail_object_collections: Vec::new(),
             lens_flares: Vec::new(),

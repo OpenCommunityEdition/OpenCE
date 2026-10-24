@@ -56,6 +56,8 @@ pub struct Level {
     pub particles: Vec<crate::Particle>,
     /// The contrails its objects trail, by path.
     pub contrails: Vec<crate::Contrail>,
+    /// The particle systems its effects and objects make, by path.
+    pub particle_systems: Vec<crate::ParticleSystem>,
     /// The weather its BSPs have, by path.
     pub weather: Vec<crate::WeatherSystem>,
     /// Its detail object collections, as its scenario's palette orders
@@ -267,6 +269,13 @@ impl Level {
     /// A contrail, by its tag.
     pub fn contrail(&self, tag: &TagRef) -> Option<&crate::Contrail> {
         self.contrails.iter().find(|contrail| contrail.tag == *tag)
+    }
+
+    /// A particle system, by its tag.
+    pub fn particle_system(&self, tag: &TagRef) -> Option<&crate::ParticleSystem> {
+        self.particle_systems
+            .iter()
+            .find(|system| system.tag == *tag)
     }
 
     /// Weather, by its tag.

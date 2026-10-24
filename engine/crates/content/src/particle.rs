@@ -219,6 +219,17 @@ pub struct EffectParticles {
     pub radius: [f32; 2],
     /// The colours they are tinted between, alpha, red, green, blue.
     pub tint: [[f32; 4]; 2],
+    /// Where they may be made: 0 anywhere, 1 in air, 2 in water, 3 in a
+    /// vacuum.
+    pub environment: i16,
+    /// The effects they are made by: 0 any, 1 violent, 2 nonviolent.
+    pub disposition: i16,
+    /// Who sees them: 0 any camera, 1 the first person only, 2 the third
+    /// person only.
+    pub camera_mode: i16,
+    /// The values the effect's scales A and B scale, each a mask of
+    /// [`EffectParticles::SCALES_VELOCITY`] and the others.
+    pub scales: [u32; 2],
 }
 
 impl EffectParticles {
@@ -226,6 +237,44 @@ impl EffectParticles {
     pub const STAY_ATTACHED: u32 = 1 << 0;
     /// Each is turned at random.
     pub const RANDOM_ROTATION: u32 = 1 << 1;
+    /// Their tint is multiplied by the effect's colour.
+    pub const TINT_FROM_CHANGE_COLOR: u32 = 1 << 2;
+
+    /// A scale scales the least speed.
+    pub const SCALES_VELOCITY: u32 = 1 << 0;
+    /// A scale scales the speed above the least.
+    pub const SCALES_VELOCITY_DELTA: u32 = 1 << 1;
+    /// A scale scales the cone.
+    pub const SCALES_VELOCITY_CONE: u32 = 1 << 2;
+    /// A scale scales the least spin.
+    pub const SCALES_ANGULAR_VELOCITY: u32 = 1 << 3;
+    /// A scale scales the spin above the least.
+    pub const SCALES_ANGULAR_VELOCITY_DELTA: u32 = 1 << 4;
+    /// A scale scales the fewest made.
+    pub const SCALES_COUNT: u32 = 1 << 5;
+    /// A scale scales how many above the fewest.
+    pub const SCALES_COUNT_DELTA: u32 = 1 << 6;
+    /// A scale scales the least distance from the location.
+    pub const SCALES_DISTRIBUTION_RADIUS: u32 = 1 << 7;
+    /// A scale scales the distance above the least.
+    pub const SCALES_DISTRIBUTION_RADIUS_DELTA: u32 = 1 << 8;
+    /// A scale scales the least radius.
+    pub const SCALES_RADIUS: u32 = 1 << 9;
+    /// A scale scales the radius above the least.
+    pub const SCALES_RADIUS_DELTA: u32 = 1 << 10;
+    /// A scale picks the tint between its bounds (otherwise it is random).
+    pub const SCALES_TINT: u32 = 1 << 11;
+
+    /// Made in air only.
+    pub const IN_AIR: i16 = 1;
+    /// Made in water only.
+    pub const IN_WATER: i16 = 2;
+    /// Made in a vacuum only.
+    pub const IN_VACUUM: i16 = 3;
+    /// Made by violent effects only.
+    pub const VIOLENT: i16 = 1;
+    /// Made by nonviolent effects only.
+    pub const NONVIOLENT: i16 = 2;
 
     /// Emitted all at once when the event begins.
     pub const START: i16 = 0;
@@ -284,6 +333,200 @@ pub struct ContrailState {
     pub width: f32,
     /// The colours it is between, alpha, red, green, blue.
     pub color: [[f32; 4]; 2],
+}
+
+/// A particle system (`pctl`): kinds of particle an effect or an object
+/// makes, each a machine of states its emitter and its particles pass
+/// through.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ParticleSystem {
+    /// Its tag.
+    pub tag: TagRef,
+    /// How the system itself moves, when nothing carries it.
+    pub point_physics: Option<PointPhysics>,
+    /// How it moves: 0 by its point physics.
+    pub update_physics: i16,
+    /// Its physics' flags.
+    pub physics_flags: u32,
+    /// Its physics' constants.
+    pub physics_constants: Vec<f32>,
+    /// Its kinds of particle (the original uses four at most).
+    pub types: Vec<ParticleSystemType>,
+}
+
+/// One of a particle system's kinds of particle.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ParticleSystemType {
+    /// Its name.
+    pub name: String,
+    /// Its flags ([`ParticleSystemType::TYPE_STATES_LOOP`]).
+    pub flags: u32,
+    /// How many particles it begins with.
+    pub initial_count: i16,
+    /// How its sprites are drawn: 0 simple, 1 rotational.
+    pub complex_sprite_render_mode: i16,
+    /// How its sprites face: 0 the screen, 1 parallel to its velocity,
+    /// 2 across it.
+    pub sprite_render_mode: i16,
+    /// Its particles' radius, by which the states' radius is scaled.
+    pub radius: f32,
+    /// How its particles are made: 0 at the marker, 1 an explosion, 2 a
+    /// jet.
+    pub creation_physics: i16,
+    /// Its physics' flags.
+    pub physics_flags: u32,
+    /// Its physics' constants.
+    pub physics_constants: Vec<f32>,
+    /// The states its emitter passes through.
+    pub type_states: Vec<ParticleTypeState>,
+    /// The states each of its particles passes through.
+    pub particle_states: Vec<ParticleState>,
+}
+
+impl ParticleSystemType {
+    /// Its emitter's states go round again.
+    pub const TYPE_STATES_LOOP: u32 = 1 << 0;
+    /// ...forwards and backwards.
+    pub const TYPE_STATES_LOOP_FORWARD_BACKWARD: u32 = 1 << 1;
+    /// Its particles' states go round again.
+    pub const PARTICLE_STATES_LOOP: u32 = 1 << 2;
+    /// ...forwards and backwards.
+    pub const PARTICLE_STATES_LOOP_FORWARD_BACKWARD: u32 = 1 << 3;
+    /// Its particles die in water.
+    pub const PARTICLES_DIE_IN_WATER: u32 = 1 << 4;
+    /// Its particles die in air.
+    pub const PARTICLES_DIE_IN_AIR: u32 = 1 << 5;
+    /// Its particles die on the ground.
+    pub const PARTICLES_DIE_ON_GROUND: u32 = 1 << 6;
+    /// Its sprites turn at random as they are made.
+    pub const ROTATIONAL_SPRITES_ANIMATE_SIDEWAYS: u32 = 1 << 7;
+    /// It is turned off.
+    pub const DISABLED: u32 = 1 << 8;
+    /// Its colour is the system's times its own.
+    pub const TINT_BY_EFFECT_COLOR: u32 = 1 << 9;
+    /// Its first count is scaled by the system's scale.
+    pub const INITIAL_COUNT_SCALES_WITH_EFFECT: u32 = 1 << 10;
+    /// Its fewest particles are scaled by the system's scale.
+    pub const MINIMUM_COUNT_SCALES_WITH_EFFECT: u32 = 1 << 11;
+    /// Its rate is scaled by the system's scale.
+    pub const CREATION_RATE_SCALES_WITH_EFFECT: u32 = 1 << 12;
+    /// Its particles' size is scaled by the system's scale.
+    pub const SCALE_SCALES_WITH_EFFECT: u32 = 1 << 13;
+    /// Its particles' frames are scaled by the system's scale.
+    pub const ANIMATION_RATE_SCALES_WITH_EFFECT: u32 = 1 << 14;
+    /// Its particles' spin is scaled by the system's scale.
+    pub const ROTATION_RATE_SCALES_WITH_EFFECT: u32 = 1 << 15;
+    /// It is not drawn in the first person.
+    pub const DONT_DRAW_IN_FIRST_PERSON: u32 = 1 << 16;
+    /// It is not drawn in the third person.
+    pub const DONT_DRAW_IN_THIRD_PERSON: u32 = 1 << 17;
+}
+
+/// What a particle's look is multiplied by, drawn between two bounds.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct RandomizedVariables {
+    /// Its size.
+    pub scale: f32,
+    /// Its frames a second.
+    pub animation_rate: f32,
+    /// Its spin, turns a second.
+    pub rotation_rate: f32,
+    /// Its colour, alpha, red, green, blue.
+    pub color: [f32; 4],
+}
+
+impl RandomizedVariables {
+    /// `self` with `other` weighted by `t` and `self` by 1 - `t`.
+    pub fn mix(&self, other: &Self, t: f32) -> Self {
+        let lerp = |a: f32, b: f32| a + (b - a) * t;
+        Self {
+            scale: lerp(self.scale, other.scale),
+            animation_rate: lerp(self.animation_rate, other.animation_rate),
+            rotation_rate: lerp(self.rotation_rate, other.rotation_rate),
+            color: [0, 1, 2, 3].map(|i| lerp(self.color[i], other.color[i])),
+        }
+    }
+}
+
+/// What an emitter's state sets.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ParticleTypeVariables {
+    /// What its particles' look is multiplied by.
+    pub randomized: RandomizedVariables,
+    /// What its particles' radius is multiplied by.
+    pub radius: f32,
+    /// The fewest particles it has: fewer, it runs its state out faster.
+    pub minimum_count: f32,
+    /// Particles made a second.
+    pub creation_rate: f32,
+}
+
+impl ParticleTypeVariables {
+    /// `self` with `other` weighted by `t` and `self` by 1 - `t`.
+    pub fn mix(&self, other: &Self, t: f32) -> Self {
+        let lerp = |a: f32, b: f32| a + (b - a) * t;
+        Self {
+            randomized: self.randomized.mix(&other.randomized, t),
+            radius: lerp(self.radius, other.radius),
+            minimum_count: lerp(self.minimum_count, other.minimum_count),
+            creation_rate: lerp(self.creation_rate, other.creation_rate),
+        }
+    }
+}
+
+/// One of an emitter's states.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ParticleTypeState {
+    /// Its name.
+    pub name: String,
+    /// The least and most seconds it lasts.
+    pub duration: [f32; 2],
+    /// The least and most seconds it takes to become the next.
+    pub transition: [f32; 2],
+    /// Its flags.
+    pub flags: u32,
+    /// What it sets.
+    pub variables: ParticleTypeVariables,
+    /// How it makes particles, if it overrides its type (`-1`: it does
+    /// not).
+    pub creation_physics: i16,
+    /// How it moves them, if it overrides its type.
+    pub update_physics: i16,
+    /// Its physics' constants.
+    pub physics_constants: Vec<f32>,
+}
+
+/// One of a particle's states.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ParticleState {
+    /// Its name.
+    pub name: String,
+    /// The least and most seconds it lasts.
+    pub duration: [f32; 2],
+    /// The least and most seconds it takes to become the next.
+    pub transition: [f32; 2],
+    /// Its picture.
+    pub bitmap: Option<TagRef>,
+    /// The picture's sequence it is drawn from.
+    pub sequence: i16,
+    /// The least and most size.
+    pub scale: [f32; 2],
+    /// The least and most frames a second.
+    pub animation_rate: [f32; 2],
+    /// The least and most spin, turns a second.
+    pub rotation_rate: [f32; 2],
+    /// The colours it is between, alpha, red, green, blue.
+    pub color: [[f32; 4]; 2],
+    /// Its radius, by its type's.
+    pub radius: f32,
+    /// How it moves.
+    pub point_physics: Option<PointPhysics>,
+    /// How it is blended.
+    pub shader: SpriteShader,
+    /// Its picture's flags (bit 0: unfiltered).
+    pub primary_map_flags: u16,
+    /// Its second picture, laid over its first.
+    pub secondary_map: Option<SecondaryMap>,
 }
 
 /// Weather (`rain`): the kinds of particle that fill a box about the

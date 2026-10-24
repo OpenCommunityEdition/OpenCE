@@ -37,6 +37,23 @@
 //! at 0x104, its rotation rate at 0x10C, its colours at 0x134 and 0x144,
 //! its bitmap at 0x194, its render mode at 0x1A4 and its shader at 0x1D0.
 //!
+//! A particle system (0x68 bytes): its point physics at 0x38, its update
+//! physics at 0x48, its physics' flags at 0x4C and constants (a real
+//! each) a block at 0x50, and its types (0x80 bytes each) a block at 0x5C.
+//! A type: its name at 0x00, flags at 0x20, first count at 0x24, sprite
+//! modes at 0x28 and 0x2A, radius at 0x2C, creation physics at 0x54,
+//! physics' flags at 0x58 and constants at 0x5C, its emitter's states
+//! (0xC0 bytes each) a block at 0x68 and its particles' (0x178 bytes) at
+//! 0x74. An emitter state: its name, its duration and transition bounds
+//! at 0x20 and 0x28, its flags at 0x30, its variables at 0x34 (scale,
+//! animation and rotation rates, a colour, then radius, fewest particles
+//! and creation rate), its physics at 0xB0 and 0xB2 and constants at 0xB4.
+//! A particle state: its name, duration and transition at 0x20 and 0x28,
+//! its bitmap at 0x30 and sequence at 0x40, its scale, animation and
+//! rotation bounds at 0x48, 0x50 and 0x58, its colours at 0x60 and 0x70,
+//! its radius at 0x80, its point physics at 0x84 and its shader at 0xE0
+//! (laid out as a particle's at 0xD8).
+//!
 //! A point physics (0x40 bytes): its flags at 0x00, the mass and
 //! buoyancies the tools work out at 0x04, its density at 0x20, its
 //! frictions at 0x24 and 0x28, its contact friction at 0x2C and its
@@ -46,8 +63,9 @@ use std::collections::BTreeSet;
 
 use opence_content::{
     Contrail, ContrailState, DetailObject, DetailObjectCollection, DetailObjectType, Effect,
-    EffectParticles, ObjectDefinition, Particle, PointPhysics, SecondaryMap, SpriteShader,
-    StructureBsp, TagRef, WeatherPalette, WeatherParticleType, WeatherSystem,
+    EffectParticles, ObjectDefinition, Particle, ParticleState, ParticleSystem, ParticleSystemType,
+    ParticleTypeState, ParticleTypeVariables, PointPhysics, RandomizedVariables, SecondaryMap,
+    SpriteShader, StructureBsp, TagRef, WeatherPalette, WeatherParticleType, WeatherSystem,
 };
 
 use crate::cache::Cache;
@@ -65,6 +83,17 @@ pub(crate) const CONTRAIL_SIZE: usize = 0x144;
 const CONTRAIL_STATES_OFFSET: usize = 0x138;
 pub(crate) const CONTRAIL_STATE_SIZE: usize = 0x68;
 const MAX_CONTRAIL_STATES: usize = 16;
+pub(crate) const PCTL: GroupTag = GroupTag::new(b"pctl");
+pub(crate) const PARTICLE_SYSTEM_SIZE: usize = 0x68;
+const PARTICLE_SYSTEM_TYPES_OFFSET: usize = 0x5C;
+pub(crate) const PARTICLE_SYSTEM_TYPE_SIZE: usize = 0x80;
+const MAX_PARTICLE_SYSTEM_TYPES: usize = 4;
+pub(crate) const TYPE_STATE_SIZE: usize = 0xC0;
+pub(crate) const PARTICLE_STATE_SIZE: usize = 0x178;
+const PARTICLE_STATE_SHADER_OFFSET: usize = 0xE0;
+const MAX_STATES: usize = 8;
+const PHYSICS_CONSTANT_SIZE: usize = 4;
+const MAX_PHYSICS_CONSTANTS: usize = 16;
 pub(crate) const RAIN: GroupTag = GroupTag::new(b"rain");
 pub(crate) const WEATHER_SIZE: usize = 0x30;
 const WEATHER_TYPES_OFFSET: usize = 0x24;
@@ -174,6 +203,13 @@ pub(crate) fn effect_particles(event: &Element<'_>) -> Result<Vec<EffectParticle
                 argb(&element, 0xB0, "tint lower bound")?,
                 argb(&element, 0xC0, "tint upper bound")?,
             ],
+            environment: element.i16(0x00, "create in")?,
+            disposition: element.i16(0x02, "create in")?,
+            camera_mode: element.i16(0x04, "create")?,
+            scales: [
+                element.u32(0xE0, "A scales values")?,
+                element.u32(0xE4, "B scales values")?,
+            ],
         });
     }
     Ok(particles)
@@ -224,24 +260,26 @@ fn import_particle(
         contact_deterioration: tag.f32(0x88, "contact deterioration")?,
         lod: vector(&tag, 0x8C, "lod falloff and cutoff")?,
         primary_map_flags: tag.u16(0xDE, "primary map flags")?,
-        secondary_map: secondary_map(reached, &tag)?,
+        secondary_map: secondary_map(reached, &tag, 0xD8)?,
     })
 }
 
-/// A particle's second picture, if it names one: its bitmap at 0xFC, its
-/// anchor at 0x10C, its flags at 0x10E and its radius at 0x148.
+/// The second picture of a shader whose flags are at `at`, if it names
+/// one: its bitmap 0x24 after, its anchor 0x34, its flags 0x36 and its
+/// radius 0x70 (a particle's at 0xFC, 0x10C, 0x10E and 0x148).
 fn secondary_map(
     reached: &mut Reached,
     tag: &Element<'_>,
+    at: usize,
 ) -> Result<Option<SecondaryMap>, ImportError> {
-    let Some(bitmap) = reached.bitmap(tag, 0xFC, "secondary map")? else {
+    let Some(bitmap) = reached.bitmap(tag, at + 0x24, "secondary map")? else {
         return Ok(None);
     };
     Ok(Some(SecondaryMap {
         bitmap,
-        anchor: tag.i16(0x10C, "secondary map anchor")?,
-        flags: tag.u16(0x10E, "secondary map flags")?,
-        radius: tag.f32(0x148, "secondary map radius")?,
+        anchor: tag.i16(at + 0x34, "secondary map anchor")?,
+        flags: tag.u16(at + 0x36, "secondary map flags")?,
+        radius: tag.f32(at + 0x70, "secondary map radius")?,
     }))
 }
 
@@ -384,6 +422,158 @@ pub(crate) fn import_contrails(
         }
     }
     Ok(contrails)
+}
+
+/// A block of physics constants, one real each, at `at`.
+fn physics_constants(element: &Element<'_>, at: usize) -> Result<Vec<f32>, ImportError> {
+    let block = element.block(
+        at,
+        "physics constants",
+        PHYSICS_CONSTANT_SIZE,
+        MAX_PHYSICS_CONSTANTS,
+    )?;
+    block
+        .iter()
+        .map(|constant| constant.f32(0x00, "k"))
+        .collect()
+}
+
+/// A name of 32 bytes at 0x00.
+fn name(element: &Element<'_>) -> Result<String, ImportError> {
+    Ok(element.text(0x00, "name", 31)?.to_owned())
+}
+
+/// A particle system's emitter state.
+fn type_state(element: &Element<'_>) -> Result<ParticleTypeState, ImportError> {
+    let randomized = |at: usize| -> Result<RandomizedVariables, ImportError> {
+        Ok(RandomizedVariables {
+            scale: element.f32(at, "scale")?,
+            animation_rate: element.f32(at + 0x04, "animation rate")?,
+            rotation_rate: element.f32(at + 0x08, "rotation rate")?,
+            color: argb(element, at + 0x0C, "color")?,
+        })
+    };
+    Ok(ParticleTypeState {
+        name: name(element)?,
+        duration: vector(element, 0x20, "duration bounds")?,
+        transition: vector(element, 0x28, "transition time bounds")?,
+        flags: element.u32(0x30, "flags")?,
+        variables: ParticleTypeVariables {
+            randomized: randomized(0x34)?,
+            radius: element.f32(0x50, "radius multiplier")?,
+            minimum_count: element.f32(0x54, "minimum particle count")?,
+            creation_rate: element.f32(0x58, "particle creation rate")?,
+        },
+        creation_physics: element.i16(0xB0, "particle creation physics")?,
+        update_physics: element.i16(0xB2, "particle update physics")?,
+        physics_constants: physics_constants(element, 0xB4)?,
+    })
+}
+
+/// A particle system's particle state, its bitmaps reached.
+fn particle_state(
+    cache: &Cache,
+    element: &Element<'_>,
+    reached: &mut Reached,
+) -> Result<ParticleState, ImportError> {
+    Ok(ParticleState {
+        name: name(element)?,
+        duration: vector(element, 0x20, "duration bounds")?,
+        transition: vector(element, 0x28, "transition time bounds")?,
+        bitmap: reached.bitmap(element, 0x30, "bitmaps")?,
+        sequence: element.i16(0x40, "sequence index")?,
+        scale: vector(element, 0x48, "scale")?,
+        animation_rate: vector(element, 0x50, "animation rate")?,
+        rotation_rate: vector(element, 0x58, "rotation rate")?,
+        color: [
+            argb(element, 0x60, "color 1")?,
+            argb(element, 0x70, "color 2")?,
+        ],
+        radius: element.f32(0x80, "radius multiplier")?,
+        point_physics: point_physics(cache, element, 0x84)?,
+        shader: sprite_shader(element, PARTICLE_STATE_SHADER_OFFSET)?,
+        primary_map_flags: element.u16(PARTICLE_STATE_SHADER_OFFSET + 6, "primary map flags")?,
+        secondary_map: secondary_map(reached, element, PARTICLE_STATE_SHADER_OFFSET)?,
+    })
+}
+
+/// A particle system tag, its states' bitmaps reached.
+fn import_particle_system(
+    cache: &Cache,
+    index: usize,
+    reached: &mut Reached,
+) -> Result<ParticleSystem, ImportError> {
+    let tag = cache.tag(index, PCTL, PARTICLE_SYSTEM_SIZE)?;
+    let block = tag.block(
+        PARTICLE_SYSTEM_TYPES_OFFSET,
+        "particle types",
+        PARTICLE_SYSTEM_TYPE_SIZE,
+        MAX_PARTICLE_SYSTEM_TYPES,
+    )?;
+    let mut types = Vec::with_capacity(block.len());
+    for kind in block.iter() {
+        let states = kind.block(0x68, "type states", TYPE_STATE_SIZE, MAX_STATES)?;
+        let type_states = states
+            .iter()
+            .map(|state| type_state(&state))
+            .collect::<Result<Vec<_>, _>>()?;
+        let states = kind.block(0x74, "particle states", PARTICLE_STATE_SIZE, MAX_STATES)?;
+        let mut particle_states = Vec::with_capacity(states.len());
+        for state in states.iter() {
+            particle_states.push(particle_state(cache, &state, reached)?);
+        }
+        types.push(ParticleSystemType {
+            name: name(&kind)?,
+            flags: kind.u32(0x20, "flags")?,
+            initial_count: kind.i16(0x24, "initial particle count")?,
+            complex_sprite_render_mode: kind.i16(0x28, "complex sprite render modes")?,
+            sprite_render_mode: kind.i16(0x2A, "sprite render modes")?,
+            radius: kind.f32(0x2C, "radius")?,
+            creation_physics: kind.i16(0x54, "particle creation physics")?,
+            physics_flags: kind.u32(0x58, "physics flags")?,
+            physics_constants: physics_constants(&kind, 0x5C)?,
+            type_states,
+            particle_states,
+        });
+    }
+    Ok(ParticleSystem {
+        tag: tag_ref(cache, index),
+        point_physics: point_physics(cache, &tag, 0x38)?,
+        update_physics: tag.i16(0x48, "system update physics")?,
+        physics_flags: tag.u32(0x4C, "physics flags")?,
+        physics_constants: physics_constants(&tag, 0x50)?,
+        types,
+    })
+}
+
+/// Every particle system the effects' parts make and the objects carry,
+/// each once, by path.
+pub(crate) fn import_particle_systems(
+    cache: &Cache,
+    effects: &[Effect],
+    objects: &[ObjectDefinition],
+    reached: &mut Reached,
+) -> Result<Vec<ParticleSystem>, ImportError> {
+    let made = effects
+        .iter()
+        .flat_map(|effect| &effect.events)
+        .flat_map(|event| &event.parts)
+        .map(|part| &part.tag);
+    let carried = objects
+        .iter()
+        .flat_map(|object| &object.attachments)
+        .filter_map(|attachment| attachment.tag.as_ref());
+    let tags: BTreeSet<&TagRef> = made
+        .chain(carried)
+        .filter(|tag| tag.group.0 == *b"pctl")
+        .collect();
+    let mut systems = Vec::with_capacity(tags.len());
+    for tag in tags {
+        if let Some(index) = tag_index(cache, tag) {
+            systems.push(import_particle_system(cache, index, reached)?);
+        }
+    }
+    Ok(systems)
 }
 
 /// A BSP's weather palette.
@@ -645,6 +835,42 @@ mod tests {
         }
     }
 
+    /// A rock carrying `attachments`.
+    fn carrying(attachments: Vec<Attachment>) -> ObjectDefinition {
+        ObjectDefinition {
+            attachments,
+            widgets: Vec::new(),
+            tag: TagRef {
+                group: opence_content::Group(*b"scen"),
+                path: "rock".into(),
+            },
+            kind: ObjectKind::Scenery,
+            flags: 0,
+            bounding_radius: 1.0,
+            bounding_offset: [0.0, 0.0, 0.0],
+            acceleration_scale: 1.0,
+            render_bounding_radius: 1.0,
+            model: None,
+            animation_graph: None,
+            collision_model: None,
+            physics: None,
+            modifier_shader: None,
+            creation_effect: None,
+            function_modes: Default::default(),
+            functions: Vec::new(),
+            change_colors: Vec::new(),
+            unit_hud: None,
+            material_effects: None,
+            unit_melee_damage: None,
+            biped: None,
+            weapon: None,
+            projectile: None,
+            equipment: None,
+            vehicle: None,
+            device: None,
+        }
+    }
+
     #[test]
     fn colours_of_five_and_six_bits_are_widened() {
         assert_eq!(rgb565(0xFFFF), [255, 255, 255]);
@@ -688,7 +914,18 @@ mod tests {
         let particle = fake.add_tag(PART, "effects\\particles\\smoke", &particle);
 
         let mut emitted = [0u8; crate::effect::PARTICLES_SIZE];
+        put(&mut emitted, 0x00, &[1, 0, 2, 0, 1, 0]);
         put(&mut emitted, 0x08, &1i16.to_le_bytes());
+        put(
+            &mut emitted,
+            0xE0,
+            &EffectParticles::SCALES_COUNT.to_le_bytes(),
+        );
+        put(
+            &mut emitted,
+            0xE4,
+            &EffectParticles::SCALES_TINT.to_le_bytes(),
+        );
         floats(&mut emitted, 0x0C, &[0.5, -0.5, 1.0, 2.0, 3.0]);
         reference(&mut emitted, 0x54, PART, fake.handle(particle));
         put(
@@ -746,6 +983,18 @@ mod tests {
         assert_eq!(emits[0].offset, [1.0, 2.0, 3.0]);
         assert_eq!(emits[0].distribution, EffectParticles::BUILDUP);
         assert_eq!(emits[0].count, [3, 5]);
+        assert_eq!(
+            (
+                emits[0].environment,
+                emits[0].disposition,
+                emits[0].camera_mode
+            ),
+            (EffectParticles::IN_AIR, EffectParticles::NONVIOLENT, 1)
+        );
+        assert_eq!(
+            emits[0].scales,
+            [EffectParticles::SCALES_COUNT, EffectParticles::SCALES_TINT]
+        );
         assert_eq!(emits[0].velocity, [1.0, 2.0]);
         assert_eq!(emits[0].velocity_cone_angle, 0.3);
         assert_eq!(emits[0].angular_velocity, [4.0, 5.0]);
@@ -803,51 +1052,20 @@ mod tests {
         let again = particle_effects(&cache, &[read, made[0].clone()])?;
         assert!(again.is_empty(), "known effects are not made again");
 
-        let carrier = ObjectDefinition {
-            attachments: vec![
-                Attachment {
-                    tag: Some(tag_ref(&cache, contrail)),
-                    marker: "trail".into(),
-                    primary_scale: 0,
-                    change_color: 0,
-                },
-                Attachment {
-                    tag: Some(tag_ref(&cache, effect)),
-                    marker: String::new(),
-                    primary_scale: 0,
-                    change_color: 0,
-                },
-            ],
-            widgets: Vec::new(),
-            tag: TagRef {
-                group: opence_content::Group(*b"scen"),
-                path: "rock".into(),
+        let carrier = carrying(vec![
+            Attachment {
+                tag: Some(tag_ref(&cache, contrail)),
+                marker: "trail".into(),
+                primary_scale: 0,
+                change_color: 0,
             },
-            kind: ObjectKind::Scenery,
-            flags: 0,
-            bounding_radius: 1.0,
-            bounding_offset: [0.0, 0.0, 0.0],
-            acceleration_scale: 1.0,
-            render_bounding_radius: 1.0,
-            model: None,
-            animation_graph: None,
-            collision_model: None,
-            physics: None,
-            modifier_shader: None,
-            creation_effect: None,
-            function_modes: Default::default(),
-            functions: Vec::new(),
-            change_colors: Vec::new(),
-            unit_hud: None,
-            material_effects: None,
-            unit_melee_damage: None,
-            biped: None,
-            weapon: None,
-            projectile: None,
-            equipment: None,
-            vehicle: None,
-            device: None,
-        };
+            Attachment {
+                tag: Some(tag_ref(&cache, effect)),
+                marker: String::new(),
+                primary_scale: 0,
+                change_color: 0,
+            },
+        ]);
         let contrails = import_contrails(&cache, &[carrier], &mut reached)?;
         assert_eq!(contrails.len(), 1);
         let trail = &contrails[0];
@@ -1052,6 +1270,171 @@ mod tests {
         let cache = Cache::open(fake.build())?;
         let element = cache.tag(bsp, GroupTag::new(b"sbsp"), BSP_DETAIL_OBJECTS_OFFSET + 12)?;
         assert!(detail_objects(&element)?.is_empty());
+        Ok(())
+    }
+
+    /// A particle system with one type: two emitter states, one particle
+    /// state with point physics and a second picture, made by an effect's
+    /// part and carried by an object.
+    #[test]
+    fn particle_systems_are_read() -> Result<(), Box<dyn Error>> {
+        let mut fake = FakeCache::new(CacheKind::CustomEdition);
+        let mut physics = [0u8; POINT_PHYSICS_SIZE];
+        floats(&mut physics, 0x04, &[3.0, 0.1, -0.5]);
+        floats(&mut physics, 0x20, &[1.0, 0.2, 0.4, 0.5, 0.25]);
+        let physics = fake.add_tag(PPHY, "effects\\point physics\\spark", &physics);
+
+        let constants = fake.add_data(&[0.5f32.to_le_bytes(), 2.0f32.to_le_bytes()].concat());
+        let mut emitting = vec![0u8; TYPE_STATE_SIZE * 2];
+        put(&mut emitting, 0x00, b"burst\0");
+        floats(&mut emitting, 0x20, &[1.0, 2.0, 0.25, 0.5]);
+        put(&mut emitting, 0x30, &1u32.to_le_bytes());
+        floats(
+            &mut emitting,
+            0x34,
+            &[1.5, 10.0, 0.5, 1.0, 0.25, 0.5, 0.75, 2.0, 4.0, 30.0],
+        );
+        put(&mut emitting, 0xB0, &[2, 0, 0xFF, 0xFF]);
+        block(&mut emitting, 0xB4, 2, constants);
+        put(&mut emitting, TYPE_STATE_SIZE, b"idle\0");
+        let emitting = fake.add_data(&emitting);
+        let mut state = [0u8; PARTICLE_STATE_SIZE];
+        put(&mut state, 0x00, b"glow\0");
+        floats(&mut state, 0x20, &[0.5, 1.0, 0.1, 0.2]);
+        empty(&mut state, 0x30);
+        put(&mut state, 0x40, &3i16.to_le_bytes());
+        floats(
+            &mut state,
+            0x48,
+            &[
+                1.0, 2.0, 5.0, 6.0, 0.1, 0.2, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.5,
+            ],
+        );
+        reference(&mut state, 0x84, PPHY, fake.handle(physics));
+        put(&mut state, 0xE0, &[1, 0, 3, 0, 2, 0, 1, 0]);
+        empty(&mut state, 0x104);
+        let state = fake.add_data(&state);
+        let mut kind = [0u8; PARTICLE_SYSTEM_TYPE_SIZE];
+        put(&mut kind, 0x00, b"sparks\0");
+        put(
+            &mut kind,
+            0x20,
+            &(ParticleSystemType::TYPE_STATES_LOOP | ParticleSystemType::PARTICLES_DIE_ON_GROUND)
+                .to_le_bytes(),
+        );
+        put(&mut kind, 0x24, &12i16.to_le_bytes());
+        put(&mut kind, 0x28, &[1, 0, 2, 0]);
+        floats(&mut kind, 0x2C, &[0.05]);
+        put(&mut kind, 0x54, &2i16.to_le_bytes());
+        put(&mut kind, 0x58, &4u32.to_le_bytes());
+        block(&mut kind, 0x5C, 2, constants);
+        block(&mut kind, 0x68, 2, emitting);
+        block(&mut kind, 0x74, 1, state);
+        let kind = fake.add_data(&kind);
+        let mut system = [0u8; PARTICLE_SYSTEM_SIZE];
+        empty(&mut system, 0x38);
+        put(&mut system, 0x48, &1i16.to_le_bytes());
+        block(&mut system, PARTICLE_SYSTEM_TYPES_OFFSET, 1, kind);
+        let system = fake.add_tag(PCTL, "effects\\particle systems\\sparks", &system);
+        fake.add_tag(
+            PCTL,
+            "effects\\particle systems\\unused",
+            &[0u8; PARTICLE_SYSTEM_SIZE],
+        );
+        let cache = Cache::open(fake.build())?;
+
+        let sparks = tag_ref(&cache, system);
+        let effect = Effect {
+            events: vec![opence_content::EffectEvent {
+                parts: vec![opence_content::EffectPart {
+                    create_in: 0,
+                    create_in_mode: 0,
+                    location: 0,
+                    flags: 0,
+                    tag: sparks.clone(),
+                    velocity: [0.0; 2],
+                    velocity_cone_angle: 0.0,
+                    angular_velocity: [0.0; 2],
+                    radius_modifier: [1.0; 2],
+                }],
+                ..Default::default()
+            }],
+            ..Effect::new(TagRef {
+                group: opence_content::Group(*b"effe"),
+                path: "effects\\sparks".into(),
+            })
+        };
+        let object = carrying(vec![Attachment {
+            tag: Some(sparks.clone()),
+            marker: "flame".into(),
+            primary_scale: 0,
+            change_color: 0,
+        }]);
+        let mut reached = Reached::default();
+        let systems = import_particle_systems(&cache, &[effect], &[object], &mut reached)?;
+        assert_eq!(
+            systems.len(),
+            1,
+            "made and carried, read once; the unused not"
+        );
+        let read = &systems[0];
+        assert_eq!(read.tag, sparks);
+        assert_eq!(read.point_physics, None);
+        assert_eq!(read.update_physics, 1);
+        assert_eq!(read.types.len(), 1);
+        let kind = &read.types[0];
+        assert_eq!(kind.name, "sparks");
+        assert_eq!(
+            kind.flags,
+            ParticleSystemType::TYPE_STATES_LOOP | ParticleSystemType::PARTICLES_DIE_ON_GROUND
+        );
+        assert_eq!(kind.initial_count, 12);
+        assert_eq!(
+            (kind.complex_sprite_render_mode, kind.sprite_render_mode),
+            (1, 2)
+        );
+        assert_eq!(kind.radius, 0.05);
+        assert_eq!(kind.creation_physics, 2);
+        assert_eq!(kind.physics_flags, 4);
+        assert_eq!(kind.physics_constants, vec![0.5, 2.0]);
+        assert_eq!(kind.type_states.len(), 2);
+        let burst = &kind.type_states[0];
+        assert_eq!(burst.name, "burst");
+        assert_eq!(burst.duration, [1.0, 2.0]);
+        assert_eq!(burst.transition, [0.25, 0.5]);
+        assert_eq!(burst.flags, 1);
+        assert_eq!(burst.variables.randomized.scale, 1.5);
+        assert_eq!(burst.variables.randomized.animation_rate, 10.0);
+        assert_eq!(burst.variables.randomized.rotation_rate, 0.5);
+        assert_eq!(burst.variables.randomized.color, [1.0, 0.25, 0.5, 0.75]);
+        assert_eq!(burst.variables.radius, 2.0);
+        assert_eq!(burst.variables.minimum_count, 4.0);
+        assert_eq!(burst.variables.creation_rate, 30.0);
+        assert_eq!((burst.creation_physics, burst.update_physics), (2, -1));
+        assert_eq!(burst.physics_constants, vec![0.5, 2.0]);
+        assert_eq!(kind.type_states[1].name, "idle");
+        let glow = &kind.particle_states[0];
+        assert_eq!(glow.name, "glow");
+        assert_eq!(glow.duration, [0.5, 1.0]);
+        assert_eq!(glow.transition, [0.1, 0.2]);
+        assert_eq!(glow.bitmap, None);
+        assert_eq!(glow.sequence, 3);
+        assert_eq!(glow.scale, [1.0, 2.0]);
+        assert_eq!(glow.animation_rate, [5.0, 6.0]);
+        assert_eq!(glow.rotation_rate, [0.1, 0.2]);
+        assert_eq!(glow.color, [[1.0, 1.0, 0.0, 0.0], [1.0, 0.0, 1.0, 0.0]]);
+        assert_eq!(glow.radius, 0.5);
+        assert_eq!(glow.shader.flags, 1);
+        assert_eq!(glow.shader.framebuffer_blend_function, 3);
+        assert_eq!(glow.shader.fade_mode, 2);
+        assert_eq!(glow.primary_map_flags, 1);
+        assert_eq!(glow.secondary_map, None);
+        let Some(physics) = glow.point_physics else {
+            panic!("the glow has no physics");
+        };
+        assert_eq!(physics.mass_over_radius_cubed, 3.0, "worked out already");
+        assert_eq!(physics.air_buoyancy, -0.5);
+        assert_eq!(physics.elasticity, 0.25);
         Ok(())
     }
 }
