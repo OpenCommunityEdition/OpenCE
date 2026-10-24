@@ -54,6 +54,9 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Seams b2f6c38
     - [x] Write tests: no lightmap or texture seams on the seam views' golden frames
     - [x] The fixes
+- [x] Task: Shadow edges 0b80026
+    - [x] Write tests: neighbouring texels of one surface step hard no more often than on the stock pages (`ShadowEdgeTests`)
+    - [x] Each texel's paths start over its footprint
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Lighting and shaders' (Protocol in workflow.md)
 
 ## Phase 5: Picking up, vehicles and responsiveness
