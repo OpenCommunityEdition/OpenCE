@@ -14,7 +14,7 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
     - [x] The tab and its launch arguments (the view modes and toggles are wired in Phase 3)
 - [x] Task: Conductor - User Manual Verification 'Phase 1: devgulch and the launcher's Developer tab' (Protocol in workflow.md)
 
-## Phase 2: Stop the heat, see the cost
+## Phase 2: Stop the heat, see the cost [checkpoint: eb37a0e]
 - [x] Task: Bake and probes out of play 123545e
     - [x] Write tests: nothing is baked or probed after the level starts; a cached bake loads already lit; a missing cache bakes behind the loading screen
     - [x] Bake at import or on the loading screen; cache by map hash; no lighting swap mid-game
@@ -24,7 +24,7 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: GPU and CPU timings, and the hitch log de38ff7
     - [x] Write tests: every pass reports a GPU time; the CPU spans nest; a forced compile, upload or allocation is logged with its cause
     - [x] Counter sample buffers, CPU spans, the hitch log, perf.log
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Stop the heat, see the cost' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Stop the heat, see the cost' (Protocol in workflow.md)
 
 ## Phase 3: Developer tools in game
 - [ ] Task: The dev state model
