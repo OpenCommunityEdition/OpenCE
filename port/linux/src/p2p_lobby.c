@@ -143,7 +143,9 @@ struct game
 	int payload_size;
 	struct p2p_listing listing;
 	/* its invite's token (none: a password's game); its host's ping
-	(-1: not known), whether it is being probed, and when it last was */
+	(-1: not known), whether it is being probed, and when it last was (0:
+	due; else odd, and never ahead of the clock, which elapsed reads as
+	long past) */
 	int has_token;
 	unsigned char token[P2P_TOKEN_SIZE];
 	int ping;
@@ -697,7 +699,7 @@ static void update_probes(void)
 		/* (set first: a probe that needs no tunnel ends at once,
 		p2p_lobby_probed) */
 		game->probing = 1;
-		game->probed_time = p2p_now() | 1;
+		game->probed_time = (p2p_now() - 1) | 1;
 		if (!p2p_probe_start(game->key_hash, game->token))
 		{
 			game->probing = 0;
@@ -802,7 +804,7 @@ void p2p_lobby_probed(const unsigned char *identifier, int ping)
 		if (game->used && !memcmp(game->listing.identifier, identifier, P2P_IDENTIFIER_SIZE))
 		{
 			game->probing = 0;
-			game->probed_time = p2p_now() | 1;
+			game->probed_time = (p2p_now() - 1) | 1;
 			/* (one not reached this time keeps the last it had) */
 			if (ping >= 0)
 				game->ping = ping;
