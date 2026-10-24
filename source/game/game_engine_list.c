@@ -29,6 +29,8 @@ extern struct game_engine stub_engine;
 extern struct game_engine king_engine;
 extern struct game_engine oddball_engine;
 extern struct game_engine ctf_engine;
+/* port: game_engine_ctf.c */
+extern struct game_engine ctf_slayer_engine;
 
 struct game_engine *game_engines[] =
 {
@@ -40,6 +42,10 @@ struct game_engine *game_engines[] =
 	&race_engine,
 	&stub_engine,
 	NULL,
+	NULL,
+	NULL,
+	/* port: game_engine_ctf_slayer */
+	&ctf_slayer_engine,
 };
 
 /* ---------- public code */
