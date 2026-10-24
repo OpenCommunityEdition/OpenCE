@@ -34,9 +34,9 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
     - [x] Write tests: each view mode gives its own golden frame on devgulch; the stock view draws the map's lightmaps
     - [x] Debug outputs in the shaders, selected by a uniform
     - [x] Wire the shell's undrawn switches (render.wireframe, render.lightmaps, render.objects, render.hud), each with a golden frame, and add them to RenderSwitches.flags so the Developer tab offers them
-- [ ] Task: Lighting controls
-    - [ ] Write tests: each slider moves the frame in the expected direction; reset restores the default
-    - [ ] Exposure, sun, bounce, probes, AO, emissive, bloom, tone curve
+- [x] Task: Lighting controls bbeeda1
+    - [x] Write tests: each slider moves the frame in the expected direction; reset restores the default
+    - [x] Exposure, sun, bounce, probes, AO, emissive, bloom, tone curve
 - [ ] Task: Object inspector, live timings and the audio view
     - [ ] Write tests: a mouse pick returns the object under the cursor; the inspector lists tag, shader, animation, physics, light and sounds; the audio view counts voices by category
     - [ ] GPU picking ID buffer; SwiftUI panel overlays
