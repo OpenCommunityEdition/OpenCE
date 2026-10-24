@@ -282,8 +282,10 @@ impl Tracer<'_> {
         }
         let towards = scale(to, 1.0 / distance);
         let facing = dot(normal, towards);
+        // (a triangle's front is against its winding's cross product, as
+        // the vertices' normals are: the point must be in front of it)
         let surface = normalize(cross(sub(b, a), sub(c, a)));
-        let cosine = dot(surface, towards).abs();
+        let cosine = dot(surface, towards);
         if facing <= 0.0 || cosine <= 0.0 {
             return None;
         }
@@ -306,6 +308,8 @@ impl Tracer<'_> {
 
     /// The light a path takes from a glowing surface of `material` it met
     /// `distance` along a ray whose direction is `cosine` to the surface:
+    /// none from its back (`front` false: a surface glows from its front
+    /// only, so that a glowing decal does not light the wall it lies on),
     /// all of it when nothing sampled the emitters at the ray's start
     /// (`density` None), else weighted against those samples (`density`
     /// the chance of the ray's direction there, per unit solid angle).
@@ -314,8 +318,12 @@ impl Tracer<'_> {
         material: &crate::scene::BakeMaterial,
         distance: f32,
         cosine: f32,
+        front: bool,
         density: Option<f32>,
     ) -> [f32; 3] {
+        if !front {
+            return [0.0; 3];
+        }
         let Some(density) = density else {
             return material.emission;
         };
@@ -347,14 +355,14 @@ impl Tracer<'_> {
             let mut glow = [0.0f32; 3];
             let met = self.meet(&ray, random, Some((&mut glow, density)));
             light = add(light, mul(throughput, glow));
-            let Some((hit, point, normal, material)) = met else {
+            let Some((hit, point, normal, front, material)) = met else {
                 light = add(light, mul(throughput, self.scene.sky));
                 break;
             };
             if bounce == 0 {
                 first = Some(hit.t);
             }
-            let emission = self.seen(material, hit.t, dot(normal, ray.direction), density);
+            let emission = self.seen(material, hit.t, dot(normal, ray.direction), front, density);
             light = add(light, mul(throughput, emission));
             let origin = add(point, scale(normal, SURFACE_OFFSET));
             // (a Lambertian surface: radiance is albedo over pi times its
@@ -386,7 +394,8 @@ impl Tracer<'_> {
     }
 
     /// The first solid surface `ray` meets: the hit, the point, the
-    /// normal facing back along the ray, and its material. A ray passes
+    /// normal facing back along the ray, whether the ray met its front,
+    /// and its material. A ray passes
     /// through an alpha-tested surface by the share of it that is open,
     /// and through a glowing transparent one, whose light it adds to
     /// `glow` (weighted as [`Tracer::seen`] says, by the density given
@@ -396,7 +405,7 @@ impl Tracer<'_> {
         ray: &Ray,
         random: &mut Random,
         mut glow: Option<(&mut [f32; 3], Option<f32>)>,
-    ) -> Option<(Hit, [f32; 3], [f32; 3], &crate::scene::BakeMaterial)> {
+    ) -> Option<(Hit, [f32; 3], [f32; 3], bool, &crate::scene::BakeMaterial)> {
         let mut ray = *ray;
         let mut travelled = 0.0;
         for _ in 0..MAX_PASSES {
@@ -405,7 +414,9 @@ impl Tracer<'_> {
             let material = self.scene.materials.get(triangle.material as usize)?;
             let point = add(ray.origin, scale(ray.direction, hit.t));
             let mut normal = normalize(cross(triangle.ab, triangle.ac));
-            if dot(normal, ray.direction) > 0.0 {
+            // (the front is against the winding's cross product)
+            let front = dot(normal, ray.direction) > 0.0;
+            if front {
                 normal = scale(normal, -1.0);
             }
             if random.next_f32() < material.coverage {
@@ -413,12 +424,12 @@ impl Tracer<'_> {
                     t: travelled + hit.t,
                     ..hit
                 };
-                return Some((hit, point, normal, material));
+                return Some((hit, point, normal, front, material));
             }
             travelled += hit.t;
             if let Some((glow, density)) = glow.as_mut() {
                 let cosine = dot(normal, ray.direction);
-                **glow = add(**glow, self.seen(material, travelled, cosine, *density));
+                **glow = add(**glow, self.seen(material, travelled, cosine, front, *density));
             }
             ray.origin = add(point, scale(ray.direction, SURFACE_OFFSET));
             ray.t_max -= hit.t;

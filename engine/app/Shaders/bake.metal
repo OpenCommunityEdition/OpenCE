@@ -162,10 +162,14 @@ static float bake_power_heuristic(float chosen, float other) {
 }
 
 // The light a path takes from a glowing surface of `material` met
-// `distance` along a ray `cosine` to it: all of it when nothing sampled the
-// emitters at the ray's start (`density` below 0), else weighted against
-// those samples (trace.rs's Tracer::seen).
-static float3 bake_seen(BakeMaterial material, float distance, float cosine, float density) {
+// `distance` along a ray `cosine` to it: none from its back (`front`
+// false), all of it when nothing sampled the emitters at the ray's start
+// (`density` below 0), else weighted against those samples (trace.rs's
+// Tracer::seen).
+static float3 bake_seen(BakeMaterial material, float distance, float cosine, bool front, float density) {
+    if (!front) {
+        return float3(0.0f);
+    }
     float3 emission = float3(material.emission);
     if (density < 0.0f) {
         return emission;
@@ -267,12 +271,13 @@ static bool bake_nearest(BakeScene scene, float3 origin, float3 direction, float
 }
 
 // The first solid surface the ray meets: how far, the point, the normal
-// facing back along the ray and the material. A ray passes through an
+// facing back along the ray, whether the ray met its front and the
+// material. A ray passes through an
 // alpha-tested surface by the share of it that is open, and through a
 // glowing transparent one, whose light it adds to `glow` (weighted by
 // bake_seen with `density`) when given.
 static bool bake_meet(BakeScene scene, float3 origin, float3 direction, float t_max, thread uint &state,
-                      thread float &distance, thread float3 &point, thread float3 &normal,
+                      thread float &distance, thread float3 &point, thread float3 &normal, thread bool &front,
                       thread BakeMaterial &material, thread float3 *glow, float density) {
     float travelled = 0.0f;
     for (uint pass = 0; pass < MAX_PASSES; pass++) {
@@ -287,7 +292,9 @@ static bool bake_meet(BakeScene scene, float3 origin, float3 direction, float t_
         normal = cross(float3(triangle.ab), float3(triangle.ac));
         float length_squared = dot(normal, normal);
         normal = length_squared > 0.0f ? normal * rsqrt(length_squared) : normal;
-        if (dot(normal, direction) > 0.0f) {
+        // (the front is against the winding's cross product)
+        front = dot(normal, direction) > 0.0f;
+        if (front) {
             normal = -normal;
         }
         if (bake_random(state) < material.coverage) {
@@ -296,7 +303,7 @@ static bool bake_meet(BakeScene scene, float3 origin, float3 direction, float t_
         }
         travelled += t;
         if (glow) {
-            *glow += bake_seen(material, travelled, dot(normal, direction), density);
+            *glow += bake_seen(material, travelled, dot(normal, direction), front, density);
         }
         origin = point + direction * SURFACE_OFFSET;
         t_max -= t;
@@ -342,7 +349,9 @@ static float3 bake_emitter(BakeScene scene, float3 origin, float3 normal, thread
     float facing = dot(normal, towards);
     float3 surface = cross(b - a, c - a);
     float length_squared = dot(surface, surface);
-    float cosine = length_squared > 0.0f ? abs(dot(surface * rsqrt(length_squared), towards)) : 0.0f;
+    // (the point must be in front of the emitter, whose front is against
+    // its winding's cross product)
+    float cosine = length_squared > 0.0f ? dot(surface * rsqrt(length_squared), towards) : 0.0f;
     if (facing <= 0.0f || cosine <= 0.0f) {
         return float3(0.0f);
     }
@@ -355,8 +364,9 @@ static float3 bake_emitter(BakeScene scene, float3 origin, float3 normal, thread
     if (reach > 0.0f) {
         float hit_distance;
         float3 point, hit_normal;
+        bool front;
         BakeMaterial material;
-        if (bake_meet(scene, origin, towards, reach, state, hit_distance, point, hit_normal, material, nullptr,
+        if (bake_meet(scene, origin, towards, reach, state, hit_distance, point, hit_normal, front, material, nullptr,
                       -1.0f)) {
             return float3(0.0f);
         }
@@ -387,8 +397,9 @@ static float3 bake_direct(BakeScene scene, float3 origin, float3 normal, uint ap
         }
         float distance;
         float3 point, hit_normal;
+        bool front;
         BakeMaterial material;
-        if (bake_meet(scene, origin, towards, RAY_LENGTH, state, distance, point, hit_normal, material, nullptr,
+        if (bake_meet(scene, origin, towards, RAY_LENGTH, state, distance, point, hit_normal, front, material, nullptr,
                       -1.0f)) {
             continue;
         }
@@ -414,9 +425,10 @@ static float3 bake_radiance(BakeScene scene, float3 origin, float3 direction, fl
     for (uint bounce = 0; bounce < MAX_BOUNCES; bounce++) {
         float distance;
         float3 point, normal;
+        bool front;
         BakeMaterial material;
         float3 glow = float3(0.0f);
-        bool met = bake_meet(scene, origin, direction, RAY_LENGTH, state, distance, point, normal, material, &glow,
+        bool met = bake_meet(scene, origin, direction, RAY_LENGTH, state, distance, point, normal, front, material, &glow,
                              density);
         light += throughput * glow;
         if (!met) {
@@ -426,7 +438,7 @@ static float3 bake_radiance(BakeScene scene, float3 origin, float3 direction, fl
         if (bounce == 0) {
             first = distance;
         }
-        light += throughput * bake_seen(material, distance, dot(normal, direction), density);
+        light += throughput * bake_seen(material, distance, dot(normal, direction), front, density);
         origin = point + normal * SURFACE_OFFSET;
         float3 albedo = float3(material.albedo);
         light += throughput * albedo * M_1_PI_F * bake_direct(scene, origin, normal, 0, state, nullptr);
@@ -482,8 +494,9 @@ kernel void bake_irradiance(device const BakeNode *nodes [[buffer(0)]],
             float3 towards = bake_cone_direction(float3(light.towards), light.cos_half_angle, state);
             float distance;
             float3 point, hit_normal;
+            bool front;
             BakeMaterial material;
-            if (!bake_meet(scene, origin, towards, RAY_LENGTH, state, distance, point, hit_normal, material,
+            if (!bake_meet(scene, origin, towards, RAY_LENGTH, state, distance, point, hit_normal, front, material,
                            nullptr, -1.0f)) {
                 seen++;
             }

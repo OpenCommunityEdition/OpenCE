@@ -26,7 +26,7 @@ use crate::probe::{self, ProbeGrid, REFLECTION_SIZE};
 use crate::scene::Scene;
 
 /// The baker's version: raised with any change to what it makes.
-pub const BAKE_VERSION: u32 = 4;
+pub const BAKE_VERSION: u32 = 5;
 /// The cache file's first eight bytes.
 pub const MAGIC: [u8; 8] = *b"OCEBAKE\0";
 

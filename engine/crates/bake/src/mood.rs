@@ -117,7 +117,7 @@ pub fn stock_light(level: &Level, bsp: usize, chart: &Chart) -> Option<[f32; 3]>
             .get(sy * width as usize + sx)
             .map(|texel| [0, 1, 2].map(|channel| f32::from(texel[channel]) / 255.0))
     };
-    mean_over(chart, stock_at)
+    mean_over(chart, stock_at, |light| light)
 }
 
 /// The baked light as the level shader shows it: the irradiance over pi
@@ -143,14 +143,25 @@ pub fn baked_light(chart: &Chart, page: &BakedPage) -> Option<[f32; 3]> {
     let light_at = |x: u32, y: u32| {
         let at = (y as usize * width + x as usize) * 4;
         let texel = page.irradiance.get(at..at + 3)?;
-        Some([0, 1, 2].map(|channel| shown(from_half(texel[channel])).min(1.0)))
+        Some([0, 1, 2].map(|channel| finite(from_half(texel[channel]))))
     };
-    mean_over(chart, light_at)
+    mean_over(chart, light_at, |light| light.map(|channel| shown(channel).min(1.0)))
 }
 
-/// The most texels [`fitted_exposure`] reads (spread evenly over the
-/// covered texels), so that fitting a large BSP stays quick.
+/// The most squares of texels ([`BLOCK`]) [`fitted_exposure`] reads
+/// (spread evenly over the covered ones), so that fitting a large BSP
+/// stays quick.
 pub const FIT_TEXELS: usize = 1 << 16;
+
+/// The side, in texels, of the squares whose light the mood check and
+/// [`fitted_exposure`] average before showing it. Each texel's light is
+/// traced along a few paths (four in the quick bake), so a level lit by
+/// small lamps has many texels that no path found and a few that met a
+/// lamp; shown texel by texel, each at most white, their mean comes out far
+/// darker than the light they average, and the darker the fewer the paths.
+/// A square averages its texels' paths first, as the eye takes in a patch
+/// of a wall rather than a texel.
+pub const BLOCK: u32 = 4;
 
 /// The scale of the baked light that brings its mean brightness over the
 /// charts' covered texels, as the level shader shows it (each channel at
@@ -167,30 +178,38 @@ pub fn fitted_exposure(
     stock: &[Option<[f32; 3]>],
     irradiance: &[[f32; 4]],
 ) -> f32 {
-    let mut target = 0.0f64;
-    let mut points = Vec::new();
+    let (mut target, mut texels) = (0.0f64, 0u64);
+    let mut squares = Vec::new();
     for (chart, stock) in charts.iter().zip(stock) {
         let Some(stock) = stock else { continue };
-        let covered = chart.texels.iter().filter(|point| **point != EMPTY);
-        let before = points.len();
-        points.extend(covered.filter_map(|point| irradiance.get(*point as usize)));
-        target += f64::from(brightness(*stock)) * (points.len() - before) as f64;
+        let width = chart.width.max(1) as usize;
+        let light_at = |x: u32, y: u32| {
+            let point = *chart.texels.get(y as usize * width + x as usize)?;
+            let light = irradiance.get(point as usize)?;
+            Some([0, 1, 2].map(|channel| finite(light[channel])))
+        };
+        let chart_squares = squares_of(chart, light_at);
+        let count: u64 = chart_squares.iter().map(|(_, count)| u64::from(*count)).sum();
+        target += f64::from(brightness(*stock)) * count as f64;
+        texels += count;
+        squares.extend(chart_squares);
     }
-    if points.is_empty() {
+    if texels == 0 {
         return 1.0;
     }
-    let target = target / points.len() as f64;
-    let step = points.len().div_ceil(FIT_TEXELS);
-    let sample: Vec<&[f32; 4]> = points.into_iter().step_by(step).collect();
+    let target = target / texels as f64;
+    let step = squares.len().div_ceil(FIT_TEXELS);
+    let sample: Vec<&([f32; 3], u32)> = squares.iter().step_by(step).collect();
+    let weight: f64 = sample.iter().map(|(_, count)| f64::from(*count)).sum();
     let shown_mean = |exposure: f32| {
         let sum: f64 = sample
             .iter()
-            .map(|texel| {
-                let channels = [0, 1, 2].map(|channel| shown(texel[channel] * exposure).min(1.0));
-                f64::from(brightness(channels))
+            .map(|(light, count)| {
+                let channels = light.map(|channel| shown(channel * exposure).min(1.0));
+                f64::from(brightness(channels)) * f64::from(*count)
             })
             .sum();
-        sum / sample.len() as f64
+        sum / weight
     };
     if shown_mean(libm::exp2f(EXPOSURE_STOPS)) <= 0.0 {
         return 1.0;
@@ -212,24 +231,61 @@ pub fn fitted_exposure(
 /// The most stops [`fitted_exposure`] moves the light by, either way.
 pub const EXPOSURE_STOPS: f32 = 8.0;
 
-/// The mean of `value` over `chart`'s covered texels that have one.
-fn mean_over(chart: &Chart, value: impl Fn(u32, u32) -> Option<[f32; 3]>) -> Option<[f32; 3]> {
+/// The mean over `chart`'s covered texels that have a `value` of each
+/// [`BLOCK`] square's mean value as `show` shows it, weighted by the
+/// square's texels.
+fn mean_over(
+    chart: &Chart,
+    value: impl Fn(u32, u32) -> Option<[f32; 3]>,
+    show: impl Fn([f32; 3]) -> [f32; 3],
+) -> Option<[f32; 3]> {
     let mut sum = [0.0f64; 3];
     let mut count = 0u64;
-    for (index, point) in chart.texels.iter().enumerate() {
-        if *point == EMPTY {
-            continue;
+    for (light, texels) in squares_of(chart, value) {
+        for (sum, channel) in sum.iter_mut().zip(show(light)) {
+            *sum += f64::from(channel) * f64::from(texels);
         }
-        let width = chart.width.max(1) as usize;
-        let Some(color) = value((index % width) as u32, (index / width) as u32) else {
-            continue;
-        };
-        for (sum, channel) in sum.iter_mut().zip(color) {
-            *sum += f64::from(channel);
-        }
-        count += 1;
+        count += u64::from(texels);
     }
     (count > 0).then(|| sum.map(|sum| (sum / count as f64) as f32))
+}
+
+/// Each [`BLOCK`] square of `chart`'s covered texels that have a `value`:
+/// its texels' mean value, and how many they are.
+fn squares_of(chart: &Chart, value: impl Fn(u32, u32) -> Option<[f32; 3]>) -> Vec<([f32; 3], u32)> {
+    let width = chart.width.max(1) as usize;
+    let mut squares = Vec::new();
+    for top in (0..chart.height).step_by(BLOCK as usize) {
+        for left in (0..chart.width).step_by(BLOCK as usize) {
+            let mut sum = [0.0f64; 3];
+            let mut count = 0u32;
+            for y in top..(top + BLOCK).min(chart.height) {
+                for x in left..(left + BLOCK).min(chart.width) {
+                    if chart.texels.get(y as usize * width + x as usize) == Some(&EMPTY) {
+                        continue;
+                    }
+                    let Some(color) = value(x, y) else { continue };
+                    for (sum, channel) in sum.iter_mut().zip(color) {
+                        *sum += f64::from(channel);
+                    }
+                    count += 1;
+                }
+            }
+            if count > 0 {
+                squares.push((sum.map(|sum| (sum / f64::from(count)) as f32), count));
+            }
+        }
+    }
+    squares
+}
+
+/// A light's channel, or none (0) if the tracer lost it.
+fn finite(channel: f32) -> f32 {
+    if channel.is_finite() {
+        channel
+    } else {
+        0.0
+    }
 }
 
 /// How many of `chart`'s texels are covered.
@@ -372,23 +428,29 @@ mod tests {
 
     #[test]
     fn the_baked_mean_is_over_the_covered_texels() {
-        let chart = chart(2, 2, &[0, 3]);
+        // (the two covered texels in squares of their own)
+        let chart = chart(8, 1, &[0, 7]);
         assert_eq!(covered(&chart), 2);
         let pi = std::f32::consts::PI;
         let texel = |value: f32| [value, value, value, 1.0].map(half);
         // (pi: white, shown as 1; 0: black)
+        let mut light = texel(pi).to_vec();
+        for _ in 1..7 {
+            light.extend(texel(100.0));
+        }
+        light.extend(texel(0.0));
         let page = BakedPage {
             page: 0,
-            width: 2,
-            height: 2,
-            irradiance: [texel(pi), texel(100.0), texel(100.0), texel(0.0)].concat(),
-            directions: vec![0; 16],
+            width: 8,
+            height: 1,
+            irradiance: light,
+            directions: vec![0; 32],
         };
         let mean = baked_light(&chart, &page).unwrap_or_else(|| panic!("no mean"));
         for channel in mean {
             assert!((channel - 0.5).abs() < 1e-2, "{mean:?}");
         }
-        assert_eq!(baked_light(&self::chart(2, 2, &[]), &page), None);
+        assert_eq!(baked_light(&self::chart(8, 1, &[]), &page), None);
         // a page shorter than its chart counts what it has
         let short = BakedPage {
             irradiance: texel(pi).to_vec(),
@@ -396,6 +458,29 @@ mod tests {
         };
         let mean = baked_light(&chart, &short).unwrap_or_else(|| panic!("no mean"));
         assert!((mean[0] - 1.0).abs() < 1e-2);
+    }
+
+    #[test]
+    fn a_square_is_averaged_before_it_is_shown() {
+        // two texels of one square, one that met a lamp and one that met
+        // nothing: their light is white on average, though each shown
+        // alone would be black and clipped white
+        let chart = chart(2, 2, &[0, 3]);
+        let pi = std::f32::consts::PI;
+        let texel = |value: f32| [value, value, value, 1.0].map(half);
+        let page = BakedPage {
+            page: 0,
+            width: 2,
+            height: 2,
+            irradiance: [texel(2.0 * pi), texel(0.0), texel(0.0), texel(0.0)].concat(),
+            directions: vec![0; 16],
+        };
+        let mean = baked_light(&chart, &page).unwrap_or_else(|| panic!("no mean"));
+        assert!((mean[0] - 1.0).abs() < 1e-2, "{mean:?}");
+        let irradiance = [[2.0 * pi, 2.0 * pi, 2.0 * pi, 1.0], [0.0, 0.0, 0.0, 1.0]];
+        let chart = self::chart(2, 1, &[0, 1]);
+        let exposure = fitted_exposure(&[chart], &[Some([1.0; 3])], &irradiance);
+        assert!((exposure - 1.0).abs() < 0.02, "{exposure}");
     }
 
     #[test]

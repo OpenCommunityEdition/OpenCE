@@ -1,7 +1,9 @@
 //! Scenes whose light is known, for checking a path tracer: the CPU's in
 //! this crate's tests, the GPU's in the app's.
 //!
-//! Each is traced at the origin, on a surface facing up (+Z).
+//! Each is traced at the origin, on a surface facing up (+Z). A
+//! triangle's front is against its winding's cross product, as the stock
+//! BSPs' are, and a glowing surface glows from its front only.
 
 use crate::scene::{BakeMaterial, DirectionalLight, Scene, SceneTriangle};
 
@@ -15,8 +17,8 @@ pub struct Expected {
 }
 
 /// The layouts by name.
-pub const NAMES: [&str; 8] = [
-    "furnace", "open", "wall", "sun", "roof", "screen", "lamp", "bulb",
+pub const NAMES: [&str; 9] = [
+    "furnace", "open", "wall", "sun", "roof", "screen", "lamp", "bulb", "back",
 ];
 
 /// The occlusion distance the layouts are traced with.
@@ -128,6 +130,19 @@ pub fn layout(name: &str) -> Option<(Scene, Expected)> {
                 occlusion: 1.0,
             },
         ),
+        // the bulb turned to glow up, away from the origin, as a glowing
+        // decal's back faces the wall it lies on: nothing
+        "back" => (
+            scene(
+                quad([-0.005, -0.005, 1.0], [0.0, 0.01, 0.0], [0.01, 0.0, 0.0]),
+                vec![material(0.0, 1e4, 1.0)],
+                0.0,
+            ),
+            Expected {
+                irradiance: 0.0,
+                occlusion: 1.0,
+            },
+        ),
         _ => return None,
     })
 }
@@ -199,7 +214,7 @@ pub fn quad(corner: [f32; 3], u: [f32; 3], v: [f32; 3]) -> Vec<SceneTriangle> {
     ]
 }
 
-/// A closed cube of side 2 about the origin, of material 0.
+/// A closed cube of side 2 about the origin, of material 0, facing in.
 pub fn cube() -> Vec<SceneTriangle> {
     let mut triangles = Vec::new();
     for axis in 0..3 {
@@ -210,7 +225,13 @@ pub fn cube() -> Vec<SceneTriangle> {
             let (mut along_u, mut along_v) = ([0.0; 3], [0.0; 3]);
             along_u[u] = 2.0;
             along_v[v] = 2.0;
-            triangles.extend(quad(corner, along_u, along_v));
+            // (the cross product of u and v points along the axis, so the
+            // low side is wound the other way to face in too)
+            if side < 0.0 {
+                triangles.extend(quad(corner, along_v, along_u));
+            } else {
+                triangles.extend(quad(corner, along_u, along_v));
+            }
         }
     }
     triangles

@@ -296,7 +296,11 @@ only a fallback.
 **The mood check** (`BakeTests.swift`, which needs `assets/maps`): each page's and
 BSP's mean brightness and colour must stay within set limits of the stock
 lightmaps. Two are listed as known colour differences: longest, and d20's
-second BSP.
+second BSP. The check and the exposure fit average the light over squares of
+4×4 texels before showing it (`mood.rs`, `BLOCK`): the quick bake traces four
+paths a texel, and in a BSP lit by small lamps (b40's, c40's) most texels then
+meet no lamp, so that shown texel by texel, each at most white, the light
+reads far darker than it is.
 
 ### Known lighting problems
 
@@ -306,7 +310,7 @@ shader station, at 960×540, with native and temporal anti-aliasing.
 
 | Problem | What is seen | Cause |
 | --- | --- | --- |
-| Emitters glow over their whole face | A light panel's face is lit red all over, not only its emblem. Red light spreads over the floor in front. | A shader with radiosity power makes every one of its triangles an emitter of the same brightness (`scene.rs`, `bake_material`). Nothing weighs that by where the shader's map glows. The stock lightmaps show only a faint glow. |
+| Emitters glow over their whole face (lessened) | A light panel's face is lit red all over, not only its emblem. Red light spreads over the floor in front. | A shader with radiosity power makes every one of its triangles an emitter of the same brightness (`scene.rs`, `bake_material`). Nothing weighs that by where the shader's map glows. The stock lightmaps show only a faint glow. Emitters now glow from their front only, as the stock BSPs wind them (a glowing decal no longer lights the wall it lies on), and at a twelfth of the power (`EMITTER_EXPOSURE`, 0.2 from 2.5), which brings the base's glow close to stock's. |
 | Fireflies and blotches | The light view has green and yellow specks on the cliffs. Inside the pits and on the panels there are red and green blobs. | Small, bright emitters are found by too few paths: 64 paths for each texel, and no filter afterwards. A rare path that meets a lamp leaves a speck, and nearby texels that each catch a few such paths leave a blob. |
 | Too bright and clipped (fixed) | Blood Gulch's start view had a mean of 86 against stock's 74, and 1.6% of its pixels were clipped against stock's none. | The baked light was shown past white, while each BSP's exposure is fitted with every channel held at white, as an 8-bit lightmap holds it. The level shader now holds it there too (`baked_shown`). Clipping is gone, and the sky and back views are within 6% of stock's mean. The start view is still 19% brighter, from the blotches on the base (next row). |
 | Lightmap seams | On a flat floor, two triangles meet along an edge with a step in brightness. Stock shows no edge there. | Each chart's texels are traced apart, and the dilation copies only the edge's points. Two charts that meet get different light, so their edge shows. |

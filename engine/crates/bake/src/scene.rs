@@ -31,8 +31,14 @@ pub const MAX_ALBEDO: f32 = 0.95;
 pub const SKY_EXPOSURE: f32 = 1.5;
 /// The bake's light for each unit of the sky's ambient power (its dome).
 pub const AMBIENT_EXPOSURE: f32 = 3.0;
-/// The bake's light for each unit of a shader's radiosity power.
-pub const EMITTER_EXPOSURE: f32 = 2.5;
+/// The bake's light for each unit of a shader's radiosity power. Fitted
+/// by eye and by measure against Blood Gulch's stock lightmaps from three
+/// views: at 2.5 the base's moss and lights washed it green, red and
+/// orange where the stock lightmaps show only a faint glow; the difference
+/// from stock was least between 0.1 and 0.25. With each glowing surface
+/// glowing from its front only, the mood check holds every stock BSP at
+/// 0.2, the lamp-lit ones (b40's, c40's) too.
+pub const EMITTER_EXPOSURE: f32 = 0.2;
 
 /// A structure BSP lit by its sky.
 #[derive(Clone, Debug, PartialEq)]
