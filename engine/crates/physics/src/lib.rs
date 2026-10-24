@@ -168,7 +168,8 @@ impl Pose {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Motion {
     /// Moved by the simulation each step ([`World::move_body`]), pushing
-    /// what it meets.
+    /// what it meets and carrying the characters that stand on it: a
+    /// platform ([`Layers::PLATFORMS`]).
     Kinematic,
     /// Moved by the world.
     Dynamic,
@@ -203,10 +204,14 @@ pub struct Layers(u32);
 impl Layers {
     /// The level's mesh.
     pub const LEVEL: Layers = Layers(sys::CAST_LEVEL);
-    /// Bodies.
+    /// Dynamic bodies: ragdoll parts and debris.
     pub const BODIES: Layers = Layers(sys::CAST_BODIES);
-    /// Both.
-    pub const ALL: Layers = Layers(sys::CAST_LEVEL | sys::CAST_BODIES);
+    /// Kinematic bodies: the lifts and doors characters stand on.
+    pub const PLATFORMS: Layers = Layers(sys::CAST_PLATFORMS);
+    /// The level and its platforms, what a character stands on.
+    pub const GROUND: Layers = Layers(sys::CAST_LEVEL | sys::CAST_PLATFORMS);
+    /// Everything.
+    pub const ALL: Layers = Layers(sys::CAST_LEVEL | sys::CAST_BODIES | sys::CAST_PLATFORMS);
 }
 
 /// What a body met.
@@ -635,6 +640,9 @@ pub struct CharacterState {
     pub ground_normal: Vec3,
     /// What holds it up.
     pub ground: Ground,
+    /// The velocity of the platform it stood on, which its last move added
+    /// to the velocity it was given (units a second).
+    pub ground_velocity: Vec3,
 }
 
 impl CharacterState {
@@ -649,6 +657,7 @@ impl CharacterState {
                 sys::GROUND_UNSUPPORTED => Ground::Unsupported,
                 _ => Ground::Airborne,
             },
+            ground_velocity: Vec3::from_array(raw.ground_velocity) / METRES_PER_UNIT,
         }
     }
 }

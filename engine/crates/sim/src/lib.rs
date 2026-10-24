@@ -29,6 +29,7 @@ pub mod input;
 pub mod item_physics;
 pub mod objects;
 pub mod periodic;
+pub mod platforms;
 pub mod player;
 pub mod projectile;
 pub mod ragdoll;
@@ -191,6 +192,8 @@ pub struct Simulation {
     debris: debris::Debris,
     /// The physics station's crates, in the player's physics world.
     crates: crates::Crates,
+    /// The machines, as platforms in the player's physics world.
+    platforms: platforms::Platforms,
     /// Detonations to do in the next tick (a script's).
     queued_detonations: Vec<projectile::Detonation>,
     /// What the items lying about met this tick.
@@ -281,6 +284,7 @@ impl Simulation {
             ragdolls: ragdoll::Ragdolls::default(),
             debris: debris::Debris::default(),
             crates: crates::Crates::default(),
+            platforms: platforms::Platforms::default(),
             queued_detonations: Vec::new(),
             item_impacts: Vec::new(),
             effects: Vec::new(),
@@ -428,8 +432,9 @@ impl Simulation {
     }
 
     /// The physics of the dead, the spent and the dropped: the items lying
-    /// about, a game tick every other tick; the ragdolls and this tick's
-    /// casings, stepped once if either moves.
+    /// about, a game tick every other tick; the machines moved to their
+    /// animations; the ragdolls, this tick's casings, the crates and what
+    /// the machines carry, stepped once if any moves.
     fn update_physics(&mut self, ejections: &[debris::Ejection]) {
         let tick = self.tick().0;
         let Some(player) = self.players.first_mut() else {
@@ -456,6 +461,7 @@ impl Simulation {
         for ejection in ejections {
             self.debris.eject(physics, ejection);
         }
+        self.platforms.update(&mut self.world, physics);
         // (items move a game tick, of 30 a second, every other tick)
         let game_ticks = u64::from(clock::TICKS_PER_SECOND / vehicle::GAME_TICKS_PER_SECOND);
         self.item_impacts = if tick.is_multiple_of(game_ticks) {
@@ -463,7 +469,7 @@ impl Simulation {
         } else {
             Vec::new()
         };
-        if ragdolls || self.debris.moving() || self.crates.moving() {
+        if ragdolls || self.debris.moving() || self.crates.moving() || self.platforms.moving() {
             // (a step the physics refuses leaves them where they were)
             let _ = physics.step(clock::TICK.0);
             self.ragdolls.settle(&mut self.world, physics);
@@ -551,6 +557,7 @@ impl Simulation {
         self.ragdolls = self.ragdolls.for_level(level);
         self.debris = self.debris.for_level(level);
         self.crates.forget();
+        self.platforms = platforms::Platforms::for_level(level);
         self.queued_detonations.clear();
         self.place_player_camera();
         self.update_first_person();
@@ -775,6 +782,11 @@ impl Simulation {
     /// The crates dropped.
     pub fn crates(&self) -> &crates::Crates {
         &self.crates
+    }
+
+    /// The machines as platforms.
+    pub fn platforms(&self) -> &platforms::Platforms {
+        &self.platforms
     }
 
     /// Drops a crate of `half_extents` at `position`, turned by

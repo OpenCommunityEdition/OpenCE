@@ -15,6 +15,7 @@ pub const MOTION_DYNAMIC: i32 = 1;
 
 pub const CAST_LEVEL: u32 = 1;
 pub const CAST_BODIES: u32 = 2;
+pub const CAST_PLATFORMS: u32 = 4;
 
 pub const GROUND_STANDING: i32 = 0;
 pub const GROUND_STEEP: i32 = 1;
@@ -84,6 +85,7 @@ pub struct CharacterState {
     pub velocity: [f32; 3],
     pub ground_normal: [f32; 3],
     pub ground: i32,
+    pub ground_velocity: [f32; 3],
 }
 
 /// The most parts a ragdoll has.

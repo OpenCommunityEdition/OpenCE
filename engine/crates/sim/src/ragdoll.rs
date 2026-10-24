@@ -380,7 +380,7 @@ fn override_part(body: &mut RagdollBody, model: &Model, line: &str) {
 
 /// The bounds of a collision node's first bsp's vertices; none if it has
 /// none, or one is not a number or is far out.
-fn node_bounds(node: &CollisionNode) -> Option<(Vec3, Vec3)> {
+pub(crate) fn node_bounds(node: &CollisionNode) -> Option<(Vec3, Vec3)> {
     let vertices = &node.bsps.first()?.vertices;
     let mut bounds: Option<(Vec3, Vec3)> = None;
     for vertex in vertices {

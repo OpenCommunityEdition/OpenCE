@@ -48,7 +48,9 @@ namespace {
 
 constexpr ObjectLayer LAYER_STATIC = 0;
 constexpr ObjectLayer LAYER_MOVING = 1;
-constexpr uint32 LAYER_COUNT = 2;
+// kinematic bodies, the lifts and doors characters stand on and are pushed by
+constexpr ObjectLayer LAYER_PLATFORM = 2;
+constexpr uint32 LAYER_COUNT = 3;
 
 // what a body's user data says it is
 constexpr uint64 KIND_LEVEL = 1;
@@ -89,12 +91,12 @@ public:
     uint GetNumBroadPhaseLayers() const override { return LAYER_COUNT; }
     BroadPhaseLayer GetBroadPhaseLayer(ObjectLayer layer) const override
     {
-        return BroadPhaseLayer(layer == LAYER_STATIC ? 0 : 1);
+        return BroadPhaseLayer(BroadPhaseLayer::Type(layer));
     }
 #if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
     const char *GetBroadPhaseLayerName(BroadPhaseLayer layer) const override
     {
-        return layer.GetValue() == 0 ? "static" : "moving";
+        return layer.GetValue() == 0 ? "static" : layer.GetValue() == 1 ? "moving" : "platform";
     }
 #endif
 };
@@ -103,7 +105,7 @@ class ObjectVsBroadPhase final : public ObjectVsBroadPhaseLayerFilter {
 public:
     bool ShouldCollide(ObjectLayer layer, BroadPhaseLayer broad_phase) const override
     {
-        return layer == LAYER_MOVING || broad_phase.GetValue() != 0;
+        return layer == LAYER_MOVING || broad_phase.GetValue() == LAYER_MOVING;
     }
 };
 
@@ -129,6 +131,8 @@ struct CharacterSlot {
     float step_up = 0.0f;
     float stick_down = 0.0f;
     uint32_t layers = 0;
+    // the velocity of the ground it stood on, added to its last move
+    Vec3 carried = Vec3::sZero();
     uint32 generation = 0;
 };
 
@@ -456,7 +460,7 @@ extern "C" uint32_t physics_body_add(physics_world *world, const physics_shape *
         return PHYSICS_NONE;
     BodyCreationSettings settings(made, position, rotation,
                                   motion == PHYSICS_MOTION_KINEMATIC ? EMotionType::Kinematic : EMotionType::Dynamic,
-                                  LAYER_MOVING);
+                                  motion == PHYSICS_MOTION_KINEMATIC ? LAYER_PLATFORM : LAYER_MOVING);
     settings.mUserData = KIND_BODY;
     settings.mFriction = friction;
     settings.mRestitution = restitution;
@@ -855,13 +859,22 @@ extern "C" float physics_ragdoll_limit_error(const physics_world *world, uint32_
 
 namespace {
 
+// the cast layer (physics_cast_layers) of an object layer, and of its broad
+// phase layer, which has the same number
+uint32_t cast_layer(ObjectLayer layer)
+{
+    return layer == LAYER_STATIC ? PHYSICS_CAST_LEVEL
+           : layer == LAYER_MOVING ? PHYSICS_CAST_BODIES
+                                   : PHYSICS_CAST_PLATFORMS;
+}
+
 // a cast's layers (physics_cast_layers), for the broad phase and the bodies
 class CastBroadPhase final : public BroadPhaseLayerFilter {
 public:
     explicit CastBroadPhase(uint32_t layers) : layers(layers) {}
     bool ShouldCollide(BroadPhaseLayer layer) const override
     {
-        return (layers & (layer == BroadPhaseLayer(0) ? PHYSICS_CAST_LEVEL : PHYSICS_CAST_BODIES)) != 0;
+        return (layers & cast_layer(ObjectLayer(layer.GetValue()))) != 0;
     }
 
 private:
@@ -873,7 +886,7 @@ public:
     explicit CastObjects(uint32_t layers) : layers(layers) {}
     bool ShouldCollide(ObjectLayer layer) const override
     {
-        return (layers & (layer == LAYER_STATIC ? PHYSICS_CAST_LEVEL : PHYSICS_CAST_BODIES)) != 0;
+        return (layers & cast_layer(layer)) != 0;
     }
 
 private:
@@ -882,7 +895,7 @@ private:
 
 bool valid_layers(uint32_t layers)
 {
-    return layers != 0 && (layers & ~uint32_t(PHYSICS_CAST_LEVEL | PHYSICS_CAST_BODIES)) == 0;
+    return layers != 0 && (layers & ~uint32_t(PHYSICS_CAST_LEVEL | PHYSICS_CAST_BODIES | PHYSICS_CAST_PLATFORMS)) == 0;
 }
 
 void write_hit(const physics_world *world, const BodyID &id, float fraction, RVec3Arg point, Vec3Arg normal,
@@ -989,6 +1002,7 @@ void write_character(const CharacterSlot &slot, physics_character_state *state)
         state->position[axis] = float(position[axis]);
         state->velocity[axis] = velocity[axis];
         state->ground_normal[axis] = normal[axis];
+        state->ground_velocity[axis] = slot.carried[axis];
     }
     switch (ground) {
     case CharacterBase::EGroundState::OnGround:
@@ -1063,7 +1077,12 @@ extern "C" int physics_character_move(physics_world *world, uint32_t character, 
     if (slot == nullptr || velocity == nullptr || state == nullptr || !finite(velocity, 3)
         || !std::isfinite(seconds) || seconds <= 0.0f || seconds > STEP_MAX)
         return -1;
-    slot->character->SetLinearVelocity(Vec3(velocity[0], velocity[1], velocity[2]));
+    // (standing on a moving platform, it goes with it)
+    slot->character->UpdateGroundVelocity();
+    slot->carried = slot->character->GetGroundState() == CharacterBase::EGroundState::OnGround
+                        ? slot->character->GetGroundVelocity()
+                        : Vec3::sZero();
+    slot->character->SetLinearVelocity(Vec3(velocity[0], velocity[1], velocity[2]) + slot->carried);
     CharacterVirtual::ExtendedUpdateSettings update;
     update.mStickToFloorStepDown = Vec3(0.0f, 0.0f, -slot->stick_down);
     update.mWalkStairsStepUp = Vec3(0.0f, 0.0f, slot->step_up);
@@ -1082,6 +1101,7 @@ extern "C" int physics_character_set_position(physics_world *world, uint32_t cha
         return -1;
     slot->character->SetPosition(RVec3(position[0], position[1], position[2]));
     slot->character->SetLinearVelocity(Vec3::sZero());
+    slot->carried = Vec3::sZero();
     CastBroadPhase broad_phase(slot->layers);
     CastObjects objects(slot->layers);
     slot->character->RefreshContacts(broad_phase, objects, BodyFilter(), ShapeFilter(), world->temp_allocator);

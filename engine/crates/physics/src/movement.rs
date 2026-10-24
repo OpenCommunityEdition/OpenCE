@@ -115,7 +115,7 @@ impl Mover {
                 maximum_slope: libm::acosf(biped.minimum_normal_k.clamp(-1.0, 1.0)),
                 step_up: STEP_UP * height,
                 stick_down: STICK_DOWN * height,
-                layers: Layers::LEVEL,
+                layers: Layers::GROUND,
             },
             position,
         )?;
@@ -231,9 +231,11 @@ impl Mover {
         let state = world.move_character(self.character, moved, TICK)?;
         let supported = state.ground == Ground::Standing && !(self.airborne && velocity.z > 0.0);
         // (the character keeps the velocity it was given: what it moved is
-        // the velocity the collisions left, Halo's clipped velocity)
-        self.velocity =
-            (state.position - self.position) / TICK - Vec3::new(0.0, 0.0, crouch_velocity);
+        // the velocity the collisions left, Halo's clipped velocity, less
+        // the platform's that carried it)
+        self.velocity = (state.position - self.position) / TICK
+            - state.ground_velocity
+            - Vec3::new(0.0, 0.0, crouch_velocity);
         self.position = state.position;
         self.slipping = slipping;
         if supported {

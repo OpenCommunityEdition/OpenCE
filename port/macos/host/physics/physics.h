@@ -130,8 +130,10 @@ int physics_body_active(const physics_world *world, uint32_t body);
 /* what a cast may hit */
 enum physics_cast_layers {
     PHYSICS_CAST_LEVEL = 1,
-    /* ragdoll parts, debris and kinematic bodies */
+    /* ragdoll parts and debris */
     PHYSICS_CAST_BODIES = 2,
+    /* kinematic bodies: the lifts and doors characters stand on */
+    PHYSICS_CAST_PLATFORMS = 4,
 };
 
 typedef struct physics_hit {
@@ -190,6 +192,9 @@ typedef struct physics_character_state {
     /* its ground's normal (up when airborne) */
     float ground_normal[3];
     int32_t ground;
+    /* the velocity of the ground it stood on, which its last move added to
+       the velocity it was given */
+    float ground_velocity[3];
 } physics_character_state;
 
 /* a character with its feet at position, or PHYSICS_NONE */
