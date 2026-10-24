@@ -21,12 +21,13 @@ use opence_content::level::Level;
 use opence_content::pack::FORMAT_VERSION;
 
 use crate::chart::{Atlas, BakePoint, Chart};
+use crate::filter;
 use crate::mood::{self, PageMood};
 use crate::probe::{self, ProbeGrid, REFLECTION_SIZE};
 use crate::scene::Scene;
 
 /// The baker's version: raised with any change to what it makes.
-pub const BAKE_VERSION: u32 = 5;
+pub const BAKE_VERSION: u32 = 6;
 /// The cache file's first eight bytes.
 pub const MAGIC: [u8; 8] = *b"OCEBAKE\0";
 
@@ -186,7 +187,8 @@ impl BakePlan {
     /// The baked light from the tracer's results: for the atlas's points,
     /// each its irradiance and occlusion and its direction and
     /// directionality; for the probes' points, each its irradiance and
-    /// occlusion; for the reflection points, each its radiance. Each is
+    /// occlusion; for the reflection points, each its radiance. The atlas's
+    /// fireflies are held down ([`filter::hold_fireflies`]), then each is
     /// scaled by the BSP's [`Self::exposure`]. A result that is missing is
     /// dark.
     pub fn finish(
@@ -196,7 +198,8 @@ impl BakePlan {
         probes: &[[f32; 4]],
         radiance: &[[f32; 4]],
     ) -> BakedLighting {
-        let exposure = self.exposure(irradiance);
+        let held = filter::hold_fireflies(&self.atlas, irradiance);
+        let exposure = self.exposure(&held);
         let exposed = |light: &[[f32; 4]]| -> Vec<[f32; 4]> {
             light
                 .iter()
@@ -204,7 +207,7 @@ impl BakePlan {
                 .collect()
         };
         let (irradiance, probes, radiance) = (
-            &exposed(irradiance)[..],
+            &exposed(&held)[..],
             &exposed(probes)[..],
             &exposed(radiance)[..],
         );

@@ -14,6 +14,7 @@
 //! - [`layout`] holds scenes whose light is known, to check tracers by.
 //! - [`trace`] is the path tracer: the light arriving at a point.
 //! - [`chart`] lays the lightmap pages' texels out as points to bake.
+//! - [`filter`] holds down the traced light's fireflies.
 //! - [`probe`] places the irradiance and reflection probes.
 //! - [`output`] makes the baked light from the tracer's results, and
 //!   keeps it in a cache file.
@@ -21,6 +22,7 @@
 
 pub mod bvh;
 pub mod chart;
+pub mod filter;
 pub mod layout;
 pub mod mood;
 pub mod output;

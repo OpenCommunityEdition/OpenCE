@@ -30,14 +30,20 @@ pub const MAX_ALBEDO: f32 = 0.95;
 /// lightmaps' brightness and colour over the stock BSPs (the mood check).
 pub const SKY_EXPOSURE: f32 = 1.5;
 /// The bake's light for each unit of the sky's ambient power (its dome).
-pub const AMBIENT_EXPOSURE: f32 = 3.0;
+/// At 3.0 the dome lit Blood Gulch's shadowed faces as brightly as its
+/// sunlit ones, and the start view came out 21% brighter than stock; at
+/// 0.5 it is 8% brighter, and every view is within 10% of stock's mean.
+pub const AMBIENT_EXPOSURE: f32 = 0.5;
 /// The bake's light for each unit of a shader's radiosity power. Fitted
 /// by eye and by measure against Blood Gulch's stock lightmaps from three
 /// views: at 2.5 the base's moss and lights washed it green, red and
 /// orange where the stock lightmaps show only a faint glow; the difference
 /// from stock was least between 0.1 and 0.25. With each glowing surface
 /// glowing from its front only, the mood check holds every stock BSP at
-/// 0.2, the lamp-lit ones (b40's, c40's) too.
+/// 0.2, the lamp-lit ones (b40's, c40's) too. Blood Gulch's caves, lit by
+/// their fungus, are darker than stock at 0.2, but more power brightens the
+/// base's lamps as well, and the BSP's one exposure takes it back from the
+/// outdoors (at 1.0 the canyon floor is 14% under stock).
 pub const EMITTER_EXPOSURE: f32 = 0.2;
 
 /// A structure BSP lit by its sky.

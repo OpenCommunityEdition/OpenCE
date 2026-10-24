@@ -52,11 +52,9 @@ final class ExposureTests: XCTestCase {
             ViewCamera(position: [start.x, start.y, start.z], yaw: start.yaw + yaw, pitch: pitch,
                        verticalFov: 70 * .pi / 180)
         }
-        // (the start view looks over the base, whose blotches of lamp light
-        // the bake does not yet filter: it is about 19% brighter than stock)
-        let views = [("start", level.camera, 0.25), ("sky", view(yaw: 0, pitch: 0.7), 0.1),
-                     ("back", view(yaw: .pi, pitch: -0.1), 0.1), ("down", view(yaw: .pi / 2, pitch: -0.5), 0.1)]
-        for (name, camera, tolerance) in views {
+        let views = [("start", level.camera), ("sky", view(yaw: 0, pitch: 0.7)),
+                     ("back", view(yaw: .pi, pitch: -0.1)), ("down", view(yaw: .pi / 2, pitch: -0.5))]
+        for (name, camera) in views {
             var shots: [Bool: Stats] = [:]
             for stock in [false, true] {
                 let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
@@ -67,7 +65,7 @@ final class ExposureTests: XCTestCase {
                 shots[stock] = stats(frame)
             }
             let baked = shots[false]!, stock = shots[true]!
-            XCTAssertLessThan(abs(baked.mean - stock.mean) / stock.mean, tolerance,
+            XCTAssertLessThan(abs(baked.mean - stock.mean) / stock.mean, 0.1,
                               "\(name): mean \(baked.mean) against \(stock.mean)")
             XCTAssertLessThanOrEqual(baked.clipped, stock.clipped + 0.0005,
                                      "\(name): \(baked.clipped) clipped, around \(baked.box)")
