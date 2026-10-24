@@ -9,9 +9,9 @@
 - [~] Task: Static mockups 0df3b584
     - [x] A private Claude design artifact with every screen in the spec, drawn from the reference with our own art and a marked logo placeholder
     - [ ] Rounds of the user's feedback, recorded in the artifact and in `docs/ui_design.md`
-- [ ] Task: The clickable prototype and motion studies
-    - [ ] The screens wired into the real flow (focus, hover, back)
-    - [ ] Motion studies of focus, transitions, scrolling and the loading sweep
+- [x] Task: The clickable prototype and motion studies 54be3505
+    - [x] The screens wired into the real flow (focus, hover, back)
+    - [x] Motion studies of focus, transitions, scrolling and the loading sweep
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: The design language and the design artifact' (Protocol in workflow.md): the user approves the design, and everything after builds from it
 
 ## Phase 2: Drawing the menus in the new language
