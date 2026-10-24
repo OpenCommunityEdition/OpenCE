@@ -61,6 +61,7 @@ being hit looks and feels like on the clients).
 #include "objects/damage_effect_definitions.h"
 #include "effects/effect_definitions.h"
 #include "physics/collision_model_definitions.h"
+#include "physics/collisions.h"
 #include "items/weapon_definitions.h"
 #include "items/projectile_definitions.h"
 #include "scenario/scenario.h"
@@ -248,6 +249,8 @@ is off the unit; a vehicle's the vehicle's size more) */
 /* how far apart the origin and the epicenter of what hits at a point are
 (one point, as the client had it) */
 #define REPORT_POINT_TOLERANCE 0.01f
+#define REPORT_EYE_HEIGHT 0.65f
+#define REPORT_LINE_OF_SIGHT_TICKS (2 * TICKS_PER_SECOND)
 /* how far from the origin anything in a report is (world units), and the
 largest damage scale a client's hit has: a melee blow's, airborne
 (unit_update_melee), anything else's all of it */
@@ -1801,6 +1804,75 @@ static boolean distributed_report_paid(
 	return TRUE;
 }
 
+static boolean distributed_report_sight_clear(unsigned long flags, real_point3d const *eye,
+	real_point3d const *impact_point, real_point3d const *centre)
+{
+	struct collision_result collision;
+
+	return !collision_test_line(flags, eye, impact_point, NONE, &collision) ||
+		!collision_test_line(flags, eye, centre, NONE, &collision);
+}
+
+static boolean distributed_report_line_of_sight(
+	long machine_index,
+	short player_index,
+	real_point3d const *impact_point,
+	struct object_datum const *target,
+	real_point3d const *target_position,
+	struct damage_reach const *reach,
+	long host_time)
+{
+	unsigned long flags = FLAG(_collision_test_structure_bit) |
+		FLAG(_collision_test_front_facing_surfaces_bit) | FLAG(_collision_test_back_facing_surfaces_bit) |
+		FLAG(_collision_test_ignore_invisible_surfaces_bit) | FLAG(_collision_test_ignore_breakable_surfaces_bit) |
+		FLAG(_collision_test_ignore_two_sided_surfaces_bit);
+	real ticks = MIN(reach->ticks, (real)REPORT_LINE_OF_SIGHT_TICKS);
+	long latest_made = game_time_get() - (long)distributed_machine_round_trip_ticks(machine_index) -
+		PLAYER_TRAIL_REPORT_SLACK_TICKS;
+	long earliest;
+	boolean had_point = FALSE;
+	real_point3d centre;
+	short index;
+
+	if (host_time < latest_made)
+		host_time = latest_made;
+	earliest = host_time - (long)ticks - TARGET_HISTORY_SLACK_TICKS - PLAYER_TRAIL_INTERVAL_TICKS;
+	centre.x = target_position->x + target->object.bounding_sphere_center.x;
+	centre.y = target_position->y + target->object.bounding_sphere_center.y;
+	centre.z = target_position->z + target->object.bounding_sphere_center.z;
+	for (index = 0; index < PLAYER_TRAIL_POINTS; index++)
+	{
+		struct damage_trail_point const *trail_point = &damage_trails[player_index][index];
+		real_point3d eye;
+
+		if (trail_point->time == NONE || trail_point->time < earliest || trail_point->time > game_time_get())
+			continue;
+		had_point = TRUE;
+		eye = trail_point->position;
+		eye.z += REPORT_EYE_HEIGHT;
+		if (distributed_report_sight_clear(flags, &eye, impact_point, &centre))
+			return TRUE;
+		if (trail_point->radius > 0.1f)
+		{
+			real_point3d muzzle = eye;
+			real dx = centre.x - eye.x, dy = centre.y - eye.y, dz = centre.z - eye.z;
+			real length = (real)sqrt(dx * dx + dy * dy + dz * dz);
+
+			if (length > 0.01f)
+			{
+				real scale = trail_point->radius / length;
+
+				muzzle.x += dx * scale;
+				muzzle.y += dy * scale;
+				muzzle.z += dz * scale;
+				if (distributed_report_sight_clear(flags, &muzzle, impact_point, &centre))
+					return TRUE;
+			}
+		}
+	}
+	return !had_point;
+}
+
 /* whether the host takes the report, which it makes the damage as the
 host deals it (the cheaper checks first, and the report paid for before the
 history is looked through: a flood of reports costs its sender no more than
@@ -1955,8 +2027,7 @@ static boolean distributed_report_valid(
 		return FALSE;
 	}
 	/* what hits at a point (a shot, an explosion) within its reach of where
-	the host had the player since it was fired, where the tags bound that
-	(no line of sight: a wall between is not looked for) */
+	the host had the player since it was fired, where the tags bound that */
 	if (!melee && !collision && fired_reach.distance >= 0.0f &&
 		!distributed_player_could_fire(machine_index, player_index, &report->damage.origin, &fired_reach,
 			report->host_time))
@@ -1982,6 +2053,12 @@ static boolean distributed_report_valid(
 			(real)sqrt(velocity.i * velocity.i + velocity.j * velocity.j + velocity.k * velocity.k);
 		if (!(distributed_distance_squared(&report->target_position, &origin) <= tolerance * tolerance))
 			return FALSE;
+	}
+	if (!melee && !collision && !area &&
+		!distributed_report_line_of_sight(machine_index, player_index, &report->damage.origin, target,
+			&report->target_position, &fired_reach, report->host_time))
+	{
+		return FALSE;
 	}
 	/* the damage as the host deals it: what a client's hit can be, from the
 	player's own */
