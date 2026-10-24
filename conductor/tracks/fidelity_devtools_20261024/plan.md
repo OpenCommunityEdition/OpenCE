@@ -9,9 +9,9 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: The stations 12b603e
     - [x] Write tests: each station spawns its set (vehicles, AI squads, weapons and equipment, effects row, sound emitters, shader test surfaces, animation stands, HUD and UI triggers); a station command teleports there
     - [x] The stations; devgulch becomes the default test level, replacing devmap
-- [ ] Task: The launcher's Developer tab
-    - [ ] Write tests (XCTest): the tab lists devgulch, its stations, view modes and toggles; launching passes them to the engine
-    - [ ] The tab and its launch arguments (the view modes and toggles are wired in Phase 3)
+- [x] Task: The launcher's Developer tab 5d266e3
+    - [x] Write tests (XCTest): the tab lists devgulch, its stations, view modes and toggles; launching passes them to the engine
+    - [x] The tab and its launch arguments (the view modes and toggles are wired in Phase 3)
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: devgulch and the launcher's Developer tab' (Protocol in workflow.md)
 
 ## Phase 2: Stop the heat, see the cost
