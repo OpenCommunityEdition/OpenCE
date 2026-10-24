@@ -158,7 +158,7 @@ public struct LauncherView: View {
             }
         }
         .padding(32)
-        .frame(minWidth: 460)
+        .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

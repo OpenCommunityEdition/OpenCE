@@ -9,13 +9,15 @@ of its code is compiled into the engine.
 
 ```sh
 nix build .#engine             # OpenCE Engine.app
+nix run .#engine               # build it and open the launcher, from the folder holding assets/maps
+nix run .#engine -- --map devgulch --station vehicles   # or start a test map at a station
 python3 tools/engine_build.py --out build/engine --test   # the app and its Swift tests
 cd engine && cargo test --release --workspace             # the Rust tests
 cd engine && cargo clippy --release --workspace --all-targets -- -D warnings
 cd engine && cargo deny check licenses
 ```
 
-Run them in `nix develop`. Tests that need game data read `assets/maps`
+Run the commands after the `nix` ones in `nix develop`. Tests that need game data read `assets/maps`
 and pass without it. `unsafe` code is refused, every public item needs a
 document comment, and `unwrap` and `expect` are refused outside tests.
 

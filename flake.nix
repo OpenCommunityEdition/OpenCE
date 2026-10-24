@@ -155,6 +155,20 @@
         default = host;
       };
 
+      # `nix run .#engine -- <arguments>`: OpenCE Engine.app built by
+      # packages.engine and started from the folder it is run in, which
+      # (with assets/maps) is the data root: the launcher without
+      # arguments, or e.g. `--map devgulch --station vehicles`
+      apps.${system} = rec {
+        engine = {
+          type = "app";
+          program = "${pkgs.writeShellScript "opence-engine" ''
+            exec "${self.packages.${system}.engine}/Applications/OpenCE Engine.app/Contents/MacOS/OpenCEEngine" "$@"
+          ''}";
+        };
+        default = engine;
+      };
+
       devShells.${system} = {
         default = pkgs.mkShell (buildEnvironment // {
           packages = tools;

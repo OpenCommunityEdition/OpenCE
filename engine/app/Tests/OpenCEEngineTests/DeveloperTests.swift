@@ -110,4 +110,16 @@ final class DeveloperTests: XCTestCase {
         view.layoutSubtreeIfNeeded()
         XCTAssertGreaterThan(view.fittingSize.height, 0)
     }
+
+    /// The window can be made as small as its least size and the tab is
+    /// laid out within it (it scrolls), rather than cut off.
+    func testTheTabFitsTheLeastWindow() {
+        let model = launcher()
+        model.choose(.developer)
+        let controller = NSHostingController(rootView: LauncherView(model: model))
+        let least = NSSize(width: 460, height: 380)
+        let size = controller.sizeThatFits(in: least)
+        XCTAssertLessThanOrEqual(size.width, least.width)
+        XCTAssertLessThanOrEqual(size.height, least.height)
+    }
 }

@@ -264,9 +264,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MenuFonts.register()
         let model = LauncherModel(settings: saved, displays: NSScreen.screens.map(\.localizedName), root: root,
                                   variables: engine.shellVariables())
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 380),
-                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 640),
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                              backing: .buffered, defer: false)
         window.title = "OpenCE"
+        window.contentMinSize = NSSize(width: 460, height: 380)
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: LauncherView(model: model))
         model.onPlay = { [weak self] in

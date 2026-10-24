@@ -97,6 +97,21 @@ struct DeveloperTab: View {
     let onDone: () -> Void
 
     var body: some View {
+        VStack(spacing: 12) {
+            form
+            HStack {
+                Button("Back") { onDone() }
+                Spacer()
+                Button("Launch") { onLaunch(model.arguments()) }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .font(MenuFonts.body(13))
+    }
+
+    /// The choices; it scrolls when the window is shorter than they are,
+    /// Back and Launch staying below it.
+    private var form: some View {
         Form {
             Picker("Level", selection: $model.level) {
                 ForEach(model.levels, id: \.self) { Text($0).tag($0) }
@@ -126,15 +141,8 @@ struct DeveloperTab: View {
                 }
             }
             Toggle("Capture the first frame", isOn: $model.capturesOnLaunch)
-            HStack {
-                Button("Back") { onDone() }
-                Spacer()
-                Button("Launch") { onLaunch(model.arguments()) }
-                    .keyboardShortcut(.defaultAction)
-            }
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 480)
-        .font(MenuFonts.body(13))
+        .frame(minWidth: 400, maxWidth: .infinity, minHeight: 200, maxHeight: .infinity)
     }
 }
