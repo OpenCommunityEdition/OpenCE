@@ -1,6 +1,7 @@
-//! What the scripts tell the AI: encounters placed, conversations begun,
-//! command lists given (`hs_library_ai.c`). The actors (`actors.rs`) act
-//! on these orders; the ones they do not yet follow are kept.
+//! What the scripts tell the AI: encounters placed and command lists given
+//! (`hs_library_ai.c`). The actors (`actors.rs`) act on these orders; the
+//! ones they do not yet follow are kept. Conversations are
+//! `conversations.rs`'s.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -57,8 +58,6 @@ pub struct AiOrders {
     pub enabled: bool,
     /// The references placed, in the order they were.
     pub placed: Vec<AiReference>,
-    /// The conversations begun, by index, and whether each was stopped.
-    pub conversations: BTreeMap<i32, bool>,
     /// The command lists given to units.
     pub command_lists: BTreeMap<ObjectHandle, i32>,
     /// The units each reference's actors are, as the AI fills them in.
@@ -74,7 +73,6 @@ impl Default for AiOrders {
         Self {
             enabled: true,
             placed: Vec::new(),
-            conversations: BTreeMap::new(),
             command_lists: BTreeMap::new(),
             actors: BTreeMap::new(),
             orders: Vec::new(),
@@ -115,10 +113,6 @@ pub(crate) const NATIVES: &[(&str, Native<Mission>)] = &[
     ("ai_command_list", ai_command_list),
     ("ai_command_list_by_unit", ai_command_list_by_unit),
     ("ai_command_list_status", ai_command_list_status),
-    ("ai_conversation", ai_conversation),
-    ("ai_conversation_stop", ai_conversation_stop),
-    ("ai_conversation_status", ai_conversation_status),
-    ("ai_conversation_line", ai_conversation_line),
     ("ai_place", ai_place),
     ("ai_erase", ai_erase),
     ("ai_erase_all", ai_erase_all),
@@ -219,33 +213,6 @@ fn ai_command_list_status(mission: &mut Mission, arguments: &[Value]) -> Value {
     count(following)
 }
 
-fn ai_conversation(mission: &mut Mission, arguments: &[Value]) -> Value {
-    mission.ai.conversations.insert(index(arguments, 0), false);
-    Value::Boolean(true)
-}
-
-fn ai_conversation_stop(mission: &mut Mission, arguments: &[Value]) -> Value {
-    if let Some(stopped) = mission.ai.conversations.get_mut(&index(arguments, 0)) {
-        *stopped = true;
-    }
-    Value::Void
-}
-
-fn ai_conversation_status(mission: &mut Mission, arguments: &[Value]) -> Value {
-    // (Halo's statuses: 0 none, 4 aborted, 6 finished; a conversation's
-    // lines are the presentation's, so one begun is taken as finished)
-    let status = match mission.ai.conversations.get(&index(arguments, 0)) {
-        None => 0,
-        Some(true) => 4,
-        Some(false) => 6,
-    };
-    Value::Short(status)
-}
-
-fn ai_conversation_line(_: &mut Mission, _: &[Value]) -> Value {
-    Value::Short(0)
-}
-
 fn ai_place(mission: &mut Mission, arguments: &[Value]) -> Value {
     let reference = AiReference::of(index(arguments, 0));
     mission.ai.placed.push(reference);
@@ -292,7 +259,7 @@ macro_rules! ordered {
 ordered! {
     ai_allow_dormant, ai_attach, ai_attach_free, ai_attack,
     ai_automatic_migration_target, ai_berserk, ai_braindead,
-    ai_braindead_by_unit, ai_command_list_advance, ai_conversation_advance,
+    ai_braindead_by_unit, ai_command_list_advance,
     ai_defend, ai_detach, ai_dialogue_triggers, ai_disregard,
     ai_exit_vehicle, ai_follow_distance, ai_follow_target_ai,
     ai_follow_target_disable, ai_follow_target_players, ai_force_active,

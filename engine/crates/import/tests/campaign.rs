@@ -71,6 +71,16 @@ fn linked(campaign: &Campaign) -> bool {
         list.commands
             .iter()
             .all(|command| within(command.object_name, names))
+    }) && campaign.conversations.iter().all(|conversation| {
+        let speakers = conversation.participants.len();
+        conversation
+            .participants
+            .iter()
+            .all(|p| within(p.object_name, names))
+            && conversation
+                .lines
+                .iter()
+                .all(|line| within(line.participant, speakers) && line.delay.is_finite())
     })
 }
 
@@ -105,6 +115,13 @@ fn the_pillar_of_autumn_has_its_encounters() -> Result {
         .encounters
         .iter()
         .any(|e| e.squads.iter().any(|s| !s.starting_locations.is_empty())));
+    // (its conversations speak: each line names a sound for some variant)
+    assert!(!campaign.conversations.is_empty());
+    assert!(campaign
+        .conversations
+        .iter()
+        .flat_map(|c| &c.lines)
+        .any(|line| line.dialogue.iter().any(Option::is_some)));
     // (each trigger volume holds the point at its middle, along its axes)
     for volume in campaign.trigger_volumes.iter().filter(|v| v.oriented) {
         let [f, u] = [volume.forward, volume.up];

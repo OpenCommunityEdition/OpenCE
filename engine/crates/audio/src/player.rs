@@ -26,6 +26,12 @@ pub const MUSIC_CLASS: u16 = 32;
 pub const DIALOG_CLASSES: [u16; 3] = [44, 46, 47];
 /// The class whose sounds play unspatialized wherever they are made.
 pub const UNSPATIALIZED_CLASS: u16 = 47;
+/// The nondialogue gain while the scripted dialogue plays, and how far it
+/// moves a game tick toward it and back to 1 after
+/// (`sound_manager_update`'s).
+const DUCKED_GAIN: f32 = 0.7;
+const DUCK_STEP: f32 = 0.03;
+const RECOVER_STEP: f32 = 0.007;
 /// The most permutations of a linked chain queued for one play.
 const LINKED_LIMIT: usize = 64;
 
@@ -103,6 +109,8 @@ pub struct SoundPlayer {
     effects_volume: f32,
     music_volume: f32,
     nondialog_gain: f32,
+    // (the scripted dialogue's voices playing)
+    dialogue: Vec<VoiceId>,
     time_ms: f32,
     mixer: Mixer,
 }
@@ -136,6 +144,7 @@ impl SoundPlayer {
             effects_volume: 1.0,
             music_volume: 1.0,
             nondialog_gain: 1.0,
+            dialogue: Vec::new(),
             time_ms: 0.0,
             mixer: Mixer::new(),
         }
@@ -173,11 +182,29 @@ impl SoundPlayer {
         self.nondialog_gain = gain.clamp(0.0, 1.0);
     }
 
-    /// Moves the clock on by `ms` milliseconds and the classes' fades by
-    /// `ticks` game ticks.
+    /// Moves the clock on by `ms` milliseconds, and the classes' fades and
+    /// the nondialogue gain by `ticks` game ticks: the gain falls toward
+    /// [`DUCKED_GAIN`] while the scripted dialogue plays and rises back to 1
+    /// after.
     pub fn advance(&mut self, ms: f32, ticks: i32) {
         self.time_ms += ms.max(0.0);
         self.classes.update(ticks);
+        let mixer = &self.mixer;
+        self.dialogue.retain(|&voice| mixer.is_playing(voice));
+        for _ in 0..ticks.clamp(0, 200) {
+            self.nondialog_gain = if self.dialogue.is_empty() {
+                (self.nondialog_gain + RECOVER_STEP).min(1.0)
+            } else if self.nondialog_gain > DUCKED_GAIN {
+                (self.nondialog_gain - DUCK_STEP).max(DUCKED_GAIN)
+            } else {
+                (self.nondialog_gain + DUCK_STEP).min(DUCKED_GAIN)
+            };
+        }
+    }
+
+    /// The gain of every sound but the scripted dialogue.
+    pub fn nondialog_gain(&self) -> f32 {
+        self.nondialog_gain
     }
 
     /// A class's gain with the settings' volume and the nondialogue gain
@@ -337,6 +364,9 @@ impl SoundPlayer {
             if let Some(samples) = self.samples(index, range, next) {
                 self.mixer.queue(voice, samples);
             }
+        }
+        if DIALOG_CLASSES.contains(&sound.class) {
+            self.dialogue.push(voice);
         }
         Some(voice)
     }
@@ -516,6 +546,27 @@ mod tests {
         player.classes().set(class(0).name, 0.0, 2);
         player.advance(33.0, 2);
         assert!(player.master_gain(0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn the_dialogue_lowers_every_other_sound_until_it_ends() -> Result<(), Box<dyn Error>> {
+        let mut line = sound("line", 0, vec![permutation(4800, 100, None)]);
+        line.class = DIALOG_CLASSES[0];
+        let mut player = player(vec![line]);
+        player.impulse(0, &Source::default()).ok_or("no voice")?;
+        player.advance(33.0, 5);
+        assert!((player.nondialog_gain() - 0.85).abs() < 1e-5);
+        player.advance(33.0, 10);
+        assert!((player.nondialog_gain() - DUCKED_GAIN).abs() < 1e-6);
+        assert!((player.master_gain(0) - DUCKED_GAIN).abs() < 1e-6);
+        assert!((player.master_gain(DIALOG_CLASSES[0]) - 1.0).abs() < 1e-6);
+        // (the line played out)
+        peak(&mut player, 4800);
+        player.advance(33.0, 10);
+        assert!((player.nondialog_gain() - (DUCKED_GAIN + 0.07)).abs() < 1e-5);
+        player.advance(33.0, 100);
+        assert!((player.nondialog_gain() - 1.0).abs() < 1e-6);
+        Ok(())
     }
 
     #[test]

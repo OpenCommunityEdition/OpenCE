@@ -5,9 +5,9 @@
 //! 31 characters.
 
 use opence_content::{
-    ActorVariant, BspSwitch, CameraPoint, Campaign, Command, CommandList, CutsceneFlag,
-    DeviceGroup, Encounter, FiringPosition, Recording, SoundLength, Squad, StartingLocation,
-    TriggerVolume,
+    ActorVariant, BspSwitch, CameraPoint, Campaign, Command, CommandList, Conversation,
+    ConversationLine, ConversationParticipant, CutsceneFlag, DeviceGroup, Encounter,
+    FiringPosition, Recording, SoundLength, Squad, StartingLocation, TriggerVolume,
 };
 
 use crate::cache::Cache;
@@ -37,6 +37,11 @@ const FIRING_POSITIONS: (usize, usize, usize) = (0x98, 0x18, 512);
 const STARTING_LOCATIONS: (usize, usize, usize) = (0xD0, 0x1C, 32);
 // (a command list's)
 const COMMANDS: (usize, usize, usize) = (0x30, 0x20, 64);
+// (a conversation's; the game speaks with its first 8 participants)
+const PARTICIPANTS: (usize, usize, usize) = (0x50, 0x54, 32);
+const LINES: (usize, usize, usize) = (0x5C, 0x7C, 64);
+// (a line's six dialogue variants)
+const DIALOGUE: usize = 0x1C;
 const POINTS: (usize, usize, usize) = (0x3C, 0x14, 64);
 
 const ACTV: GroupTag = GroupTag::new(b"actv");
@@ -153,7 +158,12 @@ pub(crate) fn scenario_campaign(scenario: &Element<'_>) -> Result<Campaign, Impo
                 points: each(e, POINTS, "points", |p| point(p, 0, "point"))?,
             })
         })?,
-        conversations: each(scenario, CONVERSATIONS, "conversations", |e| name(e, 0))?,
+        conversations: each(
+            scenario,
+            CONVERSATIONS,
+            "conversations",
+            import_conversation,
+        )?,
         starting_profiles: each(scenario, STARTING_PROFILES, "starting profiles", |e| {
             name(e, 0)
         })?,
@@ -166,6 +176,38 @@ pub(crate) fn scenario_campaign(scenario: &Element<'_>) -> Result<Campaign, Impo
             })
         })?,
         sound_lengths: sound_lengths(cache)?,
+    })
+}
+
+/// A conversation (`ai_conversation`): its participants and lines.
+fn import_conversation(element: &Element<'_>) -> Result<Conversation, ImportError> {
+    let cache = element.cache();
+    Ok(Conversation {
+        name: name(element, 0)?,
+        participants: each(element, PARTICIPANTS, "participants", |p| {
+            let mut variants = [0; 6];
+            for (at, variant) in (0x18..).step_by(2).zip(variants.iter_mut()) {
+                *variant = p.i16(at, "dialogue variant")?;
+            }
+            Ok(ConversationParticipant {
+                selection: p.i16(4, "selection type")?,
+                object_name: p.i16(8, "use this object")?,
+                variants,
+            })
+        })?,
+        lines: each(element, LINES, "lines", |l| {
+            Ok(ConversationLine {
+                flags: l.u16(0, "flags")?,
+                participant: l.i16(2, "participant")?,
+                delay: l.f32(0xC, "delay time")?,
+                dialogue: (0..6)
+                    .map(|variant| {
+                        Ok(l.reference(DIALOGUE + variant * 0x10, "variant", &[SND])?
+                            .map(|index| tag_ref(cache, index)))
+                    })
+                    .collect::<Result<_, ImportError>>()?,
+            })
+        })?,
     })
 }
 
@@ -182,6 +224,7 @@ fn sound_lengths(cache: &Cache) -> Result<Vec<SoundLength>, ImportError> {
             Ok(SoundLength {
                 path: instance.name.clone(),
                 milliseconds: sound.u32(LONGEST_PERMUTATION, "longest permutation length")?,
+                class: sound.u16(0x04, "class")?,
             })
         })
         .collect()

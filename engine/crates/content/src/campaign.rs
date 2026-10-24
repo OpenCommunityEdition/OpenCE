@@ -32,8 +32,8 @@ pub struct Campaign {
     pub encounters: Vec<Encounter>,
     /// Its AI command lists.
     pub command_lists: Vec<CommandList>,
-    /// Its AI conversations' names.
-    pub conversations: Vec<String>,
+    /// Its AI conversations.
+    pub conversations: Vec<Conversation>,
     /// Its starting profiles' names.
     pub starting_profiles: Vec<String>,
     /// The trigger volumes that switch the structure a player stands in.
@@ -50,6 +50,53 @@ pub struct SoundLength {
     pub path: String,
     /// Its length in milliseconds.
     pub milliseconds: u32,
+    /// Its class (`sound_class`), which tells the scripts' dialogue from
+    /// other sounds.
+    pub class: u16,
+}
+
+/// An AI conversation (`ai_conversation`): lines its participants speak in
+/// turn.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct Conversation {
+    /// Its name.
+    pub name: String,
+    /// Who speaks.
+    pub participants: Vec<ConversationParticipant>,
+    /// What they say, in order.
+    pub lines: Vec<ConversationLine>,
+}
+
+/// One who speaks in a conversation.
+#[derive(Clone, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
+pub struct ConversationParticipant {
+    /// How the speaker is chosen: 1 a voice without a body, 6 and 7 the
+    /// radio (heard everywhere alike); others an actor.
+    pub selection: i16,
+    /// The object name of the speaker already in the world; -1 for none.
+    pub object_name: i16,
+    /// The unit variants each of a line's six dialogue variants is for (0
+    /// any, -1 none).
+    pub variants: [i16; 6],
+}
+
+/// A line of a conversation.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct ConversationLine {
+    /// Its flags: [`ConversationLine::WAIT_UNTIL_TOLD`] and the looks.
+    pub flags: u16,
+    /// The participant who speaks it.
+    pub participant: i16,
+    /// The seconds waited after it before the next.
+    pub delay: f32,
+    /// The sound of each of its six variants.
+    pub dialogue: Vec<Option<TagRef>>,
+}
+
+impl ConversationLine {
+    /// The conversation waits after this line until a script advances it
+    /// (`ai_conversation_advance`).
+    pub const WAIT_UNTIL_TOLD: u16 = 1 << 3;
 }
 
 /// A trigger volume that switches the structure when a player enters it

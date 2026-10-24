@@ -14,11 +14,13 @@ mod actors;
 mod ai;
 mod checkpoint;
 mod cinematic;
+mod conversations;
 mod devices;
 mod game;
 mod objects;
 mod presented;
 mod signatures;
+mod sounds;
 mod units;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -35,8 +37,10 @@ pub use actors::{Actor, ActorState};
 pub use ai::{AiOrders, AiReference};
 pub use checkpoint::{Checkpoint, CheckpointError, CHECKPOINT_VERSION};
 pub use cinematic::{CameraShot, Cinematic};
+pub use conversations::ConversationStatus;
 pub use devices::DeviceState;
 pub use game::Flow;
+pub use sounds::{ClassGain, ScriptedLoop, ScriptedSound, SoundOrders, DIALOGUE_CLASSES};
 
 /// The object lists a mission keeps at once: a list's index is reused once
 /// this many more are made (as Halo's object list table is).
@@ -104,9 +108,8 @@ pub struct Mission {
     saving: Option<usize>,
     saved: Option<usize>,
     reverted: bool,
-    // (each sound the scripts started, by its path in lowercase, and the
-    // game tick it ends on)
-    sounds: BTreeMap<String, u64>,
+    sounds: sounds::ScriptedSounds,
+    conversations: conversations::Conversations,
 }
 
 /// The simulation's ticks a game tick: the scripts, and all they time, run
@@ -188,7 +191,8 @@ impl Mission {
             saving: None,
             saved: None,
             reverted: false,
-            sounds: BTreeMap::new(),
+            sounds: sounds::ScriptedSounds::default(),
+            conversations: conversations::Conversations::default(),
         };
         let difficulty = match difficulty {
             Difficulty::Easy => 0,
@@ -302,7 +306,7 @@ impl Mission {
     /// Runs one tick of the simulation with `input` and then moves on what
     /// the scripts started: attached objects with their parents, and on a
     /// game tick devices toward their positions, recordings, animations and
-    /// sounds to their ends, the camera and the timers. Objects that cannot be hurt keep their
+    /// sounds to their ends, conversations, the camera and the timers. Objects that cannot be hurt keep their
     /// vitality.
     pub fn step(&mut self, input: TickInput) {
         let game_tick = self.is_game_tick();
@@ -350,7 +354,8 @@ impl Mission {
                 }
             }
         }
-        self.sounds.retain(|_, ends| *ends > tick);
+        self.sounds.ends.retain(|_, ends| *ends > tick);
+        self.converse();
         self.cinematic.advance();
         self.flow.advance();
         if self.flow.saving == 0 {
@@ -581,7 +586,6 @@ impl Mission {
         self.random >> 8
     }
 
-    /// Keeps what a script did for the presentation.
     /// The game ticks run so far.
     pub fn game_tick(&self) -> u64 {
         self.sim.tick().0 / SIM_TICKS_PER_GAME_TICK
@@ -592,6 +596,7 @@ impl Mission {
         self.sim.tick().0.is_multiple_of(SIM_TICKS_PER_GAME_TICK)
     }
 
+    /// Keeps what a script did for the presentation.
     fn present(&mut self, function: &'static str, arguments: &[Value]) {
         self.events.push(Event {
             function,
@@ -668,6 +673,9 @@ impl MissionScripts {
         for &input in &checkpoint.inputs {
             loaded.play(input);
         }
+        // (what was played again was heard and seen before)
+        loaded.mission.sounds.orders = SoundOrders::default();
+        loaded.mission.events.clear();
         Ok(loaded)
     }
 
@@ -746,10 +754,12 @@ fn natives() -> impl Iterator<Item = (&'static str, Native<Mission>)> {
         ai::NATIVES,
         ai::PRESENTED,
         cinematic::NATIVES,
+        conversations::NATIVES,
         devices::NATIVES,
         game::NATIVES,
         objects::NATIVES,
         presented::PRESENTED,
+        sounds::NATIVES,
         units::NATIVES,
     ]
     .into_iter()

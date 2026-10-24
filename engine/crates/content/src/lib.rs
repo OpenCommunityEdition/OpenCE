@@ -26,9 +26,9 @@ pub use bitmap::{
     Bitmap, BitmapImage, Pixels, ResourceRange, Sequence, Sprite, Texture, TextureFormat,
 };
 pub use campaign::{
-    ActorVariant, BspSwitch, CameraPoint, Campaign, Command, CommandList, CutsceneFlag,
-    DeviceGroup, Encounter, FiringPosition, Recording, SoundLength, Squad, StartingLocation,
-    TriggerVolume,
+    ActorVariant, BspSwitch, CameraPoint, Campaign, Command, CommandList, Conversation,
+    ConversationLine, ConversationParticipant, CutsceneFlag, DeviceGroup, Encounter,
+    FiringPosition, Recording, SoundLength, Squad, StartingLocation, TriggerVolume,
 };
 pub use decal::{Decal, LevelDecal};
 pub use hud::{

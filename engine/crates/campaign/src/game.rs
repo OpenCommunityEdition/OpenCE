@@ -103,9 +103,6 @@ pub(crate) const NATIVES: &[(&str, Native<Mission>)] = &[
     ("real_random_range", real_random_range),
     ("not", not),
     ("print", print),
-    ("sound_impulse_start", sound_impulse_start),
-    ("sound_impulse_stop", sound_impulse_stop),
-    ("sound_impulse_time", sound_impulse_time),
     ("hud_get_timer_ticks", hud_get_timer_ticks),
     ("hud_set_timer_time", hud_set_timer_time),
     ("pause_hud_timer", pause_hud_timer),
@@ -244,51 +241,6 @@ fn print(mission: &mut Mission, arguments: &[Value]) -> Value {
     let line = text(arguments, 0).to_owned();
     mission.printed.push(line);
     Value::Void
-}
-
-/// The sound's path as the mission keys it.
-fn sound_key(arguments: &[Value]) -> Option<String> {
-    match arguments.first() {
-        Some(Value::Tag(Some(tag))) => Some(tag.path.to_ascii_lowercase()),
-        _ => None,
-    }
-}
-
-fn sound_impulse_start(mission: &mut Mission, arguments: &[Value]) -> Value {
-    mission.present("sound_impulse_start", arguments);
-    if let Some(key) = sound_key(arguments) {
-        // (one in the resource maps, of no known length, has ended at once)
-        let milliseconds = mission
-            .level
-            .scenario
-            .campaign
-            .sound_lengths
-            .iter()
-            .find(|sound| sound.path.eq_ignore_ascii_case(&key))
-            .map_or(0, |sound| sound.milliseconds);
-        let ticks = u64::from(milliseconds) * u64::from(opence_script::TICKS_PER_SECOND) / 1000;
-        let ends = mission.game_tick() + ticks;
-        mission.sounds.insert(key, ends);
-    }
-    Value::Void
-}
-
-fn sound_impulse_stop(mission: &mut Mission, arguments: &[Value]) -> Value {
-    mission.present("sound_impulse_stop", arguments);
-    if let Some(key) = sound_key(arguments) {
-        mission.sounds.remove(&key);
-    }
-    Value::Void
-}
-
-/// The game ticks left of a sound the scripts started, as
-/// `scripted_sound_time` counts them; 0 once it has ended or been stopped.
-fn sound_impulse_time(mission: &mut Mission, arguments: &[Value]) -> Value {
-    let tick = mission.game_tick();
-    let left = sound_key(arguments)
-        .and_then(|key| mission.sounds.get(&key))
-        .map_or(0, |ends| ends.saturating_sub(tick));
-    Value::Long(i32::try_from(left).unwrap_or(i32::MAX))
 }
 
 fn hud_get_timer_ticks(mission: &mut Mission, _: &[Value]) -> Value {

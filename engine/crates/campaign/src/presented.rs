@@ -1,6 +1,6 @@
 //! What the scripts do that only the player sees or hears, or that the
 //! simulation has no part of yet: each kept as an event for the
-//! presentation (fades, sounds, the HUD's pieces, screen effects, nav
+//! presentation (fades, the HUD's pieces, screen effects, nav
 //! points, effects and damage made at markers, and the units' seats and
 //! doors).
 
@@ -64,10 +64,6 @@ crate::presents! {
     rasterizer_lights_reset_for_new_map,
     rasterizer_model_ambient_reflection_tint,
     show_hud_timer,
-    sound_class_set_gain,
-    sound_looping_set_alternate,
-    sound_looping_start,
-    sound_looping_stop,
     time_code_show,
     time_code_start,
     unit_close,

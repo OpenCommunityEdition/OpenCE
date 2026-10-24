@@ -981,7 +981,7 @@ impl Engine {
         let shell_bsp = state.shell.bsp;
         if let (Some(running), Some(advanced)) = (state.running.as_mut(), frame.as_ref()) {
             let heard = std::mem::take(&mut running.heard);
-            let camera = running.simulation.camera().transform;
+            let camera = campaign::camera(running).transform;
             if let Some(level) = running.level.clone() {
                 let bsp = running
                     .campaign
@@ -1028,6 +1028,9 @@ impl Engine {
                         };
                         player.refresh_looping(looping.key, index, &source, false);
                     }
+                }
+                if let Some(campaign) = running.campaign.as_mut() {
+                    campaign.play_sounds(player, &running.simulation);
                 }
                 player.update_loops();
             }

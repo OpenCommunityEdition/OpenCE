@@ -1,10 +1,12 @@
 //! The campaign in the app: a mission started at a difficulty, its scripts
 //! run with the world, its cinematics' camera seen, the objects its scripts
-//! make dressed, and its saved games written and read again.
+//! make dressed, its sounds and music played, and its saved games written
+//! and read again.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use opence_campaign::{Checkpoint, MissionScripts};
+use opence_campaign::{Checkpoint, MissionScripts, SoundOrders};
 use opence_sim::animation::AnimationPlayer;
 use opence_sim::input::TickInput;
 use opence_sim::objects::Appearance;
@@ -19,6 +21,27 @@ use crate::{
 pub(crate) struct Campaign {
     scripts: MissionScripts,
     wardrobe: Wardrobe,
+    // (what the scripts did to the sounds since the last frame played it)
+    orders: SoundOrders,
+    // (the voices of the impulses the scripts started, by their paths in
+    // lowercase, so the scripts can stop them)
+    voices: BTreeMap<String, opence_audio::VoiceId>,
+    // (whether the mission went back to its last save since the last frame,
+    // which silences the impulses it started before)
+    silenced: bool,
+}
+
+/// The bit a scripted loop's key carries, apart from the keys of the
+/// objects' loops and the background's.
+const SCRIPTED_LOOP: u64 = 1 << 62;
+
+/// The key a looping sound the scripts play is refreshed under: its path's
+/// FNV-1a hash, marked as scripted.
+fn loop_key(path: &str) -> u64 {
+    let hash = path.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    });
+    SCRIPTED_LOOP | (hash & (SCRIPTED_LOOP - 1))
 }
 
 /// How the mission stands, for the app's screens.
@@ -47,6 +70,9 @@ impl Campaign {
         Self {
             scripts,
             wardrobe: Wardrobe::default(),
+            orders: SoundOrders::default(),
+            voices: BTreeMap::new(),
+            silenced: false,
         }
     }
 
@@ -56,6 +82,77 @@ impl Campaign {
         std::mem::swap(self.scripts.mission_mut().sim_mut(), simulation);
         self.scripts.tick(input);
         std::mem::swap(self.scripts.mission_mut().sim_mut(), simulation);
+        let mission = self.scripts.mission_mut();
+        if mission.reverted() {
+            self.orders = SoundOrders::default();
+            self.silenced = true;
+        }
+        let orders = mission.take_sounds();
+        self.orders.started.extend(orders.started);
+        self.orders.stopped.extend(orders.stopped);
+        self.orders.gains.extend(orders.gains);
+        // (the titles and nav points are not shown yet)
+        mission.take_events();
+    }
+
+    /// Plays what the scripts did to the sounds since the last frame on
+    /// `player`: the impulses started (from their objects in
+    /// `simulation`) and stopped, the classes' gains, and the loops they
+    /// play, refreshed so they play on.
+    pub(crate) fn play_sounds(
+        &mut self,
+        player: &mut opence_audio::SoundPlayer,
+        simulation: &Simulation,
+    ) {
+        let orders = std::mem::take(&mut self.orders);
+        if std::mem::take(&mut self.silenced) {
+            for (_, voice) in std::mem::take(&mut self.voices) {
+                player.mixer().stop(voice);
+            }
+        }
+        for key in &orders.stopped {
+            if let Some(voice) = self.voices.remove(key) {
+                player.mixer().stop(voice);
+            }
+        }
+        let at = |object: Option<opence_sim::objects::ObjectHandle>| {
+            object
+                .and_then(|handle| simulation.transform(handle))
+                .map(|transform| transform.position.to_array())
+        };
+        for sound in &orders.started {
+            let Some(index) = player.sound_index(&sound.tag.path) else {
+                continue;
+            };
+            let source = opence_audio::Source {
+                position: at(sound.object),
+                scale: sound.scale,
+                ..opence_audio::Source::default()
+            };
+            if let Some(voice) = player.impulse(index, &source) {
+                let key = sound.tag.path.to_ascii_lowercase();
+                if let Some(earlier) = self.voices.insert(key, voice) {
+                    player.mixer().stop(earlier);
+                }
+            }
+        }
+        for gain in &orders.gains {
+            player
+                .classes()
+                .set(&gain.class, gain.gain, i32::from(gain.ticks));
+        }
+        let mixer = player.mixer();
+        self.voices.retain(|_, voice| mixer.is_playing(*voice));
+        for (path, looping) in self.scripts.mission().loops() {
+            if let Some(index) = player.looping_index(&looping.tag.path) {
+                let source = opence_audio::Source {
+                    position: at(looping.object),
+                    scale: looping.scale,
+                    ..opence_audio::Source::default()
+                };
+                player.refresh_looping(loop_key(path), index, &source, looping.alternate);
+            }
+        }
     }
 
     /// Evaluates console text with the mission's scripts over
@@ -225,5 +322,21 @@ impl Engine {
         let mut state = self.lock();
         state.running = Some(running);
         publish(&mut state, &self.snapshots, 0.0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_scripted_loops_key_is_its_own_and_none_an_objects_or_the_backgrounds() {
+        let music = loop_key("sound\\music\\a10\\a10_01");
+        assert_eq!(music, loop_key("sound\\music\\a10\\a10_01"));
+        assert_ne!(music, loop_key("sound\\music\\a10\\a10_02"));
+        assert_ne!(music & SCRIPTED_LOOP, 0);
+        assert_ne!(music, crate::sound_world::BACKGROUND_KEY);
+        // (an object's loops are keyed by its index and slot, far below)
+        assert!(music > u64::from(u32::MAX) << 8);
     }
 }
