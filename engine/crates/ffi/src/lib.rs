@@ -1358,6 +1358,21 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
                 running.effects.running(),
                 bsp,
             );
+            // (what the particles made starts at the next tick's effects)
+            let decals = &mut running.decals;
+            running.stepped.clear();
+            sound_events::gather_particles(
+                level,
+                running.particles.events(),
+                |point, normal| decals.surface_material(level, bsp, point, normal),
+                &mut running.heard,
+                &mut running.stepped,
+            );
+            for step in &running.stepped {
+                running
+                    .effects
+                    .start(level, &step.effect, step.point, step.normal);
+            }
         }
         // (the mouse's turn is used once)
         input.yaw = 0.0;

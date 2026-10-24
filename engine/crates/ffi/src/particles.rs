@@ -10,6 +10,8 @@ use opence_content::{
 };
 use opence_sim::effects::Running;
 use opence_sim::objects::ObjectHandle;
+use opence_sim::particle_collision::PointHit;
+use opence_sim::point_physics;
 use opence_sim::seats::default_pose;
 use opence_sim::{Simulation, Vec3};
 
@@ -21,13 +23,14 @@ use crate::snapshot::{
 
 /// A tick, in seconds.
 const TICK: f32 = 1.0 / 30.0;
-/// The game's gravity in world units a second a second (0.0035651792 a
-/// tick a tick).
-const GRAVITY: f32 = 0.003_565_179_2 * 900.0;
-/// The density of air, grams a millilitre.
-const AIR_DENSITY: f32 = 0.0011;
-/// Grams a millilitre in the game's mass a cubic world unit.
-const DENSITY_SCALE: f32 = 118_613.34;
+/// The squared speed below which a settled particle is at rest.
+const AT_REST_SPEED_SQUARED: f32 = 0.0625;
+/// The speeds at which a particle's collision effect is played at none
+/// of its scale, and at all of it.
+const COLLISION_SCALE_SPEEDS: [f32; 2] = [0.5, 1.5];
+/// The least a surface a particle meets faces up (its normal's z) for it
+/// to settle on it.
+const SETTLES_ON: f32 = 0.8;
 /// The most particles the effects keep alive.
 const MAX_LIVE: usize = 1024;
 /// The most weather particles of one kind.
@@ -134,17 +137,77 @@ fn mix(from: [f32; 4], to: [f32; 4], t: f32) -> [f32; 4] {
     [0, 1, 2, 3].map(|i| from[i] + (to[i] - from[i]) * t)
 }
 
-/// A point's velocity after `dt`, as `physics` moves it in `wind`.
+/// A point's velocity after `dt`, as `physics` moves it in `wind`,
+/// meeting nothing.
 fn pushed(physics: &PointPhysics, radius: f32, velocity: Vec3, wind: Vec3, dt: f32) -> Vec3 {
-    let radius = radius.max(1e-3);
-    let mass =
-        (physics.mass_over_radius_cubed + AIR_DENSITY * DENSITY_SCALE) * radius * radius * radius;
-    let mut velocity = velocity;
-    if physics.flags & PointPhysics::NO_GRAVITY == 0 {
-        velocity.z += GRAVITY * physics.air_buoyancy * dt;
+    let (mut at, mut velocity) = (Vec3::ZERO, velocity);
+    point_physics::update(
+        physics,
+        &mut at,
+        &mut velocity,
+        radius,
+        dt,
+        (false, wind),
+        |_, _| None,
+    );
+    velocity
+}
+
+/// An effect (or sound) a particle made: where it met the world, or where
+/// it died.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Made {
+    /// The effect or sound.
+    pub tag: TagRef,
+    /// Where.
+    pub point: Vec3,
+    /// The way it faces: the surface's normal, or the particle's way.
+    pub normal: Vec3,
+    /// How much of it the original plays, 0 to 1, by the particle's speed
+    /// (0 for a death).
+    pub scale: f32,
+}
+
+/// A particle that met the world, for its material effects' impact event
+/// on the material there.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ParticleImpact {
+    /// Its material effects.
+    pub material_effects: TagRef,
+    /// Where it met the world.
+    pub point: Vec3,
+    /// The surface's normal there.
+    pub normal: Vec3,
+    /// How much of its effect the original plays, 0 to 1.
+    pub scale: f32,
+}
+
+/// What the particles made in a tick.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct ParticleEvents {
+    /// Their collision and death effects and sounds.
+    pub made: Vec<Made>,
+    /// Their impacts, for their material effects.
+    pub impacts: Vec<ParticleImpact>,
+}
+
+impl ParticleEvents {
+    fn clear(&mut self) {
+        self.made.clear();
+        self.impacts.clear();
     }
-    let drag = (dt / mass.max(1e-6) * physics.air_friction * radius * radius).clamp(0.0, 1.0);
-    velocity + (wind - velocity) * drag
+
+    /// `particle` dying at `point`, going `way`: its death effect.
+    fn died(&mut self, particle: &Particle, point: Vec3, way: Vec3) {
+        if let Some(tag) = &particle.death_effect {
+            self.made.push(Made {
+                tag: tag.clone(),
+                point,
+                normal: way.normalize_or(Vec3::Z),
+                scale: 0.0,
+            });
+        }
+    }
 }
 
 /// The level's sprites' pictures: each bitmap's images, one after another.
@@ -278,7 +341,13 @@ struct Live {
     spin: f32,
     color: [f32; 4],
     sequence: i32,
-    fps: f32,
+    /// Seconds a frame of its animation shows (worn longer each time it
+    /// meets the world), or none if it does not animate.
+    frame_span: Option<f32>,
+    /// The frames it has shown.
+    frame: f32,
+    /// It settled and stopped: it moves no more.
+    at_rest: bool,
     /// The effect it stays with, and where that was at the last tick.
     anchor: Option<(u32, Vec3)>,
 }
@@ -314,17 +383,123 @@ impl Live {
             color: tint,
             sequence: i32::from(particle.first_sequence)
                 + random.below(i32::from(particle.initial_sequences)),
-            fps: random.between(particle.fps),
+            frame_span: (particle.fps[1] > 0.0)
+                .then(|| random.between(particle.fps))
+                .filter(|&fps| fps > 0.0)
+                .map(|fps| 1.0 / fps),
+            frame: 0.0,
+            at_rest: false,
             anchor: (emitter.flags & EffectParticles::STAY_ATTACHED != 0)
                 .then_some((effect.number, origin.position)),
         }
     }
 
+    /// Its radius now, by its particle's radius over its life.
+    fn radius_now(&self, particle: &Particle) -> f32 {
+        self.radius * particle.radius_at(self.age / self.life)
+    }
+
+    /// One tick of its physics (`particle_update_physics`), in `wind`,
+    /// meeting the world where `collide` says: false if it died (its death
+    /// effect into `events`) or is gone. What it makes meeting the world
+    /// goes into `events` too.
+    fn step(
+        &mut self,
+        particle: &Particle,
+        wind: Vec3,
+        mut collide: impl FnMut(Vec3, Vec3) -> Option<PointHit>,
+        events: &mut ParticleEvents,
+    ) -> bool {
+        if self.at_rest {
+            return true;
+        }
+        let mut settled = false;
+        let radius = self.radius_now(particle);
+        match (&particle.physics, self.anchor.is_some()) {
+            (Some(physics), true) => {
+                self.velocity = point_physics::damped(physics, radius, self.velocity, TICK);
+                self.position += self.velocity * TICK;
+                settled = true;
+            }
+            (Some(physics), false) => {
+                let moved = point_physics::update(
+                    physics,
+                    &mut self.position,
+                    &mut self.velocity,
+                    radius,
+                    TICK,
+                    (false, wind),
+                    &mut collide,
+                );
+                if let Some(hit) = moved.collision {
+                    let [none, all] = COLLISION_SCALE_SPEEDS;
+                    let scale = ((self.velocity.length() - none) / (all - none)).clamp(0.0, 1.0);
+                    if let Some(tag) = &particle.collision_effect {
+                        events.made.push(Made {
+                            tag: tag.clone(),
+                            point: self.position,
+                            normal: hit.normal,
+                            scale,
+                        });
+                    }
+                    if let Some(effects) = &particle.collision_material_effects {
+                        events.impacts.push(ParticleImpact {
+                            material_effects: effects.clone(),
+                            point: self.position,
+                            normal: hit.normal,
+                            scale,
+                        });
+                    }
+                    if particle.flags & Particle::DIES_ON_CONTACT_WITH_STRUCTURE != 0 {
+                        // (with a collision effect it is only gone)
+                        if particle.collision_effect.is_none() {
+                            events.died(particle, self.position, self.velocity);
+                        }
+                        return false;
+                    }
+                }
+                let dies = if moved.in_water {
+                    Particle::DIES_ON_CONTACT_WITH_WATER
+                } else {
+                    Particle::DIES_ON_CONTACT_WITH_AIR
+                };
+                if particle.flags & dies != 0 {
+                    events.died(particle, self.position, self.velocity);
+                    return false;
+                }
+                if let Some(hit) = moved.collision {
+                    settled = hit.normal.z > SETTLES_ON;
+                    if let Some(span) = &mut self.frame_span {
+                        *span += particle.contact_deterioration;
+                    }
+                }
+            }
+            (None, _) => self.position += self.velocity * TICK,
+        }
+        if settled && self.velocity.length_squared() < AT_REST_SPEED_SQUARED {
+            if particle.flags & Particle::DIES_AT_REST != 0 {
+                events.died(particle, self.position, self.velocity);
+                return false;
+            }
+            self.at_rest = true;
+        }
+        self.rotation += self.spin * TICK;
+        true
+    }
+
+    /// One tick of its animation, unless it stopped at rest.
+    fn animate(&mut self, particle: &Particle) {
+        if self.at_rest && particle.flags & Particle::ANIMATION_STOPS_AT_REST != 0 {
+            return;
+        }
+        if let Some(span) = self.frame_span.filter(|&span| span > 0.0) {
+            self.frame += TICK / span;
+        }
+    }
+
     fn snapshot(&self, level: &Level, pictures: &Pictures) -> Option<ParticleSnapshot> {
         let particle = level.particles.get(self.particle)?;
-        let f = (self.age / self.life).clamp(0.0, 1.0);
-        let radius =
-            self.radius * (particle.radius[0] + (particle.radius[1] - particle.radius[0]) * f);
+        let radius = self.radius_now(particle);
         let fade_in = if particle.fade_in > 0.0 {
             (self.age / particle.fade_in).min(1.0)
         } else {
@@ -339,7 +514,7 @@ impl Live {
             level,
             particle.bitmap.as_ref(),
             self.sequence,
-            (self.age * self.fps.max(0.0)) as usize,
+            self.frame as usize,
         );
         let along = self.velocity.normalize_or_zero();
         let facing = match particle.orientation {
@@ -789,6 +964,8 @@ pub(crate) struct LevelParticles {
     /// Each particle's index in the level's.
     particles: HashMap<TagRef, usize>,
     live: Vec<Live>,
+    /// What they made in the last tick.
+    events: ParticleEvents,
     /// Each running effect's event's emitters: how many they emit, and how
     /// many they have.
     emitted: HashMap<(u32, usize, usize), (u16, u16)>,
@@ -817,8 +994,9 @@ impl LevelParticles {
     }
 
     /// One tick, after the effects': the running effects emit, the
-    /// particles move, the weather about the camera on BSP `bsp` drifts,
-    /// and the objects trail their contrails.
+    /// particles move, meeting the world of `simulation`, the weather about
+    /// the camera on BSP `bsp` drifts, and the objects trail their
+    /// contrails. What the particles made is in [`LevelParticles::events`].
     pub(crate) fn tick(
         &mut self,
         level: &Level,
@@ -833,10 +1011,12 @@ impl LevelParticles {
             .map(|effect| (effect.number, effect.origin.position))
             .collect();
         let wind = self.weather.wind;
-        for live in &mut self.live {
+        let events = &mut self.events;
+        events.clear();
+        let world: &Simulation = simulation;
+        self.live.retain_mut(|live| {
             let Some(particle) = level.particles.get(live.particle) else {
-                live.age = live.life;
-                continue;
+                return false;
             };
             if let Some((number, at)) = &mut live.anchor {
                 if let Some(&now) = origins.get(number) {
@@ -844,19 +1024,32 @@ impl LevelParticles {
                     *at = now;
                 }
             }
-            if let Some(physics) = &particle.physics {
-                live.velocity = pushed(physics, live.radius, live.velocity, wind, TICK);
-            }
-            live.position += live.velocity * TICK;
-            live.rotation += live.spin * TICK;
             live.age += TICK;
-        }
-        self.live.retain(|live| live.age < live.life);
+            if !live.step(
+                particle,
+                wind,
+                |from, motion| world.collide_point(from, motion),
+                events,
+            ) {
+                return false;
+            }
+            live.animate(particle);
+            if live.age >= live.life {
+                events.died(particle, live.position, live.velocity);
+                return false;
+            }
+            true
+        });
         if let Some(structure) = level.structure_bsps.get(bsp) {
             self.weather
                 .tick(level, structure, self.camera, &mut self.random);
         }
         self.contrails.tick(level, simulation, &mut self.random);
+    }
+
+    /// What the particles made in the last tick.
+    pub(crate) fn events(&self) -> &ParticleEvents {
+        &self.events
     }
 
     fn emit(&mut self, level: &Level, running: &[Running]) {
@@ -1051,6 +1244,174 @@ mod tests {
             fired: true,
             age: clock,
         }
+    }
+
+    /// A heavy, unbouncing pebble that meets the world.
+    fn pebble(flags: u32) -> Particle {
+        Particle {
+            flags,
+            radius: [1.0, 1.0],
+            physics: Some(PointPhysics {
+                flags: PointPhysics::STRUCTURE_COLLISIONS,
+                mass_over_radius_cubed: 1.0,
+                air_buoyancy: -1.0,
+                density: 1.0,
+                contact_friction: 1.0,
+                ..PointPhysics::default()
+            }),
+            death_effect: Some(tag(b"effe", "dust")),
+            contact_deterioration: 0.5,
+            ..Particle::new(tag(b"part", "pebble"))
+        }
+    }
+
+    /// A particle at `height` going `velocity`, with frames of 0.1s.
+    fn live(height: f32, velocity: Vec3) -> Live {
+        Live {
+            particle: 0,
+            position: Vec3::new(0.0, 0.0, height),
+            velocity,
+            age: 0.0,
+            life: 10.0,
+            radius: 0.01,
+            rotation: 0.0,
+            spin: 1.0,
+            color: [1.0; 4],
+            sequence: 0,
+            frame_span: Some(0.1),
+            frame: 0.0,
+            at_rest: false,
+            anchor: None,
+        }
+    }
+
+    /// The ground at z = 0, facing up.
+    fn floor(from: Vec3, motion: Vec3) -> Option<PointHit> {
+        let to = from + motion;
+        (from.z >= 0.0 && to.z < 0.0).then(|| {
+            let fraction = from.z / (from.z - to.z);
+            PointHit {
+                point: from + motion * fraction,
+                normal: Vec3::Z,
+                fraction,
+            }
+        })
+    }
+
+    #[test]
+    fn a_particle_meets_the_ground_settles_and_rests() {
+        let stops = pebble(Particle::ANIMATION_STOPS_AT_REST);
+        let mut one = live(0.01, Vec3::new(0.0, 0.0, -1.0));
+        let mut events = ParticleEvents::default();
+        assert!(one.step(&stops, Vec3::ZERO, floor, &mut events));
+        // (its frames wear longer for meeting the ground; it slid to a stop)
+        assert_eq!(one.frame_span, Some(0.6));
+        assert!(one.at_rest, "{:?}", one.velocity);
+        assert!(one.position.z >= 0.0, "{}", one.position);
+        assert!(events.made.is_empty() && events.impacts.is_empty());
+        // at rest it moves, turns and animates no more
+        let still = one.clone();
+        one.animate(&stops);
+        assert!(one.step(&stops, Vec3::ONE, floor, &mut events));
+        assert_eq!(one, still);
+        // unless its animation goes on at rest
+        one.animate(&pebble(0));
+        assert!(one.frame > 0.0);
+        // in the air, far from the ground, it falls and turns
+        let mut falling = live(10.0, Vec3::ZERO);
+        assert!(falling.step(&stops, Vec3::ZERO, floor, &mut events));
+        assert!(falling.velocity.z < 0.0 && !falling.at_rest);
+        assert_eq!(falling.rotation, TICK);
+        assert_eq!(falling.frame_span, Some(0.1));
+    }
+
+    #[test]
+    fn a_particle_dies_at_rest_or_on_contact_by_its_flags() {
+        let down = Vec3::new(0.0, 0.0, -1.0);
+        let mut events = ParticleEvents::default();
+        let mut one = live(0.01, down);
+        assert!(!one.step(
+            &pebble(Particle::DIES_AT_REST),
+            Vec3::ZERO,
+            floor,
+            &mut events
+        ));
+        let made: Vec<&str> = events
+            .made
+            .iter()
+            .map(|one| one.tag.path.as_str())
+            .collect();
+        assert_eq!(made, ["dust"]);
+        assert_eq!(events.made.first().map(|one| one.scale), Some(0.0));
+
+        // meeting the world, with no collision effect it dies
+        events.clear();
+        let mut one = live(0.01, down * 2.0);
+        let dies = pebble(Particle::DIES_ON_CONTACT_WITH_STRUCTURE);
+        assert!(!one.step(&dies, Vec3::ZERO, floor, &mut events));
+        assert_eq!(events.made.len(), 1);
+        // and with one it plays that, scaled by its speed, and is only gone
+        events.clear();
+        let mut one = live(0.01, down * 2.0);
+        let chipped = Particle {
+            collision_effect: Some(tag(b"snd!", "tink")),
+            collision_material_effects: Some(tag(b"foot", "pebble")),
+            ..dies
+        };
+        assert!(!one.step(&chipped, Vec3::ZERO, floor, &mut events));
+        let made: Vec<(&str, f32)> = events
+            .made
+            .iter()
+            .map(|one| (one.tag.path.as_str(), one.scale))
+            .collect();
+        assert_eq!(made, [("tink", 0.0)]);
+        assert_eq!(events.impacts.len(), 1);
+        assert_eq!(events.impacts.first().map(|one| one.normal), Some(Vec3::Z));
+
+        // one that dies in air dies on its first tick
+        events.clear();
+        let mut one = live(10.0, Vec3::ZERO);
+        assert!(!one.step(
+            &pebble(Particle::DIES_ON_CONTACT_WITH_AIR),
+            Vec3::ZERO,
+            floor,
+            &mut events
+        ));
+        assert_eq!(events.made.len(), 1);
+    }
+
+    #[test]
+    fn an_attached_particle_is_slowed_by_its_air_and_one_without_physics_coasts() {
+        let mut events = ParticleEvents::default();
+        let draggy = Particle {
+            physics: Some(PointPhysics {
+                mass_over_radius_cubed: 1.0,
+                air_friction: 1.0,
+                ..PointPhysics::default()
+            }),
+            ..pebble(Particle::DIES_AT_REST)
+        };
+        let mut one = Live {
+            anchor: Some((1, Vec3::ZERO)),
+            radius: 1.0,
+            ..live(5.0, Vec3::X)
+        };
+        assert!(one.step(&draggy, Vec3::ZERO, floor, &mut events));
+        assert!(
+            one.velocity.x < 1.0 && one.velocity.x > 0.0,
+            "{}",
+            one.velocity
+        );
+        assert_eq!(one.velocity.z, 0.0);
+        // (settled, but too fast to rest)
+        assert!(!one.at_rest && events.made.is_empty());
+        let mut coasting = live(5.0, Vec3::X);
+        let ghost = Particle {
+            physics: None,
+            ..pebble(0)
+        };
+        assert!(coasting.step(&ghost, Vec3::ZERO, floor, &mut events));
+        assert_eq!(coasting.position, Vec3::new(TICK, 0.0, 5.0));
     }
 
     #[test]

@@ -10,6 +10,8 @@ use opence_sim::effects::FiredPart;
 use opence_sim::item_physics::{Impact, ItemImpact};
 use opence_sim::Vec3;
 
+use crate::particles::ParticleEvents;
+
 /// How far from the camera, in world units, a footstep is looked for: the
 /// ground under a foot further off is not cast for.
 pub(crate) const FOOTSTEP_REACH: f32 = 10.0;
@@ -134,6 +136,59 @@ pub(crate) fn gather_items(
             heard.push(Heard {
                 tag: sound.clone(),
                 position: impact.sound_position,
+            });
+        }
+    }
+}
+
+/// Gathers what the particles made in a tick: their collision and death
+/// sounds into `heard` and effects into `stepped`, and their material
+/// effects' impact event on the material `material` finds at each impact
+/// (by its point and normal).
+pub(crate) fn gather_particles(
+    level: &Level,
+    events: &ParticleEvents,
+    mut material: impl FnMut(Vec3, Vec3) -> i16,
+    heard: &mut Vec<Heard>,
+    stepped: &mut Vec<Stepped>,
+) {
+    for made in &events.made {
+        if made.tag.group.0 == *b"snd!" {
+            heard.push(Heard {
+                tag: made.tag.clone(),
+                position: made.point,
+            });
+        } else {
+            stepped.push(Stepped {
+                effect: made.tag.clone(),
+                point: made.point,
+                normal: made.normal,
+            });
+        }
+    }
+    for impact in &events.impacts {
+        let Some(made) = level
+            .material_effects(&impact.material_effects)
+            .and_then(|effects| {
+                effects.of(
+                    MaterialEffects::IMPACT,
+                    material(impact.point, impact.normal),
+                )
+            })
+        else {
+            continue;
+        };
+        if let Some(sound) = &made.sound {
+            heard.push(Heard {
+                tag: sound.clone(),
+                position: impact.point,
+            });
+        }
+        if let Some(effect) = &made.effect {
+            stepped.push(Stepped {
+                effect: effect.clone(),
+                point: impact.point,
+                normal: impact.normal,
             });
         }
     }
@@ -400,5 +455,56 @@ mod tests {
         );
         assert_eq!(heard.len(), 1);
         assert!(stepped.is_empty());
+    }
+
+    #[test]
+    fn a_particles_sounds_are_heard_its_effects_started_and_its_impacts_seen() {
+        use crate::particles::{Made, ParticleImpact};
+        let mut level = level();
+        let mut impact = vec![MaterialEffect::default(); 3];
+        impact[2] = MaterialEffect {
+            effect: Some(tag(b"effe", "chips")),
+            sound: Some(tag(b"snd!", "tick")),
+        };
+        let mut events = vec![Vec::new(); MaterialEffects::IMPACT + 1];
+        events[MaterialEffects::IMPACT] = impact;
+        level.material_effects.push(MaterialEffects {
+            tag: tag(b"foot", "shell"),
+            events,
+        });
+        let at = Vec3::new(1.0, 0.0, 0.0);
+        let made = |group: &[u8; 4], path: &str| Made {
+            tag: tag(group, path),
+            point: at,
+            normal: Vec3::Z,
+            scale: 1.0,
+        };
+        let impact = |effects: &str| ParticleImpact {
+            material_effects: tag(b"foot", effects),
+            point: at,
+            normal: Vec3::Z,
+            scale: 1.0,
+        };
+        let particles = ParticleEvents {
+            made: vec![made(b"snd!", "ping"), made(b"effe", "puff")],
+            impacts: vec![impact("shell"), impact("missing")],
+        };
+        let (mut heard, mut stepped) = (Vec::new(), Vec::new());
+        let mut asked = Vec::new();
+        gather_particles(
+            &level,
+            &particles,
+            |point, normal| {
+                asked.push((point, normal));
+                2
+            },
+            &mut heard,
+            &mut stepped,
+        );
+        assert_eq!(asked, [(at, Vec3::Z)]);
+        let heard: Vec<&str> = heard.iter().map(|one| one.tag.path.as_str()).collect();
+        assert_eq!(heard, ["ping", "tick"]);
+        let stepped: Vec<&str> = stepped.iter().map(|one| one.effect.path.as_str()).collect();
+        assert_eq!(stepped, ["puff", "chips"]);
     }
 }

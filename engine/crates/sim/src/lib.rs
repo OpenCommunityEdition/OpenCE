@@ -32,6 +32,7 @@ pub mod particle_collision;
 pub mod periodic;
 pub mod platforms;
 pub mod player;
+pub mod point_physics;
 pub mod projectile;
 pub mod ragdoll;
 pub mod random;
