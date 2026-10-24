@@ -3,9 +3,12 @@
 //! down by their share of gravity, and stopped by the first thing a tick's
 //! path crosses (`projectiles.c`'s flight, without its guidance or water).
 //!
-//! A thrown grenade has a fuse: it arms, bounces off what it strikes by its
-//! material response, sticks to what it may stick to, counts down once it
-//! stops or sticks, and detonates.
+//! A thrown grenade has a fuse: it arms, bounces off what it strikes by the
+//! response to that material (with the response's noise), passes through
+//! what it overpenetrates, sticks to what it may stick to, counts down once
+//! it stops or sticks, and detonates. It moves a game tick, of 30 a second,
+//! every other tick, as the game's projectiles do, so that its friction at
+//! each touch of the ground is the game's.
 
 use glam::{Quat, Vec3};
 use opence_content::{MaterialResponse, Projectile, TagRef, Trigger};
@@ -15,7 +18,11 @@ use crate::clock;
 use crate::hash::WorldHasher;
 use crate::objects::ObjectHandle;
 use crate::random::RandomSeed;
+use crate::vehicle::GAME_TICKS_PER_SECOND;
 use crate::Transform;
+
+/// The engine's ticks to a game tick.
+const TICKS_PER_GAME_TICK: u32 = clock::TICKS_PER_SECOND / GAME_TICKS_PER_SECOND;
 
 /// The longest a projectile flies, in ticks, when its range does not stop
 /// it first (half a minute: past any level's edge).
@@ -46,6 +53,9 @@ pub struct Contact {
     pub object: Option<ObjectHandle>,
     /// That object's transform, to stick to it.
     pub frame: Option<Transform>,
+    /// The material type of what was struck (-1: none), which chooses the
+    /// projectile's response.
+    pub material: i16,
 }
 
 /// Where a stuck projectile is held.
@@ -88,8 +98,10 @@ pub struct Fuse {
     longest_if_attached: bool,
     /// Its least speed.
     minimum_velocity: f32,
-    /// Its response to what it strikes.
-    response: MaterialResponse,
+    /// Its responses to what it strikes, by the material struck.
+    responses: Vec<MaterialResponse>,
+    /// The object it passed into, which it no longer strikes.
+    ignore: Option<ObjectHandle>,
     /// The draws for its potential responses.
     seed: RandomSeed,
     /// The effect where it detonates.
@@ -136,9 +148,10 @@ impl Fuse {
     }
 }
 
-/// The ticks' delta that runs a timer of `seconds` (none for no time).
+/// The game ticks' delta that runs a timer of `seconds` (none for no
+/// time).
 fn delta(seconds: f32) -> f32 {
-    let ticks = seconds * clock::TICKS_PER_SECOND as f32;
+    let ticks = seconds * GAME_TICKS_PER_SECOND as f32;
     if ticks >= 1.0 {
         1.0 / ticks
     } else {
@@ -301,11 +314,8 @@ impl Flight {
                 timer_upper: upper,
                 longest_if_attached,
                 minimum_velocity: definition.minimum_velocity,
-                response: definition
-                    .material_responses
-                    .first()
-                    .cloned()
-                    .unwrap_or_default(),
+                responses: definition.material_responses.clone(),
+                ignore: None,
                 seed: draws,
                 effect: definition.effect.clone(),
                 attached_damage: definition.attached_detonation_damage.clone(),
@@ -351,8 +361,11 @@ impl Flight {
     }
 
     /// One tick of flight; `cast` finds the first thing along a path (from
-    /// a point, the path's whole length).
-    pub fn step(&mut self, mut cast: impl FnMut(Vec3, Vec3) -> Option<Contact>) -> Flew {
+    /// a point, the path's whole length) but the object it is given.
+    pub fn step(
+        &mut self,
+        mut cast: impl FnMut(Vec3, Vec3, Option<ObjectHandle>) -> Option<Contact>,
+    ) -> Flew {
         if self.fuse.is_some() {
             return self.step_fused(cast);
         }
@@ -375,7 +388,7 @@ impl Flight {
         }
         self.age += 1;
         if path.length_squared() > 0.0 {
-            if let Some(Contact { hit, object, .. }) = cast(self.position, path) {
+            if let Some(Contact { hit, object, .. }) = cast(self.position, path, None) {
                 return Flew::Hit(Impact {
                     projectile: self.tag.clone(),
                     owner: self.owner,
@@ -397,11 +410,22 @@ impl Flight {
         }
     }
 
-    /// A tick of a fused projectile: its arming and timer run, and it
-    /// moves, bouncing, until it stops, sticks or detonates.
-    fn step_fused(&mut self, mut cast: impl FnMut(Vec3, Vec3) -> Option<Contact>) -> Flew {
-        let dt = clock::TICK.0;
+    /// A tick of a fused projectile: on each game tick its arming and
+    /// timer run, and it moves, bouncing, until it stops, sticks or
+    /// detonates.
+    fn step_fused(
+        &mut self,
+        mut cast: impl FnMut(Vec3, Vec3, Option<ObjectHandle>) -> Option<Contact>,
+    ) -> Flew {
+        let dt = clock::TICK.0 * TICKS_PER_GAME_TICK as f32;
         self.age += 1;
+        if !(self.age - 1).is_multiple_of(TICKS_PER_GAME_TICK) {
+            return if self.age >= MAXIMUM_FLIGHT_TICKS {
+                Flew::Spent
+            } else {
+                Flew::On
+            };
+        }
         let Some(mut fuse) = self.fuse.take() else {
             return Flew::Spent;
         };
@@ -432,7 +456,7 @@ impl Flight {
             if path.length_squared() == 0.0 {
                 break;
             }
-            let Some(contact) = cast(self.position, path) else {
+            let Some(contact) = cast(self.position, path, fuse.ignore) else {
                 self.position += path;
                 self.travelled += path.length();
                 break;
@@ -476,10 +500,16 @@ impl Flight {
         }
     }
 
-    /// What it does on striking `contact` (`projectile_collision`): its
-    /// material's potential response if its bounds hold, else its default.
+    /// What it does on striking `contact` (`projectile_collision`): the
+    /// response to the material struck (none, past its responses, is the
+    /// default's, which disappears), its potential response if its bounds
+    /// hold, else its default, and then its noise.
     fn collide(&mut self, fuse: &mut Fuse, contact: &Contact) -> Collided {
-        let response = fuse.response.clone();
+        let response = usize::try_from(contact.material)
+            .ok()
+            .and_then(|material| fuse.responses.get(material))
+            .cloned()
+            .unwrap_or_default();
         let normal = contact.hit.normal;
         let speed = self.velocity.length();
         let along = self.velocity.dot(normal);
@@ -488,11 +518,20 @@ impl Flight {
         } else {
             0.0
         };
+        // (the noise makes it strike slower, and at another angle)
+        let mut impact_velocity = -along;
+        if response.velocity_noise != 0.0 {
+            impact_velocity -= response.velocity_noise * fuse.seed.next_real();
+        }
+        let mut impact_angle = angle;
+        if response.angular_noise != 0.0 {
+            impact_angle += response.angular_noise * (2.0 * fuse.seed.next_real() - 1.0);
+        }
         let within =
             |[lower, upper]: [f32; 2], value: f32| upper == 0.0 || (lower..=upper).contains(&value);
         let potential = response.potential_response != 0
-            && within(response.potential_angle, angle)
-            && within(response.potential_velocity, -along)
+            && within(response.potential_angle, impact_angle)
+            && within(response.potential_velocity, impact_velocity)
             && (response.potential_flags & MaterialResponse::ONLY_AGAINST_UNITS == 0
                 || contact.object.is_some())
             && fuse.seed.next_real() >= response.potential_skip_fraction;
@@ -502,21 +541,36 @@ impl Flight {
             response.default_response
         };
         if kind == MaterialResponse::OVERPENETRATE {
-            kind = if fuse.timer_upper != 0.0 {
+            if let Some(object) = contact.object {
+                // (it passes into the object, slowed, and no longer strikes
+                // it)
+                self.velocity *= 1.0 - response.initial_friction;
+                fuse.ignore = Some(object);
+            } else if fuse.timer_upper != 0.0 {
                 fuse.collided_once = true;
                 fuse.stopped = true;
-                MaterialResponse::ATTACH
+                kind = MaterialResponse::ATTACH;
             } else {
-                MaterialResponse::DETONATE
-            };
+                kind = MaterialResponse::DETONATE;
+            }
         }
         if kind == MaterialResponse::REFLECT {
             let across = normal * along;
             let surface = self.velocity - across;
             self.velocity = surface * (1.0 - response.perpendicular_friction)
                 - across * (1.0 - response.parallel_friction);
-        } else {
+        } else if kind != MaterialResponse::OVERPENETRATE {
             self.velocity = Vec3::ZERO;
+        }
+        if response.angular_noise != 0.0 {
+            self.velocity = in_cone(self.velocity, response.angular_noise, &mut fuse.seed);
+        }
+        if response.velocity_noise != 0.0 {
+            let magnitude = self.velocity.length();
+            if magnitude != 0.0 {
+                let noise = response.velocity_noise * (2.0 * fuse.seed.next_real() - 1.0);
+                self.velocity *= (magnitude + noise) / magnitude;
+            }
         }
         let minimum = fuse.minimum_velocity;
         if kind != MaterialResponse::ATTACH && self.velocity.length_squared() < minimum * minimum {
@@ -588,6 +642,19 @@ impl Flight {
             fuse.hash(hasher);
         }
     }
+}
+
+/// `velocity` turned a random angle of up to `cone` about itself.
+fn in_cone(velocity: Vec3, cone: f32, seed: &mut RandomSeed) -> Vec3 {
+    let length = velocity.length();
+    if length == 0.0 {
+        return velocity;
+    }
+    let theta = cone * seed.next_real();
+    let phi = std::f32::consts::TAU * seed.next_real();
+    let (sin, cos) = (libm::sinf(theta), libm::cosf(theta));
+    let local = Vec3::new(cos, sin * libm::cosf(phi), sin * libm::sinf(phi));
+    Quat::from_rotation_arc(Vec3::X, velocity / length) * local * length
 }
 
 /// What striking something came to.
@@ -682,7 +749,7 @@ mod tests {
     #[test]
     fn it_flies_its_range_and_slows() {
         let mut flight = flight(&bullet());
-        let first = flight.step(|_, _| None);
+        let first = flight.step(|_, _, _| None);
         assert_eq!(first, Flew::On);
         assert!(
             (flight.position.x - 5.0).abs() < 0.01,
@@ -690,7 +757,7 @@ mod tests {
             flight.position
         );
         let mut ticks = 1;
-        while flight.step(|_, _| None) == Flew::On {
+        while flight.step(|_, _, _| None) == Flew::On {
             ticks += 1;
             assert!(ticks < 100, "it flew on");
         }
@@ -705,7 +772,7 @@ mod tests {
     #[test]
     fn it_stops_where_it_hits() {
         let mut flight = flight(&bullet());
-        let wall = |from: Vec3, path: Vec3| {
+        let wall = |from: Vec3, path: Vec3, _: Option<ObjectHandle>| {
             let to = from + path;
             (to.x >= 12.0).then(|| Contact {
                 hit: Hit {
@@ -716,6 +783,7 @@ mod tests {
                 },
                 object: None,
                 frame: None,
+                material: 0,
             })
         };
         let mut flew = Flew::On;
@@ -743,7 +811,7 @@ mod tests {
             ..bullet()
         };
         let mut flight = flight(&definition);
-        let ticks = (1..).find(|_| flight.step(|_, _| None) != Flew::On);
+        let ticks = (1..).find(|_| flight.step(|_, _, _| None) != Flew::On);
         assert_eq!(ticks, Some(MAXIMUM_FLIGHT_TICKS));
         // (no slowing without a range)
         assert!((flight.velocity.length() - 300.0).abs() < 1e-3);
@@ -816,7 +884,7 @@ mod tests {
     }
 
     /// The ground at z = 0.
-    fn ground(from: Vec3, path: Vec3) -> Option<Contact> {
+    fn ground(from: Vec3, path: Vec3, _: Option<ObjectHandle>) -> Option<Contact> {
         let to = from + path;
         (to.z < 0.0 && path.z < 0.0).then(|| {
             let fraction = (from.z / -path.z).clamp(0.0, 1.0);
@@ -829,6 +897,7 @@ mod tests {
                 },
                 object: None,
                 frame: None,
+                material: 0,
             }
         })
     }
@@ -901,7 +970,7 @@ mod tests {
             scale: 1.0,
         };
         // (a unit's wall at x = 3)
-        let unit = |from: Vec3, path: Vec3| {
+        let unit = |from: Vec3, path: Vec3, _: Option<ObjectHandle>| {
             let to = from + path;
             (to.x >= 3.0 && from.x < 3.0).then(|| {
                 let fraction = (3.0 - from.x) / path.x;
@@ -914,6 +983,7 @@ mod tests {
                     },
                     object: Some(handle(7)),
                     frame: Some(frame),
+                    material: 0,
                 }
             })
         };
@@ -965,5 +1035,145 @@ mod tests {
             tick.is_some_and(|tick| (armed - 1..=armed + 1).contains(&tick)),
             "{tick:?}"
         );
+    }
+
+    /// The ground at z = 0, of `material`.
+    fn ground_of(material: i16) -> impl FnMut(Vec3, Vec3, Option<ObjectHandle>) -> Option<Contact> {
+        move |from, path, ignore| {
+            ground(from, path, ignore).map(|contact| Contact {
+                material,
+                ..contact
+            })
+        }
+    }
+
+    #[test]
+    fn a_material_past_its_responses_makes_it_disappear() {
+        for material in [-1, 1, 7] {
+            let mut flight = throw(&grenade(0, bouncing()), Vec3::new(2.0, 0.0, -4.0));
+            let mut cast = ground_of(material);
+            let flew = (0..60)
+                .map(|_| flight.step(&mut cast))
+                .find(|flew| *flew != Flew::On);
+            assert_eq!(flew, Some(Flew::Spent), "{material}");
+        }
+    }
+
+    #[test]
+    fn each_material_has_its_own_response() {
+        let mut definition = grenade(0, bouncing());
+        definition.arming_time = 0.0;
+        definition.material_responses.push(MaterialResponse {
+            default_response: MaterialResponse::DETONATE,
+            ..MaterialResponse::default()
+        });
+        let mut flight = throw(&definition, Vec3::new(2.0, 0.0, -4.0));
+        let mut cast = ground_of(1);
+        let flew = (0..60)
+            .map(|_| flight.step(&mut cast))
+            .find(|flew| *flew != Flew::On);
+        assert!(matches!(flew, Some(Flew::Detonated(_))), "{flew:?}");
+        // (the first material bounces it)
+        let mut flight = throw(&definition, Vec3::new(2.0, 0.0, -4.0));
+        let mut cast = ground_of(0);
+        let mut bounced = false;
+        for _ in 0..30 {
+            let before = flight.velocity.z;
+            assert_eq!(flight.step(&mut cast), Flew::On);
+            bounced |= before < 0.0 && flight.velocity.z > 0.0;
+        }
+        assert!(bounced);
+    }
+
+    #[test]
+    fn a_cone_keeps_the_speed_and_stays_within_its_angle() {
+        let mut seed = RandomSeed::default();
+        let velocity = Vec3::new(3.0, -1.0, 2.0);
+        let mut turned = false;
+        for _ in 0..200 {
+            let noisy = in_cone(velocity, 0.2, &mut seed);
+            assert!((noisy.length() - velocity.length()).abs() < 1e-4, "{noisy}");
+            assert!(noisy.angle_between(velocity) <= 0.2 + 1e-4, "{noisy}");
+            turned |= noisy.angle_between(velocity) > 0.01;
+        }
+        assert!(turned, "it never turned");
+        assert_eq!(in_cone(Vec3::ZERO, 0.2, &mut seed), Vec3::ZERO);
+    }
+
+    #[test]
+    fn its_noise_is_the_same_each_time_and_changes_its_bounces() {
+        let noisy = MaterialResponse {
+            angular_noise: 0.3,
+            velocity_noise: 0.5,
+            ..bouncing()
+        };
+        let trace = |response: MaterialResponse| {
+            let mut flight = throw(&grenade(0, response), Vec3::new(6.0, 1.0, 2.0));
+            (0..120)
+                .map(|_| {
+                    flight.step(ground);
+                    flight.position
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(trace(noisy.clone()), trace(noisy.clone()));
+        assert_ne!(trace(noisy), trace(bouncing()));
+    }
+
+    #[test]
+    fn it_passes_through_an_object_it_overpenetrates_slowed() {
+        let through = MaterialResponse {
+            default_response: MaterialResponse::OVERPENETRATE,
+            initial_friction: 0.5,
+            ..MaterialResponse::default()
+        };
+        // (a unit's wall at x = 3, which no longer stops what passed into
+        // it)
+        let mut struck = 0;
+        let mut unit = |from: Vec3, path: Vec3, ignore: Option<ObjectHandle>| {
+            let to = from + path;
+            (ignore != Some(handle(7)) && to.x >= 3.0 && from.x < 3.0).then(|| {
+                struck += 1;
+                let fraction = (3.0 - from.x) / path.x;
+                Contact {
+                    hit: Hit {
+                        fraction,
+                        point: from + path * fraction,
+                        normal: -Vec3::X,
+                        struck: Struck::Other,
+                    },
+                    object: Some(handle(7)),
+                    frame: None,
+                    material: 0,
+                }
+            })
+        };
+        let mut flight = throw(&grenade(0, through), Vec3::new(10.0, 0.0, 0.0));
+        for _ in 0..40 {
+            assert_eq!(flight.step(&mut unit), Flew::On);
+        }
+        assert_eq!(struck, 1);
+        assert!(flight.position.x > 4.0, "{}", flight.position);
+        assert!(
+            (flight.velocity.x - 5.0).abs() < 1e-3,
+            "{}",
+            flight.velocity
+        );
+    }
+
+    #[test]
+    fn it_moves_on_the_game_ticks_only() {
+        let mut flight = throw(&grenade(0, bouncing()), Vec3::new(6.0, 0.0, 2.0));
+        let mut positions = vec![flight.position];
+        for _ in 0..6 {
+            assert_eq!(flight.step(ground), Flew::On);
+            positions.push(flight.position);
+        }
+        // (it moves on the first of each pair of ticks, for both)
+        for pair in positions[1..].chunks(2) {
+            assert_eq!(pair[0], pair[1]);
+        }
+        assert_ne!(positions[0], positions[1]);
+        assert_ne!(positions[2], positions[3]);
     }
 }

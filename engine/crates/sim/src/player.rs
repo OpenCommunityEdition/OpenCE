@@ -836,12 +836,29 @@ impl Player {
             .iter()
             .map(|target| frame(world, target.handle))
             .collect();
+        let surfaces = world
+            .get_resource::<crate::seats::LevelSurfaces>()
+            .cloned()
+            .unwrap_or_default();
         let mut poses = Vec::with_capacity(self.flights.len());
         self.flights.retain_mut(|flight| {
-            // (the nearer of the level and the bipeds)
-            let flew = flight.step(|from, path| {
+            // (the nearer of the level and the bipeds, but one it has passed
+            // into)
+            let flew = flight.step(|from, path, ignore| {
                 let level = physics.cast_ray(from, path, Layers::LEVEL).ok().flatten();
-                match damage::first_target(&targets, from, path) {
+                let unpassed: Vec<damage::Target>;
+                let candidates = match ignore {
+                    Some(ignored) => {
+                        unpassed = targets
+                            .iter()
+                            .filter(|target| target.handle != ignored)
+                            .copied()
+                            .collect();
+                        &unpassed
+                    }
+                    None => &targets,
+                };
+                match damage::first_target(candidates, from, path) {
                     Some((target, fraction, normal))
                         if level.as_ref().is_none_or(|hit| fraction < hit.fraction) =>
                     {
@@ -857,9 +874,11 @@ impl Player {
                                 .iter()
                                 .position(|other| other.handle == target.handle)
                                 .and_then(|index| frames.get(index).copied().flatten()),
+                            material: target.material,
                         })
                     }
                     _ => level.map(|hit| Contact {
+                        material: surfaces.at(hit.point),
                         hit,
                         object: None,
                         frame: None,

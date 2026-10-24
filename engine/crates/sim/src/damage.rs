@@ -697,6 +697,9 @@ pub struct Target {
     pub top: Vec3,
     /// Its pill's radius.
     pub radius: f32,
+    /// The material type of its body (-1: none): what projectiles that
+    /// strike it respond to.
+    pub material: i16,
 }
 
 impl Target {
@@ -707,6 +710,17 @@ impl Target {
     }
 }
 
+/// The material type of `model`'s body: its root node's, else the one
+/// indirect damage hits (-1: none).
+fn body_material(model: &CollisionModel) -> i16 {
+    model
+        .node_material(0)
+        .filter(|&material| usize::from(material) < model.materials.len())
+        .or(model.indirect_damage_material)
+        .and_then(|material| model.materials.get(usize::from(material)))
+        .map_or(-1, |material| material.material_type)
+}
+
 /// The objects of the table with pills or spheres, but `except`, in the
 /// order of their handles: a vehicle's sphere is a pill of no height about
 /// its bounding centre.
@@ -714,7 +728,7 @@ pub fn targets(world: &mut World, except: ObjectHandle) -> Vec<Target> {
     let Some(table) = world.get_resource::<DamageTable>() else {
         return Vec::new();
     };
-    let shapes: BTreeMap<TagRef, Shape> = table
+    let shapes: BTreeMap<TagRef, (Shape, i16)> = table
         .objects
         .iter()
         .filter_map(|(tag, damageable)| {
@@ -723,7 +737,7 @@ pub fn targets(world: &mut World, except: ObjectHandle) -> Vec<Target> {
                 (None, Some(radius)) => Shape::Sphere(radius, damageable.centre),
                 (None, None) => return None,
             };
-            Some((tag.clone(), shape))
+            Some((tag.clone(), (shape, body_material(&damageable.model))))
         })
         .collect();
     let mut targets: Vec<Target> = world
@@ -731,7 +745,8 @@ pub fn targets(world: &mut World, except: ObjectHandle) -> Vec<Target> {
         .iter(world)
         .filter(|(handle, ..)| **handle != except)
         .filter_map(|(handle, object, transform)| {
-            let target = match *shapes.get(&object.tag)? {
+            let (shape, material) = *shapes.get(&object.tag)?;
+            let target = match shape {
                 Shape::Pill((radius, height)) => {
                     let radius = radius * transform.scale;
                     let height = (height * transform.scale).max(2.0 * radius);
@@ -740,6 +755,7 @@ pub fn targets(world: &mut World, except: ObjectHandle) -> Vec<Target> {
                         bottom: transform.position + Vec3::Z * radius,
                         top: transform.position + Vec3::Z * (height - radius),
                         radius,
+                        material,
                     }
                 }
                 Shape::Sphere(radius, centre) => {
@@ -750,6 +766,7 @@ pub fn targets(world: &mut World, except: ObjectHandle) -> Vec<Target> {
                         bottom: centre,
                         top: centre,
                         radius: radius * transform.scale,
+                        material,
                     }
                 }
             };

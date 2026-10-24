@@ -497,6 +497,7 @@ impl Simulation {
             player.physics().set_level(&mesh)?;
         }
         self.rides.set_bsp(level, bsp);
+        self.world.insert_resource(self.rides.surfaces());
         Ok(())
     }
 
@@ -532,6 +533,7 @@ impl Simulation {
             .and_then(|start| start.structure_bsp)
             .unwrap_or(0);
         self.rides.set_bsp(level, usize::from(bsp));
+        self.world.insert_resource(self.rides.surfaces());
         self.players.push(player);
         self.sensor = hud::MotionSensor::default();
         self.sensor_settings = level

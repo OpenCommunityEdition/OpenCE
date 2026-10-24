@@ -13,6 +13,8 @@ use opence_content::{
     AnimationNode, BspWater, Level, MaterialPhysics, Model, ObjectKind, Physics, TagRef, Vehicle,
     VehicleAnimations, VehicleSeat, Weapon,
 };
+use std::sync::Arc;
+
 use opence_physics::{Layers, LevelMesh, SurfaceMaterials};
 
 use crate::animation::{
@@ -96,6 +98,18 @@ pub struct Ride {
     pub suspension: [u8; SUSPENSIONS],
 }
 
+/// What the current structure BSP's surfaces are made of, for what
+/// strikes them (projectiles' responses).
+#[derive(Resource, Clone, Debug, Default)]
+pub struct LevelSurfaces(pub Option<Arc<SurfaceMaterials>>);
+
+impl LevelSurfaces {
+    /// The material type of the surface at `point` (-1: none).
+    pub fn at(&self, point: Vec3) -> i16 {
+        self.0.as_ref().map_or(-1, |surfaces| surfaces.at(point))
+    }
+}
+
 /// The level's vehicles, and the vehicles in the world.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Rides {
@@ -111,7 +125,7 @@ pub struct Rides {
     ceiling: f32,
     // (what the current structure BSP's surfaces are made of, and the
     // globals' materials' physics)
-    surfaces: Option<SurfaceMaterials>,
+    surfaces: Option<Arc<SurfaceMaterials>>,
     materials: Vec<MaterialPhysics>,
     // (each player last seen seated: the vehicle and the tick)
     left: Vec<(ObjectHandle, ObjectHandle, u64)>,
@@ -335,9 +349,17 @@ impl Rides {
                 .iter()
                 .map(|material| material.material_type)
                 .collect();
-            SurfaceMaterials::new(&LevelMesh::from_collision(&structure.collision), &types)
+            Arc::new(SurfaceMaterials::new(
+                &LevelMesh::from_collision(&structure.collision),
+                &types,
+            ))
         });
         self.materials = level.globals.materials.clone();
+    }
+
+    /// What the current structure BSP's surfaces are made of, shared.
+    pub fn surfaces(&self) -> LevelSurfaces {
+        LevelSurfaces(self.surfaces.clone())
     }
 
     /// `level`'s vehicles, for a player whose unit is `unit` and whose
@@ -730,7 +752,7 @@ impl Rides {
                         floor: self.floor,
                         ceiling: self.ceiling,
                         water: self.water.as_ref(),
-                        surfaces: self.surfaces.as_ref(),
+                        surfaces: self.surfaces.as_deref(),
                         materials: &self.materials,
                     };
                     // (a step the physics refuses leaves it where it was)
