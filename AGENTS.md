@@ -94,6 +94,7 @@ python tools/test_death_timing.py
 python -m pytest -q tools/test_web_build.py                 # the web build's graph, sockets, menus
 node --test "port/web/tests/*.test.js"                      # the web page's importer and service worker
 node port/web/tests/webrtc_native.mjs chromium firefox      # the native builds' WebRTC with browsers (Playwright)
+python -m pytest -q tools/test_p2p_tunnel.py                # internet play's invite and tunnel, over IPv4 and over IPv6 alone (brokers)
 python -m pytest -q tools/test_net_compare.py               # net_compare.py's judging of logs, its copies and their processes
 python tools/net_compare.py --a build/linux/halo --b <other build> --data <game data> --swap
                                                             # two builds in one network game, in step (retail maps: local only)
