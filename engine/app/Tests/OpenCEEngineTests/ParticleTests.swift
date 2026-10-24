@@ -55,7 +55,7 @@ final class ParticleTests: XCTestCase {
     /// The frame's red at its centre and corner after `rows` are drawn over
     /// a frame of red 0.25, with `details` as the level's detail objects.
     private func draw(_ rows: [OCEParticleSnapshot], details: [OCEParticleSnapshot] = [],
-                      eye: SIMD3<Float> = .zero) throws -> (centre: Float, corner: Float) {
+                      eye: SIMD3<Float> = .zero, probes: UInt32? = nil) throws -> (centre: Float, corner: Float) {
         let device = try XCTUnwrap(MTLCreateSystemDefaultDevice(), "no Metal device")
         let queue = try XCTUnwrap(device.makeCommandQueue())
         let pass = try ParticlePass(device: device, source: try ShaderSources.source(.particle), pictures: [],
@@ -75,8 +75,24 @@ final class ParticleTests: XCTestCase {
         clear.depthAttachment.storeAction = .store
         try XCTUnwrap(commands.makeRenderCommandEncoder(descriptor: clear)).endEncoding()
         let camera = ViewCamera(position: eye, yaw: 0, pitch: 0, verticalFov: 70 * .pi / 180)
+        var lighting: ParticleLighting?
+        if let probes {
+            // (a grid of one probe each way, of one light from every side)
+            let descriptor = MTLTextureDescriptor()
+            descriptor.textureType = .type3D
+            descriptor.pixelFormat = .rgba8Unorm
+            descriptor.width = 1
+            descriptor.height = 1
+            descriptor.depth = 1
+            let volume = try XCTUnwrap(device.makeTexture(descriptor: descriptor))
+            var texel = probes
+            volume.replace(region: MTLRegionMake3D(0, 0, 0, 1, 1, 1), mipmapLevel: 0, slice: 0, withBytes: &texel,
+                           bytesPerRow: 4, bytesPerImage: 4)
+            lighting = ParticleLighting(probes: Array(repeating: volume, count: 6), probeOrigin: [0, 0, 0, 1],
+                                        probeCounts: [1, 1, 1, 1], sunTowards: .zero, sunColor: .zero)
+        }
         pass.encode(into: commands, frame: frame, depth: depth, worldToClip: camera.viewProjection(aspect: 1),
-                    eye: eye, right: [0, -1, 0], up: [0, 0, 1], sprites: rows)
+                    eye: eye, right: [0, -1, 0], up: [0, 0, 1], sprites: rows, lighting: lighting)
         commands.commit()
         commands.waitUntilCompleted()
         let red = try reds(frame, queue: queue)
@@ -123,6 +139,20 @@ final class ParticleTests: XCTestCase {
         // colours are mixed along it, linearly while both are opaque)
         quad.modes.3 = 0xFF00_0000
         XCTAssertEqual(try draw([quad]).centre, 0.75, accuracy: 0.03, "the colours were not mixed")
+    }
+
+    func testLitSpritesTakeTheProbesAndTheirLightsHeldToWhite() throws {
+        var lit = sprite()
+        lit.modes.3 = 0xFF00_0000
+        // (unlit, or lit without probes: as they are)
+        XCTAssertEqual(try draw([sprite()], probes: 0).centre, 1.25, accuracy: 0.01)
+        XCTAssertEqual(try draw([lit]).centre, 1.25, accuracy: 0.01)
+        // (dark probes: a tenth of the light; the frame's lights add theirs)
+        XCTAssertEqual(try draw([lit], probes: 0).centre, 0.35, accuracy: 0.01)
+        lit.modes.3 = 0xFF00_0080
+        XCTAssertEqual(try draw([lit], probes: 0).centre, 0.25 + 0.1 + 128.0 / 255, accuracy: 0.01)
+        // (bright probes: no more than white)
+        XCTAssertEqual(try draw([lit], probes: 0xFFFF_FFFF).centre, 1.25, accuracy: 0.01)
     }
 
     func testSpritesFadeWithDistance() throws {

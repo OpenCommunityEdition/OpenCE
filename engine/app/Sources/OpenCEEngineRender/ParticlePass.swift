@@ -2,11 +2,32 @@
 // the frame's sprites (the snapshot's) and the level's detail objects
 // (built once), drawn after the level's blended surfaces, tested against
 // the depth but not writing it, in runs that share a picture. Switched by
-// `render.particles`.
+// `render.particles`. Lit rows take the baked probes and the sun as the
+// level's surfaces do (`ParticleLighting`).
 import Foundation
 import Metal
 import opence_ffiFFI
 import simd
+
+/// The light lit particles take: the level's baked probes and its sun.
+public struct ParticleLighting {
+    /// The probes' light from each axis (+x, -x, +y, -y, +z, -z).
+    public var probes: [MTLTexture]
+    /// As `FrameUniforms`' fields of the same names.
+    public var probeOrigin: SIMD4<Float>
+    public var probeCounts: SIMD4<Float>
+    public var sunTowards: SIMD4<Float>
+    public var sunColor: SIMD4<Float>
+
+    public init(probes: [MTLTexture], probeOrigin: SIMD4<Float>, probeCounts: SIMD4<Float>,
+                sunTowards: SIMD4<Float>, sunColor: SIMD4<Float>) {
+        self.probes = probes
+        self.probeOrigin = probeOrigin
+        self.probeCounts = probeCounts
+        self.sunTowards = sunTowards
+        self.sunColor = sunColor
+    }
+}
 
 public final class ParticlePass {
     private struct Frame {
@@ -14,6 +35,10 @@ public final class ParticlePass {
         var eye: SIMD4<Float>
         var right: SIMD4<Float>
         var up: SIMD4<Float>
+        var probeOrigin: SIMD4<Float> = .zero
+        var probeCounts: SIMD4<Float> = .zero
+        var sunTowards: SIMD4<Float> = .zero
+        var sunColor: SIMD4<Float> = .zero
     }
 
     private static let framesInFlight = 3
@@ -22,6 +47,8 @@ public final class ParticlePass {
     private let depthState: MTLDepthStencilState
     private let sampler: MTLSamplerState
     private let white: MTLTexture
+    /// (bound for the probes when there are none)
+    private let whiteVolume: MTLTexture
     private let pictures: [MTLTexture?]
     private let details: [OCEParticleSnapshot]
     private var buffers: [MTLBuffer]
@@ -43,15 +70,25 @@ public final class ParticlePass {
         samplerDescriptor.tAddressMode = .repeat
         let whiteDescriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .rgba8Unorm, width: 1, height: 1, mipmapped: false)
+        let volumeDescriptor = MTLTextureDescriptor()
+        volumeDescriptor.textureType = .type3D
+        volumeDescriptor.pixelFormat = .rgba8Unorm
+        volumeDescriptor.width = 1
+        volumeDescriptor.height = 1
+        volumeDescriptor.depth = 1
         guard let depthState = device.makeDepthStencilState(descriptor: depth),
               let sampler = device.makeSamplerState(descriptor: samplerDescriptor),
-              let white = device.makeTexture(descriptor: whiteDescriptor)
+              let white = device.makeTexture(descriptor: whiteDescriptor),
+              let whiteVolume = device.makeTexture(descriptor: volumeDescriptor)
         else { throw LevelRendererError.resources("particle states") }
         var texel: UInt32 = 0xFFFF_FFFF
         white.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &texel, bytesPerRow: 4)
+        whiteVolume.replace(region: MTLRegionMake3D(0, 0, 0, 1, 1, 1), mipmapLevel: 0, slice: 0, withBytes: &texel,
+                            bytesPerRow: 4, bytesPerImage: 4)
         self.depthState = depthState
         self.sampler = sampler
         self.white = white
+        self.whiteVolume = whiteVolume
         buffers = []
     }
 
@@ -90,10 +127,11 @@ public final class ParticlePass {
         return out
     }
 
-    /// Draws `sprites` and the level's detail objects into `frame`.
+    /// Draws `sprites` and the level's detail objects into `frame`, the lit
+    /// ones by `lighting` (white without it).
     public func encode(into commands: MTLCommandBuffer, frame: MTLTexture, depth: MTLTexture,
                        worldToClip: simd_float4x4, eye: SIMD3<Float>, right: SIMD3<Float>, up: SIMD3<Float>,
-                       sprites: [OCEParticleSnapshot]) {
+                       sprites: [OCEParticleSnapshot], lighting: ParticleLighting? = nil) {
         let rows = details + sprites
         guard !rows.isEmpty else { return }
         let size = rows.count * MemoryLayout<OCEParticleSnapshot>.stride
@@ -111,6 +149,14 @@ public final class ParticlePass {
         let buffer = buffers[slot]
         rows.withUnsafeBytes { buffer.contents().copyMemory(from: $0.baseAddress!, byteCount: size) }
         var uniforms = Frame(worldToClip: worldToClip, eye: SIMD4(eye, 1), right: SIMD4(right, 0), up: SIMD4(up, 0))
+        var probes = Array(repeating: whiteVolume, count: 6)
+        if let lighting, lighting.probes.count == 6 {
+            uniforms.probeOrigin = lighting.probeOrigin
+            uniforms.probeCounts = lighting.probeCounts
+            uniforms.sunTowards = lighting.sunTowards
+            uniforms.sunColor = lighting.sunColor
+            probes = lighting.probes
+        }
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = frame
         pass.colorAttachments[0].loadAction = .load
@@ -124,6 +170,7 @@ public final class ParticlePass {
         encoder.setDepthStencilState(depthState)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Frame>.stride, index: 0)
         encoder.setVertexBuffer(buffer, offset: 0, index: 1)
+        encoder.setVertexTextures(probes, range: 0..<6)
         encoder.setFragmentSamplerState(sampler, index: 0)
         for run in Self.runs(rows) {
             var first = UInt32(run.first)

@@ -271,6 +271,22 @@ fn draw_layer(state: &mut State, name: &str, value: &VarValue) {
     state.shell.scene.set_layer(layer, on);
 }
 
+/// The shell variable that holds how many particles the effects keep
+/// alive.
+const PARTICLE_LIMIT: &str = "particles.limit";
+
+/// The most particles the effects keep alive, as `particles.limit` sets
+/// it: Halo's `MAX_LIVE` unless it is set, and never more than can be
+/// drawn (`MAX_PARTICLES`) or fewer than one.
+pub(crate) fn particle_limit(registry: &Registry<State>) -> usize {
+    match registry.get(PARTICLE_LIMIT) {
+        Some(VarValue::Int(limit)) => usize::try_from(*limit)
+            .unwrap_or(1)
+            .clamp(1, crate::snapshot::MAX_PARTICLES),
+        _ => crate::particles::MAX_LIVE,
+    }
+}
+
 /// The registry with the engine's commands and variables.
 pub(crate) fn registry() -> Registry<State> {
     let mut registry = Registry::new();
@@ -422,6 +438,13 @@ pub(crate) fn registry() -> Registry<State> {
         "The resolution of the ambient occlusion and contact shadows (half or full).",
         VarKind::Enum(AO_QUALITIES),
         VarValue::String("half".into()),
+        true,
+    );
+    registry.variable(
+        PARTICLE_LIMIT,
+        "The most particles the effects keep alive, the oldest making way past it (Halo's 1024, up to 2048).",
+        VarKind::Int,
+        VarValue::Int(1024),
         true,
     );
     for (layer, help) in LAYERS {

@@ -16,8 +16,8 @@ mod systems;
 mod weather;
 mod wind;
 use crate::snapshot::{
-    ParticleSnapshot, MAX_PARTICLES, PARTICLE_FACING_AXIS, PARTICLE_FACING_SCREEN,
-    PARTICLE_NO_PICTURE,
+    LightSnapshot, ParticleSnapshot, LIGHT_SPOT, MAX_PARTICLES, PARTICLE_FACING_AXIS,
+    PARTICLE_FACING_SCREEN, PARTICLE_LIT, PARTICLE_NO_PICTURE,
 };
 use contrails::Contrails;
 pub(crate) use weather::ParticleView;
@@ -32,8 +32,9 @@ const COLLISION_SCALE_SPEEDS: [f32; 2] = [0.5, 1.5];
 /// The least a surface a particle meets faces up (its normal's z) for it
 /// to settle on it.
 const SETTLES_ON: f32 = 0.8;
-/// The most particles the effects keep alive.
-const MAX_LIVE: usize = 1024;
+/// The most particles the effects keep alive, as Halo has it (the
+/// `particles.limit` setting changes it, up to `MAX_PARTICLES`).
+pub(crate) const MAX_LIVE: usize = 1024;
 
 /// A small random sequence (xorshift), the particles' own, so that they
 /// take nothing from the simulation's.
@@ -593,7 +594,13 @@ impl Live {
         }
     }
 
-    fn snapshot(&self, level: &Level, pictures: &Pictures) -> Option<ParticleSnapshot> {
+    /// As drawn this frame, lit by `lights` unless it lights itself.
+    fn snapshot(
+        &self,
+        level: &Level,
+        pictures: &Pictures,
+        lights: &[LightSnapshot],
+    ) -> Option<ParticleSnapshot> {
         let particle = level.particles.get(self.particle)?;
         let radius = self.radius_now(particle);
         let fade_in = if particle.fade_in > 0.0 {
@@ -618,6 +625,11 @@ impl Live {
             _ => PARTICLE_FACING_SCREEN,
         };
         let [r, g, b, a] = self.color;
+        let lighting = if particle.flags & Particle::SELF_ILLUMINATED == 0 {
+            PARTICLE_LIT | pack_light(lights_at(lights, self.position))
+        } else {
+            0
+        };
         Some(ParticleSnapshot {
             position: [self.position.x, self.position.y, self.position.z, radius],
             axis: [along.x, along.y, along.z, self.rotation],
@@ -628,10 +640,43 @@ impl Live {
                 frame.picture,
                 blend(particle.shader.framebuffer_blend_function),
                 facing,
-                0,
+                lighting,
             ],
         })
     }
+}
+
+/// The frame's `lights` at `at`, as a sprite takes them: each light's
+/// colour falling to nothing at its radius and, for a spot, to its cone's
+/// edge, as the level's shader has it (with no gel or shadow, and facing
+/// every light).
+fn lights_at(lights: &[LightSnapshot], at: Vec3) -> Vec3 {
+    let glam = |v: crate::snapshot::Vec3| Vec3::new(v.x, v.y, v.z);
+    let mut sum = Vec3::ZERO;
+    for light in lights {
+        let to = glam(light.position) - at;
+        let distance = to.length();
+        if light.radius <= 0.0 || distance >= light.radius {
+            continue;
+        }
+        let mut color = glam(light.color);
+        if light.flags & LIGHT_SPOT != 0 && distance > 1e-4 {
+            let along = (-to / distance).dot(glam(light.forward));
+            let width = (light.cosine_falloff - light.cosine_cutoff).max(1e-4);
+            let cone = ((along - light.cosine_cutoff) / width).clamp(0.0, 1.0);
+            color *= cone * cone * (3.0 - 2.0 * cone);
+        }
+        let near = 1.0 - (distance / light.radius) * (distance / light.radius);
+        sum += color * near * near;
+    }
+    sum
+}
+
+/// `light` as the lowest three bytes of a sprite's lighting, each held to
+/// 1.
+fn pack_light(light: Vec3) -> u32 {
+    let byte = |value: f32| (value.clamp(0.0, 1.0) * 255.0 + 0.5) as u32;
+    byte(light.x) | byte(light.y) << 8 | byte(light.z) << 16
 }
 
 /// A framebuffer blend function as the snapshot gives it.
@@ -662,6 +707,9 @@ pub(crate) struct LevelParticles {
     pub(crate) camera: Vec3,
     /// The seconds run.
     seconds: f32,
+    /// The most particles kept alive (0: `MAX_LIVE`); the oldest makes
+    /// way for a new one past it.
+    pub(crate) limit: usize,
 }
 
 impl LevelParticles {
@@ -793,8 +841,13 @@ impl LevelParticles {
                     .min(*total);
                 while *done < target {
                     *done += 1;
-                    if self.live.len() >= MAX_LIVE {
-                        self.live.remove(0);
+                    let limit = match self.limit {
+                        0 => MAX_LIVE,
+                        limit => limit.min(MAX_PARTICLES),
+                    };
+                    if self.live.len() >= limit {
+                        let over = self.live.len() + 1 - limit;
+                        self.live.drain(..over);
                     }
                     self.live.push(Live::emit(
                         random,
@@ -809,12 +862,14 @@ impl LevelParticles {
         self.emitted.retain(|key, _| seen.contains(key));
     }
 
-    /// The frame's particles: the effects', the particle systems', the
-    /// contrails', then the weather's, seen from `view`.
+    /// The frame's particles: the effects' (lit by the frame's `lights`),
+    /// the particle systems', the contrails', then the weather's, seen from
+    /// `view`.
     pub(crate) fn gather(
         &self,
         level: &Level,
         view: &ParticleView,
+        lights: &[LightSnapshot],
         out: &mut Vec<ParticleSnapshot>,
     ) {
         out.clear();
@@ -822,7 +877,7 @@ impl LevelParticles {
             if out.len() >= MAX_PARTICLES {
                 return;
             }
-            out.extend(live.snapshot(level, &self.pictures));
+            out.extend(live.snapshot(level, &self.pictures, lights));
         }
         self.systems.gather(level, &self.pictures, out);
         self.contrails
@@ -1158,7 +1213,7 @@ mod tests {
         particles.tick(&level, &mut simulation, (&[running(1, 30)], &[]), 0);
         assert_eq!(particles.live.len(), 3);
         let mut out = Vec::new();
-        particles.gather(&level, &ParticleView::at(Vec3::ZERO), &mut out);
+        particles.gather(&level, &ParticleView::at(Vec3::ZERO), &[], &mut out);
         assert_eq!(out.len(), 3);
         let first = out[0];
         // (it left forward at 2 a second, for two ticks)
@@ -1173,11 +1228,115 @@ mod tests {
         for _ in 0..27 {
             particles.tick(&level, &mut simulation, (&[], &[]), 0);
         }
-        particles.gather(&level, &ParticleView::at(Vec3::ZERO), &mut out);
+        particles.gather(&level, &ParticleView::at(Vec3::ZERO), &[], &mut out);
         assert!(out[0].color[3] < 0.5, "it fades out: {:?}", out[0]);
         particles.tick(&level, &mut simulation, (&[], &[]), 0);
         assert!(particles.live.is_empty(), "it dies at a second");
         assert!(particles.emitted.is_empty());
+    }
+
+    #[test]
+    fn the_frames_lights_fall_off_to_their_radius_and_their_cone() {
+        let at = |x, y, z| crate::snapshot::Vec3 { x, y, z };
+        let point = LightSnapshot {
+            radius: 2.0,
+            color: at(1.0, 0.5, 0.0),
+            ..LightSnapshot::default()
+        };
+        let lit = lights_at(&[point], Vec3::X);
+        assert!(
+            (lit - Vec3::new(0.5625, 0.28125, 0.0)).length() < 1e-6,
+            "{lit}"
+        );
+        assert_eq!(lights_at(&[point], Vec3::X * 2.0), Vec3::ZERO);
+        assert_eq!(lights_at(&[], Vec3::X), Vec3::ZERO);
+        let spot = LightSnapshot {
+            radius: 4.0,
+            color: at(1.0, 1.0, 1.0),
+            forward: at(1.0, 0.0, 0.0),
+            cosine_cutoff: 0.5,
+            cosine_falloff: 0.9,
+            flags: LIGHT_SPOT,
+            ..LightSnapshot::default()
+        };
+        let full = (1.0f32 - 1.0 / 16.0) * (1.0 - 1.0 / 16.0);
+        assert!((lights_at(&[spot], Vec3::X).x - full).abs() < 1e-6);
+        assert_eq!(lights_at(&[spot], -Vec3::X), Vec3::ZERO);
+        // (halfway from its cone's cutoff to its falloff: smoothstep's half)
+        let edge = Vec3::new(0.7, (1.0f32 - 0.49).sqrt(), 0.0);
+        let at_edge = lights_at(&[spot], edge).x;
+        assert!((at_edge - full * 0.5).abs() < 1e-5, "{at_edge}");
+        assert_eq!(lights_at(&[point, point], Vec3::X), lit * 2.0);
+        assert_eq!(
+            pack_light(Vec3::new(1.0, 0.5, 2.0)),
+            255 | 128 << 8 | 255 << 16
+        );
+        assert_eq!(pack_light(Vec3::splat(-1.0)), 0);
+    }
+
+    #[test]
+    fn the_effects_particles_are_lit_unless_they_light_themselves() {
+        let mut level = level(EffectParticles::START, 1);
+        let mut particles = LevelParticles::new(&level);
+        let mut simulation = Simulation::empty();
+        particles.tick(&level, &mut simulation, (&[running(0, 30)], &[]), 0);
+        let mut out = Vec::new();
+        let view = ParticleView::at(Vec3::ZERO);
+        particles.gather(&level, &view, &[], &mut out);
+        assert_eq!(out[0].modes[3], PARTICLE_LIT, "lit, by no lights");
+        let at = |x, y, z| crate::snapshot::Vec3 { x, y, z };
+        let light = LightSnapshot {
+            position: at(1.0, 2.0, 3.0),
+            radius: 10.0,
+            color: at(1.0, 0.0, 2.0),
+            ..LightSnapshot::default()
+        };
+        particles.gather(&level, &view, &[light], &mut out);
+        let packed = out[0].modes[3];
+        assert_eq!(packed & PARTICLE_LIT, PARTICLE_LIT);
+        assert!(
+            packed & 0xFF > 240 && packed >> 8 & 0xFF == 0,
+            "{packed:#x}"
+        );
+        assert_eq!(packed >> 16 & 0xFF, 255, "held to 1");
+        let Some(spark) = level.particles.last_mut() else {
+            panic!("no spark");
+        };
+        spark.flags |= Particle::SELF_ILLUMINATED;
+        particles.gather(&level, &view, &[light], &mut out);
+        assert_eq!(out[0].modes[3], 0);
+    }
+
+    #[test]
+    fn past_the_limit_the_oldest_particles_make_way() {
+        let level = level(EffectParticles::START, 5);
+        let mut particles = LevelParticles::new(&level);
+        let mut simulation = Simulation::empty();
+        particles.limit = 3;
+        particles.tick(&level, &mut simulation, (&[running(0, 30)], &[]), 0);
+        assert_eq!(particles.live.len(), 3);
+        // (lowered: the oldest go as the next is made)
+        particles.limit = 1;
+        let mut next = running(0, 30);
+        next.number = 2;
+        particles.tick(&level, &mut simulation, (&[next], &[]), 0);
+        assert_eq!(particles.live.len(), 1);
+        let mut many = level.clone();
+        if let Some(effect) = many.effects.last_mut() {
+            effect.events[0].particles[0].count = [250, 250];
+        }
+        let mut more = LevelParticles::new(&many);
+        more.limit = usize::MAX;
+        for number in 0..10 {
+            let mut effect = running(0, 30);
+            effect.number = number;
+            more.tick(&many, &mut simulation, (&[effect], &[]), 0);
+        }
+        assert_eq!(
+            more.live.len(),
+            MAX_PARTICLES,
+            "never more than can be drawn"
+        );
     }
 
     #[test]

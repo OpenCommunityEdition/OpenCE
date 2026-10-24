@@ -938,7 +938,10 @@ public final class LevelRenderer {
         if switches.particles {
             particles.encode(into: commands, frame: frame, depth: depth, worldToClip: viewProjection,
                              eye: camera.position, right: camera.rotation.act([0, -1, 0]),
-                             up: camera.rotation.act([0, 0, 1]), sprites: laidParticles)
+                             up: camera.rotation.act([0, 0, 1]), sprites: laidParticles,
+                             lighting: ParticleLighting(probes: probes, probeOrigin: uniforms.probeOrigin,
+                                                        probeCounts: uniforms.probeCounts,
+                                                        sunTowards: uniforms.sunTowards, sunColor: uniforms.sunColor))
         }
     }
 

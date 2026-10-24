@@ -2,7 +2,10 @@
 // each row a quad facing the screen, standing on its axis, spanning a
 // strip's segment, or between four corners (a contrail's piece), blended
 // with the frame as its framebuffer blend function says (read from the
-// frame: Apple GPUs blend in the shader).
+// frame: Apple GPUs blend in the shader). A lit row is lit at its centre,
+// as Halo lights a particle by the light under it: the baked probes facing
+// the camera, the sun where they see it and the frame's lights its row
+// carries, a tenth more, held to 1.
 
 #include <metal_stdlib>
 using namespace metal;
@@ -12,6 +15,13 @@ struct ParticleFrame {
     float4 eye;
     float4 right;
     float4 up;
+    // (as LevelRenderer's FrameUniforms) the probe grid's first probe and
+    // one over its spacing; its counts, and 1 when there are probes
+    float4 probe_origin;
+    float4 probe_counts;
+    // the way to the sun, and 1 when there is one; the sun's irradiance
+    float4 sun_towards;
+    float4 sun_color;
 };
 
 // (as snapshot.rs's ParticleSnapshot)
@@ -23,7 +33,7 @@ struct Particle {
     float4 color;      // rgba
     float4 uv;         // the picture's rectangle: u0, v0, u1, v1
     float4 shape;      // half height, fade begins, fade ends, 0
-    uint4 modes;       // picture, blend, facing, 0
+    uint4 modes;       // picture, blend, facing, lit (the frame's lights, packed)
 };
 
 struct ParticleVertex {
@@ -33,6 +43,38 @@ struct ParticleVertex {
     uint blend [[flat]];
 };
 
+// the bake's irradiance as a display value (level.metal's baked_shown)
+float3 particle_shown(float3 irradiance) {
+    float3 linear = max(irradiance, 0) / M_PI_F;
+    return select(1.055 * pow(linear, 1.0 / 2.4) - 0.055, linear * 12.92, linear <= 0.0031308);
+}
+
+// the light on a particle at `world` facing `normal`: the probes', the
+// sun's where they see it and `frame_lights`, a tenth more, held to 1
+// (white without probes)
+float3 particle_light(constant ParticleFrame &frame, float3 world, float3 normal, float3 frame_lights,
+                      texture3d<float> px, texture3d<float> nx, texture3d<float> py,
+                      texture3d<float> ny, texture3d<float> pz, texture3d<float> nz) {
+    if (frame.probe_counts.w <= 0) {
+        return float3(1);
+    }
+    constexpr sampler clamp(filter::linear, address::clamp_to_edge);
+    float3 at = ((world - frame.probe_origin.xyz) * frame.probe_origin.w + 0.5) / frame.probe_counts.xyz;
+    float3 weight = normal * normal;
+    float4 x = normal.x >= 0 ? px.sample(clamp, at, level(0)) : nx.sample(clamp, at, level(0));
+    float4 y = normal.y >= 0 ? py.sample(clamp, at, level(0)) : ny.sample(clamp, at, level(0));
+    float4 z = normal.z >= 0 ? pz.sample(clamp, at, level(0)) : nz.sample(clamp, at, level(0));
+    float4 cube = weight.x * x + weight.y * y + weight.z * z;
+    float3 irradiance = cube.rgb;
+    if (frame.sun_towards.w > 0) {
+        // (a sprite is lit from all round it: half the sun's light, more
+        // facing it)
+        float facing = 0.5 + 0.5 * dot(normal, frame.sun_towards.xyz);
+        irradiance += frame.sun_color.rgb * facing * saturate(cube.w);
+    }
+    return min(particle_shown(irradiance) + frame_lights + 0.1, float3(1));
+}
+
 constant float2 corners[6] = {
     float2(-1, -1), float2(1, -1), float2(1, 1),
     float2(-1, -1), float2(1, 1), float2(-1, 1),
@@ -41,7 +83,10 @@ constant float2 corners[6] = {
 vertex ParticleVertex particle_vertex(uint vid [[vertex_id]], uint instance [[instance_id]],
                                       constant ParticleFrame &frame [[buffer(0)]],
                                       const device Particle *particles [[buffer(1)]],
-                                      constant uint &first [[buffer(2)]]) {
+                                      constant uint &first [[buffer(2)]],
+                                      texture3d<float> px [[texture(0)]], texture3d<float> nx [[texture(1)]],
+                                      texture3d<float> py [[texture(2)]], texture3d<float> ny [[texture(3)]],
+                                      texture3d<float> pz [[texture(4)]], texture3d<float> nz [[texture(5)]]) {
     Particle p = particles[first + instance];
     float2 c = corners[vid];
     if (p.modes.z == 3) {
@@ -90,7 +135,13 @@ vertex ParticleVertex particle_vertex(uint vid [[vertex_id]], uint instance [[in
     out.position = frame.worldToClip * float4(world, 1);
     float2 t = c * 0.5 + 0.5;
     out.uv = float2(mix(p.uv.x, p.uv.z, t.x), mix(p.uv.w, p.uv.y, t.y));
-    out.color = float4(p.color.rgb, p.color.a * fade);
+    float3 color = p.color.rgb;
+    if ((p.modes.w >> 24) != 0) {
+        float3 normal = normalize(frame.eye.xyz - p.position.xyz + float3(0, 0, 1e-6));
+        float3 lights = unpack_unorm4x8_to_float(p.modes.w).rgb;
+        color *= particle_light(frame, p.position.xyz, normal, lights, px, nx, py, ny, pz, nz);
+    }
+    out.color = float4(color, p.color.a * fade);
     out.blend = p.modes.y;
     return out;
 }

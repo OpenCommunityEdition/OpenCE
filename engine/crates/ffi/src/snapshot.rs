@@ -258,6 +258,11 @@ pub const PARTICLE_FACING_SEGMENT: u32 = 2;
 /// from its colour at the near edge to the packed colour of its modes at
 /// the far (a contrail's piece between two of its points).
 pub const PARTICLE_FACING_QUAD: u32 = 3;
+/// `ParticleSnapshot::modes`' lighting, its top byte: the sprite is lit by
+/// the level's light about it (its lowest three bytes are the frame's
+/// lights there, red, green and blue from the lowest, linear and held to
+/// 1). A sprite without it is drawn as its colour.
+pub const PARTICLE_LIT: u32 = 0xFF00_0000;
 
 /// A sprite: a particle, a piece of a contrail, a weather particle or a
 /// detail object (laid out as the app's particle shader reads it).
@@ -281,9 +286,10 @@ pub struct ParticleSnapshot {
     /// its far edge's first corner and the far edge's second corner's z).
     pub shape: [f32; 4],
     /// Its picture (among the level's particle pictures, or
-    /// `PARTICLE_NO_PICTURE`), its blend function, its facing, then 0
-    /// (for `PARTICLE_FACING_QUAD`, its far edge's colour, a byte each of
-    /// red, green, blue and opacity from the lowest).
+    /// `PARTICLE_NO_PICTURE`), its blend function, its facing, then its
+    /// lighting (`PARTICLE_LIT` and the frame's lights, or 0: unlit; for
+    /// `PARTICLE_FACING_QUAD`, its far edge's colour, a byte each of red,
+    /// green, blue and opacity from the lowest).
     pub modes: [u32; 4],
 }
 

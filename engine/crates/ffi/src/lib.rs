@@ -975,6 +975,7 @@ impl Engine {
         };
         let mut frame = None;
         if let Some(running) = state.running.as_mut() {
+            running.particles.limit = devtools::particle_limit(&registry);
             let advanced = running.clock.advance(frame_seconds * scale);
             run_ticks(&mut state, advanced.ticks)?;
             frame = Some(advanced);
@@ -1446,6 +1447,7 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
                 rotation: camera.transform.rotation,
                 vertical_fov: camera.vertical_fov.0,
             },
+            &lit,
             &mut particle_rows,
         );
     }
@@ -1896,6 +1898,34 @@ mod tests {
             frame.camera.current.position.y - eyes.y,
         );
         assert!(moved > 1.0, "{moved}");
+    }
+
+    #[test]
+    fn the_particle_limit_is_set_by_its_setting_held_to_what_can_be_drawn() {
+        let engine = Engine::new();
+        let limit = |engine: &Engine| devtools::particle_limit(&engine.lock_registry());
+        assert_eq!(limit(&engine), particles::MAX_LIVE);
+        for (set, held) in [
+            ("5000", snapshot::MAX_PARTICLES),
+            ("0", 1),
+            ("-3", 1),
+            ("1500", 1500),
+        ] {
+            assert!(engine
+                .set_shell_variable("particles.limit".into(), set.into())
+                .is_ok());
+            assert_eq!(limit(&engine), held, "{set}");
+        }
+        assert!(engine
+            .saved_shell_variables()
+            .contains_key("particles.limit"));
+        engine.start_empty_world();
+        assert!(engine.advance(1.0 / 30.0).is_ok());
+        let state = engine.lock();
+        let Some(running) = state.running.as_ref() else {
+            panic!("no world");
+        };
+        assert_eq!(running.particles.limit, 1500);
     }
 
     #[test]
