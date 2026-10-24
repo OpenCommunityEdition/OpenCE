@@ -28,6 +28,7 @@ pub mod hud;
 pub mod input;
 pub mod item_physics;
 pub mod objects;
+pub mod particle_collision;
 pub mod periodic;
 pub mod platforms;
 pub mod player;
@@ -681,6 +682,26 @@ impl Simulation {
         self.players
             .first()
             .is_none_or(|player| player.level_clear(from, to))
+    }
+
+    /// Where a point moving from `from` by `motion` first meets the level
+    /// or a machine, in the local player's physics world (the particles'
+    /// collision); none if it meets nothing, has no motion or there is no
+    /// player.
+    pub fn collide_point(&self, from: Vec3, motion: Vec3) -> Option<particle_collision::PointHit> {
+        if !(from.is_finite() && motion.is_finite()) || motion.length_squared() == 0.0 {
+            return None;
+        }
+        let player = self.players.first()?;
+        let hit = player
+            .physics()
+            .cast_ray(from, motion, opence_physics::Layers::GROUND)
+            .ok()??;
+        Some(particle_collision::PointHit {
+            point: hit.point,
+            normal: hit.normal,
+            fraction: hit.fraction,
+        })
     }
 
     /// Puts player `index`'s biped at `position`, standing still; false

@@ -436,6 +436,57 @@ Autumn* and *Halo*, that every sound the scripts start or wait on has its
 length, that a wait lasts its longest permutation to the tick, and that
 the music loops until it is stopped.
 
+## Physics
+
+The `physics` crate is Jolt Physics (`port/third_party/jolt`) through the
+C interface in `port/macos/host/physics`. Jolt is built in its
+cross-platform deterministic mode, without fused multiply-add, so the same
+calls give the same results on every run and every machine. A `World`
+holds a level's collision mesh, made from its collision BSP, and bodies in
+layers: the level, the platforms (kinematic bodies the simulation moves)
+and the bodies (dynamic ones Jolt moves). Rays and shape casts name the
+layers they look for; `Layers::GROUND`, the level and the platforms, is
+what stands under a player. Everything is in world units, converted to
+metres at the boundary, and the level's materials are found by a point on
+them (`ground.rs`), since Jolt's mesh does not carry them.
+
+What moves in it, and by whose rules:
+
+- **The player** walks, runs, crouches and jumps by Halo's biped rules
+  (`movement.rs`), converted from its 30 Hz to the engine's 60, and its
+  character collides with the level. Standing on a platform, it is carried
+  at the platform's velocity.
+- **Vehicles** move by Halo's mass points (`sim/src/vehicle.rs`), not
+  Jolt's vehicle constraints, so that they handle as they did; they step
+  at 30 Hz, on every other tick. A vehicle on its back is turned over when
+  the player acts by it.
+- **Items** lying about move as `items.c` moves them
+  (`sim/src/item_physics.rs`): a point that falls, bounces and rests.
+- **Ragdolls** are bodies of parts joined by swing-twist joints
+  (`ragdoll.rs`), following the death animation for a moment before they
+  go limp. **Debris** (spent casings) and the test map's **crates** are
+  plain dynamic bodies.
+- **Platforms** are the machines (lifts, doors, gates): a box for each
+  node of their collision models, moved each tick to where the machine's
+  animation put it (`sim/src/platforms.rs`). What stands on one is carried,
+  and what one meets is pushed ahead.
+- **Forces**: damage pushes what it strikes by its effect's acceleration
+  (`sim/src/forces.rs`), and grenades bounce and detonate by their
+  projectile's rules.
+
+The particles ask `Simulation::collide_point` where a point's path meets
+the level or a platform, and `particle_collision::rebound` puts the point
+just off the surface with its velocity bounced by the particle's
+elasticity and friction.
+
+The physics station's tests (`physics/tests/station.rs`) check that a pile
+of crates on the slope rests without jitter, settles again after
+explosions and never sinks through the ground; that two runs with a lift
+and explosions agree to the bit; and, in a release build, that 500 bodies
+tumbling together step in under 2 ms. `sim/tests/crates.rs` checks that
+two simulations given the same inputs agree, a player throwing a frag into
+the pile.
+
 ## The Halo UI
 
 The menus are the game's own: the widget definitions, bitmaps, fonts and
