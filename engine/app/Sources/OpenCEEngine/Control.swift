@@ -94,8 +94,10 @@ final class ControlServant {
         renderer.lights = frame.drawnLights()
         renderer.laidDecals = Array(frame.decals)
         renderer.laidParticles = Array(frame.particles)
-        renderer.switches = dev.update(generation: engine.devGeneration(), flag: { engine.shellFlag(name: $0) },
-                                       value: { engine.shellValue(name: $0) }).switches
+        let devState = dev.update(generation: engine.devGeneration(), flag: { engine.shellFlag(name: $0) },
+                                  value: { engine.shellValue(name: $0) })
+        renderer.switches = devState.switches
+        renderer.tuning = devState.tuning
         renderer.sprites = engine.cameraSprites(camera: camera.spriteCamera, flares: renderer.switches.lensFlares,
                                                 widgets: renderer.switches.glows)
         let width = Int(request.width), height = Int(request.height)

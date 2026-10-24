@@ -94,9 +94,11 @@ struct ScreenUniforms {
     var passes: SIMD4<UInt32>
     /// The occlusion's resolution (0 full, 1 half).
     var quality: SIMD4<UInt32>
+    /// How much the occlusion darkens, scaled (`tune.ao`).
+    var tune: SIMD4<Float>
 
     init(viewProjection: simd_float4x4, eye: SIMD3<Float>, sunTowards: SIMD4<Float>, width: Int, height: Int,
-         switches: RenderSwitches) {
+         switches: RenderSwitches, ambientOcclusion: Float = 1) {
         clipToWorld = viewProjection.inverse
         worldToClip = viewProjection
         self.eye = SIMD4(eye, ViewCamera.near)
@@ -108,6 +110,7 @@ struct ScreenUniforms {
         passes = SIMD4(switches.gtao ? 1 : 0, switches.contactShadows ? 1 : 0, switches.ssr ? 1 : 0,
                        switches.view.index)
         quality = SIMD4(switches.halfOcclusion ? 1 : 0, 0, 0, 0)
+        tune = SIMD4(ambientOcclusion, 0, 0, 0)
     }
 }
 

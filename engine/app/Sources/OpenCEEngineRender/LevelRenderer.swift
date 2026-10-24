@@ -207,6 +207,8 @@ struct ToneUniforms {
     var bloom: Float
     /// 0 the frame, 1 its brightness, 2 the bloom alone.
     var view: UInt32
+    /// The tone curve's contrast (`tune.tone_curve`, 1 as it is).
+    var curve: Float = 1
 }
 
 public struct FrameUniforms {
@@ -231,6 +233,11 @@ public struct FrameUniforms {
     /// The developer's view of the level's surfaces (0 the frame, 1 unlit,
     /// 2 their light alone), and 1 when the lightmaps are off.
     public var debug: SIMD4<UInt32> = .zero
+    /// The lighting controls (`tune.*`): the sun's scale in each channel,
+    /// and 1 when any control is off its stock value (0: none applied);
+    /// the bounced light's, the probes' and the shaders' own light's.
+    public var tuneSun = SIMD4<Float>(1, 1, 1, 0)
+    public var tune = SIMD4<Float>(1, 1, 1, 0)
 
     /// The frame from `camera`, its fog `fog` (none without a sky), its
     /// maps sampled `mipBias` levels sharper (negative) than its size's.
@@ -455,6 +462,8 @@ public final class LevelRenderer {
     private var exposureTime: Float?
     /// The passes switched on, and the buffer shown (`render.*`).
     public var switches = RenderSwitches()
+    /// The lighting controls (`tune.*`).
+    public var tuning = LightingTuning()
     /// Whether the sun's shadows are drawn (with a baked sun).
     public var sunShadows: Bool {
         get { switches.sunShadows }
@@ -763,9 +772,10 @@ public final class LevelRenderer {
         }
         let bloom = switches.bloom || switches.view == .bloom
             ? cameraPass.encodeBloom(into: commands, frame: shown) : nil
-        var toneUniforms = ToneUniforms(exposure: exp2(-exposure),
-                                        bloom: switches.bloom ? CameraPass.bloomStrength : 0,
-                                        view: switches.view == .luminance ? 1 : switches.view == .bloom ? 2 : 0)
+        var toneUniforms = ToneUniforms(exposure: exp2(tuning.exposure - exposure),
+                                        bloom: switches.bloom ? CameraPass.bloomStrength * tuning.bloom : 0,
+                                        view: switches.view == .luminance ? 1 : switches.view == .bloom ? 2 : 0,
+                                        curve: tuning.toneCurve)
 
         let tonePass = MTLRenderPassDescriptor()
         tonePass.colorAttachments[0].texture = target
@@ -818,6 +828,10 @@ public final class LevelRenderer {
         uniforms.sunColor = sun.color
         uniforms.debug = SIMD4(switches.view == .albedo ? 1 : switches.view == .light ? 2 : 0,
                                switches.lightmaps ? 0 : 1, 0, 0)
+        if !tuning.isStock {
+            uniforms.tuneSun = SIMD4(tuning.sunColor * tuning.sun, 1)
+            uniforms.tune = SIMD4(tuning.bounce, tuning.probes, tuning.emissive, 0)
+        }
         // (the stock view: lit as the map ships, without the bake's probes
         // and sun)
         let stock = switches.view == .stock && baked
@@ -919,7 +933,8 @@ public final class LevelRenderer {
         }
         let screenUniforms = ScreenUniforms(viewProjection: viewProjection, eye: camera.position,
                                             sunTowards: towards == nil ? .zero : sun.towards, width: frame.width,
-                                            height: frame.height, switches: switches)
+                                            height: frame.height, switches: switches,
+                                            ambientOcclusion: tuning.ambientOcclusion)
         let cameraFrame = profiled("screen", scopes) {
             screen.encode(into: commands, targets: screenTargets, frame: frame, depth: depth, uniforms: screenUniforms)
             return cameraPass.encodeOcclusion(sprites, into: commands, depth: depth,

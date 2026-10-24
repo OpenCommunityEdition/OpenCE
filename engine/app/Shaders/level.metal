@@ -50,10 +50,21 @@ struct Frame {
     // the developer's view of the level's surfaces (0 the frame, 1 unlit,
     // 2 their light alone), and 1 when the lightmaps are off (lit flat)
     uint4 debug;
+    // the lighting controls: the sun's scale in each channel, and 1 when
+    // any control is off its stock value; the bounced light's, the
+    // probes' and the shaders' own light's scales
+    float4 tune_sun;
+    float4 tune;
 };
 
 constant uint VIEW_ALBEDO = 1;
 constant uint VIEW_LIGHT = 2;
+
+// `value` scaled by the lighting controls' `scale`, where any control is
+// off its stock value (untouched, the frame is the stock frame's)
+float3 tuned(constant Frame &frame, float3 value, float3 scale) {
+    return frame.tune_sun.w != 0 ? value * scale : value;
+}
 
 // (as LevelRenderer's MaterialUniforms)
 struct Material {
@@ -362,7 +373,8 @@ float4 probe_cube(constant Frame &frame, float3 world, float3 normal, sampler cl
 float3 probe_light(constant Frame &frame, float3 world, float3 normal, sampler clamp,
                    texture3d<float> px, texture3d<float> nx, texture3d<float> py,
                    texture3d<float> ny, texture3d<float> pz, texture3d<float> nz) {
-    return baked_shown(probe_cube(frame, world, normal, clamp, px, nx, py, ny, pz, nz).rgb);
+    return baked_shown(tuned(frame, probe_cube(frame, world, normal, clamp, px, nx, py, ny, pz, nz).rgb,
+                             float3(frame.tune.y)));
 }
 
 // (as LevelRenderer's ShadowUniforms) the sun's cascaded shadow maps
@@ -419,12 +431,12 @@ float4 object_light(constant Frame &frame, float3 world, float3 normal, sampler 
                     constant Shadows &shadows, depth2d_array<float> shadow_map) {
     float3 n = direction(normal, float3(0, 0, 1));
     float4 cube = probe_cube(frame, world, n, clamp, px, nx, py, ny, pz, nz);
-    float3 irradiance = cube.rgb;
+    float3 irradiance = tuned(frame, cube.rgb, float3(frame.tune.y));
     float3 sun = float3(0);
     if (frame.sun_towards.w > 0) {
         float facing = saturate(dot(n, frame.sun_towards.xyz));
         float2 seen = facing > 0 ? sun_seen(shadows, frame, world, n, shadow_map) : float2(0);
-        sun = frame.sun_color.rgb * facing * mix(saturate(cube.w), seen.x, seen.y);
+        sun = tuned(frame, frame.sun_color.rgb * facing * mix(saturate(cube.w), seen.x, seen.y), frame.tune_sun.rgb);
         irradiance += sun;
     }
     return float4(baked_shown(irradiance), sun_share(sun, irradiance));
@@ -695,11 +707,24 @@ fragment Opaque level_fragment(VertexOut in [[stage_in]],
                 irradiance = max(irradiance - frame.sun_color.rgb * facing * hidden, float3(0));
                 sun = sun_share(frame.sun_color.rgb * facing * (seen.y > 0 ? seen.x : open.x), irradiance);
             }
+            // (the lighting controls: the sun's share and the rest, the
+            // light bounced, scaled apart; without the sun's shadows the
+            // share is not known, and all of it is the bounce's)
+            if (frame.tune_sun.w != 0) {
+                float3 lit = irradiance * sun * frame.tune_sun.rgb;
+                irradiance = irradiance * (1 - sun) * frame.tune.x + lit;
+                sun = sun_share(lit, irradiance);
+            }
             lightmapped = baked_shown(irradiance);
             float4 baked = baked_directions.sample(clamp, in.lightmap);
             incident_light = (baked.xyz * 2 - 1) * baked.w;
         } else {
             lightmapped = lightmap.sample(clamp, in.lightmap).rgb;
+            // (the map's own lightmaps keep the sun with the rest: the
+            // bounce's control scales all of it)
+            if (frame.tune_sun.w != 0) {
+                lightmapped = to_shown(to_linear(lightmapped) * frame.tune.x);
+            }
         }
         light = lightmapped;
     } else if (material.maps & UNBAKED) {
@@ -736,7 +761,7 @@ fragment Opaque level_fragment(VertexOut in [[stage_in]],
     if (bits & SELF_ILLUMINATION) {
         float2 at = texcoord * material.environment_scales.z;
         float4 map = (bits & UNFILTERED) ? glow.sample(nearest, at, bias(lod)) : glow.sample(wrap, at, bias(lod));
-        light += self_illumination(map, material);
+        light += tuned(frame, self_illumination(map, material), float3(frame.tune.z));
     }
     color.rgb *= light;
 
@@ -968,7 +993,7 @@ fragment Opaque model_fragment(ModelOut in [[stage_in]],
     if (self_source >= 1 && self_source <= 4) {
         self_color *= change_colors[self_source - 1].rgb;
     }
-    light += multipurpose.g * self_color;
+    light += tuned(frame, multipurpose.g * self_color, float3(frame.tune.z));
     uint change_source = material.model.z;
     if (change_source >= 1 && change_source <= 4) {
         light *= mix(float3(1), change_colors[change_source - 1].rgb, multipurpose.b);
@@ -1178,6 +1203,8 @@ struct Tone {
     float bloom;
     // 0 the frame, 1 its brightness, 2 the bloom alone
     uint view;
+    // the tone curve's contrast about the middle grey (1: as it is)
+    float curve;
 };
 
 fragment float4 tone_fragment(ToneOut in [[stage_in]], texture2d<float> frame [[texture(0)]],
@@ -1194,6 +1221,9 @@ fragment float4 tone_fragment(ToneOut in [[stage_in]], texture2d<float> frame [[
         return float4(float3(saturate(log2(max(brightness, 1e-4)) / 8 + 0.5)), 1);
     }
     color = color * tone.exposure + bloomed * tone.bloom;
+    if (tone.curve != 1) {
+        color = 0.5 * pow(color / 0.5, tone.curve);
+    }
     float3 over = max(color - 0.8, 0);
     float3 eased = 0.8 + 0.2 * (1 - exp(-over / 0.2));
     return float4(select(color, eased, color > 0.8), 1);

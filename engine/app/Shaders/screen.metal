@@ -32,6 +32,8 @@ struct Screen {
     uint4 passes;
     // the occlusion's resolution (0 full, 1 half)
     uint4 quality;
+    // how much the occlusion darkens, scaled (the lighting controls)
+    float4 tune;
 };
 
 constant uint VIEW_DEPTH = 1;
@@ -336,7 +338,8 @@ fragment float4 screen_resolve(ScreenOut in [[stage_in]], float4 current [[color
     }
     float4 occluded = occlusion.read(texel);
     if (screen.passes.x != 0) {
-        color *= mix(1.0, occluded.r, 1 - added.a);
+        // (held to 0: the control above 1 darkens past the occlusion)
+        color *= saturate(mix(1.0, occluded.r, (1 - added.a) * screen.tune.x));
     }
     if (screen.passes.y != 0) {
         color *= 1 - added.a * occluded.g;

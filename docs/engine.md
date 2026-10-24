@@ -809,6 +809,20 @@ value out of its range, is refused and logged. The Developer tab's
 Lighting section has a slider for each, launched as `--set` values that
 win over the map's file.
 
+The renderer applies them only while one is off its default (a flag in
+the frame's uniforms), so an untouched state is the stock frame to the
+byte. Exposure, bloom and the tone curve act in the tone pass (the curve
+a power about the middle grey); the occlusion in the screen pass's
+resolve. On a baked surface the light is split by the sun's share, as the
+sun's shadows see it: that share is scaled by `tune.sun` and its colour,
+the rest by `tune.bounce` (where the sun's shadows are off the share is
+not known, and all of it is the bounce's). The map's own lightmaps keep
+the sun with the rest, so on them `tune.bounce` scales all their light
+and `tune.sun` does nothing. `tune.probes` and `tune.sun` light the
+objects and the surfaces the probes light; `tune.emissive` scales the
+level's and the models' self-illumination. Particles are lit as they
+are.
+
 ### Debug drawing
 
 Any system calls the immediate-mode shapes (a line, a box, a sphere, text
