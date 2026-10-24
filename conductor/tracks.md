@@ -52,3 +52,6 @@ This file tracks all major tracks for the project.
 
 - [~] **Track: Fidelity, performance and developer tools: a dev Blood Gulch with a station for each system, a launcher Developer tab, an in-game dev panel with lighting control and a stock lightmap view, the bake out of play, the systems' bugs fixed close to the original, and the performance track merged in**
   *Link: [./tracks/fidelity_devtools_20261024/](./tracks/fidelity_devtools_20261024/)*
+
+- [ ] **Track: Rust crates and tools for the engine: snapshot, mutation, property and fuzz tests, deterministic maps, binrw readers, a faster bake cache, fewer allocations in the frame, a better optimised release, and the Nix checks**
+  *Link: [./tracks/rust_tools_20261024/](./tracks/rust_tools_20261024/)*

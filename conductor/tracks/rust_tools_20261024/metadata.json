@@ -1,0 +1,8 @@
+{
+  "track_id": "rust_tools_20261024",
+  "type": "chore",
+  "status": "new",
+  "created_at": "2026-10-24T00:00:00Z",
+  "updated_at": "2026-10-24T00:00:00Z",
+  "description": "The Rust crates and tools reviewed for the engine: faster development, stronger tests and logs for Claude, and a faster game on the user's Mac"
+}
