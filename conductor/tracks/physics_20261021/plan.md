@@ -4,9 +4,9 @@
 - [x] Task: The mass-point model for objects f9b867a9
     - [x] Write tests: mass points, density, inertia, buoyancy and drag from `phys`; a crate falling and resting against a reference trace (marked, needs `assets/maps`)
     - [x] Bodies for objects in `opence_physics` and `sim`
-- [~] Task: Collision and rest
-    - [ ] Write tests: friction by material; sleeping and waking; impact effects chosen by material
-    - [ ] Collision with the BSP and other objects' collision models
+- [x] Task: Collision and rest 33a8b9e3
+    - [x] Write tests: friction by material; sleeping and waking; impact effects chosen by material
+    - [x] Collision with the BSP and other objects' collision models
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Objects as bodies' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 2: Forces and grenades
