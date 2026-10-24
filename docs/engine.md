@@ -298,6 +298,24 @@ BSP's mean brightness and colour must stay within set limits of the stock
 lightmaps. Two are listed as known colour differences: longest, and d20's
 second BSP.
 
+### Known lighting problems
+
+These were found by comparing the bake against the stock view (`view stock`)
+and the light view (`view light`). The views were Blood Gulch and devgulch's
+shader station, at 960×540, with native and temporal anti-aliasing.
+
+| Problem | What is seen | Cause |
+| --- | --- | --- |
+| Emitters glow over their whole face | A light panel's face is lit red all over, not only its emblem. Red light spreads over the floor in front. | A shader with radiosity power makes every one of its triangles an emitter of the same brightness (`scene.rs`, `bake_material`). Nothing weighs that by where the shader's map glows. The stock lightmaps show only a faint glow. |
+| Fireflies and blotches | The light view has green and yellow specks on the cliffs. Inside the pits and on the panels there are red and green blobs. | Small, bright emitters are found by too few paths: 64 paths for each texel, and no filter afterwards. A rare path that meets a lamp leaves a speck, and nearby texels that each catch a few such paths leave a blob. |
+| Too bright and clipped | Blood Gulch's start view has a mean of 86 against stock's 74, and 1.6% of its pixels are clipped against stock's none. The back view's mean matches stock. | The emitters' light above, added to the panels' own glow. The sky light's exposure matches stock where no emitter is near. |
+| Lightmap seams | On a flat floor, two triangles meet along an edge with a step in brightness. Stock shows no edge there. | Each chart's texels are traced apart, and the dilation copies only the edge's points. Two charts that meet get different light, so their edge shows. |
+| Settling under temporal AA | With the camera still, the first frames under temporal anti-aliasing differ by up to 109 (of 255) from one to the next. By the twelfth frame they differ by under 25, and only in a few pixels. | The temporal upscaler gathers its history after a cut. The difference is not a flicker in the shaders: the same frame drawn twice is identical, and native anti-aliasing shows no change between ticks. |
+| The weapon's idle pose steps | Every second tick, the first-person weapon moves by a few pixels. | The weapon's idle animation advances at 15 Hz. Phase 6, the animation work, takes this. |
+
+Black pixels match stock in every view (about 0.2–0.4%, in the weapon's dark
+parts). No view showed NaNs.
+
 ### The passes
 
 A frame is drawn in this order. Each switch is a shell variable
