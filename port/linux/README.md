@@ -977,6 +977,12 @@ game with a password, whose invite the listing hides, shows no ping, nor
 does a host not reached; a game that is full or starting shows CLOSED.
 REFRESH also asks the hosts for their listings again.
 
+The gametype column names an OpenCE gametype's kind (SWAT, INFECTION, GUN
+GAME, or HC and the game engine for Hardcore: HC CTF, HC SLAYER), which the
+host sends with the game (network version 37), and otherwise the game
+engine's (SLAYER, CTF, KING OF THE HILL). The browser of LAN games, and the
+preview of a game before joining it, name it the same way.
+
 How it operates (`src/p2p_lobby.c`):
 
 - The host of a public game publishes a listing: the invite, and the name,
