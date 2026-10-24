@@ -60,6 +60,8 @@ pub struct Level {
     pub particle_systems: Vec<crate::ParticleSystem>,
     /// The weather its BSPs have, by path.
     pub weather: Vec<crate::WeatherSystem>,
+    /// The winds its weather palettes have, by path.
+    pub winds: Vec<crate::Wind>,
     /// Its detail object collections, as its scenario's palette orders
     /// them (none: an entry naming none).
     pub detail_object_collections: Vec<Option<crate::DetailObjectCollection>>,
@@ -628,6 +630,8 @@ pub struct StructureBsp {
     pub decals: Vec<LevelDecal>,
     /// Its weather palette.
     pub weather_palette: Vec<crate::WeatherPalette>,
+    /// Its weather polyhedra, where weather is not drawn.
+    pub weather_polyhedra: Vec<crate::WeatherPolyhedron>,
     /// Each cluster's weather, an index in its palette.
     pub cluster_weather: Vec<Option<u16>>,
     /// Each of its leaves' cluster (as its collision BSP numbers its

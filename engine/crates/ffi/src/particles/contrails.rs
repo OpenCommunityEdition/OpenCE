@@ -18,6 +18,7 @@ use opence_sim::point_physics;
 use opence_sim::seats::default_pose;
 use opence_sim::{Simulation, Vec3};
 
+use super::wind::Air;
 use super::{blend, Pictures, Random, TICK};
 use crate::lights::marker_frames;
 use crate::snapshot::{ParticleSnapshot, MAX_PARTICLES, PARTICLE_FACING_QUAD};
@@ -371,7 +372,7 @@ impl Trail {
         &mut self,
         contrail: &Contrail,
         dt: f32,
-        wind: Vec3,
+        air: &Air<'_>,
         random: &mut Random,
         mut collide: impl FnMut(Vec3, Vec3) -> Option<PointHit>,
     ) {
@@ -391,6 +392,7 @@ impl Trail {
                 continue;
             };
             if let Some(physics) = &state.physics {
+                let wind = air.at(point.position, physics.flags);
                 point_physics::update(
                     physics,
                     &mut point.position,
@@ -568,12 +570,12 @@ impl Contrails {
     }
 
     /// One tick: the objects leave their contrails' points, then every
-    /// trail's points age and move in `wind`, meeting the world.
+    /// trail's points age and move in `air`, meeting the world.
     pub(super) fn tick(
         &mut self,
         level: &Level,
         simulation: &mut Simulation,
-        wind: Vec3,
+        air: &Air<'_>,
         random: &mut Random,
     ) {
         if self.carried.is_empty() && self.trails.is_empty() {
@@ -588,7 +590,7 @@ impl Contrails {
             if !trail.carried {
                 trail.animate(contrail, level, TICK, random);
             }
-            trail.age(contrail, TICK, wind, random, |from, motion| {
+            trail.age(contrail, TICK, air, random, |from, motion| {
                 world.collide_point(from, motion)
             });
             trail.carried || !trail.points.is_empty()
@@ -887,11 +889,11 @@ mod tests {
         }
         let definition = contrail(0, vec![state(10.0, 0.0, 1.0, red())]);
         let mut random = Random::default();
-        trail.age(&definition, 0.0, Vec3::ZERO, &mut random, |_, _| None);
+        trail.age(&definition, 0.0, &Air::still(), &mut random, |_, _| None);
         assert_eq!(trail.points.len(), 2, "the newest and one expired end");
         let mut lone = self::trail(&[Vec3::ZERO]);
         lone.points[0].expired = true;
-        lone.age(&definition, 0.0, Vec3::ZERO, &mut random, |_, _| None);
+        lone.age(&definition, 0.0, &Air::still(), &mut random, |_, _| None);
         assert!(lone.points.is_empty());
     }
 
@@ -908,15 +910,15 @@ mod tests {
         trail
             .points
             .push_front(TrailPoint::new(Vec3::ZERO, Vec3::X, 1.0));
-        trail.age(&definition, 0.5, Vec3::ZERO, &mut random, |_, _| None);
+        trail.age(&definition, 0.5, &Air::still(), &mut random, |_, _| None);
         assert_eq!(trail.points[0].position, Vec3::ZERO, "made this tick");
-        trail.age(&definition, 0.5, Vec3::ZERO, &mut random, |_, _| None);
+        trail.age(&definition, 0.5, &Air::still(), &mut random, |_, _| None);
         assert!((trail.points[0].position.x - 0.5).abs() < 1e-4);
         // (without physics, a point stays where it was left)
         let still = contrail(0, vec![state(10.0, 0.0, 1.0, red())]);
         let mut trail = self::trail(&[Vec3::ZERO]);
         trail.points[0].velocity = Vec3::X;
-        trail.age(&still, 0.5, Vec3::ZERO, &mut random, |_, _| None);
+        trail.age(&still, 0.5, &Air::still(), &mut random, |_, _| None);
         assert_eq!(trail.points[0].position, Vec3::ZERO);
     }
 
@@ -1110,7 +1112,7 @@ mod tests {
         let handle = spawn(&mut simulation);
         let mut random = Random::default();
         for _ in 0..3 {
-            contrails.tick(&level, &mut simulation, Vec3::ZERO, &mut random);
+            contrails.tick(&level, &mut simulation, &Air::still(), &mut random);
         }
         let mut out = Vec::new();
         contrails.gather(
@@ -1128,7 +1130,7 @@ mod tests {
         assert!(out[0].shape[0] > 0.0, "{:?}", out[0]);
         assert!(simulation.remove(handle));
         for _ in 0..31 {
-            contrails.tick(&level, &mut simulation, Vec3::ZERO, &mut random);
+            contrails.tick(&level, &mut simulation, &Air::still(), &mut random);
         }
         assert_eq!(contrails.len(), 0, "its points died");
     }
@@ -1154,7 +1156,7 @@ mod tests {
         spawn(&mut simulation);
         let mut random = Random::default();
         for _ in 0..3 {
-            contrails.tick(&level, &mut simulation, Vec3::ZERO, &mut random);
+            contrails.tick(&level, &mut simulation, &Air::still(), &mut random);
         }
         let mut out = Vec::new();
         contrails.gather(&level, &Pictures::default(), Vec3::ZERO, &mut out);
@@ -1163,7 +1165,7 @@ mod tests {
         level.objects[0].attachments[0].primary_scale = 1;
         let mut contrails = Contrails::new(&level);
         for _ in 0..3 {
-            contrails.tick(&level, &mut simulation, Vec3::ZERO, &mut random);
+            contrails.tick(&level, &mut simulation, &Air::still(), &mut random);
         }
         assert_eq!(contrails.len(), 1);
         assert!(contrails

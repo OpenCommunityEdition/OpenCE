@@ -630,11 +630,47 @@ pub struct WeatherParticleType {
     pub render_mode: i16,
     /// How it is blended.
     pub shader: SpriteShader,
+    /// The heights it fades over: in from the first to the second above
+    /// the camera, out from the third to the fourth below it.
+    pub height_fade: [f32; 4],
+    /// Which way an oriented one points: 0 its velocity, 1 its
+    /// acceleration.
+    pub direction_source: i16,
+    /// One over its picture's width in world units, as the tag has it.
+    pub one_over_sprite_width: f32,
 }
 
 impl WeatherParticleType {
     /// Each is turned at random.
-    pub const RANDOM_ROTATION: u32 = 1 << 3;
+    pub const RANDOM_ROTATION: u32 = 1 << 2;
+}
+
+/// Wind (`wind`): how the air moves where a weather palette entry has it.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct Wind {
+    /// Its tag.
+    pub tag: TagRef,
+    /// The least and most it blows at.
+    pub velocity: [f32; 2],
+    /// How far its direction wanders, pitch and yaw.
+    pub variation_area: [f32; 2],
+    /// How much of it varies from place to place.
+    pub local_variation_weight: f32,
+    /// How fast that variation changes.
+    pub local_variation_rate: f32,
+    /// How much damped air keeps of it taken away.
+    pub damping: f32,
+}
+
+/// A BSP's weather polyhedron: a convex volume weather is not drawn in.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct WeatherPolyhedron {
+    /// The centre of the sphere about it.
+    pub center: [f32; 3],
+    /// That sphere's radius.
+    pub radius: f32,
+    /// Its planes, each a normal and a distance, facing out.
+    pub planes: Vec<[f32; 4]>,
 }
 
 /// One of a BSP's weather palette's entries.
@@ -642,6 +678,8 @@ impl WeatherParticleType {
 pub struct WeatherPalette {
     /// Its weather.
     pub system: Option<TagRef>,
+    /// Its wind.
+    pub wind_tag: Option<TagRef>,
     /// Its wind's direction and speed.
     pub wind: [f32; 4],
 }

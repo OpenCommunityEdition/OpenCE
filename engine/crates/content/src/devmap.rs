@@ -108,6 +108,7 @@ pub fn plane(half_size: f32, cells: u16) -> StructureBsp {
     StructureBsp {
         cluster_skies: Vec::new(),
         weather_palette: Vec::new(),
+        weather_polyhedra: Vec::new(),
         cluster_weather: Vec::new(),
         leaf_clusters: Vec::new(),
         detail_objects: Vec::new(),
@@ -857,6 +858,7 @@ pub fn level(donor: Option<&Level>) -> Level {
             contrails: Vec::new(),
             particle_systems: Vec::new(),
             weather: Vec::new(),
+            winds: Vec::new(),
             detail_object_collections: Vec::new(),
             lens_flares: Vec::new(),
             light_volumes: Vec::new(),

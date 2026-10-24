@@ -5,9 +5,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use opence_content::{
-    EffectParticles, Level, Particle, PointPhysics, StructureBsp, TagRef, WeatherParticleType,
-};
+use opence_content::{EffectParticles, Level, Particle, StructureBsp, TagRef};
 use opence_sim::effects::{FiredPart, Running};
 use opence_sim::particle_collision::PointHit;
 use opence_sim::point_physics;
@@ -15,11 +13,14 @@ use opence_sim::{Simulation, Vec3};
 
 mod contrails;
 mod systems;
+mod weather;
+mod wind;
 use crate::snapshot::{
     ParticleSnapshot, MAX_PARTICLES, PARTICLE_FACING_AXIS, PARTICLE_FACING_SCREEN,
     PARTICLE_NO_PICTURE,
 };
 use contrails::Contrails;
+pub(crate) use weather::ParticleView;
 
 /// A tick, in seconds.
 const TICK: f32 = 1.0 / 30.0;
@@ -33,8 +34,6 @@ const COLLISION_SCALE_SPEEDS: [f32; 2] = [0.5, 1.5];
 const SETTLES_ON: f32 = 0.8;
 /// The most particles the effects keep alive.
 const MAX_LIVE: usize = 1024;
-/// The most weather particles of one kind.
-const MAX_WEATHER: usize = 384;
 
 /// A small random sequence (xorshift), the particles' own, so that they
 /// take nothing from the simulation's.
@@ -192,7 +191,14 @@ fn mix(from: [f32; 4], to: [f32; 4], t: f32) -> [f32; 4] {
 
 /// A point's velocity after `dt`, as `physics` moves it in `wind`,
 /// meeting nothing.
-fn pushed(physics: &PointPhysics, radius: f32, velocity: Vec3, wind: Vec3, dt: f32) -> Vec3 {
+#[cfg(test)]
+fn pushed(
+    physics: &opence_content::PointPhysics,
+    radius: f32,
+    velocity: Vec3,
+    wind: Vec3,
+    dt: f32,
+) -> Vec3 {
     let (mut at, mut velocity) = (Vec3::ZERO, velocity);
     point_physics::update(
         physics,
@@ -633,195 +639,6 @@ fn blend(function: i16) -> u32 {
     u32::try_from(function).unwrap_or(0).min(7)
 }
 
-/// A weather particle, drifting in the box about the camera.
-#[derive(Clone, Debug, PartialEq)]
-struct Drop {
-    position: Vec3,
-    velocity: Vec3,
-    acceleration: Vec3,
-    radius: f32,
-    rotation: f32,
-    spin: f32,
-    color: [f32; 4],
-    fps: f32,
-    age: f32,
-}
-
-/// The weather about the camera.
-#[derive(Clone, Debug, Default)]
-struct Weather {
-    /// The system falling (its index in the level's weather).
-    system: Option<usize>,
-    /// Each of its kinds' particles.
-    drops: Vec<Vec<Drop>>,
-    wind: Vec3,
-}
-
-/// The size of a weather kind's box.
-fn box_size(kind: &WeatherParticleType) -> f32 {
-    if kind.distance_fade[3] > 0.0 {
-        kind.distance_fade[3].min(64.0)
-    } else {
-        10.0
-    }
-}
-
-/// The weather, and its wind, of the cluster `point` is in.
-fn weather_at(level: &Level, bsp: &StructureBsp, point: Vec3) -> (Option<usize>, Vec3) {
-    let entry = bsp
-        .collision
-        .leaf_at(point.to_array())
-        .and_then(|leaf| *bsp.leaf_clusters.get(leaf as usize)?)
-        .and_then(|cluster| *bsp.cluster_weather.get(usize::from(cluster))?)
-        .and_then(|index| bsp.weather_palette.get(usize::from(index)));
-    let Some(entry) = entry else {
-        return (None, Vec3::ZERO);
-    };
-    let [x, y, z, speed] = entry.wind;
-    let wind = Vec3::new(x, y, z).normalize_or_zero() * speed;
-    let system = entry
-        .system
-        .as_ref()
-        .and_then(|tag| level.weather.iter().position(|system| &system.tag == tag));
-    (system, wind)
-}
-
-/// `offset` brought into the box of side `side` about 0.
-fn wrapped(offset: Vec3, side: f32) -> Vec3 {
-    let wrap = |value: f32| {
-        let mut value = libm::fmodf(value + side * 0.5, side);
-        if value < 0.0 {
-            value += side;
-        }
-        value - side * 0.5
-    };
-    Vec3::new(wrap(offset.x), wrap(offset.y), wrap(offset.z))
-}
-
-impl Weather {
-    fn tick(&mut self, level: &Level, bsp: &StructureBsp, camera: Vec3, random: &mut Random) {
-        let (system, wind) = weather_at(level, bsp, camera);
-        self.wind = wind;
-        if system != self.system {
-            self.system = system;
-            self.drops.clear();
-            for kind in system
-                .and_then(|index| level.weather.get(index))
-                .map_or(&[][..], |system| system.types.as_slice())
-            {
-                let side = box_size(kind);
-                let density = (kind.density[0] + kind.density[1]) * 0.5;
-                let count = ((density * side * side * side).max(0.0) as usize).min(MAX_WEATHER);
-                let drops = (0..count)
-                    .map(|_| {
-                        let place = Vec3::new(random.next(), random.next(), random.next());
-                        let magnitude =
-                            random.between([kind.acceleration[0], kind.acceleration[1]]);
-                        Drop {
-                            position: camera + (place - Vec3::splat(0.5)) * side,
-                            velocity: Vec3::ZERO,
-                            acceleration: random.direction() * magnitude,
-                            radius: random.between(kind.radius),
-                            rotation: if kind.flags & WeatherParticleType::RANDOM_ROTATION != 0 {
-                                std::f32::consts::TAU * random.next()
-                            } else {
-                                0.0
-                            },
-                            spin: random.between(kind.rotation_rate),
-                            color: mix(rgba(kind.color[0]), rgba(kind.color[1]), random.next()),
-                            fps: random.between(kind.animation_rate),
-                            age: 0.0,
-                        }
-                    })
-                    .collect();
-                self.drops.push(drops);
-            }
-        }
-        let Some(system) = self.system.and_then(|index| level.weather.get(index)) else {
-            return;
-        };
-        for (kind, drops) in system.types.iter().zip(&mut self.drops) {
-            let side = box_size(kind);
-            for drop in drops {
-                // (its acceleration turns at random)
-                let magnitude = drop.acceleration.length();
-                if magnitude > 0.0 {
-                    let turned = drop.acceleration
-                        + random.direction() * magnitude * kind.acceleration[2] * TICK;
-                    drop.acceleration = turned.normalize_or_zero() * magnitude;
-                }
-                drop.velocity += drop.acceleration * TICK;
-                if let Some(physics) = &kind.physics {
-                    drop.velocity = pushed(physics, drop.radius, drop.velocity, wind, TICK);
-                }
-                drop.position =
-                    camera + wrapped(drop.position + drop.velocity * TICK - camera, side);
-                drop.rotation += drop.spin * TICK;
-                drop.age += TICK;
-            }
-        }
-    }
-
-    fn gather(
-        &self,
-        level: &Level,
-        pictures: &Pictures,
-        camera: Vec3,
-        out: &mut Vec<ParticleSnapshot>,
-    ) {
-        let Some(system) = self.system.and_then(|index| level.weather.get(index)) else {
-            return;
-        };
-        for (kind, drops) in system.types.iter().zip(&self.drops) {
-            let side = box_size(kind);
-            let [near, full, start, far] = kind.distance_fade;
-            for drop in drops {
-                if out.len() >= MAX_PARTICLES {
-                    return;
-                }
-                let position = camera + wrapped(drop.position - camera, side);
-                let distance = position.distance(camera);
-                let fade_in = if full > near {
-                    ((distance - near) / (full - near)).clamp(0.0, 1.0)
-                } else {
-                    1.0
-                };
-                let fade_out = if far > start {
-                    ((far - distance) / (far - start)).clamp(0.0, 1.0)
-                } else {
-                    1.0
-                };
-                let frame = pictures.frame(
-                    level,
-                    kind.bitmap.as_ref(),
-                    0,
-                    (drop.age * drop.fps.max(0.0)) as usize,
-                );
-                let along = drop.velocity.normalize_or_zero();
-                let (facing, axis) = match kind.render_mode {
-                    1 if along != Vec3::ZERO => (PARTICLE_FACING_AXIS, along),
-                    1 => (PARTICLE_FACING_AXIS, Vec3::Z),
-                    _ => (PARTICLE_FACING_SCREEN, along),
-                };
-                let [r, g, b, a] = drop.color;
-                out.push(ParticleSnapshot {
-                    position: [position.x, position.y, position.z, drop.radius],
-                    axis: [axis.x, axis.y, axis.z, drop.rotation],
-                    color: [r, g, b, a * fade_in * fade_out],
-                    uv: frame.uv,
-                    shape: [drop.radius, 0.0, 0.0, 0.0],
-                    modes: [
-                        frame.picture,
-                        blend(kind.shader.framebuffer_blend_function),
-                        facing,
-                        0,
-                    ],
-                });
-            }
-        }
-    }
-}
-
 /// The particles, contrails and weather while the game runs.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct LevelParticles {
@@ -834,7 +651,9 @@ pub(crate) struct LevelParticles {
     /// Each running effect's event's emitters: how many they emit, and how
     /// many they have.
     emitted: HashMap<(u32, usize, usize), (u16, u16)>,
-    weather: Weather,
+    weather: weather::Weather,
+    /// The winds blowing.
+    winds: wind::Winds,
     contrails: Contrails,
     /// The particle systems running.
     systems: systems::Systems,
@@ -880,7 +699,11 @@ impl LevelParticles {
             .iter()
             .map(|effect| (effect.number, effect.origin.position))
             .collect();
-        let wind = self.weather.wind;
+        let structure = level.structure_bsps.get(bsp);
+        if let Some(structure) = structure {
+            self.winds.tick(level, structure, &mut self.random);
+        }
+        let air = wind::Air::new(&self.winds, structure);
         let events = &mut self.events;
         events.clear();
         let world: &Simulation = simulation;
@@ -895,6 +718,10 @@ impl LevelParticles {
                 }
             }
             live.age += TICK;
+            let wind = particle
+                .physics
+                .as_ref()
+                .map_or(Vec3::ZERO, |physics| air.at(live.position, physics.flags));
             if !live.step(
                 particle,
                 wind,
@@ -910,12 +737,12 @@ impl LevelParticles {
             }
             true
         });
-        if let Some(structure) = level.structure_bsps.get(bsp) {
+        if let Some(structure) = structure {
             self.weather
-                .tick(level, structure, self.camera, &mut self.random);
+                .tick(level, (bsp, structure), &air, self.camera, &mut self.random);
         }
         self.contrails
-            .tick(level, simulation, self.weather.wind, &mut self.random);
+            .tick(level, simulation, &air, &mut self.random);
         self.systems
             .tick(level, simulation, fired, &mut self.random);
     }
@@ -983,8 +810,13 @@ impl LevelParticles {
     }
 
     /// The frame's particles: the effects', the particle systems', the
-    /// contrails', then the weather's about `camera`.
-    pub(crate) fn gather(&self, level: &Level, camera: Vec3, out: &mut Vec<ParticleSnapshot>) {
+    /// contrails', then the weather's, seen from `view`.
+    pub(crate) fn gather(
+        &self,
+        level: &Level,
+        view: &ParticleView,
+        out: &mut Vec<ParticleSnapshot>,
+    ) {
         out.clear();
         for live in &self.live {
             if out.len() >= MAX_PARTICLES {
@@ -993,8 +825,9 @@ impl LevelParticles {
             out.extend(live.snapshot(level, &self.pictures));
         }
         self.systems.gather(level, &self.pictures, out);
-        self.contrails.gather(level, &self.pictures, camera, out);
-        self.weather.gather(level, &self.pictures, camera, out);
+        self.contrails
+            .gather(level, &self.pictures, view.position, out);
+        self.weather.gather(level, &self.pictures, view, out);
     }
 }
 
@@ -1049,7 +882,7 @@ mod tests {
     use super::*;
     use opence_content::{
         DetailObject, DetailObjectCollection, DetailObjectType, Effect, EffectEvent, Group,
-        Sequence, Sprite, SpriteShader, WeatherPalette, WeatherSystem,
+        PointPhysics, Sequence, Sprite,
     };
     use opence_sim::effects::Origin;
     use opence_sim::Quat;
@@ -1325,7 +1158,7 @@ mod tests {
         particles.tick(&level, &mut simulation, (&[running(1, 30)], &[]), 0);
         assert_eq!(particles.live.len(), 3);
         let mut out = Vec::new();
-        particles.gather(&level, Vec3::ZERO, &mut out);
+        particles.gather(&level, &ParticleView::at(Vec3::ZERO), &mut out);
         assert_eq!(out.len(), 3);
         let first = out[0];
         // (it left forward at 2 a second, for two ticks)
@@ -1340,7 +1173,7 @@ mod tests {
         for _ in 0..27 {
             particles.tick(&level, &mut simulation, (&[], &[]), 0);
         }
-        particles.gather(&level, Vec3::ZERO, &mut out);
+        particles.gather(&level, &ParticleView::at(Vec3::ZERO), &mut out);
         assert!(out[0].color[3] < 0.5, "it fades out: {:?}", out[0]);
         particles.tick(&level, &mut simulation, (&[], &[]), 0);
         assert!(particles.live.is_empty(), "it dies at a second");
@@ -1429,80 +1262,6 @@ mod tests {
         let images = particle_images(&level);
         assert_eq!(images.len(), 3);
         assert_eq!(images[2], (tag(b"bitm", "sprites"), 0));
-    }
-
-    /// The devmap with snow falling in every cluster, in a wind along y.
-    fn snowing() -> (Level, Vec3) {
-        let mut level = level(EffectParticles::START, 1);
-        level.weather.push(WeatherSystem {
-            tag: tag(b"rain", "snow"),
-            types: vec![WeatherParticleType {
-                flags: 0,
-                distance_fade: [0.0, 1.0, 3.0, 4.0],
-                density: [1.0, 1.0],
-                physics: None,
-                acceleration: [0.0, 0.0, 0.0, 0.0],
-                radius: [0.1, 0.1],
-                animation_rate: [0.0, 0.0],
-                rotation_rate: [0.0, 0.0],
-                color: [[1.0, 1.0, 1.0, 1.0]; 2],
-                bitmap: Some(tag(b"bitm", "sheet")),
-                render_mode: 1,
-                shader: SpriteShader::default(),
-            }],
-        });
-        let bsp = &mut level.structure_bsps[0];
-        bsp.weather_palette = vec![WeatherPalette {
-            system: Some(tag(b"rain", "snow")),
-            wind: [0.0, 2.0, 0.0, 3.0],
-        }];
-        bsp.cluster_weather = vec![Some(0)];
-        bsp.leaf_clusters = vec![Some(0); bsp.collision.leaves.len()];
-        let camera = [1.0, -1.0, 10.0, -10.0]
-            .into_iter()
-            .map(|z| Vec3::new(0.5, 0.5, z))
-            .find(|point| bsp.collision.leaf_at(point.to_array()).is_some());
-        let Some(camera) = camera else {
-            panic!("the devmap has no leaf");
-        };
-        (level, camera)
-    }
-
-    #[test]
-    fn weather_fills_a_box_about_the_camera_where_its_cluster_has_some() {
-        let (level, camera) = snowing();
-        let (system, wind) = weather_at(&level, &level.structure_bsps[0], camera);
-        assert_eq!(system, Some(0));
-        assert_eq!(wind, Vec3::new(0.0, 3.0, 0.0));
-        let mut particles = LevelParticles::new(&level);
-        particles.camera = camera;
-        let mut simulation = Simulation::empty();
-        particles.tick(&level, &mut simulation, (&[], &[]), 0);
-        assert_eq!(particles.weather.drops[0].len(), 64);
-        let mut out = Vec::new();
-        particles.gather(&level, camera, &mut out);
-        assert_eq!(out.len(), 64);
-        for drop in &out {
-            let at = Vec3::new(drop.position[0], drop.position[1], drop.position[2]);
-            assert!((at - camera).abs().max_element() <= 2.0 + 1e-4, "{at}");
-            assert!((0.0..=1.0).contains(&drop.color[3]));
-            assert_eq!(drop.modes[2], PARTICLE_FACING_AXIS);
-        }
-        // (somewhere with none, it stops)
-        let mut dry = level.clone();
-        dry.structure_bsps[0].cluster_weather = vec![None];
-        particles.tick(&dry, &mut simulation, (&[], &[]), 0);
-        particles.gather(&dry, camera, &mut out);
-        assert!(out.is_empty());
-    }
-
-    #[test]
-    fn wrapping_brings_an_offset_into_the_box() {
-        let wrapped = wrapped(Vec3::new(2.5, -2.5, 0.25), 4.0);
-        assert!(
-            (wrapped - Vec3::new(-1.5, 1.5, 0.25)).length() < 1e-5,
-            "{wrapped}"
-        );
     }
 
     #[test]

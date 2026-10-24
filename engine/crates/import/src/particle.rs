@@ -65,7 +65,8 @@ use opence_content::{
     Contrail, ContrailState, DetailObject, DetailObjectCollection, DetailObjectType, Effect,
     EffectParticles, ObjectDefinition, Particle, ParticleState, ParticleSystem, ParticleSystemType,
     ParticleTypeState, ParticleTypeVariables, PointPhysics, RandomizedVariables, SecondaryMap,
-    SpriteShader, StructureBsp, TagRef, WeatherPalette, WeatherParticleType, WeatherSystem,
+    SpriteShader, StructureBsp, TagRef, WeatherPalette, WeatherParticleType, WeatherPolyhedron,
+    WeatherSystem, Wind,
 };
 
 use crate::cache::Cache;
@@ -113,6 +114,14 @@ const MAX_DETAIL_PALETTE: usize = 32;
 pub(crate) const BSP_WEATHER_PALETTE_OFFSET: usize = 0x1B4;
 pub(crate) const BSP_WEATHER_PALETTE_SIZE: usize = 0xF0;
 const MAX_BSP_WEATHER_PALETTE: usize = 32;
+pub(crate) const WIND: GroupTag = GroupTag::new(b"wind");
+pub(crate) const WIND_SIZE: usize = 0x40;
+/// A BSP's weather polyhedra (`structure_bsp.weather_polyhedra`).
+pub(crate) const BSP_WEATHER_POLYHEDRA_OFFSET: usize = 0x1C0;
+pub(crate) const WEATHER_POLYHEDRON_SIZE: usize = 0x20;
+const MAX_WEATHER_POLYHEDRA: usize = 32;
+const POLYHEDRON_PLANE_SIZE: usize = 0x10;
+const MAX_POLYHEDRON_PLANES: usize = 16;
 /// A BSP's detail objects (`structure_bsp.detail_objects`, one element).
 pub(crate) const BSP_DETAIL_OBJECTS_OFFSET: usize = 0x24C;
 pub(crate) const BSP_DETAIL_OBJECTS_SIZE: usize = 0x40;
@@ -593,6 +602,7 @@ pub(crate) fn weather_palette(bsp: &Element<'_>) -> Result<Vec<WeatherPalette>, 
         let direction = vector::<3>(&element, 0x90, "wind direction")?;
         palette.push(WeatherPalette {
             system: crate::object::reference(&element, 0x20, "particle system", &[RAIN])?,
+            wind_tag: crate::object::reference(&element, 0x80, "wind", &[WIND])?,
             wind: [
                 direction[0],
                 direction[1],
@@ -602,6 +612,29 @@ pub(crate) fn weather_palette(bsp: &Element<'_>) -> Result<Vec<WeatherPalette>, 
         });
     }
     Ok(palette)
+}
+
+/// A BSP's weather polyhedra.
+pub(crate) fn weather_polyhedra(bsp: &Element<'_>) -> Result<Vec<WeatherPolyhedron>, ImportError> {
+    let block = bsp.block(
+        BSP_WEATHER_POLYHEDRA_OFFSET,
+        "weather polyhedra",
+        WEATHER_POLYHEDRON_SIZE,
+        MAX_WEATHER_POLYHEDRA,
+    )?;
+    let mut polyhedra = Vec::with_capacity(block.len());
+    for element in block.iter() {
+        let planes = element.block(0x14, "planes", POLYHEDRON_PLANE_SIZE, MAX_POLYHEDRON_PLANES)?;
+        polyhedra.push(WeatherPolyhedron {
+            center: vector(&element, 0x00, "bounding sphere center")?,
+            radius: element.f32(0x0C, "bounding sphere radius")?,
+            planes: planes
+                .iter()
+                .map(|plane| vector(&plane, 0x00, "plane"))
+                .collect::<Result<_, _>>()?,
+        });
+    }
+    Ok(polyhedra)
 }
 
 /// A colour of five, six and five bits, in eight bits each.
@@ -731,6 +764,9 @@ fn import_weather_system(
             bitmap: reached.bitmap(&kind, 0x194, "sprite bitmap")?,
             render_mode: kind.i16(0x1A4, "render mode")?,
             shader: sprite_shader(&kind, 0x1D0)?,
+            height_fade: vector(&kind, 0x34, "fade heights")?,
+            direction_source: kind.i16(0x1A6, "render direction source")?,
+            one_over_sprite_width: kind.f32(0x154, "one over sprite width")?,
         });
     }
     Ok(WeatherSystem {
@@ -757,6 +793,33 @@ pub(crate) fn import_weather(
         }
     }
     Ok(weather)
+}
+
+/// Every wind the BSPs' weather palettes name, each once, by path.
+pub(crate) fn import_winds(
+    cache: &Cache,
+    structure_bsps: &[StructureBsp],
+) -> Result<Vec<Wind>, ImportError> {
+    let tags: BTreeSet<&TagRef> = structure_bsps
+        .iter()
+        .flat_map(|bsp| &bsp.weather_palette)
+        .filter_map(|entry| entry.wind_tag.as_ref())
+        .collect();
+    let mut winds = Vec::with_capacity(tags.len());
+    for tag in tags {
+        if let Some(index) = tag_index(cache, tag) {
+            let wind = cache.tag(index, WIND, WIND_SIZE)?;
+            winds.push(Wind {
+                tag: tag_ref(cache, index),
+                velocity: vector(&wind, 0x00, "velocity")?,
+                variation_area: vector(&wind, 0x08, "variation area")?,
+                local_variation_weight: wind.f32(0x10, "local variation weight")?,
+                local_variation_rate: wind.f32(0x14, "local variation rate")?,
+                damping: wind.f32(0x18, "damping")?,
+            });
+        }
+    }
+    Ok(winds)
 }
 
 /// A detail object collection, its bitmap reached.
@@ -1107,37 +1170,66 @@ mod tests {
             0x20,
             &WeatherParticleType::RANDOM_ROTATION.to_le_bytes(),
         );
-        floats(&mut kind, 0x24, &[1.0, 2.0, 10.0, 20.0]);
+        floats(&mut kind, 0x24, &[1.0, 2.0, 10.0, 20.0, 3.0, 4.0, 5.0, 6.0]);
         floats(&mut kind, 0xA4, &[0.01, 0.02]);
         empty(&mut kind, 0xAC);
         floats(&mut kind, 0xCC, &[1.0, 2.0, 0.5, 0.25]);
         floats(&mut kind, 0xFC, &[0.05, 0.1, 4.0, 8.0, 1.0, 2.0]);
         floats(&mut kind, 0x134, &[1.0; 8]);
+        floats(&mut kind, 0x154, &[0.5]);
         empty(&mut kind, 0x194);
         put(&mut kind, 0x1A4, &1i16.to_le_bytes());
+        put(&mut kind, 0x1A6, &1i16.to_le_bytes());
         put(&mut kind, 0x1D0, &[0, 0, 3, 0, 0, 0]);
         let kind = fake.add_data(&kind);
         let mut rain = [0u8; WEATHER_SIZE];
         block(&mut rain, WEATHER_TYPES_OFFSET, 1, kind);
         let rain = fake.add_tag(RAIN, "weather\\snow", &rain);
+        let mut wind = [0u8; WIND_SIZE];
+        floats(&mut wind, 0x00, &[1.0, 2.0, 0.1, 0.2, 0.25, 4.0, 0.75]);
+        let wind = fake.add_tag(WIND, "weather\\breeze", &wind);
         let mut entry = [0u8; BSP_WEATHER_PALETTE_SIZE];
         reference(&mut entry, 0x20, RAIN, fake.handle(rain));
+        reference(&mut entry, 0x80, WIND, fake.handle(wind));
         floats(&mut entry, 0x90, &[1.0, 0.0, 0.0, 3.0]);
         let mut unnamed = [0u8; BSP_WEATHER_PALETTE_SIZE];
         empty(&mut unnamed, 0x20);
+        empty(&mut unnamed, 0x80);
         let mut entries = entry.to_vec();
         entries.extend_from_slice(&unnamed);
         let entries = fake.add_data(&entries);
-        let mut bsp = vec![0u8; BSP_WEATHER_PALETTE_OFFSET + 12];
+        let planes = fake.add_data(
+            &[0.0f32, 0.0, 1.0, 2.0, 0.0, 0.0, -1.0, 0.0]
+                .iter()
+                .flat_map(|value| value.to_le_bytes())
+                .collect::<Vec<_>>(),
+        );
+        let mut polyhedron = [0u8; WEATHER_POLYHEDRON_SIZE];
+        floats(&mut polyhedron, 0x00, &[1.0, 2.0, 3.0, 5.0]);
+        block(&mut polyhedron, 0x14, 2, planes);
+        let polyhedron = fake.add_data(&polyhedron);
+        let size = BSP_WEATHER_POLYHEDRA_OFFSET + 12;
+        let mut bsp = vec![0u8; size];
         block(&mut bsp, BSP_WEATHER_PALETTE_OFFSET, 2, entries);
+        block(&mut bsp, BSP_WEATHER_POLYHEDRA_OFFSET, 1, polyhedron);
         let bsp = fake.add_tag(GroupTag::new(b"sbsp"), "levels\\bsp", &bsp);
         let cache = Cache::open(fake.build())?;
 
-        let element = cache.tag(bsp, GroupTag::new(b"sbsp"), BSP_WEATHER_PALETTE_OFFSET + 12)?;
+        let element = cache.tag(bsp, GroupTag::new(b"sbsp"), size)?;
+        let polyhedra = weather_polyhedra(&element)?;
+        assert_eq!(
+            polyhedra,
+            [WeatherPolyhedron {
+                center: [1.0, 2.0, 3.0],
+                radius: 5.0,
+                planes: vec![[0.0, 0.0, 1.0, 2.0], [0.0, 0.0, -1.0, 0.0]],
+            }]
+        );
         let palette = weather_palette(&element)?;
         assert_eq!(palette.len(), 2);
         assert_eq!(palette[0].wind, [1.0, 0.0, 0.0, 3.0]);
         assert_eq!(palette[1].system, None);
+        assert_eq!(palette[1].wind_tag, None);
         let Some(system) = &palette[0].system else {
             panic!("the palette names no weather");
         };
@@ -1147,11 +1239,22 @@ mod tests {
             ..opence_content::devmap::plane(1.0, 1)
         };
         let mut reached = Reached::default();
-        let weather = import_weather(&cache, &[structure], &mut reached)?;
+        let weather = import_weather(&cache, std::slice::from_ref(&structure), &mut reached)?;
+        let winds = import_winds(&cache, &[structure])?;
+        assert_eq!(winds.len(), 1);
+        assert_eq!(winds[0].tag.path, "weather\\breeze");
+        assert_eq!(winds[0].velocity, [1.0, 2.0]);
+        assert_eq!(winds[0].variation_area, [0.1, 0.2]);
+        assert_eq!(winds[0].local_variation_weight, 0.25);
+        assert_eq!(winds[0].local_variation_rate, 4.0);
+        assert_eq!(winds[0].damping, 0.75);
         assert_eq!(weather.len(), 1);
         let snow = &weather[0].types[0];
         assert_eq!(snow.flags, WeatherParticleType::RANDOM_ROTATION);
         assert_eq!(snow.distance_fade, [1.0, 2.0, 10.0, 20.0]);
+        assert_eq!(snow.height_fade, [3.0, 4.0, 5.0, 6.0]);
+        assert_eq!(snow.direction_source, 1);
+        assert_eq!(snow.one_over_sprite_width, 0.5);
         assert_eq!(snow.density, [0.01, 0.02]);
         assert_eq!(snow.physics, None);
         assert_eq!(snow.acceleration, [1.0, 2.0, 0.5, 0.25]);

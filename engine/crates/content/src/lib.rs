@@ -60,7 +60,7 @@ pub use particle::{
     Contrail, ContrailState, DetailObject, DetailObjectCollection, DetailObjectType,
     EffectParticles, Particle, ParticleState, ParticleSystem, ParticleSystemType,
     ParticleTypeState, ParticleTypeVariables, PointPhysics, RandomizedVariables, SecondaryMap,
-    SpriteShader, WeatherPalette, WeatherParticleType, WeatherSystem,
+    SpriteShader, WeatherPalette, WeatherParticleType, WeatherPolyhedron, WeatherSystem, Wind,
 };
 pub use script::{
     Call, Constant, GlobalRef, Named, NodeKind, Script, ScriptGlobal, ScriptKind, ScriptNode,

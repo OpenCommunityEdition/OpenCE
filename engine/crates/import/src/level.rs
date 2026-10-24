@@ -301,6 +301,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     let particle_systems =
         crate::particle::import_particle_systems(cache, &effects, &objects, &mut reached)?;
     let weather = crate::particle::import_weather(cache, &structure_bsps, &mut reached)?;
+    let winds = crate::particle::import_winds(cache, &structure_bsps)?;
     let detail_object_collections = crate::particle::import_detail_object_collections(
         cache,
         &scenario,
@@ -351,6 +352,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
         contrails,
         particle_systems,
         weather,
+        winds,
         detail_object_collections,
         glows,
         lens_flares,
@@ -1264,9 +1266,14 @@ fn import_structure_bsp(
     let mut cluster_water = Vec::with_capacity(clusters_block.len());
     let fogs = Fogs::read(cache, &bsp)?;
     for cluster in clusters_block.iter() {
-        cluster_water.push(fogs.water(cluster.i16(0x02, "fog")?)?);
+        let fog = cluster.i16(0x02, "fog")?;
+        cluster_water.push(fogs.water(fog)?);
         cluster_skies.push(u16::try_from(cluster.i16(0, "sky")?).ok());
-        cluster_weather.push(u16::try_from(cluster.i16(0x08, "weather")?).ok());
+        let weather = match fogs.weather(fog)? {
+            Some(index) => index,
+            None => cluster.i16(0x08, "weather")?,
+        };
+        cluster_weather.push(u16::try_from(weather).ok());
         let within = |index: i16, count: usize| {
             u16::try_from(index)
                 .ok()
@@ -1303,6 +1310,7 @@ fn import_structure_bsp(
 
     let decals = crate::decal::runtime_decals(&bsp)?;
     let weather_palette = crate::particle::weather_palette(&bsp)?;
+    let weather_polyhedra = crate::particle::weather_polyhedra(&bsp)?;
     let detail_objects = crate::particle::detail_objects(&bsp)?;
 
     Ok(StructureBsp {
@@ -1313,6 +1321,7 @@ fn import_structure_bsp(
         cluster_weather,
         leaf_clusters,
         weather_palette,
+        weather_polyhedra,
         detail_objects,
         background_sounds,
         sound_environments,
@@ -1435,6 +1444,22 @@ impl<'a> Fogs<'a> {
                 0.0
             },
         }))
+    }
+
+    /// The weather palette index the fog region a cluster's fog reference
+    /// names puts in place of the cluster's own, where the reference is a
+    /// region (the whole cluster in it) whose index is not none. A fog
+    /// plane's region overrides only on the plane's far side, which is
+    /// not kept.
+    fn weather(&self, reference: i16) -> Result<Option<i16>, ImportError> {
+        let Some(region) = usize::try_from(reference)
+            .ok()
+            .and_then(|region| self.regions.get(region))
+        else {
+            return Ok(None);
+        };
+        let index = region.i16(0x26, "weather palette index")?;
+        Ok((index >= 0).then_some(index))
     }
 }
 
@@ -1954,6 +1979,34 @@ pub(crate) mod tests {
 
     pub(crate) fn empty(bytes: &mut [u8], at: usize) {
         reference(bytes, at, GroupTag::NONE, u32::MAX);
+    }
+
+    #[test]
+    fn a_fog_regions_weather_takes_the_place_of_its_clusters(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut fake = FakeCache::new(CacheKind::CustomEdition);
+        let mut regions = vec![0u8; 2 * BSP_FOG_REGION_SIZE];
+        put(&mut regions, 0x26, &2i16.to_le_bytes());
+        put(
+            &mut regions,
+            BSP_FOG_REGION_SIZE + 0x26,
+            &(-1i16).to_le_bytes(),
+        );
+        let regions = fake.add_data(&regions);
+        let mut bsp = vec![0u8; BSP_FOG_PALETTE_OFFSET + 12];
+        block(&mut bsp, BSP_FOG_REGIONS_OFFSET, 2, regions);
+        let bsp = fake.add_tag(GroupTag::new(b"sbsp"), "levels\\bsp", &bsp);
+        let cache = Cache::open(fake.build())?;
+        let element = cache.tag(bsp, GroupTag::new(b"sbsp"), BSP_FOG_PALETTE_OFFSET + 12)?;
+        let fogs = Fogs::read(&cache, &element)?;
+        assert_eq!(fogs.weather(0)?, Some(2));
+        // (a region whose weather is none, a fog plane, no fog and a region
+        // the map does not have leave the cluster's)
+        assert_eq!(fogs.weather(1)?, None);
+        assert_eq!(fogs.weather(i16::MIN)?, None);
+        assert_eq!(fogs.weather(-1)?, None);
+        assert_eq!(fogs.weather(5)?, None);
+        Ok(())
     }
 
     /// A BSP's bytes, placed at `BSP_BASE`: elements go after the header

@@ -244,6 +244,7 @@ pub(crate) mod tests {
             contrails: Vec::new(),
             particle_systems: Vec::new(),
             weather: Vec::new(),
+            winds: Vec::new(),
             detail_object_collections: Vec::new(),
             lights: Vec::new(),
             unit_huds: Vec::new(),
@@ -259,6 +260,7 @@ pub(crate) mod tests {
         let mut structure = StructureBsp {
             cluster_skies: Vec::new(),
             weather_palette: Vec::new(),
+            weather_polyhedra: Vec::new(),
             cluster_weather: Vec::new(),
             leaf_clusters: Vec::new(),
             detail_objects: Vec::new(),

@@ -1439,9 +1439,15 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
     particle_rows.clear();
     running.particles.camera = camera.transform.position;
     if let Some(level) = &running.level {
-        running
-            .particles
-            .gather(level, camera.transform.position, &mut particle_rows);
+        running.particles.gather(
+            level,
+            &particles::ParticleView {
+                position: camera.transform.position,
+                rotation: camera.transform.rotation,
+                vertical_fov: camera.vertical_fov.0,
+            },
+            &mut particle_rows,
+        );
     }
     let simulation = &mut running.simulation;
     writer.publish(buffers, tick, alpha, |frame| {
