@@ -19,9 +19,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Forces and grenades' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 3: Vehicles and devices
-- [ ] Task: Vehicles
-    - [ ] Write tests: each manoeuvre of the spec against the reference traces
-    - [ ] The fixes to the vehicle model; entering from where the player stands; flipping back over
+- [x] Task: Vehicles 7affe693
+    - [x] Write tests: each manoeuvre of the spec against the reference traces (by property: no reference traces exist)
+    - [x] The fixes to the vehicle model; entering from where the player stands; flipping back over
 - [ ] Task: Devices carrying objects
     - [ ] Write tests: a lift carries a crate and a player; a door pushes a body
     - [ ] Moving device collision
