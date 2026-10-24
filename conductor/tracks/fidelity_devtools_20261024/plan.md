@@ -2,7 +2,7 @@
 
 Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported and fixed one at a time in later tracks.
 
-## Phase 1: devgulch and the launcher's Developer tab
+## Phase 1: devgulch and the launcher's Developer tab [checkpoint: 9410383]
 - [x] Task: devgulch from bloodgulch.map aae24b5
     - [x] Write tests: the import makes devgulch from the user's map; it loads; nothing of it is in the repository or the app bundle
     - [x] The generated copy and its station layout
@@ -12,10 +12,10 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: The launcher's Developer tab 5d266e3
     - [x] Write tests (XCTest): the tab lists devgulch, its stations, view modes and toggles; launching passes them to the engine
     - [x] The tab and its launch arguments (the view modes and toggles are wired in Phase 3)
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: devgulch and the launcher's Developer tab' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: devgulch and the launcher's Developer tab' (Protocol in workflow.md)
 
 ## Phase 2: Stop the heat, see the cost
-- [ ] Task: Bake and probes out of play
+- [~] Task: Bake and probes out of play
     - [ ] Write tests: nothing is baked or probed after the level starts; a cached bake loads already lit; a missing cache bakes behind the loading screen
     - [ ] Bake at import or on the loading screen; cache by map hash; no lighting swap mid-game
 - [ ] Task: Thermals and idling
@@ -117,7 +117,7 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [ ] Task: Upscaling and the parallel simulation
     - [ ] Write tests: MetalFX golden frames at 0.67; dynamic resolution holds the target; replay hash unchanged in parallel
     - [ ] MetalFX, dynamic resolution, the ECS in parallel
-- [ ] Task: Conductor - User Manual Verification 'Phase 10: Performance' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 10: Performance' (Protocol in workflow.md)
 
 ## Phase 11: Tiers and graphics settings
 - [ ] Task: Quality tiers
@@ -129,7 +129,7 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [ ] Task: Meeting the targets
     - [ ] Write tests: each path at Ultra on the M1 Max meets 8.33 ms p99
     - [ ] The last fixes; docs/engine.md updated
-- [ ] Task: Conductor - User Manual Verification 'Phase 11: Tiers and graphics settings' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 11: Tiers and graphics settings' (Protocol in workflow.md)
 
 ## Wrap-up
 - [ ] Retire performance_20261023 into this track (marked merged in tracks.md, its folder archived)
