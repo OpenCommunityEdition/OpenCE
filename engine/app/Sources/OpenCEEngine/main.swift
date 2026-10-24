@@ -317,10 +317,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         startShell(view: controller.window.engineView)
         startServant(device: controller.window.engineView.device)
-        if launchArguments.contains("--control") || argument("--socket") != nil {
+        if servesControl {
             startControl()
         }
-        controller.window.engineView.onFrame = { [weak self] link in self?.frame(link) }
+        controller.window.engineView.onFrame = { [weak self] tick in self?.frame(tick) }
+        controller.window.engineView.frameCap = Int(saved.settings.video.frameCap)
+        // (the socket's commands are answered on the frames, seen or not)
+        controller.window.engineView.keepsRunning = servesControl
         let screens = NSScreen.screens
         let display = Int(saved.settings.video.display)
         controller.show(fullScreen: launchArguments.contains("--full-screen") || saved.settings.video.fullScreen,
@@ -767,10 +770,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         loadCampaignBehindScreen(map: next.path, difficulty: lastCampaign.difficulty)
     }
 
-    private func frame(_ link: CADisplayLink) {
+    /// Whether the control socket is opened (--control or --socket).
+    var servesControl: Bool { launchArguments.contains("--control") || argument("--socket") != nil }
+
+    private func frame(_ tick: FrameTick) {
         guard let controller else { return }
-        let seconds = lastFrame.map { link.timestamp - $0 } ?? 0
-        lastFrame = link.timestamp
+        // (no time passes for the game while the window draws nothing)
+        let seconds = tick.resumed ? 0 : lastFrame.map { tick.timestamp - $0 } ?? 0
+        lastFrame = tick.timestamp
         frameTimes.add(seconds)
         // (the keys and mouse fly the camera only while the mouse is captured)
         let mouse = controller.takeMouseMotion()
@@ -789,7 +796,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
-        menu.update(now: link.timestamp)
+        menu.update(now: tick.timestamp)
         let loading = updateLoadingScreen(seconds: seconds)
         if !holdsWorld {
             _ = try? engine.advance(frameSeconds: seconds)
@@ -797,13 +804,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         followStructure()
         nextMissionIfWon()
         showStatus()
-        profiled("shell", engine) { shell?.update(seconds: seconds, now: link.timestamp) }
-        reloadShaders(now: link.timestamp)
+        profiled("shell", engine) { shell?.update(seconds: seconds, now: tick.timestamp) }
+        reloadShaders(now: tick.timestamp)
         if controller.showsFrameTimes {
             // (four times a second, so that it can be read)
-            if link.timestamp - lastOverlay >= 0.25 {
+            if tick.timestamp - lastOverlay >= 0.25 {
                 controller.window.engineView.overlayText = frameTimes.text
-                lastOverlay = link.timestamp
+                lastOverlay = tick.timestamp
             }
         } else {
             controller.window.engineView.overlayText = nil
@@ -974,6 +981,8 @@ extension AppDelegate: GameActions {
         let status = engine.networkStatus()
         guard status != shownStatus, let controller else { return }
         shownStatus = status
+        // (a network game's frames go on out of sight: the others play on)
+        controller.window.engineView.keepsRunning = servesControl || status != .alone
         let map = level.map { " — " + URL(fileURLWithPath: $0.map).deletingPathExtension().lastPathComponent } ?? ""
         let state: String
         switch status {

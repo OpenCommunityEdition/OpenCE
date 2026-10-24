@@ -63,6 +63,27 @@ the multiplayer and the tests rely on that.
   `Mission::game_tick` is that clock. `game_time`, `sleep`, the recordings,
   the custom animations and the sound lengths count in it.
 
+### Frame pacing
+
+The window's frames come from a `CAMetalDisplayLink`
+(`app/Sources/OpenCEEngineWindow/EngineView.swift`), at the rate
+`FramePacing` gives (`WindowModel.swift`):
+
+- **In front:** the setting `video.frame_cap`, 60 by default. 0 means the
+  display's own rate. Other values are held to 30–360, and never go above the
+  display's rate.
+- **Behind another window or app:** 10 frames a second.
+- **Minimised, covered or on another Space:** the link is paused and nothing
+  is drawn. The first frame after a pause counts no time for the game.
+- **Out of sight but still needed:** a network game and the control socket
+  keep the capped rate, because others wait on those frames.
+
+At most two frames are in flight. The link queues two drawables at most
+(`preferredFrameLatency`). `FramesInFlight` counts the command buffers that
+the GPU has not finished, and a frame past the count is skipped rather than
+waited for. The simulation runs at most eight ticks a frame, so even at 10
+frames a second it keeps pace with its 60 Hz.
+
 ## The contract
 
 `opence_ffi` is the only crate Swift sees:
@@ -596,7 +617,7 @@ first player start, rising and falling, looking ahead and down and up. It
 draws offscreen at 3840×2160 with temporal anti-aliasing at full scale, with
 the scenario's objects and the sky. No window opens.
 
-- **Frames in flight:** up to three, as the window has.
+- **Frames in flight:** up to three. The window has two (Frame pacing).
 - **Frame time:** the time between the ends of two frames' GPU work. It counts
   whichever of the CPU and the GPU is slower.
 - **The bar:** p99 must be at most 8.33 ms (120 frames a second).

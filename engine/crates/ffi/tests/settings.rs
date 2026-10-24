@@ -52,6 +52,19 @@ fn missing_and_out_of_range_settings_are_the_stock_ones() -> Result {
 }
 
 #[test]
+fn the_frame_cap_is_60_and_held_to_its_range() -> Result {
+    assert_eq!(stock_settings().video.frame_cap, 60);
+    let cap = |text: &str| -> std::result::Result<u32, Box<dyn std::error::Error>> {
+        Ok(settings_from_toml(format!("[video]\nframe_cap = {text}\n"))?.video.frame_cap)
+    };
+    assert_eq!(cap("0")?, 0);
+    assert_eq!(cap("10")?, 30);
+    assert_eq!(cap("120")?, 120);
+    assert_eq!(cap("1000")?, 360);
+    Ok(())
+}
+
+#[test]
 fn settings_are_saved_and_loaded() -> Result {
     let folder = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("settings_test");
     let _ = std::fs::remove_dir_all(&folder);

@@ -86,6 +86,10 @@ pub struct VideoOptions {
     /// The screen the game opens on (0 the main one; one not there is the
     /// main one).
     pub display: u32,
+    /// The most frames drawn a second (0 the display's rate; otherwise 30
+    /// to 360). The stock 60 keeps a laptop cool; the window draws far
+    /// fewer when it is not in front, and none when it cannot be seen.
+    pub frame_cap: u32,
 }
 
 impl Default for VideoOptions {
@@ -96,6 +100,7 @@ impl Default for VideoOptions {
             full_screen: false,
             show_frame_times: false,
             display: 0,
+            frame_cap: 60,
         }
     }
 }
@@ -258,6 +263,10 @@ impl Settings {
                 full_screen: video.full_screen,
                 show_frame_times: video.show_frame_times,
                 display: video.display,
+                frame_cap: match video.frame_cap {
+                    0 => 0,
+                    cap => cap.clamp(30, 360),
+                },
             },
             audio: AudioSettings {
                 master: within(audio.master, 0.0..=1.0, stock.audio.master),

@@ -82,6 +82,55 @@ final class WindowModelTests: XCTestCase {
         }
         XCTAssertEqual(FrameRate.range(maximumFramesPerSecond: 0).preferred, 1)
     }
+
+    func testTheFrameCapHolds() {
+        // (the cap below the display's rate, the display's below the cap, none)
+        XCTAssertEqual(FramePacing.rate(display: 120, cap: 60, activity: .focused, keepsRunning: false), 60)
+        XCTAssertEqual(FramePacing.rate(display: 60, cap: 144, activity: .focused, keepsRunning: false), 60)
+        XCTAssertEqual(FramePacing.rate(display: 120, cap: 0, activity: .focused, keepsRunning: false), 120)
+        XCTAssertEqual(FramePacing.rate(display: 0, cap: 0, activity: .focused, keepsRunning: false), 1)
+    }
+
+    func testTheWindowIdlesUnfocusedAndStopsWhenItCannotBeSeen() {
+        XCTAssertEqual(FramePacing.rate(display: 120, cap: 60, activity: .unfocused, keepsRunning: false),
+                       FramePacing.idleRate)
+        XCTAssertNil(FramePacing.rate(display: 120, cap: 60, activity: .hidden, keepsRunning: false))
+        // (a network game or the control socket keeps the rate: others wait on it)
+        XCTAssertEqual(FramePacing.rate(display: 120, cap: 60, activity: .hidden, keepsRunning: true), 60)
+        XCTAssertEqual(FramePacing.rate(display: 120, cap: 60, activity: .unfocused, keepsRunning: true), 60)
+        XCTAssertEqual(FramePacing.rate(display: 5, cap: 0, activity: .unfocused, keepsRunning: false), 5)
+    }
+
+    func testTheActivityFollowsTheWindow() {
+        XCTAssertEqual(WindowActivity(key: true, appActive: true, visible: true, miniaturised: false), .focused)
+        XCTAssertEqual(WindowActivity(key: true, appActive: false, visible: true, miniaturised: false), .unfocused)
+        XCTAssertEqual(WindowActivity(key: false, appActive: true, visible: true, miniaturised: false), .unfocused)
+        XCTAssertEqual(WindowActivity(key: true, appActive: true, visible: false, miniaturised: false), .hidden)
+        XCTAssertEqual(WindowActivity(key: false, appActive: false, visible: true, miniaturised: true), .hidden)
+    }
+
+    func testFramesInFlightStayBounded() async {
+        let inFlight = FramesInFlight(limit: 2)
+        XCTAssertTrue(inFlight.begin())
+        XCTAssertTrue(inFlight.begin())
+        XCTAssertFalse(inFlight.begin(), "a third frame waits for the GPU")
+        XCTAssertEqual(inFlight.count, 2)
+        inFlight.end()
+        XCTAssertTrue(inFlight.begin())
+        // (the GPU's completions come on its own threads)
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<2 {
+                group.addTask { inFlight.end() }
+            }
+        }
+        XCTAssertEqual(inFlight.count, 0)
+        for _ in 0..<100 {
+            if inFlight.begin() {
+                XCTAssertLessThanOrEqual(inFlight.count, 2)
+            }
+        }
+        XCTAssertEqual(inFlight.count, 2)
+    }
 }
 
 /// The window made off the screen, with a fake pointer and mouse.
@@ -149,6 +198,29 @@ final class EngineWindowTests: XCTestCase {
                            CGSize(width: view.bounds.width * scale, height: view.bounds.height * scale))
         }
         XCTAssertEqual(Array(resized.suffix(2)), [1280, 640])
+    }
+
+    func testTheViewIsPacedByItsActivityAndCap() {
+        let view = controller.window.engineView
+        let display = view.maximumFramesPerSecond
+        view.frameCap = 30
+        view.activity = .focused
+        XCTAssertEqual(view.pacedRate, min(30, display))
+        view.activity = .unfocused
+        XCTAssertEqual(view.pacedRate, min(FramePacing.idleRate, display))
+        view.startDisplayLink()
+        defer { view.stopDisplayLink() }
+        XCTAssertFalse(view.isDisplayLinkPaused)
+        view.activity = .hidden
+        XCTAssertNil(view.pacedRate)
+        XCTAssertTrue(view.isDisplayLinkPaused)
+        view.keepsRunning = true
+        XCTAssertFalse(view.isDisplayLinkPaused)
+    }
+
+    func testLosingTheFocusIdlesTheView() {
+        post(NSWindow.didResignKeyNotification)
+        XCTAssertNotEqual(controller.window.engineView.activity, .focused)
     }
 
     func testTheMouseIsCapturedOnFocusAndLetGoOnEscapeOrLossOfFocus() {

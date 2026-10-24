@@ -143,6 +143,27 @@ public final class EngineWindowController {
                 MainActor.assumeIsolated { self?.handle(event) }
             })
         }
+        // (the display link idles behind other windows and stops out of sight)
+        let window = window
+        let changes: [(NSNotification.Name, AnyObject?)] = [
+            (NSWindow.didBecomeKeyNotification, window), (NSWindow.didResignKeyNotification, window),
+            (NSWindow.didChangeOcclusionStateNotification, window), (NSWindow.didMiniaturizeNotification, window),
+            (NSWindow.didDeminiaturizeNotification, window), (NSApplication.didBecomeActiveNotification, nil),
+            (NSApplication.didResignActiveNotification, nil),
+        ]
+        for (name, object) in changes {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: object, queue: nil) {
+                [weak self] _ in
+                MainActor.assumeIsolated { self?.followActivity() }
+            })
+        }
+    }
+
+    /// The view's activity from the window's state.
+    private func followActivity() {
+        window.engineView.activity = WindowActivity(key: window.isKeyWindow, appActive: NSApp?.isActive ?? false,
+                                                    visible: window.occlusionState.contains(.visible),
+                                                    miniaturised: window.isMiniaturized)
     }
 
     isolated deinit {

@@ -1,10 +1,13 @@
 // What the engine's window decides, apart from AppKit: its size in pixels,
 // when the mouse is captured, the mouse's raw motion between frames, the
-// keys held, the frame times, and the display link's rate.
+// keys held, the frame times, and the display link's rate: the frame cap
+// in front, a few frames a second behind other windows, none when the
+// window cannot be seen, and at most a few frames in flight on the GPU.
 
 import AppKit
 import CoreGraphics
 import QuartzCore
+import Synchronization
 
 /// The drawable's size: the view's points at the screen's scale.
 public enum Viewport {
@@ -164,10 +167,82 @@ public struct FrameTimes: Equatable, Sendable {
 }
 
 public enum FrameRate {
-    /// The display link's rate: the display's own, however fast, and no
-    /// slower.
+    /// The display link's range for a rate: that rate exactly, no faster
+    /// and no slower.
     public static func range(maximumFramesPerSecond: Int) -> CAFrameRateRange {
         let rate = Float(max(maximumFramesPerSecond, 1))
         return CAFrameRateRange(minimum: rate, maximum: rate, preferred: rate)
+    }
+}
+
+/// How much of the window the player has.
+public enum WindowActivity: Sendable, Equatable {
+    /// In front, with the keys.
+    case focused
+    /// Seen, behind another window or app.
+    case unfocused
+    /// Minimised, covered or on another Space.
+    case hidden
+
+    public init(key: Bool, appActive: Bool, visible: Bool, miniaturised: Bool) {
+        if miniaturised || !visible {
+            self = .hidden
+        } else {
+            self = key && appActive ? .focused : .unfocused
+        }
+    }
+}
+
+/// How fast the window draws.
+public enum FramePacing {
+    /// The rate behind another window: enough to show the game going on.
+    public static let idleRate = 10
+
+    /// The frames a second for `activity` on a display of `display` Hz
+    /// with the setting's `cap` (0 the display's rate), or nil when none
+    /// are drawn. `keepsRunning` (a network game, the control socket) keeps
+    /// the cap's rate whatever the window, since others wait on its frames.
+    public static func rate(display: Int, cap: Int, activity: WindowActivity, keepsRunning: Bool) -> Int? {
+        let display = max(display, 1)
+        let capped = cap > 0 ? min(cap, display) : display
+        if keepsRunning {
+            return capped
+        }
+        switch activity {
+        case .focused:
+            return capped
+        case .unfocused:
+            return min(idleRate, capped)
+        case .hidden:
+            return nil
+        }
+    }
+}
+
+/// The frames the GPU has yet to finish, held to a limit: a frame begun
+/// past it is skipped, not waited for, so that the main thread never
+/// blocks and the CPU runs no further ahead of the GPU than the limit.
+public final class FramesInFlight: Sendable {
+    public let limit: Int
+    private let frames = Mutex(0)
+
+    public init(limit: Int) {
+        self.limit = max(limit, 1)
+    }
+
+    public var count: Int { frames.withLock { $0 } }
+
+    /// Takes a place for a frame, false when every place is taken.
+    public func begin() -> Bool {
+        frames.withLock { count in
+            guard count < limit else { return false }
+            count += 1
+            return true
+        }
+    }
+
+    /// Gives a frame's place back (from the GPU's completion handler).
+    public func end() {
+        frames.withLock { count in count = max(count - 1, 0) }
     }
 }

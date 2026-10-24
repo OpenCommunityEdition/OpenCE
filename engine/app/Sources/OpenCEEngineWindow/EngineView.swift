@@ -1,20 +1,51 @@
 // The view the engine draws in: a CAMetalLayer at the window's backing
-// scale, the display link at the display's rate, and the keyboard and
-// mouse passed on to its window's controller (EngineWindow.swift).
+// scale, its CAMetalDisplayLink paced by the frame cap and the window's
+// activity (WindowModel.swift's FramePacing), and the keyboard and mouse
+// passed on to its window's controller (EngineWindow.swift).
 
 import AppKit
 import Metal
 import QuartzCore
 
+/// A frame of the display link's.
+public struct FrameTick: Sendable {
+    /// When the frame is to be shown, in CACurrentMediaTime's seconds.
+    public let timestamp: CFTimeInterval
+    /// Whether it is the first since the link started or was paused (the
+    /// time since the last is then not the game's).
+    public let resumed: Bool
+}
+
 public final class EngineView: NSView {
     public let metalLayer = CAMetalLayer()
     public let device: MTLDevice?
     private let queue: MTLCommandQueue?
-    private var displayLink: CADisplayLink?
+    private var displayLink: CAMetalDisplayLink?
+    private let linkDelegate = LinkDelegate()
+    /// The frame's drawable, while `onFrame` runs.
+    private var drawable: CAMetalDrawable?
+    private var resumed = true
+    /// The frames committed and not yet finished by the GPU.
+    public let inFlight = FramesInFlight(limit: EngineView.framesInFlight)
     private let overlay = NSTextField(labelWithString: "")
 
-    /// Called on each of the display's frames, while the link runs.
-    public var onFrame: ((CADisplayLink) -> Void)?
+    /// The frames the CPU may be ahead of the GPU by.
+    public static let framesInFlight = 2
+
+    /// Called on each of the display link's frames.
+    public var onFrame: ((FrameTick) -> Void)?
+    /// The most frames a second (0 the display's rate).
+    public var frameCap = 60 {
+        didSet { pace() }
+    }
+    /// How much of the window the player has (its controller sets it).
+    public var activity = WindowActivity.focused {
+        didSet { pace() }
+    }
+    /// Whether the frames go on at the cap's rate whatever the window.
+    public var keepsRunning = false {
+        didSet { pace() }
+    }
     /// Called when the drawable's size changes, in pixels.
     public var onResize: ((Int, Int) -> Void)?
     var onKey: ((UInt16, Bool) -> Void)?
@@ -61,6 +92,7 @@ public final class EngineView: NSView {
             overlay.topAnchor.constraint(equalTo: topAnchor, constant: 8),
         ])
         layout(scale: backingScale)
+        linkDelegate.view = self
     }
 
     @available(*, unavailable)
@@ -113,13 +145,17 @@ public final class EngineView: NSView {
 
     // ---------- the display link
 
-    /// Starts calling `onFrame` at the display's rate.
+    /// Starts calling `onFrame`, at the rate `pacedRate` gives.
     public func startDisplayLink() {
         guard displayLink == nil else { return }
-        let link = displayLink(target: self, selector: #selector(frame(_:)))
-        link.preferredFrameRateRange = FrameRate.range(maximumFramesPerSecond: maximumFramesPerSecond)
+        let link = CAMetalDisplayLink(metalLayer: metalLayer)
+        link.delegate = linkDelegate
+        // (two drawables queued at most: the frame shown and the one drawn)
+        link.preferredFrameLatency = Float(EngineView.framesInFlight)
         link.add(to: .main, forMode: .common)
         displayLink = link
+        resumed = true
+        pace()
     }
 
     public func stopDisplayLink() {
@@ -129,43 +165,105 @@ public final class EngineView: NSView {
 
     public var isDisplayLinkRunning: Bool { displayLink != nil }
 
+    /// Whether the link runs but draws nothing (the window cannot be seen).
+    public var isDisplayLinkPaused: Bool { displayLink?.isPaused ?? false }
+
     /// The rate of the screen the view is on (or the main one's).
     public var maximumFramesPerSecond: Int {
         (window?.screen ?? NSScreen.main)?.maximumFramesPerSecond ?? 60
     }
 
-    @objc private func frame(_ link: CADisplayLink) {
-        // (a move to a faster or slower screen changes the rate)
-        let range = FrameRate.range(maximumFramesPerSecond: maximumFramesPerSecond)
+    /// The frames a second drawn now, nil for none.
+    public var pacedRate: Int? {
+        FramePacing.rate(display: maximumFramesPerSecond, cap: frameCap, activity: activity,
+                         keepsRunning: keepsRunning)
+    }
+
+    /// Sets the link's rate, or pauses it.
+    private func pace() {
+        guard let link = displayLink else { return }
+        guard let rate = pacedRate else {
+            if !link.isPaused {
+                link.isPaused = true
+                resumed = true
+            }
+            return
+        }
+        let range = FrameRate.range(maximumFramesPerSecond: rate)
         if link.preferredFrameRateRange != range {
             link.preferredFrameRateRange = range
         }
-        onFrame?(link)
+        link.isPaused = false
+    }
+
+    fileprivate func update(_ update: CAMetalDisplayLink.Update) {
+        // (a move to a faster or slower screen changes the rate)
+        pace()
+        let tick = FrameTick(timestamp: update.targetTimestamp, resumed: resumed)
+        resumed = false
+        drawable = update.drawable
+        defer { drawable = nil }
+        onFrame?(tick)
+    }
+
+    /// The display link's callbacks, on the main thread's run loop (the
+    /// link is added to it; the conformance checks so as it is called).
+    @MainActor
+    private final class LinkDelegate: NSObject, @preconcurrency CAMetalDisplayLinkDelegate {
+        weak var view: EngineView?
+
+        func metalDisplayLink(_ link: CAMetalDisplayLink, needsUpdate update: CAMetalDisplayLink.Update) {
+            view?.update(update)
+        }
+    }
+
+    /// The drawable to draw into: the link's frame's (once), else (before
+    /// the link runs) the layer's next.
+    private func nextDrawable() -> CAMetalDrawable? {
+        guard window?.isVisible == true, metalLayer.drawableSize.width > 0,
+              metalLayer.drawableSize.height > 0 else { return nil }
+        if displayLink != nil {
+            defer { drawable = nil }
+            return drawable
+        }
+        return metalLayer.nextDrawable()
+    }
+
+    /// Commits `commands`, presenting `drawable`, with its place in flight
+    /// given back when the GPU is done.
+    private func commit(_ commands: MTLCommandBuffer, presenting drawable: CAMetalDrawable) {
+        let inFlight = inFlight
+        commands.addCompletedHandler { _ in inFlight.end() }
+        commands.present(drawable)
+        commands.commit()
     }
 
     /// Presents a black frame (until the renderer draws).
     public func clear() {
-        guard window?.isVisible == true, let queue, metalLayer.drawableSize.width > 0,
-              metalLayer.drawableSize.height > 0, let drawable = metalLayer.nextDrawable(),
-              let commands = queue.makeCommandBuffer() else { return }
+        guard let queue, let drawable = nextDrawable(), inFlight.begin() else { return }
+        guard let commands = queue.makeCommandBuffer() else {
+            inFlight.end()
+            return
+        }
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = drawable.texture
         pass.colorAttachments[0].loadAction = .clear
         pass.colorAttachments[0].storeAction = .store
         pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
         commands.makeRenderCommandEncoder(descriptor: pass)?.endEncoding()
-        commands.present(drawable)
-        commands.commit()
+        commit(commands, presenting: drawable)
     }
 
-    /// Has `encode` draw into the next drawable, then presents it.
+    /// Has `encode` draw into the frame's drawable, then presents it (a
+    /// frame with every place in flight taken is skipped).
     public func render(_ encode: (MTLCommandBuffer, MTLTexture) -> Void) {
-        guard window?.isVisible == true, let queue, metalLayer.drawableSize.width > 0,
-              metalLayer.drawableSize.height > 0, let drawable = metalLayer.nextDrawable(),
-              let commands = queue.makeCommandBuffer() else { return }
+        guard let queue, let drawable = nextDrawable(), inFlight.begin() else { return }
+        guard let commands = queue.makeCommandBuffer() else {
+            inFlight.end()
+            return
+        }
         encode(commands, drawable.texture)
-        commands.present(drawable)
-        commands.commit()
+        commit(commands, presenting: drawable)
     }
 
     // ---------- the frame-time overlay
