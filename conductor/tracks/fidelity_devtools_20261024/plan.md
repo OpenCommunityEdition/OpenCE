@@ -48,9 +48,9 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Exposure and tone mapping matched to the original d54fa7a
     - [x] Write tests: mean and peak brightness stay within tolerance of the stock view's; the ring and bright textures are not clipped
     - [x] The fix
-- [ ] Task: Black artifacts, flicker and blotchy emissives
-    - [ ] Write tests: no NaN or black pixels on every shader class; the same frame twice gives the same image; emissive golden frames; ExposureTests' start view held to 10% of stock's mean
-    - [ ] The fixes
+- [x] Task: Black artifacts, flicker and blotchy emissives 6ef5857
+    - [x] Write tests: no NaN or black pixels on every shader class; the same frame twice gives the same image; emissive golden frames; ExposureTests' start view held to 10% of stock's mean
+    - [x] The fixes
 - [ ] Task: Seams
     - [ ] Write tests: no lightmap or texture seams on the seam views' golden frames
     - [ ] The fixes
