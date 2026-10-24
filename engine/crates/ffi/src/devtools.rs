@@ -1162,6 +1162,7 @@ fn inspect(state: &mut State, args: &Args) -> Result<Output, CommandError> {
         data["rotation"] = json!([rotation.x, rotation.y, rotation.z, rotation.w]);
     }
     shading(running, handle, &mut lines, &mut data);
+    carrying(running, handle, &mut lines, &mut data);
     motion(running, handle, &mut lines, &mut data);
     lighting(running, handle, &mut lines, &mut data);
     sounding(running, handle, &audio, &mut lines, &mut data);
@@ -1213,6 +1214,36 @@ fn shading(running: &Running, handle: ObjectHandle, lines: &mut Vec<String>, dat
             "frames": frames,
         });
     }
+}
+
+/// A player's weapons, the one in its hands, and its grenades.
+fn carrying(running: &Running, handle: ObjectHandle, lines: &mut Vec<String>, data: &mut Data) {
+    let players = running.simulation.players();
+    let Some(player) = players.iter().find(|player| player.handle() == handle) else {
+        return;
+    };
+    let inventory = player.inventory();
+    let weapons: Vec<&str> = inventory
+        .weapons
+        .iter()
+        .filter_map(|carried| player.armory().get(carried.armory))
+        .map(|weapon| weapon.tag.path.as_str())
+        .collect();
+    for (index, weapon) in weapons.iter().enumerate() {
+        let held = if index == inventory.current {
+            " (held)"
+        } else {
+            ""
+        };
+        lines.push(format!("  weapon {weapon}{held}"));
+    }
+    lines.push(format!(
+        "  grenades {}",
+        inventory.grenades.map(|count| count.to_string()).join(" ")
+    ));
+    data["weapons"] = json!(weapons);
+    data["held"] = json!(inventory.current);
+    data["grenades"] = json!(inventory.grenades);
 }
 
 /// How an object moves: its velocity over the last tick, and an item's

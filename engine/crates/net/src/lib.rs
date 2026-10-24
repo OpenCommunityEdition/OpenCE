@@ -28,7 +28,7 @@ pub use transport::{Link, LinkEndpoint, Transport, Udp};
 /// The protocol's version: raised with any change to what the machines
 /// send each other or must agree on. Machines of different versions do
 /// not play together.
-pub const PROTOCOL_VERSION: u16 = 1;
+pub const PROTOCOL_VERSION: u16 = 2;
 
 /// The bytes every packet starts with.
 pub const MAGIC: [u8; 4] = *b"OCEN";

@@ -854,6 +854,17 @@ impl Simulation {
         true
     }
 
+    /// Takes all the player's weapons, as a level that starts it unarmed
+    /// does; false without a player.
+    pub fn disarm(&mut self) -> bool {
+        let Some(player) = self.players.first_mut() else {
+            return false;
+        };
+        player.disarm();
+        self.update_first_person();
+        true
+    }
+
     /// Puts `weapon` in the player's hands, full, if the level has it
     /// (dropping what a full hand held); false without a player or for a
     /// weapon the level does not have.

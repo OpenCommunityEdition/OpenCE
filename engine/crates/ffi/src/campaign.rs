@@ -305,6 +305,7 @@ impl Engine {
             network: None,
             dressed: 0,
             campaign: Some(campaign),
+            solo: None,
             lights: crate::lights::Lights::new(&geometry.content),
             lit: Vec::new(),
             decals: crate::dynamic_decals::DynamicDecals::new(&geometry.content),

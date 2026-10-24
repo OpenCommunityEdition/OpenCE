@@ -278,3 +278,102 @@ fn weapons_are_picked_up_dropped_and_their_rounds_taken() -> Result<(), Box<dyn 
     assert_eq!(position, lying.motion.position);
     Ok(())
 }
+
+#[test]
+fn grenades_walked_over_are_taken_up_to_the_most_carried() -> Result<(), Box<dyn Error>> {
+    let Some(level) = bloodgulch()? else {
+        return Ok(());
+    };
+    let mut simulation = settled(&level)?;
+    let feet = simulation.player().ok_or("no player")?.mover().position;
+    let frag = level
+        .objects
+        .iter()
+        .find(|object| {
+            object
+                .equipment
+                .as_ref()
+                .is_some_and(|equipment| equipment.powerup_type == 6 && equipment.grenade_type == 0)
+        })
+        .map(|object| object.tag.clone())
+        .ok_or("no frag grenade item")?;
+    let maximum = simulation
+        .player()
+        .and_then(|player| player.armory().grenade(0))
+        .ok_or("no frag grenades")?
+        .maximum;
+    let frags = |simulation: &Simulation| {
+        simulation
+            .player()
+            .map_or(-1, |player| player.inventory().grenades[0])
+    };
+    let lying = ObjectSpawn {
+        kind: ObjectKind::Equipment,
+        tag: frag,
+        transform: Transform {
+            position: feet,
+            ..Transform::default()
+        },
+        name: None,
+        permutation: None,
+        team: None,
+    };
+    // (none carried: the one at its feet is taken)
+    simulation.give_grenades(0, -maximum);
+    assert_eq!(frags(&simulation), 0);
+    let first = simulation.spawn(lying.clone())?;
+    simulation.step(TickInput::default());
+    assert_eq!(frags(&simulation), 1);
+    assert!(
+        simulation.object(first).is_none(),
+        "the grenade taken is gone"
+    );
+    // (the most carried: it is left lying)
+    simulation.give_grenades(0, maximum);
+    let second = simulation.spawn(lying)?;
+    simulation.step(TickInput::default());
+    assert_eq!(frags(&simulation), maximum);
+    assert!(
+        simulation.object(second).is_some(),
+        "a grenade not taken stays"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_player_with_a_free_hand_takes_a_weapon_it_walks_over() -> Result<(), Box<dyn Error>> {
+    let Some(level) = bloodgulch()? else {
+        return Ok(());
+    };
+    let mut simulation = settled(&level)?;
+    let (feet, armory) = {
+        let player = simulation.player().ok_or("no player")?;
+        (player.mover().position, player.armory().clone())
+    };
+    let shotgun = (0..armory.len())
+        .filter_map(|index| armory.get(index))
+        .find(|weapon| weapon.tag.path.contains("shotgun"))
+        .map(|weapon| weapon.tag.clone())
+        .ok_or("no shotgun")?;
+    assert!(simulation.disarm());
+    assert_eq!(path(&simulation), "");
+    let lying = simulation.spawn(ObjectSpawn {
+        kind: ObjectKind::Weapon,
+        tag: shotgun,
+        transform: Transform {
+            position: feet,
+            ..Transform::default()
+        },
+        name: None,
+        permutation: None,
+        team: None,
+    })?;
+    simulation.step(TickInput::default());
+    assert!(
+        path(&simulation).contains("shotgun"),
+        "{}",
+        path(&simulation)
+    );
+    assert!(simulation.object(lying).is_none());
+    Ok(())
+}

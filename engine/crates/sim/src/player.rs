@@ -403,6 +403,12 @@ impl Player {
         true
     }
 
+    /// Takes all its weapons, as a level that starts it unarmed does.
+    pub(crate) fn disarm(&mut self) {
+        self.inventory.weapons.clear();
+        self.inventory.current = 0;
+    }
+
     /// Its biped's tag.
     pub fn unit(&self) -> &TagRef {
         &self.unit
@@ -964,11 +970,30 @@ impl Player {
         })
     }
 
-    /// Takes the rounds of weapons it walks over that it carries, and
-    /// with `action`, picks up the nearest other, dropping the one in its
-    /// hands if its hands are full.
+    /// Takes the grenades it walks over while it has room for them and the
+    /// rounds of weapons it walks over that it carries, and with `action`,
+    /// or with a hand free, picks up the nearest other weapon, dropping the
+    /// one in its hands if its hands are full.
     fn pick_up(&mut self, world: &mut World, action: bool) {
         let feet = self.mover.position;
+        let mut grenades: Vec<(f32, ObjectHandle, usize)> = world
+            .query::<(&ObjectHandle, &Transform, &Object)>()
+            .iter(world)
+            .filter(|(_, _, object)| object.kind == ObjectKind::Equipment)
+            .filter_map(|(handle, transform, object)| {
+                let distance = transform.position.distance(feet);
+                let kind = self.armory.grenade_item(&object.tag)?;
+                (distance <= armory::PICKUP_RADIUS).then_some((distance, *handle, kind))
+            })
+            .collect();
+        grenades.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        for (_, handle, kind) in grenades {
+            if self.inventory.take_grenade(&self.armory, kind) {
+                objects::remove(world, handle);
+            }
+        }
+        // (a hand free takes a weapon walked over, as the action button does)
+        let action = action || self.inventory.weapons.len() < armory::MAXIMUM_WEAPONS;
         let mut near: Vec<(f32, ObjectHandle, usize, Option<WeaponState>)> = world
             .query::<(&ObjectHandle, &Transform, &Object, Option<&WeaponItem>)>()
             .iter(world)

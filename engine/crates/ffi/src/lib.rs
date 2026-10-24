@@ -697,6 +697,9 @@ pub(crate) struct Running {
     dressed: usize,
     /// The mission it plays, if any.
     campaign: Option<campaign::Campaign>,
+    /// The game of Slayer a multiplayer map played alone is (its weapons
+    /// and equipment lying about, the player standing again when killed).
+    solo: Option<opence_sim::game::Game>,
     /// The lights objects carry and effects make.
     lights: lights::Lights,
     /// The frame's lights (kept for their memory).
@@ -859,6 +862,7 @@ impl Engine {
             network: None,
             dressed: 0,
             campaign: None,
+            solo: None,
             lights: lights::Lights::default(),
             lit: Vec::new(),
             decals: dynamic_decals::DynamicDecals::default(),
@@ -911,6 +915,7 @@ impl Engine {
             network: None,
             dressed: 0,
             campaign: None,
+            solo: None,
             lights: lights::Lights::new(&geometry.content),
             lit: Vec::new(),
             decals: dynamic_decals::DynamicDecals::new(&geometry.content),
@@ -945,6 +950,21 @@ impl Engine {
                 message: error.to_string(),
             })?;
         Wardrobe::default().dress(&mut running.simulation, &level, handle);
+        // (a multiplayer map alone is a game of Slayer, as the original
+        // plays none of its maps without a game)
+        let multiplayer = !level.scenario.netgame_equipment.is_empty();
+        if multiplayer
+            && running.solo.is_none()
+            && running.network.is_none()
+            && running.campaign.is_none()
+        {
+            let variant = opence_sim::game::Variant::slayer();
+            running.solo = Some(opence_sim::game::Game::start(
+                &mut running.simulation,
+                &level,
+                variant,
+            ));
+        }
         running.previous_camera = transform(&running.simulation.camera().transform);
         publish(&mut state, &self.snapshots, 0.0);
         Ok(())
@@ -1456,6 +1476,9 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
                     .and_then(|run| run.input(&running.simulation))
                     .unwrap_or_else(|| input.tick_input());
                 running.simulation.step(tick);
+                if let (Some(game), Some(level)) = (&mut running.solo, &running.level) {
+                    game.step(&mut running.simulation, level);
+                }
                 if let (Some(run), Some(level)) = (&mut shell.station, &running.level) {
                     run.after_tick(&mut running.simulation, level, &mut shell.draw);
                 }

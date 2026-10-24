@@ -295,6 +295,7 @@ impl Engine {
             network: Some(network),
             dressed,
             campaign: None,
+            solo: None,
         });
         publish(&mut state, &self.snapshots, 0.0);
     }

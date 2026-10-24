@@ -33,6 +33,9 @@ pub struct ArmoryWeapon {
 /// The kinds of grenade: frag, then plasma.
 pub const GRENADE_KINDS: usize = 2;
 
+/// The powerup of equipment that is a grenade.
+const POWERUP_GRENADE: i16 = 6;
+
 /// A kind of grenade of the level: its globals' entry, and its projectile
 /// if the level has it.
 #[derive(Clone, Debug, PartialEq)]
@@ -50,6 +53,9 @@ pub struct ArmoryGrenade {
 pub struct Armory {
     weapons: Vec<ArmoryWeapon>,
     grenades: Vec<ArmoryGrenade>,
+    /// The equipment of the level that is a grenade lying in the world,
+    /// and its kind.
+    grenade_items: Vec<(TagRef, usize)>,
 }
 
 impl Armory {
@@ -93,7 +99,29 @@ impl Armory {
                 }),
             })
             .collect();
-        Armory { weapons, grenades }
+        let grenade_items = level
+            .objects
+            .iter()
+            .filter_map(|object| {
+                let equipment = object.equipment.as_ref()?;
+                let kind = usize::try_from(equipment.grenade_type).ok()?;
+                (equipment.powerup_type == POWERUP_GRENADE && kind < GRENADE_KINDS)
+                    .then(|| (object.tag.clone(), kind))
+            })
+            .collect();
+        Armory {
+            weapons,
+            grenades,
+            grenade_items,
+        }
+    }
+
+    /// The kind of grenade the equipment `tag` is, if it is one.
+    pub fn grenade_item(&self, tag: &TagRef) -> Option<usize> {
+        self.grenade_items
+            .iter()
+            .find(|(item, _)| item == tag)
+            .map(|&(_, kind)| kind)
     }
 
     /// The grenade of `kind` (0 frag, 1 plasma).
@@ -192,6 +220,21 @@ impl Inventory {
         };
         if let Some(carried) = self.grenades.get_mut(kind) {
             *carried = carried.saturating_add(count).clamp(0, maximum);
+        }
+    }
+
+    /// Takes one grenade of `kind` picked up, if it carries fewer than the
+    /// most; false if it has no room for it.
+    pub fn take_grenade(&mut self, armory: &Armory, kind: usize) -> bool {
+        let Some(maximum) = armory.grenade(kind).map(|grenade| grenade.maximum) else {
+            return false;
+        };
+        match self.grenades.get_mut(kind) {
+            Some(carried) if *carried < maximum => {
+                *carried += 1;
+                true
+            }
+            _ => false,
         }
     }
 
@@ -330,6 +373,7 @@ mod tests {
         Armory {
             weapons: vec![weapon("a"), weapon("b"), weapon("c")],
             grenades: vec![grenade(4), grenade(2)],
+            grenade_items: vec![(tag("frag"), 0)],
         }
     }
 
@@ -376,6 +420,13 @@ mod tests {
         assert_eq!(inventory.grenade, 0);
         inventory.give_grenades(&armory, 2, 1);
         assert_eq!(inventory.grenades, [1, 2]);
+        // (one picked up at a time, while there is room)
+        assert_eq!(armory.grenade_item(&tag("frag")), Some(0));
+        assert_eq!(armory.grenade_item(&tag("a")), None);
+        assert!(inventory.take_grenade(&armory, 0));
+        assert!(!inventory.take_grenade(&armory, 1));
+        assert!(!inventory.take_grenade(&armory, 2));
+        assert_eq!(inventory.grenades, [2, 2]);
     }
 
     #[test]
