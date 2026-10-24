@@ -42,6 +42,7 @@ struct xgpu_texture_description {
  unsigned long width, height, depth, levels, format;
  BOOL cube_map;
 };
+static int android_texture_fixes=1;
 static unsigned long serial=1, generation=1, uploads, next_texture;
 static unsigned long memory_watch_serial(void) { return serial; }
 static unsigned long memory_watch_generation(unsigned long a,unsigned long s) { return generation; }
@@ -239,12 +240,12 @@ int main(void) {
     run_c(tmp_path, code)
 
 
-@pytest.mark.parametrize('platform', ['android', 'desktop', 'web'])
+@pytest.mark.parametrize('platform', ['android', 'android-normal', 'desktop', 'web'])
 def test_normal_gpu_cache_keeps_write_tracking(tmp_path, platform):
     gpu = (ROOT/'port/linux/src/xbox_textures.c').read_text()
-    code = ('#define HALO_ANDROID 1\n' if platform == 'android' else
+    code = ('#define HALO_ANDROID 1\n' if platform.startswith('android') else
             '#define HALO_WEB 1\n' if platform == 'web' else '') + GPU_FIXTURE
-    code += 'static const void *android_ce_texture_pixels(const void *r,unsigned long *b) { *b=0;return NULL; }\n'
+    code += 'static int ce_queries;static const void *android_ce_texture_pixels(const void *r,unsigned long *b) { ce_queries++;*b=0;return NULL; }\n'
     code += gpu[gpu.index('struct texture_entry\n'):gpu.index('/* (every bit of the three mixed')]
     for name in ('bucket_index', 'palette_hash', 'texture_entry_pixels_valid'):
         code += function(gpu,name) + '\n'
@@ -266,19 +267,16 @@ int main(void) {
  return 0;
 }
 '''
+    if platform == 'android-normal':
+        code = code.replace('static int android_texture_fixes=1;', 'static int android_texture_fixes=0;')
+    code = code.replace('if(uploads!=2)return 3;',
+                        'if(uploads!=2)return 3; if(ce_queries!=' + str(3 if platform == 'android' else 0) + ')return 4;')
     run_c(tmp_path,code)
 
 
-@pytest.mark.parametrize('platform', ['android', 'desktop', 'web'])
-def test_draw_refresh_is_android_only(tmp_path, platform):
-    draw = function((ROOT/'port/linux/src/d3d8_gl.c').read_text(),'prepare_draw')
-    block = re.search(r'#ifdef HALO_ANDROID\n\t/\* Refresh GL shadow.*?#endif',draw,re.S).group()
-    assert draw.index(block) < draw.index('bind_textures(')
-    code = ('#define HALO_ANDROID 1\n' if platform == 'android' else
-            '#define HALO_WEB 1\n' if platform == 'web' else '')
-    code += 'static int refreshes;static void xgpu_gl_state_invalidate(void){refreshes++;}\nint main(void){\n'
-    code += block + '\nreturn refreshes!=' + str(int(platform == 'android')) + ';}\n'
-    run_c(tmp_path,code)
+def test_draw_refresh_removed():
+    draw = function((ROOT/'port/linux/src/d3d8_gl.c').read_text(), 'prepare_draw')
+    assert 'xgpu_gl_state_invalidate(' not in draw
 
 
 def test_unbind_clears_only_owned_headers(tmp_path):

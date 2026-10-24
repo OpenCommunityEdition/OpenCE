@@ -115,6 +115,9 @@ void host_gl_wait_frame(unsigned int slot);
 
 /* ---------- Android */
 
+/* SoC classification for the immutable rendering policy. */
+int host_android_chip_family(void);
+
 /* the storage directories the port uses, copied into buffer */
 void host_android_path(int which, char *buffer, unsigned int size);
 
