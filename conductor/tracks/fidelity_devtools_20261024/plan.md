@@ -60,10 +60,10 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Lighting and shaders' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 5: Picking up, vehicles and responsiveness
-- [~] Task: Picking up
-    - [ ] Write tests: walking over a weapon or holding the action button picks it up or swaps; ammo and grenades are taken as in the original
-    - [ ] The fix
-- [ ] Task: Vehicles
+- [x] Task: Picking up d2efbc5
+    - [x] Write tests: walking over a weapon or holding the action button picks it up or swaps; ammo and grenades are taken as in the original
+    - [x] The fix
+- [~] Task: Vehicles
     - [ ] Write tests: entering gives the vehicle camera and hides the first-person weapon; driver, gunner and passenger seats as in the original; exiting restores first person
     - [ ] The fix
 - [ ] Task: Responsiveness
