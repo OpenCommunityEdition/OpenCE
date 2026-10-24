@@ -71,17 +71,17 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
     - [x] Tick interpolation and the latency fixes
 - [x] Task: Conductor - User Manual Verification 'Phase 5: Picking up, vehicles and responsiveness' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
-## Phase 6: Animation
+## Phase 6: Animation [checkpoint: 14bcc84]
 - [x] Task: The animation stands 741a726
     - [x] Write tests: each stand plays every animation of its graph; none fails to resolve
     - [x] The fixes
 - [x] Task: Vehicle and weapon animation 9a676e5
     - [x] Write tests: entering, driving, exiting and seat changes animate; first-person reload, melee, throw and switch play
     - [x] The fixes
-- [ ] Task: Conductor - User Manual Verification 'Phase 6: Animation' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 6: Animation' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 7: Sound
-- [ ] Task: The sound emitters
+- [~] Task: The sound emitters
     - [ ] Write tests: each sound class's emitter on devgulch produces a voice; none fail; the audio view's counts match
     - [ ] The fixes
 - [ ] Task: Sounds of play
