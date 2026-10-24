@@ -886,6 +886,100 @@ impl CollisionBsp {
         }
         None
     }
+
+    /// The vertices round `surface`, in its edges' order, into `ring`; false
+    /// if its edges are broken or more than [`RING_MAX`].
+    pub fn surface_ring(&self, surface: usize, ring: &mut Vec<u32>) -> bool {
+        ring.clear();
+        let Some(first) = self.surfaces.get(surface).map(|surface| surface.first_edge) else {
+            return false;
+        };
+        let surface = surface as u32;
+        let mut edge_index = first;
+        loop {
+            let Some(edge) = self.edges.get(edge_index as usize) else {
+                return false;
+            };
+            if ring.len() >= RING_MAX {
+                return false;
+            }
+            let reverse = usize::from(edge.surfaces[1] == Some(surface));
+            let vertex = edge.vertices[reverse];
+            if vertex as usize >= self.vertices.len() {
+                return false;
+            }
+            ring.push(vertex);
+            edge_index = edge.edges[reverse];
+            if edge_index == first {
+                return true;
+            }
+        }
+    }
+
+    /// The height of the highest upward surface over (`x`, `y`) that is
+    /// lower than `below`, or none if there is none: the ground a thing
+    /// stood there would stand on, under a ceiling (such as a sky's) at
+    /// `below` or above.
+    pub fn ground_at(&self, x: f32, y: f32, below: f32) -> Option<f32> {
+        let mut ring = Vec::new();
+        let mut ground: Option<f32> = None;
+        for surface in 0..self.surfaces.len() {
+            if !self.faces_up(surface) || !self.surface_ring(surface, &mut ring) || ring.len() < 3 {
+                continue;
+            }
+            let point = |at: u32| self.vertices[at as usize].point;
+            let first = point(ring[0]);
+            for pair in ring[1..].windows(2) {
+                let (b, c) = (point(pair[0]), point(pair[1]));
+                if let Some(z) = triangle_height([first, b, c], x, y) {
+                    if z < below && ground.is_none_or(|ground| z > ground) {
+                        ground = Some(z);
+                    }
+                }
+            }
+        }
+        ground
+    }
+
+    /// Whether `surface`'s plane faces up (its normal's z is positive).
+    fn faces_up(&self, surface: usize) -> bool {
+        let Some(designator) = self.surfaces.get(surface).map(|surface| surface.plane) else {
+            return false;
+        };
+        let Some(plane) = usize::try_from(designator & i32::MAX)
+            .ok()
+            .and_then(|index| self.planes.get(index))
+        else {
+            return false;
+        };
+        if designator < 0 {
+            plane[2] < 0.0
+        } else {
+            plane[2] > 0.0
+        }
+    }
+}
+
+/// The most edges [`CollisionBsp::surface_ring`] follows round a surface.
+pub const RING_MAX: usize = 64;
+
+/// The height of triangle `t` over (`x`, `y`), if it is over that point
+/// (seen from above, wound either way).
+fn triangle_height(t: [[f32; 3]; 3], x: f32, y: f32) -> Option<f32> {
+    let [a, b, c] = t;
+    let (ux, uy) = (b[0] - a[0], b[1] - a[1]);
+    let (vx, vy) = (c[0] - a[0], c[1] - a[1]);
+    let area = ux * vy - uy * vx;
+    if area.abs() <= 1e-6 {
+        return None;
+    }
+    let (px, py) = (x - a[0], y - a[1]);
+    let s = (px * vy - py * vx) / area;
+    let t = (ux * py - uy * px) / area;
+    if s < 0.0 || t < 0.0 || s + t > 1.0 {
+        return None;
+    }
+    Some(a[2] + s * (b[2] - a[2]) + t * (c[2] - a[2]))
 }
 
 /// A 3D node of a collision BSP.
@@ -964,6 +1058,31 @@ pub struct CollisionVertex {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_ground_is_the_highest_upward_surface_under_the_cap() -> Result<(), &'static str> {
+        let bsp = crate::devmap::ground(crate::devmap::HALF_SIZE, crate::devmap::CELLS);
+        let collision = &bsp.collision;
+        // the plane, away from the solids
+        let flat = collision.ground_at(10.0, 10.0, 20.0).ok_or("no plane")?;
+        assert!(flat.abs() < 1e-4, "{flat}");
+        // on the slope, its top face rather than the plane under it
+        let slope = crate::devmap::SLOPE;
+        let [x, y] = [
+            slope.foot[0] + slope.rising[0] * slope.length / 2.0,
+            slope.foot[1] + slope.rising[1] * slope.length / 2.0,
+        ];
+        let on = collision.ground_at(x, y, 20.0).ok_or("no slope")?;
+        assert!((on - slope.height_at(x, y)).abs() < 1e-3, "{on}");
+        // a cap under the slope's top finds the plane under it
+        let under = collision
+            .ground_at(x, y, on - 0.01)
+            .ok_or("no plane under")?;
+        assert!(under.abs() < 1e-4, "{under}");
+        // off the plane there is nothing
+        assert_eq!(collision.ground_at(500.0, 0.0, 20.0), None);
+        Ok(())
+    }
 
     #[test]
     fn sound_travels_between_clusters_by_the_bsps_pairwise_distances() {

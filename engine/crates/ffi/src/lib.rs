@@ -122,22 +122,66 @@ pub struct LevelGeometry {
     content: Arc<opence_content::Level>,
 }
 
+/// The folder `maps_folder` names (the working folder if it is empty).
+fn maps_folder_path(maps_folder: &str) -> &Path {
+    if maps_folder.is_empty() {
+        Path::new(".")
+    } else {
+        Path::new(maps_folder)
+    }
+}
+
+/// The levels of the .map files of `folder`, in name order, their packs
+/// kept in `cache_folder`; each that does not load is left out, and logged
+/// under `area`.
+fn folder_levels(
+    folder: &Path,
+    cache_folder: &str,
+    area: &str,
+) -> Result<Vec<(std::path::PathBuf, opence_content::Level)>, EngineError> {
+    let mut maps: Vec<_> = std::fs::read_dir(folder)
+        .map_err(|error| EngineError::Load {
+            message: format!("{}: {error}", folder.display()),
+        })?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| path.extension().is_some_and(|extension| extension == "map"))
+        .collect();
+    maps.sort();
+    Ok(maps
+        .into_iter()
+        .filter_map(
+            |map| match opence_import::load_level(&map, Path::new(cache_folder)) {
+                Ok(loaded) => Some((map, loaded.level)),
+                Err(error) => {
+                    let text = format!("{} left out: {error}", map.display());
+                    opence_dev::logbook::record(opence_dev::logbook::Level::Warn, area, &text);
+                    None
+                }
+            },
+        )
+        .collect())
+}
+
 #[uniffi::export]
 impl LevelGeometry {
     /// The BSP `bsp` of the map at `map`, its pack kept in `cache_folder`.
     #[uniffi::constructor]
     pub fn load(map: String, cache_folder: String, bsp: u32) -> Result<Arc<Self>, EngineError> {
         let path = Path::new(&map);
-        if !path.exists()
-            && path.file_stem().and_then(|stem| stem.to_str()) == Some(opence_content::devmap::NAME)
-        {
+        let stem = path.file_stem().and_then(|stem| stem.to_str());
+        let made = [opence_content::devmap::NAME, opence_content::devgulch::NAME];
+        if let Some(stem) = stem.filter(|stem| !path.exists() && made.contains(stem)) {
             if bsp != 0 {
                 return Err(EngineError::NoBsp { index: bsp });
             }
             let folder = path
                 .parent()
                 .map_or_else(String::new, |folder| folder.to_string_lossy().into_owned());
-            return Self::devmap_gathered(folder, cache_folder);
+            return if stem == opence_content::devgulch::NAME {
+                Self::devgulch(folder, cache_folder)
+            } else {
+                Self::devmap_gathered(folder, cache_folder)
+            };
         }
         let loaded = opence_import::load_level(Path::new(&map), Path::new(&cache_folder)).map_err(
             |error| EngineError::Load {
@@ -191,35 +235,10 @@ impl LevelGeometry {
         maps_folder: String,
         cache_folder: String,
     ) -> Result<Arc<Self>, EngineError> {
-        let folder = if maps_folder.is_empty() {
-            Path::new(".")
-        } else {
-            Path::new(&maps_folder)
-        };
-        let mut maps: Vec<_> = std::fs::read_dir(folder)
-            .map_err(|error| EngineError::Load {
-                message: format!("{}: {error}", folder.display()),
-            })?
-            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-            .filter(|path| path.extension().is_some_and(|extension| extension == "map"))
-            .collect();
-        maps.sort();
-        let levels: Vec<_> = maps
-            .iter()
-            .filter_map(
-                |map| match opence_import::load_level(map, Path::new(&cache_folder)) {
-                    Ok(loaded) => Some(loaded.level),
-                    Err(error) => {
-                        let text = format!("{} left out: {error}", map.display());
-                        opence_dev::logbook::record(
-                            opence_dev::logbook::Level::Warn,
-                            "devmap",
-                            &text,
-                        );
-                        None
-                    }
-                },
-            )
+        let folder = maps_folder_path(&maps_folder);
+        let levels: Vec<_> = folder_levels(folder, &cache_folder, "devmap")?
+            .into_iter()
+            .map(|(_, level)| level)
             .collect();
         let (level, galleries) =
             opence_content::devmap::gallery_level(&levels).ok_or_else(|| EngineError::Load {
@@ -235,6 +254,43 @@ impl LevelGeometry {
         let render = RenderLevel::build(&level, 0).ok_or(EngineError::NoBsp { index: 0 })?;
         Ok(Arc::new(Self {
             name: opence_content::devmap::NAME.into(),
+            level: render,
+            bsp: 0,
+            content: Arc::new(level),
+        }))
+    }
+
+    /// The development playground, devgulch: the `bloodgulch.map` of
+    /// `maps_folder` with every definition of the folder's other maps (in
+    /// name order; a map that does not load is left out), made when it is
+    /// loaded and never written. `map devgulch` and `--map devgulch` load
+    /// it; without bloodgulch.map it is refused.
+    #[uniffi::constructor]
+    pub fn devgulch(maps_folder: String, cache_folder: String) -> Result<Arc<Self>, EngineError> {
+        let folder = maps_folder_path(&maps_folder);
+        let donor = format!("{}.map", opence_content::devgulch::DONOR);
+        if !folder.join(&donor).is_file() {
+            return Err(EngineError::Load {
+                message: format!(
+                    "{} is made from {donor}, which is not in {}",
+                    opence_content::devgulch::NAME,
+                    folder.display()
+                ),
+            });
+        }
+        let mut levels = folder_levels(folder, &cache_folder, opence_content::devgulch::NAME)?;
+        let at = levels
+            .iter()
+            .position(|(map, _)| map.file_name().is_some_and(|name| name == donor.as_str()))
+            .ok_or_else(|| EngineError::Load {
+                message: format!("{donor} did not load"),
+            })?;
+        let (_, blood_gulch) = levels.remove(at);
+        let others: Vec<_> = levels.into_iter().map(|(_, level)| level).collect();
+        let level = opence_content::devgulch::level(&blood_gulch, &others);
+        let render = RenderLevel::build(&level, 0).ok_or(EngineError::NoBsp { index: 0 })?;
+        Ok(Arc::new(Self {
+            name: opence_content::devgulch::NAME.into(),
             level: render,
             bsp: 0,
             content: Arc::new(level),

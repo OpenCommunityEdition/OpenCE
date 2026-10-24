@@ -6,6 +6,7 @@
 pub mod bitmap;
 pub mod campaign;
 pub mod decal;
+pub mod devgulch;
 pub mod devmap;
 pub mod hud;
 pub mod lens;
