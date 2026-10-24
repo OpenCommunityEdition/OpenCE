@@ -277,7 +277,10 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     let huds = crate::hud::import_huds(cache, &objects, &globals, &mut reached)?;
     let (sounds, looping_sounds) = crate::sound::import_sounds(cache)?;
     let material_effects = crate::sound::import_material_effects(cache)?;
-    let effects = import_effects(cache, &objects)?;
+    let mut effects = import_effects(cache, &objects)?;
+    // (and those the particles make where they strike and die)
+    let made = crate::particle::particle_effects(cache, &effects)?;
+    effects.extend(made);
     let damage_effects = import_damage_effects(cache, &objects, &globals, &effects)?;
     let lights = import_lights(cache, &objects, &effects)?;
     let collision_models = import_collision_models(cache, &objects)?;

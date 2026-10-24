@@ -24,11 +24,26 @@ pub struct PointPhysics {
     pub air_friction: f32,
     /// How water drags it.
     pub water_friction: f32,
+    /// How much of its speed along a surface it meets it loses, 0 to 1.
+    pub contact_friction: f32,
+    /// How much of its speed into a surface it meets it keeps, turned
+    /// back.
+    pub elasticity: f32,
 }
 
 impl PointPhysics {
+    /// It is a flamethrower's flame.
+    pub const FLAMETHROWER: u32 = 1 << 0;
+    /// It meets the level's structure.
+    pub const STRUCTURE_COLLISIONS: u32 = 1 << 1;
+    /// It meets water's surface.
+    pub const WATER_COLLISIONS: u32 = 1 << 2;
+    /// The wind blows it.
+    pub const SIMPLE_WIND: u32 = 1 << 3;
+    /// The wind blows it, damped.
+    pub const DAMPED_WIND: u32 = 1 << 4;
     /// It feels no gravity.
-    pub const NO_GRAVITY: u32 = 1 << 3;
+    pub const NO_GRAVITY: u32 = 1 << 5;
 }
 
 /// The look of something drawn as sprites: how its picture is blended.
@@ -79,9 +94,70 @@ pub struct Particle {
     pub orientation: i16,
     /// How it is blended.
     pub shader: SpriteShader,
+    /// What it makes on the materials it strikes (`foot`).
+    pub collision_material_effects: Option<TagRef>,
+    /// What it makes where it strikes the structure (`effe` or `snd!`).
+    pub collision_effect: Option<TagRef>,
+    /// What it makes where it dies (`effe` or `snd!`).
+    pub death_effect: Option<TagRef>,
+    /// The fewest pixels it is drawn at: smaller, it is drawn this big.
+    pub minimum_pixels: f32,
+    /// The seconds its frames slow by each time it settles on the ground.
+    pub contact_deterioration: f32,
+    /// The distances it thins out from and is gone by (falloff, cutoff).
+    pub lod: [f32; 2],
+    /// Its picture's flags (bit 0: unfiltered).
+    pub primary_map_flags: u16,
+    /// Its second picture, laid over its first.
+    pub secondary_map: Option<SecondaryMap>,
+}
+
+/// A particle's second picture.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct SecondaryMap {
+    /// The picture.
+    pub bitmap: TagRef,
+    /// What it turns with: 0 the world, 1 the screen, 2 the particle.
+    pub anchor: i16,
+    /// Its flags (bit 0: unfiltered).
+    pub flags: u16,
+    /// How big it is, by the particle's radius.
+    pub radius: f32,
 }
 
 impl Particle {
+    /// It may play its frames backwards.
+    pub const CAN_ANIMATE_BACKWARDS: u32 = 1 << 0;
+    /// Its frames stop when it comes to rest.
+    pub const ANIMATION_STOPS_AT_REST: u32 = 1 << 1;
+    /// It begins on a frame at random.
+    pub const ANIMATION_STARTS_ON_RANDOM_FRAME: u32 = 1 << 2;
+    /// It moves on a frame at most each frame drawn.
+    pub const ANIMATE_ONCE_PER_FRAME: u32 = 1 << 3;
+    /// It dies when it comes to rest.
+    pub const DIES_AT_REST: u32 = 1 << 4;
+    /// It dies when it strikes the structure.
+    pub const DIES_ON_CONTACT_WITH_STRUCTURE: u32 = 1 << 5;
+    /// It takes its colour from its picture's under it.
+    pub const TINT_FROM_DIFFUSE_TEXTURE: u32 = 1 << 6;
+    /// It dies in water.
+    pub const DIES_ON_CONTACT_WITH_WATER: u32 = 1 << 7;
+    /// It dies out of water.
+    pub const DIES_ON_CONTACT_WITH_AIR: u32 = 1 << 8;
+    /// It is not lit: it shines with its own colour.
+    pub const SELF_ILLUMINATED: u32 = 1 << 9;
+    /// It may be mirrored left to right.
+    pub const RANDOM_HORIZONTAL_MIRRORING: u32 = 1 << 10;
+    /// It may be mirrored top to bottom.
+    pub const RANDOM_VERTICAL_MIRRORING: u32 = 1 << 11;
+
+    /// Its radius `fraction` of the way through its life, for a radius of
+    /// 1 at emission (`particle_get_radius`).
+    pub fn radius_at(&self, fraction: f32) -> f32 {
+        let [birth, death] = self.radius;
+        (death - birth) * fraction.clamp(0.0, 1.0) + birth
+    }
+
     /// A particle named `tag` with no picture, living one second.
     pub fn new(tag: TagRef) -> Self {
         Self {
@@ -100,6 +176,14 @@ impl Particle {
             final_sequences: 0,
             orientation: 0,
             shader: SpriteShader::default(),
+            collision_material_effects: None,
+            collision_effect: None,
+            death_effect: None,
+            minimum_pixels: 0.0,
+            contact_deterioration: 0.0,
+            lod: [0.0, 0.0],
+            primary_map_flags: 0,
+            secondary_map: None,
         }
     }
 }

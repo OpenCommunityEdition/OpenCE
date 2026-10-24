@@ -15,7 +15,12 @@
 //! and 0x44, its radius at birth and death at 0x74, its frames a second at
 //! 0x80, its sequences at 0x98 (first, initial, looping, final), its
 //! orientation at 0xAC and its shader's flags, blending and fading at
-//! 0xD8.
+//! 0xD8. It names what it makes on the materials it strikes (`foot`) at
+//! 0x24, where it strikes the structure at 0x48 and where it dies at 0x58
+//! (`effe` or `snd!`); its least size in pixels is at 0x68, its frames'
+//! slowing on contact at 0x88, its distances of detail at 0x8C, its
+//! picture's flags at 0xDE and its second picture at 0xFC (its anchor at
+//! 0x10C, flags at 0x10E and radius at 0x148).
 //!
 //! A contrail (0x144 bytes): its flags at 0x00, its point rate at 0x04,
 //! its velocity bounds at 0x08, its cone at 0x10, its inherited velocity
@@ -33,15 +38,16 @@
 //! its bitmap at 0x194, its render mode at 0x1A4 and its shader at 0x1D0.
 //!
 //! A point physics (0x40 bytes): its flags at 0x00, the mass and
-//! buoyancies the tools work out at 0x04, its density at 0x20 and its
-//! frictions at 0x24 and 0x28.
+//! buoyancies the tools work out at 0x04, its density at 0x20, its
+//! frictions at 0x24 and 0x28, its contact friction at 0x2C and its
+//! elasticity at 0x30.
 
 use std::collections::BTreeSet;
 
 use opence_content::{
     Contrail, ContrailState, DetailObject, DetailObjectCollection, DetailObjectType, Effect,
-    EffectParticles, ObjectDefinition, Particle, PointPhysics, SpriteShader, StructureBsp, TagRef,
-    WeatherPalette, WeatherParticleType, WeatherSystem,
+    EffectParticles, ObjectDefinition, Particle, PointPhysics, SecondaryMap, SpriteShader,
+    StructureBsp, TagRef, WeatherPalette, WeatherParticleType, WeatherSystem,
 };
 
 use crate::cache::Cache;
@@ -127,6 +133,8 @@ fn point_physics(
         density: physics.f32(0x20, "density")?,
         air_friction: physics.f32(0x24, "air friction")?,
         water_friction: physics.f32(0x28, "water friction")?,
+        contact_friction: physics.f32(0x2C, "surface friction")?,
+        elasticity: physics.f32(0x30, "elasticity")?,
     };
     if read.mass_over_radius_cubed == 0.0 && read.density > 0.0 {
         read.mass_over_radius_cubed = read.density * DENSITY_SCALE;
@@ -194,7 +202,101 @@ fn import_particle(
         final_sequences: tag.i16(0x9E, "final sequence count")?,
         orientation: tag.i16(0xAC, "orientation")?,
         shader: sprite_shader(&tag, 0xD8)?,
+        collision_material_effects: crate::object::reference(
+            &tag,
+            0x24,
+            "collision effect",
+            &[crate::sound::FOOT],
+        )?,
+        collision_effect: crate::object::reference(
+            &tag,
+            0x48,
+            "collision effect",
+            &[crate::effect::EFFE, crate::sound::SND],
+        )?,
+        death_effect: crate::object::reference(
+            &tag,
+            0x58,
+            "death effect",
+            &[crate::effect::EFFE, crate::sound::SND],
+        )?,
+        minimum_pixels: tag.f32(0x68, "minimum size")?,
+        contact_deterioration: tag.f32(0x88, "contact deterioration")?,
+        lod: vector(&tag, 0x8C, "lod falloff and cutoff")?,
+        primary_map_flags: tag.u16(0xDE, "primary map flags")?,
+        secondary_map: secondary_map(reached, &tag)?,
     })
+}
+
+/// A particle's second picture, if it names one: its bitmap at 0xFC, its
+/// anchor at 0x10C, its flags at 0x10E and its radius at 0x148.
+fn secondary_map(
+    reached: &mut Reached,
+    tag: &Element<'_>,
+) -> Result<Option<SecondaryMap>, ImportError> {
+    let Some(bitmap) = reached.bitmap(tag, 0xFC, "secondary map")? else {
+        return Ok(None);
+    };
+    Ok(Some(SecondaryMap {
+        bitmap,
+        anchor: tag.i16(0x10C, "secondary map anchor")?,
+        flags: tag.u16(0x10E, "secondary map flags")?,
+        radius: tag.f32(0x148, "secondary map radius")?,
+    }))
+}
+
+/// The effects `particles`' particles make where they strike the structure
+/// and where they die, as many times over as those effects' own particles
+/// name more: the effects not among `known`, each once, by path.
+pub(crate) fn particle_effects(
+    cache: &Cache,
+    known: &[Effect],
+) -> Result<Vec<Effect>, ImportError> {
+    let mut seen: BTreeSet<TagRef> = known.iter().map(|effect| effect.tag.clone()).collect();
+    let mut looked: BTreeSet<TagRef> = BTreeSet::new();
+    let mut found = Vec::new();
+    let mut fresh: Vec<TagRef> = known
+        .iter()
+        .flat_map(|effect| &effect.events)
+        .flat_map(|event| &event.particles)
+        .map(|particles| particles.particle.clone())
+        .collect();
+    while let Some(particle) = fresh.pop() {
+        if !looked.insert(particle.clone()) {
+            continue;
+        }
+        let Some(index) = tag_index(cache, &particle) else {
+            continue;
+        };
+        let tag = cache.tag(index, PART, PARTICLE_SIZE)?;
+        for at in [0x48, 0x58] {
+            let Some(made) =
+                tag.reference(at, "effect", &[crate::effect::EFFE, crate::sound::SND])?
+            else {
+                continue;
+            };
+            // (a sound is made as it is, not as an effect)
+            if !cache.tags()[made].is(crate::effect::EFFE) {
+                continue;
+            }
+            let made = tag_ref(cache, made);
+            if !seen.insert(made.clone()) {
+                continue;
+            }
+            if let Some(index) = tag_index(cache, &made) {
+                let effect = crate::effect::import_effect(cache, index)?;
+                fresh.extend(
+                    effect
+                        .events
+                        .iter()
+                        .flat_map(|event| &event.particles)
+                        .map(|particles| particles.particle.clone()),
+                );
+                found.push(effect);
+            }
+        }
+    }
+    Ok(found)
 }
 
 /// Every particle the effects' events emit, each once, by path.
@@ -559,8 +661,14 @@ mod tests {
         let mut fake = FakeCache::new(CacheKind::CustomEdition);
         let mut physics = [0u8; POINT_PHYSICS_SIZE];
         put(&mut physics, 0x00, &PointPhysics::NO_GRAVITY.to_le_bytes());
-        floats(&mut physics, 0x20, &[0.5, 0.25, 0.75]);
+        floats(&mut physics, 0x20, &[0.5, 0.25, 0.75, 0.3, 0.6]);
         let physics = fake.add_tag(PPHY, "effects\\point physics\\smoke", &physics);
+        // (what the smoke makes where it dies, which emits it again)
+        let puff = fake.add_tag(
+            crate::effect::EFFE,
+            "effects\\puff",
+            &[0u8; crate::effect::EFFECT_SIZE],
+        );
         let mut particle = [0u8; PARTICLE_SIZE];
         put(&mut particle, 0x00, &4u32.to_le_bytes());
         empty(&mut particle, 0x04);
@@ -570,6 +678,13 @@ mod tests {
         put(&mut particle, 0x98, &[2, 0, 3, 0, 1, 0, 1, 0]);
         put(&mut particle, 0xAC, &1i16.to_le_bytes());
         put(&mut particle, 0xD8, &[1, 0, 3, 0, 2, 0]);
+        empty(&mut particle, 0x24);
+        empty(&mut particle, 0x48);
+        reference(&mut particle, 0x58, crate::effect::EFFE, fake.handle(puff));
+        floats(&mut particle, 0x68, &[2.0]);
+        floats(&mut particle, 0x88, &[0.1, 20.0, 40.0]);
+        put(&mut particle, 0xDE, &1u16.to_le_bytes());
+        empty(&mut particle, 0xFC);
         let particle = fake.add_tag(PART, "effects\\particles\\smoke", &particle);
 
         let mut emitted = [0u8; crate::effect::PARTICLES_SIZE];
@@ -665,6 +780,28 @@ mod tests {
         assert_eq!(physics.mass_over_radius_cubed, 0.5 * DENSITY_SCALE);
         assert_eq!(physics.air_buoyancy, AIR_DENSITY / 0.5 - 1.0);
         assert_eq!((physics.air_friction, physics.water_friction), (0.25, 0.75));
+        assert_eq!((physics.contact_friction, physics.elasticity), (0.3, 0.6));
+        assert_eq!(smoke.collision_material_effects, None);
+        assert_eq!(smoke.collision_effect, None);
+        assert_eq!(
+            smoke.death_effect.as_ref().map(|tag| tag.path.as_str()),
+            Some("effects\\puff")
+        );
+        assert_eq!(smoke.minimum_pixels, 2.0);
+        assert_eq!(smoke.contact_deterioration, 0.1);
+        assert_eq!(smoke.lod, [20.0, 40.0]);
+        assert_eq!(smoke.primary_map_flags, 1);
+        assert_eq!(smoke.secondary_map, None);
+        assert!((smoke.radius_at(0.5) - 0.25).abs() < 1e-6);
+        assert_eq!(smoke.radius_at(2.0), 0.4);
+
+        // the effect the smoke dies with is reached through it, once
+        let read = crate::effect::import_effect(&cache, effect)?;
+        let made = particle_effects(&cache, std::slice::from_ref(&read))?;
+        assert_eq!(made.len(), 1);
+        assert_eq!(made[0].tag.path, "effects\\puff");
+        let again = particle_effects(&cache, &[read, made[0].clone()])?;
+        assert!(again.is_empty(), "known effects are not made again");
 
         let carrier = ObjectDefinition {
             attachments: vec![
