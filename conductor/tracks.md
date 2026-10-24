@@ -50,5 +50,5 @@ This file tracks all major tracks for the project.
 - [ ] **Track: Decision models for the Covenant: a commander layer over Halo's AI with local models such as kev-4b, host-only and recorded**
   *Link: [./tracks/ai_decisions_20261023/](./tracks/ai_decisions_20261023/)*
 
-- [ ] **Track: The menus, launcher and loading screen redesigned in the original's design language, designed first in a Claude design artifact**
+- [~] **Track: The menus, launcher and loading screen redesigned in the original's design language, designed first in a Claude design artifact**
   *Link: [./tracks/menu_redesign_20261024/](./tracks/menu_redesign_20261024/)*

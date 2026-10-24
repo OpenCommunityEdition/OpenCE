@@ -1,9 +1,9 @@
 # Plan: The menus, launcher and loading screen redesigned
 
 ## Phase 1: The design language and the design artifact
-- [ ] Task: Reference captures of the original
-    - [ ] Write tests: `opence capture-ui` walks every screen headless and writes PNGs to `assets/ui_reference/` (gitignored); a test that the folder is ignored
-    - [ ] The capture command; the palette sampled from the captures into a local swatch file
+- [x] Task: Reference captures of the original ba7d643e
+    - [x] Write tests: `OpenCEEngine --capture-ui` walks every screen headless and writes PNGs to `assets/ui_reference/` (gitignored); a test that the folder is ignored
+    - [x] The capture command; the palette sampled from the captures into a local swatch file
 - [ ] Task: The design reference
     - [ ] `docs/ui_design.md`: the palette, panel and frame shapes, bevels, spacing, the type scale (OpenCE and Overpass sizes matched to the original's), focus and selection, motion curves, sounds
 - [ ] Task: Static mockups
