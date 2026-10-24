@@ -103,7 +103,7 @@ fn the_stations_run_and_measure() -> Result {
 
     // listed, none running; a name that is not one is refused
     let listed = run(&engine, "station")?;
-    assert_eq!(listed["stations"].as_array().map(Vec::len), Some(5));
+    assert_eq!(listed["stations"].as_array().map(Vec::len), Some(6));
     assert!(listed["run"].is_null());
     assert!(!engine.run_command("station nowhere".into()).ok);
     assert!(!engine.run_command("station stop".into()).ok);
@@ -136,6 +136,17 @@ fn the_stations_run_and_measure() -> Result {
     let crates = station(&engine, "station physics", 40)?;
     assert_eq!(crates.len(), 12);
     assert!(crates.iter().all(|one| one["resting"] == Value::Bool(true)));
+
+    // the effects make their particles, each counted alone
+    let all = run(&engine, "station particles")?;
+    eprintln!("{}", all["status"]);
+    run(&engine, "station stop")?;
+    let effects = station(&engine, "station particles explosion", 120)?;
+    eprintln!("{effects:?}");
+    assert!(!effects.is_empty());
+    assert!(effects
+        .iter()
+        .any(|effect| number(effect, "particles") > 0.0));
 
     // a run is stopped
     run(&engine, "station physics")?;

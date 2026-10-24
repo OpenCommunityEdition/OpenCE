@@ -13,9 +13,11 @@
 //! - `doors`: moves every device through its positions, back and forth.
 //! - `physics`: drops a pile of crates onto the slope, until they lie
 //!   still.
+//! - `particles`: starts each effect of the level that makes particles, in
+//!   turn, before the player: the most particles it kept alive.
 //!
-//! The filter keeps the weapons, vehicles, animations or devices whose
-//! name has it in it.
+//! The filter keeps the weapons, vehicles, animations, devices or effects
+//! whose name has it in it.
 
 use std::sync::Arc;
 
@@ -31,6 +33,8 @@ use opence_sim::units::Radians;
 use opence_sim::{Quat, Simulation, Transform, Vec3};
 use serde_json::json;
 
+use crate::effects::LevelEffects;
+use crate::particles::LevelParticles;
 use crate::{State, Wardrobe};
 
 /// The most the player turns in a tick, in radians.
@@ -72,6 +76,10 @@ const CRATES: usize = 12;
 const CRATE_HALF: f32 = 0.5;
 /// The longest the crates may take to lie still.
 const SETTLE_TICKS: u32 = 30 * TICKS_PER_SECOND;
+/// The ticks each effect of the particle station is watched for.
+const EFFECT_TICKS: u32 = 3 * TICKS_PER_SECOND;
+/// Where the particle station's effects start, and the way they face.
+const EFFECT_AT: [f32; 3] = [-14.0, 15.0, 1.0];
 
 /// A station running.
 #[derive(Debug)]
@@ -96,6 +104,7 @@ enum Drive {
     Animation(Animations),
     Doors(Doors),
     Physics(Physics),
+    Particles(Particles),
 }
 
 impl Run {
@@ -107,7 +116,7 @@ impl Run {
         Some(match &mut self.drive {
             Drive::Weapons(weapons) => weapons.input(simulation),
             Drive::Vehicles(vehicles) => vehicles.input(simulation),
-            Drive::Animation(_) | Drive::Doors(_) | Drive::Physics(_) => {
+            Drive::Animation(_) | Drive::Doors(_) | Drive::Physics(_) | Drive::Particles(_) => {
                 face(simulation, self.station.facing)
             }
         })
@@ -139,6 +148,7 @@ impl Run {
             Drive::Animation(animations) => animations.after_tick(simulation, &mut report),
             Drive::Doors(doors) => doors.after_tick(simulation, &mut report),
             Drive::Physics(physics) => physics.after_tick(simulation, &mut report),
+            Drive::Particles(particles) => particles.after_tick(&mut report),
         };
         if let Some(status) = report.status {
             self.status = status;
@@ -146,6 +156,19 @@ impl Run {
         if finished {
             let tested = self.results.len();
             self.finish(&format!("done: {tested} tested"));
+        }
+    }
+
+    /// After the tick's effects and particles: the particle station starts
+    /// its next effect, and counts the particles alive.
+    pub(crate) fn after_effects(
+        &mut self,
+        level: &Level,
+        effects: &mut LevelEffects,
+        particles: &mut LevelParticles,
+    ) {
+        if let (false, Drive::Particles(station)) = (self.done, &mut self.drive) {
+            station.after_effects(level, effects, particles);
         }
     }
 
@@ -254,6 +277,7 @@ pub(crate) fn command(state: &mut State, args: &Args) -> Result<Output, CommandE
         "vehicles" => Drive::Vehicles(Vehicles::new(&level, &filter)),
         "animation" => Drive::Animation(Animations::new(simulation, &level, &filter)),
         "doors" => Drive::Doors(Doors::new(simulation, &level, &filter)),
+        "particles" => Drive::Particles(Particles::new(&level, &filter)),
         _ => Drive::Physics(Physics::new(simulation)),
     };
     let count = drive.count();
@@ -285,6 +309,7 @@ impl Drive {
             Drive::Animation(animations) => animations.animations.len(),
             Drive::Doors(doors) => doors.devices.len(),
             Drive::Physics(_) => CRATES,
+            Drive::Particles(particles) => particles.effects.len(),
         }
     }
 }
@@ -1015,5 +1040,96 @@ impl Physics {
         report.label(Vec3::new(x, y, 3.0), &text, 5 * TICKS_PER_SECOND);
         report.status = Some(format!("physics: {text}"));
         true
+    }
+}
+
+/// The particle station: each effect that makes particles, started in
+/// turn and watched.
+#[derive(Debug)]
+struct Particles {
+    effects: Vec<TagRef>,
+    /// The effect watched.
+    at: usize,
+    /// The ticks it has been watched.
+    ticks: u32,
+    /// The effect to start after this tick's effects.
+    start: Option<TagRef>,
+    /// The particles alive after the last tick.
+    alive: usize,
+    /// The most alive while the effect has been watched.
+    peak: usize,
+}
+
+impl Particles {
+    /// The level's effects whose path has `filter` in it and whose events
+    /// emit particles or make particle systems.
+    fn new(level: &Level, filter: &str) -> Particles {
+        let effects = level
+            .effects
+            .iter()
+            .filter(|effect| effect.tag.path.to_lowercase().contains(filter))
+            .filter(|effect| {
+                effect.events.iter().any(|event| {
+                    !event.particles.is_empty()
+                        || event
+                            .parts
+                            .iter()
+                            .any(|part| level.particle_system(&part.tag).is_some())
+                })
+            })
+            .map(|effect| effect.tag.clone())
+            .collect();
+        Particles {
+            effects,
+            at: 0,
+            ticks: 0,
+            start: None,
+            alive: 0,
+            peak: 0,
+        }
+    }
+
+    fn after_tick(&mut self, report: &mut Report<'_>) -> bool {
+        let Some(effect) = self.effects.get(self.at) else {
+            return true;
+        };
+        let [x, y, z] = EFFECT_AT;
+        if self.ticks == 0 {
+            self.start = Some(effect.clone());
+            self.peak = 0;
+            report.label(Vec3::new(x, y, z + 2.0), short(effect), EFFECT_TICKS);
+            report.status = Some(format!(
+                "particles: {}/{} {}",
+                self.at + 1,
+                self.effects.len(),
+                short(effect)
+            ));
+        }
+        self.peak = self.peak.max(self.alive);
+        self.ticks += 1;
+        if self.ticks < EFFECT_TICKS {
+            return false;
+        }
+        report.results.push(json!({
+            "effect": effect.path,
+            "particles": self.peak,
+        }));
+        self.ticks = 0;
+        self.at += 1;
+        self.at >= self.effects.len()
+    }
+
+    fn after_effects(
+        &mut self,
+        level: &Level,
+        effects: &mut LevelEffects,
+        particles: &mut LevelParticles,
+    ) {
+        if let Some(effect) = self.start.take() {
+            // (the last effect's particles go, so that each is counted alone)
+            particles.clear();
+            effects.start(level, &effect, Vec3::from_array(EFFECT_AT), Vec3::Z);
+        }
+        self.alive = particles.alive();
     }
 }

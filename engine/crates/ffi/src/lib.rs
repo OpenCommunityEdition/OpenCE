@@ -1374,6 +1374,9 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
                     .effects
                     .start(level, &step.effect, step.point, step.normal);
             }
+            if let Some(run) = &mut shell.station {
+                run.after_effects(level, &mut running.effects, &mut running.particles);
+            }
         }
         // (the mouse's turn is used once)
         input.yaw = 0.0;

@@ -795,6 +795,18 @@ impl LevelParticles {
             .tick(level, simulation, fired, &mut self.random);
     }
 
+    /// The particles alive: the effects' and the particle systems'.
+    pub(crate) fn alive(&self) -> usize {
+        self.live.len() + self.systems.count()
+    }
+
+    /// Ends the effects' particles and the particle systems they made.
+    pub(crate) fn clear(&mut self) {
+        self.live.clear();
+        self.emitted.clear();
+        self.systems.clear();
+    }
+
     /// What the particles made in the last tick.
     pub(crate) fn events(&self) -> &ParticleEvents {
         &self.events

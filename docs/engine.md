@@ -296,25 +296,35 @@ A frame is drawn in this order. Each switch is a shell variable
 - **Effects** (`effe`) run in `sim` (`crates/sim/src/effects.rs`). Weapons,
   projectiles, explosions, scenery and vehicles start them; an impact picks its
   effect by the material it strikes. Each event fires its parts (lights,
-  decals, particles, contrails) at its time.
+  decals, particles, particle systems, contrails, other effects) at its time,
+  at the effect's markers.
 - **Particles** (`part`) follow their sequence, colour and size over their
-  lives, and move by their velocity and gravity. They are drawn as quads
-  facing the screen.
-- **Contrails** (`cont`) are strips of points. Each segment is a quad along it
-  that turns to face the camera.
-- **Weather** (`rain`) falls in a box around the camera, in the clusters that have it.
+  lives. They move by their physics (`pphy`) and the winds (`wind`), collide
+  with the level and objects, and make their collision and death effects. An
+  effect's particles are lit by the level's probes, the sun and the frame's
+  dynamic lights, unless they light themselves.
+- **Particle systems** (`pctl`) run their emitters and type states, from
+  effects or carried by objects.
+- **Contrails** (`cont`) are strips of points that take on the velocity of
+  what leaves them. Each segment is a quad along it that turns to face the
+  camera.
+- **Weather** (`rain`) drifts in boxes tiled about the camera, in the clusters
+  that have it, faded by depth and height and kept out of its polyhedra.
 - **Detail objects** (`dobc`) are placed by the importer and drawn with the
   frame's particles.
 
-The snapshot carries up to 2048 particles a frame.
+The effects keep at most 1024 particles alive (Halo's limit); past it the
+oldest makes way. The setting `particles.limit` raises it up to 2048, the most
+the snapshot carries a frame.
 
 These are not done yet:
 
-- particle systems (`pctl`);
-- particles start at the effect's origin, not at its markers;
-- contrails do not take on the velocity of what leaves them;
-- particles do not collide;
-- weather ignores its polyhedra and its height fades;
+- particles are not updated on the GPU, and water is not detected;
+- an effect's particles are lit every frame at their centre, not once when
+  made; the particle systems', contrails, weather and detail objects are
+  unlit;
+- some part fields: starters' scale and colour, HSV colours, camera modes,
+  the nonviolent mode;
 - detail objects are blended and not sorted;
 - particles are drawn after the first-person weapon, so they can draw over it.
 
@@ -735,7 +745,8 @@ Its stations run a test on the spot, from a pad or `station <name>`:
 `weapons` fires each weapon at targets and shows its shots, damage and
 heat; `vehicles` drives a course with corners and ramps; `animation` plays
 each of a biped's animations with its name; `doors` cycles every device;
-`physics` drops a pile of crates on a slope. Their results are data, so
+`physics` drops a pile of crates on a slope; `particles` starts each effect
+that makes particles and counts the most it keeps alive. Their results are data, so
 `ffi/tests/stations.rs` checks them.
 
 ### Placement checks

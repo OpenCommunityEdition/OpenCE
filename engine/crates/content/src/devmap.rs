@@ -481,7 +481,7 @@ pub struct Station {
 }
 
 /// The stations, behind the start (along -x), clear of the galleries.
-pub const STATIONS: [Station; 5] = [
+pub const STATIONS: [Station; 6] = [
     Station {
         name: "weapons",
         at: [-8.0, -15.0],
@@ -511,6 +511,12 @@ pub const STATIONS: [Station; 5] = [
         at: [-22.0, -40.0],
         facing: core::f32::consts::PI,
         help: "drops a pile of crates onto the slope",
+    },
+    Station {
+        name: "particles",
+        at: [-8.0, 15.0],
+        facing: core::f32::consts::PI,
+        help: "starts each effect that makes particles: the most it keeps alive",
     },
 ];
 

@@ -811,8 +811,13 @@ impl Systems {
         });
     }
 
+    /// Ends the systems effects made.
+    pub(super) fn clear(&mut self) {
+        self.free.clear();
+    }
+
     /// The particles alive.
-    fn count(&self) -> usize {
+    pub(super) fn count(&self) -> usize {
         self.free
             .iter()
             .chain(self.attached.values())
