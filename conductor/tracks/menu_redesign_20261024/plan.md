@@ -14,38 +14,47 @@
     - [x] Motion studies of focus, transitions, scrolling and the loading sweep
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: The design language and the design artifact' (Protocol in workflow.md): the user approves the design, and everything after builds from it
 
-## Phase 2: Drawing the menus in the new language
+## Phase 2: A UI system of our own
+- [ ] Task: Screens, layout and widgets
+    - [ ] Write tests: each screen declared from the design; the layout engine places anchors, columns, panes and dividers at 3840×2160 and at 4:3, 16:10 and 21:9, in 1080p, 1440p and 4K windows; hit boxes follow the layout
+    - [ ] `engine/crates/ui`: screen declarations, the layout engine, the widgets (list, tab, pane, option row, card, capsule, keycap)
+- [ ] Task: Faithful to the original
+    - [ ] Write tests: for every screen, each choice runs the same game function as the original widget (checked against the widget tree from `ui.map`); strings and sounds read from `ui.map`
+    - [ ] The flow: main menu, profiles, campaign, difficulty, settings, player setup, the pause menus, post-game
+- [ ] Task: Focus, input and motion
+    - [ ] Write tests: keyboard and mouse focus, hover, back; focus, transitions and scrolling ease over time, independent of the frame rate
 - [ ] Task: Fonts from the font files
-    - [ ] Write tests: SDF atlases built from OpenCE and Overpass; metrics and kerning; metrics at the design's 4K sizes, and the same widths at every scale (height / 2160)
-    - [ ] The atlas build (at app build time); text drawn from the atlases instead of the font tags
-- [ ] Task: Vector panels and frames
-    - [ ] Write tests: each widget type's shapes from the design (backgrounds, frames, highlights, arrows); content bitmaps kept
-    - [ ] A vector UI pass in Metal: SDF rounded rectangles, bevels and strokes
+    - [ ] Write tests: SDF atlases built from OpenCE and Overpass; metrics and kerning at the design's 4K sizes, the same widths at every scale (height / 2160)
+    - [ ] The atlas build (at app build time)
+- [ ] Task: The Metal UI pass
+    - [ ] Write tests: SDF rounded rectangles, tabs with a flat end, dividers, strokes; content bitmaps (the logo, mission pictures, emblems) filtered up to their size
+    - [ ] The pass, and the old widget rendering removed from the menus
 - [ ] Task: The logo
-    - [ ] Write tests: the logo bitmap is found in the UI pack and placed where the original placed it; the wordmark shows without it
-- [ ] Task: Widescreen layout
-    - [ ] Write tests: the 3840×2160 reference layout at 16:9; anchors, columns and stretching per screen at 4:3, 16:10 and 21:9; 1080p, 1440p and 4K windows; hit boxes follow the layout
-- [ ] Task: Colour and motion
-    - [ ] Write tests: the palette is applied; focus, transitions and scrolling ease over time, independent of the frame rate
+    - [ ] Write tests: the logo bitmap is found in the UI pack and drawn on the main menu; the wordmark shows without it
 - [ ] Task: Golden frames of every screen against the mockups; frame time under 1 ms at 4K
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Drawing the menus in the new language' (Protocol in workflow.md)
+- [ ] Task: Conductor - User Manual Verification 'Phase 2: A UI system of our own' (Protocol in workflow.md)
 
 ## Phase 3: The launcher
 - [ ] Task: The launcher's layout and backdrop
-    - [ ] Write tests: XCTest of each section and its navigation
+    - [ ] Write tests: XCTest of each section and its navigation; the window resizes, the rail keeps its width and the right side grows
     - [ ] SwiftUI in the design language; the backdrop (our own art, credited in AUTHORS.md); the logo from the UI pack, or the wordmark
 - [ ] Task: The map library and profiles
-    - [ ] Write tests: maps listed with their import status; Import runs the importer; profiles are created and picked
-- [ ] Task: Multiplayer settings, the version and updates
-    - [ ] Write tests: the player name, colour, port and servers are saved to the engine's settings; the update check (without downloading)
+    - [ ] Write tests: maps listed by kind (campaign, multiplayer, Custom Edition, misc) with their import status; a new game starts from a map; Import runs the importer; profiles are created and picked
+- [ ] Task: Multiplayer: the server browser and the lobby
+    - [ ] Write tests: servers listed and joined; a game hosted from the lobby
+- [ ] Task: Settings, the version and updates
+    - [ ] Write tests: every setting, grouped by section, saved to the engine's settings; the version and hash; the update check (without downloading)
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: The launcher' (Protocol in workflow.md)
 
-## Phase 4: The loading screen completed
+## Phase 4: The loading screen in HD, completed
+- [ ] Task: Original in HD
+    - [ ] Write tests: the sweep, trail and timing match `progress_bar.c`'s constants at 640×480 and scale with the frame's height at 1080p, 1440p and 4K; the blur is in screen pixels
+    - [ ] The setting: Original (the default) or OpenCE's
 - [ ] Task: The cloud noise
-    - [ ] Write tests: the noise texture built as progress_bar.c builds it; its coordinates and blend in the pass
+    - [ ] Write tests: the noise built as progress_bar.c builds it, at the screen's size; its coordinates and blend in the pass
 - [ ] Task: The loading picture
-    - [ ] Our own hand-drawn 320×240 picture, credited in AUTHORS.md, drawn where loading.tga was
+    - [ ] Our own hand-drawn picture at 4K, credited in AUTHORS.md, drawn where loading.tga was
 - [ ] Task: Every campaign transition
     - [ ] Write tests: the screen plays at each mission's end before the next, and on loading a saved game
     - [ ] The timing case: a10 to a30 with no hitch over 33 ms; a golden frame of the screen
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: The loading screen completed' (Protocol in workflow.md)
+- [ ] Task: Conductor - User Manual Verification 'Phase 4: The loading screen in HD, completed' (Protocol in workflow.md)

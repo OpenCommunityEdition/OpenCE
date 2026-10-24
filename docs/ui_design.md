@@ -10,9 +10,11 @@ artifact; each round of feedback is recorded at the end of this file.
 
 Sizes are pixels of a 3840×2160 frame: the menus are designed natively at
 4K and laid out across the whole 16:9 width. Other windows scale the frame
-by their height / 2160 (see Layout). The original's widgets sit on a
-640×480 grid; the redesign reads `ui.map` for which widgets a screen has
-and what they do, not for where they sit or how large they are.
+by their height / 2160 (see Layout). The menus are a UI system of our
+own, not the Xbox's widget system restyled: the original's screens, flow,
+functions, strings and sounds are what it is faithful to, and `ui.map`'s
+widget tree is the reference each screen is checked against, not what
+lays it out or draws it.
 
 ## Palette
 
@@ -45,10 +47,15 @@ stay crisp at 4K rather than scaled up from a smaller frame.
   y 198. The footer band is y 1836–1998, with a 6 px rule on top.
   Separators between groups of items are 720 px long and start at the
   list's text.
-- **The focus tab** (lists): 1035×108, at x 231. Its left end is rounded
-  (radius 54) and it is open on the right. A 9 px `blue` stroke runs on
-  the top, left and bottom, and the tab fades out over its last half. Its
-  fill is `ink`, and the text in it is `silver`.
+- **The focus tab** (lists): 1149×108, from x 231 to the divider at
+  x 1380. Its left end is rounded (radius 54) and its right end is flat
+  and meets the divider. A 9 px `blue` stroke runs on the top, left and
+  bottom. Its fill is `ink`, and the text in it is `silver`.
+- **The divider and the pane:** a 6 px `line` rule from the title rule to
+  the footer at x 1380 parts the list from the pane. Right of it the pane
+  is one darker surface (`#01050D` at 80%) that holds the description and
+  the options directly, with no box inside it, as the Xbox's settings
+  screens did. In the launcher the rail's 6 px right edge is the divider.
 - **Panels** (pause, dialogs): radius 36, a 9 px `blue` stroke, and a
   `panel` fill. A header strip inside is set off by a 3 px `line` rule. A
   panel's focus capsule is rounded at both ends (radius 54) and inset
@@ -109,7 +116,7 @@ vertical gradient from `glow` at the top to `blue` at the baseline.
 | State | Lists | The main menu |
 | --- | --- | --- |
 | At rest | `blue` text | `blue` text at 80% |
-| Focused | The tab or capsule, `silver` text; a list's tab, open on the right, fades out over its last half | `white` text, a 42 px `glow` halo |
+| Focused | The tab or capsule, `silver` text; a list's tab runs to the divider | `white` text, a 42 px `glow` halo |
 | Hovered (mouse) | The same as focused: the mouse moves focus | The same |
 | Pressed | The capsule's fill lifts to `deep` for 80 ms | The halo flashes to 100% |
 | Disabled | `muted` text, never focused | `muted` |
@@ -153,7 +160,7 @@ focus moves.
 
 The Halo logo is drawn from the user's `ui.map` at run time, where the
 original placed it: centred on the main menu, its middle at y 675, 2340 px
-wide. Its bitmap is the original's size, so it is drawn larger than it
+wide. Its bitmap is the original's own, the user's: its size, so it is drawn larger than it
 was made: filtered, and the redesign adds no detail to it. The mission
 pictures and the other content bitmaps are the same. It
 is never shipped or committed. The artifact shows a marked placeholder
@@ -165,8 +172,13 @@ wordmark (OpenCE, `title`, `blue` gradient).
 A setting, `loading_screen`, in the launcher's Interface section, chooses
 between two:
 
-- **Original** (the default): the Xbox's screen 1:1, as
-  `engine/crates/ui/src/loading.rs` draws it from `progress_bar.c`. A band
+- **Original** (the default): the Xbox's screen recreated natively in HD.
+  Its motion, timing and constants are `progress_bar.c`'s 1:1, as
+  `engine/crates/ui/src/loading.rs` has them, but it is drawn at the
+  display's resolution: the screen's units scale with the frame's height
+  (4.5 px a unit at 2160), the cloud noise is made at the screen's size,
+  the blur is in screen pixels, and the picture is a 4K redraw, rather
+  than the 640×480 frame scaled up. A band
   of light 128 of the screen's 640 units wide (768 px of the 4K frame)
   pans 768 units across the map's picture over the load, leaving a trail
   at alpha 0.9 (until the load passes 0.9), enlarged
@@ -179,7 +191,7 @@ between two:
 
 Either plays on every campaign transition and on loading a saved game.
 The engine's `loading_screen` is a boolean today; it becomes the choice of
-the two in Phase 2.
+the two in Phase 4.
 
 ## The design artifact
 
@@ -253,3 +265,19 @@ where its tag puts it, at 1.5× (1280×720) in a centred 4:3 column. Phase 2
 draws panels and text as vectors and from SDF atlases, so nothing ties the
 layout to that grid. The launcher is a SwiftUI window measured in points,
 already sharp at any scale, and is unchanged.
+
+### Round 3 (2026-10-24, artifact version 24)
+
+| Board | Comment | Change |
+| --- | --- | --- |
+| Settings | Instead of a fade, go back to before and add a divider; make the right side darker so there are no nested boxes, as on the Xbox | The tab's flat end meets a divider at x 1380; right of it one darker pane holds the options directly. The same on player setup and difficulty |
+| Player setup | A line between them so the flat cut-off makes sense | As above: the divider |
+| Launcher | The same: merge the cut-off into the divider | The tab runs to the rail's edge, now a 6 px divider |
+| Launcher | Is the launcher a variable size, as a Swift window? | Yes: a resizable macOS window. The boards are its default 1100×700; the rail keeps its width and the right side grows |
+| Main menu | Use the original logo bitmap here | It is, in the game: read from the user's `ui.map` at run time. It cannot go in the artifact or the repository, so the board keeps a marked placeholder |
+| Loading: Original | A native HD version, recreated for modern displays rather than the Xbox's exactly | Original is the Xbox's screen recreated in HD: the same constants and timing, drawn at the display's resolution (see The loading screen) |
+
+With this round the track's remaining phases were rewritten: the menus
+become a UI system of our own (screens, layout, widgets and a Metal pass)
+faithful to the original's screens, flow, functions, strings and sounds,
+instead of the Xbox's widget system restyled.

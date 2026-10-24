@@ -1,16 +1,18 @@
 # Spec: The menus, launcher and loading screen redesigned
 
 ## Overview
-The Xbox UI from `ui.map` stays the menus' structure: its screens,
-navigation, event handlers, strings and lists. Its look is rebuilt in the
-original's own design language: the same palette, panel shapes, type
-hierarchy and feel, drawn sharp at native resolution and laid out for
-widescreen. It is a modern rendering of the original, not a new identity.
+The menus are rewritten as a UI system of our own: its screens, layout,
+widgets, renderer and motion are designed for the engine and for modern
+displays, not bound to the Xbox's widget system or to `ui.map`'s widget
+definitions. It stays faithful to the original: the same screens in the
+same flow, each doing what the original's did, in the original's design
+language (its palette, panel shapes, type hierarchy and feel) and with its
+sounds. It is a modern rendering of the original, not a new identity.
 The Halo logo stays. The launcher grows into a richer pre-game window in
-the same language. The loading screen is completed as the Xbox had it.
-Every screen is designed first in a Claude design artifact (static
-mockups, a clickable prototype and motion studies) and built only once
-the user approves it.
+the same language. The loading screen is the Xbox's, recreated natively
+in HD and completed. Every screen is designed first in a Claude design
+artifact (static mockups, a clickable prototype and motion studies) and
+built only once the user approves it.
 
 ## Functional Requirements
 
@@ -46,34 +48,40 @@ the user approves it.
    Overpass) are the assets the rest of the track builds with and ships.
    Nothing is substituted after approval without a new design round.
 
-### The menus in that language (no setting brings back the old rendering)
-6. Fonts: titles are set in OpenCE (Newtown, respaced, the face Halo's
-   titles were drawn in) and body text in Overpass, each matched to the
-   original's sizes and weights. They are drawn as signed-distance-field
-   atlases built from the font files. The strings, formatting and
-   replacements still come from `ui.map`.
-7. The Halo logo is drawn from the user's `ui.map` logo bitmap at run time,
-   on the main menu where the original placed it, and on the launcher
-   once the UI is imported. It is never shipped or committed. Before the
-   import, the launcher shows the OpenCE wordmark.
-8. Panels, frames, highlights and arrows are redrawn as vector shapes in
-   the original's forms, replacing the low-resolution bitmaps. Content
-   bitmaps (map previews, the 3D ring scene) stay.
-9. Colour and motion: the original's palette, with focus and hover eased
-   in and out, transitions between screens and smooth scrolling. Sounds
-   still come from the widgets' tags.
-10. 4K native and widescreen: the screens are designed at 3840×2160 and
-    laid out across the full 16:9 width by layout rules (anchors, columns
-    and stretching from the design), not on the original's 640×480 grid.
-    Other windows scale by height; wider and narrower ones move the
-    anchored parts. The background scene fills the window. Content
-    bitmaps from `ui.map` (the logo, mission pictures) are filtered up to
-    their new size.
-11. Every screen can be navigated with the keyboard and the mouse.
+### The menus, rewritten (no setting brings back the old rendering)
+6. A UI system of our own in `engine/crates/ui`: screens declared in Rust
+   from the approved design (their items, panes and what each item does),
+   a layout engine (anchors, columns, panes and dividers, at 3840×2160 and
+   scaled by height), widgets (list, tab, pane, option row, card, capsule,
+   keycap), focus and input for keyboard and mouse, and a Metal pass that
+   draws them as vector shapes. The Xbox widget tree from `ui.map` no
+   longer drives the menus; its screens, functions and flow are the
+   reference the new screens are checked against: the same choices run
+   the same game functions (start a level, set the difficulty, save a
+   profile).
+7. Faithful content: the strings (titles, items, descriptions, mission
+   text) and the sounds are still read from the user's `ui.map` at run
+   time, so the words and clicks are the original's. Content bitmaps from
+   it (the logo, mission pictures, difficulty emblems) are drawn filtered
+   up to their new size.
+8. Fonts: titles are set in OpenCE (Newtown, respaced, the face Halo's
+   titles were drawn in) and body text in Overpass, at the design's sizes,
+   drawn from signed-distance-field atlases built from the font files.
+9. The Halo logo is drawn from the user's `ui.map` logo bitmap at run time,
+   on the main menu and on the launcher once the UI is imported. It is
+   never shipped or committed. Before the import, the launcher shows the
+   OpenCE wordmark.
+10. 4K native and widescreen: the screens are designed at 3840×2160 across
+    the full 16:9 width. Other windows scale by height; wider and narrower
+    ones move the anchored parts. The background scene fills the window.
+11. Colour and motion: the design's palette, with focus and hover eased in
+    and out, transitions between screens and smooth scrolling, independent
+    of the frame rate.
+12. Every screen can be navigated with the keyboard and the mouse.
 
 ### The launcher
-12. A pre-game window in the same design language, with the Halo logo (as
-    in item 7) over an artwork backdrop (our own art). It holds:
+13. A pre-game window in the same design language, with the Halo logo (as
+    in item 9) over an artwork backdrop (our own art). It holds:
     - Play, Settings, Exit;
     - a map library: the campaign, multiplayer and Custom Edition maps,
       their import status, and Import;
@@ -82,16 +90,23 @@ the user approves it.
     - the version, what changed, and whether an update is out;
     - data folders, display and window mode.
 
-### The loading screen (the Xbox's, completed)
-13. The loading screen plays between every pair of campaign maps (at the
-    end of each mission, before the next) and when a saved game is loaded,
-    not only between a10 and a30.
-14. The procedural cloud noise from `progress_bar.c`
-    (`progress_bar_create_noise_texture`) is added under the light.
-15. Our own hand-drawn 320×240 picture is drawn where `loading.tga` would
-    have been.
-16. The sweep, its trail, the chant from the user's xbe and the background
-    load stay as they are.
+### The loading screen (the Xbox's, recreated in HD and completed)
+14. Original, the default, is the Xbox's screen recreated natively for
+    modern displays: the same sweep, trail, timing and constants as
+    `progress_bar.c`, drawn at the display's resolution (its units scaled
+    by the frame's height, the blur in screen pixels) instead of the
+    640×480 frame scaled up. OpenCE's own loading screen is the other
+    choice of the setting.
+15. It plays between every pair of campaign maps (at the end of each
+    mission, before the next) and when a saved game is loaded, not only
+    between a10 and a30.
+16. The procedural cloud noise from `progress_bar.c`
+    (`progress_bar_create_noise_texture`) is added under the light, made
+    at the screen's size.
+17. Our own hand-drawn picture, drawn at 4K, is shown where `loading.tga`
+    would have been.
+18. The chant from the user's xbe and the background load stay as they
+    are.
 
 ## Non-Functional Requirements
 - The UI's frame time stays under 1 ms at 3840×2160. Text is crisp at any
@@ -104,9 +119,10 @@ the user approves it.
 - The user approves the design artifact before any code is written.
 - Golden frames of each screen match the approved mockups.
 - Side by side with the reference captures, each screen reads as the
-  original's.
+  original's, and each choice runs the same game function the original's
+  widget did.
 - Every screen can be reached by keyboard and by mouse.
-- The launcher has everything listed in item 12.
+- The launcher has everything listed in item 13.
 - The loading screen shows the clouds and the picture at every campaign
   transition. Its timing test case is a10 to a30: no hitch over 33 ms.
 
