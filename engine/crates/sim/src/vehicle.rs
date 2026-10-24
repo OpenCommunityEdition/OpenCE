@@ -445,7 +445,8 @@ pub fn collide(
     if apart.is_nan() || apart > reach(first_physics) + reach(second_physics) {
         return false;
     }
-    let mass_scale = libm::sqrtf(first_physics.mass * second_physics.mass);
+    // (a map's mass is finite but may be negative: no push, not a NaN)
+    let mass_scale = libm::sqrtf((first_physics.mass * second_physics.mass).max(0.0));
     let (mut force, mut torque) = ([Vec3::ZERO; 2], [Vec3::ZERO; 2]);
     let mut met = false;
     for (point0, radius0) in spheres(first, first_physics) {
@@ -1995,6 +1996,15 @@ mod tests {
         far.at_rest = true;
         assert!(!collide((&mut first, &physics), (&mut far, &physics)));
         assert!(far.at_rest);
+        // (a map's negative mass pushes neither, rather than making a NaN)
+        let mut weightless = physics.clone();
+        weightless.mass = -1.0;
+        let mut third = VehicleState::placed(&physics, Vec3::ZERO, Vec3::X, Vec3::Z);
+        let mut fourth =
+            VehicleState::placed(&weightless, Vec3::new(0.15, 0.0, 0.0), Vec3::X, Vec3::Z);
+        assert!(collide((&mut third, &physics), (&mut fourth, &weightless)));
+        assert_eq!(third.collision_force, Vec3::ZERO);
+        assert_eq!(fourth.collision_force, Vec3::ZERO);
         Ok(())
     }
 }

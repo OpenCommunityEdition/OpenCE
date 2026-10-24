@@ -1,7 +1,8 @@
 //! The sounds a tick makes: the sound parts its effects fired, the sounds
 //! its animations reached, its footsteps, each heard by the material
-//! underfoot, and the items lying about striking things. They are queued in the tick and played after it, so that the
-//! tick never takes the audio's lock.
+//! underfoot, and the items lying about striking things. They are queued
+//! in the tick and played after it, so that the tick never takes the
+//! audio's lock.
 
 use opence_content::{Level, MaterialEffects, TagRef};
 use opence_sim::animation::AnimationEvent;
