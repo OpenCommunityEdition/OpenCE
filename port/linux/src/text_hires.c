@@ -52,7 +52,20 @@ static struct
 	float narrowing;
 	/* how many times the display's pixels its glyphs are rasterized with */
 	float oversample;
+	/* made while text_hires_force was on */
+	int forced;
 } fonts[MAXIMUM_FONTS];
+static int forced_text;
+
+void text_hires_force(int on)
+{
+	forced_text = on != 0;
+}
+
+int text_hires_forced(void)
+{
+	return forced_text;
+}
 static long font_count;
 
 static struct
@@ -103,6 +116,101 @@ void text_hires_set_reset_hook(void (*hook)(void))
 	reset_hook = hook;
 }
 
+/* the font of the characters that the fonts lack, for the subtitles'
+language: Noto Sans CJK, a subset of its region's forms (fonts.json) */
+static stbtt_fontinfo fallback_info;
+static long fallback_language = -1;     /* the embedded font in use, -1: none */
+static int fallback_stale;              /* the glyphs of another font are in the atlas */
+static unsigned long fallback_read_at = (unsigned long)-1;
+
+/* the characters that the fallback is for: CJK ideographs, symbols and
+punctuation, kana, Hangul and the full-width forms; no other characters, which
+a font tag without them is without in the maps' own text */
+static int fallback_range(unsigned long code)
+{
+	return (code >= 0x2E80 && code <= 0x9FFF) || (code >= 0xAC00 && code <= 0xD7AF) ||
+		(code >= 0xF900 && code <= 0xFAFF) || (code >= 0xFF00 && code <= 0xFFEF);
+}
+
+/* whether the subtitles' language has a fallback font, read again when the
+settings change */
+static int fallback_ready(void)
+{
+	if (fallback_read_at != config_changes())
+	{
+		char const *language = config_string("display.subtitles_language");
+		long found = -1;
+		unsigned int index;
+
+		fallback_read_at = config_changes();
+		for (index = 0; index < text_hires_fallbacks_count; index++)
+		{
+			const struct text_hires_fallback *embedded = &text_hires_fallbacks[index];
+
+			if (language && embedded->language && !strcmp(embedded->language, language))
+			{
+				const unsigned char *data = (const unsigned char *)embedded->data;
+
+				if (stbtt_InitFont(&fallback_info, data, stbtt_GetFontOffsetForIndex(data, 0)))
+					found = (long)index;
+				else
+					platform_log("high-res text: could not read %s", embedded->file);
+				break;
+			}
+		}
+		if (found != fallback_language)
+		{
+			fallback_language = found;
+			fallback_stale = 1;
+		}
+	}
+	return fallback_language >= 0 && text_hires_enabled();
+}
+
+int text_hires_cjk_covers(unsigned long code)
+{
+	return placeholder_data && fallback_range(code) && fallback_ready() &&
+		stbtt_FindGlyphIndex(&fallback_info, (int)code) != 0;
+}
+
+float text_hires_forced_advance(unsigned long code, float cap_height)
+{
+	static stbtt_fontinfo small_info;
+	static int small_state;     /* 0: not looked for, 1: found, -1: none */
+	int x0, y0, x1, y1, glyph, advance = 0, bearing = 0;
+
+	if (!forced_text || !placeholder_data || cap_height <= 0.0f || !text_hires_enabled())
+		return 0.0f;
+	if (!small_state)
+	{
+		unsigned int index;
+
+		small_state = -1;
+		for (index = 0; index < text_hires_embedded_count; index++)
+		{
+			const unsigned char *data = (const unsigned char *)text_hires_embedded[index].data;
+
+			if (text_hires_embedded[index].tag && !names_differ(text_hires_embedded[index].tag, "ui\\small_ui") &&
+				stbtt_InitFont(&small_info, data, stbtt_GetFontOffsetForIndex(data, 0)))
+			{
+				small_state = 1;
+				break;
+			}
+		}
+	}
+	if (small_state < 0 || !stbtt_GetCodepointBox(&small_info, 'H', &x0, &y0, &x1, &y1) || y1 <= y0)
+		return 0.0f;
+	glyph = stbtt_FindGlyphIndex(&small_info, (int)code);
+	if (!glyph)
+		return 0.0f;
+	stbtt_GetGlyphHMetrics(&small_info, glyph, &advance, &bearing);
+	return advance * cap_height / (float)(y1 - y0);
+}
+
+/* the em of a fallback glyph, in its cell: Noto's ideographs fill most of the
+em, and the cell is the text's line */
+#define FALLBACK_EM 0.92f
+
 /* the atlas emptied: every glyph to be rasterized again */
 static void atlas_reset(float scale)
 {
@@ -130,6 +238,7 @@ long text_hires_font(char const *tag_name, float cap_height, short const *letter
 	long letters_width = 0;
 	int x0, y0, x1, y1;
 	int letter;
+	int use_small;
 
 	if (!text_hires_enabled() || !tag_name || cap_height <= 0.0f || !letter_widths)
 		return -1;
@@ -141,7 +250,8 @@ long text_hires_font(char const *tag_name, float cap_height, short const *letter
 	for (font = 0; font < font_count; font++)
 	{
 		if (!names_differ(fonts[font].tag, tag_name) && fonts[font].cap_height == cap_height &&
-			fonts[font].letters_width == letters_width && fonts[font].oversample == oversample)
+			fonts[font].letters_width == letters_width && fonts[font].oversample == oversample &&
+			fonts[font].forced == forced_text)
 		{
 			return fonts[font].scale > 0.0f ? font : -1;
 		}
@@ -155,13 +265,24 @@ long text_hires_font(char const *tag_name, float cap_height, short const *letter
 	fonts[font].scale = 0.0f;
 	fonts[font].narrowing = 1.0f;
 	fonts[font].oversample = oversample;
+	fonts[font].forced = forced_text;
+	/* (a tag no font stands for, drawn with the small font while forced) */
+	for (index = 0; index < text_hires_embedded_count; index++)
+	{
+		if (text_hires_embedded[index].tag && !names_differ(text_hires_embedded[index].tag, tag_name))
+			break;
+	}
+	use_small = forced_text && index == text_hires_embedded_count;
 	for (index = 0; index < text_hires_embedded_count; index++)
 	{
 		const struct text_hires_embedded *embedded = &text_hires_embedded[index];
 		const unsigned char *data = (const unsigned char *)embedded->data;
 
-		if (!embedded->tag || names_differ(embedded->tag, tag_name))
+		if (!embedded->tag ||
+			(use_small ? names_differ(embedded->tag, "ui\\small_ui") : names_differ(embedded->tag, tag_name)))
+		{
 			continue;
+		}
 		if (!stbtt_InitFont(&fonts[font].info, data, stbtt_GetFontOffsetForIndex(data, 0)) ||
 			!stbtt_GetCodepointBox(&fonts[font].info, 'H', &x0, &y0, &x1, &y1) || y1 <= y0)
 		{
@@ -199,10 +320,16 @@ int text_hires_covers(long font, unsigned long code)
 	if (font < 0 || font >= font_count || fonts[font].scale <= 0.0f)
 		return 0;
 	/* (control characters are never drawn) */
-	return code < 32 || code == ' ' || stbtt_FindGlyphIndex(&fonts[font].info, (int)code) != 0;
+	return code < 32 || code == ' ' || stbtt_FindGlyphIndex(&fonts[font].info, (int)code) != 0 ||
+		text_hires_cjk_covers(code);
 }
 
 int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *glyph)
+{
+	return text_hires_glyph_cell(font, code, 0.0f, glyph);
+}
+
+int text_hires_glyph_cell(long font, unsigned long code, float cell, struct text_hires_glyph *glyph)
 {
 	float scale = halo_screen_pixel_scale();
 	float pixel_scale;
@@ -211,8 +338,13 @@ int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *gly
 
 	if (font < 0 || font >= font_count || fonts[font].scale <= 0.0f || !placeholder_data || scale <= 0.0f)
 		return 0;
-	if (!atlas || scale != atlas_scale)
+	/* (a fallback font of another language has other glyphs for the characters) */
+	fallback_ready();
+	if (!atlas || scale != atlas_scale || fallback_stale)
+	{
+		fallback_stale = 0;
 		atlas_reset(scale);
+	}
 	if (!atlas)
 		return 0;
 	slot = ((unsigned long)font * 2654435761UL ^ code * 40503UL) & (GLYPH_CACHE_SIZE - 1);
@@ -224,21 +356,35 @@ int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *gly
 	if (probe == GLYPH_CACHE_SIZE)
 	{
 		atlas_reset(scale);
-		return text_hires_glyph(font, code, glyph);
+		return text_hires_glyph_cell(font, code, cell, glyph);
 	}
 	if (glyphs[slot].font == -1)
 	{
 		/* rasterized now */
+		float unit_scale = fonts[font].scale * fonts[font].narrowing;
 		float pixels = fonts[font].scale * scale * fonts[font].oversample;
 		float pixels_x = pixels * fonts[font].narrowing;
-		int index = stbtt_FindGlyphIndex(&fonts[font].info, (int)code);
+		stbtt_fontinfo *info = &fonts[font].info;
+		int index = stbtt_FindGlyphIndex(info, (int)code);
 		int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
 		int width, height, advance = 0, bearing = 0;
 
+		/* (a character the font lacks, from the fallback, its em in the cell) */
+		if (!index && cell > 0.0f && fallback_range(code) && fallback_ready())
+		{
+			index = stbtt_FindGlyphIndex(&fallback_info, (int)code);
+			if (index)
+			{
+				info = &fallback_info;
+				unit_scale = cell * FALLBACK_EM * stbtt_ScaleForMappingEmToPixels(info, 1.0f);
+				pixels = unit_scale * scale * fonts[font].oversample;
+				pixels_x = pixels;
+			}
+		}
 		if (index)
 		{
-			stbtt_GetGlyphBitmapBox(&fonts[font].info, index, pixels_x, pixels, &x0, &y0, &x1, &y1);
-			stbtt_GetGlyphHMetrics(&fonts[font].info, index, &advance, &bearing);
+			stbtt_GetGlyphBitmapBox(info, index, pixels_x, pixels, &x0, &y0, &x1, &y1);
+			stbtt_GetGlyphHMetrics(info, index, &advance, &bearing);
 		}
 		width = x1 - x0;
 		height = y1 - y0;
@@ -255,9 +401,9 @@ int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *gly
 			if (pack_y + height + 2 * ATLAS_PADDING > ATLAS_SIZE)
 			{
 				atlas_reset(scale);
-				return text_hires_glyph(font, code, glyph);
+				return text_hires_glyph_cell(font, code, cell, glyph);
 			}
-			stbtt_MakeGlyphBitmap(&fonts[font].info,
+			stbtt_MakeGlyphBitmap(info,
 				atlas + (pack_y + ATLAS_PADDING) * ATLAS_SIZE + pack_x + ATLAS_PADDING,
 				width, height, ATLAS_SIZE, pixels_x, pixels, index);
 			if (pack_y < dirty_top)
@@ -273,7 +419,7 @@ int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *gly
 		glyphs[slot].height = (short)(width > 0 && height > 0 ? height : 0);
 		glyphs[slot].left = (short)x0;
 		glyphs[slot].top = (short)y0;
-		glyphs[slot].advance = advance * fonts[font].scale * fonts[font].narrowing;
+		glyphs[slot].advance = advance * unit_scale;
 		if (width > 0 && height > 0)
 		{
 			pack_x += width + 2 * ATLAS_PADDING;

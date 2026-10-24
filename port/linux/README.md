@@ -465,6 +465,9 @@ the setting for one start of the game. It has priority over the file.
 | `display.scoreboard_background_color` | `"16, 16, 16, 150"` | `HALO_SCOREBOARD_BACKGROUND_COLOR` | The colour of the scoreboard's panel: `"red, green, blue, alpha"`, each from `0` to `255`. Alpha `0` is see-through, `255` is solid. |
 | `display.anisotropic_filtering` | `0` | `HALO_ANISOTROPIC_FILTERING` | Textures seen at a grazing angle (floors, walls, terrain) are sampled along the angle from finer mip levels, so they stay sharp; the Xbox game asks for none. `0` or `1`: as on the Xbox. `2`, `4`, `8` or `16`: at most that many samples (at most the GPU's); `4` keeps most of `16`'s sharpness at less cost on slower GPUs. TEXTURE FILTERING in Video Setup > Graphics. It applies to the textures of the map that have mip levels and are filtered linearly (base, detail, bump and environment maps; lightmaps have no mip levels), not to what the game renders, such as the water's ripples. On Android and the web, only where the GPU has `GL_EXT_texture_filter_anisotropic`. |
 | `display.latency_meter` | `false` | `HALO_LATENCY_METER` | `true`: in a network game, your round trip to the host in milliseconds at the top right of the screen, "Ping 45 ms" with four bars: green below 80 ms, yellow below 150, red from 150. The host shows "Max ping", its slowest player's. A player's machine that has heard nothing from the host for two seconds shows "Connection problem". The round trip includes each machine's wait for its next tick, so a LAN reads 15 to 35 ms. Not shown in the menus, after the game, in a co-op cutscene or when the host plays alone. The scoreboard's pings take the same colours, and show the round trips this machine times itself (the host: each player's; a player: their own), so they agree with the meter. Nothing more is sent. Only in config.toml, not in the menus. |
+| `display.subtitles` | `false` | `HALO_SUBTITLES` | `true`: subtitles at the bottom of the screen, on single player maps, for the sound tags that the subtitles name (built into the game, or your own file), while they play. Refer to "Subtitles". Also in the menus: Audio Setup, Subtitles. |
+| `display.subtitles_language` | `"english"` | `HALO_SUBTITLES_LANGUAGE` | The subtitles' language: `english`, `french`, `german`, `italian`, `chinese`, `chinese_simple`, `japanese`, `korean`, `spanish_latam`, `spanish` or `portuguese`. Refer to "Subtitles". Also in the menus: Audio Setup, Subtitles. |
+| `display.subtitles_file` | `"subtitles.txt"` | `HALO_SUBTITLES_FILE` | Your own subtitles file, in the data root (next to `maps`), or a path; it replaces the subtitles built into the game, which are used where there is no such file. Read again when the settings change. |
 | `display.per_pixel_lighting` | `false` | `HALO_PER_PIXEL_LIGHTING` | `false`: the models (characters, weapons, vehicles, scenery) are lit at each vertex and the light is blended between them, as on the Xbox. The light across a curved surface then shows facets, and a point light that passes close lights only the vertices it reaches. `true`: the models are lit at each pixel by the same lights (the ambient light, two distant lights and two point lights), which changes their look. |
 | `display.structure_culling` | `31` | `HALO_STRUCTURE_CULLING` | Which tests skip the triangles of the level (its walls, floors and terrain) that the camera cannot see before they are drawn, as bits added together: `1`, triangles outside the view; `2`, groups of triangles that all face away from the camera; `4`, single triangles that face away; `8`, smaller groups, so that more of them are skipped whole; `16`, the rooms nearest the camera first. Each test is conservative: the picture is the same, with fewer triangles drawn. `0`: the original walk, which draws every triangle of each visible room. The console's `structure_culling <bits>` changes it until the game quits, and `debug_structure_culling true` shows what was skipped (red: outside the view, blue: facing away). |
 | `display.shield_glow` | `false` | `HALO_SHIELD_GLOW` | `true`: as a unit's energy shield flares (hit, charging, falling), it lights what is around it and itself, as a plasma bolt does, in the shield shader's own color (a Spartan's gold, an Elite's blue), rising and falling with the flare seen on the body. An ordinary dynamic light of the game's, drawn with a light definition the map has (`shield_glow.c`). Up to 8 units near the camera. Video Setup's Extra Effects screen sets it. In a network game, the host's `network.shield_effects` decides, unless it is `players` (each player's own). |
@@ -1233,6 +1236,59 @@ has a private party with the invite as its join secret. The host can send
 the invite with the invite button of Discord. When a person accepts it, that
 person joins the game. If the game does not operate, Discord starts it.
 The game sends the activity only to a Discord client of the same user.
+
+## Subtitles
+
+The game shows subtitles at the bottom of the screen for the sound tags that
+a text file names. The game has its own built in, from
+`port/assets/subtitles/subtitles.txt` (the build embeds the file, so edit it
+and build again). To use your own instead, put `subtitles.txt` in the data
+root (next to `maps`; `display.subtitles_file` changes the name): a file
+there replaces the built-in subtitles whole. A line is a sound tag's path, a
+`-` (or `=` or `:`), and the text:
+
+```
+# the tag's path: the tag folder, without ".sound" (any case; / or \)
+"sound/dialog/a10/a10_chief_get_down" - "Chief, get down!"
+sound\dialog\a10\cortana_01 = Chief, I need you on the bridge.\nNow.
+sound/dialog/b30/* - "(radio chatter)"
+```
+
+- The path is in quotes, or without them if it holds no spaces. The text is
+  in quotes or not. `\n` in the text starts a new line, and a long line
+  wraps.
+- A path that ends in `/*` is every sound tag below that folder. A line that
+  names a tag, or a longer folder, is used before it.
+- Empty lines and lines that start with `#`, `//` or `;` are ignored. A path
+  named twice keeps its last line.
+- A line is shown when its sound is heard (a sound too far away to be heard
+  shows nothing), and stays for the sound's length. Up to four lines are
+  shown together, the newest lowest. In a cutscene they stand above the
+  letterbox's bar. A paused game keeps its lines.
+- Each language has a file: `subtitles.txt` is English, and the others are
+  `subtitles_french.txt`, `subtitles_german.txt`, `subtitles_italian.txt`,
+  `subtitles_chinese.txt` (Traditional), `subtitles_chinese_simple.txt`,
+  `subtitles_japanese.txt`, `subtitles_korean.txt`, `subtitles_spanish_latam.txt`,
+  `subtitles_spanish.txt` and `subtitles_portuguese.txt`, built in (from
+  `port/assets/subtitles`) or next to `maps`, which replaces the built-in
+  one. Choose the language with `display.subtitles_language` (Audio Setup,
+  Subtitles). A language's file need not have every line: a line it
+  lacks is shown in English. Only the English subtitles are built in now.
+- The files are UTF-8, and the text is drawn in the HUD font (Overpass),
+  which has the Latin letters of French, German, Italian, Spanish and
+  Portuguese with their accents. The Chinese, Japanese and Korean characters
+  are drawn from Noto Sans CJK (`port/assets/fonts`, SIL Open Font License),
+  a subset of the forms of the language's region: Traditional Chinese,
+  Simplified Chinese, Japanese or Korean, from `display.subtitles_language`.
+  The subset has the commonly used characters (the first levels of Big5,
+  GB 2312 and JIS X 0208, and the Hangul of KS X 1001) and the kana and
+  punctuation; a rarer character is left out. It needs
+  `display.high_res_text` (on by default), and a line of them is wrapped
+  only where the text has a space: write a space in a long line where it may
+  break.
+- The file is read when the game starts, and again when a setting changes.
+  They are off until `display.subtitles` is `true` (Audio Setup,
+  Subtitles), and only on single player maps.
 
 ## Mods
 

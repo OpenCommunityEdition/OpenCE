@@ -4,8 +4,9 @@ tools/hud_assets.py), the menus' titles (port/assets/titles, made by
 tools/title_assets.py), their controller button icons (port/assets/buttons,
 made by tools/button_assets.py), the fonts the text is drawn with
 (port/assets/fonts), the menus' files (port/assets/menus, made by
-tools/ce_menus.py) and SMAA's shader and lookup textures
-(port/third_party/smaa) in the game as C data:
+tools/ce_menus.py), the subtitles (port/assets/subtitles: a file for each
+language) and SMAA's shader and lookup textures (port/third_party/smaa) in the
+game as C data:
 
     python tools/embed_assets.py OUTPUT.c
 
@@ -50,6 +51,14 @@ MENU_LIST = MENU_ASSETS / "menus.json"
 SMAA_ASSETS = Path("port/third_party/smaa")
 SMAA_FILES = (("SMAA.hlsl", "xgpu_smaa_shader"), ("area_tex.zlib", "xgpu_smaa_area_texture"),
               ("search_tex.zlib", "xgpu_smaa_search_texture"))
+# the subtitles of the sound tags, the game's own, a file for each language
+# (port/linux/game/subtitles.c reads those next to the maps instead, where
+# there are any): subtitles.txt for English, subtitles_<language>.txt for the
+# others. The order is subtitles.c's subtitle_languages and the setting's
+# choices (display.subtitles_language, tools/port_settings.py)
+SUBTITLE_ASSETS = Path("port/assets/subtitles")
+SUBTITLE_LANGUAGES = ("english", "french", "german", "italian", "chinese", "chinese_simple", "japanese", "korean",
+                      "spanish_latam", "spanish", "portuguese")
 # the desktop windows' icon (tools/app_icon.py; port/linux/src/sdl_platform.c)
 WINDOW_ICON = Path("port/assets/icon/opence-icon-256.png")
 # the pointer the menus show in place of the system's (port/linux/src/sdl_platform.c)
@@ -61,8 +70,8 @@ def font_files() -> List[str]:
     """The font files fonts.json uses, each once."""
     if not (ROOT / FONT_LIST).is_file():
         return []
-    fonts = json.loads((ROOT / FONT_LIST).read_text())["fonts"]
-    return sorted({font["file"] for font in fonts})
+    listed = json.loads((ROOT / FONT_LIST).read_text())
+    return sorted({font["file"] for font in listed["fonts"] + listed.get("fallbacks", [])})
 
 
 def textures() -> List[tuple]:
@@ -84,6 +93,16 @@ def menu_files() -> List[str]:
     return json.loads((ROOT / MENU_LIST).read_text())["files"]
 
 
+def subtitle_file(language: str) -> Path:
+    """A language's subtitles file."""
+    return SUBTITLE_ASSETS / ("subtitles.txt" if language == "english" else f"subtitles_{language}.txt")
+
+
+def subtitle_files() -> List[Path]:
+    """The subtitles files that the checkout has."""
+    return [subtitle_file(language) for language in SUBTITLE_LANGUAGES if (ROOT / subtitle_file(language)).is_file()]
+
+
 def smaa_files() -> List[tuple]:
     """SMAA's files that the checkout has, with their symbols."""
     return [(name, symbol) for name, symbol in SMAA_FILES if (ROOT / SMAA_ASSETS / name).is_file()]
@@ -96,6 +115,7 @@ def hud_asset_inputs() -> List[Path]:
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
             *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files()),
             *(SMAA_ASSETS / name for name, _ in smaa_files()),
+            *subtitle_files(),
             *([WINDOW_ICON] if (ROOT / WINDOW_ICON).is_file() else []),
             *([MENU_CURSOR] if (ROOT / MENU_CURSOR).is_file() else [])]
 
@@ -111,6 +131,8 @@ def hud_configure_inputs() -> List[Path]:
             inputs += [folder, listing]
     if (ROOT / SMAA_ASSETS).is_dir():
         inputs.append(SMAA_ASSETS)
+    if (ROOT / SUBTITLE_ASSETS).is_dir():
+        inputs.append(SUBTITLE_ASSETS)
     return inputs
 
 
@@ -225,6 +247,20 @@ def main() -> None:
     lines.append("};")
     lines.append(f"const unsigned int text_hires_embedded_count = {len(fonts)};")
     lines.append("")
+    # the fonts of the characters those lack, a font for each subtitle
+    # language that needs one (text_hires.h)
+    fallbacks = json.loads((ROOT / FONT_LIST).read_text()).get("fallbacks", []) if files else []
+    lines.append("const struct text_hires_fallback text_hires_fallbacks[] =")
+    lines.append("{")
+    for font in fallbacks:
+        index = files.index(font["file"])
+        size = (ROOT / FONT_ASSETS / font["file"]).stat().st_size
+        lines.append(f'\t{{ "{font["language"]}", "{font["file"]}", font{index}, {size} }},')
+    if not fallbacks:
+        lines.append("\t{ 0 },")
+    lines.append("};")
+    lines.append(f"const unsigned int text_hires_fallbacks_count = {len(fallbacks)};")
+    lines.append("")
     # the menus' files (menu_files.h)
     lines.append('#include "menu_files.h"')
     lines.append("")
@@ -246,6 +282,29 @@ def main() -> None:
         lines.append("\t{ 0 },")
     lines.append("};")
     lines.append(f"const unsigned int menu_files_embedded_count = {len(menus)};")
+    lines.append("")
+    # the subtitles, text, a table with an entry for each language
+    # (port/linux/game/subtitles.c; of size 0 where the checkout has none of
+    # a language's). On every platform, the OpenGL ES ones too
+    present = {language: (ROOT / subtitle_file(language)).read_bytes()
+               for language in SUBTITLE_LANGUAGES if (ROOT / subtitle_file(language)).is_file()}
+    for index, language in enumerate(SUBTITLE_LANGUAGES):
+        if language in present:
+            lines.append(f"static const unsigned int subtitles{index}[] = {{")
+            lines.extend(words(present[language]))
+            lines.append("};")
+            lines.append("")
+    lines.append("const unsigned int *const subtitles_embedded_data[] =")
+    lines.append("{")
+    for index, language in enumerate(SUBTITLE_LANGUAGES):
+        lines.append(f"\tsubtitles{index}," if language in present else "\t0,")
+    lines.append("};")
+    lines.append("const unsigned long subtitles_embedded_sizes[] =")
+    lines.append("{")
+    for language in SUBTITLE_LANGUAGES:
+        lines.append(f"\t{len(present.get(language, b''))},")
+    lines.append("};")
+    lines.append(f"const unsigned long subtitles_embedded_count = {len(SUBTITLE_LANGUAGES)};")
     lines.append("")
     # SMAA's shader, as text a GLSL compiler takes (ASCII, ending in a NUL),
     # and its lookup textures (xgpu_post.c); each of size 0 that the

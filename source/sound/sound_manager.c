@@ -240,6 +240,7 @@ symbols in this file:
 #include "render/render_debug.h"
 #include "scenario/scenario.h"
 #include "tag_files/tag_files.h"
+#include "subtitles.h" /* port: port/linux/game/subtitles.c */
 
 #include <math.h>
 #include <stdio.h>
@@ -2579,6 +2580,12 @@ long sound_new_impulse(
 									{
 										sound->start_time = sound_manager_globals.render_time;
 									}
+
+									/* port: the sound tag's subtitle (display.subtitles) */
+									subtitles_sound_started(
+										definition_index,
+										sound->start_time - sound_manager_globals.render_time,
+										definition->longest_permutation_length);
 								}
 							}
 							else if (promotion_result == _sound_promotion_do)

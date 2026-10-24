@@ -4,5 +4,12 @@
   {"tag": "ui\\large_ui", "file": "Overpass-900.ttf"},
   {"tag": "ui\\interstate", "file": "Overpass-900.ttf"},
   {"tag": "ui\\small_ui", "file": "Overpass-750.ttf"}
+ ],
+ "comment_fallbacks": "The font that draws the characters of the fonts above that they lack, for each subtitle language (display.subtitles_language) that needs one.",
+ "fallbacks": [
+  {"language": "chinese", "file": "NotoSansCJK-TC-Medium-subset.otf"},
+  {"language": "chinese_simple", "file": "NotoSansCJK-SC-Medium-subset.otf"},
+  {"language": "japanese", "file": "NotoSansCJK-JP-Medium-subset.otf"},
+  {"language": "korean", "file": "NotoSansCJK-KR-Medium-subset.otf"}
  ]
 }

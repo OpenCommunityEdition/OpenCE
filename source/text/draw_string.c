@@ -528,6 +528,10 @@ static void bitmap_draw_character(
 			((color & 0xFF) >> 3));
 	}
 
+	/* port: a CJK character's cell (font_group.c) has no pixels */
+	if (character->pixels_offset == -1)
+		return;
+
 	if (dy <= 0)
 		return;
 
@@ -790,7 +794,12 @@ static word parse_unicode_string(
 		state->result = _parsed_end_of_line;
 		break;
 	default:
-		state->result = _parsed_character;
+		/* port: a line breaks after a space, and between the characters of
+		Chinese, Japanese and Korean (the characters of a string drawn as
+		wide characters, as parse_string's patterns have it) */
+		state->result = (character == ' ' || (character >= 0x2E80 && character <= 0x9FFF) ||
+			(character >= 0xAC00 && character <= 0xD7AF) || (character >= 0xFF00 && character <= 0xFFEF)) ?
+			_parsed_end_of_word : _parsed_character;
 		break;
 	}
 
@@ -1321,6 +1330,13 @@ void draw_unicode_string(
 							line_width = break_line_width;
 							wrapped = TRUE;
 						}
+						else if (line_width > 0)
+						{
+							/* port: a word longer than the line breaks before
+							the character that does not fit, not after it,
+							where it was cut by the box */
+							wrapped = TRUE;
+						}
 						done = TRUE;
 					}
 				}
@@ -1450,6 +1466,18 @@ void draw_unicode_string_compute_bounds(
 	rectangle2d *text_bounds,
 	rectangle2d *cursor_bounds)
 {
+	draw_unicode_string_compute_bounds_spaced(bounds, string, 0, text_bounds, cursor_bounds);
+
+	return;
+}
+
+void draw_unicode_string_compute_bounds_spaced(
+	rectangle2d const *bounds,
+	wchar_t const *string,
+	short height_adjust,
+	rectangle2d *text_bounds,
+	rectangle2d *cursor_bounds)
+{
 	point2d cursor;
 
 	text_bounds_globals.bounds.y0 = SHORT_MAX;
@@ -1460,7 +1488,7 @@ void draw_unicode_string_compute_bounds(
 	text_bounds_globals.last_font_header = styled_font_get(
 		font_drawing_globals.current_font_index,
 		font_drawing_globals.current_style);
-	draw_unicode_string(text_bounds_draw_character, bounds, &cursor, NULL, 0, string);
+	draw_unicode_string(text_bounds_draw_character, bounds, &cursor, NULL, height_adjust, string);
 
 	cursor_bounds->x0 = cursor.x;
 	cursor_bounds->x1 = (short)(cursor.x + 1);

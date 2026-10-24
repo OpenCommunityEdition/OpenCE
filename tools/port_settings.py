@@ -33,6 +33,11 @@ SHIELD_COLORS = ["white", "black", "red", "blue", "gray", "yellow", "green", "pi
                  "orange", "teal", "sage", "brown", "tan", "maroon", "salmon"]
 SENSITIVITIES = [(f"{value:g}", f"{value:g}") for value in (0.1, 0.15, 0.25, 0.4, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4)]
 VOLUMES = [(str(step), f"{step / 10:g}") for step in range(11)]
+# the subtitles' languages (port/linux/game/subtitles.c, tools/embed_assets.py)
+SUBTITLE_LANGUAGES = [("ENGLISH", "english"), ("FRENCH", "french"), ("GERMAN", "german"), ("ITALIAN", "italian"),
+                      ("CHINESE", "chinese"), ("CHINESE (SIMPLE)", "chinese_simple"), ("JAPANESE", "japanese"),
+                      ("KOREAN", "korean"), ("SPANISH (LATAM)", "spanish_latam"), ("SPANISH", "spanish"),
+                      ("PORTUGUESE", "portuguese")]
 
 # each screen: its folder below PE, its screen's widget (the name the profile
 # menu opens), its header (widget, bitmap), the row spacing, and its rows:
@@ -138,7 +143,8 @@ SCREENS = {
     "audio_settings": {
         "screen": "audio_settings_screen",
         "header": ("header_profile_audio_settings", f"{PE}/audio_settings/header_profile_audio_settings"),
-        "spacing": 30,
+        # (ten places, with the categories)
+        "spacing": 27,
         # (the devices, desktop only, first: Android's rows from the top)
         "platform_places": True,
         "rows": [
@@ -280,9 +286,21 @@ _audio["rows"] = [row for row in _audio["rows"] if row[1] not in _processing]
 
 # (voice chat stays on Audio Setup; the text chat's rows are the multiplayer
 # HUD's, on Network Setup)
+# (the subtitles, a screen of their own: Sound Setup's places are all taken)
+SCREENS["audio_settings/subtitles"] = {
+    "screen": "subtitles_settings_screen", "header": _audio["header"], "spacing": 30,
+    "rows": [
+        ("SUBTITLES:", "display.subtitles", ON_OFF,
+         "Subtitles at the bottom of the screen for the\nsound tags named in subtitles.txt. Off: none.", None),
+        ("SUBTITLE LANGUAGE:", "display.subtitles_language", SUBTITLE_LANGUAGES,
+         "The subtitles' language. A line a language\nlacks is shown in English. From subtitles_<language>.txt.", None),
+    ],
+}
 _audio["categories"] = [
     ("SOUND PROCESSING:", "audio_settings/sound_processing",
      "The reverb, and how sounds are converted to the\noutput's rate."),
+    ("SUBTITLES:", "audio_settings/subtitles",
+     "Subtitles at the bottom of the screen for the\nsound tags named in subtitles.txt, and their language."),
 ]
 
 # Network Setup's map sharing (port/linux/game/map_share.c): this machine's
@@ -364,7 +382,7 @@ CONTROL_ROWS = 7
 
 # the settings whose rows have the wider spinner (a device's name)
 WIDE_SETTINGS = {"audio.output_device", "audio.input_device", "streamer.slurs", "streamer.swearing",
-                 "streamer.insults"}
+                 "streamer.insults", "display.subtitles_language"}
 
 # the host's voice chat and vote kicks, on Teamplay Options
 # (_teamplay_options_extras): each row's key, its label, its choices' words

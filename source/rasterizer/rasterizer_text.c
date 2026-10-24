@@ -93,6 +93,8 @@ int text_hires_enabled(void); /* port: port/linux/src/text_hires.c */
 long text_hires_font(char const *tag_name, float cap_height, short const *letter_widths, float oversample);
 int text_hires_covers(long font, unsigned long code);
 int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *glyph);
+int text_hires_glyph_cell(long font, unsigned long code, float cell, struct text_hires_glyph *glyph);
+int text_hires_forced(void);
 void text_hires_register_atlas(unsigned long const *texture, unsigned long width, unsigned long height);
 
 /* ---------- constants */
@@ -247,6 +249,7 @@ static struct
 {
 	struct font_header *font;
 	real oversample;
+	int forced;
 	long hires_font;
 } hires_text_fonts[MAXIMUM_HIRES_TEXT_FONTS];
 static short hires_text_next_font = 0;
@@ -398,6 +401,11 @@ rasterizer_draw_character(
 	short dx,
 	short dy)
 {
+	/* port: a CJK character's cell (font_group.c) has no pixels of the font
+	tag's to cache; only the high-res text draws it */
+	if (font_character->pixels_offset == -1 || font_character->hardware_character_index == -2)
+		return;
+
 	/* port: the string's characters so far drawn before a character is
 	cached, which can give another's place in the cache to it */
 	if (font_character->hardware_character_index == NONE)
@@ -707,6 +715,11 @@ rasterizer_draw_character_with_dropshadow(
 	short dx,
 	short dy)
 {
+	/* port: a CJK character's cell (font_group.c) has no pixels of the font
+	tag's to cache; only the high-res text draws it */
+	if (font_character->pixels_offset == -1 || font_character->hardware_character_index == -2)
+		return;
+
 	/* port: the string's characters so far drawn before a character is
 	cached, which can give another's place in the cache to it */
 	if (font_character->hardware_character_index == NONE)
@@ -830,7 +843,8 @@ static long hires_text_font_get(
 	font = font_definition_get(font_index);
 	for (font_slot = 0; font_slot < MAXIMUM_HIRES_TEXT_FONTS; font_slot++)
 	{
-		if (hires_text_fonts[font_slot].font == font && hires_text_fonts[font_slot].oversample == oversample)
+		if (hires_text_fonts[font_slot].font == font && hires_text_fonts[font_slot].oversample == oversample &&
+			hires_text_fonts[font_slot].forced == text_hires_forced())
 			return hires_text_fonts[font_slot].hires_font;
 	}
 	/* (A to Z, then a to z; none where the tag has not the letter) */
@@ -868,6 +882,7 @@ static long hires_text_font_get(
 		hires_font = NONE;
 	hires_text_fonts[hires_text_next_font].font = font;
 	hires_text_fonts[hires_text_next_font].oversample = oversample;
+	hires_text_fonts[hires_text_next_font].forced = text_hires_forced();
 	hires_text_fonts[hires_text_next_font].hires_font = hires_font;
 	hires_text_next_font = (short)((hires_text_next_font + 1) % MAXIMUM_HIRES_TEXT_FONTS);
 
@@ -887,6 +902,10 @@ static long font_character_ink(
 	byte const *pixels = (byte const *)font->pixels.address + font_character->pixels_offset;
 	short row, column;
 	long ink = 0;
+
+	/* (a CJK character's cell, font_group.c's, has no pixels) */
+	if (font_character->pixels_offset == -1 || font_character->hardware_character_index == -2)
+		return 0;
 
 	for (row = MAX(y0, 0); row < MIN(y1, font_character->bitmap_height); row++)
 	{
@@ -943,8 +962,16 @@ static void rasterizer_draw_hires_glyph(
 	real left, top, right, bottom, u0, v0, u1, v1;
 	short pass;
 
-	if (!text_hires_glyph(hires_text_font, font_character->character, &glyph))
+	/* (a CJK character's cell, which the font tag has no character for, is
+	the cell the fallback font's glyph is drawn in) */
+	if (!text_hires_glyph_cell(
+		hires_text_font,
+		font_character->character,
+		font_character->pixels_offset == -1 ? (float)font_character->character_width : 0.0f,
+		&glyph))
+	{
 		return;
+	}
 	/* (the font's advance centred on the tag's, so that its letters keep
 	their own spacing) */
 	left = pen_x + (font_character->character_width - glyph.advance) * 0.5f + glyph.left;
