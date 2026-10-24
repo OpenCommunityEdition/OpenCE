@@ -40,9 +40,9 @@ built only once the user approves it.
 
    A clickable prototype wires them into the real flow. Motion studies
    cover focus and hover, transitions, scrolling and the loading sweep.
-   The artifact uses only our own drawings and the fonts. The Halo logo
-   appears there as a marked placeholder, since nothing from `ui.map` or
-   the xbe goes into it. Each round's feedback is recorded.
+   The artifact uses only our own drawings and the fonts, and the Halo
+   logo the user supplies to it; it stays private, and nothing else from
+   `ui.map` or the xbe goes into it. Each round's feedback is recorded.
 5. **The approved design is binding.** Its palette, shapes, type scale,
    spacing, motion curves, its drawings and its fonts (OpenCE and
    Overpass) are the assets the rest of the track builds with and ships.
@@ -111,8 +111,9 @@ built only once the user approves it.
 ## Non-Functional Requirements
 - The UI's frame time stays under 1 ms at 3840×2160. Text is crisp at any
   size.
-- Nothing from `ui.map` or the xbe (the logo included) is committed,
-  shipped or put in the artifact.
+- Nothing from `ui.map` or the xbe (the logo included) is committed or
+  shipped. The only exception in the artifact is the logo the user
+  supplied to it, which stays in that private artifact.
 - New art is our own and credited in `AUTHORS.md`.
 
 ## Acceptance Criteria

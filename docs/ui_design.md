@@ -163,8 +163,9 @@ original placed it: centred on the main menu, its middle at y 675, 2340 px
 wide. Its bitmap is the original's own, the user's: its size, so it is drawn larger than it
 was made: filtered, and the redesign adds no detail to it. The mission
 pictures and the other content bitmaps are the same. It
-is never shipped or committed. The artifact shows a marked placeholder
-in its place. Before the UI is imported, the launcher shows the OpenCE
+is never shipped or committed. The artifact's boards show the logo the
+user supplied to it, kept in that private artifact only; it is not in the
+repository. Before the UI is imported, the launcher shows the OpenCE
 wordmark (OpenCE, `title`, `blue` gradient).
 
 ## The loading screen
@@ -185,9 +186,12 @@ between two:
   by 1/128 a frame and blurred by 0.1 texel. The light eases 0.2 of the way
   to the progress each 30 Hz step, with a 0.05 wobble, settles for up to
   3 s once the map is ready, and crossfades into the mission over 0.5 s.
-- **OpenCE**: black; our own hand-drawn 1440×1080 picture, centred; the
-  cloud noise drifting over it; a progress sweep under it: a 9 px
-  `line` track with a `blue` fill and a `glow` leading edge.
+- **OpenCE**: our own hand-drawn picture, drawn at 3840×2160 and filling
+  the screen; the cloud noise drifting over it; a black fade over its
+  bottom 900 px holding a progress sweep: a 9 px `line` track with a
+  `blue` fill and a `glow` leading edge.
+
+Both fill the whole screen; neither sits in a box.
 
 Either plays on every campaign transition and on loading a saved game.
 The engine's `loading_screen` is a boolean today; it becomes the choice of
@@ -206,9 +210,11 @@ would, and the keycaps in each footer are links. A last row holds the
 motion studies: focus, hover, open and back, scrolling with the edge fade,
 the loading sweep with the cloud, and the one easing curve they share.
 
-Everything in it is our own drawing. The logo, the mission pictures, the
-figures and the loading picture are marked placeholders; nothing from
-`ui.map` or the executable is in the artifact. Its titles are set in OpenCE,
+Everything else in it is our own drawing. The Halo logo is the one the
+user supplied to the private artifact themselves; it is not committed or
+shipped, and the game reads its own from `ui.map`. The mission pictures,
+the figures and the loading picture are marked placeholders; nothing else
+from `ui.map` or the executable is in the artifact. Its titles are set in OpenCE,
 uploaded to the artifact with its licence (`port/assets/fonts/OpenCE-OFL.txt`);
 its body text is Overpass from Google Fonts, the same face as the files the
 builds embed.
@@ -281,3 +287,18 @@ With this round the track's remaining phases were rewritten: the menus
 become a UI system of our own (screens, layout, widgets and a Metal pass)
 faithful to the original's screens, flow, functions, strings and sounds,
 instead of the Xbox's widget system restyled.
+
+### Round 4 (2026-10-24, artifact version 28)
+
+The user supplied the Halo logo to the artifact.
+
+| Board | Comment | Change |
+| --- | --- | --- |
+| Main menu | Place the logo | The supplied logo replaces the placeholder: 2340 px wide, its middle at y 675, with a faint blue glow |
+| Launcher | Place the logo; tighten Play | The logo (560 wide) and the Ready panel are one block centred right of the rail, Play under them |
+| Launcher: Map library | Dev maps | A Dev section (the devmap and the debug scene) before Other; the Maps row counts it |
+| Pause: campaign | The same divider as settings | Its items are tabs whose flat end meets a divider; right of it a darker pane holds the objectives |
+| Loading: OpenCE | Fill the screen | The picture covers the screen, with a black fade at the bottom under the progress bar |
+| Loading: Original | Fill the screen, no box | The picture covers the screen; the description and the console sit over it |
+
+Pause: multiplayer keeps its capsules: it has no right pane for a divider.
