@@ -3,10 +3,10 @@
 Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported and fixed one at a time in later tracks.
 
 ## Phase 1: devgulch and the launcher's Developer tab
-- [ ] Task: devgulch from bloodgulch.map
-    - [ ] Write tests: the import makes devgulch from the user's map; it loads; nothing of it is in the repository or the app bundle
-    - [ ] The generated copy and its station layout
-- [ ] Task: The stations
+- [x] Task: devgulch from bloodgulch.map aae24b5
+    - [x] Write tests: the import makes devgulch from the user's map; it loads; nothing of it is in the repository or the app bundle
+    - [x] The generated copy and its station layout
+- [~] Task: The stations
     - [ ] Write tests: each station spawns its set (vehicles, AI squads, weapons and equipment, effects row, sound emitters, shader test surfaces, animation stands, HUD and UI triggers); a station command teleports there
     - [ ] The stations; devgulch becomes the default test level, replacing devmap
 - [ ] Task: The launcher's Developer tab

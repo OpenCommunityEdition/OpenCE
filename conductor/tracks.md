@@ -50,5 +50,5 @@ This file tracks all major tracks for the project.
 - [~] **Track: The menus, launcher and loading screen redesigned in the original's design language, designed first in a Claude design artifact**
   *Link: [./tracks/menu_redesign_20261024/](./tracks/menu_redesign_20261024/)*
 
-- [ ] **Track: Fidelity, performance and developer tools: a dev Blood Gulch with a station for each system, a launcher Developer tab, an in-game dev panel with lighting control and a stock lightmap view, the bake out of play, the systems' bugs fixed close to the original, and the performance track merged in**
+- [~] **Track: Fidelity, performance and developer tools: a dev Blood Gulch with a station for each system, a launcher Developer tab, an in-game dev panel with lighting control and a stock lightmap view, the bake out of play, the systems' bugs fixed close to the original, and the performance track merged in**
   *Link: [./tracks/fidelity_devtools_20261024/](./tracks/fidelity_devtools_20261024/)*
