@@ -57,8 +57,8 @@ VERIFY_BUDGET milliseconds of it each pass of the p2p thread, from a queue
 of MAXIMUM_QUEUED; the rest is dropped (hosts publish again).
 
 Each game's host is probed for its ping (p2p_probe_start: the tunnel to it
-timed, p2p.c), a few at once, again each PROBE_REFRESH and on Refresh. A
-game with a password is not: its token is sealed.
+timed, p2p.c), a few at once, in the order shown, again each PROBE_REFRESH
+and on Refresh. A game with a password is not: its token is sealed.
 */
 
 #include "platform.h"
@@ -678,30 +678,60 @@ static void listing_take(const struct queued *queued, const struct listing *list
 	shown->has_teams = (listing->flags & _listing_has_teams) != 0;
 }
 
-/* the hosts' pings: those not known lately probed, while there is room (a
-few refused, and the rest wait for a later pass) */
+/* the game as listed: whether joining it failed, and its host's ping and
+whether it is being probed */
+static void game_listed(const struct game *game, struct p2p_listing *listing)
+{
+	*listing = game->listing;
+	listing->failed = (unsigned char)identifier_failed(listing->identifier);
+	listing->ping = (short)game->ping;
+	listing->probing = (unsigned char)game->probing;
+}
+
+static int listing_order(const void *first, const void *second);
+
+/* the hosts' pings: those not known lately probed, in the order shown,
+while there is room (a few refused, and the rest wait for a later pass) */
 static void update_probes(void)
 {
+	unsigned char started[MAXIMUM_GAMES] = { 0 };
 	int refused = 0;
-	int index;
 
-	for (index = 0; index < MAXIMUM_GAMES && refused < P2P_MAXIMUM_PROBES; index++)
+	while (refused < P2P_MAXIMUM_PROBES)
 	{
-		struct game *game = &lobby.games[index];
+		struct p2p_listing best, other;
+		struct game *next = NULL;
+		int index;
 
-		if (!game->used || !game->has_token || game->probing ||
-			(game->probed_time && !elapsed(game->probed_time, PROBE_REFRESH)))
+		for (index = 0; index < MAXIMUM_GAMES; index++)
 		{
-			continue;
+			struct game *game = &lobby.games[index];
+
+			if (!game->used || !game->has_token || game->probing || started[index] ||
+				(game->probed_time && !elapsed(game->probed_time, PROBE_REFRESH)))
+			{
+				continue;
+			}
+			game_listed(game, &other);
+			if (!next || listing_order(&other, &best) < 0)
+			{
+				best = other;
+				next = game;
+			}
 		}
+		if (!next)
+			break;
+		/* (each game once a pass: a refused one stays wanted, and one whose
+		probe ends at once could be picked again) */
+		started[next - lobby.games] = 1;
 		/* (set first: a probe that needs no tunnel ends at once,
 		p2p_lobby_probed) */
-		game->probing = 1;
-		game->probed_time = p2p_now() | 1;
-		if (!p2p_probe_start(game->key_hash, game->token))
+		next->probing = 1;
+		next->probed_time = p2p_now() | 1;
+		if (!p2p_probe_start(next->key_hash, next->token))
 		{
-			game->probing = 0;
-			game->probed_time = 0;
+			next->probing = 0;
+			next->probed_time = 0;
 			refused++;
 		}
 	}
@@ -787,7 +817,9 @@ static void update_browsing(void)
 		if (lobby.newer[index].used && elapsed(lobby.newer[index].heard_time, GAME_EXPIRY))
 			lobby.newer[index].used = 0;
 	}
-	if (lobby.browsing)
+	/* (the listings still waiting are shown before the probes start, which
+	then start in the order shown) */
+	if (lobby.browsing && !lobby.queue_count)
 		update_probes();
 }
 
@@ -978,9 +1010,7 @@ int p2p_lobby_games(struct p2p_listing *games, int maximum_count)
 	{
 		if (!lobby.games[index].used)
 			continue;
-		games[count] = lobby.games[index].listing;
-		games[count].failed = (unsigned char)identifier_failed(games[count].identifier);
-		games[count].ping = (short)lobby.games[index].ping;
+		game_listed(&lobby.games[index], &games[count]);
 		count++;
 	}
 	pthread_mutex_unlock(&p2p_lock);

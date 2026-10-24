@@ -4123,6 +4123,30 @@ static void lobby_browser_focus_row(struct widget_instance *list, short row)
 	}
 }
 
+/* a game's ping cell: FAILED, else its host's ping once probed (kept while
+it is timed again), else dots stepping every 300 ms while the host is being
+timed (without a colour: pc_menu_text_color colours a number only), else
+CLOSED or LIVE, else a dash */
+static wchar_t const *browser_ping_text(struct p2p_listing const *game, unsigned long now, wchar_t *text, int size)
+{
+	static wchar_t const dots[3][4] = { L".", L"..", L"..." };
+
+	if (game->failed)
+		return L"FAILED";
+	if (game->ping >= 0)
+	{
+		usnprintf(text, size - 1, L"%d", game->ping);
+		return text;
+	}
+	if (game->probing)
+		return dots[(now / 300) % 3];
+	if (!game->open)
+		return L"CLOSED";
+	if (game->in_progress)
+		return L"LIVE";
+	return L"-";
+}
+
 /* "gamespy screen update" for the server browser: the rows (scrolled on
 at their ends), the line below them, the counts over the titles */
 static void lobby_browser_update(struct widget_instance *list)
@@ -4186,9 +4210,7 @@ static void lobby_browser_update(struct widget_instance *list)
 		text_set(named(row, "server_item_players", 0), text);
 		/* (its host's ping, once probed: p2p_lobby.c) */
 		browser_row_pings[index - lobby_browser.first] = game->failed ? -1 : game->ping;
-		usnprintf(text, ROW_TEXT_LENGTH - 1, L"%d", game->ping);
-		text_set(named(row, "server_item_ping", 0), game->failed ? L"FAILED" : game->ping >= 0 ? text :
-			!game->open ? L"CLOSED" : game->in_progress ? L"LIVE" : L"-");
+		text_set(named(row, "server_item_ping", 0), browser_ping_text(game, now, text, ROW_TEXT_LENGTH));
 		/* (the lock: a game with a password. Its bitmap's first frame is
 		empty, the PC version's for no lock; the next is the lock, in the
 		menus' blue) */
