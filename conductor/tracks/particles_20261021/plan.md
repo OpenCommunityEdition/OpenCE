@@ -9,7 +9,7 @@
     - [x] The update on the CPU, with the collision queries (no GPU update: the CPU's is the original's, per particle, and fits the budget)
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Particles and their physics' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 2: Systems, effects and contrails
+## Phase 2: Systems, effects and contrails [checkpoint: c7e2de33]
 - [x] Task: Particle systems 36abd8c0
     - [x] Write tests: emitters, rates and their functions, states and transitions, attachment to markers
     - [x] `pctl` in full
