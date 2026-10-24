@@ -18,7 +18,7 @@
     - [ ] Looping sounds, sound environments, occlusion
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: The world's sounds' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 3: Music, dialogue and scripts
+## Phase 3: Music, dialogue and scripts [checkpoint: 35a1e351]
 - [x] Task: Music and dialogue bf9e1ea1
     - [ ] Write tests: music starts, stops and alternates; dialogue rules; conversations
     - [ ] Music and dialogue
