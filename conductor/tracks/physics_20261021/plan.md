@@ -13,9 +13,9 @@
 - [x] Task: Forces 0928583d
     - [x] Write tests: explosion force by distance; impacts; vehicles and players pushing objects; bipeds thrown before ragdolls
     - [x] Forces from damage, impacts and contacts
-- [~] Task: Grenades
-    - [ ] Write tests: the frag's bounces and the plasma's sticking against the reference traces
-    - [ ] Grenade projectile physics
+- [x] Task: Grenades 185f6293
+    - [x] Write tests: the frag's bounces and the plasma's sticking against the reference traces
+    - [x] Grenade projectile physics
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Forces and grenades' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 3: Vehicles and devices
