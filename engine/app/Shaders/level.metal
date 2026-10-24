@@ -47,7 +47,13 @@ struct Frame {
     // (the probes leave its direct light out for the objects to add)
     float4 sun_towards;
     float4 sun_color;
+    // the developer's view of the level's surfaces (0 the frame, 1 unlit,
+    // 2 their light alone), and 1 when the lightmaps are off (lit flat)
+    uint4 debug;
 };
+
+constant uint VIEW_ALBEDO = 1;
+constant uint VIEW_LIGHT = 2;
 
 // (as LevelRenderer's MaterialUniforms)
 struct Material {
@@ -651,6 +657,9 @@ fragment Opaque level_fragment(VertexOut in [[stage_in]],
         color.rgb = detailed(material.environment.x, color.rgb, detail.rgb);
     }
     float3 normal = direction(in.normal, float3(0, 0, 1));
+    if (frame.debug.x == VIEW_ALBEDO) {
+        return opaque(color, in.position, SURFACE_KEPT, normal, 0, float3(0), float3(0), 0);
+    }
     // the bumped normal, from the bump map in the surface's frame
     float3 bumped = normal;
     float4 bump_texel = float4(0.5, 0.5, 1, 1);
@@ -699,6 +708,14 @@ fragment Opaque level_fragment(VertexOut in [[stage_in]],
                           probe_nz)
             : unbaked_light(in.normal);
         light = lightmapped;
+    }
+    if (frame.debug.y != 0) {
+        light = float3(1);
+        lightmapped = float3(1);
+        incident_light = float3(0);
+    }
+    if (frame.debug.x == VIEW_LIGHT) {
+        return opaque(float4(light, 1), in.position, SURFACE_KEPT, normal, 0, float3(0), float3(0), 0);
     }
     float3 eye = direction(frame.eye.xyz - in.world, normal);
     if (!(bits & ENVIRONMENT)) {

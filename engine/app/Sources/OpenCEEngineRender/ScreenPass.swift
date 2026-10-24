@@ -16,6 +16,10 @@ public enum RenderView: String, CaseIterable, Sendable {
     /// The brightness the exposure adapts to, and the bloom (drawn by the
     /// tone map).
     case luminance, bloom
+    /// The level's surfaces unlit, their light alone (on white), and lit
+    /// by the map's own lightmaps where a bake replaced them (drawn by the
+    /// level's shader).
+    case albedo, light, stock
 
     var index: UInt32 { UInt32(Self.allCases.firstIndex(of: self) ?? 0) }
 }
@@ -36,6 +40,14 @@ public struct RenderSwitches: Equatable, Sendable {
     /// The occlusion and contact shadows found at half resolution and
     /// brought up to the frame's (`render.ao_quality` half).
     public var halfOcclusion = true
+    /// The level and the objects drawn as their triangles' edges.
+    public var wireframe = false
+    /// The level lit by its lightmaps (off: lit flat, white).
+    public var lightmaps = true
+    /// The objects drawn (off: the level and the sky alone).
+    public var objects = true
+    /// The HUD drawn over the frame.
+    public var hud = true
     public var view = RenderView.frame
 
     public init() {}
@@ -46,7 +58,7 @@ public struct RenderSwitches: Equatable, Sendable {
     public static let flags = [
         "render.gtao", "render.ssr", "render.contact_shadows", "render.sun_shadows", "render.lights",
         "render.exposure", "render.bloom", "render.lens_flares", "render.glows", "render.decals",
-        "render.particles",
+        "render.particles", "render.wireframe", "render.lightmaps", "render.objects", "render.hud",
     ]
 
     /// The switches as the shell's variables hold them (`render.*`), read
@@ -64,6 +76,10 @@ public struct RenderSwitches: Equatable, Sendable {
         decals = flag("render.decals")
         particles = flag("render.particles")
         halfOcclusion = value("render.ao_quality") != "full"
+        wireframe = flag("render.wireframe")
+        lightmaps = flag("render.lightmaps")
+        objects = flag("render.objects")
+        hud = flag("render.hud")
         view = RenderView(rawValue: value("render.view")) ?? .frame
     }
 }

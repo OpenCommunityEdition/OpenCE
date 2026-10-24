@@ -129,11 +129,11 @@ fn the_screen_passes_can_be_switched_off_and_shown_alone() -> Result {
         );
     }
     assert_eq!(engine.shell_value("render.view".into()), "frame");
-    for view in ["depth", "normals", "ao", "contact", "ssr", "frame"] {
+    for view in ["depth", "normals", "ao", "contact", "ssr", "albedo", "light", "stock", "frame"] {
         run(&engine, &format!("render.view {view}"))?;
         assert_eq!(engine.shell_value("render.view".into()), view);
     }
-    refused(&engine, "render.view albedo")?;
+    refused(&engine, "render.view sparkle")?;
     assert_eq!(engine.shell_value("render.view".into()), "frame");
     assert_eq!(engine.shell_value("no.such.variable".into()), "");
     // (the view is not kept between runs)

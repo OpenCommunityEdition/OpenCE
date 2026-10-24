@@ -302,7 +302,21 @@ second BSP.
 
 A frame is drawn in this order. Each switch is a shell variable
 (`set render.bloom 0`). `render.view` shows one buffer alone: `frame`, `depth`,
-`normals`, `ao`, `contact`, `ssr`, `luminance` or `bloom`.
+`normals`, `ao`, `contact`, `ssr`, `luminance` or `bloom`. Three more views come
+from the level's shader:
+
+- `albedo`: the level's surfaces unlit.
+- `light`: their lightmaps' or probes' light alone, on white.
+- `stock`: a baked level lit by the map's own lightmaps, without the bake's
+  probes and sun. This is the reference to compare the bake with; on an unbaked
+  level it is the frame.
+
+`render.lightmaps 0` lights the level flat, `render.wireframe 1` draws the level
+and the objects as their triangles' edges, `render.objects 0` leaves out the
+objects but not the sky, and `render.hud 0` leaves out the HUD. The objects'
+own shader ignores the three views. `ViewModeTests.swift` (which needs
+`assets/maps`) checks that each view and each switch draws its own frame, and
+writes the frames to `build/engine/golden`.
 
 | Pass | Does | Switch |
 | --- | --- | --- |

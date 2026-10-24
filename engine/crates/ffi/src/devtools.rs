@@ -221,8 +221,10 @@ const VARIABLES: [(&str, &str, bool, bool); 15] = [
     ),
 ];
 
-/// What `render.view` can show alone: the frame, or one of the buffers
-/// the screen's passes read or write.
+/// What `render.view` can show alone: the frame, one of the buffers the
+/// screen's passes read or write, or the level's surfaces unlit, their
+/// light alone, or lit by the map's own lightmaps where a bake replaced
+/// them.
 pub const RENDER_VIEWS: &[&str] = &[
     "frame",
     "depth",
@@ -232,6 +234,9 @@ pub const RENDER_VIEWS: &[&str] = &[
     "ssr",
     "luminance",
     "bloom",
+    "albedo",
+    "light",
+    "stock",
 ];
 
 /// The resolutions the ambient occlusion and contact shadows can be

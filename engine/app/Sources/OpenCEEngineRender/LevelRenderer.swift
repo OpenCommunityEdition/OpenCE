@@ -228,6 +228,9 @@ public struct FrameUniforms {
     /// The sun's irradiance, which the probes leave out for the objects
     /// to add where the probes see it.
     public var sunColor: SIMD4<Float> = .zero
+    /// The developer's view of the level's surfaces (0 the frame, 1 unlit,
+    /// 2 their light alone), and 1 when the lightmaps are off.
+    public var debug: SIMD4<UInt32> = .zero
 
     /// The frame from `camera`, its fog `fog` (none without a sky), its
     /// maps sampled `mipBias` levels sharper (negative) than its size's.
@@ -325,6 +328,9 @@ public final class LevelRenderer {
         var material: Int
         /// Its page in the BSP's lightmaps, when it is drawn with one.
         var lightmapPage: UInt32?
+        /// The map's own lightmap, where the bake's replaced it (for the
+        /// stock view).
+        var stockLightmap: MTLTexture?
     }
 
     public let device: MTLDevice
@@ -771,7 +777,9 @@ public final class LevelRenderer {
         toneEncoder.setFragmentTexture(bloom ?? cameraPass.blackLevel(), index: 1)
         toneEncoder.setFragmentBytes(&toneUniforms, length: MemoryLayout<ToneUniforms>.stride, index: 0)
         toneEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
-        hud?.encode(hudQuads, width: target.width, height: target.height, into: toneEncoder)
+        if switches.hud {
+            hud?.encode(hudQuads, width: target.width, height: target.height, into: toneEncoder)
+        }
         ui?.encode(uiQuads, textures: levelTextures, width: target.width, height: target.height, into: toneEncoder)
         toneEncoder.endEncoding()
     }
@@ -800,7 +808,7 @@ public final class LevelRenderer {
             DrawnObject(model: Int(model), transform: simd_float4x4(translation: camera.position),
                         center: camera.position, radius: 1, regions: [], nodes: [])
         }
-        let prepared = models.prepare(objects, sky: skyObject, camera: camera, viewportHeight: frame.height,
+        let prepared = models.prepare(switches.objects ? objects : [], sky: skyObject, camera: camera, viewportHeight: frame.height,
                                       device: device)
         let animation = geometry.materialAnimation(seconds: time)
         var uniforms = FrameUniforms(viewProjection: viewProjection, camera: camera, fog: sky?.fog, mipBias: mipBias)
@@ -808,7 +816,17 @@ public final class LevelRenderer {
         uniforms.probeCounts = probeGrid.counts
         uniforms.sunTowards = sun.towards
         uniforms.sunColor = sun.color
-        let towards = sunShadows && sun.towards.w > 0
+        uniforms.debug = SIMD4(switches.view == .albedo ? 1 : switches.view == .light ? 2 : 0,
+                               switches.lightmaps ? 0 : 1, 0, 0)
+        // (the stock view: lit as the map ships, without the bake's probes
+        // and sun)
+        let stock = switches.view == .stock && baked
+        if stock {
+            uniforms.probeCounts.w = 0
+            uniforms.sunTowards = .zero
+            uniforms.sunColor = .zero
+        }
+        let towards = sunShadows && uniforms.sunTowards.w > 0
             ? SIMD3(sun.towards.x, sun.towards.y, sun.towards.z) : nil
         profiled("shadows", scopes) {
             shadows.encode(into: commands, camera: camera, aspect: Float(frame.width) / Float(max(frame.height, 1)),
@@ -839,6 +857,7 @@ public final class LevelRenderer {
                                        height: Double(frame.height), znear: 0.5, zfar: 1)
         func bind(_ encoder: MTLRenderCommandEncoder) {
             encoder.setCullMode(.none)
+            encoder.setTriangleFillMode(switches.wireframe ? .lines : .fill)
             encoder.setVertexBuffer(vertices, offset: 0, index: 0)
             encoder.setVertexBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<FrameUniforms>.stride, index: 1)
@@ -881,7 +900,7 @@ public final class LevelRenderer {
         encoder.setRenderPipelineState(opaque)
         encoder.setDepthStencilState(depthWrite)
         for draw in opaqueDraws {
-            encode(draw, animation, encoder)
+            encode(draw, animation, encoder, stock: stock)
         }
         models.encode(prepared, blendedParts: false, animation: animation, into: encoder)
         if !prepared.firstPerson.isEmpty {
@@ -927,7 +946,7 @@ public final class LevelRenderer {
         for draw in far {
             guard let blend = draw.blend, let index = Self.blendFunctions.firstIndex(of: blend) else { continue }
             blendedEncoder.setRenderPipelineState(blended[index])
-            encode(draw, animation, blendedEncoder)
+            encode(draw, animation, blendedEncoder, stock: stock)
         }
         models.encode(prepared, blendedParts: true, animation: animation, into: blendedEncoder)
         // the lens flares, light volumes and glows, added
@@ -1035,6 +1054,7 @@ public final class LevelRenderer {
         func bake(_ draw: inout Draw) {
             guard let page = draw.lightmapPage.flatMap({ pages[$0] }), draw.uniforms.maps & MapBit.lightmap != 0,
                   draw.uniforms.chicagoCount == 0, draw.uniforms.transparent.x == 0 else { return }
+            draw.stockLightmap = draw.stockLightmap ?? draw.textures[3]
             draw.textures[3] = page.irradiance
             draw.textures[8] = page.directions
             draw.uniforms.maps |= MapBit.baked
@@ -1134,11 +1154,18 @@ public final class LevelRenderer {
         }
     }
 
-    private func encode(_ draw: Draw, _ animation: [Float], _ encoder: MTLRenderCommandEncoder) {
+    /// Draws `draw`, with the map's own lightmap in place of the bake's
+    /// when `stock`.
+    private func encode(_ draw: Draw, _ animation: [Float], _ encoder: MTLRenderCommandEncoder, stock: Bool = false) {
         var uniforms = draw.uniforms
         uniforms.animate(animation, material: draw.material)
+        var textures = draw.textures
+        if stock, let lightmap = draw.stockLightmap {
+            uniforms.maps &= ~MapBit.baked
+            textures[3] = lightmap
+        }
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<MaterialUniforms>.stride, index: 0)
-        encoder.setFragmentTextures(draw.textures, range: 0..<draw.textures.count)
+        encoder.setFragmentTextures(textures, range: 0..<textures.count)
         encoder.drawIndexedPrimitives(type: .triangle, indexCount: draw.indexCount, indexType: .uint32,
                                       indexBuffer: indices, indexBufferOffset: draw.firstIndex * 4)
     }

@@ -39,7 +39,9 @@ final class DeveloperTests: XCTestCase {
         let names = model.switches.map(\.name)
         XCTAssertEqual(names, names.filter(RenderSwitches.flags.contains))
         XCTAssertEqual(Set(names), Set(RenderSwitches.flags), "the shell has every flag the renderer reads")
-        XCTAssertFalse(names.contains("render.wireframe"), "not drawn yet, so not offered")
+        for name in ["render.wireframe", "render.lightmaps", "render.objects", "render.hud"] {
+            XCTAssertTrue(names.contains(name), "\(name) is drawn, so offered")
+        }
         XCTAssertFalse(names.contains("render.view"), "the view is its own picker")
         model.level = "devmap"
         XCTAssertTrue(model.stations.map(\.name).contains("doors"))
