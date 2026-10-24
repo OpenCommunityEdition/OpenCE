@@ -89,7 +89,9 @@ To see the glibc version that a build needs, enter
 ## Build the game
 
 1. Go to the root folder of the repository.
-2. Enter `python configure.py`.
+2. Enter `python configure.py`. Add `--with-ffmpeg` to play the disc's movies
+   (refer to "Bink video" below): it downloads FFmpeg's release tarball,
+   checked against its SHA-256, and builds its libraries for this target.
 3. Enter `ninja linux`.
 
 ## Start the game
@@ -1375,7 +1377,7 @@ crafted file) is refused, and the level starts over.
 | Memory | The port reserves the Xbox memory at `0x80000000`. Thus the game gets the fixed addresses that it expects. |
 | Saved games | The Xbox `UDATA` layout, with SHA-1 signatures. |
 | Networking | Winsock on BSD sockets. System link on a local network and on the internet. |
-| Bink video | Not available. The game skips the movies. |
+| Bink video | The disc's `.bik` movies (the intro, the menu's attract loop, the credits) play with `configure.py --with-ffmpeg`, through the game's own Bink SDK entry points (`src/bink_ffmpeg.c`) over FFmpeg's Bink demuxer and decoders; without the option `src/bink_null.c` keeps the stubs and the game skips them, as it always did. FFmpeg is built by the build for this target, against the same system root, since a library called from the game's units has to share their ABI (`tools/linux_ffmpeg.py`; its release tarball is checked against the SHA-256 in the script). The importer copies the disc's `bink` folder beside `maps`. |
 
 ## How the port operates
 

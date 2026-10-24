@@ -276,17 +276,11 @@ SDL_OPTIONS = [
 ]
 
 
-def portable_sdl(n: Writer, sln: Any, build_dir: Path, cc: str) -> Tuple[List[str], List[str], Path, Path, Path]:
-    """The portable build's system root and SDL3: the compiler's flags, the
-    linker's, what every unit waits for (the system root's stamp), the
-    libSDL3.so.0 that the executable links to, and SDL's license (which the
-    release carries beside it)."""
+def linux_sysroot(n: Writer, build_dir: Path) -> Tuple[Path, Path]:
+    """Debian 11's i386 system root (tools/linux_sysroot.py, and SDL's source):
+    the stamp the units wait for, and the root itself."""
     third_party = build_dir / "third_party"
-    sysroot = third_party / "sysroot"
-    sdl_source = third_party / "SDL3"
     stamp = third_party / "stamp"
-    sdl_build = build_dir / "sdl3-build"
-    libsdl = sdl_build / "libSDL3.so.0"
     n.rule(
         name="linux_sysroot",
         command=f"$python {SYSROOT_SCRIPT} {third_party}",
@@ -294,8 +288,57 @@ def portable_sdl(n: Writer, sln: Any, build_dir: Path, cc: str) -> Tuple[List[st
         restat=True,
     )
     # (and SDL's license, which the release carries)
-    sdl_license_source = sdl_source / "LICENSE.txt"
+    sdl_license_source = third_party / "SDL3" / "LICENSE.txt"
     n.build(outputs=stamp, rule="linux_sysroot", implicit=[SYSROOT_SCRIPT], implicit_outputs=[sdl_license_source])
+    return stamp, third_party / "sysroot"
+
+
+FFMPEG_LIBS = ["libavformat", "libavcodec", "libswscale", "libswresample", "libavutil"]
+# (the game's own flags that FFmpeg has to see too: a library called from the
+# game's units has to share their ABI, or a structure it returns by value comes
+# back wrong)
+FFMPEG_ABI_FLAGS = [
+    "-fshort-wchar", "-malign-double", "-fcommon", "-fno-pic", "-fno-strict-aliasing",
+    "-fwrapv", "-fno-delete-null-pointer-checks", "-freg-struct-return", "-ffp-contract=off",
+]
+
+
+def linux_ffmpeg(n: Writer, build_dir: Path, cc: str, sysroot: Path, sysroot_stamp: Path
+                 ) -> Tuple[List[str], List[str], Path, List[Path]]:
+    """The movies' decoder, FFmpeg (tools/linux_ffmpeg.py, only with
+    configure.py --with-ffmpeg): its compiler flags, what the link takes, the
+    stamp the units wait for, and the libraries themselves."""
+    root = build_dir / "ffmpeg"
+    archives = [root / "build" / library / f"{library}.a" for library in FFMPEG_LIBS]
+    stamp = root / "ffmpeg.stamp"
+    n.rule(
+        name="linux_ffmpeg",
+        command=(f"$python tools/linux_ffmpeg.py {root} --sysroot {sysroot} --cc {cc} "
+                 f"--flags \"{' '.join(FFMPEG_ABI_FLAGS)}\""),
+        description="LINUX FFMPEG (the movies' decoder)",
+        restat=True,
+        pool="console",
+    )
+    n.build(outputs=[*archives, stamp], rule="linux_ffmpeg",
+            implicit=[Path("tools/linux_ffmpeg.py"), sysroot_stamp])
+    cflags = ["-DHALO_BINK_FFMPEG", f"-I{root / 'src'}", f"-I{root / 'build'}"]
+    # (FFmpeg's libraries call each other's symbols: the group is what a static
+    # link needs to resolve them in one pass)
+    link = ["-Wl,--start-group", *[str(archive) for archive in archives], "-Wl,--end-group"]
+    return cflags, link, stamp, archives
+
+
+def portable_sdl(n: Writer, sln: Any, build_dir: Path, cc: str) -> Tuple[List[str], List[str], Path, Path, Path]:
+    """The portable build's system root and SDL3: the compiler's flags, the
+    linker's, what every unit waits for (the system root's stamp), the
+    libSDL3.so.0 that the executable links to, and SDL's license (which the
+    release carries beside it)."""
+    third_party = build_dir / "third_party"
+    sdl_source = third_party / "SDL3"
+    sdl_license_source = sdl_source / "LICENSE.txt"
+    stamp, sysroot = linux_sysroot(n, build_dir)
+    sdl_build = build_dir / "sdl3-build"
+    libsdl = sdl_build / "libSDL3.so.0"
     launcher = getattr(sln, "compiler_launcher", None)
     options = SDL_OPTIONS + ([f"-DCMAKE_C_COMPILER_LAUNCHER={launcher}"] if launcher else [])
     n.rule(
@@ -509,6 +552,23 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         sysroot_cflags, sysroot_ldflags, sysroot_inputs, libsdl, sdl_outputs = [], [], [], None, []
     target = [march_flag(sln), *sysroot_cflags]
 
+    # the disc's movies (configure.py --with-ffmpeg): FFmpeg, built here for
+    # this target and against the same system root, or bink_null.c's stubs
+    with_ffmpeg = getattr(sln, "with_ffmpeg", False)
+    ffmpeg_cflags: List[str] = []
+    ffmpeg_libs: List[str] = []
+    if with_ffmpeg:
+        if getattr(sln, "port_portable", False):
+            sysroot_root = build_dir / "third_party" / "sysroot"
+        else:
+            # (a library called from the game's units is built for the 32-bit
+            # system root too, not from whatever FFmpeg the machine has)
+            sysroot_stamp, sysroot_root = linux_sysroot(n, build_dir)
+            sysroot_inputs = [sysroot_stamp]
+        ffmpeg_cflags, ffmpeg_libs, ffmpeg_stamp, ffmpeg_archives = linux_ffmpeg(
+            n, build_dir, cc, sysroot_root, sysroot_stamp)
+        sysroot_inputs = [*sysroot_inputs, ffmpeg_stamp, *ffmpeg_archives]
+
     # (a debug build checks its stack frames, and stops at the first one
     # overrun, as it stops at the first failed assertion; a release build
     # does not, so that an overrun nobody has met cannot end a game)
@@ -517,6 +577,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     port_include = PORT_DIR / "include"
     sdk_flags = f"-idirafter {XDK_INCLUDE}"
     libs = " ".join(f"-l{lib}" for lib in config.get("libraries", []))
+    libs = " ".join([libs, *ffmpeg_libs]).strip()
 
     def emit(obj_dir: Path, output: Path, extra_cflags: List[str], extra_ldflags: List[str],
              implicit_inputs: List[Path], validator: Optional[Path] = None) -> None:
@@ -581,6 +642,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             f"-I{MONOCYPHER_DIR}",
             f"-I{ZLIB_DIR}",
             "-Isource -Isource/cseries",
+            *ffmpeg_cflags,
             sdk_flags,
         ])
         posix_cflags = " ".join(POSIX_FLAGS + target + [f"-I{platform_dir}"])
