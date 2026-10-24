@@ -45,6 +45,16 @@ short game_modes_variant_mode(struct game_variant const *variant, struct game_va
 CTF"), NULL for a game engine's own ("SLAYER") */
 wchar_t const *game_modes_variant_kind_name(struct game_variant const *variant,
 	struct game_variant_options const *options);
+/* a game's kind in a byte, as its LAN advertisement and internet listing
+carry it to the server browser: the mode it plays (game_modes_variant_mode),
+and GAME_MODES_KIND_HARDCORE */
+#define GAME_MODES_KIND_HARDCORE 0x80
+byte game_modes_kind(struct game_variant const *variant, struct game_variant_options const *options);
+/* the name of a game engine's game of that kind, in full or abbreviated
+("HC CTF": the server browser's column), NULL for the game engine's own
+(another machine's kind: a mode of any game engine but Slayer, or one this
+build does not know, is none) */
+wchar_t const *game_modes_kind_name(long game_engine_index, byte kind, boolean abbreviated);
 /* whether a gametype is one of OpenCE's (a mode, or Hardcore) */
 boolean game_modes_variant_is_opence(struct game_variant const *variant, struct game_variant_options const *options);
 

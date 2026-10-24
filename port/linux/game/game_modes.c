@@ -279,35 +279,53 @@ short game_modes_variant_mode(
 	return _game_mode_none;
 }
 
+byte game_modes_kind(
+	struct game_variant const *variant,
+	struct game_variant_options const *options)
+{
+	return (byte)(game_modes_variant_mode(variant, options) |
+		(options && options->hardcore ? GAME_MODES_KIND_HARDCORE : 0));
+}
+
+wchar_t const *game_modes_kind_name(
+	long game_engine_index,
+	byte kind,
+	boolean abbreviated)
+{
+	/* (each kind's name, and its name with Hardcore's, in full and short) */
+	static wchar_t const *const mode_names[NUMBER_OF_GAME_MODES][2][2] =
+	{
+		{ { NULL, NULL }, { NULL, NULL } },
+		{ { L"SWAT", L"SWAT" }, { L"HARDCORE SWAT", L"HC SWAT" } },
+		{ { L"INFECTION", L"INFECTION" }, { L"HARDCORE INFECTION", L"HC INFECTION" } },
+		{ { L"GUN GAME", L"GUN GAME" }, { L"HARDCORE GUN GAME", L"HC GUN GAME" } },
+	};
+	static wchar_t const *const hardcore_names[][2] =
+	{
+		{ NULL, NULL },
+		{ L"HARDCORE CTF", L"HC CTF" },
+		{ L"HARDCORE SLAYER", L"HC SLAYER" },
+		{ L"HARDCORE ODDBALL", L"HC ODDBALL" },
+		{ L"HARDCORE KING", L"HC KING" },
+		{ L"HARDCORE RACE", L"HC RACE" },
+	};
+	boolean hardcore = (kind & GAME_MODES_KIND_HARDCORE) != 0;
+	short mode = (short)(kind & ~GAME_MODES_KIND_HARDCORE);
+
+	/* (another machine's: a mode of Slayer only, and one this build knows) */
+	if (game_engine_index == game_engine_slayer && mode > _game_mode_none && mode < NUMBER_OF_GAME_MODES)
+		return mode_names[mode][hardcore][abbreviated != FALSE];
+	if (!hardcore || game_engine_index <= game_engine_none || game_engine_index >= (long)NUMBEROF(hardcore_names))
+		return NULL;
+	return hardcore_names[game_engine_index][abbreviated != FALSE];
+}
+
 wchar_t const *game_modes_variant_kind_name(
 	struct game_variant const *variant,
 	struct game_variant_options const *options)
 {
-	switch (game_modes_variant_mode(variant, options))
-	{
-	case _game_mode_swat:
-		return options->hardcore ? L"HARDCORE SWAT" : L"SWAT";
-	case _game_mode_infection:
-		return options->hardcore ? L"HARDCORE INFECTION" : L"INFECTION";
-	case _game_mode_gun_game:
-		return options->hardcore ? L"HARDCORE GUN GAME" : L"GUN GAME";
-	}
-	if (!options || !options->hardcore || !variant)
-		return NULL;
-	switch (variant->game_engine_index)
-	{
-	case game_engine_ctf:
-		return L"HARDCORE CTF";
-	case game_engine_slayer:
-		return L"HARDCORE SLAYER";
-	case game_engine_oddball:
-		return L"HARDCORE ODDBALL";
-	case game_engine_king:
-		return L"HARDCORE KING";
-	case game_engine_race:
-		return L"HARDCORE RACE";
-	}
-	return NULL;
+	return variant && options ?
+		game_modes_kind_name(variant->game_engine_index, game_modes_kind(variant, options), FALSE) : NULL;
 }
 
 boolean game_modes_variant_is_opence(

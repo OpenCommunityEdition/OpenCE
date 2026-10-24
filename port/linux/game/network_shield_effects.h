@@ -2,7 +2,7 @@
 #define NETWORK_SHIELD_EFFECTS_H
 #include "cseries.h"
 /* the shield effects a network game draws (network.shield_effects): the
-host's, for every machine */
+host's, for every machine, or (players) each player's own */
 enum
 {
 	_shield_effects_stock,
@@ -11,6 +11,8 @@ enum
 	_shield_effects_overshield,
 	_shield_effects_glow_overshield,
 	_shield_effects_light_show_overshield,
+	/* not synced: each machine draws its own settings' */
+	_shield_effects_players,
 	NUMBER_OF_SHIELD_EFFECTS
 };
 void network_shield_effects_reset(void);
