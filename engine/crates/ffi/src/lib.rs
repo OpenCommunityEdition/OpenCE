@@ -44,6 +44,7 @@ use opence_content::ObjectKind;
 use opence_sim::animation::{self, AnimationPlayer};
 use opence_sim::clock::Clock;
 use opence_sim::input::{Buttons, TickInput};
+use opence_sim::item_physics::Struck;
 use opence_sim::objects::{Appearance, Difficulty, Object, ObjectHandle, Permutation};
 use opence_sim::player::View;
 use opence_sim::units::Radians;
@@ -1329,6 +1330,20 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
                 &events,
                 camera,
                 |point| decals.ground_material(level, bsp, point),
+                &mut running.heard,
+                &mut running.stepped,
+            );
+            // (an item's material is the level's where it struck the
+            // level; what it struck otherwise is not known)
+            sound_events::gather_items(
+                level,
+                running.simulation.item_impacts(),
+                |impact| match impact.struck {
+                    Struck::Level => {
+                        decals.surface_material(level, bsp, impact.point, impact.normal)
+                    }
+                    _ => -1,
+                },
                 &mut running.heard,
                 &mut running.stepped,
             );

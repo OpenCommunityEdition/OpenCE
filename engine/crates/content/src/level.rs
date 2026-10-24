@@ -113,6 +113,26 @@ pub struct Globals {
     /// damage, vitality and shield first), each at easy, normal, hard and
     /// legendary; none if the globals have none.
     pub difficulty: Vec<[f32; 4]>,
+    /// How each material type scales the ground's hold on a vehicle, by
+    /// material type (the globals' `materials`).
+    pub materials: Vec<MaterialPhysics>,
+}
+
+/// How a material scales what the ground does to a vehicle's mass points
+/// on it (`physics.c`'s ground contact). A scale of 0 or less leaves the
+/// vehicle's own value.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Archive, Serialize, Deserialize)]
+pub struct MaterialPhysics {
+    /// Of the ground friction (a vehicle of 7500 or less mass only).
+    pub ground_friction_scale: f32,
+    /// Of the ground's normal k1 (the slope it holds fully up to).
+    pub ground_normal_k1_scale: f32,
+    /// Of the ground's normal k0 (the slope it holds not at all from).
+    pub ground_normal_k0_scale: f32,
+    /// Of the ground depth (how deep the mass points sink).
+    pub ground_depth_scale: f32,
+    /// Of the ground damp fraction.
+    pub ground_damp_fraction_scale: f32,
 }
 
 /// How a biped that uses player physics moves. Speeds are in world units a

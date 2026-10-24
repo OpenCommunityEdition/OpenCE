@@ -12,8 +12,10 @@
 
 use bevy_ecs::prelude::{Component, World as Ecs};
 use glam::{Mat3, Quat, Vec3};
-use opence_content::Item;
-use opence_physics::{BodyId, Layers, Struck, World};
+use opence_content::{Item, TagRef};
+/// What an item struck.
+pub use opence_physics::Struck;
+use opence_physics::{BodyId, Layers, World};
 
 use crate::random::RandomSeed;
 use crate::vehicle::GRAVITY;
@@ -102,6 +104,18 @@ pub struct Impact {
     /// Where its sound plays: off the surface past where the item would
     /// have gone.
     pub sound_position: Vec3,
+}
+
+/// What an item lying about met in a tick, with what it makes of it
+/// (`item_physics_update`'s material effect and impulse sound).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ItemImpact {
+    /// Where and how hard.
+    pub impact: Impact,
+    /// What it makes on the material it struck (its item part's).
+    pub material_effects: Option<TagRef>,
+    /// The sound it makes.
+    pub collision_sound: Option<TagRef>,
 }
 
 /// What a tick did to an item.
@@ -459,7 +473,7 @@ pub fn orientation(forward: Vec3, up: Vec3) -> Quat {
 
 /// Moves every item lying about a tick through `physics`, its transform
 /// following; what they met.
-pub fn step_lying(world: &mut Ecs, physics: &World) -> Vec<Impact> {
+pub fn step_lying(world: &mut Ecs, physics: &World) -> Vec<ItemImpact> {
     let mut seed = world.remove_resource::<RandomSeed>().unwrap_or_default();
     let mut impacts = Vec::new();
     let mut lying: Vec<_> = world
@@ -475,7 +489,11 @@ pub fn step_lying(world: &mut Ecs, physics: &World) -> Vec<Impact> {
         }
         let Lying { item, motion } = &mut *lying;
         let step = motion.update(item, physics, &mut seed);
-        impacts.extend(step.impact);
+        impacts.extend(step.impact.map(|impact| ItemImpact {
+            impact,
+            material_effects: item.material_effects.clone(),
+            collision_sound: item.collision_sound.clone(),
+        }));
         transform.position = motion.position;
         transform.rotation = orientation(motion.forward, motion.up);
     }

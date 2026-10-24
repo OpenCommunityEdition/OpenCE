@@ -13,8 +13,10 @@
 //! vehicle runs into.
 
 use glam::{Mat3, Quat, Vec2, Vec3};
-use opence_content::{BspWater, FrictionType, Physics, PoweredMassPoint, Vehicle, VehicleKind};
-use opence_physics::{Layers, PhysicsError, World};
+use opence_content::{
+    BspWater, FrictionType, MaterialPhysics, Physics, PoweredMassPoint, Vehicle, VehicleKind,
+};
+use opence_physics::{Layers, PhysicsError, SurfaceMaterials, World};
 
 /// The game's ticks a second, which a vehicle steps at.
 pub const GAME_TICKS_PER_SECOND: u32 = 30;
@@ -36,6 +38,10 @@ const REST_SPEED_SQUARED: f32 = 0.0011111111;
 const REST_SPIN_SQUARED: f32 = 0.0027415568;
 const REST_ACCELERATION_SQUARED: f32 = 3.0864197e-7;
 const REST_ANGULAR_ACCELERATION_SQUARED: f32 = 3.0461742e-6;
+
+/// How deep two mass points meet before their push is their weight
+/// (physics.c's global_physics_collision_depth).
+const COLLISION_DEPTH: f32 = 0.2;
 
 /// The passes a step takes to back out of the level.
 const PENETRATION_PASSES: usize = 4;
@@ -90,6 +96,10 @@ pub struct VehicleState {
     pub brake: bool,
     /// Each mass point's flags, as it left the last tick.
     pub points: Vec<u8>,
+    /// The push of the vehicles it met, for its next step.
+    pub collision_force: Vec3,
+    /// Their turn, about its centre of mass, for its next step.
+    pub collision_torque: Vec3,
 }
 
 impl VehicleState {
@@ -119,7 +129,14 @@ impl VehicleState {
             under_water: false,
             brake: false,
             points: vec![0; physics.mass_points.len()],
+            collision_force: Vec3::ZERO,
+            collision_torque: Vec3::ZERO,
         }
+    }
+
+    /// Wakes its physics: something pushed it, or what it rested on moved.
+    pub fn wake(&mut self) {
+        self.at_rest = false;
     }
 
     /// Where its origin is (its model's), from its centre of mass.
@@ -174,6 +191,10 @@ pub struct VehicleLevel<'a> {
     pub ceiling: f32,
     /// Its water (none: it has none).
     pub water: Option<&'a BspWater>,
+    /// What its surfaces are made of (none: all of no material).
+    pub surfaces: Option<&'a SurfaceMaterials>,
+    /// The globals' materials' physics, by material type.
+    pub materials: &'a [MaterialPhysics],
 }
 
 impl VehicleLevel<'_> {
@@ -182,6 +203,60 @@ impl VehicleLevel<'_> {
     fn water_depth(&self, point: Vec3) -> f32 {
         self.water
             .map_or(f32::MIN, |water| water.depth(point.to_array()))
+    }
+
+    /// The physics of the material of the surface at `point`: none for no
+    /// material, or one the globals do not have (the game's default
+    /// material, whose scales are all 0).
+    fn material(&self, point: Vec3) -> Option<&MaterialPhysics> {
+        let kind = self.surfaces?.at(point);
+        self.materials.get(usize::try_from(kind).ok()?)
+    }
+}
+
+/// What the ground does to a mass point on it: the vehicle's own terms,
+/// each scaled by its material's where that scale is above 0 (the
+/// friction's only for a vehicle of 7500 or less mass).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Ground {
+    friction: f32,
+    normal_k1: f32,
+    normal_k0: f32,
+    depth: f32,
+    damp_fraction: f32,
+}
+
+impl Ground {
+    /// The heaviest vehicle whose friction a material scales.
+    const FRICTION_MASS_MOST: f32 = 7500.0;
+
+    fn of(physics: &Physics, material: Option<&MaterialPhysics>) -> Ground {
+        let mut ground = Ground {
+            friction: physics.ground_friction,
+            normal_k1: physics.ground_normal_k1,
+            normal_k0: physics.ground_normal_k0,
+            depth: physics.ground_depth,
+            damp_fraction: physics.ground_damp_fraction,
+        };
+        let Some(material) = material else {
+            return ground;
+        };
+        let scale = |value: &mut f32, by: f32| {
+            if by > 0.0 {
+                *value *= by;
+            }
+        };
+        if physics.mass <= Ground::FRICTION_MASS_MOST {
+            scale(&mut ground.friction, material.ground_friction_scale);
+        }
+        scale(&mut ground.normal_k1, material.ground_normal_k1_scale);
+        scale(&mut ground.normal_k0, material.ground_normal_k0_scale);
+        scale(&mut ground.depth, material.ground_depth_scale);
+        scale(
+            &mut ground.damp_fraction,
+            material.ground_damp_fraction_scale,
+        );
+        ground
     }
 }
 
@@ -205,6 +280,78 @@ struct Powered {
 struct Point {
     /// Where it is.
     position: Vec3,
+}
+
+/// Its mass points where it is: each one's centre and radius.
+fn spheres<'a>(
+    state: &'a VehicleState,
+    physics: &'a Physics,
+) -> impl Iterator<Item = (Vec3, f32)> + 'a {
+    let frame = frame(state.forward, state.up);
+    let com = Vec3::from_array(physics.center_of_mass);
+    physics.mass_points.iter().map(move |point| {
+        (
+            state.position + frame * (Vec3::from_array(point.position) - com),
+            point.radius,
+        )
+    })
+}
+
+/// How far its mass points reach from its centre of mass.
+fn reach(physics: &Physics) -> f32 {
+    let com = Vec3::from_array(physics.center_of_mass);
+    physics
+        .mass_points
+        .iter()
+        .map(|point| (Vec3::from_array(point.position) - com).length() + point.radius)
+        .fold(0.0, f32::max)
+}
+
+/// Two vehicles meeting (physics_compute_vehicle_collision): each two of
+/// their mass points that overlap push apart by half their overlap, as
+/// hard as their weight over the collision depth, at the point between
+/// them. The pushes are kept for each one's next step, and both are woken.
+/// Whether they met.
+pub fn collide(
+    (first, first_physics): (&mut VehicleState, &Physics),
+    (second, second_physics): (&mut VehicleState, &Physics),
+) -> bool {
+    let apart = first.position.distance(second.position);
+    // (too far apart to meet, or nowhere)
+    if apart.is_nan() || apart > reach(first_physics) + reach(second_physics) {
+        return false;
+    }
+    let mass_scale = libm::sqrtf(first_physics.mass * second_physics.mass);
+    let (mut force, mut torque) = ([Vec3::ZERO; 2], [Vec3::ZERO; 2]);
+    let mut met = false;
+    for (point0, radius0) in spheres(first, first_physics) {
+        for (point1, radius1) in spheres(second, second_physics) {
+            let radius = radius0 + radius1;
+            let offset = point1 - point0;
+            let distance = offset.length();
+            if !(distance < radius && distance > 0.0) {
+                continue;
+            }
+            let direction = offset / distance;
+            let penetration = (radius - distance) * 0.5;
+            let magnitude = 2.0 * mass_scale * GRAVITY / COLLISION_DEPTH * penetration;
+            let at = point0 + direction * (radius0 - penetration);
+            let pushes = [-direction * magnitude, direction * magnitude];
+            for (side, centre) in [first.position, second.position].into_iter().enumerate() {
+                force[side] += pushes[side];
+                torque[side] += (at - centre).cross(pushes[side]);
+            }
+            met = true;
+        }
+    }
+    if met {
+        for (side, state) in [first, second].into_iter().enumerate() {
+            state.collision_force += force[side];
+            state.collision_torque += torque[side];
+            state.wake();
+        }
+    }
+    met
 }
 
 /// One game tick of a vehicle: its controls taken, and its physics
@@ -283,7 +430,7 @@ pub fn game_tick(
             && controls.seat_power[1] != 0.0)
         || (vehicle.flags & Vehicle::SLIDE_WAKES_PHYSICS != 0 && state.slide != 0.0);
     if wakes {
-        state.at_rest = false;
+        state.wake();
     }
 
     if !state.at_rest {
@@ -934,29 +1081,34 @@ fn compute_new(
         let mut flags = 0u8;
 
         // (the ground under it, or the depths of hell)
-        let (normal, depth) = match world.sphere_contact(position, point.radius, Layers::LEVEL)? {
-            Some(contact) => (contact.normal, contact.depth),
-            None => (Vec3::Z, point.radius - (position.z + 256.0)),
-        };
+        let (normal, depth, material) =
+            match world.sphere_contact(position, point.radius, Layers::LEVEL)? {
+                Some(contact) => {
+                    // (the material under it, on the plane it meets)
+                    let under = position - contact.normal * (point.radius - contact.depth);
+                    (contact.normal, contact.depth, level.material(under))
+                }
+                None => (Vec3::Z, point.radius - (position.z + 256.0), None),
+            };
         let mut normal_force = Vec3::ZERO;
         let mut ground_friction = Vec3::ZERO;
         if depth > 0.0 {
+            let ground = Ground::of(physics, material);
             let into = velocity.dot(normal);
-            let spring = if physics.ground_depth > 0.0 {
-                GRAVITY / physics.ground_depth * depth
+            let spring = if ground.depth > 0.0 {
+                GRAVITY / ground.depth * depth
             } else {
                 0.0
             };
-            normal_force = normal * (physics.mass * (spring - into * physics.ground_damp_fraction));
+            normal_force = normal * (physics.mass * (spring - into * ground.damp_fraction));
             let sliding = velocity - normal * into;
-            let scale = -mass * physics.ground_friction;
+            let scale = -mass * ground.friction;
             let mut friction = sliding * scale;
             if let Some((definition, powered)) = pushed {
                 if definition.flags & PoweredMassPoint::GROUND_FRICTION != 0
                     && powered.ground_friction_velocity != 0.0
                 {
-                    let footing =
-                        pin_fraction(normal.z, physics.ground_normal_k0, physics.ground_normal_k1);
+                    let footing = pin_fraction(normal.z, ground.normal_k0, ground.normal_k1);
                     let upright = up.dot(normal).clamp(0.0, 1.0);
                     let weight = upright * upright * footing * footing * scale;
                     let mut drive = forward * -powered.ground_friction_velocity;
@@ -1106,8 +1258,9 @@ fn physics_update(
     let world = level.world;
     let mut points = Vec::with_capacity(physics.mass_points.len());
     let (force, torque) = compute_new(state, physics, powered, level, &mut points)?;
-    let force = force + magic_force;
-    let torque = torque + magic_torque;
+    // (and the push of the vehicles it met, spent)
+    let force = force + magic_force + std::mem::take(&mut state.collision_force);
+    let torque = torque + magic_torque + std::mem::take(&mut state.collision_torque);
 
     let acceleration = if physics.mass > 0.0 {
         force / physics.mass
@@ -1383,6 +1536,8 @@ mod tests {
             floor: 0.0,
             ceiling: 0.0,
             water: Some(&water),
+            surfaces: None,
+            materials: &[],
         };
         let light = floater(1, 0.5);
         let mut state = VehicleState::placed(&light, Vec3::new(0.0, 0.0, -2.0), Vec3::X, Vec3::Z);
@@ -1450,6 +1605,8 @@ mod tests {
             floor: 0.0,
             ceiling: 0.0,
             water: Some(&water),
+            surfaces: None,
+            materials: &[],
         };
         let boat_physics = floater(3, 0.5);
         // (rolled most of a quarter turn onto its side)
@@ -1482,6 +1639,156 @@ mod tests {
             boat(&mut state, &raft, level)?;
         }
         assert!(state.velocity.x.abs() < 1e-3, "{}", state.velocity);
+        Ok(())
+    }
+
+    #[test]
+    fn a_material_scales_the_ground_s_terms() {
+        let mut physics = floater(1, 0.5);
+        assert_eq!(
+            Ground::of(&physics, None),
+            Ground {
+                friction: 0.2,
+                normal_k1: 0.7,
+                normal_k0: 0.5,
+                depth: 0.15,
+                damp_fraction: 0.05,
+            }
+        );
+        let ice = MaterialPhysics {
+            ground_friction_scale: 0.5,
+            ground_normal_k1_scale: 2.0,
+            ground_normal_k0_scale: -1.0,
+            ground_depth_scale: 0.0,
+            ground_damp_fraction_scale: 3.0,
+        };
+        let scaled = Ground::of(&physics, Some(&ice));
+        assert!((scaled.friction - 0.1).abs() < 1e-6);
+        assert!((scaled.normal_k1 - 1.4).abs() < 1e-6);
+        // (a scale of 0 or less leaves the vehicle's own)
+        assert_eq!(scaled.normal_k0, 0.5);
+        assert_eq!(scaled.depth, 0.15);
+        assert!((scaled.damp_fraction - 0.15).abs() < 1e-6);
+        // (a vehicle heavier than 7500 keeps its friction)
+        physics.mass = 8000.0;
+        let heavy = Ground::of(&physics, Some(&ice));
+        assert_eq!(heavy.friction, 0.2);
+        assert!((heavy.normal_k1 - 1.4).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_slide_slows_by_what_the_ground_is_made_of() -> Result<(), PhysicsError> {
+        use opence_physics::{LevelMesh, WorldSettings};
+
+        let mut world = World::new(WorldSettings::default())?;
+        let mesh = LevelMesh {
+            vertices: vec![
+                [-50.0, -50.0, 0.0],
+                [50.0, -50.0, 0.0],
+                [50.0, 50.0, 0.0],
+                [-50.0, 50.0, 0.0],
+            ],
+            triangles: vec![[0, 1, 2], [0, 2, 3]],
+            materials: vec![Some(0), Some(0)],
+        };
+        world.set_level(&mesh)?;
+        // (collision material 0 is of material type 1, whose friction is
+        // four times)
+        let surfaces = SurfaceMaterials::new(&mesh, &[1]);
+        let rough = [
+            MaterialPhysics::default(),
+            MaterialPhysics {
+                ground_friction_scale: 4.0,
+                ..MaterialPhysics::default()
+            },
+        ];
+        let slide = |physics: &Physics, materials: &[MaterialPhysics]| {
+            let level = VehicleLevel {
+                world: &world,
+                floor: 0.0,
+                ceiling: 0.0,
+                water: None,
+                surfaces: Some(&surfaces),
+                materials,
+            };
+            // (resting on the ground at its depth, sliding along x)
+            let mut state =
+                VehicleState::placed(physics, Vec3::new(0.0, 0.0, 0.1), Vec3::X, Vec3::Z);
+            state.velocity = Vec3::new(0.1, 0.0, 0.0);
+            for _ in 0..5 {
+                let mut powered = [Powered::identity(); 32];
+                physics_update(
+                    &mut state,
+                    physics,
+                    &mut powered,
+                    Vec3::ZERO,
+                    Vec3::ZERO,
+                    level,
+                )?;
+            }
+            Ok::<_, PhysicsError>(state)
+        };
+        let mut physics = floater(1, 0.5);
+        physics.mass_points[0].radius = 0.25;
+        let plain = slide(&physics, &rough[..1])?;
+        let roughened = slide(&physics, &rough)?;
+        assert!(plain.on_ground && roughened.on_ground);
+        assert!(plain.velocity.x > 0.0, "{}", plain.velocity);
+        assert!(
+            roughened.velocity.x < plain.velocity.x * 0.5,
+            "{} against {}",
+            roughened.velocity,
+            plain.velocity
+        );
+        // (a vehicle heavier than 7500 slides as on any ground)
+        physics.mass = 8000.0;
+        let heavy = slide(&physics, &rough[..1])?;
+        let heavy_rough = slide(&physics, &rough)?;
+        assert_eq!(heavy.velocity, heavy_rough.velocity);
+        Ok(())
+    }
+
+    #[test]
+    fn two_vehicles_that_meet_push_apart_and_wake() -> Result<(), PhysicsError> {
+        let world = World::new(opence_physics::WorldSettings::default())?;
+        let physics = floater(1, 0.5);
+        let mut first = VehicleState::placed(&physics, Vec3::ZERO, Vec3::X, Vec3::Z);
+        let mut second =
+            VehicleState::placed(&physics, Vec3::new(0.15, 0.0, 0.0), Vec3::X, Vec3::Z);
+        first.at_rest = true;
+        second.at_rest = true;
+        assert!(collide((&mut first, &physics), (&mut second, &physics)));
+        assert!(!first.at_rest && !second.at_rest);
+        // (radii 0.1 and 0.1, 0.15 apart: half of 0.05 deep, pushed along x)
+        let expected = 2.0 * GRAVITY / COLLISION_DEPTH * 0.025;
+        assert!((first.collision_force.x + expected).abs() < 1e-6);
+        assert!((second.collision_force.x - expected).abs() < 1e-6);
+        assert_eq!(first.collision_force + second.collision_force, Vec3::ZERO);
+        // (spent on the next step, which moves them apart)
+        let level = VehicleLevel {
+            world: &world,
+            floor: 0.0,
+            ceiling: 0.0,
+            water: None,
+            surfaces: None,
+            materials: &[],
+        };
+        let mut powered = [Powered::identity(); 32];
+        physics_update(
+            &mut first,
+            &physics,
+            &mut powered,
+            Vec3::ZERO,
+            Vec3::ZERO,
+            level,
+        )?;
+        assert_eq!(first.collision_force, Vec3::ZERO);
+        assert!(first.velocity.x < 0.0);
+        // (far apart, they do not meet)
+        let mut far = VehicleState::placed(&physics, Vec3::new(5.0, 0.0, 0.0), Vec3::X, Vec3::Z);
+        far.at_rest = true;
+        assert!(!collide((&mut first, &physics), (&mut far, &physics)));
+        assert!(far.at_rest);
         Ok(())
     }
 }

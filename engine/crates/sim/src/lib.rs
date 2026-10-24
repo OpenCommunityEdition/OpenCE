@@ -193,7 +193,7 @@ pub struct Simulation {
     /// Detonations to do in the next tick (a script's).
     queued_detonations: Vec<projectile::Detonation>,
     /// What the items lying about met this tick.
-    item_impacts: Vec<item_physics::Impact>,
+    item_impacts: Vec<item_physics::ItemImpact>,
     /// The effects the players' shots made this tick.
     effects: Vec<debris::Ejection>,
     /// The vehicles, and the seat the player sits in.
@@ -710,7 +710,7 @@ impl Simulation {
     }
 
     /// What the items lying about met in the last tick.
-    pub fn item_impacts(&self) -> &[item_physics::Impact] {
+    pub fn item_impacts(&self) -> &[item_physics::ItemImpact] {
         &self.item_impacts
     }
 

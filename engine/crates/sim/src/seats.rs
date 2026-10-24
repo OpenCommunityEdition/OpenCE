@@ -10,10 +10,10 @@
 use bevy_ecs::prelude::*;
 use glam::{Quat, Vec3};
 use opence_content::{
-    AnimationNode, BspWater, Level, Model, ObjectKind, Physics, TagRef, Vehicle, VehicleAnimations,
-    VehicleSeat, Weapon,
+    AnimationNode, BspWater, Level, MaterialPhysics, Model, ObjectKind, Physics, TagRef, Vehicle,
+    VehicleAnimations, VehicleSeat, Weapon,
 };
-use opence_physics::Layers;
+use opence_physics::{Layers, LevelMesh, SurfaceMaterials};
 
 use crate::animation::{
     base_orientations, model_orientations, node_matrices, standing_animation, NodeMatrix,
@@ -109,6 +109,10 @@ pub struct Rides {
     water: Option<BspWater>,
     floor: f32,
     ceiling: f32,
+    // (what the current structure BSP's surfaces are made of, and the
+    // globals' materials' physics)
+    surfaces: Option<SurfaceMaterials>,
+    materials: Vec<MaterialPhysics>,
 }
 
 /// Where the vehicles' objects go this tick.
@@ -138,6 +142,47 @@ pub(crate) fn move_rides(
 }
 
 impl Rides {
+    /// Each vehicle that moved this game tick meets those before it and
+    /// those at rest (physics.c's unit collisions, after each vehicle's
+    /// update), for their next steps.
+    fn collide(&mut self, stepped: &[bool]) {
+        for index in 0..self.rides.len() {
+            if !stepped.get(index).copied().unwrap_or(false) {
+                continue;
+            }
+            for other in 0..self.rides.len() {
+                if other == index || !(other < index || self.rides[other].state.at_rest) {
+                    continue;
+                }
+                let (low, high) = (index.min(other), index.max(other));
+                let (before, after) = self.rides.split_at_mut(high);
+                let (Some(low_ride), Some(high_ride)) = (before.get_mut(low), after.first_mut())
+                else {
+                    continue;
+                };
+                let (Some(low_kind), Some(high_kind)) = (
+                    self.kinds.get(low_ride.kind),
+                    self.kinds.get(high_ride.kind),
+                ) else {
+                    continue;
+                };
+                // (the one that moved first, as the game has it)
+                let (mover, met) = if index == low {
+                    (
+                        (&mut low_ride.state, &low_kind.physics),
+                        (&mut high_ride.state, &high_kind.physics),
+                    )
+                } else {
+                    (
+                        (&mut high_ride.state, &high_kind.physics),
+                        (&mut low_ride.state, &low_kind.physics),
+                    )
+                };
+                vehicle::collide(mover, met);
+            }
+        }
+    }
+
     /// The player's unit's centre, from its origin, as its body is turned
     /// (Halo's bounding sphere's centre).
     pub fn centre(&self) -> Vec3 {
@@ -151,6 +196,15 @@ impl Rides {
         self.water = structure.map(|structure| structure.water());
         self.floor = structure.map_or(0.0, |structure| structure.vehicle_floor);
         self.ceiling = structure.map_or(0.0, |structure| structure.vehicle_ceiling);
+        self.surfaces = structure.map(|structure| {
+            let types: Vec<i16> = structure
+                .collision_materials
+                .iter()
+                .map(|material| material.material_type)
+                .collect();
+            SurfaceMaterials::new(&LevelMesh::from_collision(&structure.collision), &types)
+        });
+        self.materials = level.globals.materials.clone();
     }
 
     /// `level`'s vehicles, for a player whose unit is `unit` and whose
@@ -479,7 +533,8 @@ impl Rides {
         let physics = &*guard;
         let mut poses = Vec::with_capacity(self.rides.len());
         let mut motions = Vec::with_capacity(self.rides.len());
-        for ride in &mut self.rides {
+        let mut stepped = vec![false; self.rides.len()];
+        for (index, ride) in self.rides.iter_mut().enumerate() {
             let Some(kind) = self.kinds.get(ride.kind) else {
                 continue;
             };
@@ -536,11 +591,14 @@ impl Rides {
                     },
                 };
                 if ridden || !ride.state.at_rest {
+                    stepped[index] = true;
                     let level = VehicleLevel {
                         world: physics,
                         floor: self.floor,
                         ceiling: self.ceiling,
                         water: self.water.as_ref(),
+                        surfaces: self.surfaces.as_ref(),
+                        materials: &self.materials,
                     };
                     // (a step the physics refuses leaves it where it was)
                     let before = ride.state.clone();
@@ -603,6 +661,9 @@ impl Rides {
                 scale: ride.pose.scale,
             };
             poses.push((ride.handle, ride.pose));
+        }
+        if game_tick {
+            self.collide(&stepped);
         }
         world.insert_resource(RidePoses(poses));
         world.insert_resource(VehicleMotions(motions));
@@ -683,6 +744,8 @@ impl Rides {
                 .chain(state.forward.to_array())
                 .chain(state.up.to_array())
                 .chain(state.angular_velocity.to_array())
+                .chain(state.collision_force.to_array())
+                .chain(state.collision_torque.to_array())
                 .chain([state.speed, state.slide, state.turn])
                 .chain(ride.power)
             {

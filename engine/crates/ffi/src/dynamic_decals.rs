@@ -159,9 +159,20 @@ impl DynamicDecals {
                 .and_then(|model| model.materials.first())
                 .map_or(-1, |material| material.material_type);
         }
-        let point = impact.point.to_array();
-        let normal = impact.normal.to_array();
-        let origin = add(point, scale(normal, MATERIAL_REACH));
+        self.surface_material(level, bsp, impact.point, impact.normal)
+    }
+
+    /// The material type of BSP `bsp`'s surface at `point`, whose normal
+    /// is `normal` (-1: none there).
+    pub(crate) fn surface_material(
+        &mut self,
+        level: &Level,
+        bsp: usize,
+        point: Vec3,
+        normal: Vec3,
+    ) -> i16 {
+        let normal = normal.to_array();
+        let origin = add(point.to_array(), scale(normal, MATERIAL_REACH));
         first_hit(
             self.bsp(level, bsp),
             origin,

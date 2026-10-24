@@ -1,11 +1,12 @@
 //! The sounds a tick makes: the sound parts its effects fired, the sounds
-//! its animations reached, and its footsteps, each heard by the material
-//! underfoot. They are queued in the tick and played after it, so that the
+//! its animations reached, its footsteps, each heard by the material
+//! underfoot, and the items lying about striking things. They are queued in the tick and played after it, so that the
 //! tick never takes the audio's lock.
 
 use opence_content::{Level, MaterialEffects, TagRef};
 use opence_sim::animation::AnimationEvent;
 use opence_sim::effects::FiredPart;
+use opence_sim::item_physics::{Impact, ItemImpact};
 use opence_sim::Vec3;
 
 /// How far from the camera, in world units, a footstep is looked for: the
@@ -90,6 +91,48 @@ pub(crate) fn gather(
                 effect: effect.clone(),
                 point,
                 normal,
+            });
+        }
+    }
+}
+
+/// Gathers what the items lying about make when they strike something
+/// (`item_physics_update`): each one's collision sound where it bounced to,
+/// and its material effects' impact event on the material `material` finds
+/// for the impact, the sound there and the effect into `stepped`.
+pub(crate) fn gather_items(
+    level: &Level,
+    impacts: &[ItemImpact],
+    mut material: impl FnMut(&Impact) -> i16,
+    heard: &mut Vec<Heard>,
+    stepped: &mut Vec<Stepped>,
+) {
+    for struck in impacts {
+        let impact = &struck.impact;
+        if let Some(made) = struck
+            .material_effects
+            .as_ref()
+            .and_then(|tag| level.material_effects(tag))
+            .and_then(|effects| effects.of(MaterialEffects::IMPACT, material(impact)))
+        {
+            if let Some(sound) = &made.sound {
+                heard.push(Heard {
+                    tag: sound.clone(),
+                    position: impact.point,
+                });
+            }
+            if let Some(effect) = &made.effect {
+                stepped.push(Stepped {
+                    effect: effect.clone(),
+                    point: impact.point,
+                    normal: impact.normal,
+                });
+            }
+        }
+        if let Some(sound) = &struck.collision_sound {
+            heard.push(Heard {
+                tag: sound.clone(),
+                position: impact.sound_position,
             });
         }
     }
@@ -282,5 +325,79 @@ mod tests {
         );
         assert_eq!(casts, 0);
         assert!(heard.is_empty());
+    }
+
+    #[test]
+    fn an_item_striking_the_ground_is_heard_and_seen_by_its_material() {
+        let mut level = level();
+        let mut impact = vec![MaterialEffect::default(); 3];
+        impact[2] = MaterialEffect {
+            effect: Some(tag(b"effe", "sparks")),
+            sound: Some(tag(b"snd!", "clank")),
+        };
+        let mut events = vec![Vec::new(); MaterialEffects::IMPACT + 1];
+        events[MaterialEffects::IMPACT] = impact;
+        level.material_effects.push(MaterialEffects {
+            tag: tag(b"foot", "weapon"),
+            events,
+        });
+        let struck = |effects: Option<&str>, sound: Option<&str>| ItemImpact {
+            impact: Impact {
+                point: Vec3::new(1.0, 2.0, 0.0),
+                normal: Vec3::Z,
+                struck: opence_sim::item_physics::Struck::Level,
+                scale: 0.5,
+                sound_position: Vec3::new(1.0, 2.0, 0.05),
+            },
+            material_effects: effects.map(|path| tag(b"foot", path)),
+            collision_sound: sound.map(|path| tag(b"snd!", path)),
+        };
+        let (mut heard, mut stepped) = (Vec::new(), Vec::new());
+        gather_items(
+            &level,
+            &[struck(Some("weapon"), Some("thud"))],
+            |_| 2,
+            &mut heard,
+            &mut stepped,
+        );
+        assert_eq!(
+            heard,
+            [
+                Heard {
+                    tag: tag(b"snd!", "clank"),
+                    position: Vec3::new(1.0, 2.0, 0.0),
+                },
+                Heard {
+                    tag: tag(b"snd!", "thud"),
+                    position: Vec3::new(1.0, 2.0, 0.05),
+                },
+            ]
+        );
+        assert_eq!(
+            stepped,
+            [Stepped {
+                effect: tag(b"effe", "sparks"),
+                point: Vec3::new(1.0, 2.0, 0.0),
+                normal: Vec3::Z,
+            }]
+        );
+
+        // (a material it makes nothing on, none, or no material effects:
+        // only its collision sound)
+        heard.clear();
+        stepped.clear();
+        gather_items(
+            &level,
+            &[
+                struck(Some("weapon"), None),
+                struck(Some("missing"), None),
+                struck(None, Some("thud")),
+            ],
+            |_| -1,
+            &mut heard,
+            &mut stepped,
+        );
+        assert_eq!(heard.len(), 1);
+        assert!(stepped.is_empty());
     }
 }

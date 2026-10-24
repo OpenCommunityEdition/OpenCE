@@ -11,6 +11,7 @@
 
 #![allow(unsafe_code)]
 
+mod ground;
 mod mesh;
 pub mod movement;
 mod ragdoll;
@@ -20,6 +21,7 @@ use std::ptr::NonNull;
 
 use glam::{Quat, Vec3};
 
+pub use ground::{SurfaceMaterials, SURFACE_REACH};
 pub use mesh::LevelMesh;
 pub use movement::{Landing, MovementInput, Mover, MoverSettings};
 pub use ragdoll::{shape_volume, RagdollId, RagdollPart, METRES_PER_UNIT_CUBED, RAGDOLL_PARTS_MAX};

@@ -284,6 +284,8 @@ impl MaterialEffects {
     pub const JUMP: usize = 4;
     /// A landing from a jump.
     pub const JUMP_LAND: usize = 5;
+    /// An item striking something.
+    pub const IMPACT: usize = 8;
 
     /// What `event` makes on material `material` (a negative one: none).
     pub fn of(&self, event: usize, material: i16) -> Option<&MaterialEffect> {

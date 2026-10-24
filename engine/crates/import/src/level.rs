@@ -2400,7 +2400,10 @@ pub(crate) mod tests {
     fn object_tag(fake: &mut FakeCache, group: &[u8; 4], kind: u16, name: &str) -> usize {
         // (equipment has its item part and its own after the object's)
         let (size, references): (usize, &[usize]) = if group == b"eqip" {
-            (crate::weapon::EQUIPMENT_SIZE, &[0x2E8, 0x2F8, 0x310])
+            (
+                crate::weapon::EQUIPMENT_SIZE,
+                &[0x248, 0x258, 0x2E8, 0x2F8, 0x310],
+            )
         } else {
             (crate::object::OBJECT_SIZE, &[])
         };

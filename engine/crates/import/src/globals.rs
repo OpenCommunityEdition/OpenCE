@@ -1,13 +1,14 @@
 //! The game's globals (`matg`): the player's speeds, what falling does,
 //! the player's bipeds, the campaign's difficulty, the grenades, the
-//! weapons, the HUD's tags and the first-person view's hands.
+//! weapons, the HUD's tags, the first-person view's hands and the
+//! materials' physics.
 //!
 //! The tag gives speeds in world units a second and accelerations in world
 //! units a second each tick (the game's 30); the engine keeps both a
 //! second. Its falling velocities, worked out by the tools that built the
 //! map, are a tick's; the engine keeps them a second.
 
-use opence_content::{FallingDamage, Globals, Grenade, PlayerPhysics, TagRef};
+use opence_content::{FallingDamage, Globals, Grenade, MaterialPhysics, PlayerPhysics, TagRef};
 
 use crate::cache::Cache;
 use crate::error::ImportError;
@@ -37,6 +38,10 @@ const FIRST_PERSON_INTERFACE_OFFSET: usize = 0x17C;
 const FIRST_PERSON_INTERFACE_SIZE: usize = 0xC0;
 const FALLING_DAMAGE_OFFSET: usize = 0x188;
 const FALLING_DAMAGE_SIZE: usize = 0x98;
+const MATERIALS_OFFSET: usize = 0x194;
+const MATERIAL_SIZE: usize = 0x374;
+/// The game's material types (`NUMBER_OF_MATERIAL_TYPES`).
+const MAX_MATERIALS: usize = 33;
 /// The game's ticks a second, which the tag's rates are of.
 const TAG_TICKS_PER_SECOND: f32 = 30.0;
 
@@ -122,6 +127,18 @@ pub fn import_globals(cache: &Cache) -> Result<Globals, ImportError> {
             falling_damage: reference(&falling, 0x10, "falling damage")?,
             maximum_distance_damage: reference(&falling, 0x2C, "maximum falling damage")?,
         };
+    }
+
+    let materials = globals.block(MATERIALS_OFFSET, "materials", MATERIAL_SIZE, MAX_MATERIALS)?;
+    for material in materials.iter() {
+        let f = |at: usize, field: &str| material.f32(at, field);
+        imported.materials.push(MaterialPhysics {
+            ground_friction_scale: f(0x94, "physics ground friction scale")?,
+            ground_normal_k1_scale: f(0x98, "physics ground friction normal k1 scale")?,
+            ground_normal_k0_scale: f(0x9C, "physics ground friction normal k0 scale")?,
+            ground_depth_scale: f(0xA0, "physics ground depth scale")?,
+            ground_damp_fraction_scale: f(0xA4, "physics ground damp fraction scale")?,
+        });
     }
 
     let difficulty = globals.block(DIFFICULTY_OFFSET, "difficulty", DIFFICULTY_SIZE, 1)?;

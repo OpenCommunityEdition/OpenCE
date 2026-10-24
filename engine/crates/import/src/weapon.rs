@@ -15,6 +15,7 @@ use crate::cache::Cache;
 use crate::error::ImportError;
 use crate::level::tag_ref;
 use crate::object::{optional_index, reference, vector, ANTR, MOD2, MODE, OBJECT_SIZE};
+use crate::sound::FOOT;
 use crate::tags::{Element, GroupTag};
 
 pub(crate) const WEAP: GroupTag = GroupTag::new(b"weap");
@@ -62,6 +63,8 @@ fn import_item(tag: &Element<'_>) -> Result<Item, ImportError> {
         flags: tag.u32(at(0x0), "item flags")?,
         hud_message_index: tag.i16(at(0x4), "pickup message index")?,
         sort_order: tag.i16(at(0x6), "sort order")?,
+        material_effects: reference(tag, at(0xCC), "material effects", &[FOOT])?,
+        collision_sound: reference(tag, at(0xDC), "collision sound", &[SND])?,
         detonation_delay: [
             tag.f32(at(0x164), "detonation delay")?,
             tag.f32(at(0x168), "detonation delay")?,
@@ -361,7 +364,7 @@ mod tests {
         let triggers = fake.add_data(&trigger);
 
         let mut weapon = vec![0u8; WEAPON_SIZE];
-        for at in [ITEM_PART + 0x16C, ITEM_PART + 0x17C] {
+        for at in [0xCC, 0xDC, 0x16C, 0x17C].map(|offset| ITEM_PART + offset) {
             empty(&mut weapon, at);
         }
         for offset in [0x8C, 0x9C, 0x154, 0x164, 0x178] {

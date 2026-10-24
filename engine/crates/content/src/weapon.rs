@@ -16,6 +16,11 @@ pub struct Item {
     pub hud_message_index: i16,
     /// Where it sorts in the inventory.
     pub sort_order: i16,
+    /// What it makes on each material it strikes (a `foot` tag, its
+    /// [`crate::MaterialEffects::IMPACT`] event).
+    pub material_effects: Option<TagRef>,
+    /// The sound it makes when it strikes something.
+    pub collision_sound: Option<TagRef>,
     /// The shortest and longest it waits before it detonates, once set off.
     pub detonation_delay: [f32; 2],
     /// The effect while it waits to detonate.

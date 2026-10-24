@@ -19,6 +19,9 @@ pub struct LevelMesh {
     pub vertices: Vec<[f32; 3]>,
     /// The triangles, wound counter-clockwise seen from their front.
     pub triangles: Vec<[u32; 3]>,
+    /// Each triangle's surface's collision material (an index into its
+    /// structure BSP's collision materials), if it has one.
+    pub materials: Vec<Option<u16>>,
 }
 
 impl LevelMesh {
@@ -73,6 +76,7 @@ impl LevelMesh {
                     };
                     self.triangles
                         .push([base + ring[0], base + ring[b], base + ring[c]]);
+                    self.materials.push(surface.material);
                 }
             }
         }

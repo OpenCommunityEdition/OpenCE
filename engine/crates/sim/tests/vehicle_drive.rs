@@ -5,7 +5,8 @@
 //! go where Halo's went (the Warthog steered by the turn of its wheels the
 //! traces hold; VEHICLE_TRACE=1 prints each tick). The Scorpion and the
 //! Banshee, which have no traces, must answer their controls as their tags
-//! say. Passes without assets/maps/bloodgulch.map and b40.map.
+//! say, and a vehicle left alone must come to rest on bloodgulch's
+//! ground and wake when driven. Passes without assets/maps/bloodgulch.map and b40.map.
 
 use std::error::Error;
 use std::f32::consts::FRAC_PI_2;
@@ -14,7 +15,7 @@ use std::path::Path;
 use glam::{Vec2, Vec3};
 use opence_content::{Level, Physics, Vehicle};
 use opence_import::{import_level, Cache};
-use opence_physics::{LevelMesh, World, WorldSettings};
+use opence_physics::{LevelMesh, SurfaceMaterials, World, WorldSettings};
 use opence_sim::vehicle::{game_tick, VehicleControls, VehicleLevel, VehicleState};
 
 type Result = std::result::Result<(), Box<dyn Error>>;
@@ -141,6 +142,8 @@ fn replay(
         floor: 0.0,
         ceiling: 0.0,
         water: None,
+        surfaces: None,
+        materials: &[],
     };
     for (tick, row) in rows.iter().enumerate().skip(1) {
         let mut controls = controls(script, tick);
@@ -238,6 +241,8 @@ fn the_ghost_drives_as_halos_did() -> Result {
         floor: 0.0,
         ceiling: 0.0,
         water: None,
+        surfaces: None,
+        materials: &[],
     };
     for tick in 1..rows.len() {
         game_tick(
@@ -267,6 +272,8 @@ fn set_down(
         floor: 0.0,
         ceiling: 0.0,
         water: None,
+        surfaces: None,
+        materials: &[],
     };
     let still = VehicleControls {
         facing: forward,
@@ -293,6 +300,8 @@ fn the_scorpion_answers_its_controls_as_its_tag_says() -> Result {
         floor: 0.0,
         ceiling: 0.0,
         water: None,
+        surfaces: None,
+        materials: &[],
     };
     // (forward: its acceleration a tick, to its fastest, the way it faces)
     let drive = VehicleControls {
@@ -346,6 +355,8 @@ fn the_banshee_answers_its_controls_as_its_tag_says() -> Result {
         floor: 0.0,
         ceiling: 0.0,
         water: None,
+        surfaces: None,
+        materials: &[],
     };
     let mut state = VehicleState::placed(physics, Vec3::ZERO, Vec3::X, Vec3::Z);
     let fly = VehicleControls {
@@ -380,5 +391,72 @@ fn the_banshee_answers_its_controls_as_its_tag_says() -> Result {
     let turned = heading(state.forward);
     assert!(turned > std::f32::consts::FRAC_PI_4, "{turned}");
     assert!(state.velocity.y > 0.0, "{}", state.velocity);
+    Ok(())
+}
+
+#[test]
+fn a_warthog_left_alone_comes_to_rest_and_wakes_when_driven() -> Result {
+    let Some((level, world)) = bloodgulch()? else {
+        return Ok(());
+    };
+    let (vehicle, physics) = vehicle(&level, "vehicles\\warthog\\warthog")?;
+    let bsp = level.structure_bsps.first().ok_or("no structure bsp")?;
+    let types: Vec<i16> = bsp
+        .collision_materials
+        .iter()
+        .map(|material| material.material_type)
+        .collect();
+    let surfaces = SurfaceMaterials::new(&LevelMesh::from_collision(&bsp.collision), &types);
+    let ground = VehicleLevel {
+        world: &world,
+        floor: 0.0,
+        ceiling: 0.0,
+        water: None,
+        surfaces: Some(&surfaces),
+        materials: &level.globals.materials,
+    };
+    let row = &read("warthog_drive")?[0];
+    let mut state =
+        VehicleState::placed(physics, vector(row, 1) + Vec3::Z, vector(row, 7), Vec3::Z);
+    // (no one in it: it faces where it faces, as an empty vehicle does)
+    let still = |state: &VehicleState| VehicleControls {
+        facing: state.forward,
+        seat_power: [1.0, 1.0],
+        ..VehicleControls::default()
+    };
+    let mut ticks = 0;
+    while !state.at_rest {
+        ticks += 1;
+        assert!(ticks < 600, "still moving: {}", state.velocity);
+        let controls = still(&state);
+        game_tick(&mut state, vehicle, physics, &controls, ground)?;
+    }
+    assert!(state.on_ground);
+    // (at rest, and no one in it, it is not stepped, as seats.rs leaves it;
+    // it stays at rest a further second)
+    let resting = state.clone();
+    for _ in 0..30 {
+        if !state.at_rest {
+            let controls = still(&state);
+            game_tick(&mut state, vehicle, physics, &controls, ground)?;
+        }
+    }
+    assert_eq!(state.position, resting.position);
+    assert_eq!(state.forward, resting.forward);
+    // (the throttle wakes it, and it drives off)
+    let drive = VehicleControls {
+        throttle: Vec2::new(1.0, 0.0),
+        ..still(&state)
+    };
+    game_tick(&mut state, vehicle, physics, &drive, ground)?;
+    assert!(!state.at_rest);
+    for _ in 0..30 {
+        game_tick(&mut state, vehicle, physics, &drive, ground)?;
+    }
+    assert!((state.position - resting.position).length() > 0.1);
+    // (and a push wakes it as well)
+    let mut pushed = resting;
+    pushed.wake();
+    assert!(!pushed.at_rest);
     Ok(())
 }
