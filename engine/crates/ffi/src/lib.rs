@@ -13,6 +13,7 @@ pub mod camera;
 pub mod campaign;
 pub mod control;
 mod debug_scene;
+pub mod dev_state;
 pub mod decals;
 pub mod devtools;
 mod dynamic_decals;
@@ -1271,8 +1272,43 @@ impl Engine {
     /// Sets the saved shell variables from the settings file; returns the
     /// names it refused.
     pub fn load_shell_variables(&self, saved: HashMap<String, String>) -> Vec<String> {
-        self.lock_registry()
-            .load_saved(&saved.into_iter().collect())
+        let mut registry = self.lock_registry();
+        let refused = registry.load_saved(&saved.into_iter().collect());
+        // (loading tells no listener: the state is counted changed here)
+        let mut state = self.lock();
+        state.shell.tuning.generation = state.shell.tuning.generation.wrapping_add(1);
+        refused
+    }
+
+    /// Opens a map's lighting controls in the tuning folder: they are set
+    /// from its file (`<map>.toml`), the rest to their defaults; returns
+    /// the names refused.
+    pub fn set_tuning(&self, folder: String, map: String) -> Result<Vec<String>, EngineError> {
+        let mut registry = self.lock_registry();
+        let mut state = self.lock();
+        state.shell.tuning.place = Some((folder.into(), map));
+        dev_state::load(&mut registry, &mut state).map_err(|message| EngineError::Load { message })
+    }
+
+    /// Saves the lighting controls as the open map's tuning; the file's
+    /// path.
+    pub fn save_tuning(&self) -> Result<String, EngineError> {
+        let registry = self.lock_registry();
+        let state = self.lock();
+        dev_state::save(&registry, &state)
+            .map(|path| path.display().to_string())
+            .map_err(|message| EngineError::Load { message })
+    }
+
+    /// The lighting controls as they are now.
+    pub fn tune_controls(&self) -> Vec<dev_state::TuneControl> {
+        dev_state::controls(&self.lock_registry())
+    }
+
+    /// How many times the shell's variables changed: the app reads the dev
+    /// state again only when this moves.
+    pub fn dev_generation(&self) -> u64 {
+        self.lock().shell.tuning.generation
     }
 
     /// Where `map` finds a map by its name.

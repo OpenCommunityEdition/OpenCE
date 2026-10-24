@@ -47,12 +47,13 @@ public final class LauncherModel {
     public var onExit: (() -> Void)?
 
     /// `variables` are the shell's, whose drawing switches the Developer
-    /// tab sets.
-    public init(settings: SettingsModel, displays: [String], root: URL, variables: [ShellVariable] = []) {
+    /// tab sets, and `tuning` its lighting controls.
+    public init(settings: SettingsModel, displays: [String], root: URL, variables: [ShellVariable] = [],
+                tuning: [TuneControl] = []) {
         self.settings = settings
         self.displays = displays.isEmpty ? ["Main Display"] : displays
         self.root = root
-        developer = DeveloperModel(variables: variables, root: root)
+        developer = DeveloperModel(variables: variables, tuning: tuning, root: root)
     }
 
     public func choose(_ choice: LauncherChoice) {

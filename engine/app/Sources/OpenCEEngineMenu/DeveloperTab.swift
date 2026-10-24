@@ -1,6 +1,6 @@
 // The launcher's Developer tab: a test map (devgulch first), the station
-// to start at, the buffer to view and the drawing switches as the game
-// starts, and a frame captured once it has; Launch starts it, and each
+// to start at, the buffer to view, the drawing switches and the lighting
+// controls as the game starts, and a frame captured once it has; Launch starts it, and each
 // station's own Launch starts straight at that station.
 import Foundation
 import OpenCEEngineCore
@@ -16,13 +16,17 @@ public final class DeveloperModel {
     /// The drawing switches (the shell's `render.*` flags the renderer
     /// reads, RenderSwitches.flags), as the shell holds them now.
     public let switches: [ShellVariable]
+    /// The lighting controls (the shell's `tune.*`), at the values the
+    /// map's tuning file gives them unless set here.
+    public let tuning: [TuneControl]
     /// Where captures are written: the data root's assets/captures.
     public let captures: URL
 
     /// `variables` are the shell's; those of its `render.*` flags the
-    /// renderer reads are the switches.
-    public init(variables: [ShellVariable], root: URL) {
+    /// renderer reads are the switches. `tuning` are its lighting controls.
+    public init(variables: [ShellVariable], tuning: [TuneControl] = [], root: URL) {
         switches = variables.filter { RenderSwitches.flags.contains($0.name) }
+        self.tuning = tuning.filter { LightingTuning.names.contains($0.name) }
         captures = root.appendingPathComponent("assets/captures", isDirectory: true)
     }
 
@@ -70,6 +74,19 @@ public final class DeveloperModel {
         launch.variables[variable.name] = value == variable.value ? nil : value
     }
 
+    /// A lighting control's value at start: the one set here, else the
+    /// map's own (its default here, the map's file read at load).
+    public func value(_ control: TuneControl) -> Double {
+        launch.variables[control.name].flatMap(Double.init) ?? control.defaultValue
+    }
+
+    /// Sets a lighting control at start, held to its range; at its
+    /// default, it is left out of the launch (the map's tuning keeps it).
+    public func set(_ control: TuneControl, to value: Double) {
+        let held = min(max(value, control.minimum), control.maximum)
+        launch.variables[control.name] = held == control.defaultValue ? nil : String(held)
+    }
+
     /// Whether the first frame is captured, to captures/<level>-<station>.png.
     public var capturesOnLaunch: Bool {
         get { launch.capture != nil }
@@ -88,8 +105,8 @@ public final class DeveloperModel {
     }
 }
 
-/// The tab: the level, the station, the view, the switches, the capture,
-/// and Launch.
+/// The tab: the level, the station, the view, the switches, the lighting,
+/// the capture, and Launch.
 struct DeveloperTab: View {
     @Bindable var model: DeveloperModel
     let onLaunch: ([String]) -> Void
@@ -137,6 +154,20 @@ struct DeveloperTab: View {
                     Toggle(variable.name, isOn: Binding(get: { model.isOn(variable) },
                                                         set: { model.set(variable, on: $0) }))
                         .help(variable.help)
+                }
+            }
+            Section("Lighting") {
+                ForEach(model.tuning, id: \.name) { control in
+                    HStack {
+                        Text(control.name).frame(width: 120, alignment: .leading)
+                        Slider(value: Binding(get: { model.value(control) },
+                                              set: { model.set(control, to: ($0 * 100).rounded() / 100) }),
+                               in: control.minimum...control.maximum)
+                        Text(String(format: "%.2f", model.value(control)))
+                            .monospacedDigit().frame(width: 44, alignment: .trailing)
+                        Button("Reset") { model.set(control, to: control.defaultValue) }
+                    }
+                    .help(control.help)
                 }
             }
             Toggle("Capture the first frame", isOn: $model.capturesOnLaunch)

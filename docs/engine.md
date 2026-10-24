@@ -765,6 +765,36 @@ and 2 when it could not reach the engine. `--headless` takes `--map`,
 `--bsp`, `--maps`, `--cache` and `--tick-rate`, and draws a frame only
 when one is asked for.
 
+### The dev state and the lighting controls
+
+The shell's variables are the one developer state that the dev panel,
+the shell, the socket, scripts and the launcher's Developer tab share
+(`dev_state.rs`, `DevState.swift`). The engine counts each change of a
+variable, and the app reads the state again only when the count moves:
+a frame nobody tuned reads nothing and draws the stock frame. `dev.panel`
+shows the dev panel.
+
+The lighting controls are floats, at the stock frame's values by default:
+
+| Variable | Default | Range | Scales |
+| --- | --- | --- | --- |
+| `tune.exposure` | 0 | −4 to 4 | Stops before the tone map |
+| `tune.sun`, `tune.sun_red`, `tune.sun_green`, `tune.sun_blue` | 1 | 0 to 4 (a channel 0 to 2) | The sun's light and its colour |
+| `tune.bounce`, `tune.probes` | 1 | 0 to 4 | The baked bounced light; the probes' light on the objects |
+| `tune.ao` | 1 | 0 to 2 | How much the ambient occlusion darkens |
+| `tune.emissive`, `tune.bloom` | 1 | 0 to 4 | The shaders' own light; the bloom |
+| `tune.tone_curve` | 1 | 0.5 to 2 | The tone curve's contrast |
+
+They are tuned per map: as a map loads its file, `tuning/<map>.toml` in
+the app's support folder, is read (the controls not in it at their
+defaults), and `tune save` writes the controls not at their defaults to
+it (removing it when every one is). `tune load` reads it again, `tune
+reset` sets the defaults, and `tune` alone lists the controls, as data
+over the socket. A file is untrusted: a name that is not a control, or a
+value out of its range, is refused and logged. The Developer tab's
+Lighting section has a slider for each, launched as `--set` values that
+win over the map's file.
+
 ### Debug drawing
 
 Any system calls the immediate-mode shapes (a line, a box, a sphere, text

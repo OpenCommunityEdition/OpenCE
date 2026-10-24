@@ -56,6 +56,8 @@ final class ControlServant {
     var reloadBsp: (UInt32) throws -> Void
     /// The level drawn, if any.
     var renderer: () -> LevelRenderer?
+    /// The developer state, read again only when the shell's variables change.
+    private let dev = DevStateReader()
 
     init(engine: Engine, device: MTLDevice, queue: MTLCommandQueue, snapshots: SnapshotReader,
          loadMap: @escaping (String, UInt32) throws -> Void, reloadBsp: @escaping (UInt32) throws -> Void,
@@ -92,8 +94,8 @@ final class ControlServant {
         renderer.lights = frame.drawnLights()
         renderer.laidDecals = Array(frame.decals)
         renderer.laidParticles = Array(frame.particles)
-        renderer.switches = RenderSwitches(flag: { engine.shellFlag(name: $0) },
-                                           value: { engine.shellValue(name: $0) })
+        renderer.switches = dev.update(generation: engine.devGeneration(), flag: { engine.shellFlag(name: $0) },
+                                       value: { engine.shellValue(name: $0) }).switches
         renderer.sprites = engine.cameraSprites(camera: camera.spriteCamera, flares: renderer.switches.lensFlares,
                                                 widgets: renderer.switches.glows)
         let width = Int(request.width), height = Int(request.height)

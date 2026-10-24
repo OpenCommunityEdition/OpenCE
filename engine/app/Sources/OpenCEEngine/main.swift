@@ -192,6 +192,8 @@ func mainMenu() -> NSMenu {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let engine = Engine()
     lazy var snapshots = SnapshotReader(engine: engine)
+    /// The developer state, read again only when the shell's variables change.
+    let dev = DevStateReader()
     /// The saved settings (settings.toml), which the menus change.
     let saved = SettingsModel()
     lazy var controls = flyControls(saved.settings.controls)
@@ -276,7 +278,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func showLauncher() {
         MenuFonts.register()
         let model = LauncherModel(settings: saved, displays: NSScreen.screens.map(\.localizedName), root: root,
-                                  variables: engine.shellVariables())
+                                  variables: engine.shellVariables(), tuning: engine.tuneControls())
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 640),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
@@ -668,6 +670,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         engine.setVolumes(effects: audio.master * audio.effects, music: audio.master * audio.music)
         _ = sound
         try engine.placeCamera(placement: loaded.start)
+        // (the map's lighting controls, from tuning/<map>.toml beside the settings)
+        if let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let folder = support.appendingPathComponent("OpenCE Engine/tuning", isDirectory: true)
+            let name = URL(fileURLWithPath: map).deletingPathExtension().lastPathComponent
+            do {
+                let refused = try engine.setTuning(folder: folder.path, map: name)
+                if !refused.isEmpty {
+                    appLog("warn", "\(name) tuning: refused \(refused.joined(separator: ", "))")
+                }
+            } catch {
+                appLog("warn", "\(name) tuning: \(error)")
+            }
+        }
         // (the player at the first start, unless flying; a map without one
         // keeps the free camera)
         if player, !launchArguments.contains("--fly") {
@@ -864,8 +879,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         renderer.lights = frame.drawnLights()
         renderer.laidDecals = Array(frame.decals)
         renderer.laidParticles = Array(frame.particles)
-        renderer.switches = RenderSwitches(flag: { engine.shellFlag(name: $0) },
-                                           value: { engine.shellValue(name: $0) })
+        renderer.switches = dev.update(generation: engine.devGeneration(), flag: { engine.shellFlag(name: $0) },
+                                       value: { engine.shellValue(name: $0) }).switches
         renderer.sprites = engine.cameraSprites(camera: camera.spriteCamera, flares: renderer.switches.lensFlares,
                                                 widgets: renderer.switches.glows)
         let objects = profiled("objects", engine) { frame.drawnObjects() }

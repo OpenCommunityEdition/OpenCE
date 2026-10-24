@@ -117,6 +117,8 @@ pub(crate) struct Shell {
     pub(crate) station: Option<crate::stations::Run>,
     /// The frames `frame` asked for, for the app to draw: path, width, height.
     pub(crate) frames: Vec<(String, u32, u32)>,
+    /// The map's lighting controls' file, and what `tune` asked for.
+    pub(crate) tuning: crate::dev_state::Tuning,
 }
 
 impl Default for Shell {
@@ -135,6 +137,7 @@ impl Default for Shell {
             script_status: String::new(),
             station: None,
             frames: Vec::new(),
+            tuning: crate::dev_state::Tuning::default(),
         }
     }
 }
@@ -543,6 +546,7 @@ pub(crate) fn registry() -> Registry<State> {
         ],
         crate::stations::command,
     );
+    crate::dev_state::register(&mut registry);
     registry.fallback(halo_script);
     registry
 }
@@ -551,6 +555,7 @@ pub(crate) fn registry() -> Registry<State> {
 pub(crate) fn run(registry: &mut Registry<State>, state: &mut State, line: &str) -> ShellOutput {
     state.shell.action = ShellAction::None;
     let result = registry.run(state, line);
+    let result = crate::dev_state::finish(registry, state, line, result);
     let action = std::mem::take(&mut state.shell.action);
     match result {
         Ok(output) => ShellOutput {
