@@ -536,7 +536,7 @@ pub(crate) fn registry() -> Registry<State> {
     );
     registry.command(
         "station",
-        "Runs one of the test map's stations (weapons, vehicles, animation, doors, physics), those whose name has the filter; alone, the stations and the one running; `stop` stops it.",
+        "Runs one of the test map's stations (devgulch's: weapons, vehicles, ai, effects, sounds, shaders, animation, hud, physics; devmap's: weapons, vehicles, animation, doors, physics, particles) on the things whose name has the filter; alone, the stations and the one running; `stop` stops it.",
         &[
             Param::optional("name", ArgKind::String),
             Param::optional("filter", ArgKind::Rest),

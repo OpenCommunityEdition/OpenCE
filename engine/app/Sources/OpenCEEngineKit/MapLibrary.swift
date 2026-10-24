@@ -66,17 +66,18 @@ public enum MapLibrary {
         }
     }
 
-    /// The test map's name: the engine makes it, gathering every map of
-    /// the first folder.
-    public static let testMap = "devmap"
+    /// The test maps' names, which the engine makes when they are loaded:
+    /// devgulch from the first folder's bloodgulch.map, holding every
+    /// definition of its other maps, and devmap's galleries of them.
+    public static let testMaps = ["devgulch", "devmap"]
 
-    /// The path `--map` loads: the test map's in the first of `folders`
-    /// (no file is there; the engine knows the name), any other as given.
+    /// The path `--map` loads: a test map's in the first of `folders` (no
+    /// file is there; the engine knows the name), any other as given.
     public static func path(of map: String, folders: [URL]) -> String {
-        guard map == testMap, let folder = folders.first else {
+        guard testMaps.contains(map), let folder = folders.first else {
             return map
         }
-        return folder.appendingPathComponent("\(testMap).map").path
+        return folder.appendingPathComponent("\(map).map").path
     }
 
     /// The levels of all `folders`, in order.

@@ -194,8 +194,9 @@ final class MapLibraryTests: XCTestCase {
         XCTAssertEqual(MapLibrary.folders(named: nil, root: root).map(\.path),
                        ["/data/assets/maps", "/data/assets/custom_maps"])
         XCTAssertEqual(MapLibrary.folders(named: "/elsewhere", root: root).map(\.path), ["/elsewhere"])
-        // (the test map is found in the first folder; others are as given)
+        // (the test maps are found in the first folder; others are as given)
         let folders = MapLibrary.folders(named: nil, root: root)
+        XCTAssertEqual(MapLibrary.path(of: "devgulch", folders: folders), "/data/assets/maps/devgulch.map")
         XCTAssertEqual(MapLibrary.path(of: "devmap", folders: folders), "/data/assets/maps/devmap.map")
         XCTAssertEqual(MapLibrary.path(of: "maps/b30.map", folders: folders), "maps/b30.map")
         XCTAssertEqual(MapLibrary.path(of: "devmap", folders: []), "devmap")

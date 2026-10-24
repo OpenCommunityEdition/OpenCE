@@ -32,31 +32,31 @@ pub const STATIONS: [Station; 9] = [
         name: "vehicles",
         at: [84.0, -166.0],
         facing: 0.0,
-        help: "each vehicle stood in a row, to enter and drive round the course",
+        help: "each vehicle stood in a row, and each driven round the course",
     },
     Station {
         name: "ai",
         at: [52.0, -86.0],
         facing: core::f32::consts::FRAC_PI_2,
-        help: "a squad of each actor kind, to watch fight",
+        help: "a squad of each biped that is not the player's, stood to look at",
     },
     Station {
         name: "effects",
         at: [74.0, -124.0],
         facing: 0.0,
-        help: "a row of every effect, each started in turn: the most particles it keeps alive",
+        help: "starts each effect that makes particles along a row: the most it keeps alive",
     },
     Station {
         name: "sounds",
         at: [88.0, -136.0],
         facing: 0.0,
-        help: "a sound emitter of each kind of sound, played in turn",
+        help: "a row of every sound scenery, each an emitter",
     },
     Station {
         name: "shaders",
         at: [42.0, -92.0],
         facing: core::f32::consts::FRAC_PI_2,
-        help: "a surface of each shader class, to light and look at",
+        help: "a row of an object of each shader class its model uses, to light and look at",
     },
     Station {
         name: "animation",
@@ -68,7 +68,7 @@ pub const STATIONS: [Station; 9] = [
         name: "hud",
         at: [46.0, -136.0],
         facing: 0.0,
-        help: "triggers each HUD and menu element: its meters, messages and screens",
+        help: "gives each weapon that has a HUD in turn, to see its HUD",
     },
     Station {
         name: "physics",
@@ -76,6 +76,15 @@ pub const STATIONS: [Station; 9] = [
         facing: 0.0,
         help: "drops a pile of crates onto the ground",
     },
+];
+
+/// The vehicles' course: a loop on the floor before the red base, from
+/// the vehicles station to each corner in turn and back.
+pub const COURSE: [[f32; 2]; 4] = [
+    [84.0, -166.0],
+    [110.0, -166.0],
+    [110.0, -142.0],
+    [80.0, -142.0],
 ];
 
 /// The station named `name`.
@@ -149,6 +158,14 @@ mod tests {
                     other.name
                 );
             }
+        }
+    }
+
+    #[test]
+    fn the_course_starts_at_the_vehicles_station_inside_the_bounds() {
+        assert_eq!(Some(COURSE[0]), station("vehicles").map(|one| one.at));
+        for [x, y] in COURSE {
+            assert!((12.0..126.0).contains(&x) && (-184.0..-50.0).contains(&y));
         }
     }
 

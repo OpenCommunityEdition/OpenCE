@@ -1,28 +1,41 @@
-//! The test map's stations (`station <name> [filter]`): tests the engine
-//! runs by itself on the test map, each from its spot behind the start
+//! The test maps' stations (`station <name> [filter]`): tests the engine
+//! runs by itself on the playground, devgulch
+//! (`opence_content::devgulch::STATIONS`), or on the test map, devmap
 //! (`opence_content::devmap::STATIONS`). A station drives the player as a
 //! person at the keyboard would, for as many ticks as it needs, and writes
 //! what it measured into the world (debug text) and into its results,
-//! which `station` alone shows.
+//! which `station` alone shows, with the set it placed or tests.
+//!
+//! Each places what it tests about its spot: so far ahead of the way it
+//! faces and to its left ([`spot`]), on the ground found there.
 //!
 //! - `weapons`: fires each weapon at three targets for a few seconds: its
-//!   shots, the damage they did, its heat.
-//! - `vehicles`: drives each vehicle round the course and over its ramps:
-//!   its lap time, top speed and how high it went.
+//!   shots, the damage they did, its heat; the equipment lies beside it.
+//! - `vehicles`: drives each vehicle round the course (and devmap's
+//!   ramps): its lap time, top speed and how high it went; each vehicle is
+//!   also parked in a row beside the course.
 //! - `animation`: plays each animation of a biped's graph in turn, named.
-//! - `doors`: moves every device through its positions, back and forth.
-//! - `physics`: drops a pile of crates onto the slope, until they lie
-//!   still.
-//! - `particles`: starts each effect of the level that makes particles, in
-//!   turn, before the player: the most particles it kept alive.
+//! - `doors` (devmap): moves every device through its positions, back and
+//!   forth.
+//! - `physics`: drops a pile of crates onto the slope (devmap) or the
+//!   ground, until they lie still.
+//! - `particles` (devmap) and `effects` (devgulch): starts each effect of
+//!   the level that makes particles, in turn, before the player: the most
+//!   particles it kept alive.
+//! - `ai` (devgulch): a squad of each biped that is not the player's,
+//!   stood facing the player.
+//! - `sounds` (devgulch): a row of every sound scenery.
+//! - `shaders` (devgulch): an object of each shader class its model uses.
+//! - `hud` (devgulch): gives each weapon that has a HUD in turn.
 //!
-//! The filter keeps the weapons, vehicles, animations, devices or effects
-//! whose name has it in it.
+//! The filter keeps the weapons, vehicles, animations, devices, effects,
+//! bipeds or sounds whose name has it in it (and the shaders whose class
+//! or path has).
 
 use std::sync::Arc;
 
 use opence_content::devmap::{self, Station};
-use opence_content::{Level, ObjectKind, TagRef};
+use opence_content::{devgulch, Level, ObjectKind, ShaderClass, TagRef};
 use opence_dev::draw::{Color, DebugDraw, Layer};
 use opence_dev::{Args, CommandError, Data, Output};
 use opence_sim::animation::{AnimationPlayer, AnimationState};
@@ -48,8 +61,10 @@ const PAUSE_TICKS: u32 = TICKS_PER_SECOND;
 /// The ticks the trigger is held for before it is let go for one (a
 /// weapon that fires once a pull fires again).
 const HOLD_TICKS: u32 = 8;
-/// Where the weapons' targets stand.
-const TARGETS: [[f32; 2]; 3] = [[-20.0, -18.0], [-20.0, -15.0], [-20.0, -12.0]];
+/// Where the weapons' targets stand: ahead of the station and to its left.
+const TARGETS: [[f32; 2]; 3] = [[12.0, 3.0], [12.0, 0.0], [12.0, -3.0]];
+/// How far to the left of the weapons station the equipment lies.
+const EQUIPMENT_LEFT: f32 = 6.0;
 /// How high on a target the weapons aim.
 const CHEST: f32 = 0.45;
 /// The longest a lap may take.
@@ -58,14 +73,17 @@ const LAP_TICKS: u32 = 40 * TICKS_PER_SECOND;
 const ARRIVED: f32 = 6.0;
 /// The longest the player may take to leave a vehicle.
 const LEAVE_TICKS: u32 = 3 * TICKS_PER_SECOND;
-/// Where the animation station's biped stands.
-const DUMMY: [f32; 2] = [-14.0, -62.0];
+/// How far to the left of the vehicles station the vehicles are parked
+/// (inside the course).
+const PARKED_LEFT: f32 = 12.0;
+/// How far ahead of the animation station its biped stands.
+const DUMMY: f32 = 6.0;
 /// The fewest and the most ticks an animation is shown for.
 const ANIMATION_TICKS: [u32; 2] = [TICKS_PER_SECOND / 2, 10 * TICKS_PER_SECOND];
 /// The animations' frames a second.
 const FRAMES_PER_SECOND: u32 = 30;
-/// Where the devices stand in a row, along y.
-const DEVICES_X: f32 = -18.0;
+/// How far ahead of the doors station the devices stand, in a row across.
+const DEVICES_AHEAD: f32 = 10.0;
 /// The ticks a device takes to go from closed to open and back.
 const DEVICE_CYCLE_TICKS: u32 = 4 * TICKS_PER_SECOND;
 /// How many times the devices go back and forth.
@@ -78,8 +96,20 @@ const CRATE_HALF: f32 = 0.5;
 const SETTLE_TICKS: u32 = 30 * TICKS_PER_SECOND;
 /// The ticks each effect of the particle station is watched for.
 const EFFECT_TICKS: u32 = 3 * TICKS_PER_SECOND;
-/// Where the particle station's effects start, and the way they face.
-const EFFECT_AT: [f32; 3] = [-14.0, 15.0, 1.0];
+/// How far ahead of the particle station its effects start, and how high.
+const EFFECT_AT: [f32; 2] = [6.0, 1.0];
+/// The places across the row the effects start at, in turn, and between
+/// them.
+const EFFECT_SLOTS: usize = 5;
+const EFFECT_SPACING: f32 = 4.0;
+/// How long each weapon's HUD is shown.
+const HUD_TICKS: u32 = 2 * TICKS_PER_SECOND;
+/// The bipeds of a squad.
+const SQUAD: usize = 3;
+/// The squads, or sounds, of a row.
+const ROW: usize = 4;
+/// How long what a station placed is labelled.
+const LABEL_TICKS: u32 = 10 * TICKS_PER_SECOND;
 
 /// A station running.
 #[derive(Debug)]
@@ -88,6 +118,8 @@ pub(crate) struct Run {
     /// The level it runs on: another level stops it.
     level: Arc<Level>,
     drive: Drive,
+    /// What it placed or tests: their tags' paths.
+    set: Vec<String>,
     /// The ticks it has run.
     ticks: u32,
     /// What it measured, one entry for each thing it tested.
@@ -105,6 +137,9 @@ enum Drive {
     Doors(Doors),
     Physics(Physics),
     Particles(Particles),
+    Huds(Huds),
+    /// Placed and labelled, measured as they were placed.
+    Placed(Placed),
 }
 
 impl Run {
@@ -116,9 +151,12 @@ impl Run {
         Some(match &mut self.drive {
             Drive::Weapons(weapons) => weapons.input(simulation),
             Drive::Vehicles(vehicles) => vehicles.input(simulation),
-            Drive::Animation(_) | Drive::Doors(_) | Drive::Physics(_) | Drive::Particles(_) => {
-                face(simulation, self.station.facing)
-            }
+            Drive::Animation(_)
+            | Drive::Doors(_)
+            | Drive::Physics(_)
+            | Drive::Particles(_)
+            | Drive::Huds(_)
+            | Drive::Placed(_) => face(simulation, self.station.facing),
         })
     }
 
@@ -149,6 +187,8 @@ impl Run {
             Drive::Doors(doors) => doors.after_tick(simulation, &mut report),
             Drive::Physics(physics) => physics.after_tick(simulation, &mut report),
             Drive::Particles(particles) => particles.after_tick(&mut report),
+            Drive::Huds(huds) => huds.after_tick(simulation, &mut report),
+            Drive::Placed(placed) => placed.after_tick(&mut report),
         };
         if let Some(status) = report.status {
             self.status = status;
@@ -185,6 +225,7 @@ impl Run {
             "done": self.done,
             "ticks": self.ticks,
             "status": self.status,
+            "set": self.set,
             "results": self.results,
         })
     }
@@ -204,14 +245,19 @@ impl Report<'_> {
     }
 }
 
-/// `station [name] [filter]`: alone, the stations and the one running;
-/// `station stop` stops it.
+/// `station [name] [filter]`: alone, the stations of the test map
+/// running (devgulch's if none is) and the one running; `station stop`
+/// stops it.
 pub(crate) fn command(state: &mut State, args: &Args) -> Result<Output, CommandError> {
     let name = args.string_or("name", "")?.to_owned();
     let filter = args.string_or("filter", "")?.to_lowercase();
     if name.is_empty() {
+        let level = state
+            .running
+            .as_ref()
+            .and_then(|running| running.level.as_deref());
         let running = state.shell.station.as_ref().map(Run::summary);
-        let mut text = devmap::STATIONS
+        let mut text = stations(level)
             .iter()
             .map(|station| format!("{:<10} {}", station.name, station.help))
             .collect::<Vec<_>>()
@@ -219,13 +265,9 @@ pub(crate) fn command(state: &mut State, args: &Args) -> Result<Output, CommandE
         if let Some(run) = &state.shell.station {
             text.push_str(&format!("\n{} ({} ticks)", run.status, run.ticks));
         }
-        let names: Vec<&str> = devmap::STATIONS
-            .iter()
-            .map(|station| station.name)
-            .collect();
         return Ok(Output::with_data(
             text,
-            json!({ "stations": names, "run": running }),
+            json!({ "stations": names(level), "run": running }),
         ));
     }
     if name == "stop" {
@@ -237,16 +279,6 @@ pub(crate) fn command(state: &mut State, args: &Args) -> Result<Output, CommandE
             None => Err(failed("no station is running")),
         };
     }
-    let station = devmap::station(&name).ok_or_else(|| {
-        let names: Vec<&str> = devmap::STATIONS
-            .iter()
-            .map(|station| station.name)
-            .collect();
-        failed(format!(
-            "no station `{name}`: there are {}",
-            names.join(", ")
-        ))
-    })?;
     let running = state
         .running
         .as_mut()
@@ -255,9 +287,18 @@ pub(crate) fn command(state: &mut State, args: &Args) -> Result<Output, CommandE
         .level
         .clone()
         .ok_or_else(|| failed("the world has no level"))?;
-    if level.scenario.path != devmap::NAME {
-        return Err(failed("the stations are on the test map: `map devmap`"));
+    if ![devgulch::NAME, devmap::NAME].contains(&level.scenario.path.as_str()) {
+        return Err(failed("the stations are on the test maps: `map devgulch`"));
     }
+    let station = stations(Some(&level))
+        .iter()
+        .find(|station| station.name == name)
+        .ok_or_else(|| {
+            failed(format!(
+                "no station `{name}`: there are {}",
+                names(Some(&level)).join(", ")
+            ))
+        })?;
     if running.network.is_some() || running.campaign.is_some() {
         return Err(failed("a station runs without a network game or a mission"));
     }
@@ -268,22 +309,28 @@ pub(crate) fn command(state: &mut State, args: &Args) -> Result<Output, CommandE
     if player.seated().is_some() {
         return Err(failed("the player is seated: leave the vehicle first"));
     }
+    let ground = devgulch::ground(&level, station.at).unwrap_or(0.0);
     let [x, y] = station.at;
-    if !simulation.teleport_player(0, Vec3::new(x, y, 0.1)) {
+    if !simulation.teleport_player(0, Vec3::new(x, y, ground + 0.1)) {
         return Err(failed("the player could not be moved to the station"));
     }
     let drive = match station.name {
-        "weapons" => Drive::Weapons(Weapons::new(simulation, &level, &filter)),
-        "vehicles" => Drive::Vehicles(Vehicles::new(&level, &filter)),
-        "animation" => Drive::Animation(Animations::new(simulation, &level, &filter)),
-        "doors" => Drive::Doors(Doors::new(simulation, &level, &filter)),
-        "particles" => Drive::Particles(Particles::new(&level, &filter)),
-        _ => Drive::Physics(Physics::new(simulation)),
+        "weapons" => Drive::Weapons(Weapons::new(simulation, &level, station, &filter)),
+        "vehicles" => Drive::Vehicles(Vehicles::new(simulation, &level, station, &filter)),
+        "animation" => Drive::Animation(Animations::new(simulation, &level, station, &filter)),
+        "doors" => Drive::Doors(Doors::new(simulation, &level, station, &filter)),
+        "particles" | "effects" => Drive::Particles(Particles::new(&level, station, &filter)),
+        "hud" => Drive::Huds(Huds::new(&level, &filter)),
+        "ai" => Drive::Placed(Placed::squads(simulation, &level, station, &filter)),
+        "sounds" => Drive::Placed(Placed::sounds(simulation, &level, station, &filter)),
+        "shaders" => Drive::Placed(Placed::shaders(simulation, &level, station, &filter)),
+        _ => Drive::Physics(Physics::new(simulation, &level, station)),
     };
     let count = drive.count();
     let run = Run {
         station,
         level,
+        set: drive.set(),
         drive,
         ticks: 0,
         results: Vec::new(),
@@ -294,6 +341,59 @@ pub(crate) fn command(state: &mut State, args: &Args) -> Result<Output, CommandE
     let data = run.summary();
     state.shell.station = Some(run);
     Ok(Output::with_data(text, data))
+}
+
+/// The stations of `level`: devmap's on devmap, otherwise devgulch's.
+fn stations(level: Option<&Level>) -> &'static [Station] {
+    match level {
+        Some(level) if level.scenario.path == devmap::NAME => &devmap::STATIONS,
+        _ => &devgulch::STATIONS,
+    }
+}
+
+fn names(level: Option<&Level>) -> Vec<&'static str> {
+    stations(level).iter().map(|station| station.name).collect()
+}
+
+/// The vehicles' course on `level`.
+fn course(level: &Level) -> &'static [[f32; 2]] {
+    if level.scenario.path == devmap::NAME {
+        &devmap::COURSE
+    } else {
+        &devgulch::COURSE
+    }
+}
+
+/// The point `ahead` of `station`, the way it faces, and `left` of it,
+/// `up` over the ground of `level` there.
+fn spot(station: &Station, level: &Level, [ahead, left]: [f32; 2], up: f32) -> Vec3 {
+    let (sin, cos) = (libm::sinf(station.facing), libm::cosf(station.facing));
+    let x = station.at[0] + ahead * cos - left * sin;
+    let y = station.at[1] + ahead * sin + left * cos;
+    let ground = devgulch::ground(level, [x, y]).unwrap_or(0.0);
+    Vec3::new(x, y, ground + up)
+}
+
+/// The room an object of `tag` is given in a row.
+fn width(level: &Level, tag: &TagRef) -> f32 {
+    level.object(tag).map_or(2.0, |object| {
+        (2.0 * object.bounding_radius).clamp(2.0, 12.0)
+    })
+}
+
+/// Where each of `tags` stands in a row across, `ahead` of `station`,
+/// centred on it, each given its [`width`].
+fn row(station: &Station, level: &Level, tags: &[TagRef], ahead: f32, up: f32) -> Vec<Vec3> {
+    let length: f32 = tags.iter().map(|tag| width(level, tag)).sum();
+    let mut left = 0.5 * length;
+    tags.iter()
+        .map(|tag| {
+            let room = width(level, tag);
+            let at = spot(station, level, [ahead, left - 0.5 * room], up);
+            left -= room;
+            at
+        })
+        .collect()
 }
 
 fn failed(text: impl Into<String>) -> CommandError {
@@ -310,6 +410,35 @@ impl Drive {
             Drive::Doors(doors) => doors.devices.len(),
             Drive::Physics(_) => CRATES,
             Drive::Particles(particles) => particles.effects.len(),
+            Drive::Huds(huds) => huds.weapons.len(),
+            Drive::Placed(placed) => placed.results.len(),
+        }
+    }
+
+    /// What it placed or tests: their tags' paths.
+    fn set(&self) -> Vec<String> {
+        let paths = |tags: &[TagRef]| tags.iter().map(|tag| tag.path.clone()).collect::<Vec<_>>();
+        match self {
+            Drive::Weapons(weapons) => {
+                [paths(&weapons.weapons), paths(&weapons.equipment)].concat()
+            }
+            Drive::Vehicles(vehicles) => {
+                [paths(&vehicles.vehicles), paths(&vehicles.parked)].concat()
+            }
+            Drive::Animation(animations) => paths(animations.tag.as_slice()),
+            Drive::Doors(doors) => doors
+                .devices
+                .iter()
+                .map(|device| device.tag.path.clone())
+                .collect(),
+            Drive::Physics(_) => vec!["crate".into(); CRATES],
+            Drive::Particles(particles) => paths(&particles.effects),
+            Drive::Huds(huds) => huds
+                .weapons
+                .iter()
+                .map(|(weapon, _)| weapon.path.clone())
+                .collect(),
+            Drive::Placed(placed) => placed.set.clone(),
         }
     }
 }
@@ -396,11 +525,19 @@ fn angles_to(from: Vec3, to: Vec3) -> (f32, f32) {
 #[derive(Debug)]
 struct Weapons {
     weapons: Vec<TagRef>,
+    /// The equipment laid beside the station.
+    equipment: Vec<TagRef>,
     at: usize,
     phase: WeaponPhase,
     phase_ticks: u32,
     target: Option<TagRef>,
     targets: Vec<ObjectHandle>,
+    /// Where the targets stand, the way they face, where the weapons aim
+    /// and where what each did is written.
+    targets_at: [Vec3; 3],
+    target_facing: f32,
+    aim: Vec3,
+    label_at: Vec3,
     tally: Tally,
 }
 
@@ -423,28 +560,37 @@ struct Tally {
 }
 
 impl Weapons {
-    fn new(simulation: &Simulation, level: &Level, filter: &str) -> Weapons {
+    fn new(simulation: &mut Simulation, level: &Level, station: &Station, filter: &str) -> Weapons {
+        // (the equipment in a line ahead, to the left of the targets)
+        let mut equipment = Vec::new();
+        for tag in definitions(level, &[ObjectKind::Equipment], filter) {
+            let ahead = 2.0 + 2.0 * equipment.len() as f32;
+            let at = spot(station, level, [ahead, EQUIPMENT_LEFT], 0.2);
+            if place(simulation, level, &tag, at, station.facing).is_some() {
+                equipment.push(tag);
+            }
+        }
         Weapons {
             weapons: definitions(level, &[ObjectKind::Weapon], filter),
+            equipment,
             at: 0,
             phase: WeaponPhase::Arm,
             phase_ticks: 0,
             target: player_biped(simulation),
             targets: Vec::new(),
+            targets_at: TARGETS.map(|target| spot(station, level, target, 0.0)),
+            target_facing: station.facing + std::f32::consts::PI,
+            aim: spot(station, level, TARGETS[1], CHEST),
+            label_at: spot(station, level, TARGETS[1], 1.2),
             tally: Tally::default(),
         }
     }
 
-    fn aim(simulation: &Simulation) -> (f32, f32) {
+    fn input(&self, simulation: &Simulation) -> TickInput {
         let eyes = simulation
             .player()
             .map_or(Vec3::ZERO, |player| player.eyes());
-        let [x, y] = TARGETS[1];
-        angles_to(eyes, Vec3::new(x, y, CHEST))
-    }
-
-    fn input(&self, simulation: &Simulation) -> TickInput {
-        let (yaw, pitch) = Weapons::aim(simulation);
+        let (yaw, pitch) = angles_to(eyes, self.aim);
         let (yaw, pitch) = turn_toward(simulation, yaw, pitch);
         let firing =
             self.phase == WeaponPhase::Fire && !self.phase_ticks.is_multiple_of(HOLD_TICKS + 1);
@@ -498,9 +644,9 @@ impl Weapons {
         while let Some(weapon) = self.weapons.get(self.at) {
             if simulation.give_weapon(weapon) {
                 if let Some(tag) = &self.target {
-                    for [x, y] in TARGETS {
-                        let at = Vec3::new(x, y, 0.0);
-                        if let Some(handle) = place(simulation, level, tag, at, 0.0) {
+                    for at in self.targets_at {
+                        if let Some(handle) = place(simulation, level, tag, at, self.target_facing)
+                        {
                             self.targets.push(handle);
                         }
                     }
@@ -557,9 +703,8 @@ impl Weapons {
             kills,
         } = self.tally;
         let seconds = FIRE_TICKS as f32 / TICKS_PER_SECOND as f32;
-        let [x, y] = TARGETS[1];
         report.label(
-            Vec3::new(x, y, 1.2),
+            self.label_at,
             &format!(
                 "{}: {shots} shots, {damage:.2} damage, heat {heat:.2}, {kills} killed",
                 short(weapon)
@@ -581,6 +726,11 @@ impl Weapons {
 #[derive(Debug)]
 struct Vehicles {
     vehicles: Vec<TagRef>,
+    /// The vehicles parked in a row beside the course.
+    parked: Vec<TagRef>,
+    /// The course's corners, the first its start, and the way it starts.
+    course: Vec<Vec3>,
+    facing: f32,
     at: usize,
     phase: VehiclePhase,
     phase_ticks: u32,
@@ -600,9 +750,33 @@ enum VehiclePhase {
 }
 
 impl Vehicles {
-    fn new(level: &Level, filter: &str) -> Vehicles {
+    fn new(
+        simulation: &mut Simulation,
+        level: &Level,
+        station: &Station,
+        filter: &str,
+    ) -> Vehicles {
+        let vehicles = definitions(level, &[ObjectKind::Vehicle], filter);
+        // (parked in a line ahead, to the left of the station)
+        let mut parked = Vec::new();
+        let mut ahead = 4.0;
+        for tag in &vehicles {
+            let room = width(level, tag).max(3.0);
+            let at = spot(station, level, [ahead + 0.5 * room, PARKED_LEFT], 0.3);
+            ahead += room;
+            if place(simulation, level, tag, at, station.facing).is_some() {
+                parked.push(tag.clone());
+            }
+        }
+        let course = course(level)
+            .iter()
+            .map(|&[x, y]| Vec3::new(x, y, devgulch::ground(level, [x, y]).unwrap_or(0.0)))
+            .collect();
         Vehicles {
-            vehicles: definitions(level, &[ObjectKind::Vehicle], filter),
+            vehicles,
+            parked,
+            course,
+            facing: station.facing,
             at: 0,
             phase: VehiclePhase::Board,
             phase_ticks: 0,
@@ -616,8 +790,10 @@ impl Vehicles {
 
     /// The corner driven to: the course's next, then its first again.
     fn goal(&self) -> Vec3 {
-        let [x, y] = devmap::COURSE[self.corner % devmap::COURSE.len()];
-        Vec3::new(x, y, 0.0)
+        self.course
+            .get(self.corner % self.course.len().max(1))
+            .copied()
+            .unwrap_or(Vec3::ZERO)
     }
 
     fn input(&self, simulation: &Simulation) -> TickInput {
@@ -687,9 +863,8 @@ impl Vehicles {
         level: &Level,
         report: &mut Report<'_>,
     ) -> bool {
-        let [x, y] = devmap::COURSE[0];
-        let start = Vec3::new(x, y, 0.3);
-        let facing = devmap::station("vehicles").map_or(0.0, |station| station.facing);
+        let start = self.course.first().copied().unwrap_or(Vec3::ZERO) + Vec3::Z * 0.3;
+        let facing = self.facing;
         while let Some(tag) = self.vehicles.get(self.at) {
             match self.vehicle.take() {
                 None => {
@@ -752,7 +927,7 @@ impl Vehicles {
         );
         if libm::hypotf(goal.x - at.x, goal.y - at.y) < ARRIVED {
             self.corner += 1;
-            if self.corner > devmap::COURSE.len() {
+            if self.corner > self.course.len() {
                 self.lap(report, "");
                 return;
             }
@@ -785,8 +960,8 @@ impl Vehicles {
             result["error"] = json!(error);
             format!("{}: {error}", short(tag))
         };
-        let [x, y] = devmap::COURSE[0];
-        report.label(Vec3::new(x, y, 2.0), &text, 3 * TICKS_PER_SECOND);
+        let start = self.course.first().copied().unwrap_or(Vec3::ZERO);
+        report.label(start + Vec3::Z * 2.0, &text, 3 * TICKS_PER_SECOND);
         report.results.push(result);
         self.next(VehiclePhase::Leave);
     }
@@ -795,6 +970,9 @@ impl Vehicles {
 /// The animation station: a biped's animations, each in turn.
 #[derive(Debug)]
 struct Animations {
+    /// The biped's tag, where it stands, and its handle.
+    tag: Option<TagRef>,
+    stand: Vec3,
     biped: Option<ObjectHandle>,
     player: Option<AnimationPlayer>,
     /// The animations shown, by their index in the graph.
@@ -804,10 +982,23 @@ struct Animations {
 }
 
 impl Animations {
-    fn new(simulation: &mut Simulation, level: &Level, filter: &str) -> Animations {
-        let [x, y] = DUMMY;
-        let biped = player_biped(simulation)
-            .and_then(|tag| place(simulation, level, &tag, Vec3::new(x, y, 0.0), 0.0));
+    fn new(
+        simulation: &mut Simulation,
+        level: &Level,
+        station: &Station,
+        filter: &str,
+    ) -> Animations {
+        let stand = spot(station, level, [DUMMY, 0.0], 0.0);
+        let tag = player_biped(simulation);
+        let biped = tag.as_ref().and_then(|tag| {
+            place(
+                simulation,
+                level,
+                tag,
+                stand,
+                station.facing + std::f32::consts::PI,
+            )
+        });
         let player = biped.and_then(|biped| simulation.component::<AnimationPlayer>(biped));
         let animations = player
             .as_ref()
@@ -824,6 +1015,8 @@ impl Animations {
             })
             .unwrap_or_default();
         Animations {
+            tag: tag.filter(|_| biped.is_some()),
+            stand,
             biped,
             player,
             animations,
@@ -853,9 +1046,8 @@ impl Animations {
         let name = animation.name.clone();
         simulation.animate(biped, player.clone());
         if self.shown == 0 {
-            let [x, y] = DUMMY;
             let text = format!("{}/{} {name}", self.at + 1, self.animations.len());
-            report.label(Vec3::new(x, y, 1.0), &text, ticks);
+            report.label(self.stand + Vec3::Z, &text, ticks);
             report.status = Some(format!("animation: {text}"));
         }
         self.shown += 1;
@@ -889,21 +1081,11 @@ struct Device {
 }
 
 impl Doors {
-    fn new(simulation: &mut Simulation, level: &Level, filter: &str) -> Doors {
+    fn new(simulation: &mut Simulation, level: &Level, station: &Station, filter: &str) -> Doors {
         let tags = definitions(level, &[ObjectKind::Machine, ObjectKind::Control], filter);
-        let spacing = |tag: &TagRef| {
-            level.object(tag).map_or(2.0, |object| {
-                (2.0 * object.bounding_radius).clamp(2.0, 12.0)
-            })
-        };
-        // (in a row along y, centred on the station)
-        let length: f32 = tags.iter().map(spacing).sum();
-        let mut y = devmap::station("doors").map_or(0.0, |station| station.at[1]) - 0.5 * length;
+        let places = row(station, level, &tags, DEVICES_AHEAD, 0.0);
         let mut devices = Vec::new();
-        for tag in tags {
-            let width = spacing(&tag);
-            let at = Vec3::new(DEVICES_X, y + 0.5 * width, 0.0);
-            y += width;
+        for (tag, at) in tags.into_iter().zip(places) {
             let Some(handle) = place(simulation, level, &tag, at, 0.0) else {
                 continue;
             };
@@ -976,28 +1158,43 @@ impl Doors {
 #[derive(Debug)]
 struct Physics {
     ticks: u32,
+    /// Where how they lay is written.
+    label_at: Vec3,
 }
 
 impl Physics {
-    fn new(simulation: &mut Simulation) -> Physics {
+    fn new(simulation: &mut Simulation, level: &Level, station: &Station) -> Physics {
         simulation.clear_crates();
         let slope = devmap::SLOPE;
+        let on_slope = level.scenario.path == devmap::NAME;
         let half = Vec3::splat(CRATE_HALF);
         for at in 0..CRATES {
-            // (a loose pile over the slope's upper half, each turned)
+            // (a loose pile over the slope's upper half, or ahead of the
+            // station, each turned)
             let row = (at / 4) as f32;
             let column = (at % 4) as f32;
-            let along = 0.55 * slope.length + 2.0 * row;
             let across = 2.5 * (column - 1.5);
-            let position = Vec3::new(
-                slope.foot[0] + slope.rising[0] * along - slope.rising[1] * across,
-                slope.foot[1] + slope.rising[1] * along + slope.rising[0] * across,
-                slope.height + 3.0 + 1.5 * row + 0.5 * column,
-            );
+            let above = 3.0 + 1.5 * row + 0.5 * column;
+            let position = if on_slope {
+                let along = 0.55 * slope.length + 2.0 * row;
+                Vec3::new(
+                    slope.foot[0] + slope.rising[0] * along - slope.rising[1] * across,
+                    slope.foot[1] + slope.rising[1] * along + slope.rising[0] * across,
+                    slope.height + above,
+                )
+            } else {
+                spot(station, level, [8.0 + 2.0 * row, across], above)
+            };
             let turn = Quat::from_rotation_z(0.4 * at as f32) * Quat::from_rotation_x(0.3 * row);
             simulation.drop_crate(position, turn, half);
         }
-        Physics { ticks: 0 }
+        let label_at = if on_slope {
+            let [x, y] = slope.foot;
+            Vec3::new(x, y, 3.0)
+        } else {
+            spot(station, level, [8.0, 0.0], 3.0)
+        };
+        Physics { ticks: 0, label_at }
     }
 
     fn after_tick(&mut self, simulation: &Simulation, report: &mut Report<'_>) -> bool {
@@ -1036,8 +1233,7 @@ impl Physics {
         } else {
             format!("the crates still move after {seconds:.1} s")
         };
-        let [x, y] = devmap::SLOPE.foot;
-        report.label(Vec3::new(x, y, 3.0), &text, 5 * TICKS_PER_SECOND);
+        report.label(self.label_at, &text, 5 * TICKS_PER_SECOND);
         report.status = Some(format!("physics: {text}"));
         true
     }
@@ -1047,13 +1243,17 @@ impl Physics {
 /// turn and watched.
 #[derive(Debug)]
 struct Particles {
+    /// The station's name, which its status starts with.
+    name: &'static str,
     effects: Vec<TagRef>,
+    /// The places across the row the effects start at, in turn.
+    slots: Vec<Vec3>,
     /// The effect watched.
     at: usize,
     /// The ticks it has been watched.
     ticks: u32,
-    /// The effect to start after this tick's effects.
-    start: Option<TagRef>,
+    /// The effect to start after this tick's effects, and where.
+    start: Option<(TagRef, Vec3)>,
     /// The particles alive after the last tick.
     alive: usize,
     /// The most alive while the effect has been watched.
@@ -1063,7 +1263,7 @@ struct Particles {
 impl Particles {
     /// The level's effects whose path has `filter` in it and whose events
     /// emit particles or make particle systems.
-    fn new(level: &Level, filter: &str) -> Particles {
+    fn new(level: &Level, station: &'static Station, filter: &str) -> Particles {
         let effects = level
             .effects
             .iter()
@@ -1079,8 +1279,16 @@ impl Particles {
             })
             .map(|effect| effect.tag.clone())
             .collect();
+        let slots = (0..EFFECT_SLOTS)
+            .map(|slot| {
+                let left = EFFECT_SPACING * (slot as f32 - 0.5 * (EFFECT_SLOTS - 1) as f32);
+                spot(station, level, [EFFECT_AT[0], left], EFFECT_AT[1])
+            })
+            .collect();
         Particles {
+            name: station.name,
             effects,
+            slots,
             at: 0,
             ticks: 0,
             start: None,
@@ -1093,13 +1301,18 @@ impl Particles {
         let Some(effect) = self.effects.get(self.at) else {
             return true;
         };
-        let [x, y, z] = EFFECT_AT;
         if self.ticks == 0 {
-            self.start = Some(effect.clone());
+            let at = self
+                .slots
+                .get(self.at % self.slots.len().max(1))
+                .copied()
+                .unwrap_or(Vec3::ZERO);
+            self.start = Some((effect.clone(), at));
             self.peak = 0;
-            report.label(Vec3::new(x, y, z + 2.0), short(effect), EFFECT_TICKS);
+            report.label(at + Vec3::Z * 2.0, short(effect), EFFECT_TICKS);
             report.status = Some(format!(
-                "particles: {}/{} {}",
+                "{}: {}/{} {}",
+                self.name,
                 self.at + 1,
                 self.effects.len(),
                 short(effect)
@@ -1125,11 +1338,288 @@ impl Particles {
         effects: &mut LevelEffects,
         particles: &mut LevelParticles,
     ) {
-        if let Some(effect) = self.start.take() {
+        if let Some((effect, at)) = self.start.take() {
             // (the last effect's particles go, so that each is counted alone)
             particles.clear();
-            effects.start(level, &effect, Vec3::from_array(EFFECT_AT), Vec3::Z);
+            effects.start(level, &effect, at, Vec3::Z);
         }
         self.alive = particles.alive();
+    }
+}
+
+/// The HUD station: each weapon that has a HUD, given in turn and held.
+#[derive(Debug)]
+struct Huds {
+    /// Each weapon, and its HUD.
+    weapons: Vec<(TagRef, TagRef)>,
+    at: usize,
+    ticks: u32,
+}
+
+impl Huds {
+    fn new(level: &Level, filter: &str) -> Huds {
+        let weapons = definitions(level, &[ObjectKind::Weapon], filter)
+            .into_iter()
+            .filter_map(|tag| {
+                let hud = level.object(&tag)?.weapon.as_ref()?.hud_interface.clone()?;
+                Some((tag, hud))
+            })
+            .collect();
+        Huds {
+            weapons,
+            at: 0,
+            ticks: 0,
+        }
+    }
+
+    fn after_tick(&mut self, simulation: &mut Simulation, report: &mut Report<'_>) -> bool {
+        let Some((weapon, hud)) = self.weapons.get(self.at) else {
+            return true;
+        };
+        if self.ticks == 0 {
+            if !simulation.give_weapon(weapon) {
+                report.results.push(json!({
+                    "weapon": weapon.path,
+                    "hud": hud.path,
+                    "error": "the player cannot carry it",
+                }));
+                self.at += 1;
+                return self.at >= self.weapons.len();
+            }
+            report.status = Some(format!(
+                "hud: {} ({}/{}) {}",
+                short(weapon),
+                self.at + 1,
+                self.weapons.len(),
+                short(hud)
+            ));
+        }
+        self.ticks += 1;
+        if self.ticks < HUD_TICKS {
+            return false;
+        }
+        report.results.push(json!({
+            "weapon": weapon.path,
+            "hud": hud.path,
+        }));
+        self.ticks = 0;
+        self.at += 1;
+        self.at >= self.weapons.len()
+    }
+}
+
+/// A station whose set is placed when it starts and stands to be looked
+/// at: what each is is written over it, and its results are what was
+/// placed.
+#[derive(Debug, Default)]
+struct Placed {
+    set: Vec<String>,
+    results: Vec<Data>,
+    labels: Vec<(Vec3, String)>,
+}
+
+impl Placed {
+    fn add(&mut self, tag: &TagRef, result: Data, label: (Vec3, String)) {
+        self.set.push(tag.path.clone());
+        self.results.push(result);
+        self.labels.push(label);
+    }
+
+    /// A squad of each biped that is not the player's, in rows ahead,
+    /// facing the player.
+    fn squads(
+        simulation: &mut Simulation,
+        level: &Level,
+        station: &Station,
+        filter: &str,
+    ) -> Placed {
+        let own = player_biped(simulation);
+        let facing = station.facing + std::f32::consts::PI;
+        let mut placed = Placed::default();
+        let bipeds = definitions(level, &[ObjectKind::Biped], filter);
+        for tag in bipeds.iter().filter(|&tag| Some(tag) != own.as_ref()) {
+            let at = placed.results.len();
+            let ahead = 8.0 + 5.0 * (at / ROW) as f32;
+            let left = 5.0 * ((at % ROW) as f32 - 0.5 * (ROW - 1) as f32);
+            let mut stood = 0;
+            for one in 0..SQUAD {
+                let beside = 1.2 * (one as f32 - 0.5 * (SQUAD - 1) as f32);
+                let here = spot(station, level, [ahead, left + beside], 0.0);
+                stood += usize::from(place(simulation, level, tag, here, facing).is_some());
+            }
+            if stood > 0 {
+                let label = spot(station, level, [ahead, left], 2.5);
+                let result = json!({ "biped": tag.path, "squad": stood });
+                placed.add(tag, result, (label, short(tag).to_owned()));
+            }
+        }
+        placed
+    }
+
+    /// Every sound scenery, in rows ahead.
+    fn sounds(
+        simulation: &mut Simulation,
+        level: &Level,
+        station: &Station,
+        filter: &str,
+    ) -> Placed {
+        let mut placed = Placed::default();
+        for tag in definitions(level, &[ObjectKind::SoundScenery], filter) {
+            let at = placed.results.len();
+            let ahead = 4.0 + 3.0 * (at / ROW) as f32;
+            let left = 3.0 * ((at % ROW) as f32 - 0.5 * (ROW - 1) as f32);
+            let here = spot(station, level, [ahead, left], 0.5);
+            if place(simulation, level, &tag, here, station.facing).is_some() {
+                let result = json!({ "sound_scenery": tag.path });
+                placed.add(&tag, result, (here + Vec3::Z, short(&tag).to_owned()));
+            }
+        }
+        placed
+    }
+
+    /// For each shader class, an object whose model uses a shader of it
+    /// (scenery first), in a row ahead.
+    fn shaders(
+        simulation: &mut Simulation,
+        level: &Level,
+        station: &Station,
+        filter: &str,
+    ) -> Placed {
+        let mut objects: Vec<_> = level.objects.iter().collect();
+        objects.sort_by_key(|object| object.kind != ObjectKind::Scenery);
+        let mut found: Vec<(&'static str, TagRef, TagRef)> = Vec::new();
+        for object in objects {
+            let Some(model) = object
+                .model
+                .as_ref()
+                .and_then(|model| level.model_index(model))
+                .and_then(|index| level.models.get(index))
+            else {
+                continue;
+            };
+            for shader in model
+                .shaders
+                .iter()
+                .filter_map(|shader| shader.shader.as_ref())
+            {
+                let Some(class) = level.shader(shader).map(|shader| class_name(&shader.class))
+                else {
+                    continue;
+                };
+                let kept = class.contains(filter) || shader.path.to_lowercase().contains(filter);
+                if kept && found.iter().all(|(seen, _, _)| *seen != class) {
+                    found.push((class, shader.clone(), object.tag.clone()));
+                }
+            }
+        }
+        found.sort_by_key(|(class, _, _)| CLASSES.iter().position(|name| name == class));
+        let tags: Vec<TagRef> = found.iter().map(|(_, _, object)| object.clone()).collect();
+        let places = row(station, level, &tags, 8.0, 0.0);
+        let mut placed = Placed::default();
+        for ((class, shader, object), here) in found.into_iter().zip(places) {
+            if place(simulation, level, &object, here, station.facing).is_some() {
+                let result = json!({
+                    "class": class,
+                    "shader": shader.path,
+                    "object": object.path,
+                });
+                let label = format!("{class}: {}", short(&shader));
+                placed.add(&object, result, (here + Vec3::Z * 3.0, label));
+            }
+        }
+        placed
+    }
+
+    fn after_tick(&mut self, report: &mut Report<'_>) -> bool {
+        for (at, text) in self.labels.drain(..) {
+            report.label(at, &text, LABEL_TICKS);
+        }
+        report.results.append(&mut self.results);
+        true
+    }
+}
+
+/// The shader classes' names, in their tags' order.
+const CLASSES: [&str; 10] = [
+    "environment",
+    "transparent_chicago",
+    "transparent_chicago_extended",
+    "model",
+    "transparent_generic",
+    "glass",
+    "meter",
+    "plasma",
+    "water",
+    "other",
+];
+
+fn class_name(class: &ShaderClass) -> &'static str {
+    match class {
+        ShaderClass::Environment(_) => CLASSES[0],
+        ShaderClass::TransparentChicago(_) => CLASSES[1],
+        ShaderClass::TransparentChicagoExtended(_) => CLASSES[2],
+        ShaderClass::Model(_) => CLASSES[3],
+        ShaderClass::TransparentGeneric(_) => CLASSES[4],
+        ShaderClass::Glass(_) => CLASSES[5],
+        ShaderClass::Meter(_) => CLASSES[6],
+        ShaderClass::Plasma(_) => CLASSES[7],
+        ShaderClass::Water(_) => CLASSES[8],
+        ShaderClass::Other(_) => CLASSES[9],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn near(at: Vec3, [x, y, z]: [f32; 3]) -> bool {
+        (at.x - x).abs() < 1e-3 && (at.y - y).abs() < 1e-3 && (at.z - z).abs() < 1e-3
+    }
+
+    #[test]
+    fn devmaps_spots_are_where_its_stations_placed_things_before() -> Result<(), &'static str> {
+        let level = devmap::level(None);
+        let weapons = devmap::station("weapons").ok_or("no weapons station")?;
+        let before = [[-20.0, -18.0], [-20.0, -15.0], [-20.0, -12.0]];
+        for (target, [x, y]) in TARGETS.into_iter().zip(before) {
+            let at = spot(weapons, &level, target, 0.0);
+            assert!(near(at, [x, y, 0.0]), "{at}");
+        }
+        let animation = devmap::station("animation").ok_or("no animation station")?;
+        let at = spot(animation, &level, [DUMMY, 0.0], 0.0);
+        assert!(near(at, [-14.0, -62.0, 0.0]), "{at}");
+        let particles = devmap::station("particles").ok_or("no particles station")?;
+        let [ahead, up] = EFFECT_AT;
+        let at = spot(particles, &level, [ahead, 0.0], up);
+        assert!(near(at, [-14.0, 15.0, 1.0]), "{at}");
+        Ok(())
+    }
+
+    #[test]
+    fn the_stations_and_course_are_the_test_maps_running() {
+        let devmap = devmap::level(None);
+        assert_eq!(stations(Some(&devmap)).len(), devmap::STATIONS.len());
+        assert_eq!(course(&devmap), &devmap::COURSE);
+        let mut other = devmap;
+        other.scenario.path = devgulch::NAME.into();
+        assert_eq!(stations(Some(&other)).len(), devgulch::STATIONS.len());
+        assert_eq!(course(&other), &devgulch::COURSE);
+        assert_eq!(stations(None).len(), devgulch::STATIONS.len());
+    }
+
+    #[test]
+    fn a_row_is_centred_ahead_of_its_station() -> Result<(), &'static str> {
+        let level = devmap::level(None);
+        let doors = devmap::station("doors").ok_or("no doors station")?;
+        let tag = TagRef {
+            group: opence_content::Group(*b"scen"),
+            path: "a".into(),
+        };
+        let tags = [tag.clone(), tag];
+        let places = row(doors, &level, &tags, DEVICES_AHEAD, 0.0);
+        // (facing -x: ahead is -x, left is -y; two of 2 each, centred)
+        assert!(near(places[0], [-18.0, 44.0, 0.0]), "{}", places[0]);
+        assert!(near(places[1], [-18.0, 46.0, 0.0]), "{}", places[1]);
+        Ok(())
     }
 }
