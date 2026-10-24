@@ -51,9 +51,9 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Black artifacts, flicker and blotchy emissives 6ef5857
     - [x] Write tests: no NaN or black pixels on every shader class; the same frame twice gives the same image; emissive golden frames; ExposureTests' start view held to 10% of stock's mean
     - [x] The fixes
-- [ ] Task: Seams
-    - [ ] Write tests: no lightmap or texture seams on the seam views' golden frames
-    - [ ] The fixes
+- [x] Task: Seams b2f6c38
+    - [x] Write tests: no lightmap or texture seams on the seam views' golden frames
+    - [x] The fixes
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Lighting and shaders' (Protocol in workflow.md)
 
 ## Phase 5: Picking up, vehicles and responsiveness
