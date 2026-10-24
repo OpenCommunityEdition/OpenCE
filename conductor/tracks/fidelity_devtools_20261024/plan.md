@@ -27,9 +27,9 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Stop the heat, see the cost' (Protocol in workflow.md)
 
 ## Phase 3: Developer tools in game
-- [ ] Task: The dev state model
-    - [ ] Write tests: each control round-trips through Rust, Swift, the shell and the socket; tuned values save and load per map; when off, the frame is unchanged and costs nothing
-    - [ ] One DevState shared by the panel, the shell, `opence` and the Developer tab
+- [x] Task: The dev state model 6cd68c2
+    - [x] Write tests: each control round-trips through Rust, Swift, the shell and the socket; tuned values save and load per map; when off, the frame is unchanged and costs nothing
+    - [x] One DevState shared by the panel, the shell, `opence` and the Developer tab
 - [ ] Task: View modes and the stock lightmap reference view
     - [ ] Write tests: each view mode gives its own golden frame on devgulch; the stock view draws the map's lightmaps
     - [ ] Debug outputs in the shaders, selected by a uniform
