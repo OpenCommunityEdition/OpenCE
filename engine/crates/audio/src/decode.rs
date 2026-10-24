@@ -11,6 +11,10 @@ use opence_content::SoundCompression;
 pub const ADPCM_BLOCK_BYTES: usize = 36;
 /// The samples of one Xbox ADPCM block, a channel.
 pub const ADPCM_BLOCK_SAMPLES: usize = 64;
+/// The most frames an Ogg Vorbis stream decodes to: ten minutes at 48 kHz.
+/// A map's stream is untrusted, and Vorbis packets of a few bytes each can
+/// code thousands of samples, so a small stream could otherwise fill memory.
+pub const MAX_OGG_FRAMES: usize = 48_000 * 600;
 
 /// A permutation's samples, decoded.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -42,6 +46,9 @@ pub enum DecodeError {
     /// An Ogg Vorbis stream that does not decode.
     #[error("the Ogg Vorbis stream: {0}")]
     Ogg(String),
+    /// An Ogg Vorbis stream longer than `MAX_OGG_FRAMES`.
+    #[error("the Ogg Vorbis stream is longer than {0} frames")]
+    TooLong(usize),
 }
 
 /// Decodes `bytes`, of `channels` channels at `sample_rate`, as
@@ -54,7 +61,7 @@ pub fn decode(
     bytes: &[u8],
 ) -> Result<Decoded, DecodeError> {
     if compression == SoundCompression::Ogg {
-        return decode_ogg(bytes);
+        return decode_ogg(bytes, MAX_OGG_FRAMES);
     }
     if !(1..=2).contains(&channels) {
         return Err(DecodeError::Channels(channels));
@@ -160,8 +167,9 @@ fn decode_adpcm(bytes: &[u8], channels: usize) -> Vec<i16> {
     samples
 }
 
-/// An Ogg Vorbis stream, at its own rate and channels.
-fn decode_ogg(bytes: &[u8]) -> Result<Decoded, DecodeError> {
+/// An Ogg Vorbis stream, at its own rate and channels, of at most
+/// `longest` frames.
+fn decode_ogg(bytes: &[u8], longest: usize) -> Result<Decoded, DecodeError> {
     let mut reader =
         OggStreamReader::new(Cursor::new(bytes)).map_err(|e| DecodeError::Ogg(e.to_string()))?;
     let channels = reader.ident_hdr.audio_channels;
@@ -175,6 +183,9 @@ fn decode_ogg(bytes: &[u8]) -> Result<Decoded, DecodeError> {
         .map_err(|e| DecodeError::Ogg(e.to_string()))?
     {
         samples.extend_from_slice(&packet);
+        if samples.len() / usize::from(channels) > longest {
+            return Err(DecodeError::TooLong(longest));
+        }
     }
     // The last page's granule position is the stream's length: the decoder
     // gives the last packet whole, padding and all, which would put a gap
@@ -282,6 +293,17 @@ mod tests {
             .count();
         // 44 cycles cross zero twice each.
         assert!((84..=92).contains(&crossings), "{crossings} crossings");
+        Ok(())
+    }
+
+    #[test]
+    fn an_ogg_stream_past_the_longest_is_refused() -> Result<(), Box<dyn Error>> {
+        let bytes = include_bytes!("../tests/fixtures/sine.ogg");
+        assert!(matches!(
+            decode_ogg(bytes, 1000),
+            Err(DecodeError::TooLong(1000))
+        ));
+        assert_eq!(decode_ogg(bytes, 4000)?.channels, 1);
         Ok(())
     }
 }
