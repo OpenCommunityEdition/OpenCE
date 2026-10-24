@@ -29,3 +29,6 @@
     - [x] Write tests: two simulations with the same inputs agree; `station physics` is stable; 500 bodies in under 2 ms
     - [x] The particle collision hook; `docs/engine.md`: physics
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Vehicles and devices' (Protocol in workflow.md) (deferred to the end)
+
+## Phase: Review Fixes
+- [x] Task: Apply review suggestions 834b7a92
