@@ -43,8 +43,8 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Developer tools in game' (Protocol in workflow.md)
 
 ## Phase 4: Lighting and shaders
-- [ ] Task: Collect the problems
-    - [ ] On devgulch's shader surfaces and Blood Gulch, with the stock view, view modes and inspector, list each problem with its cause in docs/engine.md
+- [x] Task: Collect the problems 56a8d15
+    - [x] On devgulch's shader surfaces and Blood Gulch, with the stock view, view modes and inspector, list each problem with its cause in docs/engine.md
 - [ ] Task: Exposure and tone mapping matched to the original
     - [ ] Write tests: mean and peak brightness stay within tolerance of the stock view's; the ring and bright textures are not clipped
     - [ ] The fix
