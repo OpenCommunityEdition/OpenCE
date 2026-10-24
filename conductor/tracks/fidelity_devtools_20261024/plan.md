@@ -26,7 +26,7 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
     - [x] Counter sample buffers, CPU spans, the hitch log, perf.log
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Stop the heat, see the cost' (Protocol in workflow.md)
 
-## Phase 3: Developer tools in game
+## Phase 3: Developer tools in game [checkpoint: 799a6a9]
 - [x] Task: The dev state model 6cd68c2
     - [x] Write tests: each control round-trips through Rust, Swift, the shell and the socket; tuned values save and load per map; when off, the frame is unchanged and costs nothing
     - [x] One DevState shared by the panel, the shell, `opence` and the Developer tab
@@ -40,7 +40,7 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Object inspector, live timings and the audio view 2ae1595
     - [x] Write tests: a mouse pick returns the object under the cursor; the inspector lists tag, shader, animation, physics, light and sounds; the audio view counts voices by category
     - [x] GPU picking ID buffer; SwiftUI panel overlays
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Developer tools in game' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Developer tools in game' (Protocol in workflow.md)
 
 ## Phase 4: Lighting and shaders
 - [ ] Task: Collect the problems
