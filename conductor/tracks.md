@@ -26,7 +26,7 @@ This file tracks all major tracks for the project.
 - [x] **Track: The complete animation set for bipeds, weapons, the first person, vehicles, AI, devices and cutscenes**
   *Link: [./tracks/animation_20261021/](./tracks/animation_20261021/)*
 
-- [ ] **Track: Complete physics: objects as mass-point bodies, collisions, forces, grenades, vehicles and devices**
+- [~] **Track: Complete physics: objects as mass-point bodies, collisions, forces, grenades, vehicles and devices**
   *Link: [./tracks/physics_20261021/](./tracks/physics_20261021/)*
 
 - [ ] **Track: The complete particle system: particles and their physics, particle systems, effects, contrails, weather and wind**
