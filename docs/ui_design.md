@@ -157,7 +157,10 @@ each for the launcher (launcher, map library, settings), the campaign (main
 menu, profiles, load level, difficulty, loading), multiplayer (multiplayer,
 system link games, select teams, pause, carnage report) and settings
 (settings, player setup, campaign pause, the tokens). The boards link to each
-other in the game's order, so the canvas also plays as a prototype.
+other in the game's order, so the canvas also plays as a prototype: hover focuses as the arrow keys
+would, and the keycaps in each footer are links. A last row holds the
+motion studies: focus, hover, open and back, scrolling with the edge fade,
+the loading sweep with the cloud, and the one easing curve they share.
 
 Everything in it is our own drawing. The logo, the mission pictures, the
 figures and the loading picture are marked placeholders; nothing from
