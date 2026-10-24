@@ -18,10 +18,12 @@ use opence_content::{
     Animation, AnimationGraph, AnimationKind, AnimationNode, Model, ScreenBounds, TagRef,
 };
 
+use crate::animation_blend::unit_pose;
 use crate::device_animation::{apply_device_overlays, DevicePose};
 use crate::objects::ObjectTable;
 use crate::random::RandomSeed;
 use crate::seats::VehicleMotions;
+use crate::unit_animator::{unit_layers, UnitAnimator};
 use crate::vehicle_animation::{apply_vehicle_overlays, VehicleMotion};
 use crate::{ObjectId, Transform};
 
@@ -1292,6 +1294,9 @@ pub struct AnimationPlayer {
     sound: Option<u16>,
     /// The foot its animation put down in the last tick.
     foot: Option<Foot>,
+    /// Its unit's state machine set its frame in this tick (it plays on by
+    /// itself no further).
+    driven: bool,
 }
 
 /// What an object's animation did in a tick that is heard.
@@ -1392,6 +1397,7 @@ impl AnimationPlayer {
             then: None,
             sound: None,
             foot: None,
+            driven: false,
         }
     }
 
@@ -1445,6 +1451,23 @@ impl AnimationPlayer {
         });
     }
 
+    /// Poses `state`, the base animation and frame its unit's state machine
+    /// played on to in this tick, blending into it from the pose now over
+    /// `frames` frames when it is a new animation (`object_start_interpolation`).
+    pub fn drive(&mut self, state: AnimationState, frames: Option<u16>) {
+        if let Some(frames) = frames.filter(|frames| *frames > 0) {
+            let from = self.blended_pose();
+            self.blend = Some(Blend {
+                from,
+                frame: 0,
+                frames,
+            });
+        }
+        self.state = state;
+        self.then = None;
+        self.driven = true;
+    }
+
     /// Whether an animation played to its end goes back to another (an
     /// impulse is playing).
     pub fn resumes(&self) -> bool {
@@ -1470,7 +1493,12 @@ impl AnimationPlayer {
     fn step(&mut self, random: impl FnOnce() -> f32) {
         self.sound = self.sound_at_frame();
         self.foot = self.foot_at_frame();
-        let update = advance(&self.graph.animations, &mut self.state, random);
+        // (a unit's state machine advanced its own)
+        let update = if std::mem::take(&mut self.driven) {
+            Update::Running
+        } else {
+            advance(&self.graph.animations, &mut self.state, random)
+        };
         if let Some(blend) = &mut self.blend {
             blend.frame += 1;
             if blend.frame + 1 >= blend.frames {
@@ -1607,6 +1635,16 @@ pub struct NodeMatrices {
     pub current: Vec<NodeMatrix>,
 }
 
+/// What `play_animations` poses of an object: where it is, its player,
+/// its nodes, and a device's or a unit's pose.
+type PlayedObject = (
+    &'static Transform,
+    &'static mut AnimationPlayer,
+    &'static mut NodeMatrices,
+    Option<&'static DevicePose>,
+    Option<&'static UnitAnimator>,
+);
+
 /// Plays each object's animation on by a frame and poses its nodes, in the
 /// order of the objects' ids, so that the seed is drawn from in the same
 /// order on every machine.
@@ -1615,12 +1653,7 @@ pub(crate) fn play_animations(
     motions: Option<Res<VehicleMotions>>,
     table: Option<Res<ObjectTable>>,
     order: Query<(Entity, &ObjectId), With<AnimationPlayer>>,
-    mut players: Query<(
-        &Transform,
-        &mut AnimationPlayer,
-        &mut NodeMatrices,
-        Option<&DevicePose>,
-    )>,
+    mut players: Query<PlayedObject>,
 ) {
     let mut entities: Vec<(Entity, ObjectId)> =
         order.iter().map(|(entity, id)| (entity, *id)).collect();
@@ -1635,7 +1668,8 @@ pub(crate) fn play_animations(
         _ => Vec::new(),
     };
     for (entity, _) in entities {
-        let Ok((transform, mut player, mut matrices, device)) = players.get_mut(entity) else {
+        let Ok((transform, mut player, mut matrices, device, unit)) = players.get_mut(entity)
+        else {
             continue;
         };
         let player = &mut *player;
@@ -1657,7 +1691,20 @@ pub(crate) fn play_animations(
                     apply_device_overlays(&player.graph, pose, &mut nodes);
                     node_matrices(&player.links, &nodes, &root_matrix(transform))
                 }
-                None => player.matrices(transform),
+                None => match unit {
+                    // (a biped's action, flinch and aiming screens over its base)
+                    Some(unit) => {
+                        let mut nodes = player.blended_pose();
+                        let model_nodes = player
+                            .model
+                            .as_ref()
+                            .map_or(nodes.len(), |model| model.nodes.len());
+                        let layers = unit_layers(unit, transform);
+                        unit_pose(&player.graph, model_nodes, &layers, &mut nodes);
+                        node_matrices(&player.links, &nodes, &root_matrix(transform))
+                    }
+                    None => player.matrices(transform),
+                },
             },
         };
         matrices.previous = std::mem::replace(&mut matrices.current, current);

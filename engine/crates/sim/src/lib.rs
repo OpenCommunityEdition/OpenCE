@@ -37,6 +37,7 @@ pub mod projectile;
 pub mod ragdoll;
 pub mod random;
 pub mod seats;
+pub mod unit_animator;
 pub mod unit_states;
 pub mod units;
 pub mod vehicle;
@@ -270,6 +271,10 @@ impl Simulation {
                 player::move_projectiles,
                 seats::move_rides.before(animation::play_animations),
                 damage::recover_vitality,
+                unit_animator::animate_units
+                    .after(player::move_player)
+                    .after(seats::move_rides)
+                    .before(animation::play_animations),
                 animation::play_animations,
             )
                 .in_set(SimSet::Simulate),
@@ -385,6 +390,13 @@ impl Simulation {
         }
         let poses = self.players.iter().map(Player::pose).collect();
         self.world.insert_resource(PlayerPoses(poses));
+        let drives = self
+            .players
+            .iter()
+            .map(|player| player.unit_drive(&self.rides))
+            .collect();
+        self.world
+            .insert_resource(unit_animator::UnitDrives(drives));
         for ((player, input), pick_up) in self.players.iter_mut().zip(&inputs).zip(actions) {
             let arms = self.rides.arms(player.seated(), pick_up);
             let mut fired = player.step_weapons(input, &mut self.world, arms);
@@ -1094,6 +1106,13 @@ impl Simulation {
         self.world.insert_resource(camera);
         let poses = self.players.iter().map(Player::pose).collect();
         self.world.insert_resource(PlayerPoses(poses));
+        let drives = self
+            .players
+            .iter()
+            .map(|player| player.unit_drive(&self.rides))
+            .collect();
+        self.world
+            .insert_resource(unit_animator::UnitDrives(drives));
     }
 
     /// Runs every tick of a recording.
@@ -1199,6 +1218,8 @@ impl Simulation {
         };
         let transform = object.get::<Transform>().copied().unwrap_or_default();
         let current = player.matrices(&transform);
+        // (an animation set by hand plays as it is, without the state machine)
+        object.remove::<unit_animator::UnitAnimator>();
         object.insert((
             player,
             NodeMatrices {
@@ -1206,6 +1227,23 @@ impl Simulation {
                 current,
             },
         ));
+        true
+    }
+
+    /// Plays `player` on a biped as [`Simulation::animate`] does, and has
+    /// its state machine choose its base animation from then on (standing,
+    /// moving, in the air, landing); false if `handle` is not in the world.
+    pub fn animate_unit(&mut self, handle: ObjectHandle, player: AnimationPlayer) -> bool {
+        if !self.animate(handle, player) {
+            return false;
+        }
+        let entity = self
+            .world
+            .get_resource::<ObjectTable>()
+            .and_then(|table| table.entity(handle));
+        if let Some(mut object) = entity.and_then(|entity| self.world.get_entity_mut(entity).ok()) {
+            object.insert(unit_animator::UnitAnimator::default());
+        }
         true
     }
 

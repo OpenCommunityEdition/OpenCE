@@ -61,6 +61,8 @@ struct SeatPlace {
     /// The player's animation graph has the seat's label, so it can sit
     /// in it.
     fits: bool,
+    /// The seat's label: the rider's seat in its animation graph.
+    label: String,
     /// Where its camera follows from: its camera marker, or the vehicle's
     /// origin for a seat without one (`unit_get_camera_position`).
     camera: Vec3,
@@ -450,6 +452,7 @@ impl Rides {
                             marker: Vec3::from_array(matrix.position),
                             entrance: Vec3::from_array(matrix.transform_point(root)),
                             fits: !seat.label.is_empty() && unit_seat.is_some(),
+                            label: seat.label.clone(),
                             camera: Some(seat.camera_marker.as_str())
                                 .filter(|name| !name.is_empty())
                                 .and_then(marker)
@@ -514,6 +517,14 @@ impl Rides {
         let ride = self.ride(handle)?;
         let place = self.kinds.get(ride.kind)?.seats.get(seat)?;
         Some(at(&ride.pose, place.entrance))
+    }
+
+    /// The label of seat `seat` of `handle`: its rider's seat in the
+    /// rider's animation graph.
+    pub fn seat_label(&self, handle: ObjectHandle, seat: usize) -> Option<&str> {
+        let ride = self.ride(handle)?;
+        let place = self.kinds.get(ride.kind)?.seats.get(seat)?;
+        Some(place.label.as_str()).filter(|label| !label.is_empty())
     }
 
     /// Where the rider of seat `seat` of `handle` sits, in the world.

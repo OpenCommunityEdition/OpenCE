@@ -337,6 +337,9 @@ pub enum Mood {
 /// The base seats' labels (`base_seat_labels`).
 pub const BASE_SEATS: [&str; 6] = ["asleep", "alert", "stand", "crouch", "flee", "flaming"];
 
+/// A seat's animation of entering it (`_unit_seat_animation_seat_enter`).
+const SEAT_ENTER: usize = 7;
+
 /// The base seat `asleep`.
 pub const SEAT_ASLEEP: usize = 0;
 /// The base seat `alert`.
@@ -534,6 +537,39 @@ impl UnitAnimation {
             events.push(UnitEvent::Interpolate(frames));
         }
         self.state = Some(new_state);
+        true
+    }
+
+    /// Puts the unit in a vehicle's seat labelled `seat_label`
+    /// (`unit_enter_seat`): that seat with `weapon_label`'s class, or any
+    /// class, and its animation of entering the seat blended in, if its
+    /// graph has one. False, changing nothing, when the graph has no such
+    /// seat.
+    pub fn enter_seat(
+        &mut self,
+        graph: &AnimationGraph,
+        seat_label: &str,
+        weapon_label: Option<&str>,
+        random: &mut impl FnMut() -> f32,
+        events: &mut Vec<UnitEvent>,
+    ) -> bool {
+        let Some(found) = seat_and_weapon(graph, Some(seat_label), weapon_label)
+            .or_else(|| seat_and_weapon(graph, Some(seat_label), None))
+        else {
+            return false;
+        };
+        self.seat = Some(found);
+        self.base_seat = None;
+        self.state = None;
+        let animation = slot_animation(graph, self.seat.as_ref(), StateAnimation::Seat(SEAT_ENTER));
+        if let Some(animation) = choose_permutation(&graph.animations, animation, random()) {
+            events.push(UnitEvent::Interpolate(6));
+            self.base = Some(AnimationState {
+                animation,
+                frame: 0,
+            });
+            self.state = Some(S::EnteringSeat);
+        }
         true
     }
 

@@ -40,7 +40,7 @@ pub const WEAPON_TYPE: [ListEntry; 10] = [
     entry("fire-2", O),
     entry("charged-1", O),
     entry("charged-2", O),
-    entry("melee", O),
+    entry("melee", R),
     entry("overheat", O),
 ];
 

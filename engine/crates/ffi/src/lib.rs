@@ -792,7 +792,12 @@ impl Wardrobe {
                     .or_insert_with(|| Arc::new(level.models[model].clone()))
                     .clone()
             });
-            simulation.animate(handle, AnimationPlayer::new(graph, model, animation));
+            let player = AnimationPlayer::new(graph, model, animation);
+            if object.kind == ObjectKind::Biped {
+                simulation.animate_unit(handle, player);
+            } else {
+                simulation.animate(handle, player);
+            }
         }
     }
 }

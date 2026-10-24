@@ -12,7 +12,7 @@ use bevy_ecs::prelude::*;
 use glam::{Quat, Vec2, Vec3};
 use opence_content::{Biped, Level, ObjectKind, TagRef, Weapon};
 use opence_physics::{
-    Hit, Layers, LevelMesh, MovementInput, Mover, MoverSettings, PhysicsError, Struck,
+    Hit, Landing, Layers, LevelMesh, MovementInput, Mover, MoverSettings, PhysicsError, Struck,
     World as PhysicsWorld, WorldSettings,
 };
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -28,6 +28,7 @@ use crate::item_physics;
 use crate::objects::{self, Object, ObjectHandle, ObjectSpawn};
 use crate::projectile::{self, Contact, Detonation, Flew, Flight, Impact};
 use crate::random::RandomSeed;
+use crate::unit_animator::UnitDrive;
 use crate::units::Radians;
 use crate::weapon::{secondary, WeaponControls, WeaponState};
 use crate::{FreeCamera, Transform};
@@ -635,6 +636,38 @@ impl Player {
                 .seat_body
                 .unwrap_or_else(|| body_transform(self.mover.position, self.yaw)),
             camera: self.camera(),
+        }
+    }
+
+    /// How it drives its biped's animation this tick: its throttle, the
+    /// air, its landing, the weapon in its hands, the seat of `rides` it
+    /// sits in and where it aims.
+    pub(crate) fn unit_drive(&self, rides: &crate::seats::Rides) -> UnitDrive {
+        let weapon_label = match self.inventory.current() {
+            Some(carried) => self
+                .armory
+                .get(carried.armory)
+                .map(|weapon| weapon.weapon.label.clone()),
+            None => Some(String::from("unarmed")),
+        };
+        UnitDrive {
+            handle: self.handle,
+            throttle: [self.throttle.x, self.throttle.y, 0.0],
+            airborne: self.mover.airborne,
+            landing: self.mover.landing.map(|landing| match landing {
+                Landing::Soft => 0,
+                Landing::Hard => 1,
+            }),
+            weapon_label,
+            attached: self.seat.is_some(),
+            seat_label: self.seat.and_then(|seated| {
+                rides
+                    .seat_label(seated.vehicle, seated.seat)
+                    .map(String::from)
+            }),
+            // (halfway down: the crouching seat)
+            crouching: self.mover.crouch >= 0.5,
+            aiming_vector: (look_rotation(self.yaw, self.pitch) * Vec3::X).to_array(),
         }
     }
 

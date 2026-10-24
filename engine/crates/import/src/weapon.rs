@@ -74,6 +74,9 @@ fn import_item(tag: &Element<'_>) -> Result<Item, ImportError> {
     })
 }
 
+/// The longest weapon label (a `char[32]`).
+const LABEL_LONGEST: usize = 31;
+
 /// A weapon's item part and its own.
 pub(crate) fn import_weapon(cache: &Cache, index: usize) -> Result<Weapon, ImportError> {
     let tag = cache.tag(index, WEAP, WEAPON_SIZE)?;
@@ -94,6 +97,7 @@ pub(crate) fn import_weapon(cache: &Cache, index: usize) -> Result<Weapon, Impor
     Ok(Weapon {
         item: import_item(&tag)?,
         flags: tag.u32(at(0x0), "weapon flags")?,
+        label: tag.text(at(0x4), "label", LABEL_LONGEST)?.to_owned(),
         secondary_trigger_mode: tag.i16(at(0x24), "secondary trigger mode")?,
         maximum_alternate_shots_loaded: tag.i16(at(0x26), "maximum alternate shots loaded")?,
         ready_time: f(0x30, "ready time")?,
@@ -370,6 +374,7 @@ mod tests {
         for offset in [0x8C, 0x9C, 0x154, 0x164, 0x178] {
             empty(&mut weapon, ITEM_END + offset);
         }
+        put(&mut weapon, ITEM_END + 0x4, b"rifle");
         f32s(&mut weapon, ITEM_END + 0x30, &[1.25]);
         block(&mut weapon, ITEM_END + 0x1E8, 1, magazines);
         block(&mut weapon, ITEM_END + 0x1F4, 1, triggers);
@@ -382,6 +387,7 @@ mod tests {
         let (cache, weapon, _) = weapon_cache(0)?;
         let weapon = import_weapon(&cache, weapon)?;
         assert_eq!(weapon.ready_time, 1.25);
+        assert_eq!(weapon.label, "rifle");
         let [magazine] = weapon.magazines.as_slice() else {
             panic!("{} magazines", weapon.magazines.len());
         };

@@ -45,6 +45,9 @@ pub struct Weapon {
     pub item: Item,
     /// Its flags ([`Weapon::MUST_BE_READIED`] and the rest).
     pub flags: u32,
+    /// The weapon type its holder's animation graph plays it by (`pistol`,
+    /// `rifle`; empty for the graph's first).
+    pub label: String,
     /// What its secondary trigger does: 0 normal, 1 slaved to the primary,
     /// 2 inhibits the primary, 3 loads alternate ammunition, 4 loads
     /// multiple primary ammunition.
