@@ -141,8 +141,10 @@ enum
 	reliably, when it is ready and when they change */
 	_distributed_message_shield_effects = 91,
 	/* the host's mutators (network_mutators.c): each effect's and
-	parameter's key and value, to each client, reliably, when it is ready */
-	_distributed_message_mutators = 92,
+	parameter's key and value, to each client, reliably, when it is ready.
+	A number of its own, as actor_states', clear of the kinds upstream and
+	its forks add after it */
+	_distributed_message_mutators = 112,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };

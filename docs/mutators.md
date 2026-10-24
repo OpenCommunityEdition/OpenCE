@@ -95,8 +95,8 @@ it.
   the map loads. Changes take effect in the next game.
 - A client plays the host's mutators, never its own. As each client is ready
   for the host's game, before the host's objects, the host sends it each
-  effect's and parameter's key and value (distributed message 92, network
-  version 37).
+  effect's and parameter's key and value (distributed message 112, network
+  version 39).
 - A client takes them only from the host, reliably, and only whole: a count
   that the size does not match, a key that is not a key's text, or a value
   outside the range of a key that it has leaves the message unplayed.

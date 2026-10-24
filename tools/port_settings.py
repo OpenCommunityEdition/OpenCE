@@ -659,7 +659,8 @@ AIM_ASSIST_HELP = [
 ]
 # the host's shield effects, for every player of a network game
 # (network_shield_effects.c): their words, then their helps
-SHIELD_EFFECTS = ['STOCK', 'GLOW', 'LIGHT SHOW', 'OVERSHIELD', 'GLOW+OVERSHIELD', 'SHOW+OVERSHIELD']
+SHIELD_EFFECTS = ['STOCK', 'GLOW', 'LIGHT SHOW', 'OVERSHIELD', 'GLOW+OVERSHIELD', 'SHOW+OVERSHIELD',
+                  "PLAYERS' OWN"]
 SHIELD_EFFECTS_HELP = [
     "Everyone sees the stock game's shields and\\novershield, whatever their own settings.",
     "Everyone's shields light their surroundings as\\nthey flare.",
@@ -667,6 +668,7 @@ SHIELD_EFFECTS_HELP = [
     "For everyone, the overshield rises up the body\\nand stays lit, in its own color.",
     "For everyone, shields light their surroundings,\\nand the overshield rises and stays lit.",
     "For everyone, Light Show's shield glow, and the\\novershield rising and staying lit.",
+    "Not synced: each player sees the shield effects\\nof their own Video Setup settings.",
 ]
 
 # OpenCE's gametypes' options (port/linux/game/game_modes.c), a screen of the

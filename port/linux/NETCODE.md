@@ -262,8 +262,16 @@ before taking it. Then version 36 sends the host's shield effects (distributed
 message 91, `network_shield_effects.c`: the shield glow, its Light Show reach
 and the overshield effect, Server Setup's SHIELD EFFECTS), which every client
 draws in place of its player's own, so that a build that would draw its own
-cannot join. Then version 37 sends the host's mutators (distributed
-message 92, `network_mutators.c`, `docs/mutators.md`) to each client as it
+cannot join. Then version 37 sends with a game's LAN advertisement (the fourth
+of its reserved bytes) and internet listing (the first byte of its stamp) the
+game's kind: an OpenCE gametype's mode and Hardcore
+(`port/linux/game/game_modes.h`'s `game_modes_kind`), which the server
+browser names in its gametype column ("SWAT", "HC CTF"); a browser takes a
+mode for a Slayer game only, and one it does not know as none. Then version 38
+lets the host's shield effects be `players` (SHIELD EFFECTS' PLAYERS' OWN), a
+value of distributed message 91 that tells each client to draw its own
+settings', not synced. Then version 39 sends the host's mutators (distributed
+message 112, `network_mutators.c`, `docs/mutators.md`) to each client as it
 is ready, which the client plays instead of its own.
 
 `port/linux/network_format.txt` records the wire format of the current
