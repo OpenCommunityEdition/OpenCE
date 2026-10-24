@@ -147,3 +147,64 @@ fn the_hud_reads_the_player() -> Result<(), Box<dyn Error>> {
     assert!(hud.blips.is_empty());
     Ok(())
 }
+
+/// Whether `state` plays within `ticks` of pressing `buttons` once.
+fn plays(
+    simulation: &mut Simulation,
+    buttons: Buttons,
+    state: FirstPersonState,
+    ticks: usize,
+) -> bool {
+    let mut played = false;
+    simulation.step(held(buttons));
+    for _ in 0..ticks {
+        played |= simulation.first_person().state() == Some(state);
+        simulation.step(TickInput::default());
+    }
+    played
+}
+
+#[test]
+fn melee_throw_and_switch_play_their_animations() -> Result<(), Box<dyn Error>> {
+    let Some(level) = bloodgulch()? else {
+        return Ok(());
+    };
+    let mut simulation = settled(&level)?;
+    assert!(plays(
+        &mut simulation,
+        Buttons::MELEE,
+        FirstPersonState::Melee,
+        60
+    ));
+    for _ in 0..240 {
+        simulation.step(TickInput::default());
+    }
+    // (the generic starting equipment carries none)
+    assert!(simulation.give_grenades(0, 2));
+    simulation.step(TickInput::default());
+    assert!(plays(
+        &mut simulation,
+        Buttons::GRENADE,
+        FirstPersonState::ThrowGrenade,
+        60
+    ));
+    for _ in 0..240 {
+        simulation.step(TickInput::default());
+    }
+    // (a switch readies the pistol: the source puts the rifle away and
+    // readies the pistol in one call, unit_ready_desired_weapon, so only
+    // the ready plays)
+    let rifle = simulation.first_person().models()[1].model;
+    assert!(plays(
+        &mut simulation,
+        Buttons::SWAP,
+        FirstPersonState::Ready,
+        60
+    ));
+    assert_ne!(simulation.first_person().models()[1].model, rifle);
+    for _ in 0..600 {
+        simulation.step(TickInput::default());
+    }
+    assert!(held_still(&simulation));
+    Ok(())
+}

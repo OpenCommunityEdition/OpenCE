@@ -44,6 +44,8 @@ pub struct Holder {
     pub airborne: bool,
     /// Where it looks: yaw and pitch, in radians.
     pub look: [f32; 2],
+    /// Whether it began a melee this tick.
+    pub melee: bool,
 }
 
 /// A model the first-person view draws, and which of the graph's nodes
@@ -396,6 +398,9 @@ impl FirstPersonWeapon {
                 self.message(&rig, weapon, message);
             } else if rounds < self.rounds {
                 self.message(&rig, weapon, FirstPersonMessage::PrimaryFire);
+            }
+            if holder.melee {
+                self.message(&rig, weapon, FirstPersonMessage::Melee);
             }
             if grenades < self.grenades {
                 self.message(&rig, weapon, FirstPersonMessage::ThrowGrenade);

@@ -1034,6 +1034,7 @@ impl Simulation {
             throttle: [throttle.x, throttle.y],
             airborne: player.mover().airborne,
             look: [yaw.0, pitch.0],
+            melee: player.began_melee(),
         };
         self.first_person
             .update(tick, player.weapon(), grenades, &holder, &camera);

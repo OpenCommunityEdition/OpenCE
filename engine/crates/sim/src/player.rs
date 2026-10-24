@@ -434,6 +434,11 @@ impl Player {
         &self.unit
     }
 
+    /// Whether it began a melee this tick.
+    pub fn began_melee(&self) -> bool {
+        self.melee_ticks == MELEE_RECOVERY_TICKS
+    }
+
     /// Its movement: where its feet are, its velocity, its ground.
     pub fn mover(&self) -> &Mover {
         &self.mover
