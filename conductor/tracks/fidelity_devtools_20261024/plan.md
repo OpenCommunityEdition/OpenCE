@@ -37,9 +37,9 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Lighting controls bbeeda1
     - [x] Write tests: each slider moves the frame in the expected direction; reset restores the default
     - [x] Exposure, sun, bounce, probes, AO, emissive, bloom, tone curve
-- [ ] Task: Object inspector, live timings and the audio view
-    - [ ] Write tests: a mouse pick returns the object under the cursor; the inspector lists tag, shader, animation, physics, light and sounds; the audio view counts voices by category
-    - [ ] GPU picking ID buffer; SwiftUI panel overlays
+- [x] Task: Object inspector, live timings and the audio view 2ae1595
+    - [x] Write tests: a mouse pick returns the object under the cursor; the inspector lists tag, shader, animation, physics, light and sounds; the audio view counts voices by category
+    - [x] GPU picking ID buffer; SwiftUI panel overlays
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Developer tools in game' (Protocol in workflow.md)
 
 ## Phase 4: Lighting and shaders
