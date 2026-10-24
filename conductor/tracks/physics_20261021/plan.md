@@ -1,6 +1,6 @@
 # Plan: Complete physics
 
-## Phase 1: Objects as bodies
+## Phase 1: Objects as bodies [checkpoint: e0a7fc61]
 - [x] Task: The mass-point model for objects f9b867a9
     - [x] Write tests: mass points, density, inertia, buoyancy and drag from `phys`; a crate falling and resting against a reference trace (marked, needs `assets/maps`)
     - [x] Bodies for objects in `opence_physics` and `sim`
