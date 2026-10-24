@@ -13,7 +13,7 @@
 - [x] Task: Events 1eb03eda
     - [ ] Write tests: footsteps, impacts, weapons, vehicles and animation events start their sounds
     - [ ] Sounds from the simulation's events in the snapshot
-- [ ] Task: Looping sounds, environments and occlusion
+- [x] Task: Looping sounds, environments and occlusion a34916da
     - [ ] Write tests: `lsnd` parts and alternates; reverb by cluster; occlusion by the BSP; Doppler
     - [ ] Looping sounds, sound environments, occlusion
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: The world's sounds' (Protocol in workflow.md) (deferred to the end)
