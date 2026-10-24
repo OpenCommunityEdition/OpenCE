@@ -9,7 +9,7 @@
     - [x] Collision with the BSP and other objects' collision models
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Objects as bodies' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 2: Forces and grenades
+## Phase 2: Forces and grenades [checkpoint: 6d8b8a8a]
 - [x] Task: Forces 0928583d
     - [x] Write tests: explosion force by distance; impacts; vehicles and players pushing objects; bipeds thrown before ragdolls
     - [x] Forces from damage, impacts and contacts
