@@ -347,10 +347,12 @@ float3 self_illumination(float4 map, constant Material &material) {
 
 // the bake's irradiance as the stock lightmaps hold their light: over pi
 // (the light a white surface sends back, linear), as a display value by
-// the sRGB curve carried on past 1 (opence_bake::mood::shown)
+// the sRGB curve (opence_bake::mood::shown), each channel at most white,
+// as an 8-bit lightmap holds it and as the bake's exposure was fitted
+// (opence_bake::mood::fitted_exposure)
 float3 baked_shown(float3 irradiance) {
     float3 linear = max(irradiance, 0) / M_PI_F;
-    return select(1.055 * pow(linear, 1.0 / 2.4) - 0.055, linear * 12.92, linear <= 0.0031308);
+    return min(select(1.055 * pow(linear, 1.0 / 2.4) - 0.055, linear * 12.92, linear <= 0.0031308), 1.0);
 }
 
 // the baked probes' ambient cube at `world` for a surface facing
