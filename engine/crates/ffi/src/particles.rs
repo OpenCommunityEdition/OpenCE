@@ -851,12 +851,18 @@ impl LevelParticles {
                 let target = ((f32::from(*total) * emitted_share(emitter.distribution, fraction))
                     as u16)
                     .min(*total);
+                let limit = match self.limit {
+                    0 => MAX_LIVE,
+                    limit => limit.min(MAX_PARTICLES),
+                };
+                // (the oldest make way for the whole batch at once, not one
+                // shift of every particle for each made)
+                let over = (self.live.len() + usize::from(target.saturating_sub(*done)))
+                    .saturating_sub(limit)
+                    .min(self.live.len());
+                self.live.drain(..over);
                 while *done < target {
                     *done += 1;
-                    let limit = match self.limit {
-                        0 => MAX_LIVE,
-                        limit => limit.min(MAX_PARTICLES),
-                    };
                     if self.live.len() >= limit {
                         let over = self.live.len() + 1 - limit;
                         self.live.drain(..over);

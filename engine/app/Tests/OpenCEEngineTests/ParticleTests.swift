@@ -150,7 +150,9 @@ final class ParticleTests: XCTestCase {
         // (dark probes: a tenth of the light; the frame's lights add theirs)
         XCTAssertEqual(try draw([lit], probes: 0).centre, 0.35, accuracy: 0.01)
         lit.modes.3 = 0xFF00_0080
-        XCTAssertEqual(try draw([lit], probes: 0).centre, 0.25 + 0.1 + 128.0 / 255, accuracy: 0.01)
+        // (linear, shown as the probes' light is)
+        let shown = Float(1.055 * pow(128.0 / 255, 1 / 2.4) - 0.055)
+        XCTAssertEqual(try draw([lit], probes: 0).centre, 0.25 + 0.1 + shown, accuracy: 0.01)
         // (bright probes: no more than white)
         XCTAssertEqual(try draw([lit], probes: 0xFFFF_FFFF).centre, 1.25, accuracy: 0.01)
     }

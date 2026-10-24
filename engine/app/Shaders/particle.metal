@@ -72,7 +72,8 @@ float3 particle_light(constant ParticleFrame &frame, float3 world, float3 normal
         float facing = 0.5 + 0.5 * dot(normal, frame.sun_towards.xyz);
         irradiance += frame.sun_color.rgb * facing * saturate(cube.w);
     }
-    return min(particle_shown(irradiance) + frame_lights + 0.1, float3(1));
+    // (the frame's lights are linear: shown as the probes' light is)
+    return min(particle_shown(irradiance + frame_lights * M_PI_F) + 0.1, float3(1));
 }
 
 constant float2 corners[6] = {
