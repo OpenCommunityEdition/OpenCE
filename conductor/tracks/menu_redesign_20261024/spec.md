@@ -90,6 +90,9 @@ built only once the user approves it.
       their import status, and Import;
     - profiles;
     - multiplayer settings: player name, colour, port, server list;
+    - the lobby: a list of the players, one row each with dividers, giving
+      each one's team, whether they have the map (or how much of it has
+      arrived) and their ping, so that it stays readable with 16 players;
     - the version, what changed, and whether an update is out;
     - data folders, display and window mode.
 

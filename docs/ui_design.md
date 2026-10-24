@@ -307,7 +307,7 @@ In version 31 the user replaced the logo with a 1024×256 picture whose
 art fills its left 640 px; the boards crop to that art (2340×936 on the
 main menu, its middle still at y 675, and 560×224 on the launcher).
 
-### Round 5 (2026-10-24, artifact versions 32 to 35)
+### Round 5 (2026-10-24, artifact versions 32 to 38)
 
 | Board | Comment | Change |
 | --- | --- | --- |
@@ -315,3 +315,5 @@ main menu, its middle still at y 675, and 560×224 on the launcher).
 | Launcher | Play seems to do the same thing twice: here, then again on the main menu to continue the latest save | Version 33: the Ready panel no longer names a campaign or save. Play only starts the game at the main menu, where Campaign picks up the latest save; a line under Play says so |
 | Launcher | Remove the note under Play and say Launch; the Maps row: remove? | Version 34: the button reads LAUNCH, the note under it is gone, and so is the Maps row (the map library already counts the maps). The Ready panel holds only the profile and Launch |
 | Launcher | Give a summary of the profile and save here, more a summary dashboard | Version 35: the Ready panel becomes two summaries side by side over a full-width Launch. Profile: the name with its colour, missions finished, the hardest difficulty finished, time played. Latest save: the mission, its level, difficulty and when it was saved. They only report; Launch still starts the game at the main menu, where Campaign continues the save |
+| Launcher | Version 36: the profile's colour square was cut off | The square's ring was clipped by the row's overflow; only the name now clips, with an ellipsis |
+| Lobby | Make it a list view with dividers showing each player's map status, like a modern server browser; cards get crowded as players join | Versions 37 and 38: the four cards become a table under a header row (Player, Team, Map, Ping), one 40 px row per player with a divider between, scrolling to 16 with open slots listed. Team is a coloured chip; Map reads Has map, a download bar with its percentage, or Missing and asked. The host's row is marked by a lit dot |
