@@ -129,6 +129,8 @@ pub struct Rides {
     materials: Vec<MaterialPhysics>,
     // (each player last seen seated: the vehicle and the tick)
     left: Vec<(ObjectHandle, ObjectHandle, u64)>,
+    // (the globals' minimum_vehicle_flipping_angle)
+    flipping_angle: f32,
 }
 
 /// A player a vehicle ran into hard enough to hurt.
@@ -139,6 +141,10 @@ pub(crate) struct Strike {
     /// Who is to blame: the vehicle's driver, else the vehicle.
     pub owner: ObjectHandle,
 }
+
+/// A player enters a vehicle only while both are stiller than the root of
+/// this, in world units (and radians) a game tick.
+const ENTRY_STILLNESS: f32 = 0.01;
 
 /// The game ticks a vehicle does not hurt the player who left it.
 const LEFT_GRACE: u64 = 90;
@@ -471,6 +477,7 @@ impl Rides {
             kinds,
             rides: Vec::new(),
             centre: Vec3::from_array(centre),
+            flipping_angle: level.globals.player.minimum_vehicle_flipping_angle,
             ..Rides::default()
         }
     }
@@ -614,14 +621,38 @@ impl Rides {
         let Some((index, seat)) = self.nearby_seat(world, centre, taken) else {
             return false;
         };
-        let ride = &self.rides[index];
-        let Some(place) = self
-            .kinds
-            .get(ride.kind)
-            .and_then(|kind| kind.seats.get(seat))
-        else {
+        let flipping_angle = self.flipping_angle;
+        let Some(ride) = self.rides.get_mut(index) else {
             return false;
         };
+        let Some(kind) = self.kinds.get(ride.kind) else {
+            return false;
+        };
+        let Some(place) = kind.seats.get(seat) else {
+            return false;
+        };
+        if !ride.state.enterable(flipping_angle) {
+            // (one lying over is turned back over, unless someone drives
+            // it)
+            let driven = taken.iter().any(|seated| {
+                seated.vehicle == ride.handle && seated.flags & VehicleSeat::DRIVER != 0
+            });
+            return !driven
+                && ride
+                    .state
+                    .start_upending(&kind.physics, player.mover().position);
+        }
+        // (and one is entered only by a player standing still, while it
+        // is still; the game's measures the player's fall too, but the
+        // mover leaves the ground walking down a slope, so only its speed
+        // across the ground counts here)
+        let speed =
+            player.mover().velocity.truncate().extend(0.0) / vehicle::GAME_TICKS_PER_SECOND as f32;
+        if speed.length_squared() >= ENTRY_STILLNESS
+            || ride.state.angular_velocity.length_squared() >= ENTRY_STILLNESS
+        {
+            return false;
+        }
         player.sit(
             Seated {
                 vehicle: ride.handle,
@@ -745,7 +776,7 @@ impl Rides {
                         ..VehicleControls::default()
                     },
                 };
-                if ridden || !ride.state.at_rest {
+                if ridden || !ride.state.at_rest || ride.state.upending.is_some() {
                     stepped[index] = true;
                     let level = VehicleLevel {
                         world: physics,

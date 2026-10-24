@@ -22,6 +22,8 @@ const MULTIPLAYER_INFORMATION_OFFSET: usize = 0x164;
 const MULTIPLAYER_INFORMATION_SIZE: usize = 0xA0;
 const PLAYER_INFORMATION_OFFSET: usize = 0x170;
 const PLAYER_INFORMATION_SIZE: usize = 0xF4;
+const PLAYER_CONTROL_OFFSET: usize = 0x110;
+const PLAYER_CONTROL_SIZE: usize = 0x80;
 const DIFFICULTY_OFFSET: usize = 0x11C;
 // (36 values at the 4 levels, then padding)
 const DIFFICULTY_SIZE: usize = 0x294;
@@ -96,7 +98,19 @@ pub fn import_globals(cache: &Cache) -> Result<Globals, ImportError> {
             first_person_idle_lower: f(0x9C, "first person idle time lower bound")?,
             first_person_idle_upper: f(0xA0, "first person idle time upper bound")?,
             first_person_idle_skip_fraction: f(0xA4, "first person idle skip fraction")?,
+            ..PlayerPhysics::default()
         };
+    }
+
+    let control = globals.block(
+        PLAYER_CONTROL_OFFSET,
+        "player control",
+        PLAYER_CONTROL_SIZE,
+        1,
+    )?;
+    if let Some(control) = control.get(0) {
+        imported.player.minimum_vehicle_flipping_angle =
+            control.f32(0x70, "minimum vehicle flipping angle")?;
     }
 
     let multiplayer = globals.block(

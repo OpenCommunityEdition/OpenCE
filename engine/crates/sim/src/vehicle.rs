@@ -49,6 +49,64 @@ const PENETRATION_PASSES: usize = 4;
 /// The game's epsilon (real_math.h's).
 const EPSILON: f32 = 0.0001;
 
+/// The game ticks a vehicle is turned back over for, at most.
+const UPENDING_TICKS: u8 = 30;
+
+/// A vehicle whose up axis stands this high is back over.
+const UPENDED: f32 = 0.9;
+
+/// The spin, a game tick, a vehicle is turned back over with, before its
+/// tag's limits scale it.
+const UPENDING_TORQUE: f32 = 0.3;
+
+/// A vehicle whose up axis stands lower than this is flipped
+/// (`vehicle_is_flipped`).
+const FLIPPED: f32 = 0.2;
+
+/// Where a player turning a vehicle back over stands, from it: the side
+/// they push it over from, or the end it stands on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Approach {
+    /// From its right, as its forward axis lies (the game's 1).
+    Right,
+    /// From its left (2).
+    Left,
+    /// It stands on its tail (3).
+    NoseUp,
+    /// It stands on its nose (4).
+    NoseDown,
+}
+
+impl Approach {
+    /// Where a player at `player` stands to a vehicle at `vehicle` facing
+    /// `forward`.
+    pub fn of(player: Vec3, vehicle: Vec3, forward: Vec3) -> Approach {
+        if libm::fabsf(forward.z) > core::f32::consts::FRAC_1_SQRT_2 {
+            return if forward.z < 0.0 {
+                Approach::NoseDown
+            } else {
+                Approach::NoseUp
+            };
+        }
+        let across = Vec3::Z.cross(vehicle - player);
+        if across.dot(forward) > 0.0 {
+            Approach::Left
+        } else {
+            Approach::Right
+        }
+    }
+}
+
+/// A vehicle being turned back over: who pushed it from where, and for
+/// how many game ticks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Upending {
+    /// Where they pushed it from.
+    pub approach: Approach,
+    /// The game ticks it has been turned for.
+    pub ticks: u8,
+}
+
 /// A vehicle's state between game ticks (its object's and its
 /// _vehicle_datum's).
 #[derive(Clone, Debug, PartialEq)]
@@ -100,6 +158,8 @@ pub struct VehicleState {
     pub collision_force: Vec3,
     /// Their turn, about its centre of mass, for its next step.
     pub collision_torque: Vec3,
+    /// Whether a player is turning it back over.
+    pub upending: Option<Upending>,
 }
 
 impl VehicleState {
@@ -131,6 +191,7 @@ impl VehicleState {
             points: vec![0; physics.mass_points.len()],
             collision_force: Vec3::ZERO,
             collision_torque: Vec3::ZERO,
+            upending: None,
         }
     }
 
@@ -148,6 +209,69 @@ impl VehicleState {
     pub fn rotation(&self) -> Quat {
         rotation_of(frame(self.forward, self.up))
     }
+
+    /// Whether it lies over (`vehicle_is_flipped`).
+    pub fn is_flipped(&self) -> bool {
+        self.up.z < FLIPPED
+    }
+
+    /// Whether it stands high enough to be entered: its up axis is above
+    /// level by more than the globals' `minimum_vehicle_flipping_angle`
+    /// from upright (else a player turns it back over).
+    pub fn enterable(&self, minimum_flipping_angle: f32) -> bool {
+        let flipping_angle = core::f32::consts::FRAC_PI_2 - minimum_flipping_angle;
+        self.up.z > libm::cosf(flipping_angle)
+    }
+
+    /// Starts turning it back over, pushed by a player at `player`; false
+    /// if it is being turned already.
+    pub fn start_upending(&mut self, physics: &Physics, player: Vec3) -> bool {
+        if self.upending.is_some() {
+            return false;
+        }
+        self.upending = Some(Upending {
+            approach: Approach::of(player, self.origin(physics), self.forward),
+            ticks: 0,
+        });
+        self.wake();
+        true
+    }
+}
+
+/// A game tick of turning a vehicle back over (the unit's upending): it
+/// spins about its long axis, pushed from a side, or about its cross axis,
+/// stood on an end, until it is up, or for at most a second. `limits` are
+/// its tag's slowest and fastest flipping spins.
+fn upend(state: &mut VehicleState, kind: VehicleKind, limits: [f32; 2]) {
+    let Some(mut upending) = state.upending else {
+        return;
+    };
+    if upending.ticks >= UPENDING_TICKS || state.up.z > UPENDED {
+        state.upending = None;
+        return;
+    }
+    let (forward, up) = (state.forward, state.up);
+    let torque = match upending.approach {
+        Approach::Left | Approach::NoseDown => UPENDING_TORQUE,
+        Approach::Right | Approach::NoseUp => -UPENDING_TORQUE,
+    };
+    let axis = match upending.approach {
+        Approach::NoseUp | Approach::NoseDown => forward.cross(up),
+        Approach::Right | Approach::Left => forward + forward.cross(up) * -forward.z,
+    };
+    // (the further over it lies, the harder it is turned, within the
+    // tag's limits; written so that limits the wrong way round do not
+    // panic)
+    let roll = (-2.0 * up.z).max(limits[0]).min(limits[1]);
+    state.wake();
+    state.angular_velocity = axis * (torque * roll);
+    match kind {
+        VehicleKind::AlienFighter => state.velocity.z = state.velocity.z.min(-0.01),
+        VehicleKind::HumanTank => state.velocity = forward * forward.dot(state.velocity),
+        _ => {}
+    }
+    upending.ticks += 1;
+    state.upending = Some(upending);
 }
 
 /// What its driver and gunner do with a vehicle this tick.
@@ -432,6 +556,14 @@ pub fn game_tick(
     if wakes {
         state.wake();
     }
+    upend(
+        state,
+        vehicle.kind,
+        [
+            vehicle.minimum_flipping_angular_velocity,
+            vehicle.maximum_flipping_angular_velocity,
+        ],
+    );
 
     if !state.at_rest {
         match vehicle.kind {
@@ -1349,6 +1481,80 @@ fn physics_update(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A body on its side or back, `up` up, facing `forward`.
+    fn lying(forward: Vec3, up: Vec3) -> VehicleState {
+        let mut state = VehicleState::placed(&floater(1, 1.0), Vec3::ZERO, forward, up);
+        state.at_rest = true;
+        state
+    }
+
+    #[test]
+    fn the_approach_is_the_side_pushed_from_or_the_end_stood_on() {
+        let forward = Vec3::X;
+        // (a player on its right, the world's -y as it faces +x)
+        assert_eq!(
+            Approach::of(Vec3::new(0.0, -2.0, 0.0), Vec3::ZERO, forward),
+            Approach::Right
+        );
+        assert_eq!(
+            Approach::of(Vec3::new(0.0, 2.0, 0.0), Vec3::ZERO, forward),
+            Approach::Left
+        );
+        let tail = Vec3::new(0.1, 0.0, 0.99).normalize();
+        assert_eq!(Approach::of(Vec3::X, Vec3::ZERO, tail), Approach::NoseUp);
+        assert_eq!(Approach::of(Vec3::X, Vec3::ZERO, -tail), Approach::NoseDown);
+    }
+
+    #[test]
+    fn a_vehicle_is_entered_above_the_flipping_angle_and_flipped_below_it() {
+        let upright = lying(Vec3::X, Vec3::Z);
+        assert!(upright.enterable(0.0) && !upright.is_flipped());
+        let side = lying(Vec3::X, Vec3::new(0.0, 0.8, 0.6).normalize());
+        // (at 45 degrees it must stand higher than sin 45)
+        assert!(side.enterable(0.5));
+        assert!(!side.enterable(core::f32::consts::FRAC_PI_4));
+        let back = lying(Vec3::X, -Vec3::Z);
+        assert!(!back.enterable(0.0) && back.is_flipped());
+    }
+
+    #[test]
+    fn upending_spins_it_over_for_a_second_at_most() {
+        let mut state = lying(Vec3::X, -Vec3::Z);
+        assert!(state.start_upending(&floater(1, 1.0), Vec3::new(0.0, -2.0, 0.0)));
+        assert!(!state.start_upending(&floater(1, 1.0), Vec3::ZERO));
+        assert!(!state.at_rest);
+        // (on its back it rolls at the fastest the tag allows, about its
+        // forward axis, the way the push from its right turns it)
+        upend(&mut state, VehicleKind::HumanJeep, [0.1, 0.4]);
+        assert!(state.angular_velocity.distance(Vec3::X * -0.3 * 0.4) < 1e-6);
+        // (limits the wrong way round give the fastest, without a panic)
+        upend(&mut state, VehicleKind::HumanJeep, [0.4, 0.1]);
+        assert!(state.angular_velocity.distance(Vec3::X * -0.3 * 0.1) < 1e-6);
+        for _ in 2..UPENDING_TICKS {
+            upend(&mut state, VehicleKind::HumanJeep, [0.1, 0.4]);
+        }
+        assert!(state.upending.is_some());
+        upend(&mut state, VehicleKind::HumanJeep, [0.1, 0.4]);
+        assert_eq!(state.upending, None);
+    }
+
+    #[test]
+    fn upending_stops_once_it_is_up_and_holds_a_tank_to_its_tracks() {
+        let mut state = lying(Vec3::X, -Vec3::Z);
+        state.velocity = Vec3::new(0.2, 0.3, 0.0);
+        assert!(state.start_upending(&floater(1, 1.0), Vec3::ZERO));
+        upend(&mut state, VehicleKind::HumanTank, [0.0, 1.0]);
+        assert!(state.velocity.distance(Vec3::new(0.2, 0.0, 0.0)) < 1e-6);
+        let mut fighter = lying(Vec3::X, -Vec3::Z);
+        fighter.velocity.z = 0.5;
+        assert!(fighter.start_upending(&floater(1, 1.0), Vec3::ZERO));
+        upend(&mut fighter, VehicleKind::AlienFighter, [0.0, 1.0]);
+        assert!((fighter.velocity.z + 0.01).abs() < 1e-6);
+        state.up = Vec3::Z;
+        upend(&mut state, VehicleKind::HumanTank, [0.0, 1.0]);
+        assert_eq!(state.upending, None);
+    }
 
     const WARTHOG: SpeedParameters = SpeedParameters {
         positive: 0.255,

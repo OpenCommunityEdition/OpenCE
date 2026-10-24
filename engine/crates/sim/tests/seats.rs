@@ -38,6 +38,11 @@ fn pressed(buttons: Buttons) -> TickInput {
 /// The player settled at the first start, and a Warthog settled on the
 /// ground 5 units in front of it.
 fn beside_a_warthog(level: &Level) -> Result<(Simulation, ObjectHandle)> {
+    warthog_rolled(level, 0.0)
+}
+
+/// The same, the Warthog dropped rolled `roll` radians about its length.
+fn warthog_rolled(level: &Level, roll: f32) -> Result<(Simulation, ObjectHandle)> {
     let mut simulation = Simulation::empty();
     simulation.spawn_player(level, 0)?;
     for _ in 0..90 {
@@ -59,8 +64,10 @@ fn beside_a_warthog(level: &Level) -> Result<(Simulation, ObjectHandle)> {
         kind: ObjectKind::Vehicle,
         tag,
         transform: Transform {
-            position: feet + turn * Vec3::new(5.0, 0.0, 0.6),
-            rotation: turn * Quat::from_rotation_z(std::f32::consts::FRAC_PI_2),
+            position: feet + turn * Vec3::new(5.0, 0.0, 0.6 + roll.abs()),
+            rotation: turn
+                * Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)
+                * Quat::from_rotation_x(roll),
             scale: 1.0,
         },
         name: None,
@@ -171,6 +178,59 @@ fn the_player_enters_and_leaves_each_seat_of_a_warthog() -> Result {
             simulation.step(TickInput::default());
         }
     }
+    Ok(())
+}
+
+#[test]
+fn a_flipped_warthog_is_turned_back_over_and_then_entered() -> Result {
+    let Some(level) = bloodgulch()? else {
+        return Ok(());
+    };
+    let flags = seat_flags(&level)?;
+    let driver = seat_with(&flags, VehicleSeat::DRIVER, 0)?;
+    // (the globals hold an angle above level, under a quarter turn)
+    let angle = level.globals.player.minimum_vehicle_flipping_angle;
+    assert!(
+        angle > 0.0 && angle < std::f32::consts::FRAC_PI_2,
+        "{angle}"
+    );
+    let (mut simulation, warthog) = warthog_rolled(&level, std::f32::consts::PI)?;
+    let state = |simulation: &Simulation| {
+        simulation
+            .rides()
+            .ride(warthog)
+            .map(|ride| ride.state.clone())
+            .ok_or("no warthog")
+    };
+    assert!(
+        state(&simulation)?.is_flipped(),
+        "{:?}",
+        state(&simulation)?.up
+    );
+    // (the action button, by the driver's door, turns it over rather than
+    // seating the player; the door, upside down, is against its hull)
+    let beside = |simulation: &Simulation| {
+        let entrance = simulation.rides().entrance(warthog, driver)?;
+        let centre = simulation.transform(warthog)?.position;
+        let out = (entrance - centre).truncate().normalize_or_zero();
+        Some(entrance + out.extend(0.0) * 0.6)
+    };
+    if !walk_to(&mut simulation, beside) {
+        return Err("never reached the driver's door".into());
+    }
+    simulation.step(TickInput::default());
+    simulation.step(pressed(Buttons::ACTION));
+    assert_eq!(seated(&simulation), None);
+    assert!(state(&simulation)?.upending.is_some());
+    for _ in 0..3 * clock::TICKS_PER_SECOND {
+        simulation.step(TickInput::default());
+    }
+    let up = state(&simulation)?.up;
+    assert!(up.z > 0.9, "it stands with {up} up");
+    assert_eq!(state(&simulation)?.upending, None);
+    // (and up, it is entered)
+    enter(&mut simulation, warthog, driver)?;
+    assert_eq!(seated(&simulation), Some(driver));
     Ok(())
 }
 

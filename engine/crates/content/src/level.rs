@@ -175,6 +175,9 @@ pub struct PlayerPhysics {
     pub first_person_idle_upper: f32,
     /// The part of those times it is not.
     pub first_person_idle_skip_fraction: f32,
+    /// How far, in radians above level, a vehicle must stand for the
+    /// player to enter it rather than turn it back over.
+    pub minimum_vehicle_flipping_angle: f32,
 }
 
 impl Default for PlayerPhysics {
@@ -200,6 +203,8 @@ impl Default for PlayerPhysics {
             first_person_idle_lower: 0.0,
             first_person_idle_upper: 0.0,
             first_person_idle_skip_fraction: 1.0,
+            // (any vehicle above level can be entered)
+            minimum_vehicle_flipping_angle: 0.0,
         }
     }
 }
