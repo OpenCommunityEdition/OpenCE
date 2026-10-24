@@ -5475,8 +5475,8 @@ static struct gametype_option const gametype_options[] =
 	{ "text_chat_spinner", _option_setting, 0, 0, 3, { 0 }, "network.text_chat", { "on", "links", "off" } },
 	{ "aim_assist_spinner", _option_setting, 0, 0, 2, { 0 }, "network.block_mouse_aim_assist", { "false", "true" } },
 	/* (the shield effects every machine draws: network_shield_effects.c) */
-	{ "shield_effects_spinner", _option_setting, 0, 0, 6, { 0 }, "network.shield_effects",
-		{ "stock", "glow", "light_show", "overshield", "glow_overshield", "light_show_overshield" } },
+	{ "shield_effects_spinner", _option_setting, 0, 0, 7, { 0 }, "network.shield_effects",
+		{ "stock", "glow", "light_show", "overshield", "glow_overshield", "light_show_overshield", "players" } },
 	/* co-op's options (Server Setup's CO-OP OPTIONS: tools/port_settings.py's
 	COOP_SETUP_SCREENS; coop_enemies.c) */
 	{ "coop_friendly_fire_spinner", _option_setting, 0, 0, 4, { 0 }, "network.coop_friendly_fire",
