@@ -25,7 +25,7 @@
 - [x] Task: Devices carrying objects 1e150faf
     - [x] Write tests: a lift carries a crate and a player; a door pushes a body
     - [x] Moving device collision
-- [~] Task: Determinism and the station
-    - [ ] Write tests: two simulations with the same inputs agree; `station physics` is stable; 500 bodies in under 2 ms
-    - [ ] The particle collision hook; `docs/engine.md`: physics
+- [x] Task: Determinism and the station 2fc9330d
+    - [x] Write tests: two simulations with the same inputs agree; `station physics` is stable; 500 bodies in under 2 ms
+    - [x] The particle collision hook; `docs/engine.md`: physics
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Vehicles and devices' (Protocol in workflow.md) (deferred to the end)
