@@ -18,7 +18,7 @@
     - [x] Grenade projectile physics
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Forces and grenades' (Protocol in workflow.md) (deferred to the end)
 
-## Phase 3: Vehicles and devices
+## Phase 3: Vehicles and devices [checkpoint: f7fe247f]
 - [x] Task: Vehicles 7affe693
     - [x] Write tests: each manoeuvre of the spec against the reference traces (by property: no reference traces exist)
     - [x] The fixes to the vehicle model; entering from where the player stands; flipping back over
