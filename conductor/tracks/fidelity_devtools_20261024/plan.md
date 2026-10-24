@@ -72,12 +72,12 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Conductor - User Manual Verification 'Phase 5: Picking up, vehicles and responsiveness' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 6: Animation
-- [~] Task: The animation stands
-    - [ ] Write tests: each stand plays every animation of its graph; none fails to resolve
-    - [ ] The fixes
-- [ ] Task: Vehicle and weapon animation
-    - [ ] Write tests: entering, driving, exiting and seat changes animate; first-person reload, melee, throw and switch play
-    - [ ] The fixes
+- [x] Task: The animation stands 741a726
+    - [x] Write tests: each stand plays every animation of its graph; none fails to resolve
+    - [x] The fixes
+- [x] Task: Vehicle and weapon animation 9a676e5
+    - [x] Write tests: entering, driving, exiting and seat changes animate; first-person reload, melee, throw and switch play
+    - [x] The fixes
 - [ ] Task: Conductor - User Manual Verification 'Phase 6: Animation' (Protocol in workflow.md)
 
 ## Phase 7: Sound
