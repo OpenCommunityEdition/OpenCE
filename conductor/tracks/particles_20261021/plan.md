@@ -11,14 +11,14 @@
 
 ## Phase 2: Systems, effects and contrails
 - [x] Task: Particle systems 36abd8c0
-    - [ ] Write tests: emitters, rates and their functions, states and transitions, attachment to markers
-    - [ ] `pctl` in full
+    - [x] Write tests: emitters, rates and their functions, states and transitions, attachment to markers
+    - [x] `pctl` in full
 - [x] Task: Effects' particle parts 36abd8c0
-    - [ ] Write tests: counts, cones, inherited velocity, scaled-by functions
-    - [ ] The effect parts in full
-- [~] Task: Contrails
-    - [ ] Write tests: point lifetimes, shapes, scroll, colours over life
-    - [ ] `cont` in full
+    - [x] Write tests: counts, cones, inherited velocity, scaled-by functions
+    - [x] The effect parts in full
+- [x] Task: Contrails a3649cde
+    - [x] Write tests: point lifetimes, shapes, scroll, colours over life
+    - [x] `cont` in full
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Systems, effects and contrails' (Protocol in workflow.md) (deferred to the end)
 
 ## Phase 3: Weather, lighting and limits
