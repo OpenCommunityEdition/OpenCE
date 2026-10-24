@@ -18,10 +18,10 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Bake and probes out of play 123545e
     - [x] Write tests: nothing is baked or probed after the level starts; a cached bake loads already lit; a missing cache bakes behind the loading screen
     - [x] Bake at import or on the loading screen; cache by map hash; no lighting swap mid-game
-- [~] Task: Thermals and idling
-    - [ ] Write tests: the frame cap holds; the app is idle when unfocused or minimised; frames in flight stay bounded
-    - [ ] Frame cap by default, idle when unfocused, CAMetalDisplayLink pacing
-- [ ] Task: GPU and CPU timings, and the hitch log
+- [x] Task: Thermals and idling 2af3aeb
+    - [x] Write tests: the frame cap holds; the app is idle when unfocused or minimised; frames in flight stay bounded
+    - [x] Frame cap by default, idle when unfocused, CAMetalDisplayLink pacing
+- [~] Task: GPU and CPU timings, and the hitch log
     - [ ] Write tests: every pass reports a GPU time; the CPU spans nest; a forced compile, upload or allocation is logged with its cause
     - [ ] Counter sample buffers, CPU spans, the hitch log, perf.log
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Stop the heat, see the cost' (Protocol in workflow.md)
