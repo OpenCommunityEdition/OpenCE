@@ -27,7 +27,7 @@ use crate::damage::Vitality;
 use crate::hash::WorldHasher;
 use crate::input::TickInput;
 use crate::objects::{Object, ObjectHandle, ObjectTable};
-use crate::player::{self, Arms, Player, Seated};
+use crate::player::{self, Arms, Player, SeatCamera, Seated};
 use crate::vehicle::{self, VehicleControls, VehicleLevel, VehicleState};
 use crate::vehicle_animation::{self, VehicleMotion, SUSPENSIONS};
 use crate::weapon::WeaponState;
@@ -61,6 +61,12 @@ struct SeatPlace {
     /// The player's animation graph has the seat's label, so it can sit
     /// in it.
     fits: bool,
+    /// Where its camera follows from: its camera marker, or the vehicle's
+    /// origin for a seat without one (`unit_get_camera_position`).
+    camera: Vec3,
+    /// Its camera track's control points, or the globals' for a seat
+    /// without one.
+    track: Arc<[[f32; 3]]>,
 }
 
 /// A kind of vehicle the level has.
@@ -434,11 +440,21 @@ impl Rides {
                             })
                             .and_then(root_of)
                             .map_or([0.0; 3], |root| root.translation);
+                        let track = if seat.camera_track.is_empty() {
+                            &level.globals.camera_track
+                        } else {
+                            &seat.camera_track
+                        };
                         SeatPlace {
                             flags: seat.flags,
                             marker: Vec3::from_array(matrix.position),
                             entrance: Vec3::from_array(matrix.transform_point(root)),
                             fits: !seat.label.is_empty() && unit_seat.is_some(),
+                            camera: Some(seat.camera_marker.as_str())
+                                .filter(|name| !name.is_empty())
+                                .and_then(marker)
+                                .map_or(Vec3::ZERO, |matrix| Vec3::from_array(matrix.position)),
+                            track: track.as_slice().into(),
                         }
                     })
                     .collect();
@@ -663,6 +679,7 @@ impl Rides {
                 position: at(&ride.pose, place.marker),
                 ..ride.pose
             },
+            seat_camera(&ride.pose, place),
         );
         true
     }
@@ -698,6 +715,7 @@ impl Rides {
                 position: at(&ride.pose, place.marker),
                 ..ride.pose
             },
+            seat_camera(&ride.pose, place),
         );
         true
     }
@@ -863,13 +881,20 @@ impl Rides {
                 Some(ride)
                     if !destroyed(world, ride.handle) && !destroyed(world, player.handle()) =>
                 {
-                    let position = self
-                        .seat(seated.vehicle, seated.seat)
-                        .unwrap_or(ride.pose.position);
-                    player.place_in_seat(Transform {
-                        position,
-                        ..ride.pose
-                    });
+                    let place = self
+                        .kinds
+                        .get(ride.kind)
+                        .and_then(|kind| kind.seats.get(seated.seat));
+                    let position =
+                        place.map_or(ride.pose.position, |place| at(&ride.pose, place.marker));
+                    let camera = place.and_then(|place| seat_camera(&ride.pose, place));
+                    player.place_in_seat(
+                        Transform {
+                            position,
+                            ..ride.pose
+                        },
+                        camera,
+                    );
                 }
                 _ => {
                     // (thrown out by its entrance, or where it sat)
@@ -978,6 +1003,16 @@ pub fn default_pose(model: &Model) -> Vec<NodeMatrix> {
     let mut orientations = vec![Orientation::REST; links.len()];
     model_orientations(model, &mut orientations);
     node_matrices(&links, &orientations, &NodeMatrix::IDENTITY)
+}
+
+/// The camera behind the vehicle at `pose` that the rider of `place`
+/// sees from, if the seat has one (`director_desired_perspective`'s
+/// third-person camera seat).
+fn seat_camera(pose: &Transform, place: &SeatPlace) -> Option<SeatCamera> {
+    (place.flags & VehicleSeat::THIRD_PERSON_CAMERA != 0).then(|| SeatCamera {
+        marker: at(pose, place.camera),
+        track: Arc::clone(&place.track),
+    })
 }
 
 /// The matrix of `model`'s marker `name` (its first instance), from its

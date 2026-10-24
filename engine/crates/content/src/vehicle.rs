@@ -148,6 +148,10 @@ pub struct VehicleSeat {
     pub camera_marker: String,
     /// The marker its camera is at under water.
     pub camera_submerged_marker: String,
+    /// Its camera track's control points (the first of its tracks), from
+    /// its camera marker in the rider's heading: forward, left, up. Empty
+    /// for the globals' camera track ([`crate::Globals::camera_track`]).
+    pub camera_track: Vec<[f32; 3]>,
     /// The pitch its camera levels to.
     pub pitch_auto_level: f32,
     /// Its camera's lowest pitch.

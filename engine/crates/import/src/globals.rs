@@ -28,6 +28,9 @@ const DIFFICULTY_OFFSET: usize = 0x11C;
 // (36 values at the 4 levels, then padding)
 const DIFFICULTY_SIZE: usize = 0x294;
 const DIFFICULTY_VALUES: usize = 36;
+const CAMERA_OFFSET: usize = 0x104;
+const CAMERA_SIZE: usize = 0x10;
+const MAX_CAMERAS: usize = 1;
 const GRENADES_OFFSET: usize = 0x128;
 const GRENADE_SIZE: usize = 0x44;
 const MAX_GRENADES: usize = 4;
@@ -165,6 +168,11 @@ pub fn import_globals(cache: &Cache) -> Result<Globals, ImportError> {
             }
             imported.difficulty.push(levels);
         }
+    }
+
+    let camera = globals.block(CAMERA_OFFSET, "camera", CAMERA_SIZE, MAX_CAMERAS)?;
+    if let Some(camera) = camera.get(0) {
+        imported.camera_track = crate::vehicle::camera_track(&camera, 0x00)?;
     }
 
     let grenades = globals.block(GRENADES_OFFSET, "grenades", GRENADE_SIZE, MAX_GRENADES)?;

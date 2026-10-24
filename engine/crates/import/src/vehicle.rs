@@ -19,6 +19,7 @@ use crate::sound::FOOT;
 const EFFE: GroupTag = GroupTag::new(b"effe");
 const ACTV: GroupTag = GroupTag::new(b"actv");
 const WEAP: GroupTag = GroupTag::new(b"weap");
+const TRAK: GroupTag = GroupTag::new(b"trak");
 
 pub(crate) const VEHICLE_SIZE: usize = 0x3F0;
 const UNIT_PART: usize = OBJECT_SIZE;
@@ -26,6 +27,11 @@ const VEHICLE_PART: usize = 0x2F0;
 pub(crate) const SEAT_SIZE: usize = 0x11C;
 pub(crate) const POWERED_SEAT_SIZE: usize = 0x44;
 pub(crate) const INITIAL_WEAPON_SIZE: usize = 0x24;
+const UNIT_CAMERA_TRACK_SIZE: usize = 0x1C;
+const MAX_UNIT_CAMERA_TRACKS: usize = 2;
+const CAMERA_TRACK_SIZE: usize = 0x30;
+const CAMERA_TRACK_CONTROL_POINT_SIZE: usize = 0x3C;
+const MAX_CAMERA_TRACK_CONTROL_POINTS: usize = 16;
 /// The most of each (the unit definition's blocks hold two powered seats
 /// and four initial weapons).
 const MAX_POWERED_SEATS: usize = 2;
@@ -133,6 +139,18 @@ fn import_seat(seat: &Element<'_>) -> Result<VehicleSeat, ImportError> {
         camera_submerged_marker: seat
             .text(0xA4, "camera submerged marker name", NAME_LONGEST)?
             .to_owned(),
+        camera_track: match seat
+            .block(
+                0xD0,
+                "camera tracks",
+                UNIT_CAMERA_TRACK_SIZE,
+                MAX_UNIT_CAMERA_TRACKS,
+            )?
+            .get(0)
+        {
+            Some(track) => camera_track(&track, 0x00)?,
+            None => Vec::new(),
+        },
         pitch_auto_level: seat.f32(0xC4, "pitch auto-level")?,
         pitch_range_minimum: seat.f32(0xC8, "pitch range minimum")?,
         pitch_range_maximum: seat.f32(0xCC, "pitch range maximum")?,
@@ -140,6 +158,30 @@ fn import_seat(seat: &Element<'_>) -> Result<VehicleSeat, ImportError> {
         yaw_maximum: seat.f32(0xF4, "yaw maximum")?,
         built_in_actor: reference(seat, 0xF8, "built-in actor", &[ACTV])?,
     })
+}
+
+/// The control points of the camera track (`trak`) a reference at `at` of
+/// `element` names; none for an empty reference.
+pub(crate) fn camera_track(element: &Element<'_>, at: usize) -> Result<Vec<[f32; 3]>, ImportError> {
+    let Some(index) = element.reference(at, "camera track", &[TRAK])? else {
+        return Ok(Vec::new());
+    };
+    let track = element.cache().tag(index, TRAK, CAMERA_TRACK_SIZE)?;
+    let block = track.block(
+        0x04,
+        "control points",
+        CAMERA_TRACK_CONTROL_POINT_SIZE,
+        MAX_CAMERA_TRACK_CONTROL_POINTS,
+    )?;
+    let mut points = Vec::with_capacity(block.len());
+    for point in block.iter() {
+        let position = vector(&point, 0x00, "position")?;
+        if !position.iter().all(|value| value.is_finite()) {
+            return Err(point.fault("position", format!("is {position:?}")));
+        }
+        points.push(position);
+    }
+    Ok(points)
 }
 
 /// A physics tag: its mass points, each of whose powered mass point is

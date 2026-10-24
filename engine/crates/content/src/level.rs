@@ -120,6 +120,10 @@ pub struct Globals {
     /// How each material type scales the ground's hold on a vehicle, by
     /// material type (the globals' `materials`).
     pub materials: Vec<MaterialPhysics>,
+    /// The camera track a seat without one of its own follows (the
+    /// globals' first `camera`): its control points, as
+    /// [`crate::VehicleSeat::camera_track`]'s.
+    pub camera_track: Vec<[f32; 3]>,
 }
 
 /// How a material scales what the ground does to a vehicle's mass points

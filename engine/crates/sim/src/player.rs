@@ -69,6 +69,9 @@ pub const FOLLOW_DISTANCE: f32 = 1.2;
 pub const FOLLOW_HEIGHT: f32 = 0.25;
 /// How far short of a wall the third-person camera stops.
 const FOLLOW_MARGIN: f32 = 0.05;
+/// The least a seat's camera is focused ahead of itself
+/// (`following_camera.c`'s).
+const FOLLOW_SEAT_DEPTH: f32 = 0.6;
 
 /// Why there is no player.
 #[derive(Debug, Error)]
@@ -139,6 +142,9 @@ pub struct Player {
     seat: Option<Seated>,
     /// Where its object is while it sits.
     seat_body: Option<Transform>,
+    /// The camera behind its vehicle it sees from while it sits, if its
+    /// seat has one.
+    seat_camera: Option<SeatCamera>,
     /// It flies where it looks, through the level, as the shell's
     /// `noclip` makes it.
     noclip: bool,
@@ -153,6 +159,17 @@ pub struct Seated {
     pub seat: usize,
     /// The seat's flags (`VehicleSeat::DRIVER` and the rest).
     pub flags: u32,
+}
+
+/// The camera behind a vehicle that a seat's rider sees from (the
+/// following camera of `following_camera.c`).
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SeatCamera {
+    /// Where it follows from: the seat's camera marker, in the world.
+    pub marker: Vec3,
+    /// Its camera track's control points, from the marker in the rider's
+    /// heading: forward, left, up.
+    pub track: Arc<[[f32; 3]]>,
 }
 
 /// What the player fights with this tick.
@@ -323,6 +340,7 @@ impl Player {
             grenade_origin: Vec3::from_array(level.globals.player.grenade_origin),
             seat: None,
             seat_body: None,
+            seat_camera: None,
             noclip: false,
         })
     }
@@ -363,6 +381,7 @@ impl Player {
         self.landed = None;
         self.seat = None;
         self.seat_body = None;
+        self.seat_camera = None;
         Ok(())
     }
 
@@ -440,9 +459,14 @@ impl Player {
         &self.flights
     }
 
-    /// Where it sees from.
+    /// Where it sees from: from behind its vehicle in a seat with a
+    /// camera of its own, else as it was set.
     pub fn view(&self) -> View {
-        self.view
+        if self.seat_camera.is_some() {
+            View::ThirdPerson
+        } else {
+            self.view
+        }
     }
 
     pub(crate) fn set_view(&mut self, view: View) {
@@ -469,23 +493,25 @@ impl Player {
         self.held
     }
 
-    /// Sits it in `seat`, its object at `body`.
-    pub(crate) fn sit(&mut self, seat: Seated, body: Transform) {
+    /// Sits it in `seat`, its object at `body`, seeing from `camera`.
+    pub(crate) fn sit(&mut self, seat: Seated, body: Transform, camera: Option<SeatCamera>) {
         self.seat = Some(seat);
-        self.place_in_seat(body);
+        self.place_in_seat(body, camera);
     }
 
-    /// Moves it with its seat, its object to `body`.
-    pub(crate) fn place_in_seat(&mut self, body: Transform) {
+    /// Moves it with its seat, its object to `body`, seeing from `camera`.
+    pub(crate) fn place_in_seat(&mut self, body: Transform, camera: Option<SeatCamera>) {
         // (the physics refuses only numbers that are not finite)
         let _ = self.mover.teleport(&mut lock(&self.physics), body.position);
         self.seat_body = Some(body);
+        self.seat_camera = camera;
     }
 
     /// Stands it up out of its seat at `position`.
     pub(crate) fn stand(&mut self, position: Vec3) {
         self.seat = None;
         self.seat_body = None;
+        self.seat_camera = None;
         let _ = self.mover.teleport(&mut lock(&self.physics), position);
     }
 
@@ -612,10 +638,18 @@ impl Player {
         }
     }
 
-    /// The camera: at its eyes, or following behind them.
+    /// The camera: at its eyes, following behind them, or behind its
+    /// vehicle.
     fn camera(&self) -> Transform {
         let rotation = look_rotation(self.yaw, self.pitch);
         let eyes = self.mover.position + Vec3::Z * self.mover.camera_height();
+        if let Some(camera) = &self.seat_camera {
+            return Transform {
+                position: self.seat_camera_position(camera, rotation),
+                rotation,
+                scale: 1.0,
+            };
+        }
         let position = match self.view {
             View::FirstPerson => eyes,
             View::ThirdPerson => {
@@ -633,6 +667,26 @@ impl Player {
             rotation,
             scale: 1.0,
         }
+    }
+
+    /// Where `camera` puts the camera looking along `rotation`: its track's
+    /// point for the pitch, in the heading, from the marker, stopped short
+    /// of walls looking back from the point it is focused on, its depth
+    /// ahead (`following_camera_update` and `observer_update_position`).
+    fn seat_camera_position(&self, camera: &SeatCamera, rotation: Quat) -> Vec3 {
+        let offset = track_offset(&camera.track, self.pitch);
+        let (sine, cosine) = (libm::sinf(self.yaw), libm::cosf(self.yaw));
+        let forward = Vec3::new(cosine, sine, 0.0);
+        let left = Vec3::new(-sine, cosine, 0.0);
+        let position = camera.marker + forward * offset.x + left * offset.y + Vec3::Z * offset.z;
+        let depth = offset.length().max(FOLLOW_SEAT_DEPTH);
+        let focus = position + rotation * Vec3::X * depth;
+        let back = position - focus;
+        let reach = match lock(&self.physics).cast_ray(focus, back, Layers::LEVEL) {
+            Ok(Some(hit)) => (hit.fraction - FOLLOW_MARGIN / back.length()).max(0.0),
+            _ => 1.0,
+        };
+        focus + back * reach
     }
 
     /// This tick's throttle: forward, left.
@@ -1250,6 +1304,57 @@ fn body_transform(position: Vec3, yaw: f32) -> Transform {
 
 /// A look's orientation: a yaw about Z, then a pitch about the camera's Y
 /// (the free camera's).
+/// The point of camera track `track` for `pitch`, from the camera marker
+/// in the heading: the cubic through the four control points about it, the
+/// track's span from looking straight down to straight up
+/// (`camera_track_splut`); along the points a track of fewer than four
+/// has, and nothing for one of none.
+pub(crate) fn track_offset(track: &[[f32; 3]], pitch: f32) -> Vec3 {
+    let t = (pitch + std::f32::consts::FRAC_PI_2) * std::f32::consts::FRAC_1_PI;
+    let point = |index: usize| {
+        track
+            .get(index)
+            .map_or(Vec3::ZERO, |point| Vec3::from_array(*point))
+    };
+    let count = track.len();
+    if count < 4 {
+        let Some(last) = count.checked_sub(1) else {
+            return Vec3::ZERO;
+        };
+        let span = last as f32 * t.clamp(0.0, 1.0);
+        // (a pitch not a number is the first point)
+        let (index, fraction) = if span.is_finite() && (span as usize) < last {
+            (span as usize, span - (span as usize) as f32)
+        } else if span.is_finite() {
+            (last, 0.0)
+        } else {
+            (0, 0.0)
+        };
+        return point(index).lerp(point((index + 1).min(last)), fraction);
+    }
+    let h = 1.0 / (count - 1) as f32;
+    let frame = ((count - 1) as f32 * t) as i64;
+    let mut first = frame;
+    while first > 0 && (first + 4 > count as i64 || first > frame - 1) {
+        first -= 1;
+    }
+    let first = usize::try_from(first.max(0)).unwrap_or(0);
+    let t0 = first as f32 * h;
+    // (Newton's divided differences through the four points, as
+    // `uniform_cubic_spline`)
+    let (f0, f1, f2, f3) = (
+        point(first),
+        point(first + 1),
+        point(first + 2),
+        point(first + 3),
+    );
+    let (d1, mut d2, mut d3) = (f1 - f0, f2 - f1, f3 - f2);
+    d3 -= d2;
+    d2 -= d1;
+    f0 + (d1 + (d2 + (d3 - d2) * ((t - (t0 + 2.0 * h)) / (3.0 * h))) * ((t - (t0 + h)) / (2.0 * h)))
+        * ((t - t0) / h)
+}
+
 fn look_rotation(yaw: f32, pitch: f32) -> Quat {
     Quat::from_rotation_z(yaw) * Quat::from_rotation_y(-pitch)
 }
@@ -1310,5 +1415,52 @@ fn ejection(effect: TagRef, eyes: Vec3, aim: Quat, velocity: Vec3) -> Ejection {
             * Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)
             * Quat::from_rotation_y(-0.5),
         velocity,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::f32::consts::FRAC_PI_2;
+
+    fn near(a: Vec3, b: Vec3) -> bool {
+        a.distance(b) < 1e-4
+    }
+
+    #[test]
+    fn a_camera_track_passes_through_its_points_from_down_to_up() {
+        let track = [
+            [-1.0, 0.0, 3.0],
+            [-2.0, 0.0, 1.0],
+            [-3.0, 0.5, 0.5],
+            [-1.0, 0.0, -0.5],
+        ];
+        let pitch = |t: f32| t * std::f32::consts::PI - FRAC_PI_2;
+        for (index, point) in track.iter().enumerate() {
+            let offset = track_offset(&track, pitch(index as f32 / 3.0));
+            assert!(near(offset, Vec3::from_array(*point)), "{index}: {offset}");
+        }
+        // (between its points, the cubic through them)
+        let between = track_offset(&track, pitch(0.5));
+        assert!(
+            between.x < -2.0 && between.z > 0.5 && between.z < 1.0,
+            "{between}"
+        );
+    }
+
+    #[test]
+    fn a_short_camera_track_is_followed_along_its_points() {
+        assert_eq!(track_offset(&[], 0.3), Vec3::ZERO);
+        assert_eq!(
+            track_offset(&[[1.0, 2.0, 3.0]], -1.0),
+            Vec3::new(1.0, 2.0, 3.0)
+        );
+        let two = [[0.0, 0.0, 0.0], [2.0, 0.0, 4.0]];
+        assert!(near(track_offset(&two, 0.0), Vec3::new(1.0, 0.0, 2.0)));
+        assert!(near(
+            track_offset(&two, FRAC_PI_2),
+            Vec3::new(2.0, 0.0, 4.0)
+        ));
+        assert_eq!(track_offset(&two, f32::NAN), Vec3::ZERO);
     }
 }

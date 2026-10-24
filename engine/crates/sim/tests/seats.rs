@@ -13,6 +13,7 @@ use opence_import::{import_level, Cache};
 use opence_sim::animation::{self, AnimationPlayer};
 use opence_sim::input::{Buttons, TickInput};
 use opence_sim::objects::{ObjectHandle, ObjectSpawn};
+use opence_sim::player::View;
 use opence_sim::units::Radians;
 use opence_sim::{clock, Quat, Simulation, Transform, Vec3};
 
@@ -472,5 +473,60 @@ fn a_driven_warthog_rides_its_suspension_and_turns_its_wheels() -> Result {
         }
     }
     assert!(moved, "the Warthog's nodes never moved as it drove");
+    Ok(())
+}
+
+#[test]
+fn the_driver_sees_from_behind_the_warthog_along_its_camera_track() -> Result {
+    let Some(level) = bloodgulch()? else {
+        return Ok(());
+    };
+    let flags = seat_flags(&level)?;
+    let driver = seat_with(&flags, VehicleSeat::DRIVER, VehicleSeat::REQUIRES_DRIVER)?;
+    assert_ne!(flags[driver] & VehicleSeat::THIRD_PERSON_CAMERA, 0);
+    // (the Warthog's seats or the globals give its camera a track)
+    let vehicle = level
+        .objects
+        .iter()
+        .find(|object| object.tag.path.eq_ignore_ascii_case(WARTHOG))
+        .and_then(|object| object.vehicle.as_ref())
+        .ok_or("no warthog vehicle")?;
+    assert!(
+        !vehicle.seats[driver].camera_track.is_empty() || !level.globals.camera_track.is_empty(),
+        "no camera track"
+    );
+    let (mut simulation, warthog) = beside_a_warthog(&level)?;
+    enter(&mut simulation, warthog, driver)?;
+    for _ in 0..30 {
+        simulation.step(TickInput::default());
+    }
+    assert_eq!(seated(&simulation), Some(driver));
+    let player = simulation.player().ok_or("no player")?;
+    assert_eq!(player.view(), View::ThirdPerson);
+    assert!(
+        simulation.first_person().models().is_empty(),
+        "the weapon is shown"
+    );
+    // (behind the seat as the driver looks, above it and well off it: the
+    // track's point for a level look is 2.75 behind its marker and 0.68
+    // above, the ground behind pulling it in a little)
+    let seat = simulation.rides().seat(warthog, driver).ok_or("no seat")?;
+    let camera = simulation.camera().transform;
+    let forward = camera.rotation * Vec3::X;
+    let from_seat = camera.position - seat;
+    assert!(from_seat.dot(forward) < -1.0, "not behind: {from_seat}");
+    assert!(from_seat.z > 0.0, "not above: {from_seat}");
+    assert!(from_seat.length() > 2.0, "too near: {from_seat}");
+    // (and back at its eyes, its weapon drawn, once out)
+    simulation.step(pressed(Buttons::ACTION));
+    for _ in 0..30 {
+        simulation.step(TickInput::default());
+    }
+    assert_eq!(seated(&simulation), None);
+    let player = simulation.player().ok_or("no player")?;
+    assert_eq!(player.view(), View::FirstPerson);
+    let eyes = player.mover().position;
+    assert!(simulation.camera().transform.position.distance(eyes) < 1.0);
+    assert!(!simulation.first_person().models().is_empty(), "no weapon");
     Ok(())
 }
