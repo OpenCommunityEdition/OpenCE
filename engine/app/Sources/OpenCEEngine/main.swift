@@ -17,8 +17,9 @@
 // --mouse-sensitivity radians a count (or settings.toml's). With --fly, or
 // on a map without a player start, the free camera flies instead: W, A, S,
 // D, Space and Control (Shift faster). F3 or --frame-times shows the frame
-// times. --benchmark SECONDS flies the map offscreen at --size (3840x2160
-// by default), with no window, and prints the frame times (--off with the
+// times. --capture-ui [FOLDER] draws every menu screen headless into
+// assets/ui_reference (UiCapture.swift). --benchmark SECONDS flies the map
+// offscreen at --size (3840x2160 by default), with no window, and prints the frame times (--off with the
 // render switches it draws without, e.g. render.gtao,render.ssr). --headless runs
 // the world with no window, answering the control socket (Control.swift);
 // --control (or --socket PATH) opens the socket beside the window. ~ (the
@@ -1008,6 +1009,42 @@ func benchmark(seconds: String) -> Never {
     } catch {
         fail("\(map): \(error)")
     }
+}
+
+/// The reference captures (UiCapture.swift): every screen of ui.map's
+/// shell, and the pause menus of a10 and bloodgulch, drawn headless into
+/// --capture-ui's folder (assets/ui_reference when it names none).
+func captureUi() -> Never {
+    let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    let named = argument("--capture-ui").flatMap { $0.hasPrefix("--") ? nil : $0 }
+    let folder = named.map { URL(fileURLWithPath: $0, relativeTo: root) } ?? UiCapture.defaultFolder(root: root)
+    let maps = URL(fileURLWithPath: argument("--maps") ?? "assets/maps", relativeTo: root)
+    guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
+        fail("no Metal device")
+    }
+    let capture = UiCapture(device: device, queue: queue)
+    let menus = [("ui", mainMenuWidget()), ("a10", pauseMenuWidget(multiplayer: false)),
+                 ("bloodgulch", pauseMenuWidget(multiplayer: true))]
+    for (map, widget) in menus {
+        let path = maps.appendingPathComponent("\(map).map").path
+        guard FileManager.default.fileExists(atPath: path) else {
+            print("\(map).map: not in \(maps.path), skipped")
+            continue
+        }
+        do {
+            let geometry = try LevelGeometry.load(map: path, cacheFolder: argument("--cache") ?? cacheFolder(), bsp: 0)
+            let into = map == "ui" ? folder : folder.appendingPathComponent(map)
+            let report = try capture.capture(geometry: geometry, widget: widget, into: into)
+            print("\(map): \(report.screens.count) screens in \(into.path)")
+        } catch {
+            fail("\(map): \(error)")
+        }
+    }
+    exit(0)
+}
+
+if CommandLine.arguments.contains("--capture-ui") {
+    captureUi()
 }
 
 if let seconds = argument("--benchmark") {
