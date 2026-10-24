@@ -13,21 +13,20 @@ import SwiftUI
 public final class DeveloperModel {
     /// What Launch starts.
     public var launch = DeveloperLaunch()
-    /// The drawing switches (the shell's `render.*` flags), as the shell
-    /// holds them now.
+    /// The drawing switches (the shell's `render.*` flags the renderer
+    /// reads, RenderSwitches.flags), as the shell holds them now.
     public let switches: [ShellVariable]
     /// Where captures are written: the data root's assets/captures.
     public let captures: URL
 
-    /// `variables` are the shell's; its `render.*` flags are the switches.
+    /// `variables` are the shell's; those of its `render.*` flags the
+    /// renderer reads are the switches.
     public init(variables: [ShellVariable], root: URL) {
-        switches = variables.filter { variable in
-            variable.name.hasPrefix("render.") && ["true", "false"].contains(variable.value)
-        }
+        switches = variables.filter { RenderSwitches.flags.contains($0.name) }
         captures = root.appendingPathComponent("assets/captures", isDirectory: true)
     }
 
-    public var levels: [String] { MapLibrary.testMaps }
+    public var levels: [String] { MapLibrary.developerMaps }
 
     public var views: [RenderView] { RenderView.allCases }
 

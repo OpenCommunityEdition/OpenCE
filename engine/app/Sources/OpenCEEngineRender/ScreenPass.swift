@@ -40,6 +40,15 @@ public struct RenderSwitches: Equatable, Sendable {
 
     public init() {}
 
+    /// The shell's `render.*` flags these switches are read from: the ones
+    /// that change the frame (the launcher's Developer tab offers these
+    /// alone).
+    public static let flags = [
+        "render.gtao", "render.ssr", "render.contact_shadows", "render.sun_shadows", "render.lights",
+        "render.exposure", "render.bloom", "render.lens_flares", "render.glows", "render.decals",
+        "render.particles",
+    ]
+
     /// The switches as the shell's variables hold them (`render.*`), read
     /// through `flag` and `value`.
     public init(flag: (String) -> Bool, value: (String) -> String) {

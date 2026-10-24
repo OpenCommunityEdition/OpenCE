@@ -29,7 +29,7 @@ final class DeveloperTests: XCTestCase {
 
     func testTheTabListsDevgulchItsStationsTheViewsAndTheSwitches() {
         let model = launcher().developer
-        XCTAssertEqual(model.levels, ["devgulch", "devmap"])
+        XCTAssertEqual(model.levels, ["devgulch"], "devmap is the tests'")
         XCTAssertEqual(model.level, "devgulch", "devgulch by default")
         XCTAssertEqual(model.stations.map(\.name),
                        ["weapons", "vehicles", "ai", "effects", "sounds", "shaders", "animation", "hud", "physics"])
@@ -37,12 +37,21 @@ final class DeveloperTests: XCTestCase {
         XCTAssertEqual(model.views.first, .frame)
         XCTAssertTrue(model.views.contains(.normals))
         let names = model.switches.map(\.name)
-        XCTAssertTrue(names.contains("render.gtao"))
-        XCTAssertTrue(names.contains("render.wireframe"))
+        XCTAssertEqual(names, names.filter(RenderSwitches.flags.contains))
+        XCTAssertEqual(Set(names), Set(RenderSwitches.flags), "the shell has every flag the renderer reads")
+        XCTAssertFalse(names.contains("render.wireframe"), "not drawn yet, so not offered")
         XCTAssertFalse(names.contains("render.view"), "the view is its own picker")
-        XCTAssertTrue(names.allSatisfy { $0.hasPrefix("render.") })
         model.level = "devmap"
         XCTAssertTrue(model.stations.map(\.name).contains("doors"))
+    }
+
+    /// Each switch offered changes what the renderer reads when it alone
+    /// is turned off, so none in the tab does nothing.
+    func testEverySwitchOfferedReachesTheRenderer() {
+        let all = RenderSwitches(flag: { _ in true }, value: { _ in "" })
+        for name in RenderSwitches.flags {
+            XCTAssertNotEqual(RenderSwitches(flag: { $0 != name }, value: { _ in "" }), all, name)
+        }
     }
 
     func testAStationTheLevelHasNotIsLetGo() {
@@ -58,14 +67,14 @@ final class DeveloperTests: XCTestCase {
     func testOnlyTheSwitchesChangedAreLaunched() throws {
         let model = launcher().developer
         let gtao = try XCTUnwrap(model.switches.first { $0.name == "render.gtao" })
-        let wireframe = try XCTUnwrap(model.switches.first { $0.name == "render.wireframe" })
+        let bloom = try XCTUnwrap(model.switches.first { $0.name == "render.bloom" })
         XCTAssertTrue(model.isOn(gtao))
-        XCTAssertFalse(model.isOn(wireframe))
+        XCTAssertTrue(model.isOn(bloom))
         model.set(gtao, on: false)
-        model.set(wireframe, on: true)
+        model.set(bloom, on: false)
         XCTAssertFalse(model.isOn(gtao))
-        XCTAssertEqual(model.launch.variables, ["render.gtao": "false", "render.wireframe": "true"])
-        model.set(wireframe, on: false)
+        XCTAssertEqual(model.launch.variables, ["render.bloom": "false", "render.gtao": "false"])
+        model.set(bloom, on: true)
         XCTAssertEqual(model.launch.variables, ["render.gtao": "false"], "as the shell has it: left out")
     }
 

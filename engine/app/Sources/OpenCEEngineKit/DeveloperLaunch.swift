@@ -6,7 +6,7 @@ import Foundation
 import OpenCEEngineRender
 
 public struct DeveloperLaunch: Equatable, Sendable {
-    /// The test map (MapLibrary.testMaps).
+    /// The test map (MapLibrary.developerMaps, or any of testMaps).
     public var level: String
     /// The station run once the level is loaded (`station <name>`).
     public var station: String?
@@ -17,7 +17,7 @@ public struct DeveloperLaunch: Equatable, Sendable {
     /// Where the first frame is drawn to (`frame <path>`).
     public var capture: String?
 
-    public init(level: String = MapLibrary.testMaps[0], station: String? = nil, view: RenderView = .frame,
+    public init(level: String = MapLibrary.developerMaps[0], station: String? = nil, view: RenderView = .frame,
                 variables: [String: String] = [:], capture: String? = nil) {
         self.level = level
         self.station = station
