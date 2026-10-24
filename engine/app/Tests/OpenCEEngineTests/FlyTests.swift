@@ -231,7 +231,7 @@ final class MapLibraryTests: XCTestCase {
         let cache = StockLevel.root.appendingPathComponent("build/engine/cache")
         try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
         let level = try LoadedLevel(map: map.path, cacheFolder: cache.path, device: device,
-                                    settings: VideoSettings(antiAliasing: .native))
+                                    settings: VideoSettings(antiAliasing: .native), bakeAtLoad: .cachedOnly)
         XCTAssertEqual(level.map, map.path)
         XCTAssertGreaterThan(level.geometry.draws().count, 0)
         XCTAssertTrue([level.start.x, level.start.y, level.start.z].allSatisfy(\.isFinite))

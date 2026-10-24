@@ -1,8 +1,9 @@
 // A level's baked light: read from the cache folder when it was baked
 // before for the same BSP and settings (the file's name holds the bake's
-// key), or traced on the GPU (PathTracer) and kept there. The bake takes
-// a while on a large map, so the app runs it in the background and draws
-// the stock lightmaps until it is done.
+// key, a hash of what the bake is made from), or traced on the GPU
+// (PathTracer) and kept there. A level is baked as it loads (LoadedLevel),
+// behind the loading screen, so that it starts lit and its light never
+// changes in play.
 import Foundation
 import Metal
 import OpenCEEngineCore
@@ -27,42 +28,46 @@ public enum LightBaker {
         try light.encode().write(to: file, options: .atomic)
     }
 
-    /// The light of `bake`, traced by `tracer`.
-    public static func bake(_ bake: LevelBake, tracer: PathTracer) throws -> BakedLight {
+    /// The light of `bake`, traced by `tracer`; `progress` is told how far
+    /// it has come (0 to 1) after each of its three traces.
+    public static func bake(_ bake: LevelBake, tracer: PathTracer,
+                            progress: ((Float) -> Void)? = nil) throws -> BakedLight {
         let scene = bake.scene()
         let distance = bake.occlusionDistance()
-        let (irradiance, directions) = try tracer.run(.irradiance, scene, points: Array(bake.lightmapPointBytes()),
+        let lightmapPoints = Array(bake.lightmapPointBytes())
+        let probePoints = Array(bake.probePointBytes())
+        let reflectionPoints = Array(bake.reflectionPointBytes())
+        // (each trace's share of the whole: its points times their samples)
+        let work = [Float(lightmapPoints.count) * Float(bake.lightmapSamples()),
+                    Float(probePoints.count) * Float(bake.probeSamples()),
+                    Float(reflectionPoints.count) * Float(bake.reflectionSamples())]
+        let total = max(work.reduce(0, +), 1)
+        let (irradiance, directions) = try tracer.run(.irradiance, scene, points: lightmapPoints,
                                                       samples: bake.lightmapSamples(), seed: 1,
                                                       occlusionDistance: distance)
+        progress?(work[0] / total)
         // (the probes leave the sun out: the renderer adds it, shadowed)
-        let (probes, _) = try tracer.run(.irradiance, scene, points: Array(bake.probePointBytes()),
+        let (probes, _) = try tracer.run(.irradiance, scene, points: probePoints,
                                          samples: bake.probeSamples(), seed: 2, occlusionDistance: distance,
                                          sun: scene.sunLight())
-        let (radiance, _) = try tracer.run(.radiance, scene, points: Array(bake.reflectionPointBytes()),
+        progress?((work[0] + work[1]) / total)
+        let (radiance, _) = try tracer.run(.radiance, scene, points: reflectionPoints,
                                            samples: bake.reflectionSamples(), seed: 3, occlusionDistance: 0)
+        progress?(1)
         return bake.finish(irradiance: bytes(irradiance), directions: bytes(directions), probes: bytes(probes),
                            radiance: bytes(radiance))
     }
 
     /// The light of `bake`: the cached file's, or traced and then kept.
-    public static func light(_ bake: LevelBake, folder: String, tracer: PathTracer) throws -> BakedLight {
+    public static func light(_ bake: LevelBake, folder: String, tracer: PathTracer,
+                             progress: ((Float) -> Void)? = nil) throws -> BakedLight {
         if let light = cached(bake, folder: folder) {
+            progress?(1)
             return light
         }
-        let light = try Self.bake(bake, tracer: tracer)
+        let light = try Self.bake(bake, tracer: tracer, progress: progress)
         try store(light, bake: bake, folder: folder)
         return light
-    }
-
-    /// Bakes `bake`'s light away from the main thread (on its own Metal
-    /// queue), keeps it in `folder`, and gives it to `done` on the main
-    /// thread.
-    public static func bakeInBackground(_ bake: LevelBake, folder: String, device: MTLDevice,
-                                        done: @escaping @MainActor @Sendable (Result<BakedLight, Error>) -> Void) {
-        Task.detached(priority: .utility) {
-            let result = Result { try light(bake, folder: folder, tracer: try PathTracer(device: device)) }
-            await MainActor.run { done(result) }
-        }
     }
 
     /// Float4s as the engine reads them.

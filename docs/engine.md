@@ -265,9 +265,12 @@ only a fallback.
    of the importer's and the baker's versions (`FORMAT_VERSION`,
    `BAKE_VERSION`), the settings and the scene, so a changed level or baker
    bakes again.
-5. **In the background** (`LightBaker.swift`): the app bakes a level that is
-   not cached while it draws the stock lightmaps, and switches over when the
-   bake is done.
+5. **At load** (`LoadedLevel.swift`, `LightBaker.swift`): a level whose bake
+   the cache lacks is baked as it loads (behind the loading screen, whose bar
+   follows the bake), so it starts lit and its light never changes in play.
+   The first load of a map bakes all its structures, so a mission's switch to
+   another structure finds its light already cached. The stock lightmaps are
+   drawn only when the bake fails, which the log reports.
 
 **The mood check** (`BakeTests.swift`, which needs `assets/maps`): each page's and
 BSP's mean brightness and colour must stay within set limits of the stock

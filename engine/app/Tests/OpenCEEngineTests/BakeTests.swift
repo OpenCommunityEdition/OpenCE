@@ -127,6 +127,11 @@ final class BakeTests: XCTestCase {
         return folder
     }
 
+    /// devmap without the galleries: a level made of no map file.
+    func devmap() throws -> LevelGeometry {
+        try LevelGeometry.devmap(donor: nil, cacheFolder: "")
+    }
+
     func testALevelsBakeIsKeptAndDrawnWith() throws {
         let tracer = try tracer()
         let geometry = try LevelGeometry.devmap(donor: nil, cacheFolder: "")
@@ -161,16 +166,66 @@ final class BakeTests: XCTestCase {
         XCTAssertGreaterThan(try XCTUnwrap(lit.difference(from: stock)).share, 0)
     }
 
-    func testABakeInTheBackgroundComesBackOnTheMainThread() throws {
+    /// A level whose bake the cache lacks is baked as it loads (behind the
+    /// loading screen, on the loader's thread), so that it starts lit and
+    /// its light is never swapped in play; the load's progress goes on
+    /// through the bake.
+    func testAMissingCacheIsBakedAsTheLevelLoads() throws {
+        let tracer = try tracer()
+        let folder = try folder()
+        var progress: [Float] = []
+        let level = try LoadedLevel(geometry: try devmap(), map: "devmap", cacheFolder: folder.path,
+                                    device: tracer.device, settings: VideoSettings(), bakeAtLoad: .quick,
+                                    progress: { progress.append($0) })
+        XCTAssertEqual(level.light, .traced)
+        XCTAssertTrue(level.renderer.baked, "lit before its first frame")
+        let bake = try XCTUnwrap(level.bake)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(LightBaker.file(bake, folder: folder.path)).path))
+        XCTAssertEqual(progress, progress.sorted(), "it only goes forward")
+        XCTAssertEqual(progress.last, 1)
+        XCTAssertTrue(progress.contains { $0 > LoadedLevel.drawnProgress && $0 < LoadedLevel.bakedProgress },
+                      "the bake reports its own progress: \(progress)")
+    }
+
+    /// A level baked before loads with its kept light, tracing nothing.
+    func testACachedBakeLoadsAlreadyLit() throws {
+        let device = try tracer().device
+        let folder = try folder()
+        let first = try LoadedLevel(geometry: try devmap(), map: "devmap", cacheFolder: folder.path,
+                                    device: device, settings: VideoSettings(), bakeAtLoad: .quick)
+        let file = try XCTUnwrap(LightBaker.file(try XCTUnwrap(first.bake), folder: folder.path))
+        let written = try FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date
+        let again = try LoadedLevel(geometry: try devmap(), map: "devmap", cacheFolder: folder.path,
+                                    device: device, settings: VideoSettings(), bakeAtLoad: .quick)
+        XCTAssertEqual(again.light, .cached)
+        XCTAssertTrue(again.renderer.baked)
+        XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date,
+                       written, "not baked again")
+    }
+
+    /// Without the bake at load (the tests that do not look at the light),
+    /// the cache's light or the stock lightmaps, and nothing traced or kept.
+    func testALoadThatDoesNotBakeTracesNothing() throws {
+        let device = try tracer().device
+        let folder = try folder()
+        let level = try LoadedLevel(geometry: try devmap(), map: "devmap", cacheFolder: folder.path,
+                                    device: device, settings: VideoSettings(), bakeAtLoad: .cachedOnly)
+        XCTAssertEqual(level.light, .stock)
+        XCTAssertFalse(level.renderer.baked)
+        let bake = try XCTUnwrap(level.bake)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(LightBaker.file(bake, folder: folder.path)).path))
+    }
+
+    /// The bake's progress: each structure's three traces in turn, ending
+    /// at 1.
+    func testTheBakeReportsItsProgress() throws {
         let tracer = try tracer()
         let bake = try LevelGeometry.devmap(donor: nil, cacheFolder: "").bakePlan(quick: true)
-        let done = expectation(description: "baked")
-        LightBaker.bakeInBackground(bake, folder: try folder().path, device: tracer.device) { result in
-            XCTAssertTrue(Thread.isMainThread)
-            XCTAssertNotNil(try? result.get())
-            done.fulfill()
-        }
-        wait(for: [done], timeout: 120)
+        var progress: [Float] = []
+        _ = try LightBaker.bake(bake, tracer: tracer, progress: { progress.append($0) })
+        XCTAssertEqual(progress, progress.sorted())
+        XCTAssertGreaterThanOrEqual(progress.count, 3)
+        XCTAssertEqual(progress.last, 1)
     }
 
     func testAStockLevelsPagesAreBaked() throws {

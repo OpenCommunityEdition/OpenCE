@@ -134,6 +134,9 @@ func headless() -> Never {
         engine: engine, device: device, queue: queue, snapshots: snapshots,
         loadMap: { path, bsp in
             let loaded = try LoadedLevel(map: path, bsp: bsp, cacheFolder: cache, device: device, settings: settings)
+            if let failure = loaded.bakeFailure {
+                appLog("warn", "the bake of \(path): \(failure); drawn with its lightmaps")
+            }
             loaded.renderer.hud = hud
             engine.leaveGame()
             _ = try engine.startLevel(geometry: loaded.geometry, difficulty: 1)

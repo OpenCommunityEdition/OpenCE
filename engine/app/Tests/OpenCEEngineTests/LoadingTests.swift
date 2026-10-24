@@ -217,7 +217,8 @@ final class LoadingTests: XCTestCase {
 
     func testTheLoadReportsItsProgress() {
         XCTAssertLessThan(LoadedLevel.importedProgress, LoadedLevel.drawnProgress)
-        XCTAssertLessThan(LoadedLevel.drawnProgress, 1)
+        XCTAssertLessThan(LoadedLevel.drawnProgress, LoadedLevel.bakedProgress)
+        XCTAssertLessThan(LoadedLevel.bakedProgress, 1)
     }
 
     /// The screen half way through a load, its trail built up over a

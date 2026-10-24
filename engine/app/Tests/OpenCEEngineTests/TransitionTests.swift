@@ -59,7 +59,9 @@ final class TransitionTests: XCTestCase {
         let cache = StockLevel.root.appendingPathComponent("build/engine/cache")
         try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
         let settings = VideoSettings()
-        let first = try LoadedLevel(map: a10, cacheFolder: cache.path, device: device, settings: settings)
+        // (the light as the cache has it: the bake's own tests bake at load)
+        let first = try LoadedLevel(map: a10, cacheFolder: cache.path, device: device, settings: settings,
+                                    bakeAtLoad: .cachedOnly)
         let screen = LoadingScreenModel(enabled: true)
         let pass = try LoadingPass(device: device, mask: screen.maskPixels(), outputFormat: .bgra8Unorm)
         let (width, height) = (1920, 1080)
@@ -100,7 +102,7 @@ final class TransitionTests: XCTestCase {
         let thread = Thread {
             load.finish(Result {
                 try LoadedLevel(map: job.map, cacheFolder: job.cache, device: job.device, settings: settings,
-                                prepare: (job.width, job.height), progress: { screen.setProgress(progress: $0) })
+                                bakeAtLoad: .cachedOnly, prepare: (job.width, job.height), progress: { screen.setProgress(progress: $0) })
             })
         }
         thread.stackSize = 16 << 20
