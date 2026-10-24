@@ -598,6 +598,7 @@
 		<string text="For everyone, the overshield rises up the body\nand stays lit, in its own color."/>
 		<string text="For everyone, shields light their surroundings,\nand the overshield rises and stays lit."/>
 		<string text="For everyone, Light Show's shield glow, and the\novershield rising and staying lit."/>
+		<string text="Not synced: each player sees the shield effects\nof their own Video Setup settings."/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/player_options_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\player_options_labels">
 		<string text="NUMBER OF LIVES:" map="0"/>

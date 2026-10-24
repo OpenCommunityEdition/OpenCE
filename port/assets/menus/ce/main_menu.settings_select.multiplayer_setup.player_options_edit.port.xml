@@ -30,5 +30,6 @@
 		<string text="OVERSHIELD"/>
 		<string text="GLOW+OVERSHIELD"/>
 		<string text="SHOW+OVERSHIELD"/>
+		<string text="PLAYERS' OWN"/>
 	</strings>
 </menus>
