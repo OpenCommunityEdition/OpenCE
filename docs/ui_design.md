@@ -302,3 +302,7 @@ The user supplied the Halo logo to the artifact.
 | Loading: Original | Fill the screen, no box | The picture covers the screen; the description and the console sit over it |
 
 Pause: multiplayer keeps its capsules: it has no right pane for a divider.
+
+In version 31 the user replaced the logo with a 1024×256 picture whose
+art fills its left 640 px; the boards crop to that art (2340×936 on the
+main menu, its middle still at y 675, and 560×224 on the launcher).
