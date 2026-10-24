@@ -18,8 +18,8 @@ typedef long GLintptr;
 #define HALO_GLES 1
 #ifndef HALO_WEB
 #define HALO_ANDROID 1
-#endif
 static int android_geometry_fixes = 1;
+#endif
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
 #define GL_STREAM_DRAW 0x88E0
@@ -175,6 +175,7 @@ int main(int argc, char **argv)
 	}
 	device.stream_buffer = device.stream_buffers[0];
 	device.index_buffer = device.index_buffers[0];
+#ifdef HALO_ANDROID
 	if (!strcmp(argv[1], "disabled"))
 	{
 		android_geometry_fixes = 0;
@@ -198,6 +199,7 @@ int main(int argc, char **argv)
 		CHECK(!device.stream_offset && !device.index_offset);
 		return 0;
 	}
+#endif
 	if (!strcmp(argv[1], "frames"))
 	{
 		/* frames of different sizes and draws: the pools grow, then are reused */
