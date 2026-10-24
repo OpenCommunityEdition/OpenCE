@@ -1572,6 +1572,7 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
         running,
         writer,
         shell,
+        input,
         ..
     } = state;
     let Some(running) = running else { return };
@@ -1595,7 +1596,16 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
         .as_ref()
         .is_some_and(|campaign| campaign.camera().is_some());
     let tick = running.simulation.tick().0;
-    let previous = running.previous_camera;
+    let mut previous = running.previous_camera;
+    // (the look is the mouse's latest, not a tick behind it: turned by the
+    // turn the next tick takes, and not interpolated)
+    let mut current = transform(&camera.transform);
+    if !cinematic && !shell.paused && shell.time_scale > 0.0 && shell.station.is_none() {
+        let turn = input.tick_input();
+        let turned = running.simulation.camera_turned(turn.yaw, turn.pitch);
+        current.rotation = transform(&turned.transform).rotation;
+        previous.rotation = current.rotation;
+    }
     let mut lit = std::mem::take(&mut running.lit);
     lit.clear();
     if let Some(level) = &running.level {
@@ -1632,7 +1642,7 @@ pub(crate) fn publish(state: &mut State, buffers: &SnapshotBuffers, alpha: f32) 
     writer.publish(buffers, tick, alpha, |frame| {
         frame.camera(CameraSnapshot {
             previous,
-            current: transform(&camera.transform),
+            current,
             vertical_fov_radians: camera.vertical_fov.0,
             reserved: [0; 3],
         });
@@ -1914,6 +1924,41 @@ mod tests {
         let _ = engine.step();
         let frame = acquire(&engine);
         assert_eq!(frame.camera.current.position.z, 2.0);
+    }
+
+    #[test]
+    fn the_camera_looks_with_the_latest_turn_every_frame() {
+        let engine = Engine::new();
+        engine.start_empty_world();
+        // (a 144 Hz display turning a little each frame: each frame shows
+        // all the turn so far, the frames between ticks too, and a tick
+        // taking it changes nothing)
+        let mut yaw = 0.0;
+        let mut ticks = 0;
+        for _ in 0..30 {
+            engine.set_input(InputState {
+                yaw: 0.01,
+                ..Default::default()
+            });
+            yaw += 0.01;
+            ticks += engine.advance(1.0 / 144.0).unwrap_or(0);
+            let frame = acquire(&engine);
+            let turned = opence_sim::FreeCamera {
+                yaw: Radians(yaw),
+                ..Default::default()
+            }
+            .rotation();
+            assert!(
+                (frame.camera.current.rotation.z - turned.z).abs() < 1e-5,
+                "{yaw}: {:?}",
+                frame.camera.current.rotation
+            );
+            assert_eq!(
+                frame.camera.previous.rotation,
+                frame.camera.current.rotation
+            );
+        }
+        assert!(ticks > 0 && ticks < 30, "{ticks}");
     }
 
     #[test]

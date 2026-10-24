@@ -1119,6 +1119,30 @@ impl Simulation {
             .unwrap_or_default()
     }
 
+    /// The camera turned `yaw` and `pitch` further, as the next tick will
+    /// turn it: the latest mouse look, shown before the tick that takes
+    /// it. Its position is the last tick's.
+    pub fn camera_turned(&self, yaw: Radians, pitch: Radians) -> Camera {
+        let mut camera = self.camera();
+        let (from_yaw, from_pitch) = match self.players.first() {
+            Some(player) => player.look(),
+            None => {
+                let free = self.world.get_resource::<FreeCamera>().copied();
+                free.map_or((Radians(0.0), Radians(0.0)), |free| (free.yaw, free.pitch))
+            }
+        };
+        let max = FreeCamera::MAX_PITCH.0;
+        let turned = FreeCamera {
+            yaw: Radians(libm::remainderf(from_yaw.0 + yaw.0, std::f32::consts::TAU)),
+            pitch: Radians((from_pitch.0 + pitch.0).clamp(-max, max)),
+            ..FreeCamera::default()
+        };
+        if turned.yaw.0.is_finite() && turned.pitch.0.is_finite() {
+            camera.transform.rotation = turned.rotation();
+        }
+        camera
+    }
+
     /// Puts the free camera at `free` (a level's start), its pitch kept
     /// within the limit, and the camera with it.
     pub fn place_free_camera(&mut self, free: FreeCamera) {
