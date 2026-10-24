@@ -307,10 +307,11 @@ In version 31 the user replaced the logo with a 1024×256 picture whose
 art fills its left 640 px; the boards crop to that art (2340×936 on the
 main menu, its middle still at y 675, and 560×224 on the launcher).
 
-### Round 5 (2026-10-24, artifact versions 32 to 34)
+### Round 5 (2026-10-24, artifact versions 32 to 35)
 
 | Board | Comment | Change |
 | --- | --- | --- |
 | Launcher | No backdrop, keep to colours and shading; remove the logo | Every launcher board loses the stars, planet and nebula for a shaded gradient of the palette's blues (a soft `#1D6AB4` glow at the top, `#041327` deepening to near black); Play drops the logo and the Ready panel is centred alone right of the rail |
 | Launcher | Play seems to do the same thing twice: here, then again on the main menu to continue the latest save | Version 33: the Ready panel no longer names a campaign or save. Play only starts the game at the main menu, where Campaign picks up the latest save; a line under Play says so |
 | Launcher | Remove the note under Play and say Launch; the Maps row: remove? | Version 34: the button reads LAUNCH, the note under it is gone, and so is the Maps row (the map library already counts the maps). The Ready panel holds only the profile and Launch |
+| Launcher | Give a summary of the profile and save here, more a summary dashboard | Version 35: the Ready panel becomes two summaries side by side over a full-width Launch. Profile: the name with its colour, missions finished, the hardest difficulty finished, time played. Latest save: the mission, its level, difficulty and when it was saved. They only report; Launch still starts the game at the main menu, where Campaign continues the save |

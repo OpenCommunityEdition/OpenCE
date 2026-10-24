@@ -81,8 +81,10 @@ built only once the user approves it.
 ### The launcher
 13. A pre-game window in the same design language, with no logo and no
     artwork backdrop: only the palette's colours and shading. It holds:
-    - Play, Settings, Exit; the Play screen's Launch starts the game at
-      the main menu and chooses no campaign or save (the main menu's
+    - Play, Settings, Exit; the Play screen summarises the profile
+      (missions finished, hardest difficulty, time played) and its latest
+      save (mission, difficulty, when), and its Launch starts the game at
+      the main menu, choosing no campaign or save (the main menu's
       Campaign does that);
     - a map library: the campaign, multiplayer and Custom Edition maps,
       their import status, and Import;
