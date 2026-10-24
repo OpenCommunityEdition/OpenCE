@@ -20,6 +20,7 @@ pub mod device_animation;
 pub mod effects;
 pub mod first_person;
 pub mod first_person_states;
+pub mod forces;
 pub mod functions;
 pub mod game;
 pub mod hash;
@@ -367,6 +368,13 @@ impl Simulation {
             actions.push(action && !seated);
         }
         self.rides.step(&mut self.world, &mut self.players, &inputs);
+        for strike in self.rides.strike(&self.world, &mut self.players) {
+            self.damage.extend(damage::apply_collision(
+                &mut self.world,
+                strike.victim,
+                strike.owner,
+            ));
+        }
         let poses = self.players.iter().map(Player::pose).collect();
         self.world.insert_resource(PlayerPoses(poses));
         for ((player, input), pick_up) in self.players.iter_mut().zip(&inputs).zip(actions) {
@@ -399,6 +407,20 @@ impl Simulation {
             self.detonations.extend(queued);
         }
         self.queued_detonations.clear();
+        // (what the damage struck is pushed, after all of it is done)
+        let pushes = match self.players.first() {
+            Some(player) => {
+                let mut pushes = forces::impact_pushes(&self.world, &self.impacts);
+                pushes.extend(forces::detonation_pushes(
+                    &mut self.world,
+                    &self.detonations,
+                    |from, to| player.level_clear(from, to),
+                ));
+                pushes
+            }
+            None => Vec::new(),
+        };
+        forces::apply(&mut self.world, &mut self.rides, &mut self.players, &pushes);
         self.schedule.run(&mut self.world);
         functions::update(&mut self.world);
         self.update_physics(&ejections);

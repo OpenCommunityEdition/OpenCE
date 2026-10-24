@@ -364,6 +364,18 @@ pub struct DamageTable {
     pub multiplayer: bool,
     /// The damage of falls.
     pub falling: FallingDamage,
+    /// The objects that damage pushes, by their tags.
+    pub pushable: BTreeMap<TagRef, Pushable>,
+}
+
+/// An object that damage pushes (its definition's acceleration scale is
+/// more than nothing).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Pushable {
+    /// What a push is multiplied by.
+    pub scale: f32,
+    /// Its bounding sphere's centre, from its origin.
+    pub centre: Vec3,
 }
 
 /// How the campaign's difficulty scales damage (`game_globals.c`): the
@@ -530,12 +542,27 @@ impl DamageTable {
             .filter(|effect| !effect.damage.is_empty())
             .map(|effect| (effect.tag.clone(), effect.damage.clone()))
             .collect();
+        let pushable = level
+            .objects
+            .iter()
+            .filter(|object| object.acceleration_scale > f32::EPSILON)
+            .map(|object| {
+                (
+                    object.tag.clone(),
+                    Pushable {
+                        scale: object.acceleration_scale,
+                        centre: Vec3::from_array(object.bounding_offset),
+                    },
+                )
+            })
+            .collect();
         DamageTable {
             objects,
             effects,
             explosions,
             multiplayer,
             falling: level.globals.falling.clone(),
+            pushable,
         }
     }
 }
@@ -866,6 +893,40 @@ pub fn apply_fall(world: &mut World, object: ObjectHandle, speed: f32) -> Option
     })
 }
 
+/// A vehicle's damage to `object`, a unit it ran into, by `owner` (its
+/// driver, else the vehicle): the globals' vehicle collision damage, in
+/// full, as an area's.
+pub fn apply_collision(
+    world: &mut World,
+    object: ObjectHandle,
+    owner: ObjectHandle,
+) -> Option<DamageEvent> {
+    let effect = world
+        .get_resource::<DamageTable>()?
+        .falling
+        .vehicle_collision_damage
+        .clone()?;
+    let owner = Some(owner).filter(|owner| *owner != object);
+    let outcome = damage_object(
+        world,
+        object,
+        owner,
+        &effect,
+        |_, _, damageable, random, multiplayer| DamageHit {
+            random,
+            material: damageable.model.indirect_damage_material,
+            multiplayer,
+            ..DamageHit::default()
+        },
+    )?;
+    Some(DamageEvent {
+        object,
+        owner,
+        effect,
+        outcome,
+    })
+}
+
 /// How much of an area's damage reaches `distance` from its centre: all
 /// within its inner radius, falling to none at its outer, and all of it
 /// where it does not fall off; none past the outer radius.
@@ -892,7 +953,7 @@ pub fn area_scale(effect: &DamageEffect, distance: f32) -> f32 {
 /// Where `damageable`'s bounding sphere is centred in the world: its
 /// centre carried by its root node, as posed (`root`) if it is animated,
 /// else at its default pose.
-fn bounding_centre(
+pub(crate) fn bounding_centre(
     damageable: &Damageable,
     transform: &Transform,
     root: Option<&NodeMatrix>,
@@ -912,7 +973,7 @@ fn bounding_centre(
     transform.position + transform.rotation * ((root + offset) * transform.scale)
 }
 
-fn reaches(
+pub(crate) fn reaches(
     epicenter: Vec3,
     centre: Vec3,
     core: f32,
@@ -1444,7 +1505,9 @@ mod tests {
                 maximum_falling_velocity: 15.0,
                 falling_damage: Some(tag("fall")),
                 maximum_distance_damage: Some(tag("distance")),
+                vehicle_collision_damage: Some(tag("blast")),
             },
+            pushable: BTreeMap::new(),
         };
         world.insert_resource(table(false));
         let spawned = crate::objects::spawn(

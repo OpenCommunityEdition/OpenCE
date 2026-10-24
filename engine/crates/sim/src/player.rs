@@ -512,6 +512,26 @@ impl Player {
         self.pose()
     }
 
+    /// Throws its biped by `acceleration` (world units a game tick), as
+    /// `biped_accelerate` throws a living one: half as hard, and off its
+    /// feet. Its facing is its player's, so it does not turn to the push.
+    pub(crate) fn push(&mut self, acceleration: Vec3) {
+        if self.seat.is_some() || self.noclip || !acceleration.is_finite() {
+            return;
+        }
+        let per_second = crate::vehicle::GAME_TICKS_PER_SECOND as f32;
+        self.mover.velocity += acceleration * (0.5 * per_second);
+        self.mover.airborne = true;
+        self.mover.slipping = true;
+    }
+
+    /// Moves its biped by `offset`, still moving as it was; false if it is
+    /// seated or cannot stand there.
+    pub(crate) fn shove(&mut self, offset: Vec3) -> bool {
+        let (velocity, yaw) = (self.mover.velocity, self.yaw);
+        self.correct(self.mover.position + offset, velocity, yaw)
+    }
+
     /// Whether it flies through the level.
     pub fn noclip(&self) -> bool {
         self.noclip

@@ -113,7 +113,35 @@ pub struct Rides {
     // globals' materials' physics)
     surfaces: Option<SurfaceMaterials>,
     materials: Vec<MaterialPhysics>,
+    // (each player last seen seated: the vehicle and the tick)
+    left: Vec<(ObjectHandle, ObjectHandle, u64)>,
 }
+
+/// A player a vehicle ran into hard enough to hurt.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Strike {
+    /// The player's biped.
+    pub victim: ObjectHandle,
+    /// Who is to blame: the vehicle's driver, else the vehicle.
+    pub owner: ObjectHandle,
+}
+
+/// The game ticks a vehicle does not hurt the player who left it.
+const LEFT_GRACE: u64 = 90;
+
+/// A vehicle faster than this (world units a game tick) hurts whom it
+/// runs into...
+const STRIKE_SPEED: f32 = 0.066_666_67;
+
+/// ...as does one whose velocity differs from theirs by more than the
+/// root of this.
+const STRIKE_RELATIVE: f32 = 0.001_111_111;
+
+/// How much the push of a vehicle running into a player is lifted.
+const STRIKE_LIFT: f32 = 0.8;
+
+/// The least speed a vehicle pushes a player it runs into at.
+const STRIKE_LEAST_SPEED: f32 = 0.1;
 
 /// Where the vehicles' objects go this tick.
 #[derive(Resource, Clone, Debug, Default)]
@@ -181,6 +209,111 @@ impl Rides {
                 vehicle::collide(mover, met);
             }
         }
+    }
+
+    /// Gives the vehicle of `handle` a push of `acceleration` (world units
+    /// a game tick; twice that if it `detonates`), as `vehicle_accelerate`
+    /// does: it speeds, spins about its up, and wakes. False if it is no
+    /// vehicle of the world's.
+    pub(crate) fn push(
+        &mut self,
+        handle: ObjectHandle,
+        acceleration: Vec3,
+        detonates: bool,
+    ) -> bool {
+        let Some(ride) = self.rides.iter_mut().find(|ride| ride.handle == handle) else {
+            return false;
+        };
+        if !acceleration.is_finite() {
+            return true;
+        }
+        let acceleration = if detonates {
+            acceleration * 2.0
+        } else {
+            acceleration
+        };
+        ride.state.velocity += acceleration;
+        ride.state.angular_velocity += ride.state.up.cross(acceleration) * std::f32::consts::PI;
+        ride.state.wake();
+        true
+    }
+
+    /// Each moving vehicle running into a player on foot this game tick
+    /// (`physics_compute_biped_collision`): the player is pushed up and
+    /// away, at least as fast as the vehicle goes, and moved out as far
+    /// again; the players it hurts. A vehicle's mass points stand for its
+    /// collision model, which the level does not keep, and a player is
+    /// struck where its pill's lower sphere meets one of them.
+    pub(crate) fn strike(&mut self, world: &World, players: &mut [Player]) -> Vec<Strike> {
+        let tick = world.resource::<crate::Tick>().0;
+        for player in players.iter() {
+            let Some(seated) = player.seated() else {
+                continue;
+            };
+            self.left.retain(|(rider, ..)| *rider != player.handle());
+            self.left.push((player.handle(), seated.vehicle, tick));
+        }
+        let grace = LEFT_GRACE * TICKS_PER_GAME_TICK;
+        self.left
+            .retain(|(.., seen)| tick.saturating_sub(*seen) <= grace);
+        if !tick.is_multiple_of(TICKS_PER_GAME_TICK) {
+            return Vec::new();
+        }
+        let mut strikes = Vec::new();
+        for ride in &self.rides {
+            let Some(kind) = self.kinds.get(ride.kind) else {
+                continue;
+            };
+            if ride.state.at_rest {
+                continue;
+            }
+            let state = &ride.state;
+            let speed = state.velocity.length();
+            let driver = players
+                .iter()
+                .find(|player| {
+                    player.seated().is_some_and(|seated| {
+                        seated.vehicle == ride.handle && seated.flags & VehicleSeat::DRIVER != 0
+                    })
+                })
+                .map(Player::handle);
+            for player in players.iter_mut() {
+                if player.seated().is_some() || player.noclip() || destroyed(world, player.handle())
+                {
+                    continue;
+                }
+                let mover = player.mover();
+                let radius = mover.radius();
+                let base = mover.position + Vec3::Z * radius;
+                let touching = vehicle::spheres(state, &kind.physics).any(|(centre, reach)| {
+                    centre.distance_squared(base) < (reach + radius) * (reach + radius)
+                });
+                if !touching {
+                    continue;
+                }
+                let away = (mover.position + self.centre - state.position).normalize_or_zero();
+                let lifted = Vec3::new(away.x, away.y, away.z + STRIKE_LIFT).normalize_or_zero();
+                let push = (lifted * speed.max(STRIKE_LEAST_SPEED) + state.velocity) * 0.5;
+                let theirs = mover.velocity / vehicle::GAME_TICKS_PER_SECOND as f32;
+                let left = self.left.iter().any(|(rider, vehicle, _)| {
+                    *rider == player.handle() && *vehicle == ride.handle
+                });
+                let hurts = !left
+                    && (speed > STRIKE_SPEED
+                        || state.velocity.distance_squared(theirs) > STRIKE_RELATIVE);
+                // (out of the way first, as the game fixes its pill there;
+                // left where it is if it cannot stand there)
+                player.shove(push * 2.0);
+                player.push(push);
+                if hurts {
+                    strikes.push(Strike {
+                        victim: player.handle(),
+                        owner: driver.unwrap_or(ride.handle),
+                    });
+                }
+            }
+        }
+        strikes
     }
 
     /// The player's unit's centre, from its origin, as its body is turned

@@ -283,7 +283,7 @@ struct Point {
 }
 
 /// Its mass points where it is: each one's centre and radius.
-fn spheres<'a>(
+pub(crate) fn spheres<'a>(
     state: &'a VehicleState,
     physics: &'a Physics,
 ) -> impl Iterator<Item = (Vec3, f32)> + 'a {

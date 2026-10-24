@@ -126,6 +126,7 @@ pub fn import_globals(cache: &Cache) -> Result<Globals, ImportError> {
             maximum_falling_velocity: speed(0x8C, "maximum falling velocity")?,
             falling_damage: reference(&falling, 0x10, "falling damage")?,
             maximum_distance_damage: reference(&falling, 0x2C, "maximum falling damage")?,
+            vehicle_collision_damage: reference(&falling, 0x5C, "vehicle collision damage")?,
         };
     }
 

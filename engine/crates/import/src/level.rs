@@ -687,6 +687,7 @@ fn import_damage_effects(
         [
             &globals.falling.falling_damage,
             &globals.falling.maximum_distance_damage,
+            &globals.falling.vehicle_collision_damage,
         ]
         .into_iter()
         .flatten(),

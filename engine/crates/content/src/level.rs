@@ -217,6 +217,8 @@ pub struct FallingDamage {
     pub falling_damage: Option<TagRef>,
     /// The damage a deadly landing does.
     pub maximum_distance_damage: Option<TagRef>,
+    /// The damage a vehicle does to a unit it runs into.
+    pub vehicle_collision_damage: Option<TagRef>,
 }
 
 impl Level {

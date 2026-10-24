@@ -144,6 +144,11 @@ impl Mover {
         self.character
     }
 
+    /// Its pill's radius.
+    pub fn radius(&self) -> f32 {
+        self.settings.biped.collision_radius
+    }
+
     /// Its eye's height above its feet, as it crouches.
     pub fn camera_height(&self) -> f32 {
         let biped = &self.settings.biped;
