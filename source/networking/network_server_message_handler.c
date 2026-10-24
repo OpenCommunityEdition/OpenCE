@@ -2514,9 +2514,11 @@ static boolean network_game_server_handle_message_client_game_start_request(
 			short countdown_event = (short)game_start_request.countdown_time;
 
 			/* port: the pregame screen's faster and slower, from any machine;
-			to stop the countdown or start at once (a script's), the host's own
-			(the Xbox game took any event from any machine, and a machine
-			could hold the lobby or skip the countdown) */
+			to stop the countdown or start at once (a script's, or the host's
+			faster), the host's own (the Xbox game took any event from any
+			machine, and a machine could hold the lobby or skip the countdown) */
+			if (countdown_event == _network_game_server_countdown_event_player_joined)
+				countdown_event = network_game_server_client_machine_faster_event(server, client_machine);
 			if ((countdown_event == _network_game_server_countdown_event_player_left &&
 					network_game_server_client_machine_may_slow_countdown(server, client_machine)) ||
 				countdown_event == _network_game_server_countdown_event_player_joined ||
