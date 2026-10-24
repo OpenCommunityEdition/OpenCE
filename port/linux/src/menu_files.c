@@ -1036,6 +1036,15 @@ static struct
 	int failed;
 } art[MAXIMUM_ART];
 static long art_count;
+/* a bit of 4096 for each bitmap's Data (art_filter_bit): a texture whose
+bit is clear is no menu's, found without searching the bitmaps, as the
+renderer asks for each texture it binds */
+static unsigned char art_filter[512];
+
+static unsigned long art_filter_bit(unsigned long data)
+{
+	return (unsigned long)((data * 2654435761UL) & 0xFFFFFFFFUL) >> 20;
+}
 
 void halo_menus_art_register(void const *texture, char const *png)
 {
@@ -1072,6 +1081,7 @@ void halo_menus_art_register(void const *texture, char const *png)
 	memset(&art[index], 0, sizeof(art[index]));
 	art[index].data = data;
 	art[index].png = strdup(png);
+	art_filter[art_filter_bit(data) >> 3] |= (unsigned char)(1 << (art_filter_bit(data) & 7));
 }
 
 void halo_menus_art_forget(void)
@@ -1088,12 +1098,16 @@ void halo_menus_art_forget(void)
 		}
 	}
 	art_count = 0;
+	memset(art_filter, 0, sizeof(art_filter));
 }
 
 unsigned int menu_art_texture(unsigned long data, unsigned long *levels)
 {
+	unsigned long bit = art_filter_bit(data);
 	long index;
 
+	if (!(art_filter[bit >> 3] & 1 << (bit & 7)))
+		return 0;
 	for (index = 0; index < art_count; index++)
 	{
 		if (art[index].data == data)
