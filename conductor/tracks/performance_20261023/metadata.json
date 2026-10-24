@@ -1,8 +1,9 @@
 {
   "track_id": "performance_20261023",
   "type": "feature",
-  "status": "new",
+  "status": "merged",
   "created_at": "2026-10-23T00:00:00Z",
-  "updated_at": "2026-10-23T00:00:00Z",
-  "description": "Smooth play on every Apple Silicon Mac: measuring, frame pacing, hitches, culling, the lighting track's problems, quality tiers and a full graphics settings suite"
+  "updated_at": "2026-10-24T00:00:00Z",
+  "description": "Smooth play on every Apple Silicon Mac: measuring, frame pacing, hitches, culling, the lighting track's problems, quality tiers and a full graphics settings suite",
+  "merged_into": "fidelity_devtools_20261024"
 }

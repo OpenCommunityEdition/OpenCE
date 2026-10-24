@@ -38,9 +38,6 @@ This file tracks all major tracks for the project.
 - [ ] **Track: Coverage of every map, a cutscene audit against the reference game, the fixes, and a review of the engine**
   *Link: [./tracks/coverage_audit_20261021/](./tracks/coverage_audit_20261021/)*
 
-- [ ] **Track: Smooth play on every Apple Silicon Mac: measuring, frame pacing, hitches, culling, the lighting track's problems, quality tiers and a full graphics settings suite**
-  *Link: [./tracks/performance_20261023/](./tracks/performance_20261023/)*
-
 - [ ] **Track: Modern lighting and atmosphere: a procedural sky blended with the original, a day-night cycle, volumetric fog and clouds, contact shadows and occlusion, emissive area lights, reflections and glass**
   *Link: [./tracks/atmosphere_20261023/](./tracks/atmosphere_20261023/)*
 
@@ -52,3 +49,6 @@ This file tracks all major tracks for the project.
 
 - [~] **Track: The menus, launcher and loading screen redesigned in the original's design language, designed first in a Claude design artifact**
   *Link: [./tracks/menu_redesign_20261024/](./tracks/menu_redesign_20261024/)*
+
+- [ ] **Track: Fidelity, performance and developer tools: a dev Blood Gulch with a station for each system, a launcher Developer tab, an in-game dev panel with lighting control and a stock lightmap view, the bake out of play, the systems' bugs fixed close to the original, and the performance track merged in**
+  *Link: [./tracks/fidelity_devtools_20261024/](./tracks/fidelity_devtools_20261024/)*

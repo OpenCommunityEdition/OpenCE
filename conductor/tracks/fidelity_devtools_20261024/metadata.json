@@ -1,0 +1,11 @@
+{
+  "track_id": "fidelity_devtools_20261024",
+  "type": "bug",
+  "status": "new",
+  "created_at": "2026-10-24T00:00:00Z",
+  "updated_at": "2026-10-24T00:00:00Z",
+  "description": "Fidelity, performance and developer tools: a dev Blood Gulch with a station for each system, a launcher Developer tab, an in-game dev panel with lighting control and a stock lightmap view, the bake out of play, the systems' bugs fixed close to the original, and the performance track merged in",
+  "merges": [
+    "performance_20261023"
+  ]
+}
