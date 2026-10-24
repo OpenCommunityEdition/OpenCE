@@ -30,10 +30,10 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: The dev state model 6cd68c2
     - [x] Write tests: each control round-trips through Rust, Swift, the shell and the socket; tuned values save and load per map; when off, the frame is unchanged and costs nothing
     - [x] One DevState shared by the panel, the shell, `opence` and the Developer tab
-- [ ] Task: View modes and the stock lightmap reference view
-    - [ ] Write tests: each view mode gives its own golden frame on devgulch; the stock view draws the map's lightmaps
-    - [ ] Debug outputs in the shaders, selected by a uniform
-    - [ ] Wire the shell's undrawn switches (render.wireframe, render.lightmaps, render.objects, render.hud), each with a golden frame, and add them to RenderSwitches.flags so the Developer tab offers them
+- [x] Task: View modes and the stock lightmap reference view 8350da6
+    - [x] Write tests: each view mode gives its own golden frame on devgulch; the stock view draws the map's lightmaps
+    - [x] Debug outputs in the shaders, selected by a uniform
+    - [x] Wire the shell's undrawn switches (render.wireframe, render.lightmaps, render.objects, render.hud), each with a golden frame, and add them to RenderSwitches.flags so the Developer tab offers them
 - [ ] Task: Lighting controls
     - [ ] Write tests: each slider moves the frame in the expected direction; reset restores the default
     - [ ] Exposure, sun, bounce, probes, AO, emissive, bloom, tone curve
