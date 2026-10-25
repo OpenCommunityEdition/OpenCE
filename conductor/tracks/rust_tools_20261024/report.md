@@ -809,3 +809,70 @@ Nix restructure. It joins the shell with that work; until then it is
 | the PGO build's reference traces (animation, first person, item, unit state) | identical |
 | clippy `-D warnings`, the whole workspace | clean |
 | the whole suite | 1120 passed, 3 skipped |
+
+## The track's report (2026-10-25, at eb52ae34)
+
+Measured again with `tools/engine_timings.py --profile test-opt`, on the
+same machine and maps as the starting point.
+
+| step | start (5fd62cd) | now | |
+| --- | --- | --- | --- |
+| debug build, cold | 47.2 s | 79.4 s | dependencies at opt-level 2, more crates |
+| debug build after touching the sim | 2.4 s | 2.3 s | |
+| test build, after the debug build | 38.8 s (`test`) | 146.4 s (`test-opt`) | the price of the optimised tests, once |
+| release library, cold | 52.3 s | 64.9 s | |
+| the app, Rust half incremental | 72.2 s | 99.5 s | |
+| **the test suites, one after another** | **3349.6 s (85 binaries)** | **270.7 s (101 binaries)** | 12.4 times faster |
+| **the whole suite under nextest** | — | **64.3 s (1120 tests)** | the loop's real cost |
+| devgulch, release, frame p50 / p99 | 9.21 / 9.74 ms | 9.28 / 9.64 ms | unchanged (GPU bound) |
+| devgulch, GPU p99 | 12.76 ms | 12.86 ms | unchanged |
+| devgulch, start and load from a cached pack | 20.9 s | 15.3 s | blake3, lz4, parallel hashing |
+
+An edit's check went from 56 minutes of suites to about a minute: the
+optimised test profile (11 times), the ready caches, and nextest running the
+tests across the cores. The cold builds are slower. They run once, and an
+edit's rebuild is unchanged. The frame is drawn on the GPU, and the CPU work
+the track removed (672 allocations a frame, the query states) does not
+show in its p50.
+
+Adopted, each with its measurement in the section above:
+
+| crate or tool | for | measured |
+| --- | --- | --- |
+| `test-opt` profile | the game-data suites | 3184 → 291 s |
+| ready caches (`opence_import::testing`) | maps held once per test binary | placements 189 → 90 s |
+| dependencies at opt-level 2 in debug | the debug suites | 10–25% |
+| cargo-nextest | the test step | 291 → 74 s |
+| cargo-deny | licences, bans, sources | clean |
+| insta, pretty_assertions | snapshot and readable diffs | — |
+| proptest | readers, packs, script, physics | 12 properties |
+| cargo-llvm-cov floors | coverage per crate | 72–97.5% held |
+| cargo-fuzz | six readers | 0 crashes in 4.4 M runs |
+| golden frames | nine stations drawn twice | identical |
+| cargo-mutants | physics, script | 240 → 44, 164 → 10 survivors |
+| blake3, lz4 | the packs | a10 load 1688 → 398 ms |
+| bytemuck | plain-data buffers | 14 types `Pod` |
+| tracing, tracing-tracy, divan | logs, spans, benches | — |
+| mimalloc and kept query states | allocation in the frame | 823 → 151 a frame |
+| rubato | 48 kHz resampling at decode | below 4 LSB on a sine |
+| rayon (with blake3's `rayon`) | the bake's finish, hashing | a10 finish 311 → 123 ms |
+
+Declined, each with its reason or measurement: sccache (no gain on
+incremental crates); memmap2 (the map read is 3 to 5 per cent of a load);
+binrw and zerocopy (the bounds-checked readers already cover it); bumpalo,
+smallvec and arrayvec (no allocation site left above 20 a frame); rtrb (one
+audio thread); a parallel import (one zlib stream); meshopt (it would change
+the bake's key, with little gain on tile GPUs); fat LTO, thin LTO and PGO
+(slower frames).
+
+Not done: Phase 5's Nix tasks (treefmt-nix and git-hooks.nix, nix-direnv
+and nix-output-monitor, the crane checks) and cargo-show-asm in the shell.
+They change `flake.nix` and `nix/`, which hold another session's
+uncommitted move to std cells and crane. Those files already have
+`nix fmt` (nixfmt) and checks for fmt, clippy, nextest and deny, and
+`.envrc` already uses the flake. The tasks follow once that work is
+committed.
+
+What the next track should take up: the frame's CPU time, now that the
+benches can show it (warthog's 280 µs is the largest station), and a
+parallel edge measure in the bake once `bake/src/edge.rs`'s band work lands.
