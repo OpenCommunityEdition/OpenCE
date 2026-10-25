@@ -22,3 +22,11 @@ def test_the_debug_builds_dependencies_are_optimised() -> None:
     profile = tomllib.loads(CARGO.read_text())["profile"]["dev"]
     assert profile["package"]["*"]["opt-level"] == 2
     assert "opt-level" not in profile
+
+
+def test_the_release_build_aborts_and_is_not_linked_whole() -> None:
+    # (a panic must not unwind into Swift; fat and thin LTO were measured
+    # and each made devgulch's frames slower, see the rust_tools report)
+    profile = tomllib.loads(CARGO.read_text())["profile"]["release"]
+    assert profile["panic"] == "abort"
+    assert profile.get("lto", False) is False

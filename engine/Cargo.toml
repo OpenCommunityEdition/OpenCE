@@ -77,6 +77,9 @@ expect_used = "deny"
 # a panic must not unwind into Swift
 panic = "abort"
 debug = "line-tables-only"
+# (no LTO: fat and thin LTO each made devgulch's frames slower, by 3 to
+# 8 per cent, and fat LTO made an edit's relink 3 times longer; see the
+# rust_tools report)
 
 [profile.dev]
 panic = "abort"

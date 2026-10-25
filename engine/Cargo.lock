@@ -1289,6 +1289,7 @@ name = "opence_ffi"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "divan",
  "libm",
  "mimalloc",
  "opence_audio",

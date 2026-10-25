@@ -751,3 +751,61 @@ C++ build into the Nix closure for no measured gain.
 | a pack loads as the level imported | pass |
 | clippy `-D warnings`, the whole workspace | clean |
 | the whole suite | 1120 passed, 3 skipped |
+
+## The release build
+
+A new benchmark, `ffi/benches/frame.rs`, measures what the release build is
+for. It starts devgulch with a station running, plays its first second, and
+then times one `advance` of 1/60 s, through the calls the app makes. It
+times four stations: AI, physics, the warthog and the pistol. Each profile
+was built clean in its own target folder, and the frames were run back to
+back on the same machine, more than once, interleaved.
+
+| profile | clean build of the library | rebuild after an edit to sim | `.a` size |
+| --- | --- | --- | --- |
+| default (no LTO, 16 units) | 64 s | 15 s | 158.6 MB |
+| fat LTO, 1 codegen unit | 94 s | 49 s | 208.3 MB |
+| thin LTO, 16 codegen units | 62 s | 16 s | 299.7 MB |
+
+Medians of a frame over several runs, in µs (the fastest sample in brackets):
+
+| station | default | fat LTO | thin LTO | PGO |
+| --- | --- | --- | --- | --- |
+| AI | 132–141 (124–128) | 140–141 (130–134) | 143–146 (136–139) | 148–154 (139–147) |
+| physics | 131–141 (115–119) | 140–144 (118–123) | 137–149 (122–125) | 145–150 (124–129) |
+| warthog | 273–290 (224–234) | 282–295 (231–242) | 290–292 (233–235) | 293–301 (240–248) |
+| pistol | 161–179 (124–128) | 174–186 (128–129) | 175–187 (134–141) | 177–181 (131–140) |
+
+Neither kind of LTO made a frame faster. Fat LTO did speed up some of the
+micro-benchmarks: animation blending went from 445 to 364 ns, the ray from
+161 to 156 ns, and the mission tick from 569 to 551 µs. But devgulch's frames
+were 3 to 8 per cent slower, the library grew by a third, and an edit's
+relink took three times as long. Thin LTO cost no build time, but its frames
+were slower too, and its library was almost twice the size. A frame here is
+bound by the ECS's queries and the world's memory, not by calls across
+crates. So the release profile stays as it was: `panic = "abort"`, with line
+tables for the profiler, and no LTO.
+
+PGO was recorded with cargo-pgo 0.3.0. The instrumented frame bench made
+one 4.2 MiB profile, and a second build was optimised with it. The
+optimised frames were 4 to 13 per cent slower than the default, in two
+interleaved runs. The profile left 2 143 functions without data, because a
+frame of four stations does not reach the whole library. A profile recorded
+on a whole game might do better, but not one that a build can record on
+devgulch without the user's play. On the PGO build the reference trace
+tests (animation, first person, items, unit state) give the same traces,
+so it would be safe. It is declined because it is slower.
+
+cargo-show-asm was not added to the shell. The shell's tool list is in
+`nix/repo/toolchain.nix`, which is part of another session's uncommitted
+Nix restructure. It joins the shell with that work; until then it is
+`nix run nixpkgs#cargo-show-asm`.
+
+| check | result |
+| --- | --- |
+| the release profile aborts on a panic and is not linked whole (`tools/test_cargo_profiles.py`) | pass |
+| the frame bench runs on devgulch's four stations and skips without assets | pass |
+| fat LTO, thin LTO and PGO frames against the default | all slower; declined |
+| the PGO build's reference traces (animation, first person, item, unit state) | identical |
+| clippy `-D warnings`, the whole workspace | clean |
+| the whole suite | 1120 passed, 3 skipped |
