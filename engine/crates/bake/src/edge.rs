@@ -9,7 +9,7 @@
 //! from one to the next. A shadow's edge falling across texels smoothly
 //! has few hard steps; one drawn texel by texel has a row of them.
 
-use crate::chart::{Atlas, BakePoint, Chart, EMPTY};
+use crate::chart::{Atlas, BakePoint, Chart, EMPTY, MAX_FOOTPRINT};
 use crate::mood::{brightness, shown, StockPage};
 use crate::output::{from_half, BakedPage};
 
@@ -19,6 +19,23 @@ pub const HARD_STEP: f32 = 0.25;
 /// How far apart, in their texels' footprints, two points may be and
 /// still be neighbours on a surface.
 const NEIGHBOURS_WITHIN: f32 = 2.5;
+
+/// The bands of texel size the edge check is also told by (world units):
+/// under half a unit (the bases, the paths), up to the widest footprint
+/// (the ground), and at it (the cliffs' and the far hills' largest
+/// texels, whose paths spread no wider than [`MAX_FOOTPRINT`]).
+pub const SIZE_BANDS: usize = 3;
+
+/// The band of [`SIZE_BANDS`] a texel of footprint `footprint` is in.
+pub fn size_band(footprint: f32) -> usize {
+    if footprint < 0.5 {
+        0
+    } else if footprint < MAX_FOOTPRINT * 0.999 {
+        1
+    } else {
+        2
+    }
+}
 
 /// The steps between neighbouring texels of a set of pages.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -43,6 +60,16 @@ impl EdgeSteps {
 
     /// The steps on the baked `pages` (one to a chart of `atlas`).
     pub fn baked(atlas: &Atlas, pages: &[BakedPage]) -> Self {
+        Self::baked_where(atlas, pages, |_| true)
+    }
+
+    /// [`Self::baked`], counting only the pairs whose first texel's point
+    /// `keep` keeps.
+    pub fn baked_where(
+        atlas: &Atlas,
+        pages: &[BakedPage],
+        keep: impl Fn(&BakePoint) -> bool,
+    ) -> Self {
         let mut steps = Tally::default();
         for (chart, page) in atlas.charts.iter().zip(pages) {
             let light = |x: u32, y: u32| -> Option<f32> {
@@ -51,7 +78,7 @@ impl EdgeSteps {
                 let color = [0, 1, 2].map(|channel| shown(from_half(texel[channel])).min(1.0));
                 Some(brightness(color))
             };
-            steps.page(atlas, chart, 1, light);
+            steps.page(atlas, chart, 1, light, &keep);
         }
         steps.finish()
     }
@@ -60,6 +87,16 @@ impl EdgeSteps {
     /// one), as stored: each stock texel's surface is the baked chart's at
     /// its middle.
     pub fn stock(atlas: &Atlas, stock: &[Option<StockPage>]) -> Self {
+        Self::stock_where(atlas, stock, |_| true)
+    }
+
+    /// [`Self::stock`], counting only the pairs whose first texel's point
+    /// `keep` keeps.
+    pub fn stock_where(
+        atlas: &Atlas,
+        stock: &[Option<StockPage>],
+        keep: impl Fn(&BakePoint) -> bool,
+    ) -> Self {
         let mut steps = Tally::default();
         for (chart, page) in atlas.charts.iter().zip(stock) {
             let Some(page) = page else { continue };
@@ -70,7 +107,13 @@ impl EdgeSteps {
             if chart.height != page.height * scale {
                 continue;
             }
-            steps.page(atlas, chart, scale, |x, y| page.light(x, y).map(brightness));
+            steps.page(
+                atlas,
+                chart,
+                scale,
+                |x, y| page.light(x, y).map(brightness),
+                &keep,
+            );
         }
         steps.finish()
     }
@@ -86,13 +129,15 @@ struct Tally {
 
 impl Tally {
     /// Counts the pairs of a page `scale` times smaller each way than
-    /// `chart`, whose light at a texel is `light`.
+    /// `chart`, whose light at a texel is `light`, whose first point `keep`
+    /// keeps.
     fn page(
         &mut self,
         atlas: &Atlas,
         chart: &Chart,
         scale: u32,
         light: impl Fn(u32, u32) -> Option<f32>,
+        keep: &impl Fn(&BakePoint) -> bool,
     ) {
         let (width, height) = (chart.width / scale, chart.height / scale);
         let point = |x: u32, y: u32| -> Option<&BakePoint> {
@@ -104,7 +149,9 @@ impl Tally {
         };
         for y in 0..height {
             for x in 0..width {
-                let Some(here) = point(x, y) else { continue };
+                let Some(here) = point(x, y).filter(|&here| keep(here)) else {
+                    continue;
+                };
                 for (nx, ny) in [(x + 1, y), (x, y + 1)] {
                     if nx >= width || ny >= height {
                         continue;

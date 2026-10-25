@@ -21,7 +21,7 @@ use opence_content::level::Level;
 use opence_content::pack::FORMAT_VERSION;
 
 use crate::chart::{Atlas, BakePoint, Chart};
-use crate::edge::EdgeSteps;
+use crate::edge::{size_band, EdgeSteps, SIZE_BANDS};
 use crate::filter;
 use crate::mood::{self, PageMood, StockPage};
 use crate::probe::{self, ProbeGrid, REFLECTION_SIZE};
@@ -83,6 +83,8 @@ pub struct BakePlan {
     /// The steps between neighbouring texels on the stock pages (for the
     /// edge check).
     pub stock_edges: EdgeSteps,
+    /// The same, band by band of texel size ([`crate::edge::size_band`]).
+    pub stock_edge_bands: [EdgeSteps; SIZE_BANDS],
 }
 
 /// A baked page: its texels' light, row by row from the top.
@@ -158,6 +160,9 @@ impl BakePlan {
         let seams = Seam::find(&level.structure_bsps[bsp], &atlas);
         let stock_seams = seam::stock_steps(&atlas, &seams, &pages);
         let stock_edges = EdgeSteps::stock(&atlas, &pages);
+        let stock_edge_bands = std::array::from_fn(|band| {
+            EdgeSteps::stock_where(&atlas, &pages, |point| size_band(point.footprint) == band)
+        });
         Some(Self {
             scene,
             atlas,
@@ -169,6 +174,7 @@ impl BakePlan {
             seams,
             stock_seams,
             stock_edges,
+            stock_edge_bands,
         })
     }
 
@@ -179,6 +185,17 @@ impl BakePlan {
             EdgeSteps::baked(&self.atlas, &light.pages),
             self.stock_edges,
         )
+    }
+
+    /// [`Self::edges`], band by band of texel size
+    /// ([`crate::edge::size_band`]).
+    pub fn edge_bands(&self, light: &BakedLighting) -> [(EdgeSteps, EdgeSteps); SIZE_BANDS] {
+        std::array::from_fn(|band| {
+            let baked = EdgeSteps::baked_where(&self.atlas, &light.pages, |point| {
+                size_band(point.footprint) == band
+            });
+            (baked, self.stock_edge_bands[band])
+        })
     }
 
     /// The step in light across each seam on `light`'s pages and on the

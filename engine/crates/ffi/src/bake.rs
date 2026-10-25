@@ -455,6 +455,23 @@ impl LevelBake {
         }
     }
 
+    /// [`Self::edges`], band by band of texel size: under half a unit, up
+    /// to the widest footprint a texel's paths spread over, and at it.
+    pub fn edges_by_size(&self, light: Arc<BakedLight>) -> Vec<BakeEdgeSteps> {
+        self.plan
+            .edge_bands(&light.light)
+            .iter()
+            .map(|(baked, stock)| BakeEdgeSteps {
+                pairs: baked.pairs,
+                hard: baked.hard,
+                mean: baked.mean,
+                stock_pairs: stock.pairs,
+                stock_hard: stock.hard,
+                stock_mean: stock.mean,
+            })
+            .collect()
+    }
+
     /// The BSP, in the level's.
     pub fn bsp(&self) -> u32 {
         self.bsp as u32
