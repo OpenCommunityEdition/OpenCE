@@ -33,8 +33,8 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [ ] Task: Mutation testing
     - [ ] Run `cargo mutants` over `sim`, `physics` and `script`; list the survivors
     - [ ] Write tests that kill the survivors that matter; record the rest with a reason
-- [ ] Task: Property tests
-    - [ ] Write tests (proptest): the tag and cache readers never panic and round-trip; the script compiler rejects or compiles; physics keeps its invariants (no tunnelling at the tested speeds, energy not gained)
+- [x] Task: Property tests 2fb6670e
+    - [x] Write tests (proptest): the tag and cache readers never panic and round-trip; the script compiler rejects or compiles; physics keeps its invariants (no tunnelling at the tested speeds, energy not gained)
 - [ ] Task: Coverage floors
     - [ ] Write tests: the test step fails below each crate's floor
     - [ ] `cargo llvm-cov` per crate, the floors set from today's numbers
