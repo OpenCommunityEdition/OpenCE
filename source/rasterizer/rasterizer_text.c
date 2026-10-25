@@ -855,7 +855,9 @@ static long hires_text_font_get(
 
 		letter_widths[letter] = character ? character->character_width : 0;
 	}
-	capital = font_get_character_by_ascii_code(font, 'H');
+	/* (the tag's own H, its pixels at their own width: not the subtitles'
+	copy, whose width is the high-res font's: font_group.c) */
+	capital = font_get_tag_character_unforced(font, 'H');
 	if (capital)
 	{
 		byte const *pixels = (byte const *)font->pixels.address + capital->pixels_offset;

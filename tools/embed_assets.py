@@ -94,8 +94,14 @@ def menu_files() -> List[str]:
 
 
 def subtitle_file(language: str) -> Path:
-    """A language's subtitles file."""
-    return SUBTITLE_ASSETS / ("subtitles.txt" if language == "english" else f"subtitles_{language}.txt")
+    """A language's subtitles file (its name in any case: subtitles_French.txt
+    is French's, on a file system that tells cases apart too)."""
+    name = "subtitles.txt" if language == "english" else f"subtitles_{language}.txt"
+    if (ROOT / SUBTITLE_ASSETS).is_dir():
+        for path in sorted((ROOT / SUBTITLE_ASSETS).iterdir()):
+            if path.is_file() and path.name.lower() == name:
+                return SUBTITLE_ASSETS / path.name
+    return SUBTITLE_ASSETS / name
 
 
 def subtitle_files() -> List[Path]:

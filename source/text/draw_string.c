@@ -1527,7 +1527,8 @@ short draw_unicode_string_capital_middle(
 	if (!font)
 		return (short)((bounds->y0 + bounds->y1) / 2);
 	baseline = (short)(cursor_bounds.y0 + font->ascending_height);
-	capital = font_get_character_by_ascii_code(font, 'H');
+	/* (the tag's own H, its pixels at their own width: font_group.c) */
+	capital = font_get_tag_character_unforced(font, 'H');
 	for (row = 0; capital && row < capital->bitmap_height; row++)
 	{
 		byte const *pixels = (byte const *)font->pixels.address + capital->pixels_offset + row * capital->bitmap_width;

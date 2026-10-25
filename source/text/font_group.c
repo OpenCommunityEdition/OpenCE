@@ -109,6 +109,13 @@ struct font_character *font_get_character_by_ascii_code(
 	return (struct font_character *)synthetic;
 }
 
+struct font_character *font_get_tag_character_unforced(
+	struct font_header *font,
+	word character_code)
+{
+	return font_get_tag_character(font, character_code);
+}
+
 /* ---------- private code */
 
 /* port: the height of the font tag's capital H, its rows with ink (as

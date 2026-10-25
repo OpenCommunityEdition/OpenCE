@@ -55,5 +55,9 @@ struct font_header
 /* ---------- public code */
 
 struct font_character *font_get_character_by_ascii_code(struct font_header *font, word character_code);
+/* port: the font tag's own character, with its own pixels (none for one the
+tag lacks): not the copy the subtitles' text is measured by, whose width is
+the high-res font's (font_get_character_by_ascii_code) */
+struct font_character *font_get_tag_character_unforced(struct font_header *font, word character_code);
 
 #endif // __FONT_GROUP_H
