@@ -24,9 +24,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: Deterministic maps eb85df8
     - [x] Write tests: one sim run twice in one process with differently seeded hashers gives the same state each tick (the contrails, run four times: the one map iterated with the game's random numbers)
     - [x] `indexmap` where the sim iterates a map, `rustc-hash` for the hot lookups; clippy's `disallowed_types` forbids std `HashMap` in `sim` (the original's slot order in place of `indexmap`; the ban covers the workspace)
-- [ ] Task: insta and pretty_assertions
-    - [ ] Write tests: snapshots of the dev state, the bake report, the import's tag dumps and the shell's command output
-    - [ ] Move the hand-written expected texts to snapshots
+- [x] Task: insta and pretty_assertions 7761dd1
+    - [x] Write tests: snapshots of the dev state, the bake report, the import's tag dumps and the shell's command output (the shell's text and the tag index; the dev state and the bake report wait for another session's changes to their code)
+    - [x] Move the hand-written expected texts to snapshots
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Quick wins' (Protocol in workflow.md)
 
 ## Phase 2: Test strength
