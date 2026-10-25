@@ -89,6 +89,7 @@ static boolean gun_game_weapon_empty(
 	struct weapon_datum *weapon = weapon_try_and_get(weapon_index);
 	struct weapon_definition *definition;
 	short magazine;
+	boolean holds_rounds = FALSE;
 
 	if (!weapon)
 		return FALSE;
@@ -98,10 +99,17 @@ static boolean gun_game_weapon_empty(
 	for (magazine = 0; magazine < MIN(definition->weapon.magazines.count, NUMBEROF(weapon->weapon.magazines));
 		magazine++)
 	{
+		struct weapon_magazine_definition const *magazine_definition =
+			TAG_BLOCK_GET_ELEMENT(&definition->weapon.magazines, magazine, struct weapon_magazine_definition);
+
+		/* (a battery weapon's magazine holds no rounds: the plasma rifle's and plasma pistol's) */
+		if (magazine_definition->rounds_loaded_maximum <= 0 && magazine_definition->rounds_total_maximum <= 0)
+			continue;
+		holds_rounds = TRUE;
 		if (weapon->weapon.magazines[magazine].rounds_loaded > 0 || weapon->weapon.magazines[magazine].rounds_total > 0)
 			return FALSE;
 	}
-	return TRUE;
+	return holds_rounds ? TRUE : weapon->weapon.age >= 1.0f;
 }
 
 /* every weapon of a unit gone, the one in its hand too (which
