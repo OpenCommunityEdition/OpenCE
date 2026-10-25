@@ -35,12 +35,12 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
     - [ ] Write tests that kill the survivors that matter; record the rest with a reason
 - [x] Task: Property tests 2fb6670e
     - [x] Write tests (proptest): the tag and cache readers never panic and round-trip; the script compiler rejects or compiles; physics keeps its invariants (no tunnelling at the tested speeds, energy not gained)
-- [ ] Task: Coverage floors
-    - [ ] Write tests: the test step fails below each crate's floor
-    - [ ] `cargo llvm-cov` per crate, the floors set from today's numbers
-- [ ] Task: Fuzz targets for every untrusted reader
-    - [ ] Write tests: each target runs a short corpus in the test step
-    - [ ] Targets for the map, tag, sound and bitmap readers
+- [x] Task: Coverage floors 40d4f953
+    - [x] Write tests: the check fails below each crate's floor (its own check at each phase's end, not every test step: instrumented, the tests take half as long again)
+    - [x] `cargo llvm-cov` per crate, the floors set from today's numbers
+- [x] Task: Fuzz targets for every untrusted reader 5bd8f372
+    - [x] Write tests: each target runs a short corpus in the test step
+    - [x] Targets for the map, tag, sound and bitmap readers
 - [ ] Task: Golden frames
     - [ ] Write tests (XCTest with swift-snapshot-testing): devgulch's stations rendered headless match their golden images within a tolerance
     - [ ] The headless capture and the recorded images (made from the user's map, kept out of the repository)
