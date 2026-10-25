@@ -65,9 +65,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: Allocation in the frame 1269e227
     - [x] Write tests: a counting allocator shows how many allocations a frame makes on devgulch, and the count goes down
     - [x] mimalloc; bumpalo frame arenas; smallvec and arrayvec in the hot paths (mimalloc adopted; the rest declined, see the report)
-- [ ] Task: The audio thread
-    - [ ] Write tests: the audio thread's queue never blocks; resampled 22 kHz sounds match a reference within a tolerance
-    - [ ] rtrb, rubato
+- [x] Task: The audio thread 0364e2b7
+    - [x] Write tests: the audio thread's queue never blocks; resampled 22 kHz sounds match a reference within a tolerance
+    - [x] rtrb (declined: one thread), rubato
 - [ ] Task: Bake and import in parallel
     - [ ] Write tests: the bake's output is the same with one thread and with many
     - [ ] rayon in bake and import; meshopt at bake time
