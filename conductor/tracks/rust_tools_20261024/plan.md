@@ -53,9 +53,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [ ] Task: memmap2 and bytemuck
     - [ ] Write tests: maps read through a mapping match a read file; the Metal buffer structures are `Pod`
     - [ ] Map files mapped, the buffer copies through bytemuck
-- [ ] Task: blake3 and lz4_flex for the bake cache
-    - [ ] Write tests: a changed input invalidates its baked asset and only it; compressed caches round-trip; load time measured
-    - [ ] The cache key and the compression
+- [x] Task: blake3 and lz4_flex for the bake cache 35faf08d
+    - [x] Write tests: a changed input invalidates its baked asset and only it; compressed caches round-trip; load time measured (the level packs, whose key the bakes share)
+    - [x] The cache key and the compression
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Formats' (Protocol in workflow.md)
 
 ## Phase 4: Performance
