@@ -32,9 +32,14 @@ fn every_control_round_trips() -> Result {
     assert_eq!(controls.len(), 11);
     for control in &controls {
         assert_eq!(control.value, control.default_value, "{}", control.name);
-        assert!(control.minimum <= control.default_value && control.default_value <= control.maximum);
+        assert!(
+            control.minimum <= control.default_value && control.default_value <= control.maximum
+        );
         // (each is a shell variable too: the Developer tab and `vars` list it)
-        assert!(engine.shell_variables().iter().any(|v| v.name == control.name));
+        assert!(engine
+            .shell_variables()
+            .iter()
+            .any(|v| v.name == control.name));
     }
     assert!(!engine.shell_flag("dev.panel".into()));
 
@@ -59,7 +64,10 @@ fn every_control_round_trips() -> Result {
 
     // (reset restores the defaults, and needs no map)
     assert!(engine.run_command("tune reset".into()).ok);
-    assert!(engine.tune_controls().iter().all(|c| c.value == c.default_value));
+    assert!(engine
+        .tune_controls()
+        .iter()
+        .all(|c| c.value == c.default_value));
     assert!(!engine.run_command("set tune.sun lots".into()).ok);
     assert!(!engine.run_command("tune save".into()).ok);
     Ok(())
@@ -92,7 +100,10 @@ fn tuning_is_saved_and_loaded_per_map() -> Result {
     let place = folder.to_string_lossy().into_owned();
     let engine = Engine::new();
 
-    assert_eq!(engine.set_tuning(place.clone(), "devgulch".into())?, Vec::<String>::new());
+    assert_eq!(
+        engine.set_tuning(place.clone(), "devgulch".into())?,
+        Vec::<String>::new()
+    );
     engine.set_shell_variable("tune.sun".into(), "1.75".into())?;
     let saved = engine.run_command("tune save".into());
     assert!(saved.ok, "{}", saved.text);

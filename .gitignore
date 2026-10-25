@@ -6,11 +6,14 @@
 __pycache__
 .mypy_cache
 .cache/
+.direnv
 
 # Build files
 build/
 .ninja_*
 build.ninja
+result
+result-*
 
 # Generated configs
 compile_commands.json

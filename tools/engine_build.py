@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Builds OpenCE Engine.app, the new engine (conductor/tracks/native_engine_20261021).
 
-  engine_build.py [--out build/engine] [--codesign codesign]
+  engine_build.py [--out build/engine] [--codesign codesign] [--rust folder]
+  engine_build.py --rust-only folder
 
-The Rust workspace in engine/ is built as a static library (the ffi crate),
-its UniFFI bindings are written into the Swift package in engine/app, Xcode's
-Swift builds the package against the library, and the executable is laid out
-in a bundle signed ad hoc. The shaders are compiled first with Xcode's Metal
+The Rust workspace in engine/ is built as a static library (the ffi crate)
+and its UniFFI bindings are written (the Rust half, in out/rust), the
+bindings are copied into the Swift package in engine/app, Xcode's Swift
+builds the package against the library, and the executable is laid out in a
+bundle signed ad hoc. --rust-only builds the Rust half alone, as the flake's
+engine-rust package does with crane; --rust takes a Rust half built already
+(nix build .#engine-rust) instead of running cargo. The shaders are compiled first with Xcode's Metal
 toolchain (xcodebuild -downloadComponent MetalToolchain), so that an error in
 one stops the build rather than the app's start. With --test, the tests run
 instead: cargo deny and the workspace's tests under nextest, then the
@@ -55,37 +59,45 @@ def rust_test_commands(profile: str = "test-opt") -> list[list[str]]:
     ]
 
 
-def rust_library() -> Path:
+def rust_half(rust: Path) -> None:
+    """Builds the library into rust/lib, and writes its UniFFI bindings and
+    the snapshot's header into rust/bindings."""
     cargo("build", "--release", "--locked", "-p", "opence_ffi", "--lib")
-    return ENGINE / "target" / "release" / LIBRARY
-
-
-def swift_bindings(library: Path, out: Path) -> None:
-    """Writes the UniFFI bindings and the snapshot's header where Package.swift expects them."""
-    generated = out / "uniffi"
-    shutil.rmtree(generated, ignore_errors=True)
+    target = Path(os.environ.get("CARGO_TARGET_DIR", ENGINE / "target"))
+    bindings = rust / "bindings"
+    for folder in (rust / "lib", bindings):
+        shutil.rmtree(folder, ignore_errors=True)
+        folder.mkdir(parents=True)
+    library = rust / "lib" / LIBRARY
+    shutil.copy(target / "release" / LIBRARY, library)
     cargo(
         "run", "--release", "--locked", "-p", "opence_ffi", "--features", "bindgen",
         "--bin", "uniffi-bindgen", "--",
-        "generate", "--library", str(library), "--language", "swift", "--out-dir", str(generated),
+        "generate", "--library", str(library), "--language", "swift", "--out-dir", str(bindings),
     )
+    subprocess.run(
+        [
+            "cbindgen", "--quiet", "--config", str(ENGINE / "crates" / "ffi" / "cbindgen.toml"),
+            "--crate", "opence_ffi", "--output", str(bindings / SNAPSHOT_HEADER), str(ENGINE / "crates" / "ffi"),
+        ],
+        check=True,
+    )
+
+
+def swift_bindings(rust: Path) -> None:
+    """Copies the Rust half's bindings where Package.swift expects them."""
+    bindings = rust / "bindings"
     ffi = PACKAGE / "Sources" / FFI_MODULE
     core = PACKAGE / "Sources" / "OpenCEEngineCore"
     for folder in (ffi, core):
         shutil.rmtree(folder, ignore_errors=True)
         folder.mkdir(parents=True)
-    shutil.copy(generated / f"{FFI_MODULE}.h", ffi / f"{FFI_MODULE}.h")
-    subprocess.run(
-        [
-            "cbindgen", "--quiet", "--config", str(ENGINE / "crates" / "ffi" / "cbindgen.toml"),
-            "--crate", "opence_ffi", "--output", str(ffi / SNAPSHOT_HEADER), str(ENGINE / "crates" / "ffi"),
-        ],
-        check=True,
-    )
+    for header in (f"{FFI_MODULE}.h", SNAPSHOT_HEADER):
+        shutil.copy(bindings / header, ffi / header)
     (ffi / "module.modulemap").write_text(
         f'module {FFI_MODULE} {{\n    header "{FFI_MODULE}.h"\n    header "{SNAPSHOT_HEADER}"\n    export *\n}}\n'
     )
-    shutil.copy(generated / "opence_ffi.swift", core / "opence_ffi.swift")
+    shutil.copy(bindings / "opence_ffi.swift", core / "opence_ffi.swift")
 
 
 def xcode_environment() -> dict[str, str]:
@@ -205,7 +217,12 @@ def main() -> None:
     parser.add_argument("--filter", help="with --test, only the tests whose names match this")
     parser.add_argument("--suite", choices=("all", "rust", "swift"), default="all",
                         help="with --test, the Rust half's tests (cargo deny and nextest), the XCTests, or both")
+    parser.add_argument("--rust", type=Path, help="the Rust half built already, instead of running cargo")
+    parser.add_argument("--rust-only", type=Path, help="build only the Rust half, into this folder")
     arguments = parser.parse_args()
+    if arguments.rust_only:
+        rust_half(arguments.rust_only.resolve())
+        return
     if arguments.test and arguments.suite != "swift":
         for command in rust_test_commands():
             subprocess.run(command, cwd=ENGINE, check=True)
@@ -214,8 +231,11 @@ def main() -> None:
     out = arguments.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     check_shaders(out)
-    library = rust_library()
-    swift_bindings(library, out)
+    rust = arguments.rust.resolve() if arguments.rust else out / "rust"
+    if not arguments.rust:
+        rust_half(rust)
+    swift_bindings(rust)
+    library = rust / "lib" / LIBRARY
     if arguments.test:
         swift("test", library, out, ("--filter", arguments.filter) if arguments.filter else ())
         return

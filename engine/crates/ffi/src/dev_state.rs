@@ -29,7 +29,13 @@ pub const TUNING: [(&str, &str, f64, f64, f64); 11] = [
         4.0,
     ),
     ("tune.sun", "Scales the sun's light.", 1.0, 0.0, 4.0),
-    ("tune.sun_red", "Scales the red of the sun's colour.", 1.0, 0.0, 2.0),
+    (
+        "tune.sun_red",
+        "Scales the red of the sun's colour.",
+        1.0,
+        0.0,
+        2.0,
+    ),
     (
         "tune.sun_green",
         "Scales the green of the sun's colour.",
@@ -37,7 +43,13 @@ pub const TUNING: [(&str, &str, f64, f64, f64); 11] = [
         0.0,
         2.0,
     ),
-    ("tune.sun_blue", "Scales the blue of the sun's colour.", 1.0, 0.0, 2.0),
+    (
+        "tune.sun_blue",
+        "Scales the blue of the sun's colour.",
+        1.0,
+        0.0,
+        2.0,
+    ),
     (
         "tune.bounce",
         "Scales the baked light that bounced off the level.",
@@ -273,7 +285,10 @@ pub(crate) fn save(registry: &Registry<State>, state: &State) -> Result<PathBuf,
 
 /// Sets the controls from the map's file, the rest to their defaults; the
 /// names refused (not a control, or out of its range).
-pub(crate) fn load(registry: &mut Registry<State>, state: &mut State) -> Result<Vec<String>, String> {
+pub(crate) fn load(
+    registry: &mut Registry<State>,
+    state: &mut State,
+) -> Result<Vec<String>, String> {
     reset(registry, state);
     let (folder, map) = state
         .shell
