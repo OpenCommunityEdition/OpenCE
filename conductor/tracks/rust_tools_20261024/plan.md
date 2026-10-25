@@ -68,9 +68,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: The audio thread 0364e2b7
     - [x] Write tests: the audio thread's queue never blocks; resampled 22 kHz sounds match a reference within a tolerance
     - [x] rtrb (declined: one thread), rubato
-- [ ] Task: Bake and import in parallel
-    - [ ] Write tests: the bake's output is the same with one thread and with many
-    - [ ] rayon in bake and import; meshopt at bake time
+- [x] Task: Bake and import in parallel ab55e7c1
+    - [x] Write tests: the bake's output is the same with one thread and with many
+    - [x] rayon in bake and import; meshopt at bake time (rayon in the bake's firefly hold and exposure fit, BLAKE3 hashing on all cores; the import kept serial and meshopt declined, see the report)
 - [ ] Task: The release build
     - [ ] Write tests: the release profile has fat LTO and one codegen unit; the PGO build gives the same reference traces
     - [ ] LTO, codegen-units, cargo-pgo profiles recorded on devgulch; cargo-show-asm in the shell
