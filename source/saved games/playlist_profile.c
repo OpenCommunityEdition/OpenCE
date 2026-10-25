@@ -440,17 +440,7 @@ boolean playlist_profile_get_display_name(
 	long playlist_profile_index,
 	wchar_t *display_name)
 {
-	wchar_t *name;
-
-	/* port: the ctf/slayer synthetic profile */
-	if (playlist_profile_index == CTF_SLAYER_PLAYLIST_PROFILE_INDEX)
-	{
-		ustrncpy(display_name, L"CTF/Slayer", MAX_GAMENAME - 1);
-		display_name[MAX_GAMENAME - 1] = 0;
-		return TRUE;
-	}
-
-	name = saved_game_file_get_display_name(playlist_profile_index);
+	wchar_t *name = saved_game_file_get_display_name(playlist_profile_index);
 
 	if (name)
 	{
@@ -468,16 +458,6 @@ boolean playlist_profile_get(
 	struct game_variant *variant)
 {
 	boolean success = FALSE;
-
-	/* port: the ctf/slayer synthetic profile */
-	if (playlist_profile_index == CTF_SLAYER_PLAYLIST_PROFILE_INDEX)
-	{
-		struct game_variant temporary;
-		*variant = *build_game_variant_ctf_slayer(&temporary);
-		ustrncpy(variant->human_readable_game_description, L"CTF/Slayer", MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1);
-		variant->human_readable_game_description[MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1] = 0;
-		return TRUE;
-	}
 
 	match_assert(
 		"c:\\halo\\SOURCE\\saved games\\playlist_profile.c",
@@ -519,13 +499,6 @@ boolean playlist_profile_get_options(
 	struct game_variant_options *options)
 {
 	byte block[SAVED_GAME_FILE_BLOCK_SIZE];
-
-	/* port: the ctf/slayer synthetic profile */
-	if (playlist_profile_index == CTF_SLAYER_PLAYLIST_PROFILE_INDEX)
-	{
-		game_variant_options_default(NULL, options);
-		return TRUE;
-	}
 
 	if (playlist_profile_index != NONE &&
 		TEST_FLAG(playlist_profile_index, _saved_game_file_index_valid_bit) &&

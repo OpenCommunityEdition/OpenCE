@@ -23,7 +23,6 @@
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_slayer_item"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_oddball_item"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_race_item"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_ctfs_item"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_ext_desc" controller="1" left="275" top="78" width="320" height="322" bitmap="bitmaps/list_field">
@@ -38,11 +37,6 @@
 	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_race_item" type="text" left="51" top="210" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_options" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
 		<on event="a" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/race_options_screen"/>
 		<on event="start" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/race_options_screen"/>
-		<on event="left_mouse" run="mouse emit accept event"/>
-	</widget>
-	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_ctfs_item" type="text" left="51" top="243" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_options" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
-		<on event="a" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_slayer_edit/ctf_slayer_options_screen"/>
-		<on event="start" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_slayer_edit/ctf_slayer_options_screen"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">

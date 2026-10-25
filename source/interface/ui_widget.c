@@ -5251,9 +5251,6 @@ static void widget_instance_render_text_box(
 		{
 			string = (wchar_t *)kills_to_win_extra_descriptions[string_list_index - SPINNER_EXTRA_DESCRIPTION_BASE];
 		}
-		/* port: the port's own text (ui_widget.h) */
-		if (string_list_index == UI_WIDGET_PORT_STRING_CTF_SLAYER_NAME)
-			string = L"CTF/Slayer";
 		length = ustrlen(string);
 		widget->parameters.text_box.text = pool_resize_pointer(
 			widget_memory_pool,

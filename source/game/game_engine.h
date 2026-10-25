@@ -40,12 +40,9 @@ enum game_engine_type
 	game_engine_race,
 	game_engine_terminator,
 	game_engine_stub,
-	/* port: ctf/slayer gametype — ctf rules, 1 point per kill, and a capture's
-	points (25 by default); its number is kept for saved gametypes */
-	game_engine_ctf_slayer = 10,
 	number_of_game_engines,
 	first_usable_game_engine_index = game_engine_ctf,
-	last_usable_game_engine_index = game_engine_ctf_slayer,
+	last_usable_game_engine_index = game_engine_race,
 };
 
 enum get_score_type
@@ -95,8 +92,12 @@ struct ctf_variant
 	boolean flag_must_reset;
 	boolean flag_at_home_to_score;
 	long single_flag_time;
-	/* port: ctf/slayer's points for a capture (0: the default, 25) */
+	/* port: Kills Score (the editor's): a kill scores a point for the
+	killer's team, and a capture is worth points_per_capture (5 to 100, 25 by
+	default) in place of one; the score to win is in captures, each worth
+	that much. Off (0): the Xbox's capture the flag */
 	long points_per_capture;
+	long kills_score;
 };
 
 struct slayer_variant
@@ -547,11 +548,6 @@ void game_engine_variant_cleanup(
 	struct game_variant *variant);
 
 boolean game_engine_display_team_indicators(
-	void);
-
-/* port: ctf/slayer plays by the ctf game type's rules (flags, spawns, equipment) */
-#define GAME_ENGINE_TYPE_IS_CTF(type) ((type) == game_engine_ctf || (type) == game_engine_ctf_slayer)
-boolean game_engine_is_ctf_slayer(
 	void);
 
 boolean game_engine_can_score(

@@ -932,12 +932,6 @@ symbols in this file:
 #include "text/unicode.h"
 #include "halo_menus.h" /* port: PC_MENU_FUNCTION_BASE */
 
-/* port: the ctf/slayer synthetic playlist profile index */
-enum
-{
-	CTF_SLAYER_PLAYLIST_PROFILE_INDEX = (long)0xCFFD0001
-};
-
 /* ---------- constants */
 
 /* ---------- macros */
@@ -5828,8 +5822,7 @@ static boolean multiplayer_profile_set_for_game(
 	if (playlist_profile_get(profile_index, &profile))
 	{
 		server = global_network_game_server_get();
-		if (profile_index != CTF_SLAYER_PLAYLIST_PROFILE_INDEX &&
-			saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
+		if (saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
 			saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
 		file = fopen("d:\\variant_automation.txt", "r");
 		if (file)
@@ -6043,10 +6036,6 @@ short ui_widget_port_gametypes(
 				*last_used = index;
 		}
 	}
-	/* port: CTF/Slayer, after the built-in gametypes (the Select Gametype
-	screen lists it in OpenCE's bank: game_modes_variant_is_opence) */
-	if (count < (word)maximum)
-		indices[count++] = CTF_SLAYER_PLAYLIST_PROFILE_INDEX;
 	return (short)count;
 }
 
@@ -6093,8 +6082,7 @@ boolean ui_widget_port_gametype_choose(
 	if (!playlist_profile_get(profile_index, &profile))
 		return FALSE;
 	server = global_network_game_server_get();
-	if (profile_index != CTF_SLAYER_PLAYLIST_PROFILE_INDEX &&
-		saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
+	if (saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
 		saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
 	player_ui_set_game_variant(&profile);
 	/* (and its PC options: game_engine.h) */

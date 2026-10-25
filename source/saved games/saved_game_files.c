@@ -971,14 +971,6 @@ wchar_t *saved_game_file_get_display_name(
 	long memory_unit = SAVED_GAME_FILE_INDEX_MEMORY_UNIT(profile_index);
 	long n = SAVED_GAME_FILE_INDEX_FILE_INDEX(profile_index);
 
-	/* port: the ctf/slayer synthetic profile */
-	if (profile_index == CTF_SLAYER_PLAYLIST_PROFILE_INDEX)
-	{
-		ustrncpy(saved_game_file_display_name, L"CTF/Slayer", MAX_GAMENAME - 1);
-		saved_game_file_display_name[MAX_GAMENAME - 1] = 0;
-		return saved_game_file_display_name;
-	}
-
 	match_assert(
 		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
 		299,
@@ -1012,10 +1004,6 @@ boolean saved_game_file_open(
 	long memory_unit = SAVED_GAME_FILE_INDEX_MEMORY_UNIT(profile_index);
 	long n = SAVED_GAME_FILE_INDEX_FILE_INDEX(profile_index);
 	boolean success;
-
-	/* port: the ctf/slayer synthetic profile cannot be opened on disk */
-	if (profile_index == CTF_SLAYER_PLAYLIST_PROFILE_INDEX)
-		return FALSE;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
@@ -1209,10 +1197,6 @@ boolean saved_game_file_get_path_to_enclosing_directory(
 		full_path);
 
 	full_path[0] = 0;
-
-	/* port: the ctf/slayer synthetic profile has no directory on disk */
-	if (profile_index == CTF_SLAYER_PLAYLIST_PROFILE_INDEX)
-		return FALSE;
 
 	if (profile_index != NONE)
 	{

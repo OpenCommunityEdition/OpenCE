@@ -3615,11 +3615,6 @@ boolean match_game_type(
 	boolean result;
 	long index;
 
-	/* port: maps tag their spawn points and equipment with the original
-	game types only; ctf/slayer plays on CTF's */
-	if (game_type == game_engine_ctf_slayer)
-		game_type = game_engine_ctf;
-
 	if (game_engine)
 	{
 		result = FALSE;
@@ -5684,7 +5679,7 @@ void game_engine_objective_weapon_deleted(
 
 	if (!game_engine || team_index == NONE)
 		return;
-	if (GAME_ENGINE_TYPE_IS_CTF(global_variant.game_engine_index))
+	if (global_variant.game_engine_index == game_engine_ctf)
 	{
 		game_engine_clear_goal_position(team_index);
 		game_engine_clear_goal_position(team_index + 2);
@@ -5959,7 +5954,7 @@ boolean game_engine_force_autopickup(
 {
 	boolean force_autopickup = FALSE;
 
-	if (game_engine && GAME_ENGINE_TYPE_IS_CTF(global_variant.game_engine_index) && weapon_is_flag(weapon_index))
+	if (game_engine && global_variant.game_engine_index==game_engine_ctf && weapon_is_flag(weapon_index))
 		force_autopickup = TRUE;
 
 	return force_autopickup;
@@ -6728,44 +6723,6 @@ struct game_variant *build_game_variant_ctf(
 	return variant;
 }
 
-/* port: ctf/slayer default variant (the ctf's, kills and captures scoring;
-its score to win is in captures) */
-struct game_variant *build_game_variant_ctf_slayer(
-	struct game_variant *variant)
-{
-	struct game_variant result = { 0 };
-
-	result.game_engine_index = game_engine_ctf_slayer;
-	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
-	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
-	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
-	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
-	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
-	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
-	result.universal_variant.goal_radar = _radar_nav_point;
-	result.universal_variant.teams = TRUE;
-	result.flags = 1;
-	result.universal_variant.health = 1.0f;
-	result.universal_variant.lives = 0;
-	result.universal_variant.odd_man_out = FALSE;
-	result.universal_variant.respawn_time = 300;
-	result.universal_variant.respawn_time_growth = 0;
-	result.universal_variant.score_to_win = 4;
-	result.universal_variant.suicide_penalty = 150;
-	result.universal_variant.weapon_set = _game_engine_weapons_normal;
-	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
-	result.game_engine_variant.ctf.assault = FALSE;
-	result.game_engine_variant.ctf.flag_at_home_to_score = FALSE;
-	result.game_engine_variant.ctf.flag_must_reset = FALSE;
-	result.game_engine_variant.ctf.reset_on_capture = FALSE;
-	result.game_engine_variant.ctf.single_flag_time = 0;
-	result.game_engine_variant.ctf.points_per_capture = 25;
-
-	*variant = result;
-
-	return variant;
-}
-
 struct game_variant *build_game_variant_ctf_pro(
 	struct game_variant *variant)
 {
@@ -7362,9 +7319,14 @@ void game_engine_variant_cleanup(
 	struct game_variant original = *variant;
 
 	variant->human_readable_game_description[NUMBEROF(variant->human_readable_game_description) - 1] = 0;
-	/* port: ctf/slayer (10) is kept; any other number is pinned to the original's 1..5 */
-	if (variant->game_engine_index != game_engine_ctf_slayer)
-		variant->game_engine_index = PIN(variant->game_engine_index, 1, 5);
+	/* port: the CTF/Slayer game type of an earlier build (10) is capture the
+	flag with Kills Score on (game_engine_ctf.c) */
+	if (variant->game_engine_index == 10)
+	{
+		variant->game_engine_index = game_engine_ctf;
+		variant->game_engine_variant.ctf.kills_score = TRUE;
+	}
+	variant->game_engine_index = PIN(variant->game_engine_index, 1, 5);
 	variant->universal_variant.teams = !!variant->universal_variant.teams;
 	variant->universal_variant.odd_man_out = !!variant->universal_variant.odd_man_out;
 	variant->universal_variant.respawn_time_growth = MAX(variant->universal_variant.respawn_time_growth, 0);
@@ -7381,23 +7343,19 @@ void game_engine_variant_cleanup(
 	switch (variant->game_engine_index)
 	{
 	case game_engine_ctf:
-	case game_engine_ctf_slayer:
 		variant->game_engine_variant.ctf.assault = !!variant->game_engine_variant.ctf.assault;
 		variant->game_engine_variant.ctf.reset_on_capture = !!variant->game_engine_variant.ctf.reset_on_capture;
 		variant->game_engine_variant.ctf.flag_must_reset = !!variant->game_engine_variant.ctf.flag_must_reset;
 		variant->universal_variant.teams = TRUE;
 		variant->game_engine_variant.ctf.flag_at_home_to_score = !!variant->game_engine_variant.ctf.flag_at_home_to_score;
 		variant->game_engine_variant.ctf.single_flag_time = FLOOR(variant->game_engine_variant.ctf.single_flag_time, 0);
-		/* port: ctf/slayer's capture points (a plain ctf game keeps none) */
-		if (variant->game_engine_index == game_engine_ctf_slayer)
-		{
-			if (variant->game_engine_variant.ctf.points_per_capture <= 0)
-				variant->game_engine_variant.ctf.points_per_capture = 25;
-			variant->game_engine_variant.ctf.points_per_capture =
-				PIN(variant->game_engine_variant.ctf.points_per_capture, 1, 100);
-		}
-		else
-			variant->game_engine_variant.ctf.points_per_capture = 0;
+		/* port: Kills Score, and a capture's points (25 where none are kept:
+		a gametype of a build without them) */
+		variant->game_engine_variant.ctf.kills_score = !!variant->game_engine_variant.ctf.kills_score;
+		if (variant->game_engine_variant.ctf.points_per_capture <= 0)
+			variant->game_engine_variant.ctf.points_per_capture = 25;
+		variant->game_engine_variant.ctf.points_per_capture =
+			PIN(variant->game_engine_variant.ctf.points_per_capture, 1, 100);
 		break;
 
 	case game_engine_slayer:
@@ -7493,7 +7451,7 @@ static void game_engine_predict_resources(
 		object_definition_predict(list_index_to_weapon_definition_index(_weapon_list_ball));
 	}
 
-	if (GAME_ENGINE_TYPE_IS_CTF(global_variant.game_engine_index))
+	if (global_variant.game_engine_index == game_engine_ctf)
 		object_definition_predict(list_index_to_weapon_definition_index(_weapon_list_flag));
 
 	weapon_indices[0] = list_index_to_weapon_definition_index(0);
@@ -9729,7 +9687,6 @@ long game_engine_write_network_state(
 	size -= sizeof(postgame_state);
 	switch (game_engine_get_type())
 	{
-	case game_engine_ctf_slayer:
 	case game_engine_ctf: written = game_engine_ctf_write_network_state(buffer, size); break;
 	/* port: (Infection's own state: infection.c) */
 	case game_engine_slayer: written = infection_enabled() ? infection_write_network_state(buffer, size) :
@@ -9759,7 +9716,6 @@ void game_engine_read_network_state(
 	first = !game_engine_network_state_read;
 	switch (game_engine_get_type())
 	{
-	case game_engine_ctf_slayer:
 	case game_engine_ctf: read = game_engine_ctf_read_network_state(buffer, size, first); break;
 	case game_engine_slayer: read = infection_enabled() ? infection_read_network_state(buffer, size, first) :
 		game_engine_slayer_read_network_state(buffer, size, first); break;

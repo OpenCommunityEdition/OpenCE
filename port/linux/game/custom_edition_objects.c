@@ -89,7 +89,6 @@ static short default_spawn_flag_bit(
 	case _game_engine_slayer:
 		return _multiplayer_spawn_slayer_default_bit;
 	case _game_engine_ctf:
-	case 10: /* game_engine_ctf_slayer */
 		return _multiplayer_spawn_ctf_default_bit;
 	case _game_engine_king:
 		return _multiplayer_spawn_king_default_bit;
