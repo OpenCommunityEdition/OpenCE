@@ -15,6 +15,10 @@ decompilation compiled as it is), and some of its rules no longer apply.
   behaves; the engine is not compiled from it, and no new C is written.
   The rules in `AGENTS.md` about changing `source/` with `port:` comments
   apply only if `source/` itself is changed.
+- **Port, match, then extend.** Lighting, shaders and graphics are
+  rewritten and enhanced. AI, particles, animation, sound, script logic
+  and gameplay are ported from `source/` and matched to it (reference
+  traces) before anything is extended.
 - **Keyboard and mouse only.** No gamepad or controller support; pad
   events are filtered out.
 - **Departures from stock** need not be off by default in the engine

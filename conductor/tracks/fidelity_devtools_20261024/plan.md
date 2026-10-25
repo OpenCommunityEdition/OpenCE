@@ -118,7 +118,81 @@ Found in play: shadows on the far hills break into large blocky triangles across
     - [ ] The fixes
 - [ ] Task: Conductor - User Manual Verification 'Phase 10: Lightmap resolution and interiors' (Protocol in workflow.md)
 
-## Phase 11: Performance
+## Phase 11: Matching the source
+Lighting, shaders and graphics are rewritten and enhanced. AI, particles, animation, sound, script logic and gameplay are ported from `source/` first, matched to it, and only then extended; this phase finds where they still differ.
+- [ ] Task: A reference map of each system
+    - [ ] Write tests: each function of `source/` that AI, particles, animation, sound, scripts and gameplay port has a reference trace, or is listed with a reason; `--check` fails on a stale trace
+    - [ ] The list (in docs/engine.md), and `tools/engine_*_reference.py` scripts for the systems that have none
+- [ ] Task: The divergences
+    - [ ] Write tests: the engine against each new trace
+    - [ ] A sweep report: each function that differs, and by how much; Phases 12 to 15 take their order from it
+- [ ] Task: Conductor - User Manual Verification 'Phase 11: Matching the source' (Protocol in workflow.md)
+
+## Phase 12: Weapons, particles and effects
+Found in play (2026-10-25): each weapon's firing effects are in the wrong place, and in first person they come from the face, not the gun; thrown grenades can't be seen; particles still face the camera; explosions are missing parts; blood decals on metal; impacts blur where bullets hit the ground.
+- [ ] Task: Where the effects start
+    - [ ] Write tests: each weapon's firing effects start at the marker the original uses (in first person, the first-person model's; in third person, the weapon's), within a tolerance; the old engine's (`port/macos`) positions recorded as the reference
+    - [ ] The fixes
+- [ ] Task: Thrown grenades
+    - [ ] Write tests: a thrown grenade is drawn every frame from the throw to its detonation, in first and third person
+    - [ ] The fixes
+- [ ] Task: How particles face
+    - [ ] Write tests: each particle's orientation follows its tag (facing the screen, parallel to its direction, vertical, local), against the original's particle functions' trace
+    - [ ] The fixes
+- [ ] Task: Explosions
+    - [ ] Write tests: each explosion spawns every event and part its effect tag lists (particles, systems, lights, sounds, decals, damage), counted against the tag
+    - [ ] The fixes
+- [ ] Task: Impacts by material
+    - [ ] Write tests: an impact on each material type uses the effect and decal the material table names (no blood on metal)
+    - [ ] The fixes
+- [ ] Task: No blur on impacts
+    - [ ] Write tests: frame interpolation never blends a spawned, teleported or attached object from a place it wasn't; golden frames of a bullet hitting the ground
+    - [ ] The fixes
+- [ ] Task: Conductor - User Manual Verification 'Phase 12: Weapons, particles and effects' (Protocol in workflow.md)
+
+## Phase 13: Vehicles
+Found in play (2026-10-25): getting in and out is too quick; vehicles collide only with other vehicles; turret and gun animations play over and over with no one using them (the warthog's chaingun barrel spins on its own); wheels and tracks don't turn properly and blur; driving sprays too many sprites, the same on every surface; the vehicle HUDs have the wrong icons and meters.
+- [ ] Task: Getting in and out
+    - [ ] Write tests: the enter and exit animations last as many ticks as the original's, against the animation graph at 30 Hz
+    - [ ] The fixes
+- [ ] Task: Collision with the world
+    - [ ] Write tests: vehicles collide with the structure, scenery, crates, bipeds and devices; none passes through on the vehicles station's paths
+    - [ ] The fixes
+- [ ] Task: Animations driven by their functions
+    - [ ] Write tests: a turret, barrel or other overlay moves only when its function (aim, firing, speed) changes, as the original's object functions say; the warthog's chaingun barrel stays still with no gunner
+    - [ ] The fixes
+- [ ] Task: Wheels and tracks
+    - [ ] Write tests: wheels turn at the ground speed over their radius and tracks scroll with speed, against the original's functions; golden frames of a moving wheel show no smear between ticks
+    - [ ] The fixes
+- [ ] Task: Effects on the move
+    - [ ] Write tests: tyre and dust effects spawn at the rate their tags give and change with the ground's material
+    - [ ] The fixes
+- [ ] Task: The vehicle HUDs
+    - [ ] Write tests: each vehicle and seat shows the HUD interface, icons and meters its tags name
+    - [ ] The fixes
+- [ ] Task: Conductor - User Manual Verification 'Phase 13: Vehicles' (Protocol in workflow.md)
+
+## Phase 14: Death and ragdolls
+Found in play (2026-10-25): when a body dies the ragdoll stretches and splits, the model glitches, and the camera doesn't follow the body.
+- [ ] Task: The ragdoll
+    - [ ] Write tests: a dying biped's ragdoll starts from the death animation's pose, keeps every bone within its length (no stretching or splitting), and the model follows it every frame
+    - [ ] The fixes
+- [ ] Task: The death camera
+    - [ ] Write tests: the dead player's camera follows the body as the original's does
+    - [ ] The fixes
+- [ ] Task: Conductor - User Manual Verification 'Phase 14: Death and ragdolls' (Protocol in workflow.md)
+
+## Phase 15: Sound
+Found in play (2026-10-25): music and many sounds (hitting surfaces and the rest) are still missing.
+- [ ] Task: Music
+    - [ ] Write tests: the scripted looping sounds (the music) start, change and stop as the scripts say
+    - [ ] The fixes
+- [ ] Task: Every sound
+    - [ ] Write tests: every sound Blood Gulch's tags refer to (impacts by material, footsteps, vehicles, weapons, ambience, dialogue) plays when its event happens; a list of any that don't
+    - [ ] The fixes
+- [ ] Task: Conductor - User Manual Verification 'Phase 15: Sound' (Protocol in workflow.md)
+
+## Phase 16: Performance
 - [ ] Task: The benchmark paths
     - [ ] Write tests: a path replays the same camera and inputs; the report has mean, p99, p99.9, hitches and pacing; a regression over 5% fails
     - [ ] devgulch, Blood Gulch, and 16 players on Blood Gulch
@@ -131,9 +205,9 @@ Found in play: shadows on the far hills break into large blocky triangles across
 - [ ] Task: Upscaling and the parallel simulation
     - [ ] Write tests: MetalFX golden frames at 0.67; dynamic resolution holds the target; replay hash unchanged in parallel
     - [ ] MetalFX, dynamic resolution, the ECS in parallel
-- [x] Task: Conductor - User Manual Verification 'Phase 11: Performance' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 16: Performance' (Protocol in workflow.md)
 
-## Phase 12: Tiers and graphics settings
+## Phase 17: Tiers and graphics settings
 - [ ] Task: Quality tiers
     - [ ] Write tests: each GPU family picks its tier; an 8 GB budget fits at Low
     - [ ] The tier table and its detection
@@ -143,7 +217,7 @@ Found in play: shadows on the far hills break into large blocky triangles across
 - [ ] Task: Meeting the targets
     - [ ] Write tests: each path at Ultra on the M1 Max meets 8.33 ms p99
     - [ ] The last fixes; docs/engine.md updated
-- [x] Task: Conductor - User Manual Verification 'Phase 12: Tiers and graphics settings' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 17: Tiers and graphics settings' (Protocol in workflow.md)
 
 ## Wrap-up
 - [ ] Retire performance_20261023 into this track (marked merged in tracks.md, its folder archived)

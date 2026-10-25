@@ -10,6 +10,15 @@ This track merges the whole performance track (performance_20261023) and a new d
 
 The scope is the systems, on devgulch and Blood Gulch only. Campaign levels are ported and fixed one at a time in later tracks.
 
+Found in play once the animations worked (2026-10-25), and fixed in Phases 12 to 15:
+- weapons' firing effects are in the wrong place, and in first person come from the face, not the gun; thrown grenades can't be seen;
+- particles still face the camera; explosions are missing parts; blood decals on metal; bullet impacts and wheels blur between frames;
+- vehicles get in and out too quickly, collide only with each other, play their turret and gun animations with no one using them, turn their wheels and tracks wrongly, spray too many sprites the same on every surface, and show the wrong HUDs;
+- ragdolls stretch and split, and the death camera doesn't follow the body;
+- music and many sounds (hitting surfaces and the rest) are missing.
+
+Lighting, shaders and graphics are rewritten and enhanced. Everything else (AI, particles, animation, sound, script logic, gameplay) is ported from `source/` and matched to it first, then extended; Phase 11 measures where it still differs.
+
 No new systems or extensions that weren't in the original. A clean-up or redesign is allowed only where it fixes a bug.
 
 ## Functional Requirements
