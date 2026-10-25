@@ -305,6 +305,9 @@ real distributed_vitality_unpack(word value);
 (machine_index; NONE: the host's own) */
 void distributed_send_notice(char const *text);
 void distributed_send_notice_to_machine(long machine_index, char const *text);
+/* (the host: a dedicated server's ban command) the next ban's reason and end
+(seconds since 1970; 0: for ever), written in its bans.txt line */
+void network_distributed_ban_details(char const *reason, unsigned long until);
 /* (the host) the names of a client machine's players, in ASCII */
 void distributed_machine_player_names(long machine_index, char *names, long size);
 /* (the host) a client machine's real IPv4 address (host byte order): an

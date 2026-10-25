@@ -2806,6 +2806,7 @@ symbols in this file:
 #include "networking/network_game_manager.h"
 #include "networking/network_server_manager.h"
 #include "network_votekick.h" /* port: port/linux/game/network_votekick.c */
+#include "server_director.h" /* port: port/linux/game/server_director.c */
 #include "objects/damage.h"
 #include "objects/object_lights.h"
 #include "objects/scenery.h"
@@ -15547,6 +15548,14 @@ static boolean hs_compile_and_evaluate_command(
 	if (profile_console_command(expression))
 		return TRUE;
 #endif
+	/* port: a dedicated server's commands (sv_*, say, kick, ban...), with the
+	role the line came with (port/linux/game/server_commands.c) */
+	{
+		boolean server_result;
+
+		if (server_command_try(expression, &server_result))
+			return server_result;
+	}
 	/* port: the co-op host's bringto, which brings every player to the host
 	(players.c; a client is told it is the host's) */
 	if (hs_host_player_command(expression, "bringto"))

@@ -91,7 +91,10 @@ jobs:
 
       - name: Test
         run: |
-          python -m pytest -q tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py
+          python -m pytest -q tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py tools/test_server_sim.py tools/test_egg.py tools/test_deploy_gametypes.py
+          # the dedicated server: --version, and --server without maps refused (exit code 2); its cases with
+          # clients need the retail maps, and are skipped
+          python -m pytest -q tools/test_dedicated_server.py
           python tools/test_light_storage.py
 
       - name: Compile cache
@@ -317,6 +320,8 @@ jobs:
         run: |
           source ~/emsdk/emsdk_env.sh
           node --test "port/web/tests/*.test.js"
+          # (the dedicated server's admin page, port/assets/server_ui, against tools/server_sim.py)
+          node --test tools/server_ui_tests/
           python3 -m pytest -q tools/test_web_build.py
 
       - name: Test in Chromium and Firefox

@@ -82,6 +82,7 @@ machine (their datum identifiers need not be).
 #include "map_share.h"
 #include "latency_meter.h"
 #include "profile_sections.h"
+#include "server_director.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -3367,6 +3368,7 @@ void network_distributed_player_killed(
 		death->killed_by_vehicle = *killing_player_index == NONE && killing_object &&
 			killing_object->object.type == _object_type_vehicle;
 		distributed_statistics_due = TRUE;
+		server_event_player_killed(*killing_player_index, *killing_object_index, dead_player_index, *friendly_fire);
 	}
 	else if (game_connection() == _game_connection_network_client && death->valid)
 	{
@@ -4186,7 +4188,8 @@ static void distributed_write_player_record(
 	char const *address,
 	long machine_index,
 	char const *names,
-	char const *reason)
+	char const *reason,
+	unsigned long until)
 {
 	char discord_id[DISCORD_ID_SIZE] = "";
 	char discord_name[DISCORD_NAME_SIZE] = "";
@@ -4220,11 +4223,16 @@ static void distributed_write_player_record(
 	}
 	/* (the Discord user as the machine told it, which it may say is anyone's:
 	marked so) */
-	fprintf(file, "%s\tip=%s\thwid=%s\tdiscord_username=%s%s\tdiscord_id=%s%s\tplayers=%s\treason=%s\n", when,
+	fprintf(file, "%s\tip=%s\thwid=%s\tdiscord_username=%s%s\tdiscord_id=%s%s\tplayers=%s\treason=%s", when,
 		kept_address, hardware_id[0] ? hardware_id : "none",
 		discord_name[0] ? discord_name : "none", discord_name[0] ? " (self-reported)" : "",
 		discord_id[0] ? discord_id : "none", discord_id[0] ? " (self-reported)" : "",
 		kept_names, kept_reason);
+	/* (a ban for a while: its end, in seconds since 1970; a line without one
+	is for ever) */
+	if (until)
+		fprintf(file, "\tuntil=%lu", until);
+	fputc('\n', file);
 	fclose(file);
 }
 
@@ -4238,8 +4246,21 @@ static void distributed_log_cheater(
 	char address[32];
 
 	distributed_machine_address_text(machine_index, address, sizeof(address));
-	distributed_write_player_record(CHEATERS_FILE, address, machine_index, names, reason);
-	distributed_write_player_record(BANS_FILE, address, machine_index, names, reason);
+	distributed_write_player_record(CHEATERS_FILE, address, machine_index, names, reason, 0);
+	distributed_write_player_record(BANS_FILE, address, machine_index, names, reason, 0);
+}
+
+/* (the host: a dedicated server's ban command, server_commands.c) the next
+ban's reason and end (seconds since 1970; 0: for ever), for its line */
+static char distributed_next_ban_reason[96];
+static unsigned long distributed_next_ban_until;
+
+void network_distributed_ban_details(
+	char const *reason,
+	unsigned long until)
+{
+	snprintf(distributed_next_ban_reason, sizeof(distributed_next_ban_reason), "%s", reason ? reason : "");
+	distributed_next_ban_until = until;
 }
 
 /* (the host: network_server_manager.c) whether a machine of this address
@@ -4255,21 +4276,28 @@ boolean network_distributed_banned(
 	char kept_hardware_id[40];
 	FILE *file;
 	boolean banned = FALSE;
+	size_t length, hardware_id_length;
 
 	p2p_hardware_id_sanitize(kept_hardware_id, 33, hardware_id);
 	if (address)
 		distributed_address_text(address, text, sizeof(text));
 	else
 		text[0] = 0;
+	length = csstrlen(text);
+	hardware_id_length = csstrlen(kept_hardware_id);
 	file = fopen(BANS_FILE, "r");
 	if (!file)
 		return FALSE;
 	while (!banned && fgets(line, sizeof(line), file))
 	{
-		char const *ip = strstr(line, "ip=");
+		char const *ip = strstr(line, "\tip=");
 		char const *hwid = strstr(line, "hwid=");
-		size_t length = csstrlen(text);
-		size_t hardware_id_length = csstrlen(kept_hardware_id);
+		char const *until = strstr(line, "\tuntil=");
+
+		/* (a ban for a while that has ended) */
+		if (until && strtoul(until + 7, NULL, 10) <= (unsigned long)time(NULL))
+			continue;
+		ip = ip ? ip + 1 : strstr(line, "ip=");
 
 		/* (the whole address: 1.2.3.4 is not 1.2.3.45) */
 		if (length && ip && !strncmp(ip + 3, text, length) &&
@@ -4294,8 +4322,9 @@ boolean network_distributed_banned(
 /* (the host: network_server_manager.c, its ban command) a machine banned
 by the host: its line in BANS_FILE, and every machine told (the Discord
 user of the machine at the index, if it is one in the game; its address,
-host byte order) */
-void network_distributed_ban(
+host byte order). The ban's end (network_distributed_ban_details: 0, for
+ever) */
+unsigned long network_distributed_ban(
 	long machine_index,
 	unsigned long address,
 	char const *names)
@@ -4306,9 +4335,13 @@ void network_distributed_ban(
 	char discord_name[DISCORD_NAME_SIZE] = "";
 	char discord[DISCORD_ID_SIZE + DISCORD_NAME_SIZE + 16] = "";
 	char notice[MAXIMUM_NOTICE_LENGTH];
+	unsigned long until = distributed_next_ban_until;
 
 	distributed_address_text(address, text, sizeof(text));
-	distributed_write_player_record(BANS_FILE, text, machine_index, names, "banned by the host");
+	distributed_write_player_record(BANS_FILE, text, machine_index, names,
+		distributed_next_ban_reason[0] ? distributed_next_ban_reason : "banned by the host", until);
+	distributed_next_ban_reason[0] = 0;
+	distributed_next_ban_until = 0;
 	distributed_printable(kept_names, sizeof(kept_names), names);
 	if (game_in_progress() && machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES)
 	{
@@ -4327,6 +4360,7 @@ void network_distributed_ban(
 		console_warning("%s", notice);
 		error(_error_log, "%s", notice);
 	}
+	return until;
 }
 
 /* (the host: network_server_manager.c, its kick command) players kicked by
@@ -4421,6 +4455,7 @@ static void distributed_note_client_clock(
 					names, discord, rate);
 				distributed_send_notice(text);
 				distributed_log_cheater(machine_index, names, reason);
+				server_event_speed_hack(machine_index, names, rate, ahead, "kicked");
 			}
 			network_game_server_kick_machine(machine_index, TRUE);
 			clock->fast_windows = 0;
@@ -4447,7 +4482,8 @@ static void distributed_note_client_clock(
 				snprintf(reason, sizeof(reason), "unverified speed hack (its datagrams only, not dropped: "
 					"game ran %.2f times as fast)", rate);
 				distributed_machine_address_text(machine_index, address, sizeof(address));
-				distributed_write_player_record(CHEATERS_FILE, address, machine_index, names, reason);
+				distributed_write_player_record(CHEATERS_FILE, address, machine_index, names, reason, 0);
+				server_event_speed_hack(machine_index, names, rate, ahead, "unverified");
 				clock->logged_unverified = TRUE;
 			}
 		}

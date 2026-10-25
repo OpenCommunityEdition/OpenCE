@@ -1,0 +1,494 @@
+"""The dedicated server (halo --server: docs/dedicated_server.md) with the game: its refusals and exit codes, a
+rotation played by a joined client (lobby, game, postgame and the next entry), the HTTP API (status, players, kick,
+ban and unban, say, the rotation), the events, standard input's commands, and its shutdown by quit, SIGTERM and
+SIGINT. Needs the retail maps in assets/maps and ninja linux's build/linux/halo; every machine runs from a folder
+of its own under pytest's tmp_path (its config.toml, data root, saves and home), on loopback addresses of its own,
+offline (system link), with no window, sound, update check or Discord."""
+
+import json
+import os
+import re
+import shutil
+import signal
+import socket
+import subprocess
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
+RETAIL_MAPS = ROOT / "assets/maps"
+GAME = ROOT / "build/linux/halo"
+SDL = ROOT / "build/linux/libSDL3.so.0"
+SERVER_ADDRESS = "127.0.0.201"
+CLIENT_ADDRESSES = ("127.0.0.202", "127.0.0.203")
+PASSWORD = "test-password-1"
+
+
+def _needs_game(*maps):
+    if not GAME.is_file():
+        pytest.skip("needs ninja linux's build/linux/halo")
+    for name in maps:
+        if not (RETAIL_MAPS / f"{name}.map").is_file():
+            pytest.skip(f"needs {name}.map in assets/maps")
+
+
+def _free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+class Machine:
+    """a machine's folder (bin/ with the game and its config.toml, data/, saves/, home/) and its process"""
+
+    def __init__(self, base, name, maps=True):
+        self.folder = base / name
+        self.name = name
+        for part in ("bin", "data", "saves", "home", "xdg"):
+            (self.folder / part).mkdir(parents=True, exist_ok=True)
+        shutil.copy(GAME, self.folder / "bin" / "halo")
+        if SDL.is_file():
+            shutil.copy(SDL, self.folder / "bin" / SDL.name)
+        if maps:
+            (self.folder / "data" / "maps").symlink_to(RETAIL_MAPS)
+        self.process = None
+        self.output = self.folder / "out.txt"
+
+    def environment(self, **settings):
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("HALO_")}
+        environment.update({
+            # (what marks the processes this test started, should one need stopping by hand)
+            "HALO_TEST_MARKER": f"test_dedicated_server-{self.name}",
+            "HALO_DATA_ROOT": str(self.folder / "data"), "HALO_SAVE_ROOT": str(self.folder / "saves"),
+            "HOME": str(self.folder / "home"), "XDG_DATA_HOME": str(self.folder / "xdg"),
+            "SDL_VIDEO_DRIVER": "dummy", "SDL_AUDIO_DRIVER": "dummy", "HALO_UPDATE_AUTO": "false",
+            "HALO_NET_ONLINE": "false", "HALO_DISCORD_APPLICATION": "", "HALO_NET_JOIN_FROM_CLIPBOARD": "0",
+        })
+        environment.update({key: str(value) for key, value in settings.items()})
+        return environment
+
+    def start(self, arguments=(), **settings):
+        self.log = open(self.output, "w")
+        self.process = subprocess.Popen([str(self.folder / "bin" / "halo"), *arguments], cwd=self.folder,
+                                        env=self.environment(**settings), stdin=subprocess.PIPE,
+                                        stdout=self.log, stderr=subprocess.STDOUT, text=True)
+        return self
+
+    def run(self, arguments=(), timeout=30, **settings):
+        """the game run to its end: (exit status, its output)"""
+        result = subprocess.run([str(self.folder / "bin" / "halo"), *arguments], cwd=self.folder,
+                                env=self.environment(**settings), stdin=subprocess.DEVNULL, capture_output=True,
+                                text=True, errors="replace", timeout=timeout)
+        return result.returncode, result.stdout + result.stderr
+
+    def text(self):
+        return self.output.read_text(errors="replace") if self.output.is_file() else ""
+
+    def debug(self):
+        path = self.folder / "data" / "debug.txt"
+        return path.read_text(errors="replace") if path.is_file() else ""
+
+    def send(self, line):
+        self.process.stdin.write(line + "\n")
+        self.process.stdin.flush()
+
+    def wait(self, timeout):
+        try:
+            return self.process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            return None
+
+    def stop(self):
+        if self.process and self.process.poll() is None:
+            self.process.kill()
+            self.process.wait()
+        if self.process:
+            self.log.close()
+
+
+@pytest.fixture
+def machines(tmp_path):
+    made = []
+
+    def make(name, maps=True):
+        machine = Machine(tmp_path, name, maps)
+        made.append(machine)
+        return machine
+
+    yield make
+    for machine in made:
+        machine.stop()
+
+
+def _server_settings(web_port, **settings):
+    values = {
+        "HALO_NET_ADDRESS": SERVER_ADDRESS, "HALO_NET_BROADCAST": ",".join(CLIENT_ADDRESSES),
+        "HALO_SERVER_WEB_PORT": web_port, "HALO_SERVER_WEB_PASSWORD": PASSWORD,
+        "HALO_SERVER_LOBBY_SECONDS": 3, "HALO_SERVER_POSTGAME_SECONDS": 3, "HALO_SERVER_NAME": "Test Server",
+        "HALO_SERVER_ROTATION": "bloodgulch:slayer, prisoner:slayer",
+    }
+    values.update(settings)
+    return values
+
+
+def _client(machine, address, name):
+    return machine.start(HALO_NULL_RENDERER=1, HALO_NETWORK_TEST="join", HALO_NETWORK_TEST_NAME=name,
+                         HALO_NET_ADDRESS=address, HALO_NET_BROADCAST=SERVER_ADDRESS, HALO_NO_AUDIO=1)
+
+
+def _until(condition, timeout, what, machine=None):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        value = condition()
+        if value:
+            return value
+        if machine and machine.process.poll() is not None:
+            break
+        time.sleep(0.5)
+    detail = f"\n--- {machine.name}'s output:\n{machine.text()[-3000:]}" if machine else ""
+    pytest.fail(f"{what} not within {timeout} s{detail}")
+
+
+class Api:
+    def __init__(self, port):
+        self.base = f"http://127.0.0.1:{port}"
+        self.token = None
+
+    def call(self, method, path, body=None, token=True):
+        request = urllib.request.Request(self.base + path, method=method,
+                                         data=json.dumps(body).encode() if body is not None else None)
+        if body is not None:
+            request.add_header("Content-Type", "application/json")
+        if token and self.token:
+            request.add_header("Authorization", f"Bearer {self.token}")
+        try:
+            with urllib.request.urlopen(request, timeout=10) as answer:
+                return answer.status, json.loads(answer.read() or b"null")
+        except urllib.error.HTTPError as failure:
+            text = failure.read()
+            try:
+                return failure.code, json.loads(text)
+            except ValueError:
+                return failure.code, text.decode(errors="replace")
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            return None, None
+
+    def login(self):
+        status, answer = self.call("POST", "/api/login", {"password": PASSWORD}, token=False)
+        assert status == 200 and answer["ok"], answer
+        self.token = answer["token"]
+
+    def status(self):
+        status, answer = self.call("GET", "/api/status")
+        return answer if status == 200 else None
+
+    def events(self):
+        status, answer = self.call("GET", "/api/events?after=0")
+        assert status == 200, answer
+        return answer["events"]
+
+
+def _event_names(api):
+    return [event.get("event") for event in api.events()]
+
+
+# ---------- refusals
+
+def test_version_and_help(machines):
+    _needs_game()
+    machine = machines("version", maps=False)
+    status, output = machine.run(["--version"], HALO_CONFIG_FILE=machine.folder / "config.toml")
+    assert status == 0, output
+    assert re.search(r"network version \d+", output), output
+    status, output = machine.run(["--help"], HALO_CONFIG_FILE=machine.folder / "config.toml")
+    assert status == 0 and "--server" in output, output
+
+
+def test_no_maps_exits_2(machines):
+    _needs_game()
+    machine = machines("nomaps", maps=False)
+    started = time.monotonic()
+    status, output = machine.run(["--server"], HALO_SERVER_WEB_PORT=0)
+    assert status == 2, output
+    assert time.monotonic() - started < 10, "the refusal took more than 10 s"
+    assert "no usable maps" in output, output
+
+
+def test_rotation_of_missing_maps_exits_2(machines):
+    _needs_game("bloodgulch")
+    machine = machines("missingmaps")
+    status, output = machine.run(["--server"], HALO_SERVER_WEB_PORT=0, HALO_SERVER_ROTATION="nosuchmap:slayer")
+    assert status == 2, output
+
+
+def test_rotation_of_unknown_gametypes_exits_3(machines):
+    _needs_game("bloodgulch")
+    machine = machines("badrotation")
+    status, output = machine.run(["--server"], HALO_SERVER_WEB_PORT=0,
+                                 HALO_SERVER_ROTATION="bloodgulch:nosuchgametype, bloodgulch:slayer+score=-5")
+    assert status == 3, output
+    assert "nothing playable" in output, output
+
+
+def test_public_web_port_needs_a_long_password(machines):
+    _needs_game("bloodgulch")
+    machine = machines("shortpassword")
+    status, output = machine.run(["--server"], HALO_SERVER_WEB_PORT=_free_port(), HALO_SERVER_WEB_BIND="0.0.0.0",
+                                 HALO_SERVER_WEB_PASSWORD="short")
+    assert status == 3, output
+
+
+def test_web_port_in_use_exits_4(machines):
+    _needs_game("bloodgulch")
+    machine = machines("portinuse")
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as taken:
+        taken.bind(("127.0.0.1", 0))
+        taken.listen(1)
+        status, output = machine.run(["--server"], HALO_SERVER_WEB_PORT=taken.getsockname()[1],
+                                     HALO_SERVER_WEB_PASSWORD=PASSWORD, HALO_NET_ADDRESS=SERVER_ADDRESS,
+                                     HALO_NET_BROADCAST=CLIENT_ADDRESSES[0])
+    assert status == 4, output
+
+
+# ---------- standard input, a read-only data root, signals
+
+def test_quit_on_standard_input_with_a_read_only_data_root(machines, tmp_path):
+    _needs_game("bloodgulch")
+    machine = machines("readonly")
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    data = machine.folder / "data"
+    port = _free_port()
+    status_file = tmp_path / "status.json"
+    # (read-only from the start: the server must not need to write there)
+    data.chmod(0o555)
+    try:
+        before = sorted(path.name for path in data.iterdir())
+        machine.start(["--server"], **_server_settings(port, HALO_LOG_ROOT=logs, HALO_SERVER_STATUS_FILE=status_file))
+        _until(lambda: "server: ready" in machine.text(), 90, "server: ready", machine)
+        machine.send("sv_status")
+        _until(lambda: "lobby" in machine.text().split("server: ready", 1)[1], 15, "sv_status's answer", machine)
+        # (the status file, by its host path, as /api/status gives it)
+        _until(lambda: status_file.is_file(), 15, "the status file", machine)
+        assert json.loads(status_file.read_text())["state"] == "lobby"
+        machine.send("quit")
+        assert machine.wait(15) == 0, machine.text()[-3000:]
+        assert sorted(path.name for path in data.iterdir()) == before, "the server wrote to its read-only data root"
+        assert (logs / "debug.txt").is_file(), "no debug.txt in paths.logs"
+    finally:
+        data.chmod(0o755)
+
+
+def test_second_sigint_exits_130(machines):
+    _needs_game("bloodgulch")
+    machine = machines("sigint")
+    machine.start(["--server"], **_server_settings(0))
+    _until(lambda: "server: ready" in machine.text(), 90, "server: ready", machine)
+    machine.process.send_signal(signal.SIGINT)
+    # (the second once the first is taken: two at once are one pending signal)
+    _until(lambda: "stopping (signal 2)" in machine.text(), 10, "the first SIGINT taken", machine)
+    machine.process.send_signal(signal.SIGINT)
+    assert machine.wait(15) == 130, machine.text()[-3000:]
+
+
+# ---------- a rotation played
+
+def test_rotation_moderation_and_shutdown(machines):
+    """a client joins, plays the first entry (ended by sv_end_game), the postgame, then the second entry; the API
+    kicks it, bans and unbans it, says a notice and refuses a bad rotation; SIGTERM shows the client the postgame
+    and exits 0"""
+    _needs_game("bloodgulch", "prisoner")
+    port = _free_port()
+    server = machines("server").start(["--server"], **_server_settings(port))
+    api = Api(port)
+    _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+    api.login()
+    status = api.status()
+    assert status["name"] == "Test Server" and status["state"] == "lobby", status
+    assert status["players"] == 0, "the host has a player of its own"
+
+    client = _client(machines("client"), CLIENT_ADDRESSES[0], "Tester")
+    _until(lambda: (api.status() or {}).get("state") == "playing", 120, "the first game", server)
+    assert api.status()["map"] == "bloodgulch"
+    players = api.call("GET", "/api/players")[1]["players"]
+    assert [player["name"] for player in players] == ["Tester"], players
+
+    # the first game ended by a command, its postgame, the second entry's lobby and game
+    server.send("sv_end_game")
+    _until(lambda: "postgame" in _event_names(api), 30, "the postgame", server)
+    _until(lambda: (api.status() or {}).get("map") == "prisoner" and api.status()["state"] == "playing", 120,
+           "the second game, on prisoner", server)
+    names = _event_names(api)
+    for event in ("server_started", "lobby_opened", "player_joined", "game_started", "game_ended", "postgame"):
+        assert event in names, f"no {event} event: {names}"
+    assert names.count("game_started") >= 2, names
+    _until(lambda: "prisoner" in client.debug(), 30, "the client on prisoner", client)
+
+    # a notice, and a rotation entry the API refuses with nothing changed
+    status, answer = api.call("POST", "/api/say", {"text": "hello from the test"})
+    assert status == 200 and answer["ok"], answer
+    rotation = api.call("GET", "/api/rotation")[1]
+    status, answer = api.call("PUT", "/api/rotation", {"entries": ["bloodgulch:slayer", "nosuchmap:ctf"]})
+    assert status == 400 and answer["error"]["code"] == "rejected", answer
+    assert answer["error"]["rejected"][0]["index"] == 1, answer
+    assert api.call("GET", "/api/rotation")[1]["entries"] == rotation["entries"], "a refused rotation changed it"
+
+    # a kick by slot (the name checked), then a ban of an hour, which bans.txt keeps with its end
+    slot = api.call("GET", "/api/players")[1]["players"][0]["slot"]
+    status, answer = api.call("POST", f"/api/players/{slot}/kick", {"name": "Someone Else"})
+    assert status != 200 or not answer.get("ok"), "a kick of another name than the slot's went through"
+    status, answer = api.call("POST", f"/api/players/{slot}/kick", {"name": "Tester"})
+    assert status == 200 and answer["ok"], answer
+    _until(lambda: not api.call("GET", "/api/players")[1]["players"], 30, "the kicked player gone", server)
+    assert "kick" in _event_names(api)
+    # (the join test joins once: a new start of it joins again)
+    client.stop()
+    _client(client, CLIENT_ADDRESSES[0], "Tester")
+    _until(lambda: api.call("GET", "/api/players")[1]["players"], 90, "the client back after its kick", server)
+    slot = api.call("GET", "/api/players")[1]["players"][0]["slot"]
+    status, answer = api.call("POST", f"/api/players/{slot}/ban",
+                              {"name": "Tester", "duration": "1h", "reason": "a test"})
+    assert status == 200 and answer["ok"], answer
+    _until(lambda: not api.call("GET", "/api/players")[1]["players"], 30, "the banned player gone", server)
+    bans = api.call("GET", "/api/bans")[1]["bans"]
+    assert len(bans) == 1 and bans[0]["until"], bans
+    assert "until=" in (server.folder / "data" / "bans.txt").read_text(errors="replace")
+    client.stop()
+    _client(client, CLIENT_ADDRESSES[0], "Tester")
+    time.sleep(25)
+    assert not api.call("GET", "/api/players")[1]["players"], "the banned client joined again"
+    status, answer = api.call("DELETE", f"/api/bans/{bans[0]['n']}")
+    assert status == 200 and answer["ok"], answer
+    client.stop()
+    _client(client, CLIENT_ADDRESSES[0], "Tester")
+    _until(lambda: api.call("GET", "/api/players")[1]["players"], 120, "the client back after its unban", server)
+
+    # SIGTERM in a game: the client shown the postgame, the server gone with exit code 0
+    _until(lambda: (api.status() or {}).get("state") == "playing", 120, "a game to stop in", server)
+    server.process.send_signal(signal.SIGTERM)
+    assert server.wait(15) == 0, server.text()[-3000:]
+    assert "stopped (exit code 0)" in server.text()
+    assert not re.search(r"EXCEPTION|assert", server.debug()), "an exception or assert in the server's debug.txt"
+
+
+def test_empty_game_ends_and_join_in_progress(machines):
+    """a game whose players leave ends after server.empty_seconds and the lobby opens again; a second client joins a
+    game in progress"""
+    _needs_game("bloodgulch")
+    port = _free_port()
+    server = machines("server").start(["--server"], **_server_settings(
+        port, HALO_SERVER_ROTATION="bloodgulch:slayer", HALO_SERVER_EMPTY_SECONDS=5))
+    api = Api(port)
+    _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+    api.login()
+    first = _client(machines("first"), CLIENT_ADDRESSES[0], "First")
+    _until(lambda: (api.status() or {}).get("state") == "playing", 120, "the game", server)
+    machines_by_name = {"second": _client(machines("second"), CLIENT_ADDRESSES[1], "Second")}
+    _until(lambda: len(api.call("GET", "/api/players")[1]["players"]) == 2, 60, "the second client in the game",
+           server)
+    # (loaded, and playing: a game whose players all leave ends, a joiner still loading with it)
+    _until(lambda: "local machine is loaded" in machines_by_name["second"].debug(), 60, "the second client loaded",
+           machines_by_name["second"])
+    time.sleep(5)
+    first.stop()
+    _until(lambda: len(api.call("GET", "/api/players")[1]["players"]) == 1, 60, "the first client gone", server)
+    assert api.status()["state"] == "playing", "the game ended with a player in it"
+    # the last client gone: the game ends as empty, and the lobby opens again
+    machines_by_name["second"].stop()
+    _until(lambda: any(event.get("event") == "game_ended" and event.get("reason") == "empty"
+                       for event in api.events()), 90, "the empty game's end", server)
+    _until(lambda: (api.status() or {}).get("state") == "lobby", 60, "the lobby again", server)
+    # the next join starts a new game
+    _client(machines("third"), CLIENT_ADDRESSES[0], "Third")
+    _until(lambda: (api.status() or {}).get("state") == "playing", 120, "a new game for the next player", server)
+    assert api.status()["games_hosted"] == 2, api.status()
+
+
+def _cpu_seconds(pid):
+    """a process's user and system time (/proc/<pid>/stat), in seconds"""
+    fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+    return (int(fields[11]) + int(fields[12])) / os.sysconf("SC_CLK_TCK")
+
+
+def test_idle_server_spends_little_cpu(machines):
+    """a server with nobody on it uses under 3 % of a core (it runs 10 frames a second)"""
+    _needs_game("bloodgulch")
+    if not Path("/proc/self/stat").is_file():
+        pytest.skip("needs /proc")
+    server = machines("idle").start(["--server"], **_server_settings(0))
+    _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+    time.sleep(5)
+    started, used = time.monotonic(), _cpu_seconds(server.process.pid)
+    time.sleep(30)
+    share = (_cpu_seconds(server.process.pid) - used) / (time.monotonic() - started)
+    assert share < 0.03, f"the idle server used {share:.1%} of a core"
+
+
+def test_web_port_survives_junk(machines):
+    """random bytes, heads cut short and left open, oversized heads and bodies, and bad WebSocket frames at the web
+    port: the server keeps answering, and keeps running"""
+    import random
+
+    _needs_game("bloodgulch")
+    port = _free_port()
+    server = machines("junk").start(["--server"], **_server_settings(port))
+    api = Api(port)
+    _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+    rng = random.Random(1)
+    stalled = []
+    for index in range(300):
+        with socket.create_connection(("127.0.0.1", port), timeout=5) as connection:
+            kind = index % 5
+            if kind == 0:
+                connection.sendall(bytes(rng.randrange(256) for _ in range(rng.randrange(1, 4096))))
+            elif kind == 1:
+                connection.sendall(b"GET / HTTP/1.1\r\nHost: x\r\n" + b"X-Long: " + b"a" * 20000 + b"\r\n\r\n")
+            elif kind == 2:
+                connection.sendall(b"POST /api/login HTTP/1.1\r\nContent-Length: 999999\r\n\r\n" + b"{" * 70000)
+            elif kind == 3:
+                connection.sendall(b"GET /ws HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                                   b"Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+                                   b"Sec-WebSocket-Protocol: opence-rcon-1\r\n\r\n")
+                connection.sendall(b"\x81\x7f" + b"\xff" * 8 + bytes(rng.randrange(256) for _ in range(64)))
+            else:
+                connection.sendall(b"GET /api/status?" + bytes(rng.choice(b"%/.\x00\xff?&=") for _ in range(200)) +
+                                   b" HTTP/1.1\r\n\r\n")
+            try:
+                connection.recv(4096)
+            except (socket.timeout, ConnectionError):
+                pass
+    for _ in range(4):
+        stalled.append(socket.create_connection(("127.0.0.1", port), timeout=5))
+        stalled[-1].sendall(b"GET /healthz HTTP/1.1\r\n")
+    status, answer = api.call("GET", "/healthz", token=False)
+    assert status == 200, (status, answer)
+    time.sleep(12)
+    for connection in stalled:
+        connection.close()
+    status, answer = api.call("GET", "/healthz", token=False)
+    assert status == 200, (status, answer)
+    assert server.process.poll() is None, server.text()[-3000:]
+    server.send("quit")
+    assert server.wait(15) == 0, server.text()[-3000:]
+
+
+def test_probe_prints_the_server(machines):
+    """halo --probe, on the LAN: the server's game as one line of JSON, nothing joined"""
+    _needs_game("prisoner")
+    server = machines("probed").start(["--server"], **_server_settings(
+        0, HALO_SERVER_NAME="Probe Me", HALO_SERVER_ROTATION="prisoner:ctf"))
+    _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+    prober = machines("prober")
+    result = subprocess.run([str(prober.folder / "bin" / "halo"), "--probe"], cwd=prober.folder,
+                            env=prober.environment(HALO_NET_ADDRESS=CLIENT_ADDRESSES[0],
+                                                   HALO_NET_BROADCAST=SERVER_ADDRESS, HALO_NET_ONLINE="false"),
+                            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=90)
+    assert result.returncode == 0, result.stdout + result.stderr[-2000:]
+    game = json.loads(result.stdout.strip().splitlines()[-1])
+    assert game["ok"] and game["name"] == "Probe Me" and game["map"] == "prisoner", game
+    assert game["gametype"] == "ctf" and game["dedicated"] and game["players"] == 0, game
+    assert not (prober.folder / "bin" / "config.toml").exists(), "the probe wrote its settings"

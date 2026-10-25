@@ -82,6 +82,7 @@ mutes.
 #include "network_chat.h"
 #include "text_filter.h"
 #include "halo_keyboard.h"
+#include "server_director.h"
 
 #include <stdio.h>
 
@@ -1220,6 +1221,7 @@ static void chat_host_send(
 	if (!sender || sender->quit_out_of_game)
 		return;
 	sender_vehicle = chat_player_vehicle(sender);
+	server_event_chat(player_index, channel, text);
 	chat_message_new(&message, player_index, chat_channel_flags(channel), text);
 	for (index = 0; index < count; index++)
 	{
@@ -1398,6 +1400,18 @@ void network_chat_host_mute(
 		chat_host_mute_name(name, CHAT_MUTE_DEFAULT_MINUTES);
 	else
 		chat_host_unmute_name(name);
+}
+
+boolean network_chat_host_mute_named(
+	char const *name,
+	short minutes,
+	boolean mute)
+{
+	if (!chat_host() || !name || !name[0])
+		return FALSE;
+	if (!mute)
+		return chat_host_unmute_name(name);
+	return chat_host_mute_name(name, minutes > 0 ? minutes : CHAT_MUTE_DEFAULT_MINUTES);
 }
 
 boolean network_chat_host_name_muted(

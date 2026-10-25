@@ -748,9 +748,11 @@ boolean update_client_dequeue(
 	if (game_connection() == _game_connection_network_client)
 		return update_client_dequeue_distributed(actions);
 	update = update_client_get_update(update_client_globals.next_update_number_to_dequeue);
+	/* port: a dedicated server's game goes on with nobody in it, its update
+	holding no action (port/linux/game/server_director.c ends it) */
 	if (!update ||
 		update_client_globals.next_update_number_to_dequeue>update_client_globals.latest_update_number_received ||
-		update->update.action_count<=0 ||
+		(update->update.action_count<=0 && !(halo_server_mode() && update->update.action_count == 0)) ||
 		update->update.action_count>MAXIMUM_NUMBER_OF_PLAYERS)
 	{
 		return FALSE;
@@ -823,8 +825,9 @@ long update_client_get_maximum_possible_server_time(
 	{
 		struct update *update = update_client_get_update(update_number);
 
+		/* port: as update_client_dequeue, a dedicated server's empty game */
 		if (!update ||
-			update->update.action_count<=0 ||
+			(update->update.action_count<=0 && !(halo_server_mode() && update->update.action_count == 0)) ||
 			update->update.action_count>MAXIMUM_NUMBER_OF_PLAYERS)
 		{
 			break;

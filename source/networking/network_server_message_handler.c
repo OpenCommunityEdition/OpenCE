@@ -1793,6 +1793,10 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			{
 				advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] |= HALO_PORT_ADVERTISED_IN_PROGRESS_FLAG;
 			}
+			/* port: a dedicated server, with no player of its own
+			(port/linux/game/server_director.c) */
+			if (halo_server_mode())
+				advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] |= HALO_PORT_ADVERTISED_DEDICATED_FLAG;
 			/* (an OpenCE gametype's kind, the server browser's name for it) */
 			advertisement.reserved[HALO_PORT_ADVERTISED_KIND_OFFSET] = game_modes_kind(&game->variant,
 				&game->variant_options);

@@ -135,6 +135,10 @@ def main() -> int:
     # voice chat's codec (port/third_party/opus), in every build, whose BSD
     # license asks binaries to carry its notice
     shutil.copy2(ROOT / "port/third_party/opus/COPYING", dist / "opus-COPYING.txt")
+    # the JSON tokenizer (port/third_party/jsmn) of the server browser's
+    # lists and the dedicated server's API, in every build, whose MIT
+    # license asks copies to carry its notice
+    shutil.copy2(ROOT / "port/third_party/jsmn/LICENSE", dist / "jsmn-LICENSE.txt")
     # voice chat's speaker icons and the Mods menu's warning icons
     # (port/assets/icons/lucide, drawn into the menus' bitmaps), whose ISC
     # license asks copies to carry its notice
@@ -143,6 +147,22 @@ def main() -> int:
     # Android's APK has its own copy)
     if args.platform != "android":
         shutil.copy2(ROOT / "port/assets/network/brokers.txt", dist / "brokers.txt")
+        # the master servers that list dedicated servers, for the server
+        # browser and the dedicated server (network.masters_file and
+        # server.masters_file, docs/dedicated_server.md)
+        masters = ROOT / "port/assets/network/masters.txt"
+        if masters.exists():
+            shutil.copy2(masters, dist / "masters.txt")
+    if args.platform in ("linux", "windows"):
+        # the dedicated server's examples: init.txt's commands and gametype
+        # files (docs/dedicated_server.md, "Files")
+        shutil.copy2(ROOT / "deploy/init.txt.example", dist / "init.txt.example")
+        shutil.copytree(ROOT / "deploy/gametypes", dist / "gametypes")
+    if args.platform == "linux":
+        # halo --server's script, and the ways to deploy a server
+        # (deploy/: systemd, Docker, Pterodactyl, Kubernetes, other panels)
+        shutil.copy2(ROOT / "deploy/halo-server", dist / "halo-server")
+        shutil.copytree(ROOT / "deploy", dist / "deploy", ignore=shutil.ignore_patterns("*.zip", "__pycache__"))
     return 0
 
 

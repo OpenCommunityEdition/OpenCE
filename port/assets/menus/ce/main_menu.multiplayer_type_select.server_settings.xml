@@ -216,12 +216,13 @@
 		<string text="Each team's vehicles and their respawn time, for\nthis game."/>
 		<string text="The motion tracker and nav points, for this game."/>
 		<string text="Friendly fire and team balance, for this game."/>
-		<string text="Anyone can see and join your game: it is listed\nin everyone's Server Browser."/>
+		<string text="Anyone can see and join your game: it is listed\nfor everyone through the brokers."/>
 		<string text="Only players with your invite link can join."/>
 		<string text="Friendly fire, the enemies and player collisions,\nfor this game."/>
 		<string text="Voice chat, text chat and votes to kick a player,\nfor this game."/>
 		<string text="Players from the Server Browser must type it to\njoin (an invite link needs none). Enter sets it."/>
 		<string text="Sending players who join without the game's\nCustom Edition map the map, and how fast."/>
+		<string text="Listed for everyone through the brokers, and on\nthe master servers with your publisher key."/>
 	</strings>
 	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/header_coop_options"/>

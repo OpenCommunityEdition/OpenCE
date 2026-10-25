@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from .embed_assets import hud_assets_build, hud_configure_inputs
+from .embed_assets import hud_assets_build, hud_configure_inputs, server_ui_build
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/linux")
@@ -499,6 +499,8 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
 
     # the high-res HUD's textures (port/assets/hud; port/linux/src/hud_hires.c)
     embedded_assets = hud_assets_build(n, "linux", build_dir / "generated" / "hud_hires_assets.c")
+    # a dedicated server's admin page (port/assets/server_ui; port/linux/src/server_http.c)
+    embedded_assets += server_ui_build(n, "linux", build_dir / "generated" / "server_ui_assets.c")
 
     # the portable build's system root and SDL3, or the build machine's
     if getattr(sln, "port_portable", False):
@@ -597,7 +599,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                 add_object(source, f"{posix_cflags} -I{MINIUPNPC_DIR / 'include'} -DMINIUPNP_STATICLIB", posix=True)
             elif source.name.startswith("posix_"):
                 add_object(source, posix_cflags, posix=True)
-            elif source.name == "updater.c":
+            elif source.name in ("updater.c", "server_mode.c"):
                 add_object(source, f"{platform_cflags} {updater_defines(getattr(sln, 'port_release', False))}")
             else:
                 add_object(source, platform_cflags)
@@ -712,6 +714,10 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     # internet play's MQTT brokers, a file beside the game (network.brokers_file)
     brokers = build_dir / "brokers.txt"
     n.build(outputs=brokers, rule="linux_copy", inputs=Path("port/assets/network/brokers.txt"))
+    # the master servers of dedicated servers, a file beside the game too
+    # (network.masters_file, server.masters_file)
+    masters = build_dir / "masters.txt"
+    n.build(outputs=masters, rule="linux_copy", inputs=Path("port/assets/network/masters.txt"))
     n.build(outputs="linux", rule="phony",
-            inputs=[output, brokers, validator, *sdl_outputs])
+            inputs=[output, brokers, masters, validator, *sdl_outputs])
     n.newline()

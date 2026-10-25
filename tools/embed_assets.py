@@ -136,6 +136,22 @@ def hud_assets_build(n: Any, prefix: str, output: Path) -> List[Path]:
     return [output]
 
 
+def server_ui_build(n: Any, prefix: str, output: Path) -> List[Path]:
+    """Emits the rule that generates a dedicated server's admin page as C
+    (tools/server_ui_embed.py, port/assets/server_ui); returns [output]"""
+    ui = Path("port/assets/server_ui")
+    inputs = sorted(path for path in (ROOT / ui).glob("*") if path.is_file())
+    n.rule(
+        name=f"{prefix}_server_ui",
+        command="$python tools/server_ui_embed.py $out",
+        description=f"{prefix.upper()} EMBED $out",
+    )
+    n.build(outputs=output, rule=f"{prefix}_server_ui",
+            implicit=[Path("tools/server_ui_embed.py"), Path("tools/server_sim.py"),
+                      *(ui / path.name for path in inputs)])
+    return [output]
+
+
 def png_size(data: bytes, name: str) -> tuple:
     """The width and height of an 8-bit RGBA, non-interlaced PNG (the only
     kind port/linux/src/hud_hires.c reads)."""
