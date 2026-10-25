@@ -1,0 +1,6 @@
+# ruff format's settings for the tools' Python (`nix fmt`)
+line-length = 120
+
+[format]
+# (the tools mix their quotes; ruff keeps each string's)
+quote-style = "preserve"
