@@ -89,14 +89,14 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
     - [x] The fixes
 - [x] Task: Conductor - User Manual Verification 'Phase 7: Sound' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
-## Phase 8: Particles and effects
+## Phase 8: Particles and effects [checkpoint: 8f5676c]
 - [x] Task: The effects row 0e1dae2
     - [x] Write tests: each effect spawns its full particle set; golden frames of the row
     - [x] The fixes
 - [x] Task: Effects of play 0e1dae2
     - [x] Write tests: muzzle flashes, impacts, explosions and vehicle effects spawn as in the original
     - [x] The fixes
-- [ ] Task: Conductor - User Manual Verification 'Phase 8: Particles and effects' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 8: Particles and effects' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 9: The HUD
 The menus and the rest of the UI are left to the UI rewrite's own track.
