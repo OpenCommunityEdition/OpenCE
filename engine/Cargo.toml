@@ -33,6 +33,8 @@ insta = { version = "1.43", default-features = false }
 pretty_assertions = "1.4"
 # (the sounds resampled to the output's rate once, as they are decoded)
 rubato = { version = "5.0", default-features = false, features = ["fft_resampler"] }
+# (the bake's CPU side, split over the cores; each result kept in order)
+rayon = "1.10"
 # (the engine's allocator, counted for `stat allocations`; the nightly
 # feature only makes StatsAlloc::new a const fn, which stable allows)
 mimalloc = { version = "0.1", default-features = false }
@@ -56,7 +58,7 @@ sha2 = { version = "0.10", default-features = false }
 # (decodes Custom Edition's Ogg Vorbis sounds)
 lewton = { version = "0.10", default-features = false, features = ["ogg"] }
 # (the packs' fingerprints, and their compression)
-blake3 = { version = "1.8", default-features = false, features = ["std"] }
+blake3 = { version = "1.8", default-features = false, features = ["std", "rayon"] }
 lz4_flex = { version = "0.11", default-features = false, features = ["std", "safe-encode", "safe-decode"] }
 # (the snapshot's plain types, checked for padding, and allocated zeroed)
 bytemuck = { version = "1.25", features = ["derive", "extern_crate_alloc", "min_const_generics"] }

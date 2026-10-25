@@ -687,3 +687,67 @@ interpolate as before.
 | every stock sound decodes | pass |
 | clippy `-D warnings`, the whole workspace | clean |
 | the whole suite | 1116 passed, 3 skipped |
+
+## Bake and import in parallel
+
+The bake traces its light on the GPU. Its CPU side plans the bake (scene,
+BVH, atlas, seams) and then finishes it: it holds down the fireflies,
+stitches the seams, fits the exposure, and encodes the pages. Timed stage by
+stage in release, the finish was the largest part, and within it the
+exposure fit. That fit bisects the exposure over 24 steps, and each step
+shows up to 65 536 squares of light through the level shader's curve. The
+measures that compare a bake with the stock pages are dev checks and are
+not on the bake's path.
+
+Two passes now run on rayon's threads: the firefly hold, chart by chart,
+and the exposure fit, square by square. Neither may change a bit of the
+output, because a bake is cached by its key and must be the bake any
+machine would make. So each result is collected in order and summed in the
+old order. For the hold, the first texel that shows each point is settled
+first, in one serial pass, and then the charts are held at once. A test
+finishes Blood Gulch's bake on one thread, on two and on eight, with
+specks and lost texels in the light, and compares every bit. A digest of
+the finished bake on Blood Gulch and a10 was taken before the change; the
+parallel bake gives the same digest.
+
+| BSP | finish before | finish after | firefly hold before | after |
+| --- | --- | --- | --- | --- |
+| bloodgulch 0 | 83.4 ms | 41.7 ms | 26.2 ms | 14.7 ms |
+| a10 0 | 211.1 ms | 97.9 ms | 28.5 ms | 11.3 ms |
+| a10 1 | 310.7 ms | 122.7 ms | 51.9 ms | 20.7 ms |
+
+These timings are on 10 cores (8 performance, 2 efficiency). The firefly
+hold gains less than the fit, because one large chart dominates each BSP.
+
+The edge measures (67 to 291 ms each) would split the same way, page by
+page, but `bake/src/edge.rs` carries another session's uncommitted work on
+size bands. They are left serial until that work lands.
+
+Loading a level from its pack hashes the whole pack (225 MB on a10) to
+check it, and the map is hashed again for its fingerprint. BLAKE3 hashes
+its chunks as a tree, so `update_rayon` hashes them on all the cores and
+gives the same digest. A test checks the fingerprint against the one-thread
+hash on 8 MiB, on 1000 bytes, and on nothing. No cached key changes.
+
+| map | fingerprint before | after | load from pack before | after |
+| --- | --- | --- | --- | --- |
+| bloodgulch | 13.8 ms | 2.5 ms | 57.2 ms | 36.8 ms |
+| a10 | 96.6 ms | 16.2 ms | 388.2 ms | 205.4 ms |
+
+The import itself is left serial. Its largest part on a10 is opening the
+Xbox cache (930 of 2000 ms), which inflates one zlib stream and cannot be
+split. The import also runs once per map before it is cached.
+
+meshopt was declined. A BSP has 5 500 to 55 000 triangles. Reordering them
+for the vertex cache would change the bake's key and the atlas's order, and
+Apple's tile-based GPUs gain little from that order. It would also bring a
+C++ build into the Nix closure for no measured gain.
+
+| check | result |
+| --- | --- |
+| a bake finished on one thread is the bake on two and on eight, bit for bit | pass |
+| the parallel bake's digest is the serial bake's (bloodgulch, a10) | pass, identical |
+| the fingerprint on many threads is the one-thread BLAKE3 hash | pass, 3 sizes |
+| a pack loads as the level imported | pass |
+| clippy `-D warnings`, the whole workspace | clean |
+| the whole suite | 1120 passed, 3 skipped |

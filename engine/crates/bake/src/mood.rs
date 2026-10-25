@@ -19,6 +19,7 @@
 //! most of its texels lie on pages that keep their own.
 
 use opence_content::{Level, Pixels};
+use rayon::prelude::*;
 
 use crate::chart::{Chart, EMPTY};
 use crate::output::{from_half, BakedPage};
@@ -216,22 +217,30 @@ pub fn fitted_exposure(
     stock: &[Option<[f32; 3]>],
     irradiance: &[[f32; 4]],
 ) -> f32 {
+    // (the squares and the shown light are found in parallel and summed
+    // in order, so the exposure is the same on any number of threads)
+    let found: Vec<(f32, Squares)> = charts
+        .par_iter()
+        .zip(stock)
+        .filter_map(|(chart, stock)| {
+            let stock = (*stock)?;
+            let width = chart.width.max(1) as usize;
+            let light_at = |x: u32, y: u32| {
+                let point = *chart.texels.get(y as usize * width + x as usize)?;
+                let light = irradiance.get(point as usize)?;
+                Some([0, 1, 2].map(|channel| finite(light[channel])))
+            };
+            Some((brightness(stock), squares_of(chart, light_at)))
+        })
+        .collect();
     let (mut target, mut texels) = (0.0f64, 0u64);
     let mut squares = Vec::new();
-    for (chart, stock) in charts.iter().zip(stock) {
-        let Some(stock) = stock else { continue };
-        let width = chart.width.max(1) as usize;
-        let light_at = |x: u32, y: u32| {
-            let point = *chart.texels.get(y as usize * width + x as usize)?;
-            let light = irradiance.get(point as usize)?;
-            Some([0, 1, 2].map(|channel| finite(light[channel])))
-        };
-        let chart_squares = squares_of(chart, light_at);
+    for (stock, chart_squares) in found {
         let count: u64 = chart_squares
             .iter()
             .map(|(_, count)| u64::from(*count))
             .sum();
-        target += f64::from(brightness(*stock)) * count as f64;
+        target += f64::from(stock) * count as f64;
         texels += count;
         squares.extend(chart_squares);
     }
@@ -243,13 +252,14 @@ pub fn fitted_exposure(
     let sample: Vec<&([f32; 3], u32)> = squares.iter().step_by(step).collect();
     let weight: f64 = sample.iter().map(|(_, count)| f64::from(*count)).sum();
     let shown_mean = |exposure: f32| {
-        let sum: f64 = sample
-            .iter()
+        let terms: Vec<f64> = sample
+            .par_iter()
             .map(|(light, count)| {
                 let channels = light.map(|channel| shown(channel * exposure).min(1.0));
                 f64::from(brightness(channels)) * f64::from(*count)
             })
-            .sum();
+            .collect();
+        let sum: f64 = terms.iter().sum();
         sum / weight
     };
     if shown_mean(libm::exp2f(EXPOSURE_STOPS)) <= 0.0 {
@@ -291,9 +301,12 @@ fn mean_over(
     (count > 0).then(|| sum.map(|sum| (sum / count as f64) as f32))
 }
 
+/// [`BLOCK`] squares' mean values, each with how many texels it has.
+type Squares = Vec<([f32; 3], u32)>;
+
 /// Each [`BLOCK`] square of `chart`'s covered texels that have a `value`:
 /// its texels' mean value, and how many they are.
-fn squares_of(chart: &Chart, value: impl Fn(u32, u32) -> Option<[f32; 3]>) -> Vec<([f32; 3], u32)> {
+fn squares_of(chart: &Chart, value: impl Fn(u32, u32) -> Option<[f32; 3]>) -> Squares {
     let width = chart.width.max(1) as usize;
     let mut squares = Vec::new();
     for top in (0..chart.height).step_by(BLOCK as usize) {

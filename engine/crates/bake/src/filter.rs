@@ -9,7 +9,9 @@
 //! a patch (a lamp's pool) is kept. The light lost is given back by the
 //! BSP's exposure ([`crate::mood::fitted_exposure`]), which is fitted after.
 
-use crate::chart::{Atlas, EMPTY};
+use rayon::prelude::*;
+
+use crate::chart::{Atlas, Chart, EMPTY};
 
 /// How many times brighter than its neighbours' mean a point may be.
 pub const FIREFLY: f32 = 4.0;
@@ -23,72 +25,114 @@ const SAME_FACING: f32 = 0.8;
 /// finite given their mean colour. A point no page covers, or one with no
 /// neighbour facing its way, is kept as it is.
 pub fn hold_fireflies(atlas: &Atlas, irradiance: &[[f32; 4]]) -> Vec<[f32; 4]> {
-    let mut held = irradiance.to_vec();
+    // (a point is held at the first texel that shows it, chart by chart:
+    // which texel that is is settled first, so that the charts can be held
+    // at once, and the light is the same on any number of threads)
     let mut seen = vec![false; irradiance.len()];
-    for chart in &atlas.charts {
-        let (width, height) = (chart.width as i64, chart.height as i64);
-        for y in 0..height {
-            for x in 0..width {
-                let point = chart.texels[(y * width + x) as usize] as usize;
-                if point >= irradiance.len() || seen[point] {
-                    continue;
-                }
-                let Some(normal) = atlas.points.get(point).map(|p| p.normal) else {
-                    continue;
-                };
-                seen[point] = true;
-                let (mut sum, mut colour, mut count) = (0.0, [0.0f32; 3], 0u32);
-                let mut counted = Vec::new();
-                for ny in (y - REACH).max(0)..(y + REACH + 1).min(height) {
-                    for nx in (x - REACH).max(0)..(x + REACH + 1).min(width) {
-                        let other = chart.texels[(ny * width + nx) as usize];
-                        if other == EMPTY || other as usize == point || counted.contains(&other) {
-                            continue;
-                        }
-                        let (Some(near), Some(light)) = (
-                            atlas.points.get(other as usize),
-                            irradiance.get(other as usize),
-                        ) else {
-                            continue;
-                        };
-                        if dot(near.normal, normal) < SAME_FACING {
-                            continue;
-                        }
-                        if !finite(*light) {
-                            continue;
-                        }
-                        counted.push(other);
-                        sum += luminance(*light);
-                        for channel in 0..3 {
-                            colour[channel] += light[channel];
-                        }
-                        count += 1;
+    let firsts: Vec<Vec<(i64, i64, usize)>> = atlas
+        .charts
+        .iter()
+        .map(|chart| {
+            let (width, height) = (i64::from(chart.width), i64::from(chart.height));
+            let mut firsts = Vec::new();
+            for y in 0..height {
+                for x in 0..width {
+                    let Some(&point) = chart.texels.get((y * width + x) as usize) else {
+                        continue;
+                    };
+                    let point = point as usize;
+                    if point >= irradiance.len() || seen[point] || atlas.points.get(point).is_none()
+                    {
+                        continue;
                     }
-                }
-                if count == 0 {
-                    continue;
-                }
-                let [r, g, b, a] = irradiance[point];
-                if !finite(irradiance[point]) {
-                    let mean = colour.map(|channel| channel / count as f32);
-                    held[point] = [
-                        mean[0],
-                        mean[1],
-                        mean[2],
-                        if a.is_finite() { a } else { 1.0 },
-                    ];
-                    continue;
-                }
-                let limit = FIREFLY * sum / count as f32;
-                let own = luminance(irradiance[point]);
-                if own > limit {
-                    let scale = limit / own;
-                    held[point] = [r * scale, g * scale, b * scale, a];
+                    seen[point] = true;
+                    firsts.push((x, y, point));
                 }
             }
-        }
+            firsts
+        })
+        .collect();
+    let changes: Vec<Vec<(usize, [f32; 4])>> = atlas
+        .charts
+        .par_iter()
+        .zip(&firsts)
+        .map(|(chart, firsts)| {
+            firsts
+                .iter()
+                .filter_map(|&(x, y, point)| {
+                    held(atlas, chart, irradiance, x, y, point).map(|light| (point, light))
+                })
+                .collect()
+        })
+        .collect();
+    let mut held = irradiance.to_vec();
+    for (point, light) in changes.into_iter().flatten() {
+        held[point] = light;
     }
     held
+}
+
+/// The light of `point`, at `x`, `y` on `chart`, held to its neighbours'
+/// mean, or none if it is kept as it is.
+fn held(
+    atlas: &Atlas,
+    chart: &Chart,
+    irradiance: &[[f32; 4]],
+    x: i64,
+    y: i64,
+    point: usize,
+) -> Option<[f32; 4]> {
+    let (width, height) = (i64::from(chart.width), i64::from(chart.height));
+    let normal = atlas.points.get(point)?.normal;
+    let (mut sum, mut colour, mut count) = (0.0, [0.0f32; 3], 0u32);
+    let mut counted = Vec::new();
+    for ny in (y - REACH).max(0)..(y + REACH + 1).min(height) {
+        for nx in (x - REACH).max(0)..(x + REACH + 1).min(width) {
+            let Some(&other) = chart.texels.get((ny * width + nx) as usize) else {
+                continue;
+            };
+            if other == EMPTY || other as usize == point || counted.contains(&other) {
+                continue;
+            }
+            let (Some(near), Some(light)) = (
+                atlas.points.get(other as usize),
+                irradiance.get(other as usize),
+            ) else {
+                continue;
+            };
+            if dot(near.normal, normal) < SAME_FACING {
+                continue;
+            }
+            if !finite(*light) {
+                continue;
+            }
+            counted.push(other);
+            sum += luminance(*light);
+            for channel in 0..3 {
+                colour[channel] += light[channel];
+            }
+            count += 1;
+        }
+    }
+    if count == 0 {
+        return None;
+    }
+    let [r, g, b, a] = irradiance[point];
+    if !finite(irradiance[point]) {
+        let mean = colour.map(|channel| channel / count as f32);
+        return Some([
+            mean[0],
+            mean[1],
+            mean[2],
+            if a.is_finite() { a } else { 1.0 },
+        ]);
+    }
+    let limit = FIREFLY * sum / count as f32;
+    let own = luminance(irradiance[point]);
+    (own > limit).then(|| {
+        let scale = limit / own;
+        [r * scale, g * scale, b * scale, a]
+    })
 }
 
 fn luminance([r, g, b, _]: [f32; 4]) -> f32 {

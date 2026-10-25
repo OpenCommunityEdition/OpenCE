@@ -79,7 +79,9 @@ pub enum PackError {
 /// little-endian. Changing any byte changes it, and it is quick to take
 /// over a whole map (some 3 GB a second, against FNV's 0.3).
 pub fn fingerprint(bytes: &[u8]) -> u64 {
-    let hash = blake3::hash(bytes);
+    // (BLAKE3 hashes its chunks as a tree, so the chunks hashed on all the
+    // cores give the hash of one: a map or a pack is hashed at each load)
+    let hash = blake3::Hasher::new().update_rayon(bytes).finalize();
     let mut first = [0; 8];
     first.copy_from_slice(&hash.as_bytes()[..8]);
     u64::from_le_bytes(first)
@@ -169,6 +171,19 @@ mod tests {
         Material, Pixels, Scenario, Shader, ShaderClass, StructureBsp, SurfaceMaterial, TagRef,
         Texture, TextureFormat,
     };
+
+    #[test]
+    fn a_fingerprint_hashed_on_many_threads_is_the_hash_on_one() {
+        // (8 MiB, many of BLAKE3's chunks, so that the hash is split)
+        let bytes: Vec<u8> = (0..8u32 << 20)
+            .map(|index| (index.wrapping_mul(2_654_435_761) >> 24) as u8)
+            .collect();
+        for bytes in [&bytes[..], &bytes[..1000], &[]] {
+            let mut first = [0; 8];
+            first.copy_from_slice(&blake3::hash(bytes).as_bytes()[..8]);
+            assert_eq!(fingerprint(bytes), u64::from_le_bytes(first));
+        }
+    }
 
     fn tag(group: &[u8; 4], path: &str) -> TagRef {
         TagRef {
