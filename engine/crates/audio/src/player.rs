@@ -277,6 +277,7 @@ impl SoundPlayer {
                     position: (sound.class != UNSPATIALIZED_CLASS)
                         .then_some(source.position)
                         .flatten(),
+                    started_ms: self.time_ms,
                 });
                 Some(voice)
             }
@@ -285,6 +286,41 @@ impl SoundPlayer {
                 None
             }
         }
+    }
+
+    /// Keeps sound `index` within its class's voices per sound
+    /// (`sound_channel_summary_build`, `sound_find_like_channel`): at the
+    /// limit, a like voice that has played the class's preemption time and
+    /// is no nearer than `distance` (by less than one in the squares) is
+    /// stopped for the new one; with none, the new one does not play.
+    fn make_room(&mut self, index: usize, class_index: u16, distance: f32) -> Result<(), Dropped> {
+        let limits = class(i32::from(class_index));
+        self.census.prune(&self.mixer);
+        let listener = self.mixer.listener().position;
+        let like: Vec<&Playing> = self
+            .census
+            .playing()
+            .iter()
+            .filter(|playing| playing.sound == index)
+            .collect();
+        if like.len() < usize::from(limits.maximum_per_definition) {
+            return Ok(());
+        }
+        let preemption = f32::from(limits.preemption_ms);
+        let taken = like
+            .iter()
+            .find(|playing| {
+                let other = playing
+                    .position
+                    .map_or(0.0, |position| distance_between(position, listener));
+                self.time_ms - playing.started_ms >= preemption
+                    && distance * distance - other * other < 1.0
+            })
+            .map(|playing| playing.voice)
+            .ok_or(Dropped::Culled)?;
+        self.mixer.stop(taken);
+        self.census.prune(&self.mixer);
+        Ok(())
     }
 
     /// Plays sound `index` once (a promotion's sound in its place, its
@@ -409,6 +445,7 @@ impl SoundPlayer {
             0.0
         };
         let samples = self.samples(index, range, first).ok_or(Dropped::Failed)?;
+        self.make_room(index, sound.class, distance)?;
         let voice = self.mixer.play(samples, properties, delay);
         for &next in chain.iter().skip(1) {
             if let Some(samples) = self.samples(index, range, next) {
@@ -539,6 +576,38 @@ mod tests {
         let voice = player.impulse(0, &Source::default()).ok_or("no voice")?;
         assert!(player.mixer().is_playing(voice));
         assert!(peak(&mut player, 256) > 0.1);
+        Ok(())
+    }
+
+    #[test]
+    fn a_sound_at_its_class_limit_takes_over_an_old_like_voice_or_does_not_play(
+    ) -> Result<(), Box<dyn Error>> {
+        // (class 0, projectile_impact: six of one sound, safe for 100 ms)
+        let mut player = player(vec![sound("a", 0, vec![permutation(16384, 48000, None)])]);
+        let here = Source {
+            position: Some([2.0, 0.0, 0.0]),
+            ..Source::default()
+        };
+        let first = player.impulse(0, &here).ok_or("no first voice")?;
+        for _ in 1..6 {
+            player.impulse(0, &here).ok_or("no voice under the limit")?;
+        }
+        assert!(player.impulse(0, &here).is_none(), "a seventh played");
+        player.advance(100.0, 3);
+        let farther = Source {
+            position: Some([3.0, 0.0, 0.0]),
+            ..Source::default()
+        };
+        assert!(
+            player.impulse(0, &farther).is_none(),
+            "a farther one took a nearer voice"
+        );
+        let taken = player
+            .impulse(0, &here)
+            .ok_or("no voice after the preemption time")?;
+        assert!(!player.mixer().is_playing(first), "the oldest still plays");
+        assert!(player.mixer().is_playing(taken));
+        assert_eq!(player.census().playing().len(), 6);
         Ok(())
     }
 

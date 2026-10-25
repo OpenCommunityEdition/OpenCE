@@ -8,6 +8,7 @@ use opence_content::{Level, MaterialEffects, TagRef};
 use opence_sim::animation::AnimationEvent;
 use opence_sim::effects::FiredPart;
 use opence_sim::item_physics::{Impact, ItemImpact};
+use opence_sim::seats::VehicleSlip;
 use opence_sim::Vec3;
 
 use crate::particles::ParticleEvents;
@@ -23,6 +24,9 @@ pub(crate) struct Heard {
     pub tag: TagRef,
     /// Where it is (`None` unspatialized, to the player: a pickup's).
     pub position: Option<Vec3>,
+    /// Its scale, 0 to 1, between its sound's zero and one modifiers (a
+    /// slip's: how hard it slips).
+    pub scale: f32,
 }
 
 /// An effect a footstep makes on the ground (a splash, a puff of dust).
@@ -56,6 +60,7 @@ pub(crate) fn gather(
             .map(|part| Heard {
                 tag: part.tag.clone(),
                 position: Some(part.position),
+                scale: 0.0,
             }),
     );
     for event in events {
@@ -63,6 +68,7 @@ pub(crate) fn gather(
             heard.push(Heard {
                 tag: sound.clone(),
                 position: Some(event.position),
+                scale: 0.0,
             });
         }
         if event.foot.is_none()
@@ -87,6 +93,7 @@ pub(crate) fn gather(
             heard.push(Heard {
                 tag: sound.clone(),
                 position: Some(point),
+                scale: 0.0,
             });
         }
         if let Some(effect) = &step.effect {
@@ -122,6 +129,7 @@ pub(crate) fn gather_items(
                 heard.push(Heard {
                     tag: sound.clone(),
                     position: Some(impact.point),
+                    scale: 0.0,
                 });
             }
             if let Some(effect) = &made.effect {
@@ -136,6 +144,7 @@ pub(crate) fn gather_items(
             heard.push(Heard {
                 tag: sound.clone(),
                 position: Some(impact.sound_position),
+                scale: 0.0,
             });
         }
     }
@@ -157,6 +166,7 @@ pub(crate) fn gather_particles(
             heard.push(Heard {
                 tag: made.tag.clone(),
                 position: Some(made.point),
+                scale: 0.0,
             });
         } else {
             stepped.push(Stepped {
@@ -182,6 +192,7 @@ pub(crate) fn gather_particles(
             heard.push(Heard {
                 tag: sound.clone(),
                 position: Some(impact.point),
+                scale: 0.0,
             });
         }
         if let Some(effect) = &made.effect {
@@ -191,6 +202,33 @@ pub(crate) fn gather_particles(
                 normal: impact.normal,
             });
         }
+    }
+}
+
+/// Gathers the sounds of the vehicles' slips (`material_effect_new`): each
+/// slip's material effects' slip event, metallic or not, on the material it
+/// slipped on, heard a centimetre off the ground and scaled by how hard it
+/// slipped. (Their effects start with the simulation's.)
+pub(crate) fn gather_slips(level: &Level, slips: &[VehicleSlip], heard: &mut Vec<Heard>) {
+    for slipped in slips {
+        let slip = &slipped.slip;
+        let event = if slip.metallic {
+            MaterialEffects::METALLIC_SLIP
+        } else {
+            MaterialEffects::VEHICLE_SLIP
+        };
+        let Some(sound) = level
+            .material_effects(&slipped.material_effects)
+            .and_then(|effects| effects.of(event, slip.material))
+            .and_then(|made| made.sound.as_ref())
+        else {
+            continue;
+        };
+        heard.push(Heard {
+            tag: sound.clone(),
+            position: Some(slip.position + slip.normal * 0.01),
+            scale: slip.scale,
+        });
     }
 }
 
@@ -282,10 +320,12 @@ mod tests {
                 Heard {
                     tag: tag(b"snd!", "bang"),
                     position: Some(Vec3::X),
+                    scale: 0.0,
                 },
                 Heard {
                     tag: tag(b"snd!", "grunt"),
                     position: Some(Vec3::Z),
+                    scale: 0.0,
                 },
             ]
         );
@@ -324,6 +364,7 @@ mod tests {
             [Heard {
                 tag: tag(b"snd!", "gravel"),
                 position: Some(floor),
+                scale: 0.0,
             }]
         );
         assert_eq!(
@@ -422,10 +463,12 @@ mod tests {
                 Heard {
                     tag: tag(b"snd!", "clank"),
                     position: Some(Vec3::new(1.0, 2.0, 0.0)),
+                    scale: 0.0,
                 },
                 Heard {
                     tag: tag(b"snd!", "thud"),
                     position: Some(Vec3::new(1.0, 2.0, 0.05)),
+                    scale: 0.0,
                 },
             ]
         );
@@ -506,5 +549,43 @@ mod tests {
         assert_eq!(heard, ["ping", "tick"]);
         let stepped: Vec<&str> = stepped.iter().map(|one| one.effect.path.as_str()).collect();
         assert_eq!(stepped, ["puff", "chips"]);
+    }
+
+    #[test]
+    fn a_slip_is_heard_by_its_material_and_scaled_by_how_hard_it_slips() {
+        let mut level = level();
+        let mut slip = vec![MaterialEffect::default(); 3];
+        slip[2].sound = Some(tag(b"snd!", "skid"));
+        let mut events = vec![Vec::new(); MaterialEffects::METALLIC_SLIP + 1];
+        events[MaterialEffects::VEHICLE_SLIP] = slip;
+        level.material_effects.push(MaterialEffects {
+            tag: tag(b"foot", "wheels"),
+            events,
+        });
+        let slipped = |material, metallic| VehicleSlip {
+            vehicle: ObjectHandle { index: 2, salt: 1 },
+            material_effects: tag(b"foot", "wheels"),
+            slip: opence_sim::vehicle::Slip {
+                position: Vec3::new(1.0, 2.0, 0.0),
+                normal: Vec3::new(0.0, 0.0, 2.0),
+                material,
+                metallic,
+                scale: 0.5,
+            },
+        };
+        let mut heard = Vec::new();
+        gather_slips(
+            &level,
+            &[slipped(2, false), slipped(1, false), slipped(2, true)],
+            &mut heard,
+        );
+        assert_eq!(
+            heard,
+            [Heard {
+                tag: tag(b"snd!", "skid"),
+                position: Some(Vec3::new(1.0, 2.0, 0.02)),
+                scale: 0.5,
+            }]
+        );
     }
 }

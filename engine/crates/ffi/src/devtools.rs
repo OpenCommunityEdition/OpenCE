@@ -423,6 +423,18 @@ pub(crate) fn registry() -> Registry<State> {
         tags,
     );
     registry.command(
+        "effects",
+        "Lists the effects running whose tags have the filter in them, with their places and ages.",
+        &[Param::optional("filter", ArgKind::String)],
+        effects,
+    );
+    registry.command(
+        "started",
+        "Lists the last 64 effects begun whose tags have the filter in them, oldest first (a muzzle flash ends within its tick).",
+        &[Param::optional("filter", ArgKind::String)],
+        started,
+    );
+    registry.command(
         "log",
         "Sets which lines the log keeps (render=debug,warn), or shows its last lines.",
         &[Param::optional("filter", ArgKind::String)],
@@ -1389,6 +1401,54 @@ fn tags(state: &mut State, args: &Args) -> Result<Output, CommandError> {
         })
         .collect();
     Ok(Output::with_data(text, Data::Array(data)))
+}
+
+fn effects(state: &mut State, args: &Args) -> Result<Output, CommandError> {
+    let filter = args.string_or("filter", "")?.replace('/', "\\");
+    let running = running(state)?;
+    Ok(effect_rows(running.effects.running().iter(), &filter))
+}
+
+fn started(state: &mut State, args: &Args) -> Result<Output, CommandError> {
+    let filter = args.string_or("filter", "")?.replace('/', "\\");
+    let running = running(state)?;
+    Ok(effect_rows(running.effects.started().iter(), &filter))
+}
+
+/// The effects whose tags have `filter` in them, by number, tag, place,
+/// scales and age.
+fn effect_rows<'a>(
+    effects: impl Iterator<Item = &'a opence_sim::effects::Running>,
+    filter: &str,
+) -> Output {
+    let found: Vec<_> = effects
+        .filter(|effect| effect.tag.path.contains(filter))
+        .collect();
+    let text = found
+        .iter()
+        .map(|effect| {
+            let at = effect.origin.position;
+            format!(
+                "{:<5} {} at {:.2} {:.2} {:.2}, {} ticks",
+                effect.number, effect.tag.path, at.x, at.y, at.z, effect.age
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let data = found
+        .iter()
+        .map(|effect| {
+            let at = effect.origin.position;
+            json!({
+                "number": effect.number,
+                "path": effect.tag.path,
+                "position": [at.x, at.y, at.z],
+                "scale": effect.origin.scale,
+                "age": effect.age,
+            })
+        })
+        .collect();
+    Output::with_data(text, Data::Array(data))
 }
 
 fn group_name(group: Group) -> String {

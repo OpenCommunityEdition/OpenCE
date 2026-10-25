@@ -716,17 +716,18 @@ impl Systems {
 
     /// One tick: the systems the effects' parts `fired` made begin, the
     /// objects of `simulation` carry theirs, and all of them run, meeting
-    /// its world.
+    /// its world. Gives the number begun.
     pub(super) fn tick(
         &mut self,
         level: &Level,
         simulation: &mut Simulation,
         fired: &[FiredPart],
         random: &mut Random,
-    ) {
+    ) -> usize {
         if self.index.is_empty() {
-            return;
+            return 0;
         }
+        let mut begun = 0;
         for part in fired {
             let Some(&system) = self.index.get(&part.tag) else {
                 continue;
@@ -742,6 +743,7 @@ impl Systems {
                 false,
                 random,
             ));
+            begun += 1;
         }
         self.carry(level, simulation, random);
         let mut room = MAX_SYSTEM_PARTICLES.saturating_sub(self.count());
@@ -753,6 +755,7 @@ impl Systems {
             let live = running.tick(level, random, &mut room, collide);
             running.carried || live
         });
+        begun
     }
 
     /// The systems the objects carry move with them; those of objects gone

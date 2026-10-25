@@ -15,9 +15,9 @@ use opence_content::{
     AnimationGraph, AtmosphericFog, ClusterWater, CollisionBsp, CollisionMaterial, CollisionModel,
     DamageEffect, Effect, EnvironmentVertex, GameTypes, Globals, Glow, Group, ItemChoice,
     LensFlare, LensFlareMarker, Level, Light, LightVolume, Lightmap, LightmapVertex, Material,
-    Model, NetgameEquipment, NetgameFlag, NetgameFlagKind, ObjectDefinition, ObjectKind,
-    ObjectPlacement, PlacementDevice, PlacementPermutation, PlayerStart, Scenario, Sky, SkyAmbient,
-    SkyLight, StructureBsp, TagRef,
+    MaterialEffects, Model, NetgameEquipment, NetgameFlag, NetgameFlagKind, ObjectDefinition,
+    ObjectKind, ObjectPlacement, PlacementDevice, PlacementPermutation, PlayerStart, Scenario, Sky,
+    SkyAmbient, SkyLight, StructureBsp, TagRef,
 };
 
 use crate::cache::Cache;
@@ -277,7 +277,7 @@ pub fn import_level(cache: &Cache) -> Result<Level, ImportError> {
     let huds = crate::hud::import_huds(cache, &objects, &globals, &mut reached)?;
     let (sounds, looping_sounds) = crate::sound::import_sounds(cache)?;
     let material_effects = crate::sound::import_material_effects(cache)?;
-    let mut effects = import_effects(cache, &objects)?;
+    let mut effects = import_effects(cache, &objects, &material_effects)?;
     // (and those the particles make where they strike and die)
     let made = crate::particle::particle_effects(cache, &effects)?;
     effects.extend(made);
@@ -555,8 +555,14 @@ fn import_physics(
 }
 
 /// The effects `objects`' projectiles detonate with and make where they
-/// strike, and their weapons' shots make, each once, by path.
-fn import_effects(cache: &Cache, objects: &[ObjectDefinition]) -> Result<Vec<Effect>, ImportError> {
+/// strike, their weapons' shots make, their vehicles' thrusters make, and
+/// the material effects make (footsteps, landings and vehicles' slips),
+/// each once, by path.
+fn import_effects(
+    cache: &Cache,
+    objects: &[ObjectDefinition],
+    material_effects: &[MaterialEffects],
+) -> Result<Vec<Effect>, ImportError> {
     let detonations = objects
         .iter()
         .filter_map(|object| object.projectile.as_ref()?.effect.as_ref());
@@ -591,10 +597,20 @@ fn import_effects(cache: &Cache, objects: &[ObjectDefinition]) -> Result<Vec<Eff
         })
         .flatten()
         .filter(|tag| tag.group.0 == *b"effe");
+    let thrusters = objects
+        .iter()
+        .filter_map(|object| object.vehicle.as_ref()?.effect.as_ref());
+    let materials = material_effects
+        .iter()
+        .flat_map(|effects| effects.events.iter().flatten())
+        .filter_map(|made| made.effect.as_ref())
+        .filter(|tag| tag.group.0 == *b"effe");
     let tags: BTreeSet<&TagRef> = detonations
         .chain(strikes)
         .chain(shots)
         .chain(handling)
+        .chain(thrusters)
+        .chain(materials)
         .collect();
     let mut effects = Vec::with_capacity(tags.len());
     for tag in tags {
@@ -2922,6 +2938,49 @@ pub(crate) mod tests {
         match Cache::open(file) {
             Ok(cache) => Some(cache),
             Err(error) => panic!("{name}: {error}"),
+        }
+    }
+
+    #[test]
+    fn the_material_effects_effects_import_when_the_map_is_here() {
+        let Some(cache) = stock_map("bloodgulch") else {
+            return;
+        };
+        let level = match import_level(&cache) {
+            Ok(level) => level,
+            Err(error) => panic!("bloodgulch: {error}"),
+        };
+        // (a vehicle's slips, a footstep's and a landing's effects)
+        let named: Vec<&TagRef> = level
+            .material_effects
+            .iter()
+            .flat_map(|effects| effects.events.iter().flatten())
+            .filter_map(|made| made.effect.as_ref())
+            .collect();
+        assert!(!named.is_empty());
+        for tag in named {
+            assert!(level.effect(tag).is_some(), "{}", tag.path);
+        }
+    }
+
+    #[test]
+    fn the_vehicles_effects_import_when_the_map_is_here() {
+        let Some(cache) = stock_map("bloodgulch") else {
+            return;
+        };
+        let level = match import_level(&cache) {
+            Ok(level) => level,
+            Err(error) => panic!("bloodgulch: {error}"),
+        };
+        // (the ghost's and the banshee's thrusters' effects)
+        let named: Vec<&TagRef> = level
+            .objects
+            .iter()
+            .filter_map(|object| object.vehicle.as_ref()?.effect.as_ref())
+            .collect();
+        assert!(!named.is_empty());
+        for tag in named {
+            assert!(level.effect(tag).is_some(), "{}", tag.path);
         }
     }
 

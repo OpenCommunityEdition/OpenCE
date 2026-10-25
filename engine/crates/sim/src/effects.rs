@@ -10,7 +10,7 @@
 use std::collections::BTreeSet;
 
 use glam::{Quat, Vec3};
-use opence_content::{Effect, EffectPart, Level, Projectile, TagRef};
+use opence_content::{Effect, EffectPart, Level, MaterialEffects, Projectile, TagRef};
 
 use crate::objects::ObjectHandle;
 use crate::projectile::Impact;
@@ -59,6 +59,11 @@ pub struct Origin {
     pub scale: [f32; 2],
     /// Its colour, red, green and blue, which tints parts tinted by it.
     pub color: [f32; 3],
+    /// Its own locations by name, a point and a turn, which come before
+    /// its object's markers (a thruster's blast's incident, normal,
+    /// reflected and midpoint, as `effect_new_unattached_from_markers`
+    /// gives them).
+    pub locations: Vec<(String, Vec3, Quat)>,
 }
 
 impl Origin {
@@ -72,6 +77,7 @@ impl Origin {
             surface: None,
             scale: [1.0; 2],
             color: [1.0; 3],
+            locations: Vec::new(),
         }
     }
 }
@@ -129,6 +135,7 @@ pub struct FiredPart {
 pub struct Effects {
     running: Vec<Running>,
     fired: Vec<FiredPart>,
+    emitting: Vec<Running>,
     seed: RandomSeed,
     made: u32,
     /// The objects' attachments that have been started, by object and
@@ -141,6 +148,7 @@ impl Default for Effects {
         Self {
             running: Vec::new(),
             fired: Vec::new(),
+            emitting: Vec::new(),
             seed: RandomSeed(EFFECT_SEED),
             made: 0,
             attached: BTreeSet::new(),
@@ -188,6 +196,15 @@ impl Effects {
     /// The parts made in the last tick.
     pub fn fired(&self) -> &[FiredPart] {
         &self.fired
+    }
+
+    /// The effects as each was in each event the last tick ran through
+    /// after its delay: an event that lasts no time is followed by the
+    /// next in the same tick, and the effect may end in it, but its
+    /// particles are still made (as the original makes them for each
+    /// event it updates).
+    pub fn emitting(&self) -> &[Running] {
+        &self.emitting
     }
 
     /// Starts `tag` at `origin`; its number, or none if the level lacks it
@@ -305,6 +322,45 @@ impl Effects {
             };
             self.start(level, effect, origin);
         }
+        // (material_effect_new: a slip's effect, a centimetre off the
+        // ground, scaled by how hard it slips)
+        for slipped in simulation.slips() {
+            let slip = &slipped.slip;
+            let event = if slip.metallic {
+                MaterialEffects::METALLIC_SLIP
+            } else {
+                MaterialEffects::VEHICLE_SLIP
+            };
+            let Some(effect) = level
+                .material_effects(&slipped.material_effects)
+                .and_then(|effects| effects.of(event, slip.material))
+                .and_then(|made| made.effect.as_ref())
+            else {
+                continue;
+            };
+            let origin = Origin {
+                scale: [slip.scale, 0.0],
+                ..Origin::at(slip.position + slip.normal * 0.01, facing(slip.normal))
+            };
+            self.start(level, effect, origin);
+        }
+        // (create_ghost_effect and create_pelican_effect: a thruster's
+        // blast's effect where it meets the ground, at its locations)
+        for thrust in simulation.thrusts() {
+            let Some(&(_, position, forward)) = thrust.locations.first() else {
+                continue;
+            };
+            let origin = Origin {
+                scale: [thrust.scale; 2],
+                locations: thrust
+                    .locations
+                    .iter()
+                    .map(|&(name, point, way)| (name.to_owned(), point, facing(way)))
+                    .collect(),
+                ..Origin::at(position, facing(forward))
+            };
+            self.start(level, &thrust.effect, origin);
+        }
     }
 
     /// One tick: effects on objects that are gone (by `exists`) end, and
@@ -318,6 +374,7 @@ impl Effects {
         mut locate: impl FnMut(ObjectHandle, &str) -> Option<(Vec3, Quat)>,
     ) {
         self.fired.clear();
+        self.emitting.clear();
         self.attached.retain(|(handle, _)| exists(*handle));
         let mut running = std::mem::take(&mut self.running);
         running.retain_mut(|running| {
@@ -368,6 +425,11 @@ impl Effects {
                 if !running.skipped {
                     self.fire(effect, running, locate);
                 }
+            }
+            if !running.skipped
+                && (running.duration == 0 || running.clock < running.delay + running.duration)
+            {
+                self.emitting.push(running.clone());
             }
             if running.clock < running.delay + running.duration {
                 return true;
@@ -442,13 +504,21 @@ impl Effects {
     }
 }
 
-/// Where `location` is for an effect made at `origin`: its object's marker
-/// of that name (else the effect's own marker), or the origin itself.
+/// Where `location` is for an effect made at `origin`: its own location
+/// of that name, its object's marker of that name (else the effect's own
+/// marker), or the origin itself.
 fn place(
     origin: &Origin,
     location: &str,
     locate: &mut impl FnMut(ObjectHandle, &str) -> Option<(Vec3, Quat)>,
 ) -> (Vec3, Quat) {
+    if let Some(&(_, position, rotation)) = origin
+        .locations
+        .iter()
+        .find(|(name, _, _)| !location.is_empty() && name.eq_ignore_ascii_case(location))
+    {
+        return (position, rotation);
+    }
     let Some((handle, marker)) = &origin.on else {
         return (origin.position, origin.rotation);
     };
@@ -521,6 +591,31 @@ mod tests {
     }
 
     #[test]
+    fn a_part_is_made_at_its_origins_own_location_of_its_name() {
+        let mut level = level(-1);
+        level.effects.push(Effect {
+            locations: vec!["NORMAL".into(), "nowhere".into()],
+            events: vec![event(0.0, 0.0, vec![part("up", 0), part("there", 1)])],
+            ..Effect::new(tag(b"effe", "blast"))
+        });
+        let mut effects = Effects::default();
+        let at = Vec3::new(1.0, 2.0, 3.0);
+        let normal = Vec3::new(1.0, 2.0, 0.0);
+        let origin = Origin {
+            locations: vec![("normal".into(), normal, facing(Vec3::Z))],
+            ..Origin::at(at, Quat::IDENTITY)
+        };
+        effects.start(&level, &tag(b"effe", "blast"), origin);
+        effects.tick(&level, |_| true, |_, _| None);
+        let made: Vec<(&str, Vec3)> = effects
+            .fired()
+            .iter()
+            .map(|part| (part.tag.path.as_str(), part.position))
+            .collect();
+        assert_eq!(made, [("up", normal), ("there", at)]);
+    }
+
+    #[test]
     fn an_effects_events_make_their_parts_at_their_times() {
         let level = level(-1);
         let mut effects = Effects::default();
@@ -545,6 +640,29 @@ mod tests {
                 Origin::at(at, Quat::IDENTITY)
             )
             .is_none());
+    }
+
+    #[test]
+    fn each_event_a_tick_runs_through_is_kept_for_its_particles() {
+        let level = level(-1);
+        let mut effects = Effects::default();
+        let at = Vec3::new(1.0, 2.0, 3.0);
+        effects.start(&level, &tag(b"effe", "two"), Origin::at(at, Quat::IDENTITY));
+        let mut seen = Vec::new();
+        for tick in 0..60 {
+            effects.tick(&level, |_| true, |_, _| None);
+            for running in effects.emitting() {
+                seen.push((tick, running.event, running.clock, running.duration));
+            }
+        }
+        // (the first event for each of its thirty ticks; the second, which
+        // lasts no time and ends the effect, once, in the tick it ends)
+        assert_eq!(seen.len(), 31, "{seen:?}");
+        assert_eq!(seen[0], (0, 0, 0, 30));
+        assert_eq!(seen[29], (29, 0, 29, 30));
+        assert_eq!(seen[30], (45, 1, 15, 0));
+        assert!(effects.running().is_empty());
+        assert!(effects.emitting().is_empty());
     }
 
     #[test]

@@ -88,11 +88,16 @@ impl Armory {
             .grenades
             .iter()
             .take(GRENADE_KINDS)
-            .map(|grenade| ArmoryGrenade {
+            .enumerate()
+            .map(|(kind, grenade)| ArmoryGrenade {
                 maximum: grenade.maximum_count.max(0),
-                starting: grenade
-                    .multiplayer_spawn_default
-                    .clamp(0, grenade.maximum_count.max(0)),
+                // (the original's: every frag, no plasma; it never reads
+                // the spawn default)
+                starting: if kind == 0 {
+                    grenade.maximum_count.max(0)
+                } else {
+                    0
+                },
                 projectile: grenade.projectile.as_ref().and_then(|tag| {
                     let projectile = level.object(tag)?.projectile.clone()?;
                     Some((tag.clone(), projectile))
@@ -411,6 +416,22 @@ mod tests {
         assert!(inventory.carries(1) && inventory.carries(2) && !inventory.carries(0));
         assert_eq!(armory.find(&tag("b")), Some(1));
         assert_eq!(armory.find(&tag("d")), None);
+    }
+
+    /// The original starts a player with all the frag grenades it may carry
+    /// and no plasma (`game_engine.c`); the globals' spawn default is unused.
+    #[test]
+    fn a_player_starts_with_full_frags_and_no_plasma() {
+        let mut level = opence_content::devmap::level(None);
+        let kind = |maximum_count| opence_content::Grenade {
+            maximum_count,
+            multiplayer_spawn_default: 0,
+            ..opence_content::Grenade::default()
+        };
+        level.globals.grenades = vec![kind(4), kind(4)];
+        let armory = Armory::new(&level);
+        let starting: Vec<i16> = armory.grenades.iter().map(|g| g.starting).collect();
+        assert_eq!(starting, [4, 0]);
     }
 
     #[test]

@@ -3,7 +3,7 @@
 //! that fills a box about the camera where its cluster has some, and the
 //! detail objects (grass and the like) a BSP scatters over its ground.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use opence_content::{EffectParticles, Level, Particle, StructureBsp, TagRef};
 use opence_sim::effects::{FiredPart, Running};
@@ -106,7 +106,7 @@ impl Random {
 /// An emitter's particles may be made: in air (no effect is under water)
 /// and by a violent effect (an effect is nonviolent only on a corpse,
 /// which effects here are not told of).
-fn made_here(emitter: &EffectParticles) -> bool {
+pub(crate) fn made_here(emitter: &EffectParticles) -> bool {
     !matches!(
         emitter.environment,
         EffectParticles::IN_WATER | EffectParticles::IN_VACUUM
@@ -684,6 +684,21 @@ fn blend(function: i16) -> u32 {
     u32::try_from(function).unwrap_or(0).min(7)
 }
 
+/// What the running effects asked of the particles since the last
+/// [`LevelParticles::clear`], and what they made: the effects row's measure
+/// of whether each effect spawns its whole set.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Census {
+    /// The particles the emitters rolled to emit.
+    pub(crate) planned: u32,
+    /// The particles emitted.
+    pub(crate) made: u32,
+    /// The particles emitters named that the level does not have.
+    pub(crate) missing: BTreeSet<String>,
+    /// The particle systems the effects' parts began.
+    pub(crate) systems: u32,
+}
+
 /// The particles, contrails and weather while the game runs.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct LevelParticles {
@@ -696,6 +711,7 @@ pub(crate) struct LevelParticles {
     /// Each running effect's event's emitters: how many they emit, and how
     /// many they have.
     emitted: HashMap<(u32, usize, usize), (u16, u16)>,
+    census: Census,
     weather: weather::Weather,
     /// The winds blowing.
     winds: wind::Winds,
@@ -728,7 +744,8 @@ impl LevelParticles {
         }
     }
 
-    /// One tick, after the effects': the running effects emit, the
+    /// One tick, after the effects': the effects' events the tick ran
+    /// through (`emitting`) emit, the
     /// particles move, meeting the world of `simulation`, the weather about
     /// the camera on BSP `bsp` drifts, the objects trail their contrails,
     /// and the particle systems the effects' parts `fired` made, and those
@@ -738,11 +755,11 @@ impl LevelParticles {
         &mut self,
         level: &Level,
         simulation: &mut Simulation,
-        (running, fired): (&[Running], &[FiredPart]),
+        (running, emitting, fired): (&[Running], &[Running], &[FiredPart]),
         bsp: usize,
     ) {
         self.seconds += TICK;
-        self.emit(level, running);
+        self.emit(level, emitting);
         let origins: HashMap<u32, Vec3> = running
             .iter()
             .map(|effect| (effect.number, effect.origin.position))
@@ -791,8 +808,10 @@ impl LevelParticles {
         }
         self.contrails
             .tick(level, simulation, &air, &mut self.random);
-        self.systems
+        let begun = self
+            .systems
             .tick(level, simulation, fired, &mut self.random);
+        self.census.systems += u32::try_from(begun).unwrap_or(u32::MAX);
     }
 
     /// The particles alive: the effects' and the particle systems'.
@@ -805,6 +824,12 @@ impl LevelParticles {
         self.live.clear();
         self.emitted.clear();
         self.systems.clear();
+        self.census = Census::default();
+    }
+
+    /// What the effects asked for and made since the last clear.
+    pub(crate) fn census(&self) -> &Census {
+        &self.census
     }
 
     /// What the particles made in the last tick.
@@ -812,9 +837,9 @@ impl LevelParticles {
         &self.events
     }
 
-    fn emit(&mut self, level: &Level, running: &[Running]) {
+    fn emit(&mut self, level: &Level, emitting: &[Running]) {
         let mut seen = HashSet::new();
-        for effect in running {
+        for effect in emitting {
             let Some(event) = level
                 .effect(&effect.tag)
                 .and_then(|definition| definition.events.get(effect.event))
@@ -831,6 +856,7 @@ impl LevelParticles {
             };
             for (index, emitter) in event.particles.iter().enumerate() {
                 let Some(&particle) = self.particles.get(&emitter.particle) else {
+                    self.census.missing.insert(emitter.particle.path.clone());
                     continue;
                 };
                 if !made_here(emitter) {
@@ -839,6 +865,7 @@ impl LevelParticles {
                 let key = (effect.number, effect.event, index);
                 seen.insert(key);
                 let random = &mut self.random;
+                let census = &mut self.census;
                 let (total, done) = self.emitted.entry(key).or_insert_with(|| {
                     let scaled = Scaled {
                         scales: emitter.scales,
@@ -846,7 +873,9 @@ impl LevelParticles {
                     };
                     let bounds = emitter.count.map(f32::from);
                     let count = scaled.between(random, bounds, EffectParticles::SCALES_COUNT);
-                    (count.clamp(0.0, f32::from(u8::MAX)) as u16, 0)
+                    let total = count.clamp(0.0, f32::from(u8::MAX)) as u16;
+                    census.planned += u32::from(total);
+                    (total, 0)
                 });
                 let target = ((f32::from(*total) * emitted_share(emitter.distribution, fraction))
                     as u16)
@@ -863,6 +892,7 @@ impl LevelParticles {
                 self.live.drain(..over);
                 while *done < target {
                     *done += 1;
+                    census.made += 1;
                     if self.live.len() >= limit {
                         let over = self.live.len() + 1 - limit;
                         self.live.drain(..over);
@@ -1220,15 +1250,92 @@ mod tests {
     }
 
     #[test]
+    fn the_census_counts_what_was_asked_made_and_missing() -> Result<(), String> {
+        let mut level = level(EffectParticles::CONSTANT, 4);
+        let event = level
+            .effects
+            .last_mut()
+            .and_then(|effect| effect.events.first_mut())
+            .ok_or("no event")?;
+        event.particles.push(EffectParticles {
+            particle: tag(b"part", "lost"),
+            ..emitter(EffectParticles::START, 2)
+        });
+        let mut particles = LevelParticles::new(&level);
+        let mut simulation = Simulation::empty();
+        // (half of the constant emitter's four by halfway, all by the end)
+        particles.tick(
+            &level,
+            &mut simulation,
+            (&[running(1, 4)], &[running(1, 4)], &[]),
+            0,
+        );
+        assert_eq!(
+            (particles.census().planned, particles.census().made),
+            (4, 2)
+        );
+        particles.tick(
+            &level,
+            &mut simulation,
+            (&[running(3, 4)], &[running(3, 4)], &[]),
+            0,
+        );
+        let census = particles.census();
+        assert_eq!((census.planned, census.made, census.systems), (4, 4, 0));
+        assert_eq!(census.missing.iter().collect::<Vec<_>>(), ["lost"]);
+        particles.clear();
+        assert_eq!(particles.census(), &Census::default());
+        Ok(())
+    }
+
+    #[test]
+    fn an_event_that_lasts_no_time_emits_though_its_effect_ends_in_the_tick() -> Result<(), String>
+    {
+        let mut level = level(EffectParticles::START, 4);
+        let event = level
+            .effects
+            .last_mut()
+            .and_then(|effect| effect.events.first_mut())
+            .ok_or("no event")?;
+        event.duration = [0.0, 0.0];
+        let mut effects = opence_sim::effects::Effects::default();
+        let origin = Origin::at(Vec3::new(1.0, 2.0, 3.0), Quat::IDENTITY);
+        effects
+            .start(&level, &tag(b"effe", "sparks"), origin)
+            .ok_or("not started")?;
+        effects.tick(&level, |_| true, |_, _| None);
+        assert!(effects.running().is_empty(), "the effect did not end");
+        let mut particles = LevelParticles::new(&level);
+        let mut simulation = Simulation::empty();
+        particles.tick(
+            &level,
+            &mut simulation,
+            (effects.running(), effects.emitting(), effects.fired()),
+            0,
+        );
+        assert_eq!(particles.live.len(), 4);
+        assert_eq!(
+            (particles.census().planned, particles.census().made),
+            (4, 4)
+        );
+        Ok(())
+    }
+
+    #[test]
     fn an_effect_emits_its_particles_which_move_grow_fade_and_die() {
         let level = level(EffectParticles::START, 3);
         let mut particles = LevelParticles::new(&level);
         let mut simulation = Simulation::empty();
         let effect = [running(0, 30)];
-        particles.tick(&level, &mut simulation, (&effect, &[]), 0);
+        particles.tick(&level, &mut simulation, (&effect, &effect, &[]), 0);
         assert_eq!(particles.live.len(), 3);
         // (emitted once, though the effect runs on)
-        particles.tick(&level, &mut simulation, (&[running(1, 30)], &[]), 0);
+        particles.tick(
+            &level,
+            &mut simulation,
+            (&[running(1, 30)], &[running(1, 30)], &[]),
+            0,
+        );
         assert_eq!(particles.live.len(), 3);
         let mut out = Vec::new();
         particles.gather(&level, &ParticleView::at(Vec3::ZERO), &[], &mut out);
@@ -1244,11 +1351,11 @@ mod tests {
         assert_eq!(first.modes[2], PARTICLE_FACING_SCREEN);
         assert!(first.modes[0] < 2, "{first:?}");
         for _ in 0..27 {
-            particles.tick(&level, &mut simulation, (&[], &[]), 0);
+            particles.tick(&level, &mut simulation, (&[], &[], &[]), 0);
         }
         particles.gather(&level, &ParticleView::at(Vec3::ZERO), &[], &mut out);
         assert!(out[0].color[3] < 0.5, "it fades out: {:?}", out[0]);
-        particles.tick(&level, &mut simulation, (&[], &[]), 0);
+        particles.tick(&level, &mut simulation, (&[], &[], &[]), 0);
         assert!(particles.live.is_empty(), "it dies at a second");
         assert!(particles.emitted.is_empty());
     }
@@ -1297,7 +1404,12 @@ mod tests {
         let mut level = level(EffectParticles::START, 1);
         let mut particles = LevelParticles::new(&level);
         let mut simulation = Simulation::empty();
-        particles.tick(&level, &mut simulation, (&[running(0, 30)], &[]), 0);
+        particles.tick(
+            &level,
+            &mut simulation,
+            (&[running(0, 30)], &[running(0, 30)], &[]),
+            0,
+        );
         let mut out = Vec::new();
         let view = ParticleView::at(Vec3::ZERO);
         particles.gather(&level, &view, &[], &mut out);
@@ -1331,13 +1443,18 @@ mod tests {
         let mut particles = LevelParticles::new(&level);
         let mut simulation = Simulation::empty();
         particles.limit = 3;
-        particles.tick(&level, &mut simulation, (&[running(0, 30)], &[]), 0);
+        particles.tick(
+            &level,
+            &mut simulation,
+            (&[running(0, 30)], &[running(0, 30)], &[]),
+            0,
+        );
         assert_eq!(particles.live.len(), 3);
         // (lowered: the oldest go as the next is made)
         particles.limit = 1;
         let mut next = running(0, 30);
         next.number = 2;
-        particles.tick(&level, &mut simulation, (&[next], &[]), 0);
+        particles.tick(&level, &mut simulation, (&[next.clone()], &[next], &[]), 0);
         assert_eq!(particles.live.len(), 1);
         let mut many = level.clone();
         if let Some(effect) = many.effects.last_mut() {
@@ -1348,7 +1465,12 @@ mod tests {
         for number in 0..10 {
             let mut effect = running(0, 30);
             effect.number = number;
-            more.tick(&many, &mut simulation, (&[effect], &[]), 0);
+            more.tick(
+                &many,
+                &mut simulation,
+                (&[effect.clone()], &[effect], &[]),
+                0,
+            );
         }
         assert_eq!(
             more.live.len(),
@@ -1362,14 +1484,29 @@ mod tests {
         let level = level(EffectParticles::CONSTANT, 10);
         let mut particles = LevelParticles::new(&level);
         let mut simulation = Simulation::empty();
-        particles.tick(&level, &mut simulation, (&[running(4, 10)], &[]), 0);
+        particles.tick(
+            &level,
+            &mut simulation,
+            (&[running(4, 10)], &[running(4, 10)], &[]),
+            0,
+        );
         assert_eq!(particles.live.len(), 5);
-        particles.tick(&level, &mut simulation, (&[running(9, 10)], &[]), 0);
+        particles.tick(
+            &level,
+            &mut simulation,
+            (&[running(9, 10)], &[running(9, 10)], &[]),
+            0,
+        );
         assert_eq!(particles.live.len(), 10);
         let mut skipped = running(0, 10);
         skipped.number = 2;
         skipped.skipped = true;
-        particles.tick(&level, &mut simulation, (&[skipped], &[]), 0);
+        particles.tick(
+            &level,
+            &mut simulation,
+            (&[skipped.clone()], &[skipped], &[]),
+            0,
+        );
         assert_eq!(particles.live.len(), 10);
     }
 
@@ -1381,10 +1518,20 @@ mod tests {
         event.particles[0].velocity = [0.0, 0.0];
         let mut particles = LevelParticles::new(&level);
         let mut simulation = Simulation::empty();
-        particles.tick(&level, &mut simulation, (&[running(0, 30)], &[]), 0);
+        particles.tick(
+            &level,
+            &mut simulation,
+            (&[running(0, 30)], &[running(0, 30)], &[]),
+            0,
+        );
         let mut moved = running(1, 30);
         moved.origin.position += Vec3::new(0.0, 0.0, 5.0);
-        particles.tick(&level, &mut simulation, (&[moved], &[]), 0);
+        particles.tick(
+            &level,
+            &mut simulation,
+            (&[moved.clone()], &[moved], &[]),
+            0,
+        );
         assert_eq!(particles.live[0].position, Vec3::new(1.0, 2.0, 8.0));
     }
 
@@ -1516,7 +1663,12 @@ mod tests {
         let mut effect = running(0, 30);
         effect.origin.scale = scale;
         effect.origin.velocity = velocity;
-        particles.tick(&level, &mut Simulation::empty(), (&[effect], &[]), 0);
+        particles.tick(
+            &level,
+            &mut Simulation::empty(),
+            (&[effect.clone()], &[effect], &[]),
+            0,
+        );
         particles.live
     }
 
@@ -1596,7 +1748,12 @@ mod tests {
         let mut particles = LevelParticles::new(&level);
         let mut effect = running(0, 30);
         effect.origin.color = [0.5, 0.25, 1.0];
-        particles.tick(&level, &mut Simulation::empty(), (&[effect], &[]), 0);
+        particles.tick(
+            &level,
+            &mut Simulation::empty(),
+            (&[effect.clone()], &[effect], &[]),
+            0,
+        );
         assert_eq!(particles.live[0].color, [0.5, 0.25, 1.0, 1.0]);
     }
 

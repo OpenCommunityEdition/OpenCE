@@ -212,3 +212,52 @@ fn the_sound_station_voices_a_sound_of_each_class() -> Result {
     assert!(census.iter().all(|count| count.failed == 0), "{census:?}");
     Ok(())
 }
+
+#[test]
+fn each_effect_of_the_row_spawns_its_full_particle_set() -> Result {
+    let Some(engine) = devgulch("devgulch_stations_effects")? else {
+        return Ok(()); // (no game data here)
+    };
+    let results = station(&engine, "station effects", 900)?;
+    for one in &results {
+        println!(
+            "{} peak {} planned {} made {} emitters {} systems {}/{} missing {}",
+            one["effect"],
+            one["particles"],
+            one["planned"],
+            one["made"],
+            one["emitters expected"],
+            one["systems"],
+            one["systems expected"],
+            one["missing"]
+        );
+    }
+    assert!(!results.is_empty());
+    let number = |one: &Value, key: &str| one[key].as_u64().unwrap_or(0);
+    for one in &results {
+        let effect = &one["effect"];
+        assert_eq!(
+            number(one, "made"),
+            number(one, "planned"),
+            "{effect} made other than it planned"
+        );
+        assert_eq!(
+            one["missing"],
+            serde_json::json!([]),
+            "{effect} lacks particles"
+        );
+        assert!(
+            number(one, "systems") >= number(one, "systems expected"),
+            "{effect} began too few particle systems"
+        );
+        // (an emitter that surely emits plans its particles, even in an
+        // event that lasts no time)
+        if number(one, "emitters expected") > 0 {
+            assert!(number(one, "planned") > 0, "{effect} planned no particles");
+        }
+        if number(one, "planned") > 0 || number(one, "systems expected") > 0 {
+            assert!(number(one, "particles") > 0, "{effect} had none alive");
+        }
+    }
+    Ok(())
+}

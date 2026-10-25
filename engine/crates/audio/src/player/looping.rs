@@ -594,6 +594,7 @@ impl SoundPlayer {
             position: (sound.class != UNSPATIALIZED_CLASS)
                 .then_some(source.position)
                 .flatten(),
+            started_ms: self.time_ms,
         });
         true
     }

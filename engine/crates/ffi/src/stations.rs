@@ -38,7 +38,7 @@ use std::sync::Arc;
 
 use opence_audio::{SoundPlayer, VoiceId};
 use opence_content::devmap::{self, Station};
-use opence_content::{devgulch, Level, ObjectKind, ShaderClass, TagRef};
+use opence_content::{devgulch, EffectPart, Level, ObjectKind, ShaderClass, TagRef};
 use opence_dev::draw::{Color, DebugDraw, Layer};
 use opence_dev::{Args, CommandError, Data, Output};
 use opence_sim::animation::{AnimationPlayer, AnimationState};
@@ -50,7 +50,7 @@ use opence_sim::{Quat, Simulation, Transform, Vec3};
 use serde_json::json;
 
 use crate::effects::LevelEffects;
-use crate::particles::LevelParticles;
+use crate::particles::{Census, LevelParticles};
 use crate::{State, Wardrobe};
 
 /// The most the player turns in a tick, in radians.
@@ -104,7 +104,7 @@ const EFFECT_AT: [f32; 2] = [6.0, 1.0];
 /// The places across the row the effects start at, in turn, and between
 /// them.
 const EFFECT_SLOTS: usize = 5;
-const EFFECT_SPACING: f32 = 4.0;
+const EFFECT_SPACING: f32 = 2.0;
 /// How long each weapon's HUD is shown.
 const HUD_TICKS: u32 = 2 * TICKS_PER_SECOND;
 /// The bipeds of a squad.
@@ -1291,6 +1291,9 @@ struct Particles {
     /// The station's name, which its status starts with.
     name: &'static str,
     effects: Vec<TagRef>,
+    /// The particle systems each effect surely begins, and its emitters
+    /// that surely emit.
+    expected: Vec<[usize; 2]>,
     /// The places across the row the effects start at, in turn.
     slots: Vec<Vec3>,
     /// The effect watched.
@@ -1303,6 +1306,48 @@ struct Particles {
     alive: usize,
     /// The most alive while the effect has been watched.
     peak: usize,
+    /// What the effect asked of the particles and made, so far.
+    census: Census,
+}
+
+/// The particle systems an effect's parts surely begin: those of its
+/// events that are never skipped, made in the air and violently, as the
+/// simulation makes parts.
+fn systems_expected(level: &Level, effect: &TagRef) -> usize {
+    level.effect(effect).map_or(0, |effect| {
+        effect
+            .events
+            .iter()
+            .filter(|event| event.skip_fraction <= 0.0)
+            .flat_map(|event| &event.parts)
+            .filter(|part| {
+                !matches!(part.create_in, EffectPart::IN_WATER | EffectPart::IN_SPACE)
+                    && part.create_in_mode != EffectPart::NOT_VIOLENT
+                    && level.particle_system(&part.tag).is_some()
+            })
+            .count()
+    })
+}
+
+/// The emitters of an effect's events that are never skipped that surely
+/// emit: made here, of a particle the level has, asking for some.
+fn emitters_expected(level: &Level, effect: &TagRef) -> usize {
+    level.effect(effect).map_or(0, |effect| {
+        effect
+            .events
+            .iter()
+            .filter(|event| event.skip_fraction <= 0.0)
+            .flat_map(|event| &event.particles)
+            .filter(|emitter| {
+                crate::particles::made_here(emitter)
+                    && emitter.count.iter().any(|count| *count > 0)
+                    && level
+                        .particles
+                        .iter()
+                        .any(|particle| particle.tag == emitter.particle)
+            })
+            .count()
+    })
 }
 
 impl Particles {
@@ -1323,6 +1368,15 @@ impl Particles {
                 })
             })
             .map(|effect| effect.tag.clone())
+            .collect::<Vec<_>>();
+        let expected = effects
+            .iter()
+            .map(|effect| {
+                [
+                    systems_expected(level, effect),
+                    emitters_expected(level, effect),
+                ]
+            })
             .collect();
         let slots = (0..EFFECT_SLOTS)
             .map(|slot| {
@@ -1333,12 +1387,14 @@ impl Particles {
         Particles {
             name: station.name,
             effects,
+            expected,
             slots,
             at: 0,
             ticks: 0,
             start: None,
             alive: 0,
             peak: 0,
+            census: Census::default(),
         }
     }
 
@@ -1368,9 +1424,17 @@ impl Particles {
         if self.ticks < EFFECT_TICKS {
             return false;
         }
+        let census = &self.census;
+        let [systems, emitters] = self.expected.get(self.at).copied().unwrap_or_default();
         report.results.push(json!({
             "effect": effect.path,
             "particles": self.peak,
+            "planned": census.planned,
+            "made": census.made,
+            "missing": census.missing,
+            "systems": census.systems,
+            "systems expected": systems,
+            "emitters expected": emitters,
         }));
         self.ticks = 0;
         self.at += 1;
@@ -1389,6 +1453,7 @@ impl Particles {
             effects.start(level, &effect, at, Vec3::Z);
         }
         self.alive = particles.alive();
+        self.census = particles.census().clone();
     }
 }
 
@@ -1839,6 +1904,21 @@ fn class_name(class: &ShaderClass) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_slot_of_the_effects_row_is_in_view() {
+        // (the narrowest window is 4:3; the slots at the row's ends were
+        // once out of the view's sides, and their particles drew nothing)
+        let vertical = opence_sim::Camera::default().vertical_fov.0;
+        let half_across = libm::atanf(libm::tanf(vertical / 2.0) * 4.0 / 3.0);
+        let outer = EFFECT_SPACING * 0.5 * (EFFECT_SLOTS - 1) as f32;
+        let [ahead, _] = EFFECT_AT;
+        let off = libm::atanf(outer / ahead);
+        assert!(
+            off < 0.8 * half_across,
+            "the outer slot is {off} across, the view {half_across}"
+        );
+    }
 
     fn near(at: Vec3, [x, y, z]: [f32; 3]) -> bool {
         (at.x - x).abs() < 1e-3 && (at.y - y).abs() < 1e-3 && (at.z - z).abs() < 1e-3

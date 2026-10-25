@@ -196,8 +196,8 @@ fn variables_completion_and_bindings() -> Result {
     let help = run(&engine, "help")?;
     for command in [
         "map", "bsp", "spawn", "teleport", "noclip", "god", "give", "enter", "kill", "time",
-        "pause", "step", "objects", "inspect", "tags", "vars", "set", "bind", "exec", "help",
-        "log", "quit",
+        "pause", "step", "objects", "inspect", "tags", "effects", "started", "vars", "set", "bind",
+        "exec", "help", "log", "quit",
     ] {
         assert!(
             help.text.lines().any(|line| line.starts_with(command)),

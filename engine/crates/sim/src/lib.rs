@@ -786,6 +786,18 @@ impl Simulation {
         &self.item_impacts
     }
 
+    /// Where the vehicles' mass points slipped on the ground in the last
+    /// tick.
+    pub fn slips(&self) -> &[seats::VehicleSlip] {
+        self.rides.slips()
+    }
+
+    /// Where the vehicles' thrusters' blasts met the ground in the last
+    /// tick.
+    pub fn thrusts(&self) -> &[seats::VehicleThrust] {
+        self.rides.thrusts()
+    }
+
     /// Where grenades detonated in the last tick.
     pub fn detonations(&self) -> &[projectile::Detonation] {
         &self.detonations

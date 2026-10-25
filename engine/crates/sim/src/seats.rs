@@ -11,7 +11,7 @@ use bevy_ecs::prelude::*;
 use glam::{Quat, Vec3};
 use opence_content::{
     AnimationNode, BspWater, Level, MaterialPhysics, Model, ObjectKind, Physics, TagRef, Vehicle,
-    VehicleAnimations, VehicleSeat, Weapon,
+    VehicleAnimations, VehicleKind, VehicleSeat, Weapon,
 };
 use std::sync::Arc;
 
@@ -28,6 +28,7 @@ use crate::hash::WorldHasher;
 use crate::input::TickInput;
 use crate::objects::{Object, ObjectHandle, ObjectTable};
 use crate::player::{self, Arms, Player, SeatCamera, Seated};
+use crate::random::RandomSeed;
 use crate::vehicle::{self, VehicleControls, VehicleLevel, VehicleState};
 use crate::vehicle_animation::{self, VehicleMotion, SUSPENSIONS};
 use crate::weapon::WeaponState;
@@ -83,6 +84,8 @@ struct RideKind {
     turret: Option<(usize, Weapon, Vec3)>,
     /// Its graph's vehicle animations: its overlays and suspensions.
     animations: Option<VehicleAnimations>,
+    /// Its hover and jet thrusters, from its origin.
+    thrusters: Thrusters,
 }
 
 /// A vehicle in the world.
@@ -139,6 +142,38 @@ pub struct Rides {
     left: Vec<(ObjectHandle, ObjectHandle, u64)>,
     // (the globals' minimum_vehicle_flipping_angle)
     flipping_angle: f32,
+    // (the mass points that slipped in the last tick)
+    slips: Vec<VehicleSlip>,
+    // (the thrusters' blasts on the ground in the last tick, and the
+    // local random seed that spreads them)
+    thrusts: Vec<VehicleThrust>,
+    thrust_seed: RandomSeed,
+}
+
+/// Where a vehicle's thruster's blast met the ground in a tick, and the
+/// vehicle's effect it plays there.
+#[derive(Clone, Debug, PartialEq)]
+pub struct VehicleThrust {
+    /// The vehicle.
+    pub vehicle: ObjectHandle,
+    /// Its effect.
+    pub effect: TagRef,
+    /// The effect's locations by name: a point and the way it faces.
+    pub locations: Vec<(&'static str, Vec3, Vec3)>,
+    /// Its scale, 0 to 1: how near and how hard the blast is.
+    pub scale: f32,
+}
+
+/// A vehicle's mass point slipping on the ground in a tick, and the
+/// material effects it plays.
+#[derive(Clone, Debug, PartialEq)]
+pub struct VehicleSlip {
+    /// The vehicle.
+    pub vehicle: ObjectHandle,
+    /// Its material effects.
+    pub material_effects: TagRef,
+    /// Where and how hard it slipped.
+    pub slip: vehicle::Slip,
 }
 
 /// A player a vehicle ran into hard enough to hurt.
@@ -198,6 +233,17 @@ pub(crate) fn move_rides(
 }
 
 impl Rides {
+    /// The vehicles' mass points that slipped in the last tick.
+    pub fn slips(&self) -> &[VehicleSlip] {
+        &self.slips
+    }
+
+    /// Where the vehicles' thrusters' blasts met the ground in the last
+    /// tick.
+    pub fn thrusts(&self) -> &[VehicleThrust] {
+        &self.thrusts
+    }
+
     /// Each vehicle that moved this game tick meets those before it and
     /// those at rest (physics.c's unit collisions, after each vehicle's
     /// update), for their next steps.
@@ -482,6 +528,10 @@ impl Rides {
                     .as_ref()
                     .and_then(|tag| level.animation_graph(tag))
                     .and_then(|graph| graph.vehicle.clone());
+                let thrusters = render.map_or_else(Thrusters::default, |render| Thrusters {
+                    hover: marker_matrices(render, &matrices, "hover thrusters"),
+                    jet: marker_matrices(render, &matrices, "jet thrusters"),
+                });
                 Some(RideKind {
                     tag: object.tag.clone(),
                     vehicle,
@@ -489,6 +539,7 @@ impl Rides {
                     seats,
                     turret,
                     animations,
+                    thrusters,
                 })
             })
             .collect();
@@ -746,6 +797,8 @@ impl Rides {
             return;
         };
         let physics = &*guard;
+        self.slips.clear();
+        self.thrusts.clear();
         let mut poses = Vec::with_capacity(self.rides.len());
         let mut motions = Vec::with_capacity(self.rides.len());
         let mut stepped = vec![false; self.rides.len()];
@@ -827,6 +880,34 @@ impl Rides {
                     .is_err()
                     {
                         ride.state = before;
+                    }
+                    let slips = std::mem::take(&mut ride.state.slips);
+                    if let Some(effects) = &kind.vehicle.material_effects {
+                        self.slips.extend(slips.into_iter().map(|slip| VehicleSlip {
+                            vehicle: ride.handle,
+                            material_effects: effects.clone(),
+                            slip,
+                        }));
+                    }
+                    if let Some(effect) = &kind.vehicle.effect {
+                        let blasts = kind.thrusters.blasts(
+                            kind.vehicle.kind,
+                            (ride.state.origin(&kind.physics), ride.state.rotation()),
+                            (ride.state.hover, ride.state.thrust),
+                            ride.power[0],
+                            &mut self.thrust_seed,
+                            |start, vector| {
+                                let hit = physics.cast_ray(start, vector, Layers::LEVEL).ok()??;
+                                Some((hit.fraction, hit.point, hit.normal))
+                            },
+                        );
+                        self.thrusts
+                            .extend(blasts.into_iter().map(|(locations, scale)| VehicleThrust {
+                                vehicle: ride.handle,
+                                effect: effect.clone(),
+                                locations,
+                                scale,
+                            }));
                     }
                 }
                 if let Some(animations) = &kind.animations {
@@ -1026,6 +1107,126 @@ fn seat_camera(pose: &Transform, place: &SeatPlace) -> Option<SeatCamera> {
     })
 }
 
+/// The matrices of every instance of `model`'s marker `name`, from its
+/// origin, with its nodes at `matrices`.
+fn marker_matrices(model: &Model, matrices: &[NodeMatrix], name: &str) -> Vec<NodeMatrix> {
+    model
+        .markers
+        .iter()
+        .filter(|marker| marker.name.eq_ignore_ascii_case(name))
+        .flat_map(|marker| &marker.instances)
+        .filter_map(|instance| {
+            let node = matrices.get(usize::from(instance.node))?;
+            Some(node.multiply(&NodeMatrix::from_orientation(&Orientation {
+                rotation: instance.rotation,
+                translation: instance.translation,
+                scale: 1.0,
+            })))
+        })
+        .collect()
+}
+
+/// A vehicle's thrusters (its model's hover and jet thrusters' markers),
+/// from its origin.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Thrusters {
+    hover: Vec<NodeMatrix>,
+    jet: Vec<NodeMatrix>,
+}
+
+/// An effect's locations by name: a point and the way it faces.
+type Locations = Vec<(&'static str, Vec3, Vec3)>;
+
+impl Thrusters {
+    /// Where the blasts of a vehicle of `kind` at `pose`, its hover and
+    /// thrust at `lift` and its driver's seat at `power`, meet what `cast` finds (the fraction along the cast, the
+    /// point and the normal): a scout's or a fighter's hover thrusters
+    /// (`create_ghost_effect`), a plane's hover and jet thrusters
+    /// (`create_pelican_effect`). Each is the effect's locations and its
+    /// scale.
+    fn blasts(
+        &self,
+        kind: VehicleKind,
+        (origin, rotation): (Vec3, Quat),
+        (hover_lift, thrust_lift): (f32, f32),
+        power: f32,
+        seed: &mut RandomSeed,
+        mut cast: impl FnMut(Vec3, Vec3) -> Option<(f32, Vec3, Vec3)>,
+    ) -> Vec<(Locations, f32)> {
+        let plane = match kind {
+            VehicleKind::AlienScout | VehicleKind::AlienFighter => false,
+            VehicleKind::HumanPlane => true,
+            _ => return Vec::new(),
+        };
+        if !plane && power <= 0.0 {
+            return Vec::new();
+        }
+        // (fifteen hover thrusters at most; a plane's jets fill to sixteen)
+        let hover = self.hover.len().min(15);
+        let jets = if plane { 16 - hover } else { 0 };
+        let mut blasts = Vec::new();
+        for (index, marker) in self.hover[..hover]
+            .iter()
+            .chain(self.jet.iter().take(jets))
+            .enumerate()
+        {
+            let position = origin + rotation * Vec3::from_array(marker.position);
+            let forward = rotation * Vec3::from_array(marker.forward);
+            // (the ghost's cone is fifteen, in radians, as the original has
+            // it: any way at all; the pelican's a twelfth of a half turn)
+            let outer = if plane {
+                std::f32::consts::PI / 12.0
+            } else {
+                15.0
+            };
+            let direction = spread(forward, outer, seed);
+            let vector = if plane {
+                let lift = if index < hover {
+                    hover_lift
+                } else {
+                    thrust_lift
+                };
+                direction * (lift * 6.0 + 2.0)
+            } else {
+                direction
+            };
+            let Some((fraction, point, normal)) = cast(position, vector) else {
+                continue;
+            };
+            let reflected = direction - normal * (2.0 * direction.dot(normal));
+            let mut locations = vec![
+                ("incident", point, -direction),
+                ("normal", point, normal),
+                ("reflected", point, reflected),
+            ];
+            let scale = if plane {
+                1.0 - fraction
+            } else {
+                locations.push(("midpoint", (position + point) * 0.5, reflected));
+                (-forward.z * (1.0 - fraction) * power).clamp(0.0, 1.0)
+            };
+            if plane || scale > 0.0 {
+                blasts.push((locations, scale));
+            }
+        }
+        blasts
+    }
+}
+
+/// `axis` turned at random by up to `outer` radians, about a way across
+/// it at random (`seed_random_vector_in_cone3d`, its inner angle 0).
+fn spread(axis: Vec3, outer: f32, seed: &mut RandomSeed) -> Vec3 {
+    let z = 2.0 * seed.next_real() - 1.0;
+    let around = std::f32::consts::TAU * seed.next_real();
+    let flat = libm::sqrtf((1.0_f32 - z * z).max(0.0));
+    let random = Vec3::new(flat * libm::cosf(around), flat * libm::sinf(around), z);
+    let across = axis.cross(random).normalize_or_zero();
+    if across == Vec3::ZERO {
+        return axis;
+    }
+    Quat::from_axis_angle(across, outer * seed.next_real()) * axis
+}
+
 /// The matrix of `model`'s marker `name` (its first instance), from its
 /// origin, with its nodes at `matrices`.
 pub fn marker_matrix(model: &Model, matrices: &[NodeMatrix], name: &str) -> Option<NodeMatrix> {
@@ -1040,4 +1241,121 @@ pub fn marker_matrix(model: &Model, matrices: &[NodeMatrix], name: &str) -> Opti
         translation: instance.translation,
         scale: 1.0,
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A thruster `height` above the origin, blowing down.
+    fn down(height: f32) -> NodeMatrix {
+        NodeMatrix {
+            forward: [0.0, 0.0, -1.0],
+            left: [0.0, 1.0, 0.0],
+            up: [1.0, 0.0, 0.0],
+            position: [0.0, 0.0, height],
+            scale: 1.0,
+        }
+    }
+
+    /// Flat ground at z = 0: the fraction along the cast, the point and the
+    /// normal where `vector` from `start` meets it.
+    fn ground(start: Vec3, vector: Vec3) -> Option<(f32, Vec3, Vec3)> {
+        if vector.z >= 0.0 {
+            return None;
+        }
+        let fraction = start.z / -vector.z;
+        (fraction <= 1.0).then(|| (fraction, start + vector * fraction, Vec3::Z))
+    }
+
+    #[test]
+    fn a_scouts_hover_thrusters_blast_the_ground_only_while_it_is_powered() {
+        let thrusters = Thrusters {
+            hover: vec![down(0.5); 20],
+            jet: Vec::new(),
+        };
+        let pose = (Vec3::ZERO, Quat::IDENTITY);
+        let mut seed = RandomSeed::default();
+        let mut casts = 0;
+        let mut blasts = Vec::new();
+        for _ in 0..100 {
+            blasts.extend(thrusters.blasts(
+                VehicleKind::AlienScout,
+                pose,
+                (0.0, 0.0),
+                1.0,
+                &mut seed,
+                |start, vector| {
+                    casts += 1;
+                    // (a unit cast, as the original's)
+                    assert!((vector.length() - 1.0).abs() < 1e-4);
+                    ground(start, vector)
+                },
+            ));
+        }
+        // (fifteen thrusters at most; the cone is fifteen radians, so some
+        // blow up and miss)
+        assert_eq!(casts, 1500);
+        assert!(
+            !blasts.is_empty() && blasts.len() < 1500,
+            "{}",
+            blasts.len()
+        );
+        for (locations, scale) in &blasts {
+            let names: Vec<&str> = locations.iter().map(|(name, _, _)| *name).collect();
+            assert_eq!(names, ["incident", "normal", "reflected", "midpoint"]);
+            assert!(*scale > 0.0 && *scale <= 1.0, "{scale}");
+            assert_eq!(locations[1].2, Vec3::Z);
+            assert!(locations[0].1.z.abs() < 1e-5, "{:?}", locations[0].1);
+        }
+        let unpowered = thrusters.blasts(
+            VehicleKind::AlienScout,
+            pose,
+            (0.0, 0.0),
+            0.0,
+            &mut seed,
+            ground,
+        );
+        assert!(unpowered.is_empty());
+        let wheeled = thrusters.blasts(
+            VehicleKind::HumanJeep,
+            pose,
+            (0.0, 0.0),
+            1.0,
+            &mut seed,
+            ground,
+        );
+        assert!(wheeled.is_empty());
+    }
+
+    #[test]
+    fn a_planes_hover_and_jet_thrusters_blast_the_ground_by_their_lift() {
+        let thrusters = Thrusters {
+            hover: vec![down(1.0)],
+            jet: vec![down(1.0)],
+        };
+        let mut seed = RandomSeed::default();
+        let mut lengths = Vec::new();
+        let blasts = thrusters.blasts(
+            VehicleKind::HumanPlane,
+            (Vec3::ZERO, Quat::IDENTITY),
+            (0.5, 0.0),
+            0.0,
+            &mut seed,
+            |start, vector| {
+                lengths.push(vector.length());
+                ground(start, vector)
+            },
+        );
+        // (hover 0.5 gives 5 units, thrust 0 gives 2; unpowered seats do not
+        // stop a plane's)
+        assert!((lengths[0] - 5.0).abs() < 1e-4 && (lengths[1] - 2.0).abs() < 1e-4);
+        assert_eq!(blasts.len(), 2);
+        for (locations, scale) in &blasts {
+            assert_eq!(locations.len(), 3);
+            assert!(*scale > 0.0 && *scale < 1.0, "{scale}");
+        }
+        // (a unit up, within a twelfth of a half turn of straight down)
+        assert!(blasts[0].1 > 1.0 - 1.0 / 5.0 / 0.96 && blasts[0].1 <= 1.0 - 1.0 / 5.0);
+    }
 }

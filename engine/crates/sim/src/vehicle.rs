@@ -14,7 +14,8 @@
 
 use glam::{Mat3, Quat, Vec2, Vec3};
 use opence_content::{
-    BspWater, FrictionType, MaterialPhysics, Physics, PoweredMassPoint, Vehicle, VehicleKind,
+    BspWater, FrictionType, MassPoint, MaterialPhysics, Physics, PoweredMassPoint, Vehicle,
+    VehicleKind,
 };
 use opence_physics::{Layers, PhysicsError, SurfaceMaterials, World};
 
@@ -35,6 +36,10 @@ const POINT_ANTIGRAVING: u8 = 1 << 4;
 
 /// Below these, squared, a mass point or a vehicle is at rest.
 const REST_SPEED_SQUARED: f32 = 0.0011111111;
+
+/// Above this slip along the ground, in world units a game tick, a mass
+/// point plays its vehicle's material effect.
+const SLIP_SPEED: f32 = 0.03;
 const REST_SPIN_SQUARED: f32 = 0.0027415568;
 const REST_ACCELERATION_SQUARED: f32 = 3.0864197e-7;
 const REST_ANGULAR_ACCELERATION_SQUARED: f32 = 3.0461742e-6;
@@ -107,6 +112,24 @@ pub struct Upending {
     pub ticks: u8,
 }
 
+/// A mass point slipping on the ground in a game tick
+/// (create_slipping_effects): where its vehicle's material effect plays.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Slip {
+    /// On the ground under it, 3 mm up.
+    pub position: Vec3,
+    /// Along its slip and up from the ground, unnormalised as the original
+    /// leaves it.
+    pub normal: Vec3,
+    /// The ground's material type (negative: none).
+    pub material: i16,
+    /// Whether the mass point is metallic (a tread: the material effects'
+    /// metallic slip, not a tyre's).
+    pub metallic: bool,
+    /// How hard it slips, 0 to 1.
+    pub scale: f32,
+}
+
 /// A vehicle's state between game ticks (its object's and its
 /// _vehicle_datum's).
 #[derive(Clone, Debug, PartialEq)]
@@ -160,6 +183,8 @@ pub struct VehicleState {
     pub collision_torque: Vec3,
     /// Whether a player is turning it back over.
     pub upending: Option<Upending>,
+    /// Its mass points that slipped in its last physics update.
+    pub slips: Vec<Slip>,
 }
 
 impl VehicleState {
@@ -192,6 +217,7 @@ impl VehicleState {
             collision_force: Vec3::ZERO,
             collision_torque: Vec3::ZERO,
             upending: None,
+            slips: Vec::new(),
         }
     }
 
@@ -1194,6 +1220,7 @@ fn compute_new(
     let mut total_torque = Vec3::ZERO;
     let mut submerged = 0usize;
     points.clear();
+    state.slips.clear();
     for (index, point) in physics.mass_points.iter().enumerate() {
         let pushed = point.powered_mass_point.and_then(|index| {
             Some((
@@ -1234,7 +1261,9 @@ fn compute_new(
                 0.0
             };
             normal_force = normal * (physics.mass * (spring - into * ground.damp_fraction));
-            let sliding = velocity - normal * into;
+            // (its velocity relative to the ground: its slide along it, and
+            // what its powered point drives it with)
+            let mut sliding = velocity - normal * into;
             let scale = -mass * ground.friction;
             let mut friction = sliding * scale;
             if let Some((definition, powered)) = pushed {
@@ -1246,6 +1275,7 @@ fn compute_new(
                     let weight = upright * upright * footing * footing * scale;
                     let mut drive = forward * -powered.ground_friction_velocity;
                     drive -= normal * drive.dot(normal);
+                    sliding += drive;
                     friction += drive * weight;
                 }
             }
@@ -1258,6 +1288,17 @@ fn compute_new(
                 up,
             );
             flags |= POINT_ON_GROUND;
+            let speed = sliding.length();
+            if speed > SLIP_SPEED {
+                let under = position - normal * (point.radius - depth);
+                state.slips.push(Slip {
+                    position: under + normal * 0.003,
+                    normal: sliding * (0.8660254 / speed) + normal * 0.5,
+                    material: level.surfaces.map_or(-1, |surfaces| surfaces.at(under)),
+                    metallic: point.flags & MassPoint::METALLIC != 0,
+                    scale: ((speed - SLIP_SPEED) * 4.5454545).clamp(0.0, 1.0),
+                });
+            }
         }
 
         let mut push = Vec3::ZERO;
@@ -1952,6 +1993,81 @@ mod tests {
         let heavy = slide(&physics, &rough[..1])?;
         let heavy_rough = slide(&physics, &rough)?;
         assert_eq!(heavy.velocity, heavy_rough.velocity);
+        Ok(())
+    }
+
+    #[test]
+    fn a_point_slipping_on_the_ground_plays_its_material_effect() -> Result<(), PhysicsError> {
+        use opence_physics::{LevelMesh, WorldSettings};
+
+        let mut world = World::new(WorldSettings::default())?;
+        let mesh = LevelMesh {
+            vertices: vec![
+                [-50.0, -50.0, 0.0],
+                [50.0, -50.0, 0.0],
+                [50.0, 50.0, 0.0],
+                [-50.0, 50.0, 0.0],
+            ],
+            triangles: vec![[0, 1, 2], [0, 2, 3]],
+            materials: vec![Some(0), Some(0)],
+        };
+        world.set_level(&mesh)?;
+        let surfaces = SurfaceMaterials::new(&mesh, &[1]);
+        let materials = [MaterialPhysics::default(), MaterialPhysics::default()];
+        let level = VehicleLevel {
+            world: &world,
+            floor: 0.0,
+            ceiling: 0.0,
+            water: None,
+            surfaces: Some(&surfaces),
+            materials: &materials,
+        };
+        let mut physics = floater(1, 0.5);
+        physics.mass_points[0].radius = 0.25;
+        physics.mass_points[0].flags = MassPoint::METALLIC;
+        let slips = |velocity: Vec3| {
+            // (in the ground 0.15 deep, moving at `velocity`)
+            let mut state =
+                VehicleState::placed(&physics, Vec3::new(0.0, 0.0, 0.1), Vec3::X, Vec3::Z);
+            state.velocity = velocity;
+            let mut powered = [Powered::identity(); 32];
+            physics_update(
+                &mut state,
+                &physics,
+                &mut powered,
+                Vec3::ZERO,
+                Vec3::ZERO,
+                level,
+            )?;
+            Ok::<_, PhysicsError>(state.slips)
+        };
+        // (a slide of 0.1 a tick: (0.1 - 0.03) * 4.5454545 of the effect)
+        let slid = slips(Vec3::new(0.1, 0.0, 0.0))?;
+        let [slip] = slid.as_slice() else {
+            panic!("{slid:?}");
+        };
+        assert!((slip.scale - 0.07 * 4.5454545).abs() < 1e-5, "{slip:?}");
+        assert!(
+            slip.position.abs_diff_eq(Vec3::new(0.0, 0.0, 0.003), 1e-5),
+            "{slip:?}"
+        );
+        assert!(
+            slip.normal
+                .abs_diff_eq(Vec3::new(0.8660254, 0.0, 0.5), 1e-5),
+            "{slip:?}"
+        );
+        assert_eq!(slip.material, 1);
+        assert!(slip.metallic);
+        // (sinking straight in, or slower than 0.03, it does not slip)
+        assert!(slips(Vec3::new(0.0, 0.0, -0.5))?.is_empty());
+        assert!(slips(Vec3::new(0.02, 0.0, 0.0))?.is_empty());
+        // (and at 0.25 or faster the effect is whole)
+        assert_eq!(
+            slips(Vec3::new(0.0, 0.4, 0.0))?
+                .first()
+                .map(|slip| slip.scale),
+            Some(1.0)
+        );
         Ok(())
     }
 

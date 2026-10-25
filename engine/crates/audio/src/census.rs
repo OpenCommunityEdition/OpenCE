@@ -28,6 +28,8 @@ pub struct Playing {
     pub class: u16,
     /// Where it plays from; `None` for one heard everywhere alike.
     pub position: Option<[f32; 3]>,
+    /// When it started, on the player's clock, in milliseconds.
+    pub started_ms: f32,
 }
 
 /// One class's sounds: the voices playing now, and the sounds culled and

@@ -4,11 +4,11 @@
 //! markers. The parts made each tick are handed to the lights and decals.
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use opence_content::{Level, TagRef};
 use opence_sim::animation::NodeMatrix;
-use opence_sim::effects::{Effects, FiredPart};
+use opence_sim::effects::{Effects, FiredPart, Running};
 use opence_sim::objects::ObjectHandle;
 use opence_sim::seats::default_pose;
 use opence_sim::{Mat3, Quat, Simulation, Vec3};
@@ -33,7 +33,14 @@ pub(crate) struct LevelEffects {
     /// Each object definition's effects, and the model their markers are
     /// on.
     carried: BTreeMap<TagRef, (Vec<Carried>, Option<usize>)>,
+    /// The last [`STARTED_LOG`] effects begun, oldest first, as each was
+    /// in the tick it began (for the shell: a muzzle flash ends within
+    /// the tick it begins).
+    started: VecDeque<Running>,
 }
+
+/// How many of the effects begun [`LevelEffects`] remembers.
+pub(crate) const STARTED_LOG: usize = 64;
 
 /// The turn whose axes are a frame's.
 fn turn(frame: &NodeMatrix) -> Quat {
@@ -76,12 +83,23 @@ impl LevelEffects {
         Self {
             effects: Effects::default(),
             carried,
+            started: VecDeque::new(),
         }
     }
 
     /// The effects running.
     pub(crate) fn running(&self) -> &[opence_sim::effects::Running] {
         self.effects.running()
+    }
+
+    /// The last [`STARTED_LOG`] effects begun, oldest first.
+    pub(crate) fn started(&self) -> &VecDeque<Running> {
+        &self.started
+    }
+
+    /// The effects as they were in each event the last tick ran through.
+    pub(crate) fn emitting(&self) -> &[opence_sim::effects::Running] {
+        self.effects.emitting()
     }
 
     /// The parts made in the last tick.
@@ -178,6 +196,24 @@ impl LevelEffects {
         self.effects.tick(level, exists, |handle, marker| {
             placed.get(&(handle, marker.to_owned())).copied()
         });
+        // (those begun this tick: newer than the newest remembered, whether
+        // still running or ended in their first events)
+        let newest = self.started.back().map_or(0, |effect| effect.number);
+        let mut begun: Vec<&Running> = self
+            .effects
+            .running()
+            .iter()
+            .chain(self.effects.emitting())
+            .filter(|effect| effect.number > newest)
+            .collect();
+        begun.sort_by_key(|effect| effect.number);
+        begun.dedup_by_key(|effect| effect.number);
+        for effect in begun {
+            if self.started.len() == STARTED_LOG {
+                self.started.pop_front();
+            }
+            self.started.push_back(effect.clone());
+        }
     }
 
     /// The effects running, as the snapshot gives them.

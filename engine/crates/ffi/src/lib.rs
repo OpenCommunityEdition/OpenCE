@@ -1122,6 +1122,7 @@ impl Engine {
                     if let Some(index) = player.sound_index(&sound.tag.path) {
                         let source = opence_audio::Source {
                             position: sound.position.map(|at| at.to_array()),
+                            scale: sound.scale,
                             ..opence_audio::Source::default()
                         };
                         player.impulse(index, &source);
@@ -1521,6 +1522,7 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
                         .map(|played| sound_events::Heard {
                             tag: played.sound.clone(),
                             position: played.position,
+                            scale: 0.0,
                         }),
                 );
             sound_events::gather(
@@ -1532,6 +1534,7 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
                 &mut running.heard,
                 &mut running.stepped,
             );
+            sound_events::gather_slips(level, running.simulation.slips(), &mut running.heard);
             // (an item's material is the level's where it struck the
             // level; what it struck otherwise is not known)
             sound_events::gather_items(
@@ -1554,7 +1557,11 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
             running.particles.tick(
                 level,
                 &mut running.simulation,
-                (running.effects.running(), running.effects.fired()),
+                (
+                    running.effects.running(),
+                    running.effects.emitting(),
+                    running.effects.fired(),
+                ),
                 bsp,
             );
             // (what the particles made starts at the next tick's effects)

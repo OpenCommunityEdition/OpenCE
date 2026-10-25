@@ -286,6 +286,10 @@ impl MaterialEffects {
     pub const JUMP_LAND: usize = 5;
     /// An item striking something.
     pub const IMPACT: usize = 8;
+    /// A vehicle's mass point slipping on the ground.
+    pub const VEHICLE_SLIP: usize = 9;
+    /// A vehicle's metallic mass point (a tread) slipping on the ground.
+    pub const METALLIC_SLIP: usize = 10;
 
     /// What `event` makes on material `material` (a negative one: none).
     pub fn of(&self, event: usize, material: i16) -> Option<&MaterialEffect> {
