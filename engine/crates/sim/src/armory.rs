@@ -54,8 +54,8 @@ pub struct Armory {
     weapons: Vec<ArmoryWeapon>,
     grenades: Vec<ArmoryGrenade>,
     /// The equipment of the level that is a grenade lying in the world,
-    /// and its kind.
-    grenade_items: Vec<(TagRef, usize)>,
+    /// its kind and the sound of its being picked up.
+    grenade_items: Vec<(TagRef, usize, Option<TagRef>)>,
 }
 
 impl Armory {
@@ -106,7 +106,7 @@ impl Armory {
                 let equipment = object.equipment.as_ref()?;
                 let kind = usize::try_from(equipment.grenade_type).ok()?;
                 (equipment.powerup_type == POWERUP_GRENADE && kind < GRENADE_KINDS)
-                    .then(|| (object.tag.clone(), kind))
+                    .then(|| (object.tag.clone(), kind, equipment.pickup_sound.clone()))
             })
             .collect();
         Armory {
@@ -120,8 +120,16 @@ impl Armory {
     pub fn grenade_item(&self, tag: &TagRef) -> Option<usize> {
         self.grenade_items
             .iter()
-            .find(|(item, _)| item == tag)
-            .map(|&(_, kind)| kind)
+            .find(|(item, _, _)| item == tag)
+            .map(|&(_, kind, _)| kind)
+    }
+
+    /// The sound of the grenade `tag` being picked up.
+    pub fn grenade_pickup_sound(&self, tag: &TagRef) -> Option<&TagRef> {
+        self.grenade_items
+            .iter()
+            .find(|(item, _, _)| item == tag)
+            .and_then(|(_, _, sound)| sound.as_ref())
     }
 
     /// The grenade of `kind` (0 frag, 1 plasma).
@@ -373,7 +381,7 @@ mod tests {
         Armory {
             weapons: vec![weapon("a"), weapon("b"), weapon("c")],
             grenades: vec![grenade(4), grenade(2)],
-            grenade_items: vec![(tag("frag"), 0)],
+            grenade_items: vec![(tag("frag"), 0, Some(tag("pickup")))],
         }
     }
 
@@ -423,6 +431,10 @@ mod tests {
         // (one picked up at a time, while there is room)
         assert_eq!(armory.grenade_item(&tag("frag")), Some(0));
         assert_eq!(armory.grenade_item(&tag("a")), None);
+        assert_eq!(
+            armory.grenade_pickup_sound(&tag("frag")),
+            Some(&tag("pickup"))
+        );
         assert!(inventory.take_grenade(&armory, 0));
         assert!(!inventory.take_grenade(&armory, 1));
         assert!(!inventory.take_grenade(&armory, 2));

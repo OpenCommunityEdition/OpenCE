@@ -30,7 +30,7 @@ use crate::projectile::{self, Contact, Detonation, Flew, Flight, Impact};
 use crate::random::RandomSeed;
 use crate::unit_animator::UnitDrive;
 use crate::units::Radians;
-use crate::weapon::{secondary, WeaponControls, WeaponState};
+use crate::weapon::{secondary, WeaponControls, WeaponState, MAXIMUM_MAGAZINES};
 use crate::{FreeCamera, Transform};
 
 /// How far the player's melee reaches from its eyes, in world units.
@@ -217,8 +217,21 @@ pub(crate) struct Fired {
     pub impacts: Vec<Impact>,
     /// Where its grenades detonated.
     pub detonations: Vec<Detonation>,
-    /// The effects its shots made, which throw out casings.
+    /// The effects its shots and its weapon's handling made, which throw
+    /// out casings.
     pub ejections: Vec<Ejection>,
+    /// The sounds its weapon's handling and its pickups made by themselves.
+    pub sounds: Vec<PlayedSound>,
+}
+
+/// A sound played by itself, not as part of an effect.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlayedSound {
+    /// The sound.
+    pub sound: TagRef,
+    /// Where it plays: `None` plays it unspatialized, to the player who
+    /// made it (a pickup's).
+    pub position: Option<Vec3>,
 }
 
 /// What the tick's systems need of the player: where its object goes and
@@ -813,7 +826,7 @@ impl Player {
                 return fired;
             }
             Arms::OnFoot { action } => {
-                self.pick_up(world, action);
+                self.pick_up(world, action, &mut fired.sounds);
                 if buttons.pressed(held, Buttons::MELEE) && self.melee_ticks == 0 {
                     if let Some(impact) = self.melee(world, eyes, aim) {
                         fired.impacts.push(impact);
@@ -1066,21 +1079,30 @@ impl Player {
     /// rounds of weapons it walks over that it carries, and with `action`,
     /// or with a hand free, picks up the nearest other weapon, dropping the
     /// one in its hands if its hands are full.
-    fn pick_up(&mut self, world: &mut World, action: bool) {
+    fn pick_up(&mut self, world: &mut World, action: bool, sounds: &mut Vec<PlayedSound>) {
         let feet = self.mover.position;
-        let mut grenades: Vec<(f32, ObjectHandle, usize)> = world
+        let mut grenades: Vec<(f32, ObjectHandle, usize, Option<TagRef>)> = world
             .query::<(&ObjectHandle, &Transform, &Object)>()
             .iter(world)
             .filter(|(_, _, object)| object.kind == ObjectKind::Equipment)
             .filter_map(|(handle, transform, object)| {
                 let distance = transform.position.distance(feet);
                 let kind = self.armory.grenade_item(&object.tag)?;
-                (distance <= armory::PICKUP_RADIUS).then_some((distance, *handle, kind))
+                let sound = self.armory.grenade_pickup_sound(&object.tag).cloned();
+                (distance <= armory::PICKUP_RADIUS).then_some((distance, *handle, kind, sound))
             })
             .collect();
         grenades.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-        for (_, handle, kind) in grenades {
+        for (_, handle, kind, sound) in grenades {
             if self.inventory.take_grenade(&self.armory, kind) {
+                // (`equipment_handle_pickup` plays its pickup sound to the
+                // one who took it)
+                if let Some(sound) = sound {
+                    sounds.push(PlayedSound {
+                        sound,
+                        position: None,
+                    });
+                }
                 objects::remove(world, handle);
             }
         }
@@ -1119,6 +1141,14 @@ impl Player {
                 },
             };
             if armory::take_rounds(&mut carried.state, &mut item, &definition.weapon) > 0 {
+                // (ammunition taken plays the weapon's pickup sound, to the
+                // one who took it)
+                if let Some(sound) = &definition.weapon.pickup_sound {
+                    sounds.push(PlayedSound {
+                        sound: sound.clone(),
+                        position: None,
+                    });
+                }
                 if let Some(entity) = world
                     .get_resource::<objects::ObjectTable>()
                     .and_then(|table| table.entity(*handle))
@@ -1268,7 +1298,35 @@ fn shoot(
 ) {
     let weapon = &definition.weapon;
     let (eyes, aim) = (shooter.eyes, shooter.aim);
-    for shot in state.step(weapon, controls) {
+    let shots = state.step(weapon, controls);
+    // (its readying, reloads and chambering, as `weapon_effect_new` plays
+    // them: an effect at the weapon, or a sound from it)
+    let cues = state.take_cues();
+    let mut handled = Vec::new();
+    if cues.ready {
+        handled.push(&weapon.ready_effect);
+    }
+    for (index, magazine) in weapon.magazines.iter().enumerate().take(MAXIMUM_MAGAZINES) {
+        if cues.reloading[index] {
+            handled.push(&magazine.reloading_effect);
+        }
+        if cues.chambering[index] {
+            handled.push(&magazine.chambering_effect);
+        }
+    }
+    for effect in handled.into_iter().flatten() {
+        if effect.group.0 == *b"snd!" {
+            fired.sounds.push(PlayedSound {
+                sound: effect.clone(),
+                position: Some(eyes),
+            });
+        } else {
+            fired
+                .ejections
+                .push(ejection(effect.clone(), eyes, aim, shooter.velocity));
+        }
+    }
+    for shot in shots {
         if let Some(effect) = weapon
             .triggers
             .get(shot.trigger)

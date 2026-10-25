@@ -1121,7 +1121,7 @@ impl Engine {
                 for sound in &heard {
                     if let Some(index) = player.sound_index(&sound.tag.path) {
                         let source = opence_audio::Source {
-                            position: Some(sound.position.to_array()),
+                            position: sound.position.map(|at| at.to_array()),
                             ..opence_audio::Source::default()
                         };
                         player.impulse(index, &source);
@@ -1509,6 +1509,20 @@ pub(crate) fn run_ticks(state: &mut State, ticks: u32) -> Result<(), EngineError
             let camera = running.simulation.camera().transform.position;
             let decals = &mut running.decals;
             running.stepped.clear();
+            // (what the weapons' handling and the pickups play by
+            // themselves)
+            running
+                .heard
+                .extend(
+                    running
+                        .simulation
+                        .sounds()
+                        .iter()
+                        .map(|played| sound_events::Heard {
+                            tag: played.sound.clone(),
+                            position: played.position,
+                        }),
+                );
             sound_events::gather(
                 level,
                 fired,

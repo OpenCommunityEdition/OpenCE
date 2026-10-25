@@ -56,6 +56,8 @@ pub struct Weapon {
     pub maximum_alternate_shots_loaded: i16,
     /// How long it takes to ready.
     pub ready_time: f32,
+    /// The effect or sound of its readying.
+    pub ready_effect: Option<TagRef>,
     /// The heat below which an overheated weapon fires again.
     pub heat_recovery_threshold: f32,
     /// The heat at which it overheats.
@@ -89,6 +91,8 @@ pub struct Weapon {
     pub first_person_animations: Option<TagRef>,
     /// Its HUD.
     pub hud_interface: Option<TagRef>,
+    /// The sound of its ammunition being picked up.
+    pub pickup_sound: Option<TagRef>,
     /// What it is: 0 undefined, 1 shotgun, 2 needler, 3 plasma pistol,
     /// 4 plasma rifle.
     pub weapon_type: i16,
@@ -159,6 +163,11 @@ pub struct Magazine {
     pub rounds_reloaded: i16,
     /// How long chambering a round takes.
     pub chamber_time: f32,
+    /// The effect or sound of a reload (each round of a one-at-a-time
+    /// reload).
+    pub reloading_effect: Option<TagRef>,
+    /// The effect or sound of chambering a round.
+    pub chambering_effect: Option<TagRef>,
     /// The ammunition picked up for it.
     pub ammunition: Vec<Ammunition>,
 }

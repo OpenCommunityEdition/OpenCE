@@ -265,6 +265,8 @@ pub struct FirstPersonWeapon {
     orientations: Vec<Orientation>,
     original: Vec<Orientation>,
     models: Vec<FirstPersonModel>,
+    /// The sound its animation reached in the last tick.
+    sound: Option<TagRef>,
 }
 
 /// What the state machine sees of `weapon` in `rig`.
@@ -372,6 +374,7 @@ impl FirstPersonWeapon {
         holder: &Holder,
         camera: &Transform,
     ) {
+        self.sound = None;
         let Some((tag, weapon)) = held.filter(|(tag, _)| self.rigs.contains_key(*tag)) else {
             self.weapon = None;
             self.models.clear();
@@ -435,6 +438,14 @@ impl FirstPersonWeapon {
                 aiming: false,
                 overcharged: 0.0,
             };
+            // (`first_person_weapons.c` plays the sound of the frame the
+            // animation is at, on the weapon, before it moves on)
+            self.sound = self.machine.animation.and_then(|index| {
+                let animation = rig.graph.animations.get(usize::from(index))?;
+                let sound = animation.sound?;
+                (animation.sound_frame == self.machine.frame).then_some(())?;
+                rig.graph.sound_references.get(usize::from(sound))?.clone()
+            });
             let held = held_weapon(&rig, weapon);
             self.machine.update(
                 &held,
@@ -500,8 +511,15 @@ impl FirstPersonWeapon {
         self.models = models;
     }
 
+    /// The sound its animation reached in the last tick: one of the
+    /// first-person graph's sound references.
+    pub fn sound(&self) -> Option<&TagRef> {
+        self.sound.as_ref()
+    }
+
     /// Hides it (the third person, or death).
     pub fn hide(&mut self) {
+        self.sound = None;
         self.models.clear();
     }
 }

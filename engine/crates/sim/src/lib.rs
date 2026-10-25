@@ -203,6 +203,8 @@ pub struct Simulation {
     item_impacts: Vec<item_physics::ItemImpact>,
     /// The effects the players' shots made this tick.
     effects: Vec<debris::Ejection>,
+    /// The sounds played by themselves in the last tick.
+    sounds: Vec<player::PlayedSound>,
     /// The vehicles, and the seat the player sits in.
     rides: seats::Rides,
     /// The AI's actors: bipeds moved and fired as the players are, by the
@@ -297,6 +299,7 @@ impl Simulation {
             queued_detonations: Vec::new(),
             item_impacts: Vec::new(),
             effects: Vec::new(),
+            sounds: Vec::new(),
             rides: seats::Rides::default(),
             actors: Vec::new(),
             actor_inputs: Vec::new(),
@@ -341,6 +344,7 @@ impl Simulation {
         self.detonations.clear();
         self.damage.clear();
         let mut ejections = Vec::new();
+        self.sounds.clear();
         // (the dead neither move nor fire, though they still fall)
         let inputs: Vec<TickInput> = (0..self.players.len())
             .map(|index| {
@@ -401,6 +405,7 @@ impl Simulation {
             let arms = self.rides.arms(player.seated(), pick_up);
             let mut fired = player.step_weapons(input, &mut self.world, arms);
             ejections.append(&mut fired.ejections);
+            self.sounds.append(&mut fired.sounds);
             let handle = player.handle();
             let mut damage = damage::apply_impacts(&mut self.world, &fired.impacts, Some(handle));
             damage.extend(damage::apply_detonations(
@@ -792,6 +797,12 @@ impl Simulation {
         &self.effects
     }
 
+    /// The sounds the players' weapons and pickups made by themselves this
+    /// tick (a ready, reload or chamber sound; a pickup's).
+    pub fn sounds(&self) -> &[player::PlayedSound] {
+        &self.sounds
+    }
+
     /// Detonates `detonation` in the next tick, as a grenade would (a
     /// script's explosion); nothing without a player.
     pub fn detonate(&mut self, detonation: projectile::Detonation) {
@@ -1038,6 +1049,13 @@ impl Simulation {
         };
         self.first_person
             .update(tick, player.weapon(), grenades, &holder, &camera);
+        if let Some(sound) = self.first_person.sound() {
+            // (heard by the player alone, as an impulse on the weapon)
+            self.sounds.push(player::PlayedSound {
+                sound: sound.clone(),
+                position: None,
+            });
+        }
     }
 
     /// The player's first-person weapon and hands.

@@ -21,8 +21,8 @@ pub(crate) const FOOTSTEP_REACH: f32 = 10.0;
 pub(crate) struct Heard {
     /// The sound.
     pub tag: TagRef,
-    /// Where it is.
-    pub position: Vec3,
+    /// Where it is (`None` unspatialized, to the player: a pickup's).
+    pub position: Option<Vec3>,
 }
 
 /// An effect a footstep makes on the ground (a splash, a puff of dust).
@@ -55,14 +55,14 @@ pub(crate) fn gather(
             .filter(|part| part.tag.group.0 == *b"snd!")
             .map(|part| Heard {
                 tag: part.tag.clone(),
-                position: part.position,
+                position: Some(part.position),
             }),
     );
     for event in events {
         if let Some(sound) = &event.sound {
             heard.push(Heard {
                 tag: sound.clone(),
-                position: event.position,
+                position: Some(event.position),
             });
         }
         if event.foot.is_none()
@@ -86,7 +86,7 @@ pub(crate) fn gather(
         if let Some(sound) = &step.sound {
             heard.push(Heard {
                 tag: sound.clone(),
-                position: point,
+                position: Some(point),
             });
         }
         if let Some(effect) = &step.effect {
@@ -121,7 +121,7 @@ pub(crate) fn gather_items(
             if let Some(sound) = &made.sound {
                 heard.push(Heard {
                     tag: sound.clone(),
-                    position: impact.point,
+                    position: Some(impact.point),
                 });
             }
             if let Some(effect) = &made.effect {
@@ -135,7 +135,7 @@ pub(crate) fn gather_items(
         if let Some(sound) = &struck.collision_sound {
             heard.push(Heard {
                 tag: sound.clone(),
-                position: impact.sound_position,
+                position: Some(impact.sound_position),
             });
         }
     }
@@ -156,7 +156,7 @@ pub(crate) fn gather_particles(
         if made.tag.group.0 == *b"snd!" {
             heard.push(Heard {
                 tag: made.tag.clone(),
-                position: made.point,
+                position: Some(made.point),
             });
         } else {
             stepped.push(Stepped {
@@ -181,7 +181,7 @@ pub(crate) fn gather_particles(
         if let Some(sound) = &made.sound {
             heard.push(Heard {
                 tag: sound.clone(),
-                position: impact.point,
+                position: Some(impact.point),
             });
         }
         if let Some(effect) = &made.effect {
@@ -281,11 +281,11 @@ mod tests {
             [
                 Heard {
                     tag: tag(b"snd!", "bang"),
-                    position: Vec3::X,
+                    position: Some(Vec3::X),
                 },
                 Heard {
                     tag: tag(b"snd!", "grunt"),
-                    position: Vec3::Z,
+                    position: Some(Vec3::Z),
                 },
             ]
         );
@@ -323,7 +323,7 @@ mod tests {
             heard,
             [Heard {
                 tag: tag(b"snd!", "gravel"),
-                position: floor,
+                position: Some(floor),
             }]
         );
         assert_eq!(
@@ -421,11 +421,11 @@ mod tests {
             [
                 Heard {
                     tag: tag(b"snd!", "clank"),
-                    position: Vec3::new(1.0, 2.0, 0.0),
+                    position: Some(Vec3::new(1.0, 2.0, 0.0)),
                 },
                 Heard {
                     tag: tag(b"snd!", "thud"),
-                    position: Vec3::new(1.0, 2.0, 0.05),
+                    position: Some(Vec3::new(1.0, 2.0, 0.05)),
                 },
             ]
         );

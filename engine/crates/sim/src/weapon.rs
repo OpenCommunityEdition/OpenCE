@@ -17,6 +17,8 @@ const TPS: f32 = TICKS_PER_SECOND as f32;
 
 /// The most triggers a weapon has.
 pub const MAXIMUM_TRIGGERS: usize = 2;
+/// The most magazines a weapon has.
+pub const MAXIMUM_MAGAZINES: usize = 2;
 
 /// Seconds as whole ticks, cut short as the original's `(short)` cut them.
 fn ticks(seconds: f32) -> i16 {
@@ -131,6 +133,19 @@ pub enum WeaponError {
     TooManyTriggers(usize),
 }
 
+/// The effects of a weapon's handling (`weapon_effect_new`) due since
+/// they were last taken: its readying, and each magazine's reloading (each
+/// round of a one-at-a-time reload) and chambering.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Cues {
+    /// It was readied.
+    pub ready: bool,
+    /// Each magazine began a reload.
+    pub reloading: [bool; MAXIMUM_MAGAZINES],
+    /// Each magazine began chambering.
+    pub chambering: [bool; MAXIMUM_MAGAZINES],
+}
+
 /// A weapon's state.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct WeaponState {
@@ -146,6 +161,9 @@ pub struct WeaponState {
     pub triggers: Vec<TriggerState>,
     /// Each magazine's state.
     pub magazines: Vec<MagazineState>,
+    /// The handling effects due (not part of its hash: they are taken the
+    /// tick they are made).
+    pub cues: Cues,
 }
 
 impl WeaponState {
@@ -160,6 +178,7 @@ impl WeaponState {
             overheated: false,
             age: 0.0,
             ready: ticks(weapon.ready_time),
+            cues: Cues::default(),
             triggers: vec![
                 TriggerState {
                     released: true,
@@ -188,6 +207,12 @@ impl WeaponState {
     /// Readies it again (drawn after being put away).
     pub fn draw(&mut self, weapon: &Weapon) {
         self.ready = ticks(weapon.ready_time);
+        self.cues.ready = true;
+    }
+
+    /// The handling effects due, which are then no longer due.
+    pub fn take_cues(&mut self) -> Cues {
+        std::mem::take(&mut self.cues)
     }
 
     /// Whether anything stops it firing now (it is still being drawn).
@@ -216,6 +241,7 @@ impl WeaponState {
         {
             state.phase = MagazinePhase::Reloading;
             state.timer = ticks(magazine.reload_time);
+            cue(&mut self.cues.reloading, index);
         }
     }
 
@@ -280,10 +306,15 @@ impl WeaponState {
             state.timer -= 1;
         }
         match state.phase {
-            MagazinePhase::Reloading if state.timer <= 0 => finish_reload(state, magazine),
+            MagazinePhase::Reloading if state.timer <= 0 => {
+                if finish_reload(state, magazine) {
+                    cue(&mut self.cues.reloading, index);
+                }
+            }
             MagazinePhase::Unchambered => {
                 state.timer = ticks(magazine.chamber_time);
                 state.phase = if state.timer > 0 {
+                    cue(&mut self.cues.chambering, index);
                     MagazinePhase::Chambering
                 } else {
                     MagazinePhase::Idle
@@ -542,10 +573,17 @@ impl WeaponState {
     }
 }
 
+/// Marks magazine `index`'s cue in `cues`.
+fn cue(cues: &mut [bool; MAXIMUM_MAGAZINES], index: usize) {
+    if let Some(cue) = cues.get_mut(index) {
+        *cue = true;
+    }
+}
+
 /// A reload done (`weapon_magazine_finish_reload`): the rounds move from
 /// those carried into the magazine, and one at a time (a shotgun) it goes
-/// on.
-fn finish_reload(state: &mut MagazineState, magazine: &Magazine) {
+/// on; whether it went on (a new reload, with its own effect).
+fn finish_reload(state: &mut MagazineState, magazine: &Magazine) -> bool {
     if magazine.flags & Magazine::WASTES_ROUNDS_WHEN_RELOADED != 0 {
         state.loaded = 0;
     }
@@ -561,7 +599,9 @@ fn finish_reload(state: &mut MagazineState, magazine: &Magazine) {
     {
         state.phase = MagazinePhase::Reloading;
         state.timer = ticks(magazine.reload_time);
+        return true;
     }
+    false
 }
 
 #[cfg(test)]

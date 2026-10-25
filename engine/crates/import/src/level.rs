@@ -577,7 +577,25 @@ fn import_effects(cache: &Cache, objects: &[ObjectDefinition]) -> Result<Vec<Eff
         .filter_map(|object| object.weapon.as_ref())
         .flat_map(|weapon| &weapon.triggers)
         .filter_map(|trigger| trigger.firing_effect.as_ref());
-    let tags: BTreeSet<&TagRef> = detonations.chain(strikes).chain(shots).collect();
+    // (a weapon's ready, reloading and chambering effects may be sounds,
+    // which the sounds are imported with)
+    let handling = objects
+        .iter()
+        .filter_map(|object| object.weapon.as_ref())
+        .flat_map(|weapon| {
+            let magazines = weapon
+                .magazines
+                .iter()
+                .flat_map(|magazine| [&magazine.reloading_effect, &magazine.chambering_effect]);
+            std::iter::once(&weapon.ready_effect).chain(magazines)
+        })
+        .flatten()
+        .filter(|tag| tag.group.0 == *b"effe");
+    let tags: BTreeSet<&TagRef> = detonations
+        .chain(strikes)
+        .chain(shots)
+        .chain(handling)
+        .collect();
     let mut effects = Vec::with_capacity(tags.len());
     for tag in tags {
         // (a reference was checked to name a tag of the map when it was read)

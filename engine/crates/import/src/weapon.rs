@@ -101,6 +101,7 @@ pub(crate) fn import_weapon(cache: &Cache, index: usize) -> Result<Weapon, Impor
         secondary_trigger_mode: tag.i16(at(0x24), "secondary trigger mode")?,
         maximum_alternate_shots_loaded: tag.i16(at(0x26), "maximum alternate shots loaded")?,
         ready_time: f(0x30, "ready time")?,
+        ready_effect: reference(&tag, at(0x34), "ready effect", &[EFFE, SND])?,
         heat_recovery_threshold: f(0x44, "heat recovery threshold")?,
         heat_overheated_threshold: f(0x48, "overheated threshold")?,
         heat_detonation_threshold: f(0x4C, "heat detonation threshold")?,
@@ -123,6 +124,7 @@ pub(crate) fn import_weapon(cache: &Cache, index: usize) -> Result<Weapon, Impor
         first_person_model: reference(&tag, at(0x154), "first person model", &[MODE, MOD2])?,
         first_person_animations: reference(&tag, at(0x164), "first person animations", &[ANTR])?,
         hud_interface: reference(&tag, at(0x178), "hud interface", &[WPHI])?,
+        pickup_sound: reference(&tag, at(0x188), "pickup sound", &[SND])?,
         weapon_type: tag.i16(at(0x1DA), "weapon type")?,
         magazines,
         triggers,
@@ -148,6 +150,8 @@ fn import_magazine(magazine: &Element<'_>) -> Result<Magazine, ImportError> {
         reload_time: magazine.f32(0x14, "reload time")?,
         rounds_reloaded: magazine.i16(0x18, "rounds reloaded")?,
         chamber_time: magazine.f32(0x1C, "chamber time")?,
+        reloading_effect: reference(magazine, 0x38, "reloading effect", &[EFFE, SND])?,
+        chambering_effect: reference(magazine, 0x48, "chambering effect", &[EFFE, SND])?,
         ammunition,
     })
 }
@@ -357,6 +361,8 @@ mod tests {
         put(&mut magazine_bytes, 0x8, &300i16.to_le_bytes());
         put(&mut magazine_bytes, 0xA, &30i16.to_le_bytes());
         f32s(&mut magazine_bytes, 0x14, &[2.5]);
+        empty(&mut magazine_bytes, 0x38);
+        empty(&mut magazine_bytes, 0x48);
         block(&mut magazine_bytes, 0x64, 1, ammunition);
         let magazines = fake.add_data(&magazine_bytes);
 
@@ -371,7 +377,7 @@ mod tests {
         for at in [0xCC, 0xDC, 0x16C, 0x17C].map(|offset| ITEM_PART + offset) {
             empty(&mut weapon, at);
         }
-        for offset in [0x8C, 0x9C, 0x154, 0x164, 0x178] {
+        for offset in [0x34, 0x8C, 0x9C, 0x154, 0x164, 0x178, 0x188] {
             empty(&mut weapon, ITEM_END + offset);
         }
         put(&mut weapon, ITEM_END + 0x4, b"rifle");
