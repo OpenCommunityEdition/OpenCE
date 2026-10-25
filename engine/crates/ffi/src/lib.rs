@@ -1089,7 +1089,9 @@ impl Engine {
             frame = Some(advanced);
         }
         let shell_bsp = state.shell.bsp;
-        if let (Some(running), Some(advanced)) = (state.running.as_mut(), frame.as_ref()) {
+        let State { running, shell, .. } = &mut *state;
+        let station = &mut shell.station;
+        if let (Some(running), Some(advanced)) = (running.as_mut(), frame.as_ref()) {
             let heard = std::mem::take(&mut running.heard);
             let camera = campaign::camera(running).transform;
             if let Some(level) = running.level.clone() {
@@ -1143,6 +1145,9 @@ impl Engine {
                     campaign.play_sounds(player, &running.simulation);
                 }
                 player.update_loops();
+                if let Some(run) = station.as_mut() {
+                    run.after_sounds(player);
+                }
             }
         }
         // (a script in the window runs a line a frame, with or without a world)

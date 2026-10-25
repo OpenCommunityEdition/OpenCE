@@ -164,3 +164,51 @@ fn the_stations_measure_on_devgulch() -> Result {
     assert!(hud["error"].is_null(), "{hud}");
     Ok(())
 }
+
+#[test]
+fn the_sound_station_voices_a_sound_of_each_class() -> Result {
+    let Some(engine) = devgulch("devgulch_stations_sounds")? else {
+        return Ok(()); // (no game data here)
+    };
+    let results = station(&engine, "station sounds", 10)?;
+    let emitters: Vec<&Value> = results
+        .iter()
+        .filter(|one| one["class"].is_string())
+        .collect();
+    let scenery: Vec<&Value> = results
+        .iter()
+        .filter(|one| one["sound_scenery"].is_string())
+        .collect();
+    let unplayed: Vec<&Value> = results
+        .iter()
+        .filter_map(|one| one.get("unplayed_class"))
+        .collect();
+    println!(
+        "{} classes voiced ({} by a sound that may be skipped), {} scenery heard, classes with nothing to play: {unplayed:?}",
+        emitters.len(),
+        emitters
+            .iter()
+            .filter(|one| one["plain"] == Value::Bool(false))
+            .count(),
+        scenery.len()
+    );
+    assert!(unplayed.is_empty(), "{unplayed:?}");
+    assert!(emitters.len() >= 20, "{results:?}");
+    assert!(!scenery.is_empty(), "{results:?}");
+    // each class's sound played on a voice, counted under its class; none
+    // failed
+    let unvoiced: Vec<_> = emitters
+        .iter()
+        .filter(|one| one["played"] != Value::Bool(true) || one["counted"] != Value::Bool(true))
+        .collect();
+    assert!(unvoiced.is_empty(), "{unvoiced:#?}");
+    // each sound scenery placed within hearing has a voice where it stands
+    let unheard: Vec<_> = scenery
+        .iter()
+        .filter(|one| one["heard"] != Value::Bool(true))
+        .collect();
+    assert!(unheard.is_empty(), "{unheard:#?}");
+    let census = engine.audio_census();
+    assert!(census.iter().all(|count| count.failed == 0), "{census:?}");
+    Ok(())
+}

@@ -24,7 +24,9 @@
 //!   particles it kept alive.
 //! - `ai` (devgulch): a squad of each biped that is not the player's,
 //!   stood facing the player.
-//! - `sounds` (devgulch): a row of every sound scenery.
+//! - `sounds` (devgulch): a sound of each sound class, each played once
+//!   from a row ahead, and every sound scenery stood within hearing:
+//!   whether each played, and was counted under its class.
 //! - `shaders` (devgulch): an object of each shader class its model uses.
 //! - `hud` (devgulch): gives each weapon that has a HUD in turn.
 //!
@@ -34,6 +36,7 @@
 
 use std::sync::Arc;
 
+use opence_audio::{SoundPlayer, VoiceId};
 use opence_content::devmap::{self, Station};
 use opence_content::{devgulch, Level, ObjectKind, ShaderClass, TagRef};
 use opence_dev::draw::{Color, DebugDraw, Layer};
@@ -106,8 +109,24 @@ const EFFECT_SPACING: f32 = 4.0;
 const HUD_TICKS: u32 = 2 * TICKS_PER_SECOND;
 /// The bipeds of a squad.
 const SQUAD: usize = 3;
-/// The squads, or sounds, of a row.
+/// The squads of a row.
 const ROW: usize = 4;
+/// The sounds of a row, how far apart they play, how far ahead the first
+/// row is, and how high.
+const SOUND_ROW: usize = 8;
+const SOUND_SPACING: f32 = 1.0;
+const SOUNDS_AHEAD: f32 = 3.0;
+const SOUND_UP: f32 = 1.0;
+/// How far ahead the sound scenery stands, in a row, and how far apart
+/// (devgulch's teleporter loop is heard only within 2.5 world units).
+const SCENERY_AHEAD: f32 = 1.0;
+const SCENERY_SPACING: f32 = 1.0;
+/// How near a voice plays to a sound scenery to be its.
+const SCENERY_NEAR: f32 = 0.5;
+/// The most times a sound that may be skipped is asked to play.
+const SOUND_TRIES: u32 = 32;
+/// How long the sound station listens.
+const LISTEN_TICKS: u32 = 2 * TICKS_PER_SECOND;
 /// How long what a station placed is labelled.
 const LABEL_TICKS: u32 = 10 * TICKS_PER_SECOND;
 
@@ -138,6 +157,7 @@ enum Drive {
     Physics(Physics),
     Particles(Particles),
     Huds(Huds),
+    Sounds(Sounds),
     /// Placed and labelled, measured as they were placed.
     Placed(Placed),
 }
@@ -156,6 +176,7 @@ impl Run {
             | Drive::Physics(_)
             | Drive::Particles(_)
             | Drive::Huds(_)
+            | Drive::Sounds(_)
             | Drive::Placed(_) => face(simulation, self.station.facing),
         })
     }
@@ -188,6 +209,7 @@ impl Run {
             Drive::Physics(physics) => physics.after_tick(simulation, &mut report),
             Drive::Particles(particles) => particles.after_tick(&mut report),
             Drive::Huds(huds) => huds.after_tick(simulation, &mut report),
+            Drive::Sounds(sounds) => sounds.after_tick(&mut report),
             Drive::Placed(placed) => placed.after_tick(&mut report),
         };
         if let Some(status) = report.status {
@@ -209,6 +231,14 @@ impl Run {
     ) {
         if let (false, Drive::Particles(station)) = (self.done, &mut self.drive) {
             station.after_effects(level, effects, particles);
+        }
+    }
+
+    /// After the frame's sounds: the sound station plays its sounds, and
+    /// sees what the player made of them.
+    pub(crate) fn after_sounds(&mut self, player: &mut SoundPlayer) {
+        if let (false, Drive::Sounds(station)) = (self.done, &mut self.drive) {
+            station.after_sounds(player);
         }
     }
 
@@ -322,7 +352,7 @@ pub(crate) fn command(state: &mut State, args: &Args) -> Result<Output, CommandE
         "particles" | "effects" => Drive::Particles(Particles::new(&level, station, &filter)),
         "hud" => Drive::Huds(Huds::new(&level, &filter)),
         "ai" => Drive::Placed(Placed::squads(simulation, &level, station, &filter)),
-        "sounds" => Drive::Placed(Placed::sounds(simulation, &level, station, &filter)),
+        "sounds" => Drive::Sounds(Sounds::new(simulation, &level, station, &filter)),
         "shaders" => Drive::Placed(Placed::shaders(simulation, &level, station, &filter)),
         _ => Drive::Physics(Physics::new(simulation, &level, station)),
     };
@@ -418,6 +448,7 @@ impl Drive {
             Drive::Physics(_) => CRATES,
             Drive::Particles(particles) => particles.effects.len(),
             Drive::Huds(huds) => huds.weapons.len(),
+            Drive::Sounds(sounds) => sounds.emitters.len() + sounds.scenery.len(),
             Drive::Placed(placed) => placed.results.len(),
         }
     }
@@ -444,6 +475,13 @@ impl Drive {
                 .weapons
                 .iter()
                 .map(|(weapon, _)| weapon.path.clone())
+                .collect(),
+            Drive::Sounds(sounds) => sounds
+                .emitters
+                .iter()
+                .map(|emitter| &emitter.sound)
+                .chain(sounds.scenery.iter().map(|scenery| &scenery.tag))
+                .map(|tag| tag.path.clone())
                 .collect(),
             Drive::Placed(placed) => placed.set.clone(),
         }
@@ -1415,6 +1453,250 @@ impl Huds {
     }
 }
 
+/// The sound station: a sound of each sound class the level has, each
+/// played once from a row ahead (nearer, within half its maximum
+/// distance, for one heard only near), and every sound scenery stood within
+/// hearing; what the player made of each, by its census.
+#[derive(Debug)]
+struct Sounds {
+    emitters: Vec<Emitter>,
+    scenery: Vec<Scenery>,
+    /// The classes with no sound that has anything to play.
+    unplayed: Vec<u16>,
+    labels: Vec<(Vec3, String)>,
+    /// The emitters have played.
+    played: bool,
+    /// The ticks since they played.
+    listened: u32,
+}
+
+/// A sound class's emitter.
+#[derive(Debug)]
+struct Emitter {
+    class: u16,
+    sound: TagRef,
+    at: Vec3,
+    /// Its sound plays every time it is asked; one that may be skipped is
+    /// asked again at full scale, up to [`SOUND_TRIES`] times.
+    plain: bool,
+    /// The times it was asked.
+    tries: u32,
+    /// The voice it played on.
+    voice: Option<VoiceId>,
+    /// Why it did not play: culled, failed, or not in the player's bank.
+    dropped: Option<&'static str>,
+    /// Its voice was counted under its class.
+    counted: bool,
+}
+
+/// A sound scenery stood within hearing.
+#[derive(Debug)]
+struct Scenery {
+    tag: TagRef,
+    at: Vec3,
+    /// A voice played where it stands.
+    heard: bool,
+}
+
+impl Sounds {
+    fn new(simulation: &mut Simulation, level: &Level, station: &Station, filter: &str) -> Sounds {
+        let mut classes: Vec<u16> = level.sounds.iter().map(|sound| sound.class).collect();
+        classes.sort_unstable();
+        classes.dedup();
+        let mut sounds = Sounds {
+            emitters: Vec::new(),
+            scenery: Vec::new(),
+            unplayed: Vec::new(),
+            labels: Vec::new(),
+            played: false,
+            listened: 0,
+        };
+        for class in classes {
+            let name = opence_audio::class(i32::from(class)).name;
+            let kept: Vec<_> = level
+                .sounds
+                .iter()
+                .filter(|sound| {
+                    sound.class == class
+                        && (name.contains(filter) || sound.tag.path.to_lowercase().contains(filter))
+                })
+                .collect();
+            if kept.is_empty() {
+                continue;
+            }
+            // (one that plays every time, else the least often skipped)
+            let plain = kept.iter().copied().find(|sound| plays_every_time(sound));
+            let Some(sound) = plain.or_else(|| {
+                kept.iter()
+                    .copied()
+                    .filter(|sound| has_samples(sound))
+                    .min_by(|a, b| a.skip_fraction.total_cmp(&b.skip_fraction))
+            }) else {
+                sounds.unplayed.push(class);
+                continue;
+            };
+            let at = sounds.emitters.len();
+            let ahead = SOUNDS_AHEAD + SOUND_SPACING * (at / SOUND_ROW) as f32;
+            let left = SOUND_SPACING * ((at % SOUND_ROW) as f32 - 0.5 * (SOUND_ROW - 1) as f32);
+            let row = spot(station, level, [ahead, left], SOUND_UP);
+            // (a sound heard only near, a first-person one, plays nearer)
+            let near = 0.5 * SoundPlayer::distances(sound)[1];
+            let player = spot(station, level, [0.0, 0.0], SOUND_UP);
+            let here = if row.distance(player) > near {
+                player + (row - player).normalize_or_zero() * near
+            } else {
+                row
+            };
+            sounds.labels.push((here, name.to_owned()));
+            sounds.emitters.push(Emitter {
+                class,
+                sound: sound.tag.clone(),
+                at: here,
+                plain: plain.is_some(),
+                tries: 0,
+                voice: None,
+                dropped: None,
+                counted: false,
+            });
+        }
+        let scenery = definitions(level, &[ObjectKind::SoundScenery], filter);
+        let count = scenery.len();
+        for (at, tag) in scenery.into_iter().enumerate() {
+            let left = SCENERY_SPACING * (at as f32 - 0.5 * count.saturating_sub(1) as f32);
+            let here = spot(station, level, [SCENERY_AHEAD, left], 0.5);
+            if let Some(handle) = place(simulation, level, &tag, here, station.facing) {
+                // (the object stands where the ground lets it)
+                let at = simulation
+                    .transform(handle)
+                    .map_or(here, |transform| transform.position);
+                sounds.labels.push((at + Vec3::Z, short(&tag).to_owned()));
+                sounds.scenery.push(Scenery {
+                    tag,
+                    at,
+                    heard: false,
+                });
+            }
+        }
+        sounds
+    }
+
+    fn after_sounds(&mut self, player: &mut SoundPlayer) {
+        if !self.played {
+            self.played = true;
+            for emitter in &mut self.emitters {
+                let Some(index) = player.sound_index(&emitter.sound.path) else {
+                    emitter.dropped = Some("not in the bank");
+                    continue;
+                };
+                // (a sound silent at no scale, an impact's say, is asked at
+                // full scale)
+                let source = opence_audio::Source {
+                    position: Some(emitter.at.to_array()),
+                    scale: if emitter.plain { 0.0 } else { 1.0 },
+                    ..opence_audio::Source::default()
+                };
+                let tries = if emitter.plain { 1 } else { SOUND_TRIES };
+                let mut before = dropped(player, emitter.class);
+                while emitter.voice.is_none() && emitter.tries < tries {
+                    before = dropped(player, emitter.class);
+                    emitter.tries += 1;
+                    emitter.voice = player.impulse(index, &source);
+                }
+                if emitter.voice.is_none() {
+                    let after = dropped(player, emitter.class);
+                    emitter.dropped = Some(if after[1] > before[1] {
+                        "failed"
+                    } else {
+                        "culled"
+                    });
+                }
+            }
+        }
+        let playing = player.census().playing();
+        for emitter in &mut self.emitters {
+            emitter.counted |= playing
+                .iter()
+                .any(|one| Some(one.voice) == emitter.voice && one.class == emitter.class);
+        }
+        for scenery in &mut self.scenery {
+            scenery.heard |= playing.iter().any(|one| {
+                one.position
+                    .is_some_and(|at| Vec3::from_array(at).distance(scenery.at) < SCENERY_NEAR)
+            });
+        }
+    }
+
+    fn after_tick(&mut self, report: &mut Report<'_>) -> bool {
+        for (at, text) in self.labels.drain(..) {
+            report.label(at, &text, LABEL_TICKS);
+        }
+        if !self.played {
+            return false;
+        }
+        self.listened = self.listened.saturating_add(1);
+        if self.listened < LISTEN_TICKS {
+            return false;
+        }
+        for emitter in &self.emitters {
+            report.results.push(json!({
+                "class": opence_audio::class(i32::from(emitter.class)).name,
+                "sound": emitter.sound.path,
+                "played": emitter.voice.is_some(),
+                "plain": emitter.plain,
+                "tries": emitter.tries,
+                "counted": emitter.counted,
+                "dropped": emitter.dropped,
+            }));
+        }
+        for &class in &self.unplayed {
+            report.results.push(json!({
+                "unplayed_class": opence_audio::class(i32::from(class)).name,
+            }));
+        }
+        for scenery in &self.scenery {
+            report.results.push(json!({
+                "sound_scenery": scenery.tag.path,
+                "heard": scenery.heard,
+            }));
+        }
+        true
+    }
+}
+
+/// A sound that plays whenever it is asked to: no skip fraction, no
+/// promotion, each pitch range with permutations, none of them skipped.
+fn plays_every_time(sound: &opence_content::Sound) -> bool {
+    sound.zero.gain > 0.0
+        && sound.skip_fraction == 0.0
+        && sound.promotion_count == 0
+        && has_samples(sound)
+        && sound.pitch_ranges.iter().all(|range| {
+            range
+                .permutations
+                .iter()
+                .all(|permutation| permutation.skip_fraction == 0.0)
+        })
+}
+
+/// A sound with something to play: each pitch range has permutations.
+fn has_samples(sound: &opence_content::Sound) -> bool {
+    !sound.pitch_ranges.is_empty()
+        && sound
+            .pitch_ranges
+            .iter()
+            .all(|range| !range.permutations.is_empty())
+}
+
+/// A class's sounds culled and failed so far.
+fn dropped(player: &mut SoundPlayer, class: u16) -> [u32; 2] {
+    player
+        .census()
+        .counts()
+        .iter()
+        .find(|count| count.class == class)
+        .map_or([0, 0], |count| [count.culled, count.failed])
+}
+
 /// A station whose set is placed when it starts and stands to be looked
 /// at: what each is is written over it, and its results are what was
 /// placed.
@@ -1458,27 +1740,6 @@ impl Placed {
                 let label = spot(station, level, [ahead, left], 2.5);
                 let result = json!({ "biped": tag.path, "squad": stood });
                 placed.add(tag, result, (label, short(tag).to_owned()));
-            }
-        }
-        placed
-    }
-
-    /// Every sound scenery, in rows ahead.
-    fn sounds(
-        simulation: &mut Simulation,
-        level: &Level,
-        station: &Station,
-        filter: &str,
-    ) -> Placed {
-        let mut placed = Placed::default();
-        for tag in definitions(level, &[ObjectKind::SoundScenery], filter) {
-            let at = placed.results.len();
-            let ahead = 4.0 + 3.0 * (at / ROW) as f32;
-            let left = 3.0 * ((at % ROW) as f32 - 0.5 * (ROW - 1) as f32);
-            let here = spot(station, level, [ahead, left], 0.5);
-            if place(simulation, level, &tag, here, station.facing).is_some() {
-                let result = json!({ "sound_scenery": tag.path });
-                placed.add(&tag, result, (here + Vec3::Z, short(&tag).to_owned()));
             }
         }
         placed
