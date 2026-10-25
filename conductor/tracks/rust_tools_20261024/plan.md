@@ -77,14 +77,14 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Performance' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 5: Nix tooling (after the crane packages build)
-- [ ] Task: Formatting and hooks (blocked: flake.nix and nix/ hold another session's uncommitted restructure)
-    - [ ] Write tests: `nix fmt` formats Rust, Swift, Nix and Python; the hook refuses an unformatted commit
-    - [ ] treefmt-nix, git-hooks.nix
-- [ ] Task: The shell (blocked, as above)
-    - [ ] nix-direnv's `.envrc`, nix-output-monitor in the shell
-- [ ] Task: The checks (blocked, as above)
-    - [ ] Write tests: `nix flake check` runs fmt, clippy, nextest, deny and llvm-cov and fails on each
-    - [ ] The crane checks
+- [x] Task: Formatting and hooks c1778fd5
+    - [x] Write tests: `nix fmt` formats Rust, Swift, Nix and Python; the hook refuses an unformatted commit
+    - [x] treefmt-nix, git-hooks.nix (the tree formatted once in 41e8fdba)
+- [x] Task: The shell e6395390
+    - [x] nix-direnv's `.envrc`, nix-output-monitor in the shell
+- [x] Task: The checks c52732aa
+    - [x] Write tests: `nix flake check` runs fmt, clippy, nextest, deny and llvm-cov and fails on each (the tests and coverage run as cargo test in the test-opt profile; nextest stays the suite's runner)
+    - [x] The crane checks
 - [x] Task: The report 9e1fc515
     - [x] Build, test, frame and load times before and after; crates adopted and declined, each with its measurement
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Nix tooling' (Protocol in workflow.md)
