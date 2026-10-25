@@ -6,7 +6,6 @@
 //! weapon, vehicle and device lists). Skipped without assets/maps.
 
 use std::error::Error;
-use std::path::Path;
 
 use opence_content::{AnimationGraph, AnimationKind};
 use opence_import::{import_animation_graph, Cache, GroupTag};
@@ -67,7 +66,7 @@ impl Sweep {
 
 #[test]
 fn every_listed_animation_resolves_on_every_map() -> Result<(), Box<dyn Error>> {
-    let maps = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps");
+    let maps = opence_import::testing::maps_folder();
     let Ok(entries) = std::fs::read_dir(&maps) else {
         return Ok(()); // (no game data here)
     };

@@ -30,8 +30,13 @@ fn sources(folder: &Path, found: &mut Vec<PathBuf>) {
 }
 
 fn main() {
+    // (OPENCE_ROOT for a copy of the workspace built outside the
+    // repository, as cargo-mutants builds one)
+    println!("cargo::rerun-if-env-changed=OPENCE_ROOT");
     let manifest = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap_or_default());
-    let repository = manifest.join("../../..");
+    let repository = std::env::var_os("OPENCE_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| manifest.join("../../.."));
     let jolt = repository.join("port/third_party/jolt");
     let wrapper = repository.join("port/macos/host/physics");
     let mut jolt_sources = Vec::new();

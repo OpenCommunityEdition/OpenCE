@@ -23,9 +23,17 @@ pub enum Held {
     Map,
 }
 
-/// The repository's root (the tests run from the checkout).
-fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
+/// The repository's root: `OPENCE_ROOT`, or the checkout the tests were
+/// built in.
+pub fn root() -> PathBuf {
+    root_from(env::var_os("OPENCE_ROOT"))
+}
+
+/// The root named by `variable` (`OPENCE_ROOT`'s value), or the checkout's.
+fn root_from(variable: Option<std::ffi::OsString>) -> PathBuf {
+    variable
+        .map(PathBuf::from)
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.."))
 }
 
 /// The user's maps: `assets/maps`.
@@ -159,6 +167,20 @@ mod tests {
         let (held, from) = held_or_panic(&map, &cache);
         assert_eq!(from, Held::Pack);
         assert_eq!(*held, written.level);
+    }
+
+    #[test]
+    fn opence_root_names_the_repository_when_set() {
+        // (cargo-mutants tests a copy of the workspace made outside the
+        // repository, which has no assets beside it)
+        assert_eq!(
+            root_from(Some("/elsewhere/OpenCE".into())),
+            PathBuf::from("/elsewhere/OpenCE")
+        );
+        assert_eq!(
+            root_from(None),
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
+        );
     }
 
     #[test]

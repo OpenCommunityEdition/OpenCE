@@ -3,7 +3,6 @@
 //! them (skipped where there is no game data).
 
 use std::error::Error;
-use std::path::Path;
 
 use opence_import::{import_scripts, Cache};
 use opence_script::{Missing, Registry, Runtime, World, TICKS_PER_SECOND};
@@ -14,7 +13,7 @@ impl World for Nothing {}
 
 #[test]
 fn the_pillar_of_autumns_scripts_run_without_their_functions() -> Result<(), Box<dyn Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/a10.map");
+    let path = opence_import::testing::maps_folder().join("a10.map");
     let Ok(file) = std::fs::read(&path) else {
         return Ok(()); // (no game data here)
     };

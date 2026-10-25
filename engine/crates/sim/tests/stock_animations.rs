@@ -4,7 +4,6 @@
 //! without assets/maps/bloodgulch.map.
 
 use std::error::Error;
-use std::path::Path;
 
 use opence_content::AnimationKind;
 use opence_import::{import_animation_graph, Cache, GroupTag};
@@ -14,7 +13,7 @@ use opence_sim::animation::{
 
 #[test]
 fn blood_gulchs_animations_pose_their_nodes() -> Result<(), Box<dyn Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/bloodgulch.map");
+    let path = opence_import::testing::maps_folder().join("bloodgulch.map");
     let Ok(file) = std::fs::read(&path) else {
         return Ok(()); // (no game data here)
     };
