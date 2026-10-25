@@ -31,6 +31,7 @@ libm = "0.2"
 # (the tests' snapshots of text, and their diffs)
 insta = { version = "1.43", default-features = false }
 pretty_assertions = "1.4"
+proptest = { version = "1.7", default-features = false, features = ["std"] }
 # (hash maps with a fixed seed: the same each run, unlike std's)
 rustc-hash = { version = "2.1", default-features = false, features = ["std"] }
 # (libm: its functions, not the platform's, for determinism)

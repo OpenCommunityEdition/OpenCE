@@ -18,4 +18,5 @@ workspace = true
 cc = { version = "1", features = ["parallel"] }
 
 [dev-dependencies]
+proptest.workspace = true
 opence_import.workspace = true

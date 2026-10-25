@@ -236,3 +236,25 @@ The failure is the Swift suite's, in two tests that are not this phase's:
   the user's to do (`build/engine/golden` to `assets/golden/engine`).
 - `ZZFarHillsTests` ("no cached bake") is another session's uncommitted
   scratch test.
+
+## Property tests (2026-10-25)
+
+proptest, with a fixed seed (`0x0CE0_0CE0`) and no failure files, so each
+run tries the same cases and a failure prints its smallest input:
+
+| crate | properties | cases |
+|---|---|---|
+| import (`src/properties.rs`) | a slice is the bytes it names or `OutOfRange` with its exact fields; reads at the end of the address space fail; a word is its little-endian bytes (u32, i32, f32 bits); text is printable, within its longest, and ends at its terminator | 512 each |
+| import | a pack gives back the level and header written to it (with arbitrary bitmap references); any archive byte changed is a `Fingerprint` error; a shortened or lengthened pack is refused | 64 each |
+| script (`tests/properties.rs`) | any text is run or refused; a line of the console's own words gives the same answer twice; 63 levels of nesting run and 64 are refused (`MAX_DEPTH`); a line past `MAX_TEXT` is refused | 1024 each |
+| physics (`tests/properties.rs`) | a sphere or box thrown at a wall at 1–60 units a second never crosses it or the floor in 120 ticks; a body dropped from up to 20 units with restitution 0–1 never gains energy (1% and 0.05 allowed) | 48 each |
+
+None found a fault. The first nesting test used `not`, which is a game
+function, not one of the console's forms, and was refused as an unknown
+function: the test now nests the console's own one-argument `and`.
+
+| check | result |
+|---|---|
+| clippy, three crates, `-D warnings` | clean |
+| cargo deny | ok (proptest and rand: MIT or Apache-2.0) |
+| nextest, all tests (`test-opt`) | 1042 passed, 3 skipped (212 s, beside a mutants run) |

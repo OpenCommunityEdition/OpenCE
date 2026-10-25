@@ -11,6 +11,7 @@ opence_content.workspace = true
 miniz_oxide.workspace = true
 
 [dev-dependencies]
+proptest.workspace = true
 insta.workspace = true
 pretty_assertions.workspace = true
 

@@ -34,6 +34,8 @@ pub mod weapon;
 mod fake;
 #[cfg(test)]
 mod fuzz_smoke;
+#[cfg(test)]
+mod properties;
 
 pub use cache::{Cache, CacheHeader, CacheKind};
 pub use campaign::import_campaign;
