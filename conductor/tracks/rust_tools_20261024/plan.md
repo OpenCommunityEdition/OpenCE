@@ -59,9 +59,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Formats' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 4: Performance
-- [ ] Task: tracing and benchmarks
-    - [ ] Write tests: spans nest and the JSON log parses; the benchmarks run
-    - [ ] `tracing` in place of `log`, `tracing-tracy` behind a feature, `divan` benchmarks for collision, the AI tick, animation blending and the bake
+- [x] Task: tracing and benchmarks d2a62812
+    - [x] Write tests: spans nest and the JSON log parses; the benchmarks run (dev/tests/tracing.rs; `cargo test --bench` runs each once)
+    - [x] `tracing` in place of `log`, `tracing-tracy` behind a feature, `divan` benchmarks for collision, the AI tick, animation blending and the bake (the log book is a layer; `OPENCE_LOG_JSON` adds the JSON log; the blend and AI benches need assets/maps)
 - [ ] Task: Allocation in the frame
     - [ ] Write tests: a counting allocator shows how many allocations a frame makes on devgulch, and the count goes down
     - [ ] mimalloc; bumpalo frame arenas; smallvec and arrayvec in the hot paths
