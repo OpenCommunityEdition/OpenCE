@@ -9,7 +9,7 @@
 //! from one to the next. A shadow's edge falling across texels smoothly
 //! has few hard steps; one drawn texel by texel has a row of them.
 
-use crate::chart::{Atlas, Chart, BakePoint, EMPTY};
+use crate::chart::{Atlas, BakePoint, Chart, EMPTY};
 use crate::mood::{brightness, shown, StockPage};
 use crate::output::{from_half, BakedPage};
 
@@ -87,12 +87,20 @@ struct Tally {
 impl Tally {
     /// Counts the pairs of a page `scale` times smaller each way than
     /// `chart`, whose light at a texel is `light`.
-    fn page(&mut self, atlas: &Atlas, chart: &Chart, scale: u32, light: impl Fn(u32, u32) -> Option<f32>) {
+    fn page(
+        &mut self,
+        atlas: &Atlas,
+        chart: &Chart,
+        scale: u32,
+        light: impl Fn(u32, u32) -> Option<f32>,
+    ) {
         let (width, height) = (chart.width / scale, chart.height / scale);
         let point = |x: u32, y: u32| -> Option<&BakePoint> {
             let middle = (y * scale + scale / 2) * chart.width + x * scale + scale / 2;
             let index = *chart.texels.get(middle as usize)?;
-            (index != EMPTY).then(|| atlas.points.get(index as usize)).flatten()
+            (index != EMPTY)
+                .then(|| atlas.points.get(index as usize))
+                .flatten()
         };
         for y in 0..height {
             for x in 0..width {
@@ -196,7 +204,9 @@ mod tests {
         let pi = core::f32::consts::PI;
         let stepped = EdgeSteps::baked(&atlas, &[page(&[pi, pi, pi, pi, 0.0, 0.0, 0.0, 0.0])]);
         assert_eq!((stepped.pairs, stepped.hard), (7, 1));
-        let ramp: Vec<f32> = (0..8).map(|x| pi * libm::powf(1.0 - x as f32 / 7.0, 2.2)).collect();
+        let ramp: Vec<f32> = (0..8)
+            .map(|x| pi * libm::powf(1.0 - x as f32 / 7.0, 2.2))
+            .collect();
         let smooth = EdgeSteps::baked(&atlas, &[page(&ramp)]);
         assert_eq!((smooth.pairs, smooth.hard), (7, 0));
         assert!(smooth.mean > 0.1 && smooth.mean < 0.2, "{smooth:?}");

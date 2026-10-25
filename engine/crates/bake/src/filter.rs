@@ -45,9 +45,10 @@ pub fn hold_fireflies(atlas: &Atlas, irradiance: &[[f32; 4]]) -> Vec<[f32; 4]> {
                         if other == EMPTY || other as usize == point || counted.contains(&other) {
                             continue;
                         }
-                        let (Some(near), Some(light)) =
-                            (atlas.points.get(other as usize), irradiance.get(other as usize))
-                        else {
+                        let (Some(near), Some(light)) = (
+                            atlas.points.get(other as usize),
+                            irradiance.get(other as usize),
+                        ) else {
                             continue;
                         };
                         if dot(near.normal, normal) < SAME_FACING {
@@ -70,7 +71,12 @@ pub fn hold_fireflies(atlas: &Atlas, irradiance: &[[f32; 4]]) -> Vec<[f32; 4]> {
                 let [r, g, b, a] = irradiance[point];
                 if !finite(irradiance[point]) {
                     let mean = colour.map(|channel| channel / count as f32);
-                    held[point] = [mean[0], mean[1], mean[2], if a.is_finite() { a } else { 1.0 }];
+                    held[point] = [
+                        mean[0],
+                        mean[1],
+                        mean[2],
+                        if a.is_finite() { a } else { 1.0 },
+                    ];
                     continue;
                 }
                 let limit = FIREFLY * sum / count as f32;
@@ -132,14 +138,23 @@ mod tests {
         let held = hold_fireflies(&atlas, &light);
         assert!((held[12][0] - FIREFLY).abs() < 1e-4, "{:?}", held[12]);
         assert_eq!(held[12][3], 0.5, "the occlusion is kept");
-        assert!(held.iter().enumerate().all(|(i, t)| i == 12 || *t == light[i]));
+        assert!(held
+            .iter()
+            .enumerate()
+            .all(|(i, t)| i == 12 || *t == light[i]));
     }
 
     #[test]
     fn a_bright_patch_is_kept() {
         let atlas = atlas(5, 5, &[UP; 25]);
         let light: Vec<[f32; 4]> = (0..25)
-            .map(|i| if i % 5 < 3 { [20.0, 20.0, 20.0, 1.0] } else { [1.0, 1.0, 1.0, 1.0] })
+            .map(|i| {
+                if i % 5 < 3 {
+                    [20.0, 20.0, 20.0, 1.0]
+                } else {
+                    [1.0, 1.0, 1.0, 1.0]
+                }
+            })
             .collect();
         assert_eq!(hold_fireflies(&atlas, &light), light);
     }
@@ -171,7 +186,11 @@ mod tests {
     #[test]
     fn a_non_finite_light_takes_its_neighbours_colour() {
         let atlas = atlas(3, 1, &[UP; 3]);
-        let light = vec![[1.0, 0.0, 0.0, 1.0], [f32::NAN, f32::INFINITY, 0.0, 1.0], [3.0, 0.0, 0.0, 1.0]];
+        let light = vec![
+            [1.0, 0.0, 0.0, 1.0],
+            [f32::NAN, f32::INFINITY, 0.0, 1.0],
+            [3.0, 0.0, 0.0, 1.0],
+        ];
         let held = hold_fireflies(&atlas, &light);
         assert_eq!(held[1], [2.0, 0.0, 0.0, 1.0]);
     }

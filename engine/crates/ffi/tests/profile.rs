@@ -102,8 +102,13 @@ fn frames_are_measured_and_traced() -> Result {
         .find(|scope| scope.name == "advance")
         .ok_or("no advance")?;
     assert_eq!(advance.depth, 0);
-    assert!(advance.milliseconds >= advance.own_milliseconds, "{advance:?}");
-    assert!(scopes.iter().any(|scope| scope.name == "tick" && scope.depth > 0));
+    assert!(
+        advance.milliseconds >= advance.own_milliseconds,
+        "{advance:?}"
+    );
+    assert!(scopes
+        .iter()
+        .any(|scope| scope.name == "tick" && scope.depth > 0));
     engine.measure_frames(false);
     assert!(engine.frame_scopes().is_empty());
     Ok(())

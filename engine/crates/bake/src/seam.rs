@@ -564,7 +564,11 @@ mod tests {
         let mut structure = cut_quad();
         let material = &mut structure.lightmaps[0].materials[0];
         material.vertices[5].position = [4.0, 4.0, 8.0];
-        let side = [core::f32::consts::FRAC_1_SQRT_2, -core::f32::consts::FRAC_1_SQRT_2, 0.0];
+        let side = [
+            core::f32::consts::FRAC_1_SQRT_2,
+            -core::f32::consts::FRAC_1_SQRT_2,
+            0.0,
+        ];
         for vertex in &mut material.vertices[3..] {
             vertex.normal = side;
         }
@@ -664,7 +668,10 @@ mod tests {
             texels,
         };
         let steps = stock_steps(&atlas, &seams, &[Some(stock)]);
-        assert!(steps[0].is_some_and(|step| (step - 1.0).abs() < 1e-4), "{steps:?}");
+        assert!(
+            steps[0].is_some_and(|step| (step - 1.0).abs() < 1e-4),
+            "{steps:?}"
+        );
         assert_eq!(stock_steps(&atlas, &seams, &[None]), vec![None]);
     }
 }

@@ -43,7 +43,13 @@ const MAX_PASSES: u32 = 8;
 
 /// What a ray meets: the hit, the point, the normal facing back along the
 /// ray, whether it met the front, and the material.
-type Met<'a> = (Hit, [f32; 3], [f32; 3], bool, &'a crate::scene::BakeMaterial);
+type Met<'a> = (
+    Hit,
+    [f32; 3],
+    [f32; 3],
+    bool,
+    &'a crate::scene::BakeMaterial,
+);
 
 /// The light arriving at a point, from the hemisphere about its normal.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -459,7 +465,10 @@ impl Tracer<'_> {
             travelled += hit.t;
             if let Some((glow, density)) = glow.as_mut() {
                 let cosine = dot(normal, ray.direction);
-                **glow = add(**glow, self.seen(material, travelled, cosine, front, *density));
+                **glow = add(
+                    **glow,
+                    self.seen(material, travelled, cosine, front, *density),
+                );
             }
             ray.origin = add(point, scale(ray.direction, SURFACE_OFFSET));
             ray.t_max -= hit.t;
@@ -774,7 +783,10 @@ mod tests {
             let h = (-x).clamp(-1.0, 1.0);
             let share = 0.5 + (h * (1.0 - h * h).sqrt() + libm::asinf(h)) / core::f32::consts::PI;
             let light = spread.irradiance[0];
-            assert!((light - 2.0 * share).abs() < 0.06, "{x}: {light} for {share}");
+            assert!(
+                (light - 2.0 * share).abs() < 0.06,
+                "{x}: {light} for {share}"
+            );
             assert!(light <= last + 0.04, "{x}: {light} after {last}");
             if light > 0.1 && light < 1.9 {
                 between += 1;
@@ -800,14 +812,20 @@ mod tests {
         for _ in 0..4096 {
             let start = tracer.spread([0.0; 3], [0.0, 0.0, 1.0], 1.0, &mut random);
             assert!(start[0] < 0.5, "{start:?}");
-            assert!(dot(start, start) <= SPREAD_RADIUS * SPREAD_RADIUS + 1e-4, "{start:?}");
+            assert!(
+                dot(start, start) <= SPREAD_RADIUS * SPREAD_RADIUS + 1e-4,
+                "{start:?}"
+            );
             assert_eq!(start[2], 0.0);
             nearest = nearest.min(0.5 - start[0]);
         }
         assert!(nearest < 0.06, "{nearest}");
         // (no footprint: the point itself, without a draw)
         let mut untouched = Random::new(11);
-        assert_eq!(tracer.spread([1.0; 3], [0.0, 0.0, 1.0], 0.0, &mut untouched), [1.0; 3]);
+        assert_eq!(
+            tracer.spread([1.0; 3], [0.0, 0.0, 1.0], 0.0, &mut untouched),
+            [1.0; 3]
+        );
         assert_eq!(untouched.next_u32(), Random::new(11).next_u32());
     }
 

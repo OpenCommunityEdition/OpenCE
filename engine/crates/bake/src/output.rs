@@ -175,7 +175,10 @@ impl BakePlan {
     /// The steps between neighbouring texels on `light`'s pages and on the
     /// stock pages.
     pub fn edges(&self, light: &BakedLighting) -> (EdgeSteps, EdgeSteps) {
-        (EdgeSteps::baked(&self.atlas, &light.pages), self.stock_edges)
+        (
+            EdgeSteps::baked(&self.atlas, &light.pages),
+            self.stock_edges,
+        )
     }
 
     /// The step in light across each seam on `light`'s pages and on the
