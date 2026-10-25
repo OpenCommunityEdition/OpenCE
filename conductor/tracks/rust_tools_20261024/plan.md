@@ -41,9 +41,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: Fuzz targets for every untrusted reader 5bd8f372
     - [x] Write tests: each target runs a short corpus in the test step
     - [x] Targets for the map, tag, sound and bitmap readers
-- [ ] Task: Golden frames
-    - [ ] Write tests (XCTest with swift-snapshot-testing): devgulch's stations rendered headless match their golden images within a tolerance
-    - [ ] The headless capture and the recorded images (made from the user's map, kept out of the repository)
+- [x] Task: Golden frames 79b59225
+    - [x] Write tests (XCTest, the tests' own capture and difference rather than swift-snapshot-testing): devgulch's stations rendered headless match their golden images within a tolerance
+    - [x] The headless capture and the recorded images (made from the user's map, kept out of the repository)
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Test strength' (Protocol in workflow.md)
 
 ## Phase 3: Formats
