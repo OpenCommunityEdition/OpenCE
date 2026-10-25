@@ -7,6 +7,7 @@ checkout's build/ and engine/target are left as they are. The steps:
   build_dev_cold      cargo build --workspace, from nothing
   build_dev_touch     the same after touching the sim (an edit's rebuild)
   build_tests         cargo test --workspace --no-run, after build_dev_cold
+                      (in --profile, test or test-opt)
   build_release_cold  the library the app links, release, from nothing
   suites              each test binary run on its own, one after another
   app                 tools/engine_build.py's app, then devgulch's load
@@ -92,6 +93,7 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=ROOT / "build" / "engine" / "timings.json")
     parser.add_argument("--only", help="comma-separated steps, of " + ", ".join(STEPS))
     parser.add_argument("--benchmark-seconds", type=float, default=20)
+    parser.add_argument("--profile", default="test", help="the cargo profile the tests are built in")
     arguments = parser.parse_args()
     steps = arguments.only.split(",") if arguments.only else list(STEPS)
     unknown = set(steps) - set(STEPS)
@@ -117,13 +119,15 @@ def main() -> None:
         (ENGINE / "crates" / "sim" / "src" / "lib.rs").touch()
         record("build_dev_touch", ["cargo", "build", "--locked", "--workspace"], dev, cold=False)
     if "build_tests" in steps:
-        record("build_tests", ["cargo", "test", "--locked", "--workspace", "--no-run"], dev, cold=False)
+        record("build_tests", ["cargo", "test", "--locked", "--workspace", "--profile", arguments.profile,
+                               "--no-run"], dev, cold=False)
     if "build_release_cold" in steps:
         record("build_release_cold", ["cargo", "build", "--locked", "--release", "-p", "opence_ffi", "--lib"],
                release, cold=True)
     if "suites" in steps:
         listing = subprocess.run(
-            ["cargo", "test", "--locked", "--workspace", "--no-run", "--message-format=json"],
+            ["cargo", "test", "--locked", "--workspace", "--profile", arguments.profile, "--no-run",
+             "--message-format=json"],
             cwd=ENGINE, env=environment | {"CARGO_TARGET_DIR": str(dev)},
             capture_output=True, text=True, check=True,
         )

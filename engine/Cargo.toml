@@ -54,3 +54,11 @@ debug = "line-tables-only"
 
 [profile.dev]
 panic = "abort"
+
+[profile.test-opt]
+# the game-data suites step the sim for minutes in a debug build; built
+# optimised, they keep the checks a debug build has
+inherits = "release"
+debug-assertions = true
+overflow-checks = true
+incremental = true

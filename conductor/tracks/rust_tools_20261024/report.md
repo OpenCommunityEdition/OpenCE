@@ -80,3 +80,38 @@ levels (`levels` and `actors` alone are 52%), which is the optimised test
 profile's task. The baseline's `scenarios` (8.3 s) was the script crate's:
 two crates have a suite of that name and one overwrote the other; the
 timings now name such suites by their crate, and campaign's takes 224.7 s.
+
+## The optimised test profile (2026-10-25)
+
+`[profile.test-opt]` builds the tests as release does, with debug
+assertions, overflow checks and incremental builds kept on
+(`sim/tests/checks.rs` fails if either check is off;
+`tools/test_cargo_profiles.py` checks the profile). All 92 suites pass
+under it, the reference traces included.
+
+| step | debug (`test`) | `test-opt` |
+|---|---|---|
+| test build, after the debug build | 38.8 s | 118.1 s |
+| test rebuild after touching the sim | 12 s | 7 s |
+| **the test suites** | **3184.1 s** | **290.8 s** |
+
+| suite | before | after |
+|---|---|---|
+| levels | 983.0 s | 55.0 s |
+| actors | 688.4 s | 47.0 s |
+| devgulch_stations | 218.6 s | 19.1 s |
+| stock_sounds | 200.0 s | 20.0 s |
+| stock_lightmaps | 143.6 s | 17.9 s |
+| placements | 89.9 s | 9.4 s |
+| campaign | 85.1 s | 10.9 s |
+| scripts | 84.1 s | 10.7 s |
+| animation_resolution | 83.0 s | 10.5 s |
+| opence_import (lib) | 70.6 s | 9.2 s |
+| stock_scenes | 46.1 s | 4.6 s |
+
+The cold build costs 80 s more once, and is then paid back on every run:
+a whole test run is now under seven minutes, where it was 53. The
+rebuild after an edit is faster too, as the optimised dependencies are
+built once and the workspace's crates rebuild incrementally. Release's
+`panic = "abort"` does not reach the tests (cargo builds test targets to
+unwind), so a failing test still reports as before.
