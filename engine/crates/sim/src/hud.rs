@@ -287,6 +287,39 @@ pub struct HudState {
     pub grenade: usize,
     /// The motion sensor's blips.
     pub blips: Vec<Blip>,
+    /// What the action button would do, as `hud_show_action_response`
+    /// tells the player.
+    pub prompt: Option<ActionPrompt>,
+}
+
+/// What the action button would do, the state message the HUD shows for
+/// it (as `player_examine_nearby_objects` sets the action result; the
+/// original never sets leaving a vehicle, so neither is it here).
+#[derive(Clone, Debug, PartialEq)]
+pub enum ActionPrompt {
+    /// Enter seat `seat` of the vehicle `vehicle`.
+    EnterVehicle {
+        /// The vehicle's tag.
+        vehicle: TagRef,
+        /// The seat.
+        seat: usize,
+    },
+    /// Turn the vehicle `vehicle` back over.
+    FlipVehicle {
+        /// The vehicle's tag.
+        vehicle: TagRef,
+    },
+    /// Swap the weapon in its hands for `weapon`.
+    SwapWeapon {
+        /// The weapon's tag.
+        weapon: TagRef,
+    },
+    /// Its weapon is empty: switch to `weapon`, the next it carries that
+    /// is not.
+    RemindToSwitch {
+        /// The weapon's tag.
+        weapon: TagRef,
+    },
 }
 
 /// A magazine's count.

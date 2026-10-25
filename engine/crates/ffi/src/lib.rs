@@ -19,6 +19,7 @@ pub mod devtools;
 mod dynamic_decals;
 mod effects;
 pub mod hud;
+pub mod hud_text;
 pub mod lights;
 pub mod loading;
 pub mod network;
@@ -822,6 +823,9 @@ pub struct Engine {
     control: Arc<control::Control>,
     /// The level's sounds (locked alone, by the app's audio thread too).
     audio: audio::SharedPlayer,
+    /// The glyphs of the running level's fonts, as the menus' atlas of it
+    /// has them (locked alone).
+    glyphs: Mutex<Option<(Arc<opence_content::Level>, Arc<ui::GlyphAtlas>)>>,
 }
 
 impl Drop for Engine {
@@ -851,6 +855,7 @@ impl Engine {
             snapshots: Arc::new(buffers),
             control: Arc::default(),
             audio,
+            glyphs: Mutex::default(),
         })
     }
 
@@ -1233,6 +1238,43 @@ impl Engine {
         let seconds =
             running.simulation.tick().0 as f32 / opence_sim::clock::TICKS_PER_SECOND as f32;
         hud::hud_quads(level, &readout, width, height, seconds)
+    }
+
+    /// The HUD's state message to draw over a window `width` by `height`
+    /// pixels, its controls written as `keys` (see
+    /// [`hud_text::prompt_text`]); its glyphs are those of the atlas a
+    /// [`ui::Menu`] of the running level makes. Nothing without a prompt.
+    pub fn hud_text(&self, width: u32, height: u32, keys: Vec<String>) -> hud_text::HudText {
+        let (level, prompt, seconds) = {
+            let state = self.lock();
+            let Some(running) = &state.running else {
+                return hud_text::HudText::default();
+            };
+            let (Some(level), Some(prompt)) = (
+                &running.level,
+                running.simulation.hud().and_then(|readout| readout.prompt),
+            ) else {
+                return hud_text::HudText::default();
+            };
+            let seconds =
+                running.simulation.tick().0 as f32 / opence_sim::clock::TICKS_PER_SECOND as f32;
+            (Arc::clone(level), prompt, seconds)
+        };
+        let atlas = {
+            let mut glyphs = self
+                .glyphs
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            match &*glyphs {
+                Some((built, atlas)) if Arc::ptr_eq(built, &level) => Arc::clone(atlas),
+                _ => {
+                    let atlas = Arc::new(ui::GlyphAtlas::build(&level));
+                    *glyphs = Some((Arc::clone(&level), Arc::clone(&atlas)));
+                    atlas
+                }
+            }
+        };
+        hud_text::prompt_text(&level, &atlas, &prompt, &keys, [width, height], seconds)
     }
 
     /// What the camera sees of lights from `camera` this frame: the lens

@@ -410,6 +410,7 @@ pub(crate) mod tests {
             bounding_offset: [0.0, 0.0, 0.1],
             acceleration_scale: 1.0,
             render_bounding_radius: 0.25,
+            icon_text_index: -1,
             model: None,
             animation_graph: None,
             collision_model: None,

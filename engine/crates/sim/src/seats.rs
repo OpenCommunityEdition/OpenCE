@@ -676,6 +676,38 @@ impl Rides {
         best.map(|(index, seat, ..)| (index, seat))
     }
 
+    /// What the action button would do for a player on foot, as `act`
+    /// decides it without doing it: enter the nearest seat it can, of a
+    /// vehicle upright and still that it stands still by, or turn over
+    /// one lying over that no one drives.
+    pub(crate) fn prompt(
+        &self,
+        world: &World,
+        player: &Player,
+        taken: &[Seated],
+    ) -> Option<crate::hud::ActionPrompt> {
+        if player.seated().is_some() {
+            return None;
+        }
+        let centre = player.mover().position + player.pose().body.rotation * self.centre;
+        let (index, seat) = self.nearby_seat(world, centre, taken)?;
+        let ride = self.rides.get(index)?;
+        let kind = self.kinds.get(ride.kind)?;
+        let vehicle = kind.tag.clone();
+        if !ride.state.enterable(self.flipping_angle) {
+            let driven = taken.iter().any(|seated| {
+                seated.vehicle == ride.handle && seated.flags & VehicleSeat::DRIVER != 0
+            });
+            return (!driven && ride.state.upending.is_none())
+                .then_some(crate::hud::ActionPrompt::FlipVehicle { vehicle });
+        }
+        let speed =
+            player.mover().velocity.truncate().extend(0.0) / vehicle::GAME_TICKS_PER_SECOND as f32;
+        (speed.length_squared() < ENTRY_STILLNESS
+            && ride.state.angular_velocity.length_squared() < ENTRY_STILLNESS)
+            .then_some(crate::hud::ActionPrompt::EnterVehicle { vehicle, seat })
+    }
+
     /// With the action button pressed, the player leaves its seat by its
     /// entrance, or enters the nearest it can; whether it did either.
     pub(crate) fn act(

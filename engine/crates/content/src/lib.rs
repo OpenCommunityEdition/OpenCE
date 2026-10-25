@@ -33,9 +33,10 @@ pub use campaign::{
 };
 pub use decal::{Decal, LevelDecal};
 pub use hud::{
-    CrosshairItem, CrosshairKind, GrenadeHud, HudAnchor, HudDigits, HudGlobals, HudMeter,
-    HudNumber, HudPlacement, HudStatic, UnitHud, WeaponHud, WeaponHudCrosshair, WeaponHudElement,
-    WeaponHudMeter, WeaponHudNumber, WeaponHudState, WeaponHudStatic,
+    CrosshairItem, CrosshairKind, GrenadeHud, HudAnchor, HudDigits, HudGlobals, HudIcon,
+    HudMessageElement, HudMessaging, HudMeter, HudNumber, HudPlacement, HudStateMessage, HudStatic,
+    UnitHud, WeaponHud, WeaponHudCrosshair, WeaponHudElement, WeaponHudMeter, WeaponHudNumber,
+    WeaponHudState, WeaponHudStatic,
 };
 pub use lens::{
     Glow, LensFlare, LensFlareMarker, LensFlareReflection, LightVolume, LightVolumeFrame,

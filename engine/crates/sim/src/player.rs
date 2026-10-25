@@ -10,7 +10,7 @@
 
 use bevy_ecs::prelude::*;
 use glam::{Quat, Vec2, Vec3};
-use opence_content::{Biped, Level, ObjectKind, TagRef, Weapon};
+use opence_content::{Biped, Level, ObjectKind, TagRef, VehicleSeat, Weapon};
 use opence_physics::{
     Hit, Landing, Layers, LevelMesh, MovementInput, Mover, MoverSettings, PhysicsError, Struck,
     World as PhysicsWorld, WorldSettings,
@@ -1187,6 +1187,66 @@ impl Player {
         if let Some(dropped) = dropped {
             self.drop_weapon(world, dropped);
         }
+    }
+
+    /// The weapon the action button would swap for the one in its hands,
+    /// as `pick_up` would choose it: the nearest within reach that it
+    /// does not carry, its hands being full (with a hand free, it takes
+    /// one without asking).
+    pub(crate) fn swap_offer(&self, world: &mut World) -> Option<TagRef> {
+        if self.seat.is_some() || self.inventory.weapons.len() < armory::MAXIMUM_WEAPONS {
+            return None;
+        }
+        let feet = self.mover.position;
+        let mut near: Vec<(f32, ObjectHandle, usize)> = world
+            .query::<(&ObjectHandle, &Transform, &Object)>()
+            .iter(world)
+            .filter(|(_, _, object)| object.kind == ObjectKind::Weapon)
+            .filter_map(|(handle, transform, object)| {
+                let distance = transform.position.distance(feet);
+                let index = self.armory.find(&object.tag)?;
+                (distance <= armory::PICKUP_RADIUS && !self.inventory.carries(index))
+                    .then_some((distance, *handle, index))
+            })
+            .collect();
+        near.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        let (_, _, index) = near.first()?;
+        Some(self.armory.get(*index)?.tag.clone())
+    }
+
+    /// The weapon the HUD reminds the player to switch to: when the one in
+    /// its hands is spent and it is not driving or gunning, the next it
+    /// carries, after the one in its hands, that is not.
+    pub(crate) fn switch_reminder(&self) -> Option<TagRef> {
+        if self
+            .seat
+            .is_some_and(|seat| seat.flags & (VehicleSeat::DRIVER | VehicleSeat::GUNNER) != 0)
+        {
+            return None;
+        }
+        let spent = |state: &WeaponState| {
+            if state.magazines.is_empty() {
+                state.age >= 1.0
+            } else {
+                state
+                    .magazines
+                    .iter()
+                    .all(|magazine| magazine.loaded <= 0 && magazine.total <= 0)
+            }
+        };
+        let weapons = &self.inventory.weapons;
+        let current = self.inventory.current;
+        if !weapons
+            .get(current)
+            .is_some_and(|carried| spent(&carried.state))
+        {
+            return None;
+        }
+        let next = (1..weapons.len())
+            .map(|step| (current + step) % weapons.len())
+            .filter_map(|index| weapons.get(index))
+            .find(|carried| !spent(&carried.state))?;
+        Some(self.armory.get(next.armory)?.tag.clone())
     }
 
     /// Puts a weapon down at its feet, keeping its rounds.

@@ -351,6 +351,9 @@ pub struct WeaponHud {
     pub numbers: Vec<WeaponHudNumber>,
     /// Its crosshairs.
     pub crosshairs: Vec<WeaponHudCrosshair>,
+    /// Its picture in the HUD's messages ("swap for the ..."); none when
+    /// its weapon's name is written instead.
+    pub messaging_icon: Option<HudIcon>,
 }
 
 /// A grenade's HUD: its picture and how many the player has.
@@ -407,4 +410,77 @@ pub struct HudGlobals {
     pub motion_sensor_scale: f32,
     /// How large the HUD is drawn in multiplayer.
     pub multiplayer_scale: f32,
+    /// The state messages ("hold E to enter the Warthog").
+    pub messaging: HudMessaging,
+}
+
+/// A picture in the HUD's messages: a sequence of the messaging icons'
+/// bitmap, or a line of the alternate icon text.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct HudIcon {
+    /// Its sequence of the messaging icons (none: -1).
+    pub sequence: i16,
+    /// How much wider than its picture it is, in HUD pixels.
+    pub width_offset: i16,
+    /// Where it is drawn from the text's cursor, in HUD pixels.
+    pub offset: [i16; 2],
+    /// Its colour, 0xAARRGGBB.
+    pub color: u32,
+    /// How fast its frames turn.
+    pub frame_rate: i8,
+    /// Its flags ([`HudIcon::USE_TEXT`] and the rest).
+    pub flags: u8,
+    /// Its line of the alternate icon text, for [`HudIcon::USE_TEXT`].
+    pub text_index: i16,
+}
+
+impl HudIcon {
+    /// It is written as its line of the alternate icon text.
+    pub const USE_TEXT: u8 = 1 << 0;
+    /// It is drawn in its own colour, not the message's.
+    pub const USE_COLOR: u8 = 1 << 1;
+    /// Its width is its width offset alone.
+    pub const ABSOLUTE_WIDTH: u8 = 1 << 2;
+}
+
+/// How the HUD's state messages are drawn, and what they say.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct HudMessaging {
+    /// The corner they keep to.
+    pub anchor: HudAnchor,
+    /// Where they are drawn from it.
+    pub placement: HudPlacement,
+    /// Their font.
+    pub font: Option<TagRef>,
+    /// Their colour, 0xAARRGGBB.
+    pub color: u32,
+    /// The bitmap their pictures are drawn from.
+    pub icons: Option<TagRef>,
+    /// The names their pictures are written as (`ustr`).
+    pub alternate_icon_text: Option<TagRef>,
+    /// The buttons' pictures, by button (the original's 18).
+    pub button_icons: Vec<HudIcon>,
+    /// The messages (`hmt `), by the original's message index.
+    pub messages: Vec<HudStateMessage>,
+}
+
+/// One of the HUD's state messages.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub struct HudStateMessage {
+    /// Its name ("enter_vehicle").
+    pub name: String,
+    /// Its pieces, in order.
+    pub elements: Vec<HudMessageElement>,
+}
+
+/// A piece of a state message.
+#[derive(Clone, Debug, PartialEq, Archive, Serialize, Deserialize)]
+pub enum HudMessageElement {
+    /// Text, as it is written.
+    Text(String),
+    /// A picture: a button (0 to 17), a control (18 to 31: action, throw
+    /// grenade, fire, flashlight, jump, equipment, swap weapons, swap
+    /// grenades, crouch, zoom, accept, back, move, look) or one of the
+    /// message's own (32 to 39).
+    Icon(u8),
 }

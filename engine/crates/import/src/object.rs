@@ -297,6 +297,7 @@ pub fn import_object(cache: &Cache, index: usize) -> Result<ObjectDefinition, Im
         bounding_offset: vector(&object, 0x08, "bounding offset")?,
         acceleration_scale: object.f32(0x20, "acceleration scale")?,
         render_bounding_radius: object.f32(0x104, "render bounding radius")?,
+        icon_text_index: object.i16(0x13C, "icon text index")?,
         model: reference(&object, 0x28, "model", &models)?,
         animation_graph: reference(&object, 0x38, "animation graph", &[ANTR])?,
         collision_model: reference(&object, 0x70, "collision model", &[COLL])?,

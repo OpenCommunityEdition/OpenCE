@@ -60,6 +60,17 @@ func hudFolder() -> URL? {
     }
 }
 
+/// The pass of `geometry`'s glyphs, for the HUD's messages (a menu opened
+/// makes its own over it), or nil (logged).
+func messagePass(device: MTLDevice, geometry: LevelGeometry) -> UiPass? {
+    do {
+        return try UiPass(device: device, atlas: Menu(geometry: geometry).glyphAtlas(), outputFormat: .bgra8Unorm)
+    } catch {
+        FileHandle.standardError.write(Data("OpenCE Engine: the messages' pass: \(error)\n".utf8))
+        return nil
+    }
+}
+
 /// The HUD's pass for `device`, or nil (logged) without its redraws.
 func hudPass(device: MTLDevice) -> HudPass? {
     do {
@@ -505,6 +516,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let switched = try LoadedLevel(map: level.map, bsp: bsp, cacheFolder: cacheFolder(), device: device,
                                        settings: settings)
         switched.renderer.hud = hud
+        switched.renderer.ui = level.renderer.ui
         self.level = switched
     }
 
@@ -671,6 +683,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hud = hudPass(device: device)
         }
         loaded.renderer.hud = hud
+        loaded.renderer.ui = messagePass(device: device, geometry: loaded.geometry)
         try engine.startCampaign(geometry: loaded.geometry, difficultyLevel: difficulty)
         lastCampaign = (map, difficulty)
         thirdPerson = false
@@ -688,6 +701,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let switched = try LoadedLevel(map: level.map, bsp: UInt32(state.bsp), cacheFolder: cacheFolder(),
                                            device: device, settings: settings)
             switched.renderer.hud = hud
+            switched.renderer.ui = level.renderer.ui
             self.level = switched
         } catch {
             fail("\(level.map) structure \(state.bsp): \(error)")
@@ -705,6 +719,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hud = hudPass(device: device)
         }
         loaded.renderer.hud = hud
+        loaded.renderer.ui = messagePass(device: device, geometry: loaded.geometry)
         // (the scenario's objects, at Normal, standing still)
         _ = try engine.startLevel(geometry: loaded.geometry, difficulty: 1)
         let audio = saved.settings.audio
@@ -932,9 +947,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         renderer.sprites = engine.cameraSprites(camera: camera.spriteCamera, flares: renderer.switches.lensFlares,
                                                 widgets: renderer.switches.glows)
         let objects = profiled("objects", engine) { frame.drawnObjects() }
-        let hudQuads = profiled("hud", engine) { engine.hud(width: UInt32(width), height: UInt32(height)) }
+        var hudQuads = profiled("hud", engine) { engine.hud(width: UInt32(width), height: UInt32(height)) }
         let debugLines = frame.debugSegments()
-        let uiQuads = profiled("ui", engine) { menu.menu?.draw(width: UInt32(width), height: UInt32(height)) ?? [] }
+        var uiQuads = profiled("ui", engine) { menu.menu?.draw(width: UInt32(width), height: UInt32(height)) ?? [] }
+        // (the HUD's message: its words with the menus' glyphs, its pictures with the HUD)
+        if !menu.isOpen, !inShellScene {
+            let message = profiled("message", engine) {
+                engine.hudText(width: UInt32(width), height: UInt32(height), keys: play.bindings.promptKeys)
+            }
+            uiQuads += message.glyphs
+            hudQuads += message.icons
+        }
         // (the labels under the shell)
         var labels: [TextItem] = []
         if let textPass, frame.debugLabels.count > 0 {

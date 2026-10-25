@@ -157,6 +157,7 @@ fn import_seat(seat: &Element<'_>) -> Result<VehicleSeat, ImportError> {
         yaw_minimum: seat.f32(0xF0, "yaw minimum")?,
         yaw_maximum: seat.f32(0xF4, "yaw maximum")?,
         built_in_actor: reference(seat, 0xF8, "built-in actor", &[ACTV])?,
+        icon_text_index: seat.i16(0xEC, "icon text index")?,
     })
 }
 

@@ -550,6 +550,7 @@ mod tests {
             bounding_offset: offset,
             acceleration_scale: 1.0,
             render_bounding_radius: radius,
+            icon_text_index: -1,
             model: None,
             animation_graph: None,
             collision_model: None,

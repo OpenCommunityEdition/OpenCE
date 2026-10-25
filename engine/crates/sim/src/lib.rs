@@ -186,6 +186,8 @@ pub struct Simulation {
     sensor: hud::MotionSensor,
     /// Its settings, from the level's HUD globals.
     sensor_settings: Option<hud::SensorSettings>,
+    /// What the local player's action button would do, this tick.
+    prompt: Option<hud::ActionPrompt>,
     /// The player's first-person weapon and hands (shown, not the
     /// world's state).
     first_person: first_person::FirstPersonWeapon,
@@ -291,6 +293,7 @@ impl Simulation {
             damage: Vec::new(),
             sensor: hud::MotionSensor::default(),
             sensor_settings: None,
+            prompt: None,
             first_person: first_person::FirstPersonWeapon::default(),
             ragdolls: ragdoll::Ragdolls::default(),
             debris: debris::Debris::default(),
@@ -381,6 +384,23 @@ impl Simulation {
                 .buttons
                 .pressed(player.held_buttons(), Buttons::FLASHLIGHT);
             step_flashlight(&mut self.world, player, flashlight);
+            if index == 0 {
+                // (as `hud_show_action_response` shows the action result:
+                // a vehicle, then a weapon, else the reminder to switch)
+                self.prompt = self
+                    .rides
+                    .prompt(&self.world, player, &taken)
+                    .or_else(|| {
+                        player
+                            .swap_offer(&mut self.world)
+                            .map(|weapon| hud::ActionPrompt::SwapWeapon { weapon })
+                    })
+                    .or_else(|| {
+                        player
+                            .switch_reminder()
+                            .map(|weapon| hud::ActionPrompt::RemindToSwitch { weapon })
+                    });
+            }
             let seated = self.rides.act(&self.world, player, &taken, action);
             actions.push(action && !seated);
         }
@@ -1103,6 +1123,7 @@ impl Simulation {
                 .sensor_settings
                 .map(|settings| self.sensor.blips(yaw.0, &settings))
                 .unwrap_or_default(),
+            prompt: self.prompt.clone(),
         })
     }
 

@@ -6,7 +6,7 @@
 use std::error::Error;
 use std::path::Path;
 
-use opence_content::{HudAnchor, Level};
+use opence_content::{HudAnchor, HudMessageElement, Level};
 use opence_import::{import_level, Cache};
 
 fn bloodgulch() -> Result<Option<Level>, Box<dyn Error>> {
@@ -67,5 +67,57 @@ fn bloodgulch_imports_its_hud() -> Result<(), Box<dyn Error>> {
             assert!(level.models.iter().any(|imported| &imported.tag == model));
         }
     }
+    Ok(())
+}
+
+#[test]
+fn bloodgulch_imports_the_huds_state_messages() -> Result<(), Box<dyn Error>> {
+    let Some(level) = bloodgulch()? else {
+        return Ok(());
+    };
+    let globals = level.hud_globals.as_ref().ok_or("no hud globals")?;
+    let messaging = &globals.messaging;
+    println!(
+        "messaging: {:?} {:?} {:08x}",
+        messaging.anchor, messaging.placement, messaging.color
+    );
+    for (index, message) in messaging.messages.iter().enumerate().take(10) {
+        println!("{index} {}: {:?}", message.name, message.elements);
+    }
+    assert!(messaging.font.is_some(), "the messages have no font");
+    assert!(messaging.alternate_icon_text.is_some());
+    assert_eq!(messaging.button_icons.len(), 18);
+    let enter = messaging.messages.get(6).ok_or("no enter_vehicle")?;
+    assert_eq!(enter.name, "enter_vehicle");
+    // "Press <action> to enter <the seat's name> seat of <the vehicle's>":
+    // its text around the action button and the two custom pictures.
+    let has = |piece: &HudMessageElement| enter.elements.contains(piece);
+    assert!(has(&HudMessageElement::Icon(18)), "{:?}", enter.elements);
+    assert!(has(&HudMessageElement::Icon(32)) && has(&HudMessageElement::Icon(33)));
+    assert!(enter
+        .elements
+        .iter()
+        .any(|piece| matches!(piece, HudMessageElement::Text(text) if !text.trim().is_empty())));
+
+    let names = level
+        .ui
+        .string_lists
+        .iter()
+        .find(|list| Some(&list.tag) == messaging.alternate_icon_text.as_ref())
+        .ok_or("the alternate icon text is not imported")?;
+    let warthog = level
+        .objects
+        .iter()
+        .find(|object| object.vehicle.is_some() && object.tag.path.contains("warthog"))
+        .ok_or("no warthog")?;
+    let seat = &warthog.vehicle.as_ref().ok_or("not a vehicle")?.seats[0];
+    let name = |index: i16| {
+        usize::try_from(index)
+            .ok()
+            .and_then(|index| names.strings.get(index))
+            .cloned()
+    };
+    assert_eq!(name(warthog.icon_text_index).as_deref(), Some("Warthog"));
+    assert_eq!(name(seat.icon_text_index).as_deref(), Some("driver"));
     Ok(())
 }

@@ -11,6 +11,7 @@ use std::sync::Arc;
 use opence_content::{Level, ObjectKind, VehicleSeat};
 use opence_import::{import_level, Cache};
 use opence_sim::animation::{self, AnimationPlayer};
+use opence_sim::hud::ActionPrompt;
 use opence_sim::input::{Buttons, TickInput};
 use opence_sim::objects::{ObjectHandle, ObjectSpawn};
 use opence_sim::player::View;
@@ -528,5 +529,62 @@ fn the_driver_sees_from_behind_the_warthog_along_its_camera_track() -> Result {
     let eyes = player.mover().position;
     assert!(simulation.camera().transform.position.distance(eyes) < 1.0);
     assert!(!simulation.first_person().models().is_empty(), "no weapon");
+    Ok(())
+}
+
+#[test]
+fn the_hud_prompts_entering_by_a_warthog_and_flipping_one_lying_over() -> Result {
+    let Some(level) = bloodgulch()? else {
+        return Ok(());
+    };
+    let flags = seat_flags(&level)?;
+    let driver = seat_with(&flags, VehicleSeat::DRIVER, 0)?;
+    let prompt = |simulation: &Simulation| simulation.hud().and_then(|hud| hud.prompt);
+    let (mut simulation, warthog) = beside_a_warthog(&level)?;
+    // (5 units off, nothing is offered)
+    assert_eq!(prompt(&simulation), None);
+    if !walk_to(&mut simulation, |simulation| {
+        simulation.rides().entrance(warthog, driver)
+    }) {
+        return Err("never reached the driver's entrance".into());
+    }
+    simulation.step(TickInput::default());
+    match prompt(&simulation) {
+        Some(ActionPrompt::EnterVehicle { vehicle, seat }) => {
+            assert!(vehicle.path.eq_ignore_ascii_case(WARTHOG), "{vehicle:?}");
+            assert_eq!(seat, driver);
+        }
+        other => return Err(format!("by the driver's seat, {other:?}").into()),
+    }
+    // (seated, it is offered nothing: the original never offers leaving)
+    simulation.step(pressed(Buttons::ACTION));
+    simulation.step(TickInput::default());
+    assert_eq!(seated(&simulation), Some(driver));
+    assert_eq!(prompt(&simulation), None);
+
+    let (mut simulation, warthog) = warthog_rolled(&level, std::f32::consts::PI)?;
+    let beside = |simulation: &Simulation| {
+        let entrance = simulation.rides().entrance(warthog, driver)?;
+        let centre = simulation.transform(warthog)?.position;
+        let out = (entrance - centre).truncate().normalize_or_zero();
+        Some(entrance + out.extend(0.0) * 0.6)
+    };
+    if !walk_to(&mut simulation, beside) {
+        return Err("never reached the driver's door".into());
+    }
+    simulation.step(TickInput::default());
+    assert!(
+        matches!(prompt(&simulation), Some(ActionPrompt::FlipVehicle { .. })),
+        "lying over, {:?}",
+        prompt(&simulation)
+    );
+    // (being turned over, it is offered no longer)
+    simulation.step(pressed(Buttons::ACTION));
+    simulation.step(TickInput::default());
+    assert!(
+        !matches!(prompt(&simulation), Some(ActionPrompt::FlipVehicle { .. })),
+        "upending, {:?}",
+        prompt(&simulation)
+    );
     Ok(())
 }

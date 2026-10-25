@@ -8,9 +8,10 @@
 use std::collections::BTreeMap;
 
 use opence_content::{
-    CrosshairItem, CrosshairKind, Globals, GrenadeHud, HudAnchor, HudDigits, HudGlobals, HudMeter,
-    HudNumber, HudPlacement, HudStatic, ObjectDefinition, TagRef, UnitHud, WeaponHud,
-    WeaponHudCrosshair, WeaponHudElement, WeaponHudMeter, WeaponHudNumber, WeaponHudStatic,
+    CrosshairItem, CrosshairKind, Globals, GrenadeHud, HudAnchor, HudDigits, HudGlobals, HudIcon,
+    HudMessageElement, HudMessaging, HudMeter, HudNumber, HudPlacement, HudStateMessage, HudStatic,
+    ObjectDefinition, TagRef, UnitHud, WeaponHud, WeaponHudCrosshair, WeaponHudElement,
+    WeaponHudMeter, WeaponHudNumber, WeaponHudStatic,
 };
 
 use crate::cache::Cache;
@@ -23,6 +24,9 @@ const WPHI: GroupTag = GroupTag::new(b"wphi");
 const GRHI: GroupTag = GroupTag::new(b"grhi");
 const HUD_DIGITS: GroupTag = GroupTag::new(b"hud#");
 const HUDG: GroupTag = GroupTag::new(b"hudg");
+const HMT: GroupTag = GroupTag::new(b"hmt ");
+const FONT: GroupTag = GroupTag::new(b"font");
+const USTR: GroupTag = GroupTag::new(b"ustr");
 
 const UNIT_HUD_SIZE: usize = 0x56C;
 const WEAPON_HUD_SIZE: usize = 0x17C;
@@ -31,6 +35,16 @@ const HUD_DIGITS_SIZE: usize = 0x64;
 /// As much of the HUD globals as the engine reads (to the motion
 /// sensor's scale).
 const HUD_GLOBALS_SIZE: usize = 0x2DC;
+const HUD_MESSAGE_TEXT_SIZE: usize = 0x80;
+const HUD_ICON_SIZE: usize = 0x10;
+const HUD_MESSAGE_ELEMENT_SIZE: usize = 2;
+const HUD_MESSAGE_SIZE: usize = 0x40;
+/// The most button icons, message pieces and messages there may be, and
+/// the longest the messages' text may be, in bytes.
+const MAX_BUTTON_ICONS: usize = 18;
+const MAX_MESSAGE_ELEMENTS: usize = 8192;
+const MAX_MESSAGES: usize = 1024;
+const MAX_MESSAGE_TEXT: usize = 0x20000;
 
 const WEAPON_STATIC_SIZE: usize = 0xB4;
 const WEAPON_METER_SIZE: usize = 0xB4;
@@ -72,7 +86,7 @@ pub(crate) fn import_huds(
     };
 
     if let Some((tag, index)) = present(&globals.hud_globals) {
-        huds.hud_globals = Some(import_hud_globals(cache, index, tag)?);
+        huds.hud_globals = Some(import_hud_globals(cache, index, tag, reached)?);
     }
     if let Some((tag, index)) = present(&globals.hud_digits) {
         huds.hud_digits = Some(import_hud_digits(cache, index, tag, reached)?);
@@ -319,6 +333,7 @@ fn import_weapon_hud(
         meters,
         numbers,
         crosshairs,
+        messaging_icon: Some(icon(&hud, 0x13C)?).filter(|icon| icon.sequence != -1),
     })
 }
 
@@ -357,17 +372,123 @@ fn import_hud_digits(
     })
 }
 
-fn import_hud_globals(cache: &Cache, index: usize, tag: TagRef) -> Result<HudGlobals, ImportError> {
+fn import_hud_globals(
+    cache: &Cache,
+    index: usize,
+    tag: TagRef,
+    reached: &mut Reached,
+) -> Result<HudGlobals, ImportError> {
     let globals = cache.tag(index, HUDG, HUD_GLOBALS_SIZE)?;
+    let reference = |at: usize, field: &str, group: GroupTag| -> Result<_, ImportError> {
+        Ok(globals
+            .reference(at, field, &[group])?
+            .map(|index| tag_ref(cache, index)))
+    };
+    let button_icons = globals
+        .block(0xC4, "button icons", HUD_ICON_SIZE, MAX_BUTTON_ICONS)?
+        .iter()
+        .map(|button| icon(&button, 0))
+        .collect::<Result<_, _>>()?;
+    let messages = match globals.reference(0xF0, "hud messages", &[HMT])? {
+        Some(index) => import_hud_messages(cache, index)?,
+        None => Vec::new(),
+    };
     Ok(HudGlobals {
         tag,
-        default_weapon_hud: globals
-            .reference(0x2C0, "default weapon hud", &[WPHI])?
-            .map(|index| tag_ref(cache, index)),
+        default_weapon_hud: reference(0x2C0, "default weapon hud", WPHI)?,
         motion_sensor_range: globals.f32(0x2D0, "motion sensor range")?,
         motion_sensor_velocity_sensitivity: globals
             .f32(0x2D4, "motion sensor velocity sensitivity")?,
         motion_sensor_scale: globals.f32(0x2D8, "motion sensor scale")?,
         multiplayer_scale: globals.f32(0x1BC, "hud scale in multiplayer")?,
+        messaging: HudMessaging {
+            anchor: HudAnchor::from_index(globals.i16(0, "messaging anchor")?),
+            placement: placement(&globals, 0x24)?,
+            font: reference(0x48, "single player font", FONT)?,
+            color: packed_argb(&globals, 0x70, "state color")?,
+            icons: reached.bitmap(&globals, 0xA4, "messaging icons")?,
+            alternate_icon_text: reference(0xB4, "alternate icon text", USTR)?,
+            button_icons,
+            messages,
+        },
     })
+}
+
+/// A picture of the HUD's messages (`icon_hud_element_definition`) at `at`.
+fn icon(element: &Element<'_>, at: usize) -> Result<HudIcon, ImportError> {
+    Ok(HudIcon {
+        sequence: element.i16(at, "icon sequence index")?,
+        width_offset: element.i16(at + 2, "icon width offset")?,
+        offset: [
+            element.i16(at + 4, "icon offset")?,
+            element.i16(at + 6, "icon offset")?,
+        ],
+        color: element.u32(at + 8, "icon color")?,
+        frame_rate: signed(element, at + 0xC, "icon frame rate")?,
+        flags: element.u8(at + 0xD, "icon flags")?,
+        text_index: element.i16(at + 0xE, "icon text index")?,
+    })
+}
+
+/// A real ARGB colour at `at`, packed 0xAARRGGBB.
+fn packed_argb(element: &Element<'_>, at: usize, field: &str) -> Result<u32, ImportError> {
+    let mut packed = 0;
+    for channel in 0..4 {
+        let value = element.f32(at + channel * 4, field)?.clamp(0.0, 1.0);
+        packed = packed << 8 | (value * 255.0).round() as u32;
+    }
+    Ok(packed)
+}
+
+/// The state messages of a `hmt ` tag: each message's pieces, its text cut
+/// from the tag's text as the original cuts it, a piece's length at a time
+/// from the message's first character. Text past the tag's end is dropped.
+fn import_hud_messages(cache: &Cache, index: usize) -> Result<Vec<HudStateMessage>, ImportError> {
+    let hmt = cache.tag(index, HMT, HUD_MESSAGE_TEXT_SIZE)?;
+    let units: Vec<u16> = hmt
+        .data(0, "text data", MAX_MESSAGE_TEXT)?
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| u16::from_le_bytes(*pair))
+        .collect();
+    let elements: Vec<(u8, u8)> = hmt
+        .block(
+            0x14,
+            "message elements",
+            HUD_MESSAGE_ELEMENT_SIZE,
+            MAX_MESSAGE_ELEMENTS,
+        )?
+        .iter()
+        .map(|element| Ok((element.u8(0, "type")?, element.u8(1, "data")?)))
+        .collect::<Result<_, ImportError>>()?;
+    let mut messages = Vec::new();
+    for message in hmt
+        .block(0x20, "messages", HUD_MESSAGE_SIZE, MAX_MESSAGES)?
+        .iter()
+    {
+        let mut position = usize::from(message.u16(0x20, "text start index")?);
+        let first = usize::from(message.u16(0x22, "element start index")?);
+        let count = usize::from(message.u8(0x24, "element count")?);
+        let mut pieces = Vec::new();
+        for &(kind, data) in elements.iter().skip(first).take(count) {
+            if kind == 0 {
+                let end = position.saturating_add(usize::from(data));
+                // (A piece's length counts the end it is stored with.)
+                let text = units
+                    .get(position.min(units.len())..end.min(units.len()))
+                    .unwrap_or_default();
+                let text = text.split(|&unit| unit == 0).next().unwrap_or_default();
+                pieces.push(HudMessageElement::Text(String::from_utf16_lossy(text)));
+                position = end;
+            } else {
+                pieces.push(HudMessageElement::Icon(data));
+            }
+        }
+        messages.push(HudStateMessage {
+            name: message.text(0, "name", 31)?.to_owned(),
+            elements: pieces,
+        });
+    }
+    Ok(messages)
 }

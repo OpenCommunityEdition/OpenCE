@@ -7,11 +7,14 @@
 //! how much of it is filled.
 
 use opence_content::hud::{
-    CrosshairKind, HudAnchor, HudMeter, HudNumber, HudPlacement, HudStatic, WeaponHud,
+    CrosshairKind, HudAnchor, HudIcon, HudMeter, HudNumber, HudPlacement, HudStatic, WeaponHud,
     WeaponHudElement, WeaponHudState,
 };
 use opence_content::{Bitmap, Level, TagRef};
 use opence_sim::hud::{HudState, WeaponReadout};
+
+/// The game's ticks a second, as the icons' frame rates count them.
+const TICKS_PER_SECOND: f32 = 30.0;
 
 /// The height of the HUD's screen, in its pixels (the Xbox's 480).
 pub const HUD_HEIGHT: f32 = 480.0;
@@ -112,16 +115,8 @@ pub fn hud_quads(
     height: u32,
     seconds: f32,
 ) -> Vec<HudQuad> {
-    if width == 0 || height == 0 {
+    let Some(mut painter) = Painter::new(level, width, height, seconds) else {
         return Vec::new();
-    }
-    let scale = height as f32 / HUD_HEIGHT;
-    let mut painter = Painter {
-        level,
-        scale,
-        width: width as f32 / scale,
-        seconds,
-        quads: Vec::new(),
     };
     painter.unit(state);
     if let Some(weapon) = &state.weapon {
@@ -131,19 +126,38 @@ pub fn hud_quads(
     painter.quads
 }
 
-struct Painter<'a> {
+/// The HUD being drawn: its quads so far, in the window's pixels.
+pub(crate) struct Painter<'a> {
     level: &'a Level,
     /// The window's pixels to the HUD's.
-    scale: f32,
+    pub(crate) scale: f32,
     /// The HUD screen's width, in its pixels.
     width: f32,
     seconds: f32,
-    quads: Vec<HudQuad>,
+    pub(crate) quads: Vec<HudQuad>,
+}
+
+impl<'a> Painter<'a> {
+    /// The HUD of `level` on a window `width` by `height` pixels at
+    /// `seconds` into the game: none on an empty window.
+    pub(crate) fn new(level: &'a Level, width: u32, height: u32, seconds: f32) -> Option<Self> {
+        if width == 0 || height == 0 {
+            return None;
+        }
+        let scale = height as f32 / HUD_HEIGHT;
+        Some(Self {
+            level,
+            scale,
+            width: width as f32 / scale,
+            seconds,
+            quads: Vec::new(),
+        })
+    }
 }
 
 impl Painter<'_> {
     /// Where an element is, in the HUD's pixels (`hud_calculate_point`).
-    fn point(&self, anchor: HudAnchor, placement: &HudPlacement) -> [f32; 2] {
+    pub(crate) fn point(&self, anchor: HudAnchor, placement: &HudPlacement) -> [f32; 2] {
         let [x, y] = placement.offset.map(f32::from);
         match anchor {
             HudAnchor::TopLeft => [x, y],
@@ -229,6 +243,49 @@ impl Painter<'_> {
             color,
             meter,
         });
+    }
+
+    /// A state message's picture `icon` of `icons`, its bottom left at
+    /// `cursor` (`render_state_bitmap`): how far it moves the cursor on.
+    pub(crate) fn icon(
+        &mut self,
+        icons: &TagRef,
+        icon: &HudIcon,
+        cursor: [f32; 2],
+        color: u32,
+    ) -> f32 {
+        let point = [
+            cursor[0] + f32::from(icon.offset[0]),
+            cursor[1] - f32::from(icon.offset[1]),
+        ];
+        let frame = match icon.frame_rate {
+            rate if rate > 0 => {
+                libm::truncf(self.seconds * TICKS_PER_SECOND / f32::from(rate)) as usize
+            }
+            _ => 0,
+        };
+        let color = if icon.flags & HudIcon::USE_COLOR != 0 {
+            icon.color
+        } else {
+            color
+        };
+        let drawn = self.quads.len();
+        self.bitmap(
+            icons,
+            HudAnchor::BottomLeft,
+            point,
+            icon.sequence,
+            frame,
+            [1.0, 1.0],
+            color,
+            None,
+        );
+        let width = match self.quads.get(drawn) {
+            _ if icon.flags & HudIcon::ABSOLUTE_WIDTH != 0 => 0.0,
+            Some(quad) => (quad.right - quad.left) / self.scale,
+            None => return 0.0,
+        };
+        point[0] + width + f32::from(icon.width_offset) - cursor[0]
     }
 
     /// A static element (`hud_draw_static_element`).

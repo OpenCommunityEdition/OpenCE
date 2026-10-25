@@ -90,6 +90,9 @@ pub struct ObjectDefinition {
     pub acceleration_scale: f32,
     /// The radius it is drawn within (0: the bounding radius).
     pub render_bounding_radius: f32,
+    /// Its name in the HUD's messages: an index into the HUD globals'
+    /// alternate icon text (none: -1).
+    pub icon_text_index: i16,
     /// Its model.
     pub model: Option<TagRef>,
     /// Its animation graph.

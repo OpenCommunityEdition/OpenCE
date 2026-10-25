@@ -164,6 +164,9 @@ pub struct VehicleSeat {
     pub yaw_maximum: f32,
     /// The character that rides it from the start.
     pub built_in_actor: Option<TagRef>,
+    /// Its name in the HUD's messages ("driver", "gunner"): an index into
+    /// the HUD globals' alternate icon text (none: -1).
+    pub icon_text_index: i16,
 }
 
 impl VehicleSeat {

@@ -1,6 +1,7 @@
 // The names of keys (AppKit's key codes, by the key's place on a US
 // keyboard) and mouse buttons, as the controls screen shows them.
 import Foundation
+import OpenCEEngineKit
 
 public enum KeyNames {
     private static let names: [UInt16: String] = [
@@ -30,5 +31,24 @@ public enum KeyNames {
     /// middle), as the window holds it.
     public static func button(_ buttonNumber: Int) -> UInt16 {
         0x100 + UInt16(min(max(buttonNumber, 0), 4))
+    }
+}
+
+extension KeyBindings {
+    /// The keys the HUD's messages name for the original's controls, in
+    /// its order (`_icon_action` on): action, throw grenade, fire,
+    /// flashlight, jump, equipment (none here), swap weapons, swap
+    /// grenades, crouch, zoom, accept, back, move and look.
+    public var promptKeys: [String] {
+        func key(_ action: PlayAction) -> String {
+            keys[action]?.first.map(KeyNames.name) ?? "None"
+        }
+        // (the move keys as one word when each is a letter: WASD)
+        let move = [PlayAction.forward, .left, .back, .right].map(key)
+        let moves = move.allSatisfy { $0.count == 1 } ? move.joined() : move.joined(separator: "/")
+        return [
+            key(.action), key(.grenade), key(.fire), key(.flashlight), key(.jump), "None", key(.swap),
+            key(.switchGrenade), key(.crouch), key(.zoom), "Return", "Escape", moves, "Mouse",
+        ]
     }
 }
