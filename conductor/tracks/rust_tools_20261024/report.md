@@ -217,3 +217,22 @@ uncommitted changes, and a snapshot of it now would fail when they land.
 | clippy, workspace, `-D warnings` | clean |
 | cargo deny | ok (insta, similar, pretty_assertions, yansi, diff: MIT or Apache-2.0) |
 | nextest, all tests (`test-opt`) | 1029 passed, 75.7 s |
+
+## Phase 1's check (2026-10-25)
+
+| check | result |
+|---|---|
+| nextest, all tests (`test-opt`) | 1029 passed |
+| the build tools' tests (pytest) | 11 passed, 1 failed |
+
+The failure is the Swift suite's, in two tests that are not this phase's:
+
+- `HudTests` differs from its approved frame by 3.5% (limit 0.5%). The
+  difference is in the lit world and the rifle (the lower half; the HUD's
+  panels match), and the approved frame is from 2026-10-22, before the
+  lighting controls changed the shaders (bbeeda1c). The maps this phase
+  changed in `ui.rs` and `render_level.rs` are looked up, never iterated,
+  so they cannot reorder a draw. The frame wants approving again, which is
+  the user's to do (`build/engine/golden` to `assets/golden/engine`).
+- `ZZFarHillsTests` ("no cached bake") is another session's uncommitted
+  scratch test.
