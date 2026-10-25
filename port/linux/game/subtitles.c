@@ -72,11 +72,13 @@ enum
 	gap between lines (the HUD's 480 lines) */
 	/* the longest line drawn, in characters */
 	MAXIMUM_SUBTITLE_CHARACTERS = 1023,
-	SUBTITLE_PADDING = 7,
+	SUBTITLE_PADDING = 5,
 	/* (added to the height of a line, whose glyphs are taller than the font tag's) */
 	SUBTITLE_LINE_SPACING = 4,
 	/* (the glyphs of the HUD font rise above the font tag's line) */
-	SUBTITLE_TOP_PADDING = 7,
+	SUBTITLE_TOP_PADDING = 5,
+	/* (below the last line, as much as above the first) */
+	SUBTITLE_BOTTOM_PADDING = 5,
 	SUBTITLE_GAP = 4,
 	/* draw_string.c's centred text and its flags (wrap in the bounds, and
 	past their bottom); its enums are its own */
@@ -856,7 +858,7 @@ void subtitles_draw(
 		background.x0 = (short)(text_bounds.x0 - SUBTITLE_PADDING);
 		background.x1 = (short)(text_bounds.x1 + SUBTITLE_PADDING);
 		background.y0 = (short)(bounds.y0 - SUBTITLE_TOP_PADDING);
-		background.y1 = (short)(bounds.y1 + SUBTITLE_PADDING / 2);
+		background.y1 = (short)(bounds.y1 + SUBTITLE_BOTTOM_PADDING);
 		draw_quad(&background, subtitle_pixel(0.0f, 0.0f, 0.0f, SUBTITLE_BACKGROUND_ALPHA * alpha));
 
 		/* a shadow, then the text */
