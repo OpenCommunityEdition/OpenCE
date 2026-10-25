@@ -29,7 +29,7 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
     - [x] Move the hand-written expected texts to snapshots
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Quick wins' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
-## Phase 2: Test strength
+## Phase 2: Test strength [checkpoint: 51c7ff1b]
 - [x] Task: Mutation testing 8847ba03
     - [x] Run `cargo mutants` over `sim`, `physics` and `script`; list the survivors
     - [x] Write tests that kill the survivors that matter; record the rest with a reason
@@ -44,7 +44,7 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: Golden frames 79b59225
     - [x] Write tests (XCTest, the tests' own capture and difference rather than swift-snapshot-testing): devgulch's stations rendered headless match their golden images within a tolerance
     - [x] The headless capture and the recorded images (made from the user's map, kept out of the repository)
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Test strength' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Test strength' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 3: Formats
 - [ ] Task: binrw for the tag and cache layouts
