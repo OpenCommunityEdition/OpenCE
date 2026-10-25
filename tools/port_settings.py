@@ -612,10 +612,14 @@ def _controls_screen() -> list:
     extra += _strings(f"{base}/help_strings", [
         "Choose what to show, with left and right.",
         "Enter sets the key chosen; left and right choose\\nwhich of two. Then press the new key or button.",
-        "Press a key, a mouse button or turn the wheel...\\nEscape cancels, Delete clears it.",
+        "Press a key, a mouse button or turn the wheel...\\nEscape or a controller's B cancels, Delete clears it.",
     ])
-    return _screen(folder, spec, rows, ["controls update menu"], ['<on event="created" run="controls screen init"/>'],
-                   extra)
+    lines = _screen(folder, spec, rows, ["controls update menu"], ['<on event="created" run="controls screen init"/>'],
+                    extra)
+    # (B cancels a key's setting first)
+    return [line.replace('<on event="b" back="true"/>', '<on event="b" run="controls back handler"/>')
+            .replace('<on event="back" back="true"/>', '<on event="back" run="controls back handler"/>')
+            for line in lines]
 
 
 def settings_files() -> dict:

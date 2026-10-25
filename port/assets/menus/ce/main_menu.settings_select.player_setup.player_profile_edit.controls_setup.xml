@@ -2,8 +2,8 @@
 <!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->
 <menus>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_settings_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
-		<on event="b" back="true"/>
-		<on event="back" back="true"/>
+		<on event="b" run="controls back handler"/>
+		<on event="back" run="controls back handler"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/header_profile_controls_settings"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/options_menu"/>
 	</widget>
@@ -110,6 +110,6 @@
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/help_strings">
 		<string text="Choose what to show, with left and right."/>
 		<string text="Enter sets the key chosen; left and right choose\nwhich of two. Then press the new key or button."/>
-		<string text="Press a key, a mouse button or turn the wheel...\nEscape cancels, Delete clears it."/>
+		<string text="Press a key, a mouse button or turn the wheel...\nEscape or a controller's B cancels, Delete clears it."/>
 	</strings>
 </menus>
