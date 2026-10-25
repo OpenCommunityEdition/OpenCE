@@ -5,7 +5,7 @@ traces matching (`sim/tests/*_reference.rs`) and the timings measured
 against the start. The phase checks are automated; the user reads the
 report at the end.
 
-## Phase 1: Quick wins
+## Phase 1: Quick wins [checkpoint: 8812cd52]
 In the order of the user's goal (2026-10-25): caches ready, debug builds and tests faster, then the rest.
 - [x] Task: Measure the starting point 9ca9137
     - [x] Debug and release build times, the test suite's time, devgulch's release frame time and load time, written to the track's report
@@ -27,7 +27,7 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: insta and pretty_assertions 7761dd1
     - [x] Write tests: snapshots of the dev state, the bake report, the import's tag dumps and the shell's command output (the shell's text and the tag index; the dev state and the bake report wait for another session's changes to their code)
     - [x] Move the hand-written expected texts to snapshots
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Quick wins' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Quick wins' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 2: Test strength
 - [ ] Task: Mutation testing
