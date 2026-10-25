@@ -33,6 +33,8 @@ struct Attached {
 struct Carried {
     lights: Vec<Attached>,
     model: Option<usize>,
+    /// The model's nodes at its default pose, for an object not animated.
+    rest: Vec<NodeMatrix>,
 }
 
 /// A light an effect made, fading.
@@ -257,7 +259,20 @@ impl Lights {
                 .model
                 .as_ref()
                 .and_then(|model| level.model_index(model));
-            carried.insert(object.tag.clone(), Carried { lights, model });
+            // (a model's default pose, for the objects not animated: it
+            // is the same every frame)
+            let rest = model
+                .and_then(|index| level.models.get(index))
+                .map(default_pose)
+                .unwrap_or_default();
+            carried.insert(
+                object.tag.clone(),
+                Carried {
+                    lights,
+                    model,
+                    rest,
+                },
+            );
         }
         Self {
             carried,
@@ -311,10 +326,6 @@ impl Lights {
             let model = carried.model.and_then(|index| level.models.get(index));
             let place =
                 |transform: &opence_sim::Transform| frame(transform.position, transform.rotation);
-            let rest = match (object.nodes, &model) {
-                (None, Some(model)) => default_pose(model),
-                _ => Vec::new(),
-            };
             for (at, attached) in carried.lights.iter().enumerate() {
                 let Some(light) = level.lights.get(attached.light) else {
                     continue;
@@ -334,7 +345,8 @@ impl Lights {
                 let (matrix, previous) = if first_person {
                     (place(camera), camera.position)
                 } else {
-                    let (current, earlier) = marker_frames(model, &object, &rest, &attached.marker);
+                    let (current, earlier) =
+                        marker_frames(model, &object, &carried.rest, &attached.marker);
                     (current, Vec3::from_array(earlier.position))
                 };
                 let source = (object.id.0 << 3 | (at as u32 & 7)) & !EFFECT_SOURCE;

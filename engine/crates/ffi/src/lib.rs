@@ -7,6 +7,7 @@
 // crate and physics are the only ones allowed it)
 #![allow(unsafe_code)]
 
+pub mod allocations;
 pub mod audio;
 pub mod bake;
 pub mod camera;
@@ -1085,6 +1086,7 @@ impl Engine {
         let mut state = self.lock();
         // (a frame is its advance and the app's drawing after it)
         end_profiled_frame(&mut state);
+        allocations::frame_end();
         opence_dev::profile_scope!("advance");
         let scale = if state.shell.paused {
             0.0

@@ -10,6 +10,7 @@ use bevy_ecs::prelude::*;
 use opence_content::{FunctionModes, Level, ObjectFunction, ObjectKind, TagRef};
 
 use crate::armory::WeaponItem;
+use crate::cached::Cached;
 use crate::damage::{transition, Vitality};
 use crate::device_animation::DevicePose;
 use crate::objects::Object;
@@ -292,24 +293,27 @@ fn random_constant(id: u32) -> f32 {
     (mixed >> 8) as f32 / (1u32 << 24) as f32
 }
 
+/// The objects whose functions [`update`] computes, kept from tick to tick.
+pub type Objects = Cached<(
+    Entity,
+    &'static ObjectId,
+    &'static Object,
+    Option<&'static Vitality>,
+    Option<&'static IntegratedLight>,
+    Option<&'static WeaponItem>,
+    Option<&'static DevicePose>,
+    Option<&'static mut FunctionValues>,
+)>;
+
 /// Every object's functions for this tick (an object the table does not
 /// name keeps none).
-pub fn update(world: &mut World) {
+pub fn update(world: &mut World, objects: &mut Objects) {
     let Some(table) = world.remove_resource::<FunctionTable>() else {
         return;
     };
     let tick = world.get_resource::<Tick>().map_or(0, |tick| tick.0);
     let mut missing = Vec::new();
-    let mut objects = world.query::<(
-        Entity,
-        &ObjectId,
-        &Object,
-        Option<&Vitality>,
-        Option<&IntegratedLight>,
-        Option<&WeaponItem>,
-        Option<&DevicePose>,
-        Option<&mut FunctionValues>,
-    )>();
+    let objects = objects.get(world);
     for (entity, id, object, vitality, light, item, device, values) in objects.iter_mut(world) {
         let Some(functions) = table.0.get(&object.tag) else {
             continue;

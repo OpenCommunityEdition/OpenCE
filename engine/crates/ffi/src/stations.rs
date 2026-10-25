@@ -534,7 +534,7 @@ fn place(
 /// The player's own biped's tag.
 fn player_biped(simulation: &Simulation) -> Option<TagRef> {
     let handle = simulation.player()?.handle();
-    Some(simulation.object(handle)?.tag)
+    Some(simulation.object(handle)?.tag.clone())
 }
 
 /// The turn toward `yaw` and `pitch` from where the player looks, at most

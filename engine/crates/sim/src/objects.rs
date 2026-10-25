@@ -27,6 +27,14 @@ pub struct ObjectHandle {
     pub salt: u32,
 }
 
+/// The query of where each object is and what it is, the one most asked
+/// (kept with [`crate::cached::Cached`]).
+pub type Placed = (
+    &'static ObjectHandle,
+    &'static Object,
+    &'static crate::Transform,
+);
+
 /// What an object is: its kind and its definition's tag.
 #[derive(Component, Clone, Debug, PartialEq, Eq)]
 pub struct Object {
@@ -609,7 +617,7 @@ mod tests {
         let hog = handles[0];
         assert_eq!(
             simulation.object(hog),
-            Some(Object {
+            Some(&Object {
                 kind: ObjectKind::Vehicle,
                 tag: tag(b"vehi", "vehicles\\warthog\\warthog"),
             })

@@ -19,13 +19,14 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use thiserror::Error;
 
 use crate::armory::{self, Armory, ArmoryWeapon, Carried, Inventory, WeaponItem};
+use crate::cached::Cached;
 use crate::clock;
 use crate::damage;
 use crate::debris::Ejection;
 use crate::hash::WorldHasher;
 use crate::input::{Buttons, TickInput};
 use crate::item_physics;
-use crate::objects::{self, Object, ObjectHandle, ObjectSpawn};
+use crate::objects::{self, Object, ObjectHandle, ObjectSpawn, Placed};
 use crate::projectile::{self, Contact, Detonation, Flew, Flight, Impact};
 use crate::random::RandomSeed;
 use crate::unit_animator::UnitDrive;
@@ -120,6 +121,14 @@ pub struct Player {
     armory: Armory,
     /// The weapons it carries.
     inventory: Inventory,
+    /// The objects about it, and the weapons lying about (kept queries).
+    placed: Cached<Placed>,
+    lying: Cached<(
+        &'static ObjectHandle,
+        &'static Transform,
+        &'static Object,
+        Option<&'static WeaponItem>,
+    )>,
     /// Its projectiles in flight.
     flights: Vec<Flight>,
     /// The buttons held the tick before, for presses.
@@ -343,6 +352,8 @@ impl Player {
             unit,
             armory,
             inventory: Inventory::default(),
+            placed: Cached::default(),
+            lying: Cached::default(),
             flights: Vec::new(),
             held: Buttons::default(),
             gravity: -settings.gravity.z,
@@ -939,7 +950,7 @@ impl Player {
             }
         }
         // (not the vehicle it rides)
-        let mut targets = damage::targets(world, self.handle);
+        let mut targets = damage::targets(world, &mut self.placed, self.handle);
         if let Some(seat) = self.seat {
             targets.retain(|target| target.handle != seat.vehicle);
         }
@@ -1044,7 +1055,7 @@ impl Player {
         };
         self.melee_ticks = MELEE_RECOVERY_TICKS;
         let damage = damage?;
-        let targets = damage::targets(world, self.handle);
+        let targets = damage::targets(world, &mut self.placed, self.handle);
         // (a fan of rays about the aim, the nearest hit taken)
         let mut nearest: Option<(f32, damage::Target, Vec3, Vec3)> = None;
         for step in 0..MELEE_RAYS * MELEE_RAYS {
@@ -1081,12 +1092,18 @@ impl Player {
     /// one in its hands if its hands are full.
     fn pick_up(&mut self, world: &mut World, action: bool, sounds: &mut Vec<PlayedSound>) {
         let feet = self.mover.position;
-        let mut grenades: Vec<(f32, ObjectHandle, usize, Option<TagRef>)> = world
-            .query::<(&ObjectHandle, &Transform, &Object)>()
+        let mut grenades: Vec<(f32, ObjectHandle, usize, Option<TagRef>)> = self
+            .placed
+            .get(world)
             .iter(world)
-            .filter(|(_, _, object)| object.kind == ObjectKind::Equipment)
-            .filter_map(|(handle, transform, object)| {
+            .filter(|(_, object, _)| object.kind == ObjectKind::Equipment)
+            .filter_map(|(handle, object, transform)| {
                 let distance = transform.position.distance(feet);
+                // (out of reach, its sound is not looked up)
+                let near = distance <= armory::PICKUP_RADIUS;
+                if !near {
+                    return None;
+                }
                 let kind = self.armory.grenade_item(&object.tag)?;
                 let sound = self.armory.grenade_pickup_sound(&object.tag).cloned();
                 (distance <= armory::PICKUP_RADIUS).then_some((distance, *handle, kind, sound))
@@ -1108,8 +1125,9 @@ impl Player {
         }
         // (a hand free takes a weapon walked over, as the action button does)
         let action = action || self.inventory.weapons.len() < armory::MAXIMUM_WEAPONS;
-        let mut near: Vec<(f32, ObjectHandle, usize, Option<WeaponState>)> = world
-            .query::<(&ObjectHandle, &Transform, &Object, Option<&WeaponItem>)>()
+        let mut near: Vec<(f32, ObjectHandle, usize, Option<WeaponState>)> = self
+            .lying
+            .get(world)
             .iter(world)
             .filter(|(_, _, object, _)| object.kind == ObjectKind::Weapon)
             .filter_map(|(handle, transform, object, item)| {
@@ -1193,16 +1211,17 @@ impl Player {
     /// as `pick_up` would choose it: the nearest within reach that it
     /// does not carry, its hands being full (with a hand free, it takes
     /// one without asking).
-    pub(crate) fn swap_offer(&self, world: &mut World) -> Option<TagRef> {
+    pub(crate) fn swap_offer(&mut self, world: &mut World) -> Option<TagRef> {
         if self.seat.is_some() || self.inventory.weapons.len() < armory::MAXIMUM_WEAPONS {
             return None;
         }
         let feet = self.mover.position;
-        let mut near: Vec<(f32, ObjectHandle, usize)> = world
-            .query::<(&ObjectHandle, &Transform, &Object)>()
+        let mut near: Vec<(f32, ObjectHandle, usize)> = self
+            .placed
+            .get(world)
             .iter(world)
-            .filter(|(_, _, object)| object.kind == ObjectKind::Weapon)
-            .filter_map(|(handle, transform, object)| {
+            .filter(|(_, object, _)| object.kind == ObjectKind::Weapon)
+            .filter_map(|(handle, object, transform)| {
                 let distance = transform.position.distance(feet);
                 let index = self.armory.find(&object.tag)?;
                 (distance <= armory::PICKUP_RADIUS && !self.inventory.carries(index))

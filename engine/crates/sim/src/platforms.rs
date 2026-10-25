@@ -9,6 +9,7 @@ use opence_content::{Level, ObjectKind, TagRef};
 use opence_physics::{BodyId, Material, Motion, Pose, Shape, World as PhysicsWorld};
 
 use crate::animation::{NodeMatrices, NodeMatrix};
+use crate::cached::Cached;
 use crate::clock;
 use crate::objects::{Device, Object, ObjectHandle};
 use crate::ragdoll::node_bounds;
@@ -49,7 +50,17 @@ pub struct Platforms {
     /// Whether any moved this tick, or the last (when they came to rest,
     /// and the physics still takes their speed away).
     moved: [bool; 2],
+    /// The machines (a kept query).
+    machines: Cached<Machines, With<Device>>,
 }
+
+/// What [`Platforms::update`] reads of each machine.
+type Machines = (
+    &'static ObjectHandle,
+    &'static Object,
+    &'static Transform,
+    Option<&'static NodeMatrices>,
+);
 
 impl Platforms {
     /// `level`'s machines' pieces, and none in the physics yet.
@@ -92,6 +103,7 @@ impl Platforms {
             pieces,
             platforms: Vec::new(),
             moved: [false; 2],
+            machines: Cached::default(),
         }
     }
 
@@ -122,8 +134,9 @@ impl Platforms {
     /// those whose machine is gone. In the order of the machines' handles,
     /// so that every machine adds its bodies in the same order.
     pub fn update(&mut self, world: &mut Ecs, physics: &mut PhysicsWorld) {
-        let mut machines: Vec<(ObjectHandle, TagRef, Transform, Option<Vec<NodeMatrix>>)> = world
-            .query_filtered::<(&ObjectHandle, &Object, &Transform, Option<&NodeMatrices>), With<Device>>()
+        let mut machines: Vec<(ObjectHandle, TagRef, Transform, Option<Vec<NodeMatrix>>)> = self
+            .machines
+            .get(world)
             .iter(world)
             .filter(|(_, object, _, _)| object.kind == ObjectKind::Machine)
             .map(|(&handle, object, &transform, nodes)| {

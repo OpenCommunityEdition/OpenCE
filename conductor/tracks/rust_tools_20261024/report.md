@@ -587,3 +587,39 @@ is 4% of the 16.7 ms frame.
 | the benchmarks run (`cargo test --bench`, each crate) | pass, 4 of 4 |
 | clippy `-D warnings`, the whole workspace, with and without `tracy` | clean |
 | the whole suite | 1106 passed, 3 skipped |
+
+## Allocation in the frame
+
+The engine's allocator is now mimalloc, wrapped in stats_alloc's counter,
+and `stat allocations` shows the last whole frame's allocations and bytes
+(from one `advance` to the next, on every thread). On devgulch's AI station
+a frame made 823 allocations. A sampler kept only while measuring (not
+committed) named where they came from. Two causes made most of them:
+
+- The lights gathered each carried object's rest pose again every frame.
+  They now keep it with the object (`Carried.rest`), which took the frame
+  to 708.
+- bevy's `World::query` builds a new query state each call, 19 to 35
+  allocations for its access sets and archetype lists, and the simulation
+  called it at every tick's query site (the lit and drawn objects, the
+  function values, damage's targets, pick-up and swap offers, the seats'
+  new vehicles, the platforms). The new `sim::cached::Cached` keeps a
+  state from one tick to the next and builds it again only for another
+  world. A kept state takes in the archetypes made since and iterates in
+  the same order, so the reference traces are unchanged. `Simulation::object`
+  now lends the object instead of copying it (a copy cloned its tag's path).
+  Pick-up checks the distance before it looks at the tag.
+
+That took the frame to 151 allocations (112 kB), 185 at most, and the
+budget test holds it to 200. bumpalo, smallvec and arrayvec were declined:
+what is left is spread over a dozen sites of under 20 each, none of them a
+buffer a frame arena would hold.
+
+| check | result |
+| --- | --- |
+| a kept query sees what is spawned after it, in the same order (`sim::cached`) | pass |
+| a kept query is built again for another world | pass |
+| an empty world's frames are counted (`ffi/tests/allocations.rs`) | pass |
+| devgulch AI station, allocations a frame | 823 → 708 → 151 (budget 200) |
+| the sim reference traces | pass, unchanged |
+| clippy `-D warnings`, the whole workspace | clean |

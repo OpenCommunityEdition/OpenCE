@@ -19,9 +19,10 @@ use opence_content::{
 use crate::animation::{
     model_orientations, node_matrices, AnimationPlayer, NodeMatrices, NodeMatrix, Orientation,
 };
+use crate::cached::Cached;
 use crate::clock;
 use crate::hash::WorldHasher;
-use crate::objects::{Object, ObjectHandle, ObjectTable, Team};
+use crate::objects::{Object, ObjectHandle, ObjectTable, Placed, Team};
 use crate::projectile::{Detonation, Impact};
 use crate::random::RandomSeed;
 use crate::Transform;
@@ -724,11 +725,16 @@ fn body_material(model: &CollisionModel) -> i16 {
 /// The objects of the table with pills or spheres, but `except`, in the
 /// order of their handles: a vehicle's sphere is a pill of no height about
 /// its bounding centre.
-pub fn targets(world: &mut World, except: ObjectHandle) -> Vec<Target> {
+pub fn targets(
+    world: &mut World,
+    placed: &mut Cached<Placed>,
+    except: ObjectHandle,
+) -> Vec<Target> {
+    let placed = placed.get(world);
     let Some(table) = world.get_resource::<DamageTable>() else {
         return Vec::new();
     };
-    let shapes: BTreeMap<TagRef, (Shape, i16)> = table
+    let shapes: BTreeMap<&TagRef, (Shape, i16)> = table
         .objects
         .iter()
         .filter_map(|(tag, damageable)| {
@@ -737,11 +743,10 @@ pub fn targets(world: &mut World, except: ObjectHandle) -> Vec<Target> {
                 (None, Some(radius)) => Shape::Sphere(radius, damageable.centre),
                 (None, None) => return None,
             };
-            Some((tag.clone(), (shape, body_material(&damageable.model))))
+            Some((tag, (shape, body_material(&damageable.model))))
         })
         .collect();
-    let mut targets: Vec<Target> = world
-        .query::<(&ObjectHandle, &Object, &Transform)>()
+    let mut targets: Vec<Target> = placed
         .iter(world)
         .filter(|(handle, ..)| **handle != except)
         .filter_map(|(handle, object, transform)| {

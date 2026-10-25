@@ -12,6 +12,7 @@ pub mod animation;
 pub mod animation_blend;
 pub mod animation_graph;
 pub mod armory;
+pub mod cached;
 pub mod clock;
 pub mod crates;
 pub mod damage;
@@ -46,6 +47,7 @@ pub mod weapon;
 
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::SingleThreadedExecutor;
+use cached::Cached;
 pub use glam::{Mat3, Quat, Vec3};
 
 use animation::{AnimationPlayer, NodeMatrices};
@@ -214,6 +216,44 @@ pub struct Simulation {
     actors: Vec<Player>,
     /// The inputs the actors take on the next tick.
     actor_inputs: Vec<TickInput>,
+    /// The queries asked each frame, kept.
+    queries: Queries,
+}
+
+/// What [`Simulation::visit_lit`] reads of each object.
+type LitQuery = (
+    &'static ObjectId,
+    &'static objects::Object,
+    &'static Transform,
+    Option<&'static PreviousTransform>,
+    Option<&'static NodeMatrices>,
+    Option<&'static functions::FunctionValues>,
+    Option<&'static objects::Appearance>,
+);
+
+/// What [`Simulation::visit_drawn`] reads of each object.
+type DrawnQuery = (
+    &'static ObjectId,
+    &'static Transform,
+    Option<&'static PreviousTransform>,
+    Option<&'static NodeMatrices>,
+    Option<&'static objects::Appearance>,
+);
+
+/// The queries [`Simulation`] asks each tick or frame, kept from one to the
+/// next (see [`cached`]).
+#[derive(Default)]
+struct Queries {
+    lit: Cached<LitQuery>,
+    drawn: Cached<DrawnQuery>,
+    handles: Cached<&'static ObjectHandle>,
+    events: Cached<(
+        &'static ObjectHandle,
+        &'static objects::Object,
+        &'static Transform,
+        &'static AnimationPlayer,
+    )>,
+    functions: functions::Objects,
 }
 
 /// An object as the renderer draws it.
@@ -306,6 +346,7 @@ impl Simulation {
             rides: seats::Rides::default(),
             actors: Vec::new(),
             actor_inputs: Vec::new(),
+            queries: Queries::default(),
         }
     }
 
@@ -467,7 +508,7 @@ impl Simulation {
         };
         forces::apply(&mut self.world, &mut self.rides, &mut self.players, &pushes);
         self.schedule.run(&mut self.world);
-        functions::update(&mut self.world);
+        functions::update(&mut self.world, &mut self.queries.functions);
         self.update_physics(&ejections);
         self.effects = ejections;
     }
@@ -1388,8 +1429,9 @@ impl Simulation {
     /// heard: the sounds it reached and the feet it put down, by object.
     pub fn animation_events(&mut self) -> Vec<animation::AnimationEvent> {
         let mut events: Vec<_> = self
-            .world
-            .query::<(&ObjectHandle, &Object, &Transform, &AnimationPlayer)>()
+            .queries
+            .events
+            .get(&mut self.world)
             .iter(&self.world)
             .filter(|(.., player)| player.sound().is_some() || player.foot().is_some())
             .map(
@@ -1409,14 +1451,9 @@ impl Simulation {
     /// Each object as the renderer draws it, in the order of their ids.
     pub fn visit_drawn(&mut self, mut visit: impl FnMut(Drawn<'_>)) {
         let mut objects: Vec<_> = self
-            .world
-            .query::<(
-                &ObjectId,
-                &Transform,
-                Option<&PreviousTransform>,
-                Option<&NodeMatrices>,
-                Option<&objects::Appearance>,
-            )>()
+            .queries
+            .drawn
+            .get(&mut self.world)
             .iter(&self.world)
             .collect();
         objects.sort_by_key(|(id, ..)| **id);
@@ -1445,16 +1482,9 @@ impl Simulation {
     /// view though the body is not drawn.
     pub fn visit_lit(&mut self, mut visit: impl FnMut(Lit<'_>)) {
         let mut objects: Vec<_> = self
-            .world
-            .query::<(
-                &ObjectId,
-                &objects::Object,
-                &Transform,
-                Option<&PreviousTransform>,
-                Option<&NodeMatrices>,
-                Option<&functions::FunctionValues>,
-                Option<&objects::Appearance>,
-            )>()
+            .queries
+            .lit
+            .get(&mut self.world)
             .iter(&self.world)
             .collect();
         objects.sort_by_key(|(id, ..)| **id);
@@ -1527,8 +1557,9 @@ impl Simulation {
     /// Every object, by slot.
     pub fn objects(&mut self) -> Vec<ObjectHandle> {
         let mut handles: Vec<ObjectHandle> = self
-            .world
-            .query::<&ObjectHandle>()
+            .queries
+            .handles
+            .get(&mut self.world)
             .iter(&self.world)
             .copied()
             .collect();
@@ -1579,9 +1610,10 @@ impl Simulation {
         true
     }
 
-    /// What an object is.
-    pub fn object(&self, handle: ObjectHandle) -> Option<Object> {
-        self.component(handle)
+    /// What an object is (borrowed: a frame asks this of many objects, and
+    /// a copy would copy its tag's path).
+    pub fn object(&self, handle: ObjectHandle) -> Option<&Object> {
+        self.entity(handle)?.get::<Object>()
     }
 
     /// Where an object is.

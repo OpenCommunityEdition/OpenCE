@@ -22,11 +22,12 @@ use crate::animation::{
     Orientation, MAX_NODES,
 };
 use crate::armory::Armory;
+use crate::cached::Cached;
 use crate::clock;
 use crate::damage::Vitality;
 use crate::hash::WorldHasher;
 use crate::input::TickInput;
-use crate::objects::{Object, ObjectHandle, ObjectTable};
+use crate::objects::{ObjectHandle, ObjectTable, Placed};
 use crate::player::{self, Arms, Player, SeatCamera, Seated};
 use crate::random::RandomSeed;
 use crate::vehicle::{self, VehicleControls, VehicleLevel, VehicleState};
@@ -138,6 +139,8 @@ pub struct Rides {
     // globals' materials' physics)
     surfaces: Option<Arc<SurfaceMaterials>>,
     materials: Vec<MaterialPhysics>,
+    /// The objects, to find the vehicles new to the world (a kept query).
+    placed: Cached<Placed>,
     // (each player last seen seated: the vehicle and the tick)
     left: Vec<(ObjectHandle, ObjectHandle, u64)>,
     // (the globals' minimum_vehicle_flipping_angle)
@@ -588,8 +591,9 @@ impl Rides {
     /// Takes on the vehicles new to the world, where their objects were
     /// put, and lets go of those it no longer has.
     pub(crate) fn adopt(&mut self, world: &mut World) {
-        let objects: Vec<(ObjectHandle, TagRef, Transform)> = world
-            .query::<(&ObjectHandle, &Object, &Transform)>()
+        let objects: Vec<(ObjectHandle, TagRef, Transform)> = self
+            .placed
+            .get(world)
             .iter(world)
             .filter(|(_, object, _)| object.kind == ObjectKind::Vehicle)
             .map(|(handle, object, transform)| (*handle, object.tag.clone(), *transform))

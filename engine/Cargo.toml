@@ -31,6 +31,10 @@ libm = "0.2"
 # (the tests' snapshots of text, and their diffs)
 insta = { version = "1.43", default-features = false }
 pretty_assertions = "1.4"
+# (the engine's allocator, counted for `stat allocations`; the nightly
+# feature only makes StatsAlloc::new a const fn, which stable allows)
+mimalloc = { version = "0.1", default-features = false }
+stats_alloc = { version = "0.1", default-features = false, features = ["nightly"] }
 # (the benchmarks: `cargo bench`, and `cargo test --benches` runs each once)
 divan = { version = "0.1", default-features = false }
 proptest = { version = "1.7", default-features = false, features = ["std"] }

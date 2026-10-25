@@ -553,9 +553,9 @@ pub(crate) fn registry() -> Registry<State> {
     );
     registry.command(
         "stat",
-        "Measures each frame's scopes and shows the last frame's; `stat frame off` stops.",
+        "Measures each frame's scopes and shows the last frame's; `stat frame off` stops; `stat allocations` shows the last frame's allocations.",
         &[
-            Param::required("what", ArgKind::Enum(&["frame"])),
+            Param::required("what", ArgKind::Enum(&["frame", "allocations"])),
             Param::optional("switch", ArgKind::Bool),
         ],
         stat,
@@ -1697,6 +1697,16 @@ fn script(state: &mut State, args: &Args) -> Result<Output, CommandError> {
 }
 
 fn stat(_: &mut State, args: &Args) -> Result<Output, CommandError> {
+    if args.string("what")? == "allocations" {
+        let frame = crate::allocations::last_frame();
+        return Ok(Output::with_data(
+            format!(
+                "{} allocations ({} bytes) in the last frame",
+                frame.allocations, frame.bytes
+            ),
+            json!({ "allocations": frame.allocations, "bytes": frame.bytes }),
+        ));
+    }
     let profiler = opence_dev::profile::profiler();
     if !args.bool_or("switch", true)? {
         profiler.measure(false);
