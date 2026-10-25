@@ -623,3 +623,67 @@ buffer a frame arena would hold.
 | devgulch AI station, allocations a frame | 823 → 708 → 151 (budget 200) |
 | the sim reference traces | pass, unchanged |
 | clippy `-D warnings`, the whole workspace | clean |
+
+## The audio thread
+
+The output's pull no longer waits for the tick. Before, `AudioOutput::pull`
+locked the player, and the tick holds that lock while it moves the
+listener, sets the environment and starts impulses (an impulse decodes its
+permutation the first time it is played), so a pull that came during the
+tick waited for it. Now the pull only tries the lock. When the player is
+free, it mixes up to 512 frames (about 11 ms) beyond what was asked for and
+keeps them. When the tick holds the player, it plays on from what it
+kept, and it counts any frames it could not cover (`missed`) rather than
+waiting. A level unloaded clears what was kept.
+
+rtrb was declined. A ring buffer joins a producer thread to a consumer
+thread, but here the mixing and the playing happen on the same thread, the
+output's. What it needed was a pull that does not block and a store of
+frames mixed ahead, and a `try_lock` with a `VecDeque` is both.
+
+A measurement (a scratch test, not committed) pulled 512 frames on a
+real-time cadence while Blood Gulch played fire, reload and walk sounds. The
+longest pull was 4.71 ms in a debug build and 6.35 ms in release with the
+blocking pull, and 3.46 ms and 6.30 ms with the new one, with 0 frames
+missed in both builds. So the lock was not contended enough to measure on
+this machine. The longest pull is the mixing itself. The change is a
+guarantee by construction: a tick that runs long can no longer stall the
+output.
+
+The sounds are now resampled to the output's 48 kHz once, as they are
+decoded (`audio::resample`, rubato's FFT resampler). The mixer steps
+through a voice's samples by linear interpolation. At 22.05 kHz, the
+rate of 895 of Blood Gulch's 916 permutations, that leaves images above
+11 kHz and smears the top of the band. At 48 kHz the mixer's step is the
+pitch alone, which is close to exact. Against an analytic sine of amplitude
+16000, the band-limited result is within about 1 LSB, and linear
+interpolation is much further off:
+
+| source | tone | rubato, worst error | linear, worst error |
+| --- | --- | --- | --- |
+| 22050 Hz | 1 kHz | 1.1 | 161.8 |
+| 22050 Hz | 7 kHz | 1.0 | 7313.6 |
+| 44100 Hz | 5 kHz | 1.0 | 1001.5 |
+| 44100 Hz | 15 kHz | 1.0 | 8271.6 |
+
+On Blood Gulch, resampling all 916 permutations (827 s of sound) takes 336
+ms in release: 0.41 ms for each second of sound, and 1.75 ms for the longest
+permutation. Since a permutation is resampled the first time it is played,
+under the tick's lock, it costs a few percent of a tick at most, and the
+mix-ahead store covers the output meanwhile. The decoded cache holds only
+what has been played. That cache is 2.07 times as large at 48 kHz (all of
+Blood Gulch's sounds would take 90.1 MB instead of 43.5 MB). Samples already
+at 48 kHz, and any the resampler refuses, are left for the mixer to
+interpolate as before.
+
+| check | result |
+| --- | --- |
+| a pull while the tick holds the player does not wait (under 20 ms, 256 frames missed) | pass |
+| what is mixed ahead carries the output through a held lock (no silence, 0 missed) | pass |
+| what was mixed ahead is dropped with the level | pass |
+| a sine at 22.05 and 44.1 kHz resampled is within 4 LSB of the sine at 48 kHz, and closer than linear | pass, 4 tones |
+| stereo keeps its channels apart | pass |
+| samples at 48 kHz or at no rate are left alone | pass |
+| every stock sound decodes | pass |
+| clippy `-D warnings`, the whole workspace | clean |
+| the whole suite | 1116 passed, 3 skipped |

@@ -19,6 +19,7 @@ use crate::choice::{
 use crate::classes::{class, ClassGains};
 use crate::decode::{decode, Decoded};
 use crate::mixer::{travel_delay_ms, Listener, Mixer, Placement, VoiceId, VoiceProperties};
+use crate::resample::to_output_rate;
 
 /// The class of the music, which the music volume sets.
 pub const MUSIC_CLASS: u16 = 32;
@@ -477,6 +478,7 @@ impl SoundPlayer {
                     &permutation.samples,
                 )
                 .ok()
+                .map(to_output_rate)
                 .map(Arc::new)
             })
             .clone()

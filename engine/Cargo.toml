@@ -31,6 +31,8 @@ libm = "0.2"
 # (the tests' snapshots of text, and their diffs)
 insta = { version = "1.43", default-features = false }
 pretty_assertions = "1.4"
+# (the sounds resampled to the output's rate once, as they are decoded)
+rubato = { version = "5.0", default-features = false, features = ["fft_resampler"] }
 # (the engine's allocator, counted for `stat allocations`; the nightly
 # feature only makes StatsAlloc::new a const fn, which stable allows)
 mimalloc = { version = "0.1", default-features = false }

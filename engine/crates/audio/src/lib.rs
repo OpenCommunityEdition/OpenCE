@@ -8,6 +8,7 @@ pub mod classes;
 pub mod decode;
 pub mod mixer;
 pub mod player;
+pub mod resample;
 pub mod reverb;
 
 pub use census::{Census, ClassCount, Dropped, Playing};
