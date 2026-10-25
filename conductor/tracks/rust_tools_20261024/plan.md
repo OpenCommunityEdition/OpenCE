@@ -50,9 +50,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [ ] Task: binrw for the tag and cache layouts
     - [ ] Write tests: each converted reader gives the same values as the hand-written one over the user's maps (skipped without them)
     - [ ] Convert the readers one layout at a time; zerocopy for the plain ones
-- [ ] Task: memmap2 and bytemuck
-    - [ ] Write tests: maps read through a mapping match a read file; the Metal buffer structures are `Pod`
-    - [ ] Map files mapped, the buffer copies through bytemuck
+- [x] Task: memmap2 and bytemuck a7aea52e
+    - [x] Write tests: maps read through a mapping match a read file; the Metal buffer structures are `Pod` (Pod only: memmap2 declined, see the report)
+    - [x] Map files mapped, the buffer copies through bytemuck (bytemuck's checks and its zeroed slot; reading the map stays fs::read)
 - [x] Task: blake3 and lz4_flex for the bake cache 35faf08d
     - [x] Write tests: a changed input invalidates its baked asset and only it; compressed caches round-trip; load time measured (the level packs, whose key the bakes share)
     - [x] The cache key and the compression
