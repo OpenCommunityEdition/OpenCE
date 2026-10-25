@@ -18,9 +18,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: A faster debug loop 74539a1a
     - [x] Write tests: the dev profile's opt-level for dependencies is set; sccache judged (left out: no incremental caching)
     - [x] `[profile.dev.package."*"] opt-level = 2`, sccache; measure again
-- [ ] Task: cargo-nextest and cargo-deny in the test step
-    - [ ] Write tests: `tools/engine_build.py` runs nextest and `cargo deny check`; a forbidden licence fails the step
-    - [ ] `deny.toml` for the workspace; nextest's profile; the build script's test step
+- [x] Task: cargo-nextest and cargo-deny in the test step 7b4d5a3
+    - [x] Write tests: `tools/engine_build.py` runs nextest and `cargo deny check`; a forbidden licence fails the step
+    - [x] `deny.toml` for the workspace; nextest's profile; the build script's test step
 - [ ] Task: Deterministic maps
     - [ ] Write tests: one sim run twice in one process with differently seeded hashers gives the same state each tick
     - [ ] `indexmap` where the sim iterates a map, `rustc-hash` for the hot lookups; clippy's `disallowed_types` forbids std `HashMap` in `sim`
