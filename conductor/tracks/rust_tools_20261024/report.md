@@ -115,3 +115,29 @@ rebuild after an edit is faster too, as the optimised dependencies are
 built once and the workspace's crates rebuild incrementally. Release's
 `panic = "abort"` does not reach the tests (cargo builds test targets to
 unwind), so a failing test still reports as before.
+
+## A faster debug loop (2026-10-25)
+
+`[profile.dev.package."*"] opt-level = 2`: the dependencies are optimised
+in debug builds and in the `test` profile, which inherits dev; the
+workspace's crates stay at opt-level 0.
+
+| step | before | after |
+|---|---|---|
+| debug build, cold | 47.2 s | 67.4 s |
+| debug build after touching the sim | 2.4 s | 2.3 s |
+| test build, after the debug build | 38.8 s | 48.2 s |
+| devgulch_stations, debug | 218.6 s | 180 s |
+| stock_sounds, debug | 200.0 s | 181 s |
+| placements, debug | 89.9 s | 69 s |
+
+A 10–25% gain on the debug suites, for 20 s once on a cold build, and an
+edit's rebuild unchanged. The gain is small because most of the sim's
+time is in the workspace's crates, and glam's generics are compiled in
+the crate that calls them, at its opt-level; `test-opt` is the profile
+for the game-data suites. (The first placements run took 112 s on a
+loaded machine; alone it took 69 s.)
+
+sccache is left out: it cannot cache crates built incrementally, which
+is every crate an edit rebuilds, and the dependencies are already kept
+by the target folder and, for `nix build`, by crane.

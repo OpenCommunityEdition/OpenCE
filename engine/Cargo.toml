@@ -55,6 +55,12 @@ debug = "line-tables-only"
 [profile.dev]
 panic = "abort"
 
+[profile.dev.package."*"]
+# the dependencies (glam, the decoders, the importer's readers) are built
+# once and run in every debug build and test; the workspace's crates stay
+# unoptimised so that an edit rebuilds fast
+opt-level = 2
+
 [profile.test-opt]
 # the game-data suites step the sim for minutes in a debug build; built
 # optimised, they keep the checks a debug build has
