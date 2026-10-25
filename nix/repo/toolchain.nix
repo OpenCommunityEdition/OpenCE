@@ -11,10 +11,18 @@ let
   # version the profiles in pgo/ were recorded with
   llvm = pkgs.llvmPackages_22;
   rust = pkgs.rust-bin.fromRustupToolchainFile (root + /rust-toolchain.toml);
-  python = pkgs.python3.withPackages (ps: [ ps.pytest ps.pyflakes ]);
+  python = pkgs.python3.withPackages (ps: [
+    ps.pytest
+    ps.pyflakes
+  ]);
 in
 {
-  inherit root llvm rust python;
+  inherit
+    root
+    llvm
+    rust
+    python
+    ;
 
   version = inputs.self.shortRev or inputs.self.dirtyShortRev or "dirty";
 
@@ -47,8 +55,13 @@ in
     pkgs.rust-cbindgen
     pkgs.cargo-deny
     pkgs.darwin.sigtool
+    # (`nom build`, `nom develop`: nix's builds, as a tree)
+    pkgs.nix-output-monitor
   ];
-  libraries = [ pkgs.sdl3 pkgs.apple-sdk_26 ];
+  libraries = [
+    pkgs.sdl3
+    pkgs.apple-sdk_26
+  ];
 
   # the guest's C library, where tools/macos_build.py would download it
   # (the sandbox has no network)
