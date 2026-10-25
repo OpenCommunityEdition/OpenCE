@@ -110,6 +110,9 @@ struct slayer_variant
 struct king_variant
 {
 	boolean moving_hill;
+	/* port: Multi-Hill: this many hills in play at once (2 to 5), else one
+	(game_engine_king.c). Zero in January's gametypes, whose union keeps it */
+	byte multi_hill;
 };
 
 /* the balls of an oddball game */

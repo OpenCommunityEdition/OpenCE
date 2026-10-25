@@ -7408,6 +7408,12 @@ void game_engine_variant_cleanup(
 		variant->game_engine_variant.slayer.kill_in_order = !!variant->game_engine_variant.slayer.kill_in_order;
 		break;
 
+	case game_engine_king:
+		/* port: Multi-Hill's hills at once: 2 to 5, else none */
+		if (variant->game_engine_variant.king.multi_hill < 2 || variant->game_engine_variant.king.multi_hill > 5)
+			variant->game_engine_variant.king.multi_hill = 0;
+		break;
+
 	case game_engine_oddball:
 		/* port: the balls' arrays and goals hold no more */
 		variant->game_engine_variant.oddball.ball_spawn_count =

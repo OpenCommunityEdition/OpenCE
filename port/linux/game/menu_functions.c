@@ -5341,7 +5341,8 @@ enum
 	_option_short,		/* a short of the options */
 	_option_option_byte,	/* a byte of the options */
 	_option_radar,		/* the options' radar players, and the variant's flag */
-	_option_setting		/* the host's own (config.toml): Server Setup's copy only */
+	_option_setting,	/* the host's own (config.toml): Server Setup's copy only */
+	_option_byte_value	/* a byte of the variant, its number (not on or off) */
 };
 
 struct gametype_option
@@ -5426,6 +5427,9 @@ static struct gametype_option const gametype_options[] =
 	{ "time_limit_spinner", _option_short, OPTIONS_FIELD(time_limit), 0, 7, TIME_LIMITS },
 	/* king of the hill */
 	{ "koth_moving_hill_spinner", _option_byte, VARIANT_FIELD(game_engine_variant.king.moving_hill), 0, 2, { 1, 0 } },
+	/* (port: Multi-Hill's hills at once, game_engine_king.c) */
+	{ "koth_multi_hill_spinner", _option_byte_value, VARIANT_FIELD(game_engine_variant.king.multi_hill), 0, 5,
+		{ 0, 2, 3, 4, 5 } },
 	{ "koth_score_to_win_spinner", _option_long, VARIANT_FIELD(universal_variant.score_to_win), 0, 5,
 		{ 1, 2, 5, 10, 15 } },
 	{ "koth_team_play_spinner", _option_byte, VARIANT_FIELD(universal_variant.teams), 0, 2, { 1, 0 } },
@@ -5572,6 +5576,7 @@ static long gametype_option_value(struct gametype_option const *option, struct g
 	case _option_health: return (long)(variant->universal_variant.health * 10.0f + 0.5f);
 	case _option_short: return *(short *)(o + option->offset);
 	case _option_option_byte: return o[option->offset];
+	case _option_byte_value: return v[option->offset];
 	case _option_radar: return options->radar_players;
 	}
 	return 0;
@@ -5596,6 +5601,7 @@ static void gametype_option_value_set(struct gametype_option const *option, long
 	case _option_health: variant->universal_variant.health = (real)value / 10.0f; break;
 	case _option_short: *(short *)(o + option->offset) = (short)value; break;
 	case _option_option_byte: o[option->offset] = (byte)value; break;
+	case _option_byte_value: v[option->offset] = (byte)value; break;
 	case _option_radar:
 		/* (and the Xbox's flag: other players on the tracker or not) */
 		options->radar_players = (byte)value;
