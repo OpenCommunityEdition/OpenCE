@@ -100,9 +100,9 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 
 ## Phase 9: The HUD
 The menus and the rest of the UI are left to the UI rewrite's own track.
-- [ ] Task: The HUD
-    - [ ] Write tests: no two HUD elements overlap at any supported resolution; the HUD reacts to ammo, shields, grenades and prompts
-    - [ ] The fixes
+- [x] Task: The HUD 25adc28
+    - [x] Write tests: no two HUD elements overlap at any supported resolution; the HUD reacts to ammo, shields, grenades and prompts
+    - [x] The fixes
 - [ ] Task: Conductor - User Manual Verification 'Phase 9: The HUD' (Protocol in workflow.md)
 
 ## Phase 10: Lightmap resolution and interiors
