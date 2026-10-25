@@ -156,7 +156,15 @@ enum
 	REPORT_LINE_OF_SIGHT_POINTS = REPORT_LINE_OF_SIGHT_TICKS / PLAYER_TRAIL_INTERVAL_TICKS,
 	MAXIMUM_STUCK_PROJECTILES = 16,
 	STUCK_PROJECTILE_TICKS = REPORT_MAXIMUM_AGE_TICKS + 2 * TICKS_PER_SECOND,
+	/* how long a player's fire origin holds after the last came (a network
+	that delivers in bursts) */
+	FIRE_ORIGIN_FRESH_TICKS = TICKS_PER_SECOND,
 };
+
+/* a fire origin's offset from the unit's camera: in 1/4096 of a world unit,
+no further from it than a player leaning out and an arm reach (1.2 m) */
+#define FIRE_ORIGIN_SCALE 4096.0f
+#define FIRE_ORIGIN_REACH 0.4f
 
 enum
 {
@@ -335,6 +343,23 @@ typedef char distributed_hit_report_size_assert[sizeof(struct distributed_hit_re
 typedef char distributed_hit_report_host_time_offset_assert[
 	offsetof(struct distributed_hit_report, host_time) == 0x68 ? 1 : -1];
 
+/* where a client's player's shots leave from, from their unit's camera
+(_distributed_message_fire_origins) */
+struct distributed_fire_origin
+{
+	byte player_index;
+	byte pad;
+	struct distributed_vector offset;
+};
+
+typedef char distributed_fire_origin_size_assert[sizeof(struct distributed_fire_origin) == 8 ? 1 : -1];
+
+struct distributed_fire_origin_message
+{
+	struct distributed_message_header header;
+	struct distributed_fire_origin origins[MAXIMUM_LOCAL_PLAYERS];
+};
+
 struct distributed_damage_event_message
 {
 	struct distributed_message_header header;
@@ -442,6 +467,15 @@ static struct damage_trail_point
 	boolean mounted;
 	real_point3d muzzle;
 } damage_trails[MAXIMUM_TRACKED_PLAYERS][PLAYER_TRAIL_POINTS];
+/* ... and where each player's shots leave from when their machine says it
+is not their unit's camera (NONE for no time: from the camera) */
+static struct damage_fire_origin
+{
+	long time;
+	real_vector3d offset;
+} damage_fire_origins[MAXIMUM_TRACKED_PLAYERS];
+/* a client: where its players' shots leave from (NULL: their cameras) */
+static network_damage_fire_origin_source damage_fire_origin_source;
 /* ... what each weapon or grenade deals, as the tags have it (their walk
 is long): the hits a second of a damage effect from it, how it deals it
 (the _damage_source flags), and how far from its firer */
@@ -481,8 +515,18 @@ static long damage_replaying_killer_score;
 word network_damage_entry_size(
 	byte type)
 {
+	if (type == _distributed_message_fire_origins)
+		return sizeof(struct distributed_fire_origin);
 	return type == _distributed_message_damage_events ?
 		sizeof(struct distributed_damage_event) : sizeof(struct distributed_hit_report);
+}
+
+/* (FALSE: no further from the camera than a player reaches) */
+static boolean distributed_fire_origin_within_reach(
+	real_vector3d const *offset)
+{
+	return offset->i * offset->i + offset->j * offset->j + offset->k * offset->k <=
+		FIRE_ORIGIN_REACH * FIRE_ORIGIN_REACH;
 }
 
 static void distributed_damage_from_data(
@@ -1501,6 +1545,18 @@ static void distributed_note_targets(
 						{
 							point->mounted = distributed_vehicle_muzzle(vehicle_index, &point->muzzle);
 						}
+					}
+					/* on foot, shots that leave from elsewhere than the
+					camera (a VR player's hand, which may be past a corner
+					the camera is behind): from there as from a vehicle's
+					gun, the line from the eye to it clear */
+					else if (damage_fire_origins[player_index].time != NONE &&
+						game_time_get() >= damage_fire_origins[player_index].time &&
+						game_time_get() - damage_fire_origins[player_index].time <= FIRE_ORIGIN_FRESH_TICKS)
+					{
+						point_from_line3d(&camera, &damage_fire_origins[player_index].offset, 1.0f,
+							&point->muzzle);
+						point->mounted = TRUE;
 					}
 				}
 			}
@@ -2647,6 +2703,74 @@ void network_damage_handle_events(
 	}
 }
 
+/* the host: where a client's players' shots leave from (checked: its own
+players', no further than they reach) */
+void network_damage_handle_fire_origins(
+	long machine_index,
+	void const *entries,
+	short count)
+{
+	short index;
+
+	for (index = 0; index < count; index++)
+	{
+		struct distributed_fire_origin origin;
+		real_vector3d offset;
+
+		csmemcpy(&origin, (byte const *)entries + index * sizeof(origin), sizeof(origin));
+		if (origin.player_index >= MAXIMUM_TRACKED_PLAYERS || !distributed_player(origin.player_index) ||
+			!distributed_machine_has_player(machine_index, origin.player_index))
+		{
+			continue;
+		}
+		distributed_vector_unpack(&origin.offset, FIRE_ORIGIN_SCALE, &offset);
+		if (!distributed_fire_origin_within_reach(&offset))
+			continue;
+		damage_fire_origins[origin.player_index].offset = offset;
+		damage_fire_origins[origin.player_index].time = game_time_get();
+	}
+}
+
+void network_damage_set_fire_origin_source(
+	network_damage_fire_origin_source source)
+{
+	damage_fire_origin_source = source;
+}
+
+/* a client: where its players' shots leave from, when not from their
+cameras, to the host every tick (unreliably: a lost one is followed by the
+next) */
+static void distributed_send_fire_origins(
+	void)
+{
+	struct distributed_fire_origin_message message;
+	short local_player_index;
+	short count = 0;
+
+	if (!damage_fire_origin_source)
+		return;
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		long player_index = local_player_get_player_index(local_player_index);
+		real_vector3d offset;
+
+		if (player_index == NONE || !damage_fire_origin_source(local_player_index, &offset) ||
+			!distributed_fire_origin_within_reach(&offset))
+		{
+			continue;
+		}
+		csmemset(&message.origins[count], 0, sizeof(message.origins[count]));
+		message.origins[count].player_index = distributed_player_to_byte(player_index);
+		distributed_vector_pack(&offset, FIRE_ORIGIN_SCALE, &message.origins[count].offset);
+		count++;
+	}
+	if (count)
+	{
+		distributed_send(&message, _distributed_message_fire_origins, count,
+			(word)(sizeof(message.header) + count * sizeof(struct distributed_fire_origin)), _distributed_to_host);
+	}
+}
+
 void network_damage_client_tick(
 	void)
 {
@@ -2654,6 +2778,8 @@ void network_damage_client_tick(
 	short limit = MIN(MAXIMUM_ENTRIES_PER_MESSAGE, RELIABLE_ENTRIES(struct distributed_hit_report));
 	short index;
 	short count = 0;
+
+	distributed_send_fire_origins();
 
 	damage_sent_reports += damage_report_count;
 	for (index = 0; index < damage_report_count; index++)
@@ -2752,6 +2878,7 @@ void network_damage_new_game(
 		damage_explosions[player_index].count = 0;
 		for (index = 0; index < PLAYER_TRAIL_POINTS; index++)
 			damage_trails[player_index][index].time = NONE;
+		damage_fire_origins[player_index].time = NONE;
 	}
 	for (player_index = 0; player_index < DAMAGE_RATE_CACHE_SIZE; player_index++)
 		damage_rate_cache[player_index].source_index = NONE;
